@@ -9,7 +9,8 @@ export type Terrain =
   | 'mountain'  // .cpp/.rs/.go — systems/low-level
   | 'desert'   // .md/.txt/.json/.yaml/.toml — config/docs
   | 'ocean'     // empty / no real code
-  | 'ice';      // archived / legacy (>180 days no commits)
+  | 'ice'       // archived / legacy (>180 days no commits)
+  | 'hills';    // mixed / generic
 
 // ─── Tile ─────────────────────────────────────────────────────────────────
 export interface Tile {

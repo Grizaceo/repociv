@@ -16,6 +16,9 @@
     <!-- Canvas principal: hex grid -->
     <canvas id="main-canvas"></canvas>
 
+    <!-- 3D Scene Container -->
+    <div id="three-container"></div>
+
     <!-- ─── HUD OVERLAYS ─────────────────────────────────────────────────── -->
     <div id="hud-overlay" data-auto-animate>
       
@@ -44,6 +47,9 @@
             <span class="gpu-temp">GPU —</span>
           </div>
           <div id="bridge-status" class="bridge-offline" title="Bridge.py status">⚡ bridge</div>
+          <button id="btn-toggle-3d" title="Cambiar Vista 2D/3D [3]">
+            <i data-lucide="box"></i>
+          </button>
           <button id="btn-screenshot" title="Captura de Pantalla [F12]">
             <i data-lucide="camera"></i>
           </button>

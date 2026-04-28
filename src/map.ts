@@ -59,6 +59,7 @@ export const TERRAIN_COLOR: Record<Terrain, { fill: string; stroke: string; grad
   desert:   { fill: '#d4a574', stroke: '#b07a4a', gradient: ['#dfb285', '#c49564'] },
   ocean:    { fill: '#2b6da5', stroke: '#1b5585', gradient: ['#3a8bc8', '#225590'] },
   ice:      { fill: '#c8d8e0', stroke: '#a0b0c0', gradient: ['#ddeaf0', '#b0c0d0'] },
+  hills:    { fill: '#8da86b', stroke: '#6a8a4b', gradient: ['#9db87b', '#7a9a5b'] },
 };
 
 // ─── Skill & session metadata (from Hermes workspace) ───────────────────────

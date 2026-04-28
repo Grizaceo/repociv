@@ -51,7 +51,7 @@ export class MinimapRenderer {
       this.cacheCanvas.width = mm.width;
       this.cacheCanvas.height = mm.height;
       const cctx = this.cacheCanvas.getContext('2d')!;
-      cctx.fillStyle = '#0a0804';
+      cctx.fillStyle = '#050505';
       cctx.fillRect(0, 0, mm.width, mm.height);
 
       for (const tile of this.state.world.tiles.values()) {

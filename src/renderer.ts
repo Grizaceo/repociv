@@ -54,6 +54,10 @@ export class Renderer {
     this.setupInput();
   }
 
+  async loadAssets() {
+    await this.hexR.loadAssets();
+  }
+
   private resize() {
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
@@ -190,7 +194,7 @@ export class Renderer {
 
   private render() {
     const { ctx, canvas, cam } = this;
-    ctx.fillStyle = '#0a0804';
+    ctx.fillStyle = '#050505'; // Deeper background
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
@@ -198,18 +202,35 @@ export class Renderer {
     ctx.scale(cam.zoom, cam.zoom);
     ctx.translate(-cam.x, -cam.y);
 
+    // Pass 1: Surfaces & Shorelines
     for (const tile of this.state.world.tiles.values()) {
-      this.hexR.drawTile(tile, this.fogEnabled);
+      const neighbors = this.getNeighbors(tile.coord);
+      this.hexR.drawTileSurface(tile, this.fogEnabled, neighbors);
     }
 
+    // Pass 2: Territory
     for (const city of this.state.world.cities) {
       this.hexR.drawCityTerritory(city);
     }
 
+    // Pass 3: Decorations (Sorted by Y for depth)
+    const allTiles = Array.from(this.state.world.tiles.values());
+    allTiles.sort((a, b) => {
+      const pa = axialToPixel(a.coord, HEX_SIZE);
+      const pb = axialToPixel(b.coord, HEX_SIZE);
+      return pa.y - pb.y;
+    });
+
+    for (const tile of allTiles) {
+      this.hexR.drawTileDecor(tile, this.fogEnabled);
+    }
+
     if (this.showGrid) {
+      ctx.setLineDash([4, 8]);
       for (const tile of this.state.world.tiles.values()) {
-        this.hexR.drawHexOutline(tile.coord, '#ffffff18', 1);
+        this.hexR.drawHexOutline(tile.coord, 'rgba(255,255,255,0.08)', 1);
       }
+      ctx.setLineDash([]);
     }
 
     for (const building of this.state.world.buildings) {
@@ -244,6 +265,13 @@ export class Renderer {
     }
 
     ctx.restore();
+
+    // Global Atmospheric Bloom / Lighting
+    const grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width);
+    grad.addColorStop(0, 'rgba(200, 180, 120, 0.03)'); // Warm center
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0.2)');        // Vignette
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
   // ─── Public actions ───────────────────────────────────────────────────────
@@ -273,5 +301,19 @@ export class Renderer {
   // Kept for minimap compatibility
   drawMinimap() {
     this.minimapR.draw(this.cam, this.canvas, this.fogEnabled);
+  }
+
+  private getNeighbors(coord: Axial): Tile[] {
+    const neighbors: Tile[] = [];
+    const dirs = [
+      { q: +1, r:  0 }, { q: +1, r: -1 }, { q:  0, r: -1 },
+      { q: -1, r:  0 }, { q: -1, r: +1 }, { q:  0, r: +1 }
+    ];
+    for (const d of dirs) {
+      const key = tileKey({ q: coord.q + d.q, r: coord.r + d.r });
+      const t = this.state.world.tiles.get(key);
+      if (t) neighbors.push(t);
+    }
+    return neighbors;
   }
 }

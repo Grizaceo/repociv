@@ -24,6 +24,22 @@
   height: 100%;
 }
 
+#main-canvas.hidden {
+  display: none;
+}
+
+#three-container {
+  position: absolute;
+  inset: 0;
+  display: none;
+  background: #050505;
+  z-index: 10;
+}
+
+#three-container.active {
+  display: block;
+}
+
 #hud-overlay {
   position: absolute;
   inset: 0;

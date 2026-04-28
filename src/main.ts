@@ -13,15 +13,17 @@ import {
   wireQuestBoardTabs, fetchPersistedMissions, fetchPendingTracker, renderQuestBoard,
   toggleKeyboardHelp,
   openCityPanel, closeCityPanel, isCityPanelOpen, wireCityPanel,
-  initExternalLibs, updateResource
+  initExternalLibs, updateResource, toggleViewHUD
 } from './ui/index.ts';
 import type { Unit } from './types.ts';
+import { Renderer3D } from './renderer3d.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 const loadSteps = [
   'Escaneando workspace...',
   'Analizando repos...',
   'Construyendo mapa hexagonal...',
+  'Pintando texturas de Civilización...',
   'Inicializando bridge a DAVI...',
   'Imperio listo.',
 ];
@@ -46,7 +48,38 @@ async function bootstrap() {
 
   const canvas = document.getElementById('main-canvas') as HTMLCanvasElement;
   const renderer = new Renderer(canvas, state);
+  
+  const threeContainer = document.getElementById('three-container') as HTMLElement;
+  const renderer3d = new Renderer3D(threeContainer, state);
+
+  // Wait for textures before starting
+  await Promise.all([
+    renderer.loadAssets(),
+    renderer3d.loadAssets()
+  ]);
+  
   renderer.start();
+
+  let is3D = false;
+  const toggleView = () => {
+    is3D = !is3D;
+    const cam = renderer.getCamera();
+    if (is3D) {
+      renderer.stop();
+      renderer3d.setCamera(cam.x, cam.y, cam.zoom);
+      renderer3d.start();
+      canvas.classList.add('hidden');
+      threeContainer.classList.add('active');
+    } else {
+      renderer3d.stop();
+      renderer.start();
+      canvas.classList.remove('hidden');
+      threeContainer.classList.remove('active');
+    }
+    toggleViewHUD(is3D);
+  };
+
+  document.getElementById('btn-toggle-3d')?.addEventListener('click', toggleView);
 
   const bridge = new BridgeEvents(state);
   bridge.start();
@@ -199,6 +232,7 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents) {
       case 'g': renderer.toggleGrid(); break;
       case 'f': renderer.toggleDebug(); break;
       case 'v': renderer.toggleFog(); break;
+      case '3': toggleView(); break;
       case '?': toggleKeyboardHelp(); break;
     }
 

@@ -45,20 +45,44 @@ export class UnitRenderer {
       ctx.stroke();
     }
 
-    ctx.beginPath();
-    ctx.arc(0, 0, HEX_SIZE * 0.30, 0, Math.PI * 2);
-    ctx.fillStyle = '#1a1208';
-    ctx.fill();
-    ctx.strokeStyle = unit.color;
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
+    // Unit Cluster (Diamond formation)
+    const offsets = [
+      { dx: 0, dy: -8 },
+      { dx: -10, dy: 2 },
+      { dx: 10, dy: 2 },
+      { dx: 0, dy: 12 },
+    ];
 
     const initials = unit.name.split(/[\s-_]/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase();
-    ctx.fillStyle = unit.color;
-    ctx.font = `bold ${HEX_SIZE * 0.28}px 'Cinzel', serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(initials, 0, 1);
+
+    offsets.forEach((off, i) => {
+      ctx.save();
+      ctx.translate(off.dx, off.dy);
+      
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.beginPath();
+      ctx.ellipse(1, 10, 8, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Body
+      ctx.beginPath();
+      ctx.arc(0, 0, HEX_SIZE * 0.18, 0, Math.PI * 2);
+      ctx.fillStyle = '#1a1208';
+      ctx.fill();
+      ctx.strokeStyle = unit.color;
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+
+      // Initials (only on the front-most unit or all if small)
+      ctx.fillStyle = unit.color;
+      ctx.font = `bold ${HEX_SIZE * 0.14}px 'Cinzel', serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(initials, 0, 0);
+      
+      ctx.restore();
+    });
 
     if (unit.state === 'working' && unit.workProgress !== undefined) {
       ctx.strokeStyle = '#5b9b5b';
