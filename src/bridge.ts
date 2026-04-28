@@ -7,7 +7,7 @@ import { type GameState } from './game.ts';
 import { type BridgeEvent } from './types.ts';
 import { logEvent, appendChatChunk, setBridgeStatus, setOperationTicker, updateGpuBar } from './ui.ts';
 
-const BRIDGE_URL = 'http://localhost:5274';
+const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL ?? 'http://localhost:5274';
 const DEMO_INTERVAL_MS = 30_000;
 const OFFLINE_DEMO_THRESHOLD_MS = 10_000;
 

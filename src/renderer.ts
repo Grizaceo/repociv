@@ -12,6 +12,7 @@ import {
   type City,
   type Unit,
   type Building,
+  tileKey,
 } from './types.ts';
 import { type GameState } from './game.ts';
 import { TERRAIN_COLOR } from './map.ts';
@@ -787,6 +788,11 @@ export class Renderer {
   }
 }
 
-function tileKey(coord: Axial): string {
-  return `${coord.q},${coord.r}`;
+function worldToViewport(q: number, r: number, cam: Camera, HEX_SIZE: number) {
+  const x = HEX_SIZE * 1.5 * q;
+  const y = HEX_SIZE * ((Math.sqrt(3) / 2) * q + Math.sqrt(3) * r);
+  return {
+    x: (x - cam.x) * cam.zoom + cam.cx,
+    y: (y - cam.y) * cam.zoom + cam.cy,
+  };
 }

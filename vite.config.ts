@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import type { Plugin, Connect } from 'vite';
 import { execSync } from 'node:child_process';
 import { readdirSync, statSync, existsSync, readFileSync } from 'node:fs';
@@ -264,7 +264,11 @@ function repocivPlugin(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [repocivPlugin()],
-  server: { port: 5273, strictPort: true },
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const vitePort = parseInt(env.VITE_PORT ?? '5273', 10);
+  return {
+    plugins: [repocivPlugin()],
+    server: { port: vitePort, strictPort: true },
+  };
 });

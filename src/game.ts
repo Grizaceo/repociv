@@ -1,6 +1,6 @@
 // ─── RepoCiv — Game State ─────────────────────────────────────────────────────
 
-import { type World, type Unit, type Building, type UnitState, tileKey } from './types.ts';
+import { type World, type Unit, type Building, type UnitState, tileKey, UNIT_COLORS } from './types.ts';
 import type { Axial } from './hex.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
 
@@ -16,17 +16,6 @@ export interface Mission {
   startedAt: number;
   completedAt: number | null;
 }
-
-import { UNIT_COLORS } from './types.ts';
-
-// ─── Unit type colors (for multi-agent visualization) ───────────────────────
-export const UNIT_TYPE_COLOR: Record<string, string> = {
-  DAVI: '#c8a84b',
-  WORKER: '#5b9b5b',
-  SCOUT: '#5b9bd5',
-  LEXO: '#b86ce8',
-  default: '#c8a84b',
-};
 
 // ─── GameState ───────────────────────────────────────────────────────────────
 export class GameState {
@@ -151,7 +140,7 @@ export class GameState {
   spawnUnit(id: string, name: string, type: Unit['type'], civ: string, coord: Axial, mission?: string): Unit {
     const existing = this.unitMap.get(id);
     if (existing) return existing;
-    const color = UNIT_COLORS[type] ?? UNIT_TYPE_COLOR[id] ?? UNIT_TYPE_COLOR['default']!;
+    const color = UNIT_COLORS[type] ?? UNIT_COLORS['hero']!;
     const unit: Unit = {
       id, name, type, civ, coord,
       targetCoord: undefined as Axial | undefined,
