@@ -2,6 +2,24 @@
 
 Este documento consolida las ideas, paradigmas y referencias sobre cómo visualizar, gestionar y orquestar flujos de trabajo de ingeniería de software (especialmente con agentes de IA) utilizando metáforas visuales derivadas de videojuegos de gestión y estrategia.
 
+---
+
+## Estado de decisiones (2026-04-28)
+
+| Paradigma | Decisión | Detalle |
+|---|---|---|
+| RTS / Civ (§1) | ✅ **Implementado** (Phases 1–5) | Vista macro del workspace. Base del proyecto. |
+| Colonia / RimWorld (§2) | ✅ **Aprobado para implementar** | Vista local de cada repo. Phases 6–7 del roadmap. |
+| Logística / Factorio (§3) | ❌ **Descartado** | Baja accionabilidad en repos estáticos; retomar solo si RepoCiv cubre sistemas en producción. |
+| Bajo nivel / Zachtronics (§4) | ❌ **Descartado** | Compite con el IDE real sin diferenciarse. |
+| Frostpunk (economía de tokens) | ⏸ **Diferido** | Phase 8 del roadmap. Requiere tracking real de tokens desde OpenClaw. |
+| XCOM (fatiga de contexto) | ✅ **Aprobado** | Phase 9 del roadmap. Proxy por longitud de chunks hasta tracking real. |
+| Slay-the-Spire (deckbuilding) | ❌ **Descartado** | Compite con el sistema de prioridades RimWorld. |
+
+**Ver roadmap completo en:** `ROADMAP_RIMWORLD_FROSTPUNK.md`
+
+---
+
 ## 1. El Paradigma RTS / Orquestación (El modelo AgentCraft / Civilization)
 Este es el modelo actual de **RepoCiv** y proyectos como **AgentCraft**.
 *   **Concepto:** Un mapa global ("Overworld") donde el usuario actúa como el "Comandante". Los agentes (Cursor, Sonnet, Opus) son "unidades" que se seleccionan, se les asignan misiones y se mueven por el mapa.
