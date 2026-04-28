@@ -181,29 +181,18 @@ export const CAMERA_DEFAULT: Camera = {
 };
 
 // ─── Spiral: place cities in outward expanding ring pattern ─────────────────
+// Uses axialRing's convention: ring k starts k steps in direction 4 (SW).
 export function spiralCoords(center: Axial, count: number): Axial[] {
   if (count === 0) return [];
   const results: Axial[] = [center];
-  let hex = center;
-  let step = 1;
-  while (results.length < count) {
-    // Move step steps in direction 1 (NE)
-    hex = axialAdd(hex, AXIAL_DIRECTIONS[1]!);
-    for (let i = 0; i < step && results.length < count; i++) {
-      results.push(hex);
-      hex = axialNeighbour(hex, 2); // SE
-    }
-    // Move step steps in direction 2 (SE) → 3 (S) → 4 (SW) → 5 (NW) → 0 (NE)
-    for (let d = 2; d <= 5 && results.length < count; d++) {
-      for (let i = 0; i < step && results.length < count; i++) {
+  for (let k = 1; results.length < count; k++) {
+    let hex = axialAdd(center, axialScale(AXIAL_DIRECTIONS[4]!, k));
+    for (let i = 0; i < 6 && results.length < count; i++) {
+      for (let j = 0; j < k && results.length < count; j++) {
         results.push(hex);
-        hex = axialNeighbour(hex, d);
+        hex = axialNeighbour(hex, i);
       }
     }
-    step++;
-    // Move step steps in direction 0 (E) and 1 (NE) to reset position
-    hex = axialAdd(hex, AXIAL_DIRECTIONS[0]!);
-    hex = axialAdd(hex, AXIAL_DIRECTIONS[1]!);
   }
   return results;
 }

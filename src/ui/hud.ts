@@ -1,5 +1,4 @@
 // ─── RepoCiv — HUD helpers (Civ V Aesthetic) ────────────────────────────────────
-// @ts-nocheck
 
 let loadingText: HTMLElement | null = null;
 let loadingFill: HTMLElement | null = null;
