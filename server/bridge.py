@@ -259,8 +259,7 @@ def scan_tech_debt(root_path: str = os.path.expanduser("~/.hermes/workspace/repo
                 continue
             for dirpath, _dirs, filenames in os.walk(repo_path):
                 # Skip node_modules, .git, __pycache__, .venv
-                skip = {'node_modules', '.git', '__pycache__', '.venv', '.venv311',
-                        'dist', 'build', '.next', 'target', 'vendor'}
+                skip = set(json.loads(Path(__file__).parent.parent.joinpath("shared/skip-dirs.json").read_text()))
                 if any(s in dirpath for s in skip):
                     continue
                 for fname in filenames:
