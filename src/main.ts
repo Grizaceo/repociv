@@ -17,7 +17,7 @@ import {
   togglePriorityPanel,
 } from './ui/index.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from './ui/settingsPanel.ts';
-import type { Unit } from './types.ts';
+import { type Unit, tileKey } from './types.ts';
 import { Renderer3D } from './renderer3d.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
@@ -96,7 +96,8 @@ async function bootstrap() {
     const city = state.world.cities.find(c => c.id === cityId);
     if (city) {
       const activeBuildings = state.world.buildings.filter(b => b.cityId === cityId);
-      openCityPanel(city, activeBuildings);
+      const tile = state.world.tiles.get(tileKey(city.coord));
+      openCityPanel(city, activeBuildings, tile);
     }
     loadGitInfo(cityId);
     loadFilesInfo(cityId);

@@ -723,7 +723,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     "type": "unit_fatigue_update",
                     "unit": unit_id,
                     "fatigue": entry["fatigue"],
-                    "effectiveSpeed": entry["effectiveSpeed"],
+                    "maxFatigue": 100,
+                    "atRest": entry["isResting"],
+                    "restAreaId": entry["restAreaId"],
                 })
 
             elif t == "discover_rest_area":

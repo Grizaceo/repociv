@@ -178,7 +178,7 @@ export class BridgeEvents {
       }
       // Phase 9: XCOM Context Fatigue events
       case 'unit_fatigue_update': {
-        this.state.updateUnitFatigue(evt.unit, evt.fatigue, evt.maxFatigue, evt.atRest, evt.restAreaId);
+        this.state.updateUnitFatigue(evt.unit, evt.fatigue, evt.maxFatigue ?? 100, evt.atRest ?? false, evt.restAreaId ?? null);
         break;
       }
       case 'unit_sent_to_rest': {
@@ -187,8 +187,16 @@ export class BridgeEvents {
         break;
       }
       case 'rest_area_discovered': {
-        this.state.addRestArea(evt.restArea);
-        logEvent(`☕ Área de descanso descubierta: ${evt.restArea.roomId}`, 'info');
+        const ra = evt.restArea;
+        this.state.addRestArea({
+          id: ra.id,
+          roomId: ra.roomId,
+          coord: { q: ra.coord[0], r: ra.coord[1] },
+          recoveryRate: ra.recoveryRate,
+          capacity: ra.capacity,
+          unitsInside: ra.unitsInside,
+        });
+        logEvent(`☕ Área de descanso descubierta: ${ra.roomId}`, 'info');
         break;
       }
       case 'rest_area_entered': {

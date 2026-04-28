@@ -6,6 +6,7 @@ import {
 } from './types.ts';
 import type { Axial } from './hex.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
+import { axialDistance } from './hex.ts';
 import { generateLocalWorldFromApi, buildMockLocalWorld } from './localMap.ts';
 import { findPath, findNearestWorkbench } from './localPathfinding.ts';
 
@@ -91,10 +92,11 @@ export class GameState {
   };
 
   // ─── Unit animation ───────────────────────────────────────────────────────
-  private updateUnits(_dt: number) {
+  private updateUnits(dt: number) {
+    const scale = dt / TICK_MS;
     for (const unit of this.world.units) {
       if (unit.state === 'moving' && unit.targetCoord) {
-        unit.pathProgress += 0.04; // ~25 frames per hex
+        unit.pathProgress += 0.04 * scale; // ~25 ticks per hex at 60fps
         if (unit.pathProgress >= 1) {
           unit.pathProgress = 0;
           unit.pathIndex++;
@@ -112,7 +114,7 @@ export class GameState {
         }
       }
       if (unit.state === 'working' && unit.workProgress !== undefined) {
-        unit.workProgress = Math.min(100, unit.workProgress + 0.05);
+        unit.workProgress = Math.min(100, unit.workProgress + 0.05 * scale);
       }
     }
   }
@@ -202,11 +204,7 @@ export class GameState {
   }
 
   getRestAreaNear(coord: Axial, radius = 3): import('./types').RestArea | undefined {
-    return this.world.restAreas.find(ra => {
-      const dq = Math.abs(ra.coord.q - coord.q);
-      const dr = Math.abs(ra.coord.r - coord.r);
-      return dq + dr <= radius;
-    });
+    return this.world.restAreas.find(ra => axialDistance(ra.coord, coord) <= radius);
   }
 
   decayUnitFatigue(unitId: string, delta: number) {
@@ -363,14 +361,15 @@ export class GameState {
   // ─── Phase 7a: Local update loop ────────────────────────────────────────────
 
   /** Main tick update for local (RimWorld) view — runs every TICK_MS when viewMode=local */
-  localUpdate(_dt: number) {
+  localUpdate(dt: number) {
     if (this.viewMode !== 'local' || !this.localWorld) return;
     this.localTickCount++;
+    const scale = dt / TICK_MS;
 
     for (const unit of this.localUnits) {
       // 1. Advance moving units
       if (unit.state === 'walking_to_workbench' && unit.path.length > 0) {
-        unit.pathProgress += 0.06 * unit.effectiveSpeed;
+        unit.pathProgress += 0.06 * unit.effectiveSpeed * scale;
         if (unit.pathProgress >= 1) {
           unit.pathProgress = 0;
           unit.gridX = unit.path[0]!.x;
@@ -385,7 +384,7 @@ export class GameState {
 
       // 2. Advance working units
       if (unit.state === 'working_on_file') {
-        unit.workProgress = Math.min(100, (unit.workProgress ?? 0) + 0.08);
+        unit.workProgress = Math.min(100, (unit.workProgress ?? 0) + 0.08 * scale);
         if (unit.workProgress >= 100) {
           this.completeLocalMission(unit.id);
         }

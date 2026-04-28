@@ -140,10 +140,10 @@ export type BridgeEvent =
   | { type: 'building_complete'; city: string; building: string; missionId?: string }
   | { type: 'building_failed';   city: string; building: string; missionId?: string }
   // Phase 9: Context Fatigue events
-  | { type: 'rest_area_discovered'; restArea: RestArea }
+  | { type: 'rest_area_discovered'; restArea: { id: string; roomId: string; coord: [number, number]; recoveryRate: number; capacity: number; unitsInside: string[] } }
   | { type: 'rest_area_entered'; unit: string; restAreaId: string }
   | { type: 'rest_area_exited'; unit: string; restAreaId: string }
-  | { type: 'unit_fatigue_update'; unit: string; fatigue: number; maxFatigue: number; atRest: boolean; restAreaId: string | null }
+  | { type: 'unit_fatigue_update'; unit: string; fatigue: number; maxFatigue?: number; atRest?: boolean; restAreaId?: string | null }
   | { type: 'unit_sent_to_rest'; unit: string; restAreaId: string; fatigue: number; maxFatigue: number; atRest: boolean }
   | { type: 'context_exhausted'; unit: string; hex: [number, number] }
   | { type: 'city_founder';  name: string; hex: [number, number] }
@@ -257,6 +257,6 @@ export function tileKey(coord: Axial): string {
 
 export function parseTileKey(key: string): Axial {
   const [q, r] = key.split(',').map(Number);
-  if (q === undefined || r === undefined) return { q: 0, r: 0 };
+  if (q === undefined || r === undefined || isNaN(q) || isNaN(r)) return { q: 0, r: 0 };
   return { q, r };
 }

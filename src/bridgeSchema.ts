@@ -84,9 +84,9 @@ const Schemas = [
     type: v.literal('unit_fatigue_update'),
     unit: v.string(),
     fatigue: v.number(),
-    maxFatigue: v.number(),
-    atRest: v.boolean(),
-    restAreaId: v.union([v.string(), v.null()]),
+    maxFatigue: v.optional(v.number()),
+    atRest: v.optional(v.boolean()),
+    restAreaId: v.optional(v.union([v.string(), v.null()])),
   }),
   v.object({
     type: v.literal('unit_sent_to_rest'),
@@ -101,9 +101,10 @@ const Schemas = [
     restArea: v.object({
       id: v.string(),
       roomId: v.string(),
-      label: v.string(),
+      coord: Hex,
+      recoveryRate: v.number(),
       capacity: v.number(),
-      repoId: v.string(),
+      unitsInside: v.array(v.string()),
     }),
   }),
   v.object({
