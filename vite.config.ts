@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process';
 import { readdirSync, statSync, existsSync, readFileSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { homedir } from 'node:os';
-import skipDirsJson from './shared/skip-dirs.json' assert { type: 'json' };
+import skipDirsJson from './shared/skip-dirs.json' with { type: 'json' };
 
 // ─── Workspace path ──────────────────────────────────────────────────────────
 const WORKSPACE = join(homedir(), '.hermes', 'workspace', 'repos');

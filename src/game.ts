@@ -1,8 +1,13 @@
 // ─── RepoCiv — Game State ─────────────────────────────────────────────────────
 
-import { type World, type Unit, type Building, type UnitState, tileKey, UNIT_COLORS } from './types.ts';
+import {
+  type World, type Unit, type Building, type UnitState, tileKey, UNIT_COLORS,
+  type ViewMode, type LocalWorld, type LocalUnit, type LocalMission, type Workbench,
+} from './types.ts';
 import type { Axial } from './hex.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
+import { buildLocalWorld, type FileNode } from './localMap.ts';
+import { findPath, findNearestWorkbench } from './localPathfinding.ts';
 
 // ─── Clock speed ──────────────────────────────────────────────────────────────
 const TICK_MS = 16; // ~60 fps
@@ -39,6 +44,13 @@ export class GameState {
   // Listener for state changes (used by UI to refresh hero bar / quest board)
   private listeners: Array<() => void> = [];
 
+  // ─── Phase 6: Local / RimWorld view ─────────────────────────────────────────
+  viewMode: ViewMode = 'macro';          // 'macro' | 'local'
+  localWorld: LocalWorld | null = null;  // generated on first local entry
+  private localUnits: LocalUnit[] = [];  // agents walking in the local grid
+  private missionQueue: LocalMission[] = []; // simple queue (Phase 7a)
+  private localTickCount = 0;
+
   constructor(world: World) {
     this.world = world;
     // Index existing units and buildings
@@ -73,6 +85,7 @@ export class GameState {
     if (!this.paused) {
       this.updateUnits(dt);
       this.updateBuildings(dt);
+      if (this.viewMode === 'local') this.localUpdate(dt);
     }
   };
 
@@ -194,6 +207,161 @@ export class GameState {
 
   invalidatePathCache(): void {
     invalidatePathCache();
+  }
+
+  // ─── Phase 6: View transition ───────────────────────────────────────────────
+
+  /** Switch to RimWorld local view, generating the grid from repoId if needed. */
+  enterLocalView(repoId: string, rootPath: string): LocalWorld {
+    if (!this.localWorld || this.localWorld.repoId !== repoId) {
+      this.localWorld = buildLocalWorld(repoId, rootPath);
+      // Spawn a default DAVI unit at the entrance if no units exist
+      if (this.localUnits.length === 0) {
+        const entrance = this.localWorld.rooms[0]!;
+        this.localUnits.push({
+          id: 'DAVI',
+          name: 'DAVI',
+          role: 'hero',
+          gridX: entrance.x + Math.floor(entrance.w / 2),
+          gridY: entrance.y + Math.floor(entrance.h / 2),
+          state: 'idle',
+          workbenchId: null,
+          workProgress: 0,
+          speed: 1,
+          color: '#4af',
+        });
+      }
+    }
+    this.viewMode = 'local';
+    return this.localWorld;
+  }
+
+  /** Switch back to macro civ view. */
+  enterMacroView() {
+    this.viewMode = 'macro';
+  }
+
+  getLocalWorld(): LocalWorld | null {
+    return this.localWorld;
+  }
+
+  getLocalUnits(): LocalUnit[] {
+    return this.localUnits;
+  }
+
+  getLocalUnit(id: string): LocalUnit | undefined {
+    return this.localUnits.find(u => u.id === id);
+  }
+
+  // ─── Phase 7a: Local update loop ────────────────────────────────────────────
+
+  /** Main tick update for local (RimWorld) view — runs every TICK_MS when viewMode=local */
+  localUpdate(dt: number) {
+    if (this.viewMode !== 'local' || !this.localWorld) return;
+    this.localTickCount++;
+
+    // 1. Advance moving units
+    for (const unit of this.localUnits) {
+      if (unit.state === 'moving' && unit.path.length > 0) {
+        unit.pathProgress += 0.06 * unit.speed; // ~16 frames per tile at speed=1
+        if (unit.pathProgress >= 1) {
+          unit.pathProgress = 0;
+          unit.gridX = unit.path[0]!.x;
+          unit.gridY = unit.path[0]!.y;
+          unit.path.shift();
+          if (unit.path.length === 0) {
+            // Arrived at workbench
+            unit.state = unit.workbenchId ? 'working' : 'idle';
+            unit.workProgress = 0;
+          }
+        }
+      }
+
+      // 2. Advance working units
+      if (unit.state === 'working') {
+        unit.workProgress = Math.min(100, (unit.workProgress ?? 0) + 0.08);
+        if (unit.workProgress >= 100) {
+          this.completeLocalMission(unit.id);
+        }
+      }
+    }
+
+    // 3. Simple queue dispatch: idle unit picks up next mission
+    if (this.localTickCount % 30 === 0) { // every ~500ms
+      this.dispatchNextMission();
+    }
+  }
+
+  /** Assign a mission to the queue (Phase 7a — no priority system). */
+  queueLocalMission(repoId: string, filePath: string, fileName: string) {
+    this.missionQueue.push({
+      id: `mission-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      unitId: '', // assigned on dispatch
+      repoId,
+      filePath,
+      fileName,
+      status: 'queued',
+      assignedAt: Date.now(),
+      startedAt: null,
+      completedAt: null,
+      workbenchId: '', // resolved on dispatch
+    });
+  }
+
+  private dispatchNextMission() {
+    if (this.missionQueue.length === 0) return;
+    const queued = this.missionQueue.find(m => m.status === 'queued');
+    if (!queued) return;
+
+    // Find an idle unit
+    const unit = this.localUnits.find(u => u.state === 'idle');
+    if (!unit) return;
+
+    // Resolve workbench for the target file
+    if (!this.localWorld) return;
+    const workbench = findNearestWorkbench(this.localWorld, queued.filePath);
+    if (!workbench) return;
+
+    // Find path to workbench
+    const path = findPath(this.localWorld, unit.gridX, unit.gridY, workbench.x, workbench.y);
+    if (!path) return;
+
+    // Assign
+    unit.workbenchId = workbench.id;
+    unit.path = path;
+    unit.pathProgress = 0;
+    unit.state = 'moving';
+
+    queued.unitId = unit.id;
+    queued.workbenchId = workbench.id;
+    queued.status = 'running';
+    queued.startedAt = Date.now();
+  }
+
+  private completeLocalMission(unitId: string) {
+    const unit = this.localUnits.find(u => u.id === unitId);
+    if (!unit) return;
+
+    const mission = this.missionQueue.find(
+      m => m.unitId === unitId && m.status === 'running',
+    );
+    if (mission) {
+      mission.status = 'completed';
+      mission.completedAt = Date.now();
+    }
+
+    unit.workbenchId = null;
+    unit.workProgress = 0;
+    unit.state = 'idle';
+    unit.path = [];
+  }
+
+  getMissionQueue(): LocalMission[] {
+    return this.missionQueue;
+  }
+
+  getLocalTick(): number {
+    return this.localTickCount;
   }
 
   // ─── Building control ──────────────────────────────────────────────────────

@@ -103,6 +103,11 @@ async function bootstrap() {
     bridge.send('tile_inspected', { cityName, coord, repoPath });
   };
 
+  // ─── Phase 6: Double-click city → enter RimWorld local view ─────────────────
+  renderer.onEnterLocal = (repoId, rootPath) => {
+    bridge.send('enter_local', { repoId, rootPath });
+  };
+
   // Spawn DAVI as the default hero, near the capital if present
   const capital = world.cities.find(c => c.isCapital) ?? world.cities[0];
   const spawnAt = capital ? capital.coord : { q: 0, r: 0 };

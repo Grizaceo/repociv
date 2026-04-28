@@ -131,6 +131,84 @@ export type BridgeEvent =
   | { type: 'log';              msg: string; level?: 'info' | 'warn' | 'success' };
 
 // ─── Renderer state ─────────────────────────────────────────────────────────
+// ─── View Mode ────────────────────────────────────────────────────────────────
+export type ViewMode = 'macro' | 'local';
+
+// ─── Local view types (RimWorld grid) ─────────────────────────────────────────
+export type LocalTileType = 'floor' | 'wall' | 'door' | 'workbench' | 'debris';
+
+export interface LocalTile {
+  x: number;         // grid column
+  y: number;         // grid row
+  type: LocalTileType;
+  roomId: string | null;
+  workbench: Workbench | null;
+}
+
+export interface Workbench {
+  id: string;          // unique numeric id
+  filePath: string;   // absolute path
+  fileName: string;
+  extension: string; // 'ts', 'py', etc.
+  isTest: boolean;    // *.test.ts pattern
+  repoPath: string;  // which repo this belongs to
+}
+
+export interface LocalRoom {
+  id: string;
+  label: string;      // display name (same as folderName)
+  w: number;           // alias for width
+  h: number;            // alias for height
+  folderPath: string; // e.g. "src/ui"
+  folderName: string;  // e.g. "ui"
+  x: number;          // top-left grid corner
+  y: number;
+  width: number;      // tiles
+  height: number;     // tiles
+  workbenches: Workbench[];
+}
+
+export interface LocalWorld {
+  repoId: string;
+  grid: LocalTile[][];   // [y][x]
+  rooms: LocalRoom[];
+  width: number;         // in tiles
+  height: number;
+  workbenches: Workbench[];
+}
+
+// ─── Local Unit State (Phase 7a) ───────────────────────────────────────────────
+export type LocalUnitState = 'idle_in_room' | 'walking_to_workbench' | 'walking_to_room' | 'working_on_file' | 'resting';
+
+export interface LocalUnit {
+  id: string;
+  name: string;
+  unitType: Unit['type'];
+  color: string;
+  // position on local grid
+  gridX: number;
+  gridY: number;
+  targetX: number | null;
+  targetY: number | null;
+  path: Array<{ x: number; y: number }>;
+  pathIndex: number;
+  pathProgress: number;  // 0-1 tween
+  state: LocalUnitState;
+  mission: string | null;
+  workProgress: number;  // 0-100
+  // pointer back to macro unit
+  macroUnitId: string;
+}
+
+export interface LocalMission {
+  id: string;
+  unitId: string;
+  workbench: Workbench;
+  status: 'queued' | 'walking' | 'working' | 'complete' | 'failed';
+  progress: number;      // 0-100
+}
+
+// ─── Renderer state ────────────────────────────────────────────────────────────
 export type RendererState = 'no_input' | 'hover' | 'click' | 'drag' | 'animation';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────

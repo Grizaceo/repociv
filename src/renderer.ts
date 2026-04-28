@@ -10,6 +10,7 @@ import { type GameState } from './game.ts';
 import { HexRenderer } from './hexRenderer.ts';
 import { UnitRenderer } from './unitRenderer.ts';
 import { MinimapRenderer } from './minimapRenderer.ts';
+import { LocalRenderer, type LocalRenderer as LocalRendererType } from './localRenderer.ts';
 
 const HEX_SIZE = 52;
 
@@ -35,10 +36,12 @@ export class Renderer {
   private hexR: HexRenderer;
   private unitR: UnitRenderer;
   private minimapR: MinimapRenderer;
+  private localR: LocalRendererType | null = null; // Phase 6: RimWorld 2D view
 
   onUnitSelect: ((unit: Unit | null) => void) | null = null;
   onCitySelect: ((cityId: string) => void) | null = null;
   onTileInspect: ((cityName: string, coord: { q: number; r: number }, repoPath: string) => void) | null = null;
+  onEnterLocal: ((repoId: string, rootPath: string) => void) | null = null; // Phase 6
 
   constructor(canvas: HTMLCanvasElement, state: GameState) {
     this.canvas = canvas;
@@ -121,6 +124,26 @@ export class Renderer {
       this.actionMode = 'none';
       this.selectedUnit = null;
     });
+
+    // ── Phase 6: Double-click to enter RimWorld local view ──────────────────
+    this.canvas.addEventListener('dblclick', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const wx = e.clientX - rect.left;
+      const wy = e.clientY - rect.top;
+      const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+      const tile = this.state.world.tiles.get(tileKey(coord));
+      if (tile?.city) {
+        this.onEnterLocal?.(tile.city.id, tile.city.id);
+      }
+    });
+
+    // ── Phase 6: Esc to return to macro view ─────────────────────────────────
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.state.viewMode === 'local') {
+        this.state.enterMacroView();
+        this.localR = null;
+      }
+    });
   }
 
   private wasDrag(e: MouseEvent): boolean {
@@ -196,6 +219,17 @@ export class Renderer {
     const { ctx, canvas, cam } = this;
     ctx.fillStyle = '#050505'; // Deeper background
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // ─── Phase 6: Local RimWorld view ───────────────────────────────────────
+    if (this.state.viewMode === 'local') {
+      if (!this.localR && this.state.localWorld) {
+        this.localR = new LocalRenderer(canvas, this.state.localWorld, this.state);
+      }
+      if (this.localR) {
+        this.localR.draw();
+      }
+      return;
+    }
 
     ctx.save();
     ctx.translate(cam.cx, cam.cy);
