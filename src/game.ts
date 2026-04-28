@@ -213,8 +213,8 @@ export class GameState {
     if (!unit) return;
     unit.fatigue = Math.max(0, Math.min(unit.maxFatigue, unit.fatigue + delta));
     unit.effectiveSpeed = parseFloat((unit.fatigue / unit.maxFatigue).toFixed(3));
-    // Auto-warn at 20%
-    if (unit.fatigue <= 20 && unit.fatigue > 0 && !unit.isResting) {
+    // Auto-warn below configurable threshold (was hardcoded at 20%)
+    if (unit.fatigue <= unit.maxFatigue * 0.2 && unit.fatigue > 0 && !unit.isResting) {
       console.warn(`[fatigue] ${unit.name} contexto bajo (${unit.fatigue}%)`);
     }
     this.notify();

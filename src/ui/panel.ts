@@ -1,6 +1,7 @@
 // ─── RepoCiv — Unit panel & hero bar (Civ V Aesthetic) ─────────────────────────
 import type { GameState } from '../game.ts';
 import type { Unit } from '../types.ts';
+import { cfg } from '../gameConfig.ts';
 
 export function showUnitPanel(unit: Unit) {
   const panel = document.getElementById('unit-panel');
@@ -67,8 +68,10 @@ export function renderHeroBar(state: GameState, onSelect: (u: Unit) => void) {
     if (state.selectedUnit?.id === unit.id) slot.classList.add('selected');
 
     // Phase 9: fatigue bar — color shifts green→yellow→red as fatigue drops
-    const pct  = unit.fatigue / unit.maxFatigue;
-    const fbar = pct > 0.6 ? '#4caf50' : pct > 0.3 ? '#ff9800' : '#f44336';
+    // Thresholds now driven by gameConfig.ts (Phase 10.2)
+    const pct = unit.fatigue / unit.maxFatigue;
+    const { warnThreshold, criticalThreshold } = cfg.fatigue;
+    const fbar = pct > criticalThreshold ? '#4caf50' : pct > warnThreshold ? '#ff9800' : '#f44336';
     const fPct = Math.round(pct * 100);
     const restBadge = unit.isResting
       ? `<span class="fatigue-rest-badge" title="${unit.name} descansando">☕</span>`

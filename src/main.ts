@@ -14,7 +14,7 @@ import {
   toggleKeyboardHelp,
   openCityPanel, closeCityPanel, isCityPanelOpen, wireCityPanel,
   initExternalLibs, updateResource, toggleViewHUD,
-  togglePriorityPanel,
+  togglePriorityPanel, openSettingsPanel, closeSettingsPanel, toggleSettingsPanel,
 } from './ui/index.ts';
 import type { Unit } from './types.ts';
 import { Renderer3D } from './renderer3d.ts';
@@ -170,6 +170,7 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents) {
       const help = document.getElementById('keyboard-help');
       if (help && !help.classList.contains('hidden')) { toggleKeyboardHelp(false); return; }
       if (isSidePanelOpen()) { closeSidePanel(); return; }
+      closeSettingsPanel();
       if (state.selectedUnit) {
         state.selectUnit(null);
         renderer.selectUnit(null);
@@ -255,6 +256,11 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents) {
       })();
     }
 
+    if (e.key === 'F11') {
+      e.preventDefault();
+      toggleSettingsPanel();
+    }
+
     if (e.key === 'F12') {
       e.preventDefault();
       takeScreenshot(renderer);
@@ -271,6 +277,9 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents) {
 
   // ─── Screenshot button ───────────────────────────────────────────────────
   document.getElementById('btn-screenshot')?.addEventListener('click', () => takeScreenshot(renderer));
+
+  // ─── Settings button ─────────────────────────────────────────────────────
+  document.getElementById('btn-settings')?.addEventListener('click', () => toggleSettingsPanel());
 
   // ─── Minimap ────────────────────────────────────────────────────────────
   const minimap = document.getElementById('minimap-canvas') as HTMLCanvasElement;
