@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RepoCiv — Imperial Map</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%232d5a27'/><polygon points='16,4 28,28 4,28' fill='%23d4a574'/></svg>" />
+</head>
+<body>
+  <div id="app">
+    <!-- Canvas principal: hex grid -->
+    <canvas id="main-canvas"></canvas>
+
+    <!-- ─── HUD OVERLAYS ─────────────────────────────────────────────────── -->
+
+    <!-- Barra superior de recursos -->
+    <header id="top-bar">
+      <div class="resource" id="res-gold">
+        <span class="res-icon">⬡</span>
+        <span class="res-label">Oro</span>
+        <span class="res-value">0</span>
+      </div>
+      <div class="resource" id="res-science">
+        <span class="res-icon">◈</span>
+        <span class="res-label">Ciencia</span>
+        <span class="res-value">0</span>
+      </div>
+      <div class="resource" id="res-production">
+        <span class="res-icon">⚙</span>
+        <span class="res-label">Producción</span>
+        <span class="res-value">0</span>
+      </div>
+      <div id="era-display">Era I — RepoCiv</div>
+      <div id="gpu-bar" class="hidden">
+        <span class="gpu-vram">VRAM —</span>
+        <span class="gpu-temp">GPU —</span>
+      </div>
+      <div id="bridge-status" class="bridge-offline" title="Bridge.py status">⚡ bridge</div>
+      <button id="btn-screenshot" title="Screenshot [F12]">📷</button>
+    </header>
+
+    <!-- Hero Bar: heroes 1–9 con avatars (estilo AgentCraft) -->
+    <div id="hero-bar">
+      <div class="hero-bar-label">Héroes</div>
+      <div id="hero-bar-slots"></div>
+      <div class="hero-bar-spawn">
+        <span class="hint">Spawn:</span>
+        <button class="spawn-btn" data-type="DAVI" title="Spawn DAVI [Q]">Q</button>
+        <button class="spawn-btn" data-type="WORKER" title="Spawn Worker [W]">W</button>
+        <button class="spawn-btn" data-type="SCOUT" title="Spawn Scout [E]">E</button>
+        <button class="spawn-btn" data-type="LEXO" title="Spawn LexO [L]" style="color:#b86ce8">L</button>
+      </div>
+    </div>
+
+    <!-- Panel inferior izquierdo: unidad seleccionada -->
+    <aside id="unit-panel" class="hidden">
+      <div id="unit-header">
+        <div id="unit-sprite">?</div>
+        <div id="unit-info">
+          <div id="unit-name">—</div>
+          <div id="unit-type">—</div>
+          <div id="unit-mission">Sin misión</div>
+        </div>
+        <div id="unit-status-dot"></div>
+      </div>
+      <div id="unit-stats">
+        <span id="unit-moves">4/4 movimientos</span>
+        <span id="unit-model">·</span>
+      </div>
+      <div id="unit-actions">
+        <button id="btn-move" data-hotkey="m">Mover [M]</button>
+        <button id="btn-sleep" data-hotkey="s">Dormir [S]</button>
+        <button id="btn-build" data-hotkey="b">Construir [B]</button>
+      </div>
+      <div id="mission-input-row">
+        <input id="mission-input" type="text" placeholder="Dar misión... [Enter]" autocomplete="off" />
+        <button id="btn-send-mission">Enviar</button>
+      </div>
+      <div class="panel-hint">Enter para abrir chat lateral</div>
+    </aside>
+
+    <!-- Side Panel (Chat / Git / Files) — estilo AgentCraft -->
+    <aside id="side-panel" class="hidden">
+      <div id="side-panel-header">
+        <div id="side-panel-hero">
+          <span id="side-hero-name">—</span>
+          <span id="side-hero-state" class="state-idle">idle</span>
+        </div>
+        <button id="side-panel-close" title="Cerrar [Esc]">✕</button>
+      </div>
+      <div id="side-panel-tabs">
+        <button class="side-tab active" data-tab="chat">Chat</button>
+        <button class="side-tab" data-tab="git">Git</button>
+        <button class="side-tab" data-tab="files">Files</button>
+      </div>
+      <div id="side-panel-content">
+        <!-- Chat tab -->
+        <div class="tab-pane active" data-pane="chat">
+          <div id="chat-messages"></div>
+          <div id="operation-ticker" class="hidden"><span class="dot"></span><span id="ticker-text">trabajando...</span></div>
+        </div>
+        <!-- Git tab -->
+        <div class="tab-pane" data-pane="git">
+          <div id="git-info">Selecciona una ciudad para ver su git status.</div>
+        </div>
+        <!-- Files tab -->
+        <div class="tab-pane" data-pane="files">
+          <div id="files-info">Selecciona una ciudad para ver sus archivos.</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Quest Board (F9) -->
+    <div id="quest-board" class="hidden">
+      <div class="board-header">
+        <div class="board-title">Quest Board</div>
+        <button id="quest-board-close">✕</button>
+      </div>
+      <div class="board-tabs">
+        <button class="quest-tab active" data-filter="all">Todas</button>
+        <button class="quest-tab" data-filter="running">En curso</button>
+        <button class="quest-tab" data-filter="complete">Completadas</button>
+        <button class="quest-tab" data-filter="failed">Fallidas</button>
+      </div>
+      <div id="quest-list"></div>
+    </div>
+
+    <!-- Keyboard help overlay (?) -->
+    <div id="keyboard-help" class="hidden">
+      <div class="kbh-content">
+        <div class="board-header">
+          <div class="board-title">Atajos de teclado</div>
+          <button id="kbh-close">✕</button>
+        </div>
+        <div class="kbh-grid">
+          <div class="kbh-section">
+            <h4>Spawn agentes</h4>
+            <kbd>Q</kbd> Spawn DAVI (multi)<br>
+            <kbd>W</kbd> Spawn Worker (multi)<br>
+            <kbd>E</kbd> Spawn Scout (multi)<br>
+            <kbd>L</kbd> Spawn LexO-α (multi)<br>
+          </div>
+          <div class="kbh-section">
+            <h4>Selección</h4>
+            <kbd>1</kbd>–<kbd>9</kbd> Seleccionar héroe<br>
+            <kbd>Space</kbd> Ciclar a héroe idle<br>
+            <kbd>Tab</kbd> Siguiente héroe<br>
+            <kbd>Esc</kbd> Deseleccionar / cerrar<br>
+          </div>
+          <div class="kbh-section">
+            <h4>Acciones</h4>
+            <kbd>M</kbd> Modo mover<br>
+            <kbd>B</kbd> Modo construir<br>
+            <kbd>S</kbd> Dormir unidad<br>
+            <kbd>Enter</kbd> Toggle side panel<br>
+          </div>
+          <div class="kbh-section">
+            <h4>Vista</h4>
+            <kbd>G</kbd> Grid de hexes<br>
+            <kbd>F</kbd> Debug overlay<br>
+            <kbd>V</kbd> Fog of war<br>
+            <kbd>F9</kbd> Quest Board<br>
+            <kbd>F12</kbd> Screenshot PNG<br>
+            <kbd>?</kbd> Esta ayuda<br>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Log de eventos inferior centro -->
+    <div id="event-log">
+      <div id="log-messages"></div>
+    </div>
+
+    <!-- Minimapa inferior derecha -->
+    <div id="minimap-container">
+      <canvas id="minimap-canvas" width="220" height="160"></canvas>
+    </div>
+
+    <!-- Tooltip flotante -->
+    <div id="tooltip" class="hidden"></div>
+
+    <!-- Bottom hotkeys ribbon -->
+    <div id="hotkeys-ribbon">
+      <span><kbd>Q/W/E</kbd> spawn</span>
+      <span><kbd>1-9</kbd> seleccionar</span>
+      <span><kbd>Enter</kbd> chat</span>
+      <span><kbd>F9</kbd> quests</span>
+      <span><kbd>?</kbd> ayuda</span>
+    </div>
+
+    <!-- Loading screen -->
+    <div id="loading-screen">
+      <div id="loading-text">Cargando imperio...</div>
+      <div id="loading-bar"><div id="loading-fill"></div></div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
