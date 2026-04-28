@@ -5,29 +5,36 @@
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&display=swap');
 
 :root {
-  /* BACKGROUNDS */
+  /* BACKGROUNDS & TEXTURES */
   --app-bg:        #0a0804;
-  --panel-bg:      rgba(22, 16, 6, 0.95);
-  --panel-border:  #5a3e1e;
-  --panel-hover:   rgba(90, 62, 30, 0.4);
+  --marble-texture: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.02) 0%, transparent 80%),
+                    linear-gradient(45deg, rgba(0,0,0,0.1) 25%, transparent 25%, transparent 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1) 75%, transparent 75%, transparent);
+  --panel-bg:      rgba(0, 0, 0, 0.75);
+  --panel-border:  #5a4a2e;
+  --panel-hover:   rgba(90, 75, 45, 0.4);
+  --glass-bg:      rgba(15, 12, 8, 0.85);
 
-  /* GOLDS */
-  --gold-dim:      #8a6a3e;
-  --gold-mid:      #c8a84b;
-  --gold-bright:   #f0c050;
-  --gold-glow:     rgba(240, 192, 80, 0.35);
+  /* CIV V EXACT COLORS */
+  --civ-science:     #0064FF;
+  --civ-culture:     #FF00FF;
+  --civ-gold:        #FFD700;
+  --civ-production:  #FF7D00;
+  --civ-food:        #00FF00;
+  --civ-happiness:   #FFFF00;
+  --civ-movement:    #00AFFF;
+  --civ-defense:     #FF0000;
+  --civ-text-beige:  #F5F5DC;
 
-  /* TEXT */
-  --text-primary:  #e8d5a0;
-  --text-dim:      #a89060;
-  --text-faint:    #6a5040;
+  /* METALLICS */
+  --gold-gradient:   linear-gradient(135deg, #8a6a3e 0%, #f0c050 50%, #c8a84b 100%);
+  --bronze-gradient: linear-gradient(135deg, #5a3e1e 0%, #8a6a3e 100%);
 
-  /* AGENTES */
-  --agt-davi:      #c8a84b;
-  --agt-worker:    #5b9b5b;
-  --agt-scout:     #5b9bd5;
-  --agt-lexo:      #b86ce8;
-  --agt-openclaw:  #7bd6c8;
+  /* AGENTES (Mapped to Civ V Colors) */
+  --agt-davi:      var(--civ-gold);
+  --agt-worker:    var(--civ-food);
+  --agt-scout:     var(--civ-movement);
+  --agt-lexo:      var(--civ-science);
+  --agt-openclaw:  #7bd6c8; /* Custom for openclaw */
 
   /* TERRENOS */
   --hex-plains:    #7ba05b;
@@ -39,33 +46,38 @@
   --hex-fog:       rgba(0, 0, 0, 0.62);
 
   /* ESTADOS */
-  --state-success: #5b9b5b;
-  --state-warn:    #d4a44b;
-  --state-error:   #d45b5b;
-  --state-working: #5b9bd5;
+  --state-success: var(--civ-food);
+  --state-warn:    var(--civ-happiness);
+  --state-error:   var(--civ-defense);
+  --state-working: var(--civ-movement);
   --state-info:    #a89060;
 
-  /* TRANSPORTS */
-  --trp-hermes:    #5b9bd5;
-  --trp-openclaw:  #7bd6c8;
-  --trp-demo:      #c8a84b;
-  --trp-offline:   #d45b5b;
-
-  /* OLD FALLBACKS (Para compatibilidad durante refactor) */
+  /* FALLBACKS & ALIASES */
   --ui-dark:         #1a1208;
   --ui-border:       var(--panel-border);
   --ui-gold:         var(--gold-mid);
   --ui-gold-bright:  var(--gold-bright);
-  --ui-text:         var(--text-primary);
-  --ui-text-dim:     var(--text-dim);
+  --ui-text:         var(--civ-text-beige);
+  --ui-text-dim:     #a89060;
   --ui-panel-bg:     var(--panel-bg);
-  --res-science:     #5b9bd5;
-  --res-production:  #d45b5b;
-  --res-gold:        #f0c040;
+  --res-science:     var(--civ-science);
+  --res-production:  var(--civ-production);
+  --res-gold:        var(--civ-gold);
   --bar-bg:          #2a1e0a;
   
+  /* SHADOWS */
+  --shadow-deep:    0 10px 40px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0, 0, 0, 0.5);
+  --shadow-glow:    0 0 15px rgba(245, 213, 128, 0.25);
+  --shadow-inset:   inset 0 2px 10px rgba(0, 0, 0, 0.8);
+
   /* FONTS */
-  --font-ui:         'Cinzel', 'Georgia', serif;
-  --font-mono:       'Courier New', monospace;
-  --font-body:       'Georgia', serif;
+  --font-ui:         'Cinzel', 'Barlow Condensed', 'Noto Sans Condensed', serif;
+  --font-mono:       'JetBrains Mono', 'Courier New', monospace;
+  --font-body:       'Libre Baskerville', 'Georgia', serif;
+
+  /* UI SCALE & SPACING */
+  --header-height:   32px; /* Civ V Top Panel exact height */
+  --panel-radius:    0px;  /* Civ V uses sharp corners mostly, or large 8px radii */
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }

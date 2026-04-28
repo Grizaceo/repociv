@@ -1,0 +1,51 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   RepoCiv — Patrones & Motivos Art Déco (Civ V Style)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Pattern: Art Deco vertical lines (Top Panel style) */
+  --pattern-deco-lines: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='32' viewBox='0 0 10 32'%3E%3Cline x1='2' y1='0' x2='2' y2='32' stroke='rgba(255,255,255,0.05)' stroke-width='1'/%3E%3Cline x1='8' y1='0' x2='8' y2='32' stroke='rgba(0,0,0,0.2)' stroke-width='1'/%3E%3C/svg%3E");
+
+  /* Pattern: Marble Texture (Complex version with filters) */
+  --pattern-marble: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.005' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+
+  /* Pattern: Art Deco Corner (Inline SVG) */
+  --deco-corner-gold: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M2 2h20v2H4v18H2V2z' fill='%23c8a84b'/%3E%3Cpath d='M6 6h12v2H8v10H6V6z' fill='rgba(240, 192, 80, 0.5)'/%3E%3C/svg%3E");
+}
+
+.deco-border {
+  border: 2px solid var(--panel-border);
+  position: relative;
+}
+
+.deco-border::before,
+.deco-border::after,
+.deco-border .corner-tl,
+.deco-border .corner-tr,
+.deco-border .corner-bl,
+.deco-border .corner-br {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+  background-image: var(--deco-corner-gold);
+  background-size: contain;
+  background-repeat: no-repeat;
+  z-index: 5;
+}
+
+.deco-border .corner-tl { top: -2px; left: -2px; }
+.deco-border .corner-tr { top: -2px; right: -2px; transform: rotate(90deg); }
+.deco-border .corner-bl { bottom: -2px; left: -2px; transform: rotate(-90deg); }
+.deco-border .corner-br { bottom: -2px; right: -2px; transform: rotate(180deg); }
+
+/* Texture overlay for panels */
+.panel-texture {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--pattern-marble);
+  opacity: 0.4;
+  z-index: -1;
+}

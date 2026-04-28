@@ -1,7 +1,27 @@
-// ─── RepoCiv — HUD helpers ────────────────────────────────────────────────────
+// ─── RepoCiv — HUD helpers (Civ V Aesthetic) ────────────────────────────────────
+// @ts-nocheck
 
 let loadingText: HTMLElement | null = null;
 let loadingFill: HTMLElement | null = null;
+
+/**
+ * Inicializa las librerías externas cargadas por CDN (Lucide, Auto-animate)
+ */
+export function initExternalLibs() {
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+  
+  const hudOverlay = document.getElementById('hud-overlay');
+  if (hudOverlay && window.autoAnimate) {
+    window.autoAnimate(hudOverlay);
+  }
+
+  const heroBarSlots = document.getElementById('hero-bar-slots');
+  if (heroBarSlots && window.autoAnimate) {
+    window.autoAnimate(heroBarSlots);
+  }
+}
 
 export function showLoadingProgress(pct: number, text: string) {
   if (!loadingText) loadingText = document.getElementById('loading-text');
@@ -15,7 +35,7 @@ export function hideLoadingScreen() {
   if (screen) {
     screen.style.opacity = '0';
     screen.style.pointerEvents = 'none';
-    setTimeout(() => { screen.style.display = 'none'; }, 400);
+    setTimeout(() => { screen.style.display = 'none'; }, 600);
   }
 }
 
@@ -24,25 +44,32 @@ export function updateResource(id: 'gold' | 'science' | 'production', value: num
   if (el) el.textContent = value.toLocaleString();
 }
 
-const LOG_MAX = 6;
+const LOG_MAX = 8;
 export function logEvent(msg: string, type: 'info' | 'warn' | 'success' | 'build' | 'error' = 'info') {
   const container = document.getElementById('log-messages');
   if (!container) return;
   const entry = document.createElement('div');
-  entry.className = `log-entry log-${type === 'warn' ? 'error' : type === 'success' ? 'gold' : type}`;
+  entry.className = `log-entry log-${type}`;
   
-  let icon = '·';
-  let iconColor = 'var(--gold-mid)';
-  if (type === 'success') { icon = '✓'; iconColor = 'var(--state-success)'; }
-  else if (type === 'warn') { icon = '⚠'; iconColor = 'var(--state-warn)'; }
-  else if (type === 'error') { icon = '✗'; iconColor = 'var(--state-error)'; }
-  else if (type === 'build') { icon = '◆'; iconColor = 'var(--state-working)'; }
+  let icon = 'circle';
+  let color = 'var(--text-dim)';
+  
+  if (type === 'success') { icon = 'check-circle'; color = 'var(--civ-food)'; }
+  else if (type === 'warn') { icon = 'alert-triangle'; color = 'var(--civ-happiness)'; }
+  else if (type === 'error') { icon = 'x-circle'; color = 'var(--civ-defense)'; }
+  else if (type === 'build') { icon = 'hammer'; color = 'var(--civ-production)'; }
 
   const escapedMsg = msg.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-  entry.innerHTML = `<span class="log-icon" style="color:${iconColor}">${icon}</span> <span class="log-text">${escapedMsg}</span>`;
-  container.appendChild(entry);
+  entry.innerHTML = `
+    <i data-lucide="${icon}" style="width:12px; height:12px; color:${color}; margin-right:6px"></i>
+    <span class="log-text" style="color:${color}">${escapedMsg}</span>
+  `;
+  
+  container.prepend(entry);
+  if (window.lucide) window.lucide.createIcons();
+
   while (container.children.length > LOG_MAX) {
-    container.removeChild(container.firstChild!);
+    container.removeChild(container.lastChild!);
   }
 }
 
@@ -68,11 +95,11 @@ export function updateGpuBar(data: { vramUsed?: number; vramTotal?: number; temp
   if (vramEl && data.vramTotal) {
     const gb = (v: number) => (v / 1024).toFixed(1);
     vramEl.textContent = `VRAM ${gb(data.vramUsed)}/${gb(data.vramTotal)} GB`;
-    vramEl.classList.toggle('gpu-warn', data.vramUsed / data.vramTotal > 0.875);
+    vramEl.classList.toggle('gpu-warn', data.vramUsed / data.vramTotal > 0.85);
   }
   if (tempEl && data.temp !== undefined) {
     tempEl.textContent = `GPU ${data.temp}°C`;
-    tempEl.classList.toggle('gpu-warn', data.temp > 80);
+    tempEl.classList.toggle('gpu-warn', data.temp > 75);
   }
 }
 

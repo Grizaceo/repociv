@@ -13,6 +13,7 @@ import {
   wireQuestBoardTabs, fetchPersistedMissions, fetchPendingTracker, renderQuestBoard,
   toggleKeyboardHelp,
   openCityPanel, closeCityPanel, isCityPanelOpen, wireCityPanel,
+  initExternalLibs, updateResource
 } from './ui/index.ts';
 import type { Unit } from './types.ts';
 
@@ -35,14 +36,13 @@ async function bootstrap() {
   const state = new GameState(world);
   state.start();
 
+  // Initialize UI Libraries (Icons, Animations)
+  initExternalLibs();
+
   // Initial resources from world
-  const setRes = (id: string, value: number) => {
-    const el = document.querySelector<HTMLElement>(`#res-${id} .res-value`);
-    if (el) el.textContent = value.toLocaleString();
-  };
-  setRes('gold', world.resources.gold);
-  setRes('science', world.resources.science);
-  setRes('production', world.resources.production);
+  updateResource('gold', world.resources.gold);
+  updateResource('science', world.resources.science);
+  updateResource('production', world.resources.production);
 
   const canvas = document.getElementById('main-canvas') as HTMLCanvasElement;
   const renderer = new Renderer(canvas, state);
