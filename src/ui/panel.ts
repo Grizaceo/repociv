@@ -55,9 +55,9 @@ export function hideUnitPanel() {
 export function renderHeroBar(state: GameState, onSelect: (u: Unit) => void) {
   const slots = document.getElementById('hero-bar-slots');
   if (!slots) return;
-  
+
   const heroes = state.getAllUnits().slice(0, 9);
-  
+
   // Limpieza simple para permitir auto-animate en el contenedor
   slots.innerHTML = '';
 
@@ -65,14 +65,26 @@ export function renderHeroBar(state: GameState, onSelect: (u: Unit) => void) {
     const slot = document.createElement('div');
     slot.className = 'hero-slot';
     if (state.selectedUnit?.id === unit.id) slot.classList.add('selected');
-    
+
+    // Phase 9: fatigue bar — color shifts green→yellow→red as fatigue drops
+    const pct  = unit.fatigue / unit.maxFatigue;
+    const fbar = pct > 0.6 ? '#4caf50' : pct > 0.3 ? '#ff9800' : '#f44336';
+    const fPct = Math.round(pct * 100);
+    const restBadge = unit.isResting
+      ? `<span class="fatigue-rest-badge" title="${unit.name} descansando">☕</span>`
+      : '';
+
     slot.innerHTML = `
       <span class="slot-num">${idx + 1}</span>
       <span class="hero-slot-sprite">${unit.name[0]}</span>
       <span class="slot-state" style="background:${unitStateColor(unit.state)}"></span>
+      <div class="hero-fatigue-wrap" title="Contexto: ${fPct}%">
+        <div class="hero-fatigue-bar" style="width:${fPct}%;background:${fbar}"></div>
+      </div>
+      ${restBadge}
     `;
-    
-    slot.title = `${unit.name} — ${unit.state}`;
+
+    slot.title = `${unit.name} — ${unit.state} | Contexto ${fPct}%${unit.isResting ? ' (descansando)' : ''}`;
     slot.addEventListener('click', () => onSelect(unit));
     slots.appendChild(slot);
   });

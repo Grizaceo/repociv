@@ -223,12 +223,34 @@ export class LocalRenderer {
     } else if (tile.type === 'wall') {
       ctx.fillStyle = '#00000022';
       ctx.fillRect(px + 2, py + 2, s - 4, s - 4);
+    } else if (tile.type === 'debris') {
+      this.drawDebrisTile(px, py, s);
     }
 
     // Grid lines
     ctx.strokeStyle = borderColor;
     ctx.lineWidth = 0.5;
     ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+  }
+
+  private drawDebrisTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    // Dark inner fill — already done by TILE_COLOR.debris, add debris texture
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(px + 3, py + 3, s - 6, s - 6);
+
+    // Crack lines (two diagonal strokes)
+    ctx.strokeStyle = 'rgba(80,60,30,0.6)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(px + 4, py + s * 0.5);
+    ctx.lineTo(px + s * 0.5, py + 4);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(px + s - 4, py + s * 0.5);
+    ctx.lineTo(px + s * 0.5, py + s - 4);
+    ctx.stroke();
   }
 
   private drawWorkbenchTile(tile: LocalTile, px: number, py: number, s: number) {

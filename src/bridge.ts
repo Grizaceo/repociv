@@ -176,6 +176,35 @@ export class BridgeEvents {
         }
         break;
       }
+      // Phase 9: XCOM Context Fatigue events
+      case 'unit_fatigue_update': {
+        this.state.updateUnitFatigue(evt.unit, evt.fatigue, evt.maxFatigue, evt.atRest, evt.restAreaId);
+        break;
+      }
+      case 'unit_sent_to_rest': {
+        this.state.updateUnitFatigue(evt.unit, evt.fatigue, evt.maxFatigue, evt.atRest, evt.restAreaId);
+        logEvent(`🛌 ${evt.unit} enviado a descanso`, 'info');
+        break;
+      }
+      case 'rest_area_discovered': {
+        this.state.addRestArea(evt.restArea);
+        logEvent(`☕ Área de descanso descubierta: ${evt.restArea.roomId}`, 'info');
+        break;
+      }
+      case 'rest_area_entered': {
+        this.state.setUnitResting(evt.unit, true, evt.restAreaId);
+        logEvent(`${evt.unit} entró al área de descanso`, 'info');
+        break;
+      }
+      case 'rest_area_exited': {
+        this.state.setUnitResting(evt.unit, false);
+        logEvent(`${evt.unit} salió del área de descanso`, 'info');
+        break;
+      }
+      case 'context_exhausted': {
+        logEvent(`⚠ Contexto agotado para ${evt.unit}`, 'warn');
+        break;
+      }
       default:
         break;
     }

@@ -81,6 +81,22 @@ const Schemas = [
     missionId: v.optional(v.string()),
   }),
   v.object({
+    type: v.literal('unit_fatigue_update'),
+    unit: v.string(),
+    fatigue: v.number(),
+    maxFatigue: v.number(),
+    atRest: v.boolean(),
+    restAreaId: v.union([v.string(), v.null()]),
+  }),
+  v.object({
+    type: v.literal('unit_sent_to_rest'),
+    unit: v.string(),
+    restAreaId: v.string(),
+    fatigue: v.number(),
+    maxFatigue: v.number(),
+    atRest: v.boolean(),
+  }),
+  v.object({
     type: v.literal('log'),
     msg: v.string(), level: v.optional(LogLevel),
   }),

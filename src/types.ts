@@ -91,6 +91,12 @@ export interface Unit {
   color: string;
   movesLeft: number;      // remaining movement points this "turn"
   maxMoves: number;
+  // ─── Phase 9: XCOM Context Fatigue ───────────────────────────────
+  fatigue: number;         // 0–100 (100 = fresh, 0 = exhausted)
+  maxFatigue: number;     // always 100
+  isResting: boolean;     // true when in a rest area
+  restingRoomId?: string; // which rest area room they're recovering in
+  effectiveSpeed: number; // speed after fatigue penalty (computed)
 }
 
 export const UNIT_COLORS: Record<string, string> = {
@@ -110,6 +116,17 @@ export interface World {
   buildings: Building[];
   resources: TileResources;
   generatedAt: number;
+  restAreas: RestArea[]; // Phase 9: Context Fatigue
+}
+
+// ─── Rest Area (Phase 9: XCOM Context Fatigue) ─────────────────────────────
+export interface RestArea {
+  id: string;
+  roomId: string;        // maps to LocalRoom.id
+  coord: Axial;          // hex center
+  recoveryRate: number;  // fatigue restored per second (default 8)
+  capacity: number;      // max units at once
+  unitsInside: string[]; // unit ids currently resting
 }
 
 // ─── Bridge Events (from bridge.py → RepoCiv) ───────────────────────────────
@@ -121,7 +138,14 @@ export type BridgeEvent =
   | { type: 'building_start';   city: string; building: string; durationSeconds: number; buildingType?: 'building' | 'wonder'; pid?: number; cmd?: string; missionId?: string }
   | { type: 'building_progress'; city: string; building: string; progress: number }
   | { type: 'building_complete'; city: string; building: string; missionId?: string }
-  | { type: 'building_failed';   city: string; building: string; missionId?: string }
+  // Phase 9: Context Fatigue events
+  | { type: 'rest_area_discovered'; restArea: RestArea }
+  | { type: 'rest_area_entered'; unit: string; restAreaId: string }
+  | { type: 'rest_area_exited'; unit: string; restAreaId: string }
+  | { type: 'unit_fatigue_update'; unit: string; fatigue: number; maxFatigue: number; atRest: boolean; restAreaId: string | null }
+  | { type: 'unit_sent_to_rest'; unit: string; restAreaId: string; fatigue: number; maxFatigue: number; atRest: boolean }
+  | { type: 'context_exhausted'; unit: string; hex: [number, number] }
+  | { eventType: string; [key: string]: unknown }
   | { type: 'city_founder';  name: string; hex: [number, number] }
   | { type: 'resource_update'; resource: 'gold' | 'science' | 'production'; delta: number }
   | { type: 'fog_reveal';    hexes: [number, number][] }
@@ -198,14 +222,27 @@ export interface LocalUnit {
   workProgress: number;  // 0-100
   // pointer back to macro unit
   macroUnitId: string;
+  // ─── Phase 9: XCOM Context Fatigue ───────────────────────────────
+  fatigue: number;         // 0–100 (100 = fresh, 0 = exhausted)
+  maxFatigue: number;     // always 100
+  isResting: boolean;     // true when resting in a rest area room
+  restingRoomId?: string;
+  effectiveSpeed: number; // local grid movement speed after fatigue penalty
 }
 
 export interface LocalMission {
   id: string;
   unitId: string;
-  workbench: Workbench;
+  repoId: string;
+  filePath: string;
+  fileName: string;
   status: 'queued' | 'walking' | 'working' | 'complete' | 'failed';
-  progress: number;      // 0-100
+  assignedAt: number;     // timestamp (ms) when queued
+  startedAt: number | null;
+  completedAt: number | null;
+  workbenchId: string;
+  workbench: Workbench | null;  // resolved at dispatch time
+  progress: number;      // 0-100 (updated while working)
 }
 
 // ─── Renderer state ────────────────────────────────────────────────────────────

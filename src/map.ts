@@ -280,6 +280,7 @@ export async function generateWorld(): Promise<World> {
     buildings: [],
     resources: { gold: totalGold, science: totalScience, production: totalProduction },
     generatedAt: Date.now(),
+    restAreas: [], // Phase 9: XCOM Context Fatigue
   };
 }
 

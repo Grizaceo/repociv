@@ -82,6 +82,115 @@ def save_mission(mission: dict[str, Any]) -> None:
         MISSIONS_FILE.write_text(json.dumps(missions, indent=2, ensure_ascii=False))
 
 
+# ─── Phase 9: XCOM Context Fatigue state ─────────────────────────────────────
+# In-memory fatigue tracking for all active units.
+# Key = unit_id, Value = {"fatigue": int, "effectiveSpeed": float, "isResting": bool, "restAreaId": str|None}
+_fatigue_state: dict[str, dict[str, Any]] = {}
+# Rest areas discovered in the world.
+# Key = restAreaId, Value = {"id": str, "roomId": str, "coord": [q,r], "recoveryRate": float, "capacity": int, "unitsInside": list[str]}
+_rest_areas: dict[str, dict[str, Any]] = {}
+# Lock for thread-safe fatigue updates
+_fatigue_lock = threading.Lock()
+
+
+def get_unit_fatigue(unit_id: str) -> dict[str, Any]:
+    with _fatigue_lock:
+        return _fatigue_state.get(unit_id, {
+            "fatigue": 100,
+            "effectiveSpeed": 1.0,
+            "isResting": False,
+            "restAreaId": None,
+        })
+
+
+def update_unit_fatigue(unit_id: str, *, fatigue: int | None = None,
+                        effective_speed: float | None = None,
+                        is_resting: bool | None = None,
+                        rest_area_id: str | None = None,
+                        delta: int = 0) -> dict[str, Any]:
+    """Update fatigue fields for a unit. Returns the updated state dict."""
+    with _fatigue_lock:
+        entry = _fatigue_state.setdefault(unit_id, {
+            "fatigue": 100,
+            "effectiveSpeed": 1.0,
+            "isResting": False,
+            "restAreaId": None,
+        })
+        if fatigue is not None:
+            entry["fatigue"] = max(0, min(100, fatigue))
+        elif delta:
+            entry["fatigue"] = max(0, min(100, entry["fatigue"] + delta))
+        if effective_speed is not None:
+            entry["effectiveSpeed"] = effective_speed
+        if is_resting is not None:
+            entry["isResting"] = is_resting
+        if rest_area_id is not None:
+            entry["restAreaId"] = rest_area_id
+        # Recompute effective speed from fatigue (linear falloff)
+        entry["effectiveSpeed"] = round(entry["fatigue"] / 100.0, 3)
+        return dict(entry)
+
+
+def discover_rest_area(rest_area_id: str, room_id: str, coord: tuple,
+                       recovery_rate: float = 8.0, capacity: int = 4) -> dict[str, Any]:
+    """Register a new rest area discovered in the world."""
+    with _fatigue_lock:
+        area = {
+            "id": rest_area_id,
+            "roomId": room_id,
+            "coord": list(coord),
+            "recoveryRate": recovery_rate,
+            "capacity": capacity,
+            "unitsInside": [],
+        }
+        _rest_areas[rest_area_id] = area
+        return dict(area)
+
+
+def enter_rest_area(unit_id: str, rest_area_id: str) -> bool:
+    """Attempt to enter a rest area. Returns True if successful."""
+    with _fatigue_lock:
+        area = _rest_areas.get(rest_area_id)
+        if not area:
+            return False
+        if len(area["unitsInside"]) >= area["capacity"]:
+            return False
+        if unit_id not in area["unitsInside"]:
+            area["unitsInside"].append(unit_id)
+        entry = _fatigue_state.get(unit_id, {})
+        entry["isResting"] = True
+        entry["restAreaId"] = rest_area_id
+        _fatigue_state[unit_id] = entry
+        return True
+
+
+def exit_rest_area(unit_id: str) -> None:
+    """Remove unit from whatever rest area they were in."""
+    with _fatigue_lock:
+        entry = _fatigue_state.get(unit_id, {})
+        ra_id = entry.get("restAreaId")
+        if ra_id and ra_id in _rest_areas:
+            try:
+                _rest_areas[ra_id]["unitsInside"].remove(unit_id)
+            except ValueError:
+                pass
+        entry["isResting"] = False
+        entry["restAreaId"] = None
+        _fatigue_state[unit_id] = entry
+
+
+def tick_fatigue_recovery(dt_seconds: float) -> None:
+    """Call each frame/tick to recover fatigue for resting units."""
+    with _fatigue_lock:
+        for unit_id, entry in list(_fatigue_state.items()):
+            if entry.get("isResting") and entry.get("restAreaId"):
+                ra = _rest_areas.get(entry["restAreaId"])
+                if ra:
+                    recovered = ra["recoveryRate"] * dt_seconds
+                    entry["fatigue"] = max(0, min(100, entry["fatigue"] + recovered))
+                    entry["effectiveSpeed"] = round(entry["fatigue"] / 100.0, 3)
+
+
 # ─── RepoCiv event sender ───────────────────────────────────────────────────
 def send_to_repociv(event: dict[str, Any]) -> None:
     try:
@@ -129,6 +238,70 @@ def get_gpu_info() -> dict[str, Any] | None:
         }
     except Exception:
         return None
+
+
+# ─── Tech-debt scanner ────────────────────────────────────────────────────────
+_TD_PATTERNS = re.compile(
+    r'(TODO\s*[:\-]?\s*tech\s*debt|FIXME\s*[:\-]?\s*hack|HACK|BUG\s*[:\-]?\s*|'
+    r'REFACTOR|TECH\s*DEBT|DEBT\s*[:\-]?\s*|LEGACY|STALE)',
+    re.IGNORECASE,
+)
+_TD_EXTENSIONS = {'.ts', '.tsx', '.js', '.jsx', '.py', '.rs', '.go', '.java', '.cpp', '.c', '.h'}
+
+
+def scan_tech_debt(root_path: str = os.path.expanduser("~/.hermes/workspace/repos")) -> list[dict[str, Any]]:
+    """Walk repos looking for files with tech-debt markers."""
+    results: list[dict[str, Any]] = []
+    try:
+        for repo in os.listdir(root_path):
+            repo_path = os.path.join(root_path, repo)
+            if not os.path.isdir(repo_path):
+                continue
+            for dirpath, _dirs, filenames in os.walk(repo_path):
+                # Skip node_modules, .git, __pycache__, .venv
+                skip = {'node_modules', '.git', '__pycache__', '.venv', '.venv311',
+                        'dist', 'build', '.next', 'target', 'vendor'}
+                if any(s in dirpath for s in skip):
+                    continue
+                for fname in filenames:
+                    ext = os.path.splitext(fname)[1].lower()
+                    if ext not in _TD_EXTENSIONS:
+                        continue
+                    fpath = os.path.join(dirpath, fname)
+                    try:
+                        rel = os.path.relpath(fpath, root_path)
+                        with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
+                            content = f.read()
+                        matches: list[dict[str, str]] = []
+                        for i, line in enumerate(content.splitlines(), 1):
+                            if _TD_PATTERNS.search(line):
+                                matches.append({'line': i, 'text': line.strip()[:120]})
+                        if matches:
+                            results.append({
+                                'repo': repo,
+                                'file': rel,
+                                'path': fpath,
+                                'matches': matches,
+                                'severity': _assess_debt_severity(matches),
+                            })
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    return results
+
+
+def _assess_debt_severity(matches: list[dict[str, str]]) -> str:
+    """Heuristic severity based on keyword."""
+    critical = {'BUG', 'HACK', 'FIXME'}
+    high = {'TECH DEBT', 'REFACTOR', 'DEBT', 'LEGACY'}
+    for m in matches:
+        first_word = m['text'].split()[0].upper() if m['text'] else ''
+        if first_word in critical:
+            return 'critical'
+        if any(w in m['text'].upper() for w in high):
+            return 'high'
+    return 'normal'
 
 
 # ─── PENDING_TRACKER parser ─────────────────────────────────────────────────
@@ -482,6 +655,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._json(tasks)
             return
 
+        if self.path == "/techdebt":
+            root = os.environ.get("REPOCIV_REPOS_ROOT",
+                                 str(Path(__file__).parent.parent / "workspace" / "repos"))
+            debt = scan_tech_debt(root)
+            self._json(debt)
+            return
+
+        # Phase 9: XCOM Context Fatigue endpoints
+        if self.path == "/context":
+            # GET /context — return fatigue state for all tracked units
+            self._json({"ok": True, "fatigue": _fatigue_state, "restAreas": _rest_areas})
+            return
+
         self.send_response(404)
         self.end_headers()
 
@@ -527,6 +713,41 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 save_mission(mission_rec)
                 send_to_repociv({"type": "mission_start", "missionId": mission_rec["id"], "unit": "DAVI", "questName": title})
                 send_to_repociv({"type": "log", "msg": f"Quest agregado: {title}", "level": "success"})
+
+            # Phase 9: XCOM Context Fatigue POST commands
+            elif t == "unit_fatigue_delta":
+                # Decay or recover fatigue for a unit (e.g. after a mission tick)
+                unit_id = body.get("unit", "")
+                delta = int(body.get("delta", 0))
+                entry = update_unit_fatigue(unit_id, delta=delta)
+                send_to_repociv({
+                    "type": "unit_fatigue_update",
+                    "unit": unit_id,
+                    "fatigue": entry["fatigue"],
+                    "effectiveSpeed": entry["effectiveSpeed"],
+                })
+
+            elif t == "discover_rest_area":
+                # Mark a room as a rest area
+                ra_id = body.get("restAreaId", f"ra-{uuid.uuid4().hex[:6]}")
+                room_id = body.get("roomId", "")
+                coord = body.get("coord", [0, 0])
+                area = discover_rest_area(ra_id, room_id, tuple(coord))
+                send_to_repociv({"type": "rest_area_discovered", "restArea": area})
+
+            elif t == "enter_rest_area":
+                unit_id = body.get("unit", "")
+                ra_id = body.get("restAreaId", "")
+                ok = enter_rest_area(unit_id, ra_id)
+                if ok:
+                    send_to_repociv({"type": "rest_area_entered", "unit": unit_id, "restAreaId": ra_id})
+                else:
+                    send_to_repociv({"type": "log", "msg": f"Rest area {ra_id} llena o no existe", "level": "warn"})
+
+            elif t == "exit_rest_area":
+                unit_id = body.get("unit", "")
+                exit_rest_area(unit_id)
+                send_to_repociv({"type": "rest_area_exited", "unit": unit_id, "restAreaId": ""})
 
             self._json({"ok": True})
 

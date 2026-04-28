@@ -149,6 +149,77 @@ export class GameState {
     }
   }
 
+  // ─── Phase 9: XCOM Context Fatigue ─────────────────────────────────────────
+  updateUnitFatigue(unitId: string, fatigue: number, maxFatigue: number, atRest: boolean, restAreaId: string | null) {
+    const unit = this.unitMap.get(unitId);
+    if (unit) {
+      unit.fatigue = fatigue;
+      unit.maxFatigue = maxFatigue;
+      unit.isResting = atRest;
+      unit.restingRoomId = restAreaId;
+      unit.effectiveSpeed = maxFatigue > 0 ? fatigue / maxFatigue : 1;
+      this.notify();
+    }
+  }
+
+  setUnitResting(unitId: string, isResting: boolean, restAreaId?: string) {
+    const unit = this.unitMap.get(unitId);
+    if (unit) {
+      unit.isResting = isResting;
+      unit.restingRoomId = isResting ? restAreaId : undefined;
+      this.notify();
+    }
+  }
+
+  getUnitFatigue(unitId: string): { unit: string; fatigue: number; maxFatigue: number; effectiveSpeed: number; isResting: boolean; restingRoomId: string | undefined } | null {
+    const unit = this.unitMap.get(unitId);
+    if (!unit) return null;
+    return {
+      unit: unit.id,
+      fatigue: unit.fatigue,
+      maxFatigue: unit.maxFatigue,
+      effectiveSpeed: unit.effectiveSpeed,
+      isResting: unit.isResting,
+      restingRoomId: unit.restingRoomId ?? undefined,
+    };
+  }
+
+  addRestArea(restArea: import('./types').RestArea) {
+    const existing = this.world.restAreas.find(r => r.id === restArea.id);
+    if (!existing) {
+      this.world.restAreas.push(restArea);
+      this.notify();
+    }
+  }
+
+  removeRestArea(restAreaId: string) {
+    const idx = this.world.restAreas.findIndex(r => r.id === restAreaId);
+    if (idx !== -1) {
+      this.world.restAreas.splice(idx, 1);
+      this.notify();
+    }
+  }
+
+  getRestAreaNear(coord: Axial, radius = 3): import('./types').RestArea | undefined {
+    return this.world.restAreas.find(ra => {
+      const dq = Math.abs(ra.coord.q - coord.q);
+      const dr = Math.abs(ra.coord.r - coord.r);
+      return dq + dr <= radius;
+    });
+  }
+
+  decayUnitFatigue(unitId: string, delta: number) {
+    const unit = this.unitMap.get(unitId);
+    if (!unit) return;
+    unit.fatigue = Math.max(0, Math.min(unit.maxFatigue, unit.fatigue + delta));
+    unit.effectiveSpeed = parseFloat((unit.fatigue / unit.maxFatigue).toFixed(3));
+    // Auto-warn at 20%
+    if (unit.fatigue <= 20 && unit.fatigue > 0 && !unit.isResting) {
+      console.warn(`[fatigue] ${unit.name} contexto bajo (${unit.fatigue}%)`);
+    }
+    this.notify();
+  }
+
   // ─── Spawn unit ────────────────────────────────────────────────────────────
   spawnUnit(id: string, name: string, type: Unit['type'], civ: string, coord: Axial, mission?: string): Unit {
     const existing = this.unitMap.get(id);
@@ -163,6 +234,10 @@ export class GameState {
       speed: type === 'scout' ? 2 : 1,
       color,
       movesLeft: 4, maxMoves: 4,
+      // Phase 9: XCOM Context Fatigue
+      fatigue: 100, maxFatigue: 100,
+      isResting: false, restingRoomId: undefined,
+      effectiveSpeed: 1.0,
     };
     this.world.units.push(unit);
     this.unitMap.set(id, unit);
@@ -305,7 +380,35 @@ export class GameState {
       startedAt: null,
       completedAt: null,
       workbenchId: '', // resolved on dispatch
+      workbench: null,
+      progress: 0,
     });
+  }
+
+  /** Manually dispatch a specific queued mission by ID (used by priority panel). */
+  dispatchMissionById(missionId: string) {
+    const idx = this.missionQueue.findIndex(m => m.id === missionId && m.status === 'queued');
+    if (idx === -1) return;
+    const queued = this.missionQueue[idx]!;
+
+    const unit = this.localUnits.find(u => u.state === 'idle');
+    if (!unit) return;
+    if (!this.localWorld) return;
+
+    const workbench = findNearestWorkbench(this.localWorld, queued.filePath);
+    if (!workbench) return;
+
+    const path = findPath(this.localWorld, unit.gridX, unit.gridY, workbench.x, workbench.y);
+    if (!path) return;
+
+    unit.workbenchId = workbench.id;
+    unit.path = path;
+    unit.pathProgress = 0;
+    unit.state = 'moving';
+    queued.unitId = unit.id;
+    queued.workbenchId = workbench.id;
+    queued.status = 'walking';
+    queued.startedAt = Date.now();
   }
 
   private dispatchNextMission() {
@@ -319,6 +422,7 @@ export class GameState {
 
     // Resolve workbench for the target file
     if (!this.localWorld) return;
+
     const workbench = findNearestWorkbench(this.localWorld, queued.filePath);
     if (!workbench) return;
 
@@ -334,7 +438,7 @@ export class GameState {
 
     queued.unitId = unit.id;
     queued.workbenchId = workbench.id;
-    queued.status = 'running';
+    queued.status = 'walking';
     queued.startedAt = Date.now();
   }
 

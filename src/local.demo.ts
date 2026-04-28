@@ -89,6 +89,12 @@ function spawnLocalUnit(id: string, name: string, unitType: LocalUnit['unitType'
     mission: null,
     workProgress: 0,
     macroUnitId: `macro-${id}`,
+    // Phase 9: XCOM Context Fatigue
+    fatigue: 100,
+    maxFatigue: 100,
+    isResting: false,
+    restingRoomId: undefined,
+    effectiveSpeed: 1.0,
   };
   localUnits.set(id, unit);
   return unit;
@@ -149,13 +155,16 @@ function findWorkbenchTile(wb: Workbench): { x: number; y: number } | null {
 }
 
 // ─── localUpdate (simplified Phase 7a simulation) ─────────────────────────────
-const SPEED = 4; // tiles per second
+const BASE_SPEED = 4; // tiles per second at full fatigue
 
 function localUpdate(dt: number): void {
   for (const unit of localUnits.values()) {
     if (unit.state === 'walking_to_workbench' || unit.state === 'walking_to_room') {
+      // Phase 9: slow movement when context is low
+      const speed = BASE_SPEED * unit.effectiveSpeed;
+
       // Advance path
-      unit.pathProgress += SPEED * dt;
+      unit.pathProgress += speed * dt;
       while (unit.pathProgress >= 1 && unit.pathIndex < unit.path.length - 1) {
         unit.pathProgress -= 1;
         unit.pathIndex++;
@@ -175,10 +184,14 @@ function localUpdate(dt: number): void {
         console.log(`  [ARRIVED] ${unit.name} reached workbench at (${unit.gridX}, ${unit.gridY})`);
       }
     } else if (unit.state === 'working_on_file') {
+      // Phase 9: context degrades while working (cognitive load)
+      unit.fatigue = Math.max(0, unit.fatigue - 4 * dt);
+      unit.effectiveSpeed = parseFloat((unit.fatigue / unit.maxFatigue).toFixed(3));
+
       // Accumulate work progress
       const mission = missionQueue.find(m => m.unitId === unit.id && (m.status === 'working' || m.status === 'walking'));
       if (mission) {
-        mission.progress = Math.min(100, mission.progress + 25 * dt);
+        mission.progress = Math.min(100, mission.progress + 25 * dt * unit.effectiveSpeed);
         unit.workProgress = mission.progress;
         if (mission.progress >= 100) {
           mission.status = 'complete';
@@ -210,12 +223,14 @@ for (let i = 0; i <= STEPS; i++) {
   processMissionQueue();
   localUpdate(0.5);
 
-  // Log every step to show walking progression
+  // Log every step to show walking progression + Phase 9 fatigue
   const state = davi.state.replace(/_/g, ' ');
   const pos = `(${davi.gridX}, ${davi.gridY})`;
   const work = davi.workProgress > 0 ? ` work:${davi.workProgress.toFixed(0)}%` : '';
   const pathLeft = (davi.path.length - davi.pathIndex - 1) > 0 ? ` path-left:${davi.path.length - davi.pathIndex - 1}` : '';
-  console.log(`  t=${t.toFixed(1)}s | DAVI: ${state.padEnd(22)} pos=${pos.padEnd(12)}${work}${pathLeft}`);
+  const fatigue = `${davi.fatigue.toFixed(0)}%`;
+  const speed = `${(BASE_SPEED * davi.effectiveSpeed).toFixed(1)}`;
+  console.log(`  t=${t.toFixed(1)}s | DAVI: ${state.padEnd(22)} pos=${pos.padEnd(12)}${work}${pathLeft} | ctx:${fatigue} speed:${speed} tiles/s`);
 }
 
 console.log('\n=== Demo complete ===');

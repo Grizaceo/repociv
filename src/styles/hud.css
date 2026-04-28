@@ -172,6 +172,30 @@
 .hero-slot .slot-state.moving { background: #c8a84b; }
 .hero-slot .slot-state.sleeping { background: #6b6b6b; }
 
+/* Phase 9: XCOM Context Fatigue bars */
+.hero-fatigue-wrap {
+  position: absolute;
+  bottom: 2px;
+  left: 4px;
+  right: 4px;
+  height: 3px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.hero-fatigue-bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease, background 0.4s ease;
+}
+.fatigue-rest-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 10px;
+  line-height: 1;
+}
+
 .hero-bar-spawn {
   display: flex;
   gap: 4px;

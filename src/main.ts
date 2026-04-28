@@ -13,7 +13,8 @@ import {
   wireQuestBoardTabs, fetchPersistedMissions, fetchPendingTracker, renderQuestBoard,
   toggleKeyboardHelp,
   openCityPanel, closeCityPanel, isCityPanelOpen, wireCityPanel,
-  initExternalLibs, updateResource, toggleViewHUD
+  initExternalLibs, updateResource, toggleViewHUD,
+  togglePriorityPanel,
 } from './ui/index.ts';
 import type { Unit } from './types.ts';
 import { Renderer3D } from './renderer3d.ts';
@@ -238,6 +239,9 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents) {
       case 'f': renderer.toggleDebug(); break;
       case 'v': renderer.toggleFog(); break;
       case '3': toggleView(); break;
+      case 'p': togglePriorityPanel(state.getMissionQueue(), (missionId) => {
+        state.dispatchMissionById(missionId);
+      }); break;
       case '?': toggleKeyboardHelp(); break;
     }
 
