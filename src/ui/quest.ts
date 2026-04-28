@@ -75,7 +75,7 @@ export function renderQuestBoard(state: GameState, persisted: Mission[] = []) {
         <span class="quest-status ${m.status}"></span>
         <div>
           <div class="quest-name">${escapeHtml(m.questName)}</div>
-          <div class="quest-meta">${escapeHtml(m.unit)} · ${when} · ${dur}</div>
+          <div class="quest-meta">${escapeHtml(m.unit)} · ${when} · ${dur}${m.simulated ? ' · <span title="Misión simulada (bridge offline)">🎭 sim</span>' : ''}</div>
         </div>
         <div class="quest-meta">${m.status}</div>
       </div>

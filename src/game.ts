@@ -20,6 +20,7 @@ export interface Mission {
   status: 'running' | 'complete' | 'failed';
   startedAt: number;
   completedAt: number | null;
+  simulated?: boolean; // true = bridge was offline/simulated
 }
 
 // ─── GameState ───────────────────────────────────────────────────────────────
