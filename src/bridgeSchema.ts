@@ -97,6 +97,31 @@ const Schemas = [
     atRest: v.boolean(),
   }),
   v.object({
+    type: v.literal('rest_area_discovered'),
+    restArea: v.object({
+      id: v.string(),
+      roomId: v.string(),
+      label: v.string(),
+      capacity: v.number(),
+      repoId: v.string(),
+    }),
+  }),
+  v.object({
+    type: v.literal('rest_area_entered'),
+    unit: v.string(),
+    restAreaId: v.string(),
+  }),
+  v.object({
+    type: v.literal('rest_area_exited'),
+    unit: v.string(),
+    restAreaId: v.string(),
+  }),
+  v.object({
+    type: v.literal('context_exhausted'),
+    unit: v.string(),
+    hex: Hex,
+  }),
+  v.object({
     type: v.literal('log'),
     msg: v.string(), level: v.optional(LogLevel),
   }),

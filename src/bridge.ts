@@ -163,7 +163,7 @@ export class BridgeEvents {
         if (evt.success) playSound('mission');
         break;
       case 'chat_chunk':
-        appendChatChunk(evt.unit, evt.text, evt.missionId);
+        appendChatChunk(evt.unit, evt.text);
         break;
       case 'log':
         logEvent(evt.msg, evt.level ?? 'info');

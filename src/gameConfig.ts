@@ -79,21 +79,15 @@ export const cfg = {
 
 // ─── Deep merge utility ────────────────────────────────────────────────────────
 function deepMerge<T extends object>(base: T, patch: Partial<T>): T {
-  const out: Record<string, unknown> = { ...base };
+  const out = { ...(base as Record<string, unknown>) };
   for (const key of Object.keys(patch) as (keyof T)[]) {
-    const pv = patch[key];
-    const bv = base[key];
+    const pv = patch[key] as unknown;
+    const bv = (base as Record<string, unknown>)[key as string];
     if (pv !== undefined) {
-      if (
-        pv !== null &&
-        bv !== null &&
-        typeof pv === 'object' &&
-        !Array.isArray(pv) &&
-        !Array.isArray(bv)
-      ) {
-        out[key] = deepMerge(bv as object, pv as object);
+      if (pv !== null && bv !== null && typeof pv === 'object' && !Array.isArray(pv) && !Array.isArray(bv)) {
+        out[key as string] = deepMerge(bv as object, pv as object);
       } else {
-        out[key] = pv;
+        out[key as string] = pv;
       }
     }
   }

@@ -138,6 +138,7 @@ export type BridgeEvent =
   | { type: 'building_start';   city: string; building: string; durationSeconds: number; buildingType?: 'building' | 'wonder'; pid?: number; cmd?: string; missionId?: string }
   | { type: 'building_progress'; city: string; building: string; progress: number }
   | { type: 'building_complete'; city: string; building: string; missionId?: string }
+  | { type: 'building_failed';   city: string; building: string; missionId?: string }
   // Phase 9: Context Fatigue events
   | { type: 'rest_area_discovered'; restArea: RestArea }
   | { type: 'rest_area_entered'; unit: string; restAreaId: string }
@@ -145,7 +146,6 @@ export type BridgeEvent =
   | { type: 'unit_fatigue_update'; unit: string; fatigue: number; maxFatigue: number; atRest: boolean; restAreaId: string | null }
   | { type: 'unit_sent_to_rest'; unit: string; restAreaId: string; fatigue: number; maxFatigue: number; atRest: boolean }
   | { type: 'context_exhausted'; unit: string; hex: [number, number] }
-  | { eventType: string; [key: string]: unknown }
   | { type: 'city_founder';  name: string; hex: [number, number] }
   | { type: 'resource_update'; resource: 'gold' | 'science' | 'production'; delta: number }
   | { type: 'fog_reveal';    hexes: [number, number][] }
@@ -222,6 +222,8 @@ export interface LocalUnit {
   workProgress: number;  // 0-100
   // pointer back to macro unit
   macroUnitId: string;
+  // currently-assigned workbench in local view
+  currentWorkbenchId: string | null;
   // ─── Phase 9: XCOM Context Fatigue ───────────────────────────────
   fatigue: number;         // 0–100 (100 = fresh, 0 = exhausted)
   maxFatigue: number;     // always 100

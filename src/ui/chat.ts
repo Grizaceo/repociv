@@ -42,7 +42,7 @@ export function openSidePanel(unit: Unit) {
 
   renderChatBuffer(unit.id);
   // Re-init icons if needed for dynamic content
-  if (window.lucide) window.lucide.createIcons();
+  if ((window as unknown as Record<string, unknown>)['lucide']) (window as unknown as Record<string, { createIcons: () => void }>)['lucide']!.createIcons();
 }
 
 export function closeSidePanel() {

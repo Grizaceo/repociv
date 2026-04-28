@@ -5,7 +5,7 @@ import {
   axialToPixel,
   type Camera,
 } from './hex.ts';
-import { type Unit, tileKey } from './types.ts';
+import { type Unit, type Tile, tileKey } from './types.ts';
 import { type GameState } from './game.ts';
 import { HexRenderer } from './hexRenderer.ts';
 import { UnitRenderer } from './unitRenderer.ts';
@@ -37,6 +37,7 @@ export class Renderer {
   private unitR: UnitRenderer;
   private minimapR: MinimapRenderer;
   private localR: LocalRendererType | null = null; // Phase 6: RimWorld 2D view
+  private localWorldId: string | null = null;
 
   onUnitSelect: ((unit: Unit | null) => void) | null = null;
   onCitySelect: ((cityId: string) => void) | null = null;
@@ -202,6 +203,16 @@ export class Renderer {
 
   getCanvas(): HTMLCanvasElement { return this.canvas; }
 
+  getCamera(): { x: number; y: number; zoom: number } {
+    return { x: this.cam.x, y: this.cam.y, zoom: this.cam.zoom };
+  }
+
+  private rafId = 0;
+
+  stop() {
+    cancelAnimationFrame(this.rafId);
+  }
+
   start() {
     let lastTime = performance.now();
     const loop = (now: number) => {
@@ -210,9 +221,9 @@ export class Renderer {
       this.animTime += dt;
       this.render();
       this.minimapR.draw(this.cam, this.canvas, this.fogEnabled);
-      requestAnimationFrame(loop);
+      this.rafId = requestAnimationFrame(loop);
     };
-    requestAnimationFrame(loop);
+    this.rafId = requestAnimationFrame(loop);
   }
 
   private render() {
@@ -222,12 +233,15 @@ export class Renderer {
 
     // ─── Phase 6: Local RimWorld view ───────────────────────────────────────
     if (this.state.viewMode === 'local') {
-      if (!this.localR && this.state.localWorld) {
-        this.localR = new LocalRenderer(canvas, this.state.localWorld, this.state);
+      if (!this.localR) {
+        this.localR = new LocalRenderer(canvas);
+        this.localR.setupInput();
       }
-      if (this.localR) {
-        this.localR.draw();
+      if (this.state.localWorld && this.state.localWorld.repoId !== this.localWorldId) {
+        this.localR.setWorld(this.state.localWorld);
+        this.localWorldId = this.state.localWorld.repoId;
       }
+      this.localR.render(this.state.getLocalUnits());
       return;
     }
 

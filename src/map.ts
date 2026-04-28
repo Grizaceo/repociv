@@ -33,7 +33,7 @@ const EXTENSION_WEIGHT: Record<string, Terrain> = {
 };
 
 const TERRAIN_WEIGHTS: Record<Terrain, number> = {
-  plains: 1, forest: 2, mountain: 3, desert: 1, ocean: 1, ice: 1,
+  plains: 1, forest: 2, mountain: 3, desert: 1, ocean: 1, ice: 1, hills: 1,
 };
 
 export function inferTerrain(extensions: Record<string, number>): Terrain {

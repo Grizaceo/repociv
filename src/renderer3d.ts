@@ -1,7 +1,7 @@
 // ─── RepoCiv — Renderer 3D (WebGL / Three.js) ──────────────────────────────────
 import * as THREE from 'three';
-import { type Axial, axialToPixel } from './hex.ts';
-import { type Tile, type World, type Unit, type City, tileKey } from './types.ts';
+import { axialToPixel } from './hex.ts';
+import { type Tile } from './types.ts';
 import { GameState } from './game.ts';
 
 const HEX_SIZE = 52;
@@ -22,11 +22,8 @@ export class Renderer3D {
 
   private textures: Record<string, THREE.Texture> = {};
   private spriteMaterials: Record<string, THREE.SpriteMaterial> = {};
-  private assetsLoaded = false;
-
   private isRunning = false;
   private camTarget = new THREE.Vector3(0, 0, 0);
-  private zoom = 1;
 
   constructor(container: HTMLElement, state: GameState) {
     this.container = container;
@@ -107,7 +104,6 @@ export class Renderer3D {
     });
 
     await Promise.all(promises);
-    this.assetsLoaded = true;
     this.rebuildWorld();
   }
 
@@ -131,7 +127,7 @@ export class Renderer3D {
         roughness: 0.8,
       });
       if (!tile.revealed) {
-        mat.map = this.textures['fog'];
+        mat.map = this.textures['fog'] ?? null;
         mat.color.set(0x888888);
       } else if (tile.inFog) {
         mat.color.set(0x444466);
@@ -218,7 +214,6 @@ export class Renderer3D {
 
   setCamera(x: number, y: number, zoom: number) {
     this.camTarget.set(x * SCALE_3D, 0, y * SCALE_3D);
-    this.zoom = zoom;
     this.camera.position.set(this.camTarget.x, 600 / zoom, this.camTarget.z + 600 / zoom);
     this.camera.lookAt(this.camTarget);
   }

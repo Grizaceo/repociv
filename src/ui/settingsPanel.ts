@@ -1,8 +1,7 @@
 // ─── RepoCiv — Settings Panel (Phase 10.2) ───────────────────────────────────
 // Parametric fatigue thresholds, animation controls, model allowlist.
 
-import { cfg, loadConfig, saveConfig, resetConfig, type GameConfig } from '../gameConfig.ts';
-import { state } from '../game.ts';
+import { loadConfig, saveConfig, resetConfig, type GameConfig } from '../gameConfig.ts';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let isOpen = false;

@@ -1,5 +1,5 @@
 // ─── RepoCiv — Local Renderer (RimWorld-style 2D grid) ─────────────────────────
-import type { LocalWorld, LocalTile, LocalRoom, LocalUnit, Workbench } from './types.ts';
+import type { LocalWorld, LocalTile, LocalRoom, LocalUnit } from './types.ts';
 
 const TILE_SIZE = 24; // px per tile
 
@@ -134,13 +134,6 @@ export class LocalRenderer {
     return { x, y };
   }
 
-  private worldToScreen(wx: number, wy: number): { x: number; y: number } {
-    return {
-      x: (wx - this.cam.x) * this.cam.zoom + this.cam.cx,
-      y: (wy - this.cam.y) * this.cam.zoom + this.cam.cy,
-    };
-  }
-
   private getTile(x: number, y: number): LocalTile | null {
     if (!this.world) return null;
     if (y < 0 || y >= this.world.height || x < 0 || x >= this.world.width) return null;
@@ -210,8 +203,8 @@ export class LocalRenderer {
     const py = tile.y * TILE_SIZE;
     const s  = TILE_SIZE;
 
-    const fillColor   = TILE_COLOR[tile.type]   ?? TILE_COLOR.floor;
-    const borderColor = TILE_BORDER[tile.type] ?? TILE_BORDER.floor;
+    const fillColor   = TILE_COLOR[tile.type]   ?? TILE_COLOR['floor']  ?? '#2a2a35';
+    const borderColor = TILE_BORDER[tile.type] ?? TILE_BORDER['floor'] ?? '#1a1a22';
 
     // Fill
     ctx.fillStyle = fillColor;
@@ -287,7 +280,6 @@ export class LocalRenderer {
     const px = room.x * TILE_SIZE;
     const py = room.y * TILE_SIZE;
     const pw = room.width  * TILE_SIZE;
-    const ph = room.height * TILE_SIZE;
 
     const label = room.folderName.toUpperCase();
     ctx.save();

@@ -55,7 +55,7 @@ export class UnitRenderer {
 
     const initials = unit.name.split(/[\s-_]/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase();
 
-    offsets.forEach((off, i) => {
+    offsets.forEach((off, _i) => {
       ctx.save();
       ctx.translate(off.dx, off.dy);
       

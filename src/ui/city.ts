@@ -1,5 +1,5 @@
 // ─── RepoCiv — City Panel ─────────────────────────────────────────────────────
-import type { City, Building, District } from '../types.ts';
+import type { City, Building } from '../types.ts';
 
 export function openCityPanel(city: City, _activeBuildings: Building[]) {
   const panel = document.getElementById('city-panel');
@@ -45,7 +45,3 @@ export function wireCityPanel() {
   document.getElementById('btn-city-close')?.addEventListener('click', closeCityPanel);
 }
 
-function esc(s: string): string {
-  return s.replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
-}

@@ -57,7 +57,7 @@ function renderPanel(container: HTMLElement, missions: LocalMission[], onAssign:
     const ageStr = age < 60 ? `${age}s` : `${Math.round(age / 60)}m`;
     const fileShort = pm.fileName.length > 22 ? pm.fileName.slice(0, 20) + '…' : pm.fileName;
     const statusColor = pm.status === 'complete' ? '#5b9b5b' :
-                         pm.status === 'running' ? '#c8a84b' : '#888';
+                         (pm.status === 'walking' || pm.status === 'working') ? '#c8a84b' : '#888';
     const isDebt = pm.filePath.includes('/debt/') || pm.filePath.includes('/legacy/') || pm.filePath.includes('/stale/');
     const debtBadge = isDebt ? '<span class="badge-debt">DEBT</span>' : '';
     const testBadge = pm.fileName.includes('.test.') || pm.fileName.includes('.spec.') ? '<span class="badge-test">TEST</span>' : '';

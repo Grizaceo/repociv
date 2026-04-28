@@ -2,11 +2,11 @@
 
 import {
   type World, type Unit, type Building, type UnitState, tileKey, UNIT_COLORS,
-  type ViewMode, type LocalWorld, type LocalUnit, type LocalMission, type Workbench,
+  type ViewMode, type LocalWorld, type LocalUnit, type LocalMission,
 } from './types.ts';
 import type { Axial } from './hex.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
-import { buildLocalWorld, type FileNode } from './localMap.ts';
+import { generateLocalWorldFromApi, buildMockLocalWorld } from './localMap.ts';
 import { findPath, findNearestWorkbench } from './localPathfinding.ts';
 
 // ─── Clock speed ──────────────────────────────────────────────────────────────
@@ -156,7 +156,7 @@ export class GameState {
       unit.fatigue = fatigue;
       unit.maxFatigue = maxFatigue;
       unit.isResting = atRest;
-      unit.restingRoomId = restAreaId;
+      unit.restingRoomId = restAreaId ?? undefined;
       unit.effectiveSpeed = maxFatigue > 0 ? fatigue / maxFatigue : 1;
       this.notify();
     }
@@ -286,24 +286,55 @@ export class GameState {
 
   // ─── Phase 6: View transition ───────────────────────────────────────────────
 
-  /** Switch to RimWorld local view, generating the grid from repoId if needed. */
-  enterLocalView(repoId: string, rootPath: string): LocalWorld {
+  /** Switch to RimWorld local view, fetching file tree from bridge API. */
+  async enterLocalView(repoId: string): Promise<LocalWorld> {
     if (!this.localWorld || this.localWorld.repoId !== repoId) {
-      this.localWorld = buildLocalWorld(repoId, rootPath);
-      // Spawn a default DAVI unit at the entrance if no units exist
+      this.localWorld = await generateLocalWorldFromApi(repoId);
       if (this.localUnits.length === 0) {
-        const entrance = this.localWorld.rooms[0]!;
+        const entrance = this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
+        const heroUnit = this.getAllUnits()[0];
         this.localUnits.push({
-          id: 'DAVI',
-          name: 'DAVI',
-          role: 'hero',
+          id: heroUnit?.id ?? 'DAVI',
+          name: heroUnit?.name ?? 'DAVI',
+          unitType: heroUnit?.type ?? 'hero',
+          color: heroUnit ? (UNIT_COLORS[heroUnit.type] ?? '#4af') : '#4af',
           gridX: entrance.x + Math.floor(entrance.w / 2),
           gridY: entrance.y + Math.floor(entrance.h / 2),
-          state: 'idle',
-          workbenchId: null,
+          targetX: null,
+          targetY: null,
+          path: [],
+          pathIndex: 0,
+          pathProgress: 0,
+          state: 'idle_in_room',
+          mission: heroUnit?.mission ?? null,
           workProgress: 0,
-          speed: 1,
-          color: '#4af',
+          macroUnitId: heroUnit?.id ?? 'DAVI',
+          currentWorkbenchId: null,
+          fatigue: heroUnit?.fatigue ?? 100,
+          maxFatigue: heroUnit?.maxFatigue ?? 100,
+          isResting: heroUnit?.isResting ?? false,
+          effectiveSpeed: heroUnit?.effectiveSpeed ?? 1,
+        });
+      }
+    }
+    this.viewMode = 'local';
+    return this.localWorld;
+  }
+
+  /** Synchronous local view entry using mock world (for tests / offline mode). */
+  enterLocalViewMock(repoId: string): LocalWorld {
+    if (!this.localWorld || this.localWorld.repoId !== repoId) {
+      this.localWorld = buildMockLocalWorld(repoId);
+      if (this.localUnits.length === 0) {
+        const entrance = this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
+        this.localUnits.push({
+          id: 'DAVI', name: 'DAVI', unitType: 'hero', color: '#4af',
+          gridX: entrance.x + 1, gridY: entrance.y + 1,
+          targetX: null, targetY: null,
+          path: [], pathIndex: 0, pathProgress: 0,
+          state: 'idle_in_room', mission: null, workProgress: 0,
+          macroUnitId: 'DAVI', currentWorkbenchId: null,
+          fatigue: 100, maxFatigue: 100, isResting: false, effectiveSpeed: 1,
         });
       }
     }
@@ -331,29 +362,28 @@ export class GameState {
   // ─── Phase 7a: Local update loop ────────────────────────────────────────────
 
   /** Main tick update for local (RimWorld) view — runs every TICK_MS when viewMode=local */
-  localUpdate(dt: number) {
+  localUpdate(_dt: number) {
     if (this.viewMode !== 'local' || !this.localWorld) return;
     this.localTickCount++;
 
-    // 1. Advance moving units
     for (const unit of this.localUnits) {
-      if (unit.state === 'moving' && unit.path.length > 0) {
-        unit.pathProgress += 0.06 * unit.speed; // ~16 frames per tile at speed=1
+      // 1. Advance moving units
+      if (unit.state === 'walking_to_workbench' && unit.path.length > 0) {
+        unit.pathProgress += 0.06 * unit.effectiveSpeed;
         if (unit.pathProgress >= 1) {
           unit.pathProgress = 0;
           unit.gridX = unit.path[0]!.x;
           unit.gridY = unit.path[0]!.y;
           unit.path.shift();
           if (unit.path.length === 0) {
-            // Arrived at workbench
-            unit.state = unit.workbenchId ? 'working' : 'idle';
+            unit.state = unit.currentWorkbenchId ? 'working_on_file' : 'idle_in_room';
             unit.workProgress = 0;
           }
         }
       }
 
       // 2. Advance working units
-      if (unit.state === 'working') {
+      if (unit.state === 'working_on_file') {
         unit.workProgress = Math.min(100, (unit.workProgress ?? 0) + 0.08);
         if (unit.workProgress >= 100) {
           this.completeLocalMission(unit.id);
@@ -361,8 +391,8 @@ export class GameState {
       }
     }
 
-    // 3. Simple queue dispatch: idle unit picks up next mission
-    if (this.localTickCount % 30 === 0) { // every ~500ms
+    // 3. Dispatch idle unit → next queued mission (~every 500ms)
+    if (this.localTickCount % 30 === 0) {
       this.dispatchNextMission();
     }
   }
@@ -390,56 +420,49 @@ export class GameState {
     const idx = this.missionQueue.findIndex(m => m.id === missionId && m.status === 'queued');
     if (idx === -1) return;
     const queued = this.missionQueue[idx]!;
+    this.assignMissionToUnit(queued);
+  }
 
-    const unit = this.localUnits.find(u => u.state === 'idle');
-    if (!unit) return;
-    if (!this.localWorld) return;
+  private assignMissionToUnit(queued: LocalMission) {
+    const unit = this.localUnits.find(u => u.state === 'idle_in_room');
+    if (!unit || !this.localWorld) return;
 
-    const workbench = findNearestWorkbench(this.localWorld, queued.filePath);
-    if (!workbench) return;
+    // Try to find workbench by filePath, fall back to nearest
+    let wbX = -1, wbY = -1, wbId = '';
+    outer: for (const row of this.localWorld.grid) {
+      for (const tile of row) {
+        if (tile.type === 'workbench' && tile.workbench?.filePath === queued.filePath) {
+          wbX = tile.x; wbY = tile.y;
+          wbId = tile.workbench.id;
+          break outer;
+        }
+      }
+    }
+    if (wbX === -1) {
+      const nearest = findNearestWorkbench(this.localWorld, unit.gridX, unit.gridY);
+      if (!nearest?.workbench) return;
+      wbX = nearest.x; wbY = nearest.y;
+      wbId = nearest.workbench.id;
+      queued.workbench = nearest.workbench;
+    }
 
-    const path = findPath(this.localWorld, unit.gridX, unit.gridY, workbench.x, workbench.y);
-    if (!path) return;
+    const pathResult = findPath(this.localWorld, unit.gridX, unit.gridY, wbX, wbY);
+    if (!pathResult) return;
 
-    unit.workbenchId = workbench.id;
-    unit.path = path;
+    unit.currentWorkbenchId = wbId;
+    unit.path = pathResult.path;
     unit.pathProgress = 0;
-    unit.state = 'moving';
+    unit.state = 'walking_to_workbench';
     queued.unitId = unit.id;
-    queued.workbenchId = workbench.id;
+    queued.workbenchId = wbId;
     queued.status = 'walking';
     queued.startedAt = Date.now();
   }
 
   private dispatchNextMission() {
-    if (this.missionQueue.length === 0) return;
     const queued = this.missionQueue.find(m => m.status === 'queued');
     if (!queued) return;
-
-    // Find an idle unit
-    const unit = this.localUnits.find(u => u.state === 'idle');
-    if (!unit) return;
-
-    // Resolve workbench for the target file
-    if (!this.localWorld) return;
-
-    const workbench = findNearestWorkbench(this.localWorld, queued.filePath);
-    if (!workbench) return;
-
-    // Find path to workbench
-    const path = findPath(this.localWorld, unit.gridX, unit.gridY, workbench.x, workbench.y);
-    if (!path) return;
-
-    // Assign
-    unit.workbenchId = workbench.id;
-    unit.path = path;
-    unit.pathProgress = 0;
-    unit.state = 'moving';
-
-    queued.unitId = unit.id;
-    queued.workbenchId = workbench.id;
-    queued.status = 'walking';
-    queued.startedAt = Date.now();
+    this.assignMissionToUnit(queued);
   }
 
   private completeLocalMission(unitId: string) {
@@ -447,16 +470,16 @@ export class GameState {
     if (!unit) return;
 
     const mission = this.missionQueue.find(
-      m => m.unitId === unitId && m.status === 'running',
+      m => m.unitId === unitId && (m.status === 'walking' || m.status === 'working'),
     );
     if (mission) {
-      mission.status = 'completed';
+      mission.status = 'complete';
       mission.completedAt = Date.now();
     }
 
-    unit.workbenchId = null;
+    unit.currentWorkbenchId = null;
     unit.workProgress = 0;
-    unit.state = 'idle';
+    unit.state = 'idle_in_room';
     unit.path = [];
   }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GameState } from './game.ts';
-import type { Unit, RestArea, World } from './types.ts';
+import type { RestArea, World } from './types.ts';
 import type { Axial } from './hex.ts';
 
 function makeAxial(q = 0, r = 0): Axial { return { q, r }; }
@@ -14,29 +14,6 @@ function makeWorld(): World {
     resources: { gold: 0, science: 0, production: 0 },
     generatedAt: Date.now(),
     restAreas: [],          // Phase 9
-  };
-}
-
-function makeUnit(id = 'davi'): Unit {
-  return {
-    id,
-    name: id.toUpperCase(),
-    type: 'hero',
-    civ: 'gris',
-    coord: makeAxial(5, 5),
-    path: [],
-    pathIndex: 0,
-    pathProgress: 0,
-    state: 'idle',
-    speed: 1,
-    color: '#c8a84b',
-    movesLeft: 4,
-    maxMoves: 4,
-    // Phase 9 fatigue fields
-    fatigue: 100,
-    maxFatigue: 100,
-    isResting: false,
-    effectiveSpeed: 1.0,
   };
 }
 

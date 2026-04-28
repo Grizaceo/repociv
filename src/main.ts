@@ -14,8 +14,9 @@ import {
   toggleKeyboardHelp,
   openCityPanel, closeCityPanel, isCityPanelOpen, wireCityPanel,
   initExternalLibs, updateResource, toggleViewHUD,
-  togglePriorityPanel, openSettingsPanel, closeSettingsPanel, toggleSettingsPanel,
+  togglePriorityPanel,
 } from './ui/index.ts';
+import { toggleSettingsPanel, closeSettingsPanel } from './ui/settingsPanel.ts';
 import type { Unit } from './types.ts';
 import { Renderer3D } from './renderer3d.ts';
 
@@ -107,6 +108,7 @@ async function bootstrap() {
   // ─── Phase 6: Double-click city → enter RimWorld local view ─────────────────
   renderer.onEnterLocal = (repoId, rootPath) => {
     bridge.send('enter_local', { repoId, rootPath });
+    state.enterLocalView(repoId).catch(() => state.enterLocalViewMock(repoId));
   };
 
   // Spawn DAVI as the default hero, near the capital if present
@@ -114,7 +116,7 @@ async function bootstrap() {
   const spawnAt = capital ? capital.coord : { q: 0, r: 0 };
   state.spawnUnit('DAVI', 'DAVI', 'hero', 'gris', spawnAt, 'En espera de misión');
 
-  wireHUD(renderer, state, bridge);
+  wireHUD(renderer, state, bridge, toggleView);
 
   // Load pending tracker missions at boot
   fetchPendingTracker().then(pending => {
@@ -155,7 +157,7 @@ function selectHero(unit: Unit, renderer: Renderer, state: GameState, _bridge: B
 }
 
 // ─── HUD wiring ───────────────────────────────────────────────────────────────
-function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents) {
+function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, toggleView: () => void) {
   const missionInput = document.getElementById('mission-input') as HTMLInputElement;
 
   // ─── Hotkeys ────────────────────────────────────────────────────────────
