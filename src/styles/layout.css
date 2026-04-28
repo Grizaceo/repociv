@@ -1,0 +1,35 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   RepoCiv — Reset & Layout Base
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--app-bg);
+  overflow: hidden;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  user-select: none;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+/* ─── Canvas principal ──────────────────────────────────────────────────── */
+#main-canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: block;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SCROLLBAR (estilo oscuro)
+   ══════════════════════════════════════════════════════════════════════════ */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--ui-dark); }
+::-webkit-scrollbar-thumb { background: var(--ui-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }

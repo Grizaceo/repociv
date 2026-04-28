@@ -11,16 +11,22 @@ export function showUnitPanel(unit: Unit) {
     sprite.textContent = unit.name[0] ?? '?';
     sprite.style.background = unit.color;
     sprite.style.color = '#1a1208';
+    if (unit.state === 'working') sprite.classList.add('working');
+    else sprite.classList.remove('working');
   }
   const setText = (id: string, value: string) => {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
   };
   setText('unit-name', unit.name);
-  setText('unit-type', unit.type.toUpperCase());
+  setText('unit-state-text', unit.state);
   setText('unit-mission', unit.mission ?? 'Sin misión');
   setText('unit-moves', `${unit.movesLeft}/${unit.maxMoves} mov`);
   setText('unit-model', unitModelLabel(unit));
+
+  const fill = document.getElementById('unit-moves-fill');
+  if (fill) fill.style.width = `${(unit.movesLeft / unit.maxMoves) * 100}%`;
+
   const dot = document.getElementById('unit-status-dot');
   if (dot) dot.style.background = unitStateColor(unit.state);
 }

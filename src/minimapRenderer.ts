@@ -7,12 +7,18 @@ const HEX_SIZE = 52;
 
 export class MinimapRenderer {
   private bounds = { minQ: 0, maxQ: 0, minR: 0, maxR: 0 };
+  private cacheCanvas = document.createElement('canvas');
+  private isDirty = true;
+  private lastFog = true;
+  private lastRevealedCount = -1;
 
   constructor(private state: GameState) {}
 
   private computeBounds() {
     let minQ = Infinity, maxQ = -Infinity, minR = Infinity, maxR = -Infinity;
+    let revealedCount = 0;
     for (const tile of this.state.world.tiles.values()) {
+      if (tile.revealed) revealedCount++;
       if (tile.terrain === 'ocean' && !tile.revealed) continue;
       if (tile.coord.q < minQ) minQ = tile.coord.q;
       if (tile.coord.q > maxQ) maxQ = tile.coord.q;
@@ -20,6 +26,7 @@ export class MinimapRenderer {
       if (tile.coord.r > maxR) maxR = tile.coord.r;
     }
     this.bounds = { minQ, maxQ, minR, maxR };
+    return revealedCount;
   }
 
   draw(cam: Camera, mainCanvas: HTMLCanvasElement, fogEnabled: boolean) {
@@ -28,29 +35,45 @@ export class MinimapRenderer {
     const ctx = mm.getContext('2d');
     if (!ctx) return;
 
-    this.computeBounds();
+    const revealedCount = this.computeBounds();
     const { minQ, maxQ, minR, maxR } = this.bounds;
     if (!isFinite(minQ)) return;
+
+    if (this.lastFog !== fogEnabled || this.lastRevealedCount !== revealedCount || mm.width !== this.cacheCanvas.width || mm.height !== this.cacheCanvas.height) {
+       this.isDirty = true;
+    }
 
     const padX = 2, padY = 2;
     const cellW = (mm.width  - padX * 2) / Math.max(1, maxQ - minQ + 1);
     const cellH = (mm.height - padY * 2) / Math.max(1, maxR - minR + 1);
 
-    ctx.fillStyle = '#0a0804';
-    ctx.fillRect(0, 0, mm.width, mm.height);
+    if (this.isDirty) {
+      this.cacheCanvas.width = mm.width;
+      this.cacheCanvas.height = mm.height;
+      const cctx = this.cacheCanvas.getContext('2d')!;
+      cctx.fillStyle = '#0a0804';
+      cctx.fillRect(0, 0, mm.width, mm.height);
 
-    for (const tile of this.state.world.tiles.values()) {
-      const c = TERRAIN_COLOR[tile.terrain]!;
-      ctx.fillStyle = tile.inFog && fogEnabled ? '#1a1208' : c.fill;
-      const x = padX + (tile.coord.q - minQ) * cellW;
-      const y = padY + (tile.coord.r - minR) * cellH + (tile.coord.q - minQ) * cellH * 0.5;
-      ctx.fillRect(x, y, Math.max(1, cellW), Math.max(1, cellH));
-      if (tile.city) {
-        ctx.fillStyle = tile.city.isCapital ? '#f0c050' : '#c8a84b';
-        ctx.fillRect(x - 1, y - 1, Math.max(2, cellW + 2), Math.max(2, cellH + 2));
+      for (const tile of this.state.world.tiles.values()) {
+        const c = TERRAIN_COLOR[tile.terrain]!;
+        cctx.fillStyle = tile.inFog && fogEnabled ? '#1a1208' : c.fill;
+        const x = padX + (tile.coord.q - minQ) * cellW;
+        const y = padY + (tile.coord.r - minR) * cellH + (tile.coord.q - minQ) * cellH * 0.5;
+        cctx.fillRect(x, y, Math.max(1, cellW), Math.max(1, cellH));
+        if (tile.city) {
+          cctx.fillStyle = tile.city.isCapital ? '#f0c050' : '#c8a84b';
+          cctx.fillRect(x - 1, y - 1, Math.max(2, cellW + 2), Math.max(2, cellH + 2));
+        }
       }
+      this.isDirty = false;
+      this.lastFog = fogEnabled;
+      this.lastRevealedCount = revealedCount;
     }
 
+    // Draw cached terrain layer
+    ctx.drawImage(this.cacheCanvas, 0, 0);
+
+    // Draw dynamic units layer
     for (const u of this.state.world.units) {
       const x = padX + (u.coord.q - minQ) * cellW;
       const y = padY + (u.coord.r - minR) * cellH + (u.coord.q - minQ) * cellH * 0.5;

@@ -19,6 +19,25 @@ export function openSidePanel(unit: Unit) {
     stateEl.textContent = unit.state;
     stateEl.className = `state-${unit.state}`;
   }
+  
+  // Model selector dropdown
+  const selector = document.getElementById('model-selector') as HTMLSelectElement;
+  if (selector) {
+    selector.innerHTML = '';
+    const base = unit.id.split('-')[0]?.toUpperCase();
+    let options: string[] = [];
+    if (base === 'DAVI' || base === 'LEXO') {
+       options = ['Hermes: minimax-m2.6', 'Hermes: claude-3-haiku', 'LM Studio: llama-3 (Local)'];
+    } else {
+       options = ['OpenClaw: gemini', 'OpenClaw: codex', 'LM Studio: phi-3 (Local)'];
+    }
+    options.forEach(opt => {
+       const el = document.createElement('option');
+       el.value = opt; el.textContent = opt;
+       selector.appendChild(el);
+    });
+  }
+
   renderChatBuffer(unit.id);
 }
 

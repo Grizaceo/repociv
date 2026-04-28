@@ -25,12 +25,21 @@ export function updateResource(id: 'gold' | 'science' | 'production', value: num
 }
 
 const LOG_MAX = 6;
-export function logEvent(msg: string, type: 'info' | 'warn' | 'success' = 'info') {
+export function logEvent(msg: string, type: 'info' | 'warn' | 'success' | 'build' | 'error' = 'info') {
   const container = document.getElementById('log-messages');
   if (!container) return;
   const entry = document.createElement('div');
-  entry.className = `log-entry log-${type === 'warn' ? 'error' : type === 'success' ? 'gold' : 'info'}`;
-  entry.textContent = msg;
+  entry.className = `log-entry log-${type === 'warn' ? 'error' : type === 'success' ? 'gold' : type}`;
+  
+  let icon = '·';
+  let iconColor = 'var(--gold-mid)';
+  if (type === 'success') { icon = '✓'; iconColor = 'var(--state-success)'; }
+  else if (type === 'warn') { icon = '⚠'; iconColor = 'var(--state-warn)'; }
+  else if (type === 'error') { icon = '✗'; iconColor = 'var(--state-error)'; }
+  else if (type === 'build') { icon = '◆'; iconColor = 'var(--state-working)'; }
+
+  const escapedMsg = msg.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+  entry.innerHTML = `<span class="log-icon" style="color:${iconColor}">${icon}</span> <span class="log-text">${escapedMsg}</span>`;
   container.appendChild(entry);
   while (container.children.length > LOG_MAX) {
     container.removeChild(container.firstChild!);

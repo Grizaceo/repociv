@@ -30,12 +30,20 @@ export function updateResource(id: 'gold' | 'science' | 'production', value: num
 
 // ─── Event log ────────────────────────────────────────────────────────────
 const LOG_MAX = 6;
-export function logEvent(msg: string, type: 'info' | 'warn' | 'success' = 'info') {
+export function logEvent(msg: string, type: 'info' | 'warn' | 'success' | 'build' | 'error' = 'info') {
   const container = document.getElementById('log-messages');
   if (!container) return;
   const entry = document.createElement('div');
-  entry.className = `log-entry log-${type === 'warn' ? 'error' : type === 'success' ? 'gold' : 'info'}`;
-  entry.textContent = msg;
+  entry.className = `log-entry log-${type === 'warn' ? 'error' : type === 'success' ? 'gold' : type}`;
+  
+  let icon = '·';
+  let iconColor = 'var(--gold-mid)';
+  if (type === 'success') { icon = '✓'; iconColor = 'var(--state-success)'; }
+  else if (type === 'warn') { icon = '⚠'; iconColor = 'var(--state-warn)'; }
+  else if (type === 'error') { icon = '✗'; iconColor = 'var(--state-error)'; }
+  else if (type === 'build') { icon = '◆'; iconColor = 'var(--state-working)'; }
+
+  entry.innerHTML = `<span class="log-icon" style="color:${iconColor}">${icon}</span> <span class="log-text">${escapeHtml(msg)}</span>`;
   container.appendChild(entry);
   while (container.children.length > LOG_MAX) {
     container.removeChild(container.firstChild!);
@@ -107,13 +115,19 @@ export function showUnitPanel(unit: Unit) {
     if (el) el.textContent = value;
   };
   setText('unit-name', unit.name);
-  setText('unit-type', unit.type.toUpperCase());
+  setText('unit-state-text', unit.state);
   setText('unit-mission', unit.mission ?? 'Sin misión');
   setText('unit-moves', `${unit.movesLeft}/${unit.maxMoves} mov`);
   setText('unit-model', unitModelLabel(unit));
 
+  const fill = document.getElementById('unit-moves-fill');
+  if (fill) fill.style.width = `${(unit.movesLeft / unit.maxMoves) * 100}%`;
+
   const dot = document.getElementById('unit-status-dot');
   if (dot) dot.style.background = unitStateColor(unit.state);
+  
+  if (unit.state === 'working') sprite.classList.add('working');
+  else sprite.classList.remove('working');
 }
 
 function unitModelLabel(unit: Unit): string {
@@ -181,6 +195,25 @@ export function openSidePanel(unit: Unit) {
     stateEl.textContent = unit.state;
     stateEl.className = `state-${unit.state}`;
   }
+  
+  // Model selector dropdown
+  const selector = document.getElementById('model-selector') as HTMLSelectElement;
+  if (selector) {
+    selector.innerHTML = '';
+    const base = unit.id.split('-')[0]?.toUpperCase();
+    let options = [];
+    if (base === 'DAVI' || base === 'LEXO') {
+       options = ['Hermes: minimax-m2.6', 'Hermes: claude-3-haiku', 'LM Studio: llama-3 (Local)'];
+    } else {
+       options = ['OpenClaw: gemini', 'OpenClaw: codex', 'LM Studio: phi-3 (Local)'];
+    }
+    options.forEach(opt => {
+       const el = document.createElement('option');
+       el.value = opt; el.textContent = opt;
+       selector.appendChild(el);
+    });
+  }
+
   renderChatBuffer(unit.id);
 }
 
@@ -299,6 +332,42 @@ export async function loadFilesInfo(repoName: string) {
   } catch (e) {
     target.innerHTML = `<div class="file-row" style="color:#d45b5b">Error: ${String(e)}</div>`;
   }
+}
+
+// ─── Ficha de Ciudad (City Modal Mocks) ───────────────────────────────────
+export function openCityModal(cityName: string) {
+  const panel = document.getElementById('city-panel');
+  if (!panel) return;
+  panel.classList.remove('hidden');
+
+  const setText = (id: string, text: string) => { const e = document.getElementById(id); if(e) e.textContent = text; };
+  setText('city-panel-name', cityName.toUpperCase());
+  setText('city-repo-name', cityName);
+
+  // Mocks delay para simular fetch
+  setTimeout(() => {
+    setText('city-git-branch', 'main');
+    setText('city-git-status', 'clean');
+    setText('city-terrain', '🌲 Bosque (70% código)');
+    setText('city-session', '🔆 Bright (Actividad reciente)');
+    setText('city-skill', '⚡ OK');
+    setText('city-res-gold', Math.floor(Math.random() * 2000).toLocaleString());
+    setText('city-res-sci', Math.floor(Math.random() * 200).toString());
+    setText('city-res-prod', Math.floor(Math.random() * 100).toString());
+    
+    const missionsEl = document.getElementById('city-missions-list');
+    if (missionsEl) missionsEl.innerHTML = '<div class="city-item">◉ Analizar dataset (2h ago)</div><div class="city-item">○ Revisar README (pending)</div>';
+
+    const gitEl = document.getElementById('city-git-details');
+    if (gitEl) gitEl.innerHTML = '<div class="city-item">⎇ main · a3f9b2c</div><div class="city-item" style="color:var(--text-dim)">3 files changed</div>';
+
+    const filesEl = document.getElementById('city-files-list');
+    if (filesEl) filesEl.innerHTML = '<div class="city-item">src/main.ts (mod 2h)</div><div class="city-item">docs/README.md (clean)</div>';
+  }, 400);
+}
+
+export function closeCityModal() {
+  document.getElementById('city-panel')?.classList.add('hidden');
 }
 
 // ─── Quest Board ──────────────────────────────────────────────────────────

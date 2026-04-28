@@ -1,0 +1,71 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   RepoCiv — Variables & Design Tokens (Civ V Inspired)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&display=swap');
+
+:root {
+  /* BACKGROUNDS */
+  --app-bg:        #0a0804;
+  --panel-bg:      rgba(22, 16, 6, 0.95);
+  --panel-border:  #5a3e1e;
+  --panel-hover:   rgba(90, 62, 30, 0.4);
+
+  /* GOLDS */
+  --gold-dim:      #8a6a3e;
+  --gold-mid:      #c8a84b;
+  --gold-bright:   #f0c050;
+  --gold-glow:     rgba(240, 192, 80, 0.35);
+
+  /* TEXT */
+  --text-primary:  #e8d5a0;
+  --text-dim:      #a89060;
+  --text-faint:    #6a5040;
+
+  /* AGENTES */
+  --agt-davi:      #c8a84b;
+  --agt-worker:    #5b9b5b;
+  --agt-scout:     #5b9bd5;
+  --agt-lexo:      #b86ce8;
+  --agt-openclaw:  #7bd6c8;
+
+  /* TERRENOS */
+  --hex-plains:    #7ba05b;
+  --hex-desert:    #d4a574;
+  --hex-forest:    #2d5a27;
+  --hex-mountain:  #6b6b6b;
+  --hex-ocean:     #2b6da5;
+  --hex-ice:       #e0e0e0;
+  --hex-fog:       rgba(0, 0, 0, 0.62);
+
+  /* ESTADOS */
+  --state-success: #5b9b5b;
+  --state-warn:    #d4a44b;
+  --state-error:   #d45b5b;
+  --state-working: #5b9bd5;
+  --state-info:    #a89060;
+
+  /* TRANSPORTS */
+  --trp-hermes:    #5b9bd5;
+  --trp-openclaw:  #7bd6c8;
+  --trp-demo:      #c8a84b;
+  --trp-offline:   #d45b5b;
+
+  /* OLD FALLBACKS (Para compatibilidad durante refactor) */
+  --ui-dark:         #1a1208;
+  --ui-border:       var(--panel-border);
+  --ui-gold:         var(--gold-mid);
+  --ui-gold-bright:  var(--gold-bright);
+  --ui-text:         var(--text-primary);
+  --ui-text-dim:     var(--text-dim);
+  --ui-panel-bg:     var(--panel-bg);
+  --res-science:     #5b9bd5;
+  --res-production:  #d45b5b;
+  --res-gold:        #f0c040;
+  --bar-bg:          #2a1e0a;
+  
+  /* FONTS */
+  --font-ui:         'Cinzel', 'Georgia', serif;
+  --font-mono:       'Courier New', monospace;
+  --font-body:       'Georgia', serif;
+}
