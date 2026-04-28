@@ -64,6 +64,7 @@ async function bootstrap() {
 
   let is3D = false;
   const toggleView = () => {
+    if (state.viewMode === 'local') return; // design decision #3: no 3D in local view
     is3D = !is3D;
     const cam = renderer.getCamera();
     if (is3D) {
