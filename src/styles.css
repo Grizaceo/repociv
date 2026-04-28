@@ -259,6 +259,40 @@ body {
   color: var(--ui-dark);
 }
 
+/* ─── Chat input (side panel) — gemelo del mission-input ─────────────────── */
+#chat-input-row {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--ui-border);
+  background: rgba(0,0,0,0.3);
+}
+#chat-input {
+  flex: 1;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  color: var(--ui-text);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  padding: 5px 8px;
+  outline: none;
+}
+#chat-input:focus { border-color: var(--ui-gold); }
+#chat-input::placeholder { color: var(--ui-text-dim); font-style: italic; }
+#btn-chat-send {
+  background: var(--ui-border);
+  border: 1px solid var(--ui-gold);
+  border-radius: 3px;
+  color: var(--ui-gold);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+#btn-chat-send:hover { background: var(--ui-gold); color: var(--ui-dark); }
+
 /* ─── Log de eventos ─────────────────────────────────────────────────────── */
 #event-log {
   position: absolute;

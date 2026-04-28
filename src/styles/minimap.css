@@ -1,0 +1,71 @@
+/* ─── Minimapa ───────────────────────────────────────────────────────────── */
+#minimap-container {
+  position: absolute;
+  bottom: 8px; right: 8px;
+  border: 2px solid var(--ui-border);
+  border-radius: 4px;
+  overflow: hidden;
+  z-index: 10;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+  background: var(--ui-dark);
+}
+#minimap-canvas { display: block; cursor: pointer; }
+
+/* City list panel */
+#city-list-panel {
+  position: absolute;
+  bottom: 8px; right: 236px;
+  background: var(--ui-panel-bg);
+  border: 2px solid var(--ui-border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  z-index: 10;
+  min-width: 130px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+}
+#city-list-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ui-text-dim);
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--ui-border);
+  padding-bottom: 3px;
+}
+#city-list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.city-item {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--ui-text);
+  padding: 2px 6px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.city-item:hover { background: var(--ui-border); color: var(--ui-gold-bright); }
+.city-item.city-capital::before { content: '★ '; color: var(--ui-gold); }
+
+/* Tooltip */
+#tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--ui-panel-bg);
+  border: 2px solid var(--ui-border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: var(--font-body);
+  color: var(--ui-text);
+  z-index: 100;
+  max-width: 220px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.8);
+  transition: opacity 0.15s;
+}
+#tooltip.hidden { opacity: 0; }

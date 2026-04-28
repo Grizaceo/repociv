@@ -1,0 +1,44 @@
+/* ─── Reset y Base ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0a0804;
+  overflow: hidden;
+  font-family: var(--font-body);
+  color: var(--ui-text);
+  user-select: none;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+/* ─── Canvas principal ───────────────────────────────────────────────────── */
+#main-canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: block;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--ui-dark); }
+::-webkit-scrollbar-thumb { background: var(--ui-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ui-border-light); }
+
+/* ─── Animaciones globales ───────────────────────────────────────────────── */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes pulse-warn {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

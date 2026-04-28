@@ -1,0 +1,3 @@
+["node_modules", ".git", "dist", "build", "target", ".next",
+ "__pycache__", ".venv", "venv", ".pytest_cache", ".cache",
+ "checkpoints", ".turbo", ".parcel-cache"]

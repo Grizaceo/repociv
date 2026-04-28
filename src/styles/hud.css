@@ -1,0 +1,280 @@
+/* ─── HUD OVERLAYS ─────────────────────────────────────────────────────────── */
+
+/* Barra superior de recursos */
+#top-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 42px;
+  background: var(--ui-panel-bg);
+  border-bottom: 2px solid var(--ui-border);
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 0 20px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  z-index: 10;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.6);
+}
+
+.resource {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+}
+
+.res-icon { font-size: 15px; }
+.res-label { color: var(--ui-text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+.res-value { font-weight: 600; min-width: 36px; }
+#res-gold   .res-value { color: var(--res-gold); }
+#res-science .res-value { color: var(--res-science); }
+#res-production .res-value { color: var(--res-production); }
+
+#era-display {
+  margin-left: auto;
+  color: var(--ui-gold);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+/* Bridge status */
+#bridge-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  margin-left: 12px;
+  letter-spacing: 0.08em;
+}
+.bridge-online  { background: #2d5a27; color: #b3e8a4; }
+.bridge-offline { background: #3a1a1a; color: #d48a8a; }
+.bridge-demo    { color: #c8a84b !important; animation: pulse-warn 2s infinite; }
+
+/* GPU/VRAM bar */
+#gpu-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--ui-text-dim);
+  padding: 0 8px;
+  border-left: 1px solid var(--border);
+}
+#gpu-bar.hidden { display: none; }
+.gpu-warn { color: #d45b5b !important; animation: pulse-warn 1s infinite; }
+
+/* Screenshot button */
+#btn-screenshot {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--ui-text-dim);
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 14px;
+  border-radius: 3px;
+  line-height: 1;
+}
+#btn-screenshot:hover {
+  background: var(--ui-bg-hover, rgba(255,255,255,0.08));
+  color: var(--ui-text);
+}
+
+/* Hero Bar */
+#hero-bar {
+  position: absolute;
+  top: 64px;
+  left: 8px;
+  background: var(--ui-panel-bg);
+  border: 2px solid var(--ui-border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+}
+
+.hero-bar-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ui-text-dim);
+  border-bottom: 1px solid var(--ui-border);
+  padding-bottom: 3px;
+}
+
+#hero-bar-slots {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-height: 28px;
+}
+
+.hero-slot {
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--ui-border);
+  background: var(--ui-dark);
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: var(--ui-text);
+  transition: all 0.15s;
+}
+
+.hero-slot:hover { border-color: var(--ui-gold); }
+.hero-slot.selected {
+  border-color: var(--ui-gold-bright);
+  box-shadow: 0 0 8px var(--ui-gold);
+}
+
+.hero-slot .slot-num {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  background: var(--ui-gold);
+  color: var(--ui-dark);
+  font-size: 9px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.hero-slot .slot-state {
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--ui-dark);
+}
+.hero-slot .slot-state.idle { background: #888; }
+.hero-slot .slot-state.working { background: #5b9bd5; animation: pulse 1.5s infinite; }
+.hero-slot .slot-state.moving { background: #c8a84b; }
+.hero-slot .slot-state.sleeping { background: #6b6b6b; }
+
+.hero-bar-spawn {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  border-top: 1px solid var(--ui-border);
+  padding-top: 6px;
+}
+.hero-bar-spawn .hint {
+  font-size: 9px;
+  color: var(--ui-text-dim);
+  font-family: var(--font-ui);
+  letter-spacing: 0.08em;
+}
+
+.spawn-btn {
+  background: var(--ui-dark);
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  color: var(--ui-text);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  width: 26px;
+  height: 22px;
+}
+.spawn-btn:hover {
+  border-color: var(--ui-gold);
+  background: var(--ui-border);
+  color: var(--ui-gold-bright);
+}
+
+/* Bottom hotkeys ribbon */
+#hotkeys-ribbon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 12px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  background: var(--ui-panel-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  padding: 4px 10px;
+  z-index: 9;
+  letter-spacing: 0.05em;
+}
+#hotkeys-ribbon kbd {
+  font-size: 9px;
+  padding: 0 4px;
+  margin-right: 2px;
+}
+
+/* Event log */
+#event-log {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 420px;
+  background: var(--ui-panel-bg);
+  border: 2px solid var(--ui-border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  z-index: 10;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+  max-height: 80px;
+  overflow: hidden;
+}
+#log-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.log-entry {
+  font-size: 11px;
+  font-family: var(--font-body);
+  color: var(--ui-text);
+  padding: 1px 4px;
+  border-radius: 2px;
+  animation: slideUp 0.3s ease;
+}
+.log-entry.log-gold { color: var(--ui-gold-bright); font-weight: 600; }
+.log-entry.log-build { color: var(--bar-building); }
+.log-entry.log-wonder { color: var(--ui-gold-bright); font-weight: 700; font-size: 12px; }
+.log-entry.log-error { color: #d45b5b; }
+
+/* Responsive */
+@media (max-width: 1366px) {
+  #minimap-container canvas {
+    width: 120px !important;
+    height: 90px !important;
+  }
+  #hero-bar-slots {
+    max-width: 5 * 42px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+  }
+  #side-panel {
+    width: 100vw !important;
+    right: 0 !important;
+    left: 0 !important;
+  }
+}

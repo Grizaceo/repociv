@@ -49,6 +49,7 @@
         <button class="spawn-btn" data-type="WORKER" title="Spawn Worker [W]">W</button>
         <button class="spawn-btn" data-type="SCOUT" title="Spawn Scout [E]">E</button>
         <button class="spawn-btn" data-type="LEXO" title="Spawn LexO [L]" style="color:#b86ce8">L</button>
+        <button class="spawn-btn" data-type="OPENCLAW" title="Spawn openclaw [O]" style="color:#7bd6c8">O</button>
       </div>
     </div>
 
@@ -98,6 +99,10 @@
         <div class="tab-pane active" data-pane="chat">
           <div id="chat-messages"></div>
           <div id="operation-ticker" class="hidden"><span class="dot"></span><span id="ticker-text">trabajando...</span></div>
+          <div id="chat-input-row">
+            <input id="chat-input" type="text" placeholder="Hablar con el agente seleccionado... [Enter]" autocomplete="off" />
+            <button id="btn-chat-send">Enviar</button>
+          </div>
         </div>
         <!-- Git tab -->
         <div class="tab-pane" data-pane="git">
@@ -109,6 +114,28 @@
         </div>
       </div>
     </aside>
+
+    <!-- City Panel (click tile con ciudad) -->
+    <div id="city-panel" class="hidden">
+      <div class="city-panel-header">
+        <div class="city-panel-title">
+          <span id="city-panel-star" class="city-star hidden">★</span>
+          <span id="city-panel-name">—</span>
+          <span id="city-panel-pop" class="city-pop"></span>
+        </div>
+        <button id="city-panel-close" title="Cerrar [Esc]">✕</button>
+      </div>
+      <div class="city-panel-tabs">
+        <button class="city-tab active" data-ctab="overview">General</button>
+        <button class="city-tab" data-ctab="districts">Distritos</button>
+        <button class="city-tab" data-ctab="buildings">Obras</button>
+      </div>
+      <div id="city-panel-content">
+        <div class="city-pane active" data-cpane="overview"><div id="city-overview"></div></div>
+        <div class="city-pane" data-cpane="districts"><div id="city-districts"></div></div>
+        <div class="city-pane" data-cpane="buildings"><div id="city-buildings"></div></div>
+      </div>
+    </div>
 
     <!-- Quest Board (F9) -->
     <div id="quest-board" class="hidden">
@@ -139,6 +166,7 @@
             <kbd>W</kbd> Spawn Worker (multi)<br>
             <kbd>E</kbd> Spawn Scout (multi)<br>
             <kbd>L</kbd> Spawn LexO-α (multi)<br>
+            <kbd>O</kbd> Spawn openclaw (multi)<br>
           </div>
           <div class="kbh-section">
             <h4>Selección</h4>

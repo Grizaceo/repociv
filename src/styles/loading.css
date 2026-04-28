@@ -1,0 +1,35 @@
+/* ─── Loading screen ─────────────────────────────────────────────────────── */
+#loading-screen {
+  position: absolute;
+  inset: 0;
+  background: var(--ui-dark);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  gap: 16px;
+  transition: opacity 0.6s;
+}
+#loading-screen.fade-out { opacity: 0; pointer-events: none; }
+#loading-text {
+  font-family: var(--font-ui);
+  font-size: 22px;
+  color: var(--ui-gold);
+  letter-spacing: 0.1em;
+}
+#loading-bar {
+  width: 280px;
+  height: 8px;
+  background: var(--bar-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+#loading-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ui-gold), var(--ui-gold-bright));
+  width: 0%;
+  transition: width 0.4s ease;
+  border-radius: 4px;
+}

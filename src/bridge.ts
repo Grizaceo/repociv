@@ -5,7 +5,8 @@
 
 import { type GameState } from './game.ts';
 import { type BridgeEvent } from './types.ts';
-import { logEvent, appendChatChunk, setBridgeStatus, setOperationTicker, updateGpuBar } from './ui.ts';
+import { parseBridgeEvent, describeBridgeEventError } from './bridgeSchema.ts';
+import { logEvent, appendChatChunk, setBridgeStatus, setOperationTicker, updateGpuBar } from './ui/index.ts';
 
 const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL ?? 'http://localhost:5274';
 const DEMO_INTERVAL_MS = 30_000;
@@ -27,7 +28,15 @@ export class BridgeEvents {
   start() {
     if (import.meta.hot) {
       import.meta.hot.on('bridge:event', (data: unknown) => {
-        this.handleBridgeEvent(data as BridgeEvent);
+        const evt = parseBridgeEvent(data);
+        if (!evt) {
+          const reason = describeBridgeEventError(data);
+          const summary = JSON.stringify(data).slice(0, 120);
+          console.warn('[bridge] descartando evento inválido:', reason, summary);
+          logEvent(`Evento inválido descartado (${reason})`, 'warn');
+          return;
+        }
+        this.handleBridgeEvent(evt);
       });
     }
     this.checkHealth();

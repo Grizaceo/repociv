@@ -1,6 +1,6 @@
 // ─── RepoCiv — Main Entry Point ───────────────────────────────────────────────
 
-import './styles.css';
+import './styles/index.css';
 import { generateWorld } from './map.ts';
 import { Renderer } from './renderer.ts';
 import { BridgeEvents } from './bridge.ts';
@@ -12,7 +12,8 @@ import {
   openQuestBoard, closeQuestBoard, isQuestBoardOpen,
   wireQuestBoardTabs, fetchPersistedMissions, fetchPendingTracker, renderQuestBoard,
   toggleKeyboardHelp,
-} from './ui.ts';
+  openCityPanel, closeCityPanel, isCityPanelOpen, wireCityPanel,
+} from './ui/index.ts';
 import type { Unit } from './types.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
@@ -56,9 +57,13 @@ async function bootstrap() {
     else { hideUnitPanel(); closeSidePanel(); }
   };
   renderer.onCitySelect = (cityId) => {
+    const city = state.world.cities.find(c => c.id === cityId);
+    if (city) {
+      const activeBuildings = state.world.buildings.filter(b => b.cityId === cityId);
+      openCityPanel(city, activeBuildings);
+    }
     loadGitInfo(cityId);
     loadFilesInfo(cityId);
-    if (state.selectedUnit) openSidePanel(state.selectedUnit);
   };
 
   renderer.onTileInspect = (cityName, coord, repoPath) => {
@@ -121,6 +126,7 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents) {
 
     // Esc: close overlays
     if (e.key === 'Escape') {
+      if (isCityPanelOpen()) { closeCityPanel(); return; }
       if (isQuestBoardOpen()) { closeQuestBoard(); return; }
       const help = document.getElementById('keyboard-help');
       if (help && !help.classList.contains('hidden')) { toggleKeyboardHelp(false); return; }
@@ -141,6 +147,7 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents) {
     if (e.key.toLowerCase() === 'w') return spawnAgent('WORKER', state, renderer, bridge);
     if (e.key.toLowerCase() === 'e') return spawnAgent('SCOUT', state, renderer, bridge);
     if (e.key.toLowerCase() === 'l') return spawnAgent('LEXO', state, renderer, bridge);
+    if (e.key.toLowerCase() === 'o') return spawnAgent('OPENCLAW', state, renderer, bridge);
 
     // Hero selection 1–9
     if (/^[1-9]$/.test(e.key)) {
@@ -229,15 +236,17 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents) {
     renderer.minimapClick(e.clientX - rect.left, e.clientY - rect.top);
   });
 
-  // ─── Mission input ──────────────────────────────────────────────────────
-  const sendMission = () => {
+  // ─── Mission / Chat input (shared logic) ────────────────────────────────
+  const chatInput = document.getElementById('chat-input') as HTMLInputElement | null;
+
+  const sendMessage = (input: HTMLInputElement | null) => {
     const unit = state.selectedUnit;
-    if (!unit || !missionInput.value.trim()) return;
+    if (!unit || !input || !input.value.trim()) return;
     const cityHere = state.world.cities.find(c =>
       c.territory.some(t => t.q === unit.coord.q && t.r === unit.coord.r),
     ) ?? state.world.cities[0];
 
-    const text = missionInput.value.trim();
+    const text = input.value.trim();
     if (!isSidePanelOpen()) openSidePanel(unit);
     appendUserMessage(unit.id, text);
 
@@ -248,12 +257,17 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents) {
       agentType: unit.type,
     });
     state.setUnitState(unit.id, 'working');
-    missionInput.value = '';
+    input.value = '';
   };
 
-  document.getElementById('btn-send-mission')?.addEventListener('click', sendMission);
+  document.getElementById('btn-send-mission')?.addEventListener('click', () => sendMessage(missionInput));
   missionInput?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.stopPropagation(); sendMission(); }
+    if (e.key === 'Enter') { e.stopPropagation(); sendMessage(missionInput); }
+  });
+
+  document.getElementById('btn-chat-send')?.addEventListener('click', () => sendMessage(chatInput));
+  chatInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.stopPropagation(); sendMessage(chatInput); }
   });
 
   // ─── Side panel close ────────────────────────────────────────────────────
@@ -269,6 +283,9 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents) {
     if (tab === 'git' && cityHere)   loadGitInfo(cityHere.id);
     if (tab === 'files' && cityHere) loadFilesInfo(cityHere.id);
   });
+
+  // ─── City panel ──────────────────────────────────────────────────────────
+  wireCityPanel();
 
   // ─── Quest board ─────────────────────────────────────────────────────────
   document.getElementById('quest-board-close')?.addEventListener('click', closeQuestBoard);
@@ -304,7 +321,7 @@ function spawnAgent(base: string, state: GameState, renderer: Renderer, bridge: 
     : { q: 1 + offset, r: 0 };
 
   const typeMap: Record<string, 'hero' | 'worker' | 'scout' | 'lexo'> = {
-    DAVI: 'hero', WORKER: 'worker', SCOUT: 'scout', LEXO: 'lexo',
+    DAVI: 'hero', WORKER: 'worker', SCOUT: 'scout', LEXO: 'lexo', OPENCLAW: 'hero',
   };
   const type = typeMap[base] ?? 'hero';
   const unit = state.spawnUnit(unitId, unitId, type, 'gris', coord, 'En espera de misión');

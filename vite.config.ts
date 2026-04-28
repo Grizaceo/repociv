@@ -4,6 +4,7 @@ import { execSync } from 'node:child_process';
 import { readdirSync, statSync, existsSync, readFileSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { homedir } from 'node:os';
+import skipDirsJson from './shared/skip-dirs.json' assert { type: 'json' };
 
 // ─── Workspace path ──────────────────────────────────────────────────────────
 const WORKSPACE = join(homedir(), '.hermes', 'workspace', 'repos');
@@ -20,11 +21,7 @@ interface ScannedRepo {
   hasGit: boolean;
 }
 
-const SKIP_DIRS = new Set([
-  'node_modules', '.git', 'dist', 'build', 'target', '.next',
-  '__pycache__', '.venv', 'venv', '.pytest_cache', '.cache',
-  'checkpoints', '.turbo', '.parcel-cache',
-]);
+const SKIP_DIRS = new Set(skipDirsJson);
 
 function countFiles(dir: string, exts: Record<string, number>, depth = 0): number {
   if (depth > 6) return 0;

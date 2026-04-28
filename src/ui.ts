@@ -122,6 +122,7 @@ function unitModelLabel(unit: Unit): string {
   if (base === 'WORKER') return 'fluido · conciso';
   if (base === 'SCOUT')  return 'analítico · útil';
   if (base === 'LEXO')   return 'lexo-alpha · analítico';
+  if (base === 'OPENCLAW') return 'openclaw · local';
   return unit.type;
 }
 
@@ -318,7 +319,7 @@ export function isQuestBoardOpen(): boolean {
 
 export async function fetchPendingTracker(): Promise<Mission[]> {
   try {
-    const res = await fetch(`${import.meta.env.VITE_BRIDGE_URL ?? 'http://localhost:5274'}/pending');
+    const res = await fetch(`${import.meta.env.VITE_BRIDGE_URL ?? 'http://localhost:5274'}/pending`);
     if (!res.ok) return [];
     const raw = await res.json() as Array<{ title: string; description?: string }>;
     return raw.map((r, i) => ({
@@ -336,7 +337,7 @@ export async function fetchPendingTracker(): Promise<Mission[]> {
 
 export async function fetchPersistedMissions(): Promise<Mission[]> {
   try {
-    const res = await fetch(`${import.meta.env.VITE_BRIDGE_URL ?? 'http://localhost:5274'}/missions');
+    const res = await fetch(`${import.meta.env.VITE_BRIDGE_URL ?? 'http://localhost:5274'}/missions`);
     if (!res.ok) return [];
     const raw = await res.json() as Array<{
       id: string; unit: string; questName: string; status: string;
