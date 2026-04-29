@@ -47,6 +47,16 @@
             <span class="gpu-temp">GPU —</span>
           </div>
           <div id="bridge-status" class="bridge-offline" title="Bridge.py status">⚡ bridge</div>
+          <button id="btn-approvals" title="Aprobaciones pendientes [A]">
+            ⚠<span class="approval-badge"></span>
+          </button>
+          <button id="btn-replay" title="Replay de directivas [F7]">↩</button>
+          <button id="btn-observability" title="Observabilidad [F8]">
+            ◉<span class="obs-health-dot"></span>
+          </button>
+          <button id="btn-timeline" title="Crónica de eventos [F10]">
+            <i data-lucide="scroll-text"></i>
+          </button>
           <button id="btn-toggle-3d" title="Cambiar Vista 2D/3D [3]">
             <i data-lucide="box"></i>
           </button>
@@ -116,6 +126,7 @@
             </div>
           </div>
           <div id="unit-mission" class="hero-mission-text">"Esperando órdenes..."</div>
+          <div id="unit-capability-badges" class="cap-badge-row"></div>
           <div id="unit-actions">
             <button id="btn-move" data-hotkey="m">Mover</button>
             <button id="btn-build" data-hotkey="b">Construir</button>
@@ -248,6 +259,8 @@
               <kbd>F</kbd> Debug overlay<br>
               <kbd>V</kbd> Fog of war<br>
               <kbd>F9</kbd> Quest Board<br>
+              <kbd>F10</kbd> Crónica / Timeline<br>
+              <kbd>A</kbd> Aprobaciones<br>
               <kbd>F12</kbd> Screenshot PNG<br>
               <kbd>?</kbd> Esta ayuda<br>
             </div>
@@ -261,6 +274,8 @@
         <span><kbd>1-9</kbd> selección</span>
         <span><kbd>Enter</kbd> chat</span>
         <span><kbd>F9</kbd> quests</span>
+        <span><kbd>F10</kbd> crónica</span>
+        <span><kbd>A</kbd> aprobaciones</span>
         <span><kbd>?</kbd> ayuda</span>
       </div>
 

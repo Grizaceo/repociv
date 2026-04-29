@@ -1,0 +1,236 @@
+// ─── RepoCiv — Spatial Directives (Fase 5) ────────────────────────────────────
+// Translates spatial gestures on the hex map into structured CommandDrafts.
+// Every gesture produces a SpatialDirective with a preview; nothing executes
+// until the user confirms. This is the "gesture → intent → policy → queue" layer.
+
+import type { Unit, Tile, City } from './types.ts';
+import type { Axial } from './hex.ts';
+import { draftCommand, type CommandDraft, type CommandType } from './commandSchema.ts';
+import { canExecute } from './agentCapabilities.ts';
+
+// ─── Core types ───────────────────────────────────────────────────────────────
+
+export type GestureType =
+  | 'drag_unit_to_city'
+  | 'drag_unit_to_unit'
+  | 'drag_city_to_city'
+  | 'area_select'
+  | 'right_click';
+
+export interface SpatialDirective {
+  gesture:    GestureType;
+  sourceCoord: Axial;
+  targetCoord?: Axial;
+  sourceUnitId?:  string;
+  sourceCityId?:  string;
+  targetCityId?:  string;
+  targetUnitId?:  string;
+  selectedCityIds?: string[];
+  shiftHeld:  boolean;
+  draft:      CommandDraft;
+  label:      string;       // human-readable: "DAVI → repociv: inspect_repo"
+  confidence: number;       // 0–1: how confident is the interpretation
+  userConfirmed: boolean;
+}
+
+// ─── Context menu item ────────────────────────────────────────────────────────
+export interface ContextMenuItem {
+  label:   string;
+  icon:    string;
+  draft:   CommandDraft;
+  risk:    'low' | 'medium' | 'high' | 'destructive';
+  hotkey?: string;
+}
+
+// ─── Drag unit → city ─────────────────────────────────────────────────────────
+export function interpretUnitDrag(params: {
+  unit:      Unit;
+  fromCoord: Axial;
+  toTile:    Tile;
+  shiftHeld: boolean;
+}): SpatialDirective | null {
+  const { unit, fromCoord, toTile, shiftHeld } = params;
+  const city: City | undefined = toTile.city;
+
+  if (!city) {
+    // Drag to empty tile → move order (not a command directive)
+    return null;
+  }
+
+  // Shift+drag → run tests if they exist, otherwise inspect
+  const cmdType: CommandType = shiftHeld ? 'run_tests' : 'inspect_repo';
+  const missionText = shiftHeld
+    ? `Ejecutar tests en ${city.name}`
+    : `Inspeccionar repo ${city.name}`;
+
+  const draft = draftCommand(cmdType, city.id, {
+    unit: unit.id,
+    city: city.id,
+    mission: missionText,
+    agentType: unit.type,
+  });
+
+  return {
+    gesture: 'drag_unit_to_city',
+    sourceCoord: fromCoord,
+    targetCoord: toTile.coord,
+    sourceUnitId: unit.id,
+    targetCityId: city.id,
+    shiftHeld,
+    draft,
+    label: `${unit.id} → ${city.name}: ${cmdType}`,
+    confidence: 0.9,
+    userConfirmed: false,
+  };
+}
+
+// ─── Drag city → city (Shift+drag) ────────────────────────────────────────────
+export function interpretCityToCityDrag(params: {
+  fromCity:  City;
+  toCity:    City;
+  fromCoord: Axial;
+  toCoord:   Axial;
+  selectedUnit: Unit | null;
+}): SpatialDirective | null {
+  const { fromCity, toCity, fromCoord, toCoord, selectedUnit } = params;
+  const unit = selectedUnit?.id ?? 'DAVI';
+  const draft = draftCommand('execute_agent', `${fromCity.id}→${toCity.id}`, {
+    unit,
+    city: fromCity.id,
+    targetCity: toCity.id,
+    mission: `Trade route workflow: ${fromCity.name} → ${toCity.name}`,
+    agentType: selectedUnit?.type ?? 'hero',
+  });
+
+  return {
+    gesture: 'drag_city_to_city',
+    sourceCoord: fromCoord,
+    targetCoord: toCoord,
+    sourceCityId: fromCity.id,
+    targetCityId: toCity.id,
+    shiftHeld: true,
+    draft,
+    label: `${fromCity.name} → ${toCity.name}: workflow multi-repo`,
+    confidence: 0.75,
+    userConfirmed: false,
+  };
+}
+
+// ─── Area select (Shift + rubber-band) ────────────────────────────────────────
+export function interpretAreaSelect(params: {
+  tiles:        Tile[];
+  selectedUnit: Unit | null;
+}): SpatialDirective | null {
+  const { tiles, selectedUnit } = params;
+  const cities = tiles.filter(t => t.city).map(t => t.city!);
+  if (cities.length === 0) return null;
+
+  const unit = selectedUnit?.id ?? 'SCOUT';
+  const cityIds = cities.map(c => c.id);
+  const draft = draftCommand('inspect_repo', cityIds.join(','), {
+    unit,
+    cities: cityIds,
+    mission: `Auditoría batch: ${cities.map(c => c.name).join(', ')}`,
+    agentType: selectedUnit?.type ?? 'scout',
+    batch: true,
+  });
+
+  return {
+    gesture: 'area_select',
+    sourceCoord: tiles[0]!.coord,
+    selectedCityIds: cityIds,
+    shiftHeld: true,
+    draft,
+    label: `Batch audit: ${cities.length} ciudad${cities.length > 1 ? 'es' : ''}`,
+    confidence: 0.85,
+    userConfirmed: false,
+  };
+}
+
+// ─── Context menu items for right-click on city ──────────────────────────────
+// Items are filtered by the selected unit's capabilities and repo restrictions.
+export function contextMenuForCity(city: City, selectedUnit: Unit | null): ContextMenuItem[] {
+  const unit  = selectedUnit?.id ?? 'DAVI';
+  const aType = selectedUnit?.type ?? 'hero';
+
+  // Helper: only include if unit can execute this type on this city
+  const allowed = (type: CommandType) => canExecute(unit, type, city.id);
+
+  const candidates: ContextMenuItem[] = [];
+
+  // "Send unit here" — appears first when a unit is selected
+  if (selectedUnit && allowed('execute_agent')) {
+    candidates.push({
+      label: `Enviar ${selectedUnit.id} aquí`,
+      icon: '▶',
+      risk: 'medium',
+      draft: draftCommand('execute_agent', city.id, {
+        unit: selectedUnit.id, city: city.id,
+        mission: `Misión en ${city.name}`,
+        agentType: selectedUnit.type,
+      }),
+    });
+  }
+
+  if (allowed('inspect_repo')) {
+    candidates.push({
+      label: `Inspeccionar ${city.name}`,
+      icon: '🔍',
+      risk: 'low',
+      hotkey: 'I',
+      draft: draftCommand('inspect_repo', city.id, {
+        unit, city: city.id, mission: `Inspeccionar repo ${city.name}`, agentType: aType,
+      }),
+    });
+  }
+
+  if (allowed('run_tests')) {
+    candidates.push({
+      label: 'Ejecutar tests',
+      icon: '🧪',
+      risk: 'low',
+      hotkey: 'T',
+      draft: draftCommand('run_tests', city.id, {
+        unit, city: city.id, mission: `Ejecutar tests en ${city.name}`, agentType: aType,
+      }),
+    });
+  }
+
+  if (allowed('run_build')) {
+    candidates.push({
+      label: 'Build proyecto',
+      icon: '⚙',
+      risk: 'low',
+      hotkey: 'B',
+      draft: draftCommand('run_build', city.id, {
+        unit, city: city.id, mission: `Build ${city.name}`, agentType: aType,
+      }),
+    });
+  }
+
+  if (allowed('execute_agent')) {
+    candidates.push({
+      label: 'Nueva misión…',
+      icon: '✏',
+      risk: 'medium',
+      draft: draftCommand('execute_agent', city.id, {
+        unit, city: city.id, mission: '', agentType: aType, promptUser: true,
+      }),
+    });
+  }
+
+  // Always offer inspect as fallback (read-only is safe for all agents)
+  if (candidates.length === 0) {
+    candidates.push({
+      label: `Inspeccionar ${city.name}`,
+      icon: '🔍',
+      risk: 'low',
+      hotkey: 'I',
+      draft: draftCommand('inspect_repo', city.id, {
+        unit, city: city.id, mission: `Inspeccionar repo ${city.name}`, agentType: aType,
+      }),
+    });
+  }
+
+  return candidates;
+}

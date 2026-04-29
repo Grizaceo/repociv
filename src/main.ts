@@ -15,8 +15,16 @@ import {
   openCityPanel, closeCityPanel, isCityPanelOpen, wireCityPanel,
   initExternalLibs, updateResource, toggleViewHUD,
   togglePriorityPanel,
+  toggleTimelinePanel, closeTimelinePanel, isTimelinePanelOpen,
+  toggleApprovalPanel, closeApprovalPanel, isApprovalPanelOpen, startApprovalPolling,
+  toggleObservabilityPanel, closeObservabilityPanel, isObservabilityPanelOpen,
+  startObservabilityPolling,
+  toggleReplayPanel, closeReplayPanel, isReplayPanelOpen,
 } from './ui/index.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from './ui/settingsPanel.ts';
+import { showDirectivePreview, showContextMenu } from './ui/spatialPreview.ts';
+import { sendCommand } from './commandBus.ts';
+import { recordGesture } from './directiveLearner.ts';
 import { type Unit, tileKey } from './types.ts';
 import type { Renderer3D } from './renderer3d.ts';
 
@@ -84,9 +92,15 @@ async function bootstrap() {
   };
 
   document.getElementById('btn-toggle-3d')?.addEventListener('click', toggleView);
+  document.getElementById('btn-timeline')?.addEventListener('click', toggleTimelinePanel);
+  document.getElementById('btn-approvals')?.addEventListener('click', toggleApprovalPanel);
+  document.getElementById('btn-replay')?.addEventListener('click', toggleReplayPanel);
+  document.getElementById('btn-observability')?.addEventListener('click', toggleObservabilityPanel);
 
   const bridge = new BridgeEvents(state);
   bridge.start();
+  startApprovalPolling();
+  startObservabilityPolling();
 
   // Canvas click → select unit / open city panels
   renderer.onUnitSelect = (unit) => {
@@ -106,6 +120,31 @@ async function bootstrap() {
 
   renderer.onTileInspect = (cityName, coord, repoPath) => {
     bridge.send('tile_inspected', { cityName, coord, repoPath });
+  };
+
+  // ─── Fase 5: Spatial gestures → preview card → command bus ──────────────────
+  renderer.onSpatialGesture = (directive, screenPos) => {
+    showDirectivePreview(
+      directive,
+      screenPos,
+      (draft) => {
+        void sendCommand(draft).then(res => {
+          if (res.ok) {
+            void recordGesture({
+              commandId: res.commandId,
+              gesture:   directive.gesture,
+              agentId:   String(draft.payload?.['unit'] ?? 'DAVI'),
+              cmdType:   draft.type,
+              target:    draft.target,
+            });
+          }
+        });
+      },
+      () => {},
+    );
+  };
+  renderer.onContextMenu = (items, screenPos) => {
+    showContextMenu(items, screenPos, (draft) => { void sendCommand(draft); });
   };
 
   // ─── Phase 6: Double-click city → enter RimWorld local view ─────────────────
@@ -168,8 +207,17 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, tog
     const target = e.target as HTMLElement;
     const inField = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 
+    // F10: Timeline panel
+    if (e.key === 'F7')  { e.preventDefault(); toggleReplayPanel(); return; }
+    if (e.key === 'F8')  { e.preventDefault(); toggleObservabilityPanel(); return; }
+    if (e.key === 'F10') { e.preventDefault(); toggleTimelinePanel(); return; }
+
     // Esc: close overlays
     if (e.key === 'Escape') {
+      if (isReplayPanelOpen()) { closeReplayPanel(); return; }
+      if (isObservabilityPanelOpen()) { closeObservabilityPanel(); return; }
+      if (isApprovalPanelOpen()) { closeApprovalPanel(); return; }
+      if (isTimelinePanelOpen()) { closeTimelinePanel(); return; }
       if (isCityPanelOpen()) { closeCityPanel(); return; }
       if (isQuestBoardOpen()) { closeQuestBoard(); return; }
       const help = document.getElementById('keyboard-help');
@@ -245,6 +293,7 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, tog
       case 'f': renderer.toggleDebug(); break;
       case 'v': renderer.toggleFog(); break;
       case '3': toggleView(); break;
+      case 'a': toggleApprovalPanel(); break;
       case 'p': togglePriorityPanel(state.getMissionQueue(), (missionId) => {
         state.dispatchMissionById(missionId);
       }); break;

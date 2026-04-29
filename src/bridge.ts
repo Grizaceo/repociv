@@ -9,6 +9,7 @@ import { parseBridgeEvent, describeBridgeEventError } from './bridgeSchema.ts';
 import { logEvent, appendChatChunk, setBridgeStatus, setOperationTicker, updateGpuBar } from './ui/index.ts';
 
 const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL ?? 'http://localhost:5274';
+const BRIDGE_TOKEN = import.meta.env.VITE_BRIDGE_TOKEN ?? '';
 const DEMO_INTERVAL_MS = 30_000;
 const OFFLINE_DEMO_THRESHOLD_MS = 10_000;
 
@@ -44,9 +45,13 @@ export class BridgeEvents {
     this.gpuInterval = window.setInterval(() => this.fetchGpu(), 5000);
   }
 
+  private _authHeaders(): Record<string, string> {
+    return BRIDGE_TOKEN ? { 'X-RepoCiv-Token': BRIDGE_TOKEN } : {};
+  }
+
   private async checkHealth() {
     try {
-      const res = await fetch(`${BRIDGE_URL}/health`, { method: 'GET' });
+      const res = await fetch(`${BRIDGE_URL}/health`, { method: 'GET', headers: this._authHeaders() });
       if (res.ok) {
         const data = await res.json() as { ok: boolean; openclaw: boolean };
         this.onBridgeOnline(data.openclaw ? 'openclaw' : 'hermes');
@@ -101,7 +106,7 @@ export class BridgeEvents {
   private async fetchGpu() {
     if (!this.bridgeOnline) return;
     try {
-      const res = await fetch(`${BRIDGE_URL}/gpu`);
+      const res = await fetch(`${BRIDGE_URL}/gpu`, { headers: this._authHeaders() });
       if (res.ok) {
         const data = await res.json() as { vramUsed?: number; vramTotal?: number; temp?: number } | null;
         updateGpuBar(data);
@@ -218,12 +223,12 @@ export class BridgeEvents {
     }
   }
 
-  // ─── Send command to bridge.py ────────────────────────────────────────────
+  // ─── Send legacy command to bridge.py root POST ───────────────────────────
   send(type: string, payload: Record<string, unknown>) {
     if (!this.bridgeOnline) return;
     fetch(BRIDGE_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
       body: JSON.stringify({ type, ...payload }),
     }).catch(() => {});
   }

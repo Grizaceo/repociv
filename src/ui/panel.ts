@@ -2,6 +2,7 @@
 import type { GameState } from '../game.ts';
 import type { Unit } from '../types.ts';
 import { cfg } from '../gameConfig.ts';
+import { renderCapabilityBadges, clearCapabilityBadges } from './capabilityBadges.ts';
 
 export function showUnitPanel(unit: Unit) {
   const panel = document.getElementById('unit-panel');
@@ -30,6 +31,8 @@ export function showUnitPanel(unit: Unit) {
 
   const dot = document.getElementById('unit-status-dot');
   if (dot) dot.style.background = unitStateColor(unit.state);
+
+  renderCapabilityBadges(unit);
 }
 
 export function unitModelLabel(unit: Unit): string {
@@ -51,6 +54,7 @@ export function unitStateColor(state: Unit['state']): string {
 
 export function hideUnitPanel() {
   document.getElementById('unit-panel')?.classList.add('hidden');
+  clearCapabilityBadges();
 }
 
 export function renderHeroBar(state: GameState, onSelect: (u: Unit) => void) {

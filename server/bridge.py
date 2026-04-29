@@ -1,17 +1,34 @@
 #!/usr/bin/env python3
-"""RepoCiv ↔ DAVI bridge.
+"""RepoCiv ↔ DAVI bridge — hardened gateway (Sprint B).
 
-Recibe comandos desde RepoCiv (port 5273) y los ejecuta via openclaw o Hermes API.
-Streamea stdout del agente como eventos chat_chunk a RepoCiv.
-Persiste misiones en ~/.repociv/missions.json.
+Security:
+  - All POST routes require X-RepoCiv-Token header.
+  - CORS restricted to http://localhost:5273 and http://127.0.0.1:5273.
+  - Request body limited to 128 KB.
+  - Incoming commands validated via command_schema.py.
+  - Rate limit: 60 requests/minute per IP (in-memory, resets on restart).
 
-Nuevos endpoints:
-  GET /gpu      — VRAM y temperatura GPU via nvidia-smi
-  GET /pending  — Misiones pendientes de ~/.hermes/workspace/PENDING_TRACKER.md
-  POST /quest_add — Agrega misión a PENDING_TRACKER.md
+Endpoints:
+  GET  /health                    — liveness
+  GET  /ready                     — readiness
+  GET  /missions                  — persisted missions list
+  GET  /gpu                       — VRAM + temp via nvidia-smi
+  GET  /pending                   — tasks from PENDING_TRACKER.md
+  GET  /techdebt                  — tech-debt scan across repos
+  GET  /context                   — XCOM fatigue state
+  GET  /events                    — event store replay (?since=<unix_ts>)
+  GET  /approvals                 — commands waiting_approval
+  GET  /agents                    — agent status + heartbeat + queue depth
+  GET  /agents/capabilities       — capability model (Fase 6)
+  GET  /metrics                   — observability metrics (Fase 7)
+  POST /commands                  — new Command Bus intake
+  POST /commands/<id>/cancel      — cancel a queued command
+  POST /approvals/<id>/approve    — approve a pending command
+  POST /approvals/<id>/reject     — reject a pending command
+  POST /                          — legacy unit_command / quest_add
 
 Uso:
-    python3 bridge.py
+    python3 server/bridge.py
 """
 
 from __future__ import annotations
@@ -19,6 +36,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import signal
 import subprocess
 import threading
 import time
@@ -29,7 +47,7 @@ from pathlib import Path
 from typing import Any
 
 
-# ─── .env loader (sin python-dotenv para evitar dependencia) ────────────────
+# ─── .env loader ─────────────────────────────────────────────────────────────
 def _load_dotenv() -> None:
     env_path = Path(__file__).parent.parent / ".env"
     if not env_path.exists():
@@ -48,15 +66,82 @@ def _load_dotenv() -> None:
 _load_dotenv()
 
 REPOCIV_PORT = int(os.environ.get("REPOCIV_PORT", "5273"))
-BRIDGE_PORT = int(os.environ.get("BRIDGE_PORT", "5274"))
+BRIDGE_PORT  = int(os.environ.get("BRIDGE_PORT", "5274"))
+REPOCIV_TOKEN = os.environ.get("REPOCIV_TOKEN", "")  # empty = auth disabled (dev only)
 
 CONFIG_DIR = Path(os.path.expanduser(os.environ.get("REPOCIV_CONFIG_DIR", "~/.repociv")))
 CONFIG_DIR.mkdir(exist_ok=True, parents=True)
-MISSIONS_FILE = CONFIG_DIR / "missions.json"
-HERMES_ROOT = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", "~/.hermes")))
-PENDING_TRACKER = HERMES_ROOT / "workspace" / "PENDING_TRACKER.md"
+MISSIONS_FILE    = CONFIG_DIR / "missions.json"
+HERMES_ROOT      = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", "~/.hermes")))
+PENDING_TRACKER  = HERMES_ROOT / "workspace" / "PENDING_TRACKER.md"
 
-# ─── Mission persistence ────────────────────────────────────────────────────
+# ─── CORS allowed origins ─────────────────────────────────────────────────────
+_ALLOWED_ORIGINS = {
+    f"http://localhost:{REPOCIV_PORT}",
+    f"http://127.0.0.1:{REPOCIV_PORT}",
+}
+
+# ─── Body size limit ──────────────────────────────────────────────────────────
+_MAX_BODY = 128 * 1024  # 128 KB
+
+# ─── Rate limiter (per-IP, in-memory) ────────────────────────────────────────
+_rate_lock = threading.Lock()
+_rate_buckets: dict[str, list[float]] = {}
+_RATE_LIMIT = 60
+_RATE_WINDOW = 60.0
+
+
+def _rate_check(ip: str) -> bool:
+    """Return True if request is allowed, False if rate-limited."""
+    now = time.time()
+    with _rate_lock:
+        bucket = _rate_buckets.setdefault(ip, [])
+        bucket[:] = [t for t in bucket if now - t < _RATE_WINDOW]
+        if len(bucket) >= _RATE_LIMIT:
+            return False
+        bucket.append(now)
+        return True
+
+
+# ─── Approval queue ───────────────────────────────────────────────────────────
+_approval_lock = threading.Lock()
+_approvals: dict[str, dict[str, Any]] = {}  # command_id → command dict
+
+
+def _add_approval(cmd_dict: dict[str, Any]) -> None:
+    with _approval_lock:
+        _approvals[cmd_dict["id"]] = cmd_dict
+
+
+def _get_approvals() -> list[dict[str, Any]]:
+    with _approval_lock:
+        return list(_approvals.values())
+
+
+def _pop_approval(cmd_id: str) -> dict[str, Any] | None:
+    with _approval_lock:
+        return _approvals.pop(cmd_id, None)
+
+
+# ─── Event store init ─────────────────────────────────────────────────────────
+from server import event_store as _es
+_es.init(CONFIG_DIR)
+
+# ─── Command schema + policy ──────────────────────────────────────────────────
+from server.command_schema import validate_command, CommandValidationError, Command
+from server import policy as _policy
+from server.capabilities import capabilities_snapshot
+from server.context_pack import build_context_pack
+from server.metrics import compute_metrics
+from server import directive_store as _ds
+from server import directive_learner as _dl
+_ds.init(CONFIG_DIR)
+
+# ─── Scheduler ────────────────────────────────────────────────────────────────
+from server import scheduler as _sched
+
+
+# ─── Mission persistence ──────────────────────────────────────────────────────
 _missions_lock = threading.Lock()
 
 
@@ -82,24 +167,16 @@ def save_mission(mission: dict[str, Any]) -> None:
         MISSIONS_FILE.write_text(json.dumps(missions, indent=2, ensure_ascii=False))
 
 
-# ─── Phase 9: XCOM Context Fatigue state ─────────────────────────────────────
-# In-memory fatigue tracking for all active units.
-# Key = unit_id, Value = {"fatigue": int, "effectiveSpeed": float, "isResting": bool, "restAreaId": str|None}
+# ─── XCOM Context Fatigue state ───────────────────────────────────────────────
 _fatigue_state: dict[str, dict[str, Any]] = {}
-# Rest areas discovered in the world.
-# Key = restAreaId, Value = {"id": str, "roomId": str, "coord": [q,r], "recoveryRate": float, "capacity": int, "unitsInside": list[str]}
 _rest_areas: dict[str, dict[str, Any]] = {}
-# Lock for thread-safe fatigue updates
 _fatigue_lock = threading.Lock()
 
 
 def get_unit_fatigue(unit_id: str) -> dict[str, Any]:
     with _fatigue_lock:
         return _fatigue_state.get(unit_id, {
-            "fatigue": 100,
-            "effectiveSpeed": 1.0,
-            "isResting": False,
-            "restAreaId": None,
+            "fatigue": 100, "effectiveSpeed": 1.0, "isResting": False, "restAreaId": None,
         })
 
 
@@ -108,13 +185,9 @@ def update_unit_fatigue(unit_id: str, *, fatigue: int | None = None,
                         is_resting: bool | None = None,
                         rest_area_id: str | None = None,
                         delta: int = 0) -> dict[str, Any]:
-    """Update fatigue fields for a unit. Returns the updated state dict."""
     with _fatigue_lock:
         entry = _fatigue_state.setdefault(unit_id, {
-            "fatigue": 100,
-            "effectiveSpeed": 1.0,
-            "isResting": False,
-            "restAreaId": None,
+            "fatigue": 100, "effectiveSpeed": 1.0, "isResting": False, "restAreaId": None,
         })
         if fatigue is not None:
             entry["fatigue"] = max(0, min(100, fatigue))
@@ -126,46 +199,35 @@ def update_unit_fatigue(unit_id: str, *, fatigue: int | None = None,
             entry["isResting"] = is_resting
         if rest_area_id is not None:
             entry["restAreaId"] = rest_area_id
-        # Recompute effective speed from fatigue (linear falloff)
         entry["effectiveSpeed"] = round(entry["fatigue"] / 100.0, 3)
         return dict(entry)
 
 
 def discover_rest_area(rest_area_id: str, room_id: str, coord: tuple,
                        recovery_rate: float = 8.0, capacity: int = 4) -> dict[str, Any]:
-    """Register a new rest area discovered in the world."""
     with _fatigue_lock:
         area = {
-            "id": rest_area_id,
-            "roomId": room_id,
-            "coord": list(coord),
-            "recoveryRate": recovery_rate,
-            "capacity": capacity,
-            "unitsInside": [],
+            "id": rest_area_id, "roomId": room_id, "coord": list(coord),
+            "recoveryRate": recovery_rate, "capacity": capacity, "unitsInside": [],
         }
         _rest_areas[rest_area_id] = area
         return dict(area)
 
 
 def enter_rest_area(unit_id: str, rest_area_id: str) -> bool:
-    """Attempt to enter a rest area. Returns True if successful."""
     with _fatigue_lock:
         area = _rest_areas.get(rest_area_id)
-        if not area:
-            return False
-        if len(area["unitsInside"]) >= area["capacity"]:
+        if not area or len(area["unitsInside"]) >= area["capacity"]:
             return False
         if unit_id not in area["unitsInside"]:
             area["unitsInside"].append(unit_id)
-        entry = _fatigue_state.get(unit_id, {})
+        entry = _fatigue_state.setdefault(unit_id, {"fatigue": 100, "effectiveSpeed": 1.0, "isResting": False, "restAreaId": None})
         entry["isResting"] = True
         entry["restAreaId"] = rest_area_id
-        _fatigue_state[unit_id] = entry
         return True
 
 
 def exit_rest_area(unit_id: str) -> None:
-    """Remove unit from whatever rest area they were in."""
     with _fatigue_lock:
         entry = _fatigue_state.get(unit_id, {})
         ra_id = entry.get("restAreaId")
@@ -179,34 +241,20 @@ def exit_rest_area(unit_id: str) -> None:
         _fatigue_state[unit_id] = entry
 
 
-def tick_fatigue_recovery(dt_seconds: float) -> None:
-    """Call each frame/tick to recover fatigue for resting units."""
-    with _fatigue_lock:
-        for unit_id, entry in list(_fatigue_state.items()):
-            if entry.get("isResting") and entry.get("restAreaId"):
-                ra = _rest_areas.get(entry["restAreaId"])
-                if ra:
-                    recovered = ra["recoveryRate"] * dt_seconds
-                    entry["fatigue"] = max(0, min(100, entry["fatigue"] + recovered))
-                    entry["effectiveSpeed"] = round(entry["fatigue"] / 100.0, 3)
-
-
-# ─── RepoCiv event sender ───────────────────────────────────────────────────
+# ─── Event sender → RepoCiv frontend ─────────────────────────────────────────
 def send_to_repociv(event: dict[str, Any]) -> None:
     try:
         data = json.dumps(event).encode()
         req = urllib.request.Request(
-            f"http://localhost:{REPOCIV_PORT}/event",
-            data=data,
-            headers={"Content-Type": "application/json"},
-            method="POST",
+            f"http://localhost:{REPOCIV_PORT}/event", data=data,
+            headers={"Content-Type": "application/json"}, method="POST",
         )
         urllib.request.urlopen(req, timeout=2)
     except Exception:
         pass
 
 
-# ─── Quest name generator ──────────────────────────────────────────────────
+# ─── Quest name generator ─────────────────────────────────────────────────────
 def generate_quest_name(mission: str) -> str:
     words = re.findall(r"\b[a-zA-ZáéíóúñÁÉÍÓÚÑ]+\b", mission)
     if not words:
@@ -217,7 +265,7 @@ def generate_quest_name(mission: str) -> str:
     return " ".join(w.capitalize() for w in keywords)[:40]
 
 
-# ─── GPU info via nvidia-smi ────────────────────────────────────────────────
+# ─── GPU info ─────────────────────────────────────────────────────────────────
 def get_gpu_info() -> dict[str, Any] | None:
     try:
         result = subprocess.run(
@@ -231,16 +279,12 @@ def get_gpu_info() -> dict[str, Any] | None:
         parts = [p.strip() for p in line.split(",")]
         if len(parts) < 3:
             return None
-        return {
-            "vramUsed": int(parts[0]),
-            "vramTotal": int(parts[1]),
-            "temp": int(parts[2]),
-        }
+        return {"vramUsed": int(parts[0]), "vramTotal": int(parts[1]), "temp": int(parts[2])}
     except Exception:
         return None
 
 
-# ─── Tech-debt scanner ────────────────────────────────────────────────────────
+# ─── Tech-debt scanner ─────────────────────────────────────────────────────────
 _TD_PATTERNS = re.compile(
     r'(TODO\s*[:\-]?\s*tech\s*debt|FIXME\s*[:\-]?\s*hack|HACK|BUG\s*[:\-]?\s*|'
     r'REFACTOR|TECH\s*DEBT|DEBT\s*[:\-]?\s*|LEGACY|STALE)',
@@ -250,16 +294,15 @@ _TD_EXTENSIONS = {'.ts', '.tsx', '.js', '.jsx', '.py', '.rs', '.go', '.java', '.
 
 
 def scan_tech_debt(root_path: str = os.path.expanduser("~/.hermes/workspace/repos")) -> list[dict[str, Any]]:
-    """Walk repos looking for files with tech-debt markers."""
     results: list[dict[str, Any]] = []
     try:
+        skip_file = Path(__file__).parent.parent / "shared" / "skip-dirs.json"
+        skip: set[str] = set(json.loads(skip_file.read_text())) if skip_file.exists() else set()
         for repo in os.listdir(root_path):
             repo_path = os.path.join(root_path, repo)
             if not os.path.isdir(repo_path):
                 continue
             for dirpath, _dirs, filenames in os.walk(repo_path):
-                # Skip node_modules, .git, __pycache__, .venv
-                skip = set(json.loads(Path(__file__).parent.parent.joinpath("shared/skip-dirs.json").read_text()))
                 if any(s in dirpath for s in skip):
                     continue
                 for fname in filenames:
@@ -276,13 +319,8 @@ def scan_tech_debt(root_path: str = os.path.expanduser("~/.hermes/workspace/repo
                             if _TD_PATTERNS.search(line):
                                 matches.append({'line': i, 'text': line.strip()[:120]})
                         if matches:
-                            results.append({
-                                'repo': repo,
-                                'file': rel,
-                                'path': fpath,
-                                'matches': matches,
-                                'severity': _assess_debt_severity(matches),
-                            })
+                            results.append({'repo': repo, 'file': rel, 'path': fpath,
+                                            'matches': matches, 'severity': _assess_debt_severity(matches)})
                     except Exception:
                         pass
     except Exception:
@@ -291,7 +329,6 @@ def scan_tech_debt(root_path: str = os.path.expanduser("~/.hermes/workspace/repo
 
 
 def _assess_debt_severity(matches: list[dict[str, str]]) -> str:
-    """Heuristic severity based on keyword."""
     critical = {'BUG', 'HACK', 'FIXME'}
     high = {'TECH DEBT', 'REFACTOR', 'DEBT', 'LEGACY'}
     for m in matches:
@@ -303,7 +340,7 @@ def _assess_debt_severity(matches: list[dict[str, str]]) -> str:
     return 'normal'
 
 
-# ─── PENDING_TRACKER parser ─────────────────────────────────────────────────
+# ─── PENDING_TRACKER ──────────────────────────────────────────────────────────
 def load_pending_tasks() -> list[dict[str, str]]:
     if not PENDING_TRACKER.exists():
         return []
@@ -329,12 +366,9 @@ def append_pending_task(title: str, description: str = "") -> None:
         print(f"[bridge] No pude escribir PENDING_TRACKER: {e}")
 
 
-# ─── Process scanner ────────────────────────────────────────────────────────
-PROCESS_KEYWORDS = [
-    "python train", "python3 train", "cargo run", "cargo build",
-    "npm run", "vite", "pytest", "uvicorn", "flask run",
-]
-
+# ─── Process scanner ──────────────────────────────────────────────────────────
+PROCESS_KEYWORDS = ["python train", "python3 train", "cargo run", "cargo build",
+                    "npm run", "vite", "pytest", "uvicorn", "flask run"]
 _last_scan_pids: set[int] = set()
 
 
@@ -342,10 +376,8 @@ def scan_active_processes() -> None:
     global _last_scan_pids
     try:
         result = subprocess.run(["ps", "aux"], capture_output=True, text=True, timeout=5)
-        lines = result.stdout.strip().splitlines()
         current_pids: set[int] = set()
-
-        for line in lines[1:]:
+        for line in result.stdout.strip().splitlines()[1:]:
             parts = line.split(None, 10)
             if len(parts) < 11:
                 continue
@@ -357,27 +389,16 @@ def scan_active_processes() -> None:
             if any(kw in cmd for kw in PROCESS_KEYWORDS):
                 current_pids.add(pid)
                 if pid not in _last_scan_pids:
-                    # New process detected
                     cmd_clean = parts[10][:80]
-                    send_to_repociv({
-                        "type": "building_start",
-                        "city": "main",
-                        "building": cmd_clean,
-                        "durationSeconds": 300,
-                        "pid": pid,
-                        "cmd": cmd_clean,
-                    })
-                    send_to_repociv({
-                        "type": "log",
-                        "msg": f"Proceso detectado: {cmd_clean[:50]}",
-                        "level": "info",
-                    })
+                    send_to_repociv({"type": "building_start", "city": "main", "building": cmd_clean,
+                                     "durationSeconds": 300, "pid": pid, "cmd": cmd_clean})
+                    send_to_repociv({"type": "log", "msg": f"Proceso detectado: {cmd_clean[:50]}", "level": "info"})
         _last_scan_pids = current_pids
     except Exception:
         pass
 
 
-# ─── LexO-Alpha detection ────────────────────────────────────────────────────
+# ─── LexO-Alpha detection ─────────────────────────────────────────────────────
 _lexo_spawned: set[str] = set()
 _lexo_counter = 0
 
@@ -386,8 +407,6 @@ def detect_lexo() -> None:
     global _lexo_counter
     try:
         result = subprocess.run(["ps", "aux"], capture_output=True, text=True, timeout=5)
-        found_pids: list[tuple[int, str]] = []
-
         for line in result.stdout.strip().splitlines()[1:]:
             parts = line.split(None, 10)
             if len(parts) < 11:
@@ -398,79 +417,46 @@ def detect_lexo() -> None:
                 continue
             cmd = parts[10].lower()
             if re.search(r"lexo|hermes.*lexo|lexo.*hermes", cmd):
-                found_pids.append((pid, parts[10]))
-
-        for pid, cmd in found_pids:
-            pid_key = str(pid)
-            if pid_key not in _lexo_spawned:
-                _lexo_spawned.add(pid_key)
-                _lexo_counter += 1
-                unit_id = f"LEXO-{_lexo_counter}"
-                send_to_repociv({
-                    "type": "unit_spawn",
-                    "unit": unit_id,
-                    "civ": "gris",
-                    "hex": [2, _lexo_counter],
-                    "unitType": "lexo",
-                    "mission": f"Proceso: {cmd[:40]}",
-                })
-                send_to_repociv({
-                    "type": "log",
-                    "msg": f"LexO-α detectado (pid {pid})",
-                    "level": "success",
-                })
+                pid_key = str(pid)
+                if pid_key not in _lexo_spawned:
+                    _lexo_spawned.add(pid_key)
+                    _lexo_counter += 1
+                    unit_id = f"LEXO-{_lexo_counter}"
+                    send_to_repociv({"type": "unit_spawn", "unit": unit_id, "civ": "gris",
+                                     "hex": [2, _lexo_counter], "unitType": "lexo",
+                                     "mission": f"Proceso: {parts[10][:40]}"})
+                    send_to_repociv({"type": "log", "msg": f"LexO-α detectado (pid {pid})", "level": "success"})
     except Exception:
         pass
 
 
-# ─── Agent roster ───────────────────────────────────────────────────────────
-# stateful=True  → la sesión de openclaw persiste entre misiones (DAVI, LEXO).
-# stateful=False → cada misión arranca con session-id fresco, sin contexto previo
-#                  (WORKER, SCOUT — agentes "ejecutores" eficientes).
+# ─── Agent roster ─────────────────────────────────────────────────────────────
 AGENT_CONFIGS: dict[str, dict[str, Any]] = {
     "DAVI": {
-        "agent": "main",
-        "personality": "technical",
-        "stateful": True,
-        "system": (
-            "Eres DAVI, agente principal de Cristóbal. Conoces el workspace, "
-            "mantienes contexto entre misiones y respondes técnico y conciso."
-        ),
+        "agent": "main", "personality": "technical", "stateful": True,
+        "system": ("Eres DAVI, agente principal de Cristóbal. Conoces el workspace, "
+                   "mantienes contexto entre misiones y respondes técnico y conciso."),
     },
     "WORKER": {
-        "agent": "main",
-        "personality": "concise",
-        "stateful": False,
-        "system": (
-            "Eres WORKER, ejecutor sin memoria previa. Recibes UNA tarea, "
-            "la resuelves en el mínimo de tokens posible y entregas el resultado. "
-            "No hagas preguntas de clarificación; asume lo razonable y avanza."
-        ),
+        "agent": "main", "personality": "concise", "stateful": False,
+        "system": ("Eres WORKER, ejecutor sin memoria previa. Recibes UNA tarea, "
+                   "la resuelves en el mínimo de tokens posible y entregas el resultado. "
+                   "No hagas preguntas de clarificación; asume lo razonable y avanza."),
     },
     "SCOUT": {
-        "agent": "main",
-        "personality": "helpful",
-        "stateful": False,
-        "system": (
-            "Eres SCOUT, explorador sin memoria previa. Tu trabajo es inspeccionar "
-            "código/archivos/repos y devolver un resumen breve y accionable. "
-            "Prioriza hechos sobre opiniones."
-        ),
+        "agent": "main", "personality": "helpful", "stateful": False,
+        "system": ("Eres SCOUT, explorador sin memoria previa. Tu trabajo es inspeccionar "
+                   "código/archivos/repos y devolver un resumen breve y accionable. "
+                   "Prioriza hechos sobre opiniones."),
     },
     "LEXO": {
-        "agent": "main",
-        "personality": "analytical",
-        "stateful": True,
-        "system": (
-            "Eres LexO-α, agente analítico con memoria. Analiza con profundidad, "
-            "cita el archivo y línea cuando aplique, y produce diagnóstico antes "
-            "que solución."
-        ),
+        "agent": "main", "personality": "analytical", "stateful": True,
+        "system": ("Eres LexO-α, agente analítico con memoria. Analiza con profundidad, "
+                   "cita el archivo y línea cuando aplique, y produce diagnóstico antes "
+                   "que solución."),
     },
     "OPENCLAW": {
-        "agent": "main",
-        "personality": "technical",
-        "stateful": True,
+        "agent": "main", "personality": "technical", "stateful": True,
         "system": "Eres openclaw, agente local de Cristóbal.",
     },
 }
@@ -481,73 +467,60 @@ def _get_agent_config(unit_id: str) -> dict[str, Any]:
     return AGENT_CONFIGS.get(base, AGENT_CONFIGS["DAVI"])
 
 
-def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero") -> None:
-    mission_id = str(uuid.uuid4())[:8]
+def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
+              command_id: str | None = None) -> None:
+    mission_id = command_id or str(uuid.uuid4())[:8]
     quest_name = generate_quest_name(mission)
     started_at = time.time()
 
     mission_record: dict[str, Any] = {
-        "id": mission_id,
-        "unit": unit_id,
-        "city": city_id,
-        "mission": mission,
-        "questName": quest_name,
-        "agentType": agent_type,
-        "startedAt": started_at,
-        "completedAt": None,
-        "status": "running",
-        "summary": "",
-        "lines": 0,
-        "duration": 0,
+        "id": mission_id, "unit": unit_id, "city": city_id, "mission": mission,
+        "questName": quest_name, "agentType": agent_type, "startedAt": started_at,
+        "completedAt": None, "status": "running", "summary": "", "lines": 0, "duration": 0,
     }
     save_mission(mission_record)
+    _es.record_started(mission_id)
 
     send_to_repociv({"type": "mission_start", "missionId": mission_id, "unit": unit_id, "questName": quest_name})
-    send_to_repociv({"type": "building_start", "city": city_id, "building": quest_name, "durationSeconds": 120, "missionId": mission_id})
+    send_to_repociv({"type": "building_start", "city": city_id, "building": quest_name,
+                     "durationSeconds": 120, "missionId": mission_id})
     send_to_repociv({"type": "unit_state", "unit": unit_id, "state": "working"})
 
     success, output = _execute_streaming(unit_id, mission_id, mission)
 
     duration = time.time() - started_at
-    mission_record.update({
-        "completedAt": time.time(),
-        "status": "complete" if success else "failed",
-        "summary": output[-500:],
-        "duration": duration,
-        "lines": len(output.splitlines()),
-    })
+    mission_record.update({"completedAt": time.time(), "status": "complete" if success else "failed",
+                           "summary": output[-500:], "duration": duration, "lines": len(output.splitlines())})
     save_mission(mission_record)
 
     if success:
+        _es.record_completed(mission_id, output[-500:])
+        _ds.record_outcome(mission_id, "success", duration)
         send_to_repociv({"type": "building_complete", "city": city_id, "building": quest_name, "missionId": mission_id})
         send_to_repociv({"type": "log", "msg": f"{unit_id} completó: {quest_name}", "level": "success"})
     else:
+        _es.record_failed(mission_id, output[-500:])
+        _ds.record_outcome(mission_id, "failure", duration)
         send_to_repociv({"type": "building_failed", "city": city_id, "building": quest_name, "missionId": mission_id})
         send_to_repociv({"type": "log", "msg": f"{unit_id} falló en: {quest_name}", "level": "warn"})
 
     send_to_repociv({"type": "unit_state", "unit": unit_id, "state": "idle"})
-    send_to_repociv({"type": "mission_complete", "missionId": mission_id, "unit": unit_id, "success": success, "duration": int(duration)})
+    send_to_repociv({"type": "mission_complete", "missionId": mission_id, "unit": unit_id,
+                     "success": success, "duration": int(duration)})
 
 
 def _execute_streaming(unit_id: str, mission_id: str, mission: str) -> tuple[bool, str]:
     config = _get_agent_config(unit_id)
     base = unit_id.split("-")[0].upper()
 
-    # OPENCLAW unit → always openclaw, no fallback
     if base == "OPENCLAW":
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
-                         "text": "[transport: openclaw]\n"})
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: openclaw]\n"})
         return _run_openclaw_streaming(unit_id, mission_id, mission, config)
 
-    # All other agents (DAVI, WORKER, SCOUT, LEXO) → Hermes primary.
-    # Each agent has its own system prompt and stateful/stateless session semantics.
-    # openclaw is available as fallback only if Hermes fails.
-    send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
-                     "text": "[transport: hermes]\n"})
+    send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: hermes]\n"})
     success, output = _run_hermes_streaming(unit_id, mission_id, mission, config)
     if not success and _has_openclaw():
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
-                         "text": "[hermes falló → fallback openclaw]\n"})
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[hermes falló → fallback openclaw]\n"})
         return _run_openclaw_streaming(unit_id, mission_id, mission, config)
     return success, output
 
@@ -562,68 +535,154 @@ def _has_openclaw() -> bool:
 
 def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
                              config: dict[str, Any]) -> tuple[bool, str]:
-    # Stateless agents (WORKER, SCOUT) get fresh session id per mission
-    # so no context leaks between misiones.
     if config.get("stateful", True):
         session_id = f"repociv-{unit_id.lower()}"
     else:
         session_id = f"repociv-{unit_id.lower()}-{mission_id}"
 
-    cmd = [
-        "openclaw", "agent",
-        "--agent", config["agent"],
-        "--session-id", session_id,
-        "--message", mission,
-    ]
+    cmd = ["openclaw", "agent", "--agent", config["agent"],
+           "--session-id", session_id, "--message", mission]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
     output_buf: list[str] = []
     assert proc.stdout is not None
     for line in proc.stdout:
         output_buf.append(line)
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": line})
+        _es.record_output_chunk(mission_id, unit_id, line)
     proc.wait(timeout=600)
     return proc.returncode == 0, "".join(output_buf)
 
 
 def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
                            config: dict[str, Any] | None = None) -> tuple[bool, str]:
-    HERMES_URL = os.environ.get("HERMES_URL", "http://localhost:8642/v1/chat/completions")
-    HERMES_KEY = os.environ.get("HERMES_KEY", "davi-voice-bridge-2026")
+    HERMES_URL   = os.environ.get("HERMES_URL",   "http://localhost:8642/v1/chat/completions")
+    HERMES_KEY   = os.environ.get("HERMES_KEY",   "davi-voice-bridge-2026")
     HERMES_MODEL = os.environ.get("HERMES_MODEL", "minimax-m2.6")
 
     cfg = config if config is not None else _get_agent_config(unit_id)
-    system_prompt = cfg.get("system", "Eres un agente útil.")
-
     payload = {
         "model": HERMES_MODEL,
         "messages": [
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": cfg.get("system", "Eres un agente útil.")},
             {"role": "user", "content": mission},
         ],
         "stream": False,
     }
     try:
         data = json.dumps(payload).encode()
-        req = urllib.request.Request(HERMES_URL, data=data, headers={"Content-Type": "application/json", "Authorization": f"Bearer {HERMES_KEY}"}, method="POST")
+        req = urllib.request.Request(
+            HERMES_URL, data=data,
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {HERMES_KEY}"},
+            method="POST",
+        )
         with urllib.request.urlopen(req, timeout=120) as resp:
-            response_text = resp.read().decode()
-        result = json.loads(response_text)
+            result = json.loads(resp.read().decode())
         content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
         for i in range(0, len(content), 40):
-            send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": content[i:i + 40]})
+            chunk = content[i:i + 40]
+            send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": chunk})
+            _es.record_output_chunk(mission_id, unit_id, chunk)
             time.sleep(0.04)
         return True, content
-
     except Exception as e:
         return False, str(e)
 
 
-# ─── HTTP Handler ───────────────────────────────────────────────────────────
+# ─── Command Bus intake ───────────────────────────────────────────────────────
+def _handle_command(cmd: Command) -> dict[str, Any]:
+    """Apply policy, attach context pack, dispatch or queue command."""
+    cmd, block_reason = _policy.apply_policy(cmd)
+    _es.record_created(cmd.id, cmd.created_by, cmd.to_dict())
+
+    if cmd.status == "rejected":
+        reason = block_reason or "blocked by policy"
+        _es.record_rejected(cmd.id, reason)
+        return {"ok": False, "status": "rejected", "commandId": cmd.id,
+                "reason": reason}
+
+    # Attach context pack to payload so the agent starts with context
+    agent_id = str(cmd.payload.get("unit", "DAVI"))
+    cmd.payload["_context"] = build_context_pack(agent_id, cmd.target, _es)
+
+    if cmd.status == "waiting_approval":
+        _es.record_waiting_approval(cmd.id)
+        _add_approval(cmd.to_dict())
+        send_to_repociv({"type": "log",
+                         "msg": f"Aprobación requerida: {cmd.type} → {cmd.target}",
+                         "level": "warn"})
+        return {"ok": True, "status": "waiting_approval", "commandId": cmd.id}
+
+    # auto-safe: enqueue in scheduler (priority-sorted dispatch)
+    _es.record_queued(cmd.id)
+    send_to_repociv({"type": "log",
+                     "msg": f"Comando encolado: {cmd.type} → {cmd.target}",
+                     "level": "info"})
+
+    _sched.enqueue(cmd)
+    return {"ok": True, "status": "queued", "commandId": cmd.id}
+
+
+def _dispatch_command(cmd: Command) -> None:
+    """Run the command in a background thread based on its type."""
+    payload = cmd.payload
+
+    if cmd.type in ("unit_command", "execute_agent"):
+        unit = payload.get("unit", "DAVI")
+        city = payload.get("city", "main")
+        mission = payload.get("mission", cmd.target)
+        agent_type = payload.get("agentType", "hero")
+        threading.Thread(target=run_agent, args=(unit, city, mission, agent_type, cmd.id), daemon=True).start()
+
+    elif cmd.type == "quest_add":
+        title = payload.get("title", cmd.target)
+        description = payload.get("description", "")
+        append_pending_task(title, description)
+        mission_rec: dict[str, Any] = {
+            "id": cmd.id, "unit": "DAVI", "city": "main", "mission": title,
+            "questName": title, "agentType": "hero", "startedAt": time.time(),
+            "completedAt": None, "status": "running", "summary": description, "lines": 0, "duration": 0,
+        }
+        save_mission(mission_rec)
+        send_to_repociv({"type": "mission_start", "missionId": cmd.id, "unit": "DAVI", "questName": title})
+        send_to_repociv({"type": "log", "msg": f"Quest agregado: {title}", "level": "success"})
+
+    elif cmd.type == "tile_inspected":
+        city_name = payload.get("cityName", cmd.target)
+        send_to_repociv({"type": "log", "msg": f"Inspeccionando: {city_name}", "level": "info"})
+
+    else:
+        # Unknown/future types: just log
+        send_to_repociv({"type": "log", "msg": f"Comando {cmd.type} recibido (sin executor)", "level": "info"})
+
+
+# ─── HTTP Handler ─────────────────────────────────────────────────────────────
 class BridgeHandler(BaseHTTPRequestHandler):
+
+    def _origin(self) -> str:
+        return self.headers.get("Origin", "")
+
     def _cors(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = self._origin()
+        if origin in _ALLOWED_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+        else:
+            # Dev fallback: allow any localhost origin (non-browser clients / curl)
+            self.send_header("Access-Control-Allow-Origin", f"http://localhost:{REPOCIV_PORT}")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-RepoCiv-Token")
+        self.send_header("Vary", "Origin")
+
+    def _check_token(self) -> bool:
+        """Return True if the request carries a valid token (or token is not configured)."""
+        if not REPOCIV_TOKEN:
+            return True  # auth disabled in dev
+        return self.headers.get("X-RepoCiv-Token", "") == REPOCIV_TOKEN
+
+    def _client_ip(self) -> str:
+        return self.client_address[0] if self.client_address else "unknown"
+
+    def _rate_limited(self) -> bool:
+        return not _rate_check(self._client_ip())
 
     def do_OPTIONS(self) -> None:
         self.send_response(200)
@@ -631,132 +690,294 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self) -> None:
-        if self.path == "/missions":
-            missions = load_missions()
-            self._json(missions)
+        path = self.path.split("?")[0]
+
+        if path == "/health":
+            self._json({"ok": True, "openclaw": _has_openclaw()})
             return
 
-        if self.path == "/health":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self._cors()
-            self.end_headers()
-            self.wfile.write(b'{"ok":true,"openclaw":' + (b"true" if _has_openclaw() else b"false") + b"}")
+        if path == "/ready":
+            self._json({"ok": True, "eventStore": str(_es._store_path), "token": bool(REPOCIV_TOKEN)})
             return
 
-        if self.path == "/gpu":
-            data = get_gpu_info()
-            self._json(data)
+        if path == "/missions":
+            self._json(load_missions())
             return
 
-        if self.path == "/pending":
-            tasks = load_pending_tasks()
-            self._json(tasks)
+        if path == "/gpu":
+            self._json(get_gpu_info())
             return
 
-        if self.path == "/techdebt":
+        if path == "/pending":
+            self._json(load_pending_tasks())
+            return
+
+        if path == "/techdebt":
             root = os.environ.get("REPOCIV_REPOS_ROOT",
-                                 str(Path(__file__).parent.parent / "workspace" / "repos"))
-            debt = scan_tech_debt(root)
-            self._json(debt)
+                                  str(Path(__file__).parent.parent / "workspace" / "repos"))
+            self._json(scan_tech_debt(root))
             return
 
-        # Phase 9: XCOM Context Fatigue endpoints
-        if self.path == "/context":
-            # GET /context — return fatigue state for all tracked units
+        if path == "/context":
             self._json({"ok": True, "fatigue": _fatigue_state, "restAreas": _rest_areas})
             return
 
+        if path == "/events":
+            try:
+                qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+                since = 0.0
+                for part in qs.split("&"):
+                    if part.startswith("since="):
+                        since = float(part.split("=", 1)[1])
+            except Exception:
+                since = 0.0
+            self._json(_es.read_events(since=since))
+            return
+
+        if path == "/approvals":
+            self._json(_get_approvals())
+            return
+
+        if path == "/agents":
+            self._json({
+                "agents": _sched.get_agent_status(),
+                "queueDepth": len(_sched.queue_snapshot()),
+                "queue": _sched.queue_snapshot()[:20],
+            })
+            return
+
+        if path == "/agents/capabilities":
+            self._json(capabilities_snapshot())
+            return
+
+        if path == "/metrics":
+            events = _es.read_events(since=0, limit=500)
+            agent_status = _sched.get_agent_status()
+            queue_depth = len(_sched.queue_snapshot())
+            gpu = get_gpu_info()
+            self._json(compute_metrics(events, agent_status, queue_depth, gpu))
+            return
+
+        if path == "/directives/stats":
+            records = _ds.read_records()
+            self._json(_dl.stats_snapshot(records))
+            return
+
+        if path == "/directives/suggest":
+            qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+            params: dict[str, str] = {}
+            for part in qs.split("&"):
+                if "=" in part:
+                    k, _, v = part.partition("=")
+                    params[k] = v
+            gesture  = params.get("gesture", "")
+            agent_id = params.get("agent", "DAVI")
+            records  = _ds.read_records()
+            self._json(_dl.suggest(gesture, agent_id, records))
+            return
+
         self.send_response(404)
+        self._cors()
         self.end_headers()
 
     def do_POST(self) -> None:
+        # Rate limit check (before reading body)
+        if self._rate_limited():
+            self.send_response(429)
+            self._cors()
+            self.end_headers()
+            self.wfile.write(b'{"error":"rate limited"}')
+            return
+
+        # Token auth (POST always requires token if configured)
+        if not self._check_token():
+            self.send_response(401)
+            self._cors()
+            self.end_headers()
+            self.wfile.write(b'{"error":"unauthorized"}')
+            return
+
+        # Body size guard
+        length = int(self.headers.get("Content-Length", 0))
+        if length > _MAX_BODY:
+            self.send_response(413)
+            self._cors()
+            self.end_headers()
+            self.wfile.write(b'{"error":"payload too large"}')
+            return
+
         try:
-            length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length))
-            t = body.get("type")
-
-            if t == "unit_command":
-                threading.Thread(
-                    target=run_agent,
-                    args=(body.get("unit", "DAVI"), body.get("city", "main"), body.get("mission", ""), body.get("agentType", "hero")),
-                    daemon=True,
-                ).start()
-
-            elif t == "tile_inspected":
-                city_name = body.get("cityName", "")
-                repo_path = body.get("repoPath", "")
-                print(f"[bridge] tile_inspected: {city_name} ({repo_path})", flush=True)
-                # Extensible: enviar contexto a Hermes en el futuro
-                send_to_repociv({"type": "log", "msg": f"Inspeccionando: {city_name}", "level": "info"})
-
-            elif t == "quest_add":
-                title = body.get("title", "Sin título")
-                description = body.get("description", "")
-                append_pending_task(title, description)
-                # Persist as mission too
-                mission_rec: dict[str, Any] = {
-                    "id": f"pending-{uuid.uuid4().hex[:6]}",
-                    "unit": "DAVI",
-                    "city": "main",
-                    "mission": title,
-                    "questName": title,
-                    "agentType": "hero",
-                    "startedAt": time.time(),
-                    "completedAt": None,
-                    "status": "running",
-                    "summary": description,
-                    "lines": 0,
-                    "duration": 0,
-                }
-                save_mission(mission_rec)
-                send_to_repociv({"type": "mission_start", "missionId": mission_rec["id"], "unit": "DAVI", "questName": title})
-                send_to_repociv({"type": "log", "msg": f"Quest agregado: {title}", "level": "success"})
-
-            # Phase 9: XCOM Context Fatigue POST commands
-            elif t == "unit_fatigue_delta":
-                # Decay or recover fatigue for a unit (e.g. after a mission tick)
-                unit_id = body.get("unit", "")
-                delta = int(body.get("delta", 0))
-                entry = update_unit_fatigue(unit_id, delta=delta)
-                send_to_repociv({
-                    "type": "unit_fatigue_update",
-                    "unit": unit_id,
-                    "fatigue": entry["fatigue"],
-                    "maxFatigue": 100,
-                    "atRest": entry["isResting"],
-                    "restAreaId": entry["restAreaId"],
-                })
-
-            elif t == "discover_rest_area":
-                # Mark a room as a rest area
-                ra_id = body.get("restAreaId", f"ra-{uuid.uuid4().hex[:6]}")
-                room_id = body.get("roomId", "")
-                coord = body.get("coord", [0, 0])
-                area = discover_rest_area(ra_id, room_id, tuple(coord))
-                send_to_repociv({"type": "rest_area_discovered", "restArea": area})
-
-            elif t == "enter_rest_area":
-                unit_id = body.get("unit", "")
-                ra_id = body.get("restAreaId", "")
-                ok = enter_rest_area(unit_id, ra_id)
-                if ok:
-                    send_to_repociv({"type": "rest_area_entered", "unit": unit_id, "restAreaId": ra_id})
-                else:
-                    send_to_repociv({"type": "log", "msg": f"Rest area {ra_id} llena o no existe", "level": "warn"})
-
-            elif t == "exit_rest_area":
-                unit_id = body.get("unit", "")
-                exit_rest_area(unit_id)
-                send_to_repociv({"type": "rest_area_exited", "unit": unit_id, "restAreaId": ""})
-
-            self._json({"ok": True})
-
-        except Exception as e:
+        except Exception:
             self.send_response(400)
             self._cors()
             self.end_headers()
-            self.wfile.write(json.dumps({"error": str(e)}).encode())
+            self.wfile.write(b'{"error":"invalid JSON"}')
+            return
+
+        path = self.path.split("?")[0]
+
+        # ─── Cancel a queued command ──────────────────────────────────────────
+        if path.startswith("/commands/") and path.endswith("/cancel"):
+            cmd_id = path.split("/")[2]
+            removed = _sched.cancel(cmd_id)
+            # Also check approval queue
+            if not removed:
+                removed = _pop_approval(cmd_id) is not None
+                if removed:
+                    _es.record_rejected(cmd_id, "cancelled by user")
+            send_to_repociv({"type": "log",
+                             "msg": f"Comando cancelado: {cmd_id}" if removed else f"Comando no encontrado: {cmd_id}",
+                             "level": "warn" if removed else "info"})
+            self._json({"ok": removed, "commandId": cmd_id})
+            return
+
+        # ─── Directive gesture record (Fase 9) ───────────────────────────────────
+        if path == "/directives/record":
+            command_id = str(body.get("commandId", ""))
+            gesture    = str(body.get("gesture",   ""))
+            agent_id   = str(body.get("agentId",   "DAVI"))
+            cmd_type   = str(body.get("cmdType",   ""))
+            target     = str(body.get("target",    ""))
+            if command_id and gesture and cmd_type:
+                _ds.record_gesture(command_id, gesture, agent_id, cmd_type, target)
+            self._json({"ok": True})
+            return
+
+        # ─── Command Bus ─────────────────────────────────────────────────────
+        if path == "/commands":
+            try:
+                cmd = validate_command(body)
+            except CommandValidationError as e:
+                self.send_response(400)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(e)}).encode())
+                return
+            result = _handle_command(cmd)
+            self._json(result)
+            return
+
+        # ─── Approval endpoints ───────────────────────────────────────────────
+        if path.startswith("/approvals/") and path.endswith("/approve"):
+            cmd_id = path.split("/")[2]
+            cmd_dict = _pop_approval(cmd_id)
+            if not cmd_dict:
+                self._json({"ok": False, "error": "approval not found"})
+                return
+            _es.record_approved(cmd_id)
+            # Rebuild command and dispatch
+            from server.command_schema import Command as _Cmd
+            cmd = _Cmd(
+                id=cmd_dict["id"],
+                type=cmd_dict["type"],
+                target=cmd_dict["target"],
+                payload=cmd_dict.get("payload", {}),
+                created_by=cmd_dict.get("created_by", "user"),
+                risk=cmd_dict.get("risk", "medium"),
+                requires_approval=False,
+                status="queued",
+            )
+            _es.record_queued(cmd.id)
+            _sched.enqueue(cmd)
+            send_to_repociv({"type": "log", "msg": f"Comando aprobado: {cmd.type}", "level": "success"})
+            self._json({"ok": True, "status": "queued", "commandId": cmd_id})
+            return
+
+        if path.startswith("/approvals/") and path.endswith("/reject"):
+            cmd_id = path.split("/")[2]
+            cmd_dict = _pop_approval(cmd_id)
+            if not cmd_dict:
+                self._json({"ok": False, "error": "approval not found"})
+                return
+            _es.record_rejected(cmd_id, "user rejected")
+            send_to_repociv({"type": "log", "msg": f"Comando rechazado: {cmd_dict.get('type')}", "level": "warn"})
+            self._json({"ok": True, "status": "rejected", "commandId": cmd_id})
+            return
+
+        # ─── Legacy root POST (unit_command / quest_add / fatigue) ───────────
+        t = body.get("type")
+
+        if t == "unit_command":
+            cmd_data = {
+                "type": "unit_command",
+                "target": body.get("city", "main"),
+                "payload": {
+                    "unit": body.get("unit", "DAVI"),
+                    "city": body.get("city", "main"),
+                    "mission": body.get("mission", ""),
+                    "agentType": body.get("agentType", "hero"),
+                },
+                "created_by": "user",
+            }
+            try:
+                cmd = validate_command(cmd_data)
+                _handle_command(cmd)
+            except CommandValidationError as e:
+                self._json({"ok": False, "error": str(e)})
+                return
+            self._json({"ok": True})
+            return
+
+        if t == "tile_inspected":
+            city_name = body.get("cityName", "")
+            send_to_repociv({"type": "log", "msg": f"Inspeccionando: {city_name}", "level": "info"})
+            self._json({"ok": True})
+            return
+
+        if t == "quest_add":
+            cmd_data = {
+                "type": "quest_add",
+                "target": body.get("title", "Sin título"),
+                "payload": {"title": body.get("title", "Sin título"), "description": body.get("description", "")},
+                "created_by": "user",
+            }
+            try:
+                cmd = validate_command(cmd_data)
+                _handle_command(cmd)
+            except CommandValidationError as e:
+                self._json({"ok": False, "error": str(e)})
+                return
+            self._json({"ok": True})
+            return
+
+        # ─── Fatigue commands (Phase 9) ───────────────────────────────────────
+        if t == "unit_fatigue_delta":
+            unit_id = body.get("unit", "")
+            delta = int(body.get("delta", 0))
+            entry = update_unit_fatigue(unit_id, delta=delta)
+            send_to_repociv({"type": "unit_fatigue_update", "unit": unit_id,
+                             "fatigue": entry["fatigue"], "maxFatigue": 100,
+                             "atRest": entry["isResting"], "restAreaId": entry["restAreaId"]})
+            self._json({"ok": True})
+            return
+
+        if t == "discover_rest_area":
+            ra_id = body.get("restAreaId", f"ra-{uuid.uuid4().hex[:6]}")
+            area = discover_rest_area(ra_id, body.get("roomId", ""), tuple(body.get("coord", [0, 0])))
+            send_to_repociv({"type": "rest_area_discovered", "restArea": area})
+            self._json({"ok": True})
+            return
+
+        if t == "enter_rest_area":
+            unit_id = body.get("unit", "")
+            ra_id = body.get("restAreaId", "")
+            ok = enter_rest_area(unit_id, ra_id)
+            if ok:
+                send_to_repociv({"type": "rest_area_entered", "unit": unit_id, "restAreaId": ra_id})
+            else:
+                send_to_repociv({"type": "log", "msg": f"Rest area {ra_id} llena o no existe", "level": "warn"})
+            self._json({"ok": ok})
+            return
+
+        if t == "exit_rest_area":
+            unit_id = body.get("unit", "")
+            exit_rest_area(unit_id)
+            send_to_repociv({"type": "rest_area_exited", "unit": unit_id, "restAreaId": ""})
+            self._json({"ok": True})
+            return
+
+        self._json({"ok": True, "ignored": t})
 
     def _json(self, data: Any) -> None:
         payload = json.dumps(data).encode()
@@ -770,9 +991,29 @@ class BridgeHandler(BaseHTTPRequestHandler):
         pass
 
 
-# ─── Background scanner thread ───────────────────────────────────────────────
+# ─── Scheduler dispatcher registration ───────────────────────────────────────
+def _scheduler_dispatch(cmd_dict: dict[str, Any]) -> None:
+    """Called by scheduler worker for each dequeued command."""
+    from server.command_schema import Command as _Cmd
+    cmd = _Cmd(
+        id=cmd_dict.get("id", ""),
+        type=cmd_dict.get("type", ""),
+        target=cmd_dict.get("target", ""),
+        payload=cmd_dict.get("payload", {}),
+        created_by=cmd_dict.get("created_by", "system"),
+        risk=cmd_dict.get("risk", "low"),
+        requires_approval=False,
+        status="running",
+    )
+    unit_id = cmd.payload.get("unit", "DAVI")
+    _sched.heartbeat(unit_id)
+    _dispatch_command(cmd)
+    _sched.heartbeat(unit_id)
+
+
+# ─── Background scanner ───────────────────────────────────────────────────────
 def background_scanner() -> None:
-    time.sleep(3)  # wait for bridge to be ready
+    time.sleep(3)
     scan_active_processes()
     detect_lexo()
     while True:
@@ -782,20 +1023,55 @@ def background_scanner() -> None:
         detect_lexo()
 
 
-# ─── Main ───────────────────────────────────────────────────────────────────
+# ─── Startup recovery ────────────────────────────────────────────────────────
+def _recover_hung_commands() -> int:
+    """Mark commands stuck in 'running' state as failed on bridge restart."""
+    events = _es.read_events(since=0, limit=10_000)
+    started: set[str] = set()
+    terminal: set[str] = set()
+    for ev in events:
+        etype = ev.get("type", "")
+        cid   = ev.get("command_id", "")
+        if etype == "CommandStarted":
+            started.add(cid)
+        elif etype in ("CommandCompleted", "CommandFailed", "CommandRejected"):
+            terminal.add(cid)
+    hung = started - terminal
+    for cid in hung:
+        _es.record_failed(cid, "recovered: bridge restarted mientras el comando estaba en ejecución")
+    return len(hung)
+
+
+# ─── Main ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    _sched.set_dispatcher(_scheduler_dispatch)
+    _sched.start_worker()
+
+    # Recover any commands that were running when the bridge last died
+    recovered = _recover_hung_commands()
+
     server = HTTPServer(("localhost", BRIDGE_PORT), BridgeHandler)
     threading.Thread(target=background_scanner, daemon=True).start()
+
+    # Graceful shutdown on SIGTERM (systemd / dev-stop.sh)
+    def _handle_sigterm(signum: int, frame: object) -> None:
+        print("\nBridge: SIGTERM recibido — cerrando limpiamente.")
+        server.shutdown()
+    signal.signal(signal.SIGTERM, _handle_sigterm)
+
     has_gpu = get_gpu_info() is not None
-    print(f"╭─ RepoCiv Bridge ─────────────────────────────╮")
-    print(f"│ Comandos:  http://localhost:{BRIDGE_PORT}              │")
-    print(f"│ Eventos:   http://localhost:{REPOCIV_PORT}/event        │")
+    auth_status = "ON" if REPOCIV_TOKEN else "OFF (dev)"
+    print(f"╭─ RepoCiv Bridge ──────────────────────────────────╮")
+    print(f"│ Endpoint:  http://localhost:{BRIDGE_PORT}                  │")
+    print(f"│ Auth:      {auth_status:<40}│")
+    print(f"│ CORS:      localhost:{REPOCIV_PORT} only                  │")
+    print(f"│ Events:    {_es._store_path}  │")
     print(f"│ Missions:  {MISSIONS_FILE}    │")
     print(f"│ openclaw:  {'OK' if _has_openclaw() else 'NO (usará Hermes API)'}                          │")
     print(f"│ GPU:       {'OK (nvidia-smi)' if has_gpu else 'no disponible'}                    │")
-    print(f"│ Pending:   {PENDING_TRACKER}  │")
-    print(f"╰──────────────────────────────────────────────╯")
-    print(f"Ctrl+C para detener")
+    if recovered:
+        print(f"│ Recuperados: {recovered} comando(s) colgado(s)              │")
+    print(f"╰───────────────────────────────────────────────────╯")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

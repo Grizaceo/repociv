@@ -8,7 +8,12 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check": "tsc --noEmit && vitest run && vite build",
+    "start": "bash scripts/dev-start.sh",
+    "stop": "bash scripts/dev-stop.sh",
+    "health": "bash scripts/healthcheck.sh",
+    "backup": "bash scripts/backup-events.sh"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

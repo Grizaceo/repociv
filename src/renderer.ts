@@ -11,6 +11,14 @@ import { HexRenderer } from './hexRenderer.ts';
 import { UnitRenderer } from './unitRenderer.ts';
 import { MinimapRenderer } from './minimapRenderer.ts';
 import { LocalRenderer, type LocalRenderer as LocalRendererType } from './localRenderer.ts';
+import {
+  interpretUnitDrag, interpretCityToCityDrag, interpretAreaSelect,
+  contextMenuForCity, type SpatialDirective,
+} from './spatialDirectives.ts';
+import {
+  renderDragGhost, renderAreaSelect, renderDropTarget,
+  hideDirectivePreview, hideContextMenu,
+} from './ui/spatialPreview.ts';
 
 const HEX_SIZE = 52;
 
@@ -32,6 +40,14 @@ export class Renderer {
   private fogEnabled = true;
   private animTime = 0;
 
+  // ─── Fase 5: Spatial gesture state ────────────────────────────────────────
+  private gestureMode: 'camera_pan' | 'unit_drag' | 'area_select' | 'route' = 'camera_pan';
+  private draggedUnit:    Unit | null = null;
+  private routeFromCity:  { tile: Tile; coord: Axial } | null = null;
+  private ghostScreenPos: { x: number; y: number } | null = null;
+  private areaStart:      { x: number; y: number } | null = null; // screen coords
+  private areaEnd:        { x: number; y: number } | null = null;
+
   private resizeObserver: ResizeObserver;
   private hexR: HexRenderer;
   private unitR: UnitRenderer;
@@ -43,6 +59,9 @@ export class Renderer {
   onCitySelect: ((cityId: string) => void) | null = null;
   onTileInspect: ((cityName: string, coord: { q: number; r: number }, repoPath: string) => void) | null = null;
   onEnterLocal: ((repoId: string, rootPath: string) => void) | null = null; // Phase 6
+  // ─── Fase 5 callbacks ─────────────────────────────────────────────────────
+  onSpatialGesture: ((directive: SpatialDirective, screenPos: { x: number; y: number }) => void) | null = null;
+  onContextMenu: ((items: ReturnType<typeof contextMenuForCity>, screenPos: { x: number; y: number }) => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement, state: GameState) {
     this.canvas = canvas;
@@ -72,34 +91,167 @@ export class Renderer {
   }
 
   private setupInput() {
+    // ── mousedown: decide gesture mode ──────────────────────────────────────
     this.canvas.addEventListener('mousedown', (e) => {
-      if (e.button === 0) {
-        this.isDragging = true;
-        this.dragStart = { x: e.clientX, y: e.clientY };
-        this.camStart = { x: this.cam.x, y: this.cam.y };
+      if (e.button !== 0) return;
+      const rect = this.canvas.getBoundingClientRect();
+      const wx = e.clientX - rect.left;
+      const wy = e.clientY - rect.top;
+      const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+      const tile  = this.state.world.tiles.get(tileKey(coord)) ?? null;
+
+      this.dragStart = { x: e.clientX, y: e.clientY };
+      this.camStart  = { x: this.cam.x, y: this.cam.y };
+
+      // Priority 1: unit drag (unit under cursor)
+      const unitHere = this.state.getUnitAt(coord);
+      if (unitHere) {
+        this.gestureMode = 'unit_drag';
+        this.draggedUnit = unitHere;
+        this.isDragging  = false;      // don't pan while dragging unit
+        return;
       }
+
+      // Priority 2: route (Shift + city tile)
+      if (e.shiftKey && tile?.city) {
+        this.gestureMode  = 'route';
+        this.routeFromCity = { tile, coord };
+        this.isDragging   = false;
+        return;
+      }
+
+      // Priority 3: area select (Shift + empty tile)
+      if (e.shiftKey) {
+        this.gestureMode = 'area_select';
+        this.areaStart   = { x: wx, y: wy };
+        this.areaEnd     = { x: wx, y: wy };
+        this.isDragging  = false;
+        return;
+      }
+
+      // Default: camera pan
+      this.gestureMode = 'camera_pan';
+      this.isDragging  = true;
     });
 
+    // ── mousemove ────────────────────────────────────────────────────────────
     this.canvas.addEventListener('mousemove', (e) => {
       const rect = this.canvas.getBoundingClientRect();
       const wx = e.clientX - rect.left;
       const wy = e.clientY - rect.top;
       this.hoveredHex = worldToAxial(wx, wy, HEX_SIZE, this.cam);
-      if (this.isDragging) {
+
+      if (this.gestureMode === 'camera_pan' && this.isDragging) {
         const dx = (wx - this.dragStart.x) / this.cam.zoom;
         const dy = (wy - this.dragStart.y) / this.cam.zoom;
         this.cam.x = this.camStart.x - dx;
         this.cam.y = this.camStart.y - dy;
       }
-      this.canvas.style.cursor = this.isDragging ? 'grabbing' :
-        this.getTileAt(wx, wy) ? 'pointer' : 'default';
+
+      if (this.gestureMode === 'unit_drag' && this.draggedUnit) {
+        this.ghostScreenPos = { x: wx, y: wy };
+        this.canvas.style.cursor = 'grabbing';
+      }
+
+      if (this.gestureMode === 'area_select' && this.areaStart) {
+        this.areaEnd = { x: wx, y: wy };
+      }
+
+      if (this.gestureMode === 'camera_pan') {
+        this.canvas.style.cursor = this.isDragging ? 'grabbing' :
+          this.getTileAt(wx, wy) ? 'pointer' : 'default';
+      }
     });
 
+    // ── mouseup: resolve gesture ─────────────────────────────────────────────
     this.canvas.addEventListener('mouseup', (e) => {
-      if (e.button === 0 && !this.wasDrag(e)) this.handleClick(e);
-      this.isDragging = false;
+      if (e.button !== 0) return;
+      const rect = this.canvas.getBoundingClientRect();
+      const wx = e.clientX - rect.left;
+      const wy = e.clientY - rect.top;
+      const screenPos = { x: e.clientX, y: e.clientY };
+
+      switch (this.gestureMode) {
+        case 'unit_drag': {
+          const unit = this.draggedUnit;
+          if (unit && this.wasDrag(e)) {
+            // Dragged to a tile → interpret as spatial directive
+            const coord    = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+            const toTile   = this.state.world.tiles.get(tileKey(coord));
+            if (toTile) {
+              const directive = interpretUnitDrag({
+                unit, fromCoord: unit.coord, toTile, shiftHeld: e.shiftKey,
+              });
+              if (directive) this.onSpatialGesture?.(directive, screenPos);
+              else {
+                // No city target → treat as move order
+                this.state.moveUnit(unit.id, coord);
+              }
+            }
+          } else if (unit) {
+            // Short click on unit → select
+            this.selectedUnit = unit;
+            this.state.selectUnit(unit);
+            this.onUnitSelect?.(unit);
+          }
+          this.draggedUnit = null;
+          this.ghostScreenPos = null;
+          break;
+        }
+
+        case 'route': {
+          if (this.routeFromCity && this.wasDrag(e)) {
+            const coord  = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+            const toTile = this.state.world.tiles.get(tileKey(coord));
+            if (toTile?.city && toTile.city.id !== this.routeFromCity.tile.city?.id) {
+              const directive = interpretCityToCityDrag({
+                fromCity: this.routeFromCity.tile.city!,
+                toCity:   toTile.city,
+                fromCoord: this.routeFromCity.coord,
+                toCoord:   coord,
+                selectedUnit: this.selectedUnit,
+              });
+              if (directive) this.onSpatialGesture?.(directive, screenPos);
+            }
+          }
+          this.routeFromCity = null;
+          break;
+        }
+
+        case 'area_select': {
+          if (this.areaStart && this.areaEnd && this.wasDrag(e)) {
+            const minX = Math.min(this.areaStart.x, this.areaEnd.x);
+            const maxX = Math.max(this.areaStart.x, this.areaEnd.x);
+            const minY = Math.min(this.areaStart.y, this.areaEnd.y);
+            const maxY = Math.max(this.areaStart.y, this.areaEnd.y);
+            const selected: Tile[] = [];
+            for (const tile of this.state.world.tiles.values()) {
+              const px = axialToPixel(tile.coord, HEX_SIZE);
+              // Convert world→screen
+              const sx = (px.x - this.cam.x) * this.cam.zoom + this.cam.cx;
+              const sy = (px.y - this.cam.y) * this.cam.zoom + this.cam.cy;
+              if (sx >= minX && sx <= maxX && sy >= minY && sy <= maxY) selected.push(tile);
+            }
+            const directive = interpretAreaSelect({ tiles: selected, selectedUnit: this.selectedUnit });
+            if (directive) this.onSpatialGesture?.(directive, screenPos);
+          }
+          this.areaStart = null;
+          this.areaEnd   = null;
+          break;
+        }
+
+        case 'camera_pan': {
+          if (!this.wasDrag(e)) this.handleClick(e);
+          break;
+        }
+      }
+
+      this.gestureMode = 'camera_pan';
+      this.isDragging  = false;
+      this.canvas.style.cursor = 'default';
     });
 
+    // ── wheel: zoom ──────────────────────────────────────────────────────────
     this.canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       const factor = e.deltaY > 0 ? 0.9 : 1.1;
@@ -120,25 +272,36 @@ export class Renderer {
       this.cam.y += before.y - after.y;
     }, { passive: false });
 
+    // ── contextmenu (right-click): command palette ────────────────────────────
     this.canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       this.actionMode = 'none';
-      this.selectedUnit = null;
+      const rect = this.canvas.getBoundingClientRect();
+      const wx = e.clientX - rect.left;
+      const wy = e.clientY - rect.top;
+      const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+      const tile  = this.state.world.tiles.get(tileKey(coord));
+      if (tile?.city) {
+        const items = contextMenuForCity(tile.city, this.selectedUnit);
+        this.onContextMenu?.(items, { x: e.clientX, y: e.clientY });
+      } else {
+        hideDirectivePreview();
+        hideContextMenu();
+        this.selectedUnit = null;
+      }
     });
 
-    // ── Phase 6: Double-click to enter RimWorld local view ──────────────────
+    // ── dblclick: enter RimWorld local view ──────────────────────────────────
     this.canvas.addEventListener('dblclick', (e) => {
       const rect = this.canvas.getBoundingClientRect();
       const wx = e.clientX - rect.left;
       const wy = e.clientY - rect.top;
       const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
       const tile = this.state.world.tiles.get(tileKey(coord));
-      if (tile?.city) {
-        this.onEnterLocal?.(tile.city.id, tile.city.id);
-      }
+      if (tile?.city) this.onEnterLocal?.(tile.city.id, tile.city.id);
     });
 
-    // ── Phase 6: Esc to return to macro view ─────────────────────────────────
+    // ── Esc: return to macro view ────────────────────────────────────────────
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.state.viewMode === 'local') {
         this.state.enterMacroView();
@@ -313,6 +476,27 @@ export class Renderer {
     }
 
     ctx.restore();
+
+    // ─── Fase 5: Spatial overlay (screen-space, outside camera transform) ──────
+    if (this.draggedUnit && this.ghostScreenPos) {
+      renderDragGhost(
+        ctx,
+        this.ghostScreenPos.x,
+        this.ghostScreenPos.y,
+        this.draggedUnit.color,
+        this.draggedUnit.id,
+      );
+      if (this.hoveredHex) {
+        const toTile = this.state.world.tiles.get(tileKey(this.hoveredHex));
+        const px = axialToPixel(this.hoveredHex, HEX_SIZE);
+        const sx = (px.x - cam.x) * cam.zoom + cam.cx;
+        const sy = (px.y - cam.y) * cam.zoom + cam.cy;
+        renderDropTarget(ctx, sx, sy, HEX_SIZE * cam.zoom, !!toTile?.city);
+      }
+    }
+    if (this.areaStart && this.areaEnd) {
+      renderAreaSelect(ctx, this.areaStart.x, this.areaStart.y, this.areaEnd.x, this.areaEnd.y);
+    }
 
     // Global Atmospheric Bloom / Lighting
     const grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width);
