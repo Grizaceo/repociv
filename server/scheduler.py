@@ -102,17 +102,27 @@ def heartbeat(agent_id: str) -> None:
 
 
 def get_agent_status() -> list[dict[str, Any]]:
-    """Return current status of all known agents."""
+    """Return current status of all known agents.
+
+    Heartbeats are recorded with concrete unit ids (e.g. DAVI-2), while leases
+    are tracked by base agent (DAVI). Aggregate heartbeats by base so cloned
+    units do not appear as `never_seen`.
+    """
     now = time.time()
     with _heartbeat_lock:
-        hb = dict(_heartbeat)
+        hb_raw = dict(_heartbeat)
     with _lease_lock:
         leases = dict(_leases)
 
-    known_bases = set(leases.keys()) | set(_agent_base(k) for k in hb)
+    hb_by_base: dict[str, float] = {}
+    for agent_id, ts in hb_raw.items():
+        base = _agent_base(agent_id)
+        hb_by_base[base] = max(hb_by_base.get(base, 0.0), ts)
+
+    known_bases = set(leases.keys()) | set(hb_by_base.keys())
     result = []
-    for base in known_bases:
-        last_ts = hb.get(base)
+    for base in sorted(known_bases):
+        last_ts = hb_by_base.get(base)
         active = leases.get(base, 0)
         if last_ts is None:
             status = "never_seen"

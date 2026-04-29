@@ -22,10 +22,10 @@ _check() {
   local label="$1" result="$2" expect="$3"
   if echo "$result" | grep -q "$expect"; then
     echo "  ✔ $label"
-    ((PASS++))
+    ((PASS+=1))
   else
     echo "  ✗ $label (respuesta: ${result:0:120})"
-    ((FAIL++))
+    ((FAIL+=1))
   fi
 }
 
@@ -42,11 +42,11 @@ echo "▶ Smoke test RepoCiv → $BASE"
 
 # 1. Health
 HEALTH=$(_curl "$BASE/health")
-_check "GET /health → ok" "$HEALTH" '"ok":true'
+_check "GET /health → ok" "$HEALTH" '"ok"[[:space:]]*:[[:space:]]*true'
 
 # 2. Ready
 READY=$(_curl "$BASE/ready")
-_check "GET /ready → ok" "$READY" '"ok":true'
+_check "GET /ready → ok" "$READY" '"ok"[[:space:]]*:[[:space:]]*true'
 
 # 3. Events endpoint
 EVENTS=$(_curl "$BASE/events")

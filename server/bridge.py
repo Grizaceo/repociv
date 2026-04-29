@@ -622,37 +622,76 @@ def _handle_command(cmd: Command) -> dict[str, Any]:
     return {"ok": True, "status": "queued", "commandId": cmd.id}
 
 
+def _default_mission_for_command(cmd: Command) -> str:
+    """Human-readable fallback mission for command types without explicit text."""
+    labels = {
+        "inspect_repo":  f"Inspeccionar repo {cmd.target} y reportar hallazgos accionables.",
+        "read_file":     f"Leer {cmd.target} y resumir contenido relevante.",
+        "run_tests":     f"Ejecutar tests en {cmd.target}, diagnosticar fallos y proponer corrección.",
+        "run_build":     f"Ejecutar build en {cmd.target}, diagnosticar fallos y proponer corrección.",
+        "edit_file":     f"Editar/proponer cambios en {cmd.target} según la instrucción del usuario.",
+        "create_branch": f"Crear/preparar rama de trabajo para {cmd.target}.",
+        "git_commit":    f"Preparar commit limpio para {cmd.target}, con resumen verificable.",
+        "delete_file":   f"Eliminar {cmd.target} solo si la aprobación explícita lo autoriza y reportar impacto.",
+        "send_message":  f"Preparar/enviar mensaje relacionado con {cmd.target} según política aprobada.",
+        "execute_agent": f"Ejecutar misión agente sobre {cmd.target}.",
+        "unit_command":  f"Ejecutar misión de unidad sobre {cmd.target}.",
+    }
+    return labels.get(cmd.type, f"Ejecutar comando {cmd.type} sobre {cmd.target}.")
+
+
 def _dispatch_command(cmd: Command) -> None:
-    """Run the command in a background thread based on its type."""
+    """Run a queued command synchronously inside the scheduler worker thread.
+
+    Earlier code spawned another thread for agent commands and returned
+    immediately, causing the scheduler lease to be released while the agent was
+    still running. That made concurrency limits decorative. This function now
+    blocks until the command reaches a terminal event.
+    """
     payload = cmd.payload
 
-    if cmd.type in ("unit_command", "execute_agent"):
-        unit = payload.get("unit", "DAVI")
-        city = payload.get("city", "main")
-        mission = payload.get("mission", cmd.target)
-        agent_type = payload.get("agentType", "hero")
-        threading.Thread(target=run_agent, args=(unit, city, mission, agent_type, cmd.id), daemon=True).start()
+    agent_command_types = {
+        "unit_command", "execute_agent", "inspect_repo", "read_file",
+        "run_tests", "run_build", "edit_file", "create_branch",
+        "git_commit", "delete_file", "send_message",
+    }
 
-    elif cmd.type == "quest_add":
-        title = payload.get("title", cmd.target)
-        description = payload.get("description", "")
+    if cmd.type in agent_command_types:
+        unit = str(payload.get("unit", "DAVI"))
+        city = str(payload.get("city", cmd.target or "main"))
+        mission = str(payload.get("mission") or _default_mission_for_command(cmd))
+        agent_type = str(payload.get("agentType", "hero"))
+        run_agent(unit, city, mission, agent_type, cmd.id)
+        return
+
+    if cmd.type == "quest_add":
+        title = str(payload.get("title", cmd.target))
+        description = str(payload.get("description", ""))
         append_pending_task(title, description)
         mission_rec: dict[str, Any] = {
             "id": cmd.id, "unit": "DAVI", "city": "main", "mission": title,
             "questName": title, "agentType": "hero", "startedAt": time.time(),
-            "completedAt": None, "status": "running", "summary": description, "lines": 0, "duration": 0,
+            "completedAt": time.time(), "status": "complete", "summary": description,
+            "lines": 0, "duration": 0,
         }
         save_mission(mission_rec)
         send_to_repociv({"type": "mission_start", "missionId": cmd.id, "unit": "DAVI", "questName": title})
+        send_to_repociv({"type": "mission_complete", "missionId": cmd.id, "unit": "DAVI", "success": True, "duration": 0})
         send_to_repociv({"type": "log", "msg": f"Quest agregado: {title}", "level": "success"})
+        _es.record_completed(cmd.id, "quest added")
+        _ds.record_outcome(cmd.id, "success", 0.0)
+        return
 
-    elif cmd.type == "tile_inspected":
-        city_name = payload.get("cityName", cmd.target)
+    if cmd.type == "tile_inspected":
+        city_name = str(payload.get("cityName", cmd.target))
         send_to_repociv({"type": "log", "msg": f"Inspeccionando: {city_name}", "level": "info"})
+        _es.record_completed(cmd.id, "tile inspected")
+        _ds.record_outcome(cmd.id, "success", 0.0)
+        return
 
-    else:
-        # Unknown/future types: just log
-        send_to_repociv({"type": "log", "msg": f"Comando {cmd.type} recibido (sin executor)", "level": "info"})
+    send_to_repociv({"type": "log", "msg": f"Comando {cmd.type} recibido (sin executor)", "level": "warn"})
+    _es.record_failed(cmd.id, f"no executor for {cmd.type}")
+    _ds.record_outcome(cmd.id, "failure", 0.0)
 
 
 # ─── HTTP Handler ─────────────────────────────────────────────────────────────
@@ -1031,7 +1070,9 @@ def _recover_hung_commands() -> int:
     terminal: set[str] = set()
     for ev in events:
         etype = ev.get("type", "")
-        cid   = ev.get("command_id", "")
+        cid = _es.command_id(ev)
+        if not cid:
+            continue
         if etype == "CommandStarted":
             started.add(cid)
         elif etype in ("CommandCompleted", "CommandFailed", "CommandRejected"):

@@ -106,3 +106,14 @@ def read_events(since: float = 0.0, limit: int = 500) -> list[dict[str, Any]]:
         if evt.get("timestamp", 0) >= since:
             results.append(evt)
     return results[-limit:]
+
+
+def command_id(event: dict[str, Any]) -> str:
+    """Return a command id from either current or legacy event shapes.
+
+    The public event schema uses camelCase (`commandId`). A previous recovery
+    path accidentally looked for `command_id`, which made restart recovery blind
+    to already-terminal commands. Keeping this helper here prevents the two
+    spellings from drifting again.
+    """
+    return str(event.get("commandId") or event.get("command_id") or "")
