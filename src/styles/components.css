@@ -302,9 +302,79 @@
   border-left: 3px solid var(--gold-mid);
   font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
   color: var(--civ-text-beige);
+  position: relative;
 }
 
 .chat-msg.user { border-left-color: var(--civ-science); background: rgba(0, 100, 255, 0.05); }
+
+/* ── Chat message header row (meta + copy buttons) ───────────────────── */
+.chat-msg-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 3px;
+}
+
+.chat-msg-meta {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--font-ui);
+}
+
+.chat-msg-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ── Full-message copy icon ──────────────────────────────────────────── */
+.chat-copy-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--gold-dim);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1;
+}
+
+.chat-copy-btn:hover {
+  color: var(--gold-bright);
+  border-color: var(--gold-mid);
+}
+
+.chat-copy-btn.copied {
+  color: var(--civ-food);
+  border-color: var(--civ-food);
+}
+
+/* ── Dedicated error-copy button ─────────────────────────────────────── */
+.chat-error-btn {
+  background: transparent;
+  border: 1px solid var(--civ-happiness);
+  color: var(--civ-happiness);
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: background 0.15s, color 0.15s;
+}
+
+.chat-error-btn:hover {
+  background: var(--civ-happiness);
+  color: var(--ui-dark);
+}
+
+.chat-error-btn.hidden { display: none; }
 
 #chat-input-row {
   padding: 14px; border-top: 1px solid var(--panel-border);
