@@ -36,6 +36,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import threading
@@ -529,11 +530,18 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str) -> tuple[boo
 
 
 def _has_openclaw() -> bool:
-    try:
-        subprocess.run(["which", "openclaw"], capture_output=True, check=True, timeout=2)
-        return True
-    except Exception:
-        return False
+    return _find_openclaw() is not None
+
+
+def _find_openclaw() -> str | None:
+    candidates = [
+        shutil.which("openclaw"),
+        str(Path.home() / ".npm-global" / "bin" / "openclaw"),
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
 
 
 def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
@@ -543,7 +551,14 @@ def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
     else:
         session_id = f"repociv-{unit_id.lower()}-{mission_id}"
 
-    cmd = ["openclaw", "agent", "--agent", config["agent"],
+    openclaw_bin = _find_openclaw()
+    if not openclaw_bin:
+        text = "[openclaw error] binary not found in PATH or ~/.npm-global/bin/openclaw\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, text.strip()
+
+    cmd = [openclaw_bin, "agent", "--agent", config["agent"],
            "--session-id", session_id, "--message", mission]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
     output_buf: list[str] = []
@@ -588,7 +603,11 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
             time.sleep(0.04)
         return True, content
     except Exception as e:
-        return False, str(e)
+        err = str(e)
+        text = f"[hermes error] {err}\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, err
 
 
 # ─── Command Bus intake ───────────────────────────────────────────────────────
