@@ -129,9 +129,11 @@ def _pop_approval(cmd_id: str) -> dict[str, Any] | None:
 from server import event_store as _es
 from server import sessions as _sessions
 from server import run_state as _run_state
+from server import workspace_issue as _wi
 _es.init(CONFIG_DIR)
 _sessions.init(CONFIG_DIR)
 _run_state.init(CONFIG_DIR)
+_wi.init(CONFIG_DIR)
 
 # ─── Command schema + policy ──────────────────────────────────────────────────
 from server.command_schema import validate_command, CommandValidationError, Command
@@ -503,6 +505,18 @@ def _default_mission_for_command(cmd: Command) -> str:
     return labels.get(cmd.type, f"Ejecutar comando {cmd.type} sobre {cmd.target}.")
 
 
+def _register_issue_run(payload: dict[str, Any], run_id: str) -> None:
+    """If payload carries issue/repo context, register the run in the issue workspace."""
+    issue_id = str(payload.get("issueId") or payload.get("issue_id") or "")
+    repo = str(payload.get("repo") or payload.get("target") or "")
+    if not issue_id or not repo:
+        return
+    try:
+        _wi.register_run(repo, issue_id, run_id)
+    except Exception:
+        pass  # non-critical — don't block command dispatch
+
+
 def _dispatch_command(cmd: Command) -> None:
     """Run a queued command synchronously inside the scheduler worker thread.
 
@@ -525,6 +539,7 @@ def _dispatch_command(cmd: Command) -> None:
         mission = str(payload.get("mission") or _default_mission_for_command(cmd))
         agent_type = str(payload.get("agentType", "hero"))
         run_agent(unit, city, mission, agent_type, cmd.id)
+        _register_issue_run(payload, cmd.id)
         return
 
     if cmd.type == "e2e_probe":
@@ -556,6 +571,7 @@ def _dispatch_command(cmd: Command) -> None:
         _es.record_completed(cmd.id, text)
         send_to_repociv({"type": "mission_complete", "missionId": cmd.id, "unit": unit, "success": True, "duration": 0})
         send_to_repociv({"type": "log", "msg": text, "level": "success"})
+        _register_issue_run(payload, cmd.id)
         return
 
     if cmd.type == "quest_add":
