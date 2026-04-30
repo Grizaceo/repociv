@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig, loadEnv } from 'vite';
 import type { Plugin, Connect } from 'vite';
 import { execSync } from 'node:child_process';
@@ -267,5 +268,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [repocivPlugin()],
     server: { port: vitePort, strictPort: true },
+    test: {
+      exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
+    },
   };
 });
