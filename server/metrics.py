@@ -84,6 +84,31 @@ def _recent_failures(events: list[dict[str, Any]], n: int = 8) -> list[dict[str,
     return list(reversed(result))  # newest first
 
 
+# ─── Model usage ──────────────────────────────────────────────────────────────
+
+def _compute_model_usage(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Extract model usage from CommandCompleted events that carry token data."""
+    seen: set[str] = set()
+    usage: list[dict[str, Any]] = []
+    for ev in reversed(events):
+        if ev.get("type") != "CommandCompleted":
+            continue
+        data = ev.get("data", {})
+        model = data.get("model", "")
+        if not model or model in seen:
+            continue
+        seen.add(model)
+        usage.append({
+            "model": model,
+            "tokensIn": data.get("tokensIn", 0),
+            "tokensOut": data.get("tokensOut", 0),
+            "costEstimate": data.get("costEstimate", 0.0),
+        })
+    # Keep chronological order (oldest first) for stable output
+    usage.reverse()
+    return usage
+
+
 # ─── Health score ─────────────────────────────────────────────────────────────
 
 def _health(error_rate: float, queue_depth: int, disk_used_pct: float) -> str:
@@ -167,6 +192,7 @@ def compute_metrics(
         "queueDepth":         queue_depth,
         "toolCallsPerAgent":  _tool_calls_per_agent(events),
         "recentFailures":     _recent_failures(events),
+        "modelUsage":         _compute_model_usage(events),
         "agentStatus":        mapped_agents,
         "gpu":                gpu_info,
         "sys":                sys_info,

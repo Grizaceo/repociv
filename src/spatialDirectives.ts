@@ -3,7 +3,7 @@
 // Every gesture produces a SpatialDirective with a preview; nothing executes
 // until the user confirms. This is the "gesture → intent → policy → queue" layer.
 
-import type { Unit, Tile, City } from './types.ts';
+import type { Unit, Tile, City, LocalUnit, LocalTile, Workbench } from './types.ts';
 import type { Axial } from './hex.ts';
 import { draftCommand, type CommandDraft, type CommandType } from './commandSchema.ts';
 import { canExecute } from './agentCapabilities.ts';
@@ -15,7 +15,9 @@ export type GestureType =
   | 'drag_unit_to_unit'
   | 'drag_city_to_city'
   | 'area_select'
-  | 'right_click';
+  | 'right_click'
+  | 'drag_unit_to_file'
+  | 'drop_card_on_unit';
 
 export interface SpatialDirective {
   gesture:    GestureType;
@@ -233,4 +235,97 @@ export function contextMenuForCity(city: City, selectedUnit: Unit | null): Conte
   }
 
   return candidates;
+}
+
+// ─── Drag unit → file (workbench assignment) ──────────────────────────────────
+// Gesture: drag a macro Unit onto a tile and specify a file path.
+// Produces an edit_file or read_file command delegated to that unit.
+export function interpretUnitToFileDrag(params: {
+  unit:      Unit;
+  fromCoord: Axial;
+  toTile:    Tile;
+  filePath:  string;
+  shiftHeld: boolean;
+}): SpatialDirective | null {
+  const { unit, fromCoord, toTile, filePath, shiftHeld } = params;
+
+  // Require a city/repo context on the target tile
+  const city = toTile.city;
+  if (!city) return null;
+
+  // Normalize filePath: strip trailing slash, extract filename
+  const cleanPath = filePath.replace(/\/$/, '');
+  const fileName  = cleanPath.split('/').pop() ?? cleanPath;
+
+  // Shift+drag = edit_file (medium risk), regular drag = read_file (low risk)
+  const isTest   = fileName.endsWith('.test.ts') || fileName.endsWith('_test.py') || fileName.startsWith('test_') || fileName.includes('.spec.');
+  const cmdType: CommandType = shiftHeld
+    ? (isTest ? 'run_tests' : 'edit_file')
+    : 'read_file';
+
+  const missionText = shiftHeld
+    ? (isTest ? `Ejecutar tests: ${fileName}` : `Editar ${fileName} en ${city.name}`)
+    : `Leer ${fileName} en ${city.name}`;
+
+  const draft = draftCommand(cmdType, city.id, {
+    unit: unit.id,
+    city: city.id,
+    filePath: cleanPath,
+    fileName,
+    mission: missionText,
+    agentType: unit.type,
+  });
+
+  return {
+    gesture: 'drag_unit_to_file',
+    sourceCoord: fromCoord,
+    targetCoord: toTile.coord,
+    sourceUnitId: unit.id,
+    targetCityId: city.id,
+    shiftHeld,
+    draft,
+    label: `${unit.id} → ${fileName} @ ${city.name}: ${cmdType}`,
+    confidence: 0.85,
+    userConfirmed: false,
+  };
+}
+
+// ─── Drop command card → unit ─────────────────────────────────────────────────
+// Gesture: drag a CommandDraft card from the command palette and drop it
+// onto a hex Unit. Delegates that command to the target unit.
+export function interpretCardDropOnUnit(params: {
+  card:      CommandDraft;
+  unit:      Unit;
+  unitCoord: Axial;
+}): SpatialDirective | null {
+  const { card, unit, unitCoord } = params;
+
+  // Check if this unit can execute the card's command type
+  if (!canExecute(unit.id, card.type, card.target)) return null;
+
+  // Merge the card's payload with unit assignment
+  const mergedPayload: Record<string, unknown> = {
+    ...(card.payload ?? {}),
+    unit: unit.id,
+    agentType: unit.type,
+    delegatedFrom: card.created_by ?? 'user',
+  };
+
+  const draft: CommandDraft = {
+    ...card,
+    payload: mergedPayload,
+    created_by: unit.id,
+  };
+
+  return {
+    gesture: 'drop_card_on_unit',
+    sourceCoord: unitCoord,
+    targetCoord: unitCoord,
+    sourceUnitId: unit.id,
+    shiftHeld: false,
+    draft,
+    label: `Card "${card.type}" → unit ${unit.id}`,
+    confidence: 0.80,
+    userConfirmed: false,
+  };
 }

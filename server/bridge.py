@@ -1159,6 +1159,8 @@ def _recover_hung_commands() -> int:
 # ─── Main ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     _sched.set_dispatcher(_scheduler_dispatch)
+    # Wire fatigue state into scheduler priority scoring
+    _sched.set_fatigue_provider(lambda unit_id: get_unit_fatigue(unit_id).get("fatigue"))
     _sched.start_worker()
 
     # Recover any commands that were running when the bridge last died
