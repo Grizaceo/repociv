@@ -6,15 +6,59 @@ Priority-based queue with:
   - Cancel queued commands (running commands log but can't be interrupted)
   - Heartbeat tracking per agent
   - Worker loop dispatches when slots are free
+  - Persistent queue survives bridge restart (Fase 4)
 """
 from __future__ import annotations
 
+import json
+import os
 import threading
 import time
+from pathlib import Path
 from typing import Any, Callable
 
 from .command_schema import Command, CommandStatus
 from . import event_store as _es
+
+# ─── Queue persistence (Fase 4) ──────────────────────────────────────────────
+_CONFIG_DIR = Path(os.environ.get("REPOCIV_CONFIG_DIR", "~/.repociv"))
+_CONFIG_DIR.mkdir(exist_ok=True, parents=True)
+_QUEUE_FILE = _CONFIG_DIR / "scheduler-queue.json"
+_queue_file_lock = threading.Lock()
+
+
+def _load_queue() -> list[dict[str, Any]]:
+    """Load persisted queue from disk. Returns empty list if file missing."""
+    if not _QUEUE_FILE.exists():
+        return []
+    try:
+        data = json.loads(_QUEUE_FILE.read_text())
+        if isinstance(data, list):
+            return data
+        return []
+    except Exception:
+        return []
+
+
+def _dump_queue(queue: list[dict[str, Any]]) -> None:
+    """Atomically write queue state to disk."""
+    with _queue_file_lock:
+        _QUEUE_FILE.write_text(json.dumps(queue, indent=2, ensure_ascii=False))
+
+
+def _init_from_disk() -> None:
+    """Pre-populate queue from persisted file at startup."""
+    global _queue
+    persisted = _load_queue()
+    # Filter out commands already in terminal state (completed/failed/cancelled
+    # before restart). Only keep 'queued' ones — they were waiting to run.
+    terminal = {"completed", "failed", "cancelled", "rejected"}
+    _queue = [c for c in persisted if c.get("status") not in terminal]
+    # Re-sort so priority matrix re-orders on recovery
+    _resort()
+    n = len(_queue)
+    if n:
+        print(f"[scheduler] Recovered {n} queued mission(s) from disk.")
 
 # ─── Concurrency limits per agent type ────────────────────────────────────────
 # WORKER can run multiple parallel tasks; others are single-threaded.
@@ -76,6 +120,7 @@ def enqueue(cmd: Command) -> None:
     with _queue_lock:
         _queue.append(cmd.to_dict())
         _resort()
+        _dump_queue(_queue)
 
 
 def cancel(command_id: str) -> bool:
@@ -86,6 +131,7 @@ def cancel(command_id: str) -> bool:
         removed = len(_queue) < before
     if removed:
         _es.record_failed(command_id, "cancelled by user")
+        _dump_queue(_queue)
     return removed
 
 
@@ -174,6 +220,7 @@ def _dispatch_next() -> bool:
             base = _agent_base(unit)
             if _acquire_slot(base):
                 _queue.pop(i)
+                _dump_queue(_queue)  # persist: item removed from queue
                 break
         else:
             return False  # nothing dispatched
@@ -199,6 +246,7 @@ def start_worker() -> None:
     global _worker_running
     if _worker_running:
         return
+    _init_from_disk()
     _worker_running = True
     threading.Thread(target=_worker_loop, daemon=True).start()
 

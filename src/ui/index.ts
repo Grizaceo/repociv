@@ -18,8 +18,13 @@ export {
   toggleObservabilityPanel, startObservabilityPolling, stopObservabilityPolling,
 } from './observabilityPanel.ts';
 export {
+  openHarnessPanel, closeHarnessPanel, isHarnessPanelOpen, toggleHarnessPanel,
+  startHarnessPolling, stopHarnessPolling,
+} from './harnessPanel';
+export { openRecoveryPanel, closeRecoveryPanel, isRecoveryPanelOpen } from './recoveryPanel';
+export {
   openReplayPanel, closeReplayPanel, isReplayPanelOpen, toggleReplayPanel,
-} from './replayPanel.ts';
+} from './replayPanel';
 
 // Re-export specific initialization helpers
 export { initExternalLibs } from './hud.ts';

@@ -1503,3 +1503,281 @@ kbd {
   padding: 4px 8px;
 }
 #btn-replay:hover { border-color: var(--ui-gold); color: var(--ui-gold); }
+
+/* ══════════════════════════════════════════════
+   M3 — Harness Panel
+   ══════════════════════════════════════════════ */
+#panel-harness {
+  min-width: 340px;
+  max-width: 420px;
+}
+.hp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid var(--ui-border);
+  flex-shrink: 0;
+}
+.hp-title {
+  font-family: var(--font-title);
+  font-size: 13px;
+  color: var(--ui-gold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.hp-refresh {
+  background: none;
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text-dim);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.hp-refresh:hover { border-color: var(--ui-gold); color: var(--ui-gold); }
+.hp-body { padding: 8px 12px; overflow-y: auto; max-height: 70vh; }
+.hp-loading,
+.hp-empty   { color: var(--ui-text-dim); font-size: 11px; text-align: center; padding: 16px; }
+.hp-error   { color: #d47b7b; font-size: 11px; text-align: center; padding: 8px; }
+
+.hp-item {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.hp-item:hover { border-color: var(--ui-gold); background: rgba(212,175,55,0.04); }
+.hp-item.hp-item--selected { border-color: var(--ui-gold); background: rgba(212,175,55,0.08); }
+.hp-item-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.hp-harness-id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ui-text);
+  font-weight: 600;
+}
+.hp-health-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.hp-health-dot.hp-healthy   { background: #4caf50; }
+.hp-health-dot.hp-degraded   { background: #e8a040; }
+.hp-health-dot.hp-unhealthy  { background: #d44b4b; }
+.hp-health-dot.hp-unknown    { background: #666; }
+.hp-trust-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 2px;
+  margin-left: auto;
+}
+.hp-trust-badge.hp-trusted   { background: rgba(76,175,80,0.2);  color: #4caf50; border: 1px solid rgba(76,175,80,0.4); }
+.hp-trust-badge.hp-cautious  { background: rgba(232,160,64,0.2); color: #e8a040; border: 1px solid rgba(232,160,64,0.4); }
+.hp-trust-badge.hp-untrusted { background: rgba(212,75,75,0.2);  color: #d44b4b; border: 1px solid rgba(212,75,75,0.4); }
+.hp-item-bottom { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.hp-recovery-mode {
+  font-size: 9px;
+  color: var(--ui-text-dim);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--ui-border);
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+.hp-detail {
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  font-family: var(--font-mono);
+  margin-top: 3px;
+}
+.hp-detail-label { color: var(--ui-text-dim); }
+.hp-detail-val   { color: var(--ui-text); }
+
+/* M3 — Recovery Panel */
+#panel-recovery {
+  min-width: 380px;
+  max-width: 500px;
+}
+.rp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid var(--ui-border);
+  flex-shrink: 0;
+}
+.rp-title {
+  font-family: var(--font-title);
+  font-size: 13px;
+  color: var(--ui-gold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.rp-badge {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+.rp-badge.rp-badge--auto     { background: rgba(76,175,80,0.2);  color: #4caf50; border: 1px solid rgba(76,175,80,0.4); }
+.rp-badge.rp-badge--manual    { background: rgba(212,175,55,0.2); color: var(--ui-gold); border: 1px solid rgba(212,175,55,0.4); }
+.rp-badge.rp-badge--escalated{ background: rgba(212,75,75,0.2);  color: #d44b4b; border: 1px solid rgba(212,75,75,0.4); }
+.rp-close {
+  background: none;
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text-dim);
+  cursor: pointer;
+  font-size: 11px;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rp-close:hover { border-color: #d44b4b; color: #d44b4b; }
+.rp-body { padding: 10px 12px; overflow-y: auto; max-height: 70vh; }
+.rp-loading,
+.rp-empty   { color: var(--ui-text-dim); font-size: 11px; text-align: center; padding: 16px; }
+.rp-error   { color: #d47b7b; font-size: 11px; text-align: center; padding: 8px; }
+
+.rp-reason {
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  margin-bottom: 10px;
+  padding: 4px 8px;
+  background: rgba(255,255,255,0.03);
+  border-left: 2px solid var(--ui-gold);
+  border-radius: 2px;
+}
+.rp-context {
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  margin-bottom: 10px;
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+.rp-section-label {
+  font-size: 9px;
+  color: var(--ui-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+.rp-shell-block {
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+.rp-shell-comment {
+  color: #6a9955;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  margin-bottom: 6px;
+}
+.rp-shell-cmd {
+  color: #dcdcaa;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  word-break: break-all;
+}
+.rp-actions { display: flex; gap: 6px; margin-top: 8px; }
+.rp-btn {
+  flex: 1;
+  padding: 5px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--ui-border);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: all 0.15s;
+}
+.rp-btn-copy {
+  background: rgba(76,175,80,0.1);
+  color: #4caf50;
+  border-color: rgba(76,175,80,0.3);
+}
+.rp-btn-copy:hover { background: rgba(76,175,80,0.2); border-color: #4caf50; }
+.rp-btn-copy.rp-btn--copied { background: rgba(76,175,80,0.3); }
+.rp-btn-run {
+  background: rgba(212,175,55,0.1);
+  color: var(--ui-gold);
+  border-color: rgba(212,175,55,0.3);
+}
+.rp-btn-run:hover { background: rgba(212,175,55,0.2); border-color: var(--ui-gold); }
+.rp-btn-run:disabled { opacity: 0.4; cursor: not-allowed; }
+.rp-output {
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.rp-output.rp-output--ok    { border-color: rgba(76,175,80,0.3);  color: #4caf50; }
+.rp-output.rp-output--err  { border-color: rgba(212,75,75,0.3);  color: #d47b7b; }
+.rp-output.rp-output--warn { border-color: rgba(232,160,64,0.3); color: #e8a040; }
+.rp-history { margin-top: 10px; }
+.rp-history-title {
+  font-size: 9px;
+  color: var(--ui-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+.rp-hist-item {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+.rp-hist-ts   { color: var(--ui-text-dim); flex-shrink: 0; min-width: 70px; }
+.rp-hist-status { flex-shrink: 0; }
+.rp-hist-status.rp-ok  { color: #4caf50; }
+.rp-hist-status.rp-err { color: #d44b4b; }
+.rp-hist-cmd  { color: var(--ui-text-dim); word-break: break-all; }
+
+/* Recovery button in observability failure list */
+.obs-btn-recover {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: rgba(212,175,55,0.12);
+  color: var(--ui-gold);
+  border: 1px solid rgba(212,175,55,0.3);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.obs-btn-recover:hover { background: rgba(212,175,55,0.24); border-color: var(--ui-gold); }

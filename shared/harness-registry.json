@@ -1,0 +1,113 @@
+{
+  "version": "1.0",
+  "schemas": {
+    "harness_id": "string, kebab-case, unique",
+    "trust_level": "reference_only | read_only | local_cli | sandboxed | privileged_external",
+    "kind": "reference | agent_runtime | sandbox | local_cli | bridge",
+    "transport": "none | cli | http | plugin | sandbox",
+    "recovery_mode": "copy_command | tmux_attach | view_logs | no_recovery_available"
+  },
+  "harnesses": [
+    {
+      "id": "hermes-local",
+      "label": "Hermes Local",
+      "kind": "agent_runtime",
+      "trust_level": "local_cli",
+      "transport": "cli",
+      "health": {
+        "kind": "static",
+        "status": "healthy"
+      },
+      "recovery_modes": ["copy_command", "tmux_attach"],
+      "allowed_actions": ["inspect_repo", "read_file", "run_tests", "run_build", "edit_file", "create_branch", "git_commit", "execute_agent", "unit_command", "quest_add"],
+      "blocked_actions": ["send_message", "delete_file"],
+      "recovery": {
+        "copy_command": {
+          "cwd": "~/.hermes",
+          "command": "tmux new -A -s hermes 'hermes'",
+          "notes": ["Attach to existing tmux session or create new one"]
+        },
+        "tmux_attach": {
+          "session": "hermes",
+          "notes": ["Direct tmux attach — no new process spawned"]
+        }
+      }
+    },
+    {
+      "id": "openclaw-local",
+      "label": "OpenClaw Local",
+      "kind": "agent_runtime",
+      "trust_level": "local_cli",
+      "transport": "cli",
+      "health": {
+        "kind": "command",
+        "command": "openclaw --version",
+        "status": "unknown"
+      },
+      "recovery_modes": ["copy_command", "tmux_attach"],
+      "allowed_actions": ["inspect_repo", "read_file", "run_tests", "run_build", "edit_file", "create_branch", "git_commit", "execute_agent"],
+      "blocked_actions": ["send_message", "delete_file"],
+      "recovery": {
+        "copy_command": {
+          "cwd": "~/.hermes/workspace/repos",
+          "command": "tmux new -A -s openclaw 'openclaw tui'",
+          "notes": ["Opens OpenClaw TUI in a tmux session"]
+        }
+      }
+    },
+    {
+      "id": "nemoclaw-sandbox",
+      "label": "NemoClaw Sandbox",
+      "kind": "sandbox",
+      "trust_level": "sandboxed",
+      "transport": "http",
+      "health": {
+        "kind": "http",
+        "url": "http://127.0.0.1:8273/health",
+        "status": "unknown"
+      },
+      "recovery_modes": ["view_logs", "no_recovery_available"],
+      "allowed_actions": ["inspect_repo", "read_file", "run_tests", "run_build"],
+      "blocked_actions": ["edit_file", "create_branch", "git_commit", "delete_file", "execute_agent", "send_message"],
+      "recovery": {
+        "view_logs": {
+          "notes": ["Sandbox logs accessible via NemoClaw dashboard"]
+        }
+      }
+    },
+    {
+      "id": "local-cli",
+      "label": "Local CLI",
+      "kind": "local_cli",
+      "trust_level": "privileged_external",
+      "transport": "cli",
+      "health": {
+        "kind": "static",
+        "status": "healthy"
+      },
+      "recovery_modes": ["copy_command"],
+      "allowed_actions": ["inspect_repo", "read_file", "run_tests", "run_build", "edit_file", "create_branch", "git_commit", "delete_file", "execute_agent", "send_message", "unit_command", "quest_add"],
+      "blocked_actions": [],
+      "recovery": {
+        "copy_command": {
+          "cwd": ".",
+          "notes": ["Run the command directly in your terminal"]
+        }
+      }
+    },
+    {
+      "id": "reference-only",
+      "label": "Reference Only",
+      "kind": "reference",
+      "trust_level": "reference_only",
+      "transport": "none",
+      "health": {
+        "kind": "static",
+        "status": "n/a"
+      },
+      "recoveryModes": [],
+      "allowed_actions": ["inspect_repo", "read_file"],
+      "blocked_actions": ["run_tests", "run_build", "edit_file", "create_branch", "git_commit", "delete_file", "execute_agent", "send_message"]
+    }
+  ]
+}

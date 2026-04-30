@@ -1,6 +1,7 @@
 // ─── RepoCiv — Observability Panel (Fase 7) ───────────────────────────────────
 // Shows system health at a glance: agents, queue, error rate, duration,
 // GPU/CPU/mem/disk, and recent failures.
+import { openRecoveryPanel } from './recoveryPanel';
 // Criterion: open RepoCiv → within 10 s know if the system is healthy.
 
 const BRIDGE_URL   = import.meta.env.VITE_BRIDGE_URL   ?? 'http://localhost:5274';
@@ -19,6 +20,8 @@ interface Failure {
   error: string;
   ts: number;
   age: number;
+  harnessId?: string;   // optional; populated if bridge sent it
+  commandType?: string; // optional; command type that failed
 }
 
 interface Metrics {
@@ -195,6 +198,14 @@ function _render() {
             <span class="obs-fail-id">${_esc(f.commandId.slice(0, 8))}</span>
             <span class="obs-fail-age">${_age(f.age)}</span>
             <span class="obs-fail-err">${_esc(f.error || '(sin mensaje)')}</span>
+            ${f.harnessId ? `
+              <button class="obs-btn-recover"
+                      data-harness="${_esc(f.harnessId)}"
+                      data-reason="${_esc(f.error || 'failure')}"
+                      data-cmdtype="${_esc(f.commandType ?? '')}"
+                      title="Abrir plan de recovery">
+                🔧
+              </button>` : ''}
           </div>
         `).join('')}
       </div>` : ''}
@@ -254,6 +265,17 @@ function _getOrCreate(): HTMLElement {
   `;
   document.body.appendChild(el);
   el.querySelector('#obs-close')?.addEventListener('click', closeObservabilityPanel);
+
+  // Delegated recovery-button handler — survives innerHTML re-renders
+  el.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.obs-btn-recover');
+    if (!btn) return;
+    const harnessId = btn.dataset['harness'] ?? '';
+    const reason    = btn.dataset['reason']    ?? 'failure';
+    const cmdtype   = btn.dataset['cmdtype']  ?? '';
+    void openRecoveryPanel(harnessId, reason, { command_type: cmdtype });
+  });
+
   _panel = el;
   return el;
 }

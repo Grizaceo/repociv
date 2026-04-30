@@ -135,6 +135,8 @@ from server.context_pack import build_context_pack
 from server.metrics import compute_metrics
 from server import directive_store as _ds
 from server import directive_learner as _dl
+from server import harness_registry as _hr
+from server import recovery as _recovery
 _ds.init(CONFIG_DIR)
 
 # ─── Scheduler ────────────────────────────────────────────────────────────────
@@ -815,6 +817,25 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._json(_dl.suggest(gesture, agent_id, records))
             return
 
+        # ─── Harness registry ────────────────────────────────────────────────────
+        # GET /harnesses           — list all harnesses
+        if path == "/harnesses":
+            self._json(_hr.list_harnesses())
+            return
+
+        # GET /harnesses/<id>     — single harness detail
+        if path.startswith("/harnesses/"):
+            harness_id = path.split("/", 2)[2]
+            harness = _hr.get_harness(harness_id)
+            if harness is None:
+                self.send_response(404)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": f"Harness '{harness_id}' not found"}).encode())
+                return
+            self._json(harness)
+            return
+
         self.send_response(404)
         self._cors()
         self.end_headers()
@@ -997,6 +1018,36 @@ class BridgeHandler(BaseHTTPRequestHandler):
             send_to_repociv({"type": "rest_area_discovered", "restArea": area})
             self._json({"ok": True})
             return
+
+        # ─── Recovery command ─────────────────────────────────────────────────────
+        # POST /harnesses/<id>/recovery-command
+        if path.startswith("/harnesses/") and path.endswith("/recovery-command"):
+            parts = path.split("/")
+            if len(parts) >= 3:
+                harness_id = parts[2]
+                harness = _hr.get_harness(harness_id)
+                if harness is None:
+                    self.send_response(404)
+                    self._cors()
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": f"Harness '{harness_id}' not found"}).encode())
+                    return
+                reason = body.get("reason", "unknown")
+                failure_context = {
+                    "reason": reason,
+                    "command_type": body.get("command_type", ""),
+                    "target": body.get("target", ""),
+                    "details": body.get("details", ""),
+                }
+                plan = _recovery.build_recovery_plan(harness, failure_context)
+                # Emit audit event
+                _es.record_event("HarnessRecoveryRequested", {
+                    "harness_id": harness_id,
+                    "reason": reason,
+                    "mode": plan.get("mode", ""),
+                })
+                self._json(plan)
+                return
 
         if t == "enter_rest_area":
             unit_id = body.get("unit", "")

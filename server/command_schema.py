@@ -72,6 +72,7 @@ class Command:
     started_at: float | None = None
     finished_at: float | None = None
     result: str = ""
+    harness_id: str | None = None    # optional harness selected for this command
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -112,10 +113,18 @@ def validate_command(data: dict[str, Any]) -> Command:
     risk: Risk = COMMAND_RISK.get(cmd_type, "medium")  # unknown types default medium
     created_by = str(data.get("created_by", "user"))[:64]
 
+    # Harness selection: top-level field or nested inside payload
+    harness_id: str | None = None
+    if data.get("harness_id"):
+        harness_id = str(data["harness_id"])[:64]
+    elif isinstance(payload, dict) and payload.get("harnessId"):
+        harness_id = str(payload["harnessId"])[:64]
+
     return Command(
         type=cmd_type,
         target=target,
         payload=payload,
         created_by=created_by,
         risk=risk,
+        harness_id=harness_id,
     )

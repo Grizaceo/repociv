@@ -85,6 +85,18 @@ def record_failed(command_id: str, error: str = "") -> None:
     _append(_event("CommandFailed", command_id, "system", {"error": error[:1024], "finishedAt": time.time()}))
 
 
+def record_event(event_type: str, data: dict[str, Any]) -> None:
+    """Record a free-form named event (e.g. 'HarnessRecoveryRequested')."""
+    _append({
+        "id": str(uuid.uuid4())[:12],
+        "commandId": "",
+        "type": event_type,
+        "timestamp": time.time(),
+        "actor": "system",
+        "data": data,
+    })
+
+
 def read_events(since: float = 0.0, limit: int = 500) -> list[dict[str, Any]]:
     """Return events newer than `since` (unix timestamp), up to `limit`."""
     if _store_path is None or not _store_path.exists():

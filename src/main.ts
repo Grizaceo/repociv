@@ -19,6 +19,7 @@ import {
   toggleApprovalPanel, closeApprovalPanel, isApprovalPanelOpen, startApprovalPolling,
   toggleObservabilityPanel, closeObservabilityPanel, isObservabilityPanelOpen,
   startObservabilityPolling,
+  toggleHarnessPanel, isHarnessPanelOpen, startHarnessPolling,
   toggleReplayPanel, closeReplayPanel, isReplayPanelOpen,
 } from './ui/index.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from './ui/settingsPanel.ts';
@@ -96,11 +97,16 @@ async function bootstrap() {
   document.getElementById('btn-approvals')?.addEventListener('click', toggleApprovalPanel);
   document.getElementById('btn-replay')?.addEventListener('click', toggleReplayPanel);
   document.getElementById('btn-observability')?.addEventListener('click', toggleObservabilityPanel);
+  document.getElementById('btn-harnesses')?.addEventListener('click', () => {
+    toggleHarnessPanel();
+    if (isHarnessPanelOpen()) startHarnessPolling();
+  });
 
   const bridge = new BridgeEvents(state);
   bridge.start();
   startApprovalPolling();
   startObservabilityPolling();
+  startHarnessPolling();
 
   // Canvas click → select unit / open city panels
   renderer.onUnitSelect = (unit) => {
@@ -208,6 +214,7 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, tog
     const inField = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 
     // F10: Timeline panel
+    if (e.key === 'F6')  { e.preventDefault(); toggleHarnessPanel(); return; }
     if (e.key === 'F7')  { e.preventDefault(); toggleReplayPanel(); return; }
     if (e.key === 'F8')  { e.preventDefault(); toggleObservabilityPanel(); return; }
     if (e.key === 'F10') { e.preventDefault(); toggleTimelinePanel(); return; }
