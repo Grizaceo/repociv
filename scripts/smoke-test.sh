@@ -38,6 +38,15 @@ _curl() {
   fi
 }
 
+_curl_status_body() {
+  local args=("$@")
+  if [[ -n "$TOKEN" ]]; then
+    curl -s --max-time 5 -H "X-RepoCiv-Token: $TOKEN" -w '\nHTTP_STATUS:%{http_code}' "${args[@]}" 2>/dev/null || echo "HTTP_STATUS:000"
+  else
+    curl -s --max-time 5 -w '\nHTTP_STATUS:%{http_code}' "${args[@]}" 2>/dev/null || echo "HTTP_STATUS:000"
+  fi
+}
+
 echo "▶ Smoke test RepoCiv → $BASE"
 
 # 1. Health
@@ -64,17 +73,20 @@ _check "GET /agents/capabilities → has DAVI" "$CAPS" '"DAVI"'
 METRICS=$(_curl "$BASE/metrics")
 _check "GET /metrics → has health field" "$METRICS" '"health"'
 
-# 7. POST /commands — safe inspect_repo (auto-safe, should queue immediately)
-CMD_BODY='{"type":"inspect_repo","target":"smoke-test","payload":{"unit":"SCOUT","city":"smoke-test","mission":"smoke test","agentType":"scout"}}'
-CMD_RESP=$(_curl -X POST "$BASE/commands" -H "Content-Type: application/json" -d "$CMD_BODY")
-_check "POST /commands inspect_repo → accepted" "$CMD_RESP" '"ok"'
+# 7. POST /commands — schema validation without enqueueing/executing a real agent.
+# Use an invalid payload intentionally: this exercises auth + request parsing + schema
+# rejection while avoiding smoke pollution in the operational queue/event health.
+CMD_BODY='{"payload":{"smoke":true}}'
+CMD_RESP=$(_curl_status_body -X POST "$BASE/commands" -H "Content-Type: application/json" -d "$CMD_BODY")
+_check "POST /commands malformed → 400" "$CMD_RESP" 'HTTP_STATUS:400'
+_check "POST /commands malformed → schema error" "$CMD_RESP" '"error"'
 
 # 8. POST /commands — rejected without token (only if token is set)
 if [[ -n "$TOKEN" ]]; then
-  NO_AUTH=$(curl -sf --max-time 5 -X POST "$BASE/commands" \
+  NO_AUTH=$(curl -s --max-time 5 -X POST "$BASE/commands" \
     -H "Content-Type: application/json" \
-    -d "$CMD_BODY" 2>/dev/null || echo '{"error":"unauthorized"}')
-  _check "POST /commands sin token → 401" "$NO_AUTH" '"error"'
+    -d "$CMD_BODY" -w '\nHTTP_STATUS:%{http_code}' 2>/dev/null || echo 'HTTP_STATUS:000')
+  _check "POST /commands sin token → 401" "$NO_AUTH" 'HTTP_STATUS:401'
 fi
 
 # ─── Summary ─────────────────────────────────────────────────────────────────

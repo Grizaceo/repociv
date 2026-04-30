@@ -23,7 +23,7 @@ import {
   toggleReplayPanel, closeReplayPanel, isReplayPanelOpen,
 } from './ui/index.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from './ui/settingsPanel.ts';
-import { showDirectivePreview, showContextMenu, showDragTooltip, hideDragTooltip } from './ui/spatialPreview.ts';
+import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
 import { sendCommand } from './commandBus.ts';
 import { recordGesture } from './directiveLearner.ts';
 import { type Unit, tileKey } from './types.ts';

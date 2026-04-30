@@ -3,7 +3,8 @@ import {
   interpretUnitToFileDrag,
   interpretCardDropOnUnit,
 } from './spatialDirectives.ts';
-import type { Unit, Tile, City, Axial } from './types.ts';
+import type { Unit, Tile, City } from './types.ts';
+import type { Axial } from './hex.ts';
 import { draftCommand, type CommandDraft } from './commandSchema.ts';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -16,23 +17,23 @@ function makeCity(id: string, name: string): City {
   return {
     id,
     name,
-    civ: 'gris',
     coord: makeAxial(0, 0),
-    districts: [],
-    resources: { gold: 0, science: 0, production: 0 },
-    foundedAt: Date.now(),
     population: 0,
+    territory: [],
+    districts: [],
+    buildings: [],
+    isCapital: false,
   };
 }
 
 function makeTile(city?: City): Tile {
   return {
     coord: makeAxial(0, 0),
-    terrain: 'grass',
-    terrainName: 'Pradera',
-    movementCost: 1,
+    terrain: 'plains',
+    resources: { gold: 0, science: 0, production: 0 },
     city,
-    fogged: false,
+    inFog: false,
+    revealed: true,
   };
 }
 

@@ -23,28 +23,36 @@ _fail() { [[ "$QUIET" != "--quiet" ]] && echo "  ✗ $*"; }
 PASS=0
 FAIL=0
 
-# ─── Lockfile ────────────────────────────────────────────────────────────────
+# ─── Process ownership ───────────────────────────────────────────────────────
+# Dev-start writes a lockfile; permanent mode is owned by systemd and may not.
+# Treat either as healthy so systemd deployments do not look falsely degraded.
 if [[ -f "$LOCKFILE" ]]; then
   BRIDGE_PID=$(grep '^BRIDGE_PID=' "$LOCKFILE" | cut -d= -f2 || true)
   VITE_PID=$(grep   '^VITE_PID='   "$LOCKFILE" | cut -d= -f2 || true)
-
-  if kill -0 "${BRIDGE_PID:-0}" 2>/dev/null; then
-    _ok "Bridge proceso vivo (PID $BRIDGE_PID)"
-    ((PASS+=1))
-  else
-    _fail "Bridge proceso muerto (PID ${BRIDGE_PID:-?})"
-    ((FAIL+=1))
-  fi
-
-  if kill -0 "${VITE_PID:-0}" 2>/dev/null; then
-    _ok "Vite proceso vivo (PID $VITE_PID)"
-    ((PASS+=1))
-  else
-    _fail "Vite proceso muerto (PID ${VITE_PID:-?})"
-    ((FAIL+=1))
-  fi
 else
-  _fail "Lockfile no encontrado — ¿está RepoCiv arriba?"
+  BRIDGE_PID=""
+  VITE_PID=""
+fi
+
+if [[ "${BRIDGE_PID:-}" =~ ^[0-9]+$ ]] && kill -0 "$BRIDGE_PID" 2>/dev/null; then
+  _ok "Bridge proceso vivo (PID $BRIDGE_PID)"
+  ((PASS+=1))
+elif command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet repociv-bridge.service 2>/dev/null; then
+  _ok "Bridge systemd activo"
+  ((PASS+=1))
+else
+  _fail "Bridge sin lockfile/PID vivo ni servicio systemd activo"
+  ((FAIL+=1))
+fi
+
+if [[ "${VITE_PID:-}" =~ ^[0-9]+$ ]] && kill -0 "$VITE_PID" 2>/dev/null; then
+  _ok "Vite proceso vivo (PID $VITE_PID)"
+  ((PASS+=1))
+elif command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet repociv-frontend.service 2>/dev/null; then
+  _ok "Vite systemd activo"
+  ((PASS+=1))
+else
+  _fail "Vite sin lockfile/PID vivo ni servicio systemd activo"
   ((FAIL+=1))
 fi
 

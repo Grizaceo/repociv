@@ -3,7 +3,7 @@
 // Every gesture produces a SpatialDirective with a preview; nothing executes
 // until the user confirms. This is the "gesture → intent → policy → queue" layer.
 
-import type { Unit, Tile, City, LocalUnit, LocalTile, Workbench } from './types.ts';
+import type { Unit, Tile, City } from './types.ts';
 import type { Axial } from './hex.ts';
 import { draftCommand, type CommandDraft, type CommandType } from './commandSchema.ts';
 import { canExecute } from './agentCapabilities.ts';

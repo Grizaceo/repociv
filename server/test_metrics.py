@@ -49,9 +49,8 @@ def test_model_usage_single_model():
     assert result[0]["costEstimate"] == 0.005
 
 
-def test_model_usage_deduplicate_same_model():
-    """Only the first occurrence (latest in time) per model is kept. Reversed scan
-    picks the most recent, then reverse() puts output in chronological order."""
+def test_model_usage_aggregates_same_model():
+    """Multiple completed calls for the same model are aggregated."""
     events = [
         {
             "type": "CommandCompleted",
@@ -65,10 +64,12 @@ def test_model_usage_deduplicate_same_model():
         },
     ]
     result = _compute_model_usage(events)
-    # Latest wins; since we scan reversed, c2 is seen first, kept; c1 skipped
     assert len(result) == 1
     assert result[0]["model"] == "gpt-4"
-    assert result[0]["tokensIn"] == 200  # the latest one
+    assert result[0]["tokensIn"] == 300
+    assert result[0]["tokensOut"] == 150
+    assert result[0]["costEstimate"] == 0.03
+    assert result[0]["calls"] == 2
 
 
 def test_model_usage_multiple_models():
@@ -148,3 +149,23 @@ def test_compute_metrics_model_usage_empty_when_no_data():
     result = compute_metrics([], _DUMMY_AGENTS, queue_depth=0)
     assert "modelUsage" in result
     assert result["modelUsage"] == []
+
+
+def test_compute_metrics_ignores_smoke_failures_for_health():
+    events = [
+        {
+            "type": "CommandCreated",
+            "commandId": "smoke-1",
+            "data": {"id": "smoke-1", "target": "smoke-test", "payload": {"unit": "SCOUT"}},
+        },
+        {
+            "type": "CommandFailed",
+            "data": {"id": "smoke-1", "error": "synthetic smoke failure"},
+            "timestamp": 1,
+        },
+    ]
+    result = compute_metrics(events, _DUMMY_AGENTS, queue_depth=0)
+    assert result["health"] == "ok"
+    assert result["errorRate"] == 0.0
+    assert result["failedCount"] == 0
+    assert result["recentFailures"] == []

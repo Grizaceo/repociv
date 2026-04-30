@@ -7,12 +7,14 @@ Servicios systemd para ejecutar RepoCiv de forma permanente en WSL.
 - `repociv-bridge.service`: Backend API (Python, puerto 5274)
 - `repociv-frontend.service`: Vite dev server (Node, puerto 5273)
 - `repociv.target`: Target combinado para gestionar ambos servicios juntos
+- `repociv-backup.service` + `repociv-backup.timer`: backup cada 6h de `~/.repociv`
 
 ## Instalación
 
 ```bash
 # Copiar servicios a ~/.config/systemd/user/
 cp deploy/systemd/*.service ~/.config/systemd/user/
+cp deploy/systemd/*.timer ~/.config/systemd/user/
 cp deploy/systemd/*.target ~/.config/systemd/user/
 
 # Recargar systemd
@@ -20,6 +22,7 @@ systemctl --user daemon-reload
 
 # Habilitar para startup automático
 systemctl --user enable repociv.target
+systemctl --user enable --now repociv-backup.timer
 
 # Iniciar
 systemctl --user start repociv.target
@@ -34,6 +37,8 @@ systemctl --user status repociv.target
 # Estado individual
 systemctl --user status repociv-bridge.service
 systemctl --user status repociv-frontend.service
+systemctl --user status repociv-backup.timer
+systemctl --user list-timers 'repociv*'
 
 # Detener
 systemctl --user stop repociv.target
@@ -44,6 +49,7 @@ systemctl --user restart repociv.target
 # Ver logs
 journalctl --user -u repociv-bridge.service -f
 journalctl --user -u repociv-frontend.service -f
+journalctl --user -u repociv-backup.service -n 50 --no-pager
 
 # Deshabilitar startup automático
 systemctl --user disable repociv.target
@@ -88,6 +94,7 @@ Los servicios están configurados con:
 - `Restart=on-failure`: Reinicio automático en caso de fallo
 - `RestartSec=5`: Espera 5 segundos entre reintentos
 - Habilitados en el user session: sobreviven a reboot de WSL
+- `repociv-backup.timer`: respalda `events.jsonl`, `missions.json`, `scheduler-queue.json`, `directive_records.jsonl` y `directive_templates.json` en `~/.repociv/backups/`, con rotación de 30 días.
 
 ## Healthcheck
 

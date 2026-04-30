@@ -13,6 +13,32 @@ from typing import Any
 
 # ─── Duration computation ─────────────────────────────────────────────────────
 
+def _event_command_id(ev: dict[str, Any]) -> str:
+    """Return command id from current or legacy/nested event shapes."""
+    data = ev.get("data", {}) if isinstance(ev.get("data", {}), dict) else {}
+    return str(ev.get("commandId") or ev.get("command_id") or data.get("id") or "")
+
+
+def _smoke_command_ids(events: list[dict[str, Any]]) -> set[str]:
+    """Return command ids created by synthetic smoke tests.
+
+    Smoke checks must validate the bridge without poisoning operational health.
+    Older smoke scripts enqueued real `inspect_repo` commands against target
+    `smoke-test`; filter those out of metrics retroactively.
+    """
+    ids: set[str] = set()
+    for ev in events:
+        if ev.get("type") != "CommandCreated":
+            continue
+        data = ev.get("data", {})
+        payload = data.get("payload", {}) if isinstance(data.get("payload", {}), dict) else {}
+        if data.get("target") == "smoke-test" or payload.get("smoke") is True:
+            cid = _event_command_id(ev)
+            if cid:
+                ids.add(cid)
+    return ids
+
+
 def _compute_durations(events: list[dict[str, Any]]) -> list[float]:
     """Return list of completed-command durations in seconds (last 200 events)."""
     started: dict[str, float] = {}
@@ -42,9 +68,11 @@ def _percentile(values: list[float], pct: float) -> float | None:
 # ─── Error rate ───────────────────────────────────────────────────────────────
 
 def _compute_error_rate(events: list[dict[str, Any]], window: int = 50) -> float:
+    smoke_ids = _smoke_command_ids(events)
     terminal = [
         e for e in events[-window:]
         if e.get("type") in ("CommandCompleted", "CommandFailed", "CommandRejected")
+        and _event_command_id(e) not in smoke_ids
     ]
     if not terminal:
         return 0.0
@@ -55,9 +83,12 @@ def _compute_error_rate(events: list[dict[str, Any]], window: int = 50) -> float
 # ─── Tool calls per agent ─────────────────────────────────────────────────────
 
 def _tool_calls_per_agent(events: list[dict[str, Any]]) -> dict[str, int]:
+    smoke_ids = _smoke_command_ids(events)
     counts: dict[str, int] = {}
     for ev in events:
         if ev.get("type") == "CommandCreated":
+            if _event_command_id(ev) in smoke_ids:
+                continue
             data = ev.get("data", {})
             unit = str(data.get("unit", data.get("created_by", "unknown")))
             base = unit.split("-")[0].upper()
@@ -68,9 +99,11 @@ def _tool_calls_per_agent(events: list[dict[str, Any]]) -> dict[str, int]:
 # ─── Recent failures ──────────────────────────────────────────────────────────
 
 def _recent_failures(events: list[dict[str, Any]], n: int = 8) -> list[dict[str, Any]]:
+    smoke_ids = _smoke_command_ids(events)
     failures = [
         e for e in events
         if e.get("type") == "CommandFailed"
+        and _event_command_id(e) not in smoke_ids
     ]
     result = []
     for ev in failures[-n:]:
@@ -87,26 +120,30 @@ def _recent_failures(events: list[dict[str, Any]], n: int = 8) -> list[dict[str,
 # ─── Model usage ──────────────────────────────────────────────────────────────
 
 def _compute_model_usage(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Extract model usage from CommandCompleted events that carry token data."""
-    seen: set[str] = set()
-    usage: list[dict[str, Any]] = []
-    for ev in reversed(events):
+    """Aggregate model usage from CommandCompleted events.
+
+    Observability should answer "how much did we spend/use?", not just show the
+    latest sample per model. Keep insertion order by first occurrence so output
+    remains stable for the frontend and tests.
+    """
+    usage_by_model: dict[str, dict[str, Any]] = {}
+    for ev in events:
         if ev.get("type") != "CommandCompleted":
             continue
         data = ev.get("data", {})
-        model = data.get("model", "")
-        if not model or model in seen:
+        model = str(data.get("model", ""))
+        if not model:
             continue
-        seen.add(model)
-        usage.append({
-            "model": model,
-            "tokensIn": data.get("tokensIn", 0),
-            "tokensOut": data.get("tokensOut", 0),
-            "costEstimate": data.get("costEstimate", 0.0),
-        })
-    # Keep chronological order (oldest first) for stable output
-    usage.reverse()
-    return usage
+        bucket = usage_by_model.setdefault(
+            model,
+            {"model": model, "tokensIn": 0, "tokensOut": 0, "costEstimate": 0.0, "calls": 0},
+        )
+        bucket["tokensIn"] += int(data.get("tokensIn") or 0)
+        bucket["tokensOut"] += int(data.get("tokensOut") or 0)
+        bucket["costEstimate"] += float(data.get("costEstimate") or 0.0)
+        bucket["costEstimate"] = round(bucket["costEstimate"], 6)
+        bucket["calls"] += 1
+    return list(usage_by_model.values())
 
 
 # ─── Health score ─────────────────────────────────────────────────────────────
@@ -172,6 +209,7 @@ def compute_metrics(
     durations = _compute_durations(events)
     error_rate = _compute_error_rate(events)
     sys_info = get_sys_info()
+    smoke_ids = _smoke_command_ids(events)
 
     # Map scheduler agent_status {id, status, activeTasks} → frontend {id, state, activeTask}
     mapped_agents = []
@@ -187,8 +225,8 @@ def compute_metrics(
         "errorRate":          error_rate,
         "durationP50":        _percentile(durations, 50),
         "durationP95":        _percentile(durations, 95),
-        "completedCount":     sum(1 for e in events if e.get("type") == "CommandCompleted"),
-        "failedCount":        sum(1 for e in events if e.get("type") == "CommandFailed"),
+        "completedCount":     sum(1 for e in events if e.get("type") == "CommandCompleted" and _event_command_id(e) not in smoke_ids),
+        "failedCount":        sum(1 for e in events if e.get("type") == "CommandFailed" and _event_command_id(e) not in smoke_ids),
         "queueDepth":         queue_depth,
         "toolCallsPerAgent":  _tool_calls_per_agent(events),
         "recentFailures":     _recent_failures(events),
