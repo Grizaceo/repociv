@@ -4,7 +4,7 @@
 // NO embedded terminal (v1 scope).
 
 import type { RecoveryPlan } from '../recoveryClient';
-import { requestRecoveryPlan, getHarness } from '../recoveryClient';
+import { requestRecoveryPlan } from '../recoveryClient';
 
 // ─── Module state ───────────────────────────────────────────────────────────────
 let _panel:  HTMLElement | null = null;

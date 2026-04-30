@@ -41,7 +41,7 @@ const HEALTH_DOT_CLASS: Record<string, string> = {
 
 describe('health dot class', () => {
   it('maps all known health kinds', () => {
-    for (const [kind, cls] of Object.entries(HEALTH_DOT_CLASS)) {
+    for (const cls of Object.values(HEALTH_DOT_CLASS)) {
       expect(cls).toMatch(/^hp-/);
     }
   });
@@ -124,8 +124,8 @@ describe('trust sort order (highest → lowest)', () => {
   it('actual harnesses respect trust ordering', () => {
     const harnesses = listHarnesses();
     for (let i = 0; i < harnesses.length - 1; i++) {
-      const a = harnesses[i].trustLevel;
-      const b = harnesses[i + 1].trustLevel;
+      const a = harnesses[i]!.trustLevel;
+      const b = harnesses[i + 1]!.trustLevel;
       // Same trust level is valid (tiebreaker by id keeps order deterministic)
       expect(ORDER.indexOf(a)).toBeLessThanOrEqual(ORDER.indexOf(b));
     }

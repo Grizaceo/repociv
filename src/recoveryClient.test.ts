@@ -18,12 +18,14 @@ describe('HarnessDescriptor structure', () => {
   it('HarnessDescriptor is exported and re-exported from harnessRegistry', () => {
     const hd: HarnessDescriptor = {
       id: 'test-harness',
+      label: 'Test Harness',
+      kind: 'bridge',
       trustLevel: 'local_cli',
       transport: 'cli',
       recoveryModes: [],
       allowedActions: [],
       blockedActions: [],
-      health: { kind: 'unknown' },
+      health: { kind: 'command', status: 'unknown' },
     };
     expect(hd.id).toBe('test-harness');
   });
@@ -31,14 +33,14 @@ describe('HarnessDescriptor structure', () => {
 
 describe('HarnessHealth', () => {
   it('HarnessHealth accepts all known kinds', () => {
-    const h: HarnessHealth = { kind: 'healthy' };
-    expect(h.kind).toBe('healthy');
-    const d: HarnessHealth = { kind: 'degraded' };
-    expect(d.kind).toBe('degraded');
-    const u: HarnessHealth = { kind: 'unhealthy' };
-    expect(u.kind).toBe('unhealthy');
-    const unk: HarnessHealth = { kind: 'unknown' };
-    expect(unk.kind).toBe('unknown');
+    const h: HarnessHealth = { kind: 'static', status: 'healthy' };
+    expect(h.status).toBe('healthy');
+    const d: HarnessHealth = { kind: 'command', status: 'degraded' };
+    expect(d.status).toBe('degraded');
+    const u: HarnessHealth = { kind: 'http', status: 'unhealthy' };
+    expect(u.status).toBe('unhealthy');
+    const unk: HarnessHealth = { kind: 'static', status: 'unknown' };
+    expect(unk.status).toBe('unknown');
   });
 
   it('harnessHealthFromJson maps server strings to HarnessHealth', () => {

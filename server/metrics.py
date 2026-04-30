@@ -19,12 +19,12 @@ def _compute_durations(events: list[dict[str, Any]]) -> list[float]:
     durations: list[float] = []
     for ev in events[-200:]:
         etype = ev.get("type", "")
-        cid = ev.get("command_id", "")
-        payload = ev.get("payload", {})
+        cid = ev.get("commandId", "")
+        data = ev.get("data", {})
         if etype == "CommandStarted":
-            started[cid] = payload.get("startedAt", ev.get("ts", 0.0))
+            started[cid] = data.get("startedAt", ev.get("timestamp", 0.0))
         elif etype == "CommandCompleted" and cid in started:
-            finished = payload.get("finishedAt", ev.get("ts", 0.0))
+            finished = data.get("finishedAt", ev.get("timestamp", 0.0))
             dur = finished - started.pop(cid)
             if 0 < dur < 3600:
                 durations.append(dur)
@@ -58,8 +58,8 @@ def _tool_calls_per_agent(events: list[dict[str, Any]]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for ev in events:
         if ev.get("type") == "CommandCreated":
-            payload = ev.get("payload", {})
-            unit = str(payload.get("unit", payload.get("created_by", "unknown")))
+            data = ev.get("data", {})
+            unit = str(data.get("unit", data.get("created_by", "unknown")))
             base = unit.split("-")[0].upper()
             counts[base] = counts.get(base, 0) + 1
     return counts
@@ -74,12 +74,12 @@ def _recent_failures(events: list[dict[str, Any]], n: int = 8) -> list[dict[str,
     ]
     result = []
     for ev in failures[-n:]:
-        payload = ev.get("payload", {})
+        data = ev.get("data", {})
         result.append({
-            "commandId": ev.get("command_id", ""),
-            "error": str(payload.get("error", ""))[:120],
-            "ts": ev.get("ts", 0.0),
-            "age": round(time.time() - ev.get("ts", time.time())),
+            "commandId": ev.get("commandId", ""),
+            "error": str(data.get("error", ""))[:120],
+            "ts": ev.get("timestamp", 0.0),
+            "age": round(time.time() - ev.get("timestamp", time.time())),
         })
     return list(reversed(result))  # newest first
 
@@ -148,6 +148,15 @@ def compute_metrics(
     error_rate = _compute_error_rate(events)
     sys_info = get_sys_info()
 
+    # Map scheduler agent_status {id, status, activeTasks} → frontend {id, state, activeTask}
+    mapped_agents = []
+    for a in agent_status:
+        mapped_agents.append({
+            "id": a.get("id", ""),
+            "state": a.get("status", a.get("state", "offline")),
+            "activeTask": a.get("activeTasks", a.get("activeTask", None)),
+        })
+
     return {
         "health":             _health(error_rate, queue_depth, sys_info.get("diskUsedPct") or 0.0),
         "errorRate":          error_rate,
@@ -158,7 +167,7 @@ def compute_metrics(
         "queueDepth":         queue_depth,
         "toolCallsPerAgent":  _tool_calls_per_agent(events),
         "recentFailures":     _recent_failures(events),
-        "agentStatus":        agent_status,
+        "agentStatus":        mapped_agents,
         "gpu":                gpu_info,
         "sys":                sys_info,
         "ts":                 time.time(),
