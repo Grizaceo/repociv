@@ -48,17 +48,35 @@ test.describe('RepoCiv e2e visual', () => {
     await expect(page.locator('#approval-panel')).toContainText(/APROBACIONES|No hay aprobaciones|Aprobar/);
   });
 
-  test('flujo browser → bridge → SSE → UI visible', async ({ page }) => {
+  test('flujo bridge: comando seguro produce mission_start, chat_chunk y mission_complete visibles', async ({ page }) => {
     await bootRepoCiv(page);
 
+    await page.locator('#hero-bar-slots .hero-slot[title^="DAVI"]').click();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#side-panel')).toBeVisible();
+
     const marker = `e2e-${Date.now()}`;
-    const response = await page.request.post(`${bridgeURL}/`, {
+    const response = await page.request.post(`${bridgeURL}/commands`, {
       headers: { 'Content-Type': 'application/json', ...bridgeHeaders() },
-      data: { type: 'tile_inspected', cityName: marker },
+      data: {
+        type: 'e2e_probe',
+        target: 'repociv-e2e',
+        payload: { unit: 'DAVI', marker },
+        created_by: 'playwright',
+      },
     });
     expect(response.ok(), await response.text()).toBeTruthy();
+    const command = await response.json() as { status: string; commandId: string };
+    expect(command.status).toBe('queued');
 
-    await expect(page.locator('#log-messages')).toContainText(`Inspeccionando: ${marker}`, { timeout: 10_000 });
+    await page.locator('#btn-timeline').click();
+    await expect(page.locator('#timeline-panel')).toBeVisible();
+    await expect(page.locator('#log-messages')).toContainText(`E2E probe completado: ${marker}`, { timeout: 10_000 });
+    await expect(page.locator('#timeline-panel')).toContainText('Command Completed', { timeout: 10_000 });
+
+    await page.locator('#hero-bar-slots .hero-slot[title^="DAVI"]').click();
+    await expect(page.locator('#side-panel')).toBeVisible();
+    await expect(page.locator('#chat-messages')).toContainText(marker, { timeout: 10_000 });
   });
 
   test('error de /api/repos queda visible y no deja pantalla vacía', async ({ page }) => {

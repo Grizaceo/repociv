@@ -14,7 +14,8 @@ export type CommandType =
   | 'execute_agent'
   | 'send_message'
   | 'unit_command'
-  | 'quest_add';
+  | 'quest_add'
+  | 'e2e_probe';
 
 export type Risk = 'low' | 'medium' | 'high' | 'destructive';
 
@@ -60,6 +61,7 @@ export const COMMAND_RISK: Record<CommandType, Risk> = {
   run_tests:     'low',
   run_build:     'low',
   quest_add:     'low',
+  e2e_probe:     'low',
   unit_command:  'medium',
   edit_file:     'medium',
   create_branch: 'medium',

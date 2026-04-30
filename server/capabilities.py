@@ -16,7 +16,7 @@ AGENT_CAPABILITIES: dict[str, list[str]] = {
     "DAVI": [
         "inspect_repo", "read_file", "run_tests", "run_build",
         "edit_file", "create_branch", "git_commit",
-        "execute_agent", "quest_add", "unit_command", "send_message",
+        "execute_agent", "quest_add", "unit_command", "e2e_probe", "send_message",
     ],
     # Advisor — code-level ops only; no orchestration, no messaging
     "LEXO": [

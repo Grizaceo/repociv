@@ -27,6 +27,7 @@ CommandType = Literal[
     "send_message",
     "unit_command",  # legacy compat
     "quest_add",     # legacy compat
+    "e2e_probe",     # safe browser/bridge test probe, no external agent
 ]
 
 # ─── Command status ───────────────────────────────────────────────────────────
@@ -55,6 +56,7 @@ COMMAND_RISK: dict[str, Risk] = {
     "send_message":   "high",
     "unit_command":   "medium",
     "quest_add":      "low",
+    "e2e_probe":      "low",
 }
 
 

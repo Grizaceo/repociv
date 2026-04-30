@@ -146,7 +146,29 @@ export function isSidePanelOpen(): boolean {
 export function appendChatChunk(unitId: string, text: string) {
   const prev = chatBuffers.get(unitId) ?? '';
   chatBuffers.set(unitId, prev + text);
-  if (activeChatUnit === unitId) renderChatBuffer(unitId);
+  if (activeChatUnit === unitId) {
+    ensureLiveAgentBubble(unitId);
+    renderChatBuffer(unitId);
+  }
+}
+
+function ensureLiveAgentBubble(unitId: string) {
+  if (document.getElementById(`chat-current-${unitId}`)) return;
+  const container = document.getElementById('chat-messages');
+  if (!container) return;
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-msg';
+  bubble.id = `chat-current-${unitId}`;
+  bubble.dataset['raw'] = '';
+  bubble.innerHTML = `<div class="chat-msg-head">
+    <div class="chat-msg-meta">REPORTE DE ${unitId.toUpperCase()}</div>
+    <div class="chat-msg-actions">
+      <button class="chat-copy-btn" title="Copiar mensaje">${COPY_SVG}</button>
+      <button class="chat-error-btn hidden" title="Copiar solo la línea de error">Copiar error</button>
+    </div>
+  </div><span class="chat-body"></span>`;
+  container.appendChild(bubble);
+  attachCopyListeners(container, unitId);
 }
 
 export function appendUserMessage(unitId: string, text: string) {

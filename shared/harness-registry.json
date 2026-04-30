@@ -19,7 +19,7 @@
         "status": "healthy"
       },
       "recovery_modes": ["copy_command", "tmux_attach"],
-      "allowed_actions": ["inspect_repo", "read_file", "run_tests", "run_build", "edit_file", "create_branch", "git_commit", "execute_agent", "unit_command", "quest_add"],
+      "allowed_actions": ["inspect_repo", "read_file", "run_tests", "run_build", "edit_file", "create_branch", "git_commit", "execute_agent", "unit_command", "quest_add", "e2e_probe"],
       "blocked_actions": ["send_message", "delete_file"],
       "recovery": {
         "copy_command": {
@@ -86,7 +86,7 @@
         "status": "healthy"
       },
       "recovery_modes": ["copy_command"],
-      "allowed_actions": ["inspect_repo", "read_file", "run_tests", "run_build", "edit_file", "create_branch", "git_commit", "delete_file", "execute_agent", "send_message", "unit_command", "quest_add"],
+      "allowed_actions": ["inspect_repo", "read_file", "run_tests", "run_build", "edit_file", "create_branch", "git_commit", "delete_file", "execute_agent", "send_message", "unit_command", "quest_add", "e2e_probe"],
       "blocked_actions": [],
       "recovery": {
         "copy_command": {

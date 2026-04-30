@@ -87,6 +87,7 @@ def test_nemoclaw_sandbox_harness_run_tests_auto_safe():
         ("run_build",    "auto-safe"),
         ("quest_add",    "auto-safe"),
         ("unit_command", "auto-safe"),
+        ("e2e_probe",    "auto-safe"),
         ("edit_file",    "approve"),
         ("create_branch","approve"),
         ("git_commit",   "approve"),

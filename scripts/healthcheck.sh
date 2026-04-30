@@ -41,6 +41,9 @@ if [[ "${BRIDGE_PID:-}" =~ ^[0-9]+$ ]] && kill -0 "$BRIDGE_PID" 2>/dev/null; the
 elif command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet repociv-bridge.service 2>/dev/null; then
   _ok "Bridge systemd activo"
   ((PASS+=1))
+elif PORT_PID=$(lsof -ti tcp:"$BRIDGE_PORT" 2>/dev/null | head -n1) && [[ "${PORT_PID:-}" =~ ^[0-9]+$ ]] && kill -0 "$PORT_PID" 2>/dev/null; then
+  _ok "Bridge puerto activo (PID $PORT_PID)"
+  ((PASS+=1))
 else
   _fail "Bridge sin lockfile/PID vivo ni servicio systemd activo"
   ((FAIL+=1))
@@ -51,6 +54,9 @@ if [[ "${VITE_PID:-}" =~ ^[0-9]+$ ]] && kill -0 "$VITE_PID" 2>/dev/null; then
   ((PASS+=1))
 elif command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet repociv-frontend.service 2>/dev/null; then
   _ok "Vite systemd activo"
+  ((PASS+=1))
+elif PORT_PID=$(lsof -ti tcp:"$REPOCIV_PORT" 2>/dev/null | head -n1) && [[ "${PORT_PID:-}" =~ ^[0-9]+$ ]] && kill -0 "$PORT_PID" 2>/dev/null; then
+  _ok "Vite puerto activo (PID $PORT_PID)"
   ((PASS+=1))
 else
   _fail "Vite sin lockfile/PID vivo ni servicio systemd activo"

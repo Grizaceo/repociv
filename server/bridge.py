@@ -514,6 +514,19 @@ def _dispatch_command(cmd: Command) -> None:
         run_agent(unit, city, mission, agent_type, cmd.id)
         return
 
+    if cmd.type == "e2e_probe":
+        unit = str(payload.get("unit", "DAVI"))
+        marker = str(payload.get("marker", cmd.id))[:120]
+        quest_name = f"E2E probe: {marker}"
+        text = f"E2E probe completado: {marker}"
+        send_to_repociv({"type": "mission_start", "missionId": cmd.id, "unit": unit, "questName": quest_name})
+        send_to_repociv({"type": "chat_chunk", "unit": unit, "text": text, "missionId": cmd.id})
+        _es.record_output_chunk(cmd.id, unit, text)
+        _es.record_completed(cmd.id, text)
+        send_to_repociv({"type": "mission_complete", "missionId": cmd.id, "unit": unit, "success": True, "duration": 0})
+        send_to_repociv({"type": "log", "msg": text, "level": "success"})
+        return
+
     if cmd.type == "quest_add":
         title = str(payload.get("title", cmd.target))
         description = str(payload.get("description", ""))

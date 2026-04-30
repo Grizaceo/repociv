@@ -60,6 +60,7 @@ _TYPE_POLICY: dict[str, PolicyDecision] = {
     "run_build":     "auto-safe",
     "quest_add":     "auto-safe",   # low-risk bookkeeping
     "unit_command":  "auto-safe",   # legacy compat — already gated by UX
+    "e2e_probe":     "auto-safe",   # browser→bridge→event probe, no external agent
     "edit_file":     "approve",
     "create_branch": "approve",
     "git_commit":    "approve",
