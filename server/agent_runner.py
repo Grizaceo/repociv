@@ -82,7 +82,9 @@ def _get_agent_config(unit_id: str) -> dict[str, Any]:
 
 def _resolve_city_path(city_id: str) -> str | None:
     root = os.environ.get("REPOCIV_REPOS_ROOT",
-                          str(Path(__file__).parent.parent / "workspace" / "repos"))
+                          os.environ.get("WORKSPACE_ROOT",
+                          str(Path.home() / ".hermes" / "workspace" / "repos")))
+    root = os.path.expanduser(root)
     candidate = os.path.join(root, city_id)
     return candidate if os.path.isdir(candidate) else None
 
