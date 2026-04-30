@@ -23,7 +23,7 @@ import {
   toggleReplayPanel, closeReplayPanel, isReplayPanelOpen,
 } from './ui/index.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from './ui/settingsPanel.ts';
-import { showDirectivePreview, showContextMenu } from './ui/spatialPreview.ts';
+import { showDirectivePreview, showContextMenu, showDragTooltip, hideDragTooltip } from './ui/spatialPreview.ts';
 import { sendCommand } from './commandBus.ts';
 import { recordGesture } from './directiveLearner.ts';
 import { type Unit, tileKey } from './types.ts';
@@ -151,6 +151,11 @@ async function bootstrap() {
   };
   renderer.onContextMenu = (items, screenPos) => {
     showContextMenu(items, screenPos, (draft) => { void sendCommand(draft); });
+  };
+
+  // ─── Fase 9: Drag tooltip with suggestion autocomplete ─────────────────────
+  renderer.onDragUpdate = (gesture, agentId, screenPos, dropTarget) => {
+    showDragTooltip(gesture, agentId, screenPos, dropTarget);
   };
 
   // ─── Phase 6: Double-click city → enter RimWorld local view ─────────────────

@@ -62,6 +62,8 @@ export class Renderer {
   // ─── Fase 5 callbacks ─────────────────────────────────────────────────────
   onSpatialGesture: ((directive: SpatialDirective, screenPos: { x: number; y: number }) => void) | null = null;
   onContextMenu: ((items: ReturnType<typeof contextMenuForCity>, screenPos: { x: number; y: number }) => void) | null = null;
+  // ─── Fase 9: Drag update callback (shows directive tooltip mid-drag) ───────
+  onDragUpdate: ((gesture: string, agentId: string, screenPos: { x: number; y: number }, dropTarget?: { cityId?: string; cityName?: string; repoType?: string; testStatus?: string }) => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement, state: GameState) {
     this.canvas = canvas;
@@ -151,6 +153,15 @@ export class Renderer {
       if (this.gestureMode === 'unit_drag' && this.draggedUnit) {
         this.ghostScreenPos = { x: wx, y: wy };
         this.canvas.style.cursor = 'grabbing';
+        // Fase 9: notify tooltip of drag position + drop target context
+        if (this.onDragUpdate && this.hoveredHex) {
+          const dropTile = this.state.world.tiles.get(tileKey(this.hoveredHex));
+          const dropCity = dropTile?.city;
+          this.onDragUpdate('drag_unit_to_city', this.draggedUnit.id, { x: e.clientX, y: e.clientY }, dropCity ? {
+            cityId: dropCity.id,
+            cityName: dropCity.name,
+          } : undefined);
+        }
       }
 
       if (this.gestureMode === 'area_select' && this.areaStart) {

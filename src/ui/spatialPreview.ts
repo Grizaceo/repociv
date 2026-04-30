@@ -316,6 +316,61 @@ function _riskStyle(risk: string): [string, string] {
   return ['#5b9b5b', '● BAJO'];
 }
 
+// ─── Drag tooltip (Fase 9) — suggestions during drag, before drop ──────────
+let _tooltipEl: HTMLElement | null = null;
+let _tooltipTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function showDragTooltip(
+  gesture: string,
+  agentId: string,
+  screenPos: { x: number; y: number },
+  dropTarget: { cityId?: string; cityName?: string } | undefined,
+) {
+  // Debounce: don't flash on every pixel
+  if (_tooltipTimer) return;
+  _tooltipTimer = setTimeout(() => { _tooltipTimer = null; }, 200);
+
+  const ctx: Record<string, string> = {};
+  if (dropTarget?.cityId) {
+    ctx.cityId = dropTarget.cityId;
+    ctx.cityName = dropTarget.cityName ?? '';
+  }
+
+  void fetchSuggestions(gesture, agentId, ctx).then(suggestions => {
+    if (suggestions.length === 0) {
+      hideDragTooltip();
+      return;
+    }
+    const el = _getOrCreateTooltip();
+    el.innerHTML = `<div class="dt-title">Sugerencias</div>` +
+      suggestions.slice(0, 3).map((s, i) => {
+        const color = successRateColor(s.successRate);
+        const pct  = Math.round(s.successRate * 100);
+        const label = cmdTypeLabel(s.cmdType);
+        return `<div class="dt-item${i === 0 ? ' dt-top' : ''}">
+          <span class="dt-label">${_esc(label)}</span>
+          <span class="dt-rate" style="color:${color}">${pct}% (${s.count}×)</span>
+        </div>`;
+      }).join('');
+    _position(el, screenPos);
+    el.classList.remove('hidden');
+  }).catch(() => { hideDragTooltip(); });
+}
+
+export function hideDragTooltip() {
+  _tooltipEl?.classList.add('hidden');
+}
+
+function _getOrCreateTooltip(): HTMLElement {
+  if (_tooltipEl) return _tooltipEl;
+  const el = document.createElement('div');
+  el.id = 'drag-tooltip';
+  el.className = 'drag-tooltip hidden';
+  document.body.appendChild(el);
+  _tooltipEl = el;
+  return el;
+}
+
 function _esc(s: string): string {
   return String(s).replace(/[&<>"']/g, c =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
