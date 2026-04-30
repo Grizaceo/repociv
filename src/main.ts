@@ -13,7 +13,7 @@ import {
   wireQuestBoardTabs, fetchPersistedMissions, fetchPendingTracker, renderQuestBoard,
   toggleKeyboardHelp,
   openCityPanel, closeCityPanel, isCityPanelOpen, wireCityPanel,
-  initExternalLibs, updateResource, toggleViewHUD,
+  initExternalLibs, updateResource,
   togglePriorityPanel,
   toggleTimelinePanel, closeTimelinePanel, isTimelinePanelOpen,
   toggleApprovalPanel, closeApprovalPanel, isApprovalPanelOpen, startApprovalPolling,
@@ -27,7 +27,6 @@ import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spa
 import { sendCommand } from './commandBus.ts';
 import { recordGesture } from './directiveLearner.ts';
 import { type Unit, tileKey } from './types.ts';
-import type { Renderer3D } from './renderer3d.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 const loadSteps = [
@@ -59,39 +58,15 @@ async function bootstrap() {
 
   const canvas = document.getElementById('main-canvas') as HTMLCanvasElement;
   const renderer = new Renderer(canvas, state);
-  
-  const threeContainer = document.getElementById('three-container') as HTMLElement;
-
   await renderer.loadAssets();
   renderer.start();
 
-  let is3D = false;
-  let renderer3d: Renderer3D | null = null;
-
-  const toggleView = async () => {
-    if (state.viewMode === 'local') return; // design decision #3: no 3D in local view
-    is3D = !is3D;
-    const cam = renderer.getCamera();
-    if (is3D) {
-      if (!renderer3d) {
-        const { Renderer3D } = await import('./renderer3d.ts');
-        renderer3d = new Renderer3D(threeContainer, state);
-        await renderer3d.loadAssets();
-      }
-      renderer.stop();
-      renderer3d.setCamera(cam.x, cam.y, cam.zoom);
-      renderer3d.start();
-      canvas.classList.add('hidden');
-      threeContainer.classList.add('active');
-    } else {
-      renderer3d?.stop();
-      renderer.start();
-      canvas.classList.remove('hidden');
-      threeContainer.classList.remove('active');
-    }
-    toggleViewHUD(is3D);
+  const toggleView = () => {
+    // 3D renderer intentionally removed: the 2D Civ view is the canonical map.
+    renderer.start();
   };
 
+  document.getElementById('btn-toggle-3d')?.classList.add('hidden');
   document.getElementById('btn-toggle-3d')?.addEventListener('click', toggleView);
   document.getElementById('btn-timeline')?.addEventListener('click', toggleTimelinePanel);
   document.getElementById('btn-approvals')?.addEventListener('click', toggleApprovalPanel);

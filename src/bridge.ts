@@ -20,6 +20,8 @@ export class BridgeEvents {
   private offlineSince: number | null = null;
   private demoInterval: ReturnType<typeof setInterval> | null = null;
   private gpuInterval = 0;
+  private sse: EventSource | null = null;
+  private sseConnected = false;
   bridgeOnline = false;
 
   constructor(state: GameState) {
@@ -27,23 +29,59 @@ export class BridgeEvents {
   }
 
   start() {
-    // TODO(prod): import.meta.hot solo disponible en dev. Para producción migrar a SSE o WebSocket.
+    this.connectSSE();
     if (import.meta.hot) {
       import.meta.hot.on('bridge:event', (data: unknown) => {
-        const evt = parseBridgeEvent(data);
-        if (!evt) {
-          const reason = describeBridgeEventError(data);
-          const summary = JSON.stringify(data).slice(0, 120);
-          console.warn('[bridge] descartando evento inválido:', reason, summary);
-          logEvent(`Evento inválido descartado (${reason})`, 'warn');
-          return;
-        }
-        this.handleBridgeEvent(evt);
+        if (!this.sseConnected) this.handleRaw(data);
       });
     }
     this.checkHealth();
     this.healthInterval = window.setInterval(() => this.checkHealth(), 5000);
     this.gpuInterval = window.setInterval(() => this.fetchGpu(), 5000);
+  }
+
+  private handleRaw(data: unknown) {
+    const evt = parseBridgeEvent(data);
+    if (!evt) {
+      const reason = describeBridgeEventError(data);
+      const summary = JSON.stringify(data).slice(0, 120);
+      console.warn('[bridge] descartando evento inválido:', reason, summary);
+      logEvent(`Evento inválido descartado (${reason})`, 'warn');
+      return;
+    }
+    this.handleBridgeEvent(evt);
+  }
+
+  private connectSSE() {
+    if (this.sse) this.sse.close();
+    try {
+      const src = new EventSource(`${BRIDGE_URL}/events`);
+      this.sse = src;
+      src.onopen = () => {
+        this.sseConnected = true;
+        this.reconnectDelay = 1000;
+      };
+      src.onmessage = (e: MessageEvent<string>) => {
+        try {
+          const data = JSON.parse(e.data) as unknown;
+          if (typeof data === 'object' && data !== null && (data as { type?: unknown }).type === 'ping') return;
+          this.handleRaw(data);
+        } catch (err) {
+          console.warn('[bridge] SSE payload inválido:', err);
+        }
+      };
+      src.onerror = () => {
+        this.sseConnected = false;
+        src.close();
+        if (this.sse === src) this.sse = null;
+        const delay = this.reconnectDelay;
+        this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000);
+        window.setTimeout(() => this.connectSSE(), delay);
+      };
+    } catch (err) {
+      this.sseConnected = false;
+      console.warn('[bridge] SSE no disponible:', err);
+    }
   }
 
   private _authHeaders(): Record<string, string> {
@@ -237,6 +275,9 @@ export class BridgeEvents {
   stop() {
     clearInterval(this.healthInterval);
     clearInterval(this.gpuInterval);
+    this.sse?.close();
+    this.sse = null;
+    this.sseConnected = false;
     this.stopDemo();
   }
 }

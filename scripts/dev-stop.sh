@@ -12,6 +12,7 @@ if [[ -f .env ]]; then
 fi
 
 CONFIG_DIR="${REPOCIV_CONFIG_DIR:-$HOME/.repociv}"
+CONFIG_DIR="${CONFIG_DIR/#\~/$HOME}"
 LOCKFILE="$CONFIG_DIR/repociv.lock"
 
 _kill() {

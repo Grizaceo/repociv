@@ -134,9 +134,12 @@ export async function generateWorld(): Promise<World> {
   let repos: ScannedRepo[] = [];
   try {
     const res = await fetch('/api/repos');
+    if (!res.ok) throw new Error(`/api/repos HTTP ${res.status}`);
     repos = await res.json() as ScannedRepo[];
   } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
     console.error('[map] /api/repos failed', e);
+    showMapLoadError(`No pude cargar repos reales: ${message}`);
   }
 
   // Sort: most-populated first → capital
@@ -282,6 +285,26 @@ export async function generateWorld(): Promise<World> {
     generatedAt: Date.now(),
     restAreas: [], // Phase 9: XCOM Context Fatigue
   };
+}
+
+export function showMapLoadError(message: string) {
+  if (typeof document === 'undefined') return;
+  const existing = document.getElementById('map-load-error');
+  const el = existing ?? document.createElement('div');
+  el.id = 'map-load-error';
+  el.textContent = message;
+  el.setAttribute('role', 'alert');
+  el.style.position = 'fixed';
+  el.style.left = '16px';
+  el.style.bottom = '16px';
+  el.style.zIndex = '9999';
+  el.style.maxWidth = '560px';
+  el.style.padding = '10px 12px';
+  el.style.border = '1px solid #b45309';
+  el.style.background = 'rgba(30, 20, 10, 0.92)';
+  el.style.color = '#fbbf24';
+  el.style.fontFamily = 'monospace';
+  if (!existing) document.body.appendChild(el);
 }
 
 // ─── Utility: range around a point ──────────────────────────────────────────

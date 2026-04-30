@@ -13,6 +13,7 @@ if [[ -f "$REPO_ROOT/.env" ]]; then
 fi
 
 CONFIG_DIR="${REPOCIV_CONFIG_DIR:-$HOME/.repociv}"
+CONFIG_DIR="${CONFIG_DIR/#\~/$HOME}"
 EVENTS_FILE="$CONFIG_DIR/events.jsonl"
 BACKUP_DIR="$CONFIG_DIR/backups"
 KEEP="${2:-7}"  # second arg overrides --keep; default 7

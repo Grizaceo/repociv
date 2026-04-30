@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import re
 import shutil
 import signal
@@ -43,7 +44,7 @@ import threading
 import time
 import uuid
 import urllib.request
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -138,6 +139,9 @@ from server import directive_store as _ds
 from server import directive_learner as _dl
 from server import harness_registry as _hr
 from server import recovery as _recovery
+from server.quest import generate_quest_name
+from server.tech_debt import scan_tech_debt
+from server import agent_runner as _agent_runner
 _ds.init(CONFIG_DIR)
 _dl.set_templates_path(CONFIG_DIR / "directive_templates.json")
 
@@ -246,7 +250,35 @@ def exit_rest_area(unit_id: str) -> None:
 
 
 # ─── Event sender → RepoCiv frontend ─────────────────────────────────────────
+_sse_lock = threading.Lock()
+_sse_clients: list[queue.Queue[dict[str, Any] | None]] = []
+
+
+def _fanout_sse(event: dict[str, Any]) -> None:
+    with _sse_lock:
+        clients = list(_sse_clients)
+    for client in clients:
+        try:
+            client.put_nowait(event)
+        except Exception:
+            pass
+
+
+def _register_sse_client(client: queue.Queue[dict[str, Any] | None]) -> None:
+    with _sse_lock:
+        _sse_clients.append(client)
+
+
+def _unregister_sse_client(client: queue.Queue[dict[str, Any] | None]) -> None:
+    with _sse_lock:
+        try:
+            _sse_clients.remove(client)
+        except ValueError:
+            pass
+
+
 def send_to_repociv(event: dict[str, Any]) -> None:
+    _fanout_sse(event)
     try:
         data = json.dumps(event).encode()
         req = urllib.request.Request(
@@ -256,17 +288,6 @@ def send_to_repociv(event: dict[str, Any]) -> None:
         urllib.request.urlopen(req, timeout=2)
     except Exception:
         pass
-
-
-# ─── Quest name generator ─────────────────────────────────────────────────────
-def generate_quest_name(mission: str) -> str:
-    words = re.findall(r"\b[a-zA-ZáéíóúñÁÉÍÓÚÑ]+\b", mission)
-    if not words:
-        return "Misión Desconocida"
-    keywords = [w for w in words if len(w) >= 4][:3]
-    if not keywords:
-        keywords = words[:3]
-    return " ".join(w.capitalize() for w in keywords)[:40]
 
 
 # ─── GPU info ─────────────────────────────────────────────────────────────────
@@ -286,70 +307,6 @@ def get_gpu_info() -> dict[str, Any] | None:
         return {"vramUsed": int(parts[0]), "vramTotal": int(parts[1]), "temp": int(parts[2])}
     except Exception:
         return None
-
-
-# ─── Tech-debt scanner ─────────────────────────────────────────────────────────
-_TD_PATTERNS = re.compile(
-    r'(TODO\s*[:\-]?\s*tech\s*debt|FIXME\s*[:\-]?\s*hack|HACK|BUG\s*[:\-]?\s*|'
-    r'REFACTOR|TECH\s*DEBT|DEBT\s*[:\-]?\s*|LEGACY|STALE)',
-    re.IGNORECASE,
-)
-_TD_EXTENSIONS = {'.ts', '.tsx', '.js', '.jsx', '.py', '.rs', '.go', '.java', '.cpp', '.c', '.h'}
-_TD_CACHE: dict[str, Any] = {}
-_TD_CACHE_TTL = 300  # 5 minutos
-
-
-def scan_tech_debt(root_path: str = os.path.expanduser("~/.hermes/workspace/repos")) -> list[dict[str, Any]]:
-    now = time.monotonic()
-    if _TD_CACHE.get('ts', 0) + _TD_CACHE_TTL > now:
-        return _TD_CACHE.get('results', [])
-
-    results: list[dict[str, Any]] = []
-    try:
-        skip_file = Path(__file__).parent.parent / "shared" / "skip-dirs.json"
-        skip: set[str] = set(json.loads(skip_file.read_text())) if skip_file.exists() else set()
-        for repo in os.listdir(root_path):
-            repo_path = os.path.join(root_path, repo)
-            if not os.path.isdir(repo_path):
-                continue
-            for dirpath, _dirs, filenames in os.walk(repo_path):
-                if any(s in dirpath for s in skip):
-                    continue
-                for fname in filenames:
-                    ext = os.path.splitext(fname)[1].lower()
-                    if ext not in _TD_EXTENSIONS:
-                        continue
-                    fpath = os.path.join(dirpath, fname)
-                    try:
-                        rel = os.path.relpath(fpath, root_path)
-                        with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
-                            content = f.read()
-                        matches: list[dict[str, str]] = []
-                        for i, line in enumerate(content.splitlines(), 1):
-                            if _TD_PATTERNS.search(line):
-                                matches.append({'line': i, 'text': line.strip()[:120]})
-                        if matches:
-                            results.append({'repo': repo, 'file': rel, 'path': fpath,
-                                            'matches': matches, 'severity': _assess_debt_severity(matches)})
-                    except Exception:
-                        pass
-    except Exception:
-        pass
-    _TD_CACHE['results'] = results
-    _TD_CACHE['ts'] = now
-    return results
-
-
-def _assess_debt_severity(matches: list[dict[str, str]]) -> str:
-    critical = {'BUG', 'HACK', 'FIXME'}
-    high = {'TECH DEBT', 'REFACTOR', 'DEBT', 'LEGACY'}
-    for m in matches:
-        first_word = m['text'].split()[0].upper() if m['text'] else ''
-        if first_word in critical:
-            return 'critical'
-        if any(w in m['text'].upper() for w in high):
-            return 'high'
-    return 'normal'
 
 
 # ─── PENDING_TRACKER ──────────────────────────────────────────────────────────
@@ -442,198 +399,43 @@ def detect_lexo() -> None:
         pass
 
 
-# ─── Agent roster ─────────────────────────────────────────────────────────────
-AGENT_CONFIGS: dict[str, dict[str, Any]] = {
-    "DAVI": {
-        "agent": "main", "personality": "technical", "stateful": True,
-        "system": ("Eres DAVI, agente principal de Cristóbal. Conoces el workspace, "
-                   "mantienes contexto entre misiones y respondes técnico y conciso."),
-    },
-    "WORKER": {
-        "agent": "main", "personality": "concise", "stateful": False,
-        "system": ("Eres WORKER, ejecutor sin memoria previa. Recibes UNA tarea, "
-                   "la resuelves en el mínimo de tokens posible y entregas el resultado. "
-                   "No hagas preguntas de clarificación; asume lo razonable y avanza."),
-    },
-    "SCOUT": {
-        "agent": "main", "personality": "helpful", "stateful": False,
-        "system": ("Eres SCOUT, explorador sin memoria previa. Tu trabajo es inspeccionar "
-                   "código/archivos/repos y devolver un resumen breve y accionable. "
-                   "Prioriza hechos sobre opiniones."),
-    },
-    "LEXO": {
-        "agent": "main", "personality": "analytical", "stateful": True,
-        "system": ("Eres LexO-α, agente analítico con memoria. Analiza con profundidad, "
-                   "cita el archivo y línea cuando aplique, y produce diagnóstico antes "
-                   "que solución."),
-    },
-    "OPENCLAW": {
-        "agent": "main", "personality": "technical", "stateful": True,
-        "system": "Eres openclaw, agente local de Cristóbal.",
-    },
-}
-
-
-def _get_agent_config(unit_id: str) -> dict[str, Any]:
-    base = unit_id.split("-")[0].upper()
-    return AGENT_CONFIGS.get(base, AGENT_CONFIGS["DAVI"])
-
-
-def _resolve_city_path(city_id: str) -> str | None:
-    """Resolve a city_id to an absolute directory path on the filesystem.
-
-    Uses REPOCIV_REPOS_ROOT (env) or a sensible default derived from this
-    file's location.  Returns ``None`` when the path does not exist.
-    """
-    root = os.environ.get("REPOCIV_REPOS_ROOT",
-                          str(Path(__file__).parent.parent / "workspace" / "repos"))
-    candidate = os.path.join(root, city_id)
-    return candidate if os.path.isdir(candidate) else None
+# ─── Agent runner facade ──────────────────────────────────────────────────────
+def _configure_agent_runner() -> None:
+    _agent_runner.configure(send=send_to_repociv, save=save_mission)
 
 
 def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
               command_id: str | None = None) -> None:
-    mission_id = command_id or str(uuid.uuid4())[:8]
-    quest_name = generate_quest_name(mission)
-    started_at = time.time()
-
-    mission_record: dict[str, Any] = {
-        "id": mission_id, "unit": unit_id, "city": city_id, "mission": mission,
-        "questName": quest_name, "agentType": agent_type, "startedAt": started_at,
-        "completedAt": None, "status": "running", "summary": "", "lines": 0, "duration": 0,
-    }
-    save_mission(mission_record)
-    _es.record_started(mission_id)
-
-    send_to_repociv({"type": "mission_start", "missionId": mission_id, "unit": unit_id, "questName": quest_name})
-    send_to_repociv({"type": "building_start", "city": city_id, "building": quest_name,
-                     "durationSeconds": 120, "missionId": mission_id})
-    send_to_repociv({"type": "unit_state", "unit": unit_id, "state": "working"})
-
-    working_dir = _resolve_city_path(city_id)
-    success, output = _execute_streaming(unit_id, mission_id, mission, working_dir)
-
-    duration = time.time() - started_at
-    mission_record.update({"completedAt": time.time(), "status": "complete" if success else "failed",
-                           "summary": output[-500:], "duration": duration, "lines": len(output.splitlines())})
-    save_mission(mission_record)
-
-    if success:
-        _es.record_completed(mission_id, output[-500:])
-        _ds.record_outcome(mission_id, "success", duration)
-        send_to_repociv({"type": "building_complete", "city": city_id, "building": quest_name, "missionId": mission_id})
-        send_to_repociv({"type": "log", "msg": f"{unit_id} completó: {quest_name}", "level": "success"})
-    else:
-        _es.record_failed(mission_id, output[-500:])
-        _ds.record_outcome(mission_id, "failure", duration)
-        send_to_repociv({"type": "building_failed", "city": city_id, "building": quest_name, "missionId": mission_id})
-        send_to_repociv({"type": "log", "msg": f"{unit_id} falló en: {quest_name}", "level": "warn"})
-
-    send_to_repociv({"type": "unit_state", "unit": unit_id, "state": "idle"})
-    send_to_repociv({"type": "mission_complete", "missionId": mission_id, "unit": unit_id,
-                     "success": success, "duration": int(duration)})
+    _configure_agent_runner()
+    return _agent_runner.run_agent(unit_id, city_id, mission, agent_type, command_id)
 
 
 def _execute_streaming(unit_id: str, mission_id: str, mission: str,
                        working_dir: str | None = None) -> tuple[bool, str]:
-    config = _get_agent_config(unit_id)
-    base = unit_id.split("-")[0].upper()
-
-    if base == "OPENCLAW":
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: openclaw]\n"})
-        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir)
-
-    send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: hermes]\n"})
-    success, output = _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir)
-    if not success and _has_openclaw():
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[hermes falló → fallback openclaw]\n"})
-        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir)
-    return success, output
+    _configure_agent_runner()
+    return _agent_runner._execute_streaming(unit_id, mission_id, mission, working_dir)
 
 
 def _has_openclaw() -> bool:
-    return _find_openclaw() is not None
+    return _agent_runner._has_openclaw()
 
 
 def _find_openclaw() -> str | None:
-    candidates = [
-        shutil.which("openclaw"),
-        str(Path.home() / ".npm-global" / "bin" / "openclaw"),
-    ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return _agent_runner._find_openclaw()
 
 
 def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
                              config: dict[str, Any],
                              working_dir: str | None = None) -> tuple[bool, str]:
-    if config.get("stateful", True):
-        session_id = f"repociv-{unit_id.lower()}"
-    else:
-        session_id = f"repociv-{unit_id.lower()}-{mission_id}"
-
-    openclaw_bin = _find_openclaw()
-    if not openclaw_bin:
-        text = "[openclaw error] binary not found in PATH or ~/.npm-global/bin/openclaw\n"
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
-        _es.record_output_chunk(mission_id, unit_id, text)
-        return False, text.strip()
-
-    cmd = [openclaw_bin, "agent", "--agent", config["agent"],
-           "--session-id", session_id, "--message", mission]
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-    output_buf: list[str] = []
-    assert proc.stdout is not None
-    for line in proc.stdout:
-        output_buf.append(line)
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": line})
-        _es.record_output_chunk(mission_id, unit_id, line)
-    proc.wait(timeout=600)
-    return proc.returncode == 0, "".join(output_buf)
+    _configure_agent_runner()
+    return _agent_runner._run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir)
 
 
 def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
                            config: dict[str, Any] | None = None,
                            working_dir: str | None = None) -> tuple[bool, str]:
-    HERMES_URL   = os.environ.get("HERMES_URL",   "http://localhost:8642/v1/chat/completions")
-    HERMES_KEY   = os.environ.get("HERMES_KEY",   "davi-voice-bridge-2026")
-    HERMES_MODEL = os.environ.get("HERMES_MODEL", "minimax-m2.6")
-
-    cfg = config if config is not None else _get_agent_config(unit_id)
-    payload: dict[str, Any] = {
-        "model": HERMES_MODEL,
-        "messages": [
-            {"role": "system", "content": cfg.get("system", "Eres un agente útil.")},
-            {"role": "user", "content": mission},
-        ],
-        "stream": False,
-    }
-    if working_dir:
-        payload["working_directory"] = working_dir
-    try:
-        data = json.dumps(payload).encode()
-        req = urllib.request.Request(
-            HERMES_URL, data=data,
-            headers={"Content-Type": "application/json", "Authorization": f"Bearer {HERMES_KEY}"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            result = json.loads(resp.read().decode())
-        content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-        for i in range(0, len(content), 40):
-            chunk = content[i:i + 40]
-            send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": chunk})
-            _es.record_output_chunk(mission_id, unit_id, chunk)
-            time.sleep(0.04)
-        return True, content
-    except Exception as e:
-        err = str(e)
-        text = f"[hermes error] {err}\n"
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
-        _es.record_output_chunk(mission_id, unit_id, text)
-        return False, err
+    _configure_agent_runner()
+    return _agent_runner._run_hermes_streaming(unit_id, mission_id, mission, config, working_dir)
 
 
 # ─── Command Bus intake ───────────────────────────────────────────────────────
@@ -810,6 +612,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/events":
+            accept = self.headers.get("Accept", "")
+            if "text/event-stream" in accept:
+                self._sse_stream()
+                return
             try:
                 qs = self.path.split("?", 1)[1] if "?" in self.path else ""
                 since = 0.0
@@ -1136,6 +942,33 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         self._json({"ok": True, "ignored": t})
 
+    def _sse_stream(self) -> None:
+        client: queue.Queue[dict[str, Any] | None] = queue.Queue()
+        _register_sse_client(client)
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self._cors()
+        self.end_headers()
+        self.wfile.write(b'data: {"type":"ping"}\n\n')
+        self.wfile.flush()
+        try:
+            while True:
+                try:
+                    event = client.get(timeout=15)
+                except queue.Empty:
+                    event = {"type": "ping"}
+                if event is None:
+                    break
+                payload = json.dumps(event).encode()
+                self.wfile.write(b"data: " + payload + b"\n\n")
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, TimeoutError, OSError):
+            pass
+        finally:
+            _unregister_sse_client(client)
+
     def _json(self, data: Any) -> None:
         payload = json.dumps(data).encode()
         self.send_response(200)
@@ -1211,7 +1044,7 @@ if __name__ == "__main__":
     # Recover any commands that were running when the bridge last died
     recovered = _recover_hung_commands()
 
-    server = HTTPServer(("localhost", BRIDGE_PORT), BridgeHandler)
+    server = ThreadingHTTPServer(("localhost", BRIDGE_PORT), BridgeHandler)
     threading.Thread(target=background_scanner, daemon=True).start()
 
     # Graceful shutdown on SIGTERM (systemd / dev-stop.sh)
