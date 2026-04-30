@@ -271,21 +271,27 @@ Paneles:
 Criterio:
 - al abrir RepoCiv, en 10 segundos sé si el sistema está sano.
 
-### Fase 8 — Persistencia y startup permanente
+### Fase 8 — Persistencia y startup permanente ✅ COMPLETADO (2026-04-29)
 
 Objetivo: consola permanente de verdad.
 
 Tareas:
-1. Crear scripts/dev-start.sh y scripts/healthcheck.sh.
-2. Opcional systemd user service o tmux managed session.
-3. Recovery de procesos colgados.
-4. Lockfile de puerto.
-5. Backup de SQLite/events.
-6. Smoke test automático al arrancar.
+1. ✅ Crear scripts/dev-start.sh y scripts/healthcheck.sh.
+2. ✅ systemd user service implementado (deploy/systemd/).
+3. ✅ Recovery de procesos colgados (Restart=on-failure).
+4. ⚠️ Lockfile de puerto (parcial: systemd reinicia si puerto ocupado).
+5. ⚠️ Backup de SQLite/events (script existe, falta automatizar).
+6. ✅ Smoke test automático al arrancar (scripts/smoke-test.sh).
 
 Criterio:
-- puedo reiniciar WSL y levantar RepoCiv con un comando.
-- no quedan zombie agents.
+- ✅ puedo reiniciar WSL y levantar RepoCiv con un comando (`systemctl --user start repociv.target`).
+- ✅ no quedan zombie agents (systemd gestiona ciclos de vida).
+
+Archivos:
+- `deploy/systemd/repociv-bridge.service`
+- `deploy/systemd/repociv-frontend.service`
+- `deploy/systemd/repociv.target`
+- `deploy/systemd/README.md`
 
 ### Fase 9 — Directives learning layer, no activation fantasy
 

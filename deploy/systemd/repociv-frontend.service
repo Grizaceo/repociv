@@ -1,0 +1,25 @@
+[Unit]
+Description=RepoCiv Frontend (Vite Dev Server)
+Documentation=https://github.com/cristobal/repociv
+After=network.target repociv-bridge.service
+Requires=repociv-bridge.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/gris/.hermes/workspace/repos/repociv
+ExecStart=/usr/bin/npm run dev
+Restart=on-failure
+RestartSec=5
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=NODE_ENV=development
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=repociv-frontend
+
+# Security hardening
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

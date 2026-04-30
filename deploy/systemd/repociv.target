@@ -1,0 +1,8 @@
+[Unit]
+Description=RepoCiv Imperial Console (Bridge + Frontend)
+Documentation=https://github.com/cristobal/repociv
+Requires=repociv-bridge.service repociv-frontend.service
+After=repociv-bridge.service repociv-frontend.service
+
+[Install]
+WantedBy=default.target
