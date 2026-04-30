@@ -293,19 +293,21 @@ Archivos:
 - `deploy/systemd/repociv.target`
 - `deploy/systemd/README.md`
 
-### Fase 9 — Directives learning layer, no activation fantasy
+### Fase 9 — Directives learning layer, no activation fantasy ✅ COMPLETADA (T5, 2026-04-30)
 
 Objetivo: aprender qué gestos/directivas producen buenos resultados.
 
 Tareas:
-1. Registrar gesture -> command -> outcome.
-2. Métricas de éxito por tipo de directiva.
-3. Sugerencias: “cuando arrastras DAVI a repo con tests rotos, normalmente quieres run_tests+fix”.
-4. Plantillas de directiva por patrón.
-5. Replay de secuencias exitosas.
+1. Registrar gesture -> command -> outcome. ✅ (directive_store.py + hook en bridge)
+2. Métricas de éxito por tipo de directiva. ✅ (outcome: success/partial/fail + context features)
+3. Sugerencias: "cuando arrastras DAVI a repo con tests rotos, normalmente quieres run_tests+fix". ✅ (top-3 con score)
+4. Plantillas de directiva por patrón. ✅ (directive_templates.json)
+5. Replay de secuencias exitosas. ⬜ pendiente para T6
 
 Criterio:
-- RepoCiv empieza a autocompletar directivas, pero no ejecuta sin policy.
+- RepoCiv empieza a autocompletar directivas, pero no ejecuta sin policy. ✅
+
+Commit: ff8b97f→(T5) — 17 nuevos tests + enrichment context features + templates persist
 
 ---
 

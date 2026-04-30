@@ -7,6 +7,7 @@ const BRIDGE_TOKEN = import.meta.env.VITE_BRIDGE_TOKEN ?? '';
 
 export interface Suggestion {
   cmdType:     string;
+  target?:     string;
   successRate: number;   // 0–1
   count:       number;
   score:       number;
@@ -16,6 +17,7 @@ export interface Template {
   gesture:     string;
   agentId:     string;
   cmdType:     string;
+  target?:     string;
   successRate: number;
   count:       number;
 }
@@ -51,12 +53,27 @@ export async function recordGesture(params: {
   agentId:   string;
   cmdType:   string;
   target:    string;
+  repoType?: string;
+  testStatus?: string;
+  lastCmdType?: string;
+  gameTick?: number;
 }): Promise<void> {
   try {
+    const body: Record<string, unknown> = {
+      commandId: params.commandId,
+      gesture:   params.gesture,
+      agentId:   params.agentId,
+      cmdType:   params.cmdType,
+      target:    params.target,
+    };
+    if (params.repoType)    body.repoType    = params.repoType;
+    if (params.testStatus)  body.testStatus  = params.testStatus;
+    if (params.lastCmdType) body.lastCmdType = params.lastCmdType;
+    if (params.gameTick !== undefined) body.gameTick = params.gameTick;
     await fetch(`${BRIDGE_URL}/directives/record`, {
       method:  'POST',
       headers: { ..._headers(), 'Content-Type': 'application/json' },
-      body:    JSON.stringify(params),
+      body:    JSON.stringify(body),
     });
   } catch {
     // bridge offline — silently drop, learning is best-effort
@@ -67,10 +84,15 @@ export async function recordGesture(params: {
 export async function fetchSuggestions(
   gesture: string,
   agentId: string,
+  ctx?: { repoType?: string; testStatus?: string; lastCmdType?: string },
 ): Promise<Suggestion[]> {
   try {
+    const params = new URLSearchParams({ gesture, agent: agentId });
+    if (ctx?.repoType)    params.set('repoType', ctx.repoType);
+    if (ctx?.testStatus)  params.set('testStatus', ctx.testStatus);
+    if (ctx?.lastCmdType) params.set('lastCmdType', ctx.lastCmdType);
     const res = await fetch(
-      `${BRIDGE_URL}/directives/suggest?gesture=${encodeURIComponent(gesture)}&agent=${encodeURIComponent(agentId)}`,
+      `${BRIDGE_URL}/directives/suggest?${params.toString()}`,
       { headers: _headers() },
     );
     if (!res.ok) return [];
@@ -88,6 +110,18 @@ export async function fetchStats(): Promise<DirectiveStats | null> {
     return await res.json() as DirectiveStats;
   } catch {
     return null;
+  }
+}
+
+// ─── Persisted templates ──────────────────────────────────────────────────────
+export async function fetchTemplates(): Promise<Template[]> {
+  try {
+    const res = await fetch(`${BRIDGE_URL}/directives/stats`, { headers: _headers() });
+    if (!res.ok) return [];
+    const stats = await res.json() as DirectiveStats;
+    return stats.templates ?? [];
+  } catch {
+    return [];
   }
 }
 

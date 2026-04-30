@@ -38,8 +38,9 @@ def record_gesture(
     agent_id: str,
     cmd_type: str,
     target: str,
+    context: dict[str, Any] | None = None,
 ) -> None:
-    _append({
+    record: dict[str, Any] = {
         "type":       "gesture",
         "command_id": command_id,
         "gesture":    gesture,
@@ -47,7 +48,10 @@ def record_gesture(
         "cmd_type":   cmd_type,
         "target":     target,
         "ts":         time.time(),
-    })
+    }
+    if context:
+        record["context"] = context
+    _append(record)
 
 
 def record_outcome(

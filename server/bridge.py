@@ -138,6 +138,7 @@ from server import directive_learner as _dl
 from server import harness_registry as _hr
 from server import recovery as _recovery
 _ds.init(CONFIG_DIR)
+_dl.set_templates_path(CONFIG_DIR / "directive_templates.json")
 
 # ─── Scheduler ────────────────────────────────────────────────────────────────
 from server import scheduler as _sched
@@ -814,7 +815,17 @@ class BridgeHandler(BaseHTTPRequestHandler):
             gesture  = params.get("gesture", "")
             agent_id = params.get("agent", "DAVI")
             records  = _ds.read_records()
-            self._json(_dl.suggest(gesture, agent_id, records))
+            # Optional context for smarter scoring
+            ctx: dict[str, Any] | None = None
+            if params.get("repoType") or params.get("testStatus") or params.get("lastCmdType"):
+                ctx = {}
+                if params.get("repoType"):
+                    ctx["repoType"] = params["repoType"]
+                if params.get("testStatus"):
+                    ctx["testStatus"] = params["testStatus"]
+                if params.get("lastCmdType"):
+                    ctx["lastCmdType"] = params["lastCmdType"]
+            self._json(_dl.suggest(gesture, agent_id, records, current_context=ctx))
             return
 
         # ─── Harness registry ────────────────────────────────────────────────────
@@ -899,8 +910,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
             agent_id   = str(body.get("agentId",   "DAVI"))
             cmd_type   = str(body.get("cmdType",   ""))
             target     = str(body.get("target",    ""))
+            # Optional context features for smarter learning
+            ctx: dict[str, Any] = {}
+            if body.get("repoType"):
+                ctx["repoType"] = str(body["repoType"])
+            if body.get("testStatus"):
+                ctx["testStatus"] = str(body["testStatus"])
+            if body.get("lastCmdType"):
+                ctx["lastCmdType"] = str(body["lastCmdType"])
+            if body.get("gameTick") is not None:
+                ctx["gameTick"] = int(body["gameTick"])
             if command_id and gesture and cmd_type:
-                _ds.record_gesture(command_id, gesture, agent_id, cmd_type, target)
+                _ds.record_gesture(command_id, gesture, agent_id, cmd_type, target,
+                                   ctx if ctx else None)
             self._json({"ok": True})
             return
 
@@ -1148,6 +1170,14 @@ if __name__ == "__main__":
     # Graceful shutdown on SIGTERM (systemd / dev-stop.sh)
     def _handle_sigterm(signum: int, frame: object) -> None:
         print("\nBridge: SIGTERM recibido — cerrando limpiamente.")
+        # Persist learned directive templates before exit
+        try:
+            records = _ds.read_records()
+            saved = _dl.save_templates(records)
+            if saved:
+                print(f"Bridge: {saved} directive templates persisted.")
+        except Exception:
+            pass
         server.shutdown()
     signal.signal(signal.SIGTERM, _handle_sigterm)
 
