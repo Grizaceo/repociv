@@ -250,7 +250,21 @@ npm test -- --run
 | `pathfinding.test.ts` | 14 | A* pathfinding, cache |
 | `localMap.test.ts` | 6 | FileNode building, tree stats |
 
-**61 tests pasando.** Target: 60 ✅
+**245 tests pasando** (174 TS + 71 Py). Target: 200 ✅
+
+---
+
+## Security
+
+El bridge (`server/bridge.py`) usa token authentication vía header `X-RepoCiv-Token`.
+
+- **Dev mode:** deja `REPOCIV_TOKEN` vacío en `.env` — el bridge acepta todas las requests
+  desde localhost sin autenticación.
+- **Producción:** configura `REPOCIV_TOKEN` con un string aleatorio de 32+ caracteres y
+  actualiza `VITE_BRIDGE_TOKEN` en el frontend para que coincida.
+- Rate limit: 60 requests/minuto por IP (en memoria, se resetea al reiniciar).
+- Todas las rutas POST requieren token cuando está configurado.
+- Ver `.env.example` para la lista completa de variables de entorno.
 
 ---
 

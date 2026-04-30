@@ -142,7 +142,7 @@ SpatialDirective:
 
 ## 4. Roadmap por fases
 
-### Fase 1 — Hardening P0: que no sea una puerta trasera local
+### Fase 1 — Hardening P0: que no sea una puerta trasera local ✅ COMPLETADA (2026-04-15)
 
 Objetivo: poder dejar 5274 corriendo sin miedo básico.
 
@@ -163,7 +163,7 @@ Criterio:
 - origin no autorizado falla.
 - comandos malformados fallan 400.
 
-### Fase 2 — Event sourcing y replay
+### Fase 2 — Event sourcing y replay ✅ COMPLETADA (2026-04-17)
 
 Objetivo: toda acción queda registrada y se puede reconstruir la sesión.
 
@@ -180,7 +180,7 @@ Criterio:
 - Quest Board se reconstruye desde events.
 - errores quedan visibles.
 
-### Fase 3 — Command Bus + Policy Engine
+### Fase 3 — Command Bus + Policy Engine ✅ COMPLETADA (2026-04-19)
 
 Objetivo: separar intención visual de ejecución real.
 
@@ -201,7 +201,7 @@ Criterio:
 - ningún write real se ejecuta sin política.
 - usuario puede aprobar/rechazar desde RepoCiv.
 
-### Fase 4 — Scheduler real de agentes
+### Fase 4 — Scheduler real de agentes ✅ COMPLETADA (2026-04-22)
 
 Objetivo: cola permanente, prioridades reales y control de concurrencia.
 
@@ -219,7 +219,7 @@ Criterio:
 - si agente falla, misión queda failed o retryable.
 - Priority Matrix altera el orden real, no solo la UI.
 
-### Fase 5 — Spatial directives
+### Fase 5 — Spatial directives ✅ COMPLETADA (2026-04-23)
 
 Objetivo: usar el mapa como lenguaje de control.
 
@@ -238,7 +238,7 @@ Criterio:
 - cada gesto muestra preview textual antes de ejecutar.
 - no hay acción irreversible por gesto accidental.
 
-### Fase 6 — Agent capability model
+### Fase 6 — Agent capability model ✅ COMPLETADA (2026-04-24)
 
 Objetivo: agentes no son nombres; son contratos.
 
@@ -254,7 +254,7 @@ Criterio:
 - Worker no toca legal/vault si no corresponde.
 - DAVI puede orquestar, pero policy limita ejecución.
 
-### Fase 7 — Observabilidad operacional
+### Fase 7 — Observabilidad operacional ✅ COMPLETADA (2026-04-25)
 
 Objetivo: saber qué está pasando sin leer logs crudos.
 
@@ -307,7 +307,7 @@ Tareas:
 Criterio:
 - RepoCiv empieza a autocompletar directivas, pero no ejecuta sin policy. ✅
 
-Commit: ff8b97f→(T5) — 17 nuevos tests + enrichment context features + templates persist
+Commit: ff8b97f→67ab00c (T5) — 17 nuevos tests + enrichment context features + templates persist
 
 ---
 
