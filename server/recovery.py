@@ -16,6 +16,7 @@ Failure reasons:
 """
 from __future__ import annotations
 
+import shlex
 from typing import Any, Literal
 
 # ─── Types ────────────────────────────────────────────────────────────────────
@@ -348,7 +349,8 @@ def _build_tmux_attach(
     notes_raw = cfg.get("notes", [])
     notes = [notes_raw] if isinstance(notes_raw, str) else list(notes_raw or [])
 
-    command = f"tmux attach-session -t {session} || tmux new-session -s {session}"
+    quoted_session = shlex.quote(session)
+    command = f"tmux attach-session -t {quoted_session} || tmux new-session -s {quoted_session}"
 
     explanations = {
         "command_failed": (

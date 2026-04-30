@@ -22,8 +22,8 @@ export function harnessHealthFromJson(raw: string): HealthStatus {
 }
 
 export function recoveryModesFromJson(raw: unknown): string[] {
-  if (!raw || !Array.isArray(raw)) return [];
-  return raw as string[];
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((x): x is string => typeof x === 'string');
 }
 
 // ─── Shell command formatting ─────────────────────────────────────────────────

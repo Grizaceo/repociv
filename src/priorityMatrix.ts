@@ -15,6 +15,7 @@ export interface PrioritizedMission extends LocalMission {
 }
 
 // ─── Priority weights (all tuneable) ─────────────────────────────────────────
+// Nota: scheduler.py tiene sus propios pesos. Pendiente unificar en shared/priority-weights.json
 const WEIGHTS = {
   age:          20,  // how long the mission has been waiting (0→∞)
   test:         15,  // is a test file?

@@ -71,7 +71,7 @@ export interface Building {
 }
 
 // ─── Unit / Agent ───────────────────────────────────────────────────────────
-export type UnitType = 'hero' | 'worker' | 'scout' | 'army' | 'caravan' | 'lexo';
+export type UnitType = 'hero' | 'worker' | 'scout' | 'army' | 'caravan' | 'lexo' | 'openclaw';
 export type UnitState = 'idle' | 'moving' | 'working' | 'sleeping' | 'building';
 
 export interface Unit {
@@ -106,6 +106,7 @@ export const UNIT_COLORS: Record<string, string> = {
   army:    '#d45b5b',
   caravan: '#9b5bd4',
   lexo:    '#b86ce8',
+  openclaw:'#7bd6c8',
 };
 
 // ─── World ──────────────────────────────────────────────────────────────────

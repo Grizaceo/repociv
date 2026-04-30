@@ -27,6 +27,7 @@ export class BridgeEvents {
   }
 
   start() {
+    // TODO(prod): import.meta.hot solo disponible en dev. Para producción migrar a SSE o WebSocket.
     if (import.meta.hot) {
       import.meta.hot.on('bridge:event', (data: unknown) => {
         const evt = parseBridgeEvent(data);

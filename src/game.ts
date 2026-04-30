@@ -9,6 +9,8 @@ import { aStarPath, invalidatePathCache } from './pathfinding.ts';
 import { axialDistance } from './hex.ts';
 import { generateLocalWorldFromApi, buildMockLocalWorld } from './localMap.ts';
 import { findPath, findNearestWorkbench } from './localPathfinding.ts';
+import { getConfig } from './gameConfig.ts';
+import { peekNextMission } from './priorityMatrix.ts';
 
 // ─── Clock speed ──────────────────────────────────────────────────────────────
 const TICK_MS = 16; // ~60 fps
@@ -123,6 +125,7 @@ export class GameState {
   private updateBuildings(_dt: number) {
     for (const b of this.world.buildings) {
       if (b.state === 'building') {
+        if (b.durationSeconds <= 0) { b.progress = 100; b.state = 'complete'; continue; }
         b.elapsedSeconds += _dt / 1000;
         b.progress = Math.min(100, (b.elapsedSeconds / b.durationSeconds) * 100);
         if (b.progress >= 100) {
@@ -211,9 +214,10 @@ export class GameState {
     const unit = this.unitMap.get(unitId);
     if (!unit) return;
     unit.fatigue = Math.max(0, Math.min(unit.maxFatigue, unit.fatigue + delta));
-    unit.effectiveSpeed = parseFloat((unit.fatigue / unit.maxFatigue).toFixed(3));
+    unit.effectiveSpeed = Math.round((unit.fatigue / unit.maxFatigue) * 1000) / 1000;
+    const cfg = getConfig();
     // Auto-warn below configurable threshold (was hardcoded at 20%)
-    if (unit.fatigue <= unit.maxFatigue * 0.2 && unit.fatigue > 0 && !unit.isResting) {
+    if (unit.fatigue <= unit.maxFatigue * cfg.fatigue.autoWarnBelow && unit.fatigue > 0 && !unit.isResting) {
       console.warn(`[fatigue] ${unit.name} contexto bajo (${unit.fatigue}%)`);
     }
     this.notify();
@@ -368,14 +372,17 @@ export class GameState {
 
     for (const unit of this.localUnits) {
       // 1. Advance moving units
-      if (unit.state === 'walking_to_workbench' && unit.path.length > 0) {
+      if (unit.state === 'walking_to_workbench' && unit.pathIndex < unit.path.length) {
         unit.pathProgress += 0.06 * unit.effectiveSpeed * scale;
         if (unit.pathProgress >= 1) {
           unit.pathProgress = 0;
-          unit.gridX = unit.path[0]!.x;
-          unit.gridY = unit.path[0]!.y;
-          unit.path.shift();
-          if (unit.path.length === 0) {
+          const step = unit.path[unit.pathIndex]!;
+          unit.gridX = step.x;
+          unit.gridY = step.y;
+          unit.pathIndex++;
+          if (unit.pathIndex >= unit.path.length) {
+            unit.path = [];
+            unit.pathIndex = 0;
             unit.state = unit.currentWorkbenchId ? 'working_on_file' : 'idle_in_room';
             unit.workProgress = 0;
           }
@@ -451,6 +458,7 @@ export class GameState {
 
     unit.currentWorkbenchId = wbId;
     unit.path = pathResult.path;
+    unit.pathIndex = 0;
     unit.pathProgress = 0;
     unit.state = 'walking_to_workbench';
     queued.unitId = unit.id;
@@ -460,9 +468,10 @@ export class GameState {
   }
 
   private dispatchNextMission() {
-    const queued = this.missionQueue.find(m => m.status === 'queued');
-    if (!queued) return;
-    this.assignMissionToUnit(queued);
+    const queued = this.missionQueue.filter(m => m.status === 'queued');
+    if (queued.length === 0) return;
+    const next = peekNextMission(queued);
+    if (next) this.assignMissionToUnit(next);
   }
 
   private completeLocalMission(unitId: string) {

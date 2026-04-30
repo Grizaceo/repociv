@@ -53,6 +53,11 @@ export function loadConfig(): GameConfig {
   return _cached;
 }
 
+/** Read current config (alias used by gameplay systems). */
+export function getConfig(): GameConfig {
+  return loadConfig();
+}
+
 /** Persist config to localStorage */
 export function saveConfig(cfg: GameConfig): void {
   _cached = cfg;

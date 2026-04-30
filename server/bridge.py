@@ -295,9 +295,15 @@ _TD_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 _TD_EXTENSIONS = {'.ts', '.tsx', '.js', '.jsx', '.py', '.rs', '.go', '.java', '.cpp', '.c', '.h'}
+_TD_CACHE: dict[str, Any] = {}
+_TD_CACHE_TTL = 300  # 5 minutos
 
 
 def scan_tech_debt(root_path: str = os.path.expanduser("~/.hermes/workspace/repos")) -> list[dict[str, Any]]:
+    now = time.monotonic()
+    if _TD_CACHE.get('ts', 0) + _TD_CACHE_TTL > now:
+        return _TD_CACHE.get('results', [])
+
     results: list[dict[str, Any]] = []
     try:
         skip_file = Path(__file__).parent.parent / "shared" / "skip-dirs.json"
@@ -329,6 +335,8 @@ def scan_tech_debt(root_path: str = os.path.expanduser("~/.hermes/workspace/repo
                         pass
     except Exception:
         pass
+    _TD_CACHE['results'] = results
+    _TD_CACHE['ts'] = now
     return results
 
 
@@ -471,6 +479,18 @@ def _get_agent_config(unit_id: str) -> dict[str, Any]:
     return AGENT_CONFIGS.get(base, AGENT_CONFIGS["DAVI"])
 
 
+def _resolve_city_path(city_id: str) -> str | None:
+    """Resolve a city_id to an absolute directory path on the filesystem.
+
+    Uses REPOCIV_REPOS_ROOT (env) or a sensible default derived from this
+    file's location.  Returns ``None`` when the path does not exist.
+    """
+    root = os.environ.get("REPOCIV_REPOS_ROOT",
+                          str(Path(__file__).parent.parent / "workspace" / "repos"))
+    candidate = os.path.join(root, city_id)
+    return candidate if os.path.isdir(candidate) else None
+
+
 def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
               command_id: str | None = None) -> None:
     mission_id = command_id or str(uuid.uuid4())[:8]
@@ -490,7 +510,8 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
                      "durationSeconds": 120, "missionId": mission_id})
     send_to_repociv({"type": "unit_state", "unit": unit_id, "state": "working"})
 
-    success, output = _execute_streaming(unit_id, mission_id, mission)
+    working_dir = _resolve_city_path(city_id)
+    success, output = _execute_streaming(unit_id, mission_id, mission, working_dir)
 
     duration = time.time() - started_at
     mission_record.update({"completedAt": time.time(), "status": "complete" if success else "failed",
@@ -513,19 +534,20 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
                      "success": success, "duration": int(duration)})
 
 
-def _execute_streaming(unit_id: str, mission_id: str, mission: str) -> tuple[bool, str]:
+def _execute_streaming(unit_id: str, mission_id: str, mission: str,
+                       working_dir: str | None = None) -> tuple[bool, str]:
     config = _get_agent_config(unit_id)
     base = unit_id.split("-")[0].upper()
 
     if base == "OPENCLAW":
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: openclaw]\n"})
-        return _run_openclaw_streaming(unit_id, mission_id, mission, config)
+        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir)
 
     send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: hermes]\n"})
-    success, output = _run_hermes_streaming(unit_id, mission_id, mission, config)
+    success, output = _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir)
     if not success and _has_openclaw():
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[hermes falló → fallback openclaw]\n"})
-        return _run_openclaw_streaming(unit_id, mission_id, mission, config)
+        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir)
     return success, output
 
 
@@ -545,7 +567,8 @@ def _find_openclaw() -> str | None:
 
 
 def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
-                             config: dict[str, Any]) -> tuple[bool, str]:
+                             config: dict[str, Any],
+                             working_dir: str | None = None) -> tuple[bool, str]:
     if config.get("stateful", True):
         session_id = f"repociv-{unit_id.lower()}"
     else:
@@ -572,13 +595,14 @@ def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
 
 
 def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
-                           config: dict[str, Any] | None = None) -> tuple[bool, str]:
+                           config: dict[str, Any] | None = None,
+                           working_dir: str | None = None) -> tuple[bool, str]:
     HERMES_URL   = os.environ.get("HERMES_URL",   "http://localhost:8642/v1/chat/completions")
     HERMES_KEY   = os.environ.get("HERMES_KEY",   "davi-voice-bridge-2026")
     HERMES_MODEL = os.environ.get("HERMES_MODEL", "minimax-m2.6")
 
     cfg = config if config is not None else _get_agent_config(unit_id)
-    payload = {
+    payload: dict[str, Any] = {
         "model": HERMES_MODEL,
         "messages": [
             {"role": "system", "content": cfg.get("system", "Eres un agente útil.")},
@@ -586,6 +610,8 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
         ],
         "stream": False,
     }
+    if working_dir:
+        payload["working_directory"] = working_dir
     try:
         data = json.dumps(payload).encode()
         req = urllib.request.Request(
