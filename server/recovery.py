@@ -440,3 +440,153 @@ def _build_view_logs(
         "explanation": explanations.get(reason, explanations["unknown"]),
         "available_modes": available_modes,
     }
+
+
+# ─── Session / Run-state aware recovery (P1 enrichment) ──────────────────────
+
+
+def build_recovery_with_state(
+    harness: dict[str, Any],
+    failure_context: dict[str, Any],
+    *,
+    unit_id: str = "",
+    run_id: str = "",
+) -> dict[str, Any]:
+    """Build a recovery plan enriched with session and run_state context.
+
+    On top of the base build_recovery_plan(), this also:
+    - Looks up the canonical session to include workspace/workingDirectory
+    - Pulls run_state for the current/past run to contextualize the failure
+    - Returns `sessionContext` and `runContext` fields for downstream consumers
+    """
+    plan = build_recovery_plan(harness, failure_context)
+
+    session_ctx: dict[str, Any] | None = None
+    run_ctx: dict[str, Any] | None = None
+
+    if unit_id:
+        try:
+            from . import sessions as _sessions
+            session_ctx = _sessions.get_or_create(unit_id)
+        except Exception:
+            pass
+
+    if run_id:
+        try:
+            from . import run_state as _run_state
+            run_ctx = _run_state.load(run_id)
+        except Exception:
+            pass
+
+    plan["sessionContext"] = session_ctx
+    plan["runContext"] = run_ctx
+    return plan
+
+
+def auto_resolve_recovery(
+    unit_id: str,
+    harness_id: str = "",
+    failure_context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Attempt automatic recovery resolution from stored state.
+
+    Checks whether a previous run_state or session already has recovery
+    instructions recorded — avoids re-deriving the same plan.
+
+    Returns a dict with:
+    - resolved: bool — whether auto-resolution was possible
+    - plan: recovery plan (if resolved) or None
+    - source: where the resolution came from
+    """
+    failure_context = failure_context or {}
+    reason = failure_context.get("reason", "unknown")
+
+    try:
+        from . import sessions as _sessions
+        from . import run_state as _run_state
+    except Exception:
+        return {"resolved": False, "plan": None, "source": "import-error"}
+
+    # 1. Check if there's a previous recovery recorded in run_state
+    session = _sessions.get_or_create(unit_id)
+    last_mission = session.get("lastMissionId", "")
+    if last_mission:
+        run = _run_state.load(last_mission)
+        if run:
+            prev_recovery = run.get("lastRecovery", None)
+            if prev_recovery and isinstance(prev_recovery, dict):
+                prev_reason = prev_recovery.get("reason", "")
+                same_reason = prev_reason == reason or prev_reason == "unknown"
+                if same_reason:
+                    return {
+                        "resolved": True,
+                        "plan": prev_recovery,
+                        "source": f"run_state:{last_mission}",
+                    }
+
+    # 2. Check recent transcript for recovery instructions
+    recent = _sessions.get_recent(unit_id, limit=10)
+    for entry in reversed(recent):
+        content = entry.get("content", "")
+        if isinstance(content, str) and "[recovery]" in content.lower():
+            return {
+                "resolved": True,
+                "plan": None,
+                "source": "transcript-hint",
+                "hint": content[:500],
+            }
+
+    return {"resolved": False, "plan": None, "source": "no-prior-state"}
+
+
+def record_recovery_outcome(
+    unit_id: str,
+    run_id: str,
+    plan: dict[str, Any],
+    *,
+    success: bool,
+    notes: str = "",
+) -> dict[str, Any] | None:
+    """Persist recovery outcome to the run_state and session transcript.
+
+    Called after a recovery action was attempted — records the result so
+    the next reconciliation pass can see it.
+    """
+    try:
+        from . import sessions as _sessions
+        from . import run_state as _run_state
+    except Exception:
+        return None
+
+    # Update run_state with recovery info
+    try:
+        _run_state.patch(
+            run_id,
+            lastRecovery=plan,
+            lastRecoverySuccess=success,
+            lastRecoveryNotes=notes[:500],
+        )
+    except Exception:
+        pass
+
+    # Log to session transcript
+    try:
+        status = "applied" if success else "failed"
+        _sessions.append_message(
+            unit_id,
+            "system",
+            f"[recovery] {plan.get('mode', 'unknown')} → {status}",
+            meta={
+                "missionId": run_id,
+                "recoveryMode": plan.get("mode"),
+                "success": success,
+            },
+        )
+    except Exception:
+        pass
+
+    # Return the updated run_state
+    try:
+        return _run_state.load(run_id)
+    except Exception:
+        return None
