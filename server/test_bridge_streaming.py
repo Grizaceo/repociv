@@ -39,3 +39,17 @@ def test_run_hermes_streaming_emits_chat_chunk_on_transport_error(monkeypatch):
         "text": "[hermes error] <urlopen error connection refused>\n",
     }]
     assert recorded == [("m1", "DAVI", "[hermes error] <urlopen error connection refused>\n")]
+
+
+def test_send_to_repociv_chat_chunk_updates_session(monkeypatch, tmp_path):
+    bridge._sessions.init(tmp_path)
+    monkeypatch.setattr(bridge, "_fanout_sse", lambda _event: None)
+    monkeypatch.setattr(bridge.urllib.request, "urlopen", lambda *_args, **_kwargs: None)
+
+    bridge.send_to_repociv({"type": "chat_chunk", "unit": "DAVI", "missionId": "m9", "text": "hola"})
+
+    canonical = bridge._sessions.get_or_create("DAVI")
+    recent = bridge._sessions.get_recent("DAVI", limit=1)
+    assert canonical["lastMissionId"] == "m9"
+    assert canonical["messageCount"] == 1
+    assert recent[0]["content"] == "hola"

@@ -18,6 +18,9 @@ from typing import Any, Callable
 
 from server import event_store as _es
 from server import directive_store as _ds
+from server import sessions as _sessions
+from server import run_state as _run_state
+from server import runtime_adapters as _runtime_adapters
 from server.quest import generate_quest_name
 
 SendFn = Callable[[dict[str, Any]], None]
@@ -94,6 +97,9 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
     mission_id = command_id or str(uuid.uuid4())[:8]
     quest_name = generate_quest_name(mission)
     started_at = time.time()
+    working_dir = _resolve_city_path(city_id)
+
+    runtime = _runtime_adapters.default_agent_runtime(unit_id)
 
     mission_record: dict[str, Any] = {
         "id": mission_id, "unit": unit_id, "city": city_id, "mission": mission,
@@ -102,13 +108,33 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
     }
     save_mission(mission_record)
     _es.record_started(mission_id)
+    _sessions.patch(
+        unit_id,
+        runtimeId=runtime.harness_id,
+        repo=city_id,
+        workingDirectory=working_dir or "",
+        summary=quest_name,
+        lastMissionId=mission_id,
+    )
+    _sessions.append_message(unit_id, "user", mission, {"missionId": mission_id, "city": city_id})
+    _run_state.save(mission_id, {
+        "unitId": unit_id,
+        "runtimeId": runtime.harness_id,
+        "repo": city_id,
+        "commandType": "execute_agent",
+        "phase": "executing",
+        "status": "running",
+        "retries": 0,
+        "checkpointApproved": [],
+        "filesTouched": [],
+        "startedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started_at)),
+    })
 
     send_to_repociv({"type": "mission_start", "missionId": mission_id, "unit": unit_id, "questName": quest_name})
     send_to_repociv({"type": "building_start", "city": city_id, "building": quest_name,
                      "durationSeconds": 120, "missionId": mission_id})
     send_to_repociv({"type": "unit_state", "unit": unit_id, "state": "working"})
 
-    working_dir = _resolve_city_path(city_id)
     success, output = _execute_streaming(unit_id, mission_id, mission, working_dir)
 
     duration = time.time() - started_at
@@ -119,11 +145,25 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
     if success:
         _es.record_completed(mission_id, output[-500:])
         _ds.record_outcome(mission_id, "success", duration)
+        _run_state.patch(
+            mission_id,
+            status="completed",
+            phase="completed",
+            finishedAt=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            result=output[-500:],
+        )
         send_to_repociv({"type": "building_complete", "city": city_id, "building": quest_name, "missionId": mission_id})
         send_to_repociv({"type": "log", "msg": f"{unit_id} completó: {quest_name}", "level": "success"})
     else:
         _es.record_failed(mission_id, output[-500:])
         _ds.record_outcome(mission_id, "failure", duration)
+        _run_state.patch(
+            mission_id,
+            status="failed",
+            phase="failed",
+            finishedAt=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            error=output[-500:],
+        )
         send_to_repociv({"type": "building_failed", "city": city_id, "building": quest_name, "missionId": mission_id})
         send_to_repociv({"type": "log", "msg": f"{unit_id} falló en: {quest_name}", "level": "warn"})
 

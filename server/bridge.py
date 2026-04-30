@@ -127,7 +127,11 @@ def _pop_approval(cmd_id: str) -> dict[str, Any] | None:
 
 # ─── Event store init ─────────────────────────────────────────────────────────
 from server import event_store as _es
+from server import sessions as _sessions
+from server import run_state as _run_state
 _es.init(CONFIG_DIR)
+_sessions.init(CONFIG_DIR)
+_run_state.init(CONFIG_DIR)
 
 # ─── Command schema + policy ──────────────────────────────────────────────────
 from server.command_schema import validate_command, CommandValidationError, Command
@@ -139,6 +143,7 @@ from server import directive_store as _ds
 from server import directive_learner as _dl
 from server import harness_registry as _hr
 from server import recovery as _recovery
+from server import runtime_adapters as _runtime_adapters
 from server.quest import generate_quest_name
 from server.tech_debt import scan_tech_debt
 from server import agent_runner as _agent_runner
@@ -278,6 +283,14 @@ def _unregister_sse_client(client: queue.Queue[dict[str, Any] | None]) -> None:
 
 
 def send_to_repociv(event: dict[str, Any]) -> None:
+    event_type = str(event.get("type", ""))
+    unit = str(event.get("unit", ""))
+    mission_id = str(event.get("missionId", ""))
+    if event_type == "chat_chunk" and unit and mission_id:
+        try:
+            _sessions.append_message(unit, "assistant", str(event.get("text", "")), {"missionId": mission_id})
+        except Exception:
+            pass
     _fanout_sse(event)
     try:
         data = json.dumps(event).encode()
@@ -519,6 +532,24 @@ def _dispatch_command(cmd: Command) -> None:
         marker = str(payload.get("marker", cmd.id))[:120]
         quest_name = f"E2E probe: {marker}"
         text = f"E2E probe completado: {marker}"
+        adapter = _runtime_adapters.infer_adapter_for_command("e2e_probe", cmd.harness_id)
+        runtime_id = adapter.harness_id if adapter else "local-cli"
+        _sessions.patch(unit, runtimeId=runtime_id, repo=str(cmd.target or "main"), summary=quest_name, lastMissionId=cmd.id)
+        _sessions.append_message(unit, "user", marker, {"missionId": cmd.id, "kind": "e2e_probe"})
+        _run_state.save(cmd.id, {
+            "unitId": unit,
+            "runtimeId": runtime_id,
+            "repo": str(cmd.target or "main"),
+            "commandType": "e2e_probe",
+            "phase": "completed",
+            "status": "completed",
+            "retries": 0,
+            "checkpointApproved": [],
+            "filesTouched": [],
+            "startedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "finishedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "result": text,
+        })
         send_to_repociv({"type": "mission_start", "missionId": cmd.id, "unit": unit, "questName": quest_name})
         send_to_repociv({"type": "chat_chunk", "unit": unit, "text": text, "missionId": cmd.id})
         _es.record_output_chunk(cmd.id, unit, text)
@@ -538,6 +569,26 @@ def _dispatch_command(cmd: Command) -> None:
             "lines": 0, "duration": 0,
         }
         save_mission(mission_rec)
+        adapter = _runtime_adapters.infer_adapter_for_command("quest_add", cmd.harness_id)
+        runtime_id = adapter.harness_id if adapter else "local-cli"
+        _sessions.patch("DAVI", runtimeId=runtime_id, repo="main", summary=title, lastMissionId=cmd.id)
+        _sessions.append_message("DAVI", "user", title, {"missionId": cmd.id, "kind": "quest_add"})
+        if description:
+            _sessions.append_message("DAVI", "assistant", description, {"missionId": cmd.id, "kind": "quest_add_summary"})
+        _run_state.save(cmd.id, {
+            "unitId": "DAVI",
+            "runtimeId": runtime_id,
+            "repo": "main",
+            "commandType": "quest_add",
+            "phase": "completed",
+            "status": "completed",
+            "retries": 0,
+            "checkpointApproved": [],
+            "filesTouched": [],
+            "startedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "finishedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "result": description,
+        })
         send_to_repociv({"type": "mission_start", "missionId": cmd.id, "unit": "DAVI", "questName": title})
         send_to_repociv({"type": "mission_complete", "missionId": cmd.id, "unit": "DAVI", "success": True, "duration": 0})
         send_to_repociv({"type": "log", "msg": f"Quest agregado: {title}", "level": "success"})
