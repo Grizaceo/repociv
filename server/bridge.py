@@ -149,6 +149,7 @@ from server import runtime_adapters as _runtime_adapters
 from server.quest import generate_quest_name
 from server.tech_debt import scan_tech_debt
 from server import agent_runner as _agent_runner
+from server import task_orchestrator as _to
 _ds.init(CONFIG_DIR)
 _dl.set_templates_path(CONFIG_DIR / "directive_templates.json")
 
@@ -619,6 +620,29 @@ def _dispatch_command(cmd: Command) -> None:
         _ds.record_outcome(cmd.id, "success", 0.0)
         return
 
+    # ─── Task orchestrator (P3) ────────────────────────────────────────────
+    if cmd.type == "task_run":
+        repo = str(payload.get("repo", cmd.target))
+        issue_id = str(payload.get("issueId") or payload.get("issue_id") or "")
+        if not issue_id:
+            _es.record_failed(cmd.id, "task_run requires issueId in payload")
+            return
+        _es.record_started(cmd.id)
+        try:
+            result = _to.run_task(repo, issue_id)
+            _es.record_completed(cmd.id, json.dumps({"phase": result.get("phase"), "repo": repo, "issueId": issue_id}))
+            send_to_repociv({
+                "type": "task_complete", "repo": repo, "issueId": issue_id,
+                "phase": result.get("phase"), "missionId": cmd.id,
+            })
+        except Exception as e:
+            _es.record_failed(cmd.id, str(e))
+            send_to_repociv({
+                "type": "task_failed", "repo": repo, "issueId": issue_id,
+                "error": str(e), "missionId": cmd.id,
+            })
+        return
+
     send_to_repociv({"type": "log", "msg": f"Comando {cmd.type} recibido (sin executor)", "level": "warn"})
     _es.record_failed(cmd.id, f"no executor for {cmd.type}")
     _ds.record_outcome(cmd.id, "failure", 0.0)
@@ -777,6 +801,15 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 return
             self._json(harness)
             return
+
+        # GET /tasks/<repo>/<issueId> — task orchestrator status (P3)
+        if path.startswith("/tasks/"):
+            parts = path.split("/")[2:]
+            if len(parts) >= 2:
+                repo, issue_id = parts[0], parts[1]
+                status = _to.get_task_status(repo, issue_id)
+                self._json(status)
+                return
 
         self.send_response(404)
         self._cors()
