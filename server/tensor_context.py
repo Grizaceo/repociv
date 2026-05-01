@@ -24,6 +24,7 @@ Fase 3+ operations (once a real DC corpus exists):
 from __future__ import annotations
 
 import hashlib
+import os
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -99,6 +100,16 @@ class TensorContext:
     CHARS_PER_TOKEN: int = 4
     """Chars-per-token approximation for budget calculations."""
 
+    def __init__(self, world_model: Any | None = None) -> None:
+        """Create a TensorContext, optionally wired to an active World Model."""
+        self.world_model = world_model
+        if self.world_model is None and os.environ.get("REPOCIV_WORLD_MODEL_MODE", "").lower() == "active":
+            try:
+                from .world_model import ContextWorldModel  # noqa: PLC0415
+                self.world_model = ContextWorldModel.from_environment()
+            except Exception:
+                self.world_model = None
+
     # ── Fase 1 operations ────────────────────────────────────────────────────
 
     def suma(
@@ -155,6 +166,17 @@ class TensorContext:
             Pruned list: all must_include DCs, then as many should_include
             as fit, in original relative order.
         """
+        if self.world_model is not None and getattr(self.world_model, "is_active", False):
+            return self.world_model.prune_context(directives, max_tokens)
+
+        return self._greedy_budget_prune(directives, max_tokens)
+
+    def _greedy_budget_prune(
+        self,
+        directives: list[ContextDirective],
+        max_tokens: int,
+    ) -> list[ContextDirective]:
+        """Fase 1 deterministic budget pruning used when World Model is inactive."""
         budget_chars = max_tokens * self.CHARS_PER_TOKEN
 
         must: list[ContextDirective] = []

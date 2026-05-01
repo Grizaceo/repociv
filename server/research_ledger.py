@@ -16,6 +16,8 @@ Design principles:
 Tables:
   missions           — one row per completed/failed mission
   agent_predictions  — swarm debate signals (Fase 3); believability scoring
+  world_model_predictions — shadow/active context utility predictions (Fase 4)
+  world_model_history     — observed DC utility outcomes for calibration
 """
 from __future__ import annotations
 
@@ -76,6 +78,42 @@ CREATE TABLE IF NOT EXISTS agent_predictions (
 )
 """
 
+_DDL_WORLD_MODEL_PREDICTIONS_SEQ = (
+    "CREATE SEQUENCE IF NOT EXISTS world_model_predictions_id_seq START 1"
+)
+
+_DDL_WORLD_MODEL_PREDICTIONS = """
+CREATE TABLE IF NOT EXISTS world_model_predictions (
+    id              INTEGER DEFAULT nextval('world_model_predictions_id_seq') PRIMARY KEY,
+    mission_id      TEXT,
+    dc_id           TEXT,
+    mode            TEXT,
+    fitness_hat     REAL,
+    uncertainty     REAL,
+    selected        BOOLEAN,
+    predicted_rank  INTEGER,
+    actual_utility  REAL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+"""
+
+_DDL_WORLD_MODEL_HISTORY_SEQ = (
+    "CREATE SEQUENCE IF NOT EXISTS world_model_history_id_seq START 1"
+)
+
+_DDL_WORLD_MODEL_HISTORY = """
+CREATE TABLE IF NOT EXISTS world_model_history (
+    id              INTEGER DEFAULT nextval('world_model_history_id_seq') PRIMARY KEY,
+    mission_id      TEXT,
+    dc_id           TEXT,
+    actual_utility  REAL,
+    tokens          INTEGER,
+    selected        BOOLEAN,
+    compressed      BOOLEAN,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+"""
+
 
 class ResearchLedger:
     """Analytics ledger for RepoCiv missions and agent believability.
@@ -125,11 +163,20 @@ class ResearchLedger:
         self._conn.execute(_DDL_MISSIONS)
         self._conn.execute(_DDL_AGENT_PREDICTIONS_SEQ)
         self._conn.execute(_DDL_AGENT_PREDICTIONS)
+        self._conn.execute(_DDL_WORLD_MODEL_PREDICTIONS_SEQ)
+        self._conn.execute(_DDL_WORLD_MODEL_PREDICTIONS)
+        self._conn.execute(_DDL_WORLD_MODEL_HISTORY_SEQ)
+        self._conn.execute(_DDL_WORLD_MODEL_HISTORY)
 
     @property
     def available(self) -> bool:
         """True if DuckDB is installed and the connection is open."""
         return self._conn is not None
+
+    @property
+    def state_dir(self) -> Path:
+        """Directory backing ledger artifacts and the DuckDB database."""
+        return self._state_dir
 
     # ── Core write API ────────────────────────────────────────────────────────
 
@@ -326,6 +373,147 @@ class ResearchLedger:
                 )
             except Exception as exc:
                 logger.warning("ResearchLedger.record_prediction: %s", exc)
+
+    # ── World Model calibration tables ────────────────────────────────────────
+
+    def record_world_model_prediction(
+        self,
+        *,
+        mission_id: str,
+        dc_id: str,
+        mode: str,
+        fitness_hat: float,
+        uncertainty: float,
+        selected: bool,
+        predicted_rank: int | None = None,
+        actual_utility: float | None = None,
+    ) -> None:
+        """Record a World Model prediction for shadow/active calibration."""
+        if not self.available:
+            return
+        with self._lock:
+            try:
+                self._conn.execute(
+                    """
+                    INSERT INTO world_model_predictions
+                        (mission_id, dc_id, mode, fitness_hat, uncertainty,
+                         selected, predicted_rank, actual_utility)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        mission_id, dc_id, mode, float(fitness_hat),
+                        float(uncertainty), bool(selected), predicted_rank,
+                        actual_utility,
+                    ),
+                )
+            except Exception as exc:
+                logger.warning("ResearchLedger.record_world_model_prediction: %s", exc)
+
+    def record_world_model_history(
+        self,
+        *,
+        mission_id: str,
+        dc_id: str,
+        actual_utility: float,
+        tokens: int = 0,
+        selected: bool = True,
+        compressed: bool = False,
+    ) -> None:
+        """Record observed DC utility used to calibrate/promo the World Model."""
+        if not self.available:
+            return
+        with self._lock:
+            try:
+                self._conn.execute(
+                    """
+                    INSERT INTO world_model_history
+                        (mission_id, dc_id, actual_utility, tokens, selected, compressed)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        mission_id, dc_id, float(actual_utility),
+                        max(0, int(tokens)), bool(selected), bool(compressed),
+                    ),
+                )
+            except Exception as exc:
+                logger.warning("ResearchLedger.record_world_model_history: %s", exc)
+
+    def get_world_model_predictions(self, limit: int = 500) -> list[dict[str, Any]]:
+        """Return recent World Model predictions as dictionaries."""
+        if not self.available:
+            return []
+        with self._lock:
+            try:
+                rows = self._conn.execute(
+                    """
+                    SELECT mission_id, dc_id, mode, fitness_hat, uncertainty,
+                           selected, predicted_rank, actual_utility, created_at
+                    FROM world_model_predictions
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+                cols = [
+                    "mission_id", "dc_id", "mode", "fitness_hat", "uncertainty",
+                    "selected", "predicted_rank", "actual_utility", "created_at",
+                ]
+                return [dict(zip(cols, row)) for row in rows]
+            except Exception as exc:
+                logger.warning("ResearchLedger.get_world_model_predictions: %s", exc)
+                return []
+
+    def get_world_model_history(self, limit: int = 500) -> list[dict[str, Any]]:
+        """Return recent observed World Model utility history."""
+        if not self.available:
+            return []
+        with self._lock:
+            try:
+                rows = self._conn.execute(
+                    """
+                    SELECT mission_id, dc_id, actual_utility, tokens, selected,
+                           compressed, created_at
+                    FROM world_model_history
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+                cols = [
+                    "mission_id", "dc_id", "actual_utility", "tokens",
+                    "selected", "compressed", "created_at",
+                ]
+                return [dict(zip(cols, row)) for row in rows]
+            except Exception as exc:
+                logger.warning("ResearchLedger.get_world_model_history: %s", exc)
+                return []
+
+    def get_world_model_calibration_samples(
+        self,
+        limit: int = 500,
+    ) -> list[dict[str, Any]]:
+        """Return predictions that have observed utility for calibration."""
+        if not self.available:
+            return []
+        with self._lock:
+            try:
+                rows = self._conn.execute(
+                    """
+                    SELECT dc_id, fitness_hat, actual_utility
+                    FROM world_model_predictions
+                    WHERE actual_utility IS NOT NULL
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+                return [
+                    {"dc_id": dc_id, "fitness_hat": fitness_hat, "actual_utility": actual}
+                    for dc_id, fitness_hat, actual in rows
+                ]
+            except Exception as exc:
+                logger.warning("ResearchLedger.get_world_model_calibration_samples: %s", exc)
+                return []
     # ── Query helpers ─────────────────────────────────────────────────────────
 
     def get_mission_stats(self, limit: int = 100) -> list[dict[str, Any]]:
