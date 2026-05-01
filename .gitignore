@@ -42,3 +42,5 @@ test-results/
 # ─── Misc ────────────────────────────────────────────────────────────────────
 coverage/
 .cache/
+coverage
+.coverage
