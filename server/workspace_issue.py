@@ -199,6 +199,56 @@ def list_artifacts(repo: str, issue_id: str) -> list[str]:
     return sorted(p.name for p in out_dir.iterdir() if p.is_file())
 
 
+# ── Step artifact helpers (context seeding) ───────────────────────────────────
+
+def write_step_artifact(
+    repo: str, issue_id: str, step_idx: int, agent: str, content: str
+) -> None:
+    """Write a numbered step output artifact for context seeding.
+
+    Files are named ``{step_idx:02d}-{agent}-output.md`` inside output/.
+    These are the files read by the next step's context builder.
+    """
+    safe_agent = "".join(c if c.isalnum() or c == "_" else "_" for c in agent.lower())
+    name = f"{step_idx:02d}-{safe_agent}-output.md"
+    with _locks.hold(f"issue:{repo}:{issue_id}"):
+        out_dir = _output_dir(repo, issue_id)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        _atomic_write(out_dir / name, content)
+
+
+def read_output_artifacts(
+    repo: str, issue_id: str, up_to_step: int
+) -> list[tuple[str, str]]:
+    """Return (name, content) pairs for step artifacts BEFORE up_to_step.
+
+    Only returns ``*-output.md`` files whose step index is < up_to_step,
+    sorted ascending. Returns an empty list if none exist.
+    """
+    out_dir = _output_dir(repo, issue_id)
+    if not out_dir.exists():
+        return []
+
+    results: list[tuple[str, str]] = []
+    for path in sorted(out_dir.iterdir()):
+        name = path.name
+        if not name.endswith("-output.md"):
+            continue
+        # Filename format: NN-agent-output.md
+        parts = name.split("-", 1)
+        if not parts[0].isdigit():
+            continue
+        idx = int(parts[0])
+        if idx >= up_to_step:
+            continue
+        try:
+            content = path.read_text(encoding="utf-8")
+            results.append((name, content))
+        except OSError:
+            pass
+    return results
+
+
 def read_artifact(repo: str, issue_id: str, name: str) -> str | None:
     """Read an artifact's text content. Returns None if not found."""
     path = _output_dir(repo, issue_id) / name

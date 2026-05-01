@@ -302,4 +302,128 @@ describe('BridgeEvents handleBridgeEvent', () => {
     warnSpy.mockRestore();
     bridge.stop();
   });
+
+  it('building_start calls startBuilding on state', () => {
+    const state = makeState();
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+    const src = FakeEventSource.instances[0]!;
+    src.open();
+    src.message({
+      type: 'building_start',
+      city: 'repo-1',
+      building: 'ci-pipeline',
+      buildingType: 'building',
+      durationSeconds: 60,
+      missionId: 'mis-1',
+    });
+    expect(state.startBuilding).toHaveBeenCalledWith(
+      'repo-1',
+      'ci-pipeline',
+      'ci-pipeline',
+      60,
+      'building',
+    );
+    bridge.stop();
+  });
+
+  it('building_complete calls completeBuilding and invalidatePathCache', () => {
+    const state = makeState();
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+    const src = FakeEventSource.instances[0]!;
+    src.open();
+    src.message({ type: 'building_complete', city: 'repo-1', building: 'ci-pipeline', missionId: 'mis-1' });
+    expect(state.completeBuilding).toHaveBeenCalledWith('repo-1', 'ci-pipeline');
+    expect(state.invalidatePathCache).toHaveBeenCalled();
+    bridge.stop();
+  });
+
+  it('building_failed calls failBuilding on state', () => {
+    const state = makeState();
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+    const src = FakeEventSource.instances[0]!;
+    src.open();
+    src.message({ type: 'building_failed', city: 'repo-1', building: 'ci-pipeline', missionId: 'mis-1' });
+    expect(state.failBuilding).toHaveBeenCalledWith('repo-1', 'ci-pipeline');
+    bridge.stop();
+  });
+
+  it('unit_move calls moveUnit on state', () => {
+    const state = makeState();
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+    const src = FakeEventSource.instances[0]!;
+    src.open();
+    src.message({ type: 'unit_move', unit: 'DAVI', from: [0, 0], to: [3, 4] });
+    expect(state.moved).toContain('DAVI');
+    bridge.stop();
+  });
+
+  it('unit_state sets state on unit and operation ticker', () => {
+    const state = makeState();
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+    const src = FakeEventSource.instances[0]!;
+    src.open();
+    src.message({ type: 'unit_state', unit: 'WORKER-1', state: 'working' });
+    expect(state.setUnitState).toHaveBeenCalledWith('WORKER-1', 'working');
+    bridge.stop();
+  });
+
+  it('unit_state idle clears operation ticker', () => {
+    const state = makeState();
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+    const src = FakeEventSource.instances[0]!;
+    src.open();
+    src.message({ type: 'unit_state', unit: 'WORKER-1', state: 'idle' });
+    expect(state.setUnitState).toHaveBeenCalledWith('WORKER-1', 'idle');
+    bridge.stop();
+  });
+
+  it('mission_start calls startMission on state', () => {
+    const state = makeState();
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+    const src = FakeEventSource.instances[0]!;
+    src.open();
+    src.message({ type: 'mission_start', missionId: 'ms-10', unit: 'LEXO', questName: 'Analyze repo' });
+    expect(state.startMission).toHaveBeenCalledWith('ms-10', 'LEXO', 'Analyze repo');
+    bridge.stop();
+  });
+
+  it('mission_complete with failure calls completeMission with false', () => {
+    const state = makeState();
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+    const src = FakeEventSource.instances[0]!;
+    src.open();
+    src.message({ type: 'mission_complete', missionId: 'ms-fail', unit: 'WORKER', success: false, duration: 10 });
+    expect(state.completeMission).toHaveBeenCalledWith('ms-fail', false);
+    bridge.stop();
+  });
+
+  it('log event calls logEvent with correct level', () => {
+    const logEvent = vi.mocked(uiMod.logEvent);
+    logEvent.mockClear();
+    const state = makeState();
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+    const src = FakeEventSource.instances[0]!;
+    src.open();
+    src.message({ type: 'log', msg: 'System up', level: 'info' });
+    expect(logEvent).toHaveBeenCalledWith('System up', 'info');
+    bridge.stop();
+  });
+
+  it('stop() closes SSE connection', () => {
+    const state = makeState();
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+    const src = FakeEventSource.instances[0]!;
+    bridge.stop();
+    expect(src.closed).toBe(true);
+  });
 });

@@ -42,6 +42,9 @@ interface Metrics {
     memTotalGb: number | null;
     diskUsedPct: number | null;
   };
+  circuitOpenCount?: number;
+  stepLatency?: { p50: number; p95: number; count: number };
+  hookStats?: { total: number; failures: number };
   ts: number;
 }
 
@@ -156,6 +159,13 @@ function _render() {
       <span class="obs-health-ts">Actualizado hace ${Math.round(Date.now() / 1000 - m.ts)}s</span>
     </div>
 
+    <!-- Circuit breaker badge -->
+    ${
+      (m.circuitOpenCount ?? 0) > 0
+        ? `<div class="obs-circuit-badge" title="${m.circuitOpenCount} tarea(s) con circuit breaker abierto — demasiados fallos consecutivos">⚡ CIRCUIT OPEN ×${m.circuitOpenCount}</div>`
+        : ''
+    }
+
     <!-- Agent grid -->
     <div class="obs-section-title">Agentes</div>
     <div class="obs-agent-grid">
@@ -176,6 +186,30 @@ function _render() {
       ${m.durationP50 != null ? _metric('P50 dur.', `${m.durationP50}s`, 'ok') : ''}
       ${m.durationP95 != null ? _metric('P95 dur.', `${m.durationP95}s`, m.durationP95 > 60 ? 'warn' : 'ok') : ''}
     </div>
+
+    <!-- Step latency (orchestrator steps) -->
+    ${
+      m.stepLatency && m.stepLatency.count > 0
+        ? `
+    <div class="obs-section-title">Latencia de steps (${m.stepLatency.count} muestras)</div>
+    <div class="obs-metrics-grid">
+      ${_metric('P50 step', `${m.stepLatency.p50}s`, 'ok')}
+      ${_metric('P95 step', `${m.stepLatency.p95}s`, m.stepLatency.p95 > 120 ? 'warn' : 'ok')}
+    </div>`
+        : ''
+    }
+
+    <!-- Hook stats -->
+    ${
+      m.hookStats && m.hookStats.total > 0
+        ? `
+    <div class="obs-section-title">Hooks</div>
+    <div class="obs-metrics-grid">
+      ${_metric('Ejecuciones', String(m.hookStats.total), 'ok')}
+      ${_metric('Fallos', String(m.hookStats.failures), m.hookStats.failures > 0 ? 'warn' : 'ok')}
+    </div>`
+        : ''
+    }
 
     <!-- Tool calls per agent -->
     ${

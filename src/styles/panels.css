@@ -1567,6 +1567,20 @@ kbd {
   font-family: var(--font-mono);
 }
 
+/* Circuit breaker open badge */
+.obs-circuit-badge {
+  background: #d44b4b22;
+  border: 1px solid #d44b4b;
+  color: #d44b4b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  border-radius: 3px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
 /* Section titles */
 .obs-section-title {
   font-size: 9px;

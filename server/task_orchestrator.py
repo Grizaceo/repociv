@@ -28,6 +28,13 @@ from . import locks as _locks
 from . import workspace_issue as _wi
 from . import workspace_state as _ws
 from . import run_state as _rs
+from . import repo_config as _rc
+from . import metrics as _metrics
+from . import checkpoint as _checkpoint
+
+
+# ─── Circuit breaker ──────────────────────────────────────────────────────────
+MAX_CONSECUTIVE_FAILURES = 3
 
 
 # ─── Injectable step executor ─────────────────────────────────────────────────
@@ -189,10 +196,20 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                 "stepCount": total,
             })
 
+            # ── Resume from checkpoint if available ───────────────────────
+            _ckpt = _checkpoint.load_checkpoint(repo, issue_id)
+            _resume_from = (_ckpt.get("stepIndex", -1) + 1) if _ckpt else 0
+
+            consecutive_failures = 0
+
             for i, step in enumerate(steps):
+                # Skip steps already completed before the checkpoint
+                if i < _resume_from:
+                    continue
                 # Check for cancellation mid-flight
                 current = _wi.load_issue_state(repo, issue_id)
                 if current and current.get("phase") == "cancelled":
+                    _checkpoint.delete_checkpoint(repo, issue_id)
                     with _registry_lock:
                         _registry[task_key] = {
                             "phase": "cancelled",
@@ -203,12 +220,38 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                 # Update progress
                 _wi.patch_issue_state(repo, issue_id, {"stepCurrent": i + 1})
 
+                # Run pre_step hook if configured (warn-only, never aborts step)
+                try:
+                    _pre_result = _rc.run_hook(repo, "pre_step")
+                    if _pre_result is not None and _pre_result.get("returncode", 0) != 0:
+                        _wi.add_artifact(
+                            repo, issue_id,
+                            f"step_{i:03d}_prehook_warn.txt",
+                            content=(
+                                f"pre_step hook returned {_pre_result['returncode']}\n\n"
+                                f"stdout:\n{_pre_result.get('stdout', '')}\n\n"
+                                f"stderr:\n{_pre_result.get('stderr', '')}"
+                            ),
+                        )
+                    if _pre_result is not None:
+                        try:
+                            _metrics.record_hook_result(
+                                "pre_step", repo,
+                                _pre_result.get("returncode", 0),
+                                0.0,
+                            )
+                        except Exception:
+                            pass
+                except Exception:
+                    pass  # Hook errors never abort the orchestration
+
                 # Execute step
                 step_meta = {
                     "stepIndex": i,
                     "totalSteps": total,
                     "step": step,
                 }
+                _step_start = time.time()
                 try:
                     if _step_executor is not None:
                         run_id = _step_executor(repo, issue_id, step, step_meta)
@@ -218,7 +261,13 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                     # Register run
                     _wi.register_run(repo, issue_id, run_id)
 
-                    # Save step artifact
+                    # Save step artifact — include agent output if available
+                    run_result = _rs.load(run_id)
+                    agent_output = ""
+                    if run_result:
+                        agent_output = str(
+                            run_result.get("result") or run_result.get("error") or ""
+                        )
                     artifact_name = f"step_{i:03d}_{_step_slug(step)}.json"
                     _wi.add_artifact(
                         repo, issue_id, artifact_name,
@@ -226,9 +275,18 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                             "stepIndex": i,
                             "step": step,
                             "runId": run_id,
+                            "agentOutput": agent_output,
                             "completedAt": _now_iso(),
                         }, ensure_ascii=False, indent=2),
                     )
+
+                    # Also write human-readable step artifact for context seeding
+                    if agent_output:
+                        _wi.write_step_artifact(
+                            repo, issue_id, i,
+                            step_meta.get("agent", "agent"),
+                            agent_output,
+                        )
 
                     # Save run state snapshot
                     _rs.save(run_id, {
@@ -245,20 +303,107 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                         "finishedAt": _now_iso(),
                     })
 
+                    # Step succeeded — reset circuit breaker counter
+                    consecutive_failures = 0
+
+                    # Save checkpoint so we can resume from next step on restart
+                    _checkpoint.save_checkpoint(repo, issue_id, {
+                        "stepIndex": i,
+                        "stepCount": total,
+                        "repo": repo,
+                        "issueId": issue_id,
+                        "savedAt": _now_iso(),
+                    })
+
+                    # Record step latency
+                    _step_agent = str(step_meta.get("agent", "DAVI"))
+                    try:
+                        _metrics.record_step_latency(
+                            repo, issue_id, i, _step_agent,
+                            time.time() - _step_start,
+                        )
+                    except Exception:
+                        pass
+
+                    # Run post_step hook if configured
+                    try:
+                        _post_result = _rc.run_hook(repo, "post_step")
+                        if _post_result is not None:
+                            try:
+                                _metrics.record_hook_result(
+                                    "post_step", repo,
+                                    _post_result.get("returncode", 0),
+                                    0.0,
+                                )
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass  # Hook errors never abort the orchestration
+
                 except Exception as step_err:
+                    # Record latency even on failure
+                    _step_agent = str(step_meta.get("agent", "DAVI"))
+                    try:
+                        _metrics.record_step_latency(
+                            repo, issue_id, i, _step_agent,
+                            time.time() - _step_start,
+                        )
+                    except Exception:
+                        pass
                     tb = traceback.format_exc()
                     _wi.add_artifact(
                         repo, issue_id,
                         f"step_{i:03d}_error.txt",
                         content=f"Error: {step_err}\n\nStep: {step}\n\n{tb}",
                     )
-                    raise  # re-raise to trigger failed phase
+                    consecutive_failures += 1
+                    if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                        # ── Circuit breaker tripped ───────────────────────
+                        _wi.patch_issue_state(repo, issue_id, {
+                            "phase": "circuit_open",
+                            "circuitBreaker": {
+                                "trippedAt": _now_iso(),
+                                "consecutiveFailures": consecutive_failures,
+                                "lastStep": step,
+                                "lastError": str(step_err),
+                            },
+                            "finishedAt": _now_iso(),
+                        })
+                        try:
+                            _ws.remove_active_mission(repo, issue_id)
+                        except Exception:
+                            pass
+                        with _registry_lock:
+                            _registry[task_key] = {
+                                "phase": "circuit_open",
+                                "consecutiveFailures": consecutive_failures,
+                                "updatedAt": _now_iso(),
+                            }
+                        # Run on_circuit_open hook if configured
+                        try:
+                            _circ_result = _rc.run_hook(repo, "on_circuit_open")
+                            if _circ_result is not None:
+                                try:
+                                    _metrics.record_hook_result(
+                                        "on_circuit_open", repo,
+                                        _circ_result.get("returncode", 0),
+                                        0.0,
+                                    )
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass  # Hook errors never abort the orchestration
+                        return _wi.load_issue_state(repo, issue_id) or {}
+                    # Below threshold — log and continue to next step
 
             # ── Phase: executing → complete ────────────────────────────────
             _wi.patch_issue_state(repo, issue_id, {
                 "phase": "complete",
                 "finishedAt": _now_iso(),
             })
+
+            # Delete checkpoint — task finished cleanly
+            _checkpoint.delete_checkpoint(repo, issue_id)
 
             # Clean workspace_state
             _ws.remove_active_mission(repo, issue_id)
@@ -364,6 +509,32 @@ def get_task_status(repo: str, issue_id: str) -> dict[str, Any]:
     }
 
 
+def get_circuit_status(repo: str, issue_id: str) -> dict[str, Any]:
+    """Return circuit breaker status for a task.
+
+    Returns a dict with: repo, issueId, open (bool), info (dict | None).
+    ``open`` is True only when phase == 'circuit_open'.
+    """
+    state = _wi.load_issue_state(repo, issue_id)
+    if state is None:
+        return {"repo": repo, "issueId": issue_id, "open": False, "info": None}
+    breaker_info = state.get("circuitBreaker")
+    return {
+        "repo": repo,
+        "issueId": issue_id,
+        "open": state.get("phase") == "circuit_open",
+        "info": breaker_info,
+    }
+
+
+def count_circuit_open() -> int:
+    """Return the number of tasks currently in circuit_open phase."""
+    with _registry_lock:
+        return sum(
+            1 for v in _registry.values() if v.get("phase") == "circuit_open"
+        )
+
+
 def cancel_task(repo: str, issue_id: str) -> bool:
     """Cancel a running or queued task.
 
@@ -399,6 +570,50 @@ def cancel_task(repo: str, issue_id: str) -> bool:
         pass
 
     return True
+
+
+def list_tasks() -> list[dict[str, Any]]:
+    """Return a snapshot of all known tasks from the registry.
+
+    Each entry contains: key, phase, stepCurrent, stepCount, startedAt, updatedAt.
+    stepCurrent and stepCount are read from the issue_state if available.
+
+    Returns:
+        List of task dicts, one per registered task (active or terminal).
+    """
+    with _registry_lock:
+        registry_copy = dict(_registry)
+
+    result: list[dict[str, Any]] = []
+    for key, reg in registry_copy.items():
+        # Parse repo and issue_id from key ("repo::ISSUE-1")
+        parts = key.split("::", 1)
+        repo = parts[0] if parts else key
+        issue_id = parts[1] if len(parts) > 1 else ""
+
+        # Enrich with step progress from issue_state
+        step_current: int | None = None
+        step_count: int | None = None
+        try:
+            state = _wi.load_issue_state(repo, issue_id)
+            if state:
+                step_current = state.get("stepCurrent")
+                step_count = state.get("stepCount")
+        except Exception:
+            pass
+
+        result.append({
+            "key": key,
+            "repo": repo,
+            "issueId": issue_id,
+            "phase": reg.get("phase", "unknown"),
+            "stepCurrent": step_current,
+            "stepCount": step_count,
+            "startedAt": reg.get("startedAt", ""),
+            "updatedAt": reg.get("updatedAt", reg.get("startedAt", "")),
+        })
+
+    return result
 
 
 def _reset() -> None:

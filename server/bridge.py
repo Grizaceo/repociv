@@ -150,8 +150,12 @@ from server.quest import generate_quest_name
 from server.tech_debt import scan_tech_debt
 from server import agent_runner as _agent_runner
 from server import task_orchestrator as _to
+from server import rate_limiter as _rl
 _ds.init(CONFIG_DIR)
 _dl.set_templates_path(CONFIG_DIR / "directive_templates.json")
+
+# ─── Per-agent-type rate limiter ──────────────────────────────────────────────
+_agent_rate_limiter = _rl.RateLimiter()
 
 # ─── Scheduler ────────────────────────────────────────────────────────────────
 from server import scheduler as _sched
@@ -785,7 +789,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
             agent_status = _sched.get_agent_status()
             queue_depth = len(_sched.queue_snapshot())
             gpu = get_gpu_info()
-            self._json(compute_metrics(events, agent_status, queue_depth, gpu))
+            payload = compute_metrics(events, agent_status, queue_depth, gpu)
+            # Inject circuit breaker count from task registry
+            payload["circuitOpenCount"] = _to.count_circuit_open()
+            self._json(payload)
             return
 
         if path == "/directives/stats":
@@ -835,9 +842,38 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._json(harness)
             return
 
+        # GET /log — last N events from the event store (D3 live log panel)
+        if path == "/log":
+            try:
+                qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+                params: dict[str, str] = {}
+                for part in qs.split("&"):
+                    if "=" in part:
+                        k, _, v = part.partition("=")
+                        params[k] = v
+                n = min(max(1, int(params.get("n", "100"))), 500)
+                event_type_filter = params.get("type", "")
+            except Exception:
+                n = 100
+                event_type_filter = ""
+            events = _es.read_events(since=0, limit=500)
+            if event_type_filter:
+                events = [e for e in events if e.get("type") == event_type_filter]
+            self._json(events[-n:])
+            return
+
+        # GET /tasks — list all tasks from orchestrator registry (C3)
+        if path == "/tasks":
+            self._json(_to.list_tasks())
+            return
+
         # GET /tasks/<repo>/<issueId> — task orchestrator status (P3)
         if path.startswith("/tasks/"):
             parts = path.split("/")[2:]
+            if len(parts) >= 3 and parts[2] == "circuit-status":
+                repo, issue_id = parts[0], parts[1]
+                self._json(_to.get_circuit_status(repo, issue_id))
+                return
             if len(parts) >= 2:
                 repo, issue_id = parts[0], parts[1]
                 status = _to.get_task_status(repo, issue_id)
@@ -900,6 +936,29 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._json({"ok": removed, "commandId": cmd_id})
             return
 
+        # ─── Cancel a task (C3) ───────────────────────────────────────────────
+        if path.startswith("/tasks/") and path.endswith("/cancel"):
+            # URL pattern: /tasks/<encoded_key>/cancel where key = "repo::ISSUE-id"
+            # We support both /tasks/repo::ISSUE-1/cancel and /tasks/repo/ISSUE-1/cancel
+            inner = path[len("/tasks/"):path.rfind("/cancel")]
+            if "::" in inner:
+                parts = inner.split("::", 1)
+                task_repo, task_issue = parts[0], parts[1]
+            else:
+                # fallback: /tasks/<repo>/<issueId>/cancel (3 path segments)
+                segments = [s for s in inner.split("/") if s]
+                if len(segments) >= 2:
+                    task_repo, task_issue = segments[0], segments[1]
+                else:
+                    self.send_response(400)
+                    self._cors()
+                    self.end_headers()
+                    self.wfile.write(b'{"error":"invalid task key"}')
+                    return
+            cancelled = _to.cancel_task(task_repo, task_issue)
+            self._json({"ok": cancelled, "key": f"{task_repo}::{task_issue}"})
+            return
+
         # ─── Directive gesture record (Fase 9) ───────────────────────────────────
         if path == "/directives/record":
             command_id = str(body.get("commandId", ""))
@@ -932,6 +991,18 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 self._cors()
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": str(e)}).encode())
+                return
+            # Per-agent-type rate limit
+            _agent_type = str(
+                cmd.payload.get("unit") or body.get("agentType") or "DAVI"
+            )
+            if not _agent_rate_limiter.check_and_consume(_agent_type):
+                self.send_response(429)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(
+                    json.dumps({"error": "rate_limit", "agent": _agent_type}).encode()
+                )
                 return
             result = _handle_command(cmd)
             self._json(result)

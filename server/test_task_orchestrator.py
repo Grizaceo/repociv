@@ -219,32 +219,61 @@ def test_cancel_before_running():
     assert result["phase"] == "cancelled"
 
 
-# ─── 7. Failure mid-cycle → phase=failed + error artifact ────────────────────
+# ─── 7. Circuit breaker trips after MAX_CONSECUTIVE_FAILURES ─────────────────
 
-def test_failure_mid_cycle():
+def test_circuit_breaker_trips_on_consecutive_failures():
+    """Circuit breaker trips after MAX_CONSECUTIVE_FAILURES consecutive errors.
+
+    Single isolated failures do NOT kill the task — only N consecutive ones do.
+    """
     _seed_workspace("repo", "ISS-7")
 
+    call_count = [0]
+
     def mock_executor(repo, issue_id, step, meta):
-        if meta["stepIndex"] == 2:
-            raise RuntimeError("Something broke on step 2")
-        return f"run-f-{meta['stepIndex']}"
+        call_count[0] += 1
+        # All steps fail to guarantee MAX_CONSECUTIVE_FAILURES is reached
+        raise RuntimeError(f"Fail on step {meta['stepIndex']}")
 
     _to.set_step_executor(mock_executor)
 
-    with pytest.raises(RuntimeError, match="Something broke"):
-        _to.run_task("repo", "ISS-7")
+    # Should NOT raise — circuit breaker returns gracefully
+    result = _to.run_task("repo", "ISS-7")
 
     state = _wi.load_issue_state("repo", "ISS-7")
     assert state is not None
-    assert state["phase"] == "failed"
-    assert "Something broke" in state.get("lastError", "")
+    assert state["phase"] == "circuit_open"
+    cb = state.get("circuitBreaker", {})
+    assert cb.get("consecutiveFailures") == _to.MAX_CONSECUTIVE_FAILURES
 
-    # Artifacts for steps 0, 1 should exist; step 2 error should exist
+    # Only MAX_CONSECUTIVE_FAILURES steps were attempted before circuit tripped
+    assert call_count[0] == _to.MAX_CONSECUTIVE_FAILURES
+
+    # Error artifacts for each attempted step should exist
     artifacts = _wi.list_artifacts("repo", "ISS-7")
-    step_jsons = [a for a in artifacts if a.startswith("step_") and a.endswith(".json")]
-    assert len(step_jsons) == 2  # steps 0 and 1 completed
-    assert "step_002_error.txt" in artifacts
-    assert "error_traceback.txt" in artifacts
+    error_txts = [a for a in artifacts if "error" in a]
+    assert len(error_txts) >= _to.MAX_CONSECUTIVE_FAILURES
+
+
+def test_circuit_breaker_resets_on_success():
+    """A success after a failure resets the consecutive counter."""
+    _seed_workspace("repo", "ISS-7b")
+
+    def mock_executor(repo, issue_id, step, meta):
+        # Only step 0 fails — steps 1,2,3 succeed
+        if meta["stepIndex"] == 0:
+            raise RuntimeError("First step fails")
+        return f"run-ok-{meta['stepIndex']}"
+
+    _to.set_step_executor(mock_executor)
+
+    # With only 1 consecutive failure (< 3), the task should complete
+    result = _to.run_task("repo", "ISS-7b")
+
+    state = _wi.load_issue_state("repo", "ISS-7b")
+    assert state is not None
+    # Should be complete because subsequent steps succeeded (circuit never tripped)
+    assert state["phase"] == "complete"
 
 
 # ─── 8. Idempotency — completed task is not re-executed ──────────────────────
@@ -420,3 +449,67 @@ def test_status_for_missing_task():
     assert status["issueId"] == "no-issue"
     assert status["phase"] == "unknown"
     assert status["progress"] is None
+
+
+# ─── Sprint C3: list_tasks() ──────────────────────────────────────────────────
+
+def test_list_tasks_empty_returns_empty_list():
+    """No tasks registered → list_tasks returns []."""
+    result = _to.list_tasks()
+    assert result == []
+
+
+def test_list_tasks_after_run_contains_task():
+    """After running a task, list_tasks contains its entry."""
+    _seed_workspace("repo-x", "ISSUE-10")
+    _to.set_step_executor(lambda *a: "run-ok")
+    _to.run_task("repo-x", "ISSUE-10")
+
+    tasks = _to.list_tasks()
+    assert len(tasks) >= 1
+    keys = [t["key"] for t in tasks]
+    assert "repo-x::ISSUE-10" in keys
+
+
+def test_list_tasks_contains_required_fields():
+    """Each task entry has key, repo, issueId, phase, stepCurrent, stepCount, startedAt, updatedAt."""
+    _seed_workspace("repo-y", "ISSUE-20")
+    _to.set_step_executor(lambda *a: "run-ok")
+    _to.run_task("repo-y", "ISSUE-20")
+
+    tasks = _to.list_tasks()
+    task = next(t for t in tasks if t["key"] == "repo-y::ISSUE-20")
+
+    assert "key" in task
+    assert "repo" in task
+    assert "issueId" in task
+    assert "phase" in task
+    assert "stepCurrent" in task
+    assert "stepCount" in task
+    assert "startedAt" in task
+    assert "updatedAt" in task
+
+
+def test_list_tasks_phase_is_complete_after_success():
+    """Task phase should be 'complete' in list_tasks after a successful run."""
+    _seed_workspace("repo-z", "ISSUE-30")
+    _to.set_step_executor(lambda *a: "run-ok")
+    _to.run_task("repo-z", "ISSUE-30")
+
+    tasks = _to.list_tasks()
+    task = next(t for t in tasks if t["key"] == "repo-z::ISSUE-30")
+    assert task["phase"] == "complete"
+
+
+def test_list_tasks_step_progress_populated():
+    """stepCurrent and stepCount are populated from the issue workspace state."""
+    _seed_workspace("repo-w", "ISSUE-40")
+    _to.set_step_executor(lambda *a: "run-ok")
+    _to.run_task("repo-w", "ISSUE-40")
+
+    tasks = _to.list_tasks()
+    task = next(t for t in tasks if t["key"] == "repo-w::ISSUE-40")
+    # The spec has 4 steps; after completion both should be set
+    assert task["stepCount"] == 4
+    assert task["stepCurrent"] is not None
+
