@@ -1,26 +1,27 @@
 // ─── RepoCiv — Renderer (orquestador) ────────────────────────────────────────
-import {
-  type Axial,
-  worldToAxial,
-  axialToPixel,
-  type Camera,
-} from './hex.ts';
+import { type Axial, worldToAxial, axialToPixel, type Camera } from './hex.ts';
 import { type Unit, type Tile, tileKey } from './types.ts';
 import { type GameState } from './game.ts';
 import { HexRenderer } from './hexRenderer.ts';
 import { UnitRenderer } from './unitRenderer.ts';
 import { MinimapRenderer } from './minimapRenderer.ts';
-import { LocalRenderer, type LocalRenderer as LocalRendererType } from './localRenderer.ts';
+// LocalRenderer is lazy-loaded on first local-view entry to keep main bundle small.
+type LocalRendererType = import('./localRenderer.ts').LocalRenderer;
 import {
-  interpretUnitDrag, interpretCityToCityDrag, interpretAreaSelect,
-  contextMenuForCity, type SpatialDirective,
+  interpretUnitDrag,
+  interpretCityToCityDrag,
+  interpretAreaSelect,
+  contextMenuForCity,
+  type SpatialDirective,
 } from './spatialDirectives.ts';
 import {
-  renderDragGhost, renderAreaSelect, renderDropTarget,
-  hideDirectivePreview, hideContextMenu,
+  renderDragGhost,
+  renderAreaSelect,
+  renderDropTarget,
+  hideDirectivePreview,
+  hideContextMenu,
 } from './ui/spatialPreview.ts';
-
-const HEX_SIZE = 52;
+import { HEX_SIZE } from './constants.ts';
 
 export class Renderer {
   private canvas: HTMLCanvasElement;
@@ -42,28 +43,45 @@ export class Renderer {
 
   // ─── Fase 5: Spatial gesture state ────────────────────────────────────────
   private gestureMode: 'camera_pan' | 'unit_drag' | 'area_select' | 'route' = 'camera_pan';
-  private draggedUnit:    Unit | null = null;
-  private routeFromCity:  { tile: Tile; coord: Axial } | null = null;
+  private draggedUnit: Unit | null = null;
+  private routeFromCity: { tile: Tile; coord: Axial } | null = null;
   private ghostScreenPos: { x: number; y: number } | null = null;
-  private areaStart:      { x: number; y: number } | null = null; // screen coords
-  private areaEnd:        { x: number; y: number } | null = null;
+  private areaStart: { x: number; y: number } | null = null; // screen coords
+  private areaEnd: { x: number; y: number } | null = null;
 
   private resizeObserver: ResizeObserver;
   private hexR: HexRenderer;
   private unitR: UnitRenderer;
   private minimapR: MinimapRenderer;
   private localR: LocalRendererType | null = null; // Phase 6: RimWorld 2D view
+  private _localRendererCtor: (new (canvas: HTMLCanvasElement) => LocalRendererType) | null = null;
   private localWorldId: string | null = null;
+  /** Cached tile list sorted by Y — recomputed only when tile count changes. */
+  private _tilesYSorted: Tile[] = [];
+  private _tilesYSortedSize = -1;
 
   onUnitSelect: ((unit: Unit | null) => void) | null = null;
   onCitySelect: ((cityId: string) => void) | null = null;
-  onTileInspect: ((cityName: string, coord: { q: number; r: number }, repoPath: string) => void) | null = null;
+  onTileInspect:
+    | ((cityName: string, coord: { q: number; r: number }, repoPath: string) => void)
+    | null = null;
   onEnterLocal: ((repoId: string, rootPath: string) => void) | null = null; // Phase 6
   // ─── Fase 5 callbacks ─────────────────────────────────────────────────────
-  onSpatialGesture: ((directive: SpatialDirective, screenPos: { x: number; y: number }) => void) | null = null;
-  onContextMenu: ((items: ReturnType<typeof contextMenuForCity>, screenPos: { x: number; y: number }) => void) | null = null;
+  onSpatialGesture:
+    | ((directive: SpatialDirective, screenPos: { x: number; y: number }) => void)
+    | null = null;
+  onContextMenu:
+    | ((items: ReturnType<typeof contextMenuForCity>, screenPos: { x: number; y: number }) => void)
+    | null = null;
   // ─── Fase 9: Drag update callback (shows directive tooltip mid-drag) ───────
-  onDragUpdate: ((gesture: string, agentId: string, screenPos: { x: number; y: number }, dropTarget?: { cityId?: string; cityName?: string; repoType?: string; testStatus?: string }) => void) | null = null;
+  onDragUpdate:
+    | ((
+        gesture: string,
+        agentId: string,
+        screenPos: { x: number; y: number },
+        dropTarget?: { cityId?: string; cityName?: string; repoType?: string; testStatus?: string },
+      ) => void)
+    | null = null;
 
   constructor(canvas: HTMLCanvasElement, state: GameState) {
     this.canvas = canvas;
@@ -100,40 +118,40 @@ export class Renderer {
       const wx = e.clientX - rect.left;
       const wy = e.clientY - rect.top;
       const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
-      const tile  = this.state.world.tiles.get(tileKey(coord)) ?? null;
+      const tile = this.state.world.tiles.get(tileKey(coord)) ?? null;
 
       this.dragStart = { x: e.clientX, y: e.clientY };
-      this.camStart  = { x: this.cam.x, y: this.cam.y };
+      this.camStart = { x: this.cam.x, y: this.cam.y };
 
       // Priority 1: unit drag (unit under cursor)
       const unitHere = this.state.getUnitAt(coord);
       if (unitHere) {
         this.gestureMode = 'unit_drag';
         this.draggedUnit = unitHere;
-        this.isDragging  = false;      // don't pan while dragging unit
+        this.isDragging = false; // don't pan while dragging unit
         return;
       }
 
       // Priority 2: route (Shift + city tile)
       if (e.shiftKey && tile?.city) {
-        this.gestureMode  = 'route';
+        this.gestureMode = 'route';
         this.routeFromCity = { tile, coord };
-        this.isDragging   = false;
+        this.isDragging = false;
         return;
       }
 
       // Priority 3: area select (Shift + empty tile)
       if (e.shiftKey) {
         this.gestureMode = 'area_select';
-        this.areaStart   = { x: wx, y: wy };
-        this.areaEnd     = { x: wx, y: wy };
-        this.isDragging  = false;
+        this.areaStart = { x: wx, y: wy };
+        this.areaEnd = { x: wx, y: wy };
+        this.isDragging = false;
         return;
       }
 
       // Default: camera pan
       this.gestureMode = 'camera_pan';
-      this.isDragging  = true;
+      this.isDragging = true;
     });
 
     // ── mousemove ────────────────────────────────────────────────────────────
@@ -157,10 +175,17 @@ export class Renderer {
         if (this.onDragUpdate && this.hoveredHex) {
           const dropTile = this.state.world.tiles.get(tileKey(this.hoveredHex));
           const dropCity = dropTile?.city;
-          this.onDragUpdate('drag_unit_to_city', this.draggedUnit.id, { x: e.clientX, y: e.clientY }, dropCity ? {
-            cityId: dropCity.id,
-            cityName: dropCity.name,
-          } : undefined);
+          this.onDragUpdate(
+            'drag_unit_to_city',
+            this.draggedUnit.id,
+            { x: e.clientX, y: e.clientY },
+            dropCity
+              ? {
+                  cityId: dropCity.id,
+                  cityName: dropCity.name,
+                }
+              : undefined,
+          );
         }
       }
 
@@ -169,8 +194,11 @@ export class Renderer {
       }
 
       if (this.gestureMode === 'camera_pan') {
-        this.canvas.style.cursor = this.isDragging ? 'grabbing' :
-          this.getTileAt(wx, wy) ? 'pointer' : 'default';
+        this.canvas.style.cursor = this.isDragging
+          ? 'grabbing'
+          : this.getTileAt(wx, wy)
+            ? 'pointer'
+            : 'default';
       }
     });
 
@@ -187,11 +215,14 @@ export class Renderer {
           const unit = this.draggedUnit;
           if (unit && this.wasDrag(e)) {
             // Dragged to a tile → interpret as spatial directive
-            const coord    = worldToAxial(wx, wy, HEX_SIZE, this.cam);
-            const toTile   = this.state.world.tiles.get(tileKey(coord));
+            const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+            const toTile = this.state.world.tiles.get(tileKey(coord));
             if (toTile) {
               const directive = interpretUnitDrag({
-                unit, fromCoord: unit.coord, toTile, shiftHeld: e.shiftKey,
+                unit,
+                fromCoord: unit.coord,
+                toTile,
+                shiftHeld: e.shiftKey,
               });
               if (directive) this.onSpatialGesture?.(directive, screenPos);
               else {
@@ -212,14 +243,14 @@ export class Renderer {
 
         case 'route': {
           if (this.routeFromCity && this.wasDrag(e)) {
-            const coord  = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+            const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
             const toTile = this.state.world.tiles.get(tileKey(coord));
             if (toTile?.city && toTile.city.id !== this.routeFromCity.tile.city?.id) {
               const directive = interpretCityToCityDrag({
                 fromCity: this.routeFromCity.tile.city!,
-                toCity:   toTile.city,
+                toCity: toTile.city,
                 fromCoord: this.routeFromCity.coord,
-                toCoord:   coord,
+                toCoord: coord,
                 selectedUnit: this.selectedUnit,
               });
               if (directive) this.onSpatialGesture?.(directive, screenPos);
@@ -243,11 +274,14 @@ export class Renderer {
               const sy = (px.y - this.cam.y) * this.cam.zoom + this.cam.cy;
               if (sx >= minX && sx <= maxX && sy >= minY && sy <= maxY) selected.push(tile);
             }
-            const directive = interpretAreaSelect({ tiles: selected, selectedUnit: this.selectedUnit });
+            const directive = interpretAreaSelect({
+              tiles: selected,
+              selectedUnit: this.selectedUnit,
+            });
             if (directive) this.onSpatialGesture?.(directive, screenPos);
           }
           this.areaStart = null;
-          this.areaEnd   = null;
+          this.areaEnd = null;
           break;
         }
 
@@ -258,30 +292,34 @@ export class Renderer {
       }
 
       this.gestureMode = 'camera_pan';
-      this.isDragging  = false;
+      this.isDragging = false;
       this.canvas.style.cursor = 'default';
     });
 
     // ── wheel: zoom ──────────────────────────────────────────────────────────
-    this.canvas.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const factor = e.deltaY > 0 ? 0.9 : 1.1;
-      const newZoom = Math.max(0.15, Math.min(4, this.cam.zoom * factor));
-      const rect = this.canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      const before = {
-        x: (mx - this.cam.cx) / this.cam.zoom + this.cam.x,
-        y: (my - this.cam.cy) / this.cam.zoom + this.cam.y,
-      };
-      this.cam.zoom = newZoom;
-      const after = {
-        x: (mx - this.cam.cx) / this.cam.zoom + this.cam.x,
-        y: (my - this.cam.cy) / this.cam.zoom + this.cam.y,
-      };
-      this.cam.x += before.x - after.x;
-      this.cam.y += before.y - after.y;
-    }, { passive: false });
+    this.canvas.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        const factor = e.deltaY > 0 ? 0.9 : 1.1;
+        const newZoom = Math.max(0.15, Math.min(4, this.cam.zoom * factor));
+        const rect = this.canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const before = {
+          x: (mx - this.cam.cx) / this.cam.zoom + this.cam.x,
+          y: (my - this.cam.cy) / this.cam.zoom + this.cam.y,
+        };
+        this.cam.zoom = newZoom;
+        const after = {
+          x: (mx - this.cam.cx) / this.cam.zoom + this.cam.x,
+          y: (my - this.cam.cy) / this.cam.zoom + this.cam.y,
+        };
+        this.cam.x += before.x - after.x;
+        this.cam.y += before.y - after.y;
+      },
+      { passive: false },
+    );
 
     // ── contextmenu (right-click): command palette ────────────────────────────
     this.canvas.addEventListener('contextmenu', (e) => {
@@ -291,7 +329,7 @@ export class Renderer {
       const wx = e.clientX - rect.left;
       const wy = e.clientY - rect.top;
       const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
-      const tile  = this.state.world.tiles.get(tileKey(coord));
+      const tile = this.state.world.tiles.get(tileKey(coord));
       if (tile?.city) {
         const items = contextMenuForCity(tile.city, this.selectedUnit);
         this.onContextMenu?.(items, { x: e.clientX, y: e.clientY });
@@ -309,7 +347,16 @@ export class Renderer {
       const wy = e.clientY - rect.top;
       const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
       const tile = this.state.world.tiles.get(tileKey(coord));
-      if (tile?.city) this.onEnterLocal?.(tile.city.id, tile.city.id);
+      if (tile?.city) {
+        const cityId = tile.city.id;
+        void (async () => {
+          if (!this._localRendererCtor) {
+            const mod = await import('./localRenderer.ts');
+            this._localRendererCtor = mod.LocalRenderer;
+          }
+          this.onEnterLocal?.(cityId, cityId);
+        })();
+      }
     });
 
     // ── Esc: return to macro view ────────────────────────────────────────────
@@ -375,7 +422,9 @@ export class Renderer {
     this.onUnitSelect?.(null);
   }
 
-  getCanvas(): HTMLCanvasElement { return this.canvas; }
+  getCanvas(): HTMLCanvasElement {
+    return this.canvas;
+  }
 
   getCamera(): { x: number; y: number; zoom: number } {
     return { x: this.cam.x, y: this.cam.y, zoom: this.cam.zoom };
@@ -413,10 +462,11 @@ export class Renderer {
 
     // ─── Phase 6: Local RimWorld view ───────────────────────────────────────
     if (this.state.viewMode === 'local') {
-      if (!this.localR) {
-        this.localR = new LocalRenderer(canvas);
+      if (!this.localR && this._localRendererCtor) {
+        this.localR = new this._localRendererCtor(canvas);
         this.localR.setupInput();
       }
+      if (!this.localR) return; // still loading module — next frame will retry
       if (this.state.localWorld && this.state.localWorld.repoId !== this.localWorldId) {
         this.localR.setWorld(this.state.localWorld);
         this.localWorldId = this.state.localWorld.repoId;
@@ -442,18 +492,22 @@ export class Renderer {
     }
 
     // Pass 3: Decorations (Sorted by Y for depth)
-    const allTiles = Array.from(this.state.world.tiles.values());
-    allTiles.sort((a, b) => {
-      const pa = axialToPixel(a.coord, HEX_SIZE);
-      const pb = axialToPixel(b.coord, HEX_SIZE);
-      return pa.y - pb.y;
-    });
+    const tileCount = this.state.world.tiles.size;
+    if (tileCount !== this._tilesYSortedSize) {
+      this._tilesYSorted = Array.from(this.state.world.tiles.values()).sort((a, b) => {
+        const pa = axialToPixel(a.coord, HEX_SIZE);
+        const pb = axialToPixel(b.coord, HEX_SIZE);
+        return pa.y - pb.y;
+      });
+      this._tilesYSortedSize = tileCount;
+    }
+    const allTiles = this._tilesYSorted;
 
     for (const tile of allTiles) {
       // A2: find active building for this tile's city (if any)
       const activeBuilding = tile.city
         ? this.state.world.buildings.find(
-            b => b.cityId === tile.city!.id && b.state === 'building',
+            (b) => b.cityId === tile.city!.id && b.state === 'building',
           )
         : undefined;
       this.hexR.drawTileDecor(tile, this.fogEnabled, activeBuilding);
@@ -522,9 +576,16 @@ export class Renderer {
     }
 
     // Global Atmospheric Bloom / Lighting
-    const grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width);
+    const grad = ctx.createRadialGradient(
+      canvas.width / 2,
+      canvas.height / 2,
+      0,
+      canvas.width / 2,
+      canvas.height / 2,
+      canvas.width,
+    );
     grad.addColorStop(0, 'rgba(200, 180, 120, 0.03)'); // Warm center
-    grad.addColorStop(1, 'rgba(0, 0, 0, 0.2)');        // Vignette
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0.2)'); // Vignette
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
@@ -542,11 +603,19 @@ export class Renderer {
     if (this.selectedUnit) this.state.setUnitState(this.selectedUnit.id, 'sleeping');
   }
 
-  toggleGrid()  { this.showGrid = !this.showGrid; }
-  toggleDebug() { this.showDebug = !this.showDebug; }
-  toggleFog()   { this.fogEnabled = !this.fogEnabled; }
+  toggleGrid() {
+    this.showGrid = !this.showGrid;
+  }
+  toggleDebug() {
+    this.showDebug = !this.showDebug;
+  }
+  toggleFog() {
+    this.fogEnabled = !this.fogEnabled;
+  }
 
-  selectUnit(unit: Unit | null) { this.selectedUnit = unit; }
+  selectUnit(unit: Unit | null) {
+    this.selectedUnit = unit;
+  }
 
   // Kept for minimap wiring (main.ts uses Renderer.minimapClick)
   minimapClick(mx: number, my: number) {
@@ -561,8 +630,12 @@ export class Renderer {
   private getNeighbors(coord: Axial): Tile[] {
     const neighbors: Tile[] = [];
     const dirs = [
-      { q: +1, r:  0 }, { q: +1, r: -1 }, { q:  0, r: -1 },
-      { q: -1, r:  0 }, { q: -1, r: +1 }, { q:  0, r: +1 }
+      { q: +1, r: 0 },
+      { q: +1, r: -1 },
+      { q: 0, r: -1 },
+      { q: -1, r: 0 },
+      { q: -1, r: +1 },
+      { q: 0, r: +1 },
     ];
     for (const d of dirs) {
       const key = tileKey({ q: coord.q + d.q, r: coord.r + d.r });

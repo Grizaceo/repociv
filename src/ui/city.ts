@@ -1,9 +1,14 @@
 // ─── RepoCiv — City Panel ─────────────────────────────────────────────────────
 import type { City, Building, Tile } from '../types.ts';
+import { trapFocus } from './focusTrap.ts';
+
+let _cityPanelCleanup: (() => void) | null = null;
 
 function esc(s: string): string {
-  return s.replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }
 
 function setText(id: string, text: string) {
@@ -37,17 +42,27 @@ export function openCityPanel(city: City, activeBuildings: Building[], tile?: Ti
   const panel = document.getElementById('city-panel');
   if (!panel) return;
   panel.classList.remove('hidden');
+  _cityPanelCleanup?.();
+  _cityPanelCleanup = trapFocus(panel);
 
   setText('city-panel-name', city.name.toUpperCase());
   setText('city-repo-name', city.name.toLowerCase());
 
   // Static data available immediately from city + tile
   if (tile) {
-    const terrainExt = tile.terrain === 'forest' ? '% .py' :
-                       tile.terrain === 'plains' ? '% .ts' :
-                       tile.terrain === 'mountain' ? '% .rs/.go' : '';
+    const terrainExt =
+      tile.terrain === 'forest'
+        ? '% .py'
+        : tile.terrain === 'plains'
+          ? '% .ts'
+          : tile.terrain === 'mountain'
+            ? '% .rs/.go'
+            : '';
     const terrainLabel = TERRAIN_LABEL[tile.terrain] ?? tile.terrain;
-    setText('city-terrain', terrainExt ? `${terrainLabel} (${city.population}${terrainExt})` : terrainLabel);
+    setText(
+      'city-terrain',
+      terrainExt ? `${terrainLabel} (${city.population}${terrainExt})` : terrainLabel,
+    );
     setText('city-session', SESSION_LABEL[tile.sessionTint ?? 'fog'] ?? '—');
     setText('city-skill', SKILL_LABEL[tile.skillHealth ?? 'broken'] ?? '—');
     const res = tile.resources;
@@ -67,15 +82,22 @@ export function openCityPanel(city: City, activeBuildings: Building[], tile?: Ti
   const missionsEl = document.getElementById('city-missions-list');
   if (missionsEl) {
     if (activeBuildings.length === 0) {
-      missionsEl.innerHTML = '<div class="city-item" style="color:var(--text-dim)">Sin misiones activas</div>';
+      missionsEl.innerHTML =
+        '<div class="city-item" style="color:var(--text-dim)">Sin misiones activas</div>';
     } else {
-      missionsEl.innerHTML = activeBuildings.map(b => {
-        const icon = b.state === 'complete' ? '✓' : b.state === 'failed' ? '✗' : '◉';
-        const color = b.state === 'complete' ? 'var(--civ-food)' :
-                      b.state === 'failed' ? 'var(--civ-happiness)' : 'var(--text-primary)';
-        const pct = b.state === 'building' ? ` (${Math.round(b.progress)}%)` : '';
-        return `<div class="city-item" style="color:${color}">${icon} ${esc(b.name)}${pct}</div>`;
-      }).join('');
+      missionsEl.innerHTML = activeBuildings
+        .map((b) => {
+          const icon = b.state === 'complete' ? '✓' : b.state === 'failed' ? '✗' : '◉';
+          const color =
+            b.state === 'complete'
+              ? 'var(--civ-food)'
+              : b.state === 'failed'
+                ? 'var(--civ-happiness)'
+                : 'var(--text-primary)';
+          const pct = b.state === 'building' ? ` (${Math.round(b.progress)}%)` : '';
+          return `<div class="city-item" style="color:${color}">${icon} ${esc(b.name)}${pct}</div>`;
+        })
+        .join('');
     }
   }
 
@@ -87,57 +109,76 @@ export function openCityPanel(city: City, activeBuildings: Building[], tile?: Ti
 async function fetchCityGit(repoName: string) {
   const gitDetailsEl = document.getElementById('city-git-details');
   if (!gitDetailsEl) return;
-  gitDetailsEl.innerHTML = '<div class="city-item" style="color:var(--text-dim)">cargando git…</div>';
+  gitDetailsEl.innerHTML =
+    '<div class="city-item" style="color:var(--text-dim)">cargando git…</div>';
   try {
     const res = await fetch(`/api/git/${encodeURIComponent(repoName)}`);
     if (!res.ok) {
       setText('city-git-branch', '—');
       setText('city-git-status', 'sin git');
-      gitDetailsEl.innerHTML = '<div class="city-item" style="color:var(--text-dim)">No es un repo git</div>';
+      gitDetailsEl.innerHTML =
+        '<div class="city-item" style="color:var(--text-dim)">No es un repo git</div>';
       return;
     }
-    const data = await res.json() as { branch: string; lastCommit: string; changes: string[] };
+    const data = (await res.json()) as { branch: string; lastCommit: string; changes: string[] };
     const [hash, subject, ago] = data.lastCommit.split('|');
     setText('city-git-branch', data.branch || 'main');
-    setText('city-git-status', data.changes.length === 0 ? 'clean' : `${data.changes.length} cambios`);
+    setText(
+      'city-git-status',
+      data.changes.length === 0 ? 'clean' : `${data.changes.length} cambios`,
+    );
     gitDetailsEl.innerHTML = [
       `<div class="city-item" style="color:var(--gold-bright)">⎇ ${esc(data.branch)}</div>`,
-      hash ? `<div class="city-item" style="color:var(--text-dim); font-size:11px">${esc(hash)} · ${esc(subject ?? '')} · ${esc(ago ?? '')}</div>` : '',
-      ...data.changes.slice(0, 8).map(c => {
+      hash
+        ? `<div class="city-item" style="color:var(--text-dim); font-size:11px">${esc(hash)} · ${esc(subject ?? '')} · ${esc(ago ?? '')}</div>`
+        : '',
+      ...data.changes.slice(0, 8).map((c) => {
         const code = c.trim()[0] ?? '?';
-        const color = code === 'M' ? 'var(--civ-gold)' :
-                      code === 'A' ? 'var(--civ-food)' :
-                      code === 'D' ? 'var(--civ-happiness)' : 'var(--text-dim)';
+        const color =
+          code === 'M'
+            ? 'var(--civ-gold)'
+            : code === 'A'
+              ? 'var(--civ-food)'
+              : code === 'D'
+                ? 'var(--civ-happiness)'
+                : 'var(--text-dim)';
         return `<div class="city-item" style="color:${color}">${esc(c)}</div>`;
       }),
     ].join('');
   } catch {
-    gitDetailsEl.innerHTML = '<div class="city-item" style="color:var(--civ-happiness)">Error al leer git</div>';
+    gitDetailsEl.innerHTML =
+      '<div class="city-item" style="color:var(--civ-happiness)">Error al leer git</div>';
   }
 }
 
 async function fetchCityFiles(repoName: string) {
   const filesEl = document.getElementById('city-files-list');
   if (!filesEl) return;
-  filesEl.innerHTML = '<div class="city-item" style="color:var(--text-dim)">cargando archivos…</div>';
+  filesEl.innerHTML =
+    '<div class="city-item" style="color:var(--text-dim)">cargando archivos…</div>';
   try {
     const res = await fetch(`/api/files/${encodeURIComponent(repoName)}`);
     if (!res.ok) {
       filesEl.innerHTML = '<div class="city-item" style="color:var(--text-dim)">—</div>';
       return;
     }
-    const data = await res.json() as { files: string[] };
-    filesEl.innerHTML = data.files.length === 0
-      ? '<div class="city-item" style="color:var(--text-dim)">vacío</div>'
-      : data.files.slice(0, 12).map(f =>
-          `<div class="city-item" style="padding:1px 0">${esc(f)}</div>`
-        ).join('');
+    const data = (await res.json()) as { files: string[] };
+    filesEl.innerHTML =
+      data.files.length === 0
+        ? '<div class="city-item" style="color:var(--text-dim)">vacío</div>'
+        : data.files
+            .slice(0, 12)
+            .map((f) => `<div class="city-item" style="padding:1px 0">${esc(f)}</div>`)
+            .join('');
   } catch {
-    filesEl.innerHTML = '<div class="city-item" style="color:var(--civ-happiness)">Error al leer archivos</div>';
+    filesEl.innerHTML =
+      '<div class="city-item" style="color:var(--civ-happiness)">Error al leer archivos</div>';
   }
 }
 
 export function closeCityPanel() {
+  _cityPanelCleanup?.();
+  _cityPanelCleanup = null;
   document.getElementById('city-panel')?.classList.add('hidden');
 }
 

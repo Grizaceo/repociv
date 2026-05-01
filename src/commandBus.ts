@@ -3,9 +3,7 @@
 // Tracks pending commands and exposes a reactive store for the UI.
 
 import type { CommandDraft, CommandResponse, CommandStatus } from './commandSchema.ts';
-
-const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL ?? 'http://localhost:5274';
-const BRIDGE_TOKEN = import.meta.env.VITE_BRIDGE_TOKEN ?? '';
+import { bridgeHeaders, bridgeUrl } from './bridgeEnv.ts';
 
 // ─── In-flight command tracking ───────────────────────────────────────────────
 export interface CommandRecord {
@@ -35,14 +33,11 @@ export function getCommands(): CommandRecord[] {
 
 // ─── Send a command draft to the bridge ───────────────────────────────────────
 export async function sendCommand(draft: CommandDraft): Promise<CommandResponse> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (BRIDGE_TOKEN) headers['X-RepoCiv-Token'] = BRIDGE_TOKEN;
-
   let resp: Response;
   try {
-    resp = await fetch(`${BRIDGE_URL}/commands`, {
+    resp = await fetch(bridgeUrl('/commands'), {
       method: 'POST',
-      headers,
+      headers: bridgeHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(draft),
     });
   } catch (err) {
@@ -51,7 +46,7 @@ export async function sendCommand(draft: CommandDraft): Promise<CommandResponse>
 
   let data: CommandResponse;
   try {
-    data = await resp.json() as CommandResponse;
+    data = (await resp.json()) as CommandResponse;
   } catch {
     return { ok: false, status: 'failed', commandId: '', reason: `HTTP ${resp.status}` };
   }
@@ -81,11 +76,13 @@ export function updateCommandStatus(commandId: string, status: CommandStatus) {
 
 // ─── Approve / reject a waiting_approval command ─────────────────────────────
 export async function approveCommand(commandId: string): Promise<boolean> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (BRIDGE_TOKEN) headers['X-RepoCiv-Token'] = BRIDGE_TOKEN;
   try {
-    const resp = await fetch(`${BRIDGE_URL}/approvals/${commandId}/approve`, { method: 'POST', headers, body: '{}' });
-    const data = await resp.json() as { ok: boolean };
+    const resp = await fetch(bridgeUrl(`/approvals/${commandId}/approve`), {
+      method: 'POST',
+      headers: bridgeHeaders({ 'Content-Type': 'application/json' }),
+      body: '{}',
+    });
+    const data = (await resp.json()) as { ok: boolean };
     if (data.ok) updateCommandStatus(commandId, 'queued');
     return data.ok;
   } catch {
@@ -94,11 +91,13 @@ export async function approveCommand(commandId: string): Promise<boolean> {
 }
 
 export async function rejectCommand(commandId: string): Promise<boolean> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (BRIDGE_TOKEN) headers['X-RepoCiv-Token'] = BRIDGE_TOKEN;
   try {
-    const resp = await fetch(`${BRIDGE_URL}/approvals/${commandId}/reject`, { method: 'POST', headers, body: '{}' });
-    const data = await resp.json() as { ok: boolean };
+    const resp = await fetch(bridgeUrl(`/approvals/${commandId}/reject`), {
+      method: 'POST',
+      headers: bridgeHeaders({ 'Content-Type': 'application/json' }),
+      body: '{}',
+    });
+    const data = (await resp.json()) as { ok: boolean };
     if (data.ok) updateCommandStatus(commandId, 'rejected');
     return data.ok;
   } catch {

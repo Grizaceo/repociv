@@ -1,14 +1,24 @@
 // ─── RepoCiv — Quest Board ────────────────────────────────────────────────────
 import type { GameState, Mission } from '../game.ts';
+import { bridgeUrl } from '../bridgeEnv.ts';
+import { trapFocus } from './focusTrap.ts';
 
 let questFilter: 'all' | 'running' | 'complete' | 'failed' = 'all';
+let _questCleanup: (() => void) | null = null;
 
 export function openQuestBoard(state: GameState) {
-  document.getElementById('quest-board')?.classList.remove('hidden');
+  const panel = document.getElementById('quest-board');
+  panel?.classList.remove('hidden');
+  if (panel) {
+    _questCleanup?.();
+    _questCleanup = trapFocus(panel);
+  }
   renderQuestBoard(state);
 }
 
 export function closeQuestBoard() {
+  _questCleanup?.();
+  _questCleanup = null;
   document.getElementById('quest-board')?.classList.add('hidden');
 }
 
@@ -18,9 +28,9 @@ export function isQuestBoardOpen(): boolean {
 
 export async function fetchPendingTracker(): Promise<Mission[]> {
   try {
-    const res = await fetch(`${import.meta.env.VITE_BRIDGE_URL ?? 'http://localhost:5274'}/pending`);
+    const res = await fetch(bridgeUrl('/pending'));
     if (!res.ok) return [];
-    const raw = await res.json() as Array<{ title: string; description?: string }>;
+    const raw = (await res.json()) as Array<{ title: string; description?: string }>;
     return raw.map((r, i) => ({
       id: `pending-${i}`,
       unit: 'DAVI',
@@ -36,14 +46,20 @@ export async function fetchPendingTracker(): Promise<Mission[]> {
 
 export async function fetchPersistedMissions(): Promise<Mission[]> {
   try {
-    const res = await fetch(`${import.meta.env.VITE_BRIDGE_URL ?? 'http://localhost:5274'}/missions`);
+    const res = await fetch(bridgeUrl('/missions'));
     if (!res.ok) return [];
-    const raw = await res.json() as Array<{
-      id: string; unit: string; questName: string; status: string;
-      startedAt: number; completedAt: number | null;
+    const raw = (await res.json()) as Array<{
+      id: string;
+      unit: string;
+      questName: string;
+      status: string;
+      startedAt: number;
+      completedAt: number | null;
     }>;
-    return raw.map(r => ({
-      id: r.id, unit: r.unit, questName: r.questName,
+    return raw.map((r) => ({
+      id: r.id,
+      unit: r.unit,
+      questName: r.questName,
       status: r.status as Mission['status'],
       startedAt: r.startedAt * 1000,
       completedAt: r.completedAt ? r.completedAt * 1000 : null,
@@ -60,17 +76,24 @@ export function renderQuestBoard(state: GameState, persisted: Mission[] = []) {
   for (const m of persisted) map.set(m.id, m);
   for (const m of state.missions.values()) map.set(m.id, m);
   let missions = Array.from(map.values()).sort((a, b) => b.startedAt - a.startedAt);
-  if (questFilter !== 'all') missions = missions.filter(m => m.status === questFilter);
+  if (questFilter !== 'all') missions = missions.filter((m) => m.status === questFilter);
   if (missions.length === 0) {
-    list.innerHTML = '<div class="quest-empty">No hay misiones aún. Selecciona un héroe y dale una misión.</div>';
+    list.innerHTML =
+      '<div class="quest-empty">No hay misiones aún. Selecciona un héroe y dale una misión.</div>';
     return;
   }
-  list.innerHTML = missions.map(m => {
-    const dur = m.completedAt
-      ? Math.round((m.completedAt - m.startedAt) / 1000) + 's'
-      : Math.round((Date.now() - m.startedAt) / 1000) + 's…';
-    const when = new Date(m.startedAt).toLocaleString('es-CL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
-    return `
+  list.innerHTML = missions
+    .map((m) => {
+      const dur = m.completedAt
+        ? Math.round((m.completedAt - m.startedAt) / 1000) + 's'
+        : Math.round((Date.now() - m.startedAt) / 1000) + 's…';
+      const when = new Date(m.startedAt).toLocaleString('es-CL', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: '2-digit',
+      });
+      return `
       <div class="quest-item">
         <span class="quest-status ${m.status}"></span>
         <div>
@@ -80,13 +103,14 @@ export function renderQuestBoard(state: GameState, persisted: Mission[] = []) {
         <div class="quest-meta">${m.status}</div>
       </div>
     `;
-  }).join('');
+    })
+    .join('');
 }
 
 export function wireQuestBoardTabs(state: GameState) {
-  document.querySelectorAll<HTMLElement>('.quest-tab').forEach(tab => {
+  document.querySelectorAll<HTMLElement>('.quest-tab').forEach((tab) => {
     tab.addEventListener('click', async () => {
-      document.querySelectorAll('.quest-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.quest-tab').forEach((t) => t.classList.remove('active'));
       tab.classList.add('active');
       questFilter = tab.dataset['filter'] as typeof questFilter;
       const persisted = await fetchPersistedMissions();
@@ -96,6 +120,8 @@ export function wireQuestBoardTabs(state: GameState) {
 }
 
 function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }

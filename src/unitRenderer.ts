@@ -2,8 +2,7 @@
 import { axialToPixel } from './hex.ts';
 import { type Unit, type Building, tileKey } from './types.ts';
 import { type GameState } from './game.ts';
-
-const HEX_SIZE = 52;
+import { HEX_SIZE } from './constants.ts';
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -20,12 +19,16 @@ export class UnitRenderer {
     let ux: number, uy: number;
     if (unit.state === 'moving' && unit.path.length > 0 && unit.pathIndex < unit.path.length) {
       const from = axialToPixel(unit.path[unit.pathIndex]!, HEX_SIZE);
-      const to   = axialToPixel(unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!, HEX_SIZE);
+      const to = axialToPixel(
+        unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!,
+        HEX_SIZE,
+      );
       ux = lerp(from.x, to.x, unit.pathProgress);
       uy = lerp(from.y, to.y, unit.pathProgress);
     } else {
       const p = axialToPixel(unit.coord, HEX_SIZE);
-      ux = p.x; uy = p.y;
+      ux = p.x;
+      uy = p.y;
     }
 
     const floatY = Math.sin(animTime * 2.5 + ux * 0.01) * 2;
@@ -53,12 +56,17 @@ export class UnitRenderer {
       { dx: 0, dy: 12 },
     ];
 
-    const initials = unit.name.split(/[\s-_]/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase();
+    const initials = unit.name
+      .split(/[\s-_]/)
+      .map((w) => w[0] ?? '')
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
 
     offsets.forEach((off, _i) => {
       ctx.save();
       ctx.translate(off.dx, off.dy);
-      
+
       // Shadow
       ctx.fillStyle = 'rgba(0,0,0,0.2)';
       ctx.beginPath();
@@ -80,7 +88,7 @@ export class UnitRenderer {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(initials, 0, 0);
-      
+
       ctx.restore();
     });
 
@@ -88,7 +96,13 @@ export class UnitRenderer {
       ctx.strokeStyle = '#5b9b5b';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(0, 0, HEX_SIZE * 0.38, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * unit.workProgress / 100));
+      ctx.arc(
+        0,
+        0,
+        HEX_SIZE * 0.38,
+        -Math.PI / 2,
+        -Math.PI / 2 + (Math.PI * 2 * unit.workProgress) / 100,
+      );
       ctx.stroke();
     }
 
@@ -147,7 +161,7 @@ export class UnitRenderer {
 
   drawBuilding(building: Building) {
     if (building.state === 'complete') return;
-    const city = this.state.world.cities.find(c => c.id === building.cityId);
+    const city = this.state.world.cities.find((c) => c.id === building.cityId);
     if (!city) return;
     const pos = axialToPixel(city.coord, HEX_SIZE);
     const barW = HEX_SIZE * 1.6;

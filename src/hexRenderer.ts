@@ -1,9 +1,9 @@
 // ─── RepoCiv — Hex & Tile drawing ────────────────────────────────────────────
+import { logger } from './logger.ts';
 import { type Axial, axialToPixel, AXIAL_DIRECTIONS } from './hex.ts';
 import { type Terrain, type Tile, type City, type Building } from './types.ts';
 import { TERRAIN_COLOR } from './map.ts';
-
-const HEX_SIZE = 52;
+import { HEX_SIZE } from './constants.ts';
 
 export class HexRenderer {
   private patterns: Record<string, CanvasPattern | null> = {};
@@ -27,7 +27,7 @@ export class HexRenderer {
 
     const spriteImages: Record<string, HTMLImageElement> = {};
 
-    const promises = assets.map(asset => {
+    const promises = assets.map((asset) => {
       return new Promise<void>((resolve) => {
         const img = new Image();
         img.src = asset.url;
@@ -40,7 +40,7 @@ export class HexRenderer {
           resolve();
         };
         img.onerror = () => {
-          console.warn(`Failed to load asset: ${asset.url}`);
+          logger.warn(`Failed to load asset: ${asset.url}`);
           resolve();
         };
       });
@@ -81,7 +81,7 @@ export class HexRenderer {
     const { ctx } = this;
     const pos = axialToPixel(tile.coord, HEX_SIZE);
     const colors = TERRAIN_COLOR[tile.terrain] || TERRAIN_COLOR.plains;
-    const alpha = (tile.inFog && fogEnabled) ? 0.35 : 1;
+    const alpha = tile.inFog && fogEnabled ? 0.35 : 1;
 
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -91,8 +91,12 @@ export class HexRenderer {
       ctx.fillStyle = pattern;
     } else if (colors.gradient) {
       const grad = ctx.createRadialGradient(
-        pos.x - HEX_SIZE * 0.2, pos.y - HEX_SIZE * 0.2, HEX_SIZE * 0.1,
-        pos.x, pos.y, HEX_SIZE * 0.85
+        pos.x - HEX_SIZE * 0.2,
+        pos.y - HEX_SIZE * 0.2,
+        HEX_SIZE * 0.1,
+        pos.x,
+        pos.y,
+        HEX_SIZE * 0.85,
       );
       grad.addColorStop(0, colors.gradient[0]!);
       grad.addColorStop(1, colors.gradient[1]!);
@@ -102,10 +106,10 @@ export class HexRenderer {
     }
 
     this.fillHex(pos.x, pos.y, HEX_SIZE);
-    
+
     // Shoreline effect (Ocean tiles touching land)
     if (tile.terrain === 'ocean') {
-      const touchesLand = neighbors.some(n => n.terrain !== 'ocean');
+      const touchesLand = neighbors.some((n) => n.terrain !== 'ocean');
       if (touchesLand) {
         ctx.strokeStyle = 'rgba(150, 220, 255, 0.4)';
         ctx.lineWidth = 4;
@@ -141,14 +145,18 @@ export class HexRenderer {
   drawTileDecor(tile: Tile, fogEnabled: boolean, activeBuilding?: Building) {
     if (!tile.revealed) return;
     const pos = axialToPixel(tile.coord, HEX_SIZE);
-    const alpha = (tile.inFog && fogEnabled) ? 0.35 : 1;
+    const alpha = tile.inFog && fogEnabled ? 0.35 : 1;
 
     this.drawTerrainDecor(tile.terrain, pos, alpha);
     this.drawTileResources(tile, pos, alpha);
 
     if (tile.city && tile.skillHealth) {
-      const skillColor = tile.skillHealth === 'ok' ? '#5b9b5b'
-        : tile.skillHealth === 'stale' ? '#c8a84b' : '#d45b5b';
+      const skillColor =
+        tile.skillHealth === 'ok'
+          ? '#5b9b5b'
+          : tile.skillHealth === 'stale'
+            ? '#c8a84b'
+            : '#d45b5b';
       const { ctx } = this;
       ctx.save();
       ctx.font = `${HEX_SIZE * 0.22}px sans-serif`;
@@ -170,8 +178,8 @@ export class HexRenderer {
     if (!tile.revealed) return;
 
     const icons: string[] = [];
-    if (res.gold >= 8)       icons.push('🪙');
-    if (res.science >= 4)    icons.push('⚗');
+    if (res.gold >= 8) icons.push('🪙');
+    if (res.science >= 4) icons.push('⚗');
     if (res.production >= 3) icons.push('⚙');
     if (icons.length === 0) return;
 
@@ -193,7 +201,7 @@ export class HexRenderer {
     const { ctx } = this;
     ctx.save();
     ctx.globalAlpha = alpha;
-    
+
     switch (terrain) {
       case 'forest': {
         const sprite = this.spriteImages['forest_sprite'];
@@ -208,13 +216,13 @@ export class HexRenderer {
           // Fallback to vector trees
           ctx.fillStyle = '#1e4d2b';
           for (let i = 0; i < 3; i++) {
-             const tx = pos.x + (i - 1) * 12;
-             const ty = pos.y + (i % 2) * 5;
-             ctx.beginPath();
-             ctx.moveTo(tx, ty - 15);
-             ctx.lineTo(tx + 8, ty + 5);
-             ctx.lineTo(tx - 8, ty + 5);
-             ctx.fill();
+            const tx = pos.x + (i - 1) * 12;
+            const ty = pos.y + (i % 2) * 5;
+            ctx.beginPath();
+            ctx.moveTo(tx, ty - 15);
+            ctx.lineTo(tx + 8, ty + 5);
+            ctx.lineTo(tx - 8, ty + 5);
+            ctx.fill();
           }
         }
         break;
@@ -308,7 +316,7 @@ export class HexRenderer {
     if (city.territory.length === 0) return;
 
     // Build fast lookup set
-    const inTerritory = new Set(city.territory.map(c => `${c.q},${c.r}`));
+    const inTerritory = new Set(city.territory.map((c) => `${c.q},${c.r}`));
     const borderColor = city.isCapital ? '#c8a84b' : '#7a5a2e';
     const borderWidth = city.isCapital ? 2.5 : 1.8;
 
@@ -411,7 +419,13 @@ export class HexRenderer {
   }
 
   // ─── A2: Production bar drawn below city label ────────────────────────────
-  private drawProductionBar(b: Building, _pos: { x: number; y: number }, bx: number, by: number, bw: number) {
+  private drawProductionBar(
+    b: Building,
+    _pos: { x: number; y: number },
+    bx: number,
+    by: number,
+    bw: number,
+  ) {
     const { ctx } = this;
     const pct = Math.max(0, Math.min(1, b.progress / 100));
     const barH = 7;
@@ -462,7 +476,7 @@ export class HexRenderer {
     const { ctx } = this;
     const short = name.split('/').pop() ?? name;
     ctx.save();
-    ctx.font = `${HEX_SIZE * 0.20}px 'Georgia', serif`;
+    ctx.font = `${HEX_SIZE * 0.2}px 'Georgia', serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(232,213,160,0.75)';

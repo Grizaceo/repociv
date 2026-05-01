@@ -2,8 +2,7 @@
 import { type Camera } from './hex.ts';
 import { type GameState } from './game.ts';
 import { TERRAIN_COLOR } from './map.ts';
-
-const HEX_SIZE = 52;
+import { HEX_SIZE } from './constants.ts';
 
 export class MinimapRenderer {
   private bounds = { minQ: 0, maxQ: 0, minR: 0, maxR: 0 };
@@ -15,7 +14,10 @@ export class MinimapRenderer {
   constructor(private state: GameState) {}
 
   private computeBounds() {
-    let minQ = Infinity, maxQ = -Infinity, minR = Infinity, maxR = -Infinity;
+    let minQ = Infinity,
+      maxQ = -Infinity,
+      minR = Infinity,
+      maxR = -Infinity;
     let revealedCount = 0;
     for (const tile of this.state.world.tiles.values()) {
       if (tile.revealed) revealedCount++;
@@ -39,12 +41,18 @@ export class MinimapRenderer {
     const { minQ, maxQ, minR, maxR } = this.bounds;
     if (!isFinite(minQ)) return;
 
-    if (this.lastFog !== fogEnabled || this.lastRevealedCount !== revealedCount || mm.width !== this.cacheCanvas.width || mm.height !== this.cacheCanvas.height) {
-       this.isDirty = true;
+    if (
+      this.lastFog !== fogEnabled ||
+      this.lastRevealedCount !== revealedCount ||
+      mm.width !== this.cacheCanvas.width ||
+      mm.height !== this.cacheCanvas.height
+    ) {
+      this.isDirty = true;
     }
 
-    const padX = 2, padY = 2;
-    const cellW = (mm.width  - padX * 2) / Math.max(1, maxQ - minQ + 1);
+    const padX = 2,
+      padY = 2;
+    const cellW = (mm.width - padX * 2) / Math.max(1, maxQ - minQ + 1);
     const cellH = (mm.height - padY * 2) / Math.max(1, maxR - minR + 1);
 
     if (this.isDirty) {
@@ -83,15 +91,16 @@ export class MinimapRenderer {
 
     // Viewport indicator
     const tlWorld = {
-      x: cam.x - (mainCanvas.width / 2) / cam.zoom,
-      y: cam.y - (mainCanvas.height / 2) / cam.zoom,
+      x: cam.x - mainCanvas.width / 2 / cam.zoom,
+      y: cam.y - mainCanvas.height / 2 / cam.zoom,
     };
     const brWorld = {
-      x: cam.x + (mainCanvas.width / 2) / cam.zoom,
-      y: cam.y + (mainCanvas.height / 2) / cam.zoom,
+      x: cam.x + mainCanvas.width / 2 / cam.zoom,
+      y: cam.y + mainCanvas.height / 2 / cam.zoom,
     };
     const worldQ = (px: number) => px / (HEX_SIZE * 1.5);
-    const tlQ = worldQ(tlWorld.x), brQ = worldQ(brWorld.x);
+    const tlQ = worldQ(tlWorld.x),
+      brQ = worldQ(brWorld.x);
     const x1 = padX + (tlQ - minQ) * cellW;
     const x2 = padX + (brQ - minQ) * cellW;
     ctx.strokeStyle = '#c8a84b88';
@@ -109,12 +118,13 @@ export class MinimapRenderer {
     if (!mm) return;
     const { minQ, maxQ, minR, maxR } = this.bounds;
     if (!isFinite(minQ)) return;
-    const padX = 2, padY = 2;
-    const cellW = (mm.width  - padX * 2) / Math.max(1, maxQ - minQ + 1);
+    const padX = 2,
+      padY = 2;
+    const cellW = (mm.width - padX * 2) / Math.max(1, maxQ - minQ + 1);
     const cellH = (mm.height - padY * 2) / Math.max(1, maxR - minR + 1);
     const q = (mx - padX) / cellW + minQ;
     const r = (my - padY - (q - minQ) * cellH * 0.5) / cellH + minR;
     cam.x = HEX_SIZE * 1.5 * q;
-    cam.y = HEX_SIZE * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r);
+    cam.y = HEX_SIZE * ((Math.sqrt(3) / 2) * q + Math.sqrt(3) * r);
   }
 }

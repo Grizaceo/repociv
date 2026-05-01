@@ -1,16 +1,23 @@
 // ─── RepoCiv — Game State ─────────────────────────────────────────────────────
 
+import { logger } from './logger.ts';
 import {
-  type World, type Unit, type Building, type UnitState, tileKey, UNIT_COLORS,
-  type ViewMode, type LocalWorld, type LocalUnit, type LocalMission,
+  type World,
+  type Unit,
+  type Building,
+  type UnitState,
+  tileKey,
+  UNIT_COLORS,
+  type ViewMode,
+  type LocalWorld,
+  type LocalUnit,
+  type LocalMission,
 } from './types.ts';
 import type { Axial } from './hex.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
 import { axialDistance } from './hex.ts';
-import { generateLocalWorldFromApi, buildMockLocalWorld } from './localMap.ts';
-import { findPath, findNearestWorkbench } from './localPathfinding.ts';
 import { getConfig } from './gameConfig.ts';
-import { peekNextMission } from './priorityMatrix.ts';
+import { LocalWorldManager } from './localWorldManager.ts';
 
 // ─── Clock speed ──────────────────────────────────────────────────────────────
 const TICK_MS = 16; // ~60 fps
@@ -48,15 +55,28 @@ export class GameState {
   // Listener for state changes (used by UI to refresh hero bar / quest board)
   private listeners: Array<() => void> = [];
 
-  // ─── Phase 6: Local / RimWorld view ─────────────────────────────────────────
-  viewMode: ViewMode = 'macro';          // 'macro' | 'local'
-  localWorld: LocalWorld | null = null;  // generated on first local entry
-  private localUnits: LocalUnit[] = [];  // agents walking in the local grid
-  private missionQueue: LocalMission[] = []; // simple queue (Phase 7a)
-  private localTickCount = 0;
+  // ─── Phase 6+7a: Local / RimWorld view (delegated to LocalWorldManager) ─────
+  private _local: LocalWorldManager;
+
+  /** Current view: 'macro' (hex map) or 'local' (RimWorld grid). */
+  get viewMode(): ViewMode {
+    return this._local.viewMode;
+  }
+  set viewMode(v: ViewMode) {
+    this._local.viewMode = v;
+  }
+
+  /** Exposed for renderer compatibility (renderer reads state.localWorld directly). */
+  get localWorld(): LocalWorld | null {
+    return this._local.getLocalWorld();
+  }
 
   constructor(world: World) {
     this.world = world;
+    this._local = new LocalWorldManager(
+      () => this.notify(),
+      () => this.getAllUnits()[0],
+    );
     // Index existing units and buildings
     for (const u of world.units) this.unitMap.set(u.id, u);
     for (const b of world.buildings) {
@@ -71,10 +91,20 @@ export class GameState {
     this.loop();
   }
 
-  stop() { this.running = false; cancelAnimationFrame(this.rafId); }
-  pause() { this.paused = true; }
-  resume() { this.paused = false; this.lastTick = performance.now(); }
-  pauseWorld() { this.pause(); }
+  stop() {
+    this.running = false;
+    cancelAnimationFrame(this.rafId);
+  }
+  pause() {
+    this.paused = true;
+  }
+  resume() {
+    this.paused = false;
+    this.lastTick = performance.now();
+  }
+  pauseWorld() {
+    this.pause();
+  }
 
   private loop = () => {
     if (!this.running) return;
@@ -87,9 +117,13 @@ export class GameState {
     this.tickCount++;
 
     if (!this.paused) {
-      this.updateUnits(dt);
-      this.updateBuildings(dt);
-      if (this.viewMode === 'local') this.localUpdate(dt);
+      try {
+        this.updateUnits(dt);
+        this.updateBuildings(dt);
+        if (this.viewMode === 'local') this._local.tick(dt);
+      } catch (err) {
+        logger.error('[GameState] loop error — frame skipped:', err);
+      }
     }
   };
 
@@ -125,7 +159,11 @@ export class GameState {
   private updateBuildings(_dt: number) {
     for (const b of this.world.buildings) {
       if (b.state === 'building') {
-        if (b.durationSeconds <= 0) { b.progress = 100; b.state = 'complete'; continue; }
+        if (b.durationSeconds <= 0) {
+          b.progress = 100;
+          b.state = 'complete';
+          continue;
+        }
         b.elapsedSeconds += _dt / 1000;
         b.progress = Math.min(100, (b.elapsedSeconds / b.durationSeconds) * 100);
         if (b.progress >= 100) {
@@ -138,7 +176,7 @@ export class GameState {
   // ─── Query: unit at hex ────────────────────────────────────────────────────
   getUnitAt(coord: Axial): Unit | null {
     const key = tileKey(coord);
-    return this.world.units.find(u => tileKey(u.coord) === key) ?? null;
+    return this.world.units.find((u) => tileKey(u.coord) === key) ?? null;
   }
 
   // ─── Selection ─────────────────────────────────────────────────────────────
@@ -156,7 +194,13 @@ export class GameState {
   }
 
   // ─── Phase 9: XCOM Context Fatigue ─────────────────────────────────────────
-  updateUnitFatigue(unitId: string, fatigue: number, maxFatigue: number, atRest: boolean, restAreaId: string | null) {
+  updateUnitFatigue(
+    unitId: string,
+    fatigue: number,
+    maxFatigue: number,
+    atRest: boolean,
+    restAreaId: string | null,
+  ) {
     const unit = this.unitMap.get(unitId);
     if (unit) {
       unit.fatigue = fatigue;
@@ -177,7 +221,14 @@ export class GameState {
     }
   }
 
-  getUnitFatigue(unitId: string): { unit: string; fatigue: number; maxFatigue: number; effectiveSpeed: number; isResting: boolean; restingRoomId: string | undefined } | null {
+  getUnitFatigue(unitId: string): {
+    unit: string;
+    fatigue: number;
+    maxFatigue: number;
+    effectiveSpeed: number;
+    isResting: boolean;
+    restingRoomId: string | undefined;
+  } | null {
     const unit = this.unitMap.get(unitId);
     if (!unit) return null;
     return {
@@ -191,7 +242,7 @@ export class GameState {
   }
 
   addRestArea(restArea: import('./types').RestArea) {
-    const existing = this.world.restAreas.find(r => r.id === restArea.id);
+    const existing = this.world.restAreas.find((r) => r.id === restArea.id);
     if (!existing) {
       this.world.restAreas.push(restArea);
       this.notify();
@@ -199,7 +250,7 @@ export class GameState {
   }
 
   removeRestArea(restAreaId: string) {
-    const idx = this.world.restAreas.findIndex(r => r.id === restAreaId);
+    const idx = this.world.restAreas.findIndex((r) => r.id === restAreaId);
     if (idx !== -1) {
       this.world.restAreas.splice(idx, 1);
       this.notify();
@@ -207,7 +258,7 @@ export class GameState {
   }
 
   getRestAreaNear(coord: Axial, radius = 3): import('./types').RestArea | undefined {
-    return this.world.restAreas.find(ra => axialDistance(ra.coord, coord) <= radius);
+    return this.world.restAreas.find((ra) => axialDistance(ra.coord, coord) <= radius);
   }
 
   decayUnitFatigue(unitId: string, delta: number) {
@@ -217,29 +268,49 @@ export class GameState {
     unit.effectiveSpeed = Math.round((unit.fatigue / unit.maxFatigue) * 1000) / 1000;
     const cfg = getConfig();
     // Auto-warn below configurable threshold (was hardcoded at 20%)
-    if (unit.fatigue <= unit.maxFatigue * cfg.fatigue.autoWarnBelow && unit.fatigue > 0 && !unit.isResting) {
-      console.warn(`[fatigue] ${unit.name} contexto bajo (${unit.fatigue}%)`);
+    if (
+      unit.fatigue <= unit.maxFatigue * cfg.fatigue.autoWarnBelow &&
+      unit.fatigue > 0 &&
+      !unit.isResting
+    ) {
+      logger.warn(`[fatigue] ${unit.name} contexto bajo (${unit.fatigue}%)`);
     }
     this.notify();
   }
 
   // ─── Spawn unit ────────────────────────────────────────────────────────────
-  spawnUnit(id: string, name: string, type: Unit['type'], civ: string, coord: Axial, mission?: string): Unit {
+  spawnUnit(
+    id: string,
+    name: string,
+    type: Unit['type'],
+    civ: string,
+    coord: Axial,
+    mission?: string,
+  ): Unit {
     const existing = this.unitMap.get(id);
     if (existing) return existing;
     const color = UNIT_COLORS[type] ?? UNIT_COLORS['hero']!;
     const unit: Unit = {
-      id, name, type, civ, coord,
+      id,
+      name,
+      type,
+      civ,
+      coord,
       targetCoord: undefined as Axial | undefined,
-      path: [] as Axial[], pathIndex: 0, pathProgress: 0,
+      path: [] as Axial[],
+      pathIndex: 0,
+      pathProgress: 0,
       state: 'idle',
       mission,
       speed: type === 'scout' ? 2 : 1,
       color,
-      movesLeft: 4, maxMoves: 4,
+      movesLeft: 4,
+      maxMoves: 4,
       // Phase 9: XCOM Context Fatigue
-      fatigue: 100, maxFatigue: 100,
-      isResting: false, restingRoomId: undefined,
+      fatigue: 100,
+      maxFatigue: 100,
+      isResting: false,
+      restingRoomId: undefined,
       effectiveSpeed: 1.0,
     };
     this.world.units.push(unit);
@@ -251,7 +322,31 @@ export class GameState {
   // ─── Listeners (UI subscribes to state changes) ──────────────────────────
   subscribe(fn: () => void): () => void {
     this.listeners.push(fn);
-    return () => { this.listeners = this.listeners.filter(l => l !== fn); };
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== fn);
+    };
+  }
+
+  // ─── Unit removal (cleans up maps, path cache, selection) ────────────────
+  /** Callbacks invoked with the removed unitId — lets UI layers clean up buffers. */
+  private unitRemovedCallbacks: Array<(unitId: string) => void> = [];
+
+  onUnitRemoved(fn: (unitId: string) => void): () => void {
+    this.unitRemovedCallbacks.push(fn);
+    return () => {
+      this.unitRemovedCallbacks = this.unitRemovedCallbacks.filter((f) => f !== fn);
+    };
+  }
+
+  removeUnit(unitId: string): boolean {
+    if (!this.unitMap.has(unitId)) return false;
+    this.world.units = this.world.units.filter((u) => u.id !== unitId);
+    this.unitMap.delete(unitId);
+    if (this.selectedUnit?.id === unitId) this.selectedUnit = null;
+    invalidatePathCache();
+    for (const cb of this.unitRemovedCallbacks) cb(unitId);
+    this.notify();
+    return true;
   }
 
   private notify() {
@@ -287,228 +382,59 @@ export class GameState {
     invalidatePathCache();
   }
 
-  // ─── Phase 6: View transition ───────────────────────────────────────────────
+  // ─── Phase 6+7a: Local view — delegated to LocalWorldManager ────────────────
 
-  /** Switch to RimWorld local view, fetching file tree from bridge API. */
   async enterLocalView(repoId: string): Promise<LocalWorld> {
-    if (!this.localWorld || this.localWorld.repoId !== repoId) {
-      this.localWorld = await generateLocalWorldFromApi(repoId);
-      if (this.localUnits.length === 0) {
-        const entrance = this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
-        const heroUnit = this.getAllUnits()[0];
-        this.localUnits.push({
-          id: heroUnit?.id ?? 'DAVI',
-          name: heroUnit?.name ?? 'DAVI',
-          unitType: heroUnit?.type ?? 'hero',
-          color: heroUnit ? (UNIT_COLORS[heroUnit.type] ?? '#4af') : '#4af',
-          gridX: entrance.x + Math.floor(entrance.w / 2),
-          gridY: entrance.y + Math.floor(entrance.h / 2),
-          targetX: null,
-          targetY: null,
-          path: [],
-          pathIndex: 0,
-          pathProgress: 0,
-          state: 'idle_in_room',
-          mission: heroUnit?.mission ?? null,
-          workProgress: 0,
-          macroUnitId: heroUnit?.id ?? 'DAVI',
-          currentWorkbenchId: null,
-          fatigue: heroUnit?.fatigue ?? 100,
-          maxFatigue: heroUnit?.maxFatigue ?? 100,
-          isResting: heroUnit?.isResting ?? false,
-          effectiveSpeed: heroUnit?.effectiveSpeed ?? 1,
-        });
-      }
-    }
-    this.viewMode = 'local';
-    return this.localWorld;
+    return this._local.enterLocalView(repoId);
   }
-
-  /** Synchronous local view entry using mock world (for tests / offline mode). */
   enterLocalViewMock(repoId: string): LocalWorld {
-    if (!this.localWorld || this.localWorld.repoId !== repoId) {
-      this.localWorld = buildMockLocalWorld(repoId);
-      if (this.localUnits.length === 0) {
-        const entrance = this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
-        this.localUnits.push({
-          id: 'DAVI', name: 'DAVI', unitType: 'hero', color: '#4af',
-          gridX: entrance.x + 1, gridY: entrance.y + 1,
-          targetX: null, targetY: null,
-          path: [], pathIndex: 0, pathProgress: 0,
-          state: 'idle_in_room', mission: null, workProgress: 0,
-          macroUnitId: 'DAVI', currentWorkbenchId: null,
-          fatigue: 100, maxFatigue: 100, isResting: false, effectiveSpeed: 1,
-        });
-      }
-    }
-    this.viewMode = 'local';
-    return this.localWorld;
+    return this._local.enterLocalViewMock(repoId);
   }
-
-  /** Switch back to macro civ view. */
-  enterMacroView() {
-    this.viewMode = 'macro';
+  enterMacroView(): void {
+    this._local.enterMacroView();
   }
-
   getLocalWorld(): LocalWorld | null {
-    return this.localWorld;
+    return this._local.getLocalWorld();
   }
-
   getLocalUnits(): LocalUnit[] {
-    return this.localUnits;
+    return this._local.getLocalUnits();
   }
-
   getLocalUnit(id: string): LocalUnit | undefined {
-    return this.localUnits.find(u => u.id === id);
+    return this._local.getLocalUnit(id);
   }
-
-  // ─── Phase 7a: Local update loop ────────────────────────────────────────────
-
-  /** Main tick update for local (RimWorld) view — runs every TICK_MS when viewMode=local */
-  localUpdate(dt: number) {
-    if (this.viewMode !== 'local' || !this.localWorld) return;
-    this.localTickCount++;
-    const scale = dt / TICK_MS;
-
-    for (const unit of this.localUnits) {
-      // 1. Advance moving units
-      if (unit.state === 'walking_to_workbench' && unit.pathIndex < unit.path.length) {
-        unit.pathProgress += 0.06 * unit.effectiveSpeed * scale;
-        if (unit.pathProgress >= 1) {
-          unit.pathProgress = 0;
-          const step = unit.path[unit.pathIndex]!;
-          unit.gridX = step.x;
-          unit.gridY = step.y;
-          unit.pathIndex++;
-          if (unit.pathIndex >= unit.path.length) {
-            unit.path = [];
-            unit.pathIndex = 0;
-            unit.state = unit.currentWorkbenchId ? 'working_on_file' : 'idle_in_room';
-            unit.workProgress = 0;
-          }
-        }
-      }
-
-      // 2. Advance working units
-      if (unit.state === 'working_on_file') {
-        unit.workProgress = Math.min(100, (unit.workProgress ?? 0) + 0.08 * scale);
-        if (unit.workProgress >= 100) {
-          this.completeLocalMission(unit.id);
-        }
-      }
-    }
-
-    // 3. Dispatch idle unit → next queued mission (~every 500ms)
-    if (this.localTickCount % 30 === 0) {
-      this.dispatchNextMission();
-    }
+  queueLocalMission(repoId: string, filePath: string, fileName: string): void {
+    this._local.queueLocalMission(repoId, filePath, fileName);
   }
-
-  /** Assign a mission to the queue (Phase 7a — no priority system). */
-  queueLocalMission(repoId: string, filePath: string, fileName: string) {
-    this.missionQueue.push({
-      id: `mission-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      unitId: '', // assigned on dispatch
-      repoId,
-      filePath,
-      fileName,
-      status: 'queued',
-      assignedAt: Date.now(),
-      startedAt: null,
-      completedAt: null,
-      workbenchId: '', // resolved on dispatch
-      workbench: null,
-      progress: 0,
-    });
+  dispatchMissionById(missionId: string): void {
+    this._local.dispatchMissionById(missionId);
   }
-
-  /** Manually dispatch a specific queued mission by ID (used by priority panel). */
-  dispatchMissionById(missionId: string) {
-    const idx = this.missionQueue.findIndex(m => m.id === missionId && m.status === 'queued');
-    if (idx === -1) return;
-    const queued = this.missionQueue[idx]!;
-    this.assignMissionToUnit(queued);
-  }
-
-  private assignMissionToUnit(queued: LocalMission) {
-    const unit = this.localUnits.find(u => u.state === 'idle_in_room');
-    if (!unit || !this.localWorld) return;
-
-    // Try to find workbench by filePath, fall back to nearest
-    let wbX = -1, wbY = -1, wbId = '';
-    outer: for (const row of this.localWorld.grid) {
-      for (const tile of row) {
-        if (tile.type === 'workbench' && tile.workbench?.filePath === queued.filePath) {
-          wbX = tile.x; wbY = tile.y;
-          wbId = tile.workbench.id;
-          break outer;
-        }
-      }
-    }
-    if (wbX === -1) {
-      const nearest = findNearestWorkbench(this.localWorld, unit.gridX, unit.gridY);
-      if (!nearest?.workbench) return;
-      wbX = nearest.x; wbY = nearest.y;
-      wbId = nearest.workbench.id;
-      queued.workbench = nearest.workbench;
-    }
-
-    const pathResult = findPath(this.localWorld, unit.gridX, unit.gridY, wbX, wbY);
-    if (!pathResult) return;
-
-    unit.currentWorkbenchId = wbId;
-    unit.path = pathResult.path;
-    unit.pathIndex = 0;
-    unit.pathProgress = 0;
-    unit.state = 'walking_to_workbench';
-    queued.unitId = unit.id;
-    queued.workbenchId = wbId;
-    queued.status = 'walking';
-    queued.startedAt = Date.now();
-  }
-
-  private dispatchNextMission() {
-    const queued = this.missionQueue.filter(m => m.status === 'queued');
-    if (queued.length === 0) return;
-    const next = peekNextMission(queued);
-    if (next) this.assignMissionToUnit(next);
-  }
-
-  private completeLocalMission(unitId: string) {
-    const unit = this.localUnits.find(u => u.id === unitId);
-    if (!unit) return;
-
-    const mission = this.missionQueue.find(
-      m => m.unitId === unitId && (m.status === 'walking' || m.status === 'working'),
-    );
-    if (mission) {
-      mission.status = 'complete';
-      mission.completedAt = Date.now();
-    }
-
-    unit.currentWorkbenchId = null;
-    unit.workProgress = 0;
-    unit.state = 'idle_in_room';
-    unit.path = [];
-  }
-
   getMissionQueue(): LocalMission[] {
-    return this.missionQueue;
+    return this._local.getMissionQueue();
   }
-
   getLocalTick(): number {
-    return this.localTickCount;
+    return this._local.getLocalTick();
   }
 
   // ─── Building control ──────────────────────────────────────────────────────
-  startBuilding(cityId: string, buildingId: string, name: string, durationSeconds: number, buildingType: 'building' | 'wonder' = 'building'): Building {
+  startBuilding(
+    cityId: string,
+    buildingId: string,
+    name: string,
+    durationSeconds: number,
+    buildingType: 'building' | 'wonder' = 'building',
+  ): Building {
     const key = `${cityId}::${buildingId}`;
     const existing = this.buildingMap.get(key);
     if (existing) return existing;
     const b: Building = {
-      id: buildingId, name, type: buildingType,
-      cityId, progress: 0, durationSeconds,
-      elapsedSeconds: 0, state: 'building',
+      id: buildingId,
+      name,
+      type: buildingType,
+      cityId,
+      progress: 0,
+      durationSeconds,
+      elapsedSeconds: 0,
+      state: 'building',
     };
     this.world.buildings.push(b);
     this.buildingMap.set(key, b);
@@ -518,7 +444,10 @@ export class GameState {
   completeBuilding(cityId: string, buildingId: string) {
     const key = `${cityId}::${buildingId}`;
     const b = this.buildingMap.get(key);
-    if (b) { b.state = 'complete'; b.progress = 100; }
+    if (b) {
+      b.state = 'complete';
+      b.progress = 100;
+    }
   }
 
   failBuilding(cityId: string, buildingId: string) {
@@ -530,8 +459,12 @@ export class GameState {
   // ─── Mission tracking ────────────────────────────────────────────────────
   startMission(id: string, unit: string, questName: string) {
     this.missions.set(id, {
-      id, unit, questName, status: 'running',
-      startedAt: Date.now(), completedAt: null,
+      id,
+      unit,
+      questName,
+      status: 'running',
+      startedAt: Date.now(),
+      completedAt: null,
     });
     this.notify();
   }
@@ -545,5 +478,7 @@ export class GameState {
   }
 
   // ─── Tick count for animations ─────────────────────────────────────────────
-  get tick(): number { return this.tickCount; }
+  get tick(): number {
+    return this.tickCount;
+  }
 }

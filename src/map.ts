@@ -1,39 +1,64 @@
 // ─── RepoCiv — Map Generator ─────────────────────────────────────────────────
 // Fetches real workspace metadata from /api/repos and builds a hex tile world.
 
-import {
-  type Axial,
-  spiralCoords,
-} from './hex.ts';
-import {
-  type Terrain,
-  type Tile,
-  type City,
-  type District,
-  type World,
-  tileKey,
-} from './types.ts';
+import { logger } from './logger.ts';
+import { type Axial, spiralCoords } from './hex.ts';
+import { type Terrain, type Tile, type City, type District, type World, tileKey } from './types.ts';
 
 // ─── Terrain inference ──────────────────────────────────────────────────────
 const EXTENSION_WEIGHT: Record<string, Terrain> = {
   // Web / frontend
-  ts: 'plains', tsx: 'plains', js: 'plains', jsx: 'plains',
-  vue: 'plains', svelte: 'plains', mjs: 'plains', cjs: 'plains',
+  ts: 'plains',
+  tsx: 'plains',
+  js: 'plains',
+  jsx: 'plains',
+  vue: 'plains',
+  svelte: 'plains',
+  mjs: 'plains',
+  cjs: 'plains',
   // ML / data
-  py: 'forest', ipynb: 'forest', r: 'forest', jl: 'forest',
+  py: 'forest',
+  ipynb: 'forest',
+  r: 'forest',
+  jl: 'forest',
   // Systems / low-level
-  rs: 'mountain', go: 'mountain', cpp: 'mountain', c: 'mountain',
-  h: 'mountain', hpp: 'mountain', java: 'mountain', kt: 'mountain',
+  rs: 'mountain',
+  go: 'mountain',
+  cpp: 'mountain',
+  c: 'mountain',
+  h: 'mountain',
+  hpp: 'mountain',
+  java: 'mountain',
+  kt: 'mountain',
   // Binary / heavy
-  pt: 'mountain', onnx: 'mountain', h5: 'mountain', pkl: 'mountain', db: 'mountain',
+  pt: 'mountain',
+  onnx: 'mountain',
+  h5: 'mountain',
+  pkl: 'mountain',
+  db: 'mountain',
   // Docs / config
-  md: 'desert', txt: 'desert', json: 'desert', yaml: 'desert',
-  yml: 'desert', toml: 'desert', xml: 'desert', html: 'desert',
-  css: 'desert', scss: 'desert', sh: 'desert', bash: 'desert',
+  md: 'desert',
+  txt: 'desert',
+  json: 'desert',
+  yaml: 'desert',
+  yml: 'desert',
+  toml: 'desert',
+  xml: 'desert',
+  html: 'desert',
+  css: 'desert',
+  scss: 'desert',
+  sh: 'desert',
+  bash: 'desert',
 };
 
 const TERRAIN_WEIGHTS: Record<Terrain, number> = {
-  plains: 1, forest: 2, mountain: 3, desert: 1, ocean: 1, ice: 1, hills: 1,
+  plains: 1,
+  forest: 2,
+  mountain: 3,
+  desert: 1,
+  ocean: 1,
+  ice: 1,
+  hills: 1,
 };
 
 export function inferTerrain(extensions: Record<string, number>): Terrain {
@@ -45,21 +70,27 @@ export function inferTerrain(extensions: Record<string, number>): Terrain {
     if (!t) continue;
     totalCounted += count;
     const score = count * TERRAIN_WEIGHTS[t];
-    if (score > bestScore) { bestScore = score; best = t; }
+    if (score > bestScore) {
+      bestScore = score;
+      best = t;
+    }
   }
   if (totalCounted === 0) return 'desert';
   return best;
 }
 
 // ─── Terrain colors (Canvas fill) ──────────────────────────────────────────
-export const TERRAIN_COLOR: Record<Terrain, { fill: string; stroke: string; gradient?: [string, string] }> = {
-  plains:   { fill: '#7ba05b', stroke: '#5a7a3a', gradient: ['#8db870', '#6a8f4a'] },
-  forest:   { fill: '#2d5a27', stroke: '#1e3d18', gradient: ['#3a7032', '#234a1f'] },
+export const TERRAIN_COLOR: Record<
+  Terrain,
+  { fill: string; stroke: string; gradient?: [string, string] }
+> = {
+  plains: { fill: '#7ba05b', stroke: '#5a7a3a', gradient: ['#8db870', '#6a8f4a'] },
+  forest: { fill: '#2d5a27', stroke: '#1e3d18', gradient: ['#3a7032', '#234a1f'] },
   mountain: { fill: '#6b6b6b', stroke: '#4a4a4a', gradient: ['#7d7d7d', '#5a5a5a'] },
-  desert:   { fill: '#d4a574', stroke: '#b07a4a', gradient: ['#dfb285', '#c49564'] },
-  ocean:    { fill: '#2b6da5', stroke: '#1b5585', gradient: ['#3a8bc8', '#225590'] },
-  ice:      { fill: '#c8d8e0', stroke: '#a0b0c0', gradient: ['#ddeaf0', '#b0c0d0'] },
-  hills:    { fill: '#8da86b', stroke: '#6a8a4b', gradient: ['#9db87b', '#7a9a5b'] },
+  desert: { fill: '#d4a574', stroke: '#b07a4a', gradient: ['#dfb285', '#c49564'] },
+  ocean: { fill: '#2b6da5', stroke: '#1b5585', gradient: ['#3a8bc8', '#225590'] },
+  ice: { fill: '#c8d8e0', stroke: '#a0b0c0', gradient: ['#ddeaf0', '#b0c0d0'] },
+  hills: { fill: '#8da86b', stroke: '#6a8a4b', gradient: ['#9db87b', '#7a9a5b'] },
 };
 
 // ─── Skill & session metadata (from Hermes workspace) ───────────────────────
@@ -67,18 +98,20 @@ async function fetchSkillHealth(repoName: string): Promise<'ok' | 'stale' | 'bro
   try {
     const res = await fetch(`/api/skill-health/${encodeURIComponent(repoName)}`);
     if (!res.ok) return undefined;
-    const data = await res.json() as { health: 'ok' | 'stale' | 'broken' };
+    const data = (await res.json()) as { health: 'ok' | 'stale' | 'broken' };
     return data.health;
   } catch {
     return undefined;
   }
 }
 
-async function fetchSessionTint(repoName: string): Promise<'bright' | 'normal' | 'fog' | undefined> {
+async function fetchSessionTint(
+  repoName: string,
+): Promise<'bright' | 'normal' | 'fog' | undefined> {
   try {
     const res = await fetch(`/api/session-tint/${encodeURIComponent(repoName)}`);
     if (!res.ok) return undefined;
-    const data = await res.json() as { tint: 'bright' | 'normal' | 'fog' };
+    const data = (await res.json()) as { tint: 'bright' | 'normal' | 'fog' };
     return data.tint;
   } catch {
     return undefined;
@@ -102,7 +135,7 @@ async function fetchSubdirs(repoName: string): Promise<{ name: string; terrain: 
   try {
     const res = await fetch(`/api/files/${repoName}`);
     if (!res.ok) return [];
-    const data = await res.json() as { files: string[] };
+    const data = (await res.json()) as { files: string[] };
     // Group files by top-level directory
     const groups = new Map<string, Record<string, number>>();
     for (const f of data.files) {
@@ -135,10 +168,10 @@ export async function generateWorld(): Promise<World> {
   try {
     const res = await fetch('/api/repos');
     if (!res.ok) throw new Error(`/api/repos HTTP ${res.status}`);
-    repos = await res.json() as ScannedRepo[];
+    repos = (await res.json()) as ScannedRepo[];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    console.error('[map] /api/repos failed', e);
+    logger.error('[map] /api/repos failed', e);
     showMapLoadError(`No pude cargar repos reales: ${message}`);
   }
 
@@ -146,24 +179,26 @@ export async function generateWorld(): Promise<World> {
   repos.sort((a, b) => b.population - a.population);
 
   // Inferred terrain per repo
-  const reposWithTerrain = repos.map(r => ({
+  const reposWithTerrain = repos.map((r) => ({
     ...r,
-    terrain: r.isLegacy ? 'ice' as Terrain :
-             r.population === 0 ? 'ocean' as Terrain :
-             inferTerrain(r.extensions),
+    terrain: r.isLegacy
+      ? ('ice' as Terrain)
+      : r.population === 0
+        ? ('ocean' as Terrain)
+        : inferTerrain(r.extensions),
     science: Math.min(99, Math.floor(r.gold / 10)),
     production: Math.min(99, Math.floor(r.gold / 50)),
   }));
 
-  const cityRepos = reposWithTerrain.filter(r => r.population > 5);
-  const orphanRepos = reposWithTerrain.filter(r => r.population <= 5);
+  const cityRepos = reposWithTerrain.filter((r) => r.population > 5);
+  const orphanRepos = reposWithTerrain.filter((r) => r.population <= 5);
   const cityCoords = spiralCoords({ q: 0, r: 0 }, cityRepos.length);
 
   // Fetch subdirs + skill health + session tint in parallel
   const [subdirsPerRepo, skillHealthPerRepo, sessionTintPerRepo] = await Promise.all([
-    Promise.all(cityRepos.map(r => fetchSubdirs(r.path))),
-    Promise.all(cityRepos.map(r => fetchSkillHealth(r.name))),
-    Promise.all(cityRepos.map(r => fetchSessionTint(r.name))),
+    Promise.all(cityRepos.map((r) => fetchSubdirs(r.path))),
+    Promise.all(cityRepos.map((r) => fetchSkillHealth(r.name))),
+    Promise.all(cityRepos.map((r) => fetchSessionTint(r.name))),
   ]);
 
   for (let i = 0; i < cityRepos.length; i++) {
@@ -177,14 +212,19 @@ export async function generateWorld(): Promise<World> {
     const districts: District[] = subdirs.map((sub, j) => ({
       id: `${repo.name}-${sub.name}`,
       name: sub.name,
-      type: sub.terrain === 'forest' ? 'campus' :
-            sub.terrain === 'mountain' ? 'industrial' :
-            sub.terrain === 'plains' ? 'commercial' : 'encamp',
+      type:
+        sub.terrain === 'forest'
+          ? 'campus'
+          : sub.terrain === 'mountain'
+            ? 'industrial'
+            : sub.terrain === 'plains'
+              ? 'commercial'
+              : 'encamp',
       coord: districtCoords[j + 1] ?? axialAdd(coord, { q: j, r: 0 }),
     }));
 
     const territory = [coord, ...axialRange(coord, 2)].filter(
-      c => !districts.some(d => d.coord.q === c.q && d.coord.r === c.r)
+      (c) => !districts.some((d) => d.coord.q === c.q && d.coord.r === c.r),
     );
 
     const city: City = {
@@ -249,7 +289,10 @@ export async function generateWorld(): Promise<World> {
   const existingKeys = new Set<string>();
   for (const tile of tiles.values()) existingKeys.add(tileKey(tile.coord));
 
-  let minQ = 0, maxQ = 0, minR = 0, maxR = 0;
+  let minQ = 0,
+    maxQ = 0,
+    minR = 0,
+    maxR = 0;
   for (const tile of tiles.values()) {
     if (tile.coord.q < minQ) minQ = tile.coord.q;
     if (tile.coord.q > maxQ) maxQ = tile.coord.q;

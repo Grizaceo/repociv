@@ -5,13 +5,20 @@
 
 import { type GameState } from './game.ts';
 import { type BridgeEvent } from './types.ts';
+import { logger } from './logger.ts';
 import { parseBridgeEvent, describeBridgeEventError } from './bridgeSchema.ts';
-import { logEvent, appendChatChunk, setBridgeStatus, setOperationTicker, updateGpuBar, showNotification } from './ui/index.ts';
+import {
+  logEvent,
+  appendChatChunk,
+  setBridgeStatus,
+  setOperationTicker,
+  updateGpuBar,
+  showNotification,
+} from './ui/index.ts';
 import { openApprovalPanel } from './ui/approvalPanel.ts';
 import { terminalPanel } from './terminalPanel.ts';
+import { bridgeHeaders, bridgeUrl } from './bridgeEnv.ts';
 
-const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL ?? 'http://localhost:5274';
-const BRIDGE_TOKEN = import.meta.env.VITE_BRIDGE_TOKEN ?? '';
 const DEMO_INTERVAL_MS = 30_000;
 const OFFLINE_DEMO_THRESHOLD_MS = 10_000;
 
@@ -47,7 +54,7 @@ export class BridgeEvents {
     if (!evt) {
       const reason = describeBridgeEventError(data);
       const summary = JSON.stringify(data).slice(0, 120);
-      console.warn('[bridge] descartando evento inválido:', reason, summary);
+      logger.warn('[bridge] descartando evento inválido:', reason, summary);
       logEvent(`Evento inválido descartado (${reason})`, 'warn');
       return;
     }
@@ -57,7 +64,7 @@ export class BridgeEvents {
   private connectSSE() {
     if (this.sse) this.sse.close();
     try {
-      const src = new EventSource(`${BRIDGE_URL}/events`);
+      const src = new EventSource(bridgeUrl('/events'));
       this.sse = src;
       src.onopen = () => {
         this.sseConnected = true;
@@ -66,10 +73,15 @@ export class BridgeEvents {
       src.onmessage = (e: MessageEvent<string>) => {
         try {
           const data = JSON.parse(e.data) as unknown;
-          if (typeof data === 'object' && data !== null && (data as { type?: unknown }).type === 'ping') return;
+          if (
+            typeof data === 'object' &&
+            data !== null &&
+            (data as { type?: unknown }).type === 'ping'
+          )
+            return;
           this.handleRaw(data);
         } catch (err) {
-          console.warn('[bridge] SSE payload inválido:', err);
+          logger.warn('[bridge] SSE payload inválido:', err);
         }
       };
       src.onerror = () => {
@@ -82,19 +94,27 @@ export class BridgeEvents {
       };
     } catch (err) {
       this.sseConnected = false;
-      console.warn('[bridge] SSE no disponible:', err);
+      logger.warn('[bridge] SSE no disponible:', err);
     }
   }
 
   private _authHeaders(): Record<string, string> {
-    return BRIDGE_TOKEN ? { 'X-RepoCiv-Token': BRIDGE_TOKEN } : {};
+    return bridgeHeaders();
   }
 
   private async checkHealth() {
     try {
-      const res = await fetch(`${BRIDGE_URL}/health`, { method: 'GET', headers: this._authHeaders() });
+      const res = await fetch(bridgeUrl('/health'), {
+        method: 'GET',
+        headers: this._authHeaders(),
+      });
       if (res.ok) {
-        const data = await res.json() as { ok: boolean; openclaw: boolean; claudeCode: boolean; cursor: boolean };
+        const data = (await res.json()) as {
+          ok: boolean;
+          openclaw: boolean;
+          claudeCode: boolean;
+          cursor: boolean;
+        };
         const mode = data.claudeCode ? 'claude-code' : data.openclaw ? 'openclaw' : 'hermes';
         this.onBridgeOnline(mode);
         return;
@@ -147,9 +167,13 @@ export class BridgeEvents {
   private async fetchGpu() {
     if (!this.bridgeOnline) return;
     try {
-      const res = await fetch(`${BRIDGE_URL}/gpu`, { headers: this._authHeaders() });
+      const res = await fetch(bridgeUrl('/gpu'), { headers: this._authHeaders() });
       if (res.ok) {
-        const data = await res.json() as { vramUsed?: number; vramTotal?: number; temp?: number } | null;
+        const data = (await res.json()) as {
+          vramUsed?: number;
+          vramTotal?: number;
+          temp?: number;
+        } | null;
         updateGpuBar(data);
       }
     } catch {
@@ -216,9 +240,8 @@ export class BridgeEvents {
       case 'mission_complete': {
         this.state.completeMission(evt.missionId, evt.success);
         setOperationTicker(false);
-        const durLabel = evt.duration >= 60
-          ? `${Math.round(evt.duration / 60)}m`
-          : `${evt.duration}s`;
+        const durLabel =
+          evt.duration >= 60 ? `${Math.round(evt.duration / 60)}m` : `${evt.duration}s`;
         showNotification({
           type: evt.success ? 'success' : 'error',
           title: evt.success ? 'Misión completada' : 'Misión fallida',
@@ -246,11 +269,23 @@ export class BridgeEvents {
       }
       // Phase 9: XCOM Context Fatigue events
       case 'unit_fatigue_update': {
-        this.state.updateUnitFatigue(evt.unit, evt.fatigue, evt.maxFatigue ?? 100, evt.atRest ?? false, evt.restAreaId ?? null);
+        this.state.updateUnitFatigue(
+          evt.unit,
+          evt.fatigue,
+          evt.maxFatigue ?? 100,
+          evt.atRest ?? false,
+          evt.restAreaId ?? null,
+        );
         break;
       }
       case 'unit_sent_to_rest': {
-        this.state.updateUnitFatigue(evt.unit, evt.fatigue, evt.maxFatigue, evt.atRest, evt.restAreaId);
+        this.state.updateUnitFatigue(
+          evt.unit,
+          evt.fatigue,
+          evt.maxFatigue,
+          evt.atRest,
+          evt.restAreaId,
+        );
         logEvent(`🛌 ${evt.unit} enviado a descanso`, 'info');
         break;
       }
@@ -278,7 +313,10 @@ export class BridgeEvents {
         break;
       }
       case 'waiting_approval':
-        logEvent(`⏳ Aprobación requerida: ${evt.commandType} → ${evt.target} [${evt.risk}]`, 'warn');
+        logEvent(
+          `⏳ Aprobación requerida: ${evt.commandType} → ${evt.target} [${evt.risk}]`,
+          'warn',
+        );
         openApprovalPanel();
         break;
       case 'context_exhausted': {
@@ -291,7 +329,7 @@ export class BridgeEvents {
   }
 
   async sendApproval(commandId: string, approved: boolean) {
-    const res = await fetch(`${BRIDGE_URL}/approvals/${encodeURIComponent(commandId)}/approve`, {
+    const res = await fetch(bridgeUrl(`/approvals/${encodeURIComponent(commandId)}/approve`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
       body: JSON.stringify({ approved }),
@@ -304,7 +342,7 @@ export class BridgeEvents {
   // ─── Send legacy command to bridge.py root POST ───────────────────────────
   send(type: string, payload: Record<string, unknown>) {
     if (!this.bridgeOnline) return;
-    fetch(BRIDGE_URL, {
+    fetch(bridgeUrl(''), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
       body: JSON.stringify({ type, ...payload }),
