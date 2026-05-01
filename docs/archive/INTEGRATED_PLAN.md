@@ -1,6 +1,6 @@
 # RepoCiv — Plan Integrado de Cierre
 
-> Basado en: `REFACTOR_PLAN.md` + auditoría `CONTEXT_ROADMAP.md` (SOBRA/MERGE/FALTA)
+> Basado en: `docs/archive/REFACTOR_PLAN.md` + auditoría `docs/archive/CONTEXT_ROADMAP.md` (SOBRA/MERGE/FALTA)
 > Fecha: 2026-04-28 · Estado: ✅ COMPLETO — todos los items cerrados
 
 ---
