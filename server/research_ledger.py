@@ -301,6 +301,18 @@ class ResearchLedger:
             return
         with self._lock:
             try:
+                existing = self._conn.execute(
+                    "SELECT COUNT(*) FROM missions WHERE id = ?",
+                    (mission_id,),
+                ).fetchone()[0]
+                if not existing:
+                    self._conn.execute(
+                        """
+                        INSERT INTO missions (id, agent, phase, outcome)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (mission_id, "SWARM", "swarm-debate", "prediction"),
+                    )
                 self._conn.execute(
                     """
                     INSERT INTO agent_predictions
@@ -366,3 +378,8 @@ def get_ledger() -> ResearchLedger:
             if _singleton is None:
                 _singleton = ResearchLedger()
     return _singleton
+
+
+def get_instance() -> ResearchLedger:
+    """Compatibility alias for Fase 2 router/scheduler integrations."""
+    return get_ledger()

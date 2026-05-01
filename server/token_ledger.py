@@ -202,3 +202,8 @@ def get_ledger() -> TokenLedger:
             if _singleton is None:
                 _singleton = TokenLedger()
     return _singleton
+
+
+def get_instance() -> TokenLedger:
+    """Compatibility alias for Fase 2 router/scheduler integrations."""
+    return get_ledger()

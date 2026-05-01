@@ -583,10 +583,11 @@ graph TD
 - `server/research_ledger.py` — registra agent_predictions del swarm
 
 **Gate F3:**
-- [ ] ConsensusEngine agrega 3 signals → PROCEED/DISCARD
-- [ ] Believability se actualiza tras cada debate
-- [ ] Swarm NO se activa en tasks de baja prioridad (performance check)
-- [ ] Output del swarm se persiste como DC
+- [x] ConsensusEngine agrega 3 signals → PROCEED/DISCARD
+- [x] Believability se actualiza tras cada debate
+- [x] Swarm NO se activa en tasks de baja prioridad (performance check)
+- [x] Output del swarm se persiste como DC
+- [x] `pytest server/` — 461 passed, 1 skipped (2026-05-01)
 
 ---
 

@@ -26,6 +26,7 @@ import server.workspace_issue as _wi
 import server.workspace_state as _ws
 import server.run_state as _rs
 import server.locks as _locks
+import server.swarm_engine as _swarm
 
 
 # ─── Fixture: fresh store each test ──────────────────────────────────────────
@@ -449,6 +450,82 @@ def test_status_for_missing_task():
     assert status["issueId"] == "no-issue"
     assert status["phase"] == "unknown"
     assert status["progress"] is None
+
+
+# ─── Fase 3: Swarm integration ────────────────────────────────────────────────
+
+class _FakeLedger:
+    def __init__(self) -> None:
+        self.predictions: list[dict] = []
+
+    def get_agent_believability(self) -> dict[str, float]:
+        return {}
+
+    def record_prediction(self, **kwargs) -> None:
+        self.predictions.append(kwargs)
+
+
+def test_swarm_not_activated_for_low_priority_task():
+    _seed_workspace("repo", "ISS-SWARM-LOW")
+    fake_ledger = _FakeLedger()
+    _swarm.set_engine(_swarm.ConsensusEngine(ledger=fake_ledger))
+
+    def mock_executor(repo, issue_id, step, meta):
+        return f"run-low-{meta['stepIndex']}"
+
+    _to.set_step_executor(mock_executor)
+    try:
+        result = _to.run_task("repo", "ISS-SWARM-LOW")
+    finally:
+        _swarm.set_engine(None)
+
+    assert result["phase"] == "complete"
+    artifacts = _wi.list_artifacts("repo", "ISS-SWARM-LOW")
+    assert not [a for a in artifacts if a.startswith("swarm_debate_")]
+    assert fake_ledger.predictions == []
+
+
+def test_swarm_activated_for_high_priority_worker_task():
+    _seed_workspace("repo", "ISS-SWARM-HIGH")
+    _wi.patch_issue_state("repo", "ISS-SWARM-HIGH", {"priority": "HIGH"})
+    fake_ledger = _FakeLedger()
+    _swarm.set_engine(_swarm.ConsensusEngine(ledger=fake_ledger))
+
+    def mock_executor(repo, issue_id, step, meta):
+        return f"run-high-{meta['stepIndex']}"
+
+    _to.set_step_executor(mock_executor)
+    try:
+        result = _to.run_task("repo", "ISS-SWARM-HIGH")
+    finally:
+        _swarm.set_engine(None)
+
+    assert result["phase"] == "complete"
+    artifacts = _wi.list_artifacts("repo", "ISS-SWARM-HIGH")
+    debate_artifacts = [a for a in artifacts if a.startswith("swarm_debate_")]
+    assert len(debate_artifacts) == 4
+    assert len(fake_ledger.predictions) == 12  # 3 specialists x 4 WORKER steps
+
+
+def test_swarm_output_is_available_as_prior_context():
+    _seed_workspace("repo", "ISS-SWARM-DC")
+    _wi.patch_issue_state("repo", "ISS-SWARM-DC", {"priority": "HIGH"})
+    _swarm.set_engine(_swarm.ConsensusEngine(ledger=_FakeLedger()))
+
+    def mock_executor(repo, issue_id, step, meta):
+        return f"run-dc-{meta['stepIndex']}"
+
+    _to.set_step_executor(mock_executor)
+    try:
+        _to.run_task("repo", "ISS-SWARM-DC")
+    finally:
+        _swarm.set_engine(None)
+
+    prior = _wi.read_output_artifacts("repo", "ISS-SWARM-DC", up_to_step=1)
+    names = [name for name, _ in prior]
+    contents = "\n".join(content for _, content in prior)
+    assert "00-swarm-output.md" in names
+    assert "Swarm debate decision:" in contents
 
 
 # ─── Sprint C3: list_tasks() ──────────────────────────────────────────────────

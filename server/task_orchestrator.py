@@ -32,6 +32,7 @@ from . import repo_config as _rc
 from . import metrics as _metrics
 from . import checkpoint as _checkpoint
 from . import repociv_hooks as _rh
+from . import swarm_engine as _swarm
 
 
 # ─── Circuit breaker ──────────────────────────────────────────────────────────
@@ -120,6 +121,106 @@ def _step_slug(step: str) -> str:
     """Safe filename slug from step text."""
     slug = "".join(c if c.isalnum() or c in "_-" else "_" for c in step.lower())
     return slug[:40].strip("_")
+
+
+# ─── Swarm helpers (Fase 3) ───────────────────────────────────────────────────
+
+_HIGH_PRIORITY_VALUES = {"high", "critical", "urgent", "p0", "p1", "blocker"}
+_CRITICAL_SURFACE_MARKERS = (
+    "server/",
+    "orchestrator",
+    "security",
+    "ledger",
+    "router",
+    "runtime",
+    "core",
+)
+
+
+def _infer_agent_for_step(step: str, step_meta: dict[str, Any]) -> str:
+    """Infer the executor role without depending on a real dispatch call."""
+    if step_meta.get("agent"):
+        return str(step_meta["agent"]).upper()
+    try:
+        from .step_executor import select_agent_for_step
+        return select_agent_for_step(step).upper()
+    except Exception:
+        lowered = step.lower()
+        if any(k in lowered for k in ("implement", "create", "fix", "add", "wire")):
+            return "WORKER"
+        if any(k in lowered for k in ("inspect", "review", "audit", "analyze")):
+            return "SCOUT"
+        return "DAVI"
+
+
+def _priority_is_high(state: dict[str, Any], step_meta: dict[str, Any]) -> bool:
+    raw = (
+        step_meta.get("priority")
+        or state.get("priority")
+        or state.get("priorityLevel")
+        or state.get("severity")
+        or ""
+    )
+    if isinstance(raw, (int, float)):
+        return float(raw) >= 8.0
+    return str(raw).strip().lower() in _HIGH_PRIORITY_VALUES
+
+
+def _should_run_swarm(
+    *,
+    state: dict[str, Any],
+    step: str,
+    step_meta: dict[str, Any],
+    consecutive_failures: int,
+) -> bool:
+    """Decide whether a post-WORKER debate is worth the added latency."""
+    explicit = step_meta.get("swarm", state.get("swarm"))
+    if explicit is False:
+        return False
+    agent = _infer_agent_for_step(step, step_meta)
+    if agent != "WORKER":
+        return False
+    if explicit is True:
+        return True
+    lowered = step.lower()
+    return (
+        _priority_is_high(state, step_meta)
+        or consecutive_failures > 0
+        or any(marker in lowered for marker in _CRITICAL_SURFACE_MARKERS)
+    )
+
+
+def _record_swarm_debate(
+    *,
+    repo: str,
+    issue_id: str,
+    step_idx: int,
+    step: str,
+    run_id: str,
+    mission_text: str,
+    agent_output: str,
+) -> None:
+    """Run swarm debate and persist it as JSON plus a context artifact."""
+    result = _swarm.get_engine().debate(
+        mission_id=f"{run_id}:swarm",
+        mission_text=mission_text,
+        step=step,
+        agent_output=agent_output,
+        metadata={"repo": repo, "issue_id": issue_id, "step_index": step_idx},
+    )
+    _wi.add_artifact(
+        repo,
+        issue_id,
+        f"swarm_debate_{step_idx:03d}.json",
+        content=result.model_dump_json(indent=2),
+    )
+    _wi.write_step_artifact(
+        repo,
+        issue_id,
+        step_idx,
+        "swarm",
+        result.context_directive_text,
+    )
 
 
 # ─── Public API ───────────────────────────────────────────────────────────────
@@ -383,6 +484,25 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                             "completedAt": _now_iso(),
                         }, ensure_ascii=False, indent=2),
                     )
+
+                    # Fase 3: run an optional post-WORKER swarm debate only for
+                    # high-risk/high-priority steps. Default path stays unchanged.
+                    _swarm_state = _wi.load_issue_state(repo, issue_id) or state
+                    if _should_run_swarm(
+                        state=_swarm_state,
+                        step=step,
+                        step_meta=step_meta,
+                        consecutive_failures=consecutive_failures,
+                    ):
+                        _record_swarm_debate(
+                            repo=repo,
+                            issue_id=issue_id,
+                            step_idx=i,
+                            step=step,
+                            run_id=run_id,
+                            mission_text=f"{spec or ''}\n\n{step}",
+                            agent_output=agent_output,
+                        )
 
                     # Also write human-readable step artifact for context seeding
                     if agent_output:
