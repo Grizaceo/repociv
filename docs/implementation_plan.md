@@ -623,14 +623,14 @@ graph TD
 - `server/security_harness.py` — integrar con container lifecycle (pre-launch gate, post-exit audit)
 
 **Gate F5:**
-- [ ] SICA `reflect()` detecta al menos 1 patrón de mejora en Ledger fixture
-- [ ] `propose_improvement()` genera propuesta válida
-- [ ] `validate_in_sandbox()` ejecuta pytest en worktree temporal
-- [ ] Container Docker se levanta con `--network none` y bind-mount read-only
-- [ ] Container NO tiene acceso a `.env`, `~/.ssh`, ni tokens del host
-- [ ] Output del container es escaneado por `post_execution_audit()` antes de aplicar
-- [ ] Red-Blue cycle: mission adversarial sintética es bloqueada en container
-- [ ] **Ningún cambio se aplica sin aprobación del usuario**
+- [x] SICA `reflect()` detecta al menos 1 patrón de mejora en Ledger fixture
+- [x] `propose_improvement()` genera propuesta válida
+- [x] `validate_in_sandbox()` ejecuta pytest en worktree temporal
+- [x] Container Docker se levanta con `--network none` y bind-mount read-only
+- [x] Container NO tiene acceso a `.env`, `~/.ssh`, ni tokens del host
+- [x] Output del container es escaneado por `post_execution_audit()` antes de aplicar
+- [x] Red-Blue cycle: mission adversarial sintética es bloqueada en container
+- [x] **Ningún cambio se aplica sin aprobación del usuario**
 
 ---
 
