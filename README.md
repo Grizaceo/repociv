@@ -193,10 +193,16 @@ if (e.key.toLowerCase() === 'x') return spawnAgent('tuagente', state, renderer, 
 | `G` | Toggle grid |
 | `F` | Toggle debug overlay |
 | `V` | Toggle fog of war |
-| `3` | Alternar vista Macro ↔ Local |
+| `A` | Abrir/cerrar aprobaciones |
+| `T` | Terminal panel |
+| `F6` | Ledger / city ledger |
+| `F7` | Replay Panel |
+| `F8` | Observability Panel |
 | `F9` | Quest Board |
+| `F10` | Timeline Panel |
 | `F11` | Settings Panel |
 | `F12` | Screenshot |
+| `3` | Alternar vista Macro ↔ Local |
 | `Escape` | Cerrar overlays |
 | `?` | Keyboard help |
 
@@ -236,6 +242,14 @@ src/
 
 ---
 
+## Documentación
+
+- Activa: `README.md`, `deploy/systemd/README.md`, `execplan/repociv-harness-control-plane.md`
+- Índice de documentación: `docs/README.md`
+- Histórico archivado: `docs/archive/`
+
+---
+
 ## Tests
 
 ```bash
@@ -249,7 +263,7 @@ npm test -- --run
 | `pathfinding.test.ts` | 14 | A* pathfinding, cache |
 | `localMap.test.ts` | 6 | FileNode building, tree stats |
 
-**245 tests pasando** (174 TS + 71 Py). Target: 200 ✅
+**199 tests de Vitest pasando**. Verificado con `npm test -- --run` ✅
 
 ---
 

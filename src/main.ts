@@ -239,7 +239,7 @@ function wireHUD(
     const target = e.target as HTMLElement;
     const inField = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 
-    // F10: Timeline panel
+    // Hotkey panels
     if (e.key === 'F6') {
       e.preventDefault();
       toggleHarnessPanel();
