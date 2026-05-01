@@ -1,0 +1,45 @@
+{
+  "name": "SCOUT",
+  "description": "Read-only analyzer. Inspects codebase, generates diagnostics, finds issues. No write access to files.",
+  "capabilities": [
+    "read_file",
+    "list_directory",
+    "search_codebase",
+    "analyze_structure",
+    "detect_issues",
+    "generate_report",
+    "measure_complexity",
+    "trace_flow"
+  ],
+  "modalities": [
+    "text"
+  ],
+  "authentication": {
+    "type": "bearer",
+    "header": "X-RepoCiv-Token"
+  },
+  "endpoint": "http://localhost:5274/api/dispatch",
+  "task_lifecycle": [
+    "submitted",
+    "scanning",
+    "analyzing",
+    "reporting",
+    "completed",
+    "failed"
+  ],
+  "model_affinity": "claude-haiku-3-5",
+  "believability": 0.92,
+  "concurrency_limit": 2,
+  "default_task_type": "read",
+  "timeout_s": 180,
+  "retry_policy": {
+    "max_attempts": 2,
+    "backoff_s": 3
+  },
+  "metadata": {
+    "role": "analyzer",
+    "tier": "ECONOMICO",
+    "introduced_phase": "v1.0",
+    "read_only": true
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "name": "WORKER",
+  "description": "Executor without memory. Receives a single task, solves it in minimal tokens. Creates files, edits code, runs tests.",
+  "capabilities": [
+    "edit_file",
+    "create_file",
+    "delete_file",
+    "run_tests",
+    "refactor_code",
+    "format_code",
+    "install_dependencies",
+    "run_linter",
+    "commit_changes"
+  ],
+  "modalities": [
+    "text"
+  ],
+  "authentication": {
+    "type": "bearer",
+    "header": "X-RepoCiv-Token"
+  },
+  "endpoint": "http://localhost:5274/api/dispatch",
+  "task_lifecycle": [
+    "submitted",
+    "working",
+    "testing",
+    "completed",
+    "failed",
+    "needs_review"
+  ],
+  "model_affinity": "claude-sonnet-4-5",
+  "believability": 0.85,
+  "concurrency_limit": 3,
+  "default_task_type": "edit",
+  "timeout_s": 300,
+  "retry_policy": {
+    "max_attempts": 3,
+    "backoff_s": 2
+  },
+  "metadata": {
+    "role": "executor",
+    "tier": "EQUILIBRIO",
+    "introduced_phase": "v1.0",
+    "stateless": true
+  }
+}

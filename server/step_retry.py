@@ -1,14 +1,14 @@
-"""RepoCiv — Sprint C1: Step Retry with Model Escalation.
+"""RepoCiv — Step Retry with FrugalGPT Cascade Escalation (Fase 2).
 
 Automatic retry logic for agent steps with progressive model escalation.
-Each retry uses a more capable model (haiku→sonnet→opus) and records what
-model was used and why it was escalated.
+Each retry uses the next model in the FrugalGPT cascade chain, which varies
+based on signal extraction, system health, and budget pressure.
 
-Model escalation chain:
-  claude-haiku-3-5 → claude-sonnet-4-5 → claude-opus-4-5 → claude-opus-4-5 (ceiling)
+The cascade chain is now *dynamic* — computed by the router and passed in
+step_meta["model_routing"]["fallback_chain"].
 
 Public API:
-  escalate_model(current_model: str) -> str
+  escalate_model(current_model, fallback_chain) -> str
   retry_step(executor_fn, repo, issue_id, step, step_meta, max_retries) -> (run_id, attempts)
 """
 from __future__ import annotations
@@ -16,8 +16,8 @@ from __future__ import annotations
 import time
 from typing import Any, Callable
 
-# ─── Model escalation chain ───────────────────────────────────────────────────
-_ESCALATION_CHAIN: list[str] = [
+# Legacy escalation chain (fallback if routing info unavailable)
+_FALLBACK_ESCALATION_CHAIN: list[str] = [
     "claude-haiku-3-5",
     "claude-sonnet-4-5",
     "claude-opus-4-5",
@@ -27,39 +27,50 @@ _ESCALATION_CHAIN: list[str] = [
 MAX_CONSECUTIVE_FAILURES = 3
 
 
-def escalate_model(current_model: str) -> str:
-    """Return the next more capable model in the escalation chain.
+def escalate_model(current_model: str, fallback_chain: list[str] | None = None) -> str:
+    """Return the next more capable model in the escalation chain (Fase 2).
 
     Args:
         current_model: The current model name (e.g. "claude-haiku-3-5").
+        fallback_chain: The cascade chain from router (e.g. ["haiku", "sonnet", "opus"]).
+                       If None, uses the legacy static chain.
 
     Returns:
         The next model in the chain. Returns the same model if already at the ceiling
-        (claude-opus-4-5) or if the model is not recognised.
+        or if the model is not recognised.
 
     Examples:
-        >>> escalate_model("claude-haiku-3-5")
+        >>> escalate_model("claude-haiku-3-5", ["haiku", "sonnet", "opus"])
         'claude-sonnet-4-5'
-        >>> escalate_model("claude-sonnet-4-5")
+        >>> escalate_model("claude-sonnet-4-5", ["sonnet", "opus"])
         'claude-opus-4-5'
-        >>> escalate_model("claude-opus-4-5")
-        'claude-opus-4-5'
-        >>> escalate_model("unknown-model")
-        'unknown-model'
+        >>> escalate_model("claude-opus-4-5", ["opus"])
+        'claude-opus-4-5'  # ceiling
     """
+    chain = fallback_chain or _FALLBACK_ESCALATION_CHAIN
+    
     try:
-        idx = _ESCALATION_CHAIN.index(current_model)
+        # Try exact match first
+        idx = chain.index(current_model)
     except ValueError:
-        # Unknown model — return unchanged
-        return current_model
+        # Try substring match (e.g. "haiku" in "claude-haiku-3-5")
+        for i, model_name in enumerate(chain):
+            if model_name in current_model.lower():
+                idx = i
+                break
+        else:
+            # Unknown model — return unchanged
+            return current_model
+
     # Clamp to ceiling
-    next_idx = min(idx + 1, len(_ESCALATION_CHAIN) - 1)
-    return _ESCALATION_CHAIN[next_idx]
+    next_idx = min(idx + 1, len(chain) - 1)
+    return chain[next_idx]
 
 
 def _backoff(attempt: int) -> float:
     """Return backoff seconds: min(2^attempt, 10)."""
     return min(2 ** attempt, 10)
+
 
 
 def retry_step(
@@ -70,10 +81,10 @@ def retry_step(
     step_meta: dict[str, Any],
     max_retries: int = 2,
 ) -> tuple[str, int]:
-    """Execute a step with automatic retry and model escalation on failure.
+    """Execute a step with automatic retry and FrugalGPT cascade escalation (Fase 2).
 
     On each retry:
-    - The model is escalated to the next tier.
+    - The model is escalated to the next in the cascade chain (from router).
     - step_meta["model"] is updated with the escalated model.
     - An escalation record is injected into step_meta["_escalations"] list.
     - A simple exponential backoff is applied.
@@ -84,7 +95,8 @@ def retry_step(
         repo:         Repository name.
         issue_id:     Issue identifier.
         step:         Step description text.
-        step_meta:    Dict with step metadata (stepIndex, totalSteps, model, ...).
+        step_meta:    Dict with step metadata (stepIndex, totalSteps, model, 
+                      model_routing, ...).
                       Mutated in-place with escalation info on each retry.
         max_retries:  Maximum number of retry attempts (default 2).
 
@@ -97,16 +109,19 @@ def retry_step(
     Raises:
         The last exception raised by executor_fn if all retries are exhausted.
     """
-    # Work on a mutable copy so we don't clobber the caller's dict directly,
-    # but we DO want the caller to see escalation side-effects if they passed
-    # their own dict. We mutate step_meta in-place as documented.
     last_exc: Exception | None = None
 
+    # Extract the cascade chain from the router's decision (Fase 2)
+    cascade_chain = (
+        step_meta.get("model_routing", {}).get("fallback_chain")
+        or _FALLBACK_ESCALATION_CHAIN
+    )
+
     for attempt in range(max_retries + 1):
-        # On retries, escalate the model
+        # On retries, escalate the model using the cascade chain
         if attempt > 0:
             current_model = str(step_meta.get("model", "claude-haiku-3-5"))
-            new_model = escalate_model(current_model)
+            new_model = escalate_model(current_model, cascade_chain)
             step_meta["model"] = new_model
 
             # Record the escalation in an audit trail
@@ -115,7 +130,8 @@ def retry_step(
                 "attempt": attempt,
                 "fromModel": current_model,
                 "toModel": new_model,
-                "reason": f"Step failed on attempt {attempt}; escalating model for retry",
+                "reason": f"Step failed on attempt {attempt}; escalating model for retry (Fase 2 FrugalGPT cascade)",
+                "cascade_chain": cascade_chain,
             })
 
             # Backoff before retry

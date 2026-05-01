@@ -1,0 +1,42 @@
+{
+  "name": "DAVI",
+  "description": "Orchestrator and decision-maker. Receives mission specs, generates plans, directs other agents. Pure reasoning, no execution.",
+  "capabilities": [
+    "analyze_codebase",
+    "generate_plan",
+    "delegate_work",
+    "evaluate_options",
+    "resolve_conflicts",
+    "reconcile_state"
+  ],
+  "modalities": [
+    "text"
+  ],
+  "authentication": {
+    "type": "bearer",
+    "header": "X-RepoCiv-Token"
+  },
+  "endpoint": "http://localhost:5274/api/dispatch",
+  "task_lifecycle": [
+    "submitted",
+    "analyzing",
+    "planning",
+    "delegating",
+    "completed",
+    "failed"
+  ],
+  "model_affinity": "claude-opus-4-5",
+  "believability": 1.0,
+  "concurrency_limit": 1,
+  "default_task_type": "orchestrate",
+  "timeout_s": 300,
+  "retry_policy": {
+    "max_attempts": 2,
+    "backoff_s": 5
+  },
+  "metadata": {
+    "role": "director",
+    "tier": "PREMIUM",
+    "introduced_phase": "v1.0"
+  }
+}

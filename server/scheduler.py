@@ -99,6 +99,13 @@ def set_fatigue_provider(fn: Callable[[str], int | None]) -> None:
 
 
 def _priority_score(cmd: dict[str, Any], now: float) -> float:
+    """Calculate task priority with age, debt, fatigue, and agent believability (Fase 2).
+    
+    Believability weighting (new in Fase 2):
+      - Unreliable agents (believability < 0.5) get deprioritized
+      - Multiplier: 0.5 + 0.5 * believability (range 0.5–1.0)
+      - This ensures failing agents don't monopolize the queue
+    """
     age_min = (now - cmd.get("created_at", now)) / 60.0
     target: str = cmd.get("target", "")
     score = _WEIGHTS["age"] * (1 + age_min / 10)  # linear growth
@@ -120,6 +127,25 @@ def _priority_score(cmd: dict[str, Any], now: float) -> float:
                 # fatigue 0   = exhausted → multiplier ~0.0
                 fatigue_ratio = max(0.0, min(1.0, fatigue / 100.0))
                 score *= (0.3 + 0.7 * fatigue_ratio)  # floor at 0.3 so exhausted units still get served
+
+    # ─── Fase 2: Agent Believability Weighting ──────────────────────
+    # Query research ledger to adjust priority based on agent reliability
+    try:
+        from . import research_ledger as _rl
+        ledger = _rl.get_instance()
+        if ledger:
+            agent_type = cmd.get("payload", {}).get("agent_type", "")
+            if agent_type:
+                agent_upper = agent_type.upper()
+                believability_scores = ledger.get_agent_believability()
+                believability = believability_scores.get(agent_upper, 1.0)
+                # Multiplier ranges from 0.5 (unreliable) to 1.0 (reliable)
+                believability_multiplier = 0.5 + 0.5 * believability
+                score *= believability_multiplier
+    except (ImportError, Exception):
+        # If ledger unavailable, use default (no adjustment)
+        pass
+
     return round(score, 2)
 
 
