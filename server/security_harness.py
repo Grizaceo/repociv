@@ -628,18 +628,126 @@ class SecurityHarness:
 
     # ── Layer 3: Runtime Enforcement (placeholder for Fase 5) ─────────────
 
-    def runtime_enforce(self, agent_pid: int | None = None) -> None:
-        """Runtime monitoring stub — full implementation in Fase 5 with Docker.
+    def pre_launch_gate(
+        self,
+        mission_text: str,
+        *,
+        container_command: list[str] | None = None,
+    ) -> GateResult:
+        """Gate immediately before launching a process/container.
 
-        In Fase 5 this will:
-          - Monitor network connections via strace/nsenter
-          - Enforce --network none on Docker containers
-          - Auto-escalate to quarantine on anomalous syscalls
+        For Docker execution this enforces the Fase 5 launch policy:
+        ``--network none``, read-only repo bind mount, and no host secret mounts.
         """
-        logger.debug(
-            "SecurityHarness.runtime_enforce(pid=%s) — stub (full impl in Fase 5)",
-            agent_pid,
+        base = self.pre_dispatch_gate(mission_text)
+        findings = list(base.findings)
+
+        if container_command is not None:
+            findings.extend(self._validate_container_command(container_command))
+
+        level = self._incident_level(findings)
+        blocked = level >= INCIDENT_L2_HIGH_RISK
+        for finding in findings:
+            self.alerts.alert(finding, context={"phase": "pre_launch"})
+        return GateResult(
+            blocked=blocked,
+            findings=findings,
+            incident_level=level,
+            reason="; ".join(f.description for f in findings if f.severity in {"high", "critical"})[:500],
         )
+
+    def post_container_exit_audit(
+        self,
+        repo_root: str,
+        output: str,
+        *,
+        changed_files: list[str] | None = None,
+        allowed_scope: list[str] | None = None,
+    ) -> AuditResult:
+        """Audit container output and declared file changes before applying."""
+        from . import container_runtime as _container_runtime
+
+        files = changed_files or _container_runtime.parse_changed_files(output)
+        audit = self.post_execution_audit(repo_root, files, allowed_scope=allowed_scope)
+        findings = list(audit.findings)
+        findings.extend(scan_text_for_secrets(output))
+        findings.extend(scan_text_for_injections(output))
+        findings.extend(scan_text_for_iocs(output))
+
+        level = self._incident_level(findings)
+        for finding in findings:
+            self.alerts.alert(finding, context={"phase": "post_container_exit"})
+        return AuditResult(
+            clean=level == INCIDENT_L0_CLEAN,
+            findings=findings,
+            incident_level=level,
+            quarantined_files=audit.quarantined_files,
+        )
+
+    def runtime_enforce(
+        self,
+        agent_pid: int | None = None,
+        *,
+        container_command: list[str] | None = None,
+    ) -> GateResult:
+        """Enforce runtime policy for local processes or Docker containers."""
+        findings: list[Finding] = []
+        if container_command is not None:
+            findings.extend(self._validate_container_command(container_command))
+        level = self._incident_level(findings)
+        for finding in findings:
+            self.alerts.alert(finding, context={"phase": "runtime"})
+        logger.debug(
+            "SecurityHarness.runtime_enforce(pid=%s, container=%s) findings=%d",
+            agent_pid,
+            container_command is not None,
+            len(findings),
+        )
+        return GateResult(
+            blocked=level >= INCIDENT_L2_HIGH_RISK,
+            findings=findings,
+            incident_level=level,
+            reason="; ".join(f.description for f in findings if f.severity in {"high", "critical"})[:500],
+        )
+
+    @staticmethod
+    def _incident_level(findings: list[Finding]) -> int:
+        has_critical = any(f.severity == "critical" for f in findings)
+        has_high = any(f.severity == "high" for f in findings)
+        multi_scanner = len({f.scanner for f in findings}) >= 2
+        if has_critical or (has_high and multi_scanner):
+            return INCIDENT_L2_HIGH_RISK
+        if has_high or findings:
+            return INCIDENT_L1_SUSPICIOUS
+        return INCIDENT_L0_CLEAN
+
+    @staticmethod
+    def _validate_container_command(command: list[str]) -> list[Finding]:
+        findings: list[Finding] = []
+        joined = " ".join(command)
+        if "--network none" not in joined:
+            findings.append(Finding(
+                scanner="runtime",
+                severity="critical",
+                description="Docker container must run with --network none",
+                evidence=joined[:160],
+            ))
+        if "readonly" not in joined and ":ro" not in joined:
+            findings.append(Finding(
+                scanner="runtime",
+                severity="high",
+                description="Docker repo mount must be read-only",
+                evidence=joined[:160],
+            ))
+        for secret_path in (".env", "/.ssh", "~/.ssh", "/root/.ssh"):
+            if secret_path in joined:
+                findings.append(Finding(
+                    scanner="runtime",
+                    severity="critical",
+                    description=f"Host secret path must not be mounted: {secret_path}",
+                    evidence=secret_path,
+                ))
+        return findings
 
 
 # ── Module-level singleton ────────────────────────────────────────────────────

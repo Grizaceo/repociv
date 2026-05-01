@@ -10,8 +10,10 @@ from __future__ import annotations
 import subprocess
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
+from . import container_runtime as _container_runtime
 from . import harness_registry as _hr
 from . import recovery as _recovery
 
@@ -56,7 +58,37 @@ class RuntimeAdapter:
         return _recovery.build_recovery_plan(self.descriptor, failure_context)
 
 
+@dataclass(frozen=True)
+class DockerAdapter(RuntimeAdapter):
+    """Runtime adapter for Fase 5 Docker-isolated agent execution."""
+
+    def build_command(
+        self,
+        *,
+        repo_root: str | Path,
+        mission: str,
+        token: str | None = None,
+    ) -> list[str]:
+        return _container_runtime.build_docker_run_command(
+            repo_root=repo_root,
+            mission=mission,
+            token=token,
+        )
+
+
+_DOCKER_DESCRIPTOR: dict[str, Any] = {
+    "id": "docker-agent",
+    "name": "Docker isolated agent",
+    "trustLevel": "sandboxed",
+    "allowedActions": ["execute_agent", "run_tests", "edit_file"],
+    "blockedActions": [],
+    "health": {"kind": "command", "command": "docker --version"},
+}
+
+
 def get_adapter(harness_id: str) -> RuntimeAdapter | None:
+    if harness_id == "docker-agent":
+        return DockerAdapter(harness_id=harness_id, descriptor=_DOCKER_DESCRIPTOR)
     descriptor = _hr.get_harness(harness_id)
     if descriptor is None:
         return None
@@ -76,6 +108,10 @@ def infer_adapter_for_command(command_type: str, harness_id: str | None = None) 
 
 
 def default_agent_runtime(unit_id: str) -> RuntimeAdapter:
+    import os
+
+    if os.environ.get("REPOCIV_AGENT_CONTAINER", "").lower() in {"1", "true", "yes"}:
+        return DockerAdapter(harness_id="docker-agent", descriptor=_DOCKER_DESCRIPTOR)
     base = unit_id.split("-")[0].upper()
     harness_id = "openclaw-local" if base == "OPENCLAW" else "hermes-local"
     adapter = get_adapter(harness_id)

@@ -19,8 +19,10 @@ from typing import Any, Callable
 from server import event_store as _es
 from server import directive_store as _ds
 from server import sessions as _sessions
+from server import container_runtime as _container_runtime
 from server import run_state as _run_state
 from server import runtime_adapters as _runtime_adapters
+from server import security_harness as _security_harness
 from server import token_ledger as _token_ledger
 from server.quest import generate_quest_name
 
@@ -188,6 +190,9 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
     config = _get_agent_config(unit_id)
     base = unit_id.split("-")[0].upper()
 
+    if _container_mode_enabled():
+        return _run_container_streaming(unit_id, mission_id, mission, config, working_dir)
+
     if base == "OPENCLAW":
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: openclaw]\n"})
         return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir)
@@ -211,6 +216,68 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": msg})
         return False, msg.strip()
     return success, output
+
+
+def _container_mode_enabled() -> bool:
+    return os.environ.get("REPOCIV_AGENT_CONTAINER", "").lower() in {"1", "true", "yes"}
+
+
+def _run_container_streaming(unit_id: str, mission_id: str, mission: str,
+                             config: dict[str, Any],
+                             working_dir: str | None = None) -> tuple[bool, str]:
+    if not working_dir:
+        text = "[docker error] working directory is required for container mode\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, text.strip()
+
+    system_prompt = config.get("system", "")
+    full_prompt = f"{system_prompt}\n\n{mission}" if system_prompt else mission
+    token = (
+        os.environ.get(_container_runtime.DEFAULT_TOKEN_ENV)
+        or os.environ.get("REPOCIV_TOKEN")
+        or os.environ.get("X_REPOCIV_TOKEN")
+    )
+    command = _container_runtime.build_docker_run_command(
+        repo_root=working_dir,
+        mission=full_prompt,
+        token=token,
+    )
+    harness = _security_harness.get_harness()
+    gate = harness.pre_launch_gate(full_prompt, container_command=command)
+    if gate.blocked:
+        text = f"[security blocked] {gate.reason}\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, text.strip()
+
+    runtime_gate = harness.runtime_enforce(container_command=command)
+    if runtime_gate.blocked:
+        text = f"[runtime blocked] {runtime_gate.reason}\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, text.strip()
+
+    result = _container_runtime.run_agent_container(
+        repo_root=working_dir,
+        mission=full_prompt,
+        token=token,
+    )
+    audit = harness.post_container_exit_audit(
+        working_dir,
+        result.output,
+        changed_files=result.changed_files,
+    )
+    output = result.output
+    for line in output.splitlines(keepends=True):
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": line})
+        _es.record_output_chunk(mission_id, unit_id, line)
+    if not audit.clean:
+        text = f"[security audit failed] {audit.incident_level}\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, (output + text).strip()
+    return result.ok, output
 
 
 def _has_openclaw() -> bool:
