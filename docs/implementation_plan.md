@@ -557,13 +557,14 @@ graph TD
 - `server/agent_runner.py` — inyectar `runtime_enforce()` como monitor del proceso del agente
 
 **Gate F1.5:**
-- [ ] `pre_dispatch_gate()` bloquea mission text que contiene API keys hardcoded
-- [ ] `pre_dispatch_gate()` bloquea mission text con prompt injection patterns
-- [ ] `post_execution_audit()` detecta secrets en archivos modificados
-- [ ] `post_execution_audit()` detecta drift
-- [ ] Quarantine atómica mueve archivo a `quarantine/` sin path traversal
-- [ ] Alert system registra con dedup 30m y HMAC
-- [ ] 3 missions adversariales bloqueadas en tests
+- [x] `pre_dispatch_gate()` bloquea mission text que contiene API keys hardcoded
+- [x] `pre_dispatch_gate()` bloquea mission text con prompt injection patterns
+- [x] `post_execution_audit()` detecta secrets en archivos modificados
+- [x] `post_execution_audit()` detecta drift
+- [x] Quarantine atómica mueve archivo a `quarantine/` sin path traversal
+- [x] Alert system registra con dedup 30m y HMAC
+- [x] 5 missions adversariales bloqueadas en tests (3 requeridas, 5 implementadas)
+- [x] `pytest server/` — 440 passed, 2 skipped (2026-05-01)
 
 ---
 

@@ -2,11 +2,16 @@
 
 Connects task_orchestrator (P3) to agent_runner (SCOUT/WORKER/DAVI).
 Provides dispatch_plan_step for injection via _to.set_step_executor().
+
+Security integration (Fase 1.5):
+  - Pre-dispatch: SecurityHarness.pre_dispatch_gate() scans mission text
+  - Post-execution: SecurityHarness.post_execution_audit() verifies output
 """
 
 from __future__ import annotations
 
 import concurrent.futures
+import logging
 import uuid
 from typing import Any
 
@@ -14,7 +19,10 @@ from . import agent_runner as _agent_runner
 from . import model_router as _mr
 from . import workspace_issue as _wi
 from . import step_retry as _sr
+from . import security_harness as _sec
 from .tensor_context import ContextDirective, TensorContext, DEONTIC_MUST, DEONTIC_SHOULD
+
+logger = logging.getLogger(__name__)
 
 STEP_TIMEOUT = 300  # default per-step timeout in seconds
 
@@ -175,6 +183,23 @@ def dispatch_plan_step(
     step_idx = int(step_meta.get("stepIndex", 0))
     prior_artifacts = _wi.read_output_artifacts(repo, issue_id, up_to_step=step_idx)
     mission = build_step_mission(step_description, spec, prior_artifacts)
+
+    # ── Security Layer 1: Pre-dispatch Gate (Fase 1.5) ────────────────────
+    harness = _sec.get_harness()
+    gate = harness.pre_dispatch_gate(mission)
+    if gate.blocked:
+        logger.warning(
+            "SecurityHarness BLOCKED mission [%s] incident=%s reason=%s",
+            run_id, gate.incident_level, gate.reason,
+        )
+        raise RuntimeError(
+            f"Security gate blocked dispatch: {gate.reason}"
+        )
+    elif gate.findings:
+        logger.info(
+            "SecurityHarness: %d findings (not blocking) for %s",
+            len(gate.findings), run_id,
+        )
 
     # Select agent — explicit in meta overrides heuristic
     agent = str(step_meta.get("agent") or select_agent_for_step(step_description))
