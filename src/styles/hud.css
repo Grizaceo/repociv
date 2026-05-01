@@ -3,7 +3,9 @@
 /* Barra superior de recursos */
 #top-bar {
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 42px;
   background: var(--ui-panel-bg);
   border-bottom: 2px solid var(--ui-border);
@@ -14,7 +16,7 @@
   font-family: var(--font-ui);
   font-size: 13px;
   z-index: 10;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.6);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
 }
 
 .resource {
@@ -22,17 +24,33 @@
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--ui-border);
   border-radius: 3px;
 }
 
-.res-icon { font-size: 15px; }
-.res-label { color: var(--ui-text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
-.res-value { font-weight: 600; min-width: 36px; }
-#res-gold   .res-value { color: var(--res-gold); }
-#res-science .res-value { color: var(--res-science); }
-#res-production .res-value { color: var(--res-production); }
+.res-icon {
+  font-size: 15px;
+}
+.res-label {
+  color: var(--ui-text-dim);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.res-value {
+  font-weight: 600;
+  min-width: 36px;
+}
+#res-gold .res-value {
+  color: var(--res-gold);
+}
+#res-science .res-value {
+  color: var(--res-science);
+}
+#res-production .res-value {
+  color: var(--res-production);
+}
 
 #era-display {
   margin-left: auto;
@@ -51,9 +69,18 @@
   margin-left: 12px;
   letter-spacing: 0.08em;
 }
-.bridge-online  { background: #2d5a27; color: #b3e8a4; }
-.bridge-offline { background: #3a1a1a; color: #d48a8a; }
-.bridge-demo    { color: #c8a84b !important; animation: pulse-warn 2s infinite; }
+.bridge-online {
+  background: #2d5a27;
+  color: #b3e8a4;
+}
+.bridge-offline {
+  background: #3a1a1a;
+  color: #d48a8a;
+}
+.bridge-demo {
+  color: #c8a84b !important;
+  animation: pulse-warn 2s infinite;
+}
 
 /* GPU/VRAM bar */
 #gpu-bar {
@@ -66,8 +93,13 @@
   padding: 0 8px;
   border-left: 1px solid var(--border);
 }
-#gpu-bar.hidden { display: none; }
-.gpu-warn { color: #d45b5b !important; animation: pulse-warn 1s infinite; }
+#gpu-bar.hidden {
+  display: none;
+}
+.gpu-warn {
+  color: #d45b5b !important;
+  animation: pulse-warn 1s infinite;
+}
 
 /* Screenshot button */
 #btn-screenshot {
@@ -81,7 +113,7 @@
   line-height: 1;
 }
 #btn-screenshot:hover {
-  background: var(--ui-bg-hover, rgba(255,255,255,0.08));
+  background: var(--ui-bg-hover, rgba(255, 255, 255, 0.08));
   color: var(--ui-text);
 }
 
@@ -97,7 +129,7 @@
   line-height: 1;
 }
 #btn-settings:hover {
-  background: var(--ui-bg-hover, rgba(255,255,255,0.08));
+  background: var(--ui-bg-hover, rgba(255, 255, 255, 0.08));
   color: var(--ui-text);
 }
 
@@ -115,7 +147,7 @@
   flex-direction: column;
   gap: 6px;
   min-width: 220px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
 }
 
 .hero-bar-label {
@@ -152,7 +184,9 @@
   transition: all 0.15s;
 }
 
-.hero-slot:hover { border-color: var(--ui-gold); }
+.hero-slot:hover {
+  border-color: var(--ui-gold);
+}
 .hero-slot.selected {
   border-color: var(--ui-gold-bright);
   box-shadow: 0 0 8px var(--ui-gold);
@@ -183,10 +217,19 @@
   border-radius: 50%;
   border: 1px solid var(--ui-dark);
 }
-.hero-slot .slot-state.idle { background: #888; }
-.hero-slot .slot-state.working { background: #5b9bd5; animation: pulse 1.5s infinite; }
-.hero-slot .slot-state.moving { background: #c8a84b; }
-.hero-slot .slot-state.sleeping { background: #6b6b6b; }
+.hero-slot .slot-state.idle {
+  background: #888;
+}
+.hero-slot .slot-state.working {
+  background: #5b9bd5;
+  animation: pulse 1.5s infinite;
+}
+.hero-slot .slot-state.moving {
+  background: #c8a84b;
+}
+.hero-slot .slot-state.sleeping {
+  background: #6b6b6b;
+}
 
 /* Phase 9: XCOM Context Fatigue bars */
 .hero-fatigue-wrap {
@@ -195,14 +238,16 @@
   left: 4px;
   right: 4px;
   height: 3px;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   border-radius: 2px;
   overflow: hidden;
 }
 .hero-fatigue-bar {
   height: 100%;
   border-radius: 2px;
-  transition: width 0.4s ease, background 0.4s ease;
+  transition:
+    width 0.4s ease,
+    background 0.4s ease;
 }
 .fatigue-rest-badge {
   position: absolute;
@@ -279,7 +324,7 @@
   border-radius: 4px;
   padding: 6px 10px;
   z-index: 10;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
   max-height: 80px;
   overflow: hidden;
 }
@@ -296,10 +341,21 @@
   border-radius: 2px;
   animation: slideUp 0.3s ease;
 }
-.log-entry.log-gold { color: var(--ui-gold-bright); font-weight: 600; }
-.log-entry.log-build { color: var(--bar-building); }
-.log-entry.log-wonder { color: var(--ui-gold-bright); font-weight: 700; font-size: 12px; }
-.log-entry.log-error { color: #d45b5b; }
+.log-entry.log-gold {
+  color: var(--ui-gold-bright);
+  font-weight: 600;
+}
+.log-entry.log-build {
+  color: var(--bar-building);
+}
+.log-entry.log-wonder {
+  color: var(--ui-gold-bright);
+  font-weight: 700;
+  font-size: 12px;
+}
+.log-entry.log-error {
+  color: #d45b5b;
+}
 
 /* Responsive */
 @media (max-width: 1366px) {

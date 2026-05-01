@@ -129,7 +129,7 @@ describe('spiralCoords', () => {
   it('all coords are unique including across ring boundaries', () => {
     for (const n of [1, 7, 8, 9, 13, 19, 20, 37, 38, 61]) {
       const coords = spiralCoords({ q: 0, r: 0 }, n);
-      const keys = new Set(coords.map(c => `${c.q},${c.r}`));
+      const keys = new Set(coords.map((c) => `${c.q},${c.r}`));
       expect(coords).toHaveLength(n);
       expect(keys.size).toBe(n);
     }

@@ -8,18 +8,20 @@ import type { GameState } from '../game.ts';
 export type LedgerFilter = 'all' | 'active' | 'idle' | string; // string = terrain filter
 
 const TERRAIN_LABEL: Record<string, string> = {
-  plains:   '🌾 TS',
-  forest:   '🌲 Py',
+  plains: '🌾 TS',
+  forest: '🌲 Py',
   mountain: '⛰ Sys',
-  desert:   '📄 Docs',
-  ocean:    '🌊 Empty',
-  ice:      '❄ Legacy',
-  hills:    '⛺ Mixed',
+  desert: '📄 Docs',
+  ocean: '🌊 Empty',
+  ice: '❄ Legacy',
+  hills: '⛺ Mixed',
 };
 
 function esc(s: string): string {
-  return s.replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }
 
 function injectLedgerDOM(): HTMLElement {
@@ -37,9 +39,9 @@ function injectLedgerDOM(): HTMLElement {
           GRAN LIBRO — Workspace Overview
         </div>
         <div id="ledger-filters">
-          <button class="ledger-filter active" data-filter="all">Todos</button>
-          <button class="ledger-filter" data-filter="active">Activos</button>
-          <button class="ledger-filter" data-filter="idle">Idle</button>
+          <button class="ledger-filter active" data-filter="all" aria-label="Mostrar todos los repos">Todos</button>
+          <button class="ledger-filter" data-filter="active" aria-label="Mostrar repos activos">Activos</button>
+          <button class="ledger-filter" data-filter="idle" aria-label="Mostrar repos idle">Idle</button>
         </div>
         <button id="ledger-close" aria-label="Cerrar [F6]">✕ <kbd>F6</kbd></button>
       </div>
@@ -277,14 +279,16 @@ function renderTable(state: GameState, filter: LedgerFilter) {
   const units = state.world.units;
   const buildings = state.world.buildings;
 
-  let rows = state.world.cities.map(city => {
+  let rows = state.world.cities.map((city) => {
     const tile = state.world.tiles.get(`${city.coord.q},${city.coord.r}`);
-    const cityUnits = units.filter(u => {
+    const cityUnits = units.filter((u) => {
       // Unit is "in" a city if it's on any tile in that city's territory
-      return city.territory.some(t => t.q === u.coord.q && t.r === u.coord.r)
-          || (u.coord.q === city.coord.q && u.coord.r === city.coord.r);
+      return (
+        city.territory.some((t) => t.q === u.coord.q && t.r === u.coord.r) ||
+        (u.coord.q === city.coord.q && u.coord.r === city.coord.r)
+      );
     });
-    const activeBuilding = buildings.find(b => b.cityId === city.id && b.state === 'building');
+    const activeBuilding = buildings.find((b) => b.cityId === city.id && b.state === 'building');
     const res = tile?.resources ?? { gold: 0, science: 0, production: 0 };
 
     return { city, tile, cityUnits, activeBuilding, res };
@@ -292,9 +296,9 @@ function renderTable(state: GameState, filter: LedgerFilter) {
 
   // Apply filter
   if (filter === 'active') {
-    rows = rows.filter(r => r.cityUnits.length > 0 || r.activeBuilding);
+    rows = rows.filter((r) => r.cityUnits.length > 0 || r.activeBuilding);
   } else if (filter === 'idle') {
-    rows = rows.filter(r => r.cityUnits.length === 0 && !r.activeBuilding);
+    rows = rows.filter((r) => r.cityUnits.length === 0 && !r.activeBuilding);
   }
 
   // Sort: capitals first, then by population desc
@@ -308,24 +312,26 @@ function renderTable(state: GameState, filter: LedgerFilter) {
     countEl.textContent = `${rows.length} repos${rows.length !== state.world.cities.length ? ` / ${state.world.cities.length} total` : ''}`;
   }
 
-  tbody.innerHTML = rows.map(({ city, tile, cityUnits, activeBuilding, res }) => {
-    const capStar = city.isCapital ? '<span class="ledger-cap-star">★</span>' : '';
-    const terrain = TERRAIN_LABEL[tile?.terrain ?? ''] ?? tile?.terrain ?? '—';
-    const agents = cityUnits.length > 0
-      ? cityUnits.map(u =>
-          `<span class="ledger-agent-badge state-${u.state}">${esc(u.name)}</span>`
-        ).join('')
-      : '<span style="color:#555">—</span>';
+  tbody.innerHTML = rows
+    .map(({ city, tile, cityUnits, activeBuilding, res }) => {
+      const capStar = city.isCapital ? '<span class="ledger-cap-star">★</span>' : '';
+      const terrain = TERRAIN_LABEL[tile?.terrain ?? ''] ?? tile?.terrain ?? '—';
+      const agents =
+        cityUnits.length > 0
+          ? cityUnits
+              .map((u) => `<span class="ledger-agent-badge state-${u.state}">${esc(u.name)}</span>`)
+              .join('')
+          : '<span style="color:#555">—</span>';
 
-    let statusHtml: string;
-    if (activeBuilding) {
-      const pct = Math.round(activeBuilding.progress);
-      statusHtml = `<span class="ledger-status-building">⚙ ${esc(activeBuilding.name)} ${pct}%</span>`;
-    } else {
-      statusHtml = '<span class="ledger-status-idle">—</span>';
-    }
+      let statusHtml: string;
+      if (activeBuilding) {
+        const pct = Math.round(activeBuilding.progress);
+        statusHtml = `<span class="ledger-status-building">⚙ ${esc(activeBuilding.name)} ${pct}%</span>`;
+      } else {
+        statusHtml = '<span class="ledger-status-idle">—</span>';
+      }
 
-    return `<tr class="${city.isCapital ? 'ledger-capital' : ''}" data-city-id="${esc(city.id)}">
+      return `<tr class="${city.isCapital ? 'ledger-capital' : ''}" data-city-id="${esc(city.id)}">
       <td><span class="ledger-repo-name">${capStar}${esc(city.name)}</span></td>
       <td class="ledger-terrain">${terrain}</td>
       <td class="ledger-num">${city.population}</td>
@@ -335,10 +341,11 @@ function renderTable(state: GameState, filter: LedgerFilter) {
       <td><div class="ledger-agents">${agents}</div></td>
       <td>${statusHtml}</td>
     </tr>`;
-  }).join('');
+    })
+    .join('');
 
   // Wire row clicks
-  tbody.querySelectorAll<HTMLTableRowElement>('tr[data-city-id]').forEach(row => {
+  tbody.querySelectorAll<HTMLTableRowElement>('tr[data-city-id]').forEach((row) => {
     row.addEventListener('click', () => {
       const id = row.dataset.cityId;
       if (id && _focusCallback) _focusCallback(id);
@@ -353,11 +360,11 @@ export function openLedger(state: GameState, onFocusCity?: (cityId: string) => v
   el.classList.remove('hidden');
 
   // Wire filter buttons
-  el.querySelectorAll<HTMLButtonElement>('.ledger-filter').forEach(btn => {
+  el.querySelectorAll<HTMLButtonElement>('.ledger-filter').forEach((btn) => {
     btn.addEventListener('click', () => {
-      el.querySelectorAll('.ledger-filter').forEach(b => b.classList.remove('active'));
+      el.querySelectorAll('.ledger-filter').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
-      _currentFilter = btn.dataset.filter as LedgerFilter ?? 'all';
+      _currentFilter = (btn.dataset.filter as LedgerFilter) ?? 'all';
       renderTable(state, _currentFilter);
     });
   });

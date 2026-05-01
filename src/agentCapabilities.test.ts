@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
-  agentCanDo, repoAllows, canExecute, getSkillBadges,
-  AGENT_CAPABILITIES, agentBase,
+  agentCanDo,
+  repoAllows,
+  canExecute,
+  getSkillBadges,
+  AGENT_CAPABILITIES,
+  agentBase,
 } from './agentCapabilities.ts';
 
 describe('agentBase', () => {
@@ -95,7 +99,7 @@ describe('getSkillBadges', () => {
   it('returns badges for DAVI', () => {
     const badges = getSkillBadges('DAVI');
     expect(badges.length).toBeGreaterThan(0);
-    expect(badges.every(b => b.key && b.label && b.icon)).toBe(true);
+    expect(badges.every((b) => b.key && b.label && b.icon)).toBe(true);
   });
 
   it('SCOUT only has inspection badge', () => {

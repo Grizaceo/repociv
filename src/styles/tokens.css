@@ -4,39 +4,39 @@
 /* ─── CSS Custom Properties ─────────────────────────────────────────────── */
 :root {
   /* Terrenos */
-  --hex-plains:      #7ba05b;
-  --hex-desert:      #d4a574;
-  --hex-forest:      #2d5a27;
-  --hex-mountain:    #6b6b6b;
-  --hex-ocean:       #2b6da5;
-  --hex-shallows:    #3a8bc8;
-  --hex-ice:         #e0e0e0;
-  --hex-fog:         rgba(0, 0, 0, 0.62);
+  --hex-plains: #7ba05b;
+  --hex-desert: #d4a574;
+  --hex-forest: #2d5a27;
+  --hex-mountain: #6b6b6b;
+  --hex-ocean: #2b6da5;
+  --hex-shallows: #3a8bc8;
+  --hex-ice: #e0e0e0;
+  --hex-fog: rgba(0, 0, 0, 0.62);
 
   /* UI del juego */
-  --ui-dark:         #1a1208;
-  --ui-dark-trans:   rgba(26, 18, 8, 0.90);
-  --ui-border:       #5a3e1e;
+  --ui-dark: #1a1208;
+  --ui-dark-trans: rgba(26, 18, 8, 0.9);
+  --ui-border: #5a3e1e;
   --ui-border-light: #8a6a3e;
-  --ui-gold:         #c8a84b;
-  --ui-gold-bright:  #f0c050;
-  --ui-text:         #e8d5a0;
-  --ui-text-dim:     #a89060;
-  --ui-panel-bg:     rgba(22, 16, 6, 0.94);
-  --ui-selection:     rgba(200, 168, 75, 0.35);
+  --ui-gold: #c8a84b;
+  --ui-gold-bright: #f0c050;
+  --ui-text: #e8d5a0;
+  --ui-text-dim: #a89060;
+  --ui-panel-bg: rgba(22, 16, 6, 0.94);
+  --ui-selection: rgba(200, 168, 75, 0.35);
 
   /* Recurso colors */
-  --res-gold:        #f0c040;
-  --res-science:     #5b9bd5;
-  --res-production:   #d45b5b;
+  --res-gold: #f0c040;
+  --res-science: #5b9bd5;
+  --res-production: #d45b5b;
 
   /* Barras de progreso */
-  --bar-building:    #5b9b5b;
-  --bar-wonder:      #c8a84b;
-  --bar-bg:          #2a1e0a;
+  --bar-building: #5b9b5b;
+  --bar-wonder: #c8a84b;
+  --bar-bg: #2a1e0a;
 
   /* Fonts */
-  --font-ui:         'Cinzel', 'Georgia', serif;
-  --font-mono:       'Courier New', monospace;
-  --font-body:       'Georgia', serif;
+  --font-ui: 'Cinzel', 'Georgia', serif;
+  --font-mono: 'Courier New', monospace;
+  --font-body: 'Georgia', serif;
 }

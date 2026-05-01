@@ -270,6 +270,28 @@ export default defineConfig(({ mode }) => {
     server: { port: vitePort, strictPort: true },
     test: {
       exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
+      coverage: {
+        provider: 'v8',
+        reporter: ['text', 'lcov'],
+        include: ['src/**/*.ts'],
+        exclude: [
+          'src/**/*.test.ts',
+          'src/local.demo.ts',
+          'src/**/*.d.ts',
+          // DOM/Canvas rendering files — untestable in jsdom
+          'src/ui/**',
+          'src/renderer.ts',
+          'src/unitRenderer.ts',
+          'src/hexRenderer.ts',
+          'src/terminalPanel.ts',
+          'src/spatialDirectives.ts',
+          'src/localRenderer.ts',
+          'src/minimapRenderer.ts',
+          'src/localWorldManager.ts',
+          'src/main.ts',
+        ],
+        thresholds: { lines: 55, branches: 70 },
+      },
     },
   };
 });

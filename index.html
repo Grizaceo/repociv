@@ -12,9 +12,12 @@
   <script src="https://unpkg.com/tippy.js@6.3.7/dist/tippy-bundle.umd.min.js"></script>
 </head>
 <body>
+  <!-- Skip link for keyboard/screen-reader users -->
+  <a href="#main-canvas" class="skip-link">Saltar al mapa principal</a>
+
   <div id="app">
     <!-- Canvas principal: hex grid -->
-    <canvas id="main-canvas"></canvas>
+    <canvas id="main-canvas" tabindex="0" aria-label="Mapa hexagonal del imperio RepoCiv"></canvas>
 
     <!-- 3D Scene Container -->
     <div id="three-container"></div>
@@ -47,23 +50,23 @@
             <span class="gpu-temp">GPU —</span>
           </div>
           <div id="bridge-status" class="bridge-offline" title="Bridge.py status">⚡ bridge</div>
-          <button id="btn-approvals" title="Aprobaciones pendientes [A]">
+          <button id="btn-approvals" title="Aprobaciones pendientes [A]" aria-label="Aprobaciones pendientes">
             ⚠<span class="approval-badge"></span>
           </button>
-          <button id="btn-replay" title="Replay de directivas [F7]">↩</button>
-          <button id="btn-observability" title="Observabilidad [F8]">
+          <button id="btn-replay" title="Replay de directivas [F7]" aria-label="Replay de directivas">↩</button>
+          <button id="btn-observability" title="Observabilidad [F8]" aria-label="Panel de observabilidad">
             ◉<span class="obs-health-dot"></span>
           </button>
-          <button id="btn-timeline" title="Crónica de eventos [F10]">
+          <button id="btn-timeline" title="Crónica de eventos [F10]" aria-label="Crónica de eventos">
             <i data-lucide="scroll-text"></i>
           </button>
-          <button id="btn-toggle-3d" title="Cambiar Vista 2D/3D [3]">
+          <button id="btn-toggle-3d" title="Cambiar Vista 2D/3D [3]" aria-label="Cambiar vista 2D/3D">
             <i data-lucide="box"></i>
           </button>
-          <button id="btn-screenshot" title="Captura de Pantalla [F12]">
+          <button id="btn-screenshot" title="Captura de Pantalla [F12]" aria-label="Captura de pantalla">
             <i data-lucide="camera"></i>
           </button>
-          <button id="btn-settings" title="Configuración [F11]">
+          <button id="btn-settings" title="Configuración [F11]" aria-label="Configuración">
             <i data-lucide="settings"></i>
           </button>
         </div>
@@ -82,12 +85,12 @@
               <!-- Rellenado dinámicamente -->
             </select>
           </div>
-          <button id="side-panel-close" title="Cerrar [Esc]">✕</button>
+          <button id="side-panel-close" title="Cerrar [Esc]" aria-label="Cerrar panel lateral">✕</button>
         </div>
         <div id="side-panel-tabs">
-          <button class="side-tab active" data-tab="chat">Crónicas</button>
-          <button class="side-tab" data-tab="git">Manuscritos</button>
-          <button class="side-tab" data-tab="files">Archivos</button>
+          <button class="side-tab active" data-tab="chat" aria-label="Pestaña de crónicas">Crónicas</button>
+          <button class="side-tab" data-tab="git" aria-label="Pestaña de manuscritos">Manuscritos</button>
+          <button class="side-tab" data-tab="files" aria-label="Pestaña de archivos">Archivos</button>
         </div>
         <div id="side-panel-content">
           <div class="tab-pane active" data-pane="chat">
@@ -95,7 +98,7 @@
             <div id="operation-ticker" class="hidden"><span class="dot"></span><span id="ticker-text">trabajando...</span></div>
             <div id="chat-input-row">
               <input id="chat-input" type="text" placeholder="Hablar con el agente... [Enter]" autocomplete="off" />
-              <button id="btn-chat-send">Enviar</button>
+              <button id="btn-chat-send" aria-label="Enviar mensaje al agente">Enviar</button>
             </div>
           </div>
           <div class="tab-pane" data-pane="git">
@@ -128,9 +131,9 @@
           <div id="unit-mission" class="hero-mission-text">"Esperando órdenes..."</div>
           <div id="unit-capability-badges" class="cap-badge-row"></div>
           <div id="unit-actions">
-            <button id="btn-move" data-hotkey="m">Mover</button>
-            <button id="btn-build" data-hotkey="b">Construir</button>
-            <button id="btn-sleep" data-hotkey="s">Dormir</button>
+            <button id="btn-move" data-hotkey="m" aria-label="Mover unidad [M]">Mover</button>
+            <button id="btn-build" data-hotkey="b" aria-label="Construir edificio [B]">Construir</button>
+            <button id="btn-sleep" data-hotkey="s" aria-label="Poner unidad a dormir [S]">Dormir</button>
           </div>
           <div id="mission-input-row">
             <input id="mission-input" type="text" placeholder="> Encomendar misión..." autocomplete="off" />
@@ -141,11 +144,11 @@
         <div id="command-bar">
           <div id="hero-bar-slots"></div>
           <div class="hero-bar-spawn">
-            <button class="spawn-btn" data-type="DAVI" title="DAVI [Q]">Q</button>
-            <button class="spawn-btn" data-type="WORKER" title="Worker [W]">W</button>
-            <button class="spawn-btn" data-type="SCOUT" title="Scout [E]">E</button>
-            <button class="spawn-btn" data-type="LEXO" title="LexO [L]">L</button>
-            <button class="spawn-btn" data-type="OPENCLAW" title="Claw [O]">O</button>
+            <button class="spawn-btn" data-type="DAVI" title="DAVI [Q]" aria-label="Desplegar agente DAVI">Q</button>
+            <button class="spawn-btn" data-type="WORKER" title="Worker [W]" aria-label="Desplegar agente Worker">W</button>
+            <button class="spawn-btn" data-type="SCOUT" title="Scout [E]" aria-label="Desplegar agente Scout">E</button>
+            <button class="spawn-btn" data-type="LEXO" title="LexO [L]" aria-label="Desplegar agente LexO">L</button>
+            <button class="spawn-btn" data-type="OPENCLAW" title="Claw [O]" aria-label="Desplegar agente OpenClaw">O</button>
           </div>
         </div>
 
@@ -199,9 +202,9 @@
           </div>
         </div>
         <div class="city-panel-footer">
-          <button id="btn-city-mission">Enviar misión a esta ciudad</button>
-          <button id="btn-city-explorer">Ver en explorador</button>
-          <button id="btn-city-close">✕</button>
+          <button id="btn-city-mission" aria-label="Enviar misión a esta ciudad">Enviar misión a esta ciudad</button>
+          <button id="btn-city-explorer" aria-label="Ver ciudad en explorador">Ver en explorador</button>
+          <button id="btn-city-close" aria-label="Cerrar panel de ciudad">✕</button>
         </div>
       </div>
 
@@ -209,17 +212,17 @@
       <div id="quest-board" class="hidden">
         <div class="board-header">
           <div class="board-title">★ QUEST BOARD — Imperio de Cristóbal ★</div>
-          <button id="quest-board-close">✕</button>
+          <button id="quest-board-close" aria-label="Cerrar tablero de misiones">✕</button>
         </div>
         <div class="board-tabs">
-          <button class="quest-tab active" data-filter="all">Todas <span class="qb-badge" id="qb-badge-all">0</span></button>
-          <button class="quest-tab" data-filter="running">En curso <span class="qb-badge" id="qb-badge-run">0</span></button>
-          <button class="quest-tab" data-filter="complete">Completas <span class="qb-badge" id="qb-badge-done">0</span></button>
-          <button class="quest-tab" data-filter="failed">Fallidas <span class="qb-badge" id="qb-badge-fail">0</span></button>
+          <button class="quest-tab active" data-filter="all" aria-label="Mostrar todas las misiones">Todas <span class="qb-badge" id="qb-badge-all">0</span></button>
+          <button class="quest-tab" data-filter="running" aria-label="Mostrar misiones en curso">En curso <span class="qb-badge" id="qb-badge-run">0</span></button>
+          <button class="quest-tab" data-filter="complete" aria-label="Mostrar misiones completas">Completas <span class="qb-badge" id="qb-badge-done">0</span></button>
+          <button class="quest-tab" data-filter="failed" aria-label="Mostrar misiones fallidas">Fallidas <span class="qb-badge" id="qb-badge-fail">0</span></button>
         </div>
         <div id="quest-list"></div>
         <div class="board-footer">
-          <button id="btn-new-quest">+ Nueva misión</button>
+          <button id="btn-new-quest" aria-label="Crear nueva misión">+ Nueva misión</button>
         </div>
       </div>
 
@@ -228,7 +231,7 @@
         <div class="kbh-content">
           <div class="board-header">
             <div class="board-title">Atajos de teclado</div>
-            <button id="kbh-close">✕</button>
+            <button id="kbh-close" aria-label="Cerrar guía de atajos">✕</button>
           </div>
           <div class="kbh-grid">
             <div class="kbh-section">

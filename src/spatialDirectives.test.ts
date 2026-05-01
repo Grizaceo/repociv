@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  interpretUnitToFileDrag,
-  interpretCardDropOnUnit,
-} from './spatialDirectives.ts';
+import { interpretUnitToFileDrag, interpretCardDropOnUnit } from './spatialDirectives.ts';
 import type { Unit, Tile, City } from './types.ts';
 import type { Axial } from './hex.ts';
 import { draftCommand, type CommandDraft } from './commandSchema.ts';
@@ -198,7 +195,7 @@ describe('interpretCardDropOnUnit', () => {
     expect(result!.draft.type).toBe('inspect_repo');
     expect(result!.draft.created_by).toBe('scout1');
     expect(result!.sourceUnitId).toBe('scout1');
-    expect(result!.confidence).toBe(0.80);
+    expect(result!.confidence).toBe(0.8);
     expect(result!.userConfirmed).toBe(false);
     expect(result!.shiftHeld).toBe(false);
   });

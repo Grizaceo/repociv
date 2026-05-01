@@ -71,7 +71,7 @@ function buildDOM() {
       <div class="settings-title-row">
         <span class="settings-title">⚙ Configuración Imperial</span>
       </div>
-      <button id="settings-close" class="icon-btn" title="Cerrar">[ X ]</button>
+      <button id="settings-close" class="icon-btn" title="Cerrar" aria-label="Cerrar panel de configuración">[ X ]</button>
     </div>
 
     <div class="settings-body">
@@ -136,8 +136,8 @@ function buildDOM() {
     </div><!-- /settings-body -->
 
     <div class="settings-footer">
-      <button id="settings-reset" class="btn-secondary">Restaurar valores</button>
-      <button id="settings-close-btn" class="btn-primary">Cerrar</button>
+      <button id="settings-reset" class="btn-secondary" aria-label="Restaurar valores por defecto">Restaurar valores</button>
+      <button id="settings-close-btn" class="btn-primary" aria-label="Cerrar panel de configuración">Cerrar</button>
     </div>
   `;
 
@@ -217,8 +217,10 @@ function persistFromDOM() {
     ...c,
     fatigue: {
       ...c.fatigue,
-      warnThreshold: parseInt(panel.querySelector<HTMLInputElement>('#set-fatigue-warn')!.value) / 100,
-      criticalThreshold: parseInt(panel.querySelector<HTMLInputElement>('#set-fatigue-crit')!.value) / 100,
+      warnThreshold:
+        parseInt(panel.querySelector<HTMLInputElement>('#set-fatigue-warn')!.value) / 100,
+      criticalThreshold:
+        parseInt(panel.querySelector<HTMLInputElement>('#set-fatigue-crit')!.value) / 100,
     },
     animations: {
       ...c.animations,
@@ -226,9 +228,10 @@ function persistFromDOM() {
     },
     models: {
       ...c.models,
-      allowed: panel.querySelector<HTMLInputElement>('#set-models')!.value
-        .split(',')
-        .map(s => s.trim())
+      allowed: panel
+        .querySelector<HTMLInputElement>('#set-models')!
+        .value.split(',')
+        .map((s) => s.trim())
         .filter(Boolean),
     },
   };

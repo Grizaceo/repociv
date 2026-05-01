@@ -5,19 +5,19 @@ const TILE_SIZE = 24; // px per tile
 
 // ─── Tile colors (RimWorld-inspired dark palette) ─────────────────────────────
 const TILE_COLOR: Record<string, string> = {
-  floor:      '#2a2a35',
-  wall:       '#0f0f18',
-  door:       '#4a3a1a',
-  workbench:  '#1a3040',
-  debris:     '#1a1a1a',
+  floor: '#2a2a35',
+  wall: '#0f0f18',
+  door: '#4a3a1a',
+  workbench: '#1a3040',
+  debris: '#1a1a1a',
 };
 
 const TILE_BORDER: Record<string, string> = {
-  floor:      '#35354a',
-  wall:       '#1a1a28',
-  door:       '#8a6a2a',
-  workbench:  '#2a5060',
-  debris:     '#252525',
+  floor: '#35354a',
+  wall: '#1a1a28',
+  door: '#8a6a2a',
+  workbench: '#2a5060',
+  debris: '#252525',
 };
 
 // ─── Main renderer class ───────────────────────────────────────────────────────
@@ -29,13 +29,13 @@ export class LocalRenderer {
   // Camera
   private cam = { x: 0, y: 0, cx: 0, cy: 0, zoom: 1 };
   private isDragging = false;
-  private dragStart  = { x: 0, y: 0 };
-  private camStart   = { x: 0, y: 0 };
+  private dragStart = { x: 0, y: 0 };
+  private camStart = { x: 0, y: 0 };
 
   // Interaction
   hoveredTile: { x: number; y: number } | null = null;
-  onTileClick:  ((x: number, y: number, tile: LocalTile | null) => void) | null = null;
-  onTileHover:  ((x: number, y: number, tile: LocalTile | null) => void) | null = null;
+  onTileClick: ((x: number, y: number, tile: LocalTile | null) => void) | null = null;
+  onTileHover: ((x: number, y: number, tile: LocalTile | null) => void) | null = null;
   onTileDblClick: ((x: number, y: number, tile: LocalTile | null) => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -52,9 +52,9 @@ export class LocalRenderer {
   }
 
   private resize() {
-    this.canvas.width  = window.innerWidth;
+    this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
-    this.cam.cx = this.canvas.width  / 2;
+    this.cam.cx = this.canvas.width / 2;
     this.cam.cy = this.canvas.height / 2;
   }
 
@@ -65,8 +65,8 @@ export class LocalRenderer {
     canvas.addEventListener('mousedown', (e) => {
       if (e.button === 0) {
         this.isDragging = true;
-        this.dragStart  = { x: e.clientX, y: e.clientY };
-        this.camStart   = { x: this.cam.x, y: this.cam.y };
+        this.dragStart = { x: e.clientX, y: e.clientY };
+        this.camStart = { x: this.cam.x, y: this.cam.y };
       }
     });
 
@@ -89,8 +89,10 @@ export class LocalRenderer {
 
     canvas.addEventListener('mouseup', (e) => {
       if (e.button === 0 && !this.wasDrag(e)) {
-        const tile = this.screenToTile(e.clientX - canvas.getBoundingClientRect().left,
-                                       e.clientY - canvas.getBoundingClientRect().top);
+        const tile = this.screenToTile(
+          e.clientX - canvas.getBoundingClientRect().left,
+          e.clientY - canvas.getBoundingClientRect().top,
+        );
         if (tile) this.onTileClick?.(tile.x, tile.y, this.getTile(tile.x, tile.y));
       }
       this.isDragging = false;
@@ -102,28 +104,35 @@ export class LocalRenderer {
       if (tile) this.onTileDblClick?.(tile.x, tile.y, this.getTile(tile.x, tile.y));
     });
 
-    canvas.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const factor = e.deltaY > 0 ? 0.9 : 1.1;
-      const newZoom = Math.max(0.2, Math.min(4, this.cam.zoom * factor));
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      const before = { x: (mx - this.cam.cx) / this.cam.zoom + this.cam.x,
-                       y: (my - this.cam.cy) / this.cam.zoom + this.cam.y };
-      this.cam.zoom = newZoom;
-      const after = { x: (mx - this.cam.cx) / this.cam.zoom + this.cam.x,
-                      y: (my - this.cam.cy) / this.cam.zoom + this.cam.y };
-      this.cam.x += before.x - after.x;
-      this.cam.y += before.y - after.y;
-    }, { passive: false });
+    canvas.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        const factor = e.deltaY > 0 ? 0.9 : 1.1;
+        const newZoom = Math.max(0.2, Math.min(4, this.cam.zoom * factor));
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const before = {
+          x: (mx - this.cam.cx) / this.cam.zoom + this.cam.x,
+          y: (my - this.cam.cy) / this.cam.zoom + this.cam.y,
+        };
+        this.cam.zoom = newZoom;
+        const after = {
+          x: (mx - this.cam.cx) / this.cam.zoom + this.cam.x,
+          y: (my - this.cam.cy) / this.cam.zoom + this.cam.y,
+        };
+        this.cam.x += before.x - after.x;
+        this.cam.y += before.y - after.y;
+      },
+      { passive: false },
+    );
 
     window.addEventListener('resize', () => this.resize());
   }
 
   private wasDrag(e: MouseEvent): boolean {
-    return Math.abs(e.clientX - this.dragStart.x) > 4 ||
-           Math.abs(e.clientY - this.dragStart.y) > 4;
+    return Math.abs(e.clientX - this.dragStart.x) > 4 || Math.abs(e.clientY - this.dragStart.y) > 4;
   }
 
   private screenToTile(sx: number, sy: number): { x: number; y: number } | null {
@@ -188,8 +197,12 @@ export class LocalRenderer {
 
     // Vignette overlay
     const grad = ctx.createRadialGradient(
-      canvas.width / 2, canvas.height / 2, 0,
-      canvas.width / 2, canvas.height / 2, canvas.width,
+      canvas.width / 2,
+      canvas.height / 2,
+      0,
+      canvas.width / 2,
+      canvas.height / 2,
+      canvas.width,
     );
     grad.addColorStop(0, 'rgba(0,0,0,0)');
     grad.addColorStop(1, 'rgba(0,0,0,0.25)');
@@ -201,9 +214,9 @@ export class LocalRenderer {
     const { ctx } = this;
     const px = tile.x * TILE_SIZE;
     const py = tile.y * TILE_SIZE;
-    const s  = TILE_SIZE;
+    const s = TILE_SIZE;
 
-    const fillColor   = TILE_COLOR[tile.type]   ?? TILE_COLOR['floor']  ?? '#2a2a35';
+    const fillColor = TILE_COLOR[tile.type] ?? TILE_COLOR['floor'] ?? '#2a2a35';
     const borderColor = TILE_BORDER[tile.type] ?? TILE_BORDER['floor'] ?? '#1a1a22';
 
     // Fill
@@ -253,10 +266,10 @@ export class LocalRenderer {
 
     // Workbench icon: small "desk" shape
     ctx.fillStyle = '#2a6080';
-    ctx.fillRect(px + 3, py + s - 8, s - 6, 5);       // desk top
+    ctx.fillRect(px + 3, py + s - 8, s - 6, 5); // desk top
     ctx.fillStyle = '#1a4055';
-    ctx.fillRect(px + 5, py + s - 8, 2, 4);            // left leg
-    ctx.fillRect(px + s - 7, py + s - 8, 2, 4);         // right leg
+    ctx.fillRect(px + 5, py + s - 8, 2, 4); // left leg
+    ctx.fillRect(px + s - 7, py + s - 8, 2, 4); // right leg
 
     // File type indicator (color dot)
     const extColor = EXT_COLOR[wb.extension] ?? '#888';
@@ -279,7 +292,7 @@ export class LocalRenderer {
     const { ctx } = this;
     const px = room.x * TILE_SIZE;
     const py = room.y * TILE_SIZE;
-    const pw = room.width  * TILE_SIZE;
+    const pw = room.width * TILE_SIZE;
 
     const label = room.folderName.toUpperCase();
     ctx.save();
@@ -304,8 +317,8 @@ export class LocalRenderer {
 
     if (unit.path.length > 0 && unit.pathIndex < unit.path.length) {
       const from = unit.path[unit.pathIndex]!;
-      const to   = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;
-      const t    = unit.pathProgress;
+      const to = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;
+      const t = unit.pathProgress;
       ux = (from.x + (to.x - from.x) * t) * TILE_SIZE + TILE_SIZE / 2;
       uy = (from.y + (to.y - from.y) * t) * TILE_SIZE + TILE_SIZE / 2;
     } else {
@@ -352,19 +365,23 @@ export class LocalRenderer {
       ctx.strokeStyle = '#5b9b5b';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.arc(0, 0, TILE_SIZE * 0.44,
+      ctx.arc(
+        0,
+        0,
+        TILE_SIZE * 0.44,
         -Math.PI / 2,
-        -Math.PI / 2 + Math.PI * 2 * unit.workProgress / 100);
+        -Math.PI / 2 + (Math.PI * 2 * unit.workProgress) / 100,
+      );
       ctx.stroke();
     }
 
     // Status indicator
     const statusIcon: Record<string, string> = {
-      idle_in_room:         '◌',
-      walking_to_workbench:  '→',
-      walking_to_room:      '→',
-      working_on_file:      '⚙',
-      resting:              '☾',
+      idle_in_room: '◌',
+      walking_to_workbench: '→',
+      walking_to_room: '→',
+      working_on_file: '⚙',
+      resting: '☾',
     };
     const icon = statusIcon[unit.state] ?? '?';
     ctx.fillStyle = unit.color;
@@ -377,7 +394,9 @@ export class LocalRenderer {
   }
 
   // ─── Zoom controls ────────────────────────────────────────────────────────────
-  getCamera() { return this.cam; }
+  getCamera() {
+    return this.cam;
+  }
 
   jumpToTile(tileX: number, tileY: number) {
     this.cam.x = tileX * TILE_SIZE + TILE_SIZE / 2;
@@ -387,22 +406,22 @@ export class LocalRenderer {
 
 // ─── Extension → color map ────────────────────────────────────────────────────
 const EXT_COLOR: Record<string, string> = {
-  ts:    '#4a9bd4',
-  tsx:   '#4a9bd4',
-  js:    '#e8c44a',
-  jsx:   '#e8c44a',
-  py:    '#4ab4d4',
-  rs:    '#b4a04a',
-  go:    '#4ad4b4',
-  json:  '#a04ab4',
-  md:    '#b4a04a',
-  css:   '#4ad44a',
-  html:  '#d44a4a',
-  yaml:  '#4a4ad4',
-  yml:   '#4a4ad4',
-  sh:    '#4ad4a0',
-  bash:  '#4ad4a0',
-  toml:  '#d4a04a',
-  png:   '#888',
-  svg:   '#888',
+  ts: '#4a9bd4',
+  tsx: '#4a9bd4',
+  js: '#e8c44a',
+  jsx: '#e8c44a',
+  py: '#4ab4d4',
+  rs: '#b4a04a',
+  go: '#4ad4b4',
+  json: '#a04ab4',
+  md: '#b4a04a',
+  css: '#4ad44a',
+  html: '#d44a4a',
+  yaml: '#4a4ad4',
+  yml: '#4a4ad4',
+  sh: '#4ad4a0',
+  bash: '#4ad4a0',
+  toml: '#d4a04a',
+  png: '#888',
+  svg: '#888',
 };

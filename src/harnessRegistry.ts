@@ -66,16 +66,29 @@ function assertString(val: unknown, field: string): string {
 
 function assertStringArray(val: unknown, field: string): string[] {
   if (!Array.isArray(val) || !val.every((v) => typeof v === 'string')) {
-    throw new Error(`Invalid harness registry: "${field}" must be string[], got ${JSON.stringify(val)}`);
+    throw new Error(
+      `Invalid harness registry: "${field}" must be string[], got ${JSON.stringify(val)}`,
+    );
   }
   return val;
 }
 
-const TRUST_LEVELS = new Set(['reference_only', 'read_only', 'local_cli', 'sandboxed', 'privileged_external']);
+const TRUST_LEVELS = new Set([
+  'reference_only',
+  'read_only',
+  'local_cli',
+  'sandboxed',
+  'privileged_external',
+]);
 const KINDS = new Set(['reference', 'agent_runtime', 'sandbox', 'local_cli', 'bridge']);
 const TRANSPORTS = new Set(['none', 'cli', 'http', 'plugin', 'sandbox']);
 const HEALTH_KINDS = new Set(['static', 'command', 'http']);
-const RECOVERY_MODES = new Set(['copy_command', 'tmux_attach', 'view_logs', 'no_recovery_available']);
+const RECOVERY_MODES = new Set([
+  'copy_command',
+  'tmux_attach',
+  'view_logs',
+  'no_recovery_available',
+]);
 
 function validateEntry(entry: unknown, id: string): HarnessDescriptor {
   if (!entry || typeof entry !== 'object') {
@@ -140,7 +153,9 @@ function load(): HarnessDescriptor[] {
   if (!data || !Array.isArray(data.harnesses)) {
     throw new Error('Invalid harness registry: missing or non-array "harnesses" field');
   }
-  return data.harnesses.map((e) => validateEntry(e, (e as unknown as Record<string, unknown>).id as string ?? '?'));
+  return data.harnesses.map((e) =>
+    validateEntry(e, ((e as unknown as Record<string, unknown>).id as string) ?? '?'),
+  );
 }
 
 let _cache: HarnessDescriptor[] | null = null;

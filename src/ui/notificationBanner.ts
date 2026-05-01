@@ -14,16 +14,16 @@ export interface NotificationOpts {
 
 const ICON: Record<NotificationOpts['type'], string> = {
   success: '✓',
-  warn:    '⚠',
-  error:   '✗',
-  info:    '◆',
+  warn: '⚠',
+  error: '✗',
+  info: '◆',
 };
 
 const COLOR: Record<NotificationOpts['type'], string> = {
   success: 'var(--civ-food, #5b9b5b)',
-  warn:    'var(--ui-gold, #c8a84b)',
-  error:   'var(--civ-defense, #d45b5b)',
-  info:    'var(--res-science, #5b9bd5)',
+  warn: 'var(--ui-gold, #c8a84b)',
+  error: 'var(--civ-defense, #d45b5b)',
+  info: 'var(--res-science, #5b9bd5)',
 };
 
 interface QueueItem extends NotificationOpts {
@@ -31,7 +31,7 @@ interface QueueItem extends NotificationOpts {
 }
 
 let _idSeq = 0;
-let _queue: QueueItem[] = [];
+const _queue: QueueItem[] = [];
 let _active: QueueItem | null = null;
 let _container: HTMLElement | null = null;
 let _dismissTimer = 0;
@@ -64,9 +64,11 @@ function renderBanner(item: QueueItem): HTMLElement {
 
   const icon = ICON[item.type];
   const color = COLOR[item.type];
-  const unit = item.unit ? `<span style="color:var(--ui-gold,#c8a84b);margin-right:4px">${esc(item.unit)}</span>` : '';
+  const unit = item.unit
+    ? `<span style="color:var(--ui-gold,#c8a84b);margin-right:4px">${esc(item.unit)}</span>`
+    : '';
   const action = item.actionLabel
-    ? `<button class="notif-action">${esc(item.actionLabel)}</button>`
+    ? `<button class="notif-action" aria-label="${esc(item.actionLabel ?? '')}">${esc(item.actionLabel)}</button>`
     : '';
 
   el.innerHTML = `
@@ -196,8 +198,10 @@ function processQueue() {
 }
 
 function esc(s: string): string {
-  return s.replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }
 
 /**

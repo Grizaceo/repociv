@@ -14,10 +14,10 @@ export interface FileNode {
 }
 
 // ─── Grid constants ────────────────────────────────────────────────────────────
-const WALL_THICKNESS  = 1;
-const MIN_ROOM_SIZE   = 4;
-const MAX_DEPTH       = 3;
-const MIN_GRID        = 60;
+const WALL_THICKNESS = 1;
+const MIN_ROOM_SIZE = 4;
+const MAX_DEPTH = 3;
+const MIN_GRID = 60;
 
 let _workbenchIdCounter = 0;
 
@@ -27,7 +27,7 @@ export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
   folders.unshift({ path: root.path, name: root.name, node: root, depth: 0 });
   folders.sort((a, b) => b.depth - a.depth);
 
-  let gridWidth  = Math.max(MIN_ROOM_SIZE * 2 + WALL_THICKNESS * 2, MIN_GRID);
+  let gridWidth = Math.max(MIN_ROOM_SIZE * 2 + WALL_THICKNESS * 2, MIN_GRID);
   let gridHeight = Math.max(MIN_ROOM_SIZE * 2 + WALL_THICKNESS * 2, MIN_GRID);
 
   const rooms: LocalRoom[] = [];
@@ -41,8 +41,14 @@ export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
     const placed = placeRoom(gridWidth, gridHeight, rooms, width, height, WALL_THICKNESS);
 
     if (!placed.fits) {
-      const newSize = expandGrid(gridWidth, gridHeight, width, height, placed.reason ?? 'vertical_overflow');
-      gridWidth  = newSize.w;
+      const newSize = expandGrid(
+        gridWidth,
+        gridHeight,
+        width,
+        height,
+        placed.reason ?? 'vertical_overflow',
+      );
+      gridWidth = newSize.w;
       gridHeight = newSize.h;
       const retry = placeRoom(gridWidth, gridHeight, rooms, width, height, WALL_THICKNESS);
       if (!retry.fits) continue;
@@ -54,7 +60,8 @@ export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
     const room = rooms[rooms.length - 1]!;
     const files = collectFiles(folder.node, MAX_DEPTH - folder.depth);
     for (const file of files) {
-      if (room.workbenches.length >= (width - WALL_THICKNESS * 2) * (height - WALL_THICKNESS * 2)) break;
+      if (room.workbenches.length >= (width - WALL_THICKNESS * 2) * (height - WALL_THICKNESS * 2))
+        break;
       const wb = makeWorkbench(file, repoId);
       room.workbenches.push(wb);
       workbenches.push(wb);
@@ -77,9 +84,14 @@ export function buildLocalWorldFromPaths(repoId: string, filePaths: string[]): L
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i]!;
       const isFile = i === parts.length - 1;
-      let child = node.children!.find(c => c.name === part);
+      let child = node.children!.find((c) => c.name === part);
       if (!child) {
-        child = { name: part, path: parts.slice(0, i + 1).join('/'), type: isFile ? 'file' : 'dir', children: isFile ? undefined : [] };
+        child = {
+          name: part,
+          path: parts.slice(0, i + 1).join('/'),
+          type: isFile ? 'file' : 'dir',
+          children: isFile ? undefined : [],
+        };
         node.children!.push(child);
       }
       if (!isFile) node = child;
@@ -94,7 +106,7 @@ export async function generateLocalWorldFromApi(repoId: string): Promise<LocalWo
   try {
     const res = await fetch(`/api/files/${encodeURIComponent(repoId)}`);
     if (res.ok) {
-      const data = await res.json() as { files?: string[]; tree?: FileNode };
+      const data = (await res.json()) as { files?: string[]; tree?: FileNode };
       if (data.tree) return buildLocalWorld(repoId, data.tree);
       if (data.files) return buildLocalWorldFromPaths(repoId, data.files);
     }
@@ -111,21 +123,34 @@ export function buildMockLocalWorld(repoId = 'repociv'): LocalWorld {
     path: `/repos/${repoId}`,
     type: 'dir',
     children: [
-      { name: 'src', path: `/repos/${repoId}/src`, type: 'dir', children: [
-        { name: 'main.ts',        path: `/repos/${repoId}/src/main.ts`,        type: 'file' },
-        { name: 'game.ts',        path: `/repos/${repoId}/src/game.ts`,        type: 'file' },
-        { name: 'renderer.ts',    path: `/repos/${repoId}/src/renderer.ts`,    type: 'file' },
-        { name: 'hex.ts',         path: `/repos/${repoId}/src/hex.ts`,         type: 'file' },
-        { name: 'pathfinding.ts', path: `/repos/${repoId}/src/pathfinding.ts`, type: 'file' },
-        { name: 'localMap.ts',    path: `/repos/${repoId}/src/localMap.ts`,    type: 'file' },
-        { name: 'ui', path: `/repos/${repoId}/src/ui`, type: 'dir', children: [
-          { name: 'hud.ts',  path: `/repos/${repoId}/src/ui/hud.ts`,  type: 'file' },
-          { name: 'chat.ts', path: `/repos/${repoId}/src/ui/chat.ts`, type: 'file' },
-        ]},
-      ]},
-      { name: 'docs', path: `/repos/${repoId}/docs`, type: 'dir', children: [
-        { name: 'ROADMAP.md', path: `/repos/${repoId}/docs/ROADMAP.md`, type: 'file' },
-      ]},
+      {
+        name: 'src',
+        path: `/repos/${repoId}/src`,
+        type: 'dir',
+        children: [
+          { name: 'main.ts', path: `/repos/${repoId}/src/main.ts`, type: 'file' },
+          { name: 'game.ts', path: `/repos/${repoId}/src/game.ts`, type: 'file' },
+          { name: 'renderer.ts', path: `/repos/${repoId}/src/renderer.ts`, type: 'file' },
+          { name: 'hex.ts', path: `/repos/${repoId}/src/hex.ts`, type: 'file' },
+          { name: 'pathfinding.ts', path: `/repos/${repoId}/src/pathfinding.ts`, type: 'file' },
+          { name: 'localMap.ts', path: `/repos/${repoId}/src/localMap.ts`, type: 'file' },
+          {
+            name: 'ui',
+            path: `/repos/${repoId}/src/ui`,
+            type: 'dir',
+            children: [
+              { name: 'hud.ts', path: `/repos/${repoId}/src/ui/hud.ts`, type: 'file' },
+              { name: 'chat.ts', path: `/repos/${repoId}/src/ui/chat.ts`, type: 'file' },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'docs',
+        path: `/repos/${repoId}/docs`,
+        type: 'dir',
+        children: [{ name: 'ROADMAP.md', path: `/repos/${repoId}/docs/ROADMAP.md`, type: 'file' }],
+      },
       { name: 'package.json', path: `/repos/${repoId}/package.json`, type: 'file' },
     ],
   };
@@ -133,7 +158,12 @@ export function buildMockLocalWorld(repoId = 'repociv'): LocalWorld {
 }
 
 // ─── Folder collector (BFS) ───────────────────────────────────────────────────
-interface FolderEntry { path: string; name: string; node: FileNode; depth: number }
+interface FolderEntry {
+  path: string;
+  name: string;
+  node: FileNode;
+  depth: number;
+}
 
 function collectFolders(node: FileNode, maxDepth: number): FolderEntry[] {
   const result: FolderEntry[] = [];
@@ -185,12 +215,19 @@ function computeRoomSize(fileCount: number): { width: number; height: number } {
 }
 
 // ─── Rect packing (shelf algorithm) ───────────────────────────────────────────
-interface PlaceResult { fits: boolean; x?: number; y?: number; reason?: string }
+interface PlaceResult {
+  fits: boolean;
+  x?: number;
+  y?: number;
+  reason?: string;
+}
 
 function placeRoom(
-  gridW: number, gridH: number,
+  gridW: number,
+  gridH: number,
   existingRooms: LocalRoom[],
-  width: number, height: number,
+  width: number,
+  height: number,
   wallThick: number,
 ): PlaceResult {
   const SHELF_SPACE = 3;
@@ -199,7 +236,11 @@ function placeRoom(
   for (const room of existingRooms) {
     let added = false;
     for (const shelf of shelves) {
-      if (Math.abs(shelf.y - room.y) < SHELF_SPACE) { shelf.rooms.push(room); added = true; break; }
+      if (Math.abs(shelf.y - room.y) < SHELF_SPACE) {
+        shelf.rooms.push(room);
+        added = true;
+        break;
+      }
     }
     if (!added) shelves.push({ y: room.y, rooms: [room] });
   }
@@ -210,7 +251,7 @@ function placeRoom(
     let cursorX = wallThick;
     for (const r of shelf.rooms) cursorX = Math.max(cursorX, r.x + r.width + SHELF_SPACE);
     if (cursorX + width <= gridW - wallThick) return { fits: true, x: cursorX, y: shelf.y };
-    const shelfBottom = Math.max(...shelf.rooms.map(r => r.y + r.height));
+    const shelfBottom = Math.max(...shelf.rooms.map((r) => r.y + r.height));
     cursorY = Math.max(cursorY, shelfBottom + SHELF_SPACE);
   }
 
@@ -219,8 +260,10 @@ function placeRoom(
 }
 
 function expandGrid(
-  currentW: number, currentH: number,
-  roomW: number, roomH: number,
+  currentW: number,
+  currentH: number,
+  roomW: number,
+  roomH: number,
   reason: string,
 ): { w: number; h: number } {
   if (reason === 'vertical_overflow') {
@@ -230,12 +273,24 @@ function expandGrid(
 }
 
 // ─── Room factory ──────────────────────────────────────────────────────────────
-function makeRoom(folder: FolderEntry, x: number, y: number, width: number, height: number): LocalRoom {
+function makeRoom(
+  folder: FolderEntry,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): LocalRoom {
   return {
-    id: folder.path, label: folder.name,
-    w: width, h: height,
-    folderPath: folder.path, folderName: folder.name,
-    x, y, width, height,
+    id: folder.path,
+    label: folder.name,
+    w: width,
+    h: height,
+    folderPath: folder.path,
+    folderName: folder.name,
+    x,
+    y,
+    width,
+    height,
     workbenches: [],
   };
 }
@@ -244,20 +299,29 @@ function makeRoom(folder: FolderEntry, x: number, y: number, width: number, heig
 function makeWorkbench(file: FileNode, repoId: string): Workbench {
   const ext = file.name.includes('.') ? file.name.split('.').pop()! : '';
   return {
-    id:        String(++_workbenchIdCounter),
-    filePath:  file.path,
-    fileName:  file.name,
+    id: String(++_workbenchIdCounter),
+    filePath: file.path,
+    fileName: file.name,
     extension: ext,
-    isTest:    /\.(test|spec)\.[^.]+$/.test(file.name),
-    repoPath:  repoId,
+    isTest: /\.(test|spec)\.[^.]+$/.test(file.name),
+    repoPath: repoId,
   };
 }
 
 // ─── Grid builder ──────────────────────────────────────────────────────────────
-function buildGrid(width: number, height: number, rooms: LocalRoom[], wallThick: number): LocalTile[][] {
+function buildGrid(
+  width: number,
+  height: number,
+  rooms: LocalRoom[],
+  wallThick: number,
+): LocalTile[][] {
   const grid: LocalTile[][] = Array.from({ length: height }, (_, y) =>
     Array.from({ length: width }, (_, x) => ({
-      x, y, type: 'floor' as LocalTileType, roomId: null, workbench: null,
+      x,
+      y,
+      type: 'floor' as LocalTileType,
+      roomId: null,
+      workbench: null,
     })),
   );
 
@@ -268,7 +332,7 @@ function buildGrid(width: number, height: number, rooms: LocalRoom[], wallThick:
       for (let rx = x; rx < x + w; rx++) {
         if (!inBounds(rx, ry, width, height)) continue;
         const isWall = ry === y || ry === y + h - 1 || rx === x || rx === x + w - 1;
-        grid[ry]![rx]!.type   = isWall ? 'wall' : 'floor';
+        grid[ry]![rx]!.type = isWall ? 'wall' : 'floor';
         grid[ry]![rx]!.roomId = room.id;
       }
     }
@@ -283,7 +347,7 @@ function buildGrid(width: number, height: number, rooms: LocalRoom[], wallThick:
     for (let i = 0; i < workbenches.length && i < floorTiles.length; i++) {
       const { x: tx, y: ty } = floorTiles[i]!;
       const tile = grid[ty]![tx]!;
-      tile.type      = 'workbench';
+      tile.type = 'workbench';
       tile.workbench = workbenches[i]!;
     }
   }
@@ -295,14 +359,14 @@ function buildGrid(width: number, height: number, rooms: LocalRoom[], wallThick:
 function addCorridors(grid: LocalTile[][], rooms: LocalRoom[], gridW: number, gridH: number): void {
   if (rooms.length < 2) return;
 
-  const sorted = [...rooms].sort((a, b) => Math.abs(a.y - b.y) < 5 ? a.x - b.x : a.y - b.y);
+  const sorted = [...rooms].sort((a, b) => (Math.abs(a.y - b.y) < 5 ? a.x - b.x : a.y - b.y));
 
   for (let i = 0; i < sorted.length - 1; i++) {
     const roomA = sorted[i]!;
     const roomB = sorted[i + 1]!;
     const y = Math.round((roomA.y + roomA.height / 2 + roomB.y + roomB.height / 2) / 2);
     const xStart = roomA.x + roomA.width - 1;
-    const xEnd   = roomB.x;
+    const xEnd = roomB.x;
     for (let x = xStart; x <= xEnd; x++) {
       if (inBounds(x, y, gridW, gridH)) {
         const tile = grid[y]![x]!;

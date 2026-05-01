@@ -9,11 +9,11 @@ import type { TrustLevel } from './harnessRegistry';
 // ── Badge label ───────────────────────────────────────────────────────────────
 
 const TRUST_LABELS: Record<TrustLevel, string> = {
-  reference_only:        'Reference',
-  read_only:             'Read-Only',
-  sandboxed:             'Sandbox',
-  local_cli:             'Local',
-  privileged_external:  'Privileged',
+  reference_only: 'Reference',
+  read_only: 'Read-Only',
+  sandboxed: 'Sandbox',
+  local_cli: 'Local',
+  privileged_external: 'Privileged',
 };
 
 describe('trust badge label', () => {
@@ -33,10 +33,10 @@ describe('trust badge label', () => {
 // ── Health dot class ─────────────────────────────────────────────────────────
 
 const HEALTH_DOT_CLASS: Record<string, string> = {
-  healthy:   'hp-healthy',
-  degraded:  'hp-degraded',
+  healthy: 'hp-healthy',
+  degraded: 'hp-degraded',
   unhealthy: 'hp-unhealthy',
-  unknown:   'hp-unknown',
+  unknown: 'hp-unknown',
 };
 
 describe('health dot class', () => {
@@ -55,11 +55,11 @@ describe('health dot class', () => {
 // ── Trust badge class ────────────────────────────────────────────────────────
 
 const TRUST_BADGE_CLASS: Record<TrustLevel, string> = {
-  reference_only:        'hp-cautious',
-  read_only:             'hp-cautious',
-  sandboxed:             'hp-cautious',
-  local_cli:             'hp-cautious',
-  privileged_external:   'hp-trusted',
+  reference_only: 'hp-cautious',
+  read_only: 'hp-cautious',
+  sandboxed: 'hp-cautious',
+  local_cli: 'hp-cautious',
+  privileged_external: 'hp-trusted',
 };
 
 describe('trust badge class', () => {
@@ -137,9 +137,9 @@ describe('trust sort order (highest → lowest)', () => {
 describe('recovery mode display', () => {
   it('maps copy_command to Copy command label', () => {
     const labels: Record<string, string> = {
-      copy_command:    'Copy',
-      tmux_attach:     'Tmux',
-      view_logs:       'Logs',
+      copy_command: 'Copy',
+      tmux_attach: 'Tmux',
+      view_logs: 'Logs',
       restart_service: 'Restart',
     };
     expect(labels['copy_command']).toBe('Copy');

@@ -35,10 +35,25 @@
   z-index: 5;
 }
 
-.deco-border .corner-tl { top: -2px; left: -2px; }
-.deco-border .corner-tr { top: -2px; right: -2px; transform: rotate(90deg); }
-.deco-border .corner-bl { bottom: -2px; left: -2px; transform: rotate(-90deg); }
-.deco-border .corner-br { bottom: -2px; right: -2px; transform: rotate(180deg); }
+.deco-border .corner-tl {
+  top: -2px;
+  left: -2px;
+}
+.deco-border .corner-tr {
+  top: -2px;
+  right: -2px;
+  transform: rotate(90deg);
+}
+.deco-border .corner-bl {
+  bottom: -2px;
+  left: -2px;
+  transform: rotate(-90deg);
+}
+.deco-border .corner-br {
+  bottom: -2px;
+  right: -2px;
+  transform: rotate(180deg);
+}
 
 /* Texture overlay for panels */
 .panel-texture {

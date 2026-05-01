@@ -7,12 +7,12 @@ import { tileKey } from './types.ts';
 
 // ─── Terrain movement costs by unit type ─────────────────────────────────────
 const TERRAIN_COSTS: Record<string, Record<string, number>> = {
-  hero:    { plains: 1, forest: 1,   mountain: 1,        desert: 1, ocean: Infinity, ice: 3 },
-  worker:  { plains: 1, forest: 2,   mountain: Infinity, desert: 1, ocean: Infinity, ice: 2 },
-  scout:   { plains: 1, forest: 1.5, mountain: 4,        desert: 1, ocean: Infinity, ice: 2 },
-  lexo:    { plains: 1, forest: 1,   mountain: 1,        desert: 1, ocean: Infinity, ice: 3 },
-  army:    { plains: 1, forest: 2,   mountain: 2,        desert: 1, ocean: Infinity, ice: 2 },
-  caravan: { plains: 1, forest: 2,   mountain: Infinity, desert: 1, ocean: Infinity, ice: Infinity },
+  hero: { plains: 1, forest: 1, mountain: 1, desert: 1, ocean: Infinity, ice: 3 },
+  worker: { plains: 1, forest: 2, mountain: Infinity, desert: 1, ocean: Infinity, ice: 2 },
+  scout: { plains: 1, forest: 1.5, mountain: 4, desert: 1, ocean: Infinity, ice: 2 },
+  lexo: { plains: 1, forest: 1, mountain: 1, desert: 1, ocean: Infinity, ice: 3 },
+  army: { plains: 1, forest: 2, mountain: 2, desert: 1, ocean: Infinity, ice: 2 },
+  caravan: { plains: 1, forest: 2, mountain: Infinity, desert: 1, ocean: Infinity, ice: Infinity },
 };
 
 const DEFAULT_COSTS = TERRAIN_COSTS['hero']!;

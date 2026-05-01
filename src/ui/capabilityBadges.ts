@@ -17,7 +17,7 @@ export function renderCapabilityBadges(unit: Unit): void {
   }
 
   container.innerHTML = badges
-    .map(b => `<span class="cap-badge" title="${b.label}">${b.icon} ${b.label}</span>`)
+    .map((b) => `<span class="cap-badge" title="${b.label}">${b.icon} ${b.label}</span>`)
     .join('');
 }
 

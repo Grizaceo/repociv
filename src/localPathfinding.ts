@@ -5,23 +5,25 @@ import type { LocalWorld, LocalTile } from './types.ts';
 
 // ─── Cost table per tile type ─────────────────────────────────────────────────
 const TILE_COST: Record<string, number> = {
-  floor:      1,
-  door:       2,   // slower through doors
-  workbench:  1,
-  debris:     5,   // very slow
-  wall:       Infinity, // impassable
+  floor: 1,
+  door: 2, // slower through doors
+  workbench: 1,
+  debris: 5, // very slow
+  wall: Infinity, // impassable
 };
 
 export interface PathResult {
   path: Array<{ x: number; y: number }>;
-  cost: number;    // total path cost
+  cost: number; // total path cost
 }
 
 // ─── A* on 2D grid ─────────────────────────────────────────────────────────────
 export function findPath(
   world: LocalWorld,
-  fromX: number, fromY: number,
-  toX: number,   toY: number,
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
 ): PathResult | null {
   const { grid } = world;
   const H = grid.length;
@@ -29,14 +31,14 @@ export function findPath(
 
   // Bounds check
   if (fromX < 0 || fromY < 0 || fromX >= W || fromY >= H) return null;
-  if (toX   < 0 || toY   < 0 || toX   >= W || toY   >= H) return null;
+  if (toX < 0 || toY < 0 || toX >= W || toY >= H) return null;
 
   const fromTile = grid[fromY]![fromX]!;
-  const toTile   = grid[toY]![toX]!;
+  const toTile = grid[toY]![toX]!;
   if (!fromTile || !toTile) return null;
 
   const startCost = TILE_COST[fromTile.type] ?? 1;
-  const endCost   = TILE_COST[toTile.type]   ?? 1;
+  const endCost = TILE_COST[toTile.type] ?? 1;
   if (!isFinite(startCost) || !isFinite(endCost)) return null;
 
   // A* with binary heap (min-heap by f = g + h)
@@ -57,10 +59,10 @@ export function findPath(
   inOpen.add(startKey);
 
   const DIRS = [
-    { dx:  0, dy: -1 },  // N
-    { dx:  1, dy:  0 },  // E
-    { dx:  0, dy:  1 },  // S
-    { dx: -1, dy:  0 },  // W
+    { dx: 0, dy: -1 }, // N
+    { dx: 1, dy: 0 }, // E
+    { dx: 0, dy: 1 }, // S
+    { dx: -1, dy: 0 }, // W
   ];
 
   while (openList.length > 0) {
@@ -123,8 +125,10 @@ function heuristic(x1: number, y1: number, x2: number, y2: number): number {
 // ─── Reconstruct path from cameFrom map ─────────────────────────────────────────
 function reconstructPath(
   cameFrom: Map<number, number>,
-  fromX: number, fromY: number,
-  toX: number,   toY: number,
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
   W: number,
 ): Array<{ x: number; y: number }> {
   const path: Array<{ x: number; y: number }> = [];
@@ -144,14 +148,21 @@ function reconstructPath(
 }
 
 // ─── Reachability check ─────────────────────────────────────────────────────────
-export function isReachable(world: LocalWorld, fromX: number, fromY: number, toX: number, toY: number): boolean {
+export function isReachable(
+  world: LocalWorld,
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+): boolean {
   return findPath(world, fromX, fromY, toX, toY) !== null;
 }
 
 // ─── Find nearest workbench tile (or nearest floor tile matching predicate) ──────
 export function findNearestTile(
   world: LocalWorld,
-  fromX: number, fromY: number,
+  fromX: number,
+  fromY: number,
   predicate: (tile: LocalTile) => boolean,
 ): { x: number; y: number; distance: number } | null {
   const { grid } = world;
@@ -161,14 +172,14 @@ export function findNearestTile(
   // BFS
   const key = (x: number, y: number) => y * W + x;
   const visited = new Set<number>();
-  const queue: Array<{ x: number; y: number; dist: number }> = [
-    { x: fromX, y: fromY, dist: 0 }
-  ];
+  const queue: Array<{ x: number; y: number; dist: number }> = [{ x: fromX, y: fromY, dist: 0 }];
   visited.add(key(fromX, fromY));
 
   const DIRS = [
-    { dx: 0, dy: -1 }, { dx: 1, dy: 0 },
-    { dx: 0, dy:  1 }, { dx: -1, dy: 0 },
+    { dx: 0, dy: -1 },
+    { dx: 1, dy: 0 },
+    { dx: 0, dy: 1 },
+    { dx: -1, dy: 0 },
   ];
 
   while (queue.length > 0) {
@@ -195,9 +206,15 @@ export function findNearestTile(
 
 export function findNearestWorkbench(
   world: LocalWorld,
-  fromX: number, fromY: number,
+  fromX: number,
+  fromY: number,
 ): { x: number; y: number; workbench: LocalTile['workbench']; distance: number } | null {
-  const result = findNearestTile(world, fromX, fromY, t => t.type === 'workbench' && t.workbench !== null);
+  const result = findNearestTile(
+    world,
+    fromX,
+    fromY,
+    (t) => t.type === 'workbench' && t.workbench !== null,
+  );
   if (!result) return null;
   const tile = world.grid[result.y]![result.x]!;
   return { x: result.x, y: result.y, workbench: tile.workbench, distance: result.distance };

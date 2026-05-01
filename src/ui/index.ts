@@ -9,23 +9,41 @@ export { toggleLedger, openLedger, closeLedger, isLedgerOpen } from './ledger.ts
 export { openPriorityPanel, closePriorityPanel, togglePriorityPanel } from './priorityPanel.ts';
 export { openSettingsPanel, closeSettingsPanel, toggleSettingsPanel } from './settingsPanel.ts';
 export {
-  openTimelinePanel, closeTimelinePanel, isTimelinePanelOpen, toggleTimelinePanel,
+  openTimelinePanel,
+  closeTimelinePanel,
+  isTimelinePanelOpen,
+  toggleTimelinePanel,
 } from './timelinePanel.ts';
 export {
-  openApprovalPanel, closeApprovalPanel, isApprovalPanelOpen, toggleApprovalPanel,
-  startApprovalPolling, stopApprovalPolling,
+  openApprovalPanel,
+  closeApprovalPanel,
+  isApprovalPanelOpen,
+  toggleApprovalPanel,
+  startApprovalPolling,
+  stopApprovalPolling,
 } from './approvalPanel.ts';
 export {
-  openObservabilityPanel, closeObservabilityPanel, isObservabilityPanelOpen,
-  toggleObservabilityPanel, startObservabilityPolling, stopObservabilityPolling,
+  openObservabilityPanel,
+  closeObservabilityPanel,
+  isObservabilityPanelOpen,
+  toggleObservabilityPanel,
+  startObservabilityPolling,
+  stopObservabilityPolling,
 } from './observabilityPanel.ts';
 export {
-  openHarnessPanel, closeHarnessPanel, isHarnessPanelOpen, toggleHarnessPanel,
-  startHarnessPolling, stopHarnessPolling,
+  openHarnessPanel,
+  closeHarnessPanel,
+  isHarnessPanelOpen,
+  toggleHarnessPanel,
+  startHarnessPolling,
+  stopHarnessPolling,
 } from './harnessPanel';
 export { openRecoveryPanel, closeRecoveryPanel, isRecoveryPanelOpen } from './recoveryPanel';
 export {
-  openReplayPanel, closeReplayPanel, isReplayPanelOpen, toggleReplayPanel,
+  openReplayPanel,
+  closeReplayPanel,
+  isReplayPanelOpen,
+  toggleReplayPanel,
 } from './replayPanel';
 
 // Re-export specific initialization helpers

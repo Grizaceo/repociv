@@ -6,78 +6,88 @@
 
 :root {
   /* BACKGROUNDS & TEXTURES */
-  --app-bg:        #0a0804;
-  --marble-texture: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.02) 0%, transparent 80%),
-                    linear-gradient(45deg, rgba(0,0,0,0.1) 25%, transparent 25%, transparent 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1) 75%, transparent 75%, transparent);
-  --panel-bg:      rgba(0, 0, 0, 0.75);
-  --panel-border:  #5a4a2e;
-  --panel-hover:   rgba(90, 75, 45, 0.4);
-  --glass-bg:      rgba(15, 12, 8, 0.85);
+  --app-bg: #0a0804;
+  --marble-texture:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02) 0%, transparent 80%),
+    linear-gradient(
+      45deg,
+      rgba(0, 0, 0, 0.1) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(0, 0, 0, 0.1) 50%,
+      rgba(0, 0, 0, 0.1) 75%,
+      transparent 75%,
+      transparent
+    );
+  --panel-bg: rgba(0, 0, 0, 0.75);
+  --panel-border: #5a4a2e;
+  --panel-hover: rgba(90, 75, 45, 0.4);
+  --glass-bg: rgba(15, 12, 8, 0.85);
 
   /* CIV V EXACT COLORS */
-  --civ-science:     #0064FF;
-  --civ-culture:     #FF00FF;
-  --civ-gold:        #FFD700;
-  --civ-production:  #FF7D00;
-  --civ-food:        #00FF00;
-  --civ-happiness:   #FFFF00;
-  --civ-movement:    #00AFFF;
-  --civ-defense:     #FF0000;
-  --civ-text-beige:  #F5F5DC;
+  --civ-science: #0064ff;
+  --civ-culture: #ff00ff;
+  --civ-gold: #ffd700;
+  --civ-production: #ff7d00;
+  --civ-food: #00ff00;
+  --civ-happiness: #ffff00;
+  --civ-movement: #00afff;
+  --civ-defense: #ff0000;
+  --civ-text-beige: #f5f5dc;
 
   /* METALLICS */
-  --gold-gradient:   linear-gradient(135deg, #8a6a3e 0%, #f0c050 50%, #c8a84b 100%);
+  --gold-gradient: linear-gradient(135deg, #8a6a3e 0%, #f0c050 50%, #c8a84b 100%);
   --bronze-gradient: linear-gradient(135deg, #5a3e1e 0%, #8a6a3e 100%);
 
   /* AGENTES (Mapped to Civ V Colors) */
-  --agt-davi:      var(--civ-gold);
-  --agt-worker:    var(--civ-food);
-  --agt-scout:     var(--civ-movement);
-  --agt-lexo:      var(--civ-science);
-  --agt-openclaw:  #7bd6c8; /* Custom for openclaw */
+  --agt-davi: var(--civ-gold);
+  --agt-worker: var(--civ-food);
+  --agt-scout: var(--civ-movement);
+  --agt-lexo: var(--civ-science);
+  --agt-openclaw: #7bd6c8; /* Custom for openclaw */
 
   /* TERRENOS */
-  --hex-plains:    #7ba05b;
-  --hex-desert:    #d4a574;
-  --hex-forest:    #2d5a27;
-  --hex-mountain:  #6b6b6b;
-  --hex-ocean:     #2b6da5;
-  --hex-ice:       #e0e0e0;
-  --hex-fog:       rgba(0, 0, 0, 0.62);
+  --hex-plains: #7ba05b;
+  --hex-desert: #d4a574;
+  --hex-forest: #2d5a27;
+  --hex-mountain: #6b6b6b;
+  --hex-ocean: #2b6da5;
+  --hex-ice: #e0e0e0;
+  --hex-fog: rgba(0, 0, 0, 0.62);
 
   /* ESTADOS */
   --state-success: var(--civ-food);
-  --state-warn:    var(--civ-happiness);
-  --state-error:   var(--civ-defense);
+  --state-warn: var(--civ-happiness);
+  --state-error: var(--civ-defense);
   --state-working: var(--civ-movement);
-  --state-info:    #a89060;
+  --state-info: #a89060;
 
   /* FALLBACKS & ALIASES */
-  --ui-dark:         #1a1208;
-  --ui-border:       var(--panel-border);
-  --ui-gold:         var(--gold-mid);
-  --ui-gold-bright:  var(--gold-bright);
-  --ui-text:         var(--civ-text-beige);
-  --ui-text-dim:     #a89060;
-  --ui-panel-bg:     var(--panel-bg);
-  --res-science:     var(--civ-science);
-  --res-production:  var(--civ-production);
-  --res-gold:        var(--civ-gold);
-  --bar-bg:          #2a1e0a;
-  
+  --ui-dark: #1a1208;
+  --ui-border: var(--panel-border);
+  --ui-gold: var(--gold-mid);
+  --ui-gold-bright: var(--gold-bright);
+  --ui-text: var(--civ-text-beige);
+  --ui-text-dim: #a89060;
+  --ui-panel-bg: var(--panel-bg);
+  --res-science: var(--civ-science);
+  --res-production: var(--civ-production);
+  --res-gold: var(--civ-gold);
+  --bar-bg: #2a1e0a;
+
   /* SHADOWS */
-  --shadow-deep:    0 10px 40px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0, 0, 0, 0.5);
-  --shadow-glow:    0 0 15px rgba(245, 213, 128, 0.25);
-  --shadow-inset:   inset 0 2px 10px rgba(0, 0, 0, 0.8);
+  --shadow-deep: 0 10px 40px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 15px rgba(245, 213, 128, 0.25);
+  --shadow-inset: inset 0 2px 10px rgba(0, 0, 0, 0.8);
 
   /* FONTS */
-  --font-ui:         'Cinzel', 'Barlow Condensed', 'Noto Sans Condensed', serif;
-  --font-mono:       'JetBrains Mono', 'Courier New', monospace;
-  --font-body:       'Libre Baskerville', 'Georgia', serif;
+  --font-ui: 'Cinzel', 'Barlow Condensed', 'Noto Sans Condensed', serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+  --font-body: 'Libre Baskerville', 'Georgia', serif;
 
   /* UI SCALE & SPACING */
-  --header-height:   32px; /* Civ V Top Panel exact height */
-  --panel-radius:    0px;  /* Civ V uses sharp corners mostly, or large 8px radii */
+  --header-height: 32px; /* Civ V Top Panel exact height */
+  --panel-radius: 0px; /* Civ V uses sharp corners mostly, or large 8px radii */
   --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }

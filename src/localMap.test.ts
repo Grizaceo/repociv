@@ -22,7 +22,10 @@ describe('localMap — buildMockLocalWorld', () => {
         const b = rooms[j]!;
         const overlapX = a.x < b.x + b.w && a.x + a.w > b.x;
         const overlapY = a.y < b.y + b.h && a.y + a.h > b.y;
-        assert.ok(!(overlapX && overlapY), `Room ${i} (${a.label}) and room ${j} (${b.label}) should not overlap`);
+        assert.ok(
+          !(overlapX && overlapY),
+          `Room ${i} (${a.label}) and room ${j} (${b.label}) should not overlap`,
+        );
       }
     }
   });
@@ -31,14 +34,14 @@ describe('localMap — buildMockLocalWorld', () => {
     const world = buildMockLocalWorld('repociv');
     for (const room of world.rooms) {
       assert.ok(room.x >= 0 && room.y >= 0, `room ${room.label} position should be >= 0`);
-      assert.ok(room.x + room.w <= world.width,  `room ${room.label} x+w exceeds world width`);
+      assert.ok(room.x + room.w <= world.width, `room ${room.label} x+w exceeds world width`);
       assert.ok(room.y + room.h <= world.height, `room ${room.label} y+h exceeds world height`);
     }
   });
 
   it('workbenches have unique ids', () => {
     const world = buildMockLocalWorld('repociv');
-    const ids = world.workbenches.map(w => w.id);
+    const ids = world.workbenches.map((w) => w.id);
     const unique = new Set(ids);
     assert.equal(ids.length, unique.size, 'workbench ids should be unique');
   });

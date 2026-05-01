@@ -20,35 +20,35 @@ export type GestureType =
   | 'drop_card_on_unit';
 
 export interface SpatialDirective {
-  gesture:    GestureType;
+  gesture: GestureType;
   sourceCoord: Axial;
   targetCoord?: Axial;
-  sourceUnitId?:  string;
-  sourceCityId?:  string;
-  targetCityId?:  string;
-  targetUnitId?:  string;
+  sourceUnitId?: string;
+  sourceCityId?: string;
+  targetCityId?: string;
+  targetUnitId?: string;
   selectedCityIds?: string[];
-  shiftHeld:  boolean;
-  draft:      CommandDraft;
-  label:      string;       // human-readable: "DAVI → repociv: inspect_repo"
-  confidence: number;       // 0–1: how confident is the interpretation
+  shiftHeld: boolean;
+  draft: CommandDraft;
+  label: string; // human-readable: "DAVI → repociv: inspect_repo"
+  confidence: number; // 0–1: how confident is the interpretation
   userConfirmed: boolean;
 }
 
 // ─── Context menu item ────────────────────────────────────────────────────────
 export interface ContextMenuItem {
-  label:   string;
-  icon:    string;
-  draft:   CommandDraft;
-  risk:    'low' | 'medium' | 'high' | 'destructive';
+  label: string;
+  icon: string;
+  draft: CommandDraft;
+  risk: 'low' | 'medium' | 'high' | 'destructive';
   hotkey?: string;
 }
 
 // ─── Drag unit → city ─────────────────────────────────────────────────────────
 export function interpretUnitDrag(params: {
-  unit:      Unit;
+  unit: Unit;
   fromCoord: Axial;
-  toTile:    Tile;
+  toTile: Tile;
   shiftHeld: boolean;
 }): SpatialDirective | null {
   const { unit, fromCoord, toTile, shiftHeld } = params;
@@ -88,10 +88,10 @@ export function interpretUnitDrag(params: {
 
 // ─── Drag city → city (Shift+drag) ────────────────────────────────────────────
 export function interpretCityToCityDrag(params: {
-  fromCity:  City;
-  toCity:    City;
+  fromCity: City;
+  toCity: City;
   fromCoord: Axial;
-  toCoord:   Axial;
+  toCoord: Axial;
   selectedUnit: Unit | null;
 }): SpatialDirective | null {
   const { fromCity, toCity, fromCoord, toCoord, selectedUnit } = params;
@@ -120,19 +120,19 @@ export function interpretCityToCityDrag(params: {
 
 // ─── Area select (Shift + rubber-band) ────────────────────────────────────────
 export function interpretAreaSelect(params: {
-  tiles:        Tile[];
+  tiles: Tile[];
   selectedUnit: Unit | null;
 }): SpatialDirective | null {
   const { tiles, selectedUnit } = params;
-  const cities = tiles.filter(t => t.city).map(t => t.city!);
+  const cities = tiles.filter((t) => t.city).map((t) => t.city!);
   if (cities.length === 0) return null;
 
   const unit = selectedUnit?.id ?? 'SCOUT';
-  const cityIds = cities.map(c => c.id);
+  const cityIds = cities.map((c) => c.id);
   const draft = draftCommand('inspect_repo', cityIds.join(','), {
     unit,
     cities: cityIds,
-    mission: `Auditoría batch: ${cities.map(c => c.name).join(', ')}`,
+    mission: `Auditoría batch: ${cities.map((c) => c.name).join(', ')}`,
     agentType: selectedUnit?.type ?? 'scout',
     batch: true,
   });
@@ -152,7 +152,7 @@ export function interpretAreaSelect(params: {
 // ─── Context menu items for right-click on city ──────────────────────────────
 // Items are filtered by the selected unit's capabilities and repo restrictions.
 export function contextMenuForCity(city: City, selectedUnit: Unit | null): ContextMenuItem[] {
-  const unit  = selectedUnit?.id ?? 'DAVI';
+  const unit = selectedUnit?.id ?? 'DAVI';
   const aType = selectedUnit?.type ?? 'hero';
 
   // Helper: only include if unit can execute this type on this city
@@ -167,7 +167,8 @@ export function contextMenuForCity(city: City, selectedUnit: Unit | null): Conte
       icon: '▶',
       risk: 'medium',
       draft: draftCommand('execute_agent', city.id, {
-        unit: selectedUnit.id, city: city.id,
+        unit: selectedUnit.id,
+        city: city.id,
         mission: `Misión en ${city.name}`,
         agentType: selectedUnit.type,
       }),
@@ -181,7 +182,10 @@ export function contextMenuForCity(city: City, selectedUnit: Unit | null): Conte
       risk: 'low',
       hotkey: 'I',
       draft: draftCommand('inspect_repo', city.id, {
-        unit, city: city.id, mission: `Inspeccionar repo ${city.name}`, agentType: aType,
+        unit,
+        city: city.id,
+        mission: `Inspeccionar repo ${city.name}`,
+        agentType: aType,
       }),
     });
   }
@@ -193,7 +197,10 @@ export function contextMenuForCity(city: City, selectedUnit: Unit | null): Conte
       risk: 'low',
       hotkey: 'T',
       draft: draftCommand('run_tests', city.id, {
-        unit, city: city.id, mission: `Ejecutar tests en ${city.name}`, agentType: aType,
+        unit,
+        city: city.id,
+        mission: `Ejecutar tests en ${city.name}`,
+        agentType: aType,
       }),
     });
   }
@@ -205,7 +212,10 @@ export function contextMenuForCity(city: City, selectedUnit: Unit | null): Conte
       risk: 'low',
       hotkey: 'B',
       draft: draftCommand('run_build', city.id, {
-        unit, city: city.id, mission: `Build ${city.name}`, agentType: aType,
+        unit,
+        city: city.id,
+        mission: `Build ${city.name}`,
+        agentType: aType,
       }),
     });
   }
@@ -216,7 +226,11 @@ export function contextMenuForCity(city: City, selectedUnit: Unit | null): Conte
       icon: '✏',
       risk: 'medium',
       draft: draftCommand('execute_agent', city.id, {
-        unit, city: city.id, mission: '', agentType: aType, promptUser: true,
+        unit,
+        city: city.id,
+        mission: '',
+        agentType: aType,
+        promptUser: true,
       }),
     });
   }
@@ -229,7 +243,10 @@ export function contextMenuForCity(city: City, selectedUnit: Unit | null): Conte
       risk: 'low',
       hotkey: 'I',
       draft: draftCommand('inspect_repo', city.id, {
-        unit, city: city.id, mission: `Inspeccionar repo ${city.name}`, agentType: aType,
+        unit,
+        city: city.id,
+        mission: `Inspeccionar repo ${city.name}`,
+        agentType: aType,
       }),
     });
   }
@@ -241,10 +258,10 @@ export function contextMenuForCity(city: City, selectedUnit: Unit | null): Conte
 // Gesture: drag a macro Unit onto a tile and specify a file path.
 // Produces an edit_file or read_file command delegated to that unit.
 export function interpretUnitToFileDrag(params: {
-  unit:      Unit;
+  unit: Unit;
   fromCoord: Axial;
-  toTile:    Tile;
-  filePath:  string;
+  toTile: Tile;
+  filePath: string;
   shiftHeld: boolean;
 }): SpatialDirective | null {
   const { unit, fromCoord, toTile, filePath, shiftHeld } = params;
@@ -255,16 +272,20 @@ export function interpretUnitToFileDrag(params: {
 
   // Normalize filePath: strip trailing slash, extract filename
   const cleanPath = filePath.replace(/\/$/, '');
-  const fileName  = cleanPath.split('/').pop() ?? cleanPath;
+  const fileName = cleanPath.split('/').pop() ?? cleanPath;
 
   // Shift+drag = edit_file (medium risk), regular drag = read_file (low risk)
-  const isTest   = fileName.endsWith('.test.ts') || fileName.endsWith('_test.py') || fileName.startsWith('test_') || fileName.includes('.spec.');
-  const cmdType: CommandType = shiftHeld
-    ? (isTest ? 'run_tests' : 'edit_file')
-    : 'read_file';
+  const isTest =
+    fileName.endsWith('.test.ts') ||
+    fileName.endsWith('_test.py') ||
+    fileName.startsWith('test_') ||
+    fileName.includes('.spec.');
+  const cmdType: CommandType = shiftHeld ? (isTest ? 'run_tests' : 'edit_file') : 'read_file';
 
   const missionText = shiftHeld
-    ? (isTest ? `Ejecutar tests: ${fileName}` : `Editar ${fileName} en ${city.name}`)
+    ? isTest
+      ? `Ejecutar tests: ${fileName}`
+      : `Editar ${fileName} en ${city.name}`
     : `Leer ${fileName} en ${city.name}`;
 
   const draft = draftCommand(cmdType, city.id, {
@@ -294,8 +315,8 @@ export function interpretUnitToFileDrag(params: {
 // Gesture: drag a CommandDraft card from the command palette and drop it
 // onto a hex Unit. Delegates that command to the target unit.
 export function interpretCardDropOnUnit(params: {
-  card:      CommandDraft;
-  unit:      Unit;
+  card: CommandDraft;
+  unit: Unit;
   unitCoord: Axial;
 }): SpatialDirective | null {
   const { card, unit, unitCoord } = params;
@@ -325,7 +346,7 @@ export function interpretCardDropOnUnit(params: {
     shiftHeld: false,
     draft,
     label: `Card "${card.type}" → unit ${unit.id}`,
-    confidence: 0.80,
+    confidence: 0.8,
     userConfirmed: false,
   };
 }

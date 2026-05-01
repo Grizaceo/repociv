@@ -56,21 +56,25 @@ export interface CommandResponse {
 
 // ─── Per-type default risk (mirrors server/command_schema.py) ─────────────────
 export const COMMAND_RISK: Record<CommandType, Risk> = {
-  inspect_repo:  'low',
-  read_file:     'low',
-  run_tests:     'low',
-  run_build:     'low',
-  quest_add:     'low',
-  e2e_probe:     'low',
-  unit_command:  'medium',
-  edit_file:     'medium',
+  inspect_repo: 'low',
+  read_file: 'low',
+  run_tests: 'low',
+  run_build: 'low',
+  quest_add: 'low',
+  e2e_probe: 'low',
+  unit_command: 'medium',
+  edit_file: 'medium',
   create_branch: 'medium',
   execute_agent: 'medium',
-  git_commit:    'high',
-  send_message:  'high',
-  delete_file:   'destructive',
+  git_commit: 'high',
+  send_message: 'high',
+  delete_file: 'destructive',
 };
 
-export function draftCommand(type: CommandType, target: string, payload?: Record<string, unknown>): CommandDraft {
+export function draftCommand(
+  type: CommandType,
+  target: string,
+  payload?: Record<string, unknown>,
+): CommandDraft {
   return { type, target, payload: payload ?? {}, created_by: 'user' };
 }

@@ -49,7 +49,7 @@ describe('HarnessHealth', () => {
     expect(harnessHealthFromJson('unhealthy')).toBe('unhealthy');
     expect(harnessHealthFromJson('unknown')).toBe('unknown');
     // Falls back to 'unknown' for unexpected values
-    expect(harnessHealthFromJson('foobar' as any)).toBe('unknown');
+    expect(harnessHealthFromJson('foobar')).toBe('unknown');
   });
 });
 
@@ -69,8 +69,8 @@ describe('RecoveryMode', () => {
   });
 
   it('recoveryModesFromJson returns empty array for null/undefined', () => {
-    expect(recoveryModesFromJson(null as any)).toEqual([]);
-    expect(recoveryModesFromJson(undefined as any)).toEqual([]);
+    expect(recoveryModesFromJson(null)).toEqual([]);
+    expect(recoveryModesFromJson(undefined)).toEqual([]);
   });
 });
 
@@ -123,7 +123,9 @@ describe('buildRecoveryRequest', () => {
   });
 
   it('adds details when provided', () => {
-    const req = buildRecoveryRequest('nemoclaw-sandbox', 'escalated', { details: 'Segfault in worker process' });
+    const req = buildRecoveryRequest('nemoclaw-sandbox', 'escalated', {
+      details: 'Segfault in worker process',
+    });
     expect(req).toEqual({
       harness_id: 'nemoclaw-sandbox',
       reason: 'escalated',

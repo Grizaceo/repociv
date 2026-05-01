@@ -4,13 +4,13 @@ import type { Axial } from './hex.ts';
 
 // ─── Terrain types (inferred from repo contents) ─────────────────────────────
 export type Terrain =
-  | 'plains'    // .ts/.tsx/.js/.jsx — web/frontend
-  | 'forest'    // .py/.ipynb — ML/data science
-  | 'mountain'  // .cpp/.rs/.go — systems/low-level
-  | 'desert'   // .md/.txt/.json/.yaml/.toml — config/docs
-  | 'ocean'     // empty / no real code
-  | 'ice'       // archived / legacy (>180 days no commits)
-  | 'hills';    // mixed / generic
+  | 'plains' // .ts/.tsx/.js/.jsx — web/frontend
+  | 'forest' // .py/.ipynb — ML/data science
+  | 'mountain' // .cpp/.rs/.go — systems/low-level
+  | 'desert' // .md/.txt/.json/.yaml/.toml — config/docs
+  | 'ocean' // empty / no real code
+  | 'ice' // archived / legacy (>180 days no commits)
+  | 'hills'; // mixed / generic
 
 // ─── Tile ─────────────────────────────────────────────────────────────────
 export interface Tile {
@@ -26,8 +26,8 @@ export interface Tile {
 }
 
 export interface TileResources {
-  gold: number;       // commits / lines added
-  science: number;    // test coverage / validations
+  gold: number; // commits / lines added
+  science: number; // test coverage / validations
   production: number; // features / PRs
 }
 
@@ -36,8 +36,8 @@ export interface City {
   id: string;
   name: string;
   coord: Axial;
-  population: number;   // total files in repo
-  territory: Axial[];   // hexes controlled (range 2)
+  population: number; // total files in repo
+  territory: Axial[]; // hexes controlled (range 2)
   districts: District[];
   buildings: Building[];
   currentProject?: Building; // what's being built right now
@@ -46,7 +46,7 @@ export interface City {
 
 export interface District {
   id: string;
-  name: string;         // subdirectory name
+  name: string; // subdirectory name
   type: 'campus' | 'industrial' | 'commercial' | 'encamp' | 'aqueduct';
   coord: Axial;
 }
@@ -59,7 +59,7 @@ export interface Building {
   name: string;
   type: 'building' | 'wonder';
   cityId: string;
-  progress: number;       // 0–100
+  progress: number; // 0–100
   durationSeconds: number;
   elapsedSeconds: number;
   state: BuildingState;
@@ -78,35 +78,35 @@ export interface Unit {
   id: string;
   name: string;
   type: UnitType;
-  civ: string;            // "gris"
-  coord: Axial;           // current position
-  targetCoord?: Axial;    // destination (while moving)
-  path: Axial[];          // A* path
-  pathIndex: number;      // current step in path
-  pathProgress: number;   // 0–1 tween between path[pathIndex] and path[pathIndex+1]
+  civ: string; // "gris"
+  coord: Axial; // current position
+  targetCoord?: Axial; // destination (while moving)
+  path: Axial[]; // A* path
+  pathIndex: number; // current step in path
+  pathProgress: number; // 0–1 tween between path[pathIndex] and path[pathIndex+1]
   state: UnitState;
   mission?: string;
   workProgress?: number; // 0–100 when working
-  speed: number;          // hexes per second
+  speed: number; // hexes per second
   color: string;
-  movesLeft: number;      // remaining movement points this "turn"
+  movesLeft: number; // remaining movement points this "turn"
   maxMoves: number;
   // ─── Phase 9: XCOM Context Fatigue ───────────────────────────────
-  fatigue: number;         // 0–100 (100 = fresh, 0 = exhausted)
-  maxFatigue: number;     // always 100
-  isResting: boolean;     // true when in a rest area
+  fatigue: number; // 0–100 (100 = fresh, 0 = exhausted)
+  maxFatigue: number; // always 100
+  isResting: boolean; // true when in a rest area
   restingRoomId?: string; // which rest area room they're recovering in
   effectiveSpeed: number; // speed after fatigue penalty (computed)
 }
 
 export const UNIT_COLORS: Record<string, string> = {
-  hero:    '#c8a84b',
-  worker:  '#5b9b5b',
-  scout:   '#5b9bd5',
-  army:    '#d45b5b',
+  hero: '#c8a84b',
+  worker: '#5b9b5b',
+  scout: '#5b9bd5',
+  army: '#d45b5b',
   caravan: '#9b5bd4',
-  lexo:    '#b86ce8',
-  openclaw:'#7bd6c8',
+  lexo: '#b86ce8',
+  openclaw: '#7bd6c8',
 };
 
 // ─── World ──────────────────────────────────────────────────────────────────
@@ -123,38 +123,96 @@ export interface World {
 // ─── Rest Area (Phase 9: XCOM Context Fatigue) ─────────────────────────────
 export interface RestArea {
   id: string;
-  roomId: string;        // maps to LocalRoom.id
-  coord: Axial;          // hex center
-  recoveryRate: number;  // fatigue restored per second (default 8)
-  capacity: number;      // max units at once
+  roomId: string; // maps to LocalRoom.id
+  coord: Axial; // hex center
+  recoveryRate: number; // fatigue restored per second (default 8)
+  capacity: number; // max units at once
   unitsInside: string[]; // unit ids currently resting
 }
 
 // ─── Bridge Events (from bridge.py → RepoCiv) ───────────────────────────────
 export type BridgeEvent =
-  | { type: 'unit_spawn';    unit: string; civ: string; hex: [number, number]; mission?: string; unitType?: UnitType }
-  | { type: 'unit_move';     unit: string; from: [number, number]; to: [number, number]; mission?: string }
-  | { type: 'unit_work';     unit: string; hex: [number, number]; progress: number; mission?: string }
-  | { type: 'unit_state';   unit: string; state: UnitState }
-  | { type: 'building_start';   city: string; building: string; durationSeconds: number; buildingType?: 'building' | 'wonder'; pid?: number; cmd?: string; missionId?: string }
+  | {
+      type: 'unit_spawn';
+      unit: string;
+      civ: string;
+      hex: [number, number];
+      mission?: string;
+      unitType?: UnitType;
+    }
+  | {
+      type: 'unit_move';
+      unit: string;
+      from: [number, number];
+      to: [number, number];
+      mission?: string;
+    }
+  | { type: 'unit_work'; unit: string; hex: [number, number]; progress: number; mission?: string }
+  | { type: 'unit_state'; unit: string; state: UnitState }
+  | {
+      type: 'building_start';
+      city: string;
+      building: string;
+      durationSeconds: number;
+      buildingType?: 'building' | 'wonder';
+      pid?: number;
+      cmd?: string;
+      missionId?: string;
+    }
   | { type: 'building_progress'; city: string; building: string; progress: number }
   | { type: 'building_complete'; city: string; building: string; missionId?: string }
-  | { type: 'building_failed';   city: string; building: string; missionId?: string }
+  | { type: 'building_failed'; city: string; building: string; missionId?: string }
   // Phase 9: Context Fatigue events
-  | { type: 'rest_area_discovered'; restArea: { id: string; roomId: string; coord: [number, number]; recoveryRate: number; capacity: number; unitsInside: string[] } }
+  | {
+      type: 'rest_area_discovered';
+      restArea: {
+        id: string;
+        roomId: string;
+        coord: [number, number];
+        recoveryRate: number;
+        capacity: number;
+        unitsInside: string[];
+      };
+    }
   | { type: 'rest_area_entered'; unit: string; restAreaId: string }
   | { type: 'rest_area_exited'; unit: string; restAreaId: string }
-  | { type: 'unit_fatigue_update'; unit: string; fatigue: number; maxFatigue?: number; atRest?: boolean; restAreaId?: string | null }
-  | { type: 'unit_sent_to_rest'; unit: string; restAreaId: string; fatigue: number; maxFatigue: number; atRest: boolean }
+  | {
+      type: 'unit_fatigue_update';
+      unit: string;
+      fatigue: number;
+      maxFatigue?: number;
+      atRest?: boolean;
+      restAreaId?: string | null;
+    }
+  | {
+      type: 'unit_sent_to_rest';
+      unit: string;
+      restAreaId: string;
+      fatigue: number;
+      maxFatigue: number;
+      atRest: boolean;
+    }
   | { type: 'context_exhausted'; unit: string; hex: [number, number] }
-  | { type: 'city_founder';  name: string; hex: [number, number] }
+  | { type: 'city_founder'; name: string; hex: [number, number] }
   | { type: 'resource_update'; resource: 'gold' | 'science' | 'production'; delta: number }
-  | { type: 'fog_reveal';    hexes: [number, number][] }
-  | { type: 'mission_start';    missionId: string; unit: string; questName: string }
-  | { type: 'mission_complete'; missionId: string; unit: string; success: boolean; duration: number }
-  | { type: 'waiting_approval'; commandId: string; commandType: string; target: string; risk: string }
-  | { type: 'chat_chunk';       unit: string; missionId?: string; text: string }
-  | { type: 'log';              msg: string; level?: 'info' | 'warn' | 'success' };
+  | { type: 'fog_reveal'; hexes: [number, number][] }
+  | { type: 'mission_start'; missionId: string; unit: string; questName: string }
+  | {
+      type: 'mission_complete';
+      missionId: string;
+      unit: string;
+      success: boolean;
+      duration: number;
+    }
+  | {
+      type: 'waiting_approval';
+      commandId: string;
+      commandType: string;
+      target: string;
+      risk: string;
+    }
+  | { type: 'chat_chunk'; unit: string; missionId?: string; text: string }
+  | { type: 'log'; msg: string; level?: 'info' | 'warn' | 'success' };
 
 // ─── Renderer state ─────────────────────────────────────────────────────────
 // ─── View Mode ────────────────────────────────────────────────────────────────
@@ -164,47 +222,52 @@ export type ViewMode = 'macro' | 'local';
 export type LocalTileType = 'floor' | 'wall' | 'door' | 'workbench' | 'debris';
 
 export interface LocalTile {
-  x: number;         // grid column
-  y: number;         // grid row
+  x: number; // grid column
+  y: number; // grid row
   type: LocalTileType;
   roomId: string | null;
   workbench: Workbench | null;
 }
 
 export interface Workbench {
-  id: string;          // unique numeric id
-  filePath: string;   // absolute path
+  id: string; // unique numeric id
+  filePath: string; // absolute path
   fileName: string;
   extension: string; // 'ts', 'py', etc.
-  isTest: boolean;    // *.test.ts pattern
-  repoPath: string;  // which repo this belongs to
+  isTest: boolean; // *.test.ts pattern
+  repoPath: string; // which repo this belongs to
 }
 
 export interface LocalRoom {
   id: string;
-  label: string;      // display name (same as folderName)
-  w: number;           // alias for width
-  h: number;            // alias for height
+  label: string; // display name (same as folderName)
+  w: number; // alias for width
+  h: number; // alias for height
   folderPath: string; // e.g. "src/ui"
-  folderName: string;  // e.g. "ui"
-  x: number;          // top-left grid corner
+  folderName: string; // e.g. "ui"
+  x: number; // top-left grid corner
   y: number;
-  width: number;      // tiles
-  height: number;     // tiles
+  width: number; // tiles
+  height: number; // tiles
   workbenches: Workbench[];
 }
 
 export interface LocalWorld {
   repoId: string;
-  grid: LocalTile[][];   // [y][x]
+  grid: LocalTile[][]; // [y][x]
   rooms: LocalRoom[];
-  width: number;         // in tiles
+  width: number; // in tiles
   height: number;
   workbenches: Workbench[];
 }
 
 // ─── Local Unit State (Phase 7a) ───────────────────────────────────────────────
-export type LocalUnitState = 'idle_in_room' | 'walking_to_workbench' | 'walking_to_room' | 'working_on_file' | 'resting';
+export type LocalUnitState =
+  | 'idle_in_room'
+  | 'walking_to_workbench'
+  | 'walking_to_room'
+  | 'working_on_file'
+  | 'resting';
 
 export interface LocalUnit {
   id: string;
@@ -218,18 +281,18 @@ export interface LocalUnit {
   targetY: number | null;
   path: Array<{ x: number; y: number }>;
   pathIndex: number;
-  pathProgress: number;  // 0-1 tween
+  pathProgress: number; // 0-1 tween
   state: LocalUnitState;
   mission: string | null;
-  workProgress: number;  // 0-100
+  workProgress: number; // 0-100
   // pointer back to macro unit
   macroUnitId: string;
   // currently-assigned workbench in local view
   currentWorkbenchId: string | null;
   // ─── Phase 9: XCOM Context Fatigue ───────────────────────────────
-  fatigue: number;         // 0–100 (100 = fresh, 0 = exhausted)
-  maxFatigue: number;     // always 100
-  isResting: boolean;     // true when resting in a rest area room
+  fatigue: number; // 0–100 (100 = fresh, 0 = exhausted)
+  maxFatigue: number; // always 100
+  isResting: boolean; // true when resting in a rest area room
   restingRoomId?: string;
   effectiveSpeed: number; // local grid movement speed after fatigue penalty
 }
@@ -241,12 +304,12 @@ export interface LocalMission {
   filePath: string;
   fileName: string;
   status: 'queued' | 'walking' | 'working' | 'complete' | 'failed';
-  assignedAt: number;     // timestamp (ms) when queued
+  assignedAt: number; // timestamp (ms) when queued
   startedAt: number | null;
   completedAt: number | null;
   workbenchId: string;
-  workbench: Workbench | null;  // resolved at dispatch time
-  progress: number;      // 0-100 (updated while working)
+  workbench: Workbench | null; // resolved at dispatch time
+  progress: number; // 0-100 (updated while working)
 }
 
 // ─── Renderer state ────────────────────────────────────────────────────────────

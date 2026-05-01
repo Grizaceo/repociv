@@ -5,13 +5,16 @@ import type { Axial } from './hex.ts';
 
 // ─── Test world builder ───────────────────────────────────────────────────────
 function makeTile(q: number, r: number, terrain: Tile['terrain'] = 'plains'): [string, Tile] {
-  return [`${q},${r}`, {
-    coord: { q, r },
-    terrain,
-    resources: { gold: 0, science: 0, production: 0 },
-    inFog: false,
-    revealed: true,
-  }];
+  return [
+    `${q},${r}`,
+    {
+      coord: { q, r },
+      terrain,
+      resources: { gold: 0, science: 0, production: 0 },
+      inFog: false,
+      revealed: true,
+    },
+  ];
 }
 
 function makeWorld(tiles: [string, Tile][]): World {
@@ -109,7 +112,7 @@ describe('aStarPath — terrain costs', () => {
     ];
     const world = makeWorld(tiles);
     // Worker must find alternate (longer) path
-    const pathHero   = aStarPath({ q: 0, r: 0 }, { q: 2, r: 0 }, world, 'hero');
+    const pathHero = aStarPath({ q: 0, r: 0 }, { q: 2, r: 0 }, world, 'hero');
     const pathWorker = aStarPath({ q: 0, r: 0 }, { q: 2, r: 0 }, world, 'worker');
     // Hero uses mountain shortcut (length 3), worker goes around (longer)
     expect(pathHero.length).toBeLessThanOrEqual(pathWorker.length === 0 ? 99 : pathWorker.length);
@@ -157,7 +160,7 @@ describe('aStarPath — cache', () => {
 
   it('different unit types have different cache entries', () => {
     const world = plainGrid();
-    const hero  = aStarPath({ q: 0, r: 0 }, { q: 2, r: 0 }, world, 'hero');
+    const hero = aStarPath({ q: 0, r: 0 }, { q: 2, r: 0 }, world, 'hero');
     const scout = aStarPath({ q: 0, r: 0 }, { q: 2, r: 0 }, world, 'scout');
     expect(hero).not.toBe(scout);
   });
@@ -168,7 +171,7 @@ describe('aStarPath — cache', () => {
     invalidatePathCache();
     const path2 = aStarPath({ q: 0, r: 0 }, { q: 2, r: 0 }, world, 'hero');
     expect(path1).not.toBe(path2); // different object after cache clear
-    expect(path1).toEqual(path2);  // but same content
+    expect(path1).toEqual(path2); // but same content
   });
 });
 
@@ -183,7 +186,7 @@ describe('aStarPath — path validity', () => {
       const dist = Math.max(
         Math.abs(curr.q - prev.q),
         Math.abs(curr.r - prev.r),
-        Math.abs((-curr.q - curr.r) - (-prev.q - prev.r)),
+        Math.abs(-curr.q - curr.r - (-prev.q - prev.r)),
       );
       expect(dist).toBe(1);
     }
@@ -192,7 +195,7 @@ describe('aStarPath — path validity', () => {
   it('start is first coord, goal is last', () => {
     const world = plainGrid();
     const start: Axial = { q: -1, r: -1 };
-    const goal: Axial  = { q:  1, r:  1 };
+    const goal: Axial = { q: 1, r: 1 };
     const path = aStarPath(start, goal, world, 'worker');
     if (path.length > 0) {
       expect(path[0]).toEqual(start);

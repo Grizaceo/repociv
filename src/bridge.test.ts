@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BridgeEvents } from './bridge.ts';
+import * as loggerMod from './logger.ts';
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 vi.mock('./ui/index.ts', () => ({
@@ -31,8 +32,12 @@ class FakeEventSource {
     FakeEventSource.instances.push(this);
   }
 
-  close() { this.closed = true; }
-  open() { this.onopen?.(); }
+  close() {
+    this.closed = true;
+  }
+  open() {
+    this.onopen?.();
+  }
   message(data: unknown) {
     this.onmessage?.({ data: JSON.stringify(data) } as MessageEvent<string>);
   }
@@ -46,7 +51,9 @@ function makeState() {
       state.spawned.push(id);
       return { id, name: id };
     },
-    moveUnit(id: string) { state.moved.push(id); },
+    moveUnit(id: string) {
+      state.moved.push(id);
+    },
     setUnitState: vi.fn(),
     startBuilding: vi.fn(),
     completeBuilding: vi.fn(),
@@ -57,7 +64,10 @@ function makeState() {
     updateUnitFatigue: vi.fn(),
     addRestArea: vi.fn(),
     setUnitResting: vi.fn(),
-  } as unknown as ConstructorParameters<typeof BridgeEvents>[0] & { spawned: string[]; moved: string[] };
+  } as unknown as ConstructorParameters<typeof BridgeEvents>[0] & {
+    spawned: string[];
+    moved: string[];
+  };
   return state;
 }
 
@@ -66,7 +76,10 @@ describe('BridgeEvents SSE transport', () => {
     vi.useFakeTimers();
     FakeEventSource.instances = [];
     vi.stubGlobal('EventSource', FakeEventSource);
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, openclaw: false }) }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, openclaw: false }) }),
+    );
     vi.stubGlobal('window', globalThis);
     vi.stubGlobal('document', {
       body: { innerHTML: '' },
@@ -132,15 +145,20 @@ describe('BridgeEvents checkHealth', () => {
   });
 
   it('marks bridge online when /health returns ok', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ ok: true, openclaw: false, claudeCode: false, cursor: false }),
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ ok: true, openclaw: false, claudeCode: false, cursor: false }),
+      }),
+    );
     const state = makeState();
     const bridge = new BridgeEvents(state);
     bridge.start();
     // flush two levels of async (fetch → json)
-    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(bridge.bridgeOnline).toBe(true);
     bridge.stop();
   });
@@ -150,22 +168,29 @@ describe('BridgeEvents checkHealth', () => {
     const state = makeState();
     const bridge = new BridgeEvents(state);
     bridge.start();
-    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(bridge.bridgeOnline).toBe(false);
     bridge.stop();
   });
 
   it('reports claude-code mode when claudeCode flag is true', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ ok: true, openclaw: false, claudeCode: true, cursor: false }),
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ ok: true, openclaw: false, claudeCode: true, cursor: false }),
+      }),
+    );
     const setBridgeStatus = vi.mocked(uiMod.setBridgeStatus);
     setBridgeStatus.mockClear();
     const state = makeState();
     const bridge = new BridgeEvents(state);
     bridge.start();
-    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(setBridgeStatus).toHaveBeenCalledWith(true, 'claude-code');
     bridge.stop();
   });
@@ -176,7 +201,13 @@ describe('BridgeEvents handleBridgeEvent', () => {
     vi.useFakeTimers();
     FakeEventSource.instances = [];
     vi.stubGlobal('EventSource', FakeEventSource);
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, openclaw: false, claudeCode: false, cursor: false }) }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ ok: true, openclaw: false, claudeCode: false, cursor: false }),
+      }),
+    );
     vi.stubGlobal('window', globalThis);
     vi.stubGlobal('document', {
       body: { innerHTML: '' },
@@ -208,7 +239,13 @@ describe('BridgeEvents handleBridgeEvent', () => {
     bridge.start();
     const src = FakeEventSource.instances[0]!;
     src.open();
-    src.message({ type: 'mission_complete', missionId: 'abc', unit: 'DAVI', success: true, duration: 42 });
+    src.message({
+      type: 'mission_complete',
+      missionId: 'abc',
+      unit: 'DAVI',
+      success: true,
+      duration: 42,
+    });
     expect(state.completeMission).toHaveBeenCalledWith('abc', true);
     bridge.stop();
   });
@@ -234,7 +271,13 @@ describe('BridgeEvents handleBridgeEvent', () => {
     bridge.start();
     const src = FakeEventSource.instances[0]!;
     src.open();
-    src.message({ type: 'waiting_approval', commandId: 'cmd-1', commandType: 'execute_agent', target: 'repociv', risk: 'high' });
+    src.message({
+      type: 'waiting_approval',
+      commandId: 'cmd-1',
+      commandType: 'execute_agent',
+      target: 'repociv',
+      risk: 'high',
+    });
     expect(openApprovalPanel).toHaveBeenCalled();
     bridge.stop();
   });
@@ -242,6 +285,7 @@ describe('BridgeEvents handleBridgeEvent', () => {
   it('discards and logs invalid bridge events', () => {
     const logEvent = vi.mocked(uiMod.logEvent);
     logEvent.mockClear();
+    const warnSpy = vi.spyOn(loggerMod.logger, 'warn').mockImplementation(() => {});
     const state = makeState();
     const bridge = new BridgeEvents(state);
     bridge.start();
@@ -250,7 +294,12 @@ describe('BridgeEvents handleBridgeEvent', () => {
     src.message({ type: 'unknown_garbage', foo: 'bar' });
     const warnCalls = logEvent.mock.calls.filter(([, level]) => level === 'warn');
     expect(warnCalls.length).toBeGreaterThan(0);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[bridge]'),
+      expect.anything(),
+      expect.anything(),
+    );
+    warnSpy.mockRestore();
     bridge.stop();
   });
 });
-

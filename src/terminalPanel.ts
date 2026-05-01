@@ -1,54 +1,71 @@
 // ─── RepoCiv — Terminal HUD overlay (xterm.js) ────────────────────────────────
-import { Terminal } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
-import '@xterm/xterm/css/xterm.css';
+// xterm is loaded lazily (dynamic import) to keep the main bundle small.
 
 const OVERLAY_ID = 'terminal-overlay';
 
 export class XTermPanel {
-  private term: Terminal | null = null;
-  private fitAddon: FitAddon | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private term: any | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private fitAddon: any | null = null;
   private container: HTMLDivElement | null = null;
   private visible = false;
   private resizeObserver: ResizeObserver | null = null;
   private initialized = false;
+  private _initPromise: Promise<void> | null = null;
 
-  private _init(): void {
-    if (this.initialized || typeof document === 'undefined') return;
+  private _init(): Promise<void> {
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = this._doInit();
+    return this._initPromise;
+  }
+
+  private async _doInit(): Promise<void> {
+    if (this.initialized || typeof document === 'undefined' || !document.body) return;
     this.initialized = true;
-
-    this.term = new Terminal({
-      theme: {
-        background: '#0d1117',
-        foreground: '#e6edf3',
-        cursor: '#58a6ff',
-        selectionBackground: '#264f78',
-        black: '#484f58',
-        brightBlack: '#6e7681',
-        red: '#ff7b72',
-        brightRed: '#ffa198',
-        green: '#3fb950',
-        brightGreen: '#56d364',
-        yellow: '#d29922',
-        brightYellow: '#e3b341',
-        blue: '#58a6ff',
-        brightBlue: '#79c0ff',
-        magenta: '#bc8cff',
-        brightMagenta: '#d2a8ff',
-        cyan: '#39d353',
-        brightCyan: '#56d364',
-        white: '#b1bac4',
-        brightWhite: '#f0f6fc',
-      },
-      fontFamily: '"Cascadia Code", "Fira Mono", "JetBrains Mono", monospace',
-      fontSize: 13,
-      lineHeight: 1.4,
-      scrollback: 2000,
-      convertEol: true,
-    });
-    this.fitAddon = new FitAddon();
-    this.term.loadAddon(this.fitAddon);
-    this.container = this._buildContainer();
+    try {
+      const [{ Terminal }, { FitAddon }] = await Promise.all([
+        import('@xterm/xterm'),
+        import('@xterm/addon-fit'),
+      ]);
+      await import('@xterm/xterm/css/xterm.css');
+      this.term = new Terminal({
+        theme: {
+          background: '#0d1117',
+          foreground: '#e6edf3',
+          cursor: '#58a6ff',
+          selectionBackground: '#264f78',
+          black: '#484f58',
+          brightBlack: '#6e7681',
+          red: '#ff7b72',
+          brightRed: '#ffa198',
+          green: '#3fb950',
+          brightGreen: '#56d364',
+          yellow: '#d29922',
+          brightYellow: '#e3b341',
+          blue: '#58a6ff',
+          brightBlue: '#79c0ff',
+          magenta: '#bc8cff',
+          brightMagenta: '#d2a8ff',
+          cyan: '#39d353',
+          brightCyan: '#56d364',
+          white: '#b1bac4',
+          brightWhite: '#f0f6fc',
+        },
+        fontFamily: '"Cascadia Code", "Fira Mono", "JetBrains Mono", monospace',
+        fontSize: 13,
+        lineHeight: 1.4,
+        scrollback: 2000,
+        convertEol: true,
+      });
+      this.fitAddon = new FitAddon();
+      this.term.loadAddon(this.fitAddon);
+      this.container = this._buildContainer();
+    } catch {
+      // DOM environment does not support xterm (e.g. test/Node env) — skip silently
+      this.initialized = false;
+      this._initPromise = null;
+    }
   }
 
   private _buildContainer(): HTMLDivElement {
@@ -82,7 +99,8 @@ export class XTermPanel {
 
     const title = document.createElement('span');
     title.textContent = '⚡ Terminal';
-    title.style.cssText = 'color: #58a6ff; font-size: 12px; font-family: monospace; font-weight: 600;';
+    title.style.cssText =
+      'color: #58a6ff; font-size: 12px; font-family: monospace; font-weight: 600;';
     header.appendChild(title);
 
     const hint = document.createElement('span');
@@ -113,13 +131,14 @@ export class XTermPanel {
   }
 
   write(text: string): void {
-    this._init();
-    if (!this.term) return;
-    this.term.write(text.endsWith('\n') ? text : text + '\r\n');
+    void this._init().then(() => {
+      if (!this.term) return;
+      this.term.write(text.endsWith('\n') ? text : text + '\r\n');
+    });
   }
 
-  show(): void {
-    this._init();
+  async show(): Promise<void> {
+    await this._init();
     if (this.visible || !this.container) return;
     this.visible = true;
     this.container.style.display = 'flex';
@@ -132,8 +151,8 @@ export class XTermPanel {
     this.container.style.display = 'none';
   }
 
-  toggle(): void {
-    this.visible ? this.hide() : this.show();
+  async toggle(): Promise<void> {
+    this.visible ? this.hide() : await this.show();
   }
 
   isVisible(): boolean {

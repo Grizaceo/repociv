@@ -3,17 +3,19 @@ import { GameState } from './game.ts';
 import type { RestArea, World } from './types.ts';
 import type { Axial } from './hex.ts';
 
-function makeAxial(q = 0, r = 0): Axial { return { q, r }; }
+function makeAxial(q = 0, r = 0): Axial {
+  return { q, r };
+}
 
 function makeWorld(): World {
   return {
     tiles: new Map(),
     cities: [],
     units: [],
-    buildings: [],          // ← required by World interface
+    buildings: [], // ← required by World interface
     resources: { gold: 0, science: 0, production: 0 },
     generatedAt: Date.now(),
-    restAreas: [],          // Phase 9
+    restAreas: [], // Phase 9
   };
 }
 

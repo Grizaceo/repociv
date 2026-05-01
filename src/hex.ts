@@ -11,12 +11,12 @@ export const AXIAL_ZERO: Axial = { q: 0, r: 0 };
 
 // ─── Direction vectors (6 neighbours in axial coords) ───────────────────────
 export const AXIAL_DIRECTIONS: readonly Axial[] = [
-  { q: +1, r:  0 },  // E
-  { q: +1, r: -1 },  // NE
-  { q:  0, r: -1 },  // NW
-  { q: -1, r:  0 },  // W
-  { q: -1, r: +1 },  // SW
-  { q:  0, r: +1 },  // SE
+  { q: +1, r: 0 }, // E
+  { q: +1, r: -1 }, // NE
+  { q: 0, r: -1 }, // NW
+  { q: -1, r: 0 }, // W
+  { q: -1, r: +1 }, // SW
+  { q: 0, r: +1 }, // SE
 ] as const;
 
 // ─── Arithmetic ─────────────────────────────────────────────────────────────
@@ -72,7 +72,7 @@ export function axialNeighbour(a: Axial, direction: number): Axial {
 }
 
 export function axialNeighbours(a: Axial): Axial[] {
-  return AXIAL_DIRECTIONS.map(d => axialAdd(a, d));
+  return AXIAL_DIRECTIONS.map((d) => axialAdd(a, d));
 }
 
 // ─── Range / Ring ───────────────────────────────────────────────────────────
@@ -118,15 +118,15 @@ export function axialLine(a: Axial, b: Axial): Axial[] {
 const SQRT3 = Math.sqrt(3);
 
 export function axialToPixel(a: Axial, size: number): { x: number; y: number } {
-  const x = size * (3 / 2 * a.q);
-  const y = size * (SQRT3 / 2 * a.q + SQRT3 * a.r);
+  const x = size * ((3 / 2) * a.q);
+  const y = size * ((SQRT3 / 2) * a.q + SQRT3 * a.r);
   return { x, y };
 }
 
 export function pixelToAxial(px: number, py: number, size: number): Axial {
   if (size <= 0) return { q: 0, r: 0 };
-  const q = (2 / 3 * px) / size;
-  const r = (-1 / 3 * px + SQRT3 / 3 * py) / size;
+  const q = ((2 / 3) * px) / size;
+  const r = ((-1 / 3) * px + (SQRT3 / 3) * py) / size;
   return axialRound({ q, r });
 }
 
@@ -170,15 +170,19 @@ export function axialRound(a: { q: number; r: number }): Axial {
 
 // ─── Camera ─────────────────────────────────────────────────────────────────
 export interface Camera {
-  x: number;       // world-space center
+  x: number; // world-space center
   y: number;
-  cx: number;      // canvas-space center (half of canvas width/height)
+  cx: number; // canvas-space center (half of canvas width/height)
   cy: number;
-  zoom: number;    // 1 = 100%, clamped
+  zoom: number; // 1 = 100%, clamped
 }
 
 export const CAMERA_DEFAULT: Camera = {
-  x: 0, y: 0, cx: 0, cy: 0, zoom: 1,
+  x: 0,
+  y: 0,
+  cx: 0,
+  cy: 0,
+  zoom: 1,
 };
 
 // ─── Spiral: place cities in outward expanding ring pattern ─────────────────

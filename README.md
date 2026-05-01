@@ -27,7 +27,7 @@ Abre `http://localhost:5273`. Verás el **Imperial Map** con tus ciudades (repos
 ```
 ┌─────────────────────────────────────────────┐
 │  Canvas 2D Renderer  (src/renderer.ts)       │  ← Dibuja hexes, unidades,
-│  Renderer3D (Three.js) (src/renderer3d.ts)  │     ciudades, minimap
+│  Minimap Renderer    (src/minimapRenderer.ts)│     ciudades, minimapa
 ├─────────────────────────────────────────────┤
 │  GameState  (src/game.ts)                   │  ← Loop de simulación,
 │  Priority Matrix (src/priorityMatrix.ts)     │     fatiga, colas misión,
@@ -216,8 +216,7 @@ src/
 ├── localMap.ts         buildLocalWorld (archivos → grid)
 ├── localPathfinding.ts A* para grid local
 ├── renderer.ts          Canvas 2D main renderer
-├── renderer3d.ts        Three.js 3D renderer
-├── minimapRenderer.ts   Minimapa
+├── minimapRenderer.ts   Minimap
 ├── unitRenderer.ts      Sprites de unidades
 ├── bridge.ts            HTTP client → Hermes/DAVI
 ├── main.ts             Entry point, hotkeys, HUD wiring

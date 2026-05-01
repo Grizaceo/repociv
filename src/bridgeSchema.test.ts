@@ -10,8 +10,12 @@ describe('parseBridgeEvent', () => {
 
   it('accepts unit_spawn with optional fields', () => {
     const evt = parseBridgeEvent({
-      type: 'unit_spawn', unit: 'DAVI', civ: 'gris', hex: [3, -1],
-      mission: 'scout area', unitType: 'hero',
+      type: 'unit_spawn',
+      unit: 'DAVI',
+      civ: 'gris',
+      hex: [3, -1],
+      mission: 'scout area',
+      unitType: 'hero',
     });
     expect(evt).not.toBeNull();
   });
@@ -44,21 +48,31 @@ describe('parseBridgeEvent', () => {
 
   it('accepts building_start event', () => {
     const evt = parseBridgeEvent({
-      type: 'building_start', city: 'main', building: 'Library', durationSeconds: 60,
+      type: 'building_start',
+      city: 'main',
+      building: 'Library',
+      durationSeconds: 60,
     });
     expect(evt).not.toBeNull();
   });
 
   it('accepts mission_start event', () => {
     const evt = parseBridgeEvent({
-      type: 'mission_start', missionId: 'abc123', unit: 'DAVI', questName: 'Explorar',
+      type: 'mission_start',
+      missionId: 'abc123',
+      unit: 'DAVI',
+      questName: 'Explorar',
     });
     expect(evt).not.toBeNull();
   });
 
   it('accepts mission_complete event', () => {
     const evt = parseBridgeEvent({
-      type: 'mission_complete', missionId: 'abc123', unit: 'DAVI', success: true, duration: 42,
+      type: 'mission_complete',
+      missionId: 'abc123',
+      unit: 'DAVI',
+      success: true,
+      duration: 42,
     });
     expect(evt).not.toBeNull();
   });
@@ -78,7 +92,7 @@ describe('parseBridgeEvent', () => {
   });
 
   it('rejects non-object input', () => {
-    expect(parseBridgeEvent("string")).toBeNull();
+    expect(parseBridgeEvent('string')).toBeNull();
     expect(parseBridgeEvent(42)).toBeNull();
   });
 
@@ -90,7 +104,14 @@ describe('parseBridgeEvent', () => {
   it('accepts rest_area_discovered event', () => {
     const evt = parseBridgeEvent({
       type: 'rest_area_discovered',
-      restArea: { id: 'ra1', roomId: 'r0', coord: [1, 1], recoveryRate: 8, capacity: 4, unitsInside: [] },
+      restArea: {
+        id: 'ra1',
+        roomId: 'r0',
+        coord: [1, 1],
+        recoveryRate: 8,
+        capacity: 4,
+        unitsInside: [],
+      },
     });
     expect(evt).not.toBeNull();
   });

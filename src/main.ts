@@ -6,28 +6,60 @@ import { Renderer } from './renderer.ts';
 import { BridgeEvents } from './bridge.ts';
 import { GameState } from './game.ts';
 import {
-  showLoadingProgress, hideLoadingScreen, showUnitPanel, hideUnitPanel,
-  renderHeroBar, openSidePanel, closeSidePanel, isSidePanelOpen,
-  appendUserMessage, wireSideTabs, loadGitInfo, loadFilesInfo,
-  openQuestBoard, closeQuestBoard, isQuestBoardOpen,
-  wireQuestBoardTabs, fetchPersistedMissions, fetchPendingTracker, renderQuestBoard,
+  showLoadingProgress,
+  hideLoadingScreen,
+  showUnitPanel,
+  hideUnitPanel,
+  renderHeroBar,
+  openSidePanel,
+  closeSidePanel,
+  isSidePanelOpen,
+  appendUserMessage,
+  wireSideTabs,
+  loadGitInfo,
+  loadFilesInfo,
+  openQuestBoard,
+  closeQuestBoard,
+  isQuestBoardOpen,
+  wireQuestBoardTabs,
+  fetchPersistedMissions,
+  fetchPendingTracker,
+  renderQuestBoard,
   toggleKeyboardHelp,
-  openCityPanel, closeCityPanel, isCityPanelOpen, wireCityPanel,
-  initExternalLibs, updateResource,
+  openCityPanel,
+  closeCityPanel,
+  isCityPanelOpen,
+  wireCityPanel,
+  initExternalLibs,
+  updateResource,
   togglePriorityPanel,
-  toggleTimelinePanel, closeTimelinePanel, isTimelinePanelOpen,
-  toggleApprovalPanel, closeApprovalPanel, isApprovalPanelOpen, startApprovalPolling,
-  toggleObservabilityPanel, closeObservabilityPanel, isObservabilityPanelOpen,
+  toggleTimelinePanel,
+  closeTimelinePanel,
+  isTimelinePanelOpen,
+  toggleApprovalPanel,
+  closeApprovalPanel,
+  isApprovalPanelOpen,
+  startApprovalPolling,
+  toggleObservabilityPanel,
+  closeObservabilityPanel,
+  isObservabilityPanelOpen,
   startObservabilityPolling,
-  toggleHarnessPanel, isHarnessPanelOpen, startHarnessPolling,
-  toggleReplayPanel, closeReplayPanel, isReplayPanelOpen,
-  toggleLedger, closeLedger, isLedgerOpen,
+  toggleHarnessPanel,
+  isHarnessPanelOpen,
+  startHarnessPolling,
+  toggleReplayPanel,
+  closeReplayPanel,
+  isReplayPanelOpen,
+  toggleLedger,
+  closeLedger,
+  isLedgerOpen,
 } from './ui/index.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from './ui/settingsPanel.ts';
 import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
 import { sendCommand } from './commandBus.ts';
 import { recordGesture } from './directiveLearner.ts';
 import { type Unit, tileKey } from './types.ts';
+import { clearChat } from './ui/chat.ts';
 import { terminalPanel } from './terminalPanel.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
@@ -43,12 +75,14 @@ const loadSteps = [
 async function bootstrap() {
   for (let i = 0; i < loadSteps.length; i++) {
     showLoadingProgress((i / loadSteps.length) * 100, loadSteps[i]!);
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 200));
   }
 
   const world = await generateWorld();
   const state = new GameState(world);
   state.start();
+  // Clean up chat buffer when a unit is removed from the world.
+  state.onUnitRemoved((unitId) => clearChat(unitId));
 
   // Initialize UI Libraries (Icons, Animations)
   initExternalLibs();
@@ -88,12 +122,15 @@ async function bootstrap() {
   // Canvas click → select unit / open city panels
   renderer.onUnitSelect = (unit) => {
     if (unit) selectHero(unit, renderer, state, bridge);
-    else { hideUnitPanel(); closeSidePanel(); }
+    else {
+      hideUnitPanel();
+      closeSidePanel();
+    }
   };
   renderer.onCitySelect = (cityId) => {
-    const city = state.world.cities.find(c => c.id === cityId);
+    const city = state.world.cities.find((c) => c.id === cityId);
     if (city) {
-      const activeBuildings = state.world.buildings.filter(b => b.cityId === cityId);
+      const activeBuildings = state.world.buildings.filter((b) => b.cityId === cityId);
       const tile = state.world.tiles.get(tileKey(city.coord));
       openCityPanel(city, activeBuildings, tile);
     }
@@ -111,14 +148,14 @@ async function bootstrap() {
       directive,
       screenPos,
       (draft) => {
-        void sendCommand(draft).then(res => {
+        void sendCommand(draft).then((res) => {
           if (res.ok) {
             void recordGesture({
               commandId: res.commandId,
-              gesture:   directive.gesture,
-              agentId:   String(draft.payload?.['unit'] ?? 'DAVI'),
-              cmdType:   draft.type,
-              target:    draft.target,
+              gesture: directive.gesture,
+              agentId: String(draft.payload?.['unit'] ?? 'DAVI'),
+              cmdType: draft.type,
+              target: draft.target,
             });
           }
         });
@@ -127,7 +164,9 @@ async function bootstrap() {
     );
   };
   renderer.onContextMenu = (items, screenPos) => {
-    showContextMenu(items, screenPos, (draft) => { void sendCommand(draft); });
+    showContextMenu(items, screenPos, (draft) => {
+      void sendCommand(draft);
+    });
   };
 
   // ─── Fase 9: Drag tooltip with suggestion autocomplete ─────────────────────
@@ -142,14 +181,14 @@ async function bootstrap() {
   };
 
   // Spawn DAVI as the default hero, near the capital if present
-  const capital = world.cities.find(c => c.isCapital) ?? world.cities[0];
+  const capital = world.cities.find((c) => c.isCapital) ?? world.cities[0];
   const spawnAt = capital ? capital.coord : { q: 0, r: 0 };
   state.spawnUnit('DAVI', 'DAVI', 'hero', 'gris', spawnAt, 'En espera de misión');
 
   wireHUD(renderer, state, bridge, toggleView);
 
   // Load pending tracker missions at boot
-  fetchPendingTracker().then(pending => {
+  fetchPendingTracker().then((pending) => {
     for (const m of pending) {
       if (!state.missions.has(m.id)) state.missions.set(m.id, m);
     }
@@ -176,8 +215,8 @@ function selectHero(unit: Unit, renderer: Renderer, state: GameState, _bridge: B
   // Auto-open side panel & load city context if hero is on a city
   if (isSidePanelOpen()) {
     openSidePanel(unit);
-    const cityHere = state.world.cities.find(c =>
-      c.coord.q === unit.coord.q && c.coord.r === unit.coord.r,
+    const cityHere = state.world.cities.find(
+      (c) => c.coord.q === unit.coord.q && c.coord.r === unit.coord.r,
     );
     if (cityHere) {
       loadGitInfo(cityHere.id);
@@ -187,7 +226,12 @@ function selectHero(unit: Unit, renderer: Renderer, state: GameState, _bridge: B
 }
 
 // ─── HUD wiring ───────────────────────────────────────────────────────────────
-function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, toggleView: () => void) {
+function wireHUD(
+  renderer: Renderer,
+  state: GameState,
+  bridge: BridgeEvents,
+  toggleView: () => void,
+) {
   const missionInput = document.getElementById('mission-input') as HTMLInputElement;
 
   // ─── Hotkeys ────────────────────────────────────────────────────────────
@@ -196,24 +240,70 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, tog
     const inField = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 
     // F10: Timeline panel
-    if (e.key === 'F6')  { e.preventDefault(); toggleHarnessPanel(); return; }
-    if (e.key === 'F7')  { e.preventDefault(); toggleReplayPanel(); return; }
-    if (e.key === 'F8')  { e.preventDefault(); toggleObservabilityPanel(); return; }
-    if (e.key === 'F10') { e.preventDefault(); toggleTimelinePanel(); return; }
+    if (e.key === 'F6') {
+      e.preventDefault();
+      toggleHarnessPanel();
+      return;
+    }
+    if (e.key === 'F7') {
+      e.preventDefault();
+      toggleReplayPanel();
+      return;
+    }
+    if (e.key === 'F8') {
+      e.preventDefault();
+      toggleObservabilityPanel();
+      return;
+    }
+    if (e.key === 'F10') {
+      e.preventDefault();
+      toggleTimelinePanel();
+      return;
+    }
 
     // Esc: close overlays
     if (e.key === 'Escape') {
-      if (isLedgerOpen()) { closeLedger(); return; }
-      if (terminalPanel.isVisible()) { terminalPanel.hide(); return; }
-      if (isReplayPanelOpen()) { closeReplayPanel(); return; }
-      if (isObservabilityPanelOpen()) { closeObservabilityPanel(); return; }
-      if (isApprovalPanelOpen()) { closeApprovalPanel(); return; }
-      if (isTimelinePanelOpen()) { closeTimelinePanel(); return; }
-      if (isCityPanelOpen()) { closeCityPanel(); return; }
-      if (isQuestBoardOpen()) { closeQuestBoard(); return; }
+      if (isLedgerOpen()) {
+        closeLedger();
+        return;
+      }
+      if (terminalPanel.isVisible()) {
+        terminalPanel.hide();
+        return;
+      }
+      if (isReplayPanelOpen()) {
+        closeReplayPanel();
+        return;
+      }
+      if (isObservabilityPanelOpen()) {
+        closeObservabilityPanel();
+        return;
+      }
+      if (isApprovalPanelOpen()) {
+        closeApprovalPanel();
+        return;
+      }
+      if (isTimelinePanelOpen()) {
+        closeTimelinePanel();
+        return;
+      }
+      if (isCityPanelOpen()) {
+        closeCityPanel();
+        return;
+      }
+      if (isQuestBoardOpen()) {
+        closeQuestBoard();
+        return;
+      }
       const help = document.getElementById('keyboard-help');
-      if (help && !help.classList.contains('hidden')) { toggleKeyboardHelp(false); return; }
-      if (isSidePanelOpen()) { closeSidePanel(); return; }
+      if (help && !help.classList.contains('hidden')) {
+        toggleKeyboardHelp(false);
+        return;
+      }
+      if (isSidePanelOpen()) {
+        closeSidePanel();
+        return;
+      }
       closeSettingsPanel();
       if (state.selectedUnit) {
         state.selectUnit(null);
@@ -245,10 +335,10 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, tog
     // Space: cycle to idle hero
     if (e.key === ' ') {
       e.preventDefault();
-      const heroes = state.getAllUnits().filter(u => u.state === 'idle');
+      const heroes = state.getAllUnits().filter((u) => u.state === 'idle');
       if (heroes.length === 0) return;
       const cur = state.selectedUnit;
-      const idx = cur ? heroes.findIndex(h => h.id === cur.id) : -1;
+      const idx = cur ? heroes.findIndex((h) => h.id === cur.id) : -1;
       const next = heroes[(idx + 1) % heroes.length]!;
       selectHero(next, renderer, state, bridge);
       return;
@@ -260,7 +350,7 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, tog
       const heroes = state.getAllUnits();
       if (heroes.length === 0) return;
       const cur = state.selectedUnit;
-      const idx = cur ? heroes.findIndex(h => h.id === cur.id) : -1;
+      const idx = cur ? heroes.findIndex((h) => h.id === cur.id) : -1;
       const next = heroes[(idx + 1) % heroes.length]!;
       selectHero(next, renderer, state, bridge);
       return;
@@ -277,25 +367,47 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, tog
 
     // Modes & toggles
     switch (e.key.toLowerCase()) {
-      case 'm': renderer.setActionMode('move'); break;
-      case 's': renderer.sleepSelectedUnit(); break;
-      case 'b': renderer.setActionMode('build'); break;
-      case 'g': renderer.toggleGrid(); break;
-      case 'f': renderer.toggleDebug(); break;
-      case 'v': renderer.toggleFog(); break;
-      case '3': toggleView(); break;
-      case 'a': toggleApprovalPanel(); break;
-      case 't': terminalPanel.toggle(); break;
-      case 'p': togglePriorityPanel(state.getMissionQueue(), (missionId) => {
-        state.dispatchMissionById(missionId);
-      }); break;
-      case '?': toggleKeyboardHelp(); break;
+      case 'm':
+        renderer.setActionMode('move');
+        break;
+      case 's':
+        renderer.sleepSelectedUnit();
+        break;
+      case 'b':
+        renderer.setActionMode('build');
+        break;
+      case 'g':
+        renderer.toggleGrid();
+        break;
+      case 'f':
+        renderer.toggleDebug();
+        break;
+      case 'v':
+        renderer.toggleFog();
+        break;
+      case '3':
+        toggleView();
+        break;
+      case 'a':
+        toggleApprovalPanel();
+        break;
+      case 't':
+        void terminalPanel.toggle();
+        break;
+      case 'p':
+        togglePriorityPanel(state.getMissionQueue(), (missionId) => {
+          state.dispatchMissionById(missionId);
+        });
+        break;
+      case '?':
+        toggleKeyboardHelp();
+        break;
     }
 
     if (e.key === 'F6') {
       e.preventDefault();
       toggleLedger(state, (cityId) => {
-        const city = state.world.cities.find(c => c.id === cityId);
+        const city = state.world.cities.find((c) => c.id === cityId);
         if (city) renderer.centerOn(city.coord);
       });
     }
@@ -303,11 +415,12 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, tog
     if (e.key === 'F9') {
       e.preventDefault();
       if (isQuestBoardOpen()) closeQuestBoard();
-      else (async () => {
-        const persisted = await fetchPersistedMissions();
-        openQuestBoard(state);
-        renderQuestBoard(state, persisted);
-      })();
+      else
+        (async () => {
+          const persisted = await fetchPersistedMissions();
+          openQuestBoard(state);
+          renderQuestBoard(state, persisted);
+        })();
     }
 
     if (e.key === 'F11') {
@@ -322,7 +435,7 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, tog
   });
 
   // ─── Spawn buttons (Q/W/E/L) ────────────────────────────────────────────
-  document.querySelectorAll<HTMLButtonElement>('.spawn-btn').forEach(btn => {
+  document.querySelectorAll<HTMLButtonElement>('.spawn-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const type = btn.dataset['type'] as string;
       spawnAgent(type, state, renderer, bridge);
@@ -330,7 +443,9 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, tog
   });
 
   // ─── Screenshot button ───────────────────────────────────────────────────
-  document.getElementById('btn-screenshot')?.addEventListener('click', () => takeScreenshot(renderer));
+  document
+    .getElementById('btn-screenshot')
+    ?.addEventListener('click', () => takeScreenshot(renderer));
 
   // ─── Settings button ─────────────────────────────────────────────────────
   document.getElementById('btn-settings')?.addEventListener('click', () => toggleSettingsPanel());
@@ -348,9 +463,10 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, tog
   const sendMessage = (input: HTMLInputElement | null) => {
     const unit = state.selectedUnit;
     if (!unit || !input || !input.value.trim()) return;
-    const cityHere = state.world.cities.find(c =>
-      c.territory.some(t => t.q === unit.coord.q && t.r === unit.coord.r),
-    ) ?? state.world.cities[0];
+    const cityHere =
+      state.world.cities.find((c) =>
+        c.territory.some((t) => t.q === unit.coord.q && t.r === unit.coord.r),
+      ) ?? state.world.cities[0];
 
     const text = input.value.trim();
     if (!isSidePanelOpen()) openSidePanel(unit);
@@ -366,14 +482,22 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, tog
     input.value = '';
   };
 
-  document.getElementById('btn-send-mission')?.addEventListener('click', () => sendMessage(missionInput));
+  document
+    .getElementById('btn-send-mission')
+    ?.addEventListener('click', () => sendMessage(missionInput));
   missionInput?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.stopPropagation(); sendMessage(missionInput); }
+    if (e.key === 'Enter') {
+      e.stopPropagation();
+      sendMessage(missionInput);
+    }
   });
 
   document.getElementById('btn-chat-send')?.addEventListener('click', () => sendMessage(chatInput));
   chatInput?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.stopPropagation(); sendMessage(chatInput); }
+    if (e.key === 'Enter') {
+      e.stopPropagation();
+      sendMessage(chatInput);
+    }
   });
 
   // ─── Side panel close ────────────────────────────────────────────────────
@@ -383,10 +507,10 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, tog
   wireSideTabs((tab) => {
     const unit = state.selectedUnit;
     if (!unit) return;
-    const cityHere = state.world.cities.find(c =>
-      c.territory.some(t => t.q === unit.coord.q && t.r === unit.coord.r),
+    const cityHere = state.world.cities.find((c) =>
+      c.territory.some((t) => t.q === unit.coord.q && t.r === unit.coord.r),
     );
-    if (tab === 'git' && cityHere)   loadGitInfo(cityHere.id);
+    if (tab === 'git' && cityHere) loadGitInfo(cityHere.id);
     if (tab === 'files' && cityHere) loadFilesInfo(cityHere.id);
   });
 
@@ -419,15 +543,19 @@ function spawnAgent(base: string, state: GameState, renderer: Renderer, bridge: 
   }
 
   const unitId = getNextUnitId(base);
-  const capital = state.world.cities.find(c => c.isCapital) ?? state.world.cities[0];
-  const existingCount = state.getAllUnits().filter(u => u.id.startsWith(base)).length;
+  const capital = state.world.cities.find((c) => c.isCapital) ?? state.world.cities[0];
+  const existingCount = state.getAllUnits().filter((u) => u.id.startsWith(base)).length;
   const offset = existingCount % 6;
   const coord = capital
     ? { q: capital.coord.q + 1 + (offset % 3), r: capital.coord.r - Math.floor(offset / 3) }
     : { q: 1 + offset, r: 0 };
 
   const typeMap: Record<string, 'hero' | 'worker' | 'scout' | 'lexo'> = {
-    DAVI: 'hero', WORKER: 'worker', SCOUT: 'scout', LEXO: 'lexo', OPENCLAW: 'hero',
+    DAVI: 'hero',
+    WORKER: 'worker',
+    SCOUT: 'scout',
+    LEXO: 'lexo',
+    OPENCLAW: 'hero',
   };
   const type = typeMap[base] ?? 'hero';
   const unit = state.spawnUnit(unitId, unitId, type, 'gris', coord, 'En espera de misión');

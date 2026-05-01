@@ -1,12 +1,7 @@
 // ─── RepoCiv — Harness Registry Tests ─────────────────────────────────────────
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  getHarness,
-  listHarnesses,
-  findHarnessForCommand,
-  _resetCache,
-} from './harnessRegistry';
+import { getHarness, listHarnesses, findHarnessForCommand, _resetCache } from './harnessRegistry';
 
 describe('harnessRegistry', () => {
   beforeEach(() => {

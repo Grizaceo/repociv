@@ -9,17 +9,17 @@ import { fetchSuggestions, cmdTypeLabel, successRateColor } from '../directiveLe
 
 // ─── Callbacks ────────────────────────────────────────────────────────────────
 type ConfirmCb = (draft: CommandDraft) => void;
-type CancelCb  = () => void;
+type CancelCb = () => void;
 
 // ─── Preview card ─────────────────────────────────────────────────────────────
 let _previewEl: HTMLElement | null = null;
-let _menuEl:    HTMLElement | null = null;
+let _menuEl: HTMLElement | null = null;
 
 export function showDirectivePreview(
   directive: SpatialDirective,
   screenPos: { x: number; y: number },
   onConfirm: ConfirmCb,
-  onCancel:  CancelCb,
+  onCancel: CancelCb,
 ) {
   hideDirectivePreview();
   hideContextMenu();
@@ -45,14 +45,18 @@ export function showDirectivePreview(
       <span class="sp-risk" style="color:${riskColor}">${riskLabel}</span>
     </div>
     ${needsApproval ? '<div class="sp-approval-warn">⚠ Requiere aprobación manual</div>' : ''}
-    ${isPrompt ? `
+    ${
+      isPrompt
+        ? `
       <div class="sp-prompt-row">
         <input id="sp-mission-input" class="sp-input" type="text"
           placeholder="Describir misión…" autocomplete="off" />
-      </div>` : ''}
+      </div>`
+        : ''
+    }
     <div class="sp-actions">
-      <button id="sp-confirm" class="sp-btn-confirm">✔ Confirmar</button>
-      <button id="sp-cancel"  class="sp-btn-cancel">✗ Cancelar</button>
+      <button id="sp-confirm" class="sp-btn-confirm" aria-label="Confirmar acción">✔ Confirmar</button>
+      <button id="sp-cancel"  class="sp-btn-cancel" aria-label="Cancelar acción">✗ Cancelar</button>
     </div>
     <div id="sp-suggestions" class="sp-suggestions"></div>
   `;
@@ -62,26 +66,29 @@ export function showDirectivePreview(
 
   // Async-fetch suggestions and inject if available (non-blocking)
   const agentId = String(directive.draft.payload?.['unit'] ?? 'DAVI');
-  void fetchSuggestions(directive.gesture, agentId).then(suggestions => {
+  void fetchSuggestions(directive.gesture, agentId).then((suggestions) => {
     const box = el.querySelector<HTMLElement>('#sp-suggestions');
     if (!box || suggestions.length === 0) return;
-    box.innerHTML = `<div class="sp-sug-title">RepoCiv sugiere:</div>` +
-      suggestions.map(s => {
-        const color = successRateColor(s.successRate);
-        const pctS  = Math.round(s.successRate * 100);
-        return `<div class="sp-sug-item" data-type="${_esc(s.cmdType)}">
+    box.innerHTML =
+      `<div class="sp-sug-title">RepoCiv sugiere:</div>` +
+      suggestions
+        .map((s) => {
+          const color = successRateColor(s.successRate);
+          const pctS = Math.round(s.successRate * 100);
+          return `<div class="sp-sug-item" data-type="${_esc(s.cmdType)}">
           <span class="sp-sug-label">${_esc(cmdTypeLabel(s.cmdType))}</span>
           <span class="sp-sug-rate" style="color:${color}">${pctS}% (${s.count}×)</span>
         </div>`;
-      }).join('');
+        })
+        .join('');
     // Clicking a suggestion swaps the draft type label (card still requires confirm)
-    box.querySelectorAll<HTMLElement>('.sp-sug-item').forEach(item => {
+    box.querySelectorAll<HTMLElement>('.sp-sug-item').forEach((item) => {
       item.addEventListener('click', () => {
         const t = item.dataset['type'];
         if (t) {
           directive.draft = { ...directive.draft, type: t as never };
           el.querySelector('.sp-cmd-type')!.textContent = t;
-          box.querySelectorAll('.sp-sug-item').forEach(i => i.classList.remove('sp-sug-active'));
+          box.querySelectorAll('.sp-sug-item').forEach((i) => i.classList.remove('sp-sug-active'));
           item.classList.add('sp-sug-active');
         }
       });
@@ -97,7 +104,10 @@ export function showDirectivePreview(
         directive.draft.payload = { ...directive.draft.payload, mission: inp.value };
         _confirm(directive.draft, onConfirm, onCancel);
       }
-      if (e.key === 'Escape') { hideDirectivePreview(); onCancel(); }
+      if (e.key === 'Escape') {
+        hideDirectivePreview();
+        onCancel();
+      }
     });
   }
 
@@ -131,9 +141,10 @@ export function showContextMenu(
   hideDirectivePreview();
 
   const el = _getOrCreateMenu();
-  el.innerHTML = items.map((item, i) => {
-    const [riskColor] = _riskStyle(item.risk);
-    return `
+  el.innerHTML = items
+    .map((item, i) => {
+      const [riskColor] = _riskStyle(item.risk);
+      return `
       <div class="cm-item" data-idx="${i}" tabindex="0">
         <span class="cm-icon">${_esc(item.icon)}</span>
         <span class="cm-label">${_esc(item.label)}</span>
@@ -141,7 +152,8 @@ export function showContextMenu(
         <span class="cm-risk-dot" style="background:${riskColor}" title="${item.risk}"></span>
       </div>
     `;
-  }).join('');
+    })
+    .join('');
 
   _position(el, screenPos);
   el.classList.remove('hidden');
@@ -154,11 +166,17 @@ export function showContextMenu(
       if (item.draft.payload?.['promptUser']) {
         showDirectivePreview(
           {
-            gesture: 'right_click', sourceCoord: { q: 0, r: 0 },
-            shiftHeld: false, draft: item.draft,
-            label: item.label, confidence: 1, userConfirmed: false,
+            gesture: 'right_click',
+            sourceCoord: { q: 0, r: 0 },
+            shiftHeld: false,
+            draft: item.draft,
+            label: item.label,
+            confidence: 1,
+            userConfirmed: false,
           },
-          screenPos, onSelect, () => {},
+          screenPos,
+          onSelect,
+          () => {},
         );
       } else {
         onSelect(item.draft);
@@ -212,8 +230,10 @@ export function renderDragGhost(
 // ─── Area-select rubber band overlay ─────────────────────────────────────────
 export function renderAreaSelect(
   ctx: CanvasRenderingContext2D,
-  x1: number, y1: number,
-  x2: number, y2: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
 ) {
   const x = Math.min(x1, x2);
   const y = Math.min(y1, y2);
@@ -232,7 +252,9 @@ export function renderAreaSelect(
 // ─── Hex highlight for drag target ────────────────────────────────────────────
 export function renderDropTarget(
   ctx: CanvasRenderingContext2D,
-  cx: number, cy: number, size: number,
+  cx: number,
+  cy: number,
+  size: number,
   valid: boolean,
 ) {
   ctx.save();
@@ -251,7 +273,8 @@ function _hexPath(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: n
     const a = (Math.PI / 180) * (60 * i - 30);
     const x = cx + size * Math.cos(a);
     const y = cy + size * Math.sin(a);
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
   }
   ctx.closePath();
 }
@@ -281,7 +304,7 @@ function _position(el: HTMLElement, pos: { x: number; y: number }) {
   // Show near cursor, nudge to stay in viewport
   el.style.position = 'fixed';
   el.style.left = '0';
-  el.style.top  = '0';
+  el.style.top = '0';
   el.style.visibility = 'hidden';
   el.classList.remove('hidden');
 
@@ -292,27 +315,27 @@ function _position(el: HTMLElement, pos: { x: number; y: number }) {
 
   let x = pos.x + 16;
   let y = pos.y - rect.height / 2;
-  if (x + rect.width  > vw - MARGIN) x = pos.x - rect.width - 16;
+  if (x + rect.width > vw - MARGIN) x = pos.x - rect.width - 16;
   if (y + rect.height > vh - MARGIN) y = vh - rect.height - MARGIN;
   if (y < MARGIN) y = MARGIN;
 
   el.style.left = `${x}px`;
-  el.style.top  = `${y}px`;
+  el.style.top = `${y}px`;
   el.style.visibility = 'visible';
 }
 
 function _gestureIcon(g: string): string {
-  if (g === 'drag_unit_to_city')  return '→';
-  if (g === 'drag_city_to_city')  return '⇌';
-  if (g === 'area_select')        return '▣';
-  if (g === 'right_click')        return '◈';
+  if (g === 'drag_unit_to_city') return '→';
+  if (g === 'drag_city_to_city') return '⇌';
+  if (g === 'area_select') return '▣';
+  if (g === 'right_click') return '◈';
   return '⬡';
 }
 
 function _riskStyle(risk: string): [string, string] {
   if (risk === 'destructive') return ['#d44b4b', '☠ DESTRUCTIVO'];
-  if (risk === 'high')        return ['#e8a040', '⚠ ALTO'];
-  if (risk === 'medium')      return ['#c8a84b', '◆ MEDIO'];
+  if (risk === 'high') return ['#e8a040', '⚠ ALTO'];
+  if (risk === 'medium') return ['#c8a84b', '◆ MEDIO'];
   return ['#5b9b5b', '● BAJO'];
 }
 
@@ -328,7 +351,9 @@ export function showDragTooltip(
 ) {
   // Debounce: don't flash on every pixel
   if (_tooltipTimer) return;
-  _tooltipTimer = setTimeout(() => { _tooltipTimer = null; }, 200);
+  _tooltipTimer = setTimeout(() => {
+    _tooltipTimer = null;
+  }, 200);
 
   const ctx: Record<string, string> = {};
   if (dropTarget?.cityId) {
@@ -336,25 +361,33 @@ export function showDragTooltip(
     ctx.cityName = dropTarget.cityName ?? '';
   }
 
-  void fetchSuggestions(gesture, agentId, ctx).then(suggestions => {
-    if (suggestions.length === 0) {
-      hideDragTooltip();
-      return;
-    }
-    const el = _getOrCreateTooltip();
-    el.innerHTML = `<div class="dt-title">Sugerencias</div>` +
-      suggestions.slice(0, 3).map((s, i) => {
-        const color = successRateColor(s.successRate);
-        const pct  = Math.round(s.successRate * 100);
-        const label = cmdTypeLabel(s.cmdType);
-        return `<div class="dt-item${i === 0 ? ' dt-top' : ''}">
+  void fetchSuggestions(gesture, agentId, ctx)
+    .then((suggestions) => {
+      if (suggestions.length === 0) {
+        hideDragTooltip();
+        return;
+      }
+      const el = _getOrCreateTooltip();
+      el.innerHTML =
+        `<div class="dt-title">Sugerencias</div>` +
+        suggestions
+          .slice(0, 3)
+          .map((s, i) => {
+            const color = successRateColor(s.successRate);
+            const pct = Math.round(s.successRate * 100);
+            const label = cmdTypeLabel(s.cmdType);
+            return `<div class="dt-item${i === 0 ? ' dt-top' : ''}">
           <span class="dt-label">${_esc(label)}</span>
           <span class="dt-rate" style="color:${color}">${pct}% (${s.count}×)</span>
         </div>`;
-      }).join('');
-    _position(el, screenPos);
-    el.classList.remove('hidden');
-  }).catch(() => { hideDragTooltip(); });
+          })
+          .join('');
+      _position(el, screenPos);
+      el.classList.remove('hidden');
+    })
+    .catch(() => {
+      hideDragTooltip();
+    });
 }
 
 export function hideDragTooltip() {
@@ -372,6 +405,8 @@ function _getOrCreateTooltip(): HTMLElement {
 }
 
 function _esc(s: string): string {
-  return String(s).replace(/[&<>"']/g, c =>
-    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+  return String(s).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }

@@ -16,7 +16,10 @@ export function closePriorityPanel() {
   _panelEl?.classList.add('hidden');
 }
 
-export function togglePriorityPanel(missions: LocalMission[], onAssign: (missionId: string) => void) {
+export function togglePriorityPanel(
+  missions: LocalMission[],
+  onAssign: (missionId: string) => void,
+) {
   if (!_panelEl || _panelEl.classList.contains('hidden')) {
     openPriorityPanel(missions, onAssign);
   } else {
@@ -34,35 +37,50 @@ function getOrCreatePanel(): HTMLElement {
   return el;
 }
 
-function renderPanel(container: HTMLElement, missions: LocalMission[], onAssign: (missionId: string) => void) {
+function renderPanel(
+  container: HTMLElement,
+  missions: LocalMission[],
+  onAssign: (missionId: string) => void,
+) {
   const now = Date.now();
   const sorted: PrioritizedMission[] = sortByPriority(missions, now);
 
   const PRIORITY_LABEL: Record<string, string> = {
     critical: 'CRIT',
-    high:     'HIGH',
-    normal:   'NORM',
-    low:      'LOW',
+    high: 'HIGH',
+    normal: 'NORM',
+    low: 'LOW',
   };
 
   const PRIORITY_COLOR: Record<string, string> = {
     critical: '#d44b4b',
-    high:     '#d48b4b',
-    normal:   '#c8a84b',
-    low:      '#5b9b5b',
+    high: '#d48b4b',
+    normal: '#c8a84b',
+    low: '#5b9b5b',
   };
 
-  const rows = sorted.map(pm => {
-    const age = Math.round((now - pm.assignedAt) / 1000);
-    const ageStr = age < 60 ? `${age}s` : `${Math.round(age / 60)}m`;
-    const fileShort = pm.fileName.length > 22 ? pm.fileName.slice(0, 20) + '…' : pm.fileName;
-    const statusColor = pm.status === 'complete' ? '#5b9b5b' :
-                         (pm.status === 'walking' || pm.status === 'working') ? '#c8a84b' : '#888';
-    const isDebt = pm.filePath.includes('/debt/') || pm.filePath.includes('/legacy/') || pm.filePath.includes('/stale/');
-    const debtBadge = isDebt ? '<span class="badge-debt">DEBT</span>' : '';
-    const testBadge = pm.fileName.includes('.test.') || pm.fileName.includes('.spec.') ? '<span class="badge-test">TEST</span>' : '';
+  const rows = sorted
+    .map((pm) => {
+      const age = Math.round((now - pm.assignedAt) / 1000);
+      const ageStr = age < 60 ? `${age}s` : `${Math.round(age / 60)}m`;
+      const fileShort = pm.fileName.length > 22 ? pm.fileName.slice(0, 20) + '…' : pm.fileName;
+      const statusColor =
+        pm.status === 'complete'
+          ? '#5b9b5b'
+          : pm.status === 'walking' || pm.status === 'working'
+            ? '#c8a84b'
+            : '#888';
+      const isDebt =
+        pm.filePath.includes('/debt/') ||
+        pm.filePath.includes('/legacy/') ||
+        pm.filePath.includes('/stale/');
+      const debtBadge = isDebt ? '<span class="badge-debt">DEBT</span>' : '';
+      const testBadge =
+        pm.fileName.includes('.test.') || pm.fileName.includes('.spec.')
+          ? '<span class="badge-test">TEST</span>'
+          : '';
 
-    return `
+      return `
       <div class="pm-row" data-mission-id="${pm.id}">
         <span class="pm-priority" style="color:${PRIORITY_COLOR[pm.priority]}">${PRIORITY_LABEL[pm.priority]}</span>
         <span class="pm-score">${pm.score.toFixed(1)}</span>
@@ -70,10 +88,11 @@ function renderPanel(container: HTMLElement, missions: LocalMission[], onAssign:
         ${debtBadge}${testBadge}
         <span class="pm-status" style="color:${statusColor}">${pm.status}</span>
         <span class="pm-age">${ageStr}</span>
-        ${pm.status === 'queued' ? `<button class="pm-assign-btn" data-id="${pm.id}">▶</button>` : ''}
+        ${pm.status === 'queued' ? `<button class="pm-assign-btn" data-id="${pm.id}" aria-label="Asignar misión ${pm.id}">▶</button>` : ''}
       </div>
     `;
-  }).join('');
+    })
+    .join('');
 
   container.innerHTML = `
     <div class="pm-header">
@@ -88,7 +107,7 @@ function renderPanel(container: HTMLElement, missions: LocalMission[], onAssign:
   `;
 
   // Attach assign-button handlers
-  container.querySelectorAll<HTMLButtonElement>('.pm-assign-btn').forEach(btn => {
+  container.querySelectorAll<HTMLButtonElement>('.pm-assign-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const id = (e.target as HTMLElement).dataset['id'];

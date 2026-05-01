@@ -5,25 +5,44 @@ import type { LocalWorld, LocalTile, LocalTileType } from './types.ts';
 
 function makeGrid(tiles: string[]): LocalWorld {
   // Simple grid from string rows: '.' floor, '#' wall, 'W' workbench, 'D' door
-  const typeMap: Record<string, LocalTileType> = { '.': 'floor', '#': 'wall', 'W': 'workbench', 'D': 'door' };
+  const typeMap: Record<string, LocalTileType> = {
+    '.': 'floor',
+    '#': 'wall',
+    W: 'workbench',
+    D: 'door',
+  };
   const grid: LocalTile[][] = tiles.map((row, y) =>
     row.split('').map((ch, x) => ({
-      x, y,
+      x,
+      y,
       type: typeMap[ch] ?? 'floor',
       roomId: null,
-      workbench: ch === 'W' ? { id: `wb-${x}-${y}`, filePath: `/f/${x}/${y}`, fileName: 'f.ts', extension: 'ts', isTest: false, repoPath: 'test' } : null,
+      workbench:
+        ch === 'W'
+          ? {
+              id: `wb-${x}-${y}`,
+              filePath: `/f/${x}/${y}`,
+              fileName: 'f.ts',
+              extension: 'ts',
+              isTest: false,
+              repoPath: 'test',
+            }
+          : null,
     })),
   );
-  return { repoId: 'test', grid, rooms: [], width: grid[0]!.length, height: grid.length, workbenches: [] };
+  return {
+    repoId: 'test',
+    grid,
+    rooms: [],
+    width: grid[0]!.length,
+    height: grid.length,
+    workbenches: [],
+  };
 }
 
 describe('localPathfinding — findPath', () => {
   it('finds direct path on open floor', () => {
-    const world = makeGrid([
-      '.....',
-      '.....',
-      '.....',
-    ]);
+    const world = makeGrid(['.....', '.....', '.....']);
     const result = findPath(world, 0, 0, 4, 2);
     assert.ok(result !== null, 'should find a path');
     assert.ok(result!.path.length > 0, 'path should have steps');
@@ -51,11 +70,7 @@ describe('localPathfinding — findPath', () => {
   });
 
   it('routes around walls', () => {
-    const world = makeGrid([
-      '..#..',
-      '..#..',
-      '.....',
-    ]);
+    const world = makeGrid(['..#..', '..#..', '.....']);
     const result = findPath(world, 0, 0, 4, 0);
     assert.ok(result !== null, 'should find a path around the wall');
   });
@@ -70,11 +85,7 @@ describe('localPathfinding — findPath', () => {
 
 describe('localPathfinding — findNearestWorkbench', () => {
   it('finds nearest workbench via BFS', () => {
-    const world = makeGrid([
-      '.....',
-      '..W..',
-      '.....',
-    ]);
+    const world = makeGrid(['.....', '..W..', '.....']);
     const result = findNearestWorkbench(world, 0, 0);
     assert.ok(result !== null, 'should find a workbench');
     assert.equal(result!.x, 2);

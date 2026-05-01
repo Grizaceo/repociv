@@ -10,7 +10,9 @@ describe('showMapLoadError', () => {
       id: '',
       textContent: '',
       style: {} as Record<string, string>,
-      setAttribute(name: string, value: string) { if (name === 'role') this.role = value; },
+      setAttribute(name: string, value: string) {
+        if (name === 'role') this.role = value;
+      },
       role: '',
     };
     vi.stubGlobal('document', {

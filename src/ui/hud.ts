@@ -10,7 +10,7 @@ export function initExternalLibs() {
   if (window.lucide) {
     window.lucide.createIcons();
   }
-  
+
   const hudOverlay = document.getElementById('hud-overlay');
   if (hudOverlay && window.autoAnimate) {
     window.autoAnimate(hudOverlay);
@@ -34,7 +34,9 @@ export function hideLoadingScreen() {
   if (screen) {
     screen.style.opacity = '0';
     screen.style.pointerEvents = 'none';
-    setTimeout(() => { screen.style.display = 'none'; }, 600);
+    setTimeout(() => {
+      screen.style.display = 'none';
+    }, 600);
   }
 }
 
@@ -44,26 +46,41 @@ export function updateResource(id: 'gold' | 'science' | 'production', value: num
 }
 
 const LOG_MAX = 8;
-export function logEvent(msg: string, type: 'info' | 'warn' | 'success' | 'build' | 'error' = 'info') {
+export function logEvent(
+  msg: string,
+  type: 'info' | 'warn' | 'success' | 'build' | 'error' = 'info',
+) {
   const container = document.getElementById('log-messages');
   if (!container) return;
   const entry = document.createElement('div');
   entry.className = `log-entry log-${type}`;
-  
+
   let icon = 'circle';
   let color = 'var(--text-dim)';
-  
-  if (type === 'success') { icon = 'check-circle'; color = 'var(--civ-food)'; }
-  else if (type === 'warn') { icon = 'alert-triangle'; color = 'var(--civ-happiness)'; }
-  else if (type === 'error') { icon = 'x-circle'; color = 'var(--civ-defense)'; }
-  else if (type === 'build') { icon = 'hammer'; color = 'var(--civ-production)'; }
 
-  const escapedMsg = msg.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+  if (type === 'success') {
+    icon = 'check-circle';
+    color = 'var(--civ-food)';
+  } else if (type === 'warn') {
+    icon = 'alert-triangle';
+    color = 'var(--civ-happiness)';
+  } else if (type === 'error') {
+    icon = 'x-circle';
+    color = 'var(--civ-defense)';
+  } else if (type === 'build') {
+    icon = 'hammer';
+    color = 'var(--civ-production)';
+  }
+
+  const escapedMsg = msg.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
   entry.innerHTML = `
     <i data-lucide="${icon}" style="width:12px; height:12px; color:${color}; margin-right:6px"></i>
     <span class="log-text" style="color:${color}">${escapedMsg}</span>
   `;
-  
+
   container.prepend(entry);
   if (window.lucide) window.lucide.createIcons();
 
@@ -72,7 +89,10 @@ export function logEvent(msg: string, type: 'info' | 'warn' | 'success' | 'build
   }
 }
 
-export function setBridgeStatus(online: boolean, mode: 'claude-code' | 'openclaw' | 'hermes' | 'demo' = 'hermes') {
+export function setBridgeStatus(
+  online: boolean,
+  mode: 'claude-code' | 'openclaw' | 'hermes' | 'demo' = 'hermes',
+) {
   const el = document.getElementById('bridge-status');
   if (!el) return;
   el.classList.toggle('bridge-online', online);
@@ -87,7 +107,9 @@ export function setBridgeStatus(online: boolean, mode: 'claude-code' | 'openclaw
   }
 }
 
-export function updateGpuBar(data: { vramUsed?: number; vramTotal?: number; temp?: number } | null) {
+export function updateGpuBar(
+  data: { vramUsed?: number; vramTotal?: number; temp?: number } | null,
+) {
   const bar = document.getElementById('gpu-bar');
   if (!bar) return;
   if (!data || data.vramUsed === undefined) {
@@ -123,5 +145,8 @@ export function toggleViewHUD(is3D: boolean) {
     if (window.lucide) window.lucide.createIcons();
     btn.classList.toggle('active', is3D);
   }
-  logEvent(is3D ? 'Cámara de perspectiva activada (3D)' : 'Cámara estratégica activada (2D)', 'info');
+  logEvent(
+    is3D ? 'Cámara de perspectiva activada (3D)' : 'Cámara estratégica activada (2D)',
+    'info',
+  );
 }
