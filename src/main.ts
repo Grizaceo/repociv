@@ -53,6 +53,12 @@ import {
   toggleLedger,
   closeLedger,
   isLedgerOpen,
+  toggleTaskPanel,
+  closeTaskPanel,
+  isTaskPanelOpen,
+  toggleLogPanel,
+  closeLogPanel,
+  isLogPanelOpen,
 } from './ui/index.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from './ui/settingsPanel.ts';
 import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
@@ -108,6 +114,8 @@ async function bootstrap() {
   document.getElementById('btn-approvals')?.addEventListener('click', toggleApprovalPanel);
   document.getElementById('btn-replay')?.addEventListener('click', toggleReplayPanel);
   document.getElementById('btn-observability')?.addEventListener('click', toggleObservabilityPanel);
+  document.getElementById('btn-tasks')?.addEventListener('click', toggleTaskPanel);
+  document.getElementById('btn-log')?.addEventListener('click', toggleLogPanel);
   document.getElementById('btn-harnesses')?.addEventListener('click', () => {
     toggleHarnessPanel();
     if (isHarnessPanelOpen()) startHarnessPolling();
@@ -277,6 +285,14 @@ function wireHUD(
       }
       if (isObservabilityPanelOpen()) {
         closeObservabilityPanel();
+        return;
+      }
+      if (isTaskPanelOpen()) {
+        closeTaskPanel();
+        return;
+      }
+      if (isLogPanelOpen()) {
+        closeLogPanel();
         return;
       }
       if (isApprovalPanelOpen()) {

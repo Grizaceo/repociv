@@ -45,6 +45,18 @@ export {
   isReplayPanelOpen,
   toggleReplayPanel,
 } from './replayPanel';
+export {
+  openTaskPanel,
+  closeTaskPanel,
+  isTaskPanelOpen,
+  toggleTaskPanel,
+} from './taskPanel';
+export {
+  openLogPanel,
+  closeLogPanel,
+  isLogPanelOpen,
+  toggleLogPanel,
+} from './logPanel.ts';
 
 // Re-export specific initialization helpers
 export { initExternalLibs } from './hud.ts';
