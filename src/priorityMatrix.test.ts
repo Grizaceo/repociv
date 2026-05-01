@@ -36,35 +36,35 @@ describe('priorityScore', () => {
   it('older missions get higher score (age weight)', () => {
     const now = Date.now();
     const fresh = makeMission({ assignedAt: now - 1_000 });
-    const old   = makeMission({ assignedAt: now - 120 * 60_000 }); // 2h ago
+    const old = makeMission({ assignedAt: now - 120 * 60_000 }); // 2h ago
     expect(priorityScore(old, now)).toBeGreaterThan(priorityScore(fresh, now));
   });
 
   it('test files get a score boost', () => {
     const now = Date.now();
-    const base = makeMission({ fileName: 'foo.ts',      filePath: '/src/foo.ts' });
+    const base = makeMission({ fileName: 'foo.ts', filePath: '/src/foo.ts' });
     const test = makeMission({ fileName: 'foo.test.ts', filePath: '/src/foo.test.ts' });
     expect(priorityScore(test, now)).toBeGreaterThan(priorityScore(base, now));
   });
 
   it('spec files also get boost', () => {
     const now = Date.now();
-    const base = makeMission({ fileName: 'utils.ts',      filePath: '/src/utils.ts' });
+    const base = makeMission({ fileName: 'utils.ts', filePath: '/src/utils.ts' });
     const spec = makeMission({ fileName: 'utils.spec.ts', filePath: '/src/utils.spec.ts' });
     expect(priorityScore(spec, now)).toBeGreaterThan(priorityScore(base, now));
   });
 
   it('ts extension scores higher than yml', () => {
     const now = Date.now();
-    const ts  = makeMission({ fileName: 'main.ts',   filePath: '/src/main.ts' });
-    const yml = makeMission({ fileName: 'ci.yml',    filePath: '/ci.yml' });
+    const ts = makeMission({ fileName: 'main.ts', filePath: '/src/main.ts' });
+    const yml = makeMission({ fileName: 'ci.yml', filePath: '/ci.yml' });
     expect(priorityScore(ts, now)).toBeGreaterThan(priorityScore(yml, now));
   });
 
   it('debt path gets higher score than normal path', () => {
     const now = Date.now();
     const normal = makeMission({ filePath: '/repos/repociv/src/utils.ts' });
-    const debt   = makeMission({ filePath: '/repos/repociv/legacy/old.ts' });
+    const debt = makeMission({ filePath: '/repos/repociv/legacy/old.ts' });
     expect(priorityScore(debt, now)).toBeGreaterThan(priorityScore(normal, now));
   });
 
@@ -123,8 +123,13 @@ describe('sortByPriority', () => {
     const now = Date.now();
     const missions = [
       makeMission({ id: 'fresh', assignedAt: now - 500 }),
-      makeMission({ id: 'old',   assignedAt: now - 200 * 60_000, fileName: 'x.test.ts', filePath: '/src/x.test.ts' }),
-      makeMission({ id: 'mid',   assignedAt: now - 30 * 60_000 }),
+      makeMission({
+        id: 'old',
+        assignedAt: now - 200 * 60_000,
+        fileName: 'x.test.ts',
+        filePath: '/src/x.test.ts',
+      }),
+      makeMission({ id: 'mid', assignedAt: now - 30 * 60_000 }),
     ];
     const sorted = sortByPriority(missions, now);
     expect(sorted[0]!.score).toBeGreaterThanOrEqual(sorted[1]!.score);
@@ -147,8 +152,13 @@ describe('peekNextMission', () => {
   it('returns the highest-priority mission', () => {
     const now = Date.now();
     const missions = [
-      makeMission({ id: 'low',  assignedAt: now - 1_000 }),
-      makeMission({ id: 'high', assignedAt: now - 150 * 60_000, fileName: 'y.test.ts', filePath: '/src/y.test.ts' }),
+      makeMission({ id: 'low', assignedAt: now - 1_000 }),
+      makeMission({
+        id: 'high',
+        assignedAt: now - 150 * 60_000,
+        fileName: 'y.test.ts',
+        filePath: '/src/y.test.ts',
+      }),
     ];
     const next = peekNextMission(missions, now);
     expect(next?.id).toBe('high');

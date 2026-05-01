@@ -77,8 +77,14 @@ def _agent_base(unit_id: str) -> str:
     return unit_id.split("-")[0].upper()
 
 
-# ─── Priority scoring (mirrors priorityMatrix.ts) ────────────────────────────
-_WEIGHTS = {"age": 20, "test": 15, "debt": 25, "extension": 5, "fatigue": 15}
+# ─── Priority weights — loaded from shared/priority-weights.json ─────────────
+# TypeScript priorityMatrix.ts imports the same file → single source of truth.
+_WEIGHTS_FILE = Path(__file__).parent.parent / "shared" / "priority-weights.json"
+try:
+    _WEIGHTS: dict[str, float] = json.loads(_WEIGHTS_FILE.read_text())
+except (OSError, json.JSONDecodeError):
+    # Fallback if file is missing or corrupt
+    _WEIGHTS = {"age": 20, "test": 15, "debt": 25, "extension": 5, "fatigue": 15}
 _EXT_SCORE = {"ts": 3, "tsx": 3, "js": 2, "jsx": 2, "py": 1, "rs": 1, "go": 1,
                "json": -1, "yaml": -1, "yml": -1, "md": -1, "css": -1}
 
