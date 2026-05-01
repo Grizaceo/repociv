@@ -332,9 +332,12 @@ def load_pending_tasks() -> list[dict[str, str]]:
     try:
         tasks = []
         for line in PENDING_TRACKER.read_text(encoding="utf-8").splitlines():
-            m = re.match(r"^\s*-\s*\[\s*\]\s*(.+)", line)
+            # Soporta - [ ], * [ ], + [ ]; excluye [x] y [X] (completadas)
+            m = re.match(r"^\s*[-*+]\s*\[\s*\]\s*(.+)", line)
             if m:
-                tasks.append({"title": m.group(1).strip()})
+                title = m.group(1).strip()
+                priority = "high" if title.startswith("!") or "[HIGH]" in title else "normal"
+                tasks.append({"title": title.lstrip("!").strip(), "priority": priority})
         return tasks
     except Exception:
         return []
@@ -343,6 +346,9 @@ def load_pending_tasks() -> list[dict[str, str]]:
 def append_pending_task(title: str, description: str = "") -> None:
     try:
         existing = PENDING_TRACKER.read_text(encoding="utf-8") if PENDING_TRACKER.exists() else ""
+        # Guard: no duplicar si el título ya existe como tarea pendiente
+        if re.search(re.escape(title), existing):
+            return
         entry = f"\n- [ ] {title}"
         if description:
             entry += f"\n  {description}"
@@ -385,11 +391,9 @@ def scan_active_processes() -> None:
 
 # ─── LexO-Alpha detection ─────────────────────────────────────────────────────
 _lexo_spawned: set[str] = set()
-_lexo_counter = 0
 
 
 def detect_lexo() -> None:
-    global _lexo_counter
     try:
         result = subprocess.run(["ps", "aux"], capture_output=True, text=True, timeout=5)
         for line in result.stdout.strip().splitlines()[1:]:
@@ -405,10 +409,13 @@ def detect_lexo() -> None:
                 pid_key = str(pid)
                 if pid_key not in _lexo_spawned:
                     _lexo_spawned.add(pid_key)
-                    _lexo_counter += 1
-                    unit_id = f"LEXO-{_lexo_counter}"
+                    # UUID corto: único entre sesiones (no colisiona tras restart)
+                    unit_id = f"LEXO-{uuid.uuid4().hex[:8]}"
+                    # Distribuir hexes usando hash del PID para evitar colisiones visuales
+                    hex_q = 2 + (pid % 3)
+                    hex_r = pid % 5
                     send_to_repociv({"type": "unit_spawn", "unit": unit_id, "civ": "gris",
-                                     "hex": [2, _lexo_counter], "unitType": "lexo",
+                                     "hex": [hex_q, hex_r], "unitType": "lexo",
                                      "mission": f"Proceso: {parts[10][:40]}"})
                     send_to_repociv({"type": "log", "msg": f"LexO-α detectado (pid {pid})", "level": "success"})
     except Exception:
@@ -438,6 +445,14 @@ def _has_openclaw() -> bool:
 
 def _find_openclaw() -> str | None:
     return _agent_runner._find_openclaw()
+
+
+def _has_claude_code() -> bool:
+    return _agent_runner._has_claude_code()
+
+
+def _has_cursor() -> bool:
+    return _agent_runner._has_cursor()
 
 
 def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
@@ -476,6 +491,11 @@ def _handle_command(cmd: Command) -> dict[str, Any]:
         send_to_repociv({"type": "log",
                          "msg": f"Aprobación requerida: {cmd.type} → {cmd.target}",
                          "level": "warn"})
+        send_to_repociv({"type": "waiting_approval",
+                         "commandId": cmd.id,
+                         "commandType": cmd.type,
+                         "target": cmd.target,
+                         "risk": cmd.risk})
         return {"ok": True, "status": "waiting_approval", "commandId": cmd.id}
 
     # auto-safe: enqueue in scheduler (priority-sorted dispatch)
@@ -643,9 +663,17 @@ def _dispatch_command(cmd: Command) -> None:
             })
         return
 
-    send_to_repociv({"type": "log", "msg": f"Comando {cmd.type} recibido (sin executor)", "level": "warn"})
+    send_to_repociv({"type": "log", "msg": f"Comando {cmd.type} sin executor — sin ejecución real", "level": "warn"})
     _es.record_failed(cmd.id, f"no executor for {cmd.type}")
     _ds.record_outcome(cmd.id, "failure", 0.0)
+    send_to_repociv({
+        "type": "mission_complete",
+        "missionId": cmd.id,
+        "unit": str(cmd.payload.get("unit", "DAVI")),
+        "success": False,
+        "duration": 0,
+        "error": f"Sin executor para tipo '{cmd.type}' — no se ejecutó ninguna acción real",
+    })
 
 
 # ─── HTTP Handler ─────────────────────────────────────────────────────────────
@@ -686,7 +714,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
 
         if path == "/health":
-            self._json({"ok": True, "openclaw": _has_openclaw()})
+            self._json({
+                "ok": True,
+                "openclaw": _has_openclaw(),
+                "claudeCode": _has_claude_code(),
+                "cursor": _has_cursor(),
+            })
             return
 
         if path == "/ready":
@@ -1187,6 +1220,8 @@ if __name__ == "__main__":
     print(f"│ Events:    {_es._store_path}  │")
     print(f"│ Missions:  {MISSIONS_FILE}    │")
     print(f"│ openclaw:  {'OK' if _has_openclaw() else 'NO (usará Hermes API)'}                          │")
+    print(f"│ claude-code: {'OK' if _has_claude_code() else 'NO'}                              │")
+    print(f"│ cursor:    {'OK' if _has_cursor() else 'NO'}                                    │")
     print(f"│ GPU:       {'OK (nvidia-smi)' if has_gpu else 'no disponible'}                    │")
     if recovered:
         print(f"│ Recuperados: {recovered} comando(s) colgado(s)              │")

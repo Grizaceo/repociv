@@ -70,6 +70,14 @@ for PORT in "$BRIDGE_PORT" "$REPOCIV_PORT"; do
   fi
 done
 
+# ─── Python venv ─────────────────────────────────────────────────────────────
+if [[ ! -d "$REPO_ROOT/.venv" ]]; then
+  echo "▶ Creando entorno virtual Python (.venv)…"
+  python3 -m venv "$REPO_ROOT/.venv"
+fi
+# shellcheck disable=SC1091
+source "$REPO_ROOT/.venv/bin/activate"
+
 # ─── Start bridge ─────────────────────────────────────────────────────────────
 echo "▶ Iniciando bridge (puerto $BRIDGE_PORT)…"
 python3 -m server.bridge \

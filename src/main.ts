@@ -21,12 +21,14 @@ import {
   startObservabilityPolling,
   toggleHarnessPanel, isHarnessPanelOpen, startHarnessPolling,
   toggleReplayPanel, closeReplayPanel, isReplayPanelOpen,
+  toggleLedger, closeLedger, isLedgerOpen,
 } from './ui/index.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from './ui/settingsPanel.ts';
 import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
 import { sendCommand } from './commandBus.ts';
 import { recordGesture } from './directiveLearner.ts';
 import { type Unit, tileKey } from './types.ts';
+import { terminalPanel } from './terminalPanel.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 const loadSteps = [
@@ -201,6 +203,8 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, tog
 
     // Esc: close overlays
     if (e.key === 'Escape') {
+      if (isLedgerOpen()) { closeLedger(); return; }
+      if (terminalPanel.isVisible()) { terminalPanel.hide(); return; }
       if (isReplayPanelOpen()) { closeReplayPanel(); return; }
       if (isObservabilityPanelOpen()) { closeObservabilityPanel(); return; }
       if (isApprovalPanelOpen()) { closeApprovalPanel(); return; }
@@ -281,10 +285,19 @@ function wireHUD(renderer: Renderer, state: GameState, bridge: BridgeEvents, tog
       case 'v': renderer.toggleFog(); break;
       case '3': toggleView(); break;
       case 'a': toggleApprovalPanel(); break;
+      case 't': terminalPanel.toggle(); break;
       case 'p': togglePriorityPanel(state.getMissionQueue(), (missionId) => {
         state.dispatchMissionById(missionId);
       }); break;
       case '?': toggleKeyboardHelp(); break;
+    }
+
+    if (e.key === 'F6') {
+      e.preventDefault();
+      toggleLedger(state, (cityId) => {
+        const city = state.world.cities.find(c => c.id === cityId);
+        if (city) renderer.centerOn(city.coord);
+      });
     }
 
     if (e.key === 'F9') {

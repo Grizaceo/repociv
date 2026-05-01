@@ -95,10 +95,10 @@ export class GameState {
 
   // ─── Unit animation ───────────────────────────────────────────────────────
   private updateUnits(dt: number) {
-    const scale = dt / TICK_MS;
     for (const unit of this.world.units) {
       if (unit.state === 'moving' && unit.targetCoord) {
-        unit.pathProgress += 0.04 * scale; // ~25 ticks per hex at 60fps
+        // 2.5 hex/s — derived from real dt (ms → s) to stay frame-rate independent
+        unit.pathProgress += (dt / 1000) * 2.5;
         if (unit.pathProgress >= 1) {
           unit.pathProgress = 0;
           unit.pathIndex++;
@@ -116,7 +116,7 @@ export class GameState {
         }
       }
       if (unit.state === 'working' && unit.workProgress !== undefined) {
-        unit.workProgress = Math.min(100, unit.workProgress + 0.05 * scale);
+        unit.workProgress = Math.min(100, unit.workProgress + (dt / 1000) * 3.0);
       }
     }
   }

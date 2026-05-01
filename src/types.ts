@@ -152,6 +152,7 @@ export type BridgeEvent =
   | { type: 'fog_reveal';    hexes: [number, number][] }
   | { type: 'mission_start';    missionId: string; unit: string; questName: string }
   | { type: 'mission_complete'; missionId: string; unit: string; success: boolean; duration: number }
+  | { type: 'waiting_approval'; commandId: string; commandType: string; target: string; risk: string }
   | { type: 'chat_chunk';       unit: string; missionId?: string; text: string }
   | { type: 'log';              msg: string; level?: 'info' | 'warn' | 'success' };
 

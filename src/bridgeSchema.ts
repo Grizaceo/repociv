@@ -76,6 +76,10 @@ const Schemas = [
     missionId: v.string(), unit: v.string(), success: v.boolean(), duration: v.number(),
   }),
   v.object({
+    type: v.literal('waiting_approval'),
+    commandId: v.string(), commandType: v.string(), target: v.string(), risk: v.string(),
+  }),
+  v.object({
     type: v.literal('chat_chunk'),
     unit: v.string(), text: v.string(),
     missionId: v.optional(v.string()),

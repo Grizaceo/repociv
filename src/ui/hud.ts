@@ -72,13 +72,19 @@ export function logEvent(msg: string, type: 'info' | 'warn' | 'success' | 'build
   }
 }
 
-export function setBridgeStatus(online: boolean, mode: 'openclaw' | 'hermes' | 'demo' = 'hermes') {
+export function setBridgeStatus(online: boolean, mode: 'claude-code' | 'openclaw' | 'hermes' | 'demo' = 'hermes') {
   const el = document.getElementById('bridge-status');
   if (!el) return;
   el.classList.toggle('bridge-online', online);
   el.classList.toggle('bridge-offline', !online);
   el.classList.toggle('bridge-demo', mode === 'demo');
-  el.textContent = online ? `⚡ ${mode}` : (mode === 'demo' ? '⚡ DEMO' : '⚡ offline');
+  if (online) {
+    el.textContent = `⚡ ${mode}`;
+    el.title = `Agente activo: ${mode}`;
+  } else {
+    el.textContent = mode === 'demo' ? '⚡ DEMO' : '⚡ offline';
+    el.title = mode === 'demo' ? 'Modo demo — sin ejecución real' : 'Bridge desconectado';
+  }
 }
 
 export function updateGpuBar(data: { vramUsed?: number; vramTotal?: number; temp?: number } | null) {

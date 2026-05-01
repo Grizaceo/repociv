@@ -181,11 +181,24 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: openclaw]\n"})
         return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir)
 
+    # Adapter selection: claude-code → hermes → openclaw
+    if _has_claude_code():
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: claude-code]\n"})
+        success, output = _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir)
+        if success:
+            return success, output
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[claude-code falló → fallback hermes]\n"})
+
     send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: hermes]\n"})
     success, output = _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir)
-    if not success and _has_openclaw():
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[hermes falló → fallback openclaw]\n"})
-        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir)
+    if not success:
+        if _has_openclaw():
+            send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[hermes falló → fallback openclaw]\n"})
+            return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir)
+        # All adapters unavailable — return explicit failure, not a silent success
+        msg = "[offline] Ningún adaptador de agente disponible (claude-code, hermes, openclaw). Sin ejecución real.\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": msg})
+        return False, msg.strip()
     return success, output
 
 
@@ -202,6 +215,88 @@ def _find_openclaw() -> str | None:
         if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
             return candidate
     return None
+
+
+def _has_claude_code() -> bool:
+    return _find_claude_code() is not None
+
+
+def _find_claude_code() -> str | None:
+    candidates = [
+        shutil.which("claude"),
+        str(Path.home() / ".npm-global" / "bin" / "claude"),
+        str(Path.home() / ".local" / "bin" / "claude"),
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
+                                config: dict[str, Any],
+                                working_dir: str | None = None) -> tuple[bool, str]:
+    claude_bin = _find_claude_code()
+    if not claude_bin:
+        text = "[claude-code error] binary not found in PATH, ~/.npm-global/bin or ~/.local/bin\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, text.strip()
+
+    system_prompt = config.get("system", "")
+    full_prompt = f"{system_prompt}\n\n{mission}" if system_prompt else mission
+    cmd = [claude_bin, "--print", "--dangerously-skip-permissions", full_prompt]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, bufsize=1, cwd=working_dir or None)
+    output_buf: list[str] = []
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        output_buf.append(line)
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": line})
+        _es.record_output_chunk(mission_id, unit_id, line)
+    proc.wait(timeout=600)
+    return proc.returncode == 0, "".join(output_buf)
+
+
+def _has_cursor() -> bool:
+    return _find_cursor() is not None
+
+
+def _find_cursor() -> str | None:
+    candidates = [
+        shutil.which("cursor"),
+        str(Path.home() / ".local" / "bin" / "cursor"),
+        "/usr/local/bin/cursor",
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def _run_cursor_streaming(unit_id: str, mission_id: str, mission: str,
+                           config: dict[str, Any],
+                           working_dir: str | None = None) -> tuple[bool, str]:
+    cursor_bin = _find_cursor()
+    if not cursor_bin:
+        text = "[cursor error] binary not found in PATH, ~/.local/bin or /usr/local/bin\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, text.strip()
+
+    system_prompt = config.get("system", "")
+    full_prompt = f"{system_prompt}\n\n{mission}" if system_prompt else mission
+    cmd = [cursor_bin, "--headless", "--message", full_prompt]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, bufsize=1, cwd=working_dir or None)
+    output_buf: list[str] = []
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        output_buf.append(line)
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": line})
+        _es.record_output_chunk(mission_id, unit_id, line)
+    proc.wait(timeout=600)
+    return proc.returncode == 0, "".join(output_buf)
 
 
 def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,

@@ -1,6 +1,6 @@
 // ─── RepoCiv — Hex & Tile drawing ────────────────────────────────────────────
-import { type Axial, axialToPixel } from './hex.ts';
-import { type Terrain, type Tile, type City } from './types.ts';
+import { type Axial, axialToPixel, AXIAL_DIRECTIONS } from './hex.ts';
+import { type Terrain, type Tile, type City, type Building } from './types.ts';
 import { TERRAIN_COLOR } from './map.ts';
 
 const HEX_SIZE = 52;
@@ -138,12 +138,13 @@ export class HexRenderer {
     }
   }
 
-  drawTileDecor(tile: Tile, fogEnabled: boolean) {
+  drawTileDecor(tile: Tile, fogEnabled: boolean, activeBuilding?: Building) {
     if (!tile.revealed) return;
     const pos = axialToPixel(tile.coord, HEX_SIZE);
     const alpha = (tile.inFog && fogEnabled) ? 0.35 : 1;
 
     this.drawTerrainDecor(tile.terrain, pos, alpha);
+    this.drawTileResources(tile, pos, alpha);
 
     if (tile.city && tile.skillHealth) {
       const skillColor = tile.skillHealth === 'ok' ? '#5b9b5b'
@@ -158,8 +159,34 @@ export class HexRenderer {
       ctx.restore();
     }
 
-    if (tile.city) this.drawCityLabel(tile.city, pos);
+    if (tile.city) this.drawCityLabel(tile.city, pos, activeBuilding);
     if (tile.district) this.drawDistrictLabel(tile.district.name, pos);
+  }
+
+  // ─── A3: Resource icons on tile ──────────────────────────────────────────
+  private drawTileResources(tile: Tile, pos: { x: number; y: number }, alpha: number) {
+    const { ctx } = this;
+    const res = tile.resources;
+    if (!tile.revealed) return;
+
+    const icons: string[] = [];
+    if (res.gold >= 8)       icons.push('🪙');
+    if (res.science >= 4)    icons.push('⚗');
+    if (res.production >= 3) icons.push('⚙');
+    if (icons.length === 0) return;
+
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.85;
+    ctx.font = `${HEX_SIZE * 0.22}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const spacing = HEX_SIZE * 0.28;
+    const startX = pos.x - (spacing * (icons.length - 1)) / 2;
+    const iconY = pos.y + HEX_SIZE * 0.42;
+    for (let i = 0; i < icons.length; i++) {
+      ctx.fillText(icons[i]!, startX + i * spacing, iconY);
+    }
+    ctx.restore();
   }
 
   private drawTerrainDecor(terrain: Terrain, pos: { x: number; y: number }, alpha: number) {
@@ -255,28 +282,78 @@ export class HexRenderer {
     ctx.stroke();
   }
 
+  // ─── A4: Territory blob border ────────────────────────────────────────────
+  // Draws only the external edges of a city's territory — the edges that face
+  // a hex NOT in the territory. This creates a solid organic border instead
+  // of per-tile outlines.
+  //
+  // Flat-topped hex corner angles (60*i - 30°):
+  //   0: -30° (top-right)  1: 30° (bottom-right)  2: 90° (bottom)
+  //   3: 150° (bottom-left) 4: 210° (top-left)     5: 270° (top)
+  //
+  // Edge i→(i+1) faces AXIAL_DIRECTIONS[d] mapping:
+  //   E(0)→edge[0,1]  NE(1)→edge[5,0]  NW(2)→edge[4,5]
+  //   W(3)→edge[3,4]  SW(4)→edge[2,3]  SE(5)→edge[1,2]
+  private static readonly EDGE_CORNERS: [number, number][] = [
+    [0, 1], // E  (dir 0)
+    [5, 0], // NE (dir 1)
+    [4, 5], // NW (dir 2)
+    [3, 4], // W  (dir 3)
+    [2, 3], // SW (dir 4)
+    [1, 2], // SE (dir 5)
+  ];
+
   drawCityTerritory(city: City) {
     const { ctx } = this;
+    if (city.territory.length === 0) return;
+
+    // Build fast lookup set
+    const inTerritory = new Set(city.territory.map(c => `${c.q},${c.r}`));
+    const borderColor = city.isCapital ? '#c8a84b' : '#7a5a2e';
+    const borderWidth = city.isCapital ? 2.5 : 1.8;
+
     ctx.save();
-    ctx.strokeStyle = city.isCapital ? '#c8a84b' : '#5a3e1e';
-    ctx.lineWidth = 2;
-    ctx.setLineDash(city.isCapital ? [] : [4, 4]);
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = borderWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = city.isCapital ? 'rgba(200,168,75,0.4)' : 'transparent';
+    ctx.shadowBlur = city.isCapital ? 4 : 0;
+    ctx.setLineDash([]);
+
     for (const coord of city.territory) {
       const pos = axialToPixel(coord, HEX_SIZE);
-      ctx.beginPath();
+      // Compute the 6 corner positions of this hex
+      const corners: { x: number; y: number }[] = [];
       for (let i = 0; i < 6; i++) {
         const angle = (Math.PI / 180) * (60 * i - 30);
-        const x = pos.x + HEX_SIZE * 0.90 * Math.cos(angle);
-        const y = pos.y + HEX_SIZE * 0.90 * Math.sin(angle);
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        corners.push({
+          x: pos.x + HEX_SIZE * 0.92 * Math.cos(angle),
+          y: pos.y + HEX_SIZE * 0.92 * Math.sin(angle),
+        });
       }
-      ctx.closePath();
-      ctx.stroke();
+
+      // Check each of the 6 directions
+      for (let d = 0; d < 6; d++) {
+        const dir = AXIAL_DIRECTIONS[d]!;
+        const neighbor = `${coord.q + dir.q},${coord.r + dir.r}`;
+        if (inTerritory.has(neighbor)) continue; // shared border — skip
+
+        // Draw this external edge
+        const [ci, cj] = HexRenderer.EDGE_CORNERS[d]!;
+        const a = corners[ci]!;
+        const b = corners[cj]!;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
     }
+
     ctx.restore();
   }
 
-  private drawCityLabel(city: City, pos: { x: number; y: number }) {
+  private drawCityLabel(city: City, pos: { x: number; y: number }, activeBuilding?: Building) {
     const { ctx } = this;
     if (city.isCapital) {
       ctx.save();
@@ -297,14 +374,14 @@ export class HexRenderer {
     const bh = HEX_SIZE * 0.38;
     const bx = pos.x - bw / 2;
     const by = pos.y + HEX_SIZE * 0.58;
-    
+
     // Background with Art Deco Gradient
     const grad = ctx.createLinearGradient(bx, by - bh, bx, by);
     grad.addColorStop(0, '#2a2218');
     grad.addColorStop(0.5, '#1a1208');
     grad.addColorStop(1, '#0a0500');
     ctx.fillStyle = grad;
-    
+
     // Rounded-ish background
     ctx.beginPath();
     ctx.moveTo(bx, by - bh);
@@ -318,13 +395,66 @@ export class HexRenderer {
     ctx.strokeStyle = '#c8a84b';
     ctx.lineWidth = 1.5;
     ctx.stroke();
-    
+
     // Text Shadow for readability
     ctx.shadowColor = 'rgba(0,0,0,0.8)';
     ctx.shadowBlur = 3;
-    
+
     ctx.fillStyle = '#e8d5a0';
     ctx.fillText(label, pos.x, by - 5);
+    ctx.restore();
+
+    // ─── A2: Production bar ─────────────────────────────────────────────────
+    if (activeBuilding && activeBuilding.state === 'building') {
+      this.drawProductionBar(activeBuilding, pos, bx, by, bw);
+    }
+  }
+
+  // ─── A2: Production bar drawn below city label ────────────────────────────
+  private drawProductionBar(b: Building, _pos: { x: number; y: number }, bx: number, by: number, bw: number) {
+    const { ctx } = this;
+    const pct = Math.max(0, Math.min(1, b.progress / 100));
+    const barH = 7;
+    const barY = by + 3;
+    const padding = 2;
+
+    ctx.save();
+
+    // Bar background
+    ctx.fillStyle = 'rgba(10,8,4,0.85)';
+    ctx.strokeStyle = '#5a3e1e';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.rect(bx, barY, bw, barH);
+    ctx.fill();
+    ctx.stroke();
+
+    // Bar fill (gold gradient)
+    if (pct > 0) {
+      const fillGrad = ctx.createLinearGradient(bx + padding, 0, bx + bw - padding, 0);
+      fillGrad.addColorStop(0, '#c8a84b');
+      fillGrad.addColorStop(1, '#f0d060');
+      ctx.fillStyle = fillGrad;
+      ctx.fillRect(bx + padding, barY + padding, (bw - padding * 2) * pct, barH - padding * 2);
+    }
+
+    // Project name truncated
+    const nameY = barY + barH + 10;
+    const maxNameW = bw - 4;
+    ctx.font = `${HEX_SIZE * 0.19}px 'Cinzel', serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#c8a84b';
+    ctx.shadowColor = 'rgba(0,0,0,0.9)';
+    ctx.shadowBlur = 2;
+    // Truncate name to fit
+    let name = `⚙ ${b.name}`;
+    while (ctx.measureText(name).width > maxNameW && name.length > 4) {
+      name = name.slice(0, -1);
+    }
+    if (name.length < `⚙ ${b.name}`.length) name += '…';
+    ctx.fillText(name, bx + bw / 2, nameY);
+
     ctx.restore();
   }
 

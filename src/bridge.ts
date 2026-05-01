@@ -6,7 +6,9 @@
 import { type GameState } from './game.ts';
 import { type BridgeEvent } from './types.ts';
 import { parseBridgeEvent, describeBridgeEventError } from './bridgeSchema.ts';
-import { logEvent, appendChatChunk, setBridgeStatus, setOperationTicker, updateGpuBar } from './ui/index.ts';
+import { logEvent, appendChatChunk, setBridgeStatus, setOperationTicker, updateGpuBar, showNotification } from './ui/index.ts';
+import { openApprovalPanel } from './ui/approvalPanel.ts';
+import { terminalPanel } from './terminalPanel.ts';
 
 const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL ?? 'http://localhost:5274';
 const BRIDGE_TOKEN = import.meta.env.VITE_BRIDGE_TOKEN ?? '';
@@ -92,8 +94,9 @@ export class BridgeEvents {
     try {
       const res = await fetch(`${BRIDGE_URL}/health`, { method: 'GET', headers: this._authHeaders() });
       if (res.ok) {
-        const data = await res.json() as { ok: boolean; openclaw: boolean };
-        this.onBridgeOnline(data.openclaw ? 'openclaw' : 'hermes');
+        const data = await res.json() as { ok: boolean; openclaw: boolean; claudeCode: boolean; cursor: boolean };
+        const mode = data.claudeCode ? 'claude-code' : data.openclaw ? 'openclaw' : 'hermes';
+        this.onBridgeOnline(mode);
         return;
       }
     } catch {
@@ -102,7 +105,7 @@ export class BridgeEvents {
     this.onBridgeOffline();
   }
 
-  private onBridgeOnline(mode: 'openclaw' | 'hermes') {
+  private onBridgeOnline(mode: 'claude-code' | 'openclaw' | 'hermes') {
     this.bridgeOnline = true;
     this.offlineSince = null;
     this.reconnectDelay = 1000;
@@ -127,11 +130,10 @@ export class BridgeEvents {
   private startDemo() {
     if (this.demoInterval) return;
     setBridgeStatus(false, 'demo' as never);
-    logEvent('Modo DEMO activo — eventos simulados cada 30s', 'info');
+    logEvent('⚠ DEMO — bridge offline. Datos simulados, sin ejecución real.', 'warn');
     this.demoInterval = setInterval(() => {
-      this.handleBridgeEvent({ type: 'resource_update', resource: 'gold', delta: 5 });
-      this.handleBridgeEvent({ type: 'resource_update', resource: 'science', delta: 2 });
-      this.handleBridgeEvent({ type: 'resource_update', resource: 'production', delta: 3 });
+      // Solo feedback visual — NO disparar handleBridgeEvent para no falsear el estado del juego
+      logEvent('[DEMO] Pulso simulado — bridge sigue offline', 'warn');
     }, DEMO_INTERVAL_MS);
   }
 
@@ -191,23 +193,45 @@ export class BridgeEvents {
         this.state.completeBuilding(evt.city, evt.building);
         this.state.invalidatePathCache();
         logEvent(`✓ ${evt.building}`, 'success');
+        showNotification({
+          type: 'success',
+          title: 'Construcción completada',
+          body: `${evt.city} → ${evt.building}`,
+        });
         playSound('complete');
         break;
       case 'building_failed':
         this.state.failBuilding(evt.city, evt.building);
         logEvent(`✗ ${evt.building}`, 'warn');
+        showNotification({
+          type: 'error',
+          title: 'Construcción fallida',
+          body: `${evt.city} → ${evt.building}`,
+        });
         break;
       case 'mission_start':
         this.state.startMission(evt.missionId, evt.unit, evt.questName);
         logEvent(`▶ ${evt.questName}`, 'info');
         break;
-      case 'mission_complete':
+      case 'mission_complete': {
         this.state.completeMission(evt.missionId, evt.success);
         setOperationTicker(false);
+        const durLabel = evt.duration >= 60
+          ? `${Math.round(evt.duration / 60)}m`
+          : `${evt.duration}s`;
+        showNotification({
+          type: evt.success ? 'success' : 'error',
+          title: evt.success ? 'Misión completada' : 'Misión fallida',
+          body: `${evt.unit} · ${durLabel}`,
+          unit: evt.unit,
+          ttl: evt.success ? 6000 : 8000,
+        });
         if (evt.success) playSound('mission');
         break;
+      }
       case 'chat_chunk':
         appendChatChunk(evt.unit, evt.text);
+        terminalPanel.write(`[${evt.unit}] ${evt.text}`);
         break;
       case 'log':
         logEvent(evt.msg, evt.level ?? 'info');
@@ -253,12 +277,27 @@ export class BridgeEvents {
         logEvent(`${evt.unit} salió del área de descanso`, 'info');
         break;
       }
+      case 'waiting_approval':
+        logEvent(`⏳ Aprobación requerida: ${evt.commandType} → ${evt.target} [${evt.risk}]`, 'warn');
+        openApprovalPanel();
+        break;
       case 'context_exhausted': {
         logEvent(`⚠ Contexto agotado para ${evt.unit}`, 'warn');
         break;
       }
       default:
         break;
+    }
+  }
+
+  async sendApproval(commandId: string, approved: boolean) {
+    const res = await fetch(`${BRIDGE_URL}/approvals/${encodeURIComponent(commandId)}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
+      body: JSON.stringify({ approved }),
+    });
+    if (!res.ok) {
+      logEvent(`Error al ${approved ? 'aprobar' : 'rechazar'} comando ${commandId}`, 'warn');
     }
   }
 

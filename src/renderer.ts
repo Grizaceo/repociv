@@ -381,6 +381,12 @@ export class Renderer {
     return { x: this.cam.x, y: this.cam.y, zoom: this.cam.zoom };
   }
 
+  centerOn(coord: import('./hex.ts').Axial) {
+    const pos = axialToPixel(coord, HEX_SIZE);
+    this.cam.x = -pos.x * this.cam.zoom + this.canvas.width / 2;
+    this.cam.y = -pos.y * this.cam.zoom + this.canvas.height / 2;
+  }
+
   private rafId = 0;
 
   stop() {
@@ -444,7 +450,13 @@ export class Renderer {
     });
 
     for (const tile of allTiles) {
-      this.hexR.drawTileDecor(tile, this.fogEnabled);
+      // A2: find active building for this tile's city (if any)
+      const activeBuilding = tile.city
+        ? this.state.world.buildings.find(
+            b => b.cityId === tile.city!.id && b.state === 'building',
+          )
+        : undefined;
+      this.hexR.drawTileDecor(tile, this.fogEnabled, activeBuilding);
     }
 
     if (this.showGrid) {
