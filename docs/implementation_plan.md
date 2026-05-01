@@ -602,11 +602,11 @@ graph TD
 - `server/research_ledger.py` — tablas world_model_predictions/history
 
 **Gate F4:**
-- [ ] Shadow mode registra sin podar
-- [ ] Promotion automática con Spearman ρ ≥ 0.6, recall ≥ 0.7
-- [ ] Active mode reduce tokens ≥ 30% sobre baseline
-- [ ] Archival compression integrada: DCs viejas comprimidas vía patrón `turboquant-memory`
-- [ ] Calibration failure genera artifact documentado
+- [x] Shadow mode registra sin podar
+- [x] Promotion automática con Spearman ρ ≥ 0.6, recall ≥ 0.7
+- [x] Active mode reduce tokens ≥ 30% sobre baseline
+- [x] Archival compression integrada: DCs viejas comprimidas vía patrón `turboquant-memory`
+- [x] Calibration failure genera artifact documentado
 
 ---
 
