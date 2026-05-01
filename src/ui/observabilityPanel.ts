@@ -2,10 +2,10 @@
 // Shows system health at a glance: agents, queue, error rate, duration,
 // GPU/CPU/mem/disk, and recent failures.
 import { openRecoveryPanel } from './recoveryPanel';
+import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
+import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
 // Criterion: open RepoCiv → within 10 s know if the system is healthy.
 
-const BRIDGE_URL   = import.meta.env.VITE_BRIDGE_URL   ?? 'http://localhost:5274';
-const BRIDGE_TOKEN = import.meta.env.VITE_BRIDGE_TOKEN ?? '';
 const POLL_MS = 5_000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -20,7 +20,7 @@ interface Failure {
   error: string;
   ts: number;
   age: number;
-  harnessId?: string;   // optional; populated if bridge sent it
+  harnessId?: string; // optional; populated if bridge sent it
   commandType?: string; // optional; command type that failed
 }
 
@@ -46,25 +46,27 @@ interface Metrics {
 }
 
 // ─── Module state ─────────────────────────────────────────────────────────────
-let _panel:   HTMLElement | null = null;
-let _timer    = 0;
-let _visible  = false;
+let _panel: HTMLElement | null = null;
+let _timer = 0;
+let _visible = false;
 let _metrics: Metrics | null = null;
-let _offline  = false;
+let _offline = false;
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 export function openObservabilityPanel() {
   _visible = true;
-  _getOrCreate().classList.remove('hidden');
+  showPanel(_getOrCreate());
   void _fetch();
 }
 
 export function closeObservabilityPanel() {
   _visible = false;
-  _panel?.classList.add('hidden');
+  if (_panel) hidePanel(_panel);
 }
 
-export function isObservabilityPanelOpen(): boolean { return _visible; }
+export function isObservabilityPanelOpen(): boolean {
+  return _visible;
+}
 
 export function toggleObservabilityPanel() {
   if (_visible) closeObservabilityPanel();
@@ -74,23 +76,32 @@ export function toggleObservabilityPanel() {
 export function startObservabilityPolling() {
   _stopPolling();
   void _fetch();
-  _timer = window.setInterval(() => { void _fetch(); }, POLL_MS);
+  _timer = window.setInterval(() => {
+    void _fetch();
+  }, POLL_MS);
 }
 
-export function stopObservabilityPolling() { _stopPolling(); }
+export function stopObservabilityPolling() {
+  _stopPolling();
+}
 
 // ─── Polling ──────────────────────────────────────────────────────────────────
 function _stopPolling() {
-  if (_timer) { clearInterval(_timer); _timer = 0; }
+  if (_timer) {
+    clearInterval(_timer);
+    _timer = 0;
+  }
 }
 
 async function _fetch() {
-  const headers: Record<string, string> = {};
-  if (BRIDGE_TOKEN) headers['X-RepoCiv-Token'] = BRIDGE_TOKEN;
   try {
-    const res = await fetch(`${BRIDGE_URL}/metrics`, { headers });
-    if (!res.ok) { _offline = true; if (_visible) _render(); return; }
-    _metrics = await res.json() as Metrics;
+    const res = await fetch(bridgeUrl('/metrics'), { headers: bridgeHeaders() });
+    if (!res.ok) {
+      _offline = true;
+      if (_visible) _render();
+      return;
+    }
+    _metrics = (await res.json()) as Metrics;
     _offline = false;
     _updateHealthDot(_metrics.health);
     if (_visible) _render();
@@ -104,7 +115,11 @@ async function _fetch() {
 function _updateHealthDot(health: string) {
   const btn = document.getElementById('btn-observability');
   if (!btn) return;
-  const colors: Record<string, string> = { ok: '#5b9b5b', degraded: '#e8a040', critical: '#d44b4b' };
+  const colors: Record<string, string> = {
+    ok: '#5b9b5b',
+    degraded: '#e8a040',
+    critical: '#d44b4b',
+  };
   let dot = btn.querySelector<HTMLElement>('.obs-health-dot');
   if (!dot) {
     dot = document.createElement('span');
@@ -118,7 +133,7 @@ function _updateHealthDot(health: string) {
 // ─── Render ───────────────────────────────────────────────────────────────────
 function _render() {
   const panel = _getOrCreate();
-  const body  = panel.querySelector<HTMLElement>('.obs-body')!;
+  const body = panel.querySelector<HTMLElement>('.obs-body')!;
 
   if (_offline) {
     body.innerHTML = '<div class="obs-offline">⚠ Bridge offline — sin datos</div>';
@@ -144,9 +159,11 @@ function _render() {
     <!-- Agent grid -->
     <div class="obs-section-title">Agentes</div>
     <div class="obs-agent-grid">
-      ${m.agentStatus.length > 0
-        ? m.agentStatus.map(a => _agentCard(a)).join('')
-        : '<div class="obs-empty">Sin agentes activos</div>'}
+      ${
+        m.agentStatus.length > 0
+          ? m.agentStatus.map((a) => _agentCard(a)).join('')
+          : '<div class="obs-empty">Sin agentes activos</div>'
+      }
     </div>
 
     <!-- Core metrics -->
@@ -161,61 +178,99 @@ function _render() {
     </div>
 
     <!-- Tool calls per agent -->
-    ${Object.keys(m.toolCallsPerAgent).length > 0 ? `
+    ${
+      Object.keys(m.toolCallsPerAgent).length > 0
+        ? `
       <div class="obs-section-title">Comandos por agente</div>
       <div class="obs-tool-calls">
         ${Object.entries(m.toolCallsPerAgent)
           .sort((a, b) => b[1] - a[1])
-          .map(([id, n]) => `<span class="obs-tc-item"><span class="obs-tc-agent">${_esc(id)}</span><span class="obs-tc-count">${n}</span></span>`)
+          .map(
+            ([id, n]) =>
+              `<span class="obs-tc-item"><span class="obs-tc-agent">${_esc(id)}</span><span class="obs-tc-count">${n}</span></span>`,
+          )
           .join('')}
-      </div>` : ''}
+      </div>`
+        : ''
+    }
 
     <!-- System resources -->
     <div class="obs-section-title">Sistema</div>
     <div class="obs-metrics-grid">
       ${m.sys.loadAvg1 != null ? _metric('Load avg', String(m.sys.loadAvg1), m.sys.loadAvg1 > 4 ? 'warn' : 'ok') : ''}
-      ${m.sys.memUsedGb != null && m.sys.memTotalGb != null
-        ? _metric('Memoria', `${m.sys.memUsedGb}/${m.sys.memTotalGb} GB`,
-            (m.sys.memUsedGb / m.sys.memTotalGb) > 0.9 ? 'warn' : 'ok')
-        : ''}
-      ${m.sys.diskUsedPct != null
-        ? _metric('Disco', `${m.sys.diskUsedPct}%`, m.sys.diskUsedPct > 90 ? 'crit' : m.sys.diskUsedPct > 75 ? 'warn' : 'ok')
-        : ''}
-      ${m.gpu
-        ? _metric('GPU VRAM', `${m.gpu.vramUsed}/${m.gpu.vramTotal} MB`, 'ok')
-        : ''}
-      ${m.gpu
-        ? _metric('GPU Temp', `${m.gpu.temp}°C`, m.gpu.temp > 85 ? 'crit' : m.gpu.temp > 70 ? 'warn' : 'ok')
-        : ''}
+      ${
+        m.sys.memUsedGb != null && m.sys.memTotalGb != null
+          ? _metric(
+              'Memoria',
+              `${m.sys.memUsedGb}/${m.sys.memTotalGb} GB`,
+              m.sys.memUsedGb / m.sys.memTotalGb > 0.9 ? 'warn' : 'ok',
+            )
+          : ''
+      }
+      ${
+        m.sys.diskUsedPct != null
+          ? _metric(
+              'Disco',
+              `${m.sys.diskUsedPct}%`,
+              m.sys.diskUsedPct > 90 ? 'crit' : m.sys.diskUsedPct > 75 ? 'warn' : 'ok',
+            )
+          : ''
+      }
+      ${m.gpu ? _metric('GPU VRAM', `${m.gpu.vramUsed}/${m.gpu.vramTotal} MB`, 'ok') : ''}
+      ${
+        m.gpu
+          ? _metric(
+              'GPU Temp',
+              `${m.gpu.temp}°C`,
+              m.gpu.temp > 85 ? 'crit' : m.gpu.temp > 70 ? 'warn' : 'ok',
+            )
+          : ''
+      }
     </div>
 
     <!-- Recent failures -->
-    ${m.recentFailures.length > 0 ? `
+    ${
+      m.recentFailures.length > 0
+        ? `
       <div class="obs-section-title">Últimos fallos</div>
       <div class="obs-failures">
-        ${m.recentFailures.map(f => `
+        ${m.recentFailures
+          .map(
+            (f) => `
           <div class="obs-failure-item">
             <span class="obs-fail-id">${_esc(f.commandId.slice(0, 8))}</span>
             <span class="obs-fail-age">${_age(f.age)}</span>
             <span class="obs-fail-err">${_esc(f.error || '(sin mensaje)')}</span>
-            ${f.harnessId ? `
+            ${
+              f.harnessId
+                ? `
               <button class="obs-btn-recover"
                       data-harness="${_esc(f.harnessId)}"
                       data-reason="${_esc(f.error || 'failure')}"
                       data-cmdtype="${_esc(f.commandType ?? '')}"
-                      title="Abrir plan de recovery">
+                      title="Abrir plan de recovery"
+                      aria-label="Abrir plan de recovery para ${_esc(f.harnessId)}">
                 🔧
-              </button>` : ''}
+              </button>`
+                : ''
+            }
           </div>
-        `).join('')}
-      </div>` : ''}
+        `,
+          )
+          .join('')}
+      </div>`
+        : ''
+    }
   `;
 }
 
 // ─── Card helpers ─────────────────────────────────────────────────────────────
 function _agentCard(a: AgentStatus): string {
   const colors: Record<string, string> = {
-    idle: '#5b9b5b', working: '#4a9ade', sleeping: '#666', offline: '#d44b4b',
+    idle: '#5b9b5b',
+    working: '#4a9ade',
+    sleeping: '#666',
+    offline: '#d44b4b',
   };
   const color = colors[a.state] ?? '#888';
   return `
@@ -253,34 +308,35 @@ function _age(seconds: number): string {
 // ─── DOM ──────────────────────────────────────────────────────────────────────
 function _getOrCreate(): HTMLElement {
   if (_panel) return _panel;
-  const el = document.createElement('div');
-  el.id = 'observability-panel';
-  el.className = 'obs-panel hidden';
-  el.innerHTML = `
+  _panel = ensurePanel(
+    'observability-panel',
+    'obs-panel hidden',
+    `
     <div class="obs-header">
       <span class="obs-title">◉ OBSERVABILIDAD</span>
-      <button id="obs-close" title="Cerrar [F8]">✕</button>
+      <button id="obs-close" title="Cerrar [F8]" aria-label="Cerrar panel de observabilidad">✕</button>
     </div>
     <div class="obs-body"></div>
-  `;
-  document.body.appendChild(el);
-  el.querySelector('#obs-close')?.addEventListener('click', closeObservabilityPanel);
+  `,
+  );
+  bindPanelAction(_panel, '#obs-close', closeObservabilityPanel);
 
   // Delegated recovery-button handler — survives innerHTML re-renders
-  el.addEventListener('click', (e) => {
+  _panel.addEventListener('click', (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.obs-btn-recover');
     if (!btn) return;
     const harnessId = btn.dataset['harness'] ?? '';
-    const reason    = btn.dataset['reason']    ?? 'failure';
-    const cmdtype   = btn.dataset['cmdtype']  ?? '';
+    const reason = btn.dataset['reason'] ?? 'failure';
+    const cmdtype = btn.dataset['cmdtype'] ?? '';
     void openRecoveryPanel(harnessId, reason, { command_type: cmdtype });
   });
 
-  _panel = el;
-  return el;
+  return _panel;
 }
 
 function _esc(s: string): string {
-  return String(s).replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+  return String(s).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }
