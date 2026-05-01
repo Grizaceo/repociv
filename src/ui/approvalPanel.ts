@@ -4,9 +4,9 @@
 // Polls /approvals every 3 seconds when bridge is online.
 
 import { approveCommand, rejectCommand } from '../commandBus.ts';
+import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
+import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
 
-const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL ?? 'http://localhost:5274';
-const BRIDGE_TOKEN = import.meta.env.VITE_BRIDGE_TOKEN ?? '';
 const POLL_MS = 3_000;
 
 interface ApprovalItem {
@@ -28,16 +28,18 @@ let _items: ApprovalItem[] = [];
 // ─── Public API ───────────────────────────────────────────────────────────────
 export function openApprovalPanel() {
   _visible = true;
-  _getOrCreate().classList.remove('hidden');
+  showPanel(_getOrCreate());
   _render();
 }
 
 export function closeApprovalPanel() {
   _visible = false;
-  _panel?.classList.add('hidden');
+  if (_panel) hidePanel(_panel);
 }
 
-export function isApprovalPanelOpen(): boolean { return _visible; }
+export function isApprovalPanelOpen(): boolean {
+  return _visible;
+}
 
 export function toggleApprovalPanel() {
   if (_visible) closeApprovalPanel();
@@ -50,20 +52,23 @@ export function startApprovalPolling() {
   _pollTimer = window.setInterval(_fetchApprovals, POLL_MS);
 }
 
-export function stopApprovalPolling() { _stopPolling(); }
+export function stopApprovalPolling() {
+  _stopPolling();
+}
 
 // ─── Polling ──────────────────────────────────────────────────────────────────
 function _stopPolling() {
-  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = 0; }
+  if (_pollTimer) {
+    clearInterval(_pollTimer);
+    _pollTimer = 0;
+  }
 }
 
 async function _fetchApprovals() {
-  const headers: Record<string, string> = {};
-  if (BRIDGE_TOKEN) headers['X-RepoCiv-Token'] = BRIDGE_TOKEN;
   try {
-    const res = await fetch(`${BRIDGE_URL}/approvals`, { headers });
+    const res = await fetch(bridgeUrl('/approvals'), { headers: bridgeHeaders() });
     if (!res.ok) return;
-    _items = await res.json() as ApprovalItem[];
+    _items = (await res.json()) as ApprovalItem[];
     _updateBadge(_items.length);
     if (_visible) _render();
   } catch {
@@ -76,14 +81,18 @@ function _updateBadge(count: number) {
   const b = _getBadge();
   b.textContent = count > 0 ? String(count) : '';
   b.classList.toggle('approval-badge-active', count > 0);
-  b.title = count > 0 ? `${count} aprobación${count > 1 ? 'es' : ''} pendiente${count > 1 ? 's' : ''}` : '';
+  b.title =
+    count > 0 ? `${count} aprobación${count > 1 ? 'es' : ''} pendiente${count > 1 ? 's' : ''}` : '';
 }
 
 function _getBadge(): HTMLElement {
   if (_badge) return _badge;
   const btn = document.getElementById('btn-approvals');
-  if (btn) { _badge = btn.querySelector<HTMLElement>('.approval-badge') ?? _createBadge(btn); }
-  else { _badge = document.createElement('span'); }
+  if (btn) {
+    _badge = btn.querySelector<HTMLElement>('.approval-badge') ?? _createBadge(btn);
+  } else {
+    _badge = document.createElement('span');
+  }
   return _badge;
 }
 
@@ -104,13 +113,14 @@ function _render() {
     return;
   }
 
-  list.innerHTML = _items.map(item => {
-    const age = Math.round((Date.now() / 1000) - item.created_at);
-    const ageStr = age < 60 ? `${age}s` : `${Math.round(age / 60)}m`;
-    const [riskColor, riskLabel] = _riskStyle(item.risk);
-    const payloadStr = JSON.stringify(item.payload ?? {}).slice(0, 80);
+  list.innerHTML = _items
+    .map((item) => {
+      const age = Math.round(Date.now() / 1000 - item.created_at);
+      const ageStr = age < 60 ? `${age}s` : `${Math.round(age / 60)}m`;
+      const [riskColor, riskLabel] = _riskStyle(item.risk);
+      const payloadStr = JSON.stringify(item.payload ?? {}).slice(0, 80);
 
-    return `
+      return `
       <div class="ap-item" data-id="${_esc(item.id)}">
         <div class="ap-item-header">
           <span class="ap-type">${_esc(item.type)}</span>
@@ -120,14 +130,15 @@ function _render() {
         <div class="ap-target" title="${_esc(item.target)}">${_esc(item.target.slice(0, 50))}</div>
         ${payloadStr !== '{}' ? `<div class="ap-payload">${_esc(payloadStr)}</div>` : ''}
         <div class="ap-actions">
-          <button class="ap-approve" data-id="${_esc(item.id)}">✔ Aprobar</button>
-          <button class="ap-reject"  data-id="${_esc(item.id)}">✗ Rechazar</button>
+          <button class="ap-approve" data-id="${_esc(item.id)}" aria-label="Aprobar comando ${_esc(item.id)}">✔ Aprobar</button>
+          <button class="ap-reject"  data-id="${_esc(item.id)}" aria-label="Rechazar comando ${_esc(item.id)}">✗ Rechazar</button>
         </div>
       </div>
     `;
-  }).join('');
+    })
+    .join('');
 
-  list.querySelectorAll<HTMLButtonElement>('.ap-approve').forEach(btn => {
+  list.querySelectorAll<HTMLButtonElement>('.ap-approve').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.dataset['id']!;
       btn.disabled = true;
@@ -136,7 +147,7 @@ function _render() {
     });
   });
 
-  list.querySelectorAll<HTMLButtonElement>('.ap-reject').forEach(btn => {
+  list.querySelectorAll<HTMLButtonElement>('.ap-reject').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.dataset['id']!;
       btn.disabled = true;
@@ -148,31 +159,32 @@ function _render() {
 
 function _riskStyle(risk: string): [string, string] {
   if (risk === 'destructive') return ['#d44b4b', '☠ DESTRUCTIVO'];
-  if (risk === 'high')        return ['#e8a040', '⚠ ALTO'];
-  if (risk === 'medium')      return ['#c8a84b', '◆ MEDIO'];
+  if (risk === 'high') return ['#e8a040', '⚠ ALTO'];
+  if (risk === 'medium') return ['#c8a84b', '◆ MEDIO'];
   return ['#5b9b5b', '● BAJO'];
 }
 
 // ─── DOM ──────────────────────────────────────────────────────────────────────
 function _getOrCreate(): HTMLElement {
   if (_panel) return _panel;
-  const el = document.createElement('div');
-  el.id = 'approval-panel';
-  el.className = 'ap-panel hidden';
-  el.innerHTML = `
+  _panel = ensurePanel(
+    'approval-panel',
+    'ap-panel hidden',
+    `
     <div class="ap-header">
       <span class="ap-title">⚠ APROBACIONES PENDIENTES</span>
-      <button id="ap-close" title="Cerrar [A]">✕</button>
+      <button id="ap-close" title="Cerrar [A]" aria-label="Cerrar panel de aprobaciones">✕</button>
     </div>
     <div class="ap-list"></div>
-  `;
-  document.body.appendChild(el);
-  el.querySelector('#ap-close')?.addEventListener('click', closeApprovalPanel);
-  _panel = el;
-  return el;
+  `,
+  );
+  bindPanelAction(_panel, '#ap-close', closeApprovalPanel);
+  return _panel;
 }
 
 function _esc(s: string): string {
-  return String(s).replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+  return String(s).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }
