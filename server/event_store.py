@@ -20,6 +20,21 @@ from typing import Any
 _lock = threading.Lock()
 _store_path: Path | None = None
 
+# ── Dual-write to DuckDB Ledger (best-effort) ─────────────────────────────────
+# Imported lazily to avoid circular imports and to allow the ledger to be
+# disabled gracefully when duckdb is not installed.
+def _ledger_ingest(event: dict[str, Any]) -> None:
+    """Forward a terminal event to the ResearchLedger (best-effort).
+
+    Never raises. If DuckDB is unavailable the event is silently skipped.
+    The JSONL write already succeeded at this point.
+    """
+    try:
+        from server import research_ledger as _rl  # noqa: PLC0415
+        _rl.get_ledger().ingest_event(event)
+    except Exception:
+        pass  # ledger failure must never break the event store
+
 
 def init(store_dir: Path) -> None:
     global _store_path
@@ -66,7 +81,9 @@ def record_approved(command_id: str, approver: str = "user") -> None:
 
 
 def record_rejected(command_id: str, reason: str = "") -> None:
-    _append(_event("CommandRejected", command_id, "system", {"reason": reason}))
+    evt = _event("CommandRejected", command_id, "system", {"reason": reason})
+    _append(evt)
+    _ledger_ingest(evt)
 
 
 def record_started(command_id: str) -> None:
@@ -78,11 +95,15 @@ def record_output_chunk(command_id: str, actor: str, text: str) -> None:
 
 
 def record_completed(command_id: str, result: str = "") -> None:
-    _append(_event("CommandCompleted", command_id, "system", {"result": result[:1024], "finishedAt": time.time()}))
+    evt = _event("CommandCompleted", command_id, "system", {"result": result[:1024], "finishedAt": time.time()})
+    _append(evt)
+    _ledger_ingest(evt)
 
 
 def record_failed(command_id: str, error: str = "") -> None:
-    _append(_event("CommandFailed", command_id, "system", {"error": error[:1024], "finishedAt": time.time()}))
+    evt = _event("CommandFailed", command_id, "system", {"error": error[:1024], "finishedAt": time.time()})
+    _append(evt)
+    _ledger_ingest(evt)
 
 
 def record_event(event_type: str, data: dict[str, Any]) -> None:

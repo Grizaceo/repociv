@@ -344,6 +344,43 @@ def get_sys_info() -> dict[str, Any]:
     return info
 
 
+# ─── Token budget endpoint (Fase 0) ──────────────────────────────────────────
+
+def get_token_budget(limit: int = 0) -> dict[str, Any]:
+    """Return current token usage from the TokenLedger.
+
+    Args:
+        limit: Optional hard budget cap (total tokens). Pass 0 to skip pct calc.
+
+    Returns::
+
+        {
+          "total_prompt_tokens":     int,
+          "total_completion_tokens": int,
+          "total_tokens":            int,
+          "total_cost_estimate":     float,
+          "budget_limit":            int | None,
+          "budget_used_pct":         float | None,   # 0.0–100.0
+          "budget_violated":         bool | None,
+        }
+    """
+    from server import token_ledger as _tl  # local import to avoid circular deps
+
+    ledger = _tl.get_ledger()
+    summary = ledger.get_summary()
+
+    if limit > 0:
+        summary["budget_limit"] = limit
+        summary["budget_used_pct"] = round(ledger.get_budget_used_pct(limit), 2)
+        summary["budget_violated"] = ledger.check_budget_violation(limit)
+    else:
+        summary["budget_limit"] = None
+        summary["budget_used_pct"] = None
+        summary["budget_violated"] = None
+
+    return summary
+
+
 # ─── Main entry point ─────────────────────────────────────────────────────────
 
 def compute_metrics(
@@ -382,5 +419,6 @@ def compute_metrics(
         "sys":                sys_info,
         "stepLatency":        get_step_latency_stats(),
         "hookStats":          get_hook_stats(),
+        "tokenBudget":        get_token_budget(),
         "ts":                 time.time(),
     }
