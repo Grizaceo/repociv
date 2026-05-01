@@ -14,6 +14,7 @@ from . import agent_runner as _agent_runner
 from . import model_router as _mr
 from . import workspace_issue as _wi
 from . import step_retry as _sr
+from .tensor_context import ContextDirective, TensorContext, DEONTIC_MUST, DEONTIC_SHOULD
 
 STEP_TIMEOUT = 300  # default per-step timeout in seconds
 
@@ -69,6 +70,7 @@ def _infer_task_type(agent: str) -> str:
 
 _MAX_PRIOR_TOKENS = 3_000   # rough char cap for prior artifact context
 _MAX_PRIOR_ARTIFACTS = 3    # max number of prior step outputs to include
+_MISSION_BUDGET_TOKENS = 4_000  # total token budget for assembled mission prompt
 
 
 def _select_relevant_artifacts(
@@ -92,32 +94,50 @@ def build_step_mission(
     spec_context: str,
     prior_artifacts: list[tuple[str, str]] | None = None,
 ) -> str:
-    """Build a self-contained agent mission from a plan step + issue spec context.
+    """Build a self-contained agent mission using TensorContext.
 
-    If ``prior_artifacts`` is provided, relevant outputs from previous steps are
-    included so the agent doesn't start blind.
-    The mission is designed to be self-sufficient — the agent should NOT need
-    to ask clarifying questions.
+    Assembles the prompt from three layers:
+      1. Base DC (must_include): step instruction + spec context header.
+      2. Prior artifact DCs (should_include): accumulated outputs from earlier
+         steps, capped by ``_MAX_PRIOR_TOKENS`` chars and ``_MAX_PRIOR_ARTIFACTS``
+         entries, then budget-pruned to fit ``_MISSION_BUDGET_TOKENS``.
+
+    The assembled prompt is designed to be self-sufficient — the agent should
+    not need to ask clarifying questions.
     """
-    base = (
+    tc = TensorContext()
+
+    # Base DC: step instruction + spec context header (always included)
+    base_text = (
         "Ejecutá esta tarea del plan de implementación:\n\n"
         f"{step}\n\n"
         "Contexto adicional del spec del issue:\n"
         f"{spec_context}\n\n"
+        "Entregá el resultado directamente. No preguntes; ejecutá y reportá."
+    )
+    base_dc = ContextDirective(
+        text=base_text,
+        metadata={"source": "step", "type": "instruction"},
+        deontic=DEONTIC_MUST,
     )
 
+    # Prior artifact DCs (should_include — pruned to fit remaining budget)
+    extra_dcs: list[ContextDirective] = []
     if prior_artifacts:
         relevant = _select_relevant_artifacts(
             prior_artifacts, _MAX_PRIOR_TOKENS, _MAX_PRIOR_ARTIFACTS
         )
-        if relevant:
-            sections = "\n\n".join(
-                f"### {name}\n{content}" for name, content in relevant
-            )
-            base += f"Artefactos de pasos anteriores (contexto acumulativo):\n{sections}\n\n"
+        for name, content in relevant:
+            extra_dcs.append(ContextDirective(
+                text=(
+                    f"Artefactos de pasos anteriores (contexto acumulativo):"
+                    f"\n### {name}\n{content}"
+                ),
+                metadata={"source": "artifact", "name": name, "type": "prior_output"},
+                deontic=DEONTIC_SHOULD,
+            ))
 
-    base += "Entregá el resultado directamente. No preguntes; ejecutá y reportá."
-    return base
+    return tc.build_mission_prompt(base_dc, extra_dcs, budget=_MISSION_BUDGET_TOKENS)
 
 
 # ─── Step dispatcher (the main injection point) ───────────────────────────────

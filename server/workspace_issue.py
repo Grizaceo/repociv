@@ -359,6 +359,103 @@ def register_run(repo: str, issue_id: str, run_id: str) -> dict[str, Any]:
         return state
 
 
+# ── A2O Sentinel File (H1 — from DAVI audit) ─────────────────────────────────
+
+_SENTINEL_VALID: frozenset[str] = frozenset({"blocked", "needs-human-review", "done", "ok"})
+
+
+def _sentinel_path(repo: str, issue_id: str) -> Path:
+    """Return the path to the A2O sentinel status file for this issue.
+
+    Located at ``<issue_dir>/.repociv/status`` — a zero-dependency signal file
+    that the agent (or orchestrator) writes to communicate lifecycle state back
+    to the orchestrator (or the caller).
+    """
+    return _issue_dir(repo, issue_id) / ".repociv" / "status"
+
+
+def write_sentinel(repo: str, issue_id: str, status: str) -> None:
+    """Write the A2O sentinel file.
+
+    Valid statuses:
+      - ``"blocked"``              — agent cannot proceed; human required.
+      - ``"needs-human-review"``   — checkpoint gate; review and clear to resume.
+      - ``"done"``                 — task completed successfully.
+      - ``"ok"``                   — explicit all-clear.
+
+    The orchestrator reads this before advancing to the next phase.
+    The executing agent may also write ``"blocked"`` to stop the loop.
+    """
+    if status not in _SENTINEL_VALID:
+        raise ValueError(
+            f"Invalid sentinel status {status!r}. "
+            f"Expected one of: {sorted(_SENTINEL_VALID)}"
+        )
+    _atomic_write(_sentinel_path(repo, issue_id), status)
+
+
+def read_sentinel(repo: str, issue_id: str) -> str | None:
+    """Read the current A2O sentinel status.
+
+    Returns the status string, or ``None`` if the sentinel file does not exist.
+    """
+    path = _sentinel_path(repo, issue_id)
+    if not path.exists():
+        return None
+    try:
+        return path.read_text(encoding="utf-8").strip() or None
+    except OSError:
+        return None
+
+
+def clear_sentinel(repo: str, issue_id: str) -> None:
+    """Delete the A2O sentinel file (human resume signal).
+
+    Idempotent: no-op if the file does not exist.
+    """
+    path = _sentinel_path(repo, issue_id)
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+# ── Git worktree integration (H5) ────────────────────────────────────────────
+
+def ensure_worktree(repo: str, issue_id: str) -> str | None:
+    """Create a git worktree for this issue if worktrees are enabled.
+
+    Delegates to ``repociv_hooks.create_worktree()``. Best-effort: returns
+    the worktree path string on success, ``None`` if disabled or if the
+    operation fails (e.g. repo is not a git repository).
+
+    The worktree path is persisted in ``state.json["worktreePath"]`` so the
+    orchestrator can clean it up even after a crash restart.
+    """
+    try:
+        from . import repociv_hooks as _hooks  # deferred — avoids circular import
+        wt = _hooks.create_worktree(repo, issue_id)
+        if wt:
+            patch_issue_state(repo, issue_id, {"worktreePath": str(wt)})
+            return str(wt)
+    except Exception:
+        pass
+    return None
+
+
+def release_worktree(repo: str, issue_id: str) -> bool:
+    """Remove the git worktree for this issue (called on close or failure).
+
+    Best-effort: returns ``True`` if a removal was attempted.
+    Never raises.
+    """
+    try:
+        from . import repociv_hooks as _hooks
+        return _hooks.remove_worktree(repo, issue_id)
+    except Exception:
+        return False
+
+
 def _reset() -> None:
     """Test helper: drop in-memory base_dir."""
     global _base_dir

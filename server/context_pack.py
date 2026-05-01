@@ -6,6 +6,10 @@ command so the executing agent doesn't start blind.
 The pack is attached to cmd.payload['_context'] before dispatch.
 It is read-only signal — the agent may use it but nothing in RepoCiv depends on
 the agent honoring it.
+
+Fase 1 addition: ``build_context_directives()`` emits the same information as
+a list of ``ContextDirective`` objects, enabling TensorContext consumers to
+incorporate context-pack data into budget-pruned prompts.
 """
 from __future__ import annotations
 
@@ -76,3 +80,60 @@ def _slim(ev: dict[str, Any]) -> dict[str, Any]:
     """Keep only the fields that matter for agent context."""
     return {k: ev[k] for k in ("type", "ts", "command_id", "result", "error")
             if k in ev}
+
+
+def build_context_directives(
+    agent_id: str,
+    target: str,
+    event_store: Any,
+    max_events: int = 10,
+) -> "list[Any]":
+    """Return context-pack data as a list of ContextDirective objects.
+
+    Each distinct piece of context (recent events, last status, test status)
+    is emitted as a separate ``ContextDirective`` with ``deontic='should_include'``
+    so TensorContext consumers can budget-prune them independently.
+
+    Returns an empty list if ``tensor_context`` is not importable.
+    """
+    try:
+        from .tensor_context import ContextDirective, DEONTIC_SHOULD
+    except ImportError:  # pragma: no cover
+        return []
+
+    pack = build_context_pack(agent_id, target, event_store, max_events)
+    directives: list[ContextDirective] = []
+
+    # Last status DC
+    if pack["last_status"] != "unknown" or pack["last_error"]:
+        status_text = f"Last command status: {pack['last_status']}"
+        if pack["last_error"]:
+            status_text += f"\nLast error: {pack['last_error']}"
+        directives.append(ContextDirective(
+            text=status_text,
+            metadata={"source": "context_pack", "type": "last_status", "agent": agent_id},
+            deontic=DEONTIC_SHOULD,
+        ))
+
+    # Test status DC
+    if pack["test_status"] != "unknown":
+        directives.append(ContextDirective(
+            text=f"Test suite status: {pack['test_status']}",
+            metadata={"source": "context_pack", "type": "test_status", "agent": agent_id},
+            deontic=DEONTIC_SHOULD,
+        ))
+
+    # Recent events DC (combined into one to preserve temporal ordering)
+    if pack["recent_events"]:
+        import json as _json
+        events_text = "Recent events for {}:\n{}".format(
+            target,
+            _json.dumps(pack["recent_events"], indent=2, ensure_ascii=False),
+        )
+        directives.append(ContextDirective(
+            text=events_text,
+            metadata={"source": "context_pack", "type": "recent_events", "agent": agent_id},
+            deontic=DEONTIC_SHOULD,
+        ))
+
+    return directives

@@ -21,6 +21,7 @@ from server import directive_store as _ds
 from server import sessions as _sessions
 from server import run_state as _run_state
 from server import runtime_adapters as _runtime_adapters
+from server import token_ledger as _token_ledger
 from server.quest import generate_quest_name
 
 SendFn = Callable[[dict[str, Any]], None]
@@ -138,6 +139,16 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
     success, output = _execute_streaming(unit_id, mission_id, mission, working_dir)
 
     duration = time.time() - started_at
+
+    # Log token usage — character-count estimate (~4 chars/token) for subprocess
+    # adapters. The hermes adapter also logs with real counts when available;
+    # this call provides a baseline for all adapters.
+    _token_ledger.get_ledger().log_usage(
+        model=os.environ.get("HERMES_MODEL", "claude-code"),
+        prompt_tokens=max(1, len(mission) // 4),
+        completion_tokens=max(1, len(output) // 4),
+    )
+
     mission_record.update({"completedAt": time.time(), "status": "complete" if success else "failed",
                            "summary": output[-500:], "duration": duration, "lines": len(output.splitlines())})
     save_mission(mission_record)
@@ -355,6 +366,14 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
         with urllib.request.urlopen(req, timeout=120) as resp:
             result = json.loads(resp.read().decode())
         content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+        # Log real token usage from the OpenAI-compatible response when present.
+        usage = result.get("usage") or {}
+        if usage.get("prompt_tokens") or usage.get("completion_tokens"):
+            _token_ledger.get_ledger().log_usage(
+                model=HERMES_MODEL,
+                prompt_tokens=int(usage.get("prompt_tokens", 0)),
+                completion_tokens=int(usage.get("completion_tokens", 0)),
+            )
         for i in range(0, len(content), 40):
             chunk = content[i:i + 40]
             send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": chunk})

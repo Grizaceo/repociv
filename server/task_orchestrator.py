@@ -31,6 +31,7 @@ from . import run_state as _rs
 from . import repo_config as _rc
 from . import metrics as _metrics
 from . import checkpoint as _checkpoint
+from . import repociv_hooks as _rh
 
 
 # ─── Circuit breaker ──────────────────────────────────────────────────────────
@@ -139,6 +140,8 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
         state = _wi.load_issue_state(repo, issue_id)
         if state is None:
             state = _wi.init_issue_workspace(repo, issue_id)
+            # Ensure git worktree for new issues if enabled (H5 — best-effort)
+            _wi.ensure_worktree(repo, issue_id)
 
         phase = state.get("phase", "init")
 
@@ -152,6 +155,55 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                 }
             return state
 
+        # ── Checkpoint gate resume (H4) ──────────────────────────────────
+        # When the orchestrator writes a checkpoint sentinel and returns
+        # early (phase="blocked", checkpointGate set), subsequent calls
+        # check whether the human cleared the sentinel and resume from
+        # after the gated phase.
+        checkpoint_gate = state.get("checkpointGate")
+        _skip_to_plan = False       # resume after post-diagnose gate cleared
+        _skip_to_dispatch = False   # resume after post-plan gate cleared
+        _skip_to_close = False      # resume after post-fix gate cleared
+
+        if phase == "blocked" and checkpoint_gate:
+            _gate_sentinel = _wi.read_sentinel(repo, issue_id)
+            if _gate_sentinel in ("blocked", "needs-human-review"):
+                # Human hasn't reviewed yet — remain blocked
+                with _registry_lock:
+                    _registry[task_key] = {
+                        "phase": "blocked",
+                        "updatedAt": _now_iso(),
+                    }
+                return state
+            # Human cleared the sentinel → resume execution
+            _wi.clear_sentinel(repo, issue_id)
+            _wi.patch_issue_state(repo, issue_id, {
+                "phase": "executing",
+                "checkpointGate": None,
+            })
+            state = _wi.load_issue_state(repo, issue_id) or {}
+            phase = "executing"
+            if checkpoint_gate == "post-diagnose":
+                _skip_to_plan = True
+            elif checkpoint_gate == "post-plan":
+                _skip_to_dispatch = True
+            elif checkpoint_gate == "post-fix":
+                _skip_to_close = True
+
+        # ── A2O sentinel check (H1) ──────────────────────────────────────
+        # Stop immediately if a blocking sentinel is present (set by the
+        # executing agent or by a previous call to the orchestrator).
+        if not checkpoint_gate:
+            _a2o = _wi.read_sentinel(repo, issue_id)
+            if _a2o in ("blocked", "needs-human-review"):
+                _wi.patch_issue_state(repo, issue_id, {"phase": "blocked"})
+                with _registry_lock:
+                    _registry[task_key] = {
+                        "phase": "blocked",
+                        "updatedAt": _now_iso(),
+                    }
+                return _wi.load_issue_state(repo, issue_id) or {}
+
         # Register as in-flight
         with _registry_lock:
             _registry[task_key] = {
@@ -162,43 +214,80 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
         try:
             # ── Phase: init/any → spec ────────────────────────────────────
             spec = _wi.read_spec(repo, issue_id)
-            # Strip markdown headings to detect heading-only specs
-            import re as _re
-            _body = _re.sub(r'^#.*$', '', spec, flags=_re.MULTILINE).strip()
-            if not _body or len(_body.strip()) < 10:
-                raise ValueError(
-                    f"spec.md is empty or too short for {repo}/{issue_id}"
-                )
-            _wi.patch_issue_state(repo, issue_id, {
-                "phase": "spec", "startedAt": _now_iso(),
-            })
+            if not _skip_to_plan and not _skip_to_dispatch and not _skip_to_close:
+                # Validate spec content (strip headings to detect empty body)
+                import re as _re
+                if spec is None:
+                    raise ValueError(f"spec.md not found for {repo}/{issue_id}")
+                _body = _re.sub(r'^#.*$', '', spec, flags=_re.MULTILINE).strip()
+                if not _body or len(_body.strip()) < 10:
+                    raise ValueError(
+                        f"spec.md is empty or too short for {repo}/{issue_id}"
+                    )
+                _wi.patch_issue_state(repo, issue_id, {
+                    "phase": "spec", "startedAt": _now_iso(),
+                })
+
+                # H4: Post-diagnose checkpoint — pause for human review
+                if _rh.checkpoints_enabled(repo):
+                    _wi.write_sentinel(repo, issue_id, "needs-human-review")
+                    _wi.patch_issue_state(repo, issue_id, {
+                        "phase": "blocked",
+                        "checkpointGate": "post-diagnose",
+                    })
+                    with _registry_lock:
+                        _registry[task_key] = {
+                            "phase": "blocked",
+                            "updatedAt": _now_iso(),
+                        }
+                    return _wi.load_issue_state(repo, issue_id) or {}
 
             # ── Phase: spec → planned ─────────────────────────────────────
             plan = _wi.read_plan(repo, issue_id)
-            if not plan or len(plan.strip()) < 20:
-                plan = _generate_plan_from_spec(spec)
-                _wi.write_plan(repo, issue_id, plan)
+            if not _skip_to_dispatch and not _skip_to_close:
+                if not plan or len(plan.strip()) < 20:
+                    plan = _generate_plan_from_spec(spec or "")
+                    _wi.write_plan(repo, issue_id, plan)
 
-            _wi.patch_issue_state(repo, issue_id, {"phase": "planned"})
+                _wi.patch_issue_state(repo, issue_id, {"phase": "planned"})
+
+                # H4: Post-plan checkpoint — pause for human review
+                if _rh.checkpoints_enabled(repo):
+                    _wi.write_sentinel(repo, issue_id, "needs-human-review")
+                    _wi.patch_issue_state(repo, issue_id, {
+                        "phase": "blocked",
+                        "checkpointGate": "post-plan",
+                    })
+                    with _registry_lock:
+                        _registry[task_key] = {
+                            "phase": "blocked",
+                            "updatedAt": _now_iso(),
+                        }
+                    return _wi.load_issue_state(repo, issue_id) or {}
 
             # ── Phase: planned → executing ────────────────────────────────
-            steps = _extract_steps(plan)
+            steps = _extract_steps(plan or "")
             total = len(steps)
-            _wi.patch_issue_state(repo, issue_id, {
-                "phase": "executing",
-                "stepCount": total,
-                "stepCurrent": 0,
-            })
+            if not _skip_to_close:
+                _wi.patch_issue_state(repo, issue_id, {
+                    "phase": "executing",
+                    "stepCount": total,
+                    "stepCurrent": 0,
+                })
 
             # Register in workspace_state as active mission
-            _ws.add_active_mission(repo, issue_id, {
-                "type": "task_orchestrator",
-                "stepCount": total,
-            })
+            if not _skip_to_close:
+                _ws.add_active_mission(repo, issue_id, {
+                    "type": "task_orchestrator",
+                    "stepCount": total,
+                })
 
             # ── Resume from checkpoint if available ───────────────────────
             _ckpt = _checkpoint.load_checkpoint(repo, issue_id)
-            _resume_from = (_ckpt.get("stepIndex", -1) + 1) if _ckpt else 0
+            # When resuming after post-fix gate, all steps are already done.
+            _resume_from = total if _skip_to_close else (
+                (_ckpt.get("stepIndex", -1) + 1) if _ckpt else 0
+            )
 
             consecutive_failures = 0
 
@@ -206,6 +295,21 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                 # Skip steps already completed before the checkpoint
                 if i < _resume_from:
                     continue
+                # A2O sentinel check — stop if agent or human has blocked (H1)
+                _step_sentinel = _wi.read_sentinel(repo, issue_id)
+                if _step_sentinel in ("blocked", "needs-human-review"):
+                    _wi.patch_issue_state(repo, issue_id, {
+                        "phase": "blocked",
+                        "blockedAtStep": i,
+                        "blockedAt": _now_iso(),
+                    })
+                    with _registry_lock:
+                        _registry[task_key] = {
+                            "phase": "blocked",
+                            "blockedAtStep": i,
+                            "updatedAt": _now_iso(),
+                        }
+                    return _wi.load_issue_state(repo, issue_id) or {}
                 # Check for cancellation mid-flight
                 current = _wi.load_issue_state(repo, issue_id)
                 if current and current.get("phase") == "cancelled":
@@ -396,6 +500,20 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                         return _wi.load_issue_state(repo, issue_id) or {}
                     # Below threshold — log and continue to next step
 
+            # H4: Post-fix checkpoint — pause after all steps for human review
+            if not _skip_to_close and _rh.checkpoints_enabled(repo):
+                _wi.write_sentinel(repo, issue_id, "needs-human-review")
+                _wi.patch_issue_state(repo, issue_id, {
+                    "phase": "blocked",
+                    "checkpointGate": "post-fix",
+                })
+                with _registry_lock:
+                    _registry[task_key] = {
+                        "phase": "blocked",
+                        "updatedAt": _now_iso(),
+                    }
+                return _wi.load_issue_state(repo, issue_id) or {}
+
             # ── Phase: executing → complete ────────────────────────────────
             _wi.patch_issue_state(repo, issue_id, {
                 "phase": "complete",
@@ -404,6 +522,12 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
 
             # Delete checkpoint — task finished cleanly
             _checkpoint.delete_checkpoint(repo, issue_id)
+
+            # Release git worktree on successful completion (H5) — best-effort
+            _wi.release_worktree(repo, issue_id)
+
+            # Write "done" sentinel — signals completion to monitoring tools
+            _wi.write_sentinel(repo, issue_id, "done")
 
             # Clean workspace_state
             _ws.remove_active_mission(repo, issue_id)
@@ -425,6 +549,8 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                 "lastError": str(e),
                 "finishedAt": _now_iso(),
             })
+            # Release git worktree on failure (H5) — best-effort
+            _wi.release_worktree(repo, issue_id)
             # Save traceback artifact
             _wi.add_artifact(
                 repo, issue_id,
