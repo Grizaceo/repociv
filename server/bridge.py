@@ -1154,6 +1154,10 @@ if __name__ == "__main__":
     _sched.set_fatigue_provider(lambda unit_id: get_unit_fatigue(unit_id).get("fatigue"))
     _sched.start_worker()
 
+    # Wire P4 step executor → orchestrator (agent dispatch: SCOUT/WORKER/DAVI)
+    from server.step_executor import dispatch_plan_step
+    _to.set_step_executor(dispatch_plan_step)
+
     # Recover any commands that were running when the bridge last died
     recovered = _recover_hung_commands()
 
