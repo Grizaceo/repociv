@@ -5,8 +5,10 @@ Called by GET /metrics in bridge.py — no side effects.
 """
 from __future__ import annotations
 
+import collections
 import os
 import statistics
+import threading
 import time
 from typing import Any
 
@@ -158,6 +160,150 @@ def _health(error_rate: float, queue_depth: int, disk_used_pct: float) -> str:
 
 # ─── System resources ─────────────────────────────────────────────────────────
 
+# ─── Step latency storage ─────────────────────────────────────────────────────
+# In-memory circular buffer of the last 1000 step latency measurements.
+# Not persisted across restarts — monitoring only.
+
+_MAX_LATENCY_SAMPLES = 1000
+
+_latency_lock = threading.Lock()
+# deque acts as circular buffer when maxlen is set
+_latency_samples: collections.deque[dict[str, Any]] = collections.deque(
+    maxlen=_MAX_LATENCY_SAMPLES
+)
+
+
+def record_step_latency(
+    repo: str,
+    issue_id: str,
+    step_idx: int,
+    agent: str,
+    duration_s: float,
+) -> None:
+    """Record the latency of a single orchestrator step.
+
+    Thread-safe. Oldest entry is automatically evicted when the buffer is full.
+
+    Args:
+        repo:       Repository name.
+        issue_id:   Issue identifier.
+        step_idx:   Zero-based step index within the plan.
+        agent:      Agent type that executed the step (e.g. "DAVI", "WORKER").
+        duration_s: Wall-clock duration in seconds.
+    """
+    entry: dict[str, Any] = {
+        "repo": repo,
+        "issue_id": issue_id,
+        "step_idx": step_idx,
+        "agent": agent.upper() if agent else "UNKNOWN",
+        "duration_s": float(duration_s),
+        "ts": time.time(),
+    }
+    with _latency_lock:
+        _latency_samples.append(entry)
+
+
+def _percentile_from_list(values: list[float], pct: float) -> float:
+    """Return pct-th percentile from a sorted list (0-100 scale)."""
+    if not values:
+        return 0.0
+    sorted_v = sorted(values)
+    idx = max(0, int(len(sorted_v) * pct / 100) - 1)
+    return round(sorted_v[min(idx, len(sorted_v) - 1)], 3)
+
+
+def get_step_latency_stats() -> dict[str, Any]:
+    """Return aggregate latency statistics over all recorded step samples.
+
+    Returns:
+        {
+          "p50": float,   — 50th-percentile duration in seconds
+          "p95": float,   — 95th-percentile duration in seconds
+          "p99": float,   — 99th-percentile duration in seconds
+          "count": int,   — total number of samples
+          "by_agent": {
+              "DAVI":   {"p50": float, "p95": float, "p99": float, "count": int},
+              "WORKER": {...},
+              ...
+          }
+        }
+    """
+    with _latency_lock:
+        samples = list(_latency_samples)
+
+    all_durations = [s["duration_s"] for s in samples]
+
+    by_agent: dict[str, list[float]] = {}
+    for s in samples:
+        by_agent.setdefault(s["agent"], []).append(s["duration_s"])
+
+    agent_stats = {
+        agent: {
+            "p50": _percentile_from_list(durations, 50),
+            "p95": _percentile_from_list(durations, 95),
+            "p99": _percentile_from_list(durations, 99),
+            "count": len(durations),
+        }
+        for agent, durations in by_agent.items()
+    }
+
+    return {
+        "p50": _percentile_from_list(all_durations, 50),
+        "p95": _percentile_from_list(all_durations, 95),
+        "p99": _percentile_from_list(all_durations, 99),
+        "count": len(all_durations),
+        "by_agent": agent_stats,
+    }
+
+
+# ─── Hook result tracking ─────────────────────────────────────────────────────
+
+_hook_lock = threading.Lock()
+# by_hook[hook_name] = {"total": int, "failures": int}
+_hook_stats: dict[str, dict[str, int]] = {}
+
+
+def record_hook_result(hook_name: str, repo: str, returncode: int, duration_s: float) -> None:
+    """Record the result of a hook execution.
+
+    Thread-safe. Aggregates totals and failure counts per hook name.
+
+    Args:
+        hook_name:   Hook identifier (e.g. "pre_step", "post_step", "on_circuit_open").
+        repo:        Repository name (currently used for future per-repo breakdown).
+        returncode:  Process return code (0 = success, non-zero = failure).
+        duration_s:  Wall-clock duration in seconds (reserved for future use).
+    """
+    with _hook_lock:
+        bucket = _hook_stats.setdefault(hook_name, {"total": 0, "failures": 0})
+        bucket["total"] += 1
+        if returncode != 0:
+            bucket["failures"] += 1
+
+
+def get_hook_stats() -> dict[str, Any]:
+    """Return aggregate hook execution statistics.
+
+    Returns:
+        {
+          "total":   int,   — total hook executions across all hook types
+          "failures": int,  — total hook failures across all hook types
+          "by_hook": {
+              "pre_step":        {"total": int, "failures": int},
+              "post_step":       {"total": int, "failures": int},
+              "on_circuit_open": {"total": int, "failures": int},
+              ...
+          }
+        }
+    """
+    with _hook_lock:
+        by_hook = {name: dict(counts) for name, counts in _hook_stats.items()}
+
+    total = sum(v["total"] for v in by_hook.values())
+    failures = sum(v["failures"] for v in by_hook.values())
+    return {"total": total, "failures": failures, "by_hook": by_hook}
+
+
 def get_sys_info() -> dict[str, Any]:
     info: dict[str, Any] = {
         "loadAvg1": None,
@@ -234,5 +380,7 @@ def compute_metrics(
         "agentStatus":        mapped_agents,
         "gpu":                gpu_info,
         "sys":                sys_info,
+        "stepLatency":        get_step_latency_stats(),
+        "hookStats":          get_hook_stats(),
         "ts":                 time.time(),
     }
