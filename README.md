@@ -244,26 +244,57 @@ src/
 
 ## Documentación
 
-- Activa: `README.md`, `deploy/systemd/README.md`, `execplan/repociv-harness-control-plane.md`
-- Índice de documentación: `docs/README.md`
-- Histórico archivado: `docs/archive/`
+- **Activa:**
+  - `README.md` (este archivo) — visión, arranque, hotkeys
+  - [`docs/SCOPE.md`](docs/SCOPE.md) — qué es y qué no es el proyecto (alpha de un solo usuario)
+  - [`docs/EVOLUTION.md`](docs/EVOLUTION.md) — narrativa cronológica de cómo se construyó
+  - [`docs/implementation_plan.md`](docs/implementation_plan.md) — plan vivo del Agent OS (Fases 0-5 cerradas)
+  - [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md) — invariantes de persistencia (JSONL ↔ DuckDB)
+  - [`docs/AUDIT_DELTA_ADDENDUM.md`](docs/AUDIT_DELTA_ADDENDUM.md) — patrones avanzados (bloqueados por SCOPE)
+  - [`deploy/systemd/README.md`](deploy/systemd/README.md) — operación / servicios permanentes
+  - [`execplan/repociv-harness-control-plane.md`](execplan/repociv-harness-control-plane.md) — plan ejecutable día a día
+- **Referencia (germen):** [`docs/archive/`](docs/archive/) — 5 documentos de diseño con valor independiente
+- **Histórico:** `git log --all -- docs/archive/<archivo>.md` para recuperar documentos condensados en `EVOLUTION.md`
 
 ---
 
 ## Tests
 
 ```bash
-npm test -- --run
+# Frontend (Vitest)
+npm test -- --run               # 279 tests, ~1s
+
+# Backend (pytest)
+python3 -m pytest server/ -q    # 488 tests, ~25s
 ```
 
-| Suite | Tests | Cobertura |
+> ⚠️ **Limitación conocida:** si el bridge está corriendo (systemd unit
+> activo o `python3 -m server.bridge` en otra terminal), DuckDB lockea
+> `~/.repociv/ledger.duckdb` exclusivamente. Tests del backend que toquen
+> el ledger fallarán en silencio. Workarounds:
+>
+> ```bash
+> # Opción 1: parar el bridge antes de testear
+> systemctl --user stop repociv-bridge && python3 -m pytest server/
+>
+> # Opción 2: usar un data dir aislado
+> REPOCIV_DATA_DIR=/tmp/repociv-test python3 -m pytest server/
+> ```
+>
+> El `checkpoint.py` ya respeta `REPOCIV_DATA_DIR` desde el sprint de
+> consolidación; el resto de los stores se irán adaptando según se
+> detecten en el dogfooding.
+
+Suites principales del frontend:
+
+| Suite | Tests | Qué cubre |
 |-------|-------|-----------|
 | `fatigue.test.ts` | 18 | Modelo lineal, RestArea, edge cases |
 | `hex.test.ts` | 23 | Coordenadas axiales, hex math |
 | `pathfinding.test.ts` | 14 | A* pathfinding, cache |
-| `localMap.test.ts` | 6 | FileNode building, tree stats |
-
-**199 tests de Vitest pasando**. Verificado con `npm test -- --run` ✅
+| `game.test.ts` | 29 | GameState, misiones, spawn |
+| `priorityMatrix.test.ts` | 18 | Scoring por archivo |
+| `bridge.test.ts` + `bridgeSchema.test.ts` | 39 | HTTP client + valibot validation |
 
 ---
 
@@ -295,12 +326,17 @@ No hay archivo `.env` para el frontend — toda config runtime va por aquí.
 ## Debug
 
 ```bash
-# Ver rooms发现问题 (si bridge.py falla)
-node debug_rooms.ts
+# Bridge health check
+curl http://localhost:5274/health
 
 # Test local map build
 npx ts-node src/local.demo.ts
 
-# Bridge health check
-curl http://localhost:5274/health
+# Reconstruir el DuckDB Ledger desde events.jsonl (si se corrompe)
+python3 -m server.rebuild_ledger              # con paths default
+python3 -m server.rebuild_ledger --dry-run    # contar sin escribir
+
+# Inspeccionar propuestas SICA dormidas (read-only)
+curl http://localhost:5274/improve/reflect    # patterns observados
+curl http://localhost:5274/improve/proposals  # propuestas scoped
 ```
