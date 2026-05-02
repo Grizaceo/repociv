@@ -27,6 +27,7 @@ import server.workspace_state as _ws
 import server.run_state as _rs
 import server.locks as _locks
 import server.swarm_engine as _swarm
+import server.checkpoint as _checkpoint
 
 
 # ─── Fixture: fresh store each test ──────────────────────────────────────────
@@ -42,7 +43,9 @@ def _setup() -> None:
     _wi.init(Path(tmp))
     _ws.init(Path(tmp))
     _rs.init(Path(tmp))
+    _checkpoint.init(Path(tmp))
     yield
+    _checkpoint._reset()
 
 
 # ─── Helper: create a realistic issue workspace ──────────────────────────────
