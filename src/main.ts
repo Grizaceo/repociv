@@ -479,10 +479,14 @@ function wireHUD(
   const sendMessage = (input: HTMLInputElement | null) => {
     const unit = state.selectedUnit;
     if (!unit || !input || !input.value.trim()) return;
+    const lookupCoord = unit.targetCoord ?? unit.coord;
+    const tile = state.world.tiles.get(tileKey(lookupCoord));
     const cityHere =
+      tile?.city ??
       state.world.cities.find((c) =>
-        c.territory.some((t) => t.q === unit.coord.q && t.r === unit.coord.r),
-      ) ?? state.world.cities[0];
+        c.territory.some((t) => t.q === lookupCoord.q && t.r === lookupCoord.r),
+      ) ??
+      state.world.cities[0];
 
     const text = input.value.trim();
     if (!isSidePanelOpen()) openSidePanel(unit);

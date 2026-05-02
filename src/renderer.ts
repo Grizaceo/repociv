@@ -224,8 +224,10 @@ export class Renderer {
                 toTile,
                 shiftHeld: e.shiftKey,
               });
-              if (directive) this.onSpatialGesture?.(directive, screenPos);
-              else {
+              if (directive) {
+                this.state.moveUnit(unit.id, coord);
+                this.onSpatialGesture?.(directive, screenPos);
+              } else {
                 // No city target → treat as move order
                 this.state.moveUnit(unit.id, coord);
               }
