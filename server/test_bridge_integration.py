@@ -22,6 +22,7 @@ def test_health_endpoint_returns_liveness_shape():
             data = json.loads(resp.read().decode())
         assert data["ok"] is True
         assert "openclaw" in data
+        assert data.get("defaultTransport") == "hermes"
     finally:
         server.shutdown()
         server.server_close()

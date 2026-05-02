@@ -69,7 +69,11 @@ def test_run_agent_persists_session_and_run_state(monkeypatch, tmp_path):
     monkeypatch.setattr(agent_runner._es, "record_failed", lambda mission_id, error='': failures.append((mission_id, error)))
     monkeypatch.setattr(agent_runner._ds, "record_outcome", lambda mission_id, status, duration: outcomes.append((mission_id, status)))
     monkeypatch.setattr(agent_runner, "_resolve_city_path", lambda city_id: f"/tmp/{city_id}")
-    monkeypatch.setattr(agent_runner, "_execute_streaming", lambda unit_id, mission_id, mission, working_dir=None: (True, "done"))
+    monkeypatch.setattr(
+        agent_runner,
+        "_execute_streaming",
+        lambda unit_id, mission_id, mission, working_dir=None, city_id="": (True, "done"),
+    )
 
     agent_runner.run_agent("DAVI", "repociv", "arregla tests", command_id="m42")
 

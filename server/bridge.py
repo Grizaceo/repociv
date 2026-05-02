@@ -442,9 +442,10 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
 
 
 def _execute_streaming(unit_id: str, mission_id: str, mission: str,
-                       working_dir: str | None = None) -> tuple[bool, str]:
+                       working_dir: str | None = None,
+                       city_id: str = "") -> tuple[bool, str]:
     _configure_agent_runner()
-    return _agent_runner._execute_streaming(unit_id, mission_id, mission, working_dir)
+    return _agent_runner._execute_streaming(unit_id, mission_id, mission, working_dir, city_id)
 
 
 def _has_openclaw() -> bool:
@@ -465,16 +466,18 @@ def _has_cursor() -> bool:
 
 def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
                              config: dict[str, Any],
-                             working_dir: str | None = None) -> tuple[bool, str]:
+                             working_dir: str | None = None,
+                             city_id: str = "") -> tuple[bool, str]:
     _configure_agent_runner()
-    return _agent_runner._run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir)
+    return _agent_runner._run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
 
 def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
                            config: dict[str, Any] | None = None,
-                           working_dir: str | None = None) -> tuple[bool, str]:
+                           working_dir: str | None = None,
+                           city_id: str = "") -> tuple[bool, str]:
     _configure_agent_runner()
-    return _agent_runner._run_hermes_streaming(unit_id, mission_id, mission, config, working_dir)
+    return _agent_runner._run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
 
 # ─── Command Bus intake ───────────────────────────────────────────────────────
@@ -727,6 +730,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 "openclaw": _has_openclaw(),
                 "claudeCode": _has_claude_code(),
                 "cursor": _has_cursor(),
+                "defaultTransport": "hermes",
             })
             return
 
@@ -1347,7 +1351,8 @@ if __name__ == "__main__":
     print(f"│ CORS:      localhost:{REPOCIV_PORT} only                  │")
     print(f"│ Events:    {_es._store_path}  │")
     print(f"│ Missions:  {MISSIONS_FILE}    │")
-    print(f"│ openclaw:  {'OK' if _has_openclaw() else 'NO (usará Hermes API)'}                          │")
+    print(f"│ default:   hermes (luego claude-code, openclaw)                        │")
+    print(f"│ openclaw:  {'OK' if _has_openclaw() else 'NO'}                                      │")
     print(f"│ claude-code: {'OK' if _has_claude_code() else 'NO'}                              │")
     print(f"│ cursor:    {'OK' if _has_cursor() else 'NO'}                                    │")
     print(f"│ GPU:       {'OK (nvidia-smi)' if has_gpu else 'no disponible'}                    │")

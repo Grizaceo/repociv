@@ -175,12 +175,18 @@ describe('BridgeEvents checkHealth', () => {
     bridge.stop();
   });
 
-  it('reports claude-code mode when claudeCode flag is true', async () => {
+  it('reports hermes mode when defaultTransport is hermes (even if claude is installed)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ ok: true, openclaw: false, claudeCode: true, cursor: false }),
+        json: async () => ({
+          ok: true,
+          openclaw: false,
+          claudeCode: true,
+          cursor: false,
+          defaultTransport: 'hermes',
+        }),
       }),
     );
     const setBridgeStatus = vi.mocked(uiMod.setBridgeStatus);
@@ -191,7 +197,7 @@ describe('BridgeEvents checkHealth', () => {
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
-    expect(setBridgeStatus).toHaveBeenCalledWith(true, 'claude-code');
+    expect(setBridgeStatus).toHaveBeenCalledWith(true, 'hermes');
     bridge.stop();
   });
 });

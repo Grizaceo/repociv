@@ -114,8 +114,15 @@ export class BridgeEvents {
           openclaw: boolean;
           claudeCode: boolean;
           cursor: boolean;
+          defaultTransport?: string;
         };
-        const mode = data.claudeCode ? 'claude-code' : data.openclaw ? 'openclaw' : 'hermes';
+        const dt = data.defaultTransport ?? 'hermes';
+        const mode: 'claude-code' | 'openclaw' | 'hermes' =
+          dt === 'claude-code' && data.claudeCode
+            ? 'claude-code'
+            : dt === 'openclaw' && data.openclaw
+              ? 'openclaw'
+              : 'hermes';
         this.onBridgeOnline(mode);
         return;
       }

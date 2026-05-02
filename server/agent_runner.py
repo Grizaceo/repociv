@@ -86,13 +86,42 @@ def _get_agent_config(unit_id: str) -> dict[str, Any]:
     return AGENT_CONFIGS.get(base, AGENT_CONFIGS["DAVI"])
 
 
+def _repos_root() -> str:
+    root = os.environ.get(
+        "REPOCIV_REPOS_ROOT",
+        os.environ.get(
+            "WORKSPACE_ROOT",
+            str(Path.home() / ".hermes" / "workspace" / "repos"),
+        ),
+    )
+    return os.path.expanduser(root)
+
+
 def _resolve_city_path(city_id: str) -> str | None:
-    root = os.environ.get("REPOCIV_REPOS_ROOT",
-                          os.environ.get("WORKSPACE_ROOT",
-                          str(Path.home() / ".hermes" / "workspace" / "repos")))
-    root = os.path.expanduser(root)
-    candidate = os.path.join(root, city_id)
+    candidate = os.path.join(_repos_root(), city_id)
     return candidate if os.path.isdir(candidate) else None
+
+
+def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
+    """Facts about which repo/city this mission targets — models must not invent a fixed home repo."""
+    root = _repos_root()
+    expected = os.path.join(root, city_id)
+    if working_dir:
+        path_line = f"- **Ruta de trabajo (cwd del adaptador):** `{working_dir}`"
+    else:
+        path_line = (
+            f"- **Ruta de trabajo:** NO resuelta: no existe `{expected}`. "
+            "Alinea el nombre de la carpeta con `city_id` o crea el clone ahí."
+        )
+    return (
+        "\n\n## Contexto espacial RepoCiv (fuente de verdad)\n"
+        f"- **Ciudad / target (`city_id`):** `{city_id}`\n"
+        f"{path_line}\n"
+        f"- **Raíz de repos (`REPOCIV_REPOS_ROOT` / `WORKSPACE_ROOT`):** `{root}`\n"
+        f"- **Ruta esperada para este target:** `{expected}`\n"
+        "Si preguntan en qué repositorio estás, responde usando SOLO este bloque y el cwd "
+        "(si existe). No asumas estar en `hermes-agent` ni en otro núcleo por defecto.\n"
+    )
 
 
 def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
@@ -101,6 +130,15 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
     quest_name = generate_quest_name(mission)
     started_at = time.time()
     working_dir = _resolve_city_path(city_id)
+    if not working_dir:
+        send_to_repociv({
+            "type": "log",
+            "msg": (
+                f"city_id={city_id!r}: no hay carpeta bajo {_repos_root()} — "
+                "cwd del adaptador puede ser el del bridge (confunde el repo)."
+            ),
+            "level": "warn",
+        })
 
     runtime = _runtime_adapters.default_agent_runtime(unit_id)
 
@@ -138,7 +176,7 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
                      "durationSeconds": 120, "missionId": mission_id})
     send_to_repociv({"type": "unit_state", "unit": unit_id, "state": "working"})
 
-    success, output = _execute_streaming(unit_id, mission_id, mission, working_dir)
+    success, output = _execute_streaming(unit_id, mission_id, mission, working_dir, city_id)
 
     duration = time.time() - started_at
 
@@ -186,36 +224,38 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
 
 
 def _execute_streaming(unit_id: str, mission_id: str, mission: str,
-                       working_dir: str | None = None) -> tuple[bool, str]:
+                       working_dir: str | None = None,
+                       city_id: str = "") -> tuple[bool, str]:
     config = _get_agent_config(unit_id)
     base = unit_id.split("-")[0].upper()
 
     if _container_mode_enabled():
-        return _run_container_streaming(unit_id, mission_id, mission, config, working_dir)
+        return _run_container_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
     if base == "OPENCLAW":
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: openclaw]\n"})
-        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir)
+        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
-    # Adapter selection: claude-code → hermes → openclaw
+    # Adapter selection: hermes → claude-code → openclaw
+    send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: hermes]\n"})
+    success, output = _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
+    if success:
+        return success, output
+
+    send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[hermes falló → probando claude-code]\n"})
     if _has_claude_code():
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: claude-code]\n"})
-        success, output = _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir)
+        success, output = _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
         if success:
             return success, output
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[claude-code falló → fallback hermes]\n"})
 
-    send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: hermes]\n"})
-    success, output = _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir)
-    if not success:
-        if _has_openclaw():
-            send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[hermes falló → fallback openclaw]\n"})
-            return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir)
-        # All adapters unavailable — return explicit failure, not a silent success
-        msg = "[offline] Ningún adaptador de agente disponible (claude-code, hermes, openclaw). Sin ejecución real.\n"
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": msg})
-        return False, msg.strip()
-    return success, output
+    if _has_openclaw():
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[fallback openclaw]\n"})
+        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
+
+    msg = "[offline] Ningún adaptador de agente disponible (hermes, claude-code, openclaw). Sin ejecución real.\n"
+    send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": msg})
+    return False, msg.strip()
 
 
 def _container_mode_enabled() -> bool:
@@ -224,7 +264,8 @@ def _container_mode_enabled() -> bool:
 
 def _run_container_streaming(unit_id: str, mission_id: str, mission: str,
                              config: dict[str, Any],
-                             working_dir: str | None = None) -> tuple[bool, str]:
+                             working_dir: str | None = None,
+                             city_id: str = "") -> tuple[bool, str]:
     if not working_dir:
         text = "[docker error] working directory is required for container mode\n"
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
@@ -232,7 +273,10 @@ def _run_container_streaming(unit_id: str, mission_id: str, mission: str,
         return False, text.strip()
 
     system_prompt = config.get("system", "")
-    full_prompt = f"{system_prompt}\n\n{mission}" if system_prompt else mission
+    spatial = _spatial_context_block(city_id, working_dir)
+    full_prompt = (
+        f"{system_prompt}{spatial}\n\n{mission}" if system_prompt else f"{spatial}\n\n{mission}"
+    )
     token = (
         os.environ.get(_container_runtime.DEFAULT_TOKEN_ENV)
         or os.environ.get("REPOCIV_TOKEN")
@@ -313,7 +357,8 @@ def _find_claude_code() -> str | None:
 
 def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
                                 config: dict[str, Any],
-                                working_dir: str | None = None) -> tuple[bool, str]:
+                                working_dir: str | None = None,
+                                city_id: str = "") -> tuple[bool, str]:
     claude_bin = _find_claude_code()
     if not claude_bin:
         text = "[claude-code error] binary not found in PATH, ~/.npm-global/bin or ~/.local/bin\n"
@@ -322,7 +367,10 @@ def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
         return False, text.strip()
 
     system_prompt = config.get("system", "")
-    full_prompt = f"{system_prompt}\n\n{mission}" if system_prompt else mission
+    spatial = _spatial_context_block(city_id, working_dir)
+    full_prompt = (
+        f"{system_prompt}{spatial}\n\n{mission}" if system_prompt else f"{spatial}\n\n{mission}"
+    )
     cmd = [claude_bin, "--print", "--dangerously-skip-permissions", full_prompt]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, bufsize=1, cwd=working_dir or None)
@@ -379,7 +427,8 @@ def _run_cursor_streaming(unit_id: str, mission_id: str, mission: str,
 
 def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
                              config: dict[str, Any],
-                             working_dir: str | None = None) -> tuple[bool, str]:
+                             working_dir: str | None = None,
+                             city_id: str = "") -> tuple[bool, str]:
     if config.get("stateful", True):
         session_id = f"repociv-{unit_id.lower()}"
     else:
@@ -392,8 +441,10 @@ def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
         _es.record_output_chunk(mission_id, unit_id, text)
         return False, text.strip()
 
+    spatial = _spatial_context_block(city_id, working_dir)
+    full_message = f"{spatial}\n\n{mission}"
     cmd = [openclaw_bin, "agent", "--agent", config["agent"],
-           "--session-id", session_id, "--message", mission]
+           "--session-id", session_id, "--message", full_message]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=working_dir or None)
     output_buf: list[str] = []
     assert proc.stdout is not None
@@ -407,16 +458,19 @@ def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
 
 def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
                            config: dict[str, Any] | None = None,
-                           working_dir: str | None = None) -> tuple[bool, str]:
+                           working_dir: str | None = None,
+                           city_id: str = "") -> tuple[bool, str]:
     HERMES_URL   = os.environ.get("HERMES_URL",   "http://localhost:8642/v1/chat/completions")
     HERMES_KEY   = os.environ.get("HERMES_KEY",   "davi-voice-bridge-2026")
     HERMES_MODEL = os.environ.get("HERMES_MODEL", "minimax-m2.6")
 
     cfg = config if config is not None else _get_agent_config(unit_id)
+    spatial = _spatial_context_block(city_id, working_dir)
+    system_content = cfg.get("system", "Eres un agente útil.") + spatial
     payload: dict[str, Any] = {
         "model": HERMES_MODEL,
         "messages": [
-            {"role": "system", "content": cfg.get("system", "Eres un agente útil.")},
+            {"role": "system", "content": system_content},
             {"role": "user", "content": mission},
         ],
         "stream": False,
