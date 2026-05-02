@@ -3,6 +3,28 @@
 The engine proposes small, scoped changes from ledger/metric patterns. It never
 applies changes to the live repository unless the caller passes explicit human
 approval.
+
+Surface area
+============
+
+* HTTP (read-only, exposed by ``server/bridge.py``):
+    GET /improve/reflect    → list observed ImprovementPattern objects.
+    GET /improve/proposals  → list scoped, schema-valid Improvement proposals.
+
+* CLI (mutating, opt-in, never wired to the network):
+    >>> from server.self_improve import SelfImprovementEngine
+    >>> eng = SelfImprovementEngine()
+    >>> patterns = eng.reflect()
+    >>> proposal = eng.propose_improvement(patterns[0])
+    >>> result = eng.validate_in_sandbox(proposal)   # git worktree + pytest
+    >>> eng.apply_if_approved(proposal, approved=True)
+
+Design intent
+=============
+This module is intentionally **dormant by default**. During the alpha phase
+the user inspects ``GET /improve/proposals`` manually and applies suggestions
+by hand. Automatic apply is reserved for a later phase once the proposal
+quality has been observed in practice.
 """
 from __future__ import annotations
 

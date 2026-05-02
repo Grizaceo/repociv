@@ -21,6 +21,8 @@ Endpoints:
   GET  /agents                    — agent status + heartbeat + queue depth
   GET  /agents/capabilities       — capability model (Fase 6)
   GET  /metrics                   — observability metrics (Fase 7)
+  GET  /improve/reflect           — SICA: list observed improvement patterns
+  GET  /improve/proposals         — SICA: list scoped, schema-valid proposals
   POST /commands                  — new Command Bus intake
   POST /commands/<id>/cancel      — cancel a queued command
   POST /approvals/<id>/approve    — approve a pending command
@@ -130,10 +132,12 @@ from server import event_store as _es
 from server import sessions as _sessions
 from server import run_state as _run_state
 from server import workspace_issue as _wi
+from server import checkpoint as _checkpoint
 _es.init(CONFIG_DIR)
 _sessions.init(CONFIG_DIR)
 _run_state.init(CONFIG_DIR)
 _wi.init(CONFIG_DIR)
+_checkpoint.init(CONFIG_DIR)
 
 # ─── Command schema + policy ──────────────────────────────────────────────────
 from server.command_schema import validate_command, CommandValidationError, Command
@@ -865,6 +869,59 @@ class BridgeHandler(BaseHTTPRequestHandler):
         # GET /tasks — list all tasks from orchestrator registry (C3)
         if path == "/tasks":
             self._json(_to.list_tasks())
+            return
+
+        # ─── SICA self-improvement (Fase 5, opt-in) ──────────────────────────
+        # Read-only inspection: surface patterns and proposals so the user
+        # (alpha tester) can decide if any are worth acting on. No changes
+        # are ever applied through GET.
+        if path == "/improve/reflect":
+            try:
+                from server.self_improve import SelfImprovementEngine
+                engine = SelfImprovementEngine()
+                patterns = engine.reflect()
+                self._json({
+                    "patterns": [
+                        {
+                            "kind": p.kind,
+                            "summary": p.summary,
+                            "evidence": p.evidence,
+                            "confidence": p.confidence,
+                        }
+                        for p in patterns
+                    ]
+                })
+            except Exception as exc:
+                self.send_response(500)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(exc)}).encode())
+            return
+
+        if path == "/improve/proposals":
+            try:
+                from server.self_improve import SelfImprovementEngine
+                engine = SelfImprovementEngine()
+                proposals = []
+                for pattern in engine.reflect():
+                    try:
+                        improvement = engine.propose_improvement(pattern)
+                    except Exception:
+                        continue
+                    proposals.append({
+                        "id": improvement.id,
+                        "targetType": improvement.target_type,
+                        "filePath": improvement.file_path,
+                        "description": improvement.description,
+                        "rationale": improvement.rationale,
+                        "payload": improvement.payload,
+                    })
+                self._json({"proposals": proposals})
+            except Exception as exc:
+                self.send_response(500)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(exc)}).encode())
             return
 
         # GET /tasks/<repo>/<issueId> — task orchestrator status (P3)
