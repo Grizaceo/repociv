@@ -205,6 +205,11 @@ export class BridgeEvents {
       case 'unit_move':
         this.state.moveUnit(evt.unit, { q: evt.to[0], r: evt.to[1] });
         break;
+      case 'unit_despawn': {
+        const ok = this.state.removeUnit(evt.unit);
+        if (ok) logEvent(`Unidad ${evt.unit} desapareció del mapa`, 'warn');
+        break;
+      }
       case 'unit_state':
         this.state.setUnitState(evt.unit, evt.state);
         if (evt.state === 'working') setOperationTicker(true, `${evt.unit} trabajando…`);

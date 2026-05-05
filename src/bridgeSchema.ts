@@ -37,6 +37,11 @@ const Schemas = [
     mission: v.optional(v.string()),
   }),
   v.object({
+    type: v.literal('unit_despawn'),
+    unit: v.string(),
+    mission: v.optional(v.string()),
+  }),
+  v.object({
     type: v.literal('unit_state'),
     unit: v.string(),
     state: UnitState,
