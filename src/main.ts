@@ -67,6 +67,7 @@ import { recordGesture } from './directiveLearner.ts';
 import { type Unit, tileKey } from './types.ts';
 import { clearChat } from './ui/chat.ts';
 import { terminalPanel } from './terminalPanel.ts';
+import { ensureRepoOnboarding } from './ui/onboardingPanel.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 const loadSteps = [
@@ -83,6 +84,9 @@ async function bootstrap() {
     showLoadingProgress((i / loadSteps.length) * 100, loadSteps[i]!);
     await new Promise((r) => setTimeout(r, 200));
   }
+
+  hideLoadingScreen();
+  await ensureRepoOnboarding();
 
   const world = await generateWorld();
   const state = new GameState(world);
@@ -210,7 +214,6 @@ async function bootstrap() {
   state.subscribe(refreshHero);
   refreshHero();
 
-  hideLoadingScreen();
 }
 
 // ─── Hero selection ──────────────────────────────────────────────────────────

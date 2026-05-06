@@ -119,7 +119,7 @@ async function fetchSessionTint(
 }
 
 // ─── ScannedRepo from /api/repos ────────────────────────────────────────────
-interface ScannedRepo {
+export interface ScannedRepo {
   name: string;
   path: string;
   population: number;
@@ -128,6 +128,67 @@ interface ScannedRepo {
   lastCommitDays: number;
   isLegacy: boolean;
   hasGit: boolean;
+}
+
+const REPO_SELECTION_STORAGE_KEY = 'repociv:selected-repos:v1';
+
+interface RepoSelectionSettings {
+  version: 1;
+  selectedRepoPaths: string[];
+  filters: {
+    owners: string[];
+    topics: string[];
+    languages: string[];
+  };
+}
+
+function canUseLocalStorage(): boolean {
+  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+}
+
+export function loadSelectedRepoPaths(): Set<string> | null {
+  if (!canUseLocalStorage()) return null;
+  try {
+    const raw = window.localStorage.getItem(REPO_SELECTION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const legacyPaths = Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string' && item.length > 0)
+      : null;
+    const settings =
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      parsed['version'] === 1 &&
+      Array.isArray(parsed['selectedRepoPaths'])
+        ? (parsed as RepoSelectionSettings)
+        : null;
+    const paths = legacyPaths ?? settings?.selectedRepoPaths ?? null;
+    if (!paths) return null;
+    return paths.length > 0 ? new Set(paths) : new Set();
+  } catch {
+    return null;
+  }
+}
+
+export function saveSelectedRepoPaths(paths: string[]): void {
+  if (!canUseLocalStorage()) return;
+  const dedupedPaths = Array.from(new Set(paths.filter((path) => path.length > 0)));
+  const payload: RepoSelectionSettings = {
+    version: 1,
+    selectedRepoPaths: dedupedPaths,
+    filters: {
+      owners: [],
+      topics: [],
+      languages: [],
+    },
+  };
+  window.localStorage.setItem(REPO_SELECTION_STORAGE_KEY, JSON.stringify(payload));
+}
+
+export async function fetchScannedRepos(): Promise<ScannedRepo[]> {
+  const res = await fetch('/api/repos');
+  if (!res.ok) throw new Error(`/api/repos HTTP ${res.status}`);
+  return (await res.json()) as ScannedRepo[];
 }
 
 // ─── Top-level subdirs detection (best-effort from extensions distribution) ─
@@ -166,13 +227,16 @@ export async function generateWorld(): Promise<World> {
   // Fetch real repos
   let repos: ScannedRepo[] = [];
   try {
-    const res = await fetch('/api/repos');
-    if (!res.ok) throw new Error(`/api/repos HTTP ${res.status}`);
-    repos = (await res.json()) as ScannedRepo[];
+    repos = await fetchScannedRepos();
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     logger.error('[map] /api/repos failed', e);
     showMapLoadError(`No pude cargar repos reales: ${message}`);
+  }
+
+  const selectedRepoPaths = loadSelectedRepoPaths();
+  if (selectedRepoPaths !== null) {
+    repos = repos.filter((repo) => selectedRepoPaths.has(repo.path));
   }
 
   // Sort: most-populated first → capital

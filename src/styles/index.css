@@ -6,6 +6,7 @@
 @import './variables.css';
 @import './patterns.css';
 @import './components.css';
+@import './onboarding.css';
 
 /* Global layout */
 #app {
