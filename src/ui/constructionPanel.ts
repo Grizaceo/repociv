@@ -1,5 +1,6 @@
 import { loadSelectedRepoPaths, saveSelectedRepoPaths, type ScannedRepo } from '../map.ts';
 import { upsertManualRepoEntry } from '../manualLayout.ts';
+import { runRepoOnboarding } from './onboardingPanel.ts';
 
 let isOpen = false;
 
@@ -76,6 +77,13 @@ function buildDOM(): void {
       </header>
       <div class="construction-panel-body">
         <p class="construction-help">Agrega un repo existente y define su posicion en el mapa.</p>
+        <div class="construction-row">
+          <label>Flujos rapidos</label>
+          <div class="construction-inline">
+            <span></span>
+            <button id="construction-reopen-onboarding" class="btn-secondary" type="button">Reabrir onboarding de repos</button>
+          </div>
+        </div>
         <div class="construction-row">
           <label>Repositorio</label>
           <div class="construction-inline">
@@ -161,6 +169,21 @@ function buildDOM(): void {
       }
     })();
   });
+
+  panel
+    .querySelector<HTMLButtonElement>('#construction-reopen-onboarding')
+    ?.addEventListener('click', () => {
+      void (async () => {
+        error.classList.add('hidden');
+        try {
+          await runRepoOnboarding();
+          window.location.reload();
+        } catch (e) {
+          error.textContent = `No se pudo abrir onboarding (${e instanceof Error ? e.message : 'error desconocido'}).`;
+          error.classList.remove('hidden');
+        }
+      })();
+    });
 
   qInput.addEventListener('input', renderPreview);
   rInput.addEventListener('input', renderPreview);

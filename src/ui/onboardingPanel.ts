@@ -326,20 +326,7 @@ async function hydrateRepos(state: OnboardingState, onContinue: () => void): Pro
   render(state, onContinue);
 }
 
-export async function ensureRepoOnboarding(): Promise<void> {
-  const existingSelection = loadSelectedRepoPaths();
-  if (existingSelection && existingSelection.size > 0) {
-    try {
-      const repos = await fetchScannedRepos();
-      const hasAnyMatch = repos.some((repo) => existingSelection.has(repo.path));
-      if (hasAnyMatch) return;
-    } catch {
-      return;
-    }
-  } else if (hasStoredSelection()) {
-    return;
-  }
-
+export async function runRepoOnboarding(): Promise<void> {
   const mapRoot = await fetchCurrentMapRoot().catch(() => 'desconocida');
   await new Promise<void>((resolve) => {
     const state: OnboardingState = {
@@ -355,4 +342,21 @@ export async function ensureRepoOnboarding(): Promise<void> {
     render(state, resolve);
     void hydrateRepos(state, resolve);
   });
+}
+
+export async function ensureRepoOnboarding(): Promise<void> {
+  const existingSelection = loadSelectedRepoPaths();
+  if (existingSelection && existingSelection.size > 0) {
+    try {
+      const repos = await fetchScannedRepos();
+      const hasAnyMatch = repos.some((repo) => existingSelection.has(repo.path));
+      if (hasAnyMatch) return;
+    } catch {
+      return;
+    }
+  } else if (hasStoredSelection()) {
+    return;
+  }
+
+  await runRepoOnboarding();
 }
