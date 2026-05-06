@@ -44,6 +44,22 @@ interface ScannedRepo {
 
 const SKIP_DIRS = new Set(skipDirsJson);
 
+function scanRepoPath(repoPath: string): ScannedRepo {
+  const exts: Record<string, number> = {};
+  const population = countFiles(repoPath, exts);
+  const { commits, days, hasGit } = gitStats(repoPath);
+  return {
+    name: basename(repoPath),
+    path: repoPath,
+    population,
+    extensions: exts,
+    gold: commits,
+    lastCommitDays: days,
+    isLegacy: days > 180,
+    hasGit,
+  };
+}
+
 function countFiles(dir: string, exts: Record<string, number>, depth = 0): number {
   if (depth > 6) return 0;
   let total = 0;
@@ -111,19 +127,8 @@ function makeScanWorkspace(getMapRoot: () => string) {
         /* skip compare */
       }
       if (entry === 'repociv') continue;
-      const exts: Record<string, number> = {};
-      const population = countFiles(full, exts);
-      const { commits, days, hasGit } = gitStats(full);
-      repos.push({
-        name: basename(full),
-        path: entry,
-        population,
-        extensions: exts,
-        gold: commits,
-        lastCommitDays: days,
-        isLegacy: days > 180,
-        hasGit,
-      });
+      const repo = scanRepoPath(full);
+      repos.push({ ...repo, path: entry });
     }
     cachedRoot = mapRoot;
     cachedRepos = repos;
@@ -281,6 +286,50 @@ function repocivPlugin(mapRoot: string): Plugin {
         res.end(JSON.stringify({ ok: true, path: currentMapRoot, count: repos.length }));
       } catch (e) {
         res.statusCode = 400;
+        res.end(JSON.stringify({ error: String(e) }));
+      }
+      return;
+    }
+
+    if (path === '/api/repo/pick' && req.method === 'POST') {
+      try {
+        const pickedPath = resolve(pickFolderWithSystemDialog());
+        if (!existsSync(pickedPath) || !statSync(pickedPath).isDirectory()) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: 'carpeta invalida' }));
+          return;
+        }
+        const repo = scanRepoPath(pickedPath);
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ ok: true, repo }));
+      } catch (e) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: String(e) }));
+      }
+      return;
+    }
+
+    if (path === '/api/repo/inspect' && req.method === 'POST') {
+      try {
+        const body = await readRequestBody(req);
+        const payload = JSON.parse(body) as { path?: string };
+        const requested = String(payload.path ?? '').trim();
+        const resolved = resolve(expandUser(requested));
+        if (!requested) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: 'path requerido' }));
+          return;
+        }
+        if (!existsSync(resolved) || !statSync(resolved).isDirectory()) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: 'path no es carpeta valida' }));
+          return;
+        }
+        const repo = scanRepoPath(resolved);
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ ok: true, repo }));
+      } catch (e) {
+        res.statusCode = 500;
         res.end(JSON.stringify({ error: String(e) }));
       }
       return;

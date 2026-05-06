@@ -68,6 +68,11 @@ import { type Unit, tileKey } from './types.ts';
 import { clearChat } from './ui/chat.ts';
 import { terminalPanel } from './terminalPanel.ts';
 import { ensureRepoOnboarding } from './ui/onboardingPanel.ts';
+import {
+  closeConstructionPanel,
+  isConstructionPanelOpen,
+  toggleConstructionPanel,
+} from './ui/constructionPanel.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 const loadSteps = [
@@ -323,6 +328,10 @@ function wireHUD(
         closeSidePanel();
         return;
       }
+      if (isConstructionPanelOpen()) {
+        closeConstructionPanel();
+        return;
+      }
       closeSettingsPanel();
       if (state.selectedUnit) {
         state.selectUnit(null);
@@ -465,6 +474,7 @@ function wireHUD(
   document
     .getElementById('btn-screenshot')
     ?.addEventListener('click', () => takeScreenshot(renderer));
+  document.getElementById('btn-construction')?.addEventListener('click', () => toggleConstructionPanel());
 
   // ─── Settings button ─────────────────────────────────────────────────────
   document.getElementById('btn-settings')?.addEventListener('click', () => toggleSettingsPanel());

@@ -4,6 +4,7 @@
 import { logger } from './logger.ts';
 import { type Axial, spiralCoords } from './hex.ts';
 import { type Terrain, type Tile, type City, type District, type World, tileKey } from './types.ts';
+import { loadManualLayout } from './manualLayout.ts';
 
 // ─── Terrain inference ──────────────────────────────────────────────────────
 const EXTENSION_WEIGHT: Record<string, Terrain> = {
@@ -128,6 +129,7 @@ export interface ScannedRepo {
   lastCommitDays: number;
   isLegacy: boolean;
   hasGit: boolean;
+  manualCoord?: Axial;
 }
 
 const REPO_SELECTION_STORAGE_KEY = 'repociv:selected-repos:v1';
@@ -239,6 +241,24 @@ export async function generateWorld(): Promise<World> {
     repos = repos.filter((repo) => selectedRepoPaths.has(repo.path));
   }
 
+  const manualLayout = loadManualLayout();
+  const manualRepoMap = new Map<string, Axial>();
+  for (const entry of manualLayout.entries) {
+    manualRepoMap.set(entry.repoPath, { q: entry.coord.q, r: entry.coord.r });
+    if (!repos.some((repo) => repo.path === entry.repoPath)) {
+      repos.push({
+        name: entry.repoName,
+        path: entry.repoPath,
+        population: 0,
+        extensions: {},
+        gold: 0,
+        lastCommitDays: 999,
+        isLegacy: false,
+        hasGit: false,
+      });
+    }
+  }
+
   // Sort: most-populated first → capital
   repos.sort((a, b) => b.population - a.population);
 
@@ -252,11 +272,33 @@ export async function generateWorld(): Promise<World> {
         : inferTerrain(r.extensions),
     science: Math.min(99, Math.floor(r.gold / 10)),
     production: Math.min(99, Math.floor(r.gold / 50)),
+    manualCoord: manualRepoMap.get(r.path),
   }));
 
-  const cityRepos = reposWithTerrain.filter((r) => r.population > 5);
-  const orphanRepos = reposWithTerrain.filter((r) => r.population <= 5);
-  const cityCoords = spiralCoords({ q: 0, r: 0 }, cityRepos.length);
+  const cityRepos = reposWithTerrain.filter((r) => r.population > 5 || !!r.manualCoord);
+  const orphanRepos = reposWithTerrain.filter((r) => r.population <= 5 && !r.manualCoord);
+  const maxAutoCoords = Math.max(cityRepos.length * 4, cityRepos.length + 16);
+  const cityCoords = spiralCoords({ q: 0, r: 0 }, maxAutoCoords);
+  const occupiedCoords = new Set<string>();
+  const cityCoordLookup = new Map<string, Axial>();
+  let autoCoordCursor = 0;
+  for (const repo of cityRepos) {
+    if (repo.manualCoord) {
+      const key = tileKey(repo.manualCoord);
+      occupiedCoords.add(key);
+      cityCoordLookup.set(repo.path, repo.manualCoord);
+      continue;
+    }
+    while (autoCoordCursor < cityCoords.length) {
+      const coord = cityCoords[autoCoordCursor]!;
+      autoCoordCursor++;
+      const key = tileKey(coord);
+      if (occupiedCoords.has(key)) continue;
+      occupiedCoords.add(key);
+      cityCoordLookup.set(repo.path, coord);
+      break;
+    }
+  }
 
   // Fetch subdirs + skill health + session tint in parallel
   const [subdirsPerRepo, skillHealthPerRepo, sessionTintPerRepo] = await Promise.all([
@@ -267,7 +309,7 @@ export async function generateWorld(): Promise<World> {
 
   for (let i = 0; i < cityRepos.length; i++) {
     const repo = cityRepos[i]!;
-    const coord = cityCoords[i]!;
+    const coord = cityCoordLookup.get(repo.path) ?? cityCoords[i]!;
     const subdirs = subdirsPerRepo[i] ?? [];
     const skillHealth = skillHealthPerRepo[i];
     const sessionTint = sessionTintPerRepo[i];
