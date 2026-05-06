@@ -15,7 +15,23 @@ interface OnboardingState {
   selected: Set<string>;
   step: OnboardingStep;
   isLoading: boolean;
+  isPickingFolder: boolean;
   error: string | null;
+  mapRoot: string;
+}
+
+async function fetchCurrentMapRoot(): Promise<string> {
+  const res = await fetch('/api/map-root');
+  if (!res.ok) throw new Error(`/api/map-root HTTP ${res.status}`);
+  const data = (await res.json()) as { path: string };
+  return data.path;
+}
+
+async function pickMapRoot(): Promise<string> {
+  const res = await fetch('/api/map-root/pick', { method: 'POST' });
+  const data = (await res.json()) as { path?: string; error?: string };
+  if (!res.ok || !data.path) throw new Error(data.error ?? `HTTP ${res.status}`);
+  return data.path;
 }
 
 function hasStoredSelection(): boolean {
@@ -94,10 +110,14 @@ function render(state: OnboardingState, onContinue: () => void): void {
         </div>`
       : `<div class="repo-onboarding-toolbar">
           <input id="repo-onboarding-search" type="search" placeholder="Buscar repositorio..." value="${state.query}" />
+          <button id="repo-onboarding-pick-folder" class="btn-secondary" type="button" ${state.isPickingFolder ? 'disabled' : ''}>
+            ${state.isPickingFolder ? 'Abriendo selector...' : 'Seleccionar carpeta del mapa'}
+          </button>
           <button id="repo-onboarding-select-visible" class="btn-secondary" type="button">Seleccionar todos visibles</button>
           <button id="repo-onboarding-clear" class="btn-secondary" type="button">Limpiar seleccion</button>
           <span class="repo-onboarding-count">${selectedCount} seleccionados</span>
         </div>
+        <div class="repo-onboarding-map-root">Carpeta actual: <code>${state.mapRoot}</code></div>
         <div class="repo-onboarding-list">
           ${
             state.isLoading
@@ -205,6 +225,24 @@ function render(state: OnboardingState, onContinue: () => void): void {
     render(state, onContinue);
   });
 
+  root.querySelector<HTMLButtonElement>('#repo-onboarding-pick-folder')?.addEventListener('click', () => {
+    void (async () => {
+      state.isPickingFolder = true;
+      render(state, onContinue);
+      try {
+        state.mapRoot = await pickMapRoot();
+        state.query = '';
+        state.selected.clear();
+        await hydrateRepos(state, onContinue);
+      } catch (error) {
+        state.error = `No pudimos abrir el selector de carpetas (${error instanceof Error ? error.message : 'error desconocido'}).`;
+      } finally {
+        state.isPickingFolder = false;
+        render(state, onContinue);
+      }
+    })();
+  });
+
   root.querySelectorAll<HTMLInputElement>('input[data-repo-path]').forEach((checkbox) => {
     checkbox.addEventListener('change', () => {
       const repoPath = checkbox.dataset['repoPath'];
@@ -234,7 +272,13 @@ async function hydrateRepos(state: OnboardingState, onContinue: () => void): Pro
   render(state, onContinue);
   try {
     state.repos = sortRepos(await fetchScannedRepos());
-    state.selected = getRecommendedSelection(state.repos);
+    const previousSelection = new Set(state.selected);
+    const availablePaths = new Set(state.repos.map((repo) => repo.path));
+    const keptSelection = new Set([...previousSelection].filter((path) => availablePaths.has(path)));
+    state.selected =
+      keptSelection.size > 0 || state.repos.length === 0
+        ? keptSelection
+        : getRecommendedSelection(state.repos);
     state.isLoading = false;
     state.error = null;
   } catch (error) {
@@ -245,8 +289,20 @@ async function hydrateRepos(state: OnboardingState, onContinue: () => void): Pro
 }
 
 export async function ensureRepoOnboarding(): Promise<void> {
-  if (hasStoredSelection()) return;
+  const existingSelection = loadSelectedRepoPaths();
+  if (existingSelection && existingSelection.size > 0) {
+    try {
+      const repos = await fetchScannedRepos();
+      const hasAnyMatch = repos.some((repo) => existingSelection.has(repo.path));
+      if (hasAnyMatch) return;
+    } catch {
+      return;
+    }
+  } else if (hasStoredSelection()) {
+    return;
+  }
 
+  const mapRoot = await fetchCurrentMapRoot().catch(() => 'desconocida');
   await new Promise<void>((resolve) => {
     const state: OnboardingState = {
       repos: [],
@@ -254,7 +310,9 @@ export async function ensureRepoOnboarding(): Promise<void> {
       selected: new Set<string>(),
       step: 'select',
       isLoading: true,
+      isPickingFolder: false,
       error: null,
+      mapRoot,
     };
     render(state, resolve);
     void hydrateRepos(state, resolve);

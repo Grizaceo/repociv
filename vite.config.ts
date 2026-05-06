@@ -2,13 +2,33 @@
 import { defineConfig, loadEnv } from 'vite';
 import type { Plugin, Connect } from 'vite';
 import { execSync } from 'node:child_process';
-import { readdirSync, statSync, existsSync, readFileSync } from 'node:fs';
-import { join, basename } from 'node:path';
-import { homedir } from 'node:os';
+import { readdirSync, statSync, existsSync, readFileSync, realpathSync } from 'node:fs';
+import { join, basename, resolve } from 'node:path';
+import { homedir, platform } from 'node:os';
 import skipDirsJson from './shared/skip-dirs.json' with { type: 'json' };
 
-// ─── Workspace path ──────────────────────────────────────────────────────────
-const WORKSPACE = join(homedir(), '.hermes', 'workspace', 'repos');
+const DEFAULT_MAP_ROOT = join(homedir(), '.hermes', 'workspace', 'repos');
+
+function expandUser(p: string): string {
+  if (p === '~') return homedir();
+  if (p.startsWith('~/')) return join(homedir(), p.slice(2));
+  return p;
+}
+
+/** Imperial map scan root: REPOCIV_MAP_ROOT → WORKSPACE_ROOT → REPOCIV_REPOS_ROOT → Hermes repos. WSL example: /home/gris */
+function resolveMapRoot(mode: string): string {
+  const env = loadEnv(mode, process.cwd(), '');
+  const pick = (key: string): string | undefined => {
+    const v = process.env[key] ?? env[key];
+    return v !== undefined && String(v).trim() !== '' ? String(v).trim() : undefined;
+  };
+  const raw =
+    pick('REPOCIV_MAP_ROOT') ??
+    pick('WORKSPACE_ROOT') ??
+    pick('REPOCIV_REPOS_ROOT') ??
+    DEFAULT_MAP_ROOT;
+  return resolve(expandUser(raw));
+}
 
 // ─── Repo scanning ───────────────────────────────────────────────────────────
 interface ScannedRepo {
@@ -64,45 +84,120 @@ function gitStats(repo: string): { commits: number; days: number; hasGit: boolea
   }
 }
 
-let cachedRepos: ScannedRepo[] | null = null;
-function scanWorkspace(): ScannedRepo[] {
-  if (cachedRepos) return cachedRepos;
-  const repos: ScannedRepo[] = [];
-  if (!existsSync(WORKSPACE)) return repos;
-  for (const entry of readdirSync(WORKSPACE)) {
-    const full = join(WORKSPACE, entry);
-    let st;
-    try { st = statSync(full); } catch { continue; }
-    if (!st.isDirectory()) continue;
-    if (entry.startsWith('.')) continue;
-    if (entry === 'repociv') continue;  // self
-    const exts: Record<string, number> = {};
-    const population = countFiles(full, exts);
-    const { commits, days, hasGit } = gitStats(full);
-    repos.push({
-      name: basename(full),
-      path: entry,
-      population,
-      extensions: exts,
-      gold: commits,
-      lastCommitDays: days,
-      isLegacy: days > 180,
-      hasGit,
-    });
+function makeScanWorkspace(getMapRoot: () => string) {
+  let cachedRepos: ScannedRepo[] | null = null;
+  let cachedRoot: string | null = null;
+  let cwdReal: string | null = null;
+  try {
+    cwdReal = realpathSync(process.cwd());
+  } catch {
+    cwdReal = resolve(process.cwd());
   }
-  cachedRepos = repos;
-  return repos;
+
+  function scanWorkspace(): ScannedRepo[] {
+    const mapRoot = getMapRoot();
+    if (cachedRepos && cachedRoot === mapRoot) return cachedRepos;
+    const repos: ScannedRepo[] = [];
+    if (!existsSync(mapRoot)) return repos;
+    for (const entry of readdirSync(mapRoot)) {
+      const full = join(mapRoot, entry);
+      let st;
+      try { st = statSync(full); } catch { continue; }
+      if (!st.isDirectory()) continue;
+      if (entry.startsWith('.')) continue;
+      try {
+        if (cwdReal && realpathSync(full) === cwdReal) continue;
+      } catch {
+        /* skip compare */
+      }
+      if (entry === 'repociv') continue;
+      const exts: Record<string, number> = {};
+      const population = countFiles(full, exts);
+      const { commits, days, hasGit } = gitStats(full);
+      repos.push({
+        name: basename(full),
+        path: entry,
+        population,
+        extensions: exts,
+        gold: commits,
+        lastCommitDays: days,
+        isLegacy: days > 180,
+        hasGit,
+      });
+    }
+    cachedRoot = mapRoot;
+    cachedRepos = repos;
+    return repos;
+  }
+
+  return {
+    scanWorkspace,
+    clearCache: () => {
+      cachedRepos = null;
+      cachedRoot = null;
+    },
+  };
+}
+
+function readRequestBody(req: Connect.IncomingMessage): Promise<string> {
+  return new Promise((resolveBody) => {
+    let body = '';
+    req.on('data', (chunk: Buffer) => {
+      body += chunk.toString();
+    });
+    req.on('end', () => resolveBody(body));
+  });
+}
+
+function pickFolderWithSystemDialog(): string {
+  const os = platform();
+  if (os === 'darwin') {
+    const output = execSync(
+      `osascript -e 'POSIX path of (choose folder with prompt "Selecciona la carpeta raiz del mapa")'`,
+      { encoding: 'utf8' },
+    ).trim();
+    if (!output) throw new Error('Dialogo cancelado');
+    return output;
+  }
+
+  if (os === 'win32') {
+    const output = execSync(
+      `powershell -NoProfile -Command "$f = New-Object System.Windows.Forms.FolderBrowserDialog; if ($f.ShowDialog() -eq 'OK') { $f.SelectedPath }"`,
+      { encoding: 'utf8' },
+    ).trim();
+    if (!output) throw new Error('Dialogo cancelado');
+    return output;
+  }
+
+  try {
+    const output = execSync(
+      `zenity --file-selection --directory --title="Selecciona la carpeta raiz del mapa"`,
+      { encoding: 'utf8' },
+    ).trim();
+    if (!output) throw new Error('Dialogo cancelado');
+    return output;
+  } catch {
+    const output = execSync(
+      `kdialog --getexistingdirectory "${homedir()}" "Selecciona la carpeta raiz del mapa"`,
+      { encoding: 'utf8' },
+    ).trim();
+    if (!output) throw new Error('Dialogo cancelado');
+    return output;
+  }
 }
 
 // ─── API + Bridge plugin ─────────────────────────────────────────────────────
-function repocivPlugin(): Plugin {
+function repocivPlugin(mapRoot: string): Plugin {
   let server: { ws: { send: (msg: object) => void } } | undefined;
+  let currentMapRoot = mapRoot;
+  const { scanWorkspace, clearCache } = makeScanWorkspace(() => currentMapRoot);
 
   const handler: Connect.NextHandleFunction = async (req, res, next) => {
-    const url = req.url ?? '';
+    const rawUrl = req.url ?? '';
+    const path = rawUrl.split('?')[0] ?? rawUrl;
 
     // Bridge events from bridge.py → frontend
-    if (url === '/event' && req.method === 'POST') {
+    if (path === '/event' && req.method === 'POST') {
       let body = '';
       req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
       req.on('end', () => {
@@ -121,7 +216,7 @@ function repocivPlugin(): Plugin {
     }
 
     // Real workspace scan
-    if (url === '/api/repos' && req.method === 'GET') {
+    if (path === '/api/repos' && req.method === 'GET') {
       const repos = scanWorkspace();
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify(repos));
@@ -129,18 +224,72 @@ function repocivPlugin(): Plugin {
     }
 
     // Force refresh of cache
-    if (url === '/api/repos/refresh' && req.method === 'POST') {
-      cachedRepos = null;
+    if (path === '/api/repos/refresh' && req.method === 'POST') {
+      clearCache();
       const repos = scanWorkspace();
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ ok: true, count: repos.length }));
       return;
     }
 
+    if (path === '/api/map-root' && req.method === 'GET') {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ path: currentMapRoot }));
+      return;
+    }
+
+    if (path === '/api/map-root' && req.method === 'POST') {
+      try {
+        const body = await readRequestBody(req);
+        const payload = JSON.parse(body) as { path?: string };
+        const requested = String(payload.path ?? '').trim();
+        const resolved = resolve(expandUser(requested));
+        if (!requested) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: 'path requerido' }));
+          return;
+        }
+        if (!existsSync(resolved) || !statSync(resolved).isDirectory()) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: 'path no es carpeta valida' }));
+          return;
+        }
+        currentMapRoot = resolved;
+        clearCache();
+        const repos = scanWorkspace();
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ ok: true, path: currentMapRoot, count: repos.length }));
+      } catch (e) {
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: String(e) }));
+      }
+      return;
+    }
+
+    if (path === '/api/map-root/pick' && req.method === 'POST') {
+      try {
+        const pickedPath = resolve(pickFolderWithSystemDialog());
+        if (!existsSync(pickedPath) || !statSync(pickedPath).isDirectory()) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: 'carpeta invalida' }));
+          return;
+        }
+        currentMapRoot = pickedPath;
+        clearCache();
+        const repos = scanWorkspace();
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ ok: true, path: currentMapRoot, count: repos.length }));
+      } catch (e) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: String(e) }));
+      }
+      return;
+    }
+
     // Git status for a specific repo
-    if (url.startsWith('/api/git/') && req.method === 'GET') {
-      const name = url.slice('/api/git/'.length);
-      const repoPath = join(WORKSPACE, name);
+    if (path.startsWith('/api/git/') && req.method === 'GET') {
+      const name = path.slice('/api/git/'.length);
+      const repoPath = join(currentMapRoot, name);
       if (!existsSync(join(repoPath, '.git'))) {
         res.statusCode = 404;
         res.end(JSON.stringify({ error: 'No git repo' }));
@@ -167,9 +316,9 @@ function repocivPlugin(): Plugin {
     }
 
     // Files in a repo
-    if (url.startsWith('/api/files/') && req.method === 'GET') {
-      const name = url.slice('/api/files/'.length).split('?')[0]!;
-      const repoPath = join(WORKSPACE, name);
+    if (path.startsWith('/api/files/') && req.method === 'GET') {
+      const name = path.slice('/api/files/'.length);
+      const repoPath = join(currentMapRoot, name);
       if (!existsSync(repoPath)) {
         res.statusCode = 404;
         res.end(JSON.stringify({ error: 'Not found' }));
@@ -201,8 +350,8 @@ function repocivPlugin(): Plugin {
     }
 
     // Skill health for a repo
-    if (url.startsWith('/api/skill-health/') && req.method === 'GET') {
-      const name = decodeURIComponent(url.slice('/api/skill-health/'.length));
+    if (path.startsWith('/api/skill-health/') && req.method === 'GET') {
+      const name = decodeURIComponent(path.slice('/api/skill-health/'.length));
       const skillPath = join(homedir(), '.hermes', 'skills', name);
       let health: 'ok' | 'stale' | 'broken' = 'broken';
       try {
@@ -218,8 +367,8 @@ function repocivPlugin(): Plugin {
     }
 
     // Session tint for a repo (based on ~/.hermes/sessions/*.jsonl)
-    if (url.startsWith('/api/session-tint/') && req.method === 'GET') {
-      const name = decodeURIComponent(url.slice('/api/session-tint/'.length));
+    if (path.startsWith('/api/session-tint/') && req.method === 'GET') {
+      const name = decodeURIComponent(path.slice('/api/session-tint/'.length));
       const sessDir = join(homedir(), '.hermes', 'sessions');
       let tint: 'bright' | 'normal' | 'fog' = 'fog';
       try {
@@ -255,6 +404,7 @@ function repocivPlugin(): Plugin {
       server = s as typeof server;
       s.middlewares.use(handler);
       // Pre-warm cache at startup
+      console.log(`[repociv] Map root: ${currentMapRoot}`);
       console.log('[repociv] Scaneando workspace...');
       const repos = scanWorkspace();
       console.log(`[repociv] ${repos.length} repos detectados`);
@@ -265,8 +415,9 @@ function repocivPlugin(): Plugin {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const vitePort = parseInt(env.VITE_PORT ?? '5273', 10);
+  const mapRoot = resolveMapRoot(mode);
   return {
-    plugins: [repocivPlugin()],
+    plugins: [repocivPlugin(mapRoot)],
     server: { port: vitePort, strictPort: true },
     test: {
       exclude: ['node_modules/**', 'dist/**', 'e2e/**'],

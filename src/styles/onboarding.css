@@ -59,7 +59,7 @@
 
 .repo-onboarding-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
   gap: 8px;
   align-items: center;
 }
@@ -77,6 +77,15 @@
   overflow: auto;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(0, 0, 0, 0.25);
+}
+
+.repo-onboarding-map-root {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.repo-onboarding-map-root code {
+  color: var(--gold-mid);
 }
 
 .repo-onboarding-item {
