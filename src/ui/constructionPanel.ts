@@ -44,6 +44,17 @@ async function pickRepoFromSystem(): Promise<ScannedRepo> {
   return data.repo;
 }
 
+async function inspectRepoPath(path: string): Promise<ScannedRepo> {
+  const res = await fetch('/api/repo/inspect', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  });
+  const data = (await res.json()) as RepoPickResponse;
+  if (!res.ok || !data.repo) throw new Error(data.error ?? `HTTP ${res.status}`);
+  return data.repo;
+}
+
 function upsertSelection(repoPath: string): void {
   const selected = loadSelectedRepoPaths();
   if (selected === null) return;
@@ -68,8 +79,12 @@ function buildDOM(): void {
         <div class="construction-row">
           <label>Repositorio</label>
           <div class="construction-inline">
-            <input id="construction-repo-path" type="text" placeholder="/ruta/al/repo" readonly />
-            <button id="construction-pick-repo" class="btn-secondary" type="button">Seleccionar carpeta</button>
+            <input id="construction-repo-path" type="text" placeholder="/ruta/al/repo" />
+            <button id="construction-pick-repo" class="btn-secondary" type="button">Dialogo</button>
+          </div>
+          <div class="construction-inline">
+            <span></span>
+            <button id="construction-inspect-repo" class="btn-secondary" type="button">Inspeccionar ruta</button>
           </div>
         </div>
         <div class="construction-row construction-coords">
@@ -126,6 +141,22 @@ function buildDOM(): void {
         renderPreview();
       } catch (e) {
         error.textContent = `No se pudo abrir el selector (${e instanceof Error ? e.message : 'error desconocido'}).`;
+        error.classList.remove('hidden');
+      }
+    })();
+  });
+
+  panel.querySelector<HTMLButtonElement>('#construction-inspect-repo')?.addEventListener('click', () => {
+    void (async () => {
+      error.classList.add('hidden');
+      try {
+        const p = pathInput.value.trim();
+        if (!p) throw new Error('Ruta vacia');
+        selectedRepo = await inspectRepoPath(p);
+        pathInput.value = selectedRepo.path;
+        renderPreview();
+      } catch (e) {
+        error.textContent = `No se pudo inspeccionar la ruta (${e instanceof Error ? e.message : 'error desconocido'}).`;
         error.classList.remove('hidden');
       }
     })();

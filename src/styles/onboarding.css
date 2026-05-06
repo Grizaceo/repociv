@@ -84,6 +84,22 @@
   color: var(--text-dim);
 }
 
+.repo-onboarding-map-root-actions {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.repo-onboarding-map-root-actions input {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--civ-text-beige);
+}
+
 .repo-onboarding-map-root code {
   color: var(--gold-mid);
 }

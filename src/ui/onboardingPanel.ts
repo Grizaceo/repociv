@@ -34,6 +34,17 @@ async function pickMapRoot(): Promise<string> {
   return data.path;
 }
 
+async function setMapRoot(path: string): Promise<string> {
+  const res = await fetch('/api/map-root', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  });
+  const data = (await res.json()) as { path?: string; error?: string };
+  if (!res.ok || !data.path) throw new Error(data.error ?? `HTTP ${res.status}`);
+  return data.path;
+}
+
 function hasStoredSelection(): boolean {
   return loadSelectedRepoPaths() !== null;
 }
@@ -117,7 +128,13 @@ function render(state: OnboardingState, onContinue: () => void): void {
           <button id="repo-onboarding-clear" class="btn-secondary" type="button">Limpiar seleccion</button>
           <span class="repo-onboarding-count">${selectedCount} seleccionados</span>
         </div>
-        <div class="repo-onboarding-map-root">Carpeta actual: <code>${state.mapRoot}</code></div>
+        <div class="repo-onboarding-map-root">
+          Carpeta actual: <code>${state.mapRoot}</code>
+          <div class="repo-onboarding-map-root-actions">
+            <input id="repo-onboarding-map-root-input" type="text" value="${state.mapRoot}" placeholder="/ruta/a/carpeta" />
+            <button id="repo-onboarding-map-root-apply" class="btn-secondary" type="button">Aplicar ruta</button>
+          </div>
+        </div>
         <div class="repo-onboarding-list">
           ${
             state.isLoading
@@ -236,6 +253,27 @@ function render(state: OnboardingState, onContinue: () => void): void {
         await hydrateRepos(state, onContinue);
       } catch (error) {
         state.error = `No pudimos abrir el selector de carpetas (${error instanceof Error ? error.message : 'error desconocido'}).`;
+      } finally {
+        state.isPickingFolder = false;
+        render(state, onContinue);
+      }
+    })();
+  });
+
+  root.querySelector<HTMLButtonElement>('#repo-onboarding-map-root-apply')?.addEventListener('click', () => {
+    const input = root.querySelector<HTMLInputElement>('#repo-onboarding-map-root-input');
+    const path = String(input?.value ?? '').trim();
+    if (!path) return;
+    void (async () => {
+      state.isPickingFolder = true;
+      render(state, onContinue);
+      try {
+        state.mapRoot = await setMapRoot(path);
+        state.query = '';
+        state.selected.clear();
+        await hydrateRepos(state, onContinue);
+      } catch (error) {
+        state.error = `No pudimos aplicar la ruta (${error instanceof Error ? error.message : 'error desconocido'}).`;
       } finally {
         state.isPickingFolder = false;
         render(state, onContinue);

@@ -154,6 +154,23 @@ function readRequestBody(req: Connect.IncomingMessage): Promise<string> {
   });
 }
 
+function convertWindowsPathToWsl(path: string): string {
+  try {
+    return execSync(`wslpath -u "${path.replace(/"/g, '\\"')}"`, { encoding: 'utf8' }).trim();
+  } catch {
+    return path;
+  }
+}
+
+function tryPickWithCommand(command: string): string | null {
+  try {
+    const output = execSync(command, { encoding: 'utf8' }).trim();
+    return output.length > 0 ? output : null;
+  } catch {
+    return null;
+  }
+}
+
 function pickFolderWithSystemDialog(): string {
   const os = platform();
   if (os === 'darwin') {
@@ -167,28 +184,34 @@ function pickFolderWithSystemDialog(): string {
 
   if (os === 'win32') {
     const output = execSync(
-      `powershell -NoProfile -Command "$f = New-Object System.Windows.Forms.FolderBrowserDialog; if ($f.ShowDialog() -eq 'OK') { $f.SelectedPath }"`,
+      `powershell -NoProfile -STA -Command "Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; if ($f.ShowDialog() -eq 'OK') { $f.SelectedPath }"`,
       { encoding: 'utf8' },
     ).trim();
     if (!output) throw new Error('Dialogo cancelado');
     return output;
   }
 
-  try {
-    const output = execSync(
-      `zenity --file-selection --directory --title="Selecciona la carpeta raiz del mapa"`,
-      { encoding: 'utf8' },
-    ).trim();
-    if (!output) throw new Error('Dialogo cancelado');
-    return output;
-  } catch {
-    const output = execSync(
-      `kdialog --getexistingdirectory "${homedir()}" "Selecciona la carpeta raiz del mapa"`,
-      { encoding: 'utf8' },
-    ).trim();
-    if (!output) throw new Error('Dialogo cancelado');
-    return output;
+  const linuxCandidateCommands = [
+    `zenity --file-selection --directory --title="Selecciona la carpeta raiz del mapa"`,
+    `kdialog --getexistingdirectory "${homedir()}" "Selecciona la carpeta raiz del mapa"`,
+  ];
+
+  for (const command of linuxCandidateCommands) {
+    const picked = tryPickWithCommand(command);
+    if (picked) return picked;
   }
+
+  // WSL fallback: use Windows folder picker via powershell.exe and convert path back to Linux.
+  if (process.env['WSL_DISTRO_NAME']) {
+    const windowsPicked = tryPickWithCommand(
+      `powershell.exe -NoProfile -STA -Command "Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; if ($f.ShowDialog() -eq 'OK') { $f.SelectedPath }"`,
+    );
+    if (windowsPicked) return convertWindowsPathToWsl(windowsPicked);
+  }
+
+  throw new Error(
+    'No hay dialogo de carpetas disponible. Instala zenity/kdialog o usa WSL con powershell.exe.',
+  );
 }
 
 // ─── API + Bridge plugin ─────────────────────────────────────────────────────
