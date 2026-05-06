@@ -155,10 +155,15 @@ function readRequestBody(req: Connect.IncomingMessage): Promise<string> {
 }
 
 function convertWindowsPathToWsl(path: string): string {
+  const normalized = path.replace(/\r/g, '').trim();
   try {
-    return execSync(`wslpath -u "${path.replace(/"/g, '\\"')}"`, { encoding: 'utf8' }).trim();
+    return execSync(`wslpath -u "${normalized.replace(/"/g, '\\"')}"`, { encoding: 'utf8' }).trim();
   } catch {
-    return path;
+    const driveMatch = /^([a-zA-Z]):[\\/](.*)$/.exec(normalized);
+    if (!driveMatch) return normalized;
+    const drive = driveMatch[1].toLowerCase();
+    const tail = driveMatch[2].replace(/\\/g, '/');
+    return `/mnt/${drive}/${tail}`;
   }
 }
 
@@ -169,6 +174,59 @@ function tryPickWithCommand(command: string): string | null {
   } catch {
     return null;
   }
+}
+
+function canRunCommand(binary: string): boolean {
+  try {
+    execSync(`command -v "${binary}"`, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function buildEncodedPowershellCommand(executable: string, script: string): string {
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
+  return `${executable} -NoProfile -STA -EncodedCommand ${encoded}`;
+}
+
+function tryPickWithWindowsDialog(executable: string): string | null {
+  const commands = [
+    buildEncodedPowershellCommand(
+      executable,
+      [
+        'Add-Type -AssemblyName System.Windows.Forms',
+        '$hostForm = New-Object System.Windows.Forms.Form',
+        '$hostForm.TopMost = $true',
+        '$hostForm.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen',
+        '$hostForm.Size = New-Object System.Drawing.Size(1,1)',
+        '$hostForm.ShowInTaskbar = $false',
+        '$hostForm.Opacity = 0',
+        '$hostForm.Show()',
+        '$hostForm.Activate()',
+        '$f = New-Object System.Windows.Forms.FolderBrowserDialog',
+        '$picked = $null',
+        'if ($f.ShowDialog($hostForm) -eq [System.Windows.Forms.DialogResult]::OK) { $picked = $f.SelectedPath }',
+        '$hostForm.Close()',
+        '$hostForm.Dispose()',
+        'if ($picked -ne $null) { $picked }',
+      ].join('; '),
+    ),
+    buildEncodedPowershellCommand(
+      executable,
+      [
+        'Add-Type -AssemblyName System.Windows.Forms',
+        '$shell = New-Object -ComObject Shell.Application',
+        '$folder = $shell.BrowseForFolder(0, "Selecciona la carpeta raiz del mapa", 0, 0)',
+        'if ($folder -ne $null) { $folder.Self.Path }',
+      ].join('; '),
+    ),
+  ];
+  for (const command of commands) {
+    const picked = tryPickWithCommand(command);
+    if (picked) return picked;
+  }
+  return null;
 }
 
 function pickFolderWithSystemDialog(): string {
@@ -183,29 +241,37 @@ function pickFolderWithSystemDialog(): string {
   }
 
   if (os === 'win32') {
-    const output = execSync(
-      `powershell -NoProfile -STA -Command "Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; if ($f.ShowDialog() -eq 'OK') { $f.SelectedPath }"`,
-      { encoding: 'utf8' },
-    ).trim();
+    const output = tryPickWithWindowsDialog('powershell');
     if (!output) throw new Error('Dialogo cancelado');
     return output;
   }
 
-  const linuxCandidateCommands = [
-    `zenity --file-selection --directory --title="Selecciona la carpeta raiz del mapa"`,
-    `kdialog --getexistingdirectory "${homedir()}" "Selecciona la carpeta raiz del mapa"`,
-  ];
+  // In WSL, prefer native Windows folder picker first for faster UX.
+  if (canRunCommand('powershell.exe')) {
+    const windowsPicked = tryPickWithWindowsDialog('powershell.exe');
+    if (windowsPicked) return convertWindowsPathToWsl(windowsPicked);
+  }
+
+  const linuxCandidateCommands: string[] = [];
+  if (canRunCommand('zenity')) {
+    linuxCandidateCommands.push(
+      `zenity --file-selection --directory --title="Selecciona la carpeta raiz del mapa"`,
+    );
+  }
+  if (canRunCommand('kdialog')) {
+    linuxCandidateCommands.push(
+      `kdialog --getexistingdirectory "${homedir()}" "Selecciona la carpeta raiz del mapa"`,
+    );
+  }
 
   for (const command of linuxCandidateCommands) {
     const picked = tryPickWithCommand(command);
     if (picked) return picked;
   }
 
-  // WSL fallback: use Windows folder picker via powershell.exe and convert path back to Linux.
-  if (process.env['WSL_DISTRO_NAME']) {
-    const windowsPicked = tryPickWithCommand(
-      `powershell.exe -NoProfile -STA -Command "Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; if ($f.ShowDialog() -eq 'OK') { $f.SelectedPath }"`,
-    );
+  // Last fallback: use Windows folder picker via powershell.exe and convert path back to Linux.
+  if (canRunCommand('powershell.exe')) {
+    const windowsPicked = tryPickWithWindowsDialog('powershell.exe');
     if (windowsPicked) return convertWindowsPathToWsl(windowsPicked);
   }
 
