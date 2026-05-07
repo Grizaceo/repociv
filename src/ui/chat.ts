@@ -1,7 +1,7 @@
 // ─── RepoCiv — Side panel: Chat / Git / Files (Civ V Aesthetic) ────────────────
 import type { Unit } from '../types.ts';
 import { trapFocus } from './focusTrap.ts';
-import { bridgeHeaders } from '../bridgeEnv.ts';
+import { bridgeHeaders, hermesWebUrl } from '../bridgeEnv.ts';
 
 let activeChatUnit: string | null = null;
 export const chatBuffers = new Map<string, string>();
@@ -215,6 +215,10 @@ function initProviderSelectors(_unit: Unit) {
       populateModels();
       persistSelection();
       updateStatusIndicator();
+      // When provider changes, also switch Hermes model if a model is selected
+      if (_selectedModel) {
+        switchHermesModel(_selectedProvider, _selectedModel);
+      }
     });
     provSel.dataset['wired'] = '1';
   }
@@ -223,6 +227,10 @@ function initProviderSelectors(_unit: Unit) {
       _selectedModel = modelSel.value;
       persistSelection();
       updateStatusIndicator();
+      // When model changes, switch Hermes to use it
+      if (_selectedModel && _selectedProvider) {
+        switchHermesModel(_selectedProvider, _selectedModel);
+      }
     });
     modelSel.dataset['wired'] = '1';
   }
@@ -359,6 +367,31 @@ function updateStatusIndicator() {
 
 function newError(msg: string): Error {
   return new Error(msg);
+}
+
+/** Switch Hermes model/provider via the web server API.
+ *  This writes to session_model_overrides.json which the gateway reads on next turn.
+ */
+function switchHermesModel(provider: string, model: string) {
+  const ctrl = new AbortController();
+  setTimeout(() => ctrl.abort(), 10_000);
+  fetch(hermesWebUrl('/api/model/switch'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider, model, session_key: 'cli', persist: false }),
+    signal: ctrl.signal,
+  })
+    .then(async (r) => {
+      if (!r.ok) {
+        const body = await r.text().catch(() => '');
+        console.warn('[repociv] model switch failed:', r.status, body);
+      }
+    })
+    .catch((err) => {
+      if (err.name !== 'AbortError') {
+        console.warn('[repociv] model switch error:', err);
+      }
+    });
 }
 
 function populateModels(savedModel?: string) {
