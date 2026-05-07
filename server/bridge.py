@@ -490,7 +490,7 @@ def append_pending_task(title: str, priority: str = "MEDIA") -> str | None:
         new_id = f"{max_id + 1:03d}"
 
         # Build the new item block
-        section_header = f"## [{priority}]"
+        section_marker = f"[{priority}]"
         new_block = (
             f"\n### [{new_id}] {title.strip()} — 🔵 registrada\n"
             f"**Estado:** 🔵 registrada\n"
@@ -501,13 +501,12 @@ def append_pending_task(title: str, priority: str = "MEDIA") -> str | None:
         lines = existing.splitlines(keepends=True)
         inserted = False
         result: list[str] = []
-        in_target_section = False
         i = 0
         while i < len(lines):
             line = lines[i]
             result.append(line)
-            if line.strip() == section_header:
-                in_target_section = True
+            # Match section headers like "## [MEDIA] Pendientes activos"
+            if section_marker in line.strip() and line.strip().startswith("##"):
                 i += 1
                 # Skip section header and any "(vacío)" line
                 while i < len(lines):
