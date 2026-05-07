@@ -142,6 +142,27 @@ export function openSidePanel(unit: Unit) {
   }
 
   renderChatBuffer(unit.id);
+
+  // Initialize scroll-to-bottom button for chat-messages
+  const chatContainer = document.getElementById('chat-messages');
+  if (chatContainer && !document.getElementById('chat-scroll-bottom')) {
+    const scrollBtn = document.createElement('button');
+    scrollBtn.id = 'chat-scroll-bottom';
+    scrollBtn.className = 'chat-scroll-btn hidden';
+    scrollBtn.textContent = '↓ Nuevos mensajes';
+    scrollBtn.addEventListener('click', () => {
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+      scrollBtn.classList.add('hidden');
+    });
+    chatContainer.parentElement?.appendChild(scrollBtn);
+
+    // Show/hide button based on scroll position
+    chatContainer.addEventListener('scroll', () => {
+      const isAtBottom = chatContainer.scrollTop + chatContainer.clientHeight >= chatContainer.scrollHeight - 30;
+      scrollBtn.classList.toggle('hidden', isAtBottom);
+    });
+  }
+
   // Re-init icons if needed for dynamic content
   if ((window as unknown as Record<string, unknown>)['lucide'])
     (window as unknown as Record<string, { createIcons: () => void }>)['lucide']!.createIcons();
@@ -166,55 +187,68 @@ export function appendChatChunk(unitId: string, text: string) {
   }
 }
 
-function ensureLiveAgentBubble(unitId: string) {
-  if (document.getElementById(`chat-current-${unitId}`)) return;
-  const container = document.getElementById('chat-messages');
-  if (!container) return;
-  const bubble = document.createElement('div');
-  bubble.className = 'chat-msg';
-  bubble.id = `chat-current-${unitId}`;
-  bubble.dataset['raw'] = '';
-  bubble.innerHTML = `<div class="chat-msg-head">
-    <div class="chat-msg-meta">REPORTE DE ${unitId.toUpperCase()}</div>
-    <div class="chat-msg-actions">
-      <button class="chat-copy-btn" title="Copiar mensaje" aria-label="Copiar mensaje al portapapeles">${COPY_SVG}</button>
-      <button class="chat-error-btn hidden" title="Copiar solo la línea de error" aria-label="Copiar línea de error al portapapeles">Copiar error</button>
-    </div>
-  </div><span class="chat-body"></span>`;
-  container.appendChild(bubble);
-  attachCopyListeners(container, unitId);
-}
-
 export function appendUserMessage(unitId: string, text: string) {
   const container = document.getElementById('chat-messages');
   if (!container || activeChatUnit !== unitId) return;
 
-  // ── User message bubble ──────────────────────────────────────────────
+  // ── User message bubble (right-aligned) ───────────────────────
   const msg = document.createElement('div');
   msg.className = 'chat-msg user';
   msg.dataset['raw'] = text;
+  const userTime = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
   msg.innerHTML = `<div class="chat-msg-head">
-    <div class="chat-msg-meta">CRÓNICA ENVIADA A ${unitId.toUpperCase()}</div>
-    <button class="chat-copy-btn" title="Copiar mensaje" aria-label="Copiar mensaje al portapapeles">${COPY_SVG}</button>
-  </div>${escapeHtml(text)}`;
+    <div class="chat-msg-meta">
+      <span>TÚ · ${userTime}</span>
+      <button class="chat-copy-btn" title="Copiar mensaje" aria-label="Copiar mensaje al portapapeles">${COPY_SVG}</button>
+    </div>
+  </div>
+  <div class="chat-body">${escapeHtml(text)}</div>`;
   container.appendChild(msg);
 
-  // ── Agent reply bubble (will be filled by streaming chunks) ──────────
+  // ── Agent reply bubble (left-aligned, will be filled by streaming chunks) ──
   chatBuffers.set(unitId, '');
+  const agentTime = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
   const bubble = document.createElement('div');
   bubble.className = 'chat-msg';
   bubble.id = `chat-current-${unitId}`;
   bubble.dataset['raw'] = '';
   bubble.innerHTML = `<div class="chat-msg-head">
-    <div class="chat-msg-meta">REPORTE DE ${unitId.toUpperCase()}</div>
-    <div class="chat-msg-actions">
-      <button class="chat-copy-btn" title="Copiar mensaje" aria-label="Copiar mensaje al portapapeles">${COPY_SVG}</button>
-      <button class="chat-error-btn hidden" title="Copiar solo la línea de error" aria-label="Copiar línea de error al portapapeles">Copiar error</button>
+    <div class="chat-msg-meta">
+      <span>${unitId.toUpperCase()} · ${agentTime}</span>
+      <div class="chat-msg-actions">
+        <button class="chat-copy-btn" title="Copiar mensaje" aria-label="Copiar mensaje al portapapeles">${COPY_SVG}</button>
+        <button class="chat-error-btn hidden" title="Copiar solo la línea de error" aria-label="Copiar línea de error al portapapeles">Copiar error</button>
+      </div>
     </div>
-  </div><span class="chat-body"></span>`;
+  </div>
+  <span class="chat-body"></span>`;
   container.appendChild(bubble);
 
+  // Scroll to bottom on new message
   container.scrollTop = container.scrollHeight;
+  attachCopyListeners(container, unitId);
+}
+
+function ensureLiveAgentBubble(unitId: string) {
+  if (document.getElementById(`chat-current-${unitId}`)) return;
+  const container = document.getElementById('chat-messages');
+  if (!container) return;
+  const agentTime = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-msg';
+  bubble.id = `chat-current-${unitId}`;
+  bubble.dataset['raw'] = '';
+  bubble.innerHTML = `<div class="chat-msg-head">
+    <div class="chat-msg-meta">
+      <span>${unitId.toUpperCase()} · ${agentTime}</span>
+      <div class="chat-msg-actions">
+        <button class="chat-copy-btn" title="Copiar mensaje" aria-label="Copiar mensaje al portapapeles">${COPY_SVG}</button>
+        <button class="chat-error-btn hidden" title="Copiar solo la línea de error" aria-label="Copiar línea de error al portapapeles">Copiar error</button>
+      </div>
+    </div>
+  </div>
+  <span class="chat-body"></span>`;
+  container.appendChild(bubble);
   attachCopyListeners(container, unitId);
 }
 
@@ -231,8 +265,14 @@ function renderChatBuffer(unitId: string) {
   if (errBtn) {
     errBtn.classList.toggle('hidden', !hasErrorLine(text));
   }
+  // Only auto-scroll if user is near bottom
   const container = document.getElementById('chat-messages');
-  if (container) container.scrollTop = container.scrollHeight;
+  if (container) {
+    const isNearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 50;
+    if (isNearBottom) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }
 }
 
 export function clearChat(unitId: string) {

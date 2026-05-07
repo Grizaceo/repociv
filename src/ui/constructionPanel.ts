@@ -5,7 +5,6 @@ import { showNotification } from './notificationBanner';
 let isOpen = false;
 let _rendererRef: { setPlacingMode(active: boolean): void; getPlacingMode(): boolean } | null = null;
 let _onPickTileCb: ((coord: { q: number; r: number }) => void) | null = null;
-let _placingNewCity = false; // true if we're placing a new city
 let selectedRepo: ScannedRepo | null = null;
 
 interface RepoPickResponse {
@@ -229,8 +228,6 @@ function buildDOM(): void {
   panel.querySelector<HTMLButtonElement>('#construction-cancel')?.addEventListener('click', close);
 
   const pathInput = panel.querySelector<HTMLInputElement>('#construction-repo-path')!;
-  const tileLabel = panel.querySelector<HTMLElement>('#construction-tile-label')!;
-  const preview = panel.querySelector<HTMLElement>('#construction-preview')!;
   const error = panel.querySelector<HTMLElement>('#construction-error')!;
 
   panel.querySelector<HTMLButtonElement>('#construction-pick-repo')?.addEventListener('click', () => {
@@ -321,6 +318,7 @@ function buildDOM(): void {
     error.classList.add('hidden');
     _onPickTileCb = (coord) => {
       // Place city directly (Civ-like)
+      if (!selectedRepo) return;
       upsertManualRepoEntry({
         repoPath: selectedRepo.path,
         repoName: selectedRepo.name,

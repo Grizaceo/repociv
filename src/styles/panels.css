@@ -219,6 +219,8 @@
   right: 8px;
   bottom: 180px;
   width: 380px;
+  min-width: 300px;
+  max-width: 600px;
   background: var(--ui-panel-bg);
   border: 2px solid var(--ui-border);
   border-radius: 4px;
@@ -229,6 +231,8 @@
   transition:
     transform 0.25s ease,
     opacity 0.25s ease;
+  resize: horizontal;
+  overflow: hidden;
 }
 #side-panel.hidden {
   transform: translateX(20px);
@@ -367,28 +371,71 @@
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.5;
+  position: relative;
 }
 .chat-msg {
   background: rgba(200, 168, 75, 0.06);
   border-left: 2px solid var(--ui-gold);
-  padding: 6px 10px;
-  border-radius: 0 3px 3px 0;
+  padding: 8px 12px;
+  border-radius: 0 8px 8px 0;
   color: var(--ui-text);
   white-space: pre-wrap;
   word-break: break-word;
   animation: slideUp 0.25s;
+  max-width: 82%;
+  align-self: flex-start;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
 }
 .chat-msg.user {
   border-left-color: var(--res-science);
   background: rgba(91, 155, 213, 0.08);
+  border-radius: 8px 0 0 8px;
+  border-left: none;
+  border-right: 2px solid var(--res-science);
+  align-self: flex-end;
 }
 .chat-msg-meta {
   font-size: 9px;
   color: var(--ui-text-dim);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
   font-family: var(--font-ui);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.chat-msg-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.chat-body {
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.chat-scroll-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  background: var(--ui-gold);
+  color: var(--ui-dark);
+  border: 1px solid var(--ui-border);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  z-index: 101;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  transition: opacity 0.2s;
+}
+.chat-scroll-btn:hover {
+  opacity: 0.85;
+}
+.chat-scroll-btn.hidden {
+  display: none;
 }
 #operation-ticker {
   padding: 6px 12px;

@@ -104,6 +104,24 @@ async function bootstrap() {
   // Initialize UI Libraries (Icons, Animations)
   initExternalLibs();
 
+  // Restore saved side panel width
+  const savedWidth = localStorage.getItem('repociv-side-panel-width');
+  const panel = document.getElementById('side-panel');
+  if (panel && savedWidth) {
+    panel.style.width = `${savedWidth}px`;
+  }
+
+  // Save panel width on resize (debounced)
+  if (panel) {
+    let resizeTimeout: ReturnType<typeof setTimeout>;
+    new ResizeObserver(() => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        localStorage.setItem('repociv-side-panel-width', panel.offsetWidth.toString());
+      }, 300);
+    }).observe(panel);
+  }
+
   // Initial resources from world
   updateResource('gold', world.resources.gold);
   updateResource('science', world.resources.science);
