@@ -222,7 +222,7 @@
   min-width: 300px;
   max-width: 600px;
   background: var(--ui-panel-bg);
-  border: 2px solid var(--ui-border);
+  border:2px solid var(--ui-border);
   border-radius: 4px;
   z-index: 12;
   display: flex;
@@ -231,8 +231,7 @@
   transition:
     transform 0.25s ease,
     opacity 0.25s ease;
-  resize: horizontal;
-  overflow: hidden;
+  /* Resize handled by JS (resize:horizontal requires overflow!=visible which breaks flex) */
 }
 #side-panel.hidden {
   transform: translateX(20px);

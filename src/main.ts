@@ -120,6 +120,39 @@ async function bootstrap() {
         localStorage.setItem('repociv-side-panel-width', panel.offsetWidth.toString());
       }, 300);
     }).observe(panel);
+
+    // Add resize handle for dragging
+    const resizeHandle = document.createElement('div');
+    resizeHandle.style.cssText = 'position:absolute; left:0; top:0; bottom:0; width:6px; cursor:col-resize; z-index:13;';
+    panel.appendChild(resizeHandle);
+
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      startX = e.clientX;
+      startWidth = panel.offsetWidth;
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      const dx = startX - e.clientX; // Positive when dragging left (making wider)
+      const newWidth = Math.max(300, Math.min(600, startWidth + dx));
+      panel.style.width = `${newWidth}px`;
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!isResizing) return;
+      isResizing = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      localStorage.setItem('repociv-side-panel-width', panel.offsetWidth.toString());
+    });
   }
 
   // Initial resources from world
