@@ -90,10 +90,11 @@
             <span id="side-hero-name">—</span>
             <span id="side-hero-state" class="state-idle">idle</span>
           </div>
-          <div class="model-selector-wrapper">
-            <select id="model-selector" title="Modelo de Inteligencia">
-              <!-- Rellenado dinámicamente -->
-            </select>
+          <div id="model-selector-wrapper" class="model-selector-wrapper">
+            <div class="provider-selectors">
+              <select id="provider-selector" title="Proveedor de IA" aria-label="Proveedor de IA"></select>
+              <select id="model-selector" title="Modelo de IA" aria-label="Modelo de IA"></select>
+            </div>
           </div>
           <button id="side-panel-close" title="Cerrar [Esc]" aria-label="Cerrar panel lateral">✕</button>
         </div>

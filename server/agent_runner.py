@@ -125,7 +125,7 @@ def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
 
 
 def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
-              command_id: str | None = None) -> None:
+              command_id: str | None = None, provider: str = "", model: str = "") -> None:
     mission_id = command_id or str(uuid.uuid4())[:8]
     quest_name = generate_quest_name(mission)
     started_at = time.time()
@@ -176,7 +176,7 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
                      "durationSeconds": 120, "missionId": mission_id})
     send_to_repociv({"type": "unit_state", "unit": unit_id, "state": "working"})
 
-    success, output = _execute_streaming(unit_id, mission_id, mission, working_dir, city_id)
+    success, output = _execute_streaming(unit_id, mission_id, mission, working_dir, city_id, provider=provider, model=model)
 
     duration = time.time() - started_at
 
@@ -225,18 +225,36 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
 
 def _execute_streaming(unit_id: str, mission_id: str, mission: str,
                        working_dir: str | None = None,
-                       city_id: str = "") -> tuple[bool, str]:
+                       city_id: str = "",
+                       provider: str = "",
+                       model: str = "") -> tuple[bool, str]:
     config = _get_agent_config(unit_id)
     base = unit_id.split("-")[0].upper()
 
     if _container_mode_enabled():
         return _run_container_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
+    # ── Provider override from chat UI ──────────────────────────────────────
+    # If the user selected a specific provider+model, use it directly
+    # instead of the default cascade.
+    if provider and provider != "auto":
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
+                          "text": f"[transport: {provider}]\n"})
+        if provider == "openclaw" and _has_openclaw():
+            return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model)
+        if provider == "claude-code" and _has_claude_code():
+            return _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model)
+        if provider == "hermes":
+            return _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model)
+        # Unknown provider — fall through to cascade with a warning
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
+                          "text": f"[warn: proveedor '{provider}' no reconocido, usando cascade]\n"})
+
+    # ── Default cascade: hermes → claude-code → openclaw ────────────────────
     if base == "OPENCLAW":
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: openclaw]\n"})
         return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
-    # Adapter selection: hermes → claude-code → openclaw
     send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: hermes]\n"})
     success, output = _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
     if success:
@@ -358,7 +376,8 @@ def _find_claude_code() -> str | None:
 def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
                                 config: dict[str, Any],
                                 working_dir: str | None = None,
-                                city_id: str = "") -> tuple[bool, str]:
+                                city_id: str = "",
+                                model: str = "") -> tuple[bool, str]:
     claude_bin = _find_claude_code()
     if not claude_bin:
         text = "[claude-code error] binary not found in PATH, ~/.npm-global/bin or ~/.local/bin\n"
@@ -371,7 +390,11 @@ def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
     full_prompt = (
         f"{system_prompt}{spatial}\n\n{mission}" if system_prompt else f"{spatial}\n\n{mission}"
     )
-    cmd = [claude_bin, "--print", "--dangerously-skip-permissions", full_prompt]
+    cmd = [claude_bin, "--print", "--dangerously-skip-permissions"]
+    # If a specific model was requested via UI, pass it to claude CLI
+    if model:
+        cmd.extend(["--model", model])
+    cmd.append(full_prompt)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, bufsize=1, cwd=working_dir or None)
     output_buf: list[str] = []
@@ -428,7 +451,8 @@ def _run_cursor_streaming(unit_id: str, mission_id: str, mission: str,
 def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
                              config: dict[str, Any],
                              working_dir: str | None = None,
-                             city_id: str = "") -> tuple[bool, str]:
+                             city_id: str = "",
+                             model: str = "") -> tuple[bool, str]:
     if config.get("stateful", True):
         session_id = f"repociv-{unit_id.lower()}"
     else:
@@ -445,6 +469,9 @@ def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
     full_message = f"{spatial}\n\n{mission}"
     cmd = [openclaw_bin, "agent", "--agent", config["agent"],
            "--session-id", session_id, "--message", full_message]
+    # If a specific model was requested via UI, pass it to openclaw
+    if model:
+        cmd.extend(["--model", model])
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=working_dir or None)
     output_buf: list[str] = []
     assert proc.stdout is not None
@@ -459,10 +486,11 @@ def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
 def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
                            config: dict[str, Any] | None = None,
                            working_dir: str | None = None,
-                           city_id: str = "") -> tuple[bool, str]:
+                           city_id: str = "",
+                           model: str = "") -> tuple[bool, str]:
     HERMES_URL   = os.environ.get("HERMES_URL",   "http://localhost:8642/v1/chat/completions")
     HERMES_KEY   = os.environ.get("HERMES_KEY",   "davi-voice-bridge-2026")
-    HERMES_MODEL = os.environ.get("HERMES_MODEL", "hermes-agent")
+    HERMES_MODEL = model or os.environ.get("HERMES_MODEL", "hermes-agent")
 
     cfg = config if config is not None else _get_agent_config(unit_id)
     spatial = _spatial_context_block(city_id, working_dir)

@@ -762,9 +762,9 @@ def _configure_agent_runner() -> None:
 
 
 def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
-              command_id: str | None = None) -> None:
+              command_id: str | None = None, provider: str = "", model: str = "") -> None:
     _configure_agent_runner()
-    return _agent_runner.run_agent(unit_id, city_id, mission, agent_type, command_id)
+    return _agent_runner.run_agent(unit_id, city_id, mission, agent_type, command_id, provider=provider, model=model)
 
 
 def _execute_streaming(unit_id: str, mission_id: str, mission: str,
@@ -788,6 +788,97 @@ def _has_claude_code() -> bool:
 
 def _has_cursor() -> bool:
     return _agent_runner._has_cursor()
+
+
+# ─── Provider registry ────────────────────────────────────────────────────────
+
+# Each provider entry: { id, name, env, models, defaultModel }
+# `env` = environment variable prefix to check (empty = native/always-available)
+# `models` = known model IDs for this provider
+# The frontend uses this to populate provider+model dropdowns dynamically.
+_PROVIDER_REGISTRY: list[dict[str, Any]] = [
+    {
+        "id": "hermes",
+        "name": "Hermes",
+        "env": "HERMES_URL",
+        "transport": "hermes",
+        "defaultModel": "hermes-agent",
+        "models": [
+            {"id": "hermes-agent", "name": "Hermes Agent (default)"},
+        ],
+    },
+    {
+        "id": "claude-code",
+        "name": "Claude Code",
+        "env": "",  # detected via PATH (claude binary)
+        "transport": "claude-code",
+        "defaultModel": "claude-sonnet-4",
+        "models": [
+            {"id": "claude-sonnet-4", "name": "Claude Sonnet 4"},
+            {"id": "claude-opus-4", "name": "Claude Opus 4"},
+            {"id": "claude-haiku-3.5", "name": "Claude Haiku 3.5"},
+        ],
+    },
+    {
+        "id": "openclaw",
+        "name": "OpenClaw",
+        "env": "",  # detected via PATH (openclaw binary)
+        "transport": "openclaw",
+        "defaultModel": "anthropic/claude-sonnet-4",
+        "models": [
+            {"id": "anthropic/claude-sonnet-4", "name": "Claude Sonnet 4 (via OpenRouter)"},
+            {"id": "anthropic/claude-opus-4", "name": "Claude Opus 4 (via OpenRouter)"},
+            {"id": "openai/gpt-4o", "name": "GPT-4o (via OpenRouter)"},
+            {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini (via OpenRouter)"},
+            {"id": "google/gemini-2.5-pro", "name": "Gemini 2.5 Pro"},
+            {"id": "deepseek/deepseek-v3", "name": "DeepSeek V3"},
+            {"id": "minimax/minimax-m2.5", "name": "MiniMax M2.5"},
+        ],
+    },
+]
+
+
+def _get_providers() -> dict[str, Any]:
+    """Return available providers and their models for the chat UI.
+
+    A provider is "available" if:
+      - Its env var is set (e.g. HERMES_URL), OR
+      - Its binary is found in PATH (claude-code, openclaw), OR
+      - It has no env/binary requirement (always listed).
+    """
+    providers = []
+    for p in _PROVIDER_REGISTRY:
+        env_var = p.get("env", "")
+        available = True
+        if env_var:
+            # Provider needs an env var to be considered available
+            val = os.environ.get(env_var, "")
+            if not val:
+                available = False
+        transport = p.get("transport", "")
+        if transport == "claude-code":
+            available = _has_claude_code()
+        elif transport == "openclaw":
+            available = _has_openclaw()
+        providers.append({
+            "id": p["id"],
+            "name": p["name"],
+            "transport": transport,
+            "available": available,
+            "defaultModel": p["defaultModel"],
+            "models": p["models"],
+        })
+    default_transport = "hermes"
+    if not any(p["available"] and p["transport"] == "hermes" for p in providers):
+        # If hermes not available, pick first available
+        for p in providers:
+            if p["available"]:
+                default_transport = p["transport"]
+                break
+    return {
+        "defaultTransport": default_transport,
+        "providers": providers,
+    }
 
 
 def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
@@ -896,7 +987,10 @@ def _dispatch_command(cmd: Command) -> None:
         city = str(payload.get("city", cmd.target or "main"))
         mission = str(payload.get("mission") or _default_mission_for_command(cmd))
         agent_type = str(payload.get("agentType", "hero"))
-        run_agent(unit, city, mission, agent_type, cmd.id)
+        # Provider/model override from chat UI (optional)
+        provider = str(payload.get("provider", ""))
+        model = str(payload.get("model", ""))
+        run_agent(unit, city, mission, agent_type, cmd.id, provider=provider, model=model)
         _register_issue_run(payload, cmd.id)
         return
 
@@ -1116,6 +1210,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         if path == "/agents/capabilities":
             self._json(capabilities_snapshot())
+            return
+
+        if path == "/api/providers":
+            self._json(_get_providers())
             return
 
         if path == "/metrics":

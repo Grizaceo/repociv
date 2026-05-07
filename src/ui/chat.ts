@@ -1,6 +1,7 @@
 // ─── RepoCiv — Side panel: Chat / Git / Files (Civ V Aesthetic) ────────────────
 import type { Unit } from '../types.ts';
 import { trapFocus } from './focusTrap.ts';
+import { bridgeHeaders } from '../bridgeEnv.ts';
 
 let activeChatUnit: string | null = null;
 export const chatBuffers = new Map<string, string>();
@@ -116,6 +117,19 @@ function attachCopyListeners(root: HTMLElement, unitId: string) {
 
 // ─── Panel lifecycle ─────────────────────────────────────────────────────────
 
+// Provider/model state
+interface ProviderInfo {
+  id: string;
+  name: string;
+  transport: string;
+  available: boolean;
+  defaultModel: string;
+  models: { id: string; name: string }[];
+}
+let _providers: ProviderInfo[] = [];
+let _selectedProvider = "";
+let _selectedModel = "";
+
 export function openSidePanel(unit: Unit) {
   const panel = document.getElementById('side-panel');
   if (!panel) return;
@@ -136,22 +150,8 @@ export function openSidePanel(unit: Unit) {
     stateEl.className = `state-${unit.state}`;
   }
 
-  // Model selector dropdown
-  const selector = document.getElementById('model-selector') as HTMLSelectElement;
-  if (selector) {
-    selector.innerHTML = '';
-    const base = unit.id.split('-')[0]?.toUpperCase();
-    const options: string[] =
-      base === 'DAVI' || base === 'LEXO'
-        ? ['Hermes: minimax-m2.6', 'Hermes: claude-3-haiku', 'LM Studio: llama-3 (Local)']
-        : ['OpenClaw: gemini', 'OpenClaw: codex', 'LM Studio: phi-3 (Local)'];
-    options.forEach((opt) => {
-      const el = document.createElement('option');
-      el.value = opt;
-      el.textContent = opt;
-      selector.appendChild(el);
-    });
-  }
+  // Provider + Model selectors
+  initProviderSelectors(unit);
 
   renderChatBuffer(unit.id);
 
@@ -178,6 +178,147 @@ export function openSidePanel(unit: Unit) {
   // Re-init icons if needed for dynamic content
   if ((window as unknown as Record<string, unknown>)['lucide'])
     (window as unknown as Record<string, { createIcons: () => void }>)['lucide']!.createIcons();
+}
+
+function initProviderSelectors(_unit: Unit) {
+  const wrapper = document.getElementById('model-selector-wrapper');
+  if (!wrapper) return;
+
+  // Build dual-select UI if not already built
+  if (!document.getElementById('provider-selector')) {
+    wrapper.innerHTML = `
+      <div class="provider-selectors">
+        <select id="provider-selector" title="Proveedor de IA" aria-label="Proveedor de IA"></select>
+        <select id="model-selector" title="Modelo de IA" aria-label="Modelo de IA"></select>
+      </div>
+    `;
+    const provSel = document.getElementById('provider-selector') as HTMLSelectElement;
+    provSel.addEventListener('change', () => {
+      _selectedProvider = provSel.value;
+      populateModels();
+      persistProviderSelection();
+    });
+    const modelSel = document.getElementById('model-selector') as HTMLSelectElement;
+    modelSel.addEventListener('change', () => {
+      _selectedModel = modelSel.value;
+      persistProviderSelection();
+    });
+  }
+
+  // Fetch providers from bridge
+  fetch('/api/providers', { headers: bridgeHeaders() })
+    .then((r) => r.json())
+    .then((data: { defaultTransport: string; providers: ProviderInfo[] }) => {
+      _providers = data.providers;
+      const provSel = document.getElementById('provider-selector') as HTMLSelectElement;
+      provSel.innerHTML = '';
+
+      // Add "auto" option
+      const autoOpt = document.createElement('option');
+      autoOpt.value = 'auto';
+      autoOpt.textContent = '⚡ Auto (cascade)';
+      provSel.appendChild(autoOpt);
+
+      let hasSelection = false;
+      for (const p of _providers) {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.available ? p.name : `${p.name} (no disponible)`;
+        opt.disabled = !p.available;
+        provSel.appendChild(opt);
+        if (p.available && p.transport === data.defaultTransport && !hasSelection) {
+          provSel.value = p.id;
+          _selectedProvider = p.id;
+          hasSelection = true;
+        }
+      }
+
+      // Restore persisted selection if available
+      const saved = loadProviderSelection();
+      if (saved.provider) {
+        const exists = _providers.find((p) => p.id === saved.provider && p.available);
+        if (exists) {
+          provSel.value = saved.provider;
+          _selectedProvider = saved.provider;
+        }
+      }
+
+      populateModels(saved.model);
+    })
+    .catch(() => {
+      // Fallback: keep existing hardcoded behavior
+      const provSel = document.getElementById('provider-selector') as HTMLSelectElement;
+      if (provSel) {
+        provSel.innerHTML = '<option value="auto">⚡ Auto (cascade)</option><option value="hermes" selected>Hermes</option>';
+        _selectedProvider = 'hermes';
+      }
+      populateModels();
+    });
+}
+
+function populateModels(savedModel?: string) {
+  const modelSel = document.getElementById('model-selector') as HTMLSelectElement;
+  if (!modelSel) return;
+  modelSel.innerHTML = '';
+
+  if (_selectedProvider === 'auto' || !_selectedProvider) {
+    modelSel.disabled = true;
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'Auto';
+    modelSel.appendChild(opt);
+    _selectedModel = '';
+    return;
+  }
+
+  modelSel.disabled = false;
+  const provider = _providers.find((p) => p.id === _selectedProvider);
+  if (!provider) return;
+
+  for (const m of provider.models) {
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = m.name;
+    modelSel.appendChild(opt);
+  }
+
+  // Restore saved model or use provider default
+  if (savedModel) {
+    const exists = provider.models.find((m) => m.id === savedModel);
+    if (exists) {
+      modelSel.value = savedModel;
+      _selectedModel = savedModel;
+      return;
+    }
+  }
+  modelSel.value = provider.defaultModel;
+  _selectedModel = provider.defaultModel;
+}
+
+function persistProviderSelection() {
+  try {
+    localStorage.setItem('repociv:provider', JSON.stringify({
+      provider: _selectedProvider,
+      model: _selectedModel,
+    }));
+  } catch {
+    // localStorage full or unavailable
+  }
+}
+
+function loadProviderSelection(): { provider: string; model: string } {
+  try {
+    const raw = localStorage.getItem('repociv:provider');
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // ignore
+  }
+  return { provider: '', model: '' };
+}
+
+/** Get the currently selected provider and model for sending to the bridge. */
+export function getSelectedProvider(): { provider: string; model: string } {
+  return { provider: _selectedProvider, model: _selectedModel };
 }
 
 export function closeSidePanel() {

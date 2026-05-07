@@ -62,6 +62,7 @@ import {
   toggleLogPanel,
   closeLogPanel,
   isLogPanelOpen,
+  getSelectedProvider,
 } from './ui/index.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from './ui/settingsPanel.ts';
 import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
@@ -573,12 +574,19 @@ function wireHUD(
     if (!isSidePanelOpen()) openSidePanel(unit);
     appendUserMessage(unit.id, text);
 
-    bridge.send('unit_command', {
+    // Include provider + model selection from chat UI
+    const { provider, model } = getSelectedProvider();
+    const payload: Record<string, unknown> = {
       unit: unit.id,
       city: cityHere?.id ?? 'main',
       mission: text,
       agentType: unit.type,
-    });
+    };
+    if (provider && provider !== 'auto') {
+      payload.provider = provider;
+      if (model) payload.model = model;
+    }
+    bridge.send('unit_command', payload);
     state.setUnitState(unit.id, 'working');
     input.value = '';
   };
