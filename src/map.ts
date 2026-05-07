@@ -241,42 +241,66 @@ export async function generateWorld(): Promise<World> {
     repos = repos.filter((repo) => selectedRepoPaths.has(repo.path));
   }
 
-  const manualLayout = loadManualLayout();
-  const manualRepoMap = new Map<string, Axial>();
-  for (const entry of manualLayout.entries) {
-    manualRepoMap.set(entry.repoPath, { q: entry.coord.q, r: entry.coord.r });
-    if (!repos.some((repo) => repo.path === entry.repoPath)) {
-      repos.push({
-        name: entry.repoName,
-        path: entry.repoPath,
-        population: 0,
-        extensions: {},
-        gold: 0,
-        lastCommitDays: 999,
-        isLegacy: false,
-        hasGit: false,
-      });
+ const manualLayout = loadManualLayout();
+ const manualRepoMap = new Map<string, Axial>();
+ for (const entry of manualLayout.entries) {
+   manualRepoMap.set(entry.repoPath, { q: entry.coord.q, r: entry.coord.r });
+   if (!repos.some((repo) => repo.path === entry.repoPath)) {
+     repos.push({
+       name: entry.repoName,
+       path: entry.repoPath,
+       population: 0,
+       extensions: {},
+       gold: 0,
+       lastCommitDays: 999,
+       isLegacy: false,
+       hasGit: false,
+     });
+   }
+ }
+  // Sort: preserve selection order if available, otherwise most-populated first → capital
+  if (selectedRepoPaths !== null) {
+    // Preserve selection order: selectedRepoPaths is a Set, convert to Array to iterate in insertion order
+    const selectedOrder = Array.from(selectedRepoPaths);
+    const orderedRepos: ScannedRepo[] = [];
+    for (const path of selectedOrder) {
+      const found = repos.find((r) => r.path === path);
+      if (found) orderedRepos.push(found);
     }
+    // Add any remaining repos that weren't in selectedRepoPaths (e.g., manual entries)
+    for (const repo of repos) {
+      if (!selectedOrder.includes(repo.path)) orderedRepos.push(repo);
+    }
+    repos = orderedRepos;
+  } else {
+    repos.sort((a, b) => b.population - a.population);
+  }
+ // Inferred terrain per repo
+ const reposWithTerrain = repos.map((r) => ({
+   ...r,
+   terrain: r.isLegacy
+     ? ('ice' as Terrain)
+     : r.population === 0
+       ? ('ocean' as Terrain)
+       : inferTerrain(r.extensions),
+   science: Math.min(99, Math.floor(r.gold / 10)),
+   production: Math.min(99, Math.floor(r.gold / 50)),
+   manualCoord: manualRepoMap.get(r.path),
+ }));
+  // All selected repos are cities (regardless of population)
+  // Orphans only exist when there's no selection and population <= 5
+  let cityRepos: typeof reposWithTerrain;
+  let orphanRepos: typeof reposWithTerrain;
+  if (selectedRepoPaths !== null) {
+    // With selection: all selected repos are cities
+    cityRepos = reposWithTerrain;
+    orphanRepos = [];
+  } else {
+    // Without selection: original behavior
+    cityRepos = reposWithTerrain.filter((r) => r.population > 5 || !!r.manualCoord);
+    orphanRepos = reposWithTerrain.filter((r) => r.population <= 5 && !r.manualCoord);
   }
 
-  // Sort: most-populated first → capital
-  repos.sort((a, b) => b.population - a.population);
-
-  // Inferred terrain per repo
-  const reposWithTerrain = repos.map((r) => ({
-    ...r,
-    terrain: r.isLegacy
-      ? ('ice' as Terrain)
-      : r.population === 0
-        ? ('ocean' as Terrain)
-        : inferTerrain(r.extensions),
-    science: Math.min(99, Math.floor(r.gold / 10)),
-    production: Math.min(99, Math.floor(r.gold / 50)),
-    manualCoord: manualRepoMap.get(r.path),
-  }));
-
-  const cityRepos = reposWithTerrain.filter((r) => r.population > 5 || !!r.manualCoord);
-  const orphanRepos = reposWithTerrain.filter((r) => r.population <= 5 && !r.manualCoord);
   const maxAutoCoords = Math.max(cityRepos.length * 4, cityRepos.length + 16);
   const cityCoords = spiralCoords({ q: 0, r: 0 }, maxAutoCoords);
   const occupiedCoords = new Set<string>();
