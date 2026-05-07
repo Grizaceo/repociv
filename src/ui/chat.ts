@@ -191,7 +191,13 @@ export function appendUserMessage(unitId: string, text: string) {
   const container = document.getElementById('chat-messages');
   if (!container || activeChatUnit !== unitId) return;
 
-  // ── User message bubble (right-aligned) ───────────────────────
+  // Finalize previous agent bubble (turn it into history)
+  const prevBubble = document.getElementById(`chat-current-${unitId}`);
+  if (prevBubble) {
+    prevBubble.id = ''; // Remove live ID so it becomes regular history
+  }
+
+  // ── User message bubble (right-aligned) ──────────────────────
   const msg = document.createElement('div');
   msg.className = 'chat-msg user';
   msg.dataset['raw'] = text;

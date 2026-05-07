@@ -144,6 +144,8 @@ async function bootstrap() {
       const dx = startX - e.clientX; // Positive when dragging left (making wider)
       const newWidth = Math.max(300, Math.min(600, startWidth + dx));
       panel.style.width = `${newWidth}px`;
+      // Force repaint to avoid black screen during drag
+      void panel.offsetHeight;
     });
 
     document.addEventListener('mouseup', () => {
