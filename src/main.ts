@@ -56,6 +56,9 @@ import {
   toggleTaskPanel,
   closeTaskPanel,
   isTaskPanelOpen,
+  togglePendingPanel,
+  closePendingPanel,
+  isPendingPanelOpen,
   toggleLogPanel,
   closeLogPanel,
   isLogPanelOpen,
@@ -181,6 +184,7 @@ async function bootstrap() {
   document.getElementById('btn-replay')?.addEventListener('click', toggleReplayPanel);
   document.getElementById('btn-observability')?.addEventListener('click', toggleObservabilityPanel);
   document.getElementById('btn-tasks')?.addEventListener('click', toggleTaskPanel);
+  document.getElementById('btn-pending')?.addEventListener('click', togglePendingPanel);
   document.getElementById('btn-log')?.addEventListener('click', toggleLogPanel);
   document.getElementById('btn-harnesses')?.addEventListener('click', () => {
     toggleHarnessPanel();
@@ -357,6 +361,10 @@ function wireHUD(
       }
       if (isTaskPanelOpen()) {
         closeTaskPanel();
+        return;
+      }
+      if (isPendingPanelOpen()) {
+        closePendingPanel();
         return;
       }
       if (isLogPanelOpen()) {

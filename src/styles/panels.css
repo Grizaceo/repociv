@@ -2415,3 +2415,217 @@ kbd {
   background: rgba(212, 175, 55, 0.24);
   border-color: var(--ui-gold);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Pending Tracker Panel (Fase F)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#pending-panel {
+  position: absolute;
+  top: 38px;
+  right: 8px;
+  width: 420px;
+  max-height: calc(100vh - 54px);
+  background: var(--ui-panel-bg);
+  border: 2px solid var(--ui-border);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+}
+#pending-panel.hidden {
+  display: none;
+}
+
+.pending-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+.pending-title {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--ui-gold-bright);
+}
+.pending-header button {
+  background: none;
+  border: none;
+  color: var(--ui-text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+}
+.pending-header button:hover {
+  color: var(--ui-gold-bright);
+}
+
+.pending-body {
+  overflow-y: auto;
+  padding: 8px;
+  flex: 1;
+}
+
+.pending-offline {
+  padding: 16px;
+  text-align: center;
+  color: var(--civ-happiness);
+}
+.pending-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--ui-text-dim);
+  font-style: italic;
+}
+
+/* ─── Group ───────────────────────────────────────────────────────────── */
+.pending-group {
+  margin-bottom: 8px;
+}
+.pending-group-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--gold-mid);
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(90, 74, 46, 0.4);
+  margin-bottom: 4px;
+}
+
+/* ─── Item ────────────────────────────────────────────────────────────── */
+.pending-item {
+  border: 1px solid transparent;
+  border-radius: 3px;
+  margin-bottom: 2px;
+  transition: border-color 0.15s;
+}
+.pending-item:hover {
+  border-color: rgba(90, 74, 46, 0.5);
+}
+.pending-item.expanded {
+  border-color: var(--ui-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.pending-item-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.pending-id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  flex-shrink: 0;
+  min-width: 30px;
+}
+.pending-title {
+  flex: 1;
+  font-size: 11px;
+  color: var(--ui-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pending-state {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.btn-resolve {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid rgba(91, 155, 91, 0.3);
+  color: #5b9b5b;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 1px 5px;
+  opacity: 0.6;
+  transition: opacity 0.15s, background 0.15s;
+}
+.btn-resolve:hover {
+  opacity: 1;
+  background: rgba(91, 155, 91, 0.15);
+  border-color: #5b9b5b;
+}
+
+/* ─── Detail ──────────────────────────────────────────────────────────── */
+.pending-detail {
+  padding: 4px 8px 8px 44px;
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  line-height: 1.5;
+  border-top: 1px solid rgba(90, 74, 46, 0.2);
+  white-space: pre-wrap;
+}
+
+/* ─── Form ────────────────────────────────────────────────────────────── */
+.pending-form {
+  border-top: 1px solid var(--ui-border);
+  padding: 8px;
+  margin-top: 4px;
+}
+.pending-form-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ui-text-dim);
+  margin-bottom: 6px;
+}
+.pending-form-row {
+  display: flex;
+  gap: 4px;
+}
+.pending-form-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  font-size: 11px;
+  padding: 4px 6px;
+  font-family: var(--font-ui);
+  outline: none;
+  min-width: 0;
+}
+.pending-form-input:focus {
+  border-color: var(--ui-gold);
+}
+.pending-form-select {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  font-size: 11px;
+  padding: 4px;
+  font-family: var(--font-ui);
+  outline: none;
+  flex-shrink: 0;
+  width: 68px;
+}
+.pending-form-btn {
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  color: var(--ui-gold);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.pending-form-btn:hover {
+  background: rgba(212, 175, 55, 0.28);
+}

@@ -52,6 +52,12 @@ export {
   toggleTaskPanel,
 } from './taskPanel';
 export {
+  openPendingPanel,
+  closePendingPanel,
+  isPendingPanelOpen,
+  togglePendingPanel,
+} from './pendingPanel';
+export {
   openLogPanel,
   closeLogPanel,
   isLogPanelOpen,
