@@ -301,6 +301,19 @@ export async function generateWorld(): Promise<World> {
     orphanRepos = reposWithTerrain.filter((r) => r.population <= 5 && !r.manualCoord);
   }
 
+  // Find the "gris" repo and make it the capital (first in array, at 0,0)
+  const grisIndex = cityRepos.findIndex((r) => r.path.endsWith('gris') || r.name === 'gris');
+  if (grisIndex > 0) {
+    // Move to front
+    const [grisRepo] = cityRepos.splice(grisIndex, 1);
+    // Force capital to be at (0,0)
+    grisRepo.manualCoord = { q: 0, r: 0 };
+    cityRepos.unshift(grisRepo);
+  } else if (grisIndex === 0) {
+    // Already first, just force to (0,0)
+    cityRepos[0].manualCoord = { q: 0, r: 0 };
+  }
+
   const maxAutoCoords = Math.max(cityRepos.length * 4, cityRepos.length + 16);
   const cityCoords = spiralCoords({ q: 0, r: 0 }, maxAutoCoords);
   const occupiedCoords = new Set<string>();
