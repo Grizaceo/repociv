@@ -246,11 +246,12 @@ function initProviderSelectors(_unit: Unit) {
       populateModels(saved.model);
     })
     .catch(() => {
-      // Fallback: keep existing hardcoded behavior
+      // Fallback: use auto (cascade) so the bridge picks the best provider
       const provSel = document.getElementById('provider-selector') as HTMLSelectElement;
       if (provSel) {
-        provSel.innerHTML = '<option value="auto">⚡ Auto (cascade)</option><option value="hermes" selected>Hermes</option>';
-        _selectedProvider = 'hermes';
+        provSel.innerHTML = '<option value="auto" selected>⚡ Auto (cascade)</option><option value="hermes">Hermes</option>';
+        _selectedProvider = 'auto';
+        _selectedModel = '';
       }
       populateModels();
     });
