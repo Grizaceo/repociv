@@ -181,6 +181,15 @@ function canRunCommand(binary: string): boolean {
     execSync(`command -v "${binary}"`, { stdio: 'ignore' });
     return true;
   } catch {
+    // command -v fails for Windows .exe binaries in some WSL PATH configurations — try direct execution
+    if (binary.endsWith('.exe')) {
+      try {
+        execSync(`"${binary}" -NoProfile -Command exit`, { stdio: 'ignore' });
+        return true;
+      } catch {
+        return false;
+      }
+    }
     return false;
   }
 }
@@ -196,15 +205,19 @@ function tryPickWithWindowsDialog(executable: string): string | null {
       executable,
       [
         'Add-Type -AssemblyName System.Windows.Forms',
+        // AllowSetForegroundWindow(ASFW_ANY) lets any process claim foreground — needed when called from WSL
+        'Add-Type -TypeDefinition "using System; using System.Runtime.InteropServices; public static class WinFg { [DllImport(""user32.dll"")] public static extern bool AllowSetForegroundWindow(uint pid); [DllImport(""user32.dll"")] public static extern bool SetForegroundWindow(IntPtr h); }"',
         '$hostForm = New-Object System.Windows.Forms.Form',
         '$hostForm.TopMost = $true',
         '$hostForm.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen',
-        '$hostForm.Size = New-Object System.Drawing.Size(1,1)',
-        '$hostForm.ShowInTaskbar = $false',
-        '$hostForm.Opacity = 0',
+        '$hostForm.Width = 1',
+        '$hostForm.Height = 1',
         '$hostForm.Show()',
-        '$hostForm.Activate()',
+        '[WinFg]::AllowSetForegroundWindow([uint]0xFFFFFFFF)',
+        '[WinFg]::SetForegroundWindow($hostForm.Handle)',
         '$f = New-Object System.Windows.Forms.FolderBrowserDialog',
+        '$f.UseDescriptionForTitle = $true',
+        '$f.Description = "Selecciona una carpeta"',
         '$picked = $null',
         'if ($f.ShowDialog($hostForm) -eq [System.Windows.Forms.DialogResult]::OK) { $picked = $f.SelectedPath }',
         '$hostForm.Close()',
