@@ -389,3 +389,105 @@ class TestValidationContract:
         assert updated["goal"] == "second"
         read = wi.read_validation_contract("repo", "ISS-VC")
         assert read["goal"] == "second"
+
+
+# ── 17. Handoff artifacts ────────────────────────────────────────────────────
+
+
+class TestHandoffArtifacts:
+    def setup_method(self):
+        wi._reset()
+        _locks._reset()
+        self.tmp = tempfile.mkdtemp()
+        wi.init(Path(self.tmp))
+
+    def _init_issue(self):
+        wi.init_issue_workspace("repo", "ISS-HF")
+
+    def test_write_and_read_handoff(self):
+        self._init_issue()
+        payload = {
+            "completed_work": ["Fix auth module"],
+            "commands_run": ["git commit -m 'fix auth'"],
+            "files_changed": ["auth.py"],
+            "tests_run": ["pytest tests/test_auth.py"],
+            "open_risks": ["No test for edge case"],
+            "known_failures": [],
+            "recommended_next_role": "VALIDATOR",
+            "recommended_next_action": "Run full test suite",
+        }
+        handoff = wi.write_handoff("repo", "ISS-HF", "execute", "WORKER", payload)
+        assert handoff["role"] == "WORKER"
+        assert handoff["phase"] == "execute"
+        assert handoff["completedWork"] == ["Fix auth module"]
+        assert handoff["recommendedNextRole"] == "VALIDATOR"
+
+        read = wi.read_latest_handoff("repo", "ISS-HF")
+        assert read is not None
+        assert read["role"] == "WORKER"
+        assert read["completedWork"] == ["Fix auth module"]
+
+    def test_read_handoff_by_role(self):
+        self._init_issue()
+        wi.write_handoff("repo", "ISS-HF", "plan", "SCOUT", {
+            "completed_work": ["Analysis"],
+            "recommended_next_role": "WORKER",
+            "recommended_next_action": "Implement",
+        })
+        wi.write_handoff("repo", "ISS-HF", "execute", "WORKER", {
+            "completed_work": ["Implementation"],
+            "recommended_next_role": "VALIDATOR",
+            "recommended_next_action": "Validate",
+        })
+
+        worker = wi.read_latest_handoff("repo", "ISS-HF", role="WORKER")
+        assert worker is not None
+        assert worker["role"] == "WORKER"
+
+        scout = wi.read_latest_handoff("repo", "ISS-HF", role="SCOUT")
+        assert scout is not None
+        assert scout["role"] == "SCOUT"
+
+    def test_read_latest_returns_most_recent(self):
+        self._init_issue()
+        wi.write_handoff("repo", "ISS-HF", "step1", "SCOUT", {
+            "completed_work": ["First"],
+            "recommended_next_role": "WORKER",
+            "recommended_next_action": "Continue",
+        })
+        import time
+        time.sleep(0.05)  # ensure different mtime
+        wi.write_handoff("repo", "ISS-HF", "step2", "WORKER", {
+            "completed_work": ["Second"],
+            "recommended_next_role": "VALIDATOR",
+            "recommended_next_action": "Validate",
+        })
+
+        latest = wi.read_latest_handoff("repo", "ISS-HF")
+        assert latest is not None
+        assert latest["role"] == "WORKER"
+        assert latest["completedWork"] == ["Second"]
+
+    def test_read_handoff_missing(self):
+        self._init_issue()
+        assert wi.read_latest_handoff("repo", "ISS-HF") is None
+
+    def test_write_handoff_invalid_role(self):
+        self._init_issue()
+        with pytest.raises(ValueError, match="Unknown handoff role"):
+            wi.write_handoff("repo", "ISS-HF", "execute", "INVALID", {})
+
+    def test_write_handoff_creates_output_dir(self):
+        self._init_issue()
+        # Remove output dir to test creation
+        out_dir = wi._output_dir("repo", "ISS-HF")
+        if out_dir.exists():
+            import shutil
+            shutil.rmtree(out_dir)
+        handoff = wi.write_handoff("repo", "ISS-HF", "execute", "WORKER", {
+            "completed_work": ["test"],
+            "recommended_next_role": "",
+            "recommended_next_action": "",
+        })
+        assert handoff["role"] == "WORKER"
+        assert out_dir.exists()

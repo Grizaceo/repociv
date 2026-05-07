@@ -101,6 +101,7 @@ def build_step_mission(
     step: str,
     spec_context: str,
     prior_artifacts: list[tuple[str, str]] | None = None,
+    latest_handoff: dict[str, Any] | None = None,
 ) -> str:
     """Build a self-contained agent mission using TensorContext.
 
@@ -109,6 +110,7 @@ def build_step_mission(
       2. Prior artifact DCs (should_include): accumulated outputs from earlier
          steps, capped by ``_MAX_PRIOR_TOKENS`` chars and ``_MAX_PRIOR_ARTIFACTS``
          entries, then budget-pruned to fit ``_MISSION_BUDGET_TOKENS``.
+      3. Handoff DC (should_include): latest structured handoff from previous role.
 
     The assembled prompt is designed to be self-sufficient — the agent should
     not need to ask clarifying questions.
@@ -144,6 +146,26 @@ def build_step_mission(
                 metadata={"source": "artifact", "name": name, "type": "prior_output"},
                 deontic=DEONTIC_SHOULD,
             ))
+
+    # Handoff DC: structured context from previous role
+    if latest_handoff:
+        handoff_role = latest_handoff.get("role", "unknown")
+        handoff_work = latest_handoff.get("completedWork", [])
+        handoff_risks = latest_handoff.get("openRisks", [])
+        handoff_next = latest_handoff.get("recommendedNextAction", "")
+        handoff_text = (
+            f"Handoff del rol anterior ({handoff_role}):\n"
+            f"Trabajo completado: {', '.join(handoff_work) if handoff_work else '(ninguno)'}\n"
+        )
+        if handoff_risks:
+            handoff_text += f"Riesgos abiertos: {', '.join(handoff_risks)}\n"
+        if handoff_next:
+            handoff_text += f"Acción recomendada: {handoff_next}\n"
+        extra_dcs.append(ContextDirective(
+            text=handoff_text,
+            metadata={"source": "handoff", "role": handoff_role, "type": "role_handoff"},
+            deontic=DEONTIC_SHOULD,
+        ))
 
     return tc.build_mission_prompt(base_dc, extra_dcs, budget=_MISSION_BUDGET_TOKENS)
 
@@ -182,7 +204,8 @@ def dispatch_plan_step(
 
     step_idx = int(step_meta.get("stepIndex", 0))
     prior_artifacts = _wi.read_output_artifacts(repo, issue_id, up_to_step=step_idx)
-    mission = build_step_mission(step_description, spec, prior_artifacts)
+    latest_handoff = _wi.read_latest_handoff(repo, issue_id)
+    mission = build_step_mission(step_description, spec, prior_artifacts, latest_handoff)
 
     # ── Security Layer 1: Pre-dispatch Gate (Fase 1.5) ────────────────────
     harness = _sec.get_harness()
@@ -252,4 +275,30 @@ def dispatch_plan_step(
         # Direct dispatch (no retry) for HERMES, OPENCLAW, DAVI, etc.
         run_id = _run_agent_once(repo, issue_id, step_description, step_meta)
 
+    # ── Write handoff artifact ──────────────────────────────────────────────
+    try:
+        handoff_payload = {
+            "completed_work": [step_description],
+            "commands_run": [f"agent:{agent}", f"run_id:{run_id}"],
+            "files_changed": [],
+            "tests_run": [],
+            "open_risks": [],
+            "known_failures": [],
+            "recommended_next_role": _infer_next_role(agent),
+            "recommended_next_action": f"Continue with step {step_idx + 1}" if step_idx < int(step_meta.get("totalSteps", 0)) - 1 else "Validate and complete",
+        }
+        _wi.write_handoff(repo, issue_id, f"step{step_idx}", agent, handoff_payload)
+    except Exception as e:
+        logger.warning("Failed to write handoff for %s/%s step %d: %s", repo, issue_id, step_idx, e)
+
     return run_id
+
+
+def _infer_next_role(current_agent: str) -> str:
+    """Infer the next role in the pipeline based on the current agent."""
+    role_map = {
+        "SCOUT": "WORKER",
+        "WORKER": "VALIDATOR",
+        "VALIDATOR": "DAVI",
+    }
+    return role_map.get(current_agent.upper(), "DAVI")

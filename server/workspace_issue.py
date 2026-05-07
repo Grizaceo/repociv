@@ -568,3 +568,102 @@ def generate_contract_from_spec(repo: str, issue_id: str) -> dict[str, Any]:
     if "test" in spec_lower or "quality" in spec_lower or "lint" in spec_lower:
         contract["mustPassChecks"] = ["tests-pass"]
     return write_validation_contract(repo, issue_id, contract)
+
+
+# ── Handoff artifacts ────────────────────────────────────────────────────────
+
+_HANDOFF_VERSION = "1.0"
+_HANDOFF_AGENT_TYPES = frozenset({"SCOUT", "WORKER", "VALIDATOR", "DAVI"})
+
+
+def _handoff_path(repo: str, issue_id: str, phase_or_step: str, role: str) -> Path:
+    """Return path to a handoff JSON file."""
+    safe_role = "".join(c if c.isalnum() or c == "_" else "_" for c in role.upper())
+    safe_phase = "".join(c if c.isalnum() or c == "_" else "_" for c in phase_or_step.lower())
+    return _issue_dir(repo, issue_id) / "output" / f"handoff-{safe_phase}-{safe_role}.json"
+
+
+def write_handoff(
+    repo: str,
+    issue_id: str,
+    phase_or_step: str,
+    role: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Write a structured handoff artifact.
+
+    The handoff captures the work completed by one role so the next role
+    can pick it up without depending on context window.
+
+    Payload should include:
+      - completed_work: list[str]
+      - commands_run: list[str]
+      - files_changed: list[str]
+      - tests_run: list[str]
+      - open_risks: list[str]
+      - known_failures: list[str]
+      - recommended_next_role: str
+      - recommended_next_action: str
+    """
+    if role.upper() not in _HANDOFF_AGENT_TYPES and role.upper() not in {"ORCHESTRATOR"}:
+        raise ValueError(f"Unknown handoff role {role!r}. Expected one of: {sorted(_HANDOFF_AGENT_TYPES | {'ORCHESTRATOR'})}")
+
+    with _locks.hold(f"issue:{repo}:{issue_id}"):
+        handoff = {
+            "version": _HANDOFF_VERSION,
+            "repo": repo,
+            "issueId": issue_id,
+            "phase": phase_or_step,
+            "role": role.upper(),
+            "timestamp": _now_iso(),
+            "completedWork": payload.get("completed_work", []),
+            "commandsRun": payload.get("commands_run", []),
+            "filesChanged": payload.get("files_changed", []),
+            "testsRun": payload.get("tests_run", []),
+            "openRisks": payload.get("open_risks", []),
+            "knownFailures": payload.get("known_failures", []),
+            "recommendedNextRole": payload.get("recommended_next_role", ""),
+            "recommendedNextAction": payload.get("recommended_next_action", ""),
+        }
+        path = _handoff_path(repo, issue_id, phase_or_step, role)
+        _atomic_write(path, json.dumps(handoff, ensure_ascii=False, indent=2))
+        return handoff
+
+
+def read_latest_handoff(
+    repo: str, issue_id: str, *, role: str | None = None
+) -> dict[str, Any] | None:
+    """Read the latest handoff artifact for an issue.
+
+    If role is specified, only returns handoffs from that role.
+    Returns the most recent handoff by file modification time.
+    """
+    out_dir = _output_dir(repo, issue_id)
+    if not out_dir.exists():
+        return None
+
+    handoffs: list[tuple[Path, float]] = []
+    for path in out_dir.iterdir():
+        if not path.name.startswith("handoff-") or not path.name.endswith(".json"):
+            continue
+        if role:
+            # Filename format: handoff-<phase>-<role>.json
+            parts = path.stem.replace("handoff-", "").rsplit("-", 1)
+            if len(parts) == 2 and parts[1].upper() != role.upper():
+                continue
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue
+        handoffs.append((path, mtime))
+
+    if not handoffs:
+        return None
+
+    # Return the most recently modified
+    handoffs.sort(key=lambda x: x[1], reverse=True)
+    try:
+        data = json.loads(handoffs[0][0].read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
