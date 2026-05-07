@@ -68,3 +68,13 @@ export function removeManualRepoEntry(repoPath: string): ManualLayoutStore {
   saveManualLayout(next);
   return next;
 }
+
+export function updateManualRepoCoord(repoPath: string, coord: Axial): ManualLayoutStore | null {
+  const store = loadManualLayout();
+  const idx = store.entries.findIndex((e) => e.repoPath === repoPath);
+  if (idx === -1) return null;
+  store.entries[idx] = { ...store.entries[idx], coord } as ManualRepoEntry;
+  saveManualLayout(store);
+  return store;
+}
+

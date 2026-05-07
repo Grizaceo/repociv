@@ -268,3 +268,115 @@
   color: #fca5a5;
   font-size: 13px;
 }
+
+/* ─── Phase 6: Map tile picking + city management ─────────────────────────── */
+
+.construction-section {
+  display: grid;
+  gap: 10px;
+}
+
+.construction-section h4 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ui-gold, #c8a84b);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.btn-accent {
+  background: rgba(91, 155, 213, 0.18);
+  border: 1px solid rgba(91, 155, 213, 0.55);
+  color: #7ab8e8;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  border-radius: 2px;
+  transition: background 0.15s ease;
+}
+
+.btn-accent:hover {
+  background: rgba(91, 155, 213, 0.30);
+}
+
+.tile-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  align-self: center;
+}
+
+.construction-divider {
+  height: 1px;
+  background: rgba(212, 165, 116, 0.20);
+  margin: 4px 0;
+}
+
+.construction-city-list {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.construction-city-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+}
+
+.construction-city-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.construction-city-name {
+  font-size: 13px;
+  color: var(--civ-text-beige);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.construction-city-coord {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.construction-city-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.btn-icon {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--civ-text-beige);
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 13px;
+  border-radius: 2px;
+  line-height: 1;
+}
+
+.btn-icon:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--ui-gold, #c8a84b);
+}
+
+.construction-empty {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 0;
+  padding: 6px 0;
+}
+
+/* Cursor crosshair for placing mode is set inline by renderer */

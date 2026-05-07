@@ -72,6 +72,8 @@ import {
   closeConstructionPanel,
   isConstructionPanelOpen,
   toggleConstructionPanel,
+  setRendererRef,
+  notifyTilePicked,
 } from './ui/constructionPanel.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
@@ -111,10 +113,12 @@ async function bootstrap() {
   const renderer = new Renderer(canvas, state);
   await renderer.loadAssets();
   renderer.start();
+  setRendererRef(renderer);
 
   const toggleView = () => {
     // 3D renderer intentionally removed: the 2D Civ view is the canonical map.
     renderer.start();
+  setRendererRef(renderer);
   };
 
   document.getElementById('btn-toggle-3d')?.classList.add('hidden');
@@ -157,6 +161,9 @@ async function bootstrap() {
 
   renderer.onTileInspect = (cityName, coord, repoPath) => {
     bridge.send('tile_inspected', { cityName, coord, repoPath });
+  };
+  renderer.onEmptyTileClick = (coord) => {
+    notifyTilePicked(coord);
   };
 
   // ─── Fase 5: Spatial gestures → preview card → command bus ──────────────────

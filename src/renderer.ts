@@ -40,6 +40,7 @@ export class Renderer {
   private showDebug = false;
   private fogEnabled = true;
   private animTime = 0;
+  private _placingMode = false; // true when user is picking a hex on map
 
   // ─── Fase 5: Spatial gesture state ────────────────────────────────────────
   private gestureMode: 'camera_pan' | 'unit_drag' | 'area_select' | 'route' = 'camera_pan';
@@ -66,6 +67,8 @@ export class Renderer {
     | ((cityName: string, coord: { q: number; r: number }, repoPath: string) => void)
     | null = null;
   onEnterLocal: ((repoId: string, rootPath: string) => void) | null = null; // Phase 6
+  /** Click on empty hex while in placing mode. */
+  onEmptyTileClick: ((coord: import('./hex.ts').Axial) => void) | null = null;
   // ─── Fase 5 callbacks ─────────────────────────────────────────────────────
   onSpatialGesture:
     | ((directive: SpatialDirective, screenPos: { x: number; y: number }) => void)
@@ -386,6 +389,15 @@ export class Renderer {
     const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
     const tile = this.state.world.tiles.get(tileKey(coord));
 
+    // Placing mode: click empty hex → callback, then exit placing mode
+    if (this._placingMode) {
+      if (!tile?.city && !this.state.getUnitAt(coord)) {
+        this.onEmptyTileClick?.(coord);
+      }
+      this.setPlacingMode(false);
+      return;
+    }
+
     if (this.actionMode === 'move' && this.selectedUnit) {
       this.state.moveUnit(this.selectedUnit.id, coord);
       this.actionMode = 'none';
@@ -551,7 +563,18 @@ export class Renderer {
     }
 
     if (this.hoveredHex && !this.isDragging) {
-      this.hexR.drawHexOutline(this.hoveredHex, '#c8a84b80', 2);
+      const tile = this.state.world.tiles.get(tileKey(this.hoveredHex));
+      const unitHere = this.state.getUnitAt(this.hoveredHex);
+      if (this._placingMode) {
+        // In placing mode: highlight only empty hexes with bright green
+        if (!tile?.city && !unitHere) {
+          this.hexR.drawHexOutline(this.hoveredHex, '#00ff00cc', 3);
+        } else {
+          this.hexR.drawHexOutline(this.hoveredHex, '#ff3333aa', 2); // occupied = red tint
+        }
+      } else {
+        this.hexR.drawHexOutline(this.hoveredHex, '#c8a84b80', 2);
+      }
     }
 
     ctx.restore();
@@ -599,6 +622,15 @@ export class Renderer {
     const btnBuild = document.getElementById('btn-build');
     if (btnMove) btnMove.dataset['active'] = mode === 'move' ? 'true' : 'false';
     if (btnBuild) btnBuild.dataset['active'] = mode === 'build' ? 'true' : 'false';
+  }
+
+  /** Enter/exit placing mode: user clicks empty hex to pick a coordinate. */
+  setPlacingMode(active: boolean) {
+    this._placingMode = active;
+    this.canvas.style.cursor = active ? 'crosshair' : 'default';
+  }
+  getPlacingMode(): boolean {
+    return this._placingMode;
   }
 
   sleepSelectedUnit() {
