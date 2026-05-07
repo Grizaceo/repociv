@@ -6,6 +6,18 @@ let activeChatUnit: string | null = null;
 export const chatBuffers = new Map<string, string>();
 let _sidePanelCleanup: (() => void) | null = null;
 
+// Chat history: per-unit array of messages
+interface ChatMessage {
+  role: 'user' | 'agent';
+  text: string;
+  timestamp: string;
+}
+const chatHistory = new Map<string, ChatMessage[]>();
+// Reference to the currently streaming agent bubble per unit
+const currentAgentBubble = new Map<string, HTMLElement>();
+// Index of the current agent message in history (for updating)
+const currentAgentMessageIndex = new Map<string, number>();
+
 // ─── Clipboard helper ────────────────────────────────────────────────────────
 function clipboardWrite(text: string): boolean {
   try {
@@ -180,10 +192,39 @@ export function isSidePanelOpen(): boolean {
 
 export function appendChatChunk(unitId: string, text: string) {
   const prev = chatBuffers.get(unitId) ?? '';
-  chatBuffers.set(unitId, prev + text);
+  const newText = prev + text;
+  chatBuffers.set(unitId, newText);
   if (activeChatUnit === unitId) {
     ensureLiveAgentBubble(unitId);
-    renderChatBuffer(unitId);
+    // Update history
+    const history = chatHistory.get(unitId) ?? [];
+    const idx = currentAgentMessageIndex.get(unitId);
+    if (idx !== undefined && idx >= 0 && idx < history.length) {
+      const msg = history[idx];
+      if (!msg) return;
+      history[idx] = { role: msg.role, text: newText, timestamp: msg.timestamp };
+      chatHistory.set(unitId, history);
+    }
+    // Update bubble directly
+    const bubble = currentAgentBubble.get(unitId);
+    if (bubble) {
+      const body = bubble.querySelector<HTMLElement>('.chat-body');
+      if (body) body.textContent = newText;
+      bubble.dataset['raw'] = newText;
+      // Show/hide error button
+      const errBtn = bubble.querySelector<HTMLElement>('.chat-error-btn');
+      if (errBtn) {
+        errBtn.classList.toggle('hidden', !hasErrorLine(newText));
+      }
+    }
+    // Auto-scroll if near bottom
+    const container = document.getElementById('chat-messages');
+    if (container) {
+      const isNearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 50;
+      if (isNearBottom) {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
   }
 }
 
@@ -192,16 +233,23 @@ export function appendUserMessage(unitId: string, text: string) {
   if (!container || activeChatUnit !== unitId) return;
 
   // Finalize previous agent bubble (turn it into history)
-  const prevBubble = document.getElementById(`chat-current-${unitId}`);
+  const prevBubble = currentAgentBubble.get(unitId);
   if (prevBubble) {
-    prevBubble.id = ''; // Remove live ID so it becomes regular history
+    prevBubble.id = ''; // Remove live ID
+    prevBubble.classList.add('history');
+    currentAgentBubble.delete(unitId);
   }
 
-  // ── User message bubble (right-aligned) ──────────────────────
+  // Add user message to history
+  const userTime = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+  const history = chatHistory.get(unitId) ?? [];
+  history.push({ role: 'user', text, timestamp: userTime });
+  chatHistory.set(unitId, history);
+
+  // Render user message immediately
   const msg = document.createElement('div');
   msg.className = 'chat-msg user';
   msg.dataset['raw'] = text;
-  const userTime = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
   msg.innerHTML = `<div class="chat-msg-head">
     <div class="chat-msg-meta">
       <span>TÚ · ${userTime}</span>
@@ -211,7 +259,7 @@ export function appendUserMessage(unitId: string, text: string) {
   <div class="chat-body">${escapeHtml(text)}</div>`;
   container.appendChild(msg);
 
-  // ── Agent reply bubble (left-aligned, will be filled by streaming chunks) ──
+  // Create new agent bubble (will be filled by streaming chunks)
   chatBuffers.set(unitId, '');
   const agentTime = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
   const bubble = document.createElement('div');
@@ -229,6 +277,11 @@ export function appendUserMessage(unitId: string, text: string) {
   </div>
   <span class="chat-body"></span>`;
   container.appendChild(bubble);
+  currentAgentBubble.set(unitId, bubble);
+
+  // Add placeholder to history for upcoming agent response
+  history.push({ role: 'agent', text: '', timestamp: agentTime });
+  currentAgentMessageIndex.set(unitId, history.length - 1);
 
   // Scroll to bottom on new message
   container.scrollTop = container.scrollHeight;
@@ -236,7 +289,7 @@ export function appendUserMessage(unitId: string, text: string) {
 }
 
 function ensureLiveAgentBubble(unitId: string) {
-  if (document.getElementById(`chat-current-${unitId}`)) return;
+  if (currentAgentBubble.has(unitId)) return;
   const container = document.getElementById('chat-messages');
   if (!container) return;
   const agentTime = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
@@ -255,6 +308,7 @@ function ensureLiveAgentBubble(unitId: string) {
   </div>
   <span class="chat-body"></span>`;
   container.appendChild(bubble);
+  currentAgentBubble.set(unitId, bubble);
   attachCopyListeners(container, unitId);
 }
 
@@ -283,6 +337,9 @@ function renderChatBuffer(unitId: string) {
 
 export function clearChat(unitId: string) {
   chatBuffers.delete(unitId);
+  chatHistory.delete(unitId);
+  currentAgentBubble.delete(unitId);
+  currentAgentMessageIndex.delete(unitId);
   if (activeChatUnit === unitId) {
     const container = document.getElementById('chat-messages');
     if (container) container.innerHTML = '';
