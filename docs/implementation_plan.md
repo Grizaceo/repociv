@@ -4,6 +4,43 @@
 
 ---
 
+## Estado Real al 2026-05-07
+
+> **Este plan fue escrito cuando el trunk estaba roto.** Esta sección documenta el estado real actual para evitar deriva entre docs y código.
+
+### Build / Tests
+- `python3 -m pytest server/ -q` → **488 passed, 1 skipped** ✅
+- `npm test` → **279 passed** ✅
+- `npm run check` → **pasa completo** (tests + vite build) ✅
+- `server/agent_runner.py` default model corregido a `hermes-agent` (era `minimax-m2.6`)
+
+### Lo que YA existe (no sobredocumentar)
+- `server/task_orchestrator.py` — ciclo por issue funcional
+- `server/workspace_issue.py` — spec/plan/state/output + artifacts
+- Checkpoints + resume + sentinel `.repociv/status`
+- `server/step_executor.py` — separación SCOUT / WORKER / DAVI
+- `server/model_router.py` — routing por rol (conceptual, no enforceado)
+- `server/bridge.py` — endpoints tareas, métricas, eventos, harnesses, recovery
+- Frontend: taskPanel, observabilityPanel, timelinePanel, approvalPanel, harnessPanel, recoveryPanel
+- `shared/harness-registry.json` + `src/harnessRegistry.ts` + `server/harness_registry.py`
+- Chat UI: resizable panel, message alignment, timestamps, scroll-to-bottom, history persistence
+- Map: hex grid, fog of war, pathfinding A*, city placement, repo onboarding
+
+### Lo que FALTA (deudas reales)
+- `validation_contract` — no existe
+- `validator role` — no existe como entidad independiente
+- Behavioural validation en loop principal
+- Handoff estructurado tipado
+- Enforcement real de modelo por rol (model_router no se refleja en runtime)
+- Mission Control semántico unificado (paneles fragmentados)
+
+### Deudas cerradas
+- ~~`npm run check` fallaba por TS~~ → ✅ resuelto (2026-05-07)
+- ~~HERMES_MODEL default inválido~~ → ✅ resuelto (2026-05-07)
+- ~~Bug drag unit a city tile~~ → ✅ resuelto (commit df70f6a)
+
+---
+
 ## 0. Orígenes y Posicionamiento
 
 ### 0.1 RepoCiv vs AgentCraft — Parity Matrix

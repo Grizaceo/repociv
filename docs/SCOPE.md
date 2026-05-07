@@ -127,3 +127,5 @@ superficie de mantenimiento a lo que efectivamente Cristóbal usa.
   SCOPE inmediatamente. No vivir en la mentira.
 - ¿El SCOPE empieza a sentirse aspiracional y desfasado del código? → el
   problema no es el código, es que el SCOPE necesita revisión honesta.
+- ¿Acabo de usar RepoCiv y encontré fricción o valor? → registrar en
+  `docs/DOGFOODING_NOTES.md`. El aprendizaje de uso real alimenta este SCOPE.
