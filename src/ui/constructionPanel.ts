@@ -1,10 +1,12 @@
-import { loadSelectedRepoPaths, saveSelectedRepoPaths, type ScannedRepo } from '../map.ts';
-import { upsertManualRepoEntry, removeManualRepoEntry, updateManualRepoCoord, loadManualLayout } from '../manualLayout.ts';
+import { loadSelectedRepoPaths, saveSelectedRepoPaths, type ScannedRepo } from '../map';
+import { upsertManualRepoEntry, removeManualRepoEntry, updateManualRepoCoord, loadManualLayout } from '../manualLayout';
+import { showNotification } from './notificationBanner';
 
 let isOpen = false;
 let _rendererRef: { setPlacingMode(active: boolean): void; getPlacingMode(): boolean } | null = null;
 let _onPickTileCb: ((coord: { q: number; r: number }) => void) | null = null;
 let _placingNewCity = false; // true if we're placing a new city
+let selectedRepo: ScannedRepo | null = null;
 
 interface RepoPickResponse {
   ok: boolean;
@@ -231,14 +233,6 @@ function buildDOM(): void {
   const preview = panel.querySelector<HTMLElement>('#construction-preview')!;
   const error = panel.querySelector<HTMLElement>('#construction-error')!;
 
-  const renderPreview = () => {
-    if (!selectedRepo) {
-      preview.textContent = 'Selecciona un repositorio para previsualizar.';
-      return;
-    }
-    preview.textContent = `Repo "${selectedRepo.name}" listo. Elige una casilla en el mapa.`;
-  };
-
   panel.querySelector<HTMLButtonElement>('#construction-pick-repo')?.addEventListener('click', () => {
     void (async () => {
       error.classList.add('hidden');
@@ -261,7 +255,6 @@ function buildDOM(): void {
           }
           select.value = selectedRepo.path;
         }
-        renderPreview();
       } catch (e) {
         error.textContent = `No se pudo abrir el selector (${e instanceof Error ? e.message : 'error desconocido'}).`;
         error.classList.remove('hidden');
@@ -295,7 +288,6 @@ function buildDOM(): void {
           selectedRepo = { name: path, path } as ScannedRepo;
         }
         pathInput.value = path;
-        renderPreview();
       })();
     }
   });
@@ -308,7 +300,6 @@ function buildDOM(): void {
         if (!p) throw new Error('Ruta vacia');
         selectedRepo = await inspectRepoPath(p);
         pathInput.value = selectedRepo.path;
-        renderPreview();
       } catch (e) {
         error.textContent = `No se pudo inspeccionar la ruta (${e instanceof Error ? e.message : 'error desconocido'}).`;
         error.classList.remove('hidden');
@@ -345,28 +336,7 @@ function buildDOM(): void {
     showNotification({ type: 'info', title: 'Nueva ciudad', body: `Haz click en una casilla para colocar "${selectedRepo.name}".` });
   });
 
-  confirm.addEventListener('click', () => {
-    if (!selectedRepo || !selectedCoord) return;
-    const { q, r } = selectedCoord;
-    if (!Number.isFinite(q) || !Number.isFinite(r)) {
-      error.textContent = 'Coordenadas invalidas.';
-      error.classList.remove('hidden');
-      return;
-    }
-    upsertManualRepoEntry({
-      repoPath: selectedRepo.path,
-      repoName: selectedRepo.name,
-      coord: { q, r },
-      addedAt: Date.now(),
-      source: 'manual',
-    });
-    upsertSelection(selectedRepo.path);
-    window.location.reload();
-  });
 }
-
-// Re-export showNotification from banner
-import { showNotification } from './notificationBanner.ts';
 
 /** Called by renderer when an empty tile is clicked while placing. */
 export function notifyTilePicked(coord: { q: number; r: number }): void {
