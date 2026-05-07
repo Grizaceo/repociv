@@ -569,7 +569,17 @@ export default defineConfig(({ mode }) => {
   const mapRoot = resolveMapRoot(mode);
   return {
     plugins: [repocivPlugin(mapRoot)],
-    server: { port: vitePort, strictPort: true },
+    server: {
+      port: vitePort,
+      strictPort: true,
+      proxy: {
+        '/api/providers': {
+          target: `http://localhost:${env.BRIDGE_PORT ?? '5274'}`,
+          changeOrigin: true,
+          secure: false,
+        },
+      },
+    },
     test: {
       exclude: ['node_modules/**', 'dist/**', 'e2e/**'],
       coverage: {
