@@ -7,6 +7,7 @@
 @import './patterns.css';
 @import './components.css';
 @import './onboarding.css';
+@import './panels.css';
 
 /* Global layout */
 #app {
