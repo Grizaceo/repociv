@@ -462,7 +462,7 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
                            city_id: str = "") -> tuple[bool, str]:
     HERMES_URL   = os.environ.get("HERMES_URL",   "http://localhost:8642/v1/chat/completions")
     HERMES_KEY   = os.environ.get("HERMES_KEY",   "davi-voice-bridge-2026")
-    HERMES_MODEL = os.environ.get("HERMES_MODEL", "minimax-m2.6")
+    HERMES_MODEL = os.environ.get("HERMES_MODEL", "hermes-agent")
 
     cfg = config if config is not None else _get_agent_config(unit_id)
     spatial = _spatial_context_block(city_id, working_dir)
