@@ -117,16 +117,28 @@ function attachCopyListeners(root: HTMLElement, unitId: string) {
 
 // ─── Panel lifecycle ─────────────────────────────────────────────────────────
 
-// Provider/model state
-interface ProviderInfo {
+// 3-layer state: harness / provider / model
+interface HarnessInfo {
   id: string;
   name: string;
   transport: string;
   available: boolean;
-  defaultModel: string;
-  models: { id: string; name: string }[];
 }
+interface ModelInfo {
+  id: string;
+  name: string;
+  harnesses: string[];
+}
+interface ProviderInfo {
+  id: string;
+  name: string;
+  available: boolean;
+  defaultModel: string;
+  models: ModelInfo[];
+}
+let _harnesses: HarnessInfo[] = [];
 let _providers: ProviderInfo[] = [];
+let _selectedHarness = "";
 let _selectedProvider = "";
 let _selectedModel = "";
 
@@ -184,75 +196,120 @@ function initProviderSelectors(_unit: Unit) {
   const wrapper = document.getElementById('model-selector-wrapper');
   if (!wrapper) return;
 
-  // Build dual-select UI if not already built
-  if (!document.getElementById('provider-selector')) {
+  // Build triple-select UI if not already built
+  if (!document.getElementById('harness-selector')) {
     wrapper.innerHTML = `
       <div class="provider-selectors">
+        <select id="harness-selector" title="Harness / Ejecutor" aria-label="Harness"></select>
         <select id="provider-selector" title="Proveedor de IA" aria-label="Proveedor de IA"></select>
         <select id="model-selector" title="Modelo de IA" aria-label="Modelo de IA"></select>
       </div>
     `;
+    const harnessSel = document.getElementById('harness-selector') as HTMLSelectElement;
+    harnessSel.addEventListener('change', () => {
+      _selectedHarness = harnessSel.value;
+      persistSelection();
+    });
     const provSel = document.getElementById('provider-selector') as HTMLSelectElement;
     provSel.addEventListener('change', () => {
       _selectedProvider = provSel.value;
       populateModels();
-      persistProviderSelection();
+      persistSelection();
     });
     const modelSel = document.getElementById('model-selector') as HTMLSelectElement;
     modelSel.addEventListener('change', () => {
       _selectedModel = modelSel.value;
-      persistProviderSelection();
+      persistSelection();
     });
   }
 
-  // Fetch providers from bridge
+  // Fetch full 3-layer config from bridge
   fetch('/api/providers', { headers: bridgeHeaders() })
     .then((r) => r.json())
-    .then((data: { defaultTransport: string; providers: ProviderInfo[] }) => {
+    .then((data: {
+      defaultHarness: string;
+      defaultProvider: string;
+      harnesses: HarnessInfo[];
+      providers: ProviderInfo[];
+    }) => {
+      _harnesses = data.harnesses;
       _providers = data.providers;
+
+      // ── Populate harness selector ──
+      const harnessSel = document.getElementById('harness-selector') as HTMLSelectElement;
+      harnessSel.innerHTML = '';
+      const autoHarness = document.createElement('option');
+      autoHarness.value = 'auto';
+      autoHarness.textContent = '⚡ Auto (cascade)';
+      harnessSel.appendChild(autoHarness);
+      for (const h of _harnesses) {
+        const opt = document.createElement('option');
+        opt.value = h.id;
+        opt.textContent = h.available ? h.name : `${h.name} (no disponible)`;
+        opt.disabled = !h.available;
+        harnessSel.appendChild(opt);
+      }
+
+      // ── Populate provider selector ──
       const provSel = document.getElementById('provider-selector') as HTMLSelectElement;
       provSel.innerHTML = '';
-
-      // Add "auto" option
-      const autoOpt = document.createElement('option');
-      autoOpt.value = 'auto';
-      autoOpt.textContent = '⚡ Auto (cascade)';
-      provSel.appendChild(autoOpt);
-
-      let hasSelection = false;
+      const autoProv = document.createElement('option');
+      autoProv.value = 'auto';
+      autoProv.textContent = '⚡ Auto';
+      provSel.appendChild(autoProv);
       for (const p of _providers) {
         const opt = document.createElement('option');
         opt.value = p.id;
         opt.textContent = p.available ? p.name : `${p.name} (no disponible)`;
         opt.disabled = !p.available;
         provSel.appendChild(opt);
-        if (p.available && p.transport === data.defaultTransport && !hasSelection) {
-          provSel.value = p.id;
-          _selectedProvider = p.id;
-          hasSelection = true;
-        }
       }
 
-      // Restore persisted selection if available
-      const saved = loadProviderSelection();
+      // ── Restore persisted selection or use defaults ──
+      const saved = loadSelection();
+      if (saved.harness) {
+        const exists = _harnesses.find((h) => h.id === saved.harness && h.available);
+        if (exists) {
+          harnessSel.value = saved.harness;
+          _selectedHarness = saved.harness;
+        } else {
+          harnessSel.value = data.defaultHarness || 'auto';
+          _selectedHarness = data.defaultHarness || 'auto';
+        }
+      } else {
+        harnessSel.value = data.defaultHarness || 'auto';
+        _selectedHarness = data.defaultHarness || 'auto';
+      }
+
       if (saved.provider) {
         const exists = _providers.find((p) => p.id === saved.provider && p.available);
         if (exists) {
           provSel.value = saved.provider;
           _selectedProvider = saved.provider;
+        } else {
+          provSel.value = data.defaultProvider || 'auto';
+          _selectedProvider = data.defaultProvider || 'auto';
         }
+      } else {
+        provSel.value = data.defaultProvider || 'auto';
+        _selectedProvider = data.defaultProvider || 'auto';
       }
 
       populateModels(saved.model);
     })
     .catch(() => {
-      // Fallback: use auto (cascade) so the bridge picks the best provider
+      // Fallback: minimal selectors
+      const harnessSel = document.getElementById('harness-selector') as HTMLSelectElement;
       const provSel = document.getElementById('provider-selector') as HTMLSelectElement;
-      if (provSel) {
-        provSel.innerHTML = '<option value="auto" selected>⚡ Auto (cascade)</option><option value="hermes">Hermes</option>';
-        _selectedProvider = 'auto';
-        _selectedModel = '';
+      if (harnessSel) {
+        harnessSel.innerHTML = '<option value="auto" selected>⚡ Auto</option><option value="hermes">Hermes</option>';
+        _selectedHarness = 'auto';
       }
+      if (provSel) {
+        provSel.innerHTML = '<option value="auto" selected>⚡ Auto</option>';
+        _selectedProvider = 'auto';
+      }
+      _selectedModel = '';
       populateModels();
     });
 }
@@ -296,9 +353,10 @@ function populateModels(savedModel?: string) {
   _selectedModel = provider.defaultModel;
 }
 
-function persistProviderSelection() {
+function persistSelection() {
   try {
-    localStorage.setItem('repociv:provider', JSON.stringify({
+    localStorage.setItem('repociv:chatConfig', JSON.stringify({
+      harness: _selectedHarness,
       provider: _selectedProvider,
       model: _selectedModel,
     }));
@@ -307,19 +365,25 @@ function persistProviderSelection() {
   }
 }
 
-function loadProviderSelection(): { provider: string; model: string } {
+function loadSelection(): { harness: string; provider: string; model: string } {
   try {
-    const raw = localStorage.getItem('repociv:provider');
+    const raw = localStorage.getItem('repociv:chatConfig');
     if (raw) return JSON.parse(raw);
+    // Migrate from old key
+    const old = localStorage.getItem('repociv:provider');
+    if (old) {
+      const parsed = JSON.parse(old);
+      return { harness: '', provider: parsed.provider || '', model: parsed.model || '' };
+    }
   } catch {
     // ignore
   }
-  return { provider: '', model: '' };
+  return { harness: '', provider: '', model: '' };
 }
 
-/** Get the currently selected provider and model for sending to the bridge. */
-export function getSelectedProvider(): { provider: string; model: string } {
-  return { provider: _selectedProvider, model: _selectedModel };
+/** Get the currently selected harness, provider and model for sending to the bridge. */
+export function getSelectedConfig(): { harness: string; provider: string; model: string } {
+  return { harness: _selectedHarness, provider: _selectedProvider, model: _selectedModel };
 }
 
 export function closeSidePanel() {

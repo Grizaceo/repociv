@@ -125,7 +125,8 @@ def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
 
 
 def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
-              command_id: str | None = None, provider: str = "", model: str = "") -> None:
+              command_id: str | None = None, harness: str = "",
+              provider: str = "", model: str = "") -> None:
     mission_id = command_id or str(uuid.uuid4())[:8]
     quest_name = generate_quest_name(mission)
     started_at = time.time()
@@ -176,7 +177,8 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
                      "durationSeconds": 120, "missionId": mission_id})
     send_to_repociv({"type": "unit_state", "unit": unit_id, "state": "working"})
 
-    success, output = _execute_streaming(unit_id, mission_id, mission, working_dir, city_id, provider=provider, model=model)
+    success, output = _execute_streaming(unit_id, mission_id, mission, working_dir, city_id,
+                                         harness=harness, provider=provider, model=model)
 
     duration = time.time() - started_at
 
@@ -226,6 +228,7 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
 def _execute_streaming(unit_id: str, mission_id: str, mission: str,
                        working_dir: str | None = None,
                        city_id: str = "",
+                       harness: str = "",
                        provider: str = "",
                        model: str = "") -> tuple[bool, str]:
     config = _get_agent_config(unit_id)
@@ -234,35 +237,43 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
     if _container_mode_enabled():
         return _run_container_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
-    # ── Provider override from chat UI ──────────────────────────────────────
-    # If the user selected a specific provider+model, use it directly
-    # instead of the default cascade.
-    if provider and provider != "auto":
+    # ── 3-layer dispatch: harness → provider → model ──────────────────────────
+    # If the user selected a specific harness, use it directly.
+    # The provider+model are passed through to the harness runner so it can
+    # pick the right API endpoint and model ID.
+    if harness and harness != "auto":
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
-                          "text": f"[transport: {provider}]\n"})
-        if provider == "openclaw" and _has_openclaw():
-            return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model)
-        if provider == "claude-code" and _has_claude_code():
-            return _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model)
-        if provider == "hermes":
-            return _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model)
-        # Unknown provider — fall through to cascade with a warning
+                          "text": f"[harness: {harness}]\n"})
+        if harness == "openclaw" and _has_openclaw():
+            return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
+                                           model=model or provider)
+        if harness == "claude-code" and _has_claude_code():
+            # For claude-code: if model includes provider prefix (e.g. openrouter/deepseek),
+            # pass it through — claude CLI --model accepts provider/model format
+            return _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
+                                              model=model or provider)
+        if harness == "cursor" and _has_cursor():
+            return _run_cursor_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
+        if harness == "hermes":
+            return _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
+                                         model=model or provider)
+        # Unknown harness — fall through to cascade with a warning
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
-                          "text": f"[warn: proveedor '{provider}' no reconocido, usando cascade]\n"})
+                          "text": f"[warn: harness '{harness}' no reconocido, usando cascade]\n"})
 
     # ── Default cascade: hermes → claude-code → openclaw ────────────────────
     if base == "OPENCLAW":
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: openclaw]\n"})
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: openclaw]\n"})
         return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
-    send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: hermes]\n"})
+    send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: hermes]\n"})
     success, output = _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
     if success:
         return success, output
 
     send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[hermes falló → probando claude-code]\n"})
     if _has_claude_code():
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[transport: claude-code]\n"})
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: claude-code]\n"})
         success, output = _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
         if success:
             return success, output
