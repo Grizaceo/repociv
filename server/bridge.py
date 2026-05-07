@@ -334,35 +334,312 @@ def get_gpu_info() -> dict[str, Any] | None:
 
 
 # ─── PENDING_TRACKER ──────────────────────────────────────────────────────────
-def load_pending_tasks() -> list[dict[str, str]]:
+
+# Sections that count as "active" (shown in the pending panel)
+_ACTIVE_SECTIONS = {"ALTA", "MEDIA", "BAJA"}
+# Sections that are excluded from active listing
+_INACTIVE_SECTIONS = {"STALE", "HECHO", "DESCARTADOS", "MOVIDOS FUERA"}
+# Regex for item headers like "### [022] TITLE — State" or "### [024] TITLE — State"
+_ITEM_RE = re.compile(
+    r"^###\s+\[(\d+)\]\s+(.*?)\s+—\s+(.*)"
+)
+# Regex for state line like "**Estado:** 🔵 registrada"
+_STATE_RE = re.compile(
+    r"\*\*Estado:\*\*\s*(🔵|🟡|🟢|🔴)\s*(.*)"
+)
+# Regex for detail start
+_DETAIL_RE = re.compile(r"\*\*Detalle:\*\*")
+# Regex for next section/item boundary
+_SECTION_RE = re.compile(r"^##\s+\[(\w+)\]|^##\s+(\w+)|^###\s+\[")
+# Known closing markers
+_SIGUIENTE_RE = re.compile(r"\*\*Siguiente paso:\*\*")
+_UBICACION_RE = re.compile(r"\*\*Ubicaci")
+
+
+def load_pending_tasks() -> list[dict[str, Any]]:
+    """Parse PENDING_TRACKER.md into structured task items.
+
+    Returns items from active sections (ALTA, MEDIA, BAJA) with:
+      id, title, priority, state, detail (multiline string)
+    Excludes items in STALE, HECHO, DESCARTADOS sections.
+    """
     if not PENDING_TRACKER.exists():
         return []
     try:
-        tasks = []
-        for line in PENDING_TRACKER.read_text(encoding="utf-8").splitlines():
-            # Soporta - [ ], * [ ], + [ ]; excluye [x] y [X] (completadas)
-            m = re.match(r"^\s*[-*+]\s*\[\s*\]\s*(.+)", line)
-            if m:
-                title = m.group(1).strip()
-                priority = "high" if title.startswith("!") or "[HIGH]" in title else "normal"
-                tasks.append({"title": title.lstrip("!").strip(), "priority": priority})
-        return tasks
+        lines = PENDING_TRACKER.read_text(encoding="utf-8").splitlines()
     except Exception:
         return []
 
+    tasks: list[dict[str, Any]] = []
+    current_section = ""
+    i = 0
+    while i < len(lines):
+        line = lines[i]
 
-def append_pending_task(title: str, description: str = "") -> None:
+        # Detect section headers: ## [ALTA], ## [MEDIA], ## [BAJA], ## [STALE], ## HECHO, etc.
+        sec = re.match(r"^##\s+\[(\w+)\]", line)
+        if sec:
+            current_section = sec.group(1).upper()
+            i += 1
+            continue
+        sec2 = re.match(r"^##\s+(\w[\w /-]*)", line)
+        if sec2 and not sec:
+            name = sec2.group(1).strip().upper()
+            # Map actual section names
+            if "HECHO" in name:
+                current_section = "HECHO"
+            elif "DESCARTADO" in name or "MOVIDO" in name:
+                current_section = "DESCARTADOS"
+            elif "STALE" in name:
+                current_section = "STALE"
+            else:
+                current_section = name
+            i += 1
+            continue
+
+        # Detect item headers: ### [NNN] TITLE — State
+        m = _ITEM_RE.match(line)
+        if m:
+            item_id = m.group(1)
+            title = m.group(2).strip()
+            subtitle = m.group(3).strip()
+            state_emoji = ""
+            state_text = subtitle
+
+            # Collect detail lines
+            detail_lines: list[str] = []
+            in_detail = False
+            j = i + 1
+            while j < len(lines):
+                dl = lines[j]
+                # Stop at next section or item header
+                if _SECTION_RE.match(dl) and (dl.startswith("##") or (dl.startswith("###") and _ITEM_RE.match(dl))):
+                    break
+                # Check for **Estado:** line
+                sm = _STATE_RE.match(dl)
+                if sm:
+                    state_emoji = sm.group(1)
+                    state_text = sm.group(2).strip() or subtitle
+                    j += 1
+                    continue
+                # Check for **Detalle:** start
+                if _DETAIL_RE.match(dl):
+                    in_detail = True
+                    # Extract any text after "**Detalle:**" on same line
+                    after_detail = dl.split("**Detalle:**", 1)[1].strip()
+                    if after_detail:
+                        detail_lines.append(after_detail)
+                    j += 1
+                    continue
+                if in_detail:
+                    # Stop detail at **Siguiente paso:**, **Ubicación:**, **Notas:** or blank line + new bullet
+                    if _SIGUIENTE_RE.match(dl) or _UBICACION_RE.match(dl) or dl.startswith("**Notas:**"):
+                        in_detail = False
+                        j += 1
+                        continue
+                    # Stop at horizontal rule
+                    if dl.strip() == "---":
+                        in_detail = False
+                        j += 1
+                        continue
+                    # Stop at empty line after detail content
+                    if not dl.strip() and detail_lines:
+                        in_detail = False
+                        j += 1
+                        continue
+                    detail_lines.append(dl)
+                j += 1
+
+            # Only include items from active sections
+            if current_section in _ACTIVE_SECTIONS:
+                priority_label = f"[{current_section}]"
+                detail_text = "\n".join(detail_lines).strip()
+                tasks.append({
+                    "id": item_id,
+                    "title": title,
+                    "priority": current_section,
+                    "state": state_emoji or "",
+                    "stateText": state_text,
+                    "detail": detail_text,
+                })
+
+        i += 1
+
+    return tasks
+
+
+def append_pending_task(title: str, priority: str = "MEDIA") -> str | None:
+    """Append a new item to PENDING_TRACKER.md under the given priority section.
+
+    Returns the new item ID string, or None on failure.
+    """
     try:
         existing = PENDING_TRACKER.read_text(encoding="utf-8") if PENDING_TRACKER.exists() else ""
-        # Guard: no duplicar si el título ya existe como tarea pendiente
-        if re.search(re.escape(title), existing):
-            return
-        entry = f"\n- [ ] {title}"
-        if description:
-            entry += f"\n  {description}"
-        PENDING_TRACKER.write_text(existing.rstrip() + entry + "\n", encoding="utf-8")
+        if not title.strip():
+            return None
+        # Guard: no duplicar si el título ya existe como item pendiente
+        if re.search(re.escape(title.strip()), existing):
+            return None
+
+        # Find the highest existing ID in the file
+        max_id = 0
+        for m in re.finditer(r"\[(\d+)\]", existing):
+            num = int(m.group(1))
+            if num > max_id:
+                max_id = num
+        new_id = f"{max_id + 1:03d}"
+
+        # Build the new item block
+        section_header = f"## [{priority}]"
+        new_block = (
+            f"\n### [{new_id}] {title.strip()} — 🔵 registrada\n"
+            f"**Estado:** 🔵 registrada\n"
+            f"**Detalle:**\n"
+        )
+
+        # Insert after the section header
+        lines = existing.splitlines(keepends=True)
+        inserted = False
+        result: list[str] = []
+        in_target_section = False
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            result.append(line)
+            if line.strip() == section_header:
+                in_target_section = True
+                i += 1
+                # Skip section header and any "(vacío)" line
+                while i < len(lines):
+                    next_line = lines[i]
+                    if next_line.strip() == "*(vacío — ninguno)*" or next_line.strip() == "*(vacío)*":
+                        # Replace the empty marker with our new block
+                        result.append(new_block)
+                        inserted = True
+                        i += 1
+                        break
+                    elif next_line.startswith("### ["):
+                        # Insert before first item in section
+                        result.append(new_block)
+                        inserted = True
+                        break
+                    elif next_line.startswith("## "):
+                        # Hit next section before finding items — insert here
+                        result.append(new_block)
+                        inserted = True
+                        break
+                    else:
+                        result.append(next_line)
+                        i += 1
+                if inserted:
+                    # Continue appending remaining lines
+                    while i < len(lines):
+                        result.append(lines[i])
+                        i += 1
+                    break
+            i += 1
+
+        if not inserted:
+            # Section not found — append at end
+            result_str = "".join(result)
+            if not result_str.endswith("\n"):
+                result_str += "\n"
+            result_str += f"\n{section_header}\n\n{new_block}"
+            PENDING_TRACKER.write_text(result_str, encoding="utf-8")
+        else:
+            PENDING_TRACKER.write_text("".join(result), encoding="utf-8")
+
+        return new_id
     except Exception as e:
         print(f"[bridge] No pude escribir PENDING_TRACKER: {e}")
+        return None
+
+
+def resolve_pending_task(item_id: str) -> bool:
+    """Move an item from its active section to the HECHO section.
+
+    Returns True if the item was found and moved.
+    """
+    try:
+        if not PENDING_TRACKER.exists():
+            return False
+        content = PENDING_TRACKER.read_text(encoding="utf-8")
+        lines = content.splitlines()
+
+        # Find the item block
+        item_start = -1
+        item_end = -1
+        for i, line in enumerate(lines):
+            m = _ITEM_RE.match(line)
+            if m and m.group(1) == item_id:
+                item_start = i
+                # Find end: next ### [ or ## section or end of file
+                for j in range(i + 1, len(lines)):
+                    if lines[j].startswith("### [") or (lines[j].startswith("## ") and not lines[j].startswith("## [")):
+                        item_end = j
+                        break
+                    if lines[j].startswith("## ["):
+                        item_end = j
+                        break
+                if item_end == -1:
+                    item_end = len(lines)
+                break
+
+        if item_start == -1:
+            return False
+
+        # Extract the item block
+        item_block = lines[item_start:item_end]
+        # Remove the item from its current position
+        remaining = lines[:item_start] + lines[item_end:]
+
+        # Find or create HECHO section
+        hecho_start = -1
+        for i, line in enumerate(remaining):
+            if re.match(r"^##\s+HECHO", line) or re.match(r"^##\s+\[HECHO\]", line):
+                hecho_start = i
+                break
+
+        # Build the table row for HECHO
+        title_line = item_block[0]
+        title_m = _ITEM_RE.match(title_line)
+        title_text = title_m.group(2).strip() if title_m else title_line
+        today = time.strftime("%Y-%m-%d")
+        table_row = f"| [{item_id}] | {title_text} | {today} | Movido desde panel |"
+
+        if hecho_start == -1:
+            # Create HECHO section at end
+            hecho_block = [
+                "",
+                "---",
+                "",
+                "## HECHO (eliminados de lista activa)",
+                "",
+                "| ID | Título | Fecha cierre | Notas |",
+                "|----|--------|-------------|-------|",
+                table_row,
+                "",
+            ]
+            new_content_lines = remaining + hecho_block
+        else:
+            # Find the table in HECHO section and insert row
+            insert_idx = -1
+            for i in range(hecho_start + 1, len(remaining)):
+                if remaining[i].startswith("|") and "---" in remaining[i]:
+                    insert_idx = i + 1
+                    break
+                if remaining[i].startswith("## ") or remaining[i].startswith("### "):
+                    break
+            if insert_idx == -1:
+                # No table header found — insert after section header
+                insert_idx = hecho_start + 1
+            new_content_lines = remaining[:insert_idx] + [table_row] + remaining[insert_idx:]
+
+        PENDING_TRACKER.write_text("\n".join(new_content_lines) + "\n", encoding="utf-8")
+        return True
+    except Exception as e:
+        print(f"[bridge] No pude resolver pendiente: {e}")
+        return False
 
 
 # ─── Process scanner ──────────────────────────────────────────────────────────
@@ -1266,6 +1543,46 @@ class BridgeHandler(BaseHTTPRequestHandler):
             exit_rest_area(unit_id)
             send_to_repociv({"type": "rest_area_exited", "unit": unit_id, "restAreaId": ""})
             self._json({"ok": True})
+            return
+
+        # ─── Pending tracker endpoints ──────────────────────────────────────────
+        if path == "/pending/add":
+            title = str(body.get("title", "")).strip()
+            priority = str(body.get("priority", "MEDIA")).upper()
+            if priority not in ("ALTA", "MEDIA", "BAJA"):
+                priority = "MEDIA"
+            if not title:
+                self.send_response(400)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(b'{"error":"title is required"}')
+                return
+            new_id = append_pending_task(title, priority)
+            if new_id is None:
+                self.send_response(409)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(b'{"error":"duplicate or write error"}')
+                return
+            self._json({"ok": True, "id": new_id, "title": title, "priority": priority})
+            return
+
+        if path == "/pending/resolve":
+            item_id = str(body.get("id", "")).strip()
+            if not item_id:
+                self.send_response(400)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(b'{"error":"id is required"}')
+                return
+            ok = resolve_pending_task(item_id)
+            if not ok:
+                self.send_response(404)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(b'{"error":"item not found"}')
+                return
+            self._json({"ok": True, "id": item_id})
             return
 
         self._json({"ok": True, "ignored": t})

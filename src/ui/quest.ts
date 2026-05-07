@@ -30,11 +30,18 @@ export async function fetchPendingTracker(): Promise<Mission[]> {
   try {
     const res = await fetch(bridgeUrl('/pending'));
     if (!res.ok) return [];
-    const raw = (await res.json()) as Array<{ title: string; description?: string }>;
-    return raw.map((r, i) => ({
-      id: `pending-${i}`,
+    const raw = (await res.json()) as Array<{
+      id: string;
+      title: string;
+      priority: string;
+      state: string;
+      stateText: string;
+      detail: string;
+    }>;
+    return raw.map((r) => ({
+      id: `pending-${r.id}`,
       unit: 'DAVI',
-      questName: r.title,
+      questName: `[${r.id}] ${r.title}`,
       status: 'running' as const,
       startedAt: Date.now(),
       completedAt: null,
