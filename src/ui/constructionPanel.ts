@@ -7,6 +7,21 @@ let _rendererRef: { setPlacingMode(active: boolean): void; getPlacingMode(): boo
 let _onPickTileCb: ((coord: { q: number; r: number }) => void) | null = null;
 let selectedRepo: ScannedRepo | null = null;
 
+// Callbacks for dynamic city add/delete (no reload)
+type CityAddedCallback = (repo: ScannedRepo, coord: { q: number; r: number }) => void;
+type CityDeletedCallback = (repoPath: string) => void;
+
+let _onCityAdded: CityAddedCallback | null = null;
+let _onCityDeleted: CityDeletedCallback | null = null;
+
+export function setOnCityAddedCb(cb: CityAddedCallback): void {
+  _onCityAdded = cb;
+}
+
+export function setOnCityDeletedCb(cb: CityDeletedCallback): void {
+  _onCityDeleted = cb;
+}
+
 interface RepoPickResponse {
   ok: boolean;
   repo?: ScannedRepo;
@@ -75,7 +90,7 @@ function upsertSelection(repoPath: string): void {
   saveSelectedRepoPaths([...selected]);
 }
 
-function refreshCityList(): void {
+export function refreshCityList(): void {
   const list = document.getElementById('construction-city-list');
   if (!list) return;
   const store = loadManualLayout();
@@ -127,7 +142,12 @@ function refreshCityList(): void {
           selected.delete(path);
           saveSelectedRepoPaths([...selected]);
         }
-        window.location.reload();
+        // Notify main.ts to delete city dynamically (no reload)
+        if (_onCityDeleted) {
+          _onCityDeleted(path);
+        } else {
+          refreshCityList(); // Fallback if no callback
+        }
       }
     });
   });
@@ -317,8 +337,8 @@ function buildDOM(): void {
     }
     error.classList.add('hidden');
     _onPickTileCb = (coord) => {
-      // Place city directly (Civ-like)
       if (!selectedRepo) return;
+      // Save to manual layout
       upsertManualRepoEntry({
         repoPath: selectedRepo.path,
         repoName: selectedRepo.name,
@@ -327,7 +347,15 @@ function buildDOM(): void {
         source: 'manual',
       });
       upsertSelection(selectedRepo.path);
-      window.location.reload();
+      // Notify main.ts to add city dynamically (no reload)
+      if (_onCityAdded) {
+        _onCityAdded(selectedRepo, coord);
+      }
+      // Close panel and exit placing mode
+      closeConstructionPanel();
+      if (_rendererRef) {
+        _rendererRef.setPlacingMode(false);
+      }
     };
     _rendererRef.setPlacingMode(true);
     closeConstructionPanel();

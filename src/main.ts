@@ -1,7 +1,8 @@
 // ─── RepoCiv — Main Entry Point ───────────────────────────────────────────────
 
 import './styles/index.css';
-import { generateWorld } from './map.ts';
+import { generateWorld, reconnectCities, addCityToWorld, removeCityFromWorld, fetchScannedRepos } from './map.ts';
+import { type ScannedRepo } from './map.ts';
 import { Renderer } from './renderer.ts';
 import { BridgeEvents } from './bridge.ts';
 import { GameState } from './game.ts';
@@ -78,6 +79,8 @@ import {
   toggleConstructionPanel,
   setRendererRef,
   notifyTilePicked,
+  setOnCityAddedCb,
+  setOnCityDeletedCb,
 } from './ui/constructionPanel.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
@@ -131,6 +134,33 @@ async function bootstrap() {
   const world = await generateWorld();
   const state = new GameState(world);
   state.start();
+
+  // Set up dynamic city add/delete callbacks from constructionPanel
+  setOnCityAddedCb(async (repo: ScannedRepo, coord) => {
+    // Fetch repo data to get population, terrain, etc.
+    const repos = await fetchScannedRepos();
+    const repoData = repos.find(r => r.path === repo.path) ?? repo;
+    // Add city to world
+    addCityToWorld(state.world, repoData, coord);
+    // Reconnect cities to ensure pathfinding works
+    await reconnectCities(state.world);
+    // Notify state update to refresh UI/renderer
+    state.notifyUpdate();
+  });
+
+  setOnCityDeletedCb((repoPath: string) => {
+    // Remove city from world
+    const removed = removeCityFromWorld(state.world, repoPath);
+    if (removed) {
+      // Reconnect cities
+      reconnectCities(state.world).then(() => {
+        state.notifyUpdate();
+      });
+    }
+    // Refresh construction panel city list
+    refreshCityList();
+  });
+
   // Clean up chat buffer when a unit is removed from the world.
   state.onUnitRemoved((unitId) => clearChat(unitId));
 

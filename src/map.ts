@@ -5,7 +5,7 @@ import { logger } from './logger.ts';
 import { type Axial, spiralCoords, axialDistance, axialNeighbours } from './hex.ts';
 import { type Terrain, type Tile, type City, type District, type World, tileKey } from './types.ts';
 import { loadManualLayout } from './manualLayout.ts';
-import { aStarPath } from './pathfinding.ts';
+import { aStarPath, invalidatePathCache } from './pathfinding.ts';
 
 // ─── Terrain inference ──────────────────────────────────────────────────────
 const EXTENSION_WEIGHT: Record<string, Terrain> = {
@@ -222,7 +222,142 @@ async function fetchSubdirs(repoName: string): Promise<{ name: string; terrain: 
   }
 }
 
-// ─── World generator ─────────────────────────────────────────────────────────
+// ─── Reconnect disconnected cities (dynamic + initial generation) ────────────
+export async function reconnectCities(world: World): Promise<void> {
+  const { tiles, cities } = world;
+  const capitalCity = cities.find(c => c.isCapital) ?? cities[0];
+  if (!capitalCity) return;
+
+  const connectedKeys = new Set<string>();
+  const queue: Axial[] = [capitalCity.coord];
+  connectedKeys.add(tileKey(capitalCity.coord));
+
+  // BFS to find all tiles connected to the capital
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const nb of axialNeighbours(current)) {
+      const key = tileKey(nb);
+      if (connectedKeys.has(key)) continue;
+      const tile = tiles.get(key);
+      if (!tile) continue;
+      // Check if tile is part of any city's territory or is a city itself
+      const isConnectedTile = cities.some(c => 
+        (c.coord.q === nb.q && c.coord.r === nb.r) || // city itself
+        c.territory.some(t => t.q === nb.q && t.r === nb.r) // territory tile
+      );
+      if (isConnectedTile) {
+        connectedKeys.add(key);
+        queue.push(nb);
+      }
+    }
+  }
+
+  // Find disconnected cities and process them
+  for (const city of cities) {
+    if (city.isCapital) continue;
+    if (connectedKeys.has(tileKey(city.coord))) continue;
+
+    // Disconnected city: find nearest connected city
+    let nearestConnectedCity: City | null = null;
+    let minDist = Infinity;
+    for (const connectedCity of cities) {
+      if (connectedCity === city) continue;
+      if (!connectedKeys.has(tileKey(connectedCity.coord))) continue;
+      const dist = axialDistance(city.coord, connectedCity.coord);
+      if (dist < minDist) {
+        minDist = dist;
+        nearestConnectedCity = connectedCity;
+      }
+    }
+
+    if (!nearestConnectedCity) continue;
+
+    // Compute A* path from disconnected city to nearest connected city
+    const path = aStarPath(city.coord, nearestConnectedCity.coord, world, 'hero');
+    if (path.length === 0) continue;
+
+    // Fetch folder structure for the disconnected city's repo
+    let folderStructure: string[] = [];
+    try {
+      const repoName = city.name;
+      const res = await fetch(`/api/files/${encodeURIComponent(repoName)}`);
+      if (res.ok) {
+        const data = await res.json() as { files: string[] };
+        // Extract unique top-level folders
+        const folders = new Set<string>();
+        for (const f of data.files) {
+          const slash = f.indexOf('/');
+          if (slash > 0) folders.add(f.slice(0, slash));
+        }
+        folderStructure = Array.from(folders);
+      }
+    } catch { /* ignore */ }
+
+    // Set intermediate tiles: terrain = 'plains', add folder structure
+    for (const coord of path) {
+      const key = tileKey(coord);
+      let tile = tiles.get(key);
+      if (!tile) {
+        // Create new tile if it doesn't exist
+        tile = {
+          coord,
+          terrain: 'plains',
+          resources: { gold: 0, science: 0, production: 0 },
+          inFog: false,
+          revealed: true,
+          folderStructure: folderStructure.length > 0 ? folderStructure : undefined,
+        };
+        tiles.set(key, tile);
+      } else {
+        tile.terrain = 'plains';
+        tile.inFog = false;
+        tile.revealed = true;
+        if (folderStructure.length > 0) tile.folderStructure = folderStructure;
+      }
+    }
+  }
+
+  // Clear path cache since tiles changed
+  invalidatePathCache();
+}
+
+// ─── Dynamic city add/remove helpers ────────────────────────────────
+export function addCityToWorld(world: World, repo: ScannedRepo, coord: Axial): City {
+  const city: City = {
+    id: repo.name,
+    name: repo.name,
+    coord,
+    population: repo.population,
+    territory: [coord, ...axialRange(coord, 2)],
+    districts: [],
+    buildings: [],
+    isCapital: false,
+  };
+  world.cities.push(city);
+  // Add city tile to world.tiles
+  world.tiles.set(tileKey(coord), {
+    coord,
+    terrain: repo.terrain ?? 'plains',
+    city,
+    resources: { gold: repo.gold, science: repo.science, production: repo.production },
+    inFog: false,
+    revealed: true,
+  });
+  return city;
+}
+
+export function removeCityFromWorld(world: World, cityName: string): boolean {
+  const idx = world.cities.findIndex(c => c.name === cityName);
+  if (idx === -1) return false;
+  const [city] = world.cities.splice(idx, 1);
+  // Remove city tile from world.tiles
+  world.tiles.delete(tileKey(city.coord));
+  // Remove any units on this city
+  world.units = world.units.filter(u => tileKey(u.coord) !== tileKey(city.coord));
+  return true;
+}
+
+// ─── World generator ─────────────────────────────────────────────────
 export async function generateWorld(): Promise<World> {
   const tiles = new Map<string, Tile>();
   const cities: City[] = [];
@@ -478,108 +613,10 @@ export async function generateWorld(): Promise<World> {
     restAreas: [],
   };
 
-  // Find connected component of the capital (first city is capital)
-  const capitalCity = cities[0];
-  if (capitalCity) {
-    const connectedKeys = new Set<string>();
-    const queue: Axial[] = [capitalCity.coord];
-    connectedKeys.add(tileKey(capitalCity.coord));
+  // Reconnect cities dynamically (BFS + A* + intermediate tiles)
+  await reconnectCities(world);
 
-    // BFS to find all tiles connected to the capital
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      for (const nb of axialNeighbours(current)) {
-        const key = tileKey(nb);
-        if (connectedKeys.has(key)) continue;
-        const tile = tiles.get(key);
-        if (!tile) continue;
-        // Check if tile is part of any city's territory or is a city itself
-        const isConnectedTile = cities.some(c => 
-          (c.coord.q === nb.q && c.coord.r === nb.r) || // city itself
-          c.territory.some(t => t.q === nb.q && t.r === nb.r) // territory tile
-        );
-        if (isConnectedTile) {
-          connectedKeys.add(key);
-          queue.push(nb);
-        }
-      }
-    }
-
-    // Find disconnected cities and process them
-    for (const city of cities) {
-      if (city.isCapital) continue;
-      if (connectedKeys.has(tileKey(city.coord))) continue;
-
-      // Disconnected city: find nearest connected city
-      let nearestConnectedCity: City | null = null;
-      let minDist = Infinity;
-      for (const connectedCity of cities) {
-        if (connectedCity === city) continue;
-        if (!connectedKeys.has(tileKey(connectedCity.coord))) continue;
-        const dist = axialDistance(city.coord, connectedCity.coord);
-        if (dist < minDist) {
-          minDist = dist;
-          nearestConnectedCity = connectedCity;
-        }
-      }
-
-      if (!nearestConnectedCity) continue;
-
-      // Compute A* path from disconnected city to nearest connected city
-      const path = aStarPath(city.coord, nearestConnectedCity.coord, world, 'hero');
-      if (path.length === 0) continue;
-
-      // Fetch folder structure for the disconnected city's repo
-      let folderStructure: string[] = [];
-      try {
-        const repoName = city.name;
-        const res = await fetch(`/api/files/${encodeURIComponent(repoName)}`);
-        if (res.ok) {
-          const data = await res.json() as { files: string[] };
-          // Extract unique top-level folders
-          const folders = new Set<string>();
-          for (const f of data.files) {
-            const slash = f.indexOf('/');
-            if (slash > 0) folders.add(f.slice(0, slash));
-          }
-          folderStructure = Array.from(folders);
-        }
-      } catch { /* ignore */ }
-
-      // Set intermediate tiles: terrain = 'plains', add folder structure
-      for (const coord of path) {
-        const key = tileKey(coord);
-        let tile = tiles.get(key);
-        if (!tile) {
-          // Create new tile if it doesn't exist
-          tile = {
-            coord,
-            terrain: 'plains',
-            resources: { gold: 0, science: 0, production: 0 },
-            inFog: false,
-            revealed: true,
-            folderStructure: folderStructure.length > 0 ? folderStructure : undefined,
-          };
-          tiles.set(key, tile);
-        } else {
-          tile.terrain = 'plains';
-          tile.inFog = false;
-          tile.revealed = true;
-          if (folderStructure.length > 0) tile.folderStructure = folderStructure;
-        }
-      }
-    }
-  }
-
-  return {
-    tiles,
-    cities,
-    units: [],
-    buildings: [],
-    resources: { gold: totalGold, science: totalScience, production: totalProduction },
-    generatedAt: Date.now(),
-    restAreas: [], // Phase 9: XCOM Context Fatigue
-  };
+  return world;
 }
 
 export function showMapLoadError(message: string) {

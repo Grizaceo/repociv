@@ -353,6 +353,11 @@ export class GameState {
     for (const l of this.listeners) l();
   }
 
+  /** Public helper to trigger state notifications (e.g., after dynamic world updates). */
+  notifyUpdate() {
+    this.notify();
+  }
+
   // ─── Get unit by id ───────────────────────────────────────────────────────
   getUnit(id: string): Unit | undefined {
     return this.unitMap.get(id);
