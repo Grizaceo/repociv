@@ -559,6 +559,9 @@ def _dispatch_command(cmd: Command) -> None:
 
 
 # ─── HTTP Handler ─────────────────────────────────────────────────────────────
+from . import http_routes as _routes
+
+
 class BridgeHandler(BaseHTTPRequestHandler):
 
     def _origin(self) -> str:
@@ -592,246 +595,107 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self._cors()
         self.end_headers()
 
+    def _parse_qs(self) -> dict[str, str]:
+        """Parse query string into a flat dict."""
+        params: dict[str, str] = {}
+        qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+        for part in qs.split("&"):
+            if "=" in part:
+                k, _, v = part.partition("=")
+                params[k] = v
+        return params
+
+    def _respond(self, status: int, data: Any) -> None:
+        """Write a JSON response with CORS headers."""
+        if status == 200:
+            self._json(data)
+        else:
+            payload = json.dumps(data).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self._cors()
+            self.end_headers()
+            self.wfile.write(payload)
+
     def do_GET(self) -> None:
         path = self.path.split("?")[0]
+        params = self._parse_qs()
+        ctx: dict[str, Any] = {"params": params}
 
-        if path == "/health":
-            self._json({
-                "ok": True,
-                "openclaw": _has_openclaw(),
-                "claudeCode": _has_claude_code(),
-                "cursor": _has_cursor(),
-                "defaultTransport": "hermes",
-            })
+        # ── Simple exact-match GET routes ──────────────────────────────────────
+        _GET_EXACT: dict[str, Any] = {
+            "/health":             _routes.get_health,
+            "/ready":              _routes.get_ready,
+            "/missions":           _routes.get_missions,
+            "/gpu":                _routes.get_gpu,
+            "/pending":            _routes.get_pending,
+            "/techdebt":          _routes.get_techdebt,
+            "/context":            _routes.get_context,
+            "/approvals":          _routes.get_approvals,
+            "/agents":             _routes.get_agents,
+            "/agents/capabilities": _routes.get_agents_capabilities,
+            "/api/providers":      _routes.get_chat_config,
+            "/providers":          _routes.get_chat_config,   # Vite proxy alias
+            "/api/chat-config":    _routes.get_chat_config,   # back-compat alias
+            "/metrics":            _routes.get_metrics,
+            "/directives/stats":   _routes.get_directives_stats,
+            "/directives/suggest": _routes.get_directives_suggest,
+            "/harnesses":          _routes.get_harnesses,
+            "/log":                _routes.get_log,
+            "/tasks":              _routes.get_tasks,
+            "/improve/reflect":    _routes.get_improve_reflect,
+            "/improve/proposals":  _routes.get_improve_proposals,
+        }
+        if path in _GET_EXACT:
+            status, body = _GET_EXACT[path](ctx)
+            self._respond(status, body)
             return
 
-        if path == "/ready":
-            self._json({"ok": True, "eventStore": str(_es._store_path), "token": bool(REPOCIV_TOKEN)})
-            return
-
-        if path == "/missions":
-            self._json(load_missions())
-            return
-
-        if path == "/gpu":
-            self._json(get_gpu_info())
-            return
-
-        if path == "/pending":
-            self._json(load_pending_tasks())
-            return
-
-        if path == "/techdebt":
-            root = os.environ.get("REPOCIV_REPOS_ROOT",
-                                  str(Path(__file__).parent.parent / "workspace" / "repos"))
-            self._json(scan_tech_debt(root))
-            return
-
-        if path == "/context":
-            self._json({"ok": True, "fatigue": _fatigue_state, "restAreas": _rest_areas})
-            return
-
+        # ── SSE stream ────────────────────────────────────────────────────────
         if path == "/events":
             accept = self.headers.get("Accept", "")
             if "text/event-stream" in accept:
                 self._sse_stream()
                 return
             try:
-                qs = self.path.split("?", 1)[1] if "?" in self.path else ""
-                since = 0.0
-                for part in qs.split("&"):
-                    if part.startswith("since="):
-                        since = float(part.split("=", 1)[1])
+                since = float(params.get("since", "0"))
             except Exception:
                 since = 0.0
             self._json(_es.read_events(since=since))
             return
 
-        if path == "/approvals":
-            self._json(_get_approvals())
-            return
-
-        if path == "/agents":
-            self._json({
-                "agents": _sched.get_agent_status(),
-                "queueDepth": len(_sched.queue_snapshot()),
-                "queue": _sched.queue_snapshot()[:20],
-            })
-            return
-
-        if path == "/agents/capabilities":
-            self._json(capabilities_snapshot())
-            return
-
-        if path == "/api/providers":
-            self._json(_get_chat_config())
-            return
-
-        # Alias without /api prefix (for Vite proxy /bridge → bridge)
-        if path == "/providers":
-            self._json(_get_chat_config())
-            return
-
-        # Back-compat: /api/chat-config alias
-        if path == "/api/chat-config":
-            self._json(_get_chat_config())
-            return
-
-        if path == "/metrics":
-            events = _es.read_events(since=0, limit=500)
-            agent_status = _sched.get_agent_status()
-            queue_depth = len(_sched.queue_snapshot())
-            gpu = get_gpu_info()
-            payload = compute_metrics(events, agent_status, queue_depth, gpu)
-            # Inject circuit breaker count from task registry
-            payload["circuitOpenCount"] = _to.count_circuit_open()
-            self._json(payload)
-            return
-
-        if path == "/directives/stats":
-            records = _ds.read_records()
-            self._json(_dl.stats_snapshot(records))
-            return
-
-        if path == "/directives/suggest":
-            qs = self.path.split("?", 1)[1] if "?" in self.path else ""
-            params: dict[str, str] = {}
-            for part in qs.split("&"):
-                if "=" in part:
-                    k, _, v = part.partition("=")
-                    params[k] = v
-            gesture  = params.get("gesture", "")
-            agent_id = params.get("agent", "DAVI")
-            records  = _ds.read_records()
-            # Optional context for smarter scoring
-            ctx: dict[str, Any] | None = None
-            if params.get("repoType") or params.get("testStatus") or params.get("lastCmdType"):
-                ctx = {}
-                if params.get("repoType"):
-                    ctx["repoType"] = params["repoType"]
-                if params.get("testStatus"):
-                    ctx["testStatus"] = params["testStatus"]
-                if params.get("lastCmdType"):
-                    ctx["lastCmdType"] = params["lastCmdType"]
-            self._json(_dl.suggest(gesture, agent_id, records, current_context=ctx))
-            return
-
-        # ─── Harness registry ────────────────────────────────────────────────────
-        # GET /harnesses           — list all harnesses
-        if path == "/harnesses":
-            self._json(_hr.list_harnesses())
-            return
-
-        # GET /harnesses/<id>     — single harness detail
+        # ── Prefix-match GET routes ────────────────────────────────────────────
         if path.startswith("/harnesses/"):
-            harness_id = path.split("/", 2)[2]
-            harness = _hr.get_harness(harness_id)
-            if harness is None:
-                self.send_response(404)
-                self._cors()
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": f"Harness '{harness_id}' not found"}).encode())
-                return
-            self._json(harness)
+            ctx["harness_id"] = path.split("/", 2)[2]
+            status, body = _routes.get_harness_by_id(ctx)
+            self._respond(status, body)
             return
 
-        # GET /log — last N events from the event store (D3 live log panel)
-        if path == "/log":
-            try:
-                qs = self.path.split("?", 1)[1] if "?" in self.path else ""
-                params: dict[str, str] = {}
-                for part in qs.split("&"):
-                    if "=" in part:
-                        k, _, v = part.partition("=")
-                        params[k] = v
-                n = min(max(1, int(params.get("n", "100"))), 500)
-                event_type_filter = params.get("type", "")
-            except Exception:
-                n = 100
-                event_type_filter = ""
-            events = _es.read_events(since=0, limit=500)
-            if event_type_filter:
-                events = [e for e in events if e.get("type") == event_type_filter]
-            self._json(events[-n:])
-            return
-
-        # GET /tasks — list all tasks from orchestrator registry (C3)
-        if path == "/tasks":
-            self._json(_to.list_tasks())
-            return
-
-        # ─── SICA self-improvement (Fase 5, opt-in) ──────────────────────────
-        # Read-only inspection: surface patterns and proposals so the user
-        # (alpha tester) can decide if any are worth acting on. No changes
-        # are ever applied through GET.
-        if path == "/improve/reflect":
-            try:
-                from server.self_improve import SelfImprovementEngine
-                engine = SelfImprovementEngine()
-                patterns = engine.reflect()
-                self._json({
-                    "patterns": [
-                        {
-                            "kind": p.kind,
-                            "summary": p.summary,
-                            "evidence": p.evidence,
-                            "confidence": p.confidence,
-                        }
-                        for p in patterns
-                    ]
-                })
-            except Exception as exc:
-                self.send_response(500)
-                self._cors()
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(exc)}).encode())
-            return
-
-        if path == "/improve/proposals":
-            try:
-                from server.self_improve import SelfImprovementEngine
-                engine = SelfImprovementEngine()
-                proposals = []
-                for pattern in engine.reflect():
-                    try:
-                        improvement = engine.propose_improvement(pattern)
-                    except Exception:
-                        continue
-                    proposals.append({
-                        "id": improvement.id,
-                        "targetType": improvement.target_type,
-                        "filePath": improvement.file_path,
-                        "description": improvement.description,
-                        "rationale": improvement.rationale,
-                        "payload": improvement.payload,
-                    })
-                self._json({"proposals": proposals})
-            except Exception as exc:
-                self.send_response(500)
-                self._cors()
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(exc)}).encode())
-            return
-
-        # GET /tasks/<repo>/<issueId> — task orchestrator status (P3)
         if path.startswith("/tasks/"):
             parts = path.split("/")[2:]
             if len(parts) >= 3 and parts[2] == "circuit-status":
-                repo, issue_id = parts[0], parts[1]
-                self._json(_to.get_circuit_status(repo, issue_id))
+                ctx["repo"], ctx["issue_id"], ctx["circuit"] = parts[0], parts[1], True
+            elif len(parts) >= 2:
+                ctx["repo"], ctx["issue_id"], ctx["circuit"] = parts[0], parts[1], False
+            else:
+                self.send_response(404)
+                self._cors()
+                self.end_headers()
                 return
-            if len(parts) >= 2:
-                repo, issue_id = parts[0], parts[1]
-                status = _to.get_task_status(repo, issue_id)
-                self._json(status)
-                return
+            status, body = _routes.get_task_by_key(ctx)
+            self._respond(status, body)
+            return
 
         self.send_response(404)
         self._cors()
         self.end_headers()
 
+    # placeholder to keep next method visible
+    def _do_GET_placeholder(self) -> None:
+        pass
+
+
     def do_POST(self) -> None:
-        # Rate limit check (before reading body)
         if self._rate_limited():
             self.send_response(429)
             self._cors()
@@ -867,7 +731,22 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         path = self.path.split("?")[0]
 
-        # ─── Cancel a queued command ──────────────────────────────────────────
+        # ── Simple exact-match POST routes ────────────────────────────────────
+        _POST_EXACT: dict[str, Any] = {
+            "/directives/record": _routes.post_directives_record,
+            "/commands":          _routes.post_commands,
+            "/pending/add":       _routes.post_pending_add,
+            "/pending/resolve":   _routes.post_pending_resolve,
+            "/pending/edit":      _routes.post_pending_edit,
+            "/pending/delete":    _routes.post_pending_delete,
+            "/pending/state":     _routes.post_pending_state,
+        }
+        if path in _POST_EXACT:
+            status, resp = _POST_EXACT[path](body, {})
+            self._respond(status, resp)
+            return
+
+        # ── Prefix-match POST routes ───────────────────────────────────────────
         if path.startswith("/commands/") and path.endswith("/cancel"):
             cmd_id = path.split("/")[2]
             removed = _sched.cancel(cmd_id)
@@ -882,7 +761,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._json({"ok": removed, "commandId": cmd_id})
             return
 
-        # ─── Cancel a task (C3) ───────────────────────────────────────────────
         if path.startswith("/tasks/") and path.endswith("/cancel"):
             # URL pattern: /tasks/<encoded_key>/cancel where key = "repo::ISSUE-id"
             # We support both /tasks/repo::ISSUE-1/cancel and /tasks/repo/ISSUE-1/cancel
@@ -905,7 +783,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._json({"ok": cancelled, "key": f"{task_repo}::{task_issue}"})
             return
 
-        # ─── Directive gesture record (Fase 9) ───────────────────────────────────
+        # ─── Legacy root POST ─────────────────────────────────────────────────
         if path == "/directives/record":
             command_id = str(body.get("commandId", ""))
             gesture    = str(body.get("gesture",   ""))
