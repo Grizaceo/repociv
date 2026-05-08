@@ -572,8 +572,14 @@ export default defineConfig(({ mode }) => {
     server: {
       port: vitePort,
       strictPort: true,
+      host: true,
       proxy: {
         '/api/providers': {
+          target: `http://localhost:${env.BRIDGE_PORT ?? '5274'}`,
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api/pending': {
           target: `http://localhost:${env.BRIDGE_PORT ?? '5274'}`,
           changeOrigin: true,
           secure: false,

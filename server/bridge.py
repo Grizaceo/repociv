@@ -651,6 +651,200 @@ def resolve_pending_task(item_id: str) -> bool:
         return False
 
 
+def edit_pending_task(item_id: str, title: str | None = None,
+                      priority: str | None = None,
+                      detail: str | None = None) -> bool:
+    """Edit fields of an existing pending item. Returns True if found and updated."""
+    try:
+        if not PENDING_TRACKER.exists():
+            return False
+        content = PENDING_TRACKER.read_text(encoding="utf-8")
+        lines = content.splitlines()
+
+        # Find the item block
+        item_start = -1
+        item_end = -1
+        current_section = ""
+        for i, line in enumerate(lines):
+            # Track section
+            sec = re.match(r"^##\s+\[(\w+)\]", line)
+            if sec:
+                current_section = sec.group(1).upper()
+                continue
+            sec2 = re.match(r"^##\s+(\w[\w /-]*)", line)
+            if sec2 and not sec:
+                name = sec2.group(1).strip().upper()
+                if "HECHO" in name:
+                    current_section = "HECHO"
+                elif "DESCARTADO" in name or "MOVIDO" in name:
+                    current_section = "DESCARTADOS"
+                elif "STALE" in name:
+                    current_section = "STALE"
+                else:
+                    current_section = name
+                continue
+
+            m = _ITEM_RE.match(line)
+            if m and m.group(1) == item_id:
+                item_start = i
+                item_section = current_section
+                for j in range(i + 1, len(lines)):
+                    if lines[j].startswith("### [") or lines[j].startswith("## "):
+                        item_end = j
+                        break
+                if item_end == -1:
+                    item_end = len(lines)
+                break
+
+        if item_start == -1:
+            return False
+
+        item_lines = lines[item_start:item_end]
+
+        # Edit title in the header line
+        if title is not None and title.strip():
+            old_header = item_lines[0]
+            m = _ITEM_RE.match(old_header)
+            if m:
+                state_part = m.group(3).strip()
+                item_lines[0] = f"### [{item_id}] {title.strip()} — {state_part}"
+
+        # Edit detail
+        if detail is not None:
+            # Remove old detail block
+            new_item_lines = []
+            in_detail = False
+            detail_done = False
+            for il in item_lines:
+                if not detail_done and _DETAIL_RE.match(il):
+                    in_detail = True
+                    detail_done = True
+                    # Skip until end of detail
+                    continue
+                if in_detail:
+                    if _SIGUIENTE_RE.match(il) or _UBICACION_RE.match(il) or il.startswith("**Notas:**") or il.strip() == "---":
+                        in_detail = False
+                        new_item_lines.append(il)
+                    continue
+                new_item_lines.append(il)
+            # Insert new detail after Estado line
+            insert_after = -1
+            for idx, il in enumerate(new_item_lines):
+                if _STATE_RE.match(il):
+                    insert_after = idx
+                    break
+            if insert_after >= 0:
+                detail_lines = ["**Detalle:**"] + detail.splitlines()
+                item_lines = new_item_lines[:insert_after + 1] + detail_lines + new_item_lines[insert_after + 1:]
+            else:
+                item_lines = new_item_lines
+
+        # If priority changed, move the block
+        if priority is not None and priority.upper() != item_section and priority.upper() in _ACTIVE_SECTIONS:
+            # Remove item from current position
+            remaining = lines[:item_start] + lines[item_end:]
+            # Insert into new section
+            new_section_marker = f"[{priority.upper()}]"
+            inserted = False
+            result2: list[str] = []
+            i = 0
+            while i < len(remaining):
+                result2.append(remaining[i])
+                if new_section_marker in remaining[i] and remaining[i].strip().startswith("##"):
+                    i += 1
+                    while i < len(remaining):
+                        if remaining[i].startswith("### ["):
+                            result2.extend(item_lines)
+                            inserted = True
+                            break
+                        if remaining[i].startswith("## "):
+                            result2.extend(item_lines)
+                            inserted = True
+                            break
+                        result2.append(remaining[i])
+                        i += 1
+                    if inserted:
+                        while i < len(remaining):
+                            result2.append(remaining[i])
+                            i += 1
+                        break
+                i += 1
+            if not inserted:
+                result2.extend(item_lines)
+            lines = result2
+        else:
+            lines = lines[:item_start] + item_lines + lines[item_end:]
+
+        PENDING_TRACKER.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return True
+    except Exception as e:
+        print(f"[bridge] No pude editar pendiente: {e}")
+        return False
+
+
+def delete_pending_task(item_id: str) -> bool:
+    """Remove an item entirely from PENDING_TRACKER.md. Returns True if found."""
+    try:
+        if not PENDING_TRACKER.exists():
+            return False
+        content = PENDING_TRACKER.read_text(encoding="utf-8")
+        lines = content.splitlines()
+
+        item_start = -1
+        item_end = -1
+        for i, line in enumerate(lines):
+            m = _ITEM_RE.match(line)
+            if m and m.group(1) == item_id:
+                item_start = i
+                for j in range(i + 1, len(lines)):
+                    if lines[j].startswith("### [") or lines[j].startswith("## "):
+                        item_end = j
+                        break
+                if item_end == -1:
+                    item_end = len(lines)
+                break
+
+        if item_start == -1:
+            return False
+
+        remaining = lines[:item_start] + lines[item_end:]
+        PENDING_TRACKER.write_text("\n".join(remaining) + "\n", encoding="utf-8")
+        return True
+    except Exception as e:
+        print(f"[bridge] No pude eliminar pendiente: {e}")
+        return False
+
+
+def change_pending_state(item_id: str, new_state: str) -> bool:
+    """Change the state emoji of an item (🔵 🟡 🟢 🔴). Returns True if found."""
+    valid_states = {"🔵", "🟡", "🟢", "🔴"}
+    if new_state not in valid_states:
+        return False
+    try:
+        if not PENDING_TRACKER.exists():
+            return False
+        content = PENDING_TRACKER.read_text(encoding="utf-8")
+        lines = content.splitlines()
+
+        for i, line in enumerate(lines):
+            m = _ITEM_RE.match(line)
+            if m and m.group(1) == item_id:
+                # Update state in header line
+                old_title = m.group(2).strip()
+                lines[i] = f"### [{item_id}] {old_title} — {new_state}"
+                # Update Estado line
+                for j in range(i + 1, min(i + 5, len(lines))):
+                    if _STATE_RE.match(lines[j]):
+                        lines[j] = f"**Estado:** {new_state}"
+                        break
+                PENDING_TRACKER.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                return True
+        return False
+    except Exception as e:
+        print(f"[bridge] No pude cambiar estado: {e}")
+        return False
+
+
 # ─── Process scanner ──────────────────────────────────────────────────────────
 PROCESS_KEYWORDS = ["python train", "python3 train", "cargo run", "cargo build",
                     "npm run", "vite", "pytest", "uvicorn", "flask run"]
@@ -1808,6 +2002,69 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 self.wfile.write(b'{"error":"item not found"}')
                 return
             self._json({"ok": True, "id": item_id})
+            return
+
+        if path == "/pending/edit":
+            item_id = str(body.get("id", "")).strip()
+            title = body.get("title")
+            priority = body.get("priority")
+            detail = body.get("detail")
+            if not item_id:
+                self.send_response(400)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(b'{"error":"id is required"}')
+                return
+            ok = edit_pending_task(
+                item_id,
+                title=str(title).strip() if title else None,
+                priority=str(priority).upper().strip() if priority else None,
+                detail=str(detail) if detail else None,
+            )
+            if not ok:
+                self.send_response(404)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(b'{"error":"item not found"}')
+                return
+            self._json({"ok": True, "id": item_id})
+            return
+
+        if path == "/pending/delete":
+            item_id = str(body.get("id", "")).strip()
+            if not item_id:
+                self.send_response(400)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(b'{"error":"id is required"}')
+                return
+            ok = delete_pending_task(item_id)
+            if not ok:
+                self.send_response(404)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(b'{"error":"item not found"}')
+                return
+            self._json({"ok": True, "id": item_id})
+            return
+
+        if path == "/pending/state":
+            item_id = str(body.get("id", "")).strip()
+            new_state = str(body.get("state", "")).strip()
+            if not item_id or not new_state:
+                self.send_response(400)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(b'{"error":"id and state are required"}')
+                return
+            ok = change_pending_state(item_id, new_state)
+            if not ok:
+                self.send_response(404)
+                self._cors()
+                self.end_headers()
+                self.wfile.write(b'{"error":"item not found or invalid state"}')
+                return
+            self._json({"ok": True, "id": item_id, "state": new_state})
             return
 
         self._json({"ok": True, "ignored": t})

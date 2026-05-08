@@ -1,8 +1,8 @@
 // ─── RepoCiv — Pending Tracker Panel (Fase F) ─────────────────────────────────
 // Side panel listing all active items from PENDING_TRACKER.md.
 // Shows: [ID] Title — State emoji — Priority, grouped by priority.
-// Click expands detail. Form inline to add. "✓ Resolver" per item.
-// Polls every 5s while open.
+// Click expands detail. Inline edit form. State changer. Delete button.
+// "✓ Resolver" moves to HECHO. Polls every 5s while open.
 import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
 
@@ -13,7 +13,7 @@ export interface PendingItem {
   id: string;
   title: string;
   priority: string;  // ALTA | MEDIA | BAJA
-  state: string;     // 🔵 | 🟡 | 🟢 | 🟴
+  state: string;     // 🔵 | 🟡 | 🟢 | 🔴
   stateText: string;
   detail: string;
 }
@@ -25,6 +25,14 @@ let _visible = false;
 let _items: PendingItem[] = [];
 let _offline = false;
 let _expandedId: string | null = null;
+let _editingId: string | null = null;
+
+const STATE_OPTIONS = [
+  { value: '🔵', label: '🔵 registrada' },
+  { value: '🟡', label: '🟡 en progreso' },
+  { value: '🟢', label: '🟢 operativo' },
+  { value: '🔴', label: '🔴 descartada' },
+];
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 export function openPendingPanel(): void {
@@ -38,6 +46,7 @@ export function closePendingPanel(): void {
   _visible = false;
   _stopPolling();
   _expandedId = null;
+  _editingId = null;
   if (_panel) hidePanel(_panel);
 }
 
@@ -65,6 +74,7 @@ function _stopPolling(): void {
   }
 }
 
+// ─── API calls ────────────────────────────────────────────────────────────────
 async function _fetch(): Promise<void> {
   try {
     const res = await fetch(bridgeUrl('/pending'), { headers: bridgeHeaders() });
@@ -90,9 +100,7 @@ async function _addItem(title: string, priority: string): Promise<void> {
       body: JSON.stringify({ title, priority }),
     });
     if (res.ok) void _fetch();
-  } catch {
-    // Ignore — will refresh on next poll
-  }
+  } catch { /* will refresh on next poll */ }
 }
 
 async function _resolveItem(id: string): Promise<void> {
@@ -103,14 +111,56 @@ async function _resolveItem(id: string): Promise<void> {
       body: JSON.stringify({ id }),
     });
     if (res.ok) {
-      // Remove from local state immediately
       _items = _items.filter((it) => it.id !== id);
-      if (_expandedId === id) _expandedId = null;
+      if (_expandedId === id) { _expandedId = null; _editingId = null; }
       if (_visible) _render();
     }
-  } catch {
-    // Ignore — will refresh on next poll
-  }
+  } catch { /* will refresh on next poll */ }
+}
+
+async function _editItem(id: string, title: string, priority: string, detail: string): Promise<void> {
+  try {
+    const res = await fetch(bridgeUrl('/pending/edit'), {
+      method: 'POST',
+      headers: { ...bridgeHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, title, priority, detail }),
+    });
+    if (res.ok) void _fetch();
+  } catch { /* will refresh on next poll */ }
+}
+
+async function _deleteItem(id: string): Promise<void> {
+  try {
+    const res = await fetch(bridgeUrl('/pending/delete'), {
+      method: 'POST',
+      headers: { ...bridgeHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (res.ok) {
+      _items = _items.filter((it) => it.id !== id);
+      if (_expandedId === id) { _expandedId = null; _editingId = null; }
+      if (_visible) _render();
+    }
+  } catch { /* will refresh on next poll */ }
+}
+
+async function _changeState(id: string, state: string): Promise<void> {
+  try {
+    const res = await fetch(bridgeUrl('/pending/state'), {
+      method: 'POST',
+      headers: { ...bridgeHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, state }),
+    });
+    if (res.ok) {
+      const item = _items.find((it) => it.id === id);
+      if (item) {
+        item.state = state;
+        const opt = STATE_OPTIONS.find((o) => o.value === state);
+        item.stateText = opt ? opt.label : state;
+      }
+      if (_visible) _render();
+    }
+  } catch { /* will refresh on next poll */ }
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
@@ -119,7 +169,7 @@ function _render(): void {
   const body = panel.querySelector<HTMLElement>('.pending-body')!;
 
   if (_offline) {
-    body.innerHTML = '<div class="pending-offline">⚠ Bridge offline — sin datos</div>';
+    body.innerHTML = '<div class="pending-offline">⚠ Bridge offline — reintentando...</div>';
     return;
   }
 
@@ -146,7 +196,7 @@ function _render(): void {
     const items = groups[pri];
     if (!items || items.length === 0) continue;
     html += `<div class="pending-group">
-      <div class="pending-group-header">${_esc(pri)}</div>
+      <div class="pending-group-header">${_esc(pri)} (${items.length})</div>
       ${items.map((it) => _renderItem(it)).join('')}
     </div>`;
   }
@@ -157,9 +207,9 @@ function _render(): void {
   // Wire interactions
   body.querySelectorAll<HTMLElement>('.pending-item-row').forEach((row) => {
     row.addEventListener('click', (e) => {
-      // Don't toggle if clicking resolve button
-      if ((e.target as HTMLElement).closest('.btn-resolve')) return;
+      if ((e.target as HTMLElement).closest('.btn-resolve, .btn-edit, .btn-delete, .btn-state, .pending-state-select')) return;
       const id = row.dataset['id'] ?? '';
+      if (_editingId === id) return; // Don't collapse while editing
       _expandedId = _expandedId === id ? null : id;
       _render();
     });
@@ -173,25 +223,118 @@ function _render(): void {
     });
   });
 
+  body.querySelectorAll<HTMLButtonElement>('.btn-edit').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.dataset['id'] ?? '';
+      if (id) {
+        _editingId = _editingId === id ? null : id;
+        _expandedId = id;
+        _render();
+      }
+    });
+  });
+
+  body.querySelectorAll<HTMLButtonElement>('.btn-delete').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.dataset['id'] ?? '';
+      const item = _items.find((it) => it.id === id);
+      if (id && item && confirm(`¿Eliminar "${item.title}" del tracker?`)) {
+        void _deleteItem(id);
+      }
+    });
+  });
+
+  body.querySelectorAll<HTMLSelectElement>('.pending-state-select').forEach((sel) => {
+    sel.addEventListener('click', (e) => e.stopPropagation());
+    sel.addEventListener('change', () => {
+      const id = sel.dataset['id'] ?? '';
+      const state = sel.value;
+      if (id && state) void _changeState(id, state);
+    });
+  });
+
+  // Wire edit forms
+  body.querySelectorAll<HTMLFormElement>('.pending-edit-form').forEach((form) => {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = form.dataset['id'] ?? '';
+      const title = (form.querySelector('.edit-title') as HTMLInputElement)?.value.trim();
+      const priority = (form.querySelector('.edit-priority') as HTMLSelectElement)?.value;
+      const detail = (form.querySelector('.edit-detail') as HTMLTextAreaElement)?.value.trim();
+      if (id && title) {
+        void _editItem(id, title, priority, detail);
+        _editingId = null;
+      }
+    });
+  });
+
   _wireForm(body);
 }
 
 function _renderItem(item: PendingItem): string {
   const isExpanded = _expandedId === item.id;
-  const detailHtml = isExpanded && item.detail
-    ? `<div class="pending-detail">${_esc(item.detail).replace(/\n/g, '<br>')}</div>`
-    : '';
+  const isEditing = _editingId === item.id;
   const stateEmoji = item.state || '🔵';
 
+  // Detail section
+  let detailHtml = '';
+  if (isExpanded && item.detail) {
+    detailHtml = `<div class="pending-detail">${_esc(item.detail).replace(/\n/g, '<br>')}</div>`;
+  }
+
+  // Edit form
+  let editHtml = '';
+  if (isEditing) {
+    editHtml = `
+      <div class="pending-edit">
+        <form class="pending-edit-form" data-id="${_esc(item.id)}">
+          <div class="edit-row">
+            <label class="edit-label">Título</label>
+            <input type="text" class="edit-title" value="${_esc(item.title)}" required />
+          </div>
+          <div class="edit-row">
+            <label class="edit-label">Prioridad</label>
+            <select class="edit-priority">
+              <option value="ALTA" ${item.priority === 'ALTA' ? 'selected' : ''}>ALTA</option>
+              <option value="MEDIA" ${item.priority === 'MEDIA' ? 'selected' : ''}>MEDIA</option>
+              <option value="BAJA" ${item.priority === 'BAJA' ? 'selected' : ''}>BAJA</option>
+            </select>
+          </div>
+          <div class="edit-row">
+            <label class="edit-label">Detalle</label>
+            <textarea class="edit-detail" rows="4">${_esc(item.detail)}</textarea>
+          </div>
+          <div class="edit-actions">
+            <button type="submit" class="btn-save-edit">💾 Guardar</button>
+            <button type="button" class="btn-cancel-edit" data-action="cancel-edit" data-id="${_esc(item.id)}">✕ Cancelar</button>
+          </div>
+        </form>
+      </div>
+    `;
+  }
+
+  // State selector
+  const stateOptions = STATE_OPTIONS.map(
+    (o) => `<option value="${o.value}" ${item.state === o.value ? 'selected' : ''}>${o.label}</option>`
+  ).join('');
+
   return `
-    <div class="pending-item ${isExpanded ? 'expanded' : ''}" data-id="${_esc(item.id)}">
+    <div class="pending-item ${isExpanded ? 'expanded' : ''} ${isEditing ? 'editing' : ''}" data-id="${_esc(item.id)}">
       <div class="pending-item-row" data-id="${_esc(item.id)}">
         <span class="pending-id">[${_esc(item.id)}]</span>
         <span class="pending-title">${_esc(item.title)}</span>
-        <span class="pending-state" title="${_esc(item.stateText)}">${stateEmoji}</span>
-        <button class="btn-resolve" data-id="${_esc(item.id)}" title="Marcar como resuelto" aria-label="Resolver ${_esc(item.title)}">✓</button>
+        <select class="pending-state-select" data-id="${_esc(item.id)}" title="Cambiar estado">
+          ${stateOptions}
+        </select>
+        <button class="btn-edit" data-id="${_esc(item.id)}" title="Editar pendiente" aria-label="Editar ${_esc(item.title)}">✎</button>
+        <button class="btn-resolve" data-id="${_esc(item.id)}" title="Marcar como resuelto (mover a HECHO)" aria-label="Resolver ${_esc(item.title)}">✓</button>
+        <button class="btn-delete" data-id="${_esc(item.id)}" title="Eliminar pendiente" aria-label="Eliminar ${_esc(item.title)}">✕</button>
       </div>
       ${detailHtml}
+      ${editHtml}
     </div>
   `;
 }
@@ -216,7 +359,7 @@ function _renderForm(): string {
 function _wireForm(body: HTMLElement): void {
   const addBtn = body.querySelector<HTMLButtonElement>('#pending-btn-add');
   const input = body.querySelector<HTMLInputElement>('#pending-new-title');
-  const select = body.querySelector<HTMLSelectElement>("#pending-new-priority");
+  const select = body.querySelector<HTMLSelectElement>('#pending-new-priority');
 
   if (!addBtn || !input || !select) return;
 
@@ -231,6 +374,15 @@ function _wireForm(body: HTMLElement): void {
   addBtn.addEventListener('click', doAdd);
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') doAdd();
+  });
+
+  // Cancel edit buttons
+  body.querySelectorAll<HTMLButtonElement>('[data-action="cancel-edit"]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _editingId = null;
+      _render();
+    });
   });
 }
 
