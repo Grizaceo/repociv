@@ -91,6 +91,35 @@ const loadSteps = [
 ];
 
 async function bootstrap() {
+  // Global error handlers for capturing unhandled errors (e.g., merge folder errors)
+  window.onerror = (msg, source, lineno, colno, error) => {
+    console.error('[Global Error]', { msg, source, lineno, colno, error: error?.stack });
+    let el = document.getElementById('global-error-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'global-error-toast';
+      el.style.cssText = 'position:fixed;bottom:16px;left:16px;max-width:560px;padding:12px;background:rgba(180,30,30,0.9);color:#fff;font-family:monospace;font-size:12px;z-index:9999;border:1px solid #f44;border-radius:4px;';
+      document.body.appendChild(el);
+    }
+    el.textContent = `Error: ${msg} ${source ? `(${source}:${lineno})` : ''}`;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 8000);
+  };
+
+  window.onunhandledrejection = (event) => {
+    console.error('[Unhandled Rejection]', event.reason);
+    let el = document.getElementById('global-error-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'global-error-toast';
+      el.style.cssText = 'position:fixed;bottom:16px;left:16px;max-width:560px;padding:12px;background:rgba(180,30,30,0.9);color:#fff;font-family:monospace;font-size:12px;z-index:9999;border:1px solid #f44;border-radius:4px;';
+      document.body.appendChild(el);
+    }
+    el.textContent = `Unhandled Rejection: ${event.reason}`;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 8000);
+  };
+
   for (let i = 0; i < loadSteps.length; i++) {
     showLoadingProgress((i / loadSteps.length) * 100, loadSteps[i]!);
     await new Promise((r) => setTimeout(r, 200));

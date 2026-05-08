@@ -23,6 +23,8 @@ export interface Tile {
   revealed: boolean;
   skillHealth?: 'ok' | 'stale' | 'broken';
   sessionTint?: 'bright' | 'normal' | 'fog';
+  // Estructura de carpetas (para casillas intermedias que conectan ciudades desconectadas)
+  folderStructure?: string[]; // Lista de rutas de carpetas del repo principal
 }
 
 export interface TileResources {
