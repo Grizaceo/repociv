@@ -322,7 +322,7 @@ export async function reconnectCities(world: World): Promise<void> {
 }
 
 // ─── Dynamic city add/remove helpers ────────────────────────────────
-export function addCityToWorld(world: World, repo: ScannedRepo, coord: Axial): City {
+export function addCityToWorld(world: World, repo: ScannedRepo & { terrain?: Terrain; science?: number; production?: number }, coord: Axial): City {
   const city: City = {
     id: repo.name,
     name: repo.name,
@@ -339,7 +339,7 @@ export function addCityToWorld(world: World, repo: ScannedRepo, coord: Axial): C
     coord,
     terrain: repo.terrain ?? 'plains',
     city,
-    resources: { gold: repo.gold, science: repo.science, production: repo.production },
+    resources: { gold: repo.gold, science: repo.science ?? 0, production: repo.production ?? 0 },
     inFog: false,
     revealed: true,
   });
@@ -351,9 +351,9 @@ export function removeCityFromWorld(world: World, cityName: string): boolean {
   if (idx === -1) return false;
   const [city] = world.cities.splice(idx, 1);
   // Remove city tile from world.tiles
-  world.tiles.delete(tileKey(city.coord));
+  world.tiles.delete(tileKey(city!.coord));
   // Remove any units on this city
-  world.units = world.units.filter(u => tileKey(u.coord) !== tileKey(city.coord));
+  world.units = world.units.filter(u => tileKey(u.coord) !== tileKey(city!.coord));
   return true;
 }
 
