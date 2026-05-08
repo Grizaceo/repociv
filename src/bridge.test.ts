@@ -104,7 +104,9 @@ describe('BridgeEvents SSE transport', () => {
     src.message({ type: 'unit_spawn', unit: 'DAVI', civ: 'gris', hex: [0, 0] });
     src.message({ type: 'ping' });
 
-    expect(src.url).toBe('http://localhost:5274/events');
+    // In dev/test mode, bridgeUrl('/events') resolves to '/bridge/events' (Vite proxy prefix).
+    // In production with VITE_BRIDGE_URL set it would be the full absolute URL.
+    expect(src.url).toBe('/bridge/events');
     expect(state.spawned).toEqual(['DAVI']);
 
     bridge.stop();
