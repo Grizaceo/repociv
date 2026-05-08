@@ -342,8 +342,8 @@ function updateStatusIndicator() {
   if (!provSel) return;
 
   // Remove old indicator
-  const wrapper = document.getElementById('model-selector-wrapper');
-  const oldDot = wrapper?.querySelector('.selector-status-dot');
+  const parent = provSel.parentNode;
+  const oldDot = parent?.querySelector('.selector-status-dot');
   if (oldDot) oldDot.remove();
 
   // Determine status
@@ -362,7 +362,7 @@ function updateStatusIndicator() {
   const dot = document.createElement('span');
   dot.className = `selector-status-dot ${status}`;
   dot.title = `Provider: ${_selectedProvider || 'auto'} — ${status === 'ok' ? 'disponible' : status === 'warn' ? 'auto' : 'no disponible'}`;
-  wrapper?.insertBefore(dot, provSel);
+  parent?.insertBefore(dot, provSel);
 }
 
 function newError(msg: string): Error {
