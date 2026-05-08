@@ -1,0 +1,63 @@
+import os
+import json
+from pathlib import Path
+from typing import Any
+import logging
+import urllib.request
+
+from server import sessions as _sessions
+
+REPOCIV_PORT = int(os.environ.get("REPOCIV_PORT", "5273"))
+
+import queue
+import threading
+
+# ─── Event sender → RepoCiv frontend ─────────────────────────────────────────
+_sse_lock = threading.Lock()
+_sse_clients: list[queue.Queue[dict[str, Any] | None]] = []
+
+
+def _fanout_sse(event: dict[str, Any]) -> None:
+    with _sse_lock:
+        clients = list(_sse_clients)
+    for client in clients:
+        try:
+            client.put_nowait(event)
+        except Exception:
+            pass
+
+
+def _register_sse_client(client: queue.Queue[dict[str, Any] | None]) -> None:
+    with _sse_lock:
+        _sse_clients.append(client)
+
+
+def _unregister_sse_client(client: queue.Queue[dict[str, Any] | None]) -> None:
+    with _sse_lock:
+        try:
+            _sse_clients.remove(client)
+        except ValueError:
+            pass
+
+
+def send_to_repociv(event: dict[str, Any]) -> None:
+    event_type = str(event.get("type", ""))
+    unit = str(event.get("unit", ""))
+    mission_id = str(event.get("missionId", ""))
+    if event_type == "chat_chunk" and unit and mission_id:
+        try:
+            _sessions.append_message(unit, "assistant", str(event.get("text", "")), {"missionId": mission_id})
+        except Exception:
+            pass
+    _fanout_sse(event)
+    try:
+        data = json.dumps(event).encode()
+        req = urllib.request.Request(
+            f"http://localhost:{REPOCIV_PORT}/event", data=data,
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        urllib.request.urlopen(req, timeout=2)
+    except Exception:
+        pass
+
+

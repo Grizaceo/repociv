@@ -72,7 +72,7 @@ def test_run_agent_persists_session_and_run_state(monkeypatch, tmp_path):
     monkeypatch.setattr(
         agent_runner,
         "_execute_streaming",
-        lambda unit_id, mission_id, mission, working_dir=None, city_id="": (True, "done"),
+        lambda *args, **kwargs: (True, "done"),
     )
 
     agent_runner.run_agent("DAVI", "repociv", "arregla tests", command_id="m42")

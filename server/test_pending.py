@@ -101,7 +101,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "server"))
 class TestLoadPendingTasks:
     def _import(self, tracker_path):
         from server.bridge import load_pending_tasks, PENDING_TRACKER
-        with patch("server.bridge.PENDING_TRACKER", tracker_path):
+        with patch("server.pending_tracker.PENDING_TRACKER", tracker_path):
             return load_pending_tasks()
 
     def test_returns_items_from_active_sections(self, tmp_tracker):
@@ -165,7 +165,7 @@ class TestAppendPendingTask:
 
     def test_add_item_creates_valid_entry(self, tmp_tracker):
         append_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             new_id = append_fn("Nuevo pendiente de prueba", "ALTA")
         assert new_id is not None
         content = tmp_tracker.read_text(encoding="utf-8")
@@ -174,26 +174,26 @@ class TestAppendPendingTask:
 
     def test_add_item_increments_id(self, tmp_tracker):
         append_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             new_id = append_fn("Otro item", "MEDIA")
         # Max existing ID is 022, so next should be 023
         assert new_id == "023"
 
     def test_duplicate_title_rejected(self, tmp_tracker):
         append_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             result = append_fn("DREAM CYCLE", "MEDIA")
         assert result is None
 
     def test_empty_title_rejected(self, tmp_tracker):
         append_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             result = append_fn("", "MEDIA")
         assert result is None
 
     def test_default_priority_is_media(self, tmp_tracker):
         append_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             new_id = append_fn("Test default priority")
         assert new_id is not None
         content = tmp_tracker.read_text(encoding="utf-8")
@@ -218,7 +218,7 @@ class TestResolvePendingTask:
 
     def test_resolve_moves_to_hecho(self, tmp_tracker):
         resolve_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             ok = resolve_fn("010")
         assert ok is True
         content = tmp_tracker.read_text(encoding="utf-8")
@@ -230,13 +230,13 @@ class TestResolvePendingTask:
 
     def test_resolve_nonexistent_returns_false(self, tmp_tracker):
         resolve_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             ok = resolve_fn("999")
         assert ok is False
 
     def test_resolve_preserves_other_items(self, tmp_tracker):
         resolve_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             resolve_fn("010")
         content = tmp_tracker.read_text(encoding="utf-8")
         # 012 should still be in MEDIA
@@ -245,7 +245,7 @@ class TestResolvePendingTask:
 
     def test_resolve_to_empty_tracker(self, empty_tracker):
         resolve_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", empty_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", empty_tracker):
             ok = resolve_fn("001")
         assert ok is False
 
@@ -257,7 +257,7 @@ class TestPendingEndpoints:
 
     def _make_handler(self, tracker_path):
         """Create a BridgeHandler with mocked tracker path."""
-        with patch("server.bridge.PENDING_TRACKER", tracker_path):
+        with patch("server.pending_tracker.PENDING_TRACKER", tracker_path):
             from server.bridge import BridgeHandler
             return BridgeHandler
 
@@ -314,14 +314,14 @@ class TestPendingEndpoints:
             server.shutdown()
 
     def test_get_pending_returns_list(self, tmp_tracker):
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             status, body = self._do_get("/pending")
         assert status == 200
         assert isinstance(body, list)
         assert len(body) >= 3
 
     def test_post_add_returns_id(self, tmp_tracker):
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             status, body = self._do_post("/pending/add", {
                 "title": "Test endpoint add",
                 "priority": "BAJA",
@@ -331,23 +331,23 @@ class TestPendingEndpoints:
         assert body["title"] == "Test endpoint add"
 
     def test_post_add_requires_title(self, tmp_tracker):
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             status, body = self._do_post("/pending/add", {"priority": "ALTA"})
         assert status == 400
 
     def test_post_resolve_returns_ok(self, tmp_tracker):
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             status, body = self._do_post("/pending/resolve", {"id": "022"})
         assert status == 200
         assert body["ok"] is True
 
     def test_post_resolve_requires_id(self, tmp_tracker):
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             status, body = self._do_post("/pending/resolve", {})
         assert status == 400
 
     def test_post_resolve_nonexistent_returns_404(self, tmp_tracker):
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             status, body = self._do_post("/pending/resolve", {"id": "999"})
         assert status == 404
 
@@ -361,7 +361,7 @@ class TestEditPendingTask:
 
     def test_edit_title(self, tmp_tracker):
         edit_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             ok = edit_fn("010", title="DREAM CYCLE v2")
         assert ok is True
         content = tmp_tracker.read_text(encoding="utf-8")
@@ -370,7 +370,7 @@ class TestEditPendingTask:
 
     def test_edit_priority_moves_section(self, tmp_tracker):
         edit_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             ok = edit_fn("010", priority="ALTA")
         assert ok is True
         content = tmp_tracker.read_text(encoding="utf-8")
@@ -380,7 +380,7 @@ class TestEditPendingTask:
 
     def test_edit_detail(self, tmp_tracker):
         edit_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             ok = edit_fn("010", detail="Nuevo detalle\nlínea 2")
         assert ok is True
         content = tmp_tracker.read_text(encoding="utf-8")
@@ -389,13 +389,13 @@ class TestEditPendingTask:
 
     def test_edit_nonexistent_returns_false(self, tmp_tracker):
         edit_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             ok = edit_fn("999", title="No existe")
         assert ok is False
 
     def test_edit_preserves_other_items(self, tmp_tracker):
         edit_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             edit_fn("010", title="Editado")
         content = tmp_tracker.read_text(encoding="utf-8")
         assert "012" in content
@@ -411,7 +411,7 @@ class TestDeletePendingTask:
 
     def test_delete_item(self, tmp_tracker):
         del_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             ok = del_fn("010")
         assert ok is True
         content = tmp_tracker.read_text(encoding="utf-8")
@@ -420,7 +420,7 @@ class TestDeletePendingTask:
 
     def test_delete_preserves_other_items(self, tmp_tracker):
         del_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             del_fn("010")
         content = tmp_tracker.read_text(encoding="utf-8")
         assert "012" in content
@@ -428,7 +428,7 @@ class TestDeletePendingTask:
 
     def test_delete_nonexistent_returns_false(self, tmp_tracker):
         del_fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             ok = del_fn("999")
         assert ok is False
 
@@ -442,7 +442,7 @@ class TestChangePendingState:
 
     def test_change_state(self, tmp_tracker):
         fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             ok = fn("010", "🟢")
         assert ok is True
         content = tmp_tracker.read_text(encoding="utf-8")
@@ -450,13 +450,13 @@ class TestChangePendingState:
 
     def test_change_state_invalid(self, tmp_tracker):
         fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             ok = fn("010", "INVALID")
         assert ok is False
 
     def test_change_state_nonexistent(self, tmp_tracker):
         fn, _ = self._import()
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             ok = fn("999", "🟢")
         assert ok is False
 
@@ -493,7 +493,7 @@ class TestNewPendingEndpoints:
             server.shutdown()
 
     def test_post_edit_returns_ok(self, tmp_tracker):
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             status, body = self._do_post("/pending/edit", {
                 "id": "010", "title": "Editado desde endpoint"
             })
@@ -501,23 +501,23 @@ class TestNewPendingEndpoints:
         assert body["ok"] is True
 
     def test_post_edit_requires_id(self, tmp_tracker):
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             status, body = self._do_post("/pending/edit", {"title": "Sin ID"})
         assert status == 400
 
     def test_post_delete_returns_ok(self, tmp_tracker):
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             status, body = self._do_post("/pending/delete", {"id": "022"})
         assert status == 200
         assert body["ok"] is True
 
     def test_post_delete_requires_id(self, tmp_tracker):
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             status, body = self._do_post("/pending/delete", {})
         assert status == 400
 
     def test_post_state_returns_ok(self, tmp_tracker):
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             status, body = self._do_post("/pending/state", {
                 "id": "010", "state": "🟢"
             })
@@ -526,6 +526,6 @@ class TestNewPendingEndpoints:
         assert body["state"] == "🟢"
 
     def test_post_state_requires_both(self, tmp_tracker):
-        with patch("server.bridge.PENDING_TRACKER", tmp_tracker):
+        with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             status, body = self._do_post("/pending/state", {"id": "010"})
         assert status == 400
