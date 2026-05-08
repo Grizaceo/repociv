@@ -574,15 +574,11 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       host: true,
       proxy: {
-        '/api/providers': {
+        '/bridge': {
           target: `http://localhost:${env.BRIDGE_PORT ?? '5274'}`,
           changeOrigin: true,
           secure: false,
-        },
-        '/api/pending': {
-          target: `http://localhost:${env.BRIDGE_PORT ?? '5274'}`,
-          changeOrigin: true,
-          secure: false,
+          rewrite: (path) => path.replace(/^\/bridge/, ''),
         },
       },
     },

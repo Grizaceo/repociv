@@ -1529,6 +1529,11 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._json(_get_chat_config())
             return
 
+        # Alias without /api prefix (for Vite proxy /bridge → bridge)
+        if path == "/providers":
+            self._json(_get_chat_config())
+            return
+
         # Back-compat: /api/chat-config alias
         if path == "/api/chat-config":
             self._json(_get_chat_config())

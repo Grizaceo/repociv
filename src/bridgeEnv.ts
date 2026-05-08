@@ -5,7 +5,7 @@
 // so the browser doesn't need to reach the bridge directly (fixes WSL/Windows
 // localhost mismatch). In production, set VITE_BRIDGE_URL to the full URL.
 
-const DEV_PROXY_PREFIX = '/api';
+const DEV_PROXY_PREFIX = '/bridge';
 
 export const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL ?? '';
 export const BRIDGE_TOKEN = import.meta.env.VITE_BRIDGE_TOKEN ?? import.meta.env.VITE_REPOCIV_TOKEN ?? '';

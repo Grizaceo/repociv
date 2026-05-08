@@ -1,7 +1,7 @@
 // ─── RepoCiv — Side panel: Chat / Git / Files (Civ V Aesthetic) ────────────────
 import type { Unit } from '../types.ts';
 import { trapFocus } from './focusTrap.ts';
-import { bridgeHeaders, hermesWebUrl } from '../bridgeEnv.ts';
+import { bridgeHeaders, bridgeUrl, hermesWebUrl } from '../bridgeEnv.ts';
 
 let activeChatUnit: string | null = null;
 export const chatBuffers = new Map<string, string>();
@@ -236,7 +236,7 @@ function initProviderSelectors(_unit: Unit) {
   }
 
   // Fetch full 3-layer config from bridge
-  fetch('/api/providers', { headers: bridgeHeaders() })
+  fetch(bridgeUrl('/providers'), { headers: bridgeHeaders() })
     .then((r) => {
       if (!r.ok) throw newError(`HTTP ${r.status}`);
       return r.json();
