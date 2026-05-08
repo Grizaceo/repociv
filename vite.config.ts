@@ -554,11 +554,9 @@ function repocivPlugin(mapRoot: string): Plugin {
     configureServer(s) {
       server = s as typeof server;
       s.middlewares.use(handler);
-      // Pre-warm cache at startup
+      // Scan on first API access, not at startup (avoids systemd timeout)
       console.log(`[repociv] Map root: ${currentMapRoot}`);
-      console.log('[repociv] Scaneando workspace...');
-      const repos = scanWorkspace();
-      console.log(`[repociv] ${repos.length} repos detectados`);
+      console.log('[repociv] Workspace se escaneara bajo demanda (/api/repos)');
     },
   };
 }
