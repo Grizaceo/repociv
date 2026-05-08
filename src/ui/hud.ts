@@ -1,4 +1,6 @@
 // ─── RepoCiv — HUD helpers (Civ V Aesthetic) ────────────────────────────────────
+import { createIcons } from 'lucide';
+import autoAnimate from '@formkit/auto-animate';
 
 let loadingText: HTMLElement | null = null;
 let loadingFill: HTMLElement | null = null;
@@ -7,18 +9,16 @@ let loadingFill: HTMLElement | null = null;
  * Inicializa las librerías externas cargadas por CDN (Lucide, Auto-animate)
  */
 export function initExternalLibs() {
-  if (window.lucide) {
-    window.lucide.createIcons();
-  }
+  createIcons();
 
   const hudOverlay = document.getElementById('hud-overlay');
-  if (hudOverlay && window.autoAnimate) {
-    window.autoAnimate(hudOverlay);
+  if (hudOverlay) {
+    autoAnimate(hudOverlay);
   }
 
   const heroBarSlots = document.getElementById('hero-bar-slots');
-  if (heroBarSlots && window.autoAnimate) {
-    window.autoAnimate(heroBarSlots);
+  if (heroBarSlots) {
+    autoAnimate(heroBarSlots);
   }
 }
 
@@ -82,7 +82,7 @@ export function logEvent(
   `;
 
   container.prepend(entry);
-  if (window.lucide) window.lucide.createIcons();
+  createIcons();
 
   while (container.children.length > LOG_MAX) {
     container.removeChild(container.lastChild!);
@@ -142,7 +142,7 @@ export function toggleViewHUD(is3D: boolean) {
   const btn = document.getElementById('btn-toggle-3d');
   if (btn) {
     btn.innerHTML = is3D ? '<i data-lucide="layers"></i>' : '<i data-lucide="box"></i>';
-    if (window.lucide) window.lucide.createIcons();
+    createIcons();
     btn.classList.toggle('active', is3D);
   }
   logEvent(

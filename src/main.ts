@@ -65,6 +65,7 @@ import {
   isLogPanelOpen,
   getSelectedConfig,
 } from './ui/index.ts';
+import { refreshCityList } from './ui/constructionPanel.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from './ui/settingsPanel.ts';
 import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
 import { sendCommand } from './commandBus.ts';
