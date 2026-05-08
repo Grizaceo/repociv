@@ -1,131 +1,71 @@
-import os
+"""RepoCiv — Provider & Harness Registry.
+
+Single source of truth: shared/provider-registry.json
+Both this module and the frontend consume that file.
+Python dicts are no longer hardcoded here.
+"""
+from __future__ import annotations
+
 import json
+import os
 from pathlib import Path
 from typing import Any
 import logging
 
 from .agent_runner import _has_claude_code, _has_openclaw, _has_cursor
 
-# ─── Provider registry ────────────────────────────────────────────────────────
+# ─── Load from shared JSON ────────────────────────────────────────────────────
 
-# ─── Three-layer configuration: harness / provider / model ─────────────────────
-#
-# HARNESS = the executor binary that runs the agent (hermes, claude-code, openclaw, cursor)
-# PROVIDER = the API backend that serves tokens (ollama-cloud, openrouter, openai, nvidia-nim)
-# MODEL    = the specific model ID (deepseek-v3, kimi-2.6, gpt-4o, etc.)
-#
-# The frontend shows 3 independent selectors. Any combination is allowed;
-# the agent runner resolves model availability at dispatch time.
+_REGISTRY_PATH = Path(__file__).parent.parent / "shared" / "provider-registry.json"
 
-# ── Harnesses ──────────────────────────────────────────────────────────────────
-# Each harness: { id, name, transport, env, available_fn }
-# `env` = env var that must be set (empty = detected via PATH or always-available)
-_HARNESS_REGISTRY: list[dict[str, Any]] = [
-    {
-        "id": "hermes",
-        "name": "Hermes",
-        "transport": "hermes",
-        "env": "HERMES_URL",
-    },
-    {
-        "id": "claude-code",
-        "name": "Claude Code",
-        "transport": "claude-code",
-        "env": "",  # detected via PATH (claude binary)
-    },
-    {
-        "id": "openclaw",
-        "name": "OpenClaw",
-        "transport": "openclaw",
-        "env": "",  # detected via PATH (openclaw binary)
-    },
-    {
-        "id": "cursor",
-        "name": "Cursor",
-        "transport": "cursor",
-        "env": "",  # detected via PATH (cursor binary)
-    },
-]
+_cache: dict[str, Any] | None = None
 
-# ── Providers ──────────────────────────────────────────────────────────────────
-# Each provider: { id, name, env, defaultModel, models }
-# `env` = env var that must be set for this provider to be available (empty = always)
-# `models` = { modelId, name, harnesses[] } — which harnesses can use this model
-_PROVIDER_REGISTRY: list[dict[str, Any]] = [
-    {
-        "id": "ollama-cloud",
-        "name": "Ollama Cloud",
-        "env": "OLLAMA_CLOUD_URL",
-        "defaultModel": "nemotron-3-nano-4b",
-        "models": [
-            {"id": "nemotron-3-nano-4b", "name": "Nemotron 3 Nano 4B", "harnesses": ["hermes", "ollama"]},
-            {"id": "llama-3.3-70b", "name": "Llama 3.3 70B", "harnesses": ["hermes", "ollama"]},
-            {"id": "qwen-2.5-coder-32b", "name": "Qwen 2.5 Coder 32B", "harnesses": ["hermes", "ollama"]},
-        ],
-    },
-    {
-        "id": "openrouter",
-        "name": "OpenRouter",
-        "env": "OPENROUTER_API_KEY",
-        "defaultModel": "deepseek/deepseek-v3",
-        "models": [
-            {"id": "deepseek/deepseek-v3", "name": "DeepSeek V3", "harnesses": ["hermes", "openclaw", "claude-code"]},
-            {"id": "deepseek/deepseek-r1", "name": "DeepSeek R1", "harnesses": ["hermes", "openclaw", "claude-code"]},
-            {"id": "moonshotai/kimi-2.6", "name": "Kimi 2.6", "harnesses": ["hermes", "openclaw"]},
-            {"id": "openai/gpt-4o", "name": "GPT-4o", "harnesses": ["hermes", "openclaw", "claude-code"]},
-            {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini", "harnesses": ["hermes", "openclaw"]},
-            {"id": "anthropic/claude-sonnet-4", "name": "Claude Sonnet 4", "harnesses": ["hermes", "openclaw", "claude-code"]},
-            {"id": "anthropic/claude-opus-4", "name": "Claude Opus 4", "harnesses": ["hermes", "openclaw", "claude-code"]},
-            {"id": "google/gemini-2.5-pro", "name": "Gemini 2.5 Pro", "harnesses": ["hermes", "openclaw"]},
-            {"id": "nvidia/nemotron-3-nano-4b", "name": "Nemotron 3 Nano 4B (NR)", "harnesses": ["hermes", "openclaw"]},
-        ],
-    },
-    {
-        "id": "openai",
-        "name": "OpenAI",
-        "env": "OPENAI_API_KEY",
-        "defaultModel": "gpt-4o",
-        "models": [
-            {"id": "gpt-4o", "name": "GPT-4o", "harnesses": ["hermes", "openclaw", "claude-code"]},
-            {"id": "gpt-4o-mini", "name": "GPT-4o Mini", "harnesses": ["hermes", "openclaw"]},
-            {"id": "o3", "name": "o3", "harnesses": ["hermes", "openclaw"]},
-            {"id": "o4-mini", "name": "o4-mini", "harnesses": ["hermes", "openclaw"]},
-        ],
-    },
-    {
-        "id": "nvidia-nim",
-        "name": "NVIDIA NIM",
-        "env": "NVIDIA_NIM_URL",
-        "defaultModel": "nvidia/nemotron-3-nano-4b",
-        "models": [
-            {"id": "nvidia/nemotron-3-nano-4b", "name": "Nemotron 3 Nano 4B", "harnesses": ["hermes", "openclaw"]},
-            {"id": "nvidia/llama-3.3-70b", "name": "Llama 3.3 70B (NIM)", "harnesses": ["hermes", "openclaw"]},
-        ],
-    },
-    {
-        "id": "anthropic",
-        "name": "Anthropic (direct)",
-        "env": "ANTHROPIC_API_KEY",
-        "defaultModel": "claude-sonnet-4-20250514",
-        "models": [
-            {"id": "claude-sonnet-4-20250514", "name": "Claude Sonnet 4", "harnesses": ["hermes", "openclaw", "claude-code"]},
-            {"id": "claude-opus-4-20250514", "name": "Claude Opus 4", "harnesses": ["hermes", "openclaw", "claude-code"]},
-            {"id": "claude-haiku-3-5-20241022", "name": "Claude Haiku 3.5", "harnesses": ["hermes", "openclaw"]},
-        ],
-    },
-]
 
+def _load_registry() -> dict[str, Any]:
+    global _cache
+    if _cache is not None:
+        return _cache
+    if not _REGISTRY_PATH.exists():
+        logging.warning("[provider_registry] shared/provider-registry.json not found; using empty registry")
+        _cache = {"harnesses": [], "providers": []}
+        return _cache
+    try:
+        with _REGISTRY_PATH.open(encoding="utf-8") as fh:
+            _cache = json.load(fh)
+    except Exception as exc:
+        logging.error("[provider_registry] Failed to load shared/provider-registry.json: %s", exc)
+        _cache = {"harnesses": [], "providers": []}
+    return _cache
+
+
+def _reset_cache() -> None:
+    """For testing: invalidate the loaded registry cache."""
+    global _cache
+    _cache = None
+
+
+_HARNESS_REGISTRY: list[dict[str, Any]] = []  # populated lazily from JSON
+_PROVIDER_REGISTRY: list[dict[str, Any]] = []  # populated lazily from JSON
+
+
+def _get_harness_list() -> list[dict[str, Any]]:
+    return _load_registry().get("harnesses", [])
+
+
+def _get_provider_list() -> list[dict[str, Any]]:
+    return _load_registry().get("providers", [])
+
+
+# ─── Public API ───────────────────────────────────────────────────────────────
 
 def _get_harnesses() -> list[dict[str, Any]]:
-    """Return available harnesses with availability info."""
+    """Return available harnesses with live availability info."""
     result = []
-    for h in _HARNESS_REGISTRY:
+    for h in _get_harness_list():
         env_var = h.get("env", "")
         available = True
         if env_var:
-            val = os.environ.get(env_var, "")
-            if not val:
-                available = False
+            available = bool(os.environ.get(env_var, ""))
         transport = h.get("transport", "")
         if transport == "claude-code":
             available = _has_claude_code()
@@ -143,30 +83,27 @@ def _get_harnesses() -> list[dict[str, Any]]:
 
 
 def _get_providers() -> dict[str, Any]:
-    """Return available providers with their models, separated from harnesses.
+    """Return available providers with their models.
 
     Each provider entry includes:
       - id, name, available, defaultModel
-      - models: list of {id, name, harnesses} showing which harnesses can use it
+      - models: list of {id, name, harnesses} — which harnesses can use it
     """
     providers = []
-    for p in _PROVIDER_REGISTRY:
+    for p in _get_provider_list():
         env_var = p.get("env", "")
-        available = True
-        if env_var:
-            val = os.environ.get(env_var, "")
-            if not val:
-                available = False
+        available = not env_var or bool(os.environ.get(env_var, ""))
         providers.append({
             "id": p["id"],
             "name": p["name"],
             "available": available,
-            "defaultModel": p["defaultModel"],
-            "models": p["models"],
+            "defaultModel": p.get("defaultModel", ""),
+            "models": p.get("models", []),
         })
     # Pick default provider: first available in priority order
+    priority = ("ollama-cloud", "openrouter", "openai", "nvidia-nim", "anthropic")
     default_provider = ""
-    for pid in ("ollama-cloud", "openrouter", "openai", "nvidia-nim", "anthropic"):
+    for pid in priority:
         for p in providers:
             if p["id"] == pid and p["available"]:
                 default_provider = pid
@@ -185,10 +122,9 @@ def _get_providers() -> dict[str, Any]:
 
 
 def _get_chat_config() -> dict[str, Any]:
-    """Return full 3-layer config for the chat UI: harnesses + providers + default selections."""
+    """Return full 3-layer config for the chat UI: harnesses + providers + defaults."""
     harnesses = _get_harnesses()
     provider_info = _get_providers()
-    # Default harness: first available in priority order
     default_harness = ""
     for hid in ("hermes", "claude-code", "openclaw", "cursor"):
         for h in harnesses:
@@ -202,8 +138,3 @@ def _get_chat_config() -> dict[str, Any]:
         "defaultHarness": default_harness,
         **provider_info,
     }
-
-
-
-
-
