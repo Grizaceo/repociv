@@ -277,8 +277,6 @@ function _render(): void {
 function _renderItem(item: PendingItem): string {
   const isExpanded = _expandedId === item.id;
   const isEditing = _editingId === item.id;
-  const stateEmoji = item.state || '🔵';
-
   // Detail section
   let detailHtml = '';
   if (isExpanded && item.detail) {
