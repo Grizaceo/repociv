@@ -188,8 +188,11 @@ export function openSidePanel(unit: Unit) {
   }
 
   // Re-init icons if needed for dynamic content
-  if ((window as unknown as Record<string, unknown>)['lucide'])
-    (window as unknown as Record<string, { createIcons: () => void }>)['lucide']!.createIcons();
+  const lucide = (window as unknown as Record<string, unknown>)['lucide'];
+  if (lucide)
+    (lucide as { createIcons: (opts: { icons: unknown }) => void }).createIcons({
+      icons: (lucide as Record<string, unknown>)['icons'],
+    });
 }
 
 function initProviderSelectors(_unit: Unit) {

@@ -2,6 +2,7 @@
 
 interface LucideLib {
   createIcons(options?: { attrs?: Record<string, string> }): void;
+  icons: Record<string, [string, Record<string, string | number>[]][]>;
 }
 
 type AutoAnimateFunction = (
