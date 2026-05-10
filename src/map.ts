@@ -2,9 +2,17 @@
 // Fetches real workspace metadata from /api/repos and builds a hex tile world.
 
 import { logger } from './logger.ts';
-import { type Axial, spiralCoords, axialDistance, axialNeighbours } from './hex.ts';
+import {
+  type Axial,
+  spiralCoords,
+  axialDistance,
+  axialNeighbours,
+  axialAdd,
+  axialEquals,
+  axialSub,
+} from './hex.ts';
 import { type Terrain, type Tile, type City, type District, type World, tileKey } from './types.ts';
-import { loadManualLayout } from './manualLayout.ts';
+import { loadManualLayout, updateManualRepoCoord } from './manualLayout.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
 
 // ─── Terrain inference ──────────────────────────────────────────────────────
@@ -327,6 +335,7 @@ export function addCityToWorld(world: World, repo: ScannedRepo & { terrain?: Ter
     id: repo.name,
     name: repo.name,
     coord,
+    repoPath: repo.path,
     population: repo.population,
     territory: [coord, ...axialRange(coord, 2)],
     districts: [],
@@ -354,6 +363,149 @@ export function removeCityFromWorld(world: World, cityName: string): boolean {
   world.tiles.delete(tileKey(city!.coord));
   // Remove any units on this city
   world.units = world.units.filter(u => tileKey(u.coord) !== tileKey(city!.coord));
+  return true;
+}
+
+/** Hex keys this city currently occupies (center + district tiles). */
+function cityOccupiedKeys(city: City): Set<string> {
+  const keys = new Set<string>([tileKey(city.coord)]);
+  for (const d of city.districts) keys.add(tileKey(d.coord));
+  return keys;
+}
+
+/** Destination hexes after moving `city` so its center lands on `targetCoord`. */
+function relocateTargetHexes(city: City, targetCoord: Axial): Axial[] {
+  const delta = axialSub(targetCoord, city.coord);
+  const out: Axial[] = [targetCoord];
+  for (const d of city.districts) out.push(axialAdd(d.coord, delta));
+  return out;
+}
+
+function resolveRepoPathForCity(city: City, fallback: string | null): string | null {
+  if (fallback) return fallback;
+  if (city.repoPath) return city.repoPath;
+  const store = loadManualLayout();
+  const hit = store.entries.find((e) => e.repoName === city.name);
+  return hit?.repoPath ?? null;
+}
+
+/**
+ * Whether the city can move its footprint (center + shifted districts) onto the map.
+ * Vacating hexes are allowed; foreign cities, foreign districts, ocean, or blocking units fail.
+ */
+export function canRelocateCityTo(world: World, city: City, targetCoord: Axial): boolean {
+  if (axialEquals(city.coord, targetCoord)) return false;
+
+  const delta = axialSub(targetCoord, city.coord);
+  for (const d of city.districts) {
+    const nd = axialAdd(d.coord, delta);
+    // District cannot land on the city center hex (still occupied until relocate runs).
+    if (axialEquals(nd, city.coord)) return false;
+    // District cannot share the destination hex with the city tile.
+    if (axialEquals(nd, targetCoord)) return false;
+  }
+
+  const sources = cityOccupiedKeys(city);
+  const targets = relocateTargetHexes(city, targetCoord);
+  const seen = new Set<string>();
+  for (const t of targets) {
+    const k = tileKey(t);
+    if (seen.has(k)) return false;
+    seen.add(k);
+
+    const tile = world.tiles.get(k);
+    if (!tile) return false;
+    if (tile.terrain === 'ocean') return false;
+
+    if (!sources.has(k)) {
+      if (tile.city) return false;
+      if (tile.district) return false;
+      for (const u of world.units) {
+        if (tileKey(u.coord) === k && !axialEquals(u.coord, city.coord)) return false;
+      }
+    } else {
+      for (const u of world.units) {
+        if (tileKey(u.coord) !== k) continue;
+        if (axialEquals(u.coord, city.coord)) continue;
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * Moves a city (center, districts, territory) and persists manual layout when `repoPath` resolves.
+ * Calls `reconnectCities` after mutation (same as dynamic add/remove).
+ */
+export async function relocateCity(
+  world: World,
+  cityId: string,
+  targetCoord: Axial,
+  repoPathFallback: string | null,
+): Promise<boolean> {
+  const city = world.cities.find((c) => c.id === cityId);
+  if (!city) return false;
+  if (!canRelocateCityTo(world, city, targetCoord)) return false;
+
+  const delta = axialSub(targetCoord, city.coord);
+  const oldCoord = city.coord;
+  const tiles = world.tiles;
+  const oldCityTile = tiles.get(tileKey(oldCoord));
+
+  // 1) Shift district tiles
+  for (const d of city.districts) {
+    const oldDc = d.coord;
+    const newDc = axialAdd(oldDc, delta);
+    const oldK = tileKey(oldDc);
+    const newK = tileKey(newDc);
+    const src = tiles.get(oldK);
+    if (!src?.district || src.district.id !== d.id) continue;
+    tiles.delete(oldK);
+    d.coord = newDc;
+    tiles.set(newK, { ...src, coord: newDc, district: d });
+  }
+
+  // 2) Move units standing on the city center hex with the city
+  for (const u of world.units) {
+    if (axialEquals(u.coord, oldCoord)) u.coord = targetCoord;
+  }
+
+  // 3) Detach city from old tile (keep terrain tile)
+  if (oldCityTile) {
+    oldCityTile.city = undefined;
+  }
+
+  // 4) Place city on destination tile (preserve metadata from old city tile)
+  const destKey = tileKey(targetCoord);
+  const destBase = tiles.get(destKey);
+  if (!destBase) return false;
+
+  city.coord = targetCoord;
+  const merged: Tile = {
+    ...destBase,
+    coord: targetCoord,
+    terrain: oldCityTile?.terrain ?? destBase.terrain,
+    resources: oldCityTile?.resources ?? destBase.resources,
+    city,
+    district: undefined,
+    skillHealth: oldCityTile?.skillHealth ?? destBase.skillHealth,
+    sessionTint: oldCityTile?.sessionTint ?? destBase.sessionTint,
+  };
+  tiles.set(destKey, merged);
+
+  city.territory = [targetCoord, ...axialRange(targetCoord, 2)].filter(
+    (c) => !city.districts.some((d) => d.coord.q === c.q && d.coord.r === c.r),
+  );
+
+  const path = resolveRepoPathForCity(city, repoPathFallback);
+  if (path) {
+    city.repoPath = path;
+    updateManualRepoCoord(path, targetCoord);
+  }
+
+  invalidatePathCache();
+  await reconnectCities(world);
   return true;
 }
 
@@ -514,6 +666,7 @@ export async function generateWorld(): Promise<World> {
       id: repo.name,
       name: repo.name,
       coord,
+      repoPath: repo.path,
       population: repo.population,
       territory,
       districts,
@@ -648,8 +801,4 @@ function axialRange(center: Axial, radius: number): Axial[] {
     }
   }
   return results;
-}
-
-function axialAdd(a: Axial, b: Axial): Axial {
-  return { q: a.q + b.q, r: a.r + b.r };
 }

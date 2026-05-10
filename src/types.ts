@@ -38,6 +38,8 @@ export interface City {
   id: string;
   name: string;
   coord: Axial;
+  /** Filesystem path from scanned repo / manual layout (optional for legacy saves). */
+  repoPath?: string;
   population: number; // total files in repo
   territory: Axial[]; // hexes controlled (range 2)
   districts: District[];
