@@ -53,6 +53,8 @@ export function setRendererRef(
 }
 
 export function openConstructionPanel(): void {
+  // Entering the panel cancels map-only relocate so HUD + canvas stay in sync.
+  _rendererRef?.setCityRelocateMode(false);
   isOpen = true;
   let panel = getPanel();
   if (!panel) {
@@ -66,6 +68,7 @@ export function openConstructionPanel(): void {
 
 export function closeConstructionPanel(): void {
   isOpen = false;
+  _rendererRef?.setCityRelocateMode(false);
   // Do NOT clear _onPickTileCb here — placing mode keeps callback alive while panel is closed.
   getPanel()?.classList.add('hidden');
 }
@@ -130,8 +133,8 @@ export function refreshCityList(): void {
     btn.addEventListener('click', () => {
       const path = btn.closest('.construction-city-item')?.getAttribute('data-path');
       if (!path || !_rendererRef) return;
-      _rendererRef.setCityRelocateMode(true, path);
       closeConstructionPanel();
+      _rendererRef.setCityRelocateMode(true, path);
       showNotification({
         type: 'info',
         title: 'Mover ciudad',

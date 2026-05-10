@@ -57,10 +57,7 @@ export class Renderer {
   private readonly _onCityRelocateKeyDown = (e: KeyboardEvent) => {
     if (e.key !== 'Escape' || !this._cityRelocateMode) return;
     e.preventDefault();
-    this._cityRelocateMode = false;
-    this._cityRelocatePanelRepoPath = null;
-    this.clearCityRelocateDrag();
-    if (!this._placingMode) this.canvas.style.cursor = 'default';
+    this.setCityRelocateMode(false);
   };
 
   // ─── Fase 5: Spatial gesture state ────────────────────────────────────────
@@ -248,12 +245,19 @@ export class Renderer {
         this.areaEnd = { x: wx, y: wy };
       }
 
-      if (this.gestureMode === 'camera_pan') {
-        this.canvas.style.cursor = this.isDragging
-          ? 'grabbing'
-          : this.getTileAt(wx, wy)
-            ? 'pointer'
-            : 'default';
+      if (
+        this.gestureMode === 'camera_pan' &&
+        this._cityRelocateMode &&
+        this.draggedCity &&
+        this.relocateDragActive
+      ) {
+        this.canvas.style.cursor = 'grabbing';
+      } else if (this.gestureMode === 'camera_pan') {
+        if (this.isDragging) {
+          this.canvas.style.cursor = 'grabbing';
+        } else {
+          this.applyIdleCursor(wx, wy);
+        }
       }
     });
 
@@ -355,6 +359,7 @@ export class Renderer {
                 if (ok) {
                   this.state.notifyUpdate();
                   refreshCityList();
+                  this.setCityRelocateMode(false);
                 }
               });
             } else {
@@ -374,7 +379,7 @@ export class Renderer {
 
       this.gestureMode = 'camera_pan';
       this.isDragging = false;
-      this.canvas.style.cursor = 'default';
+      this.applyIdleCursor(wx, wy);
     });
 
     // ── wheel: zoom ──────────────────────────────────────────────────────────
@@ -456,6 +461,23 @@ export class Renderer {
   private getTileAt(wx: number, wy: number) {
     const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
     return this.state.world.tiles.get(tileKey(coord)) ?? null;
+  }
+
+  /** Cursor when not actively grabbing/panning (respects placing + city relocate modes). */
+  private applyIdleCursor(wx: number, wy: number) {
+    if (this._placingMode || this._cityRelocateMode) {
+      this.canvas.style.cursor = 'crosshair';
+      return;
+    }
+    this.canvas.style.cursor = this.getTileAt(wx, wy) ? 'pointer' : 'default';
+  }
+
+  private syncChromeCursor() {
+    if (this._placingMode || this._cityRelocateMode) {
+      this.canvas.style.cursor = 'crosshair';
+    } else {
+      this.canvas.style.cursor = 'default';
+    }
   }
 
   private handleClick(e: MouseEvent) {
@@ -729,8 +751,13 @@ export class Renderer {
 
   /** Enter/exit placing mode: user clicks empty hex to pick a coordinate. */
   setPlacingMode(active: boolean) {
+    if (active) {
+      this._cityRelocateMode = false;
+      this._cityRelocatePanelRepoPath = null;
+      this.clearCityRelocateDrag();
+    }
     this._placingMode = active;
-    this.canvas.style.cursor = active ? 'crosshair' : 'default';
+    this.syncChromeCursor();
   }
   getPlacingMode(): boolean {
     return this._placingMode;
@@ -738,12 +765,13 @@ export class Renderer {
 
   /** Enable/disable relocate-by-drag from construction panel (optional repo path from ✥). */
   setCityRelocateMode(active: boolean, panelRepoPath?: string | null) {
+    if (active) {
+      this._placingMode = false;
+    }
     this._cityRelocateMode = active;
     this._cityRelocatePanelRepoPath = panelRepoPath ?? null;
     if (!active) this.clearCityRelocateDrag();
-    if (!this._placingMode) {
-      this.canvas.style.cursor = active ? 'crosshair' : 'default';
-    }
+    this.syncChromeCursor();
   }
 
   getCityRelocateMode(): boolean {
