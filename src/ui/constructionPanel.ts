@@ -1,5 +1,5 @@
 import { loadSelectedRepoPaths, saveSelectedRepoPaths, type ScannedRepo } from '../map';
-import { upsertManualRepoEntry, removeManualRepoEntry, updateManualRepoCoord, loadManualLayout } from '../manualLayout';
+import { upsertManualRepoEntry, removeManualRepoEntry, loadManualLayout } from '../manualLayout';
 import { showNotification } from './notificationBanner';
 
 let isOpen = false;
