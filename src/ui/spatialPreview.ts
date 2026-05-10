@@ -6,6 +6,7 @@ import type { SpatialDirective, ContextMenuItem } from '../spatialDirectives.ts'
 import type { CommandDraft } from '../commandSchema.ts';
 import { COMMAND_RISK } from '../commandSchema.ts';
 import { fetchSuggestions, cmdTypeLabel, successRateColor } from '../directiveLearner.ts';
+import { HEX_SIZE } from '../constants.ts';
 
 // ─── Callbacks ────────────────────────────────────────────────────────────────
 type ConfirmCb = (draft: CommandDraft) => void;
@@ -224,6 +225,31 @@ export function renderDragGhost(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(unitLabel[0] ?? '?', screenX, screenY);
+  ctx.restore();
+}
+
+/** Ghost for relocating a city (larger than unit ghost, flat-top hex + label). */
+export function renderCityDragGhost(
+  ctx: CanvasRenderingContext2D,
+  screenX: number,
+  screenY: number,
+  cityName: string,
+) {
+  ctx.save();
+  ctx.globalAlpha = 0.65;
+  const size = HEX_SIZE * 1.2;
+  _hexPath(ctx, screenX, screenY, size);
+  ctx.fillStyle = '#d4a574';
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(cityName.slice(0, 8), screenX, screenY);
   ctx.restore();
 }
 

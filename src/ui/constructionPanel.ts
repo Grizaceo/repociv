@@ -3,7 +3,12 @@ import { upsertManualRepoEntry, removeManualRepoEntry, updateManualRepoCoord, lo
 import { showNotification } from './notificationBanner';
 
 let isOpen = false;
-let _rendererRef: { setPlacingMode(active: boolean): void; getPlacingMode(): boolean } | null = null;
+let _rendererRef: {
+  setPlacingMode(active: boolean): void;
+  getPlacingMode(): boolean;
+  setCityRelocateMode(active: boolean, panelRepoPath?: string | null): void;
+  getCityRelocateMode(): boolean;
+} | null = null;
 let _onPickTileCb: ((coord: { q: number; r: number }) => void) | null = null;
 let selectedRepo: ScannedRepo | null = null;
 
@@ -37,7 +42,12 @@ export function isConstructionPanelOpen(): boolean {
 }
 
 export function setRendererRef(
-  renderer: { setPlacingMode(active: boolean): void; getPlacingMode(): boolean },
+  renderer: {
+    setPlacingMode(active: boolean): void;
+    getPlacingMode(): boolean;
+    setCityRelocateMode(active: boolean, panelRepoPath?: string | null): void;
+    getCityRelocateMode(): boolean;
+  },
 ) {
   _rendererRef = renderer;
 }
@@ -120,13 +130,13 @@ export function refreshCityList(): void {
     btn.addEventListener('click', () => {
       const path = btn.closest('.construction-city-item')?.getAttribute('data-path');
       if (!path || !_rendererRef) return;
-      _onPickTileCb = (coord) => {
-        updateManualRepoCoord(path, coord);
-        window.location.reload();
-      };
-      _rendererRef.setPlacingMode(true);
+      _rendererRef.setCityRelocateMode(true, path);
       closeConstructionPanel();
-      showNotification({ type: 'info', title: 'Mover ciudad', body: 'Haz click en una casilla vacia del mapa.' });
+      showNotification({
+        type: 'info',
+        title: 'Mover ciudad',
+        body: 'Arrastra la ciudad en el mapa a una casilla válida (Escape para cancelar).',
+      });
     });
   });
 
