@@ -1,4 +1,4 @@
-"""RepoCiv — HTTP Route Handlers.
+"""RepoCiv — HTTP Route Handlers (Hotfix 2026-05-09 — provider reachability).
 
 Each function here handles one route. It receives the parsed request body
 (for POST) or query params (for GET), and returns a tuple:
@@ -10,6 +10,90 @@ This makes routes individually testable without spinning up an HTTP server.
 from __future__ import annotations
 
 from typing import Any
+import os
+import urllib.request
+import urllib.error
+import json as _json_lib
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _auth_headers(provider: str) -> dict[str, str]:
+    """Return Authorization header for a given provider, if API key is set."""
+    env_keys = {
+        "ollama-cloud": "OLLAMA_API_KEY",
+        "openrouter": "OPENROUTER_API_KEY",
+        "openai": "OPENAI_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY",
+        "deepseek": "DEEPSEEK_API_KEY",
+        "xai": "XAI_API_KEY",
+        "nvidia-nim": "NVIDIA_API_KEY",
+    }
+    key = env_keys.get(provider)
+    if key:
+        token = os.environ.get(key, "")
+        if token:
+            # OpenRouter and xAI use Bearer; OpenAI/Anthropic use Bearer; Ollama uses header
+            if provider == "ollama-cloud":
+                return {"Authorization": f"Bearer {token}"}
+            return {"Authorization": f"Bearer {token}"}
+    return {}
+
+
+def _probe_url(url: str, method: str = "GET", headers: dict | None = None, timeout: int = 5) -> list[str]:
+    """Attempt HTTP request; return list of model IDs or empty on failure."""
+    try:
+        h: dict[str, str] = headers or {}
+        req = urllib.request.Request(url, headers=h, method=method)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = _json_lib.loads(resp.read())
+            # Normalise various provider response shapes into a flat list of model ID strings
+            return _extract_model_ids(data, url)
+    except Exception:
+        return []
+
+
+def _extract_model_ids(data: Any, url: str) -> list[str]:
+    """Extract model ID strings from various API response shapes."""
+    ids: list[str] = []
+
+    # OpenAI / Anthropic / DeepSeek / xAI / NVIDIA — { "data": [{ "id": "..." }] }
+    if isinstance(data, dict):
+        raw = data.get("data")
+        if isinstance(raw, list):
+            for m in raw:
+                mid = m.get("id") if isinstance(m, dict) else None
+                if mid:
+                    ids.append(str(mid))
+            if ids:
+                return ids
+
+        # OpenRouter — { "data": [{ "id": "..." }] }  (same shape, already handled)
+        # Ollama tags — { "models": [{ "name": "..." }] }
+        if "models" in data and isinstance(data["models"], list):
+            for m in data["models"]:
+                name = m.get("name") if isinstance(m, dict) else None
+                if name:
+                    ids.append(str(name))
+            if ids:
+                return ids
+
+        # NVIDIA NIM — { "models": [{"model_id": "..." }] }
+        if "models" in data and isinstance(data["models"], list):
+            for m in data["models"]:
+                mid = m.get("model_id") if isinstance(m, dict) else None
+                if mid:
+                    ids.append(str(mid))
+            if ids:
+                return ids
+
+    # Fallback: if data itself is a list
+    if isinstance(data, list):
+        for m in data:
+            mid = m.get("id") if isinstance(m, dict) else None
+            if mid:
+                ids.append(str(mid))
+
+    return ids
 
 
 # ─── GET routes ───────────────────────────────────────────────────────────────
@@ -26,7 +110,6 @@ def get_health(ctx: "RouteContext") -> tuple[int, Any]:
 
 
 def get_ready(ctx: "RouteContext") -> tuple[int, Any]:
-    import os
     from server.bridge import _es, REPOCIV_TOKEN
     return 200, {"ok": True, "eventStore": str(_es._store_path), "token": bool(REPOCIV_TOKEN)}
 
@@ -119,13 +202,91 @@ def get_harnesses(ctx: "RouteContext") -> tuple[int, Any]:
     return 200, _hr.list_harnesses()
 
 
-def get_harness_by_id(ctx: "RouteContext") -> tuple[int, Any]:
-    from server import harness_registry as _hr
-    harness_id = ctx.get("harness_id", "")
-    harness = _hr.get_harness(harness_id)
-    if harness is None:
-        return 404, {"error": f"Harness '{harness_id}' not found"}
-    return 200, harness
+def get_providers_live(ctx: "RouteContext") -> tuple[int, Any]:
+    """Fetch live model reachability from each provider's own API.
+
+    Instead of relying solely on the Hermes gateway, we probe each configured
+    provider directly (using its API key from the environment) so the UI gets
+    accurate per-model availability.
+    """
+    from server.provider_registry import _get_providers
+
+    # ── 1. Build a set of all model IDs reachable via Hermes gateway ──
+    hermes_url_raw = os.environ.get("HERMES_URL", "http://localhost:8642/v1")
+    for suffix in ("/v1/chat/completions", "/v1/completions", "/v1", ""):
+        if hermes_url_raw.endswith(suffix):
+            hermes_url = hermes_url_raw[: -len(suffix)] if suffix else hermes_url_raw
+            break
+    else:
+        hermes_url = hermes_url_raw
+
+    hermes_models: set[str] = set()
+    try:
+        headers: dict[str, str] = {}
+        hermes_key = os.environ.get("HERMES_KEY", "")
+        if hermes_key:
+            headers["Authorization"] = f"Bearer {hermes_key}"
+        resp = _probe_url(f"{hermes_url}/v1/models", headers=headers)
+        hermes_models = set(resp)
+    except Exception:
+        pass
+    hermes_reachable = len(hermes_models) > 0
+
+    # ── 2. Probe each provider's native API ──
+    _PROVIDER_MODEL_ENDPOINTS = {
+        "ollama-cloud": ("https://api.ollama.com/v1/models", "GET"),
+        "openrouter": ("https://openrouter.ai/api/v1/models", "GET"),
+        "openai": ("https://api.openai.com/v1/models", "GET"),
+        "anthropic": ("https://api.anthropic.com/v1/models", "GET"),
+        "deepseek": ("https://api.deepseek.com/v1/models", "GET"),
+        "xai": ("https://api.x.ai/v1/models", "GET"),
+        "nvidia-nim": ("https://integrate.api.nvidia.com/v1/models", "GET"),
+    }
+
+    provider_live: dict[str, list[str]] = {}
+    for pid, (ep_url, _) in _PROVIDER_MODEL_ENDPOINTS.items():
+        h = _auth_headers(pid)
+        provider_live[pid] = _probe_url(ep_url, headers=h)
+
+    # ── 3. Merge with static provider data ──
+    static_data = _get_providers()
+    static_providers = {p["id"]: p for p in static_data["providers"]}
+
+    providers_out = []
+    for pid, p in static_providers.items():
+        live_ids = provider_live.get(pid, [])
+        reachable_set = set(live_ids) | hermes_models  # union of both sources
+
+        models = []
+        for m in p.get("models", []):
+            mid = m.get("id", "")
+            reachable = mid in reachable_set
+            models.append({**m, "reachable": reachable})
+
+        # Also add any live model IDs we got that aren't in static list
+        known_ids = {m["id"] for m in models}
+        for mid in live_ids:
+            if mid not in known_ids:
+                models.append({"id": mid, "name": mid, "harnesses": ["hermes", "openclaw"], "reachable": True})
+
+        providers_out.append({
+            "id": pid,
+            "name": p["name"],
+            "available": p["available"],
+            "configured": p.get("configured", False),
+            "defaultModel": p["defaultModel"],
+            "models": models,
+            "env": p.get("env", ""),
+            "hermesReachable": hermes_reachable,
+            "liveModelCount": len(live_ids),
+        })
+
+    return 200, {
+        "defaultProvider": static_data["defaultProvider"],
+        "hermesReachable": hermes_reachable,
+        "hermesBaseUrl": hermes_url,
+        "providers": providers_out,
+    }
 
 
 def get_log(ctx: "RouteContext") -> tuple[int, Any]:
@@ -299,5 +460,4 @@ def post_pending_state(body: dict[str, Any], ctx: "RouteContext") -> tuple[int, 
 
 
 # ─── Type alias ───────────────────────────────────────────────────────────────
-# RouteContext is just a plain dict carrying parsed path params or query params.
 RouteContext = dict[str, Any]

@@ -128,13 +128,17 @@ interface ModelInfo {
   id: string;
   name: string;
   harnesses: string[];
+  reachable?: boolean;
 }
 interface ProviderInfo {
   id: string;
   name: string;
   available: boolean;
   defaultModel: string;
-  models: ModelInfo[];
+  models: (ModelInfo & { reachable?: boolean })[];
+  configured?: boolean;
+  env?: string;
+  hermesReachable?: boolean;
 }
 let _harnesses: HarnessInfo[] = [];
 let _providers: ProviderInfo[] = [];
@@ -253,75 +257,8 @@ function initProviderSelectors(_unit: Unit) {
       _harnesses = data.harnesses;
       _providers = data.providers;
 
-      // ── Populate harness selector ──
-      if (harnessSel) {
-        harnessSel.innerHTML = '';
-        const autoHarness = document.createElement('option');
-        autoHarness.value = 'auto';
-        autoHarness.textContent = '⚡ Auto (cascade)';
-        harnessSel.appendChild(autoHarness);
-        for (const h of _harnesses) {
-          const opt = document.createElement('option');
-          opt.value = h.id;
-          opt.textContent = h.available ? h.name : `${h.name} (no disponible)`;
-          opt.disabled = !h.available;
-          harnessSel.appendChild(opt);
-        }
-      }
-
-      // ── Populate provider selector ──
-      if (provSel) {
-        provSel.innerHTML = '';
-        const autoProv = document.createElement('option');
-        autoProv.value = 'auto';
-        autoProv.textContent = '⚡ Auto';
-        provSel.appendChild(autoProv);
-        for (const p of _providers) {
-          const opt = document.createElement('option');
-          opt.value = p.id;
-          opt.textContent = p.available ? p.name : `${p.name} (no disponible)`;
-          opt.disabled = !p.available;
-          provSel.appendChild(opt);
-        }
-      }
-
-      // ── Restore persisted selection or use defaults ──
-      const saved = loadSelection();
-
-      if (harnessSel) {
-        if (saved.harness) {
-          const exists = _harnesses.find((h) => h.id === saved.harness && h.available);
-          if (exists) {
-            harnessSel.value = saved.harness;
-            _selectedHarness = saved.harness;
-          } else {
-            harnessSel.value = data.defaultHarness || 'auto';
-            _selectedHarness = data.defaultHarness || 'auto';
-          }
-        } else {
-          harnessSel.value = data.defaultHarness || 'auto';
-          _selectedHarness = data.defaultHarness || 'auto';
-        }
-      }
-
-      if (provSel) {
-        if (saved.provider) {
-          const exists = _providers.find((p) => p.id === saved.provider && p.available);
-          if (exists) {
-            provSel.value = saved.provider;
-            _selectedProvider = saved.provider;
-          } else {
-            provSel.value = data.defaultProvider || 'auto';
-            _selectedProvider = data.defaultProvider || 'auto';
-          }
-        } else {
-          provSel.value = data.defaultProvider || 'auto';
-          _selectedProvider = data.defaultProvider || 'auto';
-        }
-      }
-
-      populateModels(saved.model);
-      updateStatusIndicator();
+      // Try to fetch live reachability data from Hermes gateway
+      fetchLiveProviderStatus(data);
     })
     .catch(() => {
       // Fallback: minimal selectors so the user can still interact
@@ -339,6 +276,125 @@ function initProviderSelectors(_unit: Unit) {
     });
 }
 
+/** Fetch live model reachability from the bridge's /providers/live endpoint
+ *  and merge it into the provider list. Gracefully degrades on failure. */
+function fetchLiveProviderStatus(
+  data: { defaultHarness: string; defaultProvider: string; harnesses: HarnessInfo[]; providers: ProviderInfo[] }
+) {
+  fetch(bridgeUrl('/providers/live'), { headers: bridgeHeaders() })
+    .then((lr) => {
+      if (!lr.ok) return null;
+      return lr.json() as Promise<{ providers: ProviderInfo[] } | null>;
+    })
+    .then((liveData) => {
+      if (liveData && liveData.providers) {
+        // Build a lookup map from live data
+        const liveMap: Record<string, { models: { id: string; reachable: boolean }[] }> = {};
+        for (const p of liveData.providers) {
+          liveMap[p.id] = p as any;
+        }
+        // Merge reachable flags into our providers
+        for (const p of _providers) {
+          const lp = liveMap[p.id];
+          if (lp && lp.models) {
+            for (const m of p.models) {
+              const lm = lp.models.find((x: any) => x.id === m.id);
+              if (lm) (m as any).reachable = lm.reachable;
+            }
+          }
+        }
+      }
+      finishInit(data);
+    })
+    .catch(() => finishInit(data));
+}
+
+/** Shared initialization: populate DOM selectors and restore state.
+ *  Called after either static or live data is available. */
+function finishInit(data: { defaultHarness: string; defaultProvider: string }) {
+  const harnessSel = document.getElementById('harness-selector') as HTMLSelectElement | null;
+  const provSel = document.getElementById('provider-selector') as HTMLSelectElement | null;
+
+  // ── Populate harness selector ──
+  if (harnessSel) {
+    harnessSel.innerHTML = '';
+    const autoHarness = document.createElement('option');
+    autoHarness.value = 'auto';
+    autoHarness.textContent = '⚡ Auto (cascade)';
+    harnessSel.appendChild(autoHarness);
+    for (const h of _harnesses) {
+      const opt = document.createElement('option');
+      opt.value = h.id;
+      opt.textContent = h.available ? h.name : `${h.name} (no disponible)`;
+      opt.disabled = !h.available;
+      harnessSel.appendChild(opt);
+    }
+  }
+
+  // ── Populate provider selector with live status ──
+  if (provSel) {
+    provSel.innerHTML = '';
+    const autoProv = document.createElement('option');
+    autoProv.value = 'auto';
+    autoProv.textContent = '⚡ Auto';
+    provSel.appendChild(autoProv);
+    for (const p of _providers) {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      const anyReachable = p.models.some((m) => (m as any).reachable);
+      const allReachable = p.models.length > 0 && p.models.every((m) => (m as any).reachable);
+      const status = !p.available
+        ? '(no disponible)'
+        : allReachable
+          ? ''  // fully connected
+          : anyReachable
+            ? '(parcial)'
+            : '(sin conexión)';
+      opt.textContent = status ? `${p.name} ${status}`.trim() : p.name;
+      opt.disabled = !p.available && !anyReachable;
+      provSel.appendChild(opt);
+    }
+  }
+
+  // ── Restore persisted selection or use defaults ──
+  const saved = loadSelection();
+
+  if (harnessSel) {
+    if (saved.harness) {
+      const exists = _harnesses.find((h) => h.id === saved.harness && h.available);
+      if (exists) {
+        harnessSel.value = saved.harness;
+        _selectedHarness = saved.harness;
+      } else {
+        harnessSel.value = data.defaultHarness || 'auto';
+        _selectedHarness = data.defaultHarness || 'auto';
+      }
+    } else {
+      harnessSel.value = data.defaultHarness || 'auto';
+      _selectedHarness = data.defaultHarness || 'auto';
+    }
+  }
+
+  if (provSel) {
+    if (saved.provider) {
+      const exists = _providers.find((p) => p.id === saved.provider && p.available);
+      if (exists) {
+        provSel.value = saved.provider;
+        _selectedProvider = saved.provider;
+      } else {
+        provSel.value = data.defaultProvider || 'auto';
+        _selectedProvider = data.defaultProvider || 'auto';
+      }
+    } else {
+      provSel.value = data.defaultProvider || 'auto';
+      _selectedProvider = data.defaultProvider || 'auto';
+    }
+  }
+
+  populateModels(saved.model);
+  updateStatusIndicator();
+}
+
 /** Update the small status dot / tooltip showing current provider health. */
 function updateStatusIndicator() {
   const provSel = document.getElementById('provider-selector') as HTMLSelectElement | null;
@@ -352,19 +408,25 @@ function updateStatusIndicator() {
   // Determine status
   let status: 'ok' | 'warn' | 'off' = 'off';
   if (_selectedProvider === 'auto' || !_selectedProvider) {
-    // Check if at least one provider is available
+    // Check if at least one provider is available AND reachable
+    const anyReady = _providers.some(
+      (p) => p.available && p.models.some((m) => (m as any).reachable)
+    );
     const anyAvailable = _providers.some((p) => p.available);
-    status = anyAvailable ? 'warn' : 'off'; // warn = auto but we don't know which
+    status = anyReady ? 'ok' : anyAvailable ? 'warn' : 'off';
   } else {
     const prov = _providers.find((p) => p.id === _selectedProvider);
     if (prov) {
-      status = prov.available ? 'ok' : 'off';
+      const hasReachable = prov.models.some((m) => (m as any).reachable);
+      status = prov.available && hasReachable ? 'ok' : prov.available ? 'warn' : 'off';
     }
   }
 
   const dot = document.createElement('span');
   dot.className = `selector-status-dot ${status}`;
-  dot.title = `Provider: ${_selectedProvider || 'auto'} — ${status === 'ok' ? 'disponible' : status === 'warn' ? 'auto' : 'no disponible'}`;
+  const label = _selectedProvider || 'auto';
+  const reason = status === 'ok' ? 'disponible' : status === 'warn' ? 'parcial / sin conexión' : 'no disponible';
+  dot.title = `Provider: ${label} — ${reason}`;
   parent?.insertBefore(dot, provSel);
 }
 
@@ -373,8 +435,7 @@ function newError(msg: string): Error {
 }
 
 /** Switch Hermes model/provider via the web server API.
- *  This writes to session_model_overrides.json which the gateway reads on next turn.
- */
+ *  This writes to session_model_overrides.json which the gateway reads on next turn. */
 function switchHermesModel(provider: string, model: string) {
   const ctrl = new AbortController();
   setTimeout(() => ctrl.abort(), 10_000);
@@ -419,7 +480,10 @@ function populateModels(savedModel?: string) {
   for (const m of provider.models) {
     const opt = document.createElement('option');
     opt.value = m.id;
-    opt.textContent = m.name;
+    const reachable = (m as any).reachable;
+    const mark = reachable !== undefined ? (reachable ? ' ✓' : ' ✗ unreachable') : '';
+    opt.textContent = `${m.name}${mark}`;
+    if (!reachable) opt.disabled = true;
     modelSel.appendChild(opt);
   }
 
@@ -540,12 +604,12 @@ export function appendUserMessage(unitId: string, text: string) {
   msg.className = 'chat-msg user';
   msg.dataset['raw'] = text;
   msg.innerHTML = `<div class="chat-msg-head">
-    <div class="chat-msg-meta">
-      <span>TÚ · ${userTime}</span>
-      <button class="chat-copy-btn" title="Copiar mensaje" aria-label="Copiar mensaje al portapapeles">${COPY_SVG}</button>
-    </div>
-  </div>
-  <div class="chat-body">${escapeHtml(text)}</div>`;
+   <div class="chat-msg-meta">
+     <span>TÚ · ${userTime}</span>
+     <button class="chat-copy-btn" title="Copiar mensaje" aria-label="Copiar mensaje al portapapeles">${COPY_SVG}</button>
+   </div>
+ </div>
+ <div class="chat-body">${escapeHtml(text)}</div>`;
   container.appendChild(msg);
 
   // Create new agent bubble (will be filled by streaming chunks)
@@ -556,15 +620,15 @@ export function appendUserMessage(unitId: string, text: string) {
   bubble.id = `chat-current-${unitId}`;
   bubble.dataset['raw'] = '';
   bubble.innerHTML = `<div class="chat-msg-head">
-    <div class="chat-msg-meta">
-      <span>${unitId.toUpperCase()} · ${agentTime}</span>
-      <div class="chat-msg-actions">
-        <button class="chat-copy-btn" title="Copiar mensaje" aria-label="Copiar mensaje al portapapeles">${COPY_SVG}</button>
-        <button class="chat-error-btn hidden" title="Copiar solo la línea de error" aria-label="Copiar línea de error al portapapeles">Copiar error</button>
-      </div>
-    </div>
-  </div>
-  <span class="chat-body"></span>`;
+   <div class="chat-msg-meta">
+     <span>${unitId.toUpperCase()} · ${agentTime}</span>
+     <div class="chat-msg-actions">
+       <button class="chat-copy-btn" title="Copiar mensaje" aria-label="Copiar mensaje al portapapeles">${COPY_SVG}</button>
+       <button class="chat-error-btn hidden" title="Copiar solo la línea de error" aria-label="Copiar línea de error al portapapeles">Copiar error</button>
+     </div>
+   </div>
+ </div>
+ <span class="chat-body"></span>`;
   container.appendChild(bubble);
   currentAgentBubble.set(unitId, bubble);
 
@@ -587,15 +651,15 @@ function ensureLiveAgentBubble(unitId: string) {
   bubble.id = `chat-current-${unitId}`;
   bubble.dataset['raw'] = '';
   bubble.innerHTML = `<div class="chat-msg-head">
-    <div class="chat-msg-meta">
-      <span>${unitId.toUpperCase()} · ${agentTime}</span>
-      <div class="chat-msg-actions">
-        <button class="chat-copy-btn" title="Copiar mensaje" aria-label="Copiar mensaje al portapapeles">${COPY_SVG}</button>
-        <button class="chat-error-btn hidden" title="Copiar solo la línea de error" aria-label="Copiar línea de error al portapapeles">Copiar error</button>
-      </div>
-    </div>
-  </div>
-  <span class="chat-body"></span>`;
+   <div class="chat-msg-meta">
+     <span>${unitId.toUpperCase()} · ${agentTime}</span>
+     <div class="chat-msg-actions">
+       <button class="chat-copy-btn" title="Copiar mensaje" aria-label="Copiar mensaje al portapapeles">${COPY_SVG}</button>
+       <button class="chat-error-btn hidden" title="Copiar solo la línea de error" aria-label="Copiar línea de error al portapapeles">Copiar error</button>
+     </div>
+   </div>
+ </div>
+ <span class="chat-body"></span>`;
   container.appendChild(bubble);
   currentAgentBubble.set(unitId, bubble);
   attachCopyListeners(container, unitId);

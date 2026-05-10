@@ -1,6 +1,6 @@
 {
-  "version": "1.0",
-  "comment": "Single source of truth for agent harnesses and providers. Read by both server/provider_registry.py and (optionally) the frontend. Add providers/models here; the backend reads this at startup.",
+  "version": "2.0",
+  "comment": "Single source of truth for agent harnesses and providers. Reads env vars to determine availability. Updated by DAVI 2026-05-09 to match actual env vars and add missing providers.",
   "harnesses": [
     {
       "id": "hermes",
@@ -12,7 +12,7 @@
       "id": "claude-code",
       "name": "Claude Code",
       "transport": "claude-code",
-      "env": ""
+      "env": "CLAUDE_CODE_URL"
     },
     {
       "id": "openclaw",
@@ -24,19 +24,49 @@
       "id": "cursor",
       "name": "Cursor",
       "transport": "cursor",
-      "env": ""
+      "env": "CURSOR_API_KEY"
     }
   ],
   "providers": [
     {
       "id": "ollama-cloud",
       "name": "Ollama Cloud",
-      "env": "OLLAMA_CLOUD_URL",
-      "defaultModel": "nemotron-3-nano-4b",
+      "env": "OLLAMA_API_KEY",
+      "defaultModel": "deepseek-v4-pro",
       "models": [
-        {"id": "nemotron-3-nano-4b", "name": "Nemotron 3 Nano 4B", "harnesses": ["hermes", "ollama"]},
-        {"id": "llama-3.3-70b", "name": "Llama 3.3 70B", "harnesses": ["hermes", "ollama"]},
-        {"id": "qwen-2.5-coder-32b", "name": "Qwen 2.5 Coder 32B", "harnesses": ["hermes", "ollama"]}
+        {"id": "deepseek-v4-pro", "name": "DeepSeek V4 Pro", "harnesses": ["hermes", "ollama"]},
+        {"id": "deepseek-v4-flash", "name": "DeepSeek V4 Flash", "harnesses": ["hermes", "ollama"]},
+        {"id": "deepseek-v3.1", "name": "DeepSeek V3.1", "harnesses": ["hermes", "ollama"]},
+        {"id": "deepseek-r1", "name": "DeepSeek R1", "harnesses": ["hermes", "ollama"]},
+        {"id": "gemini-3-flash-preview", "name": "Gemini 3 Flash Preview", "harnesses": ["hermes", "ollama"]},
+        {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "harnesses": ["hermes", "ollama"]},
+        {"id": "qwen3-vl:235b", "name": "Qwen3 VL 235B", "harnesses": ["hermes", "ollama"]},
+        {"id": "qwen3-vl:235b-instruct", "name": "Qwen3 VL 235B Instruct", "harnesses": ["hermes", "ollama"]},
+        {"id": "qwen3-next:80b", "name": "Qwen3 Next 80B", "harnesses": ["hermes", "ollama"]},
+        {"id": "qwen3-coder:480b", "name": "Qwen3 Coder 480B", "harnesses": ["hermes", "ollama"]},
+        {"id": "qwen3-coder-next", "name": "Qwen3 Coder Next", "harnesses": ["hermes", "ollama"]},
+        {"id": "qwen3.5:397b", "name": "Qwen3.5 397B", "harnesses": ["hermes", "ollama"]},
+        {"id": "gpt-oss:120b", "name": "GPT OSS 120B", "harnesses": ["hermes", "ollama"]},
+        {"id": "gpt-oss:20b", "name": "GPT OSS 20B", "harnesses": ["hermes", "ollama"]},
+        {"id": "glm-5.1", "name": "GLM 5.1", "harnesses": ["hermes", "ollama"]},
+        {"id": "glm-5", "name": "GLM 5", "harnesses": ["hermes", "ollama"]},
+        {"id": "glm-4.7", "name": "GLM 4.7", "harnesses": ["hermes", "ollama"]},
+        {"id": "glm-4.6", "name": "GLM 4.6", "harnesses": ["hermes", "ollama"]},
+        {"id": "kimi-k2.6", "name": "Kimi K2.6", "harnesses": ["hermes", "ollama"]},
+        {"id": "kimi-k2.5", "name": "Kimi K2.5", "harnesses": ["hermes", "ollama"]},
+        {"id": "kimi-k2-thinking", "name": "Kimi K2 Thinking", "harnesses": ["hermes", "ollama"]},
+        {"id": "kimi-k2:1t", "name": "Kimi K2 1T", "harnesses": ["hermes", "ollama"]},
+        {"id": "ministral-3:14b", "name": "Mistral Ministral 3 14B", "harnesses": ["hermes", "ollama"]},
+        {"id": "mistral-large-3:675b", "name": "Mistral Large 3 675B", "harnesses": ["hermes", "ollama"]},
+        {"id": "nemotron-3-nano:30b", "name": "Nemotron 3 Nano 30B", "harnesses": ["hermes", "ollama"]},
+        {"id": "nemotron-3-super", "name": "Nemotron 3 Super", "harnesses": ["hermes", "ollama"]},
+        {"id": "devstral-2:123b", "name": "DevStral 2 123B", "harnesses": ["hermes", "ollama"]},
+        {"id": "devstral-small-2:24b", "name": "DevStral Small 2 24B", "harnesses": ["hermes", "ollama"]},
+        {"id": "gemma3:4b", "name": "Gemma 3 4B", "harnesses": ["hermes", "ollama"]},
+        {"id": "gemma3:12b", "name": "Gemma 3 12B", "harnesses": ["hermes", "ollama"]},
+        {"id": "gemma3:27b", "name": "Gemma 3 27B", "harnesses": ["hermes", "ollama"]},
+        {"id": "gemma4:31b", "name": "Gemma 4 31B", "harnesses": ["hermes", "ollama"]},
+        {"id": "rnj-1:8b", "name": "RNJ 1 8B", "harnesses": ["hermes", "ollama"]}
       ]
     },
     {
@@ -47,13 +77,15 @@
       "models": [
         {"id": "deepseek/deepseek-v3", "name": "DeepSeek V3", "harnesses": ["hermes", "openclaw", "claude-code"]},
         {"id": "deepseek/deepseek-r1", "name": "DeepSeek R1", "harnesses": ["hermes", "openclaw", "claude-code"]},
-        {"id": "moonshotai/kimi-2.6", "name": "Kimi 2.6", "harnesses": ["hermes", "openclaw"]},
         {"id": "openai/gpt-4o", "name": "GPT-4o", "harnesses": ["hermes", "openclaw", "claude-code"]},
         {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini", "harnesses": ["hermes", "openclaw"]},
         {"id": "anthropic/claude-sonnet-4", "name": "Claude Sonnet 4", "harnesses": ["hermes", "openclaw", "claude-code"]},
         {"id": "anthropic/claude-opus-4", "name": "Claude Opus 4", "harnesses": ["hermes", "openclaw", "claude-code"]},
         {"id": "google/gemini-2.5-pro", "name": "Gemini 2.5 Pro", "harnesses": ["hermes", "openclaw"]},
-        {"id": "nvidia/nemotron-3-nano-4b", "name": "Nemotron 3 Nano 4B (NR)", "harnesses": ["hermes", "openclaw"]}
+        {"id": "moonshotai/kimi-2.6", "name": "Kimi 2.6", "harnesses": ["hermes", "openclaw"]},
+        {"id": "nvidia/nemotron-3-nano-4b", "name": "Nemotron 3 Nano 4B (NR)", "harnesses": ["hermes", "openclaw"]},
+        {"id": "openai/o3", "name": "o3", "harnesses": ["hermes", "openclaw"]},
+        {"id": "openai/o4-mini", "name": "o4-mini", "harnesses": ["hermes", "openclaw"]}
       ]
     },
     {
@@ -71,7 +103,7 @@
     {
       "id": "nvidia-nim",
       "name": "NVIDIA NIM",
-      "env": "NVIDIA_NIM_URL",
+      "env": "NVIDIA_API_KEY",
       "defaultModel": "nvidia/nemotron-3-nano-4b",
       "models": [
         {"id": "nvidia/nemotron-3-nano-4b", "name": "Nemotron 3 Nano 4B", "harnesses": ["hermes", "openclaw"]},
@@ -87,6 +119,27 @@
         {"id": "claude-sonnet-4-20250514", "name": "Claude Sonnet 4", "harnesses": ["hermes", "openclaw", "claude-code"]},
         {"id": "claude-opus-4-20250514", "name": "Claude Opus 4", "harnesses": ["hermes", "openclaw", "claude-code"]},
         {"id": "claude-haiku-3-5-20241022", "name": "Claude Haiku 3.5", "harnesses": ["hermes", "openclaw"]}
+      ]
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek (direct)",
+      "env": "DEEPSEEK_API_KEY",
+      "defaultModel": "deepseek-chat",
+      "models": [
+        {"id": "deepseek-chat", "name": "DeepSeek Chat", "harnesses": ["hermes", "openclaw"]},
+        {"id": "deepseek-reasoner", "name": "DeepSeek Reasoner", "harnesses": ["hermes", "openclaw"]}
+      ]
+    },
+    {
+      "id": "xai",
+      "name": "xAI",
+      "env": "XAI_API_KEY",
+      "defaultModel": "grok-3",
+      "models": [
+        {"id": "grok-3", "name": "Grok 3", "harnesses": ["hermes", "openclaw"]},
+        {"id": "grok-3-mini", "name": "Grok 3 Mini", "harnesses": ["hermes", "openclaw"]},
+        {"id": "grok-3-fast", "name": "Grok 3 Fast", "harnesses": ["hermes", "openclaw"]}
       ]
     }
   ]

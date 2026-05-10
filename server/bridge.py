@@ -645,6 +645,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/tasks":              _routes.get_tasks,
             "/improve/reflect":    _routes.get_improve_reflect,
             "/improve/proposals":  _routes.get_improve_proposals,
+            "/providers/live":     _routes.get_providers_live,
         }
         if path in _GET_EXACT:
             status, body = _GET_EXACT[path](ctx)
