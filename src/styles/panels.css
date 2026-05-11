@@ -3061,6 +3061,23 @@ kbd {
   font-style: italic;
 }
 
+/* Collapsed state — hide body and shrink to header-only */
+#log-panel.collapsed {
+  width: auto;
+  min-width: 260px;
+  max-height: none;
+}
+#log-panel.collapsed .log-body {
+  display: none;
+}
+#log-panel.collapsed .log-filter,
+#log-panel.collapsed .log-clear {
+  display: none;
+}
+#log-panel.collapsed .log-toggle {
+  margin-right: 4px;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Harness Panel — CSS faltante
    ═══════════════════════════════════════════════════════════════════════════ */

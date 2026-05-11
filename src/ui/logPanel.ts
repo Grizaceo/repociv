@@ -76,6 +76,7 @@ export function buildBodyHTML(events: LogEvent[] | null): string {
 let _panel: HTMLElement | null = null;
 let _timer = 0;
 let _visible = false;
+let _collapsed = false;
 let _buffer: LogEvent[] = [];
 let _offline = false;
 let _filter = '';
@@ -111,6 +112,14 @@ export function isLogPanelOpen(): boolean {
 export function toggleLogPanel(): void {
   if (_visible) closeLogPanel();
   else openLogPanel();
+}
+
+export function toggleLogCollapse(): void {
+  if (!_panel) return;
+  _collapsed = !_collapsed;
+  _panel.classList.toggle('collapsed', _collapsed);
+  const toggleBtn = _panel.querySelector<HTMLButtonElement>('.log-toggle');
+  if (toggleBtn) toggleBtn.textContent = _collapsed ? '▸' : '▾';
 }
 
 // ─── Polling ──────────────────────────────────────────────────────────────────
@@ -163,6 +172,7 @@ function _getOrCreate(): HTMLElement {
     `<div class="panel-header">
       <span class="panel-title">📜 Log en vivo</span>
       <div class="log-controls">
+        <button class="log-toggle" aria-label="Colapsar / desplegar" title="Colapsar / desplegar">▾</button>
         <select class="log-filter" aria-label="Filtrar por tipo">
           <option value="">Todos</option>
           <option value="CommandCreated">CommandCreated</option>
@@ -180,6 +190,7 @@ function _getOrCreate(): HTMLElement {
     <div class="log-body"></div>`,
   );
   bindPanelAction(_panel, '.log-close', closeLogPanel);
+  bindPanelAction(_panel, '.log-toggle', toggleLogCollapse);
   _panel.querySelector('.log-clear')?.addEventListener('click', () => {
     clearLocalBuffer();
   });
