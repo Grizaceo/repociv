@@ -513,6 +513,9 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
             {"role": "user", "content": mission},
         ],
         "stream": False,
+        # Cap max_tokens to avoid OpenRouter 402 errors caused by huge
+        # context-window estimates on low-credit keys.
+        "max_tokens": 4096,
     }
     if working_dir:
         payload["working_directory"] = working_dir
