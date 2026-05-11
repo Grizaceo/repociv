@@ -267,20 +267,20 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
         return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
     send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: hermes]\n"})
-    success, output = _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
+    success, output = _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model or provider)
     if success:
         return success, output
 
     send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[hermes falló → probando claude-code]\n"})
     if _has_claude_code():
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: claude-code]\n"})
-        success, output = _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
+        success, output = _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model or provider)
         if success:
             return success, output
 
     if _has_openclaw():
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[fallback openclaw]\n"})
-        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
+        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model or provider)
 
     msg = "[offline] Ningún adaptador de agente disponible (hermes, claude-code, openclaw). Sin ejecución real.\n"
     send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": msg})

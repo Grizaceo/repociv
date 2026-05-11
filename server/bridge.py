@@ -318,9 +318,9 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
     return _agent_runner._run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
 def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
-              command_id: str | None = None, provider: str = "", model: str = "") -> None:
+              command_id: str | None = None, harness: str = "", provider: str = "", model: str = "") -> None:
     _configure_agent_runner()
-    return _agent_runner.run_agent(unit_id, city_id, mission, agent_type, command_id, provider=provider, model=model)
+    return _agent_runner.run_agent(unit_id, city_id, mission, agent_type, command_id, harness=harness, provider=provider, model=model)
 
 
 def _execute_streaming(unit_id: str, mission_id: str, mission: str,
