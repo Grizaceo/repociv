@@ -48,6 +48,7 @@ export class LocalWorldManager {
           workProgress: 0,
           macroUnitId: heroUnit?.id ?? 'DAVI',
           currentWorkbenchId: null,
+          currentRoomId: this.localWorld.grid[entrance.y + Math.floor(entrance.h / 2)]?.[entrance.x + Math.floor(entrance.w / 2)]?.roomId ?? null,
           fatigue: heroUnit?.fatigue ?? 100,
           maxFatigue: heroUnit?.maxFatigue ?? 100,
           isResting: heroUnit?.isResting ?? false,
@@ -81,6 +82,7 @@ export class LocalWorldManager {
           workProgress: 0,
           macroUnitId: 'DAVI',
           currentWorkbenchId: null,
+          currentRoomId: this.localWorld.grid[entrance.y + 1]?.[entrance.x + 1]?.roomId ?? null,
           fatigue: 100,
           maxFatigue: 100,
           isResting: false,
@@ -128,6 +130,9 @@ export class LocalWorldManager {
           const step = unit.path[unit.pathIndex]!;
           unit.gridX = step.x;
           unit.gridY = step.y;
+          // Spatial awareness: update room on tile change (efficient, not every tick)
+          const tile = this.localWorld?.grid[unit.gridY]?.[unit.gridX];
+          unit.currentRoomId = tile?.roomId ?? null;
           unit.pathIndex++;
           if (unit.pathIndex >= unit.path.length) {
             unit.path = [];

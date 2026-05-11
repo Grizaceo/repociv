@@ -440,6 +440,48 @@ export function repocivPlugin(mapRoot: string): Plugin {
         return;
       }
       try {
+        const qs = new URLSearchParams(rawUrl.includes('?') ? rawUrl.split('?')[1]! : '');
+        const file = qs.get('file');
+
+        if (file) {
+          // Per-file git history + blame
+          const logRaw = execSync(
+            `git -C "${repoPath}" log --oneline -n 5 -- "${file}" 2>/dev/null || true`,
+            { encoding: 'utf8' },
+          ).trim();
+          const blameRaw = execSync(
+            `git -C "${repoPath}" blame -L 1,15 --porcelain -- "${file}" 2>/dev/null || true`,
+            { encoding: 'utf8' },
+          ).trim();
+
+          const log = logRaw ? logRaw.split('\n').filter(Boolean) : [];
+          const blame: Array<{ line: number; author: string; date: string }> = [];
+          if (blameRaw) {
+            const blameLines = blameRaw.split('\n');
+            let currentAuthor = '';
+            let currentTime = 0;
+            let lineNum = 0;
+            for (const line of blameLines) {
+              if (line.startsWith('author ')) {
+                currentAuthor = line.slice(7);
+              } else if (line.startsWith('author-time ')) {
+                currentTime = parseInt(line.slice(12), 10);
+              } else if (line.startsWith('\t')) {
+                lineNum++;
+                blame.push({
+                  line: lineNum,
+                  author: currentAuthor.slice(0, 20),
+                  date: currentTime ? new Date(currentTime * 1000).toLocaleDateString() : '',
+                });
+              }
+            }
+          }
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ log, blame }));
+          return;
+        }
+
+        // Repo-wide git summary (existing behaviour)
         const status = execSync(`git -C "${repoPath}" status --short 2>/dev/null || true`,
           { encoding: 'utf8' }).trim();
         const branch = execSync(`git -C "${repoPath}" branch --show-current 2>/dev/null || echo`,

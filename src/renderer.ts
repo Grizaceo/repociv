@@ -73,6 +73,10 @@ export class Renderer {
   private unitR: UnitRenderer;
   private minimapR: MinimapRenderer;
   private localR: LocalRendererType | null = null; // Phase 6: RimWorld 2D view
+  // Callbacks for local view (applied lazily when localR is instantiated)
+  localUnitHoverCb: ((unit: import('./types.ts').LocalUnit | null, screenX: number, screenY: number) => void) | null = null;
+  localWorkbenchClickCb: ((tile: import('./types.ts').LocalTile, screenX: number, screenY: number) => void) | null = null;
+  localUnitClickCb: ((unit: import('./types.ts').LocalUnit, screenX: number, screenY: number) => void) | null = null;
   private _localRendererCtor: (new (canvas: HTMLCanvasElement) => LocalRendererType) | null = null;
   private localWorldId: string | null = null;
   /** Cached tile list sorted by Y — recomputed only when tile count changes. */
@@ -578,6 +582,10 @@ export class Renderer {
       if (!this.localR && this._localRendererCtor) {
         this.localR = new this._localRendererCtor(canvas);
         this.localR.setupInput();
+        // Wire stored local-view callbacks (set from main.ts)
+        this.localR.onLocalUnitHover = (unit, sx, sy) => this.localUnitHoverCb?.(unit, sx, sy);
+        this.localR.onWorkbenchClick = this.localWorkbenchClickCb;
+        this.localR.onLocalUnitClick = this.localUnitClickCb;
       }
       if (!this.localR) return; // still loading module — next frame will retry
       if (this.state.localWorld && this.state.localWorld.repoId !== this.localWorldId) {

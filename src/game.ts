@@ -398,6 +398,7 @@ export class GameState {
   enterMacroView(): void {
     this._local.enterMacroView();
   }
+
   getLocalWorld(): LocalWorld | null {
     return this._local.getLocalWorld();
   }

@@ -35,6 +35,15 @@ import {
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { wireHUD, selectHero } from './ui/hudWiring.ts';
 import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
+import {
+  showLocalUnitTooltip,
+  hideLocalUnitTooltip,
+  showLocalWorkbenchTooltip,
+  hideLocalWorkbenchTooltip,
+  showLocalContextMenu,
+  showLocalMissionPreview,
+  showGitForFile,
+} from './ui/localSpatialPreview.ts';
 import { sendCommand } from './commandBus.ts';
 import { recordGesture } from './directiveLearner.ts';
 import { tileKey } from './types.ts';
@@ -283,6 +292,43 @@ async function bootstrap() {
   renderer.onEnterLocal = (repoId, rootPath) => {
     bridge.send('enter_local', { repoId, rootPath });
     state.enterLocalView(repoId).catch(() => state.enterLocalViewMock(repoId));
+  };
+
+  // ─── Local view callbacks (wired to renderer; applied lazily when localR is created) ──
+  renderer.localUnitHoverCb = (unit, mx, my) => {
+    if (unit) showLocalUnitTooltip(unit, { x: mx, y: my });
+    else hideLocalUnitTooltip();
+  };
+  renderer.localWorkbenchClickCb = (tile, sx, sy) => {
+    const wb = tile.workbench;
+    if (!wb) return;
+    const idleAgents = state.getAllUnits()
+      .filter((u) => u.state === 'idle')
+      .map((u) => ({ id: u.id, name: u.name, type: u.type }));
+    const localWorld = state.localWorld;
+    const repoId = localWorld?.repoId ?? wb.repoPath;
+    showLocalContextMenu(wb, idleAgents, { x: sx, y: sy }, (action) => {
+      if (action === 'git') {
+        void showGitForFile(repoId, wb.filePath, { x: sx, y: sy });
+        return;
+      }
+      if (action === 'code') {
+        bridge.send('open_file', { filePath: wb.filePath });
+        return;
+      }
+      if (action === 'info') {
+        showLocalWorkbenchTooltip(wb, { x: sx, y: sy });
+        setTimeout(() => hideLocalWorkbenchTooltip(), 3000);
+        return;
+      }
+      showLocalMissionPreview(action, wb.fileName, { x: sx, y: sy }, () => {
+        state.queueLocalMission(repoId, wb.filePath, wb.fileName);
+      }, () => {});
+    });
+  };
+  renderer.localUnitClickCb = (unit, _sx, _sy) => {
+    // Highlight selected local unit (future: show detail panel)
+    showLocalUnitTooltip(unit, { x: _sx, y: _sy });
   };
 
   // Spawn DAVI as the default hero, near the capital if present

@@ -38,6 +38,15 @@ export class LocalRenderer {
   onTileHover: ((x: number, y: number, tile: LocalTile | null) => void) | null = null;
   onTileDblClick: ((x: number, y: number, tile: LocalTile | null) => void) | null = null;
 
+  // Spatial awareness callbacks (ported from macro pattern)
+  onLocalUnitClick: ((unit: LocalUnit, screenX: number, screenY: number) => void) | null = null;
+  onWorkbenchClick: ((tile: LocalTile, screenX: number, screenY: number) => void) | null = null;
+  onLocalUnitHover: ((unit: LocalUnit | null, screenX: number, screenY: number) => void) | null = null;
+
+  // Internal
+  private _localUnits: LocalUnit[] = [];
+  private _hoveredUnit: LocalUnit | null = null;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
@@ -77,6 +86,13 @@ export class LocalRenderer {
       const tile = this.screenToTile(wx, wy);
       this.hoveredTile = tile;
 
+      // Spatial awareness: unit hover (ported from macro hit-testing)
+      const hoveredUnit = this.getUnitAt(wx, wy);
+      if (hoveredUnit !== this._hoveredUnit) {
+        this._hoveredUnit = hoveredUnit;
+        this.onLocalUnitHover?.(hoveredUnit, wx, wy);
+      }
+
       if (this.isDragging) {
         const dx = (wx - this.dragStart.x) / this.cam.zoom;
         const dy = (wy - this.dragStart.y) / this.cam.zoom;
@@ -89,11 +105,25 @@ export class LocalRenderer {
 
     canvas.addEventListener('mouseup', (e) => {
       if (e.button === 0 && !this.wasDrag(e)) {
-        const tile = this.screenToTile(
-          e.clientX - canvas.getBoundingClientRect().left,
-          e.clientY - canvas.getBoundingClientRect().top,
-        );
-        if (tile) this.onTileClick?.(tile.x, tile.y, this.getTile(tile.x, tile.y));
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        const tile = this.screenToTile(sx, sy);
+
+        if (tile) {
+          // Priority: unit > workbench > generic tile (matches macro pattern)
+          const unit = this.getUnitAt(sx, sy);
+          if (unit) {
+            this.onLocalUnitClick?.(unit, sx, sy);
+          } else {
+            const t = this.getTile(tile.x, tile.y);
+            if (t?.type === 'workbench' && t.workbench) {
+              this.onWorkbenchClick?.(t, sx, sy);
+            } else {
+              this.onTileClick?.(tile.x, tile.y, t);
+            }
+          }
+        }
       }
       this.isDragging = false;
     });
@@ -149,8 +179,34 @@ export class LocalRenderer {
     return this.world.grid[y]![x] ?? null;
   }
 
+  /** Hit-test for local units (ported from macro getUnitAt pattern).
+   *  Returns the unit whose interpolated world position is within TILE_SIZE*0.45 of screen coords. */
+  private getUnitAt(screenX: number, screenY: number): LocalUnit | null {
+    if (!this.world || this._localUnits.length === 0) return null;
+    const wx = (screenX - this.cam.cx) / this.cam.zoom + this.cam.x;
+    const wy = (screenY - this.cam.cy) / this.cam.zoom + this.cam.y;
+    const threshold = TILE_SIZE * 0.45;
+
+    for (const unit of this._localUnits) {
+      let ux: number, uy: number;
+      if (unit.path.length > 0 && unit.pathIndex < unit.path.length) {
+        const from = unit.path[unit.pathIndex]!;
+        const to = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;
+        const t = unit.pathProgress;
+        ux = (from.x + (to.x - from.x) * t) * TILE_SIZE + TILE_SIZE / 2;
+        uy = (from.y + (to.y - from.y) * t) * TILE_SIZE + TILE_SIZE / 2;
+      } else {
+        ux = unit.gridX * TILE_SIZE + TILE_SIZE / 2;
+        uy = unit.gridY * TILE_SIZE + TILE_SIZE / 2;
+      }
+      if (Math.hypot(wx - ux, wy - uy) < threshold) return unit;
+    }
+    return null;
+  }
+
   // ─── Render ───────────────────────────────────────────────────────────────────
   render(localUnits: LocalUnit[]) {
+    this._localUnits = localUnits;
     const { ctx, canvas, cam, world } = this;
     if (!world) return;
 
@@ -216,8 +272,14 @@ export class LocalRenderer {
     const py = tile.y * TILE_SIZE;
     const s = TILE_SIZE;
 
-    const fillColor = TILE_COLOR[tile.type] ?? TILE_COLOR['floor'] ?? '#2a2a35';
+    let fillColor = TILE_COLOR[tile.type] ?? TILE_COLOR['floor'] ?? '#2a2a35';
     const borderColor = TILE_BORDER[tile.type] ?? TILE_BORDER['floor'] ?? '#1a1a22';
+
+    // Floor variation: subtle brightness shift to break uniformity
+    if (tile.type === 'floor' || tile.type === 'door') {
+      const delta = ((tile.x * 7 + tile.y * 3) % 7) - 3; // -3..+3
+      fillColor = _adjustBrightness(fillColor, delta);
+    }
 
     // Fill
     ctx.fillStyle = fillColor;
@@ -227,7 +289,10 @@ export class LocalRenderer {
     if (tile.type === 'workbench') {
       this.drawWorkbenchTile(tile, px, py, s);
     } else if (tile.type === 'wall') {
-      ctx.fillStyle = '#00000022';
+      // 3/4 perspective: cast shadow down-right
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillRect(px + 3, py + 3, s, s);
+      ctx.fillStyle = '#00000018';
       ctx.fillRect(px + 2, py + 2, s - 4, s - 4);
     } else if (tile.type === 'debris') {
       this.drawDebrisTile(px, py, s);
@@ -264,27 +329,27 @@ export class LocalRenderer {
     const wb = tile.workbench;
     if (!wb) return;
 
-    // Workbench icon: small "desk" shape
+    // Desk body with drawers (improved silhouette)
     ctx.fillStyle = '#2a6080';
-    ctx.fillRect(px + 3, py + s - 8, s - 6, 5); // desk top
+    ctx.fillRect(px + 2, py + 4, s - 4, s - 10); // desk top / body
     ctx.fillStyle = '#1a4055';
-    ctx.fillRect(px + 5, py + s - 8, 2, 4); // left leg
-    ctx.fillRect(px + s - 7, py + s - 8, 2, 4); // right leg
+    ctx.fillRect(px + 4, py + s - 6, s - 8, 3); // drawer line
+    ctx.fillRect(px + 4, py + s - 10, s - 8, 2); // second drawer
 
-    // File type indicator (color dot)
+    // File extension label centered and larger
     const extColor = EXT_COLOR[wb.extension] ?? '#888';
     ctx.fillStyle = extColor;
-    ctx.beginPath();
-    ctx.arc(px + s - 5, py + 5, 3, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.font = `bold ${Math.max(7, s * 0.32)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(wb.extension.slice(0, 3), px + s / 2, py + s / 2 - 1);
 
-    // Test badge
+    // Test badge (small gold dot in corner)
     if (wb.isTest) {
       ctx.fillStyle = '#c8a84b';
-      ctx.font = `bold ${s * 0.3}px monospace`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillText('T', px + s / 2, py + 2);
+      ctx.beginPath();
+      ctx.arc(px + s - 4, py + 4, 2.5, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
@@ -330,10 +395,10 @@ export class LocalRenderer {
     ctx.save();
     ctx.translate(ux, uy + floatY);
 
-    // Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    // Shadow (more pronounced)
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
     ctx.beginPath();
-    ctx.ellipse(0, TILE_SIZE * 0.35, TILE_SIZE * 0.2, TILE_SIZE * 0.07, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, TILE_SIZE * 0.38, TILE_SIZE * 0.22, TILE_SIZE * 0.09, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Selection ring
@@ -351,6 +416,27 @@ export class LocalRenderer {
     ctx.strokeStyle = unit.color;
     ctx.lineWidth = 2;
     ctx.stroke();
+
+    // Direction indicator (triangle pointing to next path tile or workbench)
+    let dirAngle = 0;
+    if (unit.path.length > 0 && unit.pathIndex < unit.path.length) {
+      const to = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;
+      dirAngle = Math.atan2(to.y - unit.gridY, to.x - unit.gridX);
+    } else if (unit.state === 'working_on_file' && unit.currentWorkbenchId) {
+      // Face the current workbench if known
+      const wbTile = this.world?.grid.flat().find((t) => t.workbench?.id === unit.currentWorkbenchId);
+      if (wbTile) dirAngle = Math.atan2(wbTile.y - unit.gridY, wbTile.x - unit.gridX);
+    }
+    ctx.save();
+    ctx.rotate(dirAngle);
+    ctx.fillStyle = unit.color;
+    ctx.beginPath();
+    ctx.moveTo(7, 0);
+    ctx.lineTo(-3, -4);
+    ctx.lineTo(-3, 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
 
     // Initials
     const initials = unit.name.slice(0, 2).toUpperCase();
@@ -402,6 +488,16 @@ export class LocalRenderer {
     this.cam.x = tileX * TILE_SIZE + TILE_SIZE / 2;
     this.cam.y = tileY * TILE_SIZE + TILE_SIZE / 2;
   }
+}
+
+// ─── Helper: vary brightness of a hex color by ±percent ───────────────────────
+function _adjustBrightness(hex: string, delta: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const clamp = (v: number) => Math.max(0, Math.min(255, v + delta));
+  const toHex = (v: number) => v.toString(16).padStart(2, '0');
+  return `#${toHex(clamp(r))}${toHex(clamp(g))}${toHex(clamp(b))}`;
 }
 
 // ─── Extension → color map ────────────────────────────────────────────────────

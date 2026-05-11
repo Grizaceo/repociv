@@ -294,6 +294,8 @@ export interface LocalUnit {
   macroUnitId: string;
   // currently-assigned workbench in local view
   currentWorkbenchId: string | null;
+  // Spatial awareness: which room the unit is currently inside
+  currentRoomId?: string | null;
   // ─── Phase 9: XCOM Context Fatigue ───────────────────────────────
   fatigue: number; // 0–100 (100 = fresh, 0 = exhausted)
   maxFatigue: number; // always 100
