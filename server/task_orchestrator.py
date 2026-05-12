@@ -20,12 +20,16 @@ Usage (test):
 from __future__ import annotations
 
 import json
+import logging
+import os
 import threading
 import time
 import traceback
 import uuid
 from pathlib import Path
 from typing import Any, Callable
+
+logger = logging.getLogger(__name__)
 
 from . import locks as _locks
 from . import workspace_issue as _wi
@@ -40,6 +44,21 @@ from . import swarm_engine as _swarm
 
 # ─── Circuit breaker ──────────────────────────────────────────────────────────
 MAX_CONSECUTIVE_FAILURES = 3
+
+# ─── Stall detection (Symphony §8.5 Part A extraction) ────────────────────────
+# A step is "stalled" when no observable progress (events) occurs within this
+# window. The orchestrator itself is synchronous (blocks on each step), so the
+# effective stall detection is:
+#   1. STEP_TIMEOUT in step_executor — hard kill after N seconds (already exists)
+#   2. STALL_TIMEOUT_SECONDS here — the orchestrator-level budget per step
+#   3. STALL_WARN_SECONDS — log a warning if a step exceeds this without finishing
+# These are overridable via environment for per-repo tuning.
+STALL_TIMEOUT_SECONDS = int(
+    os.environ.get("REPOCIV_STALL_TIMEOUT", "600")
+)  # 10 min default
+STALL_WARN_SECONDS = int(
+    os.environ.get("REPOCIV_STALL_WARN", "120")
+)  # 2 min — log artifact warning
 
 
 # ─── Injectable step executor ─────────────────────────────────────────────────
@@ -501,6 +520,51 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                             "completedAt": _now_iso(),
                         }, ensure_ascii=False, indent=2),
                     )
+
+                    # ── Stall detection (Symphony §8.5 Part A) ──────────────
+                    _step_elapsed = time.time() - _step_start
+                    _step_elapsed_ms = _step_elapsed * 1000
+
+                    # Warn on suspiciously slow steps
+                    if _step_elapsed >= STALL_WARN_SECONDS:
+                        logger.warning(
+                            "Step %d/%d in %s/%s took %.0fs (>%ds stall warning threshold)",
+                            i + 1, total, repo, issue_id,
+                            _step_elapsed, STALL_WARN_SECONDS,
+                        )
+                        _wi.add_artifact(
+                            repo, issue_id,
+                            f"step_{i:03d}_stall_warning.json",
+                            content=json.dumps({
+                                "warning": "step exceeded stall warning threshold",
+                                "stepIndex": i,
+                                "elapsedSeconds": round(_step_elapsed, 1),
+                                "stallWarnThresholdSeconds": STALL_WARN_SECONDS,
+                                "step": step[:200],
+                                "timestamp": _now_iso(),
+                            }),
+                        )
+
+                    # Detect empty output — agent returned no content at all
+                    if (
+                        agent_output is not None
+                        and not agent_output.strip()
+                        and run_result is not None
+                    ):
+                        logger.warning(
+                            "Step %d/%d in %s/%s produced empty output — possible stall",
+                            i + 1, total, repo, issue_id,
+                        )
+                        _wi.add_artifact(
+                            repo, issue_id,
+                            f"step_{i:03d}_empty_output.json",
+                            content=json.dumps({
+                                "warning": "step returned empty output",
+                                "stepIndex": i,
+                                "runId": run_id,
+                                "timestamp": _now_iso(),
+                            }),
+                        )
 
                     # Fase 3: run an optional post-WORKER swarm debate only for
                     # high-risk/high-priority steps. Default path stays unchanged.

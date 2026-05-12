@@ -593,3 +593,59 @@ def test_list_tasks_step_progress_populated():
     assert task["stepCount"] == 4
     assert task["stepCurrent"] is not None
 
+
+# ─── Stall detection (Symphony §8.5 Part A extraction) ────────────────────────
+
+def test_stall_warning_artifact_on_slow_step(monkeypatch):
+    """Step taking > STALL_WARN_SECONDS triggers a stall_warning artifact."""
+    monkeypatch.setattr(_to, "STALL_WARN_SECONDS", 0)  # force trigger
+    _seed_workspace("repo", "ISS-STALL")
+
+    # Use a real but fast mock — the orchestrator measures elapsed wall time
+    _to.set_step_executor(lambda *a: "run-stalled")
+
+    _to.run_task("repo", "ISS-STALL")
+
+    artifacts = _wi.list_artifacts("repo", "ISS-STALL")
+    stall_warnings = [a for a in artifacts if "stall_warning" in a]
+    assert len(stall_warnings) >= 1, (
+        f"Expected stall_warning artifact but got artifacts: {artifacts}"
+    )
+
+
+def test_empty_output_artifact_on_blank_result(monkeypatch):
+    """Agent returning empty output triggers empty_output artifact."""
+    _seed_workspace("repo", "ISS-EMPTY")
+
+    def empty_executor(repo, issue_id, step, meta):
+        run_id = f"empty-run-{meta['stepIndex']}"
+        # Simulate run_state with empty result
+        import server.run_state as _rs
+        _rs.save(run_id, {"status": "completed", "result": ""})
+        return run_id
+
+    _to.set_step_executor(empty_executor)
+    _to.run_task("repo", "ISS-EMPTY")
+
+    artifacts = _wi.list_artifacts("repo", "ISS-EMPTY")
+    empty_warnings = [a for a in artifacts if "empty_output" in a]
+    assert len(empty_warnings) >= 1
+
+
+def test_healthy_step_no_stall_no_empty():
+    """Fast step with real output generates no stall or empty warnings."""
+    _seed_workspace("repo", "ISS-HEALTHY")
+
+    def healthy_executor(repo, issue_id, step, meta):
+        run_id = f"healthy-{meta['stepIndex']}"
+        import server.run_state as _rs
+        _rs.save(run_id, {"status": "completed", "result": "All tests pass"})
+        return run_id
+
+    _to.set_step_executor(healthy_executor)
+    _to.run_task("repo", "ISS-HEALTHY")
+
+    artifacts = _wi.list_artifacts("repo", "ISS-HEALTHY")
+    stall_related = [a for a in artifacts if "stall_warning" in a or "empty_output" in a]
+    assert len(stall_related) == 0, f"Unexpected stall artifacts: {stall_related}"
+

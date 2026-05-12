@@ -30,6 +30,8 @@ from .tensor_context import ContextDirective, TensorContext, DEONTIC_MUST, DEONT
 logger = logging.getLogger(__name__)
 
 STEP_TIMEOUT = 300  # default per-step timeout in seconds
+STALL_TIMEOUT_MS = 300_000  # 5 min — no events in this window → stall (Symphony §8.5A)
+STALL_WARN_SECONDS = 120  # log warning when step exceeds this duration
 
 # ─── Workspace safety invariants (Symphony §9.5 extraction) ──────────────────
 
