@@ -6,12 +6,17 @@ Provides dispatch_plan_step for injection via _to.set_step_executor().
 Security integration (Fase 1.5):
   - Pre-dispatch: SecurityHarness.pre_dispatch_gate() scans mission text
   - Post-execution: SecurityHarness.post_execution_audit() verifies output
+
+Workspace safety invariants (Symphony §9.5 extraction):
+  - Workspace key validation: repo + issue_id sanitised before any dispatch
+  - Path traversal prevention: no '..', '/', '\\', '~' in workspace identifiers
 """
 
 from __future__ import annotations
 
 import concurrent.futures
 import logging
+import re
 import uuid
 from typing import Any
 
@@ -25,6 +30,41 @@ from .tensor_context import ContextDirective, TensorContext, DEONTIC_MUST, DEONT
 logger = logging.getLogger(__name__)
 
 STEP_TIMEOUT = 300  # default per-step timeout in seconds
+
+# ─── Workspace safety invariants (Symphony §9.5 extraction) ──────────────────
+
+# Only [A-Za-z0-9._-] — no path traversal, no shell metacharacters
+_WORKSPACE_KEY_RE = re.compile(r'^[A-Za-z0-9._-]{1,128}$')
+
+
+class WorkspaceSafetyError(ValueError):
+    """Raised when workspace identifiers violate safety invariants.
+
+    Prevents path traversal and sandbox escape. Aligned with Symphony §9.5.
+    """
+
+
+def _validate_workspace_safety(repo: str, issue_id: str) -> None:
+    """Validate workspace identifiers before agent dispatch (Symphony §9.5).
+
+    Invariants:
+      1. repo in [A-Za-z0-9._-]{1,128} — no '..', '/', '~'
+      2. issue_id in [A-Za-z0-9._-]{1,128} — no shell metacharacters
+      3. Neither is empty
+
+    Raises WorkspaceSafetyError on violation.
+    """
+    for label, value in (("repo", repo), ("issue_id", issue_id)):
+        if not value:
+            raise WorkspaceSafetyError(
+                f"{label} must not be empty"
+            )
+        if not _WORKSPACE_KEY_RE.match(value):
+            raise WorkspaceSafetyError(
+                f"Invalid {label} {value!r}: "
+                "only [A-Za-z0-9._-] allowed. "
+                "Path traversal characters ('..', '/', '~') are rejected."
+            )
 
 
 # ─── Agent selection heuristic ────────────────────────────────────────────────
@@ -193,7 +233,11 @@ def dispatch_plan_step(
 
     Raises:
         TimeoutError: if the step exceeds the timeout.
+        WorkspaceSafetyError: if repo or issue_id violate safety invariants.
     """
+    # ── Workspace safety gate (Symphony §9.5) — must run before any dispatch
+    _validate_workspace_safety(repo, issue_id)
+
     run_id = f"step-{uuid.uuid4().hex[:8]}"
 
     # Build mission with issue context + prior step artifacts for context seeding
