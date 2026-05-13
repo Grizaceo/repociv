@@ -364,3 +364,13 @@ python3 -m server.rebuild_ledger --dry-run    # contar sin escribir
 curl http://localhost:5274/improve/reflect    # patterns observados
 curl http://localhost:5274/improve/proposals  # propuestas scoped
 ```
+
+---
+
+## Contributing
+
+Ver [CONTRIBUTING.md](CONTRIBUTING.md) para setup de desarrollo, workflow, conventional commits, y guía de estilo.
+
+---
+
+_RepoCiv — v0.1.0 — Cristóbal & DAVI_
