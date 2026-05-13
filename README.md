@@ -341,6 +341,12 @@ No hay archivo `.env` para el frontend — toda config runtime va por aquí.
 
 ---
 
+## API Reference
+
+Ver [docs/API.md](docs/API.md) para documentación completa de endpoints del bridge.
+
+---
+
 ## Debug
 
 ```bash
