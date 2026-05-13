@@ -27,7 +27,7 @@ pip install -r requirements.txt
 ```bash
 # Opción A: dos terminales manuales
 # Terminal 1 — Backend
-python3 server/bridge.py
+python3 -m server.bridge
 
 # Terminal 2 — Frontend
 npm run dev
