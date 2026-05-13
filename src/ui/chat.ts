@@ -130,12 +130,17 @@ interface ModelInfo {
   harnesses: string[];
   reachable?: boolean;
 }
+/** Live provider response from /providers/live (models have `reachable` baked in). */
+interface LiveProviderInfo {
+  id: string;
+  models: { id: string; reachable: boolean }[];
+}
 interface ProviderInfo {
   id: string;
   name: string;
   available: boolean;
   defaultModel: string;
-  models: (ModelInfo & { reachable?: boolean })[];
+  models: ModelInfo[];
   configured?: boolean;
   env?: string;
   hermesReachable?: boolean;
@@ -291,22 +296,22 @@ function fetchLiveProviderStatus(data: {
   fetch(bridgeUrl('/providers/live'), { headers: bridgeHeaders() })
     .then((lr) => {
       if (!lr.ok) return null;
-      return lr.json() as Promise<{ providers: ProviderInfo[] } | null>;
+      return lr.json() as Promise<{ providers: LiveProviderInfo[] } | null>;
     })
     .then((liveData) => {
       if (liveData && liveData.providers) {
         // Build a lookup map from live data
-        const liveMap: Record<string, { models: { id: string; reachable: boolean }[] }> = {};
+        const liveMap: Record<string, LiveProviderInfo> = {};
         for (const p of liveData.providers) {
-          liveMap[p.id] = p as any;
+          liveMap[p.id] = p;
         }
         // Merge reachable flags into our providers
         for (const p of _providers) {
           const lp = liveMap[p.id];
           if (lp && lp.models) {
             for (const m of p.models) {
-              const lm = lp.models.find((x: any) => x.id === m.id);
-              if (lm) (m as any).reachable = lm.reachable;
+              const lm = lp.models.find((x) => x.id === m.id);
+              if (lm) m.reachable = lm.reachable;
             }
           }
         }
@@ -348,8 +353,8 @@ function finishInit(data: { defaultHarness: string; defaultProvider: string }) {
     for (const p of _providers) {
       const opt = document.createElement('option');
       opt.value = p.id;
-      const anyReachable = p.models.some((m) => (m as any).reachable);
-      const allReachable = p.models.length > 0 && p.models.every((m) => (m as any).reachable);
+      const anyReachable = p.models.some((m) => m.reachable);
+      const allReachable = p.models.length > 0 && p.models.every((m) => m.reachable);
       const status = !p.available
         ? '(no disponible)'
         : allReachable
@@ -417,14 +422,14 @@ function updateStatusIndicator() {
   if (_selectedProvider === 'auto' || !_selectedProvider) {
     // Check if at least one provider is available AND reachable
     const anyReady = _providers.some(
-      (p) => p.available && p.models.some((m) => (m as any).reachable),
+      (p) => p.available && p.models.some((m) => m.reachable),
     );
     const anyAvailable = _providers.some((p) => p.available);
     status = anyReady ? 'ok' : anyAvailable ? 'warn' : 'off';
   } else {
     const prov = _providers.find((p) => p.id === _selectedProvider);
     if (prov) {
-      const hasReachable = prov.models.some((m) => (m as any).reachable);
+      const hasReachable = prov.models.some((m) => m.reachable);
       status = prov.available && hasReachable ? 'ok' : prov.available ? 'warn' : 'off';
     }
   }
@@ -456,11 +461,13 @@ function switchHermesModel(provider: string, model: string) {
     .then(async (r) => {
       if (!r.ok) {
         const body = await r.text().catch(() => '');
+        // eslint-disable-next-line no-console
         console.warn('[repociv] model switch failed:', r.status, body);
       }
     })
     .catch((err) => {
       if (err.name !== 'AbortError') {
+        // eslint-disable-next-line no-console
         console.warn('[repociv] model switch error:', err);
       }
     });
@@ -488,7 +495,7 @@ function populateModels(savedModel?: string) {
   for (const m of provider.models) {
     const opt = document.createElement('option');
     opt.value = m.id;
-    const reachable = (m as any).reachable;
+    const reachable = m.reachable;
     const mark = reachable !== undefined ? (reachable ? ' ✓' : ' ✗ unreachable') : '';
     opt.textContent = `${m.name}${mark}`;
     if (!reachable) opt.disabled = true;

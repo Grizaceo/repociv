@@ -75,6 +75,7 @@ const loadSteps = [
 async function bootstrap() {
   // Global error handlers for capturing unhandled errors (e.g., merge folder errors)
   window.onerror = (msg, source, lineno, colno, error) => {
+    // eslint-disable-next-line no-console
     console.error('[Global Error]', { msg, source, lineno, colno, error: error?.stack });
     let el = document.getElementById('global-error-toast');
     if (!el) {
@@ -92,6 +93,7 @@ async function bootstrap() {
   };
 
   window.onunhandledrejection = (event) => {
+    // eslint-disable-next-line no-console
     console.error('[Unhandled Rejection]', event.reason);
     let el = document.getElementById('global-error-toast');
     if (!el) {
