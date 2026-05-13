@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 import os
+import time
 import urllib.request
 import urllib.error
 import json as _json_lib
@@ -100,12 +101,25 @@ def _extract_model_ids(data: Any, url: str) -> list[str]:
 
 def get_health(ctx: "RouteContext") -> tuple[int, Any]:
     from server.agent_runner import _has_claude_code, _has_openclaw, _has_cursor
+    from server.bridge import _sched, get_gpu_info, _es
+    agent_status = _sched.get_agent_status()
+    queue_depth = len(_sched.queue_snapshot())
+    gpu = get_gpu_info()
     return 200, {
         "ok": True,
+        "version": "0.1.0",
+        "timestamp": time.time(),
         "openclaw": _has_openclaw(),
         "claudeCode": _has_claude_code(),
         "cursor": _has_cursor(),
         "defaultTransport": "hermes",
+        "agents": {
+            "active": sum(1 for a in agent_status if a.get("status") == "active"),
+            "total": len(agent_status),
+            "queueDepth": queue_depth,
+        },
+        "gpu": gpu,
+        "eventStore": str(_es._store_path) if hasattr(_es, "_store_path") else None,
     }
 
 

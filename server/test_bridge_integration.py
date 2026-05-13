@@ -23,6 +23,15 @@ def test_health_endpoint_returns_liveness_shape():
         assert data["ok"] is True
         assert "openclaw" in data
         assert data.get("defaultTransport") == "hermes"
+        # Extended health payload (2026-05-13)
+        assert "version" in data
+        assert "timestamp" in data
+        assert "agents" in data
+        assert isinstance(data["agents"].get("active"), int)
+        assert isinstance(data["agents"].get("total"), int)
+        assert isinstance(data["agents"].get("queueDepth"), int)
+        assert "gpu" in data
+        assert "eventStore" in data
     finally:
         server.shutdown()
         server.server_close()
