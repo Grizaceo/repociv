@@ -8,14 +8,32 @@
 
 ## Quick Start
 
+### 1. Instalar dependencias
+
 ```bash
-# Terminal 1 — Backend
 cd ~/.hermes/workspace/repos/repociv
+
+# Frontend
+npm install
+
+# Backend (Python)
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 2. Levantar el sistema
+
+```bash
+# Opción A: dos terminales manuales
+# Terminal 1 — Backend
 python3 server/bridge.py
 
 # Terminal 2 — Frontend
-cd ~/.hermes/workspace/repos/repociv
 npm run dev
+
+# Opción B: script de startup con tmux
+./scripts/dev-start.sh --tmux
 ```
 
 Abre `http://localhost:5273`. Verás el **Imperial Map** con tus ciudades (repos) y agentes caminando.
