@@ -1059,15 +1059,21 @@ if __name__ == "__main__":
     # Graceful shutdown on SIGTERM (systemd / dev-stop.sh)
     def _handle_sigterm(signum: int, frame: object) -> None:
         print("\nBridge: SIGTERM recibido — cerrando limpiamente.")
-        # Persist learned directive templates before exit
-        try:
-            records = _ds.read_records()
-            saved = _dl.save_templates(records)
-            if saved:
-                print(f"Bridge: {saved} directive templates persisted.")
-        except Exception:
-            pass
-        server.shutdown()
+        # Shutdown HTTP immediately so systemd doesn't see a hung service
+        threading.Thread(target=server.shutdown, daemon=True).start()
+        # Persist learned directive templates with a hard timeout so a slow disk
+        # or contested lock doesn't turn us into a zombie with an open socket.
+        def _persist() -> None:
+            try:
+                records = _ds.read_records()
+                saved = _dl.save_templates(records)
+                if saved:
+                    print(f"Bridge: {saved} directive templates persisted.")
+            except Exception:
+                pass
+        persist_thread = threading.Thread(target=_persist, daemon=True)
+        persist_thread.start()
+        persist_thread.join(timeout=3.0)
     signal.signal(signal.SIGTERM, _handle_sigterm)
 
     has_gpu = get_gpu_info() is not None
