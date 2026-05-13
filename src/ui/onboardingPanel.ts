@@ -99,7 +99,8 @@ function render(state: OnboardingState, onContinue: () => void): void {
   const root = ensureRoot();
   const filtered = getFilteredRepos(state.repos, state.query);
   const selectedCount = state.selected.size;
-  const emptySearch = !state.isLoading && !state.error && filtered.length === 0 && state.repos.length > 0;
+  const emptySearch =
+    !state.isLoading && !state.error && filtered.length === 0 && state.repos.length > 0;
   const emptyRepos = !state.isLoading && !state.error && state.repos.length === 0;
 
   const listMarkup =
@@ -209,77 +210,91 @@ function render(state: OnboardingState, onContinue: () => void): void {
   `;
 
   if (state.step !== 'select') {
-    root.querySelector<HTMLButtonElement>('#repo-onboarding-back')?.addEventListener('click', () => {
-      state.step = 'select';
-      render(state, onContinue);
-    });
-    root.querySelector<HTMLButtonElement>('#repo-onboarding-next')?.addEventListener('click', () => {
-      saveSelectedRepoPaths([...state.selected]);
-      root.remove();
-      onContinue();
-    });
+    root
+      .querySelector<HTMLButtonElement>('#repo-onboarding-back')
+      ?.addEventListener('click', () => {
+        state.step = 'select';
+        render(state, onContinue);
+      });
+    root
+      .querySelector<HTMLButtonElement>('#repo-onboarding-next')
+      ?.addEventListener('click', () => {
+        saveSelectedRepoPaths([...state.selected]);
+        root.remove();
+        onContinue();
+      });
     return;
   }
 
-  root.querySelector<HTMLInputElement>('#repo-onboarding-search')?.addEventListener('input', (event) => {
-    const target = event.target as HTMLInputElement;
-    state.query = target.value;
-    render(state, onContinue);
-  });
+  root
+    .querySelector<HTMLInputElement>('#repo-onboarding-search')
+    ?.addEventListener('input', (event) => {
+      const target = event.target as HTMLInputElement;
+      state.query = target.value;
+      render(state, onContinue);
+    });
 
-  root.querySelector<HTMLButtonElement>('#repo-onboarding-clear-search')?.addEventListener('click', () => {
-    state.query = '';
-    render(state, onContinue);
-  });
+  root
+    .querySelector<HTMLButtonElement>('#repo-onboarding-clear-search')
+    ?.addEventListener('click', () => {
+      state.query = '';
+      render(state, onContinue);
+    });
 
-  root.querySelector<HTMLButtonElement>('#repo-onboarding-select-visible')?.addEventListener('click', () => {
-    for (const repo of filtered) state.selected.add(repo.path);
-    render(state, onContinue);
-  });
+  root
+    .querySelector<HTMLButtonElement>('#repo-onboarding-select-visible')
+    ?.addEventListener('click', () => {
+      for (const repo of filtered) state.selected.add(repo.path);
+      render(state, onContinue);
+    });
 
   root.querySelector<HTMLButtonElement>('#repo-onboarding-clear')?.addEventListener('click', () => {
     state.selected.clear();
     render(state, onContinue);
   });
 
-  root.querySelector<HTMLButtonElement>('#repo-onboarding-pick-folder')?.addEventListener('click', () => {
-    void (async () => {
-      state.isPickingFolder = true;
-      render(state, onContinue);
-      try {
-        state.mapRoot = await pickMapRoot();
-        state.query = '';
-        state.selected.clear();
-        await hydrateRepos(state, onContinue);
-      } catch (error) {
-        state.error = `No pudimos abrir el selector de carpetas (${error instanceof Error ? error.message : 'error desconocido'}).`;
-      } finally {
-        state.isPickingFolder = false;
+  root
+    .querySelector<HTMLButtonElement>('#repo-onboarding-pick-folder')
+    ?.addEventListener('click', () => {
+      void (async () => {
+        state.isPickingFolder = true;
         render(state, onContinue);
-      }
-    })();
-  });
+        try {
+          state.mapRoot = await pickMapRoot();
+          state.query = '';
+          state.selected.clear();
+          await hydrateRepos(state, onContinue);
+        } catch (error) {
+          state.error = `No pudimos abrir el selector de carpetas (${error instanceof Error ? error.message : 'error desconocido'}).`;
+        } finally {
+          state.isPickingFolder = false;
+          render(state, onContinue);
+        }
+      })();
+    });
 
-  root.querySelector<HTMLButtonElement>('#repo-onboarding-map-root-apply')?.addEventListener('click', () => {
-    const input = root.querySelector<HTMLInputElement>('#repo-onboarding-map-root-input');
-    const path = String(input?.value ?? '').trim();
-    if (!path) return;
-    void (async () => {
-      state.isPickingFolder = true;
-      render(state, onContinue);
-      try {
-        state.mapRoot = await setMapRoot(path);
-        state.query = '';
-        state.selected.clear();
-        await hydrateRepos(state, onContinue);
-      } catch (error) {
-        state.error = `No pudimos aplicar la ruta (${error instanceof Error ? error.message : 'error desconocido'}).`;
-      } finally {
-        state.isPickingFolder = false;
+  root
+    .querySelector<HTMLButtonElement>('#repo-onboarding-map-root-apply')
+    ?.addEventListener('click', () => {
+      const input = root.querySelector<HTMLInputElement>('#repo-onboarding-map-root-input');
+      const path = String(input?.value ?? '').trim();
+      if (!path) return;
+      void (async () => {
+        state.isPickingFolder = true;
         render(state, onContinue);
-      }
-    })();
-  });
+        try {
+          state.mapRoot = await setMapRoot(path);
+          state.query = '';
+          state.selected.clear();
+          await hydrateRepos(state, onContinue);
+        } catch (error) {
+          state.error = `No pudimos aplicar la ruta (${error instanceof Error ? error.message : 'error desconocido'}).`;
+        } finally {
+          state.isPickingFolder = false;
+          render(state, onContinue);
+        }
+      })();
+    });
 
   root.querySelectorAll<HTMLInputElement>('input[data-repo-path]').forEach((checkbox) => {
     checkbox.addEventListener('change', () => {
@@ -312,7 +327,9 @@ async function hydrateRepos(state: OnboardingState, onContinue: () => void): Pro
     state.repos = sortRepos(await fetchScannedRepos());
     const previousSelection = new Set(state.selected);
     const availablePaths = new Set(state.repos.map((repo) => repo.path));
-    const keptSelection = new Set([...previousSelection].filter((path) => availablePaths.has(path)));
+    const keptSelection = new Set(
+      [...previousSelection].filter((path) => availablePaths.has(path)),
+    );
     state.selected =
       keptSelection.size > 0 || state.repos.length === 0
         ? keptSelection

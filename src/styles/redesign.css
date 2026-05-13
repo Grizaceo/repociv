@@ -185,9 +185,15 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
-.selector-status-dot.ok { background: #4caf50; }
-.selector-status-dot.warn { background: #ff9800; }
-.selector-status-dot.off { background: #666; }
+.selector-status-dot.ok {
+  background: #4caf50;
+}
+.selector-status-dot.warn {
+  background: #ff9800;
+}
+.selector-status-dot.off {
+  background: #666;
+}
 .model-selector-wrapper select {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid var(--panel-border);

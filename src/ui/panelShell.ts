@@ -20,11 +20,7 @@ export function hidePanel(panel: HTMLElement) {
   panel.classList.add('hidden');
 }
 
-export function bindPanelAction(
-  panel: HTMLElement,
-  selector: string,
-  handler: () => void,
-): void {
+export function bindPanelAction(panel: HTMLElement, selector: string, handler: () => void): void {
   panel.querySelector(selector)?.addEventListener('click', handler);
 }
 

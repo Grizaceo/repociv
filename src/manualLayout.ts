@@ -77,4 +77,3 @@ export function updateManualRepoCoord(repoPath: string, coord: Axial): ManualLay
   saveManualLayout(store);
   return store;
 }
-

@@ -1,7 +1,13 @@
 // ─── RepoCiv — Main Entry Point ───────────────────────────────────────────────
 
 import './styles/index.css';
-import { generateWorld, reconnectCities, addCityToWorld, removeCityFromWorld, fetchScannedRepos } from './map.ts';
+import {
+  generateWorld,
+  reconnectCities,
+  addCityToWorld,
+  removeCityFromWorld,
+  fetchScannedRepos,
+} from './map.ts';
 import { type ScannedRepo } from './map.ts';
 import { Renderer } from './renderer.ts';
 import { BridgeEvents } from './bridge.ts';
@@ -74,12 +80,15 @@ async function bootstrap() {
     if (!el) {
       el = document.createElement('div');
       el.id = 'global-error-toast';
-      el.style.cssText = 'position:fixed;bottom:16px;left:16px;max-width:560px;padding:12px;background:rgba(180,30,30,0.9);color:#fff;font-family:monospace;font-size:12px;z-index:9999;border:1px solid #f44;border-radius:4px;';
+      el.style.cssText =
+        'position:fixed;bottom:16px;left:16px;max-width:560px;padding:12px;background:rgba(180,30,30,0.9);color:#fff;font-family:monospace;font-size:12px;z-index:9999;border:1px solid #f44;border-radius:4px;';
       document.body.appendChild(el);
     }
     el.textContent = `Error: ${msg} ${source ? `(${source}:${lineno})` : ''}`;
     el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; }, 8000);
+    setTimeout(() => {
+      el.style.display = 'none';
+    }, 8000);
   };
 
   window.onunhandledrejection = (event) => {
@@ -88,12 +97,15 @@ async function bootstrap() {
     if (!el) {
       el = document.createElement('div');
       el.id = 'global-error-toast';
-      el.style.cssText = 'position:fixed;bottom:16px;left:16px;max-width:560px;padding:12px;background:rgba(180,30,30,0.9);color:#fff;font-family:monospace;font-size:12px;z-index:9999;border:1px solid #f44;border-radius:4px;';
+      el.style.cssText =
+        'position:fixed;bottom:16px;left:16px;max-width:560px;padding:12px;background:rgba(180,30,30,0.9);color:#fff;font-family:monospace;font-size:12px;z-index:9999;border:1px solid #f44;border-radius:4px;';
       document.body.appendChild(el);
     }
     el.textContent = `Unhandled Rejection: ${event.reason}`;
     el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; }, 8000);
+    setTimeout(() => {
+      el.style.display = 'none';
+    }, 8000);
   };
 
   for (let i = 0; i < loadSteps.length; i++) {
@@ -112,7 +124,7 @@ async function bootstrap() {
   setOnCityAddedCb(async (repo: ScannedRepo, coord) => {
     // Fetch repo data to get population, terrain, etc.
     const repos = await fetchScannedRepos();
-    const repoData = repos.find(r => r.path === repo.path) ?? repo;
+    const repoData = repos.find((r) => r.path === repo.path) ?? repo;
     // Add city to world
     addCityToWorld(state.world, repoData, coord);
     // Reconnect cities to ensure pathfinding works
@@ -159,7 +171,8 @@ async function bootstrap() {
 
     // Add resize handle for dragging
     const resizeHandle = document.createElement('div');
-    resizeHandle.style.cssText = 'position:absolute; left:0; top:0; bottom:0; width:6px; cursor:col-resize; z-index:13;';
+    resizeHandle.style.cssText =
+      'position:absolute; left:0; top:0; bottom:0; width:6px; cursor:col-resize; z-index:13;';
     panel.appendChild(resizeHandle);
 
     let isResizing = false;
@@ -207,7 +220,7 @@ async function bootstrap() {
   const toggleView = () => {
     // 3D renderer intentionally removed: the 2D Civ view is the canonical map.
     renderer.start();
-  setRendererRef(renderer);
+    setRendererRef(renderer);
   };
 
   document.getElementById('btn-toggle-3d')?.classList.add('hidden');
@@ -302,7 +315,8 @@ async function bootstrap() {
   renderer.localWorkbenchClickCb = (tile, sx, sy) => {
     const wb = tile.workbench;
     if (!wb) return;
-    const idleAgents = state.getAllUnits()
+    const idleAgents = state
+      .getAllUnits()
       .filter((u) => u.state === 'idle')
       .map((u) => ({ id: u.id, name: u.name, type: u.type }));
     const localWorld = state.localWorld;
@@ -321,9 +335,15 @@ async function bootstrap() {
         setTimeout(() => hideLocalWorkbenchTooltip(), 3000);
         return;
       }
-      showLocalMissionPreview(action, wb.fileName, { x: sx, y: sy }, () => {
-        state.queueLocalMission(repoId, wb.filePath, wb.fileName);
-      }, () => {});
+      showLocalMissionPreview(
+        action,
+        wb.fileName,
+        { x: sx, y: sy },
+        () => {
+          state.queueLocalMission(repoId, wb.filePath, wb.fileName);
+        },
+        () => {},
+      );
     });
   };
   renderer.localUnitClickCb = (unit, _sx, _sy) => {
@@ -352,9 +372,7 @@ async function bootstrap() {
   };
   state.subscribe(refreshHero);
   refreshHero();
-
 }
-
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', bootstrap);

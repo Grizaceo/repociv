@@ -222,7 +222,7 @@
   min-width: 300px;
   max-width: 600px;
   background: var(--ui-panel-bg);
-  border:2px solid var(--ui-border);
+  border: 2px solid var(--ui-border);
   border-radius: 4px;
   z-index: 12;
   display: flex;
@@ -383,7 +383,7 @@
   animation: slideUp 0.25s;
   max-width: 82%;
   align-self: flex-start;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 .chat-msg.user {
   border-left-color: var(--res-science);
@@ -427,7 +427,7 @@
   font-family: var(--font-ui);
   cursor: pointer;
   z-index: 101;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   transition: opacity 0.2s;
 }
 .chat-scroll-btn:hover {
@@ -2553,7 +2553,9 @@ kbd {
   font-size: 11px;
   padding: 1px 5px;
   opacity: 0.6;
-  transition: opacity 0.15s, background 0.15s;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
 }
 .btn-resolve:hover {
   opacity: 1;
@@ -2660,7 +2662,9 @@ kbd {
   font-size: 11px;
   padding: 1px 5px;
   opacity: 0.6;
-  transition: opacity 0.15s, background 0.15s;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
 }
 .btn-edit:hover {
   opacity: 1;
@@ -2678,7 +2682,9 @@ kbd {
   font-size: 11px;
   padding: 1px 5px;
   opacity: 0.6;
-  transition: opacity 0.15s, background 0.15s;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
 }
 .btn-delete:hover {
   opacity: 1;
@@ -2789,7 +2795,6 @@ kbd {
   border-color: var(--ui-gold);
   background: rgba(212, 175, 55, 0.04);
 }
-
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Task Panel (Sprint C3) — CSS faltante
@@ -3228,8 +3233,8 @@ kbd {
   font-size: 11px;
   color: var(--ui-text);
 }
-.settings-row input[type="number"],
-.settings-row input[type="text"],
+.settings-row input[type='number'],
+.settings-row input[type='text'],
 .settings-row select {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid var(--ui-border);

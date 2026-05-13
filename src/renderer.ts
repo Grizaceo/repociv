@@ -74,9 +74,15 @@ export class Renderer {
   private minimapR: MinimapRenderer;
   private localR: LocalRendererType | null = null; // Phase 6: RimWorld 2D view
   // Callbacks for local view (applied lazily when localR is instantiated)
-  localUnitHoverCb: ((unit: import('./types.ts').LocalUnit | null, screenX: number, screenY: number) => void) | null = null;
-  localWorkbenchClickCb: ((tile: import('./types.ts').LocalTile, screenX: number, screenY: number) => void) | null = null;
-  localUnitClickCb: ((unit: import('./types.ts').LocalUnit, screenX: number, screenY: number) => void) | null = null;
+  localUnitHoverCb:
+    | ((unit: import('./types.ts').LocalUnit | null, screenX: number, screenY: number) => void)
+    | null = null;
+  localWorkbenchClickCb:
+    | ((tile: import('./types.ts').LocalTile, screenX: number, screenY: number) => void)
+    | null = null;
+  localUnitClickCb:
+    | ((unit: import('./types.ts').LocalUnit, screenX: number, screenY: number) => void)
+    | null = null;
   private _localRendererCtor: (new (canvas: HTMLCanvasElement) => LocalRendererType) | null = null;
   private localWorldId: string | null = null;
   /** Cached tile list sorted by Y — recomputed only when tile count changes. */
@@ -159,8 +165,7 @@ export class Renderer {
         this.camStart = { x: this.cam.x, y: this.cam.y };
         this.dragStartPos = { x: e.clientX, y: e.clientY };
         this.draggedCity = tile.city;
-        this.dragCityRepoPath =
-          this._cityRelocatePanelRepoPath ?? tile.city.repoPath ?? null;
+        this.dragCityRepoPath = this._cityRelocatePanelRepoPath ?? tile.city.repoPath ?? null;
         this._cityRelocatePanelRepoPath = null;
         this.relocateDragActive = false;
         this.cityGhostScreenPos = { x: wx, y: wy };
@@ -353,8 +358,7 @@ export class Renderer {
         case 'camera_pan': {
           if (this._cityRelocateMode && this.draggedCity && this.dragStartPos) {
             const dsp = this.dragStartPos;
-            const dragMoved =
-              Math.abs(e.clientX - dsp.x) > 3 || Math.abs(e.clientY - dsp.y) > 3;
+            const dragMoved = Math.abs(e.clientX - dsp.x) > 3 || Math.abs(e.clientY - dsp.y) > 3;
             const dropCoord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
             const dc = this.draggedCity;
             const path = this.dragCityRepoPath;
@@ -679,11 +683,7 @@ export class Renderer {
         } else {
           this.hexR.drawHexOutline(this.hoveredHex, '#ff3333aa', 2); // occupied = red tint
         }
-      } else if (
-        this._cityRelocateMode &&
-        this.draggedCity &&
-        this.relocateDragActive
-      ) {
+      } else if (this._cityRelocateMode && this.draggedCity && this.relocateDragActive) {
         const ok = canRelocateCityTo(this.state.world, this.draggedCity, this.hoveredHex);
         this.hexR.drawHexOutline(this.hoveredHex, ok ? '#00ff00cc' : '#ff3333aa', 3);
       } else {
@@ -710,11 +710,7 @@ export class Renderer {
         renderDropTarget(ctx, sx, sy, HEX_SIZE * cam.zoom, !!toTile?.city);
       }
     }
-    if (
-      this.draggedCity &&
-      this.cityGhostScreenPos &&
-      this.relocateDragActive
-    ) {
+    if (this.draggedCity && this.cityGhostScreenPos && this.relocateDragActive) {
       renderCityDragGhost(
         ctx,
         this.cityGhostScreenPos.x,

@@ -41,7 +41,8 @@ export class LocalRenderer {
   // Spatial awareness callbacks (ported from macro pattern)
   onLocalUnitClick: ((unit: LocalUnit, screenX: number, screenY: number) => void) | null = null;
   onWorkbenchClick: ((tile: LocalTile, screenX: number, screenY: number) => void) | null = null;
-  onLocalUnitHover: ((unit: LocalUnit | null, screenX: number, screenY: number) => void) | null = null;
+  onLocalUnitHover: ((unit: LocalUnit | null, screenX: number, screenY: number) => void) | null =
+    null;
 
   // Internal
   private _localUnits: LocalUnit[] = [];
@@ -424,7 +425,9 @@ export class LocalRenderer {
       dirAngle = Math.atan2(to.y - unit.gridY, to.x - unit.gridX);
     } else if (unit.state === 'working_on_file' && unit.currentWorkbenchId) {
       // Face the current workbench if known
-      const wbTile = this.world?.grid.flat().find((t) => t.workbench?.id === unit.currentWorkbenchId);
+      const wbTile = this.world?.grid
+        .flat()
+        .find((t) => t.workbench?.id === unit.currentWorkbenchId);
       if (wbTile) dirAngle = Math.atan2(wbTile.y - unit.gridY, wbTile.x - unit.gridX);
     }
     ctx.save();

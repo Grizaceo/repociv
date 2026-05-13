@@ -33,7 +33,11 @@ function groupByPriority(items: PendingItem[]): Record<string, PendingItem[]> {
 }
 
 function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function validateNewItem(title: string): { ok: boolean; error?: string } {
@@ -50,10 +54,38 @@ function validatePriority(priority: string): string {
 // ── Sample data ───────────────────────────────────────────────────────────────
 
 const SAMPLE_ITEMS: PendingItem[] = [
-  { id: '022', title: 'AGENTIC_RIEMANN_TROPICAL', priority: 'ALTA', state: '🔵', stateText: 'registrada', detail: 'Rate limit issue' },
-  { id: '010', title: 'DREAM CYCLE', priority: 'MEDIA', state: '🟡', stateText: 'en progreso', detail: 'Scripts OK\nLock protocol' },
-  { id: '012', title: 'PROTEIN LAB', priority: 'MEDIA', state: '', stateText: 'operativo', detail: 'Directorio operativo' },
-  { id: '014', title: 'TAMAGOTCHI', priority: 'BAJA', state: '🟡', stateText: 'en progreso', detail: '5 commits ahead' },
+  {
+    id: '022',
+    title: 'AGENTIC_RIEMANN_TROPICAL',
+    priority: 'ALTA',
+    state: '🔵',
+    stateText: 'registrada',
+    detail: 'Rate limit issue',
+  },
+  {
+    id: '010',
+    title: 'DREAM CYCLE',
+    priority: 'MEDIA',
+    state: '🟡',
+    stateText: 'en progreso',
+    detail: 'Scripts OK\nLock protocol',
+  },
+  {
+    id: '012',
+    title: 'PROTEIN LAB',
+    priority: 'MEDIA',
+    state: '',
+    stateText: 'operativo',
+    detail: 'Directorio operativo',
+  },
+  {
+    id: '014',
+    title: 'TAMAGOTCHI',
+    priority: 'BAJA',
+    state: '🟡',
+    stateText: 'en progreso',
+    detail: '5 commits ahead',
+  },
 ];
 
 // ── Priority sorting ─────────────────────────────────────────────────────────
@@ -61,15 +93,15 @@ const SAMPLE_ITEMS: PendingItem[] = [
 describe('sortByPriority', () => {
   it('puts ALTA before MEDIA', () => {
     const sorted = sortByPriority(SAMPLE_ITEMS);
-    const altaIdx = sorted.findIndex(i => i.priority === 'ALTA');
-    const mediaIdx = sorted.findIndex(i => i.priority === 'MEDIA');
+    const altaIdx = sorted.findIndex((i) => i.priority === 'ALTA');
+    const mediaIdx = sorted.findIndex((i) => i.priority === 'MEDIA');
     expect(altaIdx).toBeLessThan(mediaIdx);
   });
 
   it('puts MEDIA before BAJA', () => {
     const sorted = sortByPriority(SAMPLE_ITEMS);
-    const mediaIdx = sorted.findIndex(i => i.priority === 'MEDIA');
-    const bajaIdx = sorted.findIndex(i => i.priority === 'BAJA');
+    const mediaIdx = sorted.findIndex((i) => i.priority === 'MEDIA');
+    const bajaIdx = sorted.findIndex((i) => i.priority === 'BAJA');
     expect(mediaIdx).toBeLessThan(bajaIdx);
   });
 
@@ -194,7 +226,9 @@ describe('pendingPanel fetch behaviour', () => {
     const mockFetch = vi.fn().mockRejectedValue(new Error('network error'));
     let caught: Error | null = null;
     try {
-      await mockFetch('/pending').catch((e: Error) => { caught = e; });
+      await mockFetch('/pending').catch((e: Error) => {
+        caught = e;
+      });
     } catch {
       // Should not propagate
     }
@@ -230,20 +264,41 @@ describe('poll interval', () => {
 
 describe('item filtering', () => {
   const items: PendingItem[] = [
-    { id: '022', title: 'Item ALTA', priority: 'ALTA', state: '🔵', stateText: 'active', detail: '' },
-    { id: '010', title: 'Item MEDIA', priority: 'MEDIA', state: '🟡', stateText: 'active', detail: '' },
-    { id: '007', title: 'Item STALE', priority: 'STALE', state: '🟡', stateText: 'stale', detail: '' },
+    {
+      id: '022',
+      title: 'Item ALTA',
+      priority: 'ALTA',
+      state: '🔵',
+      stateText: 'active',
+      detail: '',
+    },
+    {
+      id: '010',
+      title: 'Item MEDIA',
+      priority: 'MEDIA',
+      state: '🟡',
+      stateText: 'active',
+      detail: '',
+    },
+    {
+      id: '007',
+      title: 'Item STALE',
+      priority: 'STALE',
+      state: '🟡',
+      stateText: 'stale',
+      detail: '',
+    },
   ];
 
   it('excludes STALE items from active list when filtered', () => {
     // In the real panel, the backend parser already excludes STALE.
     // Here we verify the frontend would display only non-STALE items.
-    const activeItems = items.filter(i => i.priority !== 'STALE');
+    const activeItems = items.filter((i) => i.priority !== 'STALE');
     expect(activeItems).toHaveLength(2);
   });
 
   it('finds item by id in list', () => {
-    const found = items.find(i => i.id === '022');
+    const found = items.find((i) => i.id === '022');
     expect(found).toBeDefined();
     expect(found?.title).toBe('Item ALTA');
   });

@@ -154,7 +154,11 @@ async function _replayLast() {
     created_by: 'replay',
   });
   try {
-    await fetch(bridgeUrl('/commands'), { method: 'POST', headers: bridgeHeaders({ 'Content-Type': 'application/json' }), body });
+    await fetch(bridgeUrl('/commands'), {
+      method: 'POST',
+      headers: bridgeHeaders({ 'Content-Type': 'application/json' }),
+      body,
+    });
     _render();
   } catch {
     // ignore

@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Axial } from './hex.ts';
-import {
-  canRelocateCityTo,
-  relocateCity,
-  showMapLoadError,
-} from './map.ts';
+import { canRelocateCityTo, relocateCity, showMapLoadError } from './map.ts';
 import type { City, Terrain, Tile, World } from './types.ts';
 import { tileKey } from './types.ts';
 

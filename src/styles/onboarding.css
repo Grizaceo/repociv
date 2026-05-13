@@ -297,7 +297,7 @@
 }
 
 .btn-accent:hover {
-  background: rgba(91, 155, 213, 0.30);
+  background: rgba(91, 155, 213, 0.3);
 }
 
 .tile-label {
@@ -308,7 +308,7 @@
 
 .construction-divider {
   height: 1px;
-  background: rgba(212, 165, 116, 0.20);
+  background: rgba(212, 165, 116, 0.2);
   margin: 4px 0;
 }
 

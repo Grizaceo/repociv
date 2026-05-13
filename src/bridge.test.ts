@@ -341,7 +341,12 @@ describe('BridgeEvents handleBridgeEvent', () => {
     bridge.start();
     const src = FakeEventSource.instances[0]!;
     src.open();
-    src.message({ type: 'building_complete', city: 'repo-1', building: 'ci-pipeline', missionId: 'mis-1' });
+    src.message({
+      type: 'building_complete',
+      city: 'repo-1',
+      building: 'ci-pipeline',
+      missionId: 'mis-1',
+    });
     expect(state.completeBuilding).toHaveBeenCalledWith('repo-1', 'ci-pipeline');
     expect(state.invalidatePathCache).toHaveBeenCalled();
     bridge.stop();
@@ -353,7 +358,12 @@ describe('BridgeEvents handleBridgeEvent', () => {
     bridge.start();
     const src = FakeEventSource.instances[0]!;
     src.open();
-    src.message({ type: 'building_failed', city: 'repo-1', building: 'ci-pipeline', missionId: 'mis-1' });
+    src.message({
+      type: 'building_failed',
+      city: 'repo-1',
+      building: 'ci-pipeline',
+      missionId: 'mis-1',
+    });
     expect(state.failBuilding).toHaveBeenCalledWith('repo-1', 'ci-pipeline');
     bridge.stop();
   });
@@ -397,7 +407,12 @@ describe('BridgeEvents handleBridgeEvent', () => {
     bridge.start();
     const src = FakeEventSource.instances[0]!;
     src.open();
-    src.message({ type: 'mission_start', missionId: 'ms-10', unit: 'LEXO', questName: 'Analyze repo' });
+    src.message({
+      type: 'mission_start',
+      missionId: 'ms-10',
+      unit: 'LEXO',
+      questName: 'Analyze repo',
+    });
     expect(state.startMission).toHaveBeenCalledWith('ms-10', 'LEXO', 'Analyze repo');
     bridge.stop();
   });
@@ -408,7 +423,13 @@ describe('BridgeEvents handleBridgeEvent', () => {
     bridge.start();
     const src = FakeEventSource.instances[0]!;
     src.open();
-    src.message({ type: 'mission_complete', missionId: 'ms-fail', unit: 'WORKER', success: false, duration: 10 });
+    src.message({
+      type: 'mission_complete',
+      missionId: 'ms-fail',
+      unit: 'WORKER',
+      success: false,
+      duration: 10,
+    });
     expect(state.completeMission).toHaveBeenCalledWith('ms-fail', false);
     bridge.stop();
   });

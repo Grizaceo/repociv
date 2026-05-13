@@ -142,9 +142,9 @@ interface ProviderInfo {
 }
 let _harnesses: HarnessInfo[] = [];
 let _providers: ProviderInfo[] = [];
-let _selectedHarness = "";
-let _selectedProvider = "";
-let _selectedModel = "";
+let _selectedHarness = '';
+let _selectedProvider = '';
+let _selectedModel = '';
 
 export function openSidePanel(unit: Unit) {
   const panel = document.getElementById('side-panel');
@@ -186,7 +186,8 @@ export function openSidePanel(unit: Unit) {
 
     // Show/hide button based on scroll position
     chatContainer.addEventListener('scroll', () => {
-      const isAtBottom = chatContainer.scrollTop + chatContainer.clientHeight >= chatContainer.scrollHeight - 30;
+      const isAtBottom =
+        chatContainer.scrollTop + chatContainer.clientHeight >= chatContainer.scrollHeight - 30;
       scrollBtn.classList.toggle('hidden', isAtBottom);
     });
   }
@@ -248,22 +249,25 @@ function initProviderSelectors(_unit: Unit) {
       if (!r.ok) throw newError(`HTTP ${r.status}`);
       return r.json();
     })
-    .then((data: {
-      defaultHarness: string;
-      defaultProvider: string;
-      harnesses: HarnessInfo[];
-      providers: ProviderInfo[];
-    }) => {
-      _harnesses = data.harnesses;
-      _providers = data.providers;
+    .then(
+      (data: {
+        defaultHarness: string;
+        defaultProvider: string;
+        harnesses: HarnessInfo[];
+        providers: ProviderInfo[];
+      }) => {
+        _harnesses = data.harnesses;
+        _providers = data.providers;
 
-      // Try to fetch live reachability data from Hermes gateway
-      fetchLiveProviderStatus(data);
-    })
+        // Try to fetch live reachability data from Hermes gateway
+        fetchLiveProviderStatus(data);
+      },
+    )
     .catch(() => {
       // Fallback: minimal selectors so the user can still interact
       if (harnessSel) {
-        harnessSel.innerHTML = '<option value="auto" selected>⚡ Auto</option><option value="hermes">Hermes</option>';
+        harnessSel.innerHTML =
+          '<option value="auto" selected>⚡ Auto</option><option value="hermes">Hermes</option>';
         _selectedHarness = 'auto';
       }
       if (provSel) {
@@ -278,9 +282,12 @@ function initProviderSelectors(_unit: Unit) {
 
 /** Fetch live model reachability from the bridge's /providers/live endpoint
  *  and merge it into the provider list. Gracefully degrades on failure. */
-function fetchLiveProviderStatus(
-  data: { defaultHarness: string; defaultProvider: string; harnesses: HarnessInfo[]; providers: ProviderInfo[] }
-) {
+function fetchLiveProviderStatus(data: {
+  defaultHarness: string;
+  defaultProvider: string;
+  harnesses: HarnessInfo[];
+  providers: ProviderInfo[];
+}) {
   fetch(bridgeUrl('/providers/live'), { headers: bridgeHeaders() })
     .then((lr) => {
       if (!lr.ok) return null;
@@ -346,7 +353,7 @@ function finishInit(data: { defaultHarness: string; defaultProvider: string }) {
       const status = !p.available
         ? '(no disponible)'
         : allReachable
-          ? ''  // fully connected
+          ? '' // fully connected
           : anyReachable
             ? '(parcial)'
             : '(sin conexión)';
@@ -410,7 +417,7 @@ function updateStatusIndicator() {
   if (_selectedProvider === 'auto' || !_selectedProvider) {
     // Check if at least one provider is available AND reachable
     const anyReady = _providers.some(
-      (p) => p.available && p.models.some((m) => (m as any).reachable)
+      (p) => p.available && p.models.some((m) => (m as any).reachable),
     );
     const anyAvailable = _providers.some((p) => p.available);
     status = anyReady ? 'ok' : anyAvailable ? 'warn' : 'off';
@@ -425,7 +432,8 @@ function updateStatusIndicator() {
   const dot = document.createElement('span');
   dot.className = `selector-status-dot ${status}`;
   const label = _selectedProvider || 'auto';
-  const reason = status === 'ok' ? 'disponible' : status === 'warn' ? 'parcial / sin conexión' : 'no disponible';
+  const reason =
+    status === 'ok' ? 'disponible' : status === 'warn' ? 'parcial / sin conexión' : 'no disponible';
   dot.title = `Provider: ${label} — ${reason}`;
   parent?.insertBefore(dot, provSel);
 }
@@ -502,11 +510,14 @@ function populateModels(savedModel?: string) {
 
 function persistSelection() {
   try {
-    localStorage.setItem('repociv:chatConfig', JSON.stringify({
-      harness: _selectedHarness,
-      provider: _selectedProvider,
-      model: _selectedModel,
-    }));
+    localStorage.setItem(
+      'repociv:chatConfig',
+      JSON.stringify({
+        harness: _selectedHarness,
+        provider: _selectedProvider,
+        model: _selectedModel,
+      }),
+    );
   } catch {
     // localStorage full or unavailable
   }
@@ -573,7 +584,8 @@ export function appendChatChunk(unitId: string, text: string) {
     // Auto-scroll if near bottom
     const container = document.getElementById('chat-messages');
     if (container) {
-      const isNearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 50;
+      const isNearBottom =
+        container.scrollTop + container.clientHeight >= container.scrollHeight - 50;
       if (isNearBottom) {
         container.scrollTop = container.scrollHeight;
       }
@@ -681,7 +693,8 @@ function renderChatBuffer(unitId: string) {
   // Only auto-scroll if user is near bottom
   const container = document.getElementById('chat-messages');
   if (container) {
-    const isNearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 50;
+    const isNearBottom =
+      container.scrollTop + container.clientHeight >= container.scrollHeight - 50;
     if (isNearBottom) {
       container.scrollTop = container.scrollHeight;
     }

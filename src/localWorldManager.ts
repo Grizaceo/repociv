@@ -48,7 +48,10 @@ export class LocalWorldManager {
           workProgress: 0,
           macroUnitId: heroUnit?.id ?? 'DAVI',
           currentWorkbenchId: null,
-          currentRoomId: this.localWorld.grid[entrance.y + Math.floor(entrance.h / 2)]?.[entrance.x + Math.floor(entrance.w / 2)]?.roomId ?? null,
+          currentRoomId:
+            this.localWorld.grid[entrance.y + Math.floor(entrance.h / 2)]?.[
+              entrance.x + Math.floor(entrance.w / 2)
+            ]?.roomId ?? null,
           fatigue: heroUnit?.fatigue ?? 100,
           maxFatigue: heroUnit?.maxFatigue ?? 100,
           isResting: heroUnit?.isResting ?? false,

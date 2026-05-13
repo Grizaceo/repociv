@@ -56,7 +56,12 @@ import {
 } from './constructionPanel.ts';
 
 // ─── Hero selection ──────────────────────────────────────────────────────────
-export function selectHero(unit: Unit, renderer: Renderer, state: GameState, _bridge: BridgeEvents) {
+export function selectHero(
+  unit: Unit,
+  renderer: Renderer,
+  state: GameState,
+  _bridge: BridgeEvents,
+) {
   state.selectUnit(unit);
   renderer.selectUnit(unit);
   showUnitPanel(unit);
@@ -307,7 +312,9 @@ export function wireHUD(
   document
     .getElementById('btn-screenshot')
     ?.addEventListener('click', () => takeScreenshot(renderer));
-  document.getElementById('btn-construction')?.addEventListener('click', () => toggleConstructionPanel());
+  document
+    .getElementById('btn-construction')
+    ?.addEventListener('click', () => toggleConstructionPanel());
 
   // ─── Settings button ─────────────────────────────────────────────────────
   document.getElementById('btn-settings')?.addEventListener('click', () => toggleSettingsPanel());

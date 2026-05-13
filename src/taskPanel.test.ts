@@ -177,7 +177,9 @@ describe('taskPanel fetch behaviour', () => {
     // Simulate an offline scenario — should not throw
     let caught: Error | null = null;
     try {
-      await mockFetch('/tasks').catch((e: Error) => { caught = e; });
+      await mockFetch('/tasks').catch((e: Error) => {
+        caught = e;
+      });
     } catch {
       // Should not propagate
     }

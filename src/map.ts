@@ -233,7 +233,7 @@ async function fetchSubdirs(repoName: string): Promise<{ name: string; terrain: 
 // ─── Reconnect disconnected cities (dynamic + initial generation) ────────────
 export async function reconnectCities(world: World): Promise<void> {
   const { tiles, cities } = world;
-  const capitalCity = cities.find(c => c.isCapital) ?? cities[0];
+  const capitalCity = cities.find((c) => c.isCapital) ?? cities[0];
   if (!capitalCity) return;
 
   const connectedKeys = new Set<string>();
@@ -249,9 +249,10 @@ export async function reconnectCities(world: World): Promise<void> {
       const tile = tiles.get(key);
       if (!tile) continue;
       // Check if tile is part of any city's territory or is a city itself
-      const isConnectedTile = cities.some(c => 
-        (c.coord.q === nb.q && c.coord.r === nb.r) || // city itself
-        c.territory.some(t => t.q === nb.q && t.r === nb.r) // territory tile
+      const isConnectedTile = cities.some(
+        (c) =>
+          (c.coord.q === nb.q && c.coord.r === nb.r) || // city itself
+          c.territory.some((t) => t.q === nb.q && t.r === nb.r), // territory tile
       );
       if (isConnectedTile) {
         connectedKeys.add(key);
@@ -290,7 +291,7 @@ export async function reconnectCities(world: World): Promise<void> {
       const repoName = city.name;
       const res = await fetch(`/api/files/${encodeURIComponent(repoName)}`);
       if (res.ok) {
-        const data = await res.json() as { files: string[] };
+        const data = (await res.json()) as { files: string[] };
         // Extract unique top-level folders
         const folders = new Set<string>();
         for (const f of data.files) {
@@ -299,7 +300,9 @@ export async function reconnectCities(world: World): Promise<void> {
         }
         folderStructure = Array.from(folders);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     // Set intermediate tiles: terrain = 'plains', add folder structure
     for (const coord of path) {
@@ -330,7 +333,11 @@ export async function reconnectCities(world: World): Promise<void> {
 }
 
 // ─── Dynamic city add/remove helpers ────────────────────────────────
-export function addCityToWorld(world: World, repo: ScannedRepo & { terrain?: Terrain; science?: number; production?: number }, coord: Axial): City {
+export function addCityToWorld(
+  world: World,
+  repo: ScannedRepo & { terrain?: Terrain; science?: number; production?: number },
+  coord: Axial,
+): City {
   const city: City = {
     id: repo.name,
     name: repo.name,
@@ -356,13 +363,13 @@ export function addCityToWorld(world: World, repo: ScannedRepo & { terrain?: Ter
 }
 
 export function removeCityFromWorld(world: World, cityName: string): boolean {
-  const idx = world.cities.findIndex(c => c.name === cityName);
+  const idx = world.cities.findIndex((c) => c.name === cityName);
   if (idx === -1) return false;
   const [city] = world.cities.splice(idx, 1);
   // Remove city tile from world.tiles
   world.tiles.delete(tileKey(city!.coord));
   // Remove any units on this city
-  world.units = world.units.filter(u => tileKey(u.coord) !== tileKey(city!.coord));
+  world.units = world.units.filter((u) => tileKey(u.coord) !== tileKey(city!.coord));
   return true;
 }
 
@@ -529,23 +536,23 @@ export async function generateWorld(): Promise<World> {
     repos = repos.filter((repo) => selectedRepoPaths.has(repo.path));
   }
 
- const manualLayout = loadManualLayout();
- const manualRepoMap = new Map<string, Axial>();
- for (const entry of manualLayout.entries) {
-   manualRepoMap.set(entry.repoPath, { q: entry.coord.q, r: entry.coord.r });
-   if (!repos.some((repo) => repo.path === entry.repoPath)) {
-     repos.push({
-       name: entry.repoName,
-       path: entry.repoPath,
-       population: 0,
-       extensions: {},
-       gold: 0,
-       lastCommitDays: 999,
-       isLegacy: false,
-       hasGit: false,
-     });
-   }
- }
+  const manualLayout = loadManualLayout();
+  const manualRepoMap = new Map<string, Axial>();
+  for (const entry of manualLayout.entries) {
+    manualRepoMap.set(entry.repoPath, { q: entry.coord.q, r: entry.coord.r });
+    if (!repos.some((repo) => repo.path === entry.repoPath)) {
+      repos.push({
+        name: entry.repoName,
+        path: entry.repoPath,
+        population: 0,
+        extensions: {},
+        gold: 0,
+        lastCommitDays: 999,
+        isLegacy: false,
+        hasGit: false,
+      });
+    }
+  }
   // Sort: preserve selection order if available, otherwise most-populated first → capital
   if (selectedRepoPaths !== null) {
     // Preserve selection order: selectedRepoPaths is a Set, convert to Array to iterate in insertion order
@@ -563,18 +570,18 @@ export async function generateWorld(): Promise<World> {
   } else {
     repos.sort((a, b) => b.population - a.population);
   }
- // Inferred terrain per repo
- const reposWithTerrain = repos.map((r) => ({
-   ...r,
-   terrain: r.isLegacy
-     ? ('ice' as Terrain)
-     : r.population === 0
-       ? ('ocean' as Terrain)
-       : inferTerrain(r.extensions),
-   science: Math.min(99, Math.floor(r.gold / 10)),
-   production: Math.min(99, Math.floor(r.gold / 50)),
-   manualCoord: manualRepoMap.get(r.path),
- }));
+  // Inferred terrain per repo
+  const reposWithTerrain = repos.map((r) => ({
+    ...r,
+    terrain: r.isLegacy
+      ? ('ice' as Terrain)
+      : r.population === 0
+        ? ('ocean' as Terrain)
+        : inferTerrain(r.extensions),
+    science: Math.min(99, Math.floor(r.gold / 10)),
+    production: Math.min(99, Math.floor(r.gold / 50)),
+    manualCoord: manualRepoMap.get(r.path),
+  }));
   // All selected repos are cities (regardless of population)
   // Orphans only exist when there's no selection and population <= 5
   let cityRepos: typeof reposWithTerrain;

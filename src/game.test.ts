@@ -337,7 +337,10 @@ describe('GameState.selectUnit', () => {
 describe('GameState.pause / resume', () => {
   it('pause and resume toggle paused state without crashing', () => {
     // game.ts uses requestAnimationFrame when start() is called — mock it
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1),
+    );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
     vi.stubGlobal('performance', { now: vi.fn(() => 0) });
     const gs = new GameState(makeWorld());

@@ -16,7 +16,9 @@ export function showLocalUnitTooltip(unit: LocalUnit, screenPos: { x: number; y:
   const el = _getOrCreate(_unitTooltipEl, 'local-unit-tooltip', 'lt-tooltip');
   _unitTooltipEl = el;
 
-  const roomLabel = unit.currentRoomId ? unit.currentRoomId.split('/').pop() ?? unit.currentRoomId : '—';
+  const roomLabel = unit.currentRoomId
+    ? (unit.currentRoomId.split('/').pop() ?? unit.currentRoomId)
+    : '—';
   const status: Record<string, string> = {
     idle_in_room: 'Idle',
     walking_to_workbench: 'Caminando → banco',
@@ -102,7 +104,8 @@ export function showLocalContextMenu(
       <span class="lt-icon">📋</span> Ver info
     </div>`);
 
-  el.innerHTML = `
+  el.innerHTML =
+    `
     <div class="lt-header">${_esc(wb.fileName)}</div>
     <div class="lt-arrow"></div>` + items.join('');
   _position(el, screenPos);
@@ -193,9 +196,14 @@ export async function showGitForFile(
   el.classList.remove('hidden');
 
   try {
-    const res = await fetch(`/api/git/${encodeURIComponent(repoId)}?file=${encodeURIComponent(filePath)}`);
+    const res = await fetch(
+      `/api/git/${encodeURIComponent(repoId)}?file=${encodeURIComponent(filePath)}`,
+    );
     if (!res.ok) throw new Error('git fetch failed');
-    const data = (await res.json()) as { log?: string[]; blame?: Array<{ line: number; author: string; date: string }> };
+    const data = (await res.json()) as {
+      log?: string[];
+      blame?: Array<{ line: number; author: string; date: string }>;
+    };
 
     const logHtml = (data.log ?? []).length
       ? `<div class="lt-git-section"><h5>Commits recientes</h5>${data.log!.map((l) => `<div class="lt-git-line">${_esc(l)}</div>`).join('')}</div>`
@@ -204,9 +212,11 @@ export async function showGitForFile(
       ? `<div class="lt-git-section"><h5>Blame (primeras líneas)</h5>${data.blame!.map((b) => `<div class="lt-git-line"><span class="lt-git-num">${b.line}</span> ${_esc(b.author)} · ${_esc(b.date)}</div>`).join('')}</div>`
       : '';
 
-    el.querySelector('.lt-git-body')!.innerHTML = logHtml + blameHtml || '<div class="lt-git-empty">Sin historial git.</div>';
+    el.querySelector('.lt-git-body')!.innerHTML =
+      logHtml + blameHtml || '<div class="lt-git-empty">Sin historial git.</div>';
   } catch {
-    el.querySelector('.lt-git-body')!.innerHTML = '<div class="lt-git-empty">No se pudo cargar git.</div>';
+    el.querySelector('.lt-git-body')!.innerHTML =
+      '<div class="lt-git-empty">No se pudo cargar git.</div>';
   }
 
   // Close on click outside
@@ -255,5 +265,8 @@ function _position(el: HTMLElement, pos: { x: number; y: number }) {
 }
 
 function _esc(s: string): string {
-  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  return String(s).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }

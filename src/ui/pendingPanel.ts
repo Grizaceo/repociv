@@ -12,8 +12,8 @@ const POLL_MS = 5_000;
 export interface PendingItem {
   id: string;
   title: string;
-  priority: string;  // ALTA | MEDIA | BAJA
-  state: string;     // 🔵 | 🟡 | 🟢 | 🔴
+  priority: string; // ALTA | MEDIA | BAJA
+  state: string; // 🔵 | 🟡 | 🟢 | 🔴
   stateText: string;
   detail: string;
 }
@@ -100,7 +100,9 @@ async function _addItem(title: string, priority: string): Promise<void> {
       body: JSON.stringify({ title, priority }),
     });
     if (res.ok) void _fetch();
-  } catch { /* will refresh on next poll */ }
+  } catch {
+    /* will refresh on next poll */
+  }
 }
 
 async function _resolveItem(id: string): Promise<void> {
@@ -112,13 +114,23 @@ async function _resolveItem(id: string): Promise<void> {
     });
     if (res.ok) {
       _items = _items.filter((it) => it.id !== id);
-      if (_expandedId === id) { _expandedId = null; _editingId = null; }
+      if (_expandedId === id) {
+        _expandedId = null;
+        _editingId = null;
+      }
       if (_visible) _render();
     }
-  } catch { /* will refresh on next poll */ }
+  } catch {
+    /* will refresh on next poll */
+  }
 }
 
-async function _editItem(id: string, title: string, priority: string, detail: string): Promise<void> {
+async function _editItem(
+  id: string,
+  title: string,
+  priority: string,
+  detail: string,
+): Promise<void> {
   try {
     const res = await fetch(bridgeUrl('/pending/edit'), {
       method: 'POST',
@@ -126,7 +138,9 @@ async function _editItem(id: string, title: string, priority: string, detail: st
       body: JSON.stringify({ id, title, priority, detail }),
     });
     if (res.ok) void _fetch();
-  } catch { /* will refresh on next poll */ }
+  } catch {
+    /* will refresh on next poll */
+  }
 }
 
 async function _deleteItem(id: string): Promise<void> {
@@ -138,10 +152,15 @@ async function _deleteItem(id: string): Promise<void> {
     });
     if (res.ok) {
       _items = _items.filter((it) => it.id !== id);
-      if (_expandedId === id) { _expandedId = null; _editingId = null; }
+      if (_expandedId === id) {
+        _expandedId = null;
+        _editingId = null;
+      }
       if (_visible) _render();
     }
-  } catch { /* will refresh on next poll */ }
+  } catch {
+    /* will refresh on next poll */
+  }
 }
 
 async function _changeState(id: string, state: string): Promise<void> {
@@ -160,7 +179,9 @@ async function _changeState(id: string, state: string): Promise<void> {
       }
       if (_visible) _render();
     }
-  } catch { /* will refresh on next poll */ }
+  } catch {
+    /* will refresh on next poll */
+  }
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
@@ -207,7 +228,12 @@ function _render(): void {
   // Wire interactions
   body.querySelectorAll<HTMLElement>('.pending-item-row').forEach((row) => {
     row.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).closest('.btn-resolve, .btn-edit, .btn-delete, .btn-state, .pending-state-select')) return;
+      if (
+        (e.target as HTMLElement).closest(
+          '.btn-resolve, .btn-edit, .btn-delete, .btn-state, .pending-state-select',
+        )
+      )
+        return;
       const id = row.dataset['id'] ?? '';
       if (_editingId === id) return; // Don't collapse while editing
       _expandedId = _expandedId === id ? null : id;
@@ -316,7 +342,8 @@ function _renderItem(item: PendingItem): string {
 
   // State selector
   const stateOptions = STATE_OPTIONS.map(
-    (o) => `<option value="${o.value}" ${item.state === o.value ? 'selected' : ''}>${o.label}</option>`
+    (o) =>
+      `<option value="${o.value}" ${item.state === o.value ? 'selected' : ''}>${o.label}</option>`,
   ).join('');
 
   return `
@@ -386,7 +413,11 @@ function _wireForm(body: HTMLElement): void {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function _esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 // ─── DOM ──────────────────────────────────────────────────────────────────────

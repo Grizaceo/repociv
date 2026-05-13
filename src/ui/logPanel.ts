@@ -38,13 +38,7 @@ export function buildLogRow(e: LogEvent): string {
   const ts = formatTimestamp(e.timestamp);
   const data = e.data ?? {};
   const repo = String(data['repo'] ?? '—');
-  const msg = String(
-    data['result'] ??
-      data['error'] ??
-      data['text'] ??
-      e.actor ??
-      '—',
-  );
+  const msg = String(data['result'] ?? data['error'] ?? data['text'] ?? e.actor ?? '—');
   return `<tr>
     <td class="log-ts">${ts}</td>
     <td class="log-repo">${repo}</td>

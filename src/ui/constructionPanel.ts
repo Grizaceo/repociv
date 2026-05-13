@@ -41,14 +41,12 @@ export function isConstructionPanelOpen(): boolean {
   return isOpen;
 }
 
-export function setRendererRef(
-  renderer: {
-    setPlacingMode(active: boolean): void;
-    getPlacingMode(): boolean;
-    setCityRelocateMode(active: boolean, panelRepoPath?: string | null): void;
-    getCityRelocateMode(): boolean;
-  },
-) {
+export function setRendererRef(renderer: {
+  setPlacingMode(active: boolean): void;
+  getPlacingMode(): boolean;
+  setCityRelocateMode(active: boolean, panelRepoPath?: string | null): void;
+  getCityRelocateMode(): boolean;
+}) {
   _rendererRef = renderer;
 }
 
@@ -108,7 +106,8 @@ export function refreshCityList(): void {
   if (!list) return;
   const store = loadManualLayout();
   if (store.entries.length === 0) {
-    list.innerHTML = '<p class="construction-empty">No hay ciudades manuales. Agrega un repo primero.</p>';
+    list.innerHTML =
+      '<p class="construction-empty">No hay ciudades manuales. Agrega un repo primero.</p>';
     return;
   }
   list.innerHTML = store.entries
@@ -175,14 +174,14 @@ function escapeHtml(text: string): string {
 function refreshRepoSelect(): void {
   const select = document.getElementById('construction-repo-select') as HTMLSelectElement;
   if (!select) return;
-  
+
   const selectedPaths = loadSelectedRepoPaths();
   const manualLayout = loadManualLayout();
-  
+
   // Get repos not in manualLayout
-  const placedPaths = new Set(manualLayout.entries.map(e => e.repoPath));
+  const placedPaths = new Set(manualLayout.entries.map((e) => e.repoPath));
   const unplaced: string[] = [];
-  
+
   if (selectedPaths) {
     for (const path of selectedPaths) {
       if (!placedPaths.has(path)) {
@@ -190,10 +189,11 @@ function refreshRepoSelect(): void {
       }
     }
   }
-  
+
   // Also fetch repo names (try to get from /api/repos)
-  select.innerHTML = '<option value="">-- Selecciona un repo --</option>' +
-    unplaced.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+  select.innerHTML =
+    '<option value="">-- Selecciona un repo --</option>' +
+    unplaced.map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
 }
 
 function buildDOM(): void {
@@ -263,118 +263,132 @@ function buildDOM(): void {
   const pathInput = panel.querySelector<HTMLInputElement>('#construction-repo-path')!;
   const error = panel.querySelector<HTMLElement>('#construction-error')!;
 
-  panel.querySelector<HTMLButtonElement>('#construction-pick-repo')?.addEventListener('click', () => {
-    void (async () => {
-      error.classList.add('hidden');
-      try {
-        selectedRepo = await pickRepoFromSystem();
-        pathInput.value = selectedRepo.path;
-        // Also update dropdown
-        const select = document.getElementById('construction-repo-select') as HTMLSelectElement;
-        if (select) {
-          // Add option if not exists
-          let found = false;
-          for (const opt of select.options) {
-            if (opt.value === selectedRepo.path) { found = true; break; }
+  panel
+    .querySelector<HTMLButtonElement>('#construction-pick-repo')
+    ?.addEventListener('click', () => {
+      void (async () => {
+        error.classList.add('hidden');
+        try {
+          selectedRepo = await pickRepoFromSystem();
+          pathInput.value = selectedRepo.path;
+          // Also update dropdown
+          const select = document.getElementById('construction-repo-select') as HTMLSelectElement;
+          if (select) {
+            // Add option if not exists
+            let found = false;
+            for (const opt of select.options) {
+              if (opt.value === selectedRepo.path) {
+                found = true;
+                break;
+              }
+            }
+            if (!found) {
+              const opt = document.createElement('option');
+              opt.value = selectedRepo.path;
+              opt.textContent = selectedRepo.name;
+              select.appendChild(opt);
+            }
+            select.value = selectedRepo.path;
           }
-          if (!found) {
-            const opt = document.createElement('option');
-            opt.value = selectedRepo.path;
-            opt.textContent = selectedRepo.name;
-            select.appendChild(opt);
-          }
-          select.value = selectedRepo.path;
+        } catch (e) {
+          error.textContent = `No se pudo abrir el selector (${e instanceof Error ? e.message : 'error desconocido'}).`;
+          error.classList.remove('hidden');
         }
-      } catch (e) {
-        error.textContent = `No se pudo abrir el selector (${e instanceof Error ? e.message : 'error desconocido'}).`;
-        error.classList.remove('hidden');
-      }
-    })();
-  });
+      })();
+    });
 
   // Dropdown change handler
-  panel.querySelector<HTMLSelectElement>('#construction-repo-select')?.addEventListener('change', () => {
-    const select = document.getElementById('construction-repo-select') as HTMLSelectElement;
-    const path = select.value;
-    if (!path) {
-      selectedRepo = null;
-    } else {
-      // Try to get repo info from /api/repos
-      void (async () => {
-        try {
-          const res = await fetch('/api/repos');
-          if (res.ok) {
-            const repos = await res.json() as Array<{ name: string; path: string }>;
-            const found = repos.find(r => r.path === path);
-            if (found) {
-              selectedRepo = found as ScannedRepo;
+  panel
+    .querySelector<HTMLSelectElement>('#construction-repo-select')
+    ?.addEventListener('change', () => {
+      const select = document.getElementById('construction-repo-select') as HTMLSelectElement;
+      const path = select.value;
+      if (!path) {
+        selectedRepo = null;
+      } else {
+        // Try to get repo info from /api/repos
+        void (async () => {
+          try {
+            const res = await fetch('/api/repos');
+            if (res.ok) {
+              const repos = (await res.json()) as Array<{ name: string; path: string }>;
+              const found = repos.find((r) => r.path === path);
+              if (found) {
+                selectedRepo = found as ScannedRepo;
+              } else {
+                selectedRepo = { name: path, path } as ScannedRepo;
+              }
             } else {
               selectedRepo = { name: path, path } as ScannedRepo;
             }
-          } else {
+          } catch {
             selectedRepo = { name: path, path } as ScannedRepo;
           }
-        } catch {
-          selectedRepo = { name: path, path } as ScannedRepo;
+          pathInput.value = path;
+        })();
+      }
+    });
+
+  panel
+    .querySelector<HTMLButtonElement>('#construction-inspect-repo')
+    ?.addEventListener('click', () => {
+      void (async () => {
+        error.classList.add('hidden');
+        try {
+          const p = pathInput.value.trim();
+          if (!p) throw new Error('Ruta vacia');
+          selectedRepo = await inspectRepoPath(p);
+          pathInput.value = selectedRepo.path;
+        } catch (e) {
+          error.textContent = `No se pudo inspeccionar la ruta (${e instanceof Error ? e.message : 'error desconocido'}).`;
+          error.classList.remove('hidden');
         }
-        pathInput.value = path;
       })();
-    }
-  });
+    });
 
-  panel.querySelector<HTMLButtonElement>('#construction-inspect-repo')?.addEventListener('click', () => {
-    void (async () => {
-      error.classList.add('hidden');
-      try {
-        const p = pathInput.value.trim();
-        if (!p) throw new Error('Ruta vacia');
-        selectedRepo = await inspectRepoPath(p);
-        pathInput.value = selectedRepo.path;
-      } catch (e) {
-        error.textContent = `No se pudo inspeccionar la ruta (${e instanceof Error ? e.message : 'error desconocido'}).`;
+  panel
+    .querySelector<HTMLButtonElement>('#construction-pick-tile')
+    ?.addEventListener('click', () => {
+      if (!_rendererRef) {
+        error.textContent = 'Renderer no disponible.';
         error.classList.remove('hidden');
+        return;
       }
-    })();
-  });
-
-  panel.querySelector<HTMLButtonElement>('#construction-pick-tile')?.addEventListener('click', () => {
-    if (!_rendererRef) {
-      error.textContent = 'Renderer no disponible.';
-      error.classList.remove('hidden');
-      return;
-    }
-    if (!selectedRepo) {
-      error.textContent = 'Selecciona un repositorio primero.';
-      error.classList.remove('hidden');
-      return;
-    }
-    error.classList.add('hidden');
-    _onPickTileCb = (coord) => {
-      if (!selectedRepo) return;
-      // Save to manual layout
-      upsertManualRepoEntry({
-        repoPath: selectedRepo.path,
-        repoName: selectedRepo.name,
-        coord,
-        addedAt: Date.now(),
-        source: 'manual',
-      });
-      upsertSelection(selectedRepo.path);
-      // Notify main.ts to add city dynamically (no reload)
-      if (_onCityAdded) {
-        _onCityAdded(selectedRepo, coord);
+      if (!selectedRepo) {
+        error.textContent = 'Selecciona un repositorio primero.';
+        error.classList.remove('hidden');
+        return;
       }
-      // Close panel and exit placing mode
+      error.classList.add('hidden');
+      _onPickTileCb = (coord) => {
+        if (!selectedRepo) return;
+        // Save to manual layout
+        upsertManualRepoEntry({
+          repoPath: selectedRepo.path,
+          repoName: selectedRepo.name,
+          coord,
+          addedAt: Date.now(),
+          source: 'manual',
+        });
+        upsertSelection(selectedRepo.path);
+        // Notify main.ts to add city dynamically (no reload)
+        if (_onCityAdded) {
+          _onCityAdded(selectedRepo, coord);
+        }
+        // Close panel and exit placing mode
+        closeConstructionPanel();
+        if (_rendererRef) {
+          _rendererRef.setPlacingMode(false);
+        }
+      };
+      _rendererRef.setPlacingMode(true);
       closeConstructionPanel();
-      if (_rendererRef) {
-        _rendererRef.setPlacingMode(false);
-      }
-    };
-    _rendererRef.setPlacingMode(true);
-    closeConstructionPanel();
-    showNotification({ type: 'info', title: 'Nueva ciudad', body: `Haz click en una casilla para colocar "${selectedRepo.name}".` });
-  });
-
+      showNotification({
+        type: 'info',
+        title: 'Nueva ciudad',
+        body: `Haz click en una casilla para colocar "${selectedRepo.name}".`,
+      });
+    });
 }
 
 /** Called by renderer when an empty tile is clicked while placing. */
