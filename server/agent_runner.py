@@ -253,7 +253,8 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
             return _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                               model=model or provider)
         if harness == "cursor" and _has_cursor():
-            return _run_cursor_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
+            return _run_cursor_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
+                                         model=model or provider)
         if harness == "hermes":
             return _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                          model=model or provider)
@@ -436,7 +437,9 @@ def _find_cursor() -> str | None:
 
 def _run_cursor_streaming(unit_id: str, mission_id: str, mission: str,
                            config: dict[str, Any],
-                           working_dir: str | None = None) -> tuple[bool, str]:
+                           working_dir: str | None = None,
+                           city_id: str = "",
+                           model: str = "") -> tuple[bool, str]:
     cursor_bin = _find_cursor()
     if not cursor_bin:
         text = "[cursor error] binary not found in PATH, ~/.local/bin or /usr/local/bin\n"

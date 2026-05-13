@@ -305,17 +305,19 @@ def _configure_agent_runner() -> None:
 def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
                              config: dict[str, Any],
                              working_dir: str | None = None,
-                             city_id: str = "") -> tuple[bool, str]:
+                             city_id: str = "",
+                             model: str = "") -> tuple[bool, str]:
     _configure_agent_runner()
-    return _agent_runner._run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
+    return _agent_runner._run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model)
 
 
 def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
                            config: dict[str, Any] | None = None,
                            working_dir: str | None = None,
-                           city_id: str = "") -> tuple[bool, str]:
+                           city_id: str = "",
+                           model: str = "") -> tuple[bool, str]:
     _configure_agent_runner()
-    return _agent_runner._run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
+    return _agent_runner._run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model)
 
 def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
               command_id: str | None = None, harness: str = "", provider: str = "", model: str = "") -> None:
@@ -325,9 +327,13 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
 
 def _execute_streaming(unit_id: str, mission_id: str, mission: str,
                        working_dir: str | None = None,
-                       city_id: str = "") -> tuple[bool, str]:
+                       city_id: str = "",
+                       harness: str = "",
+                       provider: str = "",
+                       model: str = "") -> tuple[bool, str]:
     _configure_agent_runner()
-    return _agent_runner._execute_streaming(unit_id, mission_id, mission, working_dir, city_id)
+    return _agent_runner._execute_streaming(unit_id, mission_id, mission, working_dir, city_id,
+                                             harness=harness, provider=provider, model=model)
 
 
 def _has_openclaw() -> bool:

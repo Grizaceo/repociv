@@ -53,3 +53,21 @@ def test_send_to_repociv_chat_chunk_updates_session(monkeypatch, tmp_path):
     assert canonical["lastMissionId"] == "m9"
     assert canonical["messageCount"] == 1
     assert recent[0]["content"] == "hola"
+
+
+def test_run_hermes_streaming_forwards_model(monkeypatch):
+    """El facade bridge._run_hermes_streaming debe pasar 'model' al agent_runner."""
+    calls = []
+
+    def fake_run(*args, **kwargs):
+        calls.append((args, kwargs))
+        return True, "ok"
+
+    monkeypatch.setattr(bridge._agent_runner, "_run_hermes_streaming", fake_run)
+
+    bridge._run_hermes_streaming("U1", "M1", "hello", model="kimi-k2.6")
+
+    assert len(calls) == 1
+    args, kwargs = calls[0]
+    # args = (unit_id, mission_id, mission, config, working_dir, city_id, model)
+    assert args[-1] == "kimi-k2.6"
