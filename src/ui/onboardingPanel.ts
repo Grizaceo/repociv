@@ -343,23 +343,6 @@ async function hydrateRepos(state: OnboardingState, onContinue: () => void): Pro
   render(state, onContinue);
 }
 
-export async function runRepoOnboarding(): Promise<void> {
-  const mapRoot = await fetchCurrentMapRoot().catch(() => 'desconocida');
-  await new Promise<void>((resolve) => {
-    const state: OnboardingState = {
-      repos: [],
-      query: '',
-      selected: new Set<string>(),
-      step: 'select',
-      isLoading: true,
-      isPickingFolder: false,
-      error: null,
-      mapRoot,
-    };
-    render(state, resolve);
-    void hydrateRepos(state, resolve);
-  });
-}
 
 export async function ensureRepoOnboarding(): Promise<void> {
   const existingSelection = loadSelectedRepoPaths();

@@ -148,57 +148,33 @@ function reconstructPath(
 }
 
 // ─── Reachability check ─────────────────────────────────────────────────────────
-export function isReachable(
-  world: LocalWorld,
-  fromX: number,
-  fromY: number,
-  toX: number,
-  toY: number,
-): boolean {
-  return findPath(world, fromX, fromY, toX, toY) !== null;
-}
 
 // ─── Find nearest workbench tile (or nearest floor tile matching predicate) ──────
-export function findNearestTile(
+
+function findNearestTile(
   world: LocalWorld,
   fromX: number,
   fromY: number,
-  predicate: (tile: LocalTile) => boolean,
+  predicate: (t: LocalTile) => boolean,
 ): { x: number; y: number; distance: number } | null {
-  const { grid } = world;
-  const H = grid.length;
-  const W = grid[0]?.length ?? 0;
-
-  // BFS
-  const key = (x: number, y: number) => y * W + x;
-  const visited = new Set<number>();
+  // BFS from (fromX, fromY) to find nearest tile matching predicate
+  const visited = new Set<string>();
   const queue: Array<{ x: number; y: number; dist: number }> = [{ x: fromX, y: fromY, dist: 0 }];
-  visited.add(key(fromX, fromY));
-
-  const DIRS = [
-    { dx: 0, dy: -1 },
-    { dx: 1, dy: 0 },
-    { dx: 0, dy: 1 },
-    { dx: -1, dy: 0 },
-  ];
-
   while (queue.length > 0) {
-    const curr = queue.shift()!;
-    const tile = grid[curr.y]![curr.x]!;
-    if (predicate(tile)) {
-      return { x: curr.x, y: curr.y, distance: curr.dist };
+    const cur = queue.shift()!;
+    const key = `${cur.x},${cur.y}`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+    if (cur.y >= 0 && cur.y < world.grid.length && cur.x >= 0 && cur.x < world.grid[0].length) {
+      const tile = world.grid[cur.y][cur.x];
+      if (predicate(tile)) {
+        return { x: cur.x, y: cur.y, distance: cur.dist };
+      }
     }
-    for (const { dx, dy } of DIRS) {
-      const nx = curr.x + dx;
-      const ny = curr.y + dy;
-      if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-      const nk = key(nx, ny);
-      if (visited.has(nk)) continue;
-      visited.add(nk);
-      const nTile = grid[ny]![nx]!;
-      const cost = TILE_COST[nTile.type] ?? 1;
-      if (!isFinite(cost)) continue;
-      queue.push({ x: nx, y: ny, dist: curr.dist + cost });
+    // neighbors
+    const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+    for (const [dx, dy] of dirs) {
+      queue.push({ x: cur.x + dx, y: cur.y + dy, dist: cur.dist + 1 });
     }
   }
   return null;

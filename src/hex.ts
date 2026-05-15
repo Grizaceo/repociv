@@ -7,7 +7,7 @@ export interface Axial {
   readonly r: number;
 }
 
-export const AXIAL_ZERO: Axial = { q: 0, r: 0 };
+const AXIAL_ZERO: Axial = { q: 0, r: 0 };
 
 // ─── Direction vectors (6 neighbours in axial coords) ───────────────────────
 export const AXIAL_DIRECTIONS: readonly Axial[] = [
@@ -28,7 +28,7 @@ export function axialSub(a: Axial, b: Axial): Axial {
   return { q: a.q - b.q, r: a.r - b.r };
 }
 
-export function axialScale(a: Axial, k: number): Axial {
+function axialScale(a: Axial, k: number): Axial {
   return { q: a.q * k, r: a.r * k };
 }
 
@@ -37,25 +37,25 @@ export function axialEquals(a: Axial, b: Axial): boolean {
 }
 
 // ─── Conversion: Axial ↔ Cube ────────────────────────────────────────────────
-export function axialToCube(a: Axial): CubeCoord {
+function axialToCube(a: Axial): CubeCoord {
   const x = a.q;
   const y = -a.q - a.r;
   const z = a.r;
   return { x, y, z };
 }
 
-export function cubeToAxial(c: CubeCoord): Axial {
+function cubeToAxial(c: CubeCoord): Axial {
   return { q: c.x, r: c.z };
 }
 
 // ─── Cube coordinates (x, y, z) with invariant x+y+z=0 ───────────────────────
-export interface CubeCoord {
+interface CubeCoord {
   readonly x: number;
   readonly y: number;
   readonly z: number;
 }
 
-export function cubeEquals(a: CubeCoord, b: CubeCoord): boolean {
+function cubeEquals(a: CubeCoord, b: CubeCoord): boolean {
   return a.x === b.x && a.y === b.y && a.z === b.z;
 }
 
@@ -67,7 +67,7 @@ export function axialDistance(a: Axial, b: Axial): number {
 }
 
 // ─── Neighbours ─────────────────────────────────────────────────────────────
-export function axialNeighbour(a: Axial, direction: number): Axial {
+function axialNeighbour(a: Axial, direction: number): Axial {
   return axialAdd(a, AXIAL_DIRECTIONS[((direction % 6) + 6) % 6]!);
 }
 
@@ -90,7 +90,7 @@ export function axialRing(center: Axial, radius: number): Axial[] {
   return results;
 }
 
-export function axialRange(center: Axial, radius: number): Axial[] {
+function axialRange(center: Axial, radius: number): Axial[] {
   const results: Axial[] = [];
   for (let q = -radius; q <= radius; q++) {
     for (let r = Math.max(-radius, -q - radius); r <= Math.min(radius, -q + radius); r++) {
@@ -123,7 +123,7 @@ export function axialToPixel(a: Axial, size: number): { x: number; y: number } {
   return { x, y };
 }
 
-export function pixelToAxial(px: number, py: number, size: number): Axial {
+function pixelToAxial(px: number, py: number, size: number): Axial {
   if (size <= 0) return { q: 0, r: 0 };
   const q = ((2 / 3) * px) / size;
   const r = ((-1 / 3) * px + (SQRT3 / 3) * py) / size;
@@ -131,7 +131,7 @@ export function pixelToAxial(px: number, py: number, size: number): Axial {
 }
 
 // ─── Pixel ↔ Axial with camera offset ──────────────────────────────────────
-export function axialToWorld(a: Axial, size: number, cam: Camera): { x: number; y: number } {
+function axialToWorld(a: Axial, size: number, cam: Camera): { x: number; y: number } {
   const { x, y } = axialToPixel(a, size);
   return {
     x: (x - cam.x) * cam.zoom + cam.cx,
@@ -177,7 +177,7 @@ export interface Camera {
   zoom: number; // 1 = 100%, clamped
 }
 
-export const CAMERA_DEFAULT: Camera = {
+const CAMERA_DEFAULT: Camera = {
   x: 0,
   y: 0,
   cx: 0,

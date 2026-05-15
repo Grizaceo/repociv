@@ -40,10 +40,6 @@ export function loadManualLayout(): ManualLayoutStore {
   }
 }
 
-export function saveManualLayout(store: ManualLayoutStore): void {
-  if (!canUseLocalStorage()) return;
-  window.localStorage.setItem(MANUAL_LAYOUT_STORAGE_KEY, JSON.stringify(store));
-}
 
 export function upsertManualRepoEntry(entry: ManualRepoEntry): ManualLayoutStore {
   const store = loadManualLayout();

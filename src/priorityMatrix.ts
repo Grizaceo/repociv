@@ -116,10 +116,3 @@ export function peekNextMission(
 
 // ─── Priority panel state ────────────────────────────────────────────────────
 let _panelOpen = false;
-export function isPriorityPanelOpen(): boolean {
-  return _panelOpen;
-}
-export function togglePriorityPanel(): boolean {
-  _panelOpen = !_panelOpen;
-  return _panelOpen;
-}

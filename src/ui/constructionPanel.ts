@@ -50,19 +50,6 @@ export function setRendererRef(renderer: {
   _rendererRef = renderer;
 }
 
-export function openConstructionPanel(): void {
-  // Entering the panel cancels map-only relocate so HUD + canvas stay in sync.
-  _rendererRef?.setCityRelocateMode(false);
-  isOpen = true;
-  let panel = getPanel();
-  if (!panel) {
-    buildDOM();
-    panel = getPanel();
-  }
-  panel?.classList.remove('hidden');
-  refreshCityList();
-  refreshRepoSelect();
-}
 
 export function closeConstructionPanel(): void {
   isOpen = false;

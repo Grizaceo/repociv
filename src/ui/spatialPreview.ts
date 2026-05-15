@@ -416,9 +416,6 @@ export function showDragTooltip(
     });
 }
 
-export function hideDragTooltip() {
-  _tooltipEl?.classList.add('hidden');
-}
 
 function _getOrCreateTooltip(): HTMLElement {
   if (_tooltipEl) return _tooltipEl;

@@ -58,14 +58,6 @@ export async function openRecoveryPanel(
 }
 
 /** Re-open the panel with the last-known harness+reason (no new fetch). */
-export function reopenRecoveryPanel() {
-  if (!_currentHarnessId) return;
-  _visible = true;
-  showPanel(_getOrCreate());
-  if (_currentPlan) _render();
-  else if (_loading) _renderLoading();
-  else void openRecoveryPanel(_currentHarnessId, _currentReason);
-}
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 function _renderLoading() {

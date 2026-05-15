@@ -24,6 +24,3 @@ export function bindPanelAction(panel: HTMLElement, selector: string, handler: (
   panel.querySelector(selector)?.addEventListener('click', handler);
 }
 
-export function panelBody(panel: HTMLElement, selector: string): HTMLElement {
-  return panel.querySelector<HTMLElement>(selector)!;
-}

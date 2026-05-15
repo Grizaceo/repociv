@@ -38,6 +38,7 @@ cp "$EVENTS_FILE" "$DEST"
 echo "✔ Backup: $DEST ($LINES líneas, $SIZE)"
 
 # Rotate: keep newest $KEEP backups
+# shellcheck disable=SC2012
 EXCESS=$(ls -t "$BACKUP_DIR"/events-*.jsonl 2>/dev/null | tail -n +$((KEEP + 1)) || true)
 if [[ -n "$EXCESS" ]]; then
   COUNT=$(echo "$EXCESS" | wc -l)
@@ -45,4 +46,4 @@ if [[ -n "$EXCESS" ]]; then
   echo "  → $COUNT backup(s) antiguo(s) eliminado(s)"
 fi
 
-echo "  → Total backups: $(ls "$BACKUP_DIR"/events-*.jsonl 2>/dev/null | wc -l)"
+echo "  → Total backups: $(find "$BACKUP_DIR" -maxdepth 1 -name 'events-*.jsonl' | wc -l)"

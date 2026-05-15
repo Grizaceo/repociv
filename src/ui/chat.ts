@@ -4,7 +4,6 @@ import { trapFocus } from './focusTrap.ts';
 import { bridgeHeaders, bridgeUrl, hermesWebUrl } from '../bridgeEnv.ts';
 
 let activeChatUnit: string | null = null;
-export const chatBuffers = new Map<string, string>();
 let _sidePanelCleanup: (() => void) | null = null;
 
 // Chat history: per-unit array of messages

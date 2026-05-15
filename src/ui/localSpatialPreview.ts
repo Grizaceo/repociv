@@ -132,9 +132,6 @@ export function showLocalContextMenu(
   }, 50);
 }
 
-export function hideLocalContextMenu() {
-  _menuEl?.classList.add('hidden');
-}
 
 // ─── Mission confirmation preview ─────────────────────────────────────────────
 export function showLocalMissionPreview(
@@ -171,9 +168,6 @@ export function showLocalMissionPreview(
   });
 }
 
-export function hideLocalMissionPreview() {
-  _previewEl?.classList.add('hidden');
-}
 
 // ─── Git panel for a single file ──────────────────────────────────────────────
 export async function showGitForFile(

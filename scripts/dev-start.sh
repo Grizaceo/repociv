@@ -114,7 +114,7 @@ trap _cleanup SIGINT SIGTERM EXIT
 # ─── Wait for bridge to be ready ─────────────────────────────────────────────
 echo "⏳ Esperando que el bridge esté listo…"
 READY=0
-for i in $(seq 1 20); do
+for _ in $(seq 1 20); do
   if curl -sf "http://localhost:$BRIDGE_PORT/health" > /dev/null 2>&1; then
     READY=1
     break

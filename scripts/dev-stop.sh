@@ -4,8 +4,6 @@
 # Safe to run even if processes are already dead.
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
 if [[ -f .env ]]; then
   # shellcheck disable=SC2046
   export $(grep -v '^#' .env | grep -v '^$' | xargs)

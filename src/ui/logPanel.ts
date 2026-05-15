@@ -108,13 +108,6 @@ export function toggleLogPanel(): void {
   else openLogPanel();
 }
 
-export function toggleLogCollapse(): void {
-  if (!_panel) return;
-  _collapsed = !_collapsed;
-  _panel.classList.toggle('collapsed', _collapsed);
-  const toggleBtn = _panel.querySelector<HTMLButtonElement>('.log-toggle');
-  if (toggleBtn) toggleBtn.textContent = _collapsed ? '▸' : '▾';
-}
 
 // ─── Polling ──────────────────────────────────────────────────────────────────
 function _startPolling(): void {

@@ -12,14 +12,7 @@ export interface Suggestion {
   score: number;
 }
 
-export interface Template {
-  gesture: string;
-  agentId: string;
-  cmdType: string;
-  target?: string;
-  successRate: number;
-  count: number;
-}
+
 
 export interface ReplayEntry {
   command_id: string;
@@ -112,16 +105,6 @@ export async function fetchStats(): Promise<DirectiveStats | null> {
 }
 
 // ─── Persisted templates ──────────────────────────────────────────────────────
-export async function fetchTemplates(): Promise<Template[]> {
-  try {
-    const res = await fetch(bridgeUrl('/directives/stats'), { headers: _headers() });
-    if (!res.ok) return [];
-    const stats = (await res.json()) as DirectiveStats;
-    return stats.templates ?? [];
-  } catch {
-    return [];
-  }
-}
 
 // ─── Label helpers ────────────────────────────────────────────────────────────
 export function cmdTypeLabel(type: string): string {

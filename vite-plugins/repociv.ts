@@ -22,16 +22,7 @@ import skipDirsJson from '../shared/skip-dirs.json' with { type: 'json' };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export interface ScannedRepo {
-  name: string;
-  path: string;
-  population: number;
-  extensions: Record<string, number>;
-  gold: number;
-  lastCommitDays: number;
-  isLegacy: boolean;
-  hasGit: boolean;
-}
+
 
 // ─── Path helpers ─────────────────────────────────────────────────────────────
 

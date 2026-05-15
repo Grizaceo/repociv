@@ -27,6 +27,8 @@ export interface Tile {
   folderStructure?: string[]; // Lista de rutas de carpetas del repo principal
 }
 
+
+
 export interface TileResources {
   gold: number; // commits / lines added
   science: number; // test coverage / validations
@@ -76,6 +78,7 @@ export interface Building {
 
 // ─── Unit / Agent ───────────────────────────────────────────────────────────
 export type UnitType = 'hero' | 'worker' | 'scout' | 'army' | 'caravan' | 'lexo' | 'openclaw';
+
 export type UnitState = 'idle' | 'moving' | 'working' | 'sleeping' | 'building';
 
 export interface Unit {
@@ -320,15 +323,9 @@ export interface LocalMission {
 }
 
 // ─── Renderer state ────────────────────────────────────────────────────────────
-export type RendererState = 'no_input' | 'hover' | 'click' | 'drag' | 'animation';
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
 export function tileKey(coord: Axial): string {
   return `${coord.q},${coord.r}`;
 }
 
-export function parseTileKey(key: string): Axial {
-  const [q, r] = key.split(',').map(Number);
-  if (q === undefined || r === undefined || isNaN(q) || isNaN(r)) return { q: 0, r: 0 };
-  return { q, r };
-}
+

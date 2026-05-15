@@ -1,0 +1,229 @@
+# HANDOFF — RepoCiv GStack Audit (2026-05-13)
+
+> **Status:** Reporte completo. Ningún código modificado todavía.
+> **Commit base:** `d6b350e` — main
+> **Repo:** `/home/gris/.hermes/workspace/repos/repociv`
+
+---
+
+## 1. RESUMEN PARA EL SIGUIENTE AGENTE
+
+Este handoff documenta el resultado de un audit completo tipo gstack (`health`
++ `devex-review` + `design-review` + `investigate`) sobre RepoCiv.
+
+**Estado general:** STABLE con deuda técnica concentrada en 4 áreas.
+**Build:** VERDE (tsc 0 errores, vitest 23 tests pasan, eslint 0 warnings tras último fix).
+**Impacto de cambios:** Commit `d6b350e` arregló los 10 warnings eslint previos. El repo
+está en mejor estado del que sugiere el reporte original.
+
+**NO MODIFICAR** este archivo. Es referencia.
+
+---
+
+## 2. RUTAS ABSOLUTAS DEL REPO
+
+```
+REPO_ROOT=/home/gris/.hermes/workspace/repos/repociv
+SCRIPTS_DIR=$REPO_ROOT/scripts
+SRC=$REPO_ROOT/src
+UI=$SRC/ui
+VITE_PLUGINS=$REPO_ROOT/vite-plugins
+```
+
+---
+
+## 3. TAREAS PENDIENTES (ordenadas por impacto/riesgo)
+
+### T1. [MED] Auditar dead exports con `knip`
+
+- **Comando de referencia:**
+  ```bash
+  cd $REPO_ROOT && npx knip
+  ```
+- **Hallazgos esperados:** ~89 exports no usados, 3 deps no usadas.
+- **Ficheros clave para revisar manualmente:**
+  - `$SRC/ui/index.ts` — paneles UI exportados dinámicamente
+    (openLedger, openPriorityPanel, closePriorityPanel, toggleSettingsPanel,
+    openTimelinePanel, openApprovalPanel, stopApprovalPolling,
+    openObservabilityPanel, stopObservabilityPolling, openHarnessPanel,
+    closeHarnessPanel, stopHarnessPolling, openRecoveryPanel,
+    closeRecoveryPanel, isRecoveryPanelOpen, openReplayPanel, openTaskPanel,
+    openPendingPanel, openLogPanel) — **SON USADOS vía reflexión, NO eliminar.**
+  - `$SRC/hex.ts` — utilidades hexagonales (axialScale, axialToCube, cubeToAxial,
+    cubeEquals, axialNeighbour, axialRange, pixelToAxial, axialToWorld) — evaluar
+    si son legacy del canvas 2D.
+  - `$SRC/bridge.ts` — `playSound()` — probablemente muerto.
+  - `$SRC/commandBus.ts` — `CommandRecord`, funciones `subscribeCommands`,
+    `getCommands`, `updateCommandStatus` — evaluar si las usa el backend.
+  - `$SRC/directiveLearner.ts` — `fetchTemplates()` — evaluar uso.
+  - `$SRC/harnessRegistry.ts` — tipos `HarnessKind`, `HarnessTransport`,
+    `RecoveryDescriptor` — verificar si backend los consume.
+  - `$SRC/types.ts` — tipos `TileResources`, `BuildingState`, `UnitType`,
+    `LocalUnitState`, `RendererState`, `parseTileKey` — verificar consumo.
+  - `$VITE_PLUGINS/repociv.ts` — funciones usadas en build-time (scanPath,
+    gitStats, countFiles). **NO eliminar** aunque knip diga "unused".
+- **Decisiones ya tomadas:**
+  - `src/local.demo.ts` — YA ELIMINADO en commit actual. No hacer nada.
+- **Trampa:** knip no distingue exports dinámicos (llamados por string name).
+  Todo en `$UI/index.ts` es dinámico.
+
+### T2. [LOW] Eliminar dependencias no usadas de package.json
+
+- **Deps confirmadas como no usadas (0 imports en src/):**
+  ```
+  @popperjs/core  ^2.11.8  (línea 40)
+  tippy.js        ^6.3.7   (línea 44)
+  ```
+- **Dep con uso indirecto (evaluar):**
+  ```
+  lucide          ^1.14.0  (línea 43)
+  ```
+  `lucide` se carga via CDN en `index.html`:
+  ```html
+  <script src="https://unpkg.com/lucide@1.14.0/dist/umd/lucide.js"></script>
+  ```
+  Y se consume en runtime via `(window as any)['lucide']` en:
+  - `$UI/chat.ts:201`
+  - `$UI/hud.ts:11,88,152`
+
+  **Opciones:**
+  (A) Eliminar de package.json y confiar en CDN.
+  (B) Migrar a `npm install lucide-react` o import estático y quitar CDN.
+  (C) Dejar como está (package.json + CDN duplicado) — es deuda menor.
+
+- **Comando:**
+  ```bash
+  cd $REPO_ROOT && npm uninstall @popperjs/core tippy.js
+  ```
+
+### T3. [LOW] Shellcheck sobre scripts shell
+
+- **Scripts a auditar:**
+  ```
+  $SCRIPTS_DIR/dev-start.sh      (7173 bytes, más complejo)
+  $SCRIPTS_DIR/dev-stop.sh       (1750 bytes)
+  $SCRIPTS_DIR/healthcheck.sh    (5445 bytes)
+  $SCRIPTS_DIR/smoke-test.sh     (3543 bytes)
+  $SCRIPTS_DIR/backup-events.sh  (1594 bytes)
+  $SCRIPTS_DIR/repociv-backup.sh (588 bytes)
+  ```
+- **Shellcheck disponible:**
+  ```bash
+  /tmp/shellcheck-stable/shellcheck --version  # v0.11.0
+  ```
+- **Comando de referencia:**
+  ```bash
+  cd $REPO_ROOT
+  for f in scripts/*.sh; do
+    echo "=== $f ==="
+    /tmp/shellcheck-stable/shellcheck "$f" || true
+  done
+  ```
+
+### T4. [HIGH] Eslint chat.ts — YA RESUELTO EN d6b350e
+
+- **Status:** FIXED. El commit actual tiene 0 warnings eslint.
+- **Historial:** El reporte original identificó 8 `any` + 2 `no-console` en
+  `$UI/chat.ts`. El commit `d6b350e` (`fix(types,lint): tipa LiveProviderInfo sin any + pasa eslint max-warnings=0`) los resolvió.
+- **No hay acción** a menos que quieras refinar los tipos tipados como
+  `unknown` (pueden tener `as Type` internamente que merece atención).
+
+### T5. [MED] Coverage e2e con Playwright
+
+- **Estado:** 0 tests e2e propios. Playwright está instalado pero solo para
+  scripts de reinstall de browsers (`node_modules/playwright-core/bin/`).
+- **Directorio esperado:** `$REPO_ROOT/e2e/` (ya en .gitignore de vitest).
+- **No se analizó el backend** (`server.py`) en este audit. Si se agregan tests
+e2e, considerar levantar backend FastAPI + frontend Vite.
+
+---
+
+## 4. DECISIONES YA DISCUTIDAS CON CRISTÓBAL
+
+1. **gstack skills no disponibles localmente** — los binarios están en
+   `~/.claude/skills/gstack/bin/` (entorno Claude Code, no Hermes).
+   Este audit se hizo ejecutando los diagnósticos manualmente con herramientas
+   estándar (eslint, tsc, vitest, knip, shellcheck descargado).
+
+2. **shellcheck se descarga a /tmp** si no está en PATH:
+   ```bash
+   curl -sL https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz -o /tmp/shellcheck.tar.xz
+   tar -xf /tmp/shellcheck.tar.xz -C /tmp
+   ```
+
+3. **No ejecutar `knip --fix` sin revisar** — eliminaría ~45 exports de UI que
+   son invocados dinámicamente. Revisar uno por uno.
+
+---
+
+## 5. COMANDOS RÁPIDOS DE REFERENCIA
+
+```bash
+# Build
+npx vite build
+
+# Tests
+npx vitest run
+npx vitest run --coverage   # (requiere instalar @vitest/coverage-v8)
+
+# Lint
+npx eslint src/ --max-warnings=0
+
+# Type check
+npx tsc --noEmit
+
+# Dead code analysis
+npx knip
+
+# Bundle visualizer (genera stats.html)
+npx vite build --mode analyze
+# o ver stats.html existente en raíz
+
+# Shellcheck
+for f in scripts/*.sh; do /tmp/shellcheck-stable/shellcheck "$f" || true; done
+```
+
+---
+
+## 6. MAPA DE ARCHIVOS POR DOMINIO
+
+| Dominio | Archivos clave |
+|---------|---------------|
+| Chat UI | `$UI/chat.ts`, `$UI/chat.ts` (~29KB, más grande del repo) |
+| HUD / Iconos | `$UI/hud.ts`, `index.html` (CDN lucide) |
+| Recovery | `$SRC/recoveryClient.ts`, `$UI/recoveryPanel.ts`, `$UI/approvalPanel.ts` |
+| Timeline | `$UI/timelinePanel.ts` |
+| Auth | `$SRC/lib/auth.ts` |
+| Hex grid | `$SRC/hex.ts`, `$SRC/types.ts` |
+| Build-time scan | `$VITE_PLUGINS/repociv.ts` |
+| Shell infra | `$SCRIPTS_DIR/dev-start.sh`, `$SCRIPTS_DIR/healthcheck.sh` |
+| Tests unit | `$SRC/**/*.test.ts` (solo 3 suites encontradas) |
+
+---
+
+## 7. RIESGOS Y SUPUESTOS
+
+- **Supuesto:** El backend FastAPI (`server.py`) no fue auditado en este run.
+  Si hay dead code en Python, requiere otro análisis.
+- **Riesgo:** `$UI/chat.ts` sigue siendo el fichero más grande del repo (~29KB).
+  Contiene lógica de WebSocket + render + DOM manipulation mezclada.
+  Considerar refactoring futuro (no está en el scope de este handoff).
+- **Riesgo:** `lucide` cargado por CDN. Si unpkg falla, los iconos desaparecen.
+  No hay fallback local.
+- **Commit sin push:** `d6b350e` está en local (ahead de origin).
+  Cualquier trabajo nuevo debería partir de este commit.
+
+---
+
+## 8. CHECKLIST DEL SIGUIENTE AGENTE
+
+Antes de tocar código:
+- [ ] Verificar que estás en `$REPO_ROOT` y commit `d6b350e`
+- [ ] Correr `npx tsc --noEmit` → debe dar 0 errores
+- [ ] Correr `npx vitest run` → 23 tests pasan
+- [ ] Correr `npx eslint src/ --max-warnings=0` → 0 warnings
+- [ ] Leer este archivo completo antes de decidir qué tarea tomar
+
+---
+
+*Generado por DAVI el 2026-05-13. Audit original: gstack manual sobre RepoCiv.*

@@ -36,16 +36,7 @@ export interface CommandDraft {
   created_by?: string;
 }
 
-export interface Command extends CommandDraft {
-  id: string;
-  risk: Risk;
-  requires_approval: boolean;
-  status: CommandStatus;
-  created_at: number;
-  started_at?: number;
-  finished_at?: number;
-  result?: string;
-}
+
 
 export interface CommandResponse {
   ok: boolean;
