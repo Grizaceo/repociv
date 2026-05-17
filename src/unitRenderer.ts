@@ -14,6 +14,84 @@ export class UnitRenderer {
     private state: GameState,
   ) {}
 
+  drawUnitTrail(unit: Unit) {
+    if (!unit.trailPositions || unit.trailPositions.length === 0) return;
+    const { ctx } = this;
+    ctx.save();
+    unit.trailPositions.forEach((pos, i) => {
+      const alpha = ((i + 1) / unit.trailPositions!.length) * 0.4;
+      const p = axialToPixel(pos, HEX_SIZE);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = unit.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1.0;
+    ctx.restore();
+  }
+
+  drawUnitBadge(unit: Unit, animTime: number) {
+    const { ctx } = this;
+    const p = axialToPixel(unit.coord, HEX_SIZE);
+    const bx = p.x + HEX_SIZE * 0.45;
+    const by = p.y - HEX_SIZE * 0.45;
+    const r = 7;
+    ctx.save();
+    switch (unit.state) {
+      case 'idle': {
+        ctx.fillStyle = '#888';
+        ctx.beginPath();
+        ctx.arc(bx, by, r, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+      case 'moving': {
+        const angle = animTime * 4;
+        ctx.strokeStyle = '#f09030';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(bx, by, r, angle, angle + Math.PI * 1.3);
+        ctx.stroke();
+        break;
+      }
+      case 'working': {
+        const alpha = 0.6 + 0.4 * Math.sin(animTime * 2.5);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#4080e0';
+        ctx.beginPath();
+        ctx.arc(bx, by, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+        break;
+      }
+      case 'sleeping': {
+        ctx.fillStyle = 'rgba(160,160,160,0.5)';
+        ctx.beginPath();
+        ctx.arc(bx, by, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ccc';
+        ctx.font = `${r + 2}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('z', bx + 1, by - 1);
+        break;
+      }
+      case 'building': {
+        const pct = (unit.workProgress ?? 0) / 100;
+        ctx.fillStyle = '#2a1e0a';
+        ctx.fillRect(bx - r, by - r, r * 2, r * 2);
+        ctx.fillStyle = '#c8a84b';
+        ctx.fillRect(bx - r, by - r + r * 2 * (1 - pct), r * 2, r * 2 * pct);
+        ctx.strokeStyle = '#f0c050';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(bx - r, by - r, r * 2, r * 2);
+        break;
+      }
+    }
+    ctx.restore();
+  }
+
   drawUnit(unit: Unit, animTime: number, selectedUnitId: string | null) {
     const { ctx } = this;
     let ux: number, uy: number;

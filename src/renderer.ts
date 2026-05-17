@@ -38,6 +38,7 @@ export class Renderer {
 
   private hoveredHex: Axial | null = null;
   private selectedUnit: Unit | null = null;
+  private unitTooltipEl: HTMLDivElement | null = null;
   private actionMode: 'none' | 'move' | 'build' = 'none';
   private showGrid = false;
   private showDebug = false;
@@ -214,6 +215,7 @@ export class Renderer {
       const wx = e.clientX - rect.left;
       const wy = e.clientY - rect.top;
       this.hoveredHex = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+      this.updateUnitTooltip(e.clientX, e.clientY);
 
       if (this._cityRelocateMode && this.draggedCity && this.dragStartPos) {
         const dx = e.clientX - this.dragStartPos.x;
@@ -435,6 +437,11 @@ export class Renderer {
       }
     });
 
+    // ── mouseleave: hide unit tooltip ────────────────────────────────────────
+    this.canvas.addEventListener('mouseleave', () => {
+      if (this.unitTooltipEl) this.unitTooltipEl.style.display = 'none';
+    });
+
     // ── dblclick: enter RimWorld local view ──────────────────────────────────
     this.canvas.addEventListener('dblclick', (e) => {
       const rect = this.canvas.getBoundingClientRect();
@@ -652,7 +659,11 @@ export class Renderer {
     }
 
     for (const unit of this.state.world.units) {
+      this.unitR.drawUnitTrail(unit);
+    }
+    for (const unit of this.state.world.units) {
       this.unitR.drawUnit(unit, this.animTime, this.selectedUnit?.id ?? null);
+      this.unitR.drawUnitBadge(unit, this.animTime);
     }
 
     if (this.selectedUnit && this.actionMode === 'move') {
@@ -809,6 +820,40 @@ export class Renderer {
   // Kept for minimap compatibility
   drawMinimap() {
     this.minimapR.draw(this.cam, this.canvas, this.fogEnabled);
+  }
+
+  private updateUnitTooltip(clientX: number, clientY: number) {
+    const unit = this.hoveredHex ? this.state.getUnitAt(this.hoveredHex) : null;
+    if (!unit || this.isDragging) {
+      if (this.unitTooltipEl) this.unitTooltipEl.style.display = 'none';
+      return;
+    }
+    if (!this.unitTooltipEl) {
+      const el = document.createElement('div');
+      el.id = 'unit-tooltip';
+      el.style.cssText =
+        'position:fixed;z-index:9999;pointer-events:none;background:rgba(20,15,5,0.92);' +
+        'border:1px solid #c8a84b;border-radius:4px;padding:6px 10px;font-family:"Cinzel",serif;' +
+        'font-size:12px;color:#e8d5a0;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.6);';
+      document.body.appendChild(el);
+      this.unitTooltipEl = el;
+    }
+    const stateLabel: Record<string, string> = {
+      idle: 'Idle',
+      moving: 'Moving',
+      working: 'Working',
+      sleeping: 'Sleeping',
+      building: 'Building',
+    };
+    const lines = [
+      `<strong>${unit.name}</strong>`,
+      `State: ${stateLabel[unit.state] ?? unit.state}`,
+    ];
+    if (unit.mission) lines.push(`Mission: ${unit.mission}`);
+    this.unitTooltipEl.innerHTML = lines.join('<br>');
+    this.unitTooltipEl.style.display = 'block';
+    this.unitTooltipEl.style.left = `${clientX + 14}px`;
+    this.unitTooltipEl.style.top = `${clientY - 10}px`;
   }
 
   private getNeighbors(coord: Axial): Tile[] {

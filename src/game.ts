@@ -135,6 +135,9 @@ export class GameState {
         unit.pathProgress += (dt / 1000) * 2.5;
         if (unit.pathProgress >= 1) {
           unit.pathProgress = 0;
+          if (!unit.trailPositions) unit.trailPositions = [];
+          unit.trailPositions.push({ q: unit.coord.q, r: unit.coord.r });
+          if (unit.trailPositions.length > 5) unit.trailPositions.shift();
           unit.pathIndex++;
           if (unit.pathIndex >= unit.path.length - 1) {
             // Arrived

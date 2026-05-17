@@ -364,3 +364,50 @@ describe('GameState.getUnitAt', () => {
     expect(gs.getUnitAt({ q: 99, r: 99 })).toBeNull();
   });
 });
+
+// ─── Trail buffer truncation ──────────────────────────────────────────────────
+// Tests the contract for the trail push logic in updateUnits():
+//   trailPositions captures the departure hex before pathIndex advances,
+//   and is capped at 5 entries (oldest dropped when full).
+describe('Unit trail buffer', () => {
+  function pushTrail(
+    trailPositions: { q: number; r: number }[] | undefined,
+    coord: { q: number; r: number },
+  ): { q: number; r: number }[] {
+    const trail = trailPositions ?? [];
+    trail.push({ q: coord.q, r: coord.r });
+    if (trail.length > 5) trail.shift();
+    return trail;
+  }
+
+  it('starts empty and grows on first push', () => {
+    const trail = pushTrail(undefined, { q: 1, r: 0 });
+    expect(trail).toHaveLength(1);
+    expect(trail[0]).toEqual({ q: 1, r: 0 });
+  });
+
+  it('records departure coords in order (oldest first)', () => {
+    let trail: { q: number; r: number }[] | undefined;
+    trail = pushTrail(trail, { q: 0, r: 0 });
+    trail = pushTrail(trail, { q: 1, r: 0 });
+    trail = pushTrail(trail, { q: 2, r: 0 });
+    expect(trail[0]).toEqual({ q: 0, r: 0 });
+    expect(trail[2]).toEqual({ q: 2, r: 0 });
+  });
+
+  it('caps at 5 entries when more than 5 positions are pushed', () => {
+    let trail: { q: number; r: number }[] | undefined;
+    for (let i = 0; i < 7; i++) trail = pushTrail(trail, { q: i, r: 0 });
+    expect(trail).toHaveLength(5);
+    expect(trail![0]).toEqual({ q: 2, r: 0 }); // oldest 2 dropped
+    expect(trail![4]).toEqual({ q: 6, r: 0 }); // most recent
+  });
+
+  it('evicts the oldest entry (index 0) when full', () => {
+    let trail: { q: number; r: number }[] | undefined;
+    for (let i = 0; i < 5; i++) trail = pushTrail(trail, { q: i, r: 0 });
+    trail = pushTrail(trail, { q: 99, r: 0 });
+    expect(trail![0]).toEqual({ q: 1, r: 0 }); // { q:0, r:0 } was evicted
+    expect(trail![4]).toEqual({ q: 99, r: 0 });
+  });
+});

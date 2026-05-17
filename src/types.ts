@@ -104,6 +104,7 @@ export interface Unit {
   isResting: boolean; // true when in a rest area
   restingRoomId?: string; // which rest area room they're recovering in
   effectiveSpeed: number; // speed after fatigue penalty (computed)
+  trailPositions?: { q: number; r: number }[]; // last 5 hex positions (index 0=oldest, 4=most recent)
 }
 
 export const UNIT_COLORS: Record<string, string> = {
