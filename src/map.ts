@@ -71,6 +71,23 @@ const TERRAIN_WEIGHTS: Record<Terrain, number> = {
   hills: 1,
 };
 
+export function inferTerrain(extensions: Record<string, number>): Terrain {
+  let best: Terrain = 'plains';
+  let bestScore = 0;
+  let totalCounted = 0;
+  for (const [ext, count] of Object.entries(extensions)) {
+    const t = EXTENSION_WEIGHT[ext];
+    if (!t) continue;
+    totalCounted += count;
+    const score = count * TERRAIN_WEIGHTS[t];
+    if (score > bestScore) {
+      bestScore = score;
+      best = t;
+    }
+  }
+  if (totalCounted === 0) return 'desert';
+  return best;
+}
 
 // ─── Terrain colors (Canvas fill) ──────────────────────────────────────────
 export const TERRAIN_COLOR: Record<

@@ -374,9 +374,15 @@ export class BridgeEvents {
 // ─── Web Audio sound effects ─────────────────────────────────────────────────
 type SoundType = 'move' | 'complete' | 'mission';
 
+let _audioCtx: AudioContext | null = null;
+function getAudioContext(): AudioContext {
+  if (!_audioCtx) _audioCtx = new AudioContext();
+  return _audioCtx;
+}
+
 function playSound(type: SoundType) {
   try {
-    const ctx = new AudioContext();
+    const ctx = getAudioContext();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);

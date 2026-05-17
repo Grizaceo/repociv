@@ -50,14 +50,5 @@ def send_to_repociv(event: dict[str, Any]) -> None:
         except Exception:
             pass
     _fanout_sse(event)
-    try:
-        data = json.dumps(event).encode()
-        req = urllib.request.Request(
-            f"http://localhost:{REPOCIV_PORT}/event", data=data,
-            headers={"Content-Type": "application/json"}, method="POST",
-        )
-        urllib.request.urlopen(req, timeout=2)
-    except Exception:
-        pass
 
 

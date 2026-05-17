@@ -21,7 +21,7 @@ from .command_schema import Command, CommandStatus
 from . import event_store as _es
 
 # ─── Queue persistence (Fase 4) ──────────────────────────────────────────────
-_CONFIG_DIR = Path(os.environ.get("REPOCIV_CONFIG_DIR", "~/.repociv"))
+_CONFIG_DIR = Path(os.path.expanduser(os.environ.get("REPOCIV_CONFIG_DIR", "~/.repociv")))
 _CONFIG_DIR.mkdir(exist_ok=True, parents=True)
 _QUEUE_FILE = _CONFIG_DIR / "scheduler-queue.json"
 _queue_file_lock = threading.Lock()

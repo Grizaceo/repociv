@@ -281,7 +281,8 @@ export class Renderer {
       switch (this.gestureMode) {
         case 'unit_drag': {
           const unit = this.draggedUnit;
-          if (unit && this.wasDrag(e)) {
+          const dragged = unit ? this.wasDrag(e) : false;
+          if (unit && dragged) {
             // Dragged to a tile → interpret as spatial directive
             const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
             const toTile = this.state.world.tiles.get(tileKey(coord));
