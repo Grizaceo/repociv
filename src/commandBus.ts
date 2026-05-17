@@ -6,7 +6,13 @@ import type { CommandDraft, CommandResponse, CommandStatus } from './commandSche
 import { bridgeHeaders, bridgeUrl } from './bridgeEnv.ts';
 
 // ─── In-flight command tracking ───────────────────────────────────────────────
-
+export interface CommandRecord {
+  id: string;
+  type: string;
+  target: string;
+  status: CommandStatus;
+  sentAt: number;
+}
 
 const _commands = new Map<string, CommandRecord>();
 const _listeners = new Set<(commands: CommandRecord[]) => void>();
@@ -54,6 +60,12 @@ export async function sendCommand(draft: CommandDraft): Promise<CommandResponse>
 }
 
 // ─── Update a command's status (called when bridge events arrive) ─────────────
+export function updateCommandStatus(commandId: string, status: CommandStatus) {
+  const rec = _commands.get(commandId);
+  if (!rec) return;
+  rec.status = status;
+  _notify();
+}
 
 // ─── Approve / reject a waiting_approval command ─────────────────────────────
 export async function approveCommand(commandId: string): Promise<boolean> {

@@ -16,6 +16,7 @@ let _currentHarnessId = '';
 let _currentReason = '';
 let _currentPlan: RecoveryPlan | null = null;
 let _loading = false;
+// @ts-ignore used by DOM event wiring
 
 // ─── Public API ────────────────────────────────────────────────────────────────
 export function isRecoveryPanelOpen(): boolean {

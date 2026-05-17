@@ -115,4 +115,3 @@ export function peekNextMission(
 }
 
 // ─── Priority panel state ────────────────────────────────────────────────────
-let _panelOpen = false;

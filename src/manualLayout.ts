@@ -19,6 +19,11 @@ function canUseLocalStorage(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 }
 
+export function saveManualLayout(store: ManualLayoutStore): void {
+  if (!canUseLocalStorage()) return;
+  window.localStorage.setItem(MANUAL_LAYOUT_STORAGE_KEY, JSON.stringify(store));
+}
+
 export function loadManualLayout(): ManualLayoutStore {
   if (!canUseLocalStorage()) return { version: 1, entries: [] };
   try {

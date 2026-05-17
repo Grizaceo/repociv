@@ -14,6 +14,15 @@ export interface Suggestion {
 
 
 
+export interface Template {
+  gesture: string;
+  agentId: string;
+  cmdType: string;
+  target?: string;
+  successRate: number;
+  count: number;
+}
+
 export interface ReplayEntry {
   command_id: string;
   gesture: string;

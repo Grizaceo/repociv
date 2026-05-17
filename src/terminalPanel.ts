@@ -1,16 +1,33 @@
 // ─── RepoCiv — Terminal HUD overlay (xterm.js) ────────────────────────────────
 // xterm is loaded lazily (dynamic import) to keep the main bundle small.
 
-const OVERLAY_ID = 'terminal-overlay';
-
-
 // ── Singleton ────────────────────────────────────────────────────────────────
 class XTermPanel {
-  // xterm.js terminal overlay — loaded lazily
+  private _isOpen = false;
+
   async open(): Promise<void> {
-    // dynamic import of xterm happens here
+    this._isOpen = true;
   }
-  async close(): Promise<void> {}
+
+  async close(): Promise<void> {
+    this._isOpen = false;
+  }
+
+  write(_text: string): void {
+  }
+
+  isVisible(): boolean {
+    return this._isOpen;
+  }
+
+  hide(): void {
+    this._isOpen = false;
+  }
+
+  toggle(): void {
+    if (this._isOpen) this.close();
+    else void this.open();
+  }
 }
 
 export const terminalPanel = new XTermPanel();

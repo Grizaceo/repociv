@@ -85,7 +85,15 @@ export function clearLocalBuffer(): void {
   if (_visible) _render();
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// ─── Public API ────────────────────────────────────────────
+export function toggleLogCollapse(): void {
+  if (!_panel) return;
+  _collapsed = !_collapsed;
+  _panel.classList.toggle('collapsed', _collapsed);
+  const toggleBtn = _panel.querySelector<HTMLButtonElement>('.log-toggle');
+  if (toggleBtn) toggleBtn.textContent = _collapsed ? '▸' : '▾';
+}
+
 export function openLogPanel(): void {
   _visible = true;
   showPanel(_getOrCreate());

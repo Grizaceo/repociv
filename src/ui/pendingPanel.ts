@@ -8,10 +8,17 @@ import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell
 
 const POLL_MS = 5_000;
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────
+export interface PendingItem {
+  id: string;
+  title: string;
+  priority: string;
+  state: string;
+  stateText: string;
+  detail: string;
+}
 
-
-// ─── State ─────────────────────────────────────────────────────────────────────
+// ─── State ──────────────────
 let _panel: HTMLElement | null = null;
 let _timer = 0;
 let _visible = false;

@@ -54,7 +54,7 @@ import { sendCommand } from './commandBus.ts';
 import { recordGesture } from './directiveLearner.ts';
 import { tileKey } from './types.ts';
 import { clearChat } from './ui/chat.ts';
-import { ensureRepoOnboarding } from './ui/onboardingPanel.ts';
+import { runRepoOnboarding } from './ui/onboardingPanel.ts';
 import {
   setRendererRef,
   notifyTilePicked,
@@ -116,7 +116,7 @@ async function bootstrap() {
   }
 
   hideLoadingScreen();
-  await ensureRepoOnboarding();
+  await runRepoOnboarding();
 
   const world = await generateWorld();
   const state = new GameState(world);

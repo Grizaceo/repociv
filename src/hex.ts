@@ -7,8 +7,6 @@ export interface Axial {
   readonly r: number;
 }
 
-const AXIAL_ZERO: Axial = { q: 0, r: 0 };
-
 // ─── Direction vectors (6 neighbours in axial coords) ───────────────────────
 export const AXIAL_DIRECTIONS: readonly Axial[] = [
   { q: +1, r: 0 }, // E
@@ -55,10 +53,6 @@ interface CubeCoord {
   readonly z: number;
 }
 
-function cubeEquals(a: CubeCoord, b: CubeCoord): boolean {
-  return a.x === b.x && a.y === b.y && a.z === b.z;
-}
-
 // ─── Distance ────────────────────────────────────────────────────────────────
 // Manhattan distance in cube space / 2 = ring distance in axial space
 export function axialDistance(a: Axial, b: Axial): number {
@@ -85,16 +79,6 @@ export function axialRing(center: Axial, radius: number): Axial[] {
     for (let j = 0; j < radius; j++) {
       results.push(hex);
       hex = axialNeighbour(hex, i);
-    }
-  }
-  return results;
-}
-
-function axialRange(center: Axial, radius: number): Axial[] {
-  const results: Axial[] = [];
-  for (let q = -radius; q <= radius; q++) {
-    for (let r = Math.max(-radius, -q - radius); r <= Math.min(radius, -q + radius); r++) {
-      results.push(axialAdd(center, { q, r }));
     }
   }
   return results;
@@ -131,14 +115,6 @@ function pixelToAxial(px: number, py: number, size: number): Axial {
 }
 
 // ─── Pixel ↔ Axial with camera offset ──────────────────────────────────────
-function axialToWorld(a: Axial, size: number, cam: Camera): { x: number; y: number } {
-  const { x, y } = axialToPixel(a, size);
-  return {
-    x: (x - cam.x) * cam.zoom + cam.cx,
-    y: (y - cam.y) * cam.zoom + cam.cy,
-  };
-}
-
 export function worldToAxial(wx: number, wy: number, size: number, cam: Camera): Axial {
   const px = (wx - cam.cx) / cam.zoom + cam.x;
   const py = (wy - cam.cy) / cam.zoom + cam.y;
@@ -176,14 +152,6 @@ export interface Camera {
   cy: number;
   zoom: number; // 1 = 100%, clamped
 }
-
-const CAMERA_DEFAULT: Camera = {
-  x: 0,
-  y: 0,
-  cx: 0,
-  cy: 0,
-  zoom: 1,
-};
 
 // ─── Spiral: place cities in outward expanding ring pattern ─────────────────
 // Uses axialRing's convention: ring k starts k steps in direction 4 (SW).

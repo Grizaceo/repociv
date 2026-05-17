@@ -6,7 +6,12 @@
 import type { LocalWorld, LocalRoom, LocalTile, LocalTileType, Workbench } from './types.ts';
 
 // ─── File tree node (mirrors bridge API shape) ────────────────────────────────
-
+export interface FileNode {
+  name: string;
+  path: string;
+  type: 'file' | 'dir';
+  children?: FileNode[];
+}
 
 // ─── Grid constants ────────────────────────────────────────────────────────────
 const WALL_THICKNESS = 1;

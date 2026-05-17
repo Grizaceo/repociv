@@ -61,6 +61,14 @@ export function hideLocalWorkbenchTooltip() {
   _wbTooltipEl?.classList.add('hidden');
 }
 
+export function hideLocalContextMenu() {
+  _menuEl?.classList.add('hidden');
+}
+
+export function hideLocalMissionPreview() {
+  _previewEl?.classList.add('hidden');
+}
+
 // ─── Context menu (Gizmo) ─────────────────────────────────────────────────────
 export type LocalMenuAction = string; // 'DAVI' | 'WORKER' | 'git' | 'code' | 'info'
 

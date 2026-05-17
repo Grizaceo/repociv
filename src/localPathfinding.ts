@@ -165,8 +165,8 @@ function findNearestTile(
     const key = `${cur.x},${cur.y}`;
     if (visited.has(key)) continue;
     visited.add(key);
-    if (cur.y >= 0 && cur.y < world.grid.length && cur.x >= 0 && cur.x < world.grid[0].length) {
-      const tile = world.grid[cur.y][cur.x];
+    if (cur.y >= 0 && cur.y < world.grid.length && cur.x >= 0 && cur.x < world.grid[0]!.length) {
+      const tile = world.grid[cur.y]![cur.x]!;
       if (predicate(tile)) {
         return { x: cur.x, y: cur.y, distance: cur.dist };
       }
@@ -174,6 +174,7 @@ function findNearestTile(
     // neighbors
     const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
     for (const [dx, dy] of dirs) {
+      if (dx === undefined || dy === undefined) continue;
       queue.push({ x: cur.x + dx, y: cur.y + dy, dist: cur.dist + 1 });
     }
   }

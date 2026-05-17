@@ -5,6 +5,7 @@
 
 import type { GameState } from '../game.ts';
 
+export type LedgerFilter = 'all' | 'active' | 'idle' | string;
 
 const TERRAIN_LABEL: Record<string, string> = {
   plains: '🌾 TS',
