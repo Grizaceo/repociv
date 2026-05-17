@@ -198,6 +198,7 @@ export class BridgeEvents {
           evt.civ,
           { q: evt.hex[0], r: evt.hex[1] },
           evt.mission,
+          evt.cityId,
         );
         logEvent(`Unidad ${unit.name} apareció en el mapa`, 'success');
         break;
@@ -214,6 +215,10 @@ export class BridgeEvents {
         this.state.setUnitState(evt.unit, evt.state);
         if (evt.state === 'working') setOperationTicker(true, `${evt.unit} trabajando…`);
         else if (evt.state === 'idle') setOperationTicker(false);
+        break;
+      case 'unit_work':
+        if (evt.cityId) this.state.setUnitCity(evt.unit, evt.cityId);
+        this.state.setUnitWorkProgress(evt.unit, evt.progress);
         break;
       case 'building_start':
         this.state.startBuilding(

@@ -850,6 +850,7 @@ export class Renderer {
       `State: ${stateLabel[unit.state] ?? unit.state}`,
     ];
     if (unit.mission) lines.push(`Mission: ${unit.mission}`);
+    if (unit.cityId) lines.push(`Repo: ${unit.cityId}`);
     this.unitTooltipEl.innerHTML = lines.join('<br>');
     this.unitTooltipEl.style.display = 'block';
     this.unitTooltipEl.style.left = `${clientX + 14}px`;

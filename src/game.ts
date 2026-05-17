@@ -289,6 +289,7 @@ export class GameState {
     civ: string,
     coord: Axial,
     mission?: string,
+    cityId?: string,
   ): Unit {
     const existing = this.unitMap.get(id);
     if (existing) return existing;
@@ -305,6 +306,7 @@ export class GameState {
       pathProgress: 0,
       state: 'idle',
       mission,
+      cityId,
       speed: type === 'scout' ? 2 : 1,
       color,
       movesLeft: 4,
@@ -489,5 +491,23 @@ export class GameState {
   // ─── Tick count for animations ─────────────────────────────────────────────
   get tick(): number {
     return this.tickCount;
+  }
+
+  // ─── Set unit's working city ───────────────────────────────────────────────
+  setUnitCity(unitId: string, cityId: string) {
+    const unit = this.unitMap.get(unitId);
+    if (unit) {
+      unit.cityId = cityId;
+      this.notify();
+    }
+  }
+
+  // ─── Set unit's work progress ────────────────────────────────────────────────
+  setUnitWorkProgress(unitId: string, progress: number) {
+    const unit = this.unitMap.get(unitId);
+    if (unit) {
+      unit.workProgress = progress;
+      this.notify();
+    }
   }
 }

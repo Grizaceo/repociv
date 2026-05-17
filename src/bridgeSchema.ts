@@ -21,6 +21,7 @@ const Schemas = [
     hex: Hex,
     mission: v.optional(v.string()),
     unitType: v.optional(UnitType),
+    cityId: v.optional(v.string()),
   }),
   v.object({
     type: v.literal('unit_move'),
@@ -35,6 +36,7 @@ const Schemas = [
     hex: Hex,
     progress: v.number(),
     mission: v.optional(v.string()),
+    cityId: v.optional(v.string()),
   }),
   v.object({
     type: v.literal('unit_despawn'),

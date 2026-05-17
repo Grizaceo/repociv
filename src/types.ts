@@ -93,6 +93,7 @@ export interface Unit {
   pathProgress: number; // 0–1 tween between path[pathIndex] and path[pathIndex+1]
   state: UnitState;
   mission?: string;
+  cityId?: string; // which city/repo this unit is working at
   workProgress?: number; // 0–100 when working
   speed: number; // hexes per second
   color: string;

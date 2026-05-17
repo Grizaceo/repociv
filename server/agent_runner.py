@@ -175,6 +175,7 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
     send_to_repociv({"type": "mission_start", "missionId": mission_id, "unit": unit_id, "questName": quest_name})
     send_to_repociv({"type": "building_start", "city": city_id, "building": quest_name,
                      "durationSeconds": 120, "missionId": mission_id})
+    send_to_repociv({"type": "unit_work", "unit": unit_id, "cityId": city_id, "progress": 0})
     send_to_repociv({"type": "unit_state", "unit": unit_id, "state": "working"})
 
     success, output = _execute_streaming(unit_id, mission_id, mission, working_dir, city_id,
@@ -507,6 +508,12 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
     HERMES_MODEL = model or os.environ.get("HERMES_MODEL", "hermes-agent")
 
     cfg = config if config is not None else _get_agent_config(unit_id)
+    # Build session_id matching _run_openclaw_streaming logic for consistency
+    if cfg.get("stateful", True):
+        session_id = f"repociv-{unit_id.lower()}"
+    else:
+        session_id = f"repociv-{unit_id.lower()}-{mission_id}"
+
     spatial = _spatial_context_block(city_id, working_dir)
     system_content = cfg.get("system", "Eres un agente útil.") + spatial
     payload: dict[str, Any] = {
@@ -526,7 +533,11 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
         data = json.dumps(payload).encode()
         req = urllib.request.Request(
             HERMES_URL, data=data,
-            headers={"Content-Type": "application/json", "Authorization": f"Bearer {HERMES_KEY}"},
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {HERMES_KEY}",
+                "X-Hermes-Session-Id": session_id,
+            },
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=120) as resp:
