@@ -13,6 +13,8 @@ interface ChatMessage {
   timestamp: string;
 }
 const chatHistory = new Map<string, ChatMessage[]>();
+// Buffer for in-progress agent streaming text per unit
+const chatBuffers = new Map<string, string>();
 // Reference to the currently streaming agent bubble per unit
 const currentAgentBubble = new Map<string, HTMLElement>();
 // Index of the current agent message in history (for updating)
