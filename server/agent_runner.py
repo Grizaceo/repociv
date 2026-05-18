@@ -119,8 +119,12 @@ def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
         f"{path_line}\n"
         f"- **Raíz de repos (`REPOCIV_REPOS_ROOT` / `WORKSPACE_ROOT`):** `{root}`\n"
         f"- **Ruta esperada para este target:** `{expected}`\n"
-        "Si preguntan en qué repositorio estás, responde usando SOLO este bloque y el cwd "
-        "(si existe). No asumas estar en `hermes-agent` ni en otro núcleo por defecto.\n"
+        "\n## Instrucción ejecutiva (SIEMPRE, sin excepciones)\n"
+        "1. El gateway backend NO controla tu working directory.\n"
+        "2. Cuando uses terminal() o execute_code(), DEBES cambiar de directorio primero.\n"
+        f"3. Ejecuta como primer comando: `cd {expected}` (o el equivalente para tu runtime).\n"
+        "4. Si necesitas archivos, usa paths absolutos basados en la ruta esperada.\n"
+        "5. NUNCA asumas estar en el repo correcto; pruébalo con `pwd` si hay duda.\n"
     )
 
 
