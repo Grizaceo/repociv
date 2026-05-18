@@ -148,6 +148,7 @@ export type BridgeEvent =
       hex: [number, number];
       mission?: string;
       unitType?: UnitType;
+      cityId?: string;
     }
   | {
       type: 'unit_move';
@@ -156,7 +157,7 @@ export type BridgeEvent =
       to: [number, number];
       mission?: string;
     }
-  | { type: 'unit_work'; unit: string; hex: [number, number]; progress: number; mission?: string }
+  | { type: 'unit_work'; unit: string; hex: [number, number]; progress: number; mission?: string; cityId?: string }
   | { type: 'unit_despawn'; unit: string; mission?: string }
   | { type: 'unit_state'; unit: string; state: UnitState }
   | {

@@ -61,10 +61,14 @@ export function closeConstructionPanel(): void {
 export function openConstructionPanel(): void {
   _rendererRef?.setCityRelocateMode(false);
   isOpen = true;
-  const panel = getPanel();
-  if (!panel) return;
-  panel.classList.remove('hidden');
+  let panel = getPanel();
+  if (!panel) {
+    buildDOM();
+    panel = getPanel();
+  }
+  panel?.classList.remove('hidden');
   refreshCityList();
+  refreshRepoSelect();
 }
 
 export function toggleConstructionPanel(): void {
@@ -167,10 +171,7 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function refreshRepoSelect(): void {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  void refreshRepoSelect;
   const select = document.getElementById('construction-repo-select') as HTMLSelectElement;
   if (!select) return;
 
@@ -195,7 +196,6 @@ function refreshRepoSelect(): void {
     unplaced.map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildDOM(): void {
   const app = document.getElementById('app');
   if (!app) return;
