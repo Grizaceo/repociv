@@ -172,10 +172,17 @@ function findNearestTile(
       }
     }
     // neighbors
+    const W = world.grid[0]?.length ?? 0;
+    const H = world.grid.length;
     const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
     for (const [dx, dy] of dirs) {
       if (dx === undefined || dy === undefined) continue;
-      queue.push({ x: cur.x + dx, y: cur.y + dy, dist: cur.dist + 1 });
+      const nx = cur.x + dx;
+      const ny = cur.y + dy;
+      // Bounds check antes del push — sin esto, la BFS expande hacia
+      // coordenadas infinitas cuando el predicado nunca se cumple.
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+      queue.push({ x: nx, y: ny, dist: cur.dist + 1 });
     }
   }
   return null;
