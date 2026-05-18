@@ -111,20 +111,26 @@ def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
     else:
         path_line = (
             f"- **Ruta de trabajo:** NO resuelta: no existe `{expected}`. "
-            "Alinea el nombre de la carpeta con `city_id` o crea el clone ahí."
+            "Alinea el nombre de la carpeta con `city_id` o crea el clone ahi."
         )
     return (
         "\n\n## Contexto espacial RepoCiv (fuente de verdad)\n"
         f"- **Ciudad / target (`city_id`):** `{city_id}`\n"
         f"{path_line}\n"
-        f"- **Raíz de repos (`REPOCIV_REPOS_ROOT` / `WORKSPACE_ROOT`):** `{root}`\n"
+        f"- **Raiz de repos (`REPOCIV_REPOS_ROOT` / `WORKSPACE_ROOT`):** `{root}`\n"
         f"- **Ruta esperada para este target:** `{expected}`\n"
-        "\n## Instrucción ejecutiva (SIEMPRE, sin excepciones)\n"
-        "1. El gateway backend NO controla tu working directory.\n"
-        "2. Cuando uses terminal() o execute_code(), DEBES cambiar de directorio primero.\n"
-        f"3. Ejecuta como primer comando: `cd {expected}` (o el equivalente para tu runtime).\n"
-        "4. Si necesitas archivos, usa paths absolutos basados en la ruta esperada.\n"
-        "5. NUNCA asumas estar en el repo correcto; pruébalo con `pwd` si hay duda.\n"
+        "\n## REGLA DE ORO — APLICABLE A TODA ESTA MISION\n"
+        f"Tu directorio de trabajo es y SERA siempre: `{expected}`\n"
+        "El gateway NO controla tu CWD automaticamente. Cada tool call es independiente.\n"
+        "Por tanto, DEBES respetar ESTRICTAMENTE estas reglas en CADA tool call:\n"
+        f"1. NUNCA ejecutes `terminal()` sin antes hacer `cd {expected}`.\n"
+        "2. NUNCA ejecutes `execute_code()` sin cambiar al directorio correcto primero.\n"
+        f"3. Usa SIEMPRE esta forma: `cd {expected} && <tu comando>`.\n"
+        f"4. Usa SIEMPPE esta forma para Python: `cd {expected} && python ...`.\n"
+        "5. Si te piden 'revisa el repo', usa `ls -la` o equivalente DESPUES del cd.\n"
+        "6. Si no estas seguro de donde estas, ejecuta `pwd` ANTES de cualquier otra cosa.\n"
+        f"7. NUNCA asumas que estas en `{expected}`. Pruebalo con `pwd`.\n"
+        "Incumplir esta regla significa que trabajaras en el repo equivocado.\n"
     )
 
 
