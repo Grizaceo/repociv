@@ -422,14 +422,36 @@
   color: var(--ui-dark);
   border: 1px solid var(--ui-border);
   padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-family: var(--font-ui);
-  cursor: pointer;
-  z-index: 101;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  transition: opacity 0.2s;
 }
+
+/* Chat Agent Selector */
+#chat-agent-selector-row {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--panel-border);
+  background: rgba(200, 168, 75, 0.03);
+}
+
+#chat-agent-selector {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 12px;
+  background: var(--ui-dark);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  font-family: var(--font-ui);
+}
+
+#chat-agent-selector option {
+  background: var(--ui-dark);
+  color: var(--ui-text);
+}
+
+#chat-agent-selector option.new-message {
+  color: var(--ui-gold-bright);
+  font-weight: 600;
+}
+
 .chat-scroll-btn:hover {
   opacity: 0.85;
 }

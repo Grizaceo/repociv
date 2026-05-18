@@ -116,6 +116,81 @@ function attachCopyListeners(root: HTMLElement, unitId: string) {
   }
 }
 
+// ─── Agent Selector for Multi-Agent Chat ───────────────────────────────────
+// Track which agents have unread messages for notification badges
+const agentsWithNewMessages = new Set<string>();
+
+/** Initialize the agent selector dropdown in the chat panel */
+function initAgentSelector(activeUnitId: string) {
+  const selector = document.getElementById('chat-agent-selector') as HTMLSelectElement | null;
+  if (!selector) return;
+
+  // Rebuild options from all units with chat history
+  selector.innerHTML = '';
+  const units = Array.from(chatHistory.keys()).sort();
+  for (const unitId of units) {
+    const opt = document.createElement('option');
+    opt.value = unitId;
+    opt.textContent = unitId.toUpperCase();
+    if (agentsWithNewMessages.has(unitId)) {
+      opt.classList.add('new-message');
+    }
+    selector.appendChild(opt);
+  }
+
+  // Add any units that might have been created but not have history yet
+  // (they'll get added on first message)
+
+  selector.value = activeUnitId;
+
+  // Wire change handler (idempotent)
+  if (!selector.dataset['wired']) {
+    selector.addEventListener('change', () => {
+      const selectedUnitId = selector.value;
+      if (selectedUnitId && selectedUnitId !== activeChatUnit) {
+        activeChatUnit = selectedUnitId;
+        agentsWithNewMessages.delete(selectedUnitId);
+        selector.querySelector(`option[value="${selectedUnitId}"]`)?.classList.remove('new-message');
+        renderChatHistory(selectedUnitId);
+        clearChat(selectedUnitId); // Clear buffer for the newly selected chat
+      }
+    });
+    selector.dataset['wired'] = '1';
+  }
+}
+
+/** Render the chat history for a specific unit */
+function renderChatHistory(unitId: string) {
+  const container = document.getElementById('chat-messages');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const history = chatHistory.get(unitId) ?? [];
+  for (const msg of history) {
+    const msgEl = document.createElement('div');
+    msgEl.className = `chat-msg ${msg.role}`;
+    msgEl.dataset['raw'] = msg.text;
+    msgEl.innerHTML = `<div class="chat-msg-head">
+      <div class="chat-msg-meta">
+        <span>${msg.role === 'user' ? 'TÚ' : unitId.toUpperCase()} · ${msg.timestamp}</span>
+        <button class="chat-copy-btn" title="Copiar mensaje" aria-label="Copiar mensaje al portapapeles">${COPY_SVG}</button>
+      </div>
+    </div>
+    <div class="chat-body">${escapeHtml(msg.text)}</div>`;
+    container.appendChild(msgEl);
+  }
+}
+
+/** Mark an agent as having new messages (for notification badge) */
+export function markAgentHasNewMessages(unitId: string) {
+  agentsWithNewMessages.add(unitId);
+  const selector = document.getElementById('chat-agent-selector') as HTMLSelectElement | null;
+  if (selector) {
+    const opt = selector.querySelector(`option[value="${unitId}"]`);
+    if (opt) opt.classList.add('new-message');
+  }
+}
+
 // ─── Panel lifecycle ─────────────────────────────────────────────────────────
 
 // 3-layer state: harness / provider / model
@@ -175,6 +250,11 @@ export function openSidePanel(unit: Unit) {
   // Provider + Model selectors
   initProviderSelectors(unit);
 
+  // Initialize agent selector for chat tabs
+  initAgentSelector(unit.id);
+
+  // Render chat history for the active unit
+  renderChatHistory(unit.id);
   renderChatBuffer(unit.id);
 
   // Initialize scroll-to-bottom button for chat-messages
@@ -566,6 +646,32 @@ export function appendChatChunk(unitId: string, text: string) {
   const prev = chatBuffers.get(unitId) ?? '';
   const newText = prev + text;
   chatBuffers.set(unitId, newText);
+
+  // If this agent is not the active one, mark it as having new messages
+  // and update history so the full text is available when switching back
+  if (activeChatUnit !== unitId) {
+    markAgentHasNewMessages(unitId);
+    // Ensure the agent is in the selector
+    const selector = document.getElementById('chat-agent-selector') as HTMLSelectElement | null;
+    if (selector && !selector.querySelector(`option[value="${unitId}"]`)) {
+      const opt = document.createElement('option');
+      opt.value = unitId;
+      opt.textContent = unitId.toUpperCase();
+      opt.classList.add('new-message');
+      selector.appendChild(opt);
+    }
+    // Accumulate into history even if not active (so it's available on switch)
+    const history = chatHistory.get(unitId) ?? [];
+    const idx = currentAgentMessageIndex.get(unitId);
+    if (idx !== undefined && idx >= 0 && idx < history.length) {
+      const msg = history[idx];
+      if (msg) {
+        history[idx] = { role: msg.role, text: newText, timestamp: msg.timestamp };
+        chatHistory.set(unitId, history);
+      }
+    }
+  }
+
   if (activeChatUnit === unitId) {
     ensureLiveAgentBubble(unitId);
     // Update history
@@ -603,7 +709,32 @@ export function appendChatChunk(unitId: string, text: string) {
 
 export function appendUserMessage(unitId: string, text: string) {
   const container = document.getElementById('chat-messages');
-  if (!container || activeChatUnit !== unitId) return;
+  if (!container) return;
+
+  // If this agent is not the active one, mark it as having new messages
+  if (activeChatUnit !== unitId) {
+    markAgentHasNewMessages(unitId);
+    // Ensure the agent is in the selector
+    const selector = document.getElementById('chat-agent-selector') as HTMLSelectElement | null;
+    if (selector && !selector.querySelector(`option[value="${unitId}"]`)) {
+      const opt = document.createElement('option');
+      opt.value = unitId;
+      opt.textContent = unitId.toUpperCase();
+      opt.classList.add('new-message');
+      selector.appendChild(opt);
+    }
+    // Still add to history even if not active
+    const userTime = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+    const history = chatHistory.get(unitId) ?? [];
+    history.push({ role: 'user', text, timestamp: userTime });
+    chatHistory.set(unitId, history);
+    // Create agent bubble placeholder in history
+    const agentTime = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+    history.push({ role: 'agent', text: '', timestamp: agentTime });
+    currentAgentMessageIndex.set(unitId, history.length - 1);
+    chatHistory.set(unitId, history);
+    return;
+  }
 
   // Finalize previous agent bubble (turn it into history)
   const prevBubble = currentAgentBubble.get(unitId);
@@ -710,8 +841,8 @@ function renderChatBuffer(unitId: string) {
 }
 
 export function clearChat(unitId: string) {
+  // Only clear buffer and active bubble, NOT the history
   chatBuffers.delete(unitId);
-  chatHistory.delete(unitId);
   currentAgentBubble.delete(unitId);
   currentAgentMessageIndex.delete(unitId);
   if (activeChatUnit === unitId) {
