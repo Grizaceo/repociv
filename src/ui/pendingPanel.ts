@@ -1,76 +1,74 @@
 // ─── RepoCiv — Pending Tracker Panel (Fase F) ─────────────────────────────────
 // Side panel listing all active items from PENDING_TRACKER.md.
-// Shows: [ID] Title — State emoji — Priority, grouped by priority.
-// Click expands detail. Inline edit form. State changer. Delete button.
-// "✓ Resolver" moves to HECHO. Polls every 5s while open.
+// State + types: src/ui/pendingPanel/state.ts
+// HTML templates: src/ui/pendingPanel/templates.ts
+// Aqui: API calls (CRUD vs bridge), render orchestration, lifecycle.
 import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
+import {
+  type PendingItem,
+  POLL_MS,
+  STATE_OPTIONS,
+  getPanel,
+  setPanel,
+  getTimer,
+  setTimer,
+  getVisible,
+  setVisible,
+  getItems,
+  setItems,
+  getOffline,
+  setOffline,
+  getExpandedId,
+  setExpandedId,
+  getEditingId,
+  setEditingId,
+} from './pendingPanel/state.ts';
+import { renderItem, renderForm, escapeHtml } from './pendingPanel/templates.ts';
 
-const POLL_MS = 5_000;
-
-// ─── Types ────────────────────────────────────────────────────
-export interface PendingItem {
-  id: string;
-  title: string;
-  priority: string;
-  state: string;
-  stateText: string;
-  detail: string;
-}
-
-// ─── State ──────────────────
-let _panel: HTMLElement | null = null;
-let _timer = 0;
-let _visible = false;
-let _items: PendingItem[] = [];
-let _offline = false;
-let _expandedId: string | null = null;
-let _editingId: string | null = null;
-
-const STATE_OPTIONS = [
-  { value: '🔵', label: '🔵 registrada' },
-  { value: '🟡', label: '🟡 en progreso' },
-  { value: '🟢', label: '🟢 operativo' },
-  { value: '🔴', label: '🔴 descartada' },
-];
+export type { PendingItem } from './pendingPanel/state.ts';
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 export function openPendingPanel(): void {
-  _visible = true;
+  setVisible(true);
   showPanel(_getOrCreate());
   void _fetch();
   _startPolling();
 }
 
 export function closePendingPanel(): void {
-  _visible = false;
+  setVisible(false);
   _stopPolling();
-  _expandedId = null;
-  _editingId = null;
-  if (_panel) hidePanel(_panel);
+  setExpandedId(null);
+  setEditingId(null);
+  const panel = getPanel();
+  if (panel) hidePanel(panel);
 }
 
 export function isPendingPanelOpen(): boolean {
-  return _visible;
+  return getVisible();
 }
 
 export function togglePendingPanel(): void {
-  if (_visible) closePendingPanel();
+  if (getVisible()) closePendingPanel();
   else openPendingPanel();
 }
 
 // ─── Polling ──────────────────────────────────────────────────────────────────
 function _startPolling(): void {
   _stopPolling();
-  _timer = window.setInterval(() => {
-    void _fetch();
-  }, POLL_MS);
+  setTimer(
+    window.setInterval(() => {
+      void _fetch();
+    }, POLL_MS),
+  );
 }
 
 function _stopPolling(): void {
-  if (_timer) {
-    clearInterval(_timer);
-    _timer = 0;
+  const t = getTimer();
+  if (t) {
+    clearInterval(t);
+    setTimer(0);
   }
 }
 
@@ -79,16 +77,16 @@ async function _fetch(): Promise<void> {
   try {
     const res = await fetch(bridgeUrl('/pending'), { headers: bridgeHeaders() });
     if (!res.ok) {
-      _offline = true;
-      if (_visible) _render();
+      setOffline(true);
+      if (getVisible()) _render();
       return;
     }
-    _items = (await res.json()) as PendingItem[];
-    _offline = false;
-    if (_visible) _render();
+    setItems((await res.json()) as PendingItem[]);
+    setOffline(false);
+    if (getVisible()) _render();
   } catch {
-    _offline = true;
-    if (_visible) _render();
+    setOffline(true);
+    if (getVisible()) _render();
   }
 }
 
@@ -113,12 +111,12 @@ async function _resolveItem(id: string): Promise<void> {
       body: JSON.stringify({ id }),
     });
     if (res.ok) {
-      _items = _items.filter((it) => it.id !== id);
-      if (_expandedId === id) {
-        _expandedId = null;
-        _editingId = null;
+      setItems(getItems().filter((it) => it.id !== id));
+      if (getExpandedId() === id) {
+        setExpandedId(null);
+        setEditingId(null);
       }
-      if (_visible) _render();
+      if (getVisible()) _render();
     }
   } catch {
     /* will refresh on next poll */
@@ -151,12 +149,12 @@ async function _deleteItem(id: string): Promise<void> {
       body: JSON.stringify({ id }),
     });
     if (res.ok) {
-      _items = _items.filter((it) => it.id !== id);
-      if (_expandedId === id) {
-        _expandedId = null;
-        _editingId = null;
+      setItems(getItems().filter((it) => it.id !== id));
+      if (getExpandedId() === id) {
+        setExpandedId(null);
+        setEditingId(null);
       }
-      if (_visible) _render();
+      if (getVisible()) _render();
     }
   } catch {
     /* will refresh on next poll */
@@ -171,13 +169,13 @@ async function _changeState(id: string, state: string): Promise<void> {
       body: JSON.stringify({ id, state }),
     });
     if (res.ok) {
-      const item = _items.find((it) => it.id === id);
+      const item = getItems().find((it) => it.id === id);
       if (item) {
         item.state = state;
         const opt = STATE_OPTIONS.find((o) => o.value === state);
         item.stateText = opt ? opt.label : state;
       }
-      if (_visible) _render();
+      if (getVisible()) _render();
     }
   } catch {
     /* will refresh on next poll */
@@ -189,15 +187,16 @@ function _render(): void {
   const panel = _getOrCreate();
   const body = panel.querySelector<HTMLElement>('.pending-body')!;
 
-  if (_offline) {
+  if (getOffline()) {
     body.innerHTML = '<div class="pending-offline">⚠ Bridge offline — reintentando...</div>';
     return;
   }
 
-  if (_items.length === 0) {
+  const items = getItems();
+  if (items.length === 0) {
     body.innerHTML = `
       <div class="pending-empty">Sin pendientes activos ✓</div>
-      ${_renderForm()}
+      ${renderForm()}
     `;
     _wireForm(body);
     return;
@@ -206,7 +205,7 @@ function _render(): void {
   // Group by priority: ALTA first, then MEDIA, then BAJA
   const order = ['ALTA', 'MEDIA', 'BAJA'];
   const groups: Record<string, PendingItem[]> = {};
-  for (const item of _items) {
+  for (const item of items) {
     const key = item.priority || 'MEDIA';
     if (!groups[key]) groups[key] = [];
     groups[key].push(item);
@@ -214,15 +213,15 @@ function _render(): void {
 
   let html = '';
   for (const pri of order) {
-    const items = groups[pri];
-    if (!items || items.length === 0) continue;
+    const list = groups[pri];
+    if (!list || list.length === 0) continue;
     html += `<div class="pending-group">
-      <div class="pending-group-header">${_esc(pri)} (${items.length})</div>
-      ${items.map((it) => _renderItem(it)).join('')}
+      <div class="pending-group-header">${escapeHtml(pri)} (${list.length})</div>
+      ${list.map((it) => renderItem(it)).join('')}
     </div>`;
   }
 
-  html += _renderForm();
+  html += renderForm();
   body.innerHTML = html;
 
   // Wire interactions
@@ -235,8 +234,8 @@ function _render(): void {
       )
         return;
       const id = row.dataset['id'] ?? '';
-      if (_editingId === id) return; // Don't collapse while editing
-      _expandedId = _expandedId === id ? null : id;
+      if (getEditingId() === id) return; // Don't collapse while editing
+      setExpandedId(getExpandedId() === id ? null : id);
       _render();
     });
   });
@@ -254,8 +253,8 @@ function _render(): void {
       e.stopPropagation();
       const id = btn.dataset['id'] ?? '';
       if (id) {
-        _editingId = _editingId === id ? null : id;
-        _expandedId = id;
+        setEditingId(getEditingId() === id ? null : id);
+        setExpandedId(id);
         _render();
       }
     });
@@ -265,7 +264,7 @@ function _render(): void {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const id = btn.dataset['id'] ?? '';
-      const item = _items.find((it) => it.id === id);
+      const item = getItems().find((it) => it.id === id);
       if (id && item && confirm(`¿Eliminar "${item.title}" del tracker?`)) {
         void _deleteItem(id);
       }
@@ -292,93 +291,12 @@ function _render(): void {
       const detail = (form.querySelector('.edit-detail') as HTMLTextAreaElement)?.value.trim();
       if (id && title) {
         void _editItem(id, title, priority, detail);
-        _editingId = null;
+        setEditingId(null);
       }
     });
   });
 
   _wireForm(body);
-}
-
-function _renderItem(item: PendingItem): string {
-  const isExpanded = _expandedId === item.id;
-  const isEditing = _editingId === item.id;
-  // Detail section
-  let detailHtml = '';
-  if (isExpanded && item.detail) {
-    detailHtml = `<div class="pending-detail">${_esc(item.detail).replace(/\n/g, '<br>')}</div>`;
-  }
-
-  // Edit form
-  let editHtml = '';
-  if (isEditing) {
-    editHtml = `
-      <div class="pending-edit">
-        <form class="pending-edit-form" data-id="${_esc(item.id)}">
-          <div class="edit-row">
-            <label class="edit-label">Título</label>
-            <input type="text" class="edit-title" value="${_esc(item.title)}" required />
-          </div>
-          <div class="edit-row">
-            <label class="edit-label">Prioridad</label>
-            <select class="edit-priority">
-              <option value="ALTA" ${item.priority === 'ALTA' ? 'selected' : ''}>ALTA</option>
-              <option value="MEDIA" ${item.priority === 'MEDIA' ? 'selected' : ''}>MEDIA</option>
-              <option value="BAJA" ${item.priority === 'BAJA' ? 'selected' : ''}>BAJA</option>
-            </select>
-          </div>
-          <div class="edit-row">
-            <label class="edit-label">Detalle</label>
-            <textarea class="edit-detail" rows="4">${_esc(item.detail)}</textarea>
-          </div>
-          <div class="edit-actions">
-            <button type="submit" class="btn-save-edit">💾 Guardar</button>
-            <button type="button" class="btn-cancel-edit" data-action="cancel-edit" data-id="${_esc(item.id)}">✕ Cancelar</button>
-          </div>
-        </form>
-      </div>
-    `;
-  }
-
-  // State selector
-  const stateOptions = STATE_OPTIONS.map(
-    (o) =>
-      `<option value="${o.value}" ${item.state === o.value ? 'selected' : ''}>${o.label}</option>`,
-  ).join('');
-
-  return `
-    <div class="pending-item ${isExpanded ? 'expanded' : ''} ${isEditing ? 'editing' : ''}" data-id="${_esc(item.id)}">
-      <div class="pending-item-row" data-id="${_esc(item.id)}">
-        <span class="pending-id">[${_esc(item.id)}]</span>
-        <span class="pending-title">${_esc(item.title)}</span>
-        <select class="pending-state-select" data-id="${_esc(item.id)}" title="Cambiar estado">
-          ${stateOptions}
-        </select>
-        <button class="btn-edit" data-id="${_esc(item.id)}" title="Editar pendiente" aria-label="Editar ${_esc(item.title)}">✎</button>
-        <button class="btn-resolve" data-id="${_esc(item.id)}" title="Marcar como resuelto (mover a HECHO)" aria-label="Resolver ${_esc(item.title)}">✓</button>
-        <button class="btn-delete" data-id="${_esc(item.id)}" title="Eliminar pendiente" aria-label="Eliminar ${_esc(item.title)}">✕</button>
-      </div>
-      ${detailHtml}
-      ${editHtml}
-    </div>
-  `;
-}
-
-function _renderForm(): string {
-  return `
-    <div class="pending-form">
-      <div class="pending-form-title">+ Agregar pendiente</div>
-      <div class="pending-form-row">
-        <input type="text" class="pending-form-input" id="pending-new-title" placeholder="Título del pendiente..." autocomplete="off" />
-        <select class="pending-form-select" id="pending-new-priority">
-          <option value="ALTA">ALTA</option>
-          <option value="MEDIA" selected>MEDIA</option>
-          <option value="BAJA">BAJA</option>
-        </select>
-        <button class="pending-form-btn" id="pending-btn-add">Agregar</button>
-      </div>
-    </div>
-  `;
 }
 
 function _wireForm(body: HTMLElement): void {
@@ -405,25 +323,17 @@ function _wireForm(body: HTMLElement): void {
   body.querySelectorAll<HTMLButtonElement>('[data-action="cancel-edit"]').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      _editingId = null;
+      setEditingId(null);
       _render();
     });
   });
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function _esc(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 // ─── DOM ──────────────────────────────────────────────────────────────────────
 function _getOrCreate(): HTMLElement {
-  if (_panel) return _panel;
-  _panel = ensurePanel(
+  const existing = getPanel();
+  if (existing) return existing;
+  const panel = ensurePanel(
     'pending-panel',
     'pending-panel hidden',
     `
@@ -434,6 +344,7 @@ function _getOrCreate(): HTMLElement {
     <div class="pending-body"></div>
     `,
   );
-  bindPanelAction(_panel, '#pending-close', closePendingPanel);
-  return _panel;
+  bindPanelAction(panel, '#pending-close', closePendingPanel);
+  setPanel(panel);
+  return panel;
 }
