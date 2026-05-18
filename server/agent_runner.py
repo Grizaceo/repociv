@@ -120,18 +120,13 @@ def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
         f"- **Raiz de repos (`REPOCIV_REPOS_ROOT` / `WORKSPACE_ROOT`):** `{root}`\n"
         f"- **Ruta esperada para este target:** `{expected}`\n"
         "\n## REGLA DE ORO — APLICABLE A TODA ESTA MISION\n"
-        f"Tu directorio de trabajo es y SERA siempre: `{expected}`\n"
+        f"Tu directorio de trabajo es y DEBE ser siempre: `{expected}`\n"
         "El gateway NO controla tu CWD automaticamente. Cada tool call es independiente.\n"
-        "Por tanto, DEBES respetar ESTRICTAMENTE estas reglas en CADA tool call:\n"
-        f"1. NUNCA ejecutes `terminal()` sin antes hacer `cd {expected}`.\n"
-        "2. NUNCA ejecutes `execute_code()` sin cambiar al directorio correcto primero.\n"
-        f"3. Usa SIEMPRE esta forma: `cd {expected} && <tu comando>`.\n"
-        f"4. Usa SIEMPPE esta forma para Python: `cd {expected} && python ...`.\n"
-        "5. Si te piden 'revisa el repo', usa `ls -la` o equivalente DESPUES del cd.\n"
-        "6. Si no estas seguro de donde estas, ejecuta `pwd` ANTES de cualquier otra cosa.\n"
-        f"7. NUNCA asumas que estas en `{expected}`. Pruebalo con `pwd`.\n"
-        "Incumplir esta regla significa que trabajaras en el repo equivocado.\n"
-    )
+        f"Para todo comando de terminal, DEBES usar el parametro `workdir='{expected}'`.\n"
+        "Esto asegura que el comando se ejecute en el repo correcto.\n\n"
+        f"Ejemplo: terminal_tool(command='ls -la', workdir='{expected}')\n"
+        "NUNCA uses terminal() sin pasar workdir. NUNCA asumas el CWD correcto.")
+
 
 
 def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
