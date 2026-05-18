@@ -14,7 +14,6 @@ Endpoints:
   GET  /missions                  — persisted missions list
   GET  /gpu                       — VRAM + temp via nvidia-smi
   GET  /pending                   — tasks from PENDING_TRACKER.md
-  GET  /techdebt                  — tech-debt scan across repos
   GET  /context                   — XCOM fatigue state
   GET  /events                    — event store replay (?since=<unix_ts>)
   GET  /approvals                 — commands waiting_approval
@@ -164,7 +163,6 @@ from server import harness_registry as _hr
 from server import recovery as _recovery
 from server import runtime_adapters as _runtime_adapters
 from server.quest import generate_quest_name
-from server.tech_debt import scan_tech_debt
 from server import agent_runner as _agent_runner
 from server import task_orchestrator as _to
 from server import rate_limiter as _rl
@@ -635,7 +633,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/missions":           _routes.get_missions,
             "/gpu":                _routes.get_gpu,
             "/pending":            _routes.get_pending,
-            "/techdebt":          _routes.get_techdebt,
             "/context":            _routes.get_context,
             "/approvals":          _routes.get_approvals,
             "/agents":             _routes.get_agents,

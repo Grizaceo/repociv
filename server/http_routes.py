@@ -143,15 +143,6 @@ def get_pending(ctx: "RouteContext") -> tuple[int, Any]:
     return 200, load_pending_tasks()
 
 
-def get_techdebt(ctx: "RouteContext") -> tuple[int, Any]:
-    import os
-    from pathlib import Path
-    from server.bridge import scan_tech_debt
-    root = os.environ.get("REPOCIV_REPOS_ROOT",
-                          str(Path(__file__).parent.parent / "workspace" / "repos"))
-    return 200, scan_tech_debt(root)
-
-
 def get_context(ctx: "RouteContext") -> tuple[int, Any]:
     from server.bridge import _fatigue_state, _rest_areas
     return 200, {"ok": True, "fatigue": _fatigue_state, "restAreas": _rest_areas}

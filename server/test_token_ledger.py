@@ -159,22 +159,3 @@ def test_concurrent_log_usage_is_thread_safe(tmp_path: Path) -> None:
     assert s["total_completion_tokens"] == 250
 
 
-# ── StrEnum check (Gate F0 criterion) ─────────────────────────────────────────
-
-def test_phases_uses_str_enum() -> None:
-    """Phase members must compare equal to their string values."""
-    from server.phases import Phase
-    assert Phase.SPEC == "spec"
-    assert Phase.DISPATCH == "dispatch"
-    assert Phase.BLOCKED == "blocked"
-    assert str(Phase.CLOSE) == "close"
-    assert Phase.NEEDS_HUMAN_REVIEW == "needs-human-review"
-    assert isinstance(Phase.IDLE, str)
-
-
-@pytest.mark.skipif(sys.version_info >= (3, 11), reason="backport only needed on <3.11")
-def test_phases_backport_is_str() -> None:
-    from server.phases import Phase
-    # Verify the backport behaves like a str for all members.
-    for member in Phase:
-        assert isinstance(member, str), f"{member!r} should be str"

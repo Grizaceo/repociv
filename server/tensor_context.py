@@ -24,7 +24,6 @@ Fase 3+ operations (once a real DC corpus exists):
 from __future__ import annotations
 
 import hashlib
-import os
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -103,12 +102,6 @@ class TensorContext:
     def __init__(self, world_model: Any | None = None) -> None:
         """Create a TensorContext, optionally wired to an active World Model."""
         self.world_model = world_model
-        if self.world_model is None and os.environ.get("REPOCIV_WORLD_MODEL_MODE", "").lower() == "active":
-            try:
-                from .world_model import ContextWorldModel  # noqa: PLC0415
-                self.world_model = ContextWorldModel.from_environment()
-            except Exception:
-                self.world_model = None
 
     # ── Fase 1 operations ────────────────────────────────────────────────────
 
