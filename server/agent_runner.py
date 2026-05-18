@@ -404,8 +404,9 @@ def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
 
     system_prompt = config.get("system", "")
     spatial = _spatial_context_block(city_id, working_dir)
+    cd_cmd = f"cd {working_dir}\n\n" if working_dir else ""
     full_prompt = (
-        f"{system_prompt}{spatial}\n\n{mission}" if system_prompt else f"{spatial}\n\n{mission}"
+        f"{system_prompt}{spatial}\n\n{cd_cmd}{mission}" if system_prompt else f"{spatial}\n\n{cd_cmd}{mission}"
     )
     cmd = [claude_bin, "--print", "--dangerously-skip-permissions"]
     # If a specific model was requested via UI, pass it to claude CLI
@@ -485,7 +486,8 @@ def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
         return False, text.strip()
 
     spatial = _spatial_context_block(city_id, working_dir)
-    full_message = f"{spatial}\n\n{mission}"
+    cd_cmd = f"cd {working_dir}\n\n" if working_dir else ""
+    full_message = f"{spatial}\n\n{cd_cmd}{mission}"
     cmd = [openclaw_bin, "agent", "--agent", config["agent"],
            "--session-id", session_id, "--message", full_message]
     # If a specific model was requested via UI, pass it to openclaw
@@ -519,16 +521,22 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
         session_id = f"repociv-{unit_id.lower()}-{mission_id}"
 
     spatial = _spatial_context_block(city_id, working_dir)
-    system_content = cfg.get("system", "Eres un agente útil.") + spatial
+    system_content = cfg.get("system", "Eres un agente util.") + spatial
+    # Inject imperative cd instruction directly in the user message
+    # (Hermes gateway ignores the working_directory field; we compensate
+    # by making the very first line of the mission a cd command.)
+    user_content: str
+    if working_dir:
+        user_content = f"cd {working_dir}\n\n{mission}"
+    else:
+        user_content = mission
     payload: dict[str, Any] = {
         "model": HERMES_MODEL,
         "messages": [
             {"role": "system", "content": system_content},
-            {"role": "user", "content": mission},
+            {"role": "user", "content": user_content},
         ],
         "stream": False,
-        # Cap max_tokens to avoid OpenRouter 402 errors caused by huge
-        # context-window estimates on low-credit keys.
         "max_tokens": 4096,
     }
     if working_dir:
@@ -544,7 +552,7 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
             },
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=900) as resp:
             result = json.loads(resp.read().decode())
         content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
         # Log real token usage from the OpenAI-compatible response when present.

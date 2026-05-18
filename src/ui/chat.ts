@@ -152,7 +152,7 @@ function initAgentSelector(activeUnitId: string) {
         agentsWithNewMessages.delete(selectedUnitId);
         selector.querySelector(`option[value="${selectedUnitId}"]`)?.classList.remove('new-message');
         renderChatHistory(selectedUnitId);
-        clearChat(selectedUnitId); // Clear buffer for the newly selected chat
+        // DON'T call clearChat here — it would wipe the DOM since activeChatUnit now matches
       }
     });
     selector.dataset['wired'] = '1';
