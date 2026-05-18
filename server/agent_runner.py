@@ -113,19 +113,14 @@ def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
             f"- **Ruta de trabajo:** NO resuelta: no existe `{expected}`. "
             "Alinea el nombre de la carpeta con `city_id` o crea el clone ahi."
         )
+    # El CWD lo fija el `cd {working_dir}` que _run_hermes_streaming inyecta como
+    # primera linea del user message. Aqui solo damos contexto, no instrucciones.
     return (
         "\n\n## Contexto espacial RepoCiv (fuente de verdad)\n"
         f"- **Ciudad / target (`city_id`):** `{city_id}`\n"
         f"{path_line}\n"
         f"- **Raiz de repos (`REPOCIV_REPOS_ROOT` / `WORKSPACE_ROOT`):** `{root}`\n"
-        f"- **Ruta esperada para este target:** `{expected}`\n"
-        "\n## REGLA DE ORO — APLICABLE A TODA ESTA MISION\n"
-        f"Tu directorio de trabajo es y DEBE ser siempre: `{expected}`\n"
-        "El gateway NO controla tu CWD automaticamente. Cada tool call es independiente.\n"
-        f"Para todo comando de terminal, DEBES usar el parametro `workdir='{expected}'`.\n"
-        "Esto asegura que el comando se ejecute en el repo correcto.\n\n"
-        f"Ejemplo: terminal_tool(command='ls -la', workdir='{expected}')\n"
-        "NUNCA uses terminal() sin pasar workdir. NUNCA asumas el CWD correcto.")
+        f"- **Ruta esperada para este target:** `{expected}`\n")
 
 
 
@@ -523,9 +518,11 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
 
     spatial = _spatial_context_block(city_id, working_dir)
     system_content = cfg.get("system", "Eres un agente util.") + spatial
-    # Inject imperative cd instruction directly in the user message
-    # (Hermes gateway ignores the working_directory field; we compensate
-    # by making the very first line of the mission a cd command.)
+    # CWD fix: el gateway de Hermes usa TERMINAL_CWD global (no per-request),
+    # asi que prefijamos la mision con `cd {working_dir}` para que cualquier
+    # tool-call subsiguiente arranque en el repo correcto. Issue de upstream:
+    # agregar working_directory per-request al gateway requiere tocar ~10500
+    # LOC en gateway/run.py + arriesgar otras plataformas (WhatsApp/QQ/WeCom).
     user_content: str
     if working_dir:
         user_content = f"cd {working_dir}\n\n{mission}"
