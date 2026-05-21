@@ -1,3 +1,11 @@
+# RepoCiv — Imperial Agent Dashboard
+
+You are inside the **RepoCiv** repository (`/home/gris/.hermes/workspace/repos/repociv`).
+This is a Civilization V-style hexagonal dashboard for Cristóbal's agents — single-user alpha.
+Stack: TypeScript + Vite (Canvas 2D) · Python HTTP bridge · DuckDB ledger.
+See `AGENTS.md` and `docs/SCOPE.md` for full context.
+
+---
 
 ## Skill routing
 
