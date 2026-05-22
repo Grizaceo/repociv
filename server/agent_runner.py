@@ -263,6 +263,17 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
             return _run_cursor_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                          model=model or provider)
         if harness == "hermes":
+            # Check profile first: agents with a profile (e.g. LEXO → lexo-alpha)
+            # need HERMES_HOME pointing at their profile dir, not the HTTP gateway
+            # which always routes to the main profile (DAVI).
+            if config.get("profile"):
+                if _has_hermes_cli():
+                    send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
+                                      "text": "[profile hermes-cli]\n"})
+                    return _run_hermes_cli_streaming(unit_id, mission_id, mission, config, working_dir,
+                                                     city_id, model=model or provider)
+                send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
+                                  "text": "[warn: perfil configurado pero hermes CLI no encontrado]\n"})
             return _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                          model=model or provider)
         # Unknown harness — fall through to cascade with a warning
