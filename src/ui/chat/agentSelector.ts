@@ -34,7 +34,14 @@ export function initAgentSelector(activeUnitId: string): void {
         agentsWithNewMessages.delete(selectedUnitId);
         selector.querySelector(`option[value="${selectedUnitId}"]`)?.classList.remove('new-message');
         renderChatHistory(selectedUnitId);
-        // DON'T call clearChat here — it would wipe the DOM since activeChatUnit now matches
+        // Update side panel header to reflect selected agent
+        const nameEl = document.getElementById('side-hero-name');
+        if (nameEl) nameEl.textContent = selectedUnitId.toUpperCase();
+        const stateEl = document.getElementById('side-hero-state');
+        if (stateEl) {
+          stateEl.textContent = 'IDLE';
+          stateEl.className = 'state-idle';
+        }
       }
     });
     selector.dataset['wired'] = '1';

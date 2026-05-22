@@ -1,5 +1,5 @@
 // ─── HUD button + input wiring (non-hotkey) ─────────────────────────────────
-import { tileKey } from '../../types.ts';
+import { tileKey, type Unit } from '../../types.ts';
 import { type Renderer } from '../../renderer.ts';
 import { type GameState } from '../../game.ts';
 import { type BridgeEvents } from '../../bridge.ts';
@@ -53,16 +53,34 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
   const chatInput = document.getElementById('chat-input') as HTMLInputElement | null;
 
   const sendMessage = (input: HTMLInputElement | null) => {
-    const unit = state.selectedUnit;
+    // 1) Resolve target unit: honor agent selector over map selection
+    const agentSelector = document.getElementById('chat-agent-selector') as HTMLSelectElement | null;
+    const selectorUnitId = agentSelector?.value;
+    const prefersSelector = selectorUnitId && selectorUnitId !== state.selectedUnit?.id;
+
+    let targetUnit: Unit | null = null;
+    if (prefersSelector) {
+      targetUnit = state.getUnit(selectorUnitId) ?? null;
+    }
+    const unit = targetUnit ?? state.selectedUnit;
     if (!unit || !input || !input.value.trim()) return;
-    const lookupCoord = unit.targetCoord ?? unit.coord;
-    const tile = state.world.tiles.get(tileKey(lookupCoord));
-    const cityHere =
-      tile?.city ??
-      state.world.cities.find((c) =>
-        c.territory.some((t) => t.q === lookupCoord.q && t.r === lookupCoord.r),
-      ) ??
-      state.world.cities[0];
+
+    // 2) Resolve city: if the target unit is on the map, use its position;
+    //    otherwise default to "main" (virtual agent not yet spawned)
+    let cityHere = state.world.cities[0];
+    if (prefersSelector && !targetUnit) {
+      // Virtual agent, not on map — use first city as default
+      cityHere = state.world.cities[0];
+    } else {
+      const lookupCoord = unit.targetCoord ?? unit.coord;
+      const tile = state.world.tiles.get(tileKey(lookupCoord));
+      cityHere =
+        tile?.city ??
+        state.world.cities.find((c) =>
+          c.territory.some((t) => t.q === lookupCoord.q && t.r === lookupCoord.r),
+        ) ??
+        state.world.cities[0];
+    }
 
     const text = input.value.trim();
     if (!isSidePanelOpen()) openSidePanel(unit);
