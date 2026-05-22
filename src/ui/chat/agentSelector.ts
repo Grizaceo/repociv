@@ -13,7 +13,10 @@ export function initAgentSelector(activeUnitId: string): void {
   if (!selector) return;
 
   selector.innerHTML = '';
-  const units = Array.from(chatHistory.keys()).sort();
+  const knownUnits = new Set(chatHistory.keys());
+  // Always include the active unit even if it has no history yet (e.g. freshly spawned CLAUDE/CODEX)
+  knownUnits.add(activeUnitId);
+  const units = Array.from(knownUnits).sort();
   for (const unitId of units) {
     const opt = document.createElement('option');
     opt.value = unitId;
