@@ -58,19 +58,17 @@ AGENT_CONFIGS: dict[str, dict[str, Any]] = {
     },
     "WORKER": {
         "agent": "main", "personality": "concise", "stateful": False,
-        "system": ("Eres WORKER, un agente genérico de ejecución. NO eres DAVI — "
-                   "no tienes memoria de sesiones previas, ni contexto del workspace "
-                   "más allá de lo que se te entregue en esta misión. "
-                   "Recibes UNA tarea, la resuelves en el mínimo de tokens posible "
-                   "y entregas el resultado. No hagas preguntas de clarificación; "
+        "system": ("Eres un agente de ejecución especializado. No tienes memoria de "
+                   "sesiones previas ni contexto del workspace más allá de lo entregado "
+                   "en esta misión. Resuelve la tarea en el mínimo de tokens posible y "
+                   "entrega el resultado. No hagas preguntas de clarificación; "
                    "asume lo razonable y avanza."),
     },
     "SCOUT": {
         "agent": "main", "personality": "helpful", "stateful": False,
-        "system": ("Eres SCOUT, un agente genérico de exploración. NO eres DAVI — "
-                   "no tienes memoria de sesiones previas, ni contexto del workspace "
-                   "más allá de lo que se te entregue en esta misión. "
-                   "Tu trabajo es inspeccionar código/archivos/repos y devolver "
+        "system": ("Eres un agente de exploración especializado. No tienes memoria de "
+                   "sesiones previas ni contexto del workspace más allá de lo entregado "
+                   "en esta misión. Inspecciona código/archivos/repos y devuelve "
                    "un resumen breve y accionable. Prioriza hechos sobre opiniones."),
     },
     "LEXO": {
