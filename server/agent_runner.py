@@ -58,21 +58,29 @@ AGENT_CONFIGS: dict[str, dict[str, Any]] = {
     },
     "WORKER": {
         "agent": "main", "personality": "concise", "stateful": False,
-        "system": ("Eres WORKER, ejecutor sin memoria previa. Recibes UNA tarea, "
-                   "la resuelves en el mínimo de tokens posible y entregas el resultado. "
-                   "No hagas preguntas de clarificación; asume lo razonable y avanza."),
+        "system": ("Eres WORKER, un agente genérico de ejecución. NO eres DAVI — "
+                   "no tienes memoria de sesiones previas, ni contexto del workspace "
+                   "más allá de lo que se te entregue en esta misión. "
+                   "Recibes UNA tarea, la resuelves en el mínimo de tokens posible "
+                   "y entregas el resultado. No hagas preguntas de clarificación; "
+                   "asume lo razonable y avanza."),
     },
     "SCOUT": {
         "agent": "main", "personality": "helpful", "stateful": False,
-        "system": ("Eres SCOUT, explorador sin memoria previa. Tu trabajo es inspeccionar "
-                   "código/archivos/repos y devolver un resumen breve y accionable. "
-                   "Prioriza hechos sobre opiniones."),
+        "system": ("Eres SCOUT, un agente genérico de exploración. NO eres DAVI — "
+                   "no tienes memoria de sesiones previas, ni contexto del workspace "
+                   "más allá de lo que se te entregue en esta misión. "
+                   "Tu trabajo es inspeccionar código/archivos/repos y devolver "
+                   "un resumen breve y accionable. Prioriza hechos sobre opiniones."),
     },
     "LEXO": {
-        "agent": "main", "personality": "analytical", "stateful": True,
-        "system": ("Eres LexO-α, agente analítico con memoria. Analiza con profundidad, "
-                   "cita el archivo y línea cuando aplique, y produce diagnóstico antes "
-                   "que solución."),
+        "agent": "lexo-alpha", "personality": "analytical", "stateful": True,
+        "profile": str(Path.home() / ".hermes" / "profiles" / "lexo-alpha"),
+        "system": ("Eres LexO-α. Tu perfil completo está en tu HERMES_HOME, "
+                   "con tu SOUL.md, skills jurídicos, pipeline de búsqueda, "
+                   "subagentes y vault. Actúa como LexO — analiza con profundidad, "
+                   "cita fuentes cuando aplique, usa tu pipeline y subagentes "
+                   "según corresponda."),
     },
     "OPENCLAW": {
         "agent": "main", "personality": "technical", "stateful": True,
@@ -268,6 +276,17 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: openclaw]\n"})
         return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
+    # Agents with a profile path (e.g. LEXO → lexo-alpha) run via hermes CLI
+    # with HERMES_HOME pointed at their profile, giving them their own config,
+    # skills, SOUL.md, memory, subagents, etc.
+    if config.get("profile"):
+        if _has_hermes_cli():
+            send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: hermes-cli]\n"})
+            return _run_hermes_cli_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
+                                             model=model or provider)
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
+                          "text": "[warn: perfil configurado pero hermes CLI no encontrado — cayendo a HTTP]\n"})
+
     send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: hermes]\n"})
     success, output = _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model or provider)
     if success:
@@ -368,6 +387,93 @@ def _find_openclaw() -> str | None:
         if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
             return candidate
     return None
+
+
+def _find_hermes_cli() -> str | None:
+    candidates = [
+        shutil.which("hermes"),
+        str(Path.home() / ".local" / "bin" / "hermes"),
+        "/usr/local/bin/hermes",
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def _has_hermes_cli() -> bool:
+    return _find_hermes_cli() is not None
+
+
+def _run_hermes_cli_streaming(
+    unit_id: str, mission_id: str, mission: str,
+    config: dict[str, Any],
+    working_dir: str | None = None,
+    city_id: str = "",
+    model: str = "",
+) -> tuple[bool, str]:
+    """Run hermes CLI as subprocess with HERMES_HOME pointing to a profile.
+
+    Used when AGENT_CONFIGS specifies a profile path (e.g. LEXO → lexo-alpha).
+    This gives the subprocess agent access to its own config, skills, SOUL.md,
+    memory, subagents, etc. — it runs as a fully independent Hermes instance.
+    """
+    hermes_bin = _find_hermes_cli()
+    if not hermes_bin:
+        text = "[hermes-cli error] binary not found in PATH or ~/.local/bin\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, text.strip()
+
+    profile_path = config.get("profile", "")
+    if not profile_path:
+        text = "[hermes-cli error] no profile path configured for this agent\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, text.strip()
+
+    profile_path = os.path.expanduser(profile_path)
+
+    spatial = _spatial_context_block(city_id, working_dir)
+    cd_cmd = f"cd {working_dir}\n\n" if working_dir else ""
+    full_query = f"{spatial}\n\n{cd_cmd}{mission}"
+
+    # Build session ID: stateful agents persist, stateless get per-mission IDs
+    if config.get("stateful", True):
+        session_id = f"repociv-{unit_id.lower()}"
+    else:
+        session_id = f"repociv-{unit_id.lower()}-{mission_id}"
+
+    cmd = [hermes_bin, "chat", "-q", full_query, "-Q", "--source", "tool"]
+    # Don't pass --ignore-rules — we WANT the profile's AGENTS.md, SOUL.md, etc.
+    if model:
+        cmd.extend(["-m", model])
+
+    # Override HERMES_HOME to the profile path so the subprocess loads
+    # the correct config, skills, memory, etc.
+    env = os.environ.copy()
+    env["HERMES_HOME"] = profile_path
+
+    send_to_repociv({
+        "type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
+        "text": f"[profile: {os.path.basename(profile_path)}]\n",
+    })
+
+    proc = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, bufsize=1, cwd=working_dir or None,
+        env=env,
+    )
+
+    output_buf: list[str] = []
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        output_buf.append(line)
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": line})
+        _es.record_output_chunk(mission_id, unit_id, line)
+
+    proc.wait(timeout=600)
+    return proc.returncode == 0, "".join(output_buf)
 
 
 def _has_claude_code() -> bool:
