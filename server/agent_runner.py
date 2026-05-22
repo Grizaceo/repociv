@@ -682,9 +682,9 @@ def _run_codex_streaming(unit_id: str, mission_id: str, mission: str,
     full_prompt = f"{spatial}\n\n{cd_cmd}{mission}"
 
     # Encapsulate CLI flags — validate locally first
-    cmd = [codex_bin, "run", "--yes"]
+    cmd = [codex_bin, "exec", "--dangerously-bypass-approvals-and-sandbox"]
     if model:
-        cmd.extend(["--model", model])
+        cmd.extend(["-m", model])
     cmd.append(full_prompt)
 
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
