@@ -193,6 +193,9 @@ export class RepoCivWebSocket {
       return;
     }
 
+    // auth_ok is a protocol-level handshake — consume silently
+    if (msgType === 'auth_ok') return;
+
     // Handle pong (server heartbeat response)
     if (msgType === 'pong') return;
 
