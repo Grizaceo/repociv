@@ -53,9 +53,12 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
   const chatInput = document.getElementById('chat-input') as HTMLInputElement | null;
 
   const sendMessage = (input: HTMLInputElement | null) => {
-    // 1) Resolve target unit: honor agent selector over map selection
+    // 1) Resolve target unit: honor agent selector over map selection.
+    // The selector lives inside the side panel — if the panel is closed its value is stale
+    // (e.g. DAVI was last selected before CLAUDE was spawned). Only honor it when the panel
+    // is open and the user can actually see and interact with the dropdown.
     const agentSelector = document.getElementById('chat-agent-selector') as HTMLSelectElement | null;
-    const selectorUnitId = agentSelector?.value;
+    const selectorUnitId = isSidePanelOpen() ? agentSelector?.value : undefined;
     const prefersSelector = selectorUnitId && selectorUnitId !== state.selectedUnit?.id;
 
     let targetUnit: Unit | null = null;
