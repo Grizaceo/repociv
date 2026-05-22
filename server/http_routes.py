@@ -362,6 +362,17 @@ def get_improve_proposals(ctx: "RouteContext") -> tuple[int, Any]:
         return 500, {"error": str(exc)}
 
 
+def get_ws_info(ctx: "RouteContext") -> tuple[int, Any]:
+    """Return WebSocket connection info for the frontend."""
+    from server.bridge import BRIDGE_WS_PORT
+    return 200, {
+        "wsUrl": f"ws://localhost:{BRIDGE_WS_PORT}",
+        "wsPort": BRIDGE_WS_PORT,
+        "protocol": "websocket",
+        "authRequired": bool(os.environ.get("REPOCIV_TOKEN", "")),
+    }
+
+
 # ─── POST routes ──────────────────────────────────────────────────────────────
 
 def post_directives_record(body: dict[str, Any], ctx: "RouteContext") -> tuple[int, Any]:

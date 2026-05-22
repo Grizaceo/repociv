@@ -84,7 +84,17 @@ _load_dotenv()
 
 REPOCIV_PORT = int(os.environ.get("REPOCIV_PORT", "5273"))
 BRIDGE_PORT  = int(os.environ.get("BRIDGE_PORT", "5274"))
+BRIDGE_WS_PORT = int(os.environ.get("BRIDGE_WS_PORT", "5275"))
 REPOCIV_TOKEN = os.environ.get("REPOCIV_TOKEN", "")  # empty = auth disabled (dev only)
+REPOCIV_REMOTE = os.environ.get("REPOCIV_REMOTE", "").lower() in ("true", "1", "yes")
+
+# ─── Remote mode: force 0.0.0.0 + require token ─────────────────────────────
+if REPOCIV_REMOTE and not REPOCIV_TOKEN:
+    print("ERROR: REPOCIV_REMOTE=true requires REPOCIV_TOKEN to be set.")
+    print("Generate one with: python3 -c \"import secrets; print(secrets.token_hex(32))\"")
+    raise SystemExit(1)
+
+BRIDGE_HOST = "0.0.0.0" if REPOCIV_REMOTE else "127.0.0.1"
 
 CONFIG_DIR = Path(os.path.expanduser(os.environ.get("REPOCIV_CONFIG_DIR", "~/.repociv")))
 CONFIG_DIR.mkdir(exist_ok=True, parents=True)
@@ -92,10 +102,13 @@ MISSIONS_FILE    = CONFIG_DIR / "missions.json"
 HERMES_ROOT      = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", "~/.hermes")))
 
 # ─── CORS allowed origins ─────────────────────────────────────────────────────
-_ALLOWED_ORIGINS = {
-    f"http://localhost:{REPOCIV_PORT}",
-    f"http://127.0.0.1:{REPOCIV_PORT}",
-}
+if REPOCIV_REMOTE:
+    _ALLOWED_ORIGINS = None  # Allow all origins in remote mode
+else:
+    _ALLOWED_ORIGINS = {
+        f"http://localhost:{REPOCIV_PORT}",
+        f"http://127.0.0.1:{REPOCIV_PORT}",
+    }
 
 # ─── Body size limit ──────────────────────────────────────────────────────────
 _MAX_BODY = 128 * 1024  # 128 KB
@@ -573,7 +586,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def _cors(self) -> None:
         origin = self._origin()
-        if origin in _ALLOWED_ORIGINS:
+        if _ALLOWED_ORIGINS is None:
+            # Remote mode: allow any origin
+            self.send_header("Access-Control-Allow-Origin", "*")
+        elif origin in _ALLOWED_ORIGINS:
             self.send_header("Access-Control-Allow-Origin", origin)
         else:
             # Dev fallback: allow any localhost origin (non-browser clients / curl)
@@ -649,6 +665,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/improve/reflect":    _routes.get_improve_reflect,
             "/improve/proposals":  _routes.get_improve_proposals,
             "/providers/live":     _routes.get_providers_live,
+            "/ws":                 _routes.get_ws_info,
         }
         if path in _GET_EXACT:
             status, body = _GET_EXACT[path](ctx)
@@ -1050,7 +1067,58 @@ if __name__ == "__main__":
     # Recover any commands that were running when the bridge last died
     recovered = _recover_hung_commands()
 
-    server = ThreadingHTTPServer(("localhost", BRIDGE_PORT), BridgeHandler)
+    # ─── WebSocket server (Phase 1: bidirectional transport) ───────────
+    from server.websocket_handler import start_ws_server, broadcast as ws_broadcast
+    from server.websocket_handler import set_command_callback as ws_set_command_callback
+    from server.sse_server import set_ws_broadcast_hook
+
+    # Wire WS broadcast into SSE fan-out so send_to_repociv() reaches WS clients
+    set_ws_broadcast_hook(ws_broadcast)
+
+    # Wire bridge command dispatch for incoming WS commands
+    def _ws_command_handler(data: dict[str, Any]) -> None:
+        """Handle incoming commands from WebSocket clients."""
+        from server.command_schema import validate_command, CommandValidationError
+        cmd_type = data.get("type", "")
+        if cmd_type == "command":
+            cmd_data = data.get("data", {})
+            try:
+                cmd = validate_command(cmd_data)
+                _handle_command(cmd)
+            except CommandValidationError as e:
+                pass  # Error handled silently; WS client gets ack/error via handler
+        elif cmd_type == "approval":
+            cmd_id = data.get("id", "")
+            approved = data.get("approved", True)
+            path = f"/approvals/{cmd_id}/{'approve' if approved else 'reject'}"
+            # Delegate to existing approval logic via scheduler
+            if approved:
+                # Re-use the approval flow from do_POST
+                from server.command_schema import Command as _Cmd
+                cmd_dict = _pop_approval(cmd_id)
+                if cmd_dict:
+                    cmd = _Cmd(
+                        id=cmd_dict["id"], type=cmd_dict["type"],
+                        target=cmd_dict["target"], payload=cmd_dict.get("payload", {}),
+                        created_by=cmd_dict.get("created_by", "user"),
+                        risk=cmd_dict.get("risk", "medium"),
+                        requires_approval=False, status="queued",
+                    )
+                    _es.record_approved(cmd.id)
+                    _es.record_queued(cmd.id)
+                    _sched.enqueue(cmd)
+                    send_to_repociv({"type": "log", "msg": f"WS aprobado: {cmd.type}", "level": "success"})
+            else:
+                _pop_approval(cmd_id)
+                _es.record_rejected(cmd_id, "user rejected (WS)")
+                send_to_repociv({"type": "log", "msg": f"WS rechazado: {cmd_id}", "level": "warn"})
+
+    ws_set_command_callback(_ws_command_handler)
+
+    # Start WS server in a daemon thread — use BRIDGE_HOST for remote support
+    ws_thread = start_ws_server(host=BRIDGE_HOST, port=BRIDGE_WS_PORT)
+
+    server = ThreadingHTTPServer((BRIDGE_HOST, BRIDGE_PORT), BridgeHandler)
     threading.Thread(target=background_scanner, daemon=True).start()
 
     # Graceful shutdown on SIGTERM (systemd / dev-stop.sh)
@@ -1075,10 +1143,14 @@ if __name__ == "__main__":
 
     has_gpu = get_gpu_info() is not None
     auth_status = "ON" if REPOCIV_TOKEN else "OFF (dev)"
-    print(f"╭─ RepoCiv Bridge ──────────────────────────────────╮")
-    print(f"│ Endpoint:  http://localhost:{BRIDGE_PORT}                  │")
+    mode_str = "REMOTE" if REPOCIV_REMOTE else "LOCAL"
+    bind_url = f"http://{BRIDGE_HOST}:{BRIDGE_PORT}"
+    ws_url = f"ws://{BRIDGE_HOST}:{BRIDGE_WS_PORT}"
+    print(f"╭─ RepoCiv Bridge [{mode_str}] ───────────────────────╮")
+    print(f"│ HTTP:      {bind_url:<38}│")
+    print(f"│ WebSocket: {ws_url:<38}│")
     print(f"│ Auth:      {auth_status:<40}│")
-    print(f"│ CORS:      localhost:{REPOCIV_PORT} only                  │")
+    print(f"│ CORS:      {'0.0.0.0/0 (remote)' if REPOCIV_REMOTE else 'localhost only':<40}│")
     print(f"│ Events:    {_es._store_path}  │")
     print(f"│ Missions:  {MISSIONS_FILE}    │")
     print(f"│ default:   hermes (luego claude-code, openclaw)                        │")

@@ -1,5 +1,9 @@
 // ─── RepoCiv — HUD helpers (Civ V Aesthetic) ────────────────────────────────────
 import autoAnimate from '@formkit/auto-animate';
+import * as lucide from 'lucide';
+
+// Expose lucide globally for offline usage across all RepoCiv panels
+(window as any).lucide = lucide;
 
 let loadingText: HTMLElement | null = null;
 let loadingFill: HTMLElement | null = null;

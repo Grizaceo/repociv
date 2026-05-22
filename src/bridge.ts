@@ -1,5 +1,5 @@
 // ─── RepoCiv — Bridge Events ──────────────────────────────────────────────────
-// Listens for events from bridge.py via Vite HMR custom events.
+// Listens for events from bridge.py via WebSocket (primary) or SSE (fallback).
 // Sends user commands to bridge.py at http://localhost:5274.
 // Handles reconnect with exponential backoff + demo mode fallback.
 
@@ -17,7 +17,8 @@ import {
 } from './ui/index.ts';
 import { openApprovalPanel } from './ui/approvalPanel.ts';
 import { terminalPanel } from './terminalPanel.ts';
-import { bridgeHeaders, bridgeUrl } from './bridgeEnv.ts';
+import { bridgeHeaders, bridgeUrl, BRIDGE_URL } from './bridgeEnv.ts';
+import { RepoCivWebSocket } from './websocket.ts';
 
 const DEMO_INTERVAL_MS = 30_000;
 const OFFLINE_DEMO_THRESHOLD_MS = 10_000;
@@ -29,24 +30,61 @@ export class BridgeEvents {
   private offlineSince: number | null = null;
   private demoInterval: ReturnType<typeof setInterval> | null = null;
   private gpuInterval = 0;
+
+  // ─── Transports ──────────────────────────────────────────────────────────
+  private ws: RepoCivWebSocket | null = null;
   private sse: EventSource | null = null;
   private sseConnected = false;
+  private wsConnected = false;
+  private wsEnabled = true; // Set false after WS connection fails
   bridgeOnline = false;
+
+  // Resolved WS URL — discovered by fetching /ws endpoint or configured
+  private wsUrl = '';
 
   constructor(state: GameState) {
     this.state = state;
   }
 
   start() {
-    this.connectSSE();
+    // Try to discover WS endpoint first, fall back to SSE
+    this._discoverWs();
     if (import.meta.hot) {
       import.meta.hot.on('bridge:event', (data: unknown) => {
-        if (!this.sseConnected) this.handleRaw(data);
+        if (!this.wsConnected && !this.sseConnected) this.handleRaw(data);
       });
     }
     this.checkHealth();
     this.healthInterval = window.setInterval(() => this.checkHealth(), 5000);
     this.gpuInterval = window.setInterval(() => this.fetchGpu(), 5000);
+  }
+
+  /** Discover the WebSocket URL from the bridge /ws endpoint */
+  private async _discoverWs() {
+    try {
+      const BRIDGE_WS_PORT = 5275; // Matches BRIDGE_WS_PORT default in Python
+      // Try to fetch /ws endpoint for the port; fall back to default
+      const res = await fetch(bridgeUrl('/ws'), {
+        method: 'GET',
+        headers: bridgeHeaders(),
+      });
+      if (res.ok) {
+        const info = (await res.json()) as {
+          wsUrl?: string;
+          wsPort?: number;
+        };
+        this.wsUrl = info.wsUrl ?? `ws://localhost:${BRIDGE_WS_PORT}`;
+      } else {
+        // Use configured BRIDGE_URL + default WS port
+        const base = BRIDGE_URL || `http://localhost:${BRIDGE_WS_PORT}`;
+        this.wsUrl = base.replace(/^http/, 'ws');
+      }
+    } catch {
+      this.wsUrl = `ws://localhost:5275`;
+    }
+
+    // Try WS first
+    this._connectWs();
   }
 
   private handleRaw(data: unknown) {
@@ -60,6 +98,51 @@ export class BridgeEvents {
     }
     this.handleBridgeEvent(evt);
   }
+
+  // ─── WebSocket transport (primary) ──────────────────────────────────────
+
+  private _connectWs() {
+    if (!this.wsEnabled) return;
+    if (this.ws) this.ws.close();
+
+    const token = BRIDGE_URL ? '' : bridgeHeaders()['X-RepoCiv-Token'] ?? '';
+    this.ws = new RepoCivWebSocket({
+      url: this.wsUrl,
+      token,
+    });
+
+    this.ws.onMessage((data) => {
+      if (!this.wsConnected) {
+        this.wsConnected = true;
+        this.sseConnected = false;
+      }
+      this.handleRaw(data);
+    });
+
+    this.ws.onStatusChange((status) => {
+      if (status === 'connected') {
+        this.wsConnected = true;
+        this.reconnectDelay = 1000;
+        this.onBridgeOnline('hermes');
+      } else if (status === 'disconnected' || status === 'auth_failed') {
+        this.wsConnected = false;
+        // Fall back to SSE after WS fails
+        if (this.wsEnabled) {
+          this.wsEnabled = false;
+          logger.log('[bridge] WS falló — cambiando a SSE');
+          this.connectSSE();
+        }
+      }
+    });
+
+    this.ws.connect();
+  }
+
+  private _sendViaWs(type: string, payload: Record<string, unknown>): boolean {
+    return this.ws?.send({ type, ...payload }) ?? false;
+  }
+
+  // ─── SSE transport (fallback) ───────────────────────────────────────────
 
   private connectSSE() {
     if (this.sse) this.sse.close();
@@ -104,6 +187,11 @@ export class BridgeEvents {
 
   private async checkHealth() {
     try {
+      // If WS is connected, bridge is healthy — no need to hit HTTP
+      if (this.wsConnected) {
+        if (!this.bridgeOnline) this.onBridgeOnline('hermes');
+        return;
+      }
       const res = await fetch(bridgeUrl('/health'), {
         method: 'GET',
         headers: this._authHeaders(),
@@ -159,7 +247,6 @@ export class BridgeEvents {
     setBridgeStatus(false, 'demo' as never);
     logEvent('⚠ DEMO — bridge offline. Datos simulados, sin ejecución real.', 'warn');
     this.demoInterval = setInterval(() => {
-      // Solo feedback visual — NO disparar handleBridgeEvent para no falsear el estado del juego
       logEvent('[DEMO] Pulso simulado — bridge sigue offline', 'warn');
     }, DEMO_INTERVAL_MS);
   }
@@ -346,6 +433,11 @@ export class BridgeEvents {
   }
 
   async sendApproval(commandId: string, approved: boolean) {
+    // Prefer WS for approvals
+    if (this.wsConnected) {
+      this._sendViaWs('approval', { id: commandId, approved });
+      return;
+    }
     const res = await fetch(bridgeUrl(`/approvals/${encodeURIComponent(commandId)}/approve`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
@@ -359,6 +451,11 @@ export class BridgeEvents {
   // ─── Send legacy command to bridge.py root POST ───────────────────────────
   send(type: string, payload: Record<string, unknown>) {
     if (!this.bridgeOnline) return;
+    // Prefer WS for commands
+    if (this.wsConnected) {
+      this._sendViaWs('command', { data: { type, ...payload } });
+      return;
+    }
     fetch(bridgeUrl(''), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
@@ -369,6 +466,9 @@ export class BridgeEvents {
   stop() {
     clearInterval(this.healthInterval);
     clearInterval(this.gpuInterval);
+    this.ws?.close();
+    this.ws = null;
+    this.wsConnected = false;
     this.sse?.close();
     this.sse = null;
     this.sseConnected = false;
@@ -425,5 +525,3 @@ function playSound(type: SoundType) {
     // AudioContext not available
   }
 }
-
-

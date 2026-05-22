@@ -35,6 +35,7 @@ export default defineConfig(({ mode }) => {
         '/bridge': {
           target: `http://localhost:${env.BRIDGE_PORT ?? '5274'}`,
           changeOrigin: true,
+          ws: true,  // WebSocket upgrade passthrough (Phase 1)
           secure: false,
           rewrite: (path) => path.replace(/^\/bridge/, ''),
         },

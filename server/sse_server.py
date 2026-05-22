@@ -16,6 +16,9 @@ import threading
 _sse_lock = threading.Lock()
 _sse_clients: list[queue.Queue[dict[str, Any] | None]] = []
 
+# Optional WebSocket broadcast hook (set by websocket_handler.py via bridge.py)
+_ws_broadcast_hook = None
+
 
 def _fanout_sse(event: dict[str, Any]) -> None:
     with _sse_lock:
@@ -25,6 +28,23 @@ def _fanout_sse(event: dict[str, Any]) -> None:
             client.put_nowait(event)
         except Exception:
             pass
+    # Also broadcast via WebSocket if the hook is set
+    hook = _ws_broadcast_hook
+    if hook is not None:
+        try:
+            hook(event)
+        except Exception:
+            pass
+
+
+def set_ws_broadcast_hook(hook=None) -> None:
+    """Set or clear the WebSocket broadcast hook.
+
+    Called from bridge.py at startup to wire WS events into the SSE fan-out.
+    Pass None to clear (teardown).
+    """
+    global _ws_broadcast_hook
+    _ws_broadcast_hook = hook
 
 
 def _register_sse_client(client: queue.Queue[dict[str, Any] | None]) -> None:
