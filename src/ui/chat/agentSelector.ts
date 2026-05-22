@@ -1,52 +1,20 @@
-// ─── Agent selector dropdown (multi-agent chat tabs) ───────────────────────
-import {
-  chatHistory,
-  agentsWithNewMessages,
-  getActiveChatUnit,
-  setActiveChatUnit,
-} from './state.ts';
-import { renderChatHistory } from './history.ts';
+// ─── Agent selector: initial chip render ────────────────────────────────────
+// Chip element + click logic live in agentChip.ts so history.ts can reuse
+// them without a circular dependency.
+import { chatHistory } from './state.ts';
+import { createChip } from './agentChip.ts';
 
-/** Initialize the agent selector dropdown in the chat panel */
+/** Initialize (or re-render) the agent selector chips. */
 export function initAgentSelector(activeUnitId: string): void {
-  const selector = document.getElementById('chat-agent-selector') as HTMLSelectElement | null;
-  if (!selector) return;
+  const container = document.getElementById('chat-agent-selector');
+  if (!container) return;
 
-  selector.innerHTML = '';
+  container.innerHTML = '';
   const knownUnits = new Set(chatHistory.keys());
-  // Always include the active unit even if it has no history yet (e.g. freshly spawned CLAUDE/CODEX)
   knownUnits.add(activeUnitId);
   const units = Array.from(knownUnits).sort();
+
   for (const unitId of units) {
-    const opt = document.createElement('option');
-    opt.value = unitId;
-    opt.textContent = unitId.toUpperCase();
-    if (agentsWithNewMessages.has(unitId)) {
-      opt.classList.add('new-message');
-    }
-    selector.appendChild(opt);
-  }
-
-  selector.value = activeUnitId;
-
-  if (!selector.dataset['wired']) {
-    selector.addEventListener('change', () => {
-      const selectedUnitId = selector.value;
-      if (selectedUnitId && selectedUnitId !== getActiveChatUnit()) {
-        setActiveChatUnit(selectedUnitId);
-        agentsWithNewMessages.delete(selectedUnitId);
-        selector.querySelector(`option[value="${selectedUnitId}"]`)?.classList.remove('new-message');
-        renderChatHistory(selectedUnitId);
-        // Update side panel header to reflect selected agent
-        const nameEl = document.getElementById('side-hero-name');
-        if (nameEl) nameEl.textContent = selectedUnitId.toUpperCase();
-        const stateEl = document.getElementById('side-hero-state');
-        if (stateEl) {
-          stateEl.textContent = 'IDLE';
-          stateEl.className = 'state-idle';
-        }
-      }
-    });
-    selector.dataset['wired'] = '1';
+    container.appendChild(createChip(unitId, unitId === activeUnitId));
   }
 }

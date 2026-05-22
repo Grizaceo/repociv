@@ -13,6 +13,8 @@ import {
   escapeHtml,
   hasErrorLine,
 } from './clipboard.ts';
+import { renderMarkdown } from './markdown.ts';
+import { ensureChipExists } from './agentChip.ts';
 
 /** Render the chat history for a specific unit */
 export function renderChatHistory(unitId: string): void {
@@ -31,7 +33,7 @@ export function renderChatHistory(unitId: string): void {
         <button class="chat-copy-btn" title="Copiar mensaje" aria-label="Copiar mensaje al portapapeles">${COPY_SVG}</button>
       </div>
     </div>
-    <div class="chat-body">${escapeHtml(msg.text)}</div>`;
+    <div class="chat-body">${msg.role === 'user' ? escapeHtml(msg.text) : renderMarkdown(msg.text)}</div>`;
     container.appendChild(msgEl);
   }
 }
@@ -39,11 +41,11 @@ export function renderChatHistory(unitId: string): void {
 /** Mark an agent as having new messages (for notification badge) */
 export function markAgentHasNewMessages(unitId: string): void {
   agentsWithNewMessages.add(unitId);
-  const selector = document.getElementById('chat-agent-selector') as HTMLSelectElement | null;
-  if (selector) {
-    const opt = selector.querySelector(`option[value="${unitId}"]`);
-    if (opt) opt.classList.add('new-message');
-  }
+  // Update chip badge if it exists
+  const chip = document.querySelector<HTMLElement>(
+    `.chat-agent-chip[data-unit="${unitId}"] .chip-badge`,
+  );
+  if (chip) chip.classList.add('active');
 }
 
 export function appendChatChunk(unitId: string, text: string): void {
@@ -57,14 +59,8 @@ export function appendChatChunk(unitId: string, text: string): void {
   // and update history so the full text is available when switching back
   if (activeChatUnit !== unitId) {
     markAgentHasNewMessages(unitId);
-    const selector = document.getElementById('chat-agent-selector') as HTMLSelectElement | null;
-    if (selector && !selector.querySelector(`option[value="${unitId}"]`)) {
-      const opt = document.createElement('option');
-      opt.value = unitId;
-      opt.textContent = unitId.toUpperCase();
-      opt.classList.add('new-message');
-      selector.appendChild(opt);
-    }
+    // Ensure chip exists
+    ensureChipExists(unitId);
     const history = chatHistory.get(unitId) ?? [];
     const idx = currentAgentMessageIndex.get(unitId);
     if (idx !== undefined && idx >= 0 && idx < history.length) {
@@ -89,7 +85,7 @@ export function appendChatChunk(unitId: string, text: string): void {
     const bubble = currentAgentBubble.get(unitId);
     if (bubble) {
       const body = bubble.querySelector<HTMLElement>('.chat-body');
-      if (body) body.textContent = newText;
+      if (body) body.innerHTML = renderMarkdown(newText);
       bubble.dataset['raw'] = newText;
       const errBtn = bubble.querySelector<HTMLElement>('.chat-error-btn');
       if (errBtn) {
@@ -115,14 +111,8 @@ export function appendUserMessage(unitId: string, text: string): void {
 
   if (activeChatUnit !== unitId) {
     markAgentHasNewMessages(unitId);
-    const selector = document.getElementById('chat-agent-selector') as HTMLSelectElement | null;
-    if (selector && !selector.querySelector(`option[value="${unitId}"]`)) {
-      const opt = document.createElement('option');
-      opt.value = unitId;
-      opt.textContent = unitId.toUpperCase();
-      opt.classList.add('new-message');
-      selector.appendChild(opt);
-    }
+    // Ensure chip exists
+    ensureChipExists(unitId);
     const userTime = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
     const history = chatHistory.get(unitId) ?? [];
     history.push({ role: 'user', text, timestamp: userTime });
@@ -214,7 +204,7 @@ export function renderChatBuffer(unitId: string): void {
   if (!current) return;
   const body = current.querySelector<HTMLElement>('.chat-body');
   const text = chatBuffers.get(unitId) ?? '';
-  if (body) body.textContent = text;
+  if (body) body.innerHTML = renderMarkdown(text);
   current.dataset['raw'] = text;
   const errBtn = current.querySelector<HTMLElement>('.chat-error-btn');
   if (errBtn) {

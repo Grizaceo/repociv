@@ -48,12 +48,12 @@ export function escapeHtml(s: string): string {
 }
 
 // ─── One-shot listener attachment (idempotent) ───────────────────────────────
-const _wired = new WeakMap<HTMLElement, { full: boolean; err: boolean }>();
+const _wired = new WeakMap<HTMLElement, { full: boolean; err: boolean; code: boolean }>();
 
 export function attachCopyListeners(root: HTMLElement, unitId: string): void {
   // Full-message copy buttons
   for (const btn of root.querySelectorAll<HTMLElement>('.chat-copy-btn')) {
-    const state = _wired.get(btn) ?? { full: false, err: false };
+    const state = _wired.get(btn) ?? { full: false, err: false, code: false };
     if (state.full) continue;
     state.full = true;
     _wired.set(btn, state);
@@ -78,7 +78,7 @@ export function attachCopyListeners(root: HTMLElement, unitId: string): void {
 
   // Error-only copy buttons
   for (const btn of root.querySelectorAll<HTMLElement>('.chat-error-btn')) {
-    const state = _wired.get(btn) ?? { full: false, err: false };
+    const state = _wired.get(btn) ?? { full: false, err: false, code: false };
     if (state.err) continue;
     state.err = true;
     _wired.set(btn, state);
@@ -96,6 +96,27 @@ export function attachCopyListeners(root: HTMLElement, unitId: string): void {
           btn.textContent = orig;
         }, 1500);
       }
+    });
+  }
+
+  // Code-block copy buttons (.chat-code-copy)
+  for (const btn of root.querySelectorAll<HTMLElement>('.chat-code-copy')) {
+    const state = _wired.get(btn) ?? { full: false, err: false, code: false };
+    if (state.code) continue;
+    state.code = true;
+    _wired.set(btn, state);
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const code = btn.dataset['code'] ?? '';
+      if (!code) return;
+      clipboardWrite(code);
+      const orig = btn.innerHTML;
+      btn.innerHTML = CHECK_SVG;
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.innerHTML = orig;
+        btn.classList.remove('copied');
+      }, 1500);
     });
   }
 }
