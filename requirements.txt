@@ -1,6 +1,9 @@
 # ─── RepoCiv backend (Python) ─────────────────────────────────────────────────
 # Mantener versiones m\u00ednimas; el lock real lo da el venv local.
 
+# MCP server (stdio transport — expone bridge como tools para agentes externos)
+mcp>=1.2
+
 # Test runner
 pytest>=9.0
 pytest-asyncio>=0.24
