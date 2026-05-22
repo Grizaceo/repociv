@@ -228,7 +228,7 @@ async def _handle_incoming(ws: websockets.asyncio.server.ServerConnection, messa
             await ws.send(json.dumps({"type": "auth_error", "msg": "invalid token"}))
         return
 
-    if msg_type == "command" or msg_type == "approval":
+    if msg_type in ("command", "approval", "unit_command"):
         # Forward to bridge command handler
         cb = _command_callback
         if cb:
