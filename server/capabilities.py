@@ -36,6 +36,16 @@ AGENT_CAPABILITIES: dict[str, list[str]] = {
     "OPENCLAW": [
         "inspect_repo", "read_file", "run_tests", "run_build", "execute_agent",
     ],
+    # Claude — full coding agent via claude-code CLI
+    "CLAUDE": [
+        "inspect_repo", "read_file", "run_tests", "run_build",
+        "edit_file", "create_branch", "git_commit", "execute_agent",
+    ],
+    # Codex — coding agent via Codex CLI (initially conservative)
+    "CODEX": [
+        "inspect_repo", "read_file", "run_tests", "run_build",
+        "edit_file", "create_branch",
+    ],
 }
 
 # ─── Skill labels (human-readable, shown in UI badges) ───────────────────────
@@ -63,6 +73,17 @@ SKILL_LABELS: dict[str, dict[str, str]] = {
         "transport":    "Transporte",
         "orchestration": "Orquestación",
         "test_runner":   "Tests",
+    },
+    "CLAUDE": {
+        "git_workflow":  "Git completo",
+        "test_runner":   "Tests",
+        "code_editor":   "Edición",
+        "orchestration": "Orquestación",
+    },
+    "CODEX": {
+        "git_workflow": "Git completo",
+        "test_runner":  "Tests",
+        "code_editor":  "Edición",
     },
 }
 

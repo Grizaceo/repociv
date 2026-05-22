@@ -1,0 +1,48 @@
+{
+  "name": "CLAUDE",
+  "description": "Agente de codificación local basado en Claude Code CLI. Ejecuta misiones dentro del repo objetivo con contexto espacial RepoCiv — sin identidad artificial, solo misión + spatial awareness.",
+  "capabilities": [
+    "edit_file",
+    "create_file",
+    "run_command",
+    "read_file",
+    "analyze_code",
+    "test_code",
+    "refactor_code",
+    "execute_agent"
+  ],
+  "modalities": [
+    "text"
+  ],
+  "authentication": {
+    "type": "bearer",
+    "header": "X-RepoCiv-Token",
+    "allow_user_override": true
+  },
+  "endpoint": "http://localhost:5274/api/dispatch",
+  "task_lifecycle": [
+    "submitted",
+    "executing",
+    "completed",
+    "failed",
+    "user_approval_required"
+  ],
+  "model_affinity": "claude-sonnet-4-5",
+  "believability": 1.0,
+  "concurrency_limit": 1,
+  "default_task_type": "edit",
+  "timeout_s": 600,
+  "retry_policy": {
+    "max_attempts": 3,
+    "backoff_s": 5
+  },
+  "metadata": {
+    "role": "coding_agent",
+    "tier": "EQUILIBRIO",
+    "introduced_phase": "v0.3",
+    "stateful": true,
+    "harness": "claude-code-local",
+    "model_recommended": false,
+    "not_enforced": true
+  }
+}

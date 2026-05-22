@@ -4,7 +4,7 @@
 
 import type { CommandType } from './commandSchema.ts';
 
-export type AgentBase = 'DAVI' | 'LEXO' | 'WORKER' | 'SCOUT' | 'OPENCLAW';
+export type AgentBase = 'DAVI' | 'LEXO' | 'WORKER' | 'SCOUT' | 'OPENCLAW' | 'CLAUDE' | 'CODEX';
 
 // ─── Per-agent allowed command types ─────────────────────────────────────────
 export const AGENT_CAPABILITIES: Record<AgentBase, CommandType[]> = {
@@ -34,6 +34,24 @@ export const AGENT_CAPABILITIES: Record<AgentBase, CommandType[]> = {
   WORKER: ['inspect_repo', 'read_file', 'run_tests', 'run_build', 'edit_file', 'create_branch'],
   SCOUT: ['inspect_repo', 'read_file'],
   OPENCLAW: ['inspect_repo', 'read_file', 'run_tests', 'run_build', 'execute_agent'],
+  CLAUDE: [
+    'inspect_repo',
+    'read_file',
+    'run_tests',
+    'run_build',
+    'edit_file',
+    'create_branch',
+    'git_commit',
+    'execute_agent',
+  ],
+  CODEX: [
+    'inspect_repo',
+    'read_file',
+    'run_tests',
+    'run_build',
+    'edit_file',
+    'create_branch',
+  ],
 };
 
 // ─── Skill labels shown as badges ────────────────────────────────────────────
@@ -65,6 +83,17 @@ export const AGENT_SKILLS: Record<AgentBase, SkillBadge[]> = {
     { key: 'transport', label: 'Transporte', icon: '▶' },
     { key: 'orchestration', label: 'Orquestación', icon: '◈' },
     { key: 'test_runner', label: 'Tests', icon: '🧪' },
+  ],
+  CLAUDE: [
+    { key: 'git_workflow', label: 'Git completo', icon: '⎇' },
+    { key: 'test_runner', label: 'Tests', icon: '🧪' },
+    { key: 'code_editor', label: 'Edición', icon: '✏' },
+    { key: 'orchestration', label: 'Orquestación', icon: '◈' },
+  ],
+  CODEX: [
+    { key: 'git_workflow', label: 'Git completo', icon: '⎇' },
+    { key: 'test_runner', label: 'Tests', icon: '🧪' },
+    { key: 'code_editor', label: 'Edición', icon: '✏' },
   ],
 };
 

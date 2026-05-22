@@ -17,11 +17,12 @@ def reset():
 
 # ── load / list ────────────────────────────────────────────────────────────────
 
-def test_list_harnesses_returns_five():
+def test_list_harnesses_returns_seven():
     all_h = list_harnesses()
-    assert len(all_h) == 5
+    assert len(all_h) == 7
     ids = sorted(h["id"] for h in all_h)
-    assert ids == ["hermes-local", "local-cli", "nemoclaw-sandbox", "openclaw-local", "reference-only"]
+    assert ids == sorted(["hermes-local", "local-cli", "nemoclaw-sandbox", "openclaw-local", "reference-only",
+                         "claude-code-local", "codex-local"])
 
 
 def test_list_harnesses_returns_copy():

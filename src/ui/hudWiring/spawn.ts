@@ -66,12 +66,14 @@ export function spawnAgent(
     ? { q: capital.coord.q + 1 + (offset % 3), r: capital.coord.r - Math.floor(offset / 3) }
     : { q: 1 + offset, r: 0 };
 
-  const typeMap: Record<string, 'hero' | 'worker' | 'scout' | 'lexo'> = {
+  const typeMap: Record<string, 'hero' | 'worker' | 'scout' | 'lexo' | 'claude' | 'codex'> = {
     DAVI: 'hero',
     WORKER: 'worker',
     SCOUT: 'scout',
     LEXO: 'lexo',
     OPENCLAW: 'hero',
+    CLAUDE: 'claude',
+    CODEX: 'codex',
   };
   const type = typeMap[base] ?? 'hero';
   const unit = state.spawnUnit(unitId, unitId, type, 'gris', coord, 'En espera de misión');

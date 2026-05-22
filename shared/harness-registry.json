@@ -56,6 +56,50 @@
       }
     },
     {
+      "id": "claude-code-local",
+      "label": "Claude Code Local",
+      "kind": "agent_runtime",
+      "trust_level": "local_cli",
+      "transport": "cli",
+      "health": {
+        "kind": "command",
+        "command": "claude --version",
+        "status": "unknown"
+      },
+      "recovery_modes": ["copy_command", "tmux_attach"],
+      "allowed_actions": ["inspect_repo", "read_file", "run_tests", "run_build", "edit_file", "create_branch", "git_commit", "execute_agent"],
+      "blocked_actions": ["send_message", "delete_file"],
+      "recovery": {
+        "copy_command": {
+          "cwd": "~/.hermes/workspace/repos",
+          "command": "tmux new -A -s claude-code 'claude'",
+          "notes": ["Opens Claude Code in a tmux session"]
+        }
+      }
+    },
+    {
+      "id": "codex-local",
+      "label": "Codex Local",
+      "kind": "agent_runtime",
+      "trust_level": "local_cli",
+      "transport": "cli",
+      "health": {
+        "kind": "command",
+        "command": "codex --version",
+        "status": "unknown"
+      },
+      "recovery_modes": ["copy_command", "tmux_attach"],
+      "allowed_actions": ["inspect_repo", "read_file", "run_tests", "run_build", "edit_file", "create_branch"],
+      "blocked_actions": ["send_message", "delete_file"],
+      "recovery": {
+        "copy_command": {
+          "cwd": "~/.hermes/workspace/repos",
+          "command": "tmux new -A -s codex 'codex'",
+          "notes": ["Opens Codex in a tmux session"]
+        }
+      }
+    },
+    {
       "id": "nemoclaw-sandbox",
       "label": "NemoClaw Sandbox",
       "kind": "sandbox",

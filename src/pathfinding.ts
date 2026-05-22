@@ -13,6 +13,9 @@ const TERRAIN_COSTS: Record<string, Record<string, number>> = {
   lexo: { plains: 1, forest: 1, mountain: 1, desert: 1, ocean: Infinity, ice: 3 },
   army: { plains: 1, forest: 2, mountain: 2, desert: 1, ocean: Infinity, ice: 2 },
   caravan: { plains: 1, forest: 2, mountain: Infinity, desert: 1, ocean: Infinity, ice: Infinity },
+  openclaw: { plains: 1, forest: 1, mountain: 1, desert: 1, ocean: Infinity, ice: 3 },
+  claude: { plains: 1, forest: 1, mountain: 1, desert: 1, ocean: Infinity, ice: 3 },
+  codex: { plains: 1, forest: 1, mountain: 1, desert: 1, ocean: Infinity, ice: 3 },
 };
 
 const DEFAULT_COSTS = TERRAIN_COSTS['hero']!;

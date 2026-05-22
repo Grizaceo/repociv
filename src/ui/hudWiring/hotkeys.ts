@@ -143,12 +143,14 @@ export function wireHotkeys(
 
     if (inField) return;
 
-    // Spawn agents (Q/W/E/L/O)
+    // Spawn agents (Q/W/E/L/O/C/X)
     if (e.key.toLowerCase() === 'q') return spawnAgent('DAVI', state, renderer, bridge);
     if (e.key.toLowerCase() === 'w') return spawnAgent('WORKER', state, renderer, bridge);
     if (e.key.toLowerCase() === 'e') return spawnAgent('SCOUT', state, renderer, bridge);
     if (e.key.toLowerCase() === 'l') return spawnAgent('LEXO', state, renderer, bridge);
     if (e.key.toLowerCase() === 'o') return spawnAgent('OPENCLAW', state, renderer, bridge);
+    if (e.key.toLowerCase() === 'c') return spawnAgent('CLAUDE', state, renderer, bridge);
+    if (e.key.toLowerCase() === 'x') return spawnAgent('CODEX', state, renderer, bridge);
 
     // Hero selection 1–9
     if (/^[1-9]$/.test(e.key)) {

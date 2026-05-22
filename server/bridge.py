@@ -363,6 +363,10 @@ def _has_cursor() -> bool:
     return _agent_runner._has_cursor()
 
 
+def _has_codex() -> bool:
+    return _agent_runner._has_codex()
+
+
 # ─── Command Bus intake ───────────────────────────────────────────────────────
 def _handle_command(cmd: Command) -> dict[str, Any]:
     """Apply policy, attach context pack, dispatch or queue command."""
@@ -1182,6 +1186,7 @@ if __name__ == "__main__":
     print(f"│ openclaw:  {'OK' if _has_openclaw() else 'NO'}                                      │")
     print(f"│ claude-code: {'OK' if _has_claude_code() else 'NO'}                              │")
     print(f"│ cursor:    {'OK' if _has_cursor() else 'NO'}                                    │")
+    print(f"│ codex:     {'OK' if _has_codex() else 'NO'}                                    │")
     print(f"│ GPU:       {'OK (nvidia-smi)' if has_gpu else 'no disponible'}                    │")
     if recovered:
         print(f"│ Recuperados: {recovered} comando(s) colgado(s)              │")

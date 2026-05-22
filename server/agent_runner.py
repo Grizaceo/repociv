@@ -86,12 +86,29 @@ AGENT_CONFIGS: dict[str, dict[str, Any]] = {
         "agent": "main", "personality": "technical", "stateful": True,
         "system": "Eres openclaw, agente local de Cristóbal.",
     },
+    "CLAUDE": {
+        "stateful": True,
+    },
+    "CODEX": {
+        "stateful": True,
+    },
 }
 
 
 def _get_agent_config(unit_id: str) -> dict[str, Any]:
     base = unit_id.split("-")[0].upper()
     return AGENT_CONFIGS.get(base, AGENT_CONFIGS["DAVI"])
+
+
+def _infer_model_label(unit_id: str) -> str:
+    """Return a descriptive model label for token ledger based on unit type."""
+    base = unit_id.split("-")[0].upper()
+    label_map = {
+        "OPENCLAW": "openclaw",
+        "CLAUDE": "claude-code",
+        "CODEX": "codex",
+    }
+    return label_map.get(base, os.environ.get("HERMES_MODEL", "claude-code"))
 
 
 def _repos_root() -> str:
@@ -195,7 +212,7 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
     # adapters. The hermes adapter also logs with real counts when available;
     # this call provides a baseline for all adapters.
     _token_ledger.get_ledger().log_usage(
-        model=os.environ.get("HERMES_MODEL", "claude-code"),
+        model=_infer_model_label(unit_id),
         prompt_tokens=max(1, len(mission) // 4),
         completion_tokens=max(1, len(output) // 4),
     )
@@ -250,6 +267,18 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
     if base == "OPENCLAW":
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: openclaw]\n"})
         return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
+
+    # CLAUDE bypass: always direct to claude-code regardless of harness selector
+    if base == "CLAUDE":
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: claude-code (bypass)]\n"})
+        return _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
+                                          model=model or provider)
+
+    # CODEX bypass: always direct to codex regardless of harness selector
+    if base == "CODEX":
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: codex (bypass)]\n"})
+        return _run_codex_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
+                                    model=model or provider)
 
     # ── 3-layer dispatch: harness → provider → model ──────────────────────────
     # If the user selected a specific harness, use it directly.
@@ -400,6 +429,23 @@ def _find_openclaw() -> str | None:
         if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
             return candidate
     return None
+
+
+def _find_codex() -> str | None:
+    candidates = [
+        shutil.which("codex"),
+        str(Path.home() / ".npm-global" / "bin" / "codex"),
+        str(Path.home() / ".local" / "bin" / "codex"),
+        "/usr/local/bin/codex",
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def _has_codex() -> bool:
+    return _find_codex() is not None
 
 
 def _find_hermes_cli() -> str | None:
@@ -609,6 +655,40 @@ def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
     if model:
         cmd.extend(["--model", model])
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=working_dir or None)
+    output_buf: list[str] = []
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        output_buf.append(line)
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": line})
+        _es.record_output_chunk(mission_id, unit_id, line)
+    proc.wait(timeout=600)
+    return proc.returncode == 0, "".join(output_buf)
+
+
+def _run_codex_streaming(unit_id: str, mission_id: str, mission: str,
+                          config: dict[str, Any],
+                          working_dir: str | None = None,
+                          city_id: str = "",
+                          model: str = "") -> tuple[bool, str]:
+    codex_bin = _find_codex()
+    if not codex_bin:
+        text = "[codex error] binary not found in PATH, ~/.npm-global/bin or ~/.local/bin\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, text.strip()
+
+    spatial = _spatial_context_block(city_id, working_dir)
+    cd_cmd = f"cd {working_dir}\n\n" if working_dir else ""
+    full_prompt = f"{spatial}\n\n{cd_cmd}{mission}"
+
+    # Encapsulate CLI flags — validate locally first
+    cmd = [codex_bin, "run", "--yes"]
+    if model:
+        cmd.extend(["--model", model])
+    cmd.append(full_prompt)
+
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, bufsize=1, cwd=working_dir or None)
     output_buf: list[str] = []
     assert proc.stdout is not None
     for line in proc.stdout:
