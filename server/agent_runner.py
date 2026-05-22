@@ -67,6 +67,7 @@ AGENT_CONFIGS: dict[str, dict[str, Any]] = {
     },
     "SCOUT": {
         "agent": "main", "personality": "helpful", "stateful": False,
+        "profile": str(Path.home() / ".hermes" / "profiles" / "scout"),
         "system": ("Eres un agente de exploración especializado. No tienes memoria de "
                    "sesiones previas ni contexto del workspace más allá de lo entregado "
                    "en esta misión. Inspecciona código/archivos/repos y devuelve "
