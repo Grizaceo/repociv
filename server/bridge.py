@@ -1081,12 +1081,37 @@ if __name__ == "__main__":
         from server.command_schema import validate_command, CommandValidationError
         cmd_type = data.get("type", "")
         if cmd_type == "command":
-            cmd_data = data.get("data", {})
+            raw = data.get("data", {})
+            # Normalize: the frontend sends flat fields (unit, city, mission, ...)
+            # but validate_command expects { type, target, payload: {...} }.
+            # Mirror the same normalization done in the legacy HTTP POST handler
+            # at lines ~849-862 so WS and HTTP produce identical Command objects.
+            raw_type = raw.get("type", "")
+            if raw_type in ("unit_command", "execute_agent"):
+                # Build Command-compatible structure
+                cmd_data = {
+                    "type": raw_type,
+                    "target": raw.get("city", "main"),
+                    "payload": {
+                        "unit": raw.get("unit", "DAVI"),
+                        "city": raw.get("city", "main"),
+                        "mission": raw.get("mission", ""),
+                        "agentType": raw.get("agentType", "hero"),
+                        "harness": raw.get("harness", ""),
+                        "provider": raw.get("provider", ""),
+                        "model": raw.get("model", ""),
+                    },
+                    "created_by": "user",
+                }
+            else:
+                cmd_data = raw  # passthrough for other types
             try:
                 cmd = validate_command(cmd_data)
                 _handle_command(cmd)
             except CommandValidationError as e:
-                pass  # Error handled silently; WS client gets ack/error via handler
+                send_to_repociv({"type": "log",
+                                 "msg": f"WS command rejected: {e}",
+                                 "level": "warn"})
         elif cmd_type == "approval":
             cmd_id = data.get("id", "")
             approved = data.get("approved", True)
