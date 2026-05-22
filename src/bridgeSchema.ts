@@ -33,7 +33,7 @@ const Schemas = [
   v.object({
     type: v.literal('unit_work'),
     unit: v.string(),
-    hex: Hex,
+    hex: v.optional(Hex),
     progress: v.number(),
     mission: v.optional(v.string()),
     cityId: v.optional(v.string()),
