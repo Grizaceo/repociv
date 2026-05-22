@@ -58,6 +58,7 @@ AGENT_CONFIGS: dict[str, dict[str, Any]] = {
     },
     "WORKER": {
         "agent": "main", "personality": "concise", "stateful": False,
+        "profile": str(Path.home() / ".hermes" / "profiles" / "worker"),
         "system": ("Eres un agente de ejecución especializado. No tienes memoria de "
                    "sesiones previas ni contexto del workspace más allá de lo entregado "
                    "en esta misión. Resuelve la tarea en el mínimo de tokens posible y "
@@ -244,6 +245,11 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
     if _container_mode_enabled():
         return _run_container_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
+    # OPENCLAW bypass: always direct to OpenClaw regardless of harness selector
+    if base == "OPENCLAW":
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: openclaw]\n"})
+        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
+
     # ── 3-layer dispatch: harness → provider → model ──────────────────────────
     # If the user selected a specific harness, use it directly.
     # The provider+model are passed through to the harness runner so it can
@@ -281,9 +287,6 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
                           "text": f"[warn: harness '{harness}' no reconocido, usando cascade]\n"})
 
     # ── Default cascade: hermes → claude-code → openclaw ────────────────────
-    if base == "OPENCLAW":
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: openclaw]\n"})
-        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
     # Agents with a profile path (e.g. LEXO → lexo-alpha) run via hermes CLI
     # with HERMES_HOME pointed at their profile, giving them their own config,
