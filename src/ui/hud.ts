@@ -165,3 +165,4 @@ export function toggleViewHUD(is3D: boolean) {
     'info',
   );
 }
+

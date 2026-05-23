@@ -10,6 +10,7 @@ const TILE_COLOR: Record<string, string> = {
   door: '#4a3a1a',
   workbench: '#1a3040',
   debris: '#1a1a1a',
+  kiosk: '#5c3d2e',
 };
 
 const TILE_BORDER: Record<string, string> = {
@@ -18,6 +19,7 @@ const TILE_BORDER: Record<string, string> = {
   door: '#8a6a2a',
   workbench: '#2a5060',
   debris: '#252525',
+  kiosk: '#8b5a2b',
 };
 
 // ─── Main renderer class ───────────────────────────────────────────────────────
@@ -297,6 +299,8 @@ export class LocalRenderer {
       ctx.fillRect(px + 2, py + 2, s - 4, s - 4);
     } else if (tile.type === 'debris') {
       this.drawDebrisTile(px, py, s);
+    } else if (tile.type === 'kiosk') {
+      this.drawKioskTile(px, py, s);
     }
 
     // Grid lines
@@ -323,6 +327,22 @@ export class LocalRenderer {
     ctx.moveTo(px + s - 4, py + s * 0.5);
     ctx.lineTo(px + s * 0.5, py + s - 4);
     ctx.stroke();
+  }
+
+  private drawKioskTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    // Draw a wooden counter top style shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.fillRect(px + 2, py + 2, s - 4, s - 4);
+
+    // Draw a small glyph like a newspaper sheet
+    ctx.fillStyle = '#e5e5d8';
+    ctx.fillRect(px + 5, py + 5, s - 10, s - 10);
+
+    // Text lines inside newspaper
+    ctx.fillStyle = '#4a4a4a';
+    ctx.fillRect(px + 7, py + 8, s - 14, 2);
+    ctx.fillRect(px + 7, py + 12, s - 14, 2);
   }
 
   private drawWorkbenchTile(tile: LocalTile, px: number, py: number, s: number) {

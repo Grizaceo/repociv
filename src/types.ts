@@ -2,6 +2,14 @@
 
 import type { Axial } from './hex.ts';
 
+export interface CDailyArticle {
+  id: number;
+  title: string;
+  url: string;
+  publishedDate: string;
+  blogName: string;
+}
+
 // ─── Terrain types (inferred from repo contents) ─────────────────────────────
 export type Terrain =
   | 'plains' // .ts/.tsx/.js/.jsx — web/frontend
@@ -232,7 +240,7 @@ export type BridgeEvent =
 export type ViewMode = 'macro' | 'local';
 
 // ─── Local view types (RimWorld grid) ─────────────────────────────────────────
-export type LocalTileType = 'floor' | 'wall' | 'door' | 'workbench' | 'debris';
+export type LocalTileType = 'floor' | 'wall' | 'door' | 'workbench' | 'debris' | 'kiosk';
 
 export interface LocalTile {
   x: number; // grid column

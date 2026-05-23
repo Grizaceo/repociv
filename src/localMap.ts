@@ -71,6 +71,16 @@ export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
   const grid = buildGrid(gridWidth, gridHeight, rooms, WALL_THICKNESS);
   addCorridors(grid, rooms, gridWidth, gridHeight);
 
+  // Colocar un kiosko en una coordenada central de la primera sala para CDaily
+  if (repoId.toLowerCase() === 'cdaily' && rooms.length > 0 && rooms[0]) {
+    const room = rooms[0];
+    const kx = room.x + Math.floor(room.width / 2);
+    const ky = room.y + Math.floor(room.height / 2);
+    if (grid[ky] && grid[ky][kx]) {
+      grid[ky][kx].type = 'kiosk';
+    }
+  }
+
   return { repoId, grid, rooms, width: gridWidth, height: gridHeight, workbenches };
 }
 

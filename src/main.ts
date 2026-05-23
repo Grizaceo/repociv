@@ -38,6 +38,7 @@ import {
   loadFilesInfo,
   fetchPendingTracker,
 } from './ui/index.ts';
+import { mountGacetaWidget } from './ui/gacetaWidget.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { wireHUD, selectHero } from './ui/hudWiring.ts';
 import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
@@ -153,6 +154,7 @@ async function bootstrap() {
 
   // Initialize UI Libraries (Icons, Animations)
   initExternalLibs();
+  mountGacetaWidget();
 
   // Restore saved side panel width
   const savedWidth = localStorage.getItem('repociv-side-panel-width');
@@ -263,6 +265,17 @@ async function bootstrap() {
     loadGitInfo(cityId);
     loadFilesInfo(cityId);
   };
+
+  // Listener para "Ver feed completo →" desde el widget Gaceta
+  window.addEventListener('repociv:open-city', (e: Event) => {
+    const detail = (e as CustomEvent).detail as { repo?: string } | undefined;
+    if (!detail?.repo) return;
+    const target = state.world.cities.find(
+      (c) => c.id.toLowerCase() === detail.repo!.toLowerCase() ||
+             (c.name || '').toLowerCase() === detail.repo!.toLowerCase(),
+    );
+    if (target && renderer.onCitySelect) renderer.onCitySelect(target.id);
+  });
 
   renderer.onTileInspect = (cityName, coord, repoPath) => {
     bridge.send('tile_inspected', { cityName, coord, repoPath });

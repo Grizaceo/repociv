@@ -1,6 +1,7 @@
 // ─── RepoCiv — City Panel ─────────────────────────────────────────────────────
 import type { City, Building, Tile } from '../types.ts';
 import { trapFocus } from './focusTrap.ts';
+import { getLatestNews, markNewsAsRead } from '../bridge.ts';
 
 let _cityPanelCleanup: (() => void) | null = null;
 
@@ -154,6 +155,43 @@ async function fetchCityGit(repoName: string) {
 async function fetchCityFiles(repoName: string) {
   const filesEl = document.getElementById('city-files-list');
   if (!filesEl) return;
+
+  // Interceptar la ciudad CDAILY para mostrar el feed en lugar de archivos
+  if (repoName.toLowerCase() === 'cdaily') {
+    filesEl.innerHTML = '<div class="city-item" style="color:var(--text-dim)">Leyendo feed de noticias...</div>';
+    try {
+      const articles = await getLatestNews();
+      if (articles.length === 0) {
+        filesEl.innerHTML = '<div class="city-item" style="color:var(--text-dim)">Sin noticias pendientes. ¡Paz imperial!</div>';
+        return;
+      }
+      filesEl.innerHTML = articles.map(art => `
+        <div class="city-item" style="border-bottom:1px solid var(--ui-border);padding:6px 0;margin-bottom:4px;">
+          <div style="font-size:11px;color:var(--ui-accent-gold);font-weight:bold;">📰 ${esc(art.blogName)}</div>
+          <div style="font-size:13px;font-weight:500;margin:2px 0;">
+            <a href="${esc(art.url)}" target="_blank" style="color:var(--text-primary);text-decoration:none;border-bottom:1px dashed var(--text-dim);">${esc(art.title)}</a>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px;">
+            <span style="font-size:10px;color:var(--text-dim);">${new Date(art.publishedDate).toLocaleDateString()}</span>
+            <button class="btn-read" data-id="${art.id}" style="background:none;border:none;color:var(--ui-green);font-size:11px;cursor:pointer;padding:2px 4px;">✓ Leído</button>
+          </div>
+        </div>
+      `).join('');
+
+      filesEl.querySelectorAll<HTMLButtonElement>('.btn-read').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = parseInt(btn.getAttribute('data-id') ?? '0', 10);
+          if (id && await markNewsAsRead(id)) {
+            fetchCityFiles('cdaily');
+          }
+        });
+      });
+    } catch {
+      filesEl.innerHTML = '<div class="city-item" style="color:var(--civ-happiness)">Error al cargar la Gaceta Exterior</div>';
+    }
+    return;
+  }
+
   filesEl.innerHTML =
     '<div class="city-item" style="color:var(--text-dim)">cargando archivos…</div>';
   try {

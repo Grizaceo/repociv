@@ -4,7 +4,7 @@
 // Handles reconnect with exponential backoff + demo mode fallback.
 
 import { type GameState } from './game.ts';
-import { type BridgeEvent } from './types.ts';
+import { type BridgeEvent, type CDailyArticle } from './types.ts';
 import { logger } from './logger.ts';
 import { parseBridgeEvent, describeBridgeEventError } from './bridgeSchema.ts';
 import {
@@ -523,5 +523,33 @@ function playSound(type: SoundType) {
     }
   } catch {
     // AudioContext not available
+  }
+}
+
+// ─── CDaily Integration helpers ───────────────────────────────────────────────
+export async function getLatestNews(): Promise<CDailyArticle[]> {
+  try {
+    const res = await fetch(bridgeUrl('/api/news/latest'), {
+      headers: bridgeHeaders(),
+    });
+    if (!res.ok) return [];
+    return (await res.json()) as CDailyArticle[];
+  } catch (e) {
+    console.error('Error al obtener noticias:', e);
+    return [];
+  }
+}
+
+export async function markNewsAsRead(id: number): Promise<boolean> {
+  try {
+    const res = await fetch(bridgeUrl('/api/news/read'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...bridgeHeaders() },
+      body: JSON.stringify({ id }),
+    });
+    return res.ok;
+  } catch (e) {
+    console.error('Error al marcar noticia como leída:', e);
+    return false;
   }
 }
