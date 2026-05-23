@@ -178,14 +178,30 @@
   border-top: 1px solid var(--ui-border);
   background: rgba(0, 0, 0, 0.3);
 }
+#chat-target-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--gold-bright);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  white-space: nowrap;
+  min-width: 50px;
+  justify-content: center;
+}
 #chat-input {
   flex: 1;
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid var(--ui-border);
   border-radius: 3px;
   color: var(--ui-text);
-  font-family: var(--font-ui);
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 12px;
   padding: 5px 8px;
   outline: none;
 }
@@ -224,7 +240,7 @@
   background: var(--ui-panel-bg);
   border: 2px solid var(--ui-border);
   border-radius: 4px;
-  z-index: 12;
+  z-index: 500;
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.8);

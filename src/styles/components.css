@@ -393,7 +393,7 @@
   box-shadow: var(--shadow-deep);
   display: flex;
   flex-direction: column;
-  z-index: 300;
+  z-index: 500;
   transition: transform var(--transition-slow);
 }
 

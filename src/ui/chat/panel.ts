@@ -3,6 +3,8 @@ import type { Unit } from '../../types.ts';
 import { trapFocus } from '../focusTrap.ts';
 import {
   setActiveChatUnit,
+  chatHistory,
+  updateChatTargetIndicator,
   getSidePanelCleanup,
   setSidePanelCleanup,
 } from './state.ts';
@@ -32,10 +34,17 @@ export function openSidePanel(unit: Unit): void {
   }
 
   initProviderSelectors();
-  initAgentSelector(unit.id);
 
-  renderChatHistory(unit.id);
-  renderChatBuffer(unit.id);
+  // Chat target: prefer saved chip preference so the user's last-selected
+  // conversation survives panel close/reopen. Falls back to hex-selected unit.
+  const savedChatUnit = localStorage.getItem('repociv:lastChatUnit');
+  const chatTargetId =
+    savedChatUnit && chatHistory.has(savedChatUnit) ? savedChatUnit : unit.id;
+  setActiveChatUnit(chatTargetId);
+  initAgentSelector(chatTargetId);
+  renderChatHistory(chatTargetId);
+  renderChatBuffer(chatTargetId);
+  updateChatTargetIndicator();
 
   const chatContainer = document.getElementById('chat-messages');
   if (chatContainer && !document.getElementById('chat-scroll-bottom')) {

@@ -53,13 +53,13 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
   const chatInput = document.getElementById('chat-input') as HTMLInputElement | null;
 
   const sendMessage = (input: HTMLInputElement | null) => {
-    // 1) Resolve target unit: honor agent selector over map selection.
-    // The selector lives inside the side panel — if the panel is closed its value is stale
-    // (e.g. DAVI was last selected before CLAUDE was spawned). Only honor it when the panel
-    // is open and the user can actually see and interact with the dropdown.
-    const agentSelector = document.getElementById('chat-agent-selector') as HTMLSelectElement | null;
-    const selectorUnitId = isSidePanelOpen() ? agentSelector?.value : undefined;
-    const prefersSelector = selectorUnitId && selectorUnitId !== state.selectedUnit?.id;
+    // 1) Resolve target unit: honor active chip selector over map selection.
+    // The chip selector (#chat-agent-selector > .chat-agent-chip.active) reflects
+    // the user's explicit agent choice. Only honor it when the side panel is open
+    // so the user can see which chip is active.
+    const chipActive = document.querySelector<HTMLElement>('.chat-agent-chip.active');
+    const selectorUnitId = isSidePanelOpen() ? chipActive?.dataset['unit'] : undefined;
+    const prefersSelector = !!selectorUnitId && selectorUnitId !== state.selectedUnit?.id;
 
     let targetUnit: Unit | null = null;
     if (prefersSelector) {
@@ -100,6 +100,25 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     if (harness && harness !== 'auto') payload.harness = harness;
     if (provider && provider !== 'auto') payload.provider = provider;
     if (model) payload.model = model;
+
+    // Update target indicator to reflect actual dispatch target
+    const indicator = document.getElementById('chat-target-indicator');
+    if (indicator) {
+      const icon = document.querySelector('.chat-agent-chip.active .chip-icon')?.textContent ?? '⬡';
+      indicator.textContent = `${icon} ${unit.id.toUpperCase()}`;
+      indicator.title = `Enviando a: ${unit.id.toUpperCase()}`;
+    }
+
+    console.log(
+      '[sendMessage] target:', unit.id,
+      '| chipActive:', selectorUnitId,
+      '| prefersSelector:', prefersSelector,
+      '| panelOpen:', isSidePanelOpen(),
+      '| harness:', harness,
+      '| provider:', provider,
+      '| model:', model,
+    );
+
     bridge.send('unit_command', payload);
     state.setUnitState(unit.id, 'working');
     input.value = '';

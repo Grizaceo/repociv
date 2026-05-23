@@ -7,6 +7,7 @@ import {
   agentsWithNewMessages,
   getActiveChatUnit,
   setActiveChatUnit,
+  updateChatTargetIndicator,
 } from './state.ts';
 
 const AGENT_ICONS: Record<string, string> = {
@@ -69,6 +70,8 @@ export async function handleChipClick(unitId: string): Promise<void> {
   // Dynamic import breaks the init-time cycle with history.ts
   const { renderChatHistory } = await import('./history.ts');
   renderChatHistory(unitId);
+
+  updateChatTargetIndicator();
 
   const nameEl = document.getElementById('side-hero-name');
   if (nameEl) nameEl.textContent = unitId.toUpperCase();
