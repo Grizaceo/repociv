@@ -170,7 +170,9 @@ def get_agents_capabilities(ctx: "RouteContext") -> tuple[int, Any]:
 
 def get_chat_config(ctx: "RouteContext") -> tuple[int, Any]:
     from server.provider_registry import _get_chat_config
-    return 200, _get_chat_config()
+    params = ctx.get("params", {})
+    harness = (params.get("harness") or "").strip()
+    return 200, _get_chat_config(harness=harness if harness else None)
 
 
 def get_metrics(ctx: "RouteContext") -> tuple[int, Any]:
@@ -474,6 +476,70 @@ def post_pending_state(body: dict[str, Any], ctx: "RouteContext") -> tuple[int, 
     if not ok:
         return 404, {"error": "item not found or invalid state"}
     return 200, {"ok": True, "id": item_id, "state": new_state}
+
+
+# ─── CDaily Integration routes ────────────────────────────────────────────────
+import sqlite3
+from contextlib import closing
+from pathlib import Path
+
+_CDAILY_DB_DEFAULT = Path.home() / ".blogwatcher-cli" / "blogwatcher-cli.db"
+
+
+def _resolve_cdaily_db() -> Path:
+    """Resuelve la ruta del SQLite de CDaily desde env o valor por defecto."""
+    env_val = os.environ.get("CDAILY_DB_PATH", "")
+    return Path(os.path.expanduser(env_val)) if env_val else _CDAILY_DB_DEFAULT
+
+
+def get_latest_news(ctx: dict[str, Any]) -> tuple[int, Any]:
+    db_path = _resolve_cdaily_db()
+    if not db_path.exists():
+        return 200, []
+
+    try:
+        with closing(sqlite3.connect(str(db_path))) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT a.id, a.title, a.url, a.published_date, b.name AS blog_name
+                FROM articles a
+                LEFT JOIN blogs b ON a.blog_id = b.id
+                WHERE a.is_read = 0
+                ORDER BY a.published_date DESC
+                LIMIT 5
+            """)
+            rows = cur.fetchall()
+        return 200, [
+            {
+                "id": r["id"],
+                "title": r["title"] or r["url"],
+                "url": r["url"],
+                "publishedDate": r["published_date"],
+                "blogName": r["blog_name"] or "Blog Desconocido",
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        return 500, {"error": f"Error al leer la base de datos de CDaily: {e}"}
+
+
+def post_news_read(body: dict[str, Any], ctx: dict[str, Any]) -> tuple[int, Any]:
+    article_id = body.get("id")
+    if not article_id:
+        return 400, {"error": "Se requiere el ID del artículo"}
+
+    db_path = _resolve_cdaily_db()
+    if not db_path.exists():
+        return 404, {"error": "Base de datos de CDaily no encontrada"}
+
+    try:
+        with closing(sqlite3.connect(str(db_path))) as conn:
+            with conn:
+                conn.execute("UPDATE articles SET is_read = 1 WHERE id = ?", (article_id,))
+        return 200, {"success": True, "marked_id": article_id}
+    except Exception as e:
+        return 500, {"error": f"Error al actualizar la base de datos: {e}"}
 
 
 # ─── Type alias ───────────────────────────────────────────────────────────────

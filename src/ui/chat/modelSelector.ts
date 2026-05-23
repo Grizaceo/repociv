@@ -31,10 +31,24 @@ interface ProviderInfo {
 }
 
 let _harnesses: HarnessInfo[] = [];
-let _providers: ProviderInfo[] = [];
+let _allProviders: ProviderInfo[] = [];   // unfiltered — full list from server
 let _selectedHarness = '';
 let _selectedProvider = '';
 let _selectedModel = '';
+
+/** Return filtered providers based on the current harness selection.
+ *  For "hermes" harness: only providers that are configured in the YAML
+ *  (configured: true).
+ *  For other harnesses (claude-code, auto): show all providers. */
+function _filteredProviders(): ProviderInfo[] {
+  if (_selectedHarness === 'hermes') {
+    return _allProviders.filter(
+      (p) => p.configured,
+    );
+  }
+  // "claude-code", "auto", or any other harness → show all
+  return _allProviders;
+}
 
 function newError(msg: string): Error {
   return new Error(msg);
@@ -50,8 +64,13 @@ export function initProviderSelectors(): void {
 
   if (harnessSel && !harnessSel.dataset['wired']) {
     harnessSel.addEventListener('change', () => {
+      const prevHarness = _selectedHarness;
       _selectedHarness = harnessSel.value;
       persistSelection(getActiveChatUnit());
+      // Only re-render provider list if the harness changed the filter
+      if (_selectedHarness !== prevHarness) {
+        _reloadProviderSelector();
+      }
       updateStatusIndicator();
     });
     harnessSel.dataset['wired'] = '1';
@@ -93,7 +112,7 @@ export function initProviderSelectors(): void {
         providers: ProviderInfo[];
       }) => {
         _harnesses = data.harnesses;
-        _providers = data.providers;
+        _allProviders = data.providers;
         fetchLiveProviderStatus(data);
       },
     )
@@ -111,6 +130,58 @@ export function initProviderSelectors(): void {
       populateModels();
       updateStatusIndicator();
     });
+}
+
+/** Re-render the provider selector dropdown using the current harness filter.
+ *  Called when the harness selection changes or when a different unit chip
+ *  is activated. */
+function _reloadProviderSelector(): void {
+  const provSel = document.getElementById('provider-selector') as HTMLSelectElement | null;
+  if (!provSel) return;
+
+  const providers = _filteredProviders();
+
+  provSel.innerHTML = '';
+  const autoProv = document.createElement('option');
+  autoProv.value = 'auto';
+  autoProv.textContent = '⚡ Auto';
+  provSel.appendChild(autoProv);
+
+  for (const p of providers) {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    const anyReachable = p.models.some((m) => m.reachable);
+    const allReachable = p.models.length > 0 && p.models.every((m) => m.reachable);
+    const status = !p.available
+      ? '(no disponible)'
+      : allReachable
+        ? ''
+        : anyReachable
+          ? '(parcial)'
+          : '(sin conexión)';
+    opt.textContent = status ? `${p.name} ${status}`.trim() : p.name;
+    opt.disabled = !p.available && !anyReachable;
+    provSel.appendChild(opt);
+  }
+
+  // Try to restore saved provider
+  const activeUnit = getActiveChatUnit();
+  const saved = loadSelection(activeUnit);
+  if (saved.provider) {
+    const exists = providers.find((p) => p.id === saved.provider && p.available);
+    if (exists) {
+      provSel.value = saved.provider;
+      _selectedProvider = saved.provider;
+    } else {
+      provSel.value = 'auto';
+      _selectedProvider = 'auto';
+    }
+  } else {
+    provSel.value = 'auto';
+    _selectedProvider = 'auto';
+  }
+
+  populateModels(saved.model);
 }
 
 /** Fetch live model reachability from the bridge's /providers/live endpoint
@@ -132,7 +203,7 @@ function fetchLiveProviderStatus(data: {
         for (const p of liveData.providers) {
           liveMap[p.id] = p;
         }
-        for (const p of _providers) {
+        for (const p of _allProviders) {
           const lp = liveMap[p.id];
           if (lp && lp.models) {
             for (const m of p.models) {
@@ -150,7 +221,6 @@ function fetchLiveProviderStatus(data: {
 /** Shared initialization: populate DOM selectors and restore state. */
 function finishInit(data: { defaultHarness: string; defaultProvider: string }): void {
   const harnessSel = document.getElementById('harness-selector') as HTMLSelectElement | null;
-  const provSel = document.getElementById('provider-selector') as HTMLSelectElement | null;
 
   if (harnessSel) {
     harnessSel.innerHTML = '';
@@ -164,30 +234,6 @@ function finishInit(data: { defaultHarness: string; defaultProvider: string }): 
       opt.textContent = h.available ? h.name : `${h.name} (no disponible)`;
       opt.disabled = !h.available;
       harnessSel.appendChild(opt);
-    }
-  }
-
-  if (provSel) {
-    provSel.innerHTML = '';
-    const autoProv = document.createElement('option');
-    autoProv.value = 'auto';
-    autoProv.textContent = '⚡ Auto';
-    provSel.appendChild(autoProv);
-    for (const p of _providers) {
-      const opt = document.createElement('option');
-      opt.value = p.id;
-      const anyReachable = p.models.some((m) => m.reachable);
-      const allReachable = p.models.length > 0 && p.models.every((m) => m.reachable);
-      const status = !p.available
-        ? '(no disponible)'
-        : allReachable
-          ? ''
-          : anyReachable
-            ? '(parcial)'
-            : '(sin conexión)';
-      opt.textContent = status ? `${p.name} ${status}`.trim() : p.name;
-      opt.disabled = !p.available && !anyReachable;
-      provSel.appendChild(opt);
     }
   }
 
@@ -211,23 +257,8 @@ function finishInit(data: { defaultHarness: string; defaultProvider: string }): 
     }
   }
 
-  if (provSel) {
-    if (saved.provider) {
-      const exists = _providers.find((p) => p.id === saved.provider && p.available);
-      if (exists) {
-        provSel.value = saved.provider;
-        _selectedProvider = saved.provider;
-      } else {
-        provSel.value = data.defaultProvider || 'auto';
-        _selectedProvider = data.defaultProvider || 'auto';
-      }
-    } else {
-      provSel.value = data.defaultProvider || 'auto';
-      _selectedProvider = data.defaultProvider || 'auto';
-    }
-  }
-
-  populateModels(saved.model);
+  // Populate provider selector (filtered by harness)
+  _reloadProviderSelector();
   updateStatusIndicator();
 }
 
@@ -240,15 +271,17 @@ function updateStatusIndicator(): void {
   const oldDot = parent?.querySelector('.selector-status-dot');
   if (oldDot) oldDot.remove();
 
+  const providers = _filteredProviders();
+
   let status: 'ok' | 'warn' | 'off' = 'off';
   if (_selectedProvider === 'auto' || !_selectedProvider) {
-    const anyReady = _providers.some(
+    const anyReady = providers.some(
       (p) => p.available && p.models.some((m) => m.reachable),
     );
-    const anyAvailable = _providers.some((p) => p.available);
+    const anyAvailable = providers.some((p) => p.available);
     status = anyReady ? 'ok' : anyAvailable ? 'warn' : 'off';
   } else {
-    const prov = _providers.find((p) => p.id === _selectedProvider);
+    const prov = providers.find((p) => p.id === _selectedProvider);
     if (prov) {
       const hasReachable = prov.models.some((m) => m.reachable);
       status = prov.available && hasReachable ? 'ok' : prov.available ? 'warn' : 'off';
@@ -294,6 +327,8 @@ function populateModels(savedModel?: string): void {
   if (!modelSel) return;
   modelSel.innerHTML = '';
 
+  const providers = _filteredProviders();
+
   if (_selectedProvider === 'auto' || !_selectedProvider) {
     modelSel.disabled = true;
     const opt = document.createElement('option');
@@ -305,7 +340,7 @@ function populateModels(savedModel?: string): void {
   }
 
   modelSel.disabled = false;
-  const provider = _providers.find((p) => p.id === _selectedProvider);
+  const provider = providers.find((p) => p.id === _selectedProvider);
   if (!provider) return;
 
   for (const m of provider.models) {
@@ -377,22 +412,43 @@ function loadSelection(unitId: string | null = null): { harness: string; provide
  * update the DOM selectors to match. Called by agentChip on chip-switch.
  */
 export function loadConfigForUnit(unitId: string): void {
-  if (!_harnesses.length && !_providers.length) return; // data not yet fetched
+  if (!_harnesses.length && !_allProviders.length) return; // data not yet fetched
   const saved = loadSelection(unitId);
 
   const harnessSel = document.getElementById('harness-selector') as HTMLSelectElement | null;
-  const provSel = document.getElementById('provider-selector') as HTMLSelectElement | null;
 
   if (harnessSel) {
     const exists = saved.harness && _harnesses.find((h) => h.id === saved.harness && h.available);
-    harnessSel.value = exists ? saved.harness : 'auto';
-    _selectedHarness = harnessSel.value;
+    const newHarness = exists ? saved.harness : 'auto';
+    if (newHarness !== _selectedHarness) {
+      _selectedHarness = newHarness;
+      harnessSel.value = newHarness;
+      // Re-filter provider list because harness changed
+      _reloadProviderSelector();
+    } else {
+      harnessSel.value = newHarness;
+      _selectedHarness = newHarness;
+    }
+  } else {
+    _selectedHarness = saved.harness || 'auto';
   }
+
+  // Provider selector is already updated by _reloadProviderSelector() above
+  // if harness changed. Otherwise restore the saved provider.
+  const provSel = document.getElementById('provider-selector') as HTMLSelectElement | null;
   if (provSel) {
-    const exists = saved.provider && _providers.find((p) => p.id === saved.provider && p.available);
-    provSel.value = exists ? saved.provider : 'auto';
-    _selectedProvider = provSel.value;
+    const providers = _filteredProviders();
+    const exists = saved.provider && providers.find((p) => p.id === saved.provider && p.available);
+    if (exists) {
+      _selectedProvider = saved.provider;
+      provSel.value = saved.provider;
+    } else if (provSel.value !== _selectedProvider) {
+      // Only reset to auto if the current selection isn't already valid
+      provSel.value = 'auto';
+      _selectedProvider = 'auto';
+    }
   }
+
   populateModels(saved.model);
   updateStatusIndicator();
 

@@ -247,10 +247,33 @@ def _get_providers() -> dict[str, Any]:
     }
 
 
-def _get_chat_config() -> dict[str, Any]:
-    """Return full 3-layer config for the chat UI: harnesses + providers + defaults."""
+def _get_chat_config(harness: str | None = None) -> dict[str, Any]:
+    """
+    Return full 3-layer config for the chat UI: harnesses + providers + defaults.
+
+    When harness='hermes', providers are filtered to show only those that are
+    actually configured in ~/.hermes/config.yaml (field `configured: true`).
+    This prevents showing providers like openai/anthropic/xai/nvidia-nim/openrouter
+    when the user hasn't configured them in Hermes.
+
+    When harness='claude-code' or harness=None, all providers are returned
+    (Claude Code can reach any provider independently).
+    """
     harnesses = _get_harnesses()
     provider_info = _get_providers()
+
+    providers_list = provider_info["providers"]
+
+    # Filter providers based on harness context
+    if harness == "hermes":
+        providers_list = [
+            p for p in providers_list
+            if p.get("configured")
+        ]
+    # For "claude-code" or any other harness, show all providers (no filter)
+
+    # Pick default provider from the (possibly filtered) list
+    default_provider = _pick_default_provider(providers_list)
 
     default_harness = ""
     for hid in ("hermes", "claude-code", "openclaw", "cursor"):
@@ -264,5 +287,23 @@ def _get_chat_config() -> dict[str, Any]:
     return {
         "harnesses": harnesses,
         "defaultHarness": default_harness,
-        **provider_info,
+        "defaultProvider": default_provider,
+        "providers": providers_list,
     }
+
+
+def _pick_default_provider(providers: list[dict[str, Any]]) -> str:
+    """
+    Pick the best default provider from a (possibly filtered) list.
+    Priority: ollama-cloud > openrouter > openai > nvidia-nim > anthropic > deepseek > xai
+    then first available.
+    """
+    priority = ("ollama-cloud", "openrouter", "openai", "nvidia-nim", "anthropic", "deepseek", "xai")
+    for pid in priority:
+        for p in providers:
+            if p["id"] == pid and p.get("available"):
+                return pid
+    for p in providers:
+        if p.get("available"):
+            return p["id"]
+    return ""
