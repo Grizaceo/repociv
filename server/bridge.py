@@ -254,6 +254,10 @@ def update_unit_fatigue(unit_id: str, *, fatigue: int | None = None,
 def discover_rest_area(rest_area_id: str, room_id: str, coord: tuple,
                        recovery_rate: float = 8.0, capacity: int = 4) -> dict[str, Any]:
     with _fatigue_lock:
+        # Kiosko rest area recovery bonus (Fase 4)
+        if room_id == 'kiosk' or room_id.startswith('kiosk') or rest_area_id.startswith('kiosk'):
+            recovery_rate = recovery_rate * 1.25
+
         area = {
             "id": rest_area_id, "roomId": room_id, "coord": list(coord),
             "recoveryRate": recovery_rate, "capacity": capacity, "unitsInside": [],
@@ -670,6 +674,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/improve/proposals":  _routes.get_improve_proposals,
             "/providers/live":     _routes.get_providers_live,
             "/ws":                 _routes.get_ws_info,
+            "/api/news/latest":    _routes.get_latest_news,
         }
         if path in _GET_EXACT:
             status, body = _GET_EXACT[path](ctx)
@@ -765,6 +770,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/pending/edit":      _routes.post_pending_edit,
             "/pending/delete":    _routes.post_pending_delete,
             "/pending/state":     _routes.post_pending_state,
+            "/api/news/read":     _routes.post_news_read,
         }
         if path in _POST_EXACT:
             status, resp = _POST_EXACT[path](body, {})
