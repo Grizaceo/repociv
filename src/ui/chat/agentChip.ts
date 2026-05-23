@@ -9,6 +9,7 @@ import {
   setActiveChatUnit,
   updateChatTargetIndicator,
 } from './state.ts';
+import { loadConfigForUnit } from './modelSelector.ts';
 
 const AGENT_ICONS: Record<string, string> = {
   DAVI: '🛡',
@@ -70,6 +71,9 @@ export async function handleChipClick(unitId: string): Promise<void> {
   // Dynamic import breaks the init-time cycle with history.ts
   const { renderChatHistory } = await import('./history.ts');
   renderChatHistory(unitId);
+
+  // Restore saved harness/provider/model config for this agent.
+  loadConfigForUnit(unitId);
 
   updateChatTargetIndicator();
 

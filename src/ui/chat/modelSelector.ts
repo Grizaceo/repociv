@@ -1,5 +1,6 @@
 // ─── 3-layer selector: Harness / Provider / Model ──────────────────────────
 import { bridgeHeaders, bridgeUrl, hermesWebUrl } from '../../bridgeEnv.ts';
+import { getActiveChatUnit } from './state.ts';
 
 interface HarnessInfo {
   id: string;
@@ -50,7 +51,7 @@ export function initProviderSelectors(): void {
   if (harnessSel && !harnessSel.dataset['wired']) {
     harnessSel.addEventListener('change', () => {
       _selectedHarness = harnessSel.value;
-      persistSelection();
+      persistSelection(getActiveChatUnit());
       updateStatusIndicator();
     });
     harnessSel.dataset['wired'] = '1';
@@ -59,7 +60,7 @@ export function initProviderSelectors(): void {
     provSel.addEventListener('change', () => {
       _selectedProvider = provSel.value;
       populateModels();
-      persistSelection();
+      persistSelection(getActiveChatUnit());
       updateStatusIndicator();
       if (_selectedModel) {
         switchHermesModel(_selectedProvider, _selectedModel);
@@ -70,7 +71,7 @@ export function initProviderSelectors(): void {
   if (modelSel && !modelSel.dataset['wired']) {
     modelSel.addEventListener('change', () => {
       _selectedModel = modelSel.value;
-      persistSelection();
+      persistSelection(getActiveChatUnit());
       updateStatusIndicator();
       if (_selectedModel && _selectedProvider) {
         switchHermesModel(_selectedProvider, _selectedModel);
@@ -190,7 +191,9 @@ function finishInit(data: { defaultHarness: string; defaultProvider: string }): 
     }
   }
 
-  const saved = loadSelection();
+  // Load per-unit config if a chip is already active, otherwise global.
+  const activeUnit = getActiveChatUnit();
+  const saved = loadSelection(activeUnit);
 
   if (harnessSel) {
     if (saved.harness) {
@@ -327,24 +330,36 @@ function populateModels(savedModel?: string): void {
   _selectedModel = provider.defaultModel;
 }
 
-function persistSelection(): void {
+// ─── Per-unit config storage ────────────────────────────────────────────────
+// Each agent chip persists its own harness/provider/model selection so that
+// switching chips restores the previous configuration for that agent.
+// Key format: repociv:chatConfig:<unitId>  (falls back to repociv:chatConfig)
+
+function _storageKey(unitId: string | null): string {
+  return unitId ? `repociv:chatConfig:${unitId}` : 'repociv:chatConfig';
+}
+
+function persistSelection(unitId: string | null = null): void {
   try {
-    localStorage.setItem(
-      'repociv:chatConfig',
-      JSON.stringify({
-        harness: _selectedHarness,
-        provider: _selectedProvider,
-        model: _selectedModel,
-      }),
-    );
+    const data = JSON.stringify({
+      harness: _selectedHarness,
+      provider: _selectedProvider,
+      model: _selectedModel,
+    });
+    localStorage.setItem(_storageKey(unitId), data);
+    // Always mirror to the global key so new chips without saved config
+    // get the most recent global choice as their default.
+    localStorage.setItem('repociv:chatConfig', data);
   } catch {
     // localStorage full or unavailable
   }
 }
 
-function loadSelection(): { harness: string; provider: string; model: string } {
+function loadSelection(unitId: string | null = null): { harness: string; provider: string; model: string } {
   try {
-    const raw = localStorage.getItem('repociv:chatConfig');
+    // Try per-unit key first, fall back to global, then legacy key.
+    const perUnit = unitId ? localStorage.getItem(_storageKey(unitId)) : null;
+    const raw = perUnit ?? localStorage.getItem('repociv:chatConfig');
     if (raw) return JSON.parse(raw);
     const old = localStorage.getItem('repociv:provider');
     if (old) {
@@ -355,6 +370,35 @@ function loadSelection(): { harness: string; provider: string; model: string } {
     // ignore
   }
   return { harness: '', provider: '', model: '' };
+}
+
+/**
+ * Restore the saved harness/provider/model config for the given unit id and
+ * update the DOM selectors to match. Called by agentChip on chip-switch.
+ */
+export function loadConfigForUnit(unitId: string): void {
+  if (!_harnesses.length && !_providers.length) return; // data not yet fetched
+  const saved = loadSelection(unitId);
+
+  const harnessSel = document.getElementById('harness-selector') as HTMLSelectElement | null;
+  const provSel = document.getElementById('provider-selector') as HTMLSelectElement | null;
+
+  if (harnessSel) {
+    const exists = saved.harness && _harnesses.find((h) => h.id === saved.harness && h.available);
+    harnessSel.value = exists ? saved.harness : 'auto';
+    _selectedHarness = harnessSel.value;
+  }
+  if (provSel) {
+    const exists = saved.provider && _providers.find((p) => p.id === saved.provider && p.available);
+    provSel.value = exists ? saved.provider : 'auto';
+    _selectedProvider = provSel.value;
+  }
+  populateModels(saved.model);
+  updateStatusIndicator();
+
+  // Stamp active unit on the wrapper so CSS can show a label like "CFG: CLAUDE".
+  const wrapper = document.getElementById('model-selector-wrapper');
+  if (wrapper) wrapper.dataset['configUnit'] = unitId;
 }
 
 /** Get the currently selected harness, provider and model for sending to the bridge. */

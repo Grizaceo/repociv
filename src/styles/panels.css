@@ -320,6 +320,67 @@
   border-color: var(--ui-gold);
 }
 
+/* ─── Model / Harness / Provider selectors (side panel header) ─────────── */
+.model-selector-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  padding: 0 6px;
+  position: relative;
+}
+
+.model-selector-wrapper[data-config-unit]::before {
+  content: "CFG: " attr(data-config-unit);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--ui-text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.provider-selectors {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.provider-selectors select {
+  flex: 1;
+  min-width: 0;
+  background: rgba(0,0,0,0.45);
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  color: var(--ui-text);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 2px 4px;
+  outline: none;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+.provider-selectors select:focus {
+  border-color: var(--ui-gold);
+}
+
+.provider-selectors select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.selector-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.selector-status-dot.ok   { background: var(--civ-food); }
+.selector-status-dot.warn { background: var(--civ-gold); }
+.selector-status-dot.off  { background: #555; }
+
 #side-panel-tabs {
   display: flex;
   border-bottom: 1px solid var(--ui-border);
