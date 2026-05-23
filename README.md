@@ -347,6 +347,37 @@ Ver [docs/API.md](docs/API.md) para documentación completa de endpoints del bri
 
 ---
 
+## Integración con CDaily — Gaceta Exterior
+
+RepoCiv lee directamente el SQLite de [CDaily](../cdaily) (`~/.blogwatcher-cli/blogwatcher-cli.db`) para mostrar el feed exterior dentro del dashboard imperial. Tres puntos de exposición:
+
+- **Widget `📰 Gaceta` (top-left)** — flotante bajo los recursos (gold/science/production). Colapsado muestra badge + último titular; expandido lista top 5 no leídos con botón ✓ Leído. Toggle con hotkey `N`. Estado persistido en localStorage.
+- **City panel CDAILY** — al hacer doble click sobre la ciudad `CDAILY` el panel lateral muestra el feed completo en lugar del árbol de archivos.
+- **Kiosko de Prensa (vista local)** — un tile especial `kiosk` en la primera sala del repo CDAILY que aplica multiplicador `1.25x` a la recuperación de fatiga (`server/bridge.py` `discover_rest_area`).
+
+### Endpoints del bridge
+
+| Método | Path | Función |
+|---|---|---|
+| GET | `/api/news/latest` | Top 5 no leídos (`server/http_routes.py:get_latest_news`) |
+| POST | `/api/news/read` | Marca como leído (`server/http_routes.py:post_news_read`) |
+
+Acceden al SQLite con `with closing(sqlite3.connect(...))` — el FastAPI de CDaily no necesita estar corriendo.
+
+### Cliente TypeScript
+
+```ts
+import { getLatestNews, markNewsAsRead } from './bridge.ts';
+const articles = await getLatestNews();      // CDailyArticle[]
+await markNewsAsRead(articleId);              // boolean
+```
+
+### MCP de CDaily
+
+Aparte de esta integración HTTP, CDaily también expone un MCP server stdio propio con 13 tools / 3 resources / 2 prompts. Ver [`cdaily/README.md`](../cdaily/README.md#mcp-server-agent-native). Útil cuando quieres que agentes externos (Claude Code, Cursor) operen el feed directamente, sin pasar por el bridge de RepoCiv.
+
+---
+
 ## Debug
 
 ```bash
