@@ -53,16 +53,27 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
   const chatInput = document.getElementById('chat-input') as HTMLInputElement | null;
 
   const sendMessage = (input: HTMLInputElement | null) => {
-    // 1) Resolve target unit: honor active chip selector over map selection.
-    // The chip selector (#chat-agent-selector > .chat-agent-chip.active) reflects
-    // the user's explicit agent choice. Only honor it when the side panel is open
-    // so the user can see which chip is active.
+    // 1) Resolve target unit: honor the user's explicit agent choice.
+    // Priority:
+    //   a) Active chip when the side panel is open (visible to the user).
+    //   b) Last chip persisted to localStorage when the panel is closed —
+    //      otherwise we'd dispatch to state.selectedUnit while openSidePanel()
+    //      below restores the saved chip, splitting dispatch from the UI and
+    //      making a second parallel message silently land on the wrong agent.
     const chipActive = document.querySelector<HTMLElement>('.chat-agent-chip.active');
-    const selectorUnitId = isSidePanelOpen() ? chipActive?.dataset['unit'] : undefined;
+    let selectorUnitId: string | undefined = isSidePanelOpen()
+      ? chipActive?.dataset['unit']
+      : undefined;
+    if (!selectorUnitId && !isSidePanelOpen()) {
+      const saved = (() => {
+        try { return localStorage.getItem('repociv:lastChatUnit'); } catch { return null; }
+      })();
+      if (saved && state.getUnit(saved)) selectorUnitId = saved;
+    }
     const prefersSelector = !!selectorUnitId && selectorUnitId !== state.selectedUnit?.id;
 
     let targetUnit: Unit | null = null;
-    if (prefersSelector) {
+    if (prefersSelector && selectorUnitId) {
       targetUnit = state.getUnit(selectorUnitId) ?? null;
     }
     const unit = targetUnit ?? state.selectedUnit;

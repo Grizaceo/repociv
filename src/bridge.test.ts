@@ -507,7 +507,7 @@ describe('BridgeEvents handleBridgeEvent', () => {
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
   url: string;
-  readyState = WebSocket.CONNECTING;
+  readyState: number = WebSocket.CONNECTING;
   private _onopen: (() => void) | null = null;
   private _onclose: ((evt: { code: number }) => void) | null = null;
   private _onerror: (() => void) | null = null;
