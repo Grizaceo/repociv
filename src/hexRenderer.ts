@@ -13,69 +13,78 @@ export class HexRenderer {
 
   private spriteImages: Record<string, HTMLImageElement | HTMLCanvasElement> = {};
 
-  private makeWhiteTransparent(img: HTMLImageElement): HTMLCanvasElement {
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext('2d')!;
-    ctx.drawImage(img, 0, 0);
-    try {
-      const imgData = ctx.getImageData(0, 0, img.width, img.height);
-      const data = imgData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i]!;
-        const g = data[i+1]!;
-        const b = data[i+2]!;
-        // Make pure white (#ffffff) or very close to it transparent
-        if (r > 240 && g > 240 && b > 240) {
-          data[i+3] = 0;
-        }
-      }
-      ctx.putImageData(imgData, 0, 0);
-    } catch (e) {
-      logger.warn('Failed to chroma-key transparent sprites:', e);
-    }
-    return canvas;
-  }
-
   async loadAssets() {
-    const assets = [
-      { name: 'plains', url: '/assets/terrain_plains.png' },
-      { name: 'forest', url: '/assets/terrain_forest.png' },
-      { name: 'desert', url: '/assets/terrain_desert.png' },
-      { name: 'ocean', url: '/assets/terrain_ocean.png' },
-      { name: 'mountain', url: '/assets/terrain_mountain.png' },
-      { name: 'ice', url: '/assets/terrain_ice.png' },
-      { name: 'fog', url: '/assets/fog_parchment.png' },
-      { name: 'hill_sprite', url: '/assets/hill_sprite.png' },
-      { name: 'mountain_sprite', url: '/assets/mountain_sprite.png' },
-      { name: 'forest_sprite', url: '/assets/forest_sprite.png' },
-    ];
+    // ── Load atlas manifest ──
+    let manifest: {
+      terrainAtlas: string;
+      decorAtlas: string;
+      cellSize: number;
+      terrainRects: Record<string, number[]>;
+      decorRects: Record<string, number[]>;
+    };
+    try {
+      const res = await fetch('/assets/asset-atlas.json');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      manifest = await res.json();
+    } catch (err) {
+      logger.warn('Failed to load asset atlas manifest:', err);
+      this.assetsLoaded = false;
+      return;
+    }
 
     const spriteImages: Record<string, HTMLImageElement | HTMLCanvasElement> = {};
 
-    const promises = assets.map((asset) => {
-      return new Promise<void>((resolve) => {
+    // ── Helper: load an image from URL ──
+    const loadImage = (url: string): Promise<HTMLImageElement> =>
+      new Promise((resolve, reject) => {
         const img = new Image();
-        img.src = asset.url;
-        img.onload = () => {
-          if (asset.name.includes('sprite')) {
-            spriteImages[asset.name] = this.makeWhiteTransparent(img);
-          } else {
-            this.patterns[asset.name] = this.ctx.createPattern(img, 'repeat');
-          }
-          resolve();
-        };
-        img.onerror = () => {
-          logger.warn(`Failed to load asset: ${asset.url}`);
-          resolve();
-        };
+        img.src = url;
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`Failed to load ${url}`));
       });
-    });
 
-    await Promise.all(promises);
-    this.spriteImages = spriteImages;
-    this.assetsLoaded = true;
+    // ── Helper: extract a subrect from an image into a NxN canvas ──
+    const extractToCanvas = (
+      src: HTMLImageElement,
+      rect: number[],
+      targetSize: number,
+    ): HTMLCanvasElement => {
+      const canvas = document.createElement('canvas');
+      canvas.width = targetSize;
+      canvas.height = targetSize;
+      const cctx = canvas.getContext('2d')!;
+      cctx.drawImage(
+        src,
+        rect[0]!, rect[1]!, rect[2]! - rect[0]!, rect[3]! - rect[1]!,
+        0, 0, targetSize, targetSize,
+      );
+      return canvas;
+    };
+
+    try {
+      // ── Terrain atlas → CanvasPatterns ──
+      const terrainImg = await loadImage(manifest.terrainAtlas);
+      const cellSize = manifest.cellSize;
+      for (const [name, rect] of Object.entries(manifest.terrainRects)) {
+        const tileCanvas = extractToCanvas(terrainImg, rect, cellSize);
+        const pattern = this.ctx.createPattern(tileCanvas, 'repeat');
+        if (pattern) {
+          this.patterns[name] = pattern;
+        }
+      }
+
+      // ── Decor atlas → individual sprite canvases ──
+      const decorImg = await loadImage(manifest.decorAtlas);
+      for (const [name, rect] of Object.entries(manifest.decorRects)) {
+        spriteImages[name] = extractToCanvas(decorImg, rect, cellSize);
+      }
+
+      this.spriteImages = spriteImages;
+      this.assetsLoaded = true;
+    } catch (err) {
+      logger.warn('Failed to load asset atlas images:', err);
+      this.assetsLoaded = false;
+    }
   }
 
   fillHex(cx: number, cy: number, size: number) {
