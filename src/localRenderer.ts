@@ -28,6 +28,13 @@ export class LocalRenderer {
   private ctx: CanvasRenderingContext2D;
   private world: LocalWorld | null = null;
 
+  // CSS Design Token Cache (Phase 3a)
+  private tokens: Record<string, string> = {};
+
+  // Offscreen Static Layer (Phase 3b)
+  private staticLayer: HTMLCanvasElement | null = null;
+  private staticWorldId: string | null = null;
+
   // Camera
   private cam = { x: 0, y: 0, cx: 0, cy: 0, zoom: 1 };
   private isDragging = false;
@@ -54,10 +61,30 @@ export class LocalRenderer {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.resize();
+    this.cacheTokens();
+  }
+
+  private cacheTokens() {
+    const style = getComputedStyle(document.documentElement);
+    this.tokens = {
+      base: style.getPropertyValue('--lt-base').trim() || '#0C0C0C',
+      surface: style.getPropertyValue('--lt-surface').trim() || '#141414',
+      border: style.getPropertyValue('--lt-border').trim() || '#262626',
+      zinc800: style.getPropertyValue('--lt-zinc-800').trim() || '#27272A',
+      zinc600: style.getPropertyValue('--lt-zinc-600').trim() || '#52525B',
+      zinc400: style.getPropertyValue('--lt-zinc-400').trim() || '#A1A1AA',
+      zinc50: style.getPropertyValue('--lt-zinc-50').trim() || '#FAFAFA',
+      amber500: style.getPropertyValue('--lt-amber-500').trim() || '#F59E0B',
+      amber400: style.getPropertyValue('--lt-amber-400').trim() || '#FBBF24',
+      error: style.getPropertyValue('--lt-error').trim() || '#EF4444',
+      success: style.getPropertyValue('--lt-success').trim() || '#22C55E',
+      fontMono: style.getPropertyValue('--lt-font-mono').trim() || "'JetBrains Mono', monospace",
+    };
   }
 
   setWorld(world: LocalWorld) {
     this.world = world;
+    this.staticLayer = null; // force rebuild on setWorld
     // Center camera on the grid
     this.cam.x = world.width / 2;
     this.cam.y = world.height / 2;
@@ -213,6 +240,11 @@ export class LocalRenderer {
     const { ctx, canvas, cam, world } = this;
     if (!world) return;
 
+    // 3b. Rebuild static layer if needed
+    if (!this.staticLayer || this.staticWorldId !== world.repoId) {
+      this.rebuildStaticLayer();
+    }
+
     // Background
     ctx.fillStyle = '#0d0d14';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -222,11 +254,21 @@ export class LocalRenderer {
     ctx.scale(cam.zoom, cam.zoom);
     ctx.translate(-cam.x, -cam.y);
 
-    // Draw grid tiles (with depth sort by y)
-    for (let y = 0; y < world.height; y++) {
-      for (let x = 0; x < world.width; x++) {
+    // Draw static pre-rendered layer (Phase 3b)
+    if (this.staticLayer) {
+      ctx.drawImage(this.staticLayer, 0, 0);
+    }
+
+    // Draw dynamic tiles on top of the static canvas (Phase 3c/3d)
+    const view = this.visibleTileRect();
+    for (let y = view.y0; y <= view.y1; y++) {
+      for (let x = view.x0; x <= view.x1; x++) {
         const tile = world.grid[y]![x]!;
-        this.drawTile(tile);
+        if (tile.type === 'door') {
+          this.drawDynamicDoorTile(tile);
+        } else if (tile.type === 'workbench') {
+          this.drawDynamicWorkbenchTile(tile);
+        }
       }
     }
 
@@ -267,6 +309,61 @@ export class LocalRenderer {
     grad.addColorStop(1, 'rgba(0,0,0,0.25)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  private rebuildStaticLayer() {
+    if (!this.world) return;
+    const c = document.createElement('canvas');
+    c.width = this.world.width * TILE_SIZE;
+    c.height = this.world.height * TILE_SIZE;
+    const sctx = c.getContext('2d')!;
+
+    // Temporarily swap context
+    const originalCtx = this.ctx;
+    this.ctx = sctx;
+
+    // Draw all tiles to offscreen canvas
+    for (let y = 0; y < this.world.height; y++) {
+      for (let x = 0; x < this.world.width; x++) {
+        const tile = this.world.grid[y]![x]!;
+        if (tile.type === 'door') {
+          // Draw floor underneath sliding door
+          this.drawTile({ ...tile, type: 'floor' });
+        } else {
+          this.drawTile(tile);
+        }
+      }
+    }
+
+    this.ctx = originalCtx;
+    this.staticLayer = c;
+    this.staticWorldId = this.world.repoId;
+  }
+
+  private visibleTileRect() {
+    if (!this.world) return { x0: 0, y0: 0, x1: 0, y1: 0 };
+    const { canvas, cam } = this;
+    
+    // Screen bounds to world coordinates
+    const left = (0 - cam.cx) / cam.zoom + cam.x;
+    const top = (0 - cam.cy) / cam.zoom + cam.y;
+    const right = (canvas.width - cam.cx) / cam.zoom + cam.x;
+    const bottom = (canvas.height - cam.cy) / cam.zoom + cam.y;
+
+    const x0 = Math.max(0, Math.floor(left / TILE_SIZE));
+    const y0 = Math.max(0, Math.floor(top / TILE_SIZE));
+    const x1 = Math.min(this.world.width - 1, Math.floor(right / TILE_SIZE));
+    const y1 = Math.min(this.world.height - 1, Math.floor(bottom / TILE_SIZE));
+
+    return { x0, y0, x1, y1 };
+  }
+
+  private drawDynamicDoorTile(tile: LocalTile) {
+    this.drawTile(tile);
+  }
+
+  private drawDynamicWorkbenchTile(tile: LocalTile) {
+    // Drawn statically in rebuildStaticLayer, no active screen glows yet in Phase 3
   }
 
   private drawTile(tile: LocalTile) {
