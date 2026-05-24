@@ -1,5 +1,9 @@
 # RepoCiv — Imperial Agent Dashboard
 
+[![CI](https://github.com/yourusername/repociv/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/repociv/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Status](https://img.shields.io/badge/status-alpha-blue.svg)](docs/ROADMAP.md)
+
 > Dashboard hexagonal estilo Civ V que visualiza `~/.hermes/workspace/repos/` como ciudades, agentes como unidades, y procesos como edificios.
 
 **Stack:** TypeScript + Vite (frontend, Canvas 2D) · Python HTTP bridge (backend) · 60 FPS target en RTX 4060.
