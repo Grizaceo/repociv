@@ -611,6 +611,9 @@ export class Renderer {
 
     // ─── Phase 6: Local RimWorld view ───────────────────────────────────────
     if (this.state.viewMode === 'local') {
+      if (!document.body.classList.contains('local-view')) {
+        document.body.classList.add('local-view');
+      }
       if (!this.localR && this._localRendererCtor) {
         this.localR = new this._localRendererCtor(canvas);
         this.localR.setupInput();
@@ -627,6 +630,10 @@ export class Renderer {
       }
       this.localR.render(this.state.getLocalUnits());
       return;
+    }
+
+    if (document.body.classList.contains('local-view')) {
+      document.body.classList.remove('local-view');
     }
 
     ctx.save();
