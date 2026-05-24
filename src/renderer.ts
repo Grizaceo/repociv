@@ -450,10 +450,27 @@ export class Renderer {
       const rect = this.canvas.getBoundingClientRect();
       const wx = e.clientX - rect.left;
       const wy = e.clientY - rect.top;
+
+      // Priority 1: wonder sprite hit test
+      const wonder = this.hitWonderAt(wx, wy);
+      if (wonder) {
+        import('./ui/wonderVignette.ts').then((mod) => {
+          mod.openWonderVignette(wonder as import('./types').WonderType);
+        });
+        return;
+      }
+
       const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
       const tile = this.state.world.tiles.get(tileKey(coord));
       if (tile?.city) {
-        const cityId = tile.city.id;
+        const city = tile.city;
+        if (city.isCapital) {
+          import('./ui/capitalPanel.ts').then((mod) => {
+            mod.openCapitalPanel();
+          });
+          return;
+        }
+        const cityId = city.id;
         void (async () => {
           if (!this._localRendererCtor) {
             const mod = await import('./localRenderer.ts');
@@ -626,6 +643,27 @@ export class Renderer {
     // Pass 2: Territory
     for (const city of this.state.world.cities) {
       this.hexR.drawCityTerritory(city, this.animTime);
+    }
+
+    // Pass 2.5: Capital wonder flanking sprites (drawn on top of capital hex)
+    const capital = this.state.world.cities.find((c) => c.isCapital);
+    if (capital) {
+      const cp = axialToPixel(capital.coord, HEX_SIZE);
+      if (capital.wonders) {
+        for (let i = 0; i < Math.min(capital.wonders.length, 2); i++) {
+          const w = capital.wonders[i]!;
+          const sx = cp.x + (i === 0 ? -1 : 1) * HEX_SIZE * 0.55;
+          const sy = cp.y - HEX_SIZE * 0.5;
+          const r = 9;
+          ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2);
+          ctx.fillStyle = w.wonderType === 'bibliotheca' ? '#1a3a5c' : '#2d5a27';
+          ctx.strokeStyle = w.wonderType === 'bibliotheca' ? '#4a90c8' : '#6bc86b';
+          ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(w.wonderType === 'bibliotheca' ? 'B' : 'I', sx, sy + 1);
+        }
+      }
     }
 
     // Pass 3: Decorations (Sorted by Y for depth)
@@ -901,5 +939,28 @@ export class Renderer {
       if (t) neighbors.push(t);
     }
     return neighbors;
+  }
+
+  /** Hit-test for wonder sprite under screen point. */
+  hitWonderAt(screenX: number, screenY: number): string | null {
+    const capital = this.state.getCapital();
+    if (!capital || !capital.wonders) return null;
+    const pos = axialToPixel(capital.coord, HEX_SIZE);
+    const cam = this.cam;
+    const sx = cam.cx + (pos.x - cam.x) * cam.zoom;
+    const sy = cam.cy + (pos.y - cam.y) * cam.zoom;
+    const R = 9 * cam.zoom;
+    for (let i = 0; i < Math.min(capital.wonders.length, 2); i++) {
+      const offX = (i === 0 ? -1 : 1) * HEX_SIZE * 0.55 * cam.zoom;
+      const offY = -HEX_SIZE * 0.5 * cam.zoom;
+      const wx = sx + offX;
+      const wy = sy + offY;
+      const dx = screenX - wx;
+      const dy = screenY - wy;
+      if (dx * dx + dy * dy <= (R + 6) * (R + 6)) {
+        return capital.wonders[i]!.wonderType ?? null;
+      }
+    }
+    return null;
   }
 }

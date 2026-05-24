@@ -11,7 +11,7 @@ import {
   axialEquals,
   axialSub,
 } from './hex.ts';
-import { type Terrain, type Tile, type City, type District, type World, tileKey } from './types.ts';
+import { type Terrain, type Tile, type City, type District, type Building, type World, tileKey } from './types.ts';
 import { loadManualLayout, updateManualRepoCoord } from './manualLayout.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
 
@@ -837,6 +837,89 @@ export async function generateWorld(): Promise<World> {
   const totalGold = reposWithTerrain.reduce((acc, r) => acc + r.gold, 0);
   const totalScience = reposWithTerrain.reduce((acc, r) => acc + r.science, 0);
   const totalProduction = reposWithTerrain.reduce((acc, r) => acc + r.production, 0);
+
+  // ─── Spawn Capitalis + 2 Maravillas ─────────────────────────────────────────
+  let capitalCity = cities.find((c) => c.isCapital);
+  if (!capitalCity) {
+    // find a vacant coord near center; fallback to (0,0) or offset if occupied
+    let capCoord: Axial = { q: 0, r: 0 };
+    const taken = new Set(cities.map((c) => tileKey(c.coord)));
+    if (taken.has(tileKey(capCoord))) {
+      const spiral = spiralCoords({ q: 0, r: 0 }, 50);
+      for (const s of spiral) {
+        if (!taken.has(tileKey(s))) { capCoord = s; break; }
+      }
+    }
+    const territory = spiralCoords(capCoord, 7).slice(1, 7); // 6 neighbours at radius 1
+
+    const bibliotheca: Building = {
+      id: 'wonder-bibliotheca',
+      name: 'Bibliotheca Alexandrina',
+      type: 'wonder',
+      wonderType: 'bibliotheca',
+      cityId: 'capital-imperialis',
+      progress: 100,
+      durationSeconds: 0,
+      elapsedSeconds: 0,
+      state: 'complete',
+    };
+    const institutum: Building = {
+      id: 'wonder-institutum',
+      name: 'Institutum Scientiarum',
+      type: 'wonder',
+      wonderType: 'institutum',
+      cityId: 'capital-imperialis',
+      progress: 100,
+      durationSeconds: 0,
+      elapsedSeconds: 0,
+      state: 'complete',
+    };
+
+    capitalCity = {
+      id: 'capital-imperialis',
+      name: 'Capitalis',
+      coord: capCoord,
+      population: 1,
+      territory,
+      districts: [],
+      buildings: [bibliotheca, institutum],
+      wonders: [bibliotheca, institutum],
+      isCapital: true,
+    };
+    cities.push(capitalCity);
+
+    // claim territory tiles
+    for (const t of territory) {
+      const k = tileKey(t);
+      if (!tiles.has(k)) {
+        tiles.set(k, {
+          coord: t,
+          terrain: 'plains',
+          city: capitalCity,
+          resources: { gold: 0, science: 0, production: 0 },
+          inFog: false,
+          revealed: true,
+        });
+      } else {
+        const tile = tiles.get(k)!;
+        tile.city = capitalCity;
+      }
+    }
+    // ensure capital tile itself exists
+    const capKey = tileKey(capCoord);
+    if (!tiles.has(capKey)) {
+      tiles.set(capKey, {
+        coord: capCoord,
+        terrain: 'plains',
+        city: capitalCity,
+        resources: { gold: 10, science: 10, production: 10 },
+        inFog: false,
+        revealed: true,
+      });
+    } else {
+      tiles.get(capKey)!.city = capitalCity;
+    }
+  }
 
   // Detect disconnected cities and generate intermediate tiles with folder structures
   const world: World = {

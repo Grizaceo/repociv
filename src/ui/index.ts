@@ -56,3 +56,5 @@ export { openLogPanel, closeLogPanel, isLogPanelOpen, toggleLogPanel } from './l
 
 // Re-export specific initialization helpers
 export { initExternalLibs } from './hud.ts';
+export { openCapitalPanel, closeCapitalPanel } from './capitalPanel.ts';
+export { openWonderVignette, closeWonderVignette } from './wonderVignette.ts';

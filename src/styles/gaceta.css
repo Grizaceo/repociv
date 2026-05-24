@@ -15,13 +15,29 @@
   z-index: 15;
   font-size: 12px;
   color: var(--text-primary, #d4a574);
-  transition: max-height 0.2s ease;
-  overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-#gaceta-widget.gaceta-collapsed { max-height: 48px; }
-#gaceta-widget.gaceta-expanded  { max-height: 420px; }
+#gaceta-widget.gaceta-collapsed {
+  max-height: 48px;
+  resize: none;
+}
+#gaceta-widget.gaceta-expanded {
+  resize: both;
+  min-width: 280px;
+  min-height: 180px;
+  max-width: 600px;
+  max-height: 800px;
+  height: 420px;
+}
+
+#gaceta-widget.gaceta-expanded .gaceta-body {
+  flex: 1;
+  overflow-y: auto;
+}
 
 .gaceta-header {
   display: flex;
@@ -137,3 +153,14 @@
   border-top: 1px solid var(--ui-border, #4a3a1a);
 }
 .gaceta-link-full:hover { background: rgba(200, 168, 75, 0.06); }
+
+/* Gaceta inside capital panel (no resize handle, full height) */
+.gaceta-mode-panel {
+  position: static !important;
+  width: 100% !important; height: 100% !important;
+  resize: none !important; max-width: none !important; max-height: none !important;
+  top: auto !important; left: auto !important;
+}
+.gaceta-mode-panel .gaceta-teaser { display: none !important; }
+.gaceta-mode-panel .gaceta-link-full { display: none !important; }
+.gaceta-mode-panel .gaceta-chevron { display: none !important; }

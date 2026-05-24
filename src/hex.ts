@@ -107,7 +107,7 @@ export function axialToPixel(a: Axial, size: number): { x: number; y: number } {
   return { x, y };
 }
 
-function pixelToAxial(px: number, py: number, size: number): Axial {
+export function pixelToAxial(px: number, py: number, size: number): Axial {
   if (size <= 0) return { q: 0, r: 0 };
   const q = ((2 / 3) * px) / size;
   const r = ((-1 / 3) * px + (SQRT3 / 3) * py) / size;

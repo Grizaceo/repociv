@@ -486,11 +486,37 @@ from pathlib import Path
 _CDAILY_DB_DEFAULT = Path.home() / ".blogwatcher-cli" / "blogwatcher-cli.db"
 
 
+
+# Inline fallback mapping: blog_name keyword → (category, emoji)
+_CATEGORY_FALLBACK: dict[str, tuple[str, str]] = {
+    "seguridad": ("Seguridad", "🔐"),
+    "security": ("Seguridad", "🔐"),
+    "code": ("Código", "💻"),
+    "claude": ("Claude", "🎯"),
+    "noattack": ("Vulnerabilidades", "🚨"),
+    "bleeping": ("Vulnerabilidades", "🚨"),
+    "the hackernews": ("Vulnerabilidades", "🚨"),
+    "hacker news": ("Vulnerabilidades", "🚨"),
+    "tech": ("Tecnología", "⚙️"),
+    "ai": ("IA", "🧠"),
+    "machine learning": ("IA", "🧠"),
+    "openai": ("IA", "🧠"),
+    "google": ("Big Tech", "🌐"),
+    "microsoft": ("Big Tech", "🌐"),
+}
+
 def _resolve_cdaily_db() -> Path:
     """Resuelve la ruta del SQLite de CDaily desde env o valor por defecto."""
     env_val = os.environ.get("CDAILY_DB_PATH", "")
     return Path(os.path.expanduser(env_val)) if env_val else _CDAILY_DB_DEFAULT
 
+
+def _infer_category(blog_name: str) -> tuple[str, str]:
+    bn = blog_name.lower()
+    for kw, (cat, emoji) in _CATEGORY_FALLBACK.items():
+        if kw in bn:
+            return cat, emoji
+    return "General", "📰"
 
 def get_latest_news(ctx: dict[str, Any]) -> tuple[int, Any]:
     db_path = _resolve_cdaily_db()
@@ -502,24 +528,30 @@ def get_latest_news(ctx: dict[str, Any]) -> tuple[int, Any]:
             conn.row_factory = sqlite3.Row
             cur = conn.cursor()
             cur.execute("""
-                SELECT a.id, a.title, a.url, a.published_date, b.name AS blog_name
+                SELECT a.id, a.title, a.url, a.published_date, b.name AS blog_name, a.categories
                 FROM articles a
                 LEFT JOIN blogs b ON a.blog_id = b.id
                 WHERE a.is_read = 0
                 ORDER BY a.published_date DESC
-                LIMIT 5
+                LIMIT 15
             """)
             rows = cur.fetchall()
-        return 200, [
-            {
+        articles = []
+        for r in rows:
+            cat, emoji = _infer_category(r["blog_name"] or "")
+            # use persisted categories if available
+            if r["categories"]:
+                cat = r["categories"].split(",")[0].strip() or cat
+            articles.append({
                 "id": r["id"],
                 "title": r["title"] or r["url"],
                 "url": r["url"],
                 "publishedDate": r["published_date"],
                 "blogName": r["blog_name"] or "Blog Desconocido",
-            }
-            for r in rows
-        ]
+                "category": cat,
+                "emoji": emoji,
+            })
+        return 200, articles
     except Exception as e:
         return 500, {"error": f"Error al leer la base de datos de CDaily: {e}"}
 
@@ -541,6 +573,29 @@ def post_news_read(body: dict[str, Any], ctx: dict[str, Any]) -> tuple[int, Any]
     except Exception as e:
         return 500, {"error": f"Error al actualizar la base de datos: {e}"}
 
+
+
+
+def post_news_scan(body: dict[str, Any], ctx: dict[str, Any]) -> tuple[int, Any]:
+    """Escanear blogs ahora mismo via blogwatcher-cli."""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["blogwatcher-cli", "scan"],
+            capture_output=True, text=True, timeout=120,
+        )
+        return 200, {
+            "ok": result.returncode == 0,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "returncode": result.returncode,
+        }
+    except FileNotFoundError:
+        return 500, {"ok": False, "error": "blogwatcher-cli no encontrado"}
+    except subprocess.TimeoutExpired:
+        return 500, {"ok": False, "error": "Timeout al escanear blogs (120s)"}
+    except Exception as e:
+        return 500, {"ok": False, "error": str(e)}
 
 # ─── Type alias ───────────────────────────────────────────────────────────────
 RouteContext = dict[str, Any]

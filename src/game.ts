@@ -388,6 +388,10 @@ export class GameState {
     return true;
   }
 
+  getCapital(): import('./types').City | undefined {
+    return this.world.cities.find((c) => c.isCapital);
+  }
+
   invalidatePathCache(): void {
     invalidatePathCache();
   }

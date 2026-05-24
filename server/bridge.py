@@ -771,6 +771,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/pending/delete":    _routes.post_pending_delete,
             "/pending/state":     _routes.post_pending_state,
             "/api/news/read":     _routes.post_news_read,
+            "/api/news/scan":     _routes.post_news_scan,
         }
         if path in _POST_EXACT:
             status, resp = _POST_EXACT[path](body, {})

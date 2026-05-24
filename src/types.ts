@@ -8,6 +8,8 @@ export interface CDailyArticle {
   url: string;
   publishedDate: string;
   blogName: string;
+  category?: string;
+  emoji?: string;
 }
 
 // ─── Terrain types (inferred from repo contents) ─────────────────────────────
@@ -54,6 +56,7 @@ export interface City {
   territory: Axial[]; // hexes controlled (range 2)
   districts: District[];
   buildings: Building[];
+  wonders?: Building[]; // Edificios tipo wonder construidos en esta ciudad
   currentProject?: Building; // what's being built right now
   isCapital: boolean;
 }
@@ -68,10 +71,13 @@ export interface District {
 // ─── Building & Wonder ─────────────────────────────────────────────────────
 export type BuildingState = 'planned' | 'building' | 'complete' | 'failed';
 
+export type WonderType = 'bibliotheca' | 'institutum';
+
 export interface Building {
   id: string;
   name: string;
   type: 'building' | 'wonder';
+  wonderType?: WonderType;
   cityId: string;
   progress: number; // 0–100
   durationSeconds: number;

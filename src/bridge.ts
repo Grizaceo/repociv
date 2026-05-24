@@ -553,3 +553,18 @@ export async function markNewsAsRead(id: number): Promise<boolean> {
     return false;
   }
 }
+
+export async function scanNews(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(bridgeUrl('/api/news/scan'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...bridgeHeaders() },
+      body: JSON.stringify({}),
+    });
+    const data = (await res.json()) as { ok?: boolean; error?: string };
+    return { ok: data.ok ?? res.ok, error: data.error };
+  } catch (e) {
+    console.error('Error al escanear blogs:', e);
+    return { ok: false, error: String(e) };
+  }
+}
