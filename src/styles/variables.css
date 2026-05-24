@@ -55,6 +55,20 @@
   --font-ui: 'Outfit', 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;
   --font-body: 'Libre Baskerville', 'Georgia', serif;
+
+  /* ═══ LOCAL VIEW TOKENS (gstack industrial) ═══ */
+  --lt-base:      #0C0C0C;  /* fondo lienzo */
+  --lt-surface:   #141414;  /* paneles */
+  --lt-border:    #262626;
+  --lt-zinc-800:  #27272A;  /* muros núcleo */
+  --lt-zinc-600:  #52525B;  /* placas suelo */
+  --lt-zinc-400:  #A1A1AA;  /* texto secundario */
+  --lt-zinc-50:   #FAFAFA;  /* texto primario */
+  --lt-amber-500: #F59E0B;  /* acento */
+  --lt-amber-400: #FBBF24;  /* texto acento */
+  --lt-error:     #EF4444;
+  --lt-success:   #22C55E;
+  --lt-font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
 /* ═════════════════════════════════════════════════════════════════

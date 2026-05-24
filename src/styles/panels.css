@@ -3903,17 +3903,34 @@ kbd {
 .lt-git-panel {
   position: fixed;
   z-index: 60;
-  background: rgba(20, 20, 30, 0.92);
-  border: 1px solid #c8a84b;
-  border-radius: 4px;
-  padding: 8px 10px;
-  font-family: var(--font-mono, monospace);
-  font-size: 11px;
-  color: #ddd;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
-  min-width: 140px;
+  background: rgba(12, 12, 12, 0.78);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid color-mix(in srgb, var(--lt-amber-500) 35%, transparent);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: var(--lt-font-mono);
+  font-size: 12px;
+  color: var(--lt-zinc-400);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   pointer-events: auto;
+  min-width: 140px;
+
+  /* Elastic entry animation from gstack design system */
+  animation: ltElasticIn 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+@keyframes ltElasticIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 .lt-tooltip.hidden,
 .lt-menu.hidden,
 .lt-preview.hidden,
@@ -3930,14 +3947,14 @@ kbd {
   height: 0;
   border-top: 6px solid transparent;
   border-bottom: 6px solid transparent;
-  border-right: 6px solid #c8a84b;
+  border-right: 6px solid color-mix(in srgb, var(--lt-amber-500) 35%, transparent);
 }
 
 .lt-header {
   font-weight: bold;
   margin-bottom: 4px;
   font-size: 12px;
-  color: #fff;
+  color: var(--lt-zinc-50);
 }
 
 .lt-row {
@@ -3951,23 +3968,30 @@ kbd {
   gap: 6px;
   padding: 4px 6px;
   border-radius: 3px;
+  border-left: 2px solid transparent;
   cursor: pointer;
-  transition: background 0.1s;
+  transition: all 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--lt-zinc-50);
 }
 .lt-item:hover {
-  background: rgba(200, 168, 75, 0.15);
+  background: rgba(245, 158, 11, 0.12);
+  border-left-color: var(--lt-amber-500);
+  padding-left: 8px;
 }
 .lt-item.lt-disabled {
   opacity: 0.35;
   cursor: not-allowed;
+  color: var(--lt-zinc-400);
 }
 .lt-item.lt-disabled:hover {
   background: transparent;
+  border-left-color: transparent;
+  padding-left: 6px;
 }
 
 .lt-sep {
   height: 1px;
-  background: rgba(200, 168, 75, 0.3);
+  background: var(--lt-border);
   margin: 4px 0;
 }
 
@@ -3985,23 +4009,24 @@ kbd {
 .lt-btn-confirm,
 .lt-btn-cancel {
   flex: 1;
-  border: 1px solid #c8a84b;
+  border: 1px solid var(--lt-amber-500);
   background: transparent;
-  color: #c8a84b;
+  color: var(--lt-amber-400);
   padding: 4px 8px;
   font-size: 11px;
   cursor: pointer;
   border-radius: 3px;
+  transition: background 0.12s ease;
 }
 .lt-btn-confirm:hover {
-  background: rgba(200, 168, 75, 0.2);
+  background: rgba(245, 158, 11, 0.15);
 }
 .lt-btn-cancel {
-  border-color: #888;
-  color: #888;
+  border-color: var(--lt-zinc-600);
+  color: var(--lt-zinc-400);
 }
 .lt-btn-cancel:hover {
-  background: rgba(136, 136, 136, 0.2);
+  background: rgba(161, 161, 170, 0.15);
 }
 
 .lt-git-panel {
@@ -4017,32 +4042,34 @@ kbd {
 }
 .lt-git-section h5 {
   margin: 6px 0 4px;
-  color: #c8a84b;
+  color: var(--lt-amber-400);
   font-size: 11px;
+  font-family: var(--lt-font-mono);
   text-transform: uppercase;
 }
 .lt-git-line {
   font-size: 10px;
-  color: #bbb;
+  color: var(--lt-zinc-400);
+  font-family: var(--lt-font-mono);
   margin-bottom: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .lt-git-num {
-  color: #888;
+  color: var(--lt-zinc-600);
   display: inline-block;
   width: 22px;
   text-align: right;
   margin-right: 4px;
 }
 .lt-git-empty {
-  color: #888;
+  color: var(--lt-zinc-400);
   font-style: italic;
   padding: 8px 0;
 }
 .lt-loading {
-  color: #888;
+  color: var(--lt-zinc-400);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
