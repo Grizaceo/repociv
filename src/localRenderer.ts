@@ -422,7 +422,50 @@ export class LocalRenderer {
   }
 
   private drawDynamicWorkbenchTile(tile: LocalTile) {
-    // Drawn statically in rebuildStaticLayer, no active screen glows yet in Phase 3
+    const { ctx } = this;
+    const wb = tile.workbench;
+    if (!wb) return;
+
+    // Check if an agent is active on this workbench (Phase 6)
+    const activeUnit = this._localUnits.find(
+      (u) => u.state === 'working_on_file' && u.currentWorkbenchId === wb.id
+    );
+    if (!activeUnit) return;
+
+    const px = tile.x * TILE_SIZE;
+    const py = tile.y * TILE_SIZE;
+    const s = TILE_SIZE;
+    const now = performance.now();
+    const extColor = EXT_COLOR[wb.extension] ?? '#888';
+
+    ctx.save();
+    
+    // Glow effect (expensive, only for active ones!)
+    ctx.shadowColor = extColor;
+    ctx.shadowBlur = 12 + 6 * Math.sin(now / 250);
+
+    // Terminal Monitor Screen background
+    ctx.fillStyle = '#1c1c1f';
+    ctx.fillRect(px + 4, py + 4, s - 8, s - 10);
+    ctx.restore();
+
+    // Scroll lines of code
+    ctx.save();
+    // Clip to screen area
+    ctx.beginPath();
+    ctx.rect(px + 4, py + 4, s - 8, s - 10);
+    ctx.clip();
+
+    ctx.fillStyle = extColor;
+    ctx.globalAlpha = 0.6;
+    const scrollY = (now / 40) % 6;
+    for (let i = 0; i < 3; i++) {
+      const ly = py + 6 + i * 5 - scrollY;
+      if (ly >= py + 4 && ly <= py + s - 7) {
+        ctx.fillRect(px + 6, ly, s - 12, 1.5);
+      }
+    }
+    ctx.restore();
   }
 
   private drawTile(tile: LocalTile) {
@@ -559,24 +602,24 @@ export class LocalRenderer {
     const wb = tile.workbench;
     if (!wb) return;
 
-    // Desk body with drawers (improved silhouette)
-    ctx.fillStyle = '#2a6080';
+    // Desk body in zinc grays (Phase 6 / gstack style)
+    ctx.fillStyle = this.tokens.zinc600 || '#52525B';
     ctx.fillRect(px + 2, py + 4, s - 4, s - 10); // desk top / body
-    ctx.fillStyle = '#1a4055';
-    ctx.fillRect(px + 4, py + s - 6, s - 8, 3); // drawer line
-    ctx.fillRect(px + 4, py + s - 10, s - 8, 2); // second drawer
+    ctx.fillStyle = this.tokens.border || '#262626';
+    ctx.fillRect(px + 4, py + s - 6, s - 8, 2); // drawer line
+    ctx.fillRect(px + 4, py + s - 9, s - 8, 1); // second drawer
 
-    // File extension label centered and larger
+    // File extension label centered, larger, with monospaced font
     const extColor = EXT_COLOR[wb.extension] ?? '#888';
     ctx.fillStyle = extColor;
-    ctx.font = `bold ${Math.max(7, s * 0.32)}px monospace`;
+    ctx.font = `bold ${Math.max(7, s * 0.32)}px ${this.tokens.fontMono}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(wb.extension.slice(0, 3), px + s / 2, py + s / 2 - 1);
 
-    // Test badge (small gold dot in corner)
+    // Test badge in amber-500 (Phase 6 / gstack style)
     if (wb.isTest) {
-      ctx.fillStyle = '#c8a84b';
+      ctx.fillStyle = this.tokens.amber500 || '#F59E0B';
       ctx.beginPath();
       ctx.arc(px + s - 4, py + 4, 2.5, 0, Math.PI * 2);
       ctx.fill();
