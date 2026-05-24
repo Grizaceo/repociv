@@ -8,7 +8,7 @@ Strategy:
 
 import json
 import os
-import random
+import socket
 import time
 
 import pytest
@@ -17,18 +17,49 @@ import websockets.sync.client
 from server import websocket_handler as wsh
 
 
+def _find_free_port():
+    """Get a free port from the OS (avoids random collisions)."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
 @pytest.fixture
 def ws_server():
-    """Start WS server on a random port, yield the port, teardown."""
-    port = random.randint(22000, 28000)
+    """Start WS server on a free port, yield the port, teardown."""
+    # Ensure clean auth state (other tests may have set REPOCIV_TOKEN)
+    old_token = os.environ.get("REPOCIV_TOKEN", "")
+    os.environ.pop("REPOCIV_TOKEN", None)
+    wsh.REPOCIV_TOKEN = ""
+
+    port = _find_free_port()
     wsh._connections.clear()
     wsh._start_time = time.time()
     wsh._loop = None
+    wsh._ws_server = None
 
     thread = wsh.start_ws_server(host="127.0.0.1", port=port)
-    time.sleep(0.8)  # Wait for server to be ready
+    # Wait for server to be ready (retry-based, not blind sleep)
+    deadline = time.time() + 5.0
+    while time.time() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+                break
+        except (OSError, ConnectionRefusedError):
+            time.sleep(0.05)
+    else:
+        pytest.fail(f"WS server did not start on port {port} within 5s")
+
     yield port
-    # Daemon thread dies with test process
+    # Stop the WS server cleanly before next test
+    wsh.stop_ws_server()
+    # Restore auth state
+    if old_token:
+        os.environ["REPOCIV_TOKEN"] = old_token
+        wsh.REPOCIV_TOKEN = old_token
+    else:
+        os.environ.pop("REPOCIV_TOKEN", None)
+        wsh.REPOCIV_TOKEN = ""
 
 
 def test_ws_connect_dev_mode(ws_server):
@@ -120,12 +151,21 @@ def test_ws_auth_with_token():
         os.environ["REPOCIV_TOKEN"] = "test-token-123"
         wsh.REPOCIV_TOKEN = "test-token-123"
 
-        port = random.randint(22000, 28000)
+        port = _find_free_port()
         wsh._connections.clear()
         wsh._start_time = time.time()
         wsh._loop = None
         thread = wsh.start_ws_server(host="127.0.0.1", port=port)
-        time.sleep(0.8)
+        # Wait for server ready
+        deadline = time.time() + 5.0
+        while time.time() < deadline:
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+                    break
+            except (OSError, ConnectionRefusedError):
+                time.sleep(0.05)
+        else:
+            pytest.fail(f"WS server did not start on port {port} within 5s")
 
         # Connect without auth — should receive auth_error
         ws = websockets.sync.client.connect(f"ws://127.0.0.1:{port}", close_timeout=10)

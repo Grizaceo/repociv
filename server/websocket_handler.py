@@ -328,6 +328,31 @@ def start_ws_server(host: str = WS_HOST, port: int = BRIDGE_WS_PORT) -> threadin
     return t
 
 
+def stop_ws_server() -> None:
+    """Stop the running WS server (for test teardown)."""
+    global _ws_server, _loop, _connections, _start_time
+    # Wait for server to be ready (up to 3s) before trying to stop it
+    deadline = time.time() + 3.0
+    while _ws_server is None and time.time() < deadline:
+        time.sleep(0.05)
+    if _loop is not None and _ws_server is not None:
+        future = asyncio.run_coroutine_threadsafe(_ws_server.close(), _loop)
+        try:
+            future.result(timeout=3)
+        except Exception:
+            pass
+        if _loop.is_running():
+            future2 = asyncio.run_coroutine_threadsafe(_ws_server.wait_closed(), _loop)
+            try:
+                future2.result(timeout=3)
+            except Exception:
+                pass
+    _ws_server = None
+    _loop = None
+    _connections.clear()
+    _start_time = 0.0
+
+
 # ─── Direct sysnc-client support (for tests) ─────────────────────────────────
 def create_sync_broadcast(host: str = WS_HOST, port: int = BRIDGE_WS_PORT) -> Callable[[dict[str, Any]], None]:
     """Create a sync broadcast function for testing.
