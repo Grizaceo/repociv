@@ -230,6 +230,66 @@ async function fetchSubdirs(repoName: string): Promise<{ name: string; terrain: 
   }
 }
 
+// ─── Voronoi Territory Partitioning (Civilization-style) ─────────────────────
+export function recalculateAllTerritories(world: World): void {
+  const { cities } = world;
+  if (cities.length === 0) return;
+
+  const coordToCities = new Map<string, { coord: Axial; cityIndices: number[] }>();
+
+  // Collect all unique coordinates in range 2 of any city
+  for (let i = 0; i < cities.length; i++) {
+    const city = cities[i]!;
+    const rangeCoords = axialRange(city.coord, 2);
+    for (const c of rangeCoords) {
+      const key = tileKey(c);
+      if (!coordToCities.has(key)) {
+        coordToCities.set(key, { coord: c, cityIndices: [] });
+      }
+      coordToCities.get(key)!.cityIndices.push(i);
+    }
+  }
+
+  const newTerritories = Array.from({ length: cities.length }, () => [] as Axial[]);
+
+  // Assign each coordinate to the nearest city center (Voronoi partition)
+  for (const { coord, cityIndices } of coordToCities.values()) {
+    let bestIndex = -1;
+    let minDist = Infinity;
+
+    for (const idx of cityIndices) {
+      const city = cities[idx]!;
+      const dist = axialDistance(coord, city.coord);
+      if (dist < minDist) {
+        minDist = dist;
+        bestIndex = idx;
+      } else if (dist === minDist) {
+        // Consistent tie-breaker: capital first, then by ID
+        if (city.isCapital) {
+          bestIndex = idx;
+          minDist = dist;
+        } else if (bestIndex === -1 || cities[bestIndex]!.isCapital) {
+          // keep previous or let capital override if it just matched
+        } else if (city.id < cities[bestIndex]!.id) {
+          bestIndex = idx;
+        }
+      }
+    }
+
+    if (bestIndex !== -1) {
+      newTerritories[bestIndex]!.push(coord);
+    }
+  }
+
+  // Update city territories, filtering out their districts
+  for (let i = 0; i < cities.length; i++) {
+    const city = cities[i]!;
+    city.territory = newTerritories[i]!.filter(
+      (c) => !city.districts.some((d) => d.coord.q === c.q && d.coord.r === c.r)
+    );
+  }
+}
+
 // ─── Reconnect disconnected cities (dynamic + initial generation) ────────────
 export async function reconnectCities(world: World): Promise<void> {
   const { tiles, cities } = world;
@@ -344,7 +404,7 @@ export function addCityToWorld(
     coord,
     repoPath: repo.path,
     population: repo.population,
-    territory: [coord, ...axialRange(coord, 2)],
+    territory: [], // recalculated below
     districts: [],
     buildings: [],
     isCapital: false,
@@ -359,6 +419,7 @@ export function addCityToWorld(
     inFog: false,
     revealed: true,
   });
+  recalculateAllTerritories(world);
   return city;
 }
 
@@ -501,9 +562,7 @@ export async function relocateCity(
   };
   tiles.set(destKey, merged);
 
-  city.territory = [targetCoord, ...axialRange(targetCoord, 2)].filter(
-    (c) => !city.districts.some((d) => d.coord.q === c.q && d.coord.r === c.r),
-  );
+  recalculateAllTerritories(world);
 
   const path = resolveRepoPathForCity(city, repoPathFallback);
   if (path) {
@@ -518,6 +577,7 @@ export async function relocateCity(
 
 // ─── World generator ─────────────────────────────────────────────────
 export async function generateWorld(): Promise<World> {
+  const MIN_CITY_DISTANCE = 3;
   const tiles = new Map<string, Tile>();
   const cities: City[] = [];
 
@@ -613,7 +673,7 @@ export async function generateWorld(): Promise<World> {
     }
   }
 
-  const maxAutoCoords = Math.max(cityRepos.length * 4, cityRepos.length + 16);
+  const maxAutoCoords = Math.max(cityRepos.length * MIN_CITY_DISTANCE * MIN_CITY_DISTANCE * 3, cityRepos.length + 32);
   const cityCoords = spiralCoords({ q: 0, r: 0 }, maxAutoCoords);
   const occupiedCoords = new Set<string>();
   const cityCoordLookup = new Map<string, Axial>();
@@ -630,6 +690,17 @@ export async function generateWorld(): Promise<World> {
       autoCoordCursor++;
       const key = tileKey(coord);
       if (occupiedCoords.has(key)) continue;
+
+      // Enforce minimum distance from all previously assigned city coordinates
+      let tooClose = false;
+      for (const assignedCoord of cityCoordLookup.values()) {
+        if (axialDistance(coord, assignedCoord) < MIN_CITY_DISTANCE) {
+          tooClose = true;
+          break;
+        }
+      }
+      if (tooClose) continue;
+
       occupiedCoords.add(key);
       cityCoordLookup.set(repo.path, coord);
       break;
@@ -665,17 +736,13 @@ export async function generateWorld(): Promise<World> {
       coord: districtCoords[j + 1] ?? axialAdd(coord, { q: j, r: 0 }),
     }));
 
-    const territory = [coord, ...axialRange(coord, 2)].filter(
-      (c) => !districts.some((d) => d.coord.q === c.q && d.coord.r === c.r),
-    );
-
     const city: City = {
       id: repo.name,
       name: repo.name,
       coord,
       repoPath: repo.path,
       population: repo.population,
-      territory,
+      territory: [], // recalculated below
       districts,
       buildings: [],
       isCapital: i === 0,
@@ -742,17 +809,26 @@ export async function generateWorld(): Promise<World> {
     if (tile.coord.r < minR) minR = tile.coord.r;
     if (tile.coord.r > maxR) maxR = tile.coord.r;
   }
-  const padding = 3;
+  const padding = 5;
   for (let q = minQ - padding; q <= maxQ + padding; q++) {
     for (let r = minR - padding; r <= maxR + padding; r++) {
       const key = tileKey({ q, r });
       if (!existingKeys.has(key)) {
+        const isWithinBounds = q >= minQ && q <= maxQ && r >= minR && r <= maxR;
+        let terrain: Terrain = 'ocean';
+        if (isWithinBounds) {
+          // Generate a beautiful, natural continental landscape inside bounding box
+          const rand = Math.random();
+          if (rand < 0.15) terrain = 'forest';
+          else if (rand < 0.30) terrain = 'hills';
+          else terrain = 'plains';
+        }
         tiles.set(key, {
           coord: { q, r },
-          terrain: 'ocean',
+          terrain,
           resources: { gold: 0, science: 0, production: 0 },
-          inFog: true,
-          revealed: false,
+          inFog: !isWithinBounds,
+          revealed: isWithinBounds,
         });
       }
     }
@@ -772,6 +848,9 @@ export async function generateWorld(): Promise<World> {
     generatedAt: Date.now(),
     restAreas: [],
   };
+
+  // Recalculate territories dynamically to prevent overlaps (Civilization Voronoi)
+  recalculateAllTerritories(world);
 
   // Reconnect cities dynamically (BFS + A* + intermediate tiles)
   await reconnectCities(world);

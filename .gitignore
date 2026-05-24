@@ -44,3 +44,4 @@ coverage/
 .cache/
 coverage
 .coverage
+.gstack/
