@@ -645,18 +645,59 @@ kbd {
 }
 
 /* ─── Scrollbar ───────────────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-gold) rgba(10, 8, 4, 0.45);
+}
+
+@media (prefers-contrast: more) {
+  * {
+    scrollbar-color: var(--ui-gold-bright) #000;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #000;
+  background: rgba(10, 8, 4, 0.4);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--gold-dim);
-  border: 2px solid #000;
+  background: var(--ui-gold);
+  border: 2px solid rgba(10, 8, 4, 0.8);
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--gold-mid);
+  background: var(--ui-gold-bright);
+}
+
+/* ─── Premium Button Hover Sweep (Metal Sheen) ────────────────────────── */
+button, .spawn-btn, .side-tab, .city-tab, .quest-tab {
+  position: relative;
+  overflow: hidden;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+button::after, .spawn-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.15),
+    transparent
+  );
+  transition: none;
+}
+
+button:hover::after, .spawn-btn:hover::after {
+  left: 100%;
+  transition: left 0.65s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 /* ─── Animations ─────────────────────────────────────────────────────── */

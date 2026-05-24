@@ -1,93 +1,179 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   RepoCiv — Variables & Design Tokens (Civ V Inspired)
+   RepoCiv — Design Tokens System (Civ V Inspired)
+   v2.0 — Unified spacing scale, typography, borders, themes, accessibility
    ═══════════════════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
 
+/* ═══ Houdini Custom Properties for smooth gradient transitions ═══ */
+@property --gold-glow-color1 { syntax: '<color>'; inherits: false; initial-value: oklch(0.55 0.12 75); }
+@property --gold-glow-color2 { syntax: '<color>'; inherits: false; initial-value: oklch(0.78 0.16 83); }
+@property --bronze-glow-color1 { syntax: '<color>'; inherits: false; initial-value: oklch(0.38 0.08 55); }
+@property --bronze-glow-color2 { syntax: '<color>'; inherits: false; initial-value: oklch(0.52 0.11 65); }
+
+/* ═══ SPACING SCALE (4px base) ═══ */
 :root {
-  /* BACKGROUNDS & TEXTURES */
-  --app-bg: #0a0804;
-  --marble-texture:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02) 0%, transparent 80%),
-    linear-gradient(
-      45deg,
-      rgba(0, 0, 0, 0.1) 25%,
-      transparent 25%,
-      transparent 50%,
-      rgba(0, 0, 0, 0.1) 50%,
-      rgba(0, 0, 0, 0.1) 75%,
-      transparent 75%,
-      transparent
-    );
-  --panel-bg: rgba(0, 0, 0, 0.75);
-  --panel-border: #5a4a2e;
-  --panel-hover: rgba(90, 75, 45, 0.4);
-  --glass-bg: rgba(15, 12, 8, 0.85);
+  --space-1: 0.25rem;  /*  4px */
+  --space-2: 0.5rem;   /*  8px */
+  --space-3: 0.625rem; /* 10px */
+  --space-4: 0.75rem;  /* 12px */
+  --space-5: 1rem;     /* 16px */
+  --space-6: 1.125rem; /* 18px */
+  --space-7: 1.25rem;  /* 20px */
+  --space-8: 1.5rem;   /* 24px */
+  --space-9: 2rem;     /* 32px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-11: 3rem;    /* 48px */
+  --space-12: 4rem;    /* 64px */
+  --space-13: 6rem;    /* 96px */
 
-  /* CIV V EXACT COLORS */
-  --civ-science: #0064ff;
-  --civ-culture: #ff00ff;
-  --civ-gold: #ffd700;
-  --civ-production: #ff7d00;
-  --civ-food: #00ff00;
-  --civ-happiness: #ffff00;
-  --civ-movement: #00afff;
-  --civ-defense: #ff0000;
-  --civ-text-beige: #f5f5dc;
+  /* ═══ TYPOGRAPHY SCALE ═══ */
+  --text-3xs: 0.5625rem; /* 9px  — legal, metadata */
+  --text-2xs: 0.625rem;  /* 10px — labels, badges */
+  --text-xs: 0.75rem;    /* 12px — captions, hints */
+  --text-sm: 0.8125rem;  /* 13px — UI secondary */
+  --text-md: 0.875rem;   /* 14px — UI primary */
+  --text-base: 1rem;     /* 16px — body */
+  --text-lg: 1.125rem;   /* 18px — subheadings */
+  --text-xl: 1.25rem;    /* 20px — panel titles */
+  --text-2xl: 1.5rem;    /* 24px — section titles */
+  --text-3xl: 2rem;      /* 32px — hero / era display */
 
-  /* METALLICS */
-  --gold-gradient: linear-gradient(135deg, #8a6a3e 0%, #f0c050 50%, #c8a84b 100%);
-  --bronze-gradient: linear-gradient(135deg, #5a3e1e 0%, #8a6a3e 100%);
+  /* ═══ BORDER WIDTHS ═══ */
+  --border-thin: 1px;
+  --border-medium: 2px;
+  --border-thick: 3px;
 
-  /* AGENTES (Mapped to Civ V Colors) */
+  /* ═══ UI SCALE ═══ */
+  --header-height: 36px;
+  --panel-radius: 6px;
+  --transition-fast: 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+  --transition-slow: 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+  --transition-instant: 0.1s ease;
+
+  /* ═══ TYPOGRAPHY FAMILIES ═══ */
+  --font-ui: 'Outfit', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+  --font-body: 'Libre Baskerville', 'Georgia', serif;
+}
+
+/* ═════════════════════════════════════════════════════════════════
+   LIGHT THEME (default/system light)
+   ================================================================= */
+[data-theme="light"] {
+  --app-bg: #f6f3ee;
+  --panel-bg: rgba(255, 255, 255, 0.85);
+  --panel-border: rgba(160, 130, 50, 0.45);
+  --panel-hover: rgba(240, 192, 80, 0.18);
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --bar-bg: #ede8df;
+
+  --ui-dark: #1c1814;
+  --ui-border: var(--panel-border);
+  --ui-gold: oklch(0.48 0.12 78);
+  --ui-gold-bright: oklch(0.35 0.14 78);
+  --ui-text: oklch(0.22 0.04 78);
+  --ui-text-dim: oklch(0.40 0.06 78);
+
+  --civ-science: oklch(0.45 0.20 250);
+  --civ-culture: oklch(0.48 0.22 320);
+  --civ-gold: oklch(0.42 0.14 78);
+  --civ-production: oklch(0.52 0.18 45);
+  --civ-food: oklch(0.55 0.16 140);
+  --civ-happiness: oklch(0.60 0.14 98);
+  --civ-movement: oklch(0.50 0.18 210);
+  --civ-defense: oklch(0.42 0.20 25);
+  --civ-text-beige: oklch(0.20 0.04 78);
+
+  --state-success: oklch(0.55 0.16 140);
+  --state-warn: oklch(0.60 0.14 98);
+  --state-error: oklch(0.42 0.20 25);
+  --state-working: oklch(0.50 0.18 210);
+  --state-info: oklch(0.55 0.08 75);
+
+  /* metallics invertidos para light */
+  --gold-gradient: linear-gradient(135deg, oklch(0.65 0.10 75) 0%, oklch(0.78 0.14 85) 50%, oklch(0.55 0.12 78) 100%);
+  --bronze-gradient: linear-gradient(135deg, oklch(0.52 0.08 55) 0%, oklch(0.68 0.10 65) 100%);
+
+  --shadow-deep: 0 16px 48px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-glow: 0 0 24px rgba(200, 168, 75, 0.12), 0 0 8px rgba(200, 168, 75, 0.08);
+  --shadow-inset: inset 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* ═════════════════════════════════════════════════════════════════
+   DARK THEME (canonical RepoCiv look)
+   ================================================================= */
+[data-theme="dark"] {
+  --app-bg: #050402;
+  --panel-bg: rgba(8, 6, 4, 0.72);
+  --panel-border: rgba(200, 168, 75, 0.25);
+  --panel-hover: rgba(240, 192, 80, 0.12);
+  --glass-bg: rgba(6, 5, 4, 0.65);
+  --bar-bg: #14100b;
+
+  --ui-dark: #070503;
+  --ui-border: var(--panel-border);
+  --ui-gold: oklch(0.72 0.14 78);
+  --ui-gold-bright: oklch(0.86 0.18 85);
+  --ui-text: var(--civ-text-beige);
+  --ui-text-dim: oklch(0.72 0.08 75);
+
+  --civ-science: oklch(0.58 0.22 250);
+  --civ-culture: oklch(0.62 0.25 320);
+  --civ-gold: oklch(0.85 0.18 85);
+  --civ-production: oklch(0.68 0.21 45);
+  --civ-food: oklch(0.72 0.19 140);
+  --civ-happiness: oklch(0.88 0.18 98);
+  --civ-movement: oklch(0.65 0.20 210);
+  --civ-defense: oklch(0.55 0.22 25);
+  --civ-text-beige: oklch(0.95 0.03 85);
+
+  --state-success: var(--civ-food);
+  --state-warn: var(--civ-happiness);
+  --state-error: var(--civ-defense);
+  --state-working: var(--civ-movement);
+  --state-info: oklch(0.72 0.08 75);
+
+  --gold-gradient: linear-gradient(135deg, var(--gold-glow-color1) 0%, oklch(0.84 0.18 88) 50%, var(--gold-glow-color2) 100%);
+  --bronze-gradient: linear-gradient(135deg, var(--bronze-glow-color1) 0%, var(--bronze-glow-color2) 100%);
+
+  --shadow-deep: 0 16px 48px rgba(0, 0, 0, 0.9), 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 24px rgba(245, 213, 128, 0.18), 0 0 8px rgba(245, 213, 128, 0.1);
+  --shadow-inset: inset 0 2px 12px rgba(0, 0, 0, 0.85);
+}
+
+/* ═══ System preference fallback: if neither data-theme nor [data-theme="dark"] is set, default to dark ═══ */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-theme="light"]) {
+    /* inherit light theme logic — handled by the default :root not having data-theme */
+  }
+}
+
+/* Default dark */
+:root {
+  /* ═══ Semantic agent palette — documented rationale ═══ */
+  /* DAVI    → Gold    : The sovereign/leader archetype; gold = authority, central. */
+  /* WORKER  → Food    : Sustenance/provisioning; builders feed the empire.            */
+  /* SCOUT   → Movement: Cyan/teal = reconnaissance, speed, frontier expansion.        */
+  /* LEXO    → Science : Academic/codex blue = law, knowledge graphs, references.     */
+  /* OPENCLAW→ Aquamarine: Bridge connector = water, flow, interoperability.         */
   --agt-davi: var(--civ-gold);
   --agt-worker: var(--civ-food);
   --agt-scout: var(--civ-movement);
   --agt-lexo: var(--civ-science);
-  --agt-openclaw: #7bd6c8; /* Custom for openclaw */
+  --agt-openclaw: oklch(0.82 0.12 175);
 
-  /* TERRENOS */
+  /* ═══ Terrain palette (light-insensitive) ═══ */
   --hex-plains: #7ba05b;
   --hex-desert: #d4a574;
   --hex-forest: #2d5a27;
   --hex-mountain: #6b6b6b;
   --hex-ocean: #2b6da5;
   --hex-ice: #e0e0e0;
-  --hex-fog: rgba(0, 0, 0, 0.62);
+  --hex-fog: rgba(5, 5, 8, 0.75);
 
-  /* ESTADOS */
-  --state-success: var(--civ-food);
-  --state-warn: var(--civ-happiness);
-  --state-error: var(--civ-defense);
-  --state-working: var(--civ-movement);
-  --state-info: #a89060;
-
-  /* FALLBACKS & ALIASES */
-  --ui-dark: #1a1208;
-  --ui-border: var(--panel-border);
-  --ui-gold: var(--gold-mid);
-  --ui-gold-bright: var(--gold-bright);
-  --ui-text: var(--civ-text-beige);
-  --ui-text-dim: #a89060;
-  --ui-panel-bg: var(--panel-bg);
+  /* ═══ Legacy aliases (keep for backwards compat until v3 refactor) ═══ */
   --res-science: var(--civ-science);
   --res-production: var(--civ-production);
   --res-gold: var(--civ-gold);
-  --bar-bg: #2a1e0a;
-
-  /* SHADOWS */
-  --shadow-deep: 0 10px 40px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 15px rgba(245, 213, 128, 0.25);
-  --shadow-inset: inset 0 2px 10px rgba(0, 0, 0, 0.8);
-
-  /* FONTS */
-  --font-ui: 'Cinzel', 'Barlow Condensed', 'Noto Sans Condensed', serif;
-  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
-  --font-body: 'Libre Baskerville', 'Georgia', serif;
-
-  /* UI SCALE & SPACING */
-  --header-height: 32px; /* Civ V Top Panel exact height */
-  --panel-radius: 0px; /* Civ V uses sharp corners mostly, or large 8px radii */
-  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }

@@ -15,28 +15,49 @@
   z-index: 9999;
   padding: 0.5em 1em;
   background: var(--ui-gold, #d4a574);
-  color: #0a0804;
+  color: var(--ui-dark, #0a0804);
   font-weight: bold;
   text-decoration: none;
   border-radius: 0 0 4px 0;
-  transition: top 0.1s;
+  transition: top var(--transition-instant, 0.1s ease);
 }
 .skip-link:focus {
   top: 0;
 }
 
+/* ═══ Focus-visible gold ring (WCAG) ═══ */
+:focus-visible {
+  outline: 2px solid var(--ui-gold-bright);
+  outline-offset: 2px;
+}
+button:focus-visible,
+[role="button"]:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ui-dark), 0 0 0 4px var(--ui-gold-bright);
+  outline: none;
+}
+
 body {
-  background: #0a0804;
+  background: var(--app-bg, #0a0804);
   overflow: hidden;
   font-family: var(--font-body);
   color: var(--ui-text);
-  user-select: none;
 }
 
+/* ═══ user-select: selectable in panels, none only on canvas/interactive ═══ */
 #app {
   width: 100vw;
   height: 100vh;
   position: relative;
+}
+
+#main-canvas,
+#hud-overlay,
+#bottom-hud,
+.spawn-btn,
+#hero-bar-slots {
+  user-select: none;
 }
 
 /* ─── Canvas principal ───────────────────────────────────────────────────── */
@@ -61,35 +82,57 @@ body {
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--ui-border-light);
+  background: var(--ui-gold);
 }
 
-/* ─── Animaciones globales ───────────────────────────────────────────────── */
+@media (prefers-contrast: more) {
+  * {
+    scrollbar-color: var(--ui-gold-bright) #000;
+  }
+}
+
+/* ═══ Reduced-motion wrap ═══ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═══ Global cursor helpers: make text panels selectable ═══ */
+.selectable-text,
+#chat-messages,
+.log-text,
+.hero-mission-text,
+#log-messages,
+.gaceta-list,
+.tab-pane,
+#side-panel-content,
+#city-missions-list,
+#city-files-list,
+#city-git-details,
+#quest-list,
+.kbh-content,
+.empty-state,
+.empty-message,
+.empty-title {
+  user-select: text;
+}
+
+/* ═══ Animaciones globales (respetan prefers-reduced-motion arriba) ═══ */
 @keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
 }
 @keyframes pulse-warn {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
 }

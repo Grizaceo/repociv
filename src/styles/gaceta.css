@@ -29,7 +29,7 @@
   gap: 6px;
   padding: 6px 10px;
   cursor: pointer;
-  user-select: none;
+  user-select: text;
   border-bottom: 1px solid var(--ui-border, #4a3a1a);
   min-height: 36px;
   box-sizing: border-box;

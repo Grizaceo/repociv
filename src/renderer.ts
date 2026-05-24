@@ -620,12 +620,12 @@ export class Renderer {
     // Pass 1: Surfaces & Shorelines
     for (const tile of this.state.world.tiles.values()) {
       const neighbors = this.getNeighbors(tile.coord);
-      this.hexR.drawTileSurface(tile, this.fogEnabled, neighbors);
+      this.hexR.drawTileSurface(tile, this.fogEnabled, neighbors, this.animTime);
     }
 
     // Pass 2: Territory
     for (const city of this.state.world.cities) {
-      this.hexR.drawCityTerritory(city);
+      this.hexR.drawCityTerritory(city, this.animTime);
     }
 
     // Pass 3: Decorations (Sorted by Y for depth)
@@ -647,7 +647,7 @@ export class Renderer {
             (b) => b.cityId === tile.city!.id && b.state === 'building',
           )
         : undefined;
-      this.hexR.drawTileDecor(tile, this.fogEnabled, activeBuilding);
+      this.hexR.drawTileDecor(tile, this.fogEnabled, activeBuilding, this.animTime);
     }
 
     if (this.showGrid) {
@@ -745,7 +745,31 @@ export class Renderer {
       renderAreaSelect(ctx, this.areaStart.x, this.areaStart.y, this.areaEnd.x, this.areaEnd.y);
     }
 
-    // Global Atmospheric Bloom / Lighting
+    // Global Atmospheric Bloom / Lighting (Time of Day Cycle)
+    const timeOfDay = (this.animTime * 0.035) % (Math.PI * 2);
+    const sinTime = Math.sin(timeOfDay);
+    
+    let warmColor = 'rgba(200, 180, 120, 0.03)';
+    let vignetteColor = 'rgba(0, 0, 0, 0.2)';
+    
+    if (sinTime > 0.5) {
+      // Mediodía brillante (claro y neutro)
+      warmColor = 'rgba(255, 255, 255, 0.015)';
+      vignetteColor = 'rgba(0, 0, 0, 0.12)';
+    } else if (sinTime > 0) {
+      // Tarde dorada (naranja cálido imperial)
+      warmColor = 'rgba(240, 150, 50, 0.04)';
+      vignetteColor = 'rgba(15, 10, 5, 0.22)';
+    } else if (sinTime > -0.5) {
+      // Amanecer/Dusk (púrpura y lavanda)
+      warmColor = 'rgba(180, 100, 240, 0.03)';
+      vignetteColor = 'rgba(8, 4, 18, 0.26)';
+    } else {
+      // Noche de neón (azul profundo oscurecido)
+      warmColor = 'rgba(40, 60, 180, 0.015)';
+      vignetteColor = 'rgba(1, 1, 6, 0.45)';
+    }
+
     const grad = ctx.createRadialGradient(
       canvas.width / 2,
       canvas.height / 2,
@@ -754,8 +778,8 @@ export class Renderer {
       canvas.height / 2,
       canvas.width,
     );
-    grad.addColorStop(0, 'rgba(200, 180, 120, 0.03)'); // Warm center
-    grad.addColorStop(1, 'rgba(0, 0, 0, 0.2)'); // Vignette
+    grad.addColorStop(0, warmColor);
+    grad.addColorStop(1, vignetteColor);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }

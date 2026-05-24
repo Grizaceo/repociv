@@ -63,6 +63,10 @@ import {
   setOnCityDeletedCb,
 } from './ui/constructionPanel.ts';
 
+import { getStoredEraLabel } from './ui/eraSystem.ts';
+import { logEvent } from './ui/hud.ts';
+import { trackPanelOpen } from './ui/analytics.ts';
+
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 const loadSteps = [
   'Escaneando workspace...',
@@ -117,6 +121,39 @@ async function bootstrap() {
   }
 
   hideLoadingScreen();
+
+  // ══ Theme init from localStorage ══
+  const savedTheme = localStorage.getItem('repociv:theme');
+  if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+  else document.documentElement.setAttribute('data-theme', 'dark');
+
+  // ══ Theme toggle wiring ══
+  document.getElementById('btn-theme-toggle')?.addEventListener('click', () => {
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme') ?? 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('repociv:theme', next);
+    const lucide = (window as any).lucide;
+    if (lucide) lucide.createIcons({ icons: lucide.icons });
+  });
+
+  // ══ Imperial random salute (Whimsy) ══
+  const salutes = [
+    { icon: '⬡', line: 'El Imperio te espera.', sub: 'Nueva era de desarrollo.' },
+    { icon: '👑', line: 'Bienvenido, Gran Estratega.', sub: 'Tus repos te saludan.' },
+    { icon: '🏛', line: 'El Senado Convoca.', sub: 'Los agentes están en formación.' },
+    { icon: '🦅', line: 'Ave Imperial.', sub: 'El viento sopla a favor.' },
+    { icon: '⚔', line: 'Preparando legiones.', sub: 'Ningún bug se escapará.' },
+  ];
+  const chosen = salutes[Math.floor(Math.random() * salutes.length)]!;
+  const welcome = document.createElement('div');
+  welcome.id = 'imperial-welcome';
+  welcome.innerHTML = `<div class="salute-icon">${chosen.icon}</div><div class="salute-line">${chosen.line}</div><div class="salute-sub">${chosen.sub}</div>`;
+  document.getElementById('app')?.appendChild(welcome);
+  requestAnimationFrame(() => welcome.classList.add('visible'));
+  setTimeout(() => { welcome.style.opacity = '0'; setTimeout(() => welcome.remove(), 800); }, 3200);
+
   await runRepoOnboarding();
 
   const world = await generateWorld();
@@ -246,6 +283,30 @@ async function bootstrap() {
   startApprovalPolling();
   startObservabilityPolling();
   startHarnessPolling();
+
+  // ══ Analytics wiring ══
+  const analyticsPanels = {
+    'btn-approvals': 'approvals',
+    'btn-timeline': 'timeline',
+    'btn-observability': 'observability',
+    'btn-tasks': 'tasks',
+    'btn-pending': 'pending',
+    'btn-log': 'log',
+    'btn-settings': 'settings',
+  };
+  for (const [id, name] of Object.entries(analyticsPanels)) {
+    document.getElementById(id)?.addEventListener('click', () => trackPanelOpen(name));
+  }
+
+  // Easter egg: press logo/era display 3 times for secret message
+  let eraClicks = 0;
+  document.getElementById('era-display')?.addEventListener('click', () => {
+    eraClicks++;
+    if (eraClicks === 3) {
+      logEvent('\u00abEl Consejo Secreto te observa.\u00bb', 'info');
+      eraClicks = 0;
+    }
+  });
 
   // Canvas click → select unit / open city panels
   renderer.onUnitSelect = (unit) => {
@@ -401,3 +462,7 @@ async function bootstrap() {
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', bootstrap);
+
+// ─── Post-load era display sync ─────────────────────────────────────────────
+const eraEl = document.getElementById('era-display');
+if (eraEl) eraEl.textContent = getStoredEraLabel();

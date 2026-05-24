@@ -11,6 +11,33 @@ export class HexRenderer {
 
   constructor(private ctx: CanvasRenderingContext2D) {}
 
+  private spriteImages: Record<string, HTMLImageElement | HTMLCanvasElement> = {};
+
+  private makeWhiteTransparent(img: HTMLImageElement): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(img, 0, 0);
+    try {
+      const imgData = ctx.getImageData(0, 0, img.width, img.height);
+      const data = imgData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i]!;
+        const g = data[i+1]!;
+        const b = data[i+2]!;
+        // Make pure white (#ffffff) or very close to it transparent
+        if (r > 240 && g > 240 && b > 240) {
+          data[i+3] = 0;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+    } catch (e) {
+      logger.warn('Failed to chroma-key transparent sprites:', e);
+    }
+    return canvas;
+  }
+
   async loadAssets() {
     const assets = [
       { name: 'plains', url: '/assets/terrain_plains.png' },
@@ -25,7 +52,7 @@ export class HexRenderer {
       { name: 'forest_sprite', url: '/assets/forest_sprite.png' },
     ];
 
-    const spriteImages: Record<string, HTMLImageElement> = {};
+    const spriteImages: Record<string, HTMLImageElement | HTMLCanvasElement> = {};
 
     const promises = assets.map((asset) => {
       return new Promise<void>((resolve) => {
@@ -33,7 +60,7 @@ export class HexRenderer {
         img.src = asset.url;
         img.onload = () => {
           if (asset.name.includes('sprite')) {
-            spriteImages[asset.name] = img;
+            spriteImages[asset.name] = this.makeWhiteTransparent(img);
           } else {
             this.patterns[asset.name] = this.ctx.createPattern(img, 'repeat');
           }
@@ -50,8 +77,6 @@ export class HexRenderer {
     this.spriteImages = spriteImages;
     this.assetsLoaded = true;
   }
-
-  private spriteImages: Record<string, HTMLImageElement> = {};
 
   fillHex(cx: number, cy: number, size: number) {
     const { ctx } = this;
@@ -77,7 +102,7 @@ export class HexRenderer {
     ctx.restore();
   }
 
-  drawTileSurface(tile: Tile, fogEnabled: boolean, neighbors: Tile[]) {
+  drawTileSurface(tile: Tile, fogEnabled: boolean, neighbors: Tile[], animTime?: number) {
     const { ctx } = this;
     const pos = axialToPixel(tile.coord, HEX_SIZE);
     const colors = TERRAIN_COLOR[tile.terrain] || TERRAIN_COLOR.plains;
@@ -111,9 +136,20 @@ export class HexRenderer {
     if (tile.terrain === 'ocean') {
       const touchesLand = neighbors.some((n) => n.terrain !== 'ocean');
       if (touchesLand) {
-        ctx.strokeStyle = 'rgba(150, 220, 255, 0.4)';
-        ctx.lineWidth = 4;
-        this.drawHexOutlineRaw(pos.x, pos.y, HEX_SIZE * 0.95);
+        const time = animTime || 0;
+        const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        
+        // Two concentric pulsating wave rings
+        const wave1 = prefersReducedMotion ? 0.95 : 0.92 + 0.03 * Math.sin(time * 2.0);
+        const wave2 = prefersReducedMotion ? 0.88 : 0.86 + 0.04 * Math.sin(time * 2.0 + Math.PI);
+        
+        ctx.strokeStyle = 'rgba(150, 220, 255, 0.35)';
+        ctx.lineWidth = 2.5;
+        this.drawHexOutlineRaw(pos.x, pos.y, HEX_SIZE * wave1);
+        
+        ctx.strokeStyle = 'rgba(150, 220, 255, 0.16)';
+        ctx.lineWidth = 1.5;
+        this.drawHexOutlineRaw(pos.x, pos.y, HEX_SIZE * wave2);
       }
     }
 
@@ -142,13 +178,13 @@ export class HexRenderer {
     }
   }
 
-  drawTileDecor(tile: Tile, fogEnabled: boolean, activeBuilding?: Building) {
+  drawTileDecor(tile: Tile, fogEnabled: boolean, activeBuilding?: Building, animTime?: number) {
     if (!tile.revealed) return;
     const pos = axialToPixel(tile.coord, HEX_SIZE);
     const alpha = tile.inFog && fogEnabled ? 0.35 : 1;
 
-    this.drawTerrainDecor(tile.terrain, pos, alpha);
-    this.drawTileResources(tile, pos, alpha);
+    this.drawTerrainDecor(tile.terrain, pos, alpha, animTime);
+    this.drawTileResources(tile, pos, alpha, animTime);
 
     if (tile.city && tile.skillHealth) {
       const skillColor =
@@ -171,8 +207,7 @@ export class HexRenderer {
     if (tile.district) this.drawDistrictLabel(tile.district.name, pos);
   }
 
-  // ─── A3: Resource icons on tile ──────────────────────────────────────────
-  private drawTileResources(tile: Tile, pos: { x: number; y: number }, alpha: number) {
+  private drawTileResources(tile: Tile, pos: { x: number; y: number }, alpha: number, animTime?: number) {
     const { ctx } = this;
     const res = tile.resources;
     if (!tile.revealed) return;
@@ -183,6 +218,11 @@ export class HexRenderer {
     if (res.production >= 3) icons.push('⚙');
     if (icons.length === 0) return;
 
+    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const time = animTime || 0;
+    // Gentle floating offset
+    const floatY = prefersReducedMotion ? 0 : Math.sin(time * 2.5 + pos.x * 0.05) * 4;
+
     ctx.save();
     ctx.globalAlpha = alpha * 0.85;
     ctx.font = `${HEX_SIZE * 0.22}px sans-serif`;
@@ -190,14 +230,14 @@ export class HexRenderer {
     ctx.textBaseline = 'middle';
     const spacing = HEX_SIZE * 0.28;
     const startX = pos.x - (spacing * (icons.length - 1)) / 2;
-    const iconY = pos.y + HEX_SIZE * 0.42;
+    const iconY = pos.y + HEX_SIZE * 0.42 + floatY;
     for (let i = 0; i < icons.length; i++) {
       ctx.fillText(icons[i]!, startX + i * spacing, iconY);
     }
     ctx.restore();
   }
 
-  private drawTerrainDecor(terrain: Terrain, pos: { x: number; y: number }, alpha: number) {
+  private drawTerrainDecor(terrain: Terrain, pos: { x: number; y: number }, alpha: number, animTime?: number) {
     const { ctx } = this;
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -205,6 +245,15 @@ export class HexRenderer {
     switch (terrain) {
       case 'forest': {
         const sprite = this.spriteImages['forest_sprite'];
+        const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const time = animTime || 0;
+        const sway = prefersReducedMotion ? 0 : Math.sin(time * 1.8 + pos.x * 0.02) * 0.05;
+        
+        ctx.save();
+        ctx.translate(pos.x, pos.y);
+        ctx.transform(1, 0, sway, 1, 0, 0); // GPU-accelerated wind sway shear transform
+        ctx.translate(-pos.x, -pos.y);
+        
         if (sprite) {
           // Draw multiple small trees from sprite
           const sw = sprite.width / 2;
@@ -225,6 +274,7 @@ export class HexRenderer {
             ctx.fill();
           }
         }
+        ctx.restore();
         break;
       }
       case 'mountain': {
@@ -290,18 +340,6 @@ export class HexRenderer {
     ctx.stroke();
   }
 
-  // ─── A4: Territory blob border ────────────────────────────────────────────
-  // Draws only the external edges of a city's territory — the edges that face
-  // a hex NOT in the territory. This creates a solid organic border instead
-  // of per-tile outlines.
-  //
-  // Flat-topped hex corner angles (60*i - 30°):
-  //   0: -30° (top-right)  1: 30° (bottom-right)  2: 90° (bottom)
-  //   3: 150° (bottom-left) 4: 210° (top-left)     5: 270° (top)
-  //
-  // Edge i→(i+1) faces AXIAL_DIRECTIONS[d] mapping:
-  //   E(0)→edge[0,1]  NE(1)→edge[5,0]  NW(2)→edge[4,5]
-  //   W(3)→edge[3,4]  SW(4)→edge[2,3]  SE(5)→edge[1,2]
   private static readonly EDGE_CORNERS: [number, number][] = [
     [0, 1], // E  (dir 0)
     [5, 0], // NE (dir 1)
@@ -311,22 +349,30 @@ export class HexRenderer {
     [1, 2], // SE (dir 5)
   ];
 
-  drawCityTerritory(city: City) {
+  drawCityTerritory(city: City, animTime?: number) {
     const { ctx } = this;
     if (city.territory.length === 0) return;
 
     // Build fast lookup set
     const inTerritory = new Set(city.territory.map((c) => `${c.q},${c.r}`));
-    const borderColor = city.isCapital ? '#c8a84b' : '#7a5a2e';
-    const borderWidth = city.isCapital ? 2.5 : 1.8;
+    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const time = animTime || 0;
+    
+    // Pulsating border opacity
+    const pulse = prefersReducedMotion ? 0.95 : 0.75 + 0.25 * Math.sin(time * 3.0);
+    const borderColor = city.isCapital 
+      ? `rgba(200, 168, 75, ${pulse})` 
+      : `rgba(122, 90, 46, ${pulse * 0.95})`;
+      
+    const borderWidth = city.isCapital ? 3.0 : 2.0;
 
     ctx.save();
     ctx.strokeStyle = borderColor;
     ctx.lineWidth = borderWidth;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.shadowColor = city.isCapital ? 'rgba(200,168,75,0.4)' : 'transparent';
-    ctx.shadowBlur = city.isCapital ? 4 : 0;
+    ctx.shadowColor = city.isCapital ? 'rgba(245, 213, 128, 0.45)' : 'transparent';
+    ctx.shadowBlur = city.isCapital && !prefersReducedMotion ? 6 + 2.5 * Math.sin(time * 3.0) : 0;
     ctx.setLineDash([]);
 
     for (const coord of city.territory) {
