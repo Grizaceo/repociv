@@ -35,6 +35,10 @@ export class LocalRenderer {
   private staticLayer: HTMLCanvasElement | null = null;
   private staticWorldId: string | null = null;
 
+  // Door Animation State (Phase 5)
+  private doorOpenStates = new Map<string, number>();
+  private lastFrameTime = performance.now();
+
   // Camera
   private cam = { x: 0, y: 0, cx: 0, cy: 0, zoom: 1 };
   private isDragging = false;
@@ -240,6 +244,11 @@ export class LocalRenderer {
     const { ctx, canvas, cam, world } = this;
     if (!world) return;
 
+    // Frame-rate independent delta time calculation (Phase 5)
+    const now = performance.now();
+    const dt = Math.min((now - this.lastFrameTime) / 1000, 0.1);
+    this.lastFrameTime = now;
+
     // 3b. Rebuild static layer if needed
     if (!this.staticLayer || this.staticWorldId !== world.repoId) {
       this.rebuildStaticLayer();
@@ -265,7 +274,7 @@ export class LocalRenderer {
       for (let x = view.x0; x <= view.x1; x++) {
         const tile = world.grid[y]![x]!;
         if (tile.type === 'door') {
-          this.drawDynamicDoorTile(tile);
+          this.drawDynamicDoorTile(tile, dt, localUnits);
         } else if (tile.type === 'workbench') {
           this.drawDynamicWorkbenchTile(tile);
         }
@@ -358,8 +367,58 @@ export class LocalRenderer {
     return { x0, y0, x1, y1 };
   }
 
-  private drawDynamicDoorTile(tile: LocalTile) {
-    this.drawTile(tile);
+  private drawDynamicDoorTile(tile: LocalTile, dt: number, localUnits: LocalUnit[]) {
+    const { ctx } = this;
+    const px = tile.x * TILE_SIZE;
+    const py = tile.y * TILE_SIZE;
+    const s = TILE_SIZE;
+    const key = `${tile.x},${tile.y}`;
+
+    const dpx = px + s / 2;
+    const dpy = py + s / 2;
+
+    // Calculate nearest agent distance
+    let minD = Infinity;
+    for (const unit of localUnits) {
+      let ux: number, uy: number;
+      if (unit.path.length > 0 && unit.pathIndex < unit.path.length) {
+        const from = unit.path[unit.pathIndex]!;
+        const to = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;
+        const t = unit.pathProgress;
+        ux = (from.x + (to.x - from.x) * t) * TILE_SIZE + TILE_SIZE / 2;
+        uy = (from.y + (to.y - from.y) * t) * TILE_SIZE + TILE_SIZE / 2;
+      } else {
+        ux = unit.gridX * TILE_SIZE + TILE_SIZE / 2;
+        uy = unit.gridY * TILE_SIZE + TILE_SIZE / 2;
+      }
+      const d = Math.hypot(ux - dpx, uy - dpy) / TILE_SIZE;
+      if (d < minD) minD = d;
+    }
+
+    // Determine target open factor (Phase 5)
+    const openPct = Math.max(0, Math.min(1, (1.8 - minD) * 1.5));
+    let currentOpen = this.doorOpenStates.get(key) ?? 0;
+    currentOpen = currentOpen + (openPct - currentOpen) * (1 - Math.exp(-dt * 12));
+    this.doorOpenStates.set(key, currentOpen);
+
+    // Draw sliding panels (Phase 5)
+    const panelW = s / 2;
+    const offset = panelW * currentOpen;
+
+    ctx.save();
+    
+    // Left sliding panel
+    ctx.fillStyle = this.tokens.zinc600 || '#52525B';
+    ctx.fillRect(px - offset, py + 1, panelW, s - 2);
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)'; // Amber outline
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px - offset + 0.5, py + 1.5, panelW - 1, s - 3);
+
+    // Right sliding panel
+    ctx.fillRect(px + panelW + offset, py + 1, panelW, s - 2);
+    ctx.strokeRect(px + panelW + offset + 0.5, py + 1.5, panelW - 1, s - 3);
+
+    ctx.restore();
   }
 
   private drawDynamicWorkbenchTile(tile: LocalTile) {
