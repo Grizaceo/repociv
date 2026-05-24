@@ -372,74 +372,127 @@ export class LocalRenderer {
     const py = tile.y * TILE_SIZE;
     const s = TILE_SIZE;
 
-    let fillColor = TILE_COLOR[tile.type] ?? TILE_COLOR['floor'] ?? '#2a2a35';
-    const borderColor = TILE_BORDER[tile.type] ?? TILE_BORDER['floor'] ?? '#1a1a22';
-
-    // Floor variation: subtle brightness shift to break uniformity
+    // Floor and Wall base styling using cached CSS variables (Phase 4)
     if (tile.type === 'floor' || tile.type === 'door') {
+      let fillColor = this.tokens.zinc800 || '#27272A';
       const delta = ((tile.x * 7 + tile.y * 3) % 7) - 3; // -3..+3
       fillColor = _adjustBrightness(fillColor, delta);
-    }
 
-    // Fill
-    ctx.fillStyle = fillColor;
-    ctx.fillRect(px, py, s, s);
+      ctx.fillStyle = fillColor;
+      ctx.fillRect(px, py, s, s);
 
-    // Subtle texture based on type
-    if (tile.type === 'workbench') {
-      this.drawWorkbenchTile(tile, px, py, s);
+      // Steel grid lines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.015)';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+
+      // Micro-remaches in corners
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+      ctx.fillRect(px + 2, py + 2, 1, 1);
+      ctx.fillRect(px + s - 3, py + 2, 1, 1);
+      ctx.fillRect(px + 2, py + s - 3, 1, 1);
+      ctx.fillRect(px + s - 3, py + s - 3, 1, 1);
+
     } else if (tile.type === 'wall') {
-      // 3/4 perspective: cast shadow down-right
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
-      ctx.fillRect(px + 3, py + 3, s, s);
-      ctx.fillStyle = '#00000018';
-      ctx.fillRect(px + 2, py + 2, s - 4, s - 4);
-    } else if (tile.type === 'debris') {
-      this.drawDebrisTile(px, py, s);
-    } else if (tile.type === 'kiosk') {
-      this.drawKioskTile(px, py, s);
-    }
+      // Solid carbon wall core
+      ctx.fillStyle = this.tokens.zinc800 || '#27272A';
+      ctx.fillRect(px, py, s, s);
 
-    // Grid lines
-    ctx.strokeStyle = borderColor;
-    ctx.lineWidth = 0.5;
-    ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+      // Ambient oclusion shadow at bottom
+      const grad = ctx.createLinearGradient(px, py + s - 4, px, py + s);
+      grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(px, py + s - 4, s, 4);
+
+      // Golden bisel top border
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.55)'; // amber-500 alpha 0.55
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px, py + 0.5);
+      ctx.lineTo(px + s, py + 0.5);
+      ctx.stroke();
+
+      // Steel border outline
+      ctx.strokeStyle = this.tokens.border || '#262626';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+
+    } else if (tile.type === 'debris') {
+      // Base floor under debris
+      let fillColor = this.tokens.base || '#0C0C0C';
+      ctx.fillStyle = fillColor;
+      ctx.fillRect(px, py, s, s);
+
+      this.drawDebrisTile(px, py, s);
+
+      // Grid line
+      ctx.strokeStyle = this.tokens.border || '#262626';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+
+    } else if (tile.type === 'kiosk') {
+      // Base floor under kiosk
+      ctx.fillStyle = this.tokens.zinc800 || '#27272A';
+      ctx.fillRect(px, py, s, s);
+
+      this.drawKioskTile(px, py, s);
+
+      ctx.strokeStyle = this.tokens.border || '#262626';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+
+    } else if (tile.type === 'workbench') {
+      // Base floor under workbench
+      ctx.fillStyle = this.tokens.zinc800 || '#27272A';
+      ctx.fillRect(px, py, s, s);
+
+      this.drawWorkbenchTile(tile, px, py, s);
+
+      ctx.strokeStyle = this.tokens.border || '#262626';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+    }
   }
 
   private drawDebrisTile(px: number, py: number, s: number) {
     const { ctx } = this;
-    // Dark inner fill — already done by TILE_COLOR.debris, add debris texture
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.fillRect(px + 3, py + 3, s - 6, s - 6);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.fillRect(px + 2, py + 2, s - 4, s - 4);
 
-    // Crack lines (two diagonal strokes)
-    ctx.strokeStyle = 'rgba(80,60,30,0.6)';
+    // Crack lines using lt-error alpha 0.18 (Phase 4)
+    const hash = (px * 17 + py * 13) % 4;
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.18)'; // error color
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(px + 4, py + s * 0.5);
-    ctx.lineTo(px + s * 0.5, py + 4);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(px + s - 4, py + s * 0.5);
-    ctx.lineTo(px + s * 0.5, py + s - 4);
+    if (hash === 0) {
+      ctx.moveTo(px + 4, py + 4);
+      ctx.lineTo(px + s - 4, py + s - 4);
+    } else if (hash === 1) {
+      ctx.moveTo(px + s - 4, py + 4);
+      ctx.lineTo(px + 4, py + s - 4);
+    } else {
+      ctx.moveTo(px + 3, py + s * 0.4);
+      ctx.lineTo(px + s * 0.5, py + 3);
+      ctx.moveTo(px + s - 3, py + s * 0.6);
+      ctx.lineTo(px + s * 0.5, py + s - 3);
+    }
     ctx.stroke();
   }
 
   private drawKioskTile(px: number, py: number, s: number) {
     const { ctx } = this;
-    // Draw a wooden counter top style shadow
+    // CRT terminal kiosk in zinc style (Phase 4)
     ctx.fillStyle = 'rgba(0,0,0,0.2)';
     ctx.fillRect(px + 2, py + 2, s - 4, s - 4);
 
-    // Draw a small glyph like a newspaper sheet
-    ctx.fillStyle = '#e5e5d8';
-    ctx.fillRect(px + 5, py + 5, s - 10, s - 10);
+    // Terminal Screen
+    ctx.fillStyle = '#1c1c1f';
+    ctx.fillRect(px + 4, py + 4, s - 8, s - 8);
 
-    // Text lines inside newspaper
-    ctx.fillStyle = '#4a4a4a';
-    ctx.fillRect(px + 7, py + 8, s - 14, 2);
-    ctx.fillRect(px + 7, py + 12, s - 14, 2);
+    // Glowing screen indicator
+    ctx.fillStyle = 'rgba(245, 158, 11, 0.7)'; // amber-500
+    ctx.fillRect(px + 6, py + 6, s - 12, s - 12);
   }
 
   private drawWorkbenchTile(tile: LocalTile, px: number, py: number, s: number) {
