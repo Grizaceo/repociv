@@ -1,72 +1,100 @@
 # Contributing to RepoCiv
 
-RepoCiv es un proyecto personal (por ahora) pero las PRs y sugerencias son bienvenidas.
+Thanks for your interest in contributing. RepoCiv is a single-user alpha, and
+contributions should be small, focused, and dogfooding-driven.
 
-## Development Setup
+## Getting Up and Running
+
+### Prerequisites
+
+- Node.js 22+
+- Python 3.12+
+- A running Hermes Agent instance (optional, for live agent features)
+
+### Setup
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/yourusername/repociv.git
 cd repociv
+
+# Frontend
 npm install
-python3 -m venv .venv
+
+# Backend
+python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-pre-commit install
 ```
 
-## Workflow
+### Development
 
-1. **Branch:** `git checkout -b feat/descripcion-corta`
-2. **Code:** haz tus cambios
-3. **Check:** `npm run check` (lint + typecheck + tests + build)
-4. **Test Python:** `pytest --tb=short`
-5. **Commit:** usa conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`)
-6. **Push:** `git push origin feat/descripcion-corta`
-7. **PR:** describe qué cambia y por qué
+```bash
+# Terminal 1 — Backend (auto-reload disabled for determinism)
+python -m server.bridge
 
-## Conventional Commits
+# Terminal 2 — Frontend (Vite dev server)
+npm run dev
 
-| Prefix | Uso |
-|--------|-----|
-| `feat:` | Nueva feature |
-| `fix:` | Bugfix |
-| `docs:` | Documentación |
-| `test:` | Tests |
-| `refactor:` | Refactor sin cambio de comportamiento |
-| `chore:` | Mantenimiento, deps, scripts |
-| `style:` | Formato (prettier, etc.) |
+# Open http://localhost:5277
+```
 
-## Pre-commit Hooks
+### Environment
 
-Si instalaste pre-commit, los hooks corren automáticamente en cada commit:
-- Prettier formatting
-- ESLint check
-- Vitest unit tests
-- TypeScript type check
-- pytest Python tests
+Copy `.env.example` to `.env` and adjust:
 
-Para correr manualmente: `pre-commit run --all-files`
+```bash
+cp .env.example .env
+```
 
-## Testing
+For local dev, leave `REPOCIV_TOKEN` empty (auth is bypassed).
 
-- **Frontend:** `npm test` (Vitest, 314 tests)
-- **Backend:** `pytest` (544 tests)
-- **E2E:** `npm run test:e2e` (Playwright)
-- **Smoke:** `./scripts/smoke-test.sh`
+## Running Tests
 
-## CI
+```bash
+# Frontend (Vitest)
+npm test
 
-GitHub Actions corre en cada push/PR:
-- Frontend: lint, typecheck, format, tests, coverage, build
-- Backend: pytest + coverage (min 70%)
+# Frontend with coverage
+npm run test:coverage
 
-## Style Guide
+# Backend (pytest)
+pytest server/ -v
 
-- TypeScript: strict mode, no `any` si se puede evitar.
-- Python: type hints donde aportan claridad.
-- Canvas: preferir `requestAnimationFrame`, evitar alloc en el loop.
+# Backend with coverage
+pytest server/ --cov=server --cov-report=term-missing
+```
 
-## Questions?
+## Code Style
 
-Abre un issue o menciona en el chat de desarrollo.
+- TypeScript strict mode is enabled.
+- ESLint + Prettier enforce formatting. Run `npm run format` to auto-fix.
+- Commit messages follow the Conventional Commits style when possible:
+  `feat:`, `fix:`, `docs:`, `chore:`, `test:`.
 
+## Submitting Changes
+
+1. Fork the repository.
+2. Create a feature branch: `git checkout -b feat/my-feature`
+3. Make your change. Keep it small.
+4. Ensure tests pass: `npm test && pytest server/ -v`
+5. Ensure typecheck passes: `npx tsc --noEmit`
+6. Commit with a descriptive message.
+7. Open a Pull Request against `main`.
+
+## What We're Looking For
+
+- Bug fixes with regression tests.
+- Small, focused feature additions that solve a real dogfooding need.
+- Documentation improvements.
+- Performance improvements (the hex map targets 60 FPS).
+
+## What We're Not Looking For
+
+- Large refactors without prior discussion.
+- Features that aren't needed by the primary user yet.
+- Multiplayer, 3D renderer, marketplace, or mobile PWA (see ROADMAP.md).
+
+## Code of Conduct
+
+Be respectful. Critique ideas, not people. Keep discussions technical and
+on-topic.
