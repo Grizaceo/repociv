@@ -3,24 +3,6 @@ import type { LocalWorld, LocalTile, LocalRoom, LocalUnit } from './types.ts';
 
 const TILE_SIZE = 24; // px per tile
 
-// ─── Tile colors (RimWorld-inspired dark palette) ─────────────────────────────
-const TILE_COLOR: Record<string, string> = {
-  floor: '#2a2a35',
-  wall: '#0f0f18',
-  door: '#4a3a1a',
-  workbench: '#1a3040',
-  debris: '#1a1a1a',
-  kiosk: '#5c3d2e',
-};
-
-const TILE_BORDER: Record<string, string> = {
-  floor: '#35354a',
-  wall: '#1a1a28',
-  door: '#8a6a2a',
-  workbench: '#2a5060',
-  debris: '#252525',
-  kiosk: '#8b5a2b',
-};
 
 // ─── Main renderer class ───────────────────────────────────────────────────────
 export class LocalRenderer {
@@ -635,17 +617,20 @@ export class LocalRenderer {
     const label = room.folderName.toUpperCase();
     ctx.save();
 
-    // Label background
-    ctx.fillStyle = 'rgba(10,8,5,0.75)';
+    // Label background in gstack style (Phase 7)
+    ctx.fillStyle = 'rgba(20, 20, 20, 0.85)';
     ctx.fillRect(px + 2, py + 2, Math.min(pw - 4, 80), 14);
 
-    ctx.font = `bold 9px 'Cinzel', serif`;
+    // Border outline
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)'; // Amber alpha 0.35
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(px + 2, py + 2, Math.min(pw - 4, 80), 14);
+
+    ctx.font = `10px ${this.tokens.fontMono}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = '#c8a84b';
-    ctx.shadowColor = 'rgba(0,0,0,0.8)';
-    ctx.shadowBlur = 3;
-    ctx.fillText(label, px + 4, py + 3);
+    ctx.fillStyle = this.tokens.amber400 || '#FBBF24';
+    ctx.fillText(label, px + 4, py + 4);
     ctx.restore();
   }
 
@@ -664,66 +649,84 @@ export class LocalRenderer {
       uy = unit.gridY * TILE_SIZE + TILE_SIZE / 2;
     }
 
-    const floatY = Math.sin(performance.now() / 300 + ux * 0.1) * 1.5;
-    ctx.save();
-    ctx.translate(ux, uy + floatY);
-
-    // Shadow (more pronounced)
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.beginPath();
-    ctx.ellipse(0, TILE_SIZE * 0.38, TILE_SIZE * 0.22, TILE_SIZE * 0.09, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Selection ring
-    ctx.strokeStyle = '#f0c050';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, TILE_SIZE * 0.4, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Body
-    ctx.beginPath();
-    ctx.arc(0, 0, TILE_SIZE * 0.32, 0, Math.PI * 2);
-    ctx.fillStyle = '#1a1208';
-    ctx.fill();
-    ctx.strokeStyle = unit.color;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Direction indicator (triangle pointing to next path tile or workbench)
+    // Determine motion vectors & angles
     let dirAngle = 0;
+    let isMoving = false;
     if (unit.path.length > 0 && unit.pathIndex < unit.path.length) {
+      isMoving = true;
+      const from = unit.path[unit.pathIndex]!;
       const to = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;
-      dirAngle = Math.atan2(to.y - unit.gridY, to.x - unit.gridX);
+      dirAngle = Math.atan2(to.y - from.y, to.x - from.x);
     } else if (unit.state === 'working_on_file' && unit.currentWorkbenchId) {
-      // Face the current workbench if known
       const wbTile = this.world?.grid
         .flat()
         .find((t) => t.workbench?.id === unit.currentWorkbenchId);
       if (wbTile) dirAngle = Math.atan2(wbTile.y - unit.gridY, wbTile.x - unit.gridX);
     }
+
+    // Physically-correct Squash & Stretch (Fase 7)
+    const speed = isMoving ? 3.6 * unit.effectiveSpeed : 0;
+    const Sf = 1 + Math.min(0.25, speed * 0.08); // cap at 1.25 max stretch
+    const Sc = 1 / Sf;
+
+    // Harmonic bobbing vertically during walks
+    const bobbingY = isMoving ? Math.sin(unit.pathProgress * Math.PI * 2) * 2.5 : 0;
+
+    ctx.save();
+    ctx.translate(ux, uy + bobbingY);
+
+    // Selection ring in gstack amber
+    ctx.strokeStyle = this.tokens.amber500 || '#F59E0B';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, TILE_SIZE * 0.4, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Squash & Stretch applied along the directional movement vector
     ctx.save();
     ctx.rotate(dirAngle);
-    ctx.fillStyle = unit.color;
-    ctx.beginPath();
-    ctx.moveTo(7, 0);
-    ctx.lineTo(-3, -4);
-    ctx.lineTo(-3, 4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
+    ctx.scale(Sf, Sc);
 
-    // Initials
+    // Elliptical dynamic shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(0, TILE_SIZE * 0.38, TILE_SIZE * 0.22, TILE_SIZE * 0.09, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Unit Body (Sleek graphite dome)
+    ctx.beginPath();
+    ctx.arc(0, 0, TILE_SIZE * 0.32, 0, Math.PI * 2);
+    ctx.fillStyle = '#1c1c1f';
+    ctx.fill();
+    ctx.strokeStyle = unit.color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Visual direction visors / dual LED sensors parpeding (Phase 7)
+    const now = performance.now();
+    const isWorking = unit.state === 'working_on_file';
+    const flash = isWorking && Math.sin(now / 180) > 0;
+    if (isWorking) {
+      ctx.fillStyle = flash ? '#22C55E' : 'rgba(34, 197, 94, 0.4)';
+      ctx.beginPath();
+      ctx.arc(TILE_SIZE * 0.22, -TILE_SIZE * 0.1, 1.5, 0, Math.PI * 2);
+      ctx.arc(TILE_SIZE * 0.22, TILE_SIZE * 0.1, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore(); // restore Squash & Stretch
+
+    // Initials centered in JetBrains Mono
     const initials = unit.name.slice(0, 2).toUpperCase();
     ctx.fillStyle = unit.color;
-    ctx.font = `bold ${TILE_SIZE * 0.3}px 'Cinzel', serif`;
+    ctx.font = `bold ${TILE_SIZE * 0.3}px ${this.tokens.fontMono}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(initials, 0, 0);
 
-    // Work progress ring
+    // Dynamic work progress ring in gstack success color
     if (unit.state === 'working_on_file' && unit.workProgress > 0) {
-      ctx.strokeStyle = '#5b9b5b';
+      ctx.strokeStyle = this.tokens.success || '#22C55E';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.arc(
@@ -736,7 +739,7 @@ export class LocalRenderer {
       ctx.stroke();
     }
 
-    // Status indicator
+    // Status icon indicator in JetBrains Mono
     const statusIcon: Record<string, string> = {
       idle_in_room: '◌',
       walking_to_workbench: '→',
@@ -746,7 +749,7 @@ export class LocalRenderer {
     };
     const icon = statusIcon[unit.state] ?? '?';
     ctx.fillStyle = unit.color;
-    ctx.font = `${TILE_SIZE * 0.28}px serif`;
+    ctx.font = `${TILE_SIZE * 0.28}px ${this.tokens.fontMono}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillText(icon, 0, -TILE_SIZE * 0.35);
