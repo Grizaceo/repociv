@@ -84,6 +84,9 @@ export class Renderer {
   localUnitClickCb:
     | ((unit: import('./types.ts').LocalUnit, screenX: number, screenY: number) => void)
     | null = null;
+  localTileClickCb:
+    | ((x: number, y: number, tile: import('./types.ts').LocalTile | null, screenX: number, screenY: number) => void)
+    | null = null;
   private _localRendererCtor: (new (canvas: HTMLCanvasElement) => LocalRendererType) | null = null;
   private localWorldId: string | null = null;
   /** Cached tile list sorted by Y — recomputed only when tile count changes. */
@@ -598,6 +601,7 @@ export class Renderer {
         this.localR.onLocalUnitHover = (unit, sx, sy) => this.localUnitHoverCb?.(unit, sx, sy);
         this.localR.onWorkbenchClick = this.localWorkbenchClickCb;
         this.localR.onLocalUnitClick = this.localUnitClickCb;
+        this.localR.onTileClick = (x, y, tile) => this.localTileClickCb?.(x, y, tile, 0, 0);
       }
       if (!this.localR) return; // still loading module — next frame will retry
       if (this.state.localWorld && this.state.localWorld.repoId !== this.localWorldId) {

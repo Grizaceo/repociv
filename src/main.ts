@@ -365,6 +365,16 @@ async function bootstrap() {
     // Highlight selected local unit (future: show detail panel)
     showLocalUnitTooltip(unit, { x: _sx, y: _sy });
   };
+  // ─── Kiosk click → discover rest area with 1.25x bonus ───────────────────
+  renderer.localTileClickCb = (x, y, tile) => {
+    if (tile?.type === 'kiosk') {
+      bridge.send('discover_rest_area', {
+        restAreaId: `kiosk-${x}-${y}`,
+        roomId: 'kiosk',
+        coord: [x, y],
+      });
+    }
+  };
 
   // Spawn DAVI as the default hero, near the capital if present
   const capital = world.cities.find((c) => c.isCapital) ?? world.cities[0];
