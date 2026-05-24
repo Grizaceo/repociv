@@ -81,14 +81,14 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
 
     // 2) Resolve city: if the target unit is on the map, use its position;
     //    otherwise default to "main" (virtual agent not yet spawned)
-    let cityHere = state.world.cities[0];
+    let _cityHere = state.world.cities[0];
     if (prefersSelector && !targetUnit) {
       // Virtual agent, not on map — use first city as default
-      cityHere = state.world.cities[0];
+      _cityHere = state.world.cities[0];
     } else {
       const lookupCoord = unit.targetCoord ?? unit.coord;
       const tile = state.world.tiles.get(tileKey(lookupCoord));
-      cityHere =
+      _cityHere =
         tile?.city ??
         state.world.cities.find((c) =>
           c.territory.some((t) => t.q === lookupCoord.q && t.r === lookupCoord.r),
@@ -104,7 +104,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     const { harness, provider, model } = getSelectedConfig();
     const payload: Record<string, unknown> = {
       unit: unit.id,
-      city: cityHere?.id ?? 'main',
+      city: _cityHere?.id ?? 'main',
       mission: text,
       agentType: unit.type,
     };
