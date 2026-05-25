@@ -139,6 +139,17 @@ export async function openWonderVignette(type: WonderType): Promise<void> {
   const body = container.querySelector('.wonder-vignette-body') as HTMLElement;
   body.innerHTML = '<div class="wonder-loading">Verificando estado de la maravilla...</div>';
 
+  if (type === 'gaceta') {
+    body.innerHTML = `
+      <div class="wonder-empty-state">
+        <div class="wonder-empty-emoji">📰</div>
+        <div class="wonder-empty-title">La Gaceta vive en el Palacio</div>
+        <div class="wonder-empty-sub">Consulta noticias, opcionalidad y funciones activables desde la pestaña Gaceta del capital panel.</div>
+      </div>
+    `;
+    return;
+  }
+
   if (type === 'bibliotheca') {
     const { backend, ui } = await checkLgbReachability();
     if (!ui && !backend) {
