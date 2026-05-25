@@ -327,6 +327,67 @@ npm run check
 
 ---
 
+## Maravilla Bibliotheca (La Gran Biblioteca)
+
+RepoCiv embeds **La Gran Biblioteca** (repo hermano `la-gran-biblioteca`) in a
+viñeta iframe. LGB no se modifica desde RepoCiv; solo enlazas su UI y compruebas
+el backend con variables `VITE_*` (ver `.env.example`).
+
+Contexto del ecosistema Hermes (repo hermano):
+[`la-gran-biblioteca/docs/ecosystem-hermes.md`](../la-gran-biblioteca/docs/ecosystem-hermes.md).
+
+### Arranque local (dos terminales)
+
+**Terminal 1 — La Gran Biblioteca** (repo `la-gran-biblioteca`):
+
+```bash
+python -m backend.library_bridge
+cd frontend && npm run dev
+```
+
+Bridge/API en `:3001`, UI Vite en `http://127.0.0.1:5173`.
+
+**Terminal 2 — RepoCiv:**
+
+```bash
+./scripts/dev-start.sh
+```
+
+Abre RepoCiv en el puerto de tu `.env` (p. ej. `VITE_PORT=5277` →
+`http://127.0.0.1:5277`).
+
+### Usar la maravilla en el mapa
+
+1. En el mapa imperial, localiza la capital y el icono **B** (Bibliotheca).
+2. Doble clic en **B**, o abre el **Palacio** (doble clic en la capital) → pestaña
+   **Bibliotheca** → **Entrar a la Bibliotheca**.
+3. La viñeta carga el iframe apuntando a `VITE_WONDER_BIBLIOTHECA_URL` (por defecto
+   `:5173`). RepoCiv solo hace health-check a `VITE_LGB_BACKEND_URL/api/health`
+   (`:3001`); si el backend no responde, verás un aviso para arrancar LGB.
+
+LGB sigue usable en paralelo en `http://127.0.0.1:5173` sin RepoCiv.
+
+### Tailscale / remoto
+
+Si abres LGB en `http://<tailscale-ip>:5173`, en `.env` de RepoCiv:
+
+```bash
+VITE_WONDER_BIBLIOTHECA_URL=http://<tailscale-ip>:5173
+VITE_LGB_BACKEND_URL=http://127.0.0.1:3001
+```
+
+El iframe usa la IP Tailscale; el health-check usa `127.0.0.1:3001` porque el bridge
+suele escuchar solo en loopback y Vite en `:5173` ya hace proxy de `/api` → `:3001`.
+
+Reinicia Vite de RepoCiv tras cambiar `.env`.
+
+Solo si RepoCiv y LGB están en **máquinas distintas** necesitas `LGB_HOST=0.0.0.0` en
+la-gran-biblioteca y `VITE_LGB_BACKEND_URL=http://<ip>:3001`.
+
+Con Docker LGB en el host: `VITE_WONDER_BIBLIOTHECA_URL=http://127.0.0.1:3000`.
+
+---
+
 ## Next Steps
 
 - Read [PUBLIC_ARCHITECTURE.md](PUBLIC_ARCHITECTURE.md) for a deep dive into

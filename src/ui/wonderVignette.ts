@@ -1,12 +1,20 @@
 // ─── RepoCiv — Wonder Vignette (iframe wrapper with health-check) ──────────────
 import type { WonderType } from '../types.ts';
-
-const WONDER_URLS: Record<WonderType, string> = {
-  bibliotheca: 'http://localhost:3001',
-  institutum: 'http://localhost:5280',
-};
+import {
+  checkLgbReachability,
+  wonderUiUrl,
+  WONDER_BIBLIOTHECA_URL,
+  LGB_BACKEND_URL,
+} from '../wonderEnv.ts';
 
 const STORAGE_POS = (t: WonderType) => `repociv-vignette-pos-${t}`;
+const IFRAME_LOAD_TIMEOUT_MS = 25000;
+
+type EmptyReason =
+  | 'lgb-offline'
+  | 'lgb-backend-offline'
+  | 'lgb-ui-offline'
+  | 'load-timeout';
 
 interface VignetteState {
   x: number;
@@ -40,7 +48,6 @@ export async function openWonderVignette(type: WonderType): Promise<void> {
   const container = document.createElement('div');
   container.id = 'wonder-vignette';
   container.className = 'wonder-vignette';
-  const url = WONDER_URLS[type];
 
   container.innerHTML = `
     <div class="wonder-vignette-header">
@@ -115,17 +122,37 @@ export async function openWonderVignette(type: WonderType): Promise<void> {
   });
   ro.observe(container);
 
-  // Health check
   const body = container.querySelector('.wonder-vignette-body') as HTMLElement;
   body.innerHTML = '<div class="wonder-loading">Verificando estado de la maravilla...</div>';
 
+  if (type === 'bibliotheca') {
+    const { backend, ui } = await checkLgbReachability();
+    if (!ui && !backend) {
+      _showEmptyState(body, type, 'lgb-offline');
+      return;
+    }
+    if (!ui) {
+      _showEmptyState(body, type, 'lgb-ui-offline');
+      return;
+    }
+    // UI reachable: Vite proxies /api → loopback :3001 inside the iframe even when
+    // RepoCiv (e.g. Windows) cannot hit 127.0.0.1:3001 on the LGB host (WSL/Tailscale).
+    if (!backend) {
+      console.warn(
+        '[Bibliotheca] Backend no alcanzable desde RepoCiv; montando iframe (API vía proxy Vite en :5173).',
+      );
+    }
+    _mountIframe(body, wonderUiUrl(type), type);
+    return;
+  }
+
+  const url = wonderUiUrl(type);
   try {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), 3000);
     await fetch(url, { method: 'HEAD', mode: 'no-cors', signal: ctrl.signal });
     clearTimeout(tid);
-    // no-cors returns opaque → we can't read status, but absence of error = likely ok
-    _mountIframe(body, url);
+    _mountIframe(body, url, type);
   } catch {
     _showEmptyState(body, type);
   }
@@ -139,30 +166,79 @@ export function closeWonderVignette(): void {
   _activeType = null;
 }
 
-function _mountIframe(body: HTMLElement, url: string): void {
+function _mountIframe(body: HTMLElement, url: string, type: WonderType): void {
+  const title =
+    type === 'bibliotheca' ? 'Bibliotheca Alexandrina' : 'Institutum Scientiarum';
   body.innerHTML = `
     <iframe
       src="${url}"
       sandbox="allow-scripts allow-same-origin allow-forms"
+      allow="fullscreen"
       loading="eager"
-      title="Wonder"
+      title="${title}"
     ></iframe>
   `;
   const iframe = body.querySelector('iframe')!;
+  let settled = false;
+  const fail = (reason?: EmptyReason) => {
+    if (settled) return;
+    settled = true;
+    _showEmptyState(body, type, reason);
+  };
+  const loadTimer = setTimeout(
+    () => fail(type === 'bibliotheca' ? 'load-timeout' : undefined),
+    IFRAME_LOAD_TIMEOUT_MS,
+  );
   iframe.addEventListener('load', () => {
-    body.querySelector('.wonder-loading')?.remove();
+    if (settled) return;
+    settled = true;
+    clearTimeout(loadTimer);
   });
-  iframe.addEventListener('error', () => {
-    body.innerHTML = `<div class="wonder-empty">La maravilla está en construcción. Los obreros duermen... <button class="wonder-retry">Reintentar</button></div>`;
-  });
+  iframe.addEventListener('error', () => fail());
 }
 
-function _showEmptyState(body: HTMLElement, type: WonderType): void {
+function _emptySub(type: WonderType, reason?: EmptyReason): string {
+  if (type !== 'bibliotheca') {
+    return 'Los obreros duermen. Vuelve más tarde.';
+  }
+  const ui = WONDER_BIBLIOTHECA_URL;
+  const api = LGB_BACKEND_URL;
+  switch (reason) {
+    case 'lgb-offline':
+      return (
+        `Arranca La Gran Biblioteca en otra terminal:<br>` +
+        `<code>python -m backend.library_bridge</code> (API ${api})<br>` +
+        `<code>cd frontend && npm run dev</code> (UI ${ui})`
+      );
+    case 'lgb-backend-offline':
+      return (
+        `El backend no responde (probado <code>${api}/api/health</code> y 127.0.0.1:3001). ` +
+        `Ejecuta <code>python -m backend.library_bridge</code> en la-gran-biblioteca. ` +
+        `Si la UI va por Tailscale, el iframe puede usar <code>${ui}</code> aunque el API sea solo local.`
+      );
+    case 'lgb-ui-offline':
+      return `El backend responde, pero la UI no en <code>${ui}</code>. Ejecuta <code>cd frontend && npm run dev</code> en la-gran-biblioteca.`;
+    case 'load-timeout':
+      return (
+        `La UI en <code>${ui}</code> no cargó a tiempo. Comprueba que Vite esté arriba y abre esa URL en una pestaña. ` +
+        `(API: <code>${api}</code>)`
+      );
+    default:
+      return 'Los obreros duermen. Vuelve más tarde.';
+  }
+}
+
+function _showEmptyState(
+  body: HTMLElement,
+  type: WonderType,
+  reason?: EmptyReason,
+): void {
+  const sub = _emptySub(type, reason);
   body.innerHTML = `
     <div class="wonder-empty">
       <div class="wonder-empty-icon">🏗️</div>
       <div class="wonder-empty-title">La maravilla está en construcción</div>
-      <div class="wonder-empty-sub">Los obreros duermen. Vuelve más tarde.</div>
+      <div class="wonder-empty-sub">${sub}</div>
       <button class="wonder-retry">Reintentar</button>
     </div>
   `;
