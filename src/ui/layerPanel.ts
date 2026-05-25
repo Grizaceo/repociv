@@ -95,6 +95,15 @@ export function isCleanMode(): boolean {
   return _cleanMode;
 }
 
+// ─── Per-layer status: allows renderer to signal empty/loading/error ──────────
+// Status drives visual cues (dim icon, pulse, red dot) via CSS data attribute.
+export type LayerStatus = 'ok' | 'empty' | 'loading' | 'error';
+
+export function setLayerStatus(id: MapLayerId, status: LayerStatus): void {
+  const row = document.querySelector<HTMLElement>(`.layer-row input[data-layer-id="${id}"]`)?.parentElement;
+  if (row) row.dataset['layerStatus'] = status;
+}
+
 // ─── Build panel DOM ──────────────────────────────────────────────────────────
 function buildPanel(): HTMLDivElement {
   const existing = document.getElementById(PANEL_ID);
@@ -175,20 +184,25 @@ function buildPanel(): HTMLDivElement {
   cleanLabel.className = 'layer-label';
   cleanLabel.textContent = 'Clean Map';
 
-  // Separator
+  // Separator (between layer list and clean mode — must be sibling of rows, not child of label)
   const sep = document.createElement('div');
   sep.className = 'layer-separator';
+  panel.appendChild(sep);
 
-  cleanRow.appendChild(sep.cloneNode());
   cleanRow.appendChild(cleanCb);
   cleanRow.appendChild(cleanIcon);
   cleanRow.appendChild(cleanLabel);
   panel.appendChild(cleanRow);
 
-  // Zoom LOD indicator
+  // Zoom LOD indicator — grouped visually with a hairline separator
+  const lodSep = document.createElement('div');
+  lodSep.className = 'layer-separator';
+  panel.appendChild(lodSep);
+
   const lodRow = document.createElement('div');
   lodRow.className = 'layer-lod-row';
   lodRow.id = 'layer-lod-indicator';
+  lodRow.title = 'Level of Detail: controla qué elementos se renderizan según el nivel de zoom actual';
   lodRow.innerHTML = '<span class="layer-lod-label">🔍 LOD:</span><span class="layer-lod-value">Auto</span>';
   panel.appendChild(lodRow);
 

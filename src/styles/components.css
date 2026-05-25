@@ -903,8 +903,9 @@ button:hover::after, .spawn-btn:hover::after {
   align-items: center;
   gap: 8px;
   padding: 4px 12px;
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   color: var(--ui-text-dim);
+  cursor: default;
 }
 
 .layer-lod-label {
@@ -913,6 +914,34 @@ button:hover::after, .spawn-btn:hover::after {
 
 .layer-lod-value {
   font-weight: 600;
+}
+
+/* ─── Per-layer status cues ─────────────────────────────────────────────────── */
+.layer-row[data-layer-status="empty"] .layer-icon {
+  opacity: 0.35;
+}
+
+.layer-row[data-layer-status="empty"] .layer-label::after {
+  content: ' —';
+  color: var(--ui-text-dim);
+  font-size: var(--text-2xs);
+}
+
+.layer-row[data-layer-status="loading"] .layer-icon {
+  animation: layer-icon-pulse 1s ease-in-out infinite;
+}
+
+.layer-row[data-layer-status="error"] .layer-icon::after {
+  content: '●';
+  font-size: 6px;
+  color: var(--state-error);
+  vertical-align: super;
+  margin-left: 2px;
+}
+
+@keyframes layer-icon-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .layer-reset-btn {
