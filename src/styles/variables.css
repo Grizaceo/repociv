@@ -104,6 +104,7 @@
   --state-error: oklch(0.42 0.20 25);
   --state-working: oklch(0.50 0.18 210);
   --state-info: oklch(0.55 0.08 75);
+  --state-approval: oklch(0.72 0.14 55); /* #e8a040 — approval/warning orange */
 
   /* metallics invertidos para light */
   --gold-gradient: linear-gradient(135deg, oklch(0.65 0.10 75) 0%, oklch(0.78 0.14 85) 50%, oklch(0.55 0.12 78) 100%);
@@ -147,6 +148,7 @@
   --state-error: var(--civ-defense);
   --state-working: var(--civ-movement);
   --state-info: oklch(0.72 0.08 75);
+  --state-approval: oklch(0.75 0.16 55); /* brighter in dark mode */
 
   --gold-gradient: linear-gradient(135deg, var(--gold-glow-color1) 0%, oklch(0.84 0.18 88) 50%, var(--gold-glow-color2) 100%);
   --bronze-gradient: linear-gradient(135deg, var(--bronze-glow-color1) 0%, var(--bronze-glow-color2) 100%);

@@ -1436,7 +1436,7 @@ kbd {
   background: var(--glass-bg);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 2px solid #e8a040;
+  border: 2px solid var(--state-approval);
   border-radius: var(--panel-radius);
   z-index: 48;
   display: flex;
@@ -1467,14 +1467,14 @@ kbd {
   justify-content: space-between;
   align-items: center;
   padding: 10px 14px;
-  border-bottom: 1px solid rgba(232, 160, 64, 0.3);
-  background: linear-gradient(180deg, rgba(232, 160, 64, 0.12), transparent);
+  border-bottom: 1px solid color-mix(in oklch, var(--state-approval) 30%, transparent);
+  background: linear-gradient(180deg, color-mix(in oklch, var(--state-approval) 12%, transparent), transparent);
 }
 .ap-title {
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 700;
-  color: #e8a040;
+  color: var(--state-approval);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -1504,7 +1504,7 @@ kbd {
 
 .ap-item {
   background: var(--ui-dark);
-  border: 1px solid rgba(232, 160, 64, 0.3);
+  border: 1px solid color-mix(in oklch, var(--state-approval) 30%, transparent);
   border-radius: 4px;
   padding: 10px 12px;
   display: flex;
@@ -1716,7 +1716,7 @@ kbd {
 
 .sp-approval-warn {
   font-size: 10px;
-  color: #e8a040;
+  color: var(--state-approval);
   margin-bottom: 6px;
 }
 
@@ -2100,7 +2100,7 @@ kbd {
   padding: 8px;
 }
 .obs-offline {
-  color: #e8a040;
+  color: var(--state-approval);
   font-size: 11px;
   text-align: center;
   padding: 16px;
@@ -2437,7 +2437,7 @@ kbd {
   background: #4caf50;
 }
 .hp-health-dot.hp-degraded {
-  background: #e8a040;
+  background: var(--state-approval);
 }
 .hp-health-dot.hp-unhealthy {
   background: #d44b4b;
@@ -2460,9 +2460,9 @@ kbd {
   border: 1px solid rgba(76, 175, 80, 0.4);
 }
 .hp-trust-badge.hp-cautious {
-  background: rgba(232, 160, 64, 0.2);
-  color: #e8a040;
-  border: 1px solid rgba(232, 160, 64, 0.4);
+  background: color-mix(in oklch, var(--state-approval) 20%, transparent);
+  color: var(--state-approval);
+  border: 1px solid color-mix(in oklch, var(--state-approval) 40%, transparent);
 }
 .hp-trust-badge.hp-untrusted {
   background: rgba(212, 75, 75, 0.2);
@@ -2682,8 +2682,8 @@ kbd {
   color: #d47b7b;
 }
 .rp-output.rp-output--warn {
-  border-color: rgba(232, 160, 64, 0.3);
-  color: #e8a040;
+  border-color: color-mix(in oklch, var(--state-approval) 30%, transparent);
+  color: var(--state-approval);
 }
 .rp-history {
   margin-top: 10px;
