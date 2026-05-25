@@ -7,6 +7,8 @@ import { UnitRenderer } from './unitRenderer.ts';
 import { MinimapRenderer } from './minimapRenderer.ts';
 import { openWonderVignette } from './ui/wonderVignette.ts';
 import { openCapitalPanel } from './ui/capitalPanel.ts';
+import { isLayerVisible } from './layers.ts';
+import { updateLodDisplay } from './ui/layerPanel.ts';
 // LocalRenderer is lazy-loaded on first local-view entry to keep main bundle small.
 type LocalRendererType = import('./localRenderer.ts').LocalRenderer;
 import {
@@ -40,11 +42,14 @@ export class Renderer {
 
   private hoveredHex: Axial | null = null;
   private selectedUnit: Unit | null = null;
+  private selectedCity: City | null = null;
   private unitTooltipEl: HTMLDivElement | null = null;
   private actionMode: 'none' | 'move' | 'build' = 'none';
   private showGrid = false;
   private showDebug = false;
   private fogEnabled = true;
+  private _cleanMode = false;
+  private _currentLod: 'low' | 'medium' | 'high' = 'medium';
   private animTime = 0;
   private _placingMode = false; // true when user is picking a hex on map
 
@@ -556,6 +561,7 @@ export class Renderer {
     const unit = this.state.getUnitAt(coord);
     if (unit) {
       this.selectedUnit = unit;
+      this.selectedCity = null;
       this.state.selectUnit(unit);
       this.canvas.style.cursor = 'pointer';
       this.onUnitSelect?.(unit);
@@ -563,12 +569,17 @@ export class Renderer {
     }
 
     if (tile?.city) {
+      this.selectedUnit = null;
+      this.selectedCity = tile.city;
+      this.state.selectUnit(null);
+      this.onUnitSelect?.(null);
       this.onCitySelect?.(tile.city.id);
       this.onTileInspect?.(tile.city.name, coord, tile.city.id);
       return;
     }
 
     this.selectedUnit = null;
+    this.selectedCity = null;
     this.state.selectUnit(null);
     this.onUnitSelect?.(null);
   }
@@ -609,8 +620,12 @@ export class Renderer {
 
   private render() {
     const { ctx, canvas, cam } = this;
-    ctx.fillStyle = '#050505'; // Deeper background
+    ctx.fillStyle = '#050505';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Compute LOD from zoom level
+    this._currentLod = this.calcLod();
+    updateLodDisplay(cam.zoom);
 
     // ─── Phase 6: Local RimWorld view ───────────────────────────────────────
     if (this.state.viewMode === 'local') {
@@ -650,39 +665,151 @@ export class Renderer {
     ctx.scale(cam.zoom, cam.zoom);
     ctx.translate(-cam.x, -cam.y);
 
-    // Pass 1: Surfaces & Shorelines
+    // ─── Layer gates (applied to each rendering pass) ─────────────────
+    const showStructure = isLayerVisible('structure');
+    const showOps = isLayerVisible('ops');
+    const showKnowledge = isLayerVisible('knowledge');
+    const showLabs = isLayerVisible('labs');
+    const showSecurity = isLayerVisible('security');
+    const showLabels = isLayerVisible('labels');
+    const isClean = this._cleanMode;
+    const lod = this._currentLod;
+    // LOD helpers: fine-grained what each zoom tier shows
+    const lodLow = lod === 'low';
+    const lodMed = lod === 'medium';
+    const lodHigh = lod === 'high';
+
+    // Pass 1: Surfaces & Shorelines (base layer — always on)
     for (const tile of this.state.world.tiles.values()) {
       const neighbors = this.getNeighbors(tile.coord);
       this.hexR.drawTileSurface(tile, this.fogEnabled, neighbors, this.animTime);
     }
 
-    // Pass 2: Territory
-    for (const city of this.state.world.cities) {
-      this.hexR.drawCityTerritory(city, this.animTime);
+    // Pass 2: Territory (structure layer)
+    if (showStructure) {
+      for (const city of this.state.world.cities) {
+        this.hexR.drawCityTerritory(city, this.animTime);
+      }
     }
 
-    // Pass 2.5: Capital wonder flanking sprites (drawn on top of capital hex)
-    const capital = this.state.world.cities.find((c) => c.isCapital);
-    if (capital) {
-      const cp = axialToPixel(capital.coord, HEX_SIZE);
-      if (capital.wonders) {
-        for (let i = 0; i < Math.min(capital.wonders.length, 2); i++) {
-          const w = capital.wonders[i]!;
-          const sx = cp.x + (i === 0 ? -1 : 1) * HEX_SIZE * 0.55;
-          const sy = cp.y - HEX_SIZE * 0.5;
-          const r = 9;
-          ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2);
-          ctx.fillStyle = w.wonderType === 'bibliotheca' ? '#1a3a5c' : '#2d5a27';
-          ctx.strokeStyle = w.wonderType === 'bibliotheca' ? '#4a90c8' : '#6bc86b';
-          ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
-          ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif';
-          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-          ctx.fillText(w.wonderType === 'bibliotheca' ? 'B' : 'I', sx, sy + 1);
+    // Pass 2.5: Capital wonder flanking sprites (structure + knowledge + labs)
+    if (showStructure) {
+      const capital = this.state.world.cities.find((c) => c.isCapital);
+      if (capital) {
+        const cp = axialToPixel(capital.coord, HEX_SIZE);
+        if (capital.wonders) {
+          for (let i = 0; i < Math.min(capital.wonders.length, 2); i++) {
+            const w = capital.wonders[i]!;
+            // Only show the sprite if its specific layer is enabled
+            const spriteAllowed =
+              (w.wonderType === 'bibliotheca' && showKnowledge) ||
+              (w.wonderType === 'institutum' && showLabs) ||
+              (w.wonderType === 'gaceta' && showKnowledge) ||
+              (w.wonderType !== 'bibliotheca' && w.wonderType !== 'institutum' && w.wonderType !== 'gaceta');
+            if (!spriteAllowed && showStructure) continue; // still show under structure
+            const sx = cp.x + (i === 0 ? -1 : 1) * HEX_SIZE * 0.55;
+            const sy = cp.y - HEX_SIZE * 0.5;
+            const r = 9;
+            ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2);
+            ctx.fillStyle = w.wonderType === 'bibliotheca' ? '#1a3a5c' : '#2d5a27';
+            ctx.strokeStyle = w.wonderType === 'bibliotheca' ? '#4a90c8' : '#6bc86b';
+            ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(w.wonderType === 'bibliotheca' ? 'B' : 'I', sx, sy + 1);
+          }
         }
       }
     }
 
-    // Pass 3: Decorations (Sorted by Y for depth)
+    // Pass 2.6: Knowledge — bibliotheca connection indicators
+    if (showKnowledge) {
+      for (const city of this.state.world.cities) {
+        const hasKnowledge = city.wonders?.some((w) => w.wonderType === 'bibliotheca');
+        if (!hasKnowledge) continue;
+        const cp = axialToPixel(city.coord, HEX_SIZE);
+        // Glowing book icon
+        ctx.save();
+        ctx.globalAlpha = 0.35 + 0.15 * Math.sin(this.animTime * 1.5 + cp.x);
+        ctx.fillStyle = '#4a90c8';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('📖', cp.x + HEX_SIZE * 0.8, cp.y - HEX_SIZE * 0.55);
+        // Thin connection lines between knowledge cities
+        for (const other of this.state.world.cities) {
+          if (other.id === city.id) continue;
+          const otherHasKnowledge = other.wonders?.some((w) => w.wonderType === 'bibliotheca');
+          if (!otherHasKnowledge) continue;
+          const op = axialToPixel(other.coord, HEX_SIZE);
+          const dist = Math.hypot(op.x - cp.x, op.y - cp.y);
+          if (dist > HEX_SIZE * 12) continue; // don't draw across the whole map
+          ctx.strokeStyle = `rgba(74, 144, 200, ${0.08 + 0.04 * Math.sin(this.animTime * 0.8 + cp.x + op.x)})`;
+          ctx.lineWidth = 0.5;
+          ctx.setLineDash([3, 6]);
+          ctx.beginPath();
+          ctx.moveTo(cp.x, cp.y);
+          ctx.lineTo(op.x, op.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        ctx.restore();
+      }
+    }
+
+    // Pass 2.7: Labs — active experiment indicators
+    if (showLabs) {
+      for (const city of this.state.world.cities) {
+        const hasLab = city.wonders?.some((w) => w.wonderType === 'institutum');
+        const hasActiveExp = this.state.world.buildings.some(
+          (b) => b.cityId === city.id && b.state === 'building',
+        );
+        if (!hasLab && !hasActiveExp) continue;
+        const cp = axialToPixel(city.coord, HEX_SIZE);
+        const pulse = 0.4 + 0.3 * Math.sin(this.animTime * 3.0);
+        ctx.save();
+        ctx.globalAlpha = pulse;
+        ctx.fillStyle = '#22C55E';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🔬', cp.x + HEX_SIZE * 0.8, cp.y + HEX_SIZE * 0.6);
+        // Pulsing ring around lab cities with active experiments
+        if (hasActiveExp) {
+          ctx.strokeStyle = `rgba(34, 197, 94, ${pulse * 0.5})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(cp.x, cp.y, HEX_SIZE * 0.85, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+
+    // Pass 2.8: Security — perimeter shield indicators
+    if (showSecurity) {
+      for (const city of this.state.world.cities) {
+        const hasSecurity = city.wonders !== undefined && city.wonders.length > 0;
+        if (!hasSecurity) continue;
+        const cp = axialToPixel(city.coord, HEX_SIZE);
+        ctx.save();
+        ctx.fillStyle = '#d45b5b';
+        ctx.globalAlpha = 0.4 + 0.2 * Math.sin(this.animTime * 2.0 + cp.x);
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🛡', cp.x - HEX_SIZE * 0.75, cp.y - HEX_SIZE * 0.6);
+        // Perimeter hex outline
+        this.hexR.drawHexOutline(
+          city.coord,
+          `rgba(212, 91, 91, ${0.12 + 0.08 * Math.sin(this.animTime * 1.2)})`,
+          1.5,
+        );
+        ctx.restore();
+      }
+    }
+
+    // Pass 3: Decorations (gated by structure + ops + labels + LOD)
     const tileCount = this.state.world.tiles.size;
     if (tileCount !== this._tilesYSortedSize) {
       this._tilesYSorted = Array.from(this.state.world.tiles.values()).sort((a, b) => {
@@ -694,14 +821,56 @@ export class Renderer {
     }
     const allTiles = this._tilesYSorted;
 
+    const shouldDrawDecor = showStructure || showOps;
+    const showTextLabels = showLabels && !lodLow;
     for (const tile of allTiles) {
-      // A2: find active building for this tile's city (if any)
+      if (!shouldDrawDecor && !showTextLabels) continue;
+
       const activeBuilding = tile.city
         ? this.state.world.buildings.find(
             (b) => b.cityId === tile.city!.id && b.state === 'building',
           )
         : undefined;
-      this.hexR.drawTileDecor(tile, this.fogEnabled, activeBuilding, this.animTime);
+
+      // LOD low: only capital city name if labels ON
+      if (lodLow) {
+        if (tile.city && tile.city.isCapital && showTextLabels) {
+          this.hexR.drawCityLabel(tile.city, axialToPixel(tile.coord, HEX_SIZE), activeBuilding);
+        }
+        continue;
+      }
+
+      // LOD medium: city labels + district labels + skill health, NO terrain decor
+      if (lodMed) {
+        if (tile.city && showTextLabels) {
+          this.hexR.drawCityLabel(tile.city, axialToPixel(tile.coord, HEX_SIZE), activeBuilding);
+        }
+        if (tile.city && tile.skillHealth && showTextLabels) {
+          this.hexR.drawSkillHealth(tile, axialToPixel(tile.coord, HEX_SIZE));
+        }
+        if (tile.city && tile.city.districts && tile.city.districts.length > 0 && showTextLabels) {
+          for (const dist of tile.city.districts) {
+            this.hexR.drawDistrictLabel(dist.name, axialToPixel(dist.coord, HEX_SIZE));
+          }
+        }
+        continue;
+      }
+
+      // LOD high (or fallback): full path
+      if (lodHigh) {
+        // Clean mode: city labels + skill health, no terrain decor
+        if (isClean) {
+          if (tile.city && showTextLabels) {
+            this.hexR.drawCityLabel(tile.city, axialToPixel(tile.coord, HEX_SIZE), activeBuilding);
+          }
+          if (tile.city && tile.skillHealth && showTextLabels) {
+            this.hexR.drawSkillHealth(tile, axialToPixel(tile.coord, HEX_SIZE));
+          }
+          continue;
+        }
+        // Full detail: full tile decor with all icons
+        this.hexR.drawTileDecor(tile, this.fogEnabled, activeBuilding, this.animTime);
+      }
     }
 
     if (this.showGrid) {
@@ -712,22 +881,84 @@ export class Renderer {
       ctx.setLineDash([]);
     }
 
-    for (const building of this.state.world.buildings) {
-      this.unitR.drawBuilding(building);
+    // Buildings (structure layer)
+    if (showStructure) {
+      for (const building of this.state.world.buildings) {
+        this.unitR.drawBuilding(building);
+      }
     }
 
-    for (const unit of this.state.world.units) {
-      this.unitR.drawUnitTrail(unit);
+    // Unit trails (ops layer; also suppressed in clean mode & low LOD)
+    if (showOps && !isClean && lod !== 'low') {
+      for (const unit of this.state.world.units) {
+        this.unitR.drawUnitTrail(unit);
+      }
     }
+
+    // Units (base layer — always visible) + badges (ops)
     for (const unit of this.state.world.units) {
       this.unitR.drawUnit(unit, this.animTime, this.selectedUnit?.id ?? null);
-      this.unitR.drawUnitBadge(unit, this.animTime);
+      if (showOps && !isClean && lod !== 'low') {
+        this.unitR.drawUnitBadge(unit, this.animTime);
+      }
+    }
+
+    // Selection glow (draw on top of selected focus for glow effect)
+    if (this.selectedCity && !this.selectedUnit) {
+      const cityPos = axialToPixel(this.selectedCity.coord, HEX_SIZE);
+      const glowPulse = 0.35 + 0.2 * Math.sin(this.animTime * 2.5);
+      ctx.save();
+      ctx.shadowColor = '#c8a84b';
+      ctx.shadowBlur = 16;
+      this.hexR.drawHexOutline(this.selectedCity.coord, `rgba(200, 168, 75, ${glowPulse})`, 3);
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = `rgba(255, 245, 200, ${glowPulse * 0.85})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(cityPos.x, cityPos.y, HEX_SIZE * 0.78, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (this.selectedUnit) {
+      const selUnit = this.state.world.units.find((u) => u.id === this.selectedUnit!.id);
+      if (selUnit) {
+        let sx: number, sy: number;
+        if (selUnit.state === 'moving' && selUnit.path.length > 0 && selUnit.pathIndex < selUnit.path.length) {
+          const from = axialToPixel(selUnit.path[selUnit.pathIndex]!, HEX_SIZE);
+          const to = axialToPixel(
+            selUnit.path[Math.min(selUnit.pathIndex + 1, selUnit.path.length - 1)]!, HEX_SIZE,
+          );
+          const t = selUnit.pathProgress;
+          sx = from.x + (to.x - from.x) * t;
+          sy = from.y + (to.y - from.y) * t;
+        } else {
+          const p = axialToPixel(selUnit.coord, HEX_SIZE);
+          sx = p.x;
+          sy = p.y;
+        }
+        const glowSize = HEX_SIZE * 0.55;
+        const glowPulse = 0.35 + 0.2 * Math.sin(this.animTime * 2.5);
+        ctx.save();
+        ctx.shadowColor = '#c8a84b';
+        ctx.shadowBlur = 18;
+        ctx.strokeStyle = `rgba(200, 168, 75, ${glowPulse})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(sx, sy, glowSize, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
     if (this.selectedUnit && this.actionMode === 'move') {
       this.unitR.drawMoveRange(this.selectedUnit);
       this.unitR.drawMovementPath(this.selectedUnit);
     }
+
+    // Update breadcrumb for current selection
+    this.updateBreadcrumb(this.selectedUnit, this.selectedCity);
 
     if (this.showDebug) {
       for (const tile of this.state.world.tiles.values()) {
@@ -890,8 +1121,63 @@ export class Renderer {
     this.fogEnabled = !this.fogEnabled;
   }
 
+  /** Toggle clean map mode (reduces visual noise). */
+  setCleanMode(active: boolean) {
+    this._cleanMode = active;
+    if (this.localR) {
+      this.localR.setCleanMode(active);
+    }
+  }
+  isCleanMode(): boolean {
+    return this._cleanMode;
+  }
+
+  /** Compute current zoom-based LOD level. */
+  private calcLod(): 'low' | 'medium' | 'high' {
+    if (this.cam.zoom < 0.5) return 'low';
+    if (this.cam.zoom < 1.2) return 'medium';
+    return 'high';
+  }
+
+  /** Update breadcrumb for current selection. */
+  private updateBreadcrumb(unit: Unit | null, city: City | null) {
+    const el = document.getElementById('selection-breadcrumb');
+    if (!el) return;
+    const path = el.querySelector('.bc-path')!;
+    const icon = el.querySelector('.bc-icon')!;
+    if (!unit && !city) {
+      el.classList.remove('visible');
+      return;
+    }
+    const parts: string[] = [];
+    let iconChar = '⬡';
+    if (unit) {
+      iconChar = unit.type === 'hero' ? '⬡' : unit.type === 'worker' ? '⚒' : unit.type === 'scout' ? '◈' : '◆';
+      parts.push(`<span class="bc-segment ${unit.type}">${unit.name}</span>`);
+      if (unit.state) {
+        parts.push(`<span class="bc-separator">·</span>`);
+        parts.push(`<span class="bc-segment" style="opacity:0.7">${unit.state}</span>`);
+      }
+      if (unit.mission) {
+        parts.push(`<span class="bc-separator">·</span>`);
+        parts.push(`<span class="bc-segment" style="opacity:0.6">${unit.mission.slice(0, 30)}</span>`);
+      }
+    } else if (city) {
+      iconChar = city.isCapital ? '★' : '⬡';
+      parts.push(`<span class="bc-segment city">${city.name}</span>`);
+      if (city.population) {
+        parts.push(`<span class="bc-separator">·</span>`);
+        parts.push(`<span class="bc-segment" style="opacity:0.7">pop ${city.population}</span>`);
+      }
+    }
+    icon.textContent = iconChar;
+    path.innerHTML = parts.join('');
+    el.classList.add('visible');
+  }
+
   selectUnit(unit: Unit | null) {
     this.selectedUnit = unit;
+    if (unit) this.selectedCity = null;
   }
 
   // Kept for minimap wiring (main.ts uses Renderer.minimapClick)

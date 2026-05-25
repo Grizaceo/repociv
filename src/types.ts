@@ -12,6 +12,70 @@ export interface CDailyArticle {
   emoji?: string;
 }
 
+// ─── Foreign Relations Report ─────────────────────────────────────────────────
+export interface ForeignRelationsReport {
+  id: string;
+  createdAt: string;
+  articleIds: string[];
+  targetCityId: string;
+  targetRepoPath: string;
+  agentId: string;
+  title: string;
+  summary: string;
+  impact: 'none' | 'low' | 'medium' | 'high' | 'critical';
+  confidence: number;
+  markdown: string;
+  evidence: Array<{
+    type: 'article' | 'repo_file' | 'event' | 'graph';
+    ref: string;
+    quote?: string;
+  }>;
+  recommendations: Array<{
+    label: string;
+    risk: 'safe' | 'approval' | 'manual';
+    command?: string;
+  }>;
+  requiresFollowUp?: boolean;
+  llmUnavailable?: boolean;
+}
+
+export interface RepoProfile {
+  repoPath: string;
+  repoName: string;
+  readmePreview: string;
+  manifestSnippet: string | null;
+  manifestType: string | null;
+  topLevelDirs: string[];
+  recentFilesCount: number;
+  recentFiles: string[];
+  skillTags: string[];
+  isGitRepo: boolean;
+}
+
+export interface ArticleRepoScore {
+  score: number;
+  confidence: string;
+  shouldTriggerLLM: boolean;
+  dimensions: {
+    keywordOverlap: number;
+    tfidfScore: number;
+    categoryFit: number;
+    manifestFit: number;
+    eventFit: number;
+  };
+}
+
+export interface ForeignScoreResponse {
+  scoring: ArticleRepoScore;
+  profile: {
+    repoName: string;
+    repoPath: string;
+    topLevelDirs: string[];
+    recentFilesCount: number;
+    skillTags: string[];
+  };
+}
+
 // ─── Terrain types (inferred from repo contents) ─────────────────────────────
 export type Terrain =
   | 'plains' // .ts/.tsx/.js/.jsx — web/frontend
@@ -357,9 +421,11 @@ export function tileKey(coord: Axial): string {
 export type MapLayerId =
   | 'base'           // terrain, cities, agents — always on
   | 'structure'      // folder structure, buildings, wonder sprites
-  | 'operational'    // tasks, active experiments, approvals, failures
+  | 'ops'            // tasks, active experiments, approvals, failures
   | 'knowledge'      // bibliotheca relations, suggested connections
-  | 'security';      // lab warnings, experiment locks, perimeter alerts
+  | 'labs'           // lab warnings, experiment activity indicators
+  | 'security'       // lab alarms, experiment locks, perimeter alerts
+  | 'labels';        // city labels, district labels, folder labels
 
 export interface MapLayerState {
   layers: Record<MapLayerId, boolean>;
@@ -369,9 +435,11 @@ export const DEFAULT_MAP_LAYERS: MapLayerState = {
   layers: {
     base: true,
     structure: true,
-    operational: false,
+    ops: false,
     knowledge: false,
+    labs: false,
     security: false,
+    labels: true,
   },
 };
 

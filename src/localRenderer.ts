@@ -39,6 +39,22 @@ export class LocalRenderer {
   private static readonly MAX_PARTICLES = 64;
   private particles: LocalParticle[] = [];
 
+  // ─── Fase 1: LOD + Clean Mode ──────────────────────────────────────
+  private _cleanMode = false;
+  private _currentLod: 'low' | 'medium' | 'high' = 'medium';
+
+  setCleanMode(active: boolean): void {
+    this._cleanMode = active;
+  }
+  isCleanMode(): boolean {
+    return this._cleanMode;
+  }
+  private calcLod(): 'low' | 'medium' | 'high' {
+    if (this.cam.zoom < 0.4) return 'low';
+    if (this.cam.zoom < 1.0) return 'medium';
+    return 'high';
+  }
+
   // Camera
   private cam = { x: 0, y: 0, cx: 0, cy: 0, zoom: 1 };
   private isDragging = false;
@@ -266,6 +282,11 @@ export class LocalRenderer {
     const { ctx, canvas, cam, world } = this;
     if (!world) return;
 
+    // ─── Fase 1: LOD + Clean Mode at local level ──────────────────────
+    this._currentLod = this.calcLod();
+    const lodLow = this._currentLod === 'low';
+    const isClean = this._cleanMode;
+
     // Frame-rate independent delta time calculation (Phase 5)
     const now = performance.now();
     const dt = Math.min((now - this.lastFrameTime) / 1000, 0.1);
@@ -303,9 +324,11 @@ export class LocalRenderer {
       }
     }
 
-    // Draw room labels
-    for (const room of world.rooms) {
-      this.drawRoomLabel(room);
+    // Draw room labels (suppressed in low LOD)
+    if (!lodLow) {
+      for (const room of world.rooms) {
+        this.drawRoomLabel(room);
+      }
     }
 
     // Draw local units
@@ -313,8 +336,10 @@ export class LocalRenderer {
       this.drawLocalUnit(unit);
     }
 
-    // Update and draw particles (Phase 8)
-    this.updateAndDrawParticles(dt);
+    // Update and draw particles (suppressed in clean mode & low LOD)
+    if (!isClean && !lodLow) {
+      this.updateAndDrawParticles(dt);
+    }
 
     // Draw hovered highlight
     if (this.hoveredTile) {

@@ -86,6 +86,9 @@
           <button id="btn-settings" title="Configuración [F11]" aria-label="Configuración">
             <i data-lucide="settings"></i>
           </button>
+          <button id="btn-layers" title="Capas del mapa [H]" aria-label="Abrir panel de capas">
+            🗺
+          </button>
           <button id="btn-theme-toggle" title="Alternar modo claro/oscuro" aria-label="Alternar tema">🌗</button>
         </div>
       </header>
@@ -244,11 +247,18 @@
                 <h4 class="city-col-title">ARCHIVOS RECIENTES</h4>
                 <div id="city-files-list"></div>
              </div>
+             <div class="city-col">
+                <h4 class="city-col-title">INSTITUTUM / LAB STATUS</h4>
+                <div id="city-lab-status"></div>
+             </div>
           </div>
         </div>
-        <div class="city-panel-footer">
+        <div class="city-panel-footer" id="city-panel-footer">
           <button id="btn-city-mission" aria-label="Enviar misión a esta ciudad">Enviar misión a esta ciudad</button>
-          <button id="btn-city-explorer" aria-label="Ver ciudad en explorador">Ver en explorador</button>
+          <button id="btn-city-bibliotheca" aria-label="Ver ciudad en Bibliotheca">Ver en Bibliotheca</button>
+          <button id="btn-city-local" aria-label="Abrir vista local del repo">Abrir vista local</button>
+          <button id="btn-city-institutum" aria-label="Abrir Institutum o LabHub">Abrir Institutum</button>
+          <button id="btn-city-logs" aria-label="Abrir logs asociados">Ver logs</button>
           <button id="btn-city-close" aria-label="Cerrar panel de ciudad">✕</button>
         </div>
       </div>
@@ -305,6 +315,8 @@
               <h4>Vista</h4>
               <kbd>G</kbd> Grid de hexes<br>
               <kbd>F</kbd> Debug overlay<br>
+              <kbd>3</kbd> Cambiar Vista 2D/3D<br>
+              <kbd>H</kbd> Panel de capas<br>
               <kbd>F6</kbd> Gran Libro<br>
               <kbd>V</kbd> Fog of war<br>
               <kbd>F9</kbd> Quest Board<br>
@@ -322,11 +334,18 @@
         <span><kbd>Q/W/E/L/O/C/X</kbd> spawn</span>
         <span><kbd>1-9</kbd> selección</span>
         <span><kbd>Enter</kbd> chat</span>
+        <span><kbd>H</kbd> capas</span>
         <span><kbd>F6</kbd> gran libro</span>
         <span><kbd>F9</kbd> quests</span>
         <span><kbd>F10</kbd> crónica</span>
         <span><kbd>A</kbd> aprobaciones</span>
         <span><kbd>?</kbd> ayuda</span>
+      </div>
+
+      <!-- Selection Breadcrumb -->
+      <div id="selection-breadcrumb">
+        <span class="bc-icon">⬡</span>
+        <span class="bc-path"></span>
       </div>
 
       <!-- Tooltip flotante -->

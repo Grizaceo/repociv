@@ -10,7 +10,7 @@ import {
 } from './map.ts';
 import { type ScannedRepo } from './map.ts';
 import { Renderer } from './renderer.ts';
-import { BridgeEvents } from './bridge.ts';
+import { BridgeEvents, syncGraphRelationFlags } from './bridge.ts';
 import { GameState } from './game.ts';
 import {
   showLoadingProgress,
@@ -68,6 +68,31 @@ import { getStoredEraLabel } from './ui/eraSystem.ts';
 import { logEvent } from './ui/hud.ts';
 import { trackPanelOpen } from './ui/analytics.ts';
 import { initBubbleLayer, updateBubble, clearAllBubbles } from './ui/actionBubbles.ts';
+import { openWonderVignette } from './ui/wonderVignette.ts';
+import { getWonder } from './wonders/manifest.ts';
+import {
+  inferCityLabStatus,
+  resolveCityLabStatus,
+  buildLabActionWarning,
+  type CityLabStatus,
+} from './labhubStatus.ts';
+import {
+  postContextToWonder,
+  postFocusToWonder,
+  postOpenLocalViewToWonder,
+} from './wonders/postMessageBridge.ts';
+import {
+  findCityByWonderSelection,
+  findNearbyCities,
+} from './wonders/bibliothecaBridge.ts';
+import { loadWonderConfig, isFeatureEnabled } from './wonders/wonderConfig.ts';
+import type { City } from './types.ts';
+import {
+  toggleLayerPanel,
+  initLayerPanel,
+  setOnCleanModeChange,
+  isCleanMode,
+} from './ui/layerPanel.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 const loadSteps = [
@@ -138,6 +163,14 @@ async function bootstrap() {
     localStorage.setItem('repociv:theme', next);
     const lucide = (window as unknown as { lucide?: { createIcons: (opts: { icons: Record<string, unknown> }) => void; icons: Record<string, unknown> } }).lucide;
     if (lucide) lucide.createIcons({ icons: lucide.icons });
+  });
+
+  // ══ Layer panel wiring ══
+  initLayerPanel();
+  document.getElementById('btn-layers')?.addEventListener('click', toggleLayerPanel);
+  // Wire clean mode changes to renderer
+  setOnCleanModeChange((active) => {
+    renderer?.setCleanMode(active);
   });
 
   // ══ Imperial random salute (Whimsy) ══
@@ -256,6 +289,7 @@ async function bootstrap() {
 
   const canvas = document.getElementById('main-canvas') as HTMLCanvasElement;
   const renderer = new Renderer(canvas, state);
+  renderer.setCleanMode(isCleanMode());
   await renderer.loadAssets();
   renderer.start();
   setRendererRef(renderer);
@@ -323,16 +357,208 @@ async function bootstrap() {
       closeSidePanel();
     }
   };
+  let _selectedCityId: string | null = null;
+
+  function _publishWonderContext(cityId?: string | null): void {
+    const selected = cityId ? state.world.cities.find((c) => c.id === cityId) ?? null : null;
+    window.dispatchEvent(
+      new CustomEvent('repociv:wonder-context', {
+        detail: {
+          cities: state.world.cities.map((c) => ({ id: c.id, name: c.name, repoPath: c.repoPath })),
+          selectedCityId: selected?.id ?? cityId ?? _selectedCityId,
+          selectedRepoPath: selected?.repoPath ?? null,
+        },
+      }),
+    );
+  }
+
+  function _syncGraphRelationOptInFlags(): void {
+    const config = loadWonderConfig();
+    const graphSuggestions = isFeatureEnabled(config, 'bibliotheca', 'graphSuggestions');
+    const aiRelationDiscovery = graphSuggestions && isFeatureEnabled(config, 'bibliotheca', 'aiRelationDiscovery');
+    void syncGraphRelationFlags({ graphSuggestions, aiRelationDiscovery });
+  }
+
+  async function _syncBibliothecaFocusIfOpen(city: City, mode: 'macro' | 'local' = 'macro'): Promise<void> {
+    const manifest = getWonder('bibliotheca');
+    if (!manifest) return;
+    const vignette = document.querySelector<HTMLElement>('#wonder-vignette');
+    if (!vignette || vignette.dataset['wonderType'] !== 'bibliotheca') return;
+    const iframe = vignette.querySelector<HTMLIFrameElement>('iframe');
+    if (!iframe) return;
+    postContextToWonder(iframe, manifest, {
+      cityId: city.id,
+      selectedRepo: city.repoPath,
+      theme: document.documentElement.dataset['theme'] ?? 'imperial-dark',
+    });
+    postFocusToWonder(iframe, manifest, city.id, mode);
+    if (mode === 'local' && city.repoPath) {
+      postOpenLocalViewToWonder(iframe, manifest, city.repoPath);
+    }
+  }
+
+  async function _openBibliothecaForCity(city: City, mode: 'macro' | 'local' = 'macro'): Promise<void> {
+    const manifest = getWonder('bibliotheca');
+    if (!manifest) return;
+    const existing = document.querySelector<HTMLElement>('#wonder-vignette');
+    if (!existing || existing.dataset['wonderType'] !== 'bibliotheca') {
+      await openWonderVignette(manifest);
+    }
+    await _syncBibliothecaFocusIfOpen(city, mode);
+  }
+
+  function _enterLocalViewForCity(city: City): void {
+    bridge.send('enter_local', { repoId: city.id, rootPath: city.repoPath });
+    state.enterLocalView(city.id).catch(() => state.enterLocalViewMock(city.id));
+    initBubbleLayer();
+    if (city.repoPath) {
+      void _openBibliothecaForCity(city, 'local');
+    }
+  }
+
+  function _getCityLabStatus(cityId: string): CityLabStatus | null {
+    const city = state.world.cities.find((c) => c.id === cityId);
+    if (!city) return null;
+    // Prefer synchronous inference for synchronous guards; the async resolve
+    // will have already updated the panel if Institutum is online.
+    return inferCityLabStatus(state, city);
+  }
+
+  async function _confirmLabSensitiveAction(cityId: string, actionLabel: string): Promise<boolean> {
+    const config = loadWonderConfig();
+
+    // Only mutating actions need warning — navigation/read focus should pass
+    const isNavigation = actionLabel.includes('Abrir') || actionLabel.includes('Ver') || actionLabel.includes('focus') || actionLabel.includes('navegar');
+    if (isNavigation) return true;
+
+    // Try to resolve real status (async) for better guard accuracy
+    const city = state.world.cities.find((c) => c.id === cityId);
+    const status = city ? await resolveCityLabStatus(state, city) : _getCityLabStatus(cityId);
+
+    if (!status) return true;
+    if (hardLocksEnabled(status, config)) {
+      window.alert(
+        `Bloqueo duro activo para ${cityId}.\n\n${status.lastMetric || status.labId}\n\nDesactiva hardLocks si quieres override manual.`,
+      );
+      return false;
+    }
+    if (shouldWarnForAction(config)) {
+      return window.confirm(buildLabActionWarning(status, actionLabel));
+    }
+    return true;
+  }
+
+  function hardLocksEnabled(status: CityLabStatus, config: ReturnType<typeof loadWonderConfig>): boolean {
+    return status.writeLock && isFeatureEnabled(config, 'institutum', 'hardLocks');
+  }
+
+  function shouldWarnForAction(config: ReturnType<typeof loadWonderConfig>): boolean {
+    return isFeatureEnabled(config, 'institutum', 'softLocks') || isFeatureEnabled(config, 'institutum', 'warnBeforeCityEdit');
+  }
+
+  function _primeMissionComposerForCity(city: City): void {
+    const unit = state.getUnit('DAVI') ?? state.getAllUnits()[0];
+    if (!unit) return;
+    state.selectUnit(unit);
+    renderer.selectUnit(unit);
+    showUnitPanel(unit);
+    const missionInput = document.getElementById('mission-input') as HTMLInputElement | null;
+    if (missionInput) {
+      missionInput.placeholder = `Misión para ${city.name} (${city.id})`;
+      missionInput.focus();
+    }
+  }
+
+  function _openLogsForCityStatus(city: City, status: CityLabStatus | null): void {
+    const logPath = status?.links.logs;
+    if (!logPath) {
+      logEvent(`ℹ ${city.name}: no hay ruta de logs declarada`, 'info');
+      return;
+    }
+    bridge.send('open_file', { filePath: logPath });
+  }
+
+  function _openInstitutumForCity(city: City): void {
+    const manifest = getWonder('institutum');
+    if (!manifest) return;
+    void openWonderVignette(manifest).then(() => {
+      const vignette = document.querySelector<HTMLElement>('#wonder-vignette');
+      const iframe = vignette?.querySelector<HTMLIFrameElement>('iframe');
+      if (!iframe) return;
+      postContextToWonder(iframe, manifest, {
+        cityId: city.id,
+        selectedRepo: city.repoPath,
+        theme: document.documentElement.dataset['theme'] ?? 'imperial-dark',
+      });
+      postFocusToWonder(iframe, manifest, city.id, 'macro');
+    });
+  }
+
+  function _focusCityRequest(detail: {
+    cityId?: string;
+    repoPath?: string;
+    nodePath?: string;
+    mode?: 'macro' | 'local';
+    source?: string;
+  }): void {
+    const cityQuery = detail.cityId ?? '';
+    const target = findCityByWonderSelection(state.world.cities, cityQuery, detail.repoPath ?? detail.nodePath);
+    if (target) {
+      const fullCity = state.world.cities.find((c) => c.id === target.id);
+      if (!fullCity) return;
+      renderer.centerOn(fullCity.coord);
+      renderer.onCitySelect?.(fullCity.id);
+      if (detail.mode === 'local' && fullCity.repoPath) {
+        _enterLocalViewForCity(fullCity);
+      }
+      logEvent(`📍 ${detail.source ?? 'Wonder'} → ${fullCity.name}`, 'info');
+      return;
+    }
+
+    const nearby = findNearbyCities(
+      state.world.cities,
+      detail.repoPath || detail.nodePath || detail.cityId || '',
+    );
+    if (nearby.length > 0) {
+      logEvent(
+        `⚠ Sin match exacto para ${detail.cityId || detail.repoPath || detail.nodePath}. Cercanas: ${nearby.map((entry) => entry.city.name).join(', ')}`,
+        'warn',
+      );
+      return;
+    }
+    logEvent(`⚠ RepoCiv no encontró ciudad para ${detail.cityId || detail.repoPath || detail.nodePath}`, 'warn');
+  }
+
   renderer.onCitySelect = (cityId) => {
+    _selectedCityId = cityId;
     const city = state.world.cities.find((c) => c.id === cityId);
     if (city) {
       const activeBuildings = state.world.buildings.filter((b) => b.cityId === cityId);
       const tile = state.world.tiles.get(tileKey(city.coord));
-      openCityPanel(city, activeBuildings, tile);
+      // Show loading state immediately, then resolve asynchronously
+      openCityPanel(city, activeBuildings, tile, null);
+      void resolveCityLabStatus(state, city).then((labStatus) => {
+        // Re-check same city — avoid race
+        if (_selectedCityId === cityId) {
+          openCityPanel(city, activeBuildings, tile, labStatus);
+        }
+      });
     }
     loadGitInfo(cityId);
     loadFilesInfo(cityId);
+    _publishWonderContext(cityId);
+    window.dispatchEvent(
+      new CustomEvent('repociv:city-selected', {
+        detail: { cityId, repoPath: state.world.cities.find((c) => c.id === cityId)?.repoPath },
+      }),
+    );
+    const selectedCity = state.world.cities.find((c) => c.id === cityId);
+    if (selectedCity) {
+      void _syncBibliothecaFocusIfOpen(selectedCity, 'macro');
+    }
   };
+  _publishWonderContext(null);
+  _syncGraphRelationOptInFlags();
 
   // Listener para "Ver feed completo →" desde el widget Gaceta
   window.addEventListener('repociv:open-city', (e: Event) => {
@@ -343,6 +569,80 @@ async function bootstrap() {
              (c.name || '').toLowerCase() === detail.repo!.toLowerCase(),
     );
     if (target && renderer.onCitySelect) renderer.onCitySelect(target.id);
+  });
+
+  // ─── Fase 4: Bibliotheca ↔ RepoCiv bidirectional focus (wiring real + fallback) ──
+  window.addEventListener('repociv:wonder-focus-city', (e: Event) => {
+    const detail = (e as CustomEvent).detail as { cityId: string; mode: 'macro' | 'local' } | undefined;
+    if (!detail?.cityId) return;
+    _focusCityRequest({ cityId: detail.cityId, mode: detail.mode, source: 'Bibliotheca focus' });
+  });
+
+  window.addEventListener('repociv:wonder-selection', (e: Event) => {
+    const detail = (e as CustomEvent).detail as { nodeId: string; nodePath: string; nodeType: string } | undefined;
+    if (!detail?.nodeId && !detail?.nodePath) return;
+    _focusCityRequest({
+      cityId: detail?.nodeId,
+      nodePath: detail?.nodePath,
+      source: `Bibliotheca ${detail?.nodeType ?? 'selection'}`,
+    });
+  });
+
+  window.addEventListener('repociv:focus-city-request', (e: Event) => {
+    const detail = (e as CustomEvent).detail as {
+      cityId?: string;
+      repoPath?: string;
+      nodePath?: string;
+      mode?: 'macro' | 'local';
+      source?: string;
+    } | undefined;
+    if (!detail) return;
+    _focusCityRequest(detail);
+  });
+
+  window.addEventListener('repociv:open-bibliotheca-request', (e: Event) => {
+    const detail = (e as CustomEvent).detail as { cityId?: string; repoPath?: string } | undefined;
+    if (!detail?.cityId) return;
+    const city = state.world.cities.find((c) => c.id === detail.cityId);
+    if (!city) return;
+    void _openBibliothecaForCity(city, 'macro');
+  });
+
+  window.addEventListener('repociv:open-local-view-request', (e: Event) => {
+    const detail = (e as CustomEvent).detail as { cityId?: string; repoPath?: string } | undefined;
+    if (!detail?.cityId) return;
+    const city = state.world.cities.find((c) => c.id === detail.cityId);
+    if (!city) return;
+    _enterLocalViewForCity(city);
+  });
+
+  window.addEventListener('repociv:open-institutum-request', (e: Event) => {
+    const detail = (e as CustomEvent).detail as { cityId?: string } | undefined;
+    if (!detail?.cityId) return;
+    const city = state.world.cities.find((c) => c.id === detail.cityId);
+    if (!city) return;
+    _openInstitutumForCity(city);
+  });
+
+  window.addEventListener('repociv:open-city-logs-request', (e: Event) => {
+    const detail = (e as CustomEvent).detail as { cityId?: string; labStatus?: string } | undefined;
+    if (!detail?.cityId) return;
+    const city = state.world.cities.find((c) => c.id === detail.cityId);
+    if (!city) return;
+    const status = detail.labStatus ? (JSON.parse(detail.labStatus) as CityLabStatus) : _getCityLabStatus(city.id);
+    _openLogsForCityStatus(city, status);
+  });
+
+  window.addEventListener('repociv:city-mission-request', async (e: Event) => {
+    const detail = (e as CustomEvent).detail as { cityId?: string } | undefined;
+    if (!detail?.cityId) return;
+    const city = state.world.cities.find((c) => c.id === detail.cityId);
+    if (!city) return;
+    if (!(await _confirmLabSensitiveAction(city.id, `Enviar misión manual a ${city.name}`))) return;
+    renderer.centerOn(city.coord);
+    renderer.onCitySelect?.(city.id);
+    _primeMissionComposerForCity(city);
+    logEvent(`🧪 Mission composer preparado para ${city.name}`, 'info');
   });
 
   renderer.onTileInspect = (cityName, coord, repoPath) => {
@@ -385,10 +685,10 @@ async function bootstrap() {
   };
 
   // ─── Phase 6: Double-click city → enter RimWorld local view ─────────────────
-  renderer.onEnterLocal = (repoId, rootPath) => {
-    bridge.send('enter_local', { repoId, rootPath });
-    state.enterLocalView(repoId).catch(() => state.enterLocalViewMock(repoId));
-    initBubbleLayer();
+  renderer.onEnterLocal = (repoId, _rootPath) => {
+    const city = state.world.cities.find((c) => c.id === repoId);
+    if (!city) return;
+    _enterLocalViewForCity(city);
   };
 
   // ─── Local view callbacks (wired to renderer; applied lazily when localR is created) ──
@@ -405,7 +705,7 @@ async function bootstrap() {
       .map((u) => ({ id: u.id, name: u.name, type: u.type }));
     const localWorld = state.localWorld;
     const repoId = localWorld?.repoId ?? wb.repoPath;
-    showLocalContextMenu(wb, idleAgents, { x: sx, y: sy }, (action) => {
+    showLocalContextMenu(wb, idleAgents, { x: sx, y: sy }, async (action) => {
       if (action === 'git') {
         void showGitForFile(repoId, wb.filePath, { x: sx, y: sy });
         return;
@@ -419,6 +719,7 @@ async function bootstrap() {
         setTimeout(() => hideLocalWorkbenchTooltip(), 3000);
         return;
       }
+      if (!(await _confirmLabSensitiveAction(repoId, `Editar/local mission sobre ${wb.fileName}`))) return;
       showLocalMissionPreview(
         action,
         wb.fileName,

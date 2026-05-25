@@ -1,7 +1,6 @@
 // ─── RepoCiv — Wonder env helpers ─────────────────────────────────────────────
-// URLs for maravilla iframes (Bibliotheca / Institutum) and LGB backend health.
-
-import type { WonderType } from './types.ts';
+// Low-level URL defaults and reachability probes for Wonder integrations.
+// The registry/source-of-truth now lives in src/wonders/manifest.ts.
 
 /** Match RepoCiv page host (localhost vs 127.0.0.1) so CORS + iframe stay consistent. */
 function _defaultLgbHost(): string {
@@ -16,32 +15,19 @@ const _lgbHost = _defaultLgbHost();
 export const WONDER_BIBLIOTHECA_URL =
   import.meta.env.VITE_WONDER_BIBLIOTHECA_URL ?? `http://${_lgbHost}:5173`;
 export const WONDER_INSTITUTUM_URL =
-  import.meta.env.VITE_WONDER_INSTITUTUM_URL ?? 'http://localhost:5280';
+  import.meta.env.VITE_WONDER_INSTITUTUM_URL ?? 'http://localhost:5281';
 /** Backend API port for Institutum/LabHub health checks and metrics. */
 export const WONDER_INSTITUTUM_API_URL =
   import.meta.env.VITE_WONDER_INSTITUTUM_API_URL ?? 'http://localhost:5281';
 export const LGB_BACKEND_URL =
   import.meta.env.VITE_LGB_BACKEND_URL ?? `http://${_lgbHost}:3001`;
 
-export const WONDER_UI_URLS: Record<WonderType, string> = {
-  gaceta: '',  // native, no iframe URL
-  bibliotheca: WONDER_BIBLIOTHECA_URL,
-  institutum: WONDER_INSTITUTUM_URL,
-};
-
-export function wonderUiUrl(type: WonderType): string {
-  return WONDER_UI_URLS[type];
-}
-
 export function lgbHealthUrl(base = LGB_BACKEND_URL): string {
   return `${base.replace(/\/$/, '')}/api/health`;
 }
 
 /** Bridge often binds 127.0.0.1 only; UI may be on Tailscale via Vite :5173. */
-const LGB_BACKEND_FALLBACKS = [
-  'http://127.0.0.1:3001',
-  'http://localhost:3001',
-] as const;
+const LGB_BACKEND_FALLBACKS = ['http://127.0.0.1:3001', 'http://localhost:3001'] as const;
 
 export function lgbBackendProbeUrls(): string[] {
   const primary = LGB_BACKEND_URL.replace(/\/$/, '');

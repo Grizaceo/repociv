@@ -416,7 +416,8 @@ export class HexRenderer {
     ctx.restore();
   }
 
-  private drawCityLabel(city: City, pos: { x: number; y: number }, activeBuilding?: Building) {
+  /** Public: draw city label (used by renderer for LOD/clean-mode paths). */
+  drawCityLabel(city: City, pos: { x: number; y: number }, activeBuilding?: Building) {
     const { ctx } = this;
     if (city.isCapital) {
       ctx.save();
@@ -527,7 +528,8 @@ export class HexRenderer {
     ctx.restore();
   }
 
-  private drawDistrictLabel(name: string, pos: { x: number; y: number }) {
+  /** Public: draw district label (used by renderer for LOD/clean-mode paths). */
+  drawDistrictLabel(name: string, pos: { x: number; y: number }) {
     const { ctx } = this;
     const short = name.split('/').pop() ?? name;
     ctx.save();
@@ -536,6 +538,25 @@ export class HexRenderer {
     ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(232,213,160,0.75)';
     ctx.fillText(short, pos.x, pos.y + HEX_SIZE * 0.15);
+    ctx.restore();
+  }
+
+  /** Public: draw skill health indicator (used by renderer for clean-mode paths). */
+  drawSkillHealth(tile: Tile, pos: { x: number; y: number }) {
+    if (!tile.city || !tile.skillHealth) return;
+    const skillColor =
+      tile.skillHealth === 'ok'
+        ? '#5b9b5b'
+        : tile.skillHealth === 'stale'
+          ? '#c8a84b'
+          : '#d45b5b';
+    const { ctx } = this;
+    ctx.save();
+    ctx.font = `${HEX_SIZE * 0.22}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = skillColor;
+    ctx.fillText('⚡', pos.x + HEX_SIZE * 0.55, pos.y - HEX_SIZE * 0.55);
     ctx.restore();
   }
 }

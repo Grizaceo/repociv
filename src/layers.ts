@@ -23,13 +23,19 @@ function _loadState(): MapLayerState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as MapLayerState;
-      // Validate shape: ensure all layer ids exist
-      for (const id of Object.keys(DEFAULT_MAP_LAYERS.layers) as MapLayerId[]) {
-        if (typeof parsed.layers[id] !== 'boolean') {
-          parsed.layers[id] = DEFAULT_MAP_LAYERS.layers[id];
-        }
+      const rawObj = JSON.parse(raw) as Record<string, unknown>;
+      const rawLayers = (rawObj.layers ?? {}) as Record<string, boolean>;
+      // Migrate old 'operational' key → 'ops'
+      if ('operational' in rawLayers && !('ops' in rawLayers)) {
+        rawLayers['ops'] = rawLayers['operational']!;
+        delete rawLayers['operational'];
       }
+      // Build clean state: inject defaults for any missing layers
+      const layers: Record<MapLayerId, boolean> = {} as Record<MapLayerId, boolean>;
+      for (const id of Object.keys(DEFAULT_MAP_LAYERS.layers) as MapLayerId[]) {
+        layers[id] = typeof rawLayers[id] === 'boolean' ? rawLayers[id] : DEFAULT_MAP_LAYERS.layers[id];
+      }
+      const parsed: MapLayerState = { layers };
       return parsed;
     }
   } catch {

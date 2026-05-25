@@ -1,22 +1,192 @@
 // ─── RepoCiv — Wonder Manifest Registry ──────────────────────────────────────
-//
-// Runtime registry: loads static manifests and resolves them by id.
-// This is the single source of truth for "what Wonders exist" at runtime.
+// Runtime registry + canonical static manifests.
 //
 // Design:
-// - Start with static manifests (gaceta, bibliotheca, institutum)
-// - Future: merge with user-provided ~/.repociv/wonders/*.json
-// - Manifest invalidation never crashes the app
+// - Static manifests are the source of truth in the frontend
+// - Invalid manifests are skipped, never crash the app
+// - Future: merge with user-provided ~/.repociv/wonders/*.json via backend
 
-import { WONDER_MANIFESTS } from './wonderConfig.ts';
+import {
+  LGB_BACKEND_URL,
+  WONDER_BIBLIOTHECA_URL,
+  WONDER_INSTITUTUM_API_URL,
+  WONDER_INSTITUTUM_URL,
+} from '../wonderEnv.ts';
 import type { WonderManifest } from './types.ts';
+import type { WonderType } from '../types.ts';
 
-// ─── Registry State ──────────────────────────────────────────────────────────
+export const WONDER_MANIFESTS = {
+  gaceta: {
+    id: 'gaceta',
+    title: 'La Gaceta Imperial',
+    kind: 'native',
+    category: 'news',
+    version: '0.1.0',
+    defaultEnabled: true,
+    automationLevel: 'passive',
+    passiveMode: true,
+    agenticMode: false,
+    canSuggest: false,
+    canAct: false,
+    requiresConfirmation: false,
+    ui: {},
+    permissions: {
+      readRepos: false,
+      writeRepos: false,
+      network: 'none',
+      requiresApprovalForMutations: false,
+    },
+    optionalFeatures: [
+      {
+        id: 'foreignRelationsReport',
+        label: 'Informe de Relaciones Exteriores',
+        description: 'Analiza cómo una noticia afecta una ciudad/repo usando agente',
+        defaultEnabled: false,
+        requiresUserOptIn: true,
+      },
+      {
+        id: 'autoSummaries',
+        label: 'Resúmenes automáticos',
+        description: 'Resume noticias relevantes sin pedirlo explícitamente',
+        defaultEnabled: false,
+        requiresUserOptIn: true,
+      },
+    ],
+    events: {
+      emits: ['wonder.ready', 'wonder.report.created'],
+      accepts: ['repociv.focus_city'],
+    },
+    actions: [
+      { id: 'open', label: 'Abrir Gaceta', risk: 'safe', requiresUserOptIn: false },
+      {
+        id: 'foreign_relations_report',
+        label: 'Informe de Relaciones Exteriores',
+        risk: 'safe',
+        requiresUserOptIn: true,
+      },
+    ],
+    mcp: { enabled: false, server: null },
+  },
+  bibliotheca: {
+    id: 'bibliotheca',
+    title: 'Bibliotheca Alexandrina',
+    kind: 'iframe',
+    category: 'knowledge',
+    version: '0.1.0',
+    defaultEnabled: true,
+    automationLevel: 'passive',
+    passiveMode: true,
+    agenticMode: false,
+    canSuggest: true,
+    canAct: false,
+    requiresConfirmation: true,
+    ui: {
+      url: WONDER_BIBLIOTHECA_URL,
+      preferredWidth: '70vw',
+      preferredHeight: '75vh',
+      sandbox: ['allow-scripts', 'allow-same-origin', 'allow-forms'],
+    },
+    health: {
+      url: `${LGB_BACKEND_URL}/api/health`,
+      timeoutMs: 4000,
+      degradedAllowed: true,
+    },
+    permissions: {
+      readRepos: true,
+      writeRepos: false,
+      network: 'loopback-only',
+      requiresApprovalForMutations: true,
+    },
+    optionalFeatures: [
+      {
+        id: 'graphSuggestions',
+        label: 'Sugerencias de relaciones',
+        description: 'El agente Astrónomo sugiere conexiones entre nodos',
+        defaultEnabled: false,
+        requiresUserOptIn: true,
+      },
+      {
+        id: 'aiRelationDiscovery',
+        label: 'Descubrimiento AI de relaciones',
+        description: 'Usa grafo offline para encontrar vínculos no obvios entre repos',
+        defaultEnabled: false,
+        requiresUserOptIn: true,
+      },
+    ],
+    events: {
+      emits: ['wonder.ready', 'wonder.selection', 'wonder.report.created'],
+      accepts: ['repociv.focus', 'repociv.open_local_view', 'repociv.graph_suggestions'],
+    },
+    actions: [
+      { id: 'open', label: 'Entrar', risk: 'safe', requiresUserOptIn: false },
+      { id: 'ask_agent', label: 'Preguntar a agente', risk: 'safe', requiresUserOptIn: true },
+    ],
+    mcp: { enabled: false, server: null },
+  },
+  institutum: {
+    id: 'institutum',
+    title: 'Institutum Laboratorium / LabHub',
+    kind: 'iframe',
+    category: 'lab',
+    version: '0.1.0',
+    defaultEnabled: true,
+    automationLevel: 'assist',
+    passiveMode: true,
+    agenticMode: true,
+    canSuggest: true,
+    canAct: false,
+    requiresConfirmation: true,
+    ui: {
+      url: WONDER_INSTITUTUM_URL,
+      preferredWidth: '70vw',
+      preferredHeight: '75vh',
+      sandbox: ['allow-scripts', 'allow-same-origin', 'allow-forms'],
+    },
+    health: {
+      url: `${WONDER_INSTITUTUM_API_URL}/health`,
+      timeoutMs: 4000,
+      degradedAllowed: true,
+    },
+    permissions: {
+      readRepos: false,
+      writeRepos: false,
+      network: 'loopback-only',
+      requiresApprovalForMutations: true,
+    },
+    optionalFeatures: [
+      {
+        id: 'hardLocks',
+        label: 'Bloqueos duros',
+        description: 'Impide completamente la edición de ciudades con experimentos críticos',
+        defaultEnabled: false,
+        requiresUserOptIn: true,
+      },
+    ],
+    events: {
+      emits: ['wonder.ready', 'labhub.experiment.started', 'labhub.experiment.finished'],
+      accepts: ['repociv.focus_city'],
+    },
+    actions: [
+      { id: 'open', label: 'Abrir Institutum', risk: 'safe', requiresUserOptIn: false },
+      {
+        id: 'kill_experiment',
+        label: 'Detener experimento',
+        risk: 'manual',
+        requiresUserOptIn: true,
+      },
+    ],
+    mcp: { enabled: false, server: null },
+  },
+} as const satisfies Record<string, WonderManifest>;
 
 const _registry: Map<string, WonderManifest> = new Map();
 let _initialized = false;
 
-// ─── Init ────────────────────────────────────────────────────────────────────
+function _validateManifest(m: WonderManifest): boolean {
+  if (!m.id || !m.title || !m.kind || !m.category || !m.version) return false;
+  if (m.kind !== 'native' && m.kind !== 'iframe') return false;
+  return true;
+}
 
 function _ensureInit(): void {
   if (_initialized) return;
@@ -27,22 +197,6 @@ function _ensureInit(): void {
   }
   _initialized = true;
 }
-
-// ─── Validation ──────────────────────────────────────────────────────────────
-
-function _validateManifest(m: WonderManifest): boolean {
-  if (!m.id || !m.title || !m.kind || !m.category || !m.version) {
-    // Invalid manifest skipped silently at runtime
-    return false;
-  }
-  if (m.kind !== 'native' && m.kind !== 'iframe') {
-    // Invalid kind skipped silently at runtime
-    return false;
-  }
-  return true;
-}
-
-// ─── Public API ──────────────────────────────────────────────────────────────
 
 export function listWonders(): WonderManifest[] {
   _ensureInit();
@@ -61,44 +215,27 @@ export function getWonderByCategory(category: string): WonderManifest[] {
 
 export function isWonderEnabled(id: string): boolean {
   _ensureInit();
-  const m = _registry.get(id);
-  return m ? m.defaultEnabled : false;
+  return _registry.get(id)?.defaultEnabled ?? false;
 }
 
 export function getWonderActions(id: string): WonderManifest['actions'] {
   _ensureInit();
-  const m = _registry.get(id);
-  return m ? m.actions : [];
+  return _registry.get(id)?.actions ?? [];
 }
 
 export function getWonderOptionalFeatures(id: string): WonderManifest['optionalFeatures'] {
   _ensureInit();
-  const m = _registry.get(id);
-  return m ? m.optionalFeatures : [];
+  return _registry.get(id)?.optionalFeatures ?? [];
 }
 
 export function isActionOptIn(id: string, actionId: string): boolean {
   _ensureInit();
-  const m = _registry.get(id);
-  if (!m) return false;
-  const action = m.actions.find((a) => a.id === actionId);
-  return action ? action.requiresUserOptIn : false;
+  const action = _registry.get(id)?.actions.find((a) => a.id === actionId);
+  return action?.requiresUserOptIn ?? false;
 }
 
-// ─── Compatibility re-exports ────────────────────────────────────────────────
-// These keep existing code (wonderVignette, capitalPanel) importing from here.
-
-import { wonderUiUrl } from '../wonderEnv.ts';
-import type { WonderType } from '../types.ts';
-
-/** Back-compat: resolve iframe URL from WonderType. */
 export function resolveWonderUrl(type: WonderType): string {
-  return wonderUiUrl(type);
+  return getWonder(type)?.ui.url ?? '';
 }
 
-/** Back-compat: all wonder types. */
-export const KNOWN_WONDER_TYPES: readonly WonderType[] = [
-  'gaceta',
-  'bibliotheca',
-  'institutum',
-] as const;
+export const KNOWN_WONDER_TYPES: readonly WonderType[] = ['gaceta', 'bibliotheca', 'institutum'] as const;

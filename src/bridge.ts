@@ -5,6 +5,7 @@
 
 import { type GameState } from './game.ts';
 import { type BridgeEvent, type CDailyArticle } from './types.ts';
+import type { SuggestionRelation as WonderSuggestionRelation } from './wonders/types.ts';
 import { logger } from './logger.ts';
 import { parseBridgeEvent, describeBridgeEventError } from './bridgeSchema.ts';
 import {
@@ -563,6 +564,209 @@ export async function scanNews(): Promise<{ ok: boolean; error?: string }> {
     return { ok: data.ok ?? res.ok, error: data.error };
   } catch (e) {
     // scan error logged silently in production
+    return { ok: false, error: String(e) };
+  }
+}
+
+// ─── Foreign Relations API ─────────────────────────────────────────────────────
+
+export async function getRepoProfile(repoPath: string): Promise<import('./types.ts').RepoProfile | null> {
+  try {
+    const res = await fetch(bridgeUrl(`/api/foreign/repo-profile?repoPath=${encodeURIComponent(repoPath)}`), {
+      headers: bridgeHeaders(),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as import('./types.ts').RepoProfile;
+  } catch {
+    return null;
+  }
+}
+
+export async function scoreArticleRepo(
+  article: import('./types.ts').CDailyArticle,
+  repoPath: string,
+): Promise<import('./types.ts').ForeignScoreResponse | null> {
+  try {
+    const res = await fetch(bridgeUrl('/api/foreign/score'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...bridgeHeaders() },
+      body: JSON.stringify({ article, repoPath }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as import('./types.ts').ForeignScoreResponse;
+  } catch {
+    return null;
+  }
+}
+
+export async function generateForeignReport(
+  articleOrArticles: import('./types.ts').CDailyArticle | import('./types.ts').CDailyArticle[],
+  repoPath: string,
+  targetCityId?: string,
+  agentId?: string,
+): Promise<import('./types.ts').ForeignRelationsReport | null> {
+  try {
+    const articles = Array.isArray(articleOrArticles) ? articleOrArticles : [articleOrArticles];
+    const res = await fetch(bridgeUrl('/api/foreign/report'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...bridgeHeaders() },
+      body: JSON.stringify({
+        article: articles[0],
+        articles,
+        repoPath,
+        targetCityId: targetCityId ?? '',
+        agentId: agentId ?? 'diplomat',
+      }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as import('./types.ts').ForeignRelationsReport;
+  } catch {
+    return null;
+  }
+}
+
+export async function listForeignReports(cityId?: string, articleId?: string): Promise<import('./types.ts').ForeignRelationsReport[]> {
+  try {
+    const params = new URLSearchParams();
+    if (cityId) params.set('cityId', cityId);
+    if (articleId) params.set('articleId', articleId);
+    const qs = params.toString();
+    const res = await fetch(bridgeUrl(`/api/foreign/reports${qs ? '?' + qs : ''}`), {
+      headers: bridgeHeaders(),
+    });
+    if (!res.ok) return [];
+    return (await res.json()) as import('./types.ts').ForeignRelationsReport[];
+  } catch {
+    return [];
+  }
+}
+
+export async function getForeignReport(reportId: string): Promise<import('./types.ts').ForeignRelationsReport | null> {
+  try {
+    const res = await fetch(bridgeUrl(`/api/foreign/reports/${encodeURIComponent(reportId)}`), {
+      headers: bridgeHeaders(),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as import('./types.ts').ForeignRelationsReport;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Graph Relations API ──────────────────────────────────────────────────────
+
+export interface GraphRelationCandidate extends WonderSuggestionRelation {
+  toCityId?: string;
+}
+
+export interface GraphRelationsResponse {
+  cityId: string;
+  count: number;
+  relations: GraphRelationCandidate[];
+}
+
+export interface GraphRelationEvidence {
+  from_id: string;
+  to_id: string;
+  exists: boolean;
+  relation?: GraphRelationCandidate;
+  jaccard_scores?: Record<string, number>;
+  coactivity?: { score: number; evidence: string[] };
+  fromCityName?: string;
+  toCityName?: string;
+  fromRepoPath?: string;
+  toRepoPath?: string;
+}
+
+export interface GraphRelationStats {
+  nodes: number;
+  edges: number;
+  last_updated: number;
+  flags: { graphSuggestions: boolean; aiRelationDiscovery: boolean };
+}
+
+export async function fetchGraphRelations(
+  cityId: string,
+  cities: Array<{ id: string; name: string; repoPath?: string }>,
+  limit = 10,
+): Promise<GraphRelationCandidate[]> {
+  try {
+    const params = new URLSearchParams({ cityId, limit: String(limit) });
+    if (cities.length > 0) {
+      params.set('cities', JSON.stringify(cities));
+    }
+    const res = await fetch(bridgeUrl(`/api/graph-relations?${params.toString()}`), {
+      headers: bridgeHeaders(),
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as GraphRelationsResponse;
+    return data.relations ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchGraphRelationEvidence(
+  fromId: string,
+  toId: string,
+  cities: Array<{ id: string; name: string; repoPath?: string }>,
+): Promise<GraphRelationEvidence | null> {
+  try {
+    const params = new URLSearchParams({ fromId, toId });
+    if (cities.length > 0) {
+      params.set('cities', JSON.stringify(cities));
+    }
+    const res = await fetch(bridgeUrl(`/api/graph-relations/evidence?${params.toString()}`), {
+      headers: bridgeHeaders(),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as GraphRelationEvidence;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchGraphRelationStats(): Promise<GraphRelationStats | null> {
+  try {
+    const res = await fetch(bridgeUrl('/api/graph-relations/stats'), {
+      headers: bridgeHeaders(),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as GraphRelationStats;
+  } catch {
+    return null;
+  }
+}
+
+export async function syncGraphRelationFlags(payload: {
+  graphSuggestions?: boolean;
+  aiRelationDiscovery?: boolean;
+}): Promise<{ ok: boolean; flags?: GraphRelationStats['flags']; error?: string }> {
+  try {
+    const res = await fetch(bridgeUrl('/api/graph-relations/flags'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...bridgeHeaders() },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    return (await res.json()) as { ok: boolean; flags?: GraphRelationStats['flags']; error?: string };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+export async function refreshGraphRelationIndex(
+  payload: { cities?: Array<{ id: string; name: string; repoPath?: string }>; repoPaths?: string[] },
+): Promise<{ ok: boolean; error?: string; stats?: Record<string, unknown> }> {
+  try {
+    const res = await fetch(bridgeUrl('/api/graph-relations/refresh'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...bridgeHeaders() },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    return (await res.json()) as { ok: boolean; error?: string; stats?: Record<string, unknown> };
+  } catch (e) {
     return { ok: false, error: String(e) };
   }
 }

@@ -45,6 +45,7 @@ import { toggleSettingsPanel, closeSettingsPanel } from '../settingsPanel.ts';
 import { closeConstructionPanel, isConstructionPanelOpen } from '../constructionPanel.ts';
 import { selectHero, spawnAgent } from './spawn.ts';
 import { takeScreenshot } from './screenshot.ts';
+import { toggleLayerPanel, closeLayerPanel, isLayerPanelOpen } from '../layerPanel.ts';
 
 export function wireHotkeys(
   renderer: Renderer,
@@ -75,6 +76,10 @@ export function wireHotkeys(
 
     // Esc: close overlays
     if (e.key === 'Escape') {
+      if (isLayerPanelOpen()) {
+        closeLayerPanel();
+        return;
+      }
       if (isLedgerOpen()) {
         closeLedger();
         return;
@@ -233,6 +238,9 @@ export function wireHotkeys(
         toggleTaskAssignPanel(() => state.getLocalUnits(), (unitId, task) => {
           state.setLocalUnitTask(unitId, task);
         });
+        break;
+      case 'h':
+        toggleLayerPanel();
         break;
       case '?':
         toggleKeyboardHelp();

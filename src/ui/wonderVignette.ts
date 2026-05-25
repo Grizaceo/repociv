@@ -1,13 +1,29 @@
 // ─── RepoCiv — Wonder Vignette (iframe wrapper with health-check) ──────────────
 import type { WonderType } from '../types.ts';
-import {
-  checkLgbReachability,
-  wonderUiUrl,
-  WONDER_BIBLIOTHECA_URL,
-  LGB_BACKEND_URL,
-} from '../wonderEnv.ts';
+import { checkLgbReachability, LGB_BACKEND_URL, WONDER_BIBLIOTHECA_URL } from '../wonderEnv.ts';
+import { getLayerState } from '../layers.ts';
 import { getWonder } from '../wonders/manifest.ts';
+import {
+  postContextToWonder,
+  postGraphSuggestionsToWonder,
+  postLayerToWonder,
+  registerWonderOrigin,
+  startWonderListener,
+  stopWonderListener,
+} from '../wonders/postMessageBridge.ts';
+import type { WonderManifest } from '../wonders/types.ts';
 import { renderCapabilityBadge } from '../wonders/wonderBadges.ts';
+import {
+  renderRelationsPanel,
+  renderRelationsPanelLoading,
+  renderRelationsPanelError,
+} from './relationsPanel.ts';
+import { loadWonderConfig, isFeatureEnabled } from '../wonders/wonderConfig.ts';
+import { fetchGraphRelations, syncGraphRelationFlags } from '../bridge.ts';
+import {
+  rankRelationsWithFeedback,
+  relationFeedbackKey,
+} from '../wonders/bibliothecaBridge.ts';
 
 const STORAGE_POS = (t: WonderType) => `repociv-vignette-pos-${t}`;
 const IFRAME_LOAD_TIMEOUT_MS = 25000;
@@ -16,7 +32,11 @@ type EmptyReason =
   | 'lgb-offline'
   | 'lgb-backend-offline'
   | 'lgb-ui-offline'
-  | 'load-timeout';
+  | 'load-timeout'
+  | 'offline'
+  | 'degraded'
+  | 'timeout'
+  | 'no-permissions';
 
 interface VignetteState {
   x: number;
@@ -29,42 +49,127 @@ function _loadState(type: WonderType): VignetteState {
   try {
     const raw = localStorage.getItem(STORAGE_POS(type));
     if (raw) return JSON.parse(raw);
-  } catch { /* noop */ }
+  } catch {
+    // noop
+  }
   return { x: 0, y: 0, w: 0, h: 0 };
 }
 
 function _saveState(type: WonderType, s: VignetteState) {
-  try { localStorage.setItem(STORAGE_POS(type), JSON.stringify(s)); } catch { /* noop */ }
+  try {
+    localStorage.setItem(STORAGE_POS(type), JSON.stringify(s));
+  } catch {
+    // noop
+  }
+}
+
+function _resolveManifest(input: WonderType | WonderManifest): WonderManifest | undefined {
+  return typeof input === 'string' ? getWonder(input) : input;
+}
+
+function _resolveType(input: WonderType | WonderManifest): WonderType {
+  return (typeof input === 'string' ? input : input.id) as WonderType;
 }
 
 let _vignette: HTMLElement | null = null;
 let _activeType: WonderType | null = null;
 let _dragging = false;
 let _dragOffset = { x: 0, y: 0 };
+let _bibliothecaRelationsContainer: HTMLElement | null = null;
+let _bibliothecaIframe: HTMLIFrameElement | null = null;
+let _bibliothecaManifest: WonderManifest | null = null;
+let _contextListenerAttached = false;
 
-/** Resolve display title from manifest, with fallback for legacy types. */
-function _wonderTitle(type: WonderType): string {
-  const m = getWonder(type);
-  if (m) return m.title;
-  // fallback for types not yet in registry (e.g. future additions)
-  return type === 'bibliotheca' ? '📚 Bibliotheca Alexandrina' : '🧪 Institutum Scientiarum';
+const _runtimeContext: {
+  cities: Array<{ id: string; name: string; repoPath?: string }>;
+  selectedCityId: string | null;
+  selectedRepoPath: string | null;
+} = {
+  cities: [],
+  selectedCityId: null,
+  selectedRepoPath: null,
+};
+
+function _wonderTitle(manifest: WonderManifest | undefined, type: WonderType): string {
+  if (manifest) return manifest.title;
+  if (type === 'gaceta') return 'La Gaceta Imperial';
+  return type === 'bibliotheca' ? 'Bibliotheca Alexandrina' : 'Institutum Scientiarum';
 }
 
-export async function openWonderVignette(type: WonderType): Promise<void> {
+function _attachWonderListener(): void {
+  startWonderListener({
+    onReady: (id) => {
+      window.dispatchEvent(new CustomEvent('repociv:wonder-ready', { detail: { id } }));
+    },
+    onFocusCity: (cityId, mode) => {
+      window.dispatchEvent(
+        new CustomEvent('repociv:wonder-focus-city', { detail: { cityId, mode: mode ?? 'macro' } }),
+      );
+    },
+    onReport: (id, title, markdown, relatedCities) => {
+      window.dispatchEvent(
+        new CustomEvent('repociv:wonder-report', {
+          detail: { id, title, markdown, relatedCities },
+        }),
+      );
+    },
+    onNotification: (level, text) => {
+      window.dispatchEvent(
+        new CustomEvent('repociv:wonder-notification', { detail: { level, text } }),
+      );
+    },
+    onSelection: (nodeId, nodePath, nodeType) => {
+      window.dispatchEvent(
+        new CustomEvent('repociv:wonder-selection', { detail: { nodeId, nodePath, nodeType } }),
+      );
+    },
+  });
+}
+
+function _ensureContextListener(): void {
+  if (_contextListenerAttached) return;
+  _contextListenerAttached = true;
+  window.addEventListener('repociv:wonder-context', (event: Event) => {
+    const detail = (event as CustomEvent).detail as {
+      cities?: Array<{ id: string; name: string; repoPath?: string }>;
+      selectedCityId?: string | null;
+      selectedRepoPath?: string | null;
+    } | undefined;
+    _runtimeContext.cities = detail?.cities ?? [];
+    _runtimeContext.selectedCityId = detail?.selectedCityId ?? null;
+    _runtimeContext.selectedRepoPath = detail?.selectedRepoPath ?? null;
+
+    if (_bibliothecaIframe && _bibliothecaManifest) {
+      postContextToWonder(_bibliothecaIframe, _bibliothecaManifest, {
+        cityId: _runtimeContext.selectedCityId ?? undefined,
+        selectedRepo: _runtimeContext.selectedRepoPath ?? undefined,
+        theme: document.documentElement.dataset['theme'] ?? 'imperial-dark',
+      });
+    }
+    if (_activeType === 'bibliotheca' && _bibliothecaRelationsContainer) {
+      void _reloadBibliothecaRelations();
+    }
+  });
+}
+
+export async function openWonderVignette(input: WonderType | WonderManifest): Promise<void> {
   if (_vignette) closeWonderVignette();
 
+  const type = _resolveType(input);
+  const manifest = _resolveManifest(input);
   _activeType = type;
+  _ensureContextListener();
 
   const container = document.createElement('div');
   container.id = 'wonder-vignette';
   container.className = 'wonder-vignette';
+  container.dataset['wonderType'] = type;
 
-  const m = getWonder(type);
-  const badgesHtml = m ? renderCapabilityBadge(m) : '';
+  const badgesHtml = manifest ? renderCapabilityBadge(manifest) : '';
 
   container.innerHTML = `
     <div class="wonder-vignette-header">
-      <span class="wonder-title">${_wonderTitle(type)}</span>
+      <span class="wonder-title">${_wonderTitle(manifest, type)}</span>
       <div class="wonder-badges">${badgesHtml}</div>
       <div class="wonder-controls">
         <button class="wonder-fullscreen" title="Fullscreen">⛶</button>
@@ -78,14 +183,13 @@ export async function openWonderVignette(type: WonderType): Promise<void> {
   document.body.appendChild(container);
   _vignette = container;
 
-  // Load persisted position/size
   const st = _loadState(type);
   if (st.w && st.h) {
     container.style.width = `${st.w}px`;
     container.style.height = `${st.h}px`;
   } else {
-    container.style.width = m?.ui?.preferredWidth ?? '70vw';
-    container.style.height = m?.ui?.preferredHeight ?? '75vh';
+    container.style.width = manifest?.ui?.preferredWidth ?? '70vw';
+    container.style.height = manifest?.ui?.preferredHeight ?? '75vh';
   }
   if (st.x || st.y) {
     container.style.left = `${st.x}px`;
@@ -95,7 +199,6 @@ export async function openWonderVignette(type: WonderType): Promise<void> {
     container.style.transform = 'none';
   }
 
-  // Event bindings
   container.querySelector('.wonder-close')!.addEventListener('click', closeWonderVignette);
   container.querySelector('.wonder-fullscreen')!.addEventListener('click', _toggleFullscreen);
   const header = container.querySelector('.wonder-vignette-header') as HTMLElement;
@@ -124,7 +227,6 @@ export async function openWonderVignette(type: WonderType): Promise<void> {
     }
   });
 
-  // Resize observer to persist dimensions
   const ro = new ResizeObserver((entries) => {
     for (const entry of entries) {
       const r = entry.contentRect;
@@ -139,6 +241,11 @@ export async function openWonderVignette(type: WonderType): Promise<void> {
   const body = container.querySelector('.wonder-vignette-body') as HTMLElement;
   body.innerHTML = '<div class="wonder-loading">Verificando estado de la maravilla...</div>';
 
+  if (!manifest) {
+    _showEmptyState(body, type, 'offline');
+    return;
+  }
+
   if (type === 'gaceta') {
     body.innerHTML = `
       <div class="wonder-empty-state">
@@ -149,6 +256,15 @@ export async function openWonderVignette(type: WonderType): Promise<void> {
     `;
     return;
   }
+
+  const iframeUrl = manifest.ui.url ?? '';
+  if (!iframeUrl) {
+    _showEmptyState(body, type, 'offline');
+    return;
+  }
+
+  registerWonderOrigin(manifest);
+  _attachWonderListener();
 
   if (type === 'bibliotheca') {
     const { backend, ui } = await checkLgbReachability();
@@ -161,37 +277,69 @@ export async function openWonderVignette(type: WonderType): Promise<void> {
       return;
     }
     if (!backend) {
-      // Bibliotheca backend unreachable; mounting iframe (API via Vite proxy)
+      _showEmptyState(body, type, 'lgb-backend-offline');
+      return;
     }
-    _mountIframe(body, wonderUiUrl(type), type);
+    _mountIframe(body, manifest, type);
     return;
   }
 
-  // institutum and future types: try fetch, fallback to empty state
-  const url = wonderUiUrl(type);
-  try {
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 3000);
-    await fetch(url, { method: 'HEAD', mode: 'no-cors', signal: ctrl.signal });
-    clearTimeout(tid);
-    _mountIframe(body, url, type);
-  } catch {
-    _showEmptyState(body, type);
+  const health = await _checkWonderHealth(manifest);
+  if (health === 'timeout') {
+    _showEmptyState(body, type, 'timeout');
+    return;
   }
+  if (health === 'offline') {
+    _showEmptyState(body, type, 'offline');
+    return;
+  }
+  if (health === 'degraded') {
+    _showEmptyState(body, type, 'degraded');
+    return;
+  }
+  if (health === 'no-permissions') {
+    _showEmptyState(body, type, 'no-permissions');
+    return;
+  }
+
+  _mountIframe(body, manifest, type);
 }
 
 export function closeWonderVignette(): void {
+  stopWonderListener();
   if (_vignette) {
     _vignette.remove();
     _vignette = null;
   }
+  _bibliothecaRelationsContainer = null;
+  _bibliothecaIframe = null;
+  _bibliothecaManifest = null;
   _activeType = null;
 }
 
-function _mountIframe(body: HTMLElement, url: string, type: WonderType): void {
-  const m = getWonder(type);
-  const title = m?.title ?? (type === 'bibliotheca' ? 'Bibliotheca Alexandrina' : 'Institutum Scientiarum');
-  const sandbox = m?.ui?.sandbox ?? ['allow-scripts', 'allow-same-origin', 'allow-forms'];
+async function _checkWonderHealth(
+  manifest: WonderManifest,
+): Promise<'ok' | 'offline' | 'degraded' | 'timeout' | 'no-permissions'> {
+  if (!manifest.health?.url) return 'ok';
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), manifest.health.timeoutMs ?? 4000);
+  try {
+    const res = await fetch(manifest.health.url, { method: 'GET', signal: ctrl.signal, mode: 'cors' });
+    if (res.status === 401 || res.status === 403) return 'no-permissions';
+    if (!res.ok) return manifest.health.degradedAllowed ? 'degraded' : 'offline';
+    return 'ok';
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') return 'timeout';
+    return 'offline';
+  } finally {
+    clearTimeout(tid);
+  }
+}
+
+function _mountIframe(body: HTMLElement, manifest: WonderManifest, type: WonderType): void {
+  const url = manifest.ui.url ?? '';
+  const title = manifest.title;
+  const sandbox = manifest.ui.sandbox ?? ['allow-scripts', 'allow-same-origin', 'allow-forms'];
   body.innerHTML = `
     <iframe
       src="${url}"
@@ -202,6 +350,10 @@ function _mountIframe(body: HTMLElement, url: string, type: WonderType): void {
     ></iframe>
   `;
   const iframe = body.querySelector('iframe')!;
+  if (type === 'bibliotheca') {
+    _bibliothecaIframe = iframe;
+    _bibliothecaManifest = manifest;
+  }
   let settled = false;
   const fail = (reason?: EmptyReason) => {
     if (settled) return;
@@ -209,53 +361,184 @@ function _mountIframe(body: HTMLElement, url: string, type: WonderType): void {
     _showEmptyState(body, type, reason);
   };
   const loadTimer = setTimeout(
-    () => fail(type === 'bibliotheca' ? 'load-timeout' : undefined),
+    () => fail(type === 'bibliotheca' ? 'load-timeout' : 'timeout'),
     IFRAME_LOAD_TIMEOUT_MS,
   );
   iframe.addEventListener('load', () => {
     if (settled) return;
     settled = true;
     clearTimeout(loadTimer);
+    postContextToWonder(iframe, manifest, {
+      cityId: _runtimeContext.selectedCityId ?? undefined,
+      selectedRepo: _runtimeContext.selectedRepoPath ?? undefined,
+      theme: document.documentElement.dataset['theme'] ?? 'imperial-dark',
+    });
+    for (const [layer, enabled] of Object.entries(getLayerState().layers)) {
+      postLayerToWonder(iframe, manifest, layer, enabled);
+    }
+
+    // Mount relations panel for Bibliotheca only when graphSuggestions was explicitly enabled.
+    if (type === 'bibliotheca') {
+      const config = loadWonderConfig();
+      const gsEnabled = isFeatureEnabled(config, 'bibliotheca', 'graphSuggestions');
+      postGraphSuggestionsToWonder(iframe, manifest, [], gsEnabled);
+      if (gsEnabled) {
+        _mountBibliothecaRelations(body);
+      }
+    }
   });
-  iframe.addEventListener('error', () => fail());
+  iframe.addEventListener('error', () => fail('offline'));
+}
+
+// ─── Feedback persistence ─────────────────────────────────────────────────────
+const RELATION_FEEDBACK_KEY = 'repociv_relation_feedback';
+
+function _loadRelationFeedback(): Record<string, { accepted: boolean; rejected: boolean }> {
+  try {
+    const raw = localStorage.getItem(RELATION_FEEDBACK_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function _saveRelationFeedback(key: string, state: { accepted: boolean; rejected: boolean }): void {
+  try {
+    const stored = _loadRelationFeedback();
+    stored[key] = state;
+    localStorage.setItem(RELATION_FEEDBACK_KEY, JSON.stringify(stored));
+  } catch {
+    // localStorage full — silent
+  }
+}
+
+// ─── Bibliotheca Relations Panel ──────────────────────────────────────────────
+
+function _mountBibliothecaRelations(body: HTMLElement): void {
+  const container = document.createElement('div');
+  container.id = 'bibliotheca-relations';
+  container.style.cssText = 'border-top: 1px solid rgba(200, 168, 75, 0.2); margin-top: 4px;';
+  body.appendChild(container);
+  _bibliothecaRelationsContainer = container;
+  void _reloadBibliothecaRelations();
+}
+
+async function _reloadBibliothecaRelations(): Promise<void> {
+  const container = _bibliothecaRelationsContainer;
+  if (!container) return;
+
+  const config = loadWonderConfig();
+  const gsEnabled = isFeatureEnabled(config, 'bibliotheca', 'graphSuggestions');
+  const aiEnabled = gsEnabled && isFeatureEnabled(config, 'bibliotheca', 'aiRelationDiscovery');
+  void syncGraphRelationFlags({ graphSuggestions: gsEnabled, aiRelationDiscovery: aiEnabled });
+  if (!gsEnabled) {
+    container.remove();
+    _bibliothecaRelationsContainer = null;
+    if (_bibliothecaIframe && _bibliothecaManifest) {
+      postGraphSuggestionsToWonder(_bibliothecaIframe, _bibliothecaManifest, [], false);
+    }
+    return;
+  }
+
+  const cities = _runtimeContext.cities;
+  if (cities.length === 0) {
+    renderRelationsPanelError(container, 'Bibliotheca no tiene ciudades cargadas desde RepoCiv todavía');
+    return;
+  }
+
+  const targetCity = _runtimeContext.selectedCityId ?? cities[0]?.id;
+  if (!targetCity) {
+    renderRelationsPanelError(container, 'Selecciona una ciudad en RepoCiv para ver relaciones');
+    return;
+  }
+
+  renderRelationsPanelLoading(container);
+
+  try {
+    const relations = rankRelationsWithFeedback(
+      await fetchGraphRelations(targetCity, cities, 15),
+      _loadRelationFeedback(),
+    );
+
+    if (_bibliothecaIframe && _bibliothecaManifest) {
+      postGraphSuggestionsToWonder(_bibliothecaIframe, _bibliothecaManifest, relations, true);
+    }
+
+    renderRelationsPanel(relations, container, {
+      onAccept: (rel) => {
+        _saveRelationFeedback(relationFeedbackKey(rel.fromId, rel.toId), {
+          accepted: true,
+          rejected: false,
+        });
+        void _reloadBibliothecaRelations();
+      },
+      onReject: (rel) => {
+        _saveRelationFeedback(relationFeedbackKey(rel.fromId, rel.toId), {
+          accepted: false,
+          rejected: true,
+        });
+        void _reloadBibliothecaRelations();
+      },
+      onGoToCity: (rel) => {
+        window.dispatchEvent(
+          new CustomEvent('repociv:focus-city-request', {
+            detail: { cityId: rel.toId, repoPath: rel.toRepoPath, source: 'relations-panel' },
+          }),
+        );
+      },
+      onOpenBoth: (rel) => {
+        window.dispatchEvent(
+          new CustomEvent('repociv:open-local-view-request', {
+            detail: { cityId: rel.toId, repoPath: rel.toRepoPath, source: 'relations-panel' },
+          }),
+        );
+      },
+    });
+  } catch {
+    renderRelationsPanelError(container, 'No se pudieron cargar las relaciones locales');
+  }
 }
 
 function _emptySub(type: WonderType, reason?: EmptyReason): string {
-  if (type !== 'bibliotheca') {
-    return 'Los obreros duermen. Vuelve más tarde.';
+  if (type === 'bibliotheca') {
+    const ui = WONDER_BIBLIOTHECA_URL;
+    const api = LGB_BACKEND_URL;
+    switch (reason) {
+      case 'lgb-offline':
+        return (
+          `Arranca La Gran Biblioteca en otra terminal:<br>` +
+          `<code>python -m backend.library_bridge</code> (API ${api})<br>` +
+          `<code>cd frontend && npm run dev</code> (UI ${ui})`
+        );
+      case 'lgb-backend-offline':
+        return (
+          `La UI vive, pero el backend no responde en <code>${api}/api/health</code>. ` +
+          `Levanta <code>python -m backend.library_bridge</code> o corrige el proxy.`
+        );
+      case 'lgb-ui-offline':
+        return `El backend responde, pero la UI no en <code>${ui}</code>. Ejecuta <code>cd frontend && npm run dev</code> en la-gran-biblioteca.`;
+      case 'load-timeout':
+        return `La UI en <code>${ui}</code> no cargó a tiempo. Comprueba que Vite esté arriba y abre esa URL en una pestaña.`;
+      case 'no-permissions':
+        return 'La maravilla respondió, pero negó permisos. Revisa headers, auth local o sandbox.';
+      default:
+        return 'La Biblioteca no respondió como debía. Revisa UI, backend o proxy local.';
+    }
   }
-  const ui = WONDER_BIBLIOTHECA_URL;
-  const api = LGB_BACKEND_URL;
+
   switch (reason) {
-    case 'lgb-offline':
-      return (
-        `Arranca La Gran Biblioteca en otra terminal:<br>` +
-        `<code>python -m backend.library_bridge</code> (API ${api})<br>` +
-        `<code>cd frontend && npm run dev</code> (UI ${ui})`
-      );
-    case 'lgb-backend-offline':
-      return (
-        `El backend no responde (probado <code>${api}/api/health</code> y 127.0.0.1:3001). ` +
-        `Ejecuta <code>python -m backend.library_bridge</code> en la-gran-biblioteca. ` +
-        `Si la UI va por Tailscale, el iframe puede usar <code>${ui}</code> aunque el API sea solo local.`
-      );
-    case 'lgb-ui-offline':
-      return `El backend responde, pero la UI no en <code>${ui}</code>. Ejecuta <code>cd frontend && npm run dev</code> en la-gran-biblioteca.`;
-    case 'load-timeout':
-      return (
-        `La UI en <code>${ui}</code> no cargó a tiempo. Comprueba que Vite esté arriba y abre esa URL en una pestaña. ` +
-        `(API: <code>${api}</code>)`
-      );
+    case 'degraded':
+      return 'La maravilla respondió degradada. RepoCiv no la abre a ciegas para evitar una UI rota.';
+    case 'timeout':
+      return 'La maravilla tardó demasiado en responder. Puede estar viva, pero no en condiciones sanas.';
+    case 'no-permissions':
+      return 'La maravilla está arriba, pero sin permisos suficientes. Revisa auth, puertos o sandbox.';
     default:
       return 'Los obreros duermen. Vuelve más tarde.';
   }
 }
 
-function _showEmptyState(
-  body: HTMLElement,
-  type: WonderType,
-  reason?: EmptyReason,
-): void {
+function _showEmptyState(body: HTMLElement, type: WonderType, reason?: EmptyReason): void {
   const sub = _emptySub(type, reason);
   body.innerHTML = `
     <div class="wonder-empty">
@@ -275,6 +558,8 @@ function _toggleFullscreen(): void {
   if (document.fullscreenElement) {
     document.exitFullscreen();
   } else {
-    _vignette.requestFullscreen().catch(() => { /* noop */ });
+    _vignette.requestFullscreen().catch(() => {
+      // noop
+    });
   }
 }

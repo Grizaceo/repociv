@@ -1,5 +1,7 @@
 // ─── RepoCiv — City Panel ─────────────────────────────────────────────────────
 import type { City, Building, Tile } from '../types.ts';
+import type { CityLabStatus } from '../labhubStatus.ts';
+import { formatLabStatusLabel, formatLabSourceLabel } from '../labhubStatus.ts';
 import { trapFocus } from './focusTrap.ts';
 import { getLatestNews, markNewsAsRead } from '../bridge.ts';
 
@@ -39,10 +41,19 @@ const SKILL_LABEL: Record<string, string> = {
   broken: '✗ Roto',
 };
 
-export function openCityPanel(city: City, activeBuildings: Building[], tile?: Tile) {
+export function openCityPanel(
+  city: City,
+  activeBuildings: Building[],
+  tile?: Tile,
+  labStatus?: CityLabStatus | null,
+) {
   const panel = document.getElementById('city-panel');
   if (!panel) return;
   panel.classList.remove('hidden');
+  panel.dataset['cityId'] = city.id;
+  panel.dataset['cityName'] = city.name;
+  panel.dataset['repoPath'] = city.repoPath ?? '';
+  panel.dataset['labStatus'] = labStatus ? JSON.stringify(labStatus) : '';
   _cityPanelCleanup?.();
   _cityPanelCleanup = trapFocus(panel);
 
@@ -77,6 +88,45 @@ export function openCityPanel(city: City, activeBuildings: Building[], tile?: Ti
     setText('city-res-gold', city.population.toLocaleString());
     setText('city-res-sci', '—');
     setText('city-res-prod', activeBuildings.length.toString());
+  }
+
+  // Active buildings → missions list
+  const labStatusEl = document.getElementById('city-lab-status');
+  if (labStatusEl) {
+    if (labStatus == null || labStatus === undefined) {
+      labStatusEl.innerHTML = '<div class="city-item" style="color:var(--text-dim);font-style:italic;">Consultando Institutum…</div>';
+    } else {
+      const sourceLabel = formatLabSourceLabel(labStatus);
+      const sourceColor = labStatus.source === 'live' ? 'var(--ui-green)' : 'var(--ui-accent-gold)';
+      labStatusEl.innerHTML = [
+        `<div class="city-item" style="color:var(--ui-green)">🔬 ${esc(formatLabStatusLabel(labStatus))}</div>`,
+        `<div class="city-item" style="color:var(--text-dim);font-size:11px">${esc(labStatus.lastMetric || labStatus.labId)}</div>`,
+        `<div class="city-item" style="color:${sourceColor};font-size:10px">${esc(sourceLabel)}</div>`,
+      ].join('');
+    }
+  }
+
+  const institutumBtn = document.getElementById('btn-city-institutum') as HTMLButtonElement | null;
+  if (institutumBtn) {
+    const labhubUrl = labStatus?.links.labhub;
+    if (labhubUrl) {
+      institutumBtn.disabled = false;
+      institutumBtn.title = `Abrir Institutum en ${labhubUrl}`;
+    } else {
+      institutumBtn.disabled = true;
+      institutumBtn.title = 'Institutum offline — sin URL disponible';
+    }
+  }
+  const logsBtn = document.getElementById('btn-city-logs') as HTMLButtonElement | null;
+  if (logsBtn) {
+    const logsUrl = labStatus?.links.logs;
+    if (logsUrl) {
+      logsBtn.disabled = false;
+      logsBtn.title = `Ver logs: ${logsUrl}`;
+    } else {
+      logsBtn.disabled = true;
+      logsBtn.title = 'Sin ruta de logs disponible';
+    }
   }
 
   // Active buildings → missions list
@@ -217,7 +267,14 @@ async function fetchCityFiles(repoName: string) {
 export function closeCityPanel() {
   _cityPanelCleanup?.();
   _cityPanelCleanup = null;
-  document.getElementById('city-panel')?.classList.add('hidden');
+  const panel = document.getElementById('city-panel');
+  if (panel) {
+    delete panel.dataset['cityId'];
+    delete panel.dataset['cityName'];
+    delete panel.dataset['repoPath'];
+    delete panel.dataset['labStatus'];
+    panel.classList.add('hidden');
+  }
 }
 
 export function isCityPanelOpen(): boolean {
@@ -241,6 +298,56 @@ export function wireCityPanel() {
   document.getElementById('city-panel-close')?.addEventListener('click', closeCityPanel);
   document.getElementById('btn-city-close')?.addEventListener('click', closeCityPanel);
   document.getElementById('city-panel-minimize')?.addEventListener('click', toggleMinimizeCityPanel);
+  document.getElementById('btn-city-mission')?.addEventListener('click', () => {
+    const panel = document.getElementById('city-panel');
+    const cityId = panel?.dataset['cityId'];
+    if (!cityId) return;
+    window.dispatchEvent(
+      new CustomEvent('repociv:city-mission-request', {
+        detail: { cityId, repoPath: panel?.dataset['repoPath'] ?? '', labStatus: panel?.dataset['labStatus'] ?? '' },
+      }),
+    );
+  });
+  document.getElementById('btn-city-bibliotheca')?.addEventListener('click', () => {
+    const panel = document.getElementById('city-panel');
+    const cityId = panel?.dataset['cityId'];
+    if (!cityId) return;
+    window.dispatchEvent(
+      new CustomEvent('repociv:open-bibliotheca-request', {
+        detail: { cityId, repoPath: panel?.dataset['repoPath'] ?? '' },
+      }),
+    );
+  });
+  document.getElementById('btn-city-local')?.addEventListener('click', () => {
+    const panel = document.getElementById('city-panel');
+    const cityId = panel?.dataset['cityId'];
+    if (!cityId) return;
+    window.dispatchEvent(
+      new CustomEvent('repociv:open-local-view-request', {
+        detail: { cityId, repoPath: panel?.dataset['repoPath'] ?? '' },
+      }),
+    );
+  });
+  document.getElementById('btn-city-institutum')?.addEventListener('click', () => {
+    const panel = document.getElementById('city-panel');
+    const cityId = panel?.dataset['cityId'];
+    if (!cityId) return;
+    window.dispatchEvent(
+      new CustomEvent('repociv:open-institutum-request', {
+        detail: { cityId, repoPath: panel?.dataset['repoPath'] ?? '' },
+      }),
+    );
+  });
+  document.getElementById('btn-city-logs')?.addEventListener('click', () => {
+    const panel = document.getElementById('city-panel');
+    const cityId = panel?.dataset['cityId'];
+    if (!cityId) return;
+    window.dispatchEvent(
+      new CustomEvent('repociv:open-city-logs-request', {
+        detail: { cityId, repoPath: panel?.dataset['repoPath'] ?? '', labStatus: panel?.dataset['labStatus'] ?? '' },
+      }),
+    );
+  });
 
   const header = document.getElementById('city-panel-header');
   const panel = document.getElementById('city-panel');

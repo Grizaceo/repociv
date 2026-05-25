@@ -175,6 +175,7 @@ from server import directive_learner as _dl
 from server import harness_registry as _hr
 from server import recovery as _recovery
 from server import runtime_adapters as _runtime_adapters
+from server import wonder_registry as _wr
 from server.quest import generate_quest_name
 from server import agent_runner as _agent_runner
 from server import task_orchestrator as _to
@@ -624,14 +625,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _parse_qs(self) -> dict[str, str]:
-        """Parse query string into a flat dict."""
+        """Parse query string into a flat dict, URL-decoding values."""
         params: dict[str, str] = {}
         qs = self.path.split("?", 1)[1] if "?" in self.path else ""
         for part in qs.split("&"):
             if "=" in part:
                 k, _, v = part.partition("=")
                 params[k] = v
-        return params
+        # URL-decode values
+        import urllib.parse as _up
+        decoded: dict[str, str] = {}
+        for k, v in params.items():
+            decoded[k] = _up.unquote_plus(v)
+        return decoded
 
     def _respond(self, status: int, data: Any) -> None:
         """Write a JSON response with CORS headers."""
@@ -662,8 +668,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/agents":             _routes.get_agents,
             "/agents/capabilities": _routes.get_agents_capabilities,
             "/api/providers":      _routes.get_chat_config,
-            "/providers":          _routes.get_chat_config,   # Vite proxy alias
-            "/api/chat-config":    _routes.get_chat_config,   # back-compat alias
+            "/providers":          _routes.get_chat_config,
+            "/api/chat-config":    _routes.get_chat_config,
             "/metrics":            _routes.get_metrics,
             "/directives/stats":   _routes.get_directives_stats,
             "/directives/suggest": _routes.get_directives_suggest,
@@ -675,6 +681,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/providers/live":     _routes.get_providers_live,
             "/ws":                 _routes.get_ws_info,
             "/api/news/latest":    _routes.get_latest_news,
+            "/wonders":            _routes.get_wonders,
+            "/api/graph-relations":       _routes.get_graph_relations,
+            "/api/graph-relations/stats": _routes.get_graph_relations_stats,
+            "/api/foreign/repo-profile": _routes.get_repo_profile,
+            "/api/foreign/repo-profile/cache": _routes.get_repo_profile_cache,
+            "/api/foreign/reports": _routes.get_reports,
+            "/api/labhub/status":    _routes.get_labhub_status,
         }
         if path in _GET_EXACT:
             status, body = _GET_EXACT[path](ctx)
@@ -701,6 +714,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._respond(status, body)
             return
 
+        if path.startswith("/wonders/"):
+            parts = path.split("/")
+            if len(parts) >= 4 and parts[3] == "health":
+                wonder_id = parts[2]
+                status, body = _routes.get_wonder_health({"wonder_id": wonder_id})
+                self._respond(status, body)
+                return
+            if len(parts) >= 3:
+                wonder_id = parts[2]
+                status, body = _routes.get_wonder_by_id({"wonder_id": wonder_id})
+                self._respond(status, body)
+                return
+
         if path.startswith("/tasks/"):
             parts = path.split("/")[2:]
             if len(parts) >= 3 and parts[2] == "circuit-status":
@@ -715,6 +741,38 @@ class BridgeHandler(BaseHTTPRequestHandler):
             status, body = _routes.get_task_by_key(ctx)
             self._respond(status, body)
             return
+
+        # ── Foreign relations report by ID ─────────────────────────────────────
+        if path.startswith("/api/foreign/reports/"):
+            parts = path.split("/")
+            if len(parts) >= 5:
+                report_id = parts[4]
+                status, body = _routes.get_report_by_id({"report_id": report_id})
+                self._respond(status, body)
+                return
+
+        # ── Graph relations evidence / refresh ──────────────────────────────────
+        if path == "/api/graph-relations/evidence":
+            status, body = _routes.get_graph_relations_evidence(ctx)
+            self._respond(status, body)
+            return
+        if path.startswith("/api/graph-relations/"):
+            parts = path.split("/")
+            if len(parts) >= 5 and parts[4] == "evidence":
+                ctx["from_id"] = parts[5] if len(parts) > 5 else ""
+                ctx["to_id"] = params.get("toId", "")
+                status, body = _routes.get_graph_relations_evidence(ctx)
+                self._respond(status, body)
+                return
+
+        # ── LabHub per-city status ───────────────────────────────────────────────
+        if path.startswith("/api/labhub/status/"):
+            city_id = path[len("/api/labhub/status/"):].split("/")[0]
+            if city_id:
+                ctx["city_id"] = city_id
+                status, body = _routes.get_city_lab_status(ctx)
+                self._respond(status, body)
+                return
 
         self.send_response(404)
         self._cors()
@@ -772,6 +830,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/pending/state":     _routes.post_pending_state,
             "/api/news/read":     _routes.post_news_read,
             "/api/news/scan":     _routes.post_news_scan,
+            "/api/foreign/score": _routes.post_foreign_score,
+            "/api/foreign/report": _routes.post_foreign_report,
+            "/api/graph-relations/flags": _routes.post_graph_relations_flags,
+            "/api/graph-relations/refresh": _routes.post_graph_relations_refresh,
         }
         if path in _POST_EXACT:
             status, resp = _POST_EXACT[path](body, {})

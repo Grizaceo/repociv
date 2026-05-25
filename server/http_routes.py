@@ -612,5 +612,338 @@ def post_news_scan(body: dict[str, Any], ctx: dict[str, Any]) -> tuple[int, Any]
     except Exception as e:
         return 500, {"ok": False, "error": str(e)}
 
+# ─── LabHub Status Routes ────────────────────────────────────────────────────
+
+from server import labhub_adapter as _labhub
+
+
+def get_labhub_status(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/labhub/status — overall Institutum reachability."""
+    return 200, _labhub.get_labhub_overall_status()
+
+
+def get_city_lab_status(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/labhub/status/{city_id} — lab status for a specific city.
+
+    Query params:
+        repoPath (str, optional): repo path for log link derivation.
+    """
+    city_id = ctx.get("city_id", "")
+    if not city_id:
+        return 400, {"error": "city_id is required"}
+    params = ctx.get("params", {})
+    repo_path = params.get("repoPath", "")
+    return 200, _labhub.get_city_lab_status(city_id, repo_path=str(repo_path) if repo_path else None)
+
+
+def get_all_cities_lab_status(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/labhub/status — batch lab status for all cities.
+
+    Query params:
+        cities (str, required): JSON-serialized list of city dicts with id, repoPath.
+    """
+    params = ctx.get("params", {})
+    cities_raw = params.get("cities", "")
+    if not cities_raw:
+        return 400, {"error": "cities query param required (JSON array)"}
+    try:
+        cities = _json_lib.loads(str(cities_raw))
+    except (_json_lib.JSONDecodeError, TypeError, ValueError):
+        return 400, {"error": "cities must be valid JSON array"}
+    if not isinstance(cities, list):
+        return 400, {"error": "cities must be a JSON array"}
+    return 200, _labhub.get_all_cities_lab_status(cities)
+
+
+# ─── Wonder Registry Routes ──────────────────────────────────────────────────
+
+from server import wonder_registry as _wr
+
+
+def get_wonders(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /wonders — list all registered Wonder manifests."""
+    return 200, _wr.list_wonders()
+
+
+def get_wonder_by_id(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /wonders/{id} — single Wonder manifest."""
+    wonder_id = ctx.get("wonder_id", "")
+    manifest = _wr.get_wonder(wonder_id)
+    if not manifest:
+        return 404, {"error": f"wonder '{wonder_id}' not found"}
+    return 200, manifest
+
+
+def get_wonder_health(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /wonders/{id}/health — health check for a specific Wonder."""
+    wonder_id = ctx.get("wonder_id", "")
+    return 200, _wr.check_wonder_health(wonder_id)
+
+
+# ─── Foreign Relations / Report Routes ────────────────────────────────────────
+
+from server import repo_profile as _rp
+from server import foreign_relations as _fr
+from server import report_store as _rs
+from server import city_graph_adapter as _cga
+from server import graph_relations as _gr
+
+
+def get_repo_profile(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/foreign/repo-profile — build profile for a repo path.
+
+    Query params:
+        repoPath (required): absolute path to the repo.
+    """
+    params = ctx.get("params", {})
+    repo_path = params.get("repoPath", "")
+    if not repo_path:
+        return 400, {"error": "repoPath is required"}
+    profile = _rp.build_profile(repo_path)
+    if profile is None:
+        return 404, {"error": f"Repo path not found or not a directory: {repo_path}"}
+    return 200, profile
+
+
+def get_repo_profile_cache(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/foreign/repo-profile/cache — list cached profiles."""
+    cache = _rp.get_cached_profiles()
+    return 200, {
+        "count": len(cache),
+        "profiles": {k: {"repoName": v.get("repoName", "") if v else None,
+                         "recentFilesCount": v.get("recentFilesCount", 0) if v else 0}
+                      for k, v in cache.items()},
+    }
+
+
+def post_foreign_score(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
+    """POST /api/foreign/score — score an article against a repo profile.
+
+    Body:
+        article (dict): article with title, blogName, category, url
+        repoPath (str): path to the repo
+        events (list, optional): recent events
+    """
+    article = body.get("article", {})
+    repo_path = body.get("repoPath", "")
+    events = body.get("events", [])
+
+    if not article or not repo_path:
+        return 400, {"error": "article and repoPath are required"}
+
+    profile = _rp.build_profile(repo_path)
+    if profile is None:
+        return 404, {"error": f"Repo path not found: {repo_path}"}
+
+    scoring = _fr.score_article_repo(article, profile, events=events if events else None)
+    return 200, {
+        "scoring": scoring,
+        "profile": {
+            "repoName": profile["repoName"],
+            "repoPath": profile["repoPath"],
+            "topLevelDirs": profile["topLevelDirs"][:10],
+            "recentFilesCount": profile["recentFilesCount"],
+            "skillTags": profile["skillTags"],
+        },
+    }
+
+
+def post_foreign_report(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
+    """POST /api/foreign/report — generate and save a ForeignRelationsReport.
+
+    Body:
+        article (dict): article with title, blogName, category, url, id
+        articles (list, optional): one or more related articles for grouped analysis
+        repoPath (str): path to the target repo
+        targetCityId (str): city ID for the target (optional, auto-detected if omitted)
+        events (list, optional): recent events for context
+        graphRelations (list, optional): bibliotheca graph relations
+        agentId (str, optional): agent identifier (default 'diplomat')
+    """
+    article = body.get("article", {})
+    articles = [a for a in body.get("articles", []) if isinstance(a, dict)]
+    if not articles and article:
+        articles = [article]
+    repo_path = body.get("repoPath", "")
+    target_city_id = body.get("targetCityId", "")
+    events = body.get("events", [])
+    graph_relations = body.get("graphRelations", [])
+    agent_id = body.get("agentId", "diplomat")
+
+    if not articles or not repo_path:
+        return 400, {"error": "article/articles and repoPath are required"}
+
+    profile = _rp.build_profile(repo_path)
+    if profile is None:
+        return 404, {"error": f"Repo path not found: {repo_path}"}
+
+    primary_article = dict(articles[0])
+    if len(articles) > 1:
+        primary_article["title"] = f"{primary_article.get('title', '')} + {len(articles) - 1} noticia(s)"
+        categories = sorted({str(a.get('category', '')).strip() for a in articles if a.get('category')})
+        if categories:
+            primary_article["category"] = ", ".join(categories[:3])
+
+    scoring = _fr.score_article_repo(primary_article, profile, events=events if events else None)
+    report = _fr.generate_report(
+        article=primary_article,
+        profile=profile,
+        scoring=scoring,
+        events=events if events else None,
+        graph_relations=graph_relations if graph_relations else None,
+        agent_id=agent_id,
+    )
+
+    if report is None:
+        return 500, {"error": "Report generation failed"}
+
+    # Enrich with article/repo links
+    article_ids = [str(a.get("id", "")) for a in articles if a.get("id") is not None]
+    report["articleIds"] = article_ids
+    report["targetCityId"] = target_city_id or profile["repoName"]
+    report["targetRepoPath"] = repo_path
+
+    # Persist
+    saved = _rs.save_report(report)
+    return 200, saved
+
+
+def get_reports(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/foreign/reports — list reports.
+
+    Query params:
+        cityId (str, optional): filter by target city
+        articleId (str, optional): filter by article ID
+    """
+    params = ctx.get("params", {})
+    city_id = params.get("cityId")
+    article_id = params.get("articleId")
+    reports = _rs.list_reports(city_id=city_id, article_id=article_id)
+    return 200, reports
+
+
+def get_report_by_id(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/foreign/reports/{id} — single report."""
+    report_id = ctx.get("report_id", "")
+    if not report_id:
+        return 400, {"error": "report_id is required"}
+    report = _rs.get_report(report_id)
+    if not report:
+        return 404, {"error": f"Report not found: {report_id}"}
+    return 200, report
+
+
+def delete_report_by_id(ctx: dict[str, Any], _body: dict[str, Any]) -> tuple[int, Any]:
+    """DELETE /api/foreign/reports/{id} — delete a report."""
+    report_id = ctx.get("report_id", "")
+    if not report_id:
+        return 400, {"error": "report_id is required"}
+    ok = _rs.delete_report(report_id)
+    if not ok:
+        return 404, {"error": f"Report not found: {report_id}"}
+    return 200, {"ok": True, "deleted": report_id}
+
+
+# ─── Graph Relations Routes ──────────────────────────────────────────────
+
+
+def get_graph_relations(ctx: dict[str, Any]) -> tuple[int, Any]:
+    """GET /api/graph-relations — candidate relations for a city.
+
+    Query params:
+        cityId (str, required): the city ID to find relations for.
+        limit (int, optional): max candidates (default 10).
+        all (str, optional): if "true", return all candidates with no limit.
+        cities (list, optional): serialized city list for name resolution.
+    """
+    params = ctx.get("params", {})
+    city_id = params.get("cityId", "")
+    if not city_id:
+        return 400, {"error": "cityId is required"}
+
+    limit_str = params.get("limit", "10")
+    try:
+        limit = int(limit_str)
+    except (ValueError, TypeError):
+        limit = 10
+
+    if params.get("all", "").lower() in ("true", "1", "yes"):
+        limit = 0  # unlimited
+
+    # Cities list — passed either in params or as a serialized JSON string
+    cities_raw = params.get("cities", "")
+    cities: list[dict] = []
+    if cities_raw:
+        try:
+            cities = _json_lib.loads(cities_raw)
+        except (_json_lib.JSONDecodeError, TypeError):
+            pass
+
+    result = _cga.get_city_relations(city_id, cities, limit=limit if limit > 0 else 999)
+    return 200, {"cityId": city_id, "count": len(result), "relations": result}
+
+
+def get_graph_relations_evidence(ctx: dict[str, Any]) -> tuple[int, Any]:
+    """GET /api/graph-relations/evidence — evidence between two cities.
+
+    Query params:
+        fromId (str, required): source city ID.
+        toId (str, required): target city ID.
+        cities (list, optional): serialized city list for name resolution.
+    """
+    params = ctx.get("params", {})
+    from_id = ctx.get("from_id", params.get("fromId", ""))
+    to_id = ctx.get("to_id", params.get("toId", ""))
+
+    if not from_id or not to_id:
+        return 400, {"error": "fromId and toId are required"}
+
+    cities_raw = params.get("cities", "")
+    cities: list[dict] = []
+    if cities_raw:
+        try:
+            cities = _json_lib.loads(cities_raw)
+        except (_json_lib.JSONDecodeError, TypeError):
+            pass
+
+    evidence = _cga.get_city_evidence(from_id, to_id, cities)
+    return 200, evidence
+
+
+def get_graph_relations_stats(_ctx: dict[str, Any]) -> tuple[int, Any]:
+    """GET /api/graph-relations/stats — index stats."""
+    stats = _gr.get_network_stats()
+    return 200, stats
+
+
+def post_graph_relations_flags(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
+    """POST /api/graph-relations/flags — sync opt-in flags from the UI."""
+    flags = _gr.set_flags(
+        graph_suggestions=body.get("graphSuggestions") if "graphSuggestions" in body else None,
+        ai_relation_discovery=body.get("aiRelationDiscovery") if "aiRelationDiscovery" in body else None,
+    )
+    return 200, {"ok": True, "flags": flags}
+
+
+def post_graph_relations_refresh(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
+    """POST /api/graph-relations/refresh — trigger index rebuild.
+
+    Body:
+        cities (list, optional): list of city dicts to rebuild index from.
+        repoPaths (list, optional): direct repo paths for index build.
+    """
+    cities = body.get("cities", [])
+    repo_paths = body.get("repoPaths", [])
+
+    if cities:
+        result = _cga.build_repo_index_from_cities(cities)
+        return 200, result
+    elif repo_paths:
+        result = _gr.build_or_refresh_index(repo_paths)
+        return 200, result
+    else:
+        return 400, {"error": "Provide either 'cities' or 'repoPaths' in the request body"}
+
+
 # ─── Type alias ───────────────────────────────────────────────────────────────
 RouteContext = dict[str, Any]
