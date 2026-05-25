@@ -1627,12 +1627,11 @@ kbd {
   font-size: 9px;
   font-family: var(--font-mono);
   color: #fff;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   padding: 0 3px;
   font-weight: 700;
-  display: none;
 }
 .approval-badge-active {
   display: flex;
