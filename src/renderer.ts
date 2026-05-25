@@ -5,6 +5,8 @@ import { type GameState } from './game.ts';
 import { HexRenderer } from './hexRenderer.ts';
 import { UnitRenderer } from './unitRenderer.ts';
 import { MinimapRenderer } from './minimapRenderer.ts';
+import { openWonderVignette } from './ui/wonderVignette.ts';
+import { openCapitalPanel } from './ui/capitalPanel.ts';
 // LocalRenderer is lazy-loaded on first local-view entry to keep main bundle small.
 type LocalRendererType = import('./localRenderer.ts').LocalRenderer;
 import {
@@ -459,9 +461,7 @@ export class Renderer {
       // Priority 1: wonder sprite hit test
       const wonder = this.hitWonderAt(wx, wy);
       if (wonder) {
-        import('./ui/wonderVignette.ts').then((mod) => {
-          mod.openWonderVignette(wonder as import('./types').WonderType);
-        });
+        openWonderVignette(wonder as import('./types').WonderType);
         return;
       }
 
@@ -470,9 +470,7 @@ export class Renderer {
       if (tile?.city) {
         const city = tile.city;
         if (city.isCapital) {
-          import('./ui/capitalPanel.ts').then((mod) => {
-            mod.openCapitalPanel();
-          });
+          openCapitalPanel();
           return;
         }
         const cityId = city.id;

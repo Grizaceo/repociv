@@ -83,6 +83,22 @@ function _renderTab(tab: TabId) {
 }
 
 function _renderGaceta(container: HTMLElement) {
+  const m = getWonder('gaceta');
+  const badgesHtml = m ? renderCapabilityBadge(m) : '';
+  const capPanelHtml = m ? renderCapabilityPanel(m) : '';
+
+  // Contract header
+  if (m) {
+    const header = document.createElement('div');
+    header.className = 'gaceta-contract-header';
+    header.innerHTML = `
+      <div class="wonder-badges">${badgesHtml}</div>
+      <div class="wonder-cap-panel">${capPanelHtml}</div>
+    `;
+    container.appendChild(header);
+  }
+
+  // Gaceta widget
   const wrapper = document.createElement('div');
   wrapper.id = 'gaceta-panel-mount';
   wrapper.style.cssText = 'height:100%;display:flex;flex-direction:column;';

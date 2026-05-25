@@ -98,6 +98,7 @@ export function resolveWonderUrl(type: WonderType): string {
 
 /** Back-compat: all wonder types. */
 export const KNOWN_WONDER_TYPES: readonly WonderType[] = [
+  'gaceta',
   'bibliotheca',
   'institutum',
 ] as const;

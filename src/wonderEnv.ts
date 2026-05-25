@@ -24,6 +24,7 @@ export const LGB_BACKEND_URL =
   import.meta.env.VITE_LGB_BACKEND_URL ?? `http://${_lgbHost}:3001`;
 
 export const WONDER_UI_URLS: Record<WonderType, string> = {
+  gaceta: '',  // native, no iframe URL
   bibliotheca: WONDER_BIBLIOTHECA_URL,
   institutum: WONDER_INSTITUTUM_URL,
 };

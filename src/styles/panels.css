@@ -4826,3 +4826,13 @@ kbd {
   width: 100%;
   max-width: 480px;
 }
+
+/* Gaceta contract header */
+.gaceta-contract-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-dim, #4a3a1a);
+}

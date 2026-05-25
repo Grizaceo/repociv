@@ -71,7 +71,7 @@ export interface District {
 // ─── Building & Wonder ─────────────────────────────────────────────────────
 export type BuildingState = 'planned' | 'building' | 'complete' | 'failed';
 
-export type WonderType = 'bibliotheca' | 'institutum';
+export type WonderType = 'gaceta' | 'bibliotheca' | 'institutum';
 
 export interface Building {
   id: string;
@@ -349,5 +349,30 @@ export interface LocalMission {
 export function tileKey(coord: Axial): string {
   return `${coord.q},${coord.r}`;
 }
+
+// ─── Map Layers ───────────────────────────────────────────────────────────────
+// Visibility toggles for information overlays on the hex map.
+// Each layer can be independently shown/hidden to reduce visual noise.
+
+export type MapLayerId =
+  | 'base'           // terrain, cities, agents — always on
+  | 'structure'      // folder structure, buildings, wonder sprites
+  | 'operational'    // tasks, active experiments, approvals, failures
+  | 'knowledge'      // bibliotheca relations, suggested connections
+  | 'security';      // lab warnings, experiment locks, perimeter alerts
+
+export interface MapLayerState {
+  layers: Record<MapLayerId, boolean>;
+}
+
+export const DEFAULT_MAP_LAYERS: MapLayerState = {
+  layers: {
+    base: true,
+    structure: true,
+    operational: false,
+    knowledge: false,
+    security: false,
+  },
+};
 
 

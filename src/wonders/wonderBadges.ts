@@ -110,7 +110,7 @@ export function renderCapabilityPanel(m: WonderManifest): string {
     if (m.permissions.readRepos) perms.push('Lectura de repos');
     if (m.permissions.writeRepos) perms.push('Escritura de repos');
     perms.push(`Red: ${m.permissions.network === 'none' ? 'sin red' : 'loopback'}`);
-    if (m.permissions.requiresApprovalForMutations) perms.push('Mutaciones requieren aprobation');
+    if (m.permissions.requiresApprovalForMutations) perms.push('Mutaciones requieren aprobación');
 
     if (perms.length > 0) {
       sections.push(`<div class="wonder-cap-section"><h4>Permisos</h4><div class="wonder-perm-list">${perms.map((p) => `<span class="wonder-perm-chip">${p}</span>`).join('')}</div></div>`);
