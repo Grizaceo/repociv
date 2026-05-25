@@ -224,7 +224,50 @@ export function isCityPanelOpen(): boolean {
   return !document.getElementById('city-panel')?.classList.contains('hidden');
 }
 
+let isMinimized = false;
+
+function toggleMinimizeCityPanel() {
+  const body = document.getElementById('city-panel-body');
+  const footer = document.getElementById('city-panel-footer');
+  isMinimized = !isMinimized;
+  if (body) body.style.display = isMinimized ? 'none' : '';
+  if (footer) footer.style.display = isMinimized ? 'none' : '';
+}
+
+let isDragging = false;
+let dragStartX = 0, dragStartY = 0, initialX = 0, initialY = 0;
+
 export function wireCityPanel() {
   document.getElementById('city-panel-close')?.addEventListener('click', closeCityPanel);
   document.getElementById('btn-city-close')?.addEventListener('click', closeCityPanel);
+  document.getElementById('city-panel-minimize')?.addEventListener('click', toggleMinimizeCityPanel);
+
+  const header = document.getElementById('city-panel-header');
+  const panel = document.getElementById('city-panel');
+  if (header && panel) {
+    header.addEventListener('mousedown', (e) => {
+      if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+      isDragging = true;
+      const rect = panel.getBoundingClientRect();
+      if (panel.style.transform === '') {
+         panel.style.left = rect.left + 'px';
+         panel.style.top = rect.top + 'px';
+         panel.style.transform = 'none';
+         panel.style.bottom = 'auto';
+      }
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      initialX = panel.offsetLeft;
+      initialY = panel.offsetTop;
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      panel.style.left = `${initialX + (e.clientX - dragStartX)}px`;
+      panel.style.top = `${initialY + (e.clientY - dragStartY)}px`;
+    });
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+  }
 }

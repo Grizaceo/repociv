@@ -721,3 +721,60 @@ button:hover::after, .spawn-btn:hover::after {
     opacity: 1;
   }
 }
+
+/* ═══ Action Bubbles — RimWorld-style DOM overlay (Phase 9) ══════════════════ */
+#action-bubbles-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 200;
+}
+
+.action-bubble {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: rgba(14, 14, 18, 0.88);
+  border: 1px solid var(--lt-amber-500, #F59E0B);
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-family: var(--lt-font-mono, 'JetBrains Mono', ui-monospace, monospace);
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--lt-zinc-50, #FAFAFA);
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.4s ease;
+  backdrop-filter: blur(4px);
+}
+
+.action-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--lt-amber-500, #F59E0B);
+  border-bottom: none;
+}
+
+.action-bubble.working {
+  border-color: var(--lt-amber-400, #FBBF24);
+}
+
+.action-bubble.working::after {
+  border-top-color: var(--lt-amber-400, #FBBF24);
+}
+
+.action-bubble.resting {
+  opacity: 0.6;
+  border-color: var(--lt-zinc-400, #A1A1AA);
+}
+
+.action-bubble.resting::after {
+  border-top-color: var(--lt-zinc-400, #A1A1AA);
+}

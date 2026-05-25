@@ -18,6 +18,16 @@
     <!-- Capas de UI y overlays -->
     <div id="three-container"></div>
 
+    <!-- Diegetic local-view monitor frame (toggled by renderer) -->
+    <div id="local-view-frame" class="hidden">
+      <div class="lvf-scanlines"></div>
+      <div class="lvf-label">LOCAL SECTOR</div>
+      <div class="lvf-bracket lvf-tl"></div>
+      <div class="lvf-bracket lvf-tr"></div>
+      <div class="lvf-bracket lvf-bl"></div>
+      <div class="lvf-bracket lvf-br"></div>
+    </div>
+
     <!-- ─── HUD OVERLAYS ─────────────────────────────────────────────────── -->
     <div id="hud-overlay" data-auto-animate>
       
@@ -60,6 +70,7 @@
             📝
           </button>
           <button id="btn-log" title="Log en vivo [F10]" aria-label="Panel de log">📜</button>
+          <button id="btn-task-assign" title="Asignar tareas [J]" aria-label="Panel de asignación de tareas">🎯</button>
           <button id="btn-timeline" title="Crónica de eventos [F10]" aria-label="Crónica de eventos">
             <i data-lucide="scroll-text"></i>
           </button>
@@ -195,14 +206,18 @@
 
       <!-- City Panel (Ficha de Ciudad estilo Civ V) -->
       <div id="city-panel" class="hidden">
-        <div class="city-panel-header">
+        <div class="city-panel-header" id="city-panel-header" style="cursor: move;">
           <div class="city-panel-title">
             ★ <span id="city-panel-name">TAMAGOTCHI</span>
             <span class="city-repo-tag">[repo: <span id="city-repo-name">tamagotchi</span>]</span>
           </div>
-          <div class="city-git-header">git: <span id="city-git-branch">main</span> ● <span id="city-git-status">clean</span></div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <div class="city-git-header">git: <span id="city-git-branch">main</span> ● <span id="city-git-status">clean</span></div>
+            <button id="city-panel-minimize" title="Minimizar" style="background:transparent;border:1px solid var(--ui-border);color:var(--text-dim);cursor:pointer;width:24px;height:24px;border-radius:3px;">_</button>
+            <button id="city-panel-close" title="Cerrar" style="background:transparent;border:1px solid var(--ui-border);color:var(--text-dim);cursor:pointer;width:24px;height:24px;border-radius:3px;">✕</button>
+          </div>
         </div>
-        <div class="city-panel-body">
+        <div class="city-panel-body" id="city-panel-body">
           <div class="city-stats-row">
             <div>TERRENO: <span id="city-terrain">🌲 Bosque (70% .py)</span></div>
             <div>SESIÓN: <span id="city-session">🔆 Bright</span></div>

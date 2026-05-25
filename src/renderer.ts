@@ -87,6 +87,11 @@ export class Renderer {
   localTileClickCb:
     | ((x: number, y: number, tile: import('./types.ts').LocalTile | null, screenX: number, screenY: number) => void)
     | null = null;
+  // Phase 9: bubble layer callbacks
+  localUnitRenderedCb:
+    | ((unit: import('./types.ts').LocalUnit, screenX: number, screenY: number) => void)
+    | null = null;
+  onExitLocalView: (() => void) | null = null;
   private _localRendererCtor: (new (canvas: HTMLCanvasElement) => LocalRendererType) | null = null;
   private localWorldId: string | null = null;
   /** Cached tile list sorted by Y — recomputed only when tile count changes. */
@@ -614,6 +619,8 @@ export class Renderer {
       if (!document.body.classList.contains('local-view')) {
         document.body.classList.add('local-view');
       }
+      const frame = document.getElementById('local-view-frame');
+      if (frame) frame.classList.remove('hidden');
       if (!this.localR && this._localRendererCtor) {
         this.localR = new this._localRendererCtor(canvas);
         this.localR.setupInput();
@@ -622,6 +629,7 @@ export class Renderer {
         this.localR.onWorkbenchClick = this.localWorkbenchClickCb;
         this.localR.onLocalUnitClick = this.localUnitClickCb;
         this.localR.onTileClick = (x, y, tile) => this.localTileClickCb?.(x, y, tile, 0, 0);
+        this.localR.onUnitRendered = (unit, sx, sy) => this.localUnitRenderedCb?.(unit, sx, sy);
       }
       if (!this.localR) return; // still loading module — next frame will retry
       if (this.state.localWorld && this.state.localWorld.repoId !== this.localWorldId) {
@@ -634,6 +642,9 @@ export class Renderer {
 
     if (document.body.classList.contains('local-view')) {
       document.body.classList.remove('local-view');
+      const frame = document.getElementById('local-view-frame');
+      if (frame) frame.classList.add('hidden');
+      this.onExitLocalView?.();
     }
 
     ctx.save();

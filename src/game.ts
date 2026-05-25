@@ -12,6 +12,7 @@ import {
   type LocalWorld,
   type LocalUnit,
   type LocalMission,
+  type AgentTask,
 } from './types.ts';
 import type { Axial } from './hex.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
@@ -416,6 +417,10 @@ export class GameState {
   }
   getLocalUnit(id: string): LocalUnit | undefined {
     return this._local.getLocalUnit(id);
+  }
+  setLocalUnitTask(unitId: string, task: AgentTask | null): void {
+    const unit = this._local.getLocalUnit(unitId);
+    if (unit) unit.assignedTask = task;
   }
   queueLocalMission(repoId: string, filePath: string, fileName: string): void {
     this._local.queueLocalMission(repoId, filePath, fileName);

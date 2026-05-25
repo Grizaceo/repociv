@@ -246,7 +246,7 @@ export type BridgeEvent =
 export type ViewMode = 'macro' | 'local';
 
 // ─── Local view types (RimWorld grid) ─────────────────────────────────────────
-export type LocalTileType = 'floor' | 'wall' | 'door' | 'workbench' | 'debris' | 'kiosk';
+export type LocalTileType = 'floor' | 'wall' | 'door' | 'workbench' | 'debris' | 'kiosk' | 'path';
 
 export interface LocalTile {
   x: number; // grid column
@@ -289,6 +289,8 @@ export interface LocalWorld {
 }
 
 // ─── Local Unit State (Phase 7a) ───────────────────────────────────────────────
+export type AgentTask = 'explore' | 'plan' | 'debug' | 'code' | 'adversarial_review';
+
 export type LocalUnitState =
   | 'idle_in_room'
   | 'walking_to_workbench'
@@ -324,6 +326,7 @@ export interface LocalUnit {
   isResting: boolean; // true when resting in a rest area room
   restingRoomId?: string;
   effectiveSpeed: number; // local grid movement speed after fatigue penalty
+  assignedTask?: AgentTask | null; // player-assigned job focus (frontend-only)
 }
 
 export interface LocalMission {

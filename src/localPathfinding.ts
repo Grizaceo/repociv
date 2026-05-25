@@ -6,6 +6,7 @@ import type { LocalWorld, LocalTile } from './types.ts';
 // ─── Cost table per tile type ─────────────────────────────────────────────────
 const TILE_COST: Record<string, number> = {
   floor: 1,
+  path: 0.6, // agents prefer corridors
   door: 2, // slower through doors
   workbench: 1,
   debris: 5, // very slow

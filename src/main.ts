@@ -31,6 +31,7 @@ import {
   toggleTaskPanel,
   togglePendingPanel,
   toggleLogPanel,
+  toggleTaskAssignPanel,
   isHarnessPanelOpen,
   closeSidePanel,
   openCityPanel,
@@ -66,6 +67,7 @@ import {
 import { getStoredEraLabel } from './ui/eraSystem.ts';
 import { logEvent } from './ui/hud.ts';
 import { trackPanelOpen } from './ui/analytics.ts';
+import { initBubbleLayer, updateBubble, clearAllBubbles } from './ui/actionBubbles.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 const loadSteps = [
@@ -273,6 +275,11 @@ async function bootstrap() {
   document.getElementById('btn-tasks')?.addEventListener('click', toggleTaskPanel);
   document.getElementById('btn-pending')?.addEventListener('click', togglePendingPanel);
   document.getElementById('btn-log')?.addEventListener('click', toggleLogPanel);
+  document.getElementById('btn-task-assign')?.addEventListener('click', () => {
+    toggleTaskAssignPanel(() => state.getLocalUnits(), (unitId, task) => {
+      state.setLocalUnitTask(unitId, task);
+    });
+  });
   document.getElementById('btn-harnesses')?.addEventListener('click', () => {
     toggleHarnessPanel();
     if (isHarnessPanelOpen()) startHarnessPolling();
@@ -381,6 +388,7 @@ async function bootstrap() {
   renderer.onEnterLocal = (repoId, rootPath) => {
     bridge.send('enter_local', { repoId, rootPath });
     state.enterLocalView(repoId).catch(() => state.enterLocalViewMock(repoId));
+    initBubbleLayer();
   };
 
   // ─── Local view callbacks (wired to renderer; applied lazily when localR is created) ──
@@ -436,6 +444,10 @@ async function bootstrap() {
       });
     }
   };
+
+  // ─── Phase 9: Action Bubbles ─────────────────────────────────────────────
+  renderer.localUnitRenderedCb = (unit, sx, sy) => updateBubble(unit, sx, sy);
+  renderer.onExitLocalView = () => clearAllBubbles();
 
   // Spawn DAVI as the default hero, near the capital if present
   const capital = world.cities.find((c) => c.isCapital) ?? world.cities[0];

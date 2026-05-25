@@ -381,6 +381,15 @@ function addCorridors(grid: LocalTile[][], rooms: LocalRoom[], gridW: number, gr
       if (inBounds(x, y, gridW, gridH)) {
         const tile = grid[y]![x]!;
         if (tile.type === 'wall') tile.type = 'door';
+        else if (tile.type === 'floor') tile.type = 'path';
+      }
+      // Widen corridor visually: paint adjacent floor tiles as path
+      for (const dy of [-1, 1]) {
+        const ny = y + dy;
+        if (inBounds(x, ny, gridW, gridH)) {
+          const neighbor = grid[ny]![x]!;
+          if (neighbor.type === 'floor') neighbor.type = 'path';
+        }
       }
     }
   }

@@ -47,6 +47,12 @@ export {
 } from './replayPanel';
 export { openTaskPanel, closeTaskPanel, isTaskPanelOpen, toggleTaskPanel } from './taskPanel';
 export {
+  openTaskAssignPanel,
+  closeTaskAssignPanel,
+  isTaskAssignPanelOpen,
+  toggleTaskAssignPanel,
+} from './taskAssignPanel.ts';
+export {
   openPendingPanel,
   closePendingPanel,
   isPendingPanelOpen,

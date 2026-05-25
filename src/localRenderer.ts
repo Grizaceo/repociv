@@ -56,6 +56,8 @@ export class LocalRenderer {
   onWorkbenchClick: ((tile: LocalTile, screenX: number, screenY: number) => void) | null = null;
   onLocalUnitHover: ((unit: LocalUnit | null, screenX: number, screenY: number) => void) | null =
     null;
+  // Phase 9: per-frame bubble position update
+  onUnitRendered: ((unit: LocalUnit, screenX: number, screenY: number) => void) | null = null;
 
   // Internal
   private _localUnits: LocalUnit[] = [];
@@ -523,30 +525,31 @@ export class LocalRenderer {
       ctx.fillRect(px + 2, py + s - 3, 1, 1);
       ctx.fillRect(px + s - 3, py + s - 3, 1, 1);
 
-    } else if (tile.type === 'wall') {
-      // Solid carbon wall core
-      ctx.fillStyle = this.tokens.zinc800 || '#27272A';
+    } else if (tile.type === 'path') {
+      // Corridor floor: cleaner, with a guiding center line
+      let fillColor = this.tokens.zinc800 || '#27272A';
+      const delta = ((tile.x * 7 + tile.y * 3) % 7) - 3;
+      fillColor = _adjustBrightness(fillColor, delta);
+
+      ctx.fillStyle = fillColor;
       ctx.fillRect(px, py, s, s);
 
-      // Ambient oclusion shadow at bottom
-      const grad = ctx.createLinearGradient(px, py + s - 4, px, py + s);
-      grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-      grad.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(px, py + s - 4, s, 4);
+      // Metallic side edging
+      ctx.fillStyle = 'rgba(82, 82, 91, 0.25)';
+      ctx.fillRect(px + 1, py, 1, s);
+      ctx.fillRect(px + s - 2, py, 1, s);
 
-      // Golden bisel top border
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.55)'; // amber-500 alpha 0.55
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(px, py + 0.5);
-      ctx.lineTo(px + s, py + 0.5);
-      ctx.stroke();
+      // Center guide line (subtle amber)
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
+      ctx.fillRect(px + s / 2 - 0.5, py + 2, 1, s - 4);
 
-      // Steel border outline
-      ctx.strokeStyle = this.tokens.border || '#262626';
+      // Steel grid lines (lighter than floor)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)';
       ctx.lineWidth = 0.5;
       ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+
+    } else if (tile.type === 'wall') {
+      this.drawWallFacade(tile, px, py, s);
 
     } else if (tile.type === 'debris') {
       // Base floor under debris
@@ -583,6 +586,85 @@ export class LocalRenderer {
       ctx.lineWidth = 0.5;
       ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
     }
+  }
+
+  private drawWallFacade(tile: LocalTile, px: number, py: number, s: number) {
+    const { ctx } = this;
+
+    const isOpen = (x: number, y: number) => {
+      const t = this.getTile(x, y);
+      return t !== null && (t.type === 'floor' || t.type === 'door' || t.type === 'path' || t.type === 'workbench' || t.type === 'kiosk');
+    };
+
+    const north = isOpen(tile.x, tile.y - 1);
+    const south = isOpen(tile.x, tile.y + 1);
+    const east = isOpen(tile.x + 1, tile.y);
+    const west = isOpen(tile.x - 1, tile.y);
+
+    // Roof line (simulated height)
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(px, py - 3, s, 3);
+
+    // Solid carbon wall core
+    ctx.fillStyle = this.tokens.zinc800 || '#27272A';
+    ctx.fillRect(px, py, s, s);
+
+    // Corner detection: open on two perpendicular cardinal sides
+    const isCorner = (east && south) || (east && north) || (west && south) || (west && north);
+
+    if (isCorner) {
+      // Reinforced pillar
+      ctx.fillStyle = '#1a1a1e';
+      ctx.fillRect(px + 4, py + 4, s - 8, s - 8);
+      // Corner accent lines
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.25)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px + 3.5, py + 3.5, s - 7, s - 7);
+    } else {
+      // Industrial window/panel on straight walls
+      ctx.fillStyle = '#1c1c1f';
+      ctx.fillRect(px + 6, py + 5, s - 12, s - 10);
+      // Window frame
+      ctx.strokeStyle = 'rgba(82, 82, 91, 0.5)';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(px + 6.5, py + 5.5, s - 13, s - 11);
+    }
+
+    // Directional shadows from neighboring open tiles
+    if (east) {
+      const shadowGrad = ctx.createLinearGradient(px + s - 4, py, px + s, py);
+      shadowGrad.addColorStop(0, 'rgba(0,0,0,0.35)');
+      shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = shadowGrad;
+      ctx.fillRect(px + s - 4, py, 4, s);
+    }
+    if (south) {
+      const shadowGrad = ctx.createLinearGradient(px, py + s - 4, px, py + s);
+      shadowGrad.addColorStop(0, 'rgba(0,0,0,0.35)');
+      shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = shadowGrad;
+      ctx.fillRect(px, py + s - 4, s, 4);
+    }
+
+    // Ambient occlusion shadow at bottom
+    const grad = ctx.createLinearGradient(px, py + s - 4, px, py + s);
+    grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(px, py + s - 4, s, 4);
+
+    // Golden bevel top border
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.55)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(px, py + 0.5);
+    ctx.lineTo(px + s, py + 0.5);
+    ctx.stroke();
+
+    // Steel border outline
+    ctx.strokeStyle = this.tokens.border || '#262626';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
   }
 
   private drawDebrisTile(px: number, py: number, s: number) {
@@ -806,6 +888,12 @@ export class LocalRenderer {
     ctx.fillText(icon, 0, -TILE_SIZE * 0.35);
 
     ctx.restore();
+
+    if (this.onUnitRendered) {
+      const sx = (ux - this.cam.x) * this.cam.zoom + this.cam.cx;
+      const sy = (uy + bobbingY - this.cam.y) * this.cam.zoom + this.cam.cy;
+      this.onUnitRendered(unit, sx, sy);
+    }
   }
 
   private spawnSpark(x: number, y: number, color: string) {

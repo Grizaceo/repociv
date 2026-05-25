@@ -3895,6 +3895,136 @@ kbd {
   padding: 8px;
 }
 
+/* ─── Task Assignment Panel ─────────────────────────────────────────────────── */
+#task-assign-panel {
+  position: absolute;
+  top: 56px;
+  right: 8px;
+  width: 240px;
+  max-height: 340px;
+  z-index: 48;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-panel-bg);
+  border: 2px solid var(--ui-border);
+  border-radius: var(--panel-radius);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.9);
+  font-family: var(--lt-font-mono);
+  font-size: 11px;
+  color: var(--lt-zinc-400);
+}
+#task-assign-panel.hidden {
+  display: none;
+}
+
+.task-assign-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+.task-assign-title {
+  color: var(--lt-amber-400);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+}
+.task-assign-header button {
+  background: none;
+  border: none;
+  color: var(--ui-text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+.task-assign-header button:hover {
+  color: var(--ui-gold-bright);
+}
+
+.task-assign-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 8px;
+}
+
+.task-assign-empty {
+  padding: 12px 0;
+  text-align: center;
+  color: var(--lt-zinc-600);
+  font-style: italic;
+}
+
+.task-assign-row {
+  padding: 6px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.task-assign-row:last-child {
+  border-bottom: none;
+}
+
+.task-assign-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.task-assign-icon {
+  font-size: 10px;
+  width: 14px;
+  text-align: center;
+}
+.task-assign-name {
+  font-weight: 700;
+  font-size: 11px;
+  min-width: 40px;
+}
+.task-assign-state {
+  color: var(--lt-zinc-600);
+  font-size: 9px;
+  text-transform: capitalize;
+  margin-left: auto;
+}
+
+.task-assign-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 20px;
+}
+
+.task-assign-fatigue {
+  flex: 1;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.task-assign-fatigue-bar {
+  height: 100%;
+  background: var(--lt-success);
+  border-radius: 2px;
+  transition: width 0.2s ease;
+}
+
+.task-assign-select {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--lt-border);
+  color: var(--lt-zinc-50);
+  font-family: var(--lt-font-mono);
+  font-size: 9px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  min-width: 90px;
+}
+.task-assign-select:focus {
+  outline: none;
+  border-color: var(--lt-amber-500);
+}
+
 /* ─── Local Spatial Preview panels (lt-tooltip, lt-menu, lt-preview, lt-git-panel) ── */
 
 .lt-tooltip,
@@ -4070,6 +4200,78 @@ kbd {
 }
 .lt-loading {
   color: var(--lt-zinc-400);
+}
+
+/* ─── Local View Diegetic Frame ───────────────────────────────────────────── */
+#local-view-frame {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  border: 14px solid rgba(10, 10, 12, 0.72);
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.6);
+  transition: opacity 0.25s ease;
+}
+#local-view-frame.hidden {
+  opacity: 0;
+}
+
+.lvf-scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.08) 0px,
+    rgba(0, 0, 0, 0.08) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.35;
+}
+
+.lvf-label {
+  position: absolute;
+  top: 18px;
+  left: 22px;
+  font-family: var(--lt-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(245, 158, 11, 0.45);
+  pointer-events: none;
+}
+
+.lvf-bracket {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: rgba(245, 158, 11, 0.35);
+  border-style: solid;
+  border-width: 0;
+}
+.lvf-tl {
+  top: 10px;
+  left: 10px;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+.lvf-tr {
+  top: 10px;
+  right: 10px;
+  border-top-width: 2px;
+  border-right-width: 2px;
+}
+.lvf-bl {
+  bottom: 10px;
+  left: 10px;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+}
+.lvf-br {
+  bottom: 10px;
+  right: 10px;
+  border-bottom-width: 2px;
+  border-right-width: 2px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

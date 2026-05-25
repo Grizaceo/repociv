@@ -39,6 +39,7 @@ import {
   isPendingPanelOpen,
   closeLogPanel,
   isLogPanelOpen,
+  toggleTaskAssignPanel,
 } from '../index.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from '../settingsPanel.ts';
 import { closeConstructionPanel, isConstructionPanelOpen } from '../constructionPanel.ts';
@@ -226,6 +227,11 @@ export function wireHotkeys(
       case 'p':
         togglePriorityPanel(state.getMissionQueue(), (missionId) => {
           state.dispatchMissionById(missionId);
+        });
+        break;
+      case 'j':
+        toggleTaskAssignPanel(() => state.getLocalUnits(), (unitId, task) => {
+          state.setLocalUnitTask(unitId, task);
         });
         break;
       case '?':
