@@ -181,7 +181,7 @@
   border-radius: 4px;
   cursor: pointer;
   font-family: inherit;
-  transition: all 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .gaceta-fr-btn:hover:not(:disabled) {
   background: rgba(200, 168, 75, 0.18);
@@ -342,7 +342,7 @@
   cursor: pointer;
   font-family: inherit;
   border: 1px solid var(--ui-border, #4a3a1a);
-  transition: all 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .fr-btn-primary {
   background: rgba(200, 168, 75, 0.15);

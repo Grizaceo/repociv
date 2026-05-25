@@ -426,7 +426,7 @@
   text-transform: uppercase;
   padding: 8px 0;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .side-tab:hover {
   color: var(--ui-text);
@@ -884,7 +884,7 @@
   text-transform: uppercase;
   padding: 7px 0;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .city-tab:hover {
   color: var(--ui-text);
@@ -1566,7 +1566,7 @@ kbd {
   font-size: 11px;
   cursor: pointer;
   border: 1px solid;
-  transition: all 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .ap-approve {
   background: rgba(91, 155, 91, 0.15);
@@ -1754,7 +1754,7 @@ kbd {
   font-size: 11px;
   cursor: pointer;
   border: 1px solid;
-  transition: all 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .sp-btn-confirm {
   background: rgba(91, 155, 91, 0.15);
@@ -2310,7 +2310,7 @@ kbd {
   font-family: var(--font-ui);
   font-size: 10px;
   padding: 3px 8px;
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 .rp-replay-btn:hover {
   background: #5b9b5b;
@@ -2634,7 +2634,7 @@ kbd {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .rp-btn-copy {
   background: rgba(76, 175, 80, 0.1);
@@ -2739,7 +2739,7 @@ kbd {
   letter-spacing: 0.06em;
   padding: 2px 6px;
   white-space: nowrap;
-  transition: all 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .obs-btn-recover:hover {
   background: rgba(212, 175, 55, 0.24);
@@ -4100,13 +4100,12 @@ kbd {
   border-radius: 3px;
   border-left: 2px solid transparent;
   cursor: pointer;
-  transition: all 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background 120ms cubic-bezier(0.16, 1, 0.3, 1), border-color 120ms cubic-bezier(0.16, 1, 0.3, 1), color 120ms cubic-bezier(0.16, 1, 0.3, 1);
   color: var(--lt-zinc-50);
 }
 .lt-item:hover {
   background: rgba(245, 158, 11, 0.12);
   border-left-color: var(--lt-amber-500);
-  padding-left: 8px;
 }
 .lt-item.lt-disabled {
   opacity: 0.35;

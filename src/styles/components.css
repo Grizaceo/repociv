@@ -841,7 +841,7 @@ button:hover::after, .spawn-btn:hover::after {
   background: rgba(0,0,0,0.3);
   cursor: pointer;
   flex-shrink: 0;
-  transition: all var(--transition-fast);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
   position: relative;
 }
 
@@ -927,7 +927,7 @@ button:hover::after, .spawn-btn:hover::after {
   font-family: var(--font-ui);
   font-size: var(--text-2xs);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
 .layer-reset-btn:hover {
