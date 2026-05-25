@@ -4614,3 +4614,215 @@ kbd {
 .gaceta-scan-btn:hover { color: var(--clr-gold, #c8a84b); }
 .gaceta-scan-btn.spinning { animation: spin 1s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ─── Wonder Capability Badges ─────────────────────────────────────────────── */
+
+.wonder-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.wonder-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.wonder-badge--passive {
+  background: rgba(130, 130, 160, 0.15);
+  color: var(--text-dim, #8a7a5a);
+  border: 1px solid rgba(130, 130, 160, 0.2);
+}
+
+.wonder-badge--assist {
+  background: rgba(255, 193, 7, 0.12);
+  color: #e0a800;
+  border: 1px solid rgba(255, 193, 7, 0.25);
+}
+
+.wonder-badge--auto {
+  background: rgba(220, 53, 69, 0.12);
+  color: #dc3545;
+  border: 1px solid rgba(220, 53, 69, 0.25);
+}
+
+.wonder-badge--agentic {
+  background: rgba(13, 202, 240, 0.12);
+  color: #0dcaf0;
+  border: 1px solid rgba(13, 202, 240, 0.25);
+}
+
+/* ─── Wonder Capability Panel (detail view) ─────────────────────────────────── */
+
+.wonder-cap-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 4px;
+  color: var(--text-primary, #d4a574);
+  font-size: 11px;
+}
+
+.wonder-cap-mode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(200, 168, 75, 0.06);
+  border: 1px solid var(--border-dim, #4a3a1a);
+  border-radius: 6px;
+}
+
+.wonder-cap-mode-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.wonder-cap-mode-text {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--clr-gold, #c8a84b);
+}
+
+.wonder-cap-mode-hint {
+  font-size: 10px;
+  color: var(--text-dim, #8a7a5a);
+  margin-top: 2px;
+}
+
+.wonder-cap-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wonder-cap-chip {
+  display: inline-flex;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.wonder-cap-chip--on {
+  background: rgba(40, 167, 69, 0.12);
+  color: #28a745;
+  border: 1px solid rgba(40, 167, 69, 0.25);
+}
+
+.wonder-cap-chip--off {
+  background: rgba(130, 130, 160, 0.1);
+  color: var(--text-dim, #8a7a5a);
+  border: 1px solid rgba(130, 130, 160, 0.15);
+  opacity: 0.6;
+}
+
+.wonder-cap-chip--warn {
+  background: rgba(255, 193, 7, 0.1);
+  color: #e0a800;
+  border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+.wonder-cap-section h4 {
+  font-size: 11px;
+  color: var(--clr-gold, #c8a84b);
+  margin: 0 0 6px 0;
+  font-weight: 600;
+}
+
+.wonder-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wonder-action-item {
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.2);
+  border-left: 3px solid transparent;
+}
+
+.wonder-action-item.wonder-action--safe {
+  border-left-color: rgba(40, 167, 69, 0.5);
+}
+
+.wonder-action-item.wonder-action--approval {
+  border-left-color: rgba(255, 193, 7, 0.5);
+}
+
+.wonder-action-item.wonder-action--manual {
+  border-left-color: rgba(130, 130, 160, 0.4);
+}
+
+.wonder-optin-mark {
+  color: var(--text-dim, #8a7a5a);
+  font-size: 9px;
+  font-style: italic;
+}
+
+.wonder-feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wonder-feature-item {
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.wonder-feature--off {
+  opacity: 0.6;
+}
+
+.wonder-feature-desc {
+  display: block;
+  font-size: 10px;
+  color: var(--text-dim, #8a7a5a);
+  margin-top: 2px;
+}
+
+.wonder-perm-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.wonder-perm-chip {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  background: rgba(130, 130, 160, 0.1);
+  color: var(--text-dim, #8a7a5a);
+  border: 1px solid rgba(130, 130, 160, 0.15);
+}
+
+/* Wonder vignette header badges */
+.wonder-vignette-header .wonder-badges {
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+/* Wonder tab content with capability info */
+.wonder-tab-content .wonder-badges {
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.wonder-tab-content .wonder-cap-panel {
+  margin-top: 12px;
+  border-top: 1px solid var(--border-dim, #4a3a1a);
+  padding-top: 12px;
+  width: 100%;
+  max-width: 480px;
+}

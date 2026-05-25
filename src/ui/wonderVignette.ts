@@ -6,6 +6,8 @@ import {
   WONDER_BIBLIOTHECA_URL,
   LGB_BACKEND_URL,
 } from '../wonderEnv.ts';
+import { getWonder } from '../wonders/manifest.ts';
+import { renderCapabilityBadge } from '../wonders/wonderBadges.ts';
 
 const STORAGE_POS = (t: WonderType) => `repociv-vignette-pos-${t}`;
 const IFRAME_LOAD_TIMEOUT_MS = 25000;
@@ -40,6 +42,14 @@ let _activeType: WonderType | null = null;
 let _dragging = false;
 let _dragOffset = { x: 0, y: 0 };
 
+/** Resolve display title from manifest, with fallback for legacy types. */
+function _wonderTitle(type: WonderType): string {
+  const m = getWonder(type);
+  if (m) return m.title;
+  // fallback for types not yet in registry (e.g. future additions)
+  return type === 'bibliotheca' ? '📚 Bibliotheca Alexandrina' : '🧪 Institutum Scientiarum';
+}
+
 export async function openWonderVignette(type: WonderType): Promise<void> {
   if (_vignette) closeWonderVignette();
 
@@ -49,9 +59,13 @@ export async function openWonderVignette(type: WonderType): Promise<void> {
   container.id = 'wonder-vignette';
   container.className = 'wonder-vignette';
 
+  const m = getWonder(type);
+  const badgesHtml = m ? renderCapabilityBadge(m) : '';
+
   container.innerHTML = `
     <div class="wonder-vignette-header">
-      <span class="wonder-title">${type === 'bibliotheca' ? '📚 Bibliotheca Alexandrina' : '🧪 Institutum Scientiarum'}</span>
+      <span class="wonder-title">${_wonderTitle(type)}</span>
+      <div class="wonder-badges">${badgesHtml}</div>
       <div class="wonder-controls">
         <button class="wonder-fullscreen" title="Fullscreen">⛶</button>
         <button class="wonder-close" title="Cerrar">✕</button>
@@ -70,8 +84,8 @@ export async function openWonderVignette(type: WonderType): Promise<void> {
     container.style.width = `${st.w}px`;
     container.style.height = `${st.h}px`;
   } else {
-    container.style.width = '70vw';
-    container.style.height = '75vh';
+    container.style.width = m?.ui?.preferredWidth ?? '70vw';
+    container.style.height = m?.ui?.preferredHeight ?? '75vh';
   }
   if (st.x || st.y) {
     container.style.left = `${st.x}px`;
@@ -135,17 +149,14 @@ export async function openWonderVignette(type: WonderType): Promise<void> {
       _showEmptyState(body, type, 'lgb-ui-offline');
       return;
     }
-    // UI reachable: Vite proxies /api → loopback :3001 inside the iframe even when
-    // RepoCiv (e.g. Windows) cannot hit 127.0.0.1:3001 on the LGB host (WSL/Tailscale).
     if (!backend) {
-      console.warn(
-        '[Bibliotheca] Backend no alcanzable desde RepoCiv; montando iframe (API vía proxy Vite en :5173).',
-      );
+      // Bibliotheca backend unreachable; mounting iframe (API via Vite proxy)
     }
     _mountIframe(body, wonderUiUrl(type), type);
     return;
   }
 
+  // institutum and future types: try fetch, fallback to empty state
   const url = wonderUiUrl(type);
   try {
     const ctrl = new AbortController();
@@ -167,12 +178,13 @@ export function closeWonderVignette(): void {
 }
 
 function _mountIframe(body: HTMLElement, url: string, type: WonderType): void {
-  const title =
-    type === 'bibliotheca' ? 'Bibliotheca Alexandrina' : 'Institutum Scientiarum';
+  const m = getWonder(type);
+  const title = m?.title ?? (type === 'bibliotheca' ? 'Bibliotheca Alexandrina' : 'Institutum Scientiarum');
+  const sandbox = m?.ui?.sandbox ?? ['allow-scripts', 'allow-same-origin', 'allow-forms'];
   body.innerHTML = `
     <iframe
       src="${url}"
-      sandbox="allow-scripts allow-same-origin allow-forms"
+      sandbox="${sandbox.join(' ')}"
       allow="fullscreen"
       loading="eager"
       title="${title}"

@@ -17,6 +17,9 @@ export const WONDER_BIBLIOTHECA_URL =
   import.meta.env.VITE_WONDER_BIBLIOTHECA_URL ?? `http://${_lgbHost}:5173`;
 export const WONDER_INSTITUTUM_URL =
   import.meta.env.VITE_WONDER_INSTITUTUM_URL ?? 'http://localhost:5280';
+/** Backend API port for Institutum/LabHub health checks and metrics. */
+export const WONDER_INSTITUTUM_API_URL =
+  import.meta.env.VITE_WONDER_INSTITUTUM_API_URL ?? 'http://localhost:5281';
 export const LGB_BACKEND_URL =
   import.meta.env.VITE_LGB_BACKEND_URL ?? `http://${_lgbHost}:3001`;
 

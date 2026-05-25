@@ -84,7 +84,7 @@ export function confettiBurst(canvas: HTMLCanvasElement, cx: number, cy: number)
 /** Sonido procedural (fanfarria imperial) */
 export function hornSound() {
   try {
-    const AC = window.AudioContext || (window as any).webkitAudioContext;
+    const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
     const ctx = new AC();
     const now = ctx.currentTime;

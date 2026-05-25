@@ -77,13 +77,13 @@ function makeState() {
  */
 class FailWS {
   readyState = 3;
-  private _onclose: ((evt: any) => void) | null = null;
+  private _onclose: ((evt: { code: number }) => void) | null = null;
   private _onerror: (() => void) | null = null;
   onopen: null = null;
   get onclose() { return this._onclose; }
-  set onclose(handler) { this._onclose = handler; (handler as any)?.({ code: 1006 } as any); }
+  set onclose(handler) { this._onclose = handler; handler?.({ code: 1006 }); }
   get onerror() { return this._onerror; }
-  set onerror(handler) { this._onerror = handler; (handler as any)?.(); }
+  set onerror(handler) { this._onerror = handler; handler?.(); }
   onmessage: null = null;
   close() { }
   send() { }

@@ -527,15 +527,30 @@ def get_latest_news(ctx: dict[str, Any]) -> tuple[int, Any]:
         with closing(sqlite3.connect(str(db_path))) as conn:
             conn.row_factory = sqlite3.Row
             cur = conn.cursor()
-            cur.execute("""
-                SELECT a.id, a.title, a.url, a.published_date, b.name AS blog_name, a.categories
-                FROM articles a
-                LEFT JOIN blogs b ON a.blog_id = b.id
-                WHERE a.is_read = 0
-                ORDER BY a.published_date DESC
-                LIMIT 15
-            """)
-            rows = cur.fetchall()
+            # Try with categories column first; fallback gracefully for older DB schemas
+            rows = None
+            for query in [
+                """SELECT a.id, a.title, a.url, a.published_date, b.name AS blog_name,
+                          COALESCE(a.categories, '') AS categories
+                   FROM articles a
+                   LEFT JOIN blogs b ON a.blog_id = b.id
+                   WHERE a.is_read = 0
+                   ORDER BY a.published_date DESC LIMIT 15""",
+                """SELECT a.id, a.title, a.url, a.published_date, b.name AS blog_name,
+                          '' AS categories
+                   FROM articles a
+                   LEFT JOIN blogs b ON a.blog_id = b.id
+                   WHERE a.is_read = 0
+                   ORDER BY a.published_date DESC LIMIT 15""",
+            ]:
+                try:
+                    cur.execute(query)
+                    rows = cur.fetchall()
+                    break
+                except sqlite3.OperationalError:
+                    continue
+            if rows is None:
+                return 500, {"error": "No se pudo leer la tabla de artículos"}
         articles = []
         for r in rows:
             cat, emoji = _infer_category(r["blog_name"] or "")

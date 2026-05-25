@@ -805,8 +805,8 @@ export class Renderer {
     const timeOfDay = (this.animTime * 0.035) % (Math.PI * 2);
     const sinTime = Math.sin(timeOfDay);
     
-    let warmColor = 'rgba(200, 180, 120, 0.03)';
-    let vignetteColor = 'rgba(0, 0, 0, 0.2)';
+    let warmColor: string;
+    let vignetteColor: string;
     
     if (sinTime > 0.5) {
       // Mediodía brillante (claro y neutro)

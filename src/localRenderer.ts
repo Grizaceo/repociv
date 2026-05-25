@@ -553,7 +553,7 @@ export class LocalRenderer {
 
     } else if (tile.type === 'debris') {
       // Base floor under debris
-      let fillColor = this.tokens.base || '#0C0C0C';
+      const fillColor = this.tokens.base || '#0C0C0C';
       ctx.fillStyle = fillColor;
       ctx.fillRect(px, py, s, s);
 

@@ -5,14 +5,16 @@
 >
 > 1. [`../README.md`](../README.md) — visión, arranque, hotkeys, tests
 > 2. [`SCOPE.md`](SCOPE.md) — qué es y qué no es el proyecto
-> 3. [`EVOLUTION.md`](EVOLUTION.md) — cómo llegamos hasta acá
-> 4. [`implementation_plan.md`](implementation_plan.md) — plan vivo del Agent OS
+> 3. [`ROADMAP_IMPERIAL_WORKSHOP.md`](ROADMAP_IMPERIAL_WORKSHOP.md) — canon actual post-alpha funcional: legibilidad, Maravillas, Gaceta, Bibliotheca, LabHub
+> 4. [`EVOLUTION.md`](EVOLUTION.md) — cómo llegamos hasta acá
+> 5. [`implementation_plan.md`](implementation_plan.md) — plan vivo del Agent OS
 
 ## Documentos vivos
 
 | Documento | Para qué |
 |---|---|
 | [`SCOPE.md`](SCOPE.md) | Alpha de un solo usuario; multi-device en branch paralela; lista explícita de lo que NO se hace |
+| [`ROADMAP_IMPERIAL_WORKSHOP.md`](ROADMAP_IMPERIAL_WORKSHOP.md) | **Canon actual post-alpha funcional**: legibilidad/capas, contrato de Maravillas, Gaceta como Relaciones Exteriores, Bibliotheca conectiva, LabHub operacional |
 | [`EVOLUTION.md`](EVOLUTION.md) | Línea de tiempo cronológica del proyecto, con citas a documentos originales |
 | [`implementation_plan.md`](implementation_plan.md) | Plan maestro v2.0 — Fases 0-5 cerradas con Gates verificables |
 | [`DATA_SOURCES.md`](DATA_SOURCES.md) | Fuentes de verdad: Event Store (JSONL) ↔ Ledger (DuckDB) ↔ Workspace Issues ↔ Sessions |

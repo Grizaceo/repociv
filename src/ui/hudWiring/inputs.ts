@@ -81,14 +81,11 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
 
     // 2) Resolve city: if the target unit is on the map, use its position;
     //    otherwise default to "main" (virtual agent not yet spawned)
-    let _cityHere = state.world.cities[0];
-    if (prefersSelector && !targetUnit) {
-      // Virtual agent, not on map — use first city as default
-      _cityHere = state.world.cities[0];
-    } else {
+    let resolvedCity = state.world.cities[0];
+    if (!prefersSelector || targetUnit) {
       const lookupCoord = unit.targetCoord ?? unit.coord;
       const tile = state.world.tiles.get(tileKey(lookupCoord));
-      _cityHere =
+      resolvedCity =
         tile?.city ??
         state.world.cities.find((c) =>
           c.territory.some((t) => t.q === lookupCoord.q && t.r === lookupCoord.r),
@@ -104,7 +101,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     const { harness, provider, model } = getSelectedConfig();
     const payload: Record<string, unknown> = {
       unit: unit.id,
-      city: _cityHere?.id ?? 'main',
+      city: resolvedCity?.id ?? 'main',
       mission: text,
       agentType: unit.type,
     };
@@ -120,15 +117,8 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
       indicator.title = `Enviando a: ${unit.id.toUpperCase()}`;
     }
 
-    console.log(
-      '[sendMessage] target:', unit.id,
-      '| chipActive:', selectorUnitId,
-      '| prefersSelector:', prefersSelector,
-      '| panelOpen:', isSidePanelOpen(),
-      '| harness:', harness,
-      '| provider:', provider,
-      '| model:', model,
-    );
+    void prefersSelector;
+    void selectorUnitId;
 
     bridge.send('unit_command', payload);
     state.setUnitState(unit.id, 'working');

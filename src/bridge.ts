@@ -534,8 +534,7 @@ export async function getLatestNews(): Promise<CDailyArticle[]> {
     });
     if (!res.ok) return [];
     return (await res.json()) as CDailyArticle[];
-  } catch (e) {
-    console.error('Error al obtener noticias:', e);
+  } catch {
     return [];
   }
 }
@@ -548,8 +547,7 @@ export async function markNewsAsRead(id: number): Promise<boolean> {
       body: JSON.stringify({ id }),
     });
     return res.ok;
-  } catch (e) {
-    console.error('Error al marcar noticia como leída:', e);
+  } catch {
     return false;
   }
 }
@@ -564,7 +562,7 @@ export async function scanNews(): Promise<{ ok: boolean; error?: string }> {
     const data = (await res.json()) as { ok?: boolean; error?: string };
     return { ok: data.ok ?? res.ok, error: data.error };
   } catch (e) {
-    console.error('Error al escanear blogs:', e);
+    // scan error logged silently in production
     return { ok: false, error: String(e) };
   }
 }

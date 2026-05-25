@@ -136,7 +136,7 @@ async function bootstrap() {
     const next = current === 'dark' ? 'light' : 'dark';
     html.setAttribute('data-theme', next);
     localStorage.setItem('repociv:theme', next);
-    const lucide = (window as any).lucide;
+    const lucide = (window as unknown as { lucide?: { createIcons: (opts: { icons: Record<string, unknown> }) => void; icons: Record<string, unknown> } }).lucide;
     if (lucide) lucide.createIcons({ icons: lucide.icons });
   });
 

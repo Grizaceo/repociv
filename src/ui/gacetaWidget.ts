@@ -28,10 +28,7 @@ interface MountOpts {
 export function mountGacetaWidget(opts: MountOpts = {}): void {
   const { target = 'gaceta-widget', mode = 'widget' } = opts;
   const widget = document.getElementById(target);
-  if (!widget) {
-    console.warn(`Gaceta mount target #${target} not found`);
-    return;
-  }
+  if (!widget) return;
 
   if (mode === 'widget') {
     widget.classList.add('gaceta-mode-widget');
@@ -132,7 +129,7 @@ async function _doScan(): Promise<void> {
   if (res.ok) {
     await _refresh();
   } else {
-    console.warn('[gaceta] scan failed:', res.error);
+    // scan failed silently in production
   }
 }
 

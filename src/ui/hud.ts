@@ -3,7 +3,8 @@ import autoAnimate from '@formkit/auto-animate';
 import * as lucide from 'lucide';
 
 // Expose lucide globally for offline usage across all RepoCiv panels
-(window as any).lucide = lucide;
+type LucideApi = { createIcons: (opts?: unknown) => void; icons: Record<string, unknown> };
+(window as unknown as { lucide: LucideApi }).lucide = lucide as LucideApi;
 
 let loadingText: HTMLElement | null = null;
 let loadingFill: HTMLElement | null = null;

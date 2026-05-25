@@ -4,6 +4,8 @@ import { getAnalytics } from './analytics.ts';
 import { getStoredEraLabel } from './eraSystem.ts';
 import { mountGacetaWidget } from './gacetaWidget.ts';
 import { openWonderVignette } from './wonderVignette.ts';
+import { getWonder, KNOWN_WONDER_TYPES } from '../wonders/manifest.ts';
+import { renderCapabilityBadge, renderCapabilityPanel } from '../wonders/wonderBadges.ts';
 
 const STORAGE_TAB = 'repociv-capital-tab';
 let _panel: HTMLElement | null = null;
@@ -85,28 +87,29 @@ function _renderGaceta(container: HTMLElement) {
   wrapper.id = 'gaceta-panel-mount';
   wrapper.style.cssText = 'height:100%;display:flex;flex-direction:column;';
   container.appendChild(wrapper);
-  // Mount gaceta in "panel mode" inside this wrapper
   mountGacetaWidget({ target: wrapper.id, mode: 'panel' });
 }
 
 function _renderWonderTab(container: HTMLElement, type: WonderType) {
-  const titles: Record<WonderType, string> = {
-    bibliotheca: 'Bibliotheca Alexandrina',
-    institutum: 'Institutum Scientiarum',
-  };
-  const stats: Record<WonderType, string> = {
-    bibliotheca: 'Grafo de conocimiento: 1,240 nodos indexados',
-    institutum: 'Labs activos: 5 | Última misión: HGAT-G4-042',
-  };
-  const btns: Record<WonderType, string> = {
-    bibliotheca: 'Entrar a la Bibliotheca',
-    institutum: 'Entrar al Institutum',
-  };
+  const m = getWonder(type);
+  const title = m?.title ?? (type === 'bibliotheca' ? 'Bibliotheca Alexandrina' : 'Institutum Scientiarum');
+  const automationLevel = m?.automationLevel ?? 'passive';
+  const statsText = type === 'bibliotheca'
+    ? 'Grafo de conocimiento: escaneando...'
+    : `Labs activos: consulta en curso [${automationLevel}]`;
+  const btnText = type === 'bibliotheca' ? 'Entrar a la Bibliotheca' : 'Entrar al Institutum';
+
+  // Build capability badges from manifest
+  const badgesHtml = m ? renderCapabilityBadge(m) : '';
+  const capPanelHtml = m ? renderCapabilityPanel(m) : '';
+
   container.innerHTML = `
     <div class="wonder-tab-content">
-      <h2>${titles[type]}</h2>
-      <p class="wonder-stat">${stats[type]}</p>
-      <button class="wonder-enter-btn" data-type="${type}">${btns[type]}</button>
+      <h2>${title}</h2>
+      <div class="wonder-badges">${badgesHtml}</div>
+      <p class="wonder-stat">${statsText}</p>
+      <button class="wonder-enter-btn" data-type="${type}">${btnText}</button>
+      <div class="wonder-cap-panel">${capPanelHtml}</div>
     </div>
   `;
   container.querySelector('button')!.addEventListener('click', () => {
@@ -117,6 +120,8 @@ function _renderWonderTab(container: HTMLElement, type: WonderType) {
 function _renderStats(container: HTMLElement) {
   const a = getAnalytics();
   const era = getStoredEraLabel();
+  // Count registered wonders
+  const wonderCount = KNOWN_WONDER_TYPES.length;
   container.innerHTML = `
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-value">${Object.values(a.panelsOpened).reduce((s, v) => s + v, 0)}</div><div class="stat-label">Paneles abiertos</div></div>
@@ -124,6 +129,7 @@ function _renderStats(container: HTMLElement) {
       <div class="stat-card"><div class="stat-value">${a.commandsIssued}</div><div class="stat-label">Comandos emitidos</div></div>
       <div class="stat-card"><div class="stat-value">${a.approvalsGiven}</div><div class="stat-label">Aprobaciones</div></div>
       <div class="stat-card"><div class="stat-value">${era || 'Desconocida'}</div><div class="stat-label">Era actual</div></div>
+      <div class="stat-card"><div class="stat-value">${wonderCount}</div><div class="stat-label">Maravillas registradas</div></div>
     </div>
   `;
 }
