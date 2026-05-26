@@ -105,7 +105,7 @@ _MANIFEST_PARSERS: dict[str, tuple[re.Pattern, ...]] = {  # type: ignore[assignm
     "Cargo.toml": (re.compile(r'^\[dependencies\]\s*$(.+?)(?:^\[|\Z)', re.MULTILINE | re.DOTALL), 0, "cargo"),
     "requirements.txt": (re.compile(r'^([a-zA-Z_][\w.-]*)', re.MULTILINE), 0, "pip"),
     "pyproject.toml": (re.compile(r'(?:dependencies|optional-dependencies)\s*=\s*\[\s*([^\]]+)\]'), 0, "pdm"),
-    "go.mod": (re.compile(r'^\s+([a-zA-Z_][\w./-]+)\s+v?\d+\.'), re.MULTILINE, 0, "go_mod"),
+    "go.mod": (re.compile(r'^\s+([a-zA-Z_][\w./-]+)\s+v?\d+\.', re.MULTILINE), 0, "go_mod"),
     "Gemfile": (re.compile(r"^\s*gem\s+['\"]([\w-]+)['\"]"), re.MULTILINE, 0, "gem"),
 }
 
@@ -341,6 +341,8 @@ def _get_file_mtimes(repo_path: Path) -> dict[str, float]:
 
 def _extract_repo_signals(repo_path: Path) -> dict[str, Any]:
     """Extract all signals from a repo: imports, deps, entities, tags, links, etc."""
+    if not repo_path.is_dir():
+        return {}
     repo_str = str(repo_path)
     signals: dict[str, Any] = {
         "repoId": _repo_id_from_path(repo_str),
