@@ -392,6 +392,74 @@ def ws_info() -> Any:
     return _get("/ws")
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# WONDERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@mcp.tool(description="Lista todas las Maravillas registradas con su estado y configuración.")
+def wonders_list() -> Any:
+    return _get("/wonders")
+
+
+@mcp.tool(description="Devuelve el manifiesto completo de una Maravilla por ID (ej: 'bibliotheca', 'gaceta', 'institutum').")
+def wonders_get(wonder_id: str) -> Any:
+    return _get(f"/wonders/{wonder_id}")
+
+
+@mcp.tool(description="Health check de una Maravilla: iframe accesible, puerto activo, latencia.")
+def wonder_health(wonder_id: str) -> Any:
+    return _get(f"/wonders/{wonder_id}/health")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GRAPH RELATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@mcp.tool(description=(
+    "Devuelve relaciones candidatas para una ciudad/repo. "
+    "repo_id: identificador del repo (slug del path). "
+    "limit: máximo de candidatos (default 20). "
+    "min_score: score mínimo de relevancia 0-1 (default 0.1)."
+))
+def graph_relations_list(repo_id: str, limit: int = 20, min_score: float = 0.1) -> Any:
+    return _get("/api/graph-relations", {"repoId": repo_id, "limit": limit, "minScore": min_score})
+
+
+@mcp.tool(description=(
+    "Evidencia de relación entre dos repos: imports compartidos, deps comunes, "
+    "entidades co-referenciadas. source_id y target_id son slugs del path."
+))
+def graph_relations_evidence(source_id: str, target_id: str) -> Any:
+    return _get("/api/graph-relations/evidence", {"sourceId": source_id, "targetId": target_id})
+
+
+@mcp.tool(description="Estadísticas del índice de relaciones: repos indexados, total de edges, última actualización.")
+def graph_relations_stats() -> Any:
+    return _get("/api/graph-relations/stats")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FOREIGN RELATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@mcp.tool(description=(
+    "Perfil de un repo: stack detectado, tipo de proyecto, entidades clave, "
+    "señales de actividad. repo_path: ruta absoluta al repo."
+))
+def foreign_repo_profile(repo_path: str) -> Any:
+    return _get("/api/foreign/repo-profile", {"repoPath": repo_path})
+
+
+@mcp.tool(description="Lista reportes de relaciones externas guardados (paginado). limit y offset opcionales.")
+def foreign_reports_list(limit: int = 20, offset: int = 0) -> Any:
+    return _get("/api/foreign/reports", {"limit": limit, "offset": offset})
+
+
+@mcp.tool(description="Devuelve un reporte de relaciones externas por ID.")
+def foreign_report_get(report_id: str) -> Any:
+    return _get(f"/api/foreign/reports/{report_id}")
+
+
 # ─── Entrypoint ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":

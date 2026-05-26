@@ -42,7 +42,23 @@ npm start                  # bridge en :5274 + vite en :5273
 Si el bridge no responde, todas las tools devuelven:
 > `RepoCiv bridge no responde en :5274 — ejecuta npm start`
 
-## Tools disponibles (32 tools, 11 dominios)
+## Quick test (sin MCP client)
+
+```bash
+# Health check básico
+curl http://127.0.0.1:5274/health
+
+# Listar Maravillas registradas
+curl http://127.0.0.1:5274/wonders
+
+# Relaciones candidatas para un repo
+curl "http://127.0.0.1:5274/api/graph-relations?repoId=repociv&limit=5"
+
+# Perfil de un repo (requiere bridge activo)
+curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/home/gris/.hermes/workspace/repos/repociv"
+```
+
+## Tools disponibles (43 tools, 14 dominios)
 
 ### Agents — estado del imperio
 | Tool | Descripción |
@@ -147,6 +163,27 @@ ValueError: REPOCIV_TOKEN no configurado — mutating tools requieren token
 ```
 
 Lee-only tools funcionan sin token (igual que el browser abriendo el dashboard).
+
+### Wonders — Maravillas del mapa
+| Tool | Descripción |
+|------|-------------|
+| `wonders_list` | Todas las Maravillas registradas con estado y configuración |
+| `wonders_get(wonder_id)` | Manifiesto de una Maravilla por ID (bibliotheca, gaceta, institutum) |
+| `wonder_health(wonder_id)` | Health check: iframe accesible, puerto activo, latencia |
+
+### Graph Relations — grafo de repos
+| Tool | Descripción |
+|------|-------------|
+| `graph_relations_list(repo_id, limit, min_score)` | Relaciones candidatas para un repo según señales de código |
+| `graph_relations_evidence(source_id, target_id)` | Evidencia entre dos repos: imports, deps, entidades co-referenciadas |
+| `graph_relations_stats` | Estadísticas del índice: repos indexados, total edges, última actualización |
+
+### Foreign Relations — perfiles y reportes externos
+| Tool | Descripción |
+|------|-------------|
+| `foreign_repo_profile(repo_path)` | Perfil de un repo: stack, tipo, entidades, señales de actividad |
+| `foreign_reports_list(limit, offset)` | Lista reportes de relaciones externos guardados |
+| `foreign_report_get(report_id)` | Reporte de relaciones externas por ID |
 
 ## Tests
 
