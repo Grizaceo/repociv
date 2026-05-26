@@ -1530,6 +1530,37 @@ kbd {
   font-weight: 600;
   margin-left: auto;
 }
+.ap-risk[data-risk="destructive"] { color: var(--state-error); }
+.ap-risk[data-risk="high"]        { color: var(--state-approval); }
+.ap-risk[data-risk="medium"]      { color: var(--state-warn); }
+.ap-risk[data-risk="low"]         { color: var(--state-success); }
+
+.ap-payload-expand {
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ap-payload-expand:hover { color: var(--ui-text); }
+.ap-payload-full {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-top: 4px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.ap-approve.confirming {
+  background: color-mix(in oklch, var(--state-error) 30%, transparent);
+  border-color: var(--state-error);
+  color: var(--state-error);
+}
 .ap-age {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -2858,6 +2889,25 @@ kbd {
   color: var(--ui-text-dim);
   flex-shrink: 0;
   min-width: 30px;
+}
+.pending-source-badge {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+.pending-source-local {
+  background: color-mix(in oklch, var(--state-success) 20%, transparent);
+  color: var(--state-success);
+  border: 1px solid color-mix(in oklch, var(--state-success) 35%, transparent);
+}
+.pending-source-hermes {
+  background: color-mix(in oklch, var(--ui-text-dim) 15%, transparent);
+  color: var(--ui-text-dim);
+  border: 1px solid color-mix(in oklch, var(--ui-text-dim) 25%, transparent);
 }
 .pending-title {
   flex: 1;

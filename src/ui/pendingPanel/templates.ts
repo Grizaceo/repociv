@@ -60,10 +60,15 @@ export function renderItem(item: PendingItem): string {
       `<option value="${o.value}" ${item.state === o.value ? 'selected' : ''}>${o.label}</option>`,
   ).join('');
 
+  const sourceBadge = item.source === 'local'
+    ? `<span class="pending-source-badge pending-source-local" title="Agregado desde RepoCiv">rc</span>`
+    : `<span class="pending-source-badge pending-source-hermes" title="Desde PENDING_TRACKER.md">hm</span>`;
+
   return `
     <div class="pending-item ${isExpanded ? 'expanded' : ''} ${isEditing ? 'editing' : ''}" data-id="${escapeHtml(item.id)}">
       <div class="pending-item-row" data-id="${escapeHtml(item.id)}">
         <span class="pending-id">[${escapeHtml(item.id)}]</span>
+        ${sourceBadge}
         <span class="pending-title">${escapeHtml(item.title)}</span>
         <select class="pending-state-select" data-id="${escapeHtml(item.id)}" title="Cambiar estado">
           ${stateOptions}

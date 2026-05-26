@@ -103,6 +103,9 @@ function _createBadge(parent: HTMLElement): HTMLElement {
   return b;
 }
 
+// ─── Confirm state ────────────────────────────────────────────────────────────
+const _confirming: Set<string> = new Set();
+
 // ─── Render ───────────────────────────────────────────────────────────────────
 function _render() {
   const panel = _getOrCreate();
@@ -117,20 +120,24 @@ function _render() {
     .map((item) => {
       const age = Math.round(Date.now() / 1000 - item.created_at);
       const ageStr = age < 60 ? `${age}s` : `${Math.round(age / 60)}m`;
-      const [riskColor, riskLabel] = _riskStyle(item.risk);
-      const payloadStr = JSON.stringify(item.payload ?? {}).slice(0, 80);
+      const riskLabel = _riskLabel(item.risk);
+      const payloadJson = JSON.stringify(item.payload ?? {});
+      const payloadPreview = payloadJson === '{}' ? '' : payloadJson.slice(0, 80);
+      const payloadFull = payloadJson.length > 80 && payloadJson !== '{}';
+      const isConfirming = _confirming.has(item.id);
+      const needsConfirm = item.risk === 'destructive' || item.risk === 'high';
 
       return `
       <div class="ap-item" data-id="${_esc(item.id)}">
         <div class="ap-item-header">
           <span class="ap-type">${_esc(item.type)}</span>
-          <span class="ap-risk" style="color:${riskColor}" title="Riesgo">${riskLabel}</span>
+          <span class="ap-risk" data-risk="${_esc(item.risk)}" title="Riesgo">${riskLabel}</span>
           <span class="ap-age">${ageStr}</span>
         </div>
         <div class="ap-target" title="${_esc(item.target)}">${_esc(item.target.slice(0, 50))}</div>
-        ${payloadStr !== '{}' ? `<div class="ap-payload">${_esc(payloadStr)}</div>` : ''}
+        ${payloadPreview ? `<div class="ap-payload-expand" data-id="${_esc(item.id)}" title="Ver payload completo">${_esc(payloadPreview)}${payloadFull ? ' …' : ''}</div>` : ''}
         <div class="ap-actions">
-          <button class="ap-approve" data-id="${_esc(item.id)}" aria-label="Aprobar comando ${_esc(item.id)}">✔ Aprobar</button>
+          <button class="ap-approve${isConfirming ? ' confirming' : ''}" data-id="${_esc(item.id)}" data-needs-confirm="${needsConfirm}" aria-label="Aprobar comando ${_esc(item.id)}">${isConfirming ? '¿Confirmar?' : '✔ Aprobar'}</button>
           <button class="ap-reject"  data-id="${_esc(item.id)}" aria-label="Rechazar comando ${_esc(item.id)}">✗ Rechazar</button>
         </div>
       </div>
@@ -138,9 +145,28 @@ function _render() {
     })
     .join('');
 
+  list.querySelectorAll<HTMLElement>('.ap-payload-expand').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = el.dataset['id']!;
+      const item = _items.find((i) => i.id === id);
+      if (!item) return;
+      const full = document.createElement('pre');
+      full.className = 'ap-payload-full';
+      full.textContent = JSON.stringify(item.payload, null, 2);
+      el.replaceWith(full);
+    });
+  });
+
   list.querySelectorAll<HTMLButtonElement>('.ap-approve').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.dataset['id']!;
+      const needsConfirm = btn.dataset['needsConfirm'] === 'true';
+      if (needsConfirm && !_confirming.has(id)) {
+        _confirming.add(id);
+        _render();
+        return;
+      }
+      _confirming.delete(id);
       btn.disabled = true;
       await approveCommand(id);
       await _fetchApprovals();
@@ -150,6 +176,7 @@ function _render() {
   list.querySelectorAll<HTMLButtonElement>('.ap-reject').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.dataset['id']!;
+      _confirming.delete(id);
       btn.disabled = true;
       await rejectCommand(id);
       await _fetchApprovals();
@@ -157,11 +184,11 @@ function _render() {
   });
 }
 
-function _riskStyle(risk: string): [string, string] {
-  if (risk === 'destructive') return ['#d44b4b', '☠ DESTRUCTIVO'];
-  if (risk === 'high') return ['#e8a040', '⚠ ALTO'];
-  if (risk === 'medium') return ['#c8a84b', '◆ MEDIO'];
-  return ['#5b9b5b', '● BAJO'];
+function _riskLabel(risk: string): string {
+  if (risk === 'destructive') return '☠ DESTRUCTIVO';
+  if (risk === 'high') return '⚠ ALTO';
+  if (risk === 'medium') return '◆ MEDIO';
+  return '● BAJO';
 }
 
 // ─── DOM ──────────────────────────────────────────────────────────────────────

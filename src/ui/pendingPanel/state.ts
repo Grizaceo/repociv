@@ -6,6 +6,7 @@ export interface PendingItem {
   state: string;
   stateText: string;
   detail: string;
+  source?: 'local' | 'hermes';
 }
 
 export const POLL_MS = 5_000;
