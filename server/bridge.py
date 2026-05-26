@@ -681,7 +681,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/providers/live":     _routes.get_providers_live,
             "/ws":                 _routes.get_ws_info,
             "/api/news/latest":    _routes.get_latest_news,
-            "/wonders":            _routes.get_wonders,
+            "/api/wonders":        _routes.get_wonders,
+            "/wonders":            _routes.get_wonders,  # legacy alias
             "/api/graph-relations":       _routes.get_graph_relations,
             "/api/graph-relations/stats": _routes.get_graph_relations_stats,
             "/api/foreign/repo-profile": _routes.get_repo_profile,
@@ -714,16 +715,17 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._respond(status, body)
             return
 
-        if path.startswith("/wonders/"):
-            parts = path.split("/")
-            if len(parts) >= 4 and parts[3] == "health":
-                wonder_id = parts[2]
-                status, body = _routes.get_wonder_health({"wonder_id": wonder_id})
+        if path.startswith("/api/wonders/") or path.startswith("/wonders/"):
+            # Canonical: /api/wonders/{id}[/health]; legacy: /wonders/{id}[/health]
+            prefix = "/api/wonders/" if path.startswith("/api/wonders/") else "/wonders/"
+            rest = path[len(prefix):]
+            parts = rest.split("/")
+            if len(parts) >= 2 and parts[1] == "health":
+                status, body = _routes.get_wonder_health({"wonder_id": parts[0]})
                 self._respond(status, body)
                 return
-            if len(parts) >= 3:
-                wonder_id = parts[2]
-                status, body = _routes.get_wonder_by_id({"wonder_id": wonder_id})
+            if parts[0]:
+                status, body = _routes.get_wonder_by_id({"wonder_id": parts[0]})
                 self._respond(status, body)
                 return
 

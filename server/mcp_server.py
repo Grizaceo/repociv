@@ -398,17 +398,17 @@ def ws_info() -> Any:
 
 @mcp.tool(description="Lista todas las Maravillas registradas con su estado y configuración.")
 def wonders_list() -> Any:
-    return _get("/wonders")
+    return _get("/api/wonders")
 
 
 @mcp.tool(description="Devuelve el manifiesto completo de una Maravilla por ID (ej: 'bibliotheca', 'gaceta', 'institutum').")
 def wonders_get(wonder_id: str) -> Any:
-    return _get(f"/wonders/{wonder_id}")
+    return _get(f"/api/wonders/{wonder_id}")
 
 
 @mcp.tool(description="Health check de una Maravilla: iframe accesible, puerto activo, latencia.")
 def wonder_health(wonder_id: str) -> Any:
-    return _get(f"/wonders/{wonder_id}/health")
+    return _get(f"/api/wonders/{wonder_id}/health")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

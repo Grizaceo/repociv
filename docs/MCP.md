@@ -49,7 +49,7 @@ Si el bridge no responde, todas las tools devuelven:
 curl http://127.0.0.1:5274/health
 
 # Listar Maravillas registradas
-curl http://127.0.0.1:5274/wonders
+curl http://127.0.0.1:5274/api/wonders
 
 # Relaciones candidatas para un repo
 curl "http://127.0.0.1:5274/api/graph-relations?repoId=repociv&limit=5"

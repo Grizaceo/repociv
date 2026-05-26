@@ -182,7 +182,7 @@ function buildPanel(): HTMLDivElement {
 
   const cleanLabel = document.createElement('span');
   cleanLabel.className = 'layer-label';
-  cleanLabel.textContent = 'Clean Map';
+  cleanLabel.textContent = 'Mapa Limpio';
 
   // Separator (between layer list and clean mode — must be sibling of rows, not child of label)
   const sep = document.createElement('div');

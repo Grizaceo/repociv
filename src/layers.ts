@@ -72,6 +72,23 @@ export function toggleLayer(id: MapLayerId): void {
   _state.layers[id] = !_state.layers[id];
   _persist();
   _notify();
+  _trackLayerToggle(id, _state.layers[id]);
+}
+
+function _trackLayerToggle(id: MapLayerId, visible: boolean): void {
+  try {
+    const key = 'repociv_layer_analytics';
+    const raw = localStorage.getItem(key);
+    const data: Record<string, { opens: number; closes: number; lastAt: number }> =
+      raw ? (JSON.parse(raw) as Record<string, { opens: number; closes: number; lastAt: number }>) : {};
+    if (!data[id]) data[id] = { opens: 0, closes: 0, lastAt: 0 };
+    if (visible) data[id].opens += 1;
+    else data[id].closes += 1;
+    data[id].lastAt = Date.now();
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    // ignore quota / parse errors
+  }
 }
 
 export function setLayer(id: MapLayerId, visible: boolean): void {
