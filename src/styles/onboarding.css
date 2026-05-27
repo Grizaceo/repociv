@@ -33,7 +33,10 @@
 
 .repo-onboarding-header h2 {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
 }
 
 .repo-onboarding-subtitle {
@@ -285,19 +288,23 @@
 }
 
 .btn-accent {
-  background: rgba(91, 155, 213, 0.18);
-  border: 1px solid rgba(91, 155, 213, 0.55);
-  color: #7ab8e8;
+  background: rgba(200, 168, 75, 0.12);
+  border: 1px solid rgba(200, 168, 75, 0.45);
+  color: var(--ui-gold);
   padding: 8px 14px;
   cursor: pointer;
-  font-family: inherit;
-  font-size: 13px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   border-radius: 2px;
-  transition: background 0.15s ease;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
 .btn-accent:hover {
-  background: rgba(91, 155, 213, 0.3);
+  background: rgba(200, 168, 75, 0.22);
+  border-color: var(--ui-gold);
+  color: var(--ui-gold-bright);
 }
 
 .tile-label {

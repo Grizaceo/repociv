@@ -63,6 +63,86 @@
   color: var(--ui-text);
 }
 
+/* ═══ Loading Screen ═══ */
+#loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #050402;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  font-family: var(--font-ui);
+  transition: opacity 0.6s ease;
+}
+#loading-screen.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#loading-text {
+  font-family: var(--font-display);
+  font-size: clamp(1rem, 2.5vw, 1.5rem);
+  font-weight: 400;
+  color: var(--ui-gold);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  text-shadow: 0 0 24px rgba(200, 168, 75, 0.4);
+  animation: loadingPulse 2s ease-in-out infinite;
+}
+
+@keyframes loadingPulse {
+  0%, 100% { opacity: 0.7; }
+  50%       { opacity: 1; }
+}
+
+#loading-bar {
+  width: clamp(200px, 40vw, 360px);
+  height: 3px;
+  background: rgba(200, 168, 75, 0.12);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+#loading-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--gold-gradient, linear-gradient(90deg, #c8a84b, #f5d580, #c8a84b));
+  border-radius: 2px;
+  transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  box-shadow: 0 0 8px rgba(200, 168, 75, 0.6);
+}
+
+/* Shimmer effect when loading */
+#loading-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 40px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: loadingShimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes loadingShimmer {
+  from { transform: translateX(-40px); }
+  to   { transform: translateX(0px); opacity: 0; }
+}
+
+/* Imperial crest above loading text */
+#loading-screen::before {
+  content: '⬡';
+  font-size: 3rem;
+  color: var(--ui-gold);
+  opacity: 0.35;
+  position: absolute;
+  top: calc(50% - 120px);
+  letter-spacing: 0;
+  animation: loadingPulse 2s ease-in-out infinite;
+}
+
 /* ═══ Phase 2: Analog noise grain scoped to local view ═══ */
 body.local-view::after {
   content: "";

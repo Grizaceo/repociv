@@ -27,7 +27,39 @@
 .top-bar-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
+}
+
+/* ─── Unified HUD button style (top-bar-right buttons) ───────────── */
+.top-bar-right button {
+  background: transparent;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--panel-radius);
+  color: var(--ui-text-dim);
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 13px;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+  flex-shrink: 0;
+  position: relative;
+}
+.top-bar-right button:hover {
+  color: var(--ui-gold-bright);
+  border-color: var(--ui-gold);
+  background: rgba(200, 168, 75, 0.08);
+}
+
+/* Overflow: allow scrolling if buttons don't fit */
+.top-bar-right {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.top-bar-right::-webkit-scrollbar {
+  display: none;
 }
 
 .resource {
@@ -74,12 +106,48 @@
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-weight: 400;
   letter-spacing: 0.2em;
   color: var(--gold-mid);
   text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
-  font-size: 14px;
+  font-size: 13px;
+  white-space: nowrap;
 }
+
+/* ─── Bridge Status Indicator ─────────────────────────────────────── */
+#bridge-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid;
+  cursor: default;
+  letter-spacing: 0.06em;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+#bridge-status.bridge-online {
+  color: var(--civ-food);
+  border-color: rgba(113, 184, 113, 0.35);
+  background: rgba(113, 184, 113, 0.08);
+}
+#bridge-status.bridge-offline {
+  color: var(--ui-text-dim);
+  border-color: var(--ui-border);
+  background: transparent;
+  opacity: 0.6;
+}
+
+/* ─── GPU Bar ─────────────────────────────────────────────────────── */
+#gpu-bar {
+  display: flex;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+}
+#gpu-bar.hidden { display: none; }
 
 /* ─── Bottom HUD Ribbon (Unit Panel + Command Bar + Minimap) ────────────── */
 #bottom-hud {
@@ -633,15 +701,17 @@ kbd {
 
 #hotkeys-ribbon {
   position: absolute;
-  top: 40px;
+  top: calc(var(--header-height) + 4px);
   right: 16px;
   display: flex;
-  gap: 16px;
+  gap: 14px;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-dim);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 /* ─── Scrollbar ───────────────────────────────────────────────────────── */

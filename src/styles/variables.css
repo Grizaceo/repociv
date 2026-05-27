@@ -192,4 +192,25 @@
   --res-science: var(--civ-science);
   --res-production: var(--civ-production);
   --res-gold: var(--civ-gold);
+
+  /* ═══ Ghost-variable shim — components.css / panels.css used these before
+         the design-token rename. Defined here so all references resolve. ═══ */
+  --gold-mid:       var(--ui-gold);
+  --gold-bright:    var(--ui-gold-bright);
+  --gold-dim:       rgba(200, 168, 75, 0.40);
+  --gold-glow:      rgba(200, 168, 75, 0.25);
+  --text-dim:       var(--ui-text-dim);
+  --text-primary:   var(--civ-text-beige);
+  --ui-border-light: rgba(255, 255, 255, 0.12);
+  --ui-panel-bg:    var(--panel-bg);
+  --font-title:     'Cinzel', 'Georgia', serif;
+
+  /* Capital / Wonder panel aliases */
+  --clr-gold:       var(--ui-gold);
+  --border-dim:     rgba(90, 74, 46, 0.40);
+  --ui-accent-gold: var(--ui-gold);
+  --ui-green:       var(--civ-food);
+
+  /* ═══ TYPOGRAPHY: Cinzel for imperial display text ═══ */
+  --font-display: 'Cinzel', 'Georgia', serif;
 }

@@ -217,15 +217,15 @@
 
       <!-- City Panel (Ficha de Ciudad estilo Civ V) -->
       <div id="city-panel" class="hidden">
-        <div class="city-panel-header" id="city-panel-header" style="cursor: move;">
+        <div class="city-panel-header city-panel-header--draggable" id="city-panel-header">
           <div class="city-panel-title">
             ★ <span id="city-panel-name">TAMAGOTCHI</span>
             <span class="city-repo-tag">[repo: <span id="city-repo-name">tamagotchi</span>]</span>
           </div>
-          <div style="display: flex; gap: 8px; align-items: center;">
+          <div class="city-panel-header-actions">
             <div class="city-git-header">git: <span id="city-git-branch">main</span> ● <span id="city-git-status">clean</span></div>
-            <button id="city-panel-minimize" title="Minimizar" style="background:transparent;border:1px solid var(--ui-border);color:var(--text-dim);cursor:pointer;width:24px;height:24px;border-radius:3px;">_</button>
-            <button id="city-panel-close" title="Cerrar" style="background:transparent;border:1px solid var(--ui-border);color:var(--text-dim);cursor:pointer;width:24px;height:24px;border-radius:3px;">✕</button>
+            <button id="city-panel-minimize" title="Minimizar">_</button>
+            <button id="city-panel-close" title="Cerrar">✕</button>
           </div>
         </div>
         <div class="city-panel-body" id="city-panel-body">

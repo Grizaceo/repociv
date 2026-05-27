@@ -58,9 +58,12 @@
 
 .gaceta-icon { font-size: 14px; }
 .gaceta-label {
-  font-weight: bold;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
   color: var(--ui-accent-gold, #c8a84b);
-  letter-spacing: 0.4px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .gaceta-badge {
   background: var(--civ-happiness, #c8553d);
