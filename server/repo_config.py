@@ -156,6 +156,16 @@ def get_hook(repo: str, hook_name: str) -> str | None:
     return config.get("hooks", {}).get(hook_name) or None
 
 
+def _command_to_argv(command: str) -> list[str]:
+    """Split a validated hook command into an argv list (no shell=True).
+
+    Uses shlex.split so quoted arguments round-trip correctly, e.g.:
+      'pytest -k "test foo"' → ['pytest', '-k', 'test foo']
+    """
+    import shlex
+    return shlex.split(command)
+
+
 def run_hook(repo: str, hook_name: str, timeout: int = 30) -> dict[str, Any] | None:
     """Execute a configured hook as a subprocess.
 
@@ -173,9 +183,10 @@ def run_hook(repo: str, hook_name: str, timeout: int = 30) -> dict[str, Any] | N
         return None
 
     try:
+        argv = _command_to_argv(command)
         proc = subprocess.run(
-            command,
-            shell=True,
+            argv,
+            shell=False,
             capture_output=True,
             text=True,
             timeout=timeout,
