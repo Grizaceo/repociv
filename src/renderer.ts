@@ -462,16 +462,23 @@ export class Renderer {
       const rect = this.canvas.getBoundingClientRect();
       const wx = e.clientX - rect.left;
       const wy = e.clientY - rect.top;
+      const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+      const tile = this.state.world.tiles.get(tileKey(coord));
 
-      // Priority 1: wonder sprite hit test
+      // Priority 1: wonder district hex (Bibliotheca / LabHub tiles)
+      if (tile?.district?.type === 'wonder' && tile.district.wonderType) {
+        openWonderVignette(tile.district.wonderType as import('./types').WonderType);
+        return;
+      }
+
+      // Priority 2: legacy wonder sprite hit test (small circles near capital)
       const wonder = this.hitWonderAt(wx, wy);
       if (wonder) {
         openWonderVignette(wonder as import('./types').WonderType);
         return;
       }
 
-      const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
-      const tile = this.state.world.tiles.get(tileKey(coord));
+      // Priority 3: capital city → capital panel
       if (tile?.city) {
         const city = tile.city;
         if (city.isCapital) {

@@ -1,6 +1,11 @@
 // ─── RepoCiv — Wonder Vignette (iframe wrapper with health-check) ──────────────
 import type { WonderType } from '../types.ts';
-import { checkLgbReachability, LGB_BACKEND_URL, WONDER_BIBLIOTHECA_URL } from '../wonderEnv.ts';
+import {
+  checkLgbReachability,
+  findReachableLgbUiUrl,
+  LGB_BACKEND_URL,
+  WONDER_BIBLIOTHECA_URL,
+} from '../wonderEnv.ts';
 import { getLayerState } from '../layers.ts';
 import { getWonder } from '../wonders/manifest.ts';
 import {
@@ -272,15 +277,22 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
       _showEmptyState(body, type, 'lgb-offline');
       return;
     }
-    if (!ui) {
-      _showEmptyState(body, type, 'lgb-ui-offline');
-      return;
-    }
     if (!backend) {
       _showEmptyState(body, type, 'lgb-backend-offline');
       return;
     }
-    _mountIframe(body, manifest, type);
+    const resolvedUiUrl = await findReachableLgbUiUrl();
+    const mountManifest =
+      resolvedUiUrl && resolvedUiUrl !== (manifest.ui.url ?? '').replace(/\/$/, '')
+        ? {
+            ...manifest,
+            ui: {
+              ...manifest.ui,
+              url: resolvedUiUrl,
+            },
+          }
+        : manifest;
+    _mountIframe(body, mountManifest, type);
     return;
   }
 

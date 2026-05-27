@@ -68,7 +68,7 @@ export function openCapitalPanel() {
 
   _panel.innerHTML = `
     <div class="capital-header">
-      <span class="capital-title">🏛 Palacio Imperial — Centrum Operarum</span>
+      <span class="capital-title">🏛 Gris — Centrum Operarum</span>
       <button class="capital-close" aria-label="Cerrar">✕</button>
     </div>
     <div class="capital-tabs">${tabsHtml}</div>

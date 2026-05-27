@@ -84,7 +84,8 @@ export type Terrain =
   | 'desert' // .md/.txt/.json/.yaml/.toml — config/docs
   | 'ocean' // empty / no real code
   | 'ice' // archived / legacy (>180 days no commits)
-  | 'hills'; // mixed / generic
+  | 'hills' // mixed / generic
+  | 'sacred'; // imperial wonder districts (capital buildings)
 
 // ─── Tile ─────────────────────────────────────────────────────────────────
 export interface Tile {
@@ -128,8 +129,10 @@ export interface City {
 export interface District {
   id: string;
   name: string; // subdirectory name
-  type: 'campus' | 'industrial' | 'commercial' | 'encamp' | 'aqueduct';
+  type: 'campus' | 'industrial' | 'commercial' | 'encamp' | 'aqueduct' | 'wonder';
   coord: Axial;
+  /** For wonder districts: which wonder type this district represents. */
+  wonderType?: WonderType;
 }
 
 // ─── Building & Wonder ─────────────────────────────────────────────────────

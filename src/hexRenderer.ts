@@ -1,7 +1,7 @@
 // ─── RepoCiv — Hex & Tile drawing ────────────────────────────────────────────
 import { logger } from './logger.ts';
 import { type Axial, axialToPixel, AXIAL_DIRECTIONS } from './hex.ts';
-import { type Terrain, type Tile, type City, type Building } from './types.ts';
+import { type Terrain, type Tile, type City, type Building, type District } from './types.ts';
 import { TERRAIN_COLOR } from './map.ts';
 import { HEX_SIZE } from './constants.ts';
 
@@ -213,7 +213,12 @@ export class HexRenderer {
     }
 
     if (tile.city) this.drawCityLabel(tile.city, pos, activeBuilding);
-    if (tile.district) this.drawDistrictLabel(tile.district.name, pos);
+    // Wonder districts get rich building visuals instead of plain text labels
+    if (tile.district?.type === 'wonder' && tile.district.wonderType) {
+      this.drawWonderDistrict(tile.district, pos, animTime);
+    } else if (tile.district) {
+      this.drawDistrictLabel(tile.district.name, pos);
+    }
   }
 
   private drawTileResources(tile: Tile, pos: { x: number; y: number }, alpha: number, animTime?: number) {
@@ -330,6 +335,30 @@ export class HexRenderer {
           ctx.bezierCurveTo(wx + 8, wy - 4, wx + 12, wy + 4, wx + 20, wy);
           ctx.stroke();
         }
+        break;
+      }
+      case 'sacred': {
+        // Golden ethereal particles floating on sacred ground
+        const time = animTime || 0;
+        const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        ctx.save();
+        for (let p = 0; p < 5; p++) {
+          const angle = (p / 5) * Math.PI * 2 + time * 0.5;
+          const radius = HEX_SIZE * (0.25 + 0.15 * Math.sin(time * 1.2 + p * 1.5));
+          const px = pos.x + Math.cos(angle) * radius;
+          const py = pos.y + Math.sin(angle) * radius;
+          const particleAlpha = prefersReducedMotion ? 0.3 : 0.15 + 0.2 * Math.sin(time * 2.0 + p);
+          ctx.fillStyle = `rgba(200, 168, 75, ${particleAlpha})`;
+          ctx.beginPath();
+          ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        // Subtle golden glow ring
+        const glowAlpha = prefersReducedMotion ? 0.08 : 0.04 + 0.04 * Math.sin(time * 1.5);
+        ctx.strokeStyle = `rgba(200, 168, 75, ${glowAlpha})`;
+        ctx.lineWidth = 2;
+        this.drawHexOutlineRaw(pos.x, pos.y, HEX_SIZE * 0.7);
+        ctx.restore();
         break;
       }
     }
@@ -557,6 +586,151 @@ export class HexRenderer {
     ctx.textBaseline = 'middle';
     ctx.fillStyle = skillColor;
     ctx.fillText('⚡', pos.x + HEX_SIZE * 0.55, pos.y - HEX_SIZE * 0.55);
+    ctx.restore();
+  }
+
+  // ─── Wonder District: rich building visuals on dedicated hex tiles ──────────
+  drawWonderDistrict(district: District, pos: { x: number; y: number }, animTime?: number) {
+    const { ctx } = this;
+    const time = animTime || 0;
+    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const wType = district.wonderType;
+
+    ctx.save();
+
+    if (wType === 'bibliotheca') {
+      // ── Bibliotheca Alexandrina: Temple with columns ──────────────────────
+      const glow = prefersReducedMotion ? 0.35 : 0.25 + 0.15 * Math.sin(time * 1.5);
+
+      // Outer glow
+      ctx.shadowColor = `rgba(74, 144, 200, ${glow})`;
+      ctx.shadowBlur = 12;
+
+      // Temple base (trapezoid)
+      const bw = HEX_SIZE * 0.7;
+      const bh = HEX_SIZE * 0.35;
+      const topW = bw * 0.7;
+      ctx.fillStyle = '#1a3a5c';
+      ctx.beginPath();
+      ctx.moveTo(pos.x - topW / 2, pos.y - bh * 0.4);
+      ctx.lineTo(pos.x + topW / 2, pos.y - bh * 0.4);
+      ctx.lineTo(pos.x + bw / 2, pos.y + bh * 0.5);
+      ctx.lineTo(pos.x - bw / 2, pos.y + bh * 0.5);
+      ctx.closePath();
+      ctx.fill();
+
+      // Columns (3 pillars)
+      ctx.fillStyle = '#4a90c8';
+      const colW = 3;
+      const colH = bh * 0.65;
+      for (let c = -1; c <= 1; c++) {
+        const cx = pos.x + c * (topW / 3);
+        ctx.fillRect(cx - colW / 2, pos.y - bh * 0.35, colW, colH);
+      }
+
+      // Triangular roof
+      ctx.fillStyle = '#2a6aa0';
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y - bh * 0.7);
+      ctx.lineTo(pos.x + topW / 2 + 4, pos.y - bh * 0.35);
+      ctx.lineTo(pos.x - topW / 2 - 4, pos.y - bh * 0.35);
+      ctx.closePath();
+      ctx.fill();
+
+      // Roof border glow
+      ctx.strokeStyle = `rgba(74, 144, 200, ${glow + 0.2})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.shadowBlur = 0;
+
+      // Book icon
+      ctx.font = `${HEX_SIZE * 0.3}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('📚', pos.x, pos.y + 2);
+
+      // Label
+      ctx.font = `bold ${HEX_SIZE * 0.18}px 'Cinzel', serif`;
+      ctx.fillStyle = '#8ac4e8';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText('BIBLIOTHECA', pos.x, pos.y + HEX_SIZE * 0.45);
+
+    } else if (wType === 'institutum') {
+      // ── Institutum / LabHub: Laboratory flask shape ────────────────────────
+      const glow = prefersReducedMotion ? 0.35 : 0.25 + 0.15 * Math.sin(time * 2.0);
+
+      // Outer glow
+      ctx.shadowColor = `rgba(34, 197, 94, ${glow})`;
+      ctx.shadowBlur = 12;
+
+      // Flask body (rounded rectangle base)
+      const fw = HEX_SIZE * 0.5;
+      const fh = HEX_SIZE * 0.4;
+      const radius = 6;
+      ctx.fillStyle = '#1a3d1a';
+      ctx.beginPath();
+      ctx.moveTo(pos.x - fw / 2 + radius, pos.y - fh * 0.2);
+      ctx.arcTo(pos.x + fw / 2, pos.y - fh * 0.2, pos.x + fw / 2, pos.y + fh * 0.6, radius);
+      ctx.arcTo(pos.x + fw / 2, pos.y + fh * 0.6, pos.x - fw / 2, pos.y + fh * 0.6, radius);
+      ctx.arcTo(pos.x - fw / 2, pos.y + fh * 0.6, pos.x - fw / 2, pos.y - fh * 0.2, radius);
+      ctx.arcTo(pos.x - fw / 2, pos.y - fh * 0.2, pos.x + fw / 2, pos.y - fh * 0.2, radius);
+      ctx.closePath();
+      ctx.fill();
+
+      // Flask neck
+      const neckW = fw * 0.3;
+      ctx.fillStyle = '#2d5a27';
+      ctx.fillRect(pos.x - neckW / 2, pos.y - fh * 0.65, neckW, fh * 0.5);
+
+      // Flask border
+      ctx.strokeStyle = `rgba(34, 197, 94, ${glow + 0.2})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Bubbles (animated)
+      if (!prefersReducedMotion) {
+        for (let b = 0; b < 3; b++) {
+          const bx = pos.x + (b - 1) * 8;
+          const by = pos.y + fh * 0.2 - ((time * 15 + b * 20) % (fh * 0.6));
+          const br = 2 + Math.sin(time * 3 + b) * 0.5;
+          ctx.fillStyle = `rgba(34, 197, 94, ${0.3 + 0.2 * Math.sin(time * 2 + b)})`;
+          ctx.beginPath();
+          ctx.arc(bx, by, br, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      ctx.shadowBlur = 0;
+
+      // Lab icon
+      ctx.font = `${HEX_SIZE * 0.3}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🧪', pos.x, pos.y + 2);
+
+      // Label
+      ctx.font = `bold ${HEX_SIZE * 0.18}px 'Cinzel', serif`;
+      ctx.fillStyle = '#6bc86b';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText('LABHUB', pos.x, pos.y + HEX_SIZE * 0.45);
+
+    } else {
+      // Fallback: generic wonder
+      ctx.font = `${HEX_SIZE * 0.35}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🏛', pos.x, pos.y);
+
+      ctx.font = `bold ${HEX_SIZE * 0.18}px 'Cinzel', serif`;
+      ctx.fillStyle = '#c8a84b';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(district.name.toUpperCase(), pos.x, pos.y + HEX_SIZE * 0.4);
+    }
+
     ctx.restore();
   }
 }

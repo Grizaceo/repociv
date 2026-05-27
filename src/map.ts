@@ -69,6 +69,7 @@ const TERRAIN_WEIGHTS: Record<Terrain, number> = {
   ocean: 1,
   ice: 1,
   hills: 1,
+  sacred: 1,
 };
 
 export function inferTerrain(extensions: Record<string, number>): Terrain {
@@ -101,6 +102,7 @@ export const TERRAIN_COLOR: Record<
   ocean: { fill: '#2b6da5', stroke: '#1b5585', gradient: ['#3a8bc8', '#225590'] },
   ice: { fill: '#c8d8e0', stroke: '#a0b0c0', gradient: ['#ddeaf0', '#b0c0d0'] },
   hills: { fill: '#8da86b', stroke: '#6a8a4b', gradient: ['#9db87b', '#7a9a5b'] },
+  sacred: { fill: '#1e1530', stroke: '#c8a84b', gradient: ['#2a1d40', '#140e22'] },
 };
 
 // ─── Skill & session metadata (from Hermes workspace) ───────────────────────
@@ -656,27 +658,18 @@ export async function generateWorld(): Promise<World> {
     orphanRepos = reposWithTerrain.filter((r) => r.population <= 5 && !r.manualCoord);
   }
 
-  // Find the "gris" repo and make it the capital (first in array, at 0,0)
-  const grisIndex = cityRepos.findIndex((r) => r.path.endsWith('gris') || r.name === 'gris');
-  if (grisIndex > 0) {
-    // Move to front
-    const [grisRepo] = cityRepos.splice(grisIndex, 1);
-    if (grisRepo) {
-      // Force capital to be at (0,0)
-      grisRepo.manualCoord = { q: 0, r: 0 };
-      cityRepos.unshift(grisRepo);
-    }
-  } else if (grisIndex === 0) {
-    // Already first, just force to (0,0)
-    if (cityRepos[0]) {
-      cityRepos[0].manualCoord = { q: 0, r: 0 };
-    }
-  }
+  // ─── Exclude "gris" from repo cities — it becomes the standalone capital ────
+  cityRepos = cityRepos.filter((r) => !(r.path.endsWith('gris') || r.name === 'gris'));
+  orphanRepos = orphanRepos.filter((r) => !(r.path.endsWith('gris') || r.name === 'gris'));
 
   const maxAutoCoords = Math.max(cityRepos.length * MIN_CITY_DISTANCE * MIN_CITY_DISTANCE * 3, cityRepos.length + 32);
   const cityCoords = spiralCoords({ q: 0, r: 0 }, maxAutoCoords);
   const occupiedCoords = new Set<string>();
   const cityCoordLookup = new Map<string, Axial>();
+  // Reserve capital + wonder district hexes so repos don't land on them
+  occupiedCoords.add(tileKey({ q: 0, r: 0 }));   // capital Gris
+  occupiedCoords.add(tileKey({ q: -1, r: 0 }));  // Bibliotheca
+  occupiedCoords.add(tileKey({ q: 1, r: 0 }));   // LabHub
   let autoCoordCursor = 0;
   for (const repo of cityRepos) {
     if (repo.manualCoord) {
@@ -745,7 +738,7 @@ export async function generateWorld(): Promise<World> {
       territory: [], // recalculated below
       districts,
       buildings: [],
-      isCapital: i === 0,
+      isCapital: false,
     };
     cities.push(city);
 
@@ -838,87 +831,105 @@ export async function generateWorld(): Promise<World> {
   const totalScience = reposWithTerrain.reduce((acc, r) => acc + r.science, 0);
   const totalProduction = reposWithTerrain.reduce((acc, r) => acc + r.production, 0);
 
-  // ─── Spawn Capitalis + 2 Maravillas ─────────────────────────────────────────
-  let capitalCity = cities.find((c) => c.isCapital);
-  if (!capitalCity) {
-    // find a vacant coord near center; fallback to (0,0) or offset if occupied
-    let capCoord: Axial = { q: 0, r: 0 };
-    const taken = new Set(cities.map((c) => tileKey(c.coord)));
-    if (taken.has(tileKey(capCoord))) {
-      const spiral = spiralCoords({ q: 0, r: 0 }, 50);
-      for (const s of spiral) {
-        if (!taken.has(tileKey(s))) { capCoord = s; break; }
-      }
-    }
-    const territory = spiralCoords(capCoord, 7).slice(1, 7); // 6 neighbours at radius 1
+  // ─── Spawn Capital "Gris" + Wonder Districts ──────────────────────────────────
+  const capCoord: Axial = { q: 0, r: 0 };
+  const bibliothecaCoord: Axial = { q: -1, r: 0 }; // west neighbor
+  const institutumCoord: Axial = { q: 1, r: 0 };   // east neighbor
 
-    const bibliotheca: Building = {
-      id: 'wonder-bibliotheca',
-      name: 'Bibliotheca Alexandrina',
-      type: 'wonder',
-      wonderType: 'bibliotheca',
-      cityId: 'capital-imperialis',
-      progress: 100,
-      durationSeconds: 0,
-      elapsedSeconds: 0,
-      state: 'complete',
-    };
-    const institutum: Building = {
-      id: 'wonder-institutum',
-      name: 'Institutum Scientiarum',
-      type: 'wonder',
-      wonderType: 'institutum',
-      cityId: 'capital-imperialis',
-      progress: 100,
-      durationSeconds: 0,
-      elapsedSeconds: 0,
-      state: 'complete',
-    };
+  const bibliotheca: Building = {
+    id: 'wonder-bibliotheca',
+    name: 'Bibliotheca Alexandrina',
+    type: 'wonder',
+    wonderType: 'bibliotheca',
+    cityId: 'gris',
+    progress: 100,
+    durationSeconds: 0,
+    elapsedSeconds: 0,
+    state: 'complete',
+  };
+  const institutum: Building = {
+    id: 'wonder-institutum',
+    name: 'Institutum Scientiarum',
+    type: 'wonder',
+    wonderType: 'institutum',
+    cityId: 'gris',
+    progress: 100,
+    durationSeconds: 0,
+    elapsedSeconds: 0,
+    state: 'complete',
+  };
 
-    capitalCity = {
-      id: 'capital-imperialis',
-      name: 'Capitalis',
-      coord: capCoord,
-      population: 1,
-      territory,
-      districts: [],
-      buildings: [bibliotheca, institutum],
-      wonders: [bibliotheca, institutum],
-      isCapital: true,
-    };
-    cities.push(capitalCity);
+  const bibliothecaDistrict: District = {
+    id: 'district-bibliotheca',
+    name: 'Bibliotheca Alexandrina',
+    type: 'wonder',
+    coord: bibliothecaCoord,
+    wonderType: 'bibliotheca',
+  };
+  const institutumDistrict: District = {
+    id: 'district-institutum',
+    name: 'LabHub',
+    type: 'wonder',
+    coord: institutumCoord,
+    wonderType: 'institutum',
+  };
 
-    // claim territory tiles
-    for (const t of territory) {
-      const k = tileKey(t);
-      if (!tiles.has(k)) {
-        tiles.set(k, {
-          coord: t,
-          terrain: 'plains',
-          city: capitalCity,
-          resources: { gold: 0, science: 0, production: 0 },
-          inFog: false,
-          revealed: true,
-        });
-      } else {
-        const tile = tiles.get(k)!;
-        tile.city = capitalCity;
-      }
-    }
-    // ensure capital tile itself exists
-    const capKey = tileKey(capCoord);
-    if (!tiles.has(capKey)) {
-      tiles.set(capKey, {
-        coord: capCoord,
-        terrain: 'plains',
-        city: capitalCity,
-        resources: { gold: 10, science: 10, production: 10 },
-        inFog: false,
-        revealed: true,
-      });
-    } else {
-      tiles.get(capKey)!.city = capitalCity;
-    }
+  const territory = spiralCoords(capCoord, 7).slice(1, 7); // 6 neighbours at radius 1
+
+  const capitalCity: City = {
+    id: 'gris',
+    name: 'Gris',
+    coord: capCoord,
+    population: 1,
+    territory,
+    districts: [bibliothecaDistrict, institutumDistrict],
+    buildings: [bibliotheca, institutum],
+    wonders: [bibliotheca, institutum],
+    isCapital: true,
+  };
+  cities.push(capitalCity);
+
+  // Capital tile (sacred terrain)
+  tiles.set(tileKey(capCoord), {
+    coord: capCoord,
+    terrain: 'sacred',
+    city: capitalCity,
+    resources: { gold: 10, science: 10, production: 10 },
+    inFog: false,
+    revealed: true,
+  });
+
+  // Bibliotheca wonder district tile
+  tiles.set(tileKey(bibliothecaCoord), {
+    coord: bibliothecaCoord,
+    terrain: 'sacred',
+    district: bibliothecaDistrict,
+    resources: { gold: 0, science: 5, production: 0 },
+    inFog: false,
+    revealed: true,
+  });
+
+  // Institutum wonder district tile
+  tiles.set(tileKey(institutumCoord), {
+    coord: institutumCoord,
+    terrain: 'sacred',
+    district: institutumDistrict,
+    resources: { gold: 0, science: 0, production: 5 },
+    inFog: false,
+    revealed: true,
+  });
+
+  // Claim remaining territory tiles for the capital
+  for (const t of territory) {
+    const k = tileKey(t);
+    if (tiles.has(k)) continue; // don't overwrite wonder district tiles
+    tiles.set(k, {
+      coord: t,
+      terrain: 'plains',
+      resources: { gold: 0, science: 0, production: 0 },
+      inFog: false,
+      revealed: true,
+    });
   }
 
   // Detect disconnected cities and generate intermediate tiles with folder structures

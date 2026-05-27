@@ -28,11 +28,26 @@ export function lgbHealthUrl(base = LGB_BACKEND_URL): string {
 
 /** Bridge often binds 127.0.0.1 only; UI may be on Tailscale via Vite :5173. */
 const LGB_BACKEND_FALLBACKS = ['http://127.0.0.1:3001', 'http://localhost:3001'] as const;
+const LGB_UI_FALLBACKS = [
+  'http://127.0.0.1:5173',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://localhost:3000',
+] as const;
 
 export function lgbBackendProbeUrls(): string[] {
   const primary = LGB_BACKEND_URL.replace(/\/$/, '');
   const urls = [primary];
   for (const fb of LGB_BACKEND_FALLBACKS) {
+    if (!urls.includes(fb)) urls.push(fb);
+  }
+  return urls;
+}
+
+export function lgbUiProbeUrls(): string[] {
+  const primary = WONDER_BIBLIOTHECA_URL.replace(/\/$/, '');
+  const urls = [primary];
+  for (const fb of LGB_UI_FALLBACKS) {
     if (!urls.includes(fb)) urls.push(fb);
   }
   return urls;
@@ -71,9 +86,15 @@ export async function checkLgbBackend(): Promise<boolean> {
 
 /** Vite dev UI (GET /). */
 export async function checkLgbUi(): Promise<boolean> {
-  const base = WONDER_BIBLIOTHECA_URL.replace(/\/$/, '');
-  if (await _probeReachable(`${base}/`)) return true;
-  return _probeReachable(base);
+  return (await findReachableLgbUiUrl()) !== null;
+}
+
+export async function findReachableLgbUiUrl(): Promise<string | null> {
+  for (const base of lgbUiProbeUrls()) {
+    if (await _probeReachable(`${base}/`)) return base;
+    if (await _probeReachable(base)) return base;
+  }
+  return null;
 }
 
 export async function checkLgbReachability(): Promise<LgbReachability> {
