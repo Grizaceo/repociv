@@ -98,4 +98,41 @@ Nada de WebGL/Three.js. La subfase 2.5D se hace en Canvas 2D puro.
 
 ---
 
+## Features post-Fase 1 (Taller Imperial)
+
+Estos features se implementaron después del cierre formal de Fase 1 como parte del Taller Imperial continuo:
+
+### Dual-source pending system
+- Tareas locales RepoCiv (IDs `L-` prefixed) junto a tareas de Hermes `PENDING_TRACKER.md`.
+- Merge en `GET /pending`, CRUD separado por prefijo.
+
+### Approval UX
+- Confirm-before-approve para comandos de riesgo alto.
+- Badges de riesgo (`data-risk`), badges de fuente (`rc`/`hm`).
+
+### Layer telemetry
+- `_trackLayerToggle()` registra opens/closes por capa en localStorage.
+
+### Per-layer status API
+- `setLayerStatus(id, status)` para señalar empty/loading/error por capa.
+
+### Standalone capital Gris
+- Capital Gris renderizada como entidad separada del grid de repos.
+- Distritos de maravillas (Bibliotheca, Institutum) con renderizado hexagonal propio.
+
+### Design fixes
+- Separator DOM bug fix, LOD tooltip, Lucide icons migration, `transition:all` fix.
+
+### ENG fixes
+- go.mod tuple arity bug fix, path validation en graph_relations, 22 signal tests.
+
+### MCP expansion
+- 11 tools nuevas (wonders, graph_relations, foreign, ws_info). Total: 41 tools, 15 dominios.
+
+### Namespace migration
+- `/wonders` → `/api/wonders/` como canonical. Legacy alias mantenido.
+
+---
+
 *Documento generado por DAVI como parte del cierre formal de Fase 1 del Taller Imperial.*
+*Actualizado con features post-Fase 1 — 2026-05-27.*

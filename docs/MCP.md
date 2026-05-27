@@ -58,7 +58,7 @@ curl "http://127.0.0.1:5274/api/graph-relations?repoId=repociv&limit=5"
 curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/home/gris/.hermes/workspace/repos/repociv"
 ```
 
-## Tools disponibles (43 tools, 14 dominios)
+## Tools disponibles (41 tools, 15 dominios)
 
 ### Agents — estado del imperio
 | Tool | Descripción |
