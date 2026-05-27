@@ -107,8 +107,18 @@ MISSIONS_FILE    = CONFIG_DIR / "missions.json"
 HERMES_ROOT      = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", "~/.hermes")))
 
 # ─── CORS allowed origins ─────────────────────────────────────────────────────
+# Remote mode: allow the configured remote origin only (not wildcard).
+# REPOCIV_REMOTE_ORIGIN overrides; falls back to REPOCIV_PORT-based localhost
+# so that the Vite dev proxy keeps working even when remote=true.
 if REPOCIV_REMOTE:
-    _ALLOWED_ORIGINS = None  # Allow all origins in remote mode
+    _remote_origin = os.environ.get("REPOCIV_REMOTE_ORIGIN", "").strip()
+    _ALLOWED_ORIGINS: set[str] | None = (
+        {_remote_origin} if _remote_origin
+        else {
+            f"http://localhost:{REPOCIV_PORT}",
+            f"http://127.0.0.1:{REPOCIV_PORT}",
+        }
+    )
 else:
     _ALLOWED_ORIGINS = {
         f"http://localhost:{REPOCIV_PORT}",
@@ -660,6 +670,14 @@ class BridgeHandler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         params = self._parse_qs()
         ctx: dict[str, Any] = {"params": params}
+
+        # Health and ready endpoints are exempt from token auth (used by monitors)
+        if path not in ("/health", "/ready") and not self._check_token():
+            self.send_response(401)
+            self._cors()
+            self.end_headers()
+            self.wfile.write(b'{"error":"unauthorized"}')
+            return
 
         # ── Simple exact-match GET routes ──────────────────────────────────────
         _GET_EXACT: dict[str, Any] = {
