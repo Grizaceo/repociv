@@ -93,7 +93,6 @@ _MANIFEST_PARSERS: dict[str, tuple[re.Pattern, ...]] = {  # type: ignore[assignm
     "Gemfile": (re.compile(r"^\s*gem\s+['\"]([\w-]+)['\"]"), re.MULTILINE, 0, "gem"),
 }
 
-# ─── Lock ──────────────────────────────────────────────────────────────────────
 
 _lock = threading.Lock()
 
@@ -101,3 +100,28 @@ _lock = threading.Lock()
 
 # Lock (shared between index and scoring)
 _lock = threading.Lock()
+
+# ─── Flag management (shared mutable state) ─────────────────────────────────────
+
+def _load_flags() -> dict[str, bool]:
+    """Load feature flags from runtime state, falling back to env vars."""
+    flags: dict[str, bool] = dict(_RUNTIME_FLAGS)
+    env_graph = os.environ.get("REPOCIV_GRAPH_SUGGESTIONS")
+    if env_graph is not None:
+        flags["graphSuggestions"] = env_graph.lower() in ("1", "true", "yes")
+    env_ai = os.environ.get("REPOCIV_AI_RELATION_DISCOVERY")
+    if env_ai is not None:
+        flags["aiRelationDiscovery"] = env_ai.lower() in ("1", "true", "yes")
+    return flags
+
+
+def _save_flags(flags: dict[str, bool]) -> None:
+    """Persist feature flags for the current runtime and for debugging on disk."""
+    global _RUNTIME_FLAGS
+    _RUNTIME_FLAGS = {
+        "graphSuggestions": bool(flags.get("graphSuggestions", False)),
+        "aiRelationDiscovery": bool(flags.get("aiRelationDiscovery", False)),
+    }
+    _INDEX_DIR.mkdir(parents=True, exist_ok=True)
+    _FLAGS_FILE.write_text(json.dumps(_RUNTIME_FLAGS, indent=2, ensure_ascii=False), encoding="utf-8")
+

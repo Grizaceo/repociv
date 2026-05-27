@@ -66,5 +66,18 @@ export default defineConfig(({ mode }) => {
         thresholds: { lines: 55, branches: 70 },
       },
     },
+    build: {
+      rollupOptions: {
+        onLog(level, log, handler) {
+          // Suppress known circular-dep dynamic-import warning:
+          // agentChip.ts ↔ history.ts: dynamic import breaks init cycle.
+          if (log.message?.includes('history.ts is dynamically imported') &&
+              log.message?.includes('also statically imported')) {
+            return;
+          }
+          handler(level, log);
+        },
+      },
+    },
   };
 });

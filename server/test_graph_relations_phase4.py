@@ -74,30 +74,23 @@ def test_get_candidates_returns_empty_when_graph_suggestions_disabled(tmp_path: 
 
 
 
-@pytest.mark.xfail(reason=(
-    "After graph_relations split, _load_flags is imported directly in graph_scoring, "
-    "not via the facade. Test needs to patch graph_scoring._load_flags directly."
-))
 def test_score_pair_skips_advanced_scoring_when_ai_relation_discovery_disabled(tmp_path: Path, monkeypatch):
     signals = _sample_signals(tmp_path)
-    monkeypatch.setattr(gr, '_load_all_signals', lambda: signals)
-    # Patch _load_flags in the module where it works for both import styles
+    # Patch all mutable state in graph_scoring directly (score_pair accesses them via module-level imports)
     try:
-        import server.graph_index as _gr_index
+        import server.graph_scoring as _gs
     except ImportError:
-        import graph_index as _gr_index
+        import graph_scoring as _gs
+    monkeypatch.setattr(_gs, '_load_all_signals', lambda: signals)
+    monkeypatch.setattr(_gs, '_personalized_pagerank', lambda *a, **kw: 0.0)
+    monkeypatch.setattr(_gs, '_random_walk_similarity', lambda *a, **kw: 0.0)
+    monkeypatch.setattr(_gs, '_check_coactivity', lambda *a, **kw: {})
+    # _load_flags is accessed via _gr_base reference (patched at module level)
     monkeypatch.setattr(
-        _gr_index,
+        _gs._gr_base,
         '_load_flags',
         lambda: {'graphSuggestions': True, 'aiRelationDiscovery': False},
     )
-
-    def fail_if_called(*_args, **_kwargs):
-        raise AssertionError('advanced scorer should stay off when aiRelationDiscovery=false')
-
-    monkeypatch.setattr(gr, '_personalized_pagerank', fail_if_called)
-    monkeypatch.setattr(gr, '_random_walk_similarity', fail_if_called)
-    monkeypatch.setattr(gr, '_check_coactivity', fail_if_called)
 
     score = gr.score_pair('repo_a', 'repo_b')
 

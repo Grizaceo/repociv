@@ -1,3 +1,10 @@
+"""RepoCiv — Graph Relations: Scoring & Candidate Generation Module.
+
+Generates candidate relations between repos using Jaccard similarity,
+Adamic-Adar, resource allocation, PageRank, and random walks.
+Exposes the public API: build_or_refresh_index, get_candidates,
+get_relation_evidence, score_pair, get_network_stats, set_flags.
+"""
 
 from __future__ import annotations
 
@@ -12,73 +19,91 @@ from math import log
 from pathlib import Path
 from typing import Any
 
-# ─── Scoring Functions ─────────────────────────────────────────────────────────
-
-
+# ── Import shared constants and keep module ref for mutable state ──────────
 
 try:
     from server.graph_relations_base import *  # noqa: F401,F403
     from server.graph_relations_base import (  # noqa: F401
         _INDEX_DIR,
-    _REPO_SIGNALS_DIR,
-    _RELATION_CACHE_DIR,
-    _META_FILE,
-    _FLAGS_FILE,
-    _MAX_EVENTS,
-    _MAX_RANDOM_WALK_STEPS,
-    _DEFAULT_FLAGS,
-    _RUNTIME_FLAGS,
-    _SUGGESTED_ACTIONS,
-    _RELATION_TYPES,
-    _IMPORT_PATTERNS,
-    _MARKDOWN_LINK_RE,
-    _MARKDOWN_HEADING_RE,
-    _ENTITY_PATTERNS,
-    _MANIFEST_PARSERS,
-    _lock,
+        _REPO_SIGNALS_DIR,
+        _RELATION_CACHE_DIR,
+        _META_FILE,
+        _FLAGS_FILE,
+        _MAX_EVENTS,
+        _MAX_RANDOM_WALK_STEPS,
+        _DEFAULT_FLAGS,
+        _RUNTIME_FLAGS,
+        _SUGGESTED_ACTIONS,
+        _RELATION_TYPES,
+        _IMPORT_PATTERNS,
+        _MARKDOWN_LINK_RE,
+        _MARKDOWN_HEADING_RE,
+        _ENTITY_PATTERNS,
+        _MANIFEST_PARSERS,
+        _lock,
     )
+    import server.graph_relations_base as _gr_base
 except ImportError:
     from graph_relations_base import *  # noqa: F401,F403
     from graph_relations_base import (  # noqa: F401
         _INDEX_DIR,
-    _REPO_SIGNALS_DIR,
-    _RELATION_CACHE_DIR,
-    _META_FILE,
-    _FLAGS_FILE,
-    _MAX_EVENTS,
-    _MAX_RANDOM_WALK_STEPS,
-    _DEFAULT_FLAGS,
-    _RUNTIME_FLAGS,
-    _SUGGESTED_ACTIONS,
-    _RELATION_TYPES,
-    _IMPORT_PATTERNS,
-    _MARKDOWN_LINK_RE,
-    _MARKDOWN_HEADING_RE,
-    _ENTITY_PATTERNS,
-    _MANIFEST_PARSERS,
-    _lock,
+        _REPO_SIGNALS_DIR,
+        _RELATION_CACHE_DIR,
+        _META_FILE,
+        _FLAGS_FILE,
+        _MAX_EVENTS,
+        _MAX_RANDOM_WALK_STEPS,
+        _DEFAULT_FLAGS,
+        _RUNTIME_FLAGS,
+        _SUGGESTED_ACTIONS,
+        _RELATION_TYPES,
+        _IMPORT_PATTERNS,
+        _MARKDOWN_LINK_RE,
+        _MARKDOWN_HEADING_RE,
+        _ENTITY_PATTERNS,
+        _MANIFEST_PARSERS,
+        _lock,
     )
+    import graph_relations_base as _gr_base
 
-# Cross-module imports (functions used from sibling modules)
-from server.graph_signals import (  # noqa: F402
-    _extract_repo_signals,
-    _get_file_mtimes,
-    _has_repo_changed,
-    _jaccard,
-    _load_recent_events,
-    _repo_id_from_path,
-)
-from server.graph_index import (  # noqa: F402
-    _check_coactivity,
-    _load_all_signals,
-    _load_flags,
-    _load_meta,
-    _load_relation_cache,
-    _save_flags,
-    _save_meta,
-    _save_relation_cache,
-    _save_repo_signals,
-)
+# ── Cross-module imports (functions used from sibling modules) ─────────────
+
+try:
+    from server.graph_signals import (  # noqa: F402
+        _extract_repo_signals,
+        _get_file_mtimes,
+        _has_repo_changed,
+        _jaccard,
+        _load_recent_events,
+        _repo_id_from_path,
+    )
+    from server.graph_index import (  # noqa: F402
+        _check_coactivity,
+        _load_all_signals,
+        _load_meta,
+        _load_relation_cache,
+        _save_meta,
+        _save_relation_cache,
+        _save_repo_signals,
+    )
+except ImportError:
+    from graph_signals import (  # noqa: F402
+        _extract_repo_signals,
+        _get_file_mtimes,
+        _has_repo_changed,
+        _jaccard,
+        _load_recent_events,
+        _repo_id_from_path,
+    )
+    from graph_index import (  # noqa: F402
+        _check_coactivity,
+        _load_all_signals,
+        _load_meta,
+        _load_relation_cache,
+        _save_meta,
+        _save_relation_cache,
+        _save_repo_signals,
+    )
 
 def _score_jaccard(sig_a: dict[str, Any], sig_b: dict[str, Any]) -> dict[str, float]:
     """Compute Jaccard similarities across all signal dimensions."""
@@ -471,7 +496,7 @@ def build_or_refresh_index(repo_base_paths: list[str]) -> dict[str, Any]:
     """
     start = time.time()
     meta = _load_meta()
-    flags = _load_flags()
+    flags = _gr_base._load_flags()
     stats: dict[str, Any] = {
         "nodes_indexed": 0,
         "nodes_skipped": 0,
@@ -549,7 +574,7 @@ def get_candidates(repo_id: str, limit: int = 10) -> list[dict[str, Any]]:
     if repo_id not in all_signals:
         return []
 
-    flags = _load_flags()
+    flags = _gr_base._load_flags()
 
     # Build neighbor graph for scoring
     neighbor_graph = _build_neighbor_graph(all_signals)
@@ -582,7 +607,7 @@ def get_relation_evidence(from_id: str, to_id: str) -> dict[str, Any]:
             "error": "One or both repos not in index",
         }
 
-    flags = _load_flags()
+    flags = _gr_base._load_flags()
     neighbor_graph = _build_neighbor_graph(all_signals)
 
     # Generate all candidates for from_id and find the one for to_id
@@ -652,7 +677,7 @@ def score_pair(from_id: str, to_id: str) -> dict[str, Any]:
             "error": "One or both repos not in index",
         }
 
-    flags = _load_flags()
+    flags = _gr_base._load_flags()
     neighbor_graph = _build_neighbor_graph(all_signals)
     item_graph = _build_item_graph(all_signals)
 
@@ -799,7 +824,7 @@ def get_network_stats() -> dict[str, Any]:
             "markdownLinks": total_links,
         },
         "cache_dir": str(_INDEX_DIR),
-        "flags": _load_flags(),
+        "flags": _gr_base._load_flags(),
     }
 
 
@@ -808,18 +833,18 @@ def get_network_stats() -> dict[str, Any]:
 
 def set_flags(graph_suggestions: bool | None = None, ai_relation_discovery: bool | None = None) -> dict[str, bool]:
     """Set feature flags globally. Returns current flags after update."""
-    flags = _load_flags()
+    flags = _gr_base._load_flags()
     if graph_suggestions is not None:
         flags["graphSuggestions"] = graph_suggestions
     if ai_relation_discovery is not None:
         flags["aiRelationDiscovery"] = ai_relation_discovery
-    _save_flags(flags)
+    _gr_base._save_flags(flags)
     return flags
 
 
 def get_flags() -> dict[str, bool]:
     """Return current feature flags."""
-    return _load_flags()
+    return _gr_base._load_flags()
 
 
 # ─── Event integration helper ──────────────────────────────────────────────────
