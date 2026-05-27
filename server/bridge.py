@@ -34,6 +34,11 @@ Uso:
 
 from __future__ import annotations
 
+import sys
+if __name__ == "__main__":
+    # Alias the __main__ module to server.bridge to prevent duplicate loading and state bifurcation
+    sys.modules["server.bridge"] = sys.modules["__main__"]
+
 from .sse_server import _sse_clients, _sse_lock, _fanout_sse, _register_sse_client, _unregister_sse_client, send_to_repociv
 from .pending_tracker import load_pending_tasks, append_pending_task, change_pending_state, resolve_pending_task, edit_pending_task, delete_pending_task, PENDING_TRACKER
 from .process_scanner import scan_active_processes, detect_lexo, _LEXO_PERSIST_PATH, _last_scan_pids
