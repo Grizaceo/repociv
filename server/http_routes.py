@@ -9,12 +9,17 @@ This makes routes individually testable without spinning up an HTTP server.
 """
 from __future__ import annotations
 
-from typing import Any
+import json as _json_lib
 import os
 import time
 import urllib.request
 import urllib.error
-import json as _json_lib
+from typing import Any
+
+
+def _error(status: int, error: str, cause: str, hint: str) -> tuple[int, dict]:
+    """Return a structured error envelope: {error, cause, hint}."""
+    return status, {"error": error, "cause": cause, "hint": hint}
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -692,7 +697,9 @@ def get_wonder_by_id(ctx: "RouteContext") -> tuple[int, Any]:
     wonder_id = ctx.get("wonder_id", "")
     manifest = _wr.get_wonder(wonder_id)
     if not manifest:
-        return 404, {"error": f"wonder '{wonder_id}' not found"}
+        return _error(404, f"wonder '{wonder_id}' not found",
+                      f"No wonder registered with id '{wonder_id}'",
+                      "Check available wonders: GET /api/wonders")
     return 200, manifest
 
 
@@ -720,10 +727,14 @@ def get_repo_profile(ctx: "RouteContext") -> tuple[int, Any]:
     params = ctx.get("params", {})
     repo_path = params.get("repoPath", "")
     if not repo_path:
-        return 400, {"error": "repoPath is required"}
+        return _error(400, "repoPath is required",
+                      "Query parameter 'repoPath' is missing",
+                      "Use /api/foreign/repo-profile?repoPath=/absolute/path/to/repo")
     profile = _rp.build_profile(repo_path)
     if profile is None:
-        return 404, {"error": f"Repo path not found or not a directory: {repo_path}"}
+        return _error(404, f"Repo path not found or not a directory: {repo_path}",
+                      f"Path does not exist or is not a directory: {repo_path}",
+                      "Verify the repo path exists and is a directory")
     return 200, profile
 
 
@@ -751,11 +762,15 @@ def post_foreign_score(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int,
     events = body.get("events", [])
 
     if not article or not repo_path:
-        return 400, {"error": "article and repoPath are required"}
+        return _error(400, "article and repoPath are required",
+                      "Request body missing required fields",
+                      "Send { article: {...}, repoPath: '/path/to/repo' }")
 
     profile = _rp.build_profile(repo_path)
     if profile is None:
-        return 404, {"error": f"Repo path not found: {repo_path}"}
+        return _error(404, f"Repo path not found: {repo_path}",
+                      f"Cannot build profile for '{repo_path}' — path does not exist or is not a directory",
+                      "Send a valid repo path that exists on the filesystem")
 
     scoring = _fr.score_article_repo(article, profile, events=events if events else None)
     return 200, {
@@ -793,11 +808,15 @@ def post_foreign_report(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int
     agent_id = body.get("agentId", "diplomat")
 
     if not articles or not repo_path:
-        return 400, {"error": "article/articles and repoPath are required"}
+        return _error(400, "article/articles and repoPath are required",
+                      "Request body missing required fields",
+                      "Send { article: {...}|articles: [...], repoPath: '/path/to/repo' }")
 
     profile = _rp.build_profile(repo_path)
     if profile is None:
-        return 404, {"error": f"Repo path not found: {repo_path}"}
+        return _error(404, f"Repo path not found: {repo_path}",
+                      f"Cannot build profile for '{repo_path}' — path does not exist or is not a directory",
+                      "Send a valid repo path that exists on the filesystem")
 
     primary_article = dict(articles[0])
     if len(articles) > 1:
@@ -848,10 +867,14 @@ def get_report_by_id(ctx: "RouteContext") -> tuple[int, Any]:
     """GET /api/foreign/reports/{id} — single report."""
     report_id = ctx.get("report_id", "")
     if not report_id:
-        return 400, {"error": "report_id is required"}
+        return _error(400, "report_id is required",
+                      "Path parameter 'report_id' is missing",
+                      "Use /api/foreign/reports/{report_id} with a valid report ID")
     report = _rs.get_report(report_id)
     if not report:
-        return 404, {"error": f"Report not found: {report_id}"}
+        return _error(404, f"Report not found: {report_id}",
+                      f"No report exists with id '{report_id}'",
+                      "Check existing reports: GET /api/foreign/reports")
     return 200, report
 
 
@@ -859,10 +882,14 @@ def delete_report_by_id(ctx: dict[str, Any], _body: dict[str, Any]) -> tuple[int
     """DELETE /api/foreign/reports/{id} — delete a report."""
     report_id = ctx.get("report_id", "")
     if not report_id:
-        return 400, {"error": "report_id is required"}
+        return _error(400, "report_id is required",
+                      "Path parameter 'report_id' is missing",
+                      "Use /api/foreign/reports/{report_id} with a valid report ID")
     ok = _rs.delete_report(report_id)
     if not ok:
-        return 404, {"error": f"Report not found: {report_id}"}
+        return _error(404, f"Report not found: {report_id}",
+                      f"No report exists with id '{report_id}'",
+                      "Check existing reports: GET /api/foreign/reports")
     return 200, {"ok": True, "deleted": report_id}
 
 
