@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-05-28
+
+- Flujo probado: sesión de evaluación de roadmap + corrida del loop de sanidad (check / lint / format / pytest / healthcheck / smoke-test) contra el sistema vivo en systemd.
+- Qué sí aportó valor: el loop de scripts (`healthcheck.sh`, `smoke-test.sh`) detectó fricción real que la suite de tests no veía.
+- Causa raíz común encontrada: `.env` ganó `REPOCIV_TOKEN` (commit `15533c2`), pero el endurecimiento de auth solo eximió `/health` y `/ready`. Todo lo demás quedó token-gated, y el tooling local que pega a endpoints gated no fue actualizado. Tres síntomas del mismo origen:
+  1. `test_bridge_integration.py::test_events_endpoint_*` → 401 (los tests no mandaban token; `bridge.py` carga `.env` al importarse). **Arreglado**: helper `_auth_headers()` que manda token si existe. Local-only — CI no tiene `.env` (gitignored).
+  2. `healthcheck.sh` → "/metrics no responde" (curl sin token → 401, reportaba DEGRADED falso). **Arreglado**: el script ahora manda `X-RepoCiv-Token` cuando hay token.
+  3. `/metrics` quedó gated mientras `/health` y `/ready` no — inconsistencia: `/metrics` es el endpoint de monitoreo por excelencia. Decisión pendiente: ¿eximir `/metrics` también, o mantenerlo gated por exponer más info en modo remoto? (recomendado: gated + monitor manda token, que es lo que ahora hace el script).
+- Bug observado (NO arreglado, es decisión de diseño): `/metrics` reporta `health: critical` por `errorRate: 1.0`. `_compute_error_rate` usa ventana **por conteo** (últimos 50 eventos terminales), no por tiempo. Como solo hay 2 comandos terminales en todo el historial (ambos fallas externas viejas: Codex token expirado hace ~17h, OpenRouter 401 hace ~5 días), el rate queda en 100% hasta que ocurran ~50 comandos exitosos. El health "cría lobos" durante idle. Recomendación: ventana temporal o piso mínimo de muestra, y/o no contar errores de auth de proveedor externo como salud del sistema.
+- Estado de gates hoy: `npm run check` 407✓ + build OK · `npm run lint` 0/0 · `pytest` 621✓/1 skip (tras fix) · `npm run format:check` **falla en 64 archivos** → **CI de `main` está rojo** (paso `format:check` en `ci.yml:28`). Deuda "Fase 0 — decidir Prettier" nunca cerrada. Acción: un commit mecánico `npm run format` (delegable).
+- Follow-up: (a) commit de Prettier para desbloquear CI; (b) decidir windowing de métricas; (c) actualizar §2 "Estado actual observado" del ROADMAP_IMPERIAL_WORKSHOP.md, que está desfasado (dice lint rojo 4 errores — ya está verde).
+
 ## 2026-05-07
 
 - Flujo probado: sesión de alineación de docs post-auditoría
