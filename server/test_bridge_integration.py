@@ -23,6 +23,10 @@ def _auth_headers(extra=None):
 
     bridge.py loads .env on import, so REPOCIV_TOKEN may be set even in local
     dev. Tests that hit auth-gated routes must send the header like the UI does.
+
+    Auth-gated routes (require this helper): /events, /agents, /pending,
+    /approvals, /missions, /metrics, /commands (POST), /approve (POST).
+    Auth-exempt routes (no header needed): /health, /ready.
     """
     headers = dict(extra or {})
     if bridge.REPOCIV_TOKEN:

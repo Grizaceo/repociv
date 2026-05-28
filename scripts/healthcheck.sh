@@ -98,7 +98,10 @@ METRICS_AUTH=()
 if [[ -n "${REPOCIV_TOKEN:-}" ]]; then
   METRICS_AUTH=(-H "X-RepoCiv-Token: $REPOCIV_TOKEN")
 fi
-if METRICS=$(curl -sf --max-time 5 "${METRICS_AUTH[@]}" "http://localhost:$BRIDGE_PORT/metrics" 2>/dev/null); then
+METRICS_HTTP=$(curl -s --max-time 5 -o /tmp/_repociv_metrics -w "%{http_code}" "${METRICS_AUTH[@]}" "http://localhost:$BRIDGE_PORT/metrics" 2>/dev/null || echo "000")
+if [[ "$METRICS_HTTP" == "200" ]]; then
+  METRICS=$(cat /tmp/_repociv_metrics 2>/dev/null)
+  rm -f /tmp/_repociv_metrics
   HEALTH_FIELD=$(echo "$METRICS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('health','?'))" 2>/dev/null || echo "?")
   case "$HEALTH_FIELD" in
     ok)       _ok "Métricas → SANO"; ((PASS+=1)) ;;
@@ -106,8 +109,13 @@ if METRICS=$(curl -sf --max-time 5 "${METRICS_AUTH[@]}" "http://localhost:$BRIDG
     critical) _fail "Métricas → CRÍTICO"; ((FAIL+=1)) ;;
     *)        _fail "Métricas → sin respuesta válida"; ((FAIL+=1)) ;;
   esac
+elif [[ "$METRICS_HTTP" == "401" ]]; then
+  rm -f /tmp/_repociv_metrics
+  _fail "Bridge /metrics → 401 (REPOCIV_TOKEN faltante o incorrecto)"
+  ((FAIL+=1))
 else
-  _fail "Bridge /metrics no responde"
+  rm -f /tmp/_repociv_metrics
+  _fail "Bridge /metrics no responde (HTTP $METRICS_HTTP)"
   ((FAIL+=1))
 fi
 
