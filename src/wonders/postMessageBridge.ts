@@ -46,8 +46,11 @@ function _isHostMessage(data: unknown): data is RepoCivToWonderMessage {
   }
   const t = (data as { type: string }).type;
   return (
-    t === 'repociv.context' || t === 'repociv.focus' || t === 'repociv.layer' ||
-    t === 'repociv.open_local_view' || t === 'repociv.graph_suggestions'
+    t === 'repociv.context' ||
+    t === 'repociv.focus' ||
+    t === 'repociv.layer' ||
+    t === 'repociv.open_local_view' ||
+    t === 'repociv.graph_suggestions'
   );
 }
 

@@ -89,7 +89,15 @@ export interface SuggestionRelation {
   fromName: string;
   toId: string;
   toName: string;
-  relationType: 'shared_dependency' | 'shared_entity' | 'temporal_coactivity' | 'conceptual_overlap' | 'imports_or_links' | 'same_lab_family' | 'security_relevance' | 'unknown_but_interesting';
+  relationType:
+    | 'shared_dependency'
+    | 'shared_entity'
+    | 'temporal_coactivity'
+    | 'conceptual_overlap'
+    | 'imports_or_links'
+    | 'same_lab_family'
+    | 'security_relevance'
+    | 'unknown_but_interesting';
   score: number;
   evidence: string[];
   suggestedActions: ('linkear' | 'ignorar' | 'abrir_ambos' | 'crear_nota')[];
@@ -113,7 +121,12 @@ export type WonderToRepoCivMessage =
   | { type: 'wonder.focus_city'; cityId: string; open?: 'macro' | 'local' }
   | { type: 'wonder.report'; id: string; title: string; markdown: string; relatedCities: string[] }
   | { type: 'wonder.notification'; level: 'info' | 'warn' | 'critical'; text: string }
-  | { type: 'wonder.selection'; nodeId: string; nodePath: string; nodeType: 'repo' | 'file' | 'folder' };
+  | {
+      type: 'wonder.selection';
+      nodeId: string;
+      nodePath: string;
+      nodeType: 'repo' | 'file' | 'folder';
+    };
 
 // ─── Per-Wonder User Configuration ──────────────────────────────────────────
 // These are the user-facing settings. They override manifest defaults.

@@ -8,22 +8,47 @@ import type { SuggestionRelation } from '../wonders/types.ts';
 // ─── Escaping helper ─────────────────────────────────────────────────────────
 
 function esc(s: string): string {
-  return s.replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
   );
 }
 
 // ─── Relation type metadata ──────────────────────────────────────────────────
 
 const RELATION_META: Record<string, { icon: string; label: string; color: string }> = {
-  shared_dependency:     { icon: '🔗', label: 'Dependencia compartida',   color: 'var(--civ-movement, #4ecdc4)' },
-  shared_entity:         { icon: '🏛', label: 'Entidad compartida',       color: 'var(--civ-gold, #c8a84b)' },
-  temporal_coactivity:   { icon: '⏳', label: 'Coactividad temporal',     color: 'var(--civ-happiness, #e8c84b)' },
-  conceptual_overlap:    { icon: '🧠', label: 'Solapamiento conceptual',   color: 'var(--civ-science, #4a9eff)' },
-  imports_or_links:      { icon: '📎', label: 'Importa o enlaza',         color: 'var(--civ-food, #6bcf7f)' },
-  same_lab_family:       { icon: '🧪', label: 'Misma familia de lab',     color: 'var(--civ-production, #d4824a)' },
-  security_relevance:    { icon: '🛡', label: 'Relevancia de seguridad',  color: 'var(--state-error, #d46a4a)' },
-  unknown_but_interesting: { icon: '💡', label: 'Desconocido pero interesante', color: 'var(--ui-text-dim, #8a7a5a)' },
+  shared_dependency: {
+    icon: '🔗',
+    label: 'Dependencia compartida',
+    color: 'var(--civ-movement, #4ecdc4)',
+  },
+  shared_entity: { icon: '🏛', label: 'Entidad compartida', color: 'var(--civ-gold, #c8a84b)' },
+  temporal_coactivity: {
+    icon: '⏳',
+    label: 'Coactividad temporal',
+    color: 'var(--civ-happiness, #e8c84b)',
+  },
+  conceptual_overlap: {
+    icon: '🧠',
+    label: 'Solapamiento conceptual',
+    color: 'var(--civ-science, #4a9eff)',
+  },
+  imports_or_links: { icon: '📎', label: 'Importa o enlaza', color: 'var(--civ-food, #6bcf7f)' },
+  same_lab_family: {
+    icon: '🧪',
+    label: 'Misma familia de lab',
+    color: 'var(--civ-production, #d4824a)',
+  },
+  security_relevance: {
+    icon: '🛡',
+    label: 'Relevancia de seguridad',
+    color: 'var(--state-error, #d46a4a)',
+  },
+  unknown_but_interesting: {
+    icon: '💡',
+    label: 'Desconocido pero interesante',
+    color: 'var(--ui-text-dim, #8a7a5a)',
+  },
 };
 
 function _relMeta(type: string): { icon: string; label: string; color: string } {
@@ -38,11 +63,16 @@ function _relScoreClass(score: number): string {
 
 function _actionLabel(action: string): string {
   switch (action) {
-    case 'linkear':     return '🔗 Vincular';
-    case 'ignorar':     return '🙈 Ignorar';
-    case 'abrir_ambos': return '📂 Abrir ambos';
-    case 'crear_nota':  return '📝 Crear nota';
-    default:            return action;
+    case 'linkear':
+      return '🔗 Vincular';
+    case 'ignorar':
+      return '🙈 Ignorar';
+    case 'abrir_ambos':
+      return '📂 Abrir ambos';
+    case 'crear_nota':
+      return '📝 Crear nota';
+    default:
+      return action;
   }
 }
 
@@ -400,19 +430,15 @@ function _renderEmpty(): void {
     </div>
   `;
 
-  _mountContainer
-    .querySelector('.relations-panel-header')
-    ?.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).classList.contains('relations-panel-toggle')) return;
-      _toggleCollapse();
-    });
+  _mountContainer.querySelector('.relations-panel-header')?.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).classList.contains('relations-panel-toggle')) return;
+    _toggleCollapse();
+  });
 
-  _mountContainer
-    .querySelector('.relations-panel-toggle')
-    ?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      _toggleCollapse();
-    });
+  _mountContainer.querySelector('.relations-panel-toggle')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    _toggleCollapse();
+  });
 }
 
 export function renderRelationsPanelLoading(container: HTMLElement): void {
@@ -556,19 +582,15 @@ function _attachListeners(relations: SuggestionRelation[]): void {
   }
 
   // Collapse toggle
-  _mountContainer
-    .querySelector('.relations-panel-header')
-    ?.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).classList.contains('relations-panel-toggle')) return;
-      _toggleCollapse();
-    });
+  _mountContainer.querySelector('.relations-panel-header')?.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).classList.contains('relations-panel-toggle')) return;
+    _toggleCollapse();
+  });
 
-  _mountContainer
-    .querySelector('.relations-panel-toggle')
-    ?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      _toggleCollapse();
-    });
+  _mountContainer.querySelector('.relations-panel-toggle')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    _toggleCollapse();
+  });
 
   // Action buttons
   _mountContainer.querySelectorAll('[data-action]').forEach((btn) => {

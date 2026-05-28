@@ -31,10 +31,12 @@
   outline-offset: 2px;
 }
 button:focus-visible,
-[role="button"]:focus-visible,
+[role='button']:focus-visible,
 select:focus-visible,
 input:focus-visible {
-  box-shadow: 0 0 0 2px var(--ui-dark), 0 0 0 4px var(--ui-gold-bright);
+  box-shadow:
+    0 0 0 2px var(--ui-dark),
+    0 0 0 4px var(--ui-gold-bright);
   outline: none;
 }
 
@@ -125,14 +127,30 @@ body {
 
 /* ═══ Animaciones globales (respetan prefers-reduced-motion arriba) ═══ */
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 @keyframes pulse-warn {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }

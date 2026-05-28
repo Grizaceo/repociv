@@ -7,7 +7,17 @@ import * as v from 'valibot';
 import type { BridgeEvent } from './types.ts';
 
 const Hex = v.tuple([v.number(), v.number()]);
-const UnitType = v.picklist(['hero', 'worker', 'scout', 'army', 'caravan', 'lexo', 'openclaw', 'claude', 'codex']);
+const UnitType = v.picklist([
+  'hero',
+  'worker',
+  'scout',
+  'army',
+  'caravan',
+  'lexo',
+  'openclaw',
+  'claude',
+  'codex',
+]);
 const UnitState = v.picklist(['idle', 'moving', 'working', 'sleeping', 'building']);
 const Resource = v.picklist(['gold', 'science', 'production']);
 const LogLevel = v.picklist(['info', 'warn', 'success']);

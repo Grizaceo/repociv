@@ -38,8 +38,7 @@ export function openSidePanel(unit: Unit): void {
   // Chat target: prefer saved chip preference so the user's last-selected
   // conversation survives panel close/reopen. Falls back to hex-selected unit.
   const savedChatUnit = localStorage.getItem('repociv:lastChatUnit');
-  const chatTargetId =
-    savedChatUnit && chatHistory.has(savedChatUnit) ? savedChatUnit : unit.id;
+  const chatTargetId = savedChatUnit && chatHistory.has(savedChatUnit) ? savedChatUnit : unit.id;
   setActiveChatUnit(chatTargetId);
   initAgentSelector(chatTargetId);
   renderChatHistory(chatTargetId);

@@ -18,12 +18,16 @@ function loadHistory(): Map<string, ChatMessage[]> {
     if (!raw) return new Map();
     const parsed = JSON.parse(raw);
     return new Map(Object.entries(parsed));
-  } catch { return new Map(); }
+  } catch {
+    return new Map();
+  }
 }
 function saveHistory(map: Map<string, ChatMessage[]>) {
   try {
     localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(Object.fromEntries(map)));
-  } catch { /* storage full or private mode */ }
+  } catch {
+    /* storage full or private mode */
+  }
 }
 function loadBuffers(): Map<string, string> {
   try {
@@ -31,12 +35,16 @@ function loadBuffers(): Map<string, string> {
     if (!raw) return new Map();
     const parsed = JSON.parse(raw);
     return new Map(Object.entries(parsed));
-  } catch { return new Map(); }
+  } catch {
+    return new Map();
+  }
 }
 function saveBuffers(map: Map<string, string>) {
   try {
     localStorage.setItem(STORAGE_KEY_BUFFERS, JSON.stringify(Object.fromEntries(map)));
-  } catch { /* storage full or private mode */ }
+  } catch {
+    /* storage full or private mode */
+  }
 }
 
 export const chatHistory = loadHistory();
@@ -72,10 +80,13 @@ chatBuffers.delete = function del(k: string) {
 };
 
 let _activeChatUnit: string | null = (() => {
-  const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('repociv:lastChatUnit') : null;
+  const saved =
+    typeof localStorage !== 'undefined' ? localStorage.getItem('repociv:lastChatUnit') : null;
   return saved ?? null;
 })();
-export function getActiveChatUnit(): string | null { return _activeChatUnit; }
+export function getActiveChatUnit(): string | null {
+  return _activeChatUnit;
+}
 export function setActiveChatUnit(v: string | null): void {
   _activeChatUnit = v;
   if (v && typeof localStorage !== 'undefined') localStorage.setItem('repociv:lastChatUnit', v);
@@ -92,5 +103,9 @@ export function updateChatTargetIndicator(): void {
 }
 
 let _sidePanelCleanup: (() => void) | null = null;
-export function getSidePanelCleanup(): (() => void) | null { return _sidePanelCleanup; }
-export function setSidePanelCleanup(v: (() => void) | null): void { _sidePanelCleanup = v; }
+export function getSidePanelCleanup(): (() => void) | null {
+  return _sidePanelCleanup;
+}
+export function setSidePanelCleanup(v: (() => void) | null): void {
+  _sidePanelCleanup = v;
+}

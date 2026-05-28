@@ -33,7 +33,8 @@ function _loadState(): MapLayerState {
       // Build clean state: inject defaults for any missing layers
       const layers: Record<MapLayerId, boolean> = {} as Record<MapLayerId, boolean>;
       for (const id of Object.keys(DEFAULT_MAP_LAYERS.layers) as MapLayerId[]) {
-        layers[id] = typeof rawLayers[id] === 'boolean' ? rawLayers[id] : DEFAULT_MAP_LAYERS.layers[id];
+        layers[id] =
+          typeof rawLayers[id] === 'boolean' ? rawLayers[id] : DEFAULT_MAP_LAYERS.layers[id];
       }
       const parsed: MapLayerState = { layers };
       return parsed;
@@ -79,8 +80,9 @@ function _trackLayerToggle(id: MapLayerId, visible: boolean): void {
   try {
     const key = 'repociv_layer_analytics';
     const raw = localStorage.getItem(key);
-    const data: Record<string, { opens: number; closes: number; lastAt: number }> =
-      raw ? (JSON.parse(raw) as Record<string, { opens: number; closes: number; lastAt: number }>) : {};
+    const data: Record<string, { opens: number; closes: number; lastAt: number }> = raw
+      ? (JSON.parse(raw) as Record<string, { opens: number; closes: number; lastAt: number }>)
+      : {};
     if (!data[id]) data[id] = { opens: 0, closes: 0, lastAt: 0 };
     if (visible) data[id].opens += 1;
     else data[id].closes += 1;

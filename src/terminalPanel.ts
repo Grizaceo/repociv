@@ -13,8 +13,7 @@ class XTermPanel {
     this._isOpen = false;
   }
 
-  write(_text: string): void {
-  }
+  write(_text: string): void {}
 
   isVisible(): boolean {
     return this._isOpen;

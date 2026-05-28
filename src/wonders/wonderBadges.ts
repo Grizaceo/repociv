@@ -18,15 +18,23 @@ export function renderCapabilityBadge(m: WonderManifest): string {
   const parts: string[] = [];
 
   if (m.automationLevel === 'assist') {
-    parts.push('<span class="wonder-badge wonder-badge--assist" title="Sugiere pero no ejecuta automáticamente">⚡ Asistente</span>');
+    parts.push(
+      '<span class="wonder-badge wonder-badge--assist" title="Sugiere pero no ejecuta automáticamente">⚡ Asistente</span>',
+    );
   } else if (m.automationLevel === 'auto') {
-    parts.push('<span class="wonder-badge wonder-badge--auto" title="Ejecuta acciones seguras automáticamente">🔄 Automático</span>');
+    parts.push(
+      '<span class="wonder-badge wonder-badge--auto" title="Ejecuta acciones seguras automáticamente">🔄 Automático</span>',
+    );
   } else {
-    parts.push('<span class="wonder-badge wonder-badge--passive" title="Solo muestra información">📖 Pasivo</span>');
+    parts.push(
+      '<span class="wonder-badge wonder-badge--passive" title="Solo muestra información">📖 Pasivo</span>',
+    );
   }
 
   if (m.agenticMode) {
-    parts.push('<span class="wonder-badge wonder-badge--agentic" title="Puede sugerir acciones">🤖 Agente</span>');
+    parts.push(
+      '<span class="wonder-badge wonder-badge--agentic" title="Puede sugerir acciones">🤖 Agente</span>',
+    );
   }
 
   return parts.join('');
@@ -73,7 +81,9 @@ export function renderCapabilityPanel(m: WonderManifest): string {
     caps.push('<span class="wonder-cap-chip wonder-cap-chip--off">🛠 Solo sugiere</span>');
   }
   if (m.requiresConfirmation) {
-    caps.push('<span class="wonder-cap-chip wonder-cap-chip--warn">⚠️ Requiere confirmación</span>');
+    caps.push(
+      '<span class="wonder-cap-chip wonder-cap-chip--warn">⚠️ Requiere confirmación</span>',
+    );
   }
 
   if (caps.length > 0) {
@@ -82,26 +92,37 @@ export function renderCapabilityPanel(m: WonderManifest): string {
 
   // ── Available actions ──
   if (actions.length > 0) {
-    const actionItems = actions.map((a) => {
-      const riskClass = a.risk === 'safe'
-        ? 'wonder-action--safe'
-        : a.risk === 'approval'
-          ? 'wonder-action--approval'
-          : 'wonder-action--manual';
-      const optInMark = a.requiresUserOptIn ? ' <span class="wonder-optin-mark">(opt-in)</span>' : '';
-      return `<div class="wonder-action-item ${riskClass}">${a.label}${optInMark}</div>`;
-    }).join('');
-    sections.push(`<div class="wonder-cap-section"><h4>Acciones disponibles</h4><div class="wonder-action-list">${actionItems}</div></div>`);
+    const actionItems = actions
+      .map((a) => {
+        const riskClass =
+          a.risk === 'safe'
+            ? 'wonder-action--safe'
+            : a.risk === 'approval'
+              ? 'wonder-action--approval'
+              : 'wonder-action--manual';
+        const optInMark = a.requiresUserOptIn
+          ? ' <span class="wonder-optin-mark">(opt-in)</span>'
+          : '';
+        return `<div class="wonder-action-item ${riskClass}">${a.label}${optInMark}</div>`;
+      })
+      .join('');
+    sections.push(
+      `<div class="wonder-cap-section"><h4>Acciones disponibles</h4><div class="wonder-action-list">${actionItems}</div></div>`,
+    );
   }
 
   // ── Optional features ──
   if (features.length > 0) {
-    const featureItems = features.map((f) => {
-      const statusIcon = f.defaultEnabled ? '✅' : '⬜';
-      const statusClass = f.defaultEnabled ? 'wonder-feature--on' : 'wonder-feature--off';
-      return `<div class="wonder-feature-item ${statusClass}">${statusIcon} ${f.label} <span class="wonder-feature-desc">${f.description}</span></div>`;
-    }).join('');
-    sections.push(`<div class="wonder-cap-section"><h4>Funciones opcionales (requieren activación)</h4><div class="wonder-feature-list">${featureItems}</div></div>`);
+    const featureItems = features
+      .map((f) => {
+        const statusIcon = f.defaultEnabled ? '✅' : '⬜';
+        const statusClass = f.defaultEnabled ? 'wonder-feature--on' : 'wonder-feature--off';
+        return `<div class="wonder-feature-item ${statusClass}">${statusIcon} ${f.label} <span class="wonder-feature-desc">${f.description}</span></div>`;
+      })
+      .join('');
+    sections.push(
+      `<div class="wonder-cap-section"><h4>Funciones opcionales (requieren activación)</h4><div class="wonder-feature-list">${featureItems}</div></div>`,
+    );
   }
 
   // ── Permissions summary ──
@@ -113,7 +134,9 @@ export function renderCapabilityPanel(m: WonderManifest): string {
     if (m.permissions.requiresApprovalForMutations) perms.push('Mutaciones requieren aprobación');
 
     if (perms.length > 0) {
-      sections.push(`<div class="wonder-cap-section"><h4>Permisos</h4><div class="wonder-perm-list">${perms.map((p) => `<span class="wonder-perm-chip">${p}</span>`).join('')}</div></div>`);
+      sections.push(
+        `<div class="wonder-cap-section"><h4>Permisos</h4><div class="wonder-perm-list">${perms.map((p) => `<span class="wonder-perm-chip">${p}</span>`).join('')}</div></div>`,
+      );
     }
   }
 

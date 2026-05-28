@@ -7,12 +7,7 @@ import {
   agentsWithNewMessages,
   getActiveChatUnit,
 } from './state.ts';
-import {
-  COPY_SVG,
-  attachCopyListeners,
-  escapeHtml,
-  hasErrorLine,
-} from './clipboard.ts';
+import { COPY_SVG, attachCopyListeners, escapeHtml, hasErrorLine } from './clipboard.ts';
 import { renderMarkdown } from './markdown.ts';
 import { ensureChipExists } from './agentChip.ts';
 
@@ -117,7 +112,10 @@ export function appendUserMessage(unitId: string, text: string): void {
     const history = chatHistory.get(unitId) ?? [];
     history.push({ role: 'user', text, timestamp: userTime });
     chatHistory.set(unitId, history);
-    const agentTime = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+    const agentTime = new Date().toLocaleTimeString('es-CL', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
     history.push({ role: 'agent', text: '', timestamp: agentTime });
     currentAgentMessageIndex.set(unitId, history.length - 1);
     chatHistory.set(unitId, history);

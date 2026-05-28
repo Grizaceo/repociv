@@ -298,7 +298,10 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   border-radius: 2px;
-  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .btn-accent:hover {

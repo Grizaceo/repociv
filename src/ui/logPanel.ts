@@ -116,7 +116,6 @@ export function toggleLogPanel(): void {
   else openLogPanel();
 }
 
-
 // ─── Polling ──────────────────────────────────────────────────────────────────
 function _startPolling(): void {
   _stopPolling();

@@ -21,8 +21,9 @@ let _selectedCityId: string | null = null;
 let _selectedRepoPath: string | null = null;
 
 function esc(s: string): string {
-  return s.replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
   );
 }
 
@@ -208,7 +209,9 @@ function _getCategories(): { name: string; emoji: string }[] {
 }
 
 function _getBlogs(): string[] {
-  return Array.from(new Set(_articles.map((a) => a.blogName).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  return Array.from(new Set(_articles.map((a) => a.blogName).filter(Boolean))).sort((a, b) =>
+    a.localeCompare(b),
+  );
 }
 
 function _renderCategories(): void {
@@ -221,7 +224,10 @@ function _renderCategories(): void {
   }
   bar.innerHTML = [
     `<span class="gaceta-chip ${_selectedCategory === 'all' ? 'active' : ''}" data-cat="all">[Todo]</span>`,
-    ...cats.map((c) => `<span class="gaceta-chip ${_selectedCategory === c.name ? 'active' : ''}" data-cat="${esc(c.name)}">[${esc(c.emoji)} ${esc(c.name)}]</span>`),
+    ...cats.map(
+      (c) =>
+        `<span class="gaceta-chip ${_selectedCategory === c.name ? 'active' : ''}" data-cat="${esc(c.name)}">[${esc(c.emoji)} ${esc(c.name)}]</span>`,
+    ),
   ].join('');
   bar.querySelectorAll('.gaceta-chip').forEach((chip) => {
     chip.addEventListener('click', (e) => {
@@ -244,7 +250,10 @@ function _renderBlogs(): void {
   }
   bar.innerHTML = [
     `<span class="gaceta-chip ${_selectedBlog === 'all' ? 'active' : ''}" data-blog="all">[Todos los blogs]</span>`,
-    ...blogs.map((blog) => `<span class="gaceta-chip ${_selectedBlog === blog ? 'active' : ''}" data-blog="${esc(blog)}">[${esc(blog)}]</span>`),
+    ...blogs.map(
+      (blog) =>
+        `<span class="gaceta-chip ${_selectedBlog === blog ? 'active' : ''}" data-blog="${esc(blog)}">[${esc(blog)}]</span>`,
+    ),
   ].join('');
   bar.querySelectorAll('.gaceta-chip').forEach((chip) => {
     chip.addEventListener('click', (e) => {
@@ -264,9 +273,10 @@ function _renderToolbar(): void {
   if (!frBtn) return;
   const count = _selectedArticleIds.size;
   frBtn.disabled = count === 0;
-  frBtn.title = count > 0
-    ? `Generar Informe de Relaciones Exteriores para ${count} noticia(s)${_selectedCityId ? ` · ${_selectedCityId}` : ''}`
-    : 'Selecciona una o más noticias primero';
+  frBtn.title =
+    count > 0
+      ? `Generar Informe de Relaciones Exteriores para ${count} noticia(s)${_selectedCityId ? ` · ${_selectedCityId}` : ''}`
+      : 'Selecciona una o más noticias primero';
 }
 
 function _renderList(refreshFilters = true): void {
@@ -274,7 +284,8 @@ function _renderList(refreshFilters = true): void {
   if (!list) return;
 
   let filtered = _articles;
-  if (_selectedCategory !== 'all') filtered = filtered.filter((a) => a.category === _selectedCategory);
+  if (_selectedCategory !== 'all')
+    filtered = filtered.filter((a) => a.category === _selectedCategory);
   if (_selectedBlog !== 'all') filtered = filtered.filter((a) => a.blogName === _selectedBlog);
 
   if (filtered.length === 0) {
@@ -284,7 +295,9 @@ function _renderList(refreshFilters = true): void {
 
   const isPanel = list.closest('.gaceta-mode-panel') !== null;
   const slice = isPanel ? filtered : filtered.slice(0, 5);
-  list.innerHTML = slice.map((a) => `
+  list.innerHTML = slice
+    .map(
+      (a) => `
     <li class="gaceta-item ${_selectedArticleIds.has(a.id) ? 'gaceta-item-selected' : ''}" data-article-id="${a.id}">
       <span class="gaceta-item-meta">${a.emoji ? esc(a.emoji) + ' ' : ''}${esc(a.blogName)} · ${new Date(a.publishedDate).toLocaleDateString()}${a.category ? ` · ${esc(a.category)}` : ''}</span>
       <a class="gaceta-item-title" href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>
@@ -293,7 +306,9 @@ function _renderList(refreshFilters = true): void {
         <span class="gaceta-select-hint">↻ click para ${_selectedArticleIds.has(a.id) ? 'deseleccionar' : 'seleccionar'}</span>
       </div>
     </li>
-  `).join('');
+  `,
+    )
+    .join('');
 
   list.querySelectorAll<HTMLElement>('.gaceta-item').forEach((item) => {
     item.addEventListener('click', (e) => {
@@ -321,9 +336,10 @@ function _renderList(refreshFilters = true): void {
     frBtn.parentNode?.replaceChild(newBtn, frBtn);
     newBtn.addEventListener('click', _openForeignReport);
     newBtn.disabled = _selectedArticleIds.size === 0;
-    newBtn.title = _selectedArticleIds.size > 0
-      ? `Generar Informe de Relaciones Exteriores para ${_selectedArticleIds.size} noticia(s)${_selectedCityId ? ` · ${_selectedCityId}` : ''}`
-      : 'Selecciona una o más noticias primero';
+    newBtn.title =
+      _selectedArticleIds.size > 0
+        ? `Generar Informe de Relaciones Exteriores para ${_selectedArticleIds.size} noticia(s)${_selectedCityId ? ` · ${_selectedCityId}` : ''}`
+        : 'Selecciona una o más noticias primero';
   }
 
   if (refreshFilters) {

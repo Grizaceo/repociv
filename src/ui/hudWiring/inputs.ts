@@ -66,7 +66,11 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
       : undefined;
     if (!selectorUnitId && !isSidePanelOpen()) {
       const saved = (() => {
-        try { return localStorage.getItem('repociv:lastChatUnit'); } catch { return null; }
+        try {
+          return localStorage.getItem('repociv:lastChatUnit');
+        } catch {
+          return null;
+        }
       })();
       if (saved && state.getUnit(saved)) selectorUnitId = saved;
     }

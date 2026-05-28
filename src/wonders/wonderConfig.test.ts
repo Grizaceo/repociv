@@ -94,33 +94,25 @@ describe('WONDER_MANIFESTS', () => {
   });
 
   it('gaceta foreign_relations_report action requires opt-in', () => {
-    const action = WONDER_MANIFESTS.gaceta.actions.find(
-      (a) => a.id === 'foreign_relations_report',
-    );
+    const action = WONDER_MANIFESTS.gaceta.actions.find((a) => a.id === 'foreign_relations_report');
     expect(action).toBeDefined();
     expect(action!.requiresUserOptIn).toBe(true);
   });
 
   it('gaceta open action does not require opt-in', () => {
-    const action = WONDER_MANIFESTS.gaceta.actions.find(
-      (a) => a.id === 'open',
-    );
+    const action = WONDER_MANIFESTS.gaceta.actions.find((a) => a.id === 'open');
     expect(action).toBeDefined();
     expect(action!.requiresUserOptIn).toBe(false);
   });
 
   it('institutum kill_experiment action requires opt-in', () => {
-    const action = WONDER_MANIFESTS.institutum.actions.find(
-      (a) => a.id === 'kill_experiment',
-    );
+    const action = WONDER_MANIFESTS.institutum.actions.find((a) => a.id === 'kill_experiment');
     expect(action).toBeDefined();
     expect(action!.requiresUserOptIn).toBe(true);
   });
 
   it('institutum hardLocks optional feature requires opt-in', () => {
-    const feature = WONDER_MANIFESTS.institutum.optionalFeatures.find(
-      (f) => f.id === 'hardLocks',
-    );
+    const feature = WONDER_MANIFESTS.institutum.optionalFeatures.find((f) => f.id === 'hardLocks');
     expect(feature).toBeDefined();
     expect(feature!.requiresUserOptIn).toBe(true);
     expect(feature!.defaultEnabled).toBe(false);
@@ -130,38 +122,22 @@ describe('WONDER_MANIFESTS', () => {
 describe('isFeatureEnabled', () => {
   it('returns true for enabled defaults', () => {
     expect(isFeatureEnabled(WONDER_DEFAULTS, 'gaceta', 'showNews')).toBe(true);
-    expect(
-      isFeatureEnabled(WONDER_DEFAULTS, 'bibliotheca', 'fileNavigation'),
-    ).toBe(true);
-    expect(
-      isFeatureEnabled(WONDER_DEFAULTS, 'labhub', 'showActiveExperiments'),
-    ).toBe(true);
-    expect(
-      isFeatureEnabled(WONDER_DEFAULTS, 'labhub', 'warnBeforeCityEdit'),
-    ).toBe(true);
+    expect(isFeatureEnabled(WONDER_DEFAULTS, 'bibliotheca', 'fileNavigation')).toBe(true);
+    expect(isFeatureEnabled(WONDER_DEFAULTS, 'labhub', 'showActiveExperiments')).toBe(true);
+    expect(isFeatureEnabled(WONDER_DEFAULTS, 'labhub', 'warnBeforeCityEdit')).toBe(true);
     expect(isFeatureEnabled(WONDER_DEFAULTS, 'labhub', 'softLocks')).toBe(true);
   });
 
   it('returns false for opt-in features with defaults', () => {
-    expect(
-      isFeatureEnabled(WONDER_DEFAULTS, 'gaceta', 'foreignRelationsReport'),
-    ).toBe(false);
-    expect(
-      isFeatureEnabled(WONDER_DEFAULTS, 'gaceta', 'autoSummaries'),
-    ).toBe(false);
-    expect(
-      isFeatureEnabled(WONDER_DEFAULTS, 'bibliotheca', 'graphSuggestions'),
-    ).toBe(false);
-    expect(
-      isFeatureEnabled(WONDER_DEFAULTS, 'bibliotheca', 'aiRelationDiscovery'),
-    ).toBe(false);
+    expect(isFeatureEnabled(WONDER_DEFAULTS, 'gaceta', 'foreignRelationsReport')).toBe(false);
+    expect(isFeatureEnabled(WONDER_DEFAULTS, 'gaceta', 'autoSummaries')).toBe(false);
+    expect(isFeatureEnabled(WONDER_DEFAULTS, 'bibliotheca', 'graphSuggestions')).toBe(false);
+    expect(isFeatureEnabled(WONDER_DEFAULTS, 'bibliotheca', 'aiRelationDiscovery')).toBe(false);
     expect(isFeatureEnabled(WONDER_DEFAULTS, 'labhub', 'hardLocks')).toBe(false);
   });
 
   it('supports institutum and legacy labhub ids for feature lookups', () => {
-    expect(
-      isFeatureEnabled(WONDER_DEFAULTS, 'institutum', 'showActiveExperiments'),
-    ).toBe(true);
+    expect(isFeatureEnabled(WONDER_DEFAULTS, 'institutum', 'showActiveExperiments')).toBe(true);
     expect(isFeatureEnabled(WONDER_DEFAULTS, 'labhub', 'hardLocks')).toBe(false);
   });
 
@@ -173,21 +149,15 @@ describe('isFeatureEnabled', () => {
         foreignRelationsReport: true,
       },
     };
-    expect(isFeatureEnabled(custom, 'gaceta', 'foreignRelationsReport')).toBe(
-      true,
-    );
+    expect(isFeatureEnabled(custom, 'gaceta', 'foreignRelationsReport')).toBe(true);
   });
 
   it('returns false for unknown wonder id', () => {
-    expect(isFeatureEnabled(WONDER_DEFAULTS, 'unknown', 'anything')).toBe(
-      false,
-    );
+    expect(isFeatureEnabled(WONDER_DEFAULTS, 'unknown', 'anything')).toBe(false);
   });
 
   it('returns false for unknown feature id', () => {
-    expect(isFeatureEnabled(WONDER_DEFAULTS, 'gaceta', 'nonexistent')).toBe(
-      false,
-    );
+    expect(isFeatureEnabled(WONDER_DEFAULTS, 'gaceta', 'nonexistent')).toBe(false);
   });
 });
 

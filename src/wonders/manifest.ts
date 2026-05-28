@@ -238,4 +238,8 @@ export function resolveWonderUrl(type: WonderType): string {
   return getWonder(type)?.ui.url ?? '';
 }
 
-export const KNOWN_WONDER_TYPES: readonly WonderType[] = ['gaceta', 'bibliotheca', 'institutum'] as const;
+export const KNOWN_WONDER_TYPES: readonly WonderType[] = [
+  'gaceta',
+  'bibliotheca',
+  'institutum',
+] as const;

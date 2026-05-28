@@ -175,7 +175,12 @@ function findNearestTile(
     // neighbors
     const W = world.grid[0]?.length ?? 0;
     const H = world.grid.length;
-    const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+    const dirs = [
+      [0, -1],
+      [0, 1],
+      [-1, 0],
+      [1, 0],
+    ];
     for (const [dx, dy] of dirs) {
       if (dx === undefined || dy === undefined) continue;
       const nx = cur.x + dx;

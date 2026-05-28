@@ -59,8 +59,6 @@ export function showUnitPanel(unit: Unit) {
   renderCapabilityBadges(unit);
 }
 
-
-
 export function hideUnitPanel() {
   document.getElementById('unit-panel')?.classList.add('hidden');
   clearCapabilityBadges();

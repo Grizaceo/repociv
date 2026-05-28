@@ -36,8 +36,6 @@ export interface CommandDraft {
   created_by?: string;
 }
 
-
-
 export interface CommandResponse {
   ok: boolean;
   status: CommandStatus;

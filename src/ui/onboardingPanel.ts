@@ -343,7 +343,6 @@ async function hydrateRepos(state: OnboardingState, onContinue: () => void): Pro
   render(state, onContinue);
 }
 
-
 export async function runRepoOnboarding(): Promise<void> {
   const mapRoot = await fetchCurrentMapRoot().catch(() => 'desconocida');
   await new Promise<void>((resolve) => {

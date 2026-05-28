@@ -1,10 +1,5 @@
 // ─── Pure HTML templates for the pending panel ──────────────────────────────
-import {
-  type PendingItem,
-  STATE_OPTIONS,
-  getExpandedId,
-  getEditingId,
-} from './state.ts';
+import { type PendingItem, STATE_OPTIONS, getExpandedId, getEditingId } from './state.ts';
 
 export function escapeHtml(s: string): string {
   return s
@@ -60,9 +55,10 @@ export function renderItem(item: PendingItem): string {
       `<option value="${o.value}" ${item.state === o.value ? 'selected' : ''}>${o.label}</option>`,
   ).join('');
 
-  const sourceBadge = item.source === 'local'
-    ? `<span class="pending-source-badge pending-source-local" title="Agregado desde RepoCiv">rc</span>`
-    : `<span class="pending-source-badge pending-source-hermes" title="Desde PENDING_TRACKER.md">hm</span>`;
+  const sourceBadge =
+    item.source === 'local'
+      ? `<span class="pending-source-badge pending-source-local" title="Agregado desde RepoCiv">rc</span>`
+      : `<span class="pending-source-badge pending-source-hermes" title="Desde PENDING_TRACKER.md">hm</span>`;
 
   return `
     <div class="pending-item ${isExpanded ? 'expanded' : ''} ${isEditing ? 'editing' : ''}" data-id="${escapeHtml(item.id)}">

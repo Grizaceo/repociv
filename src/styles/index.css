@@ -53,13 +53,16 @@
   place-items: center;
   cursor: pointer;
   font-size: var(--text-base);
-  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
 #btn-theme-toggle:hover {
   color: var(--ui-gold-bright);
   border-color: var(--ui-gold);
 }
-[data-theme="light"] #btn-theme-toggle {
+[data-theme='light'] #btn-theme-toggle {
   color: var(--ui-text);
 }
 
@@ -94,8 +97,13 @@
 }
 
 @keyframes loadingPulse {
-  0%, 100% { opacity: 0.7; }
-  50%       { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 #loading-bar {
@@ -120,15 +128,22 @@
 #loading-fill::after {
   content: '';
   position: absolute;
-  top: 0; right: 0; bottom: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
   width: 40px;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
   animation: loadingShimmer 1.2s ease-in-out infinite;
 }
 
 @keyframes loadingShimmer {
-  from { transform: translateX(-40px); }
-  to   { transform: translateX(0px); opacity: 0; }
+  from {
+    transform: translateX(-40px);
+  }
+  to {
+    transform: translateX(0px);
+    opacity: 0;
+  }
 }
 
 /* Imperial crest above loading text */
@@ -145,7 +160,7 @@
 
 /* ═══ Phase 2: Analog noise grain scoped to local view ═══ */
 body.local-view::after {
-  content: "";
+  content: '';
   position: fixed;
   inset: 0;
   width: 100vw;

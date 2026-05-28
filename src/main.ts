@@ -81,10 +81,7 @@ import {
   postFocusToWonder,
   postOpenLocalViewToWonder,
 } from './wonders/postMessageBridge.ts';
-import {
-  findCityByWonderSelection,
-  findNearbyCities,
-} from './wonders/bibliothecaBridge.ts';
+import { findCityByWonderSelection, findNearbyCities } from './wonders/bibliothecaBridge.ts';
 import { loadWonderConfig, isFeatureEnabled } from './wonders/wonderConfig.ts';
 import type { City } from './types.ts';
 import {
@@ -161,7 +158,14 @@ async function bootstrap() {
     const next = current === 'dark' ? 'light' : 'dark';
     html.setAttribute('data-theme', next);
     localStorage.setItem('repociv:theme', next);
-    const lucide = (window as unknown as { lucide?: { createIcons: (opts: { icons: Record<string, unknown> }) => void; icons: Record<string, unknown> } }).lucide;
+    const lucide = (
+      window as unknown as {
+        lucide?: {
+          createIcons: (opts: { icons: Record<string, unknown> }) => void;
+          icons: Record<string, unknown>;
+        };
+      }
+    ).lucide;
     if (lucide) lucide.createIcons({ icons: lucide.icons });
   });
 
@@ -187,7 +191,10 @@ async function bootstrap() {
   welcome.innerHTML = `<div class="salute-icon">${chosen.icon}</div><div class="salute-line">${chosen.line}</div><div class="salute-sub">${chosen.sub}</div>`;
   document.getElementById('app')?.appendChild(welcome);
   requestAnimationFrame(() => welcome.classList.add('visible'));
-  setTimeout(() => { welcome.style.opacity = '0'; setTimeout(() => welcome.remove(), 800); }, 3200);
+  setTimeout(() => {
+    welcome.style.opacity = '0';
+    setTimeout(() => welcome.remove(), 800);
+  }, 3200);
 
   await runRepoOnboarding();
 
@@ -310,9 +317,12 @@ async function bootstrap() {
   document.getElementById('btn-pending')?.addEventListener('click', togglePendingPanel);
   document.getElementById('btn-log')?.addEventListener('click', toggleLogPanel);
   document.getElementById('btn-task-assign')?.addEventListener('click', () => {
-    toggleTaskAssignPanel(() => state.getLocalUnits(), (unitId, task) => {
-      state.setLocalUnitTask(unitId, task);
-    });
+    toggleTaskAssignPanel(
+      () => state.getLocalUnits(),
+      (unitId, task) => {
+        state.setLocalUnitTask(unitId, task);
+      },
+    );
   });
   document.getElementById('btn-harnesses')?.addEventListener('click', () => {
     toggleHarnessPanel();
@@ -360,7 +370,7 @@ async function bootstrap() {
   let _selectedCityId: string | null = null;
 
   function _publishWonderContext(cityId?: string | null): void {
-    const selected = cityId ? state.world.cities.find((c) => c.id === cityId) ?? null : null;
+    const selected = cityId ? (state.world.cities.find((c) => c.id === cityId) ?? null) : null;
     window.dispatchEvent(
       new CustomEvent('repociv:wonder-context', {
         detail: {
@@ -375,11 +385,15 @@ async function bootstrap() {
   function _syncGraphRelationOptInFlags(): void {
     const config = loadWonderConfig();
     const graphSuggestions = isFeatureEnabled(config, 'bibliotheca', 'graphSuggestions');
-    const aiRelationDiscovery = graphSuggestions && isFeatureEnabled(config, 'bibliotheca', 'aiRelationDiscovery');
+    const aiRelationDiscovery =
+      graphSuggestions && isFeatureEnabled(config, 'bibliotheca', 'aiRelationDiscovery');
     void syncGraphRelationFlags({ graphSuggestions, aiRelationDiscovery });
   }
 
-  async function _syncBibliothecaFocusIfOpen(city: City, mode: 'macro' | 'local' = 'macro'): Promise<void> {
+  async function _syncBibliothecaFocusIfOpen(
+    city: City,
+    mode: 'macro' | 'local' = 'macro',
+  ): Promise<void> {
     const manifest = getWonder('bibliotheca');
     if (!manifest) return;
     const vignette = document.querySelector<HTMLElement>('#wonder-vignette');
@@ -397,7 +411,10 @@ async function bootstrap() {
     }
   }
 
-  async function _openBibliothecaForCity(city: City, mode: 'macro' | 'local' = 'macro'): Promise<void> {
+  async function _openBibliothecaForCity(
+    city: City,
+    mode: 'macro' | 'local' = 'macro',
+  ): Promise<void> {
     const manifest = getWonder('bibliotheca');
     if (!manifest) return;
     const existing = document.querySelector<HTMLElement>('#wonder-vignette');
@@ -428,7 +445,11 @@ async function bootstrap() {
     const config = loadWonderConfig();
 
     // Only mutating actions need warning — navigation/read focus should pass
-    const isNavigation = actionLabel.includes('Abrir') || actionLabel.includes('Ver') || actionLabel.includes('focus') || actionLabel.includes('navegar');
+    const isNavigation =
+      actionLabel.includes('Abrir') ||
+      actionLabel.includes('Ver') ||
+      actionLabel.includes('focus') ||
+      actionLabel.includes('navegar');
     if (isNavigation) return true;
 
     // Try to resolve real status (async) for better guard accuracy
@@ -448,12 +469,18 @@ async function bootstrap() {
     return true;
   }
 
-  function hardLocksEnabled(status: CityLabStatus, config: ReturnType<typeof loadWonderConfig>): boolean {
+  function hardLocksEnabled(
+    status: CityLabStatus,
+    config: ReturnType<typeof loadWonderConfig>,
+  ): boolean {
     return status.writeLock && isFeatureEnabled(config, 'institutum', 'hardLocks');
   }
 
   function shouldWarnForAction(config: ReturnType<typeof loadWonderConfig>): boolean {
-    return isFeatureEnabled(config, 'institutum', 'softLocks') || isFeatureEnabled(config, 'institutum', 'warnBeforeCityEdit');
+    return (
+      isFeatureEnabled(config, 'institutum', 'softLocks') ||
+      isFeatureEnabled(config, 'institutum', 'warnBeforeCityEdit')
+    );
   }
 
   function _primeMissionComposerForCity(city: City): void {
@@ -502,7 +529,11 @@ async function bootstrap() {
     source?: string;
   }): void {
     const cityQuery = detail.cityId ?? '';
-    const target = findCityByWonderSelection(state.world.cities, cityQuery, detail.repoPath ?? detail.nodePath);
+    const target = findCityByWonderSelection(
+      state.world.cities,
+      cityQuery,
+      detail.repoPath ?? detail.nodePath,
+    );
     if (target) {
       const fullCity = state.world.cities.find((c) => c.id === target.id);
       if (!fullCity) return;
@@ -526,7 +557,10 @@ async function bootstrap() {
       );
       return;
     }
-    logEvent(`⚠ RepoCiv no encontró ciudad para ${detail.cityId || detail.repoPath || detail.nodePath}`, 'warn');
+    logEvent(
+      `⚠ RepoCiv no encontró ciudad para ${detail.cityId || detail.repoPath || detail.nodePath}`,
+      'warn',
+    );
   }
 
   renderer.onCitySelect = (cityId) => {
@@ -565,21 +599,26 @@ async function bootstrap() {
     const detail = (e as CustomEvent).detail as { repo?: string } | undefined;
     if (!detail?.repo) return;
     const target = state.world.cities.find(
-      (c) => c.id.toLowerCase() === detail.repo!.toLowerCase() ||
-             (c.name || '').toLowerCase() === detail.repo!.toLowerCase(),
+      (c) =>
+        c.id.toLowerCase() === detail.repo!.toLowerCase() ||
+        (c.name || '').toLowerCase() === detail.repo!.toLowerCase(),
     );
     if (target && renderer.onCitySelect) renderer.onCitySelect(target.id);
   });
 
   // ─── Fase 4: Bibliotheca ↔ RepoCiv bidirectional focus (wiring real + fallback) ──
   window.addEventListener('repociv:wonder-focus-city', (e: Event) => {
-    const detail = (e as CustomEvent).detail as { cityId: string; mode: 'macro' | 'local' } | undefined;
+    const detail = (e as CustomEvent).detail as
+      | { cityId: string; mode: 'macro' | 'local' }
+      | undefined;
     if (!detail?.cityId) return;
     _focusCityRequest({ cityId: detail.cityId, mode: detail.mode, source: 'Bibliotheca focus' });
   });
 
   window.addEventListener('repociv:wonder-selection', (e: Event) => {
-    const detail = (e as CustomEvent).detail as { nodeId: string; nodePath: string; nodeType: string } | undefined;
+    const detail = (e as CustomEvent).detail as
+      | { nodeId: string; nodePath: string; nodeType: string }
+      | undefined;
     if (!detail?.nodeId && !detail?.nodePath) return;
     _focusCityRequest({
       cityId: detail?.nodeId,
@@ -589,13 +628,15 @@ async function bootstrap() {
   });
 
   window.addEventListener('repociv:focus-city-request', (e: Event) => {
-    const detail = (e as CustomEvent).detail as {
-      cityId?: string;
-      repoPath?: string;
-      nodePath?: string;
-      mode?: 'macro' | 'local';
-      source?: string;
-    } | undefined;
+    const detail = (e as CustomEvent).detail as
+      | {
+          cityId?: string;
+          repoPath?: string;
+          nodePath?: string;
+          mode?: 'macro' | 'local';
+          source?: string;
+        }
+      | undefined;
     if (!detail) return;
     _focusCityRequest(detail);
   });
@@ -629,7 +670,9 @@ async function bootstrap() {
     if (!detail?.cityId) return;
     const city = state.world.cities.find((c) => c.id === detail.cityId);
     if (!city) return;
-    const status = detail.labStatus ? (JSON.parse(detail.labStatus) as CityLabStatus) : _getCityLabStatus(city.id);
+    const status = detail.labStatus
+      ? (JSON.parse(detail.labStatus) as CityLabStatus)
+      : _getCityLabStatus(city.id);
     _openLogsForCityStatus(city, status);
   });
 
@@ -719,7 +762,8 @@ async function bootstrap() {
         setTimeout(() => hideLocalWorkbenchTooltip(), 3000);
         return;
       }
-      if (!(await _confirmLabSensitiveAction(repoId, `Editar/local mission sobre ${wb.fileName}`))) return;
+      if (!(await _confirmLabSensitiveAction(repoId, `Editar/local mission sobre ${wb.fileName}`)))
+        return;
       showLocalMissionPreview(
         action,
         wb.fileName,

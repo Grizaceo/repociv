@@ -19,8 +19,6 @@ export type TrustLevel =
   | 'sandboxed'
   | 'privileged_external';
 
-
-
 export type RecoveryMode = 'copy_command' | 'tmux_attach' | 'view_logs' | 'no_recovery_available';
 
 export interface RecoveryDescriptor {
@@ -36,7 +34,6 @@ export interface HarnessHealth {
   command?: string;
   url?: string;
 }
-
 
 export interface HarnessDescriptor {
   id: string;

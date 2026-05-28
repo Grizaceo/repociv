@@ -140,7 +140,6 @@ export function showLocalContextMenu(
   }, 50);
 }
 
-
 // ─── Mission confirmation preview ─────────────────────────────────────────────
 export function showLocalMissionPreview(
   agentName: string,
@@ -175,7 +174,6 @@ export function showLocalMissionPreview(
     onCancel();
   });
 }
-
 
 // ─── Git panel for a single file ──────────────────────────────────────────────
 export async function showGitForFile(

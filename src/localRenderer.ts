@@ -402,7 +402,7 @@ export class LocalRenderer {
   private visibleTileRect() {
     if (!this.world) return { x0: 0, y0: 0, x1: 0, y1: 0 };
     const { canvas, cam } = this;
-    
+
     // Screen bounds to world coordinates
     const left = (0 - cam.cx) / cam.zoom + cam.x;
     const top = (0 - cam.cy) / cam.zoom + cam.y;
@@ -456,7 +456,7 @@ export class LocalRenderer {
     const offset = panelW * currentOpen;
 
     ctx.save();
-    
+
     // Left sliding panel
     ctx.fillStyle = this.tokens.zinc600 || '#52525B';
     ctx.fillRect(px - offset, py + 1, panelW, s - 2);
@@ -478,7 +478,7 @@ export class LocalRenderer {
 
     // Check if an agent is active on this workbench (Phase 6)
     const activeUnit = this._localUnits.find(
-      (u) => u.state === 'working_on_file' && u.currentWorkbenchId === wb.id
+      (u) => u.state === 'working_on_file' && u.currentWorkbenchId === wb.id,
     );
     if (!activeUnit) return;
 
@@ -489,7 +489,7 @@ export class LocalRenderer {
     const extColor = EXT_COLOR[wb.extension] ?? '#888';
 
     ctx.save();
-    
+
     // Glow effect (expensive, only for active ones!)
     ctx.shadowColor = extColor;
     ctx.shadowBlur = 12 + 6 * Math.sin(now / 250);
@@ -549,7 +549,6 @@ export class LocalRenderer {
       ctx.fillRect(px + s - 3, py + 2, 1, 1);
       ctx.fillRect(px + 2, py + s - 3, 1, 1);
       ctx.fillRect(px + s - 3, py + s - 3, 1, 1);
-
     } else if (tile.type === 'path') {
       // Corridor floor: cleaner, with a guiding center line
       let fillColor = this.tokens.zinc800 || '#27272A';
@@ -572,10 +571,8 @@ export class LocalRenderer {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)';
       ctx.lineWidth = 0.5;
       ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
-
     } else if (tile.type === 'wall') {
       this.drawWallFacade(tile, px, py, s);
-
     } else if (tile.type === 'debris') {
       // Base floor under debris
       const fillColor = this.tokens.base || '#0C0C0C';
@@ -588,7 +585,6 @@ export class LocalRenderer {
       ctx.strokeStyle = this.tokens.border || '#262626';
       ctx.lineWidth = 0.5;
       ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
-
     } else if (tile.type === 'kiosk') {
       // Base floor under kiosk
       ctx.fillStyle = this.tokens.zinc800 || '#27272A';
@@ -599,7 +595,6 @@ export class LocalRenderer {
       ctx.strokeStyle = this.tokens.border || '#262626';
       ctx.lineWidth = 0.5;
       ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
-
     } else if (tile.type === 'workbench') {
       // Base floor under workbench
       ctx.fillStyle = this.tokens.zinc800 || '#27272A';
@@ -618,7 +613,14 @@ export class LocalRenderer {
 
     const isOpen = (x: number, y: number) => {
       const t = this.getTile(x, y);
-      return t !== null && (t.type === 'floor' || t.type === 'door' || t.type === 'path' || t.type === 'workbench' || t.type === 'kiosk');
+      return (
+        t !== null &&
+        (t.type === 'floor' ||
+          t.type === 'door' ||
+          t.type === 'path' ||
+          t.type === 'workbench' ||
+          t.type === 'kiosk')
+      );
     };
 
     const north = isOpen(tile.x, tile.y - 1);

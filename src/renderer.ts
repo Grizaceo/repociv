@@ -92,7 +92,13 @@ export class Renderer {
     | ((unit: import('./types.ts').LocalUnit, screenX: number, screenY: number) => void)
     | null = null;
   localTileClickCb:
-    | ((x: number, y: number, tile: import('./types.ts').LocalTile | null, screenX: number, screenY: number) => void)
+    | ((
+        x: number,
+        y: number,
+        tile: import('./types.ts').LocalTile | null,
+        screenX: number,
+        screenY: number,
+      ) => void)
     | null = null;
   // Phase 9: bubble layer callbacks
   localUnitRenderedCb:
@@ -712,17 +718,24 @@ export class Renderer {
               (w.wonderType === 'bibliotheca' && showKnowledge) ||
               (w.wonderType === 'institutum' && showLabs) ||
               (w.wonderType === 'gaceta' && showKnowledge) ||
-              (w.wonderType !== 'bibliotheca' && w.wonderType !== 'institutum' && w.wonderType !== 'gaceta');
+              (w.wonderType !== 'bibliotheca' &&
+                w.wonderType !== 'institutum' &&
+                w.wonderType !== 'gaceta');
             if (!spriteAllowed && showStructure) continue; // still show under structure
             const sx = cp.x + (i === 0 ? -1 : 1) * HEX_SIZE * 0.55;
             const sy = cp.y - HEX_SIZE * 0.5;
             const r = 9;
-            ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2);
+            ctx.beginPath();
+            ctx.arc(sx, sy, r, 0, Math.PI * 2);
             ctx.fillStyle = w.wonderType === 'bibliotheca' ? '#1a3a5c' : '#2d5a27';
             ctx.strokeStyle = w.wonderType === 'bibliotheca' ? '#4a90c8' : '#6bc86b';
-            ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
-            ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif';
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.lineWidth = 2;
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
             ctx.fillText(w.wonderType === 'bibliotheca' ? 'B' : 'I', sx, sy + 1);
           }
         }
@@ -932,10 +945,15 @@ export class Renderer {
       const selUnit = this.state.world.units.find((u) => u.id === this.selectedUnit!.id);
       if (selUnit) {
         let sx: number, sy: number;
-        if (selUnit.state === 'moving' && selUnit.path.length > 0 && selUnit.pathIndex < selUnit.path.length) {
+        if (
+          selUnit.state === 'moving' &&
+          selUnit.path.length > 0 &&
+          selUnit.pathIndex < selUnit.path.length
+        ) {
           const from = axialToPixel(selUnit.path[selUnit.pathIndex]!, HEX_SIZE);
           const to = axialToPixel(
-            selUnit.path[Math.min(selUnit.pathIndex + 1, selUnit.path.length - 1)]!, HEX_SIZE,
+            selUnit.path[Math.min(selUnit.pathIndex + 1, selUnit.path.length - 1)]!,
+            HEX_SIZE,
           );
           const t = selUnit.pathProgress;
           sx = from.x + (to.x - from.x) * t;
@@ -1040,10 +1058,10 @@ export class Renderer {
     // Global Atmospheric Bloom / Lighting (Time of Day Cycle)
     const timeOfDay = (this.animTime * 0.035) % (Math.PI * 2);
     const sinTime = Math.sin(timeOfDay);
-    
+
     let warmColor: string;
     let vignetteColor: string;
-    
+
     if (sinTime > 0.5) {
       // Mediodía brillante (claro y neutro)
       warmColor = 'rgba(255, 255, 255, 0.015)';
@@ -1159,7 +1177,14 @@ export class Renderer {
     const parts: string[] = [];
     let iconChar = '⬡';
     if (unit) {
-      iconChar = unit.type === 'hero' ? '⬡' : unit.type === 'worker' ? '⚒' : unit.type === 'scout' ? '◈' : '◆';
+      iconChar =
+        unit.type === 'hero'
+          ? '⬡'
+          : unit.type === 'worker'
+            ? '⚒'
+            : unit.type === 'scout'
+              ? '◈'
+              : '◆';
       parts.push(`<span class="bc-segment ${unit.type}">${unit.name}</span>`);
       if (unit.state) {
         parts.push(`<span class="bc-separator">·</span>`);
@@ -1167,7 +1192,9 @@ export class Renderer {
       }
       if (unit.mission) {
         parts.push(`<span class="bc-separator">·</span>`);
-        parts.push(`<span class="bc-segment" style="opacity:0.6">${unit.mission.slice(0, 30)}</span>`);
+        parts.push(
+          `<span class="bc-segment" style="opacity:0.6">${unit.mission.slice(0, 30)}</span>`,
+        );
       }
     } else if (city) {
       iconChar = city.isCapital ? '★' : '⬡';
