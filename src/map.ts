@@ -11,7 +11,15 @@ import {
   axialEquals,
   axialSub,
 } from './hex.ts';
-import { type Terrain, type Tile, type City, type District, type Building, type World, tileKey } from './types.ts';
+import {
+  type Terrain,
+  type Tile,
+  type City,
+  type District,
+  type Building,
+  type World,
+  tileKey,
+} from './types.ts';
 import { loadManualLayout, updateManualRepoCoord } from './manualLayout.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
 
@@ -287,7 +295,7 @@ export function recalculateAllTerritories(world: World): void {
   for (let i = 0; i < cities.length; i++) {
     const city = cities[i]!;
     city.territory = newTerritories[i]!.filter(
-      (c) => !city.districts.some((d) => d.coord.q === c.q && d.coord.r === c.r)
+      (c) => !city.districts.some((d) => d.coord.q === c.q && d.coord.r === c.r),
     );
   }
 }
@@ -662,14 +670,17 @@ export async function generateWorld(): Promise<World> {
   cityRepos = cityRepos.filter((r) => !(r.path.endsWith('gris') || r.name === 'gris'));
   orphanRepos = orphanRepos.filter((r) => !(r.path.endsWith('gris') || r.name === 'gris'));
 
-  const maxAutoCoords = Math.max(cityRepos.length * MIN_CITY_DISTANCE * MIN_CITY_DISTANCE * 3, cityRepos.length + 32);
+  const maxAutoCoords = Math.max(
+    cityRepos.length * MIN_CITY_DISTANCE * MIN_CITY_DISTANCE * 3,
+    cityRepos.length + 32,
+  );
   const cityCoords = spiralCoords({ q: 0, r: 0 }, maxAutoCoords);
   const occupiedCoords = new Set<string>();
   const cityCoordLookup = new Map<string, Axial>();
   // Reserve capital + wonder district hexes so repos don't land on them
-  occupiedCoords.add(tileKey({ q: 0, r: 0 }));   // capital Gris
-  occupiedCoords.add(tileKey({ q: -1, r: 0 }));  // Bibliotheca
-  occupiedCoords.add(tileKey({ q: 1, r: 0 }));   // LabHub
+  occupiedCoords.add(tileKey({ q: 0, r: 0 })); // capital Gris
+  occupiedCoords.add(tileKey({ q: -1, r: 0 })); // Bibliotheca
+  occupiedCoords.add(tileKey({ q: 1, r: 0 })); // LabHub
   let autoCoordCursor = 0;
   for (const repo of cityRepos) {
     if (repo.manualCoord) {
@@ -813,7 +824,7 @@ export async function generateWorld(): Promise<World> {
           // Generate a beautiful, natural continental landscape inside bounding box
           const rand = Math.random();
           if (rand < 0.15) terrain = 'forest';
-          else if (rand < 0.30) terrain = 'hills';
+          else if (rand < 0.3) terrain = 'hills';
           else terrain = 'plains';
         }
         tiles.set(key, {
@@ -834,7 +845,7 @@ export async function generateWorld(): Promise<World> {
   // ─── Spawn Capital "Gris" + Wonder Districts ──────────────────────────────────
   const capCoord: Axial = { q: 0, r: 0 };
   const bibliothecaCoord: Axial = { q: -1, r: 0 }; // west neighbor
-  const institutumCoord: Axial = { q: 1, r: 0 };   // east neighbor
+  const institutumCoord: Axial = { q: 1, r: 0 }; // east neighbor
 
   const bibliotheca: Building = {
     id: 'wonder-bibliotheca',

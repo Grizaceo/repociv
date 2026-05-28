@@ -12,8 +12,6 @@ export interface Suggestion {
   score: number;
 }
 
-
-
 export interface Template {
   gesture: string;
   agentId: string;

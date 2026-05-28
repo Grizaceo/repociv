@@ -40,12 +40,18 @@ export function findCityByWonderSelection(
     (city: CityBridgeCandidate) => city.id.toLowerCase() === safeNodeId.toLowerCase(),
     (city: CityBridgeCandidate) => city.name.toLowerCase() === safeNodeId.toLowerCase(),
     (city: CityBridgeCandidate) => !!safeNodePath && city.repoPath === safeNodePath,
-    (city: CityBridgeCandidate) => !!safeNodePath && !!city.repoPath && safeNodePath.startsWith(city.repoPath.replace(/\\/g, '/')),
-    (city: CityBridgeCandidate) => !!nodeBasename && basenameFromPath(city.repoPath ?? '') === nodeBasename,
-    (city: CityBridgeCandidate) => !!nodeBasename && city.name.toLowerCase() === nodeBasename.toLowerCase(),
+    (city: CityBridgeCandidate) =>
+      !!safeNodePath &&
+      !!city.repoPath &&
+      safeNodePath.startsWith(city.repoPath.replace(/\\/g, '/')),
+    (city: CityBridgeCandidate) =>
+      !!nodeBasename && basenameFromPath(city.repoPath ?? '') === nodeBasename,
+    (city: CityBridgeCandidate) =>
+      !!nodeBasename && city.name.toLowerCase() === nodeBasename.toLowerCase(),
     (city: CityBridgeCandidate) =>
       normalizedNodeId.length > 0 &&
-      (_normalizeToken(city.id) === normalizedNodeId || _normalizeToken(city.name) === normalizedNodeId),
+      (_normalizeToken(city.id) === normalizedNodeId ||
+        _normalizeToken(city.name) === normalizedNodeId),
     (city: CityBridgeCandidate) =>
       normalizedNodeBasename.length > 0 &&
       (_normalizeToken(city.id) === normalizedNodeBasename ||

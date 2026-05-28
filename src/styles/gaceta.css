@@ -50,13 +50,17 @@
   min-height: 36px;
   box-sizing: border-box;
 }
-.gaceta-header:hover { background: rgba(200, 168, 75, 0.08); }
+.gaceta-header:hover {
+  background: rgba(200, 168, 75, 0.08);
+}
 .gaceta-header:focus-visible {
   outline: 1px dashed var(--ui-accent-gold, #c8a84b);
   outline-offset: -2px;
 }
 
-.gaceta-icon { font-size: 14px; }
+.gaceta-icon {
+  font-size: 14px;
+}
 .gaceta-label {
   font-family: var(--font-display);
   font-weight: 600;
@@ -75,10 +79,17 @@
   text-align: center;
   font-weight: bold;
 }
-.gaceta-badge.pulse { animation: gaceta-pulse 0.6s ease 2; }
+.gaceta-badge.pulse {
+  animation: gaceta-pulse 0.6s ease 2;
+}
 @keyframes gaceta-pulse {
-  0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.3); }
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.3);
+  }
 }
 
 .gaceta-teaser {
@@ -95,7 +106,9 @@
   transition: transform 0.2s;
   font-size: 10px;
 }
-#gaceta-widget.gaceta-expanded .gaceta-chevron { transform: rotate(180deg); }
+#gaceta-widget.gaceta-expanded .gaceta-chevron {
+  transform: rotate(180deg);
+}
 
 .gaceta-body {
   max-height: 372px;
@@ -111,7 +124,9 @@
   padding: 6px 10px;
   border-bottom: 1px solid var(--ui-border, #4a3a1a);
 }
-.gaceta-list li:last-child { border-bottom: none; }
+.gaceta-list li:last-child {
+  border-bottom: none;
+}
 
 .gaceta-item-meta {
   font-size: 10px;
@@ -128,7 +143,9 @@
   border-bottom: 1px dashed transparent;
   line-height: 1.35;
 }
-.gaceta-item-title:hover { border-bottom-color: var(--text-dim, #8a7a5a); }
+.gaceta-item-title:hover {
+  border-bottom-color: var(--text-dim, #8a7a5a);
+}
 
 .gaceta-item-row {
   display: flex;
@@ -144,7 +161,9 @@
   cursor: pointer;
   padding: 2px 4px;
 }
-.gaceta-mark-read:hover { color: #6fc; }
+.gaceta-mark-read:hover {
+  color: #6fc;
+}
 
 .gaceta-link-full {
   display: block;
@@ -155,18 +174,30 @@
   text-decoration: none;
   border-top: 1px solid var(--ui-border, #4a3a1a);
 }
-.gaceta-link-full:hover { background: rgba(200, 168, 75, 0.06); }
+.gaceta-link-full:hover {
+  background: rgba(200, 168, 75, 0.06);
+}
 
 /* Gaceta inside capital panel (no resize handle, full height) */
 .gaceta-mode-panel {
   position: static !important;
-  width: 100% !important; height: 100% !important;
-  resize: none !important; max-width: none !important; max-height: none !important;
-  top: auto !important; left: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  resize: none !important;
+  max-width: none !important;
+  max-height: none !important;
+  top: auto !important;
+  left: auto !important;
 }
-.gaceta-mode-panel .gaceta-teaser { display: none !important; }
-.gaceta-mode-panel .gaceta-link-full { display: none !important; }
-.gaceta-mode-panel .gaceta-chevron { display: none !important; }
+.gaceta-mode-panel .gaceta-teaser {
+  display: none !important;
+}
+.gaceta-mode-panel .gaceta-link-full {
+  display: none !important;
+}
+.gaceta-mode-panel .gaceta-chevron {
+  display: none !important;
+}
 
 /* ─── Gaceta Toolbar (Foreign Relations button) ────────────────────────── */
 .gaceta-toolbar {
@@ -184,7 +215,10 @@
   border-radius: 4px;
   cursor: pointer;
   font-family: inherit;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 .gaceta-fr-btn:hover:not(:disabled) {
   background: rgba(200, 168, 75, 0.18);
@@ -345,7 +379,10 @@
   cursor: pointer;
   font-family: inherit;
   border: 1px solid var(--ui-border, #4a3a1a);
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 .fr-btn-primary {
   background: rgba(200, 168, 75, 0.15);

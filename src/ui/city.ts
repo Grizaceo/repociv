@@ -94,7 +94,8 @@ export function openCityPanel(
   const labStatusEl = document.getElementById('city-lab-status');
   if (labStatusEl) {
     if (labStatus == null || labStatus === undefined) {
-      labStatusEl.innerHTML = '<div class="city-item" style="color:var(--text-dim);font-style:italic;">Consultando Institutum…</div>';
+      labStatusEl.innerHTML =
+        '<div class="city-item" style="color:var(--text-dim);font-style:italic;">Consultando Institutum…</div>';
     } else {
       const sourceLabel = formatLabSourceLabel(labStatus);
       const sourceColor = labStatus.source === 'live' ? 'var(--ui-green)' : 'var(--ui-accent-gold)';
@@ -208,14 +209,18 @@ async function fetchCityFiles(repoName: string) {
 
   // Interceptar la ciudad CDAILY para mostrar el feed en lugar de archivos
   if (repoName.toLowerCase() === 'cdaily') {
-    filesEl.innerHTML = '<div class="city-item" style="color:var(--text-dim)">Leyendo feed de noticias...</div>';
+    filesEl.innerHTML =
+      '<div class="city-item" style="color:var(--text-dim)">Leyendo feed de noticias...</div>';
     try {
       const articles = await getLatestNews();
       if (articles.length === 0) {
-        filesEl.innerHTML = '<div class="city-item" style="color:var(--text-dim)">Sin noticias pendientes. ¡Paz imperial!</div>';
+        filesEl.innerHTML =
+          '<div class="city-item" style="color:var(--text-dim)">Sin noticias pendientes. ¡Paz imperial!</div>';
         return;
       }
-      filesEl.innerHTML = articles.map(art => `
+      filesEl.innerHTML = articles
+        .map(
+          (art) => `
         <div class="city-item" style="border-bottom:1px solid var(--ui-border);padding:6px 0;margin-bottom:4px;">
           <div style="font-size:11px;color:var(--ui-accent-gold);font-weight:bold;">📰 ${esc(art.blogName)}</div>
           <div style="font-size:13px;font-weight:500;margin:2px 0;">
@@ -226,18 +231,21 @@ async function fetchCityFiles(repoName: string) {
             <button class="btn-read" data-id="${art.id}" style="background:none;border:none;color:var(--ui-green);font-size:11px;cursor:pointer;padding:2px 4px;">✓ Leído</button>
           </div>
         </div>
-      `).join('');
+      `,
+        )
+        .join('');
 
-      filesEl.querySelectorAll<HTMLButtonElement>('.btn-read').forEach(btn => {
+      filesEl.querySelectorAll<HTMLButtonElement>('.btn-read').forEach((btn) => {
         btn.addEventListener('click', async () => {
           const id = parseInt(btn.getAttribute('data-id') ?? '0', 10);
-          if (id && await markNewsAsRead(id)) {
+          if (id && (await markNewsAsRead(id))) {
             fetchCityFiles('cdaily');
           }
         });
       });
     } catch {
-      filesEl.innerHTML = '<div class="city-item" style="color:var(--civ-happiness)">Error al cargar la Gaceta Exterior</div>';
+      filesEl.innerHTML =
+        '<div class="city-item" style="color:var(--civ-happiness)">Error al cargar la Gaceta Exterior</div>';
     }
     return;
   }
@@ -292,19 +300,28 @@ function toggleMinimizeCityPanel() {
 }
 
 let isDragging = false;
-let dragStartX = 0, dragStartY = 0, initialX = 0, initialY = 0;
+let dragStartX = 0,
+  dragStartY = 0,
+  initialX = 0,
+  initialY = 0;
 
 export function wireCityPanel() {
   document.getElementById('city-panel-close')?.addEventListener('click', closeCityPanel);
   document.getElementById('btn-city-close')?.addEventListener('click', closeCityPanel);
-  document.getElementById('city-panel-minimize')?.addEventListener('click', toggleMinimizeCityPanel);
+  document
+    .getElementById('city-panel-minimize')
+    ?.addEventListener('click', toggleMinimizeCityPanel);
   document.getElementById('btn-city-mission')?.addEventListener('click', () => {
     const panel = document.getElementById('city-panel');
     const cityId = panel?.dataset['cityId'];
     if (!cityId) return;
     window.dispatchEvent(
       new CustomEvent('repociv:city-mission-request', {
-        detail: { cityId, repoPath: panel?.dataset['repoPath'] ?? '', labStatus: panel?.dataset['labStatus'] ?? '' },
+        detail: {
+          cityId,
+          repoPath: panel?.dataset['repoPath'] ?? '',
+          labStatus: panel?.dataset['labStatus'] ?? '',
+        },
       }),
     );
   });
@@ -344,7 +361,11 @@ export function wireCityPanel() {
     if (!cityId) return;
     window.dispatchEvent(
       new CustomEvent('repociv:open-city-logs-request', {
-        detail: { cityId, repoPath: panel?.dataset['repoPath'] ?? '', labStatus: panel?.dataset['labStatus'] ?? '' },
+        detail: {
+          cityId,
+          repoPath: panel?.dataset['repoPath'] ?? '',
+          labStatus: panel?.dataset['labStatus'] ?? '',
+        },
       }),
     );
   });
@@ -357,10 +378,10 @@ export function wireCityPanel() {
       isDragging = true;
       const rect = panel.getBoundingClientRect();
       if (panel.style.transform === '') {
-         panel.style.left = rect.left + 'px';
-         panel.style.top = rect.top + 'px';
-         panel.style.transform = 'none';
-         panel.style.bottom = 'auto';
+        panel.style.left = rect.left + 'px';
+        panel.style.top = rect.top + 'px';
+        panel.style.transform = 'none';
+        panel.style.bottom = 'auto';
       }
       dragStartX = e.clientX;
       dragStartY = e.clientY;

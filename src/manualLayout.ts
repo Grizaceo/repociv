@@ -45,7 +45,6 @@ export function loadManualLayout(): ManualLayoutStore {
   }
 }
 
-
 export function upsertManualRepoEntry(entry: ManualRepoEntry): ManualLayoutStore {
   const store = loadManualLayout();
   const withoutSameRepo = store.entries.filter((item) => item.repoPath !== entry.repoPath);

@@ -22,8 +22,6 @@ function _notify() {
   for (const cb of _listeners) cb(snapshot);
 }
 
-
-
 // ─── Send a command draft to the bridge ───────────────────────────────────────
 export async function sendCommand(draft: CommandDraft): Promise<CommandResponse> {
   let resp: Response;

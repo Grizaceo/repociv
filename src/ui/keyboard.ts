@@ -19,5 +19,3 @@ export function toggleKeyboardHelp(force?: boolean) {
     _kbhCleanup = null;
   }
 }
-
-

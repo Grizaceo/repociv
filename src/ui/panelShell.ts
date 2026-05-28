@@ -23,4 +23,3 @@ export function hidePanel(panel: HTMLElement) {
 export function bindPanelAction(panel: HTMLElement, selector: string, handler: () => void): void {
   panel.querySelector(selector)?.addEventListener('click', handler);
 }
-

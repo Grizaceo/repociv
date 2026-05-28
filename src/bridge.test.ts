@@ -80,15 +80,28 @@ class FailWS {
   private _onclose: ((evt: { code: number }) => void) | null = null;
   private _onerror: (() => void) | null = null;
   onopen: null = null;
-  get onclose() { return this._onclose; }
-  set onclose(handler) { this._onclose = handler; handler?.({ code: 1006 }); }
-  get onerror() { return this._onerror; }
-  set onerror(handler) { this._onerror = handler; handler?.(); }
+  get onclose() {
+    return this._onclose;
+  }
+  set onclose(handler) {
+    this._onclose = handler;
+    handler?.({ code: 1006 });
+  }
+  get onerror() {
+    return this._onerror;
+  }
+  set onerror(handler) {
+    this._onerror = handler;
+    handler?.();
+  }
   onmessage: null = null;
-  close() { }
-  send() { }
-  static CONNECTING = 0; static OPEN = 1; static CLOSING = 2; static CLOSED = 3;
-  constructor(_url: string) { }
+  close() {}
+  send() {}
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSING = 2;
+  static CLOSED = 3;
+  constructor(_url: string) {}
 }
 
 describe('BridgeEvents SSE transport', () => {
@@ -100,7 +113,7 @@ describe('BridgeEvents SSE transport', () => {
     vi.stubGlobal('WebSocket', FailWS);
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockRejectedValue(new Error('no bridge')),  // WS discovery fails → SSE fallback
+      vi.fn().mockRejectedValue(new Error('no bridge')), // WS discovery fails → SSE fallback
     );
     vi.stubGlobal('window', globalThis);
     vi.stubGlobal('document', {
@@ -239,7 +252,7 @@ describe('BridgeEvents handleBridgeEvent', () => {
     vi.stubGlobal('WebSocket', FailWS);
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockRejectedValue(new Error('no bridge')),  // WS discovery fails → SSE fallback
+      vi.fn().mockRejectedValue(new Error('no bridge')), // WS discovery fails → SSE fallback
     );
     vi.stubGlobal('window', globalThis);
     vi.stubGlobal('document', {
@@ -520,14 +533,26 @@ class FakeWebSocket {
   static readonly CLOSING = 2;
   static readonly CLOSED = 3;
 
-  get onopen() { return this._onopen; }
-  set onopen(handler) { this._onopen = handler; }
+  get onopen() {
+    return this._onopen;
+  }
+  set onopen(handler) {
+    this._onopen = handler;
+  }
 
-  get onclose() { return this._onclose; }
-  set onclose(handler) { this._onclose = handler; }
+  get onclose() {
+    return this._onclose;
+  }
+  set onclose(handler) {
+    this._onclose = handler;
+  }
 
-  get onerror() { return this._onerror; }
-  set onerror(handler) { this._onerror = handler; }
+  get onerror() {
+    return this._onerror;
+  }
+  set onerror(handler) {
+    this._onerror = handler;
+  }
 
   constructor(url: string) {
     this.url = url;
@@ -577,7 +602,12 @@ describe('BridgeEvents WS transport', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ ok: true, wsUrl: 'ws://localhost:5275', wsPort: 5275, authRequired: false }),
+        json: async () => ({
+          ok: true,
+          wsUrl: 'ws://localhost:5275',
+          wsPort: 5275,
+          authRequired: false,
+        }),
       }),
     );
     vi.stubGlobal('window', globalThis);
@@ -691,4 +721,3 @@ describe('BridgeEvents WS transport', () => {
     bridge.stop();
   });
 });
-

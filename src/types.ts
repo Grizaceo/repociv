@@ -102,8 +102,6 @@ export interface Tile {
   folderStructure?: string[]; // Lista de rutas de carpetas del repo principal
 }
 
-
-
 export interface TileResources {
   gold: number; // commits / lines added
   science: number; // test coverage / validations
@@ -158,7 +156,16 @@ export interface Building {
 }
 
 // ─── Unit / Agent ───────────────────────────────────────────────────────────
-export type UnitType = 'hero' | 'worker' | 'scout' | 'army' | 'caravan' | 'lexo' | 'openclaw' | 'claude' | 'codex';
+export type UnitType =
+  | 'hero'
+  | 'worker'
+  | 'scout'
+  | 'army'
+  | 'caravan'
+  | 'lexo'
+  | 'openclaw'
+  | 'claude'
+  | 'codex';
 
 export type UnitState = 'idle' | 'moving' | 'working' | 'sleeping' | 'building';
 
@@ -240,7 +247,14 @@ export type BridgeEvent =
       to: [number, number];
       mission?: string;
     }
-  | { type: 'unit_work'; unit: string; hex?: [number, number]; progress: number; mission?: string; cityId?: string }
+  | {
+      type: 'unit_work';
+      unit: string;
+      hex?: [number, number];
+      progress: number;
+      mission?: string;
+      cityId?: string;
+    }
   | { type: 'unit_despawn'; unit: string; mission?: string }
   | { type: 'unit_state'; unit: string; state: UnitState }
   | {
@@ -422,13 +436,13 @@ export function tileKey(coord: Axial): string {
 // Each layer can be independently shown/hidden to reduce visual noise.
 
 export type MapLayerId =
-  | 'base'           // terrain, cities, agents — always on
-  | 'structure'      // folder structure, buildings, wonder sprites
-  | 'ops'            // tasks, active experiments, approvals, failures
-  | 'knowledge'      // bibliotheca relations, suggested connections
-  | 'labs'           // lab warnings, experiment activity indicators
-  | 'security'       // lab alarms, experiment locks, perimeter alerts
-  | 'labels';        // city labels, district labels, folder labels
+  | 'base' // terrain, cities, agents — always on
+  | 'structure' // folder structure, buildings, wonder sprites
+  | 'ops' // tasks, active experiments, approvals, failures
+  | 'knowledge' // bibliotheca relations, suggested connections
+  | 'labs' // lab warnings, experiment activity indicators
+  | 'security' // lab alarms, experiment locks, perimeter alerts
+  | 'labels'; // city labels, district labels, folder labels
 
 export interface MapLayerState {
   layers: Record<MapLayerId, boolean>;
@@ -445,5 +459,3 @@ export const DEFAULT_MAP_LAYERS: MapLayerState = {
     labels: true,
   },
 };
-
-

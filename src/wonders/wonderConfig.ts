@@ -7,12 +7,7 @@
 // Users can override these via localStorage key: repociv_wonder_config
 // Format: JSON matching WondersConfig shape (partial OK — merged with defaults).
 
-import type {
-  WondersConfig,
-  GacetaConfig,
-  BibliothecaConfig,
-  LabHubConfig,
-} from './types.ts';
+import type { WondersConfig, GacetaConfig, BibliothecaConfig, LabHubConfig } from './types.ts';
 export { WONDER_MANIFESTS } from './manifest.ts';
 
 const DEFAULT_GACETA: GacetaConfig = {
@@ -79,7 +74,11 @@ export function saveWonderConfig(config: WondersConfig): void {
   }
 }
 
-export function isFeatureEnabled(config: WondersConfig, wonderId: string, featureId: string): boolean {
+export function isFeatureEnabled(
+  config: WondersConfig,
+  wonderId: string,
+  featureId: string,
+): boolean {
   switch (wonderId) {
     case 'gaceta': {
       const gaceta = config.gaceta;

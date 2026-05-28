@@ -129,7 +129,8 @@ export function inferCityLabStatus(state: GameState, city: City): CityLabStatus 
   const labId = firstBuilding?.id ?? firstUnit?.id ?? `${city.id}-active`;
   const status = activeBuildings.length > 0 || activeUnits.length > 0 ? 'running' : 'idle';
   const lastMetricParts = [] as string[];
-  if (activeBuildings.length > 0) lastMetricParts.push(`${activeBuildings.length} build(s) activas`);
+  if (activeBuildings.length > 0)
+    lastMetricParts.push(`${activeBuildings.length} build(s) activas`);
   if (activeUnits.length > 0) lastMetricParts.push(`${activeUnits.length} unidad(es) trabajando`);
   if (firstBuilding) lastMetricParts.push(`principal=${firstBuilding.name}`);
 
@@ -171,11 +172,12 @@ export async function resolveCityLabStatus(
 export function formatLabStatusLabel(status: CityLabStatus | null): string {
   if (!status) return 'Sin experimento activo';
   const risk = status.risk.toUpperCase();
-  const sourceLabel = status.source === 'live'
-    ? 'Institutum'
-    : status.institutumOnline
-      ? 'live (sin datos)'
-      : 'inferido local';
+  const sourceLabel =
+    status.source === 'live'
+      ? 'Institutum'
+      : status.institutumOnline
+        ? 'live (sin datos)'
+        : 'inferido local';
   return `${status.status.toUpperCase()} · riesgo ${risk} · ${sourceLabel}`;
 }
 
@@ -188,9 +190,8 @@ export function formatLabSourceLabel(status: CityLabStatus): string {
 export function buildLabActionWarning(status: CityLabStatus, actionLabel: string): string {
   const age = status.startedAt ? `\nInicio: ${status.startedAt}` : '';
   const lock = status.writeLock ? '\nwriteLock=true (bloqueo fuerte declarado).' : '';
-  const sourceNote = status.source === 'inferred'
-    ? '\n⚠ Status inferido localmente — Institutum offline.'
-    : '';
+  const sourceNote =
+    status.source === 'inferred' ? '\n⚠ Status inferido localmente — Institutum offline.' : '';
   return [
     `Hay trabajo vivo en ${status.cityId}.`,
     `Acción: ${actionLabel}.`,

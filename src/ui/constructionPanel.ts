@@ -50,7 +50,6 @@ export function setRendererRef(renderer: {
   _rendererRef = renderer;
 }
 
-
 export function closeConstructionPanel(): void {
   isOpen = false;
   _rendererRef?.setCityRelocateMode(false);

@@ -31,7 +31,7 @@ interface ProviderInfo {
 }
 
 let _harnesses: HarnessInfo[] = [];
-let _allProviders: ProviderInfo[] = [];   // unfiltered — full list from server
+let _allProviders: ProviderInfo[] = []; // unfiltered — full list from server
 let _selectedHarness = '';
 let _selectedProvider = '';
 let _selectedModel = '';
@@ -42,9 +42,7 @@ let _selectedModel = '';
  *  For other harnesses (claude-code, auto): show all providers. */
 function _filteredProviders(): ProviderInfo[] {
   if (_selectedHarness === 'hermes') {
-    return _allProviders.filter(
-      (p) => p.configured,
-    );
+    return _allProviders.filter((p) => p.configured);
   }
   // "claude-code", "auto", or any other harness → show all
   return _allProviders;
@@ -275,9 +273,7 @@ function updateStatusIndicator(): void {
 
   let status: 'ok' | 'warn' | 'off' = 'off';
   if (_selectedProvider === 'auto' || !_selectedProvider) {
-    const anyReady = providers.some(
-      (p) => p.available && p.models.some((m) => m.reachable),
-    );
+    const anyReady = providers.some((p) => p.available && p.models.some((m) => m.reachable));
     const anyAvailable = providers.some((p) => p.available);
     status = anyReady ? 'ok' : anyAvailable ? 'warn' : 'off';
   } else {
@@ -390,7 +386,11 @@ function persistSelection(unitId: string | null = null): void {
   }
 }
 
-function loadSelection(unitId: string | null = null): { harness: string; provider: string; model: string } {
+function loadSelection(unitId: string | null = null): {
+  harness: string;
+  provider: string;
+  model: string;
+} {
   try {
     // Try per-unit key first, fall back to global, then legacy key.
     const perUnit = unitId ? localStorage.getItem(_storageKey(unitId)) : null;

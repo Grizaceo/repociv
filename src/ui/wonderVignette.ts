@@ -25,10 +25,7 @@ import {
 } from './relationsPanel.ts';
 import { loadWonderConfig, isFeatureEnabled } from '../wonders/wonderConfig.ts';
 import { fetchGraphRelations, syncGraphRelationFlags } from '../bridge.ts';
-import {
-  rankRelationsWithFeedback,
-  relationFeedbackKey,
-} from '../wonders/bibliothecaBridge.ts';
+import { rankRelationsWithFeedback, relationFeedbackKey } from '../wonders/bibliothecaBridge.ts';
 
 const STORAGE_POS = (t: WonderType) => `repociv-vignette-pos-${t}`;
 const IFRAME_LOAD_TIMEOUT_MS = 25000;
@@ -135,11 +132,13 @@ function _ensureContextListener(): void {
   if (_contextListenerAttached) return;
   _contextListenerAttached = true;
   window.addEventListener('repociv:wonder-context', (event: Event) => {
-    const detail = (event as CustomEvent).detail as {
-      cities?: Array<{ id: string; name: string; repoPath?: string }>;
-      selectedCityId?: string | null;
-      selectedRepoPath?: string | null;
-    } | undefined;
+    const detail = (event as CustomEvent).detail as
+      | {
+          cities?: Array<{ id: string; name: string; repoPath?: string }>;
+          selectedCityId?: string | null;
+          selectedRepoPath?: string | null;
+        }
+      | undefined;
     _runtimeContext.cities = detail?.cities ?? [];
     _runtimeContext.selectedCityId = detail?.selectedCityId ?? null;
     _runtimeContext.selectedRepoPath = detail?.selectedRepoPath ?? null;
@@ -336,7 +335,11 @@ async function _checkWonderHealth(
   const ctrl = new AbortController();
   const tid = setTimeout(() => ctrl.abort(), manifest.health.timeoutMs ?? 4000);
   try {
-    const res = await fetch(manifest.health.url, { method: 'GET', signal: ctrl.signal, mode: 'cors' });
+    const res = await fetch(manifest.health.url, {
+      method: 'GET',
+      signal: ctrl.signal,
+      mode: 'cors',
+    });
     if (res.status === 401 || res.status === 403) return 'no-permissions';
     if (!res.ok) return manifest.health.degradedAllowed ? 'degraded' : 'offline';
     return 'ok';
@@ -454,7 +457,10 @@ async function _reloadBibliothecaRelations(): Promise<void> {
 
   const cities = _runtimeContext.cities;
   if (cities.length === 0) {
-    renderRelationsPanelError(container, 'Bibliotheca no tiene ciudades cargadas desde RepoCiv todavía');
+    renderRelationsPanelError(
+      container,
+      'Bibliotheca no tiene ciudades cargadas desde RepoCiv todavía',
+    );
     return;
   }
 

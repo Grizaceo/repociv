@@ -13,19 +13,34 @@ const EMPTY_STATES: Record<string, EmptyStateConfig> = {
     icon: '⛺',
     title: 'Tierras Inexploradas',
     message: 'Tu imperio no tiene colonias. Escanea el workspace para fundar la primera ciudad.',
-    action: { label: 'Explorar terrenos', handler: () => { /* caller wires */ } },
+    action: {
+      label: 'Explorar terrenos',
+      handler: () => {
+        /* caller wires */
+      },
+    },
   },
   agents: {
     icon: '🦅',
     title: 'Sin Tropas en Campo',
     message: 'Despliega al menos un agente para comenzar las operaciones.',
-    action: { label: 'Desplegar agente', handler: () => { /* caller wires */ } },
+    action: {
+      label: 'Desplegar agente',
+      handler: () => {
+        /* caller wires */
+      },
+    },
   },
   bridge: {
     icon: '⚡',
     title: 'El Puente Está Cerrado',
     message: 'No hay conexión con el servidor. El imperio está incomunicado.',
-    action: { label: 'Intentar reconexión', handler: () => { window.location.reload(); } },
+    action: {
+      label: 'Intentar reconexión',
+      handler: () => {
+        window.location.reload();
+      },
+    },
   },
   pending: {
     icon: '📜',
@@ -48,7 +63,11 @@ export function getEmptyState(key: string): EmptyStateConfig | null {
   return EMPTY_STATES[key] ?? null;
 }
 
-export function renderEmptyState(container: HTMLElement, key: string, customAction?: () => void): void {
+export function renderEmptyState(
+  container: HTMLElement,
+  key: string,
+  customAction?: () => void,
+): void {
   const cfg = getEmptyState(key);
   if (!cfg) return;
   container.innerHTML = '';

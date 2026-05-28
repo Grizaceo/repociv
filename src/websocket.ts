@@ -63,7 +63,10 @@ export class RepoCivWebSocket {
 
   /** Open the WebSocket connection */
   connect(): void {
-    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+    if (
+      this.ws &&
+      (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)
+    ) {
       return; // Already connected or connecting
     }
     this.closed = false;

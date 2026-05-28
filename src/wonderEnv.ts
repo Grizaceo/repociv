@@ -19,8 +19,7 @@ export const WONDER_INSTITUTUM_URL =
 /** Backend API port for Institutum/LabHub health checks and metrics. */
 export const WONDER_INSTITUTUM_API_URL =
   import.meta.env.VITE_WONDER_INSTITUTUM_API_URL ?? 'http://localhost:5281';
-export const LGB_BACKEND_URL =
-  import.meta.env.VITE_LGB_BACKEND_URL ?? `http://${_lgbHost}:3001`;
+export const LGB_BACKEND_URL = import.meta.env.VITE_LGB_BACKEND_URL ?? `http://${_lgbHost}:3001`;
 
 export function lgbHealthUrl(base = LGB_BACKEND_URL): string {
   return `${base.replace(/\/$/, '')}/api/health`;

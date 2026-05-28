@@ -6,38 +6,54 @@
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
 
 /* ═══ Houdini Custom Properties for smooth gradient transitions ═══ */
-@property --gold-glow-color1 { syntax: '<color>'; inherits: false; initial-value: oklch(0.55 0.12 75); }
-@property --gold-glow-color2 { syntax: '<color>'; inherits: false; initial-value: oklch(0.78 0.16 83); }
-@property --bronze-glow-color1 { syntax: '<color>'; inherits: false; initial-value: oklch(0.38 0.08 55); }
-@property --bronze-glow-color2 { syntax: '<color>'; inherits: false; initial-value: oklch(0.52 0.11 65); }
+@property --gold-glow-color1 {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: oklch(0.55 0.12 75);
+}
+@property --gold-glow-color2 {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: oklch(0.78 0.16 83);
+}
+@property --bronze-glow-color1 {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: oklch(0.38 0.08 55);
+}
+@property --bronze-glow-color2 {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: oklch(0.52 0.11 65);
+}
 
 /* ═══ SPACING SCALE (4px base) ═══ */
 :root {
-  --space-1: 0.25rem;  /*  4px */
-  --space-2: 0.5rem;   /*  8px */
+  --space-1: 0.25rem; /*  4px */
+  --space-2: 0.5rem; /*  8px */
   --space-3: 0.625rem; /* 10px */
-  --space-4: 0.75rem;  /* 12px */
-  --space-5: 1rem;     /* 16px */
+  --space-4: 0.75rem; /* 12px */
+  --space-5: 1rem; /* 16px */
   --space-6: 1.125rem; /* 18px */
-  --space-7: 1.25rem;  /* 20px */
-  --space-8: 1.5rem;   /* 24px */
-  --space-9: 2rem;     /* 32px */
-  --space-10: 2.5rem;  /* 40px */
-  --space-11: 3rem;    /* 48px */
-  --space-12: 4rem;    /* 64px */
-  --space-13: 6rem;    /* 96px */
+  --space-7: 1.25rem; /* 20px */
+  --space-8: 1.5rem; /* 24px */
+  --space-9: 2rem; /* 32px */
+  --space-10: 2.5rem; /* 40px */
+  --space-11: 3rem; /* 48px */
+  --space-12: 4rem; /* 64px */
+  --space-13: 6rem; /* 96px */
 
   /* ═══ TYPOGRAPHY SCALE ═══ */
   --text-3xs: 0.5625rem; /* 9px  — legal, metadata */
-  --text-2xs: 0.625rem;  /* 10px — labels, badges */
-  --text-xs: 0.75rem;    /* 12px — captions, hints */
-  --text-sm: 0.8125rem;  /* 13px — UI secondary */
-  --text-md: 0.875rem;   /* 14px — UI primary */
-  --text-base: 1rem;     /* 16px — body */
-  --text-lg: 1.125rem;   /* 18px — subheadings */
-  --text-xl: 1.25rem;    /* 20px — panel titles */
-  --text-2xl: 1.5rem;    /* 24px — section titles */
-  --text-3xl: 2rem;      /* 32px — hero / era display */
+  --text-2xs: 0.625rem; /* 10px — labels, badges */
+  --text-xs: 0.75rem; /* 12px — captions, hints */
+  --text-sm: 0.8125rem; /* 13px — UI secondary */
+  --text-md: 0.875rem; /* 14px — UI primary */
+  --text-base: 1rem; /* 16px — body */
+  --text-lg: 1.125rem; /* 18px — subheadings */
+  --text-xl: 1.25rem; /* 20px — panel titles */
+  --text-2xl: 1.5rem; /* 24px — section titles */
+  --text-3xl: 2rem; /* 32px — hero / era display */
 
   /* ═══ BORDER WIDTHS ═══ */
   --border-thin: 1px;
@@ -57,24 +73,24 @@
   --font-body: 'Libre Baskerville', 'Georgia', serif;
 
   /* ═══ LOCAL VIEW TOKENS (gstack industrial) ═══ */
-  --lt-base:      #0C0C0C;  /* fondo lienzo */
-  --lt-surface:   #141414;  /* paneles */
-  --lt-border:    #262626;
-  --lt-zinc-800:  #27272A;  /* muros núcleo */
-  --lt-zinc-600:  #52525B;  /* placas suelo */
-  --lt-zinc-400:  #A1A1AA;  /* texto secundario */
-  --lt-zinc-50:   #FAFAFA;  /* texto primario */
-  --lt-amber-500: #F59E0B;  /* acento */
-  --lt-amber-400: #FBBF24;  /* texto acento */
-  --lt-error:     #EF4444;
-  --lt-success:   #22C55E;
+  --lt-base: #0c0c0c; /* fondo lienzo */
+  --lt-surface: #141414; /* paneles */
+  --lt-border: #262626;
+  --lt-zinc-800: #27272a; /* muros núcleo */
+  --lt-zinc-600: #52525b; /* placas suelo */
+  --lt-zinc-400: #a1a1aa; /* texto secundario */
+  --lt-zinc-50: #fafafa; /* texto primario */
+  --lt-amber-500: #f59e0b; /* acento */
+  --lt-amber-400: #fbbf24; /* texto acento */
+  --lt-error: #ef4444;
+  --lt-success: #22c55e;
   --lt-font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
 /* ═════════════════════════════════════════════════════════════════
    LIGHT THEME (default/system light)
    ================================================================= */
-[data-theme="light"] {
+[data-theme='light'] {
   --app-bg: #f6f3ee;
   --panel-bg: rgba(255, 255, 255, 0.85);
   --panel-border: rgba(160, 130, 50, 0.45);
@@ -87,28 +103,33 @@
   --ui-gold: oklch(0.48 0.12 78);
   --ui-gold-bright: oklch(0.35 0.14 78);
   --ui-text: oklch(0.22 0.04 78);
-  --ui-text-dim: oklch(0.40 0.06 78);
+  --ui-text-dim: oklch(0.4 0.06 78);
 
-  --civ-science: oklch(0.45 0.20 250);
+  --civ-science: oklch(0.45 0.2 250);
   --civ-culture: oklch(0.48 0.22 320);
   --civ-gold: oklch(0.42 0.14 78);
   --civ-production: oklch(0.52 0.18 45);
   --civ-food: oklch(0.55 0.16 140);
-  --civ-happiness: oklch(0.60 0.14 98);
-  --civ-movement: oklch(0.50 0.18 210);
-  --civ-defense: oklch(0.42 0.20 25);
-  --civ-text-beige: oklch(0.20 0.04 78);
+  --civ-happiness: oklch(0.6 0.14 98);
+  --civ-movement: oklch(0.5 0.18 210);
+  --civ-defense: oklch(0.42 0.2 25);
+  --civ-text-beige: oklch(0.2 0.04 78);
 
   --state-success: oklch(0.55 0.16 140);
-  --state-warn: oklch(0.60 0.14 98);
-  --state-error: oklch(0.42 0.20 25);
-  --state-working: oklch(0.50 0.18 210);
+  --state-warn: oklch(0.6 0.14 98);
+  --state-error: oklch(0.42 0.2 25);
+  --state-working: oklch(0.5 0.18 210);
   --state-info: oklch(0.55 0.08 75);
   --state-approval: oklch(0.72 0.14 55); /* #e8a040 — approval/warning orange */
 
   /* metallics invertidos para light */
-  --gold-gradient: linear-gradient(135deg, oklch(0.65 0.10 75) 0%, oklch(0.78 0.14 85) 50%, oklch(0.55 0.12 78) 100%);
-  --bronze-gradient: linear-gradient(135deg, oklch(0.52 0.08 55) 0%, oklch(0.68 0.10 65) 100%);
+  --gold-gradient: linear-gradient(
+    135deg,
+    oklch(0.65 0.1 75) 0%,
+    oklch(0.78 0.14 85) 50%,
+    oklch(0.55 0.12 78) 100%
+  );
+  --bronze-gradient: linear-gradient(135deg, oklch(0.52 0.08 55) 0%, oklch(0.68 0.1 65) 100%);
 
   --shadow-deep: 0 16px 48px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08);
   --shadow-glow: 0 0 24px rgba(200, 168, 75, 0.12), 0 0 8px rgba(200, 168, 75, 0.08);
@@ -118,7 +139,7 @@
 /* ═════════════════════════════════════════════════════════════════
    DARK THEME (canonical RepoCiv look)
    ================================================================= */
-[data-theme="dark"] {
+[data-theme='dark'] {
   --app-bg: #050402;
   --panel-bg: rgba(8, 6, 4, 0.72);
   --panel-border: rgba(200, 168, 75, 0.25);
@@ -139,7 +160,7 @@
   --civ-production: oklch(0.68 0.21 45);
   --civ-food: oklch(0.72 0.19 140);
   --civ-happiness: oklch(0.88 0.18 98);
-  --civ-movement: oklch(0.65 0.20 210);
+  --civ-movement: oklch(0.65 0.2 210);
   --civ-defense: oklch(0.55 0.22 25);
   --civ-text-beige: oklch(0.95 0.03 85);
 
@@ -150,8 +171,17 @@
   --state-info: oklch(0.72 0.08 75);
   --state-approval: oklch(0.75 0.16 55); /* brighter in dark mode */
 
-  --gold-gradient: linear-gradient(135deg, var(--gold-glow-color1) 0%, oklch(0.84 0.18 88) 50%, var(--gold-glow-color2) 100%);
-  --bronze-gradient: linear-gradient(135deg, var(--bronze-glow-color1) 0%, var(--bronze-glow-color2) 100%);
+  --gold-gradient: linear-gradient(
+    135deg,
+    var(--gold-glow-color1) 0%,
+    oklch(0.84 0.18 88) 50%,
+    var(--gold-glow-color2) 100%
+  );
+  --bronze-gradient: linear-gradient(
+    135deg,
+    var(--bronze-glow-color1) 0%,
+    var(--bronze-glow-color2) 100%
+  );
 
   --shadow-deep: 0 16px 48px rgba(0, 0, 0, 0.9), 0 4px 16px rgba(0, 0, 0, 0.4);
   --shadow-glow: 0 0 24px rgba(245, 213, 128, 0.18), 0 0 8px rgba(245, 213, 128, 0.1);
@@ -160,7 +190,7 @@
 
 /* ═══ System preference fallback: if neither data-theme nor [data-theme="dark"] is set, default to dark ═══ */
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]):not([data-theme="light"]) {
+  :root:not([data-theme='dark']):not([data-theme='light']) {
     /* inherit light theme logic — handled by the default :root not having data-theme */
   }
 }
@@ -195,21 +225,21 @@
 
   /* ═══ Ghost-variable shim — components.css / panels.css used these before
          the design-token rename. Defined here so all references resolve. ═══ */
-  --gold-mid:       var(--ui-gold);
-  --gold-bright:    var(--ui-gold-bright);
-  --gold-dim:       rgba(200, 168, 75, 0.40);
-  --gold-glow:      rgba(200, 168, 75, 0.25);
-  --text-dim:       var(--ui-text-dim);
-  --text-primary:   var(--civ-text-beige);
+  --gold-mid: var(--ui-gold);
+  --gold-bright: var(--ui-gold-bright);
+  --gold-dim: rgba(200, 168, 75, 0.4);
+  --gold-glow: rgba(200, 168, 75, 0.25);
+  --text-dim: var(--ui-text-dim);
+  --text-primary: var(--civ-text-beige);
   --ui-border-light: rgba(255, 255, 255, 0.12);
-  --ui-panel-bg:    var(--panel-bg);
-  --font-title:     'Cinzel', 'Georgia', serif;
+  --ui-panel-bg: var(--panel-bg);
+  --font-title: 'Cinzel', 'Georgia', serif;
 
   /* Capital / Wonder panel aliases */
-  --clr-gold:       var(--ui-gold);
-  --border-dim:     rgba(90, 74, 46, 0.40);
+  --clr-gold: var(--ui-gold);
+  --border-dim: rgba(90, 74, 46, 0.4);
   --ui-accent-gold: var(--ui-gold);
-  --ui-green:       var(--civ-food);
+  --ui-green: var(--civ-food);
 
   /* ═══ TYPOGRAPHY: Cinzel for imperial display text ═══ */
   --font-display: 'Cinzel', 'Georgia', serif;

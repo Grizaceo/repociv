@@ -106,7 +106,7 @@ export class BridgeEvents {
     if (!this.wsEnabled) return;
     if (this.ws) this.ws.close();
 
-    const token = BRIDGE_URL ? '' : bridgeHeaders()['X-RepoCiv-Token'] ?? '';
+    const token = BRIDGE_URL ? '' : (bridgeHeaders()['X-RepoCiv-Token'] ?? '');
     this.ws = new RepoCivWebSocket({
       url: this.wsUrl,
       token,
@@ -570,11 +570,16 @@ export async function scanNews(): Promise<{ ok: boolean; error?: string }> {
 
 // ─── Foreign Relations API ─────────────────────────────────────────────────────
 
-export async function getRepoProfile(repoPath: string): Promise<import('./types.ts').RepoProfile | null> {
+export async function getRepoProfile(
+  repoPath: string,
+): Promise<import('./types.ts').RepoProfile | null> {
   try {
-    const res = await fetch(bridgeUrl(`/api/foreign/repo-profile?repoPath=${encodeURIComponent(repoPath)}`), {
-      headers: bridgeHeaders(),
-    });
+    const res = await fetch(
+      bridgeUrl(`/api/foreign/repo-profile?repoPath=${encodeURIComponent(repoPath)}`),
+      {
+        headers: bridgeHeaders(),
+      },
+    );
     if (!res.ok) return null;
     return (await res.json()) as import('./types.ts').RepoProfile;
   } catch {
@@ -625,7 +630,10 @@ export async function generateForeignReport(
   }
 }
 
-export async function listForeignReports(cityId?: string, articleId?: string): Promise<import('./types.ts').ForeignRelationsReport[]> {
+export async function listForeignReports(
+  cityId?: string,
+  articleId?: string,
+): Promise<import('./types.ts').ForeignRelationsReport[]> {
   try {
     const params = new URLSearchParams();
     if (cityId) params.set('cityId', cityId);
@@ -641,7 +649,9 @@ export async function listForeignReports(cityId?: string, articleId?: string): P
   }
 }
 
-export async function getForeignReport(reportId: string): Promise<import('./types.ts').ForeignRelationsReport | null> {
+export async function getForeignReport(
+  reportId: string,
+): Promise<import('./types.ts').ForeignRelationsReport | null> {
   try {
     const res = await fetch(bridgeUrl(`/api/foreign/reports/${encodeURIComponent(reportId)}`), {
       headers: bridgeHeaders(),
@@ -749,15 +759,20 @@ export async function syncGraphRelationFlags(payload: {
       body: JSON.stringify(payload),
     });
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-    return (await res.json()) as { ok: boolean; flags?: GraphRelationStats['flags']; error?: string };
+    return (await res.json()) as {
+      ok: boolean;
+      flags?: GraphRelationStats['flags'];
+      error?: string;
+    };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
 }
 
-export async function refreshGraphRelationIndex(
-  payload: { cities?: Array<{ id: string; name: string; repoPath?: string }>; repoPaths?: string[] },
-): Promise<{ ok: boolean; error?: string; stats?: Record<string, unknown> }> {
+export async function refreshGraphRelationIndex(payload: {
+  cities?: Array<{ id: string; name: string; repoPath?: string }>;
+  repoPaths?: string[];
+}): Promise<{ ok: boolean; error?: string; stats?: Record<string, unknown> }> {
   try {
     const res = await fetch(bridgeUrl('/api/graph-relations/refresh'), {
       method: 'POST',

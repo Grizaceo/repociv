@@ -56,15 +56,21 @@ function _buildTabs(): TabEntry[] {
 let _activeTab = localStorage.getItem(STORAGE_TAB) || 'tab-gaceta';
 
 export function openCapitalPanel() {
-  if (_panel) { _panel.classList.remove('hidden'); return; }
+  if (_panel) {
+    _panel.classList.remove('hidden');
+    return;
+  }
   _panel = document.createElement('div');
   _panel.id = 'capital-panel';
   _panel.className = 'capital-panel';
 
   const tabs = _buildTabs();
-  const tabsHtml = tabs.map((t) =>
-    `<div class="capital-tab ${_activeTab === t.id ? 'active' : ''}" data-tab="${t.id}">${t.icon} ${t.label}</div>`
-  ).join('');
+  const tabsHtml = tabs
+    .map(
+      (t) =>
+        `<div class="capital-tab ${_activeTab === t.id ? 'active' : ''}" data-tab="${t.id}">${t.icon} ${t.label}</div>`,
+    )
+    .join('');
 
   _panel.innerHTML = `
     <div class="capital-header">
@@ -135,9 +141,10 @@ function _renderGaceta(container: HTMLElement) {
 }
 
 function _renderWonderTab(container: HTMLElement, m: WonderManifest) {
-  const statsText = m.id === 'bibliotheca'
-    ? 'Grafo de conocimiento: escaneando...'
-    : `Labs activos: consulta en curso [${m.automationLevel}]`;
+  const statsText =
+    m.id === 'bibliotheca'
+      ? 'Grafo de conocimiento: escaneando...'
+      : `Labs activos: consulta en curso [${m.automationLevel}]`;
   const btnText = `Entrar a ${m.title.split('/')[0]!.trim()}`;
 
   const badgesHtml = renderCapabilityBadge(m);

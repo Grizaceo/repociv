@@ -85,7 +85,9 @@ describe('renderMarkdown', () => {
   // ── Links ──────────────────────────────────────────────────────────
   it('renders [text](url) as <a> with target=_blank', () => {
     const result = renderMarkdown('[click](https://example.com)');
-    expect(result).toContain('<a href="https://example.com" target="_blank" rel="noopener">click</a>');
+    expect(result).toContain(
+      '<a href="https://example.com" target="_blank" rel="noopener">click</a>',
+    );
   });
 
   it('strips dangerous javascript: links', () => {

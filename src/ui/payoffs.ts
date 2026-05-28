@@ -2,8 +2,16 @@
 // Canvas-based procedural celebrations. Zero assets required.
 
 interface Particle {
-  x: number; y: number; vx: number; vy: number; life: number; maxLife: number;
-  color: string; size: number; rotation: number; rotSpeed: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  color: string;
+  size: number;
+  rotation: number;
+  rotSpeed: number;
 }
 
 /** Flash dorado sobre el canvas (screen-wide) */
@@ -29,11 +37,16 @@ export function confettiBurst(canvas: HTMLCanvasElement, cx: number, cy: number)
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   const colors = [
-    'oklch(0.85 0.18 85)', 'oklch(0.72 0.14 78)', 'oklch(0.88 0.18 98)',
-    '#fff', 'oklch(0.72 0.19 140)', 'oklch(0.58 0.22 250)',
+    'oklch(0.85 0.18 85)',
+    'oklch(0.72 0.14 78)',
+    'oklch(0.88 0.18 98)',
+    '#fff',
+    'oklch(0.72 0.19 140)',
+    'oklch(0.58 0.22 250)',
   ];
   const particles: Particle[] = Array.from({ length: 60 }).map(() => ({
-    x: cx, y: cy,
+    x: cx,
+    y: cy,
     vx: (Math.random() - 0.5) * 10,
     vy: (Math.random() - 0.5) * 10 - 3,
     life: 1,
@@ -75,7 +88,7 @@ export function confettiBurst(canvas: HTMLCanvasElement, cx: number, cy: number)
       ctx.fill();
       ctx.restore();
     }
-    const alive = particles.some(p => p.life > 0);
+    const alive = particles.some((p) => p.life > 0);
     if (alive) requestAnimationFrame(frame);
   }
   frame();
@@ -84,7 +97,9 @@ export function confettiBurst(canvas: HTMLCanvasElement, cx: number, cy: number)
 /** Sonido procedural (fanfarria imperial) */
 export function hornSound() {
   try {
-    const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const AC =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
     const ctx = new AC();
     const now = ctx.currentTime;
@@ -101,13 +116,16 @@ export function hornSound() {
       osc.start(now);
       osc.stop(now + 2);
     });
-  } catch { /* audio blocked */ }
+  } catch {
+    /* audio blocked */
+  }
 }
 
 /** Pan de cámara suave hacia una coordenada hex (renderer hook) */
 export function panCameraTo(
   renderer: { panTo: (x: number, y: number) => void } | null,
-  worldX: number, worldY: number,
+  worldX: number,
+  worldY: number,
 ) {
   if (!renderer) return;
   renderer.panTo(worldX, worldY);
@@ -126,10 +144,7 @@ export function celebrateMission(
 }
 
 /** City discovered celebration */
-export function celebrateDiscovery(
-  canvas: HTMLCanvasElement,
-  screenX: number, screenY: number,
-) {
+export function celebrateDiscovery(canvas: HTMLCanvasElement, screenX: number, screenY: number) {
   flashGlory(canvas, 0.2);
   confettiBurst(canvas, screenX, screenY);
   hornSound();

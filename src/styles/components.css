@@ -42,7 +42,10 @@
   place-items: center;
   cursor: pointer;
   font-size: 13px;
-  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast);
   flex-shrink: 0;
   position: relative;
 }
@@ -147,7 +150,9 @@
   font-size: 10px;
   color: var(--ui-text-dim);
 }
-#gpu-bar.hidden { display: none; }
+#gpu-bar.hidden {
+  display: none;
+}
 
 /* ─── Bottom HUD Ribbon (Unit Panel + Command Bar + Minimap) ────────────── */
 #bottom-hud {
@@ -743,29 +748,34 @@ kbd {
 }
 
 /* ─── Premium Button Hover Sweep (Metal Sheen) ────────────────────────── */
-button, .spawn-btn, .side-tab, .city-tab, .quest-tab {
+button,
+.spawn-btn,
+.side-tab,
+.city-tab,
+.quest-tab {
   position: relative;
   overflow: hidden;
-  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
-button::after, .spawn-btn::after {
+button::after,
+.spawn-btn::after {
   content: '';
   position: absolute;
   top: 0;
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.15),
-    transparent
-  );
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
   transition: none;
 }
 
-button:hover::after, .spawn-btn:hover::after {
+button:hover::after,
+.spawn-btn:hover::after {
   left: 100%;
   transition: left 0.65s cubic-bezier(0.25, 1, 0.5, 1);
 }
@@ -806,13 +816,13 @@ button:hover::after, .spawn-btn:hover::after {
   top: 0;
   left: 0;
   background: rgba(14, 14, 18, 0.88);
-  border: 1px solid var(--lt-amber-500, #F59E0B);
+  border: 1px solid var(--lt-amber-500, #f59e0b);
   border-radius: 6px;
   padding: 3px 7px;
   font-family: var(--lt-font-mono, 'JetBrains Mono', ui-monospace, monospace);
   font-size: 10px;
   line-height: 1.4;
-  color: var(--lt-zinc-50, #FAFAFA);
+  color: var(--lt-zinc-50, #fafafa);
   white-space: nowrap;
   max-width: 160px;
   overflow: hidden;
@@ -828,25 +838,25 @@ button:hover::after, .spawn-btn:hover::after {
   left: 50%;
   transform: translateX(-50%);
   border: 5px solid transparent;
-  border-top-color: var(--lt-amber-500, #F59E0B);
+  border-top-color: var(--lt-amber-500, #f59e0b);
   border-bottom: none;
 }
 
 .action-bubble.working {
-  border-color: var(--lt-amber-400, #FBBF24);
+  border-color: var(--lt-amber-400, #fbbf24);
 }
 
 .action-bubble.working::after {
-  border-top-color: var(--lt-amber-400, #FBBF24);
+  border-top-color: var(--lt-amber-400, #fbbf24);
 }
 
 .action-bubble.resting {
   opacity: 0.6;
-  border-color: var(--lt-zinc-400, #A1A1AA);
+  border-color: var(--lt-zinc-400, #a1a1aa);
 }
 
 .action-bubble.resting::after {
-  border-top-color: var(--lt-zinc-400, #A1A1AA);
+  border-top-color: var(--lt-zinc-400, #a1a1aa);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -872,8 +882,14 @@ button:hover::after, .spawn-btn:hover::after {
 }
 
 @keyframes layer-panel-enter {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .layer-panel-header {
@@ -908,10 +924,12 @@ button:hover::after, .spawn-btn:hover::after {
   height: 14px;
   border: 1px solid var(--panel-border);
   border-radius: 3px;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0, 0, 0, 0.3);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background var(--transition-fast), border-color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
   position: relative;
 }
 
@@ -987,21 +1005,21 @@ button:hover::after, .spawn-btn:hover::after {
 }
 
 /* ─── Per-layer status cues ─────────────────────────────────────────────────── */
-.layer-row[data-layer-status="empty"] .layer-icon {
+.layer-row[data-layer-status='empty'] .layer-icon {
   opacity: 0.35;
 }
 
-.layer-row[data-layer-status="empty"] .layer-label::after {
+.layer-row[data-layer-status='empty'] .layer-label::after {
   content: ' —';
   color: var(--ui-text-dim);
   font-size: var(--text-2xs);
 }
 
-.layer-row[data-layer-status="loading"] .layer-icon {
+.layer-row[data-layer-status='loading'] .layer-icon {
   animation: layer-icon-pulse 1s ease-in-out infinite;
 }
 
-.layer-row[data-layer-status="error"] .layer-icon::after {
+.layer-row[data-layer-status='error'] .layer-icon::after {
   content: '●';
   font-size: 6px;
   color: var(--state-error);
@@ -1010,8 +1028,13 @@ button:hover::after, .spawn-btn:hover::after {
 }
 
 @keyframes layer-icon-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 .layer-reset-btn {
@@ -1026,7 +1049,10 @@ button:hover::after, .spawn-btn:hover::after {
   font-family: var(--font-ui);
   font-size: var(--text-2xs);
   cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .layer-reset-btn:hover {
@@ -1088,10 +1114,18 @@ button:hover::after, .spawn-btn:hover::after {
   font-weight: 500;
 }
 
-.bc-segment.hero { color: var(--civ-gold); }
-.bc-segment.worker { color: var(--civ-food); }
-.bc-segment.scout { color: var(--civ-movement); }
-.bc-segment.city { color: var(--ui-text); }
+.bc-segment.hero {
+  color: var(--civ-gold);
+}
+.bc-segment.worker {
+  color: var(--civ-food);
+}
+.bc-segment.scout {
+  color: var(--civ-movement);
+}
+.bc-segment.city {
+  color: var(--ui-text);
+}
 .bc-separator {
   color: var(--ui-text-dim);
   opacity: 0.5;

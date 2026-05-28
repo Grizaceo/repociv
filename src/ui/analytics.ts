@@ -18,7 +18,9 @@ function load(): AnalyticsData {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) return JSON.parse(raw);
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
   return {
     sessions: 0,
     panelsOpened: {},
@@ -32,7 +34,11 @@ function load(): AnalyticsData {
 }
 
 function save(d: AnalyticsData) {
-  try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { /* storage full */ }
+  try {
+    localStorage.setItem(KEY, JSON.stringify(d));
+  } catch {
+    /* storage full */
+  }
 }
 
 const data = load();

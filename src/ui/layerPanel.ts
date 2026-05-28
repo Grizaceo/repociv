@@ -3,12 +3,7 @@
 // Uses layers.ts for state management and persistence.
 
 import type { MapLayerId } from '../types.ts';
-import {
-  getLayerState,
-  toggleLayer,
-  resetLayers,
-  subscribe,
-} from '../layers.ts';
+import { getLayerState, toggleLayer, resetLayers, subscribe } from '../layers.ts';
 
 // ─── Layer metadata ───────────────────────────────────────────────────────────
 interface LayerDef {
@@ -100,7 +95,9 @@ export function isCleanMode(): boolean {
 export type LayerStatus = 'ok' | 'empty' | 'loading' | 'error';
 
 export function setLayerStatus(id: MapLayerId, status: LayerStatus): void {
-  const row = document.querySelector<HTMLElement>(`.layer-row input[data-layer-id="${id}"]`)?.parentElement;
+  const row = document.querySelector<HTMLElement>(
+    `.layer-row input[data-layer-id="${id}"]`,
+  )?.parentElement;
   if (row) row.dataset['layerStatus'] = status;
 }
 
@@ -202,8 +199,10 @@ function buildPanel(): HTMLDivElement {
   const lodRow = document.createElement('div');
   lodRow.className = 'layer-lod-row';
   lodRow.id = 'layer-lod-indicator';
-  lodRow.title = 'Level of Detail: controla qué elementos se renderizan según el nivel de zoom actual';
-  lodRow.innerHTML = '<span class="layer-lod-label">🔍 LOD:</span><span class="layer-lod-value">Auto</span>';
+  lodRow.title =
+    'Level of Detail: controla qué elementos se renderizan según el nivel de zoom actual';
+  lodRow.innerHTML =
+    '<span class="layer-lod-label">🔍 LOD:</span><span class="layer-lod-value">Auto</span>';
   panel.appendChild(lodRow);
 
   // Reset button

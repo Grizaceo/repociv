@@ -55,8 +55,14 @@ export class HexRenderer {
       const cctx = canvas.getContext('2d')!;
       cctx.drawImage(
         src,
-        rect[0]!, rect[1]!, rect[2]! - rect[0]!, rect[3]! - rect[1]!,
-        0, 0, targetSize, targetSize,
+        rect[0]!,
+        rect[1]!,
+        rect[2]! - rect[0]!,
+        rect[3]! - rect[1]!,
+        0,
+        0,
+        targetSize,
+        targetSize,
       );
       return canvas;
     };
@@ -146,16 +152,18 @@ export class HexRenderer {
       const touchesLand = neighbors.some((n) => n.terrain !== 'ocean');
       if (touchesLand) {
         const time = animTime || 0;
-        const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        
+        const prefersReducedMotion =
+          typeof window !== 'undefined' &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
         // Two concentric pulsating wave rings
         const wave1 = prefersReducedMotion ? 0.95 : 0.92 + 0.03 * Math.sin(time * 2.0);
         const wave2 = prefersReducedMotion ? 0.88 : 0.86 + 0.04 * Math.sin(time * 2.0 + Math.PI);
-        
+
         ctx.strokeStyle = 'rgba(150, 220, 255, 0.35)';
         ctx.lineWidth = 2.5;
         this.drawHexOutlineRaw(pos.x, pos.y, HEX_SIZE * wave1);
-        
+
         ctx.strokeStyle = 'rgba(150, 220, 255, 0.16)';
         ctx.lineWidth = 1.5;
         this.drawHexOutlineRaw(pos.x, pos.y, HEX_SIZE * wave2);
@@ -221,7 +229,12 @@ export class HexRenderer {
     }
   }
 
-  private drawTileResources(tile: Tile, pos: { x: number; y: number }, alpha: number, animTime?: number) {
+  private drawTileResources(
+    tile: Tile,
+    pos: { x: number; y: number },
+    alpha: number,
+    animTime?: number,
+  ) {
     const { ctx } = this;
     const res = tile.resources;
     if (!tile.revealed) return;
@@ -232,7 +245,9 @@ export class HexRenderer {
     if (res.production >= 3) icons.push('⚙');
     if (icons.length === 0) return;
 
-    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const time = animTime || 0;
     // Gentle floating offset
     const floatY = prefersReducedMotion ? 0 : Math.sin(time * 2.5 + pos.x * 0.05) * 4;
@@ -251,7 +266,12 @@ export class HexRenderer {
     ctx.restore();
   }
 
-  private drawTerrainDecor(terrain: Terrain, pos: { x: number; y: number }, alpha: number, animTime?: number) {
+  private drawTerrainDecor(
+    terrain: Terrain,
+    pos: { x: number; y: number },
+    alpha: number,
+    animTime?: number,
+  ) {
     const { ctx } = this;
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -259,15 +279,17 @@ export class HexRenderer {
     switch (terrain) {
       case 'forest': {
         const sprite = this.spriteImages['forest_sprite'];
-        const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const prefersReducedMotion =
+          typeof window !== 'undefined' &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const time = animTime || 0;
         const sway = prefersReducedMotion ? 0 : Math.sin(time * 1.8 + pos.x * 0.02) * 0.05;
-        
+
         ctx.save();
         ctx.translate(pos.x, pos.y);
         ctx.transform(1, 0, sway, 1, 0, 0); // GPU-accelerated wind sway shear transform
         ctx.translate(-pos.x, -pos.y);
-        
+
         if (sprite) {
           // Draw multiple small trees from sprite
           const sw = sprite.width / 2;
@@ -340,7 +362,9 @@ export class HexRenderer {
       case 'sacred': {
         // Golden ethereal particles floating on sacred ground
         const time = animTime || 0;
-        const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const prefersReducedMotion =
+          typeof window !== 'undefined' &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         ctx.save();
         for (let p = 0; p < 5; p++) {
           const angle = (p / 5) * Math.PI * 2 + time * 0.5;
@@ -393,15 +417,17 @@ export class HexRenderer {
 
     // Build fast lookup set
     const inTerritory = new Set(city.territory.map((c) => `${c.q},${c.r}`));
-    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const time = animTime || 0;
-    
+
     // Pulsating border opacity
     const pulse = prefersReducedMotion ? 0.95 : 0.75 + 0.25 * Math.sin(time * 3.0);
-    const borderColor = city.isCapital 
-      ? `rgba(200, 168, 75, ${pulse})` 
+    const borderColor = city.isCapital
+      ? `rgba(200, 168, 75, ${pulse})`
       : `rgba(122, 90, 46, ${pulse * 0.95})`;
-      
+
     const borderWidth = city.isCapital ? 3.0 : 2.0;
 
     ctx.save();
@@ -574,11 +600,7 @@ export class HexRenderer {
   drawSkillHealth(tile: Tile, pos: { x: number; y: number }) {
     if (!tile.city || !tile.skillHealth) return;
     const skillColor =
-      tile.skillHealth === 'ok'
-        ? '#5b9b5b'
-        : tile.skillHealth === 'stale'
-          ? '#c8a84b'
-          : '#d45b5b';
+      tile.skillHealth === 'ok' ? '#5b9b5b' : tile.skillHealth === 'stale' ? '#c8a84b' : '#d45b5b';
     const { ctx } = this;
     ctx.save();
     ctx.font = `${HEX_SIZE * 0.22}px sans-serif`;
@@ -593,7 +615,9 @@ export class HexRenderer {
   drawWonderDistrict(district: District, pos: { x: number; y: number }, animTime?: number) {
     const { ctx } = this;
     const time = animTime || 0;
-    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const wType = district.wonderType;
 
     ctx.save();
@@ -656,7 +680,6 @@ export class HexRenderer {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       ctx.fillText('BIBLIOTHECA', pos.x, pos.y + HEX_SIZE * 0.45);
-
     } else if (wType === 'institutum') {
       // ── Institutum / LabHub: Laboratory flask shape ────────────────────────
       const glow = prefersReducedMotion ? 0.35 : 0.25 + 0.15 * Math.sin(time * 2.0);
@@ -716,7 +739,6 @@ export class HexRenderer {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       ctx.fillText('LABHUB', pos.x, pos.y + HEX_SIZE * 0.45);
-
     } else {
       // Fallback: generic wonder
       ctx.font = `${HEX_SIZE * 0.35}px sans-serif`;

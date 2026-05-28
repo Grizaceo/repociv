@@ -44,14 +44,7 @@ export const AGENT_CAPABILITIES: Record<AgentBase, CommandType[]> = {
     'git_commit',
     'execute_agent',
   ],
-  CODEX: [
-    'inspect_repo',
-    'read_file',
-    'run_tests',
-    'run_build',
-    'edit_file',
-    'create_branch',
-  ],
+  CODEX: ['inspect_repo', 'read_file', 'run_tests', 'run_build', 'edit_file', 'create_branch'],
 };
 
 // ─── Skill labels shown as badges ────────────────────────────────────────────

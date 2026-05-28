@@ -4,11 +4,7 @@
 // Respects the city selection from the map and allows manual override.
 
 import type { CDailyArticle, ForeignRelationsReport } from '../types.ts';
-import {
-  generateForeignReport,
-  listForeignReports,
-  getForeignReport,
-} from '../bridge.ts';
+import { generateForeignReport, listForeignReports, getForeignReport } from '../bridge.ts';
 
 const STORAGE_LAST_REPORT = 'repociv-last-report';
 
@@ -33,19 +29,26 @@ const _state: PanelState = {
 };
 
 function esc(s: string): string {
-  return s.replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
   );
 }
 
 function _impactEmoji(impact: string): string {
   switch (impact) {
-    case 'none': return '⬜';
-    case 'low': return '🟡';
-    case 'medium': return '🟠';
-    case 'high': return '🔴';
-    case 'critical': return '🚨';
-    default: return '⬜';
+    case 'none':
+      return '⬜';
+    case 'low':
+      return '🟡';
+    case 'medium':
+      return '🟠';
+    case 'high':
+      return '🔴';
+    case 'critical':
+      return '🚨';
+    default:
+      return '⬜';
   }
 }
 
@@ -202,34 +205,46 @@ function _renderReportHTML(): string {
       <div class="fr-report-section">
         <h4>Evidencia utilizada</h4>
         <ul class="fr-evidence-list">
-          ${r.evidence.map((e) => `
+          ${r.evidence
+            .map(
+              (e) => `
             <li>
               <span class="fr-evidence-type">${e.type === 'article' ? '📰' : e.type === 'repo_file' ? '📁' : e.type === 'event' ? '🔔' : '🔗'}</span>
               <span class="fr-evidence-ref">${esc(e.ref)}</span>
               ${e.quote ? `<span class="fr-evidence-quote"> — ${esc(e.quote.slice(0, 120))}</span>` : ''}
             </li>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </ul>
       </div>
 
       <div class="fr-report-section">
         <h4>Recomendaciones</h4>
         <ul class="fr-rec-list">
-          ${r.recommendations.map((rec) => `
+          ${r.recommendations
+            .map(
+              (rec) => `
             <li>
               <span class="fr-rec-risk ${rec.risk}">[${rec.risk}]</span>
               <span>${esc(rec.label)}</span>
             </li>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </ul>
       </div>
 
-      ${r.markdown ? `
+      ${
+        r.markdown
+          ? `
       <div class="fr-report-section">
         <h4>Informe completo</h4>
         <pre class="fr-markdown">${esc(r.markdown.slice(0, 2500))}</pre>
       </div>
-      ` : ''}
+      `
+          : ''
+      }
 
       <div class="fr-report-footer">
         <small>Creado: ${new Date(r.createdAt).toLocaleString()}</small>
@@ -260,12 +275,7 @@ async function _doGenerate(): Promise<void> {
   _render();
 
   try {
-    const report = await generateForeignReport(
-      articles,
-      repoPath,
-      cityId || undefined,
-      'diplomat',
-    );
+    const report = await generateForeignReport(articles, repoPath, cityId || undefined, 'diplomat');
 
     if (report) {
       _state.currentReport = report;
@@ -315,12 +325,16 @@ function _renderRecentReports(): void {
   container.innerHTML = `
     <div class="fr-section-title">📋 Informes anteriores para esta noticia</div>
     <div class="fr-recent-list">
-      ${reports.map((r) => `
+      ${reports
+        .map(
+          (r) => `
         <div class="fr-recent-item" data-id="${esc(r.id)}">
           <span>${_impactEmoji(r.impact)} ${esc(r.title.slice(0, 60))}</span>
           <span class="fr-recent-meta">${esc(r.targetCityId)} · ${_confidenceLabel(r.confidence)}</span>
         </div>
-      `).join('')}
+      `,
+        )
+        .join('')}
     </div>
   `;
 

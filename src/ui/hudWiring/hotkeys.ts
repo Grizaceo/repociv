@@ -235,9 +235,12 @@ export function wireHotkeys(
         });
         break;
       case 'j':
-        toggleTaskAssignPanel(() => state.getLocalUnits(), (unitId, task) => {
-          state.setLocalUnitTask(unitId, task);
-        });
+        toggleTaskAssignPanel(
+          () => state.getLocalUnits(),
+          (unitId, task) => {
+            state.setLocalUnitTask(unitId, task);
+          },
+        );
         break;
       case 'h':
         toggleLayerPanel();
