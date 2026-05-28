@@ -18,6 +18,18 @@ def _start_test_server():
     return server, f"http://{host}:{port}"
 
 
+def _auth_headers(extra=None):
+    """Mirror a real client: send the token header when the bridge has one.
+
+    bridge.py loads .env on import, so REPOCIV_TOKEN may be set even in local
+    dev. Tests that hit auth-gated routes must send the header like the UI does.
+    """
+    headers = dict(extra or {})
+    if bridge.REPOCIV_TOKEN:
+        headers["X-RepoCiv-Token"] = bridge.REPOCIV_TOKEN
+    return headers
+
+
 def test_health_endpoint_returns_liveness_shape():
     server, base = _start_test_server()
     try:
@@ -43,7 +55,8 @@ def test_health_endpoint_returns_liveness_shape():
 def test_events_endpoint_serves_history_as_json():
     server, base = _start_test_server()
     try:
-        with urllib.request.urlopen(f"{base}/events", timeout=2) as resp:
+        req = urllib.request.Request(f"{base}/events", headers=_auth_headers())
+        with urllib.request.urlopen(req, timeout=2) as resp:
             data = json.loads(resp.read().decode())
         assert isinstance(data, list)
     finally:
@@ -54,7 +67,9 @@ def test_events_endpoint_serves_history_as_json():
 def test_events_endpoint_streams_sse_fanout():
     server, base = _start_test_server()
     try:
-        req = urllib.request.Request(f"{base}/events", headers={"Accept": "text/event-stream"})
+        req = urllib.request.Request(
+            f"{base}/events", headers=_auth_headers({"Accept": "text/event-stream"})
+        )
         with urllib.request.urlopen(req, timeout=2) as resp:
             first = resp.readline().decode().strip()
             assert first == 'data: {"type":"ping"}'

@@ -92,7 +92,13 @@ else
 fi
 
 # ─── Metrics health ──────────────────────────────────────────────────────────
-if METRICS=$(curl -sf --max-time 5 "http://localhost:$BRIDGE_PORT/metrics" 2>/dev/null); then
+# /metrics is token-gated (only /health and /ready are auth-exempt), so send the
+# token header when one is configured — mirrors how a real monitor would scrape.
+METRICS_AUTH=()
+if [[ -n "${REPOCIV_TOKEN:-}" ]]; then
+  METRICS_AUTH=(-H "X-RepoCiv-Token: $REPOCIV_TOKEN")
+fi
+if METRICS=$(curl -sf --max-time 5 "${METRICS_AUTH[@]}" "http://localhost:$BRIDGE_PORT/metrics" 2>/dev/null); then
   HEALTH_FIELD=$(echo "$METRICS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('health','?'))" 2>/dev/null || echo "?")
   case "$HEALTH_FIELD" in
     ok)       _ok "Métricas → SANO"; ((PASS+=1)) ;;
