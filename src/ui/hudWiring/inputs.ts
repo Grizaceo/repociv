@@ -8,6 +8,7 @@ import {
   closeSidePanel,
   isSidePanelOpen,
   appendUserMessage,
+  appendSystemMessage,
   wireSideTabs,
   loadGitInfo,
   loadFilesInfo,
@@ -17,6 +18,7 @@ import {
   wireCityPanel,
   getSelectedConfig,
 } from '../index.ts';
+import { handleSlashCommand } from '../chat/slashCommands.ts';
 import { toggleSettingsPanel } from '../settingsPanel.ts';
 import { toggleConstructionPanel } from '../constructionPanel.ts';
 import { spawnAgent } from './spawn.ts';
@@ -52,7 +54,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
   // ─── Mission / Chat input (shared logic) ────────────────────────────────
   const chatInput = document.getElementById('chat-input') as HTMLInputElement | null;
 
-  const sendMessage = (input: HTMLInputElement | null) => {
+  const sendMessage = async (input: HTMLInputElement | null) => {
     // 1) Resolve target unit: honor the user's explicit agent choice.
     // Priority:
     //   a) Active chip when the side panel is open (visible to the user).
@@ -98,6 +100,43 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     }
 
     const text = input.value.trim();
+
+    // ─── Slash-command interceptor ─────────────────────────────────────────
+    if (text.startsWith('/')) {
+      if (!isSidePanelOpen()) openSidePanel(unit);
+      const appendFn = (uid: string, msg: string) => appendSystemMessage(uid, msg);
+      const handled = await handleSlashCommand(text, unit.id, appendFn);
+      if (handled) {
+        input.value = '';
+        return;
+      }
+      // /retry falls through (handled=false) — re-use last message from history
+      const lastUserMsg = (() => {
+        try {
+          const raw = localStorage.getItem(`repociv:lastMsg:${unit.id}`);
+          return raw ?? '';
+        } catch {
+          return '';
+        }
+      })();
+      if (text.toLowerCase().startsWith('/retry')) {
+        if (lastUserMsg && !lastUserMsg.startsWith('/')) {
+          appendSystemMessage(unit.id, '🔄 Reenviando último mensaje...');
+          input.value = lastUserMsg;
+          sendMessage(input);
+        } else {
+          appendSystemMessage(unit.id, '❌ No hay mensaje anterior para reenviar.');
+        }
+        input.value = '';
+        return;
+      }
+      input.value = '';
+      return;
+    }
+
+    // Persist last message for /retry
+    try { localStorage.setItem(`repociv:lastMsg:${unit.id}`, text); } catch { /* ignore */ }
+
     if (!isSidePanelOpen()) openSidePanel(unit);
     appendUserMessage(unit.id, text);
 

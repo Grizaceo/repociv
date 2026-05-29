@@ -126,6 +126,20 @@ def append_message(unit_id: str, role: str, content: str, meta: dict[str, Any] |
         return canonical
 
 
+def reset(unit_id: str) -> str:
+    """Delete canonical.json + transcript.jsonl and return a new session nonce."""
+    nonce = str(time.time_ns())
+    with _locks.hold(f"session:{unit_id}"):
+        canonical = _canonical_path(unit_id)
+        transcript = _transcript_path(unit_id)
+        for p in (canonical, transcript):
+            try:
+                p.unlink(missing_ok=True)
+            except Exception:
+                pass
+    return f"repociv-{unit_id.lower()}-{nonce}"
+
+
 def get_recent(unit_id: str, limit: int = 20) -> list[dict[str, Any]]:
     with _locks.hold(f"session:{unit_id}"):
         path = _transcript_path(unit_id)

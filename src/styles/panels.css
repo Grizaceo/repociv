@@ -507,6 +507,15 @@
   border-right: 2px solid var(--res-science);
   align-self: flex-end;
 }
+.chat-msg.system {
+  border-left: 2px solid var(--civ-gold);
+  background: rgba(212, 175, 55, 0.07);
+  border-radius: 4px;
+  font-size: 12px;
+  opacity: 0.85;
+  align-self: stretch;
+  padding: 6px 10px;
+}
 .chat-msg-meta {
   font-size: 10px;
   color: var(--ui-text-dim);

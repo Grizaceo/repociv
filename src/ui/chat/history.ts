@@ -218,6 +218,31 @@ export function renderChatBuffer(unitId: string): void {
   }
 }
 
+/** Clear chat history for a unit and re-render empty (used by /new command). */
+export function resetChatHistory(unitId: string): void {
+  chatHistory.delete(unitId);
+  chatBuffers.delete(unitId);
+  currentAgentBubble.delete(unitId);
+  currentAgentMessageIndex.delete(unitId);
+  if (getActiveChatUnit() === unitId) {
+    const container = document.getElementById('chat-messages');
+    if (container) container.innerHTML = '';
+  }
+}
+
+/** Append an inline system notice (slash-command feedback, session resets, etc.).
+ *  Rendered as a distinct "system" bubble — not persisted to chatHistory. */
+export function appendSystemMessage(unitId: string, text: string): void {
+  if (getActiveChatUnit() !== unitId) return;
+  const container = document.getElementById('chat-messages');
+  if (!container) return;
+  const msg = document.createElement('div');
+  msg.className = 'chat-msg system';
+  msg.innerHTML = `<div class="chat-body">${renderMarkdown(text)}</div>`;
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+}
+
 export function clearChat(unitId: string): void {
   // Only clear buffer and active bubble, NOT the history
   chatBuffers.delete(unitId);

@@ -859,6 +859,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/api/foreign/report": _routes.post_foreign_report,
             "/api/graph-relations/flags": _routes.post_graph_relations_flags,
             "/api/graph-relations/refresh": _routes.post_graph_relations_refresh,
+            "/session/reset":  _routes.post_session_reset,
+            "/model/override": _routes.post_model_override,
         }
         if path in _POST_EXACT:
             status, resp = _POST_EXACT[path](body, {})

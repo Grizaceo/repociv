@@ -36,15 +36,9 @@ let _selectedHarness = '';
 let _selectedProvider = '';
 let _selectedModel = '';
 
-/** Return filtered providers based on the current harness selection.
- *  For "hermes" harness: only providers that are configured in the YAML
- *  (configured: true).
- *  For other harnesses (claude-code, auto): show all providers. */
+/** Return providers — server already filters to only configured providers,
+ *  so this just returns the full list regardless of harness. */
 function _filteredProviders(): ProviderInfo[] {
-  if (_selectedHarness === 'hermes') {
-    return _allProviders.filter((p) => p.configured);
-  }
-  // "claude-code", "auto", or any other harness → show all
   return _allProviders;
 }
 

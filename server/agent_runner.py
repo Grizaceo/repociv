@@ -41,6 +41,17 @@ def _noop_save(_mission: dict[str, Any]) -> None:
 send_to_repociv: SendFn = _noop_send
 save_mission: SaveMissionFn = _noop_save
 
+# Per-unit model overrides set by /model/override endpoint (in-memory, resets on bridge restart)
+_model_overrides: dict[str, dict[str, str]] = {}  # unit_id → {provider, model}
+
+
+def set_model_override(unit_id: str, provider: str, model: str) -> None:
+    _model_overrides[unit_id] = {"provider": provider, "model": model}
+
+
+def get_model_override(unit_id: str) -> dict[str, str] | None:
+    return _model_overrides.get(unit_id)
+
 
 def configure(*, send: SendFn | None = None, save: SaveMissionFn | None = None) -> None:
     global send_to_repociv, save_mission
@@ -706,7 +717,9 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
                            model: str = "") -> tuple[bool, str]:
     HERMES_URL   = os.environ.get("HERMES_URL",   "http://localhost:8642/v1/chat/completions")
     HERMES_KEY   = os.environ.get("HERMES_KEY",   "davi-voice-bridge-2026")
-    HERMES_MODEL = model or os.environ.get("HERMES_MODEL", "hermes-agent")
+    # Priority: explicit payload model → per-unit override → env default
+    _override = _model_overrides.get(unit_id)
+    HERMES_MODEL = model or (_override["model"] if _override else None) or os.environ.get("HERMES_MODEL", "hermes-agent")
 
     cfg = config if config is not None else _get_agent_config(unit_id)
     # Build session_id matching _run_openclaw_streaming logic for consistency

@@ -6,6 +6,8 @@ export {
   markAgentHasNewMessages,
   appendChatChunk,
   appendUserMessage,
+  appendSystemMessage,
+  resetChatHistory,
   clearChat,
 } from './chat/history.ts';
 

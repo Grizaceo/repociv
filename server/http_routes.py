@@ -231,8 +231,6 @@ def get_providers_live(ctx: "RouteContext") -> tuple[int, Any]:
     provider directly (using its API key from the environment) so the UI gets
     accurate per-model availability.
     """
-    from server.provider_registry import _get_providers
-
     # ── 1. Build a set of all model IDs reachable via Hermes gateway ──
     hermes_url_raw = os.environ.get("HERMES_URL", "http://localhost:8642/v1")
     for suffix in ("/v1/chat/completions", "/v1/completions", "/v1", ""):
@@ -270,9 +268,10 @@ def get_providers_live(ctx: "RouteContext") -> tuple[int, Any]:
         h = _auth_headers(pid)
         provider_live[pid] = _probe_url(ep_url, headers=h)
 
-    # ── 3. Merge with static provider data ──
-    static_data = _get_providers()
-    static_providers = {p["id"]: p for p in static_data["providers"]}
+    # ── 3. Merge with static provider data (only configured providers) ──
+    from server.provider_registry import _get_chat_config
+    chat_cfg = _get_chat_config()
+    static_providers = {p["id"]: p for p in chat_cfg["providers"]}
 
     providers_out = []
     for pid, p in static_providers.items():
@@ -304,7 +303,7 @@ def get_providers_live(ctx: "RouteContext") -> tuple[int, Any]:
         })
 
     return 200, {
-        "defaultProvider": static_data["defaultProvider"],
+        "defaultProvider": chat_cfg["defaultProvider"],
         "hermesReachable": hermes_reachable,
         "hermesBaseUrl": hermes_url,
         "providers": providers_out,
@@ -992,6 +991,52 @@ def post_graph_relations_refresh(body: dict[str, Any], _ctx: dict[str, Any]) -> 
         return 200, result
     else:
         return 400, {"error": "Provide either 'cities' or 'repoPaths' in the request body"}
+
+
+def _validate_unit_id(raw: Any) -> str | None:
+    """Return sanitized unit_id (uppercase, alphanumeric + dash/underscore, 1–32 chars)
+    or None if the value is invalid. Guards against path-traversal attacks."""
+    import re
+    uid = str(raw or "").strip().upper()
+    if not uid:
+        return "DAVI"
+    if re.fullmatch(r"[A-Z0-9_-]{1,32}", uid):
+        return uid
+    return None
+
+
+def post_session_reset(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
+    """POST /session/reset — delete session files and return a new session nonce.
+
+    Body: { "unit": "<unit_id>" }
+    Response: { "ok": True, "newSessionId": "repociv-davi-<timestamp>" }
+    """
+    from server import sessions as _sessions
+    unit_id = _validate_unit_id(body.get("unit", "DAVI"))
+    if unit_id is None:
+        return 400, {"error": "Invalid unit_id — must be alphanumeric/dash/underscore, max 32 chars"}
+    new_sid = _sessions.reset(unit_id)
+    return 200, {"ok": True, "newSessionId": new_sid, "unit": unit_id}
+
+
+def post_model_override(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
+    """POST /model/override — set per-unit provider/model override (in-memory).
+
+    Body: { "unit": "<unit_id>", "provider": "<provider_id>", "model": "<model_id>" }
+    Persists until bridge restart or another /model/override call for the same unit.
+    Note: override applies to the Hermes harness only; other harnesses use their
+    own model-selection logic.
+    """
+    from server import agent_runner as _ar
+    unit_id = _validate_unit_id(body.get("unit", "DAVI"))
+    if unit_id is None:
+        return 400, {"error": "Invalid unit_id — must be alphanumeric/dash/underscore, max 32 chars"}
+    provider = str(body.get("provider", "")).strip()
+    model = str(body.get("model", "")).strip()
+    if not provider or not model:
+        return 400, {"error": "Both 'provider' and 'model' are required"}
+    _ar.set_model_override(unit_id, provider, model)
+    return 200, {"ok": True, "unit": unit_id, "provider": provider, "model": model}
 
 
 # ─── Type alias ───────────────────────────────────────────────────────────────

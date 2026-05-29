@@ -251,26 +251,19 @@ def _get_chat_config(harness: str | None = None) -> dict[str, Any]:
     """
     Return full 3-layer config for the chat UI: harnesses + providers + defaults.
 
-    When harness='hermes', providers are filtered to show only those that are
-    actually configured in ~/.hermes/config.yaml (field `configured: true`).
-    This prevents showing providers like openai/anthropic/xai/nvidia-nim/openrouter
-    when the user hasn't configured them in Hermes.
-
-    When harness='claude-code' or harness=None, all providers are returned
-    (Claude Code can reach any provider independently).
+    Always filters to only providers actually configured in ~/.hermes/config.yaml
+    (field `configured: true`). Never returns providers from the static registry
+    that the user hasn't set up — no hardcoded lists.
+    The `harness` parameter is accepted for future use but does not change filtering.
     """
     harnesses = _get_harnesses()
     provider_info = _get_providers()
 
-    providers_list = provider_info["providers"]
-
-    # Filter providers based on harness context
-    if harness == "hermes":
-        providers_list = [
-            p for p in providers_list
-            if p.get("configured")
-        ]
-    # For "claude-code" or any other harness, show all providers (no filter)
+    # Always filter to only providers configured in ~/.hermes/config.yaml
+    providers_list = [
+        p for p in provider_info["providers"]
+        if p.get("configured")
+    ]
 
     # Pick default provider from the (possibly filtered) list
     default_provider = _pick_default_provider(providers_list)
