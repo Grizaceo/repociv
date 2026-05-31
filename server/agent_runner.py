@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 import uuid
 import urllib.request
@@ -693,21 +694,56 @@ def _run_codex_streaming(unit_id: str, mission_id: str, mission: str,
     full_prompt = f"{spatial}\n\n{cd_cmd}{mission}"
 
     # Encapsulate CLI flags — validate locally first
-    cmd = [codex_bin, "exec", "--dangerously-bypass-approvals-and-sandbox"]
+    with tempfile.NamedTemporaryFile(prefix="repociv-codex-last-message-", suffix=".txt", delete=False) as tmp:
+        last_message_path = tmp.name
+
+    cmd = [
+        codex_bin,
+        "exec",
+        "--dangerously-bypass-approvals-and-sandbox",
+        "--output-last-message",
+        last_message_path,
+    ]
     if model:
         cmd.extend(["-m", model])
     cmd.append(full_prompt)
 
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            text=True, bufsize=1, cwd=working_dir or None)
-    output_buf: list[str] = []
-    assert proc.stdout is not None
-    for line in proc.stdout:
-        output_buf.append(line)
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": line})
-        _es.record_output_chunk(mission_id, unit_id, line)
-    proc.wait(timeout=600)
-    return proc.returncode == 0, "".join(output_buf)
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+        cwd=working_dir or None,
+    )
+    _, stderr_text = proc.communicate(timeout=600)
+
+    if proc.returncode != 0:
+        err = (stderr_text or "").strip()
+        text = f"[codex error] {err}\n" if err else "[codex error] codex exec failed\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, text.strip()
+
+    try:
+        output = Path(last_message_path).read_text(encoding="utf-8").strip()
+    except OSError:
+        output = ""
+    finally:
+        try:
+            os.unlink(last_message_path)
+        except OSError:
+            pass
+
+    if not output:
+        output = "[codex error] empty final message\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": output})
+        _es.record_output_chunk(mission_id, unit_id, output)
+        return False, output.strip()
+
+    text = output if output.endswith("\n") else f"{output}\n"
+    send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+    _es.record_output_chunk(mission_id, unit_id, text)
+    return True, output
 
 
 def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
