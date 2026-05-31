@@ -49,7 +49,11 @@ export async function handleSlashCommand(
     return handler.run(args, unitId, append);
   }
 
-  append(unitId, `❌ Comando desconocido: /${cmd}. Escribe /help para ver los disponibles.`, 'system');
+  append(
+    unitId,
+    `❌ Comando desconocido: /${cmd}. Escribe /help para ver los disponibles.`,
+    'system',
+  );
   return true;
 }
 
@@ -132,7 +136,11 @@ _register('model', {
 
     const parts = args.trim().split(/\s+/);
     if (parts.length < 2) {
-      append(unitId, '❌ Uso: `/model <provider> <modelo>` — ej. `/model ollama-cloud deepseek-v4-pro`', 'system');
+      append(
+        unitId,
+        '❌ Uso: `/model <provider> <modelo>` — ej. `/model ollama-cloud deepseek-v4-pro`',
+        'system',
+      );
       return true;
     }
     const [provider, ...modelParts] = parts;

@@ -1,10 +1,59 @@
 // ─── RepoCiv — HUD helpers (Civ V Aesthetic) ────────────────────────────────────
 import autoAnimate from '@formkit/auto-animate';
-import * as lucide from 'lucide';
+import {
+  Activity,
+  AlertTriangle,
+  Box,
+  Camera,
+  CheckCircle,
+  Circle,
+  ClipboardList,
+  Coins,
+  Crosshair,
+  FileText,
+  FlaskConical,
+  Hammer,
+  Layers,
+  Pickaxe,
+  RotateCcw,
+  Scroll,
+  ScrollText,
+  Settings,
+  SunMoon,
+  Terminal,
+  TriangleAlert,
+  XCircle,
+  createIcons,
+} from 'lucide';
 
-// Expose lucide globally for offline usage across all RepoCiv panels
-type LucideApi = { createIcons: (opts?: unknown) => void; icons: Record<string, unknown> };
-(window as unknown as { lucide: LucideApi }).lucide = lucide as LucideApi;
+const lucideIcons = {
+  activity: Activity,
+  'alert-triangle': AlertTriangle,
+  box: Box,
+  camera: Camera,
+  'check-circle': CheckCircle,
+  circle: Circle,
+  'clipboard-list': ClipboardList,
+  coins: Coins,
+  crosshair: Crosshair,
+  'file-text': FileText,
+  'flask-conical': FlaskConical,
+  hammer: Hammer,
+  layers: Layers,
+  pickaxe: Pickaxe,
+  'rotate-ccw': RotateCcw,
+  scroll: Scroll,
+  'scroll-text': ScrollText,
+  settings: Settings,
+  'sun-moon': SunMoon,
+  terminal: Terminal,
+  'triangle-alert': TriangleAlert,
+  'x-circle': XCircle,
+};
+
+// Expose only the icons RepoCiv actually uses; importing all Lucide icons adds ~700 KB.
+type LucideApi = { createIcons: typeof createIcons; icons: typeof lucideIcons };
+(window as unknown as { lucide: LucideApi }).lucide = { createIcons, icons: lucideIcons };
 
 let loadingText: HTMLElement | null = null;
 let loadingFill: HTMLElement | null = null;

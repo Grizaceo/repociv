@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
         '/bridge': {
           target: `http://localhost:${env.BRIDGE_PORT ?? '5274'}`,
           changeOrigin: true,
-          ws: true,  // WebSocket upgrade passthrough (Phase 1)
+          ws: true, // WebSocket upgrade passthrough (Phase 1)
           secure: false,
           rewrite: (path) => path.replace(/^\/bridge/, ''),
         },
@@ -68,11 +68,33 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('/node_modules/')) {
+              return undefined;
+            }
+            if (id.includes('/lucide/')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('/valibot/')) {
+              return 'vendor-schema';
+            }
+            if (id.includes('/@xterm/')) {
+              return 'vendor-terminal';
+            }
+            if (id.includes('/@formkit/')) {
+              return 'vendor-ui';
+            }
+            return 'vendor';
+          },
+        },
         onLog(level, log, handler) {
           // Suppress known circular-dep dynamic-import warning:
           // agentChip.ts ↔ history.ts: dynamic import breaks init cycle.
-          if (log.message?.includes('history.ts is dynamically imported') &&
-              log.message?.includes('also statically imported')) {
+          if (
+            log.message?.includes('history.ts is dynamically imported') &&
+            log.message?.includes('also statically imported')
+          ) {
             return;
           }
           handler(level, log);

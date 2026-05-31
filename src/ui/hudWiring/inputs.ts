@@ -135,7 +135,11 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     }
 
     // Persist last message for /retry
-    try { localStorage.setItem(`repociv:lastMsg:${unit.id}`, text); } catch { /* ignore */ }
+    try {
+      localStorage.setItem(`repociv:lastMsg:${unit.id}`, text);
+    } catch {
+      /* ignore */
+    }
 
     if (!isSidePanelOpen()) openSidePanel(unit);
     appendUserMessage(unit.id, text);
