@@ -1,9 +1,8 @@
-import os
 import json
-from pathlib import Path
-
-import subprocess
+import os
 import re
+import subprocess
+from pathlib import Path
 
 
 # ─── Process scanner ──────────────────────────────────────────────────────────

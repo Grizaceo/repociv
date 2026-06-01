@@ -1,12 +1,11 @@
 import os
+import queue
+import threading
 from typing import Any
 
 from server import sessions as _sessions
 
 REPOCIV_PORT = int(os.environ.get("REPOCIV_PORT", "5273"))
-
-import queue
-import threading
 
 # ─── Event sender → RepoCiv frontend ─────────────────────────────────────────
 _sse_lock = threading.Lock()
