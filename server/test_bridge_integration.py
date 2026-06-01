@@ -132,3 +132,55 @@ def test_dev_mode_works_without_token(monkeypatch):
     assert bridge.REPOCIV_REMOTE is False
     assert bridge.REPOCIV_TOKEN == ""  # Empty = dev mode
     assert bridge.BRIDGE_HOST == "127.0.0.1"
+
+
+# ─── Approval idempotency ─────────────────────────────────────────────────────
+
+def test_approval_concurrent_requests_only_one_succeeds():
+    """Three simultaneous /approvals/<id>/approve requests — exactly one succeeds."""
+    CMD_ID = "test-approval-idempotency-001"
+    bridge._add_approval({
+        "id": CMD_ID, "type": "unit_command", "target": "test-repo",
+        "payload": {"unit": "DAVI", "mission": "smoke test"},
+        "created_by": "user", "risk": "low",
+    })
+
+    server, base = _start_test_server()
+    results: list[dict] = []
+    lock = threading.Lock()
+
+    def do_approve():
+        try:
+            req = urllib.request.Request(
+                f"{base}/approvals/{CMD_ID}/approve",
+                data=b"{}",
+                headers=_auth_headers({"Content-Type": "application/json"}),
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                data = json.loads(resp.read().decode())
+                with lock:
+                    results.append(data)
+        except urllib.error.HTTPError as e:
+            data = json.loads(e.read().decode())
+            with lock:
+                results.append(data)
+        except Exception as exc:
+            with lock:
+                results.append({"error": str(exc)})
+
+    try:
+        threads = [threading.Thread(target=do_approve) for _ in range(3)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=5)
+
+        ok_count = sum(1 for r in results if r.get("ok") is True)
+        not_found_count = sum(1 for r in results if r.get("error") == "approval not found")
+
+        assert ok_count == 1, f"Expected exactly 1 success, got {ok_count}: {results}"
+        assert not_found_count == 2, f"Expected 2 'not found', got {not_found_count}: {results}"
+    finally:
+        server.shutdown()
+        server.server_close()
