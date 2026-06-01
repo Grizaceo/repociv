@@ -10,6 +10,7 @@ import {
 import { COPY_SVG, attachCopyListeners, escapeHtml, hasErrorLine } from './clipboard.ts';
 import { renderMarkdown } from './markdown.ts';
 import { ensureChipExists } from './agentChip.ts';
+import { renderEmptyState, clearEmptyState } from '../emptyStates.ts';
 
 /** Render the chat history for a specific unit */
 export function renderChatHistory(unitId: string): void {
@@ -18,6 +19,11 @@ export function renderChatHistory(unitId: string): void {
   container.innerHTML = '';
 
   const history = chatHistory.get(unitId) ?? [];
+  clearEmptyState(container);
+  if (history.length === 0) {
+    renderEmptyState(container, 'chat');
+    return;
+  }
   for (const msg of history) {
     const msgEl = document.createElement('div');
     msgEl.className = `chat-msg ${msg.role}`;

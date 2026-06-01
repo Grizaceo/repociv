@@ -6,6 +6,7 @@
 import { approveCommand, rejectCommand } from '../commandBus.ts';
 import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
+import { renderEmptyState, clearEmptyState } from './emptyStates.ts';
 
 const POLL_MS = 3_000;
 
@@ -111,8 +112,9 @@ function _render() {
   const panel = _getOrCreate();
   const list = panel.querySelector<HTMLElement>('.ap-list')!;
 
+  clearEmptyState(list);
   if (_items.length === 0) {
-    list.innerHTML = '<div class="ap-empty">No hay aprobaciones pendientes.</div>';
+    renderEmptyState(list, 'approvals');
     return;
   }
 

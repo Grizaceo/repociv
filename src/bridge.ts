@@ -5,6 +5,8 @@
 
 import { type GameState } from './game.ts';
 import { type BridgeEvent, type CDailyArticle } from './types.ts';
+import { axialToPixel } from './hex.ts';
+import { HEX_SIZE } from './constants.ts';
 import type { SuggestionRelation as WonderSuggestionRelation } from './wonders/types.ts';
 import { logger } from './logger.ts';
 import { parseBridgeEvent, describeBridgeEventError } from './bridgeSchema.ts';
@@ -31,6 +33,7 @@ export class BridgeEvents {
   private offlineSince: number | null = null;
   private demoInterval: ReturnType<typeof setInterval> | null = null;
   private gpuInterval = 0;
+  rendererRef: { panTo: (x: number, y: number) => void } | null = null;
 
   // ─── Transports ──────────────────────────────────────────────────────────
   private ws: RepoCivWebSocket | null = null;
@@ -358,7 +361,18 @@ export class BridgeEvents {
           unit: evt.unit,
           ttl: evt.success ? 6000 : 8000,
         });
-        if (evt.success) playSound('mission');
+        if (evt.success) {
+          playSound('mission');
+          // Visual celebration — lazy import keeps payoffs out of the initial bundle
+          const canvas = document.getElementById('main-canvas') as HTMLCanvasElement | null;
+          const unit = this.state.getUnit(evt.unit);
+          if (canvas && unit) {
+            const worldPos = axialToPixel(unit.coord, HEX_SIZE);
+            import('./ui/payoffs.ts').then(({ celebrateMission }) => {
+              celebrateMission(canvas, this.rendererRef, worldPos);
+            });
+          }
+        }
         break;
       }
       case 'chat_chunk':

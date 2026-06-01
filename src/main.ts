@@ -330,6 +330,7 @@ async function bootstrap() {
   });
 
   const bridge = new BridgeEvents(state);
+  bridge.rendererRef = renderer;
   bridge.start();
   startApprovalPolling();
   startObservabilityPolling();

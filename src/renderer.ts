@@ -611,6 +611,11 @@ export class Renderer {
     this.cam.y = -pos.y * this.cam.zoom + this.canvas.height / 2;
   }
 
+  panTo(worldX: number, worldY: number) {
+    this.cam.x = -worldX * this.cam.zoom + this.canvas.width / 2;
+    this.cam.y = -worldY * this.cam.zoom + this.canvas.height / 2;
+  }
+
   private rafId = 0;
 
   stop() {

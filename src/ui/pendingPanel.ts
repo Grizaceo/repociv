@@ -25,6 +25,7 @@ import {
   setEditingId,
 } from './pendingPanel/state.ts';
 import { renderItem, renderForm, escapeHtml } from './pendingPanel/templates.ts';
+import { renderEmptyState, clearEmptyState } from './emptyStates.ts';
 
 export type { PendingItem } from './pendingPanel/state.ts';
 
@@ -193,11 +194,10 @@ function _render(): void {
   }
 
   const items = getItems();
+  clearEmptyState(body);
   if (items.length === 0) {
-    body.innerHTML = `
-      <div class="pending-empty">Sin pendientes activos ✓</div>
-      ${renderForm()}
-    `;
+    renderEmptyState(body, 'pending');
+    body.insertAdjacentHTML('beforeend', renderForm());
     _wireForm(body);
     return;
   }
