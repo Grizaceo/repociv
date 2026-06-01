@@ -81,6 +81,9 @@ let _bibliothecaRelationsContainer: HTMLElement | null = null;
 let _bibliothecaIframe: HTMLIFrameElement | null = null;
 let _bibliothecaManifest: WonderManifest | null = null;
 let _contextListenerAttached = false;
+let _dragMoveHandler: ((e: MouseEvent) => void) | null = null;
+let _dragUpHandler: (() => void) | null = null;
+let _vignetteRO: ResizeObserver | null = null;
 
 const _runtimeContext: {
   cities: Array<{ id: string; name: string; repoPath?: string }>;
@@ -213,15 +216,18 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
     _dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     header.style.cursor = 'grabbing';
   });
-  window.addEventListener('mousemove', (e) => {
+  if (_dragMoveHandler) window.removeEventListener('mousemove', _dragMoveHandler);
+  if (_dragUpHandler) window.removeEventListener('mouseup', _dragUpHandler);
+
+  _dragMoveHandler = (e: MouseEvent) => {
     if (!_dragging || !_vignette) return;
     _vignette.style.left = `${e.clientX - _dragOffset.x}px`;
     _vignette.style.top = `${e.clientY - _dragOffset.y}px`;
     _vignette.style.right = 'auto';
     _vignette.style.bottom = 'auto';
     _vignette.style.transform = 'none';
-  });
-  window.addEventListener('mouseup', () => {
+  };
+  _dragUpHandler = () => {
     if (!_dragging) return;
     _dragging = false;
     header.style.cursor = 'grab';
@@ -229,9 +235,12 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
       const r = _vignette.getBoundingClientRect();
       _saveState(_activeType!, { x: r.left, y: r.top, w: r.width, h: r.height });
     }
-  });
+  };
+  window.addEventListener('mousemove', _dragMoveHandler);
+  window.addEventListener('mouseup', _dragUpHandler);
 
-  const ro = new ResizeObserver((entries) => {
+  if (_vignetteRO) _vignetteRO.disconnect();
+  _vignetteRO = new ResizeObserver((entries) => {
     for (const entry of entries) {
       const r = entry.contentRect;
       const pos = _vignette?.getBoundingClientRect();
@@ -240,7 +249,7 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
       }
     }
   });
-  ro.observe(container);
+  _vignetteRO.observe(container);
 
   const body = container.querySelector('.wonder-vignette-body') as HTMLElement;
   body.innerHTML = '<div class="wonder-loading">Verificando estado de la maravilla...</div>';
@@ -318,6 +327,9 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
 
 export function closeWonderVignette(): void {
   stopWonderListener();
+  if (_vignetteRO) { _vignetteRO.disconnect(); _vignetteRO = null; }
+  if (_dragMoveHandler) { window.removeEventListener('mousemove', _dragMoveHandler); _dragMoveHandler = null; }
+  if (_dragUpHandler) { window.removeEventListener('mouseup', _dragUpHandler); _dragUpHandler = null; }
   if (_vignette) {
     _vignette.remove();
     _vignette = null;

@@ -615,6 +615,7 @@ export class Renderer {
 
   stop() {
     cancelAnimationFrame(this.rafId);
+    this.resizeObserver.disconnect();
     document.removeEventListener('keydown', this._onCityRelocateKeyDown);
   }
 
