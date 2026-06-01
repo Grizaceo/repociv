@@ -90,3 +90,154 @@ def test_run_agent_persists_session_and_run_state(monkeypatch, tmp_path):
     assert completions == [("m42", "done")]
     assert failures == []
     assert outcomes == [("m42", "success")]
+
+
+# ─── cursor-agent harness ──────────────────────────────────────────────────────
+
+def test_find_cursor_agent_returns_none_when_not_installed(monkeypatch):
+    """_find_cursor_agent() returns None when the binary is absent."""
+    monkeypatch.setattr(agent_runner.shutil, "which", lambda _name: None)
+    # Patch Path.exists to False for all cursor-agent candidate paths
+    from unittest.mock import patch
+    with patch("pathlib.Path.exists", return_value=False):
+        result = agent_runner._find_cursor_agent()
+    assert result is None
+
+
+def test_has_cursor_false_when_agent_not_installed(monkeypatch):
+    """`_has_cursor()` is False when cursor-agent is absent."""
+    monkeypatch.setattr(agent_runner, "_find_cursor_agent", lambda: None)
+    assert agent_runner._has_cursor() is False
+
+
+def test_run_cursor_agent_streaming_missing_binary(monkeypatch):
+    """Returns (False, error) with an install hint when cursor-agent is absent."""
+    sent = []
+    recorded = []
+    monkeypatch.setattr(agent_runner, "_find_cursor_agent", lambda: None)
+    monkeypatch.setattr(agent_runner, "send_to_repociv", lambda evt: sent.append(evt))
+    monkeypatch.setattr(agent_runner._es, "record_output_chunk",
+                        lambda m, u, t: recorded.append(t))
+
+    ok, output = agent_runner._run_cursor_agent_streaming("WORKER", "m1", "list files", config={})
+
+    assert ok is False
+    assert "cursor-agent not found" in output
+    assert "cursor.com/install" in output
+    assert sent[0]["type"] == "chat_chunk"
+
+
+class TestParseCursorNdjsonChunk:
+    """Unit tests for the NDJSON chunk parser."""
+
+    def test_empty_line_returns_empty(self):
+        assert agent_runner._parse_cursor_ndjson_chunk("") == ""
+        assert agent_runner._parse_cursor_ndjson_chunk("   ") == ""
+
+    def test_text_event_returns_text(self):
+        line = '{"type": "text", "text": "hello world"}'
+        assert agent_runner._parse_cursor_ndjson_chunk(line) == "hello world"
+
+    def test_assistant_event_extracts_content_array(self):
+        line = '{"type": "assistant", "message": {"content": [{"type": "text", "text": "done"}, {"type": "tool_use"}]}}'
+        assert agent_runner._parse_cursor_ndjson_chunk(line) == "done"
+
+    def test_assistant_event_string_content(self):
+        line = '{"type": "assistant", "message": {"content": "simple string"}}'
+        assert agent_runner._parse_cursor_ndjson_chunk(line) == "simple string"
+
+    def test_tool_use_event_filtered_out(self):
+        line = '{"type": "tool_use", "name": "read_file", "input": {}}'
+        assert agent_runner._parse_cursor_ndjson_chunk(line) == ""
+
+    def test_tool_result_filtered_out(self):
+        line = '{"type": "tool_result", "content": "file contents"}'
+        assert agent_runner._parse_cursor_ndjson_chunk(line) == ""
+
+    def test_ping_filtered_out(self):
+        assert agent_runner._parse_cursor_ndjson_chunk('{"type": "ping"}') == ""
+
+    def test_result_event(self):
+        line = '{"type": "result", "output": "task complete"}'
+        assert agent_runner._parse_cursor_ndjson_chunk(line) == "task complete"
+
+    def test_invalid_json_returns_raw_line(self):
+        raw = "plain text output not json"
+        assert agent_runner._parse_cursor_ndjson_chunk(raw) == raw
+
+    def test_unknown_type_returns_empty(self):
+        line = '{"type": "metadata", "tokens": 42}'
+        assert agent_runner._parse_cursor_ndjson_chunk(line) == ""
+
+
+def test_run_cursor_agent_streaming_success(monkeypatch, tmp_path):
+    """Full streaming path with a fake cursor-agent subprocess."""
+    import subprocess as _sp
+    from io import StringIO
+
+    sent = []
+    recorded = []
+    monkeypatch.setattr(agent_runner, "_find_cursor_agent", lambda: "/fake/cursor-agent")
+    monkeypatch.setattr(agent_runner, "send_to_repociv", lambda evt: sent.append(evt))
+    monkeypatch.setattr(agent_runner._es, "record_output_chunk",
+                        lambda m, u, t: recorded.append(t))
+
+    # Simulate cursor-agent emitting NDJSON lines
+    fake_ndjson = "\n".join([
+        '{"type": "text", "text": "Analyzing repo..."}',
+        '{"type": "tool_use", "name": "read_file"}',   # should be filtered
+        '{"type": "text", "text": "Done."}',
+        "",
+    ])
+
+    class FakeProc:
+        returncode = 0
+        stdout = StringIO(fake_ndjson)
+        def wait(self, timeout=None): pass
+
+    monkeypatch.setattr(_sp, "Popen", lambda *_a, **_kw: FakeProc())
+
+    ok, output = agent_runner._run_cursor_agent_streaming(
+        "WORKER", "m99", "inspect repo", config={}, working_dir=str(tmp_path)
+    )
+
+    assert ok is True
+    assert output == "Analyzing repo...Done."
+    # tool_use was filtered — only 2 text chunks + 1 harness announcement
+    text_chunks = [e["text"] for e in sent if e["type"] == "chat_chunk"]
+    assert "[harness: cursor-agent]" in text_chunks[0]
+    assert "Analyzing repo..." in text_chunks[1]
+    assert "Done." in text_chunks[2]
+    assert not any("tool_use" in c for c in text_chunks)
+
+
+def test_run_cursor_agent_streaming_model_flag(monkeypatch, tmp_path):
+    """--model flag is passed when a model is specified."""
+    import subprocess as _sp
+    from io import StringIO
+
+    captured_cmd = []
+    monkeypatch.setattr(agent_runner, "_find_cursor_agent", lambda: "/fake/cursor-agent")
+    monkeypatch.setattr(agent_runner, "send_to_repociv", lambda _e: None)
+    monkeypatch.setattr(agent_runner._es, "record_output_chunk", lambda *_a: None)
+
+    class FakeProc:
+        returncode = 0
+        stdout = StringIO("")
+        def wait(self, timeout=None): pass
+
+    def fake_popen(cmd, **_kw):
+        captured_cmd.extend(cmd)
+        return FakeProc()
+
+    monkeypatch.setattr(_sp, "Popen", fake_popen)
+
+    agent_runner._run_cursor_agent_streaming(
+        "WORKER", "m1", "task", config={}, model="claude-opus-4-5", working_dir=str(tmp_path)
+    )
+
+    assert "--model" in captured_cmd
+    assert "claude-opus-4-5" in captured_cmd
+    assert "--workspace" in captured_cmd
+    assert "--trust" in captured_cmd
+    assert "--print" in captured_cmd

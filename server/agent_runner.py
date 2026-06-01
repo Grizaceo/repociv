@@ -336,8 +336,8 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
             return _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                               model=model or provider)
         if harness == "cursor" and _has_cursor():
-            return _run_cursor_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
-                                         model=model or provider)
+            return _run_cursor_agent_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
+                                               model=model or provider)
         if harness == "hermes":
             # Check profile first: agents with a profile (e.g. LEXO → lexo-alpha)
             # need HERMES_HOME pointing at their profile dir, not the HTTP gateway
@@ -630,11 +630,29 @@ def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
     return proc.returncode == 0, "".join(output_buf)
 
 
-def _has_cursor() -> bool:
-    return _find_cursor() is not None
+def _find_cursor_agent() -> str | None:
+    """Find the cursor-agent headless binary (NOT the cursor IDE launcher).
+
+    Install via: curl https://cursor.com/install | bash
+    Lands at ~/.local/bin/cursor-agent or ~/.cursor/bin/cursor-agent.
+
+    # TODO: validate flags against `cursor-agent --help` once installed:
+    #   expected: --print, --trust, --output-format stream-json, --model, --workspace
+    """
+    candidates = [
+        shutil.which("cursor-agent"),
+        str(Path.home() / ".local" / "bin" / "cursor-agent"),
+        str(Path.home() / ".cursor" / "bin" / "cursor-agent"),
+        "/usr/local/bin/cursor-agent",
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
 
 
-def _find_cursor() -> str | None:
+def _find_cursor_ide() -> str | None:
+    """Find the cursor IDE launcher binary (opens the editor, not for headless use)."""
     candidates = [
         shutil.which("cursor"),
         str(Path.home() / ".local" / "bin" / "cursor"),
@@ -646,29 +664,109 @@ def _find_cursor() -> str | None:
     return None
 
 
-def _run_cursor_streaming(unit_id: str, mission_id: str, mission: str,
-                           config: dict[str, Any],
-                           working_dir: str | None = None,
-                           city_id: str = "",
-                           model: str = "") -> tuple[bool, str]:
-    cursor_bin = _find_cursor()
+def _has_cursor() -> bool:
+    """True if cursor-agent headless binary is available."""
+    return _find_cursor_agent() is not None
+
+
+def _parse_cursor_ndjson_chunk(line: str) -> str:
+    """Extract human-readable text from a cursor-agent NDJSON output line.
+
+    cursor-agent --output-format stream-json emits newline-delimited JSON.
+    Known shapes (may vary — validate against cursor-agent --help):
+      {"type": "assistant", "message": {"content": [{"type": "text", "text": "..."}]}}
+      {"type": "text", "text": "..."}
+      {"type": "tool_use", ...}  — skip, not human-readable output
+    Falls back to the raw line if it is not valid JSON or has no text content.
+    # TODO: validate against actual cursor-agent --output-format stream-json output
+    """
+    line = line.strip()
+    if not line:
+        return ""
+    try:
+        data = json.loads(line)
+        event_type = data.get("type", "")
+        # Tool-use events are noise — don't surface them as chat text
+        if event_type in ("tool_use", "tool_result", "ping", "heartbeat"):
+            return ""
+        # text shorthand
+        if event_type == "text":
+            return data.get("text", "")
+        # assistant message with content array
+        if event_type == "assistant":
+            content = data.get("message", {}).get("content", "")
+            if isinstance(content, list):
+                return "".join(
+                    c.get("text", "") for c in content
+                    if isinstance(c, dict) and c.get("type") == "text"
+                )
+            return str(content) if content else ""
+        # result / final output
+        if event_type in ("result", "final_output"):
+            return data.get("output", data.get("text", ""))
+        return ""
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        return line  # not JSON — pass raw (plaintext fallback)
+
+
+def _run_cursor_agent_streaming(
+    unit_id: str, mission_id: str, mission: str,
+    config: dict[str, Any],
+    working_dir: str | None = None,
+    city_id: str = "",
+    model: str = "",
+) -> tuple[bool, str]:
+    """Run cursor-agent headless CLI subprocess.
+
+    Requires cursor-agent to be installed:
+        curl https://cursor.com/install | bash
+
+    Flags used (# TODO: validate against `cursor-agent --help` once installed):
+        --print               non-interactive, write output to stdout
+        --trust               auto-approve all tool calls (like --dangerously-skip-permissions)
+        --output-format stream-json   NDJSON stream; each line is a typed event
+        --model <id>          optional model override
+        --workspace <dir>     working directory for tool calls
+    """
+    cursor_bin = _find_cursor_agent()
     if not cursor_bin:
-        text = "[cursor error] binary not found in PATH, ~/.local/bin or /usr/local/bin\n"
+        text = (
+            "[cursor error] cursor-agent not found — "
+            "install with: curl https://cursor.com/install | bash\n"
+        )
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
         _es.record_output_chunk(mission_id, unit_id, text)
         return False, text.strip()
 
-    system_prompt = config.get("system", "")
-    full_prompt = f"{system_prompt}\n\n{mission}" if system_prompt else mission
-    cmd = [cursor_bin, "--headless", "--message", full_prompt]
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            text=True, bufsize=1, cwd=working_dir or None)
+    spatial = _spatial_context_block(city_id, working_dir)
+    cd_cmd = f"cd {working_dir}\n\n" if working_dir else ""
+    full_prompt = f"{spatial}\n\n{cd_cmd}{mission}"
+
+    # TODO: validate these flags against `cursor-agent --help` once installed
+    cmd = [cursor_bin, "--print", "--trust", "--output-format", "stream-json"]
+    if model:
+        cmd.extend(["--model", model])
+    if working_dir:
+        cmd.extend(["--workspace", working_dir])
+    cmd.append(full_prompt)
+
+    send_to_repociv({
+        "type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
+        "text": "[harness: cursor-agent]\n",
+    })
+
+    proc = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, bufsize=1, cwd=working_dir or None,
+    )
     output_buf: list[str] = []
     assert proc.stdout is not None
-    for line in proc.stdout:
-        output_buf.append(line)
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": line})
-        _es.record_output_chunk(mission_id, unit_id, line)
+    for raw_line in proc.stdout:
+        chunk = _parse_cursor_ndjson_chunk(raw_line)
+        if chunk:
+            output_buf.append(chunk)
+            send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": chunk})
+            _es.record_output_chunk(mission_id, unit_id, chunk)
     proc.wait(timeout=600)
     return proc.returncode == 0, "".join(output_buf)
 
