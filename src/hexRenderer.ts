@@ -8,6 +8,7 @@ import { HEX_SIZE } from './constants.ts';
 export class HexRenderer {
   private patterns: Record<string, CanvasPattern | null> = {};
   private assetsLoaded = false;
+  private readonly _labelWidthCache = new Map<string, number>();
 
   constructor(private ctx: CanvasRenderingContext2D) {}
 
@@ -488,8 +489,12 @@ export class HexRenderer {
     ctx.font = `bold ${HEX_SIZE * 0.26}px 'Cinzel', serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    const metrics = ctx.measureText(label);
-    const bw = metrics.width + 16;
+    let cachedW = this._labelWidthCache.get(label);
+    if (cachedW === undefined) {
+      cachedW = ctx.measureText(label).width;
+      this._labelWidthCache.set(label, cachedW);
+    }
+    const bw = cachedW + 16;
     const bh = HEX_SIZE * 0.38;
     const bx = pos.x - bw / 2;
     const by = pos.y + HEX_SIZE * 0.58;
