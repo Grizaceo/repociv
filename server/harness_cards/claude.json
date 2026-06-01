@@ -1,0 +1,25 @@
+{
+  "id": "claude",
+  "type": "harness",
+  "name": "Claude Code",
+  "description": "Local coding agent via the Claude Code CLI (claude --print). Full agentic mode with file editing, shell commands, and test running. The CLAUDE unit type in RepoCiv is a direct bypass to this harness.",
+  "transport": ["cli"],
+  "discovery": {
+    "binary": "claude",
+    "search_paths": ["$PATH", "~/.npm-global/bin", "~/.local/bin"]
+  },
+  "auth": "none (local binary; credentials managed by claude CLI's own auth flow)",
+  "session": {
+    "supported": true,
+    "flag": "-c / --continue (resumes most recent conversation in the working directory)",
+    "stateful_agents": "Pass -c for stateful unit types to persist conversation across missions",
+    "stateless_agents": "Omit -c; each mission starts a fresh context"
+  },
+  "execution_flags": "--print --dangerously-skip-permissions",
+  "model_selection": "--model flag; user selects via UI model picker",
+  "unit_type": "CLAUDE",
+  "bypass": true,
+  "note": "CLAUDE always routes directly to this harness regardless of the harness selector in the UI.",
+  "timeout_s": 600,
+  "status": "stable"
+}

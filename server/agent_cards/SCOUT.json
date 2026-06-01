@@ -1,6 +1,6 @@
 {
   "name": "SCOUT",
-  "description": "Read-only analyzer. Inspects codebase, generates diagnostics, finds issues. No write access to files.",
+  "description": "Read-only analyst. Inspects codebases, generates diagnostics, reports issues. Stateless: no memory between missions. Works with any harness — defaults to Hermes CLI (hermes profile) but falls back through the standard cascade.",
   "capabilities": [
     "read_file",
     "list_directory",
@@ -11,9 +11,7 @@
     "measure_complexity",
     "trace_flow"
   ],
-  "modalities": [
-    "text"
-  ],
+  "modalities": ["text"],
   "authentication": {
     "type": "bearer",
     "header": "X-RepoCiv-Token"
@@ -27,11 +25,12 @@
     "completed",
     "failed"
   ],
-  "model_affinity": "claude-haiku-3-5",
+  "harness": "hermes",
+  "stateful": false,
   "believability": 0.92,
   "concurrency_limit": 2,
   "default_task_type": "read",
-  "timeout_s": 180,
+  "timeout_s": 600,
   "retry_policy": {
     "max_attempts": 2,
     "backoff_s": 3
@@ -40,6 +39,7 @@
     "role": "analyzer",
     "tier": "ECONOMICO",
     "introduced_phase": "v1.0",
+    "built_in": true,
     "read_only": true
   }
 }

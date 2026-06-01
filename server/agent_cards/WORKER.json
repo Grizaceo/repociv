@@ -1,6 +1,6 @@
 {
   "name": "WORKER",
-  "description": "Executor without memory. Receives a single task, solves it in minimal tokens. Creates files, edits code, runs tests.",
+  "description": "General-purpose executor. Receives a single task, solves it in minimal tokens, and returns. Stateless by design: no memory between missions. Works with any harness — defaults to Hermes CLI (hermes profile) but falls back through the standard cascade.",
   "capabilities": [
     "edit_file",
     "create_file",
@@ -12,9 +12,7 @@
     "run_linter",
     "commit_changes"
   ],
-  "modalities": [
-    "text"
-  ],
+  "modalities": ["text"],
   "authentication": {
     "type": "bearer",
     "header": "X-RepoCiv-Token"
@@ -25,14 +23,14 @@
     "working",
     "testing",
     "completed",
-    "failed",
-    "needs_review"
+    "failed"
   ],
-  "model_affinity": "claude-sonnet-4-5",
+  "harness": "hermes",
+  "stateful": false,
   "believability": 0.85,
   "concurrency_limit": 3,
   "default_task_type": "edit",
-  "timeout_s": 300,
+  "timeout_s": 600,
   "retry_policy": {
     "max_attempts": 3,
     "backoff_s": 2
@@ -41,6 +39,6 @@
     "role": "executor",
     "tier": "EQUILIBRIO",
     "introduced_phase": "v1.0",
-    "stateless": true
+    "built_in": true
   }
 }

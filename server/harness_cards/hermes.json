@@ -1,0 +1,39 @@
+{
+  "id": "hermes",
+  "type": "harness",
+  "name": "Hermes",
+  "description": "Primary harness. Connects to a Hermes gateway over HTTP or runs the hermes CLI subprocess when a profile is configured. Supports personal agents: create a profile at ~/.hermes/profiles/<name>, add it to AGENT_CONFIGS with a 'profile' key, and RepoCiv will route to it automatically.",
+  "transport": ["http", "cli"],
+  "discovery": {
+    "http": {
+      "env": "HERMES_URL",
+      "default": "http://localhost:8642/v1/chat/completions"
+    },
+    "cli": {
+      "binary": "hermes",
+      "search_paths": ["$PATH", "~/.local/bin", "/usr/local/bin"]
+    }
+  },
+  "auth": {
+    "http": { "type": "bearer", "env": "HERMES_KEY" },
+    "cli": "none (HERMES_HOME controls profile access)"
+  },
+  "session": {
+    "http": "X-Hermes-Session-Id request header",
+    "cli": "--continue <session-name> flag (stateful agents only)"
+  },
+  "profiles": {
+    "supported": true,
+    "mechanism": "HERMES_HOME env var points the subprocess to a profile directory",
+    "path": "~/.hermes/profiles/<profile-name>",
+    "note": "Each profile is a fully independent Hermes instance with its own config, SOUL.md, skills, memory, and subagents. WORKER and SCOUT ship with default profiles. Add your own agent by creating a profile and registering it in AGENT_CONFIGS."
+  },
+  "model_selection": {
+    "http": "HERMES_MODEL env var or per-request override via UI model picker",
+    "cli": "-m flag passed to hermes chat; defaults to profile configuration"
+  },
+  "built_in_agents": ["WORKER", "SCOUT"],
+  "concurrency": "configurable per agent via AGENT_CONCURRENCY in scheduler.py",
+  "timeout_s": 600,
+  "status": "stable"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "cursor",
+  "type": "harness",
+  "name": "Cursor",
+  "description": "Cursor IDE agent via cursor --headless. Experimental harness — not exposed as a dedicated unit type yet. Available as a manual harness selection via the UI model picker when cursor is installed.",
+  "transport": ["cli"],
+  "discovery": {
+    "binary": "cursor",
+    "search_paths": ["$PATH", "~/.local/bin", "/usr/local/bin"]
+  },
+  "auth": "none (local binary; credentials managed by Cursor IDE)",
+  "session": {
+    "supported": false,
+    "note": "cursor --headless does not expose session flags. Stateless."
+  },
+  "execution_flags": "--headless --message <prompt>",
+  "model_selection": "controlled by Cursor IDE settings; no per-request flag",
+  "unit_type": null,
+  "bypass": false,
+  "note": "Cursor is available via the harness selector but does not have a dedicated unit type. Routes through the general cascade when harness='cursor' is selected.",
+  "timeout_s": 600,
+  "status": "experimental"
+}

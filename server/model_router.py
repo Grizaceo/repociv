@@ -210,10 +210,20 @@ def route_model(
 
 
 def get_agent_cards_path() -> str:
-    """Return the path to the agent_cards directory.
+    """Return the path to the agent_cards directory (built-in agents only).
 
     Returns:
-        Absolute path to server/agent_cards/
+        Absolute path to server/agent_cards/ (WORKER, SCOUT)
     """
     from pathlib import Path
     return str(Path(__file__).parent / "agent_cards")
+
+
+def get_harness_cards_path() -> str:
+    """Return the path to the harness_cards directory.
+
+    Returns:
+        Absolute path to server/harness_cards/ (hermes, openclaw, codex, claude, cursor)
+    """
+    from pathlib import Path
+    return str(Path(__file__).parent / "harness_cards")

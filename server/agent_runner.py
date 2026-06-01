@@ -62,54 +62,82 @@ def configure(*, send: SendFn | None = None, save: SaveMissionFn | None = None) 
         save_mission = save
 
 
+# ─── Agent configuration ──────────────────────────────────────────────────────
+# Two categories:
+#
+#   Built-in agents (ship with RepoCiv, work out of the box):
+#     WORKER — stateless general executor (hermes profile: worker)
+#     SCOUT  — stateless read-only analyst (hermes profile: scout)
+#
+#   Harness bypasses (unit type = harness selection, no independent identity):
+#     OPENCLAW — always routes to openclaw harness
+#     CLAUDE   — always routes to claude-code harness
+#     CODEX    — always routes to codex harness
+#
+#   Personal profiles (NOT shipped; each user adds their own):
+#     Example: DAVI, LEXO — create a Hermes profile at
+#     ~/.hermes/profiles/<name> and add an entry here with a "profile" key.
+#     The bridge will set HERMES_HOME to that profile directory and run the
+#     hermes CLI subprocess, giving the agent its own config, SOUL.md, skills,
+#     memory, and subagents.
+#
 AGENT_CONFIGS: dict[str, dict[str, Any]] = {
-    "DAVI": {
-        "agent": "main", "personality": "technical", "stateful": True,
-        "system": ("Eres DAVI, agente principal de Cristóbal. Conoces el workspace, "
-                   "mantienes contexto entre misiones y respondes técnico y conciso."),
-    },
+    # ── Built-in agents ────────────────────────────────────────────────────────
     "WORKER": {
         "agent": "main", "personality": "concise", "stateful": False,
         "profile": str(Path.home() / ".hermes" / "profiles" / "worker"),
-        "system": ("Eres un agente de ejecución especializado. No tienes memoria de "
-                   "sesiones previas ni contexto del workspace más allá de lo entregado "
-                   "en esta misión. Resuelve la tarea en el mínimo de tokens posible y "
-                   "entrega el resultado. No hagas preguntas de clarificación; "
-                   "asume lo razonable y avanza."),
+        "system": (
+            "You are a specialized execution agent. You have no memory of previous "
+            "sessions or workspace context beyond what is provided in this mission. "
+            "Solve the task using the minimum tokens necessary and return the result. "
+            "Do not ask clarifying questions; make reasonable assumptions and proceed."
+        ),
     },
     "SCOUT": {
         "agent": "main", "personality": "helpful", "stateful": False,
         "profile": str(Path.home() / ".hermes" / "profiles" / "scout"),
-        "system": ("Eres un agente de exploración especializado. No tienes memoria de "
-                   "sesiones previas ni contexto del workspace más allá de lo entregado "
-                   "en esta misión. Inspecciona código/archivos/repos y devuelve "
-                   "un resumen breve y accionable. Prioriza hechos sobre opiniones."),
+        "system": (
+            "You are a specialized exploration agent. You have no memory of previous "
+            "sessions or workspace context beyond what is provided in this mission. "
+            "Inspect code, files, and repositories, then return a brief and actionable "
+            "summary. Prioritize facts over opinions."
+        ),
     },
-    "LEXO": {
-        "agent": "lexo-alpha", "personality": "analytical", "stateful": True,
-        "profile": str(Path.home() / ".hermes" / "profiles" / "lexo-alpha"),
-        "system": ("Eres LexO-α. Tu perfil completo está en tu HERMES_HOME, "
-                   "con tu SOUL.md, skills jurídicos, pipeline de búsqueda, "
-                   "subagentes y vault. Actúa como LexO — analiza con profundidad, "
-                   "cita fuentes cuando aplique, usa tu pipeline y subagentes "
-                   "según corresponda."),
-    },
+
+    # ── Harness bypasses ───────────────────────────────────────────────────────
+    # These are routing aliases — the unit name selects the harness directly.
     "OPENCLAW": {
-        "agent": "main", "personality": "technical", "stateful": True,
-        "system": "Eres openclaw, agente local de Cristóbal.",
+        "agent": "main", "stateful": True,
     },
     "CLAUDE": {
-        "stateful": True,
+        "stateful": True,   # enables --continue flag for session persistence
     },
     "CODEX": {
-        "stateful": True,
+        "stateful": False,  # codex exec is stateless by design; flag has no effect
     },
+
+    # ── Personal profile example (not shipped) ─────────────────────────────────
+    # Copy and adapt this block to add your own Hermes-based agent.
+    # The "profile" key must point to a valid ~/.hermes/profiles/<name> directory.
+    #
+    # "MY_AGENT": {
+    #     "agent": "main", "stateful": True,
+    #     "profile": str(Path.home() / ".hermes" / "profiles" / "my-agent"),
+    #     "system": "Brief identity description passed to the agent.",
+    # },
+}
+
+
+# Fallback for unit types not in AGENT_CONFIGS (personal profiles not yet registered,
+# or any agent spawned with a custom unit-id). Acts like a generic stateful hermes agent.
+_DEFAULT_AGENT_CONFIG: dict[str, Any] = {
+    "agent": "main", "personality": "technical", "stateful": True,
 }
 
 
 def _get_agent_config(unit_id: str) -> dict[str, Any]:
     base = unit_id.split("-")[0].upper()
-    return AGENT_CONFIGS.get(base, AGENT_CONFIGS["DAVI"])
+    return AGENT_CONFIGS.get(base, _DEFAULT_AGENT_CONFIG)
 
 
 def _infer_model_label(unit_id: str) -> str:
@@ -583,9 +611,12 @@ def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
         f"{system_prompt}{spatial}\n\n{cd_cmd}{mission}" if system_prompt else f"{spatial}\n\n{cd_cmd}{mission}"
     )
     cmd = [claude_bin, "--print", "--dangerously-skip-permissions"]
-    # If a specific model was requested via UI, pass it to claude CLI
     if model:
         cmd.extend(["--model", model])
+    # Stateful CLAUDE units resume the most recent conversation in the working dir.
+    # This persists context across missions (claude --continue = resume most recent session).
+    if config.get("stateful", True):
+        cmd.append("--continue")
     cmd.append(full_prompt)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, bufsize=1, cwd=working_dir or None)

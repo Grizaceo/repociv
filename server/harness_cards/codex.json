@@ -1,0 +1,24 @@
+{
+  "id": "codex",
+  "type": "harness",
+  "name": "Codex",
+  "description": "Local coding agent via the Codex CLI (codex exec). Runs in non-interactive execution mode: takes a prompt, edits files, and writes its final message to a temp file. No session persistence — each mission is stateless by design.",
+  "transport": ["cli"],
+  "discovery": {
+    "binary": "codex",
+    "search_paths": ["$PATH", "~/.npm-global/bin", "~/.local/bin", "/usr/local/bin"]
+  },
+  "auth": "none (local binary)",
+  "session": {
+    "supported": false,
+    "note": "codex exec does not support sessions. Each mission starts with a fresh context. The stateful flag in AGENT_CONFIGS has no effect for this harness."
+  },
+  "execution_mode": "codex exec --dangerously-bypass-approvals-and-sandbox --output-last-message <path> <prompt>",
+  "model_selection": "-m flag; user selects via UI model picker (default: codex built-in default)",
+  "output": "Reads final assistant message from --output-last-message temp file after process exits",
+  "unit_type": "CODEX",
+  "bypass": true,
+  "note": "CODEX always routes directly to this harness regardless of the harness selector in the UI.",
+  "timeout_s": 600,
+  "status": "stable"
+}

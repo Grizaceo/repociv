@@ -1,0 +1,23 @@
+{
+  "id": "openclaw",
+  "type": "harness",
+  "name": "OpenClaw",
+  "description": "Local agent harness via the openclaw CLI. Routes to a configured agent with persistent session support. The OPENCLAW unit type in RepoCiv is a direct bypass to this harness — no cascade fallback.",
+  "transport": ["cli"],
+  "discovery": {
+    "binary": "openclaw",
+    "search_paths": ["$PATH", "~/.npm-global/bin"]
+  },
+  "auth": "none (local binary, access controlled by binary presence)",
+  "session": {
+    "stateful": "--session-id repociv-<unit_id> (persists across missions)",
+    "stateless": "--session-id repociv-<unit_id>-<mission_id> (per-mission isolation)"
+  },
+  "model_selection": "--model flag; user selects via UI model picker",
+  "agent_flag": "--agent <agent-name> (configured in AGENT_CONFIGS, default: 'main')",
+  "unit_type": "OPENCLAW",
+  "bypass": true,
+  "note": "OPENCLAW always routes directly to this harness regardless of the harness selector in the UI.",
+  "timeout_s": 600,
+  "status": "stable"
+}

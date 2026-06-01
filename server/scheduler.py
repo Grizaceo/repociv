@@ -64,9 +64,9 @@ def _init_from_disk() -> None:
 AGENT_CONCURRENCY: dict[str, int] = {
     "DAVI":     1,
     "LEXO":     1,
-    "SCOUT":    1,
+    "SCOUT":    2,   # read-only: safe to run 2 parallel scans (matches agent card)
     "OPENCLAW": 1,
-    "WORKER":   3,   # batch workers can run in parallel
+    "WORKER":   3,   # stateless executor: safe to batch in parallel
 }
 
 _DEFAULT_CONCURRENCY = 1

@@ -217,40 +217,50 @@ def test_agent_cards_path_exists():
 
 
 def test_agent_cards_present():
-    """All expected agent cards should exist."""
+    """Built-in agent cards (WORKER, SCOUT) should exist and be valid JSON."""
     import json
     from pathlib import Path
-    
+
     cards_dir = Path(get_agent_cards_path())
-    expected_agents = ["DAVI", "WORKER", "SCOUT", "LEXO", "OPENCLAW"]
-    
-    for agent in expected_agents:
+    for agent in ["WORKER", "SCOUT"]:
         card_path = cards_dir / f"{agent}.json"
-        assert card_path.exists(), f"Agent card not found: {agent}.json"
-        
-        # Verify JSON is valid
-        content = card_path.read_text()
-        data = json.loads(content)
+        assert card_path.exists(), f"Built-in agent card not found: {agent}.json"
+        data = json.loads(card_path.read_text())
         assert data["name"] == agent
         assert "capabilities" in data
-        assert "model_affinity" in data
+        assert "believability" in data
+
+
+def test_harness_cards_present():
+    """All harness cards should exist and be valid JSON."""
+    import json
+    from pathlib import Path
+    from server.model_router import get_harness_cards_path
+
+    harness_dir = Path(get_harness_cards_path())
+    for harness in ["hermes", "openclaw", "codex", "claude", "cursor"]:
+        card_path = harness_dir / f"{harness}.json"
+        assert card_path.exists(), f"Harness card not found: {harness}.json"
+        data = json.loads(card_path.read_text())
+        assert data["id"] == harness
+        assert data["type"] == "harness"
+        assert "description" in data
 
 
 def test_agent_card_metadata_complete():
-    """Agent cards should have required metadata."""
+    """Built-in agent cards should have required metadata."""
     import json
     from pathlib import Path
-    
+
     cards_dir = Path(get_agent_cards_path())
     card_path = cards_dir / "WORKER.json"
     data = json.loads(card_path.read_text())
-    
-    # Check required fields
+
     assert data["name"] == "WORKER"
     assert data["capabilities"]
-    assert data["model_affinity"]
     assert data["believability"] > 0.0
     assert data["concurrency_limit"] > 0
+    assert data["stateful"] is False  # WORKER is stateless by design
 
 
 # ─── enforced vs recommended propagation in meta ─────────────────────────────
