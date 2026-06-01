@@ -54,6 +54,8 @@ except ImportError:
     )
     from graph_signals import (
         _extract_repo_signals, _has_repo_changed, _load_recent_events,
+        _get_file_mtimes, _repo_id_from_path, _jaccard,  # noqa: F401 (used via module in tests)
+        _extract_package_deps, _extract_imports,  # noqa: F401 (used via module in tests)
     )
     from graph_index import (
         _load_all_signals, _load_meta, _save_meta,
