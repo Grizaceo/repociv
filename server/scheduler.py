@@ -50,13 +50,12 @@ def _init_from_disk() -> None:
     """Pre-populate queue from persisted file at startup."""
     global _queue
     persisted = _load_queue()
-    # Filter out commands already in terminal state (completed/failed/cancelled
-    # before restart). Only keep 'queued' ones — they were waiting to run.
     terminal = {"completed", "failed", "cancelled", "rejected"}
-    _queue = [c for c in persisted if c.get("status") not in terminal]
-    # Re-sort so priority matrix re-orders on recovery
-    _resort()
-    n = len(_queue)
+    filtered = [c for c in persisted if c.get("status") not in terminal]
+    with _queue_lock:
+        _queue = filtered
+        _resort()
+    n = len(filtered)
     if n:
         print(f"[scheduler] Recovered {n} queued mission(s) from disk.")
 
@@ -265,28 +264,30 @@ def _release_slot(agent_base: str) -> None:
 
 def _dispatch_next() -> bool:
     """Pick highest-priority queued command that has a free agent slot. Returns True if dispatched."""
+    cmd_to_run: dict[str, Any] | None = None
+    base_to_run: str = ""
     with _queue_lock:
         _resort()
         for i, cmd in enumerate(_queue):
             unit = cmd.get("payload", {}).get("unit", "DAVI")
             base = _agent_base(unit)
             if _acquire_slot(base):
-                _queue.pop(i)
-                _dump_queue(_queue)  # persist: item removed from queue
+                cmd_to_run = dict(_queue.pop(i))  # explicit copy — safe across threads
+                base_to_run = base
+                _dump_queue(_queue)
                 break
         else:
-            return False  # nothing dispatched
+            return False
 
-    # Run in a thread so we don't block the worker loop
     def _run() -> None:
-        heartbeat(base)
-        _es.record_started(cmd.get("id", ""))
+        heartbeat(base_to_run)
+        _es.record_started(cmd_to_run.get("id", ""))
         try:
             if _dispatcher:
-                _dispatcher(cmd)
+                _dispatcher(cmd_to_run)
         finally:
-            _release_slot(base)
-            heartbeat(base)
+            _release_slot(base_to_run)
+            heartbeat(base_to_run)
 
     threading.Thread(target=_run, daemon=True).start()
     return True
