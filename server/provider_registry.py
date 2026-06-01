@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 import logging
 
-from .agent_runner import _has_claude_code, _has_openclaw, _has_cursor
+from .agent_runner import _has_claude_code, _has_openclaw, _has_cursor, _has_codex
 
 # ─── Static JSON (fallback) ──────────────────────────────────────────────────────
 
@@ -122,6 +122,8 @@ def _build_dynamic_providers() -> tuple[list[dict], list[dict]]:
             available = _has_openclaw()
         elif transport == "cursor":
             available = _has_cursor()
+        elif transport == "codex":
+            available = _has_codex()
         elif transport == "hermes":
             # Hermes is always available if the gateway is running
             available = True
@@ -269,7 +271,7 @@ def _get_chat_config(harness: str | None = None) -> dict[str, Any]:
     default_provider = _pick_default_provider(providers_list)
 
     default_harness = ""
-    for hid in ("hermes", "claude-code", "openclaw", "cursor"):
+    for hid in ("hermes", "claude-code", "openclaw", "cursor", "codex"):
         for h in harnesses:
             if h["id"] == hid and h["available"]:
                 default_harness = hid

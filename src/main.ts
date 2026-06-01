@@ -538,7 +538,10 @@ async function bootstrap() {
     if (target) {
       const fullCity = state.world.cities.find((c) => c.id === target.id);
       if (!fullCity) return;
-      renderer.centerOn(fullCity.coord);
+
+      // Si el usuario está enfocado en una unidad, no mover la cámara
+      if (!state.selectedUnit) renderer.centerOn(fullCity.coord);
+
       renderer.onCitySelect?.(fullCity.id);
       if (detail.mode === 'local' && fullCity.repoPath) {
         _enterLocalViewForCity(fullCity);
@@ -683,7 +686,9 @@ async function bootstrap() {
     const city = state.world.cities.find((c) => c.id === detail.cityId);
     if (!city) return;
     if (!(await _confirmLabSensitiveAction(city.id, `Enviar misión manual a ${city.name}`))) return;
-    renderer.centerOn(city.coord);
+
+    if (!state.selectedUnit) renderer.centerOn(city.coord);
+
     renderer.onCitySelect?.(city.id);
     _primeMissionComposerForCity(city);
     logEvent(`🧪 Mission composer preparado para ${city.name}`, 'info');

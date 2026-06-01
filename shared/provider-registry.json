@@ -25,6 +25,12 @@
       "name": "Cursor",
       "transport": "cursor",
       "env": "CURSOR_API_KEY"
+    },
+    {
+      "id": "codex",
+      "name": "Codex",
+      "transport": "codex",
+      "env": ""
     }
   ],
   "providers": [

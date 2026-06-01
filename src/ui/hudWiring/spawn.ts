@@ -10,6 +10,8 @@ import {
   isSidePanelOpen,
   loadGitInfo,
   loadFilesInfo,
+  getSelectedConfig,
+  persistSelection,
 } from '../index.ts';
 
 export function selectHero(
@@ -77,5 +79,15 @@ export function spawnAgent(
   };
   const type = typeMap[base] ?? 'hero';
   const unit = state.spawnUnit(unitId, unitId, type, 'gris', coord, 'En espera de misión');
+
+  // Seed harness default for units that map 1:1 to a harness selector
+  if (base === 'CODEX') {
+    try {
+      localStorage.setItem(`repociv:chatConfig:${unitId}`, JSON.stringify({ harness: 'codex', provider: '', model: '' }));
+    } catch {
+      // ignore
+    }
+  }
+
   selectHero(unit, renderer, state, bridge);
 }
