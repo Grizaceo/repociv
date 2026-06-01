@@ -14,6 +14,7 @@ import os
 import time
 import urllib.request
 import urllib.error
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 
@@ -224,14 +225,25 @@ def get_harnesses(ctx: "RouteContext") -> tuple[int, Any]:
     return 200, _hr.list_harnesses()
 
 
+# ─── providers-live cache (avoids blocking the HTTP thread for up to 40s) ──────
+_providers_live_cache: dict | None = None
+_providers_live_ts: float = 0.0
+_PROVIDERS_CACHE_TTL = 30.0
+
+
 def get_providers_live(ctx: "RouteContext") -> tuple[int, Any]:
     """Fetch live model reachability from each provider's own API.
 
-    Instead of relying solely on the Hermes gateway, we probe each configured
-    provider directly (using its API key from the environment) so the UI gets
-    accurate per-model availability.
+    Probes are run in parallel (ThreadPoolExecutor) and the result is cached
+    for 30 s to avoid blocking the HTTP handler on every call.
     """
-    # ── 1. Build a set of all model IDs reachable via Hermes gateway ──
+    global _providers_live_cache, _providers_live_ts
+
+    now = time.time()
+    if _providers_live_cache and now - _providers_live_ts < _PROVIDERS_CACHE_TTL:
+        return 200, _providers_live_cache
+
+    # ── 1. Resolve Hermes base URL ──
     hermes_url_raw = os.environ.get("HERMES_URL", "http://localhost:8642/v1")
     for suffix in ("/v1/chat/completions", "/v1/completions", "/v1", ""):
         if hermes_url_raw.endswith(suffix):
@@ -240,35 +252,47 @@ def get_providers_live(ctx: "RouteContext") -> tuple[int, Any]:
     else:
         hermes_url = hermes_url_raw
 
-    hermes_models: set[str] = set()
-    try:
-        headers: dict[str, str] = {}
-        hermes_key = os.environ.get("HERMES_KEY", "")
-        if hermes_key:
-            headers["Authorization"] = f"Bearer {hermes_key}"
-        resp = _probe_url(f"{hermes_url}/v1/models", headers=headers)
-        hermes_models = set(resp)
-    except Exception:
-        pass
-    hermes_reachable = len(hermes_models) > 0
+    hermes_headers: dict[str, str] = {}
+    hermes_key = os.environ.get("HERMES_KEY", "")
+    if hermes_key:
+        hermes_headers["Authorization"] = f"Bearer {hermes_key}"
 
-    # ── 2. Probe each provider's native API ──
+    # ── 2. Build probe map: all providers + hermes in one pass ──
     _PROVIDER_MODEL_ENDPOINTS = {
-        "ollama-cloud": ("https://api.ollama.com/v1/models", "GET"),
-        "openrouter": ("https://openrouter.ai/api/v1/models", "GET"),
-        "openai": ("https://api.openai.com/v1/models", "GET"),
-        "anthropic": ("https://api.anthropic.com/v1/models", "GET"),
-        "deepseek": ("https://api.deepseek.com/v1/models", "GET"),
-        "xai": ("https://api.x.ai/v1/models", "GET"),
-        "nvidia-nim": ("https://integrate.api.nvidia.com/v1/models", "GET"),
+        "ollama-cloud": "https://api.ollama.com/v1/models",
+        "openrouter":   "https://openrouter.ai/api/v1/models",
+        "openai":       "https://api.openai.com/v1/models",
+        "anthropic":    "https://api.anthropic.com/v1/models",
+        "deepseek":     "https://api.deepseek.com/v1/models",
+        "xai":          "https://api.x.ai/v1/models",
+        "nvidia-nim":   "https://integrate.api.nvidia.com/v1/models",
     }
 
-    provider_live: dict[str, list[str]] = {}
-    for pid, (ep_url, _) in _PROVIDER_MODEL_ENDPOINTS.items():
-        h = _auth_headers(pid)
-        provider_live[pid] = _probe_url(ep_url, headers=h)
+    to_probe: dict[str, tuple[str, dict[str, str]]] = {
+        "__hermes__": (f"{hermes_url}/v1/models", hermes_headers),
+    }
+    for pid, ep_url in _PROVIDER_MODEL_ENDPOINTS.items():
+        to_probe[pid] = (ep_url, _auth_headers(pid))
 
-    # ── 3. Merge with static provider data (only configured providers) ──
+    # ── 3. Run all probes in parallel — max wall-clock ≈ 6 s ──
+    probe_results: dict[str, list[str]] = {}
+    with ThreadPoolExecutor(max_workers=len(to_probe)) as pool:
+        futures = {
+            pool.submit(_probe_url, url, "GET", headers): pid
+            for pid, (url, headers) in to_probe.items()
+        }
+        for future in as_completed(futures, timeout=6):
+            pid = futures[future]
+            try:
+                probe_results[pid] = future.result()
+            except Exception:
+                probe_results[pid] = []
+
+    hermes_models: set[str] = set(probe_results.pop("__hermes__", []))
+    hermes_reachable = len(hermes_models) > 0
+    provider_live = probe_results
+
+    # ── 4. Merge with static provider registry ──
     from server.provider_registry import _get_chat_config
     chat_cfg = _get_chat_config()
     static_providers = {p["id"]: p for p in chat_cfg["providers"]}
@@ -276,15 +300,13 @@ def get_providers_live(ctx: "RouteContext") -> tuple[int, Any]:
     providers_out = []
     for pid, p in static_providers.items():
         live_ids = provider_live.get(pid, [])
-        reachable_set = set(live_ids) | hermes_models  # union of both sources
+        reachable_set = set(live_ids) | hermes_models
 
         models = []
         for m in p.get("models", []):
             mid = m.get("id", "")
-            reachable = mid in reachable_set
-            models.append({**m, "reachable": reachable})
+            models.append({**m, "reachable": mid in reachable_set})
 
-        # Also add any live model IDs we got that aren't in static list
         known_ids = {m["id"] for m in models}
         for mid in live_ids:
             if mid not in known_ids:
@@ -302,12 +324,15 @@ def get_providers_live(ctx: "RouteContext") -> tuple[int, Any]:
             "liveModelCount": len(live_ids),
         })
 
-    return 200, {
+    response: dict = {
         "defaultProvider": chat_cfg["defaultProvider"],
         "hermesReachable": hermes_reachable,
         "hermesBaseUrl": hermes_url,
         "providers": providers_out,
     }
+    _providers_live_cache = response
+    _providers_live_ts = time.time()
+    return 200, response
 
 
 def get_log(ctx: "RouteContext") -> tuple[int, Any]:
