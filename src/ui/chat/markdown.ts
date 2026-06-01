@@ -17,13 +17,19 @@ function escapeHtml(s: string): string {
   );
 }
 
+let _mdCache: { text: string; html: string } | null = null;
+
 /**
  * Render markdown text to safe HTML.
  * Supports: ```lang blocks, inline `code`, **bold**, *italic*,
  * # h1-3, - / 1. lists, [links](url).
+ *
+ * Result is memoized on the last input — during streaming the same
+ * growing text is often passed multiple times before the next chunk.
  */
 export function renderMarkdown(text: string): string {
   if (!text) return '';
+  if (_mdCache?.text === text) return _mdCache.html;
 
   // Step 1: Extract fenced code blocks → placeholders
   const blocks: CodeBlock[] = [];
@@ -96,6 +102,7 @@ export function renderMarkdown(text: string): string {
     );
   });
 
+  _mdCache = { text, html: body };
   return body;
 }
 

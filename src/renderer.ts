@@ -745,10 +745,12 @@ export class Renderer {
 
     // Pass 2.6: Knowledge — bibliotheca connection indicators
     if (showKnowledge) {
-      for (const city of this.state.world.cities) {
-        const hasKnowledge = city.wonders?.some((w) => w.wonderType === 'bibliotheca');
-        if (!hasKnowledge) continue;
-        const cp = axialToPixel(city.coord, HEX_SIZE);
+      // Precompute knowledge city positions once to avoid O(n²) per-frame wonders scan
+      const knowledgePts = this.state.world.cities
+        .filter((c) => c.wonders?.some((w) => w.wonderType === 'bibliotheca'))
+        .map((c) => ({ id: c.id, p: axialToPixel(c.coord, HEX_SIZE) }));
+
+      for (const { p: cp } of knowledgePts) {
         // Glowing book icon
         ctx.save();
         ctx.globalAlpha = 0.35 + 0.15 * Math.sin(this.animTime * 1.5 + cp.x);
@@ -758,11 +760,8 @@ export class Renderer {
         ctx.textBaseline = 'middle';
         ctx.fillText('📖', cp.x + HEX_SIZE * 0.8, cp.y - HEX_SIZE * 0.55);
         // Thin connection lines between knowledge cities
-        for (const other of this.state.world.cities) {
-          if (other.id === city.id) continue;
-          const otherHasKnowledge = other.wonders?.some((w) => w.wonderType === 'bibliotheca');
-          if (!otherHasKnowledge) continue;
-          const op = axialToPixel(other.coord, HEX_SIZE);
+        for (const { p: op } of knowledgePts) {
+          if (op === cp) continue;
           const dist = Math.hypot(op.x - cp.x, op.y - cp.y);
           if (dist > HEX_SIZE * 12) continue; // don't draw across the whole map
           ctx.strokeStyle = `rgba(74, 144, 200, ${0.08 + 0.04 * Math.sin(this.animTime * 0.8 + cp.x + op.x)})`;

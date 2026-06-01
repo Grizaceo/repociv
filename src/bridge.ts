@@ -57,7 +57,11 @@ export class BridgeEvents {
     }
     this.checkHealth();
     this.healthInterval = window.setInterval(() => this.checkHealth(), 5000);
-    this.gpuInterval = window.setInterval(() => this.fetchGpu(), 5000);
+    // Stagger GPU poll so both timers don't fire simultaneously
+    window.setTimeout(() => {
+      this.fetchGpu();
+      this.gpuInterval = window.setInterval(() => this.fetchGpu(), 5000);
+    }, 2500);
   }
 
   /** Discover the WebSocket URL from the bridge /ws endpoint */

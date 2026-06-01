@@ -77,6 +77,12 @@ export function appendChatChunk(unitId: string, text: string): void {
       history[idx] = { role: msg.role, text: newText, timestamp: msg.timestamp };
       chatHistory.set(unitId, history);
     }
+    // Read scroll position before any DOM write to avoid forced reflow
+    const container = document.getElementById('chat-messages');
+    const isNearBottom = container
+      ? container.scrollTop + container.clientHeight >= container.scrollHeight - 50
+      : false;
+
     const bubble = currentAgentBubble.get(unitId);
     if (bubble) {
       const body = bubble.querySelector<HTMLElement>('.chat-body');
@@ -87,13 +93,9 @@ export function appendChatChunk(unitId: string, text: string): void {
         errBtn.classList.toggle('hidden', !hasErrorLine(newText));
       }
     }
-    const container = document.getElementById('chat-messages');
-    if (container) {
-      const isNearBottom =
-        container.scrollTop + container.clientHeight >= container.scrollHeight - 50;
-      if (isNearBottom) {
-        container.scrollTop = container.scrollHeight;
-      }
+
+    if (container && isNearBottom) {
+      container.scrollTop = container.scrollHeight;
     }
   }
 }

@@ -660,6 +660,14 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(payload)
 
+    def _err_json(self, status: int, error: str) -> None:
+        """Write a plain error JSON response with Content-Type set."""
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self._cors()
+        self.end_headers()
+        self.wfile.write(json.dumps({"error": error}).encode())
+
     def do_GET(self) -> None:
         path = self.path.split("?")[0]
         params = self._parse_qs()
@@ -667,10 +675,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         # Health and ready endpoints are exempt from token auth (used by monitors)
         if path not in ("/health", "/ready") and not self._check_token():
-            self.send_response(401)
-            self._cors()
-            self.end_headers()
-            self.wfile.write(b'{"error":"unauthorized"}')
+            self._err_json(401, "unauthorized")
             return
 
         # ── Simple exact-match GET routes ──────────────────────────────────────
@@ -753,9 +758,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             elif len(parts) >= 2:
                 ctx["repo"], ctx["issue_id"], ctx["circuit"] = parts[0], parts[1], False
             else:
-                self.send_response(404)
-                self._cors()
-                self.end_headers()
+                self._err_json(404, "invalid task path")
                 return
             status, body = _routes.get_task_by_key(ctx)
             self._respond(status, body)
@@ -793,9 +796,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 self._respond(status, body)
                 return
 
-        self.send_response(404)
-        self._cors()
-        self.end_headers()
+        self._err_json(404, "not found")
 
     # placeholder to keep next method visible
     def _do_GET_placeholder(self) -> None:
@@ -804,36 +805,24 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         if self._rate_limited():
-            self.send_response(429)
-            self._cors()
-            self.end_headers()
-            self.wfile.write(b'{"error":"rate limited"}')
+            self._err_json(429, "rate limited")
             return
 
         # Token auth (POST always requires token if configured)
         if not self._check_token():
-            self.send_response(401)
-            self._cors()
-            self.end_headers()
-            self.wfile.write(b'{"error":"unauthorized"}')
+            self._err_json(401, "unauthorized")
             return
 
         # Body size guard
         length = int(self.headers.get("Content-Length", 0))
         if length > _MAX_BODY:
-            self.send_response(413)
-            self._cors()
-            self.end_headers()
-            self.wfile.write(b'{"error":"payload too large"}')
+            self._err_json(413, "payload too large")
             return
 
         try:
             body = json.loads(self.rfile.read(length))
         except Exception:
-            self.send_response(400)
-            self._cors()
-            self.end_headers()
-            self.wfile.write(b'{"error":"invalid JSON"}')
+            self._err_json(400, "invalid JSON")
             return
 
         path = self.path.split("?")[0]
@@ -889,10 +878,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 if len(segments) >= 2:
                     task_repo, task_issue = segments[0], segments[1]
                 else:
-                    self.send_response(400)
-                    self._cors()
-                    self.end_headers()
-                    self.wfile.write(b'{"error":"invalid task key"}')
+                    self._err_json(400, "invalid task key")
                     return
             cancelled = _to.cancel_task(task_repo, task_issue)
             self._json({"ok": cancelled, "key": f"{task_repo}::{task_issue}"})
@@ -1012,10 +998,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 harness_id = parts[2]
                 harness = _hr.get_harness(harness_id)
                 if harness is None:
-                    self.send_response(404)
-                    self._cors()
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"error": f"Harness '{harness_id}' not found"}).encode())
+                    self._err_json(404, f"Harness '{harness_id}' not found")
                     return
                 reason = body.get("reason", "unknown")
                 failure_context = {
