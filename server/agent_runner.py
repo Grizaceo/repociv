@@ -514,6 +514,13 @@ def _run_hermes_cli_streaming(
     if model:
         cmd.extend(["-m", model])
 
+    # Stateful agents (LEXO) persist conversation history across missions via
+    # --continue <name>. Stateless agents (WORKER, SCOUT) get a fresh context
+    # each mission — omitting --continue is intentional.
+    if config.get("stateful", True):
+        session_name = f"repociv-{unit_id.lower().split('-')[0]}"
+        cmd.extend(["--continue", session_name])
+
     # Override HERMES_HOME to the profile path so the subprocess loads
     # the correct config, skills, memory, etc.
     env = os.environ.copy()
