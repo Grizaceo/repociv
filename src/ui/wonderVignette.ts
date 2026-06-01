@@ -327,9 +327,18 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
 
 export function closeWonderVignette(): void {
   stopWonderListener();
-  if (_vignetteRO) { _vignetteRO.disconnect(); _vignetteRO = null; }
-  if (_dragMoveHandler) { window.removeEventListener('mousemove', _dragMoveHandler); _dragMoveHandler = null; }
-  if (_dragUpHandler) { window.removeEventListener('mouseup', _dragUpHandler); _dragUpHandler = null; }
+  if (_vignetteRO) {
+    _vignetteRO.disconnect();
+    _vignetteRO = null;
+  }
+  if (_dragMoveHandler) {
+    window.removeEventListener('mousemove', _dragMoveHandler);
+    _dragMoveHandler = null;
+  }
+  if (_dragUpHandler) {
+    window.removeEventListener('mouseup', _dragUpHandler);
+    _dragUpHandler = null;
+  }
   if (_vignette) {
     _vignette.remove();
     _vignette = null;
