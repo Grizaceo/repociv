@@ -11,20 +11,14 @@ Covers all 7 gate criteria from the implementation plan:
 """
 from __future__ import annotations
 
-import json
-import os
-import time
 from pathlib import Path
 
 import pytest
 
 from server.security_harness import (
     AlertSystem,
-    AuditResult,
     Finding,
-    GateResult,
     INCIDENT_L0_CLEAN,
-    INCIDENT_L1_SUSPICIOUS,
     INCIDENT_L2_HIGH_RISK,
     SecurityHarness,
     detect_drift,

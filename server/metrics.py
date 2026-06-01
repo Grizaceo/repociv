@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import collections
 import os
-import statistics
 import threading
 import time
 from typing import Any

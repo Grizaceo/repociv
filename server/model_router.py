@@ -215,6 +215,5 @@ def get_agent_cards_path() -> str:
     Returns:
         Absolute path to server/agent_cards/
     """
-    import os
     from pathlib import Path
     return str(Path(__file__).parent / "agent_cards")

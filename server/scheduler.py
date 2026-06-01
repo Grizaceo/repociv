@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from .command_schema import Command, CommandStatus
+from .command_schema import Command
 from . import event_store as _es
 
 # ─── Queue persistence (Fase 4) ──────────────────────────────────────────────
@@ -265,7 +265,6 @@ def _release_slot(agent_base: str) -> None:
 
 def _dispatch_next() -> bool:
     """Pick highest-priority queued command that has a free agent slot. Returns True if dispatched."""
-    now = time.time()
     with _queue_lock:
         _resort()
         for i, cmd in enumerate(_queue):

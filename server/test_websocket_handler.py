@@ -38,7 +38,7 @@ def ws_server():
     wsh._loop = None
     wsh._ws_server = None
 
-    thread = wsh.start_ws_server(host="127.0.0.1", port=port)
+    wsh.start_ws_server(host="127.0.0.1", port=port)
     # Wait for server to be ready (retry-based, not blind sleep)
     deadline = time.time() + 5.0
     while time.time() < deadline:
@@ -155,7 +155,7 @@ def test_ws_auth_with_token():
         wsh._connections.clear()
         wsh._start_time = time.time()
         wsh._loop = None
-        thread = wsh.start_ws_server(host="127.0.0.1", port=port)
+        wsh.start_ws_server(host="127.0.0.1", port=port)
         # Wait for server ready
         deadline = time.time() + 5.0
         while time.time() < deadline:

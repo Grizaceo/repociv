@@ -1,6 +1,5 @@
 """RepoCiv — Wonder Registry Python Tests."""
 
-import pytest
 from wonder_registry import (
     list_wonders,
     get_wonder,

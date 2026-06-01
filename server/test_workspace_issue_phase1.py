@@ -93,8 +93,8 @@ class TestA2OSentinel:
     def test_sentinel_survives_state_updates(self) -> None:
         """Sentinel is independent of state.json."""
         repo, issue = "test-repo", "issue-1"
-        state = _wi.init_issue_workspace(repo, issue)
-        
+        _wi.init_issue_workspace(repo, issue)
+
         _wi.write_sentinel(repo, issue, "needs-human-review")
         _wi.patch_issue_state(repo, issue, {"phase": "blocked"})
         
@@ -137,7 +137,7 @@ class TestWorktreeIntegration:
         # Note: This test can't fully test worktree creation without a real git repo
         # But we can mock the outcome to verify the state persistence
         # For now, just verify the method doesn't crash
-        result = _wi.ensure_worktree(repo, issue)
+        _wi.ensure_worktree(repo, issue)
         # In a non-git directory, result should be None (best-effort)
         # State should still be readable
         state = _wi.load_issue_state(repo, issue)
@@ -161,8 +161,8 @@ class TestPhaseIntegration:
     def test_checkpoint_gate_prevents_advance(self) -> None:
         """When checkpointGate is set + sentinel not cleared, phase stays blocked."""
         repo, issue = "test-repo", "issue-1"
-        state = _wi.init_issue_workspace(repo, issue)
-        
+        _wi.init_issue_workspace(repo, issue)
+
         # Simulate checkpoint gate state
         _wi.patch_issue_state(repo, issue, {
             "phase": "blocked",

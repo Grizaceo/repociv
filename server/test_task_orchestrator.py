@@ -242,7 +242,7 @@ def test_circuit_breaker_trips_on_consecutive_failures():
     _to.set_step_executor(mock_executor)
 
     # Should NOT raise — circuit breaker returns gracefully
-    result = _to.run_task("repo", "ISS-7")
+    _to.run_task("repo", "ISS-7")
 
     state = _wi.load_issue_state("repo", "ISS-7")
     assert state is not None
@@ -272,7 +272,7 @@ def test_circuit_breaker_resets_on_success():
     _to.set_step_executor(mock_executor)
 
     # With only 1 consecutive failure (< 3), the task should complete
-    result = _to.run_task("repo", "ISS-7b")
+    _to.run_task("repo", "ISS-7b")
 
     state = _wi.load_issue_state("repo", "ISS-7b")
     assert state is not None

@@ -1,17 +1,10 @@
 import os
 import json
 from pathlib import Path
-from typing import Any
-import logging
 
 import subprocess
 import re
-import json
-from pathlib import Path
-from typing import Any
-import logging
 
-import subprocess
 
 # ─── Process scanner ──────────────────────────────────────────────────────────
 PROCESS_KEYWORDS = ["python train", "python3 train", "cargo run", "cargo build",

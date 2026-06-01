@@ -6,7 +6,6 @@ from harness_registry import (
     get_harness,
     infer_harness_for_command,
     _reset_cache,
-    ValidationError,
 )
 
 

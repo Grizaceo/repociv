@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any
 
 # ─── Keyword taxonomy for signal extraction ──────────────────────────────────
 
@@ -112,7 +111,6 @@ class SignalExtractor:
         Returns:
             ExtractionResult with all extracted signals and computed weights.
         """
-        text_lower = mission_text.lower()
         signals: list[Signal] = []
 
         # ─── Cost critical signals ────────────────────────────────────────────

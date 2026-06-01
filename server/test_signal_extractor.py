@@ -1,7 +1,6 @@
 """Tests for signal_extractor.py (Fase 2)."""
 from __future__ import annotations
 
-import pytest
 
 from server.signal_extractor import (
     SignalExtractor,

@@ -5,7 +5,6 @@ import pytest
 
 from server.command_schema import Command
 from server import policy as _policy
-from server import harness_registry as _hr
 
 
 # ─── Helpers ───────────────────────────────────────────────────────────────────

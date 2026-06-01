@@ -339,7 +339,6 @@ def validate_issue(repo: str, issue_id: str) -> dict[str, Any]:
     )]
     critical_failures = [c for c in critical_checks if not c["passed"]]
 
-    all_passed = all(c["passed"] for c in technical_checks)
     any_failed = any(not c["passed"] for c in technical_checks)
     must_pass_failures = [c for c in must_pass if not c["passed"]]
 

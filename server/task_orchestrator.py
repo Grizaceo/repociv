@@ -26,7 +26,6 @@ import threading
 import time
 import traceback
 import uuid
-from pathlib import Path
 from typing import Any, Callable
 
 logger = logging.getLogger(__name__)

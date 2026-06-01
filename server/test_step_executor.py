@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import tempfile
-import uuid
 from pathlib import Path
 from unittest import mock
 
@@ -231,7 +230,7 @@ def test_step_not_re_executed_if_already_has_run_id():
         mock_run.side_effect = _fake
 
         _to.set_step_executor(_se.dispatch_plan_step)
-        result = _to.run_task("repo", "ISS-IDEM")
+        _to.run_task("repo", "ISS-IDEM")
 
     # The orchestrator should still run normally (it's idempotent at task level)
     # But the first step artifact should preserve the existing run_id

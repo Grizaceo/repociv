@@ -39,21 +39,19 @@ if __name__ == "__main__":
     # Alias the __main__ module to server.bridge to prevent duplicate loading and state bifurcation
     sys.modules["server.bridge"] = sys.modules["__main__"]
 
-from .sse_server import _sse_clients, _sse_lock, _fanout_sse, _register_sse_client, _unregister_sse_client, send_to_repociv
-from .pending_tracker import load_pending_tasks, append_pending_task, change_pending_state, resolve_pending_task, edit_pending_task, delete_pending_task, PENDING_TRACKER
-from .process_scanner import scan_active_processes, detect_lexo, _LEXO_PERSIST_PATH, _last_scan_pids
-from .provider_registry import _PROVIDER_REGISTRY, _HARNESS_REGISTRY, _get_harnesses, _get_providers, _get_chat_config
+from .sse_server import _fanout_sse, _register_sse_client, _unregister_sse_client, send_to_repociv  # noqa: F401 (_fanout_sse patched by tests)
+from .pending_tracker import load_pending_tasks, append_pending_task, change_pending_state, resolve_pending_task, edit_pending_task, delete_pending_task, PENDING_TRACKER  # noqa: F401 (re-exported for tests and external callers)
+from .process_scanner import scan_active_processes, detect_lexo
 import json
 import os
 import queue
-import re
-import shutil
+import shutil  # noqa: F401 (patched by tests via bridge.shutil)
 import signal
 import subprocess
 import threading
 import time
+import urllib.request  # noqa: F401 (patched by tests via bridge.urllib.request)
 import uuid
-import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -182,16 +180,12 @@ _checkpoint.init(CONFIG_DIR)
 # ─── Command schema + policy ──────────────────────────────────────────────────
 from server.command_schema import validate_command, CommandValidationError, Command
 from server import policy as _policy
-from server.capabilities import capabilities_snapshot
 from server.context_pack import build_context_pack
-from server.metrics import compute_metrics
 from server import directive_store as _ds
 from server import directive_learner as _dl
 from server import harness_registry as _hr
 from server import recovery as _recovery
 from server import runtime_adapters as _runtime_adapters
-from server import wonder_registry as _wr
-from server.quest import generate_quest_name
 from server import agent_runner as _agent_runner
 from server import task_orchestrator as _to
 from server import rate_limiter as _rl
@@ -1215,7 +1209,6 @@ if __name__ == "__main__":
         elif cmd_type == "approval":
             cmd_id = data.get("id", "")
             approved = data.get("approved", True)
-            path = f"/approvals/{cmd_id}/{'approve' if approved else 'reject'}"
             # Delegate to existing approval logic via scheduler
             if approved:
                 # Re-use the approval flow from do_POST
@@ -1278,7 +1271,7 @@ if __name__ == "__main__":
     print(f"│ CORS:      {'0.0.0.0/0 (remote)' if REPOCIV_REMOTE else 'localhost only':<40}│")
     print(f"│ Events:    {_es._store_path}  │")
     print(f"│ Missions:  {MISSIONS_FILE}    │")
-    print(f"│ default:   hermes (luego claude-code, openclaw)                        │")
+    print("│ default:   hermes (luego claude-code, openclaw)                        │")
     print(f"│ openclaw:  {'OK' if _has_openclaw() else 'NO'}                                      │")
     print(f"│ claude-code: {'OK' if _has_claude_code() else 'NO'}                              │")
     print(f"│ cursor:    {'OK' if _has_cursor() else 'NO'}                                    │")
@@ -1286,7 +1279,7 @@ if __name__ == "__main__":
     print(f"│ GPU:       {'OK (nvidia-smi)' if has_gpu else 'no disponible'}                    │")
     if recovered:
         print(f"│ Recuperados: {recovered} comando(s) colgado(s)              │")
-    print(f"╰───────────────────────────────────────────────────╯")
+    print("╰───────────────────────────────────────────────────╯")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

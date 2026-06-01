@@ -509,12 +509,6 @@ def _run_hermes_cli_streaming(
     cd_cmd = f"cd {working_dir}\n\n" if working_dir else ""
     full_query = f"{spatial}\n\n{cd_cmd}{mission}"
 
-    # Build session ID: stateful agents persist, stateless get per-mission IDs
-    if config.get("stateful", True):
-        session_id = f"repociv-{unit_id.lower()}"
-    else:
-        session_id = f"repociv-{unit_id.lower()}-{mission_id}"
-
     cmd = [hermes_bin, "chat", "-q", full_query, "-Q", "--source", "tool"]
     # Don't pass --ignore-rules — we WANT the profile's AGENTS.md, SOUL.md, etc.
     if model:

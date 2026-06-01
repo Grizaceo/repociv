@@ -1,7 +1,6 @@
 """Tests for server/model_router.py — Fase 2 (FrugalGPT Cascade)."""
 from __future__ import annotations
 
-import pytest
 from server.model_router import route_model, get_agent_cards_path
 from server.step_executor import _infer_task_type
 
@@ -135,7 +134,7 @@ def test_budget_pressure_downgrade():
 def test_mission_text_signals_affect_tier():
     """Quality-critical mission text escalates tier."""
     # SCOUT normally ECONOMICO, but quality-critical mission should stay or escalate
-    r_normal = route_model("SCOUT", "read", context={"mission_text": "List files"})
+    route_model("SCOUT", "read", context={"mission_text": "List files"})
     r_secure = route_model("SCOUT", "read", context={
         "mission_text": "Security audit of the authentication system"
     })
@@ -220,7 +219,6 @@ def test_agent_cards_path_exists():
 def test_agent_cards_present():
     """All expected agent cards should exist."""
     import json
-    import os
     from pathlib import Path
     
     cards_dir = Path(get_agent_cards_path())

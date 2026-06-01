@@ -19,12 +19,9 @@ from __future__ import annotations
 import json
 import os
 import re
-import time
 import urllib.error
 import urllib.request
-from collections import Counter
 from math import log
-from pathlib import Path
 from typing import Any
 
 
@@ -252,7 +249,7 @@ def _invoke_llm(prompt: str, model: str = "deepseek/deepseek-v4-flash:free") -> 
             result = json.loads(resp.read())
         content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
         return content.strip() if content else None
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
         # LLM unavailable — caller handles fallback
         return None
 
@@ -271,7 +268,6 @@ def generate_report(
     low-confidence report from heuristics only.
     """
     score = scoring.get("score", 0.0)
-    confidence = scoring.get("confidence", "low")
 
     if score < _SCORE_THRESHOLD:
         # Below threshold — no LLM, return low-confidence baseline
@@ -429,7 +425,6 @@ def _parse_llm_report(
     }
 
     # Extract structured fields from LLM output
-    sections = re.split(r"\n\s*\*\*\s*\d+\.\s*\*\*|\n\d+\.\s*\*\*", llm_output)
     current_field = None
 
     for line in llm_output.split("\n"):

@@ -1,7 +1,6 @@
 """Tests for server/workspace_issue.py — task-folder portable per issue."""
 from __future__ import annotations
 
-import os
 import tempfile
 import threading
 from pathlib import Path

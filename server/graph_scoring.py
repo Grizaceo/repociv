@@ -10,11 +10,8 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
-import threading
 import time
-from collections import Counter, defaultdict
-from functools import lru_cache
+from collections import defaultdict
 from math import log
 from pathlib import Path
 from typing import Any
@@ -496,7 +493,6 @@ def build_or_refresh_index(repo_base_paths: list[str]) -> dict[str, Any]:
     """
     start = time.time()
     meta = _load_meta()
-    flags = _gr_base._load_flags()
     stats: dict[str, Any] = {
         "nodes_indexed": 0,
         "nodes_skipped": 0,
@@ -864,7 +860,6 @@ def attach_events_to_signals(events: list[dict[str, Any]], max_events: int = 50)
     for evt in events[:max_events]:
         cmd_id = evt.get("commandId", evt.get("command_id", ""))
         actor = evt.get("actor", "")
-        evt_type = evt.get("type", "")
 
         # Try to match commandId to repo name patterns
         for rid, sig in all_signals.items():

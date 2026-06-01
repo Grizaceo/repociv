@@ -1,8 +1,6 @@
 import os
-import json
 from pathlib import Path
 from typing import Any
-import logging
 import re
 import time
 
@@ -128,7 +126,6 @@ def load_pending_tasks() -> list[dict[str, Any]]:
 
             # Only include items from active sections
             if current_section in _ACTIVE_SECTIONS:
-                priority_label = f"[{current_section}]"
                 detail_text = "\n".join(detail_lines).strip()
                 tasks.append({
                     "id": item_id,

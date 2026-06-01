@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import json
-import tempfile
-import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -100,7 +98,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "server"))
 
 class TestLoadPendingTasks:
     def _import(self, tracker_path):
-        from server.bridge import load_pending_tasks, PENDING_TRACKER
+        from server.bridge import load_pending_tasks
         with patch("server.pending_tracker.PENDING_TRACKER", tracker_path):
             return load_pending_tasks()
 

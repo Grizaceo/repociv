@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from typing import Literal
 from .command_schema import Command, Risk
-from .capabilities import check_capability
 from . import harness_registry as _hr
 
 PolicyDecision = Literal["auto-safe", "approve", "blocked"]
