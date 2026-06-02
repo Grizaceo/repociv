@@ -7,8 +7,12 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ -f "$REPO_ROOT/.env" ]]; then
-  # shellcheck disable=SC2046
-  export $(grep -v '^#' "$REPO_ROOT/.env" | grep -v '^$' | xargs)
+  # Export every assignment in .env without word-splitting on values that
+  # contain spaces (xargs would mangle those). `set -a` auto-exports.
+  set -a
+  # shellcheck source=/dev/null
+  source "$REPO_ROOT/.env"
+  set +a
 fi
 
 BRIDGE_PORT="${BRIDGE_PORT:-5274}"
