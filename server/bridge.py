@@ -101,7 +101,6 @@ if REPOCIV_REMOTE and not REPOCIV_TOKEN:
 BRIDGE_HOST = "0.0.0.0" if REPOCIV_REMOTE else "127.0.0.1"
 
 CONFIG_DIR = Path(os.path.expanduser(os.environ.get("REPOCIV_CONFIG_DIR", "~/.repociv")))
-CONFIG_DIR.mkdir(exist_ok=True, parents=True)
 MISSIONS_FILE    = CONFIG_DIR / "missions.json"
 HERMES_ROOT      = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", "~/.hermes")))
 
@@ -172,11 +171,7 @@ from server import sessions as _sessions
 from server import run_state as _run_state
 from server import workspace_issue as _wi
 from server import checkpoint as _checkpoint
-_es.init(CONFIG_DIR)
-_sessions.init(CONFIG_DIR)
-_run_state.init(CONFIG_DIR)
-_wi.init(CONFIG_DIR)
-_checkpoint.init(CONFIG_DIR)
+from server import endpoint_usage as _endpoint_usage
 
 # ─── Command schema + policy ──────────────────────────────────────────────────
 from server.command_schema import validate_command, CommandValidationError, Command
@@ -190,8 +185,38 @@ from server import runtime_adapters as _runtime_adapters
 from server import agent_runner as _agent_runner
 from server import task_orchestrator as _to
 from server import rate_limiter as _rl
-_ds.init(CONFIG_DIR)
-_dl.set_templates_path(CONFIG_DIR / "directive_templates.json")
+
+_BRIDGE_STATE_CONFIG_DIR: Path | None = None
+
+
+def init_bridge_state(config_dir: Path | str | None = None) -> Path:
+    """Initialize persistent bridge stores.
+
+    The bridge historically initialized stores at import time. Keeping this
+    function idempotent preserves runtime compatibility while allowing tests and
+    future callers to rebind bridge state explicitly to a temporary directory.
+    """
+    global CONFIG_DIR, MISSIONS_FILE, _BRIDGE_STATE_CONFIG_DIR
+
+    selected = Path(config_dir) if config_dir is not None else CONFIG_DIR
+    selected = Path(os.path.expanduser(str(selected)))
+    selected.mkdir(exist_ok=True, parents=True)
+
+    CONFIG_DIR = selected
+    MISSIONS_FILE = CONFIG_DIR / "missions.json"
+    _es.init(CONFIG_DIR)
+    _sessions.init(CONFIG_DIR)
+    _run_state.init(CONFIG_DIR)
+    _wi.init(CONFIG_DIR)
+    _checkpoint.init(CONFIG_DIR)
+    _endpoint_usage.init(CONFIG_DIR)
+    _ds.init(CONFIG_DIR)
+    _dl.set_templates_path(CONFIG_DIR / "directive_templates.json")
+    _BRIDGE_STATE_CONFIG_DIR = CONFIG_DIR
+    return CONFIG_DIR
+
+
+init_bridge_state(CONFIG_DIR)
 
 # ─── Per-agent-type rate limiter ──────────────────────────────────────────────
 _agent_rate_limiter = _rl.RateLimiter()
@@ -654,8 +679,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def _respond(self, status: int, data: Any) -> None:
         """Write a JSON response with CORS headers."""
+        _endpoint_usage.record(self.command, self.path, status)
         if status == 200:
-            self._json(data)
+            self._json(data, record_usage=False)
         else:
             payload = json.dumps(data).encode()
             self.send_response(status)
@@ -666,6 +692,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def _err_json(self, status: int, error: str) -> None:
         """Write a plain error JSON response with Content-Type set."""
+        _endpoint_usage.record(self.command, self.path, status)
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self._cors()
@@ -725,6 +752,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if path == "/events":
             accept = self.headers.get("Accept", "")
             if "text/event-stream" in accept:
+                _endpoint_usage.record("GET", self.path, 200)
                 self._sse_stream()
                 return
             try:
@@ -1069,7 +1097,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
         finally:
             _unregister_sse_client(client)
 
-    def _json(self, data: Any) -> None:
+    def _json(self, data: Any, *, record_usage: bool = True) -> None:
+        if record_usage:
+            _endpoint_usage.record(self.command, self.path, 200)
         payload = json.dumps(data).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")

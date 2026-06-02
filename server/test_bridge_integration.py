@@ -9,6 +9,20 @@ import pytest
 from server import bridge
 
 
+def test_init_bridge_state_rebinds_persistent_paths(tmp_path):
+    original_config_dir = bridge.CONFIG_DIR
+    try:
+        selected = bridge.init_bridge_state(tmp_path)
+
+        assert selected == tmp_path
+        assert bridge.CONFIG_DIR == tmp_path
+        assert bridge.MISSIONS_FILE == tmp_path / "missions.json"
+        bridge._ds.record_gesture("cmd-1", "drag", "DAVI", "unit_command", "repo")
+        assert (tmp_path / "directive_records.jsonl").exists()
+    finally:
+        bridge.init_bridge_state(original_config_dir)
+
+
 def _start_test_server():
     server = ThreadingHTTPServer(("localhost", 0), bridge.BridgeHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -62,6 +76,23 @@ def test_events_endpoint_serves_history_as_json():
         with urllib.request.urlopen(req, timeout=2) as resp:
             data = json.loads(resp.read().decode())
         assert isinstance(data, list)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_metrics_include_endpoint_usage():
+    server, base = _start_test_server()
+    try:
+        with urllib.request.urlopen(f"{base}/health", timeout=2):
+            pass
+        req = urllib.request.Request(f"{base}/metrics", headers=_auth_headers())
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            data = json.loads(resp.read().decode())
+        assert any(
+            row["method"] == "GET" and row["path"] == "/health" and row["count"] >= 1
+            for row in data["endpointUsage"]
+        )
     finally:
         server.shutdown()
         server.server_close()
