@@ -179,7 +179,7 @@ def get_agents(ctx: "RouteContext") -> tuple[int, Any]:
 
 
 def get_agents_capabilities(ctx: "RouteContext") -> tuple[int, Any]:
-    from server.bridge import capabilities_snapshot
+    from server.capabilities import capabilities_snapshot
     return 200, capabilities_snapshot()
 
 
