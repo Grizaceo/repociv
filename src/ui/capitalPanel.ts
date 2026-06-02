@@ -171,6 +171,7 @@ function _renderStats(container: HTMLElement) {
   container.innerHTML = `
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-value">${Object.values(a.panelsOpened).reduce((s, v) => s + v, 0)}</div><div class="stat-label">Paneles abiertos</div></div>
+      <div class="stat-card"><div class="stat-value">${Object.values(a.hotkeysUsed).reduce((s, v) => s + v, 0)}</div><div class="stat-label">Hotkeys usadas</div></div>
       <div class="stat-card"><div class="stat-value">${Object.values(a.messagesSent).reduce((s, v) => s + v, 0)}</div><div class="stat-label">Mensajes enviados</div></div>
       <div class="stat-card"><div class="stat-value">${a.commandsIssued}</div><div class="stat-label">Comandos emitidos</div></div>
       <div class="stat-card"><div class="stat-value">${a.approvalsGiven}</div><div class="stat-label">Aprobaciones</div></div>

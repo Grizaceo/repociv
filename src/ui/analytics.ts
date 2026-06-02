@@ -6,6 +6,7 @@ const KEY = 'repociv:analytics';
 interface AnalyticsData {
   sessions: number;
   panelsOpened: Record<string, number>;
+  hotkeysUsed: Record<string, number>;
   messagesSent: Record<string, number>;
   commandsIssued: number;
   approvalsGiven: number;
@@ -17,13 +18,27 @@ interface AnalyticsData {
 function load(): AnalyticsData {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<AnalyticsData>;
+      return {
+        sessions: parsed.sessions ?? 0,
+        panelsOpened: parsed.panelsOpened ?? {},
+        hotkeysUsed: parsed.hotkeysUsed ?? {},
+        messagesSent: parsed.messagesSent ?? {},
+        commandsIssued: parsed.commandsIssued ?? 0,
+        approvalsGiven: parsed.approvalsGiven ?? 0,
+        citiesVisited: parsed.citiesVisited ?? 0,
+        missionsCompleted: parsed.missionsCompleted ?? 0,
+        lastSession: parsed.lastSession ?? new Date().toISOString(),
+      };
+    }
   } catch {
     /* noop */
   }
   return {
     sessions: 0,
     panelsOpened: {},
+    hotkeysUsed: {},
     messagesSent: {},
     commandsIssued: 0,
     approvalsGiven: 0,
@@ -48,6 +63,11 @@ save(data);
 
 export function trackPanelOpen(panelName: string) {
   data.panelsOpened[panelName] = (data.panelsOpened[panelName] ?? 0) + 1;
+  save(data);
+}
+
+export function trackHotkey(hotkey: string) {
+  data.hotkeysUsed[hotkey] = (data.hotkeysUsed[hotkey] ?? 0) + 1;
   save(data);
 }
 

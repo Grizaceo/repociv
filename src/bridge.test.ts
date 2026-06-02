@@ -61,6 +61,7 @@ function makeState() {
     invalidatePathCache: vi.fn(),
     startMission: vi.fn(),
     completeMission: vi.fn(),
+    getUnit: vi.fn(() => null),
     updateUnitFatigue: vi.fn(),
     addRestArea: vi.fn(),
     setUnitResting: vi.fn(),

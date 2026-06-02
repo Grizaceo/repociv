@@ -16,6 +16,10 @@ export function closePriorityPanel() {
   _panelEl?.classList.add('hidden');
 }
 
+export function isPriorityPanelOpen(): boolean {
+  return !!_panelEl && !_panelEl.classList.contains('hidden');
+}
+
 export function togglePriorityPanel(
   missions: LocalMission[],
   onAssign: (missionId: string) => void,
