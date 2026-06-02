@@ -42,6 +42,7 @@ if __name__ == "__main__":
 from .sse_server import _fanout_sse, _register_sse_client, _unregister_sse_client, send_to_repociv  # noqa: F401 (_fanout_sse patched by tests)
 from .pending_tracker import load_pending_tasks, append_pending_task, change_pending_state, resolve_pending_task, edit_pending_task, delete_pending_task, PENDING_TRACKER  # noqa: F401 (re-exported for tests and external callers)
 from .process_scanner import scan_active_processes, detect_lexo
+import hmac
 import json
 import os
 import queue
@@ -620,7 +621,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
         """Return True if the request carries a valid token (or token is not configured)."""
         if not REPOCIV_TOKEN:
             return True  # auth disabled in dev
-        return self.headers.get("X-RepoCiv-Token", "") == REPOCIV_TOKEN
+        received = self.headers.get("X-RepoCiv-Token", "")
+        # Constant-time comparison to avoid a timing oracle on the token
+        # (relevant when REPOCIV_REMOTE=true exposes auth over the network).
+        return hmac.compare_digest(received.encode("utf-8"), REPOCIV_TOKEN.encode("utf-8"))
 
     def _client_ip(self) -> str:
         return self.client_address[0] if self.client_address else "unknown"
