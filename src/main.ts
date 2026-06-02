@@ -674,9 +674,17 @@ async function bootstrap() {
     if (!detail?.cityId) return;
     const city = state.world.cities.find((c) => c.id === detail.cityId);
     if (!city) return;
-    const status = detail.labStatus
-      ? (JSON.parse(detail.labStatus) as CityLabStatus)
-      : _getCityLabStatus(city.id);
+    let status: CityLabStatus | null;
+    if (detail.labStatus) {
+      try {
+        status = JSON.parse(detail.labStatus) as CityLabStatus;
+      } catch {
+        // Corrupt/unexpected dataset payload — fall back to the resolved status.
+        status = _getCityLabStatus(city.id);
+      }
+    } else {
+      status = _getCityLabStatus(city.id);
+    }
     _openLogsForCityStatus(city, status);
   });
 
