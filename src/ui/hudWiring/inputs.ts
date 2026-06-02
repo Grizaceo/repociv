@@ -23,6 +23,8 @@ import { toggleSettingsPanel } from '../settingsPanel.ts';
 import { toggleConstructionPanel } from '../constructionPanel.ts';
 import { spawnAgent } from './spawn.ts';
 import { takeScreenshot } from './screenshot.ts';
+import type { CommandDraft, CommandType } from '../../commandSchema.ts';
+import { sendCommand } from '../../commandBus.ts';
 
 export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeEvents): void {
   const missionInput = document.getElementById('mission-input') as HTMLInputElement;
@@ -144,17 +146,28 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     if (!isSidePanelOpen()) openSidePanel(unit);
     appendUserMessage(unit.id, text);
 
+    // CHAT PATH: chat del usuario al agente seleccionado. Usamos execute_agent para
+    // distinguir el flujo conversacional del legacy unit_command, reduciendo ambigüedad
+    // en type-policy, logs y aprobaciones.
+    const chatCommandType: CommandType = 'execute_agent';
+    const targetForCommand = unit.id;
+
+    const draft: CommandDraft = {
+      type: chatCommandType,
+      target: targetForCommand,
+      payload: {
+        unit: unit.id,
+        city: resolvedCity?.id ?? 'main',
+        mission: text,
+        agentType: unit.type,
+      },
+    };
+
     // Include 3-layer config from chat UI: harness + provider + model
     const { harness, provider, model } = getSelectedConfig();
-    const payload: Record<string, unknown> = {
-      unit: unit.id,
-      city: resolvedCity?.id ?? 'main',
-      mission: text,
-      agentType: unit.type,
-    };
-    if (harness && harness !== 'auto') payload.harness = harness;
-    if (provider && provider !== 'auto') payload.provider = provider;
-    if (model) payload.model = model;
+    if (harness && harness !== 'auto') draft.payload!.harness = harness;
+    if (provider && provider !== 'auto') draft.payload!.provider = provider;
+    if (model) draft.payload!.model = model;
 
     // Update target indicator to reflect actual dispatch target
     const indicator = document.getElementById('chat-target-indicator');
@@ -164,10 +177,13 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
       indicator.title = `Enviando a: ${unit.id.toUpperCase()}`;
     }
 
-    void prefersSelector;
-    void selectorUnitId;
-
-    bridge.send('unit_command', payload);
+    void sendCommand(draft).then((res) => {
+      if (!res.ok) {
+        appendSystemMessage(unit.id, `❌ Comando rechazado: ${res.reason || res.status}`);
+      }
+    }).catch(() => {
+      appendSystemMessage(unit.id, '❌ No se pudo enviar el mensaje al bridge.');
+    });
     state.setUnitState(unit.id, 'working');
     input.value = '';
   };

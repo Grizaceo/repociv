@@ -108,13 +108,30 @@ SKILL_REQUIREMENTS: dict[str, str] = {
 
 
 def _agent_base(agent_id: str) -> str:
-    """Normalize 'DAVI-2' → 'DAVI'."""
+    """Normalize 'DAVI-2' -> 'DAVI', matching frontend agentBase()."""
     return agent_id.split("-")[0].upper()
+
+
+_AGENT_BASE_ALIASES = {
+    "DAVI": "DAVI",
+    "LEXO": "LEXO",
+    "WORKER": "WORKER",
+    "SCOUT": "SCOUT",
+    "OPENCLAW": "OPENCLAW",
+    "CLAUDE": "CLAUDE",
+    "CODEX": "CODEX",
+}
+
+
+def _normalize_agent_base(raw: str) -> str:
+    upper = raw.upper()
+    return _AGENT_BASE_ALIASES.get(upper, "DAVI")
 
 
 def agent_capabilities(agent_id: str) -> list[str]:
     """Return capability list for an agent (falls back to DAVI if unknown)."""
-    return AGENT_CAPABILITIES.get(_agent_base(agent_id), AGENT_CAPABILITIES["DAVI"])
+    base = _normalize_agent_base(agent_id.split("-")[0])
+    return AGENT_CAPABILITIES.get(base, AGENT_CAPABILITIES["DAVI"])
 
 
 def can_execute(agent_id: str, cmd_type: str) -> bool:

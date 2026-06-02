@@ -6,6 +6,21 @@ import type { CommandType } from './commandSchema.ts';
 
 export type AgentBase = 'DAVI' | 'LEXO' | 'WORKER' | 'SCOUT' | 'OPENCLAW' | 'CLAUDE' | 'CODEX';
 
+const AGENT_BASE_ALIASES: Record<string, AgentBase> = {
+  DAVI: 'DAVI',
+  LEXO: 'LEXO',
+  WORKER: 'WORKER',
+  SCOUT: 'SCOUT',
+  OPENCLAW: 'OPENCLAW',
+  CLAUDE: 'CLAUDE',
+  CODEX: 'CODEX',
+};
+
+function normalizeAgentBase(raw: string): AgentBase {
+  const upper = raw.toUpperCase();
+  return AGENT_BASE_ALIASES[upper] ?? 'DAVI';
+}
+
 // ─── Per-agent allowed command types ─────────────────────────────────────────
 export const AGENT_CAPABILITIES: Record<AgentBase, CommandType[]> = {
   DAVI: [
@@ -100,8 +115,8 @@ const REPO_RESTRICTIONS: Record<string, CommandType[]> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 export function agentBase(agentId: string): AgentBase {
-  const b = agentId.split('-')[0]!.toUpperCase();
-  return b in AGENT_CAPABILITIES ? (b as AgentBase) : 'DAVI';
+  const raw = agentId.split('-')[0] ?? '';
+  return normalizeAgentBase(raw);
 }
 
 export function agentCanDo(agentId: string, type: CommandType): boolean {
