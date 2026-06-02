@@ -27,28 +27,28 @@ import {
 } from 'lucide';
 
 const lucideIcons = {
-  activity: Activity,
-  'alert-triangle': AlertTriangle,
-  box: Box,
-  camera: Camera,
-  'check-circle': CheckCircle,
-  circle: Circle,
-  'clipboard-list': ClipboardList,
-  coins: Coins,
-  crosshair: Crosshair,
-  'file-text': FileText,
-  'flask-conical': FlaskConical,
-  hammer: Hammer,
-  layers: Layers,
-  pickaxe: Pickaxe,
-  'rotate-ccw': RotateCcw,
-  scroll: Scroll,
-  'scroll-text': ScrollText,
-  settings: Settings,
-  'sun-moon': SunMoon,
-  terminal: Terminal,
-  'triangle-alert': TriangleAlert,
-  'x-circle': XCircle,
+  Activity,
+  AlertTriangle,
+  Box,
+  Camera,
+  CheckCircle,
+  Circle,
+  ClipboardList,
+  Coins,
+  Crosshair,
+  FileText,
+  FlaskConical,
+  Hammer,
+  Layers,
+  Pickaxe,
+  RotateCcw,
+  Scroll,
+  ScrollText,
+  Settings,
+  SunMoon,
+  Terminal,
+  TriangleAlert,
+  XCircle,
 };
 
 // Expose only the icons RepoCiv actually uses; importing all Lucide icons adds ~700 KB.
@@ -141,8 +141,9 @@ export function logEvent(
   container.prepend(entry);
   const lucide = (window as unknown as Record<string, unknown>)['lucide'];
   if (lucide)
-    (lucide as { createIcons: (opts: { icons: unknown }) => void }).createIcons({
+    (lucide as { createIcons: (opts: { icons: unknown; root: Element }) => void }).createIcons({
       icons: (lucide as Record<string, unknown>)['icons'],
+      root: entry,
     });
 
   while (container.children.length > LOG_MAX) {
@@ -205,8 +206,9 @@ export function toggleViewHUD(is3D: boolean) {
     btn.innerHTML = is3D ? '<i data-lucide="layers"></i>' : '<i data-lucide="box"></i>';
     const lucide = (window as unknown as Record<string, unknown>)['lucide'];
     if (lucide)
-      (lucide as { createIcons: (opts: { icons: unknown }) => void }).createIcons({
+      (lucide as { createIcons: (opts: { icons: unknown; root: Element }) => void }).createIcons({
         icons: (lucide as Record<string, unknown>)['icons'],
+        root: btn,
       });
     btn.classList.toggle('active', is3D);
   }

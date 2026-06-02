@@ -1826,8 +1826,11 @@ kbd {
   color: var(--ui-text-dim);
   cursor: pointer;
   font-family: var(--font-ui);
-  font-size: 11px;
-  padding: 4px 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
 }
 #btn-approvals:hover {
   border-color: var(--ui-gold);
@@ -2335,8 +2338,11 @@ kbd {
   color: var(--ui-text-dim);
   cursor: pointer;
   font-family: var(--font-ui);
-  font-size: 13px;
-  padding: 4px 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
 }
 #btn-observability:hover {
   border-color: var(--ui-gold);
@@ -2558,8 +2564,11 @@ kbd {
   color: var(--ui-text-dim);
   cursor: pointer;
   font-family: var(--font-ui);
-  font-size: 13px;
-  padding: 4px 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
 }
 #btn-replay:hover {
   border-color: var(--ui-gold);

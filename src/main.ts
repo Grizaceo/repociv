@@ -56,7 +56,7 @@ import { sendCommand } from './commandBus.ts';
 import { recordGesture } from './directiveLearner.ts';
 import { tileKey } from './types.ts';
 import { clearChat } from './ui/chat.ts';
-import { runRepoOnboarding } from './ui/onboardingPanel.ts';
+import { openOnboardingPanel } from './ui/onboardingPanel.ts';
 import {
   setRendererRef,
   notifyTilePicked,
@@ -158,15 +158,8 @@ async function bootstrap() {
     const next = current === 'dark' ? 'light' : 'dark';
     html.setAttribute('data-theme', next);
     localStorage.setItem('repociv:theme', next);
-    const lucide = (
-      window as unknown as {
-        lucide?: {
-          createIcons: (opts: { icons: Record<string, unknown> }) => void;
-          icons: Record<string, unknown>;
-        };
-      }
-    ).lucide;
-    if (lucide) lucide.createIcons({ icons: lucide.icons });
+    // No need to re-render Lucide icons — SVG stroke uses currentColor and
+    // inherits the new theme automatically.
   });
 
   // ══ Layer panel wiring ══
@@ -196,7 +189,7 @@ async function bootstrap() {
     setTimeout(() => welcome.remove(), 800);
   }, 3200);
 
-  await runRepoOnboarding();
+  await openOnboardingPanel();
 
   const world = await generateWorld();
   const state = new GameState(world);

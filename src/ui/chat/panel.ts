@@ -67,8 +67,9 @@ export function openSidePanel(unit: Unit): void {
   // Re-init icons if needed for dynamic content
   const lucide = (window as unknown as Record<string, unknown>)['lucide'];
   if (lucide)
-    (lucide as { createIcons: (opts: { icons: unknown }) => void }).createIcons({
+    (lucide as { createIcons: (opts: { icons: unknown; root: Element }) => void }).createIcons({
       icons: (lucide as Record<string, unknown>)['icons'],
+      root: panel,
     });
 }
 
