@@ -6,8 +6,8 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import graph_relations as gr
-import http_routes as routes
+import graph_relations as gr  # noqa: E402
+import http_routes as routes  # noqa: E402
 
 
 def _sample_signals(tmp_path: Path) -> dict[str, dict]:

@@ -11,7 +11,7 @@ import pytest
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 SAMPLE_TRACKER = """\
-# PENDING TRACKER — DAVI + Cristóbal
+# PENDING TRACKER — RepoCiv
 
 Última revisión: 2026-05-06
 
@@ -90,7 +90,7 @@ def empty_tracker(tmp_path):
 
 # Import the functions under test
 # Need to adjust path to find server.bridge
-import sys
+import sys  # noqa: E402
 sys.path.insert(0, str(Path(__file__).parent.parent / "server"))
 
 
@@ -272,7 +272,7 @@ class TestPendingEndpoints:
         try:
             req = urllib.request.Request(
                 f"http://localhost:{port}{path}",
-                headers={"X-RepoCiv-Token": "CPLZlthUBzy1T7TBKYWqGvYDNMbWcP4x0N0rkb9XPbc"},
+                headers={"X-RepoCiv-Token": "test-token-fixture-not-a-secret"},
             )
             try:
                 resp = urllib.request.urlopen(req, timeout=3)
@@ -299,7 +299,7 @@ class TestPendingEndpoints:
                 data=data,
                 headers={
                     "Content-Type": "application/json",
-                    "X-RepoCiv-Token": "CPLZlthUBzy1T7TBKYWqGvYDNMbWcP4x0N0rkb9XPbc",
+                    "X-RepoCiv-Token": "test-token-fixture-not-a-secret",
                 },
                 method="POST",
             )
@@ -478,7 +478,7 @@ class TestNewPendingEndpoints:
                 data=data,
                 headers={
                     "Content-Type": "application/json",
-                    "X-RepoCiv-Token": "CPLZlthUBzy1T7TBKYWqGvYDNMbWcP4x0N0rkb9XPbc",
+                    "X-RepoCiv-Token": "test-token-fixture-not-a-secret",
                 },
                 method="POST",
             )

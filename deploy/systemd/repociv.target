@@ -1,6 +1,6 @@
 [Unit]
 Description=RepoCiv Imperial Console (Bridge + Frontend)
-Documentation=https://github.com/cristobal/repociv
+Documentation=file:%h/.hermes/workspace/repos/repociv/deploy/systemd/README.md
 Requires=repociv-bridge.service repociv-frontend.service
 After=repociv-bridge.service repociv-frontend.service
 

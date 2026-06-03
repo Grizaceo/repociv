@@ -533,9 +533,9 @@ def post_pending_state(body: dict[str, Any], ctx: "RouteContext") -> tuple[int, 
 
 
 # ─── CDaily Integration routes ────────────────────────────────────────────────
-import sqlite3
-from contextlib import closing
-from pathlib import Path
+import sqlite3  # noqa: E402
+from contextlib import closing  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 _CDAILY_DB_DEFAULT = Path.home() / ".blogwatcher-cli" / "blogwatcher-cli.db"
 
@@ -668,7 +668,7 @@ def post_news_scan(body: dict[str, Any], ctx: dict[str, Any]) -> tuple[int, Any]
 
 # ─── LabHub Status Routes ────────────────────────────────────────────────────
 
-from server import labhub_adapter as _labhub
+from server import labhub_adapter as _labhub  # noqa: E402
 
 
 def get_labhub_status(ctx: "RouteContext") -> tuple[int, Any]:
@@ -711,7 +711,7 @@ def get_all_cities_lab_status(ctx: "RouteContext") -> tuple[int, Any]:
 
 # ─── Wonder Registry Routes ──────────────────────────────────────────────────
 
-from server import wonder_registry as _wr
+from server import wonder_registry as _wr  # noqa: E402
 
 
 def get_wonders(ctx: "RouteContext") -> tuple[int, Any]:
@@ -738,11 +738,11 @@ def get_wonder_health(ctx: "RouteContext") -> tuple[int, Any]:
 
 # ─── Foreign Relations / Report Routes ────────────────────────────────────────
 
-from server import repo_profile as _rp
-from server import foreign_relations as _fr
-from server import report_store as _rs
-from server import city_graph_adapter as _cga
-from server import graph_relations as _gr
+from server import repo_profile as _rp  # noqa: E402
+from server import foreign_relations as _fr  # noqa: E402
+from server import report_store as _rs  # noqa: E402
+from server import city_graph_adapter as _cga  # noqa: E402
+from server import graph_relations as _gr  # noqa: E402
 
 
 def get_repo_profile(ctx: "RouteContext") -> tuple[int, Any]:

@@ -82,7 +82,7 @@ La mayoría de proyectos así mueren por una de tres razones:
 2. **El creador se aburre cuando ya no hay novedad técnica** → muere por hastío.
 3. **El creador publica antes de tiempo, recibe críticas, se desinfla** → muere por desánimo.
 
-El autor (Cristóbal) está explícitamente evitando los tres:
+El proyecto está explícitamente evitando los tres:
 
 - **Va a dogfoodear** ([`SCOPE.md`](SCOPE.md)) → mata el #1.
 - **Aceptó parar de expandir** cuando se lo señalaron → mata el #2 (al menos esta vuelta).

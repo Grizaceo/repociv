@@ -1,50 +1,54 @@
-# ─── Node ──────────────────────────────────────────────────────────────────────
+# Node / Vite
 node_modules/
+.vite/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# ─── Build ───────────────────────────────────────────────────────────────────
-dist/
-build/
 *.tsbuildinfo
 
-# ─── Vite ────────────────────────────────────────────────────────────────────
-.vite/
+# Build outputs
+dist/
+build/
 
-# ─── OS ──────────────────────────────────────────────────────────────────────
+# Python
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.ruff_cache/
+
+# Coverage and test artifacts
+.coverage
+coverage/
+test-results/
+
+# Runtime data
+data/
+*.duckdb
+*.duckdb.wal
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+shared/provider-registry.json
+
+# Local IDE / agent config
+.claude/
+.cursor/
+.gstack/
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# OS / editor noise
 .DS_Store
 Thumbs.db
-
-# ─── IDE ─────────────────────────────────────────────────────────────────────
-.vscode/
-.idea/
 *.swp
 *.swo
 *~
-
-# ─── Logs ────────────────────────────────────────────────────────────────────
-*.log
-
-# ─── Local env ───────────────────────────────────────────────────────────────
-.env
-.env.local
-.env.*.local
-
-# ─── Python cache (bridge.py) ───────────────────────────────────────────────
-__pycache__/
-*.pyc
-*.pyo
-
-# ─── Test artifacts ────────────────────────────────────────────────────────────
-test-results/
-
-# ─── Runtime data (local pending store, etc.) ────────────────────────────────
-data/
-
-# ─── Misc ────────────────────────────────────────────────────────────────────
-coverage/
-.cache/
-coverage
-.coverage
-.gstack/

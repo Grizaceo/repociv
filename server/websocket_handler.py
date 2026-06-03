@@ -27,6 +27,7 @@ Security:
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import logging
 import os
@@ -55,6 +56,13 @@ _HEARTBEAT_MISSED_LIMIT = 3
 
 # ─── Command dispatch callback (set by bridge.py) ────────────────────────────
 _command_callback: Callable[[dict[str, Any]], None] | None = None
+
+
+def _token_matches(candidate: Any) -> bool:
+    """Constant-time token comparison for WebSocket auth."""
+    if not isinstance(candidate, str):
+        return False
+    return hmac.compare_digest(candidate.encode("utf-8"), REPOCIV_TOKEN.encode("utf-8"))
 
 
 def set_command_callback(cb: Callable[[dict[str, Any]], None]) -> None:
@@ -152,7 +160,7 @@ async def _auth_ws(ws: websockets.asyncio.server.ServerConnection) -> bool:
         if isinstance(msg, bytes):
             msg = msg.decode()
         data = json.loads(msg)
-        if data.get("type") == "auth" and data.get("token") == REPOCIV_TOKEN:
+        if data.get("type") == "auth" and _token_matches(data.get("token")):
             await ws.send(json.dumps({"type": "auth_ok"}))
             return True
         await ws.send(json.dumps({"type": "auth_error", "msg": "invalid token"}))
@@ -221,7 +229,7 @@ async def _handle_incoming(ws: websockets.asyncio.server.ServerConnection, messa
         if not REPOCIV_TOKEN:
             await ws.send(json.dumps({"type": "auth_ok"}))
             return
-        if data.get("token") == REPOCIV_TOKEN:
+        if _token_matches(data.get("token")):
             await ws.send(json.dumps({"type": "auth_ok"}))
         else:
             await ws.send(json.dumps({"type": "auth_error", "msg": "invalid token"}))

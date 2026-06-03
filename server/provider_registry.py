@@ -1,7 +1,8 @@
 """RepoCiv — Provider & Harness Registry (v2).
 
-Reads shared/provider-registry.json as fallback, but also dynamically
-detects providers from the actual HERMES_ROOT config.yaml and env vars.
+Reads shared/provider-registry.json as a local override and
+shared/provider-registry.example.json as the public fallback. It also
+dynamically detects providers from the actual HERMES_ROOT config.yaml and env vars.
 This ensures RepoCiv stays in sync with what Hermes really has available.
 """
 from __future__ import annotations
@@ -16,22 +17,25 @@ from .agent_runner import _has_claude_code, _has_openclaw, _has_cursor, _has_cod
 
 # ─── Static JSON (fallback) ──────────────────────────────────────────────────────
 
-_REGISTRY_PATH = Path(__file__).parent.parent / "shared" / "provider-registry.json"
+_SHARED_DIR = Path(__file__).parent.parent / "shared"
+_REGISTRY_PATH = _SHARED_DIR / "provider-registry.json"
+_REGISTRY_EXAMPLE_PATH = _SHARED_DIR / "provider-registry.example.json"
 
 _cache: dict[str, Any] | None = None
 
 
 def _load_registry() -> dict[str, Any]:
-    """Load the static provider-registry.json."""
+    """Load the local provider registry, falling back to the public example."""
     global _cache
     if _cache is not None:
         return _cache
-    if not _REGISTRY_PATH.exists():
-        logging.warning("[provider_registry] shared/provider-registry.json not found")
+    registry_path = _REGISTRY_PATH if _REGISTRY_PATH.exists() else _REGISTRY_EXAMPLE_PATH
+    if not registry_path.exists():
+        logging.warning("[provider_registry] no provider registry file found")
         _cache = {"harnesses": [], "providers": []}
         return _cache
     try:
-        with _REGISTRY_PATH.open(encoding="utf-8") as fh:
+        with registry_path.open(encoding="utf-8") as fh:
             _cache = json.load(fh)
     except Exception as exc:
         logging.error("[provider_registry] Failed to load registry: %s", exc)

@@ -29,16 +29,16 @@ import uuid
 from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
+from . import locks as _locks  # noqa: E402
+from . import workspace_issue as _wi  # noqa: E402
+from . import workspace_state as _ws  # noqa: E402
+from . import run_state as _rs  # noqa: E402
+from . import repo_config as _rc  # noqa: E402
+from . import metrics as _metrics  # noqa: E402
+from . import checkpoint as _checkpoint  # noqa: E402
+from . import repociv_hooks as _rh  # noqa: E402
+from . import swarm_engine as _swarm  # noqa: E402
 
-from . import locks as _locks
-from . import workspace_issue as _wi
-from . import workspace_state as _ws
-from . import run_state as _rs
-from . import repo_config as _rc
-from . import metrics as _metrics
-from . import checkpoint as _checkpoint
-from . import repociv_hooks as _rh
-from . import swarm_engine as _swarm
 
 
 # ─── Circuit breaker ──────────────────────────────────────────────────────────

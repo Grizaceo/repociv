@@ -165,26 +165,26 @@ def _pop_approval(cmd_id: str) -> dict[str, Any] | None:
         return _approvals.pop(cmd_id, None)
 
 
-# ─── Event store init ─────────────────────────────────────────────────────────
-from server import event_store as _es
-from server import sessions as _sessions
-from server import run_state as _run_state
-from server import workspace_issue as _wi
-from server import checkpoint as _checkpoint
-from server import endpoint_usage as _endpoint_usage
+# ─── Event store init
+from server import event_store as _es  # noqa: E402
+from server import sessions as _sessions  # noqa: E402
+from server import run_state as _run_state  # noqa: E402
+from server import workspace_issue as _wi  # noqa: E402
+from server import checkpoint as _checkpoint  # noqa: E402
+from server import endpoint_usage as _endpoint_usage  # noqa: E402
 
-# ─── Command schema + policy ──────────────────────────────────────────────────
-from server.command_schema import validate_command, CommandValidationError, Command
-from server import policy as _policy
-from server.context_pack import build_context_pack
-from server import directive_store as _ds
-from server import directive_learner as _dl
-from server import harness_registry as _hr
-from server import recovery as _recovery
-from server import runtime_adapters as _runtime_adapters
-from server import agent_runner as _agent_runner
-from server import task_orchestrator as _to
-from server import rate_limiter as _rl
+# ─── Command schema + policy
+from server.command_schema import validate_command, CommandValidationError, Command  # noqa: E402
+from server import policy as _policy  # noqa: E402
+from server.context_pack import build_context_pack  # noqa: E402
+from server import directive_store as _ds  # noqa: E402
+from server import directive_learner as _dl  # noqa: E402
+from server import harness_registry as _hr  # noqa: E402
+from server import recovery as _recovery  # noqa: E402
+from server import runtime_adapters as _runtime_adapters  # noqa: E402
+from server import agent_runner as _agent_runner  # noqa: E402
+from server import task_orchestrator as _to  # noqa: E402
+from server import rate_limiter as _rl  # noqa: E402
 
 _BRIDGE_STATE_CONFIG_DIR: Path | None = None
 
@@ -222,7 +222,7 @@ init_bridge_state(CONFIG_DIR)
 _agent_rate_limiter = _rl.RateLimiter()
 
 # ─── Scheduler ────────────────────────────────────────────────────────────────
-from server import scheduler as _sched
+from server import scheduler as _sched  # noqa: E402
 
 
 # ─── Mission persistence ──────────────────────────────────────────────────────
@@ -620,7 +620,7 @@ def _dispatch_command(cmd: Command) -> None:
 
 
 # ─── HTTP Handler ─────────────────────────────────────────────────────────────
-from . import http_routes as _routes
+from . import http_routes as _routes  # noqa: E402
 
 
 class BridgeHandler(BaseHTTPRequestHandler):

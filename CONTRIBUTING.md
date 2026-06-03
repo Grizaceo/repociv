@@ -14,7 +14,7 @@ contributions should be small, focused, and dogfooding-driven.
 ### Setup
 
 ```bash
-git clone https://github.com/yourusername/repociv.git
+git clone <repo-url> repociv
 cd repociv
 
 # Frontend
@@ -35,7 +35,7 @@ python -m server.bridge
 # Terminal 2 — Frontend (Vite dev server)
 npm run dev
 
-# Open http://localhost:5277
+# Open http://localhost:5273
 ```
 
 ### Environment

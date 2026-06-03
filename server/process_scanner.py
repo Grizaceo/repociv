@@ -2,7 +2,10 @@ import json
 import os
 import re
 import subprocess
+import uuid
 from pathlib import Path
+
+from .sse_server import send_to_repociv
 
 
 # ─── Process scanner ──────────────────────────────────────────────────────────
@@ -118,5 +121,4 @@ def detect_lexo() -> None:
             send_to_repociv({"type": "log", "msg": f"LexO-α detectado (pid {pid})", "level": "success"})
     except Exception:
         pass
-
 

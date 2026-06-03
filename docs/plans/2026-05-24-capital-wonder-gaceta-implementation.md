@@ -2,7 +2,7 @@
 
 ## Contexto Base (no modificar fuera del alcance)
 
-- Repo: `/home/gris/.hermes/workspace/repos/repociv`
+- Repo: `<repo-root>`
 - Commit base: `371f737`
 - Stack: TypeScript vanilla, Vite, Canvas 2D, Python bridge (FastAPI-style)
 - CSS tokens ya implementados en `src/styles/variables.css`
@@ -301,7 +301,7 @@ Agregar:
 ## Comandos de Verificacion Post-Implementacion
 
 ```bash
-cd /home/gris/.hermes/workspace/repos/repociv
+cd <repo-root>
 
 # 1. Types limpio
 npx tsc --noEmit

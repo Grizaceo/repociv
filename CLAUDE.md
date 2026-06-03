@@ -1,10 +1,10 @@
 # RepoCiv — Imperial Agent Dashboard
 
-You are inside the **RepoCiv** repository (`/home/gris/.hermes/workspace/repos/repociv`).
-This is a Civilization V-style hexagonal dashboard for Cristóbal's agents — single-user alpha.
+You are inside the **RepoCiv** repository.
+This is a Civilization V-style hexagonal dashboard for RepoCiv's agents — single-user alpha.
 Stack: TypeScript + Vite (Canvas 2D) · Python HTTP bridge · DuckDB ledger.
 See `AGENTS.md` and `docs/SCOPE.md` for full context.
-MCP server: `server/mcp_server.py` — expone el bridge como 32 tools por stdio. Ver `docs/MCP.md`.
+MCP server: `server/mcp_server.py` — expone el bridge como 41 tools por stdio. Ver `docs/MCP.md`.
 
 ---
 

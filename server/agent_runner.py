@@ -877,7 +877,7 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
                            city_id: str = "",
                            model: str = "") -> tuple[bool, str]:
     HERMES_URL   = os.environ.get("HERMES_URL",   "http://localhost:8642/v1/chat/completions")
-    HERMES_KEY   = os.environ.get("HERMES_KEY",   "davi-voice-bridge-2026")
+    HERMES_KEY   = os.environ.get("HERMES_KEY", "")
     # Priority: explicit payload model → per-unit override → env default
     _override = _model_overrides.get(unit_id)
     HERMES_MODEL = model or (_override["model"] if _override else None) or os.environ.get("HERMES_MODEL", "hermes-agent")
@@ -914,13 +914,15 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
         payload["working_directory"] = working_dir
     try:
         data = json.dumps(payload).encode()
+        headers = {
+            "Content-Type": "application/json",
+            "X-Hermes-Session-Id": session_id,
+        }
+        if HERMES_KEY:
+            headers["Authorization"] = f"Bearer {HERMES_KEY}"
         req = urllib.request.Request(
             HERMES_URL, data=data,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {HERMES_KEY}",
-                "X-Hermes-Session-Id": session_id,
-            },
+            headers=headers,
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=900) as resp:

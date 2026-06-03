@@ -8,8 +8,8 @@
 
 ## Current Status: v0.1.0 alpha — May 2026
 
-RepoCiv is a **single-user alpha**, actively dogfooded by its creator
-Cristobal for daily multi-agent research work. The project follows a
+RepoCiv is a **single-user alpha**, actively dogfooded for daily
+multi-agent research work. The project follows a
 simple rule: **no feature ships unless its creator needed it first.**
 
 ### What is stable
@@ -37,12 +37,8 @@ These components are used daily and have passing test suites:
 
 ### Test coverage
 
-- **Frontend (Vitest):** 318 tests, covering hex math, pathfinding, game
-  state, priority matrix, fatigue, bridge validation
-- **Backend (pytest):** 466 tests, covering bridge endpoints, ledger,
-  token management, scheduler, sessions, container runtime, security
-  harness, swarm engine, recovery
-- **Total:** 784 passing tests
+The test suite is split across frontend Vitest tests and backend pytest tests.
+Run `npm test -- --run` and `python3 -m pytest server/ -q` for current counts.
 
 ---
 
@@ -152,7 +148,7 @@ monitoring and quick approvals, not building the map on a phone.
 RepoCiv has a single user who is also its primary developer. Every
 feature, every refactor, every new panel must pass this test:
 
-> "Did Cristobal need this in the last 7 days of real work?"
+> "Did the dogfooding workflow need this in the last 7 days of real work?"
 
 If not, it does not go into trunk. This is not gatekeeping -- it is
 survival. Without this rule, alpha projects accumulate shelfware

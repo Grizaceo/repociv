@@ -1,0 +1,27 @@
+{
+  "version": "2.0",
+  "comment": "Example provider registry. Copy to shared/provider-registry.json and edit.",
+  "harnesses": [
+    {
+      "id": "hermes",
+      "name": "Hermes",
+      "transport": "hermes",
+      "env": "HERMES_URL"
+    },
+    {
+      "id": "openclaw",
+      "name": "OpenClaw",
+      "transport": "openclaw",
+      "env": ""
+    }
+  ],
+  "providers": [
+    {
+      "id": "ollama-cloud",
+      "name": "Ollama Cloud",
+      "env": "OLLAMA_API_KEY",
+      "defaultModel": "<MODEL_ID>",
+      "models": []
+    }
+  ]
+}

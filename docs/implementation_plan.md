@@ -107,7 +107,7 @@ RepoCiv nació inspirado en [AgentCraft](https://getagentcraft.com) — el orque
 
 ## 0.4 Hallazgos de la Auditoría Previa Incorporados
 
-Del [AUDIT_REPORT.md](file:///wsl.localhost/Ubuntu/home/gris/.hermes/workspace/repos/orchestrator-audit/AUDIT_REPORT.md) (543 líneas, 22 fuentes, 6 hallazgos profundos):
+Del `orchestrator-audit/AUDIT_REPORT.md` (543 líneas, 22 fuentes, 6 hallazgos profundos):
 
 | Hallazgo | Fuente | Qué es | Dónde se integra |
 |---|---|---|---|

@@ -28,13 +28,13 @@ without exposing anything to the public internet.
 
 ```bash
 python3 -c "import secrets; print(secrets.token_hex(32))"
-# Example output: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1
+# Example output: <64-hex-character-token>
 ```
 
 ### 2. Configure `.env`
 
 ```ini
-REPOCIV_TOKEN=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1
+REPOCIV_TOKEN=<64-hex-character-token>
 REPOCIV_REMOTE=true
 ```
 
@@ -68,16 +68,16 @@ Once RepoCiv is running on the host, find its Tailscale IP:
 
 ```bash
 tailscale ip -4
-# Example: 100.82.34.156
+# Example: <tailscale-ip>
 ```
 
 On any device connected to the same Tailscale network, open:
 
 ```
-http://100.82.34.156:5273
+http://<tailscale-ip>:5273
 ```
 
-Replace `100.82.34.156` with your host's actual Tailscale IP. The WebSocket
+Replace `<tailscale-ip>` with your host's actual Tailscale IP. The WebSocket
 transport (port 5275) is also accessible via the same IP.
 
 ### API Access
@@ -85,13 +85,13 @@ transport (port 5275) is also accessible via the same IP.
 The bridge API is at:
 
 ```
-http://100.82.34.156:5274/health
+http://<tailscale-ip>:5274/health
 ```
 
 All requests require the `X-RepoCiv-Token` header:
 
 ```bash
-curl -H "X-RepoCiv-Token: <your-token>" http://100.82.34.156:5274/health
+curl -H "X-RepoCiv-Token: <your-token>" http://<tailscale-ip>:5274/health
 ```
 
 ## Architecture
@@ -182,7 +182,7 @@ If the WS URL is wrong (e.g. `ws://localhost:5275` instead of
 `ws://<tailscale-ip>:5275`), set `VITE_BRIDGE_URL` in `.env`:
 
 ```ini
-VITE_BRIDGE_URL=http://100.82.34.156:5274
+VITE_BRIDGE_URL=http://<tailscale-ip>:5274
 ```
 
 The frontend will derive the WS URL from this base.

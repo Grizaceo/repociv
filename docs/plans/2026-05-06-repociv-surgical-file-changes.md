@@ -568,7 +568,7 @@ Base de evidencia para poda post-dogfooding de:
 # Comandos de verificación por lote
 
 ```bash
-cd /home/gris/.hermes/workspace/repos/repociv
+cd <repo-root>
 
 # base
 python3 -m pytest server/ -q

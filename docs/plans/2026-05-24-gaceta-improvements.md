@@ -13,7 +13,7 @@ Este plan propone mejoras robustas y sencillas (KISS) para la integración de la
 
 Actualmente, el widget `#gaceta-widget` alterna estrictamente entre `max-height: 48px` (colapsado) y `max-height: 420px` (expandido) usando CSS estático.
 
-#### [MODIFY] [gaceta.css](file:///home/gris/.hermes/workspace/repos/repociv/src/styles/gaceta.css)
+#### [MODIFY] `src/styles/gaceta.css`
 * Cambiaremos `#gaceta-widget` para usar un layout de tipo **Flexbox** vertical, lo que permite que el cuerpo (`.gaceta-body`) se adapte dinámicamente al tamaño del contenedor padre.
 * Añadiremos soporte nativo para redimensionamiento en el estado expandido:
   ```css
@@ -46,7 +46,7 @@ Actualmente, el widget `#gaceta-widget` alterna estrictamente entre `max-height:
 
 Para permitir la sincronización bajo demanda sin depender de que el backend de `cdaily` esté levantado, ejecutaremos directamente el comando de escaneo del CLI.
 
-#### [MODIFY] [http_routes.py](file:///home/gris/.hermes/workspace/repos/repociv/server/http_routes.py)
+#### [MODIFY] `server/http_routes.py`
 * Añadiremos una nueva ruta POST `/api/news/scan` que ejecuta `blogwatcher-cli scan` a través de Python `subprocess`:
   ```python
   def post_news_scan(body: dict[str, Any], ctx: dict[str, Any]) -> tuple[int, Any]:
@@ -73,13 +73,13 @@ Para permitir la sincronización bajo demanda sin depender de que el backend de 
           return 500, {"error": f"Error interno: {str(e)}"}
   ```
 
-#### [MODIFY] [bridge.py](file:///home/gris/.hermes/workspace/repos/repociv/server/bridge.py)
+#### [MODIFY] `server/bridge.py`
 * Registraremos la ruta POST en el mapeo `_POST_EXACT`:
   ```python
   "/api/news/scan": _routes.post_news_scan,
   ```
 
-#### [MODIFY] [bridge.ts](file:///home/gris/.hermes/workspace/repos/repociv/src/bridge.ts)
+#### [MODIFY] `src/bridge.ts`
 * Exportaremos una nueva función auxiliar para invocar el escaneo:
   ```typescript
   export async function scanNews(): Promise<{ ok: boolean; error?: string }> {
@@ -101,7 +101,7 @@ Para permitir la sincronización bajo demanda sin depender de que el backend de 
   }
   ```
 
-#### [MODIFY] [gacetaWidget.ts](file:///home/gris/.hermes/workspace/repos/repociv/src/ui/gacetaWidget.ts)
+#### [MODIFY] `src/ui/gacetaWidget.ts`
 * Añadiremos un botón de recarga `🔄` o `sync` en la cabecera `.gaceta-header` (al lado del chevron) o en el cuerpo.
 * Al hacer click en el botón de actualización:
   1. Pondremos el botón en un estado activo/animado (haciendo que el icono gire).
@@ -114,13 +114,13 @@ Para permitir la sincronización bajo demanda sin depender de que el backend de 
 
 Haremos que el backend provea la categoría de cada noticia leyendo las configuraciones compartidas de CDaily, y el frontend ofrecerá un filtrado instantáneo tipo "chips".
 
-#### [MODIFY] [http_routes.py](file:///home/gris/.hermes/workspace/repos/repociv/server/http_routes.py)
+#### [MODIFY] `server/http_routes.py`
 * Cargaremos de forma segura el mapeo de categorías y emojis desde `../cdaily/config.yaml`.
 * Si no se encuentra el archivo o falla, usaremos los diccionarios por defecto idénticos a los de CDaily.
 * Ampliaremos el límite de consulta en `get_latest_news` de **5 a 15 artículos** para asegurar que haya variedad para el filtrado.
 * Retornaremos en el JSON de cada artículo: `"category"` (ej. `security`) y `"emoji"` (ej. `🔐`).
 
-#### [MODIFY] [gacetaWidget.ts](file:///home/gris/.hermes/workspace/repos/repociv/src/ui/gacetaWidget.ts)
+#### [MODIFY] `src/ui/gacetaWidget.ts`
 * Añadiremos una barra horizontal de categorías en el DOM superior de `.gaceta-body`:
   ```html
   <div class="gaceta-categories"></div>

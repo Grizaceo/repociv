@@ -256,8 +256,7 @@ function persistFromDOM() {
     },
     trust: {
       ...c.trust,
-      autoApproveChat:
-        panel.querySelector<HTMLInputElement>('#set-auto-approve-chat')!.checked,
+      autoApproveChat: panel.querySelector<HTMLInputElement>('#set-auto-approve-chat')!.checked,
     },
   };
   saveConfig(newCfg);

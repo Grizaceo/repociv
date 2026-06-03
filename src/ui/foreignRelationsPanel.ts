@@ -151,7 +151,7 @@ function _renderGenerateArea(): string {
         </div>
         <div class="fr-target-row">
           <span>📁 Repositorio:</span>
-          <input type="text" id="fr-repo-path" class="fr-input" value="${esc(repoValue)}" placeholder="/home/gris/.hermes/workspace/repos/..." />
+          <input type="text" id="fr-repo-path" class="fr-input" value="${esc(repoValue)}" placeholder="~/workspace/repos/..." />
         </div>
       </div>
       <div class="fr-actions">

@@ -369,7 +369,7 @@ No subir `self_improve` de categoría hasta que existan:
 ## 5. Comandos de verificación
 
 ```bash
-cd /home/gris/.hermes/workspace/repos/repociv
+cd <repo-root>
 python3 -m pytest server/ -q
 npm test
 npm run check

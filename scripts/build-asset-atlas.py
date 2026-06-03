@@ -6,7 +6,6 @@ from the original 10 individual PNGs in public/assets/.
 """
 
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -148,11 +147,11 @@ def main() -> None:
         f.stat().st_size for f in ASSETS_DIR.iterdir()
         if f.suffix in (".png", ".webp", ".json") and f.is_file()
     )
-    print(f"\n=== Results ===")
+    print("\n=== Results ===")
     print(f"Before: {before_bytes / 1024:.0f} KB")
     print(f"After:  {after_bytes / 1024:.0f} KB")
     print(f"Delta:  {(before_bytes - after_bytes) / 1024:.0f} KB saved ({100*(1-after_bytes/before_bytes):.0f}%)")
-    print(f"\nDone. Output files:")
+    print("\nDone. Output files:")
     for f in sorted(ASSETS_DIR.iterdir()):
         if f.suffix in (".png", ".webp", ".json") and "atlas" in f.name:
             print(f"  {f.relative_to(REPO_ROOT)}  ({f.stat().st_size/1024:.0f} KB)")

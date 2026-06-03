@@ -12,23 +12,19 @@ const cities = [
   {
     id: 'workspace__repociv',
     name: 'RepoCiv',
-    repoPath: '/home/gris/.hermes/workspace/repos/repociv',
+    repoPath: '/workspace/repos/repociv',
   },
   {
     id: 'workspace__agent-lab',
     name: 'Agent Lab',
-    repoPath: '/home/gris/.hermes/workspace/repos/agent-lab',
+    repoPath: '/workspace/repos/agent-lab',
   },
 ];
 
 describe('bibliothecaBridge', () => {
   it('matches cities by exact repo path and basename fallback', () => {
     expect(
-      findCityByWonderSelection(
-        cities,
-        'missing-id',
-        '/home/gris/.hermes/workspace/repos/repociv/src/main.ts',
-      ),
+      findCityByWonderSelection(cities, 'missing-id', '/workspace/repos/repociv/src/main.ts'),
     )?.toMatchObject({ id: 'workspace__repociv' });
 
     expect(findCityByWonderSelection(cities, 'agent-lab'))?.toMatchObject({

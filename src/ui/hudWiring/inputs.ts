@@ -177,13 +177,15 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
       indicator.title = `Enviando a: ${unit.id.toUpperCase()}`;
     }
 
-    void sendCommand(draft).then((res) => {
-      if (!res.ok) {
-        appendSystemMessage(unit.id, `❌ Comando rechazado: ${res.reason || res.status}`);
-      }
-    }).catch(() => {
-      appendSystemMessage(unit.id, '❌ No se pudo enviar el mensaje al bridge.');
-    });
+    void sendCommand(draft)
+      .then((res) => {
+        if (!res.ok) {
+          appendSystemMessage(unit.id, `❌ Comando rechazado: ${res.reason || res.status}`);
+        }
+      })
+      .catch(() => {
+        appendSystemMessage(unit.id, '❌ No se pudo enviar el mensaje al bridge.');
+      });
     state.setUnitState(unit.id, 'working');
     input.value = '';
   };

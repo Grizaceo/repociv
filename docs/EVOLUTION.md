@@ -24,7 +24,7 @@
 
 ## 2026-04-27 · Génesis
 
-Cristóbal define la metáfora núcleo: visualizar `~/.hermes/workspace/repos/`
+RepoCiv define la metáfora núcleo: visualizar `~/.hermes/workspace/repos/`
 como un mapa hexagonal estilo Civilization V donde cada repo es una ciudad,
 cada agente es una unidad, y cada proceso de background es un edificio en
 construcción. La idea no es decorativa — es operacional: usar la representación
@@ -133,7 +133,7 @@ del renderer, rediseño de UI.
 
 ## 2026-05-01 · Agent OS Industrial — `implementation_plan.md` v2.0
 
-Cristóbal escribe el manifiesto: convertir RepoCiv en el primer sistema que
+RepoCiv escribe el manifiesto: convertir RepoCiv en el primer sistema que
 implementa el paradigma "Agent OS" (MemGPT) con el rigor de control de
 LangGraph y la especialización de roles de CrewAI. El plan incorpora SOTA
 externo (SICA, MemGPT, A2A, FrugalGPT, Darwin Gödel Machine) y patrones

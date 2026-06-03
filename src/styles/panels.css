@@ -383,7 +383,8 @@
   border-radius: 3px;
   color: var(--ui-text);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
+  letter-spacing: 0.02em;
   padding: 2px 4px;
   outline: none;
   cursor: pointer;
@@ -573,7 +574,9 @@
   padding: 1px 6px;
   border-radius: 3px;
   line-height: 1.4;
-  transition: background 0.15s, opacity 0.15s;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
 }
 .approval-approve {
   color: var(--civ-food, #5b9b5b);

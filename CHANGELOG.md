@@ -81,6 +81,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Priority Matrix for file/carpeta scoring.
 - Fatigue system and A* pathfinding.
 - 314 frontend unit tests (Vitest) + 544 backend tests (pytest).
-
-[unreleased]: https://github.com/cristobal/repociv/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/cristobal/repociv/releases/tag/v0.1.0

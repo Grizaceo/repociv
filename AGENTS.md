@@ -2,10 +2,10 @@
 
 You are inside the **RepoCiv** repository, a Civilization V-style hexagonal dashboard.
 
-**Where you are:** `/home/gris/.hermes/workspace/repos/repociv`
-**What this is:** A single-user alpha dashboard for Cristóbal. It visualizes `~/.hermes/workspace/repos/` as cities, agents as units, and processes as buildings on a hex grid.
+**Where you are:** the RepoCiv repository root.
+**What this is:** A single-user alpha dashboard for a local agent workspace. It visualizes `~/.hermes/workspace/repos/` as cities, agents as units, and processes as buildings on a hex grid.
 **Stack:** TypeScript + Vite (Canvas 2D frontend) · Python HTTP bridge (backend) · DuckDB ledger
-**Owner:** Cristóbal & DAVI
+**Owner:** RepoCiv maintainers
 **Version:** v0.1.0 alpha — scope frozen until dogfooding says otherwise.
 
 Key files to know about:
@@ -32,7 +32,7 @@ Para conectar desde otra sesión de Claude Code, añadir en `~/.claude.json`:
   "mcpServers": {
     "repociv": {
       "command": "python",
-      "args": ["/home/gris/.hermes/workspace/repos/repociv/server/mcp_server.py"]
+      "args": ["<absolute-path-to-repociv>/server/mcp_server.py"]
     }
   }
 }

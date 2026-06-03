@@ -18,7 +18,7 @@ source .venv/bin/activate && pip install -r requirements.txt
   "mcpServers": {
     "repociv": {
       "command": "python",
-      "args": ["/home/gris/.hermes/workspace/repos/repociv/server/mcp_server.py"],
+      "args": ["<absolute-path-to-repociv>/server/mcp_server.py"],
       "env": {
         "BRIDGE_PORT": "5274"
       }
@@ -55,7 +55,7 @@ curl http://127.0.0.1:5274/api/wonders
 curl "http://127.0.0.1:5274/api/graph-relations?repoId=repociv&limit=5"
 
 # Perfil de un repo (requiere bridge activo)
-curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/home/gris/.hermes/workspace/repos/repociv"
+curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/path/to/workspace/repociv"
 ```
 
 ## Tools disponibles (41 tools, 15 dominios)
@@ -196,4 +196,4 @@ pytest server/test_mcp_server.py -v   # 39 tests, bridge mockeado
 
 - Transport HTTP/SSE — solo stdio
 - Streaming en vivo de `/events` por MCP — usa `events_since` con polling
-- Auth multi-usuario — single-user (Cristóbal)
+- Auth multi-usuario — el alpha es single-user

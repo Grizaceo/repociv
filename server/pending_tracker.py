@@ -216,7 +216,7 @@ def append_pending_task(title: str, priority: str = "MEDIA") -> str | None:
             result_str = "".join(result)
             if not result_str.endswith("\n"):
                 result_str += "\n"
-            result_str += f"\n{section_header}\n\n{new_block}"
+            result_str += f"\n## Pending\n\n{new_block}"
             PENDING_TRACKER.write_text(result_str, encoding="utf-8")
         else:
             PENDING_TRACKER.write_text("".join(result), encoding="utf-8")

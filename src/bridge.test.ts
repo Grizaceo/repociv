@@ -321,12 +321,16 @@ describe('BridgeEvents handleBridgeEvent', () => {
     src.message({
       type: 'waiting_approval',
       commandId: 'cmd-1',
-      commandType: 'execute_agent',
+      commandType: 'run_tests',
       target: 'repociv',
       risk: 'high',
     });
     expect(appendApprovalCard).toHaveBeenCalledWith(
-      'repociv', 'cmd-1', 'execute_agent', 'repociv', 'high',
+      'repociv',
+      'cmd-1',
+      'run_tests',
+      'repociv',
+      'high',
     );
     bridge.stop();
   });

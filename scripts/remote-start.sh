@@ -17,12 +17,15 @@ cd "$REPO_ROOT"
 
 # ─── Load .env ────────────────────────────────────────────────────────────────
 if [[ -f .env ]]; then
-  # shellcheck disable=SC2046
-  export $(grep -v '^#' .env | grep -v '^$' | xargs)
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
 fi
 
 BRIDGE_PORT="${BRIDGE_PORT:-5274}"
-REPOCIV_PORT="${REPOCIV_PORT:-5273}"
+REPOCIV_PORT="${REPOCIV_PORT:-${VITE_PORT:-5273}}"
+export VITE_PORT="${VITE_PORT:-$REPOCIV_PORT}"
 CONFIG_DIR="${REPOCIV_CONFIG_DIR:-$HOME/.repociv}"
 CONFIG_DIR="${CONFIG_DIR/#\~/$HOME}"
 LOCKFILE="$CONFIG_DIR/repociv-remote.lock"

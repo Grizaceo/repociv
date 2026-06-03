@@ -26,7 +26,7 @@ Optional but recommended:
 ## Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/cristobal/repociv.git
+git clone <repo-url> repociv
 cd repociv
 ```
 
@@ -314,10 +314,10 @@ REPOCIV_DATA_DIR=/tmp/repociv-test python3 -m pytest server/ -q
 ## Running Tests
 
 ```bash
-# Frontend tests (Vitest) — 318 tests
+# Frontend tests (Vitest)
 npm test -- --run
 
-# Backend tests (pytest) — 466 tests
+# Backend tests (pytest)
 source .venv/bin/activate
 python3 -m pytest server/ -q
 
@@ -353,8 +353,8 @@ Bridge/API en `:3001`, UI Vite en `http://127.0.0.1:5173`.
 ./scripts/dev-start.sh
 ```
 
-Abre RepoCiv en el puerto de tu `.env` (p. ej. `VITE_PORT=5277` →
-`http://127.0.0.1:5277`).
+Abre RepoCiv en el puerto de tu `.env` (p. ej. `VITE_PORT=5273` →
+`http://127.0.0.1:5273`).
 
 ### Usar la maravilla en el mapa
 

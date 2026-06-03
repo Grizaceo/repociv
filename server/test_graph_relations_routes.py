@@ -14,7 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 # Import the module under test so we can patch its imports
-import http_routes as routes
+import http_routes as routes  # noqa: E402
 
 
 # ─── get_graph_relations ─────────────────────────────────────────────────────

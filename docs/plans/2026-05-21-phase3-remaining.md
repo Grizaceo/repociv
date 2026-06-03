@@ -27,8 +27,8 @@ Wants=tailscaled.service
 [Service]
 Type=simple
 Environment=REPOCIV_REMOTE=true
-EnvironmentFile=/home/gris/.repociv/env
-ExecStart=/home/gris/.hermes/workspace/repos/repociv/scripts/remote-start.sh
+EnvironmentFile=%h/.repociv/env
+ExecStart=%h/.hermes/workspace/repos/repociv/scripts/remote-start.sh
 Restart=on-failure
 RestartSec=5
 

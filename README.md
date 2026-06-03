@@ -1,12 +1,11 @@
 # RepoCiv — Imperial Agent Dashboard
 
-[![CI](https://github.com/yourusername/repociv/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/repociv/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Status](https://img.shields.io/badge/status-alpha-blue.svg)](docs/ROADMAP.md)
+[![Status](https://img.shields.io/badge/status-public%20preview-blue.svg)](docs/ROADMAP.md)
 
 > Dashboard hexagonal estilo Civ V que visualiza `~/.hermes/workspace/repos/` como ciudades, agentes como unidades, y procesos como edificios.
 
-**Stack:** TypeScript + Vite (frontend, Canvas 2D) · Python HTTP bridge (backend) · 60 FPS target en RTX 4060.
+**Stack:** TypeScript + Vite (frontend, Canvas 2D) · Python HTTP bridge (backend) · DuckDB/JSONL para ledger local.
 
 ---
 
@@ -15,7 +14,8 @@
 ### 1. Instalar dependencias
 
 ```bash
-cd ~/.hermes/workspace/repos/repociv
+git clone <repo-url> repociv
+cd repociv
 
 # Frontend
 npm install
@@ -55,7 +55,7 @@ Abre `http://localhost:5273`. Verás el **Imperial Map** con tus ciudades (repos
 │  Priority Matrix (src/priorityMatrix.ts)     │     fatiga, colas misión,
 │  Fatigue System (src/fatigue.ts)             │     Pathfinding A*
 ├─────────────────────────────────────────────┤
-│  Bridge  (src/bridge.ts + server/bridge.py) │  ← HTTP → Hermes/DAVI,
+│  Bridge  (src/bridge.ts + server/bridge.py) │  ← HTTP → agent runtime,
 │  localMap.ts + localPathfinding.ts            │     LexO, agentes Worker
 └─────────────────────────────────────────────┘
 ```
@@ -76,7 +76,7 @@ Abre `http://localhost:5273`. Verás el **Imperial Map** con tus ciudades (repos
 - **Macro:** hex map donde cada tile es un repo.
 - **Local:** al hacer doble-click en una ciudad, entras a la vista interior.
   - Los **workbenches** son archivos/carpetas prioritizados.
-  - Las **unidades** (DAVI, LexO, Workers) caminan hacia workbenches.
+  - Las **unidades** (orchestrator, LexO, Workers) caminan hacia workbenches.
   - El **pathfinding** usa A* con cache por `unitType` (≤300 hexes explorados).
 - `Space` o `3` alterna entre vista macro y local de la ciudad seleccionada.
 
@@ -203,7 +203,7 @@ if (e.key.toLowerCase() === 'x') return spawnAgent('tuagente', state, renderer, 
 
 | Tecla | Acción |
 |-------|--------|
-| `Q` `W` `E` `L` `O` | Spawn DAVI / WORKER / SCOUT / LEXO / OPENCLAW |
+| `Q` `W` `E` `L` `O` | Spawn orchestrator / WORKER / SCOUT / LEXO / OPENCLAW |
 | `1`–`9` | Seleccionar héroe por slot |
 | `Space` | Ciclar al siguiente héroe idle |
 | `Tab` | Ciclar todos los héroes |
@@ -246,7 +246,7 @@ src/
 ├── renderer.ts          Canvas 2D main renderer
 ├── minimapRenderer.ts   Minimap
 ├── unitRenderer.ts      Sprites de unidades
-├── bridge.ts            HTTP client → Hermes/DAVI
+├── bridge.ts            HTTP client → agent runtime
 ├── main.ts             Entry point, hotkeys, HUD wiring
 ├── ui/
 │   ├── index.ts         Barrel re-export
@@ -408,4 +408,4 @@ Ver [CONTRIBUTING.md](CONTRIBUTING.md) para setup de desarrollo, workflow, conve
 
 ---
 
-_RepoCiv — v0.1.0 — Cristóbal & DAVI_
+_RepoCiv — v0.1.0 — RepoCiv Team_

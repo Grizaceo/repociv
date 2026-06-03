@@ -47,7 +47,7 @@ curl http://localhost:5274/ready
 ```json
 {
   "ok": true,
-  "eventStore": "/home/gris/.repociv/events.jsonl",
+  "eventStore": "~/.repociv/events.jsonl",
   "token": true
 }
 ```
@@ -230,7 +230,7 @@ curl http://localhost:5274/ready
 ```json
 {
   "cities": [...],
-  "repoPaths": ["/home/gris/.hermes/workspace/repos/repociv"]
+  "repoPaths": ["/path/to/workspace/repociv"]
 }
 ```
 
@@ -255,7 +255,7 @@ curl http://localhost:5274/ready
 ```json
 {
   "article": { "title": "...", "url": "...", "blogName": "..." },
-  "repoPath": "/home/gris/.hermes/workspace/repos/repociv",
+  "repoPath": "/path/to/workspace/repociv",
   "events": []
 }
 ```
@@ -264,7 +264,7 @@ curl http://localhost:5274/ready
 ```json
 {
   "article": { "title": "...", "url": "...", "id": "..." },
-  "repoPath": "/home/gris/.hermes/workspace/repos/repociv",
+  "repoPath": "/path/to/workspace/repociv",
   "targetCityId": "repociv",
   "agentId": "diplomat",
   "events": [],

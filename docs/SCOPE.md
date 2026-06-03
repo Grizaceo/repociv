@@ -10,9 +10,8 @@
 
 ## Qué es RepoCiv hoy
 
-Un dashboard hexagonal estilo Civilization V que **Cristóbal usa como alpha
-tester de un solo asiento**, corriendo local en una RTX 4060, para coordinar
-sus propios agentes (DAVI, LEXO, WORKER, SCOUT, OPENCLAW) sobre los repos
+Un dashboard hexagonal estilo Civilization V que **un usuario alpha de un solo asiento**
+corre localmente para coordinar sus propios agentes (DAVI, LEXO, WORKER, SCOUT, OPENCLAW) sobre los repos
 en `~/.hermes/workspace/repos/`.
 
 Por debajo del juego hay un Agent OS real (Tensor Context, FrugalGPT Router,
@@ -27,19 +26,19 @@ Versión: **v2.0 — congelada en scope hasta que el dogfooding diga otra cosa.*
 
 ## Definición de "done" para esta etapa
 
-> **Done = funciona para Cristóbal en su workflow diario y se siente
+> **Done = funciona para el workflow diario del usuario alpha y se siente
 > mejor que no usarlo. NO = paridad feature-by-feature con AgentCraft o
 > con cualquier otro producto.**
 
 Métricas concretas para considerar el alpha "exitoso":
 
-- Cristóbal abre RepoCiv ≥ 5 días por semana de forma espontánea (sin recordatorio).
+- El usuario alpha abre RepoCiv ≥ 5 días por semana de forma espontánea (sin recordatorio).
 - Al menos 3 de los 21 paneles de UI se invocan habitualmente. Los demás
   son candidatos a poda (ver §"Roadmap de poda" abajo).
 - El bridge se mantiene corriendo como systemd unit por ≥ 7 días sin
   intervención manual.
 - Los endpoints `GET /improve/proposals` muestran al menos una propuesta
-  útil que Cristóbal aplica a mano por mes.
+  útil que el usuario aplica a mano por mes.
 
 ---
 
@@ -63,7 +62,7 @@ Métricas concretas para considerar el alpha "exitoso":
   siendo el render canónico hasta que el 3D demuestre paridad funcional
   (no solo estética).
 - **`feat/multi-device-mobile`** — el celular como segundo cliente vía
-  PWA o app liviana. Útil porque Cristóbal va a alpha-testear desde el
+  PWA o app liviana. Útil porque el usuario alpha va a probar desde el
   teléfono, así que tiene sentido empezar a probar el contacto entre
   devices. Empieza por: serve-over-Tailscale + un cliente móvil
   mínimo (read-only) que se conecte al bridge local.
@@ -74,7 +73,7 @@ Métricas concretas para considerar el alpha "exitoso":
 
 Listado heredado del `implementation_plan.md` §10 + ajustes de esta etapa:
 
-- ❌ Multi-tenant / multi-usuario (alguien que no sea Cristóbal usándolo)
+- ❌ Multi-tenant / multi-usuario (más de un usuario operando el mismo dashboard)
 - ❌ Alliance Hall / multiplayer en tiempo real
 - ❌ Race skins / achievements / sistema de logros
 - ❌ Voice input / TTS
@@ -106,14 +105,14 @@ Tras 4-8 semanas de uso real, ejecutar este audit:
    accuracy mejorada), se mueven a `experimental/` o se borran.
 
 El objetivo de la poda **no** es achicar por achicar — es bajar la
-superficie de mantenimiento a lo que efectivamente Cristóbal usa.
+superficie de mantenimiento a lo que efectivamente se usa.
 
 ---
 
 ## Política de release
 
 - **Mientras alpha:** no hay tags, no hay release notes, todo va a `main`.
-- **Cuando Cristóbal sienta que lo usa diario y prefiere RepoCiv a no
+- **Cuando el usuario alpha lo use diario y prefiera RepoCiv a no
   usarlo:** se hace `v0.2.0 alpha` y se publica el repo. Antes no.
 - **Multi-device decente:** condición necesaria para considerar `v1.0`.
 - **Multi-usuario:** explícitamente fuera de cualquier roadmap por ahora.

@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import graph_relations as gr
+import graph_relations as gr  # noqa: E402
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────

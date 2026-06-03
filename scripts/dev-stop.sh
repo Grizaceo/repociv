@@ -5,13 +5,16 @@
 set -euo pipefail
 
 if [[ -f .env ]]; then
-  # shellcheck disable=SC2046
-  export $(grep -v '^#' .env | grep -v '^$' | xargs)
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
 fi
 
 CONFIG_DIR="${REPOCIV_CONFIG_DIR:-$HOME/.repociv}"
 CONFIG_DIR="${CONFIG_DIR/#\~/$HOME}"
 LOCKFILE="$CONFIG_DIR/repociv.lock"
+REPOCIV_PORT="${REPOCIV_PORT:-${VITE_PORT:-5273}}"
 
 _kill() {
   local pid="$1" label="$2"

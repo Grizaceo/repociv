@@ -829,7 +829,7 @@ Tareas:
    - Modulos sin impacto -> mover a experimental.
 
 4. Boton `Modo Limpio Permanente`.
-   - Si Cristobal lo usa mas que modo completo, el modo limpio pasa a default.
+   - Si el usuario alpha lo usa mas que modo completo, el modo limpio pasa a default.
 
 Gates:
 
