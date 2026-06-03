@@ -333,8 +333,7 @@ RepoCiv embeds **La Gran Biblioteca** (repo hermano `la-gran-biblioteca`) in a
 viñeta iframe. LGB no se modifica desde RepoCiv; solo enlazas su UI y compruebas
 el backend con variables `VITE_*` (ver `.env.example`).
 
-Contexto del ecosistema Hermes (repo hermano):
-[`la-gran-biblioteca/docs/ecosystem-hermes.md`](../la-gran-biblioteca/docs/ecosystem-hermes.md).
+La Gran Biblioteca es un proyecto compañero opcional (repo separado, no incluido en RepoCiv).
 
 ### Arranque local (dos terminales)
 

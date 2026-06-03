@@ -115,7 +115,7 @@ def detect_lexo() -> None:
             _save_lexo_seen(seen)
             hex_q = 2 + (pid % 3)
             hex_r = pid % 5
-            send_to_repociv({"type": "unit_spawn", "unit": unit_id, "civ": "gris",
+            send_to_repociv({"type": "unit_spawn", "unit": unit_id, "civ": "capital",
                              "hex": [hex_q, hex_r], "unitType": "lexo",
                              "mission": f"Proceso: {cmd[:40]}"})
             send_to_repociv({"type": "log", "msg": f"LexO-α detectado (pid {pid})", "level": "success"})

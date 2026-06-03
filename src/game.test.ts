@@ -80,7 +80,7 @@ describe('GameState construction', () => {
           id: 'DAVI',
           name: 'DAVI',
           type: 'hero',
-          civ: 'gris',
+          civ: 'capital',
           coord: { q: 0, r: 0 },
           path: [],
           pathIndex: 0,
@@ -130,20 +130,20 @@ describe('GameState.spawnUnit', () => {
   });
 
   it('adds unit to world.units and unitMap', () => {
-    const u = gs.spawnUnit('WORKER-1', 'Worker 1', 'worker', 'gris', { q: 1, r: 2 });
+    const u = gs.spawnUnit('WORKER-1', 'Worker 1', 'worker', 'capital', { q: 1, r: 2 });
     expect(u.id).toBe('WORKER-1');
     expect(gs.getUnit('WORKER-1')).toBe(u);
     expect(gs.world.units).toContain(u);
   });
 
   it('returns existing unit if id already present', () => {
-    const u1 = gs.spawnUnit('LEXO', 'LexO', 'hero', 'gris', { q: 0, r: 0 });
-    const u2 = gs.spawnUnit('LEXO', 'LexO', 'hero', 'gris', { q: 1, r: 1 });
+    const u1 = gs.spawnUnit('LEXO', 'LexO', 'hero', 'capital', { q: 0, r: 0 });
+    const u2 = gs.spawnUnit('LEXO', 'LexO', 'hero', 'capital', { q: 1, r: 1 });
     expect(u1).toBe(u2);
   });
 
   it('initialises unit with default fatigue values', () => {
-    const u = gs.spawnUnit('S1', 'Scout', 'scout', 'gris', { q: 0, r: 0 });
+    const u = gs.spawnUnit('S1', 'Scout', 'scout', 'capital', { q: 0, r: 0 });
     // freshly spawned units start at full fatigue (100)
     expect(u.fatigue).toBe(100);
     expect(u.maxFatigue).toBeGreaterThan(0);
@@ -154,7 +154,7 @@ describe('GameState.spawnUnit', () => {
 describe('GameState.removeUnit', () => {
   it('removes unit from world.units and unitMap', () => {
     const gs = new GameState(makeWorld());
-    gs.spawnUnit('X1', 'X', 'worker', 'gris', { q: 0, r: 0 });
+    gs.spawnUnit('X1', 'X', 'worker', 'capital', { q: 0, r: 0 });
     expect(gs.removeUnit('X1')).toBe(true);
     expect(gs.getUnit('X1')).toBeUndefined();
     expect(gs.world.units.find((u) => u.id === 'X1')).toBeUndefined();
@@ -170,7 +170,7 @@ describe('GameState.moveUnit', () => {
   it('returns false when A* finds no path (mocked to [])', () => {
     // aStarPath is mocked to return [] — path.length < 2, so moveUnit returns false
     const gs = new GameState(makeWorld());
-    gs.spawnUnit('DAVI', 'DAVI', 'hero', 'gris', { q: 0, r: 0 });
+    gs.spawnUnit('DAVI', 'DAVI', 'hero', 'capital', { q: 0, r: 0 });
     const moved = gs.moveUnit('DAVI', { q: 3, r: 4 });
     expect(moved).toBe(false);
   });
@@ -184,7 +184,7 @@ describe('GameState.moveUnit', () => {
 describe('GameState.setUnitState', () => {
   it('updates unit state field', () => {
     const gs = new GameState(makeWorld());
-    gs.spawnUnit('W1', 'W', 'worker', 'gris', { q: 0, r: 0 });
+    gs.spawnUnit('W1', 'W', 'worker', 'capital', { q: 0, r: 0 });
     gs.setUnitState('W1', 'working');
     expect(gs.getUnit('W1')!.state).toBe('working');
   });
@@ -257,7 +257,7 @@ describe('GameState.subscribe / notify', () => {
     const gs = new GameState(makeWorld());
     const cb = vi.fn();
     const unsub = gs.subscribe(cb);
-    gs.spawnUnit('N1', 'N', 'scout', 'gris', { q: 0, r: 0 });
+    gs.spawnUnit('N1', 'N', 'scout', 'capital', { q: 0, r: 0 });
     expect(cb).toHaveBeenCalled();
     unsub();
   });
@@ -267,7 +267,7 @@ describe('GameState.subscribe / notify', () => {
     const cb = vi.fn();
     const unsub = gs.subscribe(cb);
     unsub();
-    gs.spawnUnit('N2', 'N2', 'scout', 'gris', { q: 0, r: 0 });
+    gs.spawnUnit('N2', 'N2', 'scout', 'capital', { q: 0, r: 0 });
     expect(cb).not.toHaveBeenCalled();
   });
 });
@@ -276,7 +276,7 @@ describe('GameState.fatigue', () => {
   let gs: GameState;
   beforeEach(() => {
     gs = new GameState(makeWorld());
-    gs.spawnUnit('F1', 'F', 'worker', 'gris', { q: 0, r: 0 });
+    gs.spawnUnit('F1', 'F', 'worker', 'capital', { q: 0, r: 0 });
   });
 
   it('updateUnitFatigue sets fatigue on unit', () => {
@@ -311,8 +311,8 @@ describe('GameState.fatigue', () => {
 describe('GameState.getAllUnits', () => {
   it('returns all spawned units', () => {
     const gs = new GameState(makeWorld());
-    gs.spawnUnit('A', 'A', 'hero', 'gris', { q: 0, r: 0 });
-    gs.spawnUnit('B', 'B', 'worker', 'gris', { q: 1, r: 0 });
+    gs.spawnUnit('A', 'A', 'hero', 'capital', { q: 0, r: 0 });
+    gs.spawnUnit('B', 'B', 'worker', 'capital', { q: 1, r: 0 });
     expect(gs.getAllUnits()).toHaveLength(2);
   });
 });
@@ -320,14 +320,14 @@ describe('GameState.getAllUnits', () => {
 describe('GameState.selectUnit', () => {
   it('sets selectedUnit', () => {
     const gs = new GameState(makeWorld());
-    const u = gs.spawnUnit('SEL', 'Sel', 'hero', 'gris', { q: 0, r: 0 });
+    const u = gs.spawnUnit('SEL', 'Sel', 'hero', 'capital', { q: 0, r: 0 });
     gs.selectUnit(u);
     expect(gs.selectedUnit).toBe(u);
   });
 
   it('clears selectedUnit with null', () => {
     const gs = new GameState(makeWorld());
-    const u = gs.spawnUnit('SEL2', 'Sel2', 'hero', 'gris', { q: 0, r: 0 });
+    const u = gs.spawnUnit('SEL2', 'Sel2', 'hero', 'capital', { q: 0, r: 0 });
     gs.selectUnit(u);
     gs.selectUnit(null);
     expect(gs.selectedUnit).toBeNull();
@@ -354,7 +354,7 @@ describe('GameState.pause / resume', () => {
 describe('GameState.getUnitAt', () => {
   it('returns unit at exact axial coordinate', () => {
     const gs = new GameState(makeWorld());
-    gs.spawnUnit('AT1', 'AT', 'scout', 'gris', { q: 2, r: 3 });
+    gs.spawnUnit('AT1', 'AT', 'scout', 'capital', { q: 2, r: 3 });
     const found = gs.getUnitAt({ q: 2, r: 3 });
     expect(found?.id).toBe('AT1');
   });

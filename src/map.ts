@@ -1,6 +1,9 @@
 // ─── RepoCiv — Map Generator ─────────────────────────────────────────────────
 // Fetches real workspace metadata from /api/repos and builds a hex tile world.
 
+const CAPITAL_ID = 'capital';
+const CAPITAL_NAME: string = import.meta.env.VITE_CAPITAL_NAME || 'Capital';
+
 import { logger } from './logger.ts';
 import {
   type Axial,
@@ -666,9 +669,10 @@ export async function generateWorld(): Promise<World> {
     orphanRepos = reposWithTerrain.filter((r) => r.population <= 5 && !r.manualCoord);
   }
 
-  // ─── Exclude "gris" from repo cities — it becomes the standalone capital ────
-  cityRepos = cityRepos.filter((r) => !(r.path.endsWith('gris') || r.name === 'gris'));
-  orphanRepos = orphanRepos.filter((r) => !(r.path.endsWith('gris') || r.name === 'gris'));
+  // ─── Exclude the capital repo folder from regular cities ─────────────────────
+  const _capSlug = CAPITAL_NAME.toLowerCase();
+  cityRepos = cityRepos.filter((r) => !(r.path.endsWith(_capSlug) || r.name === _capSlug));
+  orphanRepos = orphanRepos.filter((r) => !(r.path.endsWith(_capSlug) || r.name === _capSlug));
 
   const maxAutoCoords = Math.max(
     cityRepos.length * MIN_CITY_DISTANCE * MIN_CITY_DISTANCE * 3,
@@ -678,7 +682,7 @@ export async function generateWorld(): Promise<World> {
   const occupiedCoords = new Set<string>();
   const cityCoordLookup = new Map<string, Axial>();
   // Reserve capital + wonder district hexes so repos don't land on them
-  occupiedCoords.add(tileKey({ q: 0, r: 0 })); // capital Gris
+  occupiedCoords.add(tileKey({ q: 0, r: 0 })); // capital
   occupiedCoords.add(tileKey({ q: -1, r: 0 })); // Bibliotheca
   occupiedCoords.add(tileKey({ q: 1, r: 0 })); // LabHub
   let autoCoordCursor = 0;
@@ -842,7 +846,7 @@ export async function generateWorld(): Promise<World> {
   const totalScience = reposWithTerrain.reduce((acc, r) => acc + r.science, 0);
   const totalProduction = reposWithTerrain.reduce((acc, r) => acc + r.production, 0);
 
-  // ─── Spawn Capital "Gris" + Wonder Districts ──────────────────────────────────
+  // ─── Spawn Capital + Wonder Districts ────────────────────────────────────────
   const capCoord: Axial = { q: 0, r: 0 };
   const bibliothecaCoord: Axial = { q: -1, r: 0 }; // west neighbor
   const institutumCoord: Axial = { q: 1, r: 0 }; // east neighbor
@@ -852,7 +856,7 @@ export async function generateWorld(): Promise<World> {
     name: 'Bibliotheca Alexandrina',
     type: 'wonder',
     wonderType: 'bibliotheca',
-    cityId: 'gris',
+    cityId: CAPITAL_ID,
     progress: 100,
     durationSeconds: 0,
     elapsedSeconds: 0,
@@ -863,7 +867,7 @@ export async function generateWorld(): Promise<World> {
     name: 'Institutum Scientiarum',
     type: 'wonder',
     wonderType: 'institutum',
-    cityId: 'gris',
+    cityId: CAPITAL_ID,
     progress: 100,
     durationSeconds: 0,
     elapsedSeconds: 0,
@@ -888,8 +892,8 @@ export async function generateWorld(): Promise<World> {
   const territory = spiralCoords(capCoord, 7).slice(1, 7); // 6 neighbours at radius 1
 
   const capitalCity: City = {
-    id: 'gris',
-    name: 'Gris',
+    id: CAPITAL_ID,
+    name: CAPITAL_NAME,
     coord: capCoord,
     population: 1,
     territory,

@@ -3,7 +3,7 @@ import { parseBridgeEvent, describeBridgeEventError } from './bridgeSchema.ts';
 
 describe('parseBridgeEvent', () => {
   it('accepts a valid unit_spawn event', () => {
-    const evt = parseBridgeEvent({ type: 'unit_spawn', unit: 'DAVI', civ: 'gris', hex: [0, 0] });
+    const evt = parseBridgeEvent({ type: 'unit_spawn', unit: 'DAVI', civ: 'capital', hex: [0, 0] });
     expect(evt).not.toBeNull();
     expect(evt?.type).toBe('unit_spawn');
   });
@@ -12,7 +12,7 @@ describe('parseBridgeEvent', () => {
     const evt = parseBridgeEvent({
       type: 'unit_spawn',
       unit: 'DAVI',
-      civ: 'gris',
+      civ: 'capital',
       hex: [3, -1],
       mission: 'scout area',
       unitType: 'hero',
@@ -21,12 +21,12 @@ describe('parseBridgeEvent', () => {
   });
 
   it('rejects unit_spawn with missing unit', () => {
-    const evt = parseBridgeEvent({ type: 'unit_spawn', civ: 'gris', hex: [0, 0] });
+    const evt = parseBridgeEvent({ type: 'unit_spawn', civ: 'capital', hex: [0, 0] });
     expect(evt).toBeNull();
   });
 
   it('rejects unit_spawn with hex containing non-numbers', () => {
-    const evt = parseBridgeEvent({ type: 'unit_spawn', unit: 'X', civ: 'gris', hex: ['a', 'b'] });
+    const evt = parseBridgeEvent({ type: 'unit_spawn', unit: 'X', civ: 'capital', hex: ['a', 'b'] });
     expect(evt).toBeNull();
   });
 

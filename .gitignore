@@ -43,6 +43,14 @@ shared/provider-registry.json
 .idea/
 .vscode/
 
+# Internal maintainer docs (not part of the public project)
+TODOS.md
+REFACTOR_PLAN.md
+WORKER_FIX_PLAN.md
+CODEX_HARNESS_INTEGRATION.md
+README_PUBLICO.md
+execplan/
+
 # Logs
 *.log
 

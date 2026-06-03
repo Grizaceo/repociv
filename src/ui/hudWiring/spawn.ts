@@ -76,7 +76,7 @@ export function spawnAgent(
     CODEX: 'codex',
   };
   const type = typeMap[base] ?? 'hero';
-  const unit = state.spawnUnit(unitId, unitId, type, 'gris', coord, 'En espera de misión');
+  const unit = state.spawnUnit(unitId, unitId, type, 'capital', coord, 'En espera de misión');
 
   // Seed harness default for units that map 1:1 to a harness selector
   if (base === 'CODEX') {
