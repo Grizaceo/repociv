@@ -8,7 +8,7 @@
 
 **Stack:** TypeScript + Vite (Canvas 2D) · Python HTTP bridge · DuckDB/JSONL ledger local
 
-![RepoCiv hex map](docs/design/screenshot-placeholder.png)
+![RepoCiv demo](docs/design/screenshots/repociv-demo.gif)
 
 ---
 
