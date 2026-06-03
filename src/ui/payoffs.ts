@@ -121,26 +121,11 @@ export function hornSound() {
   }
 }
 
-/** Pan de cámara suave hacia una coordenada hex (renderer hook) */
-export function panCameraTo(
-  renderer: { panTo: (x: number, y: number) => void } | null,
-  worldX: number,
-  worldY: number,
-) {
-  if (!renderer) return;
-  renderer.panTo(worldX, worldY);
-}
-
 /** Complete mission celebration pipeline */
-export function celebrateMission(
-  canvas: HTMLCanvasElement,
-  renderer: { panTo: (x: number, y: number) => void } | null,
-  worldPos: { x: number; y: number },
-) {
+export function celebrateMission(canvas: HTMLCanvasElement) {
   flashGlory(canvas, 0.35);
   confettiBurst(canvas, canvas.width / 2, canvas.height / 2);
   hornSound();
-  panCameraTo(renderer, worldPos.x, worldPos.y);
 }
 
 /** City discovered celebration */

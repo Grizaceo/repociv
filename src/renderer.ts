@@ -168,8 +168,6 @@ export class Renderer {
     this.canvas.height = window.innerHeight;
     this.cam.cx = this.canvas.width / 2;
     this.cam.cy = this.canvas.height / 2;
-    this.cam.x = 0;
-    this.cam.y = 0;
   }
 
   private setupInput() {
