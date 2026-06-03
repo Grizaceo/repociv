@@ -48,6 +48,10 @@ function render() {
   warnVal.textContent = `${Math.round(c.fatigue.warnThreshold * 100)}%`;
   critVal.textContent = `${Math.round(c.fatigue.criticalThreshold * 100)}%`;
 
+  // Trust toggles
+  const autoApproveChat = panel.querySelector<HTMLInputElement>('#set-auto-approve-chat')!;
+  autoApproveChat.checked = c.trust.autoApproveChat;
+
   // Animation toggle
   const skipAnim = panel.querySelector<HTMLInputElement>('#set-skip-anim')!;
   skipAnim.checked = c.animations.skipAll;
@@ -103,6 +107,19 @@ function buildDOM() {
         </div>
       </section>
 
+      <!-- ── TRUST / APPROVALS ───────────────────────────────────────────────── -->
+      <section class="settings-section">
+        <h3 class="settings-section-title">Confianza y Aprobaciones</h3>
+
+        <div class="setting-row setting-row--toggle">
+          <label class="toggle-label" for="set-auto-approve-chat">
+            <input type="checkbox" id="set-auto-approve-chat" class="setting-check" />
+            <span class="toggle-text">Auto-aprobar comandos de chat</span>
+          </label>
+          <span class="setting-desc">Enviar mensaje equivale a aprobarlo — omite la tarjeta de aprobación para <code>execute_agent</code></span>
+        </div>
+      </section>
+
       <!-- ── ANIMATIONS ────────────────────────────────────────────────────── -->
       <section class="settings-section">
         <h3 class="settings-section-title">Animaciones</h3>
@@ -153,6 +170,7 @@ function buildDOM() {
   const critVal = panel.querySelector<HTMLElement>('#set-fatigue-crit-val')!;
   const skipAnim = panel.querySelector<HTMLInputElement>('#set-skip-anim')!;
   const modelInput = panel.querySelector<HTMLInputElement>('#set-models')!;
+  const autoApproveChatEl = panel.querySelector<HTMLInputElement>('#set-auto-approve-chat')!;
 
   const closeHandler = () => closeSettingsPanel();
   closeBtn.addEventListener('click', closeHandler);
@@ -167,6 +185,7 @@ function buildDOM() {
     warnVal.textContent = `${Math.round(def.fatigue.warnThreshold * 100)}%`;
     critVal.textContent = `${Math.round(def.fatigue.criticalThreshold * 100)}%`;
     skipAnim.checked = def.animations.skipAll;
+    autoApproveChatEl.checked = def.trust.autoApproveChat;
     modelInput.value = '';
     applyAnimConfig(def);
   });
@@ -184,6 +203,7 @@ function buildDOM() {
   });
 
   skipAnim.addEventListener('change', persistFromDOM);
+  autoApproveChatEl.addEventListener('change', persistFromDOM);
 
   modelInput.addEventListener('change', persistFromDOM);
 
@@ -233,6 +253,11 @@ function persistFromDOM() {
         .value.split(',')
         .map((s) => s.trim())
         .filter(Boolean),
+    },
+    trust: {
+      ...c.trust,
+      autoApproveChat:
+        panel.querySelector<HTMLInputElement>('#set-auto-approve-chat')!.checked,
     },
   };
   saveConfig(newCfg);

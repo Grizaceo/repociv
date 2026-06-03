@@ -305,18 +305,18 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
 
     # OPENCLAW bypass: always direct to OpenClaw regardless of harness selector
     if base == "OPENCLAW":
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: openclaw]\n"})
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: openclaw", "level": "info"})
         return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
     # CLAUDE bypass: always direct to claude-code regardless of harness selector
     if base == "CLAUDE":
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: claude-code (bypass)]\n"})
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: claude-code (bypass)", "level": "info"})
         return _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                           model=model or provider)
 
     # CODEX bypass: always direct to codex regardless of harness selector
     if base == "CODEX":
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: codex (bypass)]\n"})
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: codex (bypass)", "level": "info"})
         return _run_codex_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                     model=model or provider)
 
@@ -325,8 +325,7 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
     # The provider+model are passed through to the harness runner so it can
     # pick the right API endpoint and model ID.
     if harness and harness != "auto":
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
-                          "text": f"[harness: {harness}]\n"})
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: {harness}", "level": "info"})
         if harness == "openclaw" and _has_openclaw():
             return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                            model=model or provider)
@@ -344,17 +343,14 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
             # which always routes to the main profile (DAVI).
             if config.get("profile"):
                 if _has_hermes_cli():
-                    send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
-                                      "text": "[profile hermes-cli]\n"})
+                    send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: hermes-cli (profile)", "level": "info"})
                     return _run_hermes_cli_streaming(unit_id, mission_id, mission, config, working_dir,
                                                      city_id, model=model or provider)
-                send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
-                                  "text": "[warn: perfil configurado pero hermes CLI no encontrado]\n"})
+                send_to_repociv({"type": "log", "msg": f"[{unit_id}] perfil configurado pero hermes CLI no encontrado", "level": "warn"})
             return _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                          model=model or provider)
         # Unknown harness — fall through to cascade with a warning
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
-                          "text": f"[warn: harness '{harness}' no reconocido, usando cascade]\n"})
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness '{harness}' no reconocido, usando cascade", "level": "warn"})
 
     # ── Default cascade: hermes → claude-code → openclaw ────────────────────
 
@@ -363,26 +359,25 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
     # skills, SOUL.md, memory, subagents, etc.
     if config.get("profile"):
         if _has_hermes_cli():
-            send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: hermes-cli]\n"})
+            send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: hermes-cli", "level": "info"})
             return _run_hermes_cli_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                              model=model or provider)
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
-                          "text": "[warn: perfil configurado pero hermes CLI no encontrado — cayendo a HTTP]\n"})
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] perfil configurado pero hermes CLI no encontrado — cayendo a HTTP", "level": "warn"})
 
-    send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: hermes]\n"})
+    send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: hermes", "level": "info"})
     success, output = _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model or provider)
     if success:
         return success, output
 
-    send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[hermes falló → probando claude-code]\n"})
+    send_to_repociv({"type": "log", "msg": f"[{unit_id}] hermes falló → probando claude-code", "level": "warn"})
     if _has_claude_code():
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[harness: claude-code]\n"})
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: claude-code (fallback)", "level": "info"})
         success, output = _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model or provider)
         if success:
             return success, output
 
     if _has_openclaw():
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": "[fallback openclaw]\n"})
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: openclaw (fallback)", "level": "info"})
         return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model or provider)
 
     msg = "[offline] Ningún adaptador de agente disponible (hermes, claude-code, openclaw). Sin ejecución real.\n"

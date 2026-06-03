@@ -19,6 +19,10 @@ export interface GameConfig {
   models: {
     allowed: string[]; // Model names; empty array = all permitted
   };
+  // Trust / approval shortcuts
+  trust: {
+    autoApproveChat: boolean; // Auto-approve execute_agent commands without showing card
+  };
 }
 
 // ─── Valibot schema (lenient: all nested fields optional to allow partial updates) ──
@@ -40,6 +44,11 @@ const GameConfigSchema = v.object({
       allowed: v.optional(v.array(v.string())),
     }),
   ),
+  trust: v.optional(
+    v.object({
+      autoApproveChat: v.optional(v.boolean()),
+    }),
+  ),
 });
 
 const DEFAULT_CONFIG: GameConfig = {
@@ -53,6 +62,9 @@ const DEFAULT_CONFIG: GameConfig = {
   },
   models: {
     allowed: [], // empty = all models allowed by default
+  },
+  trust: {
+    autoApproveChat: true, // auto-approve chat commands (execute_agent) by default
   },
 };
 
@@ -114,6 +126,9 @@ export const cfg = {
   },
   get models() {
     return loadConfig().models;
+  },
+  get trust() {
+    return loadConfig().trust;
   },
 };
 
