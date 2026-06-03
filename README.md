@@ -10,6 +10,11 @@
 
 ![RepoCiv demo](docs/design/screenshots/repociv-demo.gif)
 
+| | |
+|---|---|
+| ![](docs/design/screenshots/ss1.jpg) | ![](docs/design/screenshots/ss2.jpg) |
+| ![](docs/design/screenshots/ss3.jpg) | ![](docs/design/screenshots/ss4.jpg) |
+
 ---
 
 ## ¿Qué es esto?
