@@ -59,13 +59,13 @@ _TYPE_POLICY: dict[str, PolicyDecision] = {
     "run_build":     "auto-safe",
     "quest_add":     "auto-safe",   # low-risk bookkeeping
     "unit_command":  "auto-safe",   # legacy compat — already gated by UX
+    "execute_agent": "auto-safe",   # chat flow — gated by UX (user types and sends)
     "e2e_probe":     "auto-safe",   # browser→bridge→event probe, no external agent
     "edit_file":     "approve",
     "create_branch": "approve",
     "git_commit":    "approve",
     "send_message":  "approve",
     "delete_file":   "approve",     # destructive but not blocked; needs explicit ok
-    "execute_agent": "approve",
 }
 
 

@@ -92,7 +92,7 @@ def test_nemoclaw_sandbox_harness_run_tests_auto_safe():
         ("git_commit",   "approve"),
         ("send_message", "approve"),
         ("delete_file",  "approve"),
-        ("execute_agent","approve"),
+        ("execute_agent","auto-safe"),
     ],
 )
 def test_type_policy_table(cmd_type: str, expected: str):

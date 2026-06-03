@@ -7,6 +7,7 @@ export {
   appendChatChunk,
   appendUserMessage,
   appendSystemMessage,
+  appendApprovalCard,
   resetChatHistory,
   clearChat,
 } from './chat/history.ts';

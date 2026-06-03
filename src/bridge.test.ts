@@ -6,18 +6,14 @@ import * as loggerMod from './logger.ts';
 vi.mock('./ui/index.ts', () => ({
   logEvent: vi.fn(),
   appendChatChunk: vi.fn(),
+  appendApprovalCard: vi.fn(),
   setBridgeStatus: vi.fn(),
   setOperationTicker: vi.fn(),
   updateGpuBar: vi.fn(),
   showNotification: vi.fn(),
 }));
 
-vi.mock('./ui/approvalPanel.ts', () => ({
-  openApprovalPanel: vi.fn(),
-}));
-
 import * as uiMod from './ui/index.ts';
-import * as approvalMod from './ui/approvalPanel.ts';
 
 class FakeEventSource {
   static instances: FakeEventSource[] = [];
@@ -313,9 +309,9 @@ describe('BridgeEvents handleBridgeEvent', () => {
     bridge.stop();
   });
 
-  it('waiting_approval opens approval panel', async () => {
-    const openApprovalPanel = vi.mocked(approvalMod.openApprovalPanel);
-    openApprovalPanel.mockClear();
+  it('waiting_approval shows inline approval card in chat', async () => {
+    const appendApprovalCard = vi.mocked(uiMod.appendApprovalCard);
+    appendApprovalCard.mockClear();
     const state = makeState();
     const bridge = new BridgeEvents(state);
     bridge.start();
@@ -329,7 +325,9 @@ describe('BridgeEvents handleBridgeEvent', () => {
       target: 'repociv',
       risk: 'high',
     });
-    expect(openApprovalPanel).toHaveBeenCalled();
+    expect(appendApprovalCard).toHaveBeenCalledWith(
+      'repociv', 'cmd-1', 'execute_agent', 'repociv', 'high',
+    );
     bridge.stop();
   });
 

@@ -5,20 +5,20 @@
 
 import { type GameState } from './game.ts';
 import { type BridgeEvent, type CDailyArticle } from './types.ts';
-import { axialToPixel } from './hex.ts';
-import { HEX_SIZE } from './constants.ts';
 import type { SuggestionRelation as WonderSuggestionRelation } from './wonders/types.ts';
 import { logger } from './logger.ts';
 import { parseBridgeEvent, describeBridgeEventError } from './bridgeSchema.ts';
 import {
   logEvent,
   appendChatChunk,
+  appendApprovalCard,
   setBridgeStatus,
   setOperationTicker,
   updateGpuBar,
   showNotification,
 } from './ui/index.ts';
-import { openApprovalPanel } from './ui/approvalPanel.ts';
+import { cfg } from './gameConfig.ts';
+import { approveCommand } from './commandBus.ts';
 import { terminalPanel } from './terminalPanel.ts';
 import { bridgeHeaders, bridgeUrl, BRIDGE_URL } from './bridgeEnv.ts';
 import { RepoCivWebSocket } from './websocket.ts';
@@ -365,11 +365,9 @@ export class BridgeEvents {
           playSound('mission');
           // Visual celebration — lazy import keeps payoffs out of the initial bundle
           const canvas = document.getElementById('main-canvas') as HTMLCanvasElement | null;
-          const unit = this.state.getUnit(evt.unit);
-          if (canvas && unit) {
-            const worldPos = axialToPixel(unit.coord, HEX_SIZE);
+          if (canvas) {
             import('./ui/payoffs.ts').then(({ celebrateMission }) => {
-              celebrateMission(canvas, this.rendererRef, worldPos);
+              celebrateMission(canvas);
             });
           }
         }
@@ -435,13 +433,21 @@ export class BridgeEvents {
         logEvent(`${evt.unit} salió del área de descanso`, 'info');
         break;
       }
-      case 'waiting_approval':
+      case 'waiting_approval': {
+        // Auto-approve execute_agent (chat) when the setting is on — user already
+        // expressed intent by typing and sending the message.
+        if (evt.commandType === 'execute_agent' && cfg.trust.autoApproveChat) {
+          void approveCommand(evt.commandId);
+          break;
+        }
         logEvent(
           `⏳ Aprobación requerida: ${evt.commandType} → ${evt.target} [${evt.risk}]`,
           'warn',
         );
-        openApprovalPanel();
+        const approvalUnit = evt.target;
+        appendApprovalCard(approvalUnit, evt.commandId, evt.commandType, evt.target, evt.risk);
         break;
+      }
       case 'context_exhausted': {
         logEvent(`⚠ Contexto agotado para ${evt.unit}`, 'warn');
         break;

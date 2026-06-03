@@ -11,6 +11,7 @@ import { COPY_SVG, attachCopyListeners, escapeHtml, hasErrorLine } from './clipb
 import { renderMarkdown } from './markdown.ts';
 import { ensureChipExists } from './agentChip.ts';
 import { renderEmptyState, clearEmptyState } from '../emptyStates.ts';
+import { approveCommand, rejectCommand } from '../../commandBus.ts';
 
 /** Render the chat history for a specific unit */
 export function renderChatHistory(unitId: string): void {
@@ -249,6 +250,83 @@ export function appendSystemMessage(unitId: string, text: string): void {
   msg.innerHTML = `<div class="chat-body">${renderMarkdown(text)}</div>`;
   container.appendChild(msg);
   container.scrollTop = container.scrollHeight;
+}
+
+const RISK_COLOR: Record<string, string> = {
+  low: 'var(--civ-food)',
+  medium: 'var(--ui-gold)',
+  high: 'var(--civ-happiness)',
+  destructive: 'var(--civ-happiness)',
+};
+
+/** Inline approval card — injected in the agent's chat when a command needs human confirmation. */
+export function appendApprovalCard(
+  unitId: string,
+  commandId: string,
+  commandType: string,
+  target: string,
+  risk: string,
+): void {
+  const container = document.getElementById('chat-messages');
+  if (!container) return;
+
+  const riskVar = RISK_COLOR[risk] ?? 'var(--ui-gold)';
+  const card = document.createElement('div');
+  card.className = 'chat-msg system chat-approval-card';
+  card.dataset['commandId'] = commandId;
+  card.innerHTML = `
+    <div class="chat-body approval-strip">
+      <span class="approval-icon" style="color:${riskVar}">⏳</span>
+      <span class="approval-label"><span class="approval-type">${escapeHtml(commandType)}</span><span class="approval-sep">→</span><span class="approval-target">${escapeHtml(target)}</span><span class="approval-risk" style="color:${riskVar}">[${escapeHtml(risk)}]</span></span>
+      <span class="approval-actions">
+        <button class="approval-btn approval-approve" data-cmd="${escapeHtml(commandId)}">✓</button>
+        <button class="approval-btn approval-reject" data-cmd="${escapeHtml(commandId)}">✗</button>
+      </span>
+    </div>`;
+
+  const approveBtn = card.querySelector<HTMLButtonElement>('.approval-approve');
+  const rejectBtn = card.querySelector<HTMLButtonElement>('.approval-reject');
+
+  function freeze(approved: boolean) {
+    const strip = card.querySelector<HTMLElement>('.approval-strip');
+    if (strip) {
+      const label = strip.querySelector<HTMLElement>('.approval-label');
+      const actions = strip.querySelector<HTMLElement>('.approval-actions');
+      if (actions) actions.remove();
+      if (label) {
+        const result = document.createElement('span');
+        result.className = 'approval-result';
+        result.style.color = approved ? 'var(--civ-food)' : 'var(--civ-happiness)';
+        result.textContent = approved ? '✓ Aprobado' : '✗ Rechazado';
+        strip.appendChild(result);
+      }
+      const icon = strip.querySelector<HTMLElement>('.approval-icon');
+      if (icon) icon.textContent = approved ? '✓' : '✗';
+      icon?.style.setProperty('color', approved ? 'var(--civ-food)' : 'var(--civ-happiness)');
+    }
+  }
+
+  approveBtn?.addEventListener('click', () => {
+    freeze(true);
+    void approveCommand(commandId);
+  });
+  rejectBtn?.addEventListener('click', () => {
+    freeze(false);
+    void rejectCommand(commandId);
+  });
+
+  container.appendChild(card);
+  container.scrollTop = container.scrollHeight;
+
+  // Mark the agent as having new messages if not active
+  if (getActiveChatUnit() !== unitId) {
+    agentsWithNewMessages.add(unitId);
+    ensureChipExists(unitId);
+    const chip = document.querySelector<HTMLElement>(
+      `.chat-agent-chip[data-unit="${unitId}"] .chip-badge`,
+    );
+    if (chip) chip.classList.add('active');
+  }
 }
 
 export function clearChat(unitId: string): void {
