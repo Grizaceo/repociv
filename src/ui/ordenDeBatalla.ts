@@ -4,6 +4,8 @@ import type { SubagentRun, Unit } from '../types.ts';
 import { sortSubagentsForDisplay } from '../priorityMatrix.ts';
 import { getSelectedConfig, isSwarmTrackingAvailable } from './chat/modelSelector.ts';
 import { isLayerVisible } from '../layers.ts';
+import { openSubagentSession, recallSubagent } from './subagentSessionPanel.ts';
+import { appendSystemMessage } from './chat/history.ts';
 
 let _highlightCb: ((unitId: string | null) => void) | null = null;
 
@@ -11,11 +13,12 @@ export function setOrdenHighlightCallback(cb: (unitId: string | null) => void): 
   _highlightCb = cb;
 }
 
-export type OrdenDisplayStatus = 'pending' | 'working' | 'done' | 'failed';
+export type OrdenDisplayStatus = 'pending' | 'working' | 'done' | 'failed' | 'cancelled';
 
 export function displayStatus(s: SubagentRun): OrdenDisplayStatus {
   if (s.status === 'proposed') return 'pending';
   if (s.status === 'running') return 'working';
+  if (s.status === 'cancelled') return 'cancelled';
   if (s.status === 'failed') return 'failed';
   return 'done';
 }
@@ -30,6 +33,8 @@ function statusChipLabel(d: OrdenDisplayStatus): string {
       return 'Hecho';
     case 'failed':
       return 'Falló';
+    case 'cancelled':
+      return 'Recall';
   }
 }
 
@@ -109,6 +114,12 @@ export function renderOrdenDeBatalla(state: GameState, unit: Unit): void {
 
   const activeRows = active.map((s) => rowHtml(s)).join('');
   const recentRows = recent.map((s) => rowHtml(s, true)).join('');
+  const highlightId = state.highlightedSubagentId;
+  const recallTarget =
+    highlightId && active.some((s) => s.id === highlightId && s.status === 'running')
+      ? highlightId
+      : active.find((s) => s.status === 'running')?.id;
+  const canRecall = !!recallTarget;
 
   root.innerHTML = `
     <details class="orden-panel" open>
@@ -125,19 +136,38 @@ export function renderOrdenDeBatalla(state: GameState, unit: Unit): void {
           : ''
       }
       <div class="orden-recall-row">
-        <button type="button" class="orden-recall-btn" disabled title="Próximamente">Recall</button>
-        <span class="orden-recall-hint">Cancelación real reservada para fase 6</span>
+        <button type="button" class="orden-recall-btn" ${canRecall ? '' : 'disabled'} data-recall="${recallTarget ?? ''}" title="Cancelar subagente en ejecución">Recall</button>
+        <button type="button" class="orden-session-btn" data-session="${highlightId ?? active[0]?.id ?? recent[0]?.id ?? ''}" title="Ver sesión (Alt+↑)">Sesión</button>
+        <span class="orden-recall-hint">${canRecall ? 'Recall · /subagent · Alt+↑' : 'Selecciona fila activa para Recall'}</span>
       </div>
     </details>
   `;
 
   root.querySelectorAll('.orden-row').forEach((el) => {
+    el.classList.toggle('orden-row--selected', el.getAttribute('data-subagent') === highlightId);
     el.addEventListener('click', () => {
       const subId = el.getAttribute('data-subagent');
       const unitId = el.getAttribute('data-unit');
       state.highlightedSubagentId = subId;
       if (unitId) _highlightCb?.(unitId);
+      renderOrdenDeBatalla(state, unit);
     });
+    el.addEventListener('dblclick', () => {
+      const subId = el.getAttribute('data-subagent');
+      if (subId) openSubagentSession(subId);
+    });
+  });
+
+  root.querySelector('.orden-recall-btn')?.addEventListener('click', async () => {
+    const sid = root.querySelector<HTMLButtonElement>('.orden-recall-btn')?.dataset['recall'];
+    if (!sid) return;
+    const result = await recallSubagent(sid);
+    appendSystemMessage(unit.id, result.ok ? `✓ Recall: ${result.message}` : `❌ Recall: ${result.message}`);
+  });
+
+  root.querySelector('.orden-session-btn')?.addEventListener('click', () => {
+    const sid = root.querySelector<HTMLButtonElement>('.orden-session-btn')?.dataset['session'];
+    if (sid) openSubagentSession(sid);
   });
 }
 

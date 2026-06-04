@@ -134,6 +134,7 @@ const Schemas = [
     summary: v.string(),
     duration: v.number(),
     ephemeralUnitId: v.optional(v.string()),
+    outputFilePath: v.optional(v.string()),
   }),
   v.object({
     type: v.literal('subagent_proposed'),

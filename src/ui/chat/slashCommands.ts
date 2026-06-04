@@ -12,6 +12,14 @@
 import { bridgeHeaders, bridgeUrl } from '../../bridgeEnv.ts';
 import { getSelectedConfig } from './modelSelector.ts';
 import { resetChatHistory } from './history.ts';
+import type { GameState } from '../../game.ts';
+import { openSubagentSession } from '../subagentSessionPanel.ts';
+
+let _gameState: GameState | null = null;
+
+export function bindSlashCommandState(state: GameState): void {
+  _gameState = state;
+}
 
 type AppendFn = (unitId: string, text: string, role?: 'system') => void;
 
@@ -163,6 +171,39 @@ _register('model', {
     }
     return true;
   },
+});
+
+// ─── /subagent — open background subagent session viewer ─────────────────────
+
+_register('subagent', {
+  description: 'Abre la sesión del subagente seleccionado (Orden de batalla). Alias: /detach',
+  run: async (args, unitId, append) => {
+    const state = _gameState;
+    if (!state) {
+      append(unitId, '❌ Estado del juego no disponible.', 'system');
+      return true;
+    }
+    const id = state.resolveSubagentId(args.trim() || null, unitId);
+    if (!id) {
+      append(
+        unitId,
+        '❌ Sin subagente. Selecciona una fila en Orden de batalla o usa `/subagent <sub-id>`.',
+        'system',
+      );
+      return true;
+    }
+    if (!openSubagentSession(id)) {
+      append(unitId, `❌ Subagente no encontrado: \`${id}\``, 'system');
+      return true;
+    }
+    append(unitId, `✓ Sesión subagente: \`${id}\` (panel inferior)`, 'system');
+    return true;
+  },
+});
+
+_register('detach', {
+  description: 'Alias de /subagent.',
+  run: async (args, unitId, append) => _commands['subagent']!.run(args, unitId, append),
 });
 
 // ─── /retry ──────────────────────────────────────────────────────────────────

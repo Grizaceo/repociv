@@ -260,14 +260,17 @@ def register_complete(
         "phase": "complete",
         "text": (summary or "")[:256],
     })
-    _send({
+    complete_evt: dict[str, Any] = {
         "type": "subagent_complete",
         "subagentId": subagent_id,
         "success": success,
         "summary": run["summary"],
         "duration": duration,
         "ephemeralUnitId": run["ephemeralUnitId"],
-    })
+    }
+    if run.get("outputFilePath"):
+        complete_evt["outputFilePath"] = run["outputFilePath"]
+    _send(complete_evt)
     _send({"type": "unit_despawn", "unit": run["ephemeralUnitId"]})
     return run
 
@@ -452,8 +455,67 @@ def on_task_complete(
     register_complete(sid, success=success, summary=summary)
 
 
+def _try_terminate_child(run: dict[str, Any]) -> bool:
+    """Best-effort kill of a tracked child PID (Hermes CLI only when wired)."""
+    pid = run.get("childPid") or run.get("child_pid")
+    if not pid:
+        return False
+    try:
+        import os
+        import signal
+
+        os.kill(int(pid), signal.SIGTERM)
+        return True
+    except (OSError, ProcessLookupError, ValueError):
+        return False
+
+
 def request_cancel(subagent_id: str) -> dict[str, Any]:
-    return {"ok": False, "error": "not_implemented", "subagentId": subagent_id}
+    """Recall: mark cancelled, emit bridge events, despawn ephemeral unit.
+
+    Cursor/Claude Task children are not owned by RepoCiv — we cannot SIGTERM them.
+    UI state still updates so Orden de batalla reflects the recall.
+    """
+    with _lock:
+        run = _runs.get(subagent_id)
+        if not run:
+            return {"ok": False, "error": "not_found", "subagentId": subagent_id}
+        status = run.get("status")
+        if status not in ("proposed", "running"):
+            return {
+                "ok": False,
+                "error": "not_active",
+                "subagentId": subagent_id,
+                "status": status,
+            }
+        run = dict(run)
+
+    terminated = _try_terminate_child(run)
+    _send({
+        "type": "subagent_cancel",
+        "subagentId": subagent_id,
+        "reason": "user_recall",
+        "childTerminated": terminated,
+    })
+    register_complete(
+        subagent_id,
+        success=False,
+        summary="cancelled by user (Recall)",
+    )
+    with _lock:
+        if subagent_id in _runs:
+            _runs[subagent_id]["status"] = "cancelled"
+            _ledger_write(dict(_runs[subagent_id]))
+    return {
+        "ok": True,
+        "subagentId": subagent_id,
+        "childTerminated": terminated,
+        "note": (
+            "child process terminated"
+            if terminated
+            else "UI cancelled; Cursor/Hermes Task child not killable from bridge"
+        ),
+    }
 
 
 def request_dispatch(
@@ -551,8 +613,31 @@ def _handle_tool_result(data: dict[str, Any]) -> bool:
     else:
         text = str(content)
     is_error = bool(data.get("is_error") or data.get("isError"))
+    output_path = _extract_output_file_path(text)
+    if output_path and tool_use_id:
+        with _lock:
+            sid = _tool_use_map.get(tool_use_id)
+            if sid and sid in _runs:
+                _runs[sid]["outputFilePath"] = output_path
     on_task_complete(tool_use_id=tool_use_id, success=not is_error, summary=text[:1024])
     return True
+
+
+def _extract_output_file_path(text: str) -> str:
+    """Parse Task tool_result for background subagent output_file path."""
+    if not text:
+        return ""
+    try:
+        data = json.loads(text) if text.strip().startswith("{") else {}
+        if isinstance(data, dict):
+            for key in ("output_file", "outputFile", "output_file_path"):
+                val = data.get(key)
+                if isinstance(val, str) and val.strip():
+                    return val.strip()
+    except json.JSONDecodeError:
+        pass
+    m = re.search(r'output_file["\']?\s*[:=]\s*["\']?([^"\'\s]+)', text)
+    return m.group(1).strip() if m else ""
 
 
 def process_cursor_ndjson_line(

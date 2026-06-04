@@ -49,10 +49,40 @@ def test_infer_target_city():
     assert st.infer_target_city("explore /home/gris/.hermes/workspace/repos/other", "repociv") == "other"
 
 
-def test_request_cancel_stub():
+def test_request_cancel_not_found():
     result = st.request_cancel("sub-deadbeef")
     assert result["ok"] is False
-    assert "not_implemented" in result["error"]
+    assert result["error"] == "not_found"
+
+
+def test_request_cancel_running(monkeypatch, tmp_path):
+    _reset_tracker()
+    sent = []
+    es.init(tmp_path)
+    st.configure(send=lambda e: sent.append(e))
+
+    run = st.register_spawn(
+        parent_mission_id="m1",
+        parent_unit="DAVI",
+        kind="explore",
+        label="scan",
+        parent_city="repociv",
+    )
+    result = st.request_cancel(run["id"])
+    assert result["ok"] is True
+    assert any(e["type"] == "subagent_cancel" for e in sent)
+    complete = next(e for e in sent if e["type"] == "subagent_complete")
+    assert complete["success"] is False
+    assert any(e["type"] == "unit_despawn" for e in sent)
+    assert st.list_active("DAVI") == []
+    finished = st.get_run(run["id"])
+    assert finished is not None
+    assert finished["status"] == "cancelled"
+
+
+def test_extract_output_file_path():
+    text = '{"output_file":"/tmp/agent-out.txt","summary":"done"}'
+    assert st._extract_output_file_path(text) == "/tmp/agent-out.txt"
 
 
 def test_register_spawn_includes_status_in_event(monkeypatch, tmp_path):

@@ -140,6 +140,16 @@ def get_missions(ctx: "RouteContext") -> tuple[int, Any]:
     return 200, load_missions()
 
 
+def post_subagent_cancel(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
+    """POST /subagents/cancel — Recall a running subagent by id."""
+    from server import subagent_tracker as _st
+
+    subagent_id = str(body.get("subagentId") or body.get("subagent_id") or "").strip()
+    if not subagent_id:
+        return 400, {"ok": False, "error": "subagentId required"}
+    return 200, _st.request_cancel(subagent_id)
+
+
 def get_subagents(ctx: "RouteContext") -> tuple[int, Any]:
     from server import research_ledger as _rl
     from server import subagent_tracker as _st

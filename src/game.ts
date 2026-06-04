@@ -430,11 +430,23 @@ export class GameState {
   }
 
   completeSubagent(id: string, success: boolean, summary: string): void {
+    this._finishSubagent(id, success ? 'complete' : 'failed', summary);
+  }
+
+  cancelSubagent(id: string, summary = 'cancelled'): void {
+    this._finishSubagent(id, 'cancelled', summary);
+  }
+
+  private _finishSubagent(
+    id: string,
+    status: 'complete' | 'failed' | 'cancelled',
+    summary: string,
+  ): void {
     const run = this.subagents.get(id);
     if (!run) return;
     const finished: SubagentRun = {
       ...run,
-      status: success ? 'complete' : 'failed',
+      status,
       completedAt: Date.now(),
       summary,
     };
@@ -444,7 +456,21 @@ export class GameState {
     const ephemeralId = run.ephemeralUnitId ?? finished.ephemeralUnitId;
     if (ephemeralId) this.removeUnit(ephemeralId);
     this._local.removeSubagentUnit(ephemeralId ?? id);
+    if (this.highlightedSubagentId === id) this.highlightedSubagentId = null;
     this.notify();
+  }
+
+  resolveSubagentId(preferredId?: string | null, unitId?: string): string | null {
+    if (preferredId && (this.subagents.has(preferredId) || this.completedSubagents.some((s) => s.id === preferredId))) {
+      return preferredId;
+    }
+    if (unitId) {
+      const active = this.getSubagentsOfUnit(unitId).filter((s) => s.status === 'running');
+      if (active.length) return active[0]!.id;
+      const recent = this.completedSubagents.filter((s) => s.parentUnitId === unitId);
+      if (recent.length) return recent[0]!.id;
+    }
+    return this.highlightedSubagentId;
   }
 
   revealHexes(hexes: [number, number][], cityId?: string): void {

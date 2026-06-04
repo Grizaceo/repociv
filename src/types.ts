@@ -247,6 +247,8 @@ export interface SubagentRun {
   harness?: string;
   /** Last progress event timestamp for live Orden sorting. */
   lastProgressAt?: number;
+  /** Background Task output_file when reported by harness. */
+  outputFilePath?: string;
 }
 
 // ─── Rest Area (Phase 9: XCOM Context Fatigue) ─────────────────────────────
@@ -364,6 +366,7 @@ export type BridgeEvent =
       summary: string;
       duration: number;
       ephemeralUnitId?: string;
+      outputFilePath?: string;
     }
   | {
       type: 'subagent_proposed';

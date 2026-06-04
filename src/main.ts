@@ -70,6 +70,8 @@ import { trackPanelOpen } from './ui/analytics.ts';
 import { initBubbleLayer, updateBubble, clearAllBubbles } from './ui/actionBubbles.ts';
 import { openWonderVignette } from './ui/wonderVignette.ts';
 import { bindOrdenDeBatalla } from './ui/ordenDeBatalla.ts';
+import { bindSubagentSessionPanel } from './ui/subagentSessionPanel.ts';
+import { bindSlashCommandState } from './ui/chat/slashCommands.ts';
 import { getWonder } from './wonders/manifest.ts';
 import {
   inferCityLabStatus,
@@ -823,6 +825,8 @@ async function bootstrap() {
   };
   state.subscribe(refreshHero);
   bindOrdenDeBatalla(state);
+  bindSubagentSessionPanel(state);
+  bindSlashCommandState(state);
   refreshHero();
 }
 

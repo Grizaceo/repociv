@@ -545,7 +545,11 @@ export class BridgeEvents {
         break;
       }
       case 'subagent_complete':
+        if (evt.outputFilePath) {
+          this.state.updateSubagent(evt.subagentId, { outputFilePath: evt.outputFilePath });
+        }
         this.state.completeSubagent(evt.subagentId, evt.success, evt.summary);
+        break;
         logEvent(
           evt.success
             ? `✓ Subagente completado (${Math.round(evt.duration)}s)`
@@ -567,6 +571,7 @@ export class BridgeEvents {
         logEvent(`⏳ Subagente propuesto [${evt.risk}]: ${evt.label.slice(0, 40)}`, 'warn');
         break;
       case 'subagent_cancel':
+        this.state.cancelSubagent(evt.subagentId, 'cancelled by user (Recall)');
         logEvent(`Subagente cancelado: ${evt.subagentId}`, 'warn');
         break;
       default:

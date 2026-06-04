@@ -21,6 +21,7 @@ import {
 } from '../index.ts';
 import { isCursorTrackingAvailable } from '../chat/modelSelector.ts';
 import { handleSlashCommand } from '../chat/slashCommands.ts';
+import { openSubagentSession } from '../subagentSessionPanel.ts';
 import { toggleSettingsPanel } from '../settingsPanel.ts';
 import { toggleConstructionPanel } from '../constructionPanel.ts';
 import { spawnAgent } from './spawn.ts';
@@ -216,10 +217,32 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
   });
 
   document.getElementById('btn-chat-send')?.addEventListener('click', () => sendMessage(chatInput));
+  const tryOpenSubagentSession = (e: KeyboardEvent) => {
+    if (!e.altKey || e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    e.stopPropagation();
+    const chipActive = document.querySelector<HTMLElement>('.chat-agent-chip.active');
+    const unitId = chipActive?.dataset['unit'] ?? state.selectedUnit?.id;
+    if (!unitId) return;
+    const sid = state.resolveSubagentId(state.highlightedSubagentId, unitId);
+    if (sid) openSubagentSession(sid);
+    else appendSystemMessage(unitId, '❌ Sin subagente para abrir. Selecciona fila en Orden de batalla.');
+  };
+
   chatInput?.addEventListener('keydown', (e) => {
+    if (e.altKey && e.key === 'ArrowUp') {
+      tryOpenSubagentSession(e);
+      return;
+    }
     if (e.key === 'Enter') {
       e.stopPropagation();
       sendMessage(chatInput);
+    }
+  });
+
+  missionInput?.addEventListener('keydown', (e) => {
+    if (e.altKey && e.key === 'ArrowUp') {
+      tryOpenSubagentSession(e);
     }
   });
 
