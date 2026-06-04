@@ -490,6 +490,9 @@ export class BridgeEvents {
           ephemeralUnitId: evt.ephemeralUnitId,
           startedAt: Date.now(),
           unitType: evt.unitType,
+          parentHarness: evt.parentHarness,
+          harness: evt.harness ?? evt.parentHarness,
+          lastProgressAt: Date.now(),
         });
         if (spawnStatus === 'running') {
           const childIndex = parentUnit
@@ -519,15 +522,28 @@ export class BridgeEvents {
             label: evt.label,
             repoId: evt.targetCityId ?? parentUnit?.cityId ?? '',
           });
+          this.state.setUnitState(evt.ephemeralUnitId, 'working');
           logEvent(`◈ Detachment: ${evt.label.slice(0, 40)}`, 'info');
         } else {
           logEvent(`◈ Detachment propuesto: ${evt.label.slice(0, 40)} (pendiente aprobación)`, 'info');
         }
         break;
       }
-      case 'subagent_progress':
-        this.state.appendSubagentProgress(evt.subagentId, evt.text ?? evt.phase ?? '…');
+      case 'subagent_progress': {
+        const progressText = evt.text ?? evt.phase ?? '…';
+        this.state.appendSubagentProgress(evt.subagentId, progressText);
+        let run = this.state.subagents.get(evt.subagentId);
+        if (run?.status === 'proposed') {
+          this.state.updateSubagent(evt.subagentId, { status: 'running', lastProgressAt: Date.now() });
+          run = this.state.subagents.get(evt.subagentId);
+        } else if (run) {
+          this.state.updateSubagent(evt.subagentId, { lastProgressAt: Date.now() });
+        }
+        if (run?.ephemeralUnitId) {
+          this.state.setUnitState(run.ephemeralUnitId, 'working');
+        }
         break;
+      }
       case 'subagent_complete':
         this.state.completeSubagent(evt.subagentId, evt.success, evt.summary);
         logEvent(

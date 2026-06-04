@@ -1,8 +1,8 @@
 // ─── Orden de batalla — subagent detachment panel ────────────────────────────
 import type { GameState } from '../game.ts';
-import type { Unit } from '../types.ts';
+import type { SubagentRun, Unit } from '../types.ts';
 import { sortSubagentsForDisplay } from '../priorityMatrix.ts';
-import { getSelectedConfig, isCursorTrackingAvailable } from './chat/modelSelector.ts';
+import { getSelectedConfig, isSwarmTrackingAvailable } from './chat/modelSelector.ts';
 import { isLayerVisible } from '../layers.ts';
 
 let _highlightCb: ((unitId: string | null) => void) | null = null;
@@ -11,11 +11,41 @@ export function setOrdenHighlightCallback(cb: (unitId: string | null) => void): 
   _highlightCb = cb;
 }
 
+export type OrdenDisplayStatus = 'pending' | 'working' | 'done' | 'failed';
+
+export function displayStatus(s: SubagentRun): OrdenDisplayStatus {
+  if (s.status === 'proposed') return 'pending';
+  if (s.status === 'running') return 'working';
+  if (s.status === 'failed') return 'failed';
+  return 'done';
+}
+
+function statusChipLabel(d: OrdenDisplayStatus): string {
+  switch (d) {
+    case 'pending':
+      return 'Pendiente';
+    case 'working':
+      return 'Trabajando';
+    case 'done':
+      return 'Hecho';
+    case 'failed':
+      return 'Falló';
+  }
+}
+
+function harnessLabel(s: SubagentRun): string {
+  return (s.harness ?? s.parentHarness ?? '').slice(0, 16);
+}
+
 function renderDiagnosticChecklist(unit: Unit): string {
   const { harness } = getSelectedConfig();
-  const effectiveHarness = harness || 'auto';
-  const cursorHarness = effectiveHarness === 'cursor';
-  const cursorInstalled = isCursorTrackingAvailable();
+  const effectiveHarness = harness && harness !== 'auto' ? harness : 'auto';
+  const trackingHarness =
+    effectiveHarness === 'auto' ? 'cursor o claude-code' : effectiveHarness;
+  const trackingOk =
+    effectiveHarness === 'auto'
+      ? isSwarmTrackingAvailable('cursor') || isSwarmTrackingAvailable('claude-code')
+      : isSwarmTrackingAvailable(effectiveHarness);
   const opsOn = isLayerVisible('ops');
 
   const item = (ok: boolean, text: string) =>
@@ -25,22 +55,26 @@ function renderDiagnosticChecklist(unit: Unit): string {
     <div class="orden-diagnostic">
       <div class="orden-diagnostic-title">Sin detachments — checklist</div>
       <ul class="orden-checklist">
-        ${item(cursorHarness, 'Harness cursor seleccionado en el chat')}
-        ${item(cursorInstalled, 'cursor-agent instalado (bridge /health)')}
+        ${item(trackingOk, `Harness del padre soporta tracking (${trackingHarness})`)}
         ${item(unit.state === 'working', 'Misión activa en esta unidad (working)')}
         ${item(true, 'Misión enviada vía RepoCiv (no solo Cursor IDE)')}
         ${item(true, 'Task con run_in_background=true en el agente')}
         ${item(opsOn, 'Capa Ops (H) activa para líneas punteadas')}
       </ul>
-      <p class="orden-diagnostic-hint">Si todo está ✓ y sigue vacío, revisa el log del bridge por <code>[swarm]</code>.</p>
+      <p class="orden-diagnostic-hint">Badge Swarm en el chat indica tracking por harness. Log bridge: <code>[swarm]</code>.</p>
     </div>
   `;
+}
+
+export function bindOrdenDeBatalla(state: GameState): void {
+  state.subscribe(() => {
+    if (state.selectedUnit) renderOrdenDeBatalla(state, state.selectedUnit);
+  });
 }
 
 export function renderOrdenDeBatalla(state: GameState, unit: Unit): void {
   const root = document.getElementById('orden-de-batalla');
   if (!root) return;
-
   const active = sortSubagentsForDisplay(state.getSubagentsOfUnit(unit.id));
   const recent = state.completedSubagents
     .filter((s) => s.parentUnitId === unit.id)
@@ -57,51 +91,34 @@ export function renderOrdenDeBatalla(state: GameState, unit: Unit): void {
 
   root.classList.remove('hidden');
 
-  const rowHtml = (
-    id: string,
-    label: string,
-    meta: string,
-    status: string,
-    ephemeralUnitId?: string,
-  ) => {
-    const peek = (state.subagentProgress.get(id) ?? []).slice(-2).join(' · ');
+  const rowHtml = (s: SubagentRun, recentRow = false) => {
+    const d = displayStatus(s);
+    const peekLines = (state.subagentProgress.get(s.id) ?? []).slice(-2);
+    const subtitle =
+      peekLines.length > 0 ? peekLines[peekLines.length - 1] : s.label;
+    const h = harnessLabel(s);
+    const meta = h ? `${s.kind} · ${s.risk} · ${h}` : `${s.kind} · ${s.risk}`;
     return `
-      <div class="orden-row" data-subagent="${id}" data-unit="${ephemeralUnitId ?? ''}">
-        <span class="orden-status orden-status--${status}">${status.slice(0, 4)}</span>
-        <span class="orden-label">${escapeHtml(label.slice(0, 48))}</span>
+      <div class="orden-row" data-subagent="${s.id}" data-unit="${s.ephemeralUnitId ?? ''}">
+        <span class="orden-status orden-status--${d}">${statusChipLabel(d)}</span>
+        <span class="orden-label">${escapeHtml((recentRow ? s.label : subtitle).slice(0, 48))}</span>
         <span class="orden-meta">${escapeHtml(meta)}</span>
-        ${peek ? `<div class="orden-peek">${escapeHtml(peek)}</div>` : ''}
+        ${peekLines.length && !recentRow ? `<div class="orden-peek">${escapeHtml(peekLines.join(' · '))}</div>` : ''}
       </div>`;
   };
 
-  const activeRows = active
-    .map((s) =>
-      rowHtml(
-        s.id,
-        s.label,
-        `${s.kind} · ${s.risk}`,
-        s.status,
-        s.ephemeralUnitId,
-      ),
-    )
-    .join('');
-
-  const recentRows = recent
-    .map((s) =>
-      rowHtml(s.id, s.label, `${s.kind} · done`, s.status, s.ephemeralUnitId),
-    )
-    .join('');
+  const activeRows = active.map((s) => rowHtml(s)).join('');
+  const recentRows = recent.map((s) => rowHtml(s, true)).join('');
 
   root.innerHTML = `
     <details class="orden-panel" open>
       <summary class="orden-title">Orden de batalla (${active.length} activos)</summary>
       ${
-        showDiagnostic
-          ? renderDiagnosticChecklist(unit)
-          : `<div class="orden-section">
-        ${activeRows || '<div class="orden-empty">Sin detachments activos</div>'}
-      </div>`
+        active.length > 0
+          ? `<div class="orden-section orden-section--active" aria-live="polite">${activeRows}</div>`
+          : ''
       }
+      ${showDiagnostic ? renderDiagnosticChecklist(unit) : ''}
       ${
         recentRows
           ? `<div class="orden-recent-title">Recientes</div><div class="orden-section">${recentRows}</div>`

@@ -8,6 +8,7 @@ def _reset_tracker():
     st._runs.clear()
     st._tool_use_map.clear()
     st._pending_spawn.clear()
+    st._last_progress_at.clear()
 
 
 def test_register_spawn_and_complete(monkeypatch, tmp_path):
@@ -100,6 +101,49 @@ def test_process_cursor_task_spawn(monkeypatch, tmp_path):
     )
     st.process_cursor_ndjson_line(line, mission_id="m9", unit_id="DAVI", city_id="repociv")
     assert any(e["type"] == "subagent_spawn" for e in sent)
+
+
+def test_register_spawn_emits_progress(monkeypatch, tmp_path):
+    _reset_tracker()
+    sent = []
+    es.init(tmp_path)
+    st.configure(send=lambda e: sent.append(e))
+
+    st.register_spawn(
+        parent_mission_id="m1",
+        parent_unit="DAVI",
+        kind="explore",
+        label="scan repos",
+        parent_harness="cursor",
+        harness="cursor",
+    )
+    progress = [e for e in sent if e["type"] == "subagent_progress"]
+    assert len(progress) >= 2
+    spawn_evt = next(e for e in sent if e["type"] == "subagent_spawn")
+    assert spawn_evt.get("harness") == "cursor"
+    assert spawn_evt.get("parentHarness") == "cursor"
+
+
+def test_process_claude_task_spawn(monkeypatch, tmp_path):
+    _reset_tracker()
+    sent = []
+    es.init(tmp_path)
+    st.configure(send=lambda e: sent.append(e))
+    from server.mission_harness import MissionHarnessContext
+
+    ctx = MissionHarnessContext(
+        mission_id="m9",
+        unit_id="DAVI",
+        city_id="repociv",
+        resolved_harness="claude-code",
+    )
+    line = (
+        '{"type":"tool_use","name":"Task","id":"tu-cl","input":'
+        '{"subagent_type":"explore","description":"claude scan","run_in_background":true}}'
+    )
+    st.process_claude_stream_line(line, ctx=ctx)
+    spawn = next(e for e in sent if e["type"] == "subagent_spawn")
+    assert spawn.get("harness") == "claude-code"
 
 
 def test_process_cursor_task_complete(monkeypatch, tmp_path):

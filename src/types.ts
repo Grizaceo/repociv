@@ -241,6 +241,12 @@ export interface SubagentRun {
   completedAt?: number | null;
   summary?: string;
   unitType?: UnitType;
+  /** Harness of the parent mission when spawn was detected. */
+  parentHarness?: string;
+  /** Effective harness for this subagent (defaults to parentHarness). */
+  harness?: string;
+  /** Last progress event timestamp for live Orden sorting. */
+  lastProgressAt?: number;
 }
 
 // ─── Rest Area (Phase 9: XCOM Context Fatigue) ─────────────────────────────

@@ -155,6 +155,20 @@ No hay tools MCP dedicadas aún; consultar el bridge directamente (o ampliar MCP
 
 Eventos SSE: `subagent_spawn`, `subagent_progress`, `subagent_complete`, `subagent_proposed`, `fog_reveal`.
 
+Campos opcionales en `subagent_spawn`: `parentHarness`, `harness` (mismo harness que la misión padre salvo dispatch explícito futuro).
+
+**Tracking por harness (pasivo, parse-only):**
+
+| Harness | Detección Task | Notas |
+|---------|----------------|-------|
+| `cursor` | Sí (NDJSON `stream-json`) | Progress mid-flight ~1 Hz |
+| `claude-code` | Sí con `--output-format stream-json` | `REPOCIV_SWARM_TRACK=0` desactiva |
+| `hermes-cli` | Best-effort JSON/líneas en stdout | Sin formato estable → badge “limited” en UI |
+| `hermes` HTTP | No | Sin SSE de subtareas aún |
+| `openclaw` / `codex` | No | Solo etiqueta harness en UI si padre usa ese runner |
+
+`subagent_dispatch` (comando bridge) está registrado pero devuelve `not_implemented` (fase 2).
+
 ## Política de approvals
 
 `command_submit` con `risk=high` o `risk=destructive` **no se ejecuta inmediatamente** —

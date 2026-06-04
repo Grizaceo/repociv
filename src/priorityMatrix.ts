@@ -130,6 +130,9 @@ export function sortSubagentsForDisplay(runs: SubagentRun[]): SubagentRun[] {
   return [...runs].sort((a, b) => {
     const rd = (RISK_ORDER[b.risk] ?? 0) - (RISK_ORDER[a.risk] ?? 0);
     if (rd !== 0) return rd;
+    const pa = a.lastProgressAt ?? a.startedAt ?? 0;
+    const pb = b.lastProgressAt ?? b.startedAt ?? 0;
+    if (pb !== pa) return pb - pa;
     return (b.startedAt ?? 0) - (a.startedAt ?? 0);
   });
 }

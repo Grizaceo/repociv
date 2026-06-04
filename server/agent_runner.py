@@ -19,6 +19,7 @@ from typing import Any, Callable
 
 from server import event_store as _es
 from server import subagent_tracker as _subagent_tracker
+from server.mission_harness import MissionHarnessContext, log_swarm_tracking_capability, swarm_track_enabled
 from server import directive_store as _ds
 from server import sessions as _sessions
 from server import container_runtime as _container_runtime
@@ -302,17 +303,6 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
     config = _get_agent_config(unit_id)
     base = unit_id.split("-")[0].upper()
 
-    effective_harness = harness if harness and harness != "auto" else "auto"
-    if effective_harness != "cursor":
-        send_to_repociv({
-            "type": "log",
-            "msg": (
-                f"[swarm] Task subagents no se trackean con harness '{effective_harness}'. "
-                "Usa harness=cursor para Orden de batalla."
-            ),
-            "level": "warn",
-        })
-
     if _container_mode_enabled():
         return _run_container_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
@@ -400,6 +390,28 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
 
 def _container_mode_enabled() -> bool:
     return os.environ.get("REPOCIV_AGENT_CONTAINER", "").lower() in {"1", "true", "yes"}
+
+
+def _harness_ctx(
+    unit_id: str,
+    mission_id: str,
+    city_id: str,
+    resolved_harness: str,
+    working_dir: str | None = None,
+    provider: str = "",
+    model: str = "",
+) -> MissionHarnessContext:
+    ctx = MissionHarnessContext(
+        mission_id=mission_id,
+        unit_id=unit_id,
+        city_id=city_id,
+        resolved_harness=resolved_harness,
+        provider=provider,
+        model=model,
+        working_dir=working_dir,
+    )
+    log_swarm_tracking_capability(send_to_repociv, resolved_harness)
+    return ctx
 
 
 def _run_container_streaming(unit_id: str, mission_id: str, mission: str,
@@ -575,7 +587,9 @@ def _run_hermes_cli_streaming(
 
     output_buf: list[str] = []
     assert proc.stdout is not None
+    ctx = _harness_ctx(unit_id, mission_id, city_id, "hermes-cli", working_dir, model=model)
     for line in proc.stdout:
+        _subagent_tracker.process_hermes_stream_line(line, ctx=ctx)
         output_buf.append(line)
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": line})
         _es.record_output_chunk(mission_id, unit_id, line)
@@ -619,10 +633,10 @@ def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
         f"{system_prompt}{spatial}\n\n{cd_cmd}{mission}" if system_prompt else f"{spatial}\n\n{cd_cmd}{mission}"
     )
     cmd = [claude_bin, "--print", "--dangerously-skip-permissions"]
+    if swarm_track_enabled():
+        cmd.extend(["--output-format", "stream-json"])
     if model:
         cmd.extend(["--model", model])
-    # Stateful CLAUDE units resume the most recent conversation in the working dir.
-    # This persists context across missions (claude --continue = resume most recent session).
     if config.get("stateful", True):
         cmd.append("--continue")
     cmd.append(full_prompt)
@@ -630,10 +644,19 @@ def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
                             text=True, bufsize=1, cwd=working_dir or None)
     output_buf: list[str] = []
     assert proc.stdout is not None
-    for line in proc.stdout:
-        output_buf.append(line)
-        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": line})
-        _es.record_output_chunk(mission_id, unit_id, line)
+    ctx = _harness_ctx(unit_id, mission_id, city_id, "claude-code", working_dir, model=model)
+    for raw_line in proc.stdout:
+        if swarm_track_enabled():
+            _subagent_tracker.process_claude_stream_line(raw_line, ctx=ctx)
+            chunk = _parse_cursor_ndjson_chunk(raw_line)
+            if chunk:
+                output_buf.append(chunk)
+                send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": chunk})
+                _es.record_output_chunk(mission_id, unit_id, chunk)
+        else:
+            output_buf.append(raw_line)
+            send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": raw_line})
+            _es.record_output_chunk(mission_id, unit_id, raw_line)
     proc.wait(timeout=600)
     return proc.returncode == 0, "".join(output_buf)
 
@@ -769,10 +792,9 @@ def _run_cursor_agent_streaming(
     )
     output_buf: list[str] = []
     assert proc.stdout is not None
+    ctx = _harness_ctx(unit_id, mission_id, city_id, "cursor", working_dir, model=model)
     for raw_line in proc.stdout:
-        _subagent_tracker.process_cursor_ndjson_line(
-            raw_line, mission_id=mission_id, unit_id=unit_id, city_id=city_id,
-        )
+        _subagent_tracker.process_cursor_ndjson_line(raw_line, ctx=ctx)
         chunk = _parse_cursor_ndjson_chunk(raw_line)
         if chunk:
             output_buf.append(chunk)

@@ -118,6 +118,8 @@ const Schemas = [
     ephemeralUnitId: v.string(),
     targetCityId: v.optional(v.string()),
     status: v.optional(v.picklist(['proposed', 'running'])),
+    parentHarness: v.optional(v.string()),
+    harness: v.optional(v.string()),
   }),
   v.object({
     type: v.literal('subagent_progress'),

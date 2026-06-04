@@ -26,6 +26,7 @@ CommandType = Literal[
     "execute_agent",
     "send_message",
     "subagent_spawn",  # high-risk Task delegation audit gate
+    "subagent_dispatch",  # explicit sub-mission dispatch (phase 2 stub)
     "unit_command",  # legacy compat
     "quest_add",     # legacy compat
     "e2e_probe",     # safe browser/bridge test probe, no external agent
@@ -56,6 +57,7 @@ COMMAND_RISK: dict[str, Risk] = {
     "execute_agent":  "medium",
     "send_message":   "high",
     "subagent_spawn": "high",
+    "subagent_dispatch": "high",
     "unit_command":   "medium",
     "quest_add":      "low",
     "e2e_probe":      "low",

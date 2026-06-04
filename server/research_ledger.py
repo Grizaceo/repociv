@@ -191,6 +191,13 @@ class ResearchLedger:
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_subagent_parent ON subagent_runs(parent_mission_id)"
         )
+        for col in ("parent_harness", "harness"):
+            try:
+                self._conn.execute(
+                    f"ALTER TABLE subagent_runs ADD COLUMN IF NOT EXISTS {col} TEXT"
+                )
+            except Exception:
+                pass
         try:
             self._conn.execute("ALTER TABLE missions ADD COLUMN IF NOT EXISTS parent_id TEXT")
         except Exception:
@@ -562,14 +569,16 @@ class ResearchLedger:
                     INSERT INTO subagent_runs (
                         id, parent_mission_id, parent_unit_id, kind, label, status, risk,
                         target_repo, target_city_id, ephemeral_unit_id, outcome, summary,
-                        duration_s, completed_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        duration_s, completed_at, parent_harness, harness
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (id) DO UPDATE SET
                         status = excluded.status,
                         outcome = excluded.outcome,
                         summary = excluded.summary,
                         duration_s = excluded.duration_s,
-                        completed_at = excluded.completed_at
+                        completed_at = excluded.completed_at,
+                        parent_harness = excluded.parent_harness,
+                        harness = excluded.harness
                     """,
                     (
                         sid,
@@ -586,6 +595,8 @@ class ResearchLedger:
                         str(run.get("summary") or "")[:1024],
                         float(run.get("duration") or run.get("duration_s") or 0.0),
                         run.get("completedAt") or run.get("completed_at"),
+                        str(run.get("parentHarness") or run.get("parent_harness") or ""),
+                        str(run.get("harness") or ""),
                     ),
                 )
             except Exception as exc:
@@ -619,7 +630,7 @@ class ResearchLedger:
                     f"""
                     SELECT id, parent_mission_id, parent_unit_id, kind, label, status, risk,
                            target_repo, target_city_id, ephemeral_unit_id, outcome, summary,
-                           duration_s, created_at, completed_at
+                           duration_s, created_at, completed_at, parent_harness, harness
                     FROM subagent_runs
                     {where}
                     ORDER BY created_at DESC
@@ -630,7 +641,8 @@ class ResearchLedger:
                 cols = [
                     "id", "parent_mission_id", "parent_unit_id", "kind", "label", "status",
                     "risk", "target_repo", "target_city_id", "ephemeral_unit_id", "outcome",
-                    "summary", "duration_s", "created_at", "completed_at",
+                    "summary", "duration_s", "created_at", "completed_at", "parent_harness",
+                    "harness",
                 ]
                 return [dict(zip(cols, row)) for row in rows]
             except Exception as exc:

@@ -5272,6 +5272,22 @@ kbd {
 .orden-check--ok { color: #5b9b5b; }
 .orden-check--todo { color: #aaa; }
 .orden-diagnostic-hint { margin: 6px 0 0; font-size: 10px; opacity: 0.75; }
+.orden-status--pending { background: #b8860b; color: #fff; padding: 1px 6px; border-radius: 3px; font-size: 10px; }
+.orden-status--working {
+  background: #4080e0;
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  animation: orden-pulse 1.2s ease-in-out infinite;
+}
+.orden-status--done { background: #3d7a3d; color: #fff; padding: 1px 6px; border-radius: 3px; font-size: 10px; }
+.orden-status--failed { background: #a04040; color: #fff; padding: 1px 6px; border-radius: 3px; font-size: 10px; }
+@keyframes orden-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+.orden-peek { font-family: ui-monospace, monospace; max-height: 2.8em; overflow-y: auto; }
 .swarm-tracking-badge {
   display: inline-block;
   margin-left: 6px;

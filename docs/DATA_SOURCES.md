@@ -57,7 +57,7 @@ El script está en `server/rebuild_ledger.py` — reconstruye `missions` y `suba
 
 ### Tabla `subagent_runs` (Swarm Civ)
 
-Registra delegaciones Task tool detectadas en el stream Cursor:
+Registra delegaciones Task tool detectadas en streams (cursor, claude-code, hermes-cli best-effort):
 
 | Columna | Descripción |
 |---|---|
@@ -68,6 +68,8 @@ Registra delegaciones Task tool detectadas en el stream Cursor:
 | `status` | proposed / running / complete / failed |
 | `risk` | low … destructive (ver `subagent_risk.py`) |
 | `ephemeral_unit_id` | unidad efímera en mapa |
+| `parent_harness` | harness resuelto de la misión padre al spawn |
+| `harness` | harness efectivo del subagente (default = parent) |
 
 Eventos JSONL: `SubagentSpawned`, `SubagentCompleted` (antes del dual-write DuckDB).
 

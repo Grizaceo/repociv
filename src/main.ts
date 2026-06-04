@@ -69,6 +69,7 @@ import { logEvent } from './ui/hud.ts';
 import { trackPanelOpen } from './ui/analytics.ts';
 import { initBubbleLayer, updateBubble, clearAllBubbles } from './ui/actionBubbles.ts';
 import { openWonderVignette } from './ui/wonderVignette.ts';
+import { bindOrdenDeBatalla } from './ui/ordenDeBatalla.ts';
 import { getWonder } from './wonders/manifest.ts';
 import {
   inferCityLabStatus,
@@ -821,6 +822,7 @@ async function bootstrap() {
     if (state.selectedUnit) showUnitPanel(state.selectedUnit, state);
   };
   state.subscribe(refreshHero);
+  bindOrdenDeBatalla(state);
   refreshHero();
 }
 

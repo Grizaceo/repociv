@@ -60,7 +60,15 @@ function makeState() {
     getUnit: vi.fn(() => null),
     getUnitAt: vi.fn(() => null),
     getChildrenOfUnit: vi.fn(() => []),
-    registerSubagent: vi.fn(),
+    subagents: new Map(),
+    registerSubagent: vi.fn(function (run: { id: string; status: string; ephemeralUnitId?: string }) {
+      state.subagents.set(run.id, run);
+    }),
+    updateSubagent: vi.fn(function (id: string, patch: Record<string, unknown>) {
+      const existing = state.subagents.get(id);
+      if (existing) state.subagents.set(id, { ...existing, ...patch });
+    }),
+    appendSubagentProgress: vi.fn(),
     syncSubagentSpawn: vi.fn(),
     updateUnitFatigue: vi.fn(),
     addRestArea: vi.fn(),
@@ -475,6 +483,44 @@ describe('BridgeEvents handleBridgeEvent', () => {
       status: 'running',
     });
     expect(state.spawned).toContain('SCOUT-sub-run');
+    expect(state.setUnitState).toHaveBeenCalledWith('SCOUT-sub-run', 'working');
+    bridge.stop();
+  });
+
+  it('subagent_progress promotes proposed to running and sets working', async () => {
+    const state = makeState();
+    vi.mocked(state.getUnit).mockImplementation((id: string) =>
+      id === 'DAVI' ? { id: 'DAVI', coord: { q: 0, r: 0 }, cityId: 'repociv' } : null,
+    );
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+    await vi.advanceTimersByTimeAsync(100);
+    const src = FakeEventSource.instances[0]!;
+    src.open();
+    src.message({
+      type: 'subagent_spawn',
+      subagentId: 'sub-p',
+      parentMissionId: 'm1',
+      parentUnit: 'DAVI',
+      kind: 'explore',
+      label: 'scan',
+      hex: [0, 0],
+      unitType: 'scout',
+      risk: 'low',
+      ephemeralUnitId: 'SCOUT-sub-p',
+      status: 'proposed',
+    });
+    src.message({
+      type: 'subagent_progress',
+      subagentId: 'sub-p',
+      phase: 'working',
+      text: 'exploring files',
+    });
+    expect(state.updateSubagent).toHaveBeenCalledWith(
+      'sub-p',
+      expect.objectContaining({ status: 'running' }),
+    );
+    expect(state.setUnitState).toHaveBeenCalledWith('SCOUT-sub-p', 'working');
     bridge.stop();
   });
 

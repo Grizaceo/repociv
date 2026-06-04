@@ -547,6 +547,23 @@ def _dispatch_command(cmd: Command) -> None:
         send_to_repociv({"type": "log", "msg": f"Subagente aprobado: {cmd.target}", "level": "success"})
         return
 
+    if cmd.type == "subagent_dispatch":
+        from server import subagent_tracker as _st  # noqa: PLC0415
+        result = _st.request_dispatch(
+            parent_mission_id=str(payload.get("parentMissionId", "")),
+            parent_unit=str(payload.get("parentUnit", cmd.target)),
+            kind=str(payload.get("kind", "generalPurpose")),
+            label=str(payload.get("label", "")),
+            harness=str(payload.get("harness", "")),
+        )
+        _es.record_failed(cmd.id, result.get("error", "not_implemented"))
+        send_to_repociv({
+            "type": "log",
+            "msg": "[swarm] subagent_dispatch no implementado (fase 2)",
+            "level": "warn",
+        })
+        return
+
     if cmd.type == "quest_add":
         title = str(payload.get("title", cmd.target))
         description = str(payload.get("description", ""))

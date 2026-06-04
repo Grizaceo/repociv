@@ -262,6 +262,13 @@ export function isCursorTrackingAvailable(): boolean {
   return _cursorAvailable;
 }
 
+/** Passive Task tracking available for the given harness (capability table). */
+export function isSwarmTrackingAvailable(harness: string): boolean {
+  if (harness === 'cursor') return _cursorAvailable;
+  if (harness === 'claude-code') return true;
+  return false;
+}
+
 function fetchBridgeHealth(): void {
   fetch(bridgeUrl('/health'), { headers: bridgeHeaders() })
     .then((r) => (r.ok ? r.json() : null))
@@ -285,8 +292,19 @@ function updateSwarmBadge(): void {
     wrapper.appendChild(badge);
   }
   const harness = _selectedHarness || 'auto';
-  const on = harness === 'cursor' && _cursorAvailable;
-  badge.textContent = on ? 'Swarm: on (cursor)' : 'Swarm: off';
+  if (harness === 'auto') {
+    badge.textContent = _cursorAvailable ? 'Swarm: on (cursor)' : 'Swarm: off';
+    return;
+  }
+  if (isSwarmTrackingAvailable(harness)) {
+    badge.textContent = `Swarm: on (${harness})`;
+    return;
+  }
+  if (harness === 'hermes' || harness === 'hermes-cli') {
+    badge.textContent = `Swarm: limited (${harness})`;
+    return;
+  }
+  badge.textContent = 'Swarm: off';
   badge.title = on
     ? 'Task subagents con run_in_background se trackean en Orden de batalla'
     : _cursorAvailable

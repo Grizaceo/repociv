@@ -1285,8 +1285,12 @@ export class Renderer {
     if (unit.ephemeral && unit.parentUnitId) {
       const run = unit.subagentRunId ? this.state.subagents.get(unit.subagentRunId) : undefined;
       const kind = run?.kind ?? unit.type;
+      const harness = run?.harness ?? run?.parentHarness ?? '';
       const parent = this.state.getUnit(unit.parentUnitId);
-      lines.unshift(`Detachment · ${kind} · padre: ${parent?.name ?? unit.parentUnitId}`);
+      const harnessBit = harness ? ` · ${harness}` : '';
+      lines.unshift(
+        `Detachment · ${kind}${harnessBit} · padre: ${parent?.name ?? unit.parentUnitId}`,
+      );
     }
     if (unit.mission) lines.push(`Mission: ${unit.mission}`);
     if (unit.cityId) lines.push(`Repo: ${unit.cityId}`);

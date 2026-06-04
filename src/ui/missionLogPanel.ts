@@ -51,6 +51,7 @@ function renderTree(
       (s) => `
     <div class="ml-node ml-node--child" data-summary="${esc(s.summary ?? '')}">
       <span class="ml-kind">${esc(s.kind ?? '?')}</span>
+      <span class="ml-harness">${esc((s.harness ?? s.parent_harness ?? '').slice(0, 12))}</span>
       <span class="ml-label">${esc((s.label ?? s.id ?? '').slice(0, 60))}</span>
       <span class="ml-status">${esc(s.status ?? '')}</span>
     </div>`,

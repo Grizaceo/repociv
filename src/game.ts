@@ -422,6 +422,10 @@ export class GameState {
     buf.push(text.slice(0, 256));
     if (buf.length > 20) buf.shift();
     this.subagentProgress.set(id, buf);
+    const existing = this.subagents.get(id);
+    if (existing) {
+      this.subagents.set(id, { ...existing, lastProgressAt: Date.now() });
+    }
     this.notify();
   }
 
