@@ -45,7 +45,7 @@ function makeState() {
     moved: [] as string[],
     spawnUnit(id: string) {
       state.spawned.push(id);
-      return { id, name: id };
+      return { id, name: id, coord: { q: 0, r: 0 } };
     },
     moveUnit(id: string) {
       state.moved.push(id);
@@ -58,6 +58,10 @@ function makeState() {
     startMission: vi.fn(),
     completeMission: vi.fn(),
     getUnit: vi.fn(() => null),
+    getUnitAt: vi.fn(() => null),
+    getChildrenOfUnit: vi.fn(() => []),
+    registerSubagent: vi.fn(),
+    syncSubagentSpawn: vi.fn(),
     updateUnitFatigue: vi.fn(),
     addRestArea: vi.fn(),
     setUnitResting: vi.fn(),
@@ -236,7 +240,7 @@ describe('BridgeEvents checkHealth', () => {
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
-    expect(setBridgeStatus).toHaveBeenCalledWith(true, 'hermes');
+    expect(setBridgeStatus).toHaveBeenCalledWith(true, 'hermes', { cursor: false });
     bridge.stop();
   });
 });
@@ -414,6 +418,63 @@ describe('BridgeEvents handleBridgeEvent', () => {
       missionId: 'mis-1',
     });
     expect(state.failBuilding).toHaveBeenCalledWith('repo-1', 'ci-pipeline');
+    bridge.stop();
+  });
+
+  it('subagent_spawn proposed does not spawn ephemeral unit', async () => {
+    const state = makeState();
+    vi.mocked(state.getUnit).mockImplementation((id: string) =>
+      id === 'DAVI' ? { id: 'DAVI', coord: { q: 0, r: 0 }, cityId: 'repociv' } : null,
+    );
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+    await vi.advanceTimersByTimeAsync(100);
+    const src = FakeEventSource.instances[0]!;
+    src.open();
+    src.message({
+      type: 'subagent_spawn',
+      subagentId: 'sub-prop',
+      parentMissionId: 'm1',
+      parentUnit: 'DAVI',
+      kind: 'explore',
+      label: 'scan repo',
+      hex: [0, 0],
+      unitType: 'scout',
+      risk: 'high',
+      ephemeralUnitId: 'SCOUT-sub-prop',
+      status: 'proposed',
+    });
+    expect(state.spawned).not.toContain('SCOUT-sub-prop');
+    expect(state.registerSubagent).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'proposed' }),
+    );
+    bridge.stop();
+  });
+
+  it('subagent_spawn running spawns ephemeral unit', async () => {
+    const state = makeState();
+    vi.mocked(state.getUnit).mockImplementation((id: string) =>
+      id === 'DAVI' ? { id: 'DAVI', coord: { q: 0, r: 0 }, cityId: 'repociv' } : null,
+    );
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+    await vi.advanceTimersByTimeAsync(100);
+    const src = FakeEventSource.instances[0]!;
+    src.open();
+    src.message({
+      type: 'subagent_spawn',
+      subagentId: 'sub-run',
+      parentMissionId: 'm1',
+      parentUnit: 'DAVI',
+      kind: 'explore',
+      label: 'scan repo',
+      hex: [0, 0],
+      unitType: 'scout',
+      risk: 'low',
+      ephemeralUnitId: 'SCOUT-sub-run',
+      status: 'running',
+    });
+    expect(state.spawned).toContain('SCOUT-sub-run');
     bridge.stop();
   });
 

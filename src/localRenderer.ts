@@ -834,6 +834,7 @@ export class LocalRenderer {
 
     ctx.save();
     ctx.translate(ux, uy + bobbingY);
+    if (unit.ephemeral) ctx.scale(0.8, 0.8);
 
     // Selection ring in gstack amber
     ctx.strokeStyle = this.tokens.amber500 || '#F59E0B';

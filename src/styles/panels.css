@@ -5256,3 +5256,35 @@ kbd {
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border-dim, #4a3a1a);
 }
+
+/* Swarm Civ — Orden de batalla + mission log */
+#orden-de-batalla { margin-top: 8px; font-size: 11px; }
+#orden-de-batalla.hidden { display: none; }
+.orden-title { cursor: pointer; color: var(--gold-mid, #c8a84b); font-weight: 600; }
+.orden-row { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.06); cursor: pointer; }
+.orden-row:hover { background: rgba(200,168,75,0.08); }
+.orden-peek { font-size: 10px; opacity: 0.7; margin-top: 2px; }
+.orden-recall-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.orden-diagnostic { margin: 6px 0; padding: 6px 8px; background: rgba(0,0,0,0.2); border-radius: 4px; }
+.orden-diagnostic-title { font-weight: 600; color: var(--gold-mid, #c8a84b); margin-bottom: 4px; }
+.orden-checklist { margin: 0; padding-left: 16px; list-style: none; }
+.orden-check { margin: 2px 0; }
+.orden-check--ok { color: #5b9b5b; }
+.orden-check--todo { color: #aaa; }
+.orden-diagnostic-hint { margin: 6px 0 0; font-size: 10px; opacity: 0.75; }
+.swarm-tracking-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 10px;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.35);
+  color: var(--gold-mid, #c8a84b);
+  vertical-align: middle;
+}
+.obs-agent-ago { font-size: 10px; opacity: 0.65; margin-left: 4px; }
+.mission-log-panel {
+  position: fixed; right: 12px; top: 80px; width: 320px; max-height: 50vh; overflow: auto;
+  background: var(--glass-bg); border: 1px solid var(--ui-border); padding: 10px; z-index: 20; font-size: 12px;
+}
+.mission-log-panel.hidden { display: none; }

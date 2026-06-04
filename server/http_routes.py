@@ -140,6 +140,39 @@ def get_missions(ctx: "RouteContext") -> tuple[int, Any]:
     return 200, load_missions()
 
 
+def get_subagents(ctx: "RouteContext") -> tuple[int, Any]:
+    from server import research_ledger as _rl
+    from server import subagent_tracker as _st
+    params = ctx.get("params", {})
+    parent_unit = str(params.get("parentUnit") or params.get("parent_unit") or "")
+    parent_mission = str(params.get("parentMission") or params.get("parent_mission") or "")
+    active = str(params.get("active", "")).lower() in ("1", "true", "yes")
+    ledger_rows = _rl.get_ledger().list_subagent_runs(
+        parent_unit=parent_unit,
+        parent_mission=parent_mission,
+        active_only=active,
+    )
+    if ledger_rows:
+        return 200, {"subagents": ledger_rows, "source": "duckdb"}
+    memory = _st.list_active(parent_unit or None)
+    if parent_mission:
+        memory = [r for r in memory if r.get("parentMissionId") == parent_mission]
+    return 200, {"subagents": memory, "source": "memory"}
+
+
+def get_mission_tree(ctx: "RouteContext") -> tuple[int, Any]:
+    from server import research_ledger as _rl
+    from server import run_state as _run_state
+    mission_id = str(ctx.get("mission_id") or "")
+    if not mission_id:
+        return 400, {"error": "mission_id required"}
+    tree = _rl.get_ledger().get_mission_tree(mission_id)
+    run_snap = _run_state.load(mission_id)
+    if run_snap:
+        tree["runState"] = run_snap
+    return 200, tree
+
+
 def get_gpu(ctx: "RouteContext") -> tuple[int, Any]:
     from server.bridge import get_gpu_info
     return 200, get_gpu_info()

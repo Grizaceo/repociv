@@ -115,6 +115,41 @@ describe('parseBridgeEvent', () => {
     });
     expect(evt).not.toBeNull();
   });
+
+  it('accepts subagent_spawn event', () => {
+    const evt = parseBridgeEvent({
+      type: 'subagent_spawn',
+      subagentId: 'sub-abc',
+      parentMissionId: 'm1',
+      parentUnit: 'DAVI',
+      kind: 'explore',
+      label: 'scan repo',
+      hex: [0, 0],
+      risk: 'low',
+      ephemeralUnitId: 'SCOUT-sub-abc',
+    });
+    expect(evt?.type).toBe('subagent_spawn');
+  });
+
+  it('accepts subagent_complete event', () => {
+    const evt = parseBridgeEvent({
+      type: 'subagent_complete',
+      subagentId: 'sub-abc',
+      success: true,
+      summary: 'done',
+      duration: 12,
+    });
+    expect(evt).not.toBeNull();
+  });
+
+  it('accepts fog_reveal with cityId', () => {
+    const evt = parseBridgeEvent({
+      type: 'fog_reveal',
+      hexes: [[1, 0]],
+      cityId: 'other-repo',
+    });
+    expect(evt).not.toBeNull();
+  });
 });
 
 describe('describeBridgeEventError', () => {

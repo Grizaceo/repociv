@@ -118,6 +118,18 @@ def record_event(event_type: str, data: dict[str, Any]) -> None:
     })
 
 
+def record_subagent_spawn(subagent_id: str, run: dict[str, Any]) -> None:
+    """Persist subagent spawn to JSONL (canonical, before DuckDB dual-write)."""
+    record_event("SubagentSpawned", {"subagentId": subagent_id, **run})
+
+
+def record_subagent_complete(subagent_id: str, run: dict[str, Any]) -> None:
+    """Persist subagent completion to JSONL."""
+    evt_data = {"subagentId": subagent_id, **run}
+    record_event("SubagentCompleted", evt_data)
+    _ledger_ingest({"type": "SubagentCompleted", "commandId": subagent_id, "data": evt_data})
+
+
 def read_events(since: float = 0.0, limit: int = 500) -> list[dict[str, Any]]:
     """Return events newer than `since` (unix timestamp), up to `limit`."""
     if _store_path is None or not _store_path.exists():

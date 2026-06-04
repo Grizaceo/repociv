@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from server import event_store as _es
+from server import subagent_tracker as _subagent_tracker
 from server import directive_store as _ds
 from server import sessions as _sessions
 from server import container_runtime as _container_runtime
@@ -58,6 +59,7 @@ def configure(*, send: SendFn | None = None, save: SaveMissionFn | None = None) 
     global send_to_repociv, save_mission
     if send is not None:
         send_to_repociv = send
+        _subagent_tracker.configure(send=send)
     if save is not None:
         save_mission = save
 
@@ -299,6 +301,17 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
                        model: str = "") -> tuple[bool, str]:
     config = _get_agent_config(unit_id)
     base = unit_id.split("-")[0].upper()
+
+    effective_harness = harness if harness and harness != "auto" else "auto"
+    if effective_harness != "cursor":
+        send_to_repociv({
+            "type": "log",
+            "msg": (
+                f"[swarm] Task subagents no se trackean con harness '{effective_harness}'. "
+                "Usa harness=cursor para Orden de batalla."
+            ),
+            "level": "warn",
+        })
 
     if _container_mode_enabled():
         return _run_container_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
@@ -757,6 +770,9 @@ def _run_cursor_agent_streaming(
     output_buf: list[str] = []
     assert proc.stdout is not None
     for raw_line in proc.stdout:
+        _subagent_tracker.process_cursor_ndjson_line(
+            raw_line, mission_id=mission_id, unit_id=unit_id, city_id=city_id,
+        )
         chunk = _parse_cursor_ndjson_chunk(raw_line)
         if chunk:
             output_buf.append(chunk)

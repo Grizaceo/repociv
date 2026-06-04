@@ -35,7 +35,7 @@ Command lifecycle event
   │       └─ events.jsonl (append-only)
   │
   └─► research_ledger.ingest_event()   ← Best-effort. Si falla, no bloquea el pipeline.
-          └─ ledger.duckdb (missions, agent_predictions tables)
+          └─ ledger.duckdb (missions, agent_predictions, subagent_runs tables)
 ```
 
 El dual-write se realiza en `event_store.record_completed()` y `event_store.record_failed()`.
@@ -53,7 +53,23 @@ python -m server.rebuild_ledger
 # Operación idempotente — usa INSERT OR REPLACE / ON CONFLICT DO UPDATE.
 ```
 
-El script está en `server/rebuild_ledger.py` (Fase 0, entregable pendiente).
+El script está en `server/rebuild_ledger.py` — reconstruye `missions` y `subagent_runs` desde JSONL.
+
+### Tabla `subagent_runs` (Swarm Civ)
+
+Registra delegaciones Task tool detectadas en el stream Cursor:
+
+| Columna | Descripción |
+|---|---|
+| `id` | `sub-{uuid8}` |
+| `parent_mission_id` | misión del agente padre |
+| `parent_unit_id` | unidad padre (ej. DAVI) |
+| `kind` / `label` | tipo y descripción del Task |
+| `status` | proposed / running / complete / failed |
+| `risk` | low … destructive (ver `subagent_risk.py`) |
+| `ephemeral_unit_id` | unidad efímera en mapa |
+
+Eventos JSONL: `SubagentSpawned`, `SubagentCompleted` (antes del dual-write DuckDB).
 
 ---
 

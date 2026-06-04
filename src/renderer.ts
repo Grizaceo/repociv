@@ -916,11 +916,24 @@ export class Renderer {
       for (const unit of this.state.world.units) {
         this.unitR.drawUnitTrail(unit);
       }
+      // Parent → ephemeral subagent tether lines
+      for (const child of this.state.world.units) {
+        if (!child.parentUnitId || !child.ephemeral) continue;
+        const parent = this.state.getUnit(child.parentUnitId);
+        if (!parent) continue;
+        if (!this._shouldDrawEphemeralOnMap(child)) continue;
+        this.unitR.drawSubagentLink(parent, child, this.animTime);
+      }
     }
 
-    // Units (base layer — always visible) + badges (ops)
+    // Units (base layer — always visible) + badges (ops for state; swarm pill always)
     for (const unit of this.state.world.units) {
-      this.unitR.drawUnit(unit, this.animTime, this.selectedUnit?.id ?? null);
+      if (unit.ephemeral && !this._shouldDrawEphemeralOnMap(unit)) continue;
+      this.unitR.drawUnit(unit, this.animTime, this.selectedUnit?.id ?? null, unit.ephemeral);
+      const childCount = this.state.getChildrenOfUnit(unit.id).filter((c) => c.ephemeral).length;
+      if (childCount > 0) {
+        this.unitR.drawSubagentCountBadge(unit, childCount, this.animTime);
+      }
       if (showOps && !isClean && lod !== 'low') {
         this.unitR.drawUnitBadge(unit, this.animTime);
       }
@@ -1199,6 +1212,11 @@ export class Renderer {
           `<span class="bc-segment" style="opacity:0.6">${unit.mission.slice(0, 30)}</span>`,
         );
       }
+      const swarm = this.state.getChildrenOfUnit(unit.id).filter((c) => c.ephemeral).length;
+      if (swarm > 0) {
+        parts.push(`<span class="bc-separator">·</span>`);
+        parts.push(`<span class="bc-segment" style="opacity:0.75">+${swarm} det</span>`);
+      }
     } else if (city) {
       iconChar = city.isCapital ? '★' : '⬡';
       parts.push(`<span class="bc-segment city">${city.name}</span>`);
@@ -1225,6 +1243,16 @@ export class Renderer {
   // Kept for minimap compatibility
   drawMinimap() {
     this.minimapR.draw(this.cam, this.canvas, this.fogEnabled);
+  }
+
+  /** Map shows up to 5 active ephemeral children per parent; rest aggregated as +N badge. */
+  private _shouldDrawEphemeralOnMap(unit: Unit): boolean {
+    if (!unit.ephemeral || !unit.parentUnitId) return true;
+    const siblings = this.state
+      .getChildrenOfUnit(unit.parentUnitId)
+      .filter((c) => c.ephemeral && c.state !== 'sleeping');
+    const idx = siblings.findIndex((c) => c.id === unit.id);
+    return idx >= 0 && idx < 5;
   }
 
   private updateUnitTooltip(clientX: number, clientY: number) {
@@ -1254,6 +1282,12 @@ export class Renderer {
       `<strong>${unit.name}</strong>`,
       `State: ${stateLabel[unit.state] ?? unit.state}`,
     ];
+    if (unit.ephemeral && unit.parentUnitId) {
+      const run = unit.subagentRunId ? this.state.subagents.get(unit.subagentRunId) : undefined;
+      const kind = run?.kind ?? unit.type;
+      const parent = this.state.getUnit(unit.parentUnitId);
+      lines.unshift(`Detachment · ${kind} · padre: ${parent?.name ?? unit.parentUnitId}`);
+    }
     if (unit.mission) lines.push(`Mission: ${unit.mission}`);
     if (unit.cityId) lines.push(`Repo: ${unit.cityId}`);
     this.unitTooltipEl.innerHTML = lines.join('<br>');

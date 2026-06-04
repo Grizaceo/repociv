@@ -115,3 +115,21 @@ export function peekNextMission(
 }
 
 // ─── Priority panel state ────────────────────────────────────────────────────
+
+import type { SubagentRun } from './types.ts';
+
+const RISK_ORDER: Record<string, number> = {
+  destructive: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+/** Sort subagents for Orden de batalla: risk desc, then age (newest first). */
+export function sortSubagentsForDisplay(runs: SubagentRun[]): SubagentRun[] {
+  return [...runs].sort((a, b) => {
+    const rd = (RISK_ORDER[b.risk] ?? 0) - (RISK_ORDER[a.risk] ?? 0);
+    if (rd !== 0) return rd;
+    return (b.startedAt ?? 0) - (a.startedAt ?? 0);
+  });
+}

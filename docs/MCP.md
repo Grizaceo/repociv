@@ -144,6 +144,17 @@ curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/path/to/workspace
 | `events_since(since_unix_ts)` | Replay del event store desde timestamp |
 | `ws_info` | Metadata del WebSocket (URL, puerto) |
 
+### Subagents (Swarm Civ) — lectura vía bridge HTTP
+
+No hay tools MCP dedicadas aún; consultar el bridge directamente (o ampliar MCP en issue posterior):
+
+| Endpoint | Descripción |
+|----------|-------------|
+| `GET /subagents?parentUnit=&parentMission=&active=1` | Subagentes activos o historial filtrado (DuckDB + fallback memoria) |
+| `GET /missions/{missionId}/tree` | Árbol misión → subagentes para mission log UI |
+
+Eventos SSE: `subagent_spawn`, `subagent_progress`, `subagent_complete`, `subagent_proposed`, `fog_reveal`.
+
 ## Política de approvals
 
 `command_submit` con `risk=high` o `risk=destructive` **no se ejecuta inmediatamente** —

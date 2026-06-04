@@ -154,6 +154,7 @@ export function logEvent(
 export function setBridgeStatus(
   online: boolean,
   mode: 'claude-code' | 'openclaw' | 'hermes' | 'demo' = 'hermes',
+  health?: { cursor?: boolean },
 ) {
   const el = document.getElementById('bridge-status');
   if (!el) return;
@@ -161,8 +162,17 @@ export function setBridgeStatus(
   el.classList.toggle('bridge-offline', !online);
   el.classList.toggle('bridge-demo', mode === 'demo');
   if (online) {
-    el.textContent = `⚡ ${mode}`;
-    el.title = `Agente activo: ${mode}`;
+    el.textContent = `Bridge OK · ${mode}`;
+    const cursor = health?.cursor;
+    const cursorLine =
+      cursor === undefined
+        ? ''
+        : cursor
+          ? 'cursor-agent: instalado (Swarm tracking disponible)'
+          : 'cursor-agent: no instalado — Swarm subagent tracking no disponible';
+    el.title = [`Bridge HTTP activo · transporte ${mode}`, cursorLine]
+      .filter(Boolean)
+      .join('\n');
   } else {
     el.textContent = mode === 'demo' ? '⚡ DEMO' : '⚡ offline';
     el.title = mode === 'demo' ? 'Modo demo — sin ejecución real' : 'Bridge desconectado';

@@ -13,15 +13,27 @@ import {
   type LocalUnit,
   type LocalMission,
   type AgentTask,
+  type SubagentRun,
 } from './types.ts';
 import type { Axial } from './hex.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
-import { axialDistance } from './hex.ts';
+import { axialDistance, axialNeighbours } from './hex.ts';
 import { getConfig } from './gameConfig.ts';
 import { LocalWorldManager } from './localWorldManager.ts';
 
 // ─── Clock speed ──────────────────────────────────────────────────────────────
 const TICK_MS = 16; // ~60 fps
+
+/** Pick an adjacent hex for a detachment scout; falls back to parent if ring full. */
+export function pickDetachmentHex(state: GameState, parentCoord: Axial, childIndex: number): Axial {
+  const neighbors = axialNeighbours(parentCoord);
+  const preferred = neighbors[((childIndex % 6) + 6) % 6]!;
+  if (!state.getUnitAt(preferred)) return preferred;
+  for (const hex of neighbors) {
+    if (!state.getUnitAt(hex)) return hex;
+  }
+  return parentCoord;
+}
 
 // ─── Mission record (in-memory mirror of bridge.py persistence) ─────────────
 export interface Mission {
@@ -53,6 +65,11 @@ export class GameState {
 
   // Active missions by missionId
   missions = new Map<string, Mission>();
+  // Swarm Civ: subagent detachments
+  subagents = new Map<string, SubagentRun>();
+  subagentProgress = new Map<string, string[]>();
+  completedSubagents: SubagentRun[] = [];
+  highlightedSubagentId: string | null = null;
   // Listener for state changes (used by UI to refresh hero bar / quest board)
   private listeners: Array<() => void> = [];
 
@@ -291,6 +308,11 @@ export class GameState {
     coord: Axial,
     mission?: string,
     cityId?: string,
+    opts?: {
+      parentUnitId?: string;
+      ephemeral?: boolean;
+      subagentRunId?: string;
+    },
   ): Unit {
     const existing = this.unitMap.get(id);
     if (existing) return existing;
@@ -312,12 +334,14 @@ export class GameState {
       color,
       movesLeft: 4,
       maxMoves: 4,
-      // Phase 9: XCOM Context Fatigue
       fatigue: 100,
       maxFatigue: 100,
       isResting: false,
       restingRoomId: undefined,
       effectiveSpeed: 1.0,
+      parentUnitId: opts?.parentUnitId,
+      ephemeral: opts?.ephemeral,
+      subagentRunId: opts?.subagentRunId,
     };
     this.world.units.push(unit);
     this.unitMap.set(id, unit);
@@ -371,6 +395,79 @@ export class GameState {
 
   getAllUnits(): Unit[] {
     return [...this.world.units];
+  }
+
+  getSubagentsOfUnit(unitId: string): SubagentRun[] {
+    return [...this.subagents.values()].filter((s) => s.parentUnitId === unitId);
+  }
+
+  getChildrenOfUnit(unitId: string): Unit[] {
+    return this.world.units.filter((u) => u.parentUnitId === unitId);
+  }
+
+  registerSubagent(run: SubagentRun): void {
+    this.subagents.set(run.id, run);
+    this.notify();
+  }
+
+  updateSubagent(id: string, patch: Partial<SubagentRun>): void {
+    const existing = this.subagents.get(id);
+    if (!existing) return;
+    this.subagents.set(id, { ...existing, ...patch });
+    this.notify();
+  }
+
+  appendSubagentProgress(id: string, text: string): void {
+    const buf = this.subagentProgress.get(id) ?? [];
+    buf.push(text.slice(0, 256));
+    if (buf.length > 20) buf.shift();
+    this.subagentProgress.set(id, buf);
+    this.notify();
+  }
+
+  completeSubagent(id: string, success: boolean, summary: string): void {
+    const run = this.subagents.get(id);
+    if (!run) return;
+    const finished: SubagentRun = {
+      ...run,
+      status: success ? 'complete' : 'failed',
+      completedAt: Date.now(),
+      summary,
+    };
+    this.subagents.delete(id);
+    this.completedSubagents.unshift(finished);
+    this.completedSubagents = this.completedSubagents.slice(0, 50);
+    const ephemeralId = run.ephemeralUnitId ?? finished.ephemeralUnitId;
+    if (ephemeralId) this.removeUnit(ephemeralId);
+    this._local.removeSubagentUnit(ephemeralId ?? id);
+    this.notify();
+  }
+
+  revealHexes(hexes: [number, number][], cityId?: string): void {
+    if (cityId) {
+      const city = this.world.cities.find((c) => c.id === cityId);
+      if (city?.territory?.length) {
+        for (const t of city.territory) {
+          const key = tileKey(t);
+          const tile = this.world.tiles.get(key);
+          if (tile) {
+            tile.inFog = false;
+            tile.revealed = true;
+          }
+        }
+        this.notify();
+        return;
+      }
+    }
+    for (const [q, r] of hexes) {
+      const key = tileKey({ q, r });
+      const tile = this.world.tiles.get(key);
+      if (tile) {
+        tile.inFog = false;
+        tile.revealed = true;
+      }
+    }
+    this.notify();
   }
 
   // ─── Move unit (A* pathfinding) ───────────────────────────────────────────
@@ -427,6 +524,16 @@ export class GameState {
   }
   dispatchMissionById(missionId: string): void {
     this._local.dispatchMissionById(missionId);
+  }
+
+  syncSubagentSpawn(payload: {
+    ephemeralUnitId: string;
+    parentUnitId: string;
+    kind: string;
+    label: string;
+    repoId: string;
+  }): void {
+    this._local.syncSubagentSpawn(payload);
   }
   getMissionQueue(): LocalMission[] {
     return this._local.getMissionQueue();

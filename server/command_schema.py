@@ -25,6 +25,7 @@ CommandType = Literal[
     "delete_file",
     "execute_agent",
     "send_message",
+    "subagent_spawn",  # high-risk Task delegation audit gate
     "unit_command",  # legacy compat
     "quest_add",     # legacy compat
     "e2e_probe",     # safe browser/bridge test probe, no external agent
@@ -54,6 +55,7 @@ COMMAND_RISK: dict[str, Risk] = {
     "delete_file":    "destructive",
     "execute_agent":  "medium",
     "send_message":   "high",
+    "subagent_spawn": "high",
     "unit_command":   "medium",
     "quest_add":      "low",
     "e2e_probe":      "low",

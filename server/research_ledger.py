@@ -114,6 +114,26 @@ CREATE TABLE IF NOT EXISTS world_model_history (
 )
 """
 
+_DDL_SUBAGENT_RUNS = """
+CREATE TABLE IF NOT EXISTS subagent_runs (
+    id                TEXT PRIMARY KEY,
+    parent_mission_id TEXT NOT NULL,
+    parent_unit_id    TEXT,
+    kind              TEXT,
+    label             TEXT,
+    status            TEXT,
+    risk              TEXT,
+    target_repo       TEXT,
+    target_city_id    TEXT,
+    ephemeral_unit_id TEXT,
+    outcome           TEXT,
+    summary           TEXT,
+    duration_s        REAL,
+    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at      TIMESTAMP
+)
+"""
+
 
 class ResearchLedger:
     """Analytics ledger for RepoCiv missions and agent believability.
@@ -167,6 +187,14 @@ class ResearchLedger:
         self._conn.execute(_DDL_WORLD_MODEL_PREDICTIONS)
         self._conn.execute(_DDL_WORLD_MODEL_HISTORY_SEQ)
         self._conn.execute(_DDL_WORLD_MODEL_HISTORY)
+        self._conn.execute(_DDL_SUBAGENT_RUNS)
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_subagent_parent ON subagent_runs(parent_mission_id)"
+        )
+        try:
+            self._conn.execute("ALTER TABLE missions ADD COLUMN IF NOT EXISTS parent_id TEXT")
+        except Exception:
+            pass
 
     @property
     def available(self) -> bool:
@@ -254,6 +282,10 @@ class ResearchLedger:
         if not self.available:
             return
         etype = event.get("type", "")
+        if etype == "SubagentCompleted":
+            data = event.get("data") or {}
+            self.record_subagent_run(data)
+            return
         if etype not in ("CommandCompleted", "CommandFailed", "CommandRejected"):
             return
 
@@ -515,6 +547,115 @@ class ResearchLedger:
                 logger.warning("ResearchLedger.get_world_model_calibration_samples: %s", exc)
                 return []
     # ── Query helpers ─────────────────────────────────────────────────────────
+
+    def record_subagent_run(self, run: dict[str, Any]) -> None:
+        """Upsert a subagent_runs row (dual-write from subagent_tracker)."""
+        if not self.available:
+            return
+        sid = str(run.get("id", ""))
+        if not sid:
+            return
+        with self._lock:
+            try:
+                self._conn.execute(
+                    """
+                    INSERT INTO subagent_runs (
+                        id, parent_mission_id, parent_unit_id, kind, label, status, risk,
+                        target_repo, target_city_id, ephemeral_unit_id, outcome, summary,
+                        duration_s, completed_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (id) DO UPDATE SET
+                        status = excluded.status,
+                        outcome = excluded.outcome,
+                        summary = excluded.summary,
+                        duration_s = excluded.duration_s,
+                        completed_at = excluded.completed_at
+                    """,
+                    (
+                        sid,
+                        str(run.get("parentMissionId") or run.get("parent_mission_id") or ""),
+                        str(run.get("parentUnitId") or run.get("parent_unit_id") or ""),
+                        str(run.get("kind") or ""),
+                        str(run.get("label") or "")[:512],
+                        str(run.get("status") or ""),
+                        str(run.get("risk") or ""),
+                        str(run.get("targetRepo") or run.get("target_repo") or ""),
+                        str(run.get("targetCityId") or run.get("target_city_id") or ""),
+                        str(run.get("ephemeralUnitId") or run.get("ephemeral_unit_id") or ""),
+                        str(run.get("status") if run.get("completedAt") else run.get("outcome") or ""),
+                        str(run.get("summary") or "")[:1024],
+                        float(run.get("duration") or run.get("duration_s") or 0.0),
+                        run.get("completedAt") or run.get("completed_at"),
+                    ),
+                )
+            except Exception as exc:
+                logger.warning("ResearchLedger.record_subagent_run: %s", exc)
+
+    def list_subagent_runs(
+        self,
+        *,
+        parent_unit: str = "",
+        parent_mission: str = "",
+        active_only: bool = False,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        if not self.available:
+            return []
+        clauses: list[str] = []
+        params: list[Any] = []
+        if parent_unit:
+            clauses.append("parent_unit_id = ?")
+            params.append(parent_unit)
+        if parent_mission:
+            clauses.append("parent_mission_id = ?")
+            params.append(parent_mission)
+        if active_only:
+            clauses.append("status IN ('proposed', 'running')")
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        params.append(limit)
+        with self._lock:
+            try:
+                rows = self._conn.execute(
+                    f"""
+                    SELECT id, parent_mission_id, parent_unit_id, kind, label, status, risk,
+                           target_repo, target_city_id, ephemeral_unit_id, outcome, summary,
+                           duration_s, created_at, completed_at
+                    FROM subagent_runs
+                    {where}
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    params,
+                ).fetchall()
+                cols = [
+                    "id", "parent_mission_id", "parent_unit_id", "kind", "label", "status",
+                    "risk", "target_repo", "target_city_id", "ephemeral_unit_id", "outcome",
+                    "summary", "duration_s", "created_at", "completed_at",
+                ]
+                return [dict(zip(cols, row)) for row in rows]
+            except Exception as exc:
+                logger.warning("ResearchLedger.list_subagent_runs: %s", exc)
+                return []
+
+    def get_mission_tree(self, mission_id: str) -> dict[str, Any]:
+        """Return mission + nested subagent runs for mission log UI."""
+        subs = self.list_subagent_runs(parent_mission=mission_id, limit=500)
+        mission_row: dict[str, Any] = {"id": mission_id}
+        if self.available:
+            with self._lock:
+                try:
+                    row = self._conn.execute(
+                        "SELECT id, repo, agent, outcome, duration_s, created_at FROM missions WHERE id = ?",
+                        (mission_id,),
+                    ).fetchone()
+                    if row:
+                        mission_row = {
+                            "id": row[0], "repo": row[1], "agent": row[2],
+                            "outcome": row[3], "duration_s": row[4], "created_at": row[5],
+                        }
+                except Exception:
+                    pass
+        return {"mission": mission_row, "subagents": subs, "children": subs}
 
     def get_mission_stats(self, limit: int = 100) -> list[dict[str, Any]]:
         """Return the *limit* most recent missions as dicts."""

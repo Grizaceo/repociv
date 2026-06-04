@@ -20,7 +20,7 @@ export function selectHero(
 ): void {
   state.selectUnit(unit);
   renderer.selectUnit(unit);
-  showUnitPanel(unit);
+  showUnitPanel(unit, state);
   renderHeroBar(state, (u) => selectHero(u, renderer, state, _bridge));
 
   // Auto-open side panel & load city context if hero is on a city

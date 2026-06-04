@@ -66,6 +66,7 @@ _TYPE_POLICY: dict[str, PolicyDecision] = {
     "git_commit":    "approve",
     "send_message":  "approve",
     "delete_file":   "approve",     # destructive but not blocked; needs explicit ok
+    "subagent_spawn": "approve",    # high/destructive Task delegations — audit gate
 }
 
 

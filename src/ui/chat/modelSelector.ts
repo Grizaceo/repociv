@@ -35,6 +35,7 @@ let _allProviders: ProviderInfo[] = []; // unfiltered — full list from server
 let _selectedHarness = '';
 let _selectedProvider = '';
 let _selectedModel = '';
+let _cursorAvailable = false;
 
 /** Return providers — server already filters to only configured providers,
  *  so this just returns the full list regardless of harness. */
@@ -90,6 +91,8 @@ export function initProviderSelectors(): void {
     });
     modelSel.dataset['wired'] = '1';
   }
+
+  fetchBridgeHealth();
 
   fetch(bridgeUrl('/providers'), { headers: bridgeHeaders() })
     .then((r) => {
@@ -254,6 +257,43 @@ function finishInit(data: { defaultHarness: string; defaultProvider: string }): 
   updateStatusIndicator();
 }
 
+/** Whether /health reports cursor-agent installed (Swarm tracking possible). */
+export function isCursorTrackingAvailable(): boolean {
+  return _cursorAvailable;
+}
+
+function fetchBridgeHealth(): void {
+  fetch(bridgeUrl('/health'), { headers: bridgeHeaders() })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data: { cursor?: boolean } | null) => {
+      _cursorAvailable = !!data?.cursor;
+      updateSwarmBadge();
+    })
+    .catch(() => {
+      _cursorAvailable = false;
+      updateSwarmBadge();
+    });
+}
+
+function updateSwarmBadge(): void {
+  const wrapper = document.getElementById('model-selector-wrapper');
+  if (!wrapper) return;
+  let badge = wrapper.querySelector<HTMLElement>('.swarm-tracking-badge');
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = 'swarm-tracking-badge';
+    wrapper.appendChild(badge);
+  }
+  const harness = _selectedHarness || 'auto';
+  const on = harness === 'cursor' && _cursorAvailable;
+  badge.textContent = on ? 'Swarm: on (cursor)' : 'Swarm: off';
+  badge.title = on
+    ? 'Task subagents con run_in_background se trackean en Orden de batalla'
+    : _cursorAvailable
+      ? 'Selecciona harness cursor para ver detachments en el mapa'
+      : 'cursor-agent no instalado — Swarm tracking no disponible';
+}
+
 /** Update the small status dot / tooltip showing current provider health. */
 function updateStatusIndicator(): void {
   const provSel = document.getElementById('provider-selector') as HTMLSelectElement | null;
@@ -285,6 +325,7 @@ function updateStatusIndicator(): void {
     status === 'ok' ? 'disponible' : status === 'warn' ? 'parcial / sin conexión' : 'no disponible';
   dot.title = `Provider: ${label} — ${reason}`;
   parent?.insertBefore(dot, provSel);
+  updateSwarmBadge();
 }
 
 /** Switch Hermes model/provider via the web server API. */

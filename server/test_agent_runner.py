@@ -211,6 +211,41 @@ def test_run_cursor_agent_streaming_success(monkeypatch, tmp_path):
     assert not any("tool_use" in c for c in text_chunks)
 
 
+def test_cursor_streaming_detects_background_task(monkeypatch, tmp_path):
+    """Task tool_use with run_in_background triggers subagent_tracker."""
+    import subprocess as _sp
+    from io import StringIO
+    from server import subagent_tracker as _st
+
+    _st._runs.clear()
+    _st._tool_use_map.clear()
+    sent = []
+    monkeypatch.setattr(agent_runner, "_find_cursor_agent", lambda: "/fake/cursor-agent")
+    monkeypatch.setattr(agent_runner._es, "record_output_chunk", lambda *_a: None)
+    agentpatch = lambda evt: sent.append(evt)
+    agent_runner.configure(send=agentpatch)
+
+    fake_ndjson = "\n".join([
+        '{"type":"tool_use","name":"Task","id":"tu-bg","input":'
+        '{"subagent_type":"explore","description":"scan","run_in_background":true}}',
+        '{"type":"tool_result","tool_use_id":"tu-bg","content":"summary text"}',
+    ])
+
+    class FakeProc:
+        returncode = 0
+        stdout = StringIO(fake_ndjson)
+        def wait(self, timeout=None): pass
+
+    monkeypatch.setattr(_sp, "Popen", lambda *_a, **_kw: FakeProc())
+
+    ok, _output = agent_runner._run_cursor_agent_streaming(
+        "DAVI", "m-task", "mission", config={}, working_dir=str(tmp_path), city_id="repociv",
+    )
+    assert ok is True
+    assert any(e.get("type") == "subagent_spawn" for e in sent)
+    assert any(e.get("type") == "subagent_complete" for e in sent)
+
+
 def test_run_cursor_agent_streaming_model_flag(monkeypatch, tmp_path):
     """--model flag is passed when a model is specified."""
     import subprocess as _sp

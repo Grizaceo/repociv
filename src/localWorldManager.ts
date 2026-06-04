@@ -251,4 +251,58 @@ export class LocalWorldManager {
     unit.path = [];
     this.notify();
   }
+
+  /** Swarm Civ: mirror ephemeral subagent as local operator. */
+  syncSubagentSpawn(payload: {
+    ephemeralUnitId: string;
+    parentUnitId: string;
+    kind: string;
+    label: string;
+    repoId: string;
+  }): void {
+    if (this.viewMode !== 'local' || !this.localWorld) return;
+    if (payload.repoId && this.localWorld.repoId !== payload.repoId) return;
+    if (this.localUnits.some((u) => u.id === payload.ephemeralUnitId)) return;
+
+    const parent = this.localUnits.find((u) => u.id === payload.parentUnitId);
+    const rooms = this.localWorld.rooms;
+    const room = rooms[Math.floor(Math.random() * rooms.length)] ?? rooms[0];
+    const gx = room ? room.x + Math.floor(room.w / 2) : 2;
+    const gy = room ? room.y + Math.floor(room.h / 2) : 2;
+    const kind = payload.kind.toLowerCase();
+    const unitType =
+      kind === 'explore' ? 'scout' : kind === 'shell' ? 'worker' : ('worker' as const);
+
+    this.localUnits.push({
+      id: payload.ephemeralUnitId,
+      name: payload.label.slice(0, 10) || payload.kind,
+      unitType,
+      color: parent?.color ?? '#8ab4f8',
+      gridX: gx,
+      gridY: gy,
+      targetX: null,
+      targetY: null,
+      path: [],
+      pathIndex: 0,
+      pathProgress: 0,
+      state: 'working_on_file',
+      mission: payload.label,
+      workProgress: 10,
+      macroUnitId: payload.parentUnitId,
+      currentWorkbenchId: null,
+      currentRoomId: room?.id ?? null,
+      fatigue: 100,
+      maxFatigue: 100,
+      isResting: false,
+      effectiveSpeed: 1,
+      ephemeral: true,
+    });
+    this.notify();
+  }
+
+  removeSubagentUnit(unitId: string): void {
+    const before = this.localUnits.length;
+    this.localUnits = this.localUnits.filter((u) => u.id !== unitId);
+    if (this.localUnits.length !== before) this.notify();
+  }
 }

@@ -92,8 +92,50 @@ export class UnitRenderer {
     ctx.restore();
   }
 
-  drawUnit(unit: Unit, animTime: number, selectedUnitId: string | null) {
+  drawSubagentLink(parent: Unit, child: Unit, animTime: number) {
     const { ctx } = this;
+    const pp = axialToPixel(parent.coord, HEX_SIZE);
+    const cp = axialToPixel(child.coord, HEX_SIZE);
+    const pulse = 0.25 + 0.15 * Math.sin(animTime * 2 + pp.x);
+    ctx.save();
+    ctx.strokeStyle = `rgba(139, 180, 248, ${pulse})`;
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([4, 5]);
+    ctx.beginPath();
+    ctx.moveTo(pp.x, pp.y);
+    ctx.lineTo(cp.x, cp.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  drawSubagentCountBadge(parent: Unit, childCount: number, animTime: number) {
+    const { ctx } = this;
+    const p = axialToPixel(parent.coord, HEX_SIZE);
+    const bx = p.x - HEX_SIZE * 0.5;
+    const by = p.y - HEX_SIZE * 0.55;
+    const label = childCount > 5 ? `+${childCount - 5}` : String(childCount);
+    ctx.save();
+    ctx.fillStyle = 'rgba(20, 30, 60, 0.85)';
+    ctx.strokeStyle = '#8ab4f8';
+    ctx.lineWidth = 1.5;
+    const w = label.length > 2 ? 22 : 16;
+    ctx.beginPath();
+    ctx.roundRect(bx - w / 2, by - 8, w, 16, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#cfe2ff';
+    ctx.font = 'bold 9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.globalAlpha = 0.85 + 0.15 * Math.sin(animTime * 3);
+    ctx.fillText(label, bx, by);
+    ctx.restore();
+  }
+
+  drawUnit(unit: Unit, animTime: number, selectedUnitId: string | null, ephemeral = false) {
+    const { ctx } = this;
+    const isEphemeral = ephemeral || unit.ephemeral;
     let ux: number, uy: number;
     if (unit.state === 'moving' && unit.path.length > 0 && unit.pathIndex < unit.path.length) {
       const from = axialToPixel(unit.path[unit.pathIndex]!, HEX_SIZE);
@@ -112,6 +154,8 @@ export class UnitRenderer {
     const floatY = Math.sin(animTime * 2.5 + ux * 0.01) * 2;
     ctx.save();
     ctx.translate(ux, uy + floatY);
+    const scale = isEphemeral ? 0.8 : 1;
+    if (scale !== 1) ctx.scale(scale, scale);
 
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.beginPath();
@@ -124,6 +168,34 @@ export class UnitRenderer {
       ctx.beginPath();
       ctx.arc(0, 0, HEX_SIZE * 0.45, 0, Math.PI * 2);
       ctx.stroke();
+    }
+
+    if (isEphemeral) {
+      const run = unit.subagentRunId ? this.state.subagents.get(unit.subagentRunId) : undefined;
+      const kind = run?.kind ?? unit.type;
+      const glyph =
+        kind === 'explore' || unit.type === 'scout'
+          ? '◈'
+          : unit.type === 'caravan'
+            ? '⛟'
+            : '◆';
+      const borderColor = unit.type === 'caravan' ? '#e8a040' : '#8ab4f8';
+      ctx.beginPath();
+      ctx.arc(0, 0, HEX_SIZE * 0.22, 0, Math.PI * 2);
+      ctx.fillStyle = '#1a1208';
+      ctx.fill();
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = borderColor;
+      ctx.font = `bold ${HEX_SIZE * 0.2}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(glyph, 0, 0);
+      ctx.restore();
+      return;
     }
 
     // Unit Cluster (Diamond formation)

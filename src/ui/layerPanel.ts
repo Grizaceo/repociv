@@ -30,7 +30,7 @@ const LAYERS: LayerDef[] = [
     id: 'ops',
     label: 'Ops',
     icon: '⚙',
-    desc: 'Tareas, experimentos activos, aprobaciones, fallos',
+    desc: 'Tareas, detachments subagente (líneas padre→hijo), aprobaciones',
   },
   {
     id: 'knowledge',

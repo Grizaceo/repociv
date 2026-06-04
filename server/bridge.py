@@ -351,6 +351,8 @@ def get_gpu_info() -> dict[str, Any] | None:
 # ─── Agent runner facade ──────────────────────────────────────────────────────
 def _configure_agent_runner() -> None:
     _agent_runner.configure(send=send_to_repociv, save=save_mission)
+    from server import subagent_tracker as _st  # noqa: PLC0415
+    _st.configure(send=send_to_repociv, add_approval=_add_approval)
 
 
 def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
@@ -538,6 +540,13 @@ def _dispatch_command(cmd: Command) -> None:
         _register_issue_run(payload, cmd.id)
         return
 
+    if cmd.type == "subagent_spawn":
+        from server import subagent_tracker as _st  # noqa: PLC0415
+        _st.approve_spawn(cmd.id)
+        _es.record_completed(cmd.id, "subagent_spawn approved")
+        send_to_repociv({"type": "log", "msg": f"Subagente aprobado: {cmd.target}", "level": "success"})
+        return
+
     if cmd.type == "quest_add":
         title = str(payload.get("title", cmd.target))
         description = str(payload.get("description", ""))
@@ -714,6 +723,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/health":             _routes.get_health,
             "/ready":              _routes.get_ready,
             "/missions":           _routes.get_missions,
+            "/subagents":          _routes.get_subagents,
             "/gpu":                _routes.get_gpu,
             "/pending":            _routes.get_pending,
             "/context":            _routes.get_context,
@@ -795,6 +805,15 @@ class BridgeHandler(BaseHTTPRequestHandler):
             status, body = _routes.get_task_by_key(ctx)
             self._respond(status, body)
             return
+
+        # ── Mission tree (subagent swarm log) ────────────────────────────────
+        if path.startswith("/missions/") and path.endswith("/tree"):
+            mission_id = path[len("/missions/"):path.rfind("/tree")]
+            if mission_id:
+                ctx["mission_id"] = mission_id
+                status, body = _routes.get_mission_tree(ctx)
+                self._respond(status, body)
+                return
 
         # ── Foreign relations report by ID ─────────────────────────────────────
         if path.startswith("/api/foreign/reports/"):
@@ -1164,12 +1183,28 @@ def _recover_hung_commands() -> int:
     return len(hung)
 
 
+def _seed_initial_heartbeats() -> None:
+    """Soft heartbeat for known agents at bridge boot — avoids eternal never_seen."""
+    from server import agent_runner as _ar  # noqa: PLC0415
+
+    seen: set[str] = {"DAVI"}
+    seen.update(_ar.AGENT_CONFIGS.keys())
+    sessions_dir = CONFIG_DIR / "sessions"
+    if sessions_dir.is_dir():
+        for entry in sessions_dir.iterdir():
+            if entry.is_dir():
+                seen.add(entry.name.upper())
+    for agent_id in sorted(seen):
+        _sched.heartbeat(agent_id)
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     _sched.set_dispatcher(_scheduler_dispatch)
     # Wire fatigue state into scheduler priority scoring
     _sched.set_fatigue_provider(lambda unit_id: get_unit_fatigue(unit_id).get("fatigue"))
     _sched.start_worker()
+    _seed_initial_heartbeats()
 
     # Wire P4 step executor → orchestrator (agent dispatch: SCOUT/WORKER/DAVI)
     from server.step_executor import dispatch_plan_step

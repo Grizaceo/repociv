@@ -400,6 +400,7 @@ def compute_metrics(
             "id": a.get("id", ""),
             "state": a.get("status", a.get("state", "offline")),
             "activeTask": a.get("activeTasks", a.get("activeTask", None)),
+            "lastSeenAgo": a.get("lastSeenAgo"),
         })
 
     return {

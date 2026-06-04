@@ -3,6 +3,12 @@ import type { GameState } from '../game.ts';
 import type { Unit, UnitState } from '../types.ts';
 import { cfg } from '../gameConfig.ts';
 import { renderCapabilityBadges, clearCapabilityBadges } from './capabilityBadges.ts';
+import { renderOrdenDeBatalla, hideOrdenDeBatalla, setOrdenHighlightCallback } from './ordenDeBatalla.ts';
+
+setOrdenHighlightCallback((unitId) => {
+  const ev = new CustomEvent('repociv:highlight-unit', { detail: { unitId } });
+  window.dispatchEvent(ev);
+});
 
 function unitStateColor(state: UnitState): string {
   const colors: Record<UnitState, string> = {
@@ -28,7 +34,7 @@ function unitModelLabel(unit: Unit): string {
   return labels[unit.type] ?? unit.type;
 }
 
-export function showUnitPanel(unit: Unit) {
+export function showUnitPanel(unit: Unit, state?: GameState) {
   const panel = document.getElementById('unit-panel');
   if (!panel) return;
   panel.classList.remove('hidden');
@@ -57,18 +63,20 @@ export function showUnitPanel(unit: Unit) {
   if (dot) dot.style.background = unitStateColor(unit.state);
 
   renderCapabilityBadges(unit);
+  if (state) renderOrdenDeBatalla(state, unit);
 }
 
 export function hideUnitPanel() {
   document.getElementById('unit-panel')?.classList.add('hidden');
   clearCapabilityBadges();
+  hideOrdenDeBatalla();
 }
 
 export function renderHeroBar(state: GameState, onSelect: (u: Unit) => void) {
   const slots = document.getElementById('hero-bar-slots');
   if (!slots) return;
 
-  const heroes = state.getAllUnits().slice(0, 9);
+  const heroes = state.getAllUnits().filter((u) => !u.ephemeral).slice(0, 9);
 
   // Limpieza simple para permitir auto-animate en el contenedor
   slots.innerHTML = '';

@@ -482,7 +482,7 @@ async function bootstrap() {
     if (!unit) return;
     state.selectUnit(unit);
     renderer.selectUnit(unit);
-    showUnitPanel(unit);
+    showUnitPanel(unit, state);
     const missionInput = document.getElementById('mission-input') as HTMLInputElement | null;
     if (missionInput) {
       missionInput.placeholder = `Misión para ${city.name} (${city.id})`;
@@ -818,7 +818,7 @@ async function bootstrap() {
   // Re-render hero bar on state changes
   const refreshHero = () => {
     renderHeroBar(state, (u) => selectHero(u, renderer, state, bridge));
-    if (state.selectedUnit) showUnitPanel(state.selectedUnit);
+    if (state.selectedUnit) showUnitPanel(state.selectedUnit, state);
   };
   state.subscribe(refreshHero);
   refreshHero();

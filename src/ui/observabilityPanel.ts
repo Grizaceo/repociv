@@ -11,8 +11,9 @@ const POLL_MS = 5_000;
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AgentStatus {
   id: string;
-  state: 'idle' | 'working' | 'sleeping' | 'offline';
+  state: 'idle' | 'working' | 'sleeping' | 'offline' | 'never_seen';
   activeTask?: string | null;
+  lastSeenAgo?: number | null;
 }
 
 interface Failure {
@@ -299,19 +300,43 @@ function _render() {
 }
 
 // ─── Card helpers ─────────────────────────────────────────────────────────────
+function _agentStateMeta(state: string): { label: string; color: string; tooltip: string } {
+  switch (state) {
+    case 'never_seen':
+      return {
+        label: 'en reposo',
+        color: '#888',
+        tooltip: 'Aún no ha ejecutado misión vía bridge',
+      };
+    case 'offline':
+      return {
+        label: 'sin latido',
+        color: '#a08040',
+        tooltip: 'Sin heartbeat reciente; bridge puede estar sano',
+      };
+    case 'idle':
+      return { label: 'idle', color: '#5b9b5b', tooltip: 'idle' };
+    case 'working':
+      return { label: 'working', color: '#4a9ade', tooltip: 'working' };
+    case 'sleeping':
+      return { label: 'sleeping', color: '#666', tooltip: 'sleeping' };
+    default:
+      return { label: state, color: '#888', tooltip: state };
+  }
+}
+
 function _agentCard(a: AgentStatus): string {
-  const colors: Record<string, string> = {
-    idle: '#5b9b5b',
-    working: '#4a9ade',
-    sleeping: '#666',
-    offline: '#d44b4b',
-  };
-  const color = colors[a.state] ?? '#888';
+  const meta = _agentStateMeta(a.state);
+  const ago =
+    a.lastSeenAgo != null && a.state !== 'never_seen'
+      ? `<span class="obs-agent-ago" title="Último heartbeat">hace ${a.lastSeenAgo}s</span>`
+      : '';
   return `
     <div class="obs-agent-card">
-      <span class="obs-agent-dot" style="background:${color}" title="${a.state}"></span>
+      <span class="obs-agent-dot" style="background:${meta.color}" title="${_esc(meta.tooltip)}"></span>
       <span class="obs-agent-id">${_esc(a.id)}</span>
-      <span class="obs-agent-state">${a.state}</span>
+      <span class="obs-agent-state" title="${_esc(meta.tooltip)}">${_esc(meta.label)}</span>
+      ${ago}
       ${a.activeTask ? `<span class="obs-agent-task" title="${_esc(a.activeTask)}">${_esc(a.activeTask.slice(0, 18))}</span>` : ''}
     </div>
   `;

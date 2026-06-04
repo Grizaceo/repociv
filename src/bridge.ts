@@ -3,7 +3,7 @@
 // Sends user commands to bridge.py at http://localhost:5274.
 // Handles reconnect with exponential backoff + demo mode fallback.
 
-import { type GameState } from './game.ts';
+import { type GameState, pickDetachmentHex } from './game.ts';
 import { type BridgeEvent, type CDailyArticle } from './types.ts';
 import type { SuggestionRelation as WonderSuggestionRelation } from './wonders/types.ts';
 import { logger } from './logger.ts';
@@ -32,6 +32,7 @@ export class BridgeEvents {
   private reconnectDelay = 1000;
   private offlineSince: number | null = null;
   private demoInterval: ReturnType<typeof setInterval> | null = null;
+  private lastHealthFlags: { cursor?: boolean } = {};
   private gpuInterval = 0;
   rendererRef: { panTo: (x: number, y: number) => void } | null = null;
 
@@ -219,6 +220,7 @@ export class BridgeEvents {
             : dt === 'openclaw' && data.openclaw
               ? 'openclaw'
               : 'hermes';
+        this.lastHealthFlags = { cursor: data.cursor };
         this.onBridgeOnline(mode);
         return;
       }
@@ -233,7 +235,7 @@ export class BridgeEvents {
     this.offlineSince = null;
     this.reconnectDelay = 1000;
     this.stopDemo();
-    setBridgeStatus(true, mode);
+    setBridgeStatus(true, mode, this.lastHealthFlags);
   }
 
   private onBridgeOffline() {
@@ -286,15 +288,32 @@ export class BridgeEvents {
   handleBridgeEvent(evt: BridgeEvent) {
     switch (evt.type) {
       case 'unit_spawn': {
+        const parent = evt.parentUnit ? this.state.getUnit(evt.parentUnit) : undefined;
+        let spawnCoord = { q: evt.hex[0], r: evt.hex[1] };
+        if (parent && evt.hex[0] === 0 && evt.hex[1] === 0) {
+          const childIndex = this.state
+            .getChildrenOfUnit(parent.id)
+            .filter((c) => c.ephemeral).length;
+          spawnCoord = pickDetachmentHex(this.state, parent.coord, childIndex);
+        }
         const unit = this.state.spawnUnit(
           evt.unit,
           evt.unit,
           evt.unitType ?? 'hero',
           evt.civ,
-          { q: evt.hex[0], r: evt.hex[1] },
+          spawnCoord,
           evt.mission,
           evt.cityId,
+          {
+            parentUnitId: evt.parentUnit,
+            ephemeral: evt.ephemeral,
+            subagentRunId: evt.subagentRunId,
+          },
         );
+        if (evt.ephemeral && evt.cityId && evt.unitType === 'caravan') {
+          const targetCity = this.state.world.cities.find((c) => c.id === evt.cityId);
+          if (targetCity) this.state.moveUnit(unit.id, targetCity.coord);
+        }
         logEvent(`Unidad ${unit.name} apareció en el mapa`, 'success');
         break;
       }
@@ -452,6 +471,88 @@ export class BridgeEvents {
         logEvent(`⚠ Contexto agotado para ${evt.unit}`, 'warn');
         break;
       }
+      case 'fog_reveal':
+        this.state.revealHexes(evt.hexes, evt.cityId);
+        logEvent(`🌫 Niebla disipada (${evt.hexes.length} hexes)`, 'info');
+        break;
+      case 'subagent_spawn': {
+        const parentUnit = this.state.getUnit(evt.parentUnit);
+        const spawnStatus = evt.status ?? 'running';
+        this.state.registerSubagent({
+          id: evt.subagentId,
+          parentMissionId: evt.parentMissionId,
+          parentUnitId: evt.parentUnit,
+          kind: evt.kind,
+          label: evt.label,
+          status: spawnStatus,
+          risk: evt.risk as import('./types.ts').SubagentRisk,
+          targetCityId: evt.targetCityId,
+          ephemeralUnitId: evt.ephemeralUnitId,
+          startedAt: Date.now(),
+          unitType: evt.unitType,
+        });
+        if (spawnStatus === 'running') {
+          const childIndex = parentUnit
+            ? this.state.getChildrenOfUnit(parentUnit.id).filter((c) => c.ephemeral).length
+            : 0;
+          const coord = parentUnit
+            ? pickDetachmentHex(this.state, parentUnit.coord, childIndex)
+            : { q: evt.hex[0], r: evt.hex[1] };
+          this.state.spawnUnit(
+            evt.ephemeralUnitId,
+            evt.label.slice(0, 12) || evt.kind,
+            evt.unitType ?? 'scout',
+            'capital',
+            coord,
+            evt.label,
+            evt.targetCityId,
+            {
+              parentUnitId: evt.parentUnit,
+              ephemeral: true,
+              subagentRunId: evt.subagentId,
+            },
+          );
+          this.state.syncSubagentSpawn({
+            ephemeralUnitId: evt.ephemeralUnitId,
+            parentUnitId: evt.parentUnit,
+            kind: evt.kind,
+            label: evt.label,
+            repoId: evt.targetCityId ?? parentUnit?.cityId ?? '',
+          });
+          logEvent(`◈ Detachment: ${evt.label.slice(0, 40)}`, 'info');
+        } else {
+          logEvent(`◈ Detachment propuesto: ${evt.label.slice(0, 40)} (pendiente aprobación)`, 'info');
+        }
+        break;
+      }
+      case 'subagent_progress':
+        this.state.appendSubagentProgress(evt.subagentId, evt.text ?? evt.phase ?? '…');
+        break;
+      case 'subagent_complete':
+        this.state.completeSubagent(evt.subagentId, evt.success, evt.summary);
+        logEvent(
+          evt.success
+            ? `✓ Subagente completado (${Math.round(evt.duration)}s)`
+            : `✗ Subagente falló`,
+          evt.success ? 'success' : 'warn',
+        );
+        break;
+      case 'subagent_proposed':
+        this.state.registerSubagent({
+          id: evt.subagentId,
+          parentMissionId: evt.parentMissionId,
+          parentUnitId: evt.parentUnit,
+          kind: evt.kind,
+          label: evt.label,
+          status: 'proposed',
+          risk: evt.risk as import('./types.ts').SubagentRisk,
+          startedAt: Date.now(),
+        });
+        logEvent(`⏳ Subagente propuesto [${evt.risk}]: ${evt.label.slice(0, 40)}`, 'warn');
+        break;
+      case 'subagent_cancel':
+        logEvent(`Subagente cancelado: ${evt.subagentId}`, 'warn');
+        break;
       default:
         break;
     }

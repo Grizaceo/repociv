@@ -194,6 +194,10 @@ export interface Unit {
   restingRoomId?: string; // which rest area room they're recovering in
   effectiveSpeed: number; // speed after fatigue penalty (computed)
   trailPositions?: { q: number; r: number }[]; // last 5 hex positions (index 0=oldest, 4=most recent)
+  // ─── Swarm Civ: subagent detachments ─────────────────────────────
+  parentUnitId?: string;
+  ephemeral?: boolean;
+  subagentRunId?: string;
 }
 
 export const UNIT_COLORS: Record<string, string> = {
@@ -219,6 +223,26 @@ export interface World {
   restAreas: RestArea[]; // Phase 9: Context Fatigue
 }
 
+export type SubagentStatus = 'proposed' | 'running' | 'complete' | 'failed' | 'cancelled';
+export type SubagentRisk = 'low' | 'medium' | 'high' | 'destructive';
+
+export interface SubagentRun {
+  id: string;
+  parentMissionId: string;
+  parentUnitId: string;
+  kind: string;
+  label: string;
+  status: SubagentStatus;
+  risk: SubagentRisk;
+  targetCityId?: string;
+  targetRepo?: string;
+  ephemeralUnitId?: string;
+  startedAt: number;
+  completedAt?: number | null;
+  summary?: string;
+  unitType?: UnitType;
+}
+
 // ─── Rest Area (Phase 9: XCOM Context Fatigue) ─────────────────────────────
 export interface RestArea {
   id: string;
@@ -239,6 +263,9 @@ export type BridgeEvent =
       mission?: string;
       unitType?: UnitType;
       cityId?: string;
+      parentUnit?: string;
+      ephemeral?: boolean;
+      subagentRunId?: string;
     }
   | {
       type: 'unit_move';
@@ -303,7 +330,51 @@ export type BridgeEvent =
   | { type: 'context_exhausted'; unit: string; hex: [number, number] }
   | { type: 'city_founder'; name: string; hex: [number, number] }
   | { type: 'resource_update'; resource: 'gold' | 'science' | 'production'; delta: number }
-  | { type: 'fog_reveal'; hexes: [number, number][] }
+  | { type: 'fog_reveal'; hexes: [number, number][]; sourceSubagentId?: string; cityId?: string }
+  | {
+      type: 'subagent_spawn';
+      subagentId: string;
+      parentMissionId: string;
+      parentUnit: string;
+      kind: string;
+      label: string;
+      hex: [number, number];
+      unitType?: UnitType;
+      risk: string;
+      ephemeralUnitId: string;
+      targetCityId?: string;
+      status?: 'proposed' | 'running';
+    }
+  | {
+      type: 'subagent_progress';
+      subagentId: string;
+      phase?: string;
+      text?: string;
+    }
+  | {
+      type: 'subagent_complete';
+      subagentId: string;
+      success: boolean;
+      summary: string;
+      duration: number;
+      ephemeralUnitId?: string;
+    }
+  | {
+      type: 'subagent_proposed';
+      subagentId: string;
+      parentMissionId: string;
+      parentUnit: string;
+      kind: string;
+      label: string;
+      risk: string;
+      approvalRequired: boolean;
+      commandId: string;
+    }
+  | {
+      type: 'subagent_cancel';
+      subagentId: string;
+      reason?: string;
+    }
   | { type: 'mission_start'; missionId: string; unit: string; questName: string }
   | {
       type: 'mission_complete';
@@ -408,6 +479,7 @@ export interface LocalUnit {
   restingRoomId?: string;
   effectiveSpeed: number; // local grid movement speed after fatigue penalty
   assignedTask?: AgentTask | null; // player-assigned job focus (frontend-only)
+  ephemeral?: boolean; // subagent detachment in local view
 }
 
 export interface LocalMission {

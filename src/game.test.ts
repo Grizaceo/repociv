@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { GameState } from './game.ts';
+import { GameState, pickDetachmentHex } from './game.ts';
 import type { World } from './types.ts';
 
 // ─── Minimal mocks ────────────────────────────────────────────────────────────
@@ -52,6 +52,8 @@ vi.mock('./localWorldManager.ts', () => {
         return { repoId: 'r', tiles: new Map(), units: [], workbenches: [], width: 5, height: 5 };
       }
       enterMacroView() {}
+      syncSubagentSpawn() {}
+      removeSubagentUnit() {}
     },
   };
 });
@@ -409,5 +411,107 @@ describe('Unit trail buffer', () => {
     trail = pushTrail(trail, { q: 99, r: 0 });
     expect(trail![0]).toEqual({ q: 1, r: 0 }); // { q:0, r:0 } was evicted
     expect(trail![4]).toEqual({ q: 99, r: 0 });
+  });
+});
+
+describe('GameState subagent detachments', () => {
+  it('spawnUnit accepts parent/ephemeral options', () => {
+    const state = new GameState(makeWorld());
+    const parent = state.spawnUnit('DAVI', 'DAVI', 'hero', 'capital', { q: 0, r: 0 });
+    const child = state.spawnUnit(
+      'SCOUT-sub-x',
+      'scout',
+      'scout',
+      'capital',
+      parent.coord,
+      'explore',
+      undefined,
+      { parentUnitId: 'DAVI', ephemeral: true, subagentRunId: 'sub-x' },
+    );
+    expect(child.parentUnitId).toBe('DAVI');
+    expect(child.ephemeral).toBe(true);
+    expect(state.getChildrenOfUnit('DAVI')).toHaveLength(1);
+  });
+
+  it('completeSubagent cascades despawn of ephemeral unit', () => {
+    const state = new GameState(makeWorld());
+    state.spawnUnit('DAVI', 'DAVI', 'hero', 'capital', { q: 0, r: 0 });
+    state.spawnUnit(
+      'SCOUT-sub-y',
+      'scout',
+      'scout',
+      'capital',
+      { q: 1, r: 0 },
+      undefined,
+      undefined,
+      { parentUnitId: 'DAVI', ephemeral: true, subagentRunId: 'sub-y' },
+    );
+    state.registerSubagent({
+      id: 'sub-y',
+      parentMissionId: 'm1',
+      parentUnitId: 'DAVI',
+      kind: 'explore',
+      label: 'scan',
+      status: 'running',
+      risk: 'low',
+      ephemeralUnitId: 'SCOUT-sub-y',
+      startedAt: Date.now(),
+    });
+    state.completeSubagent('sub-y', true, 'ok');
+    expect(state.getUnit('SCOUT-sub-y')).toBeUndefined();
+    expect(state.subagents.has('sub-y')).toBe(false);
+    expect(state.completedSubagents[0]?.summary).toBe('ok');
+  });
+
+  it('revealHexes clears fog on tiles', () => {
+    const world = makeWorld();
+    world.tiles.set('0,0', {
+      coord: { q: 0, r: 0 },
+      terrain: 'plains',
+      resources: { gold: 0, science: 0, production: 0 },
+      inFog: true,
+      revealed: false,
+    });
+    const state = new GameState(world);
+    state.revealHexes([[0, 0]]);
+    const tile = state.world.tiles.get('0,0');
+    expect(tile?.inFog).toBe(false);
+    expect(tile?.revealed).toBe(true);
+  });
+});
+
+describe('pickDetachmentHex', () => {
+  it('returns neighbor hex offset from parent, not same coord', () => {
+    const state = new GameState(makeWorld());
+    state.spawnUnit('DAVI', 'DAVI', 'hero', 'capital', { q: 0, r: 0 });
+    const hex = pickDetachmentHex(state, { q: 0, r: 0 }, 0);
+    expect(hex).not.toEqual({ q: 0, r: 0 });
+    expect(state.getUnitAt(hex)).toBeNull();
+  });
+
+  it('uses childIndex to pick different ring slots', () => {
+    const state = new GameState(makeWorld());
+    state.spawnUnit('DAVI', 'DAVI', 'hero', 'capital', { q: 0, r: 0 });
+    const h0 = pickDetachmentHex(state, { q: 0, r: 0 }, 0);
+    const h1 = pickDetachmentHex(state, { q: 0, r: 0 }, 1);
+    expect(h0).not.toEqual(h1);
+  });
+
+  it('falls back to parent when all neighbors occupied', () => {
+    const state = new GameState(makeWorld());
+    state.spawnUnit('DAVI', 'DAVI', 'hero', 'capital', { q: 0, r: 0 });
+    const parent = { q: 0, r: 0 };
+    const neighbors = [
+      { q: 1, r: 0 },
+      { q: 1, r: -1 },
+      { q: 0, r: -1 },
+      { q: -1, r: 0 },
+      { q: -1, r: 1 },
+      { q: 0, r: 1 },
+    ];
+    neighbors.forEach((c, i) => {
+      state.spawnUnit(`BLOCK-${i}`, `B${i}`, 'worker', 'capital', c);
+    });
+    expect(pickDetachmentHex(state, parent, 0)).toEqual(parent);
   });
 });
