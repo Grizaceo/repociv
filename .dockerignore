@@ -1,0 +1,26 @@
+# RepoCiv agent image build context (Dockerfile.agent)
+.git
+.github
+.venv
+venv
+node_modules
+dist
+build
+.vite
+coverage
+.pytest_cache
+.ruff_cache
+*.duckdb
+*.duckdb.wal
+data
+.env
+.env.*
+!.env.example
+*.log
+docs/design/screenshots
+execplan
+.claude
+.cursor
+.gstack
+.idea
+.vscode

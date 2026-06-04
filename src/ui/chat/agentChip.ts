@@ -19,19 +19,15 @@ const AGENT_ICONS: Record<string, string> = {
   OPENCLAW: '🦀',
   CLAUDE: '🧠',
   CODEX: '⌨',
+  CURSOR: '🖱',
 };
-
-export function getAgentIcon(unitId: string): string {
-  return AGENT_ICONS[unitId.toUpperCase()] ?? '◆';
-}
-
 /** Create a chip button with click handler attached. */
 export function createChip(unitId: string, isActive: boolean): HTMLElement {
   const btn = document.createElement('button');
   btn.className = `chat-agent-chip${isActive ? ' active' : ''}`;
   btn.dataset['unit'] = unitId;
   btn.innerHTML =
-    `<span class="chip-icon">${getAgentIcon(unitId)}</span>` +
+    `<span class="chip-icon">${AGENT_ICONS[unitId.toUpperCase()] ?? '◆'}</span>` +
     `<span class="chip-name">${unitId.toUpperCase()}</span>` +
     `<span class="chip-badge${agentsWithNewMessages.has(unitId) ? ' active' : ''}"></span>`;
   btn.addEventListener('click', () => {

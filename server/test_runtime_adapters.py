@@ -6,6 +6,11 @@ def test_default_agent_runtime_maps_openclaw_unit():
     assert adapter.harness_id == "openclaw-local"
 
 
+def test_default_agent_runtime_maps_cursor_unit():
+    adapter = runtime_adapters.default_agent_runtime("CURSOR")
+    assert adapter.harness_id == "cursor-local"
+
+
 def test_infer_adapter_for_command_prefers_registered_runtime():
     adapter = runtime_adapters.infer_adapter_for_command("run_tests")
     assert adapter is not None

@@ -1,0 +1,23 @@
+# RepoCiv — isolated agent image (Fase 5). Not the dashboard stack.
+#
+# Used when REPOCIV_AGENT_CONTAINER=1: bridge runs missions via
+# server/container_runtime.py (--network none, read-only /repo bind).
+#
+# Build:  ./scripts/build-agent-image.sh
+# Tag:    repociv-agent:latest (override with REPOCIV_AGENT_IMAGE)
+
+FROM python:3.12-slim-bookworm
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates git \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r repociv -g 1000 \
+    && useradd -r -u 1000 -g repociv -m -d /home/repociv repociv
+
+COPY docker/agent-entrypoint.sh /usr/local/bin/repociv-agent-entrypoint
+RUN chmod 755 /usr/local/bin/repociv-agent-entrypoint
+
+WORKDIR /tmp/workspace
+USER repociv
+
+ENTRYPOINT ["/usr/local/bin/repociv-agent-entrypoint"]

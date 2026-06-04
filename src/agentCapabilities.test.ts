@@ -50,6 +50,12 @@ describe('agentCanDo', () => {
     expect(agentCanDo('OPENCLAW', 'execute_agent')).toBe(true);
   });
 
+  it('CURSOR mirrors coding-agent capabilities', () => {
+    expect(agentCanDo('CURSOR', 'edit_file')).toBe(true);
+    expect(agentCanDo('CURSOR', 'git_commit')).toBe(true);
+    expect(agentCanDo('CURSOR', 'execute_agent')).toBe(true);
+  });
+
   it('handles suffixed agent IDs', () => {
     expect(agentCanDo('SCOUT-2', 'edit_file')).toBe(false);
     expect(agentCanDo('WORKER-3', 'run_tests')).toBe(true);
@@ -106,6 +112,11 @@ describe('getSkillBadges', () => {
     const badges = getSkillBadges('SCOUT');
     expect(badges).toHaveLength(1);
     expect(badges[0]!.key).toBe('inspection');
+  });
+
+  it('CURSOR has coding + orchestration badges', () => {
+    const badges = getSkillBadges('CURSOR');
+    expect(badges.map((b) => b.key)).toEqual(['git_workflow', 'test_runner', 'code_editor', 'orchestration']);
   });
 
   it('handles suffixed ID', () => {

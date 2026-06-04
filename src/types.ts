@@ -165,7 +165,8 @@ export type UnitType =
   | 'lexo'
   | 'openclaw'
   | 'claude'
-  | 'codex';
+  | 'codex'
+  | 'cursor';
 
 export type UnitState = 'idle' | 'moving' | 'working' | 'sleeping' | 'building';
 
@@ -210,6 +211,7 @@ export const UNIT_COLORS: Record<string, string> = {
   openclaw: '#7bd6c8',
   claude: '#d4a574',
   codex: '#e87d7d',
+  cursor: '#a0d6c8',
 };
 
 // ─── World ──────────────────────────────────────────────────────────────────

@@ -12,11 +12,12 @@ describe('harnessRegistry', () => {
 
   it('listHarnesses returns all seeded harnesses', () => {
     const all = listHarnesses();
-    expect(all).toHaveLength(7);
+    expect(all).toHaveLength(8);
     const ids = all.map((h) => h.id).sort();
     expect(ids).toEqual([
       'claude-code-local',
       'codex-local',
+      'cursor-local',
       'hermes-local',
       'local-cli',
       'nemoclaw-sandbox',

@@ -46,6 +46,11 @@ AGENT_CAPABILITIES: dict[str, list[str]] = {
         "inspect_repo", "read_file", "run_tests", "run_build",
         "edit_file", "create_branch",
     ],
+    # Cursor — coding agent via cursor-agent CLI
+    "CURSOR": [
+        "inspect_repo", "read_file", "run_tests", "run_build",
+        "edit_file", "create_branch", "git_commit", "execute_agent",
+    ],
 }
 
 # ─── Skill labels (human-readable, shown in UI badges) ───────────────────────
@@ -85,6 +90,12 @@ SKILL_LABELS: dict[str, dict[str, str]] = {
         "test_runner":  "Tests",
         "code_editor":  "Edición",
     },
+    "CURSOR": {
+        "git_workflow":  "Git completo",
+        "test_runner":   "Tests",
+        "code_editor":   "Edición",
+        "orchestration": "Orquestación",
+    },
 }
 
 # ─── Repo-level restrictions (path fragment → allowed types only) ─────────────
@@ -120,6 +131,7 @@ _AGENT_BASE_ALIASES = {
     "OPENCLAW": "OPENCLAW",
     "CLAUDE": "CLAUDE",
     "CODEX": "CODEX",
+    "CURSOR": "CURSOR",
 }
 
 

@@ -387,6 +387,29 @@ Con Docker LGB en el host: `VITE_WONDER_BIBLIOTHECA_URL=http://127.0.0.1:3000`.
 
 ---
 
+## Docker: agentes aislados (opcional)
+
+RepoCiv **no** empaqueta el dashboard (Vite + bridge) en Docker hoy. La imagen
+`repociv-agent` es solo para ejecutar misiones WORKER en contenedor cuando el bridge
+tiene `REPOCIV_AGENT_CONTAINER=1` (ver `server/container_runtime.py`).
+
+```bash
+./scripts/build-agent-image.sh
+# En .env del bridge:
+# REPOCIV_AGENT_CONTAINER=1
+# REPOCIV_AGENT_IMAGE=repociv-agent:latest
+```
+
+La imagen por defecto es un contenedor base **sin LLM**. Para un agente real,
+extiende `Dockerfile.agent` con tu CLI (Claude Code, Codex, etc.) y define
+`REPOCIV_AGENT_CMD` como comando confiable (se parsea como argv, sin `sh -c`).
+Si solo quieres un smoke test del contenedor, usa `REPOCIV_CONTAINER_STUB=1`.
+
+Política aplicada por el bridge: `--network none`, bind read-only del repo objetivo,
+tmpfs en `/tmp/workspace`, sin montar `.env` ni `~/.ssh` del host.
+
+---
+
 ## Next Steps
 
 - Read [PUBLIC_ARCHITECTURE.md](PUBLIC_ARCHITECTURE.md) for a deep dive into

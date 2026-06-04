@@ -127,6 +127,24 @@ def test_run_cursor_agent_streaming_missing_binary(monkeypatch):
     assert sent[0]["type"] == "chat_chunk"
 
 
+def test_execute_streaming_cursor_bypass_uses_cursor_agent(monkeypatch):
+    called = {}
+    monkeypatch.setattr(agent_runner, "_container_mode_enabled", lambda: False)
+    monkeypatch.setattr(agent_runner, "send_to_repociv", lambda evt: None)
+
+    def fake_cursor_runner(unit_id, mission_id, mission, config, working_dir=None, city_id="", model=""):
+        called["args"] = (unit_id, mission_id, mission, city_id, model)
+        return True, "ok"
+
+    monkeypatch.setattr(agent_runner, "_run_cursor_agent_streaming", fake_cursor_runner)
+
+    ok, output = agent_runner._execute_streaming("CURSOR", "m-cur", "inspect repo", city_id="repociv", model="gpt-5.4")
+
+    assert ok is True
+    assert output == "ok"
+    assert called["args"] == ("CURSOR", "m-cur", "inspect repo", "repociv", "gpt-5.4")
+
+
 class TestParseCursorNdjsonChunk:
     """Unit tests for the NDJSON chunk parser."""
 

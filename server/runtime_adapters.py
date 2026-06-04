@@ -113,7 +113,13 @@ def default_agent_runtime(unit_id: str) -> RuntimeAdapter:
     if os.environ.get("REPOCIV_AGENT_CONTAINER", "").lower() in {"1", "true", "yes"}:
         return DockerAdapter(harness_id="docker-agent", descriptor=_DOCKER_DESCRIPTOR)
     base = unit_id.split("-")[0].upper()
-    harness_id = "openclaw-local" if base == "OPENCLAW" else "claude-code-local" if base == "CLAUDE" else "codex-local" if base == "CODEX" else "hermes-local"
+    harness_id = (
+        "openclaw-local" if base == "OPENCLAW"
+        else "claude-code-local" if base == "CLAUDE"
+        else "codex-local" if base == "CODEX"
+        else "cursor-local" if base == "CURSOR"
+        else "hermes-local"
+    )
     adapter = get_adapter(harness_id)
     if adapter is None:
         raise RuntimeError(f"Default runtime adapter '{harness_id}' not found")

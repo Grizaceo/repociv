@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
 from server import agent_runner
 from server.container_runtime import build_docker_run_command, run_agent_container
 from server.security_harness import SecurityHarness
+
+
+ENTRYPOINT = Path(__file__).resolve().parent.parent / "docker" / "agent-entrypoint.sh"
 
 
 def test_docker_run_uses_network_none_and_readonly_repo_mount(tmp_path: Path) -> None:
@@ -91,3 +95,32 @@ def test_container_output_audited_before_success(monkeypatch, tmp_path: Path) ->
     assert ok is False
     assert "security audit failed" in output
     assert sent
+
+
+def test_agent_entrypoint_requires_explicit_stub_or_agent_command(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [str(ENTRYPOINT), "mission text"],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "REPOCIV_WORKSPACE": str(tmp_path)},
+    )
+
+    assert result.returncode == 64
+    assert "set REPOCIV_AGENT_CMD" in result.stderr
+
+
+def test_agent_entrypoint_stub_mode_is_explicit(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [str(ENTRYPOINT), "mission text"],
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "REPOCIV_WORKSPACE": str(tmp_path),
+            "REPOCIV_CONTAINER_STUB": "1",
+        },
+    )
+
+    assert result.returncode == 0
+    assert "REPOCIV_CONTAINER_STUB=1" in result.stdout
+    assert "mission text" in result.stdout

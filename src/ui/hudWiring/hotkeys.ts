@@ -187,6 +187,10 @@ export function wireHotkeys(
       trackHotkey('X:spawn:CODEX');
       return spawnAgent('CODEX', state, renderer, bridge);
     }
+    if (e.key.toLowerCase() === 'r') {
+      trackHotkey('R:spawn:CURSOR');
+      return spawnAgent('CURSOR', state, renderer, bridge);
+    }
 
     // Hero selection 1–9
     if (/^[1-9]$/.test(e.key)) {

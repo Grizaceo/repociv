@@ -100,6 +100,28 @@
       }
     },
     {
+      "id": "cursor-local",
+      "label": "Cursor Local",
+      "kind": "agent_runtime",
+      "trust_level": "local_cli",
+      "transport": "cli",
+      "health": {
+        "kind": "command",
+        "command": "cursor-agent --version",
+        "status": "unknown"
+      },
+      "recovery_modes": ["copy_command", "tmux_attach"],
+      "allowed_actions": ["inspect_repo", "read_file", "run_tests", "run_build", "edit_file", "create_branch", "git_commit", "execute_agent"],
+      "blocked_actions": ["send_message", "delete_file"],
+      "recovery": {
+        "copy_command": {
+          "cwd": "~/.hermes/workspace/repos",
+          "command": "tmux new -A -s cursor 'cursor-agent'",
+          "notes": ["Opens Cursor agent in a tmux session"]
+        }
+      }
+    },
+    {
       "id": "nemoclaw-sandbox",
       "label": "NemoClaw Sandbox",
       "kind": "sandbox",

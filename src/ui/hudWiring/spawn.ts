@@ -66,24 +66,20 @@ export function spawnAgent(
     ? { q: capital.coord.q + 1 + (offset % 3), r: capital.coord.r - Math.floor(offset / 3) }
     : { q: 1 + offset, r: 0 };
 
-  const typeMap: Record<string, 'hero' | 'worker' | 'scout' | 'lexo' | 'claude' | 'codex'> = {
-    DAVI: 'hero',
-    WORKER: 'worker',
-    SCOUT: 'scout',
-    LEXO: 'lexo',
-    OPENCLAW: 'hero',
+  const typeMap: Record<string, Unit['type']> = {
     CLAUDE: 'claude',
     CODEX: 'codex',
+    CURSOR: 'cursor',
   };
   const type = typeMap[base] ?? 'hero';
   const unit = state.spawnUnit(unitId, unitId, type, 'capital', coord, 'En espera de misión');
 
-  // Seed harness default for units that map 1:1 to a harness selector
-  if (base === 'CODEX') {
+  if (base === 'CODEX' || base === 'CURSOR') {
+    const harnessKey = base === 'CODEX' ? 'codex' : 'cursor';
     try {
       localStorage.setItem(
         `repociv:chatConfig:${unitId}`,
-        JSON.stringify({ harness: 'codex', provider: '', model: '' }),
+        JSON.stringify({ harness: harnessKey, provider: '', model: '' }),
       );
     } catch {
       // ignore

@@ -119,6 +119,11 @@ AGENT_CONFIGS: dict[str, dict[str, Any]] = {
         "stateful": False,  # codex exec is stateless by design; flag has no effect
     },
 
+    # Cursor bypass (runs cursor CLI for agent execution)
+    "CURSOR": {
+        "stateful": False,
+    },
+
     # ── Personal profile example (not shipped) ─────────────────────────────────
     # Copy and adapt this block to add your own Hermes-based agent.
     # The "profile" key must point to a valid ~/.hermes/profiles/<name> directory.
@@ -150,6 +155,7 @@ def _infer_model_label(unit_id: str) -> str:
         "OPENCLAW": "openclaw",
         "CLAUDE": "claude-code",
         "CODEX": "codex",
+        "CURSOR": "cursor",
     }
     return label_map.get(base, os.environ.get("HERMES_MODEL", "claude-code"))
 
@@ -318,6 +324,9 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
                                           model=model or provider)
 
     # CODEX bypass: always direct to codex regardless of harness selector
+    if base == "CURSOR":
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: cursor (bypass)", "level": "info"})
+        return _run_cursor_agent_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model or provider)
     if base == "CODEX":
         send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: codex (bypass)", "level": "info"})
         return _run_codex_streaming(unit_id, mission_id, mission, config, working_dir, city_id,

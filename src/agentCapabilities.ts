@@ -4,7 +4,7 @@
 
 import type { CommandType } from './commandSchema.ts';
 
-export type AgentBase = 'DAVI' | 'LEXO' | 'WORKER' | 'SCOUT' | 'OPENCLAW' | 'CLAUDE' | 'CODEX';
+export type AgentBase = 'DAVI' | 'LEXO' | 'WORKER' | 'SCOUT' | 'OPENCLAW' | 'CLAUDE' | 'CODEX' | 'CURSOR';
 
 const AGENT_BASE_ALIASES: Record<string, AgentBase> = {
   DAVI: 'DAVI',
@@ -14,6 +14,7 @@ const AGENT_BASE_ALIASES: Record<string, AgentBase> = {
   OPENCLAW: 'OPENCLAW',
   CLAUDE: 'CLAUDE',
   CODEX: 'CODEX',
+  CURSOR: 'CURSOR',
 };
 
 function normalizeAgentBase(raw: string): AgentBase {
@@ -60,6 +61,7 @@ export const AGENT_CAPABILITIES: Record<AgentBase, CommandType[]> = {
     'execute_agent',
   ],
   CODEX: ['inspect_repo', 'read_file', 'run_tests', 'run_build', 'edit_file', 'create_branch'],
+  CURSOR: ['inspect_repo', 'read_file', 'run_tests', 'run_build', 'edit_file', 'create_branch', 'git_commit', 'execute_agent'],
 };
 
 // ─── Skill labels shown as badges ────────────────────────────────────────────
@@ -102,6 +104,12 @@ export const AGENT_SKILLS: Record<AgentBase, SkillBadge[]> = {
     { key: 'git_workflow', label: 'Git completo', icon: '⎇' },
     { key: 'test_runner', label: 'Tests', icon: '🧪' },
     { key: 'code_editor', label: 'Edición', icon: '✏' },
+  ],
+  CURSOR: [
+    { key: 'git_workflow', label: 'Git completo', icon: '⎇' },
+    { key: 'test_runner', label: 'Tests', icon: '🧪' },
+    { key: 'code_editor', label: 'Edición', icon: '✏' },
+    { key: 'orchestration', label: 'Orquestación', icon: '◈' },
   ],
 };
 
