@@ -305,7 +305,7 @@ function updateSwarmBadge(): void {
     return;
   }
   badge.textContent = 'Swarm: off';
-  badge.title = on
+  badge.title = isSwarmTrackingAvailable(harness)
     ? 'Task subagents con run_in_background se trackean en Orden de batalla'
     : _cursorAvailable
       ? 'Selecciona harness cursor para ver detachments en el mapa'

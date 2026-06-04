@@ -100,7 +100,7 @@ export function renderOrdenDeBatalla(state: GameState, unit: Unit): void {
     const d = displayStatus(s);
     const peekLines = (state.subagentProgress.get(s.id) ?? []).slice(-2);
     const subtitle =
-      peekLines.length > 0 ? peekLines[peekLines.length - 1] : s.label;
+      peekLines.length > 0 ? (peekLines[peekLines.length - 1] ?? s.label) : s.label;
     const h = harnessLabel(s);
     const meta = h ? `${s.kind} · ${s.risk} · ${h}` : `${s.kind} · ${s.risk}`;
     return `

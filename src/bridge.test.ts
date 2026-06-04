@@ -61,7 +61,7 @@ function makeState() {
     getUnitAt: vi.fn(() => null),
     getChildrenOfUnit: vi.fn(() => []),
     subagents: new Map(),
-    registerSubagent: vi.fn(function (run: { id: string; status: string; ephemeralUnitId?: string }) {
+    registerSubagent: vi.fn(function (run: import('./types.ts').SubagentRun) {
       state.subagents.set(run.id, run);
     }),
     updateSubagent: vi.fn(function (id: string, patch: Record<string, unknown>) {
@@ -432,7 +432,9 @@ describe('BridgeEvents handleBridgeEvent', () => {
   it('subagent_spawn proposed does not spawn ephemeral unit', async () => {
     const state = makeState();
     vi.mocked(state.getUnit).mockImplementation((id: string) =>
-      id === 'DAVI' ? { id: 'DAVI', coord: { q: 0, r: 0 }, cityId: 'repociv' } : null,
+      id === 'DAVI'
+        ? ({ id: 'DAVI', coord: { q: 0, r: 0 }, cityId: 'repociv' } as import('./types.ts').Unit)
+        : undefined,
     );
     const bridge = new BridgeEvents(state);
     bridge.start();
@@ -462,7 +464,9 @@ describe('BridgeEvents handleBridgeEvent', () => {
   it('subagent_spawn running spawns ephemeral unit', async () => {
     const state = makeState();
     vi.mocked(state.getUnit).mockImplementation((id: string) =>
-      id === 'DAVI' ? { id: 'DAVI', coord: { q: 0, r: 0 }, cityId: 'repociv' } : null,
+      id === 'DAVI'
+        ? ({ id: 'DAVI', coord: { q: 0, r: 0 }, cityId: 'repociv' } as import('./types.ts').Unit)
+        : undefined,
     );
     const bridge = new BridgeEvents(state);
     bridge.start();
@@ -490,7 +494,9 @@ describe('BridgeEvents handleBridgeEvent', () => {
   it('subagent_progress promotes proposed to running and sets working', async () => {
     const state = makeState();
     vi.mocked(state.getUnit).mockImplementation((id: string) =>
-      id === 'DAVI' ? { id: 'DAVI', coord: { q: 0, r: 0 }, cityId: 'repociv' } : null,
+      id === 'DAVI'
+        ? ({ id: 'DAVI', coord: { q: 0, r: 0 }, cityId: 'repociv' } as import('./types.ts').Unit)
+        : undefined,
     );
     const bridge = new BridgeEvents(state);
     bridge.start();

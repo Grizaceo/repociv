@@ -352,6 +352,8 @@ export type BridgeEvent =
       ephemeralUnitId: string;
       targetCityId?: string;
       status?: 'proposed' | 'running';
+      parentHarness?: string;
+      harness?: string;
     }
   | {
       type: 'subagent_progress';

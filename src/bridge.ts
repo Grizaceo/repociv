@@ -549,7 +549,6 @@ export class BridgeEvents {
           this.state.updateSubagent(evt.subagentId, { outputFilePath: evt.outputFilePath });
         }
         this.state.completeSubagent(evt.subagentId, evt.success, evt.summary);
-        break;
         logEvent(
           evt.success
             ? `✓ Subagente completado (${Math.round(evt.duration)}s)`
