@@ -25,6 +25,7 @@ const bridgeURL = process.env.VITE_BRIDGE_URL ?? `http://127.0.0.1:${bridgePort}
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: ['**/_debug/**'],
   timeout: 30_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,

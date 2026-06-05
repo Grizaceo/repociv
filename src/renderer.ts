@@ -81,6 +81,7 @@ export class Renderer {
   private unitR: UnitRenderer;
   private minimapR: MinimapRenderer;
   private localR: LocalRendererType | null = null; // Phase 6: RimWorld 2D view
+  private _previousViewMode: 'macro' | 'local' | null = null; // Track view mode for transitions
   // Callbacks for local view (applied lazily when localR is instantiated)
   localUnitHoverCb:
     | ((unit: import('./types.ts').LocalUnit | null, screenX: number, screenY: number) => void)
@@ -645,7 +646,21 @@ export class Renderer {
     updateLodDisplay(cam.zoom);
 
     // ─── Phase 6: Local RimWorld view ───────────────────────────────────────
-    if (this.state.viewMode === 'local') {
+    const currentViewMode = this.state.viewMode === 'local' ? 'local' : 'macro';
+
+    // Handle view mode transitions
+    if (currentViewMode !== this._previousViewMode) {
+      if (currentViewMode === 'local' && this.localR) {
+        // Entering local view
+        this.localR.startEnterTransition();
+      } else if (currentViewMode === 'macro' && this.localR) {
+        // Exiting local view - start exit transition
+        this.localR.startExitTransition();
+      }
+      this._previousViewMode = currentViewMode;
+    }
+
+    if (currentViewMode === 'local') {
       if (!document.body.classList.contains('local-view')) {
         document.body.classList.add('local-view');
       }
@@ -666,6 +681,19 @@ export class Renderer {
         this.localR.setWorld(this.state.localWorld);
         this.localWorldId = this.state.localWorld.repoId;
       }
+      this.localR.render(this.state.getLocalUnits());
+
+      // Check if exit transition is complete
+      if (this.localR && !this.localR.isTransitionComplete()) {
+        return; // wait for next frame to continue transition
+      }
+
+      return;
+    }
+
+    // Exiting local view (macro mode) - but wait for exit transition to complete
+    if (this._previousViewMode === 'local' && this.localR && !this.localR.isTransitionComplete()) {
+      // Still in exit transition, render one more frame
       this.localR.render(this.state.getLocalUnits());
       return;
     }

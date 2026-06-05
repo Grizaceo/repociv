@@ -226,7 +226,11 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     if (!unitId) return;
     const sid = state.resolveSubagentId(state.highlightedSubagentId, unitId);
     if (sid) openSubagentSession(sid);
-    else appendSystemMessage(unitId, '❌ Sin subagente para abrir. Selecciona fila en Orden de batalla.');
+    else
+      appendSystemMessage(
+        unitId,
+        '❌ Sin subagente para abrir. Selecciona fila en Orden de batalla.',
+      );
   };
 
   chatInput?.addEventListener('keydown', (e) => {

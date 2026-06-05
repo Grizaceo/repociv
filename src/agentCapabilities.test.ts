@@ -116,7 +116,12 @@ describe('getSkillBadges', () => {
 
   it('CURSOR has coding + orchestration badges', () => {
     const badges = getSkillBadges('CURSOR');
-    expect(badges.map((b) => b.key)).toEqual(['git_workflow', 'test_runner', 'code_editor', 'orchestration']);
+    expect(badges.map((b) => b.key)).toEqual([
+      'git_workflow',
+      'test_runner',
+      'code_editor',
+      'orchestration',
+    ]);
   });
 
   it('handles suffixed ID', () => {

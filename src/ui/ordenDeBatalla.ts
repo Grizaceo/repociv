@@ -45,8 +45,7 @@ function harnessLabel(s: SubagentRun): string {
 function renderDiagnosticChecklist(unit: Unit): string {
   const { harness } = getSelectedConfig();
   const effectiveHarness = harness && harness !== 'auto' ? harness : 'auto';
-  const trackingHarness =
-    effectiveHarness === 'auto' ? 'cursor o claude-code' : effectiveHarness;
+  const trackingHarness = effectiveHarness === 'auto' ? 'cursor o claude-code' : effectiveHarness;
   const trackingOk =
     effectiveHarness === 'auto'
       ? isSwarmTrackingAvailable('cursor') || isSwarmTrackingAvailable('claude-code')
@@ -81,12 +80,9 @@ export function renderOrdenDeBatalla(state: GameState, unit: Unit): void {
   const root = document.getElementById('orden-de-batalla');
   if (!root) return;
   const active = sortSubagentsForDisplay(state.getSubagentsOfUnit(unit.id));
-  const recent = state.completedSubagents
-    .filter((s) => s.parentUnitId === unit.id)
-    .slice(0, 10);
+  const recent = state.completedSubagents.filter((s) => s.parentUnitId === unit.id).slice(0, 10);
 
-  const showDiagnostic =
-    active.length === 0 && recent.length === 0 && unit.state === 'working';
+  const showDiagnostic = active.length === 0 && recent.length === 0 && unit.state === 'working';
 
   if (active.length === 0 && recent.length === 0 && !showDiagnostic) {
     root.classList.add('hidden');
@@ -99,8 +95,7 @@ export function renderOrdenDeBatalla(state: GameState, unit: Unit): void {
   const rowHtml = (s: SubagentRun, recentRow = false) => {
     const d = displayStatus(s);
     const peekLines = (state.subagentProgress.get(s.id) ?? []).slice(-2);
-    const subtitle =
-      peekLines.length > 0 ? (peekLines[peekLines.length - 1] ?? s.label) : s.label;
+    const subtitle = peekLines.length > 0 ? (peekLines[peekLines.length - 1] ?? s.label) : s.label;
     const h = harnessLabel(s);
     const meta = h ? `${s.kind} · ${s.risk} · ${h}` : `${s.kind} · ${s.risk}`;
     return `
@@ -162,7 +157,10 @@ export function renderOrdenDeBatalla(state: GameState, unit: Unit): void {
     const sid = root.querySelector<HTMLButtonElement>('.orden-recall-btn')?.dataset['recall'];
     if (!sid) return;
     const result = await recallSubagent(sid);
-    appendSystemMessage(unit.id, result.ok ? `✓ Recall: ${result.message}` : `❌ Recall: ${result.message}`);
+    appendSystemMessage(
+      unit.id,
+      result.ok ? `✓ Recall: ${result.message}` : `❌ Recall: ${result.message}`,
+    );
   });
 
   root.querySelector('.orden-session-btn')?.addEventListener('click', () => {

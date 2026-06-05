@@ -3,7 +3,11 @@ import type { GameState } from '../game.ts';
 import type { Unit, UnitState } from '../types.ts';
 import { cfg } from '../gameConfig.ts';
 import { renderCapabilityBadges, clearCapabilityBadges } from './capabilityBadges.ts';
-import { renderOrdenDeBatalla, hideOrdenDeBatalla, setOrdenHighlightCallback } from './ordenDeBatalla.ts';
+import {
+  renderOrdenDeBatalla,
+  hideOrdenDeBatalla,
+  setOrdenHighlightCallback,
+} from './ordenDeBatalla.ts';
 
 setOrdenHighlightCallback((unitId) => {
   const ev = new CustomEvent('repociv:highlight-unit', { detail: { unitId } });
@@ -76,7 +80,10 @@ export function renderHeroBar(state: GameState, onSelect: (u: Unit) => void) {
   const slots = document.getElementById('hero-bar-slots');
   if (!slots) return;
 
-  const heroes = state.getAllUnits().filter((u) => !u.ephemeral).slice(0, 9);
+  const heroes = state
+    .getAllUnits()
+    .filter((u) => !u.ephemeral)
+    .slice(0, 9);
 
   // Limpieza simple para permitir auto-animate en el contenedor
   slots.innerHTML = '';

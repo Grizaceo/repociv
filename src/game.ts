@@ -461,7 +461,10 @@ export class GameState {
   }
 
   resolveSubagentId(preferredId?: string | null, unitId?: string): string | null {
-    if (preferredId && (this.subagents.has(preferredId) || this.completedSubagents.some((s) => s.id === preferredId))) {
+    if (
+      preferredId &&
+      (this.subagents.has(preferredId) || this.completedSubagents.some((s) => s.id === preferredId))
+    ) {
       return preferredId;
     }
     if (unitId) {

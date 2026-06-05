@@ -525,7 +525,10 @@ export class BridgeEvents {
           this.state.setUnitState(evt.ephemeralUnitId, 'working');
           logEvent(`◈ Detachment: ${evt.label.slice(0, 40)}`, 'info');
         } else {
-          logEvent(`◈ Detachment propuesto: ${evt.label.slice(0, 40)} (pendiente aprobación)`, 'info');
+          logEvent(
+            `◈ Detachment propuesto: ${evt.label.slice(0, 40)} (pendiente aprobación)`,
+            'info',
+          );
         }
         break;
       }
@@ -534,7 +537,10 @@ export class BridgeEvents {
         this.state.appendSubagentProgress(evt.subagentId, progressText);
         let run = this.state.subagents.get(evt.subagentId);
         if (run?.status === 'proposed') {
-          this.state.updateSubagent(evt.subagentId, { status: 'running', lastProgressAt: Date.now() });
+          this.state.updateSubagent(evt.subagentId, {
+            status: 'running',
+            lastProgressAt: Date.now(),
+          });
           run = this.state.subagents.get(evt.subagentId);
         } else if (run) {
           this.state.updateSubagent(evt.subagentId, { lastProgressAt: Date.now() });

@@ -49,6 +49,46 @@ export class LocalRenderer {
   isCleanMode(): boolean {
     return this._cleanMode;
   }
+
+  // ─── Fade Transition (300ms) ──────────────────────────────────────
+  private _transitionState: 'entering' | 'active' | 'exiting' | null = null;
+  private _transitionStartTime = 0;
+  private readonly _transitionDuration = 300; // ms
+
+  /** Call when local view is being entered (from macro view). */
+  startEnterTransition(): void {
+    this._transitionState = 'entering';
+    this._transitionStartTime = performance.now();
+  }
+
+  /** Call when local view is being exited (back to macro view). */
+  startExitTransition(): void {
+    this._transitionState = 'exiting';
+    this._transitionStartTime = performance.now();
+  }
+
+  /** Check if transition is complete. */
+  isTransitionComplete(): boolean {
+    return this._transitionState === null || this._transitionState === 'active';
+  }
+
+  /** Get current transition alpha (0 = transparent, 1 = opaque). */
+  private _getTransitionAlpha(): number {
+    if (!this._transitionState || this._transitionState === 'active') return 1;
+    const elapsed = performance.now() - this._transitionStartTime;
+    const progress = Math.min(elapsed / this._transitionDuration, 1);
+    if (this._transitionState === 'entering') {
+      return progress; // 0 -> 1
+    } else if (this._transitionState === 'exiting') {
+      return 1 - progress; // 1 -> 0
+    }
+    return 1;
+  }
+
+  /** Call after exit transition completes to reset state. */
+  resetTransition(): void {
+    this._transitionState = null;
+  }
   private calcLod(): 'low' | 'medium' | 'high' {
     if (this.cam.zoom < 0.4) return 'low';
     if (this.cam.zoom < 1.0) return 'medium';
@@ -74,6 +114,8 @@ export class LocalRenderer {
     null;
   // Phase 9: per-frame bubble position update
   onUnitRendered: ((unit: LocalUnit, screenX: number, screenY: number) => void) | null = null;
+  // Phase 9 (transition): notifies parent when the exit transition completes
+  onExitLocalView: (() => void) | null = null;
 
   // Internal
   private _localUnits: LocalUnit[] = [];
@@ -282,6 +324,14 @@ export class LocalRenderer {
     const { ctx, canvas, cam, world } = this;
     if (!world) return;
 
+    // ─── Fade Transition ──────────────────────────────────────────────
+    const transitionAlpha = this._getTransitionAlpha();
+    if (transitionAlpha <= 0 && this._transitionState === 'exiting') {
+      this._transitionState = null; // reset after exit
+      this.onExitLocalView?.(); // notify parent
+      return;
+    }
+
     // ─── Fase 1: LOD + Clean Mode at local level ──────────────────────
     this._currentLod = this.calcLod();
     const lodLow = this._currentLod === 'low';
@@ -297,7 +347,8 @@ export class LocalRenderer {
       this.rebuildStaticLayer();
     }
 
-    // Background
+    // Background (with transition alpha)
+    ctx.globalAlpha = transitionAlpha;
     ctx.fillStyle = '#0d0d14';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 

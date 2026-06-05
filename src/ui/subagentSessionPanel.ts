@@ -31,8 +31,7 @@ function guessTranscriptHint(harness: string): string {
 
 function findRun(state: GameState, subagentId: string): SubagentRun | undefined {
   return (
-    state.subagents.get(subagentId) ??
-    state.completedSubagents.find((s) => s.id === subagentId)
+    state.subagents.get(subagentId) ?? state.completedSubagents.find((s) => s.id === subagentId)
   );
 }
 
@@ -107,7 +106,9 @@ export function isSubagentSessionOpen(): boolean {
   return !!panel && !panel.classList.contains('hidden');
 }
 
-export async function recallSubagent(subagentId: string): Promise<{ ok: boolean; message: string }> {
+export async function recallSubagent(
+  subagentId: string,
+): Promise<{ ok: boolean; message: string }> {
   try {
     const res = await fetch(bridgeUrl('/subagents/cancel'), {
       method: 'POST',

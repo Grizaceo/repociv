@@ -174,11 +174,7 @@ export class UnitRenderer {
       const run = unit.subagentRunId ? this.state.subagents.get(unit.subagentRunId) : undefined;
       const kind = run?.kind ?? unit.type;
       const glyph =
-        kind === 'explore' || unit.type === 'scout'
-          ? '◈'
-          : unit.type === 'caravan'
-            ? '⛟'
-            : '◆';
+        kind === 'explore' || unit.type === 'scout' ? '◈' : unit.type === 'caravan' ? '⛟' : '◆';
       const borderColor = unit.type === 'caravan' ? '#e8a040' : '#8ab4f8';
       ctx.beginPath();
       ctx.arc(0, 0, HEX_SIZE * 0.22, 0, Math.PI * 2);

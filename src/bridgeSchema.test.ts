@@ -26,7 +26,12 @@ describe('parseBridgeEvent', () => {
   });
 
   it('rejects unit_spawn with hex containing non-numbers', () => {
-    const evt = parseBridgeEvent({ type: 'unit_spawn', unit: 'X', civ: 'capital', hex: ['a', 'b'] });
+    const evt = parseBridgeEvent({
+      type: 'unit_spawn',
+      unit: 'X',
+      civ: 'capital',
+      hex: ['a', 'b'],
+    });
     expect(evt).toBeNull();
   });
 
