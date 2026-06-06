@@ -1,5 +1,7 @@
 # RepoCiv — Imperial Agent Dashboard
 
+> 🌐 **Idiomas / Languages:** [Español](README.md) · [English](README.en.md)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/Grizaceo/repociv/actions/workflows/ci.yml/badge.svg)](https://github.com/Grizaceo/repociv/actions)
 [![Status](https://img.shields.io/badge/status-public%20alpha-blue.svg)](docs/ROADMAP.md)
