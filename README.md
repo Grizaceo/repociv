@@ -160,7 +160,7 @@ RepoCiv también se expone como **MCP server por stdio** (`server/mcp_server.py`
 }
 ```
 
-41 tools cubriendo 15 dominios: agents, commands, approvals, pending, context, GPU, wonders, graph-relations, foreign-relations y más. Ver [docs/MCP.md](docs/MCP.md).
+43 tools cubriendo 15 dominios con tools MCP: agents, commands, approvals, pending, context, GPU, wonders, graph-relations, foreign-relations y más. Ver [docs/MCP.md](docs/MCP.md).
 
 ---
 
@@ -257,7 +257,7 @@ server/
 ├── bridge.py            FastAPI bridge (entry point: python -m server.bridge)
 ├── http_routes.py       Todos los endpoints HTTP
 ├── websocket_handler.py WebSocket bidireccional
-├── mcp_server.py        MCP stdio server (41 tools)
+├── mcp_server.py        MCP stdio server (43 tools)
 ├── agent_runner.py      Ejecuta agentes (Hermes, Claude, Codex, OpenRouter…)
 ├── process_scanner.py   Detecta procesos → spawns automáticos
 ├── task_orchestrator.py Cola de tareas con prioridad
@@ -269,10 +269,10 @@ server/
 ## Tests
 
 ```bash
-# Frontend (Vitest) — 409 tests
+# Frontend (Vitest) — 423 tests
 npm test -- --run
 
-# Backend (pytest) — 644 tests
+# Backend (pytest) — 661 passed, 1 skipped
 python3 -m pytest server/ -q
 ```
 
@@ -299,7 +299,7 @@ python3 -m pytest server/ -q
 |-----|-----------|
 | [docs/SCOPE.md](docs/SCOPE.md) | Qué es y qué no es el proyecto |
 | [docs/API.md](docs/API.md) | Referencia completa de endpoints |
-| [docs/MCP.md](docs/MCP.md) | MCP server — 41 tools, ejemplos |
+| [docs/MCP.md](docs/MCP.md) | MCP server — 43 tools, ejemplos |
 | [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | Tutorial paso a paso |
 | [docs/REMOTE_ACCESS.md](docs/REMOTE_ACCESS.md) | Acceso remoto via Tailscale |
 | [docs/EVOLUTION.md](docs/EVOLUTION.md) | Historia del proyecto |
