@@ -9,6 +9,7 @@
 > Un dashboard hexagonal estilo Civilization V que visualiza tu workspace de repos como ciudades en un mapa, agentes de IA como unidades, y procesos en segundo plano como edificios.
 
 **Stack:** TypeScript + Vite (Canvas 2D) · Python HTTP bridge · DuckDB/JSONL ledger local
+**Compatible con:** [Hermes Agent](https://hermes-agent.nousresearch.com) (Nous Research) — drop-in en cualquier setup existente
 
 ![RepoCiv demo](docs/design/screenshots/repociv-demo.gif)
 
@@ -80,7 +81,7 @@ Abre `http://localhost:5273`. Verás el **Imperial Map** con tus repos como ciud
 
 ## Configuración del workspace
 
-RepoCiv busca repos en este orden de prioridad:
+RepoCiv busca repos en este orden de prioridad. Los valores por defecto son **ejemplos típicos** (asumen un layout estilo Hermes) — puedes apuntar a cualquier ruta de tu sistema. El **onboarding** te guía en la primera ejecución y te deja elegir tus propias carpetas.
 
 | Variable | Default | Función |
 |---|---|---|
@@ -201,11 +202,24 @@ Thresholds configurables en `Settings Panel` (`F11`) o en `src/gameConfig.ts`.
 
 ---
 
+## Gaceta de noticias
+
+Cada acción del sistema (misión completada, aprobación solicitada, agente que entra o sale, error, info) se registra como un **evento** en la **Gaceta**, un feed cronológico visible dentro del tablero. Funciona como un mini-log visual estilo "newspaper" de Civilization.
+
+- Pulsa `N` para abrir/cerrar el panel de la Gaceta
+- Los eventos se ordenan por timestamp, más recientes arriba
+- Filtros por tipo: `mission`, `approval`, `agent`, `error`, `info`
+- Doble click en un evento salta al contexto (ej. el agente o archivo implicado)
+
+Sirve para auditar sesiones largas sin abrir logs externos: es el "story so far" de tu imperio.
+
+---
+
 ## Hotkeys
 
 | Tecla | Acción |
 |-------|--------|
-| `Q` `W` `E` `L` `O` | Spawn orchestrator / WORKER / SCOUT / LEXO / OPENCLAW |
+| `Q` `W` `E` `O` | Spawn orchestrator / WORKER / SCOUT / OPENCLAW |
 | `1`–`9` | Seleccionar héroe por slot |
 | `Space` | Ciclar al siguiente héroe idle |
 | `Tab` | Ciclar todos los héroes |

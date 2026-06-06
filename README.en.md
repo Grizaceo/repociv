@@ -9,6 +9,7 @@
 > A hexagonal dashboard inspired by Civilization V that visualizes your repos folder as cities on a map, AI agents as units, and background processes as buildings.
 
 **Stack:** TypeScript + Vite (Canvas 2D) · Python HTTP bridge · DuckDB/JSONL local ledger
+**Compatible with:** [Hermes Agent](https://hermes-agent.nousresearch.com) (Nous Research) — drop-in in any existing setup
 
 ![RepoCiv demo](docs/design/screenshots/repociv-demo.gif)
 
@@ -79,7 +80,7 @@ Open `http://localhost:5273`. You will see the **Imperial Map** with your repos 
 
 ## Workspace configuration
 
-RepoCiv looks for repos in this priority order:
+RepoCiv looks for repos in this priority order. Defaults are **typical examples** (they assume a Hermes-style layout) — you can point them at any path on your system. The **onboarding** flow walks you through this on first run and lets you pick your own folders.
 
 | Variable | Default | Function |
 |---|---|---|
@@ -200,11 +201,24 @@ Thresholds configurable in the `Settings Panel` (`F11`) or in `src/gameConfig.ts
 
 ---
 
+## News gazette
+
+Every system action (mission completed, approval requested, agent entering or leaving, error, info) is recorded as an **event** in the **Gazette**, a chronological feed rendered inside the board. It works like a Civilization-style "newspaper" mini-log.
+
+- Press `N` to toggle the Gazette panel
+- Events are ordered by timestamp, newest on top
+- Filters by type: `mission`, `approval`, `agent`, `error`, `info`
+- Double-click on an event jumps to context (e.g. the agent or file involved)
+
+It is useful for auditing long sessions without opening external logs: the "story so far" of your empire.
+
+---
+
 ## Hotkeys
 
 | Key | Action |
 |-----|--------|
-| `Q` `W` `E` `L` `O` | Spawn orchestrator / WORKER / SCOUT / LEXO / OPENCLAW |
+| `Q` `W` `E` `O` | Spawn orchestrator / WORKER / SCOUT / OPENCLAW |
 | `1`–`9` | Select hero by slot |
 | `Space` | Cycle to next idle hero |
 | `Tab` | Cycle all heroes |
