@@ -15,7 +15,7 @@ test.describe('Debug Local View', () => {
       // Try to access the game state
       // The state is created in main.ts as `const state = new GameState(world);`
       // It's not globally exposed, but let's check what's available
-      
+
       // Check localStorage for selected repos
       const selected = localStorage.getItem('repociv:selected-repos:v1');
       let selectedPaths: string[] = [];
@@ -67,7 +67,7 @@ test.describe('Debug Local View', () => {
 
       // The renderer is created in main.ts and has onEnterLocal callback
       // We can try to find it by checking event listeners or module exports
-      
+
       // Actually, let's try to trigger a double-click at a specific position
       // and see if the local view frame appears
       const rect = canvas.getBoundingClientRect();

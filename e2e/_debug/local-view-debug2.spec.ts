@@ -90,7 +90,7 @@ test.describe('Debug Local View - with seed', () => {
     // state.start();
     // const renderer = new Renderer(canvas, state);
     // renderer.onEnterLocal = (repoId, _rootPath) => { ... }
-    
+
     // We can't directly access state, but we can check what's rendered on canvas
     // by looking at the world tiles through the bridge API
     const response = await page.request.get('/api/repos');
@@ -109,12 +109,12 @@ test.describe('Debug Local View - with seed', () => {
       if (!canvas) return { error: 'no canvas' };
       const ctx = canvas.getContext('2d');
       if (!ctx) return { error: 'no context' };
-      
+
       // Check a few pixels to see if there's content
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
       const pixel = ctx.getImageData(centerX, centerY, 1, 1).data;
-      
+
       // Check corners too
       const tl = ctx.getImageData(10, 10, 1, 1).data;
       const tr = ctx.getImageData(canvas.width - 10, 10, 1, 1).data;

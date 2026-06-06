@@ -69,9 +69,9 @@ async function getActualCityScreenPositions(page: Page): Promise<Array<{ x: numb
 
     function axialAdd(a: any, b: any) { return { q: a.q + b.q, r: a.r + b.r }; }
     function axialScale(a: any, k: number) { return { q: a.q * k, r: a.r * k }; }
-    function axialNeighbour(hex: any, dir: number) { 
-      const d = AXIAL_DIRECTIONS[dir]; 
-      return { q: hex.q + d.q, r: hex.r + d.r }; 
+    function axialNeighbour(hex: any, dir: number) {
+      const d = AXIAL_DIRECTIONS[dir];
+      return { q: hex.q + d.q, r: hex.r + d.r };
     }
     function axialDistance(a: any, b: any) {
       const dq = a.q - b.q;
@@ -125,7 +125,7 @@ async function getActualCityScreenPositions(page: Page): Promise<Array<{ x: numb
         const coord = cityCoords[cursor];
         const key = `${coord.q},${coord.r}`;
         if (occupiedCoords.has(key)) continue;
-        
+
         let tooClose = false;
         for (const assignedCoord of cityCoordLookup.values()) {
           if (axialDistance(coord, assignedCoord) < MIN_CITY_DISTANCE) {
@@ -134,7 +134,7 @@ async function getActualCityScreenPositions(page: Page): Promise<Array<{ x: numb
           }
         }
         if (tooClose) continue;
-        
+
         occupiedCoords.add(key);
         cityCoordLookup.set(`repo-${repoIdx}`, coord);
         placed = true;
@@ -156,21 +156,21 @@ async function getActualCityScreenPositions(page: Page): Promise<Array<{ x: numb
 
 async function tryEnterLocalView(page: Page): Promise<boolean> {
   const positions = await getActualCityScreenPositions(page);
-  
+
   if (positions.length === 0) return false;
-  
+
   for (const pos of positions) {
     await page.mouse.dblclick(pos.x, pos.y);
     await page.waitForTimeout(300);
-    
+
     const localFrame = page.locator('#local-view-frame');
     const isVisible = await localFrame.isVisible().catch(() => false);
-    
+
     if (isVisible) {
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -212,17 +212,17 @@ test.describe('RepoCiv Local View - Memory Leak Test', () => {
     // Run for 30 seconds, measuring heap every 5 seconds
     const heapSamples: number[] = [];
     const startTime = Date.now();
-    
+
     while (Date.now() - startTime < 30_000) {
       await page.waitForTimeout(5000);
-      
+
       // Force GC periodically
       await page.evaluate(() => {
         // @ts-ignore
         if (window.gc) window.gc();
       });
       await page.waitForTimeout(200);
-      
+
       const currentHeap = await getJSHeapSize(page);
       heapSamples.push(currentHeap);
       console.log(`Heap at ${((Date.now() - startTime) / 1000).toFixed(0)}s: ${(currentHeap / 1024 / 1024).toFixed(2)} MB`);
@@ -255,11 +255,11 @@ test.describe('RepoCiv Local View - Memory Leak Test', () => {
       const ySum = heapSamples.reduce((a, b) => a + b, 0);
       const xySum = heapSamples.reduce((sum, y, i) => sum + i * y, 0);
       const x2Sum = heapSamples.reduce((sum, _, i) => sum + i * i, 0);
-      
+
       const slope = (n * xySum - xSum * ySum) / (n * x2Sum - xSum * xSum);
       const slopeMBPerSample = slope / 1024 / 1024;
       console.log(`Heap trend slope: ${slopeMBPerSample.toFixed(4)} MB per 5s sample`);
-      
+
       // Slope should be minimal (less than 1 MB per 5s interval)
       expect(Math.abs(slopeMBPerSample), `Heap trending upward: ${slopeMBPerSample.toFixed(4)} MB/sample`).toBeLessThan(1);
     }

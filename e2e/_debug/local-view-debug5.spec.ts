@@ -54,32 +54,32 @@ test.describe('Debug Local View - check camera and double-click handler', () => 
 
       // Check event listeners on canvas
       const listeners = canvas.cloneNode(true);
-      
+
       // Try to manually trigger the double-click handler logic
       // by simulating what renderer.ts does
-      
+
       // The renderer's camera
       // We can't access it directly, but we can check the game state
-      
+
       // Let's check the world tiles via the bridge API or by accessing the game state
       // The game state is in main.ts: const state = new GameState(world);
-      
+
       // Try to trigger a double-click at canvas center and see what tile it hits
       const rect = canvas.getBoundingClientRect();
       const centerX = rect.left + canvas.width / 2;
       const centerY = rect.top + canvas.height / 2;
-      
+
       // Simulate the renderer's worldToAxial logic
       const HEX_SIZE = 48;
       const SQRT3 = Math.sqrt(3);
-      
+
       function pixelToAxial(px: number, py: number, size: number, cam: any): { q: number; r: number } {
         if (size <= 0) return { q: 0, r: 0 };
         const q = ((2 / 3) * px) / size;
         const r = ((-1 / 3) * px + (SQRT3 / 3) * py) / size;
         return axialRound({ q, r });
       }
-      
+
       function axialRound(a: { q: number; r: number }): { q: number; r: number } {
         const x = a.q;
         const z = a.r;
@@ -95,17 +95,17 @@ test.describe('Debug Local View - check camera and double-click handler', () => 
         else rz = -rx - ry;
         return { q: rx, r: rz };
       }
-      
+
       // Camera defaults from renderer
       const cam = { x: 0, y: 0, cx: canvas.width / 2, cy: canvas.height / 2, zoom: 1 };
-      
+
       // Test at canvas center
       const wx = centerX;
       const wy = centerY;
       const px = (wx - cam.cx) / cam.zoom + cam.x;
       const py = (wy - cam.cy) / cam.zoom + cam.y;
       const coord = pixelToAxial(px, py, HEX_SIZE, cam);
-      
+
       return {
         canvasCenter: { x: centerX, y: centerY },
         camera: cam,
@@ -113,44 +113,44 @@ test.describe('Debug Local View - check camera and double-click handler', () => 
         HEX_SIZE,
       };
     });
-    
+
     console.log('Camera info:', JSON.stringify(info, null, 2));
-    
+
     // Now try double-click at canvas center and check what happens
     const canvas = page.locator('#main-canvas');
     const box = await canvas.boundingBox();
     if (box) {
       const cx = box.x + box.width / 2;
       const cy = box.y + box.height / 2;
-      
+
       console.log(`Clicking at canvas center (${cx}, ${cy})`);
       await page.mouse.dblclick(cx, cy);
       await page.waitForTimeout(500);
-      
+
       const capitalPanel = page.locator('#capital-panel');
       const localFrame = page.locator('#local-view-frame');
-      
+
       const capVisible = await capitalPanel.isVisible().catch(() => false);
       const locVisible = await localFrame.isVisible().catch(() => false);
-      
+
       console.log(`  capital-panel: ${capVisible}, local-view-frame: ${locVisible}`);
     }
-    
+
     // Also check if the renderer's double-click handler is attached
     const handlerCheck = await page.evaluate(() => {
       const canvas = document.getElementById('main-canvas') as HTMLCanvasElement;
       if (!canvas) return { error: 'no canvas' };
-      
+
       // We can't easily check event listeners, but we can try to trigger
       // a double-click via the canvas dispatchEvent and see if the handler runs
-      
-      return { 
+
+      return {
         canvasExists: true,
         canvasWidth: canvas.width,
         canvasHeight: canvas.height,
       };
     });
-    
+
     console.log('Handler check:', JSON.stringify(handlerCheck, null, 2));
   });
 });

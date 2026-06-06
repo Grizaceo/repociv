@@ -71,9 +71,9 @@ async function getActualCityScreenPositions(page: Page): Promise<Array<{ x: numb
 
     function axialAdd(a: any, b: any) { return { q: a.q + b.q, r: a.r + b.r }; }
     function axialScale(a: any, k: number) { return { q: a.q * k, r: a.r * k }; }
-    function axialNeighbour(hex: any, dir: number) { 
-      const d = AXIAL_DIRECTIONS[dir]; 
-      return { q: hex.q + d.q, r: hex.r + d.r }; 
+    function axialNeighbour(hex: any, dir: number) {
+      const d = AXIAL_DIRECTIONS[dir];
+      return { q: hex.q + d.q, r: hex.r + d.r };
     }
     function axialDistance(a: any, b: any) {
       const dq = a.q - b.q;
@@ -121,7 +121,7 @@ async function getActualCityScreenPositions(page: Page): Promise<Array<{ x: numb
         const coord = cityCoords[cursor];
         const key = `${coord.q},${coord.r}`;
         if (occupiedCoords.has(key)) continue;
-        
+
         let tooClose = false;
         for (const assignedCoord of cityCoordLookup.values()) {
           if (axialDistance(coord, assignedCoord) < MIN_CITY_DISTANCE) {
@@ -130,7 +130,7 @@ async function getActualCityScreenPositions(page: Page): Promise<Array<{ x: numb
           }
         }
         if (tooClose) continue;
-        
+
         occupiedCoords.add(key);
         cityCoordLookup.set(`repo-${repoIdx}`, coord);
         placed = true;
@@ -158,21 +158,21 @@ async function getActualCityScreenPositions(page: Page): Promise<Array<{ x: numb
 
 async function tryEnterLocalView(page: Page): Promise<boolean> {
   const positions = await getActualCityScreenPositions(page);
-  
+
   if (positions.length === 0) return false;
-  
+
   for (const pos of positions) {
     await page.mouse.dblclick(pos.x, pos.y);
     await page.waitForTimeout(300);
-    
+
     const localFrame = page.locator('#local-view-frame');
     const isVisible = await localFrame.isVisible().catch(() => false);
-    
+
     if (isVisible) {
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -208,9 +208,9 @@ test.describe('RepoCiv Local View (RimWorld-style)', () => {
 
     const pageErrors: string[] = [];
     page.on('pageerror', err => pageErrors.push(err.message));
-    
+
     await page.waitForTimeout(1000);
-    const localErrors = pageErrors.filter(e => 
+    const localErrors = pageErrors.filter(e =>
       e.includes('localRenderer') || e.includes('LocalRenderer') || e.includes('localMap') || e.includes('LocalMap')
     );
     expect(localErrors, `errores en local view: ${localErrors.join('; ')}`).toEqual([]);
