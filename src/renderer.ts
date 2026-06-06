@@ -82,6 +82,7 @@ export class Renderer {
   private minimapR: MinimapRenderer;
   private localR: LocalRendererType | null = null; // Phase 6: RimWorld 2D view
   private _previousViewMode: 'macro' | 'local' | null = null; // Track view mode for transitions
+  private _localExitInProgress = false;
   // Callbacks for local view (applied lazily when localR is instantiated)
   localUnitHoverCb:
     | ((unit: import('./types.ts').LocalUnit | null, screenX: number, screenY: number) => void)
@@ -647,17 +648,35 @@ export class Renderer {
 
     // ─── Phase 6: Local RimWorld view ───────────────────────────────────────
     const currentViewMode = this.state.viewMode === 'local' ? 'local' : 'macro';
+    const viewModeChanged = currentViewMode !== this._previousViewMode;
+
+    if (currentViewMode === 'local' && !this.localR && this._localRendererCtor) {
+      this.localR = new this._localRendererCtor(canvas);
+      this.localR.setupInput();
+      // Wire stored local-view callbacks (set from main.ts)
+      this.localR.onLocalUnitHover = (unit, sx, sy) => this.localUnitHoverCb?.(unit, sx, sy);
+      this.localR.onWorkbenchClick = this.localWorkbenchClickCb;
+      this.localR.onLocalUnitClick = this.localUnitClickCb;
+      this.localR.onTileClick = (x, y, tile) => this.localTileClickCb?.(x, y, tile, 0, 0);
+      this.localR.onUnitRendered = (unit, sx, sy) => this.localUnitRenderedCb?.(unit, sx, sy);
+    }
 
     // Handle view mode transitions
-    if (currentViewMode !== this._previousViewMode) {
+    if (viewModeChanged) {
       if (currentViewMode === 'local' && this.localR) {
         // Entering local view
+        this._localExitInProgress = false;
         this.localR.startEnterTransition();
+        this._previousViewMode = 'local';
       } else if (currentViewMode === 'macro' && this.localR) {
         // Exiting local view - start exit transition
-        this.localR.startExitTransition();
+        if (!this._localExitInProgress) {
+          this._localExitInProgress = true;
+          this.localR.startExitTransition();
+        }
+      } else {
+        this._previousViewMode = currentViewMode;
       }
-      this._previousViewMode = currentViewMode;
     }
 
     if (currentViewMode === 'local') {
@@ -666,16 +685,6 @@ export class Renderer {
       }
       const frame = document.getElementById('local-view-frame');
       if (frame) frame.classList.remove('hidden');
-      if (!this.localR && this._localRendererCtor) {
-        this.localR = new this._localRendererCtor(canvas);
-        this.localR.setupInput();
-        // Wire stored local-view callbacks (set from main.ts)
-        this.localR.onLocalUnitHover = (unit, sx, sy) => this.localUnitHoverCb?.(unit, sx, sy);
-        this.localR.onWorkbenchClick = this.localWorkbenchClickCb;
-        this.localR.onLocalUnitClick = this.localUnitClickCb;
-        this.localR.onTileClick = (x, y, tile) => this.localTileClickCb?.(x, y, tile, 0, 0);
-        this.localR.onUnitRendered = (unit, sx, sy) => this.localUnitRenderedCb?.(unit, sx, sy);
-      }
       if (!this.localR) return; // still loading module — next frame will retry
       if (this.state.localWorld && this.state.localWorld.repoId !== this.localWorldId) {
         this.localR.setWorld(this.state.localWorld);
@@ -692,7 +701,7 @@ export class Renderer {
     }
 
     // Exiting local view (macro mode) - but wait for exit transition to complete
-    if (this._previousViewMode === 'local' && this.localR && !this.localR.isTransitionComplete()) {
+    if (this._localExitInProgress && this.localR && !this.localR.isTransitionComplete()) {
       // Still in exit transition, render one more frame
       this.localR.render(this.state.getLocalUnits());
       return;
@@ -704,6 +713,8 @@ export class Renderer {
       if (frame) frame.classList.add('hidden');
       this.onExitLocalView?.();
     }
+    this._localExitInProgress = false;
+    this._previousViewMode = 'macro';
 
     ctx.save();
     ctx.translate(cam.cx, cam.cy);

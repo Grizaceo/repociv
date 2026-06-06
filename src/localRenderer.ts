@@ -331,6 +331,9 @@ export class LocalRenderer {
       this.onExitLocalView?.(); // notify parent
       return;
     }
+    if (transitionAlpha >= 1 && this._transitionState === 'entering') {
+      this._transitionState = 'active';
+    }
 
     // ─── Fase 1: LOD + Clean Mode at local level ──────────────────────
     this._currentLod = this.calcLod();
