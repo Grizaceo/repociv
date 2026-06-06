@@ -294,3 +294,74 @@ def test_run_cursor_agent_streaming_model_flag(monkeypatch, tmp_path):
     assert "--workspace" in captured_cmd
     assert "--trust" in captured_cmd
     assert "--print" in captured_cmd
+
+
+# ─── _repos_root() env-var priority (regression: MAP_ROOT bug) ────────────────
+
+def test_repos_root_prefers_map_root(monkeypatch, tmp_path):
+    """REPOCIV_MAP_ROOT wins over REPOCIV_REPOS_ROOT and WORKSPACE_ROOT."""
+    map_root = tmp_path / "map"
+    repos_root = tmp_path / "repos"
+    ws_root = tmp_path / "ws"
+    for d in (map_root, repos_root, ws_root):
+        d.mkdir()
+    monkeypatch.setenv("REPOCIV_MAP_ROOT", str(map_root))
+    monkeypatch.setenv("REPOCIV_REPOS_ROOT", str(repos_root))
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws_root))
+    assert agent_runner._repos_root() == str(map_root)
+
+
+def test_repos_root_falls_back_to_repos_root(monkeypatch, tmp_path):
+    """When MAP_ROOT is unset, REPOCIV_REPOS_ROOT is used."""
+    repos_root = tmp_path / "repos"
+    ws_root = tmp_path / "ws"
+    for d in (repos_root, ws_root):
+        d.mkdir()
+    monkeypatch.delenv("REPOCIV_MAP_ROOT", raising=False)
+    monkeypatch.setenv("REPOCIV_REPOS_ROOT", str(repos_root))
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws_root))
+    assert agent_runner._repos_root() == str(repos_root)
+
+
+def test_repos_root_falls_back_to_workspace_root(monkeypatch, tmp_path):
+    """When MAP_ROOT and REPOS_ROOT are unset, WORKSPACE_ROOT is used."""
+    ws_root = tmp_path / "ws"
+    ws_root.mkdir()
+    monkeypatch.delenv("REPOCIV_MAP_ROOT", raising=False)
+    monkeypatch.delenv("REPOCIV_REPOS_ROOT", raising=False)
+    monkeypatch.setenv("WORKSPACE_ROOT", str(ws_root))
+    assert agent_runner._repos_root() == str(ws_root)
+
+
+def test_repos_root_falls_back_to_default(monkeypatch):
+    """When all env vars are unset, the hardcoded default is used."""
+    monkeypatch.delenv("REPOCIV_MAP_ROOT", raising=False)
+    monkeypatch.delenv("REPOCIV_REPOS_ROOT", raising=False)
+    monkeypatch.delenv("WORKSPACE_ROOT", raising=False)
+    from pathlib import Path
+    expected = str(Path.home() / ".hermes" / "workspace" / "repos")
+    assert agent_runner._repos_root() == expected
+
+
+def test_repos_root_expands_tilde(monkeypatch):
+    """The result is os.path.expanduser'd — ~ gets resolved."""
+    monkeypatch.delenv("REPOCIV_MAP_ROOT", raising=False)
+    monkeypatch.delenv("REPOCIV_REPOS_ROOT", raising=False)
+    monkeypatch.setenv("WORKSPACE_ROOT", "~/my-repos")
+    from pathlib import Path
+    assert agent_runner._repos_root() == str(Path.home() / "my-repos")
+
+
+def test_repos_root_empty_string_treated_as_unset(monkeypatch, tmp_path):
+    """An empty string in MAP_ROOT must not block fallback to REPOS_ROOT/WORKSPACE_ROOT.
+
+    os.environ.get returns '' for an empty value; the previous implementation
+    used nested os.environ.get which would treat '' as truthy-ish only in
+    specific fall-through patterns. The new chain uses `or`, which short-
+    circuits on '', correctly falling through to the next var.
+    """
+    repos_root = tmp_path / "repos"
+    repos_root.mkdir()
+    monkeypatch.setenv("REPOCIV_MAP_ROOT", "")
+    monkeypatch.setenv("REPOCIV_REPOS_ROOT", str(repos_root))
+    assert agent_runner._repos_root() == str(repos_root)

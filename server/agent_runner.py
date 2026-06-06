@@ -161,12 +161,16 @@ def _infer_model_label(unit_id: str) -> str:
 
 
 def _repos_root() -> str:
-    root = os.environ.get(
-        "REPOCIV_REPOS_ROOT",
-        os.environ.get(
-            "WORKSPACE_ROOT",
-            str(Path.home() / ".hermes" / "workspace" / "repos"),
-        ),
+    # Mirrors vite.config.ts::resolveMapRoot priority:
+    # REPOCIV_MAP_ROOT > REPOCIV_REPOS_ROOT > WORKSPACE_ROOT > ~/.hermes/workspace/repos
+    # Previously this only checked REPOCIV_REPOS_ROOT/WORKSPACE_ROOT, which caused
+    # the bridge (and agent working_dir) to ignore a MAP_ROOT change made via the
+    # onboarding panel or .env, while the frontend map (Vite plugin) respected it.
+    root = (
+        os.environ.get("REPOCIV_MAP_ROOT")
+        or os.environ.get("REPOCIV_REPOS_ROOT")
+        or os.environ.get("WORKSPACE_ROOT")
+        or str(Path.home() / ".hermes" / "workspace" / "repos")
     )
     return os.path.expanduser(root)
 
@@ -193,7 +197,7 @@ def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
         "\n\n## Contexto espacial RepoCiv (fuente de verdad)\n"
         f"- **Ciudad / target (`city_id`):** `{city_id}`\n"
         f"{path_line}\n"
-        f"- **Raiz de repos (`REPOCIV_REPOS_ROOT` / `WORKSPACE_ROOT`):** `{root}`\n"
+        f"- **Raiz de repos (`REPOCIV_MAP_ROOT` / `REPOCIV_REPOS_ROOT` / `WORKSPACE_ROOT`):** `{root}`\n"
         f"- **Ruta esperada para este target:** `{expected}`\n")
 
 
