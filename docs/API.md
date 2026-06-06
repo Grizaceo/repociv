@@ -7,13 +7,15 @@
 
 ## Autenticación
 
-Todos los endpoints `POST` requieren el header:
+Todos los endpoints (GET y POST) requieren el header:
 
 ```
 X-RepoCiv-Token: <token>
 ```
 
 El token se define en `.env` como `REPOCIV_TOKEN`. En modo dev, dejar vacío = bypass de auth.
+
+Excepciones: solo `GET /health` y `GET /ready` no requieren token (utilizados por monitores de liveness/readiness). Todos los demás endpoints, incluyendo el legacy `POST /`, requieren token.
 
 ---
 
@@ -77,8 +79,12 @@ curl http://localhost:5274/ready
 | Method | Path | Descripción |
 |--------|------|-------------|
 | GET | `/missions` | Lista de misiones persistidas |
+| GET | `/missions/<id>/tree` | Árbol de subagentes de una misión (swarm log) |
 | GET | `/pending` | Tareas desde `PENDING_TRACKER.md` + tareas locales (L-prefixed) |
 | GET | `/tasks` | Tareas activas del orquestador |
+| GET | `/tasks/<repo>/<issueId>` | Status de una tarea por clave (repo + issue) |
+| GET | `/tasks/<repo>/<issueId>/circuit-status` | Estado del circuit breaker para una tarea |
+| POST | `/tasks/<repo>/<issueId>/cancel` | Cancelar una tarea activa |
 | GET | `/approvals` | Comandos esperando aprobación |
 | POST | `/commands` | Intake del Command Bus |
 | POST | `/commands/<id>/cancel` | Cancelar comando en cola |
@@ -89,6 +95,52 @@ curl http://localhost:5274/ready
 | POST | `/pending/edit` | Editar tarea (body: `{id, title, priority}`) |
 | POST | `/pending/delete` | Eliminar tarea (body: `{id}`) |
 | POST | `/pending/state` | Cambiar estado (body: `{id, state}`) |
+
+**`/missions/<id>/tree`** — Path params:
+- `<id>` (str, required): mission_id.
+
+Response 200: árbol del swarm log de la misión desde research_ledger, con `runState` (snapshot de run_state) embebido si existe. 400 si `mission_id` vacío.
+
+**`/tasks/<repo>/<issueId>`** — Path params:
+- `<repo>` (str, required): nombre o path del repo.
+- `<issueId>` (str, required): ID de la issue/quest.
+
+Response 200: estado actual de la tarea desde el task orchestrator. Acepta clave encoded con `::` (ej: `/tasks/repo::ISSUE-1`) además del path con segmentos.
+
+**`/tasks/<repo>/<issueId>/circuit-status`** — Mismos path params. Devuelve el estado del circuit breaker (abierto/cerrado, conteo de fallos, próximo retry) en lugar del status normal.
+
+**`/tasks/<repo>/<issueId>/cancel`** — Mismos path params. Cancela la tarea activa. Response 200: `{"ok": true|false, "taskKey": "..."}`. Idempotente: si la tarea no existe, devuelve `ok: false`.
+
+---
+
+### Subagentes
+
+| Method | Path | Descripción |
+|--------|------|-------------|
+| GET | `/subagents` | Lista subagentes activos y/o históricos |
+| POST | `/subagents/cancel` | Recall (cancelar) un subagente en ejecución |
+
+**`/subagents`** — Query params:
+- `parentUnit` (str, optional): filtrar por unit padre.
+- `parentMission` (str, optional): filtrar por mission_id padre.
+- `active` (str, optional): `"1"`, `"true"` o `"yes"` para solo activos.
+
+Response 200:
+```json
+{
+  "subagents": [ { "id": "...", "parentUnit": "...", "parentMissionId": "...", "status": "running|done|cancelled", "...": "..." } ],
+  "source": "duckdb" | "memory"
+}
+```
+
+La fuente es `duckdb` (research_ledger persistido) si hay rows; fallback a `memory` (subagent_tracker in-memory) si no.
+
+**`/subagents/cancel`** — Body:
+```json
+{ "subagentId": "<id>" }
+```
+
+Acepta también `subagent_id` como alias. Response 200: `{"ok": true|false, "subagentId": "..."}`. 400 si `subagentId` falta o vacío.
 
 ---
 
@@ -122,6 +174,87 @@ curl http://localhost:5274/ready
 | GET | `/providers/live` | Providers disponibles en tiempo real |
 | GET | `/harnesses` | Harnesses registrados |
 | GET | `/harnesses/<id>` | Detalle de un harness |
+| POST | `/harnesses/<id>/recovery-command` | Construir plan de recovery declarativo para un harness fallado |
+
+**`/harnesses/<id>/recovery-command`** — Path params:
+- `<id>` (str, required): ID del harness (debe existir en harness_registry).
+
+Body:
+```json
+{
+  "reason": "timeout|crash|stalled|unknown",
+  "command_type": "<opcional: tipo de comando que falló>",
+  "target": "<opcional: target del comando>",
+  "details": "<opcional: detalles adicionales>"
+}
+```
+
+Response 200: plan de recovery declarativo con shape:
+```json
+{
+  "mode": "copy_command | tmux_attach | no_recovery_available",
+  "harness_id": "...",
+  "harness_label": "...",
+  "trust_level": "...",
+  "command": "<shell command>",
+  "cwd": "<working dir>",
+  "session": "<tmux session name, solo tmux_attach>",
+  "notes": ["..."],
+  "requires_approval": true|false,
+  "risk": "low|medium|high",
+  "reason": "...",
+  "explanation": "...",
+  "available_modes": ["..."]
+}
+```
+
+404 si `<id>` no existe en el registry. El plan se registra como `HarnessRecoveryRequested` en el event store.
+
+---
+
+### Sesión & Modelo
+
+| Method | Path | Descripción |
+|--------|------|-------------|
+| POST | `/session/reset` | Reset de la sesión de un unit (borra archivos, devuelve nuevo nonce) |
+| POST | `/model/override` | Override de provider/model para un unit (in-memory, hasta restart) |
+
+**`/session/reset`** — Body:
+```json
+{ "unit": "DAVI" }
+```
+
+`unit` es opcional (default `"DAVI"`). Debe ser alfanumérico/dash/underscore, max 32 chars (validado por `_validate_unit_id`). Response 200:
+```json
+{
+  "ok": true,
+  "newSessionId": "repociv-davi-<unix_ts>",
+  "unit": "DAVI"
+}
+```
+
+Borra los archivos de sesión correspondientes (`~/.repociv/sessions/<unit>.*`) y devuelve un nuevo nonce. 400 si unit inválido.
+
+**`/model/override`** — Body:
+```json
+{
+  "unit": "DAVI",
+  "provider": "<provider_id>",
+  "model": "<model_id>"
+}
+```
+
+`unit` opcional (default `"DAVI"`), misma validación que `/session/reset`. `provider` y `model` son requeridos y no-vacíos. Response 200:
+```json
+{
+  "ok": true,
+  "unit": "DAVI",
+  "provider": "...",
+  "model": "..."
+}
+```
+
+Persiste **en memoria** hasta que el bridge se reinicie o se invoque otro `/model/override` para el mismo unit. **Nota:** el override aplica solo al harness `hermes`; otros harnesses usan su propia lógica de selección de modelo. 400 si unit inválido o `provider`/`model` vacíos.
 
 ---
 
