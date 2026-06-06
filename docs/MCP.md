@@ -58,7 +58,9 @@ curl "http://127.0.0.1:5274/api/graph-relations?repoId=repociv&limit=5"
 curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/path/to/workspace/repociv"
 ```
 
-## Tools disponibles (41 tools, 15 dominios)
+## Tools disponibles (43 tools, 15 dominios con tools MCP)
+
+> Conteo verificado 2026-06-05 contra `server/mcp_server.py`: 43 funciones decoradas con `@mcp.tool()`. La sección "Subagents" abajo lista endpoints del bridge sin tools MCP dedicadas (no se cuenta como dominio MCP).
 
 ### Agents — estado del imperio
 | Tool | Descripción |
