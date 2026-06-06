@@ -144,7 +144,9 @@ async function fetchSessionTint(
 // ─── ScannedRepo from /api/repos ────────────────────────────────────────────
 export interface ScannedRepo {
   name: string;
-  path: string;
+  path: string; // stable city/repo id used by the UI and bridge
+  repoPath?: string; // absolute filesystem path
+  rootPath?: string; // absolute parent root selected in onboarding
   population: number;
   extensions: Record<string, number>;
   gold: number;
@@ -164,6 +166,21 @@ interface RepoSelectionSettings {
     topics: string[];
     languages: string[];
   };
+}
+
+export interface RepoSelectionRootState {
+  path: string;
+  label?: string;
+  selectedRepoIds: string[];
+  selectedRepoPaths: string[];
+}
+
+export interface RepoSelectionState {
+  activeRoot: string;
+  roots: RepoSelectionRootState[];
+  selectedRepoIds: string[];
+  selectedRepoPaths: string[];
+  hasSelections: boolean;
 }
 
 function canUseLocalStorage(): boolean {
@@ -209,9 +226,81 @@ export function saveSelectedRepoPaths(paths: string[]): void {
   window.localStorage.setItem(REPO_SELECTION_STORAGE_KEY, JSON.stringify(payload));
 }
 
+function normalizeSelectionState(payload: RepoSelectionState): RepoSelectionState {
+  const ids = Array.from(new Set(payload.selectedRepoIds.filter((item) => item.length > 0)));
+  const paths = Array.from(new Set(payload.selectedRepoPaths.filter((item) => item.length > 0)));
+  return {
+    activeRoot: payload.activeRoot,
+    roots: payload.roots,
+    selectedRepoIds: ids,
+    selectedRepoPaths: paths,
+    hasSelections: ids.length > 0,
+  };
+}
+
+export async function fetchRepoSelectionState(): Promise<RepoSelectionState> {
+  const res = await fetch('/api/repo-selections');
+  if (!res.ok) throw new Error(`/api/repo-selections HTTP ${res.status}`);
+  return normalizeSelectionState((await res.json()) as RepoSelectionState);
+}
+
+export async function hydrateSelectedRepoPathCache(): Promise<Set<string>> {
+  const state = await fetchRepoSelectionState();
+  saveSelectedRepoPaths(state.selectedRepoIds);
+  return new Set(state.selectedRepoIds);
+}
+
+export async function fetchSelectionForRoot(rootPath: string): Promise<Set<string>> {
+  const state = await fetchRepoSelectionState();
+  const root = state.roots.find((item) => item.path === rootPath);
+  return new Set(root?.selectedRepoIds ?? []);
+}
+
+export async function persistRootSelection(rootPath: string, repoIds: string[]): Promise<Set<string>> {
+  const res = await fetch('/api/repo-selections', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rootPath, selectedRepoIds: repoIds }),
+  });
+  if (!res.ok) throw new Error(`/api/repo-selections HTTP ${res.status}`);
+  const data = normalizeSelectionState((await res.json()) as RepoSelectionState);
+  saveSelectedRepoPaths(data.selectedRepoIds);
+  return new Set(data.selectedRepoIds);
+}
+
+export async function addSelectedRepoPath(repoId: string): Promise<Set<string>> {
+  const res = await fetch('/api/repo-selections/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ repoId }),
+  });
+  if (!res.ok) throw new Error(`/api/repo-selections/add HTTP ${res.status}`);
+  const data = normalizeSelectionState((await res.json()) as RepoSelectionState);
+  saveSelectedRepoPaths(data.selectedRepoIds);
+  return new Set(data.selectedRepoIds);
+}
+
+export async function removeSelectedRepoPath(repoId: string): Promise<Set<string>> {
+  const res = await fetch('/api/repo-selections/remove', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ repoId }),
+  });
+  if (!res.ok) throw new Error(`/api/repo-selections/remove HTTP ${res.status}`);
+  const data = normalizeSelectionState((await res.json()) as RepoSelectionState);
+  saveSelectedRepoPaths(data.selectedRepoIds);
+  return new Set(data.selectedRepoIds);
+}
+
 export async function fetchScannedRepos(): Promise<ScannedRepo[]> {
   const res = await fetch('/api/repos');
   if (!res.ok) throw new Error(`/api/repos HTTP ${res.status}`);
+  return (await res.json()) as ScannedRepo[];
+}
+
+export async function fetchSelectedRepos(): Promise<ScannedRepo[]> {
+  const res = await fetch('/api/repos/selected');
+  if (!res.ok) throw new Error(`/api/repos/selected HTTP ${res.status}`);
   return (await res.json()) as ScannedRepo[];
 }
 
@@ -412,10 +501,10 @@ export function addCityToWorld(
   coord: Axial,
 ): City {
   const city: City = {
-    id: repo.name,
+    id: repo.path,
     name: repo.name,
     coord,
-    repoPath: repo.path,
+    repoPath: repo.repoPath ?? repo.path,
     population: repo.population,
     territory: [], // recalculated below
     districts: [],
@@ -436,8 +525,10 @@ export function addCityToWorld(
   return city;
 }
 
-export function removeCityFromWorld(world: World, cityName: string): boolean {
-  const idx = world.cities.findIndex((c) => c.name === cityName);
+export function removeCityFromWorld(world: World, cityRef: string): boolean {
+  const idx = world.cities.findIndex(
+    (c) => c.name === cityRef || c.id === cityRef || c.repoPath === cityRef,
+  );
   if (idx === -1) return false;
   const [city] = world.cities.splice(idx, 1);
   // Remove city tile from world.tiles
@@ -466,8 +557,8 @@ function resolveRepoPathForCity(city: City, fallback: string | null): string | n
   if (fallback) return fallback;
   if (city.repoPath) return city.repoPath;
   const store = loadManualLayout();
-  const hit = store.entries.find((e) => e.repoName === city.name);
-  return hit?.repoPath ?? null;
+  const hit = store.entries.find((e) => e.repoPath === city.id || e.repoName === city.name);
+  return hit?.repoFsPath ?? hit?.repoPath ?? null;
 }
 
 /**
@@ -597,15 +688,16 @@ export async function generateWorld(): Promise<World> {
   // Fetch real repos
   let repos: ScannedRepo[] = [];
   try {
-    repos = await fetchScannedRepos();
+    repos = await fetchSelectedRepos();
+    saveSelectedRepoPaths(repos.map((repo) => repo.path));
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    logger.error('[map] /api/repos failed', e);
-    showMapLoadError(`No pude cargar repos reales: ${message}`);
+    logger.error('[map] /api/repos/selected failed', e);
+    showMapLoadError(`No pude cargar repos seleccionados: ${message}`);
   }
 
   const selectedRepoPaths = loadSelectedRepoPaths();
-  if (selectedRepoPaths !== null) {
+  if (selectedRepoPaths !== null && selectedRepoPaths.size > 0) {
     repos = repos.filter((repo) => selectedRepoPaths.has(repo.path));
   }
 

@@ -1,4 +1,10 @@
-import { loadSelectedRepoPaths, saveSelectedRepoPaths, type ScannedRepo } from '../map';
+import {
+  addSelectedRepoPath,
+  loadSelectedRepoPaths,
+  removeSelectedRepoPath,
+  saveSelectedRepoPaths,
+  type ScannedRepo,
+} from '../map';
 import { upsertManualRepoEntry, removeManualRepoEntry, loadManualLayout } from '../manualLayout';
 import { showNotification } from './notificationBanner';
 
@@ -93,10 +99,8 @@ async function inspectRepoPath(path: string): Promise<ScannedRepo> {
   return data.repo;
 }
 
-function upsertSelection(repoPath: string): void {
-  const selected = loadSelectedRepoPaths();
-  if (selected === null) return;
-  selected.add(repoPath);
+async function upsertSelection(repoPath: string): Promise<void> {
+  const selected = await addSelectedRepoPath(repoPath);
   saveSelectedRepoPaths([...selected]);
 }
 
@@ -148,11 +152,15 @@ export function refreshCityList(): void {
       if (!path) return;
       if (confirm('Eliminar esta ciudad del mapa?')) {
         removeManualRepoEntry(path);
-        const selected = loadSelectedRepoPaths();
-        if (selected) {
-          selected.delete(path);
-          saveSelectedRepoPaths([...selected]);
-        }
+        void removeSelectedRepoPath(path)
+          .then((selected) => saveSelectedRepoPaths([...selected]))
+          .catch(() => {
+            const selected = loadSelectedRepoPaths();
+            if (selected) {
+              selected.delete(path);
+              saveSelectedRepoPaths([...selected]);
+            }
+          });
         // Notify main.ts to delete city dynamically (no reload)
         if (_onCityDeleted) {
           _onCityDeleted(path);
@@ -269,7 +277,7 @@ function buildDOM(): void {
         error.classList.add('hidden');
         try {
           selectedRepo = await pickRepoFromSystem();
-          pathInput.value = selectedRepo.path;
+          pathInput.value = selectedRepo.repoPath ?? selectedRepo.path;
           // Also update dropdown
           const select = document.getElementById('construction-repo-select') as HTMLSelectElement;
           if (select) {
@@ -315,15 +323,15 @@ function buildDOM(): void {
               if (found) {
                 selectedRepo = found as ScannedRepo;
               } else {
-                selectedRepo = { name: path, path } as ScannedRepo;
+                selectedRepo = { name: path, path, repoPath: path } as ScannedRepo;
               }
             } else {
-              selectedRepo = { name: path, path } as ScannedRepo;
+              selectedRepo = { name: path, path, repoPath: path } as ScannedRepo;
             }
           } catch {
-            selectedRepo = { name: path, path } as ScannedRepo;
+            selectedRepo = { name: path, path, repoPath: path } as ScannedRepo;
           }
-          pathInput.value = path;
+          pathInput.value = selectedRepo?.repoPath ?? path;
         })();
       }
     });
@@ -337,7 +345,7 @@ function buildDOM(): void {
           const p = pathInput.value.trim();
           if (!p) throw new Error('Ruta vacia');
           selectedRepo = await inspectRepoPath(p);
-          pathInput.value = selectedRepo.path;
+          pathInput.value = selectedRepo.repoPath ?? selectedRepo.path;
         } catch (e) {
           error.textContent = `No se pudo inspeccionar la ruta (${e instanceof Error ? e.message : 'error desconocido'}).`;
           error.classList.remove('hidden');
@@ -364,12 +372,13 @@ function buildDOM(): void {
         // Save to manual layout
         upsertManualRepoEntry({
           repoPath: selectedRepo.path,
+          repoFsPath: selectedRepo.repoPath,
           repoName: selectedRepo.name,
           coord,
           addedAt: Date.now(),
           source: 'manual',
         });
-        upsertSelection(selectedRepo.path);
+        void upsertSelection(selectedRepo.path);
         // Notify main.ts to add city dynamically (no reload)
         if (_onCityAdded) {
           _onCityAdded(selectedRepo, coord);

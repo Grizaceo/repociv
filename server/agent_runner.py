@@ -27,6 +27,7 @@ from server import run_state as _run_state
 from server import runtime_adapters as _runtime_adapters
 from server import security_harness as _security_harness
 from server import token_ledger as _token_ledger
+from server import repo_roots_state as _rrs
 from server.quest import generate_quest_name
 
 SendFn = Callable[[dict[str, Any]], None]
@@ -161,11 +162,9 @@ def _infer_model_label(unit_id: str) -> str:
 
 
 def _repos_root() -> str:
-    # Mirrors vite.config.ts::resolveMapRoot priority:
-    # REPOCIV_MAP_ROOT > REPOCIV_REPOS_ROOT > WORKSPACE_ROOT > ~/.hermes/workspace/repos
-    # Previously this only checked REPOCIV_REPOS_ROOT/WORKSPACE_ROOT, which caused
-    # the bridge (and agent working_dir) to ignore a MAP_ROOT change made via the
-    # onboarding panel or .env, while the frontend map (Vite plugin) respected it.
+    state_root = _rrs.active_root()
+    if state_root:
+        return state_root
     root = (
         os.environ.get("REPOCIV_MAP_ROOT")
         or os.environ.get("REPOCIV_REPOS_ROOT")
@@ -176,6 +175,9 @@ def _repos_root() -> str:
 
 
 def _resolve_city_path(city_id: str) -> str | None:
+    decoded = _rrs.decode_repo_id(city_id)
+    if decoded and os.path.isdir(decoded):
+        return decoded
     candidate = os.path.join(_repos_root(), city_id)
     return candidate if os.path.isdir(candidate) else None
 

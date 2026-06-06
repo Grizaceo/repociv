@@ -1,6 +1,8 @@
 import {
+  fetchRepoSelectionState,
   fetchScannedRepos,
-  loadSelectedRepoPaths,
+  fetchSelectionForRoot,
+  persistRootSelection,
   saveSelectedRepoPaths,
   type ScannedRepo,
 } from '../map.ts';
@@ -46,7 +48,7 @@ async function setMapRoot(path: string): Promise<string> {
 }
 
 function hasStoredSelection(): boolean {
-  return loadSelectedRepoPaths() !== null;
+  return false;
 }
 
 function sortRepos(repos: ScannedRepo[]): ScannedRepo[] {
@@ -219,9 +221,18 @@ function render(state: OnboardingState, onContinue: () => void): void {
     root
       .querySelector<HTMLButtonElement>('#repo-onboarding-next')
       ?.addEventListener('click', () => {
-        saveSelectedRepoPaths([...state.selected]);
-        root.remove();
-        onContinue();
+        void (async () => {
+          try {
+            const union = await persistRootSelection(state.mapRoot, [...state.selected]);
+            saveSelectedRepoPaths([...union]);
+            root.remove();
+            onContinue();
+          } catch (error) {
+            state.error = `No pudimos guardar la seleccion (${error instanceof Error ? error.message : 'error desconocido'}).`;
+            state.step = 'select';
+            render(state, onContinue);
+          }
+        })();
       });
     return;
   }
@@ -325,7 +336,8 @@ async function hydrateRepos(state: OnboardingState, onContinue: () => void): Pro
   render(state, onContinue);
   try {
     state.repos = sortRepos(await fetchScannedRepos());
-    const previousSelection = new Set(state.selected);
+    const rootSelection = await fetchSelectionForRoot(state.mapRoot);
+    const previousSelection = rootSelection.size > 0 ? rootSelection : new Set(state.selected);
     const availablePaths = new Set(state.repos.map((repo) => repo.path));
     const keptSelection = new Set(
       [...previousSelection].filter((path) => availablePaths.has(path)),
@@ -362,17 +374,14 @@ export async function runRepoOnboarding(): Promise<void> {
 }
 
 export async function openOnboardingPanel(): Promise<void> {
-  const existingSelection = loadSelectedRepoPaths();
-  if (existingSelection && existingSelection.size > 0) {
-    try {
-      const repos = await fetchScannedRepos();
-      const hasAnyMatch = repos.some((repo) => existingSelection.has(repo.path));
-      if (hasAnyMatch) return;
-    } catch {
+  try {
+    const state = await fetchRepoSelectionState();
+    if (state.hasSelections) {
+      saveSelectedRepoPaths(state.selectedRepoIds);
       return;
     }
-  } else if (hasStoredSelection()) {
-    return;
+  } catch {
+    if (hasStoredSelection()) return;
   }
 
   await runRepoOnboarding();

@@ -2,6 +2,7 @@ import type { Axial } from './hex.ts';
 
 export interface ManualRepoEntry {
   repoPath: string;
+  repoFsPath?: string;
   repoName: string;
   coord: Axial;
   addedAt: number;
@@ -31,14 +32,24 @@ export function loadManualLayout(): ManualLayoutStore {
     if (!raw) return { version: 1, entries: [] };
     const parsed = JSON.parse(raw) as Partial<ManualLayoutStore>;
     if (parsed.version !== 1 || !Array.isArray(parsed.entries)) return { version: 1, entries: [] };
-    const entries = parsed.entries.filter(
-      (entry): entry is ManualRepoEntry =>
-        typeof entry?.repoPath === 'string' &&
-        typeof entry?.repoName === 'string' &&
-        typeof entry?.coord?.q === 'number' &&
-        typeof entry?.coord?.r === 'number' &&
-        entry?.source === 'manual',
-    );
+    const entries = parsed.entries
+      .filter(
+        (entry): entry is ManualRepoEntry =>
+          typeof entry?.repoPath === 'string' &&
+          typeof entry?.repoName === 'string' &&
+          typeof entry?.coord?.q === 'number' &&
+          typeof entry?.coord?.r === 'number' &&
+          entry?.source === 'manual',
+      )
+      .map((entry) => ({
+        ...entry,
+        repoFsPath:
+          typeof entry.repoFsPath === 'string'
+            ? entry.repoFsPath
+            : entry.repoPath.startsWith('/')
+              ? entry.repoPath
+              : undefined,
+      }));
     return { version: 1, entries };
   } catch {
     return { version: 1, entries: [] };

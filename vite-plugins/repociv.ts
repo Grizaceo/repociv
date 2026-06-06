@@ -16,8 +16,21 @@
 import type { Plugin, Connect } from 'vite';
 import { execSync } from 'node:child_process';
 import { readdirSync, statSync, existsSync, readFileSync, realpathSync } from 'node:fs';
-import { join, basename, resolve } from 'node:path';
+import { join, basename, dirname, resolve } from 'node:path';
 import { homedir, platform } from 'node:os';
+import type { ScannedRepo } from '../src/map.ts';
+import {
+  addRepoSelection,
+  decodeRepoId,
+  encodeRepoId,
+  ensureRoot,
+  loadState,
+  removeRepoSelection,
+  repoExists,
+  saveState,
+  setRootSelection,
+  summarizeState,
+} from './repoRootsState.ts';
 import skipDirsJson from '../shared/skip-dirs.json' with { type: 'json' };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -36,13 +49,16 @@ export function expandUser(p: string): string {
 
 // ─── Repo scanning ────────────────────────────────────────────────────────────
 
-export function scanRepoPath(repoPath: string): ScannedRepo {
+export function scanRepoPath(repoPath: string, rootPath?: string): ScannedRepo {
+  const resolvedRepoPath = resolve(repoPath);
   const exts: Record<string, number> = {};
-  const population = countFiles(repoPath, exts);
-  const { commits, days, hasGit } = gitStats(repoPath);
+  const population = countFiles(resolvedRepoPath, exts);
+  const { commits, days, hasGit } = gitStats(resolvedRepoPath);
   return {
-    name: basename(repoPath),
-    path: repoPath,
+    name: basename(resolvedRepoPath),
+    path: encodeRepoId(resolvedRepoPath),
+    repoPath: resolvedRepoPath,
+    rootPath: rootPath ? resolve(rootPath) : undefined,
     population,
     extensions: exts,
     gold: commits,
@@ -119,8 +135,8 @@ export function makeScanWorkspace(getMapRoot: () => string) {
         /* skip compare */
       }
       if (entry === 'repociv') continue;
-      const repo = scanRepoPath(full);
-      repos.push({ ...repo, path: entry });
+      const repo = scanRepoPath(full, mapRoot);
+      repos.push(repo);
     }
     cachedRoot = mapRoot;
     cachedRepos = repos;
@@ -284,12 +300,47 @@ export function pickFolderWithSystemDialog(): string {
   );
 }
 
+function resolveRepoPathFromId(repoIdOrPath: string, currentMapRoot: string): string | null {
+  const decodedId = decodeRepoId(decodeURIComponent(repoIdOrPath));
+  if (decodedId && repoExists(decodedId)) return decodedId;
+  const direct = resolve(expandUser(decodeURIComponent(repoIdOrPath)));
+  if (repoExists(direct)) return direct;
+  const legacy = join(currentMapRoot, decodeURIComponent(repoIdOrPath));
+  if (repoExists(legacy)) return legacy;
+  return null;
+}
+
+function scanSelectedRepos(state: ReturnType<typeof loadState>): ScannedRepo[] {
+  const seen = new Set<string>();
+  const repos: ScannedRepo[] = [];
+  for (const [rootPath, entry] of Object.entries(state.roots)) {
+    for (const repoPath of entry.selectedRepoPaths) {
+      const resolvedRepoPath = resolve(repoPath);
+      if (seen.has(resolvedRepoPath) || !repoExists(resolvedRepoPath)) continue;
+      seen.add(resolvedRepoPath);
+      repos.push(scanRepoPath(resolvedRepoPath, rootPath));
+    }
+  }
+  return repos;
+}
+
+function respondJson(res: { setHeader: (name: string, value: string) => void; end: (body: string) => void }, body: unknown): void {
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify(body));
+}
+
 // ─── Main plugin factory ──────────────────────────────────────────────────────
 
 export function repocivPlugin(mapRoot: string): Plugin {
   let server: { ws: { send: (msg: object) => void } } | undefined;
-  let currentMapRoot = mapRoot;
-  const { scanWorkspace, clearCache } = makeScanWorkspace(() => currentMapRoot);
+  let rootsState = ensureRoot(loadState(resolve(mapRoot)), resolve(mapRoot));
+  saveState(rootsState);
+  const getCurrentMapRoot = () => rootsState.activeRoot;
+  const { scanWorkspace, clearCache } = makeScanWorkspace(getCurrentMapRoot);
+  const persistState = () => {
+    saveState(rootsState);
+    clearCache();
+  };
 
   const handler: Connect.NextHandleFunction = async (req, res, next) => {
     const rawUrl = req.url ?? '';
@@ -315,22 +366,98 @@ export function repocivPlugin(mapRoot: string): Plugin {
     }
 
     if (path === '/api/repos' && req.method === 'GET') {
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify(scanWorkspace()));
+      respondJson(res, scanWorkspace());
+      return;
+    }
+
+    if (path === '/api/repos/selected' && req.method === 'GET') {
+      respondJson(res, scanSelectedRepos(rootsState));
       return;
     }
 
     if (path === '/api/repos/refresh' && req.method === 'POST') {
       clearCache();
-      const repos = scanWorkspace();
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ ok: true, count: repos.length }));
+      respondJson(res, { ok: true, count: scanWorkspace().length, selectedCount: scanSelectedRepos(rootsState).length });
+      return;
+    }
+
+    if (path === '/api/repo-selections' && req.method === 'GET') {
+      respondJson(res, summarizeState(rootsState));
+      return;
+    }
+
+    if (path === '/api/repo-selections' && req.method === 'POST') {
+      try {
+        const body = await readRequestBody(req);
+        const payload = JSON.parse(body) as { rootPath?: string; selectedRepoIds?: string[]; selectedRepoPaths?: string[] };
+        const rootPath = resolve(expandUser(String(payload.rootPath ?? rootsState.activeRoot ?? '').trim()));
+        if (!rootPath || !repoExists(rootPath)) {
+          res.statusCode = 400;
+          respondJson(res, { error: 'rootPath no es carpeta valida' });
+          return;
+        }
+        const repoPaths = [
+          ...((payload.selectedRepoIds ?? []).map((item) => decodeRepoId(String(item)) ?? '')),
+          ...((payload.selectedRepoPaths ?? []).map((item) => String(item))),
+        ]
+          .map((item) => item.trim())
+          .filter((item) => item.length > 0 && repoExists(item));
+        setRootSelection(rootsState, rootPath, repoPaths);
+        persistState();
+        respondJson(res, summarizeState(rootsState));
+      } catch (e) {
+        res.statusCode = 500;
+        respondJson(res, { error: String(e) });
+      }
+      return;
+    }
+
+    if (path === '/api/repo-selections/add' && req.method === 'POST') {
+      try {
+        const body = await readRequestBody(req);
+        const payload = JSON.parse(body) as { repoId?: string; repoPath?: string };
+        const repoPath = payload.repoPath
+          ? resolve(expandUser(String(payload.repoPath)))
+          : resolveRepoPathFromId(String(payload.repoId ?? ''), rootsState.activeRoot);
+        if (!repoPath) {
+          res.statusCode = 400;
+          respondJson(res, { error: 'repoId/repoPath invalido' });
+          return;
+        }
+        addRepoSelection(rootsState, repoPath);
+        persistState();
+        respondJson(res, summarizeState(rootsState));
+      } catch (e) {
+        res.statusCode = 500;
+        respondJson(res, { error: String(e) });
+      }
+      return;
+    }
+
+    if (path === '/api/repo-selections/remove' && req.method === 'POST') {
+      try {
+        const body = await readRequestBody(req);
+        const payload = JSON.parse(body) as { repoId?: string; repoPath?: string };
+        const repoPath = payload.repoPath
+          ? resolve(expandUser(String(payload.repoPath)))
+          : resolveRepoPathFromId(String(payload.repoId ?? ''), rootsState.activeRoot);
+        if (!repoPath) {
+          res.statusCode = 400;
+          respondJson(res, { error: 'repoId/repoPath invalido' });
+          return;
+        }
+        removeRepoSelection(rootsState, repoPath);
+        persistState();
+        respondJson(res, summarizeState(rootsState));
+      } catch (e) {
+        res.statusCode = 500;
+        respondJson(res, { error: String(e) });
+      }
       return;
     }
 
     if (path === '/api/map-root' && req.method === 'GET') {
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ path: currentMapRoot }));
+      respondJson(res, { path: rootsState.activeRoot });
       return;
     }
 
@@ -342,21 +469,20 @@ export function repocivPlugin(mapRoot: string): Plugin {
         const resolved = resolve(expandUser(requested));
         if (!requested) {
           res.statusCode = 400;
-          res.end(JSON.stringify({ error: 'path requerido' }));
+          respondJson(res, { error: 'path requerido' });
           return;
         }
-        if (!existsSync(resolved) || !statSync(resolved).isDirectory()) {
+        if (!repoExists(resolved)) {
           res.statusCode = 400;
-          res.end(JSON.stringify({ error: 'path no es carpeta valida' }));
+          respondJson(res, { error: 'path no es carpeta valida' });
           return;
         }
-        currentMapRoot = resolved;
-        clearCache();
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ ok: true, path: currentMapRoot, count: scanWorkspace().length }));
+        ensureRoot(rootsState, resolved);
+        persistState();
+        respondJson(res, { ok: true, path: rootsState.activeRoot, count: scanWorkspace().length });
       } catch (e) {
         res.statusCode = 500;
-        res.end(JSON.stringify({ error: String(e) }));
+        respondJson(res, { error: String(e) });
       }
       return;
     }
@@ -364,18 +490,17 @@ export function repocivPlugin(mapRoot: string): Plugin {
     if (path === '/api/map-root/pick' && req.method === 'POST') {
       try {
         const pickedPath = resolve(pickFolderWithSystemDialog());
-        if (!existsSync(pickedPath) || !statSync(pickedPath).isDirectory()) {
+        if (!repoExists(pickedPath)) {
           res.statusCode = 400;
-          res.end(JSON.stringify({ error: 'carpeta invalida' }));
+          respondJson(res, { error: 'carpeta invalida' });
           return;
         }
-        currentMapRoot = pickedPath;
-        clearCache();
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ ok: true, path: currentMapRoot, count: scanWorkspace().length }));
+        ensureRoot(rootsState, pickedPath);
+        persistState();
+        respondJson(res, { ok: true, path: rootsState.activeRoot, count: scanWorkspace().length });
       } catch (e) {
         res.statusCode = 400;
-        res.end(JSON.stringify({ error: String(e) }));
+        respondJson(res, { error: String(e) });
       }
       return;
     }
@@ -383,16 +508,15 @@ export function repocivPlugin(mapRoot: string): Plugin {
     if (path === '/api/repo/pick' && req.method === 'POST') {
       try {
         const pickedPath = resolve(pickFolderWithSystemDialog());
-        if (!existsSync(pickedPath) || !statSync(pickedPath).isDirectory()) {
+        if (!repoExists(pickedPath)) {
           res.statusCode = 400;
-          res.end(JSON.stringify({ error: 'carpeta invalida' }));
+          respondJson(res, { error: 'carpeta invalida' });
           return;
         }
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ ok: true, repo: scanRepoPath(pickedPath) }));
+        respondJson(res, { ok: true, repo: scanRepoPath(pickedPath, dirname(pickedPath)) });
       } catch (e) {
         res.statusCode = 400;
-        res.end(JSON.stringify({ error: String(e) }));
+        respondJson(res, { error: String(e) });
       }
       return;
     }
@@ -405,27 +529,26 @@ export function repocivPlugin(mapRoot: string): Plugin {
         const resolved = resolve(expandUser(requested));
         if (!requested) {
           res.statusCode = 400;
-          res.end(JSON.stringify({ error: 'path requerido' }));
+          respondJson(res, { error: 'path requerido' });
           return;
         }
-        if (!existsSync(resolved) || !statSync(resolved).isDirectory()) {
+        if (!repoExists(resolved)) {
           res.statusCode = 400;
-          res.end(JSON.stringify({ error: 'path no es carpeta valida' }));
+          respondJson(res, { error: 'path no es carpeta valida' });
           return;
         }
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ ok: true, repo: scanRepoPath(resolved) }));
+        respondJson(res, { ok: true, repo: scanRepoPath(resolved, dirname(resolved)) });
       } catch (e) {
         res.statusCode = 500;
-        res.end(JSON.stringify({ error: String(e) }));
+        respondJson(res, { error: String(e) });
       }
       return;
     }
 
     if (path.startsWith('/api/git/') && req.method === 'GET') {
       const name = path.slice('/api/git/'.length);
-      const repoPath = join(currentMapRoot, name);
-      if (!existsSync(join(repoPath, '.git'))) {
+      const repoPath = resolveRepoPathFromId(name, rootsState.activeRoot);
+      if (!repoPath || !existsSync(join(repoPath, '.git'))) {
         res.statusCode = 404;
         res.end(JSON.stringify({ error: 'No git repo' }));
         return;
@@ -494,8 +617,8 @@ export function repocivPlugin(mapRoot: string): Plugin {
 
     if (path.startsWith('/api/files/') && req.method === 'GET') {
       const name = path.slice('/api/files/'.length);
-      const repoPath = join(currentMapRoot, name);
-      if (!existsSync(repoPath)) {
+      const repoPath = resolveRepoPathFromId(name, rootsState.activeRoot);
+      if (!repoPath || !existsSync(repoPath)) {
         res.statusCode = 404;
         res.end(JSON.stringify({ error: 'Not found' }));
         return;
@@ -576,7 +699,7 @@ export function repocivPlugin(mapRoot: string): Plugin {
     configureServer(s) {
       server = s as typeof server;
       s.middlewares.use(handler);
-      console.log(`[repociv] Map root: ${currentMapRoot}`);
+      console.log(`[repociv] Active map root: ${getCurrentMapRoot()}`);
       console.log('[repociv] Workspace se escaneara bajo demanda (/api/repos)');
     },
   };

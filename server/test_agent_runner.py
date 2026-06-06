@@ -1,3 +1,4 @@
+import json
 from urllib.error import URLError
 
 from server import agent_runner
@@ -300,6 +301,7 @@ def test_run_cursor_agent_streaming_model_flag(monkeypatch, tmp_path):
 
 def test_repos_root_prefers_map_root(monkeypatch, tmp_path):
     """REPOCIV_MAP_ROOT wins over REPOCIV_REPOS_ROOT and WORKSPACE_ROOT."""
+    monkeypatch.setenv("REPOCIV_STATE_FILE", str(tmp_path / "missing-state.json"))
     map_root = tmp_path / "map"
     repos_root = tmp_path / "repos"
     ws_root = tmp_path / "ws"
@@ -313,6 +315,7 @@ def test_repos_root_prefers_map_root(monkeypatch, tmp_path):
 
 def test_repos_root_falls_back_to_repos_root(monkeypatch, tmp_path):
     """When MAP_ROOT is unset, REPOCIV_REPOS_ROOT is used."""
+    monkeypatch.setenv("REPOCIV_STATE_FILE", str(tmp_path / "missing-state.json"))
     repos_root = tmp_path / "repos"
     ws_root = tmp_path / "ws"
     for d in (repos_root, ws_root):
@@ -325,6 +328,7 @@ def test_repos_root_falls_back_to_repos_root(monkeypatch, tmp_path):
 
 def test_repos_root_falls_back_to_workspace_root(monkeypatch, tmp_path):
     """When MAP_ROOT and REPOS_ROOT are unset, WORKSPACE_ROOT is used."""
+    monkeypatch.setenv("REPOCIV_STATE_FILE", str(tmp_path / "missing-state.json"))
     ws_root = tmp_path / "ws"
     ws_root.mkdir()
     monkeypatch.delenv("REPOCIV_MAP_ROOT", raising=False)
@@ -333,8 +337,9 @@ def test_repos_root_falls_back_to_workspace_root(monkeypatch, tmp_path):
     assert agent_runner._repos_root() == str(ws_root)
 
 
-def test_repos_root_falls_back_to_default(monkeypatch):
+def test_repos_root_falls_back_to_default(monkeypatch, tmp_path):
     """When all env vars are unset, the hardcoded default is used."""
+    monkeypatch.setenv("REPOCIV_STATE_FILE", str(tmp_path / "missing-state.json"))
     monkeypatch.delenv("REPOCIV_MAP_ROOT", raising=False)
     monkeypatch.delenv("REPOCIV_REPOS_ROOT", raising=False)
     monkeypatch.delenv("WORKSPACE_ROOT", raising=False)
@@ -343,8 +348,9 @@ def test_repos_root_falls_back_to_default(monkeypatch):
     assert agent_runner._repos_root() == expected
 
 
-def test_repos_root_expands_tilde(monkeypatch):
+def test_repos_root_expands_tilde(monkeypatch, tmp_path):
     """The result is os.path.expanduser'd — ~ gets resolved."""
+    monkeypatch.setenv("REPOCIV_STATE_FILE", str(tmp_path / "missing-state.json"))
     monkeypatch.delenv("REPOCIV_MAP_ROOT", raising=False)
     monkeypatch.delenv("REPOCIV_REPOS_ROOT", raising=False)
     monkeypatch.setenv("WORKSPACE_ROOT", "~/my-repos")
@@ -360,8 +366,41 @@ def test_repos_root_empty_string_treated_as_unset(monkeypatch, tmp_path):
     specific fall-through patterns. The new chain uses `or`, which short-
     circuits on '', correctly falling through to the next var.
     """
+    monkeypatch.setenv("REPOCIV_STATE_FILE", str(tmp_path / "missing-state.json"))
     repos_root = tmp_path / "repos"
     repos_root.mkdir()
     monkeypatch.setenv("REPOCIV_MAP_ROOT", "")
     monkeypatch.setenv("REPOCIV_REPOS_ROOT", str(repos_root))
     assert agent_runner._repos_root() == str(repos_root)
+
+
+def test_repos_root_prefers_state_file(monkeypatch, tmp_path):
+    active = tmp_path / "legal-roots"
+    active.mkdir()
+    state_file = tmp_path / "state.json"
+    state_file.write_text(
+        json.dumps({
+            "version": 1,
+            "activeRoot": str(active),
+            "roots": {str(active): {"selectedRepoPaths": []}},
+        }),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("REPOCIV_STATE_FILE", str(state_file))
+    monkeypatch.setenv("REPOCIV_MAP_ROOT", "/should/not/win")
+
+    assert agent_runner._repos_root() == str(active)
+
+
+def test_resolve_city_path_decodes_repo_id(monkeypatch, tmp_path):
+    repo = tmp_path / "repo-a"
+    repo.mkdir()
+    state_file = tmp_path / "state.json"
+    state_file.write_text(
+        json.dumps({"version": 1, "activeRoot": str(tmp_path), "roots": {}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("REPOCIV_STATE_FILE", str(state_file))
+
+    repo_id = "repo:" + __import__("base64").urlsafe_b64encode(str(repo).encode("utf-8")).decode("ascii").rstrip("=")
+    assert agent_runner._resolve_city_path(repo_id) == str(repo)
