@@ -506,7 +506,6 @@ export class Renderer {
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.state.viewMode === 'local') {
         this.state.enterMacroView();
-        this.localR = null;
       }
     });
   }
