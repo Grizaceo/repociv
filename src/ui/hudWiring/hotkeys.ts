@@ -260,8 +260,13 @@ export function wireHotkeys(
         renderer.toggleGrid();
         break;
       case 'f':
-        trackHotkey('F:debug');
-        renderer.toggleDebug();
+        if (state.viewMode === 'local') {
+          trackHotkey('F:local-debug');
+          renderer.toggleLocalDebugOverlay();
+        } else {
+          trackHotkey('F:debug');
+          renderer.toggleDebug();
+        }
         break;
       case 'v':
         trackHotkey('V:fog');

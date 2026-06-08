@@ -94,6 +94,11 @@ export class LocalRenderer {
   private doorOpenStates = new Map<string, number>();
   private lastFrameTime = performance.now();
 
+  // Debug FPS counter
+  private _fpsFrames = 0;
+  private _fpsLastTime = 0;
+  private _fpsValue = 0;
+
   // Particle Pool (Phase 8)
   private static readonly MAX_PARTICLES = 64;
   private particles: LocalParticle[] = [];
@@ -132,6 +137,16 @@ export class LocalRenderer {
   }
   isWorkbenchLabelsVisible(): boolean {
     return this._workbenchLabelOverlay;
+  }
+
+  // Debug overlay toggle (RimWorld-style dev mode)
+  private _debugOverlay = false;
+  toggleDebugOverlay(): boolean {
+    this._debugOverlay = !this._debugOverlay;
+    return this._debugOverlay;
+  }
+  isDebugOverlay(): boolean {
+    return this._debugOverlay;
   }
 
   // Power overlay toggle
@@ -636,6 +651,14 @@ export class LocalRenderer {
     const now = performance.now();
     const dt = Math.min((now - this.lastFrameTime) / 1000, 0.1);
     this.lastFrameTime = now;
+
+    // FPS counter (for debug overlay)
+    this._fpsFrames++;
+    if (now - this._fpsLastTime >= 1000) {
+      this._fpsValue = this._fpsFrames;
+      this._fpsFrames = 0;
+      this._fpsLastTime = now;
+    }
 
     // 3b. Rebuild static layer if needed
     if (!this.staticLayer || this.staticWorldId !== world.repoId) {
@@ -3236,6 +3259,11 @@ export class LocalRenderer {
     if (this.hoveredTile) {
       this.drawIsoHoveredTile(this.hoveredTile);
     }
+
+    // ─── Debug Overlay (RimWorld-style dev mode) ──────────────────────
+    if (this._debugOverlay) {
+      this.drawIsoDebugOverlay(world, localUnits, dt);
+    }
   }
 
   /** Draw a single tile in isometric 2.5D projection. */
@@ -4455,6 +4483,98 @@ export class LocalRenderer {
       }
     }
 
+    ctx.restore();
+  }
+
+  /** RimWorld-style debug overlay: paths, agent data cards, FPS counter. */
+  private drawIsoDebugOverlay(
+    world: LocalWorld,
+    localUnits: LocalUnit[],
+    _dt: number,
+  ) {
+    const { ctx } = this;
+
+    // ── 1. Agent paths (colored lines connecting waypoints) ─────────
+    for (const unit of localUnits) {
+      if (unit.path.length === 0 || unit.pathIndex >= unit.path.length) continue;
+      const remaining = unit.path.slice(unit.pathIndex);
+      if (remaining.length < 2) continue;
+
+      ctx.strokeStyle = unit.color;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      const start = isoProject(remaining[0]!.x, remaining[0]!.y);
+      ctx.moveTo(start.px, start.py);
+      for (let i = 1; i < remaining.length; i++) {
+        const p = isoProject(remaining[i]!.x, remaining[i]!.y);
+        ctx.lineTo(p.px, p.py);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // waypoint dots
+      ctx.fillStyle = unit.color;
+      for (const wp of remaining) {
+        const p = isoProject(wp.x, wp.y);
+        ctx.beginPath();
+        ctx.arc(p.px, p.py, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // ── 2. Debug cards floating above each unit ─────────────────────
+    for (const unit of localUnits) {
+      const base = isoProject(unit.gridX, unit.gridY);
+      const lines: string[] = [
+        `${unit.name}`,
+        `st: ${unit.state}`,
+        `pos: ${unit.gridX},${unit.gridY}`,
+        `fat: ${Math.round(unit.fatigue)}`,
+        `spd: ${unit.effectiveSpeed.toFixed(1)}`,
+      ];
+      if (unit.mission) lines.push(`mission: ${unit.mission.slice(0, 12)}`);
+      if (unit.currentWorkbenchId) lines.push(`wb: ${unit.currentWorkbenchId.slice(0, 8)}`);
+
+      const lineH = 9;
+      const cardW = 72;
+      const cardH = lines.length * lineH + 4;
+      const cx = base.px - cardW / 2;
+      const cy = base.py - ISO_WALL_H - 34 - cardH;
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+      ctx.beginPath();
+      ctx.roundRect(cx, cy, cardW, cardH, 2);
+      ctx.fill();
+      ctx.strokeStyle = unit.color;
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+
+      ctx.fillStyle = '#E2E8F0';
+      ctx.font = `bold 7px ${this.tokens.fontMono}`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i]!, cx + 3, cy + 2 + i * lineH);
+      }
+    }
+
+    // ── 3. FPS / TPS counter (screen-space, fixed position) ────────
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(8, 8, 90, 40);
+    ctx.strokeStyle = '#606060';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(8, 8, 90, 40);
+
+    ctx.fillStyle = '#E2E8F0';
+    ctx.font = `bold 10px ${this.tokens.fontMono}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`FPS: ${this._fpsValue}`, 14, 14);
+    ctx.fillText(`Ticks: ${world.rooms.reduce((n, r) => n + r.workbenches.length, 0)}`, 14, 26);
+    ctx.fillText(`Units: ${localUnits.length}`, 14, 38);
     ctx.restore();
   }
 }

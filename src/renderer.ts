@@ -1257,6 +1257,14 @@ export class Renderer {
     return this.localR?.isWorkbenchLabelsVisible() ?? false;
   }
 
+  /** Toggle RimWorld-style debug overlay in local view. */
+  toggleLocalDebugOverlay(): boolean {
+    return this.localR?.toggleDebugOverlay() ?? false;
+  }
+  isLocalDebugOverlay(): boolean {
+    return this.localR?.isDebugOverlay() ?? false;
+  }
+
   /** Compute current zoom-based LOD level. */
   private calcLod(): 'low' | 'medium' | 'high' {
     if (this.cam.zoom < 0.5) return 'low';
