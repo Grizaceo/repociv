@@ -716,6 +716,10 @@ export class LocalRenderer {
     const s = TILE_SIZE;
     const key = `${tile.x},${tile.y}`;
 
+    const room = tile.roomId ? this.world?.rooms.find((r) => r.id === tile.roomId) : undefined;
+    const zone = room?.zoneType;
+    const isGlass = zone === 'team_cluster' || zone === 'meeting';
+
     const dpx = px + s / 2;
     const dpy = py + s / 2;
 
@@ -749,16 +753,31 @@ export class LocalRenderer {
 
     ctx.save();
 
-    // Left sliding panel
-    ctx.fillStyle = this.tokens.zinc600 || '#52525B';
-    ctx.fillRect(px - offset, py + 1, panelW, s - 2);
-    ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)'; // Amber outline
-    ctx.lineWidth = 1;
-    ctx.strokeRect(px - offset + 0.5, py + 1.5, panelW - 1, s - 3);
+    if (isGlass) {
+      // Glass sliding panels
+      ctx.fillStyle = 'rgba(200, 220, 240, 0.25)';
+      ctx.fillRect(px - offset, py + 1, panelW, s - 2);
+      ctx.fillRect(px + panelW + offset, py + 1, panelW, s - 2);
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(px - offset + 0.5, py + 1.5, panelW - 1, s - 3);
+      ctx.strokeRect(px + panelW + offset + 0.5, py + 1.5, panelW - 1, s - 3);
+      // Frosted stripe
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(px - offset, py + s / 2 - 1, panelW, 2);
+      ctx.fillRect(px + panelW + offset, py + s / 2 - 1, panelW, 2);
+    } else {
+      // Left sliding panel
+      ctx.fillStyle = this.tokens.zinc600 || '#52525B';
+      ctx.fillRect(px - offset, py + 1, panelW, s - 2);
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)'; // Amber outline
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px - offset + 0.5, py + 1.5, panelW - 1, s - 3);
 
-    // Right sliding panel
-    ctx.fillRect(px + panelW + offset, py + 1, panelW, s - 2);
-    ctx.strokeRect(px + panelW + offset + 0.5, py + 1.5, panelW - 1, s - 3);
+      // Right sliding panel
+      ctx.fillRect(px + panelW + offset, py + 1, panelW, s - 2);
+      ctx.strokeRect(px + panelW + offset + 0.5, py + 1.5, panelW - 1, s - 3);
+    }
 
     ctx.restore();
   }
@@ -815,112 +834,163 @@ export class LocalRenderer {
     }
   }
 
-  private drawFloorBackground(tile: LocalTile, px: number, py: number, s: number, inRoom: boolean) {
+  private drawFloorBackground(tile: LocalTile, px: number, py: number, s: number, inRoom: boolean, zone?: string) {
     const { ctx } = this;
     if (!inRoom) {
-      // Non-room space: industrial poured-concrete factory floor
+      // Non-room space: office corridor / avenue carpet
       const brightness = ((tile.x * 7 + tile.y * 3) % 5) - 2; // -2..+2
-      const base = 52 + brightness * 2;
-      ctx.fillStyle = `rgb(${base},${Math.round(base * 0.95)},${Math.round(base * 0.9)})`;
+      const base = 72 + brightness * 2;
+      ctx.fillStyle = `rgb(${base},${Math.round(base * 0.98)},${Math.round(base * 0.96)})`;
       ctx.fillRect(px, py, s, s);
 
-      // Concrete slab seam lines
-      ctx.strokeStyle = `rgba(0,0,0,0.35)`;
-      ctx.lineWidth = 1;
+      // Carpet tile seam lines
+      ctx.strokeStyle = `rgba(0,0,0,0.12)`;
+      ctx.lineWidth = 0.5;
       ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
 
-      // Sub-divider cross (stamped concrete look)
-      ctx.strokeStyle = `rgba(0,0,0,0.15)`;
-      ctx.lineWidth = 0.5;
+      // Center guide strip on main avenues
+      const isAvenue = tile.type === 'path';
+      if (isAvenue) {
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.15)';
+        ctx.fillRect(px + s / 2 - 1, py, 2, s);
+      }
+
+      return;
+    }
+
+    // Room floors — zone-aware styling
+    const baseColors: Record<string, string> = {
+      team_cluster: '#64748b', // slate-500 carpet
+      meeting: '#475569',     // darker executive carpet
+      focus: '#94a3b8',       // muted acoustic carpet
+      break: '#d4d4d8',       // warm laminate
+      infra: '#52525b',       // raised floor panels
+      reception: '#a1a1aa',   // polished stone
+      biophilic: '#a8a29e',   // natural wood tone
+    };
+
+    const baseColor = baseColors[zone ?? 'team_cluster'] ?? '#64748b';
+    const delta = ((tile.x * 7 + tile.y * 3) % 5) * 2 - 4; // -4..+4
+    ctx.fillStyle = _adjustBrightness(baseColor, delta);
+    ctx.fillRect(px, py, s, s);
+
+    // Carpet tile grid pattern (office-style squares)
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+
+    // Raised-floor hint for infra zones
+    if (zone === 'infra') {
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
       ctx.beginPath();
       ctx.moveTo(px + s / 2, py);
       ctx.lineTo(px + s / 2, py + s);
       ctx.moveTo(px, py + s / 2);
       ctx.lineTo(px + s, py + s / 2);
       ctx.stroke();
+      // Floor pedestal dot
+      ctx.fillStyle = 'rgba(100,100,100,0.3)';
+      ctx.fillRect(px + s / 2 - 1, py + s / 2 - 1, 2, 2);
+    }
 
-      // Yellow safety markings every 8 tiles along specific rows/cols (factory hazard lines)
-      const markX = tile.x % 8 === 0;
-      const markY = tile.y % 8 === 0;
-      if (markX || markY) {
-        ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
-        if (markX) ctx.fillRect(px, py, 3, s); // vertical stripe
-        if (markY) ctx.fillRect(px, py, s, 3); // horizontal stripe
-      }
-
-      // Subtle rivet-like bolt detail at corners (every 4th tile)
-      if (tile.x % 4 === 0 && tile.y % 4 === 0) {
-        ctx.fillStyle = 'rgba(100,90,70,0.6)';
-        ctx.fillRect(px + 2, py + 2, 3, 3);
-        ctx.fillStyle = 'rgba(200,180,120,0.3)';
-        ctx.fillRect(px + 3, py + 3, 1, 1);
-      }
-    } else {
-      // Room floor: warm wood panels / flooring
-      let baseColor = '#4e3e34'; // warm wood
-      const delta = ((tile.x * 7 + tile.y * 3) % 5) * 2 - 4; // -4..+4
-      baseColor = _adjustBrightness(baseColor, delta);
-      ctx.fillStyle = baseColor;
-      ctx.fillRect(px, py, s, s);
-
-      // Vertical plank joints
-      ctx.strokeStyle = '#382a22';
-      ctx.lineWidth = 0.5;
+    // Warm laminate plank lines for break / reception
+    if (zone === 'break' || zone === 'reception') {
+      ctx.strokeStyle = 'rgba(0,0,0,0.06)';
       ctx.beginPath();
       ctx.moveTo(px + s / 3, py);
       ctx.lineTo(px + s / 3, py + s);
       ctx.moveTo(px + 2 * s / 3, py);
       ctx.lineTo(px + 2 * s / 3, py + s);
       ctx.stroke();
-
-      // Horizontal plank staggered joint lines
-      ctx.beginPath();
-      const offsetHash = (tile.x * 13 + tile.y * 7) % 3;
-      if (offsetHash === 0) {
-        ctx.moveTo(px, py + s / 2);
-        ctx.lineTo(px + s / 3, py + s / 2);
-        ctx.moveTo(px + 2 * s / 3, py + s / 3);
-        ctx.lineTo(px + s, py + s / 3);
-      } else if (offsetHash === 1) {
-        ctx.moveTo(px + s / 3, py + 2 * s / 3);
-        ctx.lineTo(px + 2 * s / 3, py + 2 * s / 3);
-      } else {
-        ctx.moveTo(px, py + s / 4);
-        ctx.lineTo(px + s / 3, py + s / 4);
-        ctx.moveTo(px + 2 * s / 3, py + 3 * s / 4);
-        ctx.lineTo(px + s, py + 3 * s / 4);
-      }
-      ctx.stroke();
-
-      // Soft reflection edge highlights
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
-      ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
     }
+
+    // Soft edge highlight
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
   }
 
   private drawPathBackground(tile: LocalTile, px: number, py: number, s: number) {
     const { ctx } = this;
-    let baseColor = '#2c2621'; // iron plate
-    const delta = ((tile.x * 7 + tile.y * 3) % 7) - 3;
-    baseColor = _adjustBrightness(baseColor, delta);
+    // ─── Office corridor carpet ──────────────────────────────────────────
+    const brightness = ((tile.x * 7 + tile.y * 3) % 7) - 3;
+    let baseColor = '#6b7b8f'; // warm slate office carpet
+    baseColor = _adjustBrightness(baseColor, brightness * 1.2);
     ctx.fillStyle = baseColor;
     ctx.fillRect(px, py, s, s);
 
-    // Steel plate borders
-    ctx.strokeStyle = '#1b1815';
-    ctx.lineWidth = 1;
+    // Carpet tile grid seams (more defined office tiles)
+    ctx.strokeStyle = 'rgba(0,0,0,0.14)';
+    ctx.lineWidth = 0.5;
     ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
 
-    // Corner rivets
-    ctx.fillStyle = '#443d35';
-    ctx.fillRect(px + 3, py + 3, 1.5, 1.5);
-    ctx.fillRect(px + s - 4.5, py + 3, 1.5, 1.5);
-    ctx.fillRect(px + 3, py + s - 4.5, 1.5, 1.5);
-    ctx.fillRect(px + s - 4.5, py + s - 4.5, 1.5, 1.5);
+    // Tufting / fiber lines (subtle loop-pile texture)
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 0.3;
+    ctx.beginPath();
+    for (let i = 2; i < s; i += 3) {
+      ctx.moveTo(px + i, py + 2);
+      ctx.lineTo(px + i, py + s - 2);
+    }
+    ctx.stroke();
 
-    // Center guide line
-    ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
-    ctx.fillRect(px + s / 2 - 1, py + s / 2 - 1, 2, 2);
+    // Center guide strip (subtle directional carpet runner)
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.15)';
+    ctx.fillRect(px + s / 2 - 2, py, 4, s);
+    // Runner inner highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    ctx.fillRect(px + s / 2 - 1, py, 2, s);
+
+    // ─── Ceiling light glow (fluorescent strip reflection on floor) ──
+    const lightX = px + s / 2;
+    const lightY = py + s / 2;
+    const lightGrad = ctx.createRadialGradient(lightX, lightY, 0, lightX, lightY, s * 0.7);
+    lightGrad.addColorStop(0, 'rgba(255, 255, 250, 0.06)');
+    lightGrad.addColorStop(1, 'rgba(255, 255, 250, 0)');
+    ctx.fillStyle = lightGrad;
+    ctx.fillRect(px, py, s, s);
+
+    // ─── Directional wayfinding arrows ─────────────────────────────────
+    if ((tile.x + tile.y * 3) % 11 === 0) {
+      ctx.fillStyle = 'rgba(148, 163, 184, 0.2)';
+      ctx.font = `bold ${s * 0.22}px ${this.tokens.fontMono}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('▸', px + s / 2, py + s / 2);
+    }
+
+    // ─── Edge shadow from nearby walls (soft ambient occlusion) ────────
+    const wallNearby = (dx: number, dy: number) => {
+      const t = this.getTile(tile.x + dx, tile.y + dy);
+      return t?.type === 'wall' || t?.type === 'door';
+    };
+    if (wallNearby(0, -1)) {
+      const shadowGrad = ctx.createLinearGradient(px, py + 4, px, py);
+      shadowGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      shadowGrad.addColorStop(1, 'rgba(0,0,0,0.18)');
+      ctx.fillStyle = shadowGrad;
+      ctx.fillRect(px, py, s, 5);
+    }
+    if (wallNearby(0, 1)) {
+      const shadowGrad = ctx.createLinearGradient(px, py + s - 4, px, py + s);
+      shadowGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      shadowGrad.addColorStop(1, 'rgba(0,0,0,0.18)');
+      ctx.fillStyle = shadowGrad;
+      ctx.fillRect(px, py + s - 4, s, 5);
+    }
+    if (wallNearby(-1, 0)) {
+      const shadowGrad = ctx.createLinearGradient(px + 4, py, px, py);
+      shadowGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      shadowGrad.addColorStop(1, 'rgba(0,0,0,0.18)');
+      ctx.fillStyle = shadowGrad;
+      ctx.fillRect(px, py, 5, s);
+    }
+    if (wallNearby(1, 0)) {
+      const shadowGrad = ctx.createLinearGradient(px + s - 4, py, px + s, py);
+      shadowGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      shadowGrad.addColorStop(1, 'rgba(0,0,0,0.18)');
+      ctx.fillStyle = shadowGrad;
+      ctx.fillRect(px + s - 4, py, 5, s);
+    }
   }
 
   private drawTile(tile: LocalTile) {
@@ -929,20 +999,22 @@ export class LocalRenderer {
     const py = tile.y * TILE_SIZE;
     const s = TILE_SIZE;
     const inRoom = tile.roomId !== null;
+    const room = tile.roomId ? this.world?.rooms.find((r) => r.id === tile.roomId) : undefined;
+    const zone = room?.zoneType;
 
     if (tile.type === 'floor') {
-      this.drawFloorBackground(tile, px, py, s, inRoom);
+      this.drawFloorBackground(tile, px, py, s, inRoom, zone);
     } else if (tile.type === 'door') {
-      this.drawFloorBackground(tile, px, py, s, inRoom);
+      this.drawFloorBackground(tile, px, py, s, inRoom, zone);
       this.drawDoorTile(px, py, s);
     } else if (tile.type === 'path') {
       this.drawPathBackground(tile, px, py, s);
     } else if (tile.type === 'wall') {
-      this.drawWallFacade(tile, px, py, s);
+      this.drawWallFacade(tile, px, py, s, zone);
     } else {
       // draw appropriate flooring under objects
       if (inRoom) {
-        this.drawFloorBackground(tile, px, py, s, true);
+        this.drawFloorBackground(tile, px, py, s, true, zone);
       } else {
         this.drawPathBackground(tile, px, py, s);
       }
@@ -980,31 +1052,69 @@ export class LocalRenderer {
       } else if (tile.type === 'vent') {
         this.drawVentTile(px, py, s);
       }
+      // ─── Office Furniture (Phase 4) ───────────────────────────────────────
+      else if (tile.type === 'standing_desk') {
+        this.drawStandingDeskTile(px, py, s);
+      } else if (tile.type === 'phone_booth') {
+        this.drawPhoneBoothTile(px, py, s);
+      } else if (tile.type === 'break_area') {
+        this.drawBreakAreaTile(px, py, s);
+      } else if (tile.type === 'meeting_room') {
+        this.drawMeetingRoomTile(px, py, s);
+      } else if (tile.type === 'whiteboard') {
+        this.drawWhiteboardTile(px, py, s);
+      } else if (tile.type === 'server_rack') {
+        this.drawServerRackTile(px, py, s);
+      } else if (tile.type === 'planter') {
+        this.drawPlanterTile(px, py, s);
+      } else if (tile.type === 'reception') {
+        this.drawReceptionTile(px, py, s);
+      } else if (tile.type === 'stairs') {
+        this.drawStairsTile(px, py, s);
+      } else if (tile.type === 'window') {
+        this.drawWindowTile(px, py, s);
+      } else if (tile.type === 'sofa') {
+        this.drawSofaTile(px, py, s);
+      } else if (tile.type === 'watercooler') {
+        this.drawWatercoolerTile(px, py, s);
+      }
     }
   }
 
-  private drawDoorTile(px: number, py: number, s: number) {
+  private drawDoorTile(px: number, py: number, s: number, zone?: string) {
     const { ctx } = this;
-    
-    // Draw door frame posts on left/right or top/bottom based on adjacent walls
-    // For simplicity, draw vertical door posts on the sides
-    ctx.fillStyle = '#3a342f'; // posts (concrete/metal)
+    const isGlass = zone === 'team_cluster' || zone === 'meeting';
+
+    // Door frame posts
+    ctx.fillStyle = isGlass ? 'rgba(148,163,184,0.5)' : '#3a342f';
     ctx.fillRect(px, py, 4, s); // Left post
     ctx.fillRect(px + s - 4, py, 4, s); // Right post
 
-    // Draw sliding door panel (wood/metal sheet in the middle, slightly open to allow agents through)
-    ctx.fillStyle = '#6e5d53'; // door panel (warm mahogany/metal)
-    ctx.fillRect(px + 4, py + s / 2 - 3, s - 8, 6);
-    ctx.strokeStyle = '#382a22';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(px + 4, py + s / 2 - 3, s - 8, 6);
+    if (isGlass) {
+      // Glass sliding door panel
+      ctx.fillStyle = 'rgba(200, 220, 240, 0.2)';
+      ctx.fillRect(px + 4, py + s / 2 - 3, s - 8, 6);
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(px + 4, py + s / 2 - 3, s - 8, 6);
+      // Frosted stripe
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.fillRect(px + 4, py + s / 2 - 1, s - 8, 2);
+    } else {
+      // Wood/metal sliding door panel
+      ctx.fillStyle = '#6e5d53';
+      ctx.fillRect(px + 4, py + s / 2 - 3, s - 8, 6);
+      ctx.strokeStyle = '#382a22';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px + 4, py + s / 2 - 3, s - 8, 6);
+    }
 
-    // Door lock/handle highlight (gold/amber)
-    ctx.fillStyle = '#f59e0b';
+    // Door handle
+    ctx.fillStyle = isGlass ? '#94a3b8' : '#f59e0b';
     ctx.fillRect(px + s / 2 - 2, py + s / 2 - 1, 4, 2);
   }
 
-  private drawWallFacade(tile: LocalTile, px: number, py: number, s: number) {
+  private drawWallFacade(tile: LocalTile, px: number, py: number, s: number, zone?: string) {
     const { ctx } = this;
 
     const isOpen = (x: number, y: number) => {
@@ -1027,76 +1137,137 @@ export class LocalRenderer {
     // Corner detection: open on two perpendicular sides
     const isCorner = (east && south) || (east && north) || (west && south) || (west && north);
 
+    // Zone-aware wall styling
+    const isGlass = zone === 'team_cluster' || zone === 'meeting';
+    const isAcoustic = zone === 'focus';
+    const isWood = zone === 'break' || zone === 'biophilic';
+    const isConcrete = zone === 'infra';
+
     if (isCorner) {
-      // Reinforced concrete column
-      ctx.fillStyle = '#3a342f'; // base wall concrete
+      // Structural column
+      ctx.fillStyle = isConcrete ? '#3a342f' : isWood ? '#5c4033' : '#475569';
       ctx.fillRect(px, py, s, s);
 
-      ctx.fillStyle = '#4a423a'; // inner column core
+      ctx.fillStyle = isConcrete ? '#4a423a' : isWood ? '#6b4f3a' : '#52525b';
       ctx.fillRect(px + 4, py + 4, s - 8, s - 8);
 
       ctx.strokeStyle = '#1b1815';
       ctx.lineWidth = 1;
       ctx.strokeRect(px + 4, py + 4, s - 8, s - 8);
 
-      // column cap corner lines
-      ctx.strokeStyle = '#786b5e';
+      ctx.strokeStyle = isGlass ? '#94a3b8' : '#786b5e';
       ctx.strokeRect(px + 1.5, py + 1.5, s - 3, s - 3);
     } else {
-      // Solid concrete blocks
-      ctx.fillStyle = '#4a423a'; // concrete color
-      ctx.fillRect(px, py, s, s);
+      if (isGlass) {
+        // Glass partition wall
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.25)';
+        ctx.fillRect(px, py, s, s);
+        // Thin metal frame
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.55)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+        // Horizontal frosted band
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.fillRect(px + 1, py + s / 2 - 2, s - 2, 4);
+      } else if (isAcoustic) {
+        // Acoustic panel wall
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(px, py, s, s);
+        // Perforated pattern
+        ctx.fillStyle = '#64748b';
+        for (let r = 0; r < 3; r++) {
+          for (let c = 0; c < 3; c++) {
+            ctx.fillRect(px + 4 + c * 9, py + 4 + r * 9, 2, 2);
+          }
+        }
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+      } else if (isWood) {
+        // Wood panel wall
+        ctx.fillStyle = '#78350f';
+        ctx.fillRect(px, py, s, s);
+        // Vertical wood grain lines
+        ctx.strokeStyle = '#5c2e0e';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(px + s / 3, py);
+        ctx.lineTo(px + s / 3, py + s);
+        ctx.moveTo(px + 2 * s / 3, py);
+        ctx.lineTo(px + 2 * s / 3, py + s);
+        ctx.stroke();
+        // Panel outline
+        ctx.strokeStyle = '#451a03';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+      } else {
+        // Standard drywall / concrete blocks
+        ctx.fillStyle = isConcrete ? '#4a423a' : '#52525b';
+        ctx.fillRect(px, py, s, s);
 
-      // Concrete block joint lines
-      ctx.strokeStyle = '#342e29';
-      ctx.lineWidth = 1;
+        ctx.strokeStyle = isConcrete ? '#342e29' : '#3f3f46';
+        ctx.lineWidth = 1;
 
-      // Horizontal joint rows
-      ctx.beginPath();
-      ctx.moveTo(px, py + 10);
-      ctx.lineTo(px + s, py + 10);
-      ctx.moveTo(px, py + 21);
-      ctx.lineTo(px + s, py + 21);
-      ctx.stroke();
+        // Horizontal joint rows
+        ctx.beginPath();
+        ctx.moveTo(px, py + 10);
+        ctx.lineTo(px + s, py + 10);
+        ctx.moveTo(px, py + 21);
+        ctx.lineTo(px + s, py + 21);
+        ctx.stroke();
 
-      // Vertical block seams (staggered)
-      ctx.beginPath();
-      // Row 1 (y: 0-10)
-      ctx.moveTo(px + s / 2, py);
-      ctx.lineTo(px + s / 2, py + 10);
-      // Row 2 (y: 10-21)
-      ctx.moveTo(px + s / 4, py + 10);
-      ctx.lineTo(px + s / 4, py + 21);
-      ctx.moveTo(px + 3 * s / 4, py + 10);
-      ctx.lineTo(px + 3 * s / 4, py + 21);
-      // Row 3 (y: 21-s)
-      ctx.moveTo(px + s / 2, py + 21);
-      ctx.lineTo(px + s / 2, py + s);
-      ctx.stroke();
+        // Vertical block seams (staggered)
+        ctx.beginPath();
+        ctx.moveTo(px + s / 2, py);
+        ctx.lineTo(px + s / 2, py + 10);
+        ctx.moveTo(px + s / 4, py + 10);
+        ctx.lineTo(px + s / 4, py + 21);
+        ctx.moveTo(px + 3 * s / 4, py + 10);
+        ctx.lineTo(px + 3 * s / 4, py + 21);
+        ctx.moveTo(px + s / 2, py + 21);
+        ctx.lineTo(px + s / 2, py + s);
+        ctx.stroke();
+      }
     }
 
-    // Top metal capping (thickness / height illusion)
-    ctx.fillStyle = '#5c5249';
+    // Top capping
+    ctx.fillStyle = isGlass ? 'rgba(148,163,184,0.5)' : isWood ? '#5c4033' : '#5c5249';
     ctx.fillRect(px, py, s, 4);
 
     // Directional shadows from neighboring open tiles
     if (east) {
       const shadowGrad = ctx.createLinearGradient(px + s - 5, py, px + s, py);
-      shadowGrad.addColorStop(0, 'rgba(0,0,0,0.3)');
+      shadowGrad.addColorStop(0, isGlass ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.3)');
       shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = shadowGrad;
       ctx.fillRect(px + s - 5, py, 5, s);
     }
     if (south) {
       const shadowGrad = ctx.createLinearGradient(px, py + s - 5, px, py + s);
-      shadowGrad.addColorStop(0, 'rgba(0,0,0,0.3)');
+      shadowGrad.addColorStop(0, isGlass ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.3)');
       shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = shadowGrad;
       ctx.fillRect(px, py + s - 5, s, 5);
     }
 
+    // Office baseboard / molding on walls facing corridors
+    const isPath = (x: number, y: number) => {
+      const t = this.getTile(x, y);
+      return t?.type === 'path' || t?.type === 'door';
+    };
+    const pathNorth = isPath(tile.x, tile.y - 1);
+    const pathSouth = isPath(tile.x, tile.y + 1);
+    const pathEast = isPath(tile.x + 1, tile.y);
+    const pathWest = isPath(tile.x - 1, tile.y);
+
+    ctx.fillStyle = isGlass ? 'rgba(200,200,210,0.4)' : '#e2e8f0';
+    if (pathNorth) ctx.fillRect(px + 1, py + s - 3, s - 2, 3);
+    if (pathSouth) ctx.fillRect(px + 1, py, s - 2, 3);
+    if (pathEast) ctx.fillRect(px, py + 1, 3, s - 2);
+    if (pathWest) ctx.fillRect(px + s - 3, py + 1, 3, s - 2);
+
     // Outline
-    ctx.strokeStyle = '#1d1a17';
+    ctx.strokeStyle = isGlass ? 'rgba(148,163,184,0.4)' : '#1d1a17';
     ctx.lineWidth = 1;
     ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
   }
@@ -1410,26 +1581,362 @@ export class LocalRenderer {
     ctx.fillText('↔', centerX, centerY);
   }
 
+  // ─── Office Furniture Tiles (Phase 4) ────────────────────────────────────────
+
+  private drawStandingDeskTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    // Elevated desk surface
+    ctx.fillStyle = '#6b5a4e'; // warm wood
+    ctx.fillRect(px + 2, py + 4, s - 4, 10);
+    ctx.strokeStyle = '#3a2e26';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(px + 2.5, py + 4.5, s - 5, 9);
+    // Monitor
+    ctx.fillStyle = '#151311';
+    ctx.fillRect(px + 5, py + 2, s - 10, 7);
+    ctx.strokeStyle = '#2d2722';
+    ctx.strokeRect(px + 5.5, py + 2.5, s - 11, 6);
+    // Cable tray hint under desk
+    ctx.fillStyle = '#2d2722';
+    ctx.fillRect(px + 4, py + 16, s - 8, 2);
+  }
+
+  private drawPhoneBoothTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    // Enclosed pod body
+    ctx.fillStyle = '#2d3748'; // slate-800
+    ctx.fillRect(px + 3, py + 3, s - 6, s - 6);
+    ctx.strokeStyle = '#1a202c';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px + 3, py + 3, s - 6, s - 6);
+    // Sound-dampening panels (horizontal lines)
+    ctx.strokeStyle = '#4a5568';
+    ctx.lineWidth = 0.5;
+    for (let i = 1; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(px + 4, py + 3 + i * 7);
+      ctx.lineTo(px + s - 4, py + 3 + i * 7);
+      ctx.stroke();
+    }
+    // Small interior desk
+    ctx.fillStyle = '#4a5568';
+    ctx.fillRect(px + 6, py + s - 10, s - 12, 4);
+    // Occupied indicator LED
+    const now = performance.now();
+    ctx.fillStyle = (now % 2000 < 1000) ? '#fbbf24' : '#4a5568';
+    ctx.fillRect(px + s / 2 - 1, py + 4, 2, 2);
+  }
+
+  private drawBreakAreaTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    // Kitchen counter base
+    ctx.fillStyle = '#e2e8f0'; // slate-200
+    ctx.fillRect(px + 2, py + 10, s - 4, s - 12);
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(px + 2.5, py + 10.5, s - 5, s - 13);
+    // Countertop
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillRect(px + 1, py + 8, s - 2, 4);
+    // Coffee machine
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(px + 4, py + 2, 8, 8);
+    // Coffee machine glow
+    const now = performance.now();
+    ctx.fillStyle = `rgba(245, 158, 11, ${0.5 + 0.3 * Math.sin(now / 300)})`;
+    ctx.fillRect(px + 6, py + 4, 2, 2);
+    // Microwave
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(px + s - 10, py + 3, 7, 6);
+    ctx.strokeStyle = '#475569';
+    ctx.strokeRect(px + s - 9.5, py + 3.5, 6, 5);
+  }
+
+  private drawMeetingRoomTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    // Glass table surface
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.25)';
+    ctx.fillRect(px + 4, py + 6, s - 8, s - 12);
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(px + 4.5, py + 6.5, s - 9, s - 13);
+    // Table legs
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(px + 6, py + s - 6, 2, 4);
+    ctx.fillRect(px + s - 8, py + s - 6, 2, 4);
+    // Chair hints around table
+    ctx.fillStyle = '#64748b';
+    ctx.fillRect(px + 2, py + s / 2 - 2, 3, 4); // left
+    ctx.fillRect(px + s - 5, py + s / 2 - 2, 3, 4); // right
+  }
+
+  private drawWhiteboardTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    // Whiteboard surface
+    ctx.fillStyle = '#f8fafc'; // slate-50
+    ctx.fillRect(px + 2, py + 3, s - 4, s - 6);
+    ctx.strokeStyle = '#94a3b8'; // aluminum frame
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(px + 2, py + 3, s - 4, s - 6);
+    // Faint marker scribbles
+    ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(px + 5, py + 8);
+    ctx.lineTo(px + s - 5, py + 8);
+    ctx.moveTo(px + 5, py + 14);
+    ctx.lineTo(px + s - 8, py + 14);
+    ctx.moveTo(px + 6, py + 10);
+    ctx.lineTo(px + s - 6, py + 12);
+    ctx.stroke();
+    // Small tray at bottom
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillRect(px + 3, py + s - 5, s - 6, 3);
+  }
+
+  private drawServerRackTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    // Rack body
+    ctx.fillStyle = '#1e293b'; // slate-800
+    ctx.fillRect(px + 2, py + 2, s - 4, s - 4);
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px + 2, py + 2, s - 4, s - 4);
+    // Server rows with blinking LEDs
+    const now = performance.now();
+    const rowCount = 4;
+    for (let i = 0; i < rowCount; i++) {
+      const ry = py + 4 + i * 7;
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(px + 4, ry, s - 8, 5);
+      // LED strip
+      const ledColors = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444'];
+      for (let j = 0; j < 3; j++) {
+        const blink = Math.sin(now / 200 + i * 3 + j * 2) > 0;
+        ctx.fillStyle = blink ? ledColors[(i + j) % ledColors.length]! : '#1e293b';
+        ctx.fillRect(px + 6 + j * 7, ry + 1.5, 3, 2);
+      }
+    }
+    // Cable mess at bottom
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(px + 4, py + s - 4);
+    ctx.lineTo(px + s / 2, py + s - 1);
+    ctx.lineTo(px + s - 4, py + s - 4);
+    ctx.stroke();
+  }
+
+  private drawPlanterTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    // Terracotta pot
+    ctx.fillStyle = '#b45309'; // amber-700
+    ctx.beginPath();
+    ctx.moveTo(px + 6, py + s - 4);
+    ctx.lineTo(px + s - 6, py + s - 4);
+    ctx.lineTo(px + s - 5, py + s - 10);
+    ctx.lineTo(px + 5, py + s - 10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    // Plant foliage (simple green blob)
+    ctx.fillStyle = '#15803d'; // green-700
+    ctx.beginPath();
+    ctx.ellipse(px + s / 2, py + s / 2 - 2, s * 0.3, s * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#16a34a'; // green-600 highlight
+    ctx.beginPath();
+    ctx.ellipse(px + s / 2 - 1, py + s / 2 - 4, s * 0.18, s * 0.15, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    // Small shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.ellipse(px + s / 2, py + s - 3, s * 0.25, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  private drawReceptionTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    // Curved desk body
+    ctx.fillStyle = '#78350f'; // warm mahogany
+    ctx.beginPath();
+    ctx.moveTo(px + 4, py + s - 4);
+    ctx.lineTo(px + s - 4, py + s - 4);
+    ctx.lineTo(px + s - 5, py + 10);
+    ctx.quadraticCurveTo(px + s / 2, py + 4, px + 5, py + 10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#451a03';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    // Countertop
+    ctx.fillStyle = '#d4d4d8';
+    ctx.beginPath();
+    ctx.moveTo(px + 3, py + s - 4);
+    ctx.lineTo(px + s - 3, py + s - 4);
+    ctx.lineTo(px + s - 4, py + 10);
+    ctx.quadraticCurveTo(px + s / 2, py + 5, px + 4, py + 10);
+    ctx.closePath();
+    ctx.fill();
+    // Small computer monitor
+    ctx.fillStyle = '#18181b';
+    ctx.fillRect(px + s / 2 - 3, py + 8, 6, 5);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillRect(px + s / 2 - 2, py + 9, 4, 3);
+  }
+
+  private drawStairsTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    // Stair steps
+    const steps = 4;
+    const stepH = (s - 4) / steps;
+    for (let i = 0; i < steps; i++) {
+      const sy = py + 2 + i * stepH;
+      const brightness = 60 + i * 8;
+      ctx.fillStyle = `rgb(${brightness},${brightness - 5},${brightness - 10})`;
+      ctx.fillRect(px + 2, sy, s - 4, stepH - 0.5);
+      // Step edge
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(px + 2, sy + stepH - 0.5);
+      ctx.lineTo(px + s - 2, sy + stepH - 0.5);
+      ctx.stroke();
+    }
+    // Handrail hint
+    ctx.strokeStyle = '#71717a';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(px + s - 3, py + 2);
+    ctx.lineTo(px + s - 3, py + s - 2);
+    ctx.stroke();
+  }
+
+  private drawWindowTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    // Window frame
+    ctx.fillStyle = '#e2e8f0'; // slate-200 frame
+    ctx.fillRect(px + 1, py + 1, s - 2, s - 2);
+    // Glass pane with natural light gradient
+    const grad = ctx.createLinearGradient(px, py, px, py + s);
+    grad.addColorStop(0, 'rgba(186, 230, 253, 0.35)'); // sky blue top
+    grad.addColorStop(1, 'rgba(224, 242, 254, 0.15)'); // lighter bottom
+    ctx.fillStyle = grad;
+    ctx.fillRect(px + 3, py + 3, s - 6, s - 6);
+    // Window cross bars
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(px + s / 2, py + 3);
+    ctx.lineTo(px + s / 2, py + s - 3);
+    ctx.moveTo(px + 3, py + s / 2);
+    ctx.lineTo(px + s - 3, py + s / 2);
+    ctx.stroke();
+    // Subtle light reflection
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.beginPath();
+    ctx.moveTo(px + 4, py + 4);
+    ctx.lineTo(px + s / 2 - 2, py + 4);
+    ctx.lineTo(px + 4, py + s / 2 - 2);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  private drawSofaTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    // Sofa body
+    ctx.fillStyle = '#475569'; // slate-600 fabric
+    ctx.beginPath();
+    ctx.roundRect(px + 2, py + 6, s - 4, s - 8, 3);
+    ctx.fill();
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    // Seat cushion
+    ctx.fillStyle = '#64748b'; // slate-500
+    ctx.fillRect(px + 4, py + 10, s - 8, s - 14);
+    // Backrest
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(px + 3, py + 6, s - 6, 5);
+    // Cushion highlight
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillRect(px + 5, py + 8, s - 10, 1.5);
+    // Armrest (left or right depending on tile position — simplified)
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(px + 2, py + 8, 3, 8);
+    ctx.fillRect(px + s - 5, py + 8, 3, 8);
+  }
+
+  private drawWatercoolerTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    // Base
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillRect(px + s / 2 - 4, py + s - 8, 8, 6);
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(px + s / 2 - 4, py + s - 8, 8, 6);
+    // Water bottle
+    ctx.fillStyle = 'rgba(59, 130, 246, 0.3)';
+    ctx.beginPath();
+    ctx.ellipse(px + s / 2, py + s / 2 + 2, 5, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    // Water level
+    ctx.fillStyle = 'rgba(59, 130, 246, 0.5)';
+    ctx.beginPath();
+    ctx.ellipse(px + s / 2, py + s / 2 + 4, 4, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Small cup stack
+    ctx.fillStyle = '#f1f5f9';
+    ctx.fillRect(px + s - 7, py + s - 6, 3, 4);
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.strokeRect(px + s - 6.5, py + s - 5.5, 2, 3);
+    // Glow
+    const now = performance.now();
+    ctx.fillStyle = `rgba(59, 130, 246, ${0.1 + 0.05 * Math.sin(now / 400)})`;
+    ctx.beginPath();
+    ctx.arc(px + s / 2, py + s / 2 + 2, 10, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   private drawRoomLabel(room: LocalRoom) {
     const { ctx } = this;
     const px = room.x * TILE_SIZE;
     const py = room.y * TILE_SIZE;
     const pw = room.width * TILE_SIZE;
 
-    const label = room.folderName.toUpperCase();
+    // Office zone label takes precedence; fallback to folder name
+    const primary = (room.zoneLabel ?? room.folderName).toUpperCase();
+    const secondary = room.zoneLabel ? room.folderName.toUpperCase() : '';
     ctx.save();
 
-    // Draw a nice metal plaque tab with clipped corners
-    ctx.fillStyle = '#26221f';
-    ctx.strokeStyle = '#857568';
-    ctx.lineWidth = 1;
-    
+    // Zone-colored plaque tab
+    const zoneColors: Record<string, string> = {
+      team_cluster: '#64748b',
+      meeting: '#475569',
+      focus: '#94a3b8',
+      break: '#d4d4d8',
+      infra: '#52525b',
+      reception: '#a1a1aa',
+      biophilic: '#a8a29e',
+    };
+    const plaqueColor = zoneColors[room.zoneType ?? 'team_cluster'] ?? '#64748b';
+
+    ctx.fillStyle = plaqueColor;
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 0.5;
+
+    const plaqueW = Math.min(pw - 4, Math.max(80, primary.length * 7 + 12));
     ctx.beginPath();
     ctx.moveTo(px + 4, py + 2);
-    ctx.lineTo(px + Math.min(pw - 4, 86), py + 2);
-    ctx.lineTo(px + Math.min(pw - 2, 88), py + 4);
-    ctx.lineTo(px + Math.min(pw - 2, 88), py + 14);
-    ctx.lineTo(px + Math.min(pw - 4, 86), py + 16);
+    ctx.lineTo(px + plaqueW, py + 2);
+    ctx.lineTo(px + plaqueW + 2, py + 4);
+    ctx.lineTo(px + plaqueW + 2, py + 14);
+    ctx.lineTo(px + plaqueW, py + 16);
     ctx.lineTo(px + 4, py + 16);
     ctx.lineTo(px + 2, py + 14);
     ctx.lineTo(px + 2, py + 4);
@@ -1440,8 +1947,16 @@ export class LocalRenderer {
     ctx.font = `bold 9px ${this.tokens.fontMono}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = '#e5d5c5'; // Warm cream text
-    ctx.fillText(label.slice(0, 12), px + 6, py + 4);
+    ctx.fillStyle = room.zoneType === 'reception' ? '#18181b' : '#f8fafc';
+    ctx.fillText(primary.slice(0, 12), px + 6, py + 4);
+
+    // Secondary label (folder name) if zone label is present
+    if (secondary) {
+      ctx.font = `7px ${this.tokens.fontMono}`;
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.fillText(secondary.slice(0, 14), px + 6, py + 18);
+    }
+
     ctx.restore();
   }
 

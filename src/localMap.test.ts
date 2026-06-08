@@ -89,3 +89,101 @@ describe('localMap — buildLocalWorldFromPaths', () => {
     assert.ok(world.workbenches.length > 0);
   });
 });
+
+describe('localMap — Office Zone Classification', () => {
+  it('classifies src/ as team_cluster', () => {
+    const world = buildLocalWorldFromPaths('test-repo', ['src/main.ts']);
+    const srcRoom = world.rooms.find((r) => r.folderName === 'src');
+    assert.ok(srcRoom, 'src room should exist');
+    assert.equal(srcRoom!.zoneType, 'team_cluster');
+    assert.equal(srcRoom!.zoneLabel, 'Engineering');
+  });
+
+  it('classifies docs/ as meeting', () => {
+    const world = buildLocalWorldFromPaths('test-repo', ['docs/README.md']);
+    const docsRoom = world.rooms.find((r) => r.folderName === 'docs');
+    assert.ok(docsRoom, 'docs room should exist');
+    assert.equal(docsRoom!.zoneType, 'meeting');
+  });
+
+  it('classifies root repo as reception', () => {
+    const world = buildLocalWorldFromPaths('test-repo', ['src/main.ts']);
+    const rootRoom = world.rooms.find((r) => r.folderName === 'test-repo');
+    assert.ok(rootRoom, 'root room should exist');
+    assert.equal(rootRoom!.zoneType, 'reception');
+  });
+});
+
+describe('localMap — Office Furnishing', () => {
+  it('places standing_desk in team_cluster rooms', () => {
+    // Use 1 file so room has free floor tiles after workbenches
+    const world = buildLocalWorldFromPaths('test-repo', ['src/main.ts']);
+    const srcRoom = world.rooms.find((r) => r.folderName === 'src');
+    assert.ok(srcRoom, 'src room should exist');
+    const standingDesks = world.grid
+      .flat()
+      .filter((t) => t.roomId === srcRoom!.id && t.type === 'standing_desk');
+    assert.ok(standingDesks.length > 0, 'team_cluster should have standing desks');
+  });
+
+  it('places whiteboard in team_cluster rooms', () => {
+    const world = buildLocalWorldFromPaths('test-repo', ['src/main.ts']);
+    const srcRoom = world.rooms.find((r) => r.folderName === 'src');
+    assert.ok(srcRoom, 'src room should exist');
+    const whiteboards = world.grid
+      .flat()
+      .filter((t) => t.roomId === srcRoom!.id && t.type === 'whiteboard');
+    assert.ok(whiteboards.length > 0, 'team_cluster should have whiteboards');
+  });
+
+  it('does not overwrite walls with furniture', () => {
+    const world = buildMockLocalWorld('test-repo');
+    let furnitureOnWall = 0;
+    for (const row of world.grid) {
+      for (const tile of row) {
+        if (
+          tile.type === 'standing_desk' ||
+          tile.type === 'whiteboard' ||
+          tile.type === 'planter' ||
+          tile.type === 'meeting_room' ||
+          tile.type === 'window'
+        ) {
+          const room = world.rooms.find((r) => r.id === tile.roomId);
+          if (room) {
+            const isWall =
+              tile.x === room.x ||
+              tile.x === room.x + room.width - 1 ||
+              tile.y === room.y ||
+              tile.y === room.y + room.height - 1;
+            if (isWall) furnitureOnWall++;
+          }
+        }
+      }
+    }
+    assert.equal(furnitureOnWall, 0, 'furniture should never be placed on wall tiles');
+  });
+
+  it('does not overwrite workbench tiles with furniture', () => {
+    const world = buildMockLocalWorld('test-repo');
+    const workbenchTiles = world.grid
+      .flat()
+      .filter((t) => t.type === 'workbench');
+    assert.ok(workbenchTiles.length > 0, 'should have workbench tiles');
+
+    for (const tile of workbenchTiles) {
+      assert.ok(tile.workbench, 'every workbench tile should have a workbench');
+    }
+  });
+
+  it('furnishes break rooms with sofa and watercooler', () => {
+    const world = buildLocalWorldFromPaths('test-repo', ['examples/demo1.ts']);
+    const breakRoom = world.rooms.find((r) => r.folderName === 'examples');
+    assert.ok(breakRoom, 'examples room should exist');
+    assert.equal(breakRoom!.zoneType, 'break');
+
+    const sofas = world.grid.flat().filter((t) => t.type === 'sofa');
+    const watercoolers = world.grid.flat().filter((t) => t.type === 'watercooler');
+    assert.ok(sofas.length >= 1, 'break room should have sofas');
+    assert.ok(watercoolers.length >= 1, 'break room should have watercoolers');
+  });
+});

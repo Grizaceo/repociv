@@ -3,7 +3,7 @@
 // BFS traversal assigns each folder a rectangular "room" proportional to its file count.
 // Files become "workbench" tiles inside their room.
 
-import type { LocalWorld, LocalRoom, LocalTile, LocalTileType, Workbench, PowerGrid, PowerSource, PowerConsumer, LocalRestArea, RoomClimate, ClimateDevice, Vent } from './types.ts';
+import type { LocalWorld, LocalRoom, LocalTile, LocalTileType, Workbench, PowerGrid, PowerSource, PowerConsumer, LocalRestArea, RoomClimate, ClimateDevice, Vent, OfficeZoneType } from './types.ts';
 
 // ─── File tree node (mirrors bridge API shape) ────────────────────────────────
 export interface FileNode {
@@ -82,6 +82,8 @@ export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
 
   const grid = buildGrid(gridWidth, gridHeight, rooms, WALL_THICKNESS);
   addCorridors(grid, rooms, gridWidth, gridHeight);
+  furnishRooms(grid, rooms, gridWidth, gridHeight, WALL_THICKNESS);
+  decorateCorridors(grid, gridWidth, gridHeight);
 
   // Colocar un kiosko en una coordenada central de la primera sala para CDaily
   if (repoId.toLowerCase() === 'cdaily' && rooms.length > 0 && rooms[0]) {
@@ -237,6 +239,74 @@ function collectFiles(node: FileNode | undefined, remainingDepth: number): FileN
   return files;
 }
 
+// ─── Office Zone Classification (Phase 2) ────────────────────────────────────
+function classifyFolderZone(folderName: string, folderPath: string, depth: number): { zoneType: OfficeZoneType; zoneLabel: string } {
+  const name = folderName.toLowerCase();
+  const path = folderPath.toLowerCase();
+
+  // Root repo acts as reception
+  if (depth === 0) return { zoneType: 'reception', zoneLabel: 'Reception' };
+
+  // Team clusters: core code directories
+  if (
+    name === 'src' || name === 'lib' || name === 'app' || name === 'core' ||
+    name === 'api' || name === 'services' || name === 'components' || name === 'modules' ||
+    name === 'ui' || name === 'frontend' || name === 'backend' || name === 'client' || name === 'server'
+  ) {
+    return { zoneType: 'team_cluster', zoneLabel: 'Engineering' };
+  }
+
+  // Meeting / knowledge sharing
+  if (
+    name === 'docs' || name === 'doc' || name === 'wiki' || name === 'guides' ||
+    name === 'tutorials' || name === 'handbook' || name === 'knowledge'
+  ) {
+    return { zoneType: 'meeting', zoneLabel: 'Knowledge' };
+  }
+
+  // Focus / quiet verification
+  if (
+    name === 'tests' || name === 'test' || name === 'spec' || name === 'e2e' ||
+    name === 'integration' || name === 'unit' || name === 'qa' || name === 'coverage'
+  ) {
+    return { zoneType: 'focus', zoneLabel: 'Focus' };
+  }
+
+  // Infra / server room
+  if (
+    name === 'config' || name === 'ci' || name === 'deploy' || name === 'infra' ||
+    name === 'infrastructure' || name === 'terraform' || name === 'docker' ||
+    name === 'kubernetes' || name === 'k8s' || name === 'helm' || name === 'ansible' ||
+    name === '.github' || name === 'scripts' || name === 'build' || name === 'dist' || name === 'out'
+  ) {
+    return { zoneType: 'infra', zoneLabel: 'Infrastructure' };
+  }
+
+  // Break / exploration
+  if (
+    name === 'examples' || name === 'demo' || name === 'playground' || name === 'samples' ||
+    name === 'storybook' || name === 'showcase' || name === 'experiments'
+  ) {
+    return { zoneType: 'break', zoneLabel: 'Innovation' };
+  }
+
+  // Biophilic / assets
+  if (
+    name === 'public' || name === 'assets' || name === 'static' || name === 'images' ||
+    name === 'fonts' || name === 'media' || name === 'resources' || name === 'styles' || name === 'css'
+  ) {
+    return { zoneType: 'biophilic', zoneLabel: 'Design' };
+  }
+
+  // Heuristic: if path contains src/ but isn't src itself → team cluster
+  if (path.includes('/src/') || path.includes('\\src\\')) {
+    return { zoneType: 'team_cluster', zoneLabel: 'Engineering' };
+  }
+
+  // Default fallback
+  return { zoneType: 'team_cluster', zoneLabel: 'Team' };
+}
+
 // ─── Room sizing ───────────────────────────────────────────────────────────────
 function computeRoomSize(fileCount: number): { width: number; height: number } {
   const area = fileCount + WALL_THICKNESS * 4;
@@ -311,6 +381,7 @@ function makeRoom(
   width: number,
   height: number,
 ): LocalRoom {
+  const { zoneType, zoneLabel } = classifyFolderZone(folder.name, folder.path, folder.depth);
   return {
     id: folder.path,
     label: folder.name,
@@ -323,6 +394,8 @@ function makeRoom(
     width,
     height,
     workbenches: [],
+    zoneType,
+    zoneLabel,
   };
 }
 
@@ -418,6 +491,300 @@ function addCorridors(grid: LocalTile[][], rooms: LocalRoom[], gridW: number, gr
 
 function inBounds(x: number, y: number, w: number, h: number): boolean {
   return x >= 0 && y >= 0 && x < w && y < h;
+}
+
+// ─── Office Furnishing Pass (Phase 3) ──────────────────────────────────────────
+function furnishRooms(
+  grid: LocalTile[][],
+  rooms: LocalRoom[],
+  gridW: number,
+  gridH: number,
+  wallThick: number,
+): void {
+  for (const room of rooms) {
+    const zone = room.zoneType ?? 'team_cluster';
+    const innerX0 = room.x + wallThick;
+    const innerY0 = room.y + wallThick;
+    const innerX1 = room.x + room.width - wallThick - 1;
+    const innerY1 = room.y + room.height - wallThick - 1;
+
+    // Collect interior floor tiles (exclude workbenches, paths, etc.)
+    const floors: Array<{ x: number; y: number }> = [];
+    for (let ry = innerY0; ry <= innerY1; ry++) {
+      for (let rx = innerX0; rx <= innerX1; rx++) {
+        if (!inBounds(rx, ry, gridW, gridH)) continue;
+        const tile = grid[ry]![rx]!;
+        if (tile.type === 'floor') floors.push({ x: rx, y: ry });
+      }
+    }
+    if (floors.length === 0) continue;
+
+    // Helper to place a single-tile furnishing
+    const place = (x: number, y: number, type: LocalTileType) => {
+      if (!inBounds(x, y, gridW, gridH)) return;
+      const tile = grid[y]![x]!;
+      if (tile.type === 'floor') tile.type = type;
+    };
+
+    // Helper: find floor tiles adjacent to a specific wall direction
+    const wallAdjacentFloors = (dx: number, dy: number) =>
+      floors.filter((f) => {
+        const wx = f.x + dx;
+        const wy = f.y + dy;
+        return (
+          inBounds(wx, wy, gridW, gridH) &&
+          grid[wy]![wx]!.type === 'wall'
+        );
+      });
+
+    switch (zone) {
+      case 'team_cluster': {
+        // Whiteboards on north or south wall (place before desks so they don't get blocked)
+        const northWall = wallAdjacentFloors(0, -1);
+        const southWall = wallAdjacentFloors(0, 1);
+        const wbCandidates = northWall.length > 0 ? northWall : southWall;
+        if (wbCandidates.length > 0) {
+          const mid = Math.floor(wbCandidates.length / 2);
+          place(wbCandidates[mid]!.x, wbCandidates[mid]!.y, 'whiteboard');
+        }
+        // Standing desks on remaining floor tiles (up to half)
+        let desksPlaced = 0;
+        const targetDesks = Math.min(floors.length, Math.max(1, Math.floor(floors.length / 2)));
+        for (const f of floors) {
+          if (desksPlaced >= targetDesks) break;
+          if (grid[f.y]![f.x]!.type === 'floor') {
+            place(f.x, f.y, 'standing_desk');
+            desksPlaced++;
+          }
+        }
+        // Planters in remaining gaps (every 3rd floor tile)
+        for (let i = 0; i < floors.length; i += 3) {
+          const f = floors[i]!;
+          if (grid[f.y]![f.x]!.type === 'floor') place(f.x, f.y, 'planter');
+        }
+        break;
+      }
+      case 'meeting': {
+        // Central meeting table (1 tile, or 2x1 if room is wide enough)
+        const centerIdx = Math.floor(floors.length / 2);
+        const center = floors[centerIdx]!;
+        place(center.x, center.y, 'meeting_room');
+        if (floors.length > 6) {
+          // Try to place a 2nd table tile to the right
+          place(center.x + 1, center.y, 'meeting_room');
+        }
+        // Whiteboard on one wall
+        const wbCandidates = wallAdjacentFloors(0, -1).length > 0
+          ? wallAdjacentFloors(0, -1)
+          : wallAdjacentFloors(0, 1);
+        if (wbCandidates.length > 0) {
+          const mid = Math.floor(wbCandidates.length / 2);
+          place(wbCandidates[mid]!.x, wbCandidates[mid]!.y, 'whiteboard');
+        }
+        // Windows on east/west walls
+        const eastWall = wallAdjacentFloors(1, 0);
+        const westWall = wallAdjacentFloors(-1, 0);
+        for (const f of eastWall.slice(0, 2)) place(f.x, f.y, 'window');
+        for (const f of westWall.slice(0, 2)) place(f.x, f.y, 'window');
+        break;
+      }
+      case 'focus': {
+        // Phone booths in corners
+        const corners = [
+          { x: innerX0, y: innerY0 },
+          { x: innerX1, y: innerY0 },
+          { x: innerX0, y: innerY1 },
+          { x: innerX1, y: innerY1 },
+        ];
+        let booths = 0;
+        for (const c of corners) {
+          if (grid[c.y]![c.x]!.type === 'floor' && booths < 2) {
+            place(c.x, c.y, 'phone_booth');
+            booths++;
+          }
+        }
+        // Whiteboard for quiet notes
+        const wbCandidates = wallAdjacentFloors(0, -1).length > 0
+          ? wallAdjacentFloors(0, -1)
+          : wallAdjacentFloors(0, 1);
+        if (wbCandidates.length > 0) {
+          place(wbCandidates[0]!.x, wbCandidates[0]!.y, 'whiteboard');
+        }
+        break;
+      }
+      case 'break': {
+        // Watercooler near center or first available (place before sofa)
+        if (floors.length > 0) {
+          const centerIdx = Math.floor(floors.length / 2);
+          place(floors[centerIdx]!.x, floors[centerIdx]!.y, 'watercooler');
+        }
+        // Break area counter near north wall or first available
+        const northWall = wallAdjacentFloors(0, -1);
+        if (northWall.length > 0) {
+          const mid = Math.floor(northWall.length / 2);
+          place(northWall[mid]!.x, northWall[mid]!.y, 'break_area');
+        } else if (floors.length > 0) {
+          place(floors[0]!.x, floors[0]!.y, 'break_area');
+        }
+        // Planter for atmosphere
+        if (floors.length > 1) {
+          place(floors[1]!.x, floors[1]!.y, 'planter');
+        }
+        // Sofa: try 2x1 against south wall, or single sofa if room is small
+        const southWall = wallAdjacentFloors(0, 1);
+        if (southWall.length >= 2) {
+          const startIdx = Math.floor((southWall.length - 2) / 2);
+          const f1 = southWall[startIdx]!;
+          const f2 = southWall[startIdx + 1]!;
+          if (
+            grid[f1.y]![f1.x]!.type === 'floor' &&
+            grid[f2.y]![f2.x]!.type === 'floor'
+          ) {
+            place(f1.x, f1.y, 'sofa');
+            place(f2.x, f2.y, 'sofa');
+          } else {
+            // Try single sofa
+            for (const f of southWall) {
+              if (grid[f.y]![f.x]!.type === 'floor') {
+                place(f.x, f.y, 'sofa');
+                break;
+              }
+            }
+          }
+        } else if (southWall.length >= 1) {
+          for (const f of southWall) {
+            if (grid[f.y]![f.x]!.type === 'floor') {
+              place(f.x, f.y, 'sofa');
+              break;
+            }
+          }
+        } else {
+          // Find first remaining floor tile
+          for (const f of floors) {
+            if (grid[f.y]![f.x]!.type === 'floor') {
+              place(f.x, f.y, 'sofa');
+              break;
+            }
+          }
+        }
+        break;
+      }
+      case 'infra': {
+        // Server racks in rows
+        let rackCount = 0;
+        for (const f of floors) {
+          if (rackCount >= Math.min(4, Math.floor(floors.length / 2))) break;
+          if (grid[f.y]![f.x]!.type === 'floor') {
+            place(f.x, f.y, 'server_rack');
+            rackCount++;
+          }
+        }
+        // Stairs for vertical circulation hint (decorative)
+        if (floors.length > 3) {
+          place(floors[floors.length - 1]!.x, floors[floors.length - 1]!.y, 'stairs');
+        }
+        break;
+      }
+      case 'reception': {
+        // Reception desk at center
+        const centerIdx = Math.floor(floors.length / 2);
+        place(floors[centerIdx]!.x, floors[centerIdx]!.y, 'reception');
+        // Windows on all perimeter walls
+        for (const f of floors) {
+          const isPerimeter =
+            f.x === innerX0 || f.x === innerX1 || f.y === innerY0 || f.y === innerY1;
+          if (isPerimeter && grid[f.y]![f.x]!.type === 'floor') {
+            place(f.x, f.y, 'window');
+          }
+        }
+        // Planters flanking reception
+        const flanks = floors.filter((f) =>
+          Math.abs(f.x - floors[centerIdx]!.x) <= 1 &&
+          Math.abs(f.y - floors[centerIdx]!.y) <= 1 &&
+          !(f.x === floors[centerIdx]!.x && f.y === floors[centerIdx]!.y)
+        );
+        for (const f of flanks.slice(0, 2)) {
+          if (grid[f.y]![f.x]!.type === 'floor') place(f.x, f.y, 'planter');
+        }
+        break;
+      }
+      case 'biophilic': {
+        // Dense planters
+        for (let i = 0; i < floors.length; i += 2) {
+          const f = floors[i]!;
+          if (grid[f.y]![f.x]!.type === 'floor') place(f.x, f.y, 'planter');
+        }
+        // Windows on perimeter
+        for (const f of floors) {
+          const isPerimeter =
+            f.x === innerX0 || f.x === innerX1 || f.y === innerY0 || f.y === innerY1;
+          if (isPerimeter && grid[f.y]![f.x]!.type === 'floor') {
+            place(f.x, f.y, 'window');
+          }
+        }
+        // Sofa for relaxing
+        if (floors.length > 4) {
+          place(floors[2]!.x, floors[2]!.y, 'sofa');
+        }
+        break;
+      }
+    }
+  }
+}
+
+// ─── Corridor Decoration (Phase 5) ─────────────────────────────────────────────
+function decorateCorridors(grid: LocalTile[][], gridW: number, gridH: number): void {
+  // Place planters in corridor corners and wall-adjacent path tiles
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      const tile = grid[y]![x]!;
+      if (tile.type !== 'path') continue;
+
+      // Count adjacent walls (corner detection)
+      let wallNeighbors = 0;
+      const dirs = [
+        { dx: 0, dy: -1 },
+        { dx: 0, dy: 1 },
+        { dx: -1, dy: 0 },
+        { dx: 1, dy: 0 },
+      ];
+      for (const { dx, dy } of dirs) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (inBounds(nx, ny, gridW, gridH)) {
+          const nt = grid[ny]![nx]!;
+          if (nt.type === 'wall') wallNeighbors++;
+        }
+      }
+
+      // Corner planter: 2+ walls adjacent + pseudo-random
+      if (wallNeighbors >= 2 && (x * 7 + y * 3) % 5 === 0) {
+        tile.type = 'planter';
+        continue;
+      }
+
+      // Wall-line planter: every 6th path tile next to a wall
+      if (wallNeighbors === 1 && (x * 13 + y * 11) % 7 === 0) {
+        tile.type = 'planter';
+        continue;
+      }
+
+      // Long-corridor window: path tile with 2+ path neighbors and no walls
+      // (simulates a glass-walled hallway looking outside)
+      let pathNeighbors = 0;
+      for (const { dx, dy } of dirs) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (inBounds(nx, ny, gridW, gridH)) {
+          const nt = grid[ny]![nx]!;
+          if (nt.type === 'path') pathNeighbors++;
+        }
+      }
+      if (wallNeighbors === 0 && pathNeighbors >= 2 && (x * 17 + y * 5) % 11 === 0) {
+        tile.type = 'window';
+      }
+    }
+  }
 }
 
 // ─── Power System Placement ───────────────────────────────────────────────────
@@ -606,7 +973,7 @@ function connectToConduit(
   }
 }
 
-// ─── Rest Areas Placement ─────────────────────────────────────────────────────
+// ─── Rest Areas Placement (Office Redesign) ────────────────────────────────────
 function placeRestAreas(
   grid: LocalTile[][],
   rooms: LocalRoom[],
@@ -616,58 +983,94 @@ function placeRestAreas(
   const restAreas: LocalRestArea[] = [];
 
   for (const room of rooms) {
-    // Only place beds in rooms that look like bedrooms/barracks
-    const name = room.folderName.toLowerCase();
-    const isBedroom = name === 'bedroom' || name === 'barracks' || name === 'sleep' || name === 'rest';
-    // Also place in small rooms that could be bedrooms (1-2 workbenches max)
+    const zone = room.zoneType ?? 'team_cluster';
+
+    // Office-style rest areas: sofas in break rooms, phone booths in focus rooms
+    const isBreak = zone === 'break';
+    const isFocus = zone === 'focus';
+    const isBedroom =
+      room.folderName.toLowerCase() === 'bedroom' ||
+      room.folderName.toLowerCase() === 'barracks' ||
+      room.folderName.toLowerCase() === 'sleep' ||
+      room.folderName.toLowerCase() === 'rest';
     const isSmallRoom = room.workbenches.length <= 2 && room.width * room.height <= 36;
 
-    if (!isBedroom && !isSmallRoom) continue;
+    if (!isBreak && !isFocus && !isBedroom && !isSmallRoom) continue;
 
-    // Calculate bed positions (along one wall, leaving space for door)
-    const bedTiles: Array<{ x: number; y: number }> = [];
-    const innerX0 = room.x + WALL_THICKNESS;
-    const innerY0 = room.y + WALL_THICKNESS;
-    const innerX1 = room.x + room.width - WALL_THICKNESS - 1;
-    const innerY1 = room.y + room.height - WALL_THICKNESS - 1;
-    const innerW = innerX1 - innerX0 + 1;
-    const innerH = innerY1 - innerY0 + 1;
+    // Collect rest tile positions
+    const restTiles: Array<{ x: number; y: number }> = [];
 
-    // Place beds along the longer wall
-    let bedCount = 0;
-    const maxBeds = isBedroom ? Math.max(2, Math.floor(Math.min(innerW, innerH) / 2)) : 1;
+    if (isBreak || isBedroom || isSmallRoom) {
+      // Use existing sofa tiles in break rooms, or place beds in bedrooms
+      const targetType: LocalTileType = isBreak ? 'sofa' : 'bed';
 
-    if (innerW >= innerH) {
-      // Horizontal placement along bottom wall
-      for (let i = 0; i < maxBeds && innerX0 + i * 2 + 1 <= innerX1; i++) {
-        const bx = innerX0 + i * 2 + 1;
-        const by = innerY1;
-        if (inBounds(bx, by, gridW, gridH) && grid[by]?.[bx]?.type === 'floor') {
-          grid[by][bx].type = 'bed';
-          bedTiles.push({ x: bx, y: by });
-          bedCount++;
+      // Scan room interior for target tiles (already placed by furnishing) or floor tiles
+      for (let ry = room.y + WALL_THICKNESS; ry < room.y + room.height - WALL_THICKNESS; ry++) {
+        for (let rx = room.x + WALL_THICKNESS; rx < room.x + room.width - WALL_THICKNESS; rx++) {
+          if (!inBounds(rx, ry, gridW, gridH)) continue;
+          const tile = grid[ry]![rx]!;
+          if (tile.type === targetType) {
+            restTiles.push({ x: rx, y: ry });
+          }
         }
       }
-    } else {
-      // Vertical placement along right wall
-      for (let i = 0; i < maxBeds && innerY0 + i * 2 + 1 <= innerY1; i++) {
-        const bx = innerX1;
-        const by = innerY0 + i * 2 + 1;
-        if (inBounds(bx, by, gridW, gridH) && grid[by]?.[bx]?.type === 'floor') {
-          grid[by][bx].type = 'bed';
-          bedTiles.push({ x: bx, y: by });
-          bedCount++;
+
+      // Fallback: if no target tiles found, place beds on floor tiles (legacy behavior)
+      if (restTiles.length === 0 && !isBreak) {
+        const innerX0 = room.x + WALL_THICKNESS;
+        const innerY0 = room.y + WALL_THICKNESS;
+        const innerX1 = room.x + room.width - WALL_THICKNESS - 1;
+        const innerY1 = room.y + room.height - WALL_THICKNESS - 1;
+        const innerW = innerX1 - innerX0 + 1;
+        const innerH = innerY1 - innerY0 + 1;
+
+        let bedCount = 0;
+        const maxBeds = isBedroom ? Math.max(2, Math.floor(Math.min(innerW, innerH) / 2)) : 1;
+
+        if (innerW >= innerH) {
+          for (let i = 0; i < maxBeds && innerX0 + i * 2 + 1 <= innerX1; i++) {
+            const bx = innerX0 + i * 2 + 1;
+            const by = innerY1;
+            if (inBounds(bx, by, gridW, gridH) && grid[by]?.[bx]?.type === 'floor') {
+              grid[by][bx].type = 'bed';
+              restTiles.push({ x: bx, y: by });
+              bedCount++;
+            }
+          }
+        } else {
+          for (let i = 0; i < maxBeds && innerY0 + i * 2 + 1 <= innerY1; i++) {
+            const bx = innerX1;
+            const by = innerY0 + i * 2 + 1;
+            if (inBounds(bx, by, gridW, gridH) && grid[by]?.[bx]?.type === 'floor') {
+              grid[by][bx].type = 'bed';
+              restTiles.push({ x: bx, y: by });
+              bedCount++;
+            }
+          }
         }
       }
     }
 
-    if (bedCount > 0) {
+    if (isFocus) {
+      // Use phone_booth tiles as rest areas (focus pods)
+      for (let ry = room.y + WALL_THICKNESS; ry < room.y + room.height - WALL_THICKNESS; ry++) {
+        for (let rx = room.x + WALL_THICKNESS; rx < room.x + room.width - WALL_THICKNESS; rx++) {
+          if (!inBounds(rx, ry, gridW, gridH)) continue;
+          const tile = grid[ry]![rx]!;
+          if (tile.type === 'phone_booth') {
+            restTiles.push({ x: rx, y: ry });
+          }
+        }
+      }
+    }
+
+    if (restTiles.length > 0) {
       restAreas.push({
         id: `rest-${room.id}`,
         roomId: room.id,
-        tiles: bedTiles,
+        tiles: restTiles,
         recoveryRate: 10, // fatigue per second
-        capacity: bedCount,
+        capacity: restTiles.length,
         unitsInside: [],
       });
     }

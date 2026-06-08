@@ -442,7 +442,20 @@ export type LocalTileType =
   | 'joy_object'
   | 'bed'
   // Research
-  | 'research_bench';
+  | 'research_bench'
+  // ─── Office Redesign (Phase 1) ────────────────────────────────────────
+  | 'meeting_room' // glass-walled collab space (central table)
+  | 'phone_booth' // 1-person focus pod
+  | 'break_area' // kitchen/lounge/coffee counter
+  | 'standing_desk' // elevated workstation
+  | 'whiteboard' // collaboration wall
+  | 'server_rack' // infra hub
+  | 'planter' // biophilic element
+  | 'reception' // entry lobby desk
+  | 'stairs' // vertical circulation (decorative)
+  | 'window' // natural light zone (perimeter glass)
+  | 'sofa' // informal seating
+  | 'watercooler'; // social node
 
 export interface LocalTile {
   x: number; // grid column
@@ -461,6 +474,16 @@ export interface Workbench {
   repoPath: string; // which repo this belongs to
 }
 
+// ─── Office Zone Classification (Phase 2) ────────────────────────────────────
+export type OfficeZoneType =
+  | 'team_cluster'
+  | 'meeting'
+  | 'focus'
+  | 'break'
+  | 'infra'
+  | 'reception'
+  | 'biophilic';
+
 export interface LocalRoom {
   id: string;
   label: string; // display name (same as folderName)
@@ -473,6 +496,9 @@ export interface LocalRoom {
   width: number; // tiles
   height: number; // tiles
   workbenches: Workbench[];
+  // ─── Office Redesign (Phase 2) ────────────────────────────────────────
+  zoneType?: OfficeZoneType; // semantic office zone
+  zoneLabel?: string; // display label for zone (e.g. "Engineering")
 }
 
 export interface LocalWorld {

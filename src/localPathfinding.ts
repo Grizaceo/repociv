@@ -11,6 +11,20 @@ const TILE_COST: Record<string, number> = {
   workbench: 1,
   debris: 5, // very slow
   wall: Infinity, // impassable
+  // Office furniture (Phase 6)
+  standing_desk: 1,
+  whiteboard: 1,
+  window: 1,
+  planter: 1.5,
+  watercooler: 1,
+  sofa: 1.5,
+  stairs: 1.5,
+  // Impassable office fixtures
+  phone_booth: Infinity,
+  break_area: Infinity,
+  meeting_room: Infinity,
+  server_rack: Infinity,
+  reception: Infinity,
 };
 
 export interface PathResult {
