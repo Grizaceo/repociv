@@ -304,14 +304,26 @@ export class LocalRenderer {
     this.world = world;
     this.staticLayer = null;
     this.isoStaticLayer = null;
-    // Center camera on the grid
+    // Center camera on the largest room (main area) rather than whole grid centroid
     if (this._isometric) {
-      const c0 = isoProject(0, 0);
-      const c1 = isoProject(world.width, 0);
-      const c2 = isoProject(0, world.height);
-      const c3 = isoProject(world.width, world.height);
-      this.cam.x = (Math.min(c0.px, c1.px, c2.px, c3.px) + Math.max(c0.px, c1.px, c2.px, c3.px)) / 2;
-      this.cam.y = (Math.min(c0.py, c1.py, c2.py, c3.py) + Math.max(c0.py, c1.py, c2.py, c3.py)) / 2;
+      const largestRoom = world.rooms.reduce<LocalRoom | null>(
+        (best, r) => (!best || r.width * r.height > best.width * best.height ? r : best),
+        null,
+      );
+      if (largestRoom) {
+        const cx = largestRoom.x + largestRoom.width / 2;
+        const cy = largestRoom.y + largestRoom.height / 2;
+        const p = isoProject(cx, cy);
+        this.cam.x = p.px;
+        this.cam.y = p.py;
+      } else {
+        const c0 = isoProject(0, 0);
+        const c1 = isoProject(world.width, 0);
+        const c2 = isoProject(0, world.height);
+        const c3 = isoProject(world.width, world.height);
+        this.cam.x = (Math.min(c0.px, c1.px, c2.px, c3.px) + Math.max(c0.px, c1.px, c2.px, c3.px)) / 2;
+        this.cam.y = (Math.min(c0.py, c1.py, c2.py, c3.py) + Math.max(c0.py, c1.py, c2.py, c3.py)) / 2;
+      }
     } else {
       this.cam.x = world.width * TILE_SIZE / 2;
       this.cam.y = world.height * TILE_SIZE / 2;
@@ -3246,13 +3258,77 @@ export class LocalRenderer {
     ctx.lineWidth = 0.5;
     ctx.stroke();
 
-    // ─── Path runner strip ──────────────────────────────────────────
+    // ─── Path corridor rendering (interior hallway, not loose grey strip) ─
     if (tile.type === 'path') {
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.lineWidth = 2;
+      // Slightly darker floor inset for corridor depth
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+      ctx.beginPath();
+      ctx.moveTo(corners[0]!.x, corners[0]!.y);
+      ctx.lineTo(corners[1]!.x, corners[1]!.y);
+      ctx.lineTo(corners[2]!.x, corners[2]!.y);
+      ctx.lineTo(corners[3]!.x, corners[3]!.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // Runner strip — wider, integrated
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+      ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(corners[0]!.x, corners[0]!.y);
       ctx.lineTo(corners[2]!.x, corners[2]!.y);
+      ctx.stroke();
+
+      // Subtle ceiling feel: faint diagonal hatch
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.04)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const hatchStep = ISO_TILE_H / 4;
+      for (let i = -2; i <= 2; i++) {
+        const oy = i * hatchStep;
+        ctx.moveTo(corners[0]!.x + oy * 0.3, corners[0]!.y + oy);
+        ctx.lineTo(corners[2]!.x + oy * 0.3, corners[2]!.y + oy);
+      }
+      ctx.stroke();
+
+      // Door alignment: if adjacent to a door, extend runner to threshold
+      const north = world.grid[gridY - 1]?.[gridX];
+      const south = world.grid[gridY + 1]?.[gridX];
+      const east = world.grid[gridY]?.[gridX + 1];
+      const west = world.grid[gridY]?.[gridX - 1];
+      const doorNeighbors = [north, south, east, west].filter((n): n is LocalTile => n?.type === 'door');
+      if (doorNeighbors.length > 0) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const midX = (corners[0]!.x + corners[2]!.x) / 2;
+        const midY = (corners[0]!.y + corners[2]!.y) / 2;
+        ctx.moveTo(midX - 3, midY);
+        ctx.lineTo(midX + 3, midY);
+        ctx.stroke();
+      }
+    }
+
+    // ─── Exterior building border / plinth ──────────────────────────
+    if (gridX === 0 || gridY === 0 || gridX === world.width - 1 || gridY === world.height - 1) {
+      ctx.strokeStyle = '#606060';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      if (gridX === 0) {
+        ctx.moveTo(corners[3]!.x, corners[3]!.y);
+        ctx.lineTo(corners[0]!.x, corners[0]!.y);
+      }
+      if (gridY === 0) {
+        ctx.moveTo(corners[0]!.x, corners[0]!.y);
+        ctx.lineTo(corners[1]!.x, corners[1]!.y);
+      }
+      if (gridX === world.width - 1) {
+        ctx.moveTo(corners[1]!.x, corners[1]!.y);
+        ctx.lineTo(corners[2]!.x, corners[2]!.y);
+      }
+      if (gridY === world.height - 1) {
+        ctx.moveTo(corners[2]!.x, corners[2]!.y);
+        ctx.lineTo(corners[3]!.x, corners[3]!.y);
+      }
       ctx.stroke();
     }
 
@@ -3783,68 +3859,92 @@ export class LocalRenderer {
     ctx.rotate(dirAngle);
     ctx.scale(Sf, Sc);
 
-    // 1. Shadow (small iso ellipse on floor)
+    // Helper to darken a hex color
+    const darken = (hex: string, pct: number): string => {
+      if (!hex.startsWith('#') || hex.length !== 7) return hex;
+      const f = (n: number) => Math.max(0, Math.min(255, Math.floor(n * (1 - pct / 100))));
+      const r = f(parseInt(hex.slice(1, 3), 16));
+      const g = f(parseInt(hex.slice(3, 5), 16));
+      const b = f(parseInt(hex.slice(5, 7), 16));
+      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    };
+
+    // Helper: draw an isometric prism (box) in local screen space
+    const drawPrism = (cx: number, zBase: number, zTop: number, hw: number, hd: number, color: string) => {
+      const bY = -zBase * scale;
+      const tY = -zTop * scale;
+      // base diamond corners (omit unused top/left of base to satisfy TS strictUnusedLocals)
+      const bx1 = cx + hw * scale, by1 = bY;
+      const bx2 = cx, by2 = bY + hd * scale;
+      const bx3 = cx - hw * scale, by3 = bY;
+      // top diamond corners
+      const tx0 = cx, ty0 = tY - hd * scale;
+      const tx1 = cx + hw * scale, ty1 = tY;
+      const tx2 = cx, ty2 = tY + hd * scale;
+      const tx3 = cx - hw * scale, ty3 = tY;
+      // left face (darker)
+      ctx.fillStyle = darken(color, 20);
+      ctx.beginPath();
+      ctx.moveTo(bx3, by3);
+      ctx.lineTo(bx2, by2);
+      ctx.lineTo(tx2, ty2);
+      ctx.lineTo(tx3, ty3);
+      ctx.closePath();
+      ctx.fill();
+      // right face (medium darker)
+      ctx.fillStyle = darken(color, 10);
+      ctx.beginPath();
+      ctx.moveTo(bx2, by2);
+      ctx.lineTo(bx1, by1);
+      ctx.lineTo(tx1, ty1);
+      ctx.lineTo(tx2, ty2);
+      ctx.closePath();
+      ctx.fill();
+      // top cap (original color)
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(tx0, ty0);
+      ctx.lineTo(tx1, ty1);
+      ctx.lineTo(tx2, ty2);
+      ctx.lineTo(tx3, ty3);
+      ctx.closePath();
+      ctx.fill();
+    };
+
+    // 1. Shadow (small iso ellipse on floor, z≈0)
     ctx.fillStyle = ISO_SHADOW;
     ctx.beginPath();
-    ctx.ellipse(-2 * scale, 1 * scale, ISO_TILE_W * 0.15, ISO_TILE_H * 0.12, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 2 * scale, ISO_TILE_W * 0.15, ISO_TILE_H * 0.12, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 2. Torso
-    ctx.fillStyle = unit.color;
-    ctx.strokeStyle = 'rgba(180, 150, 130, 0.3)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.ellipse(-2 * scale, 0, ISO_TILE_W * 0.12, ISO_TILE_H * 0.18, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    // 2. Legs — two thin vertical prisms, z=0..8, darkened 20%
+    const legColor = darken(unit.color, 20);
+    drawPrism(-5 * scale, 0, 8, 2.5, 2, legColor);
+    drawPrism(5 * scale, 0, 8, 2.5, 2, legColor);
 
-    // Tool belt
-    ctx.fillStyle = '#2d2722';
-    ctx.fillRect(-8 * scale, -4 * scale, 3 * scale, 8 * scale);
+    // 3. Torso — horizontal box, z=8..18, ~60% tile width
+    drawPrism(0, 8, 18, 10, 6, unit.color);
 
-    // 3. Head
-    ctx.fillStyle = '#f5d6b8';
-    ctx.beginPath();
-    ctx.arc(4 * scale, 0, ISO_TILE_W * 0.1, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    // 4. Head — small cube, z=18..26
+    drawPrism(0, 18, 26, 5, 3.5, '#e8d8c8');
 
-    // 4. Hard-hat
-    ctx.fillStyle = ISO_HELMET;
-    ctx.beginPath();
-    ctx.arc(4 * scale, 0, ISO_TILE_W * 0.09, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    // 5. Helmet / highlight — small yellow box on top, z=26..28
+    drawPrism(0, 26, 28, 6, 4, ISO_HELMET);
 
-    // Helmet brim
-    ctx.strokeStyle = '#B89820';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(4 * scale, 0, ISO_TILE_W * 0.1, -Math.PI / 3, Math.PI / 3);
-    ctx.stroke();
-
-    // Helmet ridge
-    ctx.strokeStyle = '#F0D040';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(1 * scale, 0);
-    ctx.lineTo(8 * scale, 0);
-    ctx.stroke();
-
-    // Working LEDs
+    // Working LEDs (green blinkers on helmet)
     const now = performance.now();
     if (unit.state === 'working_on_file') {
       const flash = Math.sin(now / 150) > 0;
       ctx.fillStyle = flash ? '#22C55E' : '#14532d';
       ctx.beginPath();
-      ctx.arc(8 * scale, -2 * scale, 1.2, 0, Math.PI * 2);
-      ctx.arc(8 * scale, 2 * scale, 1.2, 0, Math.PI * 2);
+      ctx.arc(6 * scale, -27 * scale, 1.2, 0, Math.PI * 2);
+      ctx.arc(-6 * scale, -27 * scale, 1.2, 0, Math.PI * 2);
       ctx.fill();
     }
 
     ctx.restore(); // Squash & Stretch
 
-    // 5. Initials capsule
+    // 6. Initials capsule
     const initials = unit.name.slice(0, 2).toUpperCase();
     ctx.save();
     ctx.translate(0, ISO_TILE_H * 0.55);
@@ -3870,7 +3970,7 @@ export class LocalRenderer {
       ctx.stroke();
     }
 
-    // Status icon
+    // Status icon floating above the prism avatar
     const statusIcon: Record<string, string> = {
       idle_in_room: '◌',
       walking_to_workbench: '→',
@@ -3883,7 +3983,7 @@ export class LocalRenderer {
     ctx.font = `${ISO_TILE_W * 0.18}px ${this.tokens.fontMono}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(icon, 0, -ISO_TILE_H * 0.35);
+    ctx.fillText(icon, 0, -ISO_TILE_H * 0.35 - 28 * scale);
 
     ctx.restore();
 
