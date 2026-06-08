@@ -110,9 +110,11 @@ export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
     }
   }
 
+  const npcs: import('./types.ts').LocalNpc[] = [];
+
   const grid = buildGrid(gridWidth, gridHeight, rooms, WALL_THICKNESS);
   addCorridors(grid, rooms, gridWidth, gridHeight);
-  furnishRooms(grid, rooms, gridWidth, gridHeight, WALL_THICKNESS);
+  furnishRooms(grid, rooms, gridWidth, gridHeight, WALL_THICKNESS, npcs);
   decorateCorridors(grid, gridWidth, gridHeight);
 
   // Colocar un kiosko en una coordenada central de la primera sala para CDaily
@@ -134,7 +136,7 @@ export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
   // ─── Temperature System: place heaters/coolers/vents ─────────────────────────
   const roomClimates = placeTemperatureSystem(grid, rooms, gridWidth, gridHeight);
 
-  return { repoId, grid, rooms, width: gridWidth, height: gridHeight, workbenches, powerGrid, powerSources, powerConsumers, restAreas, roomClimates };
+  return { repoId, grid, rooms, width: gridWidth, height: gridHeight, workbenches, powerGrid, powerSources, powerConsumers, restAreas, roomClimates, npcs };
 }
 
 // ─── Browser API entry point: convert flat path list → FileNode tree ──────────
@@ -535,6 +537,7 @@ function furnishRooms(
   gridW: number,
   gridH: number,
   wallThick: number,
+  npcs?: import('./types.ts').LocalNpc[],
 ): void {
   for (const room of rooms) {
     const zone = room.zoneType ?? 'team_cluster';
@@ -578,10 +581,35 @@ function furnishRooms(
         const northWall = wallAdjacentFloors(0, -1);
         const southWall = wallAdjacentFloors(0, 1);
         const wbCandidates = northWall.length > 0 ? northWall : southWall;
+        let wbX = -1, wbY = -1;
+        // Reserves the manager NPC's tile so later furniture passes don't draw on top of it.
+        let npcTile: { x: number; y: number } | null = null;
         if (wbCandidates.length > 0) {
           const mid = Math.floor(wbCandidates.length / 2);
-          place(wbCandidates[mid]!.x, wbCandidates[mid]!.y, 'whiteboard');
+          wbX = wbCandidates[mid]!.x;
+          wbY = wbCandidates[mid]!.y;
+          place(wbX, wbY, 'whiteboard');
+          // Spawn manager NPC one tile toward the room interior from the whiteboard.
+          // wbCandidates is always drawn from northWall/southWall, so wbY is always
+          // innerY0 (north wall) or innerY1 (south wall) — interior is south/north respectively.
+          if (npcs) {
+            const ny = wbY === innerY0 ? wbY + 1 : wbY - 1;
+            if (inBounds(wbX, ny, gridW, gridH) && grid[ny]![wbX]!.type === 'floor') {
+              npcTile = { x: wbX, y: ny };
+              npcs.push({
+                id: `npc-${room.id}`,
+                name: room.zoneLabel ?? room.folderName,
+                color: '#A0A0B0',
+                gridX: wbX,
+                gridY: ny,
+                roomId: room.id,
+                type: 'manager',
+              });
+            }
+          }
         }
+        const isFreeFloor = (x: number, y: number) =>
+          grid[y]![x]!.type === 'floor' && !(npcTile && npcTile.x === x && npcTile.y === y);
         // Cubicle clusters: pair desks against east/west walls with aisle gaps
         const eastWall = wallAdjacentFloors(1, 0);
         const westWall = wallAdjacentFloors(-1, 0);
@@ -595,7 +623,7 @@ function furnishRooms(
             const b = sorted[i + 1]!;
             // Only pair if truly adjacent (same y, x diff 1) or (same x, y diff 1)
             const adjacent = Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1;
-            if (adjacent && grid[a.y]![a.x]!.type === 'floor' && grid[b.y]![b.x]!.type === 'floor') {
+            if (adjacent && isFreeFloor(a.x, a.y) && isFreeFloor(b.x, b.y)) {
               place(a.x, a.y, 'standing_desk');
               place(b.x, b.y, 'standing_desk');
               i += 3; // pair + 1-tile gap
@@ -611,13 +639,13 @@ function furnishRooms(
         const targetDesks = Math.min(floors.length, Math.max(1, Math.floor(floors.length / 2)));
         for (const f of floors) {
           if (desksPlaced >= targetDesks) break;
-          if (grid[f.y]![f.x]!.type === 'floor') {
+          if (isFreeFloor(f.x, f.y)) {
             place(f.x, f.y, 'standing_desk');
             desksPlaced++;
           }
         }
         // Planters in remaining gaps (every 3rd remaining floor tile)
-        const remainingFloors = floors.filter((f) => grid[f.y]![f.x]!.type === 'floor');
+        const remainingFloors = floors.filter((f) => isFreeFloor(f.x, f.y));
         for (let i = 0; i < remainingFloors.length; i += 3) {
           const f = remainingFloors[i]!;
           place(f.x, f.y, 'planter');
@@ -670,6 +698,10 @@ function furnishRooms(
         if (wbCandidates.length > 0) {
           place(wbCandidates[0]!.x, wbCandidates[0]!.y, 'whiteboard');
         }
+        // Floor lamp at NW interior corner (if still a floor tile)
+        if (inBounds(innerX0, innerY0, gridW, gridH) && grid[innerY0]![innerX0]!.type === 'floor') {
+          grid[innerY0]![innerX0]!.decor = 'focus_lamp';
+        }
         break;
       }
       case 'break': {
@@ -689,6 +721,10 @@ function furnishRooms(
         // Planter for atmosphere
         if (floors.length > 1) {
           place(floors[1]!.x, floors[1]!.y, 'planter');
+        }
+        // Coffee machine at NE interior corner (if still a floor tile)
+        if (inBounds(innerX1, innerY0, gridW, gridH) && grid[innerY0]![innerX1]!.type === 'floor') {
+          grid[innerY0]![innerX1]!.decor = 'coffee_machine';
         }
         // Sofa: try 2x1 against south wall, or single sofa if room is small
         const southWall = wallAdjacentFloors(0, 1);

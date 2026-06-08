@@ -30,8 +30,19 @@ const ISO_HELMET = '#E8B830';
 const ISO_SHADOW = 'rgba(80, 80, 80, 0.18)';
 const ISO_SELECTION = '#B08040'; // warm brown (distinct from all floors)
 
+// Zone ambient radial-light colors (very low alpha — applied in static layer)
+const ISO_ZONE_LIGHT: Record<string, string> = {
+  team_cluster: 'rgba(200, 220, 255, 0.08)',
+  meeting: 'rgba(255, 230, 180, 0.08)',
+  focus: 'rgba(200, 255, 210, 0.06)',
+  break: 'rgba(255, 200, 180, 0.07)',
+  infra: 'rgba(220, 230, 245, 0.06)',
+  reception: 'rgba(255, 240, 220, 0.08)',
+  biophilic: 'rgba(200, 255, 245, 0.06)',
+};
+
 /** Convert grid (x, y, z) to isometric screen pixel coordinates. */
-function isoProject(x: number, y: number, z = 0): { px: number; py: number } {
+export function isoProject(x: number, y: number, z = 0): { px: number; py: number } {
   return {
     px: (x - y) * ISO_TILE_W / 2,
     py: (x + y) * ISO_TILE_H / 2 - z * ISO_WALL_H,
@@ -249,6 +260,9 @@ export class LocalRenderer {
   private camStart = { x: 0, y: 0 };
   private _inputActive = true;
 
+  // Camera animation (smooth pan)
+  private _camAnim: { targetX: number; targetY: number; startTime: number; duration: number; fromX: number; fromY: number } | null = null;
+
   setInputActive(active: boolean): void {
     this._inputActive = active;
     if (!active) {
@@ -271,6 +285,7 @@ export class LocalRenderer {
   onWorkbenchClick: ((tile: LocalTile, screenX: number, screenY: number) => void) | null = null;
   onLocalUnitHover: ((unit: LocalUnit | null, screenX: number, screenY: number) => void) | null =
     null;
+  onNpcClick: ((npc: import('./types.ts').LocalNpc, screenX: number, screenY: number) => void) | null = null;
   // Phase 9: per-frame bubble position update
   onUnitRendered: ((unit: LocalUnit, screenX: number, screenY: number) => void) | null = null;
   // Phase 9 (transition): notifies parent when the exit transition completes
@@ -332,6 +347,7 @@ export class LocalRenderer {
     this.world = world;
     this.staticLayer = null;
     this.isoStaticLayer = null;
+    this._camAnim = null; // cancel any in-flight pan — its target belongs to the previous world
     // Center camera on the largest room (main area) rather than whole grid centroid
     if (this._isometric) {
       const largestRoom = world.rooms.reduce<LocalRoom | null>(
@@ -387,6 +403,7 @@ export class LocalRenderer {
           this.isDragging = true;
           this.dragStart = { x: e.clientX, y: e.clientY };
           this.camStart = { x: this.cam.x, y: this.cam.y };
+          this._camAnim = null; // cancel any active camera animation
         }
       }
     });
@@ -437,16 +454,21 @@ export class LocalRenderer {
           const tile = this.screenToTile(sx, sy);
 
           if (tile) {
-            // Priority: unit > workbench > generic tile (matches macro pattern)
+            // Priority: unit > NPC > workbench > generic tile
             const unit = this.getUnitAt(sx, sy);
             if (unit) {
               this.onLocalUnitClick?.(unit, sx, sy);
             } else {
-              const t = this.getTile(tile.x, tile.y);
-              if (t?.workbench) {
-                this.onWorkbenchClick?.(t, sx, sy);
+              const npc = this.getNpcAt(sx, sy);
+              if (npc) {
+                this.onNpcClick?.(npc, sx, sy);
               } else {
-                this.onTileClick?.(tile.x, tile.y, t, sx, sy);
+                const t = this.getTile(tile.x, tile.y);
+                if (t?.workbench) {
+                  this.onWorkbenchClick?.(t, sx, sy);
+                } else {
+                  this.onTileClick?.(tile.x, tile.y, t, sx, sy);
+                }
               }
             }
           }
@@ -623,6 +645,30 @@ export class LocalRenderer {
     return null;
   }
 
+  /** Hit-test for stationary NPCs. */
+  private getNpcAt(screenX: number, screenY: number): import('./types.ts').LocalNpc | null {
+    if (!this.world || !this.world.npcs || this.world.npcs.length === 0) return null;
+    const wx = (screenX - this.cam.cx) / this.cam.zoom + this.cam.x;
+    const wy = (screenY - this.cam.cy) / this.cam.zoom + this.cam.y;
+
+    if (this._isometric) {
+      const threshold = ISO_TILE_W * 0.18;
+      for (const npc of this.world.npcs) {
+        const np = isoProject(npc.gridX, npc.gridY);
+        if (Math.hypot(wx - np.px, wy - np.py) < threshold) return npc;
+      }
+      return null;
+    }
+
+    const threshold = TILE_SIZE * 0.35;
+    for (const npc of this.world.npcs) {
+      const nx = npc.gridX * TILE_SIZE + TILE_SIZE / 2;
+      const ny = npc.gridY * TILE_SIZE + TILE_SIZE / 2;
+      if (Math.hypot(wx - nx, wy - ny) < threshold) return npc;
+    }
+    return null;
+  }
+
   // ─── Render ───────────────────────────────────────────────────────────────────
   render(localUnits: LocalUnit[]) {
     this._localUnits = localUnits;
@@ -651,6 +697,15 @@ export class LocalRenderer {
     const now = performance.now();
     const dt = Math.min((now - this.lastFrameTime) / 1000, 0.1);
     this.lastFrameTime = now;
+
+    // Smooth camera animation (cubic ease-out)
+    if (this._camAnim) {
+      const t = Math.min(1, (now - this._camAnim.startTime) / this._camAnim.duration);
+      const ease = 1 - Math.pow(1 - t, 3);
+      this.cam.x = this._camAnim.fromX + (this._camAnim.targetX - this._camAnim.fromX) * ease;
+      this.cam.y = this._camAnim.fromY + (this._camAnim.targetY - this._camAnim.fromY) * ease;
+      if (t >= 1) this._camAnim = null;
+    }
 
     // FPS counter (for debug overlay)
     this._fpsFrames++;
@@ -945,6 +1000,25 @@ export class LocalRenderer {
           this.drawIsoTile(tile, x, y, world);
         }
       }
+    }
+
+    // Zone ambient radial lights (subtle glow per room, drawn over floors)
+    for (const room of world.rooms) {
+      const lightColor = ISO_ZONE_LIGHT[room.zoneType ?? 'team_cluster'];
+      if (!lightColor) continue;
+      const cx = room.x + room.width / 2;
+      const cy = room.y + room.height / 2;
+      const base = isoProject(cx, cy);
+      const radius = Math.max(room.width, room.height) * ISO_TILE_W * 0.55;
+      const grad = sctx.createRadialGradient(base.px, base.py, 0, base.px, base.py, radius);
+      grad.addColorStop(0, lightColor);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      sctx.globalAlpha = 0.5; // blend the gradient shape
+      sctx.fillStyle = grad;
+      sctx.beginPath();
+      sctx.arc(base.px, base.py, radius, 0, Math.PI * 2);
+      sctx.fill();
+      sctx.globalAlpha = 1;
     }
 
     this.ctx = originalCtx;
@@ -3102,6 +3176,26 @@ export class LocalRenderer {
     }
   }
 
+  /** Smooth animated camera pan (cubic ease-out). Cancels on user drag. */
+  animateCameraTo(px: number, py: number, duration = 400): void {
+    this._camAnim = {
+      fromX: this.cam.x,
+      fromY: this.cam.y,
+      targetX: px,
+      targetY: py,
+      startTime: performance.now(),
+      duration,
+    };
+  }
+
+  /** Smoothly pan the camera to center on a grid coordinate, projecting per the active render mode. */
+  animateCameraToGrid(gridX: number, gridY: number, duration = 400): void {
+    const p = this._isometric
+      ? isoProject(gridX, gridY)
+      : { px: gridX * TILE_SIZE, py: gridY * TILE_SIZE };
+    this.animateCameraTo(p.px, p.py, duration);
+  }
+
   // ─── Isometric 2.5D Render Pipeline ─────────────────────────────────
   private renderIso(
     world: LocalWorld,
@@ -3182,6 +3276,15 @@ export class LocalRenderer {
     // Draw dynamic tiles (doors, windows, furniture) on top of static layer
     for (const { x, y, tile } of tiles) {
       this.drawIsoTile(tile, x, y, world, activeWbIds);
+    }
+
+    // Sort and draw NPCs (back-to-front, before units)
+    const npcEntries = (world.npcs ?? [])
+      .filter((n) => n.gridX >= view.x0 && n.gridX <= view.x1 && n.gridY >= view.y0 && n.gridY <= view.y1)
+      .map((n) => ({ npc: n, sortKey: n.gridX + n.gridY }));
+    npcEntries.sort((a, b) => a.sortKey - b.sortKey);
+    for (const { npc } of npcEntries) {
+      this.drawIsoNpc(npc);
     }
 
     // Sort and draw units (also back-to-front by grid position)
@@ -3434,6 +3537,40 @@ export class LocalRenderer {
     } else if (tile.type === 'stairs') {
       this.drawIsoStairs(gridX, gridY);
     }
+
+    // ─── Zone floor decorators (placed by localMap.ts; rendered here) ──────
+    if (tile.decor === 'focus_lamp') {
+      const { ctx } = this;
+      const poleX = corners[0]!.x;
+      const baseY = corners[0]!.y + 2;
+      ctx.strokeStyle = '#8B7355';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(poleX, baseY);
+      ctx.lineTo(poleX, baseY - ISO_WALL_H * 0.6);
+      ctx.stroke();
+      ctx.fillStyle = '#FFE0A0';
+      ctx.beginPath();
+      ctx.arc(poleX, baseY - ISO_WALL_H * 0.6, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowColor = '#FFE0A0';
+      ctx.shadowBlur = 6;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+    if (tile.decor === 'coffee_machine') {
+      const { ctx } = this;
+      const mx = corners[3]!.x + 4;
+      const my = corners[3]!.y - 2;
+      ctx.fillStyle = '#6B5B4F';
+      ctx.fillRect(mx, my, 6, 5);
+      ctx.fillStyle = '#D4C0A8';
+      ctx.fillRect(mx + 1, my + 1, 4, 3);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.beginPath();
+      ctx.arc(mx + 3, my - 2, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   /** Shared wall drawing logic for iso tiles (wall / door / window). */
@@ -3479,6 +3616,12 @@ export class LocalRenderer {
       ctx.strokeStyle = 'rgba(80, 80, 80, 0.15)';
       ctx.lineWidth = 0.5;
       ctx.stroke();
+      // Contact shadow AO at base
+      const aoGrad = ctx.createLinearGradient(0, bottom.y + ISO_WALL_H - 4, 0, bottom.y + ISO_WALL_H);
+      aoGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      aoGrad.addColorStop(1, 'rgba(0,0,0,0.25)');
+      ctx.fillStyle = aoGrad;
+      ctx.fillRect(left.x, bottom.y + ISO_WALL_H - 4, bottom.x - left.x, 4);
     }
 
     // Side face (east)
@@ -3494,6 +3637,12 @@ export class LocalRenderer {
       ctx.strokeStyle = 'rgba(80, 80, 80, 0.15)';
       ctx.lineWidth = 0.5;
       ctx.stroke();
+      // Contact shadow AO at base
+      const aoGrad = ctx.createLinearGradient(0, bottom.y + ISO_WALL_H - 4, 0, bottom.y + ISO_WALL_H);
+      aoGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      aoGrad.addColorStop(1, 'rgba(0,0,0,0.22)');
+      ctx.fillStyle = aoGrad;
+      ctx.fillRect(bottom.x, bottom.y + ISO_WALL_H - 4, right.x - bottom.x, 4);
     }
 
     // Top cap
@@ -3506,9 +3655,39 @@ export class LocalRenderer {
     ctx.closePath();
     ctx.fill();
 
+    // ─── Zone wall decorators ──────────────────────────────────────
+    if (zone === 'infra') {
+      // Cable conduits on wall faces (thin vertical lines)
+      ctx.strokeStyle = 'rgba(30, 30, 30, 0.35)';
+      ctx.lineWidth = 0.8;
+      if (hasNorthFace) {
+        ctx.beginPath();
+        ctx.moveTo((left.x + bottom.x) / 2 - 2, bottom.y);
+        ctx.lineTo((left.x + bottom.x) / 2 - 2, bottom.y + ISO_WALL_H);
+        ctx.stroke();
+      }
+      if (hasWestFace) {
+        ctx.beginPath();
+        ctx.moveTo((bottom.x + right.x) / 2 + 2, bottom.y);
+        ctx.lineTo((bottom.x + right.x) / 2 + 2, bottom.y + ISO_WALL_H);
+        ctx.stroke();
+      }
+    }
+    if (zone === 'biophilic') {
+      // Hanging plant under wall top cap
+      ctx.fillStyle = '#6A9E6A';
+      ctx.beginPath();
+      ctx.arc(topCap[3]!.x + 3, topCap[3]!.y + 4, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#4A7E4A';
+      ctx.beginPath();
+      ctx.arc(topCap[3]!.x + 1, topCap[3]!.y + 6, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     // Door specifics
     if (tile.type === 'door') {
-      this._drawIsoDoor(tile, gridX, gridY, corners, isGlass);
+      this._drawIsoDoor(tile, corners, isGlass, hasNorthFace, hasWestFace);
     }
 
     // Window specifics
@@ -3519,40 +3698,70 @@ export class LocalRenderer {
 
   private _drawIsoDoor(
     tile: LocalTile,
-    _gridX: number,
-    _gridY: number,
     corners: Array<{ x: number; y: number }>,
     isGlass: boolean,
+    hasNorthFace: boolean,
+    hasWestFace: boolean,
   ) {
     const { ctx } = this;
-    const key = `${tile.x},${tile.y}`;
-    const openPct = this.doorOpenStates.get(key) ?? 0;
+    const openPct = this.doorOpenStates.get(`${tile.x},${tile.y}`) ?? 0;
+
+    const right = corners[1]!;
     const bottom = corners[2]!;
     const left = corners[3]!;
-    const baseY = Math.min(bottom.y, left.y);
 
-    // Door frame
-    ctx.fillStyle = isGlass ? ISO_DOOR_GLASS : ISO_DOOR_WOOD;
-    ctx.fillRect(bottom.x - 2, baseY, 4, ISO_WALL_H);
-    ctx.fillRect(left.x - 2, baseY, 4, ISO_WALL_H);
+    const frameColor = isGlass ? ISO_DOOR_GLASS : ISO_DOOR_WOOD;
+    const panelColor = isGlass ? 'rgba(160, 190, 210, 0.5)' : '#A08850';
+    const WH = ISO_WALL_H;
 
-    // Sliding panels
-    const panelW = ISO_TILE_W / 2;
-    const offset = panelW * openPct * 0.5;
+    // Draw door panels as iso-perspective parallelograms on a given face.
+    // tl/tr are the two top vertices of the face; side edges are vertical.
+    const drawOnFace = (tl: { x: number; y: number }, tr: { x: number; y: number }) => {
+      const dx = tr.x - tl.x;
+      const dy = tr.y - tl.y;
+      // Point along the top edge at parameter t, shifted down by `down` pixels.
+      const pt = (t: number, down = 0) => ({ x: tl.x + dx * t, y: tl.y + dy * t + down });
 
-    if (isGlass) {
-      ctx.fillStyle = 'rgba(160, 190, 210, 0.4)';
-      ctx.fillRect(bottom.x - panelW / 2 - offset, baseY + 2, panelW, ISO_WALL_H - 4);
-      ctx.fillRect(left.x + offset, baseY + 2, panelW, ISO_WALL_H - 4);
-    } else {
-      ctx.fillStyle = '#A08850';
-      ctx.fillRect(bottom.x - panelW / 2 - offset, baseY + 2, panelW, ISO_WALL_H - 4);
-      ctx.fillRect(left.x + offset, baseY + 2, panelW, ISO_WALL_H - 4);
-    }
+      // Jamb posts
+      ctx.fillStyle = frameColor;
+      for (const [t0, t1] of [[0, 0.06], [0.94, 1]] as [number, number][]) {
+        const a = pt(t0), b = pt(t1);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+        ctx.lineTo(b.x, b.y + WH); ctx.lineTo(a.x, a.y + WH);
+        ctx.closePath(); ctx.fill();
+      }
 
-    // Handle
-    ctx.fillStyle = isGlass ? '#90A8B8' : '#806840';
-    ctx.fillRect(bottom.x - 1, baseY + ISO_WALL_H / 2, 2, 2);
+      // Two sliding panels — each half, moving apart as openPct increases
+      const slide = openPct * 0.42;
+      ctx.fillStyle = panelColor;
+      // Left panel: [0.06 .. 0.5] slides toward 0
+      const lEnd = 0.5 - slide;
+      if (lEnd > 0.06) {
+        const a = pt(0.06, 2), b = pt(lEnd, 2);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+        ctx.lineTo(b.x, b.y + WH - 4); ctx.lineTo(a.x, a.y + WH - 4);
+        ctx.closePath(); ctx.fill();
+      }
+      // Right panel: [0.5 .. 0.94] slides toward 1
+      const rStart = 0.5 + slide;
+      if (rStart < 0.94) {
+        const a = pt(rStart, 2), b = pt(0.94, 2);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+        ctx.lineTo(b.x, b.y + WH - 4); ctx.lineTo(a.x, a.y + WH - 4);
+        ctx.closePath(); ctx.fill();
+      }
+
+      // Handle
+      ctx.fillStyle = isGlass ? '#90A8B8' : '#806840';
+      const h = pt(openPct < 0.5 ? 0.44 : 0.56, WH / 2);
+      ctx.beginPath(); ctx.arc(h.x, h.y, 1.5, 0, Math.PI * 2); ctx.fill();
+    };
+
+    if (hasNorthFace) drawOnFace(left, bottom);   // south-facing wall face
+    if (hasWestFace) drawOnFace(bottom, right);    // east-facing wall face
   }
 
   private _drawIsoWindowTile(
@@ -3873,6 +4082,67 @@ export class LocalRenderer {
     ctx.lineTo(base.px + 8, base.py + 8);
     ctx.stroke();
   }
+  /** Darken a hex color by a percentage (used for prism face shading). */
+  private darkenHex(hex: string, pct: number): string {
+    if (!hex.startsWith('#') || hex.length !== 7) return hex;
+    const f = (n: number) => Math.max(0, Math.min(255, Math.floor(n * (1 - pct / 100))));
+    const r = f(parseInt(hex.slice(1, 3), 16));
+    const g = f(parseInt(hex.slice(3, 5), 16));
+    const b = f(parseInt(hex.slice(5, 7), 16));
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  }
+
+  /** Draw an isometric prism (box) in local screen space, shaded by darkening `color` on its side faces. */
+  private drawIsoPrism(
+    cx: number,
+    zBase: number,
+    zTop: number,
+    hw: number,
+    hd: number,
+    color: string,
+    scale: number,
+  ) {
+    const { ctx } = this;
+    const bY = -zBase * scale;
+    const tY = -zTop * scale;
+    // base diamond corners (omit unused top/left of base to satisfy TS strictUnusedLocals)
+    const bx1 = cx + hw * scale, by1 = bY;
+    const bx2 = cx, by2 = bY + hd * scale;
+    const bx3 = cx - hw * scale, by3 = bY;
+    // top diamond corners
+    const tx0 = cx, ty0 = tY - hd * scale;
+    const tx1 = cx + hw * scale, ty1 = tY;
+    const tx2 = cx, ty2 = tY + hd * scale;
+    const tx3 = cx - hw * scale, ty3 = tY;
+    // left face (darker)
+    ctx.fillStyle = this.darkenHex(color, 20);
+    ctx.beginPath();
+    ctx.moveTo(bx3, by3);
+    ctx.lineTo(bx2, by2);
+    ctx.lineTo(tx2, ty2);
+    ctx.lineTo(tx3, ty3);
+    ctx.closePath();
+    ctx.fill();
+    // right face (medium darker)
+    ctx.fillStyle = this.darkenHex(color, 10);
+    ctx.beginPath();
+    ctx.moveTo(bx2, by2);
+    ctx.lineTo(bx1, by1);
+    ctx.lineTo(tx1, ty1);
+    ctx.lineTo(tx2, ty2);
+    ctx.closePath();
+    ctx.fill();
+    // top cap (original color)
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(tx0, ty0);
+    ctx.lineTo(tx1, ty1);
+    ctx.lineTo(tx2, ty2);
+    ctx.lineTo(tx3, ty3);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   private drawIsoUnit(unit: LocalUnit, gx: number, gy: number) {
     const { ctx } = this;
     const base = isoProject(gx, gy);
@@ -3928,66 +4198,25 @@ export class LocalRenderer {
     ctx.rotate(dirAngle);
     ctx.scale(Sf, Sc);
 
-    // Helper to darken a hex color
-    const darken = (hex: string, pct: number): string => {
-      if (!hex.startsWith('#') || hex.length !== 7) return hex;
-      const f = (n: number) => Math.max(0, Math.min(255, Math.floor(n * (1 - pct / 100))));
-      const r = f(parseInt(hex.slice(1, 3), 16));
-      const g = f(parseInt(hex.slice(3, 5), 16));
-      const b = f(parseInt(hex.slice(5, 7), 16));
-      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-    };
+    const drawPrism = (cx: number, zBase: number, zTop: number, hw: number, hd: number, color: string) =>
+      this.drawIsoPrism(cx, zBase, zTop, hw, hd, color, scale);
 
-    // Helper: draw an isometric prism (box) in local screen space
-    const drawPrism = (cx: number, zBase: number, zTop: number, hw: number, hd: number, color: string) => {
-      const bY = -zBase * scale;
-      const tY = -zTop * scale;
-      // base diamond corners (omit unused top/left of base to satisfy TS strictUnusedLocals)
-      const bx1 = cx + hw * scale, by1 = bY;
-      const bx2 = cx, by2 = bY + hd * scale;
-      const bx3 = cx - hw * scale, by3 = bY;
-      // top diamond corners
-      const tx0 = cx, ty0 = tY - hd * scale;
-      const tx1 = cx + hw * scale, ty1 = tY;
-      const tx2 = cx, ty2 = tY + hd * scale;
-      const tx3 = cx - hw * scale, ty3 = tY;
-      // left face (darker)
-      ctx.fillStyle = darken(color, 20);
-      ctx.beginPath();
-      ctx.moveTo(bx3, by3);
-      ctx.lineTo(bx2, by2);
-      ctx.lineTo(tx2, ty2);
-      ctx.lineTo(tx3, ty3);
-      ctx.closePath();
-      ctx.fill();
-      // right face (medium darker)
-      ctx.fillStyle = darken(color, 10);
-      ctx.beginPath();
-      ctx.moveTo(bx2, by2);
-      ctx.lineTo(bx1, by1);
-      ctx.lineTo(tx1, ty1);
-      ctx.lineTo(tx2, ty2);
-      ctx.closePath();
-      ctx.fill();
-      // top cap (original color)
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(tx0, ty0);
-      ctx.lineTo(tx1, ty1);
-      ctx.lineTo(tx2, ty2);
-      ctx.lineTo(tx3, ty3);
-      ctx.closePath();
-      ctx.fill();
-    };
-
-    // 1. Shadow (small iso ellipse on floor, z≈0)
+    // 1. Shadow (soft iso ellipse on floor, offset by top-left light)
+    const shadowOffX = 1.5 * scale;
+    const shadowOffY = 3 * scale;
+    // Outer ambient-occlusion halo
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+    ctx.beginPath();
+    ctx.ellipse(shadowOffX, shadowOffY + 1 * scale, ISO_TILE_W * 0.22, ISO_TILE_H * 0.18, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Core shadow
     ctx.fillStyle = ISO_SHADOW;
     ctx.beginPath();
-    ctx.ellipse(0, 2 * scale, ISO_TILE_W * 0.15, ISO_TILE_H * 0.12, 0, 0, Math.PI * 2);
+    ctx.ellipse(shadowOffX, shadowOffY, ISO_TILE_W * 0.18, ISO_TILE_H * 0.15, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // 2. Legs — two thin vertical prisms, z=0..8, darkened 20%
-    const legColor = darken(unit.color, 20);
+    const legColor = this.darkenHex(unit.color, 20);
     drawPrism(-5 * scale, 0, 8, 2.5, 2, legColor);
     drawPrism(5 * scale, 0, 8, 2.5, 2, legColor);
 
@@ -4118,6 +4347,40 @@ export class LocalRenderer {
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#5C4033';
     ctx.fillText(primary.slice(0, 14), plaqueX, plaqueY - plaqueH / 2);
+    ctx.restore();
+  }
+
+  /** Draw a stationary NPC (manager) as a small dark-suited prism figure. */
+  private drawIsoNpc(npc: import('./types.ts').LocalNpc) {
+    const { ctx } = this;
+    const base = isoProject(npc.gridX, npc.gridY);
+    const scale = ISO_TILE_W / 64;
+
+    ctx.save();
+    ctx.translate(base.px, base.py - ISO_WALL_H * 0.3);
+
+    // Subtle ground ring (always visible — distinguishes stationary NPCs from agents)
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, ISO_TILE_W * 0.18, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Shadow (smaller than agent)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
+    ctx.beginPath();
+    ctx.ellipse(0, 2 * scale, ISO_TILE_W * 0.12, ISO_TILE_H * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Legs (single block, legs together)
+    this.drawIsoPrism(0, 0, 6, 2, 1.5, '#2d2722', scale);
+    // Torso (dark suit)
+    this.drawIsoPrism(0, 6, 14, 7, 4, '#3a3a45', scale);
+    // Head
+    this.drawIsoPrism(0, 14, 20, 4, 2.5, '#e8d8c8', scale);
+    // Briefcase (small brown prism, offset right)
+    this.drawIsoPrism(6 * scale, 0, 5, 3, 1.5, '#8B7355', scale);
+
     ctx.restore();
   }
 

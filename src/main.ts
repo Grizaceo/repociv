@@ -56,7 +56,7 @@ import {
 import { sendCommand } from './commandBus.ts';
 import { recordGesture } from './directiveLearner.ts';
 import { tileKey } from './types.ts';
-import type { LocalRoom } from './types.ts';
+import type { LocalRoom, LocalNpc } from './types.ts';
 import { clearChat } from './ui/chat.ts';
 import { openOnboardingPanel } from './ui/onboardingPanel.ts';
 import { axialToPixel } from './hex.ts';
@@ -112,6 +112,18 @@ type RepoCivDebugApi = {
   getMacroCityScreenPositions: () => Array<{ cityId: string; x: number; y: number }>;
   openLocalView: (cityId: string) => boolean;
 };
+
+function showToast(message: string, duration = 3000) {
+  const el = document.createElement('div');
+  el.style.cssText =
+    'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:8px 16px;background:rgba(20,20,20,0.85);color:#fff;font-family:var(--font-mono);font-size:12px;z-index:9999;border-radius:4px;pointer-events:none;transition:opacity 0.3s ease;';
+  el.textContent = message;
+  document.body.appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 300);
+  }, duration);
+}
 
 async function bootstrap() {
   // Global error handlers for capturing unhandled errors (e.g., merge folder errors)
@@ -857,6 +869,28 @@ async function bootstrap() {
     // Highlight selected local unit (future: show detail panel)
     showLocalUnitTooltip(unit, { x: _sx, y: _sy });
   };
+  // Pan the local-view camera to the room matching `folderName`, or toast if it has no room of its own.
+  const navigateToFolder = (folderName: string) => {
+    const lw = state.getLocalWorld();
+    const target = lw?.rooms.find((r: LocalRoom) => r.folderName === folderName || r.label === folderName);
+    if (target) {
+      renderer.animateCameraToGrid(target.x + target.width / 2, target.y + target.height / 2, 500);
+    } else {
+      showToast(`📁 ${folderName} no tiene sala propia`);
+    }
+  };
+  renderer.localNpcClickCb = (npc: LocalNpc, sx, sy) => {
+    const localWorld = state.getLocalWorld();
+    const room = localWorld?.rooms.find((r: LocalRoom) => r.id === npc.roomId);
+    if (room) {
+      showWhiteboardPanel(
+        room,
+        { x: sx, y: sy },
+        (folderPath) => { bridge.send('open_file', { filePath: folderPath }); },
+        navigateToFolder,
+      );
+    }
+  };
   // ─── Kiosk click → discover rest area with 1.25x bonus ───────────────────
   renderer.localTileClickCb = (x, y, tile, sx, sy) => {
     if (tile?.type === 'kiosk') {
@@ -871,9 +905,12 @@ async function bootstrap() {
       const localWorld = state.getLocalWorld();
       const room = localWorld?.rooms.find((r: LocalRoom) => r.id === tile.roomId);
       if (room) {
-        showWhiteboardPanel(room, { x: sx, y: sy }, (folderPath) => {
-          bridge.send('open_file', { filePath: folderPath });
-        });
+        showWhiteboardPanel(
+          room,
+          { x: sx, y: sy },
+          (folderPath) => { bridge.send('open_file', { filePath: folderPath }); },
+          navigateToFolder,
+        );
       }
       return;
     }

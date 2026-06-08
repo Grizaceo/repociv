@@ -75,6 +75,7 @@ export function showWhiteboardPanel(
   room: LocalRoom,
   screenPos: { x: number; y: number },
   onOpenFolder?: (folderPath: string) => void,
+  onNavigateToFolder?: (folderName: string) => void,
 ) {
   hideWhiteboardPanel();
 
@@ -83,7 +84,12 @@ export function showWhiteboardPanel(
 
   const subFolders = room.subFolderNames ?? [];
   const subList = subFolders.length
-    ? `<ul class="lt-wb-list">${subFolders.map((n) => `<li>${_esc(n)}</li>`).join('')}</ul>`
+    ? subFolders.map((n) => `
+      <div class="lt-wb-nav" data-folder="${_esc(n)}">
+        <span class="lt-wb-nav-icon">📁</span>
+        <span class="lt-wb-nav-name">${_esc(n)}</span>
+      </div>
+    `).join('')
     : '<div class="lt-wb-empty">Sin subcarpetas</div>';
 
   const openBtn = onOpenFolder
@@ -109,6 +115,16 @@ export function showWhiteboardPanel(
     const btn = el.querySelector('.lt-wb-open-btn');
     btn?.addEventListener('click', () => {
       onOpenFolder(room.folderPath);
+    });
+  }
+
+  if (onNavigateToFolder) {
+    el.querySelectorAll<HTMLElement>('.lt-wb-nav').forEach((row) => {
+      row.addEventListener('click', () => {
+        const folder = row.dataset['folder'] ?? '';
+        hideWhiteboardPanel();
+        onNavigateToFolder(folder);
+      });
     });
   }
 

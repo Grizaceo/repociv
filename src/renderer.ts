@@ -93,6 +93,9 @@ export class Renderer {
   localUnitClickCb:
     | ((unit: import('./types.ts').LocalUnit, screenX: number, screenY: number) => void)
     | null = null;
+  localNpcClickCb:
+    | ((npc: import('./types.ts').LocalNpc, screenX: number, screenY: number) => void)
+    | null = null;
   localTileClickCb:
     | ((
         x: number,
@@ -685,6 +688,7 @@ export class Renderer {
       this.localR.onLocalUnitHover = (unit, sx, sy) => this.localUnitHoverCb?.(unit, sx, sy);
       this.localR.onWorkbenchClick = this.localWorkbenchClickCb;
       this.localR.onLocalUnitClick = this.localUnitClickCb;
+      this.localR.onNpcClick = this.localNpcClickCb;
       this.localR.onTileClick = (x, y, tile, sx, sy) => this.localTileClickCb?.(x, y, tile, sx, sy);
       this.localR.onUnitRendered = (unit, sx, sy) => this.localUnitRenderedCb?.(unit, sx, sy);
       this.localR.onZonePainted = (type, tiles) => this.onZonePaintedCb?.(type, tiles);
@@ -1263,6 +1267,11 @@ export class Renderer {
   }
   isLocalDebugOverlay(): boolean {
     return this.localR?.isDebugOverlay() ?? false;
+  }
+
+  /** Smoothly pan the local-view camera to center on a grid coordinate. */
+  animateCameraToGrid(gridX: number, gridY: number, duration = 400): void {
+    this.localR?.animateCameraToGrid(gridX, gridY, duration);
   }
 
   /** Compute current zoom-based LOD level. */

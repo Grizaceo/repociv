@@ -4582,20 +4582,31 @@ kbd {
   margin-bottom: 4px;
   letter-spacing: 0.5px;
 }
-.lt-wb-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  font-size: 11px;
+.lt-wb-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 3px;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  transition: background 120ms cubic-bezier(0.16, 1, 0.3, 1), border-color 120ms cubic-bezier(0.16, 1, 0.3, 1);
   color: var(--lt-zinc-50);
+  font-size: 11px;
 }
-.lt-wb-list li {
-  padding: 2px 0;
-  border-bottom: 1px solid var(--lt-border);
+.lt-wb-nav:hover {
+  background: rgba(245, 158, 11, 0.12);
+  border-left-color: var(--lt-amber-500);
 }
-.lt-wb-list li:last-child {
-  border-bottom: none;
+.lt-wb-nav-icon {
+  font-size: 10px;
 }
+.lt-wb-nav-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .lt-wb-empty {
   color: var(--lt-zinc-600);
   font-style: italic;

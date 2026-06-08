@@ -463,6 +463,7 @@ export interface LocalTile {
   type: LocalTileType;
   roomId: string | null;
   workbench: Workbench | null;
+  decor?: 'focus_lamp' | 'coffee_machine';
 }
 
 export interface Workbench {
@@ -519,6 +520,8 @@ export interface LocalWorld {
   restAreas?: LocalRestArea[];
   // Temperature System
   roomClimates?: Map<string, RoomClimate>;
+  // Stationary NPCs (managers, receptionists)
+  npcs?: LocalNpc[];
 }
 
 // ─── Local Unit State (Phase 7a) ───────────────────────────────────────────────
@@ -561,6 +564,16 @@ export interface LocalUnit {
   effectiveSpeed: number; // local grid movement speed after fatigue penalty
   assignedTask?: AgentTask | null; // player-assigned job focus (frontend-only)
   ephemeral?: boolean; // subagent detachment in local view
+}
+
+export interface LocalNpc {
+  id: string;
+  name: string;
+  color: string;
+  gridX: number;
+  gridY: number;
+  roomId: string;
+  type: 'manager'; // future: receptionist, security
 }
 
 export interface LocalMission {

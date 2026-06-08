@@ -606,6 +606,34 @@ def _dispatch_command(cmd: Command) -> None:
         _ds.record_outcome(cmd.id, "success", 0.0)
         return
 
+    if cmd.type == "open_file":
+        import os as _os  # noqa: PLC0415
+        fp = str(payload.get("filePath", "")).strip()
+        if not fp or not _os.path.exists(fp):
+            send_to_repociv({"type": "log", "msg": f"open_file: ruta no encontrada: {fp!r}", "level": "warn"})
+            _es.record_failed(cmd.id, "path not found")
+            return
+        try:
+            is_dir = _os.path.isdir(fp)
+            # On WSL2 convert to Windows path and open with explorer / VS Code
+            wpath_result = subprocess.run(["wslpath", "-w", fp], capture_output=True, text=True, timeout=3)
+            if wpath_result.returncode == 0:
+                win_path = wpath_result.stdout.strip()
+                if is_dir:
+                    subprocess.Popen(["explorer.exe", win_path])
+                else:
+                    subprocess.Popen(["code", "--reuse-window", fp])
+            else:
+                # Non-WSL fallback: xdg-open
+                subprocess.Popen(["xdg-open", fp])
+            send_to_repociv({"type": "log", "msg": f"Abriendo: {fp}", "level": "info"})
+            _es.record_completed(cmd.id, fp)
+            _ds.record_outcome(cmd.id, "success", 0.0)
+        except Exception as exc:
+            send_to_repociv({"type": "log", "msg": f"open_file error: {exc}", "level": "error"})
+            _es.record_failed(cmd.id, str(exc))
+        return
+
     if cmd.type == "tile_inspected":
         city_name = str(payload.get("cityName", cmd.target))
         send_to_repociv({"type": "log", "msg": f"Inspeccionando: {city_name}", "level": "info"})

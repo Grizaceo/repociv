@@ -20,12 +20,40 @@
 
 ---
 
+## Vista Local — estilo RimWorld / isométrica 2.5D
+
+Al hacer doble-click en una ciudad del mapa hex se entra a la **vista local**: una oficina isométrica estilo RimWorld generada proceduralmente a partir de la estructura real del repo.
+
+![Vista isométrica — oficina completa](docs/design/screenshots/iso_rimworld_ui.jpg)
+
+Cada sala corresponde a una carpeta del repo. Las unidades (agentes IA) caminan entre workbenches, los NPCs manager están de pie frente a pizarras, y las puertas se deslizan al pasar.
+
+![Detalle de salas — RECEPTION, ENGINEERING, DESIGN](docs/design/screenshots/iso_rimworld_detail.jpg)
+
+### Elementos de la vista local
+
+| Elemento | Qué representa |
+|----------|---------------|
+| **Sala (room)** | Carpeta del repo — zona coloreada según tipo (`team_cluster`, `focus`, `break`, `infra`, `meeting`) |
+| **Workbench** (`×`) | Archivo priorizado por la Priority Matrix — hover muestra nombre y score |
+| **Whiteboard** | Pared norte de cada sala — click abre panel con subcarpetas navegables |
+| **NPC Manager** | Figura estacionaria frente a la pizarra — representa la sala, clickeable para info |
+| **Unidad (agente)** | Prismo 2.5D animado — camina de workbench en workbench mientras trabaja |
+| **Puerta** | Divide salas — se desliza al entrar/salir (animación paralela-ográmica) |
+| **Lámpara de piso** | Zona `focus` — luz ambiental en esquina NW interior |
+| **Cafetera** | Zona `break` — esquina NE interior |
+| **Placa de puerta** | Label flotante sobre cada sala — hotkey `L` para alternar visibilidad |
+
+**Hotkeys en vista local:** `F` overlay de debug · `L` labels · `Q/W/E` zoom · `1-9` selección de sala · `ENTER` entra/sale de sala
+
+---
+
 ## ¿Qué es esto?
 
 RepoCiv convierte tu carpeta de repos en un mapa interactivo:
 
 - Cada **repo** es una **ciudad** en el mapa hexagonal
-- Cada **agente de IA** (Claude, Codex, tu propio LLM) es una **unidad** que camina hacia workbenches
+- Cada **agente de IA** (Claude, Codex, tu propio LLM) es una **unidad** que camina hacia workbenches en una oficina isométrica 2.5D
 - Los **procesos en segundo plano** son edificios dentro de la ciudad
 - El **bridge HTTP + WebSocket** conecta el mapa en tiempo real con tu runtime de agentes
 
@@ -126,9 +154,13 @@ REPOCIV_MAP_ROOT=~/projects
 ```
 
 - **Macro:** hex map donde cada tile es un repo
-- **Local:** doble-click en una ciudad → vista interior de archivos
-  - Los **workbenches** son archivos/carpetas priorizados por la Priority Matrix
-  - Las **unidades** caminan hacia workbenches con A* cacheado (≤300 hexes)
+- **Local:** doble-click en una ciudad → oficina isométrica 2.5D generada desde la estructura del repo
+  - **Salas** = carpetas, coloreadas por zona (`team_cluster` azul, `focus` violeta, `break` verde, `infra` concreto)
+  - **Workbenches** (`×`) = archivos priorizados por la Priority Matrix — A* cacheado (≤300 hexes)
+  - **Whiteboards** = pared norte de cada sala; click → panel de subcarpetas navegables
+  - **Puertas isométricas** = paneles deslizantes con perspectiva correcta
+  - **NPCs manager** = figuras estacionarias frente a pizarras; click → info de sala
+  - **Unidades** = prismos 2.5D animados que caminan entre workbenches
 - `Space` o tecla `3` alterna entre las dos vistas
 
 ---
