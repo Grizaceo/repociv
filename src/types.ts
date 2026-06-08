@@ -499,6 +499,7 @@ export interface LocalRoom {
   // ─── Office Redesign (Phase 2) ────────────────────────────────────────
   zoneType?: OfficeZoneType; // semantic office zone
   zoneLabel?: string; // display label for zone (e.g. "Engineering")
+  subFolderNames?: string[]; // child directory names for whiteboard panel
 }
 
 export interface LocalWorld {

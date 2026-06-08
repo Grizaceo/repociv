@@ -34,7 +34,7 @@ export class LocalWorldManager {
     if (!this.localWorld || this.localWorld.repoId !== repoId) {
       this.localWorld = await generateLocalWorldFromApi(repoId);
       if (this.localUnits.length === 0) {
-        const entrance = this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
+        const entrance = this.localWorld.rooms.find((r) => r.zoneType === 'reception') ?? this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
         const heroUnit = this.getFirstUnit();
         this.localUnits.push({
           id: heroUnit?.id ?? 'DAVI',
@@ -75,7 +75,7 @@ export class LocalWorldManager {
     if (!this.localWorld || this.localWorld.repoId !== repoId) {
       this.localWorld = buildMockLocalWorld(repoId);
       if (this.localUnits.length === 0) {
-        const entrance = this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
+        const entrance = this.localWorld.rooms.find((r) => r.zoneType === 'reception') ?? this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
         this.localUnits.push({
           id: 'DAVI',
           name: 'DAVI',
@@ -383,9 +383,10 @@ export class LocalWorldManager {
   private _assignMissionToSpecificUnit(queued: LocalMission, unitId: string): void {
     let unit = this.localUnits.find((u) => u.id === unitId || u.macroUnitId === unitId);
     if (!unit && this.localWorld) {
-      // Spawn unit at the room entrance
+      // Spawn unit at the reception entrance
       const macroUnit = this.getMacroUnit?.(unitId);
-      const entrance = this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
+      const entrance = this.localWorld.rooms.find((r) =>
+        r.zoneType === 'reception') ?? this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
       const gx = entrance.x + Math.floor(entrance.w / 2);
       const gy = entrance.y + Math.floor(entrance.h / 2);
       const color = macroUnit ? (UNIT_COLORS[macroUnit.type] ?? '#4af') : '#4af';

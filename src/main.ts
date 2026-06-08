@@ -51,10 +51,12 @@ import {
   showLocalContextMenu,
   showLocalMissionPreview,
   showGitForFile,
+  showWhiteboardPanel,
 } from './ui/localSpatialPreview.ts';
 import { sendCommand } from './commandBus.ts';
 import { recordGesture } from './directiveLearner.ts';
 import { tileKey } from './types.ts';
+import type { LocalRoom } from './types.ts';
 import { clearChat } from './ui/chat.ts';
 import { openOnboardingPanel } from './ui/onboardingPanel.ts';
 import { axialToPixel } from './hex.ts';
@@ -848,13 +850,22 @@ async function bootstrap() {
     showLocalUnitTooltip(unit, { x: _sx, y: _sy });
   };
   // ─── Kiosk click → discover rest area with 1.25x bonus ───────────────────
-  renderer.localTileClickCb = (x, y, tile) => {
+  renderer.localTileClickCb = (x, y, tile, sx, sy) => {
     if (tile?.type === 'kiosk') {
       bridge.send('discover_rest_area', {
         restAreaId: `kiosk-${x}-${y}`,
         roomId: 'kiosk',
         coord: [x, y],
       });
+      return;
+    }
+    if (tile?.type === 'whiteboard') {
+      const localWorld = state.getLocalWorld();
+      const room = localWorld?.rooms.find((r: LocalRoom) => r.id === tile.roomId);
+      if (room) {
+        showWhiteboardPanel(room, { x: sx, y: sy });
+      }
+      return;
     }
   };
 

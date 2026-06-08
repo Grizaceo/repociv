@@ -685,7 +685,7 @@ export class Renderer {
       this.localR.onLocalUnitHover = (unit, sx, sy) => this.localUnitHoverCb?.(unit, sx, sy);
       this.localR.onWorkbenchClick = this.localWorkbenchClickCb;
       this.localR.onLocalUnitClick = this.localUnitClickCb;
-      this.localR.onTileClick = (x, y, tile) => this.localTileClickCb?.(x, y, tile, 0, 0);
+      this.localR.onTileClick = (x, y, tile, sx, sy) => this.localTileClickCb?.(x, y, tile, sx, sy);
       this.localR.onUnitRendered = (unit, sx, sy) => this.localUnitRenderedCb?.(unit, sx, sy);
       this.localR.onZonePainted = (type, tiles) => this.onZonePaintedCb?.(type, tiles);
       this.localR.setInputActive(currentViewMode === 'local');

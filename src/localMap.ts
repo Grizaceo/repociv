@@ -45,6 +45,36 @@ export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
   const rooms: LocalRoom[] = [];
   const workbenches: Workbench[] = [];
 
+  // ─── Reception / Spawn Hall (lobby before any departmental rooms) ──────────
+  const totalFiles = countFiles(root, MAX_DEPTH);
+  const lobbyW = Math.max(8, Math.min(14, Math.ceil(Math.sqrt(totalFiles * 0.6))));
+  const lobbyH = Math.max(6, Math.min(10, Math.ceil(totalFiles / lobbyW * 0.4)));
+  const lobbyPlaced = placeRoom(gridWidth, gridHeight, rooms, lobbyW, lobbyH, WALL_THICKNESS);
+  if (!lobbyPlaced.fits) {
+    const newSize = expandGrid(gridWidth, gridHeight, lobbyW, lobbyH, 'vertical_overflow');
+    gridWidth = newSize.w;
+    gridHeight = newSize.h;
+  }
+  // Force placement at top-left if shelf algorithm didn't find space
+  const lobbyX = lobbyPlaced.x ?? WALL_THICKNESS;
+  const lobbyY = lobbyPlaced.y ?? WALL_THICKNESS;
+  const lobbyRoom: LocalRoom = {
+    id: '__lobby__',
+    label: 'Reception',
+    w: lobbyW,
+    h: lobbyH,
+    folderPath: root.path,
+    folderName: root.name,
+    x: lobbyX,
+    y: lobbyY,
+    width: lobbyW,
+    height: lobbyH,
+    workbenches: [],
+    zoneType: 'reception',
+    zoneLabel: 'Reception',
+  };
+  rooms.push(lobbyRoom);
+
   for (const folder of folders) {
     const fileCount = countFiles(folder.node, MAX_DEPTH - folder.depth);
     if (fileCount === 0) continue;
@@ -382,6 +412,10 @@ function makeRoom(
   height: number,
 ): LocalRoom {
   const { zoneType, zoneLabel } = classifyFolderZone(folder.name, folder.path, folder.depth);
+  const subFolderNames =
+    folder.node.children
+      ?.filter((c) => c.type === 'dir')
+      .map((c) => c.name) ?? [];
   return {
     id: folder.path,
     label: folder.name,
@@ -396,6 +430,7 @@ function makeRoom(
     workbenches: [],
     zoneType,
     zoneLabel,
+    subFolderNames,
   };
 }
 
@@ -547,7 +582,31 @@ function furnishRooms(
           const mid = Math.floor(wbCandidates.length / 2);
           place(wbCandidates[mid]!.x, wbCandidates[mid]!.y, 'whiteboard');
         }
-        // Standing desks on remaining floor tiles (up to half)
+        // Cubicle clusters: pair desks against east/west walls with aisle gaps
+        const eastWall = wallAdjacentFloors(1, 0);
+        const westWall = wallAdjacentFloors(-1, 0);
+        // Helper: place desk pairs in contiguous wall runs, skipping 1 tile between pairs
+        const placeClusters = (candidates: Array<{ x: number; y: number }>) => {
+          // Sort by primary axis so contiguous tiles are adjacent in array
+          const sorted = [...candidates].sort((a, b) => (a.y !== b.y ? a.y - b.y : a.x - b.x));
+          let i = 0;
+          while (i < sorted.length - 1) {
+            const a = sorted[i]!;
+            const b = sorted[i + 1]!;
+            // Only pair if truly adjacent (same y, x diff 1) or (same x, y diff 1)
+            const adjacent = Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1;
+            if (adjacent && grid[a.y]![a.x]!.type === 'floor' && grid[b.y]![b.x]!.type === 'floor') {
+              place(a.x, a.y, 'standing_desk');
+              place(b.x, b.y, 'standing_desk');
+              i += 3; // pair + 1-tile gap
+            } else {
+              i++;
+            }
+          }
+        };
+        placeClusters(eastWall);
+        placeClusters(westWall);
+        // Fallback: if no clusters placed, scatter a few single desks on remaining floors
         let desksPlaced = 0;
         const targetDesks = Math.min(floors.length, Math.max(1, Math.floor(floors.length / 2)));
         for (const f of floors) {
@@ -557,10 +616,11 @@ function furnishRooms(
             desksPlaced++;
           }
         }
-        // Planters in remaining gaps (every 3rd floor tile)
-        for (let i = 0; i < floors.length; i += 3) {
-          const f = floors[i]!;
-          if (grid[f.y]![f.x]!.type === 'floor') place(f.x, f.y, 'planter');
+        // Planters in remaining gaps (every 3rd remaining floor tile)
+        const remainingFloors = floors.filter((f) => grid[f.y]![f.x]!.type === 'floor');
+        for (let i = 0; i < remainingFloors.length; i += 3) {
+          const f = remainingFloors[i]!;
+          place(f.x, f.y, 'planter');
         }
         break;
       }

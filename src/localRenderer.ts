@@ -121,6 +121,19 @@ export class LocalRenderer {
     return this._cleanMode;
   }
 
+  // Workbench label overlay toggle
+  private _workbenchLabelOverlay = false;
+  setWorkbenchLabelOverlay(active: boolean): void {
+    this._workbenchLabelOverlay = active;
+  }
+  toggleWorkbenchLabels(): boolean {
+    this._workbenchLabelOverlay = !this._workbenchLabelOverlay;
+    return this._workbenchLabelOverlay;
+  }
+  isWorkbenchLabelsVisible(): boolean {
+    return this._workbenchLabelOverlay;
+  }
+
   // Power overlay toggle
   setPowerOverlay(active: boolean): void {
     this._powerOverlay = active;
@@ -234,7 +247,7 @@ export class LocalRenderer {
 
   // Interaction
   hoveredTile: { x: number; y: number } | null = null;
-  onTileClick: ((x: number, y: number, tile: LocalTile | null) => void) | null = null;
+  onTileClick: ((x: number, y: number, tile: LocalTile | null, screenX: number, screenY: number) => void) | null = null;
   onTileHover: ((x: number, y: number, tile: LocalTile | null) => void) | null = null;
   onTileDblClick: ((x: number, y: number, tile: LocalTile | null) => void) | null = null;
 
@@ -418,7 +431,7 @@ export class LocalRenderer {
               if (t?.workbench) {
                 this.onWorkbenchClick?.(t, sx, sy);
               } else {
-                this.onTileClick?.(tile.x, tile.y, t);
+                this.onTileClick?.(tile.x, tile.y, t, sx, sy);
               }
             }
           }
@@ -3179,6 +3192,34 @@ export class LocalRenderer {
       }
     }
 
+    // Draw workbench file-name labels (toggleable overlay)
+    if (!lodLow && this._workbenchLabelOverlay) {
+      const { ctx } = this;
+      for (let y = view.y0; y <= view.y1; y++) {
+        for (let x = view.x0; x <= view.x1; x++) {
+          const tile = world.grid[y]?.[x];
+          if (tile?.type !== 'workbench' || !tile.workbench) continue;
+          const base = isoProject(x, y);
+          const name = tile.workbench.fileName;
+          const short = name.length > 8 ? name.slice(0, 6) + '..' : name;
+          const textW = ctx.measureText(short).width + 6;
+          const labelW = Math.max(24, textW);
+          const labelH = 8;
+          const lx = base.px - labelW / 2;
+          const ly = base.py - ISO_WALL_H - 8;
+          ctx.fillStyle = 'rgba(20, 20, 30, 0.8)';
+          ctx.beginPath();
+          ctx.roundRect(lx, ly, labelW, labelH, 2);
+          ctx.fill();
+          ctx.fillStyle = '#E2E8F0';
+          ctx.font = `bold 5px ${this.tokens.fontMono}`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(short, base.px, ly + labelH / 2);
+        }
+      }
+    }
+
     // ─── Isometric Overlays ───────────────────────────────────────────
     if (this._powerOverlay && world.powerGrid) {
       this.drawIsoPowerOverlay(world, view);
@@ -3995,10 +4036,31 @@ export class LocalRenderer {
   }
   private drawIsoRoomLabel(room: LocalRoom) {
     const { ctx } = this;
-    const cx = (room.x + room.width / 2);
-    const cy = (room.y + room.height / 2);
-    const base = isoProject(cx, cy);
+    const world = this.world;
     const primary = (room.zoneLabel ?? room.folderName).toUpperCase();
+
+    // Find the door tile for this room to place the plaque near the entrance
+    let doorBase: { px: number; py: number } | null = null;
+    if (world) {
+      for (let y = room.y; y < room.y + room.height; y++) {
+        for (let x = room.x; x < room.x + room.width; x++) {
+          const tile = world.grid[y]?.[x];
+          if (tile?.type === 'door' && tile.roomId === room.id) {
+            doorBase = isoProject(x, y);
+            break;
+          }
+        }
+        if (doorBase) break;
+      }
+    }
+
+    // Fallback to room center if no door found
+    const base = doorBase ?? isoProject(room.x + room.width / 2, room.y + room.height / 2);
+    // Offset plaque slightly above the door wall face, or above room center
+    const plaqueX = base.px;
+    const plaqueY = doorBase
+      ? base.py - ISO_WALL_H * 0.6 // on wall face next to door
+      : base.py - ISO_WALL_H - 4;  // floating above center (old behavior)
 
     const zoneColors: Record<string, string> = {
       team_cluster: '#F5D0C5',
@@ -4016,18 +4078,18 @@ export class LocalRenderer {
     ctx.strokeStyle = 'rgba(255,255,255,0.4)';
     ctx.lineWidth = 0.5;
 
-    const plaqueW = Math.min(room.width * ISO_TILE_W, Math.max(60, primary.length * 6 + 12));
-    const plaqueH = 14;
+    const plaqueW = Math.min(room.width * ISO_TILE_W, Math.max(40, primary.length * 5 + 8));
+    const plaqueH = 10;
     ctx.beginPath();
-    ctx.roundRect(base.px - plaqueW / 2, base.py - ISO_WALL_H - plaqueH - 4, plaqueW, plaqueH, 3);
+    ctx.roundRect(plaqueX - plaqueW / 2, plaqueY - plaqueH, plaqueW, plaqueH, 2);
     ctx.fill();
     ctx.stroke();
 
-    ctx.font = `bold 8px ${this.tokens.fontMono}`;
+    ctx.font = `bold 7px ${this.tokens.fontMono}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#5C4033';
-    ctx.fillText(primary.slice(0, 14), base.px, base.py - ISO_WALL_H - plaqueH / 2 - 4);
+    ctx.fillText(primary.slice(0, 14), plaqueX, plaqueY - plaqueH / 2);
     ctx.restore();
   }
 

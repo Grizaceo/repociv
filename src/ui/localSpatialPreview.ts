@@ -2,7 +2,7 @@
 // Floating DOM panels for the local (RimWorld) view.
 // Pattern copied from spatialPreview.ts but tailored for grid interactions.
 
-import type { LocalUnit, Workbench } from '../types.ts';
+import type { LocalRoom, LocalUnit, Workbench } from '../types.ts';
 
 // ─── Tooltip elements ─────────────────────────────────────────────────────────
 let _unitTooltipEl: HTMLElement | null = null;
@@ -67,6 +67,52 @@ export function hideLocalContextMenu() {
 
 export function hideLocalMissionPreview() {
   _previewEl?.classList.add('hidden');
+}
+
+let _whiteboardEl: HTMLElement | null = null;
+
+export function showWhiteboardPanel(
+  room: LocalRoom,
+  screenPos: { x: number; y: number },
+) {
+  hideWhiteboardPanel();
+
+  const el = _getOrCreate(_whiteboardEl, 'local-whiteboard-panel', 'lt-whiteboard');
+  _whiteboardEl = el;
+
+  const subFolders = room.subFolderNames ?? [];
+  const subList = subFolders.length
+    ? `<ul class="lt-wb-list">${subFolders.map((n) => `<li>${_esc(n)}</li>`).join('')}</ul>`
+    : '<div class="lt-wb-empty">Sin subcarpetas</div>';
+
+  el.innerHTML = `
+    <div class="lt-arrow"></div>
+    <div class="lt-header">📋 ${_esc(room.zoneLabel ?? room.folderName)}</div>
+    <div class="lt-wb-section">
+      <div class="lt-wb-badge">${room.workbenches.length} archivo${room.workbenches.length === 1 ? '' : 's'}</div>
+    </div>
+    <div class="lt-wb-section">
+      <div class="lt-wb-subtitle">Subcarpetas</div>
+      ${subList}
+    </div>
+  `;
+  _position(el, screenPos);
+  el.classList.remove('hidden');
+
+  // Close on click outside
+  setTimeout(() => {
+    const close = (e: MouseEvent) => {
+      if (!el.contains(e.target as Node)) {
+        hideWhiteboardPanel();
+        document.removeEventListener('mousedown', close);
+      }
+    };
+    document.addEventListener('mousedown', close);
+  }, 50);
+}
+
+export function hideWhiteboardPanel() {
+  _whiteboardEl?.classList.add('hidden');
 }
 
 // ─── Context menu (Gizmo) ─────────────────────────────────────────────────────
