@@ -3,6 +3,59 @@ import type { LocalWorld, LocalTile, LocalRoom, LocalUnit, ZoneType } from './ty
 
 const TILE_SIZE = 32; // px per tile
 
+// ─── Isometric 2.5D Constants ────────────────────────────────────────────
+const ISO_TILE_W = 64; // width of the isometric diamond (2:1 ratio)
+const ISO_TILE_H = 32; // height of the isometric diamond
+const ISO_WALL_H = 24; // visual wall height (upwards in screen Y)
+
+// ─── Colorblind-friendly Iso Palette (luminosity + pattern differentiation) ──
+const ISO_FLOOR: Record<string, string> = {
+  team_cluster: '#6B8FB5', // blue-grey  (high luminosity)
+  meeting: '#D49B3A',      // amber      (mid luminosity, distinct from blue)
+  focus: '#4A8F4A',        // green      (low-mid luminosity)
+  break: '#C47A4A',        // terracotta (mid luminosity, warm)
+  infra: '#7A8B9E',        // slate      (cool mid)
+  reception: '#C4B8A0',    // sand       (high luminosity, warm)
+  biophilic: '#4A9E8E',    // teal       (mid luminosity, cool)
+  path: '#B8B8B8',         // neutral grey corridor
+  outside: '#A8A8A8',      // darker grey outside
+};
+const ISO_WALL_FACE = '#C8C8C8';
+const ISO_WALL_SIDE = '#B0B0B0';
+const ISO_WALL_TOP = '#D8D8D8';
+const ISO_DOOR_WOOD = '#B89860';
+const ISO_DOOR_GLASS = 'rgba(180, 210, 230, 0.4)';
+const ISO_WINDOW_SKY: [string, string] = ['rgba(140, 190, 220, 0.5)', 'rgba(180, 210, 230, 0.3)'];
+const ISO_HELMET = '#E8B830';
+const ISO_SHADOW = 'rgba(80, 80, 80, 0.18)';
+const ISO_SELECTION = '#B08040'; // warm brown (distinct from all floors)
+
+/** Convert grid (x, y, z) to isometric screen pixel coordinates. */
+function isoProject(x: number, y: number, z = 0): { px: number; py: number } {
+  return {
+    px: (x - y) * ISO_TILE_W / 2,
+    py: (x + y) * ISO_TILE_H / 2 - z * ISO_WALL_H,
+  };
+}
+
+/** Convert screen pixel to approximate grid coordinates (for click/hover). */
+function isoUnproject(px: number, py: number): { x: number; y: number } {
+  const x = px / (ISO_TILE_W / 2) + py / (ISO_TILE_H / 2);
+  const y = py / (ISO_TILE_H / 2) - px / (ISO_TILE_W / 2);
+  return { x: x / 2, y: y / 2 };
+}
+
+/** Get the four corner points of an isometric tile at (x, y, z). */
+function isoTileCorners(x: number, y: number, z = 0): Array<{ x: number; y: number }> {
+  const base = isoProject(x, y, z);
+  return [
+    { x: base.px, y: base.py - ISO_TILE_H / 2 },               // top
+    { x: base.px + ISO_TILE_W / 2, y: base.py },               // right
+    { x: base.px, y: base.py + ISO_TILE_H / 2 },               // bottom
+    { x: base.px - ISO_TILE_W / 2, y: base.py },               // left
+  ];
+}
+
 interface LocalParticle {
   active: boolean;
   type: 'spark' | 'zzz';
@@ -31,6 +84,10 @@ export class LocalRenderer {
   private staticLayer: HTMLCanvasElement | null = null;
   private staticWorldId: string | null = null;
 
+  // Isometric Static Layer
+  private isoStaticLayer: HTMLCanvasElement | null = null;
+  private isoStaticWorldId: string | null = null;
+
   // Door Animation State (Phase 5)
   private doorOpenStates = new Map<string, number>();
   private lastFrameTime = performance.now();
@@ -43,6 +100,17 @@ export class LocalRenderer {
   private _cleanMode = false;
   private _currentLod: 'low' | 'medium' | 'high' = 'medium';
   private _powerOverlay = false;
+
+  // ─── Isometric 2.5D Mode ───────────────────────────────────────────
+  private _isometric = true;
+
+  setIsometric(active: boolean): void {
+    this._isometric = active;
+    this.staticLayer = null;
+  }
+  isIsometric(): boolean {
+    return this._isometric;
+  }
 
   setCleanMode(active: boolean): void {
     this._cleanMode = active;
@@ -234,8 +302,14 @@ export class LocalRenderer {
     this.world = world;
     this.staticLayer = null; // force rebuild on setWorld
     // Center camera on the grid
-    this.cam.x = world.width / 2;
-    this.cam.y = world.height / 2;
+    if (this._isometric) {
+      const p = isoProject(world.width / 2, world.height / 2);
+      this.cam.x = p.px;
+      this.cam.y = p.py;
+    } else {
+      this.cam.x = world.width / 2;
+      this.cam.y = world.height / 2;
+    }
   }
 
   private resize() {
@@ -443,6 +517,10 @@ export class LocalRenderer {
   private screenToTile(sx: number, sy: number): { x: number; y: number } | null {
     const wx = (sx - this.cam.cx) / this.cam.zoom + this.cam.x;
     const wy = (sy - this.cam.cy) / this.cam.zoom + this.cam.y;
+    if (this._isometric) {
+      const iso = isoUnproject(wx, wy);
+      return { x: Math.floor(iso.x), y: Math.floor(iso.y) };
+    }
     const x = Math.floor(wx / TILE_SIZE);
     const y = Math.floor(wy / TILE_SIZE);
     return { x, y };
@@ -454,14 +532,34 @@ export class LocalRenderer {
     return this.world.grid[y]![x] ?? null;
   }
 
-  /** Hit-test for local units (ported from macro getUnitAt pattern).
-   *  Returns the unit whose interpolated world position is within TILE_SIZE*0.45 of screen coords. */
+  /** Hit-test for local units (ported from macro getUnitAt pattern). */
   private getUnitAt(screenX: number, screenY: number): LocalUnit | null {
     if (!this.world || this._localUnits.length === 0) return null;
     const wx = (screenX - this.cam.cx) / this.cam.zoom + this.cam.x;
     const wy = (screenY - this.cam.cy) / this.cam.zoom + this.cam.y;
-    const threshold = TILE_SIZE * 0.45;
 
+    if (this._isometric) {
+      // In isometric mode, find the unit whose iso-projected position is nearest
+      const threshold = ISO_TILE_W * 0.3;
+      for (const unit of this._localUnits) {
+        let gx: number, gy: number;
+        if (unit.path.length > 0 && unit.pathIndex < unit.path.length) {
+          const from = unit.path[unit.pathIndex]!;
+          const to = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;
+          const t = unit.pathProgress;
+          gx = from.x + (to.x - from.x) * t;
+          gy = from.y + (to.y - from.y) * t;
+        } else {
+          gx = unit.gridX;
+          gy = unit.gridY;
+        }
+        const up = isoProject(gx, gy);
+        if (Math.hypot(wx - up.px, wy - up.py) < threshold) return unit;
+      }
+      return null;
+    }
+
+    const threshold = TILE_SIZE * 0.45;
     for (const unit of this._localUnits) {
       let ux: number, uy: number;
       if (unit.path.length > 0 && unit.pathIndex < unit.path.length) {
@@ -540,6 +638,23 @@ export class LocalRenderer {
     ctx.scale(cam.zoom, cam.zoom);
     ctx.translate(-cam.x, -cam.y);
 
+    // ─── Isometric 2.5D Rendering Branch ───────────────────────────────
+    if (this._isometric && world) {
+      this.renderIso(world, localUnits, dt, lodLow, isClean);
+      ctx.restore();
+      // Vignette overlay
+      const grad = ctx.createRadialGradient(
+        canvas.width / 2, canvas.height / 2, 0,
+        canvas.width / 2, canvas.height / 2, canvas.width,
+      );
+      grad.addColorStop(0, 'rgba(255, 248, 243, 0)');
+      grad.addColorStop(0.65, 'rgba(255, 240, 230, 0)');
+      grad.addColorStop(1, 'rgba(245, 220, 205, 0.35)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
+
     // ─── Cozy Outside World (soft patio / garden outside office) ────────
     if (world) {
       const worldPxW = world.width * TILE_SIZE;
@@ -579,7 +694,7 @@ export class LocalRenderer {
               // Small rounded bush
               const bx = tx + S / 2;
               const by = ty + S / 2;
-              ctx.fillStyle = hash === 0 ? '#A8D5A2' : '#C8E6C9';
+              ctx.fillStyle = hash === 0 ? '#608860' : '#90B090';
               ctx.beginPath();
               ctx.ellipse(bx, by, S * 0.35, S * 0.25, 0, 0, Math.PI * 2);
               ctx.fill();
@@ -662,7 +777,7 @@ export class LocalRenderer {
       const sx = x * TILE_SIZE;
       const sy = y * TILE_SIZE;
       ctx.save();
-      ctx.strokeStyle = '#D4A574';
+      ctx.strokeStyle = '#A07840';
       ctx.lineWidth = 2 / cam.zoom;
       ctx.strokeRect(sx + 1, sy + 1, TILE_SIZE - 2, TILE_SIZE - 2);
       ctx.restore();
@@ -716,9 +831,91 @@ export class LocalRenderer {
     this.staticWorldId = this.world.repoId;
   }
 
+  private rebuildIsoStaticLayer() {
+    if (!this.world) return;
+    const world = this.world;
+    // Compute iso bounds to size the offscreen canvas
+    const c0 = isoProject(0, 0);
+    const c1 = isoProject(world.width, 0);
+    const c2 = isoProject(0, world.height);
+    const c3 = isoProject(world.width, world.height);
+    const minPx = Math.min(c0.px, c1.px, c2.px, c3.px) - ISO_TILE_W;
+    const maxPx = Math.max(c0.px, c1.px, c2.px, c3.px) + ISO_TILE_W;
+    const minPy = Math.min(c0.py, c1.py, c2.py, c3.py) - ISO_WALL_H - ISO_TILE_H;
+    const maxPy = Math.max(c0.py, c1.py, c2.py, c3.py) + ISO_TILE_H;
+
+    const c = document.createElement('canvas');
+    c.width = Math.ceil(maxPx - minPx);
+    c.height = Math.ceil(maxPy - minPy);
+    const sctx = c.getContext('2d')!;
+
+    // Temporarily swap context and offset for iso coordinates
+    const originalCtx = this.ctx;
+    this.ctx = sctx;
+
+    // Draw all static tiles (floors + walls) — skip dynamic objects
+    for (let y = 0; y < world.height; y++) {
+      for (let x = 0; x < world.width; x++) {
+        const tile = world.grid[y]![x]!;
+        if (tile.type === 'door') {
+          // Draw floor underneath door
+          const tempTile: LocalTile = { ...tile, type: 'floor' };
+          this.drawIsoTile(tempTile, x, y, world);
+        } else if (
+          tile.type === 'workbench' ||
+          tile.type === 'standing_desk' ||
+          tile.type === 'sofa' ||
+          tile.type === 'planter' ||
+          tile.type === 'server_rack' ||
+          tile.type === 'whiteboard' ||
+          tile.type === 'reception' ||
+          tile.type === 'window' ||
+          tile.type === 'meeting_room' ||
+          tile.type === 'phone_booth' ||
+          tile.type === 'break_area' ||
+          tile.type === 'watercooler' ||
+          tile.type === 'stairs'
+        ) {
+          // Draw floor underneath furniture
+          const tempTile: LocalTile = { ...tile, type: 'floor' };
+          this.drawIsoTile(tempTile, x, y, world);
+        } else {
+          this.drawIsoTile(tile, x, y, world);
+        }
+      }
+    }
+
+    this.ctx = originalCtx;
+    this.isoStaticLayer = c;
+    this.isoStaticWorldId = world.repoId;
+  }
+
   private visibleTileRect() {
     if (!this.world) return { x0: 0, y0: 0, x1: 0, y1: 0 };
     const { canvas, cam } = this;
+
+    if (this._isometric) {
+      // Screen corners → iso grid, then expand margin generously
+      const corners = [
+        isoUnproject((0 - cam.cx) / cam.zoom + cam.x, (0 - cam.cy) / cam.zoom + cam.y),
+        isoUnproject((canvas.width - cam.cx) / cam.zoom + cam.x, (0 - cam.cy) / cam.zoom + cam.y),
+        isoUnproject((0 - cam.cx) / cam.zoom + cam.x, (canvas.height - cam.cy) / cam.zoom + cam.y),
+        isoUnproject((canvas.width - cam.cx) / cam.zoom + cam.x, (canvas.height - cam.cy) / cam.zoom + cam.y),
+      ];
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const c of corners) {
+        minX = Math.min(minX, c.x);
+        minY = Math.min(minY, c.y);
+        maxX = Math.max(maxX, c.x);
+        maxY = Math.max(maxY, c.y);
+      }
+      const margin = 3;
+      const x0 = Math.max(0, Math.floor(minX) - margin);
+      const y0 = Math.max(0, Math.floor(minY) - margin);
+      const x1 = Math.min(this.world.width - 1, Math.ceil(maxX) + margin);
+      const y1 = Math.min(this.world.height - 1, Math.ceil(maxY) + margin);
+      return { x0, y0, x1, y1 };
+    }
 
     // Screen bounds to world coordinates
     const left = (0 - cam.cx) / cam.zoom + cam.x;
@@ -891,9 +1088,9 @@ export class LocalRenderer {
     // ─── Room floors — Cozy Pastel palette ────────────────────────────────
     const baseColors: Record<string, string> = {
       team_cluster: '#F5D0C5',   // soft rose office carpet
-      meeting: '#E8C596',        // warm light wood
+      meeting: '#B09060',        // warm light wood
       focus: '#E8F5D6',          // matcha green acoustic
-      break: '#FCE8C5',          // warm lemon kitchen tile
+      break: '#D0C0A0',          // warm lemon kitchen tile
       infra: '#E2E8F0',          // cool gray server floor
       reception: '#F5F0E8',      // polished marble cream
       biophilic: '#D4E8D0',      // sage green natural
@@ -1185,7 +1382,7 @@ export class LocalRenderer {
       ctx.fillRect(px + 4, py + s / 2 - 1, s - 8, 2);
     } else {
       // Warm wood sliding door panel
-      ctx.fillStyle = '#E8C596';
+      ctx.fillStyle = '#B09060';
       ctx.fillRect(px + 4, py + s / 2 - 3, s - 8, 6);
       ctx.strokeStyle = 'rgba(200, 170, 140, 0.5)';
       ctx.lineWidth = 0.5;
@@ -1193,7 +1390,7 @@ export class LocalRenderer {
     }
 
     // Soft gold door handle
-    ctx.fillStyle = isGlass ? '#E0E8F0' : '#D4A574';
+    ctx.fillStyle = isGlass ? '#E0E8F0' : '#A07840';
     ctx.fillRect(px + s / 2 - 2, py + s / 2 - 1, 4, 2);
   }
 
@@ -1229,7 +1426,7 @@ export class LocalRenderer {
       // Rounded structural column (soft cream)
       ctx.fillStyle = isConcrete ? '#E2E8F0' : isWood ? '#F5E6D3' : '#FDFBF7';
       ctx.fillRect(px, py, s, s);
-      ctx.fillStyle = isConcrete ? '#E8EDF2' : isWood ? '#FAF0E6' : '#FFFFFF';
+      ctx.fillStyle = isConcrete ? '#E8EDF2' : isWood ? '#FAF0E6' : '#D0D0D0';
       ctx.fillRect(px + 3, py + 3, s - 6, s - 6);
       ctx.strokeStyle = 'rgba(200, 190, 180, 0.3)';
       ctx.lineWidth = 0.5;
@@ -1248,7 +1445,7 @@ export class LocalRenderer {
         ctx.fillRect(px + 1, py + s / 2 - 2, s - 2, 4);
       } else if (isAcoustic) {
         // Soft green acoustic panels
-        ctx.fillStyle = '#E8F5E9';
+        ctx.fillStyle = '#B0C0B0';
         ctx.fillRect(px, py, s, s);
         // Subtle dot pattern
         ctx.fillStyle = 'rgba(168, 213, 162, 0.3)';
@@ -1279,7 +1476,7 @@ export class LocalRenderer {
         ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
       } else {
         // Standard cozy white drywall
-        ctx.fillStyle = isConcrete ? '#F0F4F8' : '#FDFBF7';
+        ctx.fillStyle = isConcrete ? '#D8DCE0' : '#FDFBF7';
         ctx.fillRect(px, py, s, s);
 
         // Subtle drywall seam lines (soft warm gray)
@@ -1293,7 +1490,7 @@ export class LocalRenderer {
     }
 
     // ─── Warm baseboard / molding ──────────────────────────────────────
-    const moldingColor = isWood ? '#E8C596' : isGlass ? '#E0E8F0' : '#F5E6D3';
+    const moldingColor = isWood ? '#B09060' : isGlass ? '#E0E8F0' : '#F5E6D3';
     ctx.fillStyle = moldingColor;
     ctx.fillRect(px, py + s - 3, s, 3);
 
@@ -1355,11 +1552,11 @@ export class LocalRenderer {
     ctx.stroke();
 
     // Keyboard shelf
-    ctx.fillStyle = '#E8C596';
+    ctx.fillStyle = '#B09060';
     ctx.fillRect(px + 8, py + s - 10, s - 16, 2);
 
     // Soft screen monitor
-    ctx.fillStyle = '#F0F4F8';
+    ctx.fillStyle = '#D8DCE0';
     ctx.beginPath();
     ctx.roundRect(px + 6, py + 8, s - 12, 10, 1);
     ctx.fill();
@@ -1378,7 +1575,7 @@ export class LocalRenderer {
 
     // ─── Cozy workbench — light wood desk + monitor ─────────────────────
     // Light wood desktop
-    ctx.fillStyle = '#E8C596';
+    ctx.fillStyle = '#B09060';
     ctx.beginPath();
     ctx.roundRect(px + 3, py + 4, s - 6, 16, 2);
     ctx.fill();
@@ -1391,7 +1588,7 @@ export class LocalRenderer {
     ctx.fillRect(px + s / 2 - 2, py + 14, 4, 3);
 
     // Monitor Screen (white frame)
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = '#D0D0D0';
     ctx.beginPath();
     ctx.roundRect(px + 5, py + 5, s - 10, 10, 1);
     ctx.fill();
@@ -1400,7 +1597,7 @@ export class LocalRenderer {
     ctx.stroke();
 
     // Soft screen glow
-    ctx.fillStyle = 'rgba(200, 230, 255, 0.3)';
+    ctx.fillStyle = 'rgba(140, 170, 190, 0.3)';
     ctx.fillRect(px + 6, py + 6, s - 12, 8);
 
     // File extension label
@@ -1420,7 +1617,7 @@ export class LocalRenderer {
 
     // Test indicator dot (soft amber)
     if (wb.isTest) {
-      ctx.fillStyle = '#D4A574';
+      ctx.fillStyle = '#A07840';
       ctx.beginPath();
       ctx.arc(px + s - 7, py + 7, 2, 0, Math.PI * 2);
       ctx.fill();
@@ -1441,7 +1638,7 @@ export class LocalRenderer {
     ctx.stroke();
 
     // Round seat cushion (soft pink)
-    ctx.fillStyle = '#F8BBD0';
+    ctx.fillStyle = '#B08090';
     ctx.beginPath();
     ctx.arc(chairX, chairY, 4, 0, Math.PI * 2);
     ctx.fill();
@@ -1456,7 +1653,7 @@ export class LocalRenderer {
     const centerY = py + s / 2;
 
     // ─── Cozy power source — soft white cabinet ─────────────────────────
-    ctx.fillStyle = '#F0F4F8';
+    ctx.fillStyle = '#D8DCE0';
     ctx.beginPath();
     ctx.roundRect(px + 3, py + 3, s - 6, s - 6, 2);
     ctx.fill();
@@ -1512,8 +1709,8 @@ export class LocalRenderer {
   private drawBedTile(px: number, py: number, s: number) {
     const { ctx } = this;
     // ─── Cozy daybed / sofa bed — pastel ───────────────────────────────
-    const frameColor = '#E8C596';
-    const sheetColor = '#FFFFFF';
+    const frameColor = '#B09060';
+    const sheetColor = '#D0D0D0';
     const blanketColor = '#FCE4EC';
 
     // Headboard
@@ -1538,7 +1735,7 @@ export class LocalRenderer {
     ctx.fill();
 
     // Pillow (top)
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = '#D0D0D0';
     ctx.beginPath();
     ctx.roundRect(px + 5, py + 6, s - 10, 4, 1);
     ctx.fill();
@@ -1552,7 +1749,7 @@ export class LocalRenderer {
     ctx.roundRect(px + 3, py + s - 14, s - 6, 10, 2);
     ctx.fill();
     // Blanket fold line
-    ctx.fillStyle = '#F8BBD0';
+    ctx.fillStyle = '#B08090';
     ctx.fillRect(px + 3, py + s - 14, s - 6, 2);
 
     // Footboard
@@ -1597,7 +1794,7 @@ export class LocalRenderer {
     const centerY = py + s / 2;
 
     // ─── Cozy AC unit — soft white ─────────────────────────────────────
-    ctx.fillStyle = '#F0F4F8';
+    ctx.fillStyle = '#D8DCE0';
     ctx.beginPath();
     ctx.roundRect(px + 4, py + 4, s - 8, s - 8, 3);
     ctx.fill();
@@ -1638,7 +1835,7 @@ export class LocalRenderer {
     const centerY = py + s / 2;
 
     // ─── Cozy vent — soft white ─────────────────────────────────────────
-    ctx.fillStyle = '#F0F4F8';
+    ctx.fillStyle = '#D8DCE0';
     ctx.beginPath();
     ctx.roundRect(px + 2, py + 2, s - 4, s - 4, 2);
     ctx.fill();
@@ -1667,7 +1864,7 @@ export class LocalRenderer {
     const { ctx } = this;
     // ─── Cozy standing desk — light wood rounded ───────────────────────
     // Desk surface (rounded feel)
-    ctx.fillStyle = '#E8C596';
+    ctx.fillStyle = '#B09060';
     ctx.beginPath();
     ctx.roundRect(px + 2, py + 4, s - 4, 10, 2);
     ctx.fill();
@@ -1675,7 +1872,7 @@ export class LocalRenderer {
     ctx.lineWidth = 0.5;
     ctx.stroke();
     // Monitor
-    ctx.fillStyle = '#F0F4F8';
+    ctx.fillStyle = '#D8DCE0';
     ctx.beginPath();
     ctx.roundRect(px + 5, py + 2, s - 10, 7, 1);
     ctx.fill();
@@ -1683,14 +1880,14 @@ export class LocalRenderer {
     ctx.lineWidth = 0.5;
     ctx.stroke();
     // Screen glow
-    ctx.fillStyle = 'rgba(200, 230, 255, 0.3)';
+    ctx.fillStyle = 'rgba(140, 170, 190, 0.3)';
     ctx.fillRect(px + 6, py + 3, s - 12, 5);
     // Small succulent on desk
-    ctx.fillStyle = '#A8D5A2';
+    ctx.fillStyle = '#608860';
     ctx.beginPath();
     ctx.arc(px + s - 5, py + 12, 2.5, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#E8C596';
+    ctx.fillStyle = '#B09060';
     ctx.beginPath();
     ctx.arc(px + s - 5, py + 14, 2, 0, Math.PI);
     ctx.fill();
@@ -1699,7 +1896,7 @@ export class LocalRenderer {
   private drawPhoneBoothTile(px: number, py: number, s: number) {
     const { ctx } = this;
     // ─── Cozy focus pod — soft rounded ────────────────────────────────
-    ctx.fillStyle = '#E8F5E9';
+    ctx.fillStyle = '#B0C0B0';
     ctx.beginPath();
     ctx.roundRect(px + 3, py + 3, s - 6, s - 6, 4);
     ctx.fill();
@@ -1722,7 +1919,7 @@ export class LocalRenderer {
     ctx.fill();
     // Soft indicator
     const now = performance.now();
-    ctx.fillStyle = (now % 2000 < 1000) ? '#A8D5A2' : '#D4E8D0';
+    ctx.fillStyle = (now % 2000 < 1000) ? '#608860' : '#D4E8D0';
     ctx.beginPath();
     ctx.arc(px + s / 2, py + 6, 2, 0, Math.PI * 2);
     ctx.fill();
@@ -1742,7 +1939,7 @@ export class LocalRenderer {
     ctx.fillStyle = '#F5E6D3';
     ctx.fillRect(px + 1, py + 8, s - 2, 4);
     // Cute coffee machine
-    ctx.fillStyle = '#F0F4F8';
+    ctx.fillStyle = '#D8DCE0';
     ctx.beginPath();
     ctx.roundRect(px + 4, py + 2, 8, 8, 2);
     ctx.fill();
@@ -1773,7 +1970,7 @@ export class LocalRenderer {
     ctx.lineWidth = 0.5;
     ctx.stroke();
     // Table legs
-    ctx.fillStyle = '#E8C596';
+    ctx.fillStyle = '#B09060';
     ctx.beginPath();
     ctx.roundRect(px + 8, py + s - 6, 3, 4, 1);
     ctx.fill();
@@ -1781,7 +1978,7 @@ export class LocalRenderer {
     ctx.roundRect(px + s - 11, py + s - 6, 3, 4, 1);
     ctx.fill();
     // Soft rounded chairs around table
-    ctx.fillStyle = '#FCE8C5';
+    ctx.fillStyle = '#D0C0A0';
     ctx.beginPath();
     ctx.roundRect(px + 2, py + s / 2 - 3, 4, 6, 2);
     ctx.fill();
@@ -1789,7 +1986,7 @@ export class LocalRenderer {
     ctx.roundRect(px + s - 6, py + s / 2 - 3, 4, 6, 2);
     ctx.fill();
     // Tiny coffee cup
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = '#D0D0D0';
     ctx.beginPath();
     ctx.arc(px + s / 2, py + s / 2 + 2, 2, 0, Math.PI * 2);
     ctx.fill();
@@ -1798,7 +1995,7 @@ export class LocalRenderer {
   private drawWhiteboardTile(px: number, py: number, s: number) {
     const { ctx } = this;
     // ─── Cozy whiteboard — rounded with colorful notes ─────────────────
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = '#D0D0D0';
     ctx.beginPath();
     ctx.roundRect(px + 2, py + 3, s - 4, s - 6, 3);
     ctx.fill();
@@ -1864,7 +2061,7 @@ export class LocalRenderer {
     const { ctx } = this;
     // ─── Large cozy indoor plant — terracotta pot ───────────────────────
     // Pot
-    ctx.fillStyle = '#E8C596';
+    ctx.fillStyle = '#B09060';
     ctx.beginPath();
     ctx.moveTo(px + 5, py + s - 3);
     ctx.lineTo(px + s - 5, py + s - 3);
@@ -1876,11 +2073,11 @@ export class LocalRenderer {
     ctx.lineWidth = 0.5;
     ctx.stroke();
     // Large plant foliage (lush green)
-    ctx.fillStyle = '#A8D5A2';
+    ctx.fillStyle = '#608860';
     ctx.beginPath();
     ctx.ellipse(px + s / 2, py + s / 2 - 2, s * 0.32, s * 0.3, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#C8E6C9';
+    ctx.fillStyle = '#90B090';
     ctx.beginPath();
     ctx.ellipse(px + s / 2 - 2, py + s / 2 - 5, s * 0.2, s * 0.18, -0.3, 0, Math.PI * 2);
     ctx.fill();
@@ -1900,7 +2097,7 @@ export class LocalRenderer {
     const { ctx } = this;
     // ─── Cozy reception desk — warm pastel wood ─────────────────────────
     // Curved desk body
-    ctx.fillStyle = '#E8C596';
+    ctx.fillStyle = '#B09060';
     ctx.beginPath();
     ctx.moveTo(px + 4, py + s - 4);
     ctx.lineTo(px + s - 4, py + s - 4);
@@ -1921,7 +2118,7 @@ export class LocalRenderer {
     ctx.closePath();
     ctx.fill();
     // Small computer monitor
-    ctx.fillStyle = '#F0F4F8';
+    ctx.fillStyle = '#D8DCE0';
     ctx.beginPath();
     ctx.roundRect(px + s / 2 - 3, py + 8, 6, 5, 1);
     ctx.fill();
@@ -2009,7 +2206,7 @@ export class LocalRenderer {
     // ─── Cozy large window with curtains ────────────────────────────────
 
     // White window frame with rounded feel
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = '#D0D0D0';
     ctx.fillRect(px + 1, py + 1, s - 2, s - 2);
     ctx.strokeStyle = '#F5E6D3';
     ctx.lineWidth = 1;
@@ -2056,7 +2253,7 @@ export class LocalRenderer {
   private drawSofaTile(px: number, py: number, s: number) {
     const { ctx } = this;
     // ─── Cozy plush sofa — soft pastel fabric ───────────────────────────
-    ctx.fillStyle = '#F8BBD0';
+    ctx.fillStyle = '#B08090';
     ctx.beginPath();
     ctx.roundRect(px + 2, py + 6, s - 4, s - 8, 4);
     ctx.fill();
@@ -2069,7 +2266,7 @@ export class LocalRenderer {
     ctx.roundRect(px + 4, py + 10, s - 8, s - 14, 2);
     ctx.fill();
     // Backrest
-    ctx.fillStyle = '#F8BBD0';
+    ctx.fillStyle = '#B08090';
     ctx.beginPath();
     ctx.roundRect(px + 3, py + 6, s - 6, 5, 2);
     ctx.fill();
@@ -2077,7 +2274,7 @@ export class LocalRenderer {
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.fillRect(px + 5, py + 8, s - 10, 1.5);
     // Soft rounded armrests
-    ctx.fillStyle = '#F48FB1';
+    ctx.fillStyle = '#A07080';
     ctx.beginPath();
     ctx.roundRect(px + 2, py + 8, 3, 8, 1.5);
     ctx.fill();
@@ -2111,7 +2308,7 @@ export class LocalRenderer {
     ctx.ellipse(px + s / 2, py + s / 2 + 4, 4, 5, 0, 0, Math.PI * 2);
     ctx.fill();
     // Small cup stack
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = '#D0D0D0';
     ctx.beginPath();
     ctx.roundRect(px + s - 7, py + s - 6, 3, 4, 1);
     ctx.fill();
@@ -2139,9 +2336,9 @@ export class LocalRenderer {
     // ─── Cozy pastel zone-colored plaque tab ────────────────────────────
     const zoneColors: Record<string, string> = {
       team_cluster: '#F5D0C5',
-      meeting: '#E8C596',
+      meeting: '#B09060',
       focus: '#E8F5D6',
-      break: '#FCE8C5',
+      break: '#D0C0A0',
       infra: '#E2E8F0',
       reception: '#F5F0E8',
       biophilic: '#D4E8D0',
@@ -2232,7 +2429,7 @@ export class LocalRenderer {
     // Selection ring in cozy warm tone
     const isHovered = this._hoveredUnit?.id === unit.id;
     if (isHovered) {
-      ctx.strokeStyle = '#D4A574';
+      ctx.strokeStyle = '#A07840';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(0, 0, TILE_SIZE * 0.55, 0, Math.PI * 2);
@@ -2315,9 +2512,9 @@ export class LocalRenderer {
     const textW = ctx.measureText(initials).width + 8;
 
     // capsule base
-    ctx.fillStyle = 'rgba(15, 13, 11, 0.85)';
+    ctx.fillStyle = 'rgba(30, 30, 30, 0.85)';
     ctx.fillRect(-textW / 2, -6, textW, 12);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.strokeStyle = 'rgba(200, 200, 200, 0.2)';
     ctx.lineWidth = 0.5;
     ctx.strokeRect(-textW / 2, -6, textW, 12);
 
@@ -2832,8 +3029,1261 @@ export class LocalRenderer {
   }
 
   jumpToTile(tileX: number, tileY: number) {
-    this.cam.x = tileX * TILE_SIZE + TILE_SIZE / 2;
-    this.cam.y = tileY * TILE_SIZE + TILE_SIZE / 2;
+    if (this._isometric) {
+      const p = isoProject(tileX, tileY);
+      this.cam.x = p.px;
+      this.cam.y = p.py;
+    } else {
+      this.cam.x = tileX * TILE_SIZE + TILE_SIZE / 2;
+      this.cam.y = tileY * TILE_SIZE + TILE_SIZE / 2;
+    }
+  }
+
+  // ─── Isometric 2.5D Render Pipeline ─────────────────────────────────
+  private renderIso(
+    world: LocalWorld,
+    localUnits: LocalUnit[],
+    dt: number,
+    lodLow: boolean,
+    _isClean: boolean,
+  ) {
+    const view = this.visibleTileRect();
+
+    // ─── Pre-pass: update door animation states for visible doors ─────
+    for (let y = view.y0; y <= view.y1; y++) {
+      for (let x = view.x0; x <= view.x1; x++) {
+        const tile = world.grid[y]?.[x];
+        if (!tile || tile.type !== 'door') continue;
+        const key = `${x},${y}`;
+        const dpx = isoProject(x, y).px;
+        const dpy = isoProject(x, y).py;
+
+        // Find nearest agent distance
+        let minD = Infinity;
+        for (const unit of localUnits) {
+          let gx: number, gy: number;
+          if (unit.path.length > 0 && unit.pathIndex < unit.path.length) {
+            const from = unit.path[unit.pathIndex]!;
+            const to = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;
+            const t = unit.pathProgress;
+            gx = from.x + (to.x - from.x) * t;
+            gy = from.y + (to.y - from.y) * t;
+          } else {
+            gx = unit.gridX;
+            gy = unit.gridY;
+          }
+          const up = isoProject(gx, gy);
+          const d = Math.hypot(up.px - dpx, up.py - dpy) / ISO_TILE_W;
+          if (d < minD) minD = d;
+        }
+
+        const targetOpen = Math.max(0, Math.min(1, (1.8 - minD) * 1.5));
+        let currentOpen = this.doorOpenStates.get(key) ?? 0;
+        currentOpen = currentOpen + (targetOpen - currentOpen) * (1 - Math.exp(-dt * 12));
+        this.doorOpenStates.set(key, currentOpen);
+      }
+    }
+
+    // ─── Static Iso Layer (Phase D optimization) ──────────────────────
+    if (!this.isoStaticLayer || this.isoStaticWorldId !== world.repoId) {
+      this.rebuildIsoStaticLayer();
+    }
+    if (this.isoStaticLayer) {
+      const c0 = isoProject(0, 0);
+      const c1 = isoProject(world.width, 0);
+      const c2 = isoProject(0, world.height);
+      const c3 = isoProject(world.width, world.height);
+      const minPx = Math.min(c0.px, c1.px, c2.px, c3.px) - ISO_TILE_W;
+      const minPy = Math.min(c0.py, c1.py, c2.py, c3.py) - ISO_WALL_H - ISO_TILE_H;
+      this.ctx.drawImage(this.isoStaticLayer, minPx, minPy);
+    }
+
+    // Collect visible dynamic tiles (doors + furniture) for back-to-front draw
+    const tiles: Array<{ x: number; y: number; tile: LocalTile; z: number }> = [];
+    for (let y = view.y0; y <= view.y1; y++) {
+      for (let x = view.x0; x <= view.x1; x++) {
+        const tile = world.grid[y]?.[x];
+        if (!tile) continue;
+        // Skip pure floors — already in static layer
+        if (tile.type === 'floor' || tile.type === 'path' || tile.type === 'wall') continue;
+        const z = tile.type === 'door' || tile.type === 'window' ? 2 : tile.type === 'workbench' ? 1 : 0;
+        tiles.push({ x, y, tile, z });
+      }
+    }
+    // Sort by (x + y) then by z for proper depth
+    tiles.sort((a, b) => {
+      const d = (a.x + a.y) - (b.x + b.y);
+      return d !== 0 ? d : a.z - b.z;
+    });
+
+    // Determine active workbenches (agent working_on_file)
+    const activeWbIds = new Set(
+      localUnits.filter((u) => u.state === 'working_on_file' && u.currentWorkbenchId).map((u) => u.currentWorkbenchId),
+    );
+
+    // Draw dynamic tiles (doors, windows, furniture) on top of static layer
+    for (const { x, y, tile } of tiles) {
+      this.drawIsoTile(tile, x, y, world, activeWbIds);
+    }
+
+    // Sort and draw units (also back-to-front by grid position)
+    const unitEntries = localUnits.map((u) => {
+      let gx: number, gy: number;
+      if (u.path.length > 0 && u.pathIndex < u.path.length) {
+        const from = u.path[u.pathIndex]!;
+        const to = u.path[Math.min(u.pathIndex + 1, u.path.length - 1)]!;
+        const t = u.pathProgress;
+        gx = from.x + (to.x - from.x) * t;
+        gy = from.y + (to.y - from.y) * t;
+      } else {
+        gx = u.gridX;
+        gy = u.gridY;
+      }
+      return { unit: u, gx, gy, sortKey: gx + gy };
+    });
+    unitEntries.sort((a, b) => a.sortKey - b.sortKey);
+
+    // Window light rays (iso projected onto adjacent floor diamonds)
+    this.drawIsoWindowLightRays(world, view);
+
+    for (const { unit, gx, gy } of unitEntries) {
+      this.drawIsoUnit(unit, gx, gy);
+    }
+
+    // Draw room labels at zone centers
+    if (!lodLow) {
+      for (const room of world.rooms) {
+        this.drawIsoRoomLabel(room);
+      }
+    }
+
+    // ─── Isometric Overlays ───────────────────────────────────────────
+    if (this._powerOverlay && world.powerGrid) {
+      this.drawIsoPowerOverlay(world, view);
+    }
+    if (this._temperatureOverlay && world.roomClimates) {
+      this.drawIsoTemperatureOverlay(world, view);
+    }
+    if (world.zones && world.zones.length > 0) {
+      this.drawIsoZones(world, view);
+    }
+    if (this._zonePaintMode && this._zonePaintStart && this._zonePaintCurrent) {
+      this.drawIsoZonePaintPreview(view);
+    }
+    if (this.hoveredTile) {
+      this.drawIsoHoveredTile(this.hoveredTile);
+    }
+  }
+
+  /** Draw a single tile in isometric 2.5D projection. */
+  private drawIsoTile(tile: LocalTile, gridX: number, gridY: number, world: LocalWorld, activeWbIds?: Set<string | null>) {
+    const { ctx } = this;
+    const corners = isoTileCorners(gridX, gridY);
+    const room = tile.roomId ? world.rooms.find((r) => r.id === tile.roomId) : undefined;
+    const zone = room?.zoneType;
+
+    // ─── Floor color based on zone ──────────────────────────────────
+    const floorKey = zone ?? 'team_cluster';
+    let floorColor = ISO_FLOOR[floorKey] || ISO_FLOOR.team_cluster || '#B8B8B8';
+    if (tile.type === 'path') floorColor = ISO_FLOOR.path || '#B8B8B8';
+    if (!tile.roomId && tile.type !== 'path') floorColor = ISO_FLOOR.outside || '#A8A8A8';
+
+    // ─── Draw floor diamond ─────────────────────────────────────────
+    ctx.fillStyle = floorColor;
+    ctx.beginPath();
+    ctx.moveTo(corners[0]!.x, corners[0]!.y);
+    ctx.lineTo(corners[1]!.x, corners[1]!.y);
+    ctx.lineTo(corners[2]!.x, corners[2]!.y);
+    ctx.lineTo(corners[3]!.x, corners[3]!.y);
+    ctx.closePath();
+    ctx.fill();
+
+    // Zone floor patterns (pattern-driven, not color-only, for colorblind accessibility)
+    if (zone === 'team_cluster' && (gridX + gridY) % 2 === 0) {
+      // Checkerboard tile
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+      ctx.beginPath();
+      ctx.arc(corners[0]!.x, corners[0]!.y + ISO_TILE_H * 0.3, ISO_TILE_H * 0.15, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (zone === 'meeting') {
+      // Wood plank line (parallel diagonals)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(corners[0]!.x, corners[0]!.y + ISO_TILE_H * 0.3);
+      ctx.lineTo(corners[2]!.x, corners[2]!.y - ISO_TILE_H * 0.3);
+      ctx.stroke();
+    }
+    if (zone === 'focus') {
+      // Acoustic dot pattern
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.beginPath();
+      ctx.arc(corners[0]!.x, corners[0]!.y + ISO_TILE_H * 0.2, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (zone === 'infra') {
+      // Grid junction
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+      ctx.beginPath();
+      ctx.moveTo(corners[0]!.x, corners[0]!.y + ISO_TILE_H * 0.1);
+      ctx.lineTo(corners[2]!.x, corners[2]!.y - ISO_TILE_H * 0.1);
+      ctx.stroke();
+    }
+
+    // Floor edge
+    ctx.strokeStyle = 'rgba(100, 100, 100, 0.15)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    // ─── Path runner strip ──────────────────────────────────────────
+    if (tile.type === 'path') {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(corners[0]!.x, corners[0]!.y);
+      ctx.lineTo(corners[2]!.x, corners[2]!.y);
+      ctx.stroke();
+    }
+
+    // ─── Draw walls with height ─────────────────────────────────────
+    if (tile.type === 'wall' || tile.type === 'door' || tile.type === 'window') {
+      this._drawIsoWallTile(tile, gridX, gridY, world, corners, zone);
+    }
+
+    // ─── Draw furniture with height ──────────────────────────────────
+    if (tile.type === 'standing_desk') {
+      this.drawIsoStandingDesk(gridX, gridY);
+    } else if (tile.type === 'sofa') {
+      this.drawIsoSofa(gridX, gridY);
+    } else if (tile.type === 'planter') {
+      this.drawIsoPlanter(gridX, gridY);
+    } else if (tile.type === 'workbench') {
+      this.drawIsoWorkbench(tile, gridX, gridY, activeWbIds);
+    } else if (tile.type === 'whiteboard') {
+      this.drawIsoWhiteboard(gridX, gridY);
+    } else if (tile.type === 'reception') {
+      this.drawIsoReception(gridX, gridY);
+    } else if (tile.type === 'server_rack') {
+      this.drawIsoServerRack(gridX, gridY);
+    } else if (tile.type === 'window') {
+      this.drawIsoWindow(gridX, gridY);
+    } else if (tile.type === 'meeting_room') {
+      this.drawIsoMeetingTable(gridX, gridY);
+    } else if (tile.type === 'phone_booth') {
+      this.drawIsoPhoneBooth(gridX, gridY);
+    } else if (tile.type === 'break_area') {
+      this.drawIsoBreakArea(gridX, gridY);
+    } else if (tile.type === 'watercooler') {
+      this.drawIsoWatercooler(gridX, gridY);
+    } else if (tile.type === 'stairs') {
+      this.drawIsoStairs(gridX, gridY);
+    }
+  }
+
+  /** Shared wall drawing logic for iso tiles (wall / door / window). */
+  private _drawIsoWallTile(
+    tile: LocalTile,
+    gridX: number,
+    gridY: number,
+    world: LocalWorld,
+    corners: Array<{ x: number; y: number }>,
+    zone?: string,
+  ) {
+    const { ctx } = this;
+    const northTile = world.grid[gridY - 1]?.[gridX];
+    const westTile = world.grid[gridY]?.[gridX - 1];
+    const isOpen = (t: LocalTile | undefined) =>
+      t !== undefined && (t.type === 'floor' || t.type === 'path' || t.type === 'door' || t.type === 'workbench' || t.type === 'kiosk');
+    const hasNorthFace = isOpen(northTile);
+    const hasWestFace = isOpen(westTile);
+
+    const isGlass = zone === 'team_cluster' || zone === 'meeting';
+    const isWood = zone === 'break' || zone === 'biophilic';
+    const isConcrete = zone === 'infra';
+
+    const right = corners[1]!;
+    const bottom = corners[2]!;
+    const left = corners[3]!;
+    const topCap = isoTileCorners(gridX, gridY, 1);
+
+    // Face colors (colorblind-friendly: zone shapes differ by luminosity, not just hue)
+    const faceColor = isConcrete ? '#A0A8B8' : isWood ? '#C4A880' : isGlass ? 'rgba(160, 190, 210, 0.35)' : ISO_WALL_FACE;
+    const sideColor = isConcrete ? '#9098A8' : isWood ? '#B49870' : isGlass ? 'rgba(140, 175, 200, 0.3)' : ISO_WALL_SIDE;
+
+    // Front face (south)
+    if (hasNorthFace) {
+      ctx.fillStyle = faceColor;
+      ctx.beginPath();
+      ctx.moveTo(left.x, left.y);
+      ctx.lineTo(bottom.x, bottom.y);
+      ctx.lineTo(bottom.x, bottom.y + ISO_WALL_H);
+      ctx.lineTo(left.x, left.y + ISO_WALL_H);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(80, 80, 80, 0.15)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+
+    // Side face (east)
+    if (hasWestFace) {
+      ctx.fillStyle = sideColor;
+      ctx.beginPath();
+      ctx.moveTo(bottom.x, bottom.y);
+      ctx.lineTo(right.x, right.y);
+      ctx.lineTo(right.x, right.y + ISO_WALL_H);
+      ctx.lineTo(bottom.x, bottom.y + ISO_WALL_H);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(80, 80, 80, 0.15)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+
+    // Top cap
+    ctx.fillStyle = isConcrete ? '#B0B8C8' : ISO_WALL_TOP;
+    ctx.beginPath();
+    ctx.moveTo(topCap[0]!.x, topCap[0]!.y);
+    ctx.lineTo(topCap[1]!.x, topCap[1]!.y);
+    ctx.lineTo(topCap[2]!.x, topCap[2]!.y);
+    ctx.lineTo(topCap[3]!.x, topCap[3]!.y);
+    ctx.closePath();
+    ctx.fill();
+
+    // Door specifics
+    if (tile.type === 'door') {
+      this._drawIsoDoor(tile, gridX, gridY, corners, isGlass);
+    }
+
+    // Window specifics
+    if (tile.type === 'window') {
+      this._drawIsoWindowTile(gridX, gridY, corners);
+    }
+  }
+
+  private _drawIsoDoor(
+    tile: LocalTile,
+    _gridX: number,
+    _gridY: number,
+    corners: Array<{ x: number; y: number }>,
+    isGlass: boolean,
+  ) {
+    const { ctx } = this;
+    const key = `${tile.x},${tile.y}`;
+    const openPct = this.doorOpenStates.get(key) ?? 0;
+    const bottom = corners[2]!;
+    const left = corners[3]!;
+    const baseY = Math.min(bottom.y, left.y);
+
+    // Door frame
+    ctx.fillStyle = isGlass ? ISO_DOOR_GLASS : ISO_DOOR_WOOD;
+    ctx.fillRect(bottom.x - 2, baseY, 4, ISO_WALL_H);
+    ctx.fillRect(left.x - 2, baseY, 4, ISO_WALL_H);
+
+    // Sliding panels
+    const panelW = ISO_TILE_W / 2;
+    const offset = panelW * openPct * 0.5;
+
+    if (isGlass) {
+      ctx.fillStyle = 'rgba(160, 190, 210, 0.4)';
+      ctx.fillRect(bottom.x - panelW / 2 - offset, baseY + 2, panelW, ISO_WALL_H - 4);
+      ctx.fillRect(left.x + offset, baseY + 2, panelW, ISO_WALL_H - 4);
+    } else {
+      ctx.fillStyle = '#A08850';
+      ctx.fillRect(bottom.x - panelW / 2 - offset, baseY + 2, panelW, ISO_WALL_H - 4);
+      ctx.fillRect(left.x + offset, baseY + 2, panelW, ISO_WALL_H - 4);
+    }
+
+    // Handle
+    ctx.fillStyle = isGlass ? '#90A8B8' : '#806840';
+    ctx.fillRect(bottom.x - 1, baseY + ISO_WALL_H / 2, 2, 2);
+  }
+
+  private _drawIsoWindowTile(
+    _gridX: number,
+    _gridY: number,
+    corners: Array<{ x: number; y: number }>,
+  ) {
+    const { ctx } = this;
+    const bottom = corners[2]!;
+    const left = corners[3]!;
+    const baseY = Math.min(bottom.y, left.y);
+
+    // Sky gradient inside window frame
+    const winGrad = ctx.createLinearGradient(bottom.x, baseY, left.x, baseY + ISO_WALL_H);
+    winGrad.addColorStop(0, ISO_WINDOW_SKY[0]);
+    winGrad.addColorStop(1, ISO_WINDOW_SKY[1]);
+    ctx.fillStyle = winGrad;
+    ctx.beginPath();
+    ctx.moveTo(bottom.x - 2, baseY + 3);
+    ctx.lineTo(left.x + 2, baseY + 3);
+    ctx.lineTo(left.x + 2, baseY + ISO_WALL_H - 3);
+    ctx.lineTo(bottom.x - 2, baseY + ISO_WALL_H - 3);
+    ctx.closePath();
+    ctx.fill();
+
+    // Frame cross (distinctive shape for colorblind identification)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo((bottom.x + left.x) / 2, baseY + 3);
+    ctx.lineTo((bottom.x + left.x) / 2, baseY + ISO_WALL_H - 3);
+    ctx.moveTo(bottom.x - 2, baseY + ISO_WALL_H / 2);
+    ctx.lineTo(left.x + 2, baseY + ISO_WALL_H / 2);
+    ctx.stroke();
+
+    // Blinds / shutters (pattern-based, not pink)
+    ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
+    for (let i = 0; i < 3; i++) {
+      const cy = baseY + 5 + i * 6;
+      ctx.fillRect(bottom.x - 7, cy, 5, 3);
+      ctx.fillRect(left.x + 2, cy, 5, 3);
+    }
+  }
+
+  // ─── Isometric Furniture Stubs (Phase B will implement visuals) ─────────
+  private drawIsoStandingDesk(gx: number, gy: number) {
+    const { ctx } = this;
+    const base = isoProject(gx, gy);
+    ctx.fillStyle = '#B09060';
+    ctx.beginPath();
+    ctx.moveTo(base.px - 10, base.py - 4);
+    ctx.lineTo(base.px, base.py - 10);
+    ctx.lineTo(base.px + 10, base.py - 4);
+    ctx.lineTo(base.px, base.py + 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#D8DCE0';
+    ctx.fillRect(base.px - 5, base.py - 18, 10, 8);
+    ctx.fillStyle = 'rgba(140, 170, 190, 0.3)';
+    ctx.fillRect(base.px - 4, base.py - 17, 8, 6);
+    ctx.fillStyle = '#608860';
+    ctx.beginPath();
+    ctx.arc(base.px + 6, base.py - 2, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  private drawIsoSofa(gx: number, gy: number) {
+    const { ctx } = this;
+    const base = isoProject(gx, gy);
+    ctx.fillStyle = '#B08090';
+    ctx.beginPath();
+    ctx.moveTo(base.px - 10, base.py);
+    ctx.lineTo(base.px, base.py - 6);
+    ctx.lineTo(base.px + 10, base.py);
+    ctx.lineTo(base.px, base.py + 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#A07080';
+    ctx.beginPath();
+    ctx.moveTo(base.px - 8, base.py - 2);
+    ctx.lineTo(base.px, base.py - 8);
+    ctx.lineTo(base.px + 8, base.py - 2);
+    ctx.lineTo(base.px, base.py + 4);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  private drawIsoPlanter(gx: number, gy: number) {
+    const { ctx } = this;
+    const base = isoProject(gx, gy);
+    ctx.fillStyle = '#B09060';
+    ctx.beginPath();
+    ctx.moveTo(base.px - 6, base.py + 2);
+    ctx.lineTo(base.px + 6, base.py + 2);
+    ctx.lineTo(base.px + 5, base.py - 6);
+    ctx.lineTo(base.px - 5, base.py - 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#608860';
+    ctx.beginPath();
+    ctx.ellipse(base.px, base.py - 10, 6, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#90B090';
+    ctx.beginPath();
+    ctx.ellipse(base.px - 2, base.py - 12, 3, 3, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  private drawIsoWorkbench(tile: LocalTile, gx: number, gy: number, activeWbIds?: Set<string | null>) {
+    const { ctx } = this;
+    const base = isoProject(gx, gy);
+    const wb = tile.workbench;
+    if (!wb) return;
+    const extColor = EXT_COLOR[wb.extension] ?? '#888';
+    const isActive = activeWbIds?.has(wb.id);
+
+    // Desk surface (raised slightly)
+    const deskH = 10;
+    ctx.fillStyle = '#B09060';
+    ctx.beginPath();
+    ctx.moveTo(base.px - 10, base.py - deskH);
+    ctx.lineTo(base.px, base.py - 6 - deskH);
+    ctx.lineTo(base.px + 10, base.py - deskH);
+    ctx.lineTo(base.px, base.py + 6 - deskH);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 170, 140, 0.4)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    // Monitor (vertical slab)
+    if (isActive) {
+      // Glow effect when agent is working
+      const now = performance.now();
+      ctx.shadowColor = extColor;
+      ctx.shadowBlur = 8 + 4 * Math.sin(now / 250);
+    }
+    ctx.fillStyle = '#D0D0D0';
+    ctx.fillRect(base.px - 6, base.py - 22, 12, 10);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#0a0a0c';
+    ctx.fillRect(base.px - 5, base.py - 21, 10, 8);
+
+    if (isActive) {
+      // Scrolling code lines
+      const now = performance.now();
+      ctx.fillStyle = extColor;
+      ctx.globalAlpha = 0.75;
+      const scrollY = (now / 35) % 6;
+      for (let i = 0; i < 3; i++) {
+        const ly = base.py - 20 + i * 3 - scrollY;
+        if (ly >= base.py - 21 && ly <= base.py - 13) {
+          ctx.fillRect(base.px - 4, ly, 8, 1.5);
+        }
+      }
+      ctx.globalAlpha = 1;
+      // Random sparks
+      if (Math.random() < 0.15) {
+        this.spawnSpark(base.px, base.py - 5, extColor);
+      }
+    } else {
+      ctx.fillStyle = 'rgba(140, 170, 190, 0.3)';
+      ctx.fillRect(base.px - 5, base.py - 21, 10, 8);
+    }
+
+    // Extension label
+    ctx.fillStyle = extColor;
+    ctx.font = `bold 5px ${this.tokens.fontMono}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(wb.extension.toUpperCase().slice(0, 3), base.px, base.py - 16);
+
+    // Keyboard hint
+    ctx.fillStyle = '#B8C0C8';
+    ctx.fillRect(base.px - 5, base.py - 2, 10, 2);
+
+    // Chair (behind/under desk in iso)
+    ctx.fillStyle = '#B08090';
+    ctx.beginPath();
+    ctx.ellipse(base.px, base.py + 6, 4, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  private drawIsoWhiteboard(_gx: number, _gy: number) {
+    // Whiteboard art is rendered on the wall face in _drawIsoWallTile
+  }
+
+  private drawIsoReception(gx: number, gy: number) {
+    const { ctx } = this;
+    const base = isoProject(gx, gy);
+    ctx.fillStyle = '#B09060';
+    ctx.beginPath();
+    ctx.moveTo(base.px - 10, base.py + 4);
+    ctx.lineTo(base.px + 10, base.py + 4);
+    ctx.lineTo(base.px + 8, base.py - 6);
+    ctx.quadraticCurveTo(base.px, base.py - 10, base.px - 8, base.py - 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#D8DCE0';
+    ctx.fillRect(base.px - 3, base.py - 14, 6, 5);
+    ctx.fillStyle = 'rgba(186, 230, 253, 0.6)';
+    ctx.fillRect(base.px - 2, base.py - 13, 4, 3);
+  }
+
+  private drawIsoServerRack(gx: number, gy: number) {
+    const { ctx } = this;
+    const base = isoProject(gx, gy);
+    const now = performance.now();
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(base.px - 8, base.py - 18, 16, 18);
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(base.px - 8, base.py - 18, 16, 18);
+    const ledColors = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444'];
+    for (let i = 0; i < 3; i++) {
+      const ry = base.py - 16 + i * 6;
+      for (let j = 0; j < 3; j++) {
+        const blink = Math.sin(now / 200 + i * 3 + j * 2) > 0;
+        ctx.fillStyle = blink ? ledColors[(i + j) % ledColors.length]! : '#1e293b';
+        ctx.fillRect(base.px - 6 + j * 5, ry, 3, 2);
+      }
+    }
+  }
+
+  private drawIsoWindow(_gx: number, _gy: number) {
+    // Window details already drawn in _drawIsoWallTile
+  }
+
+  private drawIsoMeetingTable(gx: number, gy: number) {
+    const { ctx } = this;
+    const base = isoProject(gx, gy);
+    ctx.fillStyle = 'rgba(232, 197, 150, 0.7)';
+    ctx.beginPath();
+    ctx.ellipse(base.px, base.py, 10, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 170, 140, 0.4)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    ctx.fillStyle = '#D0C0A0';
+    ctx.beginPath();
+    ctx.ellipse(base.px - 12, base.py, 3, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(base.px + 12, base.py, 3, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#D0D0D0';
+    ctx.beginPath();
+    ctx.arc(base.px + 3, base.py + 1, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  private drawIsoPhoneBooth(gx: number, gy: number) {
+    const { ctx } = this;
+    const base = isoProject(gx, gy);
+    ctx.fillStyle = '#B0C0B0';
+    ctx.beginPath();
+    ctx.moveTo(base.px - 8, base.py);
+    ctx.lineTo(base.px, base.py - 6);
+    ctx.lineTo(base.px + 8, base.py);
+    ctx.lineTo(base.px, base.py + 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(168, 213, 162, 0.4)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    const now = performance.now();
+    ctx.fillStyle = (now % 2000 < 1000) ? '#608860' : '#D4E8D0';
+    ctx.beginPath();
+    ctx.arc(base.px, base.py - 10, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  private drawIsoBreakArea(gx: number, gy: number) {
+    const { ctx } = this;
+    const base = isoProject(gx, gy);
+    ctx.fillStyle = '#FAF0E6';
+    ctx.fillRect(base.px - 10, base.py - 4, 20, 6);
+    ctx.fillStyle = '#D8DCE0';
+    ctx.fillRect(base.px - 8, base.py - 14, 6, 8);
+    const now = performance.now();
+    ctx.fillStyle = `rgba(212, 165, 116, ${0.4 + 0.2 * Math.sin(now / 300)})`;
+    ctx.fillRect(base.px - 6, base.py - 12, 2, 2);
+    ctx.fillStyle = '#E2E8F0';
+    ctx.fillRect(base.px + 4, base.py - 12, 6, 5);
+  }
+
+  private drawIsoWatercooler(gx: number, gy: number) {
+    const { ctx } = this;
+    const base = isoProject(gx, gy);
+    ctx.fillStyle = '#E3F2FD';
+    ctx.beginPath();
+    ctx.roundRect(base.px - 3, base.py - 2, 6, 5, 1);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(186, 230, 253, 0.5)';
+    ctx.beginPath();
+    ctx.ellipse(base.px, base.py - 8, 4, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(186, 230, 253, 0.7)';
+    ctx.beginPath();
+    ctx.ellipse(base.px, base.py - 6, 3, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#D0D0D0';
+    ctx.fillRect(base.px + 5, base.py - 1, 2, 3);
+  }
+
+  private drawIsoStairs(gx: number, gy: number) {
+    const { ctx } = this;
+    const base = isoProject(gx, gy);
+    for (let i = 0; i < 4; i++) {
+      const r = 232 + i * 3;
+      const g = 197 + i * 2;
+      const b = 150 + i * 2;
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(base.px - 8 + i * 4, base.py - 4 + i * 2, 8, 3);
+    }
+    ctx.strokeStyle = '#E2E8F0';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(base.px + 8, base.py - 4);
+    ctx.lineTo(base.px + 8, base.py + 8);
+    ctx.stroke();
+  }
+  private drawIsoUnit(unit: LocalUnit, gx: number, gy: number) {
+    const { ctx } = this;
+    const base = isoProject(gx, gy);
+    let ux = base.px;
+    let uy = base.py;
+
+    // Spawning Zzzs if unit is idle or resting
+    if ((unit.state === 'idle_in_room' || unit.state === 'resting') && Math.random() < 0.02) {
+      this.spawnZzz(ux, uy);
+    }
+
+    // Motion vectors & angles
+    let dirAngle = 0;
+    let isMoving = false;
+    if (unit.path.length > 0 && unit.pathIndex < unit.path.length) {
+      isMoving = true;
+      const from = unit.path[unit.pathIndex]!;
+      const to = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;
+      dirAngle = Math.atan2(to.y - from.y, to.x - from.x);
+    } else if (unit.state === 'working_on_file' && unit.currentWorkbenchId) {
+      const wbTile = this.world?.grid
+        .flat()
+        .find((t) => t.workbench?.id === unit.currentWorkbenchId);
+      if (wbTile) dirAngle = Math.atan2(wbTile.y - unit.gridY, wbTile.x - unit.gridX);
+    }
+
+    // Squash & Stretch
+    const speed = isMoving ? 3.6 * unit.effectiveSpeed : 0;
+    const Sf = 1 + Math.min(0.25, speed * 0.08);
+    const Sc = 1 / Sf;
+
+    // Harmonic bobbing (vertical in screen space)
+    const bobbingY = isMoving ? Math.sin(unit.pathProgress * Math.PI * 2) * 3 : 0;
+
+    const scale = ISO_TILE_W / 64; // base scale factor relative to design size
+
+    ctx.save();
+    ctx.translate(ux, uy + bobbingY - ISO_WALL_H * 0.3); // lift slightly above floor
+    if (unit.ephemeral) ctx.scale(0.8, 0.8);
+
+    // Selection ring
+    const isHovered = this._hoveredUnit?.id === unit.id;
+    if (isHovered) {
+      ctx.strokeStyle = ISO_SELECTION;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, ISO_TILE_W * 0.3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Squash & Stretch along movement
+    ctx.save();
+    ctx.rotate(dirAngle);
+    ctx.scale(Sf, Sc);
+
+    // 1. Shadow (small iso ellipse on floor)
+    ctx.fillStyle = ISO_SHADOW;
+    ctx.beginPath();
+    ctx.ellipse(-2 * scale, 1 * scale, ISO_TILE_W * 0.15, ISO_TILE_H * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Torso
+    ctx.fillStyle = unit.color;
+    ctx.strokeStyle = 'rgba(180, 150, 130, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(-2 * scale, 0, ISO_TILE_W * 0.12, ISO_TILE_H * 0.18, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Tool belt
+    ctx.fillStyle = '#2d2722';
+    ctx.fillRect(-8 * scale, -4 * scale, 3 * scale, 8 * scale);
+
+    // 3. Head
+    ctx.fillStyle = '#f5d6b8';
+    ctx.beginPath();
+    ctx.arc(4 * scale, 0, ISO_TILE_W * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // 4. Hard-hat
+    ctx.fillStyle = ISO_HELMET;
+    ctx.beginPath();
+    ctx.arc(4 * scale, 0, ISO_TILE_W * 0.09, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Helmet brim
+    ctx.strokeStyle = '#B89820';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(4 * scale, 0, ISO_TILE_W * 0.1, -Math.PI / 3, Math.PI / 3);
+    ctx.stroke();
+
+    // Helmet ridge
+    ctx.strokeStyle = '#F0D040';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(1 * scale, 0);
+    ctx.lineTo(8 * scale, 0);
+    ctx.stroke();
+
+    // Working LEDs
+    const now = performance.now();
+    if (unit.state === 'working_on_file') {
+      const flash = Math.sin(now / 150) > 0;
+      ctx.fillStyle = flash ? '#22C55E' : '#14532d';
+      ctx.beginPath();
+      ctx.arc(8 * scale, -2 * scale, 1.2, 0, Math.PI * 2);
+      ctx.arc(8 * scale, 2 * scale, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore(); // Squash & Stretch
+
+    // 5. Initials capsule
+    const initials = unit.name.slice(0, 2).toUpperCase();
+    ctx.save();
+    ctx.translate(0, ISO_TILE_H * 0.55);
+    ctx.font = `bold 8px ${this.tokens.fontMono}`;
+    const textW = ctx.measureText(initials).width + 8;
+    ctx.fillStyle = 'rgba(30, 30, 30, 0.85)';
+    ctx.fillRect(-textW / 2, -6, textW, 12);
+    ctx.strokeStyle = 'rgba(200, 200, 200, 0.2)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(-textW / 2, -6, textW, 12);
+    ctx.fillStyle = unit.color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(initials, 0, 0);
+    ctx.restore();
+
+    // Work progress ring
+    if (unit.state === 'working_on_file' && unit.workProgress > 0) {
+      ctx.strokeStyle = this.tokens.success || '#22C55E';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, ISO_TILE_W * 0.28, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * unit.workProgress) / 100);
+      ctx.stroke();
+    }
+
+    // Status icon
+    const statusIcon: Record<string, string> = {
+      idle_in_room: '◌',
+      walking_to_workbench: '→',
+      walking_to_room: '→',
+      working_on_file: '⚙',
+      resting: '☾',
+    };
+    const icon = statusIcon[unit.state] ?? '?';
+    ctx.fillStyle = unit.color;
+    ctx.font = `${ISO_TILE_W * 0.18}px ${this.tokens.fontMono}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(icon, 0, -ISO_TILE_H * 0.35);
+
+    ctx.restore();
+
+    if (this.onUnitRendered) {
+      const sx = (ux - this.cam.x) * this.cam.zoom + this.cam.cx;
+      const sy = (uy + bobbingY - this.cam.y) * this.cam.zoom + this.cam.cy;
+      this.onUnitRendered(unit, sx, sy);
+    }
+  }
+  private drawIsoRoomLabel(room: LocalRoom) {
+    const { ctx } = this;
+    const cx = (room.x + room.width / 2);
+    const cy = (room.y + room.height / 2);
+    const base = isoProject(cx, cy);
+    const primary = (room.zoneLabel ?? room.folderName).toUpperCase();
+
+    const zoneColors: Record<string, string> = {
+      team_cluster: '#F5D0C5',
+      meeting: '#B09060',
+      focus: '#E8F5D6',
+      break: '#D0C0A0',
+      infra: '#E2E8F0',
+      reception: '#F5F0E8',
+      biophilic: '#D4E8D0',
+    };
+    const plaqueColor = zoneColors[room.zoneType ?? 'team_cluster'] ?? '#F5D0C5';
+
+    ctx.save();
+    ctx.fillStyle = plaqueColor;
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 0.5;
+
+    const plaqueW = Math.min(room.width * ISO_TILE_W, Math.max(60, primary.length * 6 + 12));
+    const plaqueH = 14;
+    ctx.beginPath();
+    ctx.roundRect(base.px - plaqueW / 2, base.py - ISO_WALL_H - plaqueH - 4, plaqueW, plaqueH, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.font = `bold 8px ${this.tokens.fontMono}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#5C4033';
+    ctx.fillText(primary.slice(0, 14), base.px, base.py - ISO_WALL_H - plaqueH / 2 - 4);
+    ctx.restore();
+  }
+
+  // ─── Isometric Overlays ─────────────────────────────────────────────
+
+  private drawIsoHoveredTile(hovered: { x: number; y: number }) {
+    const { ctx } = this;
+    const corners = isoTileCorners(hovered.x, hovered.y);
+    ctx.save();
+    ctx.strokeStyle = ISO_SELECTION;
+    ctx.lineWidth = 2 / this.cam.zoom;
+    ctx.beginPath();
+    ctx.moveTo(corners[0]!.x, corners[0]!.y);
+    ctx.lineTo(corners[1]!.x, corners[1]!.y);
+    ctx.lineTo(corners[2]!.x, corners[2]!.y);
+    ctx.lineTo(corners[3]!.x, corners[3]!.y);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private drawIsoZones(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
+    const { ctx } = this;
+    if (!world.zones) return;
+    const zoneColors: Record<string, string> = {
+      stockpile: '#8B5A2B',
+      growing: '#4A7C2E',
+      recreation: '#D4A537',
+      bedroom: '#6B4F8A',
+      dining: '#C46B3B',
+      hospital: '#C0392B',
+    };
+    for (const zone of world.zones) {
+      const color = zoneColors[zone.type] || '#888';
+      ctx.save();
+      ctx.globalAlpha = 0.2;
+      for (const tile of zone.tiles) {
+        if (tile.x < view.x0 || tile.x > view.x1 || tile.y < view.y0 || tile.y > view.y1) continue;
+        const corners = isoTileCorners(tile.x, tile.y);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(corners[0]!.x, corners[0]!.y);
+        ctx.lineTo(corners[1]!.x, corners[1]!.y);
+        ctx.lineTo(corners[2]!.x, corners[2]!.y);
+        ctx.lineTo(corners[3]!.x, corners[3]!.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+      // Border
+      if (zone.tiles.length > 0) {
+        const xs = zone.tiles.map((t) => t.x);
+        const ys = zone.tiles.map((t) => t.y);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        const c1 = isoTileCorners(minX, minY);
+        const c2 = isoTileCorners(maxX, maxY);
+        // Approximate bounding diamond
+        ctx.beginPath();
+        ctx.moveTo(c1[0]!.x, c1[0]!.y);
+        ctx.lineTo(c1[1]!.x, c1[1]!.y);
+        ctx.lineTo(c2[2]!.x, c2[2]!.y);
+        ctx.lineTo(c2[3]!.x, c2[3]!.y);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = color;
+        ctx.font = `bold 9px ${this.tokens.fontMono}`;
+        ctx.textAlign = 'left';
+        ctx.fillText(zone.type.toUpperCase(), c1[0]!.x, c1[0]!.y - 4);
+      }
+    }
+  }
+
+  private drawIsoZonePaintPreview(view: { x0: number; y0: number; x1: number; y1: number }) {
+    const { ctx } = this;
+    if (!this._zonePaintStart || !this._zonePaintCurrent) return;
+    const x0 = Math.min(this._zonePaintStart.x, this._zonePaintCurrent.x);
+    const y0 = Math.min(this._zonePaintStart.y, this._zonePaintCurrent.y);
+    const x1 = Math.max(this._zonePaintStart.x, this._zonePaintCurrent.x);
+    const y1 = Math.max(this._zonePaintStart.y, this._zonePaintCurrent.y);
+
+    const zoneColors: Record<string, string> = {
+      stockpile: '#8B5A2B',
+      growing: '#4A7C2E',
+      recreation: '#D4A537',
+      bedroom: '#6B4F8A',
+      dining: '#C46B3B',
+      hospital: '#C0392B',
+    };
+    const color = zoneColors[this._zonePaintMode || 'stockpile'] || '#888';
+
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    for (let y = y0; y <= y1; y++) {
+      if (y < view.y0 || y > view.y1) continue;
+      for (let x = x0; x <= x1; x++) {
+        if (x < view.x0 || x > view.x1) continue;
+        const corners = isoTileCorners(x, y);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(corners[0]!.x, corners[0]!.y);
+        ctx.lineTo(corners[1]!.x, corners[1]!.y);
+        ctx.lineTo(corners[2]!.x, corners[2]!.y);
+        ctx.lineTo(corners[3]!.x, corners[3]!.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+
+    // Border around preview area
+    const c1 = isoTileCorners(x0, y0);
+    const c2 = isoTileCorners(x1, y1);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 4]);
+    ctx.beginPath();
+    ctx.moveTo(c1[0]!.x, c1[0]!.y);
+    ctx.lineTo(c1[1]!.x, c1[1]!.y);
+    ctx.lineTo(c2[2]!.x, c2[2]!.y);
+    ctx.lineTo(c2[3]!.x, c2[3]!.y);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const w = x1 - x0 + 1;
+    const h = y1 - y0 + 1;
+    ctx.fillStyle = color;
+    ctx.font = `bold 10px ${this.tokens.fontMono}`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${w}×${h} (${w * h} tiles)`, (c1[0]!.x + c2[2]!.x) / 2, c1[0]!.y - 8);
+  }
+
+  private drawIsoPowerOverlay(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
+    const { ctx } = this;
+    const pg = world.powerGrid;
+    if (!pg) return;
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+
+    // Conduits
+    for (const key of pg.conduits) {
+      const parts = key.split(',');
+      if (parts.length < 2) continue;
+      const sx = Number(parts[0]);
+      const sy = Number(parts[1]);
+      if (!Number.isFinite(sx) || !Number.isFinite(sy)) continue;
+      if (sx < view.x0 || sx > view.x1 || sy < view.y0 || sy > view.y1) continue;
+      const base = isoProject(sx, sy);
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(base.px, base.py - ISO_TILE_H / 2);
+      ctx.lineTo(base.px, base.py + ISO_TILE_H / 2);
+      ctx.moveTo(base.px - ISO_TILE_W / 2, base.py);
+      ctx.lineTo(base.px + ISO_TILE_W / 2, base.py);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.9)';
+      ctx.beginPath();
+      ctx.arc(base.px, base.py, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Sources
+    for (const src of pg.sources) {
+      if (src.tileX < view.x0 || src.tileX > view.x1 || src.tileY < view.y0 || src.tileY > view.y1) continue;
+      const base = isoProject(src.tileX, src.tileY);
+      const now = performance.now();
+      const pulse = 0.5 + 0.5 * Math.sin(now / 500);
+      const glowR = ISO_TILE_W * 0.5 + 10 * pulse;
+      const grad = ctx.createRadialGradient(base.px, base.py, 0, base.px, base.py, glowR);
+      grad.addColorStop(0, `rgba(245, 158, 11, ${0.4 * pulse})`);
+      grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(base.px - glowR, base.py - glowR, glowR * 2, glowR * 2);
+      ctx.fillStyle = '#F59E0B';
+      ctx.font = `bold 9px ${this.tokens.fontMono}`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`${src.outputWatts}W`, base.px, base.py - 8);
+    }
+
+    // Consumers
+    for (const cons of pg.consumers) {
+      if (cons.tileX < view.x0 || cons.tileX > view.x1 || cons.tileY < view.y0 || cons.tileY > view.y1) continue;
+      const base = isoProject(cons.tileX, cons.tileY);
+      const barW = ISO_TILE_W * 0.6;
+      const barH = 3;
+      const bx = base.px - barW / 2;
+      const by = base.py + ISO_TILE_H / 2 + 4;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(bx, by, barW, barH);
+      const loadPct = Math.min(1, cons.watts / 200);
+      ctx.fillStyle = loadPct > 0.8 ? '#EF4444' : loadPct > 0.5 ? '#F59E0B' : '#22C55E';
+      ctx.fillRect(bx, by, barW * loadPct, barH);
+    }
+
+    // Global stats
+    if (pg.generatedWatts > 0 || pg.consumedWatts > 0) {
+      const statsBase = isoProject(view.x0, view.y0);
+      ctx.fillStyle = 'rgba(13, 13, 20, 0.9)';
+      ctx.fillRect(statsBase.px - 5, statsBase.py - ISO_WALL_H - 55, 160, 50);
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
+      ctx.strokeRect(statsBase.px - 5, statsBase.py - ISO_WALL_H - 55, 160, 50);
+      ctx.fillStyle = '#22C55E';
+      ctx.font = `11px ${this.tokens.fontMono}`;
+      ctx.textAlign = 'left';
+      ctx.fillText(`⚡ Gen: ${pg.generatedWatts}W`, statsBase.px, statsBase.py - ISO_WALL_H - 40);
+      ctx.fillStyle = '#EF4444';
+      ctx.fillText(`🔌 Con: ${pg.consumedWatts}W`, statsBase.px, statsBase.py - ISO_WALL_H - 24);
+      ctx.fillStyle = pg.storedWatts > 0 ? '#3B82F6' : '#6B7280';
+      ctx.fillText(`🔋 Bat: ${pg.storedWatts}W`, statsBase.px, statsBase.py - ISO_WALL_H - 8);
+    }
+
+    ctx.restore();
+  }
+
+  private drawIsoWindowLightRays(
+    world: LocalWorld,
+    view: { x0: number; y0: number; x1: number; y1: number },
+  ) {
+    const { ctx } = this;
+    for (let y = view.y0; y <= view.y1; y++) {
+      for (let x = view.x0; x <= view.x1; x++) {
+        const tile = world.grid[y]?.[x];
+        if (!tile || tile.type !== 'window') continue;
+
+        const dirs = [
+          { dx: 0, dy: 1 },
+          { dx: 0, dy: -1 },
+          { dx: 1, dy: 0 },
+          { dx: -1, dy: 0 },
+        ];
+        for (const { dx, dy } of dirs) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < view.x0 || nx > view.x1 || ny < view.y0 || ny > view.y1) continue;
+          const neighbor = world.grid[ny]?.[nx];
+          if (!neighbor) continue;
+          if (neighbor.type === 'floor' || neighbor.type === 'path') {
+            const base = isoProject(nx, ny);
+            const rayGrad = ctx.createRadialGradient(
+              base.px - dx * ISO_TILE_W * 0.15,
+              base.py - dy * ISO_TILE_H * 0.15,
+              0,
+              base.px,
+              base.py,
+              ISO_TILE_W * 0.6,
+            );
+            rayGrad.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
+            rayGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = rayGrad;
+            const corners = isoTileCorners(nx, ny);
+            ctx.beginPath();
+            ctx.moveTo(corners[0]!.x, corners[0]!.y);
+            ctx.lineTo(corners[1]!.x, corners[1]!.y);
+            ctx.lineTo(corners[2]!.x, corners[2]!.y);
+            ctx.lineTo(corners[3]!.x, corners[3]!.y);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+      }
+    }
+  }
+
+  private drawIsoTemperatureOverlay(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
+    const { ctx } = this;
+    const climates = world.roomClimates;
+    if (!climates) return;
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+
+    function tempToColor(temp: number): string {
+      const comfortMin = 16, comfortMax = 26;
+      if (temp <= comfortMin) return `rgb(80, ${Math.round(100 + (temp + 20) / (comfortMin + 20) * 155)}, 220)`;
+      if (temp >= comfortMax) return `rgb(220, ${Math.round(255 * (1 - Math.min(1, (temp - comfortMax) / (50 - comfortMax))))}, 0)`;
+      const t = (temp - comfortMin) / (comfortMax - comfortMin);
+      return `rgb(${Math.round(200 * (1 - t))}, 255, ${Math.round(200 * (1 - t))}`;
+    }
+
+    for (const [roomId, climate] of climates) {
+      const room = world.rooms.find((r) => r.id === roomId);
+      if (!room) continue;
+      const cx = room.x + room.width / 2;
+      const cy = room.y + room.height / 2;
+      const base = isoProject(cx, cy);
+      if (cx < view.x0 || cx > view.x1 || cy < view.y0 || cy > view.y1) continue;
+
+      const color = tempToColor(climate.temperature);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.3;
+      ctx.beginPath();
+      ctx.arc(base.px, base.py, Math.max(room.width, room.height) * ISO_TILE_W * 0.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = color;
+      ctx.font = `bold 12px ${this.tokens.fontMono}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`${climate.temperature.toFixed(1)}°C`, base.px, base.py);
+
+      if (Math.abs(climate.temperature - climate.targetTemperature) > 0.5) {
+        ctx.fillStyle = '#FBBF24';
+        ctx.font = `9px ${this.tokens.fontMono}`;
+        const arrow = climate.temperature < climate.targetTemperature ? '▲' : '▼';
+        ctx.fillText(`${arrow} ${climate.targetTemperature.toFixed(1)}°C`, base.px, base.py + 18);
+      }
+
+      if (climate.temperature < 10 && Math.random() < 0.02) {
+        const rx = room.x + Math.random() * room.width;
+        const ry = room.y + Math.random() * room.height;
+        const p = isoProject(rx, ry);
+        this.spawnBreath(p.px, p.py);
+      }
+    }
+
+    // Heaters
+    for (const [roomId, climate] of climates) {
+      const room = world.rooms.find((r) => r.id === roomId);
+      if (!room) continue;
+      for (const heater of climate.heaters) {
+        if (heater.tileX < view.x0 || heater.tileX > view.x1 || heater.tileY < view.y0 || heater.tileY > view.y1) continue;
+        const base = isoProject(heater.tileX, heater.tileY);
+        const now = performance.now();
+        ctx.strokeStyle = `rgba(239, 83, 80, ${0.4 + 0.3 * Math.sin(now / 120)})`;
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          ctx.moveTo(base.px - 6 + i * 6, base.py + ISO_TILE_H / 2);
+          ctx.quadraticCurveTo(base.px + 4 * Math.sin(now / 100 + i), base.py + ISO_TILE_H / 2 - 8, base.px - 6 + i * 6, base.py + ISO_TILE_H / 2 - 16);
+          ctx.stroke();
+        }
+      }
+      for (const cooler of climate.coolers) {
+        if (cooler.tileX < view.x0 || cooler.tileX > view.x1 || cooler.tileY < view.y0 || cooler.tileY > view.y1) continue;
+        const base = isoProject(cooler.tileX, cooler.tileY);
+        const now = performance.now();
+        ctx.fillStyle = `rgba(100, 181, 246, ${0.4 + 0.3 * Math.sin(now / 150)})`;
+        for (let i = 0; i < 4; i++) {
+          const px2 = base.px + (i - 1.5) * 4;
+          const py2 = base.py + ISO_TILE_H / 2 - 3 - (now / 80 + i * 0.5) % 10;
+          ctx.beginPath();
+          ctx.arc(px2, py2, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      for (const vent of climate.vents) {
+        if (!vent.open) continue;
+        if (vent.tileX < view.x0 || vent.tileX > view.x1 || vent.tileY < view.y0 || vent.tileY > view.y1) continue;
+        const base = isoProject(vent.tileX, vent.tileY);
+        ctx.fillStyle = `rgba(144, 164, 174, ${0.6 + 0.3 * Math.sin(performance.now() / 200)})`;
+        ctx.font = `${ISO_TILE_W * 0.18}px ${this.tokens.fontMono}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('↔', base.px, base.py);
+      }
+    }
+
+    ctx.restore();
   }
 }
 
