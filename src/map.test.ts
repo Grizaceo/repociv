@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Axial } from './hex.ts';
-import { canRelocateCityTo, relocateCity, showMapLoadError } from './map.ts';
+import { canRelocateCityTo, generateWorld, relocateCity, showMapLoadError } from './map.ts';
 import type { City, Terrain, Tile, World } from './types.ts';
 import { tileKey } from './types.ts';
 
@@ -181,5 +181,158 @@ describe('relocateCity', () => {
     const { world, city } = minimalWorldWithCity({ q: 0, r: 0 }, { q: 2, r: 0 });
     const ok = await relocateCity(world, city.id, { q: 0, r: 0 }, city.repoPath ?? null);
     expect(ok).toBe(false);
+  });
+});
+
+describe('generateWorld', () => {
+  beforeEach(() => {
+    const storage: Record<string, string> = {};
+    const localStorageMock = {
+      getItem: (key: string) => storage[key] ?? null,
+      setItem: (key: string, value: string) => {
+        storage[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete storage[key];
+      },
+    };
+    vi.stubGlobal('window', { localStorage: localStorageMock });
+    vi.stubGlobal('localStorage', localStorageMock);
+    vi.stubGlobal('document', {
+      getElementById: vi.fn(() => null),
+      createElement: vi.fn(() => ({
+        id: '',
+        textContent: '',
+        style: {},
+        setAttribute: vi.fn(),
+      })),
+      body: { appendChild: vi.fn() },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('prefers client-side selected repo paths over shared backend selection', async () => {
+    window.localStorage.setItem(
+      'repociv:selected-repos:v1',
+      JSON.stringify({
+        version: 1,
+        selectedRepoPaths: ['/workspace/repo-a', '/workspace/repo-b'],
+        filters: { owners: [], topics: [], languages: [] },
+      }),
+    );
+
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === '/api/repos') {
+        return {
+          ok: true,
+          json: async () => [
+            {
+              name: 'repo-a',
+              path: '/workspace/repo-a',
+              population: 20,
+              extensions: { ts: 10 },
+              gold: 40,
+              lastCommitDays: 1,
+              isLegacy: false,
+              hasGit: true,
+            },
+            {
+              name: 'repo-b',
+              path: '/workspace/repo-b',
+              population: 12,
+              extensions: { py: 6 },
+              gold: 30,
+              lastCommitDays: 2,
+              isLegacy: false,
+              hasGit: true,
+            },
+            {
+              name: 'repo-shared',
+              path: '/workspace/repo-shared',
+              population: 50,
+              extensions: { rs: 5 },
+              gold: 90,
+              lastCommitDays: 1,
+              isLegacy: false,
+              hasGit: true,
+            },
+          ],
+        };
+      }
+      if (input.startsWith('/api/files/') || input.startsWith('/api/skill-health/') || input.startsWith('/api/session-tint/')) {
+        return { ok: false, json: async () => ({}) };
+      }
+      throw new Error(`unexpected fetch ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const world = await generateWorld();
+
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/repos/selected');
+    expect(world.cities.some((city) => city.id === 'repo-a')).toBe(true);
+    expect(world.cities.some((city) => city.id === 'repo-b')).toBe(true);
+    expect(world.cities.some((city) => city.id === 'repo-shared')).toBe(false);
+  });
+
+  it('matches backend-selected absolute repo paths against encoded repo ids', async () => {
+    window.localStorage.setItem(
+      'repociv:selected-repos:v1',
+      JSON.stringify({
+        version: 1,
+        selectedRepoPaths: ['/workspace/repo-a'],
+        filters: { owners: [], topics: [], languages: [] },
+      }),
+    );
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        if (input === '/api/repos') {
+          return {
+            ok: true,
+            json: async () => [
+              {
+                name: 'repo-a',
+                path: 'repo:encoded-a',
+                repoPath: '/workspace/repo-a',
+                population: 20,
+                extensions: { ts: 10 },
+                gold: 40,
+                lastCommitDays: 1,
+                isLegacy: false,
+                hasGit: true,
+              },
+              {
+                name: 'repo-b',
+                path: 'repo:encoded-b',
+                repoPath: '/workspace/repo-b',
+                population: 12,
+                extensions: { py: 6 },
+                gold: 30,
+                lastCommitDays: 2,
+                isLegacy: false,
+                hasGit: true,
+              },
+            ],
+          };
+        }
+        if (
+          input.startsWith('/api/files/') ||
+          input.startsWith('/api/skill-health/') ||
+          input.startsWith('/api/session-tint/')
+        ) {
+          return { ok: false, json: async () => ({}) };
+        }
+        throw new Error(`unexpected fetch ${input}`);
+      }),
+    );
+
+    const world = await generateWorld();
+
+    expect(world.cities.some((city) => city.id === 'repo-a')).toBe(true);
+    expect(world.cities.some((city) => city.id === 'repo-b')).toBe(false);
   });
 });

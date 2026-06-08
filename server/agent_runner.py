@@ -204,13 +204,37 @@ def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
 
 
 
+def resolve_absolute_file_path(repo_path: str, file_path: str) -> str:
+    if not file_path:
+        return ""
+    if os.path.isabs(file_path):
+        return file_path
+    
+    # Normalize path separators
+    file_path = file_path.replace("\\", "/")
+    repo_path = repo_path.replace("\\", "/")
+    
+    repo_name = os.path.basename(repo_path)
+    parts = file_path.split("/")
+    if parts and parts[0] == repo_name:
+        parts = parts[1:]
+    
+    rel_path = "/".join(parts)
+    return os.path.normpath(os.path.join(repo_path, rel_path))
+
+
 def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
               command_id: str | None = None, harness: str = "",
-              provider: str = "", model: str = "") -> None:
+              provider: str = "", model: str = "",
+              repo_path: str = "", file_path: str = "") -> None:
     mission_id = command_id or str(uuid.uuid4())[:8]
     quest_name = generate_quest_name(mission)
     started_at = time.time()
-    working_dir = _resolve_city_path(city_id)
+    working_dir = repo_path or _resolve_city_path(city_id)
+    if file_path and working_dir:
+        abs_file_path = resolve_absolute_file_path(working_dir, file_path)
+        mission = f"Trabaja en el archivo: `{abs_file_path}`\nInstrucción: {mission}"
+
     if not working_dir:
         send_to_repociv({
             "type": "log",

@@ -4,7 +4,7 @@
 
 import type { Unit, LocalWorld, LocalUnit, LocalMission, ViewMode } from './types.ts';
 import { UNIT_COLORS } from './types.ts';
-import { generateLocalWorldFromApi, buildMockLocalWorld } from './localMap.ts';
+import { generateLocalWorldFromApi, buildMockLocalWorld, BATTERY_STORED } from './localMap.ts';
 import { findPath, findNearestWorkbench } from './localPathfinding.ts';
 import { peekNextMission } from './priorityMatrix.ts';
 
@@ -21,11 +21,16 @@ export class LocalWorldManager {
     private readonly notify: () => void,
     /** Returns the first macro-world unit (used to seed the local unit on entry). */
     private readonly getFirstUnit: () => Unit | undefined,
+    private readonly getMacroUnit?: (id: string) => Unit | undefined,
   ) {}
 
   // ─── Phase 6: View transition ──────────────────────────────────────────────
 
   async enterLocalView(repoId: string): Promise<LocalWorld> {
+    if (this.viewMode !== 'local') {
+      this.viewMode = 'local';
+      this.notify();
+    }
     if (!this.localWorld || this.localWorld.repoId !== repoId) {
       this.localWorld = await generateLocalWorldFromApi(repoId);
       if (this.localUnits.length === 0) {
@@ -59,11 +64,14 @@ export class LocalWorldManager {
         });
       }
     }
-    this.viewMode = 'local';
     return this.localWorld;
   }
 
   enterLocalViewMock(repoId: string): LocalWorld {
+    if (this.viewMode !== 'local') {
+      this.viewMode = 'local';
+      this.notify();
+    }
     if (!this.localWorld || this.localWorld.repoId !== repoId) {
       this.localWorld = buildMockLocalWorld(repoId);
       if (this.localUnits.length === 0) {
@@ -93,7 +101,6 @@ export class LocalWorldManager {
         });
       }
     }
-    this.viewMode = 'local';
     return this.localWorld;
   }
 
@@ -125,7 +132,7 @@ export class LocalWorldManager {
     const scale = dt / TICK_MS;
 
     for (const unit of this.localUnits) {
-      // 1. Advance moving units
+      // 1. Advance moving units (workbench)
       if (unit.state === 'walking_to_workbench' && unit.pathIndex < unit.path.length) {
         unit.pathProgress += 0.06 * unit.effectiveSpeed * scale;
         if (unit.pathProgress >= 1) {
@@ -146,6 +153,27 @@ export class LocalWorldManager {
         }
       }
 
+      // 1b. Advance moving units (rest/bed)
+      if (unit.state === 'walking_to_room' && unit.pathIndex < unit.path.length) {
+        unit.pathProgress += 0.06 * unit.effectiveSpeed * scale;
+        if (unit.pathProgress >= 1) {
+          unit.pathProgress = 0;
+          const step = unit.path[unit.pathIndex]!;
+          unit.gridX = step.x;
+          unit.gridY = step.y;
+          const tile = this.localWorld?.grid[unit.gridY]?.[unit.gridX];
+          unit.currentRoomId = tile?.roomId ?? null;
+          unit.pathIndex++;
+          if (unit.pathIndex >= unit.path.length) {
+            unit.path = [];
+            unit.pathIndex = 0;
+            unit.state = 'resting';
+            unit.isResting = true;
+            unit.workProgress = 0;
+          }
+        }
+      }
+
       // 2. Advance working units
       if (unit.state === 'working_on_file') {
         unit.workProgress = Math.min(100, (unit.workProgress ?? 0) + 0.08 * scale);
@@ -159,12 +187,173 @@ export class LocalWorldManager {
     if (this.localTickCount % 30 === 0) {
       this._dispatchNextMission();
     }
+
+    // 4. Power System tick (every 100ms = ~6 ticks)
+    if (this.localTickCount % 6 === 0) {
+      this._tickPowerSystem();
+    }
+
+    // 5. Rest System tick (every 200ms = ~12 ticks)
+    if (this.localTickCount % 12 === 0) {
+      this._tickRestSystem();
+    }
+
+    // 6. Temperature System tick (every 500ms = ~30 ticks)
+    if (this.localTickCount % 30 === 0) {
+      this._tickTemperatureSystem();
+    }
   }
 
-  queueLocalMission(repoId: string, filePath: string, fileName: string): void {
-    this.missionQueue.push({
+  private _tickRestSystem(): void {
+    if (!this.localWorld || !this.localWorld.restAreas) return;
+
+    for (const unit of this.localUnits) {
+      // Fatigue decreases while working, increases while resting
+      if (unit.state === 'working_on_file') {
+        unit.fatigue = Math.max(0, unit.fatigue - 0.5); // fatigue drain per tick
+      } else if (unit.state === 'resting') {
+        // Recovery handled by rest area
+      } else if (unit.state === 'idle_in_room' || unit.state === 'walking_to_workbench' || unit.state === 'walking_to_room') {
+        unit.fatigue = Math.max(0, unit.fatigue - 0.1); // slow drain while idle/moving
+      }
+
+      // Auto-seek rest when fatigue < 30 and not already resting
+      if (unit.fatigue < 30 && unit.state !== 'resting' && unit.state !== 'walking_to_room') {
+        this._sendUnitToRest(unit);
+      }
+
+      // Resting units recover fatigue
+      if (unit.state === 'resting' && unit.restingRoomId) {
+        const restArea = this.localWorld.restAreas.find(ra => ra.id === unit.restingRoomId);
+        if (restArea) {
+          const recoveryPerTick = (restArea.recoveryRate / 1000) * TICK_MS * 12; // per 12-tick interval
+          unit.fatigue = Math.min(unit.maxFatigue, unit.fatigue + recoveryPerTick);
+
+          // Leave rest when fully recovered
+          if (unit.fatigue >= unit.maxFatigue * 0.95) {
+            this._exitRest(unit, restArea);
+          }
+        } else {
+          // Rest area gone, exit rest
+          unit.state = 'idle_in_room';
+          unit.isResting = false;
+          unit.restingRoomId = undefined;
+        }
+      }
+    }
+  }
+
+  private _sendUnitToRest(unit: LocalUnit): void {
+    if (!this.localWorld || !this.localWorld.restAreas || this.localWorld.restAreas.length === 0) return;
+
+    // Find available rest area with capacity
+    let bestRest: typeof this.localWorld.restAreas[0] | null = null;
+    let bestDist = Infinity;
+
+    for (const rest of this.localWorld.restAreas) {
+      if (rest.unitsInside.length >= rest.capacity) continue;
+
+      // Find nearest bed tile
+      for (const bedTile of rest.tiles) {
+        const dist = Math.abs(unit.gridX - bedTile.x) + Math.abs(unit.gridY - bedTile.y);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestRest = rest;
+        }
+      }
+    }
+
+    if (!bestRest) return;
+
+    // Pick a free bed
+    const freeBed = bestRest.tiles.find(() => !bestRest.unitsInside.includes(unit.id));
+    if (!freeBed) return;
+
+    // Path to bed
+    const pathResult = findPath(this.localWorld, unit.gridX, unit.gridY, freeBed.x, freeBed.y);
+    if (!pathResult) return;
+
+    unit.path = pathResult.path;
+    unit.pathIndex = 0;
+    unit.pathProgress = 0;
+    unit.state = 'walking_to_room';
+    unit.targetX = freeBed.x;
+    unit.targetY = freeBed.y;
+    unit.restingRoomId = bestRest.id;
+    bestRest.unitsInside.push(unit.id);
+  }
+
+  private _exitRest(unit: LocalUnit, restArea: { id: string; unitsInside: string[] }): void {
+    unit.state = 'idle_in_room';
+    unit.isResting = false;
+    unit.restingRoomId = undefined;
+    restArea.unitsInside = restArea.unitsInside.filter(id => id !== unit.id);
+  }
+
+  private _tickPowerSystem(): void {
+    if (!this.localWorld || !this.localWorld.powerGrid) return;
+
+    const pg = this.localWorld.powerGrid;
+
+    // Calculate net power
+    let generated = 0;
+    for (const src of pg.sources) {
+      if (src.type === 'generator' && src.fuel !== undefined) {
+        src.fuel = Math.max(0, src.fuel - 0.1); // fuel consumption
+        if (src.fuel > 0) generated += src.outputWatts;
+      } else if (src.type === 'solar') {
+        // Solar varies with "time of day" simulation
+        const hour = (Date.now() / 3600000) % 24;
+        const solarFactor = hour > 6 && hour < 18 ? Math.sin((hour - 6) / 12 * Math.PI) : 0;
+        generated += src.outputWatts * solarFactor;
+      } else if (src.type === 'wind') {
+        // Wind is random-ish
+        generated += src.outputWatts * (0.3 + Math.random() * 0.7);
+      }
+      // Batteries don't generate
+    }
+
+    let consumed = 0;
+    for (const cons of pg.consumers) {
+      consumed += cons.watts;
+    }
+
+    pg.generatedWatts = Math.round(generated);
+    pg.consumedWatts = Math.round(consumed);
+
+    // Battery charge/discharge
+    const netWatts = pg.generatedWatts - pg.consumedWatts;
+    if (netWatts > 0) {
+      // Charge batteries
+      for (const src of pg.sources) {
+        if (src.type === 'battery' && src.fuel !== undefined) {
+          src.fuel = Math.min(100, src.fuel + (netWatts / BATTERY_STORED) * 100 * (1/600)); // per tick
+          pg.storedWatts = Math.round(src.fuel / 100 * BATTERY_STORED);
+        }
+      }
+    } else if (netWatts < 0) {
+      // Discharge batteries
+      const deficit = Math.abs(netWatts);
+      for (const src of pg.sources) {
+        if (src.type === 'battery' && src.fuel !== undefined && src.fuel > 0) {
+          const draw = Math.min(deficit, src.fuel / 100 * BATTERY_STORED * (1/600));
+          src.fuel = Math.max(0, src.fuel - (draw / BATTERY_STORED) * 100 * 600);
+          pg.storedWatts = Math.round(src.fuel / 100 * BATTERY_STORED);
+        }
+      }
+    }
+
+    // Power outage incident if severe deficit
+    if (pg.consumedWatts > pg.generatedWatts + pg.storedWatts * 0.1 && Math.random() < 0.001) {
+      // Could trigger incident system later
+      console.warn('[Power] Grid overload! Consumed:', pg.consumedWatts, 'Generated:', pg.generatedWatts, 'Stored:', pg.storedWatts);
+    }
+  }
+
+  queueLocalMission(repoId: string, filePath: string, fileName: string, unitId?: string): void {
+    const mission: LocalMission = {
       id: `mission-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      unitId: '',
+      unitId: unitId ?? '',
       repoId,
       filePath,
       fileName,
@@ -175,7 +364,12 @@ export class LocalWorldManager {
       workbenchId: '',
       workbench: null,
       progress: 0,
-    });
+    };
+    this.missionQueue.push(mission);
+
+    if (unitId) {
+      this._assignMissionToSpecificUnit(mission, unitId);
+    }
   }
 
   dispatchMissionById(missionId: string): void {
@@ -185,6 +379,90 @@ export class LocalWorldManager {
   }
 
   // ─── Private helpers ───────────────────────────────────────────────────────
+
+  private _assignMissionToSpecificUnit(queued: LocalMission, unitId: string): void {
+    let unit = this.localUnits.find((u) => u.id === unitId || u.macroUnitId === unitId);
+    if (!unit && this.localWorld) {
+      // Spawn unit at the room entrance
+      const macroUnit = this.getMacroUnit?.(unitId);
+      const entrance = this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
+      const gx = entrance.x + Math.floor(entrance.w / 2);
+      const gy = entrance.y + Math.floor(entrance.h / 2);
+      const color = macroUnit ? (UNIT_COLORS[macroUnit.type] ?? '#4af') : '#4af';
+
+      unit = {
+        id: unitId,
+        name: macroUnit?.name ?? unitId,
+        unitType: macroUnit?.type ?? 'worker',
+        color,
+        gridX: gx,
+        gridY: gy,
+        targetX: null,
+        targetY: null,
+        path: [],
+        pathIndex: 0,
+        pathProgress: 0,
+        state: 'idle_in_room',
+        mission: macroUnit?.mission ?? null,
+        workProgress: 0,
+        macroUnitId: unitId,
+        currentWorkbenchId: null,
+        currentRoomId: this.localWorld.grid[gy]?.[gx]?.roomId ?? null,
+        fatigue: macroUnit?.fatigue ?? 100,
+        maxFatigue: macroUnit?.maxFatigue ?? 100,
+        isResting: macroUnit?.isResting ?? false,
+        effectiveSpeed: macroUnit?.effectiveSpeed ?? 1,
+      };
+      this.localUnits.push(unit);
+    }
+
+    if (!unit || !this.localWorld) return;
+
+    // Interrupt current mission for this unit in missionQueue
+    for (const m of this.missionQueue) {
+      if (m.unitId === unit.id && (m.status === 'walking' || m.status === 'working')) {
+        m.status = 'failed';
+        m.completedAt = Date.now();
+      }
+    }
+
+    let wbX = -1,
+      wbY = -1,
+      wbId = '';
+    outer: for (const row of this.localWorld.grid) {
+      for (const tile of row) {
+        if (tile.type === 'workbench' && tile.workbench?.filePath === queued.filePath) {
+          wbX = tile.x;
+          wbY = tile.y;
+          wbId = tile.workbench.id;
+          break outer;
+        }
+      }
+    }
+    if (wbX === -1) {
+      const nearest = findNearestWorkbench(this.localWorld, unit.gridX, unit.gridY);
+      if (!nearest?.workbench) return;
+      wbX = nearest.x;
+      wbY = nearest.y;
+      wbId = nearest.workbench.id;
+      queued.workbench = nearest.workbench;
+    }
+
+    const pathResult = findPath(this.localWorld, unit.gridX, unit.gridY, wbX, wbY);
+    if (!pathResult) return;
+
+    unit.currentWorkbenchId = wbId;
+    unit.path = pathResult.path;
+    unit.pathIndex = 0;
+    unit.pathProgress = 0;
+    unit.state = 'walking_to_workbench';
+    unit.isResting = false;
+    queued.unitId = unit.id;
+    queued.workbenchId = wbId;
+    queued.status = 'walking';
+    queued.startedAt = Date.now();
+    this.notify();
+  }
 
   private _assignMissionToUnit(queued: LocalMission): void {
     const unit = this.localUnits.find((u) => u.state === 'idle_in_room');
@@ -304,5 +582,46 @@ export class LocalWorldManager {
     const before = this.localUnits.length;
     this.localUnits = this.localUnits.filter((u) => u.id !== unitId);
     if (this.localUnits.length !== before) this.notify();
+  }
+
+  private _tickTemperatureSystem(): void {
+    if (!this.localWorld || !this.localWorld.roomClimates) return;
+
+    const climates = this.localWorld.roomClimates;
+    const HEAT_TRANSFER_RATE = 0.02; // per tick through doors/vents
+
+    for (const [, climate] of climates) {
+      // 1. Heaters add heat
+      for (const heater of climate.heaters) {
+        climate.temperature += (heater.powerWatts / 1000) * 0.5; // simplified heating
+      }
+
+      // 2. Coolers remove heat
+      for (const cooler of climate.coolers) {
+        climate.temperature -= (cooler.powerWatts / 1000) * 0.5; // simplified cooling
+      }
+
+      // 3. Heat transfer through vents to adjacent rooms
+      for (const vent of climate.vents) {
+        if (!vent.open) continue;
+        const otherClimate = climates.get(vent.connectedRoomId);
+        if (!otherClimate) continue;
+
+        const tempDiff = climate.temperature - otherClimate.temperature;
+        const transfer = tempDiff * HEAT_TRANSFER_RATE;
+        climate.temperature -= transfer;
+        otherClimate.temperature += transfer;
+      }
+
+      // 4. Passive heat loss/gain to ambient (21°C)
+      const ambientTemp = 21;
+      const ambientDiff = climate.temperature - ambientTemp;
+      climate.temperature -= ambientDiff * 0.001; // very slow drift to ambient
+
+      // Clamp temperature
+      climate.temperature = Math.max(-20, Math.min(50, climate.temperature));
+    }
+
+    this.notify();
   }
 }

@@ -373,9 +373,10 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
     return _agent_runner._run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model)
 
 def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
-              command_id: str | None = None, harness: str = "", provider: str = "", model: str = "") -> None:
+              command_id: str | None = None, harness: str = "", provider: str = "", model: str = "",
+              repo_path: str = "", file_path: str = "") -> None:
     _configure_agent_runner()
-    return _agent_runner.run_agent(unit_id, city_id, mission, agent_type, command_id, harness=harness, provider=provider, model=model)
+    return _agent_runner.run_agent(unit_id, city_id, mission, agent_type, command_id, harness=harness, provider=provider, model=model, repo_path=repo_path, file_path=file_path)
 
 
 def _execute_streaming(unit_id: str, mission_id: str, mission: str,
@@ -503,8 +504,11 @@ def _dispatch_command(cmd: Command) -> None:
         harness = str(payload.get("harness", ""))
         provider = str(payload.get("provider", ""))
         model = str(payload.get("model", ""))
+        repo_path = str(payload.get("repoPath") or payload.get("cwd") or "")
+        file_path = str(payload.get("filePath") or "")
         run_agent(unit, city, mission, agent_type, cmd.id,
-                 harness=harness, provider=provider, model=model)
+                 harness=harness, provider=provider, model=model,
+                 repo_path=repo_path, file_path=file_path)
         _register_issue_run(payload, cmd.id)
         return
 
@@ -861,6 +865,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
             if city_id:
                 ctx["city_id"] = city_id
                 status, body = _routes.get_city_lab_status(ctx)
+                self._respond(status, body)
+                return
+
+        # ── File tree API for local view ──────────────────────────────────────────
+        if path.startswith("/api/files/"):
+            repo_id = path[len("/api/files/"):].split("/")[0]
+            if repo_id:
+                ctx["path"] = self.path  # full path for extraction
+                ctx["repo_path"] = ""  # will be resolved from repo_id
+                status, body = _routes.get_repo_file_tree(ctx)
                 self._respond(status, body)
                 return
 
@@ -1264,6 +1278,10 @@ if __name__ == "__main__":
                         "harness": raw.get("harness", ""),
                         "provider": raw.get("provider", ""),
                         "model": raw.get("model", ""),
+                        "repoPath": raw.get("repoPath", ""),
+                        "filePath": raw.get("filePath", ""),
+                        "fileName": raw.get("fileName", ""),
+                        "cwd": raw.get("cwd", ""),
                     },
                     "created_by": "user",
                 }

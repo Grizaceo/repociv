@@ -94,6 +94,7 @@ export class GameState {
     this._local = new LocalWorldManager(
       () => this.notify(),
       () => this.getAllUnits()[0],
+      (id: string) => this.getUnit(id),
     );
     // Index existing units and buildings
     for (const u of world.units) this.unitMap.set(u.id, u);
@@ -552,8 +553,8 @@ export class GameState {
     const unit = this._local.getLocalUnit(unitId);
     if (unit) unit.assignedTask = task;
   }
-  queueLocalMission(repoId: string, filePath: string, fileName: string): void {
-    this._local.queueLocalMission(repoId, filePath, fileName);
+  queueLocalMission(repoId: string, filePath: string, fileName: string, unitId?: string): void {
+    this._local.queueLocalMission(repoId, filePath, fileName, unitId);
   }
   dispatchMissionById(missionId: string): void {
     this._local.dispatchMissionById(missionId);

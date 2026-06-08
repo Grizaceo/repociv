@@ -49,129 +49,78 @@ async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}
   expect(pageErrors, 'sin errores JS no capturados durante bootstrap').toEqual([]);
 }
 
-async function getActualCityScreenPositions(page: Page): Promise<Array<{ x: number; y: number; coord: { q: number; r: number } }>> {
+async function getActualCityScreenPositions(page: Page): Promise<Array<{ cityId: string; x: number; y: number }>> {
   return await page.evaluate(() => {
-    const canvas = document.getElementById('main-canvas') as HTMLCanvasElement;
-    if (!canvas) return [];
-
-    const HEX_SIZE = 48;
-    const SQRT3 = Math.sqrt(3);
-
-    // Helper functions (must be inside evaluate for browser context)
-    const AXIAL_DIRECTIONS = [
-      { q: +1, r: 0 },   // E (0)
-      { q: +1, r: -1 },  // NE (1)
-      { q: 0, r: -1 },   // NW (2)
-      { q: -1, r: 0 },   // W (3)
-      { q: -1, r: +1 },  // SW (4)
-      { q: 0, r: +1 },   // SE (5)
-    ];
-
-    function axialAdd(a: any, b: any) { return { q: a.q + b.q, r: a.r + b.r }; }
-    function axialScale(a: any, k: number) { return { q: a.q * k, r: a.r * k }; }
-    function axialNeighbour(hex: any, dir: number) {
-      const d = AXIAL_DIRECTIONS[dir];
-      return { q: hex.q + d.q, r: hex.r + d.r };
-    }
-    function axialDistance(a: any, b: any) {
-      const dq = a.q - b.q;
-      const dr = a.r - b.r;
-      const ds = (-a.q - a.r) - (-b.q - b.r);
-      return (Math.abs(dq) + Math.abs(dr) + Math.abs(ds)) / 2;
-    }
-
-    function spiralCoords(center: any, count: number) {
-      if (count === 0) return [];
-      const results: any[] = [center];
-      for (let k = 1; results.length < count; k++) {
-        let hex = axialAdd(center, axialScale(AXIAL_DIRECTIONS[4], k));
-        for (let i = 0; i < 6 && results.length < count; i++) {
-          for (let j = 0; j < k && results.length < count; j++) {
-            results.push(hex);
-            hex = axialNeighbour(hex, i);
-          }
+    return (
+      (
+        window as Window & {
+          __repocivDebug?: {
+            getMacroCityScreenPositions?: () => Array<{ cityId: string; x: number; y: number }>;
+          };
         }
-      }
-      return results;
-    }
-
-    function axialToPixel(a: any) {
-      const x = HEX_SIZE * ((3 / 2) * a.q);
-      const y = HEX_SIZE * ((SQRT3 / 2) * a.q + SQRT3 * a.r);
-      return { x, y };
-    }
-
-    const MIN_CITY_DISTANCE = 3;
-    const center = { q: 0, r: 0 };
-    const maxAutoCoords = 200;
-    const cityCoords = spiralCoords(center, maxAutoCoords);
-
-    const occupiedCoords = new Set(['0,0', '-1,0', '1,0']);
-    const cityCoordLookup = new Map<string, { q: number; r: number }>();
-
-    let maxCities = 12;
-    try {
-      const selected = localStorage.getItem('repociv:selected-repos:v1');
-      if (selected) {
-        const data = JSON.parse(selected);
-        const nonCapital = data.selectedRepoPaths.filter((p: string) => !p.toLowerCase().includes('repociv'));
-        maxCities = Math.min(nonCapital.length, 12);
-      }
-    } catch {}
-
-    for (let repoIdx = 0; repoIdx < maxCities; repoIdx++) {
-      let placed = false;
-      for (let cursor = 0; cursor < cityCoords.length && !placed; cursor++) {
-        const coord = cityCoords[cursor];
-        const key = `${coord.q},${coord.r}`;
-        if (occupiedCoords.has(key)) continue;
-
-        let tooClose = false;
-        for (const assignedCoord of cityCoordLookup.values()) {
-          if (axialDistance(coord, assignedCoord) < MIN_CITY_DISTANCE) {
-            tooClose = true;
-            break;
-          }
-        }
-        if (tooClose) continue;
-
-        occupiedCoords.add(key);
-        cityCoordLookup.set(`repo-${repoIdx}`, coord);
-        placed = true;
-      }
-    }
-
-    const cam = { x: 0, y: 0, cx: canvas.width / 2, cy: canvas.height / 2, zoom: 1 };
-
-    const positions: Array<{ x: number; y: number; coord: { q: number; r: number } }> = [];
-    for (const [repo, coord] of cityCoordLookup.entries()) {
-      const worldPos = axialToPixel(coord);
-      const screenX = (worldPos.x - cam.x) * cam.zoom + cam.cx;
-      const screenY = (worldPos.y - cam.y) * cam.zoom + cam.cy;
-      positions.push({ x: screenX, y: screenY, coord: { q: coord.q, r: coord.r } });
-    }
-    return positions;
+      ).__repocivDebug?.getMacroCityScreenPositions?.() ?? []
+    );
   });
 }
 
+async function waitForCityScreenPositions(
+  page: Page,
+  timeoutMs = 5000,
+): Promise<Array<{ cityId: string; x: number; y: number }>> {
+  const deadline = Date.now() + timeoutMs;
+  let positions: Array<{ cityId: string; x: number; y: number }> = [];
+  while (Date.now() < deadline) {
+    positions = await getActualCityScreenPositions(page);
+    if (positions.length > 0) return positions;
+    await page.waitForTimeout(250);
+  }
+  return positions;
+}
+
+async function getFirstSelectableCityId(page: Page): Promise<string | null> {
+  const response = await page.request.get('/api/repos');
+  expect(response.ok(), await response.text()).toBeTruthy();
+  const repos = (await response.json()) as Array<{ name?: string }>;
+  return repos
+    .map((repo) => repo.name)
+    .find((name): name is string => typeof name === 'string' && name.length > 0 && !/repociv/i.test(name)) ?? null;
+}
+
 async function tryEnterLocalView(page: Page): Promise<boolean> {
-  const positions = await getActualCityScreenPositions(page);
+  const positions = await waitForCityScreenPositions(page);
 
-  if (positions.length === 0) return false;
+  if (positions.length > 0) {
+    for (const pos of positions) {
+      await page.mouse.dblclick(pos.x, pos.y);
+      await page.waitForTimeout(300);
 
-  for (const pos of positions) {
-    await page.mouse.dblclick(pos.x, pos.y);
-    await page.waitForTimeout(300);
+      const localFrame = page.locator('#local-view-frame');
+      const isVisible = await localFrame.isVisible().catch(() => false);
 
-    const localFrame = page.locator('#local-view-frame');
-    const isVisible = await localFrame.isVisible().catch(() => false);
-
-    if (isVisible) {
-      return true;
+      if (isVisible) {
+        return true;
+      }
     }
   }
 
-  return false;
+  const fallbackCityId = positions[0]?.cityId ?? (await getFirstSelectableCityId(page));
+  if (!fallbackCityId) return false;
+
+  const openedViaDebug = await page.evaluate((cityId) => {
+    return (
+      (
+        window as Window & {
+          __repocivDebug?: { openLocalView?: (id: string) => boolean };
+        }
+      ).__repocivDebug?.openLocalView?.(cityId) ?? false
+    );
+  }, fallbackCityId);
+  if (!openedViaDebug) return false;
+
+  const localFrame = page.locator('#local-view-frame');
+  await expect(localFrame).toBeVisible({ timeout: 5000 });
+  await page.locator('#main-canvas').focus();
+  return true;
 }
 
 async function getJSHeapSize(page: Page): Promise<number> {

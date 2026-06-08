@@ -2,6 +2,7 @@ import {
   fetchRepoSelectionState,
   fetchScannedRepos,
   fetchSelectionForRoot,
+  loadSelectedRepoPaths,
   persistRootSelection,
   saveSelectedRepoPaths,
   type ScannedRepo,
@@ -48,7 +49,8 @@ async function setMapRoot(path: string): Promise<string> {
 }
 
 function hasStoredSelection(): boolean {
-  return false;
+  const stored = loadSelectedRepoPaths();
+  return stored !== null && stored.size > 0;
 }
 
 function sortRepos(repos: ScannedRepo[]): ScannedRepo[] {
@@ -376,10 +378,13 @@ export async function runRepoOnboarding(): Promise<void> {
 export async function openOnboardingPanel(): Promise<void> {
   try {
     const state = await fetchRepoSelectionState();
-    if (state.hasSelections) {
-      saveSelectedRepoPaths(state.selectedRepoIds);
+    const activeRootState = state.roots.find((r) => r.path === state.activeRoot);
+    const hasActiveSelections = activeRootState && activeRootState.selectedRepoPaths.length > 0;
+    if (hasActiveSelections) {
+      saveSelectedRepoPaths(activeRootState.selectedRepoPaths);
       return;
     }
+    if (hasStoredSelection()) return;
   } catch {
     if (hasStoredSelection()) return;
   }

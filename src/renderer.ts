@@ -106,6 +106,10 @@ export class Renderer {
   localUnitRenderedCb:
     | ((unit: import('./types.ts').LocalUnit, screenX: number, screenY: number) => void)
     | null = null;
+  // Zone painting callback
+  onZonePaintedCb:
+    | ((type: import('./types.ts').ZoneType, tiles: Array<{ x: number; y: number }>) => void)
+    | null = null;
   onExitLocalView: (() => void) | null = null;
   private _localRendererCtor: (new (canvas: HTMLCanvasElement) => LocalRendererType) | null = null;
   private localWorldId: string | null = null;
@@ -140,6 +144,7 @@ export class Renderer {
 
   constructor(canvas: HTMLCanvasElement, state: GameState) {
     this.canvas = canvas;
+    this.canvas.tabIndex = 0;
     this.ctx = canvas.getContext('2d')!;
     this.state = state;
     this.hexR = new HexRenderer(this.ctx);
@@ -163,6 +168,12 @@ export class Renderer {
 
   async loadAssets() {
     await this.hexR.loadAssets();
+  }
+
+  async preloadLocalRenderer() {
+    if (this._localRendererCtor) return;
+    const mod = await import('./localRenderer.ts');
+    this._localRendererCtor = mod.LocalRenderer;
   }
 
   private resize() {
@@ -470,6 +481,7 @@ export class Renderer {
       const wy = e.clientY - rect.top;
       const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
       const tile = this.state.world.tiles.get(tileKey(coord));
+      const city = tile?.city ?? this.getCityAtScreen(wx, wy);
 
       // Priority 1: wonder district hex (Bibliotheca / LabHub tiles)
       if (tile?.district?.type === 'wonder' && tile.district.wonderType) {
@@ -485,20 +497,14 @@ export class Renderer {
       }
 
       // Priority 3: capital city → capital panel
-      if (tile?.city) {
-        const city = tile.city;
+      if (city) {
         if (city.isCapital) {
           openCapitalPanel();
           return;
         }
         const cityId = city.id;
-        void (async () => {
-          if (!this._localRendererCtor) {
-            const mod = await import('./localRenderer.ts');
-            this._localRendererCtor = mod.LocalRenderer;
-          }
-          this.onEnterLocal?.(cityId, cityId);
-        })();
+        void this.preloadLocalRenderer();
+        this.onEnterLocal?.(cityId, cityId);
       }
     });
 
@@ -517,6 +523,27 @@ export class Renderer {
   private getTileAt(wx: number, wy: number) {
     const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
     return this.state.world.tiles.get(tileKey(coord)) ?? null;
+  }
+
+  private getCityAtScreen(wx: number, wy: number): City | null {
+    const exact = this.getTileAt(wx, wy)?.city ?? null;
+    if (exact) return exact;
+
+    const worldX = (wx - this.cam.cx) / this.cam.zoom + this.cam.x;
+    const worldY = (wy - this.cam.cy) / this.cam.zoom + this.cam.y;
+    const threshold = HEX_SIZE * 0.95;
+
+    let best: City | null = null;
+    let bestDistance = Infinity;
+    for (const city of this.state.world.cities) {
+      const pos = axialToPixel(city.coord, HEX_SIZE);
+      const distance = Math.hypot(worldX - pos.x, worldY - pos.y);
+      if (distance <= threshold && distance < bestDistance) {
+        best = city;
+        bestDistance = distance;
+      }
+    }
+    return best;
   }
 
   /** Cursor when not actively grabbing/panning (respects placing + city relocate modes). */
@@ -542,10 +569,11 @@ export class Renderer {
     const wy = e.clientY - rect.top;
     const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
     const tile = this.state.world.tiles.get(tileKey(coord));
+    const city = tile?.city ?? this.getCityAtScreen(wx, wy);
 
     // Placing mode: click empty hex → callback, then exit placing mode
     if (this._placingMode) {
-      if (!tile?.city && !this.state.getUnitAt(coord)) {
+      if (!city && !this.state.getUnitAt(coord)) {
         this.onEmptyTileClick?.(coord);
       }
       this.setPlacingMode(false);
@@ -558,10 +586,10 @@ export class Renderer {
       return;
     }
 
-    if (this.actionMode === 'build' && this.selectedUnit && tile?.city) {
-      const proj = tile.city.currentProject;
+    if (this.actionMode === 'build' && this.selectedUnit && city) {
+      const proj = city.currentProject;
       this.state.startBuilding(
-        tile.city.id,
+        city.id,
         proj?.id ?? `building-${Date.now()}`,
         proj?.name ?? 'New Building',
         proj?.durationSeconds ?? 60,
@@ -580,13 +608,13 @@ export class Renderer {
       return;
     }
 
-    if (tile?.city) {
+    if (city) {
       this.selectedUnit = null;
-      this.selectedCity = tile.city;
+      this.selectedCity = city;
       this.state.selectUnit(null);
       this.onUnitSelect?.(null);
-      this.onCitySelect?.(tile.city.id);
-      this.onTileInspect?.(tile.city.name, coord, tile.city.id);
+      this.onCitySelect?.(city.id);
+      this.onTileInspect?.(city.name, city.coord, city.id);
       return;
     }
 
@@ -652,12 +680,15 @@ export class Renderer {
     if (currentViewMode === 'local' && !this.localR && this._localRendererCtor) {
       this.localR = new this._localRendererCtor(canvas);
       this.localR.setupInput();
+      this.localR.onRequestExit = () => this.state.enterMacroView();
       // Wire stored local-view callbacks (set from main.ts)
       this.localR.onLocalUnitHover = (unit, sx, sy) => this.localUnitHoverCb?.(unit, sx, sy);
       this.localR.onWorkbenchClick = this.localWorkbenchClickCb;
       this.localR.onLocalUnitClick = this.localUnitClickCb;
       this.localR.onTileClick = (x, y, tile) => this.localTileClickCb?.(x, y, tile, 0, 0);
       this.localR.onUnitRendered = (unit, sx, sy) => this.localUnitRenderedCb?.(unit, sx, sy);
+      this.localR.onZonePainted = (type, tiles) => this.onZonePaintedCb?.(type, tiles);
+      this.localR.setInputActive(currentViewMode === 'local');
     }
 
     // Handle view mode transitions
@@ -665,6 +696,7 @@ export class Renderer {
       if (currentViewMode === 'local' && this.localR) {
         // Entering local view
         this._localExitInProgress = false;
+        this.canvas.focus({ preventScroll: true });
         this.localR.startEnterTransition();
         this._previousViewMode = 'local';
       } else if (currentViewMode === 'macro' && this.localR) {
@@ -679,6 +711,7 @@ export class Renderer {
     }
 
     if (currentViewMode === 'local') {
+      this.localR?.setInputActive(true);
       if (!document.body.classList.contains('local-view')) {
         document.body.classList.add('local-view');
       }
@@ -713,7 +746,12 @@ export class Renderer {
       this.onExitLocalView?.();
     }
     this._localExitInProgress = false;
+    this.localR?.setInputActive(false);
     this._previousViewMode = 'macro';
+
+    // Reset canvas context state after local view exit (localR leaves globalAlpha ~0)
+    ctx.globalAlpha = 1;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     ctx.save();
     ctx.translate(cam.cx, cam.cy);

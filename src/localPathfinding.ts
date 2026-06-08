@@ -203,7 +203,7 @@ export function findNearestWorkbench(
     world,
     fromX,
     fromY,
-    (t) => t.type === 'workbench' && t.workbench !== null,
+    (t) => t.workbench !== null && t.workbench !== undefined,
   );
   if (!result) return null;
   const tile = world.grid[result.y]![result.x]!;

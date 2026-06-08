@@ -1112,3 +1112,73 @@ def post_model_override(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int
 
 # ─── Type alias ───────────────────────────────────────────────────────────────
 RouteContext = dict[str, Any]
+
+# ─── File tree API for local view ─────────────────────────────────────────────
+def get_repo_file_tree(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/files/{repoId} — return file tree for local view generation."""
+    from pathlib import Path
+
+    from server import repo_roots_state as _rrs
+
+    def _extract_repo_id(raw_path: str) -> str:
+        repo_path = raw_path.split("?", 1)[0]
+        return repo_path[len("/api/files/") :] if repo_path.startswith("/api/files/") else ""
+
+    def _resolve_repo_path(repo_id: str, explicit_path: str) -> str:
+        if explicit_path:
+            return explicit_path
+        decoded = _rrs.decode_repo_id(repo_id)
+        if decoded:
+            return decoded
+        active_root = _rrs.active_root()
+        if active_root:
+            return os.path.join(active_root, repo_id)
+        map_root = (
+            os.environ.get("REPOCIV_MAP_ROOT")
+            or os.environ.get("REPOCIV_REPOS_ROOT")
+            or os.environ.get("WORKSPACE_ROOT")
+            or str(Path.home() / ".hermes" / "workspace" / "repos")
+        )
+        return os.path.join(os.path.expanduser(map_root), repo_id)
+
+    path = str(ctx.get("repo_path", "") or "")
+    full_path = str(ctx.get("path", "") or "")
+    repo_id = _extract_repo_id(full_path)
+    path = _resolve_repo_path(repo_id, path)
+
+    if not path:
+        return 400, {"error": "Missing repo path"}
+
+    try:
+        repo_path = Path(path).expanduser().resolve()
+        if not repo_path.is_dir():
+            return 404, {"error": f"Repository not found: {path}"}
+
+        files: list[str] = []
+
+        # Build file tree
+        def build_tree(dir_path: Path, rel_path: str = "") -> dict:
+            node = {"name": dir_path.name or dir_path.name, "path": rel_path, "type": "dir", "children": []}
+            try:
+                for item in sorted(dir_path.iterdir(), key=lambda x: (x.is_file(), x.name.lower())):
+                    if item.name.startswith(".") or item.name in ("__pycache__", "node_modules", "dist", "build", ".git"):
+                        continue
+                    item_rel = os.path.join(rel_path, item.name)
+                    if item.is_dir():
+                        node["children"].append(build_tree(item, item_rel))
+                    else:
+                        files.append(item_rel)
+                        node["children"].append({
+                            "name": item.name,
+                            "path": item_rel,
+                            "type": "file"
+                        })
+            except PermissionError:
+                pass
+            return node
+
+        tree = build_tree(repo_path, repo_path.name)
+        return 200, {"tree": tree, "files": files, "repoId": repo_id or repo_path.name}
+
+    except Exception as e:
+        return 500, {"error": str(e)}

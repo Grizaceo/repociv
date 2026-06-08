@@ -74,7 +74,7 @@ export type LocalMenuAction = string; // 'DAVI' | 'WORKER' | 'git' | 'code' | 'i
 
 export function showLocalContextMenu(
   wb: Workbench,
-  idleAgents: Array<{ id: string; name: string; type: string }>,
+  idleAgents: Array<{ id: string; name: string; type: string; state?: string }>,
   screenPos: { x: number; y: number },
   onSelect: (action: LocalMenuAction) => void,
 ) {
@@ -86,17 +86,30 @@ export function showLocalContextMenu(
 
   const items: string[] = [];
 
-  // Agent dispatch items (only if idle agents exist)
+  // Agent dispatch items
   const dav = idleAgents.find((a) => a.id === 'DAVI' || a.name === 'DAVI');
   const wrk = idleAgents.find((a) => a.type === 'worker');
 
+  const hasDavi = true; // DAVI is the primary agent, always allow sending
+  const hasWorker = !!wrk || idleAgents.some((a) => a.id.toLowerCase().includes('worker'));
+
+  const daviState = dav && dav.state && dav.state !== 'idle'
+    ? ` (${dav.state === 'working' ? 'Trabajando' : dav.state})`
+    : '';
+  const daviLabel = `Enviar DAVI${daviState}`;
+
+  const workerState = wrk && wrk.state && wrk.state !== 'idle'
+    ? ` (${wrk.state === 'working' ? 'Trabajando' : wrk.state})`
+    : '';
+  const workerLabel = `Enviar WORKER${workerState}`;
+
   items.push(`
-    <div class="lt-item${dav ? '' : ' lt-disabled'}" data-action="DAVI">
-      <span class="lt-icon">🧑‍🔧</span> Enviar DAVI
+    <div class="lt-item${hasDavi ? '' : ' lt-disabled'}" data-action="DAVI">
+      <span class="lt-icon">🧑‍🔧</span> ${daviLabel}
     </div>`);
   items.push(`
-    <div class="lt-item${wrk ? '' : ' lt-disabled'}" data-action="WORKER">
-      <span class="lt-icon">👷</span> Enviar WORKER
+    <div class="lt-item${hasWorker ? '' : ' lt-disabled'}" data-action="WORKER">
+      <span class="lt-icon">👷</span> ${workerLabel}
     </div>`);
   items.push(`
     <div class="lt-sep"></div>

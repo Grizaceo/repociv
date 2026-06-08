@@ -1,7 +1,7 @@
 // ─── RepoCiv — Local Renderer (RimWorld-style 2D grid) ─────────────────────────
-import type { LocalWorld, LocalTile, LocalRoom, LocalUnit } from './types.ts';
+import type { LocalWorld, LocalTile, LocalRoom, LocalUnit, ZoneType } from './types.ts';
 
-const TILE_SIZE = 24; // px per tile
+const TILE_SIZE = 32; // px per tile
 
 interface LocalParticle {
   active: boolean;
@@ -42,12 +42,56 @@ export class LocalRenderer {
   // ─── Fase 1: LOD + Clean Mode ──────────────────────────────────────
   private _cleanMode = false;
   private _currentLod: 'low' | 'medium' | 'high' = 'medium';
+  private _powerOverlay = false;
 
   setCleanMode(active: boolean): void {
     this._cleanMode = active;
   }
   isCleanMode(): boolean {
     return this._cleanMode;
+  }
+
+  // Power overlay toggle
+  setPowerOverlay(active: boolean): void {
+    this._powerOverlay = active;
+  }
+  togglePowerOverlay(): boolean {
+    this._powerOverlay = !this._powerOverlay;
+    return this._powerOverlay;
+  }
+  isPowerOverlay(): boolean {
+    return this._powerOverlay;
+  }
+
+  // ─── Zone Painting Mode (RimWorld-style) ────────────────────────────────
+  private _zonePaintMode: ZoneType | null = null;
+  private _zonePaintStart: { x: number; y: number } | null = null;
+  private _zonePaintCurrent: { x: number; y: number } | null = null;
+
+  setZonePaintMode(type: ZoneType | null): void {
+    this._zonePaintMode = type;
+    this._zonePaintStart = null;
+    this._zonePaintCurrent = null;
+  }
+  getZonePaintMode(): ZoneType | null {
+    return this._zonePaintMode;
+  }
+  isZonePaintMode(): boolean {
+    return this._zonePaintMode !== null;
+  }
+
+  // ─── Temperature Overlay Toggle ─────────────────────────────────────────
+  private _temperatureOverlay = false;
+
+  setTemperatureOverlay(active: boolean): void {
+    this._temperatureOverlay = active;
+  }
+  toggleTemperatureOverlay(): boolean {
+    this._temperatureOverlay = !this._temperatureOverlay;
+    return this._temperatureOverlay;
+  }
+  isTemperatureOverlay(): boolean {
+    return this._temperatureOverlay;
   }
 
   // ─── Fade Transition (300ms) ──────────────────────────────────────
@@ -57,12 +101,17 @@ export class LocalRenderer {
 
   /** Call when local view is being entered (from macro view). */
   startEnterTransition(): void {
+    this._inputActive = true;
     this._transitionState = 'entering';
     this._transitionStartTime = performance.now();
   }
 
   /** Call when local view is being exited (back to macro view). */
   startExitTransition(): void {
+    this._inputActive = false;
+    this.isDragging = false;
+    this._zonePaintStart = null;
+    this._zonePaintCurrent = null;
     this._transitionState = 'exiting';
     this._transitionStartTime = performance.now();
   }
@@ -100,6 +149,18 @@ export class LocalRenderer {
   private isDragging = false;
   private dragStart = { x: 0, y: 0 };
   private camStart = { x: 0, y: 0 };
+  private _inputActive = true;
+
+  setInputActive(active: boolean): void {
+    this._inputActive = active;
+    if (!active) {
+      this.isDragging = false;
+      this._zonePaintStart = null;
+      this._zonePaintCurrent = null;
+      this._hoveredUnit = null;
+      this.hoveredTile = null;
+    }
+  }
 
   // Interaction
   hoveredTile: { x: number; y: number } | null = null;
@@ -116,6 +177,9 @@ export class LocalRenderer {
   onUnitRendered: ((unit: LocalUnit, screenX: number, screenY: number) => void) | null = null;
   // Phase 9 (transition): notifies parent when the exit transition completes
   onExitLocalView: (() => void) | null = null;
+  // Zone painting: notifies parent when a zone rectangle is finalized
+  onZonePainted: ((type: ZoneType, tiles: Array<{ x: number; y: number }>) => void) | null = null;
+  onRequestExit: (() => void) | null = null;
 
   // Internal
   private _localUnits: LocalUnit[] = [];
@@ -186,19 +250,39 @@ export class LocalRenderer {
     const canvas = this.canvas;
 
     canvas.addEventListener('mousedown', (e) => {
+      if (!this._inputActive) return;
       if (e.button === 0) {
-        this.isDragging = true;
-        this.dragStart = { x: e.clientX, y: e.clientY };
-        this.camStart = { x: this.cam.x, y: this.cam.y };
+        if (this._zonePaintMode) {
+          // Zone painting: start drag-rect
+          const rect = canvas.getBoundingClientRect();
+          const wx = e.clientX - rect.left;
+          const wy = e.clientY - rect.top;
+          const tile = this.screenToTile(wx, wy);
+          if (tile) {
+            this._zonePaintStart = { x: tile.x, y: tile.y };
+            this._zonePaintCurrent = { x: tile.x, y: tile.y };
+          }
+        } else {
+          // Normal camera drag
+          this.isDragging = true;
+          this.dragStart = { x: e.clientX, y: e.clientY };
+          this.camStart = { x: this.cam.x, y: this.cam.y };
+        }
       }
     });
 
     canvas.addEventListener('mousemove', (e) => {
+      if (!this._inputActive) return;
       const rect = canvas.getBoundingClientRect();
       const wx = e.clientX - rect.left;
       const wy = e.clientY - rect.top;
       const tile = this.screenToTile(wx, wy);
       this.hoveredTile = tile;
+
+      // Zone painting: update current drag position
+      if (this._zonePaintMode && this._zonePaintStart && tile) {
+        this._zonePaintCurrent = { x: tile.x, y: tile.y };
+      }
 
       // Spatial awareness: unit hover (ported from macro hit-testing)
       const hoveredUnit = this.getUnitAt(wx, wy);
@@ -218,23 +302,32 @@ export class LocalRenderer {
     });
 
     canvas.addEventListener('mouseup', (e) => {
-      if (e.button === 0 && !this.wasDrag(e)) {
-        const rect = canvas.getBoundingClientRect();
-        const sx = e.clientX - rect.left;
-        const sy = e.clientY - rect.top;
-        const tile = this.screenToTile(sx, sy);
+      if (!this._inputActive) return;
+      if (e.button === 0) {
+        if (this._zonePaintMode && this._zonePaintStart && this._zonePaintCurrent) {
+          // Zone painting: finalize rectangle
+          this._finalizeZonePaint();
+          this._zonePaintStart = null;
+          this._zonePaintCurrent = null;
+        } else if (!this.wasDrag(e)) {
+          // Normal click handling
+          const rect = canvas.getBoundingClientRect();
+          const sx = e.clientX - rect.left;
+          const sy = e.clientY - rect.top;
+          const tile = this.screenToTile(sx, sy);
 
-        if (tile) {
-          // Priority: unit > workbench > generic tile (matches macro pattern)
-          const unit = this.getUnitAt(sx, sy);
-          if (unit) {
-            this.onLocalUnitClick?.(unit, sx, sy);
-          } else {
-            const t = this.getTile(tile.x, tile.y);
-            if (t?.type === 'workbench' && t.workbench) {
-              this.onWorkbenchClick?.(t, sx, sy);
+          if (tile) {
+            // Priority: unit > workbench > generic tile (matches macro pattern)
+            const unit = this.getUnitAt(sx, sy);
+            if (unit) {
+              this.onLocalUnitClick?.(unit, sx, sy);
             } else {
-              this.onTileClick?.(tile.x, tile.y, t);
+              const t = this.getTile(tile.x, tile.y);
+              if (t?.workbench) {
+                this.onWorkbenchClick?.(t, sx, sy);
+              } else {
+                this.onTileClick?.(tile.x, tile.y, t);
+              }
             }
           }
         }
@@ -243,6 +336,7 @@ export class LocalRenderer {
     });
 
     canvas.addEventListener('dblclick', (e) => {
+      if (!this._inputActive) return;
       const rect = canvas.getBoundingClientRect();
       const tile = this.screenToTile(e.clientX - rect.left, e.clientY - rect.top);
       if (tile) this.onTileDblClick?.(tile.x, tile.y, this.getTile(tile.x, tile.y));
@@ -251,6 +345,7 @@ export class LocalRenderer {
     canvas.addEventListener(
       'wheel',
       (e) => {
+        if (!this._inputActive) return;
         e.preventDefault();
         const factor = e.deltaY > 0 ? 0.9 : 1.1;
         const newZoom = Math.max(0.2, Math.min(4, this.cam.zoom * factor));
@@ -273,10 +368,76 @@ export class LocalRenderer {
     );
 
     window.addEventListener('resize', () => this.resize());
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (!this._inputActive) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        this.togglePowerOverlay();
+      }
+      if (e.key === 't' || e.key === 'T') {
+        e.preventDefault();
+        this.toggleTemperatureOverlay();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (this._zonePaintMode) {
+          this.setZonePaintMode(null);
+          return;
+        }
+        this.onRequestExit?.();
+        return;
+      }
+      // Zone painting shortcuts (shift + key to avoid conflicts)
+      if (e.shiftKey) {
+        const zoneMap: Record<string, ZoneType> = {
+          s: 'stockpile',
+          g: 'growing',
+          r: 'recreation',
+          b: 'bedroom',
+          d: 'dining',
+          h: 'hospital',
+        };
+        const type = zoneMap[e.key.toLowerCase()];
+        if (type) {
+          e.preventDefault();
+          this.setZonePaintMode(this._zonePaintMode === type ? null : type);
+        }
+        // Escape to cancel zone painting
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          this.setZonePaintMode(null);
+        }
+      }
+    });
   }
 
   private wasDrag(e: MouseEvent): boolean {
     return Math.abs(e.clientX - this.dragStart.x) > 4 || Math.abs(e.clientY - this.dragStart.y) > 4;
+  }
+
+  private _finalizeZonePaint(): void {
+    if (!this._zonePaintMode || !this._zonePaintStart || !this._zonePaintCurrent || !this.world) return;
+
+    const x0 = Math.min(this._zonePaintStart.x, this._zonePaintCurrent.x);
+    const y0 = Math.min(this._zonePaintStart.y, this._zonePaintCurrent.y);
+    const x1 = Math.max(this._zonePaintStart.x, this._zonePaintCurrent.x);
+    const y1 = Math.max(this._zonePaintStart.y, this._zonePaintCurrent.y);
+
+    const tiles: Array<{ x: number; y: number }> = [];
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if (this.getTile(x, y)) {
+          tiles.push({ x, y });
+        }
+      }
+    }
+
+    if (tiles.length > 0) {
+      this.onZonePainted?.(this._zonePaintMode, tiles);
+    }
   }
 
   private screenToTile(sx: number, sy: number): { x: number; y: number } | null {
@@ -322,9 +483,8 @@ export class LocalRenderer {
   render(localUnits: LocalUnit[]) {
     this._localUnits = localUnits;
     const { ctx, canvas, cam, world } = this;
-    if (!world) return;
 
-    // ─── Fade Transition ──────────────────────────────────────────────
+    // ─── Fade Transition (process FIRST — works even without world) ────────────────────────
     const transitionAlpha = this._getTransitionAlpha();
     if (transitionAlpha <= 0 && this._transitionState === 'exiting') {
       this._transitionState = null; // reset after exit
@@ -334,6 +494,9 @@ export class LocalRenderer {
     if (transitionAlpha >= 1 && this._transitionState === 'entering') {
       this._transitionState = 'active';
     }
+
+    // World-dependent rendering — skip if no world yet
+    if (!world) return;
 
     // ─── Fase 1: LOD + Clean Mode at local level ──────────────────────
     this._currentLod = this.calcLod();
@@ -350,15 +513,70 @@ export class LocalRenderer {
       this.rebuildStaticLayer();
     }
 
-    // Background (with transition alpha)
+    // Background fill with transition alpha ONLY for the fade effect
     ctx.globalAlpha = transitionAlpha;
-    ctx.fillStyle = '#0d0d14';
+    ctx.fillStyle = '#12100e';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 1; // reset so world content renders at full opacity
 
     ctx.save();
     ctx.translate(cam.cx, cam.cy);
     ctx.scale(cam.zoom, cam.zoom);
     ctx.translate(-cam.x, -cam.y);
+
+    // Draw tiled industrial concrete floor OUTSIDE the world grid bounds
+    // This fills the visible area beyond the world tiles with the same factory texture
+    if (world) {
+      const worldPxW = world.width * TILE_SIZE;
+      const worldPxH = world.height * TILE_SIZE;
+      // Compute world-space visible rectangle
+      const left = (0 - cam.cx) / cam.zoom + cam.x;
+      const top = (0 - cam.cy) / cam.zoom + cam.y;
+      const right = (canvas.width - cam.cx) / cam.zoom + cam.x;
+      const bottom = (canvas.height - cam.cy) / cam.zoom + cam.y;
+      // Only paint if some outside area is visible
+      if (left < 0 || top < 0 || right > worldPxW || bottom > worldPxH) {
+        const S = TILE_SIZE; // tile stride
+        // Round to nearest tile boundary
+        const x0 = Math.floor(left / S) * S;
+        const y0 = Math.floor(top / S) * S;
+        const x1 = Math.ceil(right / S) * S;
+        const y1 = Math.ceil(bottom / S) * S;
+        for (let ty = y0; ty < y1; ty += S) {
+          for (let tx = x0; tx < x1; tx += S) {
+            // Skip tiles that are inside the world (those get drawn by the static layer)
+            if (tx >= 0 && ty >= 0 && tx < worldPxW && ty < worldPxH) continue;
+            const brightness = ((Math.abs(tx / S) * 7 + Math.abs(ty / S) * 3) % 5) - 2; // -2..+2
+            const base = 52 + brightness * 2;
+            ctx.fillStyle = `rgb(${base},${Math.round(base * 0.95)},${Math.round(base * 0.9)})`;
+            ctx.fillRect(tx, ty, S, S);
+            // Subtle grid seams
+            ctx.strokeStyle = `rgba(0,0,0,0.3)`;
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(tx + 0.5, ty + 0.5, S - 1, S - 1);
+            // Quarter-cross sub-dividers
+            ctx.strokeStyle = `rgba(0,0,0,0.15)`;
+            ctx.beginPath();
+            ctx.moveTo(tx + S / 2, ty);
+            ctx.lineTo(tx + S / 2, ty + S);
+            ctx.moveTo(tx, ty + S / 2);
+            ctx.lineTo(tx + S, ty + S / 2);
+            ctx.stroke();
+            // Rivet dots in corners
+            ctx.fillStyle = `rgba(255,220,100,0.07)`;
+            const r = S / 4;
+            ctx.fillRect(tx + r - 1, ty + r - 1, 2, 2);
+            ctx.fillRect(tx + 3 * r - 1, ty + r - 1, 2, 2);
+            ctx.fillRect(tx + r - 1, ty + 3 * r - 1, 2, 2);
+            ctx.fillRect(tx + 3 * r - 1, ty + 3 * r - 1, 2, 2);
+          }
+        }
+        // Draw a safety-stripe border along the world edge
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.25)';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(0.5, 0.5, worldPxW - 1, worldPxH - 1);
+      }
+    }
 
     // Draw static pre-rendered layer (Phase 3b)
     if (this.staticLayer) {
@@ -393,6 +611,26 @@ export class LocalRenderer {
     // Update and draw particles (suppressed in clean mode & low LOD)
     if (!isClean && !lodLow) {
       this.updateAndDrawParticles(dt);
+    }
+
+    // Draw Power Overlay (if toggled on)
+    if (this._powerOverlay) {
+      this.drawPowerOverlay(world, view);
+    }
+
+    // Draw Temperature Overlay (if toggled on)
+    if (this._temperatureOverlay) {
+      this.drawTemperatureOverlay(world, view);
+    }
+
+    // Draw Zones (from world.zones)
+    if (world.zones && world.zones.length > 0) {
+      this.drawZones(world, view);
+    }
+
+    // Draw Zone Paint Preview (while dragging)
+    if (this._zonePaintMode && this._zonePaintStart && this._zonePaintCurrent) {
+      this.drawZonePaintPreview(view);
     }
 
     // Draw hovered highlight
@@ -530,7 +768,7 @@ export class LocalRenderer {
     const wb = tile.workbench;
     if (!wb) return;
 
-    // Check if an agent is active on this workbench (Phase 6)
+    // Check if an agent is active on this workbench
     const activeUnit = this._localUnits.find(
       (u) => u.state === 'working_on_file' && u.currentWorkbenchId === wb.id,
     );
@@ -546,35 +784,143 @@ export class LocalRenderer {
 
     // Glow effect (expensive, only for active ones!)
     ctx.shadowColor = extColor;
-    ctx.shadowBlur = 12 + 6 * Math.sin(now / 250);
+    ctx.shadowBlur = 10 + 4 * Math.sin(now / 250);
 
-    // Terminal Monitor Screen background
-    ctx.fillStyle = '#1c1c1f';
-    ctx.fillRect(px + 4, py + 4, s - 8, s - 10);
+    // Active Monitor Screen background
+    ctx.fillStyle = '#0f0f12';
+    ctx.fillRect(px + 6, py + 5, s - 12, 9);
     ctx.restore();
 
     // Scroll lines of code
     ctx.save();
     // Clip to screen area
     ctx.beginPath();
-    ctx.rect(px + 4, py + 4, s - 8, s - 10);
+    ctx.rect(px + 6, py + 5, s - 12, 9);
     ctx.clip();
 
     ctx.fillStyle = extColor;
-    ctx.globalAlpha = 0.6;
-    const scrollY = (now / 40) % 6;
+    ctx.globalAlpha = 0.75;
+    const scrollY = (now / 35) % 6;
     for (let i = 0; i < 3; i++) {
-      const ly = py + 6 + i * 5 - scrollY;
-      if (ly >= py + 4 && ly <= py + s - 7) {
-        ctx.fillRect(px + 6, ly, s - 12, 1.5);
+      const ly = py + 6 + i * 4 - scrollY;
+      if (ly >= py + 5 && ly <= py + 14) {
+        ctx.fillRect(px + 7, ly, s - 14, 1.5);
       }
     }
     ctx.restore();
 
-    // Spawning sparks with random chance (Phase 8)
+    // Spawning sparks with random chance
     if (Math.random() < 0.15) {
-      this.spawnSpark(px + s / 2, py + s / 2, extColor);
+      this.spawnSpark(px + s / 2, py + 15, extColor);
     }
+  }
+
+  private drawFloorBackground(tile: LocalTile, px: number, py: number, s: number, inRoom: boolean) {
+    const { ctx } = this;
+    if (!inRoom) {
+      // Non-room space: industrial poured-concrete factory floor
+      const brightness = ((tile.x * 7 + tile.y * 3) % 5) - 2; // -2..+2
+      const base = 52 + brightness * 2;
+      ctx.fillStyle = `rgb(${base},${Math.round(base * 0.95)},${Math.round(base * 0.9)})`;
+      ctx.fillRect(px, py, s, s);
+
+      // Concrete slab seam lines
+      ctx.strokeStyle = `rgba(0,0,0,0.35)`;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+
+      // Sub-divider cross (stamped concrete look)
+      ctx.strokeStyle = `rgba(0,0,0,0.15)`;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(px + s / 2, py);
+      ctx.lineTo(px + s / 2, py + s);
+      ctx.moveTo(px, py + s / 2);
+      ctx.lineTo(px + s, py + s / 2);
+      ctx.stroke();
+
+      // Yellow safety markings every 8 tiles along specific rows/cols (factory hazard lines)
+      const markX = tile.x % 8 === 0;
+      const markY = tile.y % 8 === 0;
+      if (markX || markY) {
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
+        if (markX) ctx.fillRect(px, py, 3, s); // vertical stripe
+        if (markY) ctx.fillRect(px, py, s, 3); // horizontal stripe
+      }
+
+      // Subtle rivet-like bolt detail at corners (every 4th tile)
+      if (tile.x % 4 === 0 && tile.y % 4 === 0) {
+        ctx.fillStyle = 'rgba(100,90,70,0.6)';
+        ctx.fillRect(px + 2, py + 2, 3, 3);
+        ctx.fillStyle = 'rgba(200,180,120,0.3)';
+        ctx.fillRect(px + 3, py + 3, 1, 1);
+      }
+    } else {
+      // Room floor: warm wood panels / flooring
+      let baseColor = '#4e3e34'; // warm wood
+      const delta = ((tile.x * 7 + tile.y * 3) % 5) * 2 - 4; // -4..+4
+      baseColor = _adjustBrightness(baseColor, delta);
+      ctx.fillStyle = baseColor;
+      ctx.fillRect(px, py, s, s);
+
+      // Vertical plank joints
+      ctx.strokeStyle = '#382a22';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(px + s / 3, py);
+      ctx.lineTo(px + s / 3, py + s);
+      ctx.moveTo(px + 2 * s / 3, py);
+      ctx.lineTo(px + 2 * s / 3, py + s);
+      ctx.stroke();
+
+      // Horizontal plank staggered joint lines
+      ctx.beginPath();
+      const offsetHash = (tile.x * 13 + tile.y * 7) % 3;
+      if (offsetHash === 0) {
+        ctx.moveTo(px, py + s / 2);
+        ctx.lineTo(px + s / 3, py + s / 2);
+        ctx.moveTo(px + 2 * s / 3, py + s / 3);
+        ctx.lineTo(px + s, py + s / 3);
+      } else if (offsetHash === 1) {
+        ctx.moveTo(px + s / 3, py + 2 * s / 3);
+        ctx.lineTo(px + 2 * s / 3, py + 2 * s / 3);
+      } else {
+        ctx.moveTo(px, py + s / 4);
+        ctx.lineTo(px + s / 3, py + s / 4);
+        ctx.moveTo(px + 2 * s / 3, py + 3 * s / 4);
+        ctx.lineTo(px + s, py + 3 * s / 4);
+      }
+      ctx.stroke();
+
+      // Soft reflection edge highlights
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+      ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+    }
+  }
+
+  private drawPathBackground(tile: LocalTile, px: number, py: number, s: number) {
+    const { ctx } = this;
+    let baseColor = '#2c2621'; // iron plate
+    const delta = ((tile.x * 7 + tile.y * 3) % 7) - 3;
+    baseColor = _adjustBrightness(baseColor, delta);
+    ctx.fillStyle = baseColor;
+    ctx.fillRect(px, py, s, s);
+
+    // Steel plate borders
+    ctx.strokeStyle = '#1b1815';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+
+    // Corner rivets
+    ctx.fillStyle = '#443d35';
+    ctx.fillRect(px + 3, py + 3, 1.5, 1.5);
+    ctx.fillRect(px + s - 4.5, py + 3, 1.5, 1.5);
+    ctx.fillRect(px + 3, py + s - 4.5, 1.5, 1.5);
+    ctx.fillRect(px + s - 4.5, py + s - 4.5, 1.5, 1.5);
+
+    // Center guide line
+    ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
+    ctx.fillRect(px + s / 2 - 1, py + s / 2 - 1, 2, 2);
   }
 
   private drawTile(tile: LocalTile) {
@@ -582,84 +928,80 @@ export class LocalRenderer {
     const px = tile.x * TILE_SIZE;
     const py = tile.y * TILE_SIZE;
     const s = TILE_SIZE;
+    const inRoom = tile.roomId !== null;
 
-    // Floor and Wall base styling using cached CSS variables (Phase 4)
-    if (tile.type === 'floor' || tile.type === 'door') {
-      let fillColor = this.tokens.zinc800 || '#27272A';
-      const delta = ((tile.x * 7 + tile.y * 3) % 7) - 3; // -3..+3
-      fillColor = _adjustBrightness(fillColor, delta);
-
-      ctx.fillStyle = fillColor;
-      ctx.fillRect(px, py, s, s);
-
-      // Steel grid lines
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.015)';
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
-
-      // Micro-remaches in corners
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-      ctx.fillRect(px + 2, py + 2, 1, 1);
-      ctx.fillRect(px + s - 3, py + 2, 1, 1);
-      ctx.fillRect(px + 2, py + s - 3, 1, 1);
-      ctx.fillRect(px + s - 3, py + s - 3, 1, 1);
+    if (tile.type === 'floor') {
+      this.drawFloorBackground(tile, px, py, s, inRoom);
+    } else if (tile.type === 'door') {
+      this.drawFloorBackground(tile, px, py, s, inRoom);
+      this.drawDoorTile(px, py, s);
     } else if (tile.type === 'path') {
-      // Corridor floor: cleaner, with a guiding center line
-      let fillColor = this.tokens.zinc800 || '#27272A';
-      const delta = ((tile.x * 7 + tile.y * 3) % 7) - 3;
-      fillColor = _adjustBrightness(fillColor, delta);
-
-      ctx.fillStyle = fillColor;
-      ctx.fillRect(px, py, s, s);
-
-      // Metallic side edging
-      ctx.fillStyle = 'rgba(82, 82, 91, 0.25)';
-      ctx.fillRect(px + 1, py, 1, s);
-      ctx.fillRect(px + s - 2, py, 1, s);
-
-      // Center guide line (subtle amber)
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
-      ctx.fillRect(px + s / 2 - 0.5, py + 2, 1, s - 4);
-
-      // Steel grid lines (lighter than floor)
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)';
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+      this.drawPathBackground(tile, px, py, s);
     } else if (tile.type === 'wall') {
       this.drawWallFacade(tile, px, py, s);
-    } else if (tile.type === 'debris') {
-      // Base floor under debris
-      const fillColor = this.tokens.base || '#0C0C0C';
-      ctx.fillStyle = fillColor;
-      ctx.fillRect(px, py, s, s);
+    } else {
+      // draw appropriate flooring under objects
+      if (inRoom) {
+        this.drawFloorBackground(tile, px, py, s, true);
+      } else {
+        this.drawPathBackground(tile, px, py, s);
+      }
 
-      this.drawDebrisTile(px, py, s);
+      if (tile.type === 'debris') {
+        this.drawDebrisTile(px, py, s);
+      } else if (tile.type === 'kiosk') {
+        this.drawKioskTile(px, py, s);
+      } else if (tile.type === 'workbench') {
+        this.drawWorkbenchTile(tile, px, py, s);
+      } else if (tile.type === 'conduit') {
+        // Subtle electrical wire on the floor
+        ctx.strokeStyle = 'rgba(217, 119, 6, 0.6)'; // amber/orange wire
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(px, py + s / 2);
+        ctx.lineTo(px + s, py + s / 2);
+        ctx.moveTo(px + s / 2, py);
+        ctx.lineTo(px + s / 2, py + s);
+        ctx.stroke();
 
-      // Grid line
-      ctx.strokeStyle = this.tokens.border || '#262626';
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
-    } else if (tile.type === 'kiosk') {
-      // Base floor under kiosk
-      ctx.fillStyle = this.tokens.zinc800 || '#27272A';
-      ctx.fillRect(px, py, s, s);
-
-      this.drawKioskTile(px, py, s);
-
-      ctx.strokeStyle = this.tokens.border || '#262626';
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
-    } else if (tile.type === 'workbench') {
-      // Base floor under workbench
-      ctx.fillStyle = this.tokens.zinc800 || '#27272A';
-      ctx.fillRect(px, py, s, s);
-
-      this.drawWorkbenchTile(tile, px, py, s);
-
-      ctx.strokeStyle = this.tokens.border || '#262626';
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
+        // Small junction connector in the center
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(px + s / 2 - 2, py + s / 2 - 2, 4, 4);
+      } else if (tile.type === 'power_source') {
+        this.drawPowerSourceTile(px, py, s);
+      } else if (tile.type === 'power_consumer') {
+        this.drawPowerConsumerTile(px, py, s);
+      } else if (tile.type === 'bed') {
+        this.drawBedTile(px, py, s);
+      } else if (tile.type === 'heater') {
+        this.drawHeaterTile(px, py, s);
+      } else if (tile.type === 'cooler') {
+        this.drawCoolerTile(px, py, s);
+      } else if (tile.type === 'vent') {
+        this.drawVentTile(px, py, s);
+      }
     }
+  }
+
+  private drawDoorTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    
+    // Draw door frame posts on left/right or top/bottom based on adjacent walls
+    // For simplicity, draw vertical door posts on the sides
+    ctx.fillStyle = '#3a342f'; // posts (concrete/metal)
+    ctx.fillRect(px, py, 4, s); // Left post
+    ctx.fillRect(px + s - 4, py, 4, s); // Right post
+
+    // Draw sliding door panel (wood/metal sheet in the middle, slightly open to allow agents through)
+    ctx.fillStyle = '#6e5d53'; // door panel (warm mahogany/metal)
+    ctx.fillRect(px + 4, py + s / 2 - 3, s - 8, 6);
+    ctx.strokeStyle = '#382a22';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px + 4, py + s / 2 - 3, s - 8, 6);
+
+    // Door lock/handle highlight (gold/amber)
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(px + s / 2 - 2, py + s / 2 - 1, 4, 2);
   }
 
   private drawWallFacade(tile: LocalTile, px: number, py: number, s: number) {
@@ -682,110 +1024,127 @@ export class LocalRenderer {
     const east = isOpen(tile.x + 1, tile.y);
     const west = isOpen(tile.x - 1, tile.y);
 
-    // Roof line (simulated height)
-    ctx.fillStyle = '#0a0a0a';
-    ctx.fillRect(px, py - 3, s, 3);
-
-    // Solid carbon wall core
-    ctx.fillStyle = this.tokens.zinc800 || '#27272A';
-    ctx.fillRect(px, py, s, s);
-
-    // Corner detection: open on two perpendicular cardinal sides
+    // Corner detection: open on two perpendicular sides
     const isCorner = (east && south) || (east && north) || (west && south) || (west && north);
 
     if (isCorner) {
-      // Reinforced pillar
-      ctx.fillStyle = '#1a1a1e';
+      // Reinforced concrete column
+      ctx.fillStyle = '#3a342f'; // base wall concrete
+      ctx.fillRect(px, py, s, s);
+
+      ctx.fillStyle = '#4a423a'; // inner column core
       ctx.fillRect(px + 4, py + 4, s - 8, s - 8);
-      // Corner accent lines
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.25)';
+
+      ctx.strokeStyle = '#1b1815';
       ctx.lineWidth = 1;
-      ctx.strokeRect(px + 3.5, py + 3.5, s - 7, s - 7);
+      ctx.strokeRect(px + 4, py + 4, s - 8, s - 8);
+
+      // column cap corner lines
+      ctx.strokeStyle = '#786b5e';
+      ctx.strokeRect(px + 1.5, py + 1.5, s - 3, s - 3);
     } else {
-      // Industrial window/panel on straight walls
-      ctx.fillStyle = '#1c1c1f';
-      ctx.fillRect(px + 6, py + 5, s - 12, s - 10);
-      // Window frame
-      ctx.strokeStyle = 'rgba(82, 82, 91, 0.5)';
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(px + 6.5, py + 5.5, s - 13, s - 11);
+      // Solid concrete blocks
+      ctx.fillStyle = '#4a423a'; // concrete color
+      ctx.fillRect(px, py, s, s);
+
+      // Concrete block joint lines
+      ctx.strokeStyle = '#342e29';
+      ctx.lineWidth = 1;
+
+      // Horizontal joint rows
+      ctx.beginPath();
+      ctx.moveTo(px, py + 10);
+      ctx.lineTo(px + s, py + 10);
+      ctx.moveTo(px, py + 21);
+      ctx.lineTo(px + s, py + 21);
+      ctx.stroke();
+
+      // Vertical block seams (staggered)
+      ctx.beginPath();
+      // Row 1 (y: 0-10)
+      ctx.moveTo(px + s / 2, py);
+      ctx.lineTo(px + s / 2, py + 10);
+      // Row 2 (y: 10-21)
+      ctx.moveTo(px + s / 4, py + 10);
+      ctx.lineTo(px + s / 4, py + 21);
+      ctx.moveTo(px + 3 * s / 4, py + 10);
+      ctx.lineTo(px + 3 * s / 4, py + 21);
+      // Row 3 (y: 21-s)
+      ctx.moveTo(px + s / 2, py + 21);
+      ctx.lineTo(px + s / 2, py + s);
+      ctx.stroke();
     }
+
+    // Top metal capping (thickness / height illusion)
+    ctx.fillStyle = '#5c5249';
+    ctx.fillRect(px, py, s, 4);
 
     // Directional shadows from neighboring open tiles
     if (east) {
-      const shadowGrad = ctx.createLinearGradient(px + s - 4, py, px + s, py);
-      shadowGrad.addColorStop(0, 'rgba(0,0,0,0.35)');
+      const shadowGrad = ctx.createLinearGradient(px + s - 5, py, px + s, py);
+      shadowGrad.addColorStop(0, 'rgba(0,0,0,0.3)');
       shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = shadowGrad;
-      ctx.fillRect(px + s - 4, py, 4, s);
+      ctx.fillRect(px + s - 5, py, 5, s);
     }
     if (south) {
-      const shadowGrad = ctx.createLinearGradient(px, py + s - 4, px, py + s);
-      shadowGrad.addColorStop(0, 'rgba(0,0,0,0.35)');
+      const shadowGrad = ctx.createLinearGradient(px, py + s - 5, px, py + s);
+      shadowGrad.addColorStop(0, 'rgba(0,0,0,0.3)');
       shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = shadowGrad;
-      ctx.fillRect(px, py + s - 4, s, 4);
+      ctx.fillRect(px, py + s - 5, s, 5);
     }
 
-    // Ambient occlusion shadow at bottom
-    const grad = ctx.createLinearGradient(px, py + s - 4, px, py + s);
-    grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    grad.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(px, py + s - 4, s, 4);
-
-    // Golden bevel top border
-    ctx.strokeStyle = 'rgba(245, 158, 11, 0.55)';
+    // Outline
+    ctx.strokeStyle = '#1d1a17';
     ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(px, py + 0.5);
-    ctx.lineTo(px + s, py + 0.5);
-    ctx.stroke();
-
-    // Steel border outline
-    ctx.strokeStyle = this.tokens.border || '#262626';
-    ctx.lineWidth = 0.5;
     ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
   }
 
   private drawDebrisTile(px: number, py: number, s: number) {
     const { ctx } = this;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-    ctx.fillRect(px + 2, py + 2, s - 4, s - 4);
+    // Rubble heap
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.fillRect(px + 4, py + 4, s - 8, s - 8);
 
-    // Crack lines using lt-error alpha 0.18 (Phase 4)
-    const hash = (px * 17 + py * 13) % 4;
-    ctx.strokeStyle = 'rgba(239, 68, 68, 0.18)'; // error color
+    // Irregular rubble blocks
+    ctx.fillStyle = '#443d35';
+    ctx.fillRect(px + 6, py + 8, 4, 3);
+    ctx.fillStyle = '#5e544b';
+    ctx.fillRect(px + 14, py + 10, 5, 4);
+    ctx.fillStyle = '#3a342f';
+    ctx.fillRect(px + 10, py + 18, 6, 3);
+
+    // Cracks
+    ctx.strokeStyle = '#2d2722';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    if (hash === 0) {
-      ctx.moveTo(px + 4, py + 4);
-      ctx.lineTo(px + s - 4, py + s - 4);
-    } else if (hash === 1) {
-      ctx.moveTo(px + s - 4, py + 4);
-      ctx.lineTo(px + 4, py + s - 4);
-    } else {
-      ctx.moveTo(px + 3, py + s * 0.4);
-      ctx.lineTo(px + s * 0.5, py + 3);
-      ctx.moveTo(px + s - 3, py + s * 0.6);
-      ctx.lineTo(px + s * 0.5, py + s - 3);
-    }
+    ctx.moveTo(px + 4, py + 4);
+    ctx.lineTo(px + 12, py + 12);
+    ctx.lineTo(px + s - 6, py + s - 10);
     ctx.stroke();
   }
 
   private drawKioskTile(px: number, py: number, s: number) {
     const { ctx } = this;
-    // CRT terminal kiosk in zinc style (Phase 4)
-    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.fillRect(px + 2, py + 2, s - 4, s - 4);
+    // Desk console
+    ctx.fillStyle = '#2d2722'; // base wood/metal desk
+    ctx.fillRect(px + 4, py + 6, s - 8, s - 12);
+    ctx.strokeRect(px + 4.5, py + 6.5, s - 9, s - 13);
 
-    // Terminal Screen
-    ctx.fillStyle = '#1c1c1f';
-    ctx.fillRect(px + 4, py + 4, s - 8, s - 8);
+    // Keyboard shelf
+    ctx.fillStyle = '#1c1916';
+    ctx.fillRect(px + 8, py + s - 10, s - 16, 2);
 
-    // Glowing screen indicator
-    ctx.fillStyle = 'rgba(245, 158, 11, 0.7)'; // amber-500
-    ctx.fillRect(px + 6, py + 6, s - 12, s - 12);
+    // Glowing CRT screen monitor
+    ctx.fillStyle = '#0f0f12';
+    ctx.fillRect(px + 6, py + 8, s - 12, 10);
+    ctx.strokeStyle = '#3a342f';
+    ctx.strokeRect(px + 6.5, py + 8.5, s - 13, 9);
+
+    ctx.fillStyle = 'rgba(245, 158, 11, 0.8)'; // amber text glow
+    ctx.font = `bold 6px ${this.tokens.fontMono}`;
+    ctx.fillText('SYS', px + 10, py + 14);
   }
 
   private drawWorkbenchTile(tile: LocalTile, px: number, py: number, s: number) {
@@ -793,28 +1152,262 @@ export class LocalRenderer {
     const wb = tile.workbench;
     if (!wb) return;
 
-    // Desk body in zinc grays (Phase 6 / gstack style)
-    ctx.fillStyle = this.tokens.zinc600 || '#52525B';
-    ctx.fillRect(px + 2, py + 4, s - 4, s - 10); // desk top / body
-    ctx.fillStyle = this.tokens.border || '#262626';
-    ctx.fillRect(px + 4, py + s - 6, s - 8, 2); // drawer line
-    ctx.fillRect(px + 4, py + s - 9, s - 8, 1); // second drawer
+    // Wood desktop top panel
+    ctx.fillStyle = '#5c4b3f'; // warm mahogany wood
+    ctx.fillRect(px + 3, py + 4, s - 6, 16); // desk body covers top portion of tile
+    ctx.strokeStyle = '#1b1815';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px + 3, py + 4, s - 6, 16);
 
-    // File extension label centered, larger, with monospaced font
+    // Monitor screen stand
+    ctx.fillStyle = '#3a342f';
+    ctx.fillRect(px + s / 2 - 2, py + 14, 4, 3);
+
+    // Monitor Screen border
+    ctx.fillStyle = '#151311';
+    ctx.fillRect(px + 5, py + 5, s - 10, 10);
+    ctx.strokeRect(px + 5.5, py + 5.5, s - 11, 9);
+
+    // Black/inactive screen center (overwritten by dynamic renderer if active)
+    ctx.fillStyle = '#0a0a0c';
+    ctx.fillRect(px + 6, py + 6, s - 12, 8);
+
+    // File extension label drawn centered on the monitor screen!
     const extColor = EXT_COLOR[wb.extension] ?? '#888';
     ctx.fillStyle = extColor;
-    ctx.font = `bold ${Math.max(7, s * 0.32)}px ${this.tokens.fontMono}`;
+    ctx.font = `bold 7px ${this.tokens.fontMono}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(wb.extension.slice(0, 3), px + s / 2, py + s / 2 - 1);
+    ctx.fillText(wb.extension.toUpperCase().slice(0, 3), px + s / 2, py + 10);
 
-    // Test badge in amber-500 (Phase 6 / gstack style)
+    // Keyboard in front of monitor
+    ctx.fillStyle = '#2d2722';
+    ctx.fillRect(px + 9, py + 21, s - 18, 3);
+    ctx.strokeStyle = '#1b1815';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(px + 9.5, py + 21.5, s - 19, 2);
+
+    // Test indicator dot
     if (wb.isTest) {
-      ctx.fillStyle = this.tokens.amber500 || '#F59E0B';
+      ctx.fillStyle = '#f59e0b';
       ctx.beginPath();
-      ctx.arc(px + s - 4, py + 4, 2.5, 0, Math.PI * 2);
+      ctx.arc(px + s - 7, py + 7, 2, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    // Office Chair facing the desk (bottom part of tile)
+    const chairX = px + s / 2;
+    const chairY = py + s - 6;
+
+    // Chair base mount
+    ctx.strokeStyle = '#2d2722';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(chairX, chairY);
+    ctx.lineTo(chairX - 3, chairY + 3);
+    ctx.moveTo(chairX, chairY);
+    ctx.lineTo(chairX + 3, chairY + 3);
+    ctx.stroke();
+
+    // Round Seat Cushion
+    ctx.fillStyle = '#443d35'; // dark grey cushion
+    ctx.strokeStyle = '#1b1815';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(chairX, chairY, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Backrest arc
+    ctx.strokeStyle = '#2d2722';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(chairX, chairY, 5, Math.PI * 0.1, Math.PI * 0.9);
+    ctx.stroke();
+  }
+
+  private drawPowerSourceTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    const centerX = px + s / 2;
+    const centerY = py + s / 2;
+
+    // Base generator box
+    ctx.fillStyle = '#2d3748'; // dark blue-grey metal casing
+    ctx.strokeStyle = '#1a202c';
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(px + 3, py + 3, s - 6, s - 6);
+    ctx.strokeRect(px + 3, py + 3, s - 6, s - 6);
+
+    // Cooling fan vents (lines)
+    ctx.strokeStyle = '#4a5568';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(px + 6, py + 8 + i * 4);
+      ctx.lineTo(px + s - 6, py + 8 + i * 4);
+      ctx.stroke();
+    }
+
+    // Power core indicator (glowing circle)
+    const now = performance.now();
+    const pulse = 0.5 + 0.5 * Math.sin(now / 400);
+    ctx.fillStyle = `rgba(16, 185, 129, ${0.7 + 0.3 * pulse})`; // emerald glow
+    ctx.beginPath();
+    ctx.arc(centerX, centerY + 4, 3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Label "GEN" or "PWR"
+    ctx.fillStyle = '#a0aec0';
+    ctx.font = `bold 6px ${this.tokens.fontMono}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('PWR', centerX, centerY - 4);
+  }
+
+  private drawPowerConsumerTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+
+    // A small electrical panel on the wall or a terminal box
+    ctx.fillStyle = '#4a5568';
+    ctx.fillRect(px + s / 2 - 5, py + s / 2 - 5, 10, 10);
+    ctx.strokeStyle = '#1a202c';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px + s / 2 - 5, py + s / 2 - 5, 10, 10);
+
+    // Tiny blinking status LED
+    const now = performance.now();
+    ctx.fillStyle = (now % 1000 < 500) ? '#10b981' : '#059669'; // blinking green
+    ctx.fillRect(px + s / 2 - 2, py + s / 2 - 2, 4, 4);
+  }
+
+  private drawBedTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+
+    const frameColor = '#5c4033'; // wood frame
+    const sheetColor = '#e2e8f0'; // slate-100 mattress sheet
+    const blanketColor = '#b7791f'; // gold-amber blanket
+
+    // Wooden headboard (top edge)
+    ctx.fillStyle = frameColor;
+    ctx.fillRect(px + 2, py + 2, s - 4, 3);
+
+    // Bed posts
+    ctx.fillRect(px + 1, py + 1, 2, 4);
+    ctx.fillRect(px + s - 3, py + 1, 2, 4);
+
+    // Mattress sheet
+    ctx.fillStyle = sheetColor;
+    ctx.fillRect(px + 3, py + 5, s - 6, s - 8);
+
+    // Pillow (top)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(px + 5, py + 6, s - 10, 4);
+    ctx.strokeStyle = '#cbd5e0';
+    ctx.strokeRect(px + 5, py + 6, s - 10, 4);
+
+    // Blanket covering the bottom half, with a nice fold
+    ctx.fillStyle = blanketColor;
+    ctx.fillRect(px + 3, py + s - 14, s - 6, 10);
+    
+    // Blanket fold line
+    ctx.fillStyle = '#d69e2e';
+    ctx.fillRect(px + 3, py + s - 14, s - 6, 2);
+
+    // Footboard (bottom frame)
+    ctx.fillStyle = frameColor;
+    ctx.fillRect(px + 2, py + s - 3, s - 4, 2);
+  }
+
+  private drawHeaterTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+
+    // Heater body (dark gray industrial metal)
+    ctx.fillStyle = '#2d3748';
+    ctx.fillRect(px + 4, py + 4, s - 8, s - 8);
+    ctx.strokeStyle = '#1a202c';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(px + 4, py + 4, s - 8, s - 8);
+
+    // Hot coils glowing red/orange in the center
+    const now = performance.now();
+    const glowIntensity = 0.7 + 0.3 * Math.sin(now / 200);
+    ctx.fillStyle = `rgba(239, 68, 68, ${glowIntensity})`; // red glow
+    ctx.fillRect(px + 7, py + 7, s - 14, s - 14);
+
+    // Grille lines on top of the glowing coils
+    ctx.strokeStyle = '#2d3748';
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 3; i++) {
+      const gx = px + 8 + i * 4;
+      ctx.beginPath();
+      ctx.moveTo(gx, py + 7);
+      ctx.lineTo(gx, py + s - 7);
+      ctx.stroke();
+    }
+  }
+
+  private drawCoolerTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    const centerX = px + s / 2;
+    const centerY = py + s / 2;
+
+    // Cooler body (clean industrial steel)
+    ctx.fillStyle = '#4a5568';
+    ctx.fillRect(px + 4, py + 4, s - 8, s - 8);
+    ctx.strokeStyle = '#1a202c';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(px + 4, py + 4, s - 8, s - 8);
+
+    // Fan circle in the center
+    ctx.fillStyle = '#1a202c';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Rotating fan blades
+    const now = performance.now();
+    const angle = (now / 150) % (Math.PI * 2);
+    ctx.strokeStyle = '#718096';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 4; i++) {
+      const bladeAngle = angle + (i * Math.PI) / 2;
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.lineTo(centerX + Math.cos(bladeAngle) * 6, centerY + Math.sin(bladeAngle) * 6);
+      ctx.stroke();
+    }
+
+    // Cooling status LED (glowing blue)
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillRect(px + 6, py + 6, 2, 2);
+  }
+
+  private drawVentTile(px: number, py: number, s: number) {
+    const { ctx } = this;
+    const centerX = px + s / 2;
+    const centerY = py + s / 2;
+
+    // Vent frame
+    ctx.fillStyle = '#4a5568'; // frame (metal)
+    ctx.fillRect(px + 2, py + 2, s - 4, s - 4);
+    ctx.strokeStyle = '#1a202c';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(px + 2, py + 2, s - 4, s - 4);
+
+    // Grille slats (horizontal)
+    ctx.fillStyle = '#1a202c'; // dark gaps
+    for (let i = 0; i < 4; i++) {
+      ctx.fillRect(px + 5, py + 5 + i * 5, s - 10, 2);
+    }
+
+    // Airflow indicator (small animated arrows)
+    const now = performance.now();
+    ctx.fillStyle = `rgba(144, 164, 174, ${0.6 + 0.3 * Math.sin(now / 200)})`;
+    ctx.font = `${s * 0.25}px ${this.tokens.fontMono}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('↔', centerX, centerY);
   }
 
   private drawRoomLabel(room: LocalRoom) {
@@ -826,20 +1419,29 @@ export class LocalRenderer {
     const label = room.folderName.toUpperCase();
     ctx.save();
 
-    // Label background in gstack style (Phase 7)
-    ctx.fillStyle = 'rgba(20, 20, 20, 0.85)';
-    ctx.fillRect(px + 2, py + 2, Math.min(pw - 4, 80), 14);
+    // Draw a nice metal plaque tab with clipped corners
+    ctx.fillStyle = '#26221f';
+    ctx.strokeStyle = '#857568';
+    ctx.lineWidth = 1;
+    
+    ctx.beginPath();
+    ctx.moveTo(px + 4, py + 2);
+    ctx.lineTo(px + Math.min(pw - 4, 86), py + 2);
+    ctx.lineTo(px + Math.min(pw - 2, 88), py + 4);
+    ctx.lineTo(px + Math.min(pw - 2, 88), py + 14);
+    ctx.lineTo(px + Math.min(pw - 4, 86), py + 16);
+    ctx.lineTo(px + 4, py + 16);
+    ctx.lineTo(px + 2, py + 14);
+    ctx.lineTo(px + 2, py + 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
 
-    // Border outline
-    ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)'; // Amber alpha 0.35
-    ctx.lineWidth = 0.5;
-    ctx.strokeRect(px + 2, py + 2, Math.min(pw - 4, 80), 14);
-
-    ctx.font = `10px ${this.tokens.fontMono}`;
+    ctx.font = `bold 9px ${this.tokens.fontMono}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = this.tokens.amber400 || '#FBBF24';
-    ctx.fillText(label, px + 4, py + 4);
+    ctx.fillStyle = '#e5d5c5'; // Warm cream text
+    ctx.fillText(label.slice(0, 12), px + 6, py + 4);
     ctx.restore();
   }
 
@@ -890,54 +1492,104 @@ export class LocalRenderer {
     ctx.translate(ux, uy + bobbingY);
     if (unit.ephemeral) ctx.scale(0.8, 0.8);
 
-    // Selection ring in gstack amber
-    ctx.strokeStyle = this.tokens.amber500 || '#F59E0B';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, TILE_SIZE * 0.4, 0, Math.PI * 2);
-    ctx.stroke();
+    // Selection ring in gstack amber (only if hovered or selected)
+    const isHovered = this._hoveredUnit?.id === unit.id;
+    if (isHovered) {
+      ctx.strokeStyle = this.tokens.amber500 || '#F59E0B';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, TILE_SIZE * 0.55, 0, Math.PI * 2);
+      ctx.stroke();
+    }
 
     // Squash & Stretch applied along the directional movement vector
     ctx.save();
     ctx.rotate(dirAngle);
     ctx.scale(Sf, Sc);
 
-    // Elliptical dynamic shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    // 1. Elliptical dynamic shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
     ctx.beginPath();
-    ctx.ellipse(0, TILE_SIZE * 0.38, TILE_SIZE * 0.22, TILE_SIZE * 0.09, 0, 0, Math.PI * 2);
+    ctx.ellipse(-2, 1, TILE_SIZE * 0.28, TILE_SIZE * 0.22, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Unit Body (Sleek graphite dome)
+    // 2. Torso (Shoulders/Clothing) - perpendicular to movement
+    ctx.fillStyle = unit.color;
+    ctx.strokeStyle = '#1a1815';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(0, 0, TILE_SIZE * 0.32, 0, Math.PI * 2);
-    ctx.fillStyle = '#1c1c1f';
+    ctx.ellipse(-2, 0, TILE_SIZE * 0.2, TILE_SIZE * 0.28, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = unit.color;
-    ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Visual direction visors / dual LED sensors parpeding (Phase 7)
+    // Draw tool belt/backpack on rear
+    ctx.fillStyle = '#2d2722';
+    ctx.fillRect(-8, -4, 3, 8);
+
+    // 3. Head (skin tone) - offset forward
+    ctx.fillStyle = '#f5d6b8';
+    ctx.beginPath();
+    ctx.arc(4, 0, TILE_SIZE * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // 4. Safety Hard-hat / Helmet (Yellow/Orange)
+    ctx.fillStyle = '#eab308'; // safety yellow
+    ctx.beginPath();
+    ctx.arc(4, 0, TILE_SIZE * 0.14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Helmet brim/visor line
+    ctx.strokeStyle = '#ca8a04';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(4, 0, TILE_SIZE * 0.16, -Math.PI / 3, Math.PI / 3);
+    ctx.stroke();
+
+    // Helmet top ridge
+    ctx.strokeStyle = '#fef08a';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(1, 0);
+    ctx.lineTo(8, 0);
+    ctx.stroke();
+
+    // Visual direction visors / LED indicators flashing when working
     const now = performance.now();
     const isWorking = unit.state === 'working_on_file';
-    const flash = isWorking && Math.sin(now / 180) > 0;
     if (isWorking) {
-      ctx.fillStyle = flash ? '#22C55E' : 'rgba(34, 197, 94, 0.4)';
+      const flash = Math.sin(now / 150) > 0;
+      ctx.fillStyle = flash ? '#22C55E' : '#14532d';
       ctx.beginPath();
-      ctx.arc(TILE_SIZE * 0.22, -TILE_SIZE * 0.1, 1.5, 0, Math.PI * 2);
-      ctx.arc(TILE_SIZE * 0.22, TILE_SIZE * 0.1, 1.5, 0, Math.PI * 2);
+      ctx.arc(8, -2, 1.2, 0, Math.PI * 2);
+      ctx.arc(8, 2, 1.2, 0, Math.PI * 2);
       ctx.fill();
     }
 
     ctx.restore(); // restore Squash & Stretch
 
-    // Initials centered in JetBrains Mono
+    // 5. Draw initials in a clean capsule below the character
     const initials = unit.name.slice(0, 2).toUpperCase();
+    ctx.save();
+    ctx.translate(0, TILE_SIZE * 0.52);
+
+    ctx.font = `bold 8px ${this.tokens.fontMono}`;
+    const textW = ctx.measureText(initials).width + 8;
+
+    // capsule base
+    ctx.fillStyle = 'rgba(15, 13, 11, 0.85)';
+    ctx.fillRect(-textW / 2, -6, textW, 12);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(-textW / 2, -6, textW, 12);
+
+    // text
     ctx.fillStyle = unit.color;
-    ctx.font = `bold ${TILE_SIZE * 0.3}px ${this.tokens.fontMono}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(initials, 0, 0);
+    ctx.restore();
 
     // Dynamic work progress ring in gstack success color
     if (unit.state === 'working_on_file' && unit.workProgress > 0) {
@@ -947,7 +1599,7 @@ export class LocalRenderer {
       ctx.arc(
         0,
         0,
-        TILE_SIZE * 0.44,
+        TILE_SIZE * 0.46,
         -Math.PI / 2,
         -Math.PI / 2 + (Math.PI * 2 * unit.workProgress) / 100,
       );
@@ -967,7 +1619,7 @@ export class LocalRenderer {
     ctx.font = `${TILE_SIZE * 0.28}px ${this.tokens.fontMono}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(icon, 0, -TILE_SIZE * 0.35);
+    ctx.fillText(icon, 0, -TILE_SIZE * 0.42);
 
     ctx.restore();
 
@@ -1052,6 +1704,389 @@ export class LocalRenderer {
         ctx.restore();
       }
     }
+  }
+
+  private drawPowerOverlay(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
+    const { ctx } = this;
+    const pg = world.powerGrid;
+    if (!pg) return;
+
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+
+    // Draw conduit connections more prominently
+    for (const key of pg.conduits) {
+      const parts = key.split(',');
+      if (parts.length < 2) continue;
+      const sx = Number(parts[0]);
+      const sy = Number(parts[1]);
+      if (!Number.isFinite(sx) || !Number.isFinite(sy)) continue;
+      if (sx < view.x0 || sx > view.x1 || sy < view.y0 || sy > view.y1) continue;
+
+      const px = sx * TILE_SIZE;
+      const py = sy * TILE_SIZE;
+      const s = TILE_SIZE;
+
+      // Bright amber conduit lines
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(px + s / 2, py);
+      ctx.lineTo(px + s / 2, py + s);
+      ctx.moveTo(px, py + s / 2);
+      ctx.lineTo(px + s, py + s / 2);
+      ctx.stroke();
+
+      // Node highlight at intersections
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.9)';
+      ctx.beginPath();
+      ctx.arc(px + s / 2, py + s / 2, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Draw power sources with enhanced glow
+    for (const src of pg.sources) {
+      if (src.tileX < view.x0 || src.tileX > view.x1 || src.tileY < view.y0 || src.tileY > view.y1) continue;
+
+      const px = src.tileX * TILE_SIZE;
+      const py = src.tileY * TILE_SIZE;
+      const s = TILE_SIZE;
+      const centerX = px + s / 2;
+      const centerY = py + s / 2;
+
+      // Pulsing outer glow
+      const now = performance.now();
+      const pulse = 0.5 + 0.5 * Math.sin(now / 500);
+      const glowR = s * 0.6 + 10 * pulse;
+
+      const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, glowR);
+      grad.addColorStop(0, `rgba(245, 158, 11, ${0.4 * pulse})`);
+      grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(px - glowR, py - glowR, s + 2 * glowR, s + 2 * glowR);
+
+      // Watts label
+      ctx.fillStyle = this.tokens.amber500 || '#F59E0B';
+      ctx.font = `bold 9px ${this.tokens.fontMono}`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`${src.outputWatts}W`, centerX, py - 4);
+    }
+
+    // Draw power consumers with load indicator
+    for (const cons of pg.consumers) {
+      if (cons.tileX < view.x0 || cons.tileX > view.x1 || cons.tileY < view.y0 || cons.tileY > view.y1) continue;
+
+      const px = cons.tileX * TILE_SIZE;
+      const py = cons.tileY * TILE_SIZE;
+      const s = TILE_SIZE;
+
+      // Small load bar
+      const barW = s * 0.8;
+      const barH = 3;
+      const bx = px + (s - barW) / 2;
+      const by = py + s + 2;
+
+      // Background
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(bx, by, barW, barH);
+
+      // Load (based on watts, max 200W)
+      const loadPct = Math.min(1, cons.watts / 200);
+      ctx.fillStyle = loadPct > 0.8 ? '#EF4444' : loadPct > 0.5 ? '#F59E0B' : '#22C55E';
+      ctx.fillRect(bx, by, barW * loadPct, barH);
+    }
+
+    // Global power stats in corner
+    if (pg.generatedWatts > 0 || pg.consumedWatts > 0) {
+      const statsX = view.x0 * TILE_SIZE + 10;
+      const statsY = view.y0 * TILE_SIZE + 20;
+      ctx.fillStyle = 'rgba(13, 13, 20, 0.9)';
+      ctx.fillRect(statsX - 5, statsY - 5, 160, 50);
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
+      ctx.strokeRect(statsX - 5, statsY - 5, 160, 50);
+
+      ctx.fillStyle = '#22C55E';
+      ctx.font = `11px ${this.tokens.fontMono}`;
+      ctx.textAlign = 'left';
+      ctx.fillText(`⚡ Gen: ${pg.generatedWatts}W`, statsX, statsY + 12);
+      ctx.fillStyle = '#EF4444';
+      ctx.fillText(`🔌 Con: ${pg.consumedWatts}W`, statsX, statsY + 28);
+      ctx.fillStyle = pg.storedWatts > 0 ? '#3B82F6' : '#6B7280';
+      ctx.fillText(`🔋 Bat: ${pg.storedWatts}W`, statsX, statsY + 44);
+    }
+
+    ctx.restore();
+  }
+
+  private drawTemperatureOverlay(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
+    const { ctx } = this;
+    const climates = world.roomClimates;
+    if (!climates) return;
+
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+
+    // Color scale: blue (cold) -> white (comfort) -> red (hot)
+    function tempToColor(temp: number): string {
+      const comfortMin = 16, comfortMax = 26;
+      if (temp <= comfortMin) {
+        // Cold: blue to cyan
+        const t = Math.max(0, (temp + 20) / (comfortMin + 20)); // -20 to comfortMin
+        const r = Math.round(0 + t * 0);
+        const g = Math.round(100 + t * 155);
+        const b = 255;
+        return `rgb(${r},${g},${b})`;
+      } else if (temp >= comfortMax) {
+        // Hot: yellow to red
+        const t = Math.min(1, (temp - comfortMax) / (50 - comfortMax)); // comfortMax to 50
+        const r = 255;
+        const g = Math.round(255 * (1 - t));
+        const b = 0;
+        return `rgb(${r},${g},${b})`;
+      } else {
+        // Comfort zone: white to light green
+        const t = (temp - comfortMin) / (comfortMax - comfortMin);
+        const r = Math.round(200 * (1 - t));
+        const g = 255;
+        const b = Math.round(200 * (1 - t));
+        return `rgb(${r},${g},${b})`;
+      }
+    }
+
+    // Draw room temperature overlay
+    for (const [roomId, climate] of climates) {
+      const room = world.rooms.find(r => r.id === roomId);
+      if (!room) continue;
+
+      const roomCenterX = (room.x + room.width / 2) * TILE_SIZE;
+      const roomCenterY = (room.y + room.height / 2) * TILE_SIZE;
+
+      // Skip if room center not in view
+      if (roomCenterX < view.x0 * TILE_SIZE || roomCenterX > view.x1 * TILE_SIZE ||
+          roomCenterY < view.y0 * TILE_SIZE || roomCenterY > view.y1 * TILE_SIZE) continue;
+
+      const color = tempToColor(climate.temperature);
+      
+      // Temperature indicator at room center
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.3;
+      ctx.beginPath();
+      ctx.arc(roomCenterX, roomCenterY, Math.max(room.width, room.height) * TILE_SIZE * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Temperature label
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = color;
+      ctx.font = `bold 12px ${this.tokens.fontMono}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`${climate.temperature.toFixed(1)}°C`, roomCenterX, roomCenterY);
+      
+      // Target temperature indicator
+      if (Math.abs(climate.temperature - climate.targetTemperature) > 0.5) {
+        ctx.fillStyle = '#FBBF24'; // amber
+        ctx.font = `9px ${this.tokens.fontMono}`;
+        const arrow = climate.temperature < climate.targetTemperature ? '▲' : '▼';
+        ctx.fillText(`${arrow} ${climate.targetTemperature.toFixed(1)}°C`, roomCenterX, roomCenterY + 18);
+      }
+
+      // Breath particles for cold rooms
+      if (climate.temperature < 10 && Math.random() < 0.02) {
+        const px = room.x * TILE_SIZE + Math.random() * room.width * TILE_SIZE;
+        const py = room.y * TILE_SIZE + Math.random() * room.height * TILE_SIZE;
+        this.spawnBreath(px, py);
+      }
+    }
+
+    // Draw heater/cooler/vent indicators
+    for (const [roomId, climate] of climates) {
+      const room = world.rooms.find(r => r.id === roomId);
+      if (!room) continue;
+
+      // Heaters
+      for (const heater of climate.heaters) {
+        if (heater.tileX < view.x0 || heater.tileX > view.x1 || heater.tileY < view.y0 || heater.tileY > view.y1) continue;
+        const px = heater.tileX * TILE_SIZE;
+        const py = heater.tileY * TILE_SIZE;
+        const s = TILE_SIZE;
+        const centerX = px + s / 2;
+
+        // Heat wave effect
+        const now = performance.now();
+        ctx.strokeStyle = `rgba(239, 83, 80, ${0.4 + 0.3 * Math.sin(now / 120)})`;
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          ctx.moveTo(centerX - 6 + i * 6, py + s);
+          ctx.quadraticCurveTo(centerX + 4 * Math.sin(now / 100 + i), py + s - 8, centerX - 6 + i * 6, py + s - 16);
+          ctx.stroke();
+        }
+      }
+
+      // Coolers
+      for (const cooler of climate.coolers) {
+        if (cooler.tileX < view.x0 || cooler.tileX > view.x1 || cooler.tileY < view.y0 || cooler.tileY > view.y1) continue;
+        const px = cooler.tileX * TILE_SIZE;
+        const py = cooler.tileY * TILE_SIZE;
+        const s = TILE_SIZE;
+        const centerX = px + s / 2;
+
+        // Cold air particles
+        const now = performance.now();
+        ctx.fillStyle = `rgba(100, 181, 246, ${0.4 + 0.3 * Math.sin(now / 150)})`;
+        for (let i = 0; i < 4; i++) {
+          const px2 = centerX + (i - 1.5) * 4;
+          const py2 = py + s - 3 - (now / 80 + i * 0.5) % 10;
+          ctx.beginPath();
+          ctx.arc(px2, py2, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Vents (airflow indicator)
+      for (const vent of climate.vents) {
+        if (!vent.open) continue;
+        if (vent.tileX < view.x0 || vent.tileX > view.x1 || vent.tileY < view.y0 || vent.tileY > view.y1) continue;
+        const px = vent.tileX * TILE_SIZE;
+        const py = vent.tileY * TILE_SIZE;
+        const s = TILE_SIZE;
+        const centerX = px + s / 2;
+        const centerY = py + s / 2;
+
+        ctx.fillStyle = `rgba(144, 164, 174, ${0.6 + 0.3 * Math.sin(performance.now() / 200)})`;
+        ctx.font = `${s * 0.3}px ${this.tokens.fontMono}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('↔', centerX, centerY);
+      }
+    }
+
+    ctx.restore();
+  }
+
+  private spawnBreath(x: number, y: number) {
+    const p = this.particles.find((part) => !part.active);
+    if (!p) return;
+
+    p.active = true;
+    p.type = 'zzz';
+    p.x = x;
+    p.y = y;
+    p.baseX = x;
+    p.vx = (Math.random() - 0.5) * 10;
+    p.vy = -8 - Math.random() * 8;
+    p.color = 'rgba(200, 230, 255, 0.7)'; // pale blue
+    p.size = 6 + Math.random() * 4;
+    p.life = 0;
+    p.maxLife = 1.5 + Math.random() * 1.0;
+    p.char = '∼';
+  }
+
+  private drawZones(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
+    const { ctx } = this;
+    if (!world.zones) return;
+
+    const zoneColors: Record<string, string> = {
+      stockpile: '#8B5A2B',      // brown
+      growing: '#4A7C2E',        // green
+      recreation: '#D4A537',     // gold
+      bedroom: '#6B4F8A',        // purple
+      dining: '#C46B3B',         // orange-brown
+      hospital: '#C0392B',       // red
+    };
+
+    for (const zone of world.zones) {
+      const color = zoneColors[zone.type] || '#888';
+      const alpha = 0.15;
+
+      // Draw filled tiles
+      ctx.fillStyle = `${color}${Math.round(alpha * 255).toString(16).padStart(2, '0')}`;
+      for (const tile of zone.tiles) {
+        if (tile.x < view.x0 || tile.x > view.x1 || tile.y < view.y0 || tile.y > view.y1) continue;
+        const px = tile.x * TILE_SIZE;
+        const py = tile.y * TILE_SIZE;
+        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+      }
+
+      // Draw border around zone bounds
+      if (zone.tiles.length > 0) {
+        const xs = zone.tiles.map((t: { x: number; y: number }) => t.x);
+        const ys = zone.tiles.map((t: { x: number; y: number }) => t.y);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+
+        const px = minX * TILE_SIZE;
+        const py = minY * TILE_SIZE;
+        const pw = (maxX - minX + 1) * TILE_SIZE;
+        const ph = (maxY - minY + 1) * TILE_SIZE;
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(px + 1, py + 1, pw - 2, ph - 2);
+        ctx.setLineDash([]);
+
+        // Zone type label
+        ctx.fillStyle = color;
+        ctx.font = `bold 9px ${this.tokens.fontMono}`;
+        ctx.textAlign = 'left';
+        ctx.fillText(zone.type.toUpperCase(), px + 3, py + 12);
+      }
+    }
+  }
+
+  private drawZonePaintPreview(view: { x0: number; y0: number; x1: number; y1: number }) {
+    const { ctx } = this;
+    if (!this._zonePaintStart || !this._zonePaintCurrent) return;
+
+    const x0 = Math.min(this._zonePaintStart.x, this._zonePaintCurrent.x);
+    const y0 = Math.min(this._zonePaintStart.y, this._zonePaintCurrent.y);
+    const x1 = Math.max(this._zonePaintStart.x, this._zonePaintCurrent.x);
+    const y1 = Math.max(this._zonePaintStart.y, this._zonePaintCurrent.y);
+
+    const zoneColors: Record<string, string> = {
+      stockpile: '#8B5A2B',
+      growing: '#4A7C2E',
+      recreation: '#D4A537',
+      bedroom: '#6B4F8A',
+      dining: '#C46B3B',
+      hospital: '#C0392B',
+    };
+    const color = zoneColors[this._zonePaintMode || 'stockpile'] || '#888';
+
+    // Semi-transparent fill
+    ctx.fillStyle = `${color}33`; // 20% alpha
+    for (let y = y0; y <= y1; y++) {
+      if (y < view.y0 || y > view.y1) continue;
+      for (let x = x0; x <= x1; x++) {
+        if (x < view.x0 || x > view.x1) continue;
+        const px = x * TILE_SIZE;
+        const py = y * TILE_SIZE;
+        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+      }
+    }
+
+    // Dashed border
+    const px = x0 * TILE_SIZE;
+    const py = y0 * TILE_SIZE;
+    const pw = (x1 - x0 + 1) * TILE_SIZE;
+    const ph = (y1 - y0 + 1) * TILE_SIZE;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 4]);
+    ctx.strokeRect(px, py, pw, ph);
+    ctx.setLineDash([]);
+
+    // Dimensions label
+    const w = x1 - x0 + 1;
+    const h = y1 - y0 + 1;
+    ctx.fillStyle = color;
+    ctx.font = `bold 10px ${this.tokens.fontMono}`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${w}×${h} (${w * h} tiles)`, px + pw / 2, py - 5);
   }
 
   // ─── Zoom controls ────────────────────────────────────────────────────────────

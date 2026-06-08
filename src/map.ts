@@ -183,6 +183,20 @@ export interface RepoSelectionState {
   hasSelections: boolean;
 }
 
+function selectionKeysForRepo(repo: Pick<ScannedRepo, 'path' | 'repoPath'>): string[] {
+  const keys = [repo.path];
+  if (repo.repoPath && repo.repoPath.length > 0) keys.push(repo.repoPath);
+  return keys;
+}
+
+function repoMatchesSelection(repo: Pick<ScannedRepo, 'path' | 'repoPath'>, selection: Set<string>): boolean {
+  return selectionKeysForRepo(repo).some((key) => selection.has(key));
+}
+
+function selectionIncludesValue(selection: Set<string>, value: string | undefined): boolean {
+  return typeof value === 'string' && value.length > 0 && selection.has(value);
+}
+
 function canUseLocalStorage(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 }
@@ -246,14 +260,14 @@ export async function fetchRepoSelectionState(): Promise<RepoSelectionState> {
 
 export async function hydrateSelectedRepoPathCache(): Promise<Set<string>> {
   const state = await fetchRepoSelectionState();
-  saveSelectedRepoPaths(state.selectedRepoIds);
-  return new Set(state.selectedRepoIds);
+  saveSelectedRepoPaths(state.selectedRepoPaths);
+  return new Set(state.selectedRepoPaths);
 }
 
 export async function fetchSelectionForRoot(rootPath: string): Promise<Set<string>> {
   const state = await fetchRepoSelectionState();
   const root = state.roots.find((item) => item.path === rootPath);
-  return new Set(root?.selectedRepoIds ?? []);
+  return new Set(root?.selectedRepoPaths ?? []);
 }
 
 export async function persistRootSelection(rootPath: string, repoIds: string[]): Promise<Set<string>> {
@@ -264,8 +278,8 @@ export async function persistRootSelection(rootPath: string, repoIds: string[]):
   });
   if (!res.ok) throw new Error(`/api/repo-selections HTTP ${res.status}`);
   const data = normalizeSelectionState((await res.json()) as RepoSelectionState);
-  saveSelectedRepoPaths(data.selectedRepoIds);
-  return new Set(data.selectedRepoIds);
+  saveSelectedRepoPaths(data.selectedRepoPaths);
+  return new Set(data.selectedRepoPaths);
 }
 
 export async function addSelectedRepoPath(repoId: string): Promise<Set<string>> {
@@ -276,8 +290,8 @@ export async function addSelectedRepoPath(repoId: string): Promise<Set<string>> 
   });
   if (!res.ok) throw new Error(`/api/repo-selections/add HTTP ${res.status}`);
   const data = normalizeSelectionState((await res.json()) as RepoSelectionState);
-  saveSelectedRepoPaths(data.selectedRepoIds);
-  return new Set(data.selectedRepoIds);
+  saveSelectedRepoPaths(data.selectedRepoPaths);
+  return new Set(data.selectedRepoPaths);
 }
 
 export async function removeSelectedRepoPath(repoId: string): Promise<Set<string>> {
@@ -288,8 +302,8 @@ export async function removeSelectedRepoPath(repoId: string): Promise<Set<string
   });
   if (!res.ok) throw new Error(`/api/repo-selections/remove HTTP ${res.status}`);
   const data = normalizeSelectionState((await res.json()) as RepoSelectionState);
-  saveSelectedRepoPaths(data.selectedRepoIds);
-  return new Set(data.selectedRepoIds);
+  saveSelectedRepoPaths(data.selectedRepoPaths);
+  return new Set(data.selectedRepoPaths);
 }
 
 export async function fetchScannedRepos(): Promise<ScannedRepo[]> {
@@ -684,21 +698,44 @@ export async function generateWorld(): Promise<World> {
   const MIN_CITY_DISTANCE = 3;
   const tiles = new Map<string, Tile>();
   const cities: City[] = [];
+  const selectedRepoPaths = loadSelectedRepoPaths();
+
+  // Non-blocking full scan: surfaces workspace errors without preventing the
+  // selected-repos flow from rendering the map.
+  void fetchScannedRepos().catch((e) => {
+    const message = e instanceof Error ? e.message : String(e);
+    logger.error('[map] /api/repos failed', e);
+    showMapLoadError(`No pude cargar repos reales: ${message}`);
+  });
 
   // Fetch real repos
   let repos: ScannedRepo[] = [];
   try {
-    repos = await fetchSelectedRepos();
-    saveSelectedRepoPaths(repos.map((repo) => repo.path));
+    if (selectedRepoPaths !== null && selectedRepoPaths.size > 0) {
+      repos = (await fetchScannedRepos()).filter((repo) => repoMatchesSelection(repo, selectedRepoPaths));
+    } else {
+      repos = await fetchSelectedRepos();
+      saveSelectedRepoPaths(repos.map((repo) => repo.path));
+    }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     logger.error('[map] /api/repos/selected failed', e);
-    showMapLoadError(`No pude cargar repos seleccionados: ${message}`);
+    showMapLoadError(
+      selectedRepoPaths !== null && selectedRepoPaths.size > 0
+        ? `No pude cargar repos reales: ${message}`
+        : `No pude cargar repos seleccionados: ${message}`,
+    );
+    if (selectedRepoPaths !== null && selectedRepoPaths.size > 0) {
+      try {
+        repos = await fetchSelectedRepos();
+      } catch {
+        repos = [];
+      }
+    }
   }
 
-  const selectedRepoPaths = loadSelectedRepoPaths();
   if (selectedRepoPaths !== null && selectedRepoPaths.size > 0) {
-    repos = repos.filter((repo) => selectedRepoPaths.has(repo.path));
+    repos = repos.filter((repo) => repoMatchesSelection(repo, selectedRepoPaths));
   }
 
   const manualLayout = loadManualLayout();
@@ -724,12 +761,14 @@ export async function generateWorld(): Promise<World> {
     const selectedOrder = Array.from(selectedRepoPaths);
     const orderedRepos: ScannedRepo[] = [];
     for (const path of selectedOrder) {
-      const found = repos.find((r) => r.path === path);
-      if (found) orderedRepos.push(found);
+      const found = repos.find(
+        (r) => selectionIncludesValue(selectedRepoPaths, path) && selectionKeysForRepo(r).includes(path),
+      );
+      if (found && !orderedRepos.some((repo) => repo.path === found.path)) orderedRepos.push(found);
     }
     // Add any remaining repos that weren't in selectedRepoPaths (e.g., manual entries)
     for (const repo of repos) {
-      if (!selectedOrder.includes(repo.path)) orderedRepos.push(repo);
+      if (!orderedRepos.some((item) => item.path === repo.path)) orderedRepos.push(repo);
     }
     repos = orderedRepos;
   } else {

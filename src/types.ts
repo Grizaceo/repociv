@@ -263,6 +263,16 @@ export interface RestArea {
   unitsInside: string[]; // unit ids currently resting
 }
 
+// ─── Local Rest Area (RimWorld-style bedroom/barracks) ────────────────────────
+export interface LocalRestArea {
+  id: string;
+  roomId: string; // maps to LocalRoom.id
+  tiles: Array<{ x: number; y: number }>; // bed tiles
+  recoveryRate: number; // fatigue restored per second (default 10)
+  capacity: number; // max units at once = bed count
+  unitsInside: string[]; // unit ids currently resting
+}
+
 // ─── Bridge Events (from bridge.py → RepoCiv) ───────────────────────────────
 export type BridgeEvent =
   | {
@@ -411,7 +421,28 @@ export type BridgeEvent =
 export type ViewMode = 'macro' | 'local';
 
 // ─── Local view types (RimWorld grid) ─────────────────────────────────────────
-export type LocalTileType = 'floor' | 'wall' | 'door' | 'workbench' | 'debris' | 'kiosk' | 'path';
+export type LocalTileType =
+  | 'floor'
+  | 'wall'
+  | 'door'
+  | 'workbench'
+  | 'debris'
+  | 'kiosk'
+  | 'path'
+  // Power System
+  | 'conduit'
+  | 'power_source'
+  | 'power_consumer'
+  // Temperature / HVAC
+  | 'heater'
+  | 'cooler'
+  | 'vent'
+  // Zoning / Stockpiles
+  | 'stockpile'
+  | 'joy_object'
+  | 'bed'
+  // Research
+  | 'research_bench';
 
 export interface LocalTile {
   x: number; // grid column
@@ -451,6 +482,16 @@ export interface LocalWorld {
   width: number; // in tiles
   height: number;
   workbenches: Workbench[];
+  // Power System (RimWorld-style)
+  powerGrid?: PowerGrid;
+  powerSources?: PowerSource[];
+  powerConsumers?: PowerConsumer[];
+  // Zoning System
+  zones?: Zone[];
+  // Rest Areas (bedrooms/barracks)
+  restAreas?: LocalRestArea[];
+  // Temperature System
+  roomClimates?: Map<string, RoomClimate>;
 }
 
 // ─── Local Unit State (Phase 7a) ───────────────────────────────────────────────
@@ -532,6 +573,153 @@ export type MapLayerId =
 export interface MapLayerState {
   layers: Record<MapLayerId, boolean>;
 }
+
+// ─── Power System (RimWorld-style) ─────────────────────────────────────────────
+export type PowerTileType = 'conduit' | 'generator' | 'battery' | 'solar' | 'wind' | 'consumer';
+
+export interface PowerGrid {
+  conduits: Set<string>; // "x,y" keys
+  sources: PowerSource[];
+  consumers: PowerConsumer[];
+  storedWatts: number;
+  generatedWatts: number;
+  consumedWatts: number;
+}
+
+export interface PowerSource {
+  id: string;
+  tileX: number;
+  tileY: number;
+  type: 'generator' | 'battery' | 'solar' | 'wind';
+  outputWatts: number;
+  fuel?: number; // 0-100 for generator
+}
+
+export interface PowerConsumer {
+  id: string;
+  tileX: number;
+  tileY: number;
+  watts: number;
+  required: boolean; // workbench = true, light = false
+  roomId: string | null;
+}
+
+// ─── Temperature / HVAC System ─────────────────────────────────────────────────
+export interface RoomClimate {
+  roomId: string;
+  temperature: number; // Celsius
+  targetTemperature: number;
+  heaters: ClimateDevice[];
+  coolers: ClimateDevice[];
+  vents: Vent[];
+}
+
+export interface ClimateDevice {
+  id: string;
+  tileX: number;
+  tileY: number;
+  type: 'heater' | 'cooler';
+  powerWatts: number;
+  powerConsumerId: string;
+}
+
+export interface Vent {
+  id: string;
+  tileX: number;
+  tileY: number;
+  connectedRoomId: string;
+  open: boolean;
+}
+
+// ─── Stockpile / Zoning System ─────────────────────────────────────────────────
+export type ZoneType = 'stockpile' | 'growing' | 'recreation' | 'bedroom' | 'dining' | 'hospital';
+
+export interface Zone {
+  id: string;
+  type: ZoneType;
+  tiles: Array<{ x: number; y: number }>;
+  filters: StockpileFilter[];
+  priority: number; // 1-4
+}
+
+export interface StockpileFilter {
+  category: 'code' | 'test' | 'config' | 'doc' | 'asset' | 'binary';
+  extensions: string[];
+  allowed: boolean;
+}
+
+// ─── Joy / Needs / Mood ────────────────────────────────────────────────────────
+export interface UnitNeeds {
+  rest: number;       // 0-100 (100 = rested)
+  food: number;       // 0-100
+  joy: number;        // 0-100
+  comfort: number;    // 0-100 (room impressiveness)
+}
+
+export interface Thought {
+  text: string;
+  moodImpact: number; // -50 a +50
+  timestamp: number;
+  source: 'environment' | 'social' | 'work' | 'health';
+}
+
+// ─── Research ──────────────────────────────────────────────────────────────────
+export interface ResearchProject {
+  id: string;
+  name: string;
+  description: string;
+  cost: number; // science points
+  progress: number;
+  unlocked: string[]; // feature flags
+  requiredTech: string[];
+}
+
+// ─── Incidents ─────────────────────────────────────────────────────────────────
+export type IncidentType =
+  | 'code_review_raid'
+  | 'dependency_rot'
+  | 'burnout'
+  | 'inspiration'
+  | 'power_outage'
+  | 'thermal_shock';
+
+export interface Incident {
+  id: string;
+  type: IncidentType;
+  severity: 'minor' | 'major' | 'critical';
+  message: string;
+  affectedRooms: string[];
+  affectedUnits: string[];
+  startedAt: number;
+  expiresAt: number | null;
+  resolved: boolean;
+}
+
+// ─── Extended LocalWorld with RimWorld systems ─────────────────────────────────
+export interface LocalWorldRimWorld extends LocalWorld {
+  powerGrid?: PowerGrid;
+  roomClimates?: Map<string, RoomClimate>;
+  zones?: Zone[];
+  researchProjects?: ResearchProject[];
+  incidents?: Incident[];
+  storytellerState?: 'randy_random' | 'cassandra_classic' | 'phoebe_chill';
+}
+
+// ─── LocalTileType extended ────────────────────────────────────────────────────
+// Adding power/climate/zone tile types
+export type LocalTileTypeExtended = LocalTileType
+  | 'conduit'
+  | 'power_source'
+  | 'power_consumer'
+  | 'heater'
+  | 'cooler'
+  | 'vent'
+  | 'stockpile'
+  | 'joy_object'
+  | 'bed'
+  | 'research_bench';
+
+// ─── Renderer state ────────────────────────────────────────────────────────────
 
 export const DEFAULT_MAP_LAYERS: MapLayerState = {
   layers: {

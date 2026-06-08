@@ -46,6 +46,19 @@ describe('localMap — buildMockLocalWorld', () => {
     assert.equal(ids.length, unique.size, 'workbench ids should be unique');
   });
 
+  it('preserves workbench tiles even when power consumers are tracked', () => {
+    const world = buildMockLocalWorld('repociv');
+    const workbenchTiles = world.grid
+      .flat()
+      .filter((tile) => tile.workbench !== null && tile.type === 'workbench');
+
+    assert.ok(workbenchTiles.length > 0, 'workbench tiles should remain addressable as workbench');
+    assert.ok(
+      (world.powerConsumers?.length ?? 0) >= workbenchTiles.length,
+      'power consumers should still be tracked for workbenches',
+    );
+  });
+
   it('same repoId produces consistent dimensions', () => {
     const w1 = buildMockLocalWorld('fresh-repo');
     const w2 = buildMockLocalWorld('fresh-repo');

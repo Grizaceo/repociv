@@ -57,6 +57,7 @@ import { recordGesture } from './directiveLearner.ts';
 import { tileKey } from './types.ts';
 import { clearChat } from './ui/chat.ts';
 import { openOnboardingPanel } from './ui/onboardingPanel.ts';
+import { axialToPixel } from './hex.ts';
 import {
   setRendererRef,
   notifyTilePicked,
@@ -93,6 +94,7 @@ import {
   setOnCleanModeChange,
   isCleanMode,
 } from './ui/layerPanel.ts';
+import { HEX_SIZE } from './constants.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 const loadSteps = [
@@ -103,6 +105,11 @@ const loadSteps = [
   'Inicializando bridge a DAVI...',
   'Imperio listo.',
 ];
+
+type RepoCivDebugApi = {
+  getMacroCityScreenPositions: () => Array<{ cityId: string; x: number; y: number }>;
+  openLocalView: (cityId: string) => boolean;
+};
 
 async function bootstrap() {
   // Global error handlers for capturing unhandled errors (e.g., merge folder errors)
@@ -294,8 +301,36 @@ async function bootstrap() {
   const renderer = new Renderer(canvas, state);
   renderer.setCleanMode(isCleanMode());
   await renderer.loadAssets();
+  void renderer.preloadLocalRenderer();
   renderer.start();
   setRendererRef(renderer);
+
+  (
+    window as Window & {
+      __repocivDebug?: RepoCivDebugApi;
+    }
+  ).__repocivDebug = {
+    getMacroCityScreenPositions: () => {
+      const camera = renderer.getCamera();
+      const rect = canvas.getBoundingClientRect();
+      return state.world.cities
+        .filter((city) => !city.isCapital)
+        .map((city) => {
+          const worldPos = axialToPixel(city.coord, HEX_SIZE);
+          return {
+            cityId: city.id,
+            x: rect.left + (worldPos.x - camera.x) * camera.zoom + rect.width / 2,
+            y: rect.top + (worldPos.y - camera.y) * camera.zoom + rect.height / 2,
+          };
+        });
+    },
+    openLocalView: (cityId: string) => {
+      const city = state.world.cities.find((item) => item.id === cityId && !item.isCapital);
+      if (!city) return false;
+      window.dispatchEvent(new CustomEvent('repociv:open-local-view-request', { detail: { cityId } }));
+      return true;
+    },
+  };
 
   const toggleView = () => {
     // 3D renderer intentionally removed: the 2D Civ view is the canonical map.
@@ -425,9 +460,6 @@ async function bootstrap() {
     bridge.send('enter_local', { repoId: city.id, rootPath: city.repoPath });
     state.enterLocalView(city.id).catch(() => state.enterLocalViewMock(city.id));
     initBubbleLayer();
-    if (city.repoPath) {
-      void _openBibliothecaForCity(city, 'local');
-    }
   }
 
   function _getCityLabStatus(cityId: string): CityLabStatus | null {
@@ -752,13 +784,12 @@ async function bootstrap() {
   renderer.localWorkbenchClickCb = (tile, sx, sy) => {
     const wb = tile.workbench;
     if (!wb) return;
-    const idleAgents = state
+    const availableAgents = state
       .getAllUnits()
-      .filter((u) => u.state === 'idle')
-      .map((u) => ({ id: u.id, name: u.name, type: u.type }));
+      .map((u) => ({ id: u.id, name: u.name, type: u.type, state: u.state }));
     const localWorld = state.localWorld;
     const repoId = localWorld?.repoId ?? wb.repoPath;
-    showLocalContextMenu(wb, idleAgents, { x: sx, y: sy }, async (action) => {
+    showLocalContextMenu(wb, availableAgents, { x: sx, y: sy }, async (action) => {
       if (action === 'git') {
         void showGitForFile(repoId, wb.filePath, { x: sx, y: sy });
         return;
@@ -774,12 +805,39 @@ async function bootstrap() {
       }
       if (!(await _confirmLabSensitiveAction(repoId, `Editar/local mission sobre ${wb.fileName}`)))
         return;
+      // Resolve which agent will receive the mission: prefer idle, fallback to busy ones
+      const agentUnit = action === 'WORKER'
+        ? (state.getAllUnits().find((u) => u.type === 'worker' && u.state === 'idle') ??
+           state.getAllUnits().find((u) => u.type === 'worker'))
+        : (state.getUnit('DAVI') ??
+           state.getAllUnits().find((u) => u.id === 'DAVI') ??
+           state.getAllUnits().find((u) => u.state === 'idle'));
+      const agentId = agentUnit?.id ?? action;
+      // Resolve the actual repo filesystem path for bridge context
+      const city = state.world.cities.find((c) => c.id === repoId);
+      const repoPath = city?.repoPath ?? wb.repoPath ?? repoId;
       showLocalMissionPreview(
         action,
         wb.fileName,
         { x: sx, y: sy },
         () => {
-          state.queueLocalMission(repoId, wb.filePath, wb.fileName);
+          // 1. Animate the unit walking to the workbench locally
+          state.queueLocalMission(repoId, wb.filePath, wb.fileName, agentId);
+          // 2. Dispatch the real agent command to the bridge with full repo context
+          void sendCommand({
+            type: 'execute_agent',
+            target: agentId,
+            payload: {
+              unit: agentId,
+              city: repoId,
+              repoPath,
+              filePath: wb.filePath,
+              fileName: wb.fileName,
+              mission: `Trabajar en ${wb.fileName}`,
+              cwd: repoPath,
+            },
+            created_by: 'local_view',
+          });
         },
         () => {},
       );
@@ -803,6 +861,27 @@ async function bootstrap() {
   // ─── Phase 9: Action Bubbles ─────────────────────────────────────────────
   renderer.localUnitRenderedCb = (unit, sx, sy) => updateBubble(unit, sx, sy);
   renderer.onExitLocalView = () => clearAllBubbles();
+
+  // Zone painting: wire to LocalWorldManager
+  renderer.onZonePaintedCb = (type, tiles) => {
+    const lw = state.getLocalWorld();
+    if (!lw) return;
+    if (!lw.zones) lw.zones = [];
+    const zoneId = `zone-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    lw.zones.push({
+      id: zoneId,
+      type,
+      tiles,
+      filters: [],
+      priority: 1,
+    });
+    // Also update tile types visually
+    for (const t of tiles) {
+      const tile = lw.grid[t.y]?.[t.x];
+      if (tile) tile.type = 'stockpile';
+    }
+    state.notifyUpdate();
+  };
 
   // Spawn DAVI as the default hero, near the capital if present
   const capital = world.cities.find((c) => c.isCapital) ?? world.cities[0];
