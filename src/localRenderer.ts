@@ -87,6 +87,8 @@ export class LocalRenderer {
   // Isometric Static Layer
   private isoStaticLayer: HTMLCanvasElement | null = null;
   private isoStaticWorldId: string | null = null;
+  private _isoStaticOffsetX = 0;
+  private _isoStaticOffsetY = 0;
 
   // Door Animation State (Phase 5)
   private doorOpenStates = new Map<string, number>();
@@ -300,15 +302,19 @@ export class LocalRenderer {
 
   setWorld(world: LocalWorld) {
     this.world = world;
-    this.staticLayer = null; // force rebuild on setWorld
+    this.staticLayer = null;
+    this.isoStaticLayer = null;
     // Center camera on the grid
     if (this._isometric) {
-      const p = isoProject(world.width / 2, world.height / 2);
-      this.cam.x = p.px;
-      this.cam.y = p.py;
+      const c0 = isoProject(0, 0);
+      const c1 = isoProject(world.width, 0);
+      const c2 = isoProject(0, world.height);
+      const c3 = isoProject(world.width, world.height);
+      this.cam.x = (Math.min(c0.px, c1.px, c2.px, c3.px) + Math.max(c0.px, c1.px, c2.px, c3.px)) / 2;
+      this.cam.y = (Math.min(c0.py, c1.py, c2.py, c3.py) + Math.max(c0.py, c1.py, c2.py, c3.py)) / 2;
     } else {
-      this.cam.x = world.width / 2;
-      this.cam.y = world.height / 2;
+      this.cam.x = world.width * TILE_SIZE / 2;
+      this.cam.y = world.height * TILE_SIZE / 2;
     }
   }
 
@@ -849,7 +855,15 @@ export class LocalRenderer {
     c.height = Math.ceil(maxPy - minPy);
     const sctx = c.getContext('2d')!;
 
-    // Temporarily swap context and offset for iso coordinates
+    // Save offsets for render-time positioning
+    this._isoStaticOffsetX = minPx;
+    this._isoStaticOffsetY = minPy;
+
+    // Translate so all tiles fit in positive canvas coords
+    sctx.save();
+    sctx.translate(-minPx, -minPy);
+
+    // Temporarily swap context
     const originalCtx = this.ctx;
     this.ctx = sctx;
 
@@ -886,6 +900,7 @@ export class LocalRenderer {
     }
 
     this.ctx = originalCtx;
+    sctx.restore();
     this.isoStaticLayer = c;
     this.isoStaticWorldId = world.repoId;
   }
@@ -3089,13 +3104,8 @@ export class LocalRenderer {
       this.rebuildIsoStaticLayer();
     }
     if (this.isoStaticLayer) {
-      const c0 = isoProject(0, 0);
-      const c1 = isoProject(world.width, 0);
-      const c2 = isoProject(0, world.height);
-      const c3 = isoProject(world.width, world.height);
-      const minPx = Math.min(c0.px, c1.px, c2.px, c3.px) - ISO_TILE_W;
-      const minPy = Math.min(c0.py, c1.py, c2.py, c3.py) - ISO_WALL_H - ISO_TILE_H;
-      this.ctx.drawImage(this.isoStaticLayer, minPx, minPy);
+      // Use stored offsets to align static layer with dynamic tiles
+      this.ctx.drawImage(this.isoStaticLayer, this._isoStaticOffsetX, this._isoStaticOffsetY);
     }
 
     // Collect visible dynamic tiles (doors + furniture) for back-to-front draw
@@ -3294,7 +3304,7 @@ export class LocalRenderer {
     const northTile = world.grid[gridY - 1]?.[gridX];
     const westTile = world.grid[gridY]?.[gridX - 1];
     const isOpen = (t: LocalTile | undefined) =>
-      t !== undefined && (t.type === 'floor' || t.type === 'path' || t.type === 'door' || t.type === 'workbench' || t.type === 'kiosk');
+      t === undefined || t.type === 'floor' || t.type === 'path' || t.type === 'door' || t.type === 'workbench' || t.type === 'kiosk';
     const hasNorthFace = isOpen(northTile);
     const hasWestFace = isOpen(westTile);
 
