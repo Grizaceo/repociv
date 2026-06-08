@@ -74,6 +74,7 @@ let _whiteboardEl: HTMLElement | null = null;
 export function showWhiteboardPanel(
   room: LocalRoom,
   screenPos: { x: number; y: number },
+  onOpenFolder?: (folderPath: string) => void,
 ) {
   hideWhiteboardPanel();
 
@@ -85,11 +86,16 @@ export function showWhiteboardPanel(
     ? `<ul class="lt-wb-list">${subFolders.map((n) => `<li>${_esc(n)}</li>`).join('')}</ul>`
     : '<div class="lt-wb-empty">Sin subcarpetas</div>';
 
+  const openBtn = onOpenFolder
+    ? `<button class="lt-wb-open-btn">📂 Abrir carpeta</button>`
+    : '';
+
   el.innerHTML = `
     <div class="lt-arrow"></div>
     <div class="lt-header">📋 ${_esc(room.zoneLabel ?? room.folderName)}</div>
     <div class="lt-wb-section">
       <div class="lt-wb-badge">${room.workbenches.length} archivo${room.workbenches.length === 1 ? '' : 's'}</div>
+      ${openBtn}
     </div>
     <div class="lt-wb-section">
       <div class="lt-wb-subtitle">Subcarpetas</div>
@@ -98,6 +104,13 @@ export function showWhiteboardPanel(
   `;
   _position(el, screenPos);
   el.classList.remove('hidden');
+
+  if (onOpenFolder) {
+    const btn = el.querySelector('.lt-wb-open-btn');
+    btn?.addEventListener('click', () => {
+      onOpenFolder(room.folderPath);
+    });
+  }
 
   // Close on click outside
   setTimeout(() => {
@@ -164,7 +177,7 @@ export function showLocalContextMenu(
     </div>`);
   items.push(`
     <div class="lt-item" data-action="code">
-      <span class="lt-icon">👁️</span> Ver código
+      <span class="lt-icon">📄</span> Abrir archivo
     </div>`);
   items.push(`
     <div class="lt-item" data-action="info">

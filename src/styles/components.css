@@ -454,6 +454,50 @@
   cursor: crosshair;
 }
 
+/* ─── Local-view floating controls (top-right, above minimap) ────────── */
+#local-view-controls {
+  position: absolute;
+  top: 48px;
+  right: 12px;
+  z-index: 200;
+  display: none;
+  gap: 6px;
+}
+
+body.local-view #local-view-controls {
+  display: flex;
+}
+
+#btn-wb-labels {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  color: var(--ui-text-dim);
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+#btn-wb-labels:hover {
+  border-color: var(--ui-border-hover);
+  color: var(--ui-text);
+}
+
+#btn-wb-labels.active {
+  background: var(--civ-food-dim);
+  border-color: var(--civ-food);
+  color: var(--civ-food-bright);
+}
+
+#btn-wb-labels .lv-icon {
+  width: 14px;
+  height: 14px;
+}
+
 /* ─── Side Panel (Council Report) ────────────────────────────────────── */
 #side-panel {
   position: absolute;

@@ -349,6 +349,14 @@ async function bootstrap() {
   document.getElementById('btn-tasks')?.addEventListener('click', toggleTaskPanel);
   document.getElementById('btn-pending')?.addEventListener('click', togglePendingPanel);
   document.getElementById('btn-log')?.addEventListener('click', toggleLogPanel);
+  document.getElementById('btn-wb-labels')?.addEventListener('click', () => {
+    const active = renderer.toggleWorkbenchLabels();
+    const btn = document.getElementById('btn-wb-labels');
+    if (btn) {
+      btn.classList.toggle('active', active);
+      btn.title = active ? 'Ocultar etiquetas de archivos [T]' : 'Etiquetas de archivos [T]';
+    }
+  });
   document.getElementById('btn-task-assign')?.addEventListener('click', () => {
     toggleTaskAssignPanel(
       () => state.getLocalUnits(),
@@ -863,7 +871,9 @@ async function bootstrap() {
       const localWorld = state.getLocalWorld();
       const room = localWorld?.rooms.find((r: LocalRoom) => r.id === tile.roomId);
       if (room) {
-        showWhiteboardPanel(room, { x: sx, y: sy });
+        showWhiteboardPanel(room, { x: sx, y: sy }, (folderPath) => {
+          bridge.send('open_file', { filePath: folderPath });
+        });
       }
       return;
     }

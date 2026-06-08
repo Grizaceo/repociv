@@ -1249,6 +1249,14 @@ export class Renderer {
     return this._cleanMode;
   }
 
+  /** Toggle workbench file-name labels overlay in local view. */
+  toggleWorkbenchLabels(): boolean {
+    return this.localR?.toggleWorkbenchLabels() ?? false;
+  }
+  isWorkbenchLabelsVisible(): boolean {
+    return this.localR?.isWorkbenchLabelsVisible() ?? false;
+  }
+
   /** Compute current zoom-based LOD level. */
   private calcLod(): 'low' | 'medium' | 'high' {
     if (this.cam.zoom < 0.5) return 'low';
