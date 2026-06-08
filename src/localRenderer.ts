@@ -513,67 +513,87 @@ export class LocalRenderer {
       this.rebuildStaticLayer();
     }
 
-    // Background fill with transition alpha ONLY for the fade effect
+    // ─── Cozy Pastel Background ─────────────────────────────────────────
     ctx.globalAlpha = transitionAlpha;
-    ctx.fillStyle = '#12100e';
+    // Warm cream base
+    ctx.fillStyle = '#FFF8F3';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.globalAlpha = 1; // reset so world content renders at full opacity
+    ctx.globalAlpha = 1;
+
+    // Subtle warm radial glow (light center, soft edges — cozy office light)
+    const bgGrad = ctx.createRadialGradient(
+      canvas.width / 2,
+      canvas.height / 2,
+      0,
+      canvas.width / 2,
+      canvas.height / 2,
+      Math.max(canvas.width, canvas.height) * 0.7,
+    );
+    bgGrad.addColorStop(0, 'rgba(255, 248, 243, 0)');
+    bgGrad.addColorStop(0.7, 'rgba(255, 240, 230, 0.3)');
+    bgGrad.addColorStop(1, 'rgba(250, 230, 220, 0.5)');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
     ctx.translate(cam.cx, cam.cy);
     ctx.scale(cam.zoom, cam.zoom);
     ctx.translate(-cam.x, -cam.y);
 
-    // Draw tiled industrial concrete floor OUTSIDE the world grid bounds
-    // This fills the visible area beyond the world tiles with the same factory texture
+    // ─── Cozy Outside World (soft patio / garden outside office) ────────
     if (world) {
       const worldPxW = world.width * TILE_SIZE;
       const worldPxH = world.height * TILE_SIZE;
-      // Compute world-space visible rectangle
       const left = (0 - cam.cx) / cam.zoom + cam.x;
       const top = (0 - cam.cy) / cam.zoom + cam.y;
       const right = (canvas.width - cam.cx) / cam.zoom + cam.x;
       const bottom = (canvas.height - cam.cy) / cam.zoom + cam.y;
-      // Only paint if some outside area is visible
+
       if (left < 0 || top < 0 || right > worldPxW || bottom > worldPxH) {
-        const S = TILE_SIZE; // tile stride
-        // Round to nearest tile boundary
+        const S = TILE_SIZE;
         const x0 = Math.floor(left / S) * S;
         const y0 = Math.floor(top / S) * S;
         const x1 = Math.ceil(right / S) * S;
         const y1 = Math.ceil(bottom / S) * S;
+
         for (let ty = y0; ty < y1; ty += S) {
           for (let tx = x0; tx < x1; tx += S) {
-            // Skip tiles that are inside the world (those get drawn by the static layer)
             if (tx >= 0 && ty >= 0 && tx < worldPxW && ty < worldPxH) continue;
-            const brightness = ((Math.abs(tx / S) * 7 + Math.abs(ty / S) * 3) % 5) - 2; // -2..+2
-            const base = 52 + brightness * 2;
-            ctx.fillStyle = `rgb(${base},${Math.round(base * 0.95)},${Math.round(base * 0.9)})`;
+
+            // Soft pastel patio tiles (alternating cream and blush)
+            const isEven = (Math.abs(tx / S) + Math.abs(ty / S)) % 2 === 0;
+            const baseR = isEven ? 250 : 248;
+            const baseG = isEven ? 240 : 235;
+            const baseB = isEven ? 230 : 228;
+            ctx.fillStyle = `rgb(${baseR},${baseG},${baseB})`;
             ctx.fillRect(tx, ty, S, S);
-            // Subtle grid seams
-            ctx.strokeStyle = `rgba(0,0,0,0.3)`;
+
+            // Patio stone seams (soft warm gray)
+            ctx.strokeStyle = 'rgba(210, 200, 190, 0.4)';
             ctx.lineWidth = 0.5;
             ctx.strokeRect(tx + 0.5, ty + 0.5, S - 1, S - 1);
-            // Quarter-cross sub-dividers
-            ctx.strokeStyle = `rgba(0,0,0,0.15)`;
-            ctx.beginPath();
-            ctx.moveTo(tx + S / 2, ty);
-            ctx.lineTo(tx + S / 2, ty + S);
-            ctx.moveTo(tx, ty + S / 2);
-            ctx.lineTo(tx + S, ty + S / 2);
-            ctx.stroke();
-            // Rivet dots in corners
-            ctx.fillStyle = `rgba(255,220,100,0.07)`;
-            const r = S / 4;
-            ctx.fillRect(tx + r - 1, ty + r - 1, 2, 2);
-            ctx.fillRect(tx + 3 * r - 1, ty + r - 1, 2, 2);
-            ctx.fillRect(tx + r - 1, ty + 3 * r - 1, 2, 2);
-            ctx.fillRect(tx + 3 * r - 1, ty + 3 * r - 1, 2, 2);
+
+            // Occasional small bush / grass tuft outside the office
+            const hash = (Math.abs(tx / S) * 13 + Math.abs(ty / S) * 7) % 11;
+            if (hash === 0 || hash === 5) {
+              // Small rounded bush
+              const bx = tx + S / 2;
+              const by = ty + S / 2;
+              ctx.fillStyle = hash === 0 ? '#A8D5A2' : '#C8E6C9';
+              ctx.beginPath();
+              ctx.ellipse(bx, by, S * 0.35, S * 0.25, 0, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.fillStyle = hash === 0 ? '#8BC34A' : '#A5D6A7';
+              ctx.beginPath();
+              ctx.ellipse(bx - 2, by - 2, S * 0.2, S * 0.15, -0.3, 0, Math.PI * 2);
+              ctx.fill();
+            }
           }
         }
-        // Draw a safety-stripe border along the world edge
-        ctx.strokeStyle = 'rgba(245, 158, 11, 0.25)';
-        ctx.lineWidth = 3;
+
+        // Soft warm border around the office building
+        ctx.strokeStyle = 'rgba(220, 200, 185, 0.5)';
+        ctx.lineWidth = 2;
         ctx.strokeRect(0.5, 0.5, worldPxW - 1, worldPxH - 1);
       }
     }
@@ -583,8 +603,11 @@ export class LocalRenderer {
       ctx.drawImage(this.staticLayer, 0, 0);
     }
 
-    // Draw dynamic tiles on top of the static canvas (Phase 3c/3d)
+    // ─── Cozy window light rays (sunlight streaming onto floors) ────────
     const view = this.visibleTileRect();
+    this.drawWindowLightRays(world, view);
+
+    // Draw dynamic tiles on top of the static canvas (Phase 3c/3d)
     for (let y = view.y0; y <= view.y1; y++) {
       for (let x = view.x0; x <= view.x1; x++) {
         const tile = world.grid[y]![x]!;
@@ -639,7 +662,7 @@ export class LocalRenderer {
       const sx = x * TILE_SIZE;
       const sy = y * TILE_SIZE;
       ctx.save();
-      ctx.strokeStyle = '#c8a84b';
+      ctx.strokeStyle = '#D4A574';
       ctx.lineWidth = 2 / cam.zoom;
       ctx.strokeRect(sx + 1, sy + 1, TILE_SIZE - 2, TILE_SIZE - 2);
       ctx.restore();
@@ -647,7 +670,8 @@ export class LocalRenderer {
 
     ctx.restore();
 
-    // Vignette overlay
+    // ─── Cozy Vignette Overlay ───────────────────────────────────────────
+    // Warm soft vignette (light center, gently darker edges — cozy ambient)
     const grad = ctx.createRadialGradient(
       canvas.width / 2,
       canvas.height / 2,
@@ -656,8 +680,9 @@ export class LocalRenderer {
       canvas.height / 2,
       canvas.width,
     );
-    grad.addColorStop(0, 'rgba(0,0,0,0)');
-    grad.addColorStop(1, 'rgba(0,0,0,0.25)');
+    grad.addColorStop(0, 'rgba(255, 248, 243, 0)');
+    grad.addColorStop(0.65, 'rgba(255, 240, 230, 0)');
+    grad.addColorStop(1, 'rgba(245, 220, 205, 0.35)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
@@ -754,11 +779,11 @@ export class LocalRenderer {
     ctx.save();
 
     if (isGlass) {
-      // Glass sliding panels
-      ctx.fillStyle = 'rgba(200, 220, 240, 0.25)';
+      // Soft glass sliding panels (cozy pastel)
+      ctx.fillStyle = 'rgba(220, 240, 255, 0.3)';
       ctx.fillRect(px - offset, py + 1, panelW, s - 2);
       ctx.fillRect(px + panelW + offset, py + 1, panelW, s - 2);
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
       ctx.lineWidth = 0.5;
       ctx.strokeRect(px - offset + 0.5, py + 1.5, panelW - 1, s - 3);
       ctx.strokeRect(px + panelW + offset + 0.5, py + 1.5, panelW - 1, s - 3);
@@ -767,11 +792,11 @@ export class LocalRenderer {
       ctx.fillRect(px - offset, py + s / 2 - 1, panelW, 2);
       ctx.fillRect(px + panelW + offset, py + s / 2 - 1, panelW, 2);
     } else {
-      // Left sliding panel
-      ctx.fillStyle = this.tokens.zinc600 || '#52525B';
+      // Warm wood sliding panels (cozy pastel)
+      ctx.fillStyle = '#F5E6D3';
       ctx.fillRect(px - offset, py + 1, panelW, s - 2);
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)'; // Amber outline
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(212, 165, 116, 0.4)';
+      ctx.lineWidth = 0.5;
       ctx.strokeRect(px - offset + 0.5, py + 1.5, panelW - 1, s - 3);
 
       // Right sliding panel
@@ -837,65 +862,67 @@ export class LocalRenderer {
   private drawFloorBackground(tile: LocalTile, px: number, py: number, s: number, inRoom: boolean, zone?: string) {
     const { ctx } = this;
     if (!inRoom) {
-      // Non-room space: office corridor / avenue carpet
-      const brightness = ((tile.x * 7 + tile.y * 3) % 5) - 2; // -2..+2
-      const base = 72 + brightness * 2;
-      ctx.fillStyle = `rgb(${base},${Math.round(base * 0.98)},${Math.round(base * 0.96)})`;
+      // ─── Corridor / common area — soft cream carpet ────────────────────
+      const isAvenue = tile.type === 'path';
+      const brightness = ((tile.x * 7 + tile.y * 3) % 5) - 2;
+      let baseR = isAvenue ? 253 : 252;
+      let baseG = isAvenue ? 246 : 244;
+      let baseB = isAvenue ? 236 : 234;
+      baseR += brightness * 1.5;
+      baseG += brightness * 1.5;
+      baseB += brightness * 1.5;
+      ctx.fillStyle = `rgb(${Math.round(baseR)},${Math.round(baseG)},${Math.round(baseB)})`;
       ctx.fillRect(px, py, s, s);
 
-      // Carpet tile seam lines
-      ctx.strokeStyle = `rgba(0,0,0,0.12)`;
+      // Soft carpet tile seams
+      ctx.strokeStyle = 'rgba(220, 200, 190, 0.25)';
       ctx.lineWidth = 0.5;
       ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
 
-      // Center guide strip on main avenues
-      const isAvenue = tile.type === 'path';
+      // Center runner strip on main avenues
       if (isAvenue) {
-        ctx.fillStyle = 'rgba(148, 163, 184, 0.15)';
-        ctx.fillRect(px + s / 2 - 1, py, 2, s);
+        ctx.fillStyle = 'rgba(245, 208, 197, 0.2)';
+        ctx.fillRect(px + s / 2 - 2, py, 4, s);
       }
 
       return;
     }
 
-    // Room floors — zone-aware styling
+    // ─── Room floors — Cozy Pastel palette ────────────────────────────────
     const baseColors: Record<string, string> = {
-      team_cluster: '#64748b', // slate-500 carpet
-      meeting: '#475569',     // darker executive carpet
-      focus: '#94a3b8',       // muted acoustic carpet
-      break: '#d4d4d8',       // warm laminate
-      infra: '#52525b',       // raised floor panels
-      reception: '#a1a1aa',   // polished stone
-      biophilic: '#a8a29e',   // natural wood tone
+      team_cluster: '#F5D0C5',   // soft rose office carpet
+      meeting: '#E8C596',        // warm light wood
+      focus: '#E8F5D6',          // matcha green acoustic
+      break: '#FCE8C5',          // warm lemon kitchen tile
+      infra: '#E2E8F0',          // cool gray server floor
+      reception: '#F5F0E8',      // polished marble cream
+      biophilic: '#D4E8D0',      // sage green natural
     };
 
-    const baseColor = baseColors[zone ?? 'team_cluster'] ?? '#64748b';
-    const delta = ((tile.x * 7 + tile.y * 3) % 5) * 2 - 4; // -4..+4
+    const baseColor = baseColors[zone ?? 'team_cluster'] ?? '#F5D0C5';
+    const delta = ((tile.x * 7 + tile.y * 3) % 5) * 2 - 4;
     ctx.fillStyle = _adjustBrightness(baseColor, delta);
     ctx.fillRect(px, py, s, s);
 
-    // Carpet tile grid pattern (office-style squares)
-    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+    // Soft tile seams (warm cream instead of dark)
+    ctx.strokeStyle = 'rgba(200, 180, 170, 0.15)';
     ctx.lineWidth = 0.5;
     ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
 
-    // Raised-floor hint for infra zones
-    if (zone === 'infra') {
-      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-      ctx.beginPath();
-      ctx.moveTo(px + s / 2, py);
-      ctx.lineTo(px + s / 2, py + s);
-      ctx.moveTo(px, py + s / 2);
-      ctx.lineTo(px + s, py + s / 2);
-      ctx.stroke();
-      // Floor pedestal dot
-      ctx.fillStyle = 'rgba(100,100,100,0.3)';
-      ctx.fillRect(px + s / 2 - 1, py + s / 2 - 1, 2, 2);
+    // ─── Zone-specific floor patterns ──────────────────────────────────
+
+    if (zone === 'team_cluster') {
+      // Soft checkerboard accent tiles
+      if ((tile.x + tile.y) % 2 === 0) {
+        ctx.fillStyle = 'rgba(252, 232, 224, 0.4)';
+        ctx.fillRect(px + 2, py + 2, s - 4, s - 4);
+      }
     }
 
-    // Warm laminate plank lines for break / reception
-    if (zone === 'break' || zone === 'reception') {
-      ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+    if (zone === 'meeting') {
+      // Light wood plank lines
+      ctx.strokeStyle = 'rgba(180, 150, 120, 0.12)';
+      ctx.lineWidth = 0.5;
       ctx.beginPath();
       ctx.moveTo(px + s / 3, py);
       ctx.lineTo(px + s / 3, py + s);
@@ -904,92 +931,149 @@ export class LocalRenderer {
       ctx.stroke();
     }
 
-    // Soft edge highlight
-    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    if (zone === 'focus') {
+      // Subtle leaf / acoustic texture dots
+      ctx.fillStyle = 'rgba(168, 213, 162, 0.15)';
+      for (let r = 0; r < 2; r++) {
+        for (let c = 0; c < 2; c++) {
+          ctx.fillRect(px + 6 + c * 14, py + 6 + r * 14, 3, 3);
+        }
+      }
+    }
+
+    if (zone === 'break') {
+      // Kitchen tile cross pattern
+      ctx.strokeStyle = 'rgba(220, 190, 140, 0.15)';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(px + s / 2, py);
+      ctx.lineTo(px + s / 2, py + s);
+      ctx.moveTo(px, py + s / 2);
+      ctx.lineTo(px + s, py + s / 2);
+      ctx.stroke();
+    }
+
+    if (zone === 'infra') {
+      // Raised floor grid
+      ctx.strokeStyle = 'rgba(160, 170, 185, 0.2)';
+      ctx.beginPath();
+      ctx.moveTo(px + s / 2, py);
+      ctx.lineTo(px + s / 2, py + s);
+      ctx.moveTo(px, py + s / 2);
+      ctx.lineTo(px + s, py + s / 2);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(160, 170, 185, 0.25)';
+      ctx.fillRect(px + s / 2 - 1, py + s / 2 - 1, 2, 2);
+    }
+
+    if (zone === 'reception') {
+      // Marble vein hint
+      ctx.strokeStyle = 'rgba(200, 190, 180, 0.1)';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(px + 4, py + s - 4);
+      ctx.quadraticCurveTo(px + s / 2, py + s / 2, px + s - 4, py + 4);
+      ctx.stroke();
+    }
+
+    if (zone === 'biophilic') {
+      // Stone path texture
+      ctx.fillStyle = 'rgba(168, 213, 162, 0.1)';
+      ctx.beginPath();
+      ctx.arc(px + s / 2, py + s / 2, s * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Soft warm edge highlight
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
     ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
   }
 
   private drawPathBackground(tile: LocalTile, px: number, py: number, s: number) {
     const { ctx } = this;
-    // ─── Office corridor carpet ──────────────────────────────────────────
+    // ─── Cozy corridor carpet — pastel cream ─────────────────────────────
     const brightness = ((tile.x * 7 + tile.y * 3) % 7) - 3;
-    let baseColor = '#6b7b8f'; // warm slate office carpet
-    baseColor = _adjustBrightness(baseColor, brightness * 1.2);
-    ctx.fillStyle = baseColor;
+    let baseR = 253;
+    let baseG = 245;
+    let baseB = 235;
+    baseR += brightness * 1.5;
+    baseG += brightness * 1.5;
+    baseB += brightness * 1.5;
+    ctx.fillStyle = `rgb(${Math.round(baseR)},${Math.round(baseG)},${Math.round(baseB)})`;
     ctx.fillRect(px, py, s, s);
 
-    // Carpet tile grid seams (more defined office tiles)
-    ctx.strokeStyle = 'rgba(0,0,0,0.14)';
+    // Soft carpet tile seams
+    ctx.strokeStyle = 'rgba(220, 200, 190, 0.25)';
     ctx.lineWidth = 0.5;
     ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
 
-    // Tufting / fiber lines (subtle loop-pile texture)
-    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    // Subtle fiber lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
     ctx.lineWidth = 0.3;
     ctx.beginPath();
-    for (let i = 2; i < s; i += 3) {
+    for (let i = 2; i < s; i += 4) {
       ctx.moveTo(px + i, py + 2);
       ctx.lineTo(px + i, py + s - 2);
     }
     ctx.stroke();
 
-    // Center guide strip (subtle directional carpet runner)
-    ctx.fillStyle = 'rgba(148, 163, 184, 0.15)';
+    // Center runner strip (soft rose)
+    ctx.fillStyle = 'rgba(245, 208, 197, 0.18)';
     ctx.fillRect(px + s / 2 - 2, py, 4, s);
-    // Runner inner highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
     ctx.fillRect(px + s / 2 - 1, py, 2, s);
 
-    // ─── Ceiling light glow (fluorescent strip reflection on floor) ──
+    // ─── Soft warm light glow from ceiling ──────────────────────────────
     const lightX = px + s / 2;
     const lightY = py + s / 2;
     const lightGrad = ctx.createRadialGradient(lightX, lightY, 0, lightX, lightY, s * 0.7);
-    lightGrad.addColorStop(0, 'rgba(255, 255, 250, 0.06)');
-    lightGrad.addColorStop(1, 'rgba(255, 255, 250, 0)');
+    lightGrad.addColorStop(0, 'rgba(255, 248, 240, 0.1)');
+    lightGrad.addColorStop(1, 'rgba(255, 248, 240, 0)');
     ctx.fillStyle = lightGrad;
     ctx.fillRect(px, py, s, s);
 
-    // ─── Directional wayfinding arrows ─────────────────────────────────
+    // ─── Soft wayfinding arrows ─────────────────────────────────────────
     if ((tile.x + tile.y * 3) % 11 === 0) {
-      ctx.fillStyle = 'rgba(148, 163, 184, 0.2)';
-      ctx.font = `bold ${s * 0.22}px ${this.tokens.fontMono}`;
+      ctx.fillStyle = 'rgba(212, 165, 116, 0.2)';
+      ctx.font = `bold ${s * 0.2}px ${this.tokens.fontMono}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('▸', px + s / 2, py + s / 2);
     }
 
-    // ─── Edge shadow from nearby walls (soft ambient occlusion) ────────
+    // ─── Soft warm edge shadows from walls ─────────────────────────────
     const wallNearby = (dx: number, dy: number) => {
       const t = this.getTile(tile.x + dx, tile.y + dy);
       return t?.type === 'wall' || t?.type === 'door';
     };
+    const warmShadow = 'rgba(180, 150, 130, 0.1)';
     if (wallNearby(0, -1)) {
-      const shadowGrad = ctx.createLinearGradient(px, py + 4, px, py);
+      const shadowGrad = ctx.createLinearGradient(px, py + 5, px, py);
       shadowGrad.addColorStop(0, 'rgba(0,0,0,0)');
-      shadowGrad.addColorStop(1, 'rgba(0,0,0,0.18)');
+      shadowGrad.addColorStop(1, warmShadow);
       ctx.fillStyle = shadowGrad;
       ctx.fillRect(px, py, s, 5);
     }
     if (wallNearby(0, 1)) {
-      const shadowGrad = ctx.createLinearGradient(px, py + s - 4, px, py + s);
+      const shadowGrad = ctx.createLinearGradient(px, py + s - 5, px, py + s);
       shadowGrad.addColorStop(0, 'rgba(0,0,0,0)');
-      shadowGrad.addColorStop(1, 'rgba(0,0,0,0.18)');
+      shadowGrad.addColorStop(1, warmShadow);
       ctx.fillStyle = shadowGrad;
-      ctx.fillRect(px, py + s - 4, s, 5);
+      ctx.fillRect(px, py + s - 5, s, 5);
     }
     if (wallNearby(-1, 0)) {
-      const shadowGrad = ctx.createLinearGradient(px + 4, py, px, py);
+      const shadowGrad = ctx.createLinearGradient(px + 5, py, px, py);
       shadowGrad.addColorStop(0, 'rgba(0,0,0,0)');
-      shadowGrad.addColorStop(1, 'rgba(0,0,0,0.18)');
+      shadowGrad.addColorStop(1, warmShadow);
       ctx.fillStyle = shadowGrad;
       ctx.fillRect(px, py, 5, s);
     }
     if (wallNearby(1, 0)) {
-      const shadowGrad = ctx.createLinearGradient(px + s - 4, py, px + s, py);
+      const shadowGrad = ctx.createLinearGradient(px + s - 5, py, px + s, py);
       shadowGrad.addColorStop(0, 'rgba(0,0,0,0)');
-      shadowGrad.addColorStop(1, 'rgba(0,0,0,0.18)');
+      shadowGrad.addColorStop(1, warmShadow);
       ctx.fillStyle = shadowGrad;
-      ctx.fillRect(px + s - 4, py, 5, s);
+      ctx.fillRect(px + s - 5, py, 5, s);
     }
   }
 
@@ -1085,32 +1169,31 @@ export class LocalRenderer {
     const { ctx } = this;
     const isGlass = zone === 'team_cluster' || zone === 'meeting';
 
-    // Door frame posts
-    ctx.fillStyle = isGlass ? 'rgba(148,163,184,0.5)' : '#3a342f';
-    ctx.fillRect(px, py, 4, s); // Left post
-    ctx.fillRect(px + s - 4, py, 4, s); // Right post
+    // ─── Cozy pastel door frame ─────────────────────────────────────────
+    ctx.fillStyle = isGlass ? 'rgba(200, 230, 255, 0.4)' : '#F5E6D3';
+    ctx.fillRect(px, py, 4, s);
+    ctx.fillRect(px + s - 4, py, 4, s);
 
     if (isGlass) {
-      // Glass sliding door panel
-      ctx.fillStyle = 'rgba(200, 220, 240, 0.2)';
+      // Soft glass sliding panel
+      ctx.fillStyle = 'rgba(220, 240, 255, 0.35)';
       ctx.fillRect(px + 4, py + s / 2 - 3, s - 8, 6);
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.lineWidth = 0.5;
       ctx.strokeRect(px + 4, py + s / 2 - 3, s - 8, 6);
-      // Frosted stripe
-      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.fillStyle = 'rgba(255,255,255,0.2)';
       ctx.fillRect(px + 4, py + s / 2 - 1, s - 8, 2);
     } else {
-      // Wood/metal sliding door panel
-      ctx.fillStyle = '#6e5d53';
+      // Warm wood sliding door panel
+      ctx.fillStyle = '#E8C596';
       ctx.fillRect(px + 4, py + s / 2 - 3, s - 8, 6);
-      ctx.strokeStyle = '#382a22';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(200, 170, 140, 0.5)';
+      ctx.lineWidth = 0.5;
       ctx.strokeRect(px + 4, py + s / 2 - 3, s - 8, 6);
     }
 
-    // Door handle
-    ctx.fillStyle = isGlass ? '#94a3b8' : '#f59e0b';
+    // Soft gold door handle
+    ctx.fillStyle = isGlass ? '#E0E8F0' : '#D4A574';
     ctx.fillRect(px + s / 2 - 2, py + s / 2 - 1, 4, 2);
   }
 
@@ -1134,61 +1217,56 @@ export class LocalRenderer {
     const east = isOpen(tile.x + 1, tile.y);
     const west = isOpen(tile.x - 1, tile.y);
 
-    // Corner detection: open on two perpendicular sides
     const isCorner = (east && south) || (east && north) || (west && south) || (west && north);
 
-    // Zone-aware wall styling
+    // ─── Cozy pastel zone-aware wall styling ────────────────────────────
     const isGlass = zone === 'team_cluster' || zone === 'meeting';
     const isAcoustic = zone === 'focus';
     const isWood = zone === 'break' || zone === 'biophilic';
     const isConcrete = zone === 'infra';
 
     if (isCorner) {
-      // Structural column
-      ctx.fillStyle = isConcrete ? '#3a342f' : isWood ? '#5c4033' : '#475569';
+      // Rounded structural column (soft cream)
+      ctx.fillStyle = isConcrete ? '#E2E8F0' : isWood ? '#F5E6D3' : '#FDFBF7';
       ctx.fillRect(px, py, s, s);
-
-      ctx.fillStyle = isConcrete ? '#4a423a' : isWood ? '#6b4f3a' : '#52525b';
-      ctx.fillRect(px + 4, py + 4, s - 8, s - 8);
-
-      ctx.strokeStyle = '#1b1815';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(px + 4, py + 4, s - 8, s - 8);
-
-      ctx.strokeStyle = isGlass ? '#94a3b8' : '#786b5e';
-      ctx.strokeRect(px + 1.5, py + 1.5, s - 3, s - 3);
+      ctx.fillStyle = isConcrete ? '#E8EDF2' : isWood ? '#FAF0E6' : '#FFFFFF';
+      ctx.fillRect(px + 3, py + 3, s - 6, s - 6);
+      ctx.strokeStyle = 'rgba(200, 190, 180, 0.3)';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(px + 3, py + 3, s - 6, s - 6);
     } else {
       if (isGlass) {
-        // Glass partition wall
-        ctx.fillStyle = 'rgba(148, 163, 184, 0.25)';
+        // Soft glass partition with blue-tint
+        ctx.fillStyle = 'rgba(200, 230, 255, 0.2)';
         ctx.fillRect(px, py, s, s);
-        // Thin metal frame
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.55)';
+        // White metal frame
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
         ctx.lineWidth = 1;
         ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
-        // Horizontal frosted band
-        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        // Soft frosted band
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
         ctx.fillRect(px + 1, py + s / 2 - 2, s - 2, 4);
       } else if (isAcoustic) {
-        // Acoustic panel wall
-        ctx.fillStyle = '#94a3b8';
+        // Soft green acoustic panels
+        ctx.fillStyle = '#E8F5E9';
         ctx.fillRect(px, py, s, s);
-        // Perforated pattern
-        ctx.fillStyle = '#64748b';
+        // Subtle dot pattern
+        ctx.fillStyle = 'rgba(168, 213, 162, 0.3)';
         for (let r = 0; r < 3; r++) {
           for (let c = 0; c < 3; c++) {
-            ctx.fillRect(px + 4 + c * 9, py + 4 + r * 9, 2, 2);
+            ctx.beginPath();
+            ctx.arc(px + 6 + c * 8, py + 6 + r * 8, 1.5, 0, Math.PI * 2);
+            ctx.fill();
           }
         }
-        ctx.strokeStyle = '#475569';
+        ctx.strokeStyle = 'rgba(200, 220, 200, 0.4)';
         ctx.lineWidth = 0.5;
         ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
       } else if (isWood) {
-        // Wood panel wall
-        ctx.fillStyle = '#78350f';
+        // Warm light wood paneling
+        ctx.fillStyle = '#F5E6D3';
         ctx.fillRect(px, py, s, s);
-        // Vertical wood grain lines
-        ctx.strokeStyle = '#5c2e0e';
+        ctx.strokeStyle = 'rgba(200, 170, 140, 0.3)';
         ctx.lineWidth = 0.5;
         ctx.beginPath();
         ctx.moveTo(px + s / 3, py);
@@ -1196,75 +1274,44 @@ export class LocalRenderer {
         ctx.moveTo(px + 2 * s / 3, py);
         ctx.lineTo(px + 2 * s / 3, py + s);
         ctx.stroke();
-        // Panel outline
-        ctx.strokeStyle = '#451a03';
+        ctx.strokeStyle = 'rgba(200, 170, 140, 0.5)';
         ctx.lineWidth = 1;
         ctx.strokeRect(px + 0.5, py + 0.5, s - 1, s - 1);
       } else {
-        // Standard drywall / concrete blocks
-        ctx.fillStyle = isConcrete ? '#4a423a' : '#52525b';
+        // Standard cozy white drywall
+        ctx.fillStyle = isConcrete ? '#F0F4F8' : '#FDFBF7';
         ctx.fillRect(px, py, s, s);
 
-        ctx.strokeStyle = isConcrete ? '#342e29' : '#3f3f46';
-        ctx.lineWidth = 1;
-
-        // Horizontal joint rows
+        // Subtle drywall seam lines (soft warm gray)
+        ctx.strokeStyle = 'rgba(220, 210, 200, 0.25)';
+        ctx.lineWidth = 0.5;
         ctx.beginPath();
-        ctx.moveTo(px, py + 10);
-        ctx.lineTo(px + s, py + 10);
-        ctx.moveTo(px, py + 21);
-        ctx.lineTo(px + s, py + 21);
-        ctx.stroke();
-
-        // Vertical block seams (staggered)
-        ctx.beginPath();
-        ctx.moveTo(px + s / 2, py);
-        ctx.lineTo(px + s / 2, py + 10);
-        ctx.moveTo(px + s / 4, py + 10);
-        ctx.lineTo(px + s / 4, py + 21);
-        ctx.moveTo(px + 3 * s / 4, py + 10);
-        ctx.lineTo(px + 3 * s / 4, py + 21);
-        ctx.moveTo(px + s / 2, py + 21);
-        ctx.lineTo(px + s / 2, py + s);
+        ctx.moveTo(px, py + s / 2);
+        ctx.lineTo(px + s, py + s / 2);
         ctx.stroke();
       }
     }
 
-    // Top capping
-    ctx.fillStyle = isGlass ? 'rgba(148,163,184,0.5)' : isWood ? '#5c4033' : '#5c5249';
-    ctx.fillRect(px, py, s, 4);
+    // ─── Warm baseboard / molding ──────────────────────────────────────
+    const moldingColor = isWood ? '#E8C596' : isGlass ? '#E0E8F0' : '#F5E6D3';
+    ctx.fillStyle = moldingColor;
+    ctx.fillRect(px, py + s - 3, s, 3);
 
-    // Directional shadows from neighboring open tiles
+    // ─── Soft warm shadows ─────────────────────────────────────────────
     if (east) {
-      const shadowGrad = ctx.createLinearGradient(px + s - 5, py, px + s, py);
-      shadowGrad.addColorStop(0, isGlass ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.3)');
-      shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      const shadowGrad = ctx.createLinearGradient(px + s - 4, py, px + s, py);
+      shadowGrad.addColorStop(0, 'rgba(180, 150, 130, 0)');
+      shadowGrad.addColorStop(1, 'rgba(180, 150, 130, 0.12)');
       ctx.fillStyle = shadowGrad;
-      ctx.fillRect(px + s - 5, py, 5, s);
+      ctx.fillRect(px + s - 4, py, 4, s);
     }
     if (south) {
-      const shadowGrad = ctx.createLinearGradient(px, py + s - 5, px, py + s);
-      shadowGrad.addColorStop(0, isGlass ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.3)');
-      shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      const shadowGrad = ctx.createLinearGradient(px, py + s - 4, px, py + s);
+      shadowGrad.addColorStop(0, 'rgba(180, 150, 130, 0)');
+      shadowGrad.addColorStop(1, 'rgba(180, 150, 130, 0.12)');
       ctx.fillStyle = shadowGrad;
-      ctx.fillRect(px, py + s - 5, s, 5);
+      ctx.fillRect(px, py + s - 4, s, 4);
     }
-
-    // Office baseboard / molding on walls facing corridors
-    const isPath = (x: number, y: number) => {
-      const t = this.getTile(x, y);
-      return t?.type === 'path' || t?.type === 'door';
-    };
-    const pathNorth = isPath(tile.x, tile.y - 1);
-    const pathSouth = isPath(tile.x, tile.y + 1);
-    const pathEast = isPath(tile.x + 1, tile.y);
-    const pathWest = isPath(tile.x - 1, tile.y);
-
-    ctx.fillStyle = isGlass ? 'rgba(200,200,210,0.4)' : '#e2e8f0';
-    if (pathNorth) ctx.fillRect(px + 1, py + s - 3, s - 2, 3);
-    if (pathSouth) ctx.fillRect(px + 1, py, s - 2, 3);
-    if (pathEast) ctx.fillRect(px, py + 1, 3, s - 2);
-    if (pathWest) ctx.fillRect(px + s - 3, py + 1, 3, s - 2);
 
     // Outline
     ctx.strokeStyle = isGlass ? 'rgba(148,163,184,0.4)' : '#1d1a17';
@@ -1298,22 +1345,28 @@ export class LocalRenderer {
 
   private drawKioskTile(px: number, py: number, s: number) {
     const { ctx } = this;
-    // Desk console
-    ctx.fillStyle = '#2d2722'; // base wood/metal desk
-    ctx.fillRect(px + 4, py + 6, s - 8, s - 12);
-    ctx.strokeRect(px + 4.5, py + 6.5, s - 9, s - 13);
+    // ─── Cozy kiosk — light wood with soft screen ─────────────────────
+    ctx.fillStyle = '#F5E6D3';
+    ctx.beginPath();
+    ctx.roundRect(px + 4, py + 6, s - 8, s - 12, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 170, 140, 0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
 
     // Keyboard shelf
-    ctx.fillStyle = '#1c1916';
+    ctx.fillStyle = '#E8C596';
     ctx.fillRect(px + 8, py + s - 10, s - 16, 2);
 
-    // Glowing CRT screen monitor
-    ctx.fillStyle = '#0f0f12';
-    ctx.fillRect(px + 6, py + 8, s - 12, 10);
-    ctx.strokeStyle = '#3a342f';
-    ctx.strokeRect(px + 6.5, py + 8.5, s - 13, 9);
+    // Soft screen monitor
+    ctx.fillStyle = '#F0F4F8';
+    ctx.beginPath();
+    ctx.roundRect(px + 6, py + 8, s - 12, 10, 1);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(180, 190, 200, 0.3)';
+    ctx.stroke();
 
-    ctx.fillStyle = 'rgba(245, 158, 11, 0.8)'; // amber text glow
+    ctx.fillStyle = 'rgba(212, 165, 116, 0.8)';
     ctx.font = `bold 6px ${this.tokens.fontMono}`;
     ctx.fillText('SYS', px + 10, py + 14);
   }
@@ -1323,27 +1376,34 @@ export class LocalRenderer {
     const wb = tile.workbench;
     if (!wb) return;
 
-    // Wood desktop top panel
-    ctx.fillStyle = '#5c4b3f'; // warm mahogany wood
-    ctx.fillRect(px + 3, py + 4, s - 6, 16); // desk body covers top portion of tile
-    ctx.strokeStyle = '#1b1815';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(px + 3, py + 4, s - 6, 16);
+    // ─── Cozy workbench — light wood desk + monitor ─────────────────────
+    // Light wood desktop
+    ctx.fillStyle = '#E8C596';
+    ctx.beginPath();
+    ctx.roundRect(px + 3, py + 4, s - 6, 16, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 170, 140, 0.4)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
 
-    // Monitor screen stand
-    ctx.fillStyle = '#3a342f';
+    // Monitor stand
+    ctx.fillStyle = '#E2E8F0';
     ctx.fillRect(px + s / 2 - 2, py + 14, 4, 3);
 
-    // Monitor Screen border
-    ctx.fillStyle = '#151311';
-    ctx.fillRect(px + 5, py + 5, s - 10, 10);
-    ctx.strokeRect(px + 5.5, py + 5.5, s - 11, 9);
+    // Monitor Screen (white frame)
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.roundRect(px + 5, py + 5, s - 10, 10, 1);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(180, 190, 200, 0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
 
-    // Black/inactive screen center (overwritten by dynamic renderer if active)
-    ctx.fillStyle = '#0a0a0c';
+    // Soft screen glow
+    ctx.fillStyle = 'rgba(200, 230, 255, 0.3)';
     ctx.fillRect(px + 6, py + 6, s - 12, 8);
 
-    // File extension label drawn centered on the monitor screen!
+    // File extension label
     const extColor = EXT_COLOR[wb.extension] ?? '#888';
     ctx.fillStyle = extColor;
     ctx.font = `bold 7px ${this.tokens.fontMono}`;
@@ -1351,27 +1411,27 @@ export class LocalRenderer {
     ctx.textBaseline = 'middle';
     ctx.fillText(wb.extension.toUpperCase().slice(0, 3), px + s / 2, py + 10);
 
-    // Keyboard in front of monitor
-    ctx.fillStyle = '#2d2722';
+    // Keyboard
+    ctx.fillStyle = '#E2E8F0';
     ctx.fillRect(px + 9, py + 21, s - 18, 3);
-    ctx.strokeStyle = '#1b1815';
+    ctx.strokeStyle = 'rgba(180, 190, 200, 0.3)';
     ctx.lineWidth = 0.5;
     ctx.strokeRect(px + 9.5, py + 21.5, s - 19, 2);
 
-    // Test indicator dot
+    // Test indicator dot (soft amber)
     if (wb.isTest) {
-      ctx.fillStyle = '#f59e0b';
+      ctx.fillStyle = '#D4A574';
       ctx.beginPath();
       ctx.arc(px + s - 7, py + 7, 2, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Office Chair facing the desk (bottom part of tile)
+    // Cute office chair (bottom part)
     const chairX = px + s / 2;
     const chairY = py + s - 6;
 
-    // Chair base mount
-    ctx.strokeStyle = '#2d2722';
+    // Chair base
+    ctx.strokeStyle = '#E2E8F0';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(chairX, chairY);
@@ -1380,21 +1440,13 @@ export class LocalRenderer {
     ctx.lineTo(chairX + 3, chairY + 3);
     ctx.stroke();
 
-    // Round Seat Cushion
-    ctx.fillStyle = '#443d35'; // dark grey cushion
-    ctx.strokeStyle = '#1b1815';
-    ctx.lineWidth = 1;
+    // Round seat cushion (soft pink)
+    ctx.fillStyle = '#F8BBD0';
     ctx.beginPath();
     ctx.arc(chairX, chairY, 4, 0, Math.PI * 2);
     ctx.fill();
-    ctx.stroke();
-
-    // Backrest arc
-    ctx.strokeStyle = '#2d2722';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.arc(chairX, chairY, 5, Math.PI * 0.1, Math.PI * 0.9);
+    ctx.strokeStyle = 'rgba(248, 187, 208, 0.5)';
+    ctx.lineWidth = 0.5;
     ctx.stroke();
   }
 
@@ -1403,16 +1455,18 @@ export class LocalRenderer {
     const centerX = px + s / 2;
     const centerY = py + s / 2;
 
-    // Base generator box
-    ctx.fillStyle = '#2d3748'; // dark blue-grey metal casing
-    ctx.strokeStyle = '#1a202c';
-    ctx.lineWidth = 1.5;
-    ctx.fillRect(px + 3, py + 3, s - 6, s - 6);
-    ctx.strokeRect(px + 3, py + 3, s - 6, s - 6);
+    // ─── Cozy power source — soft white cabinet ─────────────────────────
+    ctx.fillStyle = '#F0F4F8';
+    ctx.beginPath();
+    ctx.roundRect(px + 3, py + 3, s - 6, s - 6, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(180, 190, 200, 0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
 
-    // Cooling fan vents (lines)
-    ctx.strokeStyle = '#4a5568';
-    ctx.lineWidth = 1;
+    // Soft vent lines
+    ctx.strokeStyle = 'rgba(180, 190, 200, 0.4)';
+    ctx.lineWidth = 0.5;
     for (let i = 0; i < 3; i++) {
       ctx.beginPath();
       ctx.moveTo(px + 6, py + 8 + i * 4);
@@ -1420,16 +1474,16 @@ export class LocalRenderer {
       ctx.stroke();
     }
 
-    // Power core indicator (glowing circle)
+    // Soft power indicator (warm glow)
     const now = performance.now();
     const pulse = 0.5 + 0.5 * Math.sin(now / 400);
-    ctx.fillStyle = `rgba(16, 185, 129, ${0.7 + 0.3 * pulse})`; // emerald glow
+    ctx.fillStyle = `rgba(168, 213, 162, ${0.5 + 0.2 * pulse})`;
     ctx.beginPath();
     ctx.arc(centerX, centerY + 4, 3, 0, Math.PI * 2);
     ctx.fill();
-    
-    // Label "GEN" or "PWR"
-    ctx.fillStyle = '#a0aec0';
+
+    // Label
+    ctx.fillStyle = 'rgba(180, 190, 200, 0.6)';
     ctx.font = `bold 6px ${this.tokens.fontMono}`;
     ctx.textAlign = 'center';
     ctx.fillText('PWR', centerX, centerY - 4);
@@ -1438,76 +1492,96 @@ export class LocalRenderer {
   private drawPowerConsumerTile(px: number, py: number, s: number) {
     const { ctx } = this;
 
-    // A small electrical panel on the wall or a terminal box
-    ctx.fillStyle = '#4a5568';
-    ctx.fillRect(px + s / 2 - 5, py + s / 2 - 5, 10, 10);
-    ctx.strokeStyle = '#1a202c';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(px + s / 2 - 5, py + s / 2 - 5, 10, 10);
+    // ─── Soft electrical panel — pastel ────────────────────────────────
+    ctx.fillStyle = '#E2E8F0';
+    ctx.beginPath();
+    ctx.roundRect(px + s / 2 - 5, py + s / 2 - 5, 10, 10, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(180, 190, 200, 0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
 
-    // Tiny blinking status LED
+    // Tiny soft blinking LED
     const now = performance.now();
-    ctx.fillStyle = (now % 1000 < 500) ? '#10b981' : '#059669'; // blinking green
-    ctx.fillRect(px + s / 2 - 2, py + s / 2 - 2, 4, 4);
+    ctx.fillStyle = (now % 1000 < 500) ? 'rgba(168, 213, 162, 0.6)' : 'rgba(180, 190, 200, 0.3)';
+    ctx.beginPath();
+    ctx.arc(px + s / 2, py + s / 2, 2, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   private drawBedTile(px: number, py: number, s: number) {
     const { ctx } = this;
+    // ─── Cozy daybed / sofa bed — pastel ───────────────────────────────
+    const frameColor = '#E8C596';
+    const sheetColor = '#FFFFFF';
+    const blanketColor = '#FCE4EC';
 
-    const frameColor = '#5c4033'; // wood frame
-    const sheetColor = '#e2e8f0'; // slate-100 mattress sheet
-    const blanketColor = '#b7791f'; // gold-amber blanket
-
-    // Wooden headboard (top edge)
+    // Headboard
     ctx.fillStyle = frameColor;
-    ctx.fillRect(px + 2, py + 2, s - 4, 3);
+    ctx.beginPath();
+    ctx.roundRect(px + 2, py + 2, s - 4, 3, 1);
+    ctx.fill();
 
     // Bed posts
-    ctx.fillRect(px + 1, py + 1, 2, 4);
-    ctx.fillRect(px + s - 3, py + 1, 2, 4);
+    ctx.fillStyle = frameColor;
+    ctx.beginPath();
+    ctx.arc(px + 2, py + 3, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(px + s - 2, py + 3, 1.5, 0, Math.PI * 2);
+    ctx.fill();
 
     // Mattress sheet
     ctx.fillStyle = sheetColor;
-    ctx.fillRect(px + 3, py + 5, s - 6, s - 8);
+    ctx.beginPath();
+    ctx.roundRect(px + 3, py + 5, s - 6, s - 8, 2);
+    ctx.fill();
 
     // Pillow (top)
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(px + 5, py + 6, s - 10, 4);
-    ctx.strokeStyle = '#cbd5e0';
-    ctx.strokeRect(px + 5, py + 6, s - 10, 4);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.roundRect(px + 5, py + 6, s - 10, 4, 1);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 200, 200, 0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
 
-    // Blanket covering the bottom half, with a nice fold
+    // Blanket covering the bottom half
     ctx.fillStyle = blanketColor;
-    ctx.fillRect(px + 3, py + s - 14, s - 6, 10);
-    
+    ctx.beginPath();
+    ctx.roundRect(px + 3, py + s - 14, s - 6, 10, 2);
+    ctx.fill();
     // Blanket fold line
-    ctx.fillStyle = '#d69e2e';
+    ctx.fillStyle = '#F8BBD0';
     ctx.fillRect(px + 3, py + s - 14, s - 6, 2);
 
-    // Footboard (bottom frame)
+    // Footboard
     ctx.fillStyle = frameColor;
-    ctx.fillRect(px + 2, py + s - 3, s - 4, 2);
+    ctx.beginPath();
+    ctx.roundRect(px + 2, py + s - 3, s - 4, 2, 1);
+    ctx.fill();
   }
 
   private drawHeaterTile(px: number, py: number, s: number) {
     const { ctx } = this;
+    // ─── Cozy radiator — warm pastel ───────────────────────────────────
+    ctx.fillStyle = '#FAF0E6';
+    ctx.beginPath();
+    ctx.roundRect(px + 4, py + 4, s - 8, s - 8, 3);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 180, 160, 0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
 
-    // Heater body (dark gray industrial metal)
-    ctx.fillStyle = '#2d3748';
-    ctx.fillRect(px + 4, py + 4, s - 8, s - 8);
-    ctx.strokeStyle = '#1a202c';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(px + 4, py + 4, s - 8, s - 8);
-
-    // Hot coils glowing red/orange in the center
+    // Warm coils (soft orange glow)
     const now = performance.now();
-    const glowIntensity = 0.7 + 0.3 * Math.sin(now / 200);
-    ctx.fillStyle = `rgba(239, 68, 68, ${glowIntensity})`; // red glow
+    const glowIntensity = 0.3 + 0.15 * Math.sin(now / 200);
+    ctx.fillStyle = `rgba(255, 200, 150, ${glowIntensity})`;
     ctx.fillRect(px + 7, py + 7, s - 14, s - 14);
 
-    // Grille lines on top of the glowing coils
-    ctx.strokeStyle = '#2d3748';
-    ctx.lineWidth = 1.5;
+    // Soft grille lines
+    ctx.strokeStyle = 'rgba(200, 180, 160, 0.4)';
+    ctx.lineWidth = 1;
     for (let i = 0; i < 3; i++) {
       const gx = px + 8 + i * 4;
       ctx.beginPath();
@@ -1522,24 +1596,26 @@ export class LocalRenderer {
     const centerX = px + s / 2;
     const centerY = py + s / 2;
 
-    // Cooler body (clean industrial steel)
-    ctx.fillStyle = '#4a5568';
-    ctx.fillRect(px + 4, py + 4, s - 8, s - 8);
-    ctx.strokeStyle = '#1a202c';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(px + 4, py + 4, s - 8, s - 8);
+    // ─── Cozy AC unit — soft white ─────────────────────────────────────
+    ctx.fillStyle = '#F0F4F8';
+    ctx.beginPath();
+    ctx.roundRect(px + 4, py + 4, s - 8, s - 8, 3);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(180, 190, 200, 0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
 
-    // Fan circle in the center
-    ctx.fillStyle = '#1a202c';
+    // Soft fan circle
+    ctx.fillStyle = '#E2E8F0';
     ctx.beginPath();
     ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
     ctx.fill();
 
-    // Rotating fan blades
+    // Rotating fan blades (soft gray)
     const now = performance.now();
     const angle = (now / 150) % (Math.PI * 2);
-    ctx.strokeStyle = '#718096';
-    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = 'rgba(180, 190, 200, 0.6)';
+    ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     for (let i = 0; i < 4; i++) {
       const bladeAngle = angle + (i * Math.PI) / 2;
@@ -1549,9 +1625,11 @@ export class LocalRenderer {
       ctx.stroke();
     }
 
-    // Cooling status LED (glowing blue)
-    ctx.fillStyle = '#3b82f6';
-    ctx.fillRect(px + 6, py + 6, 2, 2);
+    // Soft blue LED
+    ctx.fillStyle = 'rgba(186, 230, 253, 0.6)';
+    ctx.beginPath();
+    ctx.arc(px + 7, py + 7, 1.5, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   private drawVentTile(px: number, py: number, s: number) {
@@ -1559,23 +1637,25 @@ export class LocalRenderer {
     const centerX = px + s / 2;
     const centerY = py + s / 2;
 
-    // Vent frame
-    ctx.fillStyle = '#4a5568'; // frame (metal)
-    ctx.fillRect(px + 2, py + 2, s - 4, s - 4);
-    ctx.strokeStyle = '#1a202c';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(px + 2, py + 2, s - 4, s - 4);
+    // ─── Cozy vent — soft white ─────────────────────────────────────────
+    ctx.fillStyle = '#F0F4F8';
+    ctx.beginPath();
+    ctx.roundRect(px + 2, py + 2, s - 4, s - 4, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(180, 190, 200, 0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
 
-    // Grille slats (horizontal)
-    ctx.fillStyle = '#1a202c'; // dark gaps
+    // Soft grille slats
+    ctx.fillStyle = 'rgba(180, 190, 200, 0.4)';
     for (let i = 0; i < 4; i++) {
       ctx.fillRect(px + 5, py + 5 + i * 5, s - 10, 2);
     }
 
-    // Airflow indicator (small animated arrows)
+    // Airflow indicator (soft animated)
     const now = performance.now();
-    ctx.fillStyle = `rgba(144, 164, 174, ${0.6 + 0.3 * Math.sin(now / 200)})`;
-    ctx.font = `${s * 0.25}px ${this.tokens.fontMono}`;
+    ctx.fillStyle = `rgba(168, 213, 162, ${0.4 + 0.2 * Math.sin(now / 200)})`;
+    ctx.font = `${s * 0.22}px ${this.tokens.fontMono}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('↔', centerX, centerY);
@@ -1585,113 +1665,166 @@ export class LocalRenderer {
 
   private drawStandingDeskTile(px: number, py: number, s: number) {
     const { ctx } = this;
-    // Elevated desk surface
-    ctx.fillStyle = '#6b5a4e'; // warm wood
-    ctx.fillRect(px + 2, py + 4, s - 4, 10);
-    ctx.strokeStyle = '#3a2e26';
+    // ─── Cozy standing desk — light wood rounded ───────────────────────
+    // Desk surface (rounded feel)
+    ctx.fillStyle = '#E8C596';
+    ctx.beginPath();
+    ctx.roundRect(px + 2, py + 4, s - 4, 10, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 170, 140, 0.4)';
     ctx.lineWidth = 0.5;
-    ctx.strokeRect(px + 2.5, py + 4.5, s - 5, 9);
+    ctx.stroke();
     // Monitor
-    ctx.fillStyle = '#151311';
-    ctx.fillRect(px + 5, py + 2, s - 10, 7);
-    ctx.strokeStyle = '#2d2722';
-    ctx.strokeRect(px + 5.5, py + 2.5, s - 11, 6);
-    // Cable tray hint under desk
-    ctx.fillStyle = '#2d2722';
-    ctx.fillRect(px + 4, py + 16, s - 8, 2);
+    ctx.fillStyle = '#F0F4F8';
+    ctx.beginPath();
+    ctx.roundRect(px + 5, py + 2, s - 10, 7, 1);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(180, 190, 200, 0.4)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    // Screen glow
+    ctx.fillStyle = 'rgba(200, 230, 255, 0.3)';
+    ctx.fillRect(px + 6, py + 3, s - 12, 5);
+    // Small succulent on desk
+    ctx.fillStyle = '#A8D5A2';
+    ctx.beginPath();
+    ctx.arc(px + s - 5, py + 12, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#E8C596';
+    ctx.beginPath();
+    ctx.arc(px + s - 5, py + 14, 2, 0, Math.PI);
+    ctx.fill();
   }
 
   private drawPhoneBoothTile(px: number, py: number, s: number) {
     const { ctx } = this;
-    // Enclosed pod body
-    ctx.fillStyle = '#2d3748'; // slate-800
-    ctx.fillRect(px + 3, py + 3, s - 6, s - 6);
-    ctx.strokeStyle = '#1a202c';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(px + 3, py + 3, s - 6, s - 6);
-    // Sound-dampening panels (horizontal lines)
-    ctx.strokeStyle = '#4a5568';
+    // ─── Cozy focus pod — soft rounded ────────────────────────────────
+    ctx.fillStyle = '#E8F5E9';
+    ctx.beginPath();
+    ctx.roundRect(px + 3, py + 3, s - 6, s - 6, 4);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(168, 213, 162, 0.4)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    // Soft sound wave pattern
+    ctx.strokeStyle = 'rgba(168, 213, 162, 0.25)';
     ctx.lineWidth = 0.5;
     for (let i = 1; i < 4; i++) {
       ctx.beginPath();
-      ctx.moveTo(px + 4, py + 3 + i * 7);
-      ctx.lineTo(px + s - 4, py + 3 + i * 7);
+      ctx.moveTo(px + 5, py + 5 + i * 7);
+      ctx.lineTo(px + s - 5, py + 5 + i * 7);
       ctx.stroke();
     }
     // Small interior desk
-    ctx.fillStyle = '#4a5568';
-    ctx.fillRect(px + 6, py + s - 10, s - 12, 4);
-    // Occupied indicator LED
+    ctx.fillStyle = '#F5E6D3';
+    ctx.beginPath();
+    ctx.roundRect(px + 6, py + s - 10, s - 12, 4, 1);
+    ctx.fill();
+    // Soft indicator
     const now = performance.now();
-    ctx.fillStyle = (now % 2000 < 1000) ? '#fbbf24' : '#4a5568';
-    ctx.fillRect(px + s / 2 - 1, py + 4, 2, 2);
+    ctx.fillStyle = (now % 2000 < 1000) ? '#A8D5A2' : '#D4E8D0';
+    ctx.beginPath();
+    ctx.arc(px + s / 2, py + 6, 2, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   private drawBreakAreaTile(px: number, py: number, s: number) {
     const { ctx } = this;
-    // Kitchen counter base
-    ctx.fillStyle = '#e2e8f0'; // slate-200
-    ctx.fillRect(px + 2, py + 10, s - 4, s - 12);
-    ctx.strokeStyle = '#94a3b8';
+    // ─── Cozy kitchen counter — warm pastel ────────────────────────────
+    ctx.fillStyle = '#FAF0E6';
+    ctx.beginPath();
+    ctx.roundRect(px + 2, py + 10, s - 4, s - 12, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 180, 160, 0.3)';
     ctx.lineWidth = 0.5;
-    ctx.strokeRect(px + 2.5, py + 10.5, s - 5, s - 13);
+    ctx.stroke();
     // Countertop
-    ctx.fillStyle = '#cbd5e1';
+    ctx.fillStyle = '#F5E6D3';
     ctx.fillRect(px + 1, py + 8, s - 2, 4);
-    // Coffee machine
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(px + 4, py + 2, 8, 8);
-    // Coffee machine glow
+    // Cute coffee machine
+    ctx.fillStyle = '#F0F4F8';
+    ctx.beginPath();
+    ctx.roundRect(px + 4, py + 2, 8, 8, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(180, 190, 200, 0.4)';
+    ctx.stroke();
+    // Coffee machine warm glow
     const now = performance.now();
-    ctx.fillStyle = `rgba(245, 158, 11, ${0.5 + 0.3 * Math.sin(now / 300)})`;
+    ctx.fillStyle = `rgba(212, 165, 116, ${0.4 + 0.2 * Math.sin(now / 300)})`;
     ctx.fillRect(px + 6, py + 4, 2, 2);
-    // Microwave
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(px + s - 10, py + 3, 7, 6);
-    ctx.strokeStyle = '#475569';
-    ctx.strokeRect(px + s - 9.5, py + 3.5, 6, 5);
+    // Small microwave
+    ctx.fillStyle = '#E2E8F0';
+    ctx.beginPath();
+    ctx.roundRect(px + s - 10, py + 3, 7, 6, 1);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(180, 190, 200, 0.3)';
+    ctx.stroke();
   }
 
   private drawMeetingRoomTile(px: number, py: number, s: number) {
     const { ctx } = this;
-    // Glass table surface
-    ctx.fillStyle = 'rgba(148, 163, 184, 0.25)';
-    ctx.fillRect(px + 4, py + 6, s - 8, s - 12);
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
+    // ─── Cozy meeting table — oval wood with soft chairs ───────────────
+    // Oval table surface
+    ctx.fillStyle = 'rgba(232, 197, 150, 0.5)';
+    ctx.beginPath();
+    ctx.ellipse(px + s / 2, py + s / 2, (s - 8) / 2, (s - 12) / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 170, 140, 0.4)';
     ctx.lineWidth = 0.5;
-    ctx.strokeRect(px + 4.5, py + 6.5, s - 9, s - 13);
+    ctx.stroke();
     // Table legs
-    ctx.fillStyle = '#475569';
-    ctx.fillRect(px + 6, py + s - 6, 2, 4);
-    ctx.fillRect(px + s - 8, py + s - 6, 2, 4);
-    // Chair hints around table
-    ctx.fillStyle = '#64748b';
-    ctx.fillRect(px + 2, py + s / 2 - 2, 3, 4); // left
-    ctx.fillRect(px + s - 5, py + s / 2 - 2, 3, 4); // right
+    ctx.fillStyle = '#E8C596';
+    ctx.beginPath();
+    ctx.roundRect(px + 8, py + s - 6, 3, 4, 1);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.roundRect(px + s - 11, py + s - 6, 3, 4, 1);
+    ctx.fill();
+    // Soft rounded chairs around table
+    ctx.fillStyle = '#FCE8C5';
+    ctx.beginPath();
+    ctx.roundRect(px + 2, py + s / 2 - 3, 4, 6, 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.roundRect(px + s - 6, py + s / 2 - 3, 4, 6, 2);
+    ctx.fill();
+    // Tiny coffee cup
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(px + s / 2, py + s / 2 + 2, 2, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   private drawWhiteboardTile(px: number, py: number, s: number) {
     const { ctx } = this;
-    // Whiteboard surface
-    ctx.fillStyle = '#f8fafc'; // slate-50
-    ctx.fillRect(px + 2, py + 3, s - 4, s - 6);
-    ctx.strokeStyle = '#94a3b8'; // aluminum frame
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(px + 2, py + 3, s - 4, s - 6);
-    // Faint marker scribbles
-    ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
-    ctx.lineWidth = 0.5;
+    // ─── Cozy whiteboard — rounded with colorful notes ─────────────────
+    ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
-    ctx.moveTo(px + 5, py + 8);
-    ctx.lineTo(px + s - 5, py + 8);
-    ctx.moveTo(px + 5, py + 14);
-    ctx.lineTo(px + s - 8, py + 14);
-    ctx.moveTo(px + 6, py + 10);
-    ctx.lineTo(px + s - 6, py + 12);
+    ctx.roundRect(px + 2, py + 3, s - 4, s - 6, 3);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 190, 180, 0.4)';
+    ctx.lineWidth = 0.5;
     ctx.stroke();
+    // Colorful marker scribbles
+    const colors = ['rgba(248, 187, 208, 0.4)', 'rgba(168, 213, 162, 0.4)', 'rgba(186, 230, 253, 0.4)'];
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < 3; i++) {
+      ctx.strokeStyle = colors[i]!;
+      ctx.beginPath();
+      ctx.moveTo(px + 5, py + 7 + i * 5);
+      ctx.lineTo(px + s - 5 - i * 2, py + 7 + i * 5 + (i % 2));
+      ctx.stroke();
+    }
+    // Sticky notes
+    ctx.fillStyle = 'rgba(248, 187, 208, 0.6)';
+    ctx.fillRect(px + s - 8, py + 5, 4, 4);
+    ctx.fillStyle = 'rgba(168, 213, 162, 0.6)';
+    ctx.fillRect(px + s - 8, py + 11, 4, 4);
     // Small tray at bottom
-    ctx.fillStyle = '#cbd5e1';
-    ctx.fillRect(px + 3, py + s - 5, s - 6, 3);
+    ctx.fillStyle = '#F5E6D3';
+    ctx.beginPath();
+    ctx.roundRect(px + 3, py + s - 5, s - 6, 3, 1);
+    ctx.fill();
   }
 
   private drawServerRackTile(px: number, py: number, s: number) {
@@ -1717,8 +1850,8 @@ export class LocalRenderer {
         ctx.fillRect(px + 6 + j * 7, ry + 1.5, 3, 2);
       }
     }
-    // Cable mess at bottom
-    ctx.strokeStyle = '#475569';
+    // Soft cable hint at bottom
+    ctx.strokeStyle = 'rgba(180, 190, 200, 0.3)';
     ctx.lineWidth = 0.5;
     ctx.beginPath();
     ctx.moveTo(px + 4, py + s - 4);
@@ -1729,38 +1862,45 @@ export class LocalRenderer {
 
   private drawPlanterTile(px: number, py: number, s: number) {
     const { ctx } = this;
-    // Terracotta pot
-    ctx.fillStyle = '#b45309'; // amber-700
+    // ─── Large cozy indoor plant — terracotta pot ───────────────────────
+    // Pot
+    ctx.fillStyle = '#E8C596';
     ctx.beginPath();
-    ctx.moveTo(px + 6, py + s - 4);
-    ctx.lineTo(px + s - 6, py + s - 4);
-    ctx.lineTo(px + s - 5, py + s - 10);
-    ctx.lineTo(px + 5, py + s - 10);
+    ctx.moveTo(px + 5, py + s - 3);
+    ctx.lineTo(px + s - 5, py + s - 3);
+    ctx.lineTo(px + s - 4, py + s - 10);
+    ctx.lineTo(px + 4, py + s - 10);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = '#78350f';
+    ctx.strokeStyle = 'rgba(200, 170, 140, 0.4)';
     ctx.lineWidth = 0.5;
     ctx.stroke();
-    // Plant foliage (simple green blob)
-    ctx.fillStyle = '#15803d'; // green-700
+    // Large plant foliage (lush green)
+    ctx.fillStyle = '#A8D5A2';
     ctx.beginPath();
-    ctx.ellipse(px + s / 2, py + s / 2 - 2, s * 0.3, s * 0.28, 0, 0, Math.PI * 2);
+    ctx.ellipse(px + s / 2, py + s / 2 - 2, s * 0.32, s * 0.3, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#16a34a'; // green-600 highlight
+    ctx.fillStyle = '#C8E6C9';
     ctx.beginPath();
-    ctx.ellipse(px + s / 2 - 1, py + s / 2 - 4, s * 0.18, s * 0.15, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(px + s / 2 - 2, py + s / 2 - 5, s * 0.2, s * 0.18, -0.3, 0, Math.PI * 2);
     ctx.fill();
-    // Small shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    // Small highlight leaf
+    ctx.fillStyle = '#D4E8D0';
     ctx.beginPath();
-    ctx.ellipse(px + s / 2, py + s - 3, s * 0.25, 2, 0, 0, Math.PI * 2);
+    ctx.ellipse(px + s / 2 + 3, py + s / 2 - 3, s * 0.12, s * 0.1, 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    // Soft shadow
+    ctx.fillStyle = 'rgba(180, 150, 130, 0.1)';
+    ctx.beginPath();
+    ctx.ellipse(px + s / 2, py + s - 2, s * 0.25, 2, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
   private drawReceptionTile(px: number, py: number, s: number) {
     const { ctx } = this;
+    // ─── Cozy reception desk — warm pastel wood ─────────────────────────
     // Curved desk body
-    ctx.fillStyle = '#78350f'; // warm mahogany
+    ctx.fillStyle = '#E8C596';
     ctx.beginPath();
     ctx.moveTo(px + 4, py + s - 4);
     ctx.lineTo(px + s - 4, py + s - 4);
@@ -1768,11 +1908,11 @@ export class LocalRenderer {
     ctx.quadraticCurveTo(px + s / 2, py + 4, px + 5, py + 10);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = '#451a03';
+    ctx.strokeStyle = 'rgba(200, 170, 140, 0.4)';
     ctx.lineWidth = 0.5;
     ctx.stroke();
     // Countertop
-    ctx.fillStyle = '#d4d4d8';
+    ctx.fillStyle = '#FAF0E6';
     ctx.beginPath();
     ctx.moveTo(px + 3, py + s - 4);
     ctx.lineTo(px + s - 3, py + s - 4);
@@ -1781,24 +1921,28 @@ export class LocalRenderer {
     ctx.closePath();
     ctx.fill();
     // Small computer monitor
-    ctx.fillStyle = '#18181b';
-    ctx.fillRect(px + s / 2 - 3, py + 8, 6, 5);
-    ctx.fillStyle = '#3b82f6';
+    ctx.fillStyle = '#F0F4F8';
+    ctx.beginPath();
+    ctx.roundRect(px + s / 2 - 3, py + 8, 6, 5, 1);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(186, 230, 253, 0.6)';
     ctx.fillRect(px + s / 2 - 2, py + 9, 4, 3);
   }
 
   private drawStairsTile(px: number, py: number, s: number) {
     const { ctx } = this;
-    // Stair steps
+    // ─── Cozy stairs — warm wood tones ─────────────────────────────────
     const steps = 4;
     const stepH = (s - 4) / steps;
     for (let i = 0; i < steps; i++) {
       const sy = py + 2 + i * stepH;
-      const brightness = 60 + i * 8;
-      ctx.fillStyle = `rgb(${brightness},${brightness - 5},${brightness - 10})`;
+      const r = 232 + i * 3;
+      const g = 197 + i * 2;
+      const b = 150 + i * 2;
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.fillRect(px + 2, sy, s - 4, stepH - 0.5);
       // Step edge
-      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+      ctx.strokeStyle = 'rgba(200, 170, 140, 0.3)';
       ctx.lineWidth = 0.5;
       ctx.beginPath();
       ctx.moveTo(px + 2, sy + stepH - 0.5);
@@ -1806,7 +1950,7 @@ export class LocalRenderer {
       ctx.stroke();
     }
     // Handrail hint
-    ctx.strokeStyle = '#71717a';
+    ctx.strokeStyle = '#E2E8F0';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(px + s - 3, py + 2);
@@ -1814,90 +1958,168 @@ export class LocalRenderer {
     ctx.stroke();
   }
 
+  // ─── Window light rays (sunlight streaming onto adjacent floors) ─────
+  private drawWindowLightRays(
+    world: LocalWorld,
+    view: { x0: number; y0: number; x1: number; y1: number },
+  ) {
+    const { ctx } = this;
+    const S = TILE_SIZE;
+
+    for (let y = view.y0; y <= view.y1; y++) {
+      for (let x = view.x0; x <= view.x1; x++) {
+        const tile = world.grid[y]?.[x];
+        if (!tile || tile.type !== 'window') continue;
+
+        // Find adjacent floor/path tiles and paint soft light rays
+        const dirs = [
+          { dx: 0, dy: 1 }, // south (into room)
+          { dx: 0, dy: -1 }, // north
+          { dx: 1, dy: 0 }, // east
+          { dx: -1, dy: 0 }, // west
+        ];
+        for (const { dx, dy } of dirs) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < view.x0 || nx > view.x1 || ny < view.y0 || ny > view.y1) continue;
+          const neighbor = world.grid[ny]?.[nx];
+          if (!neighbor) continue;
+          if (neighbor.type === 'floor' || neighbor.type === 'path') {
+            // Soft warm sunlight ray on floor
+            const npx = nx * S;
+            const npy = ny * S;
+            const rayGrad = ctx.createLinearGradient(
+              npx + S / 2 - dx * S * 0.3,
+              npy + S / 2 - dy * S * 0.3,
+              npx + S / 2 + dx * S * 0.5,
+              npy + S / 2 + dy * S * 0.5,
+            );
+            rayGrad.addColorStop(0, 'rgba(255, 248, 240, 0.25)');
+            rayGrad.addColorStop(1, 'rgba(255, 248, 240, 0)');
+            ctx.fillStyle = rayGrad;
+            ctx.fillRect(npx, npy, S, S);
+          }
+        }
+      }
+    }
+  }
+
   private drawWindowTile(px: number, py: number, s: number) {
     const { ctx } = this;
-    // Window frame
-    ctx.fillStyle = '#e2e8f0'; // slate-200 frame
+    // ─── Cozy large window with curtains ────────────────────────────────
+
+    // White window frame with rounded feel
+    ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(px + 1, py + 1, s - 2, s - 2);
-    // Glass pane with natural light gradient
-    const grad = ctx.createLinearGradient(px, py, px, py + s);
-    grad.addColorStop(0, 'rgba(186, 230, 253, 0.35)'); // sky blue top
-    grad.addColorStop(1, 'rgba(224, 242, 254, 0.15)'); // lighter bottom
-    ctx.fillStyle = grad;
-    ctx.fillRect(px + 3, py + 3, s - 6, s - 6);
-    // Window cross bars
-    ctx.strokeStyle = '#cbd5e1';
+    ctx.strokeStyle = '#F5E6D3';
     ctx.lineWidth = 1;
+    ctx.strokeRect(px + 1, py + 1, s - 2, s - 2);
+
+    // Sky view through window (soft blue gradient)
+    const skyGrad = ctx.createLinearGradient(px, py, px, py + s);
+    skyGrad.addColorStop(0, 'rgba(186, 230, 253, 0.6)');
+    skyGrad.addColorStop(0.5, 'rgba(224, 242, 254, 0.4)');
+    skyGrad.addColorStop(1, 'rgba(255, 250, 245, 0.3)');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(px + 4, py + 4, s - 8, s - 8);
+
+    // Soft white window cross bars
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(px + s / 2, py + 3);
-    ctx.lineTo(px + s / 2, py + s - 3);
-    ctx.moveTo(px + 3, py + s / 2);
-    ctx.lineTo(px + s - 3, py + s / 2);
+    ctx.moveTo(px + s / 2, py + 4);
+    ctx.lineTo(px + s / 2, py + s - 4);
+    ctx.moveTo(px + 4, py + s / 2);
+    ctx.lineTo(px + s - 4, py + s / 2);
     ctx.stroke();
-    // Subtle light reflection
-    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+
+    // Pink curtains on sides
+    ctx.fillStyle = 'rgba(248, 187, 208, 0.7)';
+    ctx.fillRect(px + 2, py + 2, 5, s - 4); // left curtain
+    ctx.fillRect(px + s - 7, py + 2, 5, s - 4); // right curtain
+
+    // Curtain tie-backs (soft gold)
+    ctx.fillStyle = 'rgba(212, 165, 116, 0.6)';
+    ctx.fillRect(px + 5, py + s / 2 - 2, 3, 4);
+    ctx.fillRect(px + s - 8, py + s / 2 - 2, 3, 4);
+
+    // Sunlight streaming diagonal reflection
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
     ctx.beginPath();
     ctx.moveTo(px + 4, py + 4);
-    ctx.lineTo(px + s / 2 - 2, py + 4);
-    ctx.lineTo(px + 4, py + s / 2 - 2);
+    ctx.lineTo(px + s / 2 - 3, py + 4);
+    ctx.lineTo(px + 4, py + s / 2 - 3);
     ctx.closePath();
     ctx.fill();
   }
 
   private drawSofaTile(px: number, py: number, s: number) {
     const { ctx } = this;
-    // Sofa body
-    ctx.fillStyle = '#475569'; // slate-600 fabric
+    // ─── Cozy plush sofa — soft pastel fabric ───────────────────────────
+    ctx.fillStyle = '#F8BBD0';
     ctx.beginPath();
-    ctx.roundRect(px + 2, py + 6, s - 4, s - 8, 3);
+    ctx.roundRect(px + 2, py + 6, s - 4, s - 8, 4);
     ctx.fill();
-    ctx.strokeStyle = '#334155';
+    ctx.strokeStyle = 'rgba(248, 187, 208, 0.5)';
     ctx.lineWidth = 0.5;
     ctx.stroke();
     // Seat cushion
-    ctx.fillStyle = '#64748b'; // slate-500
-    ctx.fillRect(px + 4, py + 10, s - 8, s - 14);
+    ctx.fillStyle = '#FCE4EC';
+    ctx.beginPath();
+    ctx.roundRect(px + 4, py + 10, s - 8, s - 14, 2);
+    ctx.fill();
     // Backrest
-    ctx.fillStyle = '#475569';
-    ctx.fillRect(px + 3, py + 6, s - 6, 5);
+    ctx.fillStyle = '#F8BBD0';
+    ctx.beginPath();
+    ctx.roundRect(px + 3, py + 6, s - 6, 5, 2);
+    ctx.fill();
     // Cushion highlight
-    ctx.fillStyle = '#94a3b8';
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.fillRect(px + 5, py + 8, s - 10, 1.5);
-    // Armrest (left or right depending on tile position — simplified)
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(px + 2, py + 8, 3, 8);
-    ctx.fillRect(px + s - 5, py + 8, 3, 8);
+    // Soft rounded armrests
+    ctx.fillStyle = '#F48FB1';
+    ctx.beginPath();
+    ctx.roundRect(px + 2, py + 8, 3, 8, 1.5);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.roundRect(px + s - 5, py + 8, 3, 8, 1.5);
+    ctx.fill();
   }
 
   private drawWatercoolerTile(px: number, py: number, s: number) {
     const { ctx } = this;
+    // ─── Cute water cooler — pastel blue ────────────────────────────────
     // Base
-    ctx.fillStyle = '#e2e8f0';
-    ctx.fillRect(px + s / 2 - 4, py + s - 8, 8, 6);
-    ctx.strokeStyle = '#94a3b8';
+    ctx.fillStyle = '#E3F2FD';
+    ctx.beginPath();
+    ctx.roundRect(px + s / 2 - 4, py + s - 8, 8, 6, 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(180, 200, 220, 0.4)';
     ctx.lineWidth = 0.5;
-    ctx.strokeRect(px + s / 2 - 4, py + s - 8, 8, 6);
-    // Water bottle
-    ctx.fillStyle = 'rgba(59, 130, 246, 0.3)';
+    ctx.stroke();
+    // Water bottle (cute rounded)
+    ctx.fillStyle = 'rgba(186, 230, 253, 0.4)';
     ctx.beginPath();
     ctx.ellipse(px + s / 2, py + s / 2 + 2, 5, 8, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
+    ctx.strokeStyle = 'rgba(186, 230, 253, 0.6)';
     ctx.lineWidth = 0.5;
     ctx.stroke();
     // Water level
-    ctx.fillStyle = 'rgba(59, 130, 246, 0.5)';
+    ctx.fillStyle = 'rgba(186, 230, 253, 0.6)';
     ctx.beginPath();
     ctx.ellipse(px + s / 2, py + s / 2 + 4, 4, 5, 0, 0, Math.PI * 2);
     ctx.fill();
     // Small cup stack
-    ctx.fillStyle = '#f1f5f9';
-    ctx.fillRect(px + s - 7, py + s - 6, 3, 4);
-    ctx.strokeStyle = '#cbd5e1';
-    ctx.strokeRect(px + s - 6.5, py + s - 5.5, 2, 3);
-    // Glow
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.roundRect(px + s - 7, py + s - 6, 3, 4, 1);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 200, 200, 0.3)';
+    ctx.stroke();
+    // Soft glow
     const now = performance.now();
-    ctx.fillStyle = `rgba(59, 130, 246, ${0.1 + 0.05 * Math.sin(now / 400)})`;
+    ctx.fillStyle = `rgba(186, 230, 253, ${0.15 + 0.08 * Math.sin(now / 400)})`;
     ctx.beginPath();
     ctx.arc(px + s / 2, py + s / 2 + 2, 10, 0, Math.PI * 2);
     ctx.fill();
@@ -1914,20 +2136,20 @@ export class LocalRenderer {
     const secondary = room.zoneLabel ? room.folderName.toUpperCase() : '';
     ctx.save();
 
-    // Zone-colored plaque tab
+    // ─── Cozy pastel zone-colored plaque tab ────────────────────────────
     const zoneColors: Record<string, string> = {
-      team_cluster: '#64748b',
-      meeting: '#475569',
-      focus: '#94a3b8',
-      break: '#d4d4d8',
-      infra: '#52525b',
-      reception: '#a1a1aa',
-      biophilic: '#a8a29e',
+      team_cluster: '#F5D0C5',
+      meeting: '#E8C596',
+      focus: '#E8F5D6',
+      break: '#FCE8C5',
+      infra: '#E2E8F0',
+      reception: '#F5F0E8',
+      biophilic: '#D4E8D0',
     };
-    const plaqueColor = zoneColors[room.zoneType ?? 'team_cluster'] ?? '#64748b';
+    const plaqueColor = zoneColors[room.zoneType ?? 'team_cluster'] ?? '#F5D0C5';
 
     ctx.fillStyle = plaqueColor;
-    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
     ctx.lineWidth = 0.5;
 
     const plaqueW = Math.min(pw - 4, Math.max(80, primary.length * 7 + 12));
@@ -1947,13 +2169,13 @@ export class LocalRenderer {
     ctx.font = `bold 9px ${this.tokens.fontMono}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = room.zoneType === 'reception' ? '#18181b' : '#f8fafc';
+    ctx.fillStyle = '#5C4033'; // warm brown text for all pastel plaques
     ctx.fillText(primary.slice(0, 12), px + 6, py + 4);
 
     // Secondary label (folder name) if zone label is present
     if (secondary) {
       ctx.font = `7px ${this.tokens.fontMono}`;
-      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.fillStyle = 'rgba(92, 64, 51, 0.6)';
       ctx.fillText(secondary.slice(0, 14), px + 6, py + 18);
     }
 
@@ -2007,10 +2229,10 @@ export class LocalRenderer {
     ctx.translate(ux, uy + bobbingY);
     if (unit.ephemeral) ctx.scale(0.8, 0.8);
 
-    // Selection ring in gstack amber (only if hovered or selected)
+    // Selection ring in cozy warm tone
     const isHovered = this._hoveredUnit?.id === unit.id;
     if (isHovered) {
-      ctx.strokeStyle = this.tokens.amber500 || '#F59E0B';
+      ctx.strokeStyle = '#D4A574';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(0, 0, TILE_SIZE * 0.55, 0, Math.PI * 2);
@@ -2022,16 +2244,16 @@ export class LocalRenderer {
     ctx.rotate(dirAngle);
     ctx.scale(Sf, Sc);
 
-    // 1. Elliptical dynamic shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    // 1. Soft warm shadow
+    ctx.fillStyle = 'rgba(180, 150, 130, 0.15)';
     ctx.beginPath();
     ctx.ellipse(-2, 1, TILE_SIZE * 0.28, TILE_SIZE * 0.22, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // 2. Torso (Shoulders/Clothing) - perpendicular to movement
     ctx.fillStyle = unit.color;
-    ctx.strokeStyle = '#1a1815';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(180, 150, 130, 0.3)';
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.ellipse(-2, 0, TILE_SIZE * 0.2, TILE_SIZE * 0.28, 0, 0, Math.PI * 2);
     ctx.fill();

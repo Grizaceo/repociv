@@ -85,6 +85,34 @@
   --lt-error: #ef4444;
   --lt-success: #22c55e;
   --lt-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* ═══ LOCAL VIEW TOKENS — Cozy Pastel Office (v2) ═══ */
+  --cozy-bg: #FFF8F3;
+  --cozy-bg-warm: #FAF0E8;
+  --cozy-floor-rose: #F5D0C5;
+  --cozy-floor-rose-light: #FCE8E0;
+  --cozy-floor-matcha: #E8F5D6;
+  --cozy-floor-matcha-light: #F0F8E8;
+  --cozy-floor-sky: #C5E8E8;
+  --cozy-floor-sky-light: #E0F5F5;
+  --cozy-floor-cream: #FDF6EC;
+  --cozy-floor-lemon: #FCE8C5;
+  --cozy-floor-wood: #E8C596;
+  --cozy-floor-marble: #F5F0E8;
+  --cozy-floor-sage: #D4E8D0;
+  --cozy-wall-white: #FDFBF7;
+  --cozy-wall-cream: #F5F0E8;
+  --cozy-wall-pink: #FCE4EC;
+  --cozy-wall-green: #E8F5E9;
+  --cozy-wall-blue: #E3F2FD;
+  --cozy-accent-gold: #D4A574;
+  --cozy-accent-rose: #E8A0A0;
+  --cozy-accent-matcha: #A8D5A2;
+  --cozy-text: #5C4033;
+  --cozy-text-light: #8B7355;
+  --cozy-glass: rgba(200, 230, 255, 0.35);
+  --cozy-curtain: #F8BBD0;
+  --cozy-curtain-light: #FCE4EC;
 }
 
 /* ═════════════════════════════════════════════════════════════════
