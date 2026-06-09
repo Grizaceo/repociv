@@ -22,9 +22,34 @@ export const TERRAIN_ATLAS_INDEX: Record<Terrain, number> = {
   sacred:   7,
 };
 
+/** Per-biome prism height scale (local Y multiplier in vertex shader). */
+export const TERRAIN_HEIGHT_SCALE: Record<Terrain, number> = {
+  plains:   1.0,
+  forest:   1.0,
+  mountain: 1.35,
+  desert:   1.0,
+  ocean:    0.75,
+  ice:      0.95,
+  hills:    1.1,
+  sacred:   1.0,
+};
+
+/** Elevation in world units (coordinates with terrainElevation() in isoHex.ts). */
+export const TERRAIN_ELEVATION_WORLD: Record<Terrain, number> = {
+  plains:   0,
+  forest:   1,
+  mountain: 3,
+  desert:   0,
+  ocean:   -1,
+  ice:      0,
+  hills:    2,
+  sacred:   0,
+};
+
 export interface TerrainMaterialOptions {
   terrainAtlas?: Texture | null;
   normalAtlas?: Texture | null;
+  roughnessAtlas?: Texture | null;
   atlasColumns?: number;
   atlasRows?: number;
 }
@@ -32,28 +57,34 @@ export interface TerrainMaterialOptions {
 export function createTerrainMaterial(
   options: TerrainMaterialOptions = {},
 ): MeshStandardMaterial {
+  // Note: roughnessAtlas is handled per-biome inside the shader via uRoughnessAtlas,
+  // NOT via mat.roughnessMap (which would use wrong raw-tile UVs instead of atlas UVs).
   const mat = new MeshStandardMaterial({
     vertexColors: true,
-    roughness: 0.82,
-    metalness: 0.04,
+    roughness: 0.80,
+    metalness: 0.03,
   });
 
   mat.onBeforeCompile = (shader: Shader) => {
     // ── Uniforms ─────────────────────────────────────────────────────────────
-    shader.uniforms.uTime            = { value: 0 };
-    shader.uniforms.uHexRadius       = { value: HEX_SIZE };
-    shader.uniforms.uUseAtlas        = { value: options.terrainAtlas ? 1 : 0 };
-    shader.uniforms.uTerrainAtlas    = { value: options.terrainAtlas ?? null };
-    shader.uniforms.uNormalAtlas     = { value: options.normalAtlas ?? null };
-    shader.uniforms.uUseNormalAtlas  = { value: options.normalAtlas ? 1 : 0 };
-    shader.uniforms.uAtlasColumns    = { value: options.atlasColumns ?? 4 };
-    shader.uniforms.uAtlasRows       = { value: options.atlasRows ?? 3 };
+    shader.uniforms.uTime             = { value: 0 };
+    shader.uniforms.uHexRadius        = { value: HEX_SIZE };
+    shader.uniforms.uUseAtlas         = { value: options.terrainAtlas ? 1 : 0 };
+    shader.uniforms.uTerrainAtlas     = { value: options.terrainAtlas ?? null };
+    shader.uniforms.uNormalAtlas      = { value: options.normalAtlas ?? null };
+    shader.uniforms.uUseNormalAtlas   = { value: options.normalAtlas ? 1 : 0 };
+    shader.uniforms.uRoughnessAtlas   = { value: options.roughnessAtlas ?? null };
+    shader.uniforms.uUseRoughAtlas    = { value: options.roughnessAtlas ? 1 : 0 };
+    shader.uniforms.uAtlasColumns     = { value: options.atlasColumns ?? 4 };
+    shader.uniforms.uAtlasRows        = { value: options.atlasRows ?? 3 };
     (mat.userData as { shader?: Shader }).shader = shader;
 
     // ── Vertex ────────────────────────────────────────────────────────────────
     shader.vertexShader =
       'attribute float instanceTerrain;\n' +
+      'attribute float instanceNeighborTerrain;\n' +
       'varying float vTerrainIndex;\n' +
+      'varying float vNeighborTerrainIndex;\n' +
       'varying vec2  vLocalXZ;\n' +
       'varying vec2  vUv;\n' +
       'varying float vTopFace;\n' +
@@ -61,15 +92,41 @@ export function createTerrainMaterial(
         '#include <begin_vertex>',
         `#include <begin_vertex>
         vTerrainIndex = instanceTerrain;
+        vNeighborTerrainIndex = instanceNeighborTerrain;
         vLocalXZ      = vec2(position.x, position.z);
         vUv           = uv;
         // normal.y > 0.5 in local space → top face
-        vTopFace      = step(0.5, normal.y);`,
+        vTopFace      = step(0.5, normal.y);
+
+        // Differential elevation: scale prism height by biome
+        float heightScale = 1.0;
+        float tidx = floor(instanceTerrain + 0.5);
+        if (tidx < 0.5) heightScale = 1.0;          // plains
+        else if (tidx < 1.5) heightScale = 1.0;      // forest
+        else if (tidx < 2.5) heightScale = 1.35;   // mountain
+        else if (tidx < 3.5) heightScale = 1.0;     // desert
+        else if (tidx < 4.5) heightScale = 0.75;   // ocean
+        else if (tidx < 5.5) heightScale = 0.95;   // ice
+        else if (tidx < 6.5) heightScale = 1.1;    // hills
+        else if (tidx < 7.5) heightScale = 1.0;    // sacred
+
+        // Only scale the downward (negative Y) part of the prism
+        if (transformed.y < 0.0) {
+          transformed.y *= heightScale;
+        }
+
+        // Ocean wave animation: gentle vertical displacement
+        if (abs(tidx - 4.0) < 0.5) {
+          float wave = 0.35 * sin(uTime * 1.4 + transformed.x * 0.12 + transformed.z * 0.08);
+          float wave2 = 0.18 * sin(uTime * 2.1 - transformed.x * 0.07 + transformed.z * 0.11);
+          transformed.y += wave + wave2;
+        }`,
       );
 
     // ── Fragment uniforms declaration ─────────────────────────────────────────
     const uniformDecl =
       'varying float vTerrainIndex;\n' +
+      'varying float vNeighborTerrainIndex;\n' +
       'varying vec2  vLocalXZ;\n' +
       'varying vec2  vUv;\n' +
       'varying float vTopFace;\n' +
@@ -79,6 +136,8 @@ export function createTerrainMaterial(
       'uniform sampler2D uTerrainAtlas;\n' +
       'uniform sampler2D uNormalAtlas;\n' +
       'uniform int   uUseNormalAtlas;\n' +
+      'uniform sampler2D uRoughnessAtlas;\n' +
+      'uniform int   uUseRoughAtlas;\n' +
       'uniform float uAtlasColumns;\n' +
       'uniform float uAtlasRows;\n';
 
@@ -98,14 +157,23 @@ vec2 terrainAtlasUv(float idx, vec2 tileUv) {
         '#include <color_fragment>',
         `#include <color_fragment>
         float tidx = floor(vTerrainIndex + 0.5);
+        float ntidx = floor(vNeighborTerrainIndex + 0.5);
+        // Radial distance from hex centre — used for vignette AND edge blend
+        float radial = clamp(length(vLocalXZ) / uHexRadius, 0.0, 1.0);
         if (uUseAtlas > 0 && vTopFace > 0.5) {
           vec2 auv = terrainAtlasUv(tidx, vUv);
           vec3 tex = texture2D(uTerrainAtlas, auv).rgb;
-          diffuseColor.rgb = mix(diffuseColor.rgb, tex, 0.85);
+          // Neighbor biome blend at hex edges
+          float edgeBlend = smoothstep(0.72, 0.98, radial);
+          if (ntidx >= 0.0 && abs(ntidx - tidx) > 0.5) {
+            vec2 nauv = terrainAtlasUv(ntidx, vUv);
+            vec3 neighborTex = texture2D(uTerrainAtlas, nauv).rgb;
+            tex = mix(tex, neighborTex, edgeBlend * 0.50);
+          }
+          diffuseColor.rgb = mix(diffuseColor.rgb, tex, 0.88);
         }
-        // Radial vignette (brighter centre, darker edges — Civ V hex look)
-        float radial = clamp(length(vLocalXZ) / uHexRadius, 0.0, 1.0);
-        diffuseColor.rgb *= mix(1.08, 0.86, radial * radial);
+        // Radial vignette — subtle (brighter centre, softer edges)
+        diffuseColor.rgb *= mix(1.06, 0.90, radial * radial);
         // Side faces: darker, warm-shadowed
         if (vTopFace < 0.5) {
           diffuseColor.rgb *= 0.60;
@@ -122,21 +190,41 @@ vec2 terrainAtlasUv(float idx, vec2 tileUv) {
           diffuseColor.rgb += vec3(wave * 0.45, wave * 0.38 + wave2 * 0.5, wave + wave2);
         }`,
       )
+      // ── Per-biome roughness from atlas (correct atlas UV, not raw tile UV) ──
+      .replace(
+        '#include <roughnessmap_fragment>',
+        `#include <roughnessmap_fragment>
+        if (uUseRoughAtlas > 0 && vTopFace > 0.5) {
+          float _rtidx = floor(vTerrainIndex + 0.5);
+          vec2 rauv = terrainAtlasUv(_rtidx, vUv);
+          float rgh = texture2D(uRoughnessAtlas, rauv).r;
+          roughnessFactor = rgh;
+        }`,
+      )
       // ── Normal-map perturbation from atlas ──────────────────────────────────
       .replace(
         '#include <normal_fragment_maps>',
         `#include <normal_fragment_maps>
         if (uUseNormalAtlas > 0 && vTopFace > 0.5) {
           float _ntidx = floor(vTerrainIndex + 0.5);
+          float _nntidx = floor(vNeighborTerrainIndex + 0.5);
           vec2 nauv  = terrainAtlasUv(_ntidx, vUv);
           vec3 nTex  = texture2D(uNormalAtlas, nauv).rgb * 2.0 - 1.0;
+          // Blend neighbor normal at edges
+          float _radial = clamp(length(vLocalXZ) / uHexRadius, 0.0, 1.0);
+          float _edgeBlend = smoothstep(0.72, 0.98, _radial);
+          if (_nntidx >= 0.0 && abs(_nntidx - _ntidx) > 0.5) {
+            vec2 nnauv = terrainAtlasUv(_nntidx, vUv);
+            vec3 nNeighbor = texture2D(uNormalAtlas, nnauv).rgb * 2.0 - 1.0;
+            nTex = mix(nTex, nNeighbor, _edgeBlend * 0.45);
+          }
           // Blend atlas normal into surface normal (TBN for a flat-top hex is identity-ish)
           normal = normalize(normal + vec3(nTex.x * 0.55, nTex.z, nTex.y * 0.55));
         }`,
       );
   };
 
-  mat.customProgramCacheKey = () => 'repociv-terrain-v3';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v6';
   return mat;
 }
 
@@ -149,6 +237,7 @@ export function updateTerrainShaderAtlas(
   mat: MeshStandardMaterial,
   texture: Texture | null,
   normalTexture?: Texture | null,
+  roughnessTexture?: Texture | null,
 ): void {
   const shader = (mat.userData as { shader?: Shader }).shader;
   if (!shader) return;
@@ -157,6 +246,10 @@ export function updateTerrainShaderAtlas(
   if (normalTexture !== undefined) {
     shader.uniforms.uUseNormalAtlas.value = normalTexture ? 1 : 0;
     shader.uniforms.uNormalAtlas.value    = normalTexture;
+  }
+  if (roughnessTexture !== undefined) {
+    shader.uniforms.uUseRoughAtlas.value   = roughnessTexture ? 1 : 0;
+    shader.uniforms.uRoughnessAtlas.value  = roughnessTexture;
   }
 }
 

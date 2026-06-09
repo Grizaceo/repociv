@@ -1,4 +1,4 @@
-// ─── Flat-top hex prism geometry (aligned with hex.ts circumradius) ───────────
+// ─── Flat-top hex prism geometry with beveled top edges ──────────────────────
 import { BufferGeometry, Float32BufferAttribute } from 'three';
 import { HEX_SIZE } from '../constants.ts';
 import { hexCornerAngle } from '../isoHex.ts';
@@ -6,20 +6,39 @@ import { hexCornerAngle } from '../isoHex.ts';
 /** Side depth of terrain prism below the top face (world units). */
 export const TILE_PRISM_HEIGHT = 8;
 
-/** Extruded flat-top hex prism centered at origin; top at y=0, bottom at y=-height.
- *  Includes UVs for texture atlas sampling: local XZ coordinates mapped to [0,1]. */
+/** Bevel depth: how far down the outer rim extends before the top face begins. */
+const BEVEL_DEPTH = 0.35;
+
+/** Bevel inset: top face radius as fraction of circumradius. */
+const BEVEL_INSET = 0.92;
+
+/**
+ * Extruded flat-top hex prism with beveled top edges.
+ * Top face is inset slightly; a slanted ring connects the outer rim to the inner top face.
+ * This eliminates the sharp "floating island" silhouette.
+ */
 export function createHexPrismGeometry(
   circumradius = HEX_SIZE,
   height = TILE_PRISM_HEIGHT,
 ): BufferGeometry {
-  const top: Array<[number, number, number]> = [];
+  const rOuter = circumradius;
+  const rInner = circumradius * BEVEL_INSET;
+  const rBevel = circumradius * (1.0 + BEVEL_INSET) * 0.5;
+
+  // Vertices: outer top ring, bevel mid ring, inner top ring, bottom ring
+  const outerTop: Array<[number, number, number]> = [];
+  const bevelRing: Array<[number, number, number]> = [];
+  const innerTop: Array<[number, number, number]> = [];
   const bottom: Array<[number, number, number]> = [];
+
   for (let i = 0; i < 6; i++) {
     const angle = hexCornerAngle(i);
-    const x = circumradius * Math.cos(angle);
-    const z = circumradius * Math.sin(angle);
-    top.push([x, 0, z]);
-    bottom.push([x, -height, z]);
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    outerTop.push([rOuter * cos, 0, rOuter * sin]);
+    bevelRing.push([rBevel * cos, -BEVEL_DEPTH, rBevel * sin]);
+    innerTop.push([rInner * cos, -BEVEL_DEPTH, rInner * sin]);
+    bottom.push([rOuter * cos, -height, rOuter * sin]);
   }
 
   const positions: number[] = [];
@@ -37,12 +56,11 @@ export function createHexPrismGeometry(
     c: [number, number, number],
   ) => {
     positions.push(...a, ...b, ...c);
-    // UVs
     const [au, av] = toUv(a);
     const [bu, bv] = toUv(b);
     const [cu, cv] = toUv(c);
     uvs.push(au, av, bu, bv, cu, cv);
-    // Normals
+
     const ux = b[0] - a[0];
     const uy = b[1] - a[1];
     const uz = b[2] - a[2];
@@ -57,17 +75,32 @@ export function createHexPrismGeometry(
     normals.push(...sn, ...sn, ...sn);
   };
 
-  // CCW from +Y so front faces are visible from the tilted overhead camera.
+  // 1. Inner top face (CCW from +Y)
   for (let i = 1; i < 5; i++) {
-    pushTri(top[0]!, top[i + 1]!, top[i]!);
+    pushTri(innerTop[0]!, innerTop[i + 1]!, innerTop[i]!);
   }
+
+  // 2. Bottom face
   for (let i = 1; i < 5; i++) {
     pushTri(bottom[0]!, bottom[i + 1]!, bottom[i]!);
   }
+
+  // 3. Bevel ring: outerTop → bevelRing → innerTop (two tris per side)
   for (let i = 0; i < 6; i++) {
     const j = (i + 1) % 6;
-    pushTri(top[i]!, bottom[i]!, bottom[j]!);
-    pushTri(top[i]!, bottom[j]!, top[j]!);
+    // Slanted bevel face (outer edge)
+    pushTri(outerTop[i]!, bevelRing[i]!, bevelRing[j]!);
+    pushTri(outerTop[i]!, bevelRing[j]!, outerTop[j]!);
+    // Top bevel face connecting to inner top
+    pushTri(bevelRing[i]!, innerTop[i]!, innerTop[j]!);
+    pushTri(bevelRing[i]!, innerTop[j]!, bevelRing[j]!);
+  }
+
+  // 4. Side faces (outerTop → bottom)
+  for (let i = 0; i < 6; i++) {
+    const j = (i + 1) % 6;
+    pushTri(outerTop[i]!, bottom[i]!, bottom[j]!);
+    pushTri(outerTop[i]!, bottom[j]!, outerTop[j]!);
   }
 
   const geom = new BufferGeometry();

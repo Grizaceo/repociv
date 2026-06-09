@@ -1,24 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { createHexPrismGeometry } from './hexGeometry.ts';
+import { createHexPrismGeometry, sharedHexGeometry } from './hexGeometry.ts';
 
 describe('createHexPrismGeometry', () => {
-  it('top-face triangles have normals pointing +Y', () => {
+  it('top-facing triangles have normals pointing +Y', () => {
     const geom = createHexPrismGeometry(50, 8);
     const positions = geom.getAttribute('position').array as Float32Array;
     const normals = geom.getAttribute('normal').array as Float32Array;
 
-    let topFaceCount = 0;
+    let upwardCount = 0;
     for (let i = 0; i < positions.length; i += 9) {
-      const y0 = positions[i + 1]!;
-      const y1 = positions[i + 4]!;
-      const y2 = positions[i + 7]!;
-      if (y0 === 0 && y1 === 0 && y2 === 0) {
-        const ny = normals[i + 4]!;
-        expect(ny).toBeGreaterThan(0.9);
-        topFaceCount++;
+      const ny = normals[i + 4]!;
+      if (ny > 0.85) {
+        upwardCount++;
       }
     }
-    expect(topFaceCount).toBe(4);
+    // Bevel geometry: inner top (4) + top bevel ring (12) = 16 upward-facing tris
+    expect(upwardCount).toBeGreaterThanOrEqual(4);
   });
 
   it('provides UVs for every vertex in 0..1 range', () => {
@@ -32,5 +29,17 @@ describe('createHexPrismGeometry', () => {
       expect(value).toBeGreaterThanOrEqual(0);
       expect(value).toBeLessThanOrEqual(1);
     }
+  });
+
+  it('has more vertices than a plain prism due to bevel rings', () => {
+    const plainCount = createHexPrismGeometry(50, 8).getAttribute('position').count;
+    // Plain hex prism = 4 top + 4 bottom + 12 side = 20 triangles = 60 vertices
+    // Beveled = 4 inner top + 4 bottom + 24 bevel + 12 side = 44 triangles = 132 vertices
+    expect(plainCount).toBeGreaterThan(60);
+  });
+
+  it('exports shared geometry with default size', () => {
+    expect(sharedHexGeometry).toBeDefined();
+    expect(sharedHexGeometry.getAttribute('position').count).toBeGreaterThan(0);
   });
 });

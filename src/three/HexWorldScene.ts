@@ -16,6 +16,7 @@ import {
   BufferGeometry,
   Float32BufferAttribute,
   Color,
+  SphereGeometry,
 } from 'three';
 import { AXIAL_DIRECTIONS, type Axial } from '../hex.ts';
 import { tileKey } from '../types.ts';
@@ -55,6 +56,7 @@ import {
   clearUnits,
 } from './UnitMesh3D.ts';
 import { rebuildMapLabels, getLabelGroup } from './MapLabels3D.ts';
+import { rebuildGroundPlane, getGroundMesh, disposeGroundMesh } from './GroundPlane3D.ts';
 
 export interface HexSceneRenderOptions {
   fogEnabled: boolean;
@@ -73,6 +75,10 @@ let fogCoverMesh: InstancedMesh | null = null;
 let fogCoverSignature = '';
 let territoryLines: LineSegments | null = null;
 let shorelineRings: LineSegments | null = null;
+let foamMesh: InstancedMesh | null = null;
+let foamSignature = '';
+let groundMeshRef: import('three').Mesh | null = null;
+let groundSignature = '';
 let tileCountSignature = '';
 let terrainMaterial: MeshStandardMaterial | null = null;
 let sunLight: DirectionalLight | null = null;
@@ -119,6 +125,28 @@ function hexEdgeMidpoint(
   const z =
     center.z + (HEX_SIZE * Math.sin(a) + HEX_SIZE * Math.sin(b)) * 0.5;
   return [x, center.y + 1.5, z];
+}
+
+/** Determine dominant neighbor terrain for edge blending. */
+function dominantNeighborTerrain(
+  tile: { coord: Axial; terrain: string },
+  getTile: (key: string) => { terrain: string } | undefined,
+): number {
+  const counts = new Map<string, number>();
+  for (const d of AXIAL_DIRECTIONS) {
+    const n = getTile(tileKey({ q: tile.coord.q + d.q, r: tile.coord.r + d.r }));
+    if (!n || n.terrain === tile.terrain) continue;
+    counts.set(n.terrain, (counts.get(n.terrain) ?? 0) + 1);
+  }
+  let best = -1;
+  let bestCount = 0;
+  for (const [terrain, count] of counts) {
+    if (count > bestCount) {
+      bestCount = count;
+      best = TERRAIN_ATLAS_INDEX[terrain as keyof typeof TERRAIN_ATLAS_INDEX] ?? -1;
+    }
+  }
+  return best;
 }
 
 function rebuildTerritoryLines(
@@ -232,6 +260,82 @@ function rebuildShorelineRings(state: GameState, animTime: number): void {
   terrainGroup.add(shorelineRings);
 }
 
+/** Foam spheres at coast-land edges. */
+function rebuildFoam(state: GameState, _animTime: number): void {
+  const tiles = Array.from(state.world.tiles.values());
+  const sig = tiles
+    .filter((t) => t.terrain === 'ocean' && t.revealed)
+    .map((t) => tileKey(t.coord))
+    .join(',');
+  if (sig === foamSignature) return;
+  foamSignature = sig;
+
+  if (foamMesh) {
+    terrainGroup.remove(foamMesh);
+    foamMesh.geometry.dispose();
+    (foamMesh.material as MeshLambertMaterial).dispose();
+    foamMesh = null;
+  }
+
+  const getTile = (c: Axial) => state.world.tiles.get(tileKey(c));
+  const foamPositions: Array<{ x: number; y: number; z: number }> = [];
+
+  for (const tile of state.world.tiles.values()) {
+    if (tile.terrain !== 'ocean' || !tile.revealed) continue;
+    const elev = terrainElevation(tile.terrain);
+    const center = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+
+    for (let i = 0; i < 6; i++) {
+      const d = AXIAL_DIRECTIONS[i]!;
+      const neighbor = getTile({ q: tile.coord.q + d.q, r: tile.coord.r + d.r });
+      if (!neighbor || neighbor.terrain === 'ocean') continue;
+
+      // Foam at edge midpoints
+      const a = hexCornerAngle(i);
+      const b = hexCornerAngle((i + 1) % 6);
+      const mx = center.x + (HEX_SIZE * Math.cos(a) + HEX_SIZE * Math.cos(b)) * 0.5;
+      const mz = center.z + (HEX_SIZE * Math.sin(a) + HEX_SIZE * Math.sin(b)) * 0.5;
+      foamPositions.push({ x: mx, y: center.y + 1.0, z: mz });
+    }
+  }
+
+  if (foamPositions.length === 0) return;
+
+  const foamGeom = new SphereGeometry(HEX_SIZE * 0.08, 6, 4);
+  const foamMat = new MeshLambertMaterial({
+    color: 0xe8f8ff,
+    transparent: true,
+    opacity: 0.55,
+  });
+  foamMesh = new InstancedMesh(foamGeom, foamMat, foamPositions.length);
+  const m = new Matrix4();
+  foamPositions.forEach((pos, i) => {
+    m.makeTranslation(pos.x, pos.y, pos.z);
+    foamMesh!.setMatrixAt(i, m);
+  });
+  foamMesh.instanceMatrix.needsUpdate = true;
+  terrainGroup.add(foamMesh);
+}
+
+function rebuildGround(state: GameState): void {
+  const tiles = Array.from(state.world.tiles.values());
+  const sig = `${tiles.length}`;
+  if (sig === groundSignature && groundMeshRef) return;
+  groundSignature = sig;
+
+  if (groundMeshRef) {
+    terrainGroup.remove(groundMeshRef);
+    groundMeshRef = null;
+  }
+  rebuildGroundPlane(state);
+  const mesh = getGroundMesh();
+  if (mesh) {
+    groundMeshRef = mesh;
+    // Insert at index 0 so ground renders behind tiles
+    terrainGroup.add(mesh);
+  }
+}
+
 function rebuildFogCover(state: GameState): void {
   const unrevealed = Array.from(state.world.tiles.values()).filter((t) => !t.revealed);
   const signature =
@@ -291,14 +395,18 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
   if (!terrainMaterial) terrainMaterial = createTerrainMaterial({
     terrainAtlas: loadedTerrainAtlas?.texture ?? null,
     normalAtlas: loadedTerrainAtlas?.normalTexture ?? null,
+    roughnessAtlas: loadedTerrainAtlas?.roughnessTexture ?? null,
   });
   // Clone shared geometry so we can safely attach an instanceTerrain attribute
   const clonedGeom = sharedHexGeometry.clone();
   terrainMesh = new InstancedMesh(clonedGeom, terrainMaterial, tiles.length);
 
   const terrainIndices = new Float32Array(tiles.length);
+  const neighborIndices = new Float32Array(tiles.length);
   const instanceEntries: Array<{ instanceId: number; coord: Axial }> = [];
   const matrix = new Matrix4();
+
+  const getTile = (key: string) => state.world.tiles.get(key);
 
   tiles.forEach((tile, i) => {
     const elev = terrainElevation(tile.terrain);
@@ -307,10 +415,12 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
     terrainMesh!.setMatrixAt(i, matrix);
     terrainMesh!.setColorAt(i, instanceColorForTile(tile, fogEnabled));
     terrainIndices[i] = TERRAIN_ATLAS_INDEX[tile.terrain];
+    neighborIndices[i] = dominantNeighborTerrain(tile, getTile);
     instanceEntries.push({ instanceId: i, coord: tile.coord });
   });
 
   terrainMesh.geometry.setAttribute('instanceTerrain', new InstancedBufferAttribute(terrainIndices, 1));
+  terrainMesh.geometry.setAttribute('instanceNeighborTerrain', new InstancedBufferAttribute(neighborIndices, 1));
   terrainMesh.frustumCulled = false;
   terrainMesh.instanceMatrix.needsUpdate = true;
   if (terrainMesh.instanceColor) terrainMesh.instanceColor.needsUpdate = true;
@@ -325,7 +435,7 @@ function ensureTerrainAtlasLoad(): void {
   loadTerrainAtlas().then((atlas) => {
     loadedTerrainAtlas = atlas;
     if (terrainMaterial && atlas) {
-      updateTerrainShaderAtlas(terrainMaterial, atlas.texture, atlas.normalTexture);
+      updateTerrainShaderAtlas(terrainMaterial, atlas.texture, atlas.normalTexture, atlas.roughnessTexture);
     }
     // Force rebuild on next frame by clearing signature
     tileCountSignature = '';
@@ -358,8 +468,10 @@ export function updateHexWorldScene(
   }
 
   rebuildTerrainMesh(state, opts.fogEnabled, picker);
+  rebuildGround(state);
   rebuildTerritoryLines(state, opts.animTime, opts.showStructure, opts.lod);
   rebuildShorelineRings(state, opts.animTime);
+  rebuildFoam(state, opts.animTime);
 
   setDecorVisible(opts.showStructure || opts.showOps);
   rebuildTileDecor(Array.from(state.world.tiles.values()), opts.lod, state);
@@ -399,11 +511,24 @@ export function disposeHexWorldScene(scene: Scene): void {
     (shorelineRings.material as LineBasicMaterial).dispose();
     shorelineRings = null;
   }
+  if (foamMesh) {
+    terrainGroup.remove(foamMesh);
+    foamMesh.geometry.dispose();
+    (foamMesh.material as MeshLambertMaterial).dispose();
+    foamMesh = null;
+  }
+  if (groundMeshRef) {
+    terrainGroup.remove(groundMeshRef);
+    disposeGroundMesh();
+    groundMeshRef = null;
+  }
   if (terrainMaterial) {
     terrainMaterial.dispose();
     terrainMaterial = null;
   }
   tileCountSignature = '';
-  fogCoverSignature = '';
+  fogCoverSignature  = '';
+  foamSignature      = '';
+  groundSignature    = '';
   scene.clear();
 }

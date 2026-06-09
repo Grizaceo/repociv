@@ -1,8 +1,9 @@
 {
-  "version": 2,
+  "version": 5,
   "kind": "repociv-3d-terrain-atlas",
   "texture": "/assets/3d/terrain-atlas-3d.png",
   "normalTexture": "/assets/3d/terrain-normal-atlas-3d.png",
+  "roughnessTexture": "/assets/3d/terrain-roughness-atlas-3d.png",
   "cellSize": 1024,
   "columns": 4,
   "rows": 3,
@@ -20,7 +21,8 @@
         0.0,
         0.25,
         0.3333333333333333
-      ]
+      ],
+      "roughness": 0.82
     },
     "forest": {
       "index": 1,
@@ -35,7 +37,8 @@
         0.0,
         0.25,
         0.3333333333333333
-      ]
+      ],
+      "roughness": 0.75
     },
     "mountain": {
       "index": 2,
@@ -50,7 +53,8 @@
         0.0,
         0.25,
         0.3333333333333333
-      ]
+      ],
+      "roughness": 0.92
     },
     "desert": {
       "index": 3,
@@ -65,7 +69,8 @@
         0.0,
         0.25,
         0.3333333333333333
-      ]
+      ],
+      "roughness": 0.88
     },
     "ocean": {
       "index": 4,
@@ -80,7 +85,8 @@
         0.3333333333333333,
         0.25,
         0.3333333333333333
-      ]
+      ],
+      "roughness": 0.18
     },
     "ice": {
       "index": 5,
@@ -95,7 +101,8 @@
         0.3333333333333333,
         0.25,
         0.3333333333333333
-      ]
+      ],
+      "roughness": 0.22
     },
     "hills": {
       "index": 6,
@@ -110,7 +117,8 @@
         0.3333333333333333,
         0.25,
         0.3333333333333333
-      ]
+      ],
+      "roughness": 0.78
     },
     "sacred": {
       "index": 7,
@@ -125,7 +133,8 @@
         0.3333333333333333,
         0.25,
         0.3333333333333333
-      ]
+      ],
+      "roughness": 0.45
     },
     "fog": {
       "index": 8,
@@ -140,7 +149,8 @@
         0.6666666666666666,
         0.25,
         0.3333333333333333
-      ]
+      ],
+      "roughness": 0.95
     }
   }
 }

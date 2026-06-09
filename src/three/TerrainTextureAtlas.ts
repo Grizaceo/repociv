@@ -14,6 +14,7 @@ export interface TerrainAtlasMeta {
   kind: 'repociv-3d-terrain-atlas';
   texture: string;
   normalTexture: string | null;
+  roughnessTexture: string | null;
   cellSize: number;
   columns: number;
   terrains: Record<
@@ -22,6 +23,7 @@ export interface TerrainAtlasMeta {
       index: number;
       rect: [number, number, number, number];
       uvRect: [number, number, number, number];
+      roughness?: number;
     }
   >;
 }
@@ -30,6 +32,7 @@ export interface LoadedTerrainAtlas {
   meta: TerrainAtlasMeta;
   texture: Texture;
   normalTexture: Texture | null;
+  roughnessTexture: Texture | null;
 }
 
 let cached: Promise<LoadedTerrainAtlas | null> | null = null;
@@ -63,7 +66,22 @@ export function loadTerrainAtlas(): Promise<LoadedTerrainAtlas | null> {
           normalTexture = null;
         }
       }
-      return { meta, texture, normalTexture };
+
+      let roughnessTexture: Texture | null = null;
+      if (meta.roughnessTexture) {
+        try {
+          roughnessTexture = await loader.loadAsync(meta.roughnessTexture);
+          roughnessTexture.wrapS = RepeatWrapping;
+          roughnessTexture.wrapT = RepeatWrapping;
+          roughnessTexture.minFilter = LinearMipmapLinearFilter;
+          roughnessTexture.magFilter = LinearFilter;
+          roughnessTexture.needsUpdate = true;
+        } catch {
+          roughnessTexture = null;
+        }
+      }
+
+      return { meta, texture, normalTexture, roughnessTexture };
     } catch {
       return null;
     }
