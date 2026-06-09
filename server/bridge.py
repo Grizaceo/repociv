@@ -185,6 +185,7 @@ from server import runtime_adapters as _runtime_adapters  # noqa: E402
 from server import agent_runner as _agent_runner  # noqa: E402
 from server import task_orchestrator as _to  # noqa: E402
 from server import rate_limiter as _rl  # noqa: E402
+from server import missions_store as _missions_store  # noqa: E402
 
 _BRIDGE_STATE_CONFIG_DIR: Path | None = None
 
@@ -204,6 +205,7 @@ def init_bridge_state(config_dir: Path | str | None = None) -> Path:
 
     CONFIG_DIR = selected
     MISSIONS_FILE = CONFIG_DIR / "missions.json"
+    _missions_store.init(CONFIG_DIR)
     _es.init(CONFIG_DIR)
     _sessions.init(CONFIG_DIR)
     _run_state.init(CONFIG_DIR)
@@ -226,29 +228,12 @@ from server import scheduler as _sched  # noqa: E402
 
 
 # ─── Mission persistence ──────────────────────────────────────────────────────
-_missions_lock = threading.Lock()
-
-
 def load_missions() -> list[dict[str, Any]]:
-    if not MISSIONS_FILE.exists():
-        return []
-    try:
-        return json.loads(MISSIONS_FILE.read_text())
-    except Exception:
-        return []
+    return _missions_store.load_missions()
 
 
 def save_mission(mission: dict[str, Any]) -> None:
-    with _missions_lock:
-        missions = load_missions()
-        for i, m in enumerate(missions):
-            if m.get("id") == mission.get("id"):
-                missions[i] = mission
-                break
-        else:
-            missions.append(mission)
-        missions = missions[-200:]
-        MISSIONS_FILE.write_text(json.dumps(missions, indent=2, ensure_ascii=False))
+    _missions_store.save_mission(mission)
 
 
 # ─── XCOM Context Fatigue state ───────────────────────────────────────────────
