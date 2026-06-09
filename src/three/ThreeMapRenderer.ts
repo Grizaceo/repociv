@@ -94,10 +94,16 @@ export class ThreeMapRenderer {
   render(state: GameState, cam: MapCamera, opts: HexSceneRenderOptions): void {
     this.syncCamera(cam);
 
-    const tileSignature = `${state.world.tiles.size}:${state.world.cities.length}:${state.world.units.length}`;
-    if (tileSignature !== this.lastTileSignature) this.lastTileSignature = tileSignature;
+    // The world signature feeds the dirty-flag: terrain/ground/territory/
+    // cities/units/labels are rebuilt only when one of these counts or
+    // identifiers changes. Per-frame animTime-driven updates (foam,
+    // shoreline, sun arc, shader time) still run on every frame because
+    // their input is animTime, not world state.
+    const tileSignature = computeWorldSignature(state);
+    const stateDirty = tileSignature !== this.lastTileSignature;
+    this.lastTileSignature = tileSignature;
 
-    updateHexWorldScene(this.scene, state, opts, this.picker);
+    updateHexWorldScene(this.scene, state, opts, this.picker, stateDirty);
 
     this.renderer.render(this.scene, this.camera);
     renderLabels(this.scene, this.camera, this.width, this.height);
@@ -172,6 +178,32 @@ export class ThreeMapRenderer {
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
+}
+
+/**
+ * Hash of the world state inputs that drive the per-frame "state-driven"
+ * rebuilds in HexWorldScene. Changing any of these forces a rebuild of
+ * the terrain mesh, ground plane, territory lines, city clusters, units,
+ * and labels. Per-frame animTime-driven updates (foam, shoreline, sun
+ * arc, shader time) are NOT gated by this — they run every frame.
+ *
+ * The signature is intentionally cheap: a string built from counts and
+ * a join of stable identifiers. It does not include animTime, fogEnabled,
+ * layer toggles, or LOD — those are layered on top by the consumer (see
+ * the call sites in ThreeMapRenderer.render). We can tighten this later
+ * if we discover false-positives.
+ */
+export function computeWorldSignature(state: GameState): string {
+  const tiles = state.world.tiles;
+  const cities = state.world.cities;
+  const units = state.world.units;
+  return [
+    tiles.size,
+    cities.length,
+    units.length,
+    cities.map((c) => c.id).join('|'),
+    units.map((u) => u.id).join('|'),
+  ].join('#');
 }
 
 export type { HexSceneRenderOptions };

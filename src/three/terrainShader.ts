@@ -306,7 +306,12 @@ float terrainDetailNoise(vec2 p) {
       );
   };
 
-  mat.customProgramCacheKey = () => 'repociv-terrain-v13';
+  // Cache key: bump on any GLSL change so the GPU program is
+  // re-compiled. Source-level changes to the chunk-replace blocks
+  // below require a version bump here, otherwise three's WebGL
+  // program cache will keep the old program around. See test in
+  // terrainShader.test.ts.
+  mat.customProgramCacheKey = () => 'repociv-terrain-v14';
   return mat;
 }
 

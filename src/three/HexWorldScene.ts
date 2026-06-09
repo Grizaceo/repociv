@@ -460,6 +460,7 @@ export function updateHexWorldScene(
   state: GameState,
   opts: HexSceneRenderOptions,
   picker: HexPicker,
+  stateDirty: boolean = true,
 ): void {
   if (terrainMaterial) updateTerrainShaderTime(terrainMaterial, opts.animTime);
 
@@ -476,11 +477,19 @@ export function updateHexWorldScene(
     );
   }
 
+  // Per-frame time-driven updates: foam and shoreline depend on
+  // animTime, so they must run every frame even when state is clean.
+  rebuildShorelineRings(state, opts.animTime);
+  rebuildFoam(state, opts.animTime);
+
+  // State-driven rebuilds: only when the world actually changed. These
+  // are the heavy ones (terrain mesh, ground plane, territory lines,
+  // city clusters, units, labels). Skipping them on idle frames is
+  // the entire point of the dirty-flag.
+  if (!stateDirty) return;
   rebuildTerrainMesh(state, opts.fogEnabled, picker);
   rebuildGround(state);
   rebuildTerritoryLines(state, opts.animTime, opts.showStructure, opts.lod);
-  rebuildShorelineRings(state, opts.animTime);
-  rebuildFoam(state, opts.animTime);
 
   setDecorVisible(opts.showStructure || opts.showOps);
   rebuildTileDecor(Array.from(state.world.tiles.values()), opts.lod, state);
