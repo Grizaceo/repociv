@@ -1,15 +1,17 @@
 // ─── WebGL map facade: renderer loop, camera sync, resize, picking ───────────
 import {
   WebGLRenderer,
-  OrthographicCamera,
+  PerspectiveCamera,
   Vector3,
   type Scene,
+  type Camera as ThreeCamera,
 } from 'three';
 import { type Camera as MapCamera } from '../hex.ts';
 import { type Axial } from '../hex.ts';
 import { type GameState } from '../game.ts';
-import { terrainElevation } from '../isoHex.ts';
+import { terrainElevation, hexCornerAngle } from '../isoHex.ts';
 import { tileKey } from '../types.ts';
+import { HEX_SIZE } from '../constants.ts';
 import {
   createHexWorldScene,
   updateHexWorldScene,
@@ -19,17 +21,21 @@ import {
 } from './HexWorldScene.ts';
 import { HexPicker } from './HexPicker.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
+import { initLabelRenderer, renderLabels, disposeLabels } from './MapLabels3D.ts';
+import { SKY_TOP } from './terrainShader.ts';
 
-const CAMERA_TILT = 0.65;
-const CAMERA_DISTANCE = 220;
+const CAMERA_TILT = 0.62;
+const CAMERA_BASE_DISTANCE = 320;
+const CAMERA_FOV = 42;
 
 export class ThreeMapRenderer {
   private container: HTMLElement;
   private renderer: WebGLRenderer;
   private scene: Scene;
-  private camera: OrthographicCamera;
+  private camera: PerspectiveCamera;
   private picker = new HexPicker();
   private target = new Vector3();
+  private cornerWorld = new Vector3();
   private resizeObserver: ResizeObserver;
   private width = 1;
   private height = 1;
@@ -37,15 +43,17 @@ export class ThreeMapRenderer {
 
   constructor(container: HTMLElement) {
     this.container = container;
-    this.renderer = new WebGLRenderer({ antialias: true, alpha: true });
+    this.renderer = new WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setClearColor(0x050505, 1);
+    this.renderer.setClearColor(SKY_TOP.getHex(), 1);
     container.appendChild(this.renderer.domElement);
     this.renderer.domElement.style.width = '100%';
     this.renderer.domElement.style.height = '100%';
 
+    initLabelRenderer(container);
+
     this.scene = createHexWorldScene();
-    this.camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 2000);
+    this.camera = new PerspectiveCamera(CAMERA_FOV, 1, 0.1, 4000);
 
     this.resizeObserver = new ResizeObserver(() => this.handleResize());
     this.resizeObserver.observe(container);
@@ -66,29 +74,18 @@ export class ThreeMapRenderer {
       this.height = Math.max(1, rect.height);
     }
     this.renderer.setSize(this.width, this.height, false);
-    this.updateProjection(1);
-  }
-
-  private updateProjection(zoom: number): void {
-    const aspect = this.width / this.height;
-    const halfH = (this.height * 0.5) / zoom;
-    const halfW = halfH * aspect;
-    this.camera.left = -halfW;
-    this.camera.right = halfW;
-    this.camera.top = halfH;
-    this.camera.bottom = -halfH;
+    this.camera.aspect = this.width / this.height;
     this.camera.updateProjectionMatrix();
   }
 
-  /** Sync orthographic Civ camera with 2D map Camera struct. */
+  /** Sync perspective Civ camera with 2D map Camera struct. */
   syncCamera(cam: MapCamera): void {
-    this.updateProjection(cam.zoom);
     this.target.set(cam.x, 0, cam.y);
-    const dist = CAMERA_DISTANCE;
+    const dist = CAMERA_BASE_DISTANCE / cam.zoom;
     this.camera.position.set(
       this.target.x - dist * Math.cos(CAMERA_TILT),
       this.target.y + dist * Math.sin(CAMERA_TILT),
-      this.target.z + dist * 0.35,
+      this.target.z + dist * 0.38,
     );
     this.camera.lookAt(this.target);
     this.camera.updateMatrixWorld();
@@ -98,12 +95,12 @@ export class ThreeMapRenderer {
     this.syncCamera(cam);
 
     const tileSignature = `${state.world.tiles.size}:${state.world.cities.length}:${state.world.units.length}`;
-    const fullRebuild = tileSignature !== this.lastTileSignature;
-    if (fullRebuild) this.lastTileSignature = tileSignature;
+    if (tileSignature !== this.lastTileSignature) this.lastTileSignature = tileSignature;
 
     updateHexWorldScene(this.scene, state, opts, this.picker);
 
     this.renderer.render(this.scene, this.camera);
+    renderLabels(this.scene, this.camera, this.width, this.height);
   }
 
   pickAxial(screenX: number, screenY: number): Axial | null {
@@ -112,13 +109,43 @@ export class ThreeMapRenderer {
     return this.picker.pick(mesh, this.camera, this.width, this.height, screenX, screenY);
   }
 
-  /** Tile center in canvas pixels (for canvas overlay sync). */
-  projectTileCenter(coord: Axial, state: GameState): { x: number; y: number } {
+  /** Tile center in map world space (for canvas overlay sync). */
+  projectTileCenter(coord: Axial, state: GameState, cam: MapCamera): { x: number; y: number } {
     const tile = state.world.tiles.get(tileKey(coord));
     const elev = tile ? terrainElevation(tile.terrain) : 0;
     const world = axialToWorld3D(coord.q, coord.r, elev);
     world.y += 2;
-    return this.picker.projectToScreen(world, this.camera, this.width, this.height);
+    return this.screenToMapSpace(world, cam);
+  }
+
+  /** Hex corner outline in map world space for canvas overlay. */
+  projectHexOutline(coord: Axial, state: GameState, cam: MapCamera): Array<{ x: number; y: number }> {
+    const tile = state.world.tiles.get(tileKey(coord));
+    const elev = tile ? terrainElevation(tile.terrain) : 0;
+    const center = axialToWorld3D(coord.q, coord.r, elev);
+    const corners: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i < 6; i++) {
+      const angle = hexCornerAngle(i);
+      this.cornerWorld.set(
+        center.x + HEX_SIZE * Math.cos(angle),
+        center.y + 1.5,
+        center.z + HEX_SIZE * Math.sin(angle),
+      );
+      corners.push(this.screenToMapSpace(this.cornerWorld, cam));
+    }
+    return corners;
+  }
+
+  private screenToMapSpace(world: Vector3, cam: MapCamera): { x: number; y: number } {
+    const screen = this.picker.projectToScreen(world, this.camera, this.width, this.height);
+    return {
+      x: (screen.x - cam.cx) / cam.zoom + cam.x,
+      y: (screen.y - cam.cy) / cam.zoom + cam.y,
+    };
+  }
+
+  getCamera(): ThreeCamera {
+    return this.camera;
   }
 
   getPicker(): HexPicker {
@@ -134,13 +161,13 @@ export class ThreeMapRenderer {
     if (active) this.handleResize();
   }
 
-  /** Force layout sync after container becomes visible. */
   resize(): void {
     this.handleResize();
   }
 
   dispose(): void {
     this.resizeObserver.disconnect();
+    disposeLabels(this.container);
     disposeHexWorldScene(this.scene);
     this.renderer.dispose();
     this.renderer.domElement.remove();

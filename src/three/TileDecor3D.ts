@@ -1,25 +1,30 @@
-// ─── Per-tile 3D decor (mountains, forests, farms) ──────────────────────────
+// ─── Per-tile 3D decor — Civ V-style silhouettes ────────────────────────────
 import {
   ConeGeometry,
+  CylinderGeometry,
   BoxGeometry,
+  SphereGeometry,
   InstancedMesh,
   Matrix4,
+  Quaternion,
   MeshLambertMaterial,
+  MeshStandardMaterial,
   Group,
   Color,
+  Vector3,
 } from 'three';
 import { type Tile, type Terrain, tileKey } from '../types.ts';
+import { type GameState } from '../game.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 
 const decorGroup = new Group();
 decorGroup.name = 'tile-decor';
-
-let mountainMesh: InstancedMesh | null = null;
-let forestMesh: InstancedMesh | null = null;
-let farmMesh: InstancedMesh | null = null;
 let lastSignature = '';
+
+// Track every instanced mesh added so we can dispose cleanly
+const activeMeshes: InstancedMesh[] = [];
 
 function decorSignature(tiles: Tile[]): string {
   return tiles
@@ -31,11 +36,433 @@ function hashCoord(q: number, r: number): number {
   return Math.abs((q * 73856093) ^ (r * 19349663)) % 997;
 }
 
+function disposeMesh(m: InstancedMesh): void {
+  m.geometry.dispose();
+  const mat = m.material;
+  if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
+  else mat.dispose();
+}
+
+function addMesh(mesh: InstancedMesh): void {
+  activeMeshes.push(mesh);
+  decorGroup.add(mesh);
+}
+
 export function getTileDecorGroup(): Group {
   return decorGroup;
 }
 
-export function rebuildTileDecor(tiles: Tile[], lod: 'low' | 'medium' | 'high'): void {
+// ── Mountain: 2-3 layered cones (6-sided) with snow cap ─────────────────────
+
+function buildMountains(tiles: Array<{ tile: Tile; variant: number }>): void {
+  if (tiles.length === 0) return;
+
+  // Rock body: 6-sided cone, warmer grey-brown
+  const rockGeom = new ConeGeometry(HEX_SIZE * 0.22, HEX_SIZE * 0.60, 6);
+  const rockMat  = new MeshLambertMaterial({ color: new Color(0x6e6b62) });
+
+  // Mid-section: slightly lighter
+  const midGeom = new ConeGeometry(HEX_SIZE * 0.16, HEX_SIZE * 0.42, 6);
+  const midMat  = new MeshLambertMaterial({ color: new Color(0x8a8880) });
+
+  // Snow cap: flat cylinder, emissive white
+  const snowGeom = new ConeGeometry(HEX_SIZE * 0.09, HEX_SIZE * 0.18, 6);
+  const snowMat  = new MeshStandardMaterial({
+    color: new Color(0xf5f5f8),
+    emissive: new Color(0xd0d8e8),
+    emissiveIntensity: 0.12,
+    roughness: 0.6,
+    metalness: 0.0,
+  });
+
+  // Count: each tile spawns up to 3 peaks; reserve max slots
+  const maxPeaks = tiles.length * 3;
+  const rockMesh = new InstancedMesh(rockGeom, rockMat, maxPeaks);
+  const midMesh  = new InstancedMesh(midGeom,  midMat,  maxPeaks);
+  const snowMesh = new InstancedMesh(snowGeom, snowMat, maxPeaks);
+  let   idx = 0;
+
+  const mat = new Matrix4();
+  for (const { tile, variant } of tiles) {
+    const elev = terrainElevation(tile.terrain);
+    const base = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    const peaks = (variant % 2) + 2;  // 2 or 3 peaks
+
+    const peakOffsets: Array<[number, number, number]> = [
+      [  0.00,  0,  0.00 ],
+      [ -0.18,  0,  0.10 ],
+      [  0.16,  0, -0.12 ],
+    ];
+    for (let p = 0; p < peaks; p++) {
+      const [ox, , oz] = peakOffsets[p]!;
+      const scale = 0.75 + (p === 0 ? 0.2 : 0) + (variant % 4) * 0.04;
+      const yBase = base.y + 2;
+
+      // Rock body
+      mat.makeScale(scale, scale * 1.0, scale);
+      mat.setPosition(base.x + ox * HEX_SIZE, yBase + scale * HEX_SIZE * 0.30, base.z + oz * HEX_SIZE);
+      rockMesh.setMatrixAt(idx, mat.clone());
+
+      // Mid-section (sits on top of rock)
+      mat.makeScale(scale * 0.78, scale * 0.78, scale * 0.78);
+      mat.setPosition(base.x + ox * HEX_SIZE, yBase + scale * HEX_SIZE * 0.58, base.z + oz * HEX_SIZE);
+      midMesh.setMatrixAt(idx, mat.clone());
+
+      // Snow cap
+      mat.makeScale(scale * 0.55, scale * 0.55, scale * 0.55);
+      mat.setPosition(base.x + ox * HEX_SIZE, yBase + scale * HEX_SIZE * 0.84, base.z + oz * HEX_SIZE);
+      snowMesh.setMatrixAt(idx, mat.clone());
+
+      idx++;
+    }
+  }
+  // Zero-out unused slots
+  const zero = new Matrix4().makeScale(0, 0, 0);
+  for (let i = idx; i < maxPeaks; i++) {
+    rockMesh.setMatrixAt(i, zero);
+    midMesh.setMatrixAt(i, zero);
+    snowMesh.setMatrixAt(i, zero);
+  }
+  rockMesh.count = idx;
+  midMesh.count  = idx;
+  snowMesh.count = idx;
+  rockMesh.instanceMatrix.needsUpdate = true;
+  midMesh.instanceMatrix.needsUpdate  = true;
+  snowMesh.instanceMatrix.needsUpdate = true;
+  addMesh(rockMesh);
+  addMesh(midMesh);
+  addMesh(snowMesh);
+}
+
+// ── Forest: trunk cylinder + 3 stacked cones = pine tree ────────────────────
+
+function buildForests(tiles: Tile[]): void {
+  if (tiles.length === 0) return;
+  const TREES_PER_TILE = 4;
+
+  const trunkGeom  = new CylinderGeometry(HEX_SIZE * 0.018, HEX_SIZE * 0.025, HEX_SIZE * 0.18, 5);
+  const trunkMat   = new MeshLambertMaterial({ color: new Color(0x3a2810) });
+
+  // Three cone tiers (bottom to top, each smaller)
+  const cone1Geom  = new ConeGeometry(HEX_SIZE * 0.095, HEX_SIZE * 0.22, 7);
+  const cone2Geom  = new ConeGeometry(HEX_SIZE * 0.075, HEX_SIZE * 0.20, 7);
+  const cone3Geom  = new ConeGeometry(HEX_SIZE * 0.055, HEX_SIZE * 0.17, 7);
+  const foliageMat = new MeshLambertMaterial({ color: new Color(0x1a4214) });
+  const topMat     = new MeshLambertMaterial({ color: new Color(0x1e5218) });
+
+  const total = tiles.length * TREES_PER_TILE;
+  const trunkMesh  = new InstancedMesh(trunkGeom, trunkMat,  total);
+  const cone1Mesh  = new InstancedMesh(cone1Geom, foliageMat, total);
+  const cone2Mesh  = new InstancedMesh(cone2Geom, foliageMat, total);
+  const cone3Mesh  = new InstancedMesh(cone3Geom, topMat,     total);
+
+  // Tree positions relative to tile centre (in fraction of HEX_SIZE)
+  const treeOffsets: Array<[number, number]> = [
+    [-0.20,  0.14],
+    [ 0.22, -0.16],
+    [-0.06, -0.22],
+    [ 0.16,  0.20],
+  ];
+
+  let idx = 0;
+  const mat = new Matrix4();
+  for (const tile of tiles) {
+    const elev = terrainElevation(tile.terrain);
+    const base = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    const h    = hashCoord(tile.coord.q, tile.coord.r);
+
+    for (let t = 0; t < TREES_PER_TILE; t++) {
+      const [ox, oz] = treeOffsets[t]!;
+      const scale    = 0.80 + ((h + t * 3) % 5) * 0.06;
+      const tx       = base.x + ox * HEX_SIZE;
+      const tz       = base.z + oz * HEX_SIZE;
+      const ty       = base.y;
+
+      const trunkH = HEX_SIZE * 0.18 * scale;
+
+      // Trunk
+      mat.makeScale(scale, scale, scale);
+      mat.setPosition(tx, ty + trunkH * 0.5 + 1, tz);
+      trunkMesh.setMatrixAt(idx, mat.clone());
+
+      // Bottom cone tier
+      mat.makeScale(scale, scale, scale);
+      mat.setPosition(tx, ty + trunkH + HEX_SIZE * 0.10 * scale, tz);
+      cone1Mesh.setMatrixAt(idx, mat.clone());
+
+      // Mid cone tier
+      mat.makeScale(scale * 0.84, scale * 0.84, scale * 0.84);
+      mat.setPosition(tx, ty + trunkH + HEX_SIZE * 0.24 * scale, tz);
+      cone2Mesh.setMatrixAt(idx, mat.clone());
+
+      // Top cone tier
+      mat.makeScale(scale * 0.68, scale * 0.68, scale * 0.68);
+      mat.setPosition(tx, ty + trunkH + HEX_SIZE * 0.37 * scale, tz);
+      cone3Mesh.setMatrixAt(idx, mat.clone());
+
+      idx++;
+    }
+  }
+  trunkMesh.instanceMatrix.needsUpdate = true;
+  cone1Mesh.instanceMatrix.needsUpdate = true;
+  cone2Mesh.instanceMatrix.needsUpdate = true;
+  cone3Mesh.instanceMatrix.needsUpdate = true;
+  addMesh(trunkMesh);
+  addMesh(cone1Mesh);
+  addMesh(cone2Mesh);
+  addMesh(cone3Mesh);
+}
+
+// ── Hills: 3 overlapping rounded bumps ──────────────────────────────────────
+
+function buildHills(tiles: Tile[]): void {
+  if (tiles.length === 0) return;
+
+  const bumpGeom = new SphereGeometry(HEX_SIZE * 0.26, 12, 8);
+  const bumpMat  = new MeshLambertMaterial({ color: new Color(0x6a9050) });
+
+  const total    = tiles.length * 3;
+  const bumpMesh = new InstancedMesh(bumpGeom, bumpMat, total);
+
+  const offsets: Array<[number, number, number, number]> = [
+    [  0.00, 0.42,  0.00, 1.00 ],
+    [ -0.18, 0.35,  0.12, 0.88 ],
+    [  0.16, 0.35, -0.10, 0.82 ],
+  ];
+
+  let idx = 0;
+  const mat = new Matrix4();
+  for (const tile of tiles) {
+    const elev = terrainElevation(tile.terrain);
+    const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    for (const [ox, oy, oz, sc] of offsets) {
+      mat.makeScale(sc * 1.1, sc * 0.42, sc * 1.0);
+      mat.setPosition(pos.x + ox * HEX_SIZE, pos.y - 1 + oy * HEX_SIZE * 0.28, pos.z + oz * HEX_SIZE);
+      bumpMesh.setMatrixAt(idx++, mat.clone());
+    }
+  }
+  bumpMesh.instanceMatrix.needsUpdate = true;
+  addMesh(bumpMesh);
+}
+
+// ── Desert: 4 elongated dune ridges ─────────────────────────────────────────
+
+function buildDesert(tiles: Tile[]): void {
+  if (tiles.length === 0) return;
+
+  const duneGeom = new CylinderGeometry(
+    HEX_SIZE * 0.06, HEX_SIZE * 0.18, HEX_SIZE * 0.55, 8, 1, false,
+  );
+  const duneMat  = new MeshLambertMaterial({ color: new Color(0xc09050) });
+
+  const total    = tiles.length * 3;
+  const duneMesh = new InstancedMesh(duneGeom, duneMat, total);
+
+  // Dune ridges are long cylinders rotated ~90° to lie flat, spread across tile
+  const q = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), Math.PI / 2);
+  const duneRots: Array<[number, number, number]> = [
+    [-0.10, 0, -0.06],
+    [ 0.06, 0,  0.10],
+    [-0.04, 0,  0.22],
+  ];
+
+  let idx = 0;
+  const mat = new Matrix4();
+  const scaleV = new Vector3();
+  for (const tile of tiles) {
+    const elev = terrainElevation(tile.terrain);
+    const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    const h    = hashCoord(tile.coord.q, tile.coord.r);
+    for (let d = 0; d < 3; d++) {
+      const [ox, , oz] = duneRots[d]!;
+      const scale = 0.75 + (h + d * 7) % 5 * 0.06;
+      const rot   = new Quaternion().setFromAxisAngle(
+        new Vector3(0, 1, 0), ((h + d * 30) % 60 - 30) * (Math.PI / 180),
+      ).multiply(q);
+      scaleV.set(scale, scale * 0.35, scale);
+      mat.compose(
+        new Vector3(pos.x + ox * HEX_SIZE, pos.y + 1.5, pos.z + oz * HEX_SIZE),
+        rot,
+        scaleV,
+      );
+      duneMesh.setMatrixAt(idx++, mat.clone());
+    }
+  }
+  duneMesh.instanceMatrix.needsUpdate = true;
+  addMesh(duneMesh);
+}
+
+// ── Ice: crystalline spikes + flat base platform ─────────────────────────────
+
+function buildIce(tiles: Tile[]): void {
+  if (tiles.length === 0) return;
+
+  // Spike: sharp 4-sided crystal
+  const spikeGeom = new ConeGeometry(HEX_SIZE * 0.045, HEX_SIZE * 0.32, 4);
+  const spikeMat  = new MeshStandardMaterial({
+    color:     new Color(0xd8eef8),
+    emissive:  new Color(0x8ab8d8),
+    emissiveIntensity: 0.15,
+    roughness: 0.2,
+    metalness: 0.1,
+  });
+
+  // Base slab: thin flat box
+  const slabGeom  = new BoxGeometry(HEX_SIZE * 0.60, HEX_SIZE * 0.05, HEX_SIZE * 0.60);
+  const slabMat   = new MeshLambertMaterial({
+    color: new Color(0xe8f4fc),
+    transparent: true,
+    opacity: 0.80,
+  });
+
+  const total     = tiles.length * 4;
+  const spikeMesh = new InstancedMesh(spikeGeom, spikeMat, total);
+  const slabMesh  = new InstancedMesh(slabGeom,  slabMat,  tiles.length);
+
+  const spikePos: Array<[number, number]> = [
+    [ 0.00,  0.00],
+    [-0.16,  0.12],
+    [ 0.18, -0.10],
+    [-0.08, -0.18],
+  ];
+
+  let spikeIdx = 0;
+  const mat = new Matrix4();
+  for (let i = 0; i < tiles.length; i++) {
+    const tile = tiles[i]!;
+    const elev = terrainElevation(tile.terrain);
+    const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    const h    = hashCoord(tile.coord.q, tile.coord.r);
+
+    // Slab
+    mat.makeTranslation(pos.x, pos.y + 0.6, pos.z);
+    slabMesh.setMatrixAt(i, mat.clone());
+
+    // Spikes
+    for (let s = 0; s < 4; s++) {
+      const [ox, oz] = spikePos[s]!;
+      const scale    = 0.65 + ((h + s * 11) % 7) * 0.06;
+      mat.makeScale(scale, scale, scale);
+      mat.setPosition(pos.x + ox * HEX_SIZE, pos.y + 1.2 + scale * HEX_SIZE * 0.15, pos.z + oz * HEX_SIZE);
+      spikeMesh.setMatrixAt(spikeIdx++, mat.clone());
+    }
+  }
+  spikeMesh.instanceMatrix.needsUpdate = true;
+  slabMesh.instanceMatrix.needsUpdate  = true;
+  addMesh(slabMesh);
+  addMesh(spikeMesh);
+}
+
+// ── Sacred: tall obelisks with glowing gold tips ─────────────────────────────
+
+function buildSacred(tiles: Tile[]): void {
+  if (tiles.length === 0) return;
+
+  const shaftGeom = new BoxGeometry(HEX_SIZE * 0.065, HEX_SIZE * 0.65, HEX_SIZE * 0.065);
+  const shaftMat  = new MeshLambertMaterial({ color: new Color(0x1c1228) });
+
+  const tipGeom   = new ConeGeometry(HEX_SIZE * 0.04, HEX_SIZE * 0.14, 4);
+  const tipMat    = new MeshStandardMaterial({
+    color:     new Color(0xd4af37),
+    emissive:  new Color(0xd4af37),
+    emissiveIntensity: 0.9,
+    roughness: 0.3,
+    metalness: 0.6,
+  });
+
+  const OBELISKS  = 5;
+  const total     = tiles.length * OBELISKS;
+  const shaftMesh = new InstancedMesh(shaftGeom, shaftMat, total);
+  const tipMesh   = new InstancedMesh(tipGeom,   tipMat,   total);
+
+  let idx = 0;
+  const mat = new Matrix4();
+  for (const tile of tiles) {
+    const elev = terrainElevation(tile.terrain);
+    const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    for (let o = 0; o < OBELISKS; o++) {
+      const angle  = (Math.PI * 2 / OBELISKS) * o;
+      const radius = HEX_SIZE * 0.32;
+      const tx     = pos.x + Math.cos(angle) * radius;
+      const tz     = pos.z + Math.sin(angle) * radius;
+      const scale  = 0.80 + (o % 3) * 0.12;
+      const shaftH = HEX_SIZE * 0.65 * scale;
+
+      mat.makeScale(scale, scale, scale);
+      mat.setPosition(tx, pos.y + shaftH * 0.5 + 2, tz);
+      shaftMesh.setMatrixAt(idx, mat.clone());
+
+      mat.makeScale(scale * 0.7, scale * 0.7, scale * 0.7);
+      mat.setPosition(tx, pos.y + shaftH + HEX_SIZE * 0.07 * scale + 2, tz);
+      tipMesh.setMatrixAt(idx, mat.clone());
+
+      idx++;
+    }
+  }
+  shaftMesh.instanceMatrix.needsUpdate = true;
+  tipMesh.instanceMatrix.needsUpdate   = true;
+  addMesh(shaftMesh);
+  addMesh(tipMesh);
+}
+
+// ── Plains grass patches (high LOD) ─────────────────────────────────────────
+
+function buildGrass(tiles: Tile[]): void {
+  if (tiles.length === 0) return;
+
+  const geom = new BoxGeometry(HEX_SIZE * 0.16, HEX_SIZE * 0.10, HEX_SIZE * 0.05);
+  const mat  = new MeshLambertMaterial({ color: new Color(0x5a9040) });
+  const mesh = new InstancedMesh(geom, mat, tiles.length * 2);
+
+  let idx = 0;
+  const m = new Matrix4();
+  for (const tile of tiles) {
+    const elev = terrainElevation(tile.terrain);
+    const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    const h    = hashCoord(tile.coord.q, tile.coord.r);
+    for (let g = 0; g < 2; g++) {
+      const angle = ((h + g * 17) % 36) * (Math.PI / 18);
+      m.makeTranslation(
+        pos.x + Math.cos(angle) * HEX_SIZE * 0.18,
+        pos.y + 1.2,
+        pos.z + Math.sin(angle) * HEX_SIZE * 0.18,
+      );
+      mesh.setMatrixAt(idx++, m.clone());
+    }
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  addMesh(mesh);
+}
+
+// ── Plains farms (high LOD) ──────────────────────────────────────────────────
+
+function buildFarms(tiles: Tile[]): void {
+  if (tiles.length === 0) return;
+
+  const geom = new BoxGeometry(HEX_SIZE * 0.40, HEX_SIZE * 0.05, HEX_SIZE * 0.28);
+  const mat  = new MeshLambertMaterial({ color: new Color(0x4e7832) });
+  const mesh = new InstancedMesh(geom, mat, tiles.length);
+
+  const m = new Matrix4();
+  tiles.forEach((tile, i) => {
+    const elev = terrainElevation(tile.terrain);
+    const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    const h    = hashCoord(tile.coord.q, tile.coord.r);
+    const rot  = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), (h % 12) * (Math.PI / 6));
+    m.compose(new Vector3(pos.x, pos.y + 1.0, pos.z), rot, new Vector3(1, 1, 1));
+    mesh.setMatrixAt(i, m.clone());
+  });
+  mesh.instanceMatrix.needsUpdate = true;
+  addMesh(mesh);
+}
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
+export function rebuildTileDecor(
+  tiles: Tile[],
+  lod: 'low' | 'medium' | 'high',
+  _state?: GameState,
+): void {
   if (lod === 'low') {
     clearTileDecor();
     return;
@@ -47,96 +474,66 @@ export function rebuildTileDecor(tiles: Tile[], lod: 'low' | 'medium' | 'high'):
 
   clearTileDecor();
 
-  const mountains: Tile[] = [];
-  const forests: Tile[] = [];
-  const farms: Tile[] = [];
+  const mountains: Array<{ tile: Tile; variant: number }> = [];
+  const forests:   Tile[] = [];
+  const hills:     Tile[] = [];
+  const deserts:   Tile[] = [];
+  const ices:      Tile[] = [];
+  const sacreds:   Tile[] = [];
+  const grass:     Tile[] = [];
+  const farms:     Tile[] = [];
 
   for (const tile of tiles) {
     if (!tile.revealed) continue;
+    const h = hashCoord(tile.coord.q, tile.coord.r);
     switch (tile.terrain) {
       case 'mountain':
-        mountains.push(tile);
+        mountains.push({ tile, variant: h });
         break;
       case 'forest':
         forests.push(tile);
         break;
-      case 'plains': {
-        const h = hashCoord(tile.coord.q, tile.coord.r);
-        if (h % 5 === 0) farms.push(tile);
+      case 'hills':
+        hills.push(tile);
         break;
-      }
+      case 'desert':
+        deserts.push(tile);
+        break;
+      case 'ice':
+        ices.push(tile);
+        break;
+      case 'sacred':
+        sacreds.push(tile);
+        break;
+      case 'plains':
+        if (h % 5 === 0) farms.push(tile);
+        else if (lod === 'high' && h % 3 === 0) grass.push(tile);
+        break;
       default:
         break;
     }
   }
 
-  if (mountains.length > 0) {
-    const geom = new ConeGeometry(HEX_SIZE * 0.22, HEX_SIZE * 0.55, 4);
-    const mat = new MeshLambertMaterial({ color: new Color(0x8a8a8a) });
-    mountainMesh = new InstancedMesh(geom, mat, mountains.length);
-    mountains.forEach((tile, i) => {
-      const elev = terrainElevation(tile.terrain);
-      const pos = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-      pos.y += HEX_SIZE * 0.08;
-      const m = new Matrix4().makeTranslation(pos.x, pos.y, pos.z);
-      mountainMesh!.setMatrixAt(i, m);
-    });
-    mountainMesh.instanceMatrix.needsUpdate = true;
-    decorGroup.add(mountainMesh);
-  }
-
-  if (forests.length > 0) {
-    const geom = new ConeGeometry(HEX_SIZE * 0.12, HEX_SIZE * 0.35, 5);
-    const mat = new MeshLambertMaterial({ color: new Color(0x1e4a18) });
-    const count = forests.length * 2;
-    forestMesh = new InstancedMesh(geom, mat, count);
-    let idx = 0;
-    for (const tile of forests) {
-      const elev = terrainElevation(tile.terrain);
-      const base = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-      for (let t = 0; t < 2; t++) {
-        const ox = (t === 0 ? -0.15 : 0.18) * HEX_SIZE;
-        const oz = (t === 0 ? 0.12 : -0.14) * HEX_SIZE;
-        const m = new Matrix4().makeTranslation(base.x + ox, base.y + 4, base.z + oz);
-        forestMesh.setMatrixAt(idx++, m);
-      }
-    }
-    forestMesh.instanceMatrix.needsUpdate = true;
-    decorGroup.add(forestMesh);
-  }
-
-  if (farms.length > 0 && lod === 'high') {
-    const geom = new BoxGeometry(HEX_SIZE * 0.35, 1.5, HEX_SIZE * 0.25);
-    const mat = new MeshLambertMaterial({ color: new Color(0x4a7038) });
-    farmMesh = new InstancedMesh(geom, mat, farms.length);
-    farms.forEach((tile, i) => {
-      const elev = terrainElevation(tile.terrain);
-      const pos = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-      pos.y += 1;
-      const m = new Matrix4().makeTranslation(pos.x, pos.y, pos.z);
-      farmMesh!.setMatrixAt(i, m);
-    });
-    farmMesh.instanceMatrix.needsUpdate = true;
-    decorGroup.add(farmMesh);
+  buildMountains(mountains);
+  buildForests(forests);
+  buildHills(hills);
+  buildDesert(deserts);
+  buildIce(ices);
+  buildSacred(sacreds);
+  if (lod === 'high') {
+    buildGrass(grass);
+    buildFarms(farms);
   }
 }
 
 export function clearTileDecor(): void {
   while (decorGroup.children.length > 0) {
-    const child = decorGroup.children[0]!;
+    const child = decorGroup.children[0] as InstancedMesh;
     decorGroup.remove(child);
-    if ('geometry' in child && child.geometry) {
-      (child as InstancedMesh).geometry.dispose();
-    }
-    if ('material' in child && child.material) {
-      const mat = (child as InstancedMesh).material;
-      if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-      else mat.dispose();
-    }
+    disposeMesh(child);
   }
-  mountainMesh = null;
-  forestMesh = null;
-  farmMesh = null;
+  activeMeshes.length = 0;
+  lastSignature = '';
 }
 
 export function setDecorVisible(visible: boolean): void {
@@ -145,5 +542,13 @@ export function setDecorVisible(visible: boolean): void {
 
 /** @internal test hook */
 export function _terrainNeedsDecor(terrain: Terrain): boolean {
-  return terrain === 'mountain' || terrain === 'forest' || terrain === 'plains';
+  return (
+    terrain === 'mountain' ||
+    terrain === 'forest'   ||
+    terrain === 'plains'   ||
+    terrain === 'hills'    ||
+    terrain === 'desert'   ||
+    terrain === 'ice'      ||
+    terrain === 'sacred'
+  );
 }

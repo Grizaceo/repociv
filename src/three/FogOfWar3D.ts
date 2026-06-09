@@ -10,7 +10,7 @@ export interface FogTileState {
 }
 
 export function tileFogAlpha(tile: Tile, fogEnabled: boolean): number {
-  if (!tile.revealed) return 0.15;
+  if (!tile.revealed) return 0.1;
   if (tile.inFog && fogEnabled) return 0.35;
   return 1;
 }

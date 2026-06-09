@@ -4,6 +4,7 @@
 // Files become "workbench" tiles inside their room.
 
 import type { LocalWorld, LocalRoom, LocalTile, LocalTileType, Workbench, PowerGrid, PowerSource, PowerConsumer, LocalRestArea, RoomClimate, ClimateDevice, Vent, OfficeZoneType } from './types.ts';
+import { applyOfficeLayout, isLayoutReservedTile } from './officeLayout.ts';
 
 // ─── File tree node (mirrors bridge API shape) ────────────────────────────────
 export interface FileNode {
@@ -113,8 +114,9 @@ export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
   const npcs: import('./types.ts').LocalNpc[] = [];
 
   const grid = buildGrid(gridWidth, gridHeight, rooms, WALL_THICKNESS);
-  addCorridors(grid, rooms, gridWidth, gridHeight);
+  layoutOfficeRooms(grid, rooms, gridWidth, gridHeight, WALL_THICKNESS);
   furnishRooms(grid, rooms, gridWidth, gridHeight, WALL_THICKNESS, npcs);
+  addCorridors(grid, rooms, gridWidth, gridHeight);
   decorateCorridors(grid, gridWidth, gridHeight);
 
   // Colocar un kiosko en una coordenada central de la primera sala para CDaily
@@ -454,7 +456,7 @@ function buildGrid(
   width: number,
   height: number,
   rooms: LocalRoom[],
-  wallThick: number,
+  _wallThick: number,
 ): LocalTile[][] {
   const grid: LocalTile[][] = Array.from({ length: height }, (_, y) =>
     Array.from({ length: width }, (_, x) => ({
@@ -467,7 +469,7 @@ function buildGrid(
   );
 
   for (const room of rooms) {
-    const { x, y, width: w, height: h, workbenches } = room;
+    const { x, y, width: w, height: h } = room;
 
     for (let ry = y; ry < y + h; ry++) {
       for (let rx = x; rx < x + w; rx++) {
@@ -478,22 +480,24 @@ function buildGrid(
       }
     }
 
-    const floorTiles: Array<{ x: number; y: number }> = [];
-    for (let ry = y + wallThick; ry < y + h - wallThick; ry++) {
-      for (let rx = x + wallThick; rx < x + w - wallThick; rx++) {
-        if (inBounds(rx, ry, width, height)) floorTiles.push({ x: rx, y: ry });
-      }
-    }
-
-    for (let i = 0; i < workbenches.length && i < floorTiles.length; i++) {
-      const { x: tx, y: ty } = floorTiles[i]!;
-      const tile = grid[ty]![tx]!;
-      tile.type = 'workbench';
-      tile.workbench = workbenches[i]!;
-    }
+    // Workbenches are placed on desk cells by layoutOfficeRooms()
   }
 
   return grid;
+}
+
+// ─── Cubicle layout pass (desk-aligned workbenches) ───────────────────────────
+function layoutOfficeRooms(
+  grid: LocalTile[][],
+  rooms: LocalRoom[],
+  gridW: number,
+  gridH: number,
+  wallThick: number,
+): void {
+  for (const room of rooms) {
+    if (room.workbenches.length === 0 && room.zoneType !== 'reception') continue;
+    applyOfficeLayout(room, grid, gridW, gridH, wallThick);
+  }
 }
 
 // ─── Corridors: connect adjacent rooms ─────────────────────────────────────────
@@ -546,13 +550,13 @@ function furnishRooms(
     const innerX1 = room.x + room.width - wallThick - 1;
     const innerY1 = room.y + room.height - wallThick - 1;
 
-    // Collect interior floor tiles (exclude workbenches, paths, etc.)
+    // Collect interior floor tiles (exclude layout-reserved cubicle tiles)
     const floors: Array<{ x: number; y: number }> = [];
     for (let ry = innerY0; ry <= innerY1; ry++) {
       for (let rx = innerX0; rx <= innerX1; rx++) {
         if (!inBounds(rx, ry, gridW, gridH)) continue;
         const tile = grid[ry]![rx]!;
-        if (tile.type === 'floor') floors.push({ x: rx, y: ry });
+        if (tile.type === 'floor' && !isLayoutReservedTile(tile)) floors.push({ x: rx, y: ry });
       }
     }
     if (floors.length === 0) continue;
@@ -608,43 +612,11 @@ function furnishRooms(
             }
           }
         }
-        const isFreeFloor = (x: number, y: number) =>
-          grid[y]![x]!.type === 'floor' && !(npcTile && npcTile.x === x && npcTile.y === y);
-        // Cubicle clusters: pair desks against east/west walls with aisle gaps
-        const eastWall = wallAdjacentFloors(1, 0);
-        const westWall = wallAdjacentFloors(-1, 0);
-        // Helper: place desk pairs in contiguous wall runs, skipping 1 tile between pairs
-        const placeClusters = (candidates: Array<{ x: number; y: number }>) => {
-          // Sort by primary axis so contiguous tiles are adjacent in array
-          const sorted = [...candidates].sort((a, b) => (a.y !== b.y ? a.y - b.y : a.x - b.x));
-          let i = 0;
-          while (i < sorted.length - 1) {
-            const a = sorted[i]!;
-            const b = sorted[i + 1]!;
-            // Only pair if truly adjacent (same y, x diff 1) or (same x, y diff 1)
-            const adjacent = Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1;
-            if (adjacent && isFreeFloor(a.x, a.y) && isFreeFloor(b.x, b.y)) {
-              place(a.x, a.y, 'standing_desk');
-              place(b.x, b.y, 'standing_desk');
-              i += 3; // pair + 1-tile gap
-            } else {
-              i++;
-            }
-          }
+        const isFreeFloor = (x: number, y: number) => {
+          const t = grid[y]![x]!;
+          return t.type === 'floor' && !isLayoutReservedTile(t) && !(npcTile && npcTile.x === x && npcTile.y === y);
         };
-        placeClusters(eastWall);
-        placeClusters(westWall);
-        // Fallback: if no clusters placed, scatter a few single desks on remaining floors
-        let desksPlaced = 0;
-        const targetDesks = Math.min(floors.length, Math.max(1, Math.floor(floors.length / 2)));
-        for (const f of floors) {
-          if (desksPlaced >= targetDesks) break;
-          if (isFreeFloor(f.x, f.y)) {
-            place(f.x, f.y, 'standing_desk');
-            desksPlaced++;
-          }
-        }
-        // Planters in remaining gaps (every 3rd remaining floor tile)
+        // Desks/workbenches placed by layoutOfficeRooms; scatter planters on remaining floor
         const remainingFloors = floors.filter((f) => isFreeFloor(f.x, f.y));
         for (let i = 0; i < remainingFloors.length; i += 3) {
           const f = remainingFloors[i]!;

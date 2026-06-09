@@ -17,6 +17,7 @@
     "stop": "bash scripts/dev-stop.sh",
     "health": "bash scripts/healthcheck.sh",
     "backup": "bash scripts/backup-events.sh",
+    "assets:3d": "bash scripts/generate-3d-textures.sh",
     "lint": "eslint src --ext .ts,.tsx --max-warnings=0",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",

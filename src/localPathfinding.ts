@@ -7,10 +7,13 @@ import type { LocalWorld, LocalTile } from './types.ts';
 const TILE_COST: Record<string, number> = {
   floor: 1,
   path: 0.6, // agents prefer corridors
+  aisle: 1, // interior office aisle (preferred routing)
   door: 2, // slower through doors
   workbench: 1,
+  chair: 1.2,
   debris: 5, // very slow
   wall: Infinity, // impassable
+  cubicle_partition: Infinity, // low partition — impassable
   // Office furniture (Phase 6)
   standing_desk: 1,
   whiteboard: 1,

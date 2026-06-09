@@ -52,3 +52,39 @@ Lazy-loaded modules live under `src/three/`. Three.js is **not** bundled until W
 npm test -- src/three
 npm run build
 ```
+
+## 3D texture assets
+
+Generated assets live in `public/assets/3d/`. Regenerate with:
+
+```bash
+npm run assets:3d
+npm test -- src/three
+```
+
+The WebGL terrain shader uses:
+- vertex colors as fallback/fog tint
+- `terrain-atlas-3d.png` as top-face texture atlas when available (lazy loaded)
+- side faces remain shader-darkened to preserve hex-prism readability
+- `instanceTerrain` instanced attribute selects the atlas tile per hex
+- UVs are local hex XZ coordinates mapped to [0,1]
+
+### Generating the atlas
+
+```bash
+npm run assets:3d
+```
+
+This runs Blender headless with `scripts/generate-3d-texture-atlas.py` and produces:
+- `public/assets/3d/terrain-atlas-3d.png` — 2048x1536 RGBA atlas
+- `public/assets/3d/terrain-atlas-3d.json` — metadata with terrain→cell mapping
+
+### Preview atlas (optional)
+
+```bash
+/home/gris/tools/blender/blender-5.1.2-linux-x64/blender \
+  --background --factory-startup \
+  --python scripts/preview-3d-texture-atlas.py
+```
+
+Renders a contact sheet to `.hermes/artifacts/terrain-atlas-preview.png`.

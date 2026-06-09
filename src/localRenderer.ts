@@ -1,5 +1,14 @@
 // ─── RepoCiv — Local Renderer (RimWorld-style 2D grid) ─────────────────────────
 import type { LocalWorld, LocalTile, LocalRoom, LocalUnit, ZoneType } from './types.ts';
+import { loadOfficeAtlas } from './officeAtlas.ts';
+import {
+  drawIsoOfficeSprite,
+  drawIsoCarpetTile,
+  drawIsoCeilingLight,
+  drawIsoExteriorFacade,
+  drawIsoDoorSignage,
+  type IsoOfficeDrawContext,
+} from './isoOfficeSprites.ts';
 
 const TILE_SIZE = 32; // px per tile
 
@@ -348,6 +357,12 @@ export class LocalRenderer {
     this.staticLayer = null;
     this.isoStaticLayer = null;
     this._camAnim = null; // cancel any in-flight pan — its target belongs to the previous world
+    void loadOfficeAtlas().then((ok) => {
+      if (ok) {
+        this.isoStaticLayer = null;
+        this.staticLayer = null;
+      }
+    });
     // Center camera on the largest room (main area) rather than whole grid centroid
     if (this._isometric) {
       const largestRoom = world.rooms.reduce<LocalRoom | null>(
@@ -981,6 +996,8 @@ export class LocalRenderer {
         } else if (
           tile.type === 'workbench' ||
           tile.type === 'standing_desk' ||
+          tile.type === 'chair' ||
+          tile.type === 'cubicle_partition' ||
           tile.type === 'sofa' ||
           tile.type === 'planter' ||
           tile.type === 'server_rack' ||
@@ -1003,6 +1020,11 @@ export class LocalRenderer {
     }
 
     // Zone ambient radial lights (subtle glow per room, drawn over floors)
+    const officeDctx: IsoOfficeDrawContext = {
+      ctx: sctx,
+      fontMono: this.tokens.fontMono,
+      extColor: EXT_COLOR,
+    };
     for (const room of world.rooms) {
       const lightColor = ISO_ZONE_LIGHT[room.zoneType ?? 'team_cluster'];
       if (!lightColor) continue;
@@ -1019,6 +1041,34 @@ export class LocalRenderer {
       sctx.arc(base.px, base.py, radius, 0, Math.PI * 2);
       sctx.fill();
       sctx.globalAlpha = 1;
+    }
+
+    // Office ambiance: carpet in aisles, ceiling lights, exterior facade, door signage
+    for (let y = 0; y < world.height; y++) {
+      for (let x = 0; x < world.width; x++) {
+        const tile = world.grid[y]![x]!;
+        if (tile.type === 'aisle' || tile.type === 'path') {
+          drawIsoCarpetTile(officeDctx, x, y);
+        }
+        if ((x + y) % 5 === 0 && (tile.type === 'aisle' || tile.type === 'path')) {
+          drawIsoCeilingLight(officeDctx, x, y);
+        }
+        if (tile.type === 'wall') {
+          drawIsoExteriorFacade(officeDctx, x, y, world.width, world.height);
+        }
+        if (tile.type === 'door' && tile.roomId) {
+          const room = world.rooms.find((r) => r.id === tile.roomId);
+          const hasCorridorNeighbor = [
+            world.grid[y - 1]?.[x],
+            world.grid[y + 1]?.[x],
+            world.grid[y]?.[x - 1],
+            world.grid[y]?.[x + 1],
+          ].some((n) => n?.type === 'path' || n?.type === 'aisle');
+          if (room?.zoneLabel && hasCorridorNeighbor) {
+            drawIsoDoorSignage(officeDctx, x, y, room.zoneLabel);
+          }
+        }
+      }
     }
 
     this.ctx = originalCtx;
@@ -3379,8 +3429,8 @@ export class LocalRenderer {
     // ─── Floor color based on zone ──────────────────────────────────
     const floorKey = zone ?? 'team_cluster';
     let floorColor = ISO_FLOOR[floorKey] || ISO_FLOOR.team_cluster || '#B8B8B8';
-    if (tile.type === 'path') floorColor = ISO_FLOOR.path || '#B8B8B8';
-    if (!tile.roomId && tile.type !== 'path') floorColor = ISO_FLOOR.outside || '#A8A8A8';
+    if (tile.type === 'path' || tile.type === 'aisle') floorColor = ISO_FLOOR.path || '#B8B8B8';
+    if (!tile.roomId && tile.type !== 'path' && tile.type !== 'aisle') floorColor = ISO_FLOOR.outside || '#A8A8A8';
 
     // ─── Draw floor diamond ─────────────────────────────────────────
     ctx.fillStyle = floorColor;
@@ -3430,8 +3480,8 @@ export class LocalRenderer {
     ctx.lineWidth = 0.5;
     ctx.stroke();
 
-    // ─── Path corridor rendering (interior hallway, not loose grey strip) ─
-    if (tile.type === 'path') {
+    // ─── Path / aisle corridor rendering ─
+    if (tile.type === 'path' || tile.type === 'aisle') {
       // Slightly darker floor inset for corridor depth
       ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
       ctx.beginPath();
@@ -3509,19 +3559,25 @@ export class LocalRenderer {
       this._drawIsoWallTile(tile, gridX, gridY, world, corners, zone);
     }
 
-    // ─── Draw furniture with height ──────────────────────────────────
-    if (tile.type === 'standing_desk') {
-      this.drawIsoStandingDesk(gridX, gridY);
+    // ─── Draw furniture / office sprites (atlas + procedural fallback) ─
+    const officeDctx: IsoOfficeDrawContext = {
+      ctx,
+      fontMono: this.tokens.fontMono,
+      extColor: EXT_COLOR,
+    };
+    if (
+      tile.type === 'workbench' ||
+      tile.type === 'standing_desk' ||
+      tile.type === 'chair' ||
+      tile.type === 'cubicle_partition' ||
+      tile.type === 'reception' ||
+      tile.type === 'watercooler' ||
+      tile.type === 'planter' ||
+      tile.type === 'whiteboard'
+    ) {
+      drawIsoOfficeSprite(officeDctx, tile, gridX, gridY, activeWbIds);
     } else if (tile.type === 'sofa') {
       this.drawIsoSofa(gridX, gridY);
-    } else if (tile.type === 'planter') {
-      this.drawIsoPlanter(gridX, gridY);
-    } else if (tile.type === 'workbench') {
-      this.drawIsoWorkbench(tile, gridX, gridY, activeWbIds);
-    } else if (tile.type === 'whiteboard') {
-      this.drawIsoWhiteboard(gridX, gridY);
-    } else if (tile.type === 'reception') {
-      this.drawIsoReception(gridX, gridY);
     } else if (tile.type === 'server_rack') {
       this.drawIsoServerRack(gridX, gridY);
     } else if (tile.type === 'window') {
@@ -3532,8 +3588,6 @@ export class LocalRenderer {
       this.drawIsoPhoneBooth(gridX, gridY);
     } else if (tile.type === 'break_area') {
       this.drawIsoBreakArea(gridX, gridY);
-    } else if (tile.type === 'watercooler') {
-      this.drawIsoWatercooler(gridX, gridY);
     } else if (tile.type === 'stairs') {
       this.drawIsoStairs(gridX, gridY);
     }
@@ -3586,7 +3640,14 @@ export class LocalRenderer {
     const northTile = world.grid[gridY - 1]?.[gridX];
     const westTile = world.grid[gridY]?.[gridX - 1];
     const isOpen = (t: LocalTile | undefined) =>
-      t === undefined || t.type === 'floor' || t.type === 'path' || t.type === 'door' || t.type === 'workbench' || t.type === 'kiosk';
+      t === undefined ||
+      t.type === 'floor' ||
+      t.type === 'path' ||
+      t.type === 'aisle' ||
+      t.type === 'chair' ||
+      t.type === 'door' ||
+      t.type === 'workbench' ||
+      t.type === 'kiosk';
     const hasNorthFace = isOpen(northTile);
     const hasWestFace = isOpen(westTile);
 

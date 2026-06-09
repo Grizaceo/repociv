@@ -312,12 +312,7 @@ export class Renderer {
 
   private tilePixelPos(coord: Axial, tile?: Tile | null): { x: number; y: number } {
     if (this.worldRenderMode === 'webgl' && this.threeMap) {
-      const screen = this.threeMap.projectTileCenter(coord, this.state);
-      const cam = this.cam;
-      return {
-        x: (screen.x - cam.cx) / cam.zoom + cam.x,
-        y: (screen.y - cam.cy) / cam.zoom + cam.y,
-      };
+      return this.threeMap.projectTileCenter(coord, this.state, this.cam);
     }
     if (this.worldRenderMode === 'iso25d') {
       const t = tile ?? this.state.world.tiles.get(tileKey(coord));
@@ -330,6 +325,17 @@ export class Renderer {
     if (this.worldRenderMode === 'iso25d') {
       const tile = this.state.world.tiles.get(tileKey(coord));
       this.isoHexR.drawHexOutlineIso(coord, tile, color, lw);
+      return;
+    }
+    if (this.worldRenderMode === 'webgl' && this.threeMap) {
+      const corners = this.threeMap.projectHexOutline(coord, this.state, this.cam);
+      const { ctx } = this;
+      ctx.beginPath();
+      corners.forEach((c, i) => (i === 0 ? ctx.moveTo(c.x, c.y) : ctx.lineTo(c.x, c.y)));
+      ctx.closePath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lw / this.cam.zoom;
+      ctx.stroke();
       return;
     }
     this.hexR.drawHexOutline(coord, color, lw);
@@ -1058,7 +1064,7 @@ export class Renderer {
     }
 
     // Pass 2.5: Capital wonder flanking sprites (structure + knowledge + labs)
-    if (!webglMode && showStructure) {
+    if (showStructure) {
       const capital = this.state.world.cities.find((c) => c.isCapital);
       if (capital) {
         const cp = this.tilePixelPos(capital.coord, this.state.world.tiles.get(tileKey(capital.coord)));
@@ -1095,7 +1101,7 @@ export class Renderer {
     }
 
     // Pass 2.6: Knowledge — bibliotheca connection indicators
-    if (!webglMode && showKnowledge) {
+    if (showKnowledge) {
       // Precompute knowledge city positions once to avoid O(n²) per-frame wonders scan
       const knowledgePts = this.state.world.cities
         .filter((c) => c.wonders?.some((w) => w.wonderType === 'bibliotheca'))
@@ -1132,7 +1138,7 @@ export class Renderer {
     }
 
     // Pass 2.7: Labs — active experiment indicators
-    if (!webglMode && showLabs) {
+    if (showLabs) {
       for (const city of this.state.world.cities) {
         const hasLab = city.wonders?.some((w) => w.wonderType === 'institutum');
         const hasActiveExp = this.state.world.buildings.some(
@@ -1161,7 +1167,7 @@ export class Renderer {
     }
 
     // Pass 2.8: Security — perimeter shield indicators
-    if (!webglMode && showSecurity) {
+    if (showSecurity) {
       for (const city of this.state.world.cities) {
         const hasSecurity = city.wonders !== undefined && city.wonders.length > 0;
         if (!hasSecurity) continue;
@@ -1191,15 +1197,15 @@ export class Renderer {
       ctx.setLineDash([]);
     }
 
-    // Buildings (structure layer) — canvas only; webgl uses 3D units mesh
-    if (!webglMode && showStructure) {
+    // Buildings (structure layer) — canvas markers; webgl uses 3D units mesh
+    if (showStructure) {
       for (const building of this.state.world.buildings) {
         this.unitR.drawBuilding(building);
       }
     }
 
     // Unit trails (ops layer; also suppressed in clean mode & low LOD)
-    if (!webglMode && showOps && !isClean && lod !== 'low') {
+    if (showOps && !isClean && lod !== 'low') {
       for (const unit of this.state.world.units) {
         this.unitR.drawUnitTrail(unit);
       }
@@ -1213,7 +1219,7 @@ export class Renderer {
       }
     }
 
-    // Units (base layer — always visible) + badges (ops for state; swarm pill always)
+    // Units (base layer — canvas in 2D modes; 3D capsules in webgl) + badges
     if (!webglMode) {
     for (const unit of this.state.world.units) {
       if (unit.ephemeral && !this._shouldDrawEphemeralOnMap(unit)) continue;
@@ -1226,6 +1232,15 @@ export class Renderer {
         this.unitR.drawUnitBadge(unit, this.animTime);
       }
     }
+    } else if (showOps && !isClean && lod !== 'low') {
+      for (const unit of this.state.world.units) {
+        if (unit.ephemeral && !this._shouldDrawEphemeralOnMap(unit)) continue;
+        this.unitR.drawUnitBadge(unit, this.animTime);
+        const childCount = this.state.getChildrenOfUnit(unit.id).filter((c) => c.ephemeral).length;
+        if (childCount > 0) {
+          this.unitR.drawSubagentCountBadge(unit, childCount, this.animTime);
+        }
+      }
     }
 
     // Selection glow (draw on top of selected focus for glow effect)
@@ -1364,7 +1379,7 @@ export class Renderer {
     }
 
     // Global Atmospheric Bloom / Lighting (Time of Day Cycle)
-    if (!webglMode) {
+    {
     const timeOfDay = (this.animTime * 0.035) % (Math.PI * 2);
     const sinTime = Math.sin(timeOfDay);
 

@@ -26,7 +26,12 @@ export function rebuildUnits(
   units: Unit[],
   getTile: (key: string) => Tile | undefined,
 ): void {
-  const signature = units
+  const visibleUnits = units.filter((unit) => {
+    const tile = getTile(tileKey(unit.coord));
+    return !tile || tile.revealed;
+  });
+
+  const signature = visibleUnits
     .map((u) => `${u.id}:${u.coord.q},${u.coord.r}:${u.state}`)
     .join('|');
   if (signature === lastSignature) return;
@@ -34,13 +39,13 @@ export function rebuildUnits(
 
   clearUnits();
 
-  if (units.length === 0) return;
+  if (visibleUnits.length === 0) return;
 
   const geom = new CapsuleGeometry(HEX_SIZE * 0.12, HEX_SIZE * 0.18, 4, 8);
   const mat = new MeshLambertMaterial({ vertexColors: true });
-  unitMesh = new InstancedMesh(geom, mat, units.length);
+  unitMesh = new InstancedMesh(geom, mat, visibleUnits.length);
 
-  units.forEach((unit, i) => {
+  visibleUnits.forEach((unit, i) => {
     const tile = getTile(tileKey(unit.coord));
     const elev = tile ? terrainElevation(tile.terrain) : 0;
     const pos = axialToWorld3D(unit.coord.q, unit.coord.r, elev);

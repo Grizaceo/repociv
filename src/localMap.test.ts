@@ -1,5 +1,6 @@
 import { describe, it, assert } from 'vitest';
 import { buildMockLocalWorld, buildLocalWorldFromPaths } from './localMap.ts';
+import { measureAisleWidth } from './officeLayout.ts';
 
 describe('localMap — buildMockLocalWorld', () => {
   it('returns a LocalWorld with width/height > 0', () => {
@@ -115,15 +116,21 @@ describe('localMap — Office Zone Classification', () => {
 });
 
 describe('localMap — Office Furnishing', () => {
-  it('places standing_desk in team_cluster rooms', () => {
-    // Use 1 file so room has free floor tiles after workbenches
-    const world = buildLocalWorldFromPaths('test-repo', ['src/main.ts']);
+  it('places workbench desks with desk_bundle decor in team_cluster', () => {
+    const paths = Array.from({ length: 8 }, (_, i) => `src/file${i}.ts`);
+    const world = buildLocalWorldFromPaths('test-repo', paths);
     const srcRoom = world.rooms.find((r) => r.folderName === 'src');
     assert.ok(srcRoom, 'src room should exist');
-    const standingDesks = world.grid
+
+    const deskWorkbenches = world.grid
       .flat()
-      .filter((t) => t.roomId === srcRoom!.id && t.type === 'standing_desk');
-    assert.ok(standingDesks.length > 0, 'team_cluster should have standing desks');
+      .filter(
+        (t) =>
+          t.roomId === srcRoom!.id &&
+          t.type === 'workbench' &&
+          t.decor === 'desk_bundle',
+      );
+    assert.ok(deskWorkbenches.length > 0, 'team_cluster should have desk-aligned workbenches');
   });
 
   it('places whiteboard in team_cluster rooms', () => {
@@ -142,7 +149,7 @@ describe('localMap — Office Furnishing', () => {
     for (const row of world.grid) {
       for (const tile of row) {
         if (
-          tile.type === 'standing_desk' ||
+          tile.type === 'workbench' ||
           tile.type === 'whiteboard' ||
           tile.type === 'planter' ||
           tile.type === 'meeting_room' ||
@@ -172,6 +179,7 @@ describe('localMap — Office Furnishing', () => {
 
     for (const tile of workbenchTiles) {
       assert.ok(tile.workbench, 'every workbench tile should have a workbench');
+      assert.equal(tile.decor, 'desk_bundle', 'workbench tiles should use desk_bundle decor');
     }
   });
 
@@ -185,5 +193,55 @@ describe('localMap — Office Furnishing', () => {
     const watercoolers = world.grid.flat().filter((t) => t.type === 'watercooler');
     assert.ok(sofas.length >= 1, 'break room should have sofas');
     assert.ok(watercoolers.length >= 1, 'break room should have watercoolers');
+  });
+});
+
+describe('localMap — cubicle layout', () => {
+  const SRC_FILES = Array.from({ length: 60 }, (_, i) => `src/module/file${i}.ts`);
+
+  it('team_cluster has central aisle at least 2 tiles wide', () => {
+    const world = buildLocalWorldFromPaths('cubicle-repo', SRC_FILES);
+    const srcRoom = world.rooms.find((r) => r.folderName === 'src');
+    assert.ok(srcRoom, 'src room should exist');
+    const aisleWidth = measureAisleWidth(world.grid, srcRoom!);
+    assert.ok(aisleWidth >= 2, `central aisle should be >= 2 tiles, got ${aisleWidth}`);
+    assert.ok(srcRoom!.layoutPlan, 'room should record layout plan metadata');
+  });
+
+  it('each workbench is adjacent to a chair tile', () => {
+    const world = buildLocalWorldFromPaths('cubicle-repo', SRC_FILES);
+    const srcRoom = world.rooms.find((r) => r.folderName === 'src');
+    assert.ok(srcRoom, 'src room should exist');
+
+    const workbenchTiles = world.grid
+      .flat()
+      .filter((t) => t.roomId === srcRoom!.id && t.type === 'workbench');
+
+    assert.ok(workbenchTiles.length > 0, 'should have workbenches in src room');
+
+    const dirs = [
+      [0, -1],
+      [0, 1],
+      [-1, 0],
+      [1, 0],
+    ];
+    for (const wb of workbenchTiles) {
+      const hasChairNeighbor = dirs.some(([dx, dy]) => {
+        const n = world.grid[wb.y + dy!]?.[wb.x + dx!];
+        return n?.type === 'chair';
+      });
+      assert.ok(hasChairNeighbor, `workbench at (${wb.x},${wb.y}) should be adjacent to a chair`);
+    }
+  });
+
+  it('places cubicle partitions between desk rows in team_cluster', () => {
+    const world = buildLocalWorldFromPaths('cubicle-repo', SRC_FILES);
+    const srcRoom = world.rooms.find((r) => r.folderName === 'src');
+    assert.ok(srcRoom, 'src room should exist');
+
+    const partitions = world.grid
+      .flat()
+      .filter((t) => t.roomId === srcRoom!.id && t.type === 'cubicle_partition');
+    assert.ok(partitions.length > 0, 'team_cluster should have cubicle partitions between rows');
   });
 });
