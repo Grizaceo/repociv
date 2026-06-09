@@ -35,7 +35,8 @@
  *     compatibility drift.
  */
 import { chromium } from '@playwright/test';
-import { mkdirSync, readFileSync, writeFileSync, existsSync, createHash } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -81,6 +82,17 @@ async function main() {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 720 },
     deviceScaleFactor: 1,
+  });
+  await context.addInitScript(() => {
+    let seed = 123456789;
+    const next = () => {
+      seed = (1664525 * seed + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    };
+    const fixedNow = 1_700_000_000_000;
+    Math.random = () => next();
+    Date.now = () => fixedNow;
+    performance.now = () => 0;
   });
   const page = await context.newPage();
 
