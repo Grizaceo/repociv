@@ -57,10 +57,10 @@ export function getTileDecorGroup(): Group {
 //  We position the cone CENTER so that base sits at tile surface:
 //    center_Y = tileY + ROCK_H/2        → base at tileY, tip at tileY + ROCK_H
 
-const ROCK_H   = HEX_SIZE * 0.55;   // rock cone height
-const ROCK_R   = HEX_SIZE * 0.20;   // rock base radius
-const SNOW_H   = HEX_SIZE * 0.22;   // snow cap height
-const SNOW_R   = HEX_SIZE * 0.085;  // snow cap base radius
+const ROCK_H   = HEX_SIZE * 0.82;   // taller so mountains read vertical from gameplay camera
+const ROCK_R   = HEX_SIZE * 0.16;   // slimmer base so peaks don't look like horizontal boulders
+const SNOW_H   = HEX_SIZE * 0.26;   // slightly taller cap to keep tip contrast visible
+const SNOW_R   = HEX_SIZE * 0.075;  // tighter cap base
 
 function buildMountains(tiles: Array<{ tile: Tile; variant: number }>): void {
   if (tiles.length === 0) return;
@@ -81,11 +81,8 @@ function buildMountains(tiles: Array<{ tile: Tile; variant: number }>): void {
     metalness: 0.0,
   });
 
-  // Tiles with a city: skip mountain decor so buildings aren't buried
-  const decorOnly = tiles.filter((t) => !t.tile.city);
-
   const PEAKS = 2;
-  const maxPeaks = decorOnly.length * PEAKS;
+  const maxPeaks = tiles.length * PEAKS;
   if (maxPeaks === 0) return;
 
   const rockMesh = new InstancedMesh(rockGeom, rockMat, maxPeaks);
@@ -98,24 +95,28 @@ function buildMountains(tiles: Array<{ tile: Tile; variant: number }>): void {
   const sv = new Vector3();
   const pv = new Vector3();
 
-  // Fixed offsets for two peaks: main (larger) and secondary (smaller, offset)
-  const offsets: Array<[number, number, number]> = [
-    [  0.00, 0,  0.00 ],
-    [ -0.16, 0,  0.12 ],
-  ];
-
-  for (const { tile, variant } of decorOnly) {
+  for (const { tile, variant } of tiles) {
     const elev = terrainElevation(tile.terrain);
     const base = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
     // Slight Y pad so decor sits above the tile's top face (+bevel)
     const yFloor = base.y + 2;
 
+    const offsets: Array<[number, number, number]> = tile.city
+      ? [
+          [ 0.26, 0, -0.20 ],
+          [-0.24, 0,  0.18 ],
+        ]
+      : [
+          [ 0.00, 0,  0.00 ],
+          [-0.16, 0,  0.12 ],
+        ];
+
     for (let p = 0; p < PEAKS; p++) {
       const [ox, , oz] = offsets[p]!;
-      // Primary peak bigger, secondary 70 %
-      const sc    = p === 0
-        ? 0.82 + (variant % 5) * 0.04   // 0.82–0.98
-        : 0.55 + (variant % 4) * 0.03;  // 0.55–0.64
+      // City mountain tiles keep the center readable by pushing slimmer peaks to the rim.
+      const sc    = tile.city
+        ? (p === 0 ? 0.66 + (variant % 4) * 0.03 : 0.54 + (variant % 3) * 0.03)
+        : (p === 0 ? 0.92 + (variant % 5) * 0.04 : 0.66 + (variant % 4) * 0.03);
       const rockH = ROCK_H * sc;
       const snowH = SNOW_H * sc;
       const tx = base.x + ox * HEX_SIZE;
@@ -227,16 +228,17 @@ function buildForests(tiles: Tile[]): void {
 function buildHills(tiles: Tile[]): void {
   if (tiles.length === 0) return;
 
-  const bumpGeom = new SphereGeometry(HEX_SIZE * 0.26, 12, 8);
-  const bumpMat  = new MeshLambertMaterial({ color: new Color(0x6a9050) });
+  const bumpGeom = new SphereGeometry(HEX_SIZE * 0.30, 12, 8);
+  const bumpMat  = new MeshLambertMaterial({ color: new Color(0x5e8842) });
 
-  const total    = tiles.length * 3;
+  const total    = tiles.length * 4;
   const bumpMesh = new InstancedMesh(bumpGeom, bumpMat, total);
 
   const offsets: Array<[number, number, number, number]> = [
-    [  0.00, 0.42,  0.00, 1.00 ],
-    [ -0.18, 0.35,  0.12, 0.88 ],
-    [  0.16, 0.35, -0.10, 0.82 ],
+    [  0.00, 0.52,  0.00, 1.00 ],
+    [ -0.22, 0.44,  0.14, 0.86 ],
+    [  0.20, 0.44, -0.12, 0.82 ],
+    [ -0.06, 0.38,  0.20, 0.74 ],
   ];
 
   let idx = 0;
@@ -245,8 +247,8 @@ function buildHills(tiles: Tile[]): void {
     const elev = terrainElevation(tile.terrain);
     const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
     for (const [ox, oy, oz, sc] of offsets) {
-      mat.makeScale(sc * 1.1, sc * 0.42, sc * 1.0);
-      mat.setPosition(pos.x + ox * HEX_SIZE, pos.y - 1 + oy * HEX_SIZE * 0.28, pos.z + oz * HEX_SIZE);
+      mat.makeScale(sc * 1.1, sc * 0.48, sc * 1.0);
+      mat.setPosition(pos.x + ox * HEX_SIZE, pos.y - 1 + oy * HEX_SIZE * 0.30, pos.z + oz * HEX_SIZE);
       bumpMesh.setMatrixAt(idx++, mat.clone());
     }
   }
@@ -260,19 +262,20 @@ function buildDesert(tiles: Tile[]): void {
   if (tiles.length === 0) return;
 
   const duneGeom = new CylinderGeometry(
-    HEX_SIZE * 0.06, HEX_SIZE * 0.18, HEX_SIZE * 0.55, 8, 1, false,
+    HEX_SIZE * 0.05, HEX_SIZE * 0.20, HEX_SIZE * 0.60, 8, 1, false,
   );
-  const duneMat  = new MeshLambertMaterial({ color: new Color(0xc09050) });
+  const duneMat  = new MeshLambertMaterial({ color: new Color(0xb88840) });
 
-  const total    = tiles.length * 3;
+  const total    = tiles.length * 4;
   const duneMesh = new InstancedMesh(duneGeom, duneMat, total);
 
   // Dune ridges are long cylinders rotated ~90° to lie flat, spread across tile
   const q = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), Math.PI / 2);
   const duneRots: Array<[number, number, number]> = [
-    [-0.10, 0, -0.06],
-    [ 0.06, 0,  0.10],
+    [-0.12, 0, -0.06],
+    [ 0.08, 0,  0.14],
     [-0.04, 0,  0.22],
+    [ 0.14, 0, -0.18],
   ];
 
   let idx = 0;
@@ -282,15 +285,15 @@ function buildDesert(tiles: Tile[]): void {
     const elev = terrainElevation(tile.terrain);
     const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
     const h    = hashCoord(tile.coord.q, tile.coord.r);
-    for (let d = 0; d < 3; d++) {
+    for (let d = 0; d < 4; d++) {
       const [ox, , oz] = duneRots[d]!;
-      const scale = 0.75 + (h + d * 7) % 5 * 0.06;
+      const scale = 0.78 + (h + d * 7) % 5 * 0.06;
       const rot   = new Quaternion().setFromAxisAngle(
         new Vector3(0, 1, 0), ((h + d * 30) % 60 - 30) * (Math.PI / 180),
       ).multiply(q);
-      scaleV.set(scale, scale * 0.35, scale);
+      scaleV.set(scale, scale * 0.38, scale);
       mat.compose(
-        new Vector3(pos.x + ox * HEX_SIZE, pos.y + 1.5, pos.z + oz * HEX_SIZE),
+        new Vector3(pos.x + ox * HEX_SIZE, pos.y + 1.8, pos.z + oz * HEX_SIZE),
         rot,
         scaleV,
       );
@@ -372,7 +375,7 @@ function buildSacred(tiles: Tile[]): void {
   const stoneMat  = new MeshStandardMaterial({
     color:    new Color(0x6b5880),
     emissive: new Color(0x3a2550),
-    emissiveIntensity: 0.35,
+    emissiveIntensity: 0.16,
     roughness: 0.88,
     metalness: 0.05,
   });
@@ -380,23 +383,23 @@ function buildSacred(tiles: Tile[]): void {
   // Altar cube at centre
   const altarGeom = new BoxGeometry(HEX_SIZE * 0.18, HEX_SIZE * 0.10, HEX_SIZE * 0.18);
   const altarMat  = new MeshStandardMaterial({
-    color:    new Color(0x8860b0),
-    emissive: new Color(0x5530a0),
-    emissiveIntensity: 0.60,
-    roughness: 0.55,
-    metalness: 0.20,
+    color:    new Color(0x76618e),
+    emissive: new Color(0x3f2a66),
+    emissiveIntensity: 0.22,
+    roughness: 0.72,
+    metalness: 0.08,
   });
 
   // Floating gem above altar
   const gemGeom = new BoxGeometry(HEX_SIZE * 0.08, HEX_SIZE * 0.08, HEX_SIZE * 0.08);
   const gemMat  = new MeshStandardMaterial({
-    color:    new Color(0xd4a0ff),
-    emissive: new Color(0xb060ff),
-    emissiveIntensity: 1.4,
-    roughness: 0.08,
-    metalness: 0.7,
+    color:    new Color(0xb992d9),
+    emissive: new Color(0x7b49a8),
+    emissiveIntensity: 0.45,
+    roughness: 0.18,
+    metalness: 0.35,
     transparent: true,
-    opacity: 0.90,
+    opacity: 0.72,
   });
 
   const STONES = 6;
@@ -543,7 +546,7 @@ export function rebuildTileDecor(
         break;
       case 'plains':
         if (h % 5 === 0) farms.push(tile);
-        else if (lod === 'high' && h % 3 === 0) grass.push(tile);
+        else if (h % 3 === 0) grass.push(tile);
         break;
       default:
         break;
@@ -556,10 +559,8 @@ export function rebuildTileDecor(
   buildDesert(deserts);
   buildIce(ices);
   buildSacred(sacreds);
-  if (lod === 'high') {
-    buildGrass(grass);
-    buildFarms(farms);
-  }
+  buildGrass(grass);
+  buildFarms(farms);
 }
 
 export function clearTileDecor(): void {

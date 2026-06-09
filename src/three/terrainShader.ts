@@ -22,15 +22,17 @@ export const TERRAIN_ATLAS_INDEX: Record<Terrain, number> = {
   sacred:   7,
 };
 
-/** Per-biome prism height scale (local Y multiplier in vertex shader). */
+/** Per-biome prism height scale (local Y multiplier in vertex shader).
+ *  At TILE_PRISM_HEIGHT=24, scale=1.0 makes hills (elev=2) prism bottom touch plains (elev=0) top.
+ *  Scales >1.0 add extra depth for drama; mountain needs ≥1.5 to bridge 3-step gap. */
 export const TERRAIN_HEIGHT_SCALE: Record<Terrain, number> = {
   plains:   1.0,
   forest:   1.0,
-  mountain: 1.35,
+  mountain: 1.58,
   desert:   1.0,
-  ocean:    0.75,
-  ice:      0.95,
-  hills:    1.1,
+  ocean:    0.70,
+  ice:      0.90,
+  hills:    1.12,
   sacred:   1.0,
 };
 
@@ -81,11 +83,13 @@ export function createTerrainMaterial(
 
     // ── Vertex ────────────────────────────────────────────────────────────────
     shader.vertexShader =
+      'uniform float uTime;\n' +
       'attribute float instanceTerrain;\n' +
       'attribute float instanceNeighborTerrain;\n' +
       'varying float vTerrainIndex;\n' +
       'varying float vNeighborTerrainIndex;\n' +
       'varying vec2  vLocalXZ;\n' +
+      'varying vec2  vWorldXZ;\n' +
       'varying vec2  vUv;\n' +
       'varying float vTopFace;\n' +
       shader.vertexShader.replace(
@@ -94,6 +98,7 @@ export function createTerrainMaterial(
         vTerrainIndex = instanceTerrain;
         vNeighborTerrainIndex = instanceNeighborTerrain;
         vLocalXZ      = vec2(position.x, position.z);
+        vWorldXZ      = instanceMatrix[3].xz + transformed.xz;
         vUv           = uv;
         // normal.y > 0.5 in local space → top face
         vTopFace      = step(0.5, normal.y);
@@ -102,12 +107,12 @@ export function createTerrainMaterial(
         float heightScale = 1.0;
         float tidx = floor(instanceTerrain + 0.5);
         if (tidx < 0.5) heightScale = 1.0;          // plains
-        else if (tidx < 1.5) heightScale = 1.0;      // forest
-        else if (tidx < 2.5) heightScale = 1.35;   // mountain
+        else if (tidx < 1.5) heightScale = 1.0;     // forest
+        else if (tidx < 2.5) heightScale = 1.58;   // mountain — 1.5+ needed to bridge 3 elevation steps
         else if (tidx < 3.5) heightScale = 1.0;     // desert
-        else if (tidx < 4.5) heightScale = 0.75;   // ocean
-        else if (tidx < 5.5) heightScale = 0.95;   // ice
-        else if (tidx < 6.5) heightScale = 1.1;    // hills
+        else if (tidx < 4.5) heightScale = 0.70;   // ocean
+        else if (tidx < 5.5) heightScale = 0.90;   // ice
+        else if (tidx < 6.5) heightScale = 1.12;    // hills — 1.0+ closes gap to plains, 1.12 adds drama
         else if (tidx < 7.5) heightScale = 1.0;    // sacred
 
         // Only scale the downward (negative Y) part of the prism
@@ -128,6 +133,7 @@ export function createTerrainMaterial(
       'varying float vTerrainIndex;\n' +
       'varying float vNeighborTerrainIndex;\n' +
       'varying vec2  vLocalXZ;\n' +
+      'varying vec2  vWorldXZ;\n' +
       'varying vec2  vUv;\n' +
       'varying float vTopFace;\n' +
       'uniform float uTime;\n' +
@@ -149,6 +155,12 @@ vec2 terrainAtlasUv(float idx, vec2 tileUv) {
   return vec2((col + tileUv.x) / uAtlasColumns,
               (row + tileUv.y) / uAtlasRows);
 }
+
+vec2 terrainMacroUv(float idx, vec2 tileUv, vec2 worldXZ) {
+  float scale = mix(3.2, 4.8, clamp(idx / 7.0, 0.0, 1.0));
+  vec2 worldUv = fract(worldXZ / (uHexRadius * scale) + vec2(idx * 0.137, idx * 0.173));
+  return mix(tileUv, worldUv, 0.78);
+}
 `;
 
     shader.fragmentShader = uniformDecl + atlasUvFn + shader.fragmentShader
@@ -160,36 +172,63 @@ vec2 terrainAtlasUv(float idx, vec2 tileUv) {
         float ntidx = floor(vNeighborTerrainIndex + 0.5);
         float radial = clamp(length(vLocalXZ) / uHexRadius, 0.0, 1.0);
         if (uUseAtlas > 0 && vTopFace > 0.5) {
-          vec2 auv = terrainAtlasUv(tidx, vUv);
+          vec2 macroUv = terrainMacroUv(tidx, vUv, vWorldXZ);
+          vec2 auv = terrainAtlasUv(tidx, macroUv);
           vec3 tex = texture2D(uTerrainAtlas, auv).rgb;
           // Lift very dark textures so no biome goes black under warm lights
-          tex = max(tex, vec3(0.06));
-          // Saturation boost: push away from grey
+          tex = max(tex, vec3(0.08));
+          // Mild saturation push only — enough to read biomes, not enough to look sticker-like
           float lum = dot(tex, vec3(0.299, 0.587, 0.114));
-          tex = mix(vec3(lum), tex, 1.30);
+          tex = mix(vec3(lum), tex, 1.12);
+          // Desert: compress local contrast and bias slightly toward a calmer sand tone.
+          if (tidx > 2.5 && tidx < 3.5) {
+            tex = mix(vec3(lum), tex, 0.92);
+            tex = mix(tex, vec3(0.73, 0.63, 0.40), 0.12);
+          }
+          // Sacred should feel special, not neon enough to dominate the whole map.
+          if (tidx > 6.5) {
+            tex = mix(vec3(dot(tex, vec3(0.299, 0.587, 0.114))), tex, 0.82);
+            tex *= 0.82;
+          }
           // Neighbour biome blend at hex edges
-          float edgeBlend = smoothstep(0.72, 0.98, radial);
+          float edgeBlend = smoothstep(0.58, 0.96, radial);
           if (ntidx >= 0.0 && abs(ntidx - tidx) > 0.5) {
-            vec2 nauv = terrainAtlasUv(ntidx, vUv);
+            vec2 nMacroUv = terrainMacroUv(ntidx, vUv, vWorldXZ);
+            vec2 nauv = terrainAtlasUv(ntidx, nMacroUv);
             vec3 nTex = texture2D(uTerrainAtlas, nauv).rgb;
-            nTex = max(nTex, vec3(0.06));
+            nTex = max(nTex, vec3(0.08));
             float nLum = dot(nTex, vec3(0.299, 0.587, 0.114));
-            nTex = mix(vec3(nLum), nTex, 1.30);
-            tex = mix(tex, nTex, edgeBlend * 0.45);
+            nTex = mix(vec3(nLum), nTex, 1.12);
+            if (ntidx > 2.5 && ntidx < 3.5) {
+              nTex = mix(vec3(nLum), nTex, 0.92);
+              nTex = mix(nTex, vec3(0.73, 0.63, 0.40), 0.12);
+            }
+            if (ntidx > 6.5) {
+              nTex = mix(vec3(dot(nTex, vec3(0.299, 0.587, 0.114))), nTex, 0.82);
+              nTex *= 0.82;
+            }
+            bool mountainForestPair =
+              ((tidx > 1.5 && tidx < 2.5) && (ntidx > 0.5 && ntidx < 1.5)) ||
+              ((tidx > 0.5 && tidx < 1.5) && (ntidx > 1.5 && ntidx < 2.5));
+            if (mountainForestPair) {
+              edgeBlend = min(1.0, edgeBlend * 1.30);
+            }
+            tex = mix(tex, nTex, edgeBlend * 0.62);
           }
           // Top-face brightening so atlas colours read through warm PBR lights
-          tex *= 1.18;
-          diffuseColor.rgb = mix(diffuseColor.rgb, tex, 0.93);
+          tex *= 1.08;
+          // Very light global tonal glue so biomes feel painted under the same sky.
+          tex = mix(tex, tex * vec3(0.97, 0.995, 0.96), 0.20);
+          diffuseColor.rgb = mix(diffuseColor.rgb, tex, 0.82);
         }
         // Radial vignette — very subtle
         if (vTopFace > 0.5) {
-          diffuseColor.rgb *= mix(1.04, 0.94, radial * radial);
+          diffuseColor.rgb *= mix(1.02, 0.98, radial * radial);
         }
-        // Side faces: clay-tinted dark
+        // Side faces: darker for depth, varied by biome height
         if (vTopFace < 0.5) {
-          diffuseColor.rgb *= 0.55;
-          diffuseColor.r *= 1.10;
-          diffuseColor.g *= 1.04;
+          float cliffDark = (tidx > 1.5 && tidx < 2.5) ? 0.58 : 0.68;
+          diffuseColor.rgb *= cliffDark;
         }
         // Ocean shimmer
         bool isOcean = (diffuseColor.b > diffuseColor.r * 1.05 &&
@@ -206,7 +245,8 @@ vec2 terrainAtlasUv(float idx, vec2 tileUv) {
         `#include <roughnessmap_fragment>
         if (uUseRoughAtlas > 0 && vTopFace > 0.5) {
           float _rtidx = floor(vTerrainIndex + 0.5);
-          vec2 rauv = terrainAtlasUv(_rtidx, vUv);
+          vec2 rmacroUv = terrainMacroUv(_rtidx, vUv, vWorldXZ);
+          vec2 rauv = terrainAtlasUv(_rtidx, rmacroUv);
           float rgh = texture2D(uRoughnessAtlas, rauv).r;
           roughnessFactor = rgh;
         }`,
@@ -218,15 +258,17 @@ vec2 terrainAtlasUv(float idx, vec2 tileUv) {
         if (uUseNormalAtlas > 0 && vTopFace > 0.5) {
           float _ntidx = floor(vTerrainIndex + 0.5);
           float _nntidx = floor(vNeighborTerrainIndex + 0.5);
-          vec2 nauv  = terrainAtlasUv(_ntidx, vUv);
+          vec2 nmacroUv = terrainMacroUv(_ntidx, vUv, vWorldXZ);
+          vec2 nauv  = terrainAtlasUv(_ntidx, nmacroUv);
           vec3 nTex  = texture2D(uNormalAtlas, nauv).rgb * 2.0 - 1.0;
           // Blend neighbor normal at edges
           float _radial = clamp(length(vLocalXZ) / uHexRadius, 0.0, 1.0);
-          float _edgeBlend = smoothstep(0.72, 0.98, _radial);
+          float _edgeBlend = smoothstep(0.58, 0.96, _radial);
           if (_nntidx >= 0.0 && abs(_nntidx - _ntidx) > 0.5) {
-            vec2 nnauv = terrainAtlasUv(_nntidx, vUv);
+            vec2 nnmacroUv = terrainMacroUv(_nntidx, vUv, vWorldXZ);
+            vec2 nnauv = terrainAtlasUv(_nntidx, nnmacroUv);
             vec3 nNeighbor = texture2D(uNormalAtlas, nnauv).rgb * 2.0 - 1.0;
-            nTex = mix(nTex, nNeighbor, _edgeBlend * 0.45);
+            nTex = mix(nTex, nNeighbor, _edgeBlend * 0.62);
           }
           // Blend atlas normal into surface normal (TBN for a flat-top hex is identity-ish)
           normal = normalize(normal + vec3(nTex.x * 0.55, nTex.z, nTex.y * 0.55));
@@ -234,7 +276,7 @@ vec2 terrainAtlasUv(float idx, vec2 tileUv) {
       );
   };
 
-  mat.customProgramCacheKey = () => 'repociv-terrain-v7';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v11';
   return mat;
 }
 

@@ -3,14 +3,16 @@ import { BufferGeometry, Float32BufferAttribute } from 'three';
 import { HEX_SIZE } from '../constants.ts';
 import { hexCornerAngle } from '../isoHex.ts';
 
-/** Side depth of terrain prism below the top face (world units). */
-export const TILE_PRISM_HEIGHT = 8;
+/** Side depth of terrain prism below the top face (world units).
+ *  Must be ≥ TILE_HEIGHT (12) × max_elevation_steps (3) = 36 to close all inter-tier gaps.
+ *  At 24 (= 2 elevation steps), hills/mountain prisms extend below plains level, eliminating float. */
+export const TILE_PRISM_HEIGHT = 24;
 
 /** Bevel depth: how far down the outer rim extends before the top face begins. */
-const BEVEL_DEPTH = 0.35;
+const BEVEL_DEPTH = 0.24;
 
 /** Bevel inset: top face radius as fraction of circumradius. */
-const BEVEL_INSET = 0.92;
+const BEVEL_INSET = 0.96;
 
 /**
  * Extruded flat-top hex prism with beveled top edges.

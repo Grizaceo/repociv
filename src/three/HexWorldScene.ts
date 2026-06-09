@@ -198,13 +198,13 @@ function rebuildTerritoryLines(
 
   if (segments.length === 0) return;
 
-  const pulse = 0.72 + 0.18 * Math.sin(animTime * 2.2);
+  const pulse = 0.90 + 0.06 * Math.sin(animTime * 2.2);
   const geom = new BufferGeometry();
   geom.setAttribute('position', new Float32BufferAttribute(segments, 3));
   const mat = new LineBasicMaterial({
-    color: new Color(0xd4b060).multiplyScalar(pulse),
+    color: new Color(0xb99654).multiplyScalar(pulse),
     transparent: true,
-    opacity: 0.70,
+    opacity: lod === 'high' ? 0.18 : 0.12,
     linewidth: 2,
   });
   territoryLines = new LineSegments(geom, mat);

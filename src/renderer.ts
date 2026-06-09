@@ -1113,7 +1113,9 @@ export class Renderer {
       for (const { p: cp } of knowledgePts) {
         // Glowing book icon
         ctx.save();
-        ctx.globalAlpha = 0.35 + 0.15 * Math.sin(this.animTime * 1.5 + cp.x);
+        ctx.globalAlpha = webglMode
+          ? 0.18 + 0.06 * Math.sin(this.animTime * 1.5 + cp.x)
+          : 0.35 + 0.15 * Math.sin(this.animTime * 1.5 + cp.x);
         ctx.fillStyle = '#4a90c8';
         ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'center';
@@ -1124,9 +1126,12 @@ export class Renderer {
           if (op === cp) continue;
           const dist = Math.hypot(op.x - cp.x, op.y - cp.y);
           if (dist > HEX_SIZE * 12) continue; // don't draw across the whole map
-          ctx.strokeStyle = `rgba(74, 144, 200, ${0.08 + 0.04 * Math.sin(this.animTime * 0.8 + cp.x + op.x)})`;
-          ctx.lineWidth = 0.5;
-          ctx.setLineDash([3, 6]);
+          const knowledgeAlpha = webglMode
+            ? 0.018 + 0.010 * Math.sin(this.animTime * 0.8 + cp.x + op.x)
+            : 0.08 + 0.04 * Math.sin(this.animTime * 0.8 + cp.x + op.x);
+          ctx.strokeStyle = `rgba(74, 144, 200, ${knowledgeAlpha})`;
+          ctx.lineWidth = webglMode ? 0.35 : 0.5;
+          ctx.setLineDash(webglMode ? [2, 10] : [3, 6]);
           ctx.beginPath();
           ctx.moveTo(cp.x, cp.y);
           ctx.lineTo(op.x, op.y);
@@ -1148,7 +1153,7 @@ export class Renderer {
         const cp = this.tilePixelPos(city.coord, this.state.world.tiles.get(tileKey(city.coord)));
         const pulse = 0.4 + 0.3 * Math.sin(this.animTime * 3.0);
         ctx.save();
-        ctx.globalAlpha = pulse;
+        ctx.globalAlpha = webglMode ? pulse * 0.45 : pulse;
         ctx.fillStyle = '#22C55E';
         ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'center';
@@ -1156,8 +1161,8 @@ export class Renderer {
         ctx.fillText('🔬', cp.x + HEX_SIZE * 0.8, cp.y + HEX_SIZE * 0.6);
         // Pulsing ring around lab cities with active experiments
         if (hasActiveExp) {
-          ctx.strokeStyle = `rgba(34, 197, 94, ${pulse * 0.5})`;
-          ctx.lineWidth = 2;
+          ctx.strokeStyle = `rgba(34, 197, 94, ${webglMode ? pulse * 0.20 : pulse * 0.5})`;
+          ctx.lineWidth = webglMode ? 1 : 2;
           ctx.beginPath();
           ctx.arc(cp.x, cp.y, HEX_SIZE * 0.85, 0, Math.PI * 2);
           ctx.stroke();
@@ -1174,7 +1179,9 @@ export class Renderer {
         const cp = this.tilePixelPos(city.coord, this.state.world.tiles.get(tileKey(city.coord)));
         ctx.save();
         ctx.fillStyle = '#d45b5b';
-        ctx.globalAlpha = 0.4 + 0.2 * Math.sin(this.animTime * 2.0 + cp.x);
+        ctx.globalAlpha = webglMode
+          ? 0.18 + 0.08 * Math.sin(this.animTime * 2.0 + cp.x)
+          : 0.4 + 0.2 * Math.sin(this.animTime * 2.0 + cp.x);
         ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -1182,17 +1189,17 @@ export class Renderer {
         // Perimeter hex outline
         this.drawHexHighlight(
           city.coord,
-          `rgba(212, 91, 91, ${0.12 + 0.08 * Math.sin(this.animTime * 1.2)})`,
-          1.5,
+          `rgba(212, 91, 91, ${webglMode ? 0.04 + 0.03 * Math.sin(this.animTime * 1.2) : 0.12 + 0.08 * Math.sin(this.animTime * 1.2)})`,
+          webglMode ? 1 : 1.5,
         );
         ctx.restore();
       }
     }
 
     if (this.showGrid) {
-      ctx.setLineDash([4, 8]);
+      ctx.setLineDash(webglMode ? [3, 12] : [4, 8]);
       for (const tile of this.state.world.tiles.values()) {
-        this.drawHexHighlight(tile.coord, 'rgba(255,255,255,0.08)', 1);
+        this.drawHexHighlight(tile.coord, webglMode ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.08)', webglMode ? 0.8 : 1);
       }
       ctx.setLineDash([]);
     }

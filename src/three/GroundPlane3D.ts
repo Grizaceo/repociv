@@ -42,13 +42,13 @@ export function rebuildGroundPlane(state: GameState): void {
   geom.rotateX(-Math.PI / 2); // face upward
 
   const mat = new MeshStandardMaterial({
-    color: new Color(0x8b7355), // warm light earth — Civ V-style base tone
-    roughness: 0.95,
+    color: new Color(0x6f6a54), // muted olive-umber so gaps feel like earth, not raw brown cardboard
+    roughness: 0.98,
     metalness: 0.0,
   });
 
   groundMesh = new Mesh(geom, mat);
-  groundMesh.position.set(cx, -TILE_PRISM_HEIGHT * 0.45, cz);
+  groundMesh.position.set(cx, -TILE_PRISM_HEIGHT * 0.22, cz);
   groundMesh.receiveShadow = true;
 }
 
