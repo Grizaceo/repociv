@@ -20,16 +20,13 @@ import {
   type SpatialDirective,
 } from './spatialDirectives.ts';
 import {
-  renderDragGhost,
-  renderCityDragGhost,
-  renderAreaSelect,
-  renderDropTarget,
   hideDirectivePreview,
   hideContextMenu,
 } from './ui/spatialPreview.ts';
 import { relocateCity, canRelocateCityTo } from './map.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { HEX_SIZE } from './constants.ts';
+import { renderScreenOverlays, type ScreenOverlayState } from './rendererScreen.ts';
 import {
   type WorldRenderMode,
   persistRenderMode,
@@ -857,6 +854,27 @@ export class Renderer {
     this.rafId = requestAnimationFrame(loop);
   }
 
+
+  private screenOverlayState(): ScreenOverlayState {
+    return {
+      ctx: this.ctx,
+      canvas: this.canvas,
+      cam: this.cam,
+      animTime: this.animTime,
+      draggedUnit: this.draggedUnit,
+      ghostScreenPos: this.ghostScreenPos,
+      draggedCity: this.draggedCity,
+      cityGhostScreenPos: this.cityGhostScreenPos,
+      relocateDragActive: this.relocateDragActive,
+      areaStart: this.areaStart,
+      areaEnd: this.areaEnd,
+      hoveredHex: this.hoveredHex,
+      tiles: this.state.world.tiles,
+      tilePixelPos: (coord, tile) => this.tilePixelPos(coord, tile),
+      canRelocateTo: (hex) => this.draggedCity ? canRelocateCityTo(this.state.world, this.draggedCity, hex) : false,
+    };
+  }
+
   private render() {
     const { ctx, canvas, cam } = this;
     const webglMode = this.worldRenderMode === 'webgl' && this.threeMap !== null;
@@ -1346,82 +1364,8 @@ export class Renderer {
 
     ctx.restore();
 
-    // ─── Fase 5: Spatial overlay (screen-space, outside camera transform) ──────
-    if (this.draggedUnit && this.ghostScreenPos) {
-      renderDragGhost(
-        ctx,
-        this.ghostScreenPos.x,
-        this.ghostScreenPos.y,
-        this.draggedUnit.color,
-        this.draggedUnit.id,
-      );
-      if (this.hoveredHex) {
-        const toTile = this.state.world.tiles.get(tileKey(this.hoveredHex));
-        const px = this.tilePixelPos(this.hoveredHex, toTile);
-        const sx = (px.x - cam.x) * cam.zoom + cam.cx;
-        const sy = (px.y - cam.y) * cam.zoom + cam.cy;
-        renderDropTarget(ctx, sx, sy, HEX_SIZE * cam.zoom, !!toTile?.city);
-      }
-    }
-    if (this.draggedCity && this.cityGhostScreenPos && this.relocateDragActive) {
-      renderCityDragGhost(
-        ctx,
-        this.cityGhostScreenPos.x,
-        this.cityGhostScreenPos.y,
-        this.draggedCity.name,
-      );
-      if (this.hoveredHex) {
-        const toTile = this.state.world.tiles.get(tileKey(this.hoveredHex));
-        const ok = canRelocateCityTo(this.state.world, this.draggedCity, this.hoveredHex);
-        const px = this.tilePixelPos(this.hoveredHex, toTile);
-        const sx = (px.x - cam.x) * cam.zoom + cam.cx;
-        const sy = (px.y - cam.y) * cam.zoom + cam.cy;
-        renderDropTarget(ctx, sx, sy, HEX_SIZE * cam.zoom, ok);
-      }
-    }
-    if (this.areaStart && this.areaEnd) {
-      renderAreaSelect(ctx, this.areaStart.x, this.areaStart.y, this.areaEnd.x, this.areaEnd.y);
-    }
-
-    // Global Atmospheric Bloom / Lighting (Time of Day Cycle)
-    {
-    const timeOfDay = (this.animTime * 0.035) % (Math.PI * 2);
-    const sinTime = Math.sin(timeOfDay);
-
-    let warmColor: string;
-    let vignetteColor: string;
-
-    if (sinTime > 0.5) {
-      // Mediodía brillante (claro y neutro)
-      warmColor = 'rgba(255, 255, 255, 0.015)';
-      vignetteColor = 'rgba(0, 0, 0, 0.12)';
-    } else if (sinTime > 0) {
-      // Tarde dorada (naranja cálido imperial)
-      warmColor = 'rgba(240, 150, 50, 0.04)';
-      vignetteColor = 'rgba(15, 10, 5, 0.22)';
-    } else if (sinTime > -0.5) {
-      // Amanecer/Dusk (púrpura y lavanda)
-      warmColor = 'rgba(180, 100, 240, 0.03)';
-      vignetteColor = 'rgba(8, 4, 18, 0.26)';
-    } else {
-      // Noche de neón (azul profundo oscurecido)
-      warmColor = 'rgba(40, 60, 180, 0.015)';
-      vignetteColor = 'rgba(1, 1, 6, 0.45)';
-    }
-
-    const grad = ctx.createRadialGradient(
-      canvas.width / 2,
-      canvas.height / 2,
-      0,
-      canvas.width / 2,
-      canvas.height / 2,
-      canvas.width,
-    );
-    grad.addColorStop(0, warmColor);
-    grad.addColorStop(1, vignetteColor);
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
+    // ─── Screen-space overlays (extracted to rendererScreen.ts) ────────────
+    renderScreenOverlays(this.screenOverlayState());
   }
 
   // ─── Public actions ───────────────────────────────────────────────────────
