@@ -95,11 +95,16 @@ export class ThreeMapRenderer {
     this.syncCamera(cam);
 
     // The world signature feeds the dirty-flag: terrain/ground/territory/
-    // cities/units/labels are rebuilt only when one of these counts or
-    // identifiers changes. Per-frame animTime-driven updates (foam,
-    // shoreline, sun arc, shader time) still run on every frame because
-    // their input is animTime, not world state.
-    const tileSignature = computeWorldSignature(state);
+    // cities/units/labels are rebuilt only when one of these inputs
+    // changes. Render options participate too: the gated rebuilds take
+    // lod/fog/layer toggles as arguments, so a toggle or zoom-driven LOD
+    // change must mark the scene dirty even when world state is stable.
+    // Per-frame animTime-driven updates (foam, shoreline, sun arc,
+    // shader time) still run on every frame because their input is
+    // animTime, not world state.
+    const tileSignature =
+      computeWorldSignature(state) +
+      `@${opts.lod}:${opts.fogEnabled ? 1 : 0}:${opts.showStructure ? 1 : 0}:${opts.showOps ? 1 : 0}:${opts.showLabels ? 1 : 0}`;
     const stateDirty = tileSignature !== this.lastTileSignature;
     this.lastTileSignature = tileSignature;
 
@@ -181,28 +186,38 @@ export class ThreeMapRenderer {
 }
 
 /**
- * Hash of the world state inputs that drive the per-frame "state-driven"
- * rebuilds in HexWorldScene. Changing any of these forces a rebuild of
- * the terrain mesh, ground plane, territory lines, city clusters, units,
+ * Hash of the world state inputs that drive the "state-driven" rebuilds
+ * in HexWorldScene. Changing any of these forces a rebuild of the
+ * terrain mesh, ground plane, territory lines, city clusters, units,
  * and labels. Per-frame animTime-driven updates (foam, shoreline, sun
  * arc, shader time) are NOT gated by this — they run every frame.
  *
- * The signature is intentionally cheap: a string built from counts and
- * a join of stable identifiers. It does not include animTime, fogEnabled,
- * layer toggles, or LOD — those are layered on top by the consumer (see
- * the call sites in ThreeMapRenderer.render). We can tighten this later
- * if we discover false-positives.
+ * It must cover every world input the gated rebuilds read, not just
+ * entity counts: unit coords/state (units move without changing id),
+ * fog/revealed flips (terrain mesh tints by fog), city names and
+ * territory growth (labels and territory lines). Misses here freeze
+ * the corresponding visual until an unrelated state change — see the
+ * Phase-2 audit. It does not include animTime or render options;
+ * those are appended at the call site in ThreeMapRenderer.render.
  */
 export function computeWorldSignature(state: GameState): string {
   const tiles = state.world.tiles;
   const cities = state.world.cities;
   const units = state.world.units;
+  let revealed = 0;
+  let fogged = 0;
+  for (const t of tiles.values()) {
+    if (t.revealed) revealed++;
+    if (t.inFog) fogged++;
+  }
   return [
     tiles.size,
+    revealed,
+    fogged,
     cities.length,
     units.length,
-    cities.map((c) => c.id).join('|'),
-    units.map((u) => u.id).join('|'),
+    cities.map((c) => `${c.id}:${c.name}:${c.territory.length}`).join('|'),
+    units.map((u) => `${u.id}:${u.coord.q},${u.coord.r}:${u.state}`).join('|'),
   ].join('#');
 }
 

@@ -100,13 +100,35 @@ describe('computeWorldSignature', () => {
     expect(computeWorldSignature(a)).not.toBe(computeWorldSignature(b));
   });
 
-  it('signature has the expected layout: counts then id lists', () => {
-    const s = makeState({
-      cities: [mkCity('c1', 0, 0), mkCity('c2', 1, 1)],
-      units: [mkUnit('u1', 2, 2)],
-    });
-    const sig = computeWorldSignature(s);
-    // 0 tiles, 2 cities, 1 unit, joined id lists separated by '#'.
-    expect(sig).toMatch(/^0#2#1#c1\|c2#u1$/);
+  // Units move (and change state) without changing id — the signature
+  // must catch that, or unit meshes freeze mid-path in WebGL mode.
+  it('changes when a unit moves to another hex', () => {
+    const a = makeState({ units: [mkUnit('u1', 0, 0)] });
+    const b = makeState({ units: [{ ...mkUnit('u1', 0, 0), coord: { q: 1, r: 0 } }] });
+    expect(computeWorldSignature(a)).not.toBe(computeWorldSignature(b));
+  });
+
+  it('changes when a unit changes state (idle → working)', () => {
+    const a = makeState({ units: [mkUnit('u1', 0, 0)] });
+    const b = makeState({ units: [{ ...mkUnit('u1', 0, 0), state: 'working' as const }] });
+    expect(computeWorldSignature(a)).not.toBe(computeWorldSignature(b));
+  });
+
+  // Fog reveals flip tile.revealed/inFog without changing tile count —
+  // the terrain mesh tints by fog, so the signature must catch it.
+  it('changes when a tile is revealed', () => {
+    const hidden = { ...mkTile(0, 0), revealed: false };
+    const shown = { ...mkTile(0, 0), revealed: true };
+    const a = makeState({ tiles: [[{ q: 0, r: 0 }, hidden]] });
+    const b = makeState({ tiles: [[{ q: 0, r: 0 }, shown]] });
+    expect(computeWorldSignature(a)).not.toBe(computeWorldSignature(b));
+  });
+
+  it('changes when city territory grows', () => {
+    const small = mkCity('c1', 0, 0);
+    const grown = { ...mkCity('c1', 0, 0), territory: [{ q: 1, r: 0 }] };
+    const a = makeState({ cities: [small] });
+    const b = makeState({ cities: [grown] });
+    expect(computeWorldSignature(a)).not.toBe(computeWorldSignature(b));
   });
 });
