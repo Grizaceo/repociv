@@ -2,6 +2,7 @@
 import type { LocalWorld, LocalTile, LocalRoom, LocalUnit, ZoneType } from './types.ts';
 import { loadOfficeAtlas } from './officeAtlas.ts';
 import { darkenHex } from './isoOfficeRenderer.ts';
+import { EXT_COLOR, adjustBrightness as _adjustBrightness, drawRoomLabel as drawRoomLabelModule, drawSofaTile as drawSofaTileModule, drawWatercoolerTile as drawWatercoolerTileModule, drawWindowTile as drawWindowTileModule } from './local2dAssets.ts';
 import {
   createParticlePool,
   spawnBreath as spawnBreathParticle,
@@ -11,6 +12,13 @@ import {
   type LocalParticle,
 } from './localParticles.ts';
 import { buildIsoStaticLayer, buildStaticLayer } from './localStaticLayers.ts';
+import {
+  drawPowerOverlay as drawPowerOverlayModule,
+  drawTemperatureOverlay as drawTemperatureOverlayModule,
+  drawWindowLightRays as drawWindowLightRaysModule,
+  drawZonePaintPreview as drawZonePaintPreviewModule,
+  drawZones as drawZonesModule,
+} from './localOverlays.ts';
 import {
   ISO_TILE_H,
   ISO_TILE_W,
@@ -804,7 +812,7 @@ export class LocalRenderer {
 
     // ─── Cozy window light rays (sunlight streaming onto floors) ────────
     const view = this.visibleTileRect();
-    this.drawWindowLightRays(world, view);
+    drawWindowLightRaysModule(this.overlayState(), world, view);
 
     // Draw dynamic tiles on top of the static canvas (Phase 3c/3d)
     for (let y = view.y0; y <= view.y1; y++) {
@@ -821,7 +829,7 @@ export class LocalRenderer {
     // Draw room labels (suppressed in low LOD)
     if (!lodLow) {
       for (const room of world.rooms) {
-        this.drawRoomLabel(room);
+        drawRoomLabelModule(this.assetState(), room);
       }
     }
 
@@ -837,22 +845,22 @@ export class LocalRenderer {
 
     // Draw Power Overlay (if toggled on)
     if (this._powerOverlay) {
-      this.drawPowerOverlay(world, view);
+      drawPowerOverlayModule(this.overlayState(), world, view);
     }
 
     // Draw Temperature Overlay (if toggled on)
     if (this._temperatureOverlay) {
-      this.drawTemperatureOverlay(world, view);
+      drawTemperatureOverlayModule(this.overlayState(), world, view);
     }
 
     // Draw Zones (from world.zones)
     if (world.zones && world.zones.length > 0) {
-      this.drawZones(world, view);
+      drawZonesModule(this.overlayState(), world, view);
     }
 
     // Draw Zone Paint Preview (while dragging)
     if (this._zonePaintMode && this._zonePaintStart && this._zonePaintCurrent) {
-      this.drawZonePaintPreview(view);
+      drawZonePaintPreviewModule(this.overlayState(), view);
     }
 
     // Draw hovered highlight
@@ -1392,11 +1400,11 @@ export class LocalRenderer {
       } else if (tile.type === 'stairs') {
         this.drawStairsTile(px, py, s);
       } else if (tile.type === 'window') {
-        this.drawWindowTile(px, py, s);
+        drawWindowTileModule(this.assetState(), px, py, s);
       } else if (tile.type === 'sofa') {
-        this.drawSofaTile(px, py, s);
+        drawSofaTileModule(this.assetState(), px, py, s);
       } else if (tile.type === 'watercooler') {
-        this.drawWatercoolerTile(px, py, s);
+        drawWatercoolerTileModule(this.assetState(), px, py, s);
       }
     }
   }
@@ -2194,230 +2202,6 @@ export class LocalRenderer {
     ctx.stroke();
   }
 
-  // ─── Window light rays (sunlight streaming onto adjacent floors) ─────
-  private drawWindowLightRays(
-    world: LocalWorld,
-    view: { x0: number; y0: number; x1: number; y1: number },
-  ) {
-    const { ctx } = this;
-    const S = TILE_SIZE;
-
-    for (let y = view.y0; y <= view.y1; y++) {
-      for (let x = view.x0; x <= view.x1; x++) {
-        const tile = world.grid[y]?.[x];
-        if (!tile || tile.type !== 'window') continue;
-
-        // Find adjacent floor/path tiles and paint soft light rays
-        const dirs = [
-          { dx: 0, dy: 1 }, // south (into room)
-          { dx: 0, dy: -1 }, // north
-          { dx: 1, dy: 0 }, // east
-          { dx: -1, dy: 0 }, // west
-        ];
-        for (const { dx, dy } of dirs) {
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx < view.x0 || nx > view.x1 || ny < view.y0 || ny > view.y1) continue;
-          const neighbor = world.grid[ny]?.[nx];
-          if (!neighbor) continue;
-          if (neighbor.type === 'floor' || neighbor.type === 'path') {
-            // Soft warm sunlight ray on floor
-            const npx = nx * S;
-            const npy = ny * S;
-            const rayGrad = ctx.createLinearGradient(
-              npx + S / 2 - dx * S * 0.3,
-              npy + S / 2 - dy * S * 0.3,
-              npx + S / 2 + dx * S * 0.5,
-              npy + S / 2 + dy * S * 0.5,
-            );
-            rayGrad.addColorStop(0, 'rgba(255, 248, 240, 0.25)');
-            rayGrad.addColorStop(1, 'rgba(255, 248, 240, 0)');
-            ctx.fillStyle = rayGrad;
-            ctx.fillRect(npx, npy, S, S);
-          }
-        }
-      }
-    }
-  }
-
-  private drawWindowTile(px: number, py: number, s: number) {
-    const { ctx } = this;
-    // ─── Cozy large window with curtains ────────────────────────────────
-
-    // White window frame with rounded feel
-    ctx.fillStyle = '#D0D0D0';
-    ctx.fillRect(px + 1, py + 1, s - 2, s - 2);
-    ctx.strokeStyle = '#F5E6D3';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(px + 1, py + 1, s - 2, s - 2);
-
-    // Sky view through window (soft blue gradient)
-    const skyGrad = ctx.createLinearGradient(px, py, px, py + s);
-    skyGrad.addColorStop(0, 'rgba(186, 230, 253, 0.6)');
-    skyGrad.addColorStop(0.5, 'rgba(224, 242, 254, 0.4)');
-    skyGrad.addColorStop(1, 'rgba(255, 250, 245, 0.3)');
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(px + 4, py + 4, s - 8, s - 8);
-
-    // Soft white window cross bars
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(px + s / 2, py + 4);
-    ctx.lineTo(px + s / 2, py + s - 4);
-    ctx.moveTo(px + 4, py + s / 2);
-    ctx.lineTo(px + s - 4, py + s / 2);
-    ctx.stroke();
-
-    // Pink curtains on sides
-    ctx.fillStyle = 'rgba(248, 187, 208, 0.7)';
-    ctx.fillRect(px + 2, py + 2, 5, s - 4); // left curtain
-    ctx.fillRect(px + s - 7, py + 2, 5, s - 4); // right curtain
-
-    // Curtain tie-backs (soft gold)
-    ctx.fillStyle = 'rgba(212, 165, 116, 0.6)';
-    ctx.fillRect(px + 5, py + s / 2 - 2, 3, 4);
-    ctx.fillRect(px + s - 8, py + s / 2 - 2, 3, 4);
-
-    // Sunlight streaming diagonal reflection
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.beginPath();
-    ctx.moveTo(px + 4, py + 4);
-    ctx.lineTo(px + s / 2 - 3, py + 4);
-    ctx.lineTo(px + 4, py + s / 2 - 3);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  private drawSofaTile(px: number, py: number, s: number) {
-    const { ctx } = this;
-    // ─── Cozy plush sofa — soft pastel fabric ───────────────────────────
-    ctx.fillStyle = '#B08090';
-    ctx.beginPath();
-    ctx.roundRect(px + 2, py + 6, s - 4, s - 8, 4);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(248, 187, 208, 0.5)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-    // Seat cushion
-    ctx.fillStyle = '#FCE4EC';
-    ctx.beginPath();
-    ctx.roundRect(px + 4, py + 10, s - 8, s - 14, 2);
-    ctx.fill();
-    // Backrest
-    ctx.fillStyle = '#B08090';
-    ctx.beginPath();
-    ctx.roundRect(px + 3, py + 6, s - 6, 5, 2);
-    ctx.fill();
-    // Cushion highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.fillRect(px + 5, py + 8, s - 10, 1.5);
-    // Soft rounded armrests
-    ctx.fillStyle = '#A07080';
-    ctx.beginPath();
-    ctx.roundRect(px + 2, py + 8, 3, 8, 1.5);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.roundRect(px + s - 5, py + 8, 3, 8, 1.5);
-    ctx.fill();
-  }
-
-  private drawWatercoolerTile(px: number, py: number, s: number) {
-    const { ctx } = this;
-    // ─── Cute water cooler — pastel blue ────────────────────────────────
-    // Base
-    ctx.fillStyle = '#E3F2FD';
-    ctx.beginPath();
-    ctx.roundRect(px + s / 2 - 4, py + s - 8, 8, 6, 2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(180, 200, 220, 0.4)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-    // Water bottle (cute rounded)
-    ctx.fillStyle = 'rgba(186, 230, 253, 0.4)';
-    ctx.beginPath();
-    ctx.ellipse(px + s / 2, py + s / 2 + 2, 5, 8, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(186, 230, 253, 0.6)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-    // Water level
-    ctx.fillStyle = 'rgba(186, 230, 253, 0.6)';
-    ctx.beginPath();
-    ctx.ellipse(px + s / 2, py + s / 2 + 4, 4, 5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Small cup stack
-    ctx.fillStyle = '#D0D0D0';
-    ctx.beginPath();
-    ctx.roundRect(px + s - 7, py + s - 6, 3, 4, 1);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(200, 200, 200, 0.3)';
-    ctx.stroke();
-    // Soft glow
-    const now = performance.now();
-    ctx.fillStyle = `rgba(186, 230, 253, ${0.15 + 0.08 * Math.sin(now / 400)})`;
-    ctx.beginPath();
-    ctx.arc(px + s / 2, py + s / 2 + 2, 10, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  private drawRoomLabel(room: LocalRoom) {
-    const { ctx } = this;
-    const px = room.x * TILE_SIZE;
-    const py = room.y * TILE_SIZE;
-    const pw = room.width * TILE_SIZE;
-
-    // Office zone label takes precedence; fallback to folder name
-    const primary = (room.zoneLabel ?? room.folderName).toUpperCase();
-    const secondary = room.zoneLabel ? room.folderName.toUpperCase() : '';
-    ctx.save();
-
-    // ─── Cozy pastel zone-colored plaque tab ────────────────────────────
-    const zoneColors: Record<string, string> = {
-      team_cluster: '#F5D0C5',
-      meeting: '#B09060',
-      focus: '#E8F5D6',
-      break: '#D0C0A0',
-      infra: '#E2E8F0',
-      reception: '#F5F0E8',
-      biophilic: '#D4E8D0',
-    };
-    const plaqueColor = zoneColors[room.zoneType ?? 'team_cluster'] ?? '#F5D0C5';
-
-    ctx.fillStyle = plaqueColor;
-    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-    ctx.lineWidth = 0.5;
-
-    const plaqueW = Math.min(pw - 4, Math.max(80, primary.length * 7 + 12));
-    ctx.beginPath();
-    ctx.moveTo(px + 4, py + 2);
-    ctx.lineTo(px + plaqueW, py + 2);
-    ctx.lineTo(px + plaqueW + 2, py + 4);
-    ctx.lineTo(px + plaqueW + 2, py + 14);
-    ctx.lineTo(px + plaqueW, py + 16);
-    ctx.lineTo(px + 4, py + 16);
-    ctx.lineTo(px + 2, py + 14);
-    ctx.lineTo(px + 2, py + 4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.font = `bold 9px ${this.tokens.fontMono}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = '#5C4033'; // warm brown text for all pastel plaques
-    ctx.fillText(primary.slice(0, 12), px + 6, py + 4);
-
-    // Secondary label (folder name) if zone label is present
-    if (secondary) {
-      ctx.font = `7px ${this.tokens.fontMono}`;
-      ctx.fillStyle = 'rgba(92, 64, 51, 0.6)';
-      ctx.fillText(secondary.slice(0, 14), px + 6, py + 18);
-    }
-
-    ctx.restore();
-  }
-
   private drawLocalUnit(unit: LocalUnit) {
     const { ctx } = this;
     let ux: number, uy: number;
@@ -2615,373 +2399,28 @@ export class LocalRenderer {
     updateAndDrawLocalParticles(this.ctx, this.particles, dt, this.tokens.fontMono || "'JetBrains Mono', monospace");
   }
 
-  private drawPowerOverlay(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
-    const { ctx } = this;
-    const pg = world.powerGrid;
-    if (!pg) return;
-
-    ctx.save();
-    ctx.globalAlpha = 0.6;
-
-    // Draw conduit connections more prominently
-    for (const key of pg.conduits) {
-      const parts = key.split(',');
-      if (parts.length < 2) continue;
-      const sx = Number(parts[0]);
-      const sy = Number(parts[1]);
-      if (!Number.isFinite(sx) || !Number.isFinite(sy)) continue;
-      if (sx < view.x0 || sx > view.x1 || sy < view.y0 || sy > view.y1) continue;
-
-      const px = sx * TILE_SIZE;
-      const py = sy * TILE_SIZE;
-      const s = TILE_SIZE;
-
-      // Bright amber conduit lines
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.8)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(px + s / 2, py);
-      ctx.lineTo(px + s / 2, py + s);
-      ctx.moveTo(px, py + s / 2);
-      ctx.lineTo(px + s, py + s / 2);
-      ctx.stroke();
-
-      // Node highlight at intersections
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.9)';
-      ctx.beginPath();
-      ctx.arc(px + s / 2, py + s / 2, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Draw power sources with enhanced glow
-    for (const src of pg.sources) {
-      if (src.tileX < view.x0 || src.tileX > view.x1 || src.tileY < view.y0 || src.tileY > view.y1) continue;
-
-      const px = src.tileX * TILE_SIZE;
-      const py = src.tileY * TILE_SIZE;
-      const s = TILE_SIZE;
-      const centerX = px + s / 2;
-      const centerY = py + s / 2;
-
-      // Pulsing outer glow
-      const now = performance.now();
-      const pulse = 0.5 + 0.5 * Math.sin(now / 500);
-      const glowR = s * 0.6 + 10 * pulse;
-
-      const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, glowR);
-      grad.addColorStop(0, `rgba(245, 158, 11, ${0.4 * pulse})`);
-      grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(px - glowR, py - glowR, s + 2 * glowR, s + 2 * glowR);
-
-      // Watts label
-      ctx.fillStyle = this.tokens.amber500 || '#F59E0B';
-      ctx.font = `bold 9px ${this.tokens.fontMono}`;
-      ctx.textAlign = 'center';
-      ctx.fillText(`${src.outputWatts}W`, centerX, py - 4);
-    }
-
-    // Draw power consumers with load indicator
-    for (const cons of pg.consumers) {
-      if (cons.tileX < view.x0 || cons.tileX > view.x1 || cons.tileY < view.y0 || cons.tileY > view.y1) continue;
-
-      const px = cons.tileX * TILE_SIZE;
-      const py = cons.tileY * TILE_SIZE;
-      const s = TILE_SIZE;
-
-      // Small load bar
-      const barW = s * 0.8;
-      const barH = 3;
-      const bx = px + (s - barW) / 2;
-      const by = py + s + 2;
-
-      // Background
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(bx, by, barW, barH);
-
-      // Load (based on watts, max 200W)
-      const loadPct = Math.min(1, cons.watts / 200);
-      ctx.fillStyle = loadPct > 0.8 ? '#EF4444' : loadPct > 0.5 ? '#F59E0B' : '#22C55E';
-      ctx.fillRect(bx, by, barW * loadPct, barH);
-    }
-
-    // Global power stats in corner
-    if (pg.generatedWatts > 0 || pg.consumedWatts > 0) {
-      const statsX = view.x0 * TILE_SIZE + 10;
-      const statsY = view.y0 * TILE_SIZE + 20;
-      ctx.fillStyle = 'rgba(13, 13, 20, 0.9)';
-      ctx.fillRect(statsX - 5, statsY - 5, 160, 50);
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
-      ctx.strokeRect(statsX - 5, statsY - 5, 160, 50);
-
-      ctx.fillStyle = '#22C55E';
-      ctx.font = `11px ${this.tokens.fontMono}`;
-      ctx.textAlign = 'left';
-      ctx.fillText(`⚡ Gen: ${pg.generatedWatts}W`, statsX, statsY + 12);
-      ctx.fillStyle = '#EF4444';
-      ctx.fillText(`🔌 Con: ${pg.consumedWatts}W`, statsX, statsY + 28);
-      ctx.fillStyle = pg.storedWatts > 0 ? '#3B82F6' : '#6B7280';
-      ctx.fillText(`🔋 Bat: ${pg.storedWatts}W`, statsX, statsY + 44);
-    }
-
-    ctx.restore();
+  private overlayState() {
+    return {
+      ctx: this.ctx,
+      tokens: this.tokens,
+      tileSize: TILE_SIZE,
+      zonePaintMode: this._zonePaintMode,
+      zonePaintStart: this._zonePaintStart,
+      zonePaintCurrent: this._zonePaintCurrent,
+      spawnBreath: (x: number, y: number) => this.spawnBreath(x, y),
+    };
   }
 
-  private drawTemperatureOverlay(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
-    const { ctx } = this;
-    const climates = world.roomClimates;
-    if (!climates) return;
-
-    ctx.save();
-    ctx.globalAlpha = 0.5;
-
-    // Color scale: blue (cold) -> white (comfort) -> red (hot)
-    function tempToColor(temp: number): string {
-      const comfortMin = 16, comfortMax = 26;
-      if (temp <= comfortMin) {
-        // Cold: blue to cyan
-        const t = Math.max(0, (temp + 20) / (comfortMin + 20)); // -20 to comfortMin
-        const r = Math.round(0 + t * 0);
-        const g = Math.round(100 + t * 155);
-        const b = 255;
-        return `rgb(${r},${g},${b})`;
-      } else if (temp >= comfortMax) {
-        // Hot: yellow to red
-        const t = Math.min(1, (temp - comfortMax) / (50 - comfortMax)); // comfortMax to 50
-        const r = 255;
-        const g = Math.round(255 * (1 - t));
-        const b = 0;
-        return `rgb(${r},${g},${b})`;
-      } else {
-        // Comfort zone: white to light green
-        const t = (temp - comfortMin) / (comfortMax - comfortMin);
-        const r = Math.round(200 * (1 - t));
-        const g = 255;
-        const b = Math.round(200 * (1 - t));
-        return `rgb(${r},${g},${b})`;
-      }
-    }
-
-    // Draw room temperature overlay
-    for (const [roomId, climate] of climates) {
-      const room = world.rooms.find(r => r.id === roomId);
-      if (!room) continue;
-
-      const roomCenterX = (room.x + room.width / 2) * TILE_SIZE;
-      const roomCenterY = (room.y + room.height / 2) * TILE_SIZE;
-
-      // Skip if room center not in view
-      if (roomCenterX < view.x0 * TILE_SIZE || roomCenterX > view.x1 * TILE_SIZE ||
-          roomCenterY < view.y0 * TILE_SIZE || roomCenterY > view.y1 * TILE_SIZE) continue;
-
-      const color = tempToColor(climate.temperature);
-      
-      // Temperature indicator at room center
-      ctx.fillStyle = color;
-      ctx.globalAlpha = 0.3;
-      ctx.beginPath();
-      ctx.arc(roomCenterX, roomCenterY, Math.max(room.width, room.height) * TILE_SIZE * 0.35, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Temperature label
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = color;
-      ctx.font = `bold 12px ${this.tokens.fontMono}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`${climate.temperature.toFixed(1)}°C`, roomCenterX, roomCenterY);
-      
-      // Target temperature indicator
-      if (Math.abs(climate.temperature - climate.targetTemperature) > 0.5) {
-        ctx.fillStyle = '#FBBF24'; // amber
-        ctx.font = `9px ${this.tokens.fontMono}`;
-        const arrow = climate.temperature < climate.targetTemperature ? '▲' : '▼';
-        ctx.fillText(`${arrow} ${climate.targetTemperature.toFixed(1)}°C`, roomCenterX, roomCenterY + 18);
-      }
-
-      // Breath particles for cold rooms
-      if (climate.temperature < 10 && Math.random() < 0.02) {
-        const px = room.x * TILE_SIZE + Math.random() * room.width * TILE_SIZE;
-        const py = room.y * TILE_SIZE + Math.random() * room.height * TILE_SIZE;
-        this.spawnBreath(px, py);
-      }
-    }
-
-    // Draw heater/cooler/vent indicators
-    for (const [roomId, climate] of climates) {
-      const room = world.rooms.find(r => r.id === roomId);
-      if (!room) continue;
-
-      // Heaters
-      for (const heater of climate.heaters) {
-        if (heater.tileX < view.x0 || heater.tileX > view.x1 || heater.tileY < view.y0 || heater.tileY > view.y1) continue;
-        const px = heater.tileX * TILE_SIZE;
-        const py = heater.tileY * TILE_SIZE;
-        const s = TILE_SIZE;
-        const centerX = px + s / 2;
-
-        // Heat wave effect
-        const now = performance.now();
-        ctx.strokeStyle = `rgba(239, 83, 80, ${0.4 + 0.3 * Math.sin(now / 120)})`;
-        ctx.lineWidth = 1.5;
-        for (let i = 0; i < 3; i++) {
-          ctx.beginPath();
-          ctx.moveTo(centerX - 6 + i * 6, py + s);
-          ctx.quadraticCurveTo(centerX + 4 * Math.sin(now / 100 + i), py + s - 8, centerX - 6 + i * 6, py + s - 16);
-          ctx.stroke();
-        }
-      }
-
-      // Coolers
-      for (const cooler of climate.coolers) {
-        if (cooler.tileX < view.x0 || cooler.tileX > view.x1 || cooler.tileY < view.y0 || cooler.tileY > view.y1) continue;
-        const px = cooler.tileX * TILE_SIZE;
-        const py = cooler.tileY * TILE_SIZE;
-        const s = TILE_SIZE;
-        const centerX = px + s / 2;
-
-        // Cold air particles
-        const now = performance.now();
-        ctx.fillStyle = `rgba(100, 181, 246, ${0.4 + 0.3 * Math.sin(now / 150)})`;
-        for (let i = 0; i < 4; i++) {
-          const px2 = centerX + (i - 1.5) * 4;
-          const py2 = py + s - 3 - (now / 80 + i * 0.5) % 10;
-          ctx.beginPath();
-          ctx.arc(px2, py2, 2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-
-      // Vents (airflow indicator)
-      for (const vent of climate.vents) {
-        if (!vent.open) continue;
-        if (vent.tileX < view.x0 || vent.tileX > view.x1 || vent.tileY < view.y0 || vent.tileY > view.y1) continue;
-        const px = vent.tileX * TILE_SIZE;
-        const py = vent.tileY * TILE_SIZE;
-        const s = TILE_SIZE;
-        const centerX = px + s / 2;
-        const centerY = py + s / 2;
-
-        ctx.fillStyle = `rgba(144, 164, 174, ${0.6 + 0.3 * Math.sin(performance.now() / 200)})`;
-        ctx.font = `${s * 0.3}px ${this.tokens.fontMono}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('↔', centerX, centerY);
-      }
-    }
-
-    ctx.restore();
+  private assetState() {
+    return {
+      ctx: this.ctx,
+      fontMono: this.tokens.fontMono || "'JetBrains Mono', monospace",
+      tileSize: TILE_SIZE,
+    };
   }
 
   private spawnBreath(x: number, y: number) {
     spawnBreathParticle(this.particles, x, y);
-  }
-
-  private drawZones(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
-    const { ctx } = this;
-    if (!world.zones) return;
-
-    const zoneColors: Record<string, string> = {
-      stockpile: '#8B5A2B',      // brown
-      growing: '#4A7C2E',        // green
-      recreation: '#D4A537',     // gold
-      bedroom: '#6B4F8A',        // purple
-      dining: '#C46B3B',         // orange-brown
-      hospital: '#C0392B',       // red
-    };
-
-    for (const zone of world.zones) {
-      const color = zoneColors[zone.type] || '#888';
-      const alpha = 0.15;
-
-      // Draw filled tiles
-      ctx.fillStyle = `${color}${Math.round(alpha * 255).toString(16).padStart(2, '0')}`;
-      for (const tile of zone.tiles) {
-        if (tile.x < view.x0 || tile.x > view.x1 || tile.y < view.y0 || tile.y > view.y1) continue;
-        const px = tile.x * TILE_SIZE;
-        const py = tile.y * TILE_SIZE;
-        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-      }
-
-      // Draw border around zone bounds
-      if (zone.tiles.length > 0) {
-        const xs = zone.tiles.map((t: { x: number; y: number }) => t.x);
-        const ys = zone.tiles.map((t: { x: number; y: number }) => t.y);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
-        const minY = Math.min(...ys);
-        const maxY = Math.max(...ys);
-
-        const px = minX * TILE_SIZE;
-        const py = minY * TILE_SIZE;
-        const pw = (maxX - minX + 1) * TILE_SIZE;
-        const ph = (maxY - minY + 1) * TILE_SIZE;
-
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        ctx.strokeRect(px + 1, py + 1, pw - 2, ph - 2);
-        ctx.setLineDash([]);
-
-        // Zone type label
-        ctx.fillStyle = color;
-        ctx.font = `bold 9px ${this.tokens.fontMono}`;
-        ctx.textAlign = 'left';
-        ctx.fillText(zone.type.toUpperCase(), px + 3, py + 12);
-      }
-    }
-  }
-
-  private drawZonePaintPreview(view: { x0: number; y0: number; x1: number; y1: number }) {
-    const { ctx } = this;
-    if (!this._zonePaintStart || !this._zonePaintCurrent) return;
-
-    const x0 = Math.min(this._zonePaintStart.x, this._zonePaintCurrent.x);
-    const y0 = Math.min(this._zonePaintStart.y, this._zonePaintCurrent.y);
-    const x1 = Math.max(this._zonePaintStart.x, this._zonePaintCurrent.x);
-    const y1 = Math.max(this._zonePaintStart.y, this._zonePaintCurrent.y);
-
-    const zoneColors: Record<string, string> = {
-      stockpile: '#8B5A2B',
-      growing: '#4A7C2E',
-      recreation: '#D4A537',
-      bedroom: '#6B4F8A',
-      dining: '#C46B3B',
-      hospital: '#C0392B',
-    };
-    const color = zoneColors[this._zonePaintMode || 'stockpile'] || '#888';
-
-    // Semi-transparent fill
-    ctx.fillStyle = `${color}33`; // 20% alpha
-    for (let y = y0; y <= y1; y++) {
-      if (y < view.y0 || y > view.y1) continue;
-      for (let x = x0; x <= x1; x++) {
-        if (x < view.x0 || x > view.x1) continue;
-        const px = x * TILE_SIZE;
-        const py = y * TILE_SIZE;
-        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-      }
-    }
-
-    // Dashed border
-    const px = x0 * TILE_SIZE;
-    const py = y0 * TILE_SIZE;
-    const pw = (x1 - x0 + 1) * TILE_SIZE;
-    const ph = (y1 - y0 + 1) * TILE_SIZE;
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.setLineDash([8, 4]);
-    ctx.strokeRect(px, py, pw, ph);
-    ctx.setLineDash([]);
-
-    // Dimensions label
-    const w = x1 - x0 + 1;
-    const h = y1 - y0 + 1;
-    ctx.fillStyle = color;
-    ctx.font = `bold 10px ${this.tokens.fontMono}`;
-    ctx.textAlign = 'center';
-    ctx.fillText(`${w}×${h} (${w * h} tiles)`, px + pw / 2, py - 5);
   }
 
   // ─── Zoom controls ────────────────────────────────────────────────────────────
@@ -3022,34 +2461,3 @@ export class LocalRenderer {
 
 }
 
-// ─── Helper: vary brightness of a hex color by ±percent ───────────────────────
-function _adjustBrightness(hex: string, delta: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const clamp = (v: number) => Math.max(0, Math.min(255, v + delta));
-  const toHex = (v: number) => v.toString(16).padStart(2, '0');
-  return `#${toHex(clamp(r))}${toHex(clamp(g))}${toHex(clamp(b))}`;
-}
-
-// ─── Extension → color map ────────────────────────────────────────────────────
-const EXT_COLOR: Record<string, string> = {
-  ts: '#4a9bd4',
-  tsx: '#4a9bd4',
-  js: '#e8c44a',
-  jsx: '#e8c44a',
-  py: '#4ab4d4',
-  rs: '#b4a04a',
-  go: '#4ad4b4',
-  json: '#a04ab4',
-  md: '#b4a04a',
-  css: '#4ad44a',
-  html: '#d44a4a',
-  yaml: '#4a4ad4',
-  yml: '#4a4ad4',
-  sh: '#4ad4a0',
-  bash: '#4ad4a0',
-  toml: '#d4a04a',
-  png: '#888',
-  svg: '#888',
-};
