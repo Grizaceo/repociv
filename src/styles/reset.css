@@ -45,6 +45,12 @@ body {
   overflow: hidden;
   font-family: var(--font-body);
   color: var(--ui-text);
+  min-height: 100vh;
+  height: 100vh;
+}
+
+html {
+  height: 100%;
 }
 
 /* ═══ user-select: selectable in panels, none only on canvas/interactive ═══ */

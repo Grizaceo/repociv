@@ -259,6 +259,10 @@ export function wireHotkeys(
         trackHotkey('G:grid');
         renderer.toggleGrid();
         break;
+      case '2':
+        trackHotkey('2:map-render-mode');
+        renderer.toggleWorldRenderMode();
+        break;
       case 'f':
         if (state.viewMode === 'local') {
           trackHotkey('F:local-debug');
@@ -273,7 +277,7 @@ export function wireHotkeys(
         renderer.toggleFog();
         break;
       case '3':
-        trackHotkey('3:toggle-view');
+        trackHotkey('3:cycle-render-mode');
         toggleView();
         break;
       case 'a':

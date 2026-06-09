@@ -96,6 +96,7 @@ import {
   setOnCleanModeChange,
   isCleanMode,
 } from './ui/layerPanel.ts';
+import { resolveInitialRenderMode } from './three/renderMode.ts';
 import { HEX_SIZE } from './constants.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
@@ -313,8 +314,22 @@ async function bootstrap() {
 
   const canvas = document.getElementById('main-canvas') as HTMLCanvasElement;
   const renderer = new Renderer(canvas, state);
+  const bootRenderMode = resolveInitialRenderMode();
+  await renderer.applyInitialRenderMode(bootRenderMode);
   renderer.setCleanMode(isCleanMode());
   await renderer.loadAssets();
+  const capital = world.cities.find((c) => c.isCapital) ?? world.cities[0];
+  if (world.tiles.size === 0) {
+    logEvent('⚠ Mapa vacío — no hay repos seleccionados', 'warn');
+  } else if (capital) {
+    renderer.focusOnCoord(capital.coord);
+  } else {
+    renderer.focusOnWorldBounds();
+  }
+  if (bootRenderMode === 'webgl' && renderer.getWorldRenderMode() !== 'webgl') {
+    showToast('WebGL no disponible — vista isométrica hexagonal');
+  }
+  canvas.classList.toggle('webgl-overlay', renderer.getWorldRenderMode() === 'webgl');
   void renderer.preloadLocalRenderer();
   renderer.start();
   setRendererRef(renderer);
@@ -347,12 +362,16 @@ async function bootstrap() {
   };
 
   const toggleView = () => {
-    // 3D renderer intentionally removed: the 2D Civ view is the canonical map.
-    renderer.start();
-    setRendererRef(renderer);
+    const mode = renderer.cycleWorldRenderMode();
+    const labels: Record<string, string> = {
+      webgl: 'Vista WebGL 3D',
+      iso25d: 'Vista isométrica 2.5D',
+      flat: 'Vista plana legacy',
+    };
+    showToast(labels[mode] ?? mode);
   };
 
-  document.getElementById('btn-toggle-3d')?.classList.add('hidden');
+  document.getElementById('btn-toggle-3d')?.classList.remove('hidden');
   document.getElementById('btn-toggle-3d')?.addEventListener('click', toggleView);
   document.getElementById('btn-timeline')?.addEventListener('click', toggleTimelinePanel);
   document.getElementById('btn-approvals')?.addEventListener('click', toggleApprovalPanel);
@@ -942,7 +961,6 @@ async function bootstrap() {
   };
 
   // Spawn DAVI as the default hero, near the capital if present
-  const capital = world.cities.find((c) => c.isCapital) ?? world.cities[0];
   const spawnAt = capital ? capital.coord : { q: 0, r: 0 };
   state.spawnUnit('DAVI', 'DAVI', 'hero', 'gris', spawnAt, 'En espera de misión');
 

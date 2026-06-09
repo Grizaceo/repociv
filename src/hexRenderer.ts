@@ -1,4 +1,6 @@
-// ─── RepoCiv — Hex & Tile drawing ────────────────────────────────────────────
+// ─── RepoCiv — Hex & Tile drawing (flat legacy mode) ────────────────────────
+// Photo atlas patterns used only when renderer worldRenderMode === 'flat'.
+// Default iso25d path uses IsoHexRenderer + procedural TERRAIN_COLOR fills.
 import { logger } from './logger.ts';
 import { type Axial, axialToPixel, AXIAL_DIRECTIONS } from './hex.ts';
 import { type Terrain, type Tile, type City, type Building, type District } from './types.ts';
