@@ -259,7 +259,9 @@ def terrain_normal_np(name: str, U, V, seed: int):
     ny = -dhdy * strength
     nz = np.ones_like(nx)
     length = np.sqrt(nx * nx + ny * ny + nz * nz)
-    nx /= length; ny /= length; nz /= length
+    nx /= length
+    ny /= length
+    nz /= length
     return nx * 0.5 + 0.5, ny * 0.5 + 0.5, nz * 0.5 + 0.5
 
 

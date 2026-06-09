@@ -1,0 +1,11 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "ignore": [
+    "scripts/screenshot-3d-audit.mjs"
+  ],
+  "ignoreDependencies": [
+    "@xterm/xterm",
+    "@xterm/addon-fit",
+    "@xterm/addon-web-links"
+  ]
+}

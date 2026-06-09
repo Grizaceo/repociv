@@ -101,9 +101,9 @@ bpy.context.scene.camera = cam
 
 # ── Light ─────────────────────────────────────────────────────────────────
 bpy.ops.object.light_add(type='AREA', location=(cx, cy - 2, 7))
-l = bpy.context.object
-l.data.energy = 500
-l.data.size = 8
+area_light = bpy.context.object
+area_light.data.energy = 500
+area_light.data.size = 8
 
 # ── Render ────────────────────────────────────────────────────────────────
 scene = bpy.context.scene

@@ -45,7 +45,16 @@ run_step "vite build"                     npx --no-install vite build
 
 # Backend
 run_step "ruff check server/"             ruff check server/
+run_step "ruff check scripts/"            ruff check scripts/
 run_step "pytest -q"                      pytest -q
+
+# Tooling (non-blocking: report only)
+log "knip (report only)"
+if npx --no-install knip --exclude duplicates 2>&1; then
+  printf "\033[1;32m[OK]\033[0m   knip\\n"
+else
+  printf "\033[1;33m[INFO]\033[0m knip found items (non-blocking)\\n"
+fi
 
 # Summary
 if (( ${#failures[@]} > 0 )); then
