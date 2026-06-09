@@ -365,8 +365,7 @@ async function bootstrap() {
     const mode = renderer.cycleWorldRenderMode();
     const labels: Record<string, string> = {
       webgl: 'Vista WebGL 3D',
-      iso25d: 'Vista isométrica 2.5D',
-      flat: 'Vista plana legacy',
+      flat: 'Vista plana 2D',
     };
     showToast(labels[mode] ?? mode);
   };

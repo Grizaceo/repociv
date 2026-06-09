@@ -1,11 +1,9 @@
 // ─── RepoCiv — Renderer (orquestador) ────────────────────────────────────────
 import { type Axial, worldToAxial, axialToPixel, type Camera } from './hex.ts';
-import { screenToAxial } from './isoHex.ts';
 import { logger } from './logger.ts';
 import { type Unit, type Tile, type City, tileKey } from './types.ts';
 import { type GameState } from './game.ts';
 import { HexRenderer } from './hexRenderer.ts';
-import { IsoHexRenderer } from './isoHexRenderer.ts';
 import { UnitRenderer } from './unitRenderer.ts';
 import { MinimapRenderer } from './minimapRenderer.ts';
 import { openWonderVignette } from './ui/wonderVignette.ts';
@@ -35,7 +33,6 @@ import { HEX_SIZE } from './constants.ts';
 import {
   type WorldRenderMode,
   persistRenderMode,
-  cycleRenderMode,
   loadThreeMapRenderer,
 } from './three/renderMode.ts';
 
@@ -61,7 +58,7 @@ export class Renderer {
   private fogEnabled = true;
   private _cleanMode = false;
   private _currentLod: 'low' | 'medium' | 'high' = 'medium';
-  private worldRenderMode: WorldRenderMode = 'iso25d';
+  private worldRenderMode: WorldRenderMode = 'flat';
   private animTime = 0;
   private _placingMode = false; // true when user is picking a hex on map
 
@@ -90,7 +87,6 @@ export class Renderer {
 
   private resizeObserver: ResizeObserver;
   private hexR: HexRenderer;
-  private isoHexR: IsoHexRenderer;
   private unitR: UnitRenderer;
   private minimapR: MinimapRenderer;
   private localR: LocalRendererType | null = null; // Phase 6: RimWorld 2D view
@@ -167,7 +163,6 @@ export class Renderer {
     this.ctx = canvas.getContext('2d')!;
     this.state = state;
     this.hexR = new HexRenderer(this.ctx);
-    this.isoHexR = new IsoHexRenderer(this.ctx, this.hexR);
     this.unitR = new UnitRenderer(this.ctx, state);
     this.minimapR = new MinimapRenderer(state);
 
@@ -187,25 +182,21 @@ export class Renderer {
   }
 
   async loadAssets() {
-    await Promise.all([this.hexR.loadAssets(), this.isoHexR.loadAssets()]);
+    await this.hexR.loadAssets();
   }
 
-  /** Toggle global map between extruded iso 2.5D and flat legacy view (not webgl). */
-  toggleWorldRenderMode(): 'iso25d' | 'flat' {
-    if (this.worldRenderMode === 'webgl') {
-      void this.setWorldRenderMode('iso25d');
-      return 'iso25d';
-    }
-    this.worldRenderMode = this.worldRenderMode === 'iso25d' ? 'flat' : 'iso25d';
-    persistRenderMode(this.worldRenderMode);
-    return this.worldRenderMode;
-  }
-
-  /** Cycle webgl → iso25d → flat → webgl (hotkey 3). */
-  cycleWorldRenderMode(): WorldRenderMode {
-    const next = cycleRenderMode(this.worldRenderMode);
+  /** Toggle global map between flat 2D hex and WebGL (hotkey 2).
+   *  With iso25d retired, the toggle is the only fast way to flip
+   *  between the two surviving world renderers. */
+  toggleWorldRenderMode(): WorldRenderMode {
+    const next: WorldRenderMode = this.worldRenderMode === 'webgl' ? 'flat' : 'webgl';
     void this.setWorldRenderMode(next);
     return next;
+  }
+
+  /** Cycle world render mode (hotkey 3). Currently the same as toggle. */
+  cycleWorldRenderMode(): WorldRenderMode {
+    return this.toggleWorldRenderMode();
   }
 
   async setWorldRenderMode(mode: WorldRenderMode): Promise<void> {
@@ -215,8 +206,8 @@ export class Renderer {
       try {
         await this.ensureThreeMap();
       } catch (err) {
-        logger.error('[Renderer] WebGL init failed, falling back to iso25d', err);
-        mode = 'iso25d';
+        logger.error('[Renderer] WebGL init failed, falling back to flat', err);
+        mode = 'flat';
       }
       if (mode === 'webgl' && this.threeMap) {
         this.worldRenderMode = 'webgl';
@@ -226,7 +217,7 @@ export class Renderer {
         this.canvas.classList.add('webgl-overlay');
         return;
       }
-      mode = 'iso25d';
+      mode = 'flat';
     }
 
     this.worldRenderMode = mode;
@@ -275,7 +266,7 @@ export class Renderer {
     let minY = Infinity;
     let maxY = -Infinity;
     for (const tile of this.state.world.tiles.values()) {
-      const pos = this.isoHexR.getTileCenter(tile.coord, tile);
+      const pos = axialToPixel(tile.coord, HEX_SIZE);
       minX = Math.min(minX, pos.x);
       maxX = Math.max(maxX, pos.x);
       minY = Math.min(minY, pos.y);
@@ -288,9 +279,8 @@ export class Renderer {
 
   /** Center macro camera on an axial hex (works before WebGL is loaded). */
   focusOnCoord(coord: import('./hex.ts').Axial): void {
-    const tile = this.state.world.tiles.get(tileKey(coord));
-    if (this.worldRenderMode === 'iso25d' || this.worldRenderMode === 'webgl') {
-      const pos = this.isoHexR.getTileCenter(coord, tile);
+    if (this.worldRenderMode === 'webgl' && this.threeMap) {
+      const pos = this.threeMap.projectTileCenter(coord, this.state, this.cam);
       this.cam.x = pos.x;
       this.cam.y = pos.y;
       return;
@@ -305,29 +295,17 @@ export class Renderer {
       const picked = this.threeMap.pickAxial(wx, wy);
       if (picked) return picked;
     }
-    if (this.worldRenderMode === 'iso25d') {
-      return screenToAxial(wx, wy, HEX_SIZE, this.cam);
-    }
     return worldToAxial(wx, wy, HEX_SIZE, this.cam);
   }
 
-  private tilePixelPos(coord: Axial, tile?: Tile | null): { x: number; y: number } {
+  private tilePixelPos(coord: Axial, _tile?: Tile | null): { x: number; y: number } {
     if (this.worldRenderMode === 'webgl' && this.threeMap) {
       return this.threeMap.projectTileCenter(coord, this.state, this.cam);
-    }
-    if (this.worldRenderMode === 'iso25d') {
-      const t = tile ?? this.state.world.tiles.get(tileKey(coord));
-      return this.isoHexR.getTileCenter(coord, t);
     }
     return axialToPixel(coord, HEX_SIZE);
   }
 
   private drawHexHighlight(coord: Axial, color: string, lw: number): void {
-    if (this.worldRenderMode === 'iso25d') {
-      const tile = this.state.world.tiles.get(tileKey(coord));
-      this.isoHexR.drawHexOutlineIso(coord, tile, color, lw);
-      return;
-    }
     if (this.worldRenderMode === 'webgl' && this.threeMap) {
       const corners = this.threeMap.projectHexOutline(coord, this.state, this.cam);
       const { ctx } = this;
@@ -957,8 +935,7 @@ export class Renderer {
     const lodMed = lod === 'medium';
     const lodHigh = lod === 'high';
 
-    // Pass 1–3: terrain (webgl / iso 2.5D / flat legacy)
-    const isoMode = this.worldRenderMode === 'iso25d' || (this.worldRenderMode === 'webgl' && !this.threeMap);
+    // Pass 1–3: terrain (webgl / flat legacy — iso25d retired)
     if (webglMode && this.threeMap) {
       this.threeMap.setActive(true);
       this.unitR.setCoordProjector((coord) => {
@@ -972,24 +949,6 @@ export class Renderer {
         showStructure,
         showOps,
         showLabels,
-      });
-    } else if (isoMode) {
-      this.unitR.setCoordProjector((coord) => {
-        const t = this.state.world.tiles.get(tileKey(coord));
-        return this.isoHexR.getTileCenter(coord, t);
-      });
-      this.isoHexR.renderWorld(this.state, {
-        fogEnabled: this.fogEnabled,
-        animTime: this.animTime,
-        zoom: cam.zoom,
-        lod,
-        cleanMode: isClean,
-        showStructure,
-        showOps,
-        showLabels,
-        showKnowledge,
-        showLabs,
-        showSecurity,
       });
     } else {
       this.unitR.resetCoordProjector();
@@ -1513,13 +1472,8 @@ export class Renderer {
 
   /** Compute current zoom-based LOD level. */
   private calcLod(): 'low' | 'medium' | 'high' {
-    if (this.worldRenderMode === 'webgl' || this.worldRenderMode === 'iso25d') {
-      if (this.cam.zoom < 0.5) return 'low';
-      if (this.cam.zoom < 1.0) return 'medium';
-      return 'high';
-    }
     if (this.cam.zoom < 0.5) return 'low';
-    if (this.cam.zoom < 1.2) return 'medium';
+    if (this.cam.zoom < (this.worldRenderMode === 'webgl' ? 1.0 : 1.2)) return 'medium';
     return 'high';
   }
 
