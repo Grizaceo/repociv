@@ -138,7 +138,7 @@ export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
   // ─── Temperature System: place heaters/coolers/vents ─────────────────────────
   const roomClimates = placeTemperatureSystem(grid, rooms, gridWidth, gridHeight);
 
-  return { repoId, grid, rooms, width: gridWidth, height: gridHeight, workbenches, powerGrid, powerSources, powerConsumers, restAreas, roomClimates, npcs };
+  return { repoId, grid, rooms, width: gridWidth, height: gridHeight, workbenches, powerGrid, powerSources, powerConsumers, restAreas, roomClimates, npcs, deskAssignments: new Map() };
 }
 
 // ─── Browser API entry point: convert flat path list → FileNode tree ──────────

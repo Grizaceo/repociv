@@ -2,7 +2,7 @@
 // Extracted from GameState to reduce god-object size.
 // Owns all "RimWorld-style" local view state and logic.
 
-import type { Unit, LocalWorld, LocalUnit, LocalMission, ViewMode } from './types.ts';
+import type { Unit, LocalWorld, LocalUnit, LocalTile, LocalMission, ViewMode } from './types.ts';
 import { UNIT_COLORS } from './types.ts';
 import { generateLocalWorldFromApi, buildMockLocalWorld, BATTERY_STORED } from './localMap.ts';
 import { findPath, findNearestWorkbench } from './localPathfinding.ts';
@@ -63,6 +63,7 @@ export class LocalWorldManager {
           isResting: heroUnit?.isResting ?? false,
           effectiveSpeed: heroUnit?.effectiveSpeed ?? 1,
         });
+        this.assignDesk(this.localUnits[this.localUnits.length - 1]!);
       }
     }
     return this.localWorld;
@@ -100,6 +101,7 @@ export class LocalWorldManager {
           isResting: false,
           effectiveSpeed: 1,
         });
+        this.assignDesk(this.localUnits[this.localUnits.length - 1]!);
       }
     }
     return this.localWorld;
@@ -416,6 +418,7 @@ export class LocalWorldManager {
         effectiveSpeed: macroUnit?.effectiveSpeed ?? 1,
       };
       this.localUnits.push(unit);
+      this.assignDesk(unit);
     }
 
     if (!unit || !this.localWorld) return;
@@ -442,12 +445,13 @@ export class LocalWorldManager {
       }
     }
     if (wbX === -1) {
-      const nearest = findNearestWorkbench(this.localWorld, unit.gridX, unit.gridY);
-      if (!nearest?.workbench) return;
-      wbX = nearest.x;
-      wbY = nearest.y;
-      wbId = nearest.workbench.id;
-      queued.workbench = nearest.workbench;
+      // Phase B: prefer assigned desk if reachable
+      const best = this.findBestWorkbench(unit);
+      if (!best?.workbench) return;
+      wbX = best.x;
+      wbY = best.y;
+      wbId = best.workbench.id;
+      queued.workbench = best.workbench;
     }
 
     const pathResult = findPath(this.localWorld, unit.gridX, unit.gridY, wbX, wbY);
@@ -484,12 +488,13 @@ export class LocalWorldManager {
       }
     }
     if (wbX === -1) {
-      const nearest = findNearestWorkbench(this.localWorld, unit.gridX, unit.gridY);
-      if (!nearest?.workbench) return;
-      wbX = nearest.x;
-      wbY = nearest.y;
-      wbId = nearest.workbench.id;
-      queued.workbench = nearest.workbench;
+      // Phase B: prefer assigned desk if reachable
+      const best = this.findBestWorkbench(unit);
+      if (!best?.workbench) return;
+      wbX = best.x;
+      wbY = best.y;
+      wbId = best.workbench.id;
+      queued.workbench = best.workbench;
     }
 
     const pathResult = findPath(this.localWorld, unit.gridX, unit.gridY, wbX, wbY);
@@ -504,6 +509,61 @@ export class LocalWorldManager {
     queued.workbenchId = wbId;
     queued.status = 'walking';
     queued.startedAt = Date.now();
+  }
+
+  // ─── Phase B: Desk assignment helpers ─────────────────────────────────────
+
+  /** Prefers the unit's assigned desk if free and reachable; falls back to nearest. */
+  findBestWorkbench(
+    unit: LocalUnit,
+  ): { x: number; y: number; workbench: LocalTile['workbench']; distance: number } | null {
+    if (!this.localWorld) return null;
+
+    // Try assigned desk first
+    if (unit.assignedDesk) {
+      const deskKey = `${unit.assignedDesk.x},${unit.assignedDesk.y}`;
+      const owner = this.localWorld.deskAssignments.get(deskKey);
+      if (!owner || owner === unit.id) {
+        const pathResult = findPath(this.localWorld, unit.gridX, unit.gridY, unit.assignedDesk.x, unit.assignedDesk.y);
+        if (pathResult) {
+          const tile = this.localWorld.grid[unit.assignedDesk.y]?.[unit.assignedDesk.x];
+          if (tile?.workbench) {
+            return { x: unit.assignedDesk.x, y: unit.assignedDesk.y, workbench: tile.workbench, distance: pathResult.cost };
+          }
+        }
+      }
+    }
+
+    // Fallback to nearest
+    return findNearestWorkbench(this.localWorld, unit.gridX, unit.gridY);
+  }
+
+  /** Assign a free desk in the unit's room. */
+  assignDesk(unit: LocalUnit): void {
+    if (!this.localWorld) return;
+    const world = this.localWorld;
+    const roomId = unit.currentRoomId;
+    if (!roomId) return;
+
+    // Collect free desk tiles in the unit's room
+    let best: { x: number; y: number; wb: LocalTile['workbench']; dist: number } | null = null;
+    for (const row of world.grid) {
+      for (const tile of row) {
+        if (tile.roomId !== roomId) continue;
+        if (tile.type !== 'workbench' || !tile.workbench) continue;
+        const key = `${tile.x},${tile.y}`;
+        if (world.deskAssignments.has(key)) continue;
+        const dist = Math.abs(unit.gridX - tile.x) + Math.abs(unit.gridY - tile.y);
+        if (!best || dist < best.dist) {
+          best = { x: tile.x, y: tile.y, wb: tile.workbench, dist };
+        }
+      }
+    }
+
+    if (best) {
+      unit.assignedDesk = { x: best.x, y: best.y };
+      world.deskAssignments.set(`${best.x},${best.y}`, unit.id);
+    }
   }
 
   private _dispatchNextMission(): void {
@@ -577,6 +637,7 @@ export class LocalWorldManager {
       effectiveSpeed: 1,
       ephemeral: true,
     });
+    this.assignDesk(this.localUnits[this.localUnits.length - 1]!);
     this.notify();
   }
 

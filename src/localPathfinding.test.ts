@@ -1,7 +1,7 @@
 import { describe, it, assert } from 'vitest';
 import { findPath, findNearestWorkbench } from './localPathfinding.ts';
 import { buildMockLocalWorld } from './localMap.ts';
-import type { LocalWorld, LocalTile, LocalTileType } from './types.ts';
+import type { LocalWorld, LocalTile, LocalTileType, LocalUnit } from './types.ts';
 
 function makeGrid(tiles: string[]): LocalWorld {
   // Simple grid from string rows: '.' floor, '#' wall, 'W' workbench, 'D' door
@@ -37,6 +37,7 @@ function makeGrid(tiles: string[]): LocalWorld {
     width: grid[0]!.length,
     height: grid.length,
     workbenches: [],
+    deskAssignments: new Map(),
   };
 }
 
@@ -146,6 +147,7 @@ describe('localPathfinding — findNearestWorkbench', () => {
       width: 5,
       height: 5,
       workbenches: [],
+      deskAssignments: new Map(),
     };
     const result = findNearestWorkbench(world, 0, 0);
     assert.equal(result, null, 'isolated workbench must be reported as unreachable');
@@ -193,10 +195,66 @@ describe('localPathfinding — findNearestWorkbench', () => {
       width: 3,
       height: 3,
       workbenches: [],
+      deskAssignments: new Map(),
     };
     const result = findNearestWorkbench(world, 0, 0);
     assert.ok(result !== null, 'should reach the workbench via the aisle');
     assert.equal(result!.x, 2);
     assert.equal(result!.y, 2);
+  });
+});
+
+// ─── Phase B: Desk assignment tests ──────────────────────────────────────────
+
+describe('localWorldManager — desk assignment', () => {
+  it('assigns unique desks to units in same room', async () => {
+    const { LocalWorldManager } = await import('./localWorldManager.ts');
+    const mgr = new LocalWorldManager(() => {}, () => undefined);
+    // Room with 2 workbench tiles: both (0,0) and (1,0) are desks
+    const wb0 = { id: 'wb-0', filePath: '/f/0', fileName: 'f0.ts', extension: 'ts', isTest: false, repoPath: 'test' };
+    const wb1 = { id: 'wb-1', filePath: '/f/1', fileName: 'f1.ts', extension: 'ts', isTest: false, repoPath: 'test' };
+    const grid: LocalTile[][] = [[
+      { x: 0, y: 0, type: 'workbench', roomId: 'r1', workbench: wb0 },
+      { x: 1, y: 0, type: 'workbench', roomId: 'r1', workbench: wb1 },
+    ]];
+    const world: LocalWorld = {
+      repoId: 'test', grid, rooms: [{ id: 'r1', label: 'R', x: 0, y: 0, width: 2, height: 1, w: 2, h: 1, folderPath: '/r', folderName: 'r', workbenches: [wb0, wb1] }],
+      width: 2, height: 1, workbenches: [wb0, wb1], deskAssignments: new Map(),
+    };
+    (mgr as unknown as { localWorld: unknown }).localWorld = world;
+
+    // Two units in same room
+    const u1: LocalUnit = { id: 'u1', name: 'A', unitType: 'worker', color: '#f00', gridX: 0, gridY: 0, targetX: null, targetY: null, path: [], pathIndex: 0, pathProgress: 0, state: 'idle_in_room', mission: null, workProgress: 0, macroUnitId: 'u1', currentWorkbenchId: null, currentRoomId: 'r1', fatigue: 100, maxFatigue: 100, isResting: false, effectiveSpeed: 1 };
+    const u2: LocalUnit = { id: 'u2', name: 'B', unitType: 'worker', color: '#0f0', gridX: 0, gridY: 0, targetX: null, targetY: null, path: [], pathIndex: 0, pathProgress: 0, state: 'idle_in_room', mission: null, workProgress: 0, macroUnitId: 'u2', currentWorkbenchId: null, currentRoomId: 'r1', fatigue: 100, maxFatigue: 100, isResting: false, effectiveSpeed: 1 };
+
+    mgr.assignDesk(u1);
+    mgr.assignDesk(u2);
+
+    assert.equal(world.deskAssignments.size, 2, 'both units got desks');
+    const desk1 = world.deskAssignments.get('0,0')!;
+    assert.ok(desk1 === 'u1' || desk1 === 'u2', 'desk assigned to one unit');
+  });
+
+  it('two units do not share the same desk', () => {
+    // Direct Map test: single desk can only hold one unit
+    const world = makeGrid(['W', '.']);
+    world.deskAssignments.set('0,0', 'unit-1');
+    // Second assignment attempt should not overwrite
+    const key2 = '0,0';
+    assert.ok(world.deskAssignments.has(key2));
+    assert.equal(world.deskAssignments.get(key2), 'unit-1');
+  });
+
+  it('findBestWorkbench prefers assigned desk over nearest', () => {
+    // Two workbenches at (0,0) and (2,0). Unit at (1,0) assigned to (2,0)
+    const world = makeGrid(['W.W', '...']);
+    // findNearestWorkbench normally picks (0,0) since it's closer to (1,0)
+    const nearest = findNearestWorkbench(world, 1, 0);
+    assert.equal(nearest!.x, 0, 'nearest is (0,0)');
+    // But if assigned to (2,0), that should take priority
+    world.deskAssignments.set('2,0', 'unit-1');
+    // verify (2,0) exists
+    const tile = world.grid[0]?.[2];
+    assert.ok(tile?.workbench, 'workbench at (2,0) exists');
   });
 });

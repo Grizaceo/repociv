@@ -536,6 +536,8 @@ export interface LocalWorld {
   roomClimates?: Map<string, RoomClimate>;
   // Stationary NPCs (managers, receptionists)
   npcs?: LocalNpc[];
+  // Desk assignments: maps "x,y" desk position → unit ID (Phase B)
+  deskAssignments: Map<string, string>;
 }
 
 // ─── Local Unit State (Phase 7a) ───────────────────────────────────────────────
@@ -578,6 +580,7 @@ export interface LocalUnit {
   effectiveSpeed: number; // local grid movement speed after fatigue penalty
   assignedTask?: AgentTask | null; // player-assigned job focus (frontend-only)
   ephemeral?: boolean; // subagent detachment in local view
+  assignedDesk?: { x: number; y: number } | null; // stable desk assignment in their room
 }
 
 export interface LocalNpc {
