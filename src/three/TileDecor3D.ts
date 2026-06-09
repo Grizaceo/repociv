@@ -353,56 +353,83 @@ function buildIce(tiles: Tile[]): void {
   addMesh(spikeMesh);
 }
 
-// ── Sacred: tall obelisks with glowing gold tips ─────────────────────────────
+// ── Sacred: stone circle + glowing altar ─────────────────────────────────────
 
 function buildSacred(tiles: Tile[]): void {
   if (tiles.length === 0) return;
 
-  const shaftGeom = new BoxGeometry(HEX_SIZE * 0.065, HEX_SIZE * 0.65, HEX_SIZE * 0.065);
-  const shaftMat  = new MeshLambertMaterial({ color: new Color(0x1c1228) });
-
-  const tipGeom   = new ConeGeometry(HEX_SIZE * 0.04, HEX_SIZE * 0.14, 4);
-  const tipMat    = new MeshStandardMaterial({
-    color:     new Color(0xd4af37),
-    emissive:  new Color(0xd4af37),
-    emissiveIntensity: 0.9,
-    roughness: 0.3,
-    metalness: 0.6,
+  // Standing stones — rough grey-violet monoliths
+  const stoneGeom = new BoxGeometry(HEX_SIZE * 0.085, HEX_SIZE * 0.28, HEX_SIZE * 0.055);
+  const stoneMat  = new MeshStandardMaterial({
+    color:    new Color(0x6b5880),
+    emissive: new Color(0x3a2550),
+    emissiveIntensity: 0.35,
+    roughness: 0.88,
+    metalness: 0.05,
   });
 
-  const OBELISKS  = 5;
-  const total     = tiles.length * OBELISKS;
-  const shaftMesh = new InstancedMesh(shaftGeom, shaftMat, total);
-  const tipMesh   = new InstancedMesh(tipGeom,   tipMat,   total);
+  // Altar cube at centre
+  const altarGeom = new BoxGeometry(HEX_SIZE * 0.18, HEX_SIZE * 0.10, HEX_SIZE * 0.18);
+  const altarMat  = new MeshStandardMaterial({
+    color:    new Color(0x8860b0),
+    emissive: new Color(0x5530a0),
+    emissiveIntensity: 0.60,
+    roughness: 0.55,
+    metalness: 0.20,
+  });
+
+  // Floating gem above altar
+  const gemGeom = new BoxGeometry(HEX_SIZE * 0.08, HEX_SIZE * 0.08, HEX_SIZE * 0.08);
+  const gemMat  = new MeshStandardMaterial({
+    color:    new Color(0xd4a0ff),
+    emissive: new Color(0xb060ff),
+    emissiveIntensity: 1.4,
+    roughness: 0.08,
+    metalness: 0.7,
+    transparent: true,
+    opacity: 0.90,
+  });
+
+  const STONES = 6;
+  const stoneMesh = new InstancedMesh(stoneGeom, stoneMat, tiles.length * STONES);
+  const altarMesh = new InstancedMesh(altarGeom, altarMat, tiles.length);
+  const gemMesh   = new InstancedMesh(gemGeom,   gemMat,   tiles.length);
 
   let idx = 0;
   const mat = new Matrix4();
   for (const tile of tiles) {
     const elev = terrainElevation(tile.terrain);
     const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-    for (let o = 0; o < OBELISKS; o++) {
-      const angle  = (Math.PI * 2 / OBELISKS) * o;
-      const radius = HEX_SIZE * 0.32;
+
+    // Stone ring
+    for (let s = 0; s < STONES; s++) {
+      const angle  = (Math.PI * 2 / STONES) * s;
+      const radius = HEX_SIZE * 0.30;
       const tx     = pos.x + Math.cos(angle) * radius;
       const tz     = pos.z + Math.sin(angle) * radius;
-      const scale  = 0.80 + (o % 3) * 0.12;
-      const shaftH = HEX_SIZE * 0.65 * scale;
-
-      mat.makeScale(scale, scale, scale);
-      mat.setPosition(tx, pos.y + shaftH * 0.5 + 2, tz);
-      shaftMesh.setMatrixAt(idx, mat.clone());
-
-      mat.makeScale(scale * 0.7, scale * 0.7, scale * 0.7);
-      mat.setPosition(tx, pos.y + shaftH + HEX_SIZE * 0.07 * scale + 2, tz);
-      tipMesh.setMatrixAt(idx, mat.clone());
-
+      const stoneH = HEX_SIZE * 0.28;
+      mat.makeRotationY(angle + Math.PI / 2);
+      mat.setPosition(tx, pos.y + stoneH * 0.5 + 1, tz);
+      stoneMesh.setMatrixAt(idx, mat.clone());
       idx++;
     }
+
+    // Central altar
+    mat.identity();
+    mat.setPosition(pos.x, pos.y + HEX_SIZE * 0.05 + 1, pos.z);
+    altarMesh.setMatrixAt(tiles.indexOf(tile), mat.clone());
+
+    // Floating gem above altar
+    mat.makeRotationY(Math.PI / 4);
+    mat.setPosition(pos.x, pos.y + HEX_SIZE * 0.26 + 1, pos.z);
+    gemMesh.setMatrixAt(tiles.indexOf(tile), mat.clone());
   }
-  shaftMesh.instanceMatrix.needsUpdate = true;
-  tipMesh.instanceMatrix.needsUpdate   = true;
-  addMesh(shaftMesh);
-  addMesh(tipMesh);
+  stoneMesh.instanceMatrix.needsUpdate = true;
+  altarMesh.instanceMatrix.needsUpdate = true;
+  gemMesh.instanceMatrix.needsUpdate   = true;
+  addMesh(stoneMesh);
+  addMesh(altarMesh);
+  addMesh(gemMesh);
 }
 
 // ── Plains grass patches (high LOD) ─────────────────────────────────────────

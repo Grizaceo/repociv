@@ -61,8 +61,8 @@ export function createTerrainMaterial(
   // NOT via mat.roughnessMap (which would use wrong raw-tile UVs instead of atlas UVs).
   const mat = new MeshStandardMaterial({
     vertexColors: true,
-    roughness: 0.80,
-    metalness: 0.03,
+    roughness: 0.68,
+    metalness: 0.04,
   });
 
   mat.onBeforeCompile = (shader: Shader) => {
@@ -156,38 +156,48 @@ vec2 terrainAtlasUv(float idx, vec2 tileUv) {
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
-        float tidx = floor(vTerrainIndex + 0.5);
+        float tidx  = floor(vTerrainIndex + 0.5);
         float ntidx = floor(vNeighborTerrainIndex + 0.5);
-        // Radial distance from hex centre — used for vignette AND edge blend
         float radial = clamp(length(vLocalXZ) / uHexRadius, 0.0, 1.0);
         if (uUseAtlas > 0 && vTopFace > 0.5) {
           vec2 auv = terrainAtlasUv(tidx, vUv);
           vec3 tex = texture2D(uTerrainAtlas, auv).rgb;
-          // Neighbor biome blend at hex edges
+          // Lift very dark textures so no biome goes black under warm lights
+          tex = max(tex, vec3(0.06));
+          // Saturation boost: push away from grey
+          float lum = dot(tex, vec3(0.299, 0.587, 0.114));
+          tex = mix(vec3(lum), tex, 1.30);
+          // Neighbour biome blend at hex edges
           float edgeBlend = smoothstep(0.72, 0.98, radial);
           if (ntidx >= 0.0 && abs(ntidx - tidx) > 0.5) {
             vec2 nauv = terrainAtlasUv(ntidx, vUv);
-            vec3 neighborTex = texture2D(uTerrainAtlas, nauv).rgb;
-            tex = mix(tex, neighborTex, edgeBlend * 0.50);
+            vec3 nTex = texture2D(uTerrainAtlas, nauv).rgb;
+            nTex = max(nTex, vec3(0.06));
+            float nLum = dot(nTex, vec3(0.299, 0.587, 0.114));
+            nTex = mix(vec3(nLum), nTex, 1.30);
+            tex = mix(tex, nTex, edgeBlend * 0.45);
           }
-          diffuseColor.rgb = mix(diffuseColor.rgb, tex, 0.88);
+          // Top-face brightening so atlas colours read through warm PBR lights
+          tex *= 1.18;
+          diffuseColor.rgb = mix(diffuseColor.rgb, tex, 0.93);
         }
-        // Radial vignette — subtle (brighter centre, softer edges)
-        diffuseColor.rgb *= mix(1.06, 0.90, radial * radial);
-        // Side faces: darker, warm-shadowed
+        // Radial vignette — very subtle
+        if (vTopFace > 0.5) {
+          diffuseColor.rgb *= mix(1.04, 0.94, radial * radial);
+        }
+        // Side faces: clay-tinted dark
         if (vTopFace < 0.5) {
-          diffuseColor.rgb *= 0.60;
-          // Slight warm clay tint on sides
-          diffuseColor.r *= 1.08;
-          diffuseColor.g *= 1.03;
+          diffuseColor.rgb *= 0.55;
+          diffuseColor.r *= 1.10;
+          diffuseColor.g *= 1.04;
         }
-        // Ocean shimmer — animated highlights on water tiles
-        bool isOcean = (diffuseColor.b > diffuseColor.r * 1.1 &&
-                        diffuseColor.g < diffuseColor.b * 0.90);
+        // Ocean shimmer
+        bool isOcean = (diffuseColor.b > diffuseColor.r * 1.05 &&
+                        diffuseColor.g < diffuseColor.b * 0.92);
         if (isOcean && vTopFace > 0.5) {
-          float wave  = 0.055 * sin(uTime * 1.8 + vLocalXZ.x * 0.09 + vLocalXZ.y * 0.07);
-          float wave2 = 0.030 * sin(uTime * 2.6 - vLocalXZ.x * 0.05 + vLocalXZ.y * 0.11);
-          diffuseColor.rgb += vec3(wave * 0.45, wave * 0.38 + wave2 * 0.5, wave + wave2);
+          float wave  = 0.06 * sin(uTime * 1.8 + vLocalXZ.x * 0.09 + vLocalXZ.y * 0.07);
+          float wave2 = 0.03 * sin(uTime * 2.6 - vLocalXZ.x * 0.05 + vLocalXZ.y * 0.11);
+          diffuseColor.rgb += vec3(wave * 0.3, wave * 0.25 + wave2 * 0.4, wave + wave2 * 1.2);
         }`,
       )
       // ── Per-biome roughness from atlas (correct atlas UV, not raw tile UV) ──
@@ -224,7 +234,7 @@ vec2 terrainAtlasUv(float idx, vec2 tileUv) {
       );
   };
 
-  mat.customProgramCacheKey = () => 'repociv-terrain-v6';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v7';
   return mat;
 }
 
