@@ -52,85 +52,94 @@ export function getTileDecorGroup(): Group {
   return decorGroup;
 }
 
-// ── Mountain: 2-3 layered cones (6-sided) with snow cap ─────────────────────
+// ── Mountain: 2 peaks per tile, rock cone + snow cap flush at tip ─────────────
+//  ConeGeometry default: tip at +height/2 (up), base at -height/2 (down).
+//  We position the cone CENTER so that base sits at tile surface:
+//    center_Y = tileY + ROCK_H/2        → base at tileY, tip at tileY + ROCK_H
+
+const ROCK_H   = HEX_SIZE * 0.55;   // rock cone height
+const ROCK_R   = HEX_SIZE * 0.20;   // rock base radius
+const SNOW_H   = HEX_SIZE * 0.22;   // snow cap height
+const SNOW_R   = HEX_SIZE * 0.085;  // snow cap base radius
 
 function buildMountains(tiles: Array<{ tile: Tile; variant: number }>): void {
   if (tiles.length === 0) return;
 
-  // Rock body: 6-sided cone, warmer grey-brown
-  const rockGeom = new ConeGeometry(HEX_SIZE * 0.22, HEX_SIZE * 0.60, 6);
-  const rockMat  = new MeshLambertMaterial({ color: new Color(0x6e6b62) });
+  const rockGeom = new ConeGeometry(ROCK_R, ROCK_H, 6);
+  const rockMat  = new MeshStandardMaterial({
+    color:    new Color(0x7a7870),
+    roughness: 0.85,
+    metalness: 0.04,
+  });
 
-  // Mid-section: slightly lighter
-  const midGeom = new ConeGeometry(HEX_SIZE * 0.16, HEX_SIZE * 0.42, 6);
-  const midMat  = new MeshLambertMaterial({ color: new Color(0x8a8880) });
-
-  // Snow cap: flat cylinder, emissive white
-  const snowGeom = new ConeGeometry(HEX_SIZE * 0.09, HEX_SIZE * 0.18, 6);
+  const snowGeom = new ConeGeometry(SNOW_R, SNOW_H, 6);
   const snowMat  = new MeshStandardMaterial({
-    color: new Color(0xf5f5f8),
-    emissive: new Color(0xd0d8e8),
-    emissiveIntensity: 0.12,
-    roughness: 0.6,
+    color:    new Color(0xf0f2f8),
+    emissive: new Color(0xc8d4e8),
+    emissiveIntensity: 0.18,
+    roughness: 0.50,
     metalness: 0.0,
   });
 
-  // Count: each tile spawns up to 3 peaks; reserve max slots
-  const maxPeaks = tiles.length * 3;
-  const rockMesh = new InstancedMesh(rockGeom, rockMat, maxPeaks);
-  const midMesh  = new InstancedMesh(midGeom,  midMat,  maxPeaks);
-  const snowMesh = new InstancedMesh(snowGeom, snowMat, maxPeaks);
-  let   idx = 0;
+  // Tiles with a city: skip mountain decor so buildings aren't buried
+  const decorOnly = tiles.filter((t) => !t.tile.city);
 
-  const mat = new Matrix4();
-  for (const { tile, variant } of tiles) {
+  const PEAKS = 2;
+  const maxPeaks = decorOnly.length * PEAKS;
+  if (maxPeaks === 0) return;
+
+  const rockMesh = new InstancedMesh(rockGeom, rockMat, maxPeaks);
+  const snowMesh = new InstancedMesh(snowGeom, snowMat, maxPeaks);
+  rockMesh.castShadow = true;
+  snowMesh.castShadow = true;
+
+  let idx = 0;
+  const q  = new Quaternion();
+  const sv = new Vector3();
+  const pv = new Vector3();
+
+  // Fixed offsets for two peaks: main (larger) and secondary (smaller, offset)
+  const offsets: Array<[number, number, number]> = [
+    [  0.00, 0,  0.00 ],
+    [ -0.16, 0,  0.12 ],
+  ];
+
+  for (const { tile, variant } of decorOnly) {
     const elev = terrainElevation(tile.terrain);
     const base = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-    const peaks = (variant % 2) + 2;  // 2 or 3 peaks
+    // Slight Y pad so decor sits above the tile's top face (+bevel)
+    const yFloor = base.y + 2;
 
-    const peakOffsets: Array<[number, number, number]> = [
-      [  0.00,  0,  0.00 ],
-      [ -0.18,  0,  0.10 ],
-      [  0.16,  0, -0.12 ],
-    ];
-    for (let p = 0; p < peaks; p++) {
-      const [ox, , oz] = peakOffsets[p]!;
-      const scale = 0.75 + (p === 0 ? 0.2 : 0) + (variant % 4) * 0.04;
-      const yBase = base.y + 2;
+    for (let p = 0; p < PEAKS; p++) {
+      const [ox, , oz] = offsets[p]!;
+      // Primary peak bigger, secondary 70 %
+      const sc    = p === 0
+        ? 0.82 + (variant % 5) * 0.04   // 0.82–0.98
+        : 0.55 + (variant % 4) * 0.03;  // 0.55–0.64
+      const rockH = ROCK_H * sc;
+      const snowH = SNOW_H * sc;
+      const tx = base.x + ox * HEX_SIZE;
+      const tz = base.z + oz * HEX_SIZE;
 
-      // Rock body
-      mat.makeScale(scale, scale * 1.0, scale);
-      mat.setPosition(base.x + ox * HEX_SIZE, yBase + scale * HEX_SIZE * 0.30, base.z + oz * HEX_SIZE);
-      rockMesh.setMatrixAt(idx, mat.clone());
+      // Rock: center at yFloor + rockH/2 → base sits at yFloor
+      pv.set(tx, yFloor + rockH * 0.5, tz);
+      sv.set(sc, sc, sc);
+      rockMesh.setMatrixAt(idx, new Matrix4().compose(pv, q, sv));
 
-      // Mid-section (sits on top of rock)
-      mat.makeScale(scale * 0.78, scale * 0.78, scale * 0.78);
-      mat.setPosition(base.x + ox * HEX_SIZE, yBase + scale * HEX_SIZE * 0.58, base.z + oz * HEX_SIZE);
-      midMesh.setMatrixAt(idx, mat.clone());
-
-      // Snow cap
-      mat.makeScale(scale * 0.55, scale * 0.55, scale * 0.55);
-      mat.setPosition(base.x + ox * HEX_SIZE, yBase + scale * HEX_SIZE * 0.84, base.z + oz * HEX_SIZE);
-      snowMesh.setMatrixAt(idx, mat.clone());
+      // Snow: base sits at rock tip (yFloor + rockH)
+      pv.set(tx, yFloor + rockH + snowH * 0.5, tz);
+      sv.set(sc, sc, sc);
+      snowMesh.setMatrixAt(idx, new Matrix4().compose(pv, q, sv));
 
       idx++;
     }
   }
-  // Zero-out unused slots
-  const zero = new Matrix4().makeScale(0, 0, 0);
-  for (let i = idx; i < maxPeaks; i++) {
-    rockMesh.setMatrixAt(i, zero);
-    midMesh.setMatrixAt(i, zero);
-    snowMesh.setMatrixAt(i, zero);
-  }
+
   rockMesh.count = idx;
-  midMesh.count  = idx;
   snowMesh.count = idx;
   rockMesh.instanceMatrix.needsUpdate = true;
-  midMesh.instanceMatrix.needsUpdate  = true;
   snowMesh.instanceMatrix.needsUpdate = true;
   addMesh(rockMesh);
-  addMesh(midMesh);
   addMesh(snowMesh);
 }
 

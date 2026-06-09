@@ -434,10 +434,19 @@ function ensureTerrainAtlasLoad(): void {
   atlasLoadStarted = true;
   loadTerrainAtlas().then((atlas) => {
     loadedTerrainAtlas = atlas;
-    if (terrainMaterial && atlas) {
-      updateTerrainShaderAtlas(terrainMaterial, atlas.texture, atlas.normalTexture, atlas.roughnessTexture);
+    if (atlas) {
+      // Try hot-update if shader already compiled
+      if (terrainMaterial) {
+        updateTerrainShaderAtlas(terrainMaterial, atlas.texture, atlas.normalTexture, atlas.roughnessTexture);
+      }
+      // Always dispose + null so the next rebuild creates a fresh material via
+      // createTerrainMaterial({terrainAtlas: atlas.texture, ...}) — this avoids
+      // the race where atlas loads before onBeforeCompile fires for the first time.
+      if (terrainMaterial) {
+        terrainMaterial.dispose();
+        terrainMaterial = null;
+      }
     }
-    // Force rebuild on next frame by clearing signature
     tileCountSignature = '';
   });
 }
