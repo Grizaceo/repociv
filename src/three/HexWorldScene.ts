@@ -75,6 +75,7 @@ let fogCoverMesh: InstancedMesh | null = null;
 let fogCoverSignature = '';
 let territoryLines: LineSegments | null = null;
 let shorelineRings: LineSegments | null = null;
+let shorelineSignature = '';
 let foamMesh: InstancedMesh | null = null;
 let foamSignature = '';
 let groundMeshRef: import('three').Mesh | null = null;
@@ -211,53 +212,70 @@ function rebuildTerritoryLines(
   terrainGroup.add(territoryLines);
 }
 
+/** Shoreline rings: rebuild geometry only when ocean tiles change.
+ *  Per-frame pulse animation uses in-place scale, avoiding allocations. */
 function rebuildShorelineRings(state: GameState, animTime: number): void {
-  if (shorelineRings) {
-    terrainGroup.remove(shorelineRings);
-    shorelineRings.geometry.dispose();
-    (shorelineRings.material as LineBasicMaterial).dispose();
-    shorelineRings = null;
-  }
-
-  const segments: number[] = [];
+  const tiles = Array.from(state.world.tiles.values());
   const getTile = (c: Axial) => state.world.tiles.get(tileKey(c));
-  const pulse = 0.88 + 0.08 * Math.sin(animTime * 2);
 
-  for (const tile of state.world.tiles.values()) {
-    if (tile.terrain !== 'ocean' || !tile.revealed) continue;
+  // Check which ocean tiles have land neighbors (need shoreline display)
+  const shorelineTiles = tiles.filter((t) => {
+    if (t.terrain !== 'ocean' || !t.revealed) return false;
     const neighbors = AXIAL_DIRECTIONS.map((d) =>
-      getTile({ q: tile.coord.q + d.q, r: tile.coord.r + d.r }),
+      getTile({ q: t.coord.q + d.q, r: t.coord.r + d.r }),
     );
-    if (!neighbors.some((n) => n && n.terrain !== 'ocean')) continue;
+    return neighbors.some((n) => n && n.terrain !== 'ocean');
+  });
+  const shorelineSig = shorelineTiles.map((t) => tileKey(t.coord)).join(',');
 
-    const elev = terrainElevation(tile.terrain);
-    const center = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-    const r = HEX_SIZE * pulse * 0.82;
-    for (let i = 0; i < 6; i++) {
-      const a = hexCornerAngle(i);
-      const b = hexCornerAngle((i + 1) % 6);
-      segments.push(
-        center.x + r * Math.cos(a),
-        center.y + 1.2,
-        center.z + r * Math.sin(a),
-        center.x + r * Math.cos(b),
-        center.y + 1.2,
-        center.z + r * Math.sin(b),
-      );
+  // Geometry rebuild only when shoreline composition changes
+  if (shorelineSig !== shorelineSignature) {
+    shorelineSignature = shorelineSig;
+
+    if (shorelineRings) {
+      terrainGroup.remove(shorelineRings);
+      shorelineRings.geometry.dispose();
+      (shorelineRings.material as LineBasicMaterial).dispose();
+      shorelineRings = null;
     }
+
+    if (shorelineTiles.length === 0) return;
+
+    const segments: number[] = [];
+    const r = HEX_SIZE * 0.82; // base radius; pulse applied via scale
+    for (const tile of shorelineTiles) {
+      const elev = terrainElevation(tile.terrain);
+      const center = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+      for (let i = 0; i < 6; i++) {
+        const a = hexCornerAngle(i);
+        const b = hexCornerAngle((i + 1) % 6);
+        segments.push(
+          center.x + r * Math.cos(a),
+          center.y + 1.2,
+          center.z + r * Math.sin(a),
+          center.x + r * Math.cos(b),
+          center.y + 1.2,
+          center.z + r * Math.sin(b),
+        );
+      }
+    }
+
+    const geom = new BufferGeometry();
+    geom.setAttribute('position', new Float32BufferAttribute(segments, 3));
+    const mat = new LineBasicMaterial({
+      color: 0x96dcff,
+      transparent: true,
+      opacity: 0.35,
+    });
+    shorelineRings = new LineSegments(geom, mat);
+    terrainGroup.add(shorelineRings);
   }
 
-  if (segments.length === 0) return;
-
-  const geom = new BufferGeometry();
-  geom.setAttribute('position', new Float32BufferAttribute(segments, 3));
-  const mat = new LineBasicMaterial({
-    color: 0x96dcff,
-    transparent: true,
-    opacity: 0.35,
-  });
-  shorelineRings = new LineSegments(geom, mat);
-  terrainGroup.add(shorelineRings);
+  // Per-frame pulse animation via in-place scale (no allocations)
+  if (shorelineRings) {
+    const pulse = 0.88 + 0.08 * Math.sin(animTime * 2);
+    shorelineRings.scale.setScalar(pulse);
+  }
 }
 
 /** Foam spheres at coast-land edges. */
