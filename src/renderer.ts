@@ -57,6 +57,11 @@ export class Renderer {
   private _currentLod: 'low' | 'medium' | 'high' = 'medium';
   private worldRenderMode: WorldRenderMode = 'flat';
   private animTime = 0;
+  // Phase D: WebGL frame metrics
+  private _frameTimeSum = 0;
+  private _frameTimeCount = 0;
+  private _frameTimeAvg = 0;
+  private _totalFrameCount = 0;
   private _placingMode = false; // true when user is picking a hex on map
 
   /** Panel-driven city relocate (drag city on map; no full gestureMode fork). */
@@ -841,14 +846,41 @@ export class Renderer {
     this.threeMap = null;
   }
 
+  /** Phase D: WebGL frame metrics for observability panel. */
+  getWebGLMetrics(): { frameTimeAvg: number; frameCount: number } | null {
+    if (this.worldRenderMode !== 'webgl') return null;
+    return {
+      frameTimeAvg: this._frameTimeAvg,
+      frameCount: this._totalFrameCount,
+    };
+  }
+
   start() {
     let lastTime = performance.now();
     const loop = (now: number) => {
+      const frameStart = performance.now();
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
       this.animTime += dt;
       this.render();
       this.minimapR.draw(this.cam, this.canvas, this.fogEnabled);
+      // Phase D: track frame time and dirty rate
+      if (this.worldRenderMode === 'webgl') {
+        const frameMs = performance.now() - frameStart;
+        this._frameTimeSum += frameMs;
+        this._frameTimeCount++;
+        this._totalFrameCount++;
+        // Rolling average every 60 frames
+        if (this._frameTimeCount >= 60) {
+          this._frameTimeAvg = Math.round(this._frameTimeSum / this._frameTimeCount * 100) / 100;
+          this._frameTimeSum = 0;
+          this._frameTimeCount = 0;
+        }
+        // Reset rolling window every 600 frames (~10s)
+        if (this._totalFrameCount >= 600) {
+          this._totalFrameCount = 0;
+        }
+      }
       this.rafId = requestAnimationFrame(loop);
     };
     this.rafId = requestAnimationFrame(loop);
@@ -1452,10 +1484,23 @@ export class Renderer {
     this.localR?.animateCameraToGrid(gridX, gridY, duration);
   }
 
-  /** Compute current zoom-based LOD level. */
+  private _lastLod: 'low' | 'medium' | 'high' = 'medium';
+
+  /** Compute current zoom-based LOD level with hysteresis to avoid thrashing. */
   private calcLod(): 'low' | 'medium' | 'high' {
-    if (this.cam.zoom < 0.5) return 'low';
-    if (this.cam.zoom < (this.worldRenderMode === 'webgl' ? 1.0 : 1.2)) return 'medium';
+    const webgl = this.worldRenderMode === 'webgl';
+    // Hysteresis: different thresholds for zooming in vs out
+    if (this._lastLod === 'low') {
+      if (this.cam.zoom >= (webgl ? 0.55 : 0.55)) { this._lastLod = 'medium'; return 'medium'; }
+      return 'low';
+    }
+    if (this._lastLod === 'medium') {
+      if (this.cam.zoom < (webgl ? 0.45 : 0.45)) { this._lastLod = 'low'; return 'low'; }
+      if (this.cam.zoom >= (webgl ? 1.05 : 1.25)) { this._lastLod = 'high'; return 'high'; }
+      return 'medium';
+    }
+    // high
+    if (this.cam.zoom < (webgl ? 0.95 : 1.15)) { this._lastLod = 'medium'; return 'medium'; }
     return 'high';
   }
 
