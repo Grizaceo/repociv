@@ -3,12 +3,17 @@ import type { LocalWorld, LocalTile, LocalRoom, LocalUnit, ZoneType } from './ty
 import { loadOfficeAtlas } from './officeAtlas.ts';
 import {
   drawIsoOfficeSprite,
-  drawIsoCarpetTile,
-  drawIsoCeilingLight,
-  drawIsoExteriorFacade,
-  drawIsoDoorSignage,
   type IsoOfficeDrawContext,
 } from './isoOfficeSprites.ts';
+import {
+  createParticlePool,
+  spawnBreath as spawnBreathParticle,
+  spawnSpark as spawnSparkParticle,
+  spawnZzz as spawnZzzParticle,
+  updateAndDrawParticles as updateAndDrawLocalParticles,
+  type LocalParticle,
+} from './localParticles.ts';
+import { buildIsoStaticLayer, buildStaticLayer } from './localStaticLayers.ts';
 
 const TILE_SIZE = 32; // px per tile
 
@@ -74,21 +79,6 @@ function isoTileCorners(x: number, y: number, z = 0): Array<{ x: number; y: numb
     { x: base.px, y: base.py + ISO_TILE_H / 2 },               // bottom
     { x: base.px - ISO_TILE_W / 2, y: base.py },               // left
   ];
-}
-
-interface LocalParticle {
-  active: boolean;
-  type: 'spark' | 'zzz';
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  color: string;
-  size: number;
-  life: number;
-  maxLife: number;
-  char?: string;
-  baseX: number;
 }
 
 // ─── Main renderer class ───────────────────────────────────────────────────────
@@ -316,22 +306,7 @@ export class LocalRenderer {
   }
 
   private initParticlePool() {
-    this.particles = [];
-    for (let i = 0; i < LocalRenderer.MAX_PARTICLES; i++) {
-      this.particles.push({
-        active: false,
-        type: 'spark',
-        x: 0,
-        y: 0,
-        vx: 0,
-        vy: 0,
-        color: '#000',
-        size: 0,
-        life: 0,
-        maxLife: 0,
-        baseX: 0,
-      });
-    }
+    this.particles = createParticlePool(LocalRenderer.MAX_PARTICLES);
   }
 
   private cacheTokens() {
@@ -928,152 +903,38 @@ export class LocalRenderer {
 
   private rebuildStaticLayer() {
     if (!this.world) return;
-    const c = document.createElement('canvas');
-    c.width = this.world.width * TILE_SIZE;
-    c.height = this.world.height * TILE_SIZE;
-    const sctx = c.getContext('2d')!;
-
-    // Temporarily swap context
-    const originalCtx = this.ctx;
-    this.ctx = sctx;
-
-    // Draw all tiles to offscreen canvas
-    for (let y = 0; y < this.world.height; y++) {
-      for (let x = 0; x < this.world.width; x++) {
-        const tile = this.world.grid[y]![x]!;
-        if (tile.type === 'door') {
-          // Draw floor underneath sliding door
-          this.drawTile({ ...tile, type: 'floor' });
-        } else {
-          this.drawTile(tile);
-        }
-      }
-    }
-
-    this.ctx = originalCtx;
-    this.staticLayer = c;
+    const result = buildStaticLayer(this.world, TILE_SIZE, (ctx, tile) => {
+      const originalCtx = this.ctx;
+      this.ctx = ctx;
+      this.drawTile(tile);
+      this.ctx = originalCtx;
+    });
+    this.staticLayer = result.canvas;
     this.staticWorldId = this.world.repoId;
   }
 
   private rebuildIsoStaticLayer() {
     if (!this.world) return;
     const world = this.world;
-    // Compute iso bounds to size the offscreen canvas
-    const c0 = isoProject(0, 0);
-    const c1 = isoProject(world.width, 0);
-    const c2 = isoProject(0, world.height);
-    const c3 = isoProject(world.width, world.height);
-    const minPx = Math.min(c0.px, c1.px, c2.px, c3.px) - ISO_TILE_W;
-    const maxPx = Math.max(c0.px, c1.px, c2.px, c3.px) + ISO_TILE_W;
-    const minPy = Math.min(c0.py, c1.py, c2.py, c3.py) - ISO_WALL_H - ISO_TILE_H;
-    const maxPy = Math.max(c0.py, c1.py, c2.py, c3.py) + ISO_TILE_H;
-
-    const c = document.createElement('canvas');
-    c.width = Math.ceil(maxPx - minPx);
-    c.height = Math.ceil(maxPy - minPy);
-    const sctx = c.getContext('2d')!;
-
-    // Save offsets for render-time positioning
-    this._isoStaticOffsetX = minPx;
-    this._isoStaticOffsetY = minPy;
-
-    // Translate so all tiles fit in positive canvas coords
-    sctx.save();
-    sctx.translate(-minPx, -minPy);
-
-    // Temporarily swap context
-    const originalCtx = this.ctx;
-    this.ctx = sctx;
-
-    // Draw all static tiles (floors + walls) — skip dynamic objects
-    for (let y = 0; y < world.height; y++) {
-      for (let x = 0; x < world.width; x++) {
-        const tile = world.grid[y]![x]!;
-        if (tile.type === 'door') {
-          // Draw floor underneath door
-          const tempTile: LocalTile = { ...tile, type: 'floor' };
-          this.drawIsoTile(tempTile, x, y, world);
-        } else if (
-          tile.type === 'workbench' ||
-          tile.type === 'standing_desk' ||
-          tile.type === 'chair' ||
-          tile.type === 'cubicle_partition' ||
-          tile.type === 'sofa' ||
-          tile.type === 'planter' ||
-          tile.type === 'server_rack' ||
-          tile.type === 'whiteboard' ||
-          tile.type === 'reception' ||
-          tile.type === 'window' ||
-          tile.type === 'meeting_room' ||
-          tile.type === 'phone_booth' ||
-          tile.type === 'break_area' ||
-          tile.type === 'watercooler' ||
-          tile.type === 'stairs'
-        ) {
-          // Draw floor underneath furniture
-          const tempTile: LocalTile = { ...tile, type: 'floor' };
-          this.drawIsoTile(tempTile, x, y, world);
-        } else {
-          this.drawIsoTile(tile, x, y, world);
-        }
-      }
-    }
-
-    // Zone ambient radial lights (subtle glow per room, drawn over floors)
-    const officeDctx: IsoOfficeDrawContext = {
-      ctx: sctx,
+    const result = buildIsoStaticLayer({
+      world,
+      isoTileW: ISO_TILE_W,
+      isoTileH: ISO_TILE_H,
+      isoWallH: ISO_WALL_H,
       fontMono: this.tokens.fontMono ?? "'JetBrains Mono', monospace",
       extColor: EXT_COLOR,
-    };
-    for (const room of world.rooms) {
-      const lightColor = ISO_ZONE_LIGHT[room.zoneType ?? 'team_cluster'];
-      if (!lightColor) continue;
-      const cx = room.x + room.width / 2;
-      const cy = room.y + room.height / 2;
-      const base = isoProject(cx, cy);
-      const radius = Math.max(room.width, room.height) * ISO_TILE_W * 0.55;
-      const grad = sctx.createRadialGradient(base.px, base.py, 0, base.px, base.py, radius);
-      grad.addColorStop(0, lightColor);
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      sctx.globalAlpha = 0.5; // blend the gradient shape
-      sctx.fillStyle = grad;
-      sctx.beginPath();
-      sctx.arc(base.px, base.py, radius, 0, Math.PI * 2);
-      sctx.fill();
-      sctx.globalAlpha = 1;
-    }
-
-    // Office ambiance: carpet in aisles, ceiling lights, exterior facade, door signage
-    for (let y = 0; y < world.height; y++) {
-      for (let x = 0; x < world.width; x++) {
-        const tile = world.grid[y]![x]!;
-        if (tile.type === 'aisle' || tile.type === 'path') {
-          drawIsoCarpetTile(officeDctx, x, y);
-        }
-        if ((x + y) % 5 === 0 && (tile.type === 'aisle' || tile.type === 'path')) {
-          drawIsoCeilingLight(officeDctx, x, y);
-        }
-        if (tile.type === 'wall') {
-          drawIsoExteriorFacade(officeDctx, x, y, world.width, world.height);
-        }
-        if (tile.type === 'door' && tile.roomId) {
-          const room = world.rooms.find((r) => r.id === tile.roomId);
-          const hasCorridorNeighbor = [
-            world.grid[y - 1]?.[x],
-            world.grid[y + 1]?.[x],
-            world.grid[y]?.[x - 1],
-            world.grid[y]?.[x + 1],
-          ].some((n) => n?.type === 'path' || n?.type === 'aisle');
-          if (room?.zoneLabel && hasCorridorNeighbor) {
-            drawIsoDoorSignage(officeDctx, x, y, room.zoneLabel);
-          }
-        }
-      }
-    }
-
-    this.ctx = originalCtx;
-    sctx.restore();
-    this.isoStaticLayer = c;
+      zoneLight: ISO_ZONE_LIGHT,
+      isoProject,
+      drawIsoTile: (ctx, tile, x, y, currentWorld) => {
+        const originalCtx = this.ctx;
+        this.ctx = ctx;
+        this.drawIsoTile(tile, x, y, currentWorld);
+        this.ctx = originalCtx;
+      },
+    });
+    this._isoStaticOffsetX = result.offsetX;
+    this._isoStaticOffsetY = result.offsetY;
+    this.isoStaticLayer = result.canvas;
     this.isoStaticWorldId = world.repoId;
   }
 
@@ -2752,79 +2613,15 @@ export class LocalRenderer {
   }
 
   private spawnSpark(x: number, y: number, color: string) {
-    const p = this.particles.find((part) => !part.active);
-    if (!p) return;
-
-    p.active = true;
-    p.type = 'spark';
-    p.x = x;
-    p.y = y;
-    p.baseX = x;
-    p.vx = (Math.random() - 0.5) * 12;
-    p.vy = -15 - Math.random() * 20;
-    p.color = color;
-    p.size = 1.5 + Math.random() * 2;
-    p.life = 0;
-    p.maxLife = 0.6 + Math.random() * 0.4;
+    spawnSparkParticle(this.particles, x, y, color);
   }
 
   private spawnZzz(x: number, y: number) {
-    const p = this.particles.find((part) => !part.active);
-    if (!p) return;
-
-    p.active = true;
-    p.type = 'zzz';
-    p.x = x;
-    p.y = y;
-    p.baseX = x;
-    p.vx = 8 + Math.random() * 8;
-    p.vy = -10 - Math.random() * 10;
-    p.color = this.tokens.amber400 || '#FBBF24';
-    p.size = 7 + Math.random() * 4;
-    p.life = 0;
-    p.maxLife = 1.2 + Math.random() * 0.8;
-    p.char = Math.random() > 0.5 ? 'z' : 'Z';
+    spawnZzzParticle(this.particles, x, y, this.tokens.amber400 || '#FBBF24');
   }
 
   private updateAndDrawParticles(dt: number) {
-    const { ctx } = this;
-    for (const p of this.particles) {
-      if (!p.active) continue;
-
-      p.life += dt;
-      if (p.life >= p.maxLife) {
-        p.active = false;
-        continue;
-      }
-
-      p.baseX += p.vx * dt;
-      p.y += p.vy * dt;
-
-      if (p.type === 'spark') {
-        p.x = p.baseX + Math.sin(p.life * 10) * 4;
-
-        const alpha = Math.max(0, 1 - p.life / p.maxLife);
-        ctx.save();
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = alpha;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      } else {
-        p.x = p.baseX + Math.sin(p.life * 4) * 5;
-
-        const alpha = Math.max(0, (1 - p.life / p.maxLife) * 0.6);
-        ctx.save();
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = alpha;
-        ctx.font = `${p.size}px ${this.tokens.fontMono}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(p.char || 'Z', p.x, p.y);
-        ctx.restore();
-      }
-    }
+    updateAndDrawLocalParticles(this.ctx, this.particles, dt, this.tokens.fontMono || "'JetBrains Mono', monospace");
   }
 
   private drawPowerOverlay(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
@@ -3086,21 +2883,7 @@ export class LocalRenderer {
   }
 
   private spawnBreath(x: number, y: number) {
-    const p = this.particles.find((part) => !part.active);
-    if (!p) return;
-
-    p.active = true;
-    p.type = 'zzz';
-    p.x = x;
-    p.y = y;
-    p.baseX = x;
-    p.vx = (Math.random() - 0.5) * 10;
-    p.vy = -8 - Math.random() * 8;
-    p.color = 'rgba(200, 230, 255, 0.7)'; // pale blue
-    p.size = 6 + Math.random() * 4;
-    p.life = 0;
-    p.maxLife = 1.5 + Math.random() * 1.0;
-    p.char = '∼';
+    spawnBreathParticle(this.particles, x, y);
   }
 
   private drawZones(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
