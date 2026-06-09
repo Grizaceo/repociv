@@ -7,6 +7,7 @@ import { UNIT_COLORS } from './types.ts';
 import { generateLocalWorldFromApi, buildMockLocalWorld, BATTERY_STORED } from './localMap.ts';
 import { findPath, findNearestWorkbench } from './localPathfinding.ts';
 import { peekNextMission } from './priorityMatrix.ts';
+import { logger } from './logger.ts';
 
 const TICK_MS = 16; // must match game.ts
 
@@ -346,7 +347,7 @@ export class LocalWorldManager {
     // Power outage incident if severe deficit
     if (pg.consumedWatts > pg.generatedWatts + pg.storedWatts * 0.1 && Math.random() < 0.001) {
       // Could trigger incident system later
-      console.warn('[Power] Grid overload! Consumed:', pg.consumedWatts, 'Generated:', pg.generatedWatts, 'Stored:', pg.storedWatts);
+      logger.warn('[Power] Grid overload! Consumed:', pg.consumedWatts, 'Generated:', pg.generatedWatts, 'Stored:', pg.storedWatts);
     }
   }
 

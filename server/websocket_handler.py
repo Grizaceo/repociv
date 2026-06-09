@@ -186,13 +186,19 @@ async def _heartbeat_loop(ws: websockets.asyncio.server.ServerConnection) -> Non
                 if entry:
                     entry["missed_heartbeats"] = 0
         except asyncio.TimeoutError:
+            disconnect = False
             async with _connections_lock:
                 entry = _connections.get(ws)
                 if entry:
                     entry["missed_heartbeats"] += 1
-                    if entry["missed_heartbeats"] >= _HEARTBEAT_MISSED_LIMIT:
-                        logger.info("WS client disconnected (heartbeat timeout)")
-                        return
+                    disconnect = entry["missed_heartbeats"] >= _HEARTBEAT_MISSED_LIMIT
+            if disconnect:
+                logger.info("WS client disconnected (heartbeat timeout)")
+                try:
+                    await ws.close(4000, "heartbeat timeout")
+                except websockets.exceptions.WebSocketException:
+                    pass
+                return
         except websockets.exceptions.WebSocketException:
             return
 
@@ -293,7 +299,7 @@ _ws_server: websockets.asyncio.server.Server | None = None
 
 async def _run_server(host: str = WS_HOST, port: int = BRIDGE_WS_PORT) -> None:
     """Run the WS server forever."""
-    global _loop, _start_time
+    global _loop, _start_time, _ws_server
     _loop = asyncio.get_running_loop()
     _start_time = time.time()
 
@@ -343,15 +349,16 @@ def stop_ws_server() -> None:
     while _ws_server is None and time.time() < deadline:
         time.sleep(0.05)
     if _loop is not None and _ws_server is not None:
-        future = asyncio.run_coroutine_threadsafe(_ws_server.close(), _loop)
+        server, loop = _ws_server, _loop
         try:
-            future.result(timeout=3)
-        except Exception:
-            pass
-        if _loop.is_running():
-            future2 = asyncio.run_coroutine_threadsafe(_ws_server.wait_closed(), _loop)
+            # Server.close() is a plain method, not a coroutine
+            loop.call_soon_threadsafe(server.close)
+        except RuntimeError:
+            pass  # Event loop is closed
+        if loop.is_running():
+            future = asyncio.run_coroutine_threadsafe(server.wait_closed(), loop)
             try:
-                future2.result(timeout=3)
+                future.result(timeout=3)
             except Exception:
                 pass
     _ws_server = None

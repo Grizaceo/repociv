@@ -8,6 +8,7 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Shader = any;
 import { HEX_SIZE } from '../constants.ts';
+import { TILE_PRISM_HEIGHT } from './hexGeometry.ts';
 import { type Terrain } from '../types.ts';
 
 /** Stable terrain-to-atlas index mapping. Keep in sync with terrain-atlas-3d.json. */
@@ -71,6 +72,7 @@ export function createTerrainMaterial(
     // ── Uniforms ─────────────────────────────────────────────────────────────
     shader.uniforms.uTime             = { value: 0 };
     shader.uniforms.uHexRadius        = { value: HEX_SIZE };
+    shader.uniforms.uPrismHeight      = { value: TILE_PRISM_HEIGHT };
     shader.uniforms.uUseAtlas         = { value: options.terrainAtlas ? 1 : 0 };
     shader.uniforms.uTerrainAtlas     = { value: options.terrainAtlas ?? null };
     shader.uniforms.uNormalAtlas      = { value: options.normalAtlas ?? null };
@@ -90,6 +92,7 @@ export function createTerrainMaterial(
       'varying float vNeighborTerrainIndex;\n' +
       'varying vec2  vLocalXZ;\n' +
       'varying vec2  vWorldXZ;\n' +
+      'varying float vLocalY;\n' +
       'varying vec2  vUv;\n' +
       'varying float vTopFace;\n' +
       shader.vertexShader.replace(
@@ -99,6 +102,7 @@ export function createTerrainMaterial(
         vNeighborTerrainIndex = instanceNeighborTerrain;
         vLocalXZ      = vec2(position.x, position.z);
         vWorldXZ      = instanceMatrix[3].xz + transformed.xz;
+        vLocalY       = transformed.y;
         vUv           = uv;
         // normal.y > 0.5 in local space → top face
         vTopFace      = step(0.5, normal.y);
@@ -134,10 +138,12 @@ export function createTerrainMaterial(
       'varying float vNeighborTerrainIndex;\n' +
       'varying vec2  vLocalXZ;\n' +
       'varying vec2  vWorldXZ;\n' +
+      'varying float vLocalY;\n' +
       'varying vec2  vUv;\n' +
       'varying float vTopFace;\n' +
       'uniform float uTime;\n' +
       'uniform float uHexRadius;\n' +
+      'uniform float uPrismHeight;\n' +
       'uniform int   uUseAtlas;\n' +
       'uniform sampler2D uTerrainAtlas;\n' +
       'uniform sampler2D uNormalAtlas;\n' +
@@ -160,6 +166,12 @@ vec2 terrainMacroUv(float idx, vec2 tileUv, vec2 worldXZ) {
   float scale = mix(3.2, 4.8, clamp(idx / 7.0, 0.0, 1.0));
   vec2 worldUv = fract(worldXZ / (uHexRadius * scale) + vec2(idx * 0.137, idx * 0.173));
   return mix(tileUv, worldUv, 0.78);
+}
+
+float terrainDetailNoise(vec2 p) {
+  float a = sin(p.x * 0.055) * sin(p.y * 0.047);
+  float b = sin(p.x * 0.113 + 1.7) * cos(p.y * 0.097 - 0.8);
+  return 0.5 + 0.5 * (0.65 * a + 0.35 * b);
 }
 `;
 
@@ -219,16 +231,34 @@ vec2 terrainMacroUv(float idx, vec2 tileUv, vec2 worldXZ) {
           tex *= 1.08;
           // Very light global tonal glue so biomes feel painted under the same sky.
           tex = mix(tex, tex * vec3(0.97, 0.995, 0.96), 0.20);
+          // Subtle world-space microvariation so broad top faces feel like terrain, not flat panels.
+          float detail = terrainDetailNoise(vWorldXZ);
+          if (tidx < 0.5) {
+            tex *= mix(0.985, 1.035, detail);
+            tex = mix(tex, tex * vec3(0.96, 1.03, 0.95), 0.10 * detail);
+          } else if (tidx < 1.5) {
+            tex *= mix(0.97, 1.02, detail);
+            tex = mix(tex, tex * vec3(0.94, 1.02, 0.95), 0.12 * detail);
+          } else if (tidx < 2.5) {
+            tex *= mix(0.96, 1.015, detail);
+            tex = mix(tex, tex * vec3(0.97, 0.99, 1.01), 0.10 * detail);
+          } else if (tidx < 6.5) {
+            tex *= mix(0.985, 1.025, detail);
+          }
           diffuseColor.rgb = mix(diffuseColor.rgb, tex, 0.82);
         }
         // Radial vignette — very subtle
         if (vTopFace > 0.5) {
           diffuseColor.rgb *= mix(1.02, 0.98, radial * radial);
         }
-        // Side faces: darker for depth, varied by biome height
+        // Side faces: use a vertical gradient so elevated tiles read as terrain mass, not flat dark boxes.
         if (vTopFace < 0.5) {
-          float cliffDark = (tidx > 1.5 && tidx < 2.5) ? 0.58 : 0.68;
-          diffuseColor.rgb *= cliffDark;
+          float cliffT = clamp((-vLocalY) / max(uPrismHeight, 0.001), 0.0, 1.0);
+          float topShade = (tidx > 1.5 && tidx < 2.5) ? 0.84 : 0.88;
+          float bottomShade = (tidx > 1.5 && tidx < 2.5) ? 0.52 : 0.60;
+          float cliffShade = mix(topShade, bottomShade, smoothstep(0.08, 1.0, cliffT));
+          diffuseColor.rgb *= cliffShade;
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.96, 0.98, 0.94), 0.18);
         }
         // Ocean shimmer
         bool isOcean = (diffuseColor.b > diffuseColor.r * 1.05 &&
@@ -276,7 +306,7 @@ vec2 terrainMacroUv(float idx, vec2 tileUv, vec2 worldXZ) {
       );
   };
 
-  mat.customProgramCacheKey = () => 'repociv-terrain-v11';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v13';
   return mat;
 }
 

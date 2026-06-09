@@ -204,7 +204,7 @@ function rebuildTerritoryLines(
   const mat = new LineBasicMaterial({
     color: new Color(0xb99654).multiplyScalar(pulse),
     transparent: true,
-    opacity: lod === 'high' ? 0.18 : 0.12,
+    opacity: lod === 'high' ? 0.08 : 0.06,
     linewidth: 2,
   });
   territoryLines = new LineSegments(geom, mat);
@@ -355,9 +355,9 @@ function rebuildFogCover(state: GameState): void {
   if (unrevealed.length === 0) return;
 
   const mat = new MeshLambertMaterial({
-    color: 0x0a0a14,
+    color: 0x2a2a35,
     transparent: true,
-    opacity: 0.72,
+    opacity: 0.55,
   });
   fogCoverMesh = new InstancedMesh(sharedHexGeometry, mat, unrevealed.length);
 

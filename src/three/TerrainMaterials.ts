@@ -42,7 +42,7 @@ export const TERRAIN_INDEX: Record<Terrain, number> = ALL_TERRAINS.reduce(
 export { ALL_TERRAINS };
 
 /** Dim a color for fog / unrevealed tiles (matches iso25d overlay tone). */
-export const FOG_DARK = 0x0a0a14;
+export const FOG_DARK = 0x2a2a35;
 
 export function fogTint(base: Color, alpha: number, target = new Color(FOG_DARK)): Color {
   return base.clone().lerp(target, 1 - alpha);

@@ -89,9 +89,9 @@ export function rebuildMapLabels(
       }
     }
 
-    if (tile?.skillHealth && lod !== 'low') {
+    if (tile?.skillHealth) {
       const health = tile.skillHealth;
-      const icon = health === 'ok' ? '⚡' : health === 'stale' ? '⚡' : '⚡';
+      const icon = '⚡';
       const cls =
         health === 'ok'
           ? 'map-label map-label-health-ok'
@@ -121,7 +121,7 @@ export function renderLabels(
   cssRenderer.render(scene, camera);
 }
 
-export function disposeLabels(container: HTMLElement): void {
+export function disposeLabels(_container: HTMLElement): void {
   clearLabels();
   lastSignature = '';
   if (cssRenderer) {

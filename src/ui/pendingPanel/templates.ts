@@ -1,13 +1,9 @@
 // ─── Pure HTML templates for the pending panel ──────────────────────────────
 import { type PendingItem, STATE_OPTIONS, getExpandedId, getEditingId } from './state.ts';
 
-export function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+import { escapeHtml } from '../escapeHtml.ts';
+
+export { escapeHtml };
 
 export function renderItem(item: PendingItem): string {
   const isExpanded = getExpandedId() === item.id;

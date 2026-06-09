@@ -6,6 +6,7 @@ import { getSelectedConfig, isSwarmTrackingAvailable } from './chat/modelSelecto
 import { isLayerVisible } from '../layers.ts';
 import { openSubagentSession, recallSubagent } from './subagentSessionPanel.ts';
 import { appendSystemMessage } from './chat/history.ts';
+import { escapeHtml } from './escapeHtml.ts';
 
 let _highlightCb: ((unitId: string | null) => void) | null = null;
 
@@ -167,10 +168,6 @@ export function renderOrdenDeBatalla(state: GameState, unit: Unit): void {
     const sid = root.querySelector<HTMLButtonElement>('.orden-session-btn')?.dataset['session'];
     if (sid) openSubagentSession(sid);
   });
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 export function hideOrdenDeBatalla(): void {

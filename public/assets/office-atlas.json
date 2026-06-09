@@ -1,0 +1,18 @@
+{
+  "atlas": "/assets/office-atlas.svg",
+  "cellWidth": 128,
+  "cellHeight": 64,
+  "spriteRects": {
+    "desk_l": [0, 0, 128, 64],
+    "desk_r": [128, 0, 256, 64],
+    "chair": [256, 0, 384, 64],
+    "partition_h": [384, 0, 512, 64],
+    "partition_v": [512, 0, 640, 64],
+    "reception_desk": [0, 64, 128, 128],
+    "watercooler": [128, 64, 256, 128],
+    "plant": [256, 64, 384, 128],
+    "whiteboard": [384, 64, 512, 128],
+    "ceiling_light": [512, 64, 640, 128],
+    "carpet_tile": [0, 128, 128, 192]
+  }
+}

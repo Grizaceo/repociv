@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="192" viewBox="0 0 640 192">
+  <!-- desk_l -->
+  <g transform="translate(0,0)">
+    <polygon points="64,40 20,52 64,64 108,52" fill="#B09060"/>
+    <rect x="42" y="18" width="44" height="18" fill="#D0D0D0"/>
+    <rect x="46" y="22" width="36" height="12" fill="#1a2030"/>
+  </g>
+  <!-- desk_r -->
+  <g transform="translate(128,0)">
+    <polygon points="64,40 20,52 64,64 108,52" fill="#A08050"/>
+    <rect x="42" y="18" width="44" height="18" fill="#C8C8C8"/>
+    <rect x="46" y="22" width="36" height="12" fill="#243048"/>
+  </g>
+  <!-- chair -->
+  <g transform="translate(256,0)">
+    <ellipse cx="64" cy="48" rx="22" ry="14" fill="#B08090"/>
+    <ellipse cx="64" cy="58" rx="6" ry="5" fill="#888"/>
+  </g>
+  <!-- partition_h -->
+  <g transform="translate(384,0)">
+    <rect x="16" y="22" width="96" height="20" fill="#A8B0C0"/>
+    <line x1="20" y1="26" x2="108" y2="38" stroke="#788898" stroke-width="2"/>
+  </g>
+  <!-- partition_v -->
+  <g transform="translate(512,0)">
+    <rect x="52" y="16" width="24" height="32" fill="#98A8B8"/>
+    <line x1="56" y1="20" x2="72" y2="44" stroke="#687888" stroke-width="2"/>
+  </g>
+  <!-- reception_desk -->
+  <g transform="translate(0,64)">
+    <path d="M20,52 L108,52 L96,28 Q64,18 32,28 Z" fill="#C4A880"/>
+    <rect x="56" y="14" width="16" height="12" fill="#D8DCE0"/>
+  </g>
+  <!-- watercooler -->
+  <g transform="translate(128,64)">
+    <rect x="52" y="20" width="24" height="36" fill="#B0C8E0" rx="2"/>
+    <ellipse cx="64" cy="16" rx="10" ry="6" fill="#E8F0FF"/>
+  </g>
+  <!-- plant -->
+  <g transform="translate(256,64)">
+    <rect x="50" y="40" width="28" height="16" fill="#8B7355"/>
+    <ellipse cx="64" cy="30" rx="24" ry="18" fill="#608860"/>
+    <ellipse cx="56" cy="22" rx="10" ry="10" fill="#90B090"/>
+  </g>
+  <!-- whiteboard -->
+  <g transform="translate(384,64)">
+    <rect x="16" y="16" width="96" height="32" fill="#E8E8E8"/>
+    <line x1="24" y1="24" x2="104" y2="40" stroke="#4A90D4" stroke-width="3"/>
+  </g>
+  <!-- ceiling_light -->
+  <g transform="translate(512,64)">
+    <ellipse cx="64" cy="36" rx="36" ry="16" fill="#FFF8E0" opacity="0.9"/>
+    <ellipse cx="64" cy="34" rx="14" ry="8" fill="#FFE8A0"/>
+  </g>
+  <!-- carpet_tile -->
+  <g transform="translate(0,128)">
+    <polygon points="64,16 112,32 64,48 16,32" fill="#9A8A7A"/>
+    <polygon points="64,20 100,32 64,44 28,32" fill="#8A7A6A" opacity="0.6"/>
+  </g>
+</svg>

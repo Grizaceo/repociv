@@ -585,13 +585,12 @@ function furnishRooms(
         const northWall = wallAdjacentFloors(0, -1);
         const southWall = wallAdjacentFloors(0, 1);
         const wbCandidates = northWall.length > 0 ? northWall : southWall;
-        let wbX = -1, wbY = -1;
         // Reserves the manager NPC's tile so later furniture passes don't draw on top of it.
         let npcTile: { x: number; y: number } | null = null;
         if (wbCandidates.length > 0) {
           const mid = Math.floor(wbCandidates.length / 2);
-          wbX = wbCandidates[mid]!.x;
-          wbY = wbCandidates[mid]!.y;
+          const wbX = wbCandidates[mid]!.x;
+          const wbY = wbCandidates[mid]!.y;
           place(wbX, wbY, 'whiteboard');
           // Spawn manager NPC one tile toward the room interior from the whiteboard.
           // wbCandidates is always drawn from northWall/southWall, so wbY is always
@@ -1092,7 +1091,6 @@ function placeRestAreas(
         const innerW = innerX1 - innerX0 + 1;
         const innerH = innerY1 - innerY0 + 1;
 
-        let bedCount = 0;
         const maxBeds = isBedroom ? Math.max(2, Math.floor(Math.min(innerW, innerH) / 2)) : 1;
 
         if (innerW >= innerH) {
@@ -1102,7 +1100,6 @@ function placeRestAreas(
             if (inBounds(bx, by, gridW, gridH) && grid[by]?.[bx]?.type === 'floor') {
               grid[by][bx].type = 'bed';
               restTiles.push({ x: bx, y: by });
-              bedCount++;
             }
           }
         } else {
@@ -1112,7 +1109,6 @@ function placeRestAreas(
             if (inBounds(bx, by, gridW, gridH) && grid[by]?.[bx]?.type === 'floor') {
               grid[by][bx].type = 'bed';
               restTiles.push({ x: bx, y: by });
-              bedCount++;
             }
           }
         }

@@ -764,8 +764,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         # Health and ready endpoints are exempt from token auth (used by monitors)
         if path not in ("/health", "/ready") and not self._check_token():
-            self._err_json(401, "unauthorized")
-            return
+            # EventSource cannot send custom headers — accept the token via
+            # query param for the SSE stream only.
+            sse_token_ok = (
+                path == "/events"
+                and bool(REPOCIV_TOKEN)
+                and hmac.compare_digest(
+                    params.get("token", "").encode("utf-8"),
+                    REPOCIV_TOKEN.encode("utf-8"),
+                )
+            )
+            if not sse_token_ok:
+                self._err_json(401, "unauthorized")
+                return
 
         # ── Simple exact-match GET routes ──────────────────────────────────────
         _GET_EXACT: dict[str, Any] = {
@@ -907,11 +918,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 return
 
         self._err_json(404, "not found")
-
-    # placeholder to keep next method visible
-    def _do_GET_placeholder(self) -> None:
-        pass
-
 
     def do_POST(self) -> None:
         if self._rate_limited():

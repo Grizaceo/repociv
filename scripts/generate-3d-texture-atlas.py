@@ -11,7 +11,7 @@ Produces:
 
 v5: full numpy vectorisation — ~100× faster than pixel-by-pixel Python loops.
 """
-import json, sys
+import json
 from pathlib import Path
 import bpy
 import numpy as np

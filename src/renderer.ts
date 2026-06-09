@@ -1,6 +1,7 @@
 // ─── RepoCiv — Renderer (orquestador) ────────────────────────────────────────
 import { type Axial, worldToAxial, axialToPixel, type Camera } from './hex.ts';
 import { screenToAxial } from './isoHex.ts';
+import { logger } from './logger.ts';
 import { type Unit, type Tile, type City, tileKey } from './types.ts';
 import { type GameState } from './game.ts';
 import { HexRenderer } from './hexRenderer.ts';
@@ -214,7 +215,7 @@ export class Renderer {
       try {
         await this.ensureThreeMap();
       } catch (err) {
-        console.error('[Renderer] WebGL init failed, falling back to iso25d', err);
+        logger.error('[Renderer] WebGL init failed, falling back to iso25d', err);
         mode = 'iso25d';
       }
       if (mode === 'webgl' && this.threeMap) {

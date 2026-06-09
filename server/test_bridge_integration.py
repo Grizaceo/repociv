@@ -1,6 +1,7 @@
 import json
 import threading
 import time
+import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
 
@@ -76,6 +77,28 @@ def test_events_endpoint_serves_history_as_json():
         with urllib.request.urlopen(req, timeout=2) as resp:
             data = json.loads(resp.read().decode())
         assert isinstance(data, list)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_events_endpoint_accepts_token_via_query_param(monkeypatch):
+    """EventSource cannot send headers — /events must accept ?token=<token>."""
+    monkeypatch.setattr(bridge, "REPOCIV_TOKEN", "sse-test-token")
+    server, base = _start_test_server()
+    try:
+        # Valid token via query param → 200
+        with urllib.request.urlopen(f"{base}/events?token=sse-test-token", timeout=2) as resp:
+            data = json.loads(resp.read().decode())
+        assert isinstance(data, list)
+        # Wrong token via query param → 401
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(f"{base}/events?token=wrong", timeout=2)
+        assert exc_info.value.code == 401
+        # Query token is only honored for /events, not other routes
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(f"{base}/missions?token=sse-test-token", timeout=2)
+        assert exc_info.value.code == 401
     finally:
         server.shutdown()
         server.server_close()

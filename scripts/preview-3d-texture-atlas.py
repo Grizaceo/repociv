@@ -2,7 +2,10 @@
 """Generate a contact-sheet Blender render of the terrain atlas tiles for visual QA.
 Run via: blender --background --factory-startup --python scripts/preview-3d-texture-atlas.py
 """
-import json, math, os, sys
+import json
+import math
+import os
+import sys
 from pathlib import Path
 import bpy
 

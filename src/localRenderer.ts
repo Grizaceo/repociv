@@ -1022,7 +1022,7 @@ export class LocalRenderer {
     // Zone ambient radial lights (subtle glow per room, drawn over floors)
     const officeDctx: IsoOfficeDrawContext = {
       ctx: sctx,
-      fontMono: this.tokens.fontMono,
+      fontMono: this.tokens.fontMono ?? "'JetBrains Mono', monospace",
       extColor: EXT_COLOR,
     };
     for (const room of world.rooms) {
@@ -3562,7 +3562,7 @@ export class LocalRenderer {
     // ─── Draw furniture / office sprites (atlas + procedural fallback) ─
     const officeDctx: IsoOfficeDrawContext = {
       ctx,
-      fontMono: this.tokens.fontMono,
+      fontMono: this.tokens.fontMono ?? "'JetBrains Mono', monospace",
       extColor: EXT_COLOR,
     };
     if (
@@ -3867,28 +3867,6 @@ export class LocalRenderer {
     }
   }
 
-  // ─── Isometric Furniture Stubs (Phase B will implement visuals) ─────────
-  private drawIsoStandingDesk(gx: number, gy: number) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    ctx.fillStyle = '#B09060';
-    ctx.beginPath();
-    ctx.moveTo(base.px - 10, base.py - 4);
-    ctx.lineTo(base.px, base.py - 10);
-    ctx.lineTo(base.px + 10, base.py - 4);
-    ctx.lineTo(base.px, base.py + 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#D8DCE0';
-    ctx.fillRect(base.px - 5, base.py - 18, 10, 8);
-    ctx.fillStyle = 'rgba(140, 170, 190, 0.3)';
-    ctx.fillRect(base.px - 4, base.py - 17, 8, 6);
-    ctx.fillStyle = '#608860';
-    ctx.beginPath();
-    ctx.arc(base.px + 6, base.py - 2, 2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
   private drawIsoSofa(gx: number, gy: number) {
     const { ctx } = this;
     const base = isoProject(gx, gy);
@@ -3908,121 +3886,6 @@ export class LocalRenderer {
     ctx.lineTo(base.px, base.py + 4);
     ctx.closePath();
     ctx.fill();
-  }
-
-  private drawIsoPlanter(gx: number, gy: number) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    ctx.fillStyle = '#B09060';
-    ctx.beginPath();
-    ctx.moveTo(base.px - 6, base.py + 2);
-    ctx.lineTo(base.px + 6, base.py + 2);
-    ctx.lineTo(base.px + 5, base.py - 6);
-    ctx.lineTo(base.px - 5, base.py - 6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#608860';
-    ctx.beginPath();
-    ctx.ellipse(base.px, base.py - 10, 6, 5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#90B090';
-    ctx.beginPath();
-    ctx.ellipse(base.px - 2, base.py - 12, 3, 3, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  private drawIsoWorkbench(tile: LocalTile, gx: number, gy: number, activeWbIds?: Set<string | null>) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    const wb = tile.workbench;
-    if (!wb) return;
-    const extColor = EXT_COLOR[wb.extension] ?? '#888';
-    const isActive = activeWbIds?.has(wb.id);
-
-    // Desk surface (raised slightly)
-    const deskH = 10;
-    ctx.fillStyle = '#B09060';
-    ctx.beginPath();
-    ctx.moveTo(base.px - 10, base.py - deskH);
-    ctx.lineTo(base.px, base.py - 6 - deskH);
-    ctx.lineTo(base.px + 10, base.py - deskH);
-    ctx.lineTo(base.px, base.py + 6 - deskH);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(200, 170, 140, 0.4)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-
-    // Monitor (vertical slab)
-    if (isActive) {
-      // Glow effect when agent is working
-      const now = performance.now();
-      ctx.shadowColor = extColor;
-      ctx.shadowBlur = 8 + 4 * Math.sin(now / 250);
-    }
-    ctx.fillStyle = '#D0D0D0';
-    ctx.fillRect(base.px - 6, base.py - 22, 12, 10);
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#0a0a0c';
-    ctx.fillRect(base.px - 5, base.py - 21, 10, 8);
-
-    if (isActive) {
-      // Scrolling code lines
-      const now = performance.now();
-      ctx.fillStyle = extColor;
-      ctx.globalAlpha = 0.75;
-      const scrollY = (now / 35) % 6;
-      for (let i = 0; i < 3; i++) {
-        const ly = base.py - 20 + i * 3 - scrollY;
-        if (ly >= base.py - 21 && ly <= base.py - 13) {
-          ctx.fillRect(base.px - 4, ly, 8, 1.5);
-        }
-      }
-      ctx.globalAlpha = 1;
-      // Random sparks
-      if (Math.random() < 0.15) {
-        this.spawnSpark(base.px, base.py - 5, extColor);
-      }
-    } else {
-      ctx.fillStyle = 'rgba(140, 170, 190, 0.3)';
-      ctx.fillRect(base.px - 5, base.py - 21, 10, 8);
-    }
-
-    // Extension label
-    ctx.fillStyle = extColor;
-    ctx.font = `bold 5px ${this.tokens.fontMono}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(wb.extension.toUpperCase().slice(0, 3), base.px, base.py - 16);
-
-    // Keyboard hint
-    ctx.fillStyle = '#B8C0C8';
-    ctx.fillRect(base.px - 5, base.py - 2, 10, 2);
-
-    // Chair (behind/under desk in iso)
-    ctx.fillStyle = '#B08090';
-    ctx.beginPath();
-    ctx.ellipse(base.px, base.py + 6, 4, 3, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  private drawIsoWhiteboard(_gx: number, _gy: number) {
-    // Whiteboard art is rendered on the wall face in _drawIsoWallTile
-  }
-
-  private drawIsoReception(gx: number, gy: number) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    ctx.fillStyle = '#B09060';
-    ctx.beginPath();
-    ctx.moveTo(base.px - 10, base.py + 4);
-    ctx.lineTo(base.px + 10, base.py + 4);
-    ctx.lineTo(base.px + 8, base.py - 6);
-    ctx.quadraticCurveTo(base.px, base.py - 10, base.px - 8, base.py - 6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#D8DCE0';
-    ctx.fillRect(base.px - 3, base.py - 14, 6, 5);
-    ctx.fillStyle = 'rgba(186, 230, 253, 0.6)';
-    ctx.fillRect(base.px - 2, base.py - 13, 4, 3);
   }
 
   private drawIsoServerRack(gx: number, gy: number) {
@@ -4107,25 +3970,6 @@ export class LocalRenderer {
     ctx.fillRect(base.px + 4, base.py - 12, 6, 5);
   }
 
-  private drawIsoWatercooler(gx: number, gy: number) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    ctx.fillStyle = '#E3F2FD';
-    ctx.beginPath();
-    ctx.roundRect(base.px - 3, base.py - 2, 6, 5, 1);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(186, 230, 253, 0.5)';
-    ctx.beginPath();
-    ctx.ellipse(base.px, base.py - 8, 4, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(186, 230, 253, 0.7)';
-    ctx.beginPath();
-    ctx.ellipse(base.px, base.py - 6, 3, 4, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#D0D0D0';
-    ctx.fillRect(base.px + 5, base.py - 1, 2, 3);
-  }
-
   private drawIsoStairs(gx: number, gy: number) {
     const { ctx } = this;
     const base = isoProject(gx, gy);
@@ -4207,8 +4051,8 @@ export class LocalRenderer {
   private drawIsoUnit(unit: LocalUnit, gx: number, gy: number) {
     const { ctx } = this;
     const base = isoProject(gx, gy);
-    let ux = base.px;
-    let uy = base.py;
+    const ux = base.px;
+    const uy = base.py;
 
     // Spawning Zzzs if unit is idle or resting
     if ((unit.state === 'idle_in_room' || unit.state === 'resting') && Math.random() < 0.02) {

@@ -1130,6 +1130,9 @@ def get_repo_file_tree(ctx: "RouteContext") -> tuple[int, Any]:
         decoded = _rrs.decode_repo_id(repo_id)
         if decoded:
             return decoded
+        # Plain ids are single folder names under the active root — reject traversal
+        if "/" in repo_id or "\\" in repo_id or ".." in repo_id:
+            return ""
         active_root = _rrs.active_root()
         if active_root:
             return os.path.join(active_root, repo_id)

@@ -4,6 +4,7 @@
 // Filter <select> by event type; "Clear" button resets local view buffer.
 import { bridgeUrl } from '../bridgeEnv.ts';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
+import { escapeHtml } from './escapeHtml.ts';
 
 export const POLL_MS = 2_000;
 
@@ -41,9 +42,9 @@ export function buildLogRow(e: LogEvent): string {
   const msg = String(data['result'] ?? data['error'] ?? data['text'] ?? e.actor ?? '—');
   return `<tr>
     <td class="log-ts">${ts}</td>
-    <td class="log-repo">${repo}</td>
-    <td class="log-type">${e.type}</td>
-    <td class="log-msg">${msg}</td>
+    <td class="log-repo">${escapeHtml(repo)}</td>
+    <td class="log-type">${escapeHtml(e.type)}</td>
+    <td class="log-msg">${escapeHtml(msg)}</td>
   </tr>`;
 }
 

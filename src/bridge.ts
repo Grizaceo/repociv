@@ -20,7 +20,7 @@ import {
 import { cfg } from './gameConfig.ts';
 import { approveCommand } from './commandBus.ts';
 import { terminalPanel } from './terminalPanel.ts';
-import { bridgeHeaders, bridgeUrl, BRIDGE_URL } from './bridgeEnv.ts';
+import { bridgeHeaders, bridgeUrl, BRIDGE_URL, BRIDGE_TOKEN } from './bridgeEnv.ts';
 import { RepoCivWebSocket } from './websocket.ts';
 
 const DEMO_INTERVAL_MS = 30_000;
@@ -156,7 +156,10 @@ export class BridgeEvents {
   private connectSSE() {
     if (this.sse) this.sse.close();
     try {
-      const src = new EventSource(bridgeUrl('/events'));
+      // EventSource cannot send custom headers — bridge accepts the token
+      // via query param for the SSE stream only.
+      const tokenQs = BRIDGE_TOKEN ? `?token=${encodeURIComponent(BRIDGE_TOKEN)}` : '';
+      const src = new EventSource(bridgeUrl('/events') + tokenQs);
       this.sse = src;
       src.onopen = () => {
         this.sseConnected = true;
