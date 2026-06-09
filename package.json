@@ -18,6 +18,8 @@
     "health": "bash scripts/healthcheck.sh",
     "backup": "bash scripts/backup-events.sh",
     "assets:3d": "bash scripts/generate-3d-textures.sh",
+    "assets:office": "python3 scripts/generate-office-atlas.py",
+    "assets": "npm run assets:3d && npm run assets:office",
     "lint": "eslint src --ext .ts,.tsx --max-warnings=0",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",

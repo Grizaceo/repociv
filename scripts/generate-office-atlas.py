@@ -1,6 +1,23 @@
 #!/usr/bin/env python3
-"""Generate procedural office-atlas.webp for RepoCiv local view."""
+"""Generate procedural office-atlas for RepoCiv local view.
 
+Produces:
+  - public/assets/office-atlas.webp  (atlas image, 640x192, 5 cols x 3 rows)
+  - public/assets/office-atlas.json  (manifest consumed by src/officeAtlas.ts)
+
+Run via:
+  python scripts/generate-office-atlas.py
+  # or
+  npm run assets:office
+
+The JSON manifest is what the frontend actually imports; the image
+URL is just a key in the JSON (the actual asset path can be swapped
+to a hand-curated .svg if you want a higher-fidelity look — see
+public/assets/office-atlas.svg for the current canonical).
+"""
+from __future__ import annotations
+
+import json
 from pathlib import Path
 
 try:
@@ -9,11 +26,14 @@ except ImportError:
     raise SystemExit('Pillow required: pip install pillow')
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'public' / 'assets' / 'office-atlas.webp'
+ASSETS = ROOT / 'public' / 'assets'
+OUT_IMG = ASSETS / 'office-atlas.webp'
+OUT_JSON = ASSETS / 'office-atlas.json'
 
 W, H = 640, 192
 CELL_W, CELL_H = 128, 64
 
+# (name, col, row, primary, accent). Layout: 5 columns, 3 rows.
 SPRITES = [
     ('desk_l', 0, 0, '#B09060', '#D0D0D0'),
     ('desk_r', 1, 0, '#B09060', '#D0D0D0'),
@@ -66,14 +86,33 @@ def draw_sprite(draw: ImageDraw.ImageDraw, col: int, row: int, primary: str, acc
         draw.rectangle([x0 + 8, y0 + 8, x1 - 8, y1 - 8], fill=primary)
 
 
+def sprite_rect(col: int, row: int) -> tuple[int, int, int, int]:
+    """(x0, y0, x1, y1) in atlas pixels for a sprite at (col, row)."""
+    x0, y0 = col * CELL_W, row * CELL_H
+    return (x0, y0, x0 + CELL_W, y0 + CELL_H)
+
+
 def main() -> None:
+    ASSETS.mkdir(parents=True, exist_ok=True)
+
+    # Image.
     img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     for _name, col, row, primary, accent in SPRITES:
         draw_sprite(draw, col, row, primary, accent)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    img.save(OUT, 'WEBP', quality=90)
-    print(f'Wrote {OUT} ({W}x{H})')
+    img.save(OUT_IMG, 'WEBP', quality=90)
+    print(f'Wrote {OUT_IMG} ({W}x{H})')
+
+    # Manifest.
+    sprite_rects = {name: list(sprite_rect(col, row)) for name, col, row, _p, _a in SPRITES}
+    manifest = {
+        'atlas': '/assets/office-atlas.webp',
+        'cellWidth': CELL_W,
+        'cellHeight': CELL_H,
+        'spriteRects': sprite_rects,
+    }
+    OUT_JSON.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+    print(f'Wrote {OUT_JSON} ({len(sprite_rects)} sprites)')
 
 
 if __name__ == '__main__':
