@@ -791,6 +791,44 @@ export class Renderer {
     this.focusOnCoord(coord);
   }
 
+  /**
+   * Set the camera to an explicit (x, y, zoom). Used by the visual
+   * regression script (scripts/screenshot-3d-audit.mjs) and e2e specs
+   * to take screenshots from a known viewpoint. The URL parser in
+   * applyInitialRenderMode() routes ?cam=x,y,zoom to this.
+   */
+  setCamera(x: number, y: number, zoom: number): void {
+    this.cam.x = x;
+    this.cam.y = y;
+    this.cam.zoom = zoom;
+  }
+
+  /**
+   * Parse a `?cam=x,y,zoom` URL fragment and apply it to the camera.
+   * No-op if the param is absent or malformed. Used by the visual
+   * regression script for reproducible viewpoints.
+   */
+  applyCameraFromUrl(): void {
+    if (typeof window === 'undefined') return;
+    const raw = new URLSearchParams(window.location.search).get('cam');
+    if (!raw) return;
+    const parts = raw.split(',').map((s) => Number(s.trim()));
+    const x = parts[0];
+    const y = parts[1];
+    const zoom = parts[2];
+    if (
+      x !== undefined &&
+      y !== undefined &&
+      zoom !== undefined &&
+      Number.isFinite(x) &&
+      Number.isFinite(y) &&
+      Number.isFinite(zoom) &&
+      zoom > 0
+    ) {
+      this.setCamera(x, y, zoom);
+    }
+  }
+
   panTo(worldX: number, worldY: number) {
     this.cam.x = worldX;
     this.cam.y = worldY;

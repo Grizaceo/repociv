@@ -1,116 +1,175 @@
 #!/usr/bin/env node
 /**
- * Quick 3D renderer audit screenshots.
- * Run after `npm run dev` is active.
+ * Visual regression script for the 3D world renderer.
+ *
+ * Captures the world view from three fixed camera positions and
+ * compares them against goldens in e2e/golden/. This is the
+ * regression net for the WebGL renderer's visual output: a
+ * `computeWorldSignature`-gated dirty-flag fix that changes a single
+ * pixel still fails this gate, but so does an unintended
+ * shader/material change — which is the point.
+ *
+ * Run after `npm run dev` is active (or PLAYWRIGHT_BASE_URL set to
+ * the deployed host).
+ *
+ * Usage:
+ *   node scripts/screenshot-3d-audit.mjs                # compare mode (default)
+ *   node scripts/screenshot-3d-audit.mjs --update       # update goldens
+ *   PLAYWRIGHT_BASE_URL=https://host node scripts/screenshot-3d-audit.mjs
+ *
+ * Determinism contract:
+ *   - The seed (selectedRepoPaths) is read from localStorage, written
+ *     to a fixed JSON shape before navigation. Same inputs every run.
+ *   - Camera is set via ?cam=x,y,zoom URL param. No mouse interaction.
+ *   - Wait time after the canvas appears is fixed at 1500 ms. Increase
+ *     in the script if a future change needs more time to settle.
+ *
+ * What this script is NOT:
+ *   - A pixelmatch-style perceptual diff. We compare SHA-256 hashes of
+ *     the PNG bytes. This catches layout/composition regressions but
+ *     NOT small tone changes (e.g. shader light intensity tweaks that
+ *     shift every pixel by <1 RGB step). For that we'd need
+ *     pixelmatch, which is a larger dependency.
+ *   - A headless-renderable test. The actual GL pipeline needs the
+ *     browser. Phase 2 keeps it that way to avoid headless GL
+ *     compatibility drift.
  */
 import { chromium } from '@playwright/test';
-import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, createHash } from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const OUT = join(process.cwd(), '.hermes/artifacts/3d-audit');
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(SCRIPT_DIR, '..');
+const OUT = join(REPO_ROOT, '.hermes/artifacts/3d-audit');
+const GOLDEN = join(REPO_ROOT, 'e2e/golden');
 mkdirSync(OUT, { recursive: true });
+mkdirSync(GOLDEN, { recursive: true });
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5273';
+const updateMode = process.argv.includes('--update');
 
-async function seedRepoSelection(page) {
-  const response = await page.request.get(`${baseURL}/api/repos`);
-  if (!response.ok()) {
-    console.warn('Could not fetch repos, proceeding without seed');
-    return;
-  }
-  const repos = await response.json();
-  const selectedRepoPaths = repos
-    .map((repo) => repo.path)
-    .filter((path) => typeof path === 'string' && path.length > 0)
-    .slice(0, 12);
-  if (selectedRepoPaths.length === 0) {
-    console.warn('No repos found to seed');
-    return;
-  }
-  await page.goto(`${baseURL}/`, { waitUntil: 'domcontentloaded' });
-  await page.evaluate((paths) => {
-    window.localStorage.setItem(
-      'repociv:selected-repos:v1',
-      JSON.stringify({
-        version: 1,
-        selectedRepoPaths: paths,
-        filters: { owners: [], topics: [], languages: [] },
-      }),
-    );
-  }, selectedRepoPaths);
-}
+// Fixed seed: a tiny, fixed repo selection so screenshots are
+// reproducible across machines and CI runs. The shapes are stable;
+// the actual paths are arbitrary as long as the resulting tile count
+// is consistent (we use 6 of the local repos which always exist on
+// the dev box).
+const FIXED_SEED = {
+  version: 1,
+  selectedRepoPaths: [
+    '/home/gris/.hermes/workspace/repos/repociv',
+    '/home/gris/.hermes/workspace/repos/labhub',
+    '/home/gris/.hermes/workspace/repos/cdaily',
+    '/home/gris/.hermes/workspace/repos/symphony',
+    '/home/gris/.hermes/workspace/repos/TradingAgents',
+    '/home/gris/.hermes/workspace/repos/labhub-oss',
+  ],
+  filters: { owners: [], topics: [], languages: [] },
+};
 
-async function bootAndScreenshot() {
+// Three fixed cameras. The (x, y) are world-space, not screen-space;
+// in a future iteration we'll compute them from the seed's bounding
+// box. For now, these are hard-coded for the canonical view.
+const CAMERAS = [
+  { name: '01-general-overview', cam: '0,0,1' },
+  { name: '02-zoomed-mid', cam: '0,0,1.8' },
+  { name: '03-zoomed-close', cam: '0,0,3.2' },
+];
+
+async function main() {
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
   const page = await context.newPage();
 
-  await seedRepoSelection(page);
+  // Pre-seed localStorage with the fixed repo selection so the
+  // world is identical on every run.
+  await page.goto(`${baseURL}/`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate((seed) => {
+    window.localStorage.setItem('repociv:selected-repos:v1', JSON.stringify(seed));
+    // Force flat -> webgl on first frame so the URL ?renderer=webgl is
+    // the only thing that controls it. This keeps the test
+    // independent of any leftover state from a previous run.
+    window.localStorage.setItem('repociv:renderer', 'webgl');
+  }, FIXED_SEED);
 
-  // Open directly in WebGL mode
-  await page.goto(`${baseURL}/?renderer=webgl`, { waitUntil: 'networkidle' });
+  // Land on the WebGL view with the first camera. The other two
+  // cameras are reachable by re-navigating to a different ?cam.
+  const results = [];
+  for (const { name, cam } of CAMERAS) {
+    const url = `${baseURL}/?renderer=webgl&cam=${encodeURIComponent(cam)}`;
+    await page.goto(url, { waitUntil: 'networkidle' });
 
-  // Wait for loading screen to disappear
-  try {
-    await page.locator('#loading-screen').waitFor({ state: 'hidden', timeout: 20_000 });
-  } catch {
-    console.warn('Loading screen did not hide, continuing anyway');
-  }
-
-  // Handle onboarding if present
-  const onboarding = page.locator('#repo-onboarding');
-  if (await onboarding.isVisible().catch(() => false)) {
-    const nextBtn = page.locator('#repo-onboarding-next');
-    await nextBtn.waitFor({ state: 'visible', timeout: 10_000 });
-    await nextBtn.click();
-    await page.locator('#repo-onboarding-title').waitFor({ state: 'visible', timeout: 10_000 });
-    await nextBtn.click();
-    await onboarding.waitFor({ state: 'hidden', timeout: 20_000 });
-  }
-
-  // Ensure canvas is visible
-  await page.locator('#main-canvas').waitFor({ state: 'visible', timeout: 10_000 });
-
-  // Let the 3D scene settle
-  await page.waitForTimeout(3000);
-
-  // Screenshot 1: General overview
-  await page.screenshot({ path: join(OUT, '01-general-overview.png'), fullPage: false });
-  console.log(`[AUDIT] Screenshot 1: general overview → ${join(OUT, '01-general-overview.png')}`);
-
-  // Zoom in by scrolling (positive = zoom in)
-  const canvas = page.locator('#main-canvas');
-  const box = await canvas.boundingBox();
-  if (box) {
-    const cx = box.x + box.width / 2;
-    const cy = box.y + box.height / 2;
-
-    // Zoom in 5 times
-    for (let i = 0; i < 5; i++) {
-      await page.mouse.wheel(0, -300, { position: { x: cx, y: cy } });
-      await page.waitForTimeout(200);
+    // Wait for the canvas to render. We can't read state from the
+    // page (no exposed API) so we wait for the canvas to be visible
+    // and then a fixed settling time. This is the "no UI
+    // dependencies" part of the contract.
+    await page.locator('#main-canvas').waitFor({ state: 'visible', timeout: 15_000 });
+    // Skip the onboarding overlay if it appears.
+    const onboarding = page.locator('#repo-onboarding');
+    if (await onboarding.isVisible().catch(() => false)) {
+      const nextBtn = page.locator('#repo-onboarding-next');
+      if (await nextBtn.isVisible().catch(() => false)) {
+        await nextBtn.click();
+        await page.waitForTimeout(200);
+        await nextBtn.click();
+      }
+      await onboarding.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {});
     }
-    await page.waitForTimeout(1000);
+    // Fixed settle time: the 3D scene needs a few frames to compile
+    // shaders, populate the instance buffer, and run the first
+    // rebuild. 1.5s is empirically enough on the dev box.
+    await page.waitForTimeout(1500);
 
-    // Screenshot 2: Zoomed in
-    await page.screenshot({ path: join(OUT, '02-zoomed-mid.png'), fullPage: false });
-    console.log(`[AUDIT] Screenshot 2: zoomed mid → ${join(OUT, '02-zoomed-mid.png')}`);
-
-    // Zoom in more
-    for (let i = 0; i < 4; i++) {
-      await page.mouse.wheel(0, -300, { position: { x: cx, y: cy } });
-      await page.waitForTimeout(200);
-    }
-    await page.waitForTimeout(1000);
-    await page.screenshot({ path: join(OUT, '03-zoomed-close.png'), fullPage: false });
-    console.log(`[AUDIT] Screenshot 3: zoomed close → ${join(OUT, '03-zoomed-close.png')}`);
+    const shotPath = join(OUT, `${name}.png`);
+    await page.screenshot({ path: shotPath, fullPage: false });
+    const hash = sha256(readFileSync(shotPath));
+    results.push({ name, shotPath, hash });
+    console.log(`[AUDIT] ${name}: ${shotPath} (sha256=${hash.slice(0, 12)}...)`);
   }
 
   await browser.close();
-  console.log('[AUDIT] Screenshots complete');
+
+  // Compare against goldens.
+  let diffCount = 0;
+  for (const { name, shotPath, hash } of results) {
+    const goldenPath = join(GOLDEN, `${name}.sha256`);
+    if (updateMode) {
+      writeFileSync(goldenPath, hash + '\n');
+      console.log(`[GOLDEN] wrote ${goldenPath}`);
+      continue;
+    }
+    if (!existsSync(goldenPath)) {
+      console.warn(`[DIFF] ${name}: no golden at ${goldenPath} — run with --update`);
+      diffCount++;
+      continue;
+    }
+    const expected = readFileSync(goldenPath, 'utf-8').trim();
+    if (expected !== hash) {
+      console.error(
+        `[DIFF] ${name}: hash mismatch\n  expected: ${expected.slice(0, 12)}...\n  got:      ${hash.slice(0, 12)}...\n  shot:     ${shotPath}`,
+      );
+      diffCount++;
+    } else {
+      console.log(`[OK]    ${name}: matches golden`);
+    }
+  }
+
+  if (!updateMode && diffCount > 0) {
+    console.error(`\n[AUDIT] ${diffCount} diff(s) — visual regression detected.`);
+    console.error('       If the change is intentional, run with --update to refresh goldens.');
+    process.exit(1);
+  }
+  console.log('\n[AUDIT] visual regression gate complete.');
 }
 
-bootAndScreenshot().catch((err) => {
-  console.error('[AUDIT] Failed:', err);
+function sha256(buf) {
+  return createHash('sha256').update(buf).digest('hex');
+}
+
+main().catch((err) => {
+  console.error('[AUDIT] failed:', err);
   process.exit(1);
 });

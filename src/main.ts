@@ -316,6 +316,7 @@ async function bootstrap() {
   const renderer = new Renderer(canvas, state);
   const bootRenderMode = resolveInitialRenderMode();
   await renderer.applyInitialRenderMode(bootRenderMode);
+  renderer.applyCameraFromUrl();
   renderer.setCleanMode(isCleanMode());
   await renderer.loadAssets();
   const capital = world.cities.find((c) => c.isCapital) ?? world.cities[0];
