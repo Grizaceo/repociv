@@ -177,10 +177,20 @@ function layoutFocusPod(
     wbIdx = 1;
   }
 
-  // Extra workbenches in remaining floor inside pod
+  // Extra workbenches in remaining floor inside pod. Skip cells that
+  // are already claimed as aisle or partition (first-wins). Without
+  // this filter deskPositions.length would count workbenches that
+  // were actually applied as something else, inflating plan.deskCount
+  // and making pathfinding aim units at non-existent desk cells.
+  const reservedCells = new Set(
+    placements
+      .filter((p) => p.type === 'aisle' || p.type === 'cubicle_partition')
+      .map((p) => `${p.x},${p.y}`),
+  );
   for (let y = podY0 + 1; y <= podY1 && wbIdx < workbenchCount; y++) {
     for (let x = podX0 + 1; x < podX1 && wbIdx < workbenchCount; x++) {
       if (x === deskX && y === deskY) continue;
+      if (reservedCells.has(`${x},${y}`)) continue;
       deskPositions.push({ x, y, facing: 's', workbenchIndex: wbIdx });
       placements.push({
         x,
@@ -190,6 +200,7 @@ function layoutFocusPod(
         decor: 'desk_bundle',
         workbenchIndex: wbIdx,
       });
+      reservedCells.add(`${x},${y}`);
       wbIdx++;
     }
   }
