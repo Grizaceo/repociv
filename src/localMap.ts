@@ -342,11 +342,16 @@ function classifyFolderZone(folderName: string, folderPath: string, depth: numbe
 }
 
 // ─── Room sizing ───────────────────────────────────────────────────────────────
+/** Room size proportional to workbench count with generous spacing for aisles.
+ *  Target: ~4 tiles per workbench (desk + chair + aisle space).
+ *  Square-ish rooms, no max width. Minimum 4 tiles per side. */
 function computeRoomSize(fileCount: number): { width: number; height: number } {
-  const area = fileCount + WALL_THICKNESS * 4;
-  const cols = Math.max(MIN_ROOM_SIZE, Math.min(12, Math.ceil(Math.sqrt(area))));
-  const rows = Math.max(MIN_ROOM_SIZE, Math.ceil(area / cols));
-  return { width: cols, height: rows };
+  // Each workbench needs ~4 tiles (desk + chair + surrounding aisle)
+  const tilesNeeded = Math.max(fileCount * 4, MIN_ROOM_SIZE * MIN_ROOM_SIZE);
+  const side = Math.ceil(Math.sqrt(tilesNeeded));
+  const width = Math.max(MIN_ROOM_SIZE, side);
+  const height = Math.max(MIN_ROOM_SIZE, Math.ceil(tilesNeeded / width));
+  return { width, height };
 }
 
 // ─── Rect packing (shelf algorithm) ───────────────────────────────────────────
