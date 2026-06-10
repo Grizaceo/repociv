@@ -668,9 +668,11 @@ export class LocalRenderer {
       this._fpsLastTime = now;
     }
 
-    // 3b. Rebuild static layer if needed
-    if (!this.staticLayer || this.staticWorldId !== world.repoId) {
+    // 3b. Rebuild static layer if needed (invalidate when room density flags change)
+    const cacheKey = `${world.repoId}:${world.rooms.reduce((n, r) => n + r.workbenches.length, 0)}:${world.rooms.filter((r) => r.highDensity).length}`;
+    if (!this.staticLayer || this.staticWorldId !== cacheKey) {
       this.rebuildStaticLayer();
+      this.staticWorldId = cacheKey;
     }
 
     // ─── Cozy Pastel Background ─────────────────────────────────────────
