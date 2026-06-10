@@ -192,6 +192,15 @@ async function main() {
         timeout: 15_000,
       })
       .catch(() => console.error('[AUDIT] terrain atlas never became ready — capturing anyway'));
+    // Mountain glb props load async too — wait until that settles (ready or
+    // failed) so captures don't race the cone→glTF swap.
+    await page
+      .waitForFunction(
+        () => window.__repocivDebug?.areMountainPropsSettled?.() !== false,
+        null,
+        { timeout: 15_000 },
+      )
+      .catch(() => console.error('[AUDIT] mountain props never settled — capturing anyway'));
     // Fixed settle time: a few frames to compile shaders, run the first
     // dirty rebuild with the atlas-backed material, and settle CSS2D labels.
     await page.waitForTimeout(1500);

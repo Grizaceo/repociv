@@ -57,6 +57,12 @@ import {
 } from './UnitMesh3D.ts';
 import { rebuildMapLabels, getLabelGroup } from './MapLabels3D.ts';
 import { rebuildGroundPlane, getGroundMesh, disposeGroundMesh } from './GroundPlane3D.ts';
+import {
+  getMountainPropsGroup,
+  ensureMountainPropsLoad,
+  rebuildMountainProps,
+  clearMountainProps,
+} from './MountainProps3D.ts';
 
 export interface HexSceneRenderOptions {
   fogEnabled: boolean;
@@ -108,11 +114,16 @@ export function createHexWorldScene(): Scene {
 
   scene.add(terrainGroup);
   scene.add(getTileDecorGroup());
+  scene.add(getMountainPropsGroup());
   scene.add(getCityGroup());
   scene.add(getUnitGroup());
   scene.add(getLabelGroup());
 
   ensureTerrainAtlasLoad();
+  // Props arriving flips areMountainPropsReady(), which participates in the
+  // ThreeMapRenderer dirty signature — the next frame rebuilds decor (cones
+  // out) and instances the glTF peaks.
+  ensureMountainPropsLoad();
 
   return scene;
 }
@@ -557,6 +568,8 @@ export function updateHexWorldScene(
 
   setDecorVisible(opts.showStructure || opts.showOps);
   rebuildTileDecor(Array.from(state.world.tiles.values()), opts.lod, state);
+  // Mountain silhouettes are terrain, not toggleable decor — always visible.
+  rebuildMountainProps(Array.from(state.world.tiles.values()));
 
   setCitiesVisible(opts.showStructure);
   rebuildCityClusters(state.world.cities, (key) => state.world.tiles.get(key), opts.lod);
@@ -569,6 +582,7 @@ export function updateHexWorldScene(
 
 export function disposeHexWorldScene(scene: Scene): void {
   clearTileDecor();
+  clearMountainProps();
   clearCityClusters();
   clearUnits();
   if (terrainMesh) {

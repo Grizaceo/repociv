@@ -17,6 +17,7 @@ import { type Tile, type Terrain, tileKey } from '../types.ts';
 import { type GameState } from '../game.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
+import { areMountainPropsReady } from './MountainProps3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 
 const decorGroup = new Group();
@@ -507,7 +508,9 @@ export function rebuildTileDecor(
     return;
   }
 
-  const signature = `${lod}:${decorSignature(tiles)}`;
+  // Props readiness participates: when the mountain glbs land, the cones
+  // must rebuild out of the decor set even though the tiles didn't change.
+  const signature = `${lod}:m${areMountainPropsReady() ? 1 : 0}:${decorSignature(tiles)}`;
   if (signature === lastSignature) return;
   lastSignature = signature;
 
@@ -527,7 +530,9 @@ export function rebuildTileDecor(
     const h = hashCoord(tile.coord.q, tile.coord.r);
     switch (tile.terrain) {
       case 'mountain':
-        mountains.push({ tile, variant: h });
+        // glTF props (MountainProps3D) replace the cones; keep the cone
+        // decor only as fallback while/if the glbs are unavailable.
+        if (!areMountainPropsReady()) mountains.push({ tile, variant: h });
         break;
       case 'forest':
         forests.push(tile);

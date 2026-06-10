@@ -61,6 +61,7 @@ import type { LocalRoom, LocalNpc } from './types.ts';
 import { clearChat } from './ui/chat.ts';
 import { openOnboardingPanel } from './ui/onboardingPanel.ts';
 import { axialToPixel } from './hex.ts';
+import { areMountainPropsSettled } from './three/MountainProps3D.ts';
 import {
   setRendererRef,
   notifyTilePicked,
@@ -114,6 +115,7 @@ type RepoCivDebugApi = {
   getMacroCityScreenPositions: () => Array<{ cityId: string; x: number; y: number }>;
   openLocalView: (cityId: string) => boolean;
   isTerrainAtlasReady: () => boolean;
+  areMountainPropsSettled: () => boolean;
   getWebGLMetrics: () => { frameTimeAvg: number; frameCount: number; dirtyRatePct: number } | null;
   getTileStats: () => {
     total: number;
@@ -386,6 +388,9 @@ async function bootstrap() {
         });
     },
     isTerrainAtlasReady: () => renderer.isTerrainAtlasReady(),
+    // Settled (ready OR failed): capture scripts wait on this so a golden
+    // never races the async mountain-glb load.
+    areMountainPropsSettled: () => areMountainPropsSettled(),
     getWebGLMetrics: () => renderer.getWebGLMetrics(),
     getTileStats: () => {
       const byTerrain: Record<string, number> = {};

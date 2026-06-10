@@ -63,6 +63,20 @@ check_asset_budget() {
 }
 run_step "asset budget (atlas ≤6MB)"      check_asset_budget
 
+# Prop glTF budget: low-poly props (public/assets/3d/props/*.glb) have
+# their own 1.5MB envelope, separate from the atlas PNGs.
+check_props_budget() {
+  local total
+  total=$(find public/assets/3d/props -name '*.glb' -printf '%s\n' 2>/dev/null | awk '{s+=$1} END {print s+0}')
+  local limit=$((1536 * 1024))
+  if (( total > limit )); then
+    echo "prop glbs total $((total / 1024))KB > 1.5MB budget"
+    return 1
+  fi
+  echo "prop glbs total: $((total / 1024))KB (budget 1.5MB)"
+}
+run_step "asset budget (props ≤1.5MB)"    check_props_budget
+
 # Tooling (non-blocking: report only)
 log "knip (report only)"
 if npx --no-install knip --exclude duplicates 2>&1; then
