@@ -47,6 +47,12 @@ export function loadTerrainAtlas(): Promise<LoadedTerrainAtlas | null> {
       const loader = new TextureLoader();
       const texture = await loader.loadAsync(meta.texture);
       texture.colorSpace = SRGBColorSpace;
+      // flipY=false: terrainAtlasUv() in terrainShader.ts addresses rows in
+      // IMAGE order (row 0 = top of the PNG = plains/forest/mountain/desert).
+      // TextureLoader's default flipY=true made shader-row 0 sample the
+      // BLACK unused bottom row of the 4×3 atlas — row-1 biomes survived
+      // only because the middle row is symmetric under the flip.
+      texture.flipY = false;
       texture.wrapS = RepeatWrapping;
       texture.wrapT = RepeatWrapping;
       texture.minFilter = LinearMipmapLinearFilter;
@@ -57,6 +63,7 @@ export function loadTerrainAtlas(): Promise<LoadedTerrainAtlas | null> {
       if (meta.normalTexture) {
         try {
           normalTexture = await loader.loadAsync(meta.normalTexture);
+          normalTexture.flipY = false;
           normalTexture.wrapS = RepeatWrapping;
           normalTexture.wrapT = RepeatWrapping;
           normalTexture.minFilter = LinearMipmapLinearFilter;
@@ -71,6 +78,7 @@ export function loadTerrainAtlas(): Promise<LoadedTerrainAtlas | null> {
       if (meta.roughnessTexture) {
         try {
           roughnessTexture = await loader.loadAsync(meta.roughnessTexture);
+          roughnessTexture.flipY = false;
           roughnessTexture.wrapS = RepeatWrapping;
           roughnessTexture.wrapT = RepeatWrapping;
           roughnessTexture.minFilter = LinearMipmapLinearFilter;

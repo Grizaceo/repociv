@@ -120,6 +120,7 @@ type RepoCivDebugApi = {
     revealed: number;
     byTerrain: Record<string, number>;
     samplePos: Record<string, { x: number; y: number }>;
+    cleanSamplePos: Record<string, { x: number; y: number }>;
   };
   queueLocalMission: (filePath: string, fileName: string, unitId?: string) => boolean;
   getLocalUnits: () => Array<{
@@ -389,6 +390,12 @@ async function bootstrap() {
     getTileStats: () => {
       const byTerrain: Record<string, number> = {};
       const samplePos: Record<string, { x: number; y: number }> = {};
+      // "Clean" samples: no city/district plate on the tile, and every
+      // neighbor shares the terrain — used by tone-instrumentation probes
+      // that need an uncontaminated top-face pixel patch per biome.
+      const cleanSamplePos: Record<string, { x: number; y: number }> = {};
+      const cleanFallback: Record<string, { x: number; y: number }> = {};
+      const dirs: Array<[number, number]> = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
       let revealed = 0;
       for (const t of state.world.tiles.values()) {
         byTerrain[t.terrain] = (byTerrain[t.terrain] ?? 0) + 1;
@@ -397,8 +404,28 @@ async function bootstrap() {
           const p = axialToPixel(t.coord, HEX_SIZE);
           samplePos[t.terrain] = { x: Math.round(p.x), y: Math.round(p.y) };
         }
+        if (!t.city && !t.district) {
+          const p = axialToPixel(t.coord, HEX_SIZE);
+          if (!cleanFallback[t.terrain]) {
+            cleanFallback[t.terrain] = { x: Math.round(p.x), y: Math.round(p.y) };
+          }
+          if (!cleanSamplePos[t.terrain]) {
+            const allSame = dirs.every((d) => {
+              const n = state.world.tiles.get(tileKey({ q: t.coord.q + d[0], r: t.coord.r + d[1] }));
+              return n !== undefined && n.terrain === t.terrain && !n.city && !n.district;
+            });
+            if (allSame) {
+              cleanSamplePos[t.terrain] = { x: Math.round(p.x), y: Math.round(p.y) };
+            }
+          }
+        }
       }
-      return { total: state.world.tiles.size, revealed, byTerrain, samplePos };
+      for (const terrain of Object.keys(byTerrain)) {
+        if (!cleanSamplePos[terrain] && cleanFallback[terrain]) {
+          cleanSamplePos[terrain] = cleanFallback[terrain];
+        }
+      }
+      return { total: state.world.tiles.size, revealed, byTerrain, samplePos, cleanSamplePos };
     },
     openLocalView: (cityId: string) => {
       const city = state.world.cities.find((item) => item.id === cityId && !item.isCapital);
