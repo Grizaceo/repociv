@@ -265,7 +265,7 @@ function buildDesert(tiles: Tile[]): void {
   const duneGeom = new CylinderGeometry(
     HEX_SIZE * 0.05, HEX_SIZE * 0.20, HEX_SIZE * 0.60, 8, 1, false,
   );
-  const duneMat  = new MeshLambertMaterial({ color: new Color(0xb88840) });
+  const duneMat  = new MeshLambertMaterial({ color: new Color(0xc9b078) });
 
   const total    = tiles.length * 4;
   const duneMesh = new InstancedMesh(duneGeom, duneMat, total);

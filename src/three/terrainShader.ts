@@ -235,10 +235,11 @@ float terrainDetailNoise(vec2 p) {
           // Mild saturation push only — enough to read biomes, not enough to look sticker-like
           float lum = dot(tex, vec3(0.299, 0.587, 0.114));
           tex = mix(vec3(lum), tex, 1.12);
-          // Desert: compress local contrast and bias slightly toward a calmer sand tone.
+          // Desert: compress local contrast and bias toward Civ V pale sand —
+          // the raw atlas cell reads as plowed brown furrows otherwise.
           if (tidx > 2.5 && tidx < 3.5) {
-            tex = mix(vec3(lum), tex, 0.92);
-            tex = mix(tex, vec3(0.73, 0.63, 0.40), 0.12);
+            tex = mix(vec3(lum), tex, 0.78);
+            tex = mix(tex, vec3(0.80, 0.71, 0.50), 0.30);
           }
           // Sacred should feel special, not neon enough to dominate the whole map.
           if (tidx > 6.5) {
@@ -255,8 +256,8 @@ float terrainDetailNoise(vec2 p) {
             float nLum = dot(nTex, vec3(0.299, 0.587, 0.114));
             nTex = mix(vec3(nLum), nTex, 1.12);
             if (ntidx > 2.5 && ntidx < 3.5) {
-              nTex = mix(vec3(nLum), nTex, 0.92);
-              nTex = mix(nTex, vec3(0.73, 0.63, 0.40), 0.12);
+              nTex = mix(vec3(nLum), nTex, 0.78);
+              nTex = mix(nTex, vec3(0.80, 0.71, 0.50), 0.30);
             }
             if (ntidx > 6.5) {
               nTex = mix(vec3(dot(nTex, vec3(0.299, 0.587, 0.114))), nTex, 0.82);
@@ -294,14 +295,25 @@ float terrainDetailNoise(vec2 p) {
         if (vTopFace > 0.5) {
           diffuseColor.rgb *= mix(1.03, 0.985, radial * radial);
         }
-        // Side faces: use a vertical gradient so elevated tiles read as terrain mass, not flat dark boxes.
+        // Side faces: Civ V cliffs. The raw palette fill went near-black on
+        // shaded flanks (forest fill is 0x2d5a27), which read as black wedges
+        // around every elevated tile. Land cliffs now lean on a warm
+        // earth/rock tone, scaled by the incoming vertex-color luminance so
+        // fog dimming still darkens them. Water/ice keep the old gradient.
         if (vTopFace < 0.5) {
           float cliffT = clamp((-vLocalY) / max(uPrismHeight, 0.001), 0.0, 1.0);
-          float topShade = (tidx > 1.5 && tidx < 2.5) ? 0.86 : 0.90;
-          float bottomShade = (tidx > 1.5 && tidx < 2.5) ? 0.60 : 0.68;
-          float cliffShade = mix(topShade, bottomShade, smoothstep(0.08, 1.0, cliffT));
-          diffuseColor.rgb *= cliffShade;
-          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.96, 0.98, 0.94), 0.18);
+          bool waterSide = (tidx > 3.5 && tidx < 5.5);
+          if (waterSide) {
+            float cliffShade = mix(1.0, 0.78, smoothstep(0.08, 1.0, cliffT));
+            diffuseColor.rgb *= cliffShade;
+          } else {
+            float dlum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+            bool rockBiome = (tidx > 1.5 && tidx < 2.5) || (tidx > 5.5 && tidx < 6.5);
+            vec3 earth = rockBiome ? vec3(0.50, 0.48, 0.44) : vec3(0.52, 0.43, 0.30);
+            diffuseColor.rgb = mix(diffuseColor.rgb, earth * clamp(0.45 + 1.4 * dlum, 0.0, 1.2), 0.80);
+            float cliffShade = mix(0.96, 0.74, smoothstep(0.08, 1.0, cliffT));
+            diffuseColor.rgb *= cliffShade;
+          }
         }
         // Ocean shimmer
         bool isOcean = (diffuseColor.b > diffuseColor.r * 1.05 &&
@@ -328,6 +340,13 @@ float terrainDetailNoise(vec2 p) {
             }
           }
           bool selfOcean = (tidx > 3.5 && tidx < 4.5);
+          // Civ V shallow-water gradient: ocean tiles brighten toward
+          // turquoise across the half of the tile nearest the coast, so the
+          // sea reads deep→shallow instead of one flat blue.
+          if (selfOcean) {
+            float shallow = smoothstep(0.05, 0.95, edgeT);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.30, 0.66, 0.68), shallow * 0.42);
+          }
           float ring = smoothstep(0.74, 0.97, edgeT);
           float foamPulse = 0.82 + 0.18 * sin(uTime * 1.7 + vWorldXZ.x * 0.045 + vWorldXZ.y * 0.038);
           float foamAmt = ring * foamPulse * (selfOcean ? 0.60 : 0.30);
@@ -376,7 +395,7 @@ float terrainDetailNoise(vec2 p) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v17';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v18';
   return mat;
 }
 

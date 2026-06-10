@@ -84,7 +84,9 @@ function hashCoord(q: number, r: number): number {
 export function rebuildMountainProps(tiles: Tile[]): void {
   if (state !== 'ready' || !variants) return;
 
-  const mountains = tiles.filter((t) => t.terrain === 'mountain');
+  // Unrevealed peaks would poke through the fog-cover clouds — skip them
+  // (TileDecor3D applies the same filter to the cone fallback).
+  const mountains = tiles.filter((t) => t.terrain === 'mountain' && t.revealed);
   const signature = mountains
     .map((t) => `${tileKey(t.coord)}:${t.city ? 1 : 0}`)
     .join('|');

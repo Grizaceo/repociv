@@ -407,10 +407,15 @@ function rebuildFogCover(state: GameState): void {
 
   if (unrevealed.length === 0) return;
 
+  // Civ V unexplored look: pale cloud cover, not a near-black void. The old
+  // 0x2a2a35 slate read as black wedges wherever an unrevealed hill/mountain
+  // poked between revealed tiles. Emissive lifts the Lambert side faces so
+  // the prism flanks stay cloud-gray instead of going black in shade.
   const mat = new MeshLambertMaterial({
-    color: 0x2a2a35,
+    color: 0xc6cdc9,
+    emissive: 0x5a6164,
     transparent: true,
-    opacity: 0.55,
+    opacity: 0.93,
   });
   fogCoverMesh = new InstancedMesh(sharedHexGeometry, mat, unrevealed.length);
 
