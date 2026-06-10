@@ -815,15 +815,33 @@ export class LocalRenderer {
     drawWindowLightRaysModule(this.overlayState(), world, view);
 
     // Draw dynamic tiles on top of the static canvas (Phase 3c/3d)
+    // For high-density rooms, accumulate extensions instead of drawing individual desks
+    const clusterMap = new Map<string, { x: number; y: number; extensions: string[] }>();
     for (let y = view.y0; y <= view.y1; y++) {
       for (let x = view.x0; x <= view.x1; x++) {
         const tile = world.grid[y]![x]!;
         if (tile.type === 'door') {
           this.drawDynamicDoorTile(tile, dt, localUnits);
         } else if (tile.type === 'workbench') {
-          this.drawDynamicWorkbenchTile(tile);
+          const room = tile.roomId ? world.rooms.find((r) => r.id === tile.roomId) : undefined;
+          if (room?.highDensity) {
+            // Accumulate for cluster rendering
+            if (!clusterMap.has(room.id)) {
+              clusterMap.set(room.id, { x: room.x + room.width / 2, y: room.y + room.height / 2, extensions: [] });
+            }
+            if (tile.workbench) {
+              clusterMap.get(room.id)!.extensions.push(tile.workbench.extension);
+            }
+          } else {
+            this.drawDynamicWorkbenchTile(tile);
+          }
         }
       }
+    }
+
+    // Phase E: draw compact clusters for high-density rooms
+    for (const [, cluster] of clusterMap) {
+      this.drawWorkbenchCluster(cluster.x, cluster.y, cluster.extensions);
     }
 
     // Draw room labels (suppressed in low LOD)
@@ -1103,6 +1121,73 @@ export class LocalRenderer {
     }
   }
 
+  /** Phase E: draw a compact cluster of file-type pills for high-density rooms. */
+  private drawWorkbenchCluster(cx: number, cy: number, extensions: string[]): void {
+    const { ctx } = this;
+    const TILE = TILE_SIZE;
+    // Transform world coords to screen coords
+    const sx = (cx * TILE - this.cam.x) * this.cam.zoom + this.cam.cx;
+    const sy = (cy * TILE - this.cam.y) * this.cam.zoom + this.cam.cy;
+
+    // Deduplicate and count extensions
+    const counts = new Map<string, number>();
+    for (const ext of extensions) {
+      counts.set(ext, (counts.get(ext) || 0) + 1);
+    }
+    const unique = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+
+    // Layout: pills in a grid, max 4 per row
+    const cols = Math.min(unique.length, 4);
+    const rows = Math.ceil(unique.length / cols);
+    const pillW = 22;
+    const pillH = 10;
+    const gap = 2;
+    const totalW = cols * (pillW + gap) - gap;
+    const totalH = rows * (pillH + gap) - gap;
+    const startX = sx - totalW / 2;
+    const startY = sy - totalH / 2;
+
+    // Background panel
+    ctx.save();
+    ctx.fillStyle = 'rgba(30, 30, 40, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(startX - 4, startY - 4, totalW + 8, totalH + 8, 4);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(100, 120, 140, 0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    // Draw pills
+    ctx.font = `bold 7px ${this.tokens.fontMono}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < unique.length; i++) {
+      const [ext, count] = unique[i]!;
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const px = startX + col * (pillW + gap);
+      const py = startY + row * (pillH + gap);
+      const color = EXT_COLOR[ext] ?? '#888';
+
+      // Pill background
+      ctx.fillStyle = color + '22'; // 13% opacity hex
+      ctx.beginPath();
+      ctx.roundRect(px, py, pillW, pillH, 3);
+      ctx.fill();
+
+      // Pill border
+      ctx.strokeStyle = color + '66';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+
+      // Label: ext + count if > 1
+      ctx.fillStyle = color;
+      const label = count > 1 ? `${ext.toUpperCase().slice(0, 3)}×${count}` : ext.toUpperCase().slice(0, 3);
+      ctx.fillText(label, px + pillW / 2, py + pillH / 2);
+    }
+    ctx.restore();
+  }
+
   private drawFloorBackground(tile: LocalTile, px: number, py: number, s: number, inRoom: boolean, zone?: string) {
     const { ctx } = this;
     if (!inRoom) {
@@ -1352,7 +1437,11 @@ export class LocalRenderer {
       } else if (tile.type === 'kiosk') {
         this.drawKioskTile(px, py, s);
       } else if (tile.type === 'workbench') {
-        this.drawWorkbenchTile(tile, px, py, s);
+        // Phase E: skip individual desk rendering in high-density rooms
+        const room = tile.roomId ? this.world?.rooms.find((r) => r.id === tile.roomId) : undefined;
+        if (!room?.highDensity) {
+          this.drawWorkbenchTile(tile, px, py, s);
+        }
       } else if (tile.type === 'conduit') {
         // Subtle electrical wire on the floor
         ctx.strokeStyle = 'rgba(217, 119, 6, 0.6)'; // amber/orange wire

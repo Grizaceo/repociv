@@ -25,6 +25,7 @@ import {
   startApprovalPolling,
   toggleObservabilityPanel,
   startObservabilityPolling,
+  setWebGLMetricsSource,
   toggleHarnessPanel,
   startHarnessPolling,
   toggleReplayPanel,
@@ -316,7 +317,6 @@ async function bootstrap() {
   const renderer = new Renderer(canvas, state);
   const bootRenderMode = resolveInitialRenderMode();
   await renderer.applyInitialRenderMode(bootRenderMode);
-  renderer.applyCameraFromUrl();
   renderer.setCleanMode(isCleanMode());
   await renderer.loadAssets();
   const capital = world.cities.find((c) => c.isCapital) ?? world.cities[0];
@@ -327,6 +327,9 @@ async function bootstrap() {
   } else {
     renderer.focusOnWorldBounds();
   }
+  // After the default focus so an explicit ?cam= actually wins (it used to
+  // run before focusOnCoord, which silently overwrote it every boot).
+  renderer.applyCameraFromUrl();
   if (bootRenderMode === 'webgl' && renderer.getWorldRenderMode() !== 'webgl') {
     showToast('WebGL no disponible — vista isométrica hexagonal');
   }
@@ -405,6 +408,7 @@ async function bootstrap() {
   bridge.rendererRef = renderer;
   bridge.start();
   startApprovalPolling();
+  setWebGLMetricsSource(() => renderer.getWebGLMetrics());
   startObservabilityPolling();
   startHarnessPolling();
 

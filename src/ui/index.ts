@@ -34,6 +34,7 @@ export {
   toggleObservabilityPanel,
   startObservabilityPolling,
   stopObservabilityPolling,
+  setWebGLMetricsSource,
 } from './observabilityPanel.ts';
 export {
   openHarnessPanel,

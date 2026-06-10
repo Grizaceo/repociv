@@ -21,6 +21,9 @@
  *   - The seed (selectedRepoPaths) is read from localStorage, written
  *     to a fixed JSON shape before navigation. Same inputs every run.
  *   - Camera is set via ?cam=x,y,zoom URL param. No mouse interaction.
+ *   - animTime is pinned via ?freeze=2, so time-driven animations
+ *     (shoreline pulse, sun arc, territory shimmer) render identically
+ *     regardless of capture-timing jitter.
  *   - Wait time after the canvas appears is fixed at 1500 ms. Increase
  *     in the script if a future change needs more time to settle.
  *
@@ -68,13 +71,13 @@ const FIXED_SEED = {
   filters: { owners: [], topics: [], languages: [] },
 };
 
-// Three fixed cameras. The (x, y) are world-space, not screen-space;
-// in a future iteration we'll compute them from the seed's bounding
-// box. For now, these are hard-coded for the canonical view.
+// Three fixed cameras. `auto` keeps the app's own capital-centered focus
+// (deterministic given the seed) and overrides only the zoom — absolute
+// world coords would need to know the centroid for this seed.
 const CAMERAS = [
-  { name: '01-general-overview', cam: '0,0,1' },
-  { name: '02-zoomed-mid', cam: '0,0,1.8' },
-  { name: '03-zoomed-close', cam: '0,0,3.2' },
+  { name: '01-general-overview', cam: 'auto,0.9' },
+  { name: '02-zoomed-mid', cam: 'auto,1.8' },
+  { name: '03-zoomed-close', cam: 'auto,3.2' },
 ];
 
 async function main() {
@@ -92,9 +95,20 @@ async function main() {
     const fixedNow = 1_700_000_000_000;
     Math.random = () => next();
     Date.now = () => fixedNow;
-    performance.now = () => 0;
+    // NOTE: do NOT freeze performance.now — the game loop derives dt from
+    // it, so freezing it stalls initialization and the capture lands on
+    // the welcome screen. Time-driven WebGL animation determinism comes
+    // from ?freeze=<s> (pins renderer.animTime) instead.
   });
   const page = await context.newPage();
+  // Surface page errors — a shader/WebGL failure renders as an empty sky
+  // and would otherwise pass silently into the goldens.
+  page.on('pageerror', (err) => console.error(`[PAGE ERROR] ${err.message}`));
+  page.on('console', (msg) => {
+    if (msg.type() === 'error' || msg.type() === 'warning') {
+      console.error(`[PAGE ${msg.type().toUpperCase()}] ${msg.text()}`);
+    }
+  });
 
   // Pre-seed localStorage with the fixed repo selection so the
   // world is identical on every run.
@@ -111,7 +125,9 @@ async function main() {
   // cameras are reachable by re-navigating to a different ?cam.
   const results = [];
   for (const { name, cam } of CAMERAS) {
-    const url = `${baseURL}/?renderer=webgl&cam=${encodeURIComponent(cam)}`;
+    // freeze=2 pins animTime so shoreline pulse / sun arc / shimmer don't
+    // depend on capture-timing jitter (the goldens are SHA-exact).
+    const url = `${baseURL}/?renderer=webgl&freeze=2&cam=${encodeURIComponent(cam)}`;
     await page.goto(url, { waitUntil: 'networkidle' });
 
     // Wait for the canvas to render. We can't read state from the
@@ -130,6 +146,20 @@ async function main() {
       }
       await onboarding.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {});
     }
+    // The imperial welcome salute covers the map for ~4s and a waitFor
+    // 'detached' resolves instantly if it hasn't been created yet —
+    // remove it outright instead. The loading screen hides when the
+    // world is ready; capturing before that compares the splash screen.
+    await page
+      .locator('#loading-screen')
+      .waitFor({ state: 'hidden', timeout: 15_000 })
+      .catch(() => {});
+    await page.evaluate(() => {
+      document.getElementById('imperial-welcome')?.remove();
+    });
+    // The WebGL canvas lives in #three-container; require it so a silent
+    // fallback to the flat renderer fails the gate instead of passing.
+    await page.locator('#three-container canvas').waitFor({ state: 'attached', timeout: 15_000 });
     // Fixed settle time: the 3D scene needs a few frames to compile
     // shaders, populate the instance buffer, and run the first
     // rebuild. 1.5s is empirically enough on the dev box.

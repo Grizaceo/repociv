@@ -257,4 +257,51 @@ describe('localWorldManager — desk assignment', () => {
     const tile = world.grid[0]?.[2];
     assert.ok(tile?.workbench, 'workbench at (2,0) exists');
   });
+
+  it('falls back to a desk outside the room when the spawn room has none', async () => {
+    // Units spawn in the reception, which has no workbenches by design.
+    const { LocalWorldManager } = await import('./localWorldManager.ts');
+    const mgr = new LocalWorldManager(() => {}, () => undefined);
+    const world = makeGrid(['..W']);
+    world.grid[0]![0]!.roomId = 'lobby';
+    world.grid[0]![2]!.roomId = 'r2';
+    (mgr as unknown as { localWorld: unknown }).localWorld = world;
+
+    const unit = {
+      id: 'hero', name: 'H', unitType: 'hero', color: '#4af',
+      gridX: 0, gridY: 0, targetX: null, targetY: null,
+      path: [], pathIndex: 0, pathProgress: 0, state: 'idle_in_room',
+      mission: null, workProgress: 0, macroUnitId: 'hero',
+      currentWorkbenchId: null, currentRoomId: 'lobby',
+      fatigue: 100, maxFatigue: 100, isResting: false, effectiveSpeed: 1,
+    } as LocalUnit;
+
+    mgr.assignDesk(unit);
+    assert.deepEqual(unit.assignedDesk, { x: 2, y: 0 }, 'hero got the desk in the other room');
+    assert.equal(world.deskAssignments.get('2,0'), 'hero');
+  });
+
+  it('releases desk assignments when a subagent unit is removed', async () => {
+    const { LocalWorldManager } = await import('./localWorldManager.ts');
+    const mgr = new LocalWorldManager(() => {}, () => undefined);
+    const world = makeGrid(['W.']);
+    (mgr as unknown as { localWorld: unknown }).localWorld = world;
+
+    const unit = {
+      id: 'sub-1', name: 'S', unitType: 'worker', color: '#8ab4f8',
+      gridX: 1, gridY: 0, targetX: null, targetY: null,
+      path: [], pathIndex: 0, pathProgress: 0, state: 'working_on_file',
+      mission: null, workProgress: 0, macroUnitId: 'DAVI',
+      currentWorkbenchId: null, currentRoomId: null,
+      fatigue: 100, maxFatigue: 100, isResting: false, effectiveSpeed: 1,
+      ephemeral: true,
+    } as LocalUnit;
+    (mgr as unknown as { localUnits: LocalUnit[] }).localUnits = [unit];
+
+    mgr.assignDesk(unit);
+    assert.equal(world.deskAssignments.size, 1, 'subagent got a desk');
+
+    mgr.removeSubagentUnit('sub-1');
+    assert.equal(world.deskAssignments.size, 0, 'desk released on removal');
+  });
 });

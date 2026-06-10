@@ -55,6 +55,14 @@ let _timer = 0;
 let _visible = false;
 let _metrics: Metrics | null = null;
 let _offline = false;
+let _webglMetricsSource: (() => { frameTimeAvg: number; frameCount: number } | null) | null = null;
+
+/** Wire the WebGL renderer's frame-time metrics into the panel (main.ts). */
+export function setWebGLMetricsSource(
+  source: () => { frameTimeAvg: number; frameCount: number } | null,
+): void {
+  _webglMetricsSource = source;
+}
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 export function openObservabilityPanel() {
@@ -251,6 +259,7 @@ function _render() {
             )
           : ''
       }
+      ${_webglFrameTimeMetric()}
       ${m.gpu ? _metric('GPU VRAM', `${m.gpu.vramUsed}/${m.gpu.vramTotal} MB`, 'ok') : ''}
       ${
         m.gpu
@@ -340,6 +349,15 @@ function _agentCard(a: AgentStatus): string {
       ${a.activeTask ? `<span class="obs-agent-task" title="${_esc(a.activeTask)}">${_esc(a.activeTask.slice(0, 18))}</span>` : ''}
     </div>
   `;
+}
+
+/** WebGL frame-time row — only when the WebGL renderer is active and warmed up. */
+function _webglFrameTimeMetric(): string {
+  const m = _webglMetricsSource?.();
+  if (!m || m.frameTimeAvg <= 0) return '';
+  // 60 fps budget is ~16.7 ms; warn past it, crit past two frames.
+  const status = m.frameTimeAvg > 33 ? 'crit' : m.frameTimeAvg > 16.7 ? 'warn' : 'ok';
+  return _metric('WebGL frame', `${m.frameTimeAvg} ms`, status);
 }
 
 function _metric(label: string, value: string, status: 'ok' | 'warn' | 'crit'): string {

@@ -76,6 +76,10 @@ let fogCoverSignature = '';
 let territoryLines: LineSegments | null = null;
 let shorelineRings: LineSegments | null = null;
 let shorelineSignature = '';
+// Per-vertex base data for the in-place pulse: [cx, cy, cz, ux, uz] × vertex.
+// The pulse scales each ring around its own tile center; scaling the whole
+// LineSegments object would drift rings toward/away from the world origin.
+let shorelineBase: Float32Array | null = null;
 let foamMesh: InstancedMesh | null = null;
 let foamSignature = '';
 let groundMeshRef: import('three').Mesh | null = null;
@@ -213,7 +217,7 @@ function rebuildTerritoryLines(
 }
 
 /** Shoreline rings: rebuild geometry only when ocean tiles change.
- *  Per-frame pulse animation uses in-place scale, avoiding allocations. */
+ *  Per-frame pulse writes vertex positions in place, avoiding allocations. */
 function rebuildShorelineRings(state: GameState, animTime: number): void {
   const tiles = Array.from(state.world.tiles.values());
   const getTile = (c: Axial) => state.world.tiles.get(tileKey(c));
@@ -237,26 +241,24 @@ function rebuildShorelineRings(state: GameState, animTime: number): void {
       shorelineRings.geometry.dispose();
       (shorelineRings.material as LineBasicMaterial).dispose();
       shorelineRings = null;
+      shorelineBase = null;
     }
 
     if (shorelineTiles.length === 0) return;
 
     const segments: number[] = [];
-    const r = HEX_SIZE * 0.82; // base radius; pulse applied via scale
+    const base: number[] = [];
     for (const tile of shorelineTiles) {
       const elev = terrainElevation(tile.terrain);
       const center = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
       for (let i = 0; i < 6; i++) {
         const a = hexCornerAngle(i);
         const b = hexCornerAngle((i + 1) % 6);
-        segments.push(
-          center.x + r * Math.cos(a),
-          center.y + 1.2,
-          center.z + r * Math.sin(a),
-          center.x + r * Math.cos(b),
-          center.y + 1.2,
-          center.z + r * Math.sin(b),
-        );
+        // x/z are filled in by the per-frame pulse below; cache each
+        // vertex's ring center + unit offset so the update is in-place.
+        segments.push(center.x, center.y + 1.2, center.z, center.x, center.y + 1.2, center.z);
+        base.push(center.x, center.y + 1.2, center.z, Math.cos(a), Math.sin(a));
+        base.push(center.x, center.y + 1.2, center.z, Math.cos(b), Math.sin(b));
       }
     }
 
@@ -267,14 +269,27 @@ function rebuildShorelineRings(state: GameState, animTime: number): void {
       transparent: true,
       opacity: 0.35,
     });
+    shorelineBase = new Float32Array(base);
     shorelineRings = new LineSegments(geom, mat);
     terrainGroup.add(shorelineRings);
   }
 
-  // Per-frame pulse animation via in-place scale (no allocations)
-  if (shorelineRings) {
+  // Per-frame pulse: write vertex x/z in place (no allocations). Each ring
+  // scales around its own tile center — matching the original per-tile
+  // `r = HEX_SIZE * pulse * 0.82` look. Scaling the whole LineSegments
+  // object instead would drift rings toward/away from the world origin.
+  if (shorelineRings && shorelineBase) {
     const pulse = 0.88 + 0.08 * Math.sin(animTime * 2);
-    shorelineRings.scale.setScalar(pulse);
+    const r = HEX_SIZE * 0.82 * pulse;
+    const posAttr = shorelineRings.geometry.getAttribute('position') as Float32BufferAttribute;
+    const arr = posAttr.array as Float32Array;
+    const vertexCount = arr.length / 3;
+    for (let v = 0; v < vertexCount; v++) {
+      const b = v * 5;
+      arr[v * 3] = shorelineBase[b]! + shorelineBase[b + 3]! * r;
+      arr[v * 3 + 2] = shorelineBase[b + 2]! + shorelineBase[b + 4]! * r;
+    }
+    posAttr.needsUpdate = true;
   }
 }
 
@@ -547,12 +562,21 @@ export function disposeHexWorldScene(scene: Scene): void {
     (shorelineRings.material as LineBasicMaterial).dispose();
     shorelineRings = null;
   }
+  shorelineBase = null;
   if (foamMesh) {
     terrainGroup.remove(foamMesh);
     foamMesh.geometry.dispose();
     (foamMesh.material as MeshLambertMaterial).dispose();
     foamMesh = null;
   }
+  // Reset rebuild signatures: a disposed scene must rebuild everything on
+  // recreate, even when the world state (and thus each signature) is the
+  // same — otherwise toggling render modes leaves ocean/fog/ground empty.
+  shorelineSignature = '';
+  foamSignature = '';
+  fogCoverSignature = '';
+  groundSignature = '';
+  tileCountSignature = '';
   if (groundMeshRef) {
     terrainGroup.remove(groundMeshRef);
     disposeGroundMesh();

@@ -515,6 +515,8 @@ export interface LocalRoom {
   zoneLabel?: string; // display label for zone (e.g. "Engineering")
   subFolderNames?: string[]; // child directory names for whiteboard panel
   layoutPlan?: CubiclePlan; // cubicle module metadata from officeLayout
+  /** Phase E: true when workbench count exceeds comfortable individual rendering. */
+  highDensity?: boolean;
 }
 
 export interface LocalWorld {

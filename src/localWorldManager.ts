@@ -538,31 +538,43 @@ export class LocalWorldManager {
     return findNearestWorkbench(this.localWorld, unit.gridX, unit.gridY);
   }
 
-  /** Assign a free desk in the unit's room. */
+  /** Assign a free desk: prefer the unit's room, fall back to the nearest
+   *  free desk anywhere. Units spawn in the reception, which has no desks
+   *  by design — without the fallback the hero never gets an assignment. */
   assignDesk(unit: LocalUnit): void {
     if (!this.localWorld) return;
     const world = this.localWorld;
     const roomId = unit.currentRoomId;
-    if (!roomId) return;
 
-    // Collect free desk tiles in the unit's room
-    let best: { x: number; y: number; wb: LocalTile['workbench']; dist: number } | null = null;
+    let bestInRoom: { x: number; y: number; dist: number } | null = null;
+    let bestAnywhere: { x: number; y: number; dist: number } | null = null;
     for (const row of world.grid) {
       for (const tile of row) {
-        if (tile.roomId !== roomId) continue;
         if (tile.type !== 'workbench' || !tile.workbench) continue;
         const key = `${tile.x},${tile.y}`;
         if (world.deskAssignments.has(key)) continue;
         const dist = Math.abs(unit.gridX - tile.x) + Math.abs(unit.gridY - tile.y);
-        if (!best || dist < best.dist) {
-          best = { x: tile.x, y: tile.y, wb: tile.workbench, dist };
+        if (roomId && tile.roomId === roomId && (!bestInRoom || dist < bestInRoom.dist)) {
+          bestInRoom = { x: tile.x, y: tile.y, dist };
+        }
+        if (!bestAnywhere || dist < bestAnywhere.dist) {
+          bestAnywhere = { x: tile.x, y: tile.y, dist };
         }
       }
     }
 
+    const best = bestInRoom ?? bestAnywhere;
     if (best) {
       unit.assignedDesk = { x: best.x, y: best.y };
       world.deskAssignments.set(`${best.x},${best.y}`, unit.id);
+    }
+  }
+
+  /** Release every desk owned by a unit (call before removing it). */
+  releaseDesks(unitId: string): void {
+    if (!this.localWorld) return;
+    for (const [key, owner] of this.localWorld.deskAssignments) {
+      if (owner === unitId) this.localWorld.deskAssignments.delete(key);
     }
   }
 
@@ -644,7 +656,10 @@ export class LocalWorldManager {
   removeSubagentUnit(unitId: string): void {
     const before = this.localUnits.length;
     this.localUnits = this.localUnits.filter((u) => u.id !== unitId);
-    if (this.localUnits.length !== before) this.notify();
+    if (this.localUnits.length !== before) {
+      this.releaseDesks(unitId);
+      this.notify();
+    }
   }
 
   private _tickTemperatureSystem(): void {

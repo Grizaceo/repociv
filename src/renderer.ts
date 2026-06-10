@@ -57,6 +57,8 @@ export class Renderer {
   private _currentLod: 'low' | 'medium' | 'high' = 'medium';
   private worldRenderMode: WorldRenderMode = 'flat';
   private animTime = 0;
+  /** Non-null = animTime pinned (deterministic golden captures, ?freeze=). */
+  private _frozenAnimTime: number | null = null;
   // Phase D: WebGL frame metrics
   private _frameTimeSum = 0;
   private _frameTimeCount = 0;
@@ -812,22 +814,44 @@ export class Renderer {
    */
   applyCameraFromUrl(): void {
     if (typeof window === 'undefined') return;
-    const raw = new URLSearchParams(window.location.search).get('cam');
-    if (!raw) return;
-    const parts = raw.split(',').map((s) => Number(s.trim()));
-    const x = parts[0];
-    const y = parts[1];
-    const zoom = parts[2];
-    if (
-      x !== undefined &&
-      y !== undefined &&
-      zoom !== undefined &&
-      Number.isFinite(x) &&
-      Number.isFinite(y) &&
-      Number.isFinite(zoom) &&
-      zoom > 0
-    ) {
-      this.setCamera(x, y, zoom);
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('cam');
+    if (raw) {
+      const parts = raw.split(',');
+      if (parts[0] === 'auto') {
+        // `?cam=auto,<zoom>` keeps the app's own (deterministic) centering
+        // and overrides only the zoom — the golden captures use this so
+        // they don't need to know the world centroid for a given seed.
+        const zoom = Number(parts[1]);
+        if (Number.isFinite(zoom) && zoom > 0) {
+          this.setCamera(this.cam.x, this.cam.y, zoom);
+        }
+      } else {
+        const nums = parts.map((s) => Number(s.trim()));
+        const x = nums[0];
+        const y = nums[1];
+        const zoom = nums[2];
+        if (
+          x !== undefined &&
+          y !== undefined &&
+          zoom !== undefined &&
+          Number.isFinite(x) &&
+          Number.isFinite(y) &&
+          Number.isFinite(zoom) &&
+          zoom > 0
+        ) {
+          this.setCamera(x, y, zoom);
+        }
+      }
+    }
+    // `?freeze=<seconds>` pins animTime to a constant. Without it, the
+    // SHA-exact golden comparison depends on capture-timing jitter:
+    // shoreline pulse, sun arc, and territory shimmer all read animTime.
+    const freezeRaw = params.get('freeze');
+    if (freezeRaw !== null) {
+      const t = Number(freezeRaw);
+      this._frozenAnimTime = Number.isFinite(t) && t >= 0 ? t : 0;
+      this.animTime = this._frozenAnimTime;
     }
   }
 
@@ -861,7 +885,11 @@ export class Renderer {
       const frameStart = performance.now();
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
-      this.animTime += dt;
+      if (this._frozenAnimTime === null) {
+        this.animTime += dt;
+      } else {
+        this.animTime = this._frozenAnimTime;
+      }
       this.render();
       this.minimapR.draw(this.cam, this.canvas, this.fogEnabled);
       // Phase D: track frame time and dirty rate
