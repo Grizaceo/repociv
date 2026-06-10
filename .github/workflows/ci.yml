@@ -45,3 +45,64 @@ jobs:
       - name: Run gate
         # The same script we use locally — single source of truth.
         run: bash scripts/check.sh
+
+  # ── Informative visual job (NOT blocking) ──────────────────────────────────
+  # Playwright e2e boots bridge + vite itself (playwright.config webServer).
+  # The golden comparison is SHA-exact against hashes captured on the dev
+  # box's GPU; the runner's software rasterizer (SwiftShader) produces
+  # different bytes for identical scenes, so a mismatch here is expected
+  # and informative only — check the uploaded artifacts when it flags.
+  visual:
+    name: e2e + goldens (informative)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install JS deps
+        run: npm ci
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.lock
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run e2e
+        run: npx playwright test
+
+      - name: Run golden captures (hash comparison is dev-box-specific)
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 5273 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:5273 >/dev/null && break
+            sleep 2
+          done
+          PLAYWRIGHT_BASE_URL=http://127.0.0.1:5273 node scripts/screenshot-3d-audit.mjs || true
+
+      - name: Upload visual artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-captures
+          path: |
+            .hermes/artifacts/3d-audit/
+            test-results/
+          if-no-files-found: ignore
