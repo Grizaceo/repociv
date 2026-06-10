@@ -158,8 +158,26 @@ export function renderIso(state: IsoRenderState) {
     localUnits.filter((u) => u.state === 'working_on_file' && u.currentWorkbenchId).map((u) => u.currentWorkbenchId),
   );
 
+  // Accumulate high-density room extensions for cluster rendering
+  const isoClusterMap = new Map<string, { room: LocalRoom; extensions: string[] }>();
+  for (const room of world.rooms) {
+    if (!room.highDensity) continue;
+    const extensions: string[] = [];
+    for (const wb of room.workbenches) {
+      extensions.push(wb.extension);
+    }
+    if (extensions.length > 0) {
+      isoClusterMap.set(room.id, { room, extensions });
+    }
+  }
+
   for (const { x, y, tile } of tiles) {
     drawIsoTile(state, tile, x, y, world, activeWbIds);
+  }
+
+  // Phase E: draw compact clusters for high-density rooms (isometric)
+  for (const { room, extensions } of isoClusterMap.values()) {
+    drawIsoWorkbenchCluster(state, room, extensions);
   }
 
   const npcEntries = (world.npcs ?? [])
@@ -379,6 +397,7 @@ export function drawIsoTile(
     ctx,
     fontMono: monoFont(state),
     extColor: state.extColor,
+    world,
   };
   if (
     tile.type === 'workbench' ||
@@ -1286,5 +1305,70 @@ function drawIsoDebugOverlay(state: IsoRenderState, world: LocalWorld, localUnit
   ctx.fillText(`FPS: ${state.fpsValue}`, 14, 14);
   ctx.fillText(`Ticks: ${world.rooms.reduce((n, r) => n + r.workbenches.length, 0)}`, 14, 26);
   ctx.fillText(`Units: ${localUnits.length}`, 14, 38);
+  ctx.restore();
+}
+
+/** Phase E: compact cluster of file-type pills for high-density rooms (isometric). */
+function drawIsoWorkbenchCluster(
+  state: IsoRenderState,
+  room: LocalRoom,
+  extensions: string[],
+): void {
+  const { ctx } = state;
+  // Center of room in iso screen coords
+  const cx = room.x + room.width / 2;
+  const cy = room.y + room.height / 2;
+  const base = officeIsoProject(cx, cy);
+
+  // Deduplicate and count extensions
+  const counts = new Map<string, number>();
+  for (const ext of extensions) {
+    counts.set(ext, (counts.get(ext) || 0) + 1);
+  }
+  const unique = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+
+  // Compact layout
+  const cols = Math.min(unique.length, 5);
+  const rows = Math.ceil(unique.length / cols);
+  const pillW = 20;
+  const pillH = 8;
+  const gap = 1;
+  const totalW = cols * (pillW + gap) - gap;
+  const totalH = rows * (pillH + gap) - gap;
+  const startX = base.px - totalW / 2;
+  const startY = base.py - ISO_WALL_H - 6 - totalH;
+
+  // Background panel
+  ctx.save();
+  ctx.globalAlpha = 0.90;
+  ctx.fillStyle = 'rgba(20, 22, 28, 0.88)';
+  ctx.beginPath();
+  ctx.roundRect(startX - 3, startY - 2, totalW + 6, totalH + 4, 3);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(80, 100, 130, 0.2)';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+
+  // Draw pills
+  ctx.font = `bold 5px ${monoFont(state)}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i < unique.length; i++) {
+    const [ext, count] = unique[i]!;
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const px = startX + col * (pillW + gap);
+    const py = startY + row * (pillH + gap);
+    const color = state.extColor[ext] ?? '#888';
+
+    ctx.fillStyle = color + '18';
+    ctx.beginPath();
+    ctx.roundRect(px, py, pillW, pillH, 2);
+    ctx.fill();
+
+    ctx.fillStyle = color;
+    const label = count > 1 ? `${ext.toUpperCase().slice(0, 3)}×${count}` : ext.toUpperCase().slice(0, 3);
+    ctx.fillText(label, px + pillW / 2, py + pillH / 2);
+  }
   ctx.restore();
 }

@@ -1,6 +1,6 @@
 // ─── RepoCiv — Isometric office sprite drawing (atlas + procedural fallback) ───
 
-import type { LocalTile } from './types.ts';
+import type { LocalTile, LocalWorld } from './types.ts';
 import { getOfficeSprite, isOfficeAtlasLoaded } from './officeAtlas.ts';
 
 export const ISO_TILE_W = 64;
@@ -19,6 +19,7 @@ export interface IsoOfficeDrawContext {
   ctx: CanvasRenderingContext2D;
   fontMono: string;
   extColor: Record<string, string>;
+  world?: LocalWorld;
 }
 
 function drawSpriteOrFallback(
@@ -160,6 +161,12 @@ export function drawIsoOfficeSprite(
   gy: number,
   activeWbIds?: Set<string | null>,
 ): void {
+  // Phase E: skip individual desk rendering in high-density rooms
+  if (tile.type === 'workbench' || tile.type === 'chair') {
+    const room = tile.roomId ? dctx.world?.rooms.find((r) => r.id === tile.roomId) : undefined;
+    if (room?.highDensity) return;
+  }
+
   const wb = tile.workbench;
   const facing = tile.facing ?? 's';
   const extColor = wb ? (dctx.extColor[wb.extension] ?? '#888') : '#888';
