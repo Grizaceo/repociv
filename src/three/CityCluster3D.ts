@@ -38,7 +38,16 @@ export function getCityGroup(): Group {
 }
 
 function citySignature(cities: City[]): string {
-  return cities.map((c) => `${c.id}:${c.coord.q},${c.coord.r}:${c.isCapital ? 1 : 0}`).join('|');
+  return cities
+    .map((c) => {
+      const bucket =
+        c.population <= 30 ? 'a' :
+        c.population <= 120 ? 'b' :
+        c.population <= 350 ? 'c' :
+        c.population <= 800 ? 'd' : 'e';
+      return `${c.id}:${c.coord.q},${c.coord.r}:${c.isCapital ? 1 : 0}:${bucket}`;
+    })
+    .join('|');
 }
 
 function hashCoord(q: number, r: number): number {

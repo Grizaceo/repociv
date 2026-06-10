@@ -449,21 +449,48 @@ function rebuildHexGrid(state: GameState, visible: boolean, lod: 'low' | 'medium
   }
   if (!visible) return;
 
-  const segments: number[] = [];
+  // Build a Set of canonical edge keys so each interior edge is drawn once.
+  const edges = new Set<string>();
+
+  const edgeKey = (q1: number, r1: number, q2: number, r2: number): string => {
+    const a = `${q1},${r1}`;
+    const b = `${q2},${r2}`;
+    return a < b ? `${a}↔${b}` : `${b}↔${a}`;
+  };
+
   for (const tile of tiles) {
     if (!tile.revealed) continue;
-    const elev = terrainElevation(tile.terrain);
-    const center = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-    for (let i = 0; i < 6; i++) {
-      const a = hexCornerAngle(i);
-      const b = hexCornerAngle((i + 1) % 6);
-      const x1 = center.x + HEX_SIZE * Math.cos(a);
-      const z1 = center.z + HEX_SIZE * Math.sin(a);
-      const x2 = center.x + HEX_SIZE * Math.cos(b);
-      const z2 = center.z + HEX_SIZE * Math.sin(b);
-      segments.push(x1, center.y + 1.2, z1, x2, center.y + 1.2, z2);
-    }
+    const q = tile.coord.q, r = tile.coord.r;
+    edges.add(edgeKey(q, r, q + 1, r));
+    edges.add(edgeKey(q, r, q, r - 1));
+    edges.add(edgeKey(q, r, q - 1, r - 1));
+    edges.add(edgeKey(q, r, q - 1, r));
+    edges.add(edgeKey(q, r, q, r + 1));
+    edges.add(edgeKey(q, r, q + 1, r + 1));
   }
+
+  const segments: number[] = [];
+  for (const key of edges) {
+    const [a, b] = key.split('↔');
+    if (!a || !b) continue;
+    const [q1s, r1s] = a.split(',');
+    const [q2s, r2s] = b.split(',');
+    if (!q1s || !r1s || !q2s || !r2s) continue;
+    const q1 = Number(q1s), r1 = Number(r1s), q2 = Number(q2s), r2 = Number(r2s);
+    if (isNaN(q1) || isNaN(r1) || isNaN(q2) || isNaN(r2)) continue;
+    const t1 = state.world.tiles.get(tileKey({ q: q1, r: r1 }))!;
+    const t2 = state.world.tiles.get(tileKey({ q: q2, r: r2 }));
+    if (t1 !== undefined && !t1.revealed) continue;
+    if (t2 !== undefined && !t2.revealed) continue;
+    const elev1 = t1 !== undefined ? terrainElevation(t1.terrain) : 0;
+    const elev2 = t2 !== undefined ? terrainElevation(t2.terrain) : 0;
+    const e = Math.max(elev1, elev2) + 0.3;
+
+    const c1 = axialToWorld3D(q1, r1, elev1);
+    const c2 = axialToWorld3D(q2, r2, elev2);
+    segments.push(c1.x, c1.y + e - elev1, c1.z, c2.x, c2.y + e - elev2, c2.z);
+  }
+
   if (segments.length === 0) return;
 
   const geom = new BufferGeometry();
@@ -471,7 +498,7 @@ function rebuildHexGrid(state: GameState, visible: boolean, lod: 'low' | 'medium
   const mat = new LineBasicMaterial({
     color: 0xffffff,
     transparent: true,
-    opacity: lod === 'high' ? 0.065 : lod === 'medium' ? 0.045 : 0.025,
+    opacity: lod === 'high' ? 0.045 : lod === 'medium' ? 0.030 : 0.015,
     linewidth: 1,
   });
   hexGridLines = new LineSegments(geom, mat);

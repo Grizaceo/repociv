@@ -71,13 +71,39 @@ The WebGL terrain shader uses:
 
 ### Generating the atlas
 
-```bash
-npm run assets:3d
-```
+**Two generators exist:**
 
-This runs Blender headless with `scripts/generate-3d-texture-atlas.py` and produces:
-- `public/assets/3d/terrain-atlas-3d.png` — 2048x1536 RGBA atlas
-- `public/assets/3d/terrain-atlas-3d.json` — metadata with terrain→cell mapping
+1. **Procedural fallback** (numpy — always functional):
+
+   ```bash
+   npm run assets:3d
+   # Runs scripts/generate-3d-texture-atlas.py (pure numpy+PIL)
+   ```
+
+2. **Blender-baked atlas** (Civ V-style — active in `feat/3d-renderer`):
+
+   ```bash
+   python3 scripts/blender/bake_atlas.py --group a --resolution 1024 --out-resolution 512
+   python3 scripts/blender/bake_atlas.py --group b --resolution 1024 --out-resolution 512
+   python3 scripts/blender/bake_atlas.py --group c --resolution 1024 --out-resolution 512
+   python3 scripts/blender/bake_atlas.py --group d --resolution 1024 --out-resolution 512
+   ```
+
+   Or all at once:
+
+   ```bash
+   for g in a b c d; do python3 scripts/blender/bake_atlas.py --group $g; done
+   ```
+
+   ⚠️ **`npm run assets:3d` reverts the atlas to the numpy fallback.** If you
+   run it after a Blender bake, the painted plains/forest/desert/… will be
+   lost. Solution: re-run the bake loops above, or `git checkout` the
+   committed PNGs.
+
+   3. **Plains post-process**: the Blender-baked `biome_plains()` renders a
+      softer, painted look vs the numpy fallback. No additional blur step is
+      needed — the blender bake IS the blur. If `npm run assets:3d` was
+      triggered accidentally, run `bake_atlas.py --group a` to restore.
 
 ### Preview atlas (optional)
 
