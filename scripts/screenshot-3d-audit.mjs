@@ -84,8 +84,15 @@ const CAMERAS = [
   { name: '01-general-overview', cam: 'auto,0.9' },
   { name: '02-zoomed-mid',       cam: 'auto,1.8' },
   { name: '03-zoomed-close',     cam: 'auto,3.2' },
-  { name: '05-ocean-macro',      cam: 'auto,0.55' },
-  { name: '06-mountain-desert-macro', cam: 'auto,0.50' },
+  // 05/06 exist to verify biome textures (ocean banding, mountain strata,
+  // desert dunes). They are CLOSE-UPS at absolute world coords — macro
+  // zoom-outs are useless for this: the FogExp2 atmospheric haze
+  // desaturates everything at distance, so texture changes vanish.
+  // Coords come from __repocivDebug.getTileStats().samplePos for the
+  // FIXED_SEED world (stable while the seed doesn't change); reveal=all
+  // lifts fog of war so the rim biomes are actually rendered.
+  { name: '05-ocean-closeup',  cam: '-1326,-2207,2.2', reveal: true },
+  { name: '06-desert-mountain-closeup', cam: '117,157,1.6', reveal: true },
 ];
 
 async function main() {
@@ -132,10 +139,11 @@ async function main() {
   // Land on the WebGL view with the first camera. The other two
   // cameras are reachable by re-navigating to a different ?cam.
   const results = [];
-  for (const { name, cam } of CAMERAS) {
+  for (const { name, cam, reveal } of CAMERAS) {
     // freeze=2 pins animTime so shoreline pulse / sun arc / shimmer don't
     // depend on capture-timing jitter (the goldens are SHA-exact).
-    const url = `${baseURL}/?renderer=webgl&freeze=2&cam=${encodeURIComponent(cam)}`;
+    const revealQs = reveal ? '&reveal=all' : '';
+    const url = `${baseURL}/?renderer=webgl&freeze=2${revealQs}&cam=${encodeURIComponent(cam)}`;
     await page.goto(url, { waitUntil: 'networkidle' });
 
     // Wait for the canvas to render. We can't read state from the

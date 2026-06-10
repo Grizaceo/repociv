@@ -21,11 +21,17 @@ Groups (one commit per group; render order matches the manifest index):
     c = ocean                                 (radial teal -> deep coastal gradient)
     d = mountain, sacred                      (rock strata w/ strong normal, snow transition)
 
-This script is *invoked* by Blender (it's a Blender script). The driver
-that calls Blender in batch-by-group is scripts/blender/run_bake.sh.
-The driver invokes this once per group with --group <letter>; we bake
-only that group's cells and re-compose the atlas. Other cells are
-preserved from the existing atlas (we do NOT degrade them).
+This file is BOTH the driver and the Blender payload: run it directly
+with python3 (it generates a bpy sub-script under /tmp and invokes the
+Blender binary on it). One invocation per group bakes only that group's
+cells and re-composes the atlas; other cells are preserved (we do NOT
+degrade them). Regenerate everything with:
+
+    for g in a b c d; do
+      python3 scripts/blender/bake_atlas.py --group $g \
+        --resolution 1024 --out-resolution 512 \
+        --blender-bin ~/tools/blender/blender-5.1.2-linux-x64/blender
+    done
 
 Determinism contract:
     - Texture Coordinate -> Mapping node with offset derived from seed.
@@ -40,9 +46,8 @@ Determinism contract:
 Constraints honored:
     - TERRAIN_ATLAS_INDEX in src/three/terrainShader.ts and the
       manifest order are NOT changed. We only swap pixel content.
-    - Budget: each baked cell at OUT_RES is OUT_RES^2 * 3 bytes (RGB).
-      The 3 atlas PNGs combined stay under 6MB (verified in
-      scripts/check.sh asset budget).
+    - Budget: the 3 atlas PNGs combined stay under 6MB — enforced by the
+      "asset budget" step in scripts/check.sh.
     - The numpy generator stays untouched as a fallback.
 """
 from __future__ import annotations
@@ -178,6 +183,17 @@ try:
 except Exception:
     pass
 
+# ── Color management ────────────────────────────────────────────────────
+# Blender 4+/5 defaults to the AgX view transform, which darkens and
+# desaturates everything — baked this way, the bright sand ramp reads as
+# mud and the teal ocean as slate in-world. Albedo output must be
+# 'Standard' (no filmic tone curve): the game's own renderer does the
+# lighting; the atlas should carry flat, saturated color.
+scene.view_settings.view_transform = 'Standard'
+scene.view_settings.look = 'None'
+scene.view_settings.exposure = 0.0
+scene.view_settings.gamma = 1.0
+
 # ── Camera (ortho, top-down) ────────────────────────────────────────────
 bpy.ops.object.camera_add(location=(0, 0, 4))
 cam = bpy.context.object
@@ -241,7 +257,18 @@ def build_material(name, seed):
     nt.links.new(bump.inputs['Height'], cr2.outputs['Color'])
     nt.links.new(bsdf.inputs['Normal'], bump.outputs['Normal'])
     bsdf.inputs['Roughness'].default_value = 0.7
-    nt.links.new(out.inputs['Surface'], bsdf.outputs['BSDF'])
+    # Albedo must leave the scene UNLIT: through a Principled BSDF the
+    # output depends on lamp energy and picks up gray specular (the teal
+    # ocean rendered as slate). Emit the ramp color directly, with a
+    # gentle multiply of the detail ramp for the painted self-shading.
+    shade = nt.nodes.new('ShaderNodeMixRGB')
+    shade.blend_type = 'MULTIPLY'
+    shade.inputs['Fac'].default_value = 0.18
+    emit = nt.nodes.new('ShaderNodeEmission')
+    nt.links.new(shade.inputs['Color1'], mix.outputs['Color'])
+    nt.links.new(shade.inputs['Color2'], cr2.outputs['Color'])
+    nt.links.new(emit.inputs['Color'], shade.outputs['Color'])
+    nt.links.new(out.inputs['Surface'], emit.outputs['Emission'])
     mix.inputs['Fac'].default_value = 0.30
     bump.inputs['Strength'].default_value = 0.35
     bump.inputs['Distance'].default_value = 0.05
@@ -432,7 +459,9 @@ def _composite(group_letter: str, terrains: list[str],
         print(f"[DAVI] wrote {path} ({(path.stat().st_size)/1024:.1f} KB)")
 
     _update_atlas(ATLAS_PNG)
-    _update_atlas(NORMAL_PNG)
+    # Do NOT paste the color render into the normal atlas: a color image
+    # used as a normal map breaks the in-world lighting response. The
+    # numpy generator's height-derived normals stay as-is.
 
     # Roughness atlas: the bake output for each cell encodes the per-biome
     # roughness in the R channel (we use the same render; roughness 0..1).

@@ -48,6 +48,21 @@ run_step "ruff check server/"             ruff check server/
 run_step "ruff check scripts/"            ruff check scripts/
 run_step "pytest -q"                      pytest -q
 
+# Asset budget: the 3 terrain atlas PNGs must stay under 6MB combined.
+# (The Blender/numpy generators can silently fatten them; tracked binaries
+# bloat every clone.)
+check_asset_budget() {
+  local total
+  total=$(find public/assets/3d -name '*.png' -printf '%s\n' 2>/dev/null | awk '{s+=$1} END {print s+0}')
+  local limit=$((6 * 1024 * 1024))
+  if (( total > limit )); then
+    echo "terrain atlas PNGs total $((total / 1024 / 1024))MB > 6MB budget"
+    return 1
+  fi
+  echo "terrain atlas PNGs total: $((total / 1024))KB (budget 6MB)"
+}
+run_step "asset budget (atlas ≤6MB)"      check_asset_budget
+
 # Tooling (non-blocking: report only)
 log "knip (report only)"
 if npx --no-install knip --exclude duplicates 2>&1; then

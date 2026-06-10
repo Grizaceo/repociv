@@ -115,6 +115,12 @@ type RepoCivDebugApi = {
   openLocalView: (cityId: string) => boolean;
   isTerrainAtlasReady: () => boolean;
   getWebGLMetrics: () => { frameTimeAvg: number; frameCount: number; dirtyRatePct: number } | null;
+  getTileStats: () => {
+    total: number;
+    revealed: number;
+    byTerrain: Record<string, number>;
+    samplePos: Record<string, { x: number; y: number }>;
+  };
   queueLocalMission: (filePath: string, fileName: string, unitId?: string) => boolean;
   getLocalUnits: () => Array<{
     id: string;
@@ -230,6 +236,15 @@ async function bootstrap() {
   await openOnboardingPanel();
 
   const world = await generateWorld();
+  // `?reveal=all` lifts fog of war for capture/audit sessions: the golden
+  // macro cameras (05/06) need every biome visible — without it, low-zoom
+  // shots are mostly fog cover and texture changes go unverified.
+  if (new URLSearchParams(window.location.search).get('reveal') === 'all') {
+    for (const tile of world.tiles.values()) {
+      tile.revealed = true;
+      tile.inFog = false;
+    }
+  }
   const state = new GameState(world);
   state.start();
 
@@ -371,6 +386,20 @@ async function bootstrap() {
     },
     isTerrainAtlasReady: () => renderer.isTerrainAtlasReady(),
     getWebGLMetrics: () => renderer.getWebGLMetrics(),
+    getTileStats: () => {
+      const byTerrain: Record<string, number> = {};
+      const samplePos: Record<string, { x: number; y: number }> = {};
+      let revealed = 0;
+      for (const t of state.world.tiles.values()) {
+        byTerrain[t.terrain] = (byTerrain[t.terrain] ?? 0) + 1;
+        if (t.revealed) revealed++;
+        if (!samplePos[t.terrain]) {
+          const p = axialToPixel(t.coord, HEX_SIZE);
+          samplePos[t.terrain] = { x: Math.round(p.x), y: Math.round(p.y) };
+        }
+      }
+      return { total: state.world.tiles.size, revealed, byTerrain, samplePos };
+    },
     openLocalView: (cityId: string) => {
       const city = state.world.cities.find((item) => item.id === cityId && !item.isCapital);
       if (!city) return false;
