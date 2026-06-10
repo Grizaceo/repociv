@@ -1121,27 +1121,28 @@ export class LocalRenderer {
     }
   }
 
-  /** Phase E: draw a compact cluster of file-type pills for high-density rooms. */
+  /** Phase E: draw a compact cluster of file-type pills for high-density rooms.
+   *  cx, cy are in tile coords; ctx already has camera transform applied. */
   private drawWorkbenchCluster(cx: number, cy: number, extensions: string[]): void {
     const { ctx } = this;
     const TILE = TILE_SIZE;
-    // Transform world coords to screen coords
+    // World-to-screen: same formula used for all tile rendering
     const sx = (cx * TILE - this.cam.x) * this.cam.zoom + this.cam.cx;
     const sy = (cy * TILE - this.cam.y) * this.cam.zoom + this.cam.cy;
 
-    // Deduplicate and count extensions
+    // Deduplicate and count extensions, sorted by count desc
     const counts = new Map<string, number>();
     for (const ext of extensions) {
       counts.set(ext, (counts.get(ext) || 0) + 1);
     }
     const unique = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
 
-    // Layout: pills in a grid, max 4 per row
-    const cols = Math.min(unique.length, 4);
+    // Compact layout: pills in a grid, max 5 per row
+    const cols = Math.min(unique.length, 5);
     const rows = Math.ceil(unique.length / cols);
-    const pillW = 22;
-    const pillH = 10;
-    const gap = 2;
+    const pillW = Math.max(18, Math.min(28, 80 / cols));
+    const pillH = 9;
+    const gap = 1;
     const totalW = cols * (pillW + gap) - gap;
     const totalH = rows * (pillH + gap) - gap;
     const startX = sx - totalW / 2;
@@ -1149,16 +1150,17 @@ export class LocalRenderer {
 
     // Background panel
     ctx.save();
-    ctx.fillStyle = 'rgba(30, 30, 40, 0.85)';
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = 'rgba(20, 22, 28, 0.90)';
     ctx.beginPath();
-    ctx.roundRect(startX - 4, startY - 4, totalW + 8, totalH + 8, 4);
+    ctx.roundRect(startX - 3, startY - 2, totalW + 6, totalH + 4, 3);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(100, 120, 140, 0.3)';
+    ctx.strokeStyle = 'rgba(80, 100, 130, 0.25)';
     ctx.lineWidth = 0.5;
     ctx.stroke();
 
     // Draw pills
-    ctx.font = `bold 7px ${this.tokens.fontMono}`;
+    ctx.font = `bold 6px ${this.tokens.fontMono}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     for (let i = 0; i < unique.length; i++) {
@@ -1170,15 +1172,11 @@ export class LocalRenderer {
       const color = EXT_COLOR[ext] ?? '#888';
 
       // Pill background
-      ctx.fillStyle = color + '22'; // 13% opacity hex
+      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = color + '18';
       ctx.beginPath();
-      ctx.roundRect(px, py, pillW, pillH, 3);
+      ctx.roundRect(px, py, pillW, pillH, 2);
       ctx.fill();
-
-      // Pill border
-      ctx.strokeStyle = color + '66';
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
 
       // Label: ext + count if > 1
       ctx.fillStyle = color;
