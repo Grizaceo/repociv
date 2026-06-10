@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "kind": "repociv-3d-terrain-atlas",
   "texture": "/assets/3d/terrain-atlas-3d.png",
   "normalTexture": "/assets/3d/terrain-normal-atlas-3d.png",
@@ -152,5 +152,8 @@
       ],
       "roughness": 0.95
     }
-  }
+  },
+  "blenderBakedGroups": [
+    "a"
+  ]
 }
