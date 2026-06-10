@@ -74,10 +74,18 @@ const FIXED_SEED = {
 // Three fixed cameras. `auto` keeps the app's own capital-centered focus
 // (deterministic given the seed) and overrides only the zoom — absolute
 // world coords would need to know the centroid for this seed.
+//
+// Two additional macro cameras (05, 06) cover the world at low zoom so
+// the biomes that the three mid-zoom shots don't frame well (ocean rim,
+// mountain clusters, desert spans) are visible. They were added in the
+// same commit that swapped to Blender-baked atlas content, so a
+// regression in any group's texture changes the same set of hashes.
 const CAMERAS = [
   { name: '01-general-overview', cam: 'auto,0.9' },
-  { name: '02-zoomed-mid', cam: 'auto,1.8' },
-  { name: '03-zoomed-close', cam: 'auto,3.2' },
+  { name: '02-zoomed-mid',       cam: 'auto,1.8' },
+  { name: '03-zoomed-close',     cam: 'auto,3.2' },
+  { name: '05-ocean-macro',      cam: 'auto,0.55' },
+  { name: '06-mountain-desert-macro', cam: 'auto,0.50' },
 ];
 
 async function main() {
