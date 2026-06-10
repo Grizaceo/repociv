@@ -4,7 +4,7 @@
   "texture": "/assets/3d/terrain-atlas-3d.png",
   "normalTexture": "/assets/3d/terrain-normal-atlas-3d.png",
   "roughnessTexture": "/assets/3d/terrain-roughness-atlas-3d.png",
-  "cellSize": 1024,
+  "cellSize": 512,
   "columns": 4,
   "rows": 3,
   "terrains": {
@@ -13,8 +13,8 @@
       "rect": [
         0,
         0,
-        1024,
-        1024
+        512,
+        512
       ],
       "uvRect": [
         0.0,
@@ -27,10 +27,10 @@
     "forest": {
       "index": 1,
       "rect": [
-        1024,
+        512,
         0,
-        1024,
-        1024
+        512,
+        512
       ],
       "uvRect": [
         0.25,
@@ -43,10 +43,10 @@
     "mountain": {
       "index": 2,
       "rect": [
-        2048,
-        0,
         1024,
-        1024
+        0,
+        512,
+        512
       ],
       "uvRect": [
         0.5,
@@ -59,10 +59,10 @@
     "desert": {
       "index": 3,
       "rect": [
-        3072,
+        1536,
         0,
-        1024,
-        1024
+        512,
+        512
       ],
       "uvRect": [
         0.75,
@@ -76,9 +76,9 @@
       "index": 4,
       "rect": [
         0,
-        1024,
-        1024,
-        1024
+        512,
+        512,
+        512
       ],
       "uvRect": [
         0.0,
@@ -91,10 +91,10 @@
     "ice": {
       "index": 5,
       "rect": [
-        1024,
-        1024,
-        1024,
-        1024
+        512,
+        512,
+        512,
+        512
       ],
       "uvRect": [
         0.25,
@@ -107,10 +107,10 @@
     "hills": {
       "index": 6,
       "rect": [
-        2048,
         1024,
-        1024,
-        1024
+        512,
+        512,
+        512
       ],
       "uvRect": [
         0.5,
@@ -123,10 +123,10 @@
     "sacred": {
       "index": 7,
       "rect": [
-        3072,
-        1024,
-        1024,
-        1024
+        1536,
+        512,
+        512,
+        512
       ],
       "uvRect": [
         0.75,
@@ -140,9 +140,9 @@
       "index": 8,
       "rect": [
         0,
-        2048,
         1024,
-        1024
+        512,
+        512
       ],
       "uvRect": [
         0.0,

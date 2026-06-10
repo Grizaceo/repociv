@@ -4,7 +4,7 @@ Runs standalone with Python + numpy + PIL (no Blender required).
 Expects to be run from the repo root; writes to public/assets/3d/.
 
 Produces:
-  terrain-atlas-3d.png         — colour atlas  (9 terrains × 1024px, 4×3 grid)
+  terrain-atlas-3d.png         — colour atlas  (9 terrains × 512px, 4×3 grid)
   terrain-normal-atlas-3d.png — tangent-space normal atlas (same layout)
   terrain-roughness-atlas-3d.png — roughness atlas (single channel, greyscale)
   terrain-atlas-3d.json      — atlas metadata
@@ -20,7 +20,7 @@ try:
 except ImportError:
     raise SystemExit("Pillow is required: pip install Pillow")
 
-CELL = 1024
+CELL = 512
 COLS = 4
 ROWS = 3
 OUT  = Path('public/assets/3d')
