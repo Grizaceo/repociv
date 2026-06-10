@@ -228,9 +228,9 @@ float terrainDetailNoise(vec2 p) {
             tex = mix(tex, nTex, edgeBlend * 0.62);
           }
           // Top-face brightening so atlas colours read through warm PBR lights
-          tex *= 1.08;
+          tex *= 1.15;
           // Very light global tonal glue so biomes feel painted under the same sky.
-          tex = mix(tex, tex * vec3(0.97, 0.995, 0.96), 0.20);
+          tex = mix(tex, tex * vec3(0.97, 0.995, 0.96), 0.15);
           // Subtle world-space microvariation so broad top faces feel like terrain, not flat panels.
           float detail = terrainDetailNoise(vWorldXZ);
           if (tidx < 0.5) {
@@ -249,13 +249,13 @@ float terrainDetailNoise(vec2 p) {
         }
         // Radial vignette — very subtle
         if (vTopFace > 0.5) {
-          diffuseColor.rgb *= mix(1.02, 0.98, radial * radial);
+          diffuseColor.rgb *= mix(1.03, 0.985, radial * radial);
         }
         // Side faces: use a vertical gradient so elevated tiles read as terrain mass, not flat dark boxes.
         if (vTopFace < 0.5) {
           float cliffT = clamp((-vLocalY) / max(uPrismHeight, 0.001), 0.0, 1.0);
-          float topShade = (tidx > 1.5 && tidx < 2.5) ? 0.84 : 0.88;
-          float bottomShade = (tidx > 1.5 && tidx < 2.5) ? 0.52 : 0.60;
+          float topShade = (tidx > 1.5 && tidx < 2.5) ? 0.86 : 0.90;
+          float bottomShade = (tidx > 1.5 && tidx < 2.5) ? 0.60 : 0.68;
           float cliffShade = mix(topShade, bottomShade, smoothstep(0.08, 1.0, cliffT));
           diffuseColor.rgb *= cliffShade;
           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.96, 0.98, 0.94), 0.18);
@@ -311,7 +311,7 @@ float terrainDetailNoise(vec2 p) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v14';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v15';
   return mat;
 }
 

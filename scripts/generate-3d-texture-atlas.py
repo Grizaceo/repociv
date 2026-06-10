@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Reproducible terrain texture + normal-map + roughness atlas for RepoCiv 3D global map.
-Run via: blender --background --factory-startup --python scripts/generate-3d-texture-atlas.py
+Runs standalone with Python + numpy + PIL (no Blender required).
 Expects to be run from the repo root; writes to public/assets/3d/.
 
 Produces:
@@ -9,12 +9,16 @@ Produces:
   terrain-roughness-atlas-3d.png — roughness atlas (single channel, greyscale)
   terrain-atlas-3d.json      — atlas metadata
 
-v5: full numpy vectorisation — ~100× faster than pixel-by-pixel Python loops.
+v6: standalone PIL output — removed Blender dependency while keeping full vectorised generation.
 """
 import json
 from pathlib import Path
-import bpy
 import numpy as np
+
+try:
+    from PIL import Image
+except ImportError:
+    raise SystemExit("Pillow is required: pip install Pillow")
 
 CELL = 1024
 COLS = 4
@@ -23,13 +27,13 @@ OUT  = Path('public/assets/3d')
 OUT.mkdir(parents=True, exist_ok=True)
 
 TERRAINS = [
-    ('plains',   (0.38, 0.68, 0.22)),
-    ('forest',   (0.08, 0.32, 0.07)),
-    ('mountain', (0.50, 0.48, 0.45)),
-    ('desert',   (0.88, 0.62, 0.28)),
-    ('ocean',    (0.06, 0.30, 0.72)),
-    ('ice',      (0.80, 0.92, 0.98)),
-    ('hills',    (0.42, 0.66, 0.24)),
+    ('plains',   (0.42, 0.74, 0.26)),  # warmer, more saturated green
+    ('forest',   (0.12, 0.42, 0.14)),  # deep green but not black
+    ('mountain', (0.44, 0.42, 0.40)),  # darker rock base for stronger contrast
+    ('desert',   (0.84, 0.64, 0.32)),  # warmer sand, less harsh orange
+    ('ocean',    (0.08, 0.40, 0.58)),  # teal base, Civ V coastal tone
+    ('ice',      (0.70, 0.88, 0.96)),  # cooler ice with more blue
+    ('hills',    (0.52, 0.68, 0.28)),  # earthier olive-green
     ('sacred',   (0.12, 0.04, 0.28)),
     ('fog',      (0.04, 0.04, 0.09)),
 ]
@@ -109,9 +113,9 @@ def terrain_rgb_np(name: str, base: tuple, U, V, seed: int):
     n3 = fbm_np(U * 40, V * 40, seed + 29, 2)
 
     if name == 'plains':
-        grass  = 0.10 * (n - 0.5) + 0.04 * (n2 - 0.5)
-        dry    = np.maximum(0.0, n3 - 0.65) * 0.4
-        stripe = 0.025 * np.sin(V * 28 + seed)
+        grass  = 0.12 * (n - 0.5) + 0.05 * (n2 - 0.5)
+        dry    = np.maximum(0.0, n3 - 0.55) * 0.50
+        stripe = 0.035 * np.sin(V * 28 + seed)
         vd, vid = voronoi_dist_np(U * 8, V * 8, seed + 41)
         # Yellow flowers
         yf = np.where((vd < 0.12) & ((vid.astype(int) % 3) == 0),
@@ -119,76 +123,82 @@ def terrain_rgb_np(name: str, base: tuple, U, V, seed: int):
         # White flowers
         wf = np.where((vd < 0.10) & ((vid.astype(int) % 3) == 1),
                       1.0 - (vd / 0.10), 0.0)
-        R = r0 + dry * 0.35 + stripe + yf * 0.35 + wf * 0.30
-        G = g0 + grass + dry * 0.15 + stripe + yf * 0.28 + wf * 0.30
-        B = b0 + grass * 0.3 + yf * 0.05 + wf * 0.28
+        R = r0 + dry * 0.40 + stripe + yf * 0.32 + wf * 0.28
+        G = g0 + grass + dry * 0.12 + stripe + yf * 0.26 + wf * 0.28
+        B = b0 + grass * 0.25 + yf * 0.04 + wf * 0.26
         return R, G, B
 
     if name == 'forest':
         forest_type = seed % 2
         if forest_type == 0:
-            canopy  = 0.14 * (n - 0.5) + 0.08 * (n2 - 0.5)
-            clearing = np.maximum(0.0, 0.55 - n) * 0.22
-            return (r0 + clearing * 0.4,
-                    g0 + canopy + clearing * 0.35,
-                    b0 + canopy * 0.5 + clearing * 0.1)
+            canopy  = 0.16 * (n - 0.5) + 0.10 * (n2 - 0.5)
+            clearing = np.maximum(0.0, 0.55 - n) * 0.28
+            return (r0 + clearing * 0.45 + 0.02,
+                    g0 + canopy + clearing * 0.40 + 0.03,
+                    b0 + canopy * 0.5 + clearing * 0.12 + 0.01)
         else:
-            canopy   = 0.10 * (n - 0.5) + 0.12 * np.maximum(0.0, n2 - 0.4) * 0.5
-            leaf_var = 0.08 * np.sin(U * 25 + V * 18 + seed)
-            return (r0 + canopy * 0.5 + leaf_var * 0.3,
-                    g0 + canopy * 1.2 + leaf_var * 0.4 + 0.06,
-                    b0 + canopy * 0.4 + leaf_var * 0.1)
+            canopy   = 0.12 * (n - 0.5) + 0.14 * np.maximum(0.0, n2 - 0.4) * 0.5
+            leaf_var = 0.10 * np.sin(U * 25 + V * 18 + seed)
+            return (r0 + canopy * 0.55 + leaf_var * 0.35 + 0.02,
+                    g0 + canopy * 1.3 + leaf_var * 0.45 + 0.04,
+                    b0 + canopy * 0.45 + leaf_var * 0.12 + 0.02)
 
     if name == 'mountain':
         dist    = np.hypot(U - 0.5, V - 0.5) * 2.0
-        strata  = 0.10 * np.sin(dist * 60 + n * 4 + seed) + 0.05 * (n2 - 0.5)
-        snow_t  = np.where(dist < 0.28, 1.0, np.maximum(0.0, (0.38 - dist) / 0.10))
-        volcanic = np.maximum(0.0, (dist - 0.70) / 0.30)
-        rock    = 0.08 * (n - 0.5) + strata
-        br      = (r0 + rock) * (1.0 - volcanic * 0.30)
-        bg      = (g0 + rock) * (1.0 - volcanic * 0.25)
-        bb      = (b0 + rock) * (1.0 - volcanic * 0.20)
-        return (br + (0.95 - br) * snow_t,
-                bg + (0.97 - bg) * snow_t,
-                bb + (1.00 - bb) * snow_t)
+        strata  = 0.14 * np.sin(dist * 55 + n * 4 + seed) + 0.07 * (n2 - 0.5)
+        snow_t  = np.where(dist < 0.24, 1.0, np.maximum(0.0, (0.40 - dist) / 0.16))
+        volcanic = np.maximum(0.0, (dist - 0.72) / 0.28)
+        rock    = 0.10 * (n - 0.5) + strata
+        # Darker rock with warm shadow
+        br      = (r0 + rock - 0.02) * (1.0 - volcanic * 0.25)
+        bg      = (g0 + rock - 0.02) * (1.0 - volcanic * 0.20)
+        bb      = (b0 + rock - 0.02) * (1.0 - volcanic * 0.15)
+        # Snow: creamy white with slight blue shadow, not pure white
+        return (br + (0.92 - br) * snow_t,
+                bg + (0.94 - bg) * snow_t,
+                bb + (0.98 - bb) * snow_t)
 
     if name == 'desert':
         dune_raw = np.sin(U * 22 + V * 6 + seed) + 0.6 * np.sin(U * 9 - V * 14)
-        dune     = 0.20 * dune_raw
-        grain    = 0.04 * (n3 - 0.5)
-        warm     = 0.06 * (1 - V)
-        shadow   = -0.04 * np.minimum(0.0, dune_raw)
+        dune     = 0.18 * dune_raw
+        grain    = 0.05 * (n3 - 0.5)
+        warm     = 0.05 * (1 - V)
+        shadow   = -0.03 * np.minimum(0.0, dune_raw)
         return (r0 + dune + warm + grain + shadow * 0.5,
-                g0 + dune * 0.70 + grain * 0.5 + shadow * 0.3,
-                b0 + dune * 0.30 + shadow * 0.2)
+                g0 + dune * 0.65 + grain * 0.5 + shadow * 0.3,
+                b0 + dune * 0.25 + shadow * 0.15)
 
     if name == 'ocean':
         dist  = np.hypot(U - 0.5, V - 0.5) * 2
-        depth = 0.10 * dist
-        wave  = 0.06 * np.sin(U * 70 + V * 20) * 0.5 + 0.03 * n2
-        foam  = np.maximum(0.0, n3 - 0.78) * 0.5
-        glint = np.where(n3 > 0.88, (n3 - 0.88) / 0.12 * 0.45, 0.0)
-        return (r0 + depth * 0.4 + foam * 0.6 + glint * 0.9,
-                g0 + depth * 0.5 + wave + foam * 0.6 + glint * 0.85,
-                b0 + depth + wave + foam * 0.7 + glint * 0.7)
+        # Coastal banding: edges lighter (shallow/turquoise), centre darker (deep)
+        depth = 0.18 * dist
+        wave  = 0.05 * np.sin(U * 70 + V * 20) * 0.5 + 0.03 * n2
+        foam  = np.maximum(0.0, n3 - 0.75) * 0.55
+        glint = np.where(n3 > 0.86, (n3 - 0.86) / 0.14 * 0.40, 0.0)
+        # Teal push: more green in shallows, deep blue in centre
+        return (r0 + depth * 0.25 + foam * 0.55 + glint * 0.8,
+                g0 + depth * 0.35 + wave + foam * 0.50 + glint * 0.75,
+                b0 + depth * 0.85 + wave + foam * 0.65 + glint * 0.65)
 
     if name == 'ice':
         crack   = np.where(
-            (np.abs((U * 7 + n * 0.3) % 1 - 0.5) < 0.018) |
-            (np.abs((V * 5 - n * 0.4) % 1 - 0.5) < 0.014),
+            (np.abs((U * 7 + n * 0.3) % 1 - 0.5) < 0.022) |
+            (np.abs((V * 5 - n * 0.4) % 1 - 0.5) < 0.018),
             1.0, 0.0)
-        shimmer = 0.05 * np.sin(U * 50 + V * 40 + seed)
-        layer   = 0.03 * np.sin(V * 12 + U * 8 + seed)
-        return (r0 - crack * 0.2 + shimmer * 0.3 + layer,
-                g0 - crack * 0.1 + shimmer * 0.2 + layer * 0.8,
-                b0 - crack * 0.05 + shimmer + layer * 1.2)
+        shimmer = 0.06 * np.sin(U * 50 + V * 40 + seed)
+        layer   = 0.04 * np.sin(V * 12 + U * 8 + seed)
+        frost   = 0.03 * (n2 - 0.5)
+        return (r0 - crack * 0.25 + shimmer * 0.35 + layer + frost * 0.5,
+                g0 - crack * 0.15 + shimmer * 0.25 + layer * 0.8 + frost * 0.4,
+                b0 - crack * 0.08 + shimmer * 0.9 + layer * 1.2 + frost * 0.6)
 
     if name == 'hills':
-        roll   = 0.12 * np.sin(U * 12 + n * 2) * np.sin(V * 10 + n2 * 2)
-        shadow = -0.06 * np.minimum(0.0, roll)
-        return (r0 + roll * 0.4 + shadow * 0.5,
-                g0 + roll + shadow,
-                b0 + roll * 0.5 + shadow * 0.3)
+        roll   = 0.18 * np.sin(U * 12 + n * 2) * np.sin(V * 10 + n2 * 2)
+        shadow = -0.08 * np.minimum(0.0, roll)
+        warm   = 0.04 * (1.0 - V)
+        return (r0 + roll * 0.45 + shadow * 0.5 + warm,
+                g0 + roll * 1.05 + shadow + warm * 0.6,
+                b0 + roll * 0.45 + shadow * 0.3 + warm * 0.3)
 
     if name == 'sacred':
         circuit = np.where(
@@ -273,11 +283,8 @@ U, V   = np.meshgrid(u_line, v_line)   # shape: (CELL, CELL)
 
 W, H = CELL * COLS, CELL * ROWS
 
-colour_img = bpy.data.images.new('repociv_terrain_atlas_colour',    width=W, height=H, alpha=True)
-normal_img = bpy.data.images.new('repociv_terrain_atlas_normal',    width=W, height=H, alpha=True)
-rough_img  = bpy.data.images.new('repociv_terrain_atlas_roughness', width=W, height=H, alpha=True)
-
-# Blender pixel buffer: flat list [R,G,B,A, ...] in bottom-left-origin order
+# Pixel buffers: [H, W, 4] — row 0 is the top of the image in memory.
+# We will write row_i terrains into y0 = row_i * CELL from the top.
 col_pixels   = np.zeros((H, W, 4), dtype=np.float32)
 norm_pixels  = np.zeros((H, W, 4), dtype=np.float32)
 rough_pixels = np.zeros((H, W, 4), dtype=np.float32)
@@ -286,7 +293,7 @@ norm_pixels[..., 3]  = 1.0
 rough_pixels[..., 3] = 1.0
 
 meta = {
-    'version': 5,
+    'version': 6,
     'kind': 'repociv-3d-terrain-atlas',
     'texture': '/assets/3d/terrain-atlas-3d.png',
     'normalTexture': '/assets/3d/terrain-normal-atlas-3d.png',
@@ -326,24 +333,31 @@ for idx, (name, base) in enumerate(TERRAINS):
     rough_pixels[y0:y0+CELL, x0:x0+CELL, 1] = RGH.astype(np.float32)
     rough_pixels[y0:y0+CELL, x0:x0+CELL, 2] = RGH.astype(np.float32)
 
-# Blender images use flattened [R,G,B,A, ...] in row-major bottom-left order
-colour_img.pixels = col_pixels.flatten().tolist()
-colour_img.filepath_raw = str(OUT / 'terrain-atlas-3d.png')
-colour_img.file_format = 'PNG'
-colour_img.save()
-print(f'[DAVI] saved colour atlas → {colour_img.filepath_raw}', flush=True)
 
-normal_img.pixels = norm_pixels.flatten().tolist()
-normal_img.filepath_raw = str(OUT / 'terrain-normal-atlas-3d.png')
-normal_img.file_format = 'PNG'
-normal_img.save()
-print(f'[DAVI] saved normal atlas → {normal_img.filepath_raw}', flush=True)
+# ── Save via PIL ────────────────────────────────────────────────────────────
+# PIL Image.fromarray expects [H, W, channels] in uint8, row 0 = top.
+# Our pixel buffers are already in that layout.
 
-rough_img.pixels = rough_pixels.flatten().tolist()
-rough_img.filepath_raw = str(OUT / 'terrain-roughness-atlas-3d.png')
-rough_img.file_format = 'PNG'
-rough_img.save()
-print(f'[DAVI] saved roughness atlas → {rough_img.filepath_raw}', flush=True)
+def save_float_rgba(arr, path):
+    # Convert float [0,1] → uint8 [0,255]
+    uint_arr = (np.clip(arr, 0.0, 1.0) * 255.0).astype(np.uint8)
+    img = Image.fromarray(uint_arr, mode='RGBA')
+    img.save(path)
+    print(f'[DAVI] saved → {path}', flush=True)
+
+
+def save_float_rgb(arr, path):
+    uint_arr = (np.clip(arr, 0.0, 1.0) * 255.0).astype(np.uint8)
+    img = Image.fromarray(uint_arr, mode='RGBA')
+    # For roughness, store single-channel grayscale as RGB to keep consistency,
+    # or we can store as greyscale PNG. Let's keep RGB for Three.js ease.
+    img.save(path)
+    print(f'[DAVI] saved → {path}', flush=True)
+
+
+save_float_rgba(col_pixels,   OUT / 'terrain-atlas-3d.png')
+save_float_rgba(norm_pixels,  OUT / 'terrain-normal-atlas-3d.png')
+save_float_rgb(rough_pixels, OUT / 'terrain-roughness-atlas-3d.png')
 
 with open(OUT / 'terrain-atlas-3d.json', 'w') as f:
     json.dump(meta, f, indent=2)
