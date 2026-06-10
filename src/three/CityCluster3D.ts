@@ -87,18 +87,29 @@ export function rebuildCityClusters(
   const capitals = cities.filter((c) => c.isCapital);
 
   // ── Normal cities: buildings + roofs + perimeter walls + corner towers ─────
+  // Civ V palette: pale stone/stucco walls, terracotta roofs, finer silhouettes.
   if (normalCities.length > 0) {
-    const bldGeom = new BoxGeometry(HEX_SIZE * 0.16, HEX_SIZE * 0.2, HEX_SIZE * 0.16);
-    const bldMat = new MeshLambertMaterial({ color: new Color(0xb89050) });
-    const roofGeom = new ConeGeometry(HEX_SIZE * 0.11, HEX_SIZE * 0.10, 4);
-    const roofMat = new MeshLambertMaterial({ color: new Color(0x8a6040) });
-    const wallGeom = new BoxGeometry(HEX_SIZE * 0.55, HEX_SIZE * 0.06, HEX_SIZE * 0.02);
-    const wallMat = new MeshLambertMaterial({ color: new Color(0x9a8060) });
-    const towerGeom = new CylinderGeometry(HEX_SIZE * 0.03, HEX_SIZE * 0.035, HEX_SIZE * 0.14, 6);
-    const towerMat = new MeshLambertMaterial({ color: new Color(0xa08050) });
+    // Taller, thinner blocks so they read as buildings rather than dunes
+    const bldGeom = new BoxGeometry(HEX_SIZE * 0.12, HEX_SIZE * 0.28, HEX_SIZE * 0.12);
+    const bldMat = new MeshLambertMaterial({ color: new Color(0xc8c0b0) });
+    const roofGeom = new ConeGeometry(HEX_SIZE * 0.10, HEX_SIZE * 0.12, 4);
+    const roofMat = new MeshLambertMaterial({ color: new Color(0x9e5a45) });
+    const wallGeom = new BoxGeometry(HEX_SIZE * 0.55, HEX_SIZE * 0.08, HEX_SIZE * 0.02);
+    const wallMat = new MeshLambertMaterial({ color: new Color(0xb0a898) });
+    const towerGeom = new CylinderGeometry(HEX_SIZE * 0.025, HEX_SIZE * 0.03, HEX_SIZE * 0.18, 6);
+    const towerMat = new MeshLambertMaterial({ color: new Color(0xa09880) });
 
-    const bldCount = normalCities.length * 5;
-    const roofCount = normalCities.length * 5;
+    // Density keyed by population (files in repo). Max 5 buildings per city.
+    function buildingCountForCity(pop: number): number {
+      if (pop <= 30) return 1;
+      if (pop <= 120) return 2;
+      if (pop <= 350) return 3;
+      if (pop <= 800) return 4;
+      return 5;
+    }
+
+    const bldCount = normalCities.reduce((s, c) => s + buildingCountForCity(c.population), 0);
+    const roofCount = bldCount;
     const wallCount = normalCities.length * 6;   // 6 wall segments
     const towerCount = normalCities.length * 4;  // 4 corner towers
 
@@ -115,26 +126,28 @@ export function rebuildCityClusters(
       const elev = tile ? terrainElevation(tile.terrain) : 0;
       const base = axialToWorld3D(city.coord.q, city.coord.r, elev);
       const h = hashCoord(city.coord.q, city.coord.r);
+      const count = buildingCountForCity(city.population);
 
-      // Buildings
-      const offsets = [
-        [0, 0, 1],
-        [-0.14, 0.1, 0.85],
-        [0.16, -0.1, 0.9],
-        [0.06, 0.16, 0.75],
-        [-0.1, -0.12, 0.7],
-      ] as const;
-      for (const [ox, oz, ht] of offsets) {
+      // Building footprints — clustered toward centre so walls read as a perimeter
+      const offsets: Array<[number, number, number]> = [
+        [0,       0,    1.00],
+        [-0.10,   0.08, 0.82],
+        [0.12,   -0.06, 0.88],
+        [0.05,    0.14, 0.72],
+        [-0.08,  -0.10, 0.68],
+      ];
+      for (let bi = 0; bi < count; bi++) {
+        const [ox, oz, ht] = offsets[bi]!;
         const m = new Matrix4().makeTranslation(
           base.x + ox * HEX_SIZE,
-          base.y + 4 + ht * 6 + (h % 4),
+          base.y + 4 + ht * 7 + (h % 4),
           base.z + oz * HEX_SIZE,
         );
         m.scale(new Vector3(1, ht, 1));
         clusterMesh.setMatrixAt(bldIdx++, m);
 
         // Triangular roof on top
-        const roofY = base.y + 4 + ht * 6 + (h % 4) + HEX_SIZE * 0.2 * ht * 0.5 + HEX_SIZE * 0.05;
+        const roofY = base.y + 4 + ht * 7 + (h % 4) + HEX_SIZE * 0.28 * ht * 0.5 + HEX_SIZE * 0.04;
         const roofM = new Matrix4().makeTranslation(
           base.x + ox * HEX_SIZE,
           roofY,
@@ -148,7 +161,7 @@ export function rebuildCityClusters(
       }
 
       // Perimeter walls (thin, around the tile edge)
-      const wallY = base.y + 3.5;
+      const wallY = base.y + 3.2;
       for (let wi = 0; wi < 6; wi++) {
         const angle = (Math.PI / 3) * wi;
         const wx = base.x + Math.cos(angle) * HEX_SIZE * 0.38;
@@ -164,7 +177,7 @@ export function rebuildCityClusters(
       for (const ca of cornerAngles) {
         const tx = base.x + Math.cos(ca) * HEX_SIZE * 0.42;
         const tz = base.z + Math.sin(ca) * HEX_SIZE * 0.42;
-        const towerM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.07, tz);
+        const towerM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.09, tz);
         towerMesh.setMatrixAt(towerIdx++, towerM);
       }
     }
@@ -180,33 +193,34 @@ export function rebuildCityClusters(
   }
 
   // ── Capitals: larger buildings + dome + complex walls + towers + star ────────
+  // Same stone/stucco palette as normal cities, but grander scale.
   if (capitals.length > 0) {
-    const bldGeom = new BoxGeometry(HEX_SIZE * 0.22, HEX_SIZE * 0.5, HEX_SIZE * 0.22);
+    const bldGeom = new BoxGeometry(HEX_SIZE * 0.20, HEX_SIZE * 0.55, HEX_SIZE * 0.20);
     const bldMat = new MeshStandardMaterial({
-      color: new Color(0xd4af37),
-      emissive: new Color(0x604010),
-      emissiveIntensity: 0.25,
+      color: new Color(0xd4c8b8),
+      emissive: new Color(0x504840),
+      emissiveIntensity: 0.18,
     });
-    const roofGeom = new ConeGeometry(HEX_SIZE * 0.15, HEX_SIZE * 0.14, 4);
-    const roofMat = new MeshStandardMaterial({ color: new Color(0xb89040), roughness: 0.5 });
-    const domeGeom = new SphereGeometry(HEX_SIZE * 0.12, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+    const roofGeom = new ConeGeometry(HEX_SIZE * 0.14, HEX_SIZE * 0.16, 4);
+    const roofMat = new MeshStandardMaterial({ color: new Color(0xa86048), roughness: 0.5 });
+    const domeGeom = new SphereGeometry(HEX_SIZE * 0.11, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
     const domeMat = new MeshStandardMaterial({
-      color: new Color(0xe8c860),
-      emissive: new Color(0x605020),
-      emissiveIntensity: 0.15,
+      color: new Color(0xe8dcc8),
+      emissive: new Color(0x605840),
+      emissiveIntensity: 0.12,
       roughness: 0.3,
-      metalness: 0.4,
+      metalness: 0.25,
     });
-    const wallGeom = new BoxGeometry(HEX_SIZE * 0.70, HEX_SIZE * 0.08, HEX_SIZE * 0.025);
-    const wallMat = new MeshStandardMaterial({ color: new Color(0x8a7040), roughness: 0.7 });
-    const towerGeom = new CylinderGeometry(HEX_SIZE * 0.04, HEX_SIZE * 0.045, HEX_SIZE * 0.20, 6);
-    const towerMat = new MeshStandardMaterial({ color: new Color(0x9a8048), roughness: 0.6 });
+    const wallGeom = new BoxGeometry(HEX_SIZE * 0.70, HEX_SIZE * 0.10, HEX_SIZE * 0.025);
+    const wallMat = new MeshStandardMaterial({ color: new Color(0xb8b0a0), roughness: 0.7 });
+    const towerGeom = new CylinderGeometry(HEX_SIZE * 0.035, HEX_SIZE * 0.04, HEX_SIZE * 0.24, 6);
+    const towerMat = new MeshStandardMaterial({ color: new Color(0xa8a090), roughness: 0.6 });
 
-    const starGeom = new ConeGeometry(HEX_SIZE * 0.1, HEX_SIZE * 0.18, 4);
+    const starGeom = new ConeGeometry(HEX_SIZE * 0.09, HEX_SIZE * 0.16, 4);
     const starMat = new MeshStandardMaterial({
-      color: 0xf0d060,
-      emissive: 0xf0d060,
-      emissiveIntensity: 0.8,
+      color: 0xf0e0a8,
+      emissive: 0xf0e0a8,
+      emissiveIntensity: 0.7,
     });
 
     const bldCount = capitals.length;
@@ -229,21 +243,21 @@ export function rebuildCityClusters(
       const elev = tile ? terrainElevation(tile.terrain) : 0;
       const base = axialToWorld3D(city.coord.q, city.coord.r, elev);
 
-      // Main building
-      capitalMesh.setMatrixAt(bldIdx++, new Matrix4().makeTranslation(base.x, base.y + 14, base.z));
+      // Main building — taller so the capital silhouette dominates
+      capitalMesh.setMatrixAt(bldIdx++, new Matrix4().makeTranslation(base.x, base.y + 16, base.z));
 
       // Roof on main building
-      const roofY = base.y + 14 + HEX_SIZE * 0.5 * 0.5 + HEX_SIZE * 0.07;
+      const roofY = base.y + 16 + HEX_SIZE * 0.55 * 0.5 + HEX_SIZE * 0.08;
       const roofM = new Matrix4().makeTranslation(base.x, roofY, base.z);
       capitalRoofMesh.setMatrixAt(roofIdx++, roofM);
 
       // Central dome (half-sphere sitting on roof)
-      const domeY = roofY + HEX_SIZE * 0.07;
+      const domeY = roofY + HEX_SIZE * 0.08;
       const domeM = new Matrix4().makeTranslation(base.x, domeY, base.z);
       capitalDomeMesh.setMatrixAt(bldIdx - 1, domeM); // reuse index
 
       // Complex walls (octagonal-ish, 8 segments)
-      const wallY = base.y + 5;
+      const wallY = base.y + 4.5;
       for (let wi = 0; wi < 8; wi++) {
         const angle = (Math.PI / 4) * wi;
         const wx = base.x + Math.cos(angle) * HEX_SIZE * 0.48;
@@ -259,12 +273,12 @@ export function rebuildCityClusters(
         const angle = (Math.PI / 3) * ti;
         const tx = base.x + Math.cos(angle) * HEX_SIZE * 0.52;
         const tz = base.z + Math.sin(angle) * HEX_SIZE * 0.52;
-        const towerM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.10, tz);
+        const towerM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.12, tz);
         capitalTowerMesh.setMatrixAt(towerIdx++, towerM);
       }
 
       // Star on top of dome
-      const starY = domeY + HEX_SIZE * 0.12 + HEX_SIZE * 0.09;
+      const starY = domeY + HEX_SIZE * 0.11 + HEX_SIZE * 0.08;
       const starM = new Matrix4().makeTranslation(base.x, starY, base.z);
       capitalStar.setMatrixAt(bldIdx - 1, starM);
     }
