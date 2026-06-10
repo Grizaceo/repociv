@@ -3,11 +3,13 @@
 exports[`terrainShader > produces a stable fragment shader from onBeforeCompile 1`] = `
 "varying float vTerrainIndex;
 varying float vNeighborTerrainIndex;
+varying float vCoastMask;
 varying vec2  vLocalXZ;
 varying vec2  vWorldXZ;
 varying float vLocalY;
 varying vec2  vUv;
 varying float vTopFace;
+uniform vec2  uCoastDir[6];
 uniform float uTime;
 uniform float uHexRadius;
 uniform float uPrismHeight;
@@ -128,6 +130,28 @@ void main() {
           float wave2 = 0.03 * sin(uTime * 2.6 - vLocalXZ.x * 0.05 + vLocalXZ.y * 0.11);
           diffuseColor.rgb += vec3(wave * 0.3, wave * 0.25 + wave2 * 0.4, wave + wave2 * 1.2);
         }
+        // Civ V shoreline ring: foam band hugging each edge where ocean
+        // meets land. instanceCoastMask carries a 6-bit mask of boundary
+        // edges (AXIAL_DIRECTIONS order); uCoastDir[k] is the matching edge
+        // normal pre-scaled so dot(vLocalXZ, dir) == 1.0 at the shared edge.
+        // Both sides of the boundary get foam — stronger on the water side.
+        // The pulse reuses uTime like the shimmer above, so ?freeze=<s>
+        // keeps golden captures deterministic.
+        if (vTopFace > 0.5 && vCoastMask > 0.5) {
+          float coastMask = floor(vCoastMask + 0.5);
+          float edgeT = 0.0;
+          for (int k = 0; k < 6; k++) {
+            float bit = mod(floor(coastMask / pow(2.0, float(k))), 2.0);
+            if (bit > 0.5) {
+              edgeT = max(edgeT, dot(vLocalXZ, uCoastDir[k]));
+            }
+          }
+          bool selfOcean = (tidx > 3.5 && tidx < 4.5);
+          float ring = smoothstep(0.74, 0.97, edgeT);
+          float foamPulse = 0.82 + 0.18 * sin(uTime * 1.7 + vWorldXZ.x * 0.045 + vWorldXZ.y * 0.038);
+          float foamAmt = ring * foamPulse * (selfOcean ? 0.60 : 0.30);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.55, 0.85, 0.88), foamAmt);
+        }
   #include <roughnessmap_fragment>
         if (uUseRoughAtlas > 0 && vTopFace > 0.5) {
           float _rtidx = floor(vTerrainIndex + 0.5);
@@ -163,8 +187,10 @@ exports[`terrainShader > produces a stable vertex shader from onBeforeCompile 1`
 "uniform float uTime;
 attribute float instanceTerrain;
 attribute float instanceNeighborTerrain;
+attribute float instanceCoastMask;
 varying float vTerrainIndex;
 varying float vNeighborTerrainIndex;
+varying float vCoastMask;
 varying vec2  vLocalXZ;
 varying vec2  vWorldXZ;
 varying float vLocalY;
@@ -174,6 +200,7 @@ void main() {
   #include <begin_vertex>
         vTerrainIndex = instanceTerrain;
         vNeighborTerrainIndex = instanceNeighborTerrain;
+        vCoastMask    = instanceCoastMask;
         vLocalXZ      = vec2(position.x, position.z);
         vWorldXZ      = instanceMatrix[3].xz + transformed.xz;
         vLocalY       = transformed.y;
@@ -198,10 +225,14 @@ void main() {
           transformed.y *= heightScale;
         }
 
-        // Ocean wave animation: gentle vertical displacement
+        // Ocean wave animation: gentle vertical displacement. Phase runs on
+        // WORLD position — with local coords every instance got its own
+        // phase, so the shared edge between two ocean tiles displaced
+        // differently and the sea opened visible seams.
         if (abs(tidx - 4.0) < 0.5) {
-          float wave = 0.35 * sin(uTime * 1.4 + transformed.x * 0.12 + transformed.z * 0.08);
-          float wave2 = 0.18 * sin(uTime * 2.1 - transformed.x * 0.07 + transformed.z * 0.11);
+          vec2 wavePos = instanceMatrix[3].xz + transformed.xz;
+          float wave = 0.35 * sin(uTime * 1.4 + wavePos.x * 0.12 + wavePos.y * 0.08);
+          float wave2 = 0.18 * sin(uTime * 2.1 - wavePos.x * 0.07 + wavePos.y * 0.11);
           transformed.y += wave + wave2;
         }
   vec3 transformed = position;

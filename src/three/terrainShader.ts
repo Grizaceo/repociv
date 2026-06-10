@@ -7,9 +7,26 @@ import {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Shader = any;
+import { Vector2 } from 'three';
 import { HEX_SIZE } from '../constants.ts';
 import { TILE_PRISM_HEIGHT } from './hexGeometry.ts';
+import { axialToWorld3D } from './axialToWorld3D.ts';
+import { AXIAL_DIRECTIONS } from '../hex.ts';
 import { type Terrain } from '../types.ts';
+
+/** Unit XZ direction toward each axial neighbor, pre-divided by the
+ *  center-to-shared-edge distance, so dot(vLocalXZ, dir) == 1.0 exactly at
+ *  that edge. Order matches AXIAL_DIRECTIONS — the same order used to build
+ *  the instanceCoastMask bits in HexWorldScene.ts. */
+const COAST_EDGE_DIRS: Vector2[] = AXIAL_DIRECTIONS.map((d) => {
+  const origin = axialToWorld3D(0, 0, 0);
+  const neighbor = axialToWorld3D(d.q, d.r, 0);
+  const dx = neighbor.x - origin.x;
+  const dz = neighbor.z - origin.z;
+  const dist = Math.hypot(dx, dz);
+  const half = dist / 2;
+  return new Vector2(dx / dist / half, dz / dist / half);
+});
 
 /** Stable terrain-to-atlas index mapping. Keep in sync with terrain-atlas-3d.json. */
 export const TERRAIN_ATLAS_INDEX: Record<Terrain, number> = {
@@ -81,6 +98,7 @@ export function createTerrainMaterial(
     shader.uniforms.uUseRoughAtlas    = { value: options.roughnessAtlas ? 1 : 0 };
     shader.uniforms.uAtlasColumns     = { value: options.atlasColumns ?? 4 };
     shader.uniforms.uAtlasRows        = { value: options.atlasRows ?? 3 };
+    shader.uniforms.uCoastDir         = { value: COAST_EDGE_DIRS };
     (mat.userData as { shader?: Shader }).shader = shader;
 
     // ── Vertex ────────────────────────────────────────────────────────────────
@@ -88,8 +106,10 @@ export function createTerrainMaterial(
       'uniform float uTime;\n' +
       'attribute float instanceTerrain;\n' +
       'attribute float instanceNeighborTerrain;\n' +
+      'attribute float instanceCoastMask;\n' +
       'varying float vTerrainIndex;\n' +
       'varying float vNeighborTerrainIndex;\n' +
+      'varying float vCoastMask;\n' +
       'varying vec2  vLocalXZ;\n' +
       'varying vec2  vWorldXZ;\n' +
       'varying float vLocalY;\n' +
@@ -100,6 +120,7 @@ export function createTerrainMaterial(
         `#include <begin_vertex>
         vTerrainIndex = instanceTerrain;
         vNeighborTerrainIndex = instanceNeighborTerrain;
+        vCoastMask    = instanceCoastMask;
         vLocalXZ      = vec2(position.x, position.z);
         vWorldXZ      = instanceMatrix[3].xz + transformed.xz;
         vLocalY       = transformed.y;
@@ -124,10 +145,14 @@ export function createTerrainMaterial(
           transformed.y *= heightScale;
         }
 
-        // Ocean wave animation: gentle vertical displacement
+        // Ocean wave animation: gentle vertical displacement. Phase runs on
+        // WORLD position — with local coords every instance got its own
+        // phase, so the shared edge between two ocean tiles displaced
+        // differently and the sea opened visible seams.
         if (abs(tidx - 4.0) < 0.5) {
-          float wave = 0.35 * sin(uTime * 1.4 + transformed.x * 0.12 + transformed.z * 0.08);
-          float wave2 = 0.18 * sin(uTime * 2.1 - transformed.x * 0.07 + transformed.z * 0.11);
+          vec2 wavePos = instanceMatrix[3].xz + transformed.xz;
+          float wave = 0.35 * sin(uTime * 1.4 + wavePos.x * 0.12 + wavePos.y * 0.08);
+          float wave2 = 0.18 * sin(uTime * 2.1 - wavePos.x * 0.07 + wavePos.y * 0.11);
           transformed.y += wave + wave2;
         }`,
       );
@@ -136,11 +161,13 @@ export function createTerrainMaterial(
     const uniformDecl =
       'varying float vTerrainIndex;\n' +
       'varying float vNeighborTerrainIndex;\n' +
+      'varying float vCoastMask;\n' +
       'varying vec2  vLocalXZ;\n' +
       'varying vec2  vWorldXZ;\n' +
       'varying float vLocalY;\n' +
       'varying vec2  vUv;\n' +
       'varying float vTopFace;\n' +
+      'uniform vec2  uCoastDir[6];\n' +
       'uniform float uTime;\n' +
       'uniform float uHexRadius;\n' +
       'uniform float uPrismHeight;\n' +
@@ -267,6 +294,28 @@ float terrainDetailNoise(vec2 p) {
           float wave  = 0.06 * sin(uTime * 1.8 + vLocalXZ.x * 0.09 + vLocalXZ.y * 0.07);
           float wave2 = 0.03 * sin(uTime * 2.6 - vLocalXZ.x * 0.05 + vLocalXZ.y * 0.11);
           diffuseColor.rgb += vec3(wave * 0.3, wave * 0.25 + wave2 * 0.4, wave + wave2 * 1.2);
+        }
+        // Civ V shoreline ring: foam band hugging each edge where ocean
+        // meets land. instanceCoastMask carries a 6-bit mask of boundary
+        // edges (AXIAL_DIRECTIONS order); uCoastDir[k] is the matching edge
+        // normal pre-scaled so dot(vLocalXZ, dir) == 1.0 at the shared edge.
+        // Both sides of the boundary get foam — stronger on the water side.
+        // The pulse reuses uTime like the shimmer above, so ?freeze=<s>
+        // keeps golden captures deterministic.
+        if (vTopFace > 0.5 && vCoastMask > 0.5) {
+          float coastMask = floor(vCoastMask + 0.5);
+          float edgeT = 0.0;
+          for (int k = 0; k < 6; k++) {
+            float bit = mod(floor(coastMask / pow(2.0, float(k))), 2.0);
+            if (bit > 0.5) {
+              edgeT = max(edgeT, dot(vLocalXZ, uCoastDir[k]));
+            }
+          }
+          bool selfOcean = (tidx > 3.5 && tidx < 4.5);
+          float ring = smoothstep(0.74, 0.97, edgeT);
+          float foamPulse = 0.82 + 0.18 * sin(uTime * 1.7 + vWorldXZ.x * 0.045 + vWorldXZ.y * 0.038);
+          float foamAmt = ring * foamPulse * (selfOcean ? 0.60 : 0.30);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.55, 0.85, 0.88), foamAmt);
         }`,
       )
       // ── Per-biome roughness from atlas (correct atlas UV, not raw tile UV) ──
@@ -311,7 +360,7 @@ float terrainDetailNoise(vec2 p) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v15';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v16';
   return mat;
 }
 

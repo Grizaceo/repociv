@@ -28,17 +28,20 @@
  *     in the script if a future change needs more time to settle.
  *
  * What this script is NOT:
- *   - A pixelmatch-style perceptual diff. We compare SHA-256 hashes of
- *     the PNG bytes. This catches layout/composition regressions but
- *     NOT small tone changes (e.g. shader light intensity tweaks that
- *     shift every pixel by <1 RGB step). For that we'd need
- *     pixelmatch, which is a larger dependency.
+ *   - A pixelmatch-style perceptual diff. The PRIMARY comparison is the
+ *     SHA-256 of the PNG bytes. When the SHA mismatches, a tolerance
+ *     fallback decodes both PNGs (in the already-open browser, no extra
+ *     dependency) and accepts ≤ TOLERANCE_MAX_PX differing pixels — MSAA
+ *     resolves the odd knife-edge pixel differently across runs (observed:
+ *     a single-pixel flip on the ground-plane silhouette in cams 03/05/06),
+ *     and a SHA-exact gate would be permanently flaky there. Anything
+ *     beyond a handful of pixels is still a hard DIFF.
  *   - A headless-renderable test. The actual GL pipeline needs the
  *     browser. Phase 2 keeps it that way to avoid headless GL
  *     compatibility drift.
  */
 import { chromium } from '@playwright/test';
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -249,15 +252,25 @@ async function main() {
     }
   }
 
-  await browser.close();
-
-  // Compare against goldens.
+  // Compare against goldens. SHA equality is the fast path; on mismatch,
+  // fall back to a strict pixel-tolerance compare against the golden PNG
+  // (decoded in the still-open browser — no image dependency in node).
+  // Observed flake modes (bimodal, stable within a run, flips between page
+  // loads — consistent with driver shader-cache hit/miss changing float
+  // scheduling): 1 px on a ground-plane knife edge (cam 05), ~22-58 px of
+  // SCATTERED single-pixel silhouette flips across the frame (cams 02/06).
+  // A real regression shifts contiguous regions (hundreds-thousands of px),
+  // so 80 scattered pixels is still a safe ceiling.
+  const TOLERANCE_MAX_PX = 80;    // max differing pixels accepted
+  const TOLERANCE_CHANNEL = 6;    // a pixel "differs" if any RGB channel deviates more
   let diffCount = 0;
   for (const { name, shotPath, hash } of results) {
     const goldenPath = join(GOLDEN, `${name}.sha256`);
+    const goldenPng = join(GOLDEN, `${name}.png`);
     if (updateMode) {
       writeFileSync(goldenPath, hash + '\n');
-      console.log(`[GOLDEN] wrote ${goldenPath}`);
+      copyFileSync(shotPath, goldenPng);
+      console.log(`[GOLDEN] wrote ${goldenPath} (+png)`);
       continue;
     }
     if (!existsSync(goldenPath)) {
@@ -266,15 +279,31 @@ async function main() {
       continue;
     }
     const expected = readFileSync(goldenPath, 'utf-8').trim();
-    if (expected !== hash) {
+    if (expected === hash) {
+      console.log(`[OK]    ${name}: matches golden`);
+      continue;
+    }
+    if (existsSync(goldenPng)) {
+      const differing = await countDifferingPixels(page, goldenPng, shotPath, TOLERANCE_CHANNEL);
+      if (differing >= 0 && differing <= TOLERANCE_MAX_PX) {
+        console.log(
+          `[OK]    ${name}: within tolerance (${differing} px differ; MSAA knife-edge jitter)`,
+        );
+        continue;
+      }
       console.error(
-        `[DIFF] ${name}: hash mismatch\n  expected: ${expected.slice(0, 12)}...\n  got:      ${hash.slice(0, 12)}...\n  shot:     ${shotPath}`,
+        `[DIFF] ${name}: ${differing < 0 ? 'size mismatch' : `${differing} px differ`}\n  expected: ${expected.slice(0, 12)}...\n  got:      ${hash.slice(0, 12)}...\n  shot:     ${shotPath}`,
       );
       diffCount++;
-    } else {
-      console.log(`[OK]    ${name}: matches golden`);
+      continue;
     }
+    console.error(
+      `[DIFF] ${name}: hash mismatch (no golden PNG for tolerance compare — run --update once)\n  expected: ${expected.slice(0, 12)}...\n  got:      ${hash.slice(0, 12)}...\n  shot:     ${shotPath}`,
+    );
+    diffCount++;
   }
+
+  await browser.close();
 
   if (!updateMode && diffCount > 0) {
     console.error(`\n[AUDIT] ${diffCount} diff(s) — visual regression detected.`);
@@ -286,6 +315,48 @@ async function main() {
 
 function sha256(buf) {
   return createHash('sha256').update(buf).digest('hex');
+}
+
+/** Decode two PNGs in the open browser page and count pixels whose RGB
+ *  differs by more than `channelTol` on any channel. Returns -1 on size
+ *  mismatch (always a hard DIFF). */
+async function countDifferingPixels(page, pathA, pathB, channelTol) {
+  const toDataUrl = (p) => `data:image/png;base64,${readFileSync(p).toString('base64')}`;
+  return page.evaluate(
+    async ({ a, b, tol }) => {
+      const load = (src) =>
+        new Promise((res, rej) => {
+          const img = new Image();
+          img.onload = () => res(img);
+          img.onerror = rej;
+          img.src = src;
+        });
+      const [ia, ib] = await Promise.all([load(a), load(b)]);
+      if (ia.width !== ib.width || ia.height !== ib.height) return -1;
+      const read = (img) => {
+        const cv = document.createElement('canvas');
+        cv.width = img.width;
+        cv.height = img.height;
+        const ctx = cv.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0);
+        return ctx.getImageData(0, 0, img.width, img.height).data;
+      };
+      const da = read(ia);
+      const db = read(ib);
+      let count = 0;
+      for (let i = 0; i < da.length; i += 4) {
+        if (
+          Math.abs(da[i] - db[i]) > tol ||
+          Math.abs(da[i + 1] - db[i + 1]) > tol ||
+          Math.abs(da[i + 2] - db[i + 2]) > tol
+        ) {
+          count++;
+        }
+      }
+      return count;
+    },
+    { a: toDataUrl(pathA), b: toDataUrl(pathB), tol: channelTol },
+  );
 }
 
 main().catch((err) => {

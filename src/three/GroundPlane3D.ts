@@ -6,9 +6,8 @@ import {
   Color,
 } from 'three';
 import { type GameState } from '../game.ts';
-import { axialToWorld3D } from './axialToWorld3D.ts';
+import { axialToWorld3D, TILE_HEIGHT } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
-import { TILE_PRISM_HEIGHT } from './hexGeometry.ts';
 
 let groundMesh: Mesh | null = null;
 
@@ -48,7 +47,11 @@ export function rebuildGroundPlane(state: GameState): void {
   });
 
   groundMesh = new Mesh(geom, mat);
-  groundMesh.position.set(cx, -TILE_PRISM_HEIGHT * 0.22, cz);
+  // Below the ocean top face (elev -1 → y = -TILE_HEIGHT): the old
+  // -TILE_PRISM_HEIGHT*0.22 (-5.28) sat ABOVE the ocean tops and buried the
+  // entire ocean ring under the disc — the map read as land floating on a
+  // brown void, and the shoreline foam (gap #2) was invisible at every coast.
+  groundMesh.position.set(cx, -TILE_HEIGHT - 2.5, cz);
   groundMesh.receiveShadow = true;
 }
 

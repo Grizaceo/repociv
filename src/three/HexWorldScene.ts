@@ -445,6 +445,7 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
 
   const terrainIndices = new Float32Array(tiles.length);
   const neighborIndices = new Float32Array(tiles.length);
+  const coastMasks = new Float32Array(tiles.length);
   const instanceEntries: Array<{ instanceId: number; coord: Axial }> = [];
   const matrix = new Matrix4();
 
@@ -458,11 +459,22 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
     terrainMesh!.setColorAt(i, instanceColorForTile(tile, fogEnabled));
     terrainIndices[i] = TERRAIN_ATLAS_INDEX[tile.terrain];
     neighborIndices[i] = dominantNeighborTerrain(tile, getTile);
+    // 6-bit mask (AXIAL_DIRECTIONS order) of edges where ocean meets land —
+    // drives the Civ V shoreline foam ring in terrainShader.ts. Both sides
+    // of the boundary get their bit so the foam straddles the shared edge.
+    let mask = 0;
+    const selfOcean = tile.terrain === 'ocean';
+    AXIAL_DIRECTIONS.forEach((d, k) => {
+      const n = getTile(tileKey({ q: tile.coord.q + d.q, r: tile.coord.r + d.r }));
+      if (n && (n.terrain === 'ocean') !== selfOcean) mask |= 1 << k;
+    });
+    coastMasks[i] = mask;
     instanceEntries.push({ instanceId: i, coord: tile.coord });
   });
 
   terrainMesh.geometry.setAttribute('instanceTerrain', new InstancedBufferAttribute(terrainIndices, 1));
   terrainMesh.geometry.setAttribute('instanceNeighborTerrain', new InstancedBufferAttribute(neighborIndices, 1));
+  terrainMesh.geometry.setAttribute('instanceCoastMask', new InstancedBufferAttribute(coastMasks, 1));
   terrainMesh.frustumCulled = false;
   terrainMesh.instanceMatrix.needsUpdate = true;
   if (terrainMesh.instanceColor) terrainMesh.instanceColor.needsUpdate = true;
