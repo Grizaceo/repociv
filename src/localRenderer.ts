@@ -826,7 +826,7 @@ export class LocalRenderer {
           this.drawDynamicDoorTile(tile, dt, localUnits);
         } else if (tile.type === 'workbench') {
           const room = tile.roomId ? world.rooms.find((r) => r.id === tile.roomId) : undefined;
-          if (room?.highDensity) {
+          if (room && room.workbenches.length >= 3) {
             // Accumulate for cluster rendering
             if (!clusterMap.has(room.id)) {
               clusterMap.set(room.id, { x: room.x + room.width / 2, y: room.y + room.height / 2, extensions: [] });
@@ -1437,9 +1437,9 @@ export class LocalRenderer {
       } else if (tile.type === 'kiosk') {
         this.drawKioskTile(px, py, s);
       } else if (tile.type === 'workbench') {
-        // Phase E: skip individual desk rendering in high-density rooms
+        // Phase E: skip individual desk rendering when >=3 workbenchs in room
         const room = tile.roomId ? this.world?.rooms.find((r) => r.id === tile.roomId) : undefined;
-        if (!room?.highDensity) {
+        if (!room || room.workbenches.length < 3) {
           this.drawWorkbenchTile(tile, px, py, s);
         }
       } else if (tile.type === 'conduit') {

@@ -338,8 +338,8 @@ export function applyOfficeLayout(
 ): void {
   const result = layoutOfficeRoom(room, grid, gridW, gridH, wallThick);
   room.layoutPlan = result.plan;
-  // Phase E: mark high-density rooms for compact rendering
-  room.highDensity = room.workbenches.length > 4;
+  // Phase E: mark high-density rooms for compact rendering (>=3 workbenches per room)
+  room.highDensity = room.workbenches.length >= 3;
 
   for (const p of result.placements) {
     if (!inBounds(p.x, p.y, gridW, gridH)) continue;

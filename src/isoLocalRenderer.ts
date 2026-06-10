@@ -161,7 +161,7 @@ export function renderIso(state: IsoRenderState) {
   // Accumulate high-density room extensions for cluster rendering
   const isoClusterMap = new Map<string, { room: LocalRoom; extensions: string[] }>();
   for (const room of world.rooms) {
-    if (!room.highDensity) continue;
+    if (room.workbenches.length < 3) continue;
     const extensions: string[] = [];
     for (const wb of room.workbenches) {
       extensions.push(wb.extension);
@@ -1320,54 +1320,66 @@ function drawIsoWorkbenchCluster(
   const cy = room.y + room.height / 2;
   const base = officeIsoProject(cx, cy);
 
-  // Deduplicate and count extensions
+  // Deduplicate and count extensions, sorted by count desc
   const counts = new Map<string, number>();
   for (const ext of extensions) {
     counts.set(ext, (counts.get(ext) || 0) + 1);
   }
   const unique = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  // Cap at top 8 most common
+  const shown = unique.slice(0, 8);
 
-  // Compact layout
-  const cols = Math.min(unique.length, 5);
-  const rows = Math.ceil(unique.length / cols);
-  const pillW = 20;
-  const pillH = 8;
-  const gap = 1;
+  // Layout: pills in a grid, max 4 per row
+  const cols = Math.min(shown.length, 4);
+  const rows = Math.ceil(shown.length / cols);
+  const pillW = 28;
+  const pillH = 11;
+  const gap = 2;
   const totalW = cols * (pillW + gap) - gap;
   const totalH = rows * (pillH + gap) - gap;
   const startX = base.px - totalW / 2;
-  const startY = base.py - ISO_WALL_H - 6 - totalH;
+  // Position above the room floor, visible over walls
+  const startY = base.py - ISO_WALL_H - 10 - totalH;
 
-  // Background panel
+  // Total count badge
+  const totalFiles = extensions.length;
+
+  // Background panel with total
   ctx.save();
-  ctx.globalAlpha = 0.90;
-  ctx.fillStyle = 'rgba(20, 22, 28, 0.88)';
+  ctx.fillStyle = 'rgba(18, 20, 26, 0.92)';
   ctx.beginPath();
-  ctx.roundRect(startX - 3, startY - 2, totalW + 6, totalH + 4, 3);
+  ctx.roundRect(startX - 6, startY - 14, totalW + 12, totalH + 28, 4);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(80, 100, 130, 0.2)';
-  ctx.lineWidth = 0.5;
+  ctx.strokeStyle = 'rgba(200, 200, 200, 0.25)';
+  ctx.lineWidth = 1;
   ctx.stroke();
 
+  // Title: total file count
+  ctx.fillStyle = '#CCCCCC';
+  ctx.font = `bold 7px ${monoFont(state)}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`${totalFiles} files`, base.px, startY - 10);
+
   // Draw pills
-  ctx.font = `bold 5px ${monoFont(state)}`;
+  ctx.font = `bold 7px ${monoFont(state)}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  for (let i = 0; i < unique.length; i++) {
-    const [ext, count] = unique[i]!;
+  for (let i = 0; i < shown.length; i++) {
+    const [ext, count] = shown[i]!;
     const col = i % cols;
     const row = Math.floor(i / cols);
     const px = startX + col * (pillW + gap);
     const py = startY + row * (pillH + gap);
     const color = state.extColor[ext] ?? '#888';
 
-    ctx.fillStyle = color + '18';
+    ctx.fillStyle = color + '22';
     ctx.beginPath();
-    ctx.roundRect(px, py, pillW, pillH, 2);
+    ctx.roundRect(px, py, pillW, pillH, 3);
     ctx.fill();
 
     ctx.fillStyle = color;
-    const label = count > 1 ? `${ext.toUpperCase().slice(0, 3)}×${count}` : ext.toUpperCase().slice(0, 3);
+    const label = `${ext.toUpperCase().slice(0, 3)} ×${count}`;
     ctx.fillText(label, px + pillW / 2, py + pillH / 2);
   }
   ctx.restore();

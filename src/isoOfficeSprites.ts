@@ -161,10 +161,10 @@ export function drawIsoOfficeSprite(
   gy: number,
   activeWbIds?: Set<string | null>,
 ): void {
-  // Phase E: skip individual desk rendering in high-density rooms
+  // Phase E: skip individual desk/chair rendering when >=3 workbenchs in room
   if (tile.type === 'workbench' || tile.type === 'chair') {
     const room = tile.roomId ? dctx.world?.rooms.find((r) => r.id === tile.roomId) : undefined;
-    if (room?.highDensity) return;
+    if (room && room.workbenches.length >= 3) return;
   }
 
   const wb = tile.workbench;
