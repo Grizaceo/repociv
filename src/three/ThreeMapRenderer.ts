@@ -17,6 +17,7 @@ import {
   updateHexWorldScene,
   disposeHexWorldScene,
   getTerrainMesh,
+  isTerrainAtlasReady,
   type HexSceneRenderOptions,
 } from './HexWorldScene.ts';
 import { HexPicker } from './HexPicker.ts';
@@ -104,7 +105,8 @@ export class ThreeMapRenderer {
     // animTime, not world state.
     const tileSignature =
       computeWorldSignature(state) +
-      `@${opts.lod}:${opts.fogEnabled ? 1 : 0}:${opts.showStructure ? 1 : 0}:${opts.showOps ? 1 : 0}:${opts.showLabels ? 1 : 0}`;
+      `@${opts.lod}:${opts.fogEnabled ? 1 : 0}:${opts.showStructure ? 1 : 0}:${opts.showOps ? 1 : 0}:${opts.showLabels ? 1 : 0}` +
+      `:atlas${isTerrainAtlasReady() ? 1 : 0}`;
     const stateDirty = tileSignature !== this.lastTileSignature;
     this.lastTileSignature = tileSignature;
 
@@ -161,6 +163,11 @@ export class ThreeMapRenderer {
 
   getPicker(): HexPicker {
     return this.picker;
+  }
+
+  /** True once the terrain texture atlas loaded (golden-capture wait). */
+  isAtlasReady(): boolean {
+    return isTerrainAtlasReady();
   }
 
   getCanvasSize(): { width: number; height: number } {

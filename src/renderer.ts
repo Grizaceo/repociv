@@ -281,14 +281,14 @@ export class Renderer {
     this.cam.y = (minY + maxY) / 2;
   }
 
-  /** Center macro camera on an axial hex (works before WebGL is loaded). */
+  /** Center macro camera on an axial hex (works before WebGL is loaded).
+   *
+   *  One formula for both modes: axialToWorld3D() is axialToPixel() with
+   *  y→z, so 2D map space and 3D world XZ are numerically identical and
+   *  syncCamera() consumes cam.x/y directly as the 3D look-at target.
+   *  (The old WebGL branch projected through the not-yet-synced three
+   *  camera at boot — w≈0 → NaN — and poisoned cam.x/y permanently.) */
   focusOnCoord(coord: import('./hex.ts').Axial): void {
-    if (this.worldRenderMode === 'webgl' && this.threeMap) {
-      const pos = this.threeMap.projectTileCenter(coord, this.state, this.cam);
-      this.cam.x = pos.x;
-      this.cam.y = pos.y;
-      return;
-    }
     const pos = axialToPixel(coord, HEX_SIZE);
     this.cam.x = pos.x;
     this.cam.y = pos.y;
@@ -868,6 +868,11 @@ export class Renderer {
     document.removeEventListener('keydown', this._onCityRelocateKeyDown);
     this.threeMap?.dispose();
     this.threeMap = null;
+  }
+
+  /** True when the WebGL terrain atlas finished loading (capture scripts). */
+  isTerrainAtlasReady(): boolean {
+    return this.threeMap?.isAtlasReady() ?? false;
   }
 
   /** Phase D: WebGL frame metrics for observability panel. */

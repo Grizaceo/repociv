@@ -113,6 +113,7 @@ const loadSteps = [
 type RepoCivDebugApi = {
   getMacroCityScreenPositions: () => Array<{ cityId: string; x: number; y: number }>;
   openLocalView: (cityId: string) => boolean;
+  isTerrainAtlasReady: () => boolean;
 };
 
 function showToast(message: string, duration = 3000) {
@@ -357,6 +358,7 @@ async function bootstrap() {
           };
         });
     },
+    isTerrainAtlasReady: () => renderer.isTerrainAtlasReady(),
     openLocalView: (cityId: string) => {
       const city = state.world.cities.find((item) => item.id === cityId && !item.isCapital);
       if (!city) return false;

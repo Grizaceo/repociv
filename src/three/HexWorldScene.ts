@@ -488,6 +488,15 @@ export function getTerrainMesh(): InstancedMesh | null {
   return terrainMesh;
 }
 
+/** True once the terrain texture atlas finished loading. Participates in the
+ *  ThreeMapRenderer dirty signature: the atlas arriving must force a rebuild
+ *  (it resets tileCountSignature), otherwise the world stays untextured until
+ *  an unrelated state change. Also used by the golden-capture script to wait
+ *  for the final visual state. */
+export function isTerrainAtlasReady(): boolean {
+  return loadedTerrainAtlas !== null;
+}
+
 export function updateHexWorldScene(
   scene: Scene,
   state: GameState,

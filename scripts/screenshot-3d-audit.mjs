@@ -157,12 +157,24 @@ async function main() {
     await page.evaluate(() => {
       document.getElementById('imperial-welcome')?.remove();
     });
+    // Hide the HUD chrome: resources tick, the Gaceta rotates teasers, and
+    // panels reflect live bridge state — none of that is what this gate
+    // protects (the WebGL world rendering), and all of it breaks SHA
+    // equality between runs.
+    await page.addStyleTag({ content: '#hud-overlay { display: none !important; }' });
     // The WebGL canvas lives in #three-container; require it so a silent
     // fallback to the flat renderer fails the gate instead of passing.
     await page.locator('#three-container canvas').waitFor({ state: 'attached', timeout: 15_000 });
-    // Fixed settle time: the 3D scene needs a few frames to compile
-    // shaders, populate the instance buffer, and run the first
-    // rebuild. 1.5s is empirically enough on the dev box.
+    // The terrain atlas loads async and swaps the material when it lands —
+    // capturing before that yields the untextured world. Wait for the
+    // explicit readiness signal instead of guessing with sleeps.
+    await page
+      .waitForFunction(() => window.__repocivDebug?.isTerrainAtlasReady?.() === true, null, {
+        timeout: 15_000,
+      })
+      .catch(() => console.error('[AUDIT] terrain atlas never became ready — capturing anyway'));
+    // Fixed settle time: a few frames to compile shaders, run the first
+    // dirty rebuild with the atlas-backed material, and settle CSS2D labels.
     await page.waitForTimeout(1500);
 
     const shotPath = join(OUT, `${name}.png`);
