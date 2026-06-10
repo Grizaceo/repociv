@@ -2,7 +2,7 @@
 import type { LocalWorld, LocalTile, LocalRoom, LocalUnit, ZoneType } from './types.ts';
 import { loadOfficeAtlas } from './officeAtlas.ts';
 import { darkenHex } from './isoOfficeRenderer.ts';
-import { EXT_COLOR, adjustBrightness as _adjustBrightness, drawRoomLabel as drawRoomLabelModule, drawSofaTile as drawSofaTileModule, drawWatercoolerTile as drawWatercoolerTileModule, drawWindowTile as drawWindowTileModule } from './local2dAssets.ts';
+import { EXT_COLOR, adjustBrightness as _adjustBrightness, drawRoomLabel as drawRoomLabelModule, drawSofaTile as drawSofaTileModule, drawWatercoolerTile as drawWatercoolerTileModule, drawWindowTile as drawWindowTileModule, drawWorkbenchClusterPanel } from './local2dAssets.ts';
 import {
   createParticlePool,
   spawnBreath as spawnBreathParticle,
@@ -837,9 +837,13 @@ export class LocalRenderer {
       if (room.workbenches.length > placed && room.workbenches.length >= 3) {
         // Anchor at the room's top edge (over the wall, next to the room
         // label) so the summary never covers the desks themselves.
-        this.drawWorkbenchCluster(
-          room.x + room.width / 2,
-          room.y,
+        const sx =
+          ((room.x + room.width / 2) * TILE_SIZE - this.cam.x) * this.cam.zoom + this.cam.cx;
+        const sy = (room.y * TILE_SIZE - this.cam.y) * this.cam.zoom + this.cam.cy;
+        drawWorkbenchClusterPanel(
+          this.assetState(),
+          sx,
+          sy,
           room.workbenches.map((wb) => wb.extension),
         );
       }
@@ -1124,69 +1128,6 @@ export class LocalRenderer {
 
   /** Phase E: draw a compact cluster of file-type pills for high-density rooms.
    *  cx, cy are in tile coords; ctx already has camera transform applied. */
-  private drawWorkbenchCluster(cx: number, cy: number, extensions: string[]): void {
-    const { ctx } = this;
-    const TILE = TILE_SIZE;
-    // World-to-screen: same formula used for all tile rendering
-    const sx = (cx * TILE - this.cam.x) * this.cam.zoom + this.cam.cx;
-    const sy = (cy * TILE - this.cam.y) * this.cam.zoom + this.cam.cy;
-
-    // Deduplicate and count extensions, sorted by count desc
-    const counts = new Map<string, number>();
-    for (const ext of extensions) {
-      counts.set(ext, (counts.get(ext) || 0) + 1);
-    }
-    const unique = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
-
-    // Compact layout: pills in a grid, max 5 per row
-    const cols = Math.min(unique.length, 5);
-    const rows = Math.ceil(unique.length / cols);
-    const pillW = Math.max(18, Math.min(28, 80 / cols));
-    const pillH = 9;
-    const gap = 1;
-    const totalW = cols * (pillW + gap) - gap;
-    const totalH = rows * (pillH + gap) - gap;
-    const startX = sx - totalW / 2;
-    const startY = sy - totalH / 2;
-
-    // Background panel
-    ctx.save();
-    ctx.globalAlpha = 0.92;
-    ctx.fillStyle = 'rgba(20, 22, 28, 0.90)';
-    ctx.beginPath();
-    ctx.roundRect(startX - 3, startY - 2, totalW + 6, totalH + 4, 3);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(80, 100, 130, 0.25)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-
-    // Draw pills
-    ctx.font = `bold 6px ${this.tokens.fontMono}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    for (let i = 0; i < unique.length; i++) {
-      const [ext, count] = unique[i]!;
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const px = startX + col * (pillW + gap);
-      const py = startY + row * (pillH + gap);
-      const color = EXT_COLOR[ext] ?? '#888';
-
-      // Pill background
-      ctx.globalAlpha = 0.92;
-      ctx.fillStyle = color + '18';
-      ctx.beginPath();
-      ctx.roundRect(px, py, pillW, pillH, 2);
-      ctx.fill();
-
-      // Label: ext + count if > 1
-      ctx.fillStyle = color;
-      const label = count > 1 ? `${ext.toUpperCase().slice(0, 3)}×${count}` : ext.toUpperCase().slice(0, 3);
-      ctx.fillText(label, px + pillW / 2, py + pillH / 2);
-    }
-    ctx.restore();
-  }
-
   private drawFloorBackground(tile: LocalTile, px: number, py: number, s: number, inRoom: boolean, zone?: string) {
     const { ctx } = this;
     if (!inRoom) {

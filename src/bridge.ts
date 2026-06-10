@@ -723,40 +723,8 @@ export async function scanNews(): Promise<{ ok: boolean; error?: string }> {
 }
 
 // ─── Foreign Relations API ─────────────────────────────────────────────────────
-
-export async function getRepoProfile(
-  repoPath: string,
-): Promise<import('./types.ts').RepoProfile | null> {
-  try {
-    const res = await fetch(
-      bridgeUrl(`/api/foreign/repo-profile?repoPath=${encodeURIComponent(repoPath)}`),
-      {
-        headers: bridgeHeaders(),
-      },
-    );
-    if (!res.ok) return null;
-    return (await res.json()) as import('./types.ts').RepoProfile;
-  } catch {
-    return null;
-  }
-}
-
-export async function scoreArticleRepo(
-  article: import('./types.ts').CDailyArticle,
-  repoPath: string,
-): Promise<import('./types.ts').ForeignScoreResponse | null> {
-  try {
-    const res = await fetch(bridgeUrl('/api/foreign/score'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...bridgeHeaders() },
-      body: JSON.stringify({ article, repoPath }),
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as import('./types.ts').ForeignScoreResponse;
-  } catch {
-    return null;
-  }
-}
+// (getRepoProfile / scoreArticleRepo wrappers removed — no frontend callers;
+//  the backend endpoints remain reachable via MCP and HTTP.)
 
 export async function generateForeignReport(
   articleOrArticles: import('./types.ts').CDailyArticle | import('./types.ts').CDailyArticle[],
@@ -870,38 +838,6 @@ export async function fetchGraphRelations(
   }
 }
 
-export async function fetchGraphRelationEvidence(
-  fromId: string,
-  toId: string,
-  cities: Array<{ id: string; name: string; repoPath?: string }>,
-): Promise<GraphRelationEvidence | null> {
-  try {
-    const params = new URLSearchParams({ fromId, toId });
-    if (cities.length > 0) {
-      params.set('cities', JSON.stringify(cities));
-    }
-    const res = await fetch(bridgeUrl(`/api/graph-relations/evidence?${params.toString()}`), {
-      headers: bridgeHeaders(),
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as GraphRelationEvidence;
-  } catch {
-    return null;
-  }
-}
-
-export async function fetchGraphRelationStats(): Promise<GraphRelationStats | null> {
-  try {
-    const res = await fetch(bridgeUrl('/api/graph-relations/stats'), {
-      headers: bridgeHeaders(),
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as GraphRelationStats;
-  } catch {
-    return null;
-  }
-}
-
 export async function syncGraphRelationFlags(payload: {
   graphSuggestions?: boolean;
   aiRelationDiscovery?: boolean;
@@ -923,19 +859,5 @@ export async function syncGraphRelationFlags(payload: {
   }
 }
 
-export async function refreshGraphRelationIndex(payload: {
-  cities?: Array<{ id: string; name: string; repoPath?: string }>;
-  repoPaths?: string[];
-}): Promise<{ ok: boolean; error?: string; stats?: Record<string, unknown> }> {
-  try {
-    const res = await fetch(bridgeUrl('/api/graph-relations/refresh'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...bridgeHeaders() },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-    return (await res.json()) as { ok: boolean; error?: string; stats?: Record<string, unknown> };
-  } catch (e) {
-    return { ok: false, error: String(e) };
-  }
-}
+// (fetchGraphRelationEvidence / fetchGraphRelationStats / refreshGraphRelationIndex
+// wrappers removed — no frontend callers; the backend endpoints remain.)

@@ -2,7 +2,7 @@
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { Group, Scene } from 'three';
 import { type GameState } from '../game.ts';
-import { type City, type Tile, tileKey } from '../types.ts';
+import { type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
@@ -128,9 +128,4 @@ export function disposeLabels(_container: HTMLElement): void {
     cssRenderer.domElement.remove();
     cssRenderer = null;
   }
-}
-
-/** @internal */
-export function _cityLabelText(city: City): string {
-  return city.isCapital ? `★ ${city.name}` : city.name;
 }

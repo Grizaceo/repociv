@@ -191,3 +191,71 @@ export function drawRoomLabel(state: Local2DAssetState, room: LocalRoom) {
 
   ctx.restore();
 }
+
+/** Overflow summary panel: extension pills for rooms with more files than
+ *  placed desks. Anchored by the caller (screen coords) so it never covers
+ *  the desk grid it summarizes. */
+export function drawWorkbenchClusterPanel(
+  state: Local2DAssetState,
+  sx: number,
+  sy: number,
+  extensions: string[],
+): void {
+  const { ctx } = state;
+
+  // Deduplicate and count extensions, sorted by count desc
+  const counts = new Map<string, number>();
+  for (const ext of extensions) {
+    counts.set(ext, (counts.get(ext) || 0) + 1);
+  }
+  const unique = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+
+  // Compact layout: pills in a grid, max 5 per row
+  const cols = Math.min(unique.length, 5);
+  const rows = Math.ceil(unique.length / cols);
+  const pillW = Math.max(18, Math.min(28, 80 / cols));
+  const pillH = 9;
+  const gap = 1;
+  const totalW = cols * (pillW + gap) - gap;
+  const totalH = rows * (pillH + gap) - gap;
+  const startX = sx - totalW / 2;
+  const startY = sy - totalH / 2;
+
+  // Background panel
+  ctx.save();
+  ctx.globalAlpha = 0.92;
+  ctx.fillStyle = 'rgba(20, 22, 28, 0.90)';
+  ctx.beginPath();
+  ctx.roundRect(startX - 3, startY - 2, totalW + 6, totalH + 4, 3);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(80, 100, 130, 0.25)';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+
+  // Draw pills
+  ctx.font = `bold 6px ${state.fontMono}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i < unique.length; i++) {
+    const [ext, count] = unique[i]!;
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const px = startX + col * (pillW + gap);
+    const py = startY + row * (pillH + gap);
+    const color = EXT_COLOR[ext] ?? '#888';
+
+    // Pill background
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = color + '18';
+    ctx.beginPath();
+    ctx.roundRect(px, py, pillW, pillH, 2);
+    ctx.fill();
+
+    // Label: ext + count if > 1
+    ctx.fillStyle = color;
+    const label =
+      count > 1 ? `${ext.toUpperCase().slice(0, 3)}×${count}` : ext.toUpperCase().slice(0, 3);
+    ctx.fillText(label, px + pillW / 2, py + pillH / 2);
+  }
+  ctx.restore();
+}

@@ -298,12 +298,6 @@ export async function fetchRepoSelectionState(): Promise<RepoSelectionState> {
   return normalizeSelectionState((await res.json()) as RepoSelectionState);
 }
 
-export async function hydrateSelectedRepoPathCache(): Promise<Set<string>> {
-  const state = await fetchRepoSelectionState();
-  saveSelectedRepoPaths(state.selectedRepoPaths);
-  return new Set(state.selectedRepoPaths);
-}
-
 export async function fetchSelectionForRoot(rootPath: string): Promise<Set<string>> {
   const state = await fetchRepoSelectionState();
   const root = state.roots.find((item) => item.path === rootPath);

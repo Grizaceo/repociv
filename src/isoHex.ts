@@ -43,11 +43,6 @@ export function axialToIsoPixel(
   return { x: flat.x, y: flat.y - elevation * ISO_EXTRUDE_H };
 }
 
-/** Depth sort key — higher draws later (in front). */
-export function isoDepthKey(q: number, r: number, elevation = 0): number {
-  return q + r + elevation * 0.01;
-}
-
 /** Screen coords → axial hex (inverse camera + iso projection). */
 export function screenToAxial(
   screenX: number,
@@ -65,22 +60,3 @@ export function hexCornerAngle(index: number): number {
   return (Math.PI / 180) * (60 * index - 30);
 }
 
-/** Top-face hex corners in iso space. */
-export function isoHexCorners(
-  cx: number,
-  cy: number,
-  size: number,
-  elevation: number,
-): Array<{ x: number; y: number }> {
-  const elevY = -elevation * ISO_EXTRUDE_H;
-  const radius = size * ISO_HEX_RADIUS;
-  const corners: Array<{ x: number; y: number }> = [];
-  for (let i = 0; i < 6; i++) {
-    const angle = hexCornerAngle(i);
-    corners.push({
-      x: cx + radius * Math.cos(angle),
-      y: cy + elevY + radius * Math.sin(angle),
-    });
-  }
-  return corners;
-}

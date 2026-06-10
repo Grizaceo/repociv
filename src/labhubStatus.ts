@@ -58,33 +58,6 @@ export async function fetchCityLabStatus(
   }
 }
 
-/** Fetch lab status for all cities in batch. */
-export async function fetchAllCitiesLabStatus(
-  cities: Array<{ id: string; repoPath?: string }>,
-): Promise<CityLabStatus[]> {
-  try {
-    const citiesJson = JSON.stringify(
-      cities.map((c) => ({ id: c.id, repoPath: c.repoPath ?? c.id })),
-    );
-    const url = `${bridgeUrl('/api/labhub/status')}?cities=${encodeURIComponent(citiesJson)}`;
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: bridgeHeaders(),
-    });
-    if (res.ok) {
-      const data = (await res.json()) as CityLabStatus[];
-      return data.map((d) => ({
-        ...d,
-        source: d.source === 'live' ? 'live' : 'inferred',
-        institutumOnline: d.institutumOnline ?? false,
-      }));
-    }
-  } catch {
-    // fall through
-  }
-  return [];
-}
-
 // ─── Local Inference Fallback ────────────────────────────────────────────────
 
 function activeBuildingsForCity(state: GameState, cityId: string): Building[] {

@@ -107,24 +107,10 @@ export async function loadOfficeAtlas(): Promise<boolean> {
   return _loadPromise;
 }
 
-/** Synchronous manifest access. Returns the bundled manifest without
- *  loading the image. Use this when you only need cell dimensions
- *  or sprite rects, not the decoded pixels. */
-export function getOfficeAtlasManifest(): OfficeAtlasManifest {
-  return BUNDLED_MANIFEST;
-}
-
 export function isOfficeAtlasLoaded(): boolean {
   return _loaded;
 }
 
 export function getOfficeSprite(name: OfficeSpriteName): HTMLCanvasElement | null {
   return _sprites[name] ?? null;
-}
-
-/** Reset cache (tests). */
-export function resetOfficeAtlas(): void {
-  _sprites = {};
-  _loaded = false;
-  _loadPromise = null;
 }
