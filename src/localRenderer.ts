@@ -835,9 +835,11 @@ export class LocalRenderer {
     for (const room of world.rooms) {
       const placed = room.layoutPlan?.deskCount ?? 0;
       if (room.workbenches.length > placed && room.workbenches.length >= 3) {
+        // Anchor at the room's top edge (over the wall, next to the room
+        // label) so the summary never covers the desks themselves.
         this.drawWorkbenchCluster(
           room.x + room.width / 2,
-          room.y + room.height / 2,
+          room.y,
           room.workbenches.map((wb) => wb.extension),
         );
       }

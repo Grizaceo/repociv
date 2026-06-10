@@ -180,11 +180,23 @@ export function findNearestWorkbench(
   world: LocalWorld,
   fromX: number,
   fromY: number,
+  forUnitId?: string,
 ): { x: number; y: number; workbench: LocalTile['workbench']; distance: number } | null {
   const { grid } = world;
   const H = grid.length;
   const W = grid[0]?.length ?? 0;
   if (fromX < 0 || fromY < 0 || fromX >= W || fromY >= H) return null;
+
+  // Desks assigned to OTHER units are taken — skip them while anything
+  // free (or our own) remains reachable; fall back to them only when the
+  // preferred sweep finds nothing.
+  const isTakenByOther = (x: number, y: number): boolean => {
+    if (!forUnitId) return false;
+    const owner = world.deskAssignments.get(`${x},${y}`);
+    return owner !== undefined && owner !== forUnitId;
+  };
+  let fallback: { x: number; y: number; workbench: LocalTile['workbench']; distance: number } | null =
+    null;
 
   const cost = (x: number, y: number): number => {
     const t = grid[y]?.[x];
@@ -232,12 +244,14 @@ export function findNearestWorkbench(
     if (cur.x !== fromX || cur.y !== fromY) {
       const tile = grid[cur.y]![cur.x]!;
       if (tile.workbench) {
-        return {
+        const found = {
           x: cur.x,
           y: cur.y,
           workbench: tile.workbench,
           distance: cur.d,
         };
+        if (!isTakenByOther(cur.x, cur.y)) return found;
+        fallback = fallback ?? found; // nearest taken desk, last resort
       }
     }
 
@@ -255,5 +269,5 @@ export function findNearestWorkbench(
       heap.push({ x: nx, y: ny, d: nd });
     }
   }
-  return null;
+  return fallback;
 }

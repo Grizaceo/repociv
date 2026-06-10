@@ -281,6 +281,20 @@ describe('localWorldManager — desk assignment', () => {
     assert.equal(world.deskAssignments.get('2,0'), 'hero');
   });
 
+  it('nearest fallback skips desks assigned to other units, uses them as last resort', () => {
+    // Two desks: (0,0) close, (2,0) far. (0,0) belongs to another unit.
+    const world = makeGrid(['W.W']);
+    world.deskAssignments.set('0,0', 'other-unit');
+    const result = findNearestWorkbench(world, 1, 0, 'me');
+    assert.ok(result, 'found a desk');
+    assert.equal(result!.x, 2, 'skipped the taken desk, walked to the free one');
+    // When EVERY desk is taken, the nearest taken one is the last resort.
+    world.deskAssignments.set('2,0', 'other-unit');
+    const lastResort = findNearestWorkbench(world, 1, 0, 'me');
+    assert.ok(lastResort, 'still returns a desk when all are taken');
+    assert.equal(lastResort!.x, 0, 'nearest taken desk wins as fallback');
+  });
+
   it('releases desk assignments when a subagent unit is removed', async () => {
     const { LocalWorldManager } = await import('./localWorldManager.ts');
     const mgr = new LocalWorldManager(() => {}, () => undefined);

@@ -114,6 +114,16 @@ type RepoCivDebugApi = {
   getMacroCityScreenPositions: () => Array<{ cityId: string; x: number; y: number }>;
   openLocalView: (cityId: string) => boolean;
   isTerrainAtlasReady: () => boolean;
+  queueLocalMission: (filePath: string, fileName: string, unitId?: string) => boolean;
+  getLocalUnits: () => Array<{
+    id: string;
+    gridX: number;
+    gridY: number;
+    state: string;
+    assignedDesk: { x: number; y: number } | null;
+    currentWorkbenchId: string | null;
+    pathLen: number;
+  }>;
 };
 
 function showToast(message: string, duration = 3000) {
@@ -365,6 +375,25 @@ async function bootstrap() {
       window.dispatchEvent(new CustomEvent('repociv:open-local-view-request', { detail: { cityId } }));
       return true;
     },
+    // Test hook: dispatch a mission to a local-view workbench and report unit
+    // state — lets the capture/probe scripts verify units actually walk to
+    // their assigned desk without going through the bridge.
+    queueLocalMission: (filePath: string, fileName: string, unitId?: string) => {
+      const world = state.localWorld;
+      if (!world) return false;
+      state.queueLocalMission(world.repoId, filePath, fileName, unitId);
+      return true;
+    },
+    getLocalUnits: () =>
+      state.getLocalUnits().map((u) => ({
+        id: u.id,
+        gridX: u.gridX,
+        gridY: u.gridY,
+        state: u.state,
+        assignedDesk: u.assignedDesk ?? null,
+        currentWorkbenchId: u.currentWorkbenchId,
+        pathLen: u.path.length,
+      })),
   };
 
   const toggleView = () => {

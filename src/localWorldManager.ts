@@ -534,8 +534,8 @@ export class LocalWorldManager {
       }
     }
 
-    // Fallback to nearest
-    return findNearestWorkbench(this.localWorld, unit.gridX, unit.gridY);
+    // Fallback to nearest — skipping desks assigned to other units
+    return findNearestWorkbench(this.localWorld, unit.gridX, unit.gridY, unit.id);
   }
 
   /** Assign a free desk: prefer the unit's room, fall back to the nearest

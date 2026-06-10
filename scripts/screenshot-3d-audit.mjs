@@ -184,6 +184,55 @@ async function main() {
     console.log(`[AUDIT] ${name}: ${shotPath} (sha256=${hash.slice(0, 12)}...)`);
   }
 
+  // ── Local view golden (office layout regression net) ─────────────────
+  // The local view once went visually empty (desks suppressed) without
+  // anything catching it. One deterministic capture of the labhub office:
+  // clean mode kills particles/Zzz randomness, freeze pins animations,
+  // and DAVI idles at the reception until a mission is dispatched.
+  {
+    const name = '04-local-office';
+    await page.goto(`${baseURL}/?renderer=webgl&freeze=2`, { waitUntil: 'networkidle' });
+    await page.evaluate(() => {
+      window.localStorage.setItem('repociv_clean_map', '1');
+    });
+    await page.goto(`${baseURL}/?renderer=webgl&freeze=2`, { waitUntil: 'networkidle' });
+    await page
+      .locator('#loading-screen')
+      .waitFor({ state: 'hidden', timeout: 15_000 })
+      .catch(() => {});
+    await page.evaluate(() => document.getElementById('imperial-welcome')?.remove());
+    await page.addStyleTag({ content: '#hud-overlay { display: none !important; }' });
+    await page
+      .waitForFunction(() => typeof window.__repocivDebug?.openLocalView === 'function', null, {
+        timeout: 15_000,
+      })
+      .catch(() => {});
+    const opened = await page.evaluate(
+      () => window.__repocivDebug?.openLocalView?.('labhub') ?? false,
+    );
+    if (!opened) {
+      console.error('[AUDIT] could not open local view for labhub — golden skipped');
+    } else {
+      // Local world generation + static layer build + camera settle.
+      await page.waitForTimeout(5000);
+      // The local renderer reads performance.now() directly for blink/pulse
+      // phases (server-rack LEDs, monitors). Freeze the clock NOW — after
+      // init, so the world loaded normally — and let a few frames repaint
+      // with the pinned phase before hashing.
+      await page.evaluate(() => {
+        // Pin to a CONSTANT, not the current time — blink phases like
+        // sin(now/200) must land identically on every run.
+        performance.now = () => 1_000_000;
+      });
+      await page.waitForTimeout(600);
+      const shotPath = join(OUT, `${name}.png`);
+      await page.screenshot({ path: shotPath, fullPage: false });
+      const hash = sha256(readFileSync(shotPath));
+      results.push({ name, shotPath, hash });
+      console.log(`[AUDIT] ${name}: ${shotPath} (sha256=${hash.slice(0, 12)}...)`);
+    }
+  }
+
   await browser.close();
 
   // Compare against goldens.

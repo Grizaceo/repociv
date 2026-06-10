@@ -1311,10 +1311,9 @@ function drawIsoWorkbenchCluster(
   extensions: string[],
 ): void {
   const { ctx } = state;
-  // Center of room in iso screen coords
-  const cx = room.x + room.width / 2;
-  const cy = room.y + room.height / 2;
-  const base = officeIsoProject(cx, cy);
+  // Anchor at the room's north corner (top in iso) so the summary panel
+  // floats over the back walls instead of covering the desk grid.
+  const base = officeIsoProject(room.x + 1, room.y + 1);
 
   // Deduplicate and count extensions, sorted by count desc
   const counts = new Map<string, number>();
