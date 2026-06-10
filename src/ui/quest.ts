@@ -1,6 +1,6 @@
 // ─── RepoCiv — Quest Board ────────────────────────────────────────────────────
 import type { GameState, Mission } from '../game.ts';
-import { bridgeUrl } from '../bridgeEnv.ts';
+import { bridgeUrl, bridgeHeaders } from '../bridgeEnv.ts';
 import { trapFocus } from './focusTrap.ts';
 
 let questFilter: 'all' | 'running' | 'complete' | 'failed' = 'all';
@@ -28,7 +28,7 @@ export function isQuestBoardOpen(): boolean {
 
 export async function fetchPendingTracker(): Promise<Mission[]> {
   try {
-    const res = await fetch(bridgeUrl('/pending'));
+    const res = await fetch(bridgeUrl('/pending'), { headers: bridgeHeaders() });
     if (!res.ok) return [];
     const raw = (await res.json()) as Array<{
       id: string;
@@ -53,7 +53,7 @@ export async function fetchPendingTracker(): Promise<Mission[]> {
 
 export async function fetchPersistedMissions(): Promise<Mission[]> {
   try {
-    const res = await fetch(bridgeUrl('/missions'));
+    const res = await fetch(bridgeUrl('/missions'), { headers: bridgeHeaders() });
     if (!res.ok) return [];
     const raw = (await res.json()) as Array<{
       id: string;

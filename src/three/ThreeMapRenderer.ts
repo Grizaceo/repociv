@@ -41,6 +41,12 @@ export class ThreeMapRenderer {
   private width = 1;
   private height = 1;
   private lastTileSignature = '';
+  // Dirty-rate telemetry: % of frames that triggered the heavy rebuilds.
+  // Idle should sit near 0% — anything above ~5% means the signature has
+  // a false positive (some input flapping per frame).
+  private _dirtyFrames = 0;
+  private _windowFrames = 0;
+  private _dirtyRatePct = 0;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -110,6 +116,14 @@ export class ThreeMapRenderer {
     const stateDirty = tileSignature !== this.lastTileSignature;
     this.lastTileSignature = tileSignature;
 
+    this._windowFrames++;
+    if (stateDirty) this._dirtyFrames++;
+    if (this._windowFrames >= 300) {
+      this._dirtyRatePct = Math.round((this._dirtyFrames / this._windowFrames) * 1000) / 10;
+      this._windowFrames = 0;
+      this._dirtyFrames = 0;
+    }
+
     updateHexWorldScene(this.scene, state, opts, this.picker, stateDirty);
 
     this.renderer.render(this.scene, this.camera);
@@ -168,6 +182,11 @@ export class ThreeMapRenderer {
   /** True once the terrain texture atlas loaded (golden-capture wait). */
   isAtlasReady(): boolean {
     return isTerrainAtlasReady();
+  }
+
+  /** % of frames in the last 300-frame window that ran the heavy rebuilds. */
+  getDirtyRatePct(): number {
+    return this._dirtyRatePct;
   }
 
   getCanvasSize(): { width: number; height: number } {

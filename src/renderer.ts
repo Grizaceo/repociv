@@ -876,11 +876,12 @@ export class Renderer {
   }
 
   /** Phase D: WebGL frame metrics for observability panel. */
-  getWebGLMetrics(): { frameTimeAvg: number; frameCount: number } | null {
+  getWebGLMetrics(): { frameTimeAvg: number; frameCount: number; dirtyRatePct: number } | null {
     if (this.worldRenderMode !== 'webgl') return null;
     return {
       frameTimeAvg: this._frameTimeAvg,
       frameCount: this._totalFrameCount,
+      dirtyRatePct: this.threeMap?.getDirtyRatePct() ?? 0,
     };
   }
 

@@ -217,8 +217,14 @@ function rebuildTerritoryLines(
 }
 
 /** Shoreline rings: rebuild geometry only when ocean tiles change.
- *  Per-frame pulse writes vertex positions in place, avoiding allocations. */
-function rebuildShorelineRings(state: GameState, animTime: number): void {
+ *  Per-frame pulse writes vertex positions in place, avoiding allocations.
+ *  The tile scan + signature build allocate, so they only run on dirty
+ *  frames — the world signature already covers terrain/revealed changes. */
+function rebuildShorelineRings(state: GameState, animTime: number, stateDirty = true): void {
+  if (!stateDirty) {
+    animateShorelinePulse(animTime);
+    return;
+  }
   const tiles = Array.from(state.world.tiles.values());
   const getTile = (c: Axial) => state.world.tiles.get(tileKey(c));
 
@@ -274,23 +280,26 @@ function rebuildShorelineRings(state: GameState, animTime: number): void {
     terrainGroup.add(shorelineRings);
   }
 
-  // Per-frame pulse: write vertex x/z in place (no allocations). Each ring
-  // scales around its own tile center — matching the original per-tile
-  // `r = HEX_SIZE * pulse * 0.82` look. Scaling the whole LineSegments
-  // object instead would drift rings toward/away from the world origin.
-  if (shorelineRings && shorelineBase) {
-    const pulse = 0.88 + 0.08 * Math.sin(animTime * 2);
-    const r = HEX_SIZE * 0.82 * pulse;
-    const posAttr = shorelineRings.geometry.getAttribute('position') as Float32BufferAttribute;
-    const arr = posAttr.array as Float32Array;
-    const vertexCount = arr.length / 3;
-    for (let v = 0; v < vertexCount; v++) {
-      const b = v * 5;
-      arr[v * 3] = shorelineBase[b]! + shorelineBase[b + 3]! * r;
-      arr[v * 3 + 2] = shorelineBase[b + 2]! + shorelineBase[b + 4]! * r;
-    }
-    posAttr.needsUpdate = true;
+  animateShorelinePulse(animTime);
+}
+
+/** Per-frame pulse: write vertex x/z in place (no allocations). Each ring
+ *  scales around its own tile center — matching the original per-tile
+ *  `r = HEX_SIZE * pulse * 0.82` look. Scaling the whole LineSegments
+ *  object instead would drift rings toward/away from the world origin. */
+function animateShorelinePulse(animTime: number): void {
+  if (!shorelineRings || !shorelineBase) return;
+  const pulse = 0.88 + 0.08 * Math.sin(animTime * 2);
+  const r = HEX_SIZE * 0.82 * pulse;
+  const posAttr = shorelineRings.geometry.getAttribute('position') as Float32BufferAttribute;
+  const arr = posAttr.array as Float32Array;
+  const vertexCount = arr.length / 3;
+  for (let v = 0; v < vertexCount; v++) {
+    const b = v * 5;
+    arr[v * 3] = shorelineBase[b]! + shorelineBase[b + 3]! * r;
+    arr[v * 3 + 2] = shorelineBase[b + 2]! + shorelineBase[b + 4]! * r;
   }
+  posAttr.needsUpdate = true;
 }
 
 /** Foam spheres at coast-land edges. */
@@ -519,10 +528,11 @@ export function updateHexWorldScene(
     );
   }
 
-  // Per-frame time-driven updates: foam and shoreline depend on
-  // animTime, so they must run every frame even when state is clean.
-  rebuildShorelineRings(state, opts.animTime);
-  rebuildFoam(state, opts.animTime);
+  // Shoreline: geometry scan only on dirty frames (its inputs — terrain +
+  // revealed — are covered by the world signature); the pulse animation
+  // runs every frame, allocation-free. Foam is purely state-driven.
+  rebuildShorelineRings(state, opts.animTime, stateDirty);
+  if (stateDirty) rebuildFoam(state, opts.animTime);
 
   // State-driven rebuilds: only when the world actually changed. These
   // are the heavy ones (terrain mesh, ground plane, territory lines,

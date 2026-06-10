@@ -114,6 +114,7 @@ type RepoCivDebugApi = {
   getMacroCityScreenPositions: () => Array<{ cityId: string; x: number; y: number }>;
   openLocalView: (cityId: string) => boolean;
   isTerrainAtlasReady: () => boolean;
+  getWebGLMetrics: () => { frameTimeAvg: number; frameCount: number; dirtyRatePct: number } | null;
   queueLocalMission: (filePath: string, fileName: string, unitId?: string) => boolean;
   getLocalUnits: () => Array<{
     id: string;
@@ -369,6 +370,7 @@ async function bootstrap() {
         });
     },
     isTerrainAtlasReady: () => renderer.isTerrainAtlasReady(),
+    getWebGLMetrics: () => renderer.getWebGLMetrics(),
     openLocalView: (cityId: string) => {
       const city = state.world.cities.find((item) => item.id === cityId && !item.isCapital);
       if (!city) return false;

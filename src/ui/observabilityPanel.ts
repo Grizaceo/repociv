@@ -55,11 +55,13 @@ let _timer = 0;
 let _visible = false;
 let _metrics: Metrics | null = null;
 let _offline = false;
-let _webglMetricsSource: (() => { frameTimeAvg: number; frameCount: number } | null) | null = null;
+let _webglMetricsSource:
+  | (() => { frameTimeAvg: number; frameCount: number; dirtyRatePct?: number } | null)
+  | null = null;
 
 /** Wire the WebGL renderer's frame-time metrics into the panel (main.ts). */
 export function setWebGLMetricsSource(
-  source: () => { frameTimeAvg: number; frameCount: number } | null,
+  source: () => { frameTimeAvg: number; frameCount: number; dirtyRatePct?: number } | null,
 ): void {
   _webglMetricsSource = source;
 }
@@ -351,13 +353,19 @@ function _agentCard(a: AgentStatus): string {
   `;
 }
 
-/** WebGL frame-time row — only when the WebGL renderer is active and warmed up. */
+/** WebGL frame-time + dirty-rate rows — only when WebGL is active and warm. */
 function _webglFrameTimeMetric(): string {
   const m = _webglMetricsSource?.();
   if (!m || m.frameTimeAvg <= 0) return '';
   // 60 fps budget is ~16.7 ms; warn past it, crit past two frames.
   const status = m.frameTimeAvg > 33 ? 'crit' : m.frameTimeAvg > 16.7 ? 'warn' : 'ok';
-  return _metric('WebGL frame', `${m.frameTimeAvg} ms`, status);
+  let html = _metric('WebGL frame', `${m.frameTimeAvg} ms`, status);
+  if (m.dirtyRatePct !== undefined) {
+    // Idle should be ~0%; sustained >5% means a signature false positive.
+    const dStatus = m.dirtyRatePct > 25 ? 'crit' : m.dirtyRatePct > 5 ? 'warn' : 'ok';
+    html += _metric('WebGL dirty', `${m.dirtyRatePct}%`, dStatus);
+  }
+  return html;
 }
 
 function _metric(label: string, value: string, status: 'ok' | 'warn' | 'crit'): string {

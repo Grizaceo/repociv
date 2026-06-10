@@ -124,6 +124,29 @@ describe('computeWorldSignature', () => {
     expect(computeWorldSignature(a)).not.toBe(computeWorldSignature(b));
   });
 
+  it('stays cheap on large maps (runs at 60fps in the render loop)', () => {
+    // 1200 tiles + 60 units ≈ a worst-case workspace. The signature runs
+    // every frame; at 60fps it has ~16ms of TOTAL budget, so it must cost
+    // a small fraction of a millisecond. Generous 0.5ms bound to stay
+    // CI-noise-proof while still catching accidental quadratic work.
+    const tiles: Array<[Axial, Tile]> = [];
+    for (let q = 0; q < 40; q++) {
+      for (let r = 0; r < 30; r++) {
+        tiles.push([{ q, r }, { ...mkTile(q, r), revealed: (q + r) % 3 !== 0 }]);
+      }
+    }
+    const units = Array.from({ length: 60 }, (_, i) => mkUnit(`u${i}`, i % 40, i % 30));
+    const cities = Array.from({ length: 12 }, (_, i) => mkCity(`c${i}`, i, i));
+    const s = makeState({ tiles, units, cities });
+
+    computeWorldSignature(s); // warm up
+    const N = 200;
+    const t0 = performance.now();
+    for (let i = 0; i < N; i++) computeWorldSignature(s);
+    const avgMs = (performance.now() - t0) / N;
+    expect(avgMs).toBeLessThan(0.5);
+  });
+
   it('changes when city territory grows', () => {
     const small = mkCity('c1', 0, 0);
     const grown = { ...mkCity('c1', 0, 0), territory: [{ q: 1, r: 0 }] };
