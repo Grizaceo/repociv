@@ -88,6 +88,8 @@ let shorelineSignature = '';
 let shorelineBase: Float32Array | null = null;
 let foamMesh: InstancedMesh | null = null;
 let foamSignature = '';
+let hexGridLines: LineSegments | null = null;
+let hexGridSignature = '';
 let groundMeshRef: import('three').Mesh | null = null;
 let groundSignature = '';
 let tileCountSignature = '';
@@ -431,6 +433,51 @@ function rebuildFogCover(state: GameState): void {
   terrainGroup.add(fogCoverMesh);
 }
 
+/** Civ V-style subtle hex grid: very faint white lines on revealed tile edges.
+ *  Visible only when showStructure is true (layer toggle). Low LOD thins it further. */
+function rebuildHexGrid(state: GameState, visible: boolean, lod: 'low' | 'medium' | 'high'): void {
+  const tiles = Array.from(state.world.tiles.values());
+  const sig = `${visible}:${lod}:${tiles.filter((t) => t.revealed).length}`;
+  if (sig === hexGridSignature && hexGridLines) return;
+  hexGridSignature = sig;
+
+  if (hexGridLines) {
+    terrainGroup.remove(hexGridLines);
+    hexGridLines.geometry.dispose();
+    (hexGridLines.material as LineBasicMaterial).dispose();
+    hexGridLines = null;
+  }
+  if (!visible) return;
+
+  const segments: number[] = [];
+  for (const tile of tiles) {
+    if (!tile.revealed) continue;
+    const elev = terrainElevation(tile.terrain);
+    const center = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    for (let i = 0; i < 6; i++) {
+      const a = hexCornerAngle(i);
+      const b = hexCornerAngle((i + 1) % 6);
+      const x1 = center.x + HEX_SIZE * Math.cos(a);
+      const z1 = center.z + HEX_SIZE * Math.sin(a);
+      const x2 = center.x + HEX_SIZE * Math.cos(b);
+      const z2 = center.z + HEX_SIZE * Math.sin(b);
+      segments.push(x1, center.y + 1.2, z1, x2, center.y + 1.2, z2);
+    }
+  }
+  if (segments.length === 0) return;
+
+  const geom = new BufferGeometry();
+  geom.setAttribute('position', new Float32BufferAttribute(segments, 3));
+  const mat = new LineBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: lod === 'high' ? 0.065 : lod === 'medium' ? 0.045 : 0.025,
+    linewidth: 1,
+  });
+  hexGridLines = new LineSegments(geom, mat);
+  terrainGroup.add(hexGridLines);
+}
+
 function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPicker): void {
   const tiles = Array.from(state.world.tiles.values());
   const signature = `${tiles.length}:${tiles.map((t) => tileKey(t.coord)).join(',')}`;
@@ -572,6 +619,7 @@ export function updateHexWorldScene(
   rebuildTerritoryLines(state, opts.animTime, opts.showStructure, opts.lod);
 
   setDecorVisible(opts.showStructure || opts.showOps);
+  rebuildHexGrid(state, opts.showStructure, opts.lod);
   rebuildTileDecor(Array.from(state.world.tiles.values()), opts.lod, state);
   // Mountain silhouettes are terrain, not toggleable decor — always visible.
   rebuildMountainProps(Array.from(state.world.tiles.values()));
@@ -619,11 +667,18 @@ export function disposeHexWorldScene(scene: Scene): void {
     (foamMesh.material as MeshLambertMaterial).dispose();
     foamMesh = null;
   }
+  if (hexGridLines) {
+    terrainGroup.remove(hexGridLines);
+    hexGridLines.geometry.dispose();
+    (hexGridLines.material as LineBasicMaterial).dispose();
+    hexGridLines = null;
+  }
   // Reset rebuild signatures: a disposed scene must rebuild everything on
   // recreate, even when the world state (and thus each signature) is the
   // same — otherwise toggling render modes leaves ocean/fog/ground empty.
   shorelineSignature = '';
   foamSignature = '';
+  hexGridSignature = '';
   fogCoverSignature = '';
   groundSignature = '';
   tileCountSignature = '';
