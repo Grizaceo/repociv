@@ -158,24 +158,20 @@ export function renderIso(state: IsoRenderState) {
     localUnits.filter((u) => u.state === 'working_on_file' && u.currentWorkbenchId).map((u) => u.currentWorkbenchId),
   );
 
-  // Accumulate high-density room extensions for cluster rendering
+  // Desks always render individually — the area-scaled grid layout
+  // guarantees they fit. The cluster pill panel is only an overflow
+  // summary for rooms with more files than placed desks.
   const isoClusterMap = new Map<string, { room: LocalRoom; extensions: string[] }>();
   for (const room of world.rooms) {
-    if (room.workbenches.length < 3) continue;
-    const extensions: string[] = [];
-    for (const wb of room.workbenches) {
-      extensions.push(wb.extension);
-    }
-    if (extensions.length > 0) {
-      isoClusterMap.set(room.id, { room, extensions });
-    }
+    const placed = room.layoutPlan?.deskCount ?? 0;
+    if (room.workbenches.length <= placed || room.workbenches.length < 3) continue;
+    isoClusterMap.set(room.id, { room, extensions: room.workbenches.map((wb) => wb.extension) });
   }
 
   for (const { x, y, tile } of tiles) {
     drawIsoTile(state, tile, x, y, world, activeWbIds);
   }
 
-  // Phase E: draw compact clusters for high-density rooms (isometric)
   for (const { room, extensions } of isoClusterMap.values()) {
     drawIsoWorkbenchCluster(state, room, extensions);
   }

@@ -816,34 +816,31 @@ export class LocalRenderer {
     const view = this.visibleTileRect();
     drawWindowLightRaysModule(this.overlayState(), world, view);
 
-    // Draw dynamic tiles on top of the static canvas (Phase 3c/3d)
-    // For high-density rooms, accumulate extensions instead of drawing individual desks
-    const clusterMap = new Map<string, { x: number; y: number; extensions: string[] }>();
+    // Draw dynamic tiles on top of the static canvas (Phase 3c/3d).
+    // Desks always render individually — the area-scaled grid layout
+    // guarantees they fit. The cluster pill panel is only an overflow
+    // summary for rooms with more files than placed desks.
     for (let y = view.y0; y <= view.y1; y++) {
       for (let x = view.x0; x <= view.x1; x++) {
         const tile = world.grid[y]![x]!;
         if (tile.type === 'door') {
           this.drawDynamicDoorTile(tile, dt, localUnits);
         } else if (tile.type === 'workbench') {
-          const room = tile.roomId ? world.rooms.find((r) => r.id === tile.roomId) : undefined;
-          if (room && room.workbenches.length >= 3) {
-            // Accumulate for cluster rendering
-            if (!clusterMap.has(room.id)) {
-              clusterMap.set(room.id, { x: room.x + room.width / 2, y: room.y + room.height / 2, extensions: [] });
-            }
-            if (tile.workbench) {
-              clusterMap.get(room.id)!.extensions.push(tile.workbench.extension);
-            }
-          } else {
-            this.drawDynamicWorkbenchTile(tile);
-          }
+          this.drawDynamicWorkbenchTile(tile);
         }
       }
     }
 
-    // Phase E: draw compact clusters for high-density rooms
-    for (const [, cluster] of clusterMap) {
-      this.drawWorkbenchCluster(cluster.x, cluster.y, cluster.extensions);
+    // Overflow summary for rooms whose file count exceeds placed desks
+    for (const room of world.rooms) {
+      const placed = room.layoutPlan?.deskCount ?? 0;
+      if (room.workbenches.length > placed && room.workbenches.length >= 3) {
+        this.drawWorkbenchCluster(
+          room.x + room.width / 2,
+          room.y + room.height / 2,
+          room.workbenches.map((wb) => wb.extension),
+        );
+      }
     }
 
     // Draw room labels (suppressed in low LOD)

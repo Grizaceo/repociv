@@ -37,7 +37,16 @@ function isFloorTile(grid: LocalTile[][], x: number, y: number, gridW: number, g
   return tile.type === 'floor';
 }
 
-/** Team cluster: central aisle (≥2 tiles) with desk rows and partitions between rows. */
+/** Team cluster: open-plan desk grid (cat-office style).
+ *
+ *  Desk rows fill the full room width on a 2-row rhythm — desk row, then an
+ *  open row for the chair/walkway — and desks sit on every other column so
+ *  each one has breathing room. A central vertical aisle (≥2 tiles) splits
+ *  the grid. Capacity scales with room AREA (~4 tiles per desk), matching
+ *  computeRoomSize's ~4-tiles-per-workbench sizing; the previous layout only
+ *  filled the two columns flanking the aisle (capacity grew with height
+ *  only), which left the larger rooms introduced by that sizing mostly
+ *  empty. */
 function layoutTeamCluster(
   innerX0: number,
   innerY0: number,
@@ -51,9 +60,6 @@ function layoutTeamCluster(
   const aisleX0 = mid - Math.floor(aisleWidth / 2);
   const aisleX1 = aisleX0 + aisleWidth - 1;
 
-  const leftDeskX = aisleX0 - 1;
-  const rightDeskX = aisleX1 + 1;
-
   const placements: LayoutPlacement[] = [];
   const deskPositions: OfficeLayoutResult['deskPositions'] = [];
   let wbIdx = 0;
@@ -65,51 +71,22 @@ function layoutTeamCluster(
     }
   }
 
-  // Desk rows every 2 tiles; partition row between groups
-  for (let y = innerY0; y <= innerY1; y++) {
-    const rowInGroup = (y - innerY0) % 3;
-    if (rowInGroup === 1) {
-      // Horizontal partition between desk rows
-      for (let x = innerX0; x <= innerX1; x++) {
-        if (x >= aisleX0 && x <= aisleX1) continue;
-        placements.push({ x, y, type: 'cubicle_partition', facing: 'n' });
-      }
-      continue;
-    }
-
-    if (wbIdx >= workbenchCount) continue;
-
-    if (leftDeskX >= innerX0 && wbIdx < workbenchCount) {
-      deskPositions.push({ x: leftDeskX, y, facing: 'e', workbenchIndex: wbIdx });
+  // Desk rows on a 2-row rhythm: desks face south, the chair sits on the
+  // open row below (reference office: monitor up, occupant behind the desk).
+  // The last inner row never takes desks — the chair would land on a wall.
+  for (let y = innerY0; y < innerY1 && wbIdx < workbenchCount; y += 2) {
+    for (let x = innerX0; x <= innerX1 && wbIdx < workbenchCount; x += 2) {
+      if (x >= aisleX0 && x <= aisleX1) continue; // keep the aisle clear
+      deskPositions.push({ x, y, facing: 's', workbenchIndex: wbIdx });
       placements.push({
-        x: leftDeskX,
+        x,
         y,
         type: 'workbench',
-        facing: 'e',
+        facing: 's',
         decor: 'desk_bundle',
         workbenchIndex: wbIdx,
       });
-      const chairX = leftDeskX - 1;
-      if (chairX >= innerX0) {
-        placements.push({ x: chairX, y, type: 'chair', facing: 'w' });
-      }
-      wbIdx++;
-    }
-
-    if (rightDeskX <= innerX1 && wbIdx < workbenchCount) {
-      deskPositions.push({ x: rightDeskX, y, facing: 'w', workbenchIndex: wbIdx });
-      placements.push({
-        x: rightDeskX,
-        y,
-        type: 'workbench',
-        facing: 'w',
-        decor: 'desk_bundle',
-        workbenchIndex: wbIdx,
-      });
-      const chairX = rightDeskX + 1;
-      if (chairX <= innerX1) {
-        placements.push({ x: chairX, y, type: 'chair', facing: 'e' });
-      }
+      placements.push({ x, y: y + 1, type: 'chair', facing: 'n' });
       wbIdx++;
     }
   }
@@ -301,11 +278,15 @@ export function layoutOfficeRoom(
 
   switch (zone) {
     case 'team_cluster':
-      if (innerW >= 6) {
+      // The desk grid handles narrow rooms too (aisle shrinks to 1);
+      // the top guard already routed anything under 4 wide to fallback.
+      return layoutTeamCluster(innerX0, innerY0, innerX1, innerY1, wbCount);
+    case 'focus':
+      // A focus pod holds a handful of desks (4×4 pod max). Rooms that
+      // carry a whole test suite need the grid or most desks vanish.
+      if (wbCount > 6) {
         return layoutTeamCluster(innerX0, innerY0, innerX1, innerY1, wbCount);
       }
-      return layoutFallback(room, grid, gridW, gridH, wallThick);
-    case 'focus':
       return layoutFocusPod(innerX0, innerY0, innerX1, innerY1, wbCount);
     case 'reception':
       return layoutReception(innerX0, innerY0, innerX1, innerY1);

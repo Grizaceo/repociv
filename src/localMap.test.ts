@@ -234,14 +234,30 @@ describe('localMap — cubicle layout', () => {
     }
   });
 
-  it('places cubicle partitions between desk rows in team_cluster', () => {
+  it('team_cluster fills the room with a desk grid (open plan, chair behind each desk)', () => {
     const world = buildLocalWorldFromPaths('cubicle-repo', SRC_FILES);
     const srcRoom = world.rooms.find((r) => r.folderName === 'src');
     assert.ok(srcRoom, 'src room should exist');
 
-    const partitions = world.grid
-      .flat()
-      .filter((t) => t.roomId === srcRoom!.id && t.type === 'cubicle_partition');
-    assert.ok(partitions.length > 0, 'team_cluster should have cubicle partitions between rows');
+    const roomTiles = world.grid.flat().filter((t) => t.roomId === srcRoom!.id);
+    const desks = roomTiles.filter((t) => t.type === 'workbench');
+    const chairs = roomTiles.filter((t) => t.type === 'chair');
+    assert.ok(desks.length > 0, 'team_cluster should place desks');
+    // Open-plan grid: every desk faces south with the chair on the row below.
+    for (const desk of desks) {
+      assert.equal(desk.facing, 's', `desk at (${desk.x},${desk.y}) faces south`);
+      const below = world.grid[desk.y + 1]?.[desk.x];
+      assert.equal(below?.type, 'chair', `desk at (${desk.x},${desk.y}) has chair below`);
+    }
+    assert.ok(chairs.length >= desks.length, 'one chair per desk');
+    // Desk capacity tracks room area (~4 tiles per desk after walls/aisle),
+    // not just the two columns flanking the aisle.
+    const innerArea = (srcRoom!.width - 2) * (srcRoom!.height - 2);
+    const wbCount = srcRoom!.workbenches.length;
+    const expected = Math.min(wbCount, Math.floor(innerArea / 8));
+    assert.ok(
+      desks.length >= expected,
+      `desk grid should scale with area: got ${desks.length}, expected ≥ ${expected} (inner area ${innerArea}, wb ${wbCount})`,
+    );
   });
 });

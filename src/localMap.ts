@@ -278,8 +278,11 @@ function classifyFolderZone(folderName: string, folderPath: string, depth: numbe
   const name = folderName.toLowerCase();
   const path = folderPath.toLowerCase();
 
-  // Root repo acts as reception
-  if (depth === 0) return { zoneType: 'reception', zoneLabel: 'Reception' };
+  // Root repo room: the dedicated __lobby__ already provides the reception;
+  // this room holds the repo's root-level files, so it needs desks. As a
+  // 'reception' zone it got NO desk layout and rendered as a giant empty
+  // hall whenever the repo keeps many files at the root.
+  if (depth === 0) return { zoneType: 'team_cluster', zoneLabel: 'Open Space' };
 
   // Team clusters: core code directories
   if (
