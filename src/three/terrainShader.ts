@@ -104,6 +104,7 @@ export function createTerrainMaterial(
     // ── Vertex ────────────────────────────────────────────────────────────────
     shader.vertexShader =
       'uniform float uTime;\n' +
+      'uniform float uHexRadius;\n' +
       'attribute float instanceTerrain;\n' +
       'attribute float instanceNeighborTerrain;\n' +
       'attribute float instanceCoastMask;\n' +
@@ -143,6 +144,21 @@ export function createTerrainMaterial(
         // Only scale the downward (negative Y) part of the prism
         if (transformed.y < 0.0) {
           transformed.y *= heightScale;
+        }
+
+        // Cheap top-cap relief for hills/mountain: low-poly undulation so
+        // elevated tiles stop being perfect mesas (iter3 gap #4). Static
+        // world-position phase (no uTime): two same-biome neighbors displace
+        // their shared edge identically, so tops stay continuous; the whole
+        // cap (top fan + bevel + side-top ring, every vertex above the
+        // bevel) moves together, so the prism stays watertight. Amplitude
+        // 5% of hexRadius — within the ≤8% contract.
+        bool reliefBiome = abs(tidx - 2.0) < 0.5 || abs(tidx - 6.0) < 0.5;
+        if (reliefBiome && transformed.y > -1.0) {
+          vec2 reliefPos = instanceMatrix[3].xz + transformed.xz;
+          float relief = sin(reliefPos.x * 0.085) * cos(reliefPos.y * 0.097)
+                       + 0.6 * sin(reliefPos.x * 0.21 + reliefPos.y * 0.16);
+          transformed.y += relief * (uHexRadius * 0.05);
         }
 
         // Ocean wave animation: gentle vertical displacement. Phase runs on
@@ -360,7 +376,7 @@ float terrainDetailNoise(vec2 p) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v16';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v17';
   return mat;
 }
 
