@@ -98,6 +98,12 @@ META_JSON = ATLAS_DIR / "terrain-atlas-3d.json"
 # Default Blender binary. Override with --blender-bin or BLENDER_BIN env.
 DEFAULT_BLENDER = Path.home() / "tools/blender/blender-5.1.2-linux-x64/blender"
 
+# Iter-5 plains smoothing (commit d6aa2d4): GaussianBlur applied to the
+# standalone plains cell after resize (and quantize, for the normal pass).
+# Part of the canonical recipe so a fresh full bake reproduces the tracked
+# atlas byte-exactly. Do not change without a manifest version bump.
+PLAINS_BLUR_RADIUS = 3.5
+
 # Per-biome seeds (stable across runs; do not change without a version bump
 # of the atlas manifest). Mirrors the numpy generator's `seed = idx + 1`.
 SEEDS = {
@@ -775,7 +781,7 @@ def _composite(group_letter: str, terrains: list[str],
        The other (non-group) cells are untouched. The roughness atlas
        is NEVER written.
     """
-    from PIL import Image
+    from PIL import Image, ImageFilter
     meta = _read_meta()
     cell = meta["cellSize"]
     if cell != out_res:
@@ -802,6 +808,14 @@ def _composite(group_letter: str, terrains: list[str],
             bk = bk.resize((out_res, out_res), Image.LANCZOS)
             if quantize:
                 bk = bk.point(lambda v: min(255, (v // 4) * 4 + 2))
+            if t == "plains":
+                # Iter-5 smoothing (d6aa2d4): the plains cell is softened so
+                # the grass micro-noise doesn't shimmer at strategic zoom.
+                # Applied to the standalone 512² cell AFTER resize/quantize —
+                # byte-exact reconstruction of the tracked atlas transform
+                # (verified: fresh bake + this blur == tracked plains cell in
+                # BOTH the albedo and the normal atlas).
+                bk = bk.filter(ImageFilter.GaussianBlur(PLAINS_BLUR_RADIUS))
             im.paste(bk, (x0, y0, x0 + out_res, y0 + out_res))
         im.save(path, optimize=True)
         print(f"[DAVI] wrote {path} ({(path.stat().st_size)/1024:.1f} KB)")
