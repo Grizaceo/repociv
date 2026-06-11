@@ -97,7 +97,11 @@ const CAMERAS = [
   // Coords come from __repocivDebug.getTileStats().samplePos for the
   // FIXED_SEED world (stable while the seed doesn't change); reveal=all
   // lifts fog of war so the rim biomes are actually rendered.
-  { name: '05-ocean-closeup',  cam: '-1326,-2207,2.2', reveal: true },
+  // 05 reframed (pase 2): the old -1326,-2207,2.2 frame was deep-ocean
+  // edge-on — prism side faces filled the shot and verified neither the
+  // coastal gradient nor the foam line. This frame holds an actual
+  // coastline with shoreline + foam dots in view.
+  { name: '05-ocean-closeup',  cam: '-900,-1600,1.0', reveal: true },
   { name: '06-desert-mountain-closeup', cam: '117,157,1.6', reveal: true },
   // 07: river ribbon (iter7). Coords = midpoint of the longest river for the
   // FIXED_SEED world, from __repocivDebug.getRiverStats(). Stable while the

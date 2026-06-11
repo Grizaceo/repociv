@@ -17,6 +17,8 @@ import {
   Float32BufferAttribute,
   Color,
   SphereGeometry,
+  Quaternion,
+  Vector3,
 } from 'three';
 import { AXIAL_DIRECTIONS, type Axial } from '../hex.ts';
 import { tileKey } from '../types.ts';
@@ -100,6 +102,7 @@ terrainGroup.name = 'terrain';
 
 let terrainMesh: InstancedMesh | null = null;
 let fogCoverMesh: InstancedMesh | null = null;
+let fogPuffMesh: InstancedMesh | null = null;
 let fogCoverSignature = '';
 let territoryInner: LineSegments | null = null;
 let territoryCapitalInner: LineSegments | null = null;
@@ -437,7 +440,10 @@ function rebuildFoam(state: GameState, _animTime: number): void {
   }
 
   const getTile = (c: Axial) => state.world.tiles.get(tileKey(c));
-  const foamPositions: Array<{ x: number; y: number; z: number }> = [];
+  // 3 dots per shore edge: full-size at the midpoint, smaller ones offset
+  // along the edge tangent — a broken foam line like Civ V's coast, not a
+  // string of even beads.
+  const foamPositions: Array<{ x: number; y: number; z: number; s: number }> = [];
 
   for (const tile of state.world.tiles.values()) {
     if (tile.terrain !== 'ocean' || !tile.revealed) continue;
@@ -455,7 +461,15 @@ function rebuildFoam(state: GameState, _animTime: number): void {
       const b = hexCornerAngle3D((e + 1) % 6);
       const mx = center.x + (HEX_SIZE * Math.cos(a) + HEX_SIZE * Math.cos(b)) * 0.5;
       const mz = center.z + (HEX_SIZE * Math.sin(a) + HEX_SIZE * Math.sin(b)) * 0.5;
-      foamPositions.push({ x: mx, y: center.y + 1.0, z: mz });
+      // Edge tangent (corner a → corner b), for the side dots
+      let tx = Math.cos(b) - Math.cos(a);
+      let tz = Math.sin(b) - Math.sin(a);
+      const tl = Math.hypot(tx, tz) || 1;
+      tx /= tl;
+      tz /= tl;
+      foamPositions.push({ x: mx, y: center.y + 1.0, z: mz, s: 1.0 });
+      foamPositions.push({ x: mx + tx * HEX_SIZE * 0.22, y: center.y + 1.0, z: mz + tz * HEX_SIZE * 0.22, s: 0.55 });
+      foamPositions.push({ x: mx - tx * HEX_SIZE * 0.22, y: center.y + 1.0, z: mz - tz * HEX_SIZE * 0.22, s: 0.55 });
     }
   }
 
@@ -469,12 +483,23 @@ function rebuildFoam(state: GameState, _animTime: number): void {
   });
   foamMesh = new InstancedMesh(foamGeom, foamMat, foamPositions.length);
   const m = new Matrix4();
+  const fs = new Vector3();
   foamPositions.forEach((pos, i) => {
-    m.makeTranslation(pos.x, pos.y, pos.z);
+    fs.set(pos.s, pos.s * 0.8, pos.s);
+    m.makeScale(fs.x, fs.y, fs.z);
+    m.setPosition(pos.x, pos.y, pos.z);
     foamMesh!.setMatrixAt(i, m);
   });
   foamMesh.instanceMatrix.needsUpdate = true;
   terrainGroup.add(foamMesh);
+}
+
+/** Per-frame foam breath: one material-opacity write, allocation-free.
+ *  Deterministic under ?freeze (input is animTime). */
+function animateFoamPulse(animTime: number): void {
+  if (!foamMesh) return;
+  (foamMesh.material as MeshLambertMaterial).opacity =
+    0.45 + 0.15 * Math.sin(animTime * 1.7);
 }
 
 function rebuildGround(state: GameState): void {
@@ -511,6 +536,12 @@ function rebuildFogCover(state: GameState): void {
     fogCoverMesh.dispose();
     fogCoverMesh = null;
   }
+  if (fogPuffMesh) {
+    terrainGroup.remove(fogPuffMesh);
+    fogPuffMesh.geometry.dispose();
+    (fogPuffMesh.material as MeshLambertMaterial).dispose();
+    fogPuffMesh = null;
+  }
 
   if (unrevealed.length === 0) return;
 
@@ -536,6 +567,52 @@ function rebuildFogCover(state: GameState): void {
   });
   fogCoverMesh.instanceMatrix.needsUpdate = true;
   terrainGroup.add(fogCoverMesh);
+
+  // Cloud tops: 3 squashed puffs per unrevealed tile turn the flat prism
+  // lid into Civ V's billowing unexplored cover. Hash-deterministic
+  // placement (same coords → same puffs → SHA-stable goldens), static —
+  // no per-frame cost, the fog reads volumetric from the play camera.
+  const puffGeom = new SphereGeometry(HEX_SIZE * 0.30, 8, 6);
+  const puffMat = new MeshLambertMaterial({
+    color: 0xdde3e1,
+    emissive: 0x767d80,
+    transparent: true,
+    opacity: 0.9,
+  });
+  const PUFFS = 3;
+  fogPuffMesh = new InstancedMesh(puffGeom, puffMat, unrevealed.length * PUFFS);
+  const puffSpots: Array<[number, number]> = [
+    [-0.18, -0.10],
+    [0.20, 0.06],
+    [-0.02, 0.20],
+  ];
+  const pPos = new Vector3();
+  const pQuat = new Quaternion();
+  const pScl = new Vector3();
+  const up = new Vector3(0, 1, 0);
+  let pi = 0;
+  for (const tile of unrevealed) {
+    const elev = terrainElevation(tile.terrain);
+    const pos = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    const h = Math.abs((tile.coord.q * 73856093) ^ (tile.coord.r * 19349663));
+    for (let p = 0; p < PUFFS; p++) {
+      const [ox, oz] = puffSpots[p]!;
+      const jx = (((h >> (p * 2)) % 9) - 4) * 0.015;
+      const jz = (((h >> (p * 2 + 3)) % 9) - 4) * 0.015;
+      const sc = 0.85 + ((h >> (p + 5)) % 5) * 0.10;
+      pPos.set(
+        pos.x + (ox + jx) * HEX_SIZE,
+        pos.y + 2.5,
+        pos.z + (oz + jz) * HEX_SIZE,
+      );
+      pQuat.setFromAxisAngle(up, ((h + p * 53) % 6) * (Math.PI / 3));
+      pScl.set(sc * 1.35, sc * 0.42, sc * 1.0);
+      matrix.compose(pPos, pQuat, pScl);
+      fogPuffMesh.setMatrixAt(pi++, matrix);
+    }
+  }
+  fogPuffMesh.instanceMatrix.needsUpdate = true;
+  terrainGroup.add(fogPuffMesh);
 }
 
 /** Civ V-style subtle hex grid: very faint white lines on revealed tile edges.
@@ -761,7 +838,11 @@ export function updateHexWorldScene(
     const warmth = 0.88 + 0.12 * Math.sin(t);
     // Golden-hour bias: green and especially blue sit lower than before
     // (0.97/0.90) so the low sun reads late-afternoon gold, not noon white.
-    sunLight.color.setRGB(1, 0.94 * warmth, 0.80 * warmth);
+    // At strategic zoom (lod low/medium) the bias deepens — the world map
+    // bathes in late gold like Civ V's continent view — and relaxes when
+    // zoomed in so close-up materials stay true to the atlas palette.
+    const lodBias = opts.lod === 'low' ? 0.06 : opts.lod === 'medium' ? 0.03 : 0;
+    sunLight.color.setRGB(1, (0.94 - lodBias) * warmth, (0.80 - lodBias * 2) * warmth);
     sunLight.intensity = 1.0 + 0.08 * Math.sin(t * 0.6);
     // Slow arc across the sky
     sunLight.position.set(
@@ -777,6 +858,7 @@ export function updateHexWorldScene(
   rebuildShorelineRings(state, opts.animTime, stateDirty);
   animateTerritoryPulse(opts.animTime);
   if (stateDirty) rebuildFoam(state, opts.animTime);
+  animateFoamPulse(opts.animTime);
 
   // State-driven rebuilds: only when the world actually changed. These
   // are the heavy ones (terrain mesh, ground plane, territory lines,
@@ -827,6 +909,12 @@ export function disposeHexWorldScene(scene: Scene): void {
     terrainGroup.remove(fogCoverMesh);
     fogCoverMesh.dispose();
     fogCoverMesh = null;
+  }
+  if (fogPuffMesh) {
+    terrainGroup.remove(fogPuffMesh);
+    fogPuffMesh.geometry.dispose();
+    (fogPuffMesh.material as MeshLambertMaterial).dispose();
+    fogPuffMesh = null;
   }
   clearTerritoryLines();
   if (shorelineRings) {
