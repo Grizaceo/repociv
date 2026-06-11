@@ -239,7 +239,9 @@ function buildHills(tiles: Tile[]): void {
   if (tiles.length === 0) return;
 
   const bumpGeom = new SphereGeometry(HEX_SIZE * 0.30, 12, 8);
-  const bumpMat  = new MeshLambertMaterial({ color: new Color(0x5e8842) });
+  // Baked-atlas hills mean (191,209,141) × 0.82 — same family as the
+  // terrain cell, darkened just enough to read as relief.
+  const bumpMat  = new MeshLambertMaterial({ color: new Color(0x9dab74) });
 
   const total    = tiles.length * 4;
   const bumpMesh = new InstancedMesh(bumpGeom, bumpMat, total);
@@ -276,7 +278,9 @@ function buildDesert(tiles: Tile[]): void {
   // mountains. Civ V desert is mostly texture; a few wide, very low mounds
   // give relief without competing with the baked dune bands.
   const duneGeom = new SphereGeometry(HEX_SIZE * 0.22, 14, 10);
-  const duneMat  = new MeshLambertMaterial({ color: new Color(0xddc58c) });
+  // Baked-atlas desert mean (209,196,163) × 1.07 — sun-catching sand in
+  // the same warm-gray family as the dune bands, not saturated yellow.
+  const duneMat  = new MeshLambertMaterial({ color: new Color(0xe0d2ae) });
 
   const MOUNDS = 3;
   const duneMesh = new InstancedMesh(duneGeom, duneMat, tiles.length * MOUNDS);
@@ -331,10 +335,11 @@ function buildIce(tiles: Tile[]): void {
     metalness: 0.1,
   });
 
-  // Base slab: thin flat box
+  // Base slab: thin flat box — exact baked-atlas ice mean (207,229,240)
+  // so the platform melts into the cell instead of reading paper-white.
   const slabGeom  = new BoxGeometry(HEX_SIZE * 0.60, HEX_SIZE * 0.05, HEX_SIZE * 0.60);
   const slabMat   = new MeshLambertMaterial({
-    color: new Color(0xe8f4fc),
+    color: new Color(0xcfe5f0),
     transparent: true,
     opacity: 0.80,
   });
@@ -474,7 +479,9 @@ function buildGrass(tiles: Tile[]): void {
   if (tiles.length === 0) return;
 
   const geom = new BoxGeometry(HEX_SIZE * 0.16, HEX_SIZE * 0.10, HEX_SIZE * 0.05);
-  const mat  = new MeshLambertMaterial({ color: new Color(0x5a9040) });
+  // Baked-atlas plains mean (186,219,132) × 0.85 — grass tufts one shade
+  // under the cell instead of the old saturated green.
+  const mat  = new MeshLambertMaterial({ color: new Color(0x9eba70) });
   const mesh = new InstancedMesh(geom, mat, tiles.length * 2);
 
   let idx = 0;
