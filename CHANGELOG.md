@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Vista local: oficina legible (rediseño de composición)** — las salas ya no escalan con el número de archivos: cap de 12 escritorios por sala (`MAX_DESKS_PER_ROOM`) con sizing por capacidad real del grid (`teamClusterCapacity`, misma geometría que el layout). Anillo perimetral de paso, pasillo central ≥2, filas desk/chair/walkway centradas. Todas las zonas con archivos (meeting/infra/break/biophilic incluidas) usan el grid ordenado en vez del fallback checkerboard. Mobiliario de anclaje: watercooler en pared norte, planters en esquinas (sin scatter). Overflow de archivos via cluster pill; misiones caen a `findBestWorkbench`. Escritorio rediseñado como caja extruida con monitor encima y silla de oficina en el atlas SVG. Golden 04 regenerado. Commit `f398568`.
 - **Standalone capital Gris + wonder district hex rendering** — capital Gris se renderiza como entidad separada del grid de repos. Distritos de maravillas (Bibliotheca, Institutum) con renderizado hexagonal propio y fallback de conectividad UI. Commit `871bce7`.
 - **Dual-source task system** — sistema de tareas dual: tareas de Hermes (`PENDING_TRACKER.md`) + tareas locales RepoCiv (IDs con prefijo `L-`). Merger en `GET /pending`, CRUD separado por prefijo de ID. Commits `d8f7efa`.
 - **Approval panel UX** — confirm-before-approve para comandos de riesgo alto, badges de riesgo por `data-risk`, badges de fuente (`rc`/`hm`) en items pending, estado de confirmación con botón "¿Confirmar?" en dos pasos. Commits `d8f7efa`.
@@ -45,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Sprites de oficina dibujados a 2× del tile** — las celdas del atlas (128×64) se renderizaban a tamaño nativo ancladas arriba: cada mueble medía 2 tiles de ancho y quedaba corrido 2 filas al sureste de su propio tile (escritorios como "piezas regadas"). Ahora se escalan a 1.5× `ISO_TILE_W` con el fondo de celda anclado a la esquina sur del tile. Commit `f398568`.
+- **Ventanas y vents como huecos en muros** — `window` colocado sobre tiles de piso (reception/meeting/biophilic/corredores) renderizaba bloques de vidrio flotantes en medio de la sala; ahora `placeWallWindows()` las pone sobre tiles de MURO. `window` y `vent` son intransitables en pathfinding y `vent` dibuja su prisma de muro (cerraba huecos visibles en paredes compartidas). Commit `f398568`.
+- **City panel: ancho y overflow** — neutralizado el `top:50%` legacy, body flexible hasta `max-height`, filas de git/files/misiones a una línea con ellipsis + tooltip (los paths largos invadían la columna vecina). Ancho 560px. Commit `d8af38b`.
 - **go.mod tuple arity bug** — manifest parser de Go tenía 4-tuple pero unpack esperaba 3. Causaba ValueError silencioso en todo repo Go. Fix: fold `re.MULTILINE` en `re.compile()`. Commit `344e0fb`.
 - **Path validation in graph_relations** — `is_dir()` guard antes de `iterdir`/`subprocess` calls previene filesystem traversal con paths inválidos. Commit `344e0fb`.
 - **display:flex overridden by display:none** — fix de bug CSS donde flex era inmediatamente sobrescrito. Commit `d18b128`.
