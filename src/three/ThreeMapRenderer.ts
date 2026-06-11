@@ -9,7 +9,7 @@ import {
 import { type Camera as MapCamera } from '../hex.ts';
 import { type Axial } from '../hex.ts';
 import { type GameState } from '../game.ts';
-import { terrainElevation, hexCornerAngle } from '../isoHex.ts';
+import { terrainElevation } from '../isoHex.ts';
 import { tileKey } from '../types.ts';
 import { HEX_SIZE } from '../constants.ts';
 import {
@@ -22,7 +22,7 @@ import {
 } from './HexWorldScene.ts';
 import { HexPicker } from './HexPicker.ts';
 import { areMountainPropsReady } from './MountainProps3D.ts';
-import { axialToWorld3D } from './axialToWorld3D.ts';
+import { axialToWorld3D, hexCornerAngle3D } from './axialToWorld3D.ts';
 import { initLabelRenderer, renderLabels, disposeLabels } from './MapLabels3D.ts';
 import { SKY_TOP } from './terrainShader.ts';
 
@@ -154,7 +154,7 @@ export class ThreeMapRenderer {
     const center = axialToWorld3D(coord.q, coord.r, elev);
     const corners: Array<{ x: number; y: number }> = [];
     for (let i = 0; i < 6; i++) {
-      const angle = hexCornerAngle(i);
+      const angle = hexCornerAngle3D(i);
       this.cornerWorld.set(
         center.x + HEX_SIZE * Math.cos(angle),
         center.y + 1.5,

@@ -1,7 +1,7 @@
 // ─── Flat-top hex prism geometry with beveled top edges ──────────────────────
 import { BufferGeometry, Float32BufferAttribute } from 'three';
 import { HEX_SIZE } from '../constants.ts';
-import { hexCornerAngle } from '../isoHex.ts';
+import { hexCornerAngle3D } from './axialToWorld3D.ts';
 
 /** Side depth of terrain prism below the top face (world units).
  *  Must be ≥ TILE_HEIGHT (12) × max_elevation_steps (3) = 36 to close all inter-tier gaps.
@@ -34,7 +34,7 @@ export function createHexPrismGeometry(
   const bottom: Array<[number, number, number]> = [];
 
   for (let i = 0; i < 6; i++) {
-    const angle = hexCornerAngle(i);
+    const angle = hexCornerAngle3D(i);
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
     outerTop.push([rOuter * cos, 0, rOuter * sin]);

@@ -146,6 +146,16 @@ export function createTerrainMaterial(
           transformed.y *= heightScale;
         }
 
+        // Ocean: flatten the bevel groove. Adjacent water tiles each dip
+        // BEVEL_DEPTH at their rim, and from a low camera the V-groove
+        // between them reads as black notches on the sea silhouette. Water
+        // has no need for the bevel (it exists to soften land prism edges),
+        // so lift the whole top cap to y=0 — the sea becomes one continuous
+        // surface and the wave displacement (world-phase) keeps it seamless.
+        if (abs(tidx - 4.0) < 0.5 && transformed.y > -1.0) {
+          transformed.y = 0.0;
+        }
+
         // Cheap top-cap relief for hills/mountain: low-poly undulation so
         // elevated tiles stop being perfect mesas (iter3 gap #4). Static
         // world-position phase (no uTime): two same-biome neighbors displace
@@ -304,14 +314,35 @@ float terrainDetailNoise(vec2 p) {
           float cliffT = clamp((-vLocalY) / max(uPrismHeight, 0.001), 0.0, 1.0);
           bool waterSide = (tidx > 3.5 && tidx < 5.5);
           if (waterSide) {
-            float cliffShade = mix(1.0, 0.78, smoothstep(0.08, 1.0, cliffT));
+            // Water flanks: shallow-water column, not a void. Mostly replaces
+            // the dark palette blue so any sliver still visible after the
+            // bevel flattening reads as sea, with depth shading below.
+            vec3 waterFlank = vec3(0.18, 0.44, 0.50);
+            float wlum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+            diffuseColor.rgb = mix(diffuseColor.rgb, waterFlank * clamp(0.6 + 1.6 * wlum, 0.0, 1.1), 0.72);
+            float cliffShade = mix(1.0, 0.80, smoothstep(0.08, 1.0, cliffT));
             diffuseColor.rgb *= cliffShade;
           } else {
             float dlum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
             bool rockBiome = (tidx > 1.5 && tidx < 2.5) || (tidx > 5.5 && tidx < 6.5);
-            vec3 earth = rockBiome ? vec3(0.50, 0.48, 0.44) : vec3(0.52, 0.43, 0.30);
-            diffuseColor.rgb = mix(diffuseColor.rgb, earth * clamp(0.45 + 1.4 * dlum, 0.0, 1.2), 0.80);
-            float cliffShade = mix(0.96, 0.74, smoothstep(0.08, 1.0, cliffT));
+            // Civ V cliff tan — bright enough to survive ambient-only shading
+            // on flanks facing away from the sun (the old 0.52/0.43/0.30 read
+            // as dark grey wedges around every elevation step).
+            vec3 earth = rockBiome ? vec3(0.58, 0.55, 0.50) : vec3(0.64, 0.53, 0.38);
+            vec3 cliffCol = earth;
+            // Strata texture on the flank: reuse the mountain atlas cell as a
+            // generic rock face, projected in world space (x+z along the wall,
+            // local depth down it) so adjacent prisms continue the pattern.
+            if (uUseAtlas > 0) {
+              vec2 cliffUv = fract(vec2(
+                (vWorldXZ.x + vWorldXZ.y * 0.7) / (uHexRadius * 1.4),
+                (-vLocalY) / (uHexRadius * 1.4)));
+              vec3 cliffTex = texture2D(uTerrainAtlas, terrainAtlasUv(2.0, cliffUv)).rgb;
+              float ctlum = dot(cliffTex, vec3(0.299, 0.587, 0.114));
+              cliffCol = earth * clamp(0.25 + 1.3 * ctlum, 0.0, 1.25);
+            }
+            diffuseColor.rgb = mix(diffuseColor.rgb, cliffCol * clamp(0.60 + 0.9 * dlum, 0.0, 1.15), 0.85);
+            float cliffShade = mix(1.0, 0.80, smoothstep(0.08, 1.0, cliffT));
             diffuseColor.rgb *= cliffShade;
           }
         }
@@ -351,6 +382,19 @@ float terrainDetailNoise(vec2 p) {
           float foamPulse = 0.82 + 0.18 * sin(uTime * 1.7 + vWorldXZ.x * 0.045 + vWorldXZ.y * 0.038);
           float foamAmt = ring * foamPulse * (selfOcean ? 0.60 : 0.30);
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.55, 0.85, 0.88), foamAmt);
+        }`,
+      )
+      // ── Side-face emissive lift ──────────────────────────────────────────────
+      // Flanks facing away from the sun only get ambient light and went
+      // near-black regardless of albedo. A fraction of the cliff diffuse as
+      // self-illumination keeps every flank readable (Civ V cliffs are never
+      // black) while preserving directional shading on top of it. Scaled by
+      // the diffuse itself, so fog-dimmed tiles keep dim flanks.
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        if (vTopFace < 0.5) {
+          totalEmissiveRadiance += diffuseColor.rgb * 0.38;
         }`,
       )
       // ── Per-biome roughness from atlas (correct atlas UV, not raw tile UV) ──
@@ -395,7 +439,7 @@ float terrainDetailNoise(vec2 p) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v18';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v19';
   return mat;
 }
 

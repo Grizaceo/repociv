@@ -21,10 +21,10 @@ import {
 import { AXIAL_DIRECTIONS, type Axial } from '../hex.ts';
 import { tileKey } from '../types.ts';
 import { type GameState } from '../game.ts';
-import { terrainElevation, hexCornerAngle } from '../isoHex.ts';
+import { terrainElevation } from '../isoHex.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { sharedHexGeometry } from './hexGeometry.ts';
-import { axialToWorld3D } from './axialToWorld3D.ts';
+import { axialToWorld3D, hexCornerAngle3D } from './axialToWorld3D.ts';
 import { instanceColorForTile } from './FogOfWar3D.ts';
 import { HexPicker } from './HexPicker.ts';
 import {
@@ -136,8 +136,8 @@ function hexEdgeMidpoint(
   elev: number,
 ): [number, number, number] {
   const center = axialToWorld3D(coord.q, coord.r, elev);
-  const a = hexCornerAngle(edgeIndex);
-  const b = hexCornerAngle((edgeIndex + 1) % 6);
+  const a = hexCornerAngle3D(edgeIndex);
+  const b = hexCornerAngle3D((edgeIndex + 1) % 6);
   const x =
     center.x + (HEX_SIZE * Math.cos(a) + HEX_SIZE * Math.cos(b)) * 0.5;
   const z =
@@ -271,8 +271,8 @@ function rebuildShorelineRings(state: GameState, animTime: number, stateDirty = 
       const elev = terrainElevation(tile.terrain);
       const center = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
       for (let i = 0; i < 6; i++) {
-        const a = hexCornerAngle(i);
-        const b = hexCornerAngle((i + 1) % 6);
+        const a = hexCornerAngle3D(i);
+        const b = hexCornerAngle3D((i + 1) % 6);
         // x/z are filled in by the per-frame pulse below; cache each
         // vertex's ring center + unit offset so the update is in-place.
         segments.push(center.x, center.y + 1.2, center.z, center.x, center.y + 1.2, center.z);
@@ -346,8 +346,8 @@ function rebuildFoam(state: GameState, _animTime: number): void {
       if (!neighbor || neighbor.terrain === 'ocean') continue;
 
       // Foam at edge midpoints
-      const a = hexCornerAngle(i);
-      const b = hexCornerAngle((i + 1) % 6);
+      const a = hexCornerAngle3D(i);
+      const b = hexCornerAngle3D((i + 1) % 6);
       const mx = center.x + (HEX_SIZE * Math.cos(a) + HEX_SIZE * Math.cos(b)) * 0.5;
       const mz = center.z + (HEX_SIZE * Math.sin(a) + HEX_SIZE * Math.sin(b)) * 0.5;
       foamPositions.push({ x: mx, y: center.y + 1.0, z: mz });
