@@ -11,7 +11,9 @@
 **Stack:** TypeScript + Vite (Canvas 2D + WebGL/Three.js) · Python HTTP bridge · DuckDB/JSONL local ledger
 **Compatible with:** [Hermes Agent](https://hermes-agent.nousresearch.com) (Nous Research) — drop-in in any existing setup
 
-![Global 3D WebGL view](docs/design/screenshots/global-3d-view.jpg)
+![Macro 2D view](docs/design/screenshots/macro-2d-view.jpg) | ![Macro 3D WebGL view](docs/design/screenshots/global-3d-view.jpg)
+--- | ---
+*Flat hexagonal map — classic, fast, feature-complete.* | *3D WebGL render (Three.js r175) — 🚧 in active development.*
 
 ---
 

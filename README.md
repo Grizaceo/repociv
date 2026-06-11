@@ -11,8 +11,9 @@
 **Stack:** TypeScript + Vite (Canvas 2D + WebGL/Three.js) · Python HTTP bridge · DuckDB/JSONL ledger local
 **Compatible con:** [Hermes Agent](https://hermes-agent.nousresearch.com) (Nous Research) — drop-in en cualquier setup existente
 
-![Vista global 3D WebGL](docs/design/screenshots/global-3d-view.jpg)
-*Vista macro en 3D WebGL — terreno, ríos, bosques, montañas, ciudades y yields renderizados con Three.js r175. Alterna entre 2D hex y 3D con la tecla `3` o el botón de la barra superior.*
+![Vista macro 2D](docs/design/screenshots/macro-2d-view.jpg) | ![Vista macro 3D WebGL](docs/design/screenshots/global-3d-view.jpg)
+--- | ---
+*Mapa hexagonal 2D plano — el clásico, rápido y completo.* | *Render 3D WebGL (Three.js r175) — 🚧 en desarrollo activo.*
 
 ---
 
