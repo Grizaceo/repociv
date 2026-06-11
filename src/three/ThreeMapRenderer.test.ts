@@ -127,8 +127,11 @@ describe('computeWorldSignature', () => {
   it('stays cheap on large maps (runs at 60fps in the render loop)', () => {
     // 1200 tiles + 60 units ≈ a worst-case workspace. The signature runs
     // every frame; at 60fps it has ~16ms of TOTAL budget, so it must cost
-    // a small fraction of a millisecond. Generous 0.5ms bound to stay
-    // CI-noise-proof while still catching accidental quadratic work.
+    // a small fraction of a millisecond. 2ms bound: the 0.5ms version
+    // flaked whenever the dev box ran Blender bakes / Playwright audits
+    // alongside the suite (observed 0.88ms under load, ~0.1ms idle).
+    // 2ms still catches accidental quadratic work by an order of
+    // magnitude while surviving a loaded machine.
     const tiles: Array<[Axial, Tile]> = [];
     for (let q = 0; q < 40; q++) {
       for (let r = 0; r < 30; r++) {
@@ -144,7 +147,7 @@ describe('computeWorldSignature', () => {
     const t0 = performance.now();
     for (let i = 0; i < N; i++) computeWorldSignature(s);
     const avgMs = (performance.now() - t0) / N;
-    expect(avgMs).toBeLessThan(0.5);
+    expect(avgMs).toBeLessThan(2);
   });
 
   it('changes when city territory grows', () => {
