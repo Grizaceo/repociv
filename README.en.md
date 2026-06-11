@@ -8,15 +8,10 @@
 
 > A hexagonal dashboard inspired by Civilization V that visualizes your repos folder as cities on a map, AI agents as units, and background processes as buildings.
 
-**Stack:** TypeScript + Vite (Canvas 2D) · Python HTTP bridge · DuckDB/JSONL local ledger
+**Stack:** TypeScript + Vite (Canvas 2D + WebGL/Three.js) · Python HTTP bridge · DuckDB/JSONL local ledger
 **Compatible with:** [Hermes Agent](https://hermes-agent.nousresearch.com) (Nous Research) — drop-in in any existing setup
 
-![RepoCiv demo](docs/design/screenshots/repociv-demo.gif)
-
-| | |
-|---|---|
-| ![](docs/design/screenshots/ss1.jpg) | ![](docs/design/screenshots/ss2.jpg) |
-| ![](docs/design/screenshots/ss3.jpg) | ![](docs/design/screenshots/ss4.jpg) |
+![Global 3D WebGL view](docs/design/screenshots/global-3d-view.jpg)
 
 ---
 
@@ -101,8 +96,9 @@ REPOCIV_MAP_ROOT=~/projects
 
 ```
 ┌─────────────────────────────────────────────┐
-│  Canvas 2D Renderer  (src/renderer.ts)       │  ← Draws hexes, units,
-│  Minimap Renderer    (src/minimapRenderer.ts)│     cities, minimap
+│  ThreeMapRenderer   (src/three/)*           │  ← WebGL 3D renderer (Three.js r175)
+│  Canvas 2D Renderer (src/renderer.ts)        │  ← Flat 2D hex fallback
+│  Minimap Renderer   (src/minimapRenderer.ts) │     minimap, units, cities
 ├─────────────────────────────────────────────┤
 │  GameState  (src/game.ts)                   │  ← Simulation loop,
 │  Priority Matrix (src/priorityMatrix.ts)     │     fatigue, mission queues,
@@ -111,6 +107,9 @@ REPOCIV_MAP_ROOT=~/projects
 │  Bridge  (src/bridge.ts + server/bridge.py) │  ← HTTP/WebSocket → agent runtime
 │  localMap.ts + localPathfinding.ts           │     Process scanner, task queue
 └─────────────────────────────────────────────┘
+
+*  \* 25+ modules: TerrainAtlas, HexWorldScene, CityProps3D, FogOfWar,
+     UnitMesh3D, Rivers3D, SkyDome3D, ForestProps, MountainProps, etc.
 ```
 
 ### Macro view → Local view
@@ -124,8 +123,8 @@ REPOCIV_MAP_ROOT=~/projects
        └─ ...
 ```
 
-- **Macro:** hex map where each tile is a repo
-- **Local:** double-click a city → interior file view
+- **Macro:** hex map in 2D or 3D WebGL (key `3` or toolbar button to toggle)
+- **Local:** double-click a city → interior isometric office view
   - **Workbenches** are files/folders prioritized by the Priority Matrix
   - **Units** walk toward workbenches with cached A* (≤300 hexes)
 - `Space` or key `3` toggles between the two views

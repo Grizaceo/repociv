@@ -8,27 +8,23 @@
 
 > Un dashboard hexagonal estilo Civilization V que visualiza tu workspace de repos como ciudades en un mapa, agentes de IA como unidades, y procesos en segundo plano como edificios.
 
-**Stack:** TypeScript + Vite (Canvas 2D) · Python HTTP bridge · DuckDB/JSONL ledger local
+**Stack:** TypeScript + Vite (Canvas 2D + WebGL/Three.js) · Python HTTP bridge · DuckDB/JSONL ledger local
 **Compatible con:** [Hermes Agent](https://hermes-agent.nousresearch.com) (Nous Research) — drop-in en cualquier setup existente
 
-![RepoCiv demo](docs/design/screenshots/repociv-demo.gif)
-
-| | |
-|---|---|
-| ![](docs/design/screenshots/ss1.jpg) | ![](docs/design/screenshots/ss2.jpg) |
-| ![](docs/design/screenshots/ss3.jpg) | ![](docs/design/screenshots/ss4.jpg) |
+![Vista global 3D WebGL](docs/design/screenshots/global-3d-view.jpg)
+*Vista macro en 3D WebGL — terreno, ríos, bosques, montañas, ciudades y yields renderizados con Three.js r175. Alterna entre 2D hex y 3D con la tecla `3` o el botón de la barra superior.*
 
 ---
 
 ## Vista Local — estilo RimWorld / isométrica 2.5D
 
-Al hacer doble-click en una ciudad del mapa hex se entra a la **vista local**: una oficina isométrica estilo RimWorld generada proceduralmente a partir de la estructura real del repo.
+Al hacer doble-click en una ciudad del mapa se entra a la **vista local**: una oficina isométrica estilo RimWorld generada proceduralmente a partir de la estructura real del repo.
 
-![Vista isométrica — oficina completa](docs/design/screenshots/iso_rimworld_ui.jpg)
+![Vista isométrica — oficina completa](docs/design/screenshots/local-isometric-view.jpg)
 
 Cada sala corresponde a una carpeta del repo. Las unidades (agentes IA) caminan entre workbenches, los NPCs manager están de pie frente a pizarras, y las puertas se deslizan al pasar.
 
-![Detalle de salas — RECEPTION, ENGINEERING, DESIGN](docs/design/screenshots/iso_rimworld_detail.jpg)
+![Detalle de salas](docs/design/screenshots/local-isometric-detail.jpg)
 
 ### Elementos de la vista local
 
@@ -130,8 +126,9 @@ REPOCIV_MAP_ROOT=~/projects
 
 ```
 ┌─────────────────────────────────────────────┐
-│  Canvas 2D Renderer  (src/renderer.ts)       │  ← Dibuja hexes, unidades,
-│  Minimap Renderer    (src/minimapRenderer.ts)│     ciudades, minimapa
+│  ThreeMapRenderer   (src/three/)*           │  ← Renderizador WebGL 3D (Three.js r175)
+│  Canvas 2D Renderer (src/renderer.ts)        │  ← Dibujo 2D hex nomral (fallback)
+│  Minimap Renderer   (src/minimapRenderer.ts) │     minimapa, unidades, ciudades
 ├─────────────────────────────────────────────┤
 │  GameState  (src/game.ts)                   │  ← Loop de simulación,
 │  Priority Matrix (src/priorityMatrix.ts)     │     fatiga, colas misión,
@@ -140,6 +137,9 @@ REPOCIV_MAP_ROOT=~/projects
 │  Bridge  (src/bridge.ts + server/bridge.py) │  ← HTTP/WebSocket → agent runtime
 │  localMap.ts + localPathfinding.ts           │     Process scanner, task queue
 └─────────────────────────────────────────────┘
+
+*  \* 25+ módulos: TerrainAtlas, HexWorldScene, CityProps3D, FogOfWar,
+     UnitMesh3D, Rivers3D, SkyDome3D, ForestProps, MountainProps, etc.
 ```
 
 ### Vista Macro → Vista Local
@@ -153,7 +153,7 @@ REPOCIV_MAP_ROOT=~/projects
        └─ ...
 ```
 
-- **Macro:** hex map donde cada tile es un repo
+- **Macro:** hex map en 2D o 3D WebGL (tecla `3` o botón en barra superior)
 - **Local:** doble-click en una ciudad → oficina isométrica 2.5D generada desde la estructura del repo
   - **Salas** = carpetas, coloreadas por zona (`team_cluster` azul, `focus` violeta, `break` verde, `infra` concreto)
   - **Workbenches** (`×`) = archivos priorizados por la Priority Matrix — A* cacheado (≤300 hexes)
