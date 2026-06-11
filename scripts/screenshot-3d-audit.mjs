@@ -84,7 +84,10 @@ const FIXED_SEED = {
 // same commit that swapped to Blender-baked atlas content, so a
 // regression in any group's texture changes the same set of hashes.
 const CAMERAS = [
-  { name: '01-general-overview', cam: 'auto,0.9' },
+  // 01 carries its own ceiling: the bimodal driver float-scheduling flip
+  // (see 07 below) lands on ~98 scattered edge pixels at this macro zoom
+  // since the GLB prop pass (units/crystals/obelisks) added knife edges.
+  { name: '01-general-overview', cam: 'auto,0.9', tolerancePx: 120 },
   { name: '02-zoomed-mid',       cam: 'auto,1.8' },
   { name: '03-zoomed-close',     cam: 'auto,3.2' },
   // 05/06 exist to verify biome textures (ocean banding, mountain strata,
