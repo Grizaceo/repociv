@@ -371,12 +371,12 @@ function buildIce(tiles: Tile[]): void {
 function buildSacred(tiles: Tile[]): void {
   if (tiles.length === 0) return;
 
-  // Standing stones — rough grey-violet monoliths
+  // Standing stones — weathered gilded-stone monoliths (matches shader v20 sacred)
   const stoneGeom = new BoxGeometry(HEX_SIZE * 0.085, HEX_SIZE * 0.28, HEX_SIZE * 0.055);
   const stoneMat  = new MeshStandardMaterial({
-    color:    new Color(0x6b5880),
-    emissive: new Color(0x3a2550),
-    emissiveIntensity: 0.16,
+    color:    new Color(0x9a8f76),
+    emissive: new Color(0x4a3d22),
+    emissiveIntensity: 0.14,
     roughness: 0.88,
     metalness: 0.05,
   });
@@ -384,9 +384,9 @@ function buildSacred(tiles: Tile[]): void {
   // Altar cube at centre
   const altarGeom = new BoxGeometry(HEX_SIZE * 0.18, HEX_SIZE * 0.10, HEX_SIZE * 0.18);
   const altarMat  = new MeshStandardMaterial({
-    color:    new Color(0x76618e),
-    emissive: new Color(0x3f2a66),
-    emissiveIntensity: 0.22,
+    color:    new Color(0xa89878),
+    emissive: new Color(0x584820),
+    emissiveIntensity: 0.20,
     roughness: 0.72,
     metalness: 0.08,
   });
@@ -394,8 +394,8 @@ function buildSacred(tiles: Tile[]): void {
   // Floating gem above altar
   const gemGeom = new BoxGeometry(HEX_SIZE * 0.08, HEX_SIZE * 0.08, HEX_SIZE * 0.08);
   const gemMat  = new MeshStandardMaterial({
-    color:    new Color(0xb992d9),
-    emissive: new Color(0x7b49a8),
+    color:    new Color(0xe8c66a),
+    emissive: new Color(0xa8842e),
     emissiveIntensity: 0.45,
     roughness: 0.18,
     metalness: 0.35,

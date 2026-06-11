@@ -421,26 +421,28 @@ def biome_hills(nt, coord, seed, variant):
 
 def biome_desert(nt, coord, seed, variant):
     m = _mapping(nt, coord, seed, variant)
-    # Directional dune bands (gap #2): Wave along X, rotated per variant.
+    # Broad Civ V dunes. Scale 6 + detail 3 read as high-frequency corduroy
+    # (plowed furrows) on the map; Civ V desert is pale sand with a handful
+    # of wide, soft dune bands per tile and a faint crest light.
     wave = nt.nodes.new('ShaderNodeTexWave')
     wave.wave_type = 'BANDS'
     wave.bands_direction = 'X'
     wave.wave_profile = 'SAW'  # asymmetric dune profile (steep slip face)
-    wave.inputs['Scale'].default_value = 6.0
-    wave.inputs['Distortion'].default_value = 3.5
-    wave.inputs['Detail'].default_value = 3.0
+    wave.inputs['Scale'].default_value = 2.2
+    wave.inputs['Distortion'].default_value = 5.0
+    wave.inputs['Detail'].default_value = 1.5
     nt.links.new(wave.inputs['Vector'], m.outputs['Vector'])
     base = _ramp(nt, wave.outputs['Fac'],
-                 [(0.32, (0.78, 0.58, 0.28, 1)), (0.72, (0.92, 0.78, 0.46, 1))])
+                 [(0.25, (0.82, 0.68, 0.42, 1)), (0.78, (0.93, 0.83, 0.58, 1))])
     crest = _ramp(nt, wave.outputs['Fac'],
-                  [(0.80, (0, 0, 0, 1)), (0.88, (0.95, 0.90, 0.65, 1))])
-    acc = _mix(nt, 'MIX', 0.45, base.outputs['Color'],
+                  [(0.82, (0, 0, 0, 1)), (0.92, (0.97, 0.92, 0.70, 1))])
+    acc = _mix(nt, 'MIX', 0.28, base.outputs['Color'],
                c2_socket=crest.outputs['Color'])
     n2 = _noise(nt, m.outputs['Vector'], 36.0, 4.0, 0.6)
-    grain = _mix(nt, 'MULTIPLY', 0.10, acc.outputs['Color'],
+    grain = _mix(nt, 'MULTIPLY', 0.08, acc.outputs['Color'],
                  c2_socket=n2.outputs['Color'])
     return (grain.outputs['Color'],
-            [(wave.outputs['Fac'], 0.60, 0.08), (n2.outputs['Fac'], 0.25, 0.02)],
+            [(wave.outputs['Fac'], 0.42, 0.05), (n2.outputs['Fac'], 0.22, 0.015)],
             0.60)
 
 
