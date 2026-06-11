@@ -149,7 +149,7 @@ function buildMountains(tiles: Array<{ tile: Tile; variant: number }>): void {
 
 function buildForests(tiles: Tile[]): void {
   if (tiles.length === 0) return;
-  const TREES_PER_TILE = 4;
+  const TREES_PER_TILE = 7;
 
   const trunkGeom  = new CylinderGeometry(HEX_SIZE * 0.018, HEX_SIZE * 0.025, HEX_SIZE * 0.18, 5);
   const trunkMat   = new MeshLambertMaterial({ color: new Color(0x3a2810) });
@@ -167,12 +167,17 @@ function buildForests(tiles: Tile[]): void {
   const cone2Mesh  = new InstancedMesh(cone2Geom, foliageMat, total);
   const cone3Mesh  = new InstancedMesh(cone3Geom, topMat,     total);
 
-  // Tree positions relative to tile centre (in fraction of HEX_SIZE)
+  // Tree positions relative to tile centre (in fraction of HEX_SIZE).
+  // 7 per tile so the canopy reads as a Civ V clump, not 4 lone pines;
+  // per-tile hash jitter below breaks the repeated-stamp look.
   const treeOffsets: Array<[number, number]> = [
     [-0.20,  0.14],
     [ 0.22, -0.16],
     [-0.06, -0.22],
     [ 0.16,  0.20],
+    [-0.28, -0.06],
+    [ 0.30,  0.04],
+    [ 0.00,  0.02],
   ];
 
   let idx = 0;
@@ -185,8 +190,10 @@ function buildForests(tiles: Tile[]): void {
     for (let t = 0; t < TREES_PER_TILE; t++) {
       const [ox, oz] = treeOffsets[t]!;
       const scale    = 0.80 + ((h + t * 3) % 5) * 0.06;
-      const tx       = base.x + ox * HEX_SIZE;
-      const tz       = base.z + oz * HEX_SIZE;
+      const jx       = (((h >> (t & 7)) % 9) - 4) * 0.012;
+      const jz       = (((h >> ((t + 3) & 7)) % 9) - 4) * 0.012;
+      const tx       = base.x + (ox + jx) * HEX_SIZE;
+      const tz       = base.z + (oz + jz) * HEX_SIZE;
       const ty       = base.y;
 
       const trunkH = HEX_SIZE * 0.18 * scale;
@@ -479,19 +486,28 @@ function buildGrass(tiles: Tile[]): void {
 function buildFarms(tiles: Tile[]): void {
   if (tiles.length === 0) return;
 
-  const geom = new BoxGeometry(HEX_SIZE * 0.40, HEX_SIZE * 0.05, HEX_SIZE * 0.28);
-  const mat  = new MeshLambertMaterial({ color: new Color(0x4e7832) });
-  const mesh = new InstancedMesh(geom, mat, tiles.length);
+  // Civ V farms read as golden wheat strips, not slabs: the old single
+  // 0x4e7832 box was darker than the grass and pockmarked every plains
+  // span with green rectangles. Two thin wheat strips per farm, rotated
+  // together by the coord hash.
+  const geom = new BoxGeometry(HEX_SIZE * 0.40, HEX_SIZE * 0.045, HEX_SIZE * 0.13);
+  const mat  = new MeshLambertMaterial({ color: new Color(0xbfa14f) });
+  const mesh = new InstancedMesh(geom, mat, tiles.length * 2);
 
   const m = new Matrix4();
-  tiles.forEach((tile, i) => {
+  const one = new Vector3(1, 1, 1);
+  let idx = 0;
+  for (const tile of tiles) {
     const elev = terrainElevation(tile.terrain);
     const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
     const h    = hashCoord(tile.coord.q, tile.coord.r);
     const rot  = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), (h % 12) * (Math.PI / 6));
-    m.compose(new Vector3(pos.x, pos.y + 1.0, pos.z), rot, new Vector3(1, 1, 1));
-    mesh.setMatrixAt(i, m.clone());
-  });
+    for (const s of [-1, 1]) {
+      const off = new Vector3(0, 0, s * HEX_SIZE * 0.085).applyQuaternion(rot);
+      m.compose(new Vector3(pos.x + off.x, pos.y + 1.0, pos.z + off.z), rot, one);
+      mesh.setMatrixAt(idx++, m.clone());
+    }
+  }
   mesh.instanceMatrix.needsUpdate = true;
   addMesh(mesh);
 }
