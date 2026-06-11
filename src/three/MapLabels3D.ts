@@ -38,6 +38,28 @@ function makeLabel(text: string, className: string): CSS2DObject {
   return obj;
 }
 
+function makeCityBanner(city: { name: string; population: number; isCapital: boolean }): CSS2DObject {
+  const root = document.createElement('div');
+  root.className = city.isCapital
+    ? 'map-label-banner map-label-banner-capital'
+    : 'map-label-banner';
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'map-label-banner-name';
+  nameEl.textContent = city.isCapital ? `★ ${city.name}` : city.name;
+
+  const popEl = document.createElement('div');
+  popEl.className = 'map-label-banner-pop';
+  popEl.textContent = String(city.population);
+
+  root.appendChild(nameEl);
+  root.appendChild(popEl);
+
+  const obj = new CSS2DObject(root);
+  obj.center.set(0.5, 1);
+  return obj;
+}
+
 function clearLabels(): void {
   while (labelGroup.children.length > 0) {
     labelGroup.remove(labelGroup.children[0]!);
@@ -46,7 +68,7 @@ function clearLabels(): void {
 
 function labelSignature(state: GameState, lod: string, show: boolean): string {
   if (!show) return 'off';
-  return `${lod}:${state.world.cities.map((c) => `${c.id}:${c.name}`).join('|')}`;
+  return `${lod}:${state.world.cities.map((c) => `${c.id}:${c.name}:${c.population}`).join('|')}`;
 }
 
 export function rebuildMapLabels(
@@ -72,8 +94,7 @@ export function rebuildMapLabels(
     const pos = axialToWorld3D(city.coord.q, city.coord.r, elev);
     pos.y += HEX_SIZE * 0.35;
 
-    const name = city.isCapital ? `★ ${city.name}` : city.name;
-    const label = makeLabel(name, city.isCapital ? 'map-label map-label-capital' : 'map-label');
+    const label = makeCityBanner(city);
     label.position.copy(pos);
     labelGroup.add(label);
 
