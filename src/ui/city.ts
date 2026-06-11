@@ -147,7 +147,7 @@ export function openCityPanel(
                 ? 'var(--civ-happiness)'
                 : 'var(--text-primary)';
           const pct = b.state === 'building' ? ` (${Math.round(b.progress)}%)` : '';
-          return `<div class="city-item" style="color:${color}">${icon} ${esc(b.name)}${pct}</div>`;
+          return `<div class="city-item" style="color:${color}" title="${esc(b.name)}${pct}">${icon} ${esc(b.name)}${pct}</div>`;
         })
         .join('');
     }
@@ -194,7 +194,7 @@ async function fetchCityGit(repoName: string) {
               : code === 'D'
                 ? 'var(--civ-happiness)'
                 : 'var(--text-dim)';
-        return `<div class="city-item" style="color:${color}">${esc(c)}</div>`;
+        return `<div class="city-item" style="color:${color}" title="${esc(c)}">${esc(c)}</div>`;
       }),
     ].join('');
   } catch {
@@ -264,7 +264,7 @@ async function fetchCityFiles(repoName: string) {
         ? '<div class="city-item" style="color:var(--text-dim)">vacío</div>'
         : data.files
             .slice(0, 12)
-            .map((f) => `<div class="city-item" style="padding:1px 0">${esc(f)}</div>`)
+            .map((f) => `<div class="city-item" style="padding:1px 0" title="${esc(f)}">${esc(f)}</div>`)
             .join('');
   } catch {
     filesEl.innerHTML =
