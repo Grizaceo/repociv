@@ -24,7 +24,7 @@ import { type GameState } from '../game.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { sharedHexGeometry } from './hexGeometry.ts';
-import { axialToWorld3D, hexCornerAngle3D } from './axialToWorld3D.ts';
+import { axialToWorld3D, hexCornerAngle3D, TILE_HEIGHT } from './axialToWorld3D.ts';
 import { instanceColorForTile } from './FogOfWar3D.ts';
 import { HexPicker } from './HexPicker.ts';
 import {
@@ -130,20 +130,12 @@ export function createHexWorldScene(): Scene {
   return scene;
 }
 
-function hexEdgeMidpoint(
-  coord: Axial,
-  edgeIndex: number,
-  elev: number,
-): [number, number, number] {
-  const center = axialToWorld3D(coord.q, coord.r, elev);
-  const a = hexCornerAngle3D(edgeIndex);
-  const b = hexCornerAngle3D((edgeIndex + 1) % 6);
-  const x =
-    center.x + (HEX_SIZE * Math.cos(a) + HEX_SIZE * Math.cos(b)) * 0.5;
-  const z =
-    center.z + (HEX_SIZE * Math.sin(a) + HEX_SIZE * Math.sin(b)) * 0.5;
-  return [x, center.y + 1.5, z];
-}
+/** Edge index (corner pair e, e+1 with flat-top corners at 60i°) facing
+ *  AXIAL_DIRECTIONS[k]. Edge i is centered at 60i+30°; the direction angles
+ *  are 30°, −30°, −90°, 210°, 150°, 90° respectively. Passing the direction
+ *  index straight through as an edge index (the old behavior) put territory
+ *  borders and foam on the wrong side of the hex for 5 of 6 directions. */
+const DIR_TO_EDGE = [0, 5, 4, 3, 2, 1] as const;
 
 /** Determine dominant neighbor terrain for edge blending. */
 function dominantNeighborTerrain(
@@ -207,9 +199,15 @@ function rebuildTerritoryLines(
         } else if (inTerritory.has(nKey)) {
           continue;
         }
-        const [x1, y1, z1] = hexEdgeMidpoint(coord, d, elev);
-        const [x2, y2, z2] = hexEdgeMidpoint(coord, (d + 1) % 6, elev);
-        segments.push(x1, y1, z1, x2, y2, z2);
+        // True shared edge facing direction d (Civ V borders hug the hex).
+        const e = DIR_TO_EDGE[d]!;
+        const center = axialToWorld3D(coord.q, coord.r, elev);
+        const a1 = hexCornerAngle3D(e);
+        const a2 = hexCornerAngle3D((e + 1) % 6);
+        segments.push(
+          center.x + HEX_SIZE * Math.cos(a1), center.y + 1.5, center.z + HEX_SIZE * Math.sin(a1),
+          center.x + HEX_SIZE * Math.cos(a2), center.y + 1.5, center.z + HEX_SIZE * Math.sin(a2),
+        );
       }
     }
   }
@@ -345,9 +343,10 @@ function rebuildFoam(state: GameState, _animTime: number): void {
       const neighbor = getTile({ q: tile.coord.q + d.q, r: tile.coord.r + d.r });
       if (!neighbor || neighbor.terrain === 'ocean') continue;
 
-      // Foam at edge midpoints
-      const a = hexCornerAngle3D(i);
-      const b = hexCornerAngle3D((i + 1) % 6);
+      // Foam at the midpoint of the edge actually facing this neighbor
+      const e = DIR_TO_EDGE[i]!;
+      const a = hexCornerAngle3D(e);
+      const b = hexCornerAngle3D((e + 1) % 6);
       const mx = center.x + (HEX_SIZE * Math.cos(a) + HEX_SIZE * Math.cos(b)) * 0.5;
       const mz = center.z + (HEX_SIZE * Math.sin(a) + HEX_SIZE * Math.sin(b)) * 0.5;
       foamPositions.push({ x: mx, y: center.y + 1.0, z: mz });
@@ -449,46 +448,40 @@ function rebuildHexGrid(state: GameState, visible: boolean, lod: 'low' | 'medium
   }
   if (!visible) return;
 
-  // Build a Set of canonical edge keys so each interior edge is drawn once.
-  const edges = new Set<string>();
-
-  const edgeKey = (q1: number, r1: number, q2: number, r2: number): string => {
-    const a = `${q1},${r1}`;
-    const b = `${q2},${r2}`;
-    return a < b ? `${a}↔${b}` : `${b}↔${a}`;
-  };
+  // Civ V grid = actual hex outlines. The old implementation pushed
+  // center-to-center segments — a triangular lattice crossing every tile
+  // face, which read as seams on flat ocean. Draw each tile's real edges
+  // instead, deduped so interior edges render once.
+  const segments: number[] = [];
+  const drawn = new Set<string>();
+  const getTile = (c: Axial) => state.world.tiles.get(tileKey(c));
 
   for (const tile of tiles) {
     if (!tile.revealed) continue;
-    const q = tile.coord.q, r = tile.coord.r;
-    edges.add(edgeKey(q, r, q + 1, r));
-    edges.add(edgeKey(q, r, q, r - 1));
-    edges.add(edgeKey(q, r, q - 1, r - 1));
-    edges.add(edgeKey(q, r, q - 1, r));
-    edges.add(edgeKey(q, r, q, r + 1));
-    edges.add(edgeKey(q, r, q + 1, r + 1));
-  }
-
-  const segments: number[] = [];
-  for (const key of edges) {
-    const [a, b] = key.split('↔');
-    if (!a || !b) continue;
-    const [q1s, r1s] = a.split(',');
-    const [q2s, r2s] = b.split(',');
-    if (!q1s || !r1s || !q2s || !r2s) continue;
-    const q1 = Number(q1s), r1 = Number(r1s), q2 = Number(q2s), r2 = Number(r2s);
-    if (isNaN(q1) || isNaN(r1) || isNaN(q2) || isNaN(r2)) continue;
-    const t1 = state.world.tiles.get(tileKey({ q: q1, r: r1 }))!;
-    const t2 = state.world.tiles.get(tileKey({ q: q2, r: r2 }));
-    if (t1 !== undefined && !t1.revealed) continue;
-    if (t2 !== undefined && !t2.revealed) continue;
-    const elev1 = t1 !== undefined ? terrainElevation(t1.terrain) : 0;
-    const elev2 = t2 !== undefined ? terrainElevation(t2.terrain) : 0;
-    const e = Math.max(elev1, elev2) + 0.3;
-
-    const c1 = axialToWorld3D(q1, r1, elev1);
-    const c2 = axialToWorld3D(q2, r2, elev2);
-    segments.push(c1.x, c1.y + e - elev1, c1.z, c2.x, c2.y + e - elev2, c2.z);
+    const elev = terrainElevation(tile.terrain);
+    const center = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    for (let d = 0; d < 6; d++) {
+      const nCoord = {
+        q: tile.coord.q + AXIAL_DIRECTIONS[d]!.q,
+        r: tile.coord.r + AXIAL_DIRECTIONS[d]!.r,
+      };
+      const nKey = tileKey(nCoord);
+      const selfKey = tileKey(tile.coord);
+      const ek = selfKey < nKey ? `${selfKey}|${nKey}` : `${nKey}|${selfKey}`;
+      if (drawn.has(ek)) continue;
+      drawn.add(ek);
+      const n = getTile(nCoord);
+      // Lines sit on the higher tile's top so steps don't bury them.
+      const nElev = n ? terrainElevation(n.terrain) : elev;
+      const y = Math.max(elev, nElev) * TILE_HEIGHT + 1.5;
+      const e = DIR_TO_EDGE[d]!;
+      const a1 = hexCornerAngle3D(e);
+      const a2 = hexCornerAngle3D((e + 1) % 6);
+      segments.push(
+        center.x + HEX_SIZE * Math.cos(a1), y, center.z + HEX_SIZE * Math.sin(a1),
+        center.x + HEX_SIZE * Math.cos(a2), y, center.z + HEX_SIZE * Math.sin(a2),
+      );
+    }
   }
 
   if (segments.length === 0) return;

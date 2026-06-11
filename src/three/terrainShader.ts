@@ -251,10 +251,12 @@ float terrainDetailNoise(vec2 p) {
             tex = mix(vec3(lum), tex, 0.78);
             tex = mix(tex, vec3(0.80, 0.71, 0.50), 0.30);
           }
-          // Sacred should feel special, not neon enough to dominate the whole map.
+          // Sacred: Civ V natural-wonder feel — pale gilded stone. The raw
+          // cell (and the #1e1530 palette) read as dark violet bruises that
+          // dominated every overview shot.
           if (tidx > 6.5) {
-            tex = mix(vec3(dot(tex, vec3(0.299, 0.587, 0.114))), tex, 0.82);
-            tex *= 0.82;
+            float slum = dot(tex, vec3(0.299, 0.587, 0.114));
+            tex = mix(tex, vec3(0.85, 0.77, 0.55) * (0.55 + 0.9 * slum), 0.78);
           }
           // Neighbour biome blend at hex edges
           float edgeBlend = smoothstep(0.58, 0.96, radial);
@@ -270,8 +272,8 @@ float terrainDetailNoise(vec2 p) {
               nTex = mix(nTex, vec3(0.80, 0.71, 0.50), 0.30);
             }
             if (ntidx > 6.5) {
-              nTex = mix(vec3(dot(nTex, vec3(0.299, 0.587, 0.114))), nTex, 0.82);
-              nTex *= 0.82;
+              float nslum = dot(nTex, vec3(0.299, 0.587, 0.114));
+              nTex = mix(nTex, vec3(0.85, 0.77, 0.55) * (0.55 + 0.9 * nslum), 0.78);
             }
             bool mountainForestPair =
               ((tidx > 1.5 && tidx < 2.5) && (ntidx > 0.5 && ntidx < 1.5)) ||
@@ -299,7 +301,11 @@ float terrainDetailNoise(vec2 p) {
           } else if (tidx < 6.5) {
             tex *= mix(0.985, 1.025, detail);
           }
-          diffuseColor.rgb = mix(diffuseColor.rgb, tex, 0.82);
+          // Sacred's palette fill (#1e1530) is near-black: at the default 0.82
+          // mix its 18% leak still muddies the gilded look, so let the atlas
+          // win almost completely there.
+          float texMix = (tidx > 6.5) ? 0.93 : 0.82;
+          diffuseColor.rgb = mix(diffuseColor.rgb, tex, texMix);
         }
         // Radial vignette — very subtle
         if (vTopFace > 0.5) {
@@ -439,7 +445,7 @@ float terrainDetailNoise(vec2 p) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v19';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v20';
   return mat;
 }
 
