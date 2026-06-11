@@ -1,5 +1,5 @@
 {
-  "version": 30,
+  "version": 31,
   "kind": "repociv-3d-terrain-atlas",
   "texture": "/assets/3d/terrain-atlas-3d.png",
   "normalTexture": "/assets/3d/terrain-normal-atlas-3d.png",

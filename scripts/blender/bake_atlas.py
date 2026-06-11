@@ -516,8 +516,10 @@ def biome_ocean(nt, coord, seed, variant):
 
 def biome_mountain(nt, coord, seed, variant):
     m = _mapping(nt, coord, seed, variant, rotate=False)
-    # Horizontal strata (gap #2): wide-brick rows, distorted by noise so
-    # the bands read as rock layers, not wallpaper.
+    # Vertical fracture lines (gap #5): tall narrow bricks produce
+    # crack-like vertical strata — in UV space X=Width, Y=Height,
+    # so tall brick = Width < Height. Civ V mountain ridges run
+    # downslope (vertical on the hex), not horizontal.
     nd = _noise(nt, m.outputs['Vector'], 4.0, 3.0)
     sc = nt.nodes.new('ShaderNodeVectorMath')
     sc.operation = 'SCALE'
@@ -529,8 +531,8 @@ def biome_mountain(nt, coord, seed, variant):
     nt.links.new(dv.inputs[1], sc.outputs['Vector'])
     brick = nt.nodes.new('ShaderNodeTexBrick')
     brick.inputs['Scale'].default_value = 8.0
-    brick.inputs['Brick Width'].default_value = 4.0
-    brick.inputs['Row Height'].default_value = 0.5
+    brick.inputs['Brick Width'].default_value = 0.5
+    brick.inputs['Row Height'].default_value = 4.0
     brick.inputs['Mortar Size'].default_value = 0.05
     brick.inputs['Mortar Smooth'].default_value = 0.3
     brick.inputs['Color1'].default_value = (0.42, 0.40, 0.38, 1)
@@ -784,19 +786,20 @@ def _composite(group_letter: str, terrains: list[str],
         if not path.exists():
             print(f"[DAVI] skip (missing): {path}")
             return
-        im = Image.open(path).convert("RGBA")
+        # Re-load in case a prior paste left the file in a bad state
+        try:
+            im = Image.open(path).convert("RGBA")
+            im.load()
+        except (OSError, EOFError) as e:
+            print(f"[DAVI] PNG truncated, re-creating blank: {e}")
+            im = Image.new("RGBA", (meta["columns"] * out_res, meta["rows"] * out_res), (0, 0, 0, 255))
         for t in terrains:
             cell_meta = meta["terrains"][t]
             x0, y0, _, _ = cell_meta["rect"]
             bk = Image.open(bake_dir / f"{t}{suffix}.png").convert("RGBA")
             bk = bk.resize((out_res, out_res), Image.LANCZOS)
             if quantize:
-                # Normal cells: quantize to 6 bits/channel (centered).
-                # Error is ±2/255 on a perturbation the shader scales by
-                # 0.55 — invisible — and the PNG compresses ~2x better,
-                # which keeps the 3-atlas total inside the 6MB budget.
                 bk = bk.point(lambda v: min(255, (v // 4) * 4 + 2))
-            # PIL coordinate system: row 0 is top. Manifest also uses top-left.
             im.paste(bk, (x0, y0, x0 + out_res, y0 + out_res))
         im.save(path, optimize=True)
         print(f"[DAVI] wrote {path} ({(path.stat().st_size)/1024:.1f} KB)")
