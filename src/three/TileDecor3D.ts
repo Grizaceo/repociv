@@ -18,6 +18,7 @@ import { type GameState } from '../game.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { areMountainPropsReady } from './MountainProps3D.ts';
+import { areForestPropsReady } from './ForestProps3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 
 const decorGroup = new Group();
@@ -528,7 +529,7 @@ export function rebuildTileDecor(
 
   // Props readiness participates: when the mountain glbs land, the cones
   // must rebuild out of the decor set even though the tiles didn't change.
-  const signature = `${lod}:m${areMountainPropsReady() ? 1 : 0}:${decorSignature(tiles)}`;
+  const signature = `${lod}:m${areMountainPropsReady() ? 1 : 0}:f${areForestPropsReady() ? 1 : 0}:${decorSignature(tiles)}`;
   if (signature === lastSignature) return;
   lastSignature = signature;
 
@@ -553,7 +554,7 @@ export function rebuildTileDecor(
         if (!areMountainPropsReady()) mountains.push({ tile, variant: h });
         break;
       case 'forest':
-        forests.push(tile);
+        if (!areForestPropsReady()) forests.push(tile);
         break;
       case 'hills':
         hills.push(tile);

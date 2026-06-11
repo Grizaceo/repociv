@@ -208,6 +208,20 @@ async function main() {
         { timeout: 15_000 },
       )
       .catch(() => console.error('[AUDIT] mountain props never settled — capturing anyway'));
+    await page
+      .waitForFunction(
+        () => window.__repocivDebug?.areForestPropsSettled?.() !== false,
+        null,
+        { timeout: 15_000 },
+      )
+      .catch(() => console.error('[AUDIT] forest props never settled — capturing anyway'));
+    await page
+      .waitForFunction(
+        () => window.__repocivDebug?.areCityPropsSettled?.() !== false,
+        null,
+        { timeout: 15_000 },
+      )
+      .catch(() => console.error('[AUDIT] city props never settled — capturing anyway'));
     // Fixed settle time: a few frames to compile shaders, run the first
     // dirty rebuild with the atlas-backed material, and settle CSS2D labels.
     await page.waitForTimeout(1500);

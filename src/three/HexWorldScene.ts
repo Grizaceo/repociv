@@ -63,6 +63,19 @@ import {
   rebuildMountainProps,
   clearMountainProps,
 } from './MountainProps3D.ts';
+import {
+  getForestPropsGroup,
+  ensureForestPropsLoad,
+  rebuildForestProps,
+  clearForestProps,
+} from './ForestProps3D.ts';
+import {
+  getCityPropsGroup,
+  ensureCityPropsLoad,
+  rebuildCityProps,
+  clearCityProps,
+} from './CityProps3D.ts';
+import { getTileYieldsGroup, rebuildTileYields, clearTileYields } from './TileYields3D.ts';
 import { getRiverGroup, rebuildRivers, clearRivers } from './Rivers3D.ts';
 import { createSkyDome, disposeSkyDome } from './SkyDome3D.ts';
 
@@ -81,7 +94,10 @@ terrainGroup.name = 'terrain';
 let terrainMesh: InstancedMesh | null = null;
 let fogCoverMesh: InstancedMesh | null = null;
 let fogCoverSignature = '';
-let territoryLines: LineSegments | null = null;
+let territoryInner: LineSegments | null = null;
+let territoryCapitalInner: LineSegments | null = null;
+let territoryGlow: LineSegments | null = null;
+let territoryLod: 'low' | 'medium' | 'high' = 'medium';
 let shorelineRings: LineSegments | null = null;
 let shorelineSignature = '';
 // Per-vertex base data for the in-place pulse: [cx, cy, cz, ux, uz] × vertex.
@@ -123,7 +139,10 @@ export function createHexWorldScene(): Scene {
   scene.add(getRiverGroup());
   scene.add(getTileDecorGroup());
   scene.add(getMountainPropsGroup());
+  scene.add(getForestPropsGroup());
   scene.add(getCityGroup());
+  scene.add(getCityPropsGroup());
+  scene.add(getTileYieldsGroup());
   scene.add(getUnitGroup());
   scene.add(getLabelGroup());
 
@@ -132,6 +151,8 @@ export function createHexWorldScene(): Scene {
   // ThreeMapRenderer dirty signature — the next frame rebuilds decor (cones
   // out) and instances the glTF peaks.
   ensureMountainPropsLoad();
+  ensureForestPropsLoad();
+  ensureCityPropsLoad();
 
   return scene;
 }
@@ -165,31 +186,59 @@ function dominantNeighborTerrain(
   return best;
 }
 
+function clearTerritoryLines(): void {
+  for (const line of [territoryInner, territoryCapitalInner, territoryGlow]) {
+    if (!line) continue;
+    terrainGroup.remove(line);
+    line.geometry.dispose();
+    (line.material as LineBasicMaterial).dispose();
+  }
+  territoryInner = null;
+  territoryCapitalInner = null;
+  territoryGlow = null;
+}
+
+function animateTerritoryPulse(animTime: number): void {
+  if (!territoryInner && !territoryCapitalInner && !territoryGlow) return;
+  const pulse = 0.90 + 0.06 * Math.sin(animTime * 2.2);
+  if (territoryInner) {
+    const mat = territoryInner.material as LineBasicMaterial;
+    mat.opacity = (territoryLod === 'high' ? 0.45 : 0.38) * pulse;
+  }
+  if (territoryCapitalInner) {
+    const mat = territoryCapitalInner.material as LineBasicMaterial;
+    mat.opacity = (territoryLod === 'high' ? 0.50 : 0.42) * pulse;
+  }
+  if (territoryGlow) {
+    const mat = territoryGlow.material as LineBasicMaterial;
+    mat.opacity = 0.12 * pulse;
+  }
+}
+
 function rebuildTerritoryLines(
   state: GameState,
-  animTime: number,
+  _animTime: number,
   visible: boolean,
   lod: 'low' | 'medium' | 'high',
 ): void {
-  if (territoryLines) {
-    terrainGroup.remove(territoryLines);
-    territoryLines.geometry.dispose();
-    (territoryLines.material as LineBasicMaterial).dispose();
-    territoryLines = null;
-  }
+  clearTerritoryLines();
   if (!visible) return;
+  territoryLod = lod;
 
   const allTerritory = new Set<string>();
   for (const city of state.world.cities) {
     for (const c of city.territory) allTerritory.add(tileKey(c));
   }
 
-  const segments: number[] = [];
+  const normalInner: number[] = [];
+  const capitalInner: number[] = [];
+  const glowSegments: number[] = [];
   const getTile = (c: Axial) => state.world.tiles.get(tileKey(c));
 
   for (const city of state.world.cities) {
     if (city.territory.length === 0) continue;
     const inTerritory = new Set(city.territory.map((c) => tileKey(c)));
+    const innerSegments = city.isCapital ? capitalInner : normalInner;
 
     for (const coord of city.territory) {
       const tile = getTile(coord);
@@ -205,32 +254,73 @@ function rebuildTerritoryLines(
         } else if (inTerritory.has(nKey)) {
           continue;
         }
-        // True shared edge facing direction d (Civ V borders hug the hex).
         const e = DIR_TO_EDGE[d]!;
         const center = axialToWorld3D(coord.q, coord.r, elev);
         const a1 = hexCornerAngle3D(e);
         const a2 = hexCornerAngle3D((e + 1) % 6);
-        segments.push(
-          center.x + HEX_SIZE * Math.cos(a1), center.y + 1.5, center.z + HEX_SIZE * Math.sin(a1),
-          center.x + HEX_SIZE * Math.cos(a2), center.y + 1.5, center.z + HEX_SIZE * Math.sin(a2),
+        const x1 = center.x + HEX_SIZE * Math.cos(a1);
+        const z1 = center.z + HEX_SIZE * Math.sin(a1);
+        const x2 = center.x + HEX_SIZE * Math.cos(a2);
+        const z2 = center.z + HEX_SIZE * Math.sin(a2);
+        const y = center.y + 1.5;
+        innerSegments.push(x1, y, z1, x2, y, z2);
+        const mx = (x1 + x2) * 0.5;
+        const mz = (z1 + z2) * 0.5;
+        const dx = mx - center.x;
+        const dz = mz - center.z;
+        const len = Math.hypot(dx, dz) || 1;
+        const push = HEX_SIZE * 0.02;
+        glowSegments.push(
+          x1 + (dx / len) * push, y, z1 + (dz / len) * push,
+          x2 + (dx / len) * push, y, z2 + (dz / len) * push,
         );
       }
     }
   }
 
-  if (segments.length === 0) return;
+  if (normalInner.length === 0 && capitalInner.length === 0) return;
 
-  const pulse = 0.90 + 0.06 * Math.sin(animTime * 2.2);
-  const geom = new BufferGeometry();
-  geom.setAttribute('position', new Float32BufferAttribute(segments, 3));
-  const mat = new LineBasicMaterial({
-    color: new Color(0xb99654).multiplyScalar(pulse),
-    transparent: true,
-    opacity: lod === 'high' ? 0.08 : 0.06,
-    linewidth: 2,
-  });
-  territoryLines = new LineSegments(geom, mat);
-  terrainGroup.add(territoryLines);
+  if (normalInner.length > 0) {
+    const innerGeom = new BufferGeometry();
+    innerGeom.setAttribute('position', new Float32BufferAttribute(normalInner, 3));
+    territoryInner = new LineSegments(
+      innerGeom,
+      new LineBasicMaterial({
+        color: new Color(0xb99654),
+        transparent: true,
+        opacity: lod === 'high' ? 0.45 : 0.38,
+        linewidth: 2,
+      }),
+    );
+    terrainGroup.add(territoryInner);
+  }
+  if (capitalInner.length > 0) {
+    const capGeom = new BufferGeometry();
+    capGeom.setAttribute('position', new Float32BufferAttribute(capitalInner, 3));
+    territoryCapitalInner = new LineSegments(
+      capGeom,
+      new LineBasicMaterial({
+        color: new Color(0xf0d060),
+        transparent: true,
+        opacity: lod === 'high' ? 0.50 : 0.42,
+        linewidth: 2,
+      }),
+    );
+    terrainGroup.add(territoryCapitalInner);
+  }
+
+  const glowGeom = new BufferGeometry();
+  glowGeom.setAttribute('position', new Float32BufferAttribute(glowSegments, 3));
+  territoryGlow = new LineSegments(
+    glowGeom,
+    new LineBasicMaterial({
+      color: new Color(0xf0d060),
+      transparent: true,
+      opacity: 0.12,
+      linewidth: 3,
+    }),
+  );
+  terrainGroup.add(territoryGlow);
 }
 
 /** Shoreline rings: rebuild geometry only when ocean tiles change.
@@ -675,6 +765,7 @@ export function updateHexWorldScene(
   // revealed — are covered by the world signature); the pulse animation
   // runs every frame, allocation-free. Foam is purely state-driven.
   rebuildShorelineRings(state, opts.animTime, stateDirty);
+  animateTerritoryPulse(opts.animTime);
   if (stateDirty) rebuildFoam(state, opts.animTime);
 
   // State-driven rebuilds: only when the world actually changed. These
@@ -691,12 +782,13 @@ export function updateHexWorldScene(
   rebuildTileDecor(Array.from(state.world.tiles.values()), opts.lod, state);
   // Mountain silhouettes are terrain, not toggleable decor — always visible.
   rebuildMountainProps(Array.from(state.world.tiles.values()));
-  // Rivers are terrain too: derived deterministically from the tile layout,
-  // rebuilt only when terrain/revealed change (signature inside the module).
+  rebuildForestProps(Array.from(state.world.tiles.values()));
   rebuildRivers(state.world.tiles);
 
   setCitiesVisible(opts.showStructure);
   rebuildCityClusters(state.world.cities, (key) => state.world.tiles.get(key), opts.lod);
+  rebuildCityProps(state.world.cities, (key) => state.world.tiles.get(key), opts.lod);
+  rebuildTileYields(Array.from(state.world.tiles.values()), opts.lod, opts.showStructure);
 
   setUnitsVisible(true);
   rebuildUnits(state.world.units, (key) => state.world.tiles.get(key));
@@ -707,6 +799,9 @@ export function updateHexWorldScene(
 export function disposeHexWorldScene(scene: Scene): void {
   clearTileDecor();
   clearMountainProps();
+  clearForestProps();
+  clearCityProps();
+  clearTileYields();
   clearRivers();
   disposeSkyDome();
   clearCityClusters();
@@ -721,12 +816,7 @@ export function disposeHexWorldScene(scene: Scene): void {
     fogCoverMesh.dispose();
     fogCoverMesh = null;
   }
-  if (territoryLines) {
-    terrainGroup.remove(territoryLines);
-    territoryLines.geometry.dispose();
-    (territoryLines.material as LineBasicMaterial).dispose();
-    territoryLines = null;
-  }
+  clearTerritoryLines();
   if (shorelineRings) {
     terrainGroup.remove(shorelineRings);
     shorelineRings.geometry.dispose();

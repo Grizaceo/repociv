@@ -22,6 +22,8 @@ import {
 } from './HexWorldScene.ts';
 import { HexPicker } from './HexPicker.ts';
 import { areMountainPropsReady } from './MountainProps3D.ts';
+import { areForestPropsReady } from './ForestProps3D.ts';
+import { areCityPropsReady } from './CityProps3D.ts';
 import { axialToWorld3D, hexCornerAngle3D } from './axialToWorld3D.ts';
 import { initLabelRenderer, renderLabels, disposeLabels } from './MapLabels3D.ts';
 import { updateSkyDome } from './SkyDome3D.ts';
@@ -117,7 +119,9 @@ export class ThreeMapRenderer {
       computeWorldSignature(state) +
       `@${opts.lod}:${opts.fogEnabled ? 1 : 0}:${opts.showStructure ? 1 : 0}:${opts.showOps ? 1 : 0}:${opts.showLabels ? 1 : 0}` +
       `:atlas${isTerrainAtlasReady() ? 1 : 0}` +
-      `:mprops${areMountainPropsReady() ? 1 : 0}`;
+      `:mprops${areMountainPropsReady() ? 1 : 0}` +
+      `:fprops${areForestPropsReady() ? 1 : 0}` +
+      `:cprops${areCityPropsReady() ? 1 : 0}`;
     const stateDirty = tileSignature !== this.lastTileSignature;
     this.lastTileSignature = tileSignature;
 

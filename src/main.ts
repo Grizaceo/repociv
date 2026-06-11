@@ -62,6 +62,8 @@ import { clearChat } from './ui/chat.ts';
 import { openOnboardingPanel } from './ui/onboardingPanel.ts';
 import { axialToPixel } from './hex.ts';
 import { areMountainPropsSettled } from './three/MountainProps3D.ts';
+import { areForestPropsSettled } from './three/ForestProps3D.ts';
+import { areCityPropsSettled } from './three/CityProps3D.ts';
 import {
   setRendererRef,
   notifyTilePicked,
@@ -117,6 +119,8 @@ type RepoCivDebugApi = {
   openLocalView: (cityId: string) => boolean;
   isTerrainAtlasReady: () => boolean;
   areMountainPropsSettled: () => boolean;
+  areForestPropsSettled: () => boolean;
+  areCityPropsSettled: () => boolean;
   getWebGLMetrics: () => { frameTimeAvg: number; frameCount: number; dirtyRatePct: number } | null;
   getTileStats: () => {
     total: number;
@@ -399,6 +403,8 @@ async function bootstrap() {
     // Settled (ready OR failed): capture scripts wait on this so a golden
     // never races the async mountain-glb load.
     areMountainPropsSettled: () => areMountainPropsSettled(),
+    areForestPropsSettled: () => areForestPropsSettled(),
+    areCityPropsSettled: () => areCityPropsSettled(),
     getWebGLMetrics: () => renderer.getWebGLMetrics(),
     getTileStats: () => {
       const byTerrain: Record<string, number> = {};

@@ -17,6 +17,7 @@ import { type City, type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+import { areCityPropsReady } from './CityProps3D.ts';
 
 const cityGroup = new Group();
 cityGroup.name = 'cities';
@@ -201,9 +202,8 @@ export function rebuildCityClusters(
     cityGroup.add(towerMesh);
   }
 
-  // ── Capitals: larger buildings + dome + complex walls + towers + star ────────
-  // Same stone/stucco palette as normal cities, but grander scale.
-  if (capitals.length > 0) {
+  // ── Capitals: glTF prop when loaded; procedural fallback otherwise ─────────
+  if (capitals.length > 0 && !areCityPropsReady()) {
     const bldGeom = new BoxGeometry(HEX_SIZE * 0.20, HEX_SIZE * 0.55, HEX_SIZE * 0.20);
     const bldMat = new MeshStandardMaterial({
       color: new Color(0xd4c8b8),
