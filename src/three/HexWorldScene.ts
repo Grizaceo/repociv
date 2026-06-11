@@ -63,6 +63,7 @@ import {
   rebuildMountainProps,
   clearMountainProps,
 } from './MountainProps3D.ts';
+import { getRiverGroup, rebuildRivers, clearRivers } from './Rivers3D.ts';
 
 export interface HexSceneRenderOptions {
   fogEnabled: boolean;
@@ -115,6 +116,7 @@ export function createHexWorldScene(): Scene {
   scene.add(fillLight);
 
   scene.add(terrainGroup);
+  scene.add(getRiverGroup());
   scene.add(getTileDecorGroup());
   scene.add(getMountainPropsGroup());
   scene.add(getCityGroup());
@@ -643,6 +645,9 @@ export function updateHexWorldScene(
   rebuildTileDecor(Array.from(state.world.tiles.values()), opts.lod, state);
   // Mountain silhouettes are terrain, not toggleable decor — always visible.
   rebuildMountainProps(Array.from(state.world.tiles.values()));
+  // Rivers are terrain too: derived deterministically from the tile layout,
+  // rebuilt only when terrain/revealed change (signature inside the module).
+  rebuildRivers(state.world.tiles);
 
   setCitiesVisible(opts.showStructure);
   rebuildCityClusters(state.world.cities, (key) => state.world.tiles.get(key), opts.lod);
@@ -656,6 +661,7 @@ export function updateHexWorldScene(
 export function disposeHexWorldScene(scene: Scene): void {
   clearTileDecor();
   clearMountainProps();
+  clearRivers();
   clearCityClusters();
   clearUnits();
   if (terrainMesh) {

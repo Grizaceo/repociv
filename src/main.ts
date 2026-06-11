@@ -99,6 +99,7 @@ import {
   isCleanMode,
 } from './ui/layerPanel.ts';
 import { resolveInitialRenderMode } from './three/renderMode.ts';
+import { computeRiverPaths } from './three/Rivers3D.ts';
 import { HEX_SIZE } from './constants.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
@@ -124,6 +125,13 @@ type RepoCivDebugApi = {
     samplePos: Record<string, { x: number; y: number }>;
     cleanSamplePos: Record<string, { x: number; y: number }>;
   };
+  /** River layout probe: path lengths + world-space midpoints (camera targets). */
+  getRiverStats: () => Array<{
+    tiles: number;
+    hasMouth: boolean;
+    mid: { x: number; z: number };
+    mouth: { x: number; z: number } | null;
+  }>;
   queueLocalMission: (filePath: string, fileName: string, unitId?: string) => boolean;
   getLocalUnits: () => Array<{
     id: string;
@@ -432,6 +440,16 @@ async function bootstrap() {
       }
       return { total: state.world.tiles.size, revealed, byTerrain, samplePos, cleanSamplePos };
     },
+    getRiverStats: () =>
+      computeRiverPaths(state.world.tiles).map((p) => {
+        const mid = p.points[Math.floor(p.points.length / 2)]!;
+        return {
+          tiles: p.points.length,
+          hasMouth: p.mouth !== null,
+          mid: { x: Math.round(mid.x), z: Math.round(mid.z) },
+          mouth: p.mouth ? { x: Math.round(p.mouth.x), z: Math.round(p.mouth.z) } : null,
+        };
+      }),
     openLocalView: (cityId: string) => {
       const city = state.world.cities.find((item) => item.id === cityId && !item.isCapital);
       if (!city) return false;

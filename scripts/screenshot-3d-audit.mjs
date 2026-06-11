@@ -96,6 +96,13 @@ const CAMERAS = [
   // lifts fog of war so the rim biomes are actually rendered.
   { name: '05-ocean-closeup',  cam: '-1326,-2207,2.2', reveal: true },
   { name: '06-desert-mountain-closeup', cam: '117,157,1.6', reveal: true },
+  // 07: river ribbon (iter7). Coords = midpoint of the longest river for the
+  // FIXED_SEED world, from __repocivDebug.getRiverStats(). Stable while the
+  // seed and the river generator stay unchanged. The ribbon is a long thin
+  // diagonal across the whole frame — the bimodal driver float-scheduling
+  // flip (see tolerance notes below) lands on ~138 scattered edge pixels
+  // here, so this camera carries its own ceiling.
+  { name: '07-river-closeup', cam: '-624,0,1.8', reveal: true, tolerancePx: 170 },
 ];
 
 async function main() {
@@ -142,7 +149,7 @@ async function main() {
   // Land on the WebGL view with the first camera. The other two
   // cameras are reachable by re-navigating to a different ?cam.
   const results = [];
-  for (const { name, cam, reveal } of CAMERAS) {
+  for (const { name, cam, reveal, tolerancePx } of CAMERAS) {
     // freeze=2 pins animTime so shoreline pulse / sun arc / shimmer don't
     // depend on capture-timing jitter (the goldens are SHA-exact).
     const revealQs = reveal ? '&reveal=all' : '';
@@ -208,7 +215,7 @@ async function main() {
     const shotPath = join(OUT, `${name}.png`);
     await page.screenshot({ path: shotPath, fullPage: false });
     const hash = sha256(readFileSync(shotPath));
-    results.push({ name, shotPath, hash });
+    results.push({ name, shotPath, hash, tolerancePx });
     console.log(`[AUDIT] ${name}: ${shotPath} (sha256=${hash.slice(0, 12)}...)`);
   }
 
@@ -270,10 +277,10 @@ async function main() {
   // SCATTERED single-pixel silhouette flips across the frame (cams 02/06).
   // A real regression shifts contiguous regions (hundreds-thousands of px),
   // so 80 scattered pixels is still a safe ceiling.
-  const TOLERANCE_MAX_PX = 80;    // max differing pixels accepted
+  const TOLERANCE_MAX_PX = 80;    // max differing pixels accepted (per-camera override via tolerancePx)
   const TOLERANCE_CHANNEL = 6;    // a pixel "differs" if any RGB channel deviates more
   let diffCount = 0;
-  for (const { name, shotPath, hash } of results) {
+  for (const { name, shotPath, hash, tolerancePx } of results) {
     const goldenPath = join(GOLDEN, `${name}.sha256`);
     const goldenPng = join(GOLDEN, `${name}.png`);
     if (updateMode) {
@@ -294,7 +301,7 @@ async function main() {
     }
     if (existsSync(goldenPng)) {
       const differing = await countDifferingPixels(page, goldenPng, shotPath, TOLERANCE_CHANNEL);
-      if (differing >= 0 && differing <= TOLERANCE_MAX_PX) {
+      if (differing >= 0 && differing <= (tolerancePx ?? TOLERANCE_MAX_PX)) {
         console.log(
           `[OK]    ${name}: within tolerance (${differing} px differ; MSAA knife-edge jitter)`,
         );
