@@ -35,13 +35,18 @@ function drawSpriteOrFallback(
   const sprite = isOfficeAtlasLoaded() ? getOfficeSprite(spriteName as never) : null;
   if (sprite) {
     ctx.save();
-    ctx.translate(base.px, base.py - ISO_TILE_H / 2);
-    if (flip) {
-      ctx.scale(-1, 1);
-      ctx.drawImage(sprite, -sprite.width / 2, 0, sprite.width, sprite.height);
-    } else {
-      ctx.drawImage(sprite, -sprite.width / 2, 0, sprite.width, sprite.height);
-    }
+    // Atlas cells (128×64) are authored at 2× the tile diamond (64×32) with
+    // the floor-contact shape at the cell bottom and headroom above. Scale
+    // to ~1 tile of footprint (slight overhang reads as real furniture) and
+    // anchor the cell bottom to the tile's south corner — drawing at native
+    // size top-anchored sheared every sprite across its neighboring tiles,
+    // which is what made desks look like scattered parts.
+    const targetW = ISO_TILE_W * 1.5;
+    const scale = targetW / sprite.width;
+    const targetH = sprite.height * scale;
+    ctx.translate(base.px, base.py + ISO_TILE_H / 2 - targetH);
+    if (flip) ctx.scale(-1, 1);
+    ctx.drawImage(sprite, -targetW / 2, 0, targetW, targetH);
     ctx.restore();
     return;
   }
@@ -127,12 +132,8 @@ function drawProceduralDesk(
         ctx.textAlign = 'center';
         ctx.fillText(extLabel, base.px, base.py - 16);
       }
-
-      ctx.fillStyle = '#B08090';
-      ctx.beginPath();
-      const chairOff = flip ? -8 : 8;
-      ctx.ellipse(base.px + chairOff, base.py + 6, 4, 3, 0, 0, Math.PI * 2);
-      ctx.fill();
+      // No chair blob here: the layout always places a dedicated chair
+      // tile behind the desk, and drawing both reads as double chairs.
     },
     flip,
   );
@@ -142,13 +143,18 @@ function drawProceduralChair(dctx: IsoOfficeDrawContext, gx: number, gy: number)
   drawSpriteOrFallback(dctx, gx, gy, 'chair', () => {
     const { ctx } = dctx;
     const base = isoProject(gx, gy);
-    ctx.fillStyle = '#B08090';
+    // Office task chair: dark seat + low backrest toward the desk (north).
+    ctx.fillStyle = '#525B68';
     ctx.beginPath();
-    ctx.ellipse(base.px, base.py + 2, 5, 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(base.px, base.py + 1, 5, 3.5, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = '#3E4650';
     ctx.beginPath();
-    ctx.ellipse(base.px, base.py + 8, 2, 2, 0, 0, Math.PI * 2);
+    ctx.ellipse(base.px, base.py - 3, 4, 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#2E343C';
+    ctx.beginPath();
+    ctx.ellipse(base.px, base.py + 5, 2, 1.5, 0, 0, Math.PI * 2);
     ctx.fill();
   });
 }
@@ -237,8 +243,9 @@ export function drawIsoCarpetTile(dctx: IsoOfficeDrawContext, gx: number, gy: nu
   ctx.lineTo(base.px - ISO_TILE_W / 2, base.py);
   ctx.closePath();
   ctx.fill();
-  // Runner stripe down the corridor center
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+  // Runner stripe down the corridor center (kept faint — at full strength
+  // every aisle tile reads as a picket fence from a distance)
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(base.px, base.py - ISO_TILE_H / 2);

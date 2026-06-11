@@ -10,6 +10,12 @@ import type {
 } from './types.ts';
 
 export const MIN_AISLE_WIDTH = 2;
+/** Visual cap: a room never renders more than this many desks. Folders with
+ *  more files keep every workbench in room.workbenches (missions fall back to
+ *  the unit's assigned desk) and the renderer's cluster pill summarizes the
+ *  overflow. Without the cap, big folders produce screen-filling desk carpets
+ *  that stop reading as an office. 12 = the reference layout's 4×3 grid. */
+export const MAX_DESKS_PER_ROOM = 12;
 const WALL_THICKNESS = 1;
 
 export interface LayoutPlacement {
@@ -37,16 +43,61 @@ function isFloorTile(grid: LocalTile[][], x: number, y: number, gridW: number, g
   return tile.type === 'floor';
 }
 
-/** Team cluster: open-plan desk grid (cat-office style).
+/** Shared geometry for the team-cluster desk grid (reference office look).
  *
- *  Desk rows fill the full room width on a 2-row rhythm — desk row, then an
- *  open row for the chair/walkway — and desks sit on every other column so
- *  each one has breathing room. A central vertical aisle (≥2 tiles) splits
- *  the grid. Capacity scales with room AREA (~4 tiles per desk), matching
- *  computeRoomSize's ~4-tiles-per-workbench sizing; the previous layout only
- *  filled the two columns flanking the aisle (capacity grew with height
- *  only), which left the larger rooms introduced by that sizing mostly
- *  empty. */
+ *  A 1-tile walkway ring hugs the walls (the north ring row doubles as the
+ *  wall-furniture band), desk columns sit every 2 tiles mirrored around a
+ *  central aisle (no aisle in narrow rooms), and desk rows repeat on a
+ *  3-row rhythm: desk, chair, open walkway. computeRoomSize sizes rooms
+ *  with the same function so capacity and layout can never drift apart. */
+interface TeamClusterDims {
+  aisleWidth: number;
+  /** Desk column x offsets relative to innerX0, sorted ascending. */
+  colOffsets: number[];
+  /** Desk row y offsets relative to innerY0, vertically centered. */
+  rowOffsets: number[];
+}
+
+function teamClusterDims(innerW: number, innerH: number): TeamClusterDims {
+  const deskX0 = 1;
+  const deskX1 = innerW - 2;
+  const deskH = innerH - 2;
+
+  const colOffsets: number[] = [];
+  let aisleWidth = 0;
+  if (innerW >= 7) {
+    // Wide room: 2-tile central aisle, desk columns mirrored on both sides
+    // with a 1-tile gap to the aisle so nothing reads glued together.
+    aisleWidth = MIN_AISLE_WIDTH;
+    const mid = Math.floor(innerW / 2);
+    const aisleX0 = mid - Math.floor(aisleWidth / 2);
+    const aisleX1 = aisleX0 + aisleWidth - 1;
+    for (let x = aisleX0 - 2; x >= deskX0; x -= 2) colOffsets.unshift(x);
+    for (let x = aisleX1 + 2; x <= deskX1; x += 2) colOffsets.push(x);
+  } else {
+    // Narrow room: no aisle, columns from the west walkway.
+    for (let x = deskX0; x <= deskX1; x += 2) colOffsets.push(x);
+  }
+
+  const rowOffsets: number[] = [];
+  if (deskH >= 2) {
+    const nRows = Math.floor((deskH - 2) / 3) + 1;
+    const usedH = (nRows - 1) * 3 + 2;
+    const yStart = 1 + Math.floor((deskH - usedH) / 2);
+    for (let i = 0; i < nRows; i++) rowOffsets.push(yStart + i * 3);
+  }
+
+  return { aisleWidth, colOffsets, rowOffsets };
+}
+
+/** Max desks a team-cluster room interior can seat (used by room sizing). */
+export function teamClusterCapacity(innerW: number, innerH: number): number {
+  if (innerW < 4 || innerH < 3) return 0;
+  const dims = teamClusterDims(innerW, innerH);
+  return dims.colOffsets.length * dims.rowOffsets.length;
+}
+
+/** Team cluster: open-plan desk grid (cat-office style). */
 function layoutTeamCluster(
   innerX0: number,
   innerY0: number,
@@ -55,28 +106,31 @@ function layoutTeamCluster(
   workbenchCount: number,
 ): OfficeLayoutResult {
   const innerW = innerX1 - innerX0 + 1;
-  const aisleWidth = innerW >= MIN_AISLE_WIDTH + 2 ? MIN_AISLE_WIDTH : 1;
-  const mid = innerX0 + Math.floor(innerW / 2);
-  const aisleX0 = mid - Math.floor(aisleWidth / 2);
-  const aisleX1 = aisleX0 + aisleWidth - 1;
+  const innerH = innerY1 - innerY0 + 1;
+  const { aisleWidth, colOffsets, rowOffsets } = teamClusterDims(innerW, innerH);
+  const deskTarget = Math.min(workbenchCount, MAX_DESKS_PER_ROOM);
 
   const placements: LayoutPlacement[] = [];
   const deskPositions: OfficeLayoutResult['deskPositions'] = [];
   let wbIdx = 0;
 
-  // Central aisle (full height)
-  for (let y = innerY0; y <= innerY1; y++) {
-    for (let x = aisleX0; x <= aisleX1; x++) {
-      placements.push({ x, y, type: 'aisle' });
+  // Central aisle (full height) so the entrance reads as a carpet runner.
+  if (aisleWidth > 0) {
+    const mid = innerX0 + Math.floor(innerW / 2);
+    const aisleX0 = mid - Math.floor(aisleWidth / 2);
+    for (let y = innerY0; y <= innerY1; y++) {
+      for (let x = aisleX0; x < aisleX0 + aisleWidth; x++) {
+        placements.push({ x, y, type: 'aisle' });
+      }
     }
   }
 
-  // Desk rows on a 2-row rhythm: desks face south, the chair sits on the
-  // open row below (reference office: monitor up, occupant behind the desk).
-  // The last inner row never takes desks — the chair would land on a wall.
-  for (let y = innerY0; y < innerY1 && wbIdx < workbenchCount; y += 2) {
-    for (let x = innerX0; x <= innerX1 && wbIdx < workbenchCount; x += 2) {
-      if (x >= aisleX0 && x <= aisleX1) continue; // keep the aisle clear
+  for (const rowOff of rowOffsets) {
+    if (wbIdx >= deskTarget) break;
+    const y = innerY0 + rowOff;
+    for (const colOff of colOffsets) {
+      if (wbIdx >= deskTarget) break;
+      const x = innerX0 + colOff;
       deskPositions.push({ x, y, facing: 's', workbenchIndex: wbIdx });
       placements.push({
         x,
@@ -234,19 +288,31 @@ function layoutFallback(
     }
   }
 
+  // Checkerboard pass first so adjacent desks don't render glued together;
+  // a second contiguous pass only runs if the room is too tight to seat
+  // every workbench with spacing.
   let wbIdx = 0;
-  for (const f of floors) {
-    if (wbIdx >= room.workbenches.length) break;
-    deskPositions.push({ x: f.x, y: f.y, facing: 's', workbenchIndex: wbIdx });
-    placements.push({
-      x: f.x,
-      y: f.y,
-      type: 'workbench',
-      facing: 's',
-      decor: 'desk_bundle',
-      workbenchIndex: wbIdx,
-    });
-    wbIdx++;
+  const taken = new Set<string>();
+  const passes: Array<(f: { x: number; y: number }) => boolean> = [
+    (f) => (f.x + f.y) % 2 === 0,
+    () => true,
+  ];
+  for (const accepts of passes) {
+    for (const f of floors) {
+      if (wbIdx >= room.workbenches.length) break;
+      if (!accepts(f) || taken.has(`${f.x},${f.y}`)) continue;
+      taken.add(`${f.x},${f.y}`);
+      deskPositions.push({ x: f.x, y: f.y, facing: 's', workbenchIndex: wbIdx });
+      placements.push({
+        x: f.x,
+        y: f.y,
+        type: 'workbench',
+        facing: 's',
+        decor: 'desk_bundle',
+        workbenchIndex: wbIdx,
+      });
+      wbIdx++;
+    }
   }
 
   return {
@@ -278,21 +344,34 @@ export function layoutOfficeRoom(
 
   switch (zone) {
     case 'team_cluster':
-      // The desk grid handles narrow rooms too (aisle shrinks to 1);
-      // the top guard already routed anything under 4 wide to fallback.
+      // Rooms too tight for the margin-ringed desk grid (capacity 0)
+      // pack desks with the fallback instead of rendering empty.
+      if (wbCount > 0 && teamClusterCapacity(innerW, innerH) === 0) {
+        return layoutFallback(room, grid, gridW, gridH, wallThick);
+      }
       return layoutTeamCluster(innerX0, innerY0, innerX1, innerY1, wbCount);
     case 'focus':
       // A focus pod holds a handful of desks (4×4 pod max). Rooms that
       // carry a whole test suite need the grid or most desks vanish.
       if (wbCount > 6) {
+        if (teamClusterCapacity(innerW, innerH) === 0) {
+          return layoutFallback(room, grid, gridW, gridH, wallThick);
+        }
         return layoutTeamCluster(innerX0, innerY0, innerX1, innerY1, wbCount);
       }
       return layoutFocusPod(innerX0, innerY0, innerX1, innerY1, wbCount);
     case 'reception':
       return layoutReception(innerX0, innerY0, innerX1, innerY1);
     default:
+      // meeting/infra/break/biophilic rooms hold workbenches too — they get
+      // the same ordered desk grid (furnishRooms layers the zone flavor on
+      // top). Routing them to layoutFallback packed desks checkerboard-style
+      // into one corner of the room, without chairs.
       if (wbCount > 0) {
-        return layoutFallback(room, grid, gridW, gridH, wallThick);
+        if (teamClusterCapacity(innerW, innerH) === 0) {
+          return layoutFallback(room, grid, gridW, gridH, wallThick);
+        }
+        return layoutTeamCluster(innerX0, innerY0, innerX1, innerY1, wbCount);
       }
       return {
         plan: { template: 'open_rows', aisleWidth: 0, deskCount: 0 },

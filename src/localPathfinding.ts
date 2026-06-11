@@ -17,12 +17,13 @@ const TILE_COST: Record<string, number> = {
   // Office furniture (Phase 6)
   standing_desk: 1,
   whiteboard: 1,
-  window: 1,
+  window: Infinity, // windows sit on wall tiles (placeWallWindows) — impassable
   planter: 1.5,
   watercooler: 1,
   sofa: 1.5,
   stairs: 1.5,
   // Impassable office fixtures
+  vent: Infinity, // vents replace wall tiles — heat passes, units don't
   phone_booth: Infinity,
   break_area: Infinity,
   meeting_room: Infinity,

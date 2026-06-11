@@ -1,20 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="640" height="192" viewBox="0 0 640 192">
-  <!-- desk_l -->
+  <!-- desk_l: extruded desk box (top + two side faces), monitor seated ON the top -->
   <g transform="translate(0,0)">
-    <polygon points="64,40 20,52 64,64 108,52" fill="#B09060"/>
-    <rect x="42" y="18" width="44" height="18" fill="#D0D0D0"/>
-    <rect x="46" y="22" width="36" height="12" fill="#1a2030"/>
+    <polygon points="64,12 106,30 64,48 22,30" fill="#C9A06A"/>
+    <polygon points="22,30 64,48 64,62 22,44" fill="#A07840"/>
+    <polygon points="64,48 106,30 106,44 64,62" fill="#8A6534"/>
+    <rect x="60" y="24" width="8" height="6" fill="#3A3F4A"/>
+    <rect x="44" y="4" width="40" height="22" rx="2" fill="#E2E6EA"/>
+    <rect x="47" y="7" width="34" height="16" fill="#1a2030"/>
+    <polygon points="86,34 98,39 90,43 78,38" fill="#EDE6D8"/>
   </g>
   <!-- desk_r -->
   <g transform="translate(128,0)">
-    <polygon points="64,40 20,52 64,64 108,52" fill="#A08050"/>
-    <rect x="42" y="18" width="44" height="18" fill="#C8C8C8"/>
-    <rect x="46" y="22" width="36" height="12" fill="#243048"/>
+    <polygon points="64,12 106,30 64,48 22,30" fill="#BE945E"/>
+    <polygon points="22,30 64,48 64,62 22,44" fill="#966F3A"/>
+    <polygon points="64,48 106,30 106,44 64,62" fill="#7E5C2F"/>
+    <rect x="60" y="24" width="8" height="6" fill="#3A3F4A"/>
+    <rect x="44" y="4" width="40" height="22" rx="2" fill="#D9DEE3"/>
+    <rect x="47" y="7" width="34" height="16" fill="#243048"/>
+    <polygon points="86,34 98,39 90,43 78,38" fill="#EDE6D8"/>
   </g>
-  <!-- chair -->
-  <g transform="translate(256,0)">
-    <ellipse cx="64" cy="48" rx="22" ry="14" fill="#B08090"/>
-    <ellipse cx="64" cy="58" rx="6" ry="5" fill="#888"/>
+  <!-- chair (office task chair: backrest toward the desk, dark base).
+       Nudged 8px up-cell so the seat tucks under the desk's front face. -->
+  <g transform="translate(256,-8)">
+    <ellipse cx="64" cy="56" rx="6" ry="3.5" fill="#2E343C"/>
+    <rect x="62" y="44" width="4" height="12" fill="#3A4048"/>
+    <ellipse cx="64" cy="44" rx="13" ry="8" fill="#525B68"/>
+    <rect x="52" y="26" width="6" height="16" fill="#3E4650"/>
+    <ellipse cx="55" cy="26" rx="6" ry="9" fill="#454D58"/>
   </g>
   <!-- partition_h -->
   <g transform="translate(384,0)">

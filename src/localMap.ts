@@ -4,7 +4,12 @@
 // Files become "workbench" tiles inside their room.
 
 import type { LocalWorld, LocalRoom, LocalTile, LocalTileType, Workbench, PowerGrid, PowerSource, PowerConsumer, LocalRestArea, RoomClimate, ClimateDevice, Vent, OfficeZoneType } from './types.ts';
-import { applyOfficeLayout, isLayoutReservedTile } from './officeLayout.ts';
+import {
+  applyOfficeLayout,
+  isLayoutReservedTile,
+  teamClusterCapacity,
+  MAX_DESKS_PER_ROOM,
+} from './officeLayout.ts';
 
 // ─── File tree node (mirrors bridge API shape) ────────────────────────────────
 export interface FileNode {
@@ -345,15 +350,22 @@ function classifyFolderZone(folderName: string, folderPath: string, depth: numbe
 }
 
 // ─── Room sizing ───────────────────────────────────────────────────────────────
-/** Room size proportional to workbench count with generous spacing for aisles.
- *  Target: ~4 tiles per workbench (desk + chair + aisle space).
- *  Square-ish rooms, no max width. Minimum 4 tiles per side. */
+/** Size a room for its desk count using the SAME geometry the layout uses
+ *  (teamClusterCapacity), so capacity and placement can't drift apart.
+ *  Desk count is capped at MAX_DESKS_PER_ROOM — beyond that, rooms stop
+ *  growing and the renderer's cluster pill summarizes the overflow. This is
+ *  what keeps every room compact enough to read as a room (walls visible in
+ *  frame) instead of a screen-filling desk carpet. */
 function computeRoomSize(fileCount: number): { width: number; height: number } {
-  // Each workbench needs ~4 tiles (desk + chair + surrounding aisle)
-  const tilesNeeded = Math.max(fileCount * 4, MIN_ROOM_SIZE * MIN_ROOM_SIZE);
-  const side = Math.ceil(Math.sqrt(tilesNeeded));
-  const width = Math.max(MIN_ROOM_SIZE, side);
-  const height = Math.max(MIN_ROOM_SIZE, Math.ceil(tilesNeeded / width));
+  const deskTarget = Math.max(1, Math.min(fileCount, MAX_DESKS_PER_ROOM));
+  let width = MIN_ROOM_SIZE;
+  let height = MIN_ROOM_SIZE;
+  while (
+    teamClusterCapacity(width - WALL_THICKNESS * 2, height - WALL_THICKNESS * 2) < deskTarget
+  ) {
+    if (width <= height) width++;
+    else height++;
+  }
   return { width, height };
 }
 
@@ -623,11 +635,24 @@ function furnishRooms(
           const t = grid[y]![x]!;
           return t.type === 'floor' && !isLayoutReservedTile(t) && !(npcTile && npcTile.x === x && npcTile.y === y);
         };
-        // Desks/workbenches placed by layoutOfficeRooms; scatter planters on remaining floor
-        const remainingFloors = floors.filter((f) => isFreeFloor(f.x, f.y));
-        for (let i = 0; i < remainingFloors.length; i += 3) {
-          const f = remainingFloors[i]!;
-          place(f.x, f.y, 'planter');
+        // Anchor furniture lives on the walkway ring, like the reference
+        // office: a watercooler against the north wall near the NE corner
+        // and a planter in each free inner corner. Nothing is scattered
+        // between desks — the open floor is what keeps the grid readable.
+        if (northWall.length > 1) {
+          const wc = northWall[northWall.length - 2]!;
+          if (isFreeFloor(wc.x, wc.y)) place(wc.x, wc.y, 'watercooler');
+        }
+        const cornerTiles = [
+          { x: innerX0, y: innerY0 },
+          { x: innerX1, y: innerY0 },
+          { x: innerX0, y: innerY1 },
+          { x: innerX1, y: innerY1 },
+        ];
+        for (const c of cornerTiles) {
+          if (inBounds(c.x, c.y, gridW, gridH) && isFreeFloor(c.x, c.y)) {
+            place(c.x, c.y, 'planter');
+          }
         }
         break;
       }
@@ -648,11 +673,8 @@ function furnishRooms(
           const mid = Math.floor(wbCandidates.length / 2);
           place(wbCandidates[mid]!.x, wbCandidates[mid]!.y, 'whiteboard');
         }
-        // Windows on east/west walls
-        const eastWall = wallAdjacentFloors(1, 0);
-        const westWall = wallAdjacentFloors(-1, 0);
-        for (const f of eastWall.slice(0, 2)) place(f.x, f.y, 'window');
-        for (const f of westWall.slice(0, 2)) place(f.x, f.y, 'window');
+        // Windows on actual wall tiles (see reception note)
+        placeWallWindows(grid, room, gridW, gridH);
         break;
       }
       case 'focus': {
@@ -764,14 +786,9 @@ function furnishRooms(
         // Reception desk at center
         const centerIdx = Math.floor(floors.length / 2);
         place(floors[centerIdx]!.x, floors[centerIdx]!.y, 'reception');
-        // Windows on all perimeter walls
-        for (const f of floors) {
-          const isPerimeter =
-            f.x === innerX0 || f.x === innerX1 || f.y === innerY0 || f.y === innerY1;
-          if (isPerimeter && grid[f.y]![f.x]!.type === 'floor') {
-            place(f.x, f.y, 'window');
-          }
-        }
+        // Windows live on actual WALL tiles — converting inner floor tiles
+        // to 'window' rendered as wall-height glass blocks mid-room.
+        placeWallWindows(grid, room, gridW, gridH);
         // Planters flanking reception
         const flanks = floors.filter((f) =>
           Math.abs(f.x - floors[centerIdx]!.x) <= 1 &&
@@ -784,19 +801,13 @@ function furnishRooms(
         break;
       }
       case 'biophilic': {
-        // Dense planters
-        for (let i = 0; i < floors.length; i += 2) {
+        // Planters in loose rows (every 3rd free tile keeps walkways visible)
+        for (let i = 0; i < floors.length; i += 3) {
           const f = floors[i]!;
           if (grid[f.y]![f.x]!.type === 'floor') place(f.x, f.y, 'planter');
         }
-        // Windows on perimeter
-        for (const f of floors) {
-          const isPerimeter =
-            f.x === innerX0 || f.x === innerX1 || f.y === innerY0 || f.y === innerY1;
-          if (isPerimeter && grid[f.y]![f.x]!.type === 'floor') {
-            place(f.x, f.y, 'window');
-          }
-        }
+        // Windows on actual wall tiles (see reception note)
+        placeWallWindows(grid, room, gridW, gridH);
         // Sofa for relaxing
         if (floors.length > 4) {
           place(floors[2]!.x, floors[2]!.y, 'sofa');
@@ -804,6 +815,29 @@ function furnishRooms(
         break;
       }
     }
+  }
+}
+
+/** Convert every other tile of a room's north and west walls (the faces the
+ *  iso camera sees) into windows. Corners and non-wall tiles (doors, vents)
+ *  are left alone. */
+function placeWallWindows(
+  grid: LocalTile[][],
+  room: LocalRoom,
+  gridW: number,
+  gridH: number,
+): void {
+  const candidates: Array<{ x: number; y: number }> = [];
+  for (let x = room.x + 1; x < room.x + room.width - 1; x += 2) {
+    candidates.push({ x, y: room.y });
+  }
+  for (let y = room.y + 1; y < room.y + room.height - 1; y += 2) {
+    candidates.push({ x: room.x, y });
+  }
+  for (const c of candidates) {
+    if (!inBounds(c.x, c.y, gridW, gridH)) continue;
+    const tile = grid[c.y]![c.x]!;
+    if (tile.type === 'wall') tile.type = 'window';
   }
 }
 
@@ -844,20 +878,9 @@ function decorateCorridors(grid: LocalTile[][], gridW: number, gridH: number): v
         continue;
       }
 
-      // Long-corridor window: path tile with 2+ path neighbors and no walls
-      // (simulates a glass-walled hallway looking outside)
-      let pathNeighbors = 0;
-      for (const { dx, dy } of dirs) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (inBounds(nx, ny, gridW, gridH)) {
-          const nt = grid[ny]![nx]!;
-          if (nt.type === 'path') pathNeighbors++;
-        }
-      }
-      if (wallNeighbors === 0 && pathNeighbors >= 2 && (x * 17 + y * 5) % 11 === 0) {
-        tile.type = 'window';
-      }
+      // NOTE: corridors used to sprinkle 'window' tiles on open path cells
+      // ("glass hallway"), but a window tile renders as a wall-height glass
+      // block — in the middle of a corridor it read as floating debris.
     }
   }
 }

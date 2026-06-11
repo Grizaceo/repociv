@@ -144,7 +144,13 @@ export function renderIso(state: IsoRenderState) {
     for (let x = view.x0; x <= view.x1; x++) {
       const tile = world.grid[y]?.[x];
       if (!tile) continue;
-      if (tile.type === 'floor' || tile.type === 'path' || tile.type === 'wall') continue;
+      if (
+        tile.type === 'floor' ||
+        tile.type === 'path' ||
+        tile.type === 'wall' ||
+        tile.type === 'vent' // drawn as wall in the static layer
+      )
+        continue;
       const z = tile.type === 'door' || tile.type === 'window' ? 2 : tile.type === 'workbench' ? 1 : 0;
       tiles.push({ x, y, tile, z });
     }
@@ -285,12 +291,6 @@ export function drawIsoTile(
   ctx.closePath();
   ctx.fill();
 
-  if (zone === 'team_cluster' && (gridX + gridY) % 2 === 0) {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.beginPath();
-    ctx.arc(corners[0]!.x, corners[0]!.y + ISO_TILE_H * 0.3, ISO_TILE_H * 0.15, 0, Math.PI * 2);
-    ctx.fill();
-  }
   if (zone === 'meeting') {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
     ctx.lineWidth = 0.5;
@@ -326,13 +326,6 @@ export function drawIsoTile(
     ctx.lineTo(corners[3]!.x, corners[3]!.y);
     ctx.closePath();
     ctx.fill();
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(corners[0]!.x, corners[0]!.y);
-    ctx.lineTo(corners[2]!.x, corners[2]!.y);
-    ctx.stroke();
 
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.04)';
     ctx.lineWidth = 1;
@@ -385,7 +378,14 @@ export function drawIsoTile(
     ctx.stroke();
   }
 
-  if (tile.type === 'wall' || tile.type === 'door' || tile.type === 'window') {
+  if (
+    tile.type === 'wall' ||
+    tile.type === 'door' ||
+    tile.type === 'window' ||
+    tile.type === 'vent'
+  ) {
+    // Vents replace wall tiles (placeTemperatureSystem); without the wall
+    // prism they punch visible gaps into every shared wall.
     drawIsoWallTile(state, tile, gridX, gridY, world, corners, zone);
   }
 

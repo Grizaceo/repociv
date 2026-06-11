@@ -1,6 +1,6 @@
 import { describe, it, assert } from 'vitest';
 import { buildMockLocalWorld, buildLocalWorldFromPaths } from './localMap.ts';
-import { measureAisleWidth } from './officeLayout.ts';
+import { measureAisleWidth, MAX_DESKS_PER_ROOM } from './officeLayout.ts';
 
 describe('localMap — buildMockLocalWorld', () => {
   it('returns a LocalWorld with width/height > 0', () => {
@@ -148,12 +148,13 @@ describe('localMap — Office Furnishing', () => {
     let furnitureOnWall = 0;
     for (const row of world.grid) {
       for (const tile of row) {
+        // 'window' is intentionally absent: windows are architecture and
+        // live ON wall tiles (placeWallWindows), not on the floor.
         if (
           tile.type === 'workbench' ||
           tile.type === 'whiteboard' ||
           tile.type === 'planter' ||
-          tile.type === 'meeting_room' ||
-          tile.type === 'window'
+          tile.type === 'meeting_room'
         ) {
           const room = world.rooms.find((r) => r.id === tile.roomId);
           if (room) {
@@ -250,14 +251,15 @@ describe('localMap — cubicle layout', () => {
       assert.equal(below?.type, 'chair', `desk at (${desk.x},${desk.y}) has chair below`);
     }
     assert.ok(chairs.length >= desks.length, 'one chair per desk');
-    // Desk capacity tracks room area (~4 tiles per desk after walls/aisle),
-    // not just the two columns flanking the aisle.
-    const innerArea = (srcRoom!.width - 2) * (srcRoom!.height - 2);
+    // Rooms are sized for min(files, MAX_DESKS_PER_ROOM) desks and the
+    // layout seats exactly that many — the renderer's cluster pill
+    // summarizes the overflow. A 60-file folder must hit the cap.
     const wbCount = srcRoom!.workbenches.length;
-    const expected = Math.min(wbCount, Math.floor(innerArea / 8));
-    assert.ok(
-      desks.length >= expected,
-      `desk grid should scale with area: got ${desks.length}, expected ≥ ${expected} (inner area ${innerArea}, wb ${wbCount})`,
+    const expected = Math.min(wbCount, MAX_DESKS_PER_ROOM);
+    assert.equal(
+      desks.length,
+      expected,
+      `desk grid should seat the capped desk count: got ${desks.length}, expected ${expected} (wb ${wbCount})`,
     );
   });
 });
