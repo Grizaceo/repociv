@@ -65,6 +65,7 @@ import { areMountainPropsSettled } from './three/MountainProps3D.ts';
 import { areForestPropsSettled } from './three/ForestProps3D.ts';
 import { areCityPropsSettled } from './three/CityProps3D.ts';
 import { areUnitPropsSettled } from './three/UnitProps3D.ts';
+import { areResourcePropsSettled } from './three/ResourceProps3D.ts';
 import {
   setRendererRef,
   notifyTilePicked,
@@ -123,6 +124,7 @@ type RepoCivDebugApi = {
   areForestPropsSettled: () => boolean;
   areCityPropsSettled: () => boolean;
   areUnitPropsSettled: () => boolean;
+  areResourcePropsSettled: () => boolean;
   getGlobalUnits: () => Array<{
     id: string;
     type: string;
@@ -137,6 +139,11 @@ type RepoCivDebugApi = {
     revealed: number;
     byTerrain: Record<string, number>;
     samplePos: Record<string, { x: number; y: number }>;
+    resourceTiers: {
+      gold8: number; science4: number; production3: number; crystal: number;
+      freeGold8: number; freeSci4: number; freeProd3: number; freeAny: number;
+    };
+    crystalPos: { x: number; y: number } | null;
     cleanSamplePos: Record<string, { x: number; y: number }>;
   };
   /** River layout probe: path lengths + world-space midpoints (camera targets). */
@@ -416,6 +423,7 @@ async function bootstrap() {
     areForestPropsSettled: () => areForestPropsSettled(),
     areCityPropsSettled: () => areCityPropsSettled(),
     areUnitPropsSettled: () => areUnitPropsSettled(),
+    areResourcePropsSettled: () => areResourcePropsSettled(),
     getWebGLMetrics: () => renderer.getWebGLMetrics(),
     getGlobalUnits: () =>
       state.world.units.map((u) => {
@@ -439,9 +447,30 @@ async function bootstrap() {
       const cleanFallback: Record<string, { x: number; y: number }> = {};
       const dirs: Array<[number, number]> = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
       let revealed = 0;
+      const resourceTiers = {
+        gold8: 0, science4: 0, production3: 0, crystal: 0,
+        freeGold8: 0, freeSci4: 0, freeProd3: 0, freeAny: 0,
+      };
+      let crystalPos: { x: number; y: number } | null = null;
       for (const t of state.world.tiles.values()) {
         byTerrain[t.terrain] = (byTerrain[t.terrain] ?? 0) + 1;
         if (t.revealed) revealed++;
+        if (t.resources.gold >= 8) resourceTiers.gold8++;
+        if (t.resources.science >= 4) resourceTiers.science4++;
+        if (t.resources.production >= 3) resourceTiers.production3++;
+        if (t.resources.gold >= 8 && t.resources.science >= 4) resourceTiers.crystal++;
+        if (!t.city && !t.district) {
+          if (t.resources.gold >= 8) resourceTiers.freeGold8++;
+          if (t.resources.science >= 4) resourceTiers.freeSci4++;
+          if (t.resources.production >= 3) resourceTiers.freeProd3++;
+          if (t.resources.gold >= 8 || t.resources.science >= 4 || t.resources.production >= 3) {
+            resourceTiers.freeAny++;
+            if (!crystalPos) {
+              const p = axialToPixel(t.coord, HEX_SIZE);
+              crystalPos = { x: Math.round(p.x), y: Math.round(p.y) };
+            }
+          }
+        }
         if (!samplePos[t.terrain]) {
           const p = axialToPixel(t.coord, HEX_SIZE);
           samplePos[t.terrain] = { x: Math.round(p.x), y: Math.round(p.y) };
@@ -467,7 +496,7 @@ async function bootstrap() {
           cleanSamplePos[terrain] = cleanFallback[terrain];
         }
       }
-      return { total: state.world.tiles.size, revealed, byTerrain, samplePos, cleanSamplePos };
+      return { total: state.world.tiles.size, revealed, byTerrain, samplePos, cleanSamplePos, resourceTiers, crystalPos };
     },
     getRiverStats: () =>
       computeRiverPaths(state.world.tiles).map((p) => {

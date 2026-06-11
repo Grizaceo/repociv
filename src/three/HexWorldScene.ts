@@ -76,6 +76,12 @@ import {
   clearCityProps,
 } from './CityProps3D.ts';
 import { ensureUnitPropsLoad } from './UnitProps3D.ts';
+import {
+  getResourcePropsGroup,
+  ensureResourcePropsLoad,
+  rebuildResourceProps,
+  clearResourceProps,
+} from './ResourceProps3D.ts';
 import { getTileYieldsGroup, rebuildTileYields, clearTileYields } from './TileYields3D.ts';
 import { getRiverGroup, rebuildRivers, clearRivers } from './Rivers3D.ts';
 import { createSkyDome, disposeSkyDome } from './SkyDome3D.ts';
@@ -143,6 +149,7 @@ export function createHexWorldScene(): Scene {
   scene.add(getForestPropsGroup());
   scene.add(getCityGroup());
   scene.add(getCityPropsGroup());
+  scene.add(getResourcePropsGroup());
   scene.add(getTileYieldsGroup());
   scene.add(getUnitGroup());
   scene.add(getLabelGroup());
@@ -155,6 +162,7 @@ export function createHexWorldScene(): Scene {
   ensureForestPropsLoad();
   ensureCityPropsLoad();
   ensureUnitPropsLoad();
+  ensureResourcePropsLoad();
 
   return scene;
 }
@@ -785,6 +793,7 @@ export function updateHexWorldScene(
   // Mountain silhouettes are terrain, not toggleable decor — always visible.
   rebuildMountainProps(Array.from(state.world.tiles.values()));
   rebuildForestProps(Array.from(state.world.tiles.values()));
+  rebuildResourceProps(Array.from(state.world.tiles.values()));
   rebuildRivers(state.world.tiles);
 
   setCitiesVisible(opts.showStructure);
@@ -803,6 +812,7 @@ export function disposeHexWorldScene(scene: Scene): void {
   clearMountainProps();
   clearForestProps();
   clearCityProps();
+  clearResourceProps();
   clearTileYields();
   clearRivers();
   disposeSkyDome();

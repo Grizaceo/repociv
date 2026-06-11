@@ -19,6 +19,7 @@ import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { areMountainPropsReady } from './MountainProps3D.ts';
 import { areForestPropsReady } from './ForestProps3D.ts';
+import { areResourcePropsReady } from './ResourceProps3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 
 const decorGroup = new Group();
@@ -381,6 +382,10 @@ function buildIce(tiles: Tile[]): void {
 function buildSacred(tiles: Tile[]): void {
   if (tiles.length === 0) return;
 
+  // When the forge obelisk GLB is live (ResourceProps3D), it takes the
+  // centre of the circle — keep only the standing stones here.
+  const glbMarker = areResourcePropsReady();
+
   // Standing stones — weathered gilded-stone monoliths (matches shader v20 sacred)
   const stoneGeom = new BoxGeometry(HEX_SIZE * 0.085, HEX_SIZE * 0.28, HEX_SIZE * 0.055);
   const stoneMat  = new MeshStandardMaterial({
@@ -391,32 +396,36 @@ function buildSacred(tiles: Tile[]): void {
     metalness: 0.05,
   });
 
-  // Altar cube at centre
-  const altarGeom = new BoxGeometry(HEX_SIZE * 0.18, HEX_SIZE * 0.10, HEX_SIZE * 0.18);
-  const altarMat  = new MeshStandardMaterial({
-    color:    new Color(0xa89878),
-    emissive: new Color(0x584820),
-    emissiveIntensity: 0.20,
-    roughness: 0.72,
-    metalness: 0.08,
-  });
+  let altarMesh: InstancedMesh | null = null;
+  let gemMesh: InstancedMesh | null = null;
+  if (!glbMarker) {
+    // Altar cube at centre (procedural fallback while the GLB is absent)
+    const altarGeom = new BoxGeometry(HEX_SIZE * 0.18, HEX_SIZE * 0.10, HEX_SIZE * 0.18);
+    const altarMat  = new MeshStandardMaterial({
+      color:    new Color(0xa89878),
+      emissive: new Color(0x584820),
+      emissiveIntensity: 0.20,
+      roughness: 0.72,
+      metalness: 0.08,
+    });
 
-  // Floating gem above altar
-  const gemGeom = new BoxGeometry(HEX_SIZE * 0.08, HEX_SIZE * 0.08, HEX_SIZE * 0.08);
-  const gemMat  = new MeshStandardMaterial({
-    color:    new Color(0xe8c66a),
-    emissive: new Color(0xa8842e),
-    emissiveIntensity: 0.45,
-    roughness: 0.18,
-    metalness: 0.35,
-    transparent: true,
-    opacity: 0.72,
-  });
+    // Floating gem above altar
+    const gemGeom = new BoxGeometry(HEX_SIZE * 0.08, HEX_SIZE * 0.08, HEX_SIZE * 0.08);
+    const gemMat  = new MeshStandardMaterial({
+      color:    new Color(0xe8c66a),
+      emissive: new Color(0xa8842e),
+      emissiveIntensity: 0.45,
+      roughness: 0.18,
+      metalness: 0.35,
+      transparent: true,
+      opacity: 0.72,
+    });
+    altarMesh = new InstancedMesh(altarGeom, altarMat, tiles.length);
+    gemMesh   = new InstancedMesh(gemGeom,   gemMat,   tiles.length);
+  }
 
   const STONES = 6;
   const stoneMesh = new InstancedMesh(stoneGeom, stoneMat, tiles.length * STONES);
-  const altarMesh = new InstancedMesh(altarGeom, altarMat, tiles.length);
-  const gemMesh   = new InstancedMesh(gemGeom,   gemMat,   tiles.length);
 
   let idx = 0;
   const mat = new Matrix4();
@@ -437,22 +446,26 @@ function buildSacred(tiles: Tile[]): void {
       idx++;
     }
 
-    // Central altar
-    mat.identity();
-    mat.setPosition(pos.x, pos.y + HEX_SIZE * 0.05 + 1, pos.z);
-    altarMesh.setMatrixAt(tiles.indexOf(tile), mat.clone());
+    if (altarMesh && gemMesh) {
+      // Central altar
+      mat.identity();
+      mat.setPosition(pos.x, pos.y + HEX_SIZE * 0.05 + 1, pos.z);
+      altarMesh.setMatrixAt(tiles.indexOf(tile), mat.clone());
 
-    // Floating gem above altar
-    mat.makeRotationY(Math.PI / 4);
-    mat.setPosition(pos.x, pos.y + HEX_SIZE * 0.26 + 1, pos.z);
-    gemMesh.setMatrixAt(tiles.indexOf(tile), mat.clone());
+      // Floating gem above altar
+      mat.makeRotationY(Math.PI / 4);
+      mat.setPosition(pos.x, pos.y + HEX_SIZE * 0.26 + 1, pos.z);
+      gemMesh.setMatrixAt(tiles.indexOf(tile), mat.clone());
+    }
   }
   stoneMesh.instanceMatrix.needsUpdate = true;
-  altarMesh.instanceMatrix.needsUpdate = true;
-  gemMesh.instanceMatrix.needsUpdate   = true;
   addMesh(stoneMesh);
-  addMesh(altarMesh);
-  addMesh(gemMesh);
+  if (altarMesh && gemMesh) {
+    altarMesh.instanceMatrix.needsUpdate = true;
+    gemMesh.instanceMatrix.needsUpdate   = true;
+    addMesh(altarMesh);
+    addMesh(gemMesh);
+  }
 }
 
 // ── Plains grass patches (high LOD) ─────────────────────────────────────────
@@ -529,7 +542,7 @@ export function rebuildTileDecor(
 
   // Props readiness participates: when the mountain glbs land, the cones
   // must rebuild out of the decor set even though the tiles didn't change.
-  const signature = `${lod}:m${areMountainPropsReady() ? 1 : 0}:f${areForestPropsReady() ? 1 : 0}:${decorSignature(tiles)}`;
+  const signature = `${lod}:m${areMountainPropsReady() ? 1 : 0}:f${areForestPropsReady() ? 1 : 0}:r${areResourcePropsReady() ? 1 : 0}:${decorSignature(tiles)}`;
   if (signature === lastSignature) return;
   lastSignature = signature;
 
