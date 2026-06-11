@@ -24,6 +24,7 @@ import { HexPicker } from './HexPicker.ts';
 import { areMountainPropsReady } from './MountainProps3D.ts';
 import { axialToWorld3D, hexCornerAngle3D } from './axialToWorld3D.ts';
 import { initLabelRenderer, renderLabels, disposeLabels } from './MapLabels3D.ts';
+import { updateSkyDome } from './SkyDome3D.ts';
 import { SKY_TOP } from './terrainShader.ts';
 
 const CAMERA_TILT = 0.62;
@@ -101,6 +102,8 @@ export class ThreeMapRenderer {
 
   render(state: GameState, cam: MapCamera, opts: HexSceneRenderOptions): void {
     this.syncCamera(cam);
+    // Keep the gradient sky centered on the camera (it must never clip).
+    updateSkyDome(this.camera.position);
 
     // The world signature feeds the dirty-flag: terrain/ground/territory/
     // cities/units/labels are rebuilt only when one of these inputs

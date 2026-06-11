@@ -64,6 +64,7 @@ import {
   clearMountainProps,
 } from './MountainProps3D.ts';
 import { getRiverGroup, rebuildRivers, clearRivers } from './Rivers3D.ts';
+import { createSkyDome, disposeSkyDome } from './SkyDome3D.ts';
 
 export interface HexSceneRenderOptions {
   fogEnabled: boolean;
@@ -103,11 +104,14 @@ export function createHexWorldScene(): Scene {
   const scene = new Scene();
   scene.background = SKY_TOP.clone();
   scene.fog = new FogExp2(SKY_HORIZON.getHex(), FOG_DENSITY);
+  // Gradient sky dome (zenith blue → warm horizon haze); the flat
+  // background colour stays underneath as fallback while shaders compile.
+  scene.add(createSkyDome());
 
-  // Civ V-style warm afternoon lighting
-  scene.add(new AmbientLight(0xd4cfc0, 0.55));
+  // Civ V-style warm afternoon lighting — golden sun, warm ambient
+  scene.add(new AmbientLight(0xdacfb6, 0.55));
   scene.add(new HemisphereLight(0xb0d8f0, 0x7aaa60, 0.45));
-  sunLight = new DirectionalLight(0xfff8e8, 1.05);
+  sunLight = new DirectionalLight(0xffeecb, 1.05);
   sunLight.position.set(-100, 200, 60);
   scene.add(sunLight);
   // Soft fill light from opposite side to reduce harsh shadows
@@ -655,7 +659,9 @@ export function updateHexWorldScene(
   if (sunLight) {
     const t = opts.animTime * 0.04;
     const warmth = 0.88 + 0.12 * Math.sin(t);
-    sunLight.color.setRGB(1, 0.97 * warmth, 0.90 * warmth);
+    // Golden-hour bias: green and especially blue sit lower than before
+    // (0.97/0.90) so the low sun reads late-afternoon gold, not noon white.
+    sunLight.color.setRGB(1, 0.94 * warmth, 0.80 * warmth);
     sunLight.intensity = 1.0 + 0.08 * Math.sin(t * 0.6);
     // Slow arc across the sky
     sunLight.position.set(
@@ -702,6 +708,7 @@ export function disposeHexWorldScene(scene: Scene): void {
   clearTileDecor();
   clearMountainProps();
   clearRivers();
+  disposeSkyDome();
   clearCityClusters();
   clearUnits();
   if (terrainMesh) {
