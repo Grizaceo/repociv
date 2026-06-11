@@ -531,10 +531,45 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
   const terrainIndices = new Float32Array(tiles.length);
   const neighborIndices = new Float32Array(tiles.length);
   const coastMasks = new Float32Array(tiles.length);
+  const oceanDepths = new Float32Array(tiles.length);
   const instanceEntries: Array<{ instanceId: number; coord: Axial }> = [];
   const matrix = new Matrix4();
 
   const getTile = (key: string) => state.world.tiles.get(key);
+
+  // Ocean depth: BFS hops from the nearest coastal water tile, normalized to
+  // 0..1 at 3 hops. Drives the Civ V shallow-turquoise → deep-blue gradient
+  // (and the specular falloff) in the terrain shader.
+  const oceanHops = new Map<string, number>();
+  {
+    let frontier: Axial[] = [];
+    for (const tile of tiles) {
+      if (tile.terrain !== 'ocean') continue;
+      const coastal = AXIAL_DIRECTIONS.some((d) => {
+        const n = getTile(tileKey({ q: tile.coord.q + d.q, r: tile.coord.r + d.r }));
+        return n !== undefined && n.terrain !== 'ocean';
+      });
+      if (coastal) {
+        oceanHops.set(tileKey(tile.coord), 0);
+        frontier.push(tile.coord);
+      }
+    }
+    while (frontier.length > 0) {
+      const next: Axial[] = [];
+      for (const c of frontier) {
+        const hops = oceanHops.get(tileKey(c))!;
+        for (const d of AXIAL_DIRECTIONS) {
+          const nc = { q: c.q + d.q, r: c.r + d.r };
+          const nk = tileKey(nc);
+          const n = getTile(nk);
+          if (!n || n.terrain !== 'ocean' || oceanHops.has(nk)) continue;
+          oceanHops.set(nk, hops + 1);
+          next.push(nc);
+        }
+      }
+      frontier = next;
+    }
+  }
 
   tiles.forEach((tile, i) => {
     const elev = terrainElevation(tile.terrain);
@@ -554,12 +589,17 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
       if (n && (n.terrain === 'ocean') !== selfOcean) mask |= 1 << k;
     });
     coastMasks[i] = mask;
+    oceanDepths[i] =
+      tile.terrain === 'ocean'
+        ? Math.min(1, (oceanHops.get(tileKey(tile.coord)) ?? 3) / 3)
+        : 0;
     instanceEntries.push({ instanceId: i, coord: tile.coord });
   });
 
   terrainMesh.geometry.setAttribute('instanceTerrain', new InstancedBufferAttribute(terrainIndices, 1));
   terrainMesh.geometry.setAttribute('instanceNeighborTerrain', new InstancedBufferAttribute(neighborIndices, 1));
   terrainMesh.geometry.setAttribute('instanceCoastMask', new InstancedBufferAttribute(coastMasks, 1));
+  terrainMesh.geometry.setAttribute('instanceOceanDepth', new InstancedBufferAttribute(oceanDepths, 1));
   terrainMesh.frustumCulled = false;
   terrainMesh.instanceMatrix.needsUpdate = true;
   if (terrainMesh.instanceColor) terrainMesh.instanceColor.needsUpdate = true;

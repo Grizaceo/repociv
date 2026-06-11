@@ -108,9 +108,11 @@ export function createTerrainMaterial(
       'attribute float instanceTerrain;\n' +
       'attribute float instanceNeighborTerrain;\n' +
       'attribute float instanceCoastMask;\n' +
+      'attribute float instanceOceanDepth;\n' +
       'varying float vTerrainIndex;\n' +
       'varying float vNeighborTerrainIndex;\n' +
       'varying float vCoastMask;\n' +
+      'varying float vOceanDepth;\n' +
       'varying vec2  vLocalXZ;\n' +
       'varying vec2  vWorldXZ;\n' +
       'varying float vLocalY;\n' +
@@ -122,6 +124,7 @@ export function createTerrainMaterial(
         vTerrainIndex = instanceTerrain;
         vNeighborTerrainIndex = instanceNeighborTerrain;
         vCoastMask    = instanceCoastMask;
+        vOceanDepth   = instanceOceanDepth;
         vLocalXZ      = vec2(position.x, position.z);
         vWorldXZ      = instanceMatrix[3].xz + transformed.xz;
         vLocalY       = transformed.y;
@@ -188,6 +191,7 @@ export function createTerrainMaterial(
       'varying float vTerrainIndex;\n' +
       'varying float vNeighborTerrainIndex;\n' +
       'varying float vCoastMask;\n' +
+      'varying float vOceanDepth;\n' +
       'varying vec2  vLocalXZ;\n' +
       'varying vec2  vWorldXZ;\n' +
       'varying float vLocalY;\n' +
@@ -282,6 +286,14 @@ float terrainDetailNoise(vec2 p) {
               edgeBlend = min(1.0, edgeBlend * 1.30);
             }
             tex = mix(tex, nTex, edgeBlend * 0.62);
+          }
+          // Civ V sea gradient: vivid turquoise on the shelf → deep saturated
+          // blue offshore. instanceOceanDepth = BFS hops from the nearest
+          // coast (0 = coastal, 1 = open sea); the old flat teal only varied
+          // inside coastal tiles via the edge gradient below.
+          if (tidx > 3.5 && tidx < 4.5) {
+            vec3 seaTint = mix(vec3(0.30, 0.63, 0.66), vec3(0.05, 0.28, 0.60), vOceanDepth);
+            tex = mix(tex, seaTint, 0.66);
           }
           // Top-face brightening so atlas colours read through warm PBR lights
           tex *= 1.15;
@@ -388,6 +400,13 @@ float terrainDetailNoise(vec2 p) {
           float foamPulse = 0.82 + 0.18 * sin(uTime * 1.7 + vWorldXZ.x * 0.045 + vWorldXZ.y * 0.038);
           float foamAmt = ring * foamPulse * (selfOcean ? 0.60 : 0.30);
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.55, 0.85, 0.88), foamAmt);
+          // Second, fainter foam band further out on the water — Civ V coasts
+          // break twice. Offset phase so the two bands don't pulse in lockstep.
+          if (selfOcean) {
+            float ring2 = smoothstep(0.46, 0.58, edgeT) * (1.0 - smoothstep(0.60, 0.72, edgeT));
+            float foamPulse2 = 0.78 + 0.22 * sin(uTime * 1.3 + vWorldXZ.x * 0.052 - vWorldXZ.y * 0.041 + 1.9);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.48, 0.80, 0.84), ring2 * foamPulse2 * 0.22);
+          }
         }`,
       )
       // ── Side-face emissive lift ──────────────────────────────────────────────
@@ -413,6 +432,16 @@ float terrainDetailNoise(vec2 p) {
           vec2 rauv = terrainAtlasUv(_rtidx, rmacroUv);
           float rgh = texture2D(uRoughnessAtlas, rauv).r;
           roughnessFactor = rgh;
+        }
+        // Wet sea: low roughness gives the directional sun a real specular
+        // glint on the water (slightly glossier offshore). The baked atlas
+        // roughness for the ocean cell is matte — terrain-like — and killed
+        // any sun reflection.
+        if (vTopFace > 0.5) {
+          float _gtidx = floor(vTerrainIndex + 0.5);
+          if (_gtidx > 3.5 && _gtidx < 4.5) {
+            roughnessFactor = mix(0.30, 0.17, vOceanDepth);
+          }
         }`,
       )
       // ── Normal-map perturbation from atlas ──────────────────────────────────
@@ -445,7 +474,7 @@ float terrainDetailNoise(vec2 p) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v20';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v21';
   return mat;
 }
 
