@@ -264,44 +264,46 @@ function buildHills(tiles: Tile[]): void {
   addMesh(bumpMesh);
 }
 
-// ── Desert: 4 elongated dune ridges ─────────────────────────────────────────
+// ── Desert: low rounded dune mounds ──────────────────────────────────────────
 
 function buildDesert(tiles: Tile[]): void {
   if (tiles.length === 0) return;
 
-  const duneGeom = new CylinderGeometry(
-    HEX_SIZE * 0.05, HEX_SIZE * 0.20, HEX_SIZE * 0.60, 8, 1, false,
-  );
-  const duneMat  = new MeshLambertMaterial({ color: new Color(0xc9b078) });
+  // Soft squashed-sphere mounds. The old decor was cone frustums rotated 90°
+  // to lie flat as "ridges" — from the play camera they read as tipped-over
+  // mountains. Civ V desert is mostly texture; a few wide, very low mounds
+  // give relief without competing with the baked dune bands.
+  const duneGeom = new SphereGeometry(HEX_SIZE * 0.22, 14, 10);
+  const duneMat  = new MeshLambertMaterial({ color: new Color(0xddc58c) });
 
-  const total    = tiles.length * 4;
-  const duneMesh = new InstancedMesh(duneGeom, duneMat, total);
+  const MOUNDS = 3;
+  const duneMesh = new InstancedMesh(duneGeom, duneMat, tiles.length * MOUNDS);
 
-  // Dune ridges are long cylinders rotated ~90° to lie flat, spread across tile
-  const q = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), Math.PI / 2);
-  const duneRots: Array<[number, number, number]> = [
-    [-0.12, 0, -0.06],
-    [ 0.08, 0,  0.14],
-    [-0.04, 0,  0.22],
-    [ 0.14, 0, -0.18],
+  const spots: Array<[number, number]> = [
+    [-0.14, -0.08],
+    [ 0.16,  0.10],
+    [-0.02,  0.20],
   ];
 
   let idx = 0;
   const mat = new Matrix4();
   const scaleV = new Vector3();
+  const up = new Vector3(0, 1, 0);
   for (const tile of tiles) {
     const elev = terrainElevation(tile.terrain);
     const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
     const h    = hashCoord(tile.coord.q, tile.coord.r);
-    for (let d = 0; d < 4; d++) {
-      const [ox, , oz] = duneRots[d]!;
-      const scale = 0.78 + (h + d * 7) % 5 * 0.06;
-      const rot   = new Quaternion().setFromAxisAngle(
-        new Vector3(0, 1, 0), ((h + d * 30) % 60 - 30) * (Math.PI / 180),
-      ).multiply(q);
-      scaleV.set(scale, scale * 0.38, scale);
+    for (let d = 0; d < MOUNDS; d++) {
+      const [ox, oz] = spots[d]!;
+      const scale = 0.72 + ((h + d * 7) % 5) * 0.09;
+      const rot = new Quaternion().setFromAxisAngle(
+        up, ((h + d * 37) % 180) * (Math.PI / 180),
+      );
+      // Wide × very low × elongated — a dune, not a boulder. The sphere
+      // centre sits near the tile top so the lower half stays buried.
+      scaleV.set(scale * 1.5, scale * 0.22, scale * 0.9);
       mat.compose(
-        new Vector3(pos.x + ox * HEX_SIZE, pos.y + 1.8, pos.z + oz * HEX_SIZE),
+        new Vector3(pos.x + ox * HEX_SIZE, pos.y + 0.6, pos.z + oz * HEX_SIZE),
         rot,
         scaleV,
       );
