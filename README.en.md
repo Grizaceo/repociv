@@ -15,6 +15,9 @@
 --- | ---
 *Flat hexagonal map — classic, fast, feature-complete.* | *3D WebGL render (Three.js r175) — 🚧 in active development.*
 
+![Demo: agent responds from the map](docs/design/screenshots/demo-chat-untracked-files.jpg)
+*Click a city on the map, ask your agent what's there — the agent inspects the real repo and answers.*
+
 ---
 
 ## What is this?

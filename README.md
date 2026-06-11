@@ -15,6 +15,9 @@
 --- | ---
 *Mapa hexagonal 2D plano — el clásico, rápido y completo.* | *Render 3D WebGL (Three.js r175) — 🚧 en desarrollo activo.*
 
+![Demo: agente responde desde el mapa](docs/design/screenshots/demo-chat-untracked-files.jpg)
+*Haz clic en una ciudad del mapa, pregúntale a tu agente qué hay ahí — el agente inspecciona el repo real y responde.*
+
 ---
 
 ## Vista Local — estilo RimWorld / isométrica 2.5D
