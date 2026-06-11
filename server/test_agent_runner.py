@@ -241,7 +241,9 @@ def test_cursor_streaming_detects_background_task(monkeypatch, tmp_path):
     sent = []
     monkeypatch.setattr(agent_runner, "_find_cursor_agent", lambda: "/fake/cursor-agent")
     monkeypatch.setattr(agent_runner._es, "record_output_chunk", lambda *_a: None)
-    agentpatch = lambda evt: sent.append(evt)
+    def agentpatch(evt: dict) -> None:
+        sent.append(evt)
+
     agent_runner.configure(send=agentpatch)
 
     fake_ndjson = "\n".join([

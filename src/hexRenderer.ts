@@ -1,4 +1,8 @@
-// ─── RepoCiv — Hex & Tile drawing ────────────────────────────────────────────
+// ─── RepoCiv — Hex & Tile drawing (flat 2D mode) ────────────────────────────
+// This is the canonical drawing pipeline for worldRenderMode === 'flat'.
+// The 'iso25d' extruded variant was retired in Phase 1; its canvas-2D
+// pseudo-3D path is gone, leaving flat (this) and the Three.js WebGL
+// path as the only two world renderers.
 import { logger } from './logger.ts';
 import { type Axial, axialToPixel, AXIAL_DIRECTIONS } from './hex.ts';
 import { type Terrain, type Tile, type City, type Building, type District } from './types.ts';

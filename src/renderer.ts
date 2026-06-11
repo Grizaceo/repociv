@@ -1,5 +1,6 @@
 // ─── RepoCiv — Renderer (orquestador) ────────────────────────────────────────
 import { type Axial, worldToAxial, axialToPixel, type Camera } from './hex.ts';
+import { logger } from './logger.ts';
 import { type Unit, type Tile, type City, tileKey } from './types.ts';
 import { type GameState } from './game.ts';
 import { HexRenderer } from './hexRenderer.ts';
@@ -19,16 +20,20 @@ import {
   type SpatialDirective,
 } from './spatialDirectives.ts';
 import {
-  renderDragGhost,
-  renderCityDragGhost,
-  renderAreaSelect,
-  renderDropTarget,
   hideDirectivePreview,
   hideContextMenu,
 } from './ui/spatialPreview.ts';
 import { relocateCity, canRelocateCityTo } from './map.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { HEX_SIZE } from './constants.ts';
+import { renderScreenOverlays, type ScreenOverlayState } from './rendererScreen.ts';
+import {
+  type WorldRenderMode,
+  persistRenderMode,
+  loadThreeMapRenderer,
+} from './three/renderMode.ts';
+
+type ThreeMapRendererType = import('./three/ThreeMapRenderer.ts').ThreeMapRenderer;
 
 export class Renderer {
   private canvas: HTMLCanvasElement;
@@ -50,7 +55,15 @@ export class Renderer {
   private fogEnabled = true;
   private _cleanMode = false;
   private _currentLod: 'low' | 'medium' | 'high' = 'medium';
+  private worldRenderMode: WorldRenderMode = 'flat';
   private animTime = 0;
+  /** Non-null = animTime pinned (deterministic golden captures, ?freeze=). */
+  private _frozenAnimTime: number | null = null;
+  // Phase D: WebGL frame metrics
+  private _frameTimeSum = 0;
+  private _frameTimeCount = 0;
+  private _frameTimeAvg = 0;
+  private _totalFrameCount = 0;
   private _placingMode = false; // true when user is picking a hex on map
 
   /** Panel-driven city relocate (drag city on map; no full gestureMode fork). */
@@ -81,6 +94,9 @@ export class Renderer {
   private unitR: UnitRenderer;
   private minimapR: MinimapRenderer;
   private localR: LocalRendererType | null = null; // Phase 6: RimWorld 2D view
+  private threeMap: ThreeMapRendererType | null = null;
+  private threeContainer: HTMLElement | null = null;
+  private threeLoadPromise: Promise<void> | null = null;
   private _previousViewMode: 'macro' | 'local' | null = null; // Track view mode for transitions
   private _localExitInProgress = false;
   // Callbacks for local view (applied lazily when localR is instantiated)
@@ -173,6 +189,141 @@ export class Renderer {
     await this.hexR.loadAssets();
   }
 
+  /** Toggle global map between flat 2D hex and WebGL (hotkey 2).
+   *  With iso25d retired, the toggle is the only fast way to flip
+   *  between the two surviving world renderers. */
+  toggleWorldRenderMode(): WorldRenderMode {
+    const next: WorldRenderMode = this.worldRenderMode === 'webgl' ? 'flat' : 'webgl';
+    void this.setWorldRenderMode(next);
+    return next;
+  }
+
+  /** Cycle world render mode (hotkey 3). Currently the same as toggle. */
+  cycleWorldRenderMode(): WorldRenderMode {
+    return this.toggleWorldRenderMode();
+  }
+
+  async setWorldRenderMode(mode: WorldRenderMode): Promise<void> {
+    if (mode === this.worldRenderMode && (mode !== 'webgl' || this.threeMap)) return;
+
+    if (mode === 'webgl') {
+      try {
+        await this.ensureThreeMap();
+      } catch (err) {
+        logger.error('[Renderer] WebGL init failed, falling back to flat', err);
+        mode = 'flat';
+      }
+      if (mode === 'webgl' && this.threeMap) {
+        this.worldRenderMode = 'webgl';
+        persistRenderMode('webgl');
+        this.threeMap.setActive(true);
+        this.threeMap.resize();
+        this.canvas.classList.add('webgl-overlay');
+        return;
+      }
+      mode = 'flat';
+    }
+
+    this.worldRenderMode = mode;
+    persistRenderMode(mode);
+    this.threeMap?.setActive(false);
+    this.canvas.classList.remove('webgl-overlay');
+  }
+
+  getWorldRenderMode(): WorldRenderMode {
+    return this.worldRenderMode;
+  }
+
+  private async ensureThreeMap(): Promise<void> {
+    if (this.threeMap) return;
+    if (!this.threeLoadPromise) {
+      this.threeLoadPromise = (async () => {
+        this.threeContainer =
+          this.threeContainer ?? document.getElementById('three-container');
+        if (!this.threeContainer) {
+          throw new Error('#three-container not found');
+        }
+        const ThreeMapRenderer = await loadThreeMapRenderer();
+        this.threeMap = new ThreeMapRenderer(this.threeContainer);
+      })();
+    }
+    try {
+      await this.threeLoadPromise;
+    } catch (err) {
+      this.threeLoadPromise = null;
+      throw err;
+    }
+    if (!this.threeMap) {
+      throw new Error('ThreeMapRenderer failed to initialize');
+    }
+  }
+
+  /** Apply saved URL/localStorage mode after construction. */
+  async applyInitialRenderMode(mode: WorldRenderMode): Promise<void> {
+    await this.setWorldRenderMode(mode);
+  }
+
+  /** Center macro camera on world tile bounds (fallback when no capital). */
+  focusOnWorldBounds(): void {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const tile of this.state.world.tiles.values()) {
+      const pos = axialToPixel(tile.coord, HEX_SIZE);
+      minX = Math.min(minX, pos.x);
+      maxX = Math.max(maxX, pos.x);
+      minY = Math.min(minY, pos.y);
+      maxY = Math.max(maxY, pos.y);
+    }
+    if (!Number.isFinite(minX)) return;
+    this.cam.x = (minX + maxX) / 2;
+    this.cam.y = (minY + maxY) / 2;
+  }
+
+  /** Center macro camera on an axial hex (works before WebGL is loaded).
+   *
+   *  One formula for both modes: axialToWorld3D() is axialToPixel() with
+   *  y→z, so 2D map space and 3D world XZ are numerically identical and
+   *  syncCamera() consumes cam.x/y directly as the 3D look-at target.
+   *  (The old WebGL branch projected through the not-yet-synced three
+   *  camera at boot — w≈0 → NaN — and poisoned cam.x/y permanently.) */
+  focusOnCoord(coord: import('./hex.ts').Axial): void {
+    const pos = axialToPixel(coord, HEX_SIZE);
+    this.cam.x = pos.x;
+    this.cam.y = pos.y;
+  }
+
+  private pickAxial(wx: number, wy: number): Axial {
+    if (this.worldRenderMode === 'webgl' && this.threeMap) {
+      const picked = this.threeMap.pickAxial(wx, wy);
+      if (picked) return picked;
+    }
+    return worldToAxial(wx, wy, HEX_SIZE, this.cam);
+  }
+
+  private tilePixelPos(coord: Axial, _tile?: Tile | null): { x: number; y: number } {
+    if (this.worldRenderMode === 'webgl' && this.threeMap) {
+      return this.threeMap.projectTileCenter(coord, this.state, this.cam);
+    }
+    return axialToPixel(coord, HEX_SIZE);
+  }
+
+  private drawHexHighlight(coord: Axial, color: string, lw: number): void {
+    if (this.worldRenderMode === 'webgl' && this.threeMap) {
+      const corners = this.threeMap.projectHexOutline(coord, this.state, this.cam);
+      const { ctx } = this;
+      ctx.beginPath();
+      corners.forEach((c, i) => (i === 0 ? ctx.moveTo(c.x, c.y) : ctx.lineTo(c.x, c.y)));
+      ctx.closePath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lw / this.cam.zoom;
+      ctx.stroke();
+      return;
+    }
+    this.hexR.drawHexOutline(coord, color, lw);
+  }
+
   async preloadLocalRenderer() {
     if (this._localRendererCtor) return;
     const mod = await import('./localRenderer.ts');
@@ -180,10 +331,14 @@ export class Renderer {
   }
 
   private resize() {
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
-    this.cam.cx = this.canvas.width / 2;
-    this.cam.cy = this.canvas.height / 2;
+    const rect = this.canvas.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width || window.innerWidth));
+    const h = Math.max(1, Math.round(rect.height || window.innerHeight));
+    this.canvas.width = w;
+    this.canvas.height = h;
+    this.cam.cx = w / 2;
+    this.cam.cy = h / 2;
+    this.threeMap?.resize();
   }
 
   private setupInput() {
@@ -193,7 +348,7 @@ export class Renderer {
       const rect = this.canvas.getBoundingClientRect();
       const wx = e.clientX - rect.left;
       const wy = e.clientY - rect.top;
-      const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+      const coord = this.pickAxial(wx, wy);
       const tile = this.state.world.tiles.get(tileKey(coord)) ?? null;
 
       if (this._cityRelocateMode && tile?.city) {
@@ -249,7 +404,7 @@ export class Renderer {
       const rect = this.canvas.getBoundingClientRect();
       const wx = e.clientX - rect.left;
       const wy = e.clientY - rect.top;
-      this.hoveredHex = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+      this.hoveredHex = this.pickAxial(wx, wy);
       this.updateUnitTooltip(e.clientX, e.clientY);
 
       if (this._cityRelocateMode && this.draggedCity && this.dragStartPos) {
@@ -321,7 +476,7 @@ export class Renderer {
           const dragged = unit ? this.wasDrag(e) : false;
           if (unit && dragged) {
             // Dragged to a tile → interpret as spatial directive
-            const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+            const coord = this.pickAxial(wx, wy);
             const toTile = this.state.world.tiles.get(tileKey(coord));
             if (toTile) {
               const directive = interpretUnitDrag({
@@ -351,7 +506,7 @@ export class Renderer {
 
         case 'route': {
           if (this.routeFromCity && this.wasDrag(e)) {
-            const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+            const coord = this.pickAxial(wx, wy);
             const toTile = this.state.world.tiles.get(tileKey(coord));
             if (toTile?.city && toTile.city.id !== this.routeFromCity.tile.city?.id) {
               const directive = interpretCityToCityDrag({
@@ -376,7 +531,7 @@ export class Renderer {
             const maxY = Math.max(this.areaStart.y, this.areaEnd.y);
             const selected: Tile[] = [];
             for (const tile of this.state.world.tiles.values()) {
-              const px = axialToPixel(tile.coord, HEX_SIZE);
+              const px = this.tilePixelPos(tile.coord, tile);
               // Convert world→screen
               const sx = (px.x - this.cam.x) * this.cam.zoom + this.cam.cx;
               const sy = (px.y - this.cam.y) * this.cam.zoom + this.cam.cy;
@@ -397,7 +552,7 @@ export class Renderer {
           if (this._cityRelocateMode && this.draggedCity && this.dragStartPos) {
             const dsp = this.dragStartPos;
             const dragMoved = Math.abs(e.clientX - dsp.x) > 3 || Math.abs(e.clientY - dsp.y) > 3;
-            const dropCoord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+            const dropCoord = this.pickAxial(wx, wy);
             const dc = this.draggedCity;
             const path = this.dragCityRepoPath;
             if (dragMoved) {
@@ -460,7 +615,7 @@ export class Renderer {
       const rect = this.canvas.getBoundingClientRect();
       const wx = e.clientX - rect.left;
       const wy = e.clientY - rect.top;
-      const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+      const coord = this.pickAxial(wx, wy);
       const tile = this.state.world.tiles.get(tileKey(coord));
       if (tile?.city) {
         const items = contextMenuForCity(tile.city, this.selectedUnit);
@@ -482,7 +637,7 @@ export class Renderer {
       const rect = this.canvas.getBoundingClientRect();
       const wx = e.clientX - rect.left;
       const wy = e.clientY - rect.top;
-      const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+      const coord = this.pickAxial(wx, wy);
       const tile = this.state.world.tiles.get(tileKey(coord));
       const city = tile?.city ?? this.getCityAtScreen(wx, wy);
 
@@ -524,7 +679,7 @@ export class Renderer {
   }
 
   private getTileAt(wx: number, wy: number) {
-    const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+    const coord = this.pickAxial(wx, wy);
     return this.state.world.tiles.get(tileKey(coord)) ?? null;
   }
 
@@ -539,7 +694,8 @@ export class Renderer {
     let best: City | null = null;
     let bestDistance = Infinity;
     for (const city of this.state.world.cities) {
-      const pos = axialToPixel(city.coord, HEX_SIZE);
+      const tile = this.state.world.tiles.get(tileKey(city.coord));
+      const pos = this.tilePixelPos(city.coord, tile);
       const distance = Math.hypot(worldX - pos.x, worldY - pos.y);
       if (distance <= threshold && distance < bestDistance) {
         best = city;
@@ -570,7 +726,7 @@ export class Renderer {
     const rect = this.canvas.getBoundingClientRect();
     const wx = e.clientX - rect.left;
     const wy = e.clientY - rect.top;
-    const coord = worldToAxial(wx, wy, HEX_SIZE, this.cam);
+    const coord = this.pickAxial(wx, wy);
     const tile = this.state.world.tiles.get(tileKey(coord));
     const city = tile?.city ?? this.getCityAtScreen(wx, wy);
 
@@ -636,14 +792,72 @@ export class Renderer {
   }
 
   centerOn(coord: import('./hex.ts').Axial) {
-    const pos = axialToPixel(coord, HEX_SIZE);
-    this.cam.x = -pos.x * this.cam.zoom + this.canvas.width / 2;
-    this.cam.y = -pos.y * this.cam.zoom + this.canvas.height / 2;
+    this.focusOnCoord(coord);
+  }
+
+  /**
+   * Set the camera to an explicit (x, y, zoom). Used by the visual
+   * regression script (scripts/screenshot-3d-audit.mjs) and e2e specs
+   * to take screenshots from a known viewpoint. The URL parser in
+   * applyInitialRenderMode() routes ?cam=x,y,zoom to this.
+   */
+  setCamera(x: number, y: number, zoom: number): void {
+    this.cam.x = x;
+    this.cam.y = y;
+    this.cam.zoom = zoom;
+  }
+
+  /**
+   * Parse a `?cam=x,y,zoom` URL fragment and apply it to the camera.
+   * No-op if the param is absent or malformed. Used by the visual
+   * regression script for reproducible viewpoints.
+   */
+  applyCameraFromUrl(): void {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('cam');
+    if (raw) {
+      const parts = raw.split(',');
+      if (parts[0] === 'auto') {
+        // `?cam=auto,<zoom>` keeps the app's own (deterministic) centering
+        // and overrides only the zoom — the golden captures use this so
+        // they don't need to know the world centroid for a given seed.
+        const zoom = Number(parts[1]);
+        if (Number.isFinite(zoom) && zoom > 0) {
+          this.setCamera(this.cam.x, this.cam.y, zoom);
+        }
+      } else {
+        const nums = parts.map((s) => Number(s.trim()));
+        const x = nums[0];
+        const y = nums[1];
+        const zoom = nums[2];
+        if (
+          x !== undefined &&
+          y !== undefined &&
+          zoom !== undefined &&
+          Number.isFinite(x) &&
+          Number.isFinite(y) &&
+          Number.isFinite(zoom) &&
+          zoom > 0
+        ) {
+          this.setCamera(x, y, zoom);
+        }
+      }
+    }
+    // `?freeze=<seconds>` pins animTime to a constant. Without it, the
+    // SHA-exact golden comparison depends on capture-timing jitter:
+    // shoreline pulse, sun arc, and territory shimmer all read animTime.
+    const freezeRaw = params.get('freeze');
+    if (freezeRaw !== null) {
+      const t = Number(freezeRaw);
+      this._frozenAnimTime = Number.isFinite(t) && t >= 0 ? t : 0;
+      this.animTime = this._frozenAnimTime;
+    }
   }
 
   panTo(worldX: number, worldY: number) {
-    this.cam.x = -worldX * this.cam.zoom + this.canvas.width / 2;
-    this.cam.y = -worldY * this.cam.zoom + this.canvas.height / 2;
+    this.cam.x = worldX;
+    this.cam.y = worldY;
   }
 
   private rafId = 0;
@@ -652,25 +866,91 @@ export class Renderer {
     cancelAnimationFrame(this.rafId);
     this.resizeObserver.disconnect();
     document.removeEventListener('keydown', this._onCityRelocateKeyDown);
+    this.threeMap?.dispose();
+    this.threeMap = null;
+  }
+
+  /** True when the WebGL terrain atlas finished loading (capture scripts). */
+  isTerrainAtlasReady(): boolean {
+    return this.threeMap?.isAtlasReady() ?? false;
+  }
+
+  /** Phase D: WebGL frame metrics for observability panel. */
+  getWebGLMetrics(): { frameTimeAvg: number; frameCount: number; dirtyRatePct: number } | null {
+    if (this.worldRenderMode !== 'webgl') return null;
+    return {
+      frameTimeAvg: this._frameTimeAvg,
+      frameCount: this._totalFrameCount,
+      dirtyRatePct: this.threeMap?.getDirtyRatePct() ?? 0,
+    };
   }
 
   start() {
     let lastTime = performance.now();
     const loop = (now: number) => {
+      const frameStart = performance.now();
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
-      this.animTime += dt;
+      if (this._frozenAnimTime === null) {
+        this.animTime += dt;
+      } else {
+        this.animTime = this._frozenAnimTime;
+      }
       this.render();
       this.minimapR.draw(this.cam, this.canvas, this.fogEnabled);
+      // Phase D: track frame time and dirty rate
+      if (this.worldRenderMode === 'webgl') {
+        const frameMs = performance.now() - frameStart;
+        this._frameTimeSum += frameMs;
+        this._frameTimeCount++;
+        this._totalFrameCount++;
+        // Rolling average every 60 frames
+        if (this._frameTimeCount >= 60) {
+          this._frameTimeAvg = Math.round(this._frameTimeSum / this._frameTimeCount * 100) / 100;
+          this._frameTimeSum = 0;
+          this._frameTimeCount = 0;
+        }
+        // Reset rolling window every 600 frames (~10s)
+        if (this._totalFrameCount >= 600) {
+          this._totalFrameCount = 0;
+        }
+      }
       this.rafId = requestAnimationFrame(loop);
     };
     this.rafId = requestAnimationFrame(loop);
   }
 
+
+  private screenOverlayState(): ScreenOverlayState {
+    return {
+      ctx: this.ctx,
+      canvas: this.canvas,
+      cam: this.cam,
+      animTime: this.animTime,
+      draggedUnit: this.draggedUnit,
+      ghostScreenPos: this.ghostScreenPos,
+      draggedCity: this.draggedCity,
+      cityGhostScreenPos: this.cityGhostScreenPos,
+      relocateDragActive: this.relocateDragActive,
+      areaStart: this.areaStart,
+      areaEnd: this.areaEnd,
+      hoveredHex: this.hoveredHex,
+      tiles: this.state.world.tiles,
+      tilePixelPos: (coord, tile) => this.tilePixelPos(coord, tile),
+      canRelocateTo: (hex) => this.draggedCity ? canRelocateCityTo(this.state.world, this.draggedCity, hex) : false,
+    };
+  }
+
   private render() {
     const { ctx, canvas, cam } = this;
-    ctx.fillStyle = '#050505';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const webglMode = this.worldRenderMode === 'webgl' && this.threeMap !== null;
+
+    if (webglMode) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    } else {
+      ctx.fillStyle = '#050505';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
 
     // Compute LOD from zoom level
     this._currentLod = this.calcLod();
@@ -715,6 +995,7 @@ export class Renderer {
     }
 
     if (currentViewMode === 'local') {
+      this.threeMap?.setActive(false);
       this.localR?.setInputActive(true);
       if (!document.body.classList.contains('local-view')) {
         document.body.classList.add('local-view');
@@ -776,16 +1057,91 @@ export class Renderer {
     const lodMed = lod === 'medium';
     const lodHigh = lod === 'high';
 
-    // Pass 1: Surfaces & Shorelines (base layer — always on)
-    for (const tile of this.state.world.tiles.values()) {
-      const neighbors = this.getNeighbors(tile.coord);
-      this.hexR.drawTileSurface(tile, this.fogEnabled, neighbors, this.animTime);
-    }
+    // Pass 1–3: terrain (webgl / flat legacy — iso25d retired)
+    if (webglMode && this.threeMap) {
+      this.threeMap.setActive(true);
+      this.unitR.setCoordProjector((coord) => {
+        const t = this.state.world.tiles.get(tileKey(coord));
+        return this.tilePixelPos(coord, t);
+      });
+      this.threeMap.render(this.state, this.cam, {
+        fogEnabled: this.fogEnabled,
+        animTime: this.animTime,
+        lod,
+        showStructure,
+        showOps,
+        showLabels,
+      });
+    } else {
+      this.unitR.resetCoordProjector();
 
-    // Pass 2: Territory (structure layer)
-    if (showStructure) {
-      for (const city of this.state.world.cities) {
-        this.hexR.drawCityTerritory(city, this.animTime);
+      for (const tile of this.state.world.tiles.values()) {
+        const neighbors = this.getNeighbors(tile.coord);
+        this.hexR.drawTileSurface(tile, this.fogEnabled, neighbors, this.animTime);
+      }
+
+      if (showStructure) {
+        for (const city of this.state.world.cities) {
+          this.hexR.drawCityTerritory(city, this.animTime);
+        }
+      }
+
+      const tileCount = this.state.world.tiles.size;
+      if (tileCount !== this._tilesYSortedSize) {
+        this._tilesYSorted = Array.from(this.state.world.tiles.values()).sort((a, b) => {
+          const pa = axialToPixel(a.coord, HEX_SIZE);
+          const pb = axialToPixel(b.coord, HEX_SIZE);
+          return pa.y - pb.y;
+        });
+        this._tilesYSortedSize = tileCount;
+      }
+      const allTiles = this._tilesYSorted;
+
+      const shouldDrawDecor = showStructure || showOps;
+      const showTextLabels = showLabels && !lodLow;
+      for (const tile of allTiles) {
+        if (!shouldDrawDecor && !showTextLabels) continue;
+
+        const activeBuilding = tile.city
+          ? this.state.world.buildings.find(
+              (b) => b.cityId === tile.city!.id && b.state === 'building',
+            )
+          : undefined;
+
+        if (lodLow) {
+          if (tile.city && tile.city.isCapital && showTextLabels) {
+            this.hexR.drawCityLabel(tile.city, axialToPixel(tile.coord, HEX_SIZE), activeBuilding);
+          }
+          continue;
+        }
+
+        if (lodMed) {
+          if (tile.city && showTextLabels) {
+            this.hexR.drawCityLabel(tile.city, axialToPixel(tile.coord, HEX_SIZE), activeBuilding);
+          }
+          if (tile.city && tile.skillHealth && showTextLabels) {
+            this.hexR.drawSkillHealth(tile, axialToPixel(tile.coord, HEX_SIZE));
+          }
+          if (tile.city && tile.city.districts && tile.city.districts.length > 0 && showTextLabels) {
+            for (const dist of tile.city.districts) {
+              this.hexR.drawDistrictLabel(dist.name, axialToPixel(dist.coord, HEX_SIZE));
+            }
+          }
+          continue;
+        }
+
+        if (lodHigh) {
+          if (isClean) {
+            if (tile.city && showTextLabels) {
+              this.hexR.drawCityLabel(tile.city, axialToPixel(tile.coord, HEX_SIZE), activeBuilding);
+            }
+            if (tile.city && tile.skillHealth && showTextLabels) {
+              this.hexR.drawSkillHealth(tile, axialToPixel(tile.coord, HEX_SIZE));
+            }
+            continue;
+          }
+          this.hexR.drawTileDecor(tile, this.fogEnabled, activeBuilding, this.animTime);
+        }
       }
     }
 
@@ -793,7 +1149,7 @@ export class Renderer {
     if (showStructure) {
       const capital = this.state.world.cities.find((c) => c.isCapital);
       if (capital) {
-        const cp = axialToPixel(capital.coord, HEX_SIZE);
+        const cp = this.tilePixelPos(capital.coord, this.state.world.tiles.get(tileKey(capital.coord)));
         if (capital.wonders) {
           for (let i = 0; i < Math.min(capital.wonders.length, 2); i++) {
             const w = capital.wonders[i]!;
@@ -831,12 +1187,17 @@ export class Renderer {
       // Precompute knowledge city positions once to avoid O(n²) per-frame wonders scan
       const knowledgePts = this.state.world.cities
         .filter((c) => c.wonders?.some((w) => w.wonderType === 'bibliotheca'))
-        .map((c) => ({ id: c.id, p: axialToPixel(c.coord, HEX_SIZE) }));
+        .map((c) => ({
+          id: c.id,
+          p: this.tilePixelPos(c.coord, this.state.world.tiles.get(tileKey(c.coord))),
+        }));
 
       for (const { p: cp } of knowledgePts) {
         // Glowing book icon
         ctx.save();
-        ctx.globalAlpha = 0.35 + 0.15 * Math.sin(this.animTime * 1.5 + cp.x);
+        ctx.globalAlpha = webglMode
+          ? 0.18 + 0.06 * Math.sin(this.animTime * 1.5 + cp.x)
+          : 0.35 + 0.15 * Math.sin(this.animTime * 1.5 + cp.x);
         ctx.fillStyle = '#4a90c8';
         ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'center';
@@ -847,9 +1208,12 @@ export class Renderer {
           if (op === cp) continue;
           const dist = Math.hypot(op.x - cp.x, op.y - cp.y);
           if (dist > HEX_SIZE * 12) continue; // don't draw across the whole map
-          ctx.strokeStyle = `rgba(74, 144, 200, ${0.08 + 0.04 * Math.sin(this.animTime * 0.8 + cp.x + op.x)})`;
-          ctx.lineWidth = 0.5;
-          ctx.setLineDash([3, 6]);
+          const knowledgeAlpha = webglMode
+            ? 0.018 + 0.010 * Math.sin(this.animTime * 0.8 + cp.x + op.x)
+            : 0.08 + 0.04 * Math.sin(this.animTime * 0.8 + cp.x + op.x);
+          ctx.strokeStyle = `rgba(74, 144, 200, ${knowledgeAlpha})`;
+          ctx.lineWidth = webglMode ? 0.35 : 0.5;
+          ctx.setLineDash(webglMode ? [2, 10] : [3, 6]);
           ctx.beginPath();
           ctx.moveTo(cp.x, cp.y);
           ctx.lineTo(op.x, op.y);
@@ -868,10 +1232,10 @@ export class Renderer {
           (b) => b.cityId === city.id && b.state === 'building',
         );
         if (!hasLab && !hasActiveExp) continue;
-        const cp = axialToPixel(city.coord, HEX_SIZE);
+        const cp = this.tilePixelPos(city.coord, this.state.world.tiles.get(tileKey(city.coord)));
         const pulse = 0.4 + 0.3 * Math.sin(this.animTime * 3.0);
         ctx.save();
-        ctx.globalAlpha = pulse;
+        ctx.globalAlpha = webglMode ? pulse * 0.45 : pulse;
         ctx.fillStyle = '#22C55E';
         ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'center';
@@ -879,8 +1243,8 @@ export class Renderer {
         ctx.fillText('🔬', cp.x + HEX_SIZE * 0.8, cp.y + HEX_SIZE * 0.6);
         // Pulsing ring around lab cities with active experiments
         if (hasActiveExp) {
-          ctx.strokeStyle = `rgba(34, 197, 94, ${pulse * 0.5})`;
-          ctx.lineWidth = 2;
+          ctx.strokeStyle = `rgba(34, 197, 94, ${webglMode ? pulse * 0.20 : pulse * 0.5})`;
+          ctx.lineWidth = webglMode ? 1 : 2;
           ctx.beginPath();
           ctx.arc(cp.x, cp.y, HEX_SIZE * 0.85, 0, Math.PI * 2);
           ctx.stroke();
@@ -894,97 +1258,35 @@ export class Renderer {
       for (const city of this.state.world.cities) {
         const hasSecurity = city.wonders !== undefined && city.wonders.length > 0;
         if (!hasSecurity) continue;
-        const cp = axialToPixel(city.coord, HEX_SIZE);
+        const cp = this.tilePixelPos(city.coord, this.state.world.tiles.get(tileKey(city.coord)));
         ctx.save();
         ctx.fillStyle = '#d45b5b';
-        ctx.globalAlpha = 0.4 + 0.2 * Math.sin(this.animTime * 2.0 + cp.x);
+        ctx.globalAlpha = webglMode
+          ? 0.18 + 0.08 * Math.sin(this.animTime * 2.0 + cp.x)
+          : 0.4 + 0.2 * Math.sin(this.animTime * 2.0 + cp.x);
         ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('🛡', cp.x - HEX_SIZE * 0.75, cp.y - HEX_SIZE * 0.6);
         // Perimeter hex outline
-        this.hexR.drawHexOutline(
+        this.drawHexHighlight(
           city.coord,
-          `rgba(212, 91, 91, ${0.12 + 0.08 * Math.sin(this.animTime * 1.2)})`,
-          1.5,
+          `rgba(212, 91, 91, ${webglMode ? 0.04 + 0.03 * Math.sin(this.animTime * 1.2) : 0.12 + 0.08 * Math.sin(this.animTime * 1.2)})`,
+          webglMode ? 1 : 1.5,
         );
         ctx.restore();
       }
     }
 
-    // Pass 3: Decorations (gated by structure + ops + labels + LOD)
-    const tileCount = this.state.world.tiles.size;
-    if (tileCount !== this._tilesYSortedSize) {
-      this._tilesYSorted = Array.from(this.state.world.tiles.values()).sort((a, b) => {
-        const pa = axialToPixel(a.coord, HEX_SIZE);
-        const pb = axialToPixel(b.coord, HEX_SIZE);
-        return pa.y - pb.y;
-      });
-      this._tilesYSortedSize = tileCount;
-    }
-    const allTiles = this._tilesYSorted;
-
-    const shouldDrawDecor = showStructure || showOps;
-    const showTextLabels = showLabels && !lodLow;
-    for (const tile of allTiles) {
-      if (!shouldDrawDecor && !showTextLabels) continue;
-
-      const activeBuilding = tile.city
-        ? this.state.world.buildings.find(
-            (b) => b.cityId === tile.city!.id && b.state === 'building',
-          )
-        : undefined;
-
-      // LOD low: only capital city name if labels ON
-      if (lodLow) {
-        if (tile.city && tile.city.isCapital && showTextLabels) {
-          this.hexR.drawCityLabel(tile.city, axialToPixel(tile.coord, HEX_SIZE), activeBuilding);
-        }
-        continue;
-      }
-
-      // LOD medium: city labels + district labels + skill health, NO terrain decor
-      if (lodMed) {
-        if (tile.city && showTextLabels) {
-          this.hexR.drawCityLabel(tile.city, axialToPixel(tile.coord, HEX_SIZE), activeBuilding);
-        }
-        if (tile.city && tile.skillHealth && showTextLabels) {
-          this.hexR.drawSkillHealth(tile, axialToPixel(tile.coord, HEX_SIZE));
-        }
-        if (tile.city && tile.city.districts && tile.city.districts.length > 0 && showTextLabels) {
-          for (const dist of tile.city.districts) {
-            this.hexR.drawDistrictLabel(dist.name, axialToPixel(dist.coord, HEX_SIZE));
-          }
-        }
-        continue;
-      }
-
-      // LOD high (or fallback): full path
-      if (lodHigh) {
-        // Clean mode: city labels + skill health, no terrain decor
-        if (isClean) {
-          if (tile.city && showTextLabels) {
-            this.hexR.drawCityLabel(tile.city, axialToPixel(tile.coord, HEX_SIZE), activeBuilding);
-          }
-          if (tile.city && tile.skillHealth && showTextLabels) {
-            this.hexR.drawSkillHealth(tile, axialToPixel(tile.coord, HEX_SIZE));
-          }
-          continue;
-        }
-        // Full detail: full tile decor with all icons
-        this.hexR.drawTileDecor(tile, this.fogEnabled, activeBuilding, this.animTime);
-      }
-    }
-
     if (this.showGrid) {
-      ctx.setLineDash([4, 8]);
+      ctx.setLineDash(webglMode ? [3, 12] : [4, 8]);
       for (const tile of this.state.world.tiles.values()) {
-        this.hexR.drawHexOutline(tile.coord, 'rgba(255,255,255,0.08)', 1);
+        this.drawHexHighlight(tile.coord, webglMode ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.08)', webglMode ? 0.8 : 1);
       }
       ctx.setLineDash([]);
     }
 
-    // Buildings (structure layer)
+    // Buildings (structure layer) — canvas markers; webgl uses 3D units mesh
     if (showStructure) {
       for (const building of this.state.world.buildings) {
         this.unitR.drawBuilding(building);
@@ -1006,7 +1308,8 @@ export class Renderer {
       }
     }
 
-    // Units (base layer — always visible) + badges (ops for state; swarm pill always)
+    // Units (base layer — canvas in 2D modes; 3D capsules in webgl) + badges
+    if (!webglMode) {
     for (const unit of this.state.world.units) {
       if (unit.ephemeral && !this._shouldDrawEphemeralOnMap(unit)) continue;
       this.unitR.drawUnit(unit, this.animTime, this.selectedUnit?.id ?? null, unit.ephemeral);
@@ -1018,15 +1321,26 @@ export class Renderer {
         this.unitR.drawUnitBadge(unit, this.animTime);
       }
     }
+    } else if (showOps && !isClean && lod !== 'low') {
+      for (const unit of this.state.world.units) {
+        if (unit.ephemeral && !this._shouldDrawEphemeralOnMap(unit)) continue;
+        this.unitR.drawUnitBadge(unit, this.animTime);
+        const childCount = this.state.getChildrenOfUnit(unit.id).filter((c) => c.ephemeral).length;
+        if (childCount > 0) {
+          this.unitR.drawSubagentCountBadge(unit, childCount, this.animTime);
+        }
+      }
+    }
 
     // Selection glow (draw on top of selected focus for glow effect)
     if (this.selectedCity && !this.selectedUnit) {
-      const cityPos = axialToPixel(this.selectedCity.coord, HEX_SIZE);
+      const cityTile = this.state.world.tiles.get(tileKey(this.selectedCity.coord));
+      const cityPos = this.tilePixelPos(this.selectedCity.coord, cityTile);
       const glowPulse = 0.35 + 0.2 * Math.sin(this.animTime * 2.5);
       ctx.save();
       ctx.shadowColor = '#c8a84b';
       ctx.shadowBlur = 16;
-      this.hexR.drawHexOutline(this.selectedCity.coord, `rgba(200, 168, 75, ${glowPulse})`, 3);
+      this.drawHexHighlight(this.selectedCity.coord, `rgba(200, 168, 75, ${glowPulse})`, 3);
       ctx.restore();
       ctx.save();
       ctx.strokeStyle = `rgba(255, 245, 200, ${glowPulse * 0.85})`;
@@ -1046,16 +1360,17 @@ export class Renderer {
           selUnit.path.length > 0 &&
           selUnit.pathIndex < selUnit.path.length
         ) {
-          const from = axialToPixel(selUnit.path[selUnit.pathIndex]!, HEX_SIZE);
-          const to = axialToPixel(
-            selUnit.path[Math.min(selUnit.pathIndex + 1, selUnit.path.length - 1)]!,
-            HEX_SIZE,
+          const from = this.tilePixelPos(
+            selUnit.path[selUnit.pathIndex]!,
+            this.state.world.tiles.get(tileKey(selUnit.path[selUnit.pathIndex]!)),
           );
+          const toCoord = selUnit.path[Math.min(selUnit.pathIndex + 1, selUnit.path.length - 1)]!;
+          const to = this.tilePixelPos(toCoord, this.state.world.tiles.get(tileKey(toCoord)));
           const t = selUnit.pathProgress;
           sx = from.x + (to.x - from.x) * t;
           sy = from.y + (to.y - from.y) * t;
         } else {
-          const p = axialToPixel(selUnit.coord, HEX_SIZE);
+          const p = this.tilePixelPos(selUnit.coord, this.state.world.tiles.get(tileKey(selUnit.coord)));
           sx = p.x;
           sy = p.y;
         }
@@ -1083,8 +1398,8 @@ export class Renderer {
 
     if (this.showDebug) {
       for (const tile of this.state.world.tiles.values()) {
-        this.hexR.drawHexOutline(tile.coord, '#ff000040', 1);
-        const wp = axialToPixel(tile.coord, HEX_SIZE);
+        this.drawHexHighlight(tile.coord, '#ff000040', 1);
+        const wp = this.tilePixelPos(tile.coord, tile);
         ctx.save();
         ctx.fillStyle = '#ff0000';
         ctx.font = '9px monospace';
@@ -1101,93 +1416,22 @@ export class Renderer {
       if (this._placingMode) {
         // In placing mode: highlight only empty hexes with bright green
         if (!tile?.city && !unitHere) {
-          this.hexR.drawHexOutline(this.hoveredHex, '#00ff00cc', 3);
+          this.drawHexHighlight(this.hoveredHex, '#00ff00cc', 3);
         } else {
-          this.hexR.drawHexOutline(this.hoveredHex, '#ff3333aa', 2); // occupied = red tint
+          this.drawHexHighlight(this.hoveredHex, '#ff3333aa', 2);
         }
       } else if (this._cityRelocateMode && this.draggedCity && this.relocateDragActive) {
         const ok = canRelocateCityTo(this.state.world, this.draggedCity, this.hoveredHex);
-        this.hexR.drawHexOutline(this.hoveredHex, ok ? '#00ff00cc' : '#ff3333aa', 3);
+        this.drawHexHighlight(this.hoveredHex, ok ? '#00ff00cc' : '#ff3333aa', 3);
       } else {
-        this.hexR.drawHexOutline(this.hoveredHex, '#c8a84b80', 2);
+        this.drawHexHighlight(this.hoveredHex, '#c8a84b80', 2);
       }
     }
 
     ctx.restore();
 
-    // ─── Fase 5: Spatial overlay (screen-space, outside camera transform) ──────
-    if (this.draggedUnit && this.ghostScreenPos) {
-      renderDragGhost(
-        ctx,
-        this.ghostScreenPos.x,
-        this.ghostScreenPos.y,
-        this.draggedUnit.color,
-        this.draggedUnit.id,
-      );
-      if (this.hoveredHex) {
-        const toTile = this.state.world.tiles.get(tileKey(this.hoveredHex));
-        const px = axialToPixel(this.hoveredHex, HEX_SIZE);
-        const sx = (px.x - cam.x) * cam.zoom + cam.cx;
-        const sy = (px.y - cam.y) * cam.zoom + cam.cy;
-        renderDropTarget(ctx, sx, sy, HEX_SIZE * cam.zoom, !!toTile?.city);
-      }
-    }
-    if (this.draggedCity && this.cityGhostScreenPos && this.relocateDragActive) {
-      renderCityDragGhost(
-        ctx,
-        this.cityGhostScreenPos.x,
-        this.cityGhostScreenPos.y,
-        this.draggedCity.name,
-      );
-      if (this.hoveredHex) {
-        const ok = canRelocateCityTo(this.state.world, this.draggedCity, this.hoveredHex);
-        const px = axialToPixel(this.hoveredHex, HEX_SIZE);
-        const sx = (px.x - cam.x) * cam.zoom + cam.cx;
-        const sy = (px.y - cam.y) * cam.zoom + cam.cy;
-        renderDropTarget(ctx, sx, sy, HEX_SIZE * cam.zoom, ok);
-      }
-    }
-    if (this.areaStart && this.areaEnd) {
-      renderAreaSelect(ctx, this.areaStart.x, this.areaStart.y, this.areaEnd.x, this.areaEnd.y);
-    }
-
-    // Global Atmospheric Bloom / Lighting (Time of Day Cycle)
-    const timeOfDay = (this.animTime * 0.035) % (Math.PI * 2);
-    const sinTime = Math.sin(timeOfDay);
-
-    let warmColor: string;
-    let vignetteColor: string;
-
-    if (sinTime > 0.5) {
-      // Mediodía brillante (claro y neutro)
-      warmColor = 'rgba(255, 255, 255, 0.015)';
-      vignetteColor = 'rgba(0, 0, 0, 0.12)';
-    } else if (sinTime > 0) {
-      // Tarde dorada (naranja cálido imperial)
-      warmColor = 'rgba(240, 150, 50, 0.04)';
-      vignetteColor = 'rgba(15, 10, 5, 0.22)';
-    } else if (sinTime > -0.5) {
-      // Amanecer/Dusk (púrpura y lavanda)
-      warmColor = 'rgba(180, 100, 240, 0.03)';
-      vignetteColor = 'rgba(8, 4, 18, 0.26)';
-    } else {
-      // Noche de neón (azul profundo oscurecido)
-      warmColor = 'rgba(40, 60, 180, 0.015)';
-      vignetteColor = 'rgba(1, 1, 6, 0.45)';
-    }
-
-    const grad = ctx.createRadialGradient(
-      canvas.width / 2,
-      canvas.height / 2,
-      0,
-      canvas.width / 2,
-      canvas.height / 2,
-      canvas.width,
-    );
-    grad.addColorStop(0, warmColor);
-    grad.addColorStop(1, vignetteColor);
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // ─── Screen-space overlays (extracted to rendererScreen.ts) ────────────
+    renderScreenOverlays(this.screenOverlayState());
   }
 
   // ─── Public actions ───────────────────────────────────────────────────────
@@ -1274,10 +1518,23 @@ export class Renderer {
     this.localR?.animateCameraToGrid(gridX, gridY, duration);
   }
 
-  /** Compute current zoom-based LOD level. */
+  private _lastLod: 'low' | 'medium' | 'high' = 'medium';
+
+  /** Compute current zoom-based LOD level with hysteresis to avoid thrashing. */
   private calcLod(): 'low' | 'medium' | 'high' {
-    if (this.cam.zoom < 0.5) return 'low';
-    if (this.cam.zoom < 1.2) return 'medium';
+    const webgl = this.worldRenderMode === 'webgl';
+    // Hysteresis: different thresholds for zooming in vs out
+    if (this._lastLod === 'low') {
+      if (this.cam.zoom >= (webgl ? 0.55 : 0.55)) { this._lastLod = 'medium'; return 'medium'; }
+      return 'low';
+    }
+    if (this._lastLod === 'medium') {
+      if (this.cam.zoom < (webgl ? 0.45 : 0.45)) { this._lastLod = 'low'; return 'low'; }
+      if (this.cam.zoom >= (webgl ? 1.05 : 1.25)) { this._lastLod = 'high'; return 'high'; }
+      return 'medium';
+    }
+    // high
+    if (this.cam.zoom < (webgl ? 0.95 : 1.15)) { this._lastLod = 'medium'; return 'medium'; }
     return 'high';
   }
 
@@ -1423,7 +1680,8 @@ export class Renderer {
   hitWonderAt(screenX: number, screenY: number): string | null {
     const capital = this.state.getCapital();
     if (!capital || !capital.wonders) return null;
-    const pos = axialToPixel(capital.coord, HEX_SIZE);
+    const capitalTile = this.state.world.tiles.get(tileKey(capital.coord));
+    const pos = this.tilePixelPos(capital.coord, capitalTile);
     const cam = this.cam;
     const sx = cam.cx + (pos.x - cam.x) * cam.zoom;
     const sy = cam.cy + (pos.y - cam.y) * cam.zoom;

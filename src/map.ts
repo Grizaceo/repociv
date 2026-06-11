@@ -101,19 +101,59 @@ export function inferTerrain(extensions: Record<string, number>): Terrain {
   return best;
 }
 
-// ─── Terrain colors (Canvas fill) ──────────────────────────────────────────
+// ─── Terrain colors (Canvas fill + iso side faces) ───────────────────────────
 export const TERRAIN_COLOR: Record<
   Terrain,
-  { fill: string; stroke: string; gradient?: [string, string] }
+  { fill: string; stroke: string; side: string; gradient?: [string, string] }
 > = {
-  plains: { fill: '#7ba05b', stroke: '#5a7a3a', gradient: ['#8db870', '#6a8f4a'] },
-  forest: { fill: '#2d5a27', stroke: '#1e3d18', gradient: ['#3a7032', '#234a1f'] },
-  mountain: { fill: '#6b6b6b', stroke: '#4a4a4a', gradient: ['#7d7d7d', '#5a5a5a'] },
-  desert: { fill: '#d4a574', stroke: '#b07a4a', gradient: ['#dfb285', '#c49564'] },
-  ocean: { fill: '#2b6da5', stroke: '#1b5585', gradient: ['#3a8bc8', '#225590'] },
-  ice: { fill: '#c8d8e0', stroke: '#a0b0c0', gradient: ['#ddeaf0', '#b0c0d0'] },
-  hills: { fill: '#8da86b', stroke: '#6a8a4b', gradient: ['#9db87b', '#7a9a5b'] },
-  sacred: { fill: '#1e1530', stroke: '#c8a84b', gradient: ['#2a1d40', '#140e22'] },
+  plains: {
+    fill: '#7ba05b',
+    stroke: '#5a7a3a',
+    side: '#688f4a',
+    gradient: ['#8db870', '#6a8f4a'],
+  },
+  forest: {
+    fill: '#2d5a27',
+    stroke: '#1e3d18',
+    side: '#264a22',
+    gradient: ['#3a7032', '#234a1f'],
+  },
+  mountain: {
+    fill: '#6b6b6b',
+    stroke: '#4a4a4a',
+    side: '#5a5a5a',
+    gradient: ['#7d7d7d', '#5a5a5a'],
+  },
+  desert: {
+    fill: '#d4a574',
+    stroke: '#b07a4a',
+    side: '#b89062',
+    gradient: ['#dfb285', '#c49564'],
+  },
+  ocean: {
+    fill: '#2b6da5',
+    stroke: '#1b5585',
+    side: '#245a88',
+    gradient: ['#3a8bc8', '#225590'],
+  },
+  ice: {
+    fill: '#c8d8e0',
+    stroke: '#a0b0c0',
+    side: '#aab8be',
+    gradient: ['#ddeaf0', '#b0c0d0'],
+  },
+  hills: {
+    fill: '#8da86b',
+    stroke: '#6a8a4b',
+    side: '#78925b',
+    gradient: ['#9db87b', '#7a9a5b'],
+  },
+  sacred: {
+    fill: '#1e1530',
+    stroke: '#c8a84b',
+    side: '#181028',
+    gradient: ['#2a1d40', '#140e22'],
+  },
 };
 
 // ─── Skill & session metadata (from Hermes workspace) ───────────────────────
@@ -256,12 +296,6 @@ export async function fetchRepoSelectionState(): Promise<RepoSelectionState> {
   const res = await fetch('/api/repo-selections');
   if (!res.ok) throw new Error(`/api/repo-selections HTTP ${res.status}`);
   return normalizeSelectionState((await res.json()) as RepoSelectionState);
-}
-
-export async function hydrateSelectedRepoPathCache(): Promise<Set<string>> {
-  const state = await fetchRepoSelectionState();
-  saveSelectedRepoPaths(state.selectedRepoPaths);
-  return new Set(state.selectedRepoPaths);
 }
 
 export async function fetchSelectionForRoot(rootPath: string): Promise<Set<string>> {

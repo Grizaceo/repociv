@@ -2,19 +2,14 @@
 // No dependencies. Regex-based parsing for the markdown subset agents emit.
 // Order: extract code blocks → escape HTML → block elements → inline → <br> → restore.
 
+import { escapeHtml } from '../escapeHtml.ts';
+
 const CB_MARK = '\x00';
 const CB_MARK_END = '\x01';
 
 interface CodeBlock {
   lang: string;
   code: string;
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-  );
 }
 
 let _mdCache: { text: string; html: string } | null = null;

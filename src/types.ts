@@ -455,7 +455,19 @@ export type LocalTileType =
   | 'stairs' // vertical circulation (decorative)
   | 'window' // natural light zone (perimeter glass)
   | 'sofa' // informal seating
-  | 'watercooler'; // social node
+  | 'watercooler' // social node
+  // ─── Office cubicle layout ─────────────────────────────────────────────
+  | 'cubicle_partition' // low cubicle divider (impassable)
+  | 'aisle' // interior corridor (preferred routing)
+  | 'chair'; // desk chair tile
+
+export type CubicleFacing = 'n' | 's' | 'e' | 'w';
+
+export interface CubiclePlan {
+  template: 'open_rows' | 'focus_pod' | 'reception';
+  aisleWidth: number;
+  deskCount: number;
+}
 
 export interface LocalTile {
   x: number; // grid column
@@ -463,7 +475,8 @@ export interface LocalTile {
   type: LocalTileType;
   roomId: string | null;
   workbench: Workbench | null;
-  decor?: 'focus_lamp' | 'coffee_machine';
+  facing?: CubicleFacing;
+  decor?: 'focus_lamp' | 'coffee_machine' | 'desk_bundle';
 }
 
 export interface Workbench {
@@ -501,6 +514,9 @@ export interface LocalRoom {
   zoneType?: OfficeZoneType; // semantic office zone
   zoneLabel?: string; // display label for zone (e.g. "Engineering")
   subFolderNames?: string[]; // child directory names for whiteboard panel
+  layoutPlan?: CubiclePlan; // cubicle module metadata from officeLayout
+  /** Phase E: true when workbench count exceeds comfortable individual rendering. */
+  highDensity?: boolean;
 }
 
 export interface LocalWorld {
@@ -522,6 +538,8 @@ export interface LocalWorld {
   roomClimates?: Map<string, RoomClimate>;
   // Stationary NPCs (managers, receptionists)
   npcs?: LocalNpc[];
+  // Desk assignments: maps "x,y" desk position → unit ID (Phase B)
+  deskAssignments: Map<string, string>;
 }
 
 // ─── Local Unit State (Phase 7a) ───────────────────────────────────────────────
@@ -564,6 +582,7 @@ export interface LocalUnit {
   effectiveSpeed: number; // local grid movement speed after fatigue penalty
   assignedTask?: AgentTask | null; // player-assigned job focus (frontend-only)
   ephemeral?: boolean; // subagent detachment in local view
+  assignedDesk?: { x: number; y: number } | null; // stable desk assignment in their room
 }
 
 export interface LocalNpc {

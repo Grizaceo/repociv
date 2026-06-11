@@ -55,6 +55,16 @@ let _timer = 0;
 let _visible = false;
 let _metrics: Metrics | null = null;
 let _offline = false;
+let _webglMetricsSource:
+  | (() => { frameTimeAvg: number; frameCount: number; dirtyRatePct?: number } | null)
+  | null = null;
+
+/** Wire the WebGL renderer's frame-time metrics into the panel (main.ts). */
+export function setWebGLMetricsSource(
+  source: () => { frameTimeAvg: number; frameCount: number; dirtyRatePct?: number } | null,
+): void {
+  _webglMetricsSource = source;
+}
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 export function openObservabilityPanel() {
@@ -251,6 +261,7 @@ function _render() {
             )
           : ''
       }
+      ${_webglFrameTimeMetric()}
       ${m.gpu ? _metric('GPU VRAM', `${m.gpu.vramUsed}/${m.gpu.vramTotal} MB`, 'ok') : ''}
       ${
         m.gpu
@@ -340,6 +351,21 @@ function _agentCard(a: AgentStatus): string {
       ${a.activeTask ? `<span class="obs-agent-task" title="${_esc(a.activeTask)}">${_esc(a.activeTask.slice(0, 18))}</span>` : ''}
     </div>
   `;
+}
+
+/** WebGL frame-time + dirty-rate rows — only when WebGL is active and warm. */
+function _webglFrameTimeMetric(): string {
+  const m = _webglMetricsSource?.();
+  if (!m || m.frameTimeAvg <= 0) return '';
+  // 60 fps budget is ~16.7 ms; warn past it, crit past two frames.
+  const status = m.frameTimeAvg > 33 ? 'crit' : m.frameTimeAvg > 16.7 ? 'warn' : 'ok';
+  let html = _metric('WebGL frame', `${m.frameTimeAvg} ms`, status);
+  if (m.dirtyRatePct !== undefined) {
+    // Idle should be ~0%; sustained >5% means a signature false positive.
+    const dStatus = m.dirtyRatePct > 25 ? 'crit' : m.dirtyRatePct > 5 ? 'warn' : 'ok';
+    html += _metric('WebGL dirty', `${m.dirtyRatePct}%`, dStatus);
+  }
+  return html;
 }
 
 function _metric(label: string, value: string, status: 'ok' | 'warn' | 'crit'): string {

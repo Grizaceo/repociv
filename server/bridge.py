@@ -185,6 +185,9 @@ from server import runtime_adapters as _runtime_adapters  # noqa: E402
 from server import agent_runner as _agent_runner  # noqa: E402
 from server import task_orchestrator as _to  # noqa: E402
 from server import rate_limiter as _rl  # noqa: E402
+from server import missions_store as _missions_store  # noqa: E402
+from server import fatigue_state as _fatigue_state_mod  # noqa: E402
+from server import command_executors as _command_executors  # noqa: E402
 
 _BRIDGE_STATE_CONFIG_DIR: Path | None = None
 
@@ -204,6 +207,7 @@ def init_bridge_state(config_dir: Path | str | None = None) -> Path:
 
     CONFIG_DIR = selected
     MISSIONS_FILE = CONFIG_DIR / "missions.json"
+    _missions_store.init(CONFIG_DIR)
     _es.init(CONFIG_DIR)
     _sessions.init(CONFIG_DIR)
     _run_state.init(CONFIG_DIR)
@@ -226,42 +230,21 @@ from server import scheduler as _sched  # noqa: E402
 
 
 # ─── Mission persistence ──────────────────────────────────────────────────────
-_missions_lock = threading.Lock()
-
-
 def load_missions() -> list[dict[str, Any]]:
-    if not MISSIONS_FILE.exists():
-        return []
-    try:
-        return json.loads(MISSIONS_FILE.read_text())
-    except Exception:
-        return []
+    return _missions_store.load_missions()
 
 
 def save_mission(mission: dict[str, Any]) -> None:
-    with _missions_lock:
-        missions = load_missions()
-        for i, m in enumerate(missions):
-            if m.get("id") == mission.get("id"):
-                missions[i] = mission
-                break
-        else:
-            missions.append(mission)
-        missions = missions[-200:]
-        MISSIONS_FILE.write_text(json.dumps(missions, indent=2, ensure_ascii=False))
+    _missions_store.save_mission(mission)
 
 
 # ─── XCOM Context Fatigue state ───────────────────────────────────────────────
-_fatigue_state: dict[str, dict[str, Any]] = {}
-_rest_areas: dict[str, dict[str, Any]] = {}
-_fatigue_lock = threading.Lock()
+_fatigue_state = _fatigue_state_mod._fatigue_state
+_rest_areas = _fatigue_state_mod._rest_areas
 
 
 def get_unit_fatigue(unit_id: str) -> dict[str, Any]:
-    with _fatigue_lock:
-        return _fatigue_state.get(unit_id, {
-            "fatigue": 100, "effectiveSpeed": 1.0, "isResting": False, "restAreaId": None,
-        })
+    return _fatigue_state_mod.get_unit_fatigue(unit_id)
 
 
 def update_unit_fatigue(unit_id: str, *, fatigue: int | None = None,
@@ -269,64 +252,33 @@ def update_unit_fatigue(unit_id: str, *, fatigue: int | None = None,
                         is_resting: bool | None = None,
                         rest_area_id: str | None = None,
                         delta: int = 0) -> dict[str, Any]:
-    with _fatigue_lock:
-        entry = _fatigue_state.setdefault(unit_id, {
-            "fatigue": 100, "effectiveSpeed": 1.0, "isResting": False, "restAreaId": None,
-        })
-        if fatigue is not None:
-            entry["fatigue"] = max(0, min(100, fatigue))
-        elif delta:
-            entry["fatigue"] = max(0, min(100, entry["fatigue"] + delta))
-        if effective_speed is not None:
-            entry["effectiveSpeed"] = effective_speed
-        if is_resting is not None:
-            entry["isResting"] = is_resting
-        if rest_area_id is not None:
-            entry["restAreaId"] = rest_area_id
-        entry["effectiveSpeed"] = round(entry["fatigue"] / 100.0, 3)
-        return dict(entry)
+    return _fatigue_state_mod.update_unit_fatigue(
+        unit_id,
+        fatigue=fatigue,
+        effective_speed=effective_speed,
+        is_resting=is_resting,
+        rest_area_id=rest_area_id,
+        delta=delta,
+    )
 
 
 def discover_rest_area(rest_area_id: str, room_id: str, coord: tuple,
                        recovery_rate: float = 8.0, capacity: int = 4) -> dict[str, Any]:
-    with _fatigue_lock:
-        # Kiosko rest area recovery bonus (Fase 4)
-        if room_id == 'kiosk' or room_id.startswith('kiosk') or rest_area_id.startswith('kiosk'):
-            recovery_rate = recovery_rate * 1.25
-
-        area = {
-            "id": rest_area_id, "roomId": room_id, "coord": list(coord),
-            "recoveryRate": recovery_rate, "capacity": capacity, "unitsInside": [],
-        }
-        _rest_areas[rest_area_id] = area
-        return dict(area)
+    return _fatigue_state_mod.discover_rest_area(
+        rest_area_id,
+        room_id,
+        coord,
+        recovery_rate=recovery_rate,
+        capacity=capacity,
+    )
 
 
 def enter_rest_area(unit_id: str, rest_area_id: str) -> bool:
-    with _fatigue_lock:
-        area = _rest_areas.get(rest_area_id)
-        if not area or len(area["unitsInside"]) >= area["capacity"]:
-            return False
-        if unit_id not in area["unitsInside"]:
-            area["unitsInside"].append(unit_id)
-        entry = _fatigue_state.setdefault(unit_id, {"fatigue": 100, "effectiveSpeed": 1.0, "isResting": False, "restAreaId": None})
-        entry["isResting"] = True
-        entry["restAreaId"] = rest_area_id
-        return True
+    return _fatigue_state_mod.enter_rest_area(unit_id, rest_area_id)
 
 
 def exit_rest_area(unit_id: str) -> None:
-    with _fatigue_lock:
-        entry = _fatigue_state.get(unit_id, {})
-        ra_id = entry.get("restAreaId")
-        if ra_id and ra_id in _rest_areas:
-            try:
-                _rest_areas[ra_id]["unitsInside"].remove(unit_id)
-            except ValueError:
-                pass
-        entry["isResting"] = False
-        entry["restAreaId"] = None
-        _fatigue_state[unit_id] = entry
+    _fatigue_state_mod.exit_rest_area(unit_id)
 
 
 # ─── GPU info ─────────────────────────────────────────────────────────────────
@@ -450,231 +402,34 @@ def _handle_command(cmd: Command) -> dict[str, Any]:
 
 
 def _default_mission_for_command(cmd: Command) -> str:
-    """Human-readable fallback mission for command types without explicit text."""
-    labels = {
-        "inspect_repo":  f"Inspeccionar repo {cmd.target} y reportar hallazgos accionables.",
-        "read_file":     f"Leer {cmd.target} y resumir contenido relevante.",
-        "run_tests":     f"Ejecutar tests en {cmd.target}, diagnosticar fallos y proponer corrección.",
-        "run_build":     f"Ejecutar build en {cmd.target}, diagnosticar fallos y proponer corrección.",
-        "edit_file":     f"Editar/proponer cambios en {cmd.target} según la instrucción del usuario.",
-        "create_branch": f"Crear/preparar rama de trabajo para {cmd.target}.",
-        "git_commit":    f"Preparar commit limpio para {cmd.target}, con resumen verificable.",
-        "delete_file":   f"Eliminar {cmd.target} solo si la aprobación explícita lo autoriza y reportar impacto.",
-        "send_message":  f"Preparar/enviar mensaje relacionado con {cmd.target} según política aprobada.",
-        "execute_agent": f"Ejecutar misión agente sobre {cmd.target}.",
-        "unit_command":  f"Ejecutar misión de unidad sobre {cmd.target}.",
-    }
-    return labels.get(cmd.type, f"Ejecutar comando {cmd.type} sobre {cmd.target}.")
+    return _command_executors.default_mission_for_command(cmd)
 
 
 def _register_issue_run(payload: dict[str, Any], run_id: str) -> None:
-    """If payload carries issue/repo context, register the run in the issue workspace."""
-    issue_id = str(payload.get("issueId") or payload.get("issue_id") or "")
-    repo = str(payload.get("repo") or payload.get("target") or "")
-    if not issue_id or not repo:
-        return
-    try:
-        _wi.register_run(repo, issue_id, run_id)
-    except Exception:
-        pass  # non-critical — don't block command dispatch
+    _command_executors.register_issue_run(payload, run_id, _wi.register_run)
 
 
 def _dispatch_command(cmd: Command) -> None:
-    """Run a queued command synchronously inside the scheduler worker thread.
-
-    Earlier code spawned another thread for agent commands and returned
-    immediately, causing the scheduler lease to be released while the agent was
-    still running. That made concurrency limits decorative. This function now
-    blocks until the command reaches a terminal event.
-    """
-    payload = cmd.payload
-
-    agent_command_types = {
-        "unit_command", "execute_agent", "inspect_repo", "read_file",
-        "run_tests", "run_build", "edit_file", "create_branch",
-        "git_commit", "delete_file", "send_message",
-    }
-
-    if cmd.type in agent_command_types:
-        unit = str(payload.get("unit", "DAVI"))
-        city = str(payload.get("city", cmd.target or "main"))
-        mission = str(payload.get("mission") or _default_mission_for_command(cmd))
-        agent_type = str(payload.get("agentType", "hero"))
-        # 3-layer config from chat UI (optional)
-        harness = str(payload.get("harness", ""))
-        provider = str(payload.get("provider", ""))
-        model = str(payload.get("model", ""))
-        repo_path = str(payload.get("repoPath") or payload.get("cwd") or "")
-        file_path = str(payload.get("filePath") or "")
-        run_agent(unit, city, mission, agent_type, cmd.id,
-                 harness=harness, provider=provider, model=model,
-                 repo_path=repo_path, file_path=file_path)
-        _register_issue_run(payload, cmd.id)
-        return
-
-    if cmd.type == "e2e_probe":
-        unit = str(payload.get("unit", "DAVI"))
-        marker = str(payload.get("marker", cmd.id))[:120]
-        quest_name = f"E2E probe: {marker}"
-        text = f"E2E probe completado: {marker}"
-        adapter = _runtime_adapters.infer_adapter_for_command("e2e_probe", cmd.harness_id)
-        runtime_id = adapter.harness_id if adapter else "local-cli"
-        _sessions.patch(unit, runtimeId=runtime_id, repo=str(cmd.target or "main"), summary=quest_name, lastMissionId=cmd.id)
-        _sessions.append_message(unit, "user", marker, {"missionId": cmd.id, "kind": "e2e_probe"})
-        _run_state.save(cmd.id, {
-            "unitId": unit,
-            "runtimeId": runtime_id,
-            "repo": str(cmd.target or "main"),
-            "commandType": "e2e_probe",
-            "phase": "completed",
-            "status": "completed",
-            "retries": 0,
-            "checkpointApproved": [],
-            "filesTouched": [],
-            "startedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "finishedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "result": text,
-        })
-        send_to_repociv({"type": "mission_start", "missionId": cmd.id, "unit": unit, "questName": quest_name})
-        send_to_repociv({"type": "chat_chunk", "unit": unit, "text": text, "missionId": cmd.id})
-        _es.record_output_chunk(cmd.id, unit, text)
-        _es.record_completed(cmd.id, text)
-        send_to_repociv({"type": "mission_complete", "missionId": cmd.id, "unit": unit, "success": True, "duration": 0})
-        send_to_repociv({"type": "log", "msg": text, "level": "success"})
-        _register_issue_run(payload, cmd.id)
-        return
-
-    if cmd.type == "subagent_spawn":
-        from server import subagent_tracker as _st  # noqa: PLC0415
-        _st.approve_spawn(cmd.id)
-        _es.record_completed(cmd.id, "subagent_spawn approved")
-        send_to_repociv({"type": "log", "msg": f"Subagente aprobado: {cmd.target}", "level": "success"})
-        return
-
-    if cmd.type == "subagent_dispatch":
-        from server import subagent_tracker as _st  # noqa: PLC0415
-        result = _st.request_dispatch(
-            parent_mission_id=str(payload.get("parentMissionId", "")),
-            parent_unit=str(payload.get("parentUnit", cmd.target)),
-            kind=str(payload.get("kind", "generalPurpose")),
-            label=str(payload.get("label", "")),
-            harness=str(payload.get("harness", "")),
-        )
-        _es.record_failed(cmd.id, result.get("error", "not_implemented"))
-        send_to_repociv({
-            "type": "log",
-            "msg": "[swarm] subagent_dispatch no implementado (fase 2)",
-            "level": "warn",
-        })
-        return
-
-    if cmd.type == "quest_add":
-        title = str(payload.get("title", cmd.target))
-        description = str(payload.get("description", ""))
-        append_pending_task(title, description)
-        mission_rec: dict[str, Any] = {
-            "id": cmd.id, "unit": "DAVI", "city": "main", "mission": title,
-            "questName": title, "agentType": "hero", "startedAt": time.time(),
-            "completedAt": time.time(), "status": "complete", "summary": description,
-            "lines": 0, "duration": 0,
-        }
-        save_mission(mission_rec)
-        adapter = _runtime_adapters.infer_adapter_for_command("quest_add", cmd.harness_id)
-        runtime_id = adapter.harness_id if adapter else "local-cli"
-        _sessions.patch("DAVI", runtimeId=runtime_id, repo="main", summary=title, lastMissionId=cmd.id)
-        _sessions.append_message("DAVI", "user", title, {"missionId": cmd.id, "kind": "quest_add"})
-        if description:
-            _sessions.append_message("DAVI", "assistant", description, {"missionId": cmd.id, "kind": "quest_add_summary"})
-        _run_state.save(cmd.id, {
-            "unitId": "DAVI",
-            "runtimeId": runtime_id,
-            "repo": "main",
-            "commandType": "quest_add",
-            "phase": "completed",
-            "status": "completed",
-            "retries": 0,
-            "checkpointApproved": [],
-            "filesTouched": [],
-            "startedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "finishedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "result": description,
-        })
-        send_to_repociv({"type": "mission_start", "missionId": cmd.id, "unit": "DAVI", "questName": title})
-        send_to_repociv({"type": "mission_complete", "missionId": cmd.id, "unit": "DAVI", "success": True, "duration": 0})
-        send_to_repociv({"type": "log", "msg": f"Quest agregado: {title}", "level": "success"})
-        _es.record_completed(cmd.id, "quest added")
-        _ds.record_outcome(cmd.id, "success", 0.0)
-        return
-
-    if cmd.type == "open_file":
-        import os as _os  # noqa: PLC0415
-        fp = str(payload.get("filePath", "")).strip()
-        if not fp or not _os.path.exists(fp):
-            send_to_repociv({"type": "log", "msg": f"open_file: ruta no encontrada: {fp!r}", "level": "warn"})
-            _es.record_failed(cmd.id, "path not found")
-            return
-        try:
-            is_dir = _os.path.isdir(fp)
-            # On WSL2 convert to Windows path and open with explorer / VS Code
-            wpath_result = subprocess.run(["wslpath", "-w", fp], capture_output=True, text=True, timeout=3)
-            if wpath_result.returncode == 0:
-                win_path = wpath_result.stdout.strip()
-                if is_dir:
-                    subprocess.Popen(["explorer.exe", win_path])
-                else:
-                    subprocess.Popen(["code", "--reuse-window", fp])
-            else:
-                # Non-WSL fallback: xdg-open
-                subprocess.Popen(["xdg-open", fp])
-            send_to_repociv({"type": "log", "msg": f"Abriendo: {fp}", "level": "info"})
-            _es.record_completed(cmd.id, fp)
-            _ds.record_outcome(cmd.id, "success", 0.0)
-        except Exception as exc:
-            send_to_repociv({"type": "log", "msg": f"open_file error: {exc}", "level": "error"})
-            _es.record_failed(cmd.id, str(exc))
-        return
-
-    if cmd.type == "tile_inspected":
-        city_name = str(payload.get("cityName", cmd.target))
-        send_to_repociv({"type": "log", "msg": f"Inspeccionando: {city_name}", "level": "info"})
-        _es.record_completed(cmd.id, "tile inspected")
-        _ds.record_outcome(cmd.id, "success", 0.0)
-        return
-
-    # ─── Task orchestrator (P3) ────────────────────────────────────────────
-    if cmd.type == "task_run":
-        repo = str(payload.get("repo", cmd.target))
-        issue_id = str(payload.get("issueId") or payload.get("issue_id") or "")
-        if not issue_id:
-            _es.record_failed(cmd.id, "task_run requires issueId in payload")
-            return
-        _es.record_started(cmd.id)
-        try:
-            result = _to.run_task(repo, issue_id)
-            _es.record_completed(cmd.id, json.dumps({"phase": result.get("phase"), "repo": repo, "issueId": issue_id}))
-            send_to_repociv({
-                "type": "task_complete", "repo": repo, "issueId": issue_id,
-                "phase": result.get("phase"), "missionId": cmd.id,
-            })
-        except Exception as e:
-            _es.record_failed(cmd.id, str(e))
-            send_to_repociv({
-                "type": "task_failed", "repo": repo, "issueId": issue_id,
-                "error": str(e), "missionId": cmd.id,
-            })
-        return
-
-    send_to_repociv({"type": "log", "msg": f"Comando {cmd.type} sin executor — sin ejecución real", "level": "warn"})
-    _es.record_failed(cmd.id, f"no executor for {cmd.type}")
-    _ds.record_outcome(cmd.id, "failure", 0.0)
-    send_to_repociv({
-        "type": "mission_complete",
-        "missionId": cmd.id,
-        "unit": str(cmd.payload.get("unit", "DAVI")),
-        "success": False,
-        "duration": 0,
-        "error": f"Sin executor para tipo '{cmd.type}' — no se ejecutó ninguna acción real",
-    })
+    from server import subagent_tracker as _st  # noqa: PLC0415
+    _command_executors.dispatch_command(
+        cmd,
+        run_agent=run_agent,
+        send_to_repociv=send_to_repociv,
+        append_pending_task=append_pending_task,
+        save_mission=save_mission,
+        infer_adapter_for_command=lambda command_type, harness_id: _runtime_adapters.infer_adapter_for_command(command_type, harness_id),
+        sessions_patch=_sessions.patch,
+        sessions_append_message=_sessions.append_message,
+        run_state_save=_run_state.save,
+        event_record_output_chunk=_es.record_output_chunk,
+        event_record_completed=_es.record_completed,
+        event_record_failed=_es.record_failed,
+        record_outcome=_ds.record_outcome,
+        register_issue_run_fn=_register_issue_run,
+        task_run=_to.run_task,
+        subagent_approve_spawn=_st.approve_spawn,
+        subagent_request_dispatch=_st.request_dispatch,
+    )
 
 
 # ─── HTTP Handler ─────────────────────────────────────────────────────────────
@@ -764,8 +519,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         # Health and ready endpoints are exempt from token auth (used by monitors)
         if path not in ("/health", "/ready") and not self._check_token():
-            self._err_json(401, "unauthorized")
-            return
+            # EventSource cannot send custom headers — accept the token via
+            # query param for the SSE stream only.
+            sse_token_ok = (
+                path == "/events"
+                and bool(REPOCIV_TOKEN)
+                and hmac.compare_digest(
+                    params.get("token", "").encode("utf-8"),
+                    REPOCIV_TOKEN.encode("utf-8"),
+                )
+            )
+            if not sse_token_ok:
+                self._err_json(401, "unauthorized")
+                return
 
         # ── Simple exact-match GET routes ──────────────────────────────────────
         _GET_EXACT: dict[str, Any] = {
@@ -907,11 +673,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 return
 
         self._err_json(404, "not found")
-
-    # placeholder to keep next method visible
-    def _do_GET_placeholder(self) -> None:
-        pass
-
 
     def do_POST(self) -> None:
         if self._rate_limited():

@@ -1,34 +1,35 @@
 // ─── RepoCiv — Local Renderer (RimWorld-style 2D grid) ─────────────────────────
 import type { LocalWorld, LocalTile, LocalRoom, LocalUnit, ZoneType } from './types.ts';
+import { loadOfficeAtlas } from './officeAtlas.ts';
+import { darkenHex } from './isoOfficeRenderer.ts';
+import { EXT_COLOR, adjustBrightness as _adjustBrightness, drawRoomLabel as drawRoomLabelModule, drawSofaTile as drawSofaTileModule, drawWatercoolerTile as drawWatercoolerTileModule, drawWindowTile as drawWindowTileModule, drawWorkbenchClusterPanel } from './local2dAssets.ts';
+import {
+  createParticlePool,
+  spawnBreath as spawnBreathParticle,
+  spawnSpark as spawnSparkParticle,
+  spawnZzz as spawnZzzParticle,
+  updateAndDrawParticles as updateAndDrawLocalParticles,
+  type LocalParticle,
+} from './localParticles.ts';
+import { buildIsoStaticLayer, buildStaticLayer } from './localStaticLayers.ts';
+import {
+  drawPowerOverlay as drawPowerOverlayModule,
+  drawTemperatureOverlay as drawTemperatureOverlayModule,
+  drawWindowLightRays as drawWindowLightRaysModule,
+  drawZonePaintPreview as drawZonePaintPreviewModule,
+  drawZones as drawZonesModule,
+} from './localOverlays.ts';
+import {
+  ISO_TILE_H,
+  ISO_TILE_W,
+  ISO_WALL_H,
+  drawIsoTile as drawIsoTileModule,
+  isoProject,
+  isoUnproject,
+  renderIso as renderIsoModule,
+} from './isoLocalRenderer.ts';
 
 const TILE_SIZE = 32; // px per tile
-
-// ─── Isometric 2.5D Constants ────────────────────────────────────────────
-const ISO_TILE_W = 64; // width of the isometric diamond (2:1 ratio)
-const ISO_TILE_H = 32; // height of the isometric diamond
-const ISO_WALL_H = 24; // visual wall height (upwards in screen Y)
-
-// ─── Colorblind-friendly Iso Palette (luminosity + pattern differentiation) ──
-const ISO_FLOOR: Record<string, string> = {
-  team_cluster: '#6B8FB5', // blue-grey  (high luminosity)
-  meeting: '#D49B3A',      // amber      (mid luminosity, distinct from blue)
-  focus: '#4A8F4A',        // green      (low-mid luminosity)
-  break: '#C47A4A',        // terracotta (mid luminosity, warm)
-  infra: '#7A8B9E',        // slate      (cool mid)
-  reception: '#C4B8A0',    // sand       (high luminosity, warm)
-  biophilic: '#4A9E8E',    // teal       (mid luminosity, cool)
-  path: '#B8B8B8',         // neutral grey corridor
-  outside: '#A8A8A8',      // darker grey outside
-};
-const ISO_WALL_FACE = '#C8C8C8';
-const ISO_WALL_SIDE = '#B0B0B0';
-const ISO_WALL_TOP = '#D8D8D8';
-const ISO_DOOR_WOOD = '#B89860';
-const ISO_DOOR_GLASS = 'rgba(180, 210, 230, 0.4)';
-const ISO_WINDOW_SKY: [string, string] = ['rgba(140, 190, 220, 0.5)', 'rgba(180, 210, 230, 0.3)'];
-const ISO_HELMET = '#E8B830';
-const ISO_SHADOW = 'rgba(80, 80, 80, 0.18)';
-const ISO_SELECTION = '#B08040'; // warm brown (distinct from all floors)
 
 // Zone ambient radial-light colors (very low alpha — applied in static layer)
 const ISO_ZONE_LIGHT: Record<string, string> = {
@@ -41,46 +42,7 @@ const ISO_ZONE_LIGHT: Record<string, string> = {
   biophilic: 'rgba(200, 255, 245, 0.06)',
 };
 
-/** Convert grid (x, y, z) to isometric screen pixel coordinates. */
-export function isoProject(x: number, y: number, z = 0): { px: number; py: number } {
-  return {
-    px: (x - y) * ISO_TILE_W / 2,
-    py: (x + y) * ISO_TILE_H / 2 - z * ISO_WALL_H,
-  };
-}
-
-/** Convert screen pixel to approximate grid coordinates (for click/hover). */
-function isoUnproject(px: number, py: number): { x: number; y: number } {
-  const x = px / (ISO_TILE_W / 2) + py / (ISO_TILE_H / 2);
-  const y = py / (ISO_TILE_H / 2) - px / (ISO_TILE_W / 2);
-  return { x: x / 2, y: y / 2 };
-}
-
-/** Get the four corner points of an isometric tile at (x, y, z). */
-function isoTileCorners(x: number, y: number, z = 0): Array<{ x: number; y: number }> {
-  const base = isoProject(x, y, z);
-  return [
-    { x: base.px, y: base.py - ISO_TILE_H / 2 },               // top
-    { x: base.px + ISO_TILE_W / 2, y: base.py },               // right
-    { x: base.px, y: base.py + ISO_TILE_H / 2 },               // bottom
-    { x: base.px - ISO_TILE_W / 2, y: base.py },               // left
-  ];
-}
-
-interface LocalParticle {
-  active: boolean;
-  type: 'spark' | 'zzz';
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  color: string;
-  size: number;
-  life: number;
-  maxLife: number;
-  char?: string;
-  baseX: number;
-}
+export { isoProject } from './isoLocalRenderer.ts';
 
 // ─── Main renderer class ───────────────────────────────────────────────────────
 export class LocalRenderer {
@@ -307,22 +269,7 @@ export class LocalRenderer {
   }
 
   private initParticlePool() {
-    this.particles = [];
-    for (let i = 0; i < LocalRenderer.MAX_PARTICLES; i++) {
-      this.particles.push({
-        active: false,
-        type: 'spark',
-        x: 0,
-        y: 0,
-        vx: 0,
-        vy: 0,
-        color: '#000',
-        size: 0,
-        life: 0,
-        maxLife: 0,
-        baseX: 0,
-      });
-    }
+    this.particles = createParticlePool(LocalRenderer.MAX_PARTICLES);
   }
 
   private cacheTokens() {
@@ -348,6 +295,12 @@ export class LocalRenderer {
     this.staticLayer = null;
     this.isoStaticLayer = null;
     this._camAnim = null; // cancel any in-flight pan — its target belongs to the previous world
+    void loadOfficeAtlas().then((ok) => {
+      if (ok) {
+        this.isoStaticLayer = null;
+        this.staticLayer = null;
+      }
+    });
     // Center camera on the largest room (main area) rather than whole grid centroid
     if (this._isometric) {
       const largestRoom = world.rooms.reduce<LocalRoom | null>(
@@ -715,9 +668,11 @@ export class LocalRenderer {
       this._fpsLastTime = now;
     }
 
-    // 3b. Rebuild static layer if needed
-    if (!this.staticLayer || this.staticWorldId !== world.repoId) {
+    // 3b. Rebuild static layer if needed (invalidate when room density flags change)
+    const cacheKey = `${world.repoId}:${world.rooms.reduce((n, r) => n + r.workbenches.length, 0)}:${world.rooms.filter((r) => r.highDensity).length}`;
+    if (!this.staticLayer || this.staticWorldId !== cacheKey) {
       this.rebuildStaticLayer();
+      this.staticWorldId = cacheKey;
     }
 
     // ─── Cozy Pastel Background ─────────────────────────────────────────
@@ -749,9 +704,39 @@ export class LocalRenderer {
 
     // ─── Isometric 2.5D Rendering Branch ───────────────────────────────
     if (this._isometric && world) {
-      this.renderIso(world, localUnits, dt, lodLow, isClean);
+      if (!this.isoStaticLayer || this.isoStaticWorldId !== world.repoId) {
+        this.rebuildIsoStaticLayer();
+      }
+      renderIsoModule({
+        ctx: this.ctx,
+        cam: this.cam,
+        world,
+        localUnits,
+        dt,
+        lodLow,
+        view: this.visibleTileRect(),
+        tokens: this.tokens,
+        extColor: EXT_COLOR,
+        isoStaticLayer: this.isoStaticLayer,
+        isoStaticOffsetX: this._isoStaticOffsetX,
+        isoStaticOffsetY: this._isoStaticOffsetY,
+        powerOverlay: this._powerOverlay,
+        temperatureOverlay: this._temperatureOverlay,
+        workbenchLabelOverlay: this._workbenchLabelOverlay,
+        debugOverlay: this._debugOverlay,
+        zonePaintMode: this._zonePaintMode,
+        zonePaintStart: this._zonePaintStart,
+        zonePaintCurrent: this._zonePaintCurrent,
+        hoveredTile: this.hoveredTile,
+        hoveredUnit: this._hoveredUnit,
+        doorOpenStates: this.doorOpenStates,
+        fpsValue: this._fpsValue,
+        onUnitRendered: this.onUnitRendered,
+        spawnZzz: (x, y) => this.spawnZzz(x, y),
+        spawnBreath: (x, y) => this.spawnBreath(x, y),
+        darkenHex: (hex, pct) => darkenHex(hex, pct),
+      });
       ctx.restore();
-      // Vignette overlay
       const grad = ctx.createRadialGradient(
         canvas.width / 2, canvas.height / 2, 0,
         canvas.width / 2, canvas.height / 2, canvas.width,
@@ -829,9 +814,12 @@ export class LocalRenderer {
 
     // ─── Cozy window light rays (sunlight streaming onto floors) ────────
     const view = this.visibleTileRect();
-    this.drawWindowLightRays(world, view);
+    drawWindowLightRaysModule(this.overlayState(), world, view);
 
-    // Draw dynamic tiles on top of the static canvas (Phase 3c/3d)
+    // Draw dynamic tiles on top of the static canvas (Phase 3c/3d).
+    // Desks always render individually — the area-scaled grid layout
+    // guarantees they fit. The cluster pill panel is only an overflow
+    // summary for rooms with more files than placed desks.
     for (let y = view.y0; y <= view.y1; y++) {
       for (let x = view.x0; x <= view.x1; x++) {
         const tile = world.grid[y]![x]!;
@@ -843,10 +831,28 @@ export class LocalRenderer {
       }
     }
 
+    // Overflow summary for rooms whose file count exceeds placed desks
+    for (const room of world.rooms) {
+      const placed = room.layoutPlan?.deskCount ?? 0;
+      if (room.workbenches.length > placed && room.workbenches.length >= 3) {
+        // Anchor at the room's top edge (over the wall, next to the room
+        // label) so the summary never covers the desks themselves.
+        const sx =
+          ((room.x + room.width / 2) * TILE_SIZE - this.cam.x) * this.cam.zoom + this.cam.cx;
+        const sy = (room.y * TILE_SIZE - this.cam.y) * this.cam.zoom + this.cam.cy;
+        drawWorkbenchClusterPanel(
+          this.assetState(),
+          sx,
+          sy,
+          room.workbenches.map((wb) => wb.extension),
+        );
+      }
+    }
+
     // Draw room labels (suppressed in low LOD)
     if (!lodLow) {
       for (const room of world.rooms) {
-        this.drawRoomLabel(room);
+        drawRoomLabelModule(this.assetState(), room);
       }
     }
 
@@ -862,22 +868,22 @@ export class LocalRenderer {
 
     // Draw Power Overlay (if toggled on)
     if (this._powerOverlay) {
-      this.drawPowerOverlay(world, view);
+      drawPowerOverlayModule(this.overlayState(), world, view);
     }
 
     // Draw Temperature Overlay (if toggled on)
     if (this._temperatureOverlay) {
-      this.drawTemperatureOverlay(world, view);
+      drawTemperatureOverlayModule(this.overlayState(), world, view);
     }
 
     // Draw Zones (from world.zones)
     if (world.zones && world.zones.length > 0) {
-      this.drawZones(world, view);
+      drawZonesModule(this.overlayState(), world, view);
     }
 
     // Draw Zone Paint Preview (while dragging)
     if (this._zonePaintMode && this._zonePaintStart && this._zonePaintCurrent) {
-      this.drawZonePaintPreview(view);
+      drawZonePaintPreviewModule(this.overlayState(), view);
     }
 
     // Draw hovered highlight
@@ -913,117 +919,44 @@ export class LocalRenderer {
 
   private rebuildStaticLayer() {
     if (!this.world) return;
-    const c = document.createElement('canvas');
-    c.width = this.world.width * TILE_SIZE;
-    c.height = this.world.height * TILE_SIZE;
-    const sctx = c.getContext('2d')!;
-
-    // Temporarily swap context
-    const originalCtx = this.ctx;
-    this.ctx = sctx;
-
-    // Draw all tiles to offscreen canvas
-    for (let y = 0; y < this.world.height; y++) {
-      for (let x = 0; x < this.world.width; x++) {
-        const tile = this.world.grid[y]![x]!;
-        if (tile.type === 'door') {
-          // Draw floor underneath sliding door
-          this.drawTile({ ...tile, type: 'floor' });
-        } else {
-          this.drawTile(tile);
-        }
-      }
-    }
-
-    this.ctx = originalCtx;
-    this.staticLayer = c;
+    const result = buildStaticLayer(this.world, TILE_SIZE, (ctx, tile) => {
+      const originalCtx = this.ctx;
+      this.ctx = ctx;
+      this.drawTile(tile);
+      this.ctx = originalCtx;
+    });
+    this.staticLayer = result.canvas;
     this.staticWorldId = this.world.repoId;
   }
 
   private rebuildIsoStaticLayer() {
     if (!this.world) return;
     const world = this.world;
-    // Compute iso bounds to size the offscreen canvas
-    const c0 = isoProject(0, 0);
-    const c1 = isoProject(world.width, 0);
-    const c2 = isoProject(0, world.height);
-    const c3 = isoProject(world.width, world.height);
-    const minPx = Math.min(c0.px, c1.px, c2.px, c3.px) - ISO_TILE_W;
-    const maxPx = Math.max(c0.px, c1.px, c2.px, c3.px) + ISO_TILE_W;
-    const minPy = Math.min(c0.py, c1.py, c2.py, c3.py) - ISO_WALL_H - ISO_TILE_H;
-    const maxPy = Math.max(c0.py, c1.py, c2.py, c3.py) + ISO_TILE_H;
-
-    const c = document.createElement('canvas');
-    c.width = Math.ceil(maxPx - minPx);
-    c.height = Math.ceil(maxPy - minPy);
-    const sctx = c.getContext('2d')!;
-
-    // Save offsets for render-time positioning
-    this._isoStaticOffsetX = minPx;
-    this._isoStaticOffsetY = minPy;
-
-    // Translate so all tiles fit in positive canvas coords
-    sctx.save();
-    sctx.translate(-minPx, -minPy);
-
-    // Temporarily swap context
-    const originalCtx = this.ctx;
-    this.ctx = sctx;
-
-    // Draw all static tiles (floors + walls) — skip dynamic objects
-    for (let y = 0; y < world.height; y++) {
-      for (let x = 0; x < world.width; x++) {
-        const tile = world.grid[y]![x]!;
-        if (tile.type === 'door') {
-          // Draw floor underneath door
-          const tempTile: LocalTile = { ...tile, type: 'floor' };
-          this.drawIsoTile(tempTile, x, y, world);
-        } else if (
-          tile.type === 'workbench' ||
-          tile.type === 'standing_desk' ||
-          tile.type === 'sofa' ||
-          tile.type === 'planter' ||
-          tile.type === 'server_rack' ||
-          tile.type === 'whiteboard' ||
-          tile.type === 'reception' ||
-          tile.type === 'window' ||
-          tile.type === 'meeting_room' ||
-          tile.type === 'phone_booth' ||
-          tile.type === 'break_area' ||
-          tile.type === 'watercooler' ||
-          tile.type === 'stairs'
-        ) {
-          // Draw floor underneath furniture
-          const tempTile: LocalTile = { ...tile, type: 'floor' };
-          this.drawIsoTile(tempTile, x, y, world);
-        } else {
-          this.drawIsoTile(tile, x, y, world);
-        }
-      }
-    }
-
-    // Zone ambient radial lights (subtle glow per room, drawn over floors)
-    for (const room of world.rooms) {
-      const lightColor = ISO_ZONE_LIGHT[room.zoneType ?? 'team_cluster'];
-      if (!lightColor) continue;
-      const cx = room.x + room.width / 2;
-      const cy = room.y + room.height / 2;
-      const base = isoProject(cx, cy);
-      const radius = Math.max(room.width, room.height) * ISO_TILE_W * 0.55;
-      const grad = sctx.createRadialGradient(base.px, base.py, 0, base.px, base.py, radius);
-      grad.addColorStop(0, lightColor);
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      sctx.globalAlpha = 0.5; // blend the gradient shape
-      sctx.fillStyle = grad;
-      sctx.beginPath();
-      sctx.arc(base.px, base.py, radius, 0, Math.PI * 2);
-      sctx.fill();
-      sctx.globalAlpha = 1;
-    }
-
-    this.ctx = originalCtx;
-    sctx.restore();
-    this.isoStaticLayer = c;
+    const result = buildIsoStaticLayer({
+      world,
+      isoTileW: ISO_TILE_W,
+      isoTileH: ISO_TILE_H,
+      isoWallH: ISO_WALL_H,
+      fontMono: this.tokens.fontMono ?? "'JetBrains Mono', monospace",
+      extColor: EXT_COLOR,
+      zoneLight: ISO_ZONE_LIGHT,
+      isoProject,
+      drawIsoTile: (ctx, tile, x, y, currentWorld) => {
+        drawIsoTileModule({
+          ctx,
+          world: currentWorld,
+          tokens: this.tokens,
+          extColor: EXT_COLOR,
+          doorOpenStates: this.doorOpenStates,
+          spawnZzz: () => {},
+          spawnBreath: () => {},
+          darkenHex: (hex, pct) => darkenHex(hex, pct),
+        }, tile, x, y, currentWorld);
+      },
+    });
+    this._isoStaticOffsetX = result.offsetX;
+    this._isoStaticOffsetY = result.offsetY;
+    this.isoStaticLayer = result.canvas;
     this.isoStaticWorldId = world.repoId;
   }
 
@@ -1193,6 +1126,8 @@ export class LocalRenderer {
     }
   }
 
+  /** Phase E: draw a compact cluster of file-type pills for high-density rooms.
+   *  cx, cy are in tile coords; ctx already has camera transform applied. */
   private drawFloorBackground(tile: LocalTile, px: number, py: number, s: number, inRoom: boolean, zone?: string) {
     const { ctx } = this;
     if (!inRoom) {
@@ -1442,7 +1377,11 @@ export class LocalRenderer {
       } else if (tile.type === 'kiosk') {
         this.drawKioskTile(px, py, s);
       } else if (tile.type === 'workbench') {
-        this.drawWorkbenchTile(tile, px, py, s);
+        // Phase E: skip individual desk rendering when >=3 workbenchs in room
+        const room = tile.roomId ? this.world?.rooms.find((r) => r.id === tile.roomId) : undefined;
+        if (!room || room.workbenches.length < 3) {
+          this.drawWorkbenchTile(tile, px, py, s);
+        }
       } else if (tile.type === 'conduit') {
         // Subtle electrical wire on the floor
         ctx.strokeStyle = 'rgba(217, 119, 6, 0.6)'; // amber/orange wire
@@ -1490,11 +1429,11 @@ export class LocalRenderer {
       } else if (tile.type === 'stairs') {
         this.drawStairsTile(px, py, s);
       } else if (tile.type === 'window') {
-        this.drawWindowTile(px, py, s);
+        drawWindowTileModule(this.assetState(), px, py, s);
       } else if (tile.type === 'sofa') {
-        this.drawSofaTile(px, py, s);
+        drawSofaTileModule(this.assetState(), px, py, s);
       } else if (tile.type === 'watercooler') {
-        this.drawWatercoolerTile(px, py, s);
+        drawWatercoolerTileModule(this.assetState(), px, py, s);
       }
     }
   }
@@ -2292,230 +2231,6 @@ export class LocalRenderer {
     ctx.stroke();
   }
 
-  // ─── Window light rays (sunlight streaming onto adjacent floors) ─────
-  private drawWindowLightRays(
-    world: LocalWorld,
-    view: { x0: number; y0: number; x1: number; y1: number },
-  ) {
-    const { ctx } = this;
-    const S = TILE_SIZE;
-
-    for (let y = view.y0; y <= view.y1; y++) {
-      for (let x = view.x0; x <= view.x1; x++) {
-        const tile = world.grid[y]?.[x];
-        if (!tile || tile.type !== 'window') continue;
-
-        // Find adjacent floor/path tiles and paint soft light rays
-        const dirs = [
-          { dx: 0, dy: 1 }, // south (into room)
-          { dx: 0, dy: -1 }, // north
-          { dx: 1, dy: 0 }, // east
-          { dx: -1, dy: 0 }, // west
-        ];
-        for (const { dx, dy } of dirs) {
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx < view.x0 || nx > view.x1 || ny < view.y0 || ny > view.y1) continue;
-          const neighbor = world.grid[ny]?.[nx];
-          if (!neighbor) continue;
-          if (neighbor.type === 'floor' || neighbor.type === 'path') {
-            // Soft warm sunlight ray on floor
-            const npx = nx * S;
-            const npy = ny * S;
-            const rayGrad = ctx.createLinearGradient(
-              npx + S / 2 - dx * S * 0.3,
-              npy + S / 2 - dy * S * 0.3,
-              npx + S / 2 + dx * S * 0.5,
-              npy + S / 2 + dy * S * 0.5,
-            );
-            rayGrad.addColorStop(0, 'rgba(255, 248, 240, 0.25)');
-            rayGrad.addColorStop(1, 'rgba(255, 248, 240, 0)');
-            ctx.fillStyle = rayGrad;
-            ctx.fillRect(npx, npy, S, S);
-          }
-        }
-      }
-    }
-  }
-
-  private drawWindowTile(px: number, py: number, s: number) {
-    const { ctx } = this;
-    // ─── Cozy large window with curtains ────────────────────────────────
-
-    // White window frame with rounded feel
-    ctx.fillStyle = '#D0D0D0';
-    ctx.fillRect(px + 1, py + 1, s - 2, s - 2);
-    ctx.strokeStyle = '#F5E6D3';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(px + 1, py + 1, s - 2, s - 2);
-
-    // Sky view through window (soft blue gradient)
-    const skyGrad = ctx.createLinearGradient(px, py, px, py + s);
-    skyGrad.addColorStop(0, 'rgba(186, 230, 253, 0.6)');
-    skyGrad.addColorStop(0.5, 'rgba(224, 242, 254, 0.4)');
-    skyGrad.addColorStop(1, 'rgba(255, 250, 245, 0.3)');
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(px + 4, py + 4, s - 8, s - 8);
-
-    // Soft white window cross bars
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(px + s / 2, py + 4);
-    ctx.lineTo(px + s / 2, py + s - 4);
-    ctx.moveTo(px + 4, py + s / 2);
-    ctx.lineTo(px + s - 4, py + s / 2);
-    ctx.stroke();
-
-    // Pink curtains on sides
-    ctx.fillStyle = 'rgba(248, 187, 208, 0.7)';
-    ctx.fillRect(px + 2, py + 2, 5, s - 4); // left curtain
-    ctx.fillRect(px + s - 7, py + 2, 5, s - 4); // right curtain
-
-    // Curtain tie-backs (soft gold)
-    ctx.fillStyle = 'rgba(212, 165, 116, 0.6)';
-    ctx.fillRect(px + 5, py + s / 2 - 2, 3, 4);
-    ctx.fillRect(px + s - 8, py + s / 2 - 2, 3, 4);
-
-    // Sunlight streaming diagonal reflection
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.beginPath();
-    ctx.moveTo(px + 4, py + 4);
-    ctx.lineTo(px + s / 2 - 3, py + 4);
-    ctx.lineTo(px + 4, py + s / 2 - 3);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  private drawSofaTile(px: number, py: number, s: number) {
-    const { ctx } = this;
-    // ─── Cozy plush sofa — soft pastel fabric ───────────────────────────
-    ctx.fillStyle = '#B08090';
-    ctx.beginPath();
-    ctx.roundRect(px + 2, py + 6, s - 4, s - 8, 4);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(248, 187, 208, 0.5)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-    // Seat cushion
-    ctx.fillStyle = '#FCE4EC';
-    ctx.beginPath();
-    ctx.roundRect(px + 4, py + 10, s - 8, s - 14, 2);
-    ctx.fill();
-    // Backrest
-    ctx.fillStyle = '#B08090';
-    ctx.beginPath();
-    ctx.roundRect(px + 3, py + 6, s - 6, 5, 2);
-    ctx.fill();
-    // Cushion highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.fillRect(px + 5, py + 8, s - 10, 1.5);
-    // Soft rounded armrests
-    ctx.fillStyle = '#A07080';
-    ctx.beginPath();
-    ctx.roundRect(px + 2, py + 8, 3, 8, 1.5);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.roundRect(px + s - 5, py + 8, 3, 8, 1.5);
-    ctx.fill();
-  }
-
-  private drawWatercoolerTile(px: number, py: number, s: number) {
-    const { ctx } = this;
-    // ─── Cute water cooler — pastel blue ────────────────────────────────
-    // Base
-    ctx.fillStyle = '#E3F2FD';
-    ctx.beginPath();
-    ctx.roundRect(px + s / 2 - 4, py + s - 8, 8, 6, 2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(180, 200, 220, 0.4)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-    // Water bottle (cute rounded)
-    ctx.fillStyle = 'rgba(186, 230, 253, 0.4)';
-    ctx.beginPath();
-    ctx.ellipse(px + s / 2, py + s / 2 + 2, 5, 8, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(186, 230, 253, 0.6)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-    // Water level
-    ctx.fillStyle = 'rgba(186, 230, 253, 0.6)';
-    ctx.beginPath();
-    ctx.ellipse(px + s / 2, py + s / 2 + 4, 4, 5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Small cup stack
-    ctx.fillStyle = '#D0D0D0';
-    ctx.beginPath();
-    ctx.roundRect(px + s - 7, py + s - 6, 3, 4, 1);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(200, 200, 200, 0.3)';
-    ctx.stroke();
-    // Soft glow
-    const now = performance.now();
-    ctx.fillStyle = `rgba(186, 230, 253, ${0.15 + 0.08 * Math.sin(now / 400)})`;
-    ctx.beginPath();
-    ctx.arc(px + s / 2, py + s / 2 + 2, 10, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  private drawRoomLabel(room: LocalRoom) {
-    const { ctx } = this;
-    const px = room.x * TILE_SIZE;
-    const py = room.y * TILE_SIZE;
-    const pw = room.width * TILE_SIZE;
-
-    // Office zone label takes precedence; fallback to folder name
-    const primary = (room.zoneLabel ?? room.folderName).toUpperCase();
-    const secondary = room.zoneLabel ? room.folderName.toUpperCase() : '';
-    ctx.save();
-
-    // ─── Cozy pastel zone-colored plaque tab ────────────────────────────
-    const zoneColors: Record<string, string> = {
-      team_cluster: '#F5D0C5',
-      meeting: '#B09060',
-      focus: '#E8F5D6',
-      break: '#D0C0A0',
-      infra: '#E2E8F0',
-      reception: '#F5F0E8',
-      biophilic: '#D4E8D0',
-    };
-    const plaqueColor = zoneColors[room.zoneType ?? 'team_cluster'] ?? '#F5D0C5';
-
-    ctx.fillStyle = plaqueColor;
-    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-    ctx.lineWidth = 0.5;
-
-    const plaqueW = Math.min(pw - 4, Math.max(80, primary.length * 7 + 12));
-    ctx.beginPath();
-    ctx.moveTo(px + 4, py + 2);
-    ctx.lineTo(px + plaqueW, py + 2);
-    ctx.lineTo(px + plaqueW + 2, py + 4);
-    ctx.lineTo(px + plaqueW + 2, py + 14);
-    ctx.lineTo(px + plaqueW, py + 16);
-    ctx.lineTo(px + 4, py + 16);
-    ctx.lineTo(px + 2, py + 14);
-    ctx.lineTo(px + 2, py + 4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.font = `bold 9px ${this.tokens.fontMono}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = '#5C4033'; // warm brown text for all pastel plaques
-    ctx.fillText(primary.slice(0, 12), px + 6, py + 4);
-
-    // Secondary label (folder name) if zone label is present
-    if (secondary) {
-      ctx.font = `7px ${this.tokens.fontMono}`;
-      ctx.fillStyle = 'rgba(92, 64, 51, 0.6)';
-      ctx.fillText(secondary.slice(0, 14), px + 6, py + 18);
-    }
-
-    ctx.restore();
-  }
-
   private drawLocalUnit(unit: LocalUnit) {
     const { ctx } = this;
     let ux: number, uy: number;
@@ -2702,462 +2417,39 @@ export class LocalRenderer {
   }
 
   private spawnSpark(x: number, y: number, color: string) {
-    const p = this.particles.find((part) => !part.active);
-    if (!p) return;
-
-    p.active = true;
-    p.type = 'spark';
-    p.x = x;
-    p.y = y;
-    p.baseX = x;
-    p.vx = (Math.random() - 0.5) * 12;
-    p.vy = -15 - Math.random() * 20;
-    p.color = color;
-    p.size = 1.5 + Math.random() * 2;
-    p.life = 0;
-    p.maxLife = 0.6 + Math.random() * 0.4;
+    spawnSparkParticle(this.particles, x, y, color);
   }
 
   private spawnZzz(x: number, y: number) {
-    const p = this.particles.find((part) => !part.active);
-    if (!p) return;
-
-    p.active = true;
-    p.type = 'zzz';
-    p.x = x;
-    p.y = y;
-    p.baseX = x;
-    p.vx = 8 + Math.random() * 8;
-    p.vy = -10 - Math.random() * 10;
-    p.color = this.tokens.amber400 || '#FBBF24';
-    p.size = 7 + Math.random() * 4;
-    p.life = 0;
-    p.maxLife = 1.2 + Math.random() * 0.8;
-    p.char = Math.random() > 0.5 ? 'z' : 'Z';
+    spawnZzzParticle(this.particles, x, y, this.tokens.amber400 || '#FBBF24');
   }
 
   private updateAndDrawParticles(dt: number) {
-    const { ctx } = this;
-    for (const p of this.particles) {
-      if (!p.active) continue;
-
-      p.life += dt;
-      if (p.life >= p.maxLife) {
-        p.active = false;
-        continue;
-      }
-
-      p.baseX += p.vx * dt;
-      p.y += p.vy * dt;
-
-      if (p.type === 'spark') {
-        p.x = p.baseX + Math.sin(p.life * 10) * 4;
-
-        const alpha = Math.max(0, 1 - p.life / p.maxLife);
-        ctx.save();
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = alpha;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      } else {
-        p.x = p.baseX + Math.sin(p.life * 4) * 5;
-
-        const alpha = Math.max(0, (1 - p.life / p.maxLife) * 0.6);
-        ctx.save();
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = alpha;
-        ctx.font = `${p.size}px ${this.tokens.fontMono}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(p.char || 'Z', p.x, p.y);
-        ctx.restore();
-      }
-    }
+    updateAndDrawLocalParticles(this.ctx, this.particles, dt, this.tokens.fontMono || "'JetBrains Mono', monospace");
   }
 
-  private drawPowerOverlay(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
-    const { ctx } = this;
-    const pg = world.powerGrid;
-    if (!pg) return;
-
-    ctx.save();
-    ctx.globalAlpha = 0.6;
-
-    // Draw conduit connections more prominently
-    for (const key of pg.conduits) {
-      const parts = key.split(',');
-      if (parts.length < 2) continue;
-      const sx = Number(parts[0]);
-      const sy = Number(parts[1]);
-      if (!Number.isFinite(sx) || !Number.isFinite(sy)) continue;
-      if (sx < view.x0 || sx > view.x1 || sy < view.y0 || sy > view.y1) continue;
-
-      const px = sx * TILE_SIZE;
-      const py = sy * TILE_SIZE;
-      const s = TILE_SIZE;
-
-      // Bright amber conduit lines
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.8)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(px + s / 2, py);
-      ctx.lineTo(px + s / 2, py + s);
-      ctx.moveTo(px, py + s / 2);
-      ctx.lineTo(px + s, py + s / 2);
-      ctx.stroke();
-
-      // Node highlight at intersections
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.9)';
-      ctx.beginPath();
-      ctx.arc(px + s / 2, py + s / 2, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Draw power sources with enhanced glow
-    for (const src of pg.sources) {
-      if (src.tileX < view.x0 || src.tileX > view.x1 || src.tileY < view.y0 || src.tileY > view.y1) continue;
-
-      const px = src.tileX * TILE_SIZE;
-      const py = src.tileY * TILE_SIZE;
-      const s = TILE_SIZE;
-      const centerX = px + s / 2;
-      const centerY = py + s / 2;
-
-      // Pulsing outer glow
-      const now = performance.now();
-      const pulse = 0.5 + 0.5 * Math.sin(now / 500);
-      const glowR = s * 0.6 + 10 * pulse;
-
-      const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, glowR);
-      grad.addColorStop(0, `rgba(245, 158, 11, ${0.4 * pulse})`);
-      grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(px - glowR, py - glowR, s + 2 * glowR, s + 2 * glowR);
-
-      // Watts label
-      ctx.fillStyle = this.tokens.amber500 || '#F59E0B';
-      ctx.font = `bold 9px ${this.tokens.fontMono}`;
-      ctx.textAlign = 'center';
-      ctx.fillText(`${src.outputWatts}W`, centerX, py - 4);
-    }
-
-    // Draw power consumers with load indicator
-    for (const cons of pg.consumers) {
-      if (cons.tileX < view.x0 || cons.tileX > view.x1 || cons.tileY < view.y0 || cons.tileY > view.y1) continue;
-
-      const px = cons.tileX * TILE_SIZE;
-      const py = cons.tileY * TILE_SIZE;
-      const s = TILE_SIZE;
-
-      // Small load bar
-      const barW = s * 0.8;
-      const barH = 3;
-      const bx = px + (s - barW) / 2;
-      const by = py + s + 2;
-
-      // Background
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(bx, by, barW, barH);
-
-      // Load (based on watts, max 200W)
-      const loadPct = Math.min(1, cons.watts / 200);
-      ctx.fillStyle = loadPct > 0.8 ? '#EF4444' : loadPct > 0.5 ? '#F59E0B' : '#22C55E';
-      ctx.fillRect(bx, by, barW * loadPct, barH);
-    }
-
-    // Global power stats in corner
-    if (pg.generatedWatts > 0 || pg.consumedWatts > 0) {
-      const statsX = view.x0 * TILE_SIZE + 10;
-      const statsY = view.y0 * TILE_SIZE + 20;
-      ctx.fillStyle = 'rgba(13, 13, 20, 0.9)';
-      ctx.fillRect(statsX - 5, statsY - 5, 160, 50);
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
-      ctx.strokeRect(statsX - 5, statsY - 5, 160, 50);
-
-      ctx.fillStyle = '#22C55E';
-      ctx.font = `11px ${this.tokens.fontMono}`;
-      ctx.textAlign = 'left';
-      ctx.fillText(`⚡ Gen: ${pg.generatedWatts}W`, statsX, statsY + 12);
-      ctx.fillStyle = '#EF4444';
-      ctx.fillText(`🔌 Con: ${pg.consumedWatts}W`, statsX, statsY + 28);
-      ctx.fillStyle = pg.storedWatts > 0 ? '#3B82F6' : '#6B7280';
-      ctx.fillText(`🔋 Bat: ${pg.storedWatts}W`, statsX, statsY + 44);
-    }
-
-    ctx.restore();
+  private overlayState() {
+    return {
+      ctx: this.ctx,
+      tokens: this.tokens,
+      tileSize: TILE_SIZE,
+      zonePaintMode: this._zonePaintMode,
+      zonePaintStart: this._zonePaintStart,
+      zonePaintCurrent: this._zonePaintCurrent,
+      spawnBreath: (x: number, y: number) => this.spawnBreath(x, y),
+    };
   }
 
-  private drawTemperatureOverlay(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
-    const { ctx } = this;
-    const climates = world.roomClimates;
-    if (!climates) return;
-
-    ctx.save();
-    ctx.globalAlpha = 0.5;
-
-    // Color scale: blue (cold) -> white (comfort) -> red (hot)
-    function tempToColor(temp: number): string {
-      const comfortMin = 16, comfortMax = 26;
-      if (temp <= comfortMin) {
-        // Cold: blue to cyan
-        const t = Math.max(0, (temp + 20) / (comfortMin + 20)); // -20 to comfortMin
-        const r = Math.round(0 + t * 0);
-        const g = Math.round(100 + t * 155);
-        const b = 255;
-        return `rgb(${r},${g},${b})`;
-      } else if (temp >= comfortMax) {
-        // Hot: yellow to red
-        const t = Math.min(1, (temp - comfortMax) / (50 - comfortMax)); // comfortMax to 50
-        const r = 255;
-        const g = Math.round(255 * (1 - t));
-        const b = 0;
-        return `rgb(${r},${g},${b})`;
-      } else {
-        // Comfort zone: white to light green
-        const t = (temp - comfortMin) / (comfortMax - comfortMin);
-        const r = Math.round(200 * (1 - t));
-        const g = 255;
-        const b = Math.round(200 * (1 - t));
-        return `rgb(${r},${g},${b})`;
-      }
-    }
-
-    // Draw room temperature overlay
-    for (const [roomId, climate] of climates) {
-      const room = world.rooms.find(r => r.id === roomId);
-      if (!room) continue;
-
-      const roomCenterX = (room.x + room.width / 2) * TILE_SIZE;
-      const roomCenterY = (room.y + room.height / 2) * TILE_SIZE;
-
-      // Skip if room center not in view
-      if (roomCenterX < view.x0 * TILE_SIZE || roomCenterX > view.x1 * TILE_SIZE ||
-          roomCenterY < view.y0 * TILE_SIZE || roomCenterY > view.y1 * TILE_SIZE) continue;
-
-      const color = tempToColor(climate.temperature);
-      
-      // Temperature indicator at room center
-      ctx.fillStyle = color;
-      ctx.globalAlpha = 0.3;
-      ctx.beginPath();
-      ctx.arc(roomCenterX, roomCenterY, Math.max(room.width, room.height) * TILE_SIZE * 0.35, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Temperature label
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = color;
-      ctx.font = `bold 12px ${this.tokens.fontMono}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`${climate.temperature.toFixed(1)}°C`, roomCenterX, roomCenterY);
-      
-      // Target temperature indicator
-      if (Math.abs(climate.temperature - climate.targetTemperature) > 0.5) {
-        ctx.fillStyle = '#FBBF24'; // amber
-        ctx.font = `9px ${this.tokens.fontMono}`;
-        const arrow = climate.temperature < climate.targetTemperature ? '▲' : '▼';
-        ctx.fillText(`${arrow} ${climate.targetTemperature.toFixed(1)}°C`, roomCenterX, roomCenterY + 18);
-      }
-
-      // Breath particles for cold rooms
-      if (climate.temperature < 10 && Math.random() < 0.02) {
-        const px = room.x * TILE_SIZE + Math.random() * room.width * TILE_SIZE;
-        const py = room.y * TILE_SIZE + Math.random() * room.height * TILE_SIZE;
-        this.spawnBreath(px, py);
-      }
-    }
-
-    // Draw heater/cooler/vent indicators
-    for (const [roomId, climate] of climates) {
-      const room = world.rooms.find(r => r.id === roomId);
-      if (!room) continue;
-
-      // Heaters
-      for (const heater of climate.heaters) {
-        if (heater.tileX < view.x0 || heater.tileX > view.x1 || heater.tileY < view.y0 || heater.tileY > view.y1) continue;
-        const px = heater.tileX * TILE_SIZE;
-        const py = heater.tileY * TILE_SIZE;
-        const s = TILE_SIZE;
-        const centerX = px + s / 2;
-
-        // Heat wave effect
-        const now = performance.now();
-        ctx.strokeStyle = `rgba(239, 83, 80, ${0.4 + 0.3 * Math.sin(now / 120)})`;
-        ctx.lineWidth = 1.5;
-        for (let i = 0; i < 3; i++) {
-          ctx.beginPath();
-          ctx.moveTo(centerX - 6 + i * 6, py + s);
-          ctx.quadraticCurveTo(centerX + 4 * Math.sin(now / 100 + i), py + s - 8, centerX - 6 + i * 6, py + s - 16);
-          ctx.stroke();
-        }
-      }
-
-      // Coolers
-      for (const cooler of climate.coolers) {
-        if (cooler.tileX < view.x0 || cooler.tileX > view.x1 || cooler.tileY < view.y0 || cooler.tileY > view.y1) continue;
-        const px = cooler.tileX * TILE_SIZE;
-        const py = cooler.tileY * TILE_SIZE;
-        const s = TILE_SIZE;
-        const centerX = px + s / 2;
-
-        // Cold air particles
-        const now = performance.now();
-        ctx.fillStyle = `rgba(100, 181, 246, ${0.4 + 0.3 * Math.sin(now / 150)})`;
-        for (let i = 0; i < 4; i++) {
-          const px2 = centerX + (i - 1.5) * 4;
-          const py2 = py + s - 3 - (now / 80 + i * 0.5) % 10;
-          ctx.beginPath();
-          ctx.arc(px2, py2, 2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-
-      // Vents (airflow indicator)
-      for (const vent of climate.vents) {
-        if (!vent.open) continue;
-        if (vent.tileX < view.x0 || vent.tileX > view.x1 || vent.tileY < view.y0 || vent.tileY > view.y1) continue;
-        const px = vent.tileX * TILE_SIZE;
-        const py = vent.tileY * TILE_SIZE;
-        const s = TILE_SIZE;
-        const centerX = px + s / 2;
-        const centerY = py + s / 2;
-
-        ctx.fillStyle = `rgba(144, 164, 174, ${0.6 + 0.3 * Math.sin(performance.now() / 200)})`;
-        ctx.font = `${s * 0.3}px ${this.tokens.fontMono}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('↔', centerX, centerY);
-      }
-    }
-
-    ctx.restore();
+  private assetState() {
+    return {
+      ctx: this.ctx,
+      fontMono: this.tokens.fontMono || "'JetBrains Mono', monospace",
+      tileSize: TILE_SIZE,
+    };
   }
 
   private spawnBreath(x: number, y: number) {
-    const p = this.particles.find((part) => !part.active);
-    if (!p) return;
-
-    p.active = true;
-    p.type = 'zzz';
-    p.x = x;
-    p.y = y;
-    p.baseX = x;
-    p.vx = (Math.random() - 0.5) * 10;
-    p.vy = -8 - Math.random() * 8;
-    p.color = 'rgba(200, 230, 255, 0.7)'; // pale blue
-    p.size = 6 + Math.random() * 4;
-    p.life = 0;
-    p.maxLife = 1.5 + Math.random() * 1.0;
-    p.char = '∼';
-  }
-
-  private drawZones(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
-    const { ctx } = this;
-    if (!world.zones) return;
-
-    const zoneColors: Record<string, string> = {
-      stockpile: '#8B5A2B',      // brown
-      growing: '#4A7C2E',        // green
-      recreation: '#D4A537',     // gold
-      bedroom: '#6B4F8A',        // purple
-      dining: '#C46B3B',         // orange-brown
-      hospital: '#C0392B',       // red
-    };
-
-    for (const zone of world.zones) {
-      const color = zoneColors[zone.type] || '#888';
-      const alpha = 0.15;
-
-      // Draw filled tiles
-      ctx.fillStyle = `${color}${Math.round(alpha * 255).toString(16).padStart(2, '0')}`;
-      for (const tile of zone.tiles) {
-        if (tile.x < view.x0 || tile.x > view.x1 || tile.y < view.y0 || tile.y > view.y1) continue;
-        const px = tile.x * TILE_SIZE;
-        const py = tile.y * TILE_SIZE;
-        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-      }
-
-      // Draw border around zone bounds
-      if (zone.tiles.length > 0) {
-        const xs = zone.tiles.map((t: { x: number; y: number }) => t.x);
-        const ys = zone.tiles.map((t: { x: number; y: number }) => t.y);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
-        const minY = Math.min(...ys);
-        const maxY = Math.max(...ys);
-
-        const px = minX * TILE_SIZE;
-        const py = minY * TILE_SIZE;
-        const pw = (maxX - minX + 1) * TILE_SIZE;
-        const ph = (maxY - minY + 1) * TILE_SIZE;
-
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        ctx.strokeRect(px + 1, py + 1, pw - 2, ph - 2);
-        ctx.setLineDash([]);
-
-        // Zone type label
-        ctx.fillStyle = color;
-        ctx.font = `bold 9px ${this.tokens.fontMono}`;
-        ctx.textAlign = 'left';
-        ctx.fillText(zone.type.toUpperCase(), px + 3, py + 12);
-      }
-    }
-  }
-
-  private drawZonePaintPreview(view: { x0: number; y0: number; x1: number; y1: number }) {
-    const { ctx } = this;
-    if (!this._zonePaintStart || !this._zonePaintCurrent) return;
-
-    const x0 = Math.min(this._zonePaintStart.x, this._zonePaintCurrent.x);
-    const y0 = Math.min(this._zonePaintStart.y, this._zonePaintCurrent.y);
-    const x1 = Math.max(this._zonePaintStart.x, this._zonePaintCurrent.x);
-    const y1 = Math.max(this._zonePaintStart.y, this._zonePaintCurrent.y);
-
-    const zoneColors: Record<string, string> = {
-      stockpile: '#8B5A2B',
-      growing: '#4A7C2E',
-      recreation: '#D4A537',
-      bedroom: '#6B4F8A',
-      dining: '#C46B3B',
-      hospital: '#C0392B',
-    };
-    const color = zoneColors[this._zonePaintMode || 'stockpile'] || '#888';
-
-    // Semi-transparent fill
-    ctx.fillStyle = `${color}33`; // 20% alpha
-    for (let y = y0; y <= y1; y++) {
-      if (y < view.y0 || y > view.y1) continue;
-      for (let x = x0; x <= x1; x++) {
-        if (x < view.x0 || x > view.x1) continue;
-        const px = x * TILE_SIZE;
-        const py = y * TILE_SIZE;
-        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-      }
-    }
-
-    // Dashed border
-    const px = x0 * TILE_SIZE;
-    const py = y0 * TILE_SIZE;
-    const pw = (x1 - x0 + 1) * TILE_SIZE;
-    const ph = (y1 - y0 + 1) * TILE_SIZE;
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.setLineDash([8, 4]);
-    ctx.strokeRect(px, py, pw, ph);
-    ctx.setLineDash([]);
-
-    // Dimensions label
-    const w = x1 - x0 + 1;
-    const h = y1 - y0 + 1;
-    ctx.fillStyle = color;
-    ctx.font = `bold 10px ${this.tokens.fontMono}`;
-    ctx.textAlign = 'center';
-    ctx.fillText(`${w}×${h} (${w * h} tiles)`, px + pw / 2, py - 5);
+    spawnBreathParticle(this.particles, x, y);
   }
 
   // ─── Zoom controls ────────────────────────────────────────────────────────────
@@ -3196,1680 +2488,5 @@ export class LocalRenderer {
     this.animateCameraTo(p.px, p.py, duration);
   }
 
-  // ─── Isometric 2.5D Render Pipeline ─────────────────────────────────
-  private renderIso(
-    world: LocalWorld,
-    localUnits: LocalUnit[],
-    dt: number,
-    lodLow: boolean,
-    _isClean: boolean,
-  ) {
-    const view = this.visibleTileRect();
-
-    // ─── Pre-pass: update door animation states for visible doors ─────
-    for (let y = view.y0; y <= view.y1; y++) {
-      for (let x = view.x0; x <= view.x1; x++) {
-        const tile = world.grid[y]?.[x];
-        if (!tile || tile.type !== 'door') continue;
-        const key = `${x},${y}`;
-        const dpx = isoProject(x, y).px;
-        const dpy = isoProject(x, y).py;
-
-        // Find nearest agent distance
-        let minD = Infinity;
-        for (const unit of localUnits) {
-          let gx: number, gy: number;
-          if (unit.path.length > 0 && unit.pathIndex < unit.path.length) {
-            const from = unit.path[unit.pathIndex]!;
-            const to = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;
-            const t = unit.pathProgress;
-            gx = from.x + (to.x - from.x) * t;
-            gy = from.y + (to.y - from.y) * t;
-          } else {
-            gx = unit.gridX;
-            gy = unit.gridY;
-          }
-          const up = isoProject(gx, gy);
-          const d = Math.hypot(up.px - dpx, up.py - dpy) / ISO_TILE_W;
-          if (d < minD) minD = d;
-        }
-
-        const targetOpen = Math.max(0, Math.min(1, (1.8 - minD) * 1.5));
-        let currentOpen = this.doorOpenStates.get(key) ?? 0;
-        currentOpen = currentOpen + (targetOpen - currentOpen) * (1 - Math.exp(-dt * 12));
-        this.doorOpenStates.set(key, currentOpen);
-      }
-    }
-
-    // ─── Static Iso Layer (Phase D optimization) ──────────────────────
-    if (!this.isoStaticLayer || this.isoStaticWorldId !== world.repoId) {
-      this.rebuildIsoStaticLayer();
-    }
-    if (this.isoStaticLayer) {
-      // Use stored offsets to align static layer with dynamic tiles
-      this.ctx.drawImage(this.isoStaticLayer, this._isoStaticOffsetX, this._isoStaticOffsetY);
-    }
-
-    // Collect visible dynamic tiles (doors + furniture) for back-to-front draw
-    const tiles: Array<{ x: number; y: number; tile: LocalTile; z: number }> = [];
-    for (let y = view.y0; y <= view.y1; y++) {
-      for (let x = view.x0; x <= view.x1; x++) {
-        const tile = world.grid[y]?.[x];
-        if (!tile) continue;
-        // Skip pure floors — already in static layer
-        if (tile.type === 'floor' || tile.type === 'path' || tile.type === 'wall') continue;
-        const z = tile.type === 'door' || tile.type === 'window' ? 2 : tile.type === 'workbench' ? 1 : 0;
-        tiles.push({ x, y, tile, z });
-      }
-    }
-    // Sort by (x + y) then by z for proper depth
-    tiles.sort((a, b) => {
-      const d = (a.x + a.y) - (b.x + b.y);
-      return d !== 0 ? d : a.z - b.z;
-    });
-
-    // Determine active workbenches (agent working_on_file)
-    const activeWbIds = new Set(
-      localUnits.filter((u) => u.state === 'working_on_file' && u.currentWorkbenchId).map((u) => u.currentWorkbenchId),
-    );
-
-    // Draw dynamic tiles (doors, windows, furniture) on top of static layer
-    for (const { x, y, tile } of tiles) {
-      this.drawIsoTile(tile, x, y, world, activeWbIds);
-    }
-
-    // Sort and draw NPCs (back-to-front, before units)
-    const npcEntries = (world.npcs ?? [])
-      .filter((n) => n.gridX >= view.x0 && n.gridX <= view.x1 && n.gridY >= view.y0 && n.gridY <= view.y1)
-      .map((n) => ({ npc: n, sortKey: n.gridX + n.gridY }));
-    npcEntries.sort((a, b) => a.sortKey - b.sortKey);
-    for (const { npc } of npcEntries) {
-      this.drawIsoNpc(npc);
-    }
-
-    // Sort and draw units (also back-to-front by grid position)
-    const unitEntries = localUnits.map((u) => {
-      let gx: number, gy: number;
-      if (u.path.length > 0 && u.pathIndex < u.path.length) {
-        const from = u.path[u.pathIndex]!;
-        const to = u.path[Math.min(u.pathIndex + 1, u.path.length - 1)]!;
-        const t = u.pathProgress;
-        gx = from.x + (to.x - from.x) * t;
-        gy = from.y + (to.y - from.y) * t;
-      } else {
-        gx = u.gridX;
-        gy = u.gridY;
-      }
-      return { unit: u, gx, gy, sortKey: gx + gy };
-    });
-    unitEntries.sort((a, b) => a.sortKey - b.sortKey);
-
-    // Window light rays (iso projected onto adjacent floor diamonds)
-    this.drawIsoWindowLightRays(world, view);
-
-    for (const { unit, gx, gy } of unitEntries) {
-      this.drawIsoUnit(unit, gx, gy);
-    }
-
-    // Draw room labels at zone centers
-    if (!lodLow) {
-      for (const room of world.rooms) {
-        this.drawIsoRoomLabel(room);
-      }
-    }
-
-    // Draw workbench file-name labels (toggleable overlay)
-    if (!lodLow && this._workbenchLabelOverlay) {
-      const { ctx } = this;
-      for (let y = view.y0; y <= view.y1; y++) {
-        for (let x = view.x0; x <= view.x1; x++) {
-          const tile = world.grid[y]?.[x];
-          if (tile?.type !== 'workbench' || !tile.workbench) continue;
-          const base = isoProject(x, y);
-          const name = tile.workbench.fileName;
-          const short = name.length > 8 ? name.slice(0, 6) + '..' : name;
-          const textW = ctx.measureText(short).width + 6;
-          const labelW = Math.max(24, textW);
-          const labelH = 8;
-          const lx = base.px - labelW / 2;
-          const ly = base.py - ISO_WALL_H - 8;
-          ctx.fillStyle = 'rgba(20, 20, 30, 0.8)';
-          ctx.beginPath();
-          ctx.roundRect(lx, ly, labelW, labelH, 2);
-          ctx.fill();
-          ctx.fillStyle = '#E2E8F0';
-          ctx.font = `bold 5px ${this.tokens.fontMono}`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(short, base.px, ly + labelH / 2);
-        }
-      }
-    }
-
-    // ─── Isometric Overlays ───────────────────────────────────────────
-    if (this._powerOverlay && world.powerGrid) {
-      this.drawIsoPowerOverlay(world, view);
-    }
-    if (this._temperatureOverlay && world.roomClimates) {
-      this.drawIsoTemperatureOverlay(world, view);
-    }
-    if (world.zones && world.zones.length > 0) {
-      this.drawIsoZones(world, view);
-    }
-    if (this._zonePaintMode && this._zonePaintStart && this._zonePaintCurrent) {
-      this.drawIsoZonePaintPreview(view);
-    }
-    if (this.hoveredTile) {
-      this.drawIsoHoveredTile(this.hoveredTile);
-    }
-
-    // ─── Debug Overlay (RimWorld-style dev mode) ──────────────────────
-    if (this._debugOverlay) {
-      this.drawIsoDebugOverlay(world, localUnits, dt);
-    }
-  }
-
-  /** Draw a single tile in isometric 2.5D projection. */
-  private drawIsoTile(tile: LocalTile, gridX: number, gridY: number, world: LocalWorld, activeWbIds?: Set<string | null>) {
-    const { ctx } = this;
-    const corners = isoTileCorners(gridX, gridY);
-    const room = tile.roomId ? world.rooms.find((r) => r.id === tile.roomId) : undefined;
-    const zone = room?.zoneType;
-
-    // ─── Floor color based on zone ──────────────────────────────────
-    const floorKey = zone ?? 'team_cluster';
-    let floorColor = ISO_FLOOR[floorKey] || ISO_FLOOR.team_cluster || '#B8B8B8';
-    if (tile.type === 'path') floorColor = ISO_FLOOR.path || '#B8B8B8';
-    if (!tile.roomId && tile.type !== 'path') floorColor = ISO_FLOOR.outside || '#A8A8A8';
-
-    // ─── Draw floor diamond ─────────────────────────────────────────
-    ctx.fillStyle = floorColor;
-    ctx.beginPath();
-    ctx.moveTo(corners[0]!.x, corners[0]!.y);
-    ctx.lineTo(corners[1]!.x, corners[1]!.y);
-    ctx.lineTo(corners[2]!.x, corners[2]!.y);
-    ctx.lineTo(corners[3]!.x, corners[3]!.y);
-    ctx.closePath();
-    ctx.fill();
-
-    // Zone floor patterns (pattern-driven, not color-only, for colorblind accessibility)
-    if (zone === 'team_cluster' && (gridX + gridY) % 2 === 0) {
-      // Checkerboard tile
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-      ctx.beginPath();
-      ctx.arc(corners[0]!.x, corners[0]!.y + ISO_TILE_H * 0.3, ISO_TILE_H * 0.15, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    if (zone === 'meeting') {
-      // Wood plank line (parallel diagonals)
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-      ctx.lineWidth = 0.5;
-      ctx.beginPath();
-      ctx.moveTo(corners[0]!.x, corners[0]!.y + ISO_TILE_H * 0.3);
-      ctx.lineTo(corners[2]!.x, corners[2]!.y - ISO_TILE_H * 0.3);
-      ctx.stroke();
-    }
-    if (zone === 'focus') {
-      // Acoustic dot pattern
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-      ctx.beginPath();
-      ctx.arc(corners[0]!.x, corners[0]!.y + ISO_TILE_H * 0.2, 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    if (zone === 'infra') {
-      // Grid junction
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-      ctx.beginPath();
-      ctx.moveTo(corners[0]!.x, corners[0]!.y + ISO_TILE_H * 0.1);
-      ctx.lineTo(corners[2]!.x, corners[2]!.y - ISO_TILE_H * 0.1);
-      ctx.stroke();
-    }
-
-    // Floor edge
-    ctx.strokeStyle = 'rgba(100, 100, 100, 0.15)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-
-    // ─── Path corridor rendering (interior hallway, not loose grey strip) ─
-    if (tile.type === 'path') {
-      // Slightly darker floor inset for corridor depth
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
-      ctx.beginPath();
-      ctx.moveTo(corners[0]!.x, corners[0]!.y);
-      ctx.lineTo(corners[1]!.x, corners[1]!.y);
-      ctx.lineTo(corners[2]!.x, corners[2]!.y);
-      ctx.lineTo(corners[3]!.x, corners[3]!.y);
-      ctx.closePath();
-      ctx.fill();
-
-      // Runner strip — wider, integrated
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(corners[0]!.x, corners[0]!.y);
-      ctx.lineTo(corners[2]!.x, corners[2]!.y);
-      ctx.stroke();
-
-      // Subtle ceiling feel: faint diagonal hatch
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.04)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      const hatchStep = ISO_TILE_H / 4;
-      for (let i = -2; i <= 2; i++) {
-        const oy = i * hatchStep;
-        ctx.moveTo(corners[0]!.x + oy * 0.3, corners[0]!.y + oy);
-        ctx.lineTo(corners[2]!.x + oy * 0.3, corners[2]!.y + oy);
-      }
-      ctx.stroke();
-
-      // Door alignment: if adjacent to a door, extend runner to threshold
-      const north = world.grid[gridY - 1]?.[gridX];
-      const south = world.grid[gridY + 1]?.[gridX];
-      const east = world.grid[gridY]?.[gridX + 1];
-      const west = world.grid[gridY]?.[gridX - 1];
-      const doorNeighbors = [north, south, east, west].filter((n): n is LocalTile => n?.type === 'door');
-      if (doorNeighbors.length > 0) {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        const midX = (corners[0]!.x + corners[2]!.x) / 2;
-        const midY = (corners[0]!.y + corners[2]!.y) / 2;
-        ctx.moveTo(midX - 3, midY);
-        ctx.lineTo(midX + 3, midY);
-        ctx.stroke();
-      }
-    }
-
-    // ─── Exterior building border / plinth ──────────────────────────
-    if (gridX === 0 || gridY === 0 || gridX === world.width - 1 || gridY === world.height - 1) {
-      ctx.strokeStyle = '#606060';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      if (gridX === 0) {
-        ctx.moveTo(corners[3]!.x, corners[3]!.y);
-        ctx.lineTo(corners[0]!.x, corners[0]!.y);
-      }
-      if (gridY === 0) {
-        ctx.moveTo(corners[0]!.x, corners[0]!.y);
-        ctx.lineTo(corners[1]!.x, corners[1]!.y);
-      }
-      if (gridX === world.width - 1) {
-        ctx.moveTo(corners[1]!.x, corners[1]!.y);
-        ctx.lineTo(corners[2]!.x, corners[2]!.y);
-      }
-      if (gridY === world.height - 1) {
-        ctx.moveTo(corners[2]!.x, corners[2]!.y);
-        ctx.lineTo(corners[3]!.x, corners[3]!.y);
-      }
-      ctx.stroke();
-    }
-
-    // ─── Draw walls with height ─────────────────────────────────────
-    if (tile.type === 'wall' || tile.type === 'door' || tile.type === 'window') {
-      this._drawIsoWallTile(tile, gridX, gridY, world, corners, zone);
-    }
-
-    // ─── Draw furniture with height ──────────────────────────────────
-    if (tile.type === 'standing_desk') {
-      this.drawIsoStandingDesk(gridX, gridY);
-    } else if (tile.type === 'sofa') {
-      this.drawIsoSofa(gridX, gridY);
-    } else if (tile.type === 'planter') {
-      this.drawIsoPlanter(gridX, gridY);
-    } else if (tile.type === 'workbench') {
-      this.drawIsoWorkbench(tile, gridX, gridY, activeWbIds);
-    } else if (tile.type === 'whiteboard') {
-      this.drawIsoWhiteboard(gridX, gridY);
-    } else if (tile.type === 'reception') {
-      this.drawIsoReception(gridX, gridY);
-    } else if (tile.type === 'server_rack') {
-      this.drawIsoServerRack(gridX, gridY);
-    } else if (tile.type === 'window') {
-      this.drawIsoWindow(gridX, gridY);
-    } else if (tile.type === 'meeting_room') {
-      this.drawIsoMeetingTable(gridX, gridY);
-    } else if (tile.type === 'phone_booth') {
-      this.drawIsoPhoneBooth(gridX, gridY);
-    } else if (tile.type === 'break_area') {
-      this.drawIsoBreakArea(gridX, gridY);
-    } else if (tile.type === 'watercooler') {
-      this.drawIsoWatercooler(gridX, gridY);
-    } else if (tile.type === 'stairs') {
-      this.drawIsoStairs(gridX, gridY);
-    }
-
-    // ─── Zone floor decorators (placed by localMap.ts; rendered here) ──────
-    if (tile.decor === 'focus_lamp') {
-      const { ctx } = this;
-      const poleX = corners[0]!.x;
-      const baseY = corners[0]!.y + 2;
-      ctx.strokeStyle = '#8B7355';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(poleX, baseY);
-      ctx.lineTo(poleX, baseY - ISO_WALL_H * 0.6);
-      ctx.stroke();
-      ctx.fillStyle = '#FFE0A0';
-      ctx.beginPath();
-      ctx.arc(poleX, baseY - ISO_WALL_H * 0.6, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowColor = '#FFE0A0';
-      ctx.shadowBlur = 6;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    }
-    if (tile.decor === 'coffee_machine') {
-      const { ctx } = this;
-      const mx = corners[3]!.x + 4;
-      const my = corners[3]!.y - 2;
-      ctx.fillStyle = '#6B5B4F';
-      ctx.fillRect(mx, my, 6, 5);
-      ctx.fillStyle = '#D4C0A8';
-      ctx.fillRect(mx + 1, my + 1, 4, 3);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.beginPath();
-      ctx.arc(mx + 3, my - 2, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  /** Shared wall drawing logic for iso tiles (wall / door / window). */
-  private _drawIsoWallTile(
-    tile: LocalTile,
-    gridX: number,
-    gridY: number,
-    world: LocalWorld,
-    corners: Array<{ x: number; y: number }>,
-    zone?: string,
-  ) {
-    const { ctx } = this;
-    const northTile = world.grid[gridY - 1]?.[gridX];
-    const westTile = world.grid[gridY]?.[gridX - 1];
-    const isOpen = (t: LocalTile | undefined) =>
-      t === undefined || t.type === 'floor' || t.type === 'path' || t.type === 'door' || t.type === 'workbench' || t.type === 'kiosk';
-    const hasNorthFace = isOpen(northTile);
-    const hasWestFace = isOpen(westTile);
-
-    const isGlass = zone === 'team_cluster' || zone === 'meeting';
-    const isWood = zone === 'break' || zone === 'biophilic';
-    const isConcrete = zone === 'infra';
-
-    const right = corners[1]!;
-    const bottom = corners[2]!;
-    const left = corners[3]!;
-    const topCap = isoTileCorners(gridX, gridY, 1);
-
-    // Face colors (colorblind-friendly: zone shapes differ by luminosity, not just hue)
-    const faceColor = isConcrete ? '#A0A8B8' : isWood ? '#C4A880' : isGlass ? 'rgba(160, 190, 210, 0.35)' : ISO_WALL_FACE;
-    const sideColor = isConcrete ? '#9098A8' : isWood ? '#B49870' : isGlass ? 'rgba(140, 175, 200, 0.3)' : ISO_WALL_SIDE;
-
-    // Front face (south)
-    if (hasNorthFace) {
-      ctx.fillStyle = faceColor;
-      ctx.beginPath();
-      ctx.moveTo(left.x, left.y);
-      ctx.lineTo(bottom.x, bottom.y);
-      ctx.lineTo(bottom.x, bottom.y + ISO_WALL_H);
-      ctx.lineTo(left.x, left.y + ISO_WALL_H);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(80, 80, 80, 0.15)';
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-      // Contact shadow AO at base
-      const aoGrad = ctx.createLinearGradient(0, bottom.y + ISO_WALL_H - 4, 0, bottom.y + ISO_WALL_H);
-      aoGrad.addColorStop(0, 'rgba(0,0,0,0)');
-      aoGrad.addColorStop(1, 'rgba(0,0,0,0.25)');
-      ctx.fillStyle = aoGrad;
-      ctx.fillRect(left.x, bottom.y + ISO_WALL_H - 4, bottom.x - left.x, 4);
-    }
-
-    // Side face (east)
-    if (hasWestFace) {
-      ctx.fillStyle = sideColor;
-      ctx.beginPath();
-      ctx.moveTo(bottom.x, bottom.y);
-      ctx.lineTo(right.x, right.y);
-      ctx.lineTo(right.x, right.y + ISO_WALL_H);
-      ctx.lineTo(bottom.x, bottom.y + ISO_WALL_H);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(80, 80, 80, 0.15)';
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-      // Contact shadow AO at base
-      const aoGrad = ctx.createLinearGradient(0, bottom.y + ISO_WALL_H - 4, 0, bottom.y + ISO_WALL_H);
-      aoGrad.addColorStop(0, 'rgba(0,0,0,0)');
-      aoGrad.addColorStop(1, 'rgba(0,0,0,0.22)');
-      ctx.fillStyle = aoGrad;
-      ctx.fillRect(bottom.x, bottom.y + ISO_WALL_H - 4, right.x - bottom.x, 4);
-    }
-
-    // Top cap
-    ctx.fillStyle = isConcrete ? '#B0B8C8' : ISO_WALL_TOP;
-    ctx.beginPath();
-    ctx.moveTo(topCap[0]!.x, topCap[0]!.y);
-    ctx.lineTo(topCap[1]!.x, topCap[1]!.y);
-    ctx.lineTo(topCap[2]!.x, topCap[2]!.y);
-    ctx.lineTo(topCap[3]!.x, topCap[3]!.y);
-    ctx.closePath();
-    ctx.fill();
-
-    // ─── Zone wall decorators ──────────────────────────────────────
-    if (zone === 'infra') {
-      // Cable conduits on wall faces (thin vertical lines)
-      ctx.strokeStyle = 'rgba(30, 30, 30, 0.35)';
-      ctx.lineWidth = 0.8;
-      if (hasNorthFace) {
-        ctx.beginPath();
-        ctx.moveTo((left.x + bottom.x) / 2 - 2, bottom.y);
-        ctx.lineTo((left.x + bottom.x) / 2 - 2, bottom.y + ISO_WALL_H);
-        ctx.stroke();
-      }
-      if (hasWestFace) {
-        ctx.beginPath();
-        ctx.moveTo((bottom.x + right.x) / 2 + 2, bottom.y);
-        ctx.lineTo((bottom.x + right.x) / 2 + 2, bottom.y + ISO_WALL_H);
-        ctx.stroke();
-      }
-    }
-    if (zone === 'biophilic') {
-      // Hanging plant under wall top cap
-      ctx.fillStyle = '#6A9E6A';
-      ctx.beginPath();
-      ctx.arc(topCap[3]!.x + 3, topCap[3]!.y + 4, 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#4A7E4A';
-      ctx.beginPath();
-      ctx.arc(topCap[3]!.x + 1, topCap[3]!.y + 6, 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Door specifics
-    if (tile.type === 'door') {
-      this._drawIsoDoor(tile, corners, isGlass, hasNorthFace, hasWestFace);
-    }
-
-    // Window specifics
-    if (tile.type === 'window') {
-      this._drawIsoWindowTile(gridX, gridY, corners);
-    }
-  }
-
-  private _drawIsoDoor(
-    tile: LocalTile,
-    corners: Array<{ x: number; y: number }>,
-    isGlass: boolean,
-    hasNorthFace: boolean,
-    hasWestFace: boolean,
-  ) {
-    const { ctx } = this;
-    const openPct = this.doorOpenStates.get(`${tile.x},${tile.y}`) ?? 0;
-
-    const right = corners[1]!;
-    const bottom = corners[2]!;
-    const left = corners[3]!;
-
-    const frameColor = isGlass ? ISO_DOOR_GLASS : ISO_DOOR_WOOD;
-    const panelColor = isGlass ? 'rgba(160, 190, 210, 0.5)' : '#A08850';
-    const WH = ISO_WALL_H;
-
-    // Draw door panels as iso-perspective parallelograms on a given face.
-    // tl/tr are the two top vertices of the face; side edges are vertical.
-    const drawOnFace = (tl: { x: number; y: number }, tr: { x: number; y: number }) => {
-      const dx = tr.x - tl.x;
-      const dy = tr.y - tl.y;
-      // Point along the top edge at parameter t, shifted down by `down` pixels.
-      const pt = (t: number, down = 0) => ({ x: tl.x + dx * t, y: tl.y + dy * t + down });
-
-      // Jamb posts
-      ctx.fillStyle = frameColor;
-      for (const [t0, t1] of [[0, 0.06], [0.94, 1]] as [number, number][]) {
-        const a = pt(t0), b = pt(t1);
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-        ctx.lineTo(b.x, b.y + WH); ctx.lineTo(a.x, a.y + WH);
-        ctx.closePath(); ctx.fill();
-      }
-
-      // Two sliding panels — each half, moving apart as openPct increases
-      const slide = openPct * 0.42;
-      ctx.fillStyle = panelColor;
-      // Left panel: [0.06 .. 0.5] slides toward 0
-      const lEnd = 0.5 - slide;
-      if (lEnd > 0.06) {
-        const a = pt(0.06, 2), b = pt(lEnd, 2);
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-        ctx.lineTo(b.x, b.y + WH - 4); ctx.lineTo(a.x, a.y + WH - 4);
-        ctx.closePath(); ctx.fill();
-      }
-      // Right panel: [0.5 .. 0.94] slides toward 1
-      const rStart = 0.5 + slide;
-      if (rStart < 0.94) {
-        const a = pt(rStart, 2), b = pt(0.94, 2);
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-        ctx.lineTo(b.x, b.y + WH - 4); ctx.lineTo(a.x, a.y + WH - 4);
-        ctx.closePath(); ctx.fill();
-      }
-
-      // Handle
-      ctx.fillStyle = isGlass ? '#90A8B8' : '#806840';
-      const h = pt(openPct < 0.5 ? 0.44 : 0.56, WH / 2);
-      ctx.beginPath(); ctx.arc(h.x, h.y, 1.5, 0, Math.PI * 2); ctx.fill();
-    };
-
-    if (hasNorthFace) drawOnFace(left, bottom);   // south-facing wall face
-    if (hasWestFace) drawOnFace(bottom, right);    // east-facing wall face
-  }
-
-  private _drawIsoWindowTile(
-    _gridX: number,
-    _gridY: number,
-    corners: Array<{ x: number; y: number }>,
-  ) {
-    const { ctx } = this;
-    const bottom = corners[2]!;
-    const left = corners[3]!;
-    const baseY = Math.min(bottom.y, left.y);
-
-    // Sky gradient inside window frame
-    const winGrad = ctx.createLinearGradient(bottom.x, baseY, left.x, baseY + ISO_WALL_H);
-    winGrad.addColorStop(0, ISO_WINDOW_SKY[0]);
-    winGrad.addColorStop(1, ISO_WINDOW_SKY[1]);
-    ctx.fillStyle = winGrad;
-    ctx.beginPath();
-    ctx.moveTo(bottom.x - 2, baseY + 3);
-    ctx.lineTo(left.x + 2, baseY + 3);
-    ctx.lineTo(left.x + 2, baseY + ISO_WALL_H - 3);
-    ctx.lineTo(bottom.x - 2, baseY + ISO_WALL_H - 3);
-    ctx.closePath();
-    ctx.fill();
-
-    // Frame cross (distinctive shape for colorblind identification)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo((bottom.x + left.x) / 2, baseY + 3);
-    ctx.lineTo((bottom.x + left.x) / 2, baseY + ISO_WALL_H - 3);
-    ctx.moveTo(bottom.x - 2, baseY + ISO_WALL_H / 2);
-    ctx.lineTo(left.x + 2, baseY + ISO_WALL_H / 2);
-    ctx.stroke();
-
-    // Blinds / shutters (pattern-based, not pink)
-    ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
-    for (let i = 0; i < 3; i++) {
-      const cy = baseY + 5 + i * 6;
-      ctx.fillRect(bottom.x - 7, cy, 5, 3);
-      ctx.fillRect(left.x + 2, cy, 5, 3);
-    }
-  }
-
-  // ─── Isometric Furniture Stubs (Phase B will implement visuals) ─────────
-  private drawIsoStandingDesk(gx: number, gy: number) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    ctx.fillStyle = '#B09060';
-    ctx.beginPath();
-    ctx.moveTo(base.px - 10, base.py - 4);
-    ctx.lineTo(base.px, base.py - 10);
-    ctx.lineTo(base.px + 10, base.py - 4);
-    ctx.lineTo(base.px, base.py + 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#D8DCE0';
-    ctx.fillRect(base.px - 5, base.py - 18, 10, 8);
-    ctx.fillStyle = 'rgba(140, 170, 190, 0.3)';
-    ctx.fillRect(base.px - 4, base.py - 17, 8, 6);
-    ctx.fillStyle = '#608860';
-    ctx.beginPath();
-    ctx.arc(base.px + 6, base.py - 2, 2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  private drawIsoSofa(gx: number, gy: number) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    ctx.fillStyle = '#B08090';
-    ctx.beginPath();
-    ctx.moveTo(base.px - 10, base.py);
-    ctx.lineTo(base.px, base.py - 6);
-    ctx.lineTo(base.px + 10, base.py);
-    ctx.lineTo(base.px, base.py + 6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#A07080';
-    ctx.beginPath();
-    ctx.moveTo(base.px - 8, base.py - 2);
-    ctx.lineTo(base.px, base.py - 8);
-    ctx.lineTo(base.px + 8, base.py - 2);
-    ctx.lineTo(base.px, base.py + 4);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  private drawIsoPlanter(gx: number, gy: number) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    ctx.fillStyle = '#B09060';
-    ctx.beginPath();
-    ctx.moveTo(base.px - 6, base.py + 2);
-    ctx.lineTo(base.px + 6, base.py + 2);
-    ctx.lineTo(base.px + 5, base.py - 6);
-    ctx.lineTo(base.px - 5, base.py - 6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#608860';
-    ctx.beginPath();
-    ctx.ellipse(base.px, base.py - 10, 6, 5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#90B090';
-    ctx.beginPath();
-    ctx.ellipse(base.px - 2, base.py - 12, 3, 3, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  private drawIsoWorkbench(tile: LocalTile, gx: number, gy: number, activeWbIds?: Set<string | null>) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    const wb = tile.workbench;
-    if (!wb) return;
-    const extColor = EXT_COLOR[wb.extension] ?? '#888';
-    const isActive = activeWbIds?.has(wb.id);
-
-    // Desk surface (raised slightly)
-    const deskH = 10;
-    ctx.fillStyle = '#B09060';
-    ctx.beginPath();
-    ctx.moveTo(base.px - 10, base.py - deskH);
-    ctx.lineTo(base.px, base.py - 6 - deskH);
-    ctx.lineTo(base.px + 10, base.py - deskH);
-    ctx.lineTo(base.px, base.py + 6 - deskH);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(200, 170, 140, 0.4)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-
-    // Monitor (vertical slab)
-    if (isActive) {
-      // Glow effect when agent is working
-      const now = performance.now();
-      ctx.shadowColor = extColor;
-      ctx.shadowBlur = 8 + 4 * Math.sin(now / 250);
-    }
-    ctx.fillStyle = '#D0D0D0';
-    ctx.fillRect(base.px - 6, base.py - 22, 12, 10);
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#0a0a0c';
-    ctx.fillRect(base.px - 5, base.py - 21, 10, 8);
-
-    if (isActive) {
-      // Scrolling code lines
-      const now = performance.now();
-      ctx.fillStyle = extColor;
-      ctx.globalAlpha = 0.75;
-      const scrollY = (now / 35) % 6;
-      for (let i = 0; i < 3; i++) {
-        const ly = base.py - 20 + i * 3 - scrollY;
-        if (ly >= base.py - 21 && ly <= base.py - 13) {
-          ctx.fillRect(base.px - 4, ly, 8, 1.5);
-        }
-      }
-      ctx.globalAlpha = 1;
-      // Random sparks
-      if (Math.random() < 0.15) {
-        this.spawnSpark(base.px, base.py - 5, extColor);
-      }
-    } else {
-      ctx.fillStyle = 'rgba(140, 170, 190, 0.3)';
-      ctx.fillRect(base.px - 5, base.py - 21, 10, 8);
-    }
-
-    // Extension label
-    ctx.fillStyle = extColor;
-    ctx.font = `bold 5px ${this.tokens.fontMono}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(wb.extension.toUpperCase().slice(0, 3), base.px, base.py - 16);
-
-    // Keyboard hint
-    ctx.fillStyle = '#B8C0C8';
-    ctx.fillRect(base.px - 5, base.py - 2, 10, 2);
-
-    // Chair (behind/under desk in iso)
-    ctx.fillStyle = '#B08090';
-    ctx.beginPath();
-    ctx.ellipse(base.px, base.py + 6, 4, 3, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  private drawIsoWhiteboard(_gx: number, _gy: number) {
-    // Whiteboard art is rendered on the wall face in _drawIsoWallTile
-  }
-
-  private drawIsoReception(gx: number, gy: number) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    ctx.fillStyle = '#B09060';
-    ctx.beginPath();
-    ctx.moveTo(base.px - 10, base.py + 4);
-    ctx.lineTo(base.px + 10, base.py + 4);
-    ctx.lineTo(base.px + 8, base.py - 6);
-    ctx.quadraticCurveTo(base.px, base.py - 10, base.px - 8, base.py - 6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#D8DCE0';
-    ctx.fillRect(base.px - 3, base.py - 14, 6, 5);
-    ctx.fillStyle = 'rgba(186, 230, 253, 0.6)';
-    ctx.fillRect(base.px - 2, base.py - 13, 4, 3);
-  }
-
-  private drawIsoServerRack(gx: number, gy: number) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    const now = performance.now();
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(base.px - 8, base.py - 18, 16, 18);
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 0.5;
-    ctx.strokeRect(base.px - 8, base.py - 18, 16, 18);
-    const ledColors = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444'];
-    for (let i = 0; i < 3; i++) {
-      const ry = base.py - 16 + i * 6;
-      for (let j = 0; j < 3; j++) {
-        const blink = Math.sin(now / 200 + i * 3 + j * 2) > 0;
-        ctx.fillStyle = blink ? ledColors[(i + j) % ledColors.length]! : '#1e293b';
-        ctx.fillRect(base.px - 6 + j * 5, ry, 3, 2);
-      }
-    }
-  }
-
-  private drawIsoWindow(_gx: number, _gy: number) {
-    // Window details already drawn in _drawIsoWallTile
-  }
-
-  private drawIsoMeetingTable(gx: number, gy: number) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    ctx.fillStyle = 'rgba(232, 197, 150, 0.7)';
-    ctx.beginPath();
-    ctx.ellipse(base.px, base.py, 10, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(200, 170, 140, 0.4)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-    ctx.fillStyle = '#D0C0A0';
-    ctx.beginPath();
-    ctx.ellipse(base.px - 12, base.py, 3, 2, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(base.px + 12, base.py, 3, 2, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#D0D0D0';
-    ctx.beginPath();
-    ctx.arc(base.px + 3, base.py + 1, 1.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  private drawIsoPhoneBooth(gx: number, gy: number) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    ctx.fillStyle = '#B0C0B0';
-    ctx.beginPath();
-    ctx.moveTo(base.px - 8, base.py);
-    ctx.lineTo(base.px, base.py - 6);
-    ctx.lineTo(base.px + 8, base.py);
-    ctx.lineTo(base.px, base.py + 6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(168, 213, 162, 0.4)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-    const now = performance.now();
-    ctx.fillStyle = (now % 2000 < 1000) ? '#608860' : '#D4E8D0';
-    ctx.beginPath();
-    ctx.arc(base.px, base.py - 10, 2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  private drawIsoBreakArea(gx: number, gy: number) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    ctx.fillStyle = '#FAF0E6';
-    ctx.fillRect(base.px - 10, base.py - 4, 20, 6);
-    ctx.fillStyle = '#D8DCE0';
-    ctx.fillRect(base.px - 8, base.py - 14, 6, 8);
-    const now = performance.now();
-    ctx.fillStyle = `rgba(212, 165, 116, ${0.4 + 0.2 * Math.sin(now / 300)})`;
-    ctx.fillRect(base.px - 6, base.py - 12, 2, 2);
-    ctx.fillStyle = '#E2E8F0';
-    ctx.fillRect(base.px + 4, base.py - 12, 6, 5);
-  }
-
-  private drawIsoWatercooler(gx: number, gy: number) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    ctx.fillStyle = '#E3F2FD';
-    ctx.beginPath();
-    ctx.roundRect(base.px - 3, base.py - 2, 6, 5, 1);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(186, 230, 253, 0.5)';
-    ctx.beginPath();
-    ctx.ellipse(base.px, base.py - 8, 4, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(186, 230, 253, 0.7)';
-    ctx.beginPath();
-    ctx.ellipse(base.px, base.py - 6, 3, 4, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#D0D0D0';
-    ctx.fillRect(base.px + 5, base.py - 1, 2, 3);
-  }
-
-  private drawIsoStairs(gx: number, gy: number) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    for (let i = 0; i < 4; i++) {
-      const r = 232 + i * 3;
-      const g = 197 + i * 2;
-      const b = 150 + i * 2;
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
-      ctx.fillRect(base.px - 8 + i * 4, base.py - 4 + i * 2, 8, 3);
-    }
-    ctx.strokeStyle = '#E2E8F0';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(base.px + 8, base.py - 4);
-    ctx.lineTo(base.px + 8, base.py + 8);
-    ctx.stroke();
-  }
-  /** Darken a hex color by a percentage (used for prism face shading). */
-  private darkenHex(hex: string, pct: number): string {
-    if (!hex.startsWith('#') || hex.length !== 7) return hex;
-    const f = (n: number) => Math.max(0, Math.min(255, Math.floor(n * (1 - pct / 100))));
-    const r = f(parseInt(hex.slice(1, 3), 16));
-    const g = f(parseInt(hex.slice(3, 5), 16));
-    const b = f(parseInt(hex.slice(5, 7), 16));
-    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-  }
-
-  /** Draw an isometric prism (box) in local screen space, shaded by darkening `color` on its side faces. */
-  private drawIsoPrism(
-    cx: number,
-    zBase: number,
-    zTop: number,
-    hw: number,
-    hd: number,
-    color: string,
-    scale: number,
-  ) {
-    const { ctx } = this;
-    const bY = -zBase * scale;
-    const tY = -zTop * scale;
-    // base diamond corners (omit unused top/left of base to satisfy TS strictUnusedLocals)
-    const bx1 = cx + hw * scale, by1 = bY;
-    const bx2 = cx, by2 = bY + hd * scale;
-    const bx3 = cx - hw * scale, by3 = bY;
-    // top diamond corners
-    const tx0 = cx, ty0 = tY - hd * scale;
-    const tx1 = cx + hw * scale, ty1 = tY;
-    const tx2 = cx, ty2 = tY + hd * scale;
-    const tx3 = cx - hw * scale, ty3 = tY;
-    // left face (darker)
-    ctx.fillStyle = this.darkenHex(color, 20);
-    ctx.beginPath();
-    ctx.moveTo(bx3, by3);
-    ctx.lineTo(bx2, by2);
-    ctx.lineTo(tx2, ty2);
-    ctx.lineTo(tx3, ty3);
-    ctx.closePath();
-    ctx.fill();
-    // right face (medium darker)
-    ctx.fillStyle = this.darkenHex(color, 10);
-    ctx.beginPath();
-    ctx.moveTo(bx2, by2);
-    ctx.lineTo(bx1, by1);
-    ctx.lineTo(tx1, ty1);
-    ctx.lineTo(tx2, ty2);
-    ctx.closePath();
-    ctx.fill();
-    // top cap (original color)
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(tx0, ty0);
-    ctx.lineTo(tx1, ty1);
-    ctx.lineTo(tx2, ty2);
-    ctx.lineTo(tx3, ty3);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  private drawIsoUnit(unit: LocalUnit, gx: number, gy: number) {
-    const { ctx } = this;
-    const base = isoProject(gx, gy);
-    let ux = base.px;
-    let uy = base.py;
-
-    // Spawning Zzzs if unit is idle or resting
-    if ((unit.state === 'idle_in_room' || unit.state === 'resting') && Math.random() < 0.02) {
-      this.spawnZzz(ux, uy);
-    }
-
-    // Motion vectors & angles
-    let dirAngle = 0;
-    let isMoving = false;
-    if (unit.path.length > 0 && unit.pathIndex < unit.path.length) {
-      isMoving = true;
-      const from = unit.path[unit.pathIndex]!;
-      const to = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;
-      dirAngle = Math.atan2(to.y - from.y, to.x - from.x);
-    } else if (unit.state === 'working_on_file' && unit.currentWorkbenchId) {
-      const wbTile = this.world?.grid
-        .flat()
-        .find((t) => t.workbench?.id === unit.currentWorkbenchId);
-      if (wbTile) dirAngle = Math.atan2(wbTile.y - unit.gridY, wbTile.x - unit.gridX);
-    }
-
-    // Squash & Stretch
-    const speed = isMoving ? 3.6 * unit.effectiveSpeed : 0;
-    const Sf = 1 + Math.min(0.25, speed * 0.08);
-    const Sc = 1 / Sf;
-
-    // Harmonic bobbing (vertical in screen space)
-    const bobbingY = isMoving ? Math.sin(unit.pathProgress * Math.PI * 2) * 3 : 0;
-
-    const scale = ISO_TILE_W / 64; // base scale factor relative to design size
-
-    ctx.save();
-    ctx.translate(ux, uy + bobbingY - ISO_WALL_H * 0.3); // lift slightly above floor
-    if (unit.ephemeral) ctx.scale(0.8, 0.8);
-
-    // Selection ring
-    const isHovered = this._hoveredUnit?.id === unit.id;
-    if (isHovered) {
-      ctx.strokeStyle = ISO_SELECTION;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(0, 0, ISO_TILE_W * 0.3, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
-    // Squash & Stretch along movement
-    ctx.save();
-    ctx.rotate(dirAngle);
-    ctx.scale(Sf, Sc);
-
-    const drawPrism = (cx: number, zBase: number, zTop: number, hw: number, hd: number, color: string) =>
-      this.drawIsoPrism(cx, zBase, zTop, hw, hd, color, scale);
-
-    // 1. Shadow (soft iso ellipse on floor, offset by top-left light)
-    const shadowOffX = 1.5 * scale;
-    const shadowOffY = 3 * scale;
-    // Outer ambient-occlusion halo
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
-    ctx.beginPath();
-    ctx.ellipse(shadowOffX, shadowOffY + 1 * scale, ISO_TILE_W * 0.22, ISO_TILE_H * 0.18, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Core shadow
-    ctx.fillStyle = ISO_SHADOW;
-    ctx.beginPath();
-    ctx.ellipse(shadowOffX, shadowOffY, ISO_TILE_W * 0.18, ISO_TILE_H * 0.15, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 2. Legs — two thin vertical prisms, z=0..8, darkened 20%
-    const legColor = this.darkenHex(unit.color, 20);
-    drawPrism(-5 * scale, 0, 8, 2.5, 2, legColor);
-    drawPrism(5 * scale, 0, 8, 2.5, 2, legColor);
-
-    // 3. Torso — horizontal box, z=8..18, ~60% tile width
-    drawPrism(0, 8, 18, 10, 6, unit.color);
-
-    // 4. Head — small cube, z=18..26
-    drawPrism(0, 18, 26, 5, 3.5, '#e8d8c8');
-
-    // 5. Helmet / highlight — small yellow box on top, z=26..28
-    drawPrism(0, 26, 28, 6, 4, ISO_HELMET);
-
-    // Working LEDs (green blinkers on helmet)
-    const now = performance.now();
-    if (unit.state === 'working_on_file') {
-      const flash = Math.sin(now / 150) > 0;
-      ctx.fillStyle = flash ? '#22C55E' : '#14532d';
-      ctx.beginPath();
-      ctx.arc(6 * scale, -27 * scale, 1.2, 0, Math.PI * 2);
-      ctx.arc(-6 * scale, -27 * scale, 1.2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.restore(); // Squash & Stretch
-
-    // 6. Initials capsule
-    const initials = unit.name.slice(0, 2).toUpperCase();
-    ctx.save();
-    ctx.translate(0, ISO_TILE_H * 0.55);
-    ctx.font = `bold 8px ${this.tokens.fontMono}`;
-    const textW = ctx.measureText(initials).width + 8;
-    ctx.fillStyle = 'rgba(30, 30, 30, 0.85)';
-    ctx.fillRect(-textW / 2, -6, textW, 12);
-    ctx.strokeStyle = 'rgba(200, 200, 200, 0.2)';
-    ctx.lineWidth = 0.5;
-    ctx.strokeRect(-textW / 2, -6, textW, 12);
-    ctx.fillStyle = unit.color;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(initials, 0, 0);
-    ctx.restore();
-
-    // Work progress ring
-    if (unit.state === 'working_on_file' && unit.workProgress > 0) {
-      ctx.strokeStyle = this.tokens.success || '#22C55E';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(0, 0, ISO_TILE_W * 0.28, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * unit.workProgress) / 100);
-      ctx.stroke();
-    }
-
-    // Status icon floating above the prism avatar
-    const statusIcon: Record<string, string> = {
-      idle_in_room: '◌',
-      walking_to_workbench: '→',
-      walking_to_room: '→',
-      working_on_file: '⚙',
-      resting: '☾',
-    };
-    const icon = statusIcon[unit.state] ?? '?';
-    ctx.fillStyle = unit.color;
-    ctx.font = `${ISO_TILE_W * 0.18}px ${this.tokens.fontMono}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(icon, 0, -ISO_TILE_H * 0.35 - 28 * scale);
-
-    ctx.restore();
-
-    if (this.onUnitRendered) {
-      const sx = (ux - this.cam.x) * this.cam.zoom + this.cam.cx;
-      const sy = (uy + bobbingY - this.cam.y) * this.cam.zoom + this.cam.cy;
-      this.onUnitRendered(unit, sx, sy);
-    }
-  }
-  private drawIsoRoomLabel(room: LocalRoom) {
-    const { ctx } = this;
-    const world = this.world;
-    const primary = (room.zoneLabel ?? room.folderName).toUpperCase();
-
-    // Find the door tile for this room to place the plaque near the entrance
-    let doorBase: { px: number; py: number } | null = null;
-    if (world) {
-      for (let y = room.y; y < room.y + room.height; y++) {
-        for (let x = room.x; x < room.x + room.width; x++) {
-          const tile = world.grid[y]?.[x];
-          if (tile?.type === 'door' && tile.roomId === room.id) {
-            doorBase = isoProject(x, y);
-            break;
-          }
-        }
-        if (doorBase) break;
-      }
-    }
-
-    // Fallback to room center if no door found
-    const base = doorBase ?? isoProject(room.x + room.width / 2, room.y + room.height / 2);
-    // Offset plaque slightly above the door wall face, or above room center
-    const plaqueX = base.px;
-    const plaqueY = doorBase
-      ? base.py - ISO_WALL_H * 0.6 // on wall face next to door
-      : base.py - ISO_WALL_H - 4;  // floating above center (old behavior)
-
-    const zoneColors: Record<string, string> = {
-      team_cluster: '#F5D0C5',
-      meeting: '#B09060',
-      focus: '#E8F5D6',
-      break: '#D0C0A0',
-      infra: '#E2E8F0',
-      reception: '#F5F0E8',
-      biophilic: '#D4E8D0',
-    };
-    const plaqueColor = zoneColors[room.zoneType ?? 'team_cluster'] ?? '#F5D0C5';
-
-    ctx.save();
-    ctx.fillStyle = plaqueColor;
-    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-    ctx.lineWidth = 0.5;
-
-    const plaqueW = Math.min(room.width * ISO_TILE_W, Math.max(40, primary.length * 5 + 8));
-    const plaqueH = 10;
-    ctx.beginPath();
-    ctx.roundRect(plaqueX - plaqueW / 2, plaqueY - plaqueH, plaqueW, plaqueH, 2);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.font = `bold 7px ${this.tokens.fontMono}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#5C4033';
-    ctx.fillText(primary.slice(0, 14), plaqueX, plaqueY - plaqueH / 2);
-    ctx.restore();
-  }
-
-  /** Draw a stationary NPC (manager) as a small dark-suited prism figure. */
-  private drawIsoNpc(npc: import('./types.ts').LocalNpc) {
-    const { ctx } = this;
-    const base = isoProject(npc.gridX, npc.gridY);
-    const scale = ISO_TILE_W / 64;
-
-    ctx.save();
-    ctx.translate(base.px, base.py - ISO_WALL_H * 0.3);
-
-    // Subtle ground ring (always visible — distinguishes stationary NPCs from agents)
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, ISO_TILE_W * 0.18, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Shadow (smaller than agent)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
-    ctx.beginPath();
-    ctx.ellipse(0, 2 * scale, ISO_TILE_W * 0.12, ISO_TILE_H * 0.1, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Legs (single block, legs together)
-    this.drawIsoPrism(0, 0, 6, 2, 1.5, '#2d2722', scale);
-    // Torso (dark suit)
-    this.drawIsoPrism(0, 6, 14, 7, 4, '#3a3a45', scale);
-    // Head
-    this.drawIsoPrism(0, 14, 20, 4, 2.5, '#e8d8c8', scale);
-    // Briefcase (small brown prism, offset right)
-    this.drawIsoPrism(6 * scale, 0, 5, 3, 1.5, '#8B7355', scale);
-
-    ctx.restore();
-  }
-
-  // ─── Isometric Overlays ─────────────────────────────────────────────
-
-  private drawIsoHoveredTile(hovered: { x: number; y: number }) {
-    const { ctx } = this;
-    const corners = isoTileCorners(hovered.x, hovered.y);
-    ctx.save();
-    ctx.strokeStyle = ISO_SELECTION;
-    ctx.lineWidth = 2 / this.cam.zoom;
-    ctx.beginPath();
-    ctx.moveTo(corners[0]!.x, corners[0]!.y);
-    ctx.lineTo(corners[1]!.x, corners[1]!.y);
-    ctx.lineTo(corners[2]!.x, corners[2]!.y);
-    ctx.lineTo(corners[3]!.x, corners[3]!.y);
-    ctx.closePath();
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  private drawIsoZones(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
-    const { ctx } = this;
-    if (!world.zones) return;
-    const zoneColors: Record<string, string> = {
-      stockpile: '#8B5A2B',
-      growing: '#4A7C2E',
-      recreation: '#D4A537',
-      bedroom: '#6B4F8A',
-      dining: '#C46B3B',
-      hospital: '#C0392B',
-    };
-    for (const zone of world.zones) {
-      const color = zoneColors[zone.type] || '#888';
-      ctx.save();
-      ctx.globalAlpha = 0.2;
-      for (const tile of zone.tiles) {
-        if (tile.x < view.x0 || tile.x > view.x1 || tile.y < view.y0 || tile.y > view.y1) continue;
-        const corners = isoTileCorners(tile.x, tile.y);
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.moveTo(corners[0]!.x, corners[0]!.y);
-        ctx.lineTo(corners[1]!.x, corners[1]!.y);
-        ctx.lineTo(corners[2]!.x, corners[2]!.y);
-        ctx.lineTo(corners[3]!.x, corners[3]!.y);
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.restore();
-      // Border
-      if (zone.tiles.length > 0) {
-        const xs = zone.tiles.map((t) => t.x);
-        const ys = zone.tiles.map((t) => t.y);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
-        const minY = Math.min(...ys);
-        const maxY = Math.max(...ys);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        const c1 = isoTileCorners(minX, minY);
-        const c2 = isoTileCorners(maxX, maxY);
-        // Approximate bounding diamond
-        ctx.beginPath();
-        ctx.moveTo(c1[0]!.x, c1[0]!.y);
-        ctx.lineTo(c1[1]!.x, c1[1]!.y);
-        ctx.lineTo(c2[2]!.x, c2[2]!.y);
-        ctx.lineTo(c2[3]!.x, c2[3]!.y);
-        ctx.closePath();
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = color;
-        ctx.font = `bold 9px ${this.tokens.fontMono}`;
-        ctx.textAlign = 'left';
-        ctx.fillText(zone.type.toUpperCase(), c1[0]!.x, c1[0]!.y - 4);
-      }
-    }
-  }
-
-  private drawIsoZonePaintPreview(view: { x0: number; y0: number; x1: number; y1: number }) {
-    const { ctx } = this;
-    if (!this._zonePaintStart || !this._zonePaintCurrent) return;
-    const x0 = Math.min(this._zonePaintStart.x, this._zonePaintCurrent.x);
-    const y0 = Math.min(this._zonePaintStart.y, this._zonePaintCurrent.y);
-    const x1 = Math.max(this._zonePaintStart.x, this._zonePaintCurrent.x);
-    const y1 = Math.max(this._zonePaintStart.y, this._zonePaintCurrent.y);
-
-    const zoneColors: Record<string, string> = {
-      stockpile: '#8B5A2B',
-      growing: '#4A7C2E',
-      recreation: '#D4A537',
-      bedroom: '#6B4F8A',
-      dining: '#C46B3B',
-      hospital: '#C0392B',
-    };
-    const color = zoneColors[this._zonePaintMode || 'stockpile'] || '#888';
-
-    ctx.save();
-    ctx.globalAlpha = 0.25;
-    for (let y = y0; y <= y1; y++) {
-      if (y < view.y0 || y > view.y1) continue;
-      for (let x = x0; x <= x1; x++) {
-        if (x < view.x0 || x > view.x1) continue;
-        const corners = isoTileCorners(x, y);
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.moveTo(corners[0]!.x, corners[0]!.y);
-        ctx.lineTo(corners[1]!.x, corners[1]!.y);
-        ctx.lineTo(corners[2]!.x, corners[2]!.y);
-        ctx.lineTo(corners[3]!.x, corners[3]!.y);
-        ctx.closePath();
-        ctx.fill();
-      }
-    }
-    ctx.restore();
-
-    // Border around preview area
-    const c1 = isoTileCorners(x0, y0);
-    const c2 = isoTileCorners(x1, y1);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.setLineDash([8, 4]);
-    ctx.beginPath();
-    ctx.moveTo(c1[0]!.x, c1[0]!.y);
-    ctx.lineTo(c1[1]!.x, c1[1]!.y);
-    ctx.lineTo(c2[2]!.x, c2[2]!.y);
-    ctx.lineTo(c2[3]!.x, c2[3]!.y);
-    ctx.closePath();
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    const w = x1 - x0 + 1;
-    const h = y1 - y0 + 1;
-    ctx.fillStyle = color;
-    ctx.font = `bold 10px ${this.tokens.fontMono}`;
-    ctx.textAlign = 'center';
-    ctx.fillText(`${w}×${h} (${w * h} tiles)`, (c1[0]!.x + c2[2]!.x) / 2, c1[0]!.y - 8);
-  }
-
-  private drawIsoPowerOverlay(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
-    const { ctx } = this;
-    const pg = world.powerGrid;
-    if (!pg) return;
-    ctx.save();
-    ctx.globalAlpha = 0.6;
-
-    // Conduits
-    for (const key of pg.conduits) {
-      const parts = key.split(',');
-      if (parts.length < 2) continue;
-      const sx = Number(parts[0]);
-      const sy = Number(parts[1]);
-      if (!Number.isFinite(sx) || !Number.isFinite(sy)) continue;
-      if (sx < view.x0 || sx > view.x1 || sy < view.y0 || sy > view.y1) continue;
-      const base = isoProject(sx, sy);
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.8)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(base.px, base.py - ISO_TILE_H / 2);
-      ctx.lineTo(base.px, base.py + ISO_TILE_H / 2);
-      ctx.moveTo(base.px - ISO_TILE_W / 2, base.py);
-      ctx.lineTo(base.px + ISO_TILE_W / 2, base.py);
-      ctx.stroke();
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.9)';
-      ctx.beginPath();
-      ctx.arc(base.px, base.py, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Sources
-    for (const src of pg.sources) {
-      if (src.tileX < view.x0 || src.tileX > view.x1 || src.tileY < view.y0 || src.tileY > view.y1) continue;
-      const base = isoProject(src.tileX, src.tileY);
-      const now = performance.now();
-      const pulse = 0.5 + 0.5 * Math.sin(now / 500);
-      const glowR = ISO_TILE_W * 0.5 + 10 * pulse;
-      const grad = ctx.createRadialGradient(base.px, base.py, 0, base.px, base.py, glowR);
-      grad.addColorStop(0, `rgba(245, 158, 11, ${0.4 * pulse})`);
-      grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(base.px - glowR, base.py - glowR, glowR * 2, glowR * 2);
-      ctx.fillStyle = '#F59E0B';
-      ctx.font = `bold 9px ${this.tokens.fontMono}`;
-      ctx.textAlign = 'center';
-      ctx.fillText(`${src.outputWatts}W`, base.px, base.py - 8);
-    }
-
-    // Consumers
-    for (const cons of pg.consumers) {
-      if (cons.tileX < view.x0 || cons.tileX > view.x1 || cons.tileY < view.y0 || cons.tileY > view.y1) continue;
-      const base = isoProject(cons.tileX, cons.tileY);
-      const barW = ISO_TILE_W * 0.6;
-      const barH = 3;
-      const bx = base.px - barW / 2;
-      const by = base.py + ISO_TILE_H / 2 + 4;
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(bx, by, barW, barH);
-      const loadPct = Math.min(1, cons.watts / 200);
-      ctx.fillStyle = loadPct > 0.8 ? '#EF4444' : loadPct > 0.5 ? '#F59E0B' : '#22C55E';
-      ctx.fillRect(bx, by, barW * loadPct, barH);
-    }
-
-    // Global stats
-    if (pg.generatedWatts > 0 || pg.consumedWatts > 0) {
-      const statsBase = isoProject(view.x0, view.y0);
-      ctx.fillStyle = 'rgba(13, 13, 20, 0.9)';
-      ctx.fillRect(statsBase.px - 5, statsBase.py - ISO_WALL_H - 55, 160, 50);
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
-      ctx.strokeRect(statsBase.px - 5, statsBase.py - ISO_WALL_H - 55, 160, 50);
-      ctx.fillStyle = '#22C55E';
-      ctx.font = `11px ${this.tokens.fontMono}`;
-      ctx.textAlign = 'left';
-      ctx.fillText(`⚡ Gen: ${pg.generatedWatts}W`, statsBase.px, statsBase.py - ISO_WALL_H - 40);
-      ctx.fillStyle = '#EF4444';
-      ctx.fillText(`🔌 Con: ${pg.consumedWatts}W`, statsBase.px, statsBase.py - ISO_WALL_H - 24);
-      ctx.fillStyle = pg.storedWatts > 0 ? '#3B82F6' : '#6B7280';
-      ctx.fillText(`🔋 Bat: ${pg.storedWatts}W`, statsBase.px, statsBase.py - ISO_WALL_H - 8);
-    }
-
-    ctx.restore();
-  }
-
-  private drawIsoWindowLightRays(
-    world: LocalWorld,
-    view: { x0: number; y0: number; x1: number; y1: number },
-  ) {
-    const { ctx } = this;
-    for (let y = view.y0; y <= view.y1; y++) {
-      for (let x = view.x0; x <= view.x1; x++) {
-        const tile = world.grid[y]?.[x];
-        if (!tile || tile.type !== 'window') continue;
-
-        const dirs = [
-          { dx: 0, dy: 1 },
-          { dx: 0, dy: -1 },
-          { dx: 1, dy: 0 },
-          { dx: -1, dy: 0 },
-        ];
-        for (const { dx, dy } of dirs) {
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx < view.x0 || nx > view.x1 || ny < view.y0 || ny > view.y1) continue;
-          const neighbor = world.grid[ny]?.[nx];
-          if (!neighbor) continue;
-          if (neighbor.type === 'floor' || neighbor.type === 'path') {
-            const base = isoProject(nx, ny);
-            const rayGrad = ctx.createRadialGradient(
-              base.px - dx * ISO_TILE_W * 0.15,
-              base.py - dy * ISO_TILE_H * 0.15,
-              0,
-              base.px,
-              base.py,
-              ISO_TILE_W * 0.6,
-            );
-            rayGrad.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
-            rayGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            ctx.fillStyle = rayGrad;
-            const corners = isoTileCorners(nx, ny);
-            ctx.beginPath();
-            ctx.moveTo(corners[0]!.x, corners[0]!.y);
-            ctx.lineTo(corners[1]!.x, corners[1]!.y);
-            ctx.lineTo(corners[2]!.x, corners[2]!.y);
-            ctx.lineTo(corners[3]!.x, corners[3]!.y);
-            ctx.closePath();
-            ctx.fill();
-          }
-        }
-      }
-    }
-  }
-
-  private drawIsoTemperatureOverlay(world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
-    const { ctx } = this;
-    const climates = world.roomClimates;
-    if (!climates) return;
-    ctx.save();
-    ctx.globalAlpha = 0.5;
-
-    function tempToColor(temp: number): string {
-      const comfortMin = 16, comfortMax = 26;
-      if (temp <= comfortMin) return `rgb(80, ${Math.round(100 + (temp + 20) / (comfortMin + 20) * 155)}, 220)`;
-      if (temp >= comfortMax) return `rgb(220, ${Math.round(255 * (1 - Math.min(1, (temp - comfortMax) / (50 - comfortMax))))}, 0)`;
-      const t = (temp - comfortMin) / (comfortMax - comfortMin);
-      return `rgb(${Math.round(200 * (1 - t))}, 255, ${Math.round(200 * (1 - t))}`;
-    }
-
-    for (const [roomId, climate] of climates) {
-      const room = world.rooms.find((r) => r.id === roomId);
-      if (!room) continue;
-      const cx = room.x + room.width / 2;
-      const cy = room.y + room.height / 2;
-      const base = isoProject(cx, cy);
-      if (cx < view.x0 || cx > view.x1 || cy < view.y0 || cy > view.y1) continue;
-
-      const color = tempToColor(climate.temperature);
-      ctx.fillStyle = color;
-      ctx.globalAlpha = 0.3;
-      ctx.beginPath();
-      ctx.arc(base.px, base.py, Math.max(room.width, room.height) * ISO_TILE_W * 0.2, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = color;
-      ctx.font = `bold 12px ${this.tokens.fontMono}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`${climate.temperature.toFixed(1)}°C`, base.px, base.py);
-
-      if (Math.abs(climate.temperature - climate.targetTemperature) > 0.5) {
-        ctx.fillStyle = '#FBBF24';
-        ctx.font = `9px ${this.tokens.fontMono}`;
-        const arrow = climate.temperature < climate.targetTemperature ? '▲' : '▼';
-        ctx.fillText(`${arrow} ${climate.targetTemperature.toFixed(1)}°C`, base.px, base.py + 18);
-      }
-
-      if (climate.temperature < 10 && Math.random() < 0.02) {
-        const rx = room.x + Math.random() * room.width;
-        const ry = room.y + Math.random() * room.height;
-        const p = isoProject(rx, ry);
-        this.spawnBreath(p.px, p.py);
-      }
-    }
-
-    // Heaters
-    for (const [roomId, climate] of climates) {
-      const room = world.rooms.find((r) => r.id === roomId);
-      if (!room) continue;
-      for (const heater of climate.heaters) {
-        if (heater.tileX < view.x0 || heater.tileX > view.x1 || heater.tileY < view.y0 || heater.tileY > view.y1) continue;
-        const base = isoProject(heater.tileX, heater.tileY);
-        const now = performance.now();
-        ctx.strokeStyle = `rgba(239, 83, 80, ${0.4 + 0.3 * Math.sin(now / 120)})`;
-        ctx.lineWidth = 1.5;
-        for (let i = 0; i < 3; i++) {
-          ctx.beginPath();
-          ctx.moveTo(base.px - 6 + i * 6, base.py + ISO_TILE_H / 2);
-          ctx.quadraticCurveTo(base.px + 4 * Math.sin(now / 100 + i), base.py + ISO_TILE_H / 2 - 8, base.px - 6 + i * 6, base.py + ISO_TILE_H / 2 - 16);
-          ctx.stroke();
-        }
-      }
-      for (const cooler of climate.coolers) {
-        if (cooler.tileX < view.x0 || cooler.tileX > view.x1 || cooler.tileY < view.y0 || cooler.tileY > view.y1) continue;
-        const base = isoProject(cooler.tileX, cooler.tileY);
-        const now = performance.now();
-        ctx.fillStyle = `rgba(100, 181, 246, ${0.4 + 0.3 * Math.sin(now / 150)})`;
-        for (let i = 0; i < 4; i++) {
-          const px2 = base.px + (i - 1.5) * 4;
-          const py2 = base.py + ISO_TILE_H / 2 - 3 - (now / 80 + i * 0.5) % 10;
-          ctx.beginPath();
-          ctx.arc(px2, py2, 2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-      for (const vent of climate.vents) {
-        if (!vent.open) continue;
-        if (vent.tileX < view.x0 || vent.tileX > view.x1 || vent.tileY < view.y0 || vent.tileY > view.y1) continue;
-        const base = isoProject(vent.tileX, vent.tileY);
-        ctx.fillStyle = `rgba(144, 164, 174, ${0.6 + 0.3 * Math.sin(performance.now() / 200)})`;
-        ctx.font = `${ISO_TILE_W * 0.18}px ${this.tokens.fontMono}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('↔', base.px, base.py);
-      }
-    }
-
-    ctx.restore();
-  }
-
-  /** RimWorld-style debug overlay: paths, agent data cards, FPS counter. */
-  private drawIsoDebugOverlay(
-    world: LocalWorld,
-    localUnits: LocalUnit[],
-    _dt: number,
-  ) {
-    const { ctx } = this;
-
-    // ── 1. Agent paths (colored lines connecting waypoints) ─────────
-    for (const unit of localUnits) {
-      if (unit.path.length === 0 || unit.pathIndex >= unit.path.length) continue;
-      const remaining = unit.path.slice(unit.pathIndex);
-      if (remaining.length < 2) continue;
-
-      ctx.strokeStyle = unit.color;
-      ctx.lineWidth = 1.5;
-      ctx.globalAlpha = 0.7;
-      ctx.beginPath();
-      const start = isoProject(remaining[0]!.x, remaining[0]!.y);
-      ctx.moveTo(start.px, start.py);
-      for (let i = 1; i < remaining.length; i++) {
-        const p = isoProject(remaining[i]!.x, remaining[i]!.y);
-        ctx.lineTo(p.px, p.py);
-      }
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-
-      // waypoint dots
-      ctx.fillStyle = unit.color;
-      for (const wp of remaining) {
-        const p = isoProject(wp.x, wp.y);
-        ctx.beginPath();
-        ctx.arc(p.px, p.py, 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    // ── 2. Debug cards floating above each unit ─────────────────────
-    for (const unit of localUnits) {
-      const base = isoProject(unit.gridX, unit.gridY);
-      const lines: string[] = [
-        `${unit.name}`,
-        `st: ${unit.state}`,
-        `pos: ${unit.gridX},${unit.gridY}`,
-        `fat: ${Math.round(unit.fatigue)}`,
-        `spd: ${unit.effectiveSpeed.toFixed(1)}`,
-      ];
-      if (unit.mission) lines.push(`mission: ${unit.mission.slice(0, 12)}`);
-      if (unit.currentWorkbenchId) lines.push(`wb: ${unit.currentWorkbenchId.slice(0, 8)}`);
-
-      const lineH = 9;
-      const cardW = 72;
-      const cardH = lines.length * lineH + 4;
-      const cx = base.px - cardW / 2;
-      const cy = base.py - ISO_WALL_H - 34 - cardH;
-
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-      ctx.beginPath();
-      ctx.roundRect(cx, cy, cardW, cardH, 2);
-      ctx.fill();
-      ctx.strokeStyle = unit.color;
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-
-      ctx.fillStyle = '#E2E8F0';
-      ctx.font = `bold 7px ${this.tokens.fontMono}`;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i]!, cx + 3, cy + 2 + i * lineH);
-      }
-    }
-
-    // ── 3. FPS / TPS counter (screen-space, fixed position) ────────
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.fillRect(8, 8, 90, 40);
-    ctx.strokeStyle = '#606060';
-    ctx.lineWidth = 0.5;
-    ctx.strokeRect(8, 8, 90, 40);
-
-    ctx.fillStyle = '#E2E8F0';
-    ctx.font = `bold 10px ${this.tokens.fontMono}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(`FPS: ${this._fpsValue}`, 14, 14);
-    ctx.fillText(`Ticks: ${world.rooms.reduce((n, r) => n + r.workbenches.length, 0)}`, 14, 26);
-    ctx.fillText(`Units: ${localUnits.length}`, 14, 38);
-    ctx.restore();
-  }
 }
 
-// ─── Helper: vary brightness of a hex color by ±percent ───────────────────────
-function _adjustBrightness(hex: string, delta: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const clamp = (v: number) => Math.max(0, Math.min(255, v + delta));
-  const toHex = (v: number) => v.toString(16).padStart(2, '0');
-  return `#${toHex(clamp(r))}${toHex(clamp(g))}${toHex(clamp(b))}`;
-}
-
-// ─── Extension → color map ────────────────────────────────────────────────────
-const EXT_COLOR: Record<string, string> = {
-  ts: '#4a9bd4',
-  tsx: '#4a9bd4',
-  js: '#e8c44a',
-  jsx: '#e8c44a',
-  py: '#4ab4d4',
-  rs: '#b4a04a',
-  go: '#4ad4b4',
-  json: '#a04ab4',
-  md: '#b4a04a',
-  css: '#4ad44a',
-  html: '#d44a4a',
-  yaml: '#4a4ad4',
-  yml: '#4a4ad4',
-  sh: '#4ad4a0',
-  bash: '#4ad4a0',
-  toml: '#d4a04a',
-  png: '#888',
-  svg: '#888',
-};

@@ -21,8 +21,18 @@ _runs: dict[str, dict[str, Any]] = {}
 _tool_use_map: dict[str, str] = {}  # tool_use_id -> subagent_id
 _pending_spawn: dict[str, dict[str, Any]] = {}  # command_id -> spawn kwargs
 _last_progress_at: dict[str, float] = {}
-_send: SendFn = lambda _evt: None
-_add_approval: ApprovalFn = lambda _cmd: None
+
+
+def _noop_send(_evt: dict[str, Any]) -> None:
+    return None
+
+
+def _noop_add_approval(_cmd: dict[str, Any]) -> None:
+    return None
+
+
+_send: SendFn = _noop_send
+_add_approval: ApprovalFn = _noop_add_approval
 
 _PROGRESS_THROTTLE_S = 1.0
 

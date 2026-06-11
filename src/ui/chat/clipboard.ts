@@ -40,12 +40,7 @@ export function extractErrorLine(text: string): string {
   return m ? m[0] : '';
 }
 
-export function escapeHtml(s: string): string {
-  return s.replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-  );
-}
+export { escapeHtml } from '../escapeHtml.ts';
 
 // ─── One-shot listener attachment (idempotent) ───────────────────────────────
 const _wired = new WeakMap<HTMLElement, { full: boolean; err: boolean; code: boolean }>();

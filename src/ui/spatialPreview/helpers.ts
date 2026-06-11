@@ -1,11 +1,6 @@
 // ─── Shared helpers for spatialPreview submodules ──────────────────────────
 
-export function escapeHtml(s: string): string {
-  return String(s).replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-  );
-}
+export { escapeHtml } from '../escapeHtml.ts';
 
 export function positionEl(el: HTMLElement, pos: { x: number; y: number }): void {
   // Show near cursor, nudge to stay in viewport

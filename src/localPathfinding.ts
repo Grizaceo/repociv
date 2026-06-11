@@ -7,10 +7,13 @@ import type { LocalWorld, LocalTile } from './types.ts';
 const TILE_COST: Record<string, number> = {
   floor: 1,
   path: 0.6, // agents prefer corridors
+  aisle: 1, // interior office aisle (preferred routing)
   door: 2, // slower through doors
   workbench: 1,
+  chair: 1.2,
   debris: 5, // very slow
   wall: Infinity, // impassable
+  cubicle_partition: Infinity, // low partition — impassable
   // Office furniture (Phase 6)
   standing_desk: 1,
   whiteboard: 1,
@@ -164,62 +167,107 @@ function reconstructPath(
 
 // ─── Reachability check ─────────────────────────────────────────────────────────
 
-// ─── Find nearest workbench tile (or nearest floor tile matching predicate) ──────
-
-function findNearestTile(
-  world: LocalWorld,
-  fromX: number,
-  fromY: number,
-  predicate: (t: LocalTile) => boolean,
-): { x: number; y: number; distance: number } | null {
-  // BFS from (fromX, fromY) to find nearest tile matching predicate
-  const visited = new Set<string>();
-  const queue: Array<{ x: number; y: number; dist: number }> = [{ x: fromX, y: fromY, dist: 0 }];
-  while (queue.length > 0) {
-    const cur = queue.shift()!;
-    const key = `${cur.x},${cur.y}`;
-    if (visited.has(key)) continue;
-    visited.add(key);
-    if (cur.y >= 0 && cur.y < world.grid.length && cur.x >= 0 && cur.x < world.grid[0]!.length) {
-      const tile = world.grid[cur.y]![cur.x]!;
-      if (predicate(tile)) {
-        return { x: cur.x, y: cur.y, distance: cur.dist };
-      }
-    }
-    // neighbors
-    const W = world.grid[0]?.length ?? 0;
-    const H = world.grid.length;
-    const dirs = [
-      [0, -1],
-      [0, 1],
-      [-1, 0],
-      [1, 0],
-    ];
-    for (const [dx, dy] of dirs) {
-      if (dx === undefined || dy === undefined) continue;
-      const nx = cur.x + dx;
-      const ny = cur.y + dy;
-      // Bounds check antes del push — sin esto, la BFS expande hacia
-      // coordenadas infinitas cuando el predicado nunca se cumple.
-      if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-      queue.push({ x: nx, y: ny, dist: cur.dist + 1 });
-    }
-  }
-  return null;
-}
+// ─── Find nearest workbench by walking, not by Manhattan ───────────────────────
+//
+// Phase 3 fix: the previous version used a Manhattan BFS through
+// impassable tiles (walls, partitions), so a unit behind a wall
+// could be told to "walk" to a workbench that was actually
+// unreachable. We now use Dijkstra with the same cost table as
+// findPath, so the result respects aisles and walls and reports
+// the true walking distance.
 
 export function findNearestWorkbench(
   world: LocalWorld,
   fromX: number,
   fromY: number,
+  forUnitId?: string,
 ): { x: number; y: number; workbench: LocalTile['workbench']; distance: number } | null {
-  const result = findNearestTile(
-    world,
-    fromX,
-    fromY,
-    (t) => t.workbench !== null && t.workbench !== undefined,
-  );
-  if (!result) return null;
-  const tile = world.grid[result.y]![result.x]!;
-  return { x: result.x, y: result.y, workbench: tile.workbench, distance: result.distance };
+  const { grid } = world;
+  const H = grid.length;
+  const W = grid[0]?.length ?? 0;
+  if (fromX < 0 || fromY < 0 || fromX >= W || fromY >= H) return null;
+
+  // Desks assigned to OTHER units are taken — skip them while anything
+  // free (or our own) remains reachable; fall back to them only when the
+  // preferred sweep finds nothing.
+  const isTakenByOther = (x: number, y: number): boolean => {
+    if (!forUnitId) return false;
+    const owner = world.deskAssignments.get(`${x},${y}`);
+    return owner !== undefined && owner !== forUnitId;
+  };
+  let fallback: { x: number; y: number; workbench: LocalTile['workbench']; distance: number } | null =
+    null;
+
+  const cost = (x: number, y: number): number => {
+    const t = grid[y]?.[x];
+    if (!t) return Infinity;
+    // Use the same TILE_COST default (1) that findPath uses, so
+    // unknown tile types don't accidentally become impassable
+    // here. Walls, partitions, and the office fixtures listed in
+    // TILE_COST are still impassable; everything else walks at
+    // cost 1. This keeps findNearestWorkbench in lockstep with
+    // findPath — they should agree on what is walkable.
+    return TILE_COST[t.type] ?? 1;
+  };
+
+  // Dijkstra with a binary heap. We stop as soon as we pop a
+  // workbench-bearing tile — first pop is the nearest walkable
+  // workbench, not the nearest by air-distance.
+  const dist = new Map<number, number>();
+  const heap: Array<{ x: number; y: number; d: number }> = [
+    { x: fromX, y: fromY, d: 0 },
+  ];
+  const k = (x: number, y: number) => y * W + x;
+  dist.set(k(fromX, fromY), 0);
+
+  const dirs: Array<[number, number]> = [
+    [0, -1],
+    [0, 1],
+    [-1, 0],
+    [1, 0],
+  ];
+
+  while (heap.length > 0) {
+    // Pop the cheapest.
+    let bestIdx = 0;
+    for (let i = 1; i < heap.length; i++) {
+      if (heap[i]!.d < heap[bestIdx]!.d) bestIdx = i;
+    }
+    const cur = heap.splice(bestIdx, 1)[0]!;
+
+    // Stale entry (we may have already settled this tile cheaper).
+    const known = dist.get(k(cur.x, cur.y));
+    if (known !== undefined && cur.d > known) continue;
+
+    // First time we settle a workbench tile, we have the
+    // nearest-by-walk.
+    if (cur.x !== fromX || cur.y !== fromY) {
+      const tile = grid[cur.y]![cur.x]!;
+      if (tile.workbench) {
+        const found = {
+          x: cur.x,
+          y: cur.y,
+          workbench: tile.workbench,
+          distance: cur.d,
+        };
+        if (!isTakenByOther(cur.x, cur.y)) return found;
+        fallback = fallback ?? found; // nearest taken desk, last resort
+      }
+    }
+
+    for (const [dx, dy] of dirs) {
+      const nx = cur.x + dx;
+      const ny = cur.y + dy;
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+      const step = cost(nx, ny);
+      if (!Number.isFinite(step)) continue; // impassable
+      const nd = cur.d + step;
+      const key = k(nx, ny);
+      const prev = dist.get(key);
+      if (prev !== undefined && nd >= prev) continue;
+      dist.set(key, nd);
+      heap.push({ x: nx, y: ny, d: nd });
+    }
+  }
+  return fallback;
 }

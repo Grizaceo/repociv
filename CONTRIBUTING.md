@@ -50,6 +50,15 @@ For local dev, leave `REPOCIV_TOKEN` empty (auth is bypassed).
 
 ## Running Tests
 
+The full gate is one command — it runs TS typecheck, ESLint, Vitest, Vite
+build, Ruff, and Pytest in order and reports any failures:
+
+```bash
+bash scripts/check.sh
+```
+
+You can also run the individual layers:
+
 ```bash
 # Frontend (Vitest)
 npm test
@@ -63,6 +72,16 @@ pytest server/ -v
 # Backend with coverage
 pytest server/ --cov=server --cov-report=term-missing
 ```
+
+### Pre-push hook (optional)
+
+To run the full gate automatically before every `git push`:
+
+```bash
+git config core.hooksPath scripts/hooks
+```
+
+Bypass with `git push --no-verify` if needed.
 
 ## Code Style
 

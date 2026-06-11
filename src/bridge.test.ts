@@ -151,7 +151,8 @@ describe('BridgeEvents SSE transport', () => {
 
     // In dev/test mode, bridgeUrl('/events') resolves to '/bridge/events' (Vite proxy prefix).
     // In production with VITE_BRIDGE_URL set it would be the full absolute URL.
-    expect(src.url).toBe('/bridge/events');
+    // When a token is configured it travels as ?token= (EventSource can't send headers).
+    expect(src.url).toMatch(/^\/bridge\/events(\?token=[A-Za-z0-9%._~-]+)?$/);
     expect(state.spawned).toEqual(['DAVI']);
 
     bridge.stop();

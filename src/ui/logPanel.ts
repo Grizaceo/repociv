@@ -2,8 +2,9 @@
 // Side panel showing the last N lines of events.jsonl in real time.
 // Polls every 2s while open; table columns: timestamp | repo | event_type | message.
 // Filter <select> by event type; "Clear" button resets local view buffer.
-import { bridgeUrl } from '../bridgeEnv.ts';
+import { bridgeUrl, bridgeHeaders } from '../bridgeEnv.ts';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
+import { escapeHtml } from './escapeHtml.ts';
 
 export const POLL_MS = 2_000;
 
@@ -41,9 +42,9 @@ export function buildLogRow(e: LogEvent): string {
   const msg = String(data['result'] ?? data['error'] ?? data['text'] ?? e.actor ?? '—');
   return `<tr>
     <td class="log-ts">${ts}</td>
-    <td class="log-repo">${repo}</td>
-    <td class="log-type">${e.type}</td>
-    <td class="log-msg">${msg}</td>
+    <td class="log-repo">${escapeHtml(repo)}</td>
+    <td class="log-type">${escapeHtml(e.type)}</td>
+    <td class="log-msg">${escapeHtml(msg)}</td>
   </tr>`;
 }
 
@@ -135,7 +136,7 @@ function _stopPolling(): void {
 async function _fetch(): Promise<void> {
   try {
     const typeParam = _filter ? `&type=${encodeURIComponent(_filter)}` : '';
-    const res = await fetch(bridgeUrl(`/log?n=100${typeParam}`));
+    const res = await fetch(bridgeUrl(`/log?n=100${typeParam}`), { headers: bridgeHeaders() });
     if (!res.ok) {
       _offline = true;
       if (_visible) _render();

@@ -40,6 +40,7 @@ shared/provider-registry.json
 .claude/
 .cursor/
 .gstack/
+.hermes/
 .idea/
 .vscode/
 

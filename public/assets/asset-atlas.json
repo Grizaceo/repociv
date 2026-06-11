@@ -2,68 +2,24 @@
   "terrainAtlas": "/assets/terrain-atlas.webp",
   "decorAtlas": "/assets/decor-atlas.png",
   "cellSize": 1024,
+  "stylizedTerrainNote": "Flat legacy mode uses terrainAtlas photo patterns; iso25d uses procedural TERRAIN_COLOR fills.",
   "terrainRects": {
-    "plains": [
-      0,
-      0,
-      1024,
-      1024
-    ],
-    "forest": [
-      1024,
-      0,
-      2048,
-      1024
-    ],
-    "desert": [
-      2048,
-      0,
-      3072,
-      1024
-    ],
-    "ocean": [
-      3072,
-      0,
-      4096,
-      1024
-    ],
-    "mountain": [
-      4096,
-      0,
-      5120,
-      1024
-    ],
-    "ice": [
-      5120,
-      0,
-      6144,
-      1024
-    ],
-    "fog": [
-      6144,
-      0,
-      7168,
-      1024
-    ]
+    "plains": [0, 0, 1024, 1024],
+    "forest": [1024, 0, 2048, 1024],
+    "desert": [2048, 0, 3072, 1024],
+    "ocean": [3072, 0, 4096, 1024],
+    "mountain": [4096, 0, 5120, 1024],
+    "ice": [5120, 0, 6144, 1024],
+    "fog": [6144, 0, 7168, 1024],
+    "hills": [0, 1024, 1024, 2048],
+    "sacred": [1024, 1024, 2048, 2048]
   },
   "decorRects": {
-    "hill_sprite": [
-      0,
-      0,
-      1024,
-      1024
-    ],
-    "mountain_sprite": [
-      1024,
-      0,
-      2048,
-      1024
-    ],
-    "forest_sprite": [
-      2048,
-      0,
-      3072,
-      1024
-    ]
+    "hill_sprite": [0, 0, 1024, 1024],
+    "mountain_sprite": [1024, 0, 2048, 1024],
+    "forest_sprite": [2048, 0, 3072, 1024],
+    "city_block": [3072, 0, 4096, 1024],
+    "farm_patch": [4096, 0, 5120, 1024],
+    "road_segment": [5120, 0, 6144, 1024]
   }
 }

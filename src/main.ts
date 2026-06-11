@@ -25,6 +25,7 @@ import {
   startApprovalPolling,
   toggleObservabilityPanel,
   startObservabilityPolling,
+  setWebGLMetricsSource,
   toggleHarnessPanel,
   startHarnessPolling,
   toggleReplayPanel,
@@ -60,6 +61,11 @@ import type { LocalRoom, LocalNpc } from './types.ts';
 import { clearChat } from './ui/chat.ts';
 import { openOnboardingPanel } from './ui/onboardingPanel.ts';
 import { axialToPixel } from './hex.ts';
+import { areMountainPropsSettled } from './three/MountainProps3D.ts';
+import { areForestPropsSettled } from './three/ForestProps3D.ts';
+import { areCityPropsSettled } from './three/CityProps3D.ts';
+import { areUnitPropsSettled } from './three/UnitProps3D.ts';
+import { areResourcePropsSettled } from './three/ResourceProps3D.ts';
 import {
   setRendererRef,
   notifyTilePicked,
@@ -96,6 +102,8 @@ import {
   setOnCleanModeChange,
   isCleanMode,
 } from './ui/layerPanel.ts';
+import { resolveInitialRenderMode } from './three/renderMode.ts';
+import { computeRiverPaths } from './three/Rivers3D.ts';
 import { HEX_SIZE } from './constants.ts';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
@@ -111,6 +119,50 @@ const loadSteps = [
 type RepoCivDebugApi = {
   getMacroCityScreenPositions: () => Array<{ cityId: string; x: number; y: number }>;
   openLocalView: (cityId: string) => boolean;
+  isTerrainAtlasReady: () => boolean;
+  areMountainPropsSettled: () => boolean;
+  areForestPropsSettled: () => boolean;
+  areCityPropsSettled: () => boolean;
+  areUnitPropsSettled: () => boolean;
+  areResourcePropsSettled: () => boolean;
+  getGlobalUnits: () => Array<{
+    id: string;
+    type: string;
+    state: string;
+    coord: { q: number; r: number };
+    x: number;
+    y: number;
+  }>;
+  getWebGLMetrics: () => { frameTimeAvg: number; frameCount: number; dirtyRatePct: number } | null;
+  getTileStats: () => {
+    total: number;
+    revealed: number;
+    byTerrain: Record<string, number>;
+    samplePos: Record<string, { x: number; y: number }>;
+    resourceTiers: {
+      gold8: number; science4: number; production3: number; crystal: number;
+      freeGold8: number; freeSci4: number; freeProd3: number; freeAny: number;
+    };
+    crystalPos: { x: number; y: number } | null;
+    cleanSamplePos: Record<string, { x: number; y: number }>;
+  };
+  /** River layout probe: path lengths + world-space midpoints (camera targets). */
+  getRiverStats: () => Array<{
+    tiles: number;
+    hasMouth: boolean;
+    mid: { x: number; z: number };
+    mouth: { x: number; z: number } | null;
+  }>;
+  queueLocalMission: (filePath: string, fileName: string, unitId?: string) => boolean;
+  getLocalUnits: () => Array<{
+    id: string;
+    gridX: number;
+    gridY: number;
+    state: string;
+    assignedDesk: { x: number; y: number } | null;
+    currentWorkbenchId: string | null;
+    pathLen: number;
+  }>;
 };
 
 function showToast(message: string, duration = 3000) {
@@ -216,6 +268,15 @@ async function bootstrap() {
   await openOnboardingPanel();
 
   const world = await generateWorld();
+  // `?reveal=all` lifts fog of war for capture/audit sessions: the golden
+  // macro cameras (05/06) need every biome visible — without it, low-zoom
+  // shots are mostly fog cover and texture changes go unverified.
+  if (new URLSearchParams(window.location.search).get('reveal') === 'all') {
+    for (const tile of world.tiles.values()) {
+      tile.revealed = true;
+      tile.inFog = false;
+    }
+  }
   const state = new GameState(world);
   state.start();
 
@@ -313,8 +374,25 @@ async function bootstrap() {
 
   const canvas = document.getElementById('main-canvas') as HTMLCanvasElement;
   const renderer = new Renderer(canvas, state);
+  const bootRenderMode = resolveInitialRenderMode();
+  await renderer.applyInitialRenderMode(bootRenderMode);
   renderer.setCleanMode(isCleanMode());
   await renderer.loadAssets();
+  const capital = world.cities.find((c) => c.isCapital) ?? world.cities[0];
+  if (world.tiles.size === 0) {
+    logEvent('⚠ Mapa vacío — no hay repos seleccionados', 'warn');
+  } else if (capital) {
+    renderer.focusOnCoord(capital.coord);
+  } else {
+    renderer.focusOnWorldBounds();
+  }
+  // After the default focus so an explicit ?cam= actually wins (it used to
+  // run before focusOnCoord, which silently overwrote it every boot).
+  renderer.applyCameraFromUrl();
+  if (bootRenderMode === 'webgl' && renderer.getWorldRenderMode() !== 'webgl') {
+    showToast('WebGL no disponible — vista isométrica hexagonal');
+  }
+  canvas.classList.toggle('webgl-overlay', renderer.getWorldRenderMode() === 'webgl');
   void renderer.preloadLocalRenderer();
   renderer.start();
   setRendererRef(renderer);
@@ -338,21 +416,135 @@ async function bootstrap() {
           };
         });
     },
+    isTerrainAtlasReady: () => renderer.isTerrainAtlasReady(),
+    // Settled (ready OR failed): capture scripts wait on this so a golden
+    // never races the async mountain-glb load.
+    areMountainPropsSettled: () => areMountainPropsSettled(),
+    areForestPropsSettled: () => areForestPropsSettled(),
+    areCityPropsSettled: () => areCityPropsSettled(),
+    areUnitPropsSettled: () => areUnitPropsSettled(),
+    areResourcePropsSettled: () => areResourcePropsSettled(),
+    getWebGLMetrics: () => renderer.getWebGLMetrics(),
+    getGlobalUnits: () =>
+      state.world.units.map((u) => {
+        const p = axialToPixel(u.coord, HEX_SIZE);
+        return {
+          id: u.id,
+          type: u.type,
+          state: u.state,
+          coord: u.coord,
+          x: Math.round(p.x),
+          y: Math.round(p.y),
+        };
+      }),
+    getTileStats: () => {
+      const byTerrain: Record<string, number> = {};
+      const samplePos: Record<string, { x: number; y: number }> = {};
+      // "Clean" samples: no city/district plate on the tile, and every
+      // neighbor shares the terrain — used by tone-instrumentation probes
+      // that need an uncontaminated top-face pixel patch per biome.
+      const cleanSamplePos: Record<string, { x: number; y: number }> = {};
+      const cleanFallback: Record<string, { x: number; y: number }> = {};
+      const dirs: Array<[number, number]> = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+      let revealed = 0;
+      const resourceTiers = {
+        gold8: 0, science4: 0, production3: 0, crystal: 0,
+        freeGold8: 0, freeSci4: 0, freeProd3: 0, freeAny: 0,
+      };
+      let crystalPos: { x: number; y: number } | null = null;
+      for (const t of state.world.tiles.values()) {
+        byTerrain[t.terrain] = (byTerrain[t.terrain] ?? 0) + 1;
+        if (t.revealed) revealed++;
+        if (t.resources.gold >= 8) resourceTiers.gold8++;
+        if (t.resources.science >= 4) resourceTiers.science4++;
+        if (t.resources.production >= 3) resourceTiers.production3++;
+        if (t.resources.gold >= 8 && t.resources.science >= 4) resourceTiers.crystal++;
+        if (!t.city && !t.district) {
+          if (t.resources.gold >= 8) resourceTiers.freeGold8++;
+          if (t.resources.science >= 4) resourceTiers.freeSci4++;
+          if (t.resources.production >= 3) resourceTiers.freeProd3++;
+          if (t.resources.gold >= 8 || t.resources.science >= 4 || t.resources.production >= 3) {
+            resourceTiers.freeAny++;
+            if (!crystalPos) {
+              const p = axialToPixel(t.coord, HEX_SIZE);
+              crystalPos = { x: Math.round(p.x), y: Math.round(p.y) };
+            }
+          }
+        }
+        if (!samplePos[t.terrain]) {
+          const p = axialToPixel(t.coord, HEX_SIZE);
+          samplePos[t.terrain] = { x: Math.round(p.x), y: Math.round(p.y) };
+        }
+        if (!t.city && !t.district) {
+          const p = axialToPixel(t.coord, HEX_SIZE);
+          if (!cleanFallback[t.terrain]) {
+            cleanFallback[t.terrain] = { x: Math.round(p.x), y: Math.round(p.y) };
+          }
+          if (!cleanSamplePos[t.terrain]) {
+            const allSame = dirs.every((d) => {
+              const n = state.world.tiles.get(tileKey({ q: t.coord.q + d[0], r: t.coord.r + d[1] }));
+              return n !== undefined && n.terrain === t.terrain && !n.city && !n.district;
+            });
+            if (allSame) {
+              cleanSamplePos[t.terrain] = { x: Math.round(p.x), y: Math.round(p.y) };
+            }
+          }
+        }
+      }
+      for (const terrain of Object.keys(byTerrain)) {
+        if (!cleanSamplePos[terrain] && cleanFallback[terrain]) {
+          cleanSamplePos[terrain] = cleanFallback[terrain];
+        }
+      }
+      return { total: state.world.tiles.size, revealed, byTerrain, samplePos, cleanSamplePos, resourceTiers, crystalPos };
+    },
+    getRiverStats: () =>
+      computeRiverPaths(state.world.tiles).map((p) => {
+        const mid = p.points[Math.floor(p.points.length / 2)]!;
+        return {
+          tiles: p.points.length,
+          hasMouth: p.mouth !== null,
+          mid: { x: Math.round(mid.x), z: Math.round(mid.z) },
+          mouth: p.mouth ? { x: Math.round(p.mouth.x), z: Math.round(p.mouth.z) } : null,
+        };
+      }),
     openLocalView: (cityId: string) => {
       const city = state.world.cities.find((item) => item.id === cityId && !item.isCapital);
       if (!city) return false;
       window.dispatchEvent(new CustomEvent('repociv:open-local-view-request', { detail: { cityId } }));
       return true;
     },
+    // Test hook: dispatch a mission to a local-view workbench and report unit
+    // state — lets the capture/probe scripts verify units actually walk to
+    // their assigned desk without going through the bridge.
+    queueLocalMission: (filePath: string, fileName: string, unitId?: string) => {
+      const world = state.localWorld;
+      if (!world) return false;
+      state.queueLocalMission(world.repoId, filePath, fileName, unitId);
+      return true;
+    },
+    getLocalUnits: () =>
+      state.getLocalUnits().map((u) => ({
+        id: u.id,
+        gridX: u.gridX,
+        gridY: u.gridY,
+        state: u.state,
+        assignedDesk: u.assignedDesk ?? null,
+        currentWorkbenchId: u.currentWorkbenchId,
+        pathLen: u.path.length,
+      })),
   };
 
   const toggleView = () => {
-    // 3D renderer intentionally removed: the 2D Civ view is the canonical map.
-    renderer.start();
-    setRendererRef(renderer);
+    const mode = renderer.cycleWorldRenderMode();
+    const labels: Record<string, string> = {
+      webgl: 'Vista WebGL 3D',
+      flat: 'Vista plana 2D',
+    };
+    showToast(labels[mode] ?? mode);
   };
 
-  document.getElementById('btn-toggle-3d')?.classList.add('hidden');
+  document.getElementById('btn-toggle-3d')?.classList.remove('hidden');
   document.getElementById('btn-toggle-3d')?.addEventListener('click', toggleView);
   document.getElementById('btn-timeline')?.addEventListener('click', toggleTimelinePanel);
   document.getElementById('btn-approvals')?.addEventListener('click', toggleApprovalPanel);
@@ -386,6 +578,7 @@ async function bootstrap() {
   bridge.rendererRef = renderer;
   bridge.start();
   startApprovalPolling();
+  setWebGLMetricsSource(() => renderer.getWebGLMetrics());
   startObservabilityPolling();
   startHarnessPolling();
 
@@ -942,7 +1135,6 @@ async function bootstrap() {
   };
 
   // Spawn DAVI as the default hero, near the capital if present
-  const capital = world.cities.find((c) => c.isCapital) ?? world.cities[0];
   const spawnAt = capital ? capital.coord : { q: 0, r: 0 };
   state.spawnUnit('DAVI', 'DAVI', 'hero', 'gris', spawnAt, 'En espera de misión');
 

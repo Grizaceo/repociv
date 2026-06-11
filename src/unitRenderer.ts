@@ -1,5 +1,5 @@
 // ─── RepoCiv — Unit, Building & path drawing ─────────────────────────────────
-import { axialToPixel } from './hex.ts';
+import { axialToPixel, type Axial } from './hex.ts';
 import { type Unit, type Building, tileKey } from './types.ts';
 import { type GameState } from './game.ts';
 import { HEX_SIZE } from './constants.ts';
@@ -9,10 +9,26 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 export class UnitRenderer {
+  private coordProjector: (coord: Axial) => { x: number; y: number } = (coord) =>
+    axialToPixel(coord, HEX_SIZE);
+
   constructor(
     private ctx: CanvasRenderingContext2D,
     private state: GameState,
   ) {}
+
+  /** Project axial coords to canvas world space (flat or iso extruded). */
+  setCoordProjector(fn: (coord: Axial) => { x: number; y: number }): void {
+    this.coordProjector = fn;
+  }
+
+  resetCoordProjector(): void {
+    this.coordProjector = (coord) => axialToPixel(coord, HEX_SIZE);
+  }
+
+  private tilePos(coord: Axial): { x: number; y: number } {
+    return this.coordProjector(coord);
+  }
 
   drawUnitTrail(unit: Unit) {
     if (!unit.trailPositions || unit.trailPositions.length === 0) return;
@@ -20,7 +36,7 @@ export class UnitRenderer {
     ctx.save();
     unit.trailPositions.forEach((pos, i) => {
       const alpha = ((i + 1) / unit.trailPositions!.length) * 0.4;
-      const p = axialToPixel(pos, HEX_SIZE);
+      const p = this.tilePos(pos);
       ctx.globalAlpha = alpha;
       ctx.fillStyle = unit.color;
       ctx.beginPath();
@@ -33,7 +49,7 @@ export class UnitRenderer {
 
   drawUnitBadge(unit: Unit, animTime: number) {
     const { ctx } = this;
-    const p = axialToPixel(unit.coord, HEX_SIZE);
+    const p = this.tilePos(unit.coord);
     const bx = p.x + HEX_SIZE * 0.45;
     const by = p.y - HEX_SIZE * 0.45;
     const r = 7;
@@ -94,8 +110,8 @@ export class UnitRenderer {
 
   drawSubagentLink(parent: Unit, child: Unit, animTime: number) {
     const { ctx } = this;
-    const pp = axialToPixel(parent.coord, HEX_SIZE);
-    const cp = axialToPixel(child.coord, HEX_SIZE);
+    const pp = this.tilePos(parent.coord);
+    const cp = this.tilePos(child.coord);
     const pulse = 0.25 + 0.15 * Math.sin(animTime * 2 + pp.x);
     ctx.save();
     ctx.strokeStyle = `rgba(139, 180, 248, ${pulse})`;
@@ -111,7 +127,7 @@ export class UnitRenderer {
 
   drawSubagentCountBadge(parent: Unit, childCount: number, animTime: number) {
     const { ctx } = this;
-    const p = axialToPixel(parent.coord, HEX_SIZE);
+    const p = this.tilePos(parent.coord);
     const bx = p.x - HEX_SIZE * 0.5;
     const by = p.y - HEX_SIZE * 0.55;
     const label = childCount > 5 ? `+${childCount - 5}` : String(childCount);
@@ -138,15 +154,14 @@ export class UnitRenderer {
     const isEphemeral = ephemeral || unit.ephemeral;
     let ux: number, uy: number;
     if (unit.state === 'moving' && unit.path.length > 0 && unit.pathIndex < unit.path.length) {
-      const from = axialToPixel(unit.path[unit.pathIndex]!, HEX_SIZE);
-      const to = axialToPixel(
+      const from = this.tilePos(unit.path[unit.pathIndex]!);
+      const to = this.tilePos(
         unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!,
-        HEX_SIZE,
       );
       ux = lerp(from.x, to.x, unit.pathProgress);
       uy = lerp(from.y, to.y, unit.pathProgress);
     } else {
-      const p = axialToPixel(unit.coord, HEX_SIZE);
+      const p = this.tilePos(unit.coord);
       ux = p.x;
       uy = p.y;
     }
@@ -271,7 +286,7 @@ export class UnitRenderer {
         const coord = { q: unit.coord.q + q, r: unit.coord.r + r };
         const tile = this.state.world.tiles.get(tileKey(coord));
         if (tile && !tile.inFog) {
-          const pos = axialToPixel(coord, HEX_SIZE);
+          const pos = this.tilePos(coord);
           ctx.beginPath();
           for (let i = 0; i < 6; i++) {
             const angle = (Math.PI / 180) * (60 * i - 30);
@@ -295,10 +310,10 @@ export class UnitRenderer {
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 4]);
     ctx.beginPath();
-    const start = axialToPixel(unit.path[0]!, HEX_SIZE);
+    const start = this.tilePos(unit.path[0]!);
     ctx.moveTo(start.x, start.y);
     for (let i = 1; i < unit.path.length; i++) {
-      const p = axialToPixel(unit.path[i]!, HEX_SIZE);
+      const p = this.tilePos(unit.path[i]!);
       ctx.lineTo(p.x, p.y);
     }
     ctx.stroke();
@@ -309,7 +324,7 @@ export class UnitRenderer {
     if (building.state === 'complete') return;
     const city = this.state.world.cities.find((c) => c.id === building.cityId);
     if (!city) return;
-    const pos = axialToPixel(city.coord, HEX_SIZE);
+    const pos = this.tilePos(city.coord);
     const barW = HEX_SIZE * 1.6;
     const barH = 8;
     const barX = pos.x - barW / 2;

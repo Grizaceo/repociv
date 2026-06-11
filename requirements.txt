@@ -29,3 +29,6 @@ duckdb>=1.0
 # Hooks declarativos por repo (Fase 1, H5)
 # repociv_hooks.py parsea repociv.yaml en cada repo gestionado.
 PyYAML>=6.0
+
+# Linter (CI gate; also used locally via scripts/check.sh)
+ruff==0.15.5
