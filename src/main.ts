@@ -64,6 +64,7 @@ import { axialToPixel } from './hex.ts';
 import { areMountainPropsSettled } from './three/MountainProps3D.ts';
 import { areForestPropsSettled } from './three/ForestProps3D.ts';
 import { areCityPropsSettled } from './three/CityProps3D.ts';
+import { areUnitPropsSettled } from './three/UnitProps3D.ts';
 import {
   setRendererRef,
   notifyTilePicked,
@@ -121,6 +122,15 @@ type RepoCivDebugApi = {
   areMountainPropsSettled: () => boolean;
   areForestPropsSettled: () => boolean;
   areCityPropsSettled: () => boolean;
+  areUnitPropsSettled: () => boolean;
+  getGlobalUnits: () => Array<{
+    id: string;
+    type: string;
+    state: string;
+    coord: { q: number; r: number };
+    x: number;
+    y: number;
+  }>;
   getWebGLMetrics: () => { frameTimeAvg: number; frameCount: number; dirtyRatePct: number } | null;
   getTileStats: () => {
     total: number;
@@ -405,7 +415,20 @@ async function bootstrap() {
     areMountainPropsSettled: () => areMountainPropsSettled(),
     areForestPropsSettled: () => areForestPropsSettled(),
     areCityPropsSettled: () => areCityPropsSettled(),
+    areUnitPropsSettled: () => areUnitPropsSettled(),
     getWebGLMetrics: () => renderer.getWebGLMetrics(),
+    getGlobalUnits: () =>
+      state.world.units.map((u) => {
+        const p = axialToPixel(u.coord, HEX_SIZE);
+        return {
+          id: u.id,
+          type: u.type,
+          state: u.state,
+          coord: u.coord,
+          x: Math.round(p.x),
+          y: Math.round(p.y),
+        };
+      }),
     getTileStats: () => {
       const byTerrain: Record<string, number> = {};
       const samplePos: Record<string, { x: number; y: number }> = {};

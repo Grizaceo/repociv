@@ -14,6 +14,7 @@ import { type Unit, type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+import { areUnitPropsReady, getUnitPropParts } from './UnitProps3D.ts';
 
 const unitGroup = new Group();
 unitGroup.name = 'units';
@@ -27,10 +28,84 @@ export function getUnitGroup(): Group {
 
 const HERO_TYPES = new Set(['hero', 'lexo', 'claude', 'codex', 'cursor', 'openclaw']);
 
-function buildUnitFigurine(unit: Unit): Group {
+/** Forge GLB figurine: shared geometry, per-unit tinted material clones.
+ *  The body keeps the sculpted GLB shading and lerps toward the agent
+ *  color (Civ V piece + player color in one), the banner takes the full
+ *  agent color so ownership reads at distance. */
+function buildGlbFigurine(isHero: boolean, col: Color): Group {
   const group = new Group();
+  const parts = getUnitPropParts()!;
+  parts.forEach((part, i) => {
+    const mat = (part.material as MeshStandardMaterial).clone();
+    // Part 0 is the body cylinder; later parts (banner cone, head) carry
+    // the accent material in the forge build.
+    if (i === 0) {
+      mat.color.lerp(col, 0.45);
+      mat.emissive.copy(col);
+      mat.emissiveIntensity = isHero ? 0.40 : 0.22;
+    } else {
+      mat.color.copy(col);
+      mat.emissive.copy(col);
+      mat.emissiveIntensity = isHero ? 0.55 : 0.35;
+    }
+    const mesh = new Mesh(part.geometry, mat);
+    mesh.applyMatrix4(part.matrix);
+    mesh.userData.sharedGeometry = true;
+    mesh.castShadow = true;
+    group.add(mesh);
+  });
+  // GLB is ~1.1 Blender units tall (scale baked); bring it to the same
+  // visual height as the old procedural figurine (~0.33 × HEX_SIZE).
+  const s = HEX_SIZE * (isHero ? 0.36 : 0.30);
+  group.scale.setScalar(s);
+  // Outer wrapper stays unscaled so the hero crown keeps absolute sizing.
+  const wrapper = new Group();
+  wrapper.add(group);
+  return wrapper;
+}
+
+/** Floating gem + halo above the figurine (hero identity marker). */
+function addHeroCrown(group: Group, col: Color, gemY: number): void {
+  const gemMat = new MeshStandardMaterial({
+    color: col,
+    emissive: col,
+    emissiveIntensity: 1.2,
+    roughness: 0.1,
+    metalness: 0.8,
+  });
+  const gemGeom = new OctahedronGeometry(HEX_SIZE * 0.055);
+  const gem = new Mesh(gemGeom, gemMat);
+  gem.position.y = gemY;
+  gem.rotation.y = Math.PI / 4;
+  group.add(gem);
+
+  const haloMat = new MeshStandardMaterial({
+    color: col,
+    emissive: col,
+    emissiveIntensity: 0.8,
+    roughness: 0.3,
+    metalness: 0.5,
+    transparent: true,
+    opacity: 0.65,
+  });
+  const haloGeom = new TorusGeometry(HEX_SIZE * 0.095, HEX_SIZE * 0.012, 4, 16);
+  const halo = new Mesh(haloGeom, haloMat);
+  halo.position.y = gemY;
+  halo.rotation.x = Math.PI / 2;
+  group.add(halo);
+}
+
+function buildUnitFigurine(unit: Unit): Group {
   const col = new Color(unit.color || '#888888');
   const isHero = HERO_TYPES.has(unit.type);
+
+  if (areUnitPropsReady()) {
+    const group = buildGlbFigurine(isHero, col);
+    if (isHero) addHeroCrown(group, col, HEX_SIZE * 0.46);
+    return group;
+  }
+
+  const group = new Group();
 
   const bodyMat = new MeshStandardMaterial({
     color: col,
@@ -65,35 +140,7 @@ function buildUnitFigurine(unit: Unit): Group {
   group.add(head);
 
   if (isHero) {
-    // Floating gem / crown above head — glowing octahedron
-    const gemMat = new MeshStandardMaterial({
-      color: col,
-      emissive: col,
-      emissiveIntensity: 1.2,
-      roughness: 0.1,
-      metalness: 0.8,
-    });
-    const gemGeom = new OctahedronGeometry(HEX_SIZE * 0.055);
-    const gem = new Mesh(gemGeom, gemMat);
-    gem.position.y = head.position.y + headR + HEX_SIZE * 0.10;
-    gem.rotation.y = Math.PI / 4;
-    group.add(gem);
-
-    // Thin halo ring around the gem
-    const haloMat = new MeshStandardMaterial({
-      color: col,
-      emissive: col,
-      emissiveIntensity: 0.8,
-      roughness: 0.3,
-      metalness: 0.5,
-      transparent: true,
-      opacity: 0.65,
-    });
-    const haloGeom = new TorusGeometry(HEX_SIZE * 0.095, HEX_SIZE * 0.012, 4, 16);
-    const halo = new Mesh(haloGeom, haloMat);
-    halo.position.y = gem.position.y;
-    halo.rotation.x = Math.PI / 2;
-    group.add(halo);
+    addHeroCrown(group, col, head.position.y + headR + HEX_SIZE * 0.10);
   }
 
   return group;
@@ -108,7 +155,9 @@ export function rebuildUnits(
     return !tile || tile.revealed;
   });
 
-  const signature = visibleUnits
+  // The props flag participates so the capsule→GLB swap happens the frame
+  // the async load finishes, even when no unit moved.
+  const signature = `uprops${areUnitPropsReady() ? 1 : 0}#` + visibleUnits
     .map((u) => `${u.id}:${u.coord.q},${u.coord.r}:${u.state}`)
     .join('|');
   if (signature === lastSignature) return;
@@ -138,7 +187,9 @@ export function clearUnits(): void {
     child.traverse((obj) => {
       const m = obj as Mesh;
       if (m.isMesh) {
-        m.geometry.dispose();
+        // GLB part geometries are shared across all units (UnitProps3D
+        // owns them); only the per-unit material clones are disposable.
+        if (!m.userData.sharedGeometry) m.geometry.dispose();
         if (Array.isArray(m.material)) m.material.forEach((mt) => mt.dispose());
         else m.material.dispose();
       }

@@ -75,6 +75,7 @@ import {
   rebuildCityProps,
   clearCityProps,
 } from './CityProps3D.ts';
+import { ensureUnitPropsLoad } from './UnitProps3D.ts';
 import { getTileYieldsGroup, rebuildTileYields, clearTileYields } from './TileYields3D.ts';
 import { getRiverGroup, rebuildRivers, clearRivers } from './Rivers3D.ts';
 import { createSkyDome, disposeSkyDome } from './SkyDome3D.ts';
@@ -153,6 +154,7 @@ export function createHexWorldScene(): Scene {
   ensureMountainPropsLoad();
   ensureForestPropsLoad();
   ensureCityPropsLoad();
+  ensureUnitPropsLoad();
 
   return scene;
 }
