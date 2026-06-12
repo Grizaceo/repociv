@@ -674,6 +674,10 @@ function rebuildHexGrid(state: GameState, visible: boolean, lod: 'low' | 'medium
       if (drawn.has(ek)) continue;
       drawn.add(ek);
       const n = getTile(nCoord);
+      // Open sea reads as one continuous surface in Civ V — drawing the
+      // grid there was the strongest "tiled jelly" cue on the ocean. Keep
+      // the grid on land and along the coastline.
+      if (tile.terrain === 'ocean' && (!n || n.terrain === 'ocean')) continue;
       // Lines sit on the higher tile's top so steps don't bury them.
       const nElev = n ? terrainElevation(n.terrain) : elev;
       const y = Math.max(elev, nElev) * TILE_HEIGHT + 1.5;
@@ -791,10 +795,24 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
       if (n && (n.terrain === 'ocean') !== selfOcean) mask |= 1 << k;
     });
     coastMasks[i] = mask;
-    oceanDepths[i] =
-      tile.terrain === 'ocean'
-        ? Math.min(1, (oceanHops.get(tileKey(tile.coord)) ?? 3) / 3)
-        : 0;
+    // Average the integer BFS hop count with the ocean neighbors': raw
+    // per-tile hops render as hex-shaped depth bands on the open sea;
+    // fractional averages read as one continuous deep→shallow gradient.
+    if (tile.terrain === 'ocean') {
+      let sum = oceanHops.get(tileKey(tile.coord)) ?? 3;
+      let cnt = 1;
+      for (const d of AXIAL_DIRECTIONS) {
+        const nk = tileKey({ q: tile.coord.q + d.q, r: tile.coord.r + d.r });
+        const n = getTile(nk);
+        if (n?.terrain === 'ocean') {
+          sum += oceanHops.get(nk) ?? 3;
+          cnt++;
+        }
+      }
+      oceanDepths[i] = Math.min(1, sum / cnt / 3);
+    } else {
+      oceanDepths[i] = 0;
+    }
     instanceEntries.push({ instanceId: i, coord: tile.coord });
   });
 

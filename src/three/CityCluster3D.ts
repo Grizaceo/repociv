@@ -118,7 +118,14 @@ export function rebuildCityClusters(
       return 5;
     }
 
-    const bldCount = normalCities.reduce((s, c) => s + buildingCountForCity(c.population), 0);
+    // Capitals with the GLB keep get 3 village-style satellite houses so
+    // the tile reads as a building CLUSTER (Civ V capitals are never one
+    // monolith). The procedural-capital fallback builds its own compound,
+    // so satellites only apply while the glTF prop is live.
+    const satellitesPerCapital = areCityPropsReady() ? 3 : 0;
+    const bldCount =
+      normalCities.reduce((s, c) => s + buildingCountForCity(c.population), 0) +
+      capitals.length * satellitesPerCapital;
     const roofCount = bldCount;
     const wallCount = normalCities.length * 6;   // 6 wall segments
     const towerCount = normalCities.length * 4;  // 4 corner towers
@@ -189,6 +196,36 @@ export function rebuildCityClusters(
         const tz = base.z + Math.sin(ca) * HEX_SIZE * 0.42;
         const towerM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.09, tz);
         towerMesh.setMatrixAt(towerIdx++, towerM);
+      }
+    }
+
+    // Capital satellite houses (ring around the GLB keep, clear of its
+    // 0.27·HEX half-footprint).
+    if (satellitesPerCapital > 0) {
+      const satAngles = [0, (Math.PI * 2) / 3 + 0.35, (Math.PI * 4) / 3 - 0.2];
+      for (const city of capitals) {
+        const tile = getTile(tileKey(city.coord));
+        const elev = tile ? terrainElevation(tile.terrain) : 0;
+        const base = axialToWorld3D(city.coord.q, city.coord.r, elev);
+        const h = hashCoord(city.coord.q, city.coord.r);
+        for (let si = 0; si < satellitesPerCapital; si++) {
+          const angle = satAngles[si]! + (h % 6) * (Math.PI / 3);
+          const r = HEX_SIZE * (0.50 + ((h >> (si + 2)) % 3) * 0.04);
+          const sx = base.x + Math.cos(angle) * r;
+          const sz = base.z + Math.sin(angle) * r;
+          const ht = 0.58 + ((h >> si) % 3) * 0.09;
+          const m = new Matrix4().makeTranslation(sx, base.y + 4 + ht * 7, sz);
+          m.scale(new Vector3(1, ht, 1));
+          clusterMesh.setMatrixAt(bldIdx++, m);
+          const roofY = base.y + 4 + ht * 7 + HEX_SIZE * 0.28 * ht * 0.5 + HEX_SIZE * 0.04;
+          const roofM = new Matrix4().makeTranslation(sx, roofY, sz);
+          const rot = new Quaternion().setFromAxisAngle(
+            new Vector3(0, 1, 0),
+            ((h + si) % 4) * (Math.PI / 4),
+          );
+          roofM.multiply(new Matrix4().makeRotationFromQuaternion(rot));
+          roofMesh.setMatrixAt(roofIdx++, roofM);
+        }
       }
     }
 

@@ -287,6 +287,16 @@ float terrainDetailNoise(vec2 p) {
             }
             tex = mix(tex, nTex, edgeBlend * 0.62);
           }
+          // High-frequency detail tap (land only): the baked atlas blurs at
+          // mid zoom; re-sampling the same cell at ~3.7× world frequency and
+          // overlaying its luminance deviation restores painted grain
+          // without new assets. Centered ≈1.0 so overall tone holds.
+          if (tidx < 3.5 || tidx > 5.5) {
+            vec2 dUv = fract(vWorldXZ / (uHexRadius * 1.27) + vec2(tidx * 0.311, tidx * 0.293));
+            vec3 dTex = texture2D(uTerrainAtlas, terrainAtlasUv(tidx, dUv)).rgb;
+            float dLum = dot(dTex, vec3(0.299, 0.587, 0.114));
+            tex *= 0.86 + 0.28 * dLum;
+          }
           // Civ V sea gradient: vivid turquoise on the shelf → deep saturated
           // blue offshore. instanceOceanDepth = BFS hops from the nearest
           // coast (0 = coastal, 1 = open sea); the old flat teal only varied
@@ -491,7 +501,7 @@ float terrainDetailNoise(vec2 p) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v23';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v24';
   return mat;
 }
 
