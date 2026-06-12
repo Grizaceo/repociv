@@ -41,6 +41,7 @@ shared/provider-registry.json
 .cursor/
 .gstack/
 .hermes/
+.commandcode/
 .idea/
 .vscode/
 
