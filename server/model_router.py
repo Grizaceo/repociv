@@ -37,19 +37,17 @@ logger = logging.getLogger(__name__)
 # ─── Base agent→tier affinity (overridable by signals) ──────────────────────
 
 _BASE_TIERS: dict[str, str] = {
-    "DAVI":     "PREMIUM",
+    "hermes":   "PREMIUM",
     "WORKER":   "EQUILIBRIO",
     "SCOUT":    "ECONOMICO",
-    "LEXO":     "EQUILIBRIO",
     "HERMES":   "PREMIUM",
     "OPENCLAW": "EQUILIBRIO",
 }
 
 _BASE_ENFORCED: dict[str, bool] = {
-    "DAVI":     True,
+    "hermes":   False,
     "WORKER":   True,
     "SCOUT":    True,
-    "LEXO":     True,
     "HERMES":   False,
     "OPENCLAW": False,
 }
@@ -98,7 +96,7 @@ def route_model(
     """Route to an optimal model using FrugalGPT cascade logic.
 
     Args:
-        agent_type:    e.g. "DAVI", "WORKER", "SCOUT", "LEXO", "HERMES", "OPENCLAW"
+        agent_type:    e.g. "MAIN", "WORKER", "SCOUT", "HERMES", "CLAUDE", "CODEX", "CURSOR", "OPENCLAW"
         task_type:     e.g. "orchestrate", "edit", "read"
         context:       Optional dict with:
           - "mission_text": str, for signal extraction

@@ -3,6 +3,7 @@
 // Pattern copied from spatialPreview.ts but tailored for grid interactions.
 
 import type { LocalRoom, LocalUnit, Workbench } from '../types.ts';
+import { DEFAULT_UNIT_NAME } from '../agentIdentity.ts';
 
 // ─── Tooltip elements ─────────────────────────────────────────────────────────
 let _unitTooltipEl: HTMLElement | null = null;
@@ -145,7 +146,7 @@ export function hideWhiteboardPanel() {
 }
 
 // ─── Context menu (Gizmo) ─────────────────────────────────────────────────────
-export type LocalMenuAction = string; // 'DAVI' | 'WORKER' | 'git' | 'code' | 'info'
+export type LocalMenuAction = string; // 'MAIN' | 'WORKER' | 'git' | 'code' | 'info'
 
 export function showLocalContextMenu(
   wb: Workbench,
@@ -162,16 +163,16 @@ export function showLocalContextMenu(
   const items: string[] = [];
 
   // Agent dispatch items
-  const dav = idleAgents.find((a) => a.id === 'DAVI' || a.name === 'DAVI');
+  const defaultAgent = idleAgents.find((a) => a.id === DEFAULT_UNIT_NAME || a.name === DEFAULT_UNIT_NAME);
   const wrk = idleAgents.find((a) => a.type === 'worker');
 
-  const hasDavi = true; // DAVI is the primary agent, always allow sending
+  const hasDefault = true; // The default unit is always available to send
   const hasWorker = !!wrk || idleAgents.some((a) => a.id.toLowerCase().includes('worker'));
 
-  const daviState = dav && dav.state && dav.state !== 'idle'
-    ? ` (${dav.state === 'working' ? 'Trabajando' : dav.state})`
+  const defaultState = defaultAgent && defaultAgent.state && defaultAgent.state !== 'idle'
+    ? ` (${defaultAgent.state === 'working' ? 'Trabajando' : defaultAgent.state})`
     : '';
-  const daviLabel = `Enviar DAVI${daviState}`;
+  const defaultLabel = `Enviar ${DEFAULT_UNIT_NAME.toUpperCase()}${defaultState}`;
 
   const workerState = wrk && wrk.state && wrk.state !== 'idle'
     ? ` (${wrk.state === 'working' ? 'Trabajando' : wrk.state})`
@@ -179,8 +180,8 @@ export function showLocalContextMenu(
   const workerLabel = `Enviar WORKER${workerState}`;
 
   items.push(`
-    <div class="lt-item${hasDavi ? '' : ' lt-disabled'}" data-action="DAVI">
-      <span class="lt-icon">🧑‍🔧</span> ${daviLabel}
+    <div class="lt-item${hasDefault ? '' : ' lt-disabled'}" data-action="${DEFAULT_UNIT_NAME}">
+      <span class="lt-icon">🧑‍🔧</span> ${defaultLabel}
     </div>`);
   items.push(`
     <div class="lt-item${hasWorker ? '' : ' lt-disabled'}" data-action="WORKER">

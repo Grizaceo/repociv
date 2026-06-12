@@ -1,155 +1,42 @@
 // ─── RepoCiv — Agent Capability Model (Fase 6) ────────────────────────────────
-// Mirror of server/capabilities.py.
-// UI uses this to filter context menus and show capability badges on units.
+// Source of truth is the bridge snapshot at /api/agents/capabilities (see
+// capabilitiesClient.ts). TS never hardcodes capability tables — that drift
+// caused the PR 1+3 contract breakage. The mirror is now data-driven.
 
 import type { CommandType } from './commandSchema.ts';
+import { getCapabilitiesSnapshot, type CapabilitiesSnapshot } from './capabilitiesClient.ts';
 
-export type AgentBase =
-  | 'DAVI'
-  | 'LEXO'
-  | 'WORKER'
-  | 'SCOUT'
-  | 'OPENCLAW'
-  | 'CLAUDE'
-  | 'CODEX'
-  | 'CURSOR';
-
-const AGENT_BASE_ALIASES: Record<string, AgentBase> = {
-  DAVI: 'DAVI',
-  LEXO: 'LEXO',
-  WORKER: 'WORKER',
-  SCOUT: 'SCOUT',
-  OPENCLAW: 'OPENCLAW',
-  CLAUDE: 'CLAUDE',
-  CODEX: 'CODEX',
-  CURSOR: 'CURSOR',
-};
-
-function normalizeAgentBase(raw: string): AgentBase {
-  const upper = raw.toUpperCase();
-  return AGENT_BASE_ALIASES[upper] ?? 'DAVI';
+/**
+ * Normalize a profile name for lookup. The base of a unit id (the part
+ * before any `-N` suffix) is the profile name the user registered. We
+ * uppercase for case-insensitive matching; the snapshot may store names
+ * in the case the user registered them, so we do a case-insensitive walk.
+ */
+function lookupAgent(agentId: string, snap: CapabilitiesSnapshot) {
+  const base = agentId.split('-')[0] ?? '';
+  if (snap.agents[base]) return snap.agents[base];
+  const upper = base.toUpperCase();
+  for (const [key, val] of Object.entries(snap.agents)) {
+    if (key.toUpperCase() === upper) return val;
+  }
+  return undefined;
 }
 
-// ─── Per-agent allowed command types ─────────────────────────────────────────
-export const AGENT_CAPABILITIES: Record<AgentBase, CommandType[]> = {
-  DAVI: [
-    'inspect_repo',
-    'read_file',
-    'run_tests',
-    'run_build',
-    'edit_file',
-    'create_branch',
-    'git_commit',
-    'execute_agent',
-    'quest_add',
-    'unit_command',
-    'e2e_probe',
-    'send_message',
-  ],
-  LEXO: [
-    'inspect_repo',
-    'read_file',
-    'run_tests',
-    'run_build',
-    'edit_file',
-    'create_branch',
-    'git_commit',
-  ],
-  WORKER: ['inspect_repo', 'read_file', 'run_tests', 'run_build', 'edit_file', 'create_branch'],
-  SCOUT: ['inspect_repo', 'read_file'],
-  OPENCLAW: ['inspect_repo', 'read_file', 'run_tests', 'run_build', 'execute_agent'],
-  CLAUDE: [
-    'inspect_repo',
-    'read_file',
-    'run_tests',
-    'run_build',
-    'edit_file',
-    'create_branch',
-    'git_commit',
-    'execute_agent',
-  ],
-  CODEX: ['inspect_repo', 'read_file', 'run_tests', 'run_build', 'edit_file', 'create_branch'],
-  CURSOR: [
-    'inspect_repo',
-    'read_file',
-    'run_tests',
-    'run_build',
-    'edit_file',
-    'create_branch',
-    'git_commit',
-    'execute_agent',
-  ],
-};
-
-// ─── Skill labels shown as badges ────────────────────────────────────────────
-export interface SkillBadge {
-  key: string;
-  label: string;
-  icon: string;
-}
-
-export const AGENT_SKILLS: Record<AgentBase, SkillBadge[]> = {
-  DAVI: [
-    { key: 'orchestration', label: 'Orquestación', icon: '◈' },
-    { key: 'git_workflow', label: 'Git completo', icon: '⎇' },
-    { key: 'test_runner', label: 'Tests', icon: '🧪' },
-    { key: 'code_editor', label: 'Edición', icon: '✏' },
-    { key: 'messaging', label: 'Mensajería', icon: '✉' },
-  ],
-  LEXO: [
-    { key: 'git_workflow', label: 'Git completo', icon: '⎇' },
-    { key: 'test_runner', label: 'Tests', icon: '🧪' },
-    { key: 'code_editor', label: 'Edición', icon: '✏' },
-  ],
-  WORKER: [
-    { key: 'test_runner', label: 'Tests', icon: '🧪' },
-    { key: 'code_editor', label: 'Edición', icon: '✏' },
-  ],
-  SCOUT: [{ key: 'inspection', label: 'Inspección', icon: '🔍' }],
-  OPENCLAW: [
-    { key: 'transport', label: 'Transporte', icon: '▶' },
-    { key: 'orchestration', label: 'Orquestación', icon: '◈' },
-    { key: 'test_runner', label: 'Tests', icon: '🧪' },
-  ],
-  CLAUDE: [
-    { key: 'git_workflow', label: 'Git completo', icon: '⎇' },
-    { key: 'test_runner', label: 'Tests', icon: '🧪' },
-    { key: 'code_editor', label: 'Edición', icon: '✏' },
-    { key: 'orchestration', label: 'Orquestación', icon: '◈' },
-  ],
-  CODEX: [
-    { key: 'git_workflow', label: 'Git completo', icon: '⎇' },
-    { key: 'test_runner', label: 'Tests', icon: '🧪' },
-    { key: 'code_editor', label: 'Edición', icon: '✏' },
-  ],
-  CURSOR: [
-    { key: 'git_workflow', label: 'Git completo', icon: '⎇' },
-    { key: 'test_runner', label: 'Tests', icon: '🧪' },
-    { key: 'code_editor', label: 'Edición', icon: '✏' },
-    { key: 'orchestration', label: 'Orquestación', icon: '◈' },
-  ],
-};
-
-// ─── Repo restriction patterns ────────────────────────────────────────────────
-// If target contains a key, only the listed types are allowed.
-const REPO_RESTRICTIONS: Record<string, CommandType[]> = {
-  legal: ['inspect_repo', 'read_file'],
-  vault: ['inspect_repo', 'read_file'],
-  secrets: ['inspect_repo', 'read_file'],
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-export function agentBase(agentId: string): AgentBase {
-  const raw = agentId.split('-')[0] ?? '';
-  return normalizeAgentBase(raw);
+export function agentBase(agentId: string): string {
+  return agentId.split('-')[0] ?? '';
 }
 
 export function agentCanDo(agentId: string, type: CommandType): boolean {
-  return AGENT_CAPABILITIES[agentBase(agentId)].includes(type);
+  const snap = getCapabilitiesSnapshot();
+  if (snap.__testAnyAgent) return true;
+  const entry = lookupAgent(agentId, snap);
+  if (!entry) return false;
+  return entry.capabilities.includes(type);
 }
 
 export function repoAllows(target: string, type: CommandType): boolean {
-  for (const [fragment, allowed] of Object.entries(REPO_RESTRICTIONS)) {
+  const restrictions = getCapabilitiesSnapshot().repoRestrictions;
+  for (const [fragment, allowed] of Object.entries(restrictions)) {
     if (target.toLowerCase().includes(fragment)) {
       return (allowed as string[]).includes(type);
     }
@@ -161,6 +48,32 @@ export function canExecute(agentId: string, type: CommandType, target: string): 
   return agentCanDo(agentId, type) && repoAllows(target, type);
 }
 
+export interface SkillBadge {
+  key: string;
+  label: string;
+  icon: string;
+}
+
+// Icons mirror server/capabilities.py:SKILL_LABELS shape; the snapshot only
+// carries the label text. We add a small icon map here for UI rendering.
+const SKILL_ICONS: Record<string, string> = {
+  git_workflow: '⎇',
+  test_runner: '🧪',
+  code_editor: '✏',
+  orchestration: '◈',
+  messaging: '✉',
+  inspection: '🔍',
+  transport: '▶',
+};
+
 export function getSkillBadges(agentId: string): SkillBadge[] {
-  return AGENT_SKILLS[agentBase(agentId)] ?? [];
+  const snap = getCapabilitiesSnapshot();
+  if (snap.__testAnyAgent) return [];
+  const entry = lookupAgent(agentId, snap);
+  if (!entry) return [];
+  return entry.skills.map((key) => ({
+    key,
+    label: entry.skillLabels[key] ?? key,
+    icon: SKILL_ICONS[key] ?? '•',
+  }));
 }

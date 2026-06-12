@@ -60,6 +60,8 @@ import { tileKey } from './types.ts';
 import type { LocalRoom, LocalNpc } from './types.ts';
 import { clearChat } from './ui/chat.ts';
 import { openOnboardingPanel } from './ui/onboardingPanel.ts';
+import { initCapabilities } from './capabilitiesClient.ts';
+import { DEFAULT_UNIT_NAME } from './agentIdentity.ts';
 import { axialToPixel } from './hex.ts';
 import { areMountainPropsSettled } from './three/MountainProps3D.ts';
 import { areForestPropsSettled } from './three/ForestProps3D.ts';
@@ -319,6 +321,14 @@ async function bootstrap() {
   // Initialize UI Libraries (Icons, Animations)
   initExternalLibs();
   mountGacetaWidget();
+
+  // Fetch the capability snapshot from the bridge. Sync callers (hotkey
+  // handlers, badge renderers) read the cached value; the fetch is awaited
+  // so the UI starts rendering with the real model, not the empty default.
+  void initCapabilities().catch((err) => {
+    // eslint-disable-next-line no-console -- intentional user-facing startup warning
+    console.warn('[repociv] initCapabilities failed; UI will run with no capability gate:', err);
+  });
 
   // Restore saved side panel width
   const savedWidth = localStorage.getItem('repociv-side-panel-width');
@@ -736,7 +746,7 @@ async function bootstrap() {
   }
 
   function _primeMissionComposerForCity(city: City): void {
-    const unit = state.getUnit('DAVI') ?? state.getAllUnits()[0];
+    const unit = state.getUnit(DEFAULT_UNIT_NAME) ?? state.getAllUnits()[0];
     if (!unit) return;
     state.selectUnit(unit);
     renderer.selectUnit(unit);
@@ -971,7 +981,7 @@ async function bootstrap() {
             void recordGesture({
               commandId: res.commandId,
               gesture: directive.gesture,
-              agentId: String(draft.payload?.['unit'] ?? 'DAVI'),
+              agentId: String(draft.payload?.['unit'] ?? DEFAULT_UNIT_NAME),
               cmdType: draft.type,
               target: draft.target,
             });
@@ -1032,8 +1042,8 @@ async function bootstrap() {
       const agentUnit = action === 'WORKER'
         ? (state.getAllUnits().find((u) => u.type === 'worker' && u.state === 'idle') ??
            state.getAllUnits().find((u) => u.type === 'worker'))
-        : (state.getUnit('DAVI') ??
-           state.getAllUnits().find((u) => u.id === 'DAVI') ??
+        : (state.getUnit(DEFAULT_UNIT_NAME) ??
+           state.getAllUnits().find((u) => u.id === DEFAULT_UNIT_NAME) ??
            state.getAllUnits().find((u) => u.state === 'idle'));
       const agentId = agentUnit?.id ?? action;
       // Resolve the actual repo filesystem path for bridge context
@@ -1144,7 +1154,7 @@ async function bootstrap() {
 
   // Spawn DAVI as the default hero, near the capital if present
   const spawnAt = capital ? capital.coord : { q: 0, r: 0 };
-  state.spawnUnit('DAVI', 'DAVI', 'hero', 'gris', spawnAt, 'En espera de misión');
+  state.spawnUnit(DEFAULT_UNIT_NAME, DEFAULT_UNIT_NAME, 'hero', 'gris', spawnAt, 'En espera de misión');
 
   wireHUD(renderer, state, bridge, toggleView);
 

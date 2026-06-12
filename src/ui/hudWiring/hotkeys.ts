@@ -2,6 +2,7 @@
 import { type Renderer } from '../../renderer.ts';
 import { type GameState } from '../../game.ts';
 import { type BridgeEvents } from '../../bridge.ts';
+import { DEFAULT_UNIT_NAME } from '../../agentIdentity.ts';
 import { terminalPanel } from '../../terminalPanel.ts';
 import {
   hideUnitPanel,
@@ -160,8 +161,8 @@ export function wireHotkeys(
 
     // Spawn agents (Q/W/E/L/O/C/X)
     if (e.key.toLowerCase() === 'q') {
-      trackHotkey('Q:spawn:DAVI');
-      return spawnAgent('DAVI', state, renderer, bridge);
+      trackHotkey(`Q:spawn:${DEFAULT_UNIT_NAME}`);
+      return spawnAgent(DEFAULT_UNIT_NAME, state, renderer, bridge);
     }
     if (e.key.toLowerCase() === 'w') {
       trackHotkey('W:spawn:WORKER');
@@ -172,8 +173,8 @@ export function wireHotkeys(
       return spawnAgent('SCOUT', state, renderer, bridge);
     }
     if (e.key.toLowerCase() === 'l') {
-      trackHotkey('L:spawn:LEXO');
-      return spawnAgent('LEXO', state, renderer, bridge);
+      trackHotkey('L:spawn:worker');
+      return spawnAgent('worker', state, renderer, bridge);
     }
     if (e.key.toLowerCase() === 'o') {
       trackHotkey('O:spawn:OPENCLAW');

@@ -86,12 +86,13 @@ WORKER_KEYWORDS: list[str] = [
 
 
 def select_agent_for_step(step_description: str) -> str:
-    """Heuristic: SCOUT for analysis/inspection, WORKER for implementation, DAVI as fallback.
+    """Heuristic role selection: SCOUT for analysis, WORKER for implementation,
+    MAIN as fallback (orchestrator role).
 
     Examples:
         "inspect the codebase"     → "SCOUT"
         "implement login handler"  → "WORKER"
-        "discuss roadmap"          → "DAVI"
+        "discuss roadmap"          → "MAIN"
     """
     step_lower = step_description.lower()
     for kw in SCOUT_KEYWORDS:
@@ -100,18 +101,23 @@ def select_agent_for_step(step_description: str) -> str:
     for kw in WORKER_KEYWORDS:
         if kw in step_lower:
             return "WORKER"
-    return "DAVI"
+    return "MAIN"
 
 
 def _infer_task_type(agent: str) -> str:
-    """Map agent type to a default task_type for model routing."""
+    """Map agent role to a default task_type for model routing.
+
+    The keys are ROLES (scout, worker, validator, main), not personal
+    agent names. Any user-registered profile can play any of these roles
+    at runtime; the role just hints at what kind of work the agent
+    should do.
+    """
     mapping = {
-        "DAVI": "orchestrate",
-        "WORKER": "edit",
-        "SCOUT": "read",
-        "HERMES": "orchestrate",
-        "OPENCLAW": "edit",
-        "LEXO": "read",
+        "MAIN":     "orchestrate",
+        "HERMES":   "orchestrate",
+        "WORKER":   "edit",
+        "SCOUT":    "read",
+        "VALIDATOR": "edit",
     }
     return mapping.get(agent.upper(), "edit")
 
@@ -345,6 +351,6 @@ def _infer_next_role(current_agent: str) -> str:
     role_map = {
         "SCOUT": "WORKER",
         "WORKER": "VALIDATOR",
-        "VALIDATOR": "DAVI",
+        "VALIDATOR": "MAIN",
     }
-    return role_map.get(current_agent.upper(), "DAVI")
+    return role_map.get(current_agent.upper(), "MAIN")

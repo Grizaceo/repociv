@@ -305,7 +305,7 @@ describe('localWorldManager — desk assignment', () => {
       id: 'sub-1', name: 'S', unitType: 'worker', color: '#8ab4f8',
       gridX: 1, gridY: 0, targetX: null, targetY: null,
       path: [], pathIndex: 0, pathProgress: 0, state: 'working_on_file',
-      mission: null, workProgress: 0, macroUnitId: 'DAVI',
+      mission: null, workProgress: 0, macroUnitId: 'H',
       currentWorkbenchId: null, currentRoomId: null,
       fatigue: 100, maxFatigue: 100, isResting: false, effectiveSpeed: 1,
       ephemeral: true,

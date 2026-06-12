@@ -179,8 +179,8 @@ def test_reason_includes_signal_info():
 
 # ─── step_executor._infer_task_type integration ───────────────────────────────
 
-def test_infer_task_type_davi():
-    assert _infer_task_type("DAVI") == "orchestrate"
+def test_infer_task_type_main():
+    assert _infer_task_type("MAIN") == "orchestrate"
 
 
 def test_infer_task_type_worker():
@@ -199,8 +199,8 @@ def test_infer_task_type_openclaw():
     assert _infer_task_type("OPENCLAW") == "edit"
 
 
-def test_infer_task_type_lexo():
-    assert _infer_task_type("LEXO") == "read"
+def test_infer_task_type_validator():
+    assert _infer_task_type("VALIDATOR") == "edit"
 
 
 def test_infer_task_type_unknown_defaults_to_edit():

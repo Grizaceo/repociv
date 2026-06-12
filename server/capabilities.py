@@ -1,100 +1,83 @@
 """RepoCiv — Agent Capability Model (Fase 6).
 
-Agents are contracts, not names.
-  - Every agent has a declared set of CommandTypes it may execute.
-  - Every repo can impose additional restrictions (e.g. legal/ = read-only).
-  - Policy uses this to block commands before type-level decisions.
+Capability is keyed by HARNESS, not by user-chosen profile name. A
+profile's name is just a label; the harness is the engine that decides
+what command types it can execute. The user's MAIN profile inherits
+its capabilities from its configured harness (see server/agent_runner).
+
+This module is the shipped capability table. Per-profile overrides
+(personality, system_prompt) live in config_store and are merged in
+at runtime by _get_agent_config().
 """
 from __future__ import annotations
 
 from typing import Any
 
-# ─── Agent capability declarations ───────────────────────────────────────────
-# Ordered from broadest to most restricted.
+# ─── Agent capability declarations (keyed by harness) ───────────────────────
+#
+# The harness name is the key, NOT a user-chosen profile name. A user
+# can register any number of profiles against the same harness; all of
+# them share this capability set.
+#
+# To add a new capability: add it to the relevant harness entry AND
+# to CommandType in commandSchema.ts (if it's a new command type).
 AGENT_CAPABILITIES: dict[str, list[str]] = {
-    # Orchestrator — can do everything policy allows
-    "DAVI": [
+    "hermes": [
+        # Hermes is the orchestrator: full coding agent via hermes CLI,
+        # all the bells and whistles.
         "inspect_repo", "read_file", "run_tests", "run_build",
         "edit_file", "create_branch", "git_commit",
-        "execute_agent", "quest_add", "unit_command", "e2e_probe", "send_message",
+        "execute_agent", "quest_add", "unit_command", "e2e_probe",
+        "send_message",
     ],
-    # Advisor — code-level ops only; no orchestration, no messaging
-    "LEXO": [
-        "inspect_repo", "read_file", "run_tests", "run_build",
-        "edit_file", "create_branch", "git_commit",
-    ],
-    # Builder — edits and builds; no commit, no messaging, no orchestration
-    "WORKER": [
-        "inspect_repo", "read_file", "run_tests", "run_build",
-        "edit_file", "create_branch",
-    ],
-    # Scout — read-only recon
-    "SCOUT": [
-        "inspect_repo", "read_file",
-    ],
-    # Transport / force — execution and transport, no editing
-    "OPENCLAW": [
-        "inspect_repo", "read_file", "run_tests", "run_build", "execute_agent",
-    ],
-    # Claude — full coding agent via claude-code CLI
-    "CLAUDE": [
+    "claude": [
         "inspect_repo", "read_file", "run_tests", "run_build",
         "edit_file", "create_branch", "git_commit", "execute_agent",
     ],
-    # Codex — coding agent via Codex CLI (initially conservative)
-    "CODEX": [
+    "codex": [
         "inspect_repo", "read_file", "run_tests", "run_build",
         "edit_file", "create_branch",
     ],
-    # Cursor — coding agent via cursor-agent CLI
-    "CURSOR": [
+    "cursor": [
         "inspect_repo", "read_file", "run_tests", "run_build",
         "edit_file", "create_branch", "git_commit", "execute_agent",
+    ],
+    "openclaw": [
+        "inspect_repo", "read_file", "run_tests", "run_build",
+        "execute_agent",
     ],
 }
 
 # ─── Skill labels (human-readable, shown in UI badges) ───────────────────────
 SKILL_LABELS: dict[str, dict[str, str]] = {
-    "DAVI": {
+    "hermes": {
         "orchestration": "Orquestación",
         "git_workflow":  "Git completo",
         "test_runner":   "Tests",
         "code_editor":   "Edición",
         "messaging":     "Mensajería",
     },
-    "LEXO": {
-        "git_workflow": "Git completo",
-        "test_runner":  "Tests",
-        "code_editor":  "Edición",
-    },
-    "WORKER": {
-        "test_runner": "Tests",
-        "code_editor": "Edición",
-    },
-    "SCOUT": {
-        "inspection": "Inspección",
-    },
-    "OPENCLAW": {
-        "transport":    "Transporte",
-        "orchestration": "Orquestación",
-        "test_runner":   "Tests",
-    },
-    "CLAUDE": {
+    "claude": {
         "git_workflow":  "Git completo",
         "test_runner":   "Tests",
         "code_editor":   "Edición",
         "orchestration": "Orquestación",
     },
-    "CODEX": {
+    "codex": {
         "git_workflow": "Git completo",
         "test_runner":  "Tests",
         "code_editor":  "Edición",
     },
-    "CURSOR": {
+    "cursor": {
         "git_workflow":  "Git completo",
         "test_runner":   "Tests",
         "code_editor":   "Edición",
         "orchestration": "Orquestación",
+    },
+    "openclaw": {
+        "transport":     "Transporte",
+        "orchestration": "Orquestación",
+        "test_runner":    "Tests",
     },
 }
 
@@ -118,32 +101,33 @@ SKILL_REQUIREMENTS: dict[str, str] = {
 }
 
 
-def _agent_base(agent_id: str) -> str:
-    """Normalize 'DAVI-2' -> 'DAVI', matching frontend agentBase()."""
-    return agent_id.split("-")[0].upper()
+# ─── Helpers ──────────────────────────────────────────────────────────────────
 
-
-_AGENT_BASE_ALIASES = {
-    "DAVI": "DAVI",
-    "LEXO": "LEXO",
-    "WORKER": "WORKER",
-    "SCOUT": "SCOUT",
-    "OPENCLAW": "OPENCLAW",
-    "CLAUDE": "CLAUDE",
-    "CODEX": "CODEX",
-    "CURSOR": "CURSOR",
-}
-
-
-def _normalize_agent_base(raw: str) -> str:
-    upper = raw.upper()
-    return _AGENT_BASE_ALIASES.get(upper, "DAVI")
+def _harness_for_profile(profile_name: str) -> str:
+    """Look up the harness for a profile name. Falls back to the profile
+    name itself (assumed to be a harness id) if no profile is registered.
+    """
+    try:
+        from . import config_store as _cs  # local import — avoid cycles
+        profile = _cs.get_profile(profile_name.upper())
+        if profile is not None and "harness" in profile:
+            return profile["harness"].lower()
+    except Exception:
+        pass
+    return profile_name.lower()
 
 
 def agent_capabilities(agent_id: str) -> list[str]:
-    """Return capability list for an agent (falls back to DAVI if unknown)."""
-    base = _normalize_agent_base(agent_id.split("-")[0])
-    return AGENT_CAPABILITIES.get(base, AGENT_CAPABILITIES["DAVI"])
+    """Return capability list for an agent, looked up by harness.
+
+    agent_id is the unit's full id (e.g. "H-1", "claude-2", or
+    "WORKER" if a legacy caller passes a plain base). The function
+    strips the suffix and resolves to a harness via the profile
+    registry.
+    """
+    base = agent_id.split("-")[0].upper()
+    harness = _harness_for_profile(base)
+    return list(AGENT_CAPABILITIES.get(harness, []))
 
 
 def can_execute(agent_id: str, cmd_type: str) -> bool:
@@ -180,16 +164,37 @@ def check_capability(agent_id: str, cmd_type: str, target: str) -> tuple[bool, s
 
 
 def capabilities_snapshot() -> dict[str, Any]:
-    """Full capability model for GET /agents/capabilities."""
-    return {
-        "agents": {
-            agent: {
-                "capabilities": caps,
-                "skills": list(SKILL_LABELS.get(agent, {}).keys()),
-                "skillLabels": SKILL_LABELS.get(agent, {}),
+    """Full capability model for GET /agents/capabilities.
+
+    Returns one entry per built-in harness. The "MAIN" entry is the
+    user's first profile's capabilities (resolved from the registry);
+    other profiles are listed separately if they exist.
+    """
+    agents_out: dict[str, dict[str, Any]] = {}
+    for harness, caps in AGENT_CAPABILITIES.items():
+        agents_out[harness] = {
+            "capabilities": caps,
+            "skills": list(SKILL_LABELS.get(harness, {}).keys()),
+            "skillLabels": SKILL_LABELS.get(harness, {}),
+        }
+    # Surface the user's registered profiles so the UI can show each
+    # profile's effective capabilities (per-profile overrides merged on top).
+    try:
+        from . import config_store as _cs
+        for name, profile in _cs.list_profiles().items():
+            harness = profile.get("harness", name).lower()
+            base_caps = list(AGENT_CAPABILITIES.get(harness, []))
+            agents_out[name] = {
+                "capabilities": base_caps,
+                "skills": list(SKILL_LABELS.get(harness, {}).keys()),
+                "skillLabels": SKILL_LABELS.get(harness, {}),
+                "harness": harness,
+                "isProfile": True,
             }
-            for agent, caps in AGENT_CAPABILITIES.items()
-        },
+    except Exception:
+        pass
+    return {
+        "agents": agents_out,
         "repoRestrictions": REPO_RESTRICTIONS,
         "skillRequirements": SKILL_REQUIREMENTS,
     }

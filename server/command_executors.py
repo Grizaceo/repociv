@@ -66,7 +66,7 @@ def dispatch_command(
     }
 
     if cmd.type in agent_command_types:
-        unit = str(payload.get('unit', 'DAVI'))
+        unit = str(payload.get('unit', 'MAIN'))
         city = str(payload.get('city', cmd.target or 'main'))
         mission = str(payload.get('mission') or default_mission_for_command(cmd))
         agent_type = str(payload.get('agentType', 'hero'))
@@ -82,7 +82,7 @@ def dispatch_command(
         return
 
     if cmd.type == 'e2e_probe':
-        unit = str(payload.get('unit', 'DAVI'))
+        unit = str(payload.get('unit', 'MAIN'))
         marker = str(payload.get('marker', cmd.id))[:120]
         quest_name = f'E2E probe: {marker}'
         text = f'E2E probe completado: {marker}'
@@ -140,7 +140,7 @@ def dispatch_command(
         description = str(payload.get('description', ''))
         append_pending_task(title, description)
         mission_rec: dict[str, Any] = {
-            'id': cmd.id, 'unit': 'DAVI', 'city': 'main', 'mission': title,
+            'id': cmd.id, 'unit': 'MAIN', 'city': 'main', 'mission': title,
             'questName': title, 'agentType': 'hero', 'startedAt': time.time(),
             'completedAt': time.time(), 'status': 'complete', 'summary': description,
             'lines': 0, 'duration': 0,
@@ -148,12 +148,12 @@ def dispatch_command(
         save_mission(mission_rec)
         adapter = infer_adapter_for_command('quest_add', cmd.harness_id)
         runtime_id = adapter.harness_id if adapter else 'local-cli'
-        sessions_patch('DAVI', runtimeId=runtime_id, repo='main', summary=title, lastMissionId=cmd.id)
-        sessions_append_message('DAVI', 'user', title, {'missionId': cmd.id, 'kind': 'quest_add'})
+        sessions_patch('MAIN', runtimeId=runtime_id, repo='main', summary=title, lastMissionId=cmd.id)
+        sessions_append_message('MAIN', 'user', title, {'missionId': cmd.id, 'kind': 'quest_add'})
         if description:
-            sessions_append_message('DAVI', 'assistant', description, {'missionId': cmd.id, 'kind': 'quest_add_summary'})
+            sessions_append_message('MAIN', 'assistant', description, {'missionId': cmd.id, 'kind': 'quest_add_summary'})
         run_state_save(cmd.id, {
-            'unitId': 'DAVI',
+            'unitId': 'MAIN',
             'runtimeId': runtime_id,
             'repo': 'main',
             'commandType': 'quest_add',
@@ -166,8 +166,8 @@ def dispatch_command(
             'finishedAt': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
             'result': description,
         })
-        send_to_repociv({'type': 'mission_start', 'missionId': cmd.id, 'unit': 'DAVI', 'questName': title})
-        send_to_repociv({'type': 'mission_complete', 'missionId': cmd.id, 'unit': 'DAVI', 'success': True, 'duration': 0})
+        send_to_repociv({'type': 'mission_start', 'missionId': cmd.id, 'unit': 'MAIN', 'questName': title})
+        send_to_repociv({'type': 'mission_complete', 'missionId': cmd.id, 'unit': 'MAIN', 'success': True, 'duration': 0})
         send_to_repociv({'type': 'log', 'msg': f'Quest agregado: {title}', 'level': 'success'})
         event_record_completed(cmd.id, 'quest added')
         record_outcome(cmd.id, 'success', 0.0)
@@ -232,7 +232,7 @@ def dispatch_command(
     send_to_repociv({
         'type': 'mission_complete',
         'missionId': cmd.id,
-        'unit': str(cmd.payload.get('unit', 'DAVI')),
+        'unit': str(cmd.payload.get('unit', 'MAIN')),
         'success': False,
         'duration': 0,
         'error': f"Sin executor para tipo '{cmd.type}' — no se ejecutó ninguna acción real",
