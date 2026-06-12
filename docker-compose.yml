@@ -26,9 +26,9 @@ services:
     # directly to 5275 for the events WebSocket (the Vite proxy only covers
     # /bridge/*, not the standalone WS port).
     ports:
-      - "5273:5273"   # Vite dev server (UI)
-      - "5274:5274"   # Bridge HTTP API
-      - "5275:5275"   # Bridge WebSocket (events)
+      - "127.0.0.1:5273:5273"   # Vite dev server (UI)
+      - "127.0.0.1:5274:5274"   # Bridge HTTP API
+      - "127.0.0.1:5275:5275"   # Bridge WebSocket (events)
 
     # MAP_ROOT is the folder whose subdirectories become cities on the hex map.
     # Bind-mount it read-only: the bridge only reads file metadata to render
@@ -48,9 +48,10 @@ services:
       BRIDGE_PORT: "5274"
       BRIDGE_WS_PORT: "5275"
 
-      # Dev mode: empty token = localhost-only auth bypass. Set a 32+ char
-      # token and REPOCIV_REMOTE=true to expose the bridge on 0.0.0.0
-      # safely. See .env.example for the full key list.
+      # Dev mode: empty token = loopback-only auth bypass because ports are
+      # published to 127.0.0.1 above. To expose beyond localhost, set a 32+
+      # char token, REPOCIV_REMOTE=true, and change port bindings deliberately.
+      # See .env.example and docs/REMOTE_ACCESS.md for the full key list.
       REPOCIV_TOKEN: ""
       REPOCIV_REMOTE: ""
 

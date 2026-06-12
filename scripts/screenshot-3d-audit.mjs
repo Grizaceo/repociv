@@ -56,20 +56,19 @@ mkdirSync(GOLDEN, { recursive: true });
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5273';
 const updateMode = process.argv.includes('--update');
 
-// Fixed seed: a tiny, fixed repo selection so screenshots are
-// reproducible across machines and CI runs. The shapes are stable;
-// the actual paths are arbitrary as long as the resulting tile count
-// is consistent (we use 6 of the local repos which always exist on
-// the dev box).
+// Fixed seed: a tiny, deterministic repo selection so screenshots are
+// reproducible across machines and CI runs. The paths are synthetic on
+// purpose: rendering only needs stable labels and tile count; it must
+// not depend on the maintainer's private workspace layout.
 const FIXED_SEED = {
   version: 1,
   selectedRepoPaths: [
-    '/home/gris/.hermes/workspace/repos/repociv',
-    '/home/gris/.hermes/workspace/repos/labhub',
-    '/home/gris/.hermes/workspace/repos/cdaily',
-    '/home/gris/.hermes/workspace/repos/symphony',
-    '/home/gris/.hermes/workspace/repos/TradingAgents',
-    '/home/gris/.hermes/workspace/repos/labhub-oss',
+    '/tmp/repociv-fixtures/repo-alpha',
+    '/tmp/repociv-fixtures/repo-beta',
+    '/tmp/repociv-fixtures/repo-gamma',
+    '/tmp/repociv-fixtures/repo-delta',
+    '/tmp/repociv-fixtures/repo-epsilon',
+    '/tmp/repociv-fixtures/repo-zeta',
   ],
   filters: { owners: [], topics: [], languages: [] },
 };

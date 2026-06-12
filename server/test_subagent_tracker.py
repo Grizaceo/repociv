@@ -46,7 +46,7 @@ def test_map_kind_to_unit_type():
 
 
 def test_infer_target_city():
-    assert st.infer_target_city("explore /home/gris/.hermes/workspace/repos/other", "repociv") == "other"
+    assert st.infer_target_city("explore /tmp/workspace/repos/other", "repociv") == "other"
 
 
 def test_request_cancel_not_found():

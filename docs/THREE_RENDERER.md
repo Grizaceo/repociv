@@ -108,7 +108,7 @@ The WebGL terrain shader uses:
 ### Preview atlas (optional)
 
 ```bash
-/home/gris/tools/blender/blender-5.1.2-linux-x64/blender \
+blender \
   --background --factory-startup \
   --python scripts/preview-3d-texture-atlas.py
 ```

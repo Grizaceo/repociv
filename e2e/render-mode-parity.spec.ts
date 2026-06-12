@@ -27,8 +27,8 @@ import { expect, test, type Page } from '@playwright/test';
  */
 
 const SEED_REPOS = [
-  '/home/gris/.hermes/workspace/repos/repociv',
-  '/home/gris/.hermes/workspace/repos/labhub',
+  '/tmp/repociv-fixtures/repo-alpha',
+  '/tmp/repociv-fixtures/repo-beta',
 ];
 
 async function bootWithMode(page: Page, mode: 'flat' | 'webgl') {

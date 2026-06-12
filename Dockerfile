@@ -13,7 +13,7 @@
 # Both layers agree because all three servers live in the same container.
 #
 # Build:   docker build -t repociv:latest .
-# Run:     docker run --rm -p 5273:5273 -p 5274:5274 -p 5275:5275 \
+# Run:     docker run --rm -p 127.0.0.1:5273:5273 -p 127.0.0.1:5274:5274 -p 127.0.0.1:5275:5275 \
 #              -v /path/to/your/repos:/workspace/repos:ro \
 #              -e REPOCIV_MAP_ROOT=/workspace/repos \
 #              repociv:latest

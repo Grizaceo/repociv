@@ -32,7 +32,9 @@ Open `http://localhost:5273` in your browser. The hex map should render the subd
 docker build -t repociv:latest .
 
 docker run --rm \
-  -p 5273:5273 -p 5274:5274 -p 5275:5275 \
+  -p 127.0.0.1:5273:5273 \
+  -p 127.0.0.1:5274:5274 \
+  -p 127.0.0.1:5275:5275 \
   -v "$HOME/projects:/workspace/repos:ro" \
   -e REPOCIV_MAP_ROOT=/workspace/repos \
   -e WORKSPACE_ROOT=/workspace/repos \
@@ -42,7 +44,7 @@ docker run --rm \
 
 ## Ports
 
-Three ports are exposed. **All three are required** — the browser connects directly to the WebSocket on `5275` (the Vite proxy only covers `/bridge/*`, not the standalone WS port).
+Three ports are exposed on loopback by default. **All three are required** — the browser connects directly to the WebSocket on `5275` (the Vite proxy only covers `/bridge/*`, not the standalone WS port).
 
 | Port | Service         | Why                          |
 |------|-----------------|------------------------------|
@@ -50,16 +52,9 @@ Three ports are exposed. **All three are required** — the browser connects dir
 | 5274 | Bridge HTTP API | Used by Vite proxy `/bridge` |
 | 5275 | Bridge WebSocket| Event stream from bridge     |
 
-If any of these ports is taken on the host (e.g. a local RepoCiv already running), change them on the `docker run` line:
+If any of these ports is taken on the host (e.g. a local RepoCiv already running), the safest path is to stop the local service first. Do **not** blindly remap only the host ports yet: the current frontend discovers WebSocket metadata as `ws://localhost:5275`, so a mapping like `8275:5275` would make the UI load while the event stream still dials the wrong host port.
 
-```bash
-docker run --rm \
-  -p 8273:5273 -p 8274:5274 -p 8275:5275 \
-  -v "$HOME/projects:/workspace/repos:ro" \
-  repociv:latest
-```
-
-…then open `http://localhost:8273`.
+If you need a remote or non-default-port setup today, use `REPOCIV_TOKEN` + `REPOCIV_REMOTE=true` and treat it as an advanced deployment; see `docs/REMOTE_ACCESS.md`.
 
 ## Environment variables
 
@@ -73,7 +68,7 @@ The compose file sets sensible defaults. Override any of them in the `environmen
 | `VITE_PORT`            | `5273`                   | Frontend dev server port                      |
 | `BRIDGE_PORT`          | `5274`                   | Bridge HTTP API port                          |
 | `BRIDGE_WS_PORT`       | `5275`                   | Bridge WebSocket port                         |
-| `REPOCIV_TOKEN`        | *(empty)*                | Empty = localhost-only dev mode. See SECURITY. |
+| `REPOCIV_TOKEN`        | *(empty)*                | Empty = loopback-only dev mode in Docker. Set for remote access. |
 | `REPOCIV_REMOTE`       | *(empty)*                | Set `true` + a token to expose beyond loopback |
 | `BRIDGE_HOST`          | `0.0.0.0`                | Always bound to all interfaces inside the container |
 
@@ -83,9 +78,9 @@ The `MAP_ROOT` shell variable in your `.env` (or exported in the shell) controls
 
 The entrypoint script (`docker/entrypoint.sh`) starts the Python bridge in the background, polls `/health` until it answers, then runs Vite in the foreground. Both processes share the same container network, so:
 
-- The browser's `http://localhost:5273` reaches Vite (port-mapped)
+- The browser's `http://localhost:5273` reaches Vite (loopback port-mapped)
 - Vite's `/bridge` proxy reaches `localhost:5274` (the bridge, same container)
-- The browser's `ws://localhost:5275` reaches the bridge's WebSocket server (port-mapped)
+- The browser's `ws://localhost:5275` reaches the bridge's WebSocket server (loopback port-mapped)
 
 No `network_mode: host` hack, no multi-service networking — one container, one image, three published ports.
 
@@ -100,8 +95,8 @@ If the healthcheck fails, run `docker inspect --format '{{json .State.Health}}' 
 ## Caveats
 
 - **Dev mode**, not production. Vite runs with HMR; the image is sized for a workstation, not a server.
-- **The Vite dev server is bound to all interfaces** inside the container (because the entrypoint forces `--host 0.0.0.0`). This is safe because the only path in is via the published ports.
-- **The bridge binds to `0.0.0.0` inside the container** as well, so the port mapping works. The default `127.0.0.1` of the dev bridge is overridden by the entrypoint setting `BRIDGE_HOST=0.0.0.0` in the environment.
+- **The Vite dev server is bound to all interfaces** inside the container (because the entrypoint forces `--host 0.0.0.0`). This is safe in the default compose file because published ports bind to host loopback (`127.0.0.1`).
+- **The bridge binds to `0.0.0.0` inside the container** as well, so the port mapping works. The default `127.0.0.1` of the dev bridge is overridden by the entrypoint setting `BRIDGE_HOST=0.0.0.0` in the environment; host exposure is still constrained by the loopback port bindings.
 - **`.hermes`, `.gstack`, `.claude`, `.cursor`, `execplan/`, `data/`, `coverage/`, `*.log`** are excluded from the build context in `.dockerignore`. A fresh `docker build` ships a clean tree, even if your working copy is full of personal tooling.
 - **The container is single-user by design.** Same scope as the local dev mode: it visualizes your repos folder; it does not serve multiple tenants.
 
@@ -109,8 +104,8 @@ If the healthcheck fails, run `docker inspect --format '{{json .State.Health}}' 
 
 | Symptom                                              | Likely cause                                                      | Fix                                                                      |
 |------------------------------------------------------|-------------------------------------------------------------------|--------------------------------------------------------------------------|
-| `Address already in use` on host startup             | A local RepoCiv is bound to 5273/5274/5275                        | Stop the local services or remap the container ports (see above)         |
+| `Address already in use` on host startup             | A local RepoCiv is bound to 5273/5274/5275                        | Stop the local services first; arbitrary WS port remaps are not yet supported |
 | `bridge failed health check` after 30s               | Bridge crashed — check `docker logs repociv`                      | Common cause: missing system deps. Open an issue with the full log       |
 | Map shows 0 cities                                   | `MAP_ROOT` is empty or the bind mount points to the wrong folder  | `docker exec repociv ls /workspace/repos` to verify                      |
-| `WebSocket connection failed` in browser console     | Port 5275 not exposed on the host                                 | Re-run with `-p 5275:5275` (compose already does this by default)        |
+| `WebSocket connection failed` in browser console     | Port 5275 not exposed on host loopback or remapped incorrectly    | Use the default `127.0.0.1:5275:5275` binding; non-default WS ports need code/config changes |
 | `Bridge offline` status in the UI                    | Browser can't reach 5274 (Vite proxy target) or 5275 (events)     | Confirm both 5274 and 5275 are mapped; the UI needs both                 |
