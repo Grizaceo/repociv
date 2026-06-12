@@ -134,6 +134,13 @@ type RepoCivDebugApi = {
     y: number;
   }>;
   getWebGLMetrics: () => { frameTimeAvg: number; frameCount: number; dirtyRatePct: number } | null;
+  getShadowDebug: () => {
+    shadowMapEnabled: boolean;
+    sunCastShadow: boolean;
+    sunShadowMapAllocated: boolean;
+    casters: number;
+    receivers: number;
+  } | null;
   getTileStats: () => {
     total: number;
     revealed: number;
@@ -425,6 +432,7 @@ async function bootstrap() {
     areUnitPropsSettled: () => areUnitPropsSettled(),
     areResourcePropsSettled: () => areResourcePropsSettled(),
     getWebGLMetrics: () => renderer.getWebGLMetrics(),
+    getShadowDebug: () => renderer.getShadowDebug(),
     getGlobalUnits: () =>
       state.world.units.map((u) => {
         const p = axialToPixel(u.coord, HEX_SIZE);

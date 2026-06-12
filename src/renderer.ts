@@ -875,6 +875,11 @@ export class Renderer {
     return this.threeMap?.isAtlasReady() ?? false;
   }
 
+  /** Shadow-pipeline introspection (capture scripts / debugging). */
+  getShadowDebug(): ReturnType<ThreeMapRendererType['getShadowDebug']> | null {
+    return this.threeMap?.getShadowDebug() ?? null;
+  }
+
   /** Phase D: WebGL frame metrics for observability panel. */
   getWebGLMetrics(): { frameTimeAvg: number; frameCount: number; dirtyRatePct: number } | null {
     if (this.worldRenderMode !== 'webgl') return null;

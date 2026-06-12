@@ -112,7 +112,7 @@ export function rebuildMountainProps(tiles: Tile[]): void {
     if (group.length === 0) return;
     const variant = variants![vi]!;
     const mesh = new InstancedMesh(variant.geometry, variant.material, group.length);
-    mesh.castShadow = false;
+    mesh.castShadow = true;
     mesh.receiveShadow = false;
 
     group.forEach((tile, i) => {

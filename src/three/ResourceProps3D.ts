@@ -119,7 +119,7 @@ function instanceParts(parts: PropPart[], tiles: Tile[], baseScale: number): voi
 
   for (const part of parts) {
     const mesh = new InstancedMesh(part.geometry, part.material, tiles.length);
-    mesh.castShadow = false;
+    mesh.castShadow = true;
     mesh.receiveShadow = false;
     tiles.forEach((tile, i) => {
       const h = hashCoord(tile.coord.q, tile.coord.r);

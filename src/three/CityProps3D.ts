@@ -75,7 +75,7 @@ export function rebuildCityProps(
   if (capitals.length === 0) return;
 
   const mesh = new InstancedMesh(variant.geometry, variant.materials, capitals.length);
-  mesh.castShadow = false;
+  mesh.castShadow = true;
   mesh.receiveShadow = false;
 
   const pos = new Vector3();

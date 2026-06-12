@@ -139,9 +139,27 @@ export function createHexWorldScene(): Scene {
   // actually model; the old 0.55/0.45 vs 1.05 split washed everything out.
   scene.add(new AmbientLight(0xdacfb6, 0.38));
   scene.add(new HemisphereLight(0xb0d8f0, 0x7aaa60, 0.34));
-  sunLight = new DirectionalLight(0xffe7bd, 1.5);
-  sunLight.position.set(-100, 200, 60);
+  sunLight = new DirectionalLight(0xffe7bd, 1.3);
+  // Initial position only — the per-frame sun arc in updateHexWorldScene
+  // owns position/intensity/color. Keep direction + ×8 distance in sync
+  // with the arc (see there for why distance matters to shadows).
+  sunLight.position.set(-880, 1240, 560);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.set(2048, 2048);
+  sunLight.shadow.camera.left = -2800;
+  sunLight.shadow.camera.right = 2800;
+  sunLight.shadow.camera.top = 2800;
+  sunLight.shadow.camera.bottom = -2800;
+  sunLight.shadow.camera.near = 0.1;
+  sunLight.shadow.camera.far = 6000;
+  // Ortho frustum edits don't take effect until the projection is rebuilt —
+  // without this the shadow window stays at the ±5-unit default and the
+  // whole world renders unshadowed.
+  sunLight.shadow.camera.updateProjectionMatrix();
+  sunLight.shadow.bias = -0.0004;
+  sunLight.shadow.normalBias = 1.5;
   scene.add(sunLight);
+  scene.add(sunLight.target);
   // Soft fill light from opposite side to reduce harsh shadows
   const fillLight = new DirectionalLight(0xd0e8ff, 0.16);
   fillLight.position.set(80, 60, -100);
@@ -710,6 +728,7 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
   // Clone shared geometry so we can safely attach an instanceTerrain attribute
   const clonedGeom = sharedHexGeometry.clone();
   terrainMesh = new InstancedMesh(clonedGeom, terrainMaterial, tiles.length);
+  terrainMesh.receiveShadow = true;
 
   const terrainIndices = new Float32Array(tiles.length);
   const neighborIndices = new Float32Array(tiles.length);
@@ -845,12 +864,16 @@ export function updateHexWorldScene(
     // zoomed in so close-up materials stay true to the atlas palette.
     const lodBias = opts.lod === 'low' ? 0.06 : opts.lod === 'medium' ? 0.03 : 0;
     sunLight.color.setRGB(1, (0.94 - lodBias) * warmth, (0.80 - lodBias * 2) * warmth);
-    sunLight.intensity = 1.0 + 0.08 * Math.sin(t * 0.6);
-    // Slow arc across the sky
+    sunLight.intensity = 1.3 + 0.08 * Math.sin(t * 0.6);
+    // Slow arc across the sky. The ×8 distance keeps the same direction
+    // (directional shading is position-invariant) but matters for shadows:
+    // the ortho shadow camera sits AT the light, and anything behind its
+    // near plane fell out of the shadow map when the sun hovered ~200
+    // units from the origin — half the world rendered shadowless.
     sunLight.position.set(
-      -100 + 30 * Math.sin(t * 0.3),
-      180 + 20 * Math.sin(t * 0.2),
-      60 + 15 * Math.cos(t * 0.25),
+      (-110 + 30 * Math.sin(t * 0.3)) * 8,
+      (155 + 20 * Math.sin(t * 0.2)) * 8,
+      (70 + 15 * Math.cos(t * 0.25)) * 8,
     );
   }
 

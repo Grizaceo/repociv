@@ -196,6 +196,8 @@ export function rebuildCityClusters(
     roofMesh.instanceMatrix.needsUpdate = true;
     wallMesh.instanceMatrix.needsUpdate = true;
     towerMesh.instanceMatrix.needsUpdate = true;
+    clusterMesh.castShadow = true;
+    roofMesh.castShadow = true;
     cityGroup.add(clusterMesh);
     cityGroup.add(roofMesh);
     cityGroup.add(wallMesh);

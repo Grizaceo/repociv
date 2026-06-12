@@ -1,6 +1,7 @@
 // ─── WebGL map facade: renderer loop, camera sync, resize, picking ───────────
 import {
   ACESFilmicToneMapping,
+  PCFSoftShadowMap,
   WebGLRenderer,
   PerspectiveCamera,
   Vector3,
@@ -65,6 +66,11 @@ export class ThreeMapRenderer {
     // distant tiles to the horizon colour, so the seam stays coherent.
     this.renderer.toneMapping = ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.22;
+    // Soft sun shadows — props anchor to the ground the way Civ V's do.
+    // One directional 4k map over the whole world; texel ≈ 1.4 world units,
+    // which reads as a soft blob, exactly the target.
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = PCFSoftShadowMap;
     this.renderer.setClearColor(SKY_TOP.getHex(), 1);
     container.appendChild(this.renderer.domElement);
     this.renderer.domElement.style.width = '100%';
@@ -207,6 +213,44 @@ export class ThreeMapRenderer {
   /** % of frames in the last 300-frame window that ran the heavy rebuilds. */
   getDirtyRatePct(): number {
     return this._dirtyRatePct;
+  }
+
+  /** Shadow-pipeline introspection for capture scripts and debugging. */
+  getShadowDebug(): {
+    shadowMapEnabled: boolean;
+    sunCastShadow: boolean;
+    sunShadowMapAllocated: boolean;
+    casters: number;
+    receivers: number;
+  } {
+    let casters = 0;
+    let receivers = 0;
+    let sunCast = false;
+    let sunMap = false;
+    this.scene.traverse((o) => {
+      const obj = o as unknown as {
+        isDirectionalLight?: boolean;
+        isMesh?: boolean;
+        castShadow?: boolean;
+        receiveShadow?: boolean;
+        shadow?: { map: unknown };
+      };
+      if (obj.isDirectionalLight && obj.castShadow) {
+        sunCast = true;
+        sunMap = Boolean(obj.shadow?.map);
+      }
+      if (obj.isMesh) {
+        if (obj.castShadow) casters++;
+        if (obj.receiveShadow) receivers++;
+      }
+    });
+    return {
+      shadowMapEnabled: this.renderer.shadowMap.enabled,
+      sunCastShadow: sunCast,
+      sunShadowMapAllocated: sunMap,
+      casters,
+      receivers,
+    };
   }
 
   getCanvasSize(): { width: number; height: number } {

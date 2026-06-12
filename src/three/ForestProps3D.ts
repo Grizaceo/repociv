@@ -114,7 +114,7 @@ export function rebuildForestProps(tiles: Tile[]): void {
       variant.materials,
       instanceCount,
     );
-    mesh.castShadow = false;
+    mesh.castShadow = true;
     mesh.receiveShadow = false;
 
     let i = 0;
