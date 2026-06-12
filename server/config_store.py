@@ -248,12 +248,23 @@ def _default_profiles() -> dict[str, dict[str, Any]]:
     the unit_id prefix → hermes profile path lookup at runtime.
     """
     return {
-        # H, DAVI, MAIN are the main-DAVI identity. They share the
-        # default ~/.hermes home so the agent responds as Cristóbal/DAVI.
-        "H":      {"harness": "hermes", "profile_path": "~/.hermes"},
-        "DAVI":   {"harness": "hermes", "profile_path": "~/.hermes"},
-        "MAIN":   {"harness": "hermes", "profile_path": "~/.hermes"},
+        # H, DAVI, MAIN are the main-DAVI identity. They deliberately
+        # have NO profile_path: the bridge's _execute_streaming falls
+        # through to the HTTP hermes gateway (hermes -m chat over HTTP),
+        # which serves the active main profile without spawning a
+        # subprocess or requiring a --continue session name. This is
+        # the path that was working before Issue 2 was reported and
+        # should not be changed without understanding the trade-offs
+        # (a subprocess hermes-cli with HERMES_HOME=~/.hermes works
+        # too, but then DAVI's existing chat history via the
+        # gateway is bypassed).
+        "H":      {"harness": "hermes"},
+        "DAVI":   {"harness": "hermes"},
+        "MAIN":   {"harness": "hermes"},
         # Civilization units — each has its own SOUL.md and config.
+        # They MUST be invoked via the hermes CLI subprocess with
+        # HERMES_HOME pointed at their profile dir, otherwise the HTTP
+        # gateway serves DAVI and we lose the persona (Issue 2).
         # SCOUT and WORKER are explicitly stateless: per their SOUL.md
         # ("Sin memoria. No aprendes de esta sesión") each mission
         # starts a fresh context. The hermes CLI omits --continue.

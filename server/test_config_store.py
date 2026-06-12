@@ -25,7 +25,9 @@ def test_default_registry_is_one_profile_per_harness(isolated_config: Path) -> N
     profiles = config_store.list_profiles()
     assert "H" in profiles and profiles["H"]["harness"] == "hermes"
     assert "SCOUT" in profiles and profiles["SCOUT"]["profile_path"] == "~/.hermes/profiles/scout"
+    assert profiles["SCOUT"]["stateful"] is False
     assert "WORKER" in profiles and profiles["WORKER"]["profile_path"] == "~/.hermes/profiles/worker"
+    assert profiles["WORKER"]["stateful"] is False
     assert "LEXO" in profiles and profiles["LEXO"]["profile_path"] == "~/.hermes/profiles/lexo-alpha"
     for name in ("claude", "codex", "cursor", "openclaw"):
         assert profiles[name] == {"harness": name}
@@ -42,16 +44,20 @@ def test_reset_to_default_populates_shipped_baseline(isolated_config: Path) -> N
         "claude", "codex", "cursor", "openclaw",
     }
     assert profiles["H"]["harness"] == "hermes"
-    assert profiles["H"]["profile_path"] == "~/.hermes"  # H shares DAVI's home
+    # H deliberately has no profile_path — it falls through to the HTTP
+    # hermes gateway, the working path for the main DAVI unit.
+    assert "profile_path" not in profiles["H"]
     assert profiles["SCOUT"]["harness"] == "hermes"
     assert profiles["SCOUT"]["profile_path"] == "~/.hermes/profiles/scout"
+    assert profiles["SCOUT"]["stateful"] is False
     assert profiles["WORKER"]["harness"] == "hermes"
     assert profiles["WORKER"]["profile_path"] == "~/.hermes/profiles/worker"
+    assert profiles["WORKER"]["stateful"] is False
     assert profiles["LEXO"]["harness"] == "hermes"
     assert profiles["LEXO"]["profile_path"] == "~/.hermes/profiles/lexo-alpha"
-    # DAVI/MAIN point at the default profile (DAVI's own home).
-    assert profiles["DAVI"]["profile_path"] == "~/.hermes"
-    assert profiles["MAIN"]["profile_path"] == "~/.hermes"
+    # DAVI/MAIN also fall through to the HTTP gateway (no profile_path).
+    assert "profile_path" not in profiles["DAVI"]
+    assert "profile_path" not in profiles["MAIN"]
     # The non-default profiles still name == harness.
     for name in ("claude", "codex", "cursor", "openclaw"):
         assert profiles[name] == {"harness": name}
