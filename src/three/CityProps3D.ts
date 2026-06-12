@@ -1,15 +1,7 @@
 // ─── Capital city prop (warm stone glTF from asset forge) ───────────────────
-import {
-  BufferGeometry,
-  Group,
-  InstancedMesh,
-  Material,
-  Matrix4,
-  Mesh,
-  Quaternion,
-  Vector3,
-} from 'three';
+import { Group, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeGlbScene, type MergedGlb } from './mergeGlbScene.ts';
 import { type City, type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
@@ -18,7 +10,7 @@ import { HEX_SIZE } from '../constants.ts';
 const propsGroup = new Group();
 propsGroup.name = 'city-props';
 
-type PropVariant = { geometry: BufferGeometry; material: Material };
+type PropVariant = MergedGlb;
 
 type PropsState = 'idle' | 'loading' | 'ready' | 'failed';
 
@@ -46,13 +38,9 @@ export function ensureCityPropsLoad(onSettled?: () => void): void {
   loader
     .loadAsync('/assets/3d/props/city-capital-0.glb')
     .then((gltf) => {
-      let found: Mesh | null = null;
-      gltf.scene.traverse((obj) => {
-        if (!found && (obj as Mesh).isMesh) found = obj as Mesh;
-      });
-      if (!found) throw new Error('glb without mesh');
-      const mesh = found as Mesh;
-      variant = { geometry: mesh.geometry, material: mesh.material as Material };
+      // 7 meshes (base/keep/roof/towers/wing) on 2 materials — merge them
+      // all; first-mesh-only renders the bare base cube.
+      variant = mergeGlbScene(gltf.scene);
       state = 'ready';
       lastSignature = '';
       onSettled?.();
@@ -86,7 +74,7 @@ export function rebuildCityProps(
   clearCityProps();
   if (capitals.length === 0) return;
 
-  const mesh = new InstancedMesh(variant.geometry, variant.material, capitals.length);
+  const mesh = new InstancedMesh(variant.geometry, variant.materials, capitals.length);
   mesh.castShadow = false;
   mesh.receiveShadow = false;
 
@@ -104,7 +92,7 @@ export function rebuildCityProps(
     const rotSteps = h % 6;
     pos.set(base.x, base.y + 2, base.z);
     quat.setFromAxisAngle(up, rotSteps * (Math.PI / 3));
-    const s = HEX_SIZE * 0.55;
+    const s = HEX_SIZE * 0.40;
     scl.set(s, s, s);
     matrix.compose(pos, quat, scl);
     mesh.setMatrixAt(i, matrix);

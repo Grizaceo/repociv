@@ -1,15 +1,18 @@
 // ─── Low-poly forest props (glTF clumps from asset forge) ───────────────────
+// Each GLB contains 3-4 complete pine trees (trunk cylinder + 3 canopy cones)
+// as separate indexed meshes. The loader merges the FIRST tree into a single
+// two-group geometry (group 0 = trunk, group 1 = canopies) so InstancedMesh
+// renders full trees — brown trunk, green conical canopy — in two draw calls.
 import {
-  BufferGeometry,
+  Color,
   Group,
   InstancedMesh,
-  Material,
   Matrix4,
-  Mesh,
   Quaternion,
   Vector3,
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeGlbScene, type MergedGlb } from './mergeGlbScene.ts';
 import { type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
@@ -18,12 +21,12 @@ import { HEX_SIZE } from '../constants.ts';
 const propsGroup = new Group();
 propsGroup.name = 'forest-props';
 
-type PropVariant = { geometry: BufferGeometry; material: Material };
+type PropVariant = MergedGlb;
 
 type PropsState = 'idle' | 'loading' | 'ready' | 'failed';
 
 const PROP_IDS = ['forest-pine-0', 'forest-pine-1', 'forest-pine-2'] as const;
-const TREES_PER_TILE = 7;
+const TREES_PER_TILE = 9;
 
 const treeOffsets: Array<[number, number]> = [
   [-0.20, 0.14],
@@ -33,6 +36,8 @@ const treeOffsets: Array<[number, number]> = [
   [-0.28, -0.06],
   [0.30, 0.04],
   [0.00, 0.02],
+  [-0.10, 0.30],
+  [0.08, -0.32],
 ];
 
 let variants: PropVariant[] | null = null;
@@ -58,15 +63,9 @@ export function ensureForestPropsLoad(onSettled?: () => void): void {
   const loader = new GLTFLoader();
   Promise.all(PROP_IDS.map((id) => loader.loadAsync(`/assets/3d/props/${id}.glb`)))
     .then((gltfs) => {
-      variants = gltfs.map((gltf) => {
-        let found: Mesh | null = null;
-        gltf.scene.traverse((obj) => {
-          if (!found && (obj as Mesh).isMesh) found = obj as Mesh;
-        });
-        if (!found) throw new Error('glb without mesh');
-        const mesh = found as Mesh;
-        return { geometry: mesh.geometry, material: mesh.material as Material };
-      });
+      // Node order is trunk, canopy-a/b/c, trunk.001, … so the first 4
+      // meshes are one complete tree — instancing handles the clumping.
+      variants = gltfs.map((gltf) => mergeGlbScene(gltf.scene, 4));
       state = 'ready';
       lastSignature = '';
       onSettled?.();
@@ -104,12 +103,17 @@ export function rebuildForestProps(tiles: Tile[]): void {
   const scl = new Vector3();
   const up = new Vector3(0, 1, 0);
   const matrix = new Matrix4();
+  const tint = new Color();
 
   byVariant.forEach((group, vi) => {
     if (group.length === 0) return;
     const variant = variants![vi]!;
     const instanceCount = group.length * TREES_PER_TILE;
-    const mesh = new InstancedMesh(variant.geometry, variant.material, instanceCount);
+    const mesh = new InstancedMesh(
+      variant.geometry,
+      variant.materials,
+      instanceCount,
+    );
     mesh.castShadow = false;
     mesh.receiveShadow = false;
 
@@ -131,14 +135,21 @@ export function rebuildForestProps(tiles: Tile[]): void {
           base.z + (oz + jz) * HEX_SIZE,
         );
         quat.setFromAxisAngle(up, rotSteps * (Math.PI / 3));
-        const s = HEX_SIZE * 0.42 * scale;
+        const s = HEX_SIZE * 0.24 * scale;
         scl.set(s, s, s);
         matrix.compose(pos, quat, scl);
+        // Per-tree canopy tint: Civ V forests read as a mottled deep green,
+        // not a uniform flat fill. Vary brightness and warmth by hash.
+        const vb = 0.78 + ((h * 7 + t * 13) % 7) * 0.05; // 0.78..1.08
+        const vw = ((h * 3 + t * 5) % 5) * 0.04; // 0..0.16 warm shift
+        tint.setRGB(vb * (0.9 + vw), vb, vb * 0.92);
+        mesh.setColorAt(i, tint);
         mesh.setMatrixAt(i++, matrix);
       }
     }
 
     mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     activeMeshes.push(mesh);
     propsGroup.add(mesh);
   });
