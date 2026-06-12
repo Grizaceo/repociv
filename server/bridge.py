@@ -1027,6 +1027,10 @@ if __name__ == "__main__":
     _sched.set_dispatcher(_scheduler_dispatch)
     # Wire fatigue state into scheduler priority scoring
     _sched.set_fatigue_provider(lambda unit_id: get_unit_fatigue(unit_id).get("fatigue"))
+    # Load any queued missions persisted on disk from a previous bridge
+    # incarnation. Without this, commands queued before a restart stay stuck
+    # in scheduler-queue.json forever — the in-memory queue starts empty.
+    _sched._init_from_disk()
     _sched.start_worker()
     _seed_initial_heartbeats()
 
