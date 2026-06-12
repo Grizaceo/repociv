@@ -8,6 +8,8 @@ import {
   getActiveChatUnit,
   setActiveChatUnit,
   updateChatTargetIndicator,
+  workingUnits,
+  subscribeWorkingUnits,
 } from './state.ts';
 import { loadConfigForUnit } from './modelSelector.ts';
 
@@ -29,12 +31,31 @@ export function createChip(unitId: string, isActive: boolean): HTMLElement {
   btn.innerHTML =
     `<span class="chip-icon">${AGENT_ICONS[unitId.toUpperCase()] ?? '◆'}</span>` +
     `<span class="chip-name">${unitId.toUpperCase()}</span>` +
+    `<span class="chip-working${workingUnits.has(unitId) ? ' active' : ''}" title="Trabajando en otra pestaña">⟳</span>` +
     `<span class="chip-badge${agentsWithNewMessages.has(unitId) ? ' active' : ''}"></span>`;
   btn.addEventListener('click', () => {
     void handleChipClick(unitId);
   });
   return btn;
 }
+
+/** Re-render the working-spinner state on every visible chip.
+ *  Called on every workingUnits change so the spinner appears/disappears
+ *  even when the user is looking at a different tab. */
+export function syncChipsWorking(): void {
+  const container = document.getElementById('chat-agent-selector');
+  if (!container) return;
+  for (const chip of container.querySelectorAll<HTMLElement>('.chat-agent-chip')) {
+    const unitId = chip.dataset['unit'];
+    if (!unitId) continue;
+    const spinner = chip.querySelector<HTMLElement>('.chip-working');
+    if (!spinner) continue;
+    spinner.classList.toggle('active', workingUnits.has(unitId));
+  }
+}
+
+// Wire the spinner sync once on module load.
+subscribeWorkingUnits(syncChipsWorking);
 
 /** Ensure a chip exists for the given unit (idempotent). */
 export function ensureChipExists(unitId: string): void {

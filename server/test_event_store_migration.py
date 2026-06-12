@@ -68,7 +68,9 @@ def test_does_not_rewrite_unknown_agent(isolated_event_store: Path) -> None:
 
 
 def test_destination_defaults_to_main_when_no_profiles(isolated_event_store: Path) -> None:
-    assert event_store._resolve_migration_destination() == "main"
+    # Auto-baseline: there's always a profile (DAVI is first alphabetically),
+    # so the destination is the first registered profile, not "main".
+    assert event_store._resolve_migration_destination() == "DAVI"
 
 
 def test_destination_uses_first_registered_profile(isolated_event_store: Path) -> None:
@@ -106,7 +108,10 @@ def test_migration_falls_back_to_main_when_no_profiles(isolated_event_store: Pat
     ])
     event_store.init(isolated_event_store)
     rewritten = _read_events(path)
-    assert rewritten[0]["actor"] == "main"
+    # Auto-baseline means the first profile is "DAVI" (alphabetical) on
+    # first read, so the legacy "DAVI" actor gets rewritten to the
+    # default profile key (DAVI) — no longer falls back to "main".
+    assert rewritten[0]["actor"] == "DAVI"
 
 
 def test_migration_is_idempotent(isolated_event_store: Path) -> None:

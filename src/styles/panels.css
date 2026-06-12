@@ -805,6 +805,30 @@
   animation: pulse 1s infinite;
 }
 
+/* Working spinner — shows next to the agent name when the agent is
+   currently working, regardless of which tab is active. Cristóbal
+   reported the "the other agent says it's working even though I'm
+   here" confusion; the spinner in the top tab solves it. */
+.chat-agent-chip .chip-working {
+  display: inline-block;
+  margin-left: 2px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--ui-text-dim);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  pointer-events: none;
+}
+.chat-agent-chip .chip-working.active {
+  color: var(--civ-food, #6ab04c);
+  opacity: 1;
+  animation: chip-spin 0.9s linear infinite;
+}
+@keyframes chip-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 .chat-scroll-btn:hover {
   opacity: 0.85;
 }

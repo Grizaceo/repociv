@@ -143,7 +143,7 @@ def _get_agent_config(unit_id: str) -> dict[str, Any]:
         harness = base.lower()
     merged = dict(AGENT_CONFIGS.get(harness, _DEFAULT_AGENT_CONFIG))
     if profile is not None:
-        for field in ("personality", "system_prompt", "model", "provider", "profile_path"):
+        for field in ("personality", "system_prompt", "model", "provider", "profile_path", "stateful"):
             if profile.get(field) is not None:
                 merged[field] = profile[field]
     return merged
