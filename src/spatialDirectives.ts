@@ -50,6 +50,12 @@ export interface ContextMenuItem {
 }
 
 // ─── Drag unit → city ─────────────────────────────────────────────────────────
+// Plain drag (no shift) = local move only. The unit's position updates
+// in the game state; no command is dispatched, no preview modal pops.
+// Mission dispatch happens via right-click → "Enviar unidad aquí"
+// (which sends execute_agent auto-safe, no approval gate).
+//
+// Shift+drag = run tests (medium-touch workflow that warrants a confirm).
 export function interpretUnitDrag(params: {
   unit: Unit;
   fromCoord: Axial;
@@ -64,16 +70,24 @@ export function interpretUnitDrag(params: {
     return null;
   }
 
-  // Shift+drag → run tests if they exist, otherwise inspect
-  const cmdType: CommandType = shiftHeld ? 'run_tests' : 'inspect_repo';
-  const missionText = shiftHeld
-    ? `Ejecutar tests en ${city.name}`
-    : `Inspeccionar repo ${city.name}`;
+  // Plain drag onto a city = local move, NO command, NO preview modal.
+  // Cristóbal reported the preview/confirm modal here as an unnecessary
+  // "approval" — it's actually a confirmation step, but for the
+  // simple drop-on-city use case the user is right that the modal is
+  // friction. Use the right-click menu when you actually want to send
+  // a mission to the city.
+  if (!shiftHeld) {
+    return null;
+  }
+
+  // Shift+drag → run tests (explicit, intentional, worth confirming).
+  const cmdType: CommandType = 'run_tests';
+  const misionText = `Ejecutar tests en ${city.name}`;
 
   const draft = draftCommand(cmdType, city.id, {
     unit: unit.id,
     city: city.id,
-    mission: missionText,
+    mission: misionText,
     agentType: unit.type,
   });
 
