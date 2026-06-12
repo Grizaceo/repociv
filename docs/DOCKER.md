@@ -24,7 +24,19 @@ docker compose up --build
 #     Vite (UI):      http://localhost:5273
 ```
 
-Open `http://localhost:5273` in your browser. The hex map should render the subdirectories of `MAP_ROOT` as cities.
+Open `http://localhost:5273` in your browser. On first load, RepoCiv shows the onboarding panel and lists the repositories found under `MAP_ROOT` so you can choose which ones should appear on the map.
+
+Important Docker distinction:
+
+- `MAP_ROOT` chooses the **host folder** that is mounted into the container as `/workspace/repos`.
+- The onboarding panel chooses which **repos inside that mounted folder** are loaded into the map.
+- The native "pick folder" button is mainly for local non-Docker runs. In Docker, use `MAP_ROOT=/path/on/host` before `docker compose up`; a container cannot browse arbitrary host folders unless they are bind-mounted.
+
+The selected repos are persisted in the named Docker volume `repociv-state`, so normal `docker compose down` / `docker compose up --build` cycles keep your onboarding choice. To reset it:
+
+```bash
+docker compose down -v
+```
 
 ### Without docker compose
 
@@ -36,9 +48,11 @@ docker run --rm \
   -p 127.0.0.1:5274:5274 \
   -p 127.0.0.1:5275:5275 \
   -v "$HOME/projects:/workspace/repos:ro" \
+  -v repociv-state:/workspace/state \
   -e REPOCIV_MAP_ROOT=/workspace/repos \
   -e WORKSPACE_ROOT=/workspace/repos \
   -e REPOCIV_REPOS_ROOT=/workspace/repos \
+  -e XDG_STATE_HOME=/workspace/state \
   repociv:latest
 ```
 
@@ -65,6 +79,7 @@ The compose file sets sensible defaults. Override any of them in the `environmen
 | `REPOCIV_MAP_ROOT`     | `/workspace/repos`       | Must match the bind mount target              |
 | `WORKSPACE_ROOT`       | `/workspace/repos`       | Fallback alias                                |
 | `REPOCIV_REPOS_ROOT`   | `/workspace/repos`       | Second fallback                               |
+| `XDG_STATE_HOME`        | `/workspace/state`       | Stores onboarding repo selection in Docker   |
 | `VITE_PORT`            | `5273`                   | Frontend dev server port                      |
 | `BRIDGE_PORT`          | `5274`                   | Bridge HTTP API port                          |
 | `BRIDGE_WS_PORT`       | `5275`                   | Bridge WebSocket port                         |
@@ -99,6 +114,7 @@ If the healthcheck fails, run `docker inspect --format '{{json .State.Health}}' 
 - **The bridge binds to `0.0.0.0` inside the container** as well, so the port mapping works. The default `127.0.0.1` of the dev bridge is overridden by the entrypoint setting `BRIDGE_HOST=0.0.0.0` in the environment; host exposure is still constrained by the loopback port bindings.
 - **`.hermes`, `.gstack`, `.claude`, `.cursor`, `execplan/`, `data/`, `coverage/`, `*.log`** are excluded from the build context in `.dockerignore`. A fresh `docker build` ships a clean tree, even if your working copy is full of personal tooling.
 - **The container is single-user by design.** Same scope as the local dev mode: it visualizes your repos folder; it does not serve multiple tenants.
+- **Folder picking in Docker is mount-based.** To load a different host folder, change `MAP_ROOT` and restart the compose stack. The in-app onboarding filters repos inside the mounted root; it does not grant access to unmounted host paths.
 
 ## Troubleshooting
 
@@ -107,5 +123,7 @@ If the healthcheck fails, run `docker inspect --format '{{json .State.Health}}' 
 | `Address already in use` on host startup             | A local RepoCiv is bound to 5273/5274/5275                        | Stop the local services first; arbitrary WS port remaps are not yet supported |
 | `bridge failed health check` after 30s               | Bridge crashed — check `docker logs repociv`                      | Common cause: missing system deps. Open an issue with the full log       |
 | Map shows 0 cities                                   | `MAP_ROOT` is empty or the bind mount points to the wrong folder  | `docker exec repociv ls /workspace/repos` to verify                      |
+| Onboarding does not show the host folder I expected  | The host folder was not mounted into the container                 | Set `MAP_ROOT=/absolute/host/path` before `docker compose up --build`     |
+| I want to redo onboarding from scratch               | Previous selection is stored in the `repociv-state` volume         | Run `docker compose down -v`, then `docker compose up --build`            |
 | `WebSocket connection failed` in browser console     | Port 5275 not exposed on host loopback or remapped incorrectly    | Use the default `127.0.0.1:5275:5275` binding; non-default WS ports need code/config changes |
 | `Bridge offline` status in the UI                    | Browser can't reach 5274 (Vite proxy target) or 5275 (events)     | Confirm both 5274 and 5275 are mapped; the UI needs both                 |

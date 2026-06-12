@@ -36,12 +36,18 @@ services:
     # own repos folder.
     volumes:
       - ${MAP_ROOT:-$HOME/.hermes/workspace/repos}:/workspace/repos:ro
+      - repociv-state:/workspace/state
 
     environment:
       # Map root inside the container. Must match the bind mount target above.
       REPOCIV_MAP_ROOT: /workspace/repos
       WORKSPACE_ROOT: /workspace/repos
       REPOCIV_REPOS_ROOT: /workspace/repos
+
+      # Persist the interactive onboarding selection across container rebuilds.
+      # The Vite plugin stores repo root + selected repo state under
+      # $XDG_STATE_HOME/repociv/state.json.
+      XDG_STATE_HOME: /workspace/state
 
       # Port configuration (matches EXPOSE in the Dockerfile).
       VITE_PORT: "5273"
@@ -69,3 +75,6 @@ services:
       timeout: 3s
       retries: 6
       start_period: 20s
+
+volumes:
+  repociv-state:
