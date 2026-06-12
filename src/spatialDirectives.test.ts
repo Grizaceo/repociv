@@ -61,7 +61,7 @@ function makeUnit(id: string, type: Unit['type'] = 'worker'): Unit {
 describe('interpretUnitToFileDrag', () => {
   const city = makeCity('repociv', 'repociv');
   const cityTile = makeTile(city);
-  const unit = makeUnit('davi', 'hero');
+  const unit = makeUnit('main', 'hero');
 
   it('returns null when target tile has no city', () => {
     const emptyTile = makeTile(); // no city
@@ -86,7 +86,7 @@ describe('interpretUnitToFileDrag', () => {
     expect(result).not.toBeNull();
     expect(result!.gesture).toBe('drag_unit_to_file');
     expect(result!.draft.type).toBe('read_file');
-    expect(result!.sourceUnitId).toBe('davi');
+    expect(result!.sourceUnitId).toBe('main');
     expect(result!.targetCityId).toBe('repociv');
     expect(result!.shiftHeld).toBe(false);
     expect(result!.confidence).toBe(0.85);
@@ -173,7 +173,7 @@ describe('interpretUnitToFileDrag', () => {
 // ─── interpretCardDropOnUnit ─────────────────────────────────────────────────
 
 describe('interpretCardDropOnUnit', () => {
-  const unit = makeUnit('scout1', 'scout');
+  const unit = makeUnit('SCOUT-1', 'scout');
   const unitCoord = makeAxial(5, 7);
 
   it('returns null when unit cannot execute card type', () => {
@@ -193,21 +193,24 @@ describe('interpretCardDropOnUnit', () => {
     expect(result).not.toBeNull();
     expect(result!.gesture).toBe('drop_card_on_unit');
     expect(result!.draft.type).toBe('inspect_repo');
-    expect(result!.draft.created_by).toBe('scout1');
-    expect(result!.sourceUnitId).toBe('scout1');
+    expect(result!.draft.created_by).toBe('SCOUT-1');
+    expect(result!.sourceUnitId).toBe('SCOUT-1');
     expect(result!.confidence).toBe(0.8);
     expect(result!.userConfirmed).toBe(false);
     expect(result!.shiftHeld).toBe(false);
   });
 
-  it('delegates execute_agent card to an army unit', () => {
-    const army = makeUnit('army1', 'army');
+  it('delegates execute_agent card to an orchestrator-class unit', () => {
+    // CURSOR/CLAUDE/OPENCLAW are the shipped units that can do execute_agent.
+    // MAIN's harness-driven capabilities are resolved at runtime; in the JS
+    // module they are empty, so we use CURSOR-1 to exercise the dispatch path.
+    const army = makeUnit('CURSOR-1', 'army');
     const card = draftCommand('execute_agent', 'target_repo', {
       mission: 'Deploy',
     });
     const result = interpretCardDropOnUnit({ card, unit: army, unitCoord });
     expect(result).not.toBeNull();
-    expect(result!.draft.created_by).toBe('army1');
+    expect(result!.draft.created_by).toBe('CURSOR-1');
   });
 
   it('merges card payload with unit assignment info', () => {
@@ -220,7 +223,7 @@ describe('interpretCardDropOnUnit', () => {
     const payload = result!.draft.payload;
     expect(payload?.filePath).toBe('README.md');
     expect(payload?.mission).toBe('Read docs');
-    expect(payload?.unit).toBe('scout1');
+    expect(payload?.unit).toBe('SCOUT-1');
     expect(payload?.agentType).toBe('scout');
     expect(payload?.delegatedFrom).toBe('user');
   });
@@ -229,12 +232,12 @@ describe('interpretCardDropOnUnit', () => {
     const card: CommandDraft = {
       type: 'inspect_repo',
       target: 'repociv',
-      created_by: 'davi',
+      created_by: 'main',
       payload: { mission: 'Audit' },
     };
     const result = interpretCardDropOnUnit({ card, unit, unitCoord });
     expect(result).not.toBeNull();
-    expect(result!.draft.payload?.delegatedFrom).toBe('davi');
+    expect(result!.draft.payload?.delegatedFrom).toBe('main');
   });
 
   it('preserves original card target', () => {

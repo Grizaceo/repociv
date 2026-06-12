@@ -342,8 +342,9 @@ RepoCiv is not a clone of AgentCraft. It started as a different project
 with AgentCraft's space. Here is what makes RepoCiv different:
 
 **RepoCiv is stronger at:**
-- **Policy engine**: granular capability control per agent (DAVI > LEXO >
-  WORKER > SCOUT permission hierarchy). AgentCraft does not expose this.
+- **Policy engine**: granular capability control per agent (each shipped
+  type has its own capability set; the user's MAIN slot inherits from the
+  harness they picked). AgentCraft does not expose this.
 - **Priority Matrix**: urgency-driven scheduling vs FIFO queues.
 - **Fatigue System**: agents that tire from work and need to rest.
   Prevents context saturation naturally.

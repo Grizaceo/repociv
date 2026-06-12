@@ -221,15 +221,15 @@ Response 200: plan de recovery declarativo con shape:
 
 **`/session/reset`** — Body:
 ```json
-{ "unit": "DAVI" }
+{ "unit": "MAIN" }
 ```
 
-`unit` es opcional (default `"DAVI"`). Debe ser alfanumérico/dash/underscore, max 32 chars (validado por `_validate_unit_id`). Response 200:
+`unit` es opcional (default `"MAIN"`). Debe ser alfanumérico/dash/underscore, max 32 chars (validado por `_validate_unit_id`). Response 200:
 ```json
 {
   "ok": true,
-  "newSessionId": "repociv-davi-<unix_ts>",
-  "unit": "DAVI"
+  "newSessionId": "repociv-main-<unix_ts>",
+  "unit": "MAIN"
 }
 ```
 
@@ -238,17 +238,17 @@ Borra los archivos de sesión correspondientes (`~/.repociv/sessions/<unit>.*`) 
 **`/model/override`** — Body:
 ```json
 {
-  "unit": "DAVI",
+  "unit": "MAIN",
   "provider": "<provider_id>",
   "model": "<model_id>"
 }
 ```
 
-`unit` opcional (default `"DAVI"`), misma validación que `/session/reset`. `provider` y `model` son requeridos y no-vacíos. Response 200:
+`unit` opcional (default `"MAIN"`), misma validación que `/session/reset`. `provider` y `model` son requeridos y no-vacíos. Response 200:
 ```json
 {
   "ok": true,
-  "unit": "DAVI",
+  "unit": "MAIN",
   "provider": "...",
   "model": "..."
 }

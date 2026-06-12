@@ -9,16 +9,26 @@ import {
 } from './agentCapabilities.ts';
 
 describe('agentBase', () => {
-  it('strips suffix from DAVI-2', () => expect(agentBase('DAVI-2')).toBe('DAVI'));
+  it('strips suffix from MAIN-2', () => expect(agentBase('MAIN-2')).toBe('MAIN'));
   it('lowercases then uppercases', () => expect(agentBase('worker')).toBe('WORKER'));
-  it('falls back to DAVI for unknown agent', () => expect(agentBase('HERMES')).toBe('DAVI'));
+  it('falls back to MAIN for unknown agent', () => expect(agentBase('HERMES')).toBe('MAIN'));
 });
 
 describe('agentCanDo', () => {
-  it('DAVI can do everything', () => {
-    for (const cap of AGENT_CAPABILITIES.DAVI) {
-      expect(agentCanDo('DAVI', cap as never)).toBe(true);
+  it('every shipped non-MAIN agent can do its declared capabilities', () => {
+    for (const [agent, caps] of Object.entries(AGENT_CAPABILITIES)) {
+      if (agent === 'MAIN') continue; // MAIN is harness-driven, tested separately
+      for (const cap of caps) {
+        expect(agentCanDo(agent, cap as never)).toBe(true);
+      }
     }
+  });
+
+  it('MAIN has no fixed capabilities (resolved at runtime from harness)', () => {
+    // AGENT_CAPABILITIES.MAIN is intentionally an empty list — the live
+    // capabilities are surfaced by server/capabilities.py:capabilities_snapshot
+    // after the user picks a harness during onboarding.
+    expect(AGENT_CAPABILITIES.MAIN).toEqual([]);
   });
 
   it('SCOUT can only inspect_repo and read_file', () => {
@@ -29,20 +39,18 @@ describe('agentCanDo', () => {
     expect(agentCanDo('SCOUT', 'git_commit')).toBe(false);
   });
 
-  it('LEXO cannot orchestrate or message', () => {
-    expect(agentCanDo('LEXO', 'execute_agent')).toBe(false);
-    expect(agentCanDo('LEXO', 'send_message')).toBe(false);
-    expect(agentCanDo('LEXO', 'unit_command')).toBe(false);
-  });
-
-  it('LEXO can edit and commit', () => {
-    expect(agentCanDo('LEXO', 'edit_file')).toBe(true);
-    expect(agentCanDo('LEXO', 'git_commit')).toBe(true);
-  });
-
-  it('WORKER cannot commit', () => {
+  it('WORKER cannot commit, message, or orchestrate', () => {
     expect(agentCanDo('WORKER', 'git_commit')).toBe(false);
+    expect(agentCanDo('WORKER', 'execute_agent')).toBe(false);
+    expect(agentCanDo('WORKER', 'send_message')).toBe(false);
+    expect(agentCanDo('WORKER', 'unit_command')).toBe(false);
+  });
+
+  it('WORKER can edit and run tests/builds', () => {
     expect(agentCanDo('WORKER', 'edit_file')).toBe(true);
+    expect(agentCanDo('WORKER', 'create_branch')).toBe(true);
+    expect(agentCanDo('WORKER', 'run_tests')).toBe(true);
+    expect(agentCanDo('WORKER', 'run_build')).toBe(true);
   });
 
   it('OPENCLAW cannot edit but can execute_agent', () => {
@@ -91,9 +99,19 @@ describe('canExecute', () => {
     expect(canExecute('SCOUT', 'edit_file', 'my-repo')).toBe(false);
   });
 
-  it('DAVI on legal repo: inspect ok, edit blocked by repo', () => {
-    expect(canExecute('DAVI', 'inspect_repo', 'legal-docs')).toBe(true);
-    expect(canExecute('DAVI', 'edit_file', 'legal-docs')).toBe(false);
+  it('MAIN on legal repo: edit blocked by repo restriction', () => {
+    // MAIN has no fixed capabilities locally — they are served by the bridge
+    // from the user's chosen harness. canExecute('MAIN', ...) returns false
+    // until the harness is selected. The repo restriction is enforced either
+    // way.
+    expect(canExecute('MAIN', 'inspect_repo', 'legal-docs')).toBe(false);
+    expect(canExecute('MAIN', 'edit_file', 'legal-docs')).toBe(false);
+  });
+
+  it('SCOUT on legal repo: inspect ok, edit blocked by repo restriction', () => {
+    // SCOUT is a built-in with fixed capabilities — it can inspect.
+    expect(canExecute('SCOUT', 'inspect_repo', 'legal-docs')).toBe(true);
+    expect(canExecute('SCOUT', 'edit_file', 'legal-docs')).toBe(false);
   });
 
   it('WORKER on vault: even run_tests blocked', () => {
@@ -102,10 +120,10 @@ describe('canExecute', () => {
 });
 
 describe('getSkillBadges', () => {
-  it('returns badges for DAVI', () => {
-    const badges = getSkillBadges('DAVI');
-    expect(badges.length).toBeGreaterThan(0);
-    expect(badges.every((b) => b.key && b.label && b.icon)).toBe(true);
+  it('returns no badges for MAIN (resolved at runtime)', () => {
+    // AGENT_SKILLS.MAIN is empty until the user picks a harness. The live
+    // skill set is served by /api/agents/capabilities.
+    expect(getSkillBadges('MAIN')).toEqual([]);
   });
 
   it('SCOUT only has inspection badge', () => {
@@ -125,6 +143,6 @@ describe('getSkillBadges', () => {
   });
 
   it('handles suffixed ID', () => {
-    expect(getSkillBadges('LEXO-2')).toEqual(getSkillBadges('LEXO'));
+    expect(getSkillBadges('MAIN-2')).toEqual(getSkillBadges('MAIN'));
   });
 });

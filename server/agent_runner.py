@@ -79,7 +79,7 @@ def configure(*, send: SendFn | None = None, save: SaveMissionFn | None = None) 
 #     CODEX    — always routes to codex harness
 #
 #   Personal profiles (NOT shipped; each user adds their own):
-#     Example: DAVI, LEXO — create a Hermes profile at
+#     Example: MY_AGENT — create a Hermes profile at
 #     ~/.hermes/profiles/<name> and add an entry here with a "profile" key.
 #     The bridge will set HERMES_HOME to that profile directory and run the
 #     hermes CLI subprocess, giving the agent its own config, SOUL.md, skills,
@@ -380,9 +380,9 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
             return _run_cursor_agent_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                                model=model or provider)
         if harness == "hermes":
-            # Check profile first: agents with a profile (e.g. LEXO → lexo-alpha)
-            # need HERMES_HOME pointing at their profile dir, not the HTTP gateway
-            # which always routes to the main profile (DAVI).
+            # Check profile first: agents with a profile need HERMES_HOME
+            # pointing at their profile dir, not the HTTP gateway which always
+            # routes to the main profile.
             if config.get("profile"):
                 if _has_hermes_cli():
                     send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: hermes-cli (profile)", "level": "info"})
@@ -396,9 +396,9 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
 
     # ── Default cascade: hermes → claude-code → openclaw ────────────────────
 
-    # Agents with a profile path (e.g. LEXO → lexo-alpha) run via hermes CLI
-    # with HERMES_HOME pointed at their profile, giving them their own config,
-    # skills, SOUL.md, memory, subagents, etc.
+    # Agents with a profile path run via hermes CLI with HERMES_HOME pointed
+    # at their profile, giving them their own config, skills, SOUL.md, memory,
+    # subagents, etc.
     if config.get("profile"):
         if _has_hermes_cli():
             send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: hermes-cli", "level": "info"})

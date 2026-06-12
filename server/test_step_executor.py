@@ -135,9 +135,9 @@ def test_select_agent_for_step(step_desc, expected):
 # ─── 4. Fallback to DAVI when no clear match ─────────────────────────────────
 
 def test_select_agent_for_step_fallback_to_davi():
-    assert _se.select_agent_for_step("Discuss architectural implications") == "DAVI"
-    assert _se.select_agent_for_step("Plan the roadmap for Q2") == "DAVI"
-    assert _se.select_agent_for_step("Coordinate with the team") == "DAVI"
+    assert _se.select_agent_for_step("Discuss architectural implications") == "MAIN"
+    assert _se.select_agent_for_step("Plan the roadmap for Q2") == "MAIN"
+    assert _se.select_agent_for_step("Coordinate with the team") == "MAIN"
 
 
 # ─── 5. Timeout per step ─────────────────────────────────────────────────────
@@ -185,7 +185,7 @@ def test_integration_orchestrator_with_step_executor():
     assert call_agents[0] == "SCOUT"   # "Inspect" step
     assert call_agents[1] == "WORKER"  # "Implement" step
     assert call_agents[2] == "WORKER"  # "Wire" step
-    assert call_agents[3] == "DAVI"    # "Discuss" step
+    assert call_agents[3] == "MAIN"    # "Discuss" step
 
     # Artifacts exist
     artifacts = _wi.list_artifacts("int-repo", "INT-1")
@@ -250,11 +250,11 @@ def test_agent_override_via_step_meta():
         _se.dispatch_plan_step(
             "repo", "ISS-OVR",
             "Inspect current middleware stack",  # would be SCOUT normally
-            {"stepIndex": 0, "totalSteps": 1, "agent": "LEXO"},  # explicit override
+            {"stepIndex": 0, "totalSteps": 1, "agent": "WORKER"},  # explicit override
         )
 
     mock_run.assert_called_once()
-    assert mock_run.call_args[0][0] == "LEXO"  # override wins
+    assert mock_run.call_args[0][0] == "WORKER"  # override wins
 
 
 # ─── Workspace safety invariants (Symphony §9.5 extraction) ───────────────────

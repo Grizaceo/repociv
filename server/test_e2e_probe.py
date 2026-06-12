@@ -9,7 +9,7 @@ def test_e2e_probe_validates_as_low_risk_command():
     cmd = validate_command({
         "type": "e2e_probe",
         "target": "repociv-e2e",
-        "payload": {"unit": "DAVI", "marker": "probe-test"},
+        "payload": {"unit": "MAIN", "marker": "probe-test"},
         "created_by": "pytest",
     })
 
@@ -21,7 +21,7 @@ def test_e2e_probe_is_auto_safe_policy():
     cmd = validate_command({
         "type": "e2e_probe",
         "target": "repociv-e2e",
-        "payload": {"unit": "DAVI", "marker": "probe-test"},
+        "payload": {"unit": "MAIN", "marker": "probe-test"},
         "created_by": "pytest",
     })
 
@@ -39,7 +39,7 @@ def test_e2e_probe_dispatch_emits_mission_chat_and_terminal_events(monkeypatch, 
     cmd = validate_command({
         "type": "e2e_probe",
         "target": "repociv-e2e",
-        "payload": {"unit": "DAVI", "marker": "probe-test"},
+        "payload": {"unit": "MAIN", "marker": "probe-test"},
         "created_by": "pytest",
     })
     cmd.id = "probe-cmd-1"
@@ -51,7 +51,7 @@ def test_e2e_probe_dispatch_emits_mission_chat_and_terminal_events(monkeypatch, 
     assert types[-1] == "log"
     assert events[0]["missionId"] == "probe-cmd-1"
     assert events[0]["questName"] == "E2E probe: probe-test"
-    assert events[1]["unit"] == "DAVI"
+    assert events[1]["unit"] == "MAIN"
     assert "probe-test" in events[1]["text"]
     assert events[2]["success"] is True
 

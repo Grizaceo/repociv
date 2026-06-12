@@ -243,7 +243,7 @@ def get_directives_suggest(ctx: "RouteContext") -> tuple[int, Any]:
     from server.bridge import _ds, _dl
     params = ctx.get("params", {})
     gesture = params.get("gesture", "")
-    agent_id = params.get("agent", "DAVI")
+    agent_id = params.get("agent", "MAIN")
     records = _ds.read_records()
     extra_ctx: dict[str, Any] | None = None
     ctx_keys = ("repoType", "testStatus", "lastCmdType")
@@ -404,7 +404,7 @@ def post_directives_record(body: dict[str, Any], ctx: "RouteContext") -> tuple[i
     from server.bridge import _ds
     command_id = str(body.get("commandId", ""))
     gesture = str(body.get("gesture", ""))
-    agent_id = str(body.get("agentId", "DAVI"))
+    agent_id = str(body.get("agentId", "MAIN"))
     cmd_type = str(body.get("cmdType", ""))
     target = str(body.get("target", ""))
     extra_ctx: dict[str, Any] = {}
@@ -425,7 +425,7 @@ def post_commands(body: dict[str, Any], ctx: "RouteContext") -> tuple[int, Any]:
         cmd = validate_command(body)
     except CommandValidationError as e:
         return 400, {"error": str(e)}
-    agent_type = str(cmd.payload.get("unit") or body.get("agentType") or "DAVI")
+    agent_type = str(cmd.payload.get("unit") or body.get("agentType") or "MAIN")
     if not _agent_rate_limiter.check_and_consume(agent_type):
         return 429, {"error": "rate_limit", "agent": agent_type}
     result = _handle_command(cmd)
@@ -508,11 +508,15 @@ def post_pending_state(body: dict[str, Any], ctx: "RouteContext") -> tuple[int, 
 
 def _validate_unit_id(raw: Any) -> str | None:
     """Return sanitized unit_id (uppercase, alphanumeric + dash/underscore, 1–32 chars)
-    or None if the value is invalid. Guards against path-traversal attacks."""
+    or None if the value is invalid. Guards against path-traversal attacks.
+
+    When the input is empty, defaults to "MAIN" — the user's first unit slot,
+    which is configured during onboarding (harness selection).
+    """
     import re
     uid = str(raw or "").strip().upper()
     if not uid:
-        return "DAVI"
+        return "MAIN"
     if re.fullmatch(r"[A-Z0-9_-]{1,32}", uid):
         return uid
     return None
@@ -521,10 +525,10 @@ def post_session_reset(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int,
     """POST /session/reset — delete session files and return a new session nonce.
 
     Body: { "unit": "<unit_id>" }
-    Response: { "ok": True, "newSessionId": "repociv-davi-<timestamp>" }
+    Response: { "ok": True, "newSessionId": "repociv-<unit_id>-<timestamp>" }
     """
     from server import sessions as _sessions
-    unit_id = _validate_unit_id(body.get("unit", "DAVI"))
+    unit_id = _validate_unit_id(body.get("unit", "MAIN"))
     if unit_id is None:
         return 400, {"error": "Invalid unit_id — must be alphanumeric/dash/underscore, max 32 chars"}
     new_sid = _sessions.reset(unit_id)
@@ -539,7 +543,7 @@ def post_model_override(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int
     own model-selection logic.
     """
     from server import agent_runner as _ar
-    unit_id = _validate_unit_id(body.get("unit", "DAVI"))
+    unit_id = _validate_unit_id(body.get("unit", "MAIN"))
     if unit_id is None:
         return 400, {"error": "Invalid unit_id — must be alphanumeric/dash/underscore, max 32 chars"}
     provider = str(body.get("provider", "")).strip()

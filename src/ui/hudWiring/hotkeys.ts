@@ -158,10 +158,13 @@ export function wireHotkeys(
 
     if (inField) return;
 
-    // Spawn agents (Q/W/E/L/O/C/X)
+    // Spawn agents (Q/W/E/O/C/X).
+    // Q spawns the user's first unit (MAIN), which is configured during
+    // onboarding. L (LEXO) was removed when the personal profile was dropped
+    // from the shipped agent set.
     if (e.key.toLowerCase() === 'q') {
-      trackHotkey('Q:spawn:DAVI');
-      return spawnAgent('DAVI', state, renderer, bridge);
+      trackHotkey('Q:spawn:MAIN');
+      return spawnAgent('MAIN', state, renderer, bridge);
     }
     if (e.key.toLowerCase() === 'w') {
       trackHotkey('W:spawn:WORKER');
@@ -170,10 +173,6 @@ export function wireHotkeys(
     if (e.key.toLowerCase() === 'e') {
       trackHotkey('E:spawn:SCOUT');
       return spawnAgent('SCOUT', state, renderer, bridge);
-    }
-    if (e.key.toLowerCase() === 'l') {
-      trackHotkey('L:spawn:LEXO');
-      return spawnAgent('LEXO', state, renderer, bridge);
     }
     if (e.key.toLowerCase() === 'o') {
       trackHotkey('O:spawn:OPENCLAW');

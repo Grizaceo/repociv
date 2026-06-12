@@ -171,7 +171,7 @@ def _infer_agent_for_step(step: str, step_meta: dict[str, Any]) -> str:
             return "WORKER"
         if any(k in lowered for k in ("inspect", "review", "audit", "analyze")):
             return "SCOUT"
-        return "DAVI"
+        return "MAIN"
 
 
 def _priority_is_high(state: dict[str, Any], step_meta: dict[str, Any]) -> bool:
@@ -594,7 +594,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
 
                     # Save run state snapshot
                     _rs.save(run_id, {
-                        "unitId": "DAVI",
+                        "unitId": "MAIN",
                         "repo": repo,
                         "issueId": issue_id,
                         "commandType": "task_step",
@@ -620,7 +620,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                     })
 
                     # Record step latency
-                    _step_agent = str(step_meta.get("agent", "DAVI"))
+                    _step_agent = str(step_meta.get("agent", "MAIN"))
                     try:
                         _metrics.record_step_latency(
                             repo, issue_id, i, _step_agent,
@@ -646,7 +646,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
 
                 except Exception as step_err:
                     # Record latency even on failure
-                    _step_agent = str(step_meta.get("agent", "DAVI"))
+                    _step_agent = str(step_meta.get("agent", "MAIN"))
                     try:
                         _metrics.record_step_latency(
                             repo, issue_id, i, _step_agent,

@@ -66,7 +66,7 @@ curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/path/to/workspace
 | Tool | Descripción |
 |------|-------------|
 | `agents_list` | Todos los agentes con status, heartbeat y queue depth |
-| `agents_capabilities` | Matriz de capacidades por tipo (DAVI, WORKER, SCOUT, LEXO, CLAUDE, CODEX, OPENCLAW) |
+| `agents_capabilities` | Matriz de capacidades por tipo (MAIN, WORKER, SCOUT, CLAUDE, CODEX, OPENCLAW; CURSOR según configuración) |
 | `agents_health` | Health check: versión, GPU, comandos en cola |
 | `agents_ready` | Readiness probe del bridge |
 

@@ -21,7 +21,7 @@ import time
 _DEFAULT_CAPACITIES: dict[str, int] = {
     "WORKER": 10,
     "SCOUT": 20,
-    "DAVI": 5,
+    "MAIN": 5,
 }
 _FALLBACK_CAPACITY = 15
 

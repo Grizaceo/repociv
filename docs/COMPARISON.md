@@ -127,9 +127,10 @@
 ## Where RepoCiv Wins (Unambiguously)
 
 1. **Programmable policy engine.** AgentCraft does not expose granular
-   capability control. RepoCiv has a full capability model where each agent
-   type has defined permissions (DAVI > LEXO > WORKER > SCOUT). You can
-   define what each agent is allowed to do at a file-by-file level.
+   capability control. RepoCiv has a full capability model where each
+   shipped agent type (and the user's MAIN slot, with its harness-driven
+   capabilities) has defined permissions. You can define what each agent
+   is allowed to do at a file-by-file level.
 
 2. **Priority Matrix.** AgentCraft uses FIFO queues. RepoCiv scores every
    incoming task by age, test coverage, churn risk, file extension, and

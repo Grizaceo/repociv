@@ -63,7 +63,7 @@ Registra delegaciones Task tool detectadas en streams (cursor, claude-code, herm
 |---|---|
 | `id` | `sub-{uuid8}` |
 | `parent_mission_id` | misión del agente padre |
-| `parent_unit_id` | unidad padre (ej. DAVI) |
+| `parent_unit_id` | unidad padre (ej. MAIN o un unit name de harness) |
 | `kind` / `label` | tipo y descripción del Task |
 | `status` | proposed / running / complete / failed |
 | `risk` | low … destructive (ver `subagent_risk.py`) |
@@ -84,7 +84,7 @@ Eventos JSONL: `SubagentSpawned`, `SubagentCompleted` (antes del dual-write Duck
 | "¿Qué tan confiable es SCOUT históricamente?" | DuckDB `agent_predictions.believability()` | Ninguno más |
 | "¿En qué fase está el issue #42?" | Workspace Issues (`~/.repociv/issues/42/`) | Sessions (solo tiene transcript) |
 | "¿El agent PID X está corriendo?" | RunState (`~/.repociv/run_state/`) | Event Store (no tiene estado live) |
-| "¿Qué escribió LEXO en el paso 3?" | Sessions transcript JSONL | Event Store (chunks truncados a 2048) |
+| "¿Qué escribió SCOUT en el paso 3?" | Sessions transcript JSONL | Event Store (chunks truncados a 2048) |
 
 ---
 

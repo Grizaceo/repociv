@@ -161,7 +161,7 @@ If the map is blank or shows "Bridge offline", go to Troubleshooting below.
 
 | Key | Action |
 |-----|--------|
-| Q/W/E/L/O | Spawn DAVI / WORKER / SCOUT / LEXO / OPENCLAW |
+| Q/W/E/O/C/X | Spawn MAIN / WORKER / SCOUT / OPENCLAW / CLAUDE / CODEX |
 | 1-9 | Select agent by roster slot |
 | Space | Cycle to next idle agent |
 | Tab | Cycle through all agents |
@@ -176,7 +176,7 @@ If the map is blank or shows "Bridge offline", go to Troubleshooting below.
 
 ### Spawning Your First Agent
 
-1. Press **Q** to spawn DAVI (the primary orchestrator agent)
+1. Press **Q** to spawn MAIN (your first unit — the harness-aware orchestrator slot)
 2. A blue unit will appear on a random city on the map
 3. Click the unit to see its status panel on the right
 4. The unit will start walking toward the nearest city

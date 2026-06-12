@@ -146,14 +146,14 @@ describe('BridgeEvents SSE transport', () => {
     await vi.advanceTimersByTimeAsync(100);
     const src = FakeEventSource.instances[0]!;
     src.open();
-    src.message({ type: 'unit_spawn', unit: 'DAVI', civ: 'gris', hex: [0, 0] });
+    src.message({ type: 'unit_spawn', unit: 'MAIN', civ: 'gris', hex: [0, 0] });
     src.message({ type: 'ping' });
 
     // In dev/test mode, bridgeUrl('/events') resolves to '/bridge/events' (Vite proxy prefix).
     // In production with VITE_BRIDGE_URL set it would be the full absolute URL.
     // When a token is configured it travels as ?token= (EventSource can't send headers).
     expect(src.url).toMatch(/^\/bridge\/events(\?token=[A-Za-z0-9%._~-]+)?$/);
-    expect(state.spawned).toEqual(['DAVI']);
+    expect(state.spawned).toEqual(['MAIN']);
 
     bridge.stop();
     expect(src.closed).toBe(true);
@@ -300,7 +300,7 @@ describe('BridgeEvents handleBridgeEvent', () => {
     src.message({
       type: 'mission_complete',
       missionId: 'abc',
-      unit: 'DAVI',
+      unit: 'MAIN',
       success: true,
       duration: 42,
     });
@@ -433,8 +433,8 @@ describe('BridgeEvents handleBridgeEvent', () => {
   it('subagent_spawn proposed does not spawn ephemeral unit', async () => {
     const state = makeState();
     vi.mocked(state.getUnit).mockImplementation((id: string) =>
-      id === 'DAVI'
-        ? ({ id: 'DAVI', coord: { q: 0, r: 0 }, cityId: 'repociv' } as import('./types.ts').Unit)
+      id === 'MAIN'
+        ? ({ id: 'MAIN', coord: { q: 0, r: 0 }, cityId: 'repociv' } as import('./types.ts').Unit)
         : undefined,
     );
     const bridge = new BridgeEvents(state);
@@ -446,7 +446,7 @@ describe('BridgeEvents handleBridgeEvent', () => {
       type: 'subagent_spawn',
       subagentId: 'sub-prop',
       parentMissionId: 'm1',
-      parentUnit: 'DAVI',
+      parentUnit: 'MAIN',
       kind: 'explore',
       label: 'scan repo',
       hex: [0, 0],
@@ -465,8 +465,8 @@ describe('BridgeEvents handleBridgeEvent', () => {
   it('subagent_spawn running spawns ephemeral unit', async () => {
     const state = makeState();
     vi.mocked(state.getUnit).mockImplementation((id: string) =>
-      id === 'DAVI'
-        ? ({ id: 'DAVI', coord: { q: 0, r: 0 }, cityId: 'repociv' } as import('./types.ts').Unit)
+      id === 'MAIN'
+        ? ({ id: 'MAIN', coord: { q: 0, r: 0 }, cityId: 'repociv' } as import('./types.ts').Unit)
         : undefined,
     );
     const bridge = new BridgeEvents(state);
@@ -478,7 +478,7 @@ describe('BridgeEvents handleBridgeEvent', () => {
       type: 'subagent_spawn',
       subagentId: 'sub-run',
       parentMissionId: 'm1',
-      parentUnit: 'DAVI',
+      parentUnit: 'MAIN',
       kind: 'explore',
       label: 'scan repo',
       hex: [0, 0],
@@ -495,8 +495,8 @@ describe('BridgeEvents handleBridgeEvent', () => {
   it('subagent_progress promotes proposed to running and sets working', async () => {
     const state = makeState();
     vi.mocked(state.getUnit).mockImplementation((id: string) =>
-      id === 'DAVI'
-        ? ({ id: 'DAVI', coord: { q: 0, r: 0 }, cityId: 'repociv' } as import('./types.ts').Unit)
+      id === 'MAIN'
+        ? ({ id: 'MAIN', coord: { q: 0, r: 0 }, cityId: 'repociv' } as import('./types.ts').Unit)
         : undefined,
     );
     const bridge = new BridgeEvents(state);
@@ -508,7 +508,7 @@ describe('BridgeEvents handleBridgeEvent', () => {
       type: 'subagent_spawn',
       subagentId: 'sub-p',
       parentMissionId: 'm1',
-      parentUnit: 'DAVI',
+      parentUnit: 'MAIN',
       kind: 'explore',
       label: 'scan',
       hex: [0, 0],
@@ -538,8 +538,8 @@ describe('BridgeEvents handleBridgeEvent', () => {
     await vi.advanceTimersByTimeAsync(100);
     const src = FakeEventSource.instances[0]!;
     src.open();
-    src.message({ type: 'unit_move', unit: 'DAVI', from: [0, 0], to: [3, 4] });
-    expect(state.moved).toContain('DAVI');
+    src.message({ type: 'unit_move', unit: 'MAIN', from: [0, 0], to: [3, 4] });
+    expect(state.moved).toContain('MAIN');
     bridge.stop();
   });
 
@@ -577,10 +577,10 @@ describe('BridgeEvents handleBridgeEvent', () => {
     src.message({
       type: 'mission_start',
       missionId: 'ms-10',
-      unit: 'LEXO',
+      unit: 'WORKER',
       questName: 'Analyze repo',
     });
-    expect(state.startMission).toHaveBeenCalledWith('ms-10', 'LEXO', 'Analyze repo');
+    expect(state.startMission).toHaveBeenCalledWith('ms-10', 'WORKER', 'Analyze repo');
     bridge.stop();
   });
 
@@ -766,9 +766,9 @@ describe('BridgeEvents WS transport', () => {
 
     const ws = FakeWebSocket.instances[0]!;
     ws.open();
-    ws.message({ type: 'unit_spawn', unit: 'DAVI', civ: 'gris', hex: [0, 0] });
+    ws.message({ type: 'unit_spawn', unit: 'MAIN', civ: 'gris', hex: [0, 0] });
 
-    expect(state.spawned).toEqual(['DAVI']);
+    expect(state.spawned).toEqual(['MAIN']);
 
     bridge.stop();
   });
@@ -805,7 +805,7 @@ describe('BridgeEvents WS transport', () => {
     ws.sentMessages = [];
 
     bridge.bridgeOnline = true;
-    bridge.send('unit_command', { unit: 'DAVI', city: 'main', mission: 'test' });
+    bridge.send('unit_command', { unit: 'MAIN', city: 'main', mission: 'test' });
 
     expect(ws.sentMessages.length).toBeGreaterThan(0);
     const sent = JSON.parse(ws.sentMessages[0]!);

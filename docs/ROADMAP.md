@@ -18,7 +18,7 @@ These components are used daily and have passing test suites:
 
 - Hex map engine (axial coordinates, camera pan/zoom, 60 FPS Canvas 2D)
 - City rendering from workspace directory structure
-- Agent unit spawning and visualizing (DAVI, LEXO, WORKER, SCOUT, OPENCLAW)
+- Agent unit spawning and visualizing (shipped agents + harness routing aliases)
 - A* pathfinding with per-unit-type caching (<=300 hexes explored)
 - Priority Matrix (urgency-driven file scoring)
 - Fatigue System (XCOM-style linear model with rest areas)

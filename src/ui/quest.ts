@@ -40,7 +40,7 @@ export async function fetchPendingTracker(): Promise<Mission[]> {
     }>;
     return raw.map((r) => ({
       id: `pending-${r.id}`,
-      unit: 'DAVI',
+      unit: 'MAIN',
       questName: `[${r.id}] ${r.title}`,
       status: 'running' as const,
       startedAt: Date.now(),

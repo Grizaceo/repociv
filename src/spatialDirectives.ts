@@ -95,7 +95,7 @@ export function interpretCityToCityDrag(params: {
   selectedUnit: Unit | null;
 }): SpatialDirective | null {
   const { fromCity, toCity, fromCoord, toCoord, selectedUnit } = params;
-  const unit = selectedUnit?.id ?? 'DAVI';
+  const unit = selectedUnit?.id ?? 'MAIN';
   const draft = draftCommand('execute_agent', `${fromCity.id}→${toCity.id}`, {
     unit,
     city: fromCity.id,
@@ -152,7 +152,7 @@ export function interpretAreaSelect(params: {
 // ─── Context menu items for right-click on city ──────────────────────────────
 // Items are filtered by the selected unit's capabilities and repo restrictions.
 export function contextMenuForCity(city: City, selectedUnit: Unit | null): ContextMenuItem[] {
-  const unit = selectedUnit?.id ?? 'DAVI';
+  const unit = selectedUnit?.id ?? 'MAIN';
   const aType = selectedUnit?.type ?? 'hero';
 
   // Helper: only include if unit can execute this type on this city

@@ -79,8 +79,8 @@ describe('GameState construction', () => {
     const world = makeWorld({
       units: [
         {
-          id: 'DAVI',
-          name: 'DAVI',
+          id: 'MAIN',
+          name: 'MAIN',
           type: 'hero',
           civ: 'capital',
           coord: { q: 0, r: 0 },
@@ -100,8 +100,8 @@ describe('GameState construction', () => {
       ],
     });
     const gs = new GameState(world);
-    expect(gs.getUnit('DAVI')).toBeDefined();
-    expect(gs.getUnit('DAVI')!.id).toBe('DAVI');
+    expect(gs.getUnit('MAIN')).toBeDefined();
+    expect(gs.getUnit('MAIN')!.id).toBe('MAIN');
   });
 
   it('indexes pre-existing buildings on construction', () => {
@@ -139,8 +139,8 @@ describe('GameState.spawnUnit', () => {
   });
 
   it('returns existing unit if id already present', () => {
-    const u1 = gs.spawnUnit('LEXO', 'LexO', 'hero', 'capital', { q: 0, r: 0 });
-    const u2 = gs.spawnUnit('LEXO', 'LexO', 'hero', 'capital', { q: 1, r: 1 });
+    const u1 = gs.spawnUnit('WORKER', 'LexO', 'hero', 'capital', { q: 0, r: 0 });
+    const u2 = gs.spawnUnit('WORKER', 'LexO', 'hero', 'capital', { q: 1, r: 1 });
     expect(u1).toBe(u2);
   });
 
@@ -172,8 +172,8 @@ describe('GameState.moveUnit', () => {
   it('returns false when A* finds no path (mocked to [])', () => {
     // aStarPath is mocked to return [] — path.length < 2, so moveUnit returns false
     const gs = new GameState(makeWorld());
-    gs.spawnUnit('DAVI', 'DAVI', 'hero', 'capital', { q: 0, r: 0 });
-    const moved = gs.moveUnit('DAVI', { q: 3, r: 4 });
+    gs.spawnUnit('MAIN', 'MAIN', 'hero', 'capital', { q: 0, r: 0 });
+    const moved = gs.moveUnit('MAIN', { q: 3, r: 4 });
     expect(moved).toBe(false);
   });
 
@@ -234,13 +234,13 @@ describe('GameState.missions', () => {
   });
 
   it('startMission registers mission', () => {
-    gs.startMission('m-1', 'DAVI', 'Build something');
+    gs.startMission('m-1', 'MAIN', 'Build something');
     expect(gs.missions.get('m-1')).toBeDefined();
     expect(gs.missions.get('m-1')!.questName).toBe('Build something');
   });
 
   it('completeMission success marks complete', () => {
-    gs.startMission('m-2', 'LEXO', 'Analysis');
+    gs.startMission('m-2', 'WORKER', 'Analysis');
     gs.completeMission('m-2', true);
     const m = gs.missions.get('m-2');
     expect(m!.status).toBe('complete');
@@ -417,7 +417,7 @@ describe('Unit trail buffer', () => {
 describe('GameState subagent detachments', () => {
   it('spawnUnit accepts parent/ephemeral options', () => {
     const state = new GameState(makeWorld());
-    const parent = state.spawnUnit('DAVI', 'DAVI', 'hero', 'capital', { q: 0, r: 0 });
+    const parent = state.spawnUnit('MAIN', 'MAIN', 'hero', 'capital', { q: 0, r: 0 });
     const child = state.spawnUnit(
       'SCOUT-sub-x',
       'scout',
@@ -426,16 +426,16 @@ describe('GameState subagent detachments', () => {
       parent.coord,
       'explore',
       undefined,
-      { parentUnitId: 'DAVI', ephemeral: true, subagentRunId: 'sub-x' },
+      { parentUnitId: 'MAIN', ephemeral: true, subagentRunId: 'sub-x' },
     );
-    expect(child.parentUnitId).toBe('DAVI');
+    expect(child.parentUnitId).toBe('MAIN');
     expect(child.ephemeral).toBe(true);
-    expect(state.getChildrenOfUnit('DAVI')).toHaveLength(1);
+    expect(state.getChildrenOfUnit('MAIN')).toHaveLength(1);
   });
 
   it('completeSubagent cascades despawn of ephemeral unit', () => {
     const state = new GameState(makeWorld());
-    state.spawnUnit('DAVI', 'DAVI', 'hero', 'capital', { q: 0, r: 0 });
+    state.spawnUnit('MAIN', 'MAIN', 'hero', 'capital', { q: 0, r: 0 });
     state.spawnUnit(
       'SCOUT-sub-y',
       'scout',
@@ -444,12 +444,12 @@ describe('GameState subagent detachments', () => {
       { q: 1, r: 0 },
       undefined,
       undefined,
-      { parentUnitId: 'DAVI', ephemeral: true, subagentRunId: 'sub-y' },
+      { parentUnitId: 'MAIN', ephemeral: true, subagentRunId: 'sub-y' },
     );
     state.registerSubagent({
       id: 'sub-y',
       parentMissionId: 'm1',
-      parentUnitId: 'DAVI',
+      parentUnitId: 'MAIN',
       kind: 'explore',
       label: 'scan',
       status: 'running',
@@ -483,7 +483,7 @@ describe('GameState subagent detachments', () => {
 describe('pickDetachmentHex', () => {
   it('returns neighbor hex offset from parent, not same coord', () => {
     const state = new GameState(makeWorld());
-    state.spawnUnit('DAVI', 'DAVI', 'hero', 'capital', { q: 0, r: 0 });
+    state.spawnUnit('MAIN', 'MAIN', 'hero', 'capital', { q: 0, r: 0 });
     const hex = pickDetachmentHex(state, { q: 0, r: 0 }, 0);
     expect(hex).not.toEqual({ q: 0, r: 0 });
     expect(state.getUnitAt(hex)).toBeNull();
@@ -491,7 +491,7 @@ describe('pickDetachmentHex', () => {
 
   it('uses childIndex to pick different ring slots', () => {
     const state = new GameState(makeWorld());
-    state.spawnUnit('DAVI', 'DAVI', 'hero', 'capital', { q: 0, r: 0 });
+    state.spawnUnit('MAIN', 'MAIN', 'hero', 'capital', { q: 0, r: 0 });
     const h0 = pickDetachmentHex(state, { q: 0, r: 0 }, 0);
     const h1 = pickDetachmentHex(state, { q: 0, r: 0 }, 1);
     expect(h0).not.toEqual(h1);
@@ -499,7 +499,7 @@ describe('pickDetachmentHex', () => {
 
   it('falls back to parent when all neighbors occupied', () => {
     const state = new GameState(makeWorld());
-    state.spawnUnit('DAVI', 'DAVI', 'hero', 'capital', { q: 0, r: 0 });
+    state.spawnUnit('MAIN', 'MAIN', 'hero', 'capital', { q: 0, r: 0 });
     const parent = { q: 0, r: 0 };
     const neighbors = [
       { q: 1, r: 0 },

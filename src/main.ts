@@ -12,6 +12,23 @@ import { type ScannedRepo } from './map.ts';
 import { Renderer } from './renderer.ts';
 import { BridgeEvents, syncGraphRelationFlags } from './bridge.ts';
 import { GameState } from './game.ts';
+
+// ─── First-unit slot ──────────────────────────────────────────────────────────
+// "MAIN" is the user's first unit — the slot configured during onboarding
+// (harness selection). It exists at boot in place of the historical hardcoded
+// "DAVI" spawn. Its capabilities and runtime identity are wired up by PR 2's
+// onboarding step; until then it spawns as a generic hero and the bridge
+// routes commands through the harness the user picked.
+export const DEFAULT_USER_UNIT_ID = 'MAIN';
+export const DEFAULT_USER_UNIT_NAME = 'Main';
+
+function getFirstUserUnit(state: GameState) {
+  return (
+    state.getUnit(DEFAULT_USER_UNIT_ID) ??
+    state.getAllUnits().find((u) => u.id === DEFAULT_USER_UNIT_ID) ??
+    state.getAllUnits()[0]
+  );
+}
 import {
   showLoadingProgress,
   hideLoadingScreen,
@@ -736,7 +753,7 @@ async function bootstrap() {
   }
 
   function _primeMissionComposerForCity(city: City): void {
-    const unit = state.getUnit('DAVI') ?? state.getAllUnits()[0];
+    const unit = getFirstUserUnit(state);
     if (!unit) return;
     state.selectUnit(unit);
     renderer.selectUnit(unit);
@@ -971,7 +988,7 @@ async function bootstrap() {
             void recordGesture({
               commandId: res.commandId,
               gesture: directive.gesture,
-              agentId: String(draft.payload?.['unit'] ?? 'DAVI'),
+              agentId: String(draft.payload?.['unit'] ?? DEFAULT_USER_UNIT_ID),
               cmdType: draft.type,
               target: draft.target,
             });
@@ -1032,9 +1049,7 @@ async function bootstrap() {
       const agentUnit = action === 'WORKER'
         ? (state.getAllUnits().find((u) => u.type === 'worker' && u.state === 'idle') ??
            state.getAllUnits().find((u) => u.type === 'worker'))
-        : (state.getUnit('DAVI') ??
-           state.getAllUnits().find((u) => u.id === 'DAVI') ??
-           state.getAllUnits().find((u) => u.state === 'idle'));
+        : (getFirstUserUnit(state));
       const agentId = agentUnit?.id ?? action;
       // Resolve the actual repo filesystem path for bridge context
       const city = state.world.cities.find((c) => c.id === repoId);
@@ -1142,9 +1157,11 @@ async function bootstrap() {
     state.notifyUpdate();
   };
 
-  // Spawn DAVI as the default hero, near the capital if present
+  // Spawn MAIN as the default hero, near the capital if present.
+  // MAIN's runtime identity is configured by the onboarding step (PR 2):
+  // the user picks a harness, and the bridge routes MAIN through it.
   const spawnAt = capital ? capital.coord : { q: 0, r: 0 };
-  state.spawnUnit('DAVI', 'DAVI', 'hero', 'gris', spawnAt, 'En espera de misión');
+  state.spawnUnit(DEFAULT_USER_UNIT_ID, DEFAULT_USER_UNIT_NAME, 'hero', 'gris', spawnAt, 'En espera de misión');
 
   wireHUD(renderer, state, bridge, toggleView);
 

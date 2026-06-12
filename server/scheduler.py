@@ -62,8 +62,7 @@ def _init_from_disk() -> None:
 # ─── Concurrency limits per agent type ────────────────────────────────────────
 # WORKER can run multiple parallel tasks; others are single-threaded.
 AGENT_CONCURRENCY: dict[str, int] = {
-    "DAVI":     1,
-    "LEXO":     1,
+    "MAIN":     1,
     "SCOUT":    2,   # read-only: safe to run 2 parallel scans (matches agent card)
     "OPENCLAW": 1,
     "WORKER":   3,   # stateless executor: safe to batch in parallel
@@ -269,7 +268,7 @@ def _dispatch_next() -> bool:
     with _queue_lock:
         _resort()
         for i, cmd in enumerate(_queue):
-            unit = cmd.get("payload", {}).get("unit", "DAVI")
+            unit = cmd.get("payload", {}).get("unit", "MAIN")
             base = _agent_base(unit)
             if _acquire_slot(base):
                 cmd_to_run = dict(_queue.pop(i))  # explicit copy — safe across threads

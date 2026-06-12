@@ -25,13 +25,13 @@ def test_run_hermes_streaming_sends_working_directory(monkeypatch, tmp_path):
     monkeypatch.setattr(agent_runner, "send_to_repociv", lambda evt: sent.append(evt))
     monkeypatch.setattr(agent_runner._es, "record_output_chunk", lambda mission_id, unit_id, text: recorded.append((mission_id, unit_id, text)))
 
-    ok, output = agent_runner._run_hermes_streaming("DAVI", "m1", "hola", working_dir=str(tmp_path))
+    ok, output = agent_runner._run_hermes_streaming("MAIN", "m1", "hola", working_dir=str(tmp_path))
 
     assert ok is True
     assert output == "ok"
     assert f'"working_directory": "{tmp_path}"'.encode() in captured["payload"]
-    assert sent[-1] == {"type": "chat_chunk", "unit": "DAVI", "missionId": "m1", "text": "ok"}
-    assert recorded[-1] == ("m1", "DAVI", "ok")
+    assert sent[-1] == {"type": "chat_chunk", "unit": "MAIN", "missionId": "m1", "text": "ok"}
+    assert recorded[-1] == ("m1", "MAIN", "ok")
 
 
 def test_run_hermes_streaming_emits_visible_error(monkeypatch):
@@ -45,12 +45,12 @@ def test_run_hermes_streaming_emits_visible_error(monkeypatch):
     monkeypatch.setattr(agent_runner, "send_to_repociv", lambda evt: sent.append(evt))
     monkeypatch.setattr(agent_runner._es, "record_output_chunk", lambda mission_id, unit_id, text: recorded.append((mission_id, unit_id, text)))
 
-    ok, output = agent_runner._run_hermes_streaming("DAVI", "m1", "hola")
+    ok, output = agent_runner._run_hermes_streaming("MAIN", "m1", "hola")
 
     assert ok is False
     assert "connection refused" in output
-    assert sent == [{"type": "chat_chunk", "unit": "DAVI", "missionId": "m1", "text": "[hermes error] <urlopen error connection refused>\n"}]
-    assert recorded == [("m1", "DAVI", "[hermes error] <urlopen error connection refused>\n")]
+    assert sent == [{"type": "chat_chunk", "unit": "MAIN", "missionId": "m1", "text": "[hermes error] <urlopen error connection refused>\n"}]
+    assert recorded == [("m1", "MAIN", "[hermes error] <urlopen error connection refused>\n")]
 
 
 def test_run_agent_persists_session_and_run_state(monkeypatch, tmp_path):
@@ -76,9 +76,9 @@ def test_run_agent_persists_session_and_run_state(monkeypatch, tmp_path):
         lambda *args, **kwargs: (True, "done"),
     )
 
-    agent_runner.run_agent("DAVI", "repociv", "arregla tests", command_id="m42")
+    agent_runner.run_agent("MAIN", "repociv", "arregla tests", command_id="m42")
 
-    canonical = agent_runner._sessions.get_or_create("DAVI")
+    canonical = agent_runner._sessions.get_or_create("MAIN")
     run_state = agent_runner._run_state.load("m42")
 
     assert canonical["repo"] == "repociv"
@@ -260,7 +260,7 @@ def test_cursor_streaming_detects_background_task(monkeypatch, tmp_path):
     monkeypatch.setattr(_sp, "Popen", lambda *_a, **_kw: FakeProc())
 
     ok, _output = agent_runner._run_cursor_agent_streaming(
-        "DAVI", "m-task", "mission", config={}, working_dir=str(tmp_path), city_id="repociv",
+        "MAIN", "m-task", "mission", config={}, working_dir=str(tmp_path), city_id="repociv",
     )
     assert ok is True
     assert any(e.get("type") == "subagent_spawn" for e in sent)

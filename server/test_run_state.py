@@ -4,7 +4,7 @@ from server import run_state
 def test_save_and_load_run_state(tmp_path):
     run_state.init(tmp_path)
     saved = run_state.save("m1", {
-        "unitId": "DAVI",
+        "unitId": "MAIN",
         "runtimeId": "hermes-local",
         "status": "running",
         "phase": "executing",
@@ -13,7 +13,7 @@ def test_save_and_load_run_state(tmp_path):
     loaded = run_state.load("m1")
     assert saved["missionId"] == "m1"
     assert loaded is not None
-    assert loaded["unitId"] == "DAVI"
+    assert loaded["unitId"] == "MAIN"
     assert loaded["status"] == "running"
 
 

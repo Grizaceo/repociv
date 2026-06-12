@@ -22,19 +22,19 @@ def raw_records():
     return [
         # DAVI drag → run_tests (success)
         {"type": "gesture", "command_id": "cmd-001", "gesture": "drag_unit_to_city",
-         "agent_id": "DAVI", "cmd_type": "run_tests", "target": "city-A",
+         "agent_id": "MAIN", "cmd_type": "run_tests", "target": "city-A",
          "context": {"repoType": "python", "testStatus": "broken"}, "ts": 1000.0},
         {"type": "outcome", "command_id": "cmd-001", "outcome": "success", "duration_s": 2.3, "ts": 1002.3},
 
         # DAVI drag → run_tests (success, same pattern)
         {"type": "gesture", "command_id": "cmd-002", "gesture": "drag_unit_to_city",
-         "agent_id": "DAVI", "cmd_type": "run_tests", "target": "city-B",
+         "agent_id": "MAIN", "cmd_type": "run_tests", "target": "city-B",
          "context": {"repoType": "python", "testStatus": "broken"}, "ts": 2000.0},
         {"type": "outcome", "command_id": "cmd-002", "outcome": "success", "duration_s": 1.1, "ts": 2001.1},
 
         # DAVI drag → run_tests (failure)
         {"type": "gesture", "command_id": "cmd-003", "gesture": "drag_unit_to_city",
-         "agent_id": "DAVI", "cmd_type": "run_tests", "target": "city-C",
+         "agent_id": "MAIN", "cmd_type": "run_tests", "target": "city-C",
          "context": {"repoType": "python", "testStatus": "passing"}, "ts": 3000.0},
         {"type": "outcome", "command_id": "cmd-003", "outcome": "failure", "duration_s": 5.0, "ts": 3005.0},
 
@@ -46,7 +46,7 @@ def raw_records():
 
         # DAVI click → inspect (success, no outcome yet → pending)
         {"type": "gesture", "command_id": "cmd-005", "gesture": "click_repo",
-         "agent_id": "DAVI", "cmd_type": "inspect", "target": "",
+         "agent_id": "MAIN", "cmd_type": "inspect", "target": "",
          "context": {}, "ts": 5000.0},
     ]
 
@@ -81,7 +81,7 @@ class TestCorrelation:
         joined = _dl._correlate(raw_records)
         drag_davi = [e for e in joined
                      if e.get("gesture") == "drag_unit_to_city"
-                     and e.get("agent_id") == "DAVI"
+                     and e.get("agent_id") == "MAIN"
                      and e.get("cmd_type") == "run_tests"]
         assert len(drag_davi) == 3
 
@@ -89,7 +89,7 @@ class TestCorrelation:
 class TestSuggest:
     def test_suggest_returns_top_cmd_by_count(self, raw_records):
         """DAVI + drag_unit_to_city → top suggestion: run_tests type, scored per target."""
-        results = _dl.suggest("drag_unit_to_city", "DAVI", records=raw_records)
+        results = _dl.suggest("drag_unit_to_city", "MAIN", records=raw_records)
         assert len(results) >= 1
         # run_tests appears across targets; each gets its own entry
         run_test_entries = [r for r in results if r["cmdType"] == "run_tests"]
@@ -101,18 +101,18 @@ class TestSuggest:
     def test_suggest_with_context_boosts_match(self, raw_records):
         """When current_context matches (repoType=python, testStatus=broken),
         run_tests gets higher score."""
-        no_ctx = _dl.suggest("drag_unit_to_city", "DAVI", records=raw_records)
-        with_ctx = _dl.suggest("drag_unit_to_city", "DAVI", records=raw_records,
+        no_ctx = _dl.suggest("drag_unit_to_city", "MAIN", records=raw_records)
+        with_ctx = _dl.suggest("drag_unit_to_city", "MAIN", records=raw_records,
                                current_context={"repoType": "python", "testStatus": "broken"})
         assert no_ctx[0]["cmdType"] == with_ctx[0]["cmdType"] == "run_tests"
         assert with_ctx[0]["score"] >= no_ctx[0]["score"]
 
     def test_suggest_empty_for_unknown_gesture(self, raw_records):
-        results = _dl.suggest("unknown_gesture", "DAVI", records=raw_records)
+        results = _dl.suggest("unknown_gesture", "MAIN", records=raw_records)
         assert results == []
 
     def test_suggest_limit_n(self, raw_records):
-        results = _dl.suggest("drag_unit_to_city", "DAVI", records=raw_records, n=1)
+        results = _dl.suggest("drag_unit_to_city", "MAIN", records=raw_records, n=1)
         assert len(results) == 1
 
 
@@ -184,14 +184,14 @@ class TestStats:
 def test_suggest_is_read_only(raw_records):
     """Suggestion must not mutate the input records."""
     before = json.dumps(raw_records)
-    _dl.suggest("drag_unit_to_city", "DAVI", records=raw_records)
+    _dl.suggest("drag_unit_to_city", "MAIN", records=raw_records)
     after = json.dumps(raw_records)
     assert before == after
 
 
 def test_suggest_never_returns_command_ids(raw_records):
     """Suggestions are patterns, not executable commands."""
-    results = _dl.suggest("drag_unit_to_city", "DAVI", records=raw_records)
+    results = _dl.suggest("drag_unit_to_city", "MAIN", records=raw_records)
     for r in results:
         assert "command_id" not in r
         assert "payload" not in r

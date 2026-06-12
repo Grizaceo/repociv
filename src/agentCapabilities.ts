@@ -5,8 +5,7 @@
 import type { CommandType } from './commandSchema.ts';
 
 export type AgentBase =
-  | 'DAVI'
-  | 'LEXO'
+  | 'MAIN'
   | 'WORKER'
   | 'SCOUT'
   | 'OPENCLAW'
@@ -15,8 +14,7 @@ export type AgentBase =
   | 'CURSOR';
 
 const AGENT_BASE_ALIASES: Record<string, AgentBase> = {
-  DAVI: 'DAVI',
-  LEXO: 'LEXO',
+  MAIN: 'MAIN',
   WORKER: 'WORKER',
   SCOUT: 'SCOUT',
   OPENCLAW: 'OPENCLAW',
@@ -27,34 +25,16 @@ const AGENT_BASE_ALIASES: Record<string, AgentBase> = {
 
 function normalizeAgentBase(raw: string): AgentBase {
   const upper = raw.toUpperCase();
-  return AGENT_BASE_ALIASES[upper] ?? 'DAVI';
+  return AGENT_BASE_ALIASES[upper] ?? 'MAIN';
 }
 
 // ─── Per-agent allowed command types ─────────────────────────────────────────
+// MAIN's capabilities are not declared here — they are computed at runtime from
+// the harness the user picked during onboarding. We expose an empty list so
+// the UI can still look it up without throwing before the user finishes
+// onboarding. See server/capabilities.py:capabilities_snapshot for the live view.
 export const AGENT_CAPABILITIES: Record<AgentBase, CommandType[]> = {
-  DAVI: [
-    'inspect_repo',
-    'read_file',
-    'run_tests',
-    'run_build',
-    'edit_file',
-    'create_branch',
-    'git_commit',
-    'execute_agent',
-    'quest_add',
-    'unit_command',
-    'e2e_probe',
-    'send_message',
-  ],
-  LEXO: [
-    'inspect_repo',
-    'read_file',
-    'run_tests',
-    'run_build',
-    'edit_file',
-    'create_branch',
-    'git_commit',
-  ],
+  MAIN: [],
   WORKER: ['inspect_repo', 'read_file', 'run_tests', 'run_build', 'edit_file', 'create_branch'],
   SCOUT: ['inspect_repo', 'read_file'],
   OPENCLAW: ['inspect_repo', 'read_file', 'run_tests', 'run_build', 'execute_agent'],
@@ -82,6 +62,8 @@ export const AGENT_CAPABILITIES: Record<AgentBase, CommandType[]> = {
 };
 
 // ─── Skill labels shown as badges ────────────────────────────────────────────
+// MAIN's skills are also empty until the harness is selected and the
+// capabilities_snapshot endpoint returns live data.
 export interface SkillBadge {
   key: string;
   label: string;
@@ -89,18 +71,7 @@ export interface SkillBadge {
 }
 
 export const AGENT_SKILLS: Record<AgentBase, SkillBadge[]> = {
-  DAVI: [
-    { key: 'orchestration', label: 'Orquestación', icon: '◈' },
-    { key: 'git_workflow', label: 'Git completo', icon: '⎇' },
-    { key: 'test_runner', label: 'Tests', icon: '🧪' },
-    { key: 'code_editor', label: 'Edición', icon: '✏' },
-    { key: 'messaging', label: 'Mensajería', icon: '✉' },
-  ],
-  LEXO: [
-    { key: 'git_workflow', label: 'Git completo', icon: '⎇' },
-    { key: 'test_runner', label: 'Tests', icon: '🧪' },
-    { key: 'code_editor', label: 'Edición', icon: '✏' },
-  ],
+  MAIN: [],
   WORKER: [
     { key: 'test_runner', label: 'Tests', icon: '🧪' },
     { key: 'code_editor', label: 'Edición', icon: '✏' },

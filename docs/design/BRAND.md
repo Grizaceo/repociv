@@ -32,10 +32,9 @@
 
 | Agente     | Color OKLCH                  | Rationale                                                     |
 |------------|------------------------------|---------------------------------------------------------------|
-| DAVI       | `var(--civ-gold)`            | Oro = autoridad, líder supremo del imperio.                   |
+| MAIN       | `var(--civ-gold)`            | Oro = autoridad, el slot del primer unit configurable.         |
 | WORKER     | `var(--civ-food)`            | Verde = sustento, constructores que alimentan el crecimiento. |
 | SCOUT      | `var(--civ-movement)`        | Azul cian = reconocimiento, velocidad, frontera.              |
-| LEXO       | `var(--civ-science)`         | Azul académico = leyes, conocimiento, referencias.          |
 | OPENCLAW   | `oklch(0.82 0.12 175)`       | Aguamarina = puente de agua, conector entre mundos.           |
 
 **Regla de extensión (6to+ agente):**  

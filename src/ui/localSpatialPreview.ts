@@ -145,7 +145,7 @@ export function hideWhiteboardPanel() {
 }
 
 // ─── Context menu (Gizmo) ─────────────────────────────────────────────────────
-export type LocalMenuAction = string; // 'DAVI' | 'WORKER' | 'git' | 'code' | 'info'
+export type LocalMenuAction = string; // 'MAIN' | 'WORKER' | 'git' | 'code' | 'info'
 
 export function showLocalContextMenu(
   wb: Workbench,
@@ -162,16 +162,16 @@ export function showLocalContextMenu(
   const items: string[] = [];
 
   // Agent dispatch items
-  const dav = idleAgents.find((a) => a.id === 'DAVI' || a.name === 'DAVI');
+  const mainUnit = idleAgents.find((a) => a.id === 'MAIN' || a.name === 'MAIN');
   const wrk = idleAgents.find((a) => a.type === 'worker');
 
-  const hasDavi = true; // DAVI is the primary agent, always allow sending
+  const hasMain = true; // MAIN is the primary agent, always allow sending
   const hasWorker = !!wrk || idleAgents.some((a) => a.id.toLowerCase().includes('worker'));
 
-  const daviState = dav && dav.state && dav.state !== 'idle'
-    ? ` (${dav.state === 'working' ? 'Trabajando' : dav.state})`
+  const mainState = mainUnit && mainUnit.state && mainUnit.state !== 'idle'
+    ? ` (${mainUnit.state === 'working' ? 'Trabajando' : mainUnit.state})`
     : '';
-  const daviLabel = `Enviar DAVI${daviState}`;
+  const mainLabel = `Enviar MAIN${mainState}`;
 
   const workerState = wrk && wrk.state && wrk.state !== 'idle'
     ? ` (${wrk.state === 'working' ? 'Trabajando' : wrk.state})`
@@ -179,8 +179,8 @@ export function showLocalContextMenu(
   const workerLabel = `Enviar WORKER${workerState}`;
 
   items.push(`
-    <div class="lt-item${hasDavi ? '' : ' lt-disabled'}" data-action="DAVI">
-      <span class="lt-icon">🧑‍🔧</span> ${daviLabel}
+    <div class="lt-item${hasMain ? '' : ' lt-disabled'}" data-action="MAIN">
+      <span class="lt-icon">🧑‍🔧</span> ${mainLabel}
     </div>`);
   items.push(`
     <div class="lt-item${hasWorker ? '' : ' lt-disabled'}" data-action="WORKER">

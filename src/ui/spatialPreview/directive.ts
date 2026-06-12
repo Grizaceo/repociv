@@ -87,7 +87,7 @@ export function showDirectivePreview(
   el.classList.remove('hidden');
 
   // Async-fetch suggestions and inject if available (non-blocking)
-  const agentId = String(directive.draft.payload?.['unit'] ?? 'DAVI');
+  const agentId = String(directive.draft.payload?.['unit'] ?? 'MAIN');
   void fetchSuggestions(directive.gesture, agentId).then((suggestions) => {
     const box = el.querySelector<HTMLElement>('#sp-suggestions');
     if (!box || suggestions.length === 0) return;

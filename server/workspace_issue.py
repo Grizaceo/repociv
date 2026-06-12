@@ -572,7 +572,7 @@ def generate_contract_from_spec(repo: str, issue_id: str) -> dict[str, Any]:
 # ── Handoff artifacts ────────────────────────────────────────────────────────
 
 _HANDOFF_VERSION = "1.0"
-_HANDOFF_AGENT_TYPES = frozenset({"SCOUT", "WORKER", "VALIDATOR", "DAVI"})
+_HANDOFF_AGENT_TYPES = frozenset({"SCOUT", "WORKER", "VALIDATOR", "MAIN"})
 
 
 def _handoff_path(repo: str, issue_id: str, phase_or_step: str, role: str) -> Path:

@@ -7,8 +7,8 @@ from server.step_executor import _infer_task_type
 
 # ─── Core routing table ───────────────────────────────────────────────────────
 
-def test_davi_orchestrate_returns_opus_enforced():
-    r = route_model("DAVI", "orchestrate")
+def test_main_orchestrate_returns_opus_enforced():
+    r = route_model("MAIN", "orchestrate")
     assert r["model"] == "claude-opus-4-5"
     assert r["enforced"] is True
     assert r["reason"]
@@ -52,8 +52,8 @@ def test_openclaw_arbitrary_task_not_enforced():
 # ─── Case insensitivity ───────────────────────────────────────────────────────
 
 def test_agent_type_case_insensitive():
-    r_upper = route_model("DAVI", "orchestrate")
-    r_lower = route_model("davi", "orchestrate")
+    r_upper = route_model("MAIN", "orchestrate")
+    r_lower = route_model("main", "orchestrate")
     assert r_upper["model"] == r_lower["model"]
     assert r_upper["enforced"] == r_lower["enforced"]
 
@@ -115,9 +115,9 @@ def test_worker_cascade_chain_equilibrio():
     assert r["fallback_chain"][0] == "claude-sonnet-4-5"
 
 
-def test_davi_cascade_chain_premium():
-    """DAVI (PREMIUM tier) only has opus."""
-    r = route_model("DAVI", "orchestrate")
+def test_main_cascade_chain_premium():
+    """MAIN (orchestrate task → PREMIUM tier) only has opus."""
+    r = route_model("MAIN", "orchestrate")
     assert r["tier"] == "PREMIUM"
     assert len(r["fallback_chain"]) == 1
     assert r["fallback_chain"][0] == "claude-opus-4-5"
@@ -145,13 +145,13 @@ def test_mission_text_signals_affect_tier():
 # ─── Context param accepted ────────────────────────────────────────────────────
 
 def test_context_param_accepted():
-    r = route_model("DAVI", "orchestrate", context={"urgency": "high"})
+    r = route_model("MAIN", "orchestrate", context={"urgency": "high"})
     assert r["model"] == "claude-opus-4-5"
 
 
 def test_override_tier_parameter():
     """Can override tier for testing."""
-    r = route_model("DAVI", "orchestrate", override_tier="ECONOMICO")
+    r = route_model("MAIN", "orchestrate", override_tier="ECONOMICO")
     assert r["tier"] == "ECONOMICO"
     assert r["model"] == "claude-haiku-3-5"
 
@@ -179,8 +179,8 @@ def test_reason_includes_signal_info():
 
 # ─── step_executor._infer_task_type integration ───────────────────────────────
 
-def test_infer_task_type_davi():
-    assert _infer_task_type("DAVI") == "orchestrate"
+def test_infer_task_type_main():
+    assert _infer_task_type("MAIN") == "orchestrate"
 
 
 def test_infer_task_type_worker():
@@ -199,12 +199,14 @@ def test_infer_task_type_openclaw():
     assert _infer_task_type("OPENCLAW") == "edit"
 
 
-def test_infer_task_type_lexo():
-    assert _infer_task_type("LEXO") == "read"
-
-
 def test_infer_task_type_unknown_defaults_to_edit():
     assert _infer_task_type("UNKNOWN") == "edit"
+
+
+# Note: SCOUT already covers the "read" mapping (test_infer_task_type_scout).
+# The historical test for LEXO (also mapped to "read") was removed when LEXO
+# was dropped from the shipped agent types — the read-only scout role is the
+# only shipped agent that maps to "read".
 
 
 # ─── Agent Cards ─────────────────────────────────────────────────────────────
@@ -266,9 +268,9 @@ def test_agent_card_metadata_complete():
 # ─── enforced vs recommended propagation in meta ─────────────────────────────
 
 def test_enforced_routing_sets_model_key():
-    """Routing for DAVI/orchestrate is enforced → meta should get 'model' key."""
+    """Routing for MAIN/orchestrate is enforced → meta should get 'model' key."""
     from server import model_router as _mr
-    routing = _mr.route_model("DAVI", "orchestrate")
+    routing = _mr.route_model("MAIN", "orchestrate")
     meta: dict = {}
     if routing["enforced"]:
         meta["model"] = routing["model"]

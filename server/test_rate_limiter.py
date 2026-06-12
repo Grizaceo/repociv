@@ -63,7 +63,7 @@ def test_token_bucket_does_not_exceed_capacity():
 def test_rate_limiter_default_davi_capacity():
     """DAVI bucket starts with capacity 5."""
     rl = RateLimiter()
-    bucket = rl._get_bucket("DAVI")
+    bucket = rl._get_bucket("MAIN")
     assert bucket.capacity == 5
 
 
@@ -91,7 +91,7 @@ def test_rate_limiter_fallback_for_unknown_agent():
 def test_rate_limiter_case_insensitive():
     """Agent type lookup is case-insensitive."""
     rl = RateLimiter()
-    assert rl._get_bucket("davi").capacity == rl._get_bucket("DAVI").capacity
+    assert rl._get_bucket("main").capacity == rl._get_bucket("MAIN").capacity
     assert rl._get_bucket("worker").capacity == rl._get_bucket("WORKER").capacity
 
 
@@ -100,8 +100,8 @@ def test_rate_limiter_buckets_independent():
     rl = RateLimiter()
     # Drain DAVI (capacity=5)
     for _ in range(5):
-        rl.check_and_consume("DAVI")
-    assert rl.check_and_consume("DAVI") is False
+        rl.check_and_consume("MAIN")
+    assert rl.check_and_consume("MAIN") is False
     # SCOUT should still be full
     assert rl.check_and_consume("SCOUT") is True
     assert rl.check_and_consume("WORKER") is True

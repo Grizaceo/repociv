@@ -19,7 +19,7 @@ def test_register_spawn_and_complete(monkeypatch, tmp_path):
 
     run = st.register_spawn(
         parent_mission_id="m1",
-        parent_unit="DAVI",
+        parent_unit="MAIN",
         kind="explore",
         label="scan repos/repociv",
         parent_city="repociv",
@@ -29,13 +29,13 @@ def test_register_spawn_and_complete(monkeypatch, tmp_path):
     assert any(e["type"] == "subagent_spawn" for e in sent)
     assert any(e["type"] == "unit_spawn" and e.get("ephemeral") for e in sent)
 
-    active = st.list_active("DAVI")
+    active = st.list_active("MAIN")
     assert len(active) == 1
 
     finished = st.register_complete(run["id"], success=True, summary="done")
     assert finished is not None
     assert finished["status"] == "complete"
-    assert st.list_active("DAVI") == []
+    assert st.list_active("MAIN") == []
     assert any(e["type"] == "subagent_complete" for e in sent)
     assert any(e["type"] == "unit_despawn" for e in sent)
 
@@ -63,7 +63,7 @@ def test_request_cancel_running(monkeypatch, tmp_path):
 
     run = st.register_spawn(
         parent_mission_id="m1",
-        parent_unit="DAVI",
+        parent_unit="MAIN",
         kind="explore",
         label="scan",
         parent_city="repociv",
@@ -74,7 +74,7 @@ def test_request_cancel_running(monkeypatch, tmp_path):
     complete = next(e for e in sent if e["type"] == "subagent_complete")
     assert complete["success"] is False
     assert any(e["type"] == "unit_despawn" for e in sent)
-    assert st.list_active("DAVI") == []
+    assert st.list_active("MAIN") == []
     finished = st.get_run(run["id"])
     assert finished is not None
     assert finished["status"] == "cancelled"
@@ -93,7 +93,7 @@ def test_register_spawn_includes_status_in_event(monkeypatch, tmp_path):
 
     st.register_spawn(
         parent_mission_id="m1",
-        parent_unit="DAVI",
+        parent_unit="MAIN",
         kind="explore",
         label="scan",
         status="running",
@@ -110,7 +110,7 @@ def test_proposed_spawn_emits_no_unit_spawn(monkeypatch, tmp_path):
 
     st.register_spawn(
         parent_mission_id="m1",
-        parent_unit="DAVI",
+        parent_unit="MAIN",
         kind="explore",
         label="risky task",
         status="proposed",
@@ -129,7 +129,7 @@ def test_process_cursor_task_spawn(monkeypatch, tmp_path):
         '{"type":"tool_use","name":"Task","id":"tu-1","input":'
         '{"subagent_type":"explore","description":"find bugs","run_in_background":true}}'
     )
-    st.process_cursor_ndjson_line(line, mission_id="m9", unit_id="DAVI", city_id="repociv")
+    st.process_cursor_ndjson_line(line, mission_id="m9", unit_id="MAIN", city_id="repociv")
     assert any(e["type"] == "subagent_spawn" for e in sent)
 
 
@@ -141,7 +141,7 @@ def test_register_spawn_emits_progress(monkeypatch, tmp_path):
 
     st.register_spawn(
         parent_mission_id="m1",
-        parent_unit="DAVI",
+        parent_unit="MAIN",
         kind="explore",
         label="scan repos",
         parent_harness="cursor",
@@ -163,7 +163,7 @@ def test_process_claude_task_spawn(monkeypatch, tmp_path):
 
     ctx = MissionHarnessContext(
         mission_id="m9",
-        unit_id="DAVI",
+        unit_id="MAIN",
         city_id="repociv",
         resolved_harness="claude-code",
     )
@@ -185,7 +185,7 @@ def test_process_cursor_task_complete(monkeypatch, tmp_path):
         '{"type":"tool_use","name":"Task","id":"tu-2","input":'
         '{"subagent_type":"explore","description":"scan","run_in_background":true}}'
     )
-    st.process_cursor_ndjson_line(spawn_line, mission_id="m9", unit_id="DAVI")
+    st.process_cursor_ndjson_line(spawn_line, mission_id="m9", unit_id="MAIN")
     complete_line = '{"type":"tool_result","tool_use_id":"tu-2","content":"all good"}'
-    st.process_cursor_ndjson_line(complete_line, mission_id="m9", unit_id="DAVI")
+    st.process_cursor_ndjson_line(complete_line, mission_id="m9", unit_id="MAIN")
     assert any(e["type"] == "subagent_complete" for e in sent)

@@ -1,6 +1,6 @@
 """RepoCiv — P4: Production step executor — wires orchestrator to agent dispatch.
 
-Connects task_orchestrator (P3) to agent_runner (SCOUT/WORKER/DAVI).
+Connects task_orchestrator (P3) to agent_runner (SCOUT/WORKER/MAIN).
 Provides dispatch_plan_step for injection via _to.set_step_executor().
 
 Security integration (Fase 1.5):
@@ -86,12 +86,12 @@ WORKER_KEYWORDS: list[str] = [
 
 
 def select_agent_for_step(step_description: str) -> str:
-    """Heuristic: SCOUT for analysis/inspection, WORKER for implementation, DAVI as fallback.
+    """Heuristic: SCOUT for analysis/inspection, WORKER for implementation, MAIN as fallback.
 
     Examples:
         "inspect the codebase"     → "SCOUT"
         "implement login handler"  → "WORKER"
-        "discuss roadmap"          → "DAVI"
+        "discuss roadmap"          → "MAIN"
     """
     step_lower = step_description.lower()
     for kw in SCOUT_KEYWORDS:
@@ -100,18 +100,17 @@ def select_agent_for_step(step_description: str) -> str:
     for kw in WORKER_KEYWORDS:
         if kw in step_lower:
             return "WORKER"
-    return "DAVI"
+    return "MAIN"
 
 
 def _infer_task_type(agent: str) -> str:
     """Map agent type to a default task_type for model routing."""
     mapping = {
-        "DAVI": "orchestrate",
-        "WORKER": "edit",
-        "SCOUT": "read",
-        "HERMES": "orchestrate",
+        "MAIN":     "orchestrate",
+        "HERMES":   "orchestrate",
+        "WORKER":   "edit",
+        "SCOUT":    "read",
         "OPENCLAW": "edit",
-        "LEXO": "read",
     }
     return mapping.get(agent.upper(), "edit")
 
@@ -318,7 +317,7 @@ def dispatch_plan_step(
             _run_agent_once, repo, issue_id, step_description, step_meta,
         )
     else:
-        # Direct dispatch (no retry) for HERMES, OPENCLAW, DAVI, etc.
+        # Direct dispatch (no retry) for HERMES, OPENCLAW, MAIN, etc.
         run_id = _run_agent_once(repo, issue_id, step_description, step_meta)
 
     # ── Write handoff artifact ──────────────────────────────────────────────
@@ -345,6 +344,6 @@ def _infer_next_role(current_agent: str) -> str:
     role_map = {
         "SCOUT": "WORKER",
         "WORKER": "VALIDATOR",
-        "VALIDATOR": "DAVI",
+        "VALIDATOR": "MAIN",
     }
-    return role_map.get(current_agent.upper(), "DAVI")
+    return role_map.get(current_agent.upper(), "MAIN")

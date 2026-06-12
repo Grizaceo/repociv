@@ -1,7 +1,9 @@
 """RepoCiv — Agent Capability Model (Fase 6).
 
 Agents are contracts, not names.
-  - Every agent has a declared set of CommandTypes it may execute.
+  - Every shipped built-in agent has a declared set of CommandTypes it may execute.
+  - The user's first unit ("MAIN") has capabilities computed at runtime from
+    the harness the user picked during onboarding — see config_store.get_default_harness.
   - Every repo can impose additional restrictions (e.g. legal/ = read-only).
   - Policy uses this to block commands before type-level decisions.
 """
@@ -11,18 +13,13 @@ from typing import Any
 
 # ─── Agent capability declarations ───────────────────────────────────────────
 # Ordered from broadest to most restricted.
+#
+# "MAIN" is the user's first unit. Its actual capabilities are not declared
+# here; they are computed from the harness the user picked in onboarding.
+# We expose it in the table as an empty list so the policy engine can still
+# look it up without a KeyError before the user finishes onboarding.
 AGENT_CAPABILITIES: dict[str, list[str]] = {
-    # Orchestrator — can do everything policy allows
-    "DAVI": [
-        "inspect_repo", "read_file", "run_tests", "run_build",
-        "edit_file", "create_branch", "git_commit",
-        "execute_agent", "quest_add", "unit_command", "e2e_probe", "send_message",
-    ],
-    # Advisor — code-level ops only; no orchestration, no messaging
-    "LEXO": [
-        "inspect_repo", "read_file", "run_tests", "run_build",
-        "edit_file", "create_branch", "git_commit",
-    ],
+    "MAIN": [],  # populated at runtime from ~/.repociv/config.json::default_harness
     # Builder — edits and builds; no commit, no messaging, no orchestration
     "WORKER": [
         "inspect_repo", "read_file", "run_tests", "run_build",
@@ -54,19 +51,9 @@ AGENT_CAPABILITIES: dict[str, list[str]] = {
 }
 
 # ─── Skill labels (human-readable, shown in UI badges) ───────────────────────
+# MAIN's skill labels are also empty until the harness is selected.
 SKILL_LABELS: dict[str, dict[str, str]] = {
-    "DAVI": {
-        "orchestration": "Orquestación",
-        "git_workflow":  "Git completo",
-        "test_runner":   "Tests",
-        "code_editor":   "Edición",
-        "messaging":     "Mensajería",
-    },
-    "LEXO": {
-        "git_workflow": "Git completo",
-        "test_runner":  "Tests",
-        "code_editor":  "Edición",
-    },
+    "MAIN": {},
     "WORKER": {
         "test_runner": "Tests",
         "code_editor": "Edición",
@@ -119,13 +106,12 @@ SKILL_REQUIREMENTS: dict[str, str] = {
 
 
 def _agent_base(agent_id: str) -> str:
-    """Normalize 'DAVI-2' -> 'DAVI', matching frontend agentBase()."""
+    """Normalize 'MAIN-2' -> 'MAIN', matching frontend agentBase()."""
     return agent_id.split("-")[0].upper()
 
 
 _AGENT_BASE_ALIASES = {
-    "DAVI": "DAVI",
-    "LEXO": "LEXO",
+    "MAIN": "MAIN",
     "WORKER": "WORKER",
     "SCOUT": "SCOUT",
     "OPENCLAW": "OPENCLAW",
@@ -137,13 +123,32 @@ _AGENT_BASE_ALIASES = {
 
 def _normalize_agent_base(raw: str) -> str:
     upper = raw.upper()
-    return _AGENT_BASE_ALIASES.get(upper, "DAVI")
+    return _AGENT_BASE_ALIASES.get(upper, "MAIN")
+
+
+def _resolve_main_capabilities() -> list[str]:
+    """Return MAIN's capabilities by reading the user's chosen harness.
+
+    Falls back to an empty list if config_store is unavailable or the user
+    hasn't picked a harness yet (i.e. onboarding not completed). PR 2 wires
+    the onboarding step that writes default_harness to disk.
+    """
+    try:
+        from . import config_store as _cs  # noqa: WPS433
+        harness = _cs.get_default_harness()
+    except Exception:
+        return []
+    if not harness:
+        return []
+    return list(AGENT_CAPABILITIES.get(harness.upper(), []))
 
 
 def agent_capabilities(agent_id: str) -> list[str]:
-    """Return capability list for an agent (falls back to DAVI if unknown)."""
+    """Return capability list for an agent (falls back to MAIN if unknown)."""
     base = _normalize_agent_base(agent_id.split("-")[0])
-    return AGENT_CAPABILITIES.get(base, AGENT_CAPABILITIES["DAVI"])
+    if base == "MAIN":
+        return _resolve_main_capabilities()
+    return AGENT_CAPABILITIES.get(base, AGENT_CAPABILITIES.get("MAIN", []))
 
 
 def can_execute(agent_id: str, cmd_type: str) -> bool:
@@ -181,15 +186,27 @@ def check_capability(agent_id: str, cmd_type: str, target: str) -> tuple[bool, s
 
 def capabilities_snapshot() -> dict[str, Any]:
     """Full capability model for GET /agents/capabilities."""
-    return {
-        "agents": {
-            agent: {
+    # For MAIN, surface the live (harness-driven) capabilities so the UI
+    # shows the right badges. If the user hasn't picked a harness yet, the
+    # entry is exposed with empty arrays.
+    agents_out: dict[str, dict[str, Any]] = {}
+    for agent, caps in AGENT_CAPABILITIES.items():
+        if agent == "MAIN":
+            live_caps = _resolve_main_capabilities()
+            agents_out[agent] = {
+                "capabilities": live_caps,
+                "skills": list(SKILL_LABELS.get(agent, {}).keys()),
+                "skillLabels": SKILL_LABELS.get(agent, {}),
+                "computedFromHarness": True,
+            }
+        else:
+            agents_out[agent] = {
                 "capabilities": caps,
                 "skills": list(SKILL_LABELS.get(agent, {}).keys()),
                 "skillLabels": SKILL_LABELS.get(agent, {}),
             }
-            for agent, caps in AGENT_CAPABILITIES.items()
-        },
+    return {
+        "agents": agents_out,
         "repoRestrictions": REPO_RESTRICTIONS,
         "skillRequirements": SKILL_REQUIREMENTS,
     }

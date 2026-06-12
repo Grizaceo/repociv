@@ -38,8 +38,8 @@ export class LocalWorldManager {
         const entrance = this.localWorld.rooms.find((r) => r.zoneType === 'reception') ?? this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
         const heroUnit = this.getFirstUnit();
         this.localUnits.push({
-          id: heroUnit?.id ?? 'DAVI',
-          name: heroUnit?.name ?? 'DAVI',
+          id: heroUnit?.id ?? 'MAIN',
+          name: heroUnit?.name ?? 'MAIN',
           unitType: heroUnit?.type ?? 'hero',
           color: heroUnit ? (UNIT_COLORS[heroUnit.type] ?? '#4af') : '#4af',
           gridX: entrance.x + Math.floor(entrance.w / 2),
@@ -52,7 +52,7 @@ export class LocalWorldManager {
           state: 'idle_in_room',
           mission: heroUnit?.mission ?? null,
           workProgress: 0,
-          macroUnitId: heroUnit?.id ?? 'DAVI',
+          macroUnitId: heroUnit?.id ?? 'MAIN',
           currentWorkbenchId: null,
           currentRoomId:
             this.localWorld.grid[entrance.y + Math.floor(entrance.h / 2)]?.[
@@ -79,8 +79,8 @@ export class LocalWorldManager {
       if (this.localUnits.length === 0) {
         const entrance = this.localWorld.rooms.find((r) => r.zoneType === 'reception') ?? this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
         this.localUnits.push({
-          id: 'DAVI',
-          name: 'DAVI',
+          id: 'MAIN',
+          name: 'MAIN',
           unitType: 'hero',
           color: '#4af',
           gridX: entrance.x + 1,
@@ -93,7 +93,7 @@ export class LocalWorldManager {
           state: 'idle_in_room',
           mission: null,
           workProgress: 0,
-          macroUnitId: 'DAVI',
+          macroUnitId: 'MAIN',
           currentWorkbenchId: null,
           currentRoomId: this.localWorld.grid[entrance.y + 1]?.[entrance.x + 1]?.roomId ?? null,
           fatigue: 100,

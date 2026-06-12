@@ -210,7 +210,7 @@ def test_single_record_stats():
 
 def test_multiple_records_aggregated():
     for i, dur in enumerate([1.0, 2.0, 3.0, 4.0, 5.0]):
-        record_step_latency("repo1", "ISSUE-1", i, "DAVI", dur)
+        record_step_latency("repo1", "ISSUE-1", i, "MAIN", dur)
     stats = get_step_latency_stats()
     assert stats["count"] == 5
     assert stats["p50"] > 0
@@ -218,12 +218,12 @@ def test_multiple_records_aggregated():
 
 
 def test_by_agent_separates_agents():
-    record_step_latency("repo", "i1", 0, "DAVI", 1.0)
+    record_step_latency("repo", "i1", 0, "MAIN", 1.0)
     record_step_latency("repo", "i1", 1, "WORKER", 2.0)
     record_step_latency("repo", "i1", 2, "SCOUT", 0.5)
     stats = get_step_latency_stats()
-    assert set(stats["by_agent"].keys()) == {"DAVI", "WORKER", "SCOUT"}
-    assert stats["by_agent"]["DAVI"]["count"] == 1
+    assert set(stats["by_agent"].keys()) == {"MAIN", "WORKER", "SCOUT"}
+    assert stats["by_agent"]["MAIN"]["count"] == 1
     assert stats["by_agent"]["WORKER"]["p50"] == 2.0
 
 
@@ -235,7 +235,7 @@ def test_agent_name_normalized_to_uppercase():
 
 
 def test_compute_metrics_includes_step_latency():
-    record_step_latency("repo", "i1", 0, "DAVI", 3.0)
+    record_step_latency("repo", "i1", 0, "MAIN", 3.0)
     result = compute_metrics([], _DUMMY_AGENTS, queue_depth=0)
     assert "stepLatency" in result
     sl = result["stepLatency"]

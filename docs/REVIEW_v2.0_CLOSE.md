@@ -158,7 +158,7 @@ compara con un producto consolidado en una métrica que no es la tuya.
 Sí: **"el dashboard espacial para construir tu propio Agent OS local"** —
 es para gente que ya tiene su propio stack de agentes y quiere
 visualizarlos/orquestarlos espacialmente. Nicho más chico, más defendible,
-y tu *moat* (`.hermes`, DAVI, LEXO, OPENCLAW, hex grid + fatiga) es
+y tu *moat* (`.hermes`, el modelo de MAIN+harness, hex grid + fatiga) es
 real ahí.
 
 ---
