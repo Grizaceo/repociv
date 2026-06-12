@@ -119,7 +119,7 @@ def suggest(
         if entry.get("gesture") != gesture:
             continue
         rec_agent = entry.get("agent_id", "").split("-")[0].upper()
-        if rec_agent not in (base_agent, "DAVI", ""):
+        if rec_agent not in (base_agent, "MAIN", ""):
             continue
         if entry["outcome"] == "pending":
             continue

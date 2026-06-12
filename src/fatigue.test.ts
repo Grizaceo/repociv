@@ -24,13 +24,13 @@ describe('Phase 9: XCOM Context Fatigue', () => {
 
   beforeEach(() => {
     gs = new GameState(makeWorld());
-    gs.spawnUnit('davi', 'DAVI', 'hero', 'gris', makeAxial(5, 5));
+    gs.spawnUnit('main', 'MAIN', 'hero', 'gris', makeAxial(5, 5));
   });
 
   // ─── Core fatigue state ──────────────────────────────────────────────────────
 
   it('spawns unit with full fatigue (100) and effectiveSpeed 1.0', () => {
-    const unit = gs.getUnit('davi')!;
+    const unit = gs.getUnit('main')!;
     expect(unit.fatigue).toBe(100);
     expect(unit.maxFatigue).toBe(100);
     expect(unit.effectiveSpeed).toBe(1.0);
@@ -38,8 +38,8 @@ describe('Phase 9: XCOM Context Fatigue', () => {
   });
 
   it('updateUnitFatigue applies ratio to effectiveSpeed', () => {
-    gs.updateUnitFatigue('davi', 50, 100, false, null);
-    const unit = gs.getUnit('davi')!;
+    gs.updateUnitFatigue('main', 50, 100, false, null);
+    const unit = gs.getUnit('main')!;
     expect(unit.fatigue).toBe(50);
     expect(unit.maxFatigue).toBe(100);
     expect(unit.effectiveSpeed).toBe(0.5);
@@ -47,39 +47,39 @@ describe('Phase 9: XCOM Context Fatigue', () => {
   });
 
   it('updateUnitFatigue sets isResting and restingRoomId', () => {
-    gs.updateUnitFatigue('davi', 80, 100, true, 'room_rest_1');
-    const unit = gs.getUnit('davi')!;
+    gs.updateUnitFatigue('main', 80, 100, true, 'room_rest_1');
+    const unit = gs.getUnit('main')!;
     expect(unit.isResting).toBe(true);
     expect(unit.restingRoomId).toBe('room_rest_1');
   });
 
   it('updateUnitFatigue recovers effectiveSpeed to 1.0 at full rest (fatigue=100)', () => {
-    gs.updateUnitFatigue('davi', 100, 100, true, 'room_rest_1');
-    const unit = gs.getUnit('davi')!;
+    gs.updateUnitFatigue('main', 100, 100, true, 'room_rest_1');
+    const unit = gs.getUnit('main')!;
     expect(unit.effectiveSpeed).toBe(1.0);
   });
 
   it('updateUnitFatigue handles zero maxFatigue gracefully (fallback to 1)', () => {
-    gs.updateUnitFatigue('davi', 0, 0, false, null);
-    const unit = gs.getUnit('davi')!;
+    gs.updateUnitFatigue('main', 0, 0, false, null);
+    const unit = gs.getUnit('main')!;
     expect(unit.effectiveSpeed).toBe(1); // fallback when maxFatigue=0
   });
 
   // ─── Speed penalties at high fatigue ───────────────────────────────────────
 
   it('effectiveSpeed is 0.0 at 0 fatigue (exhausted)', () => {
-    gs.updateUnitFatigue('davi', 0, 100, false, null);
-    expect(gs.getUnit('davi')!.effectiveSpeed).toBe(0);
+    gs.updateUnitFatigue('main', 0, 100, false, null);
+    expect(gs.getUnit('main')!.effectiveSpeed).toBe(0);
   });
 
   it('effectiveSpeed is 0.25 at 25 fatigue', () => {
-    gs.updateUnitFatigue('davi', 25, 100, false, null);
-    expect(gs.getUnit('davi')!.effectiveSpeed).toBe(0.25);
+    gs.updateUnitFatigue('main', 25, 100, false, null);
+    expect(gs.getUnit('main')!.effectiveSpeed).toBe(0.25);
   });
 
   it('effectiveSpeed is 0.8 at 80 fatigue (>80% = slow)', () => {
-    gs.updateUnitFatigue('davi', 80, 100, false, null);
-    expect(gs.getUnit('davi')!.effectiveSpeed).toBe(0.8);
+    gs.updateUnitFatigue('main', 80, 100, false, null);
+    expect(gs.getUnit('main')!.effectiveSpeed).toBe(0.8);
   });
 
   // ─── Rest areas ─────────────────────────────────────────────────────────────
@@ -120,10 +120,10 @@ describe('Phase 9: XCOM Context Fatigue', () => {
   // ─── getUnitFatigue ──────────────────────────────────────────────────────────
 
   it('getUnitFatigue returns current fatigue snapshot', () => {
-    gs.updateUnitFatigue('davi', 60, 100, false, null);
-    const snap = gs.getUnitFatigue('davi');
+    gs.updateUnitFatigue('main', 60, 100, false, null);
+    const snap = gs.getUnitFatigue('main');
     expect(snap).toEqual({
-      unit: 'davi',
+      unit: 'main',
       fatigue: 60,
       maxFatigue: 100,
       effectiveSpeed: 0.6,
@@ -139,14 +139,14 @@ describe('Phase 9: XCOM Context Fatigue', () => {
   // ─── setUnitState ─────────────────────────────────────────────────────────
 
   it('setUnitState changes unit state', () => {
-    gs.setUnitState('davi', 'moving');
-    expect(gs.getUnit('davi')!.state).toBe('moving');
+    gs.setUnitState('main', 'moving');
+    expect(gs.getUnit('main')!.state).toBe('moving');
   });
 
   it('setUnitState notifies observers', () => {
     const spy = vi.fn();
     gs.subscribe(spy);
-    gs.setUnitState('davi', 'working');
+    gs.setUnitState('main', 'working');
     expect(spy).toHaveBeenCalled();
   });
 
@@ -157,16 +157,16 @@ describe('Phase 9: XCOM Context Fatigue', () => {
   // ─── Resting behavior ───────────────────────────────────────────────────────
 
   it('setUnitResting marks unit as resting', () => {
-    gs.setUnitResting('davi', true, 'room_0');
-    const unit = gs.getUnit('davi')!;
+    gs.setUnitResting('main', true, 'room_0');
+    const unit = gs.getUnit('main')!;
     expect(unit.isResting).toBe(true);
     expect(unit.restingRoomId).toBe('room_0');
   });
 
   it('setUnitResting clears resting when set to false', () => {
-    gs.setUnitResting('davi', true, 'room_0');
-    gs.setUnitResting('davi', false);
-    const unit = gs.getUnit('davi')!;
+    gs.setUnitResting('main', true, 'room_0');
+    gs.setUnitResting('main', false);
+    const unit = gs.getUnit('main')!;
     expect(unit.isResting).toBe(false);
     expect(unit.restingRoomId).toBeUndefined();
   });

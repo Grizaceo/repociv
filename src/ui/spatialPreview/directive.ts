@@ -4,6 +4,7 @@ import type { CommandDraft } from '../../commandSchema.ts';
 import { COMMAND_RISK } from '../../commandSchema.ts';
 import { fetchSuggestions, cmdTypeLabel, successRateColor } from '../../directiveLearner.ts';
 import { escapeHtml, positionEl, gestureIcon, riskStyle } from './helpers.ts';
+import { DEFAULT_UNIT_NAME } from '../../agentIdentity.ts';
 
 type ConfirmCb = (draft: CommandDraft) => void;
 type CancelCb = () => void;
@@ -87,7 +88,7 @@ export function showDirectivePreview(
   el.classList.remove('hidden');
 
   // Async-fetch suggestions and inject if available (non-blocking)
-  const agentId = String(directive.draft.payload?.['unit'] ?? 'DAVI');
+  const agentId = String(directive.draft.payload?.['unit'] ?? DEFAULT_UNIT_NAME);
   void fetchSuggestions(directive.gesture, agentId).then((suggestions) => {
     const box = el.querySelector<HTMLElement>('#sp-suggestions');
     if (!box || suggestions.length === 0) return;

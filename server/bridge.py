@@ -375,7 +375,7 @@ def _handle_command(cmd: Command) -> dict[str, Any]:
                 "reason": reason}
 
     # Attach context pack to payload so the agent starts with context
-    agent_id = str(cmd.payload.get("unit", "DAVI"))
+    agent_id = str(cmd.payload.get("unit", "MAIN"))
     cmd.payload["_context"] = build_context_pack(agent_id, cmd.target, _es)
 
     if cmd.status == "waiting_approval":
@@ -552,6 +552,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/directives/stats":   _routes.get_directives_stats,
             "/directives/suggest": _routes.get_directives_suggest,
             "/harnesses":          _routes.get_harnesses,
+            "/api/profiles":        _routes.get_profiles,
             "/log":                _routes.get_log,
             "/tasks":              _routes.get_tasks,
             "/improve/reflect":    _routes.get_improve_reflect,
@@ -715,6 +716,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/api/graph-relations/refresh": _routes.post_graph_relations_refresh,
             "/session/reset":  _routes.post_session_reset,
             "/model/override": _routes.post_model_override,
+            "/api/profiles":         _routes.post_profiles,
+            "/api/profiles/delete":  _routes.post_profiles_delete,
             "/subagents/cancel": _routes.post_subagent_cancel,
         }
         if path in _POST_EXACT:
@@ -802,7 +805,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 "type": "unit_command",
                 "target": body.get("city", "main"),
                 "payload": {
-                    "unit": body.get("unit", "DAVI"),
+                    "unit": body.get("unit", "MAIN"),
                     "city": body.get("city", "main"),
                     "mission": body.get("mission", ""),
                     "agentType": body.get("agentType", "hero"),
@@ -965,7 +968,7 @@ def _scheduler_dispatch(cmd_dict: dict[str, Any]) -> None:
         requires_approval=False,
         status="running",
     )
-    unit_id = cmd.payload.get("unit", "DAVI")
+    unit_id = cmd.payload.get("unit", "MAIN")
     _sched.heartbeat(unit_id)
     _dispatch_command(cmd)
     _sched.heartbeat(unit_id)
@@ -1008,7 +1011,7 @@ def _seed_initial_heartbeats() -> None:
     """Soft heartbeat for known agents at bridge boot — avoids eternal never_seen."""
     from server import agent_runner as _ar  # noqa: PLC0415
 
-    seen: set[str] = {"DAVI"}
+    seen: set[str] = {"MAIN"}
     seen.update(_ar.AGENT_CONFIGS.keys())
     sessions_dir = CONFIG_DIR / "sessions"
     if sessions_dir.is_dir():
@@ -1060,7 +1063,7 @@ if __name__ == "__main__":
                     "type": raw_type,
                     "target": raw.get("city", "main"),
                     "payload": {
-                        "unit": raw.get("unit", "DAVI"),
+                        "unit": raw.get("unit", "MAIN"),
                         "city": raw.get("city", "main"),
                         "mission": raw.get("mission", ""),
                         "agentType": raw.get("agentType", "hero"),

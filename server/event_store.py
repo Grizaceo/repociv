@@ -10,6 +10,7 @@ Event types persisted:
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 import uuid
@@ -40,6 +41,94 @@ def init(store_dir: Path) -> None:
     global _store_path
     store_dir.mkdir(parents=True, exist_ok=True)
     _store_path = store_dir / "events.jsonl"
+    _migrate_legacy_agent_names()
+
+
+# One-shot migration: rewrite events.jsonl so historical events that
+# referenced the personal agent names "DAVI" / "LEXO" now point at
+# the first profile registered in the user's profile registry. The
+# migration is idempotent (a marker file short-circuits subsequent runs)
+# and is safe to run before the bridge accepts any new traffic.
+_MIGRATION_MARKER = ".migrated-legacy-agent-names"
+_LEGACY_AGENT_NAMES = frozenset({"DAVI", "LEXO"})
+_LEGACY_AGENT_FIELDS = ("actor", "unit", "unitId", "unit_id", "agentId", "agent_id")
+
+
+def _resolve_migration_destination() -> str:
+    """Pick the destination name for legacy personal agent references.
+
+    Strategy: use the first registered profile from the user's
+    profile registry. If no profiles are registered yet (fresh
+    install), fall back to "main" — the first profile name the user
+    will encounter during onboarding.
+    """
+    try:
+        from . import config_store as _cs  # local import — avoid cycles
+        first = _cs.first_profile_name()
+        if first:
+            return first
+    except Exception:
+        pass
+    return "main"
+
+
+def _migrate_legacy_agent_names() -> None:
+    global _store_path
+    if _store_path is None:
+        return
+    marker = _store_path.parent / _MIGRATION_MARKER
+    if marker.exists():
+        return
+    if not _store_path.exists():
+        marker.touch()
+        return
+    destination = _resolve_migration_destination()
+    try:
+        rewritten = 0
+        scanned = 0
+        tmp = _store_path.with_suffix(_store_path.suffix + ".tmp")
+        with _store_path.open("r", encoding="utf-8") as src, tmp.open("w", encoding="utf-8") as dst:
+            for raw in src:
+                scanned += 1
+                line = raw.rstrip("\n")
+                if not line:
+                    dst.write("\n")
+                    continue
+                try:
+                    evt = json.loads(line)
+                except ValueError:
+                    dst.write(raw)
+                    continue
+                if _rewrite_legacy_agent(evt, destination):
+                    rewritten += 1
+                dst.write(json.dumps(evt, ensure_ascii=False) + "\n")
+        os.replace(tmp, _store_path)
+        marker.touch()
+        if rewritten:
+            print(
+                f"[event_store] migrated {rewritten}/{scanned} events to '{destination}'",
+                flush=True,
+            )
+    except Exception as exc:  # pragma: no cover — defensive
+        print(f"[event_store] legacy agent migration skipped: {exc}", flush=True)
+
+
+def _rewrite_legacy_agent(evt: dict[str, Any], destination: str) -> bool:
+    """Return True if the event was rewritten."""
+    changed = False
+    for field in _LEGACY_AGENT_FIELDS:
+        value = evt.get(field)
+        if isinstance(value, str) and value in _LEGACY_AGENT_NAMES:
+            evt[field] = destination
+            changed = True
+    data = evt.get("data")
+    if isinstance(data, dict):
+        for field in _LEGACY_AGENT_FIELDS:
+            value = data.get(field)
+            if isinstance(value, str) and value in _LEGACY_AGENT_NAMES:
+                data[field] = destination
+                changed = True
+    return changed
 
 
 def _append(event: dict[str, Any]) -> None:

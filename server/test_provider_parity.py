@@ -12,7 +12,6 @@ without hermes-agent installed (so the public repo doesn't fail).
 
 from __future__ import annotations
 
-import importlib
 from pathlib import Path
 
 import pytest

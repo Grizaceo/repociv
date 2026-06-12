@@ -1,13 +1,15 @@
-"""RepoCiv — D2: Per-agent-type token-bucket rate limiter.
+"""RepoCiv — D2: Per-harness token-bucket rate limiter.
 
-Each agent type gets its own independent TokenBucket. Requests exceeding
+Each harness gets its own independent TokenBucket. Requests exceeding
 the bucket capacity are rejected.
 
 Default capacities (burst; refills at cap/60 tokens per second):
-  WORKER = 10
-  SCOUT  = 20
-  DAVI   = 5
-  *      = 15  (catch-all for unknown agent types)
+  claude   = 10  (stateless CLI calls)
+  codex    = 10
+  cursor   = 10
+  hermes   = 5   (stateful orchestrator, fewer parallel)
+  openclaw = 5
+  *        = 15  (catch-all for unknown harnesses)
 
 Thread-safe: every shared state is protected by threading.Lock.
 """
@@ -17,11 +19,13 @@ from __future__ import annotations
 import threading
 import time
 
-# ─── Default capacities per agent type ───────────────────────────────────────
+# ─── Default capacities per harness ──────────────────────────────────────────
 _DEFAULT_CAPACITIES: dict[str, int] = {
-    "WORKER": 10,
-    "SCOUT": 20,
-    "DAVI": 5,
+    "claude":   10,
+    "codex":    10,
+    "cursor":   10,
+    "hermes":   5,
+    "openclaw": 5,
 }
 _FALLBACK_CAPACITY = 15
 
