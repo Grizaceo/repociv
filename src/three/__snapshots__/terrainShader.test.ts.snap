@@ -214,6 +214,19 @@ void main() {
             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.48, 0.80, 0.84), ring2 * foamPulse2 * 0.22);
           }
         }
+        // ── Final Civ V grade ──────────────────────────────────────────────
+        // Vibrance + a warm lift on land only. ACES tone mapping compresses
+        // the pastel atlas into mud without this; the ocean keeps its cool
+        // teal (a global warm shift greened it).
+        {
+          float glum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+          diffuseColor.rgb = mix(vec3(glum), diffuseColor.rgb, 1.14);
+          bool gradeWater = (tidx > 3.5 && tidx < 4.5) || (tidx > 4.5 && tidx < 5.5);
+          if (!gradeWater) {
+            diffuseColor.rgb *= vec3(1.06, 1.01, 0.94);
+          }
+          diffuseColor.rgb = clamp(diffuseColor.rgb, 0.0, 1.0);
+        }
   #include <roughnessmap_fragment>
         if (uUseRoughAtlas > 0 && vTopFace > 0.5) {
           float _rtidx = floor(vTerrainIndex + 0.5);

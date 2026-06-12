@@ -1,5 +1,6 @@
 // ─── WebGL map facade: renderer loop, camera sync, resize, picking ───────────
 import {
+  ACESFilmicToneMapping,
   WebGLRenderer,
   PerspectiveCamera,
   Vector3,
@@ -58,6 +59,12 @@ export class ThreeMapRenderer {
     this.container = container;
     this.renderer = new WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Filmic curve gives the warm, slightly compressed highlights of the
+    // Civ V palette; the linear default read flat and pastel. The sky dome
+    // is a raw ShaderMaterial (not tone-mapped) but FogExp2 converges
+    // distant tiles to the horizon colour, so the seam stays coherent.
+    this.renderer.toneMapping = ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.22;
     this.renderer.setClearColor(SKY_TOP.getHex(), 1);
     container.appendChild(this.renderer.domElement);
     this.renderer.domElement.style.width = '100%';

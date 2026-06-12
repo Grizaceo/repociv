@@ -407,6 +407,19 @@ float terrainDetailNoise(vec2 p) {
             float foamPulse2 = 0.78 + 0.22 * sin(uTime * 1.3 + vWorldXZ.x * 0.052 - vWorldXZ.y * 0.041 + 1.9);
             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.48, 0.80, 0.84), ring2 * foamPulse2 * 0.22);
           }
+        }
+        // ── Final Civ V grade ──────────────────────────────────────────────
+        // Vibrance + a warm lift on land only. ACES tone mapping compresses
+        // the pastel atlas into mud without this; the ocean keeps its cool
+        // teal (a global warm shift greened it).
+        {
+          float glum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+          diffuseColor.rgb = mix(vec3(glum), diffuseColor.rgb, 1.14);
+          bool gradeWater = (tidx > 3.5 && tidx < 4.5) || (tidx > 4.5 && tidx < 5.5);
+          if (!gradeWater) {
+            diffuseColor.rgb *= vec3(1.06, 1.01, 0.94);
+          }
+          diffuseColor.rgb = clamp(diffuseColor.rgb, 0.0, 1.0);
         }`,
       )
       // ── Side-face emissive lift ──────────────────────────────────────────────
@@ -474,7 +487,7 @@ float terrainDetailNoise(vec2 p) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v21';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v22';
   return mat;
 }
 
@@ -506,4 +519,4 @@ export function updateTerrainShaderAtlas(
 /** Sky / horizon palette — warm Civ V afternoon. */
 export const SKY_TOP     = new Color(0x89b5d4);   // was 0x7a9ec8 — warmer blue
 export const SKY_HORIZON = new Color(0x9ab870);   // was 0x8aab85 — greener mid
-export const FOG_DENSITY = 0.00025;               // was 0.00032 — slightly less haze
+export const FOG_DENSITY = 0.00019;               // v22: ACES + sun boost already model depth; the old haze went milky at mid-zoom

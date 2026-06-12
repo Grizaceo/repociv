@@ -134,14 +134,16 @@ export function createHexWorldScene(): Scene {
   // background colour stays underneath as fallback while shaders compile.
   scene.add(createSkyDome());
 
-  // Civ V-style warm afternoon lighting — golden sun, warm ambient
-  scene.add(new AmbientLight(0xdacfb6, 0.55));
-  scene.add(new HemisphereLight(0xb0d8f0, 0x7aaa60, 0.45));
-  sunLight = new DirectionalLight(0xffeecb, 1.05);
+  // Civ V-style warm afternoon lighting — golden sun, warm ambient.
+  // Flat-light budget (ambient + hemi) stays well under the sun so faces
+  // actually model; the old 0.55/0.45 vs 1.05 split washed everything out.
+  scene.add(new AmbientLight(0xdacfb6, 0.38));
+  scene.add(new HemisphereLight(0xb0d8f0, 0x7aaa60, 0.34));
+  sunLight = new DirectionalLight(0xffe7bd, 1.5);
   sunLight.position.set(-100, 200, 60);
   scene.add(sunLight);
   // Soft fill light from opposite side to reduce harsh shadows
-  const fillLight = new DirectionalLight(0xd0e8ff, 0.18);
+  const fillLight = new DirectionalLight(0xd0e8ff, 0.16);
   fillLight.position.set(80, 60, -100);
   scene.add(fillLight);
 
