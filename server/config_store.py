@@ -56,7 +56,10 @@ def _config_path() -> Path:
     base = os.environ.get(_CONFIG_DIR_ENV) or os.path.join(
         os.path.expanduser("~"), ".repociv"
     )
-    return Path(base) / _CONFIG_FILENAME
+    # Belt-and-suspenders: Path() does not expand `~`, so if a caller
+    # passes a literal `~/.repociv` (e.g. from a stale .pyc or a test
+    # fixture), expand it here. Idempotent on already-expanded paths.
+    return Path(os.path.expanduser(str(Path(base) / _CONFIG_FILENAME)))
 
 
 def _read_raw() -> dict[str, Any]:
