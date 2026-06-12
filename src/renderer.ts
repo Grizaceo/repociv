@@ -648,10 +648,15 @@ export class Renderer {
         return;
       }
       // Priority 2: city tile → city action menu (mission dispatch).
+      // The menu can come back empty (no unit selected + agent policy
+      // disallows every command) — fall through to clearing instead of
+      // popping an empty box.
       if (tile?.city) {
         const items = contextMenuForCity(tile.city, this.selectedUnit);
-        this.onContextMenu?.(items, { x: e.clientX, y: e.clientY });
-        return;
+        if (items.length > 0) {
+          this.onContextMenu?.(items, { x: e.clientX, y: e.clientY });
+          return;
+        }
       }
       // Priority 3: empty hex → clear selection.
       hideDirectivePreview();

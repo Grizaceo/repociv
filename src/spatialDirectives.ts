@@ -82,12 +82,12 @@ export function interpretUnitDrag(params: {
 
   // Shift+drag → run tests (explicit, intentional, worth confirming).
   const cmdType: CommandType = 'run_tests';
-  const misionText = `Ejecutar tests en ${city.name}`;
+  const missionText = `Ejecutar tests en ${city.name}`;
 
   const draft = draftCommand(cmdType, city.id, {
     unit: unit.id,
     city: city.id,
-    mission: misionText,
+    mission: missionText,
     agentType: unit.type,
   });
 
