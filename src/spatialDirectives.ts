@@ -37,10 +37,14 @@ export interface SpatialDirective {
 }
 
 // ─── Context menu item ────────────────────────────────────────────────────────
+// Either a `draft` (sent to the bridge as a command) or a local `action`
+// callback (renderer/game state mutation). The renderer picks which path
+// to take when the user clicks the item.
 export interface ContextMenuItem {
   label: string;
   icon: string;
-  draft: CommandDraft;
+  draft?: CommandDraft;
+  action?: () => void;
   risk: 'low' | 'medium' | 'high' | 'destructive';
   hotkey?: string;
 }
@@ -161,12 +165,14 @@ export function contextMenuForCity(city: City, selectedUnit: Unit | null): Conte
 
   const candidates: ContextMenuItem[] = [];
 
-  // "Send unit here" — appears first when a unit is selected
+  // "Send unit here" — appears first when a unit is selected.
+  // risk: 'low' to skip the approval gate (D1 — local unit move is not
+  // a destructive action; the gate was triggering on every send).
   if (selectedUnit && allowed('execute_agent')) {
     candidates.push({
       label: `Enviar ${selectedUnit.id} aquí`,
       icon: '▶',
-      risk: 'medium',
+      risk: 'low',
       draft: draftCommand('execute_agent', city.id, {
         unit: selectedUnit.id,
         city: city.id,
@@ -236,23 +242,48 @@ export function contextMenuForCity(city: City, selectedUnit: Unit | null): Conte
     });
   }
 
-  // Always offer inspect as fallback (read-only is safe for all agents)
-  if (candidates.length === 0) {
-    candidates.push({
-      label: `Inspeccionar ${city.name}`,
-      icon: '🔍',
+  return candidates;
+}
+
+// ─── Context menu items for right-click on a unit ────────────────────────────
+// Local actions: Mover / Construir / Dormir / Información. These are
+// renderer/game state mutations, not commands — they don't go through
+// the bridge approval queue. The 4 items mirror the old #unit-actions
+// panel buttons (M/B/S) plus a 4th Información action.
+export function contextMenuForUnit(
+  unit: Unit,
+  actions: { onMove: () => void; onBuild: () => void; onSleep: () => void; onInfo: () => void },
+): ContextMenuItem[] {
+  return [
+    {
+      label: `Mover ${unit.id}`,
+      icon: '↗',
+      risk: 'low',
+      hotkey: 'M',
+      action: actions.onMove,
+    },
+    {
+      label: `Construir con ${unit.id}`,
+      icon: '🔨',
+      risk: 'low',
+      hotkey: 'B',
+      action: actions.onBuild,
+    },
+    {
+      label: `Dormir ${unit.id}`,
+      icon: '☕',
+      risk: 'low',
+      hotkey: 'S',
+      action: actions.onSleep,
+    },
+    {
+      label: `Información de ${unit.id}`,
+      icon: 'ℹ',
       risk: 'low',
       hotkey: 'I',
-      draft: draftCommand('inspect_repo', city.id, {
-        unit,
-        city: city.id,
-        mission: `Inspeccionar repo ${city.name}`,
-        agentType: aType,
-      }),
-    });
-  }
-
-  return candidates;
+      action: actions.onInfo,
+    },
+  ];
 }
 
 // ─── Drag unit → file (workbench assignment) ──────────────────────────────────

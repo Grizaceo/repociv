@@ -338,7 +338,15 @@ export class LocalRenderer {
   setupInput() {
     const canvas = this.canvas;
 
+    // Local view owns clicks. Stop the event from bubbling to the global
+    // canvas's handlers, which would otherwise pick a tile using the
+    // GLOBAL grid coordinates (different scale + offset) and open a
+    // different city's panel. Symptom reported 2026-06-12: "ciertas
+    // casillas en local view abren ventanas de otras ciudades".
+    const stopBubble = (e: MouseEvent) => e.stopPropagation();
+
     canvas.addEventListener('mousedown', (e) => {
+      stopBubble(e);
       if (!this._inputActive) return;
       if (e.button === 0) {
         if (this._zonePaintMode) {
@@ -392,6 +400,7 @@ export class LocalRenderer {
     });
 
     canvas.addEventListener('mouseup', (e) => {
+      stopBubble(e);
       if (!this._inputActive) return;
       if (e.button === 0) {
         if (this._zonePaintMode && this._zonePaintStart && this._zonePaintCurrent) {
@@ -431,6 +440,7 @@ export class LocalRenderer {
     });
 
     canvas.addEventListener('dblclick', (e) => {
+      stopBubble(e);
       if (!this._inputActive) return;
       const rect = canvas.getBoundingClientRect();
       const tile = this.screenToTile(e.clientX - rect.left, e.clientY - rect.top);

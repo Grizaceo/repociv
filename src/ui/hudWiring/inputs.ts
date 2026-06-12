@@ -17,9 +17,7 @@ import {
   toggleKeyboardHelp,
   wireCityPanel,
   getSelectedConfig,
-  showNotification,
 } from '../index.ts';
-import { isCursorTrackingAvailable } from '../chat/modelSelector.ts';
 import { handleSlashCommand } from '../chat/slashCommands.ts';
 import { openSubagentSession } from '../subagentSessionPanel.ts';
 import { toggleSettingsPanel } from '../settingsPanel.ts';
@@ -171,19 +169,6 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     if (harness && harness !== 'auto') draft.payload!.harness = harness;
     if (provider && provider !== 'auto') draft.payload!.provider = provider;
     if (model) draft.payload!.model = model;
-
-    const effectiveHarness = harness || 'auto';
-    if (
-      (effectiveHarness === 'auto' || effectiveHarness === 'hermes') &&
-      isCursorTrackingAvailable()
-    ) {
-      showNotification({
-        type: 'info',
-        title: 'Swarm tracking',
-        body: 'Para ver detachments, selecciona harness cursor en el chat.',
-        ttl: 8000,
-      });
-    }
 
     // Update target indicator to reflect actual dispatch target
     const indicator = document.getElementById('chat-target-indicator');

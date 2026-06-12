@@ -178,6 +178,13 @@ export function showContextMenu(
     row.addEventListener('click', () => {
       const item = items[i]!;
       hideContextMenu();
+      // Local-action items (Mover/Construir/Dormir/Info) carry a callback
+      // instead of a draft. Run it and skip the command-bus dispatch.
+      if (item.action) {
+        item.action();
+        return;
+      }
+      if (!item.draft) return; // malformed item — no-op
       // If prompt: show preview instead of direct send
       if (item.draft.payload?.['promptUser']) {
         showDirectivePreview(

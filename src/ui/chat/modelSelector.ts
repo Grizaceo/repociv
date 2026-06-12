@@ -1,5 +1,5 @@
 // ─── 3-layer selector: Harness / Provider / Model ──────────────────────────
-import { bridgeHeaders, bridgeUrl, hermesWebUrl } from '../../bridgeEnv.ts';
+import { bridgeHeaders, bridgeUrl } from '../../bridgeEnv.ts';
 import { getActiveChatUnit } from './state.ts';
 
 interface HarnessInfo {
@@ -74,9 +74,12 @@ export function initProviderSelectors(): void {
       populateModels();
       persistSelection(getActiveChatUnit());
       updateStatusIndicator();
-      if (_selectedModel) {
-        switchHermesModel(_selectedProvider, _selectedModel);
-      }
+      // Note: previously called switchHermesModel() here, but that hit
+      // the Hermes web server (:9119, TUI-only) instead of the gateway
+      // (:8642) and silently failed. The gateway honors the per-request
+      // `model` field on /v1/chat/completions, which is already carried
+      // in every chat draft's payload — so the next message will use
+      // the newly-selected model without any extra round-trip.
     });
     provSel.dataset['wired'] = '1';
   }
@@ -85,9 +88,8 @@ export function initProviderSelectors(): void {
       _selectedModel = modelSel.value;
       persistSelection(getActiveChatUnit());
       updateStatusIndicator();
-      if (_selectedModel && _selectedProvider) {
-        switchHermesModel(_selectedProvider, _selectedModel);
-      }
+      // See provSel change comment — switchHermesModel is a no-op now;
+      // the model is applied per-request via the chat draft payload.
     });
     modelSel.dataset['wired'] = '1';
   }
@@ -344,31 +346,6 @@ function updateStatusIndicator(): void {
   dot.title = `Provider: ${label} — ${reason}`;
   parent?.insertBefore(dot, provSel);
   updateSwarmBadge();
-}
-
-/** Switch Hermes model/provider via the web server API. */
-function switchHermesModel(provider: string, model: string): void {
-  const ctrl = new AbortController();
-  setTimeout(() => ctrl.abort(), 10_000);
-  fetch(hermesWebUrl('/api/model/switch'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ provider, model, session_key: 'cli', persist: false }),
-    signal: ctrl.signal,
-  })
-    .then(async (r) => {
-      if (!r.ok) {
-        const body = await r.text().catch(() => '');
-        // eslint-disable-next-line no-console
-        console.warn('[repociv] model switch failed:', r.status, body);
-      }
-    })
-    .catch((err) => {
-      if (err.name !== 'AbortError') {
-        // eslint-disable-next-line no-console
-        console.warn('[repociv] model switch error:', err);
-      }
-    });
 }
 
 function populateModels(savedModel?: string): void {

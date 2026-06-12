@@ -17,6 +17,7 @@ import {
   interpretCityToCityDrag,
   interpretAreaSelect,
   contextMenuForCity,
+  contextMenuForUnit,
   type SpatialDirective,
 } from './spatialDirectives.ts';
 import {
@@ -608,7 +609,7 @@ export class Renderer {
       { passive: false },
     );
 
-    // ── contextmenu (right-click): command palette ────────────────────────────
+    // ── contextmenu (right-click): unit OR city menu ─────────────────────────
     this.canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       this.actionMode = 'none';
@@ -617,14 +618,45 @@ export class Renderer {
       const wy = e.clientY - rect.top;
       const coord = this.pickAxial(wx, wy);
       const tile = this.state.world.tiles.get(tileKey(coord));
+      // Priority 1: a unit is under the cursor → unit action menu
+      // (Mover / Construir / Dormir / Información).
+      const hitUnit = this.state.getUnitAt(coord);
+      if (hitUnit) {
+        const items = contextMenuForUnit(hitUnit, {
+          onMove: () => {
+            this.selectedUnit = hitUnit;
+            this.state.selectUnit(hitUnit);
+            this.setActionMode('move');
+          },
+          onBuild: () => {
+            this.selectedUnit = hitUnit;
+            this.state.selectUnit(hitUnit);
+            this.setActionMode('build');
+          },
+          onSleep: () => {
+            this.selectedUnit = hitUnit;
+            this.state.selectUnit(hitUnit);
+            this.state.setUnitState(hitUnit.id, 'sleeping');
+          },
+          onInfo: () => {
+            this.selectedUnit = hitUnit;
+            this.state.selectUnit(hitUnit);
+            this.onUnitSelect?.(hitUnit);
+          },
+        });
+        this.onContextMenu?.(items, { x: e.clientX, y: e.clientY });
+        return;
+      }
+      // Priority 2: city tile → city action menu (mission dispatch).
       if (tile?.city) {
         const items = contextMenuForCity(tile.city, this.selectedUnit);
         this.onContextMenu?.(items, { x: e.clientX, y: e.clientY });
-      } else {
-        hideDirectivePreview();
-        hideContextMenu();
-        this.selectedUnit = null;
+        return;
       }
+      // Priority 3: empty hex → clear selection.
+      hideDirectivePreview();
+      hideContextMenu();
+      this.selectedUnit = null;
     });
 
     // ── mouseleave: hide unit tooltip ────────────────────────────────────────
