@@ -63,6 +63,20 @@ Es single-user por diseño: un tablero para coordinar tu propio ecosistema de ag
 
 ## Quick Start
 
+### Opción A — Docker (recomendado para probarlo)
+
+```bash
+git clone https://github.com/Grizaceo/repociv.git
+cd repociv
+export MAP_ROOT="$HOME/projects"   # carpeta cuyas hijas se vuelven ciudades
+docker compose up --build
+# Abre http://localhost:5273
+```
+
+Ver [docs/DOCKER.md](docs/DOCKER.md) para referencia completa (mapeo de puertos, env vars, troubleshooting). La imagen corre bridge + Vite en un solo container — no necesitas Python ni Node en el host.
+
+### Opción B — Instalación local
+
 ### 1. Clonar e instalar
 
 ```bash

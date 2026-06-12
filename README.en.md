@@ -35,6 +35,20 @@ It is single-user by design: a board for coordinating your own agent ecosystem, 
 
 ## Quick Start
 
+### Option A — Docker (recommended for trying it out)
+
+```bash
+git clone https://github.com/Grizaceo/repociv.git
+cd repociv
+export MAP_ROOT="$HOME/projects"   # folder whose subdirs become cities
+docker compose up --build
+# Open http://localhost:5273
+```
+
+See [docs/DOCKER.md](docs/DOCKER.md) for full reference (port mapping, env vars, troubleshooting). The image runs the bridge + Vite in a single container — no Python or Node install needed on the host.
+
+### Option B — Local install
+
 ### 1. Clone and install
 
 ```bash

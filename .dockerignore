@@ -1,26 +1,63 @@
-# RepoCiv agent image build context (Dockerfile.agent)
+# RepoCiv Docker build context
+# Used by both Dockerfile (full dashboard) and Dockerfile.agent (isolated workers).
+# Keep this aggressive — the .hermes/ folder alone is 187M and would
+# balloon the build context otherwise.
+
+# VCS / CI
 .git
 .github
-.venv
-venv
-node_modules
-dist
-build
-.vite
-coverage
-.pytest_cache
-.ruff_cache
-*.duckdb
-*.duckdb.wal
-data
-.env
-.env.*
-!.env.example
-*.log
-docs/design/screenshots
-execplan
+.gitignore
+
+# Editor / agent / personal tooling (also gitignored, but exclude from context too)
 .claude
 .cursor
 .gstack
+.hermes
+.commandcode
 .idea
 .vscode
+execplan
+
+# Python
+.venv
+venv
+ENV
+__pycache__
+*.py[cod]
+*.pyo
+.pytest_cache
+.ruff_cache
+.coverage
+coverage
+
+# Node
+node_modules
+.vite
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist
+build
+test-results
+
+# Runtime data and secrets
+data
+*.duckdb
+*.duckdb.wal
+.env
+.env.*
+!.env.example
+shared/provider-registry.json
+
+# Logs
+*.log
+bridge.log
+build.log
+vite.log
+
+# Heavy design assets (served via CDN in the UI, not needed in image)
+docs/design/screenshots
+docs/design/screenshots/repociv-demo.mp4

@@ -1,0 +1,70 @@
+# RepoCiv — full dashboard stack in Docker
+#
+# One service. One image. Three ports exposed. The MAP_ROOT bind mount is the
+# only thing you really need to think about.
+#
+# Usage:
+#   1. Set MAP_ROOT in .env (or export MAP_ROOT=/path/to/your/repos)
+#   2. docker compose up --build
+#   3. Open http://localhost:5273
+#
+# The image is built from the Dockerfile in this directory. The first build
+# pulls python:3.12-slim and nodejs from Nodesource, then runs npm ci and
+# pip install. Subsequent builds are cached.
+
+services:
+  repociv:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: repociv:latest
+    container_name: repociv
+    restart: unless-stopped
+
+    # Bridge HTTP (5274), Bridge WebSocket (5275), Vite UI (5273).
+    # All three are required: the browser connects to 5273 for the UI and
+    # directly to 5275 for the events WebSocket (the Vite proxy only covers
+    # /bridge/*, not the standalone WS port).
+    ports:
+      - "5273:5273"   # Vite dev server (UI)
+      - "5274:5274"   # Bridge HTTP API
+      - "5275:5275"   # Bridge WebSocket (events)
+
+    # MAP_ROOT is the folder whose subdirectories become cities on the hex map.
+    # Bind-mount it read-only: the bridge only reads file metadata to render
+    # the map. Override MAP_ROOT in the environment block to point at your
+    # own repos folder.
+    volumes:
+      - ${MAP_ROOT:-$HOME/.hermes/workspace/repos}:/workspace/repos:ro
+
+    environment:
+      # Map root inside the container. Must match the bind mount target above.
+      REPOCIV_MAP_ROOT: /workspace/repos
+      WORKSPACE_ROOT: /workspace/repos
+      REPOCIV_REPOS_ROOT: /workspace/repos
+
+      # Port configuration (matches EXPOSE in the Dockerfile).
+      VITE_PORT: "5273"
+      BRIDGE_PORT: "5274"
+      BRIDGE_WS_PORT: "5275"
+
+      # Dev mode: empty token = localhost-only auth bypass. Set a 32+ char
+      # token and REPOCIV_REMOTE=true to expose the bridge on 0.0.0.0
+      # safely. See .env.example for the full key list.
+      REPOCIV_TOKEN: ""
+      REPOCIV_REMOTE: ""
+
+    # Run as non-root for defense in depth. The image already creates the
+    # repociv user in Dockerfile.agent — but this image is separate, so we
+    # add it here too if missing. Kept commented for simplicity; uncomment
+    # for production.
+    # user: "1000:1000"
+
+    # Healthcheck mirrors the one in the Dockerfile: Vite serves index.html
+    # only after the bridge is up, so a 200 on the UI implies a healthy stack.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5273/"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
