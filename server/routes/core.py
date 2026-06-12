@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json as _json_lib
+import logging
 import os
 import time
 import urllib.error
@@ -21,15 +22,24 @@ def _error(status: int, error: str, cause: str, hint: str) -> tuple[int, dict]:
     return status, {"error": error, "cause": cause, "hint": hint}
 
 def _auth_headers(provider: str) -> dict[str, str]:
-    """Return Authorization header for a given provider, if API key is set."""
+    """Return Authorization header for a given provider, if API key is set.
+
+    Slugs are the canonical Hermes names; legacy aliases (``openai``,
+    ``nvidia-nim``) are kept as fallbacks for persisted selections from
+    pre-v2.1 RepoCiv state. See execplan/provider-model-parity-with-hermes-tui.md §A.6.
+    """
     env_keys = {
         "ollama-cloud": "OLLAMA_API_KEY",
         "openrouter": "OPENROUTER_API_KEY",
+        # Canonical Hermes slugs:
+        "openai-api": "OPENAI_API_KEY",
+        "nvidia": "NVIDIA_API_KEY",
+        # Legacy aliases (RepoCiv static registry used these pre-v2.1):
         "openai": "OPENAI_API_KEY",
+        "nvidia-nim": "NVIDIA_API_KEY",
         "anthropic": "ANTHROPIC_API_KEY",
         "deepseek": "DEEPSEEK_API_KEY",
         "xai": "XAI_API_KEY",
-        "nvidia-nim": "NVIDIA_API_KEY",
     }
     key = env_keys.get(provider)
     if key:
@@ -272,15 +282,34 @@ def get_providers_live(ctx: "RouteContext") -> tuple[int, Any]:
         hermes_headers["Authorization"] = f"Bearer {hermes_key}"
 
     # ── 2. Build probe map: all providers + hermes in one pass ──
+    # Canonical Hermes slugs (post-v2.1); legacy aliases removed from the
+    # probe set so a probe result for a slug is keyed by the canonical name
+    # the new builder emits. Legacy aliases still resolve to env keys via
+    # `_auth_headers` (above) for backward compat with persisted state.
     _PROVIDER_MODEL_ENDPOINTS = {
         "ollama-cloud": "https://api.ollama.com/v1/models",
         "openrouter":   "https://openrouter.ai/api/v1/models",
-        "openai":       "https://api.openai.com/v1/models",
+        "openai-api":   "https://api.openai.com/v1/models",
         "anthropic":    "https://api.anthropic.com/v1/models",
         "deepseek":     "https://api.deepseek.com/v1/models",
         "xai":          "https://api.x.ai/v1/models",
-        "nvidia-nim":   "https://integrate.api.nvidia.com/v1/models",
+        "nvidia":       "https://integrate.api.nvidia.com/v1/models",
     }
+    # Auto-extend from any provider declared in ~/.hermes/config.yaml with
+    # a base_url ending in /v1 — that gives live probe for user-added
+    # custom endpoints (and any future plugin provider). No-op if the
+    # YAML doesn't expose a base_url for that provider.
+    try:
+        from server.provider_registry import _read_hermes_yaml
+        _yaml_providers = (_read_hermes_yaml() or {}).get("providers", {}) or {}
+        for _pid, _pcfg in _yaml_providers.items():
+            if _pid in _PROVIDER_MODEL_ENDPOINTS:
+                continue
+            base = str((_pcfg or {}).get("base_url", "")).rstrip("/")
+            if base.endswith("/v1"):
+                _PROVIDER_MODEL_ENDPOINTS[_pid] = base + "/models"
+    except Exception:
+        logging.exception("[/providers/live] failed to extend endpoints from YAML")
 
     to_probe: dict[str, tuple[str, dict[str, str]]] = {
         "__hermes__": (f"{hermes_url}/v1/models", hermes_headers),

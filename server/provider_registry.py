@@ -1,19 +1,61 @@
-"""RepoCiv — Provider & Harness Registry (v2).
+"""RepoCiv — Provider & Harness Registry (v2.1 — Hermes parity).
 
 Reads shared/provider-registry.json as a local override and
 shared/provider-registry.example.json as the public fallback. It also
 dynamically detects providers from the actual HERMES_ROOT config.yaml and env vars.
 This ensures RepoCiv stays in sync with what Hermes really has available.
+
+v2.1 (2026-06-11): when hermes-agent is importable, source the provider/model
+list from `build_models_payload` (the same function that feeds Hermes GUI
+pickers). Fallback to the static registry if hermes-agent is not installed
+or the import fails for any reason. See execplan/provider-model-parity-with-hermes-tui.md.
 """
 from __future__ import annotations
 
 import json
+import logging
 import os
+import sys
+import time
 from pathlib import Path
 from typing import Any
-import logging
 
 from .agent_runner import _has_claude_code, _has_openclaw, _has_cursor, _has_codex
+
+# ─── HERMES IMPORT BLOCK ────────────────────────────────────────────────────
+# When hermes-agent is importable, source the provider/model list from
+# `build_models_payload` (same function that feeds Hermes GUI pickers).
+# This gives 1:1 parity with `hermes model` in the TUI.
+#
+# `HERMES_AGENT_PATH=/nonexistent` is a kill-switch for rollback without
+# code revert. We do not import anything else from `hermes_cli` — smaller
+# surface = smaller refactor-breakage risk.
+
+_HERMES_AGENT = Path(
+    os.environ.get("HERMES_AGENT_PATH", str(Path.home() / ".hermes" / "hermes-agent"))
+)
+if _HERMES_AGENT.exists() and str(_HERMES_AGENT) not in sys.path:
+    sys.path.insert(0, str(_HERMES_AGENT))
+
+try:
+    from hermes_cli.inventory import build_models_payload, load_picker_context
+    from hermes_cli.models import provider_group_for_slug
+
+    _HERMES_IMPORT_OK = True
+    _HERMES_IMPORT_ERROR: str | None = None
+except Exception as _exc:  # noqa: BLE001 — any failure -> legacy fallback
+    build_models_payload = None  # type: ignore[assignment]
+    load_picker_context = None  # type: ignore[assignment]
+    provider_group_for_slug = None  # type: ignore[assignment]
+    _HERMES_IMPORT_OK = False
+    _HERMES_IMPORT_ERROR = repr(_exc)
+
+# Cache for the raw Hermes payload (same data Hermes GUI pickers consume).
+# build_models_payload can hit the network (model cache refresh); 60 s TTL
+# keeps /providers cheap without going stale on model additions.
+_hermes_payload_cache: tuple[float, dict] | None = None
+_HERMES_PAYLOAD_TTL = 60.0
+# ───────────────────────────────────────────────────────────────────────────
 
 # ─── Static JSON (fallback) ──────────────────────────────────────────────────────
 
@@ -65,7 +107,7 @@ def _read_hermes_yaml() -> dict[str, Any] | None:
     """Read ~/.hermes/config.yaml and return the parsed config (best-effort)."""
     import yaml  # PyYAML — available in hermes venv
 
-    hermes_root = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", str(Path.home() / ".hermes"))))
+    hermes_root = Path(os.environ.get("HERMES_ROOT", str(Path.home() / ".hermes")))
     config_path = hermes_root / "config.yaml"
 
     # Also check the RepoCiv .env override
@@ -218,20 +260,53 @@ def _build_dynamic_providers() -> tuple[list[dict], list[dict]]:
     return harnesses_out, providers_out
 
 
-# ─── Public API ───────────────────────────────────────────────────────────────────
-
-def _get_harnesses() -> list[dict[str, Any]]:
-    """Return available harnesses with live availability info."""
-    harnesses, _ = _build_dynamic_providers()
-    return harnesses
+# ─── Hermes parity layer (v2.1) ─────────────────────────────────────────────
 
 
-def _get_providers() -> dict[str, Any]:
-    """Return available providers with their models (dynamic + static merge)."""
+def _hermes_models_payload() -> dict[str, Any] | None:
+    """Return the raw payload Hermes' GUI pickers consume, or None on failure.
+
+    Cached for ``_HERMES_PAYLOAD_TTL`` seconds. ``build_models_payload`` may
+    hit the network (model cache refresh); the TTL keeps ``GET /providers``
+    cheap without going stale on provider additions.
+    """
+    global _hermes_payload_cache
+    if not _HERMES_IMPORT_OK:
+        return None
+    assert build_models_payload is not None and load_picker_context is not None
+    now = time.time()
+    if _hermes_payload_cache and now - _hermes_payload_cache[0] < _HERMES_PAYLOAD_TTL:
+        return _hermes_payload_cache[1]
+    try:
+        payload = build_models_payload(
+            load_picker_context(),
+            max_models=50,
+            include_unconfigured=True,
+            picker_hints=True,
+            canonical_order=True,
+            pricing=False,  # not consumed by RepoCiv UI; skip network
+            capabilities=False,  # not consumed by RepoCiv UI; skip network
+        )
+    except Exception:
+        logging.exception("[provider_registry] build_models_payload failed")
+        return None
+    _hermes_payload_cache = (now, payload)
+    return payload
+
+
+def _legacy_get_providers() -> dict[str, Any]:
+    """Pre-v2.1 behavior: dynamic + static merge of shared registry + YAML."""
     _, providers = _build_dynamic_providers()
 
-    # Pick default provider: first available configured one, then any available
-    priority = ("ollama-cloud", "openrouter", "openai", "nvidia-nim", "anthropic", "deepseek", "xai")
+    # Pick default provider: first available configured one, then any available.
+    # Slugs updated to canonical Hermes names; legacy aliases kept for backward
+    # compat with persisted selections (see execplan §A.7).
+    priority = (
+        "ollama-cloud", "openrouter",
+        "openai-api", "openai",          # canonical first, legacy fallback
+        "nvidia", "nvidia-nim",
+        "anthropic", "deepseek", "xai",
+    )
     default_provider = ""
     for pid in priority:
         for p in providers:
@@ -253,23 +328,101 @@ def _get_providers() -> dict[str, Any]:
     }
 
 
+def _get_providers() -> dict[str, Any]:
+    """Providers with 1:1 parity vs `hermes model`; legacy fallback otherwise.
+
+    When ``_HERMES_IMPORT_OK`` and the payload builds cleanly, we source
+    the list from Hermes' own ``build_models_payload`` (same function that
+    feeds Hermes GUI pickers). Otherwise we fall back to the pre-v2.1
+    static + YAML merge, and signal that with ``hermesParity: False``.
+    """
+    payload = _hermes_models_payload()
+    if payload is None:
+        out = _legacy_get_providers()
+        out["hermesParity"] = False
+        out["hermesParityError"] = _HERMES_IMPORT_ERROR or "payload build failed"
+        return out
+
+    cfg = _read_hermes_yaml() or {}
+    yaml_providers = cfg.get("providers", {}) or {}
+    assert provider_group_for_slug is not None  # only reached if import OK
+
+    # The currently active model (e.g. "MiniMax-M3") — used for default_model
+    # of the row whose slug matches `payload["provider"]`.
+    active_model = payload.get("model") or ""
+    active_provider_slug = payload.get("provider") or ""
+
+    providers_out: list[dict[str, Any]] = []
+    for row in payload.get("providers", []):
+        slug = str(row.get("slug") or "").strip()
+        if not slug:
+            continue
+        model_ids = [m for m in (row.get("models") or []) if m]
+        models = [
+            {"id": mid, "name": mid, "harnesses": ["hermes", "openclaw"]}
+            for mid in model_ids
+        ]
+        ycfg = yaml_providers.get(slug) or {}
+        # defaultModel precedence:
+        #   1. yaml default_model (explicit user choice)
+        #   2. the active model name if this is the active provider
+        #   3. first model in the curated list
+        if row.get("is_current") or slug == active_provider_slug:
+            default_model = ycfg.get("default_model") or active_model or (
+                model_ids[0] if model_ids else ""
+            )
+        else:
+            default_model = ycfg.get("default_model") or (
+                model_ids[0] if model_ids else ""
+            )
+
+        providers_out.append({
+            "id": slug,
+            "name": row.get("name") or slug,
+            "available": bool(row.get("authenticated") or row.get("is_user_defined")),
+            "configured": bool(
+                slug in yaml_providers
+                or row.get("authenticated")
+                or row.get("is_user_defined")
+            ),
+            "env": row.get("key_env") or ycfg.get("api_key_env") or "",
+            "defaultModel": default_model,
+            "models": models,
+            "group": provider_group_for_slug(slug) or "",
+            "warning": row.get("warning") or "",
+        })
+
+    default_provider = active_provider_slug or _pick_default_provider(providers_out)
+    # Guard: if default_provider is not in our emitted list (e.g. "custom" with
+    # a user-defined variant that canonical mapping didn't cover), fall back.
+    if default_provider not in {p["id"] for p in providers_out}:
+        default_provider = _pick_default_provider(providers_out)
+
+    return {
+        "defaultProvider": default_provider,
+        "providers": providers_out,
+        "hermesParity": True,
+    }
+
+
 def _get_chat_config(harness: str | None = None) -> dict[str, Any]:
     """
     Return full 3-layer config for the chat UI: harnesses + providers + defaults.
 
-    Always filters to only providers actually configured in ~/.hermes/config.yaml
-    (field `configured: true`). Never returns providers from the static registry
-    that the user hasn't set up — no hardcoded lists.
-    The `harness` parameter is accepted for future use but does not change filtering.
+    In parity mode (hermes-agent importable), returns the full Hermes
+    provider universe — same as `hermes model` shows in the TUI. In legacy
+    mode, filters to only providers configured in ~/.hermes/config.yaml
+    (field `configured: true`) — pre-v2.1 behavior, kept as the safe
+    fallback when hermes-agent is unreachable.
     """
     harnesses = _get_harnesses()
     provider_info = _get_providers()
 
-    # Always filter to only providers configured in ~/.hermes/config.yaml
-    providers_list = [
-        p for p in provider_info["providers"]
-        if p.get("configured")
-    ]
+    providers_list = provider_info["providers"]
+    if not provider_info.get("hermesParity"):
+        # Legacy path: keep the old "only configured" filter to preserve
+        # the pre-v2.1 user experience when parity is unavailable.
+        providers_list = [p for p in providers_list if p.get("configured")]
 
     # Pick default provider from the (possibly filtered) list
     default_provider = _pick_default_provider(providers_list)
@@ -283,21 +436,33 @@ def _get_chat_config(harness: str | None = None) -> dict[str, Any]:
         if default_harness:
             break
 
-    return {
+    out = {
         "harnesses": harnesses,
         "defaultHarness": default_harness,
         "defaultProvider": default_provider,
         "providers": providers_list,
     }
+    if "hermesParity" in provider_info:
+        out["hermesParity"] = provider_info["hermesParity"]
+    if "hermesParityError" in provider_info:
+        out["hermesParityError"] = provider_info["hermesParityError"]
+    return out
 
 
 def _pick_default_provider(providers: list[dict[str, Any]]) -> str:
     """
     Pick the best default provider from a (possibly filtered) list.
-    Priority: ollama-cloud > openrouter > openai > nvidia-nim > anthropic > deepseek > xai
+
+    Priority: ollama-cloud > openrouter > openai-api > openai (legacy alias)
+    > nvidia > nvidia-nim (legacy alias) > anthropic > deepseek > xai;
     then first available.
     """
-    priority = ("ollama-cloud", "openrouter", "openai", "nvidia-nim", "anthropic", "deepseek", "xai")
+    priority = (
+        "ollama-cloud", "openrouter",
+        "openai-api", "openai",
+        "nvidia", "nvidia-nim",
+        "anthropic", "deepseek", "xai",
+    )
     for pid in priority:
         for p in providers:
             if p["id"] == pid and p.get("available"):
@@ -306,3 +471,11 @@ def _pick_default_provider(providers: list[dict[str, Any]]) -> str:
         if p.get("available"):
             return p["id"]
     return ""
+
+
+# ─── Public API ───────────────────────────────────────────────────────────────────
+
+def _get_harnesses() -> list[dict[str, Any]]:
+    """Return available harnesses with live availability info."""
+    harnesses, _ = _build_dynamic_providers()
+    return harnesses
