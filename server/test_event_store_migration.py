@@ -7,7 +7,6 @@ that referenced the legacy personal agent name "DAVI" to the generic
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pytest

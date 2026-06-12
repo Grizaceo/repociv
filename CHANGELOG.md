@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Onboarding harness pick step** — paso 2 de 4 del panel inicial. El usuario elige el harness que corre su primera unidad (MAIN) entre Hermes (recomendado), Claude Code, Codex, Cursor y OpenClaw. La elección persiste en `~/.repociv/config.json` y se usa al rutear comandos sobre MAIN. Visitantes recurrentes ven su selección previa. Endpoint `GET/POST /api/config/default-harness` (auth por token).
+- **MAIN slot como primera unidad** — `state.spawnUnit('MAIN', ...)` reemplaza al antiguo `'DAVI'` hardcoded. La tecla Q spawnea MAIN; la L (LEXO) se eliminó del hotkey map. MAIN es agnóstico al harness hasta que el usuario elige uno; el bridge resuelve el routing desde config en cada comando.
+- **One-shot events.jsonl migration** — al primer boot, las entradas históricas que referencian al agente personal `'DAVI'` se reescriben a `'MAIN'` (actor, unit, unitId, agentId, y campos en `data.*`). Marker file `.migrated-davi-to-main` hace la migración idempotente. Commits `55b9dc0`, `f84ff20`.
+
+### Changed
+
+- **Sanitize agent surface** — los nombres personales DAVI y LEXO salen del shipped product surface. AgentBase (TS), AGENT_CAPABILITIES, _BASE_TIERS, _BASE_ENFORCED, AGENT_CONCURRENCY, los defaults de los endpoints del bridge, y la Q-spawn heredada ahora apuntan a MAIN o a los shipped built-ins (WORKER, SCOUT) y aliases de harness (OPENCLAW, CLAUDE, CODEX, CURSOR). 9 docs públicos saneados (SCOPE, ROADMAP, COMPARISON, PUBLIC_ARCHITECTURE, API, MCP, GETTING_STARTED, DATA_SOURCES, design/BRAND). Los archivos históricos (`docs/archive/`, `docs/plans/`, `AUDIT_*`, `FASE1_*`, `EVOLUTION`) se preservan como registro. 677/677 → 684/684 pytest, 493/493 vitest. Commits `55b9dc0`, `f84ff20`.
+
+### Added
+
 - **Vista local: oficina legible (rediseño de composición)** — las salas ya no escalan con el número de archivos: cap de 12 escritorios por sala (`MAX_DESKS_PER_ROOM`) con sizing por capacidad real del grid (`teamClusterCapacity`, misma geometría que el layout). Anillo perimetral de paso, pasillo central ≥2, filas desk/chair/walkway centradas. Todas las zonas con archivos (meeting/infra/break/biophilic incluidas) usan el grid ordenado en vez del fallback checkerboard. Mobiliario de anclaje: watercooler en pared norte, planters en esquinas (sin scatter). Overflow de archivos via cluster pill; misiones caen a `findBestWorkbench`. Escritorio rediseñado como caja extruida con monitor encima y silla de oficina en el atlas SVG. Golden 04 regenerado. Commit `f398568`.
 - **Standalone capital Gris + wonder district hex rendering** — capital Gris se renderiza como entidad separada del grid de repos. Distritos de maravillas (Bibliotheca, Institutum) con renderizado hexagonal propio y fallback de conectividad UI. Commit `871bce7`.
 - **Dual-source task system** — sistema de tareas dual: tareas de Hermes (`PENDING_TRACKER.md`) + tareas locales RepoCiv (IDs con prefijo `L-`). Merger en `GET /pending`, CRUD separado por prefijo de ID. Commits `d8f7efa`.
