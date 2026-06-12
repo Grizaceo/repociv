@@ -6,6 +6,7 @@ import {
   currentAgentMessageIndex,
   agentsWithNewMessages,
   getActiveChatUnit,
+  setActiveChatUnit,
 } from './state.ts';
 import { COPY_SVG, attachCopyListeners, escapeHtml, hasErrorLine } from './clipboard.ts';
 import { renderMarkdown } from './markdown.ts';
@@ -330,11 +331,19 @@ export function appendApprovalCard(
 }
 
 export function clearChat(unitId: string): void {
-  // Only clear buffer and active bubble, NOT the history
+  // Drop the per-unit buffer, in-flight bubble, message index, AND the
+  // persisted history. Without deleting history, the agent selector
+  // re-creates a chip for the removed unit on next session (its
+  // localStorage entry survives), so the user sees tabs for agents
+  // that no longer exist in the game state. Symptom 2026-06-12: "al
+  // reiniciar, los subtabs siguen mostrando agentes anteriores que
+  // ya no se les puede conversar".
   chatBuffers.delete(unitId);
+  chatHistory.delete(unitId);
   currentAgentBubble.delete(unitId);
   currentAgentMessageIndex.delete(unitId);
   if (getActiveChatUnit() === unitId) {
+    setActiveChatUnit(null);
     const container = document.getElementById('chat-messages');
     if (container) container.innerHTML = '';
   }

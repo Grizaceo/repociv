@@ -54,7 +54,7 @@ COMMAND_RISK: dict[str, Risk] = {
     "create_branch":  "medium",
     "git_commit":     "high",
     "delete_file":    "destructive",
-    "execute_agent":  "medium",
+    "execute_agent":  "low",  # user-gated: the act of clicking/sending IS the approval
     "send_message":   "high",
     "subagent_spawn": "high",
     "subagent_dispatch": "high",

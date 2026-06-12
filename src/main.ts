@@ -751,10 +751,55 @@ async function bootstrap() {
     state.selectUnit(unit);
     renderer.selectUnit(unit);
     showUnitPanel(unit, state);
+    _wireUnitPanelButtons();
     const missionInput = document.getElementById('mission-input') as HTMLInputElement | null;
     if (missionInput) {
       missionInput.placeholder = `Misión para ${city.name} (${city.id})`;
       missionInput.focus();
+    }
+  }
+
+  // Wire the 4 unit-panel action buttons (Mover / Construir / Dormir /
+  // Información) to renderer actions. Done once at boot; buttons
+  // dispatch to the currently-selected unit. Symptom 2026-06-12:
+  // "los botones del agent panel parecieran no hacer nada".
+  let _unitPanelWired = false;
+  function _wireUnitPanelButtons(): void {
+    if (_unitPanelWired) return;
+    _unitPanelWired = true;
+    const move = document.getElementById('btn-move');
+    const build = document.getElementById('btn-build');
+    const sleep = document.getElementById('btn-sleep');
+    const info = document.getElementById('btn-info');
+    if (move) {
+      move.addEventListener('click', () => {
+        if (!state.selectedUnit) return;
+        renderer.setActionMode('move');
+      });
+    }
+    if (build) {
+      build.addEventListener('click', () => {
+        if (!state.selectedUnit) return;
+        renderer.setActionMode('build');
+      });
+    }
+    if (sleep) {
+      sleep.addEventListener('click', () => {
+        if (!state.selectedUnit) return;
+        renderer.sleepSelectedUnit();
+      });
+    }
+    if (info) {
+      info.addEventListener('click', () => {
+        const u = state.selectedUnit;
+        if (!u) return;
+        // Mirror the right-click "Información" entry: select the unit and
+        // fire the unit-select callback so any panel listening to it (the
+        // orden de batalla, etc.) re-renders with this unit.
+        state.selectUnit(u);
+        renderer.selectUnit(u);
+        showUnitPanel(u, state);
+      });
     }
   }
 
