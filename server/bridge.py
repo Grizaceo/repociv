@@ -552,6 +552,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/directives/stats":   _routes.get_directives_stats,
             "/directives/suggest": _routes.get_directives_suggest,
             "/harnesses":          _routes.get_harnesses,
+            "/api/config/default-harness": _routes.get_default_harness,
             "/log":                _routes.get_log,
             "/tasks":              _routes.get_tasks,
             "/improve/reflect":    _routes.get_improve_reflect,
@@ -715,6 +716,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/api/graph-relations/refresh": _routes.post_graph_relations_refresh,
             "/session/reset":  _routes.post_session_reset,
             "/model/override": _routes.post_model_override,
+            "/api/config/default-harness": _routes.post_default_harness,
             "/subagents/cancel": _routes.post_subagent_cancel,
         }
         if path in _POST_EXACT:

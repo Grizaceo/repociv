@@ -27,7 +27,9 @@ from server.routes.core import get_chat_config  # noqa: F401
 from server.routes.core import get_metrics  # noqa: F401
 from server.routes.core import get_directives_stats  # noqa: F401
 from server.routes.core import get_directives_suggest  # noqa: F401
-from server.routes.core import get_harnesses  # noqa: F401
+from server.routes.core import get_harnesses
+from server.routes.core import get_default_harness
+from server.routes.core import post_default_harness  # noqa: F401
 from server.routes.core import get_providers_live  # noqa: F401
 from server.routes.core import get_log  # noqa: F401
 from server.routes.core import get_ws_info  # noqa: F401

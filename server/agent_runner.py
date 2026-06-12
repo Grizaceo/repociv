@@ -339,6 +339,23 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
     config = _get_agent_config(unit_id)
     base = unit_id.split("-")[0].upper()
 
+    # MAIN is the user's first unit — its harness is the one the user picked
+    # in onboarding (persisted in ~/.repociv/config.json). Fall back to the
+    # cascade if no choice was made.
+    if base == "MAIN" and not harness:
+        try:
+            from . import config_store as _cs  # noqa: WPS433
+            configured = _cs.get_default_harness()
+            if configured:
+                harness = configured
+                send_to_repociv({
+                    "type": "log",
+                    "msg": f"[{unit_id}] harness from config: {harness}",
+                    "level": "info",
+                })
+        except Exception:
+            pass
+
     if _container_mode_enabled():
         return _run_container_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 

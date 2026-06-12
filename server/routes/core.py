@@ -255,6 +255,35 @@ def get_harnesses(ctx: "RouteContext") -> tuple[int, Any]:
     from server import harness_registry as _hr
     return 200, _hr.list_harnesses()
 
+
+def get_default_harness(_ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/config/default-harness — return the user's chosen default harness.
+
+    Onboarding writes this in step 2 of the panel; until then it is None
+    and MAIN's capabilities stay empty (the bridge does not crash on missing
+    config — it just refuses capability-gated commands).
+    """
+    from server import config_store as _cs
+    return 200, {"harness": _cs.get_default_harness()}
+
+
+def post_default_harness(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
+    """POST /api/config/default-harness — persist the user's harness choice.
+
+    Body: { "harness": "hermes" | "claude" | "codex" | "cursor" | "openclaw" }
+    Response 200: { "harness": "<normalized>" }
+    Response 400: { "error": "<reason>" }
+    """
+    from server import config_store as _cs
+    harness = body.get("harness")
+    if not isinstance(harness, str) or not harness.strip():
+        return 400, {"error": "harness is required and must be a non-empty string"}
+    try:
+        normalized = _cs.set_default_harness(harness)
+    except ValueError as exc:
+        return 400, {"error": str(exc)}
+    return 200, {"harness": normalized}
+
 def get_providers_live(ctx: "RouteContext") -> tuple[int, Any]:
     """Fetch live model reachability from each provider's own API.
 
