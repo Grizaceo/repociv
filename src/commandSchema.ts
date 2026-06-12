@@ -54,7 +54,7 @@ export const COMMAND_RISK: Record<CommandType, Risk> = {
   unit_command: 'medium',
   edit_file: 'medium',
   create_branch: 'medium',
-  execute_agent: 'medium',
+  execute_agent: 'low',  // user-gated: the act of clicking/sending IS the approval
   git_commit: 'high',
   send_message: 'high',
   delete_file: 'destructive',
