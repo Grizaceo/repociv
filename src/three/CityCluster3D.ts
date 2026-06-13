@@ -32,6 +32,13 @@ let capitalDomeMesh: InstancedMesh | null = null;
 let capitalWallMesh: InstancedMesh | null = null;
 let capitalTowerMesh: InstancedMesh | null = null;
 let capitalStar: InstancedMesh | null = null;
+// Civic centre (iter11): a stepped stone plaza dais under every city, a
+// central monument spire for normal cities (capitals already have the GLB
+// keep as their landmark), and a pair of obelisks flanking each capital as
+// its monument district.
+let plazaMesh: InstancedMesh | null = null;
+let spireMesh: InstancedMesh | null = null;
+let capitalLandmarkMesh: InstancedMesh | null = null;
 let lastSignature = '';
 
 export function getCityGroup(): Group {
@@ -95,6 +102,88 @@ export function rebuildCityClusters(
 
   const normalCities = cities.filter((c) => !c.isCapital);
   const capitals = cities.filter((c) => c.isCapital);
+
+  // ── Civic centre: stepped stone plaza + monuments ──────────────────────────
+  // A short two-radius cylinder reads as a stepped dais (top narrower than
+  // base); every city sits on one so the cluster reads as a deliberate civic
+  // ground, not props dropped on grass. Normal cities get a slender marble
+  // spire as their monument (offset south, into the open plaza, so it clears
+  // the central building); capitals skip the spire — the GLB keep is their
+  // landmark — and instead get two flanking obelisks as a monument district.
+  {
+    // Wide tapered dais: bottom radius (0.46) reaches past the perimeter
+    // walls (0.38) so the stone platform frames the whole city; the strong
+    // taper to 0.30 reads as a stepped civic terrace, not a flat disc.
+    const plazaGeom = new CylinderGeometry(HEX_SIZE * 0.30, HEX_SIZE * 0.46, HEX_SIZE * 0.10, 14);
+    const plazaMat = new MeshStandardMaterial({ color: new Color(0xc9bfa6), roughness: 0.92 });
+    const spireGeom = new CylinderGeometry(HEX_SIZE * 0.013, HEX_SIZE * 0.032, HEX_SIZE * 0.46, 6);
+    const spireMat = new MeshStandardMaterial({ color: new Color(0xe4ddca), roughness: 0.5 });
+    const landmarkGeom = new CylinderGeometry(HEX_SIZE * 0.022, HEX_SIZE * 0.046, HEX_SIZE * 0.38, 6);
+    const landmarkMat = new MeshStandardMaterial({
+      color: new Color(0xd9cca2),
+      roughness: 0.55,
+      emissive: new Color(0x3a3220),
+      emissiveIntensity: 0.15,
+    });
+
+    plazaMesh = new InstancedMesh(plazaGeom, plazaMat, cities.length);
+    plazaMesh.receiveShadow = true;
+    if (normalCities.length > 0) {
+      spireMesh = new InstancedMesh(spireGeom, spireMat, normalCities.length);
+      spireMesh.castShadow = true;
+    }
+    if (capitals.length > 0) {
+      capitalLandmarkMesh = new InstancedMesh(landmarkGeom, landmarkMat, capitals.length * 2);
+      capitalLandmarkMesh.castShadow = true;
+    }
+
+    let plazaIdx = 0, spireIdx = 0, landmarkIdx = 0;
+    for (const city of cities) {
+      const tile = getTile(tileKey(city.coord));
+      const elev = tile ? terrainElevation(tile.terrain) : 0;
+      const base = axialToWorld3D(city.coord.q, city.coord.r, elev);
+      plazaMesh.setMatrixAt(
+        plazaIdx++,
+        new Matrix4().makeTranslation(base.x, base.y + 1.5, base.z),
+      );
+      if (!city.isCapital && spireMesh) {
+        // Monument spire, offset south into the open plaza, rising above roofs.
+        spireMesh.setMatrixAt(
+          spireIdx++,
+          new Matrix4().makeTranslation(
+            base.x,
+            base.y + 4 + HEX_SIZE * 0.21,
+            base.z + HEX_SIZE * 0.24,
+          ),
+        );
+      } else if (city.isCapital && capitalLandmarkMesh) {
+        // Two obelisks flanking the keep (clear of its ~0.27·HEX footprint).
+        const h = hashCoord(city.coord.q, city.coord.r);
+        const axis = (h % 6) * (Math.PI / 3);
+        for (let li = 0; li < 2; li++) {
+          const angle = axis + li * Math.PI;
+          capitalLandmarkMesh.setMatrixAt(
+            landmarkIdx++,
+            new Matrix4().makeTranslation(
+              base.x + Math.cos(angle) * HEX_SIZE * 0.42,
+              base.y + 4 + HEX_SIZE * 0.15,
+              base.z + Math.sin(angle) * HEX_SIZE * 0.42,
+            ),
+          );
+        }
+      }
+    }
+    plazaMesh.instanceMatrix.needsUpdate = true;
+    cityGroup.add(plazaMesh);
+    if (spireMesh) {
+      spireMesh.instanceMatrix.needsUpdate = true;
+      cityGroup.add(spireMesh);
+    }
+    if (capitalLandmarkMesh) {
+      capitalLandmarkMesh.instanceMatrix.needsUpdate = true;
+      cityGroup.add(capitalLandmarkMesh);
+    }
+  }
 
   // ── Normal cities: buildings + roofs + perimeter walls + corner towers ─────
   // Civ V palette: pale stone/stucco walls, terracotta roofs, finer silhouettes.
@@ -362,6 +451,9 @@ export function clearCityClusters(): void {
   capitalWallMesh = null;
   capitalTowerMesh = null;
   capitalStar = null;
+  plazaMesh = null;
+  spireMesh = null;
+  capitalLandmarkMesh = null;
 }
 
 export function setCitiesVisible(visible: boolean): void {

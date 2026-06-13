@@ -127,9 +127,10 @@ export class ThreeMapRenderer {
     // changes. Render options participate too: the gated rebuilds take
     // lod/fog/layer toggles as arguments, so a toggle or zoom-driven LOD
     // change must mark the scene dirty even when world state is stable.
-    // Per-frame animTime-driven updates (foam, shoreline, sun arc,
-    // shader time) still run on every frame because their input is
-    // animTime, not world state.
+    // Per-frame animTime-driven updates (foam, shoreline, sun colour
+    // breathing, shader time) still run on every frame because their input
+    // is animTime, not world state. The sun's position is fixed (stable
+    // shadows); only its golden-hour colour/intensity breathe.
     const tileSignature =
       computeWorldSignature(state) +
       `@${opts.lod}:${opts.fogEnabled ? 1 : 0}:${opts.showStructure ? 1 : 0}:${opts.showOps ? 1 : 0}:${opts.showLabels ? 1 : 0}` +
@@ -280,7 +281,8 @@ export class ThreeMapRenderer {
  * in HexWorldScene. Changing any of these forces a rebuild of the
  * terrain mesh, ground plane, territory lines, city clusters, units,
  * and labels. Per-frame animTime-driven updates (foam, shoreline, sun
- * arc, shader time) are NOT gated by this — they run every frame.
+ * colour breathing, shader time) are NOT gated by this — they run every
+ * frame. The sun's position is fixed; only its colour/intensity breathe.
  *
  * It must cover every world input the gated rebuilds read, not just
  * entity counts: unit coords/state (units move without changing id),

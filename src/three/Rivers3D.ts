@@ -149,10 +149,13 @@ export function computeRiverPaths(tiles: Map<string, Tile>): RiverPath[] {
         // reads as a short cascade down the coastal cliff, not a ribbon
         // hovering 13 units over the sea.
         const sea = axialToWorld3D(next.coord.q, next.coord.r, terrainElevation('ocean'));
+        // Reach further into the sea tile (0.70) and sit just at the water
+        // surface (+0.5, was +1.0) so the ribbon dips into the ocean and
+        // merges gaplessly instead of hovering over a coastal seam.
         mouth = new Vector3(
-          landTop.x + (sea.x - landTop.x) * 0.62,
-          sea.y + 1.0,
-          landTop.z + (sea.z - landTop.z) * 0.62,
+          landTop.x + (sea.x - landTop.x) * 0.70,
+          sea.y + 0.5,
+          landTop.z + (sea.z - landTop.z) * 0.70,
         );
         break;
       }
@@ -169,21 +172,55 @@ export function computeRiverPaths(tiles: Map<string, Tile>): RiverPath[] {
     if (path.length < 2 || (mouth === null && !joined)) continue;
     for (const t of path) occupied.add(tileKey(t.coord));
 
-    const points: Vector3[] = [];
-    const revealed: boolean[] = [];
-    for (const t of path) {
-      const p = axialToWorld3D(t.coord.q, t.coord.r, terrainElevation(t.terrain));
-      p.y += riverLift(t.terrain);
-      points.push(p);
-      revealed.push(t.revealed);
-    }
-    if (mouth) {
-      points.push(mouth);
-      revealed.push(path[path.length - 1]!.revealed);
-    }
+    const { points, revealed } = edgeRoutePath(path, mouth);
     paths.push({ points, revealed, mouth });
   }
   return paths;
+}
+
+/** Lifted world-space center of a tile (ribbon clearance baked in). */
+function tileCenterWorld(t: Tile): Vector3 {
+  const p = axialToWorld3D(t.coord.q, t.coord.r, terrainElevation(t.terrain));
+  p.y += riverLift(t.terrain);
+  return p;
+}
+
+/** Re-route a tile-center descent onto the hex EDGE graph (Civ V draws rivers
+ *  along edges, not across tile interiors). Two facts about a regular hex grid
+ *  make this exact and index-free:
+ *    - the midpoint of two adjacent tile centers IS the midpoint of their
+ *      shared edge (centers are mirror images across that edge), so every
+ *      body control point lands on a real tile boundary, never a center;
+ *    - three mutually-adjacent hexes meet at one corner = the centroid of the
+ *      three centers, so a 60° turn routes mid → corner → mid with BOTH spans
+ *      lying on actual edges.
+ *  Only the spring head keeps the source-tile center (a river is born at a
+ *  tile); the whole body hugs edges. Deterministic — same layout, same path. */
+function edgeRoutePath(path: Tile[], mouth: Vector3 | null): {
+  points: Vector3[];
+  revealed: boolean[];
+} {
+  const points: Vector3[] = [tileCenterWorld(path[0]!)];
+  const revealed: boolean[] = [path[0]!.revealed];
+  for (let i = 0; i < path.length - 1; i++) {
+    const a = path[i]!;
+    const b = path[i + 1]!;
+    const ca = tileCenterWorld(a);
+    const cb = tileCenterWorld(b);
+    points.push(ca.clone().add(cb).multiplyScalar(0.5)); // shared-edge midpoint
+    revealed.push(a.revealed && b.revealed);
+    const c = path[i + 2];
+    if (c && axialDistance(a.coord, c.coord) === 1) {
+      // a, b, c mutually adjacent → 60° turn → route through their shared corner.
+      points.push(ca.clone().add(cb).add(tileCenterWorld(c)).multiplyScalar(1 / 3));
+      revealed.push(a.revealed && b.revealed && c.revealed);
+    }
+  }
+  if (mouth) {
+    points.push(mouth);
+    revealed.push(path[path.length - 1]!.revealed);
+  }
+  return { points, revealed };
 }
 
 /** Insert a hash-offset midpoint between consecutive controls so straight
@@ -299,14 +336,17 @@ export function rebuildRivers(tiles: Map<string, Tile>): void {
   geom.setAttribute('position', new Float32BufferAttribute(positions, 3));
   geom.setIndex(indices);
   geom.computeVertexNormals();
-  // Shallow-water blue with a wet-specular finish: low roughness lets the
-  // directional sun put a moving glint on the ribbon as the camera orbits.
+  // Turquoise to match the coastal sea tint (terrainShader sea = rgb
+  // 0.30,0.63,0.66 ≈ 0x4ca1a8) so a river reads as the SAME water as the
+  // coast it flows into, not a separate blue ribbon. Low roughness keeps a
+  // soft wet-specular glint from the fixed afternoon sun; the teal emissive
+  // gives shallow water a faint inner glow without going neon.
   const mat = new MeshStandardMaterial({
-    color: new Color(0x3f8ecb),
-    roughness: 0.20,
+    color: new Color(0x4ca1a8),
+    roughness: 0.22,
     metalness: 0.05,
-    emissive: new Color(0x103450),
-    emissiveIntensity: 0.45,
+    emissive: new Color(0x0e3338),
+    emissiveIntensity: 0.40,
   });
   const mesh = new Mesh(geom, mat);
   riverGroup.add(mesh);
