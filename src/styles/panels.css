@@ -805,24 +805,56 @@
   animation: pulse 1s infinite;
 }
 
+/* Close button on a chip — visible on hover, lets the user clear
+   stale chat tabs (e.g. DAVI/CODEX chips that persist from localStorage
+   after the user hasn't actually used them in a while). */
+.chat-agent-chip .chip-close {
+  display: none;
+  margin-left: 2px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--ui-text-dim);
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+.chat-agent-chip:hover .chip-close {
+  display: inline-block;
+}
+.chat-agent-chip .chip-close:hover {
+  color: var(--civ-happiness, #d44b4b);
+  background: rgba(212, 75, 75, 0.1);
+}
+
 /* Working spinner — shows next to the agent name when the agent is
    currently working, regardless of which tab is active. Cristóbal
    reported the "the other agent says it's working even though I'm
-   here" confusion; the spinner in the top tab solves it. */
+   here" confusion; the spinner in the top tab solves it.
+
+   Implementation note: I originally used a Unicode character (⟳)
+   but the spinner wasn't visibly rotating in some browsers because
+   the character glyph is rendered by the system font, not as a
+   transformed element. Switching to a CSS border-based spinner
+   guarantees the rotation is rendered by the browser's compositing
+   layer. */
 .chat-agent-chip .chip-working {
   display: inline-block;
-  margin-left: 2px;
-  font-size: 11px;
-  line-height: 1;
-  color: var(--ui-text-dim);
+  width: 10px;
+  height: 10px;
+  margin-left: 4px;
+  border: 2px solid transparent;
+  border-top-color: var(--civ-food, #6ab04c);
+  border-right-color: var(--civ-food, #6ab04c);
+  border-radius: 50%;
   opacity: 0;
   transition: opacity var(--transition-fast);
   pointer-events: none;
+  vertical-align: middle;
+  box-sizing: border-box;
 }
 .chat-agent-chip .chip-working.active {
-  color: var(--civ-food, #6ab04c);
   opacity: 1;
-  animation: chip-spin 0.9s linear infinite;
+  animation: chip-spin 0.8s linear infinite;
 }
 @keyframes chip-spin {
   from { transform: rotate(0deg); }
