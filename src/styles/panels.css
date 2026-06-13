@@ -5671,3 +5671,161 @@ kbd {
 .mission-log-panel.hidden {
   display: none;
 }
+
+/* ─── In-chat slash picker (harness / provider / model) ──────────────────── */
+/* Keyboard-first overlay opened by /model, /harness, /provider. Scoped to the
+   chat pane (position: absolute; inset: 0) so it dims the conversation while
+   the user picks. Civ V chrome: gold border, mono type, reachability dots. */
+.slash-picker-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(1.5px);
+}
+.slash-picker {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 78%;
+  background: var(--panel-bg, rgba(8, 6, 4, 0.96));
+  border: 1px solid var(--ui-gold);
+  border-radius: 6px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  font-family: var(--font-mono);
+}
+.slash-picker-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.35);
+}
+.slash-picker-head .sp-title {
+  color: var(--gold-bright);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.slash-picker-head .sp-current {
+  color: var(--ui-text-dim);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.slash-picker-filter {
+  margin: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  color: var(--ui-text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 5px 8px;
+  outline: none;
+}
+.slash-picker-filter:focus {
+  border-color: var(--ui-gold);
+}
+.slash-picker-filter::placeholder {
+  color: var(--ui-text-dim);
+  font-style: italic;
+}
+.slash-picker-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 6px 4px;
+}
+.slash-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  margin: 1px 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--ui-text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.slash-picker-item.selected {
+  background: rgba(0, 0, 0, 0.45);
+  border-color: var(--ui-gold);
+}
+.slash-picker-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.slash-picker-item .sp-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.slash-picker-item .sp-dot.ok {
+  background: var(--civ-food);
+}
+.slash-picker-item .sp-dot.warn {
+  background: var(--civ-gold);
+}
+.slash-picker-item .sp-dot.off {
+  background: #555;
+}
+.slash-picker-item .sp-num {
+  width: 12px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 9px;
+  color: var(--ui-text-dim);
+}
+.slash-picker-item .sp-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.slash-picker-item.current .sp-label {
+  color: var(--gold-bright);
+  font-weight: 700;
+}
+.slash-picker-item .sp-sub {
+  flex-shrink: 0;
+  font-size: 9px;
+  color: var(--ui-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.slash-picker-item .sp-cur {
+  flex-shrink: 0;
+  font-size: 9px;
+  color: var(--civ-food);
+}
+.slash-picker .sp-empty {
+  padding: 14px 10px;
+  color: var(--ui-text-dim);
+  font-size: 11px;
+  font-style: italic;
+  text-align: center;
+}
+.slash-picker-foot {
+  padding: 6px 10px;
+  border-top: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--ui-text-dim);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
