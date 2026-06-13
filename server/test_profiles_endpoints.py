@@ -71,9 +71,16 @@ def _get(bridge, path: str, *, token: str = "") -> tuple[int, dict]:
 
 
 def test_get_profiles_returns_empty_initially(bridge) -> None:
+    # Auto-baseline: the first GET seeds the file with the shipped set,
+    # so the response is the baseline (H, DAVI, MAIN, SCOUT, WORKER,
+    # LEXO, claude, codex, cursor, openclaw) — not empty.
     status, body = _get(bridge, "/api/profiles", token="test-token")
     assert status == 200
-    assert body == {"profiles": {}}
+    profiles = body["profiles"]
+    assert "H" in profiles
+    assert "SCOUT" in profiles and profiles["SCOUT"]["profile_path"] == "~/.hermes/profiles/scout"
+    assert "WORKER" in profiles and profiles["WORKER"]["profile_path"] == "~/.hermes/profiles/worker"
+    assert "LEXO" in profiles and profiles["LEXO"]["profile_path"] == "~/.hermes/profiles/lexo-alpha"
 
 
 def test_post_profiles_creates_entry(bridge) -> None:

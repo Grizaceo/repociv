@@ -83,6 +83,7 @@ import { openWonderVignette } from './ui/wonderVignette.ts';
 import { bindOrdenDeBatalla } from './ui/ordenDeBatalla.ts';
 import { bindSubagentSessionPanel } from './ui/subagentSessionPanel.ts';
 import { bindSlashCommandState } from './ui/chat/slashCommands.ts';
+import { syncWorkingUnitsFromGameState } from './ui/chat/state.ts';
 import { getWonder } from './wonders/manifest.ts';
 import {
   inferCityLabStatus,
@@ -1216,6 +1217,11 @@ async function bootstrap() {
     if (state.selectedUnit) showUnitPanel(state.selectedUnit, state);
   };
   state.subscribe(refreshHero);
+  // Keep the chat chip working-spinner in sync with the game state. The
+  // spinner shows next to the agent name in the top tab so the user can
+  // see at-a-glance which agent is currently working — even when looking
+  // at a different agent's chat.
+  state.subscribe(() => syncWorkingUnitsFromGameState(state));
   bindOrdenDeBatalla(state);
   bindSubagentSessionPanel(state);
   bindSlashCommandState(state);

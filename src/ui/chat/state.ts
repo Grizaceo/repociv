@@ -109,3 +109,60 @@ export function getSidePanelCleanup(): (() => void) | null {
 export function setSidePanelCleanup(v: (() => void) | null): void {
   _sidePanelCleanup = v;
 }
+
+// ═══ Unit working-state tracking (chip indicator) ═══
+// `workingUnits` mirrors the set of unitIds currently in `state === 'working'`.
+// Chat modules (agentChip) read this to show/hide the spinner next to the
+// agent name in the top tab, regardless of which tab is active. The
+// subscription in panel.ts keeps this set in sync with the game state.
+export const workingUnits = new Set<string>();
+
+const _workingSubscribers = new Set<() => void>();
+export function subscribeWorkingUnits(fn: () => void): () => void {
+  _workingSubscribers.add(fn);
+  return () => _workingSubscribers.delete(fn);
+}
+export function notifyWorkingUnitsChanged(): void {
+  for (const fn of _workingSubscribers) fn();
+}
+export function setUnitWorking(unitId: string, isWorking: boolean): void {
+  const had = workingUnits.has(unitId);
+  if (isWorking && !had) {
+    workingUnits.add(unitId);
+    notifyWorkingUnitsChanged();
+  } else if (!isWorking && had) {
+    workingUnits.delete(unitId);
+    notifyWorkingUnitsChanged();
+  }
+}
+
+// Re-sync `workingUnits` from a full game state snapshot. Call this on
+// every game-state change so the chip spinner reflects reality. The
+// `subscribe` in GameState notifies on *any* mutation, so the set is
+// always close to current; using a single pass through units keeps
+// it O(n) per notify, which is fine for a Civ-scale unit count.
+export interface GameStateLike {
+  world: { units: Array<{ id: string; state: string }> };
+}
+export function syncWorkingUnitsFromGameState(state: GameStateLike): void {
+  let changed = false;
+  const current = new Set<string>();
+  for (const unit of state.world.units) {
+    if (unit.state === 'working') current.add(unit.id);
+  }
+  // Add new working
+  for (const id of current) {
+    if (!workingUnits.has(id)) {
+      workingUnits.add(id);
+      changed = true;
+    }
+  }
+  // Remove those no longer working
+  for (const id of workingUnits) {
+    if (!current.has(id)) {
+      workingUnits.delete(id);
+      changed = true;
+    }
+  }
+  if (changed) notifyWorkingUnitsChanged();
+}
