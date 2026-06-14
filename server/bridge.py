@@ -110,7 +110,7 @@ HERMES_ROOT      = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", "~/.her
 # so that the Vite dev proxy keeps working even when remote=true.
 if REPOCIV_REMOTE:
     _remote_origin = os.environ.get("REPOCIV_REMOTE_ORIGIN", "").strip()
-    _ALLOWED_ORIGINS: set[str] | None = (
+    _ALLOWED_ORIGINS: set[str] = (
         {_remote_origin} if _remote_origin
         else {
             f"http://localhost:{REPOCIV_PORT}",
@@ -442,14 +442,15 @@ class BridgeHandler(BaseHTTPRequestHandler):
         return self.headers.get("Origin", "")
 
     def _cors(self) -> None:
+        # _ALLOWED_ORIGINS is always a concrete set (localhost pair, or the
+        # configured REPOCIV_REMOTE_ORIGIN). We never emit a wildcard ACAO:
+        # auth is token-based and credentials/headers depend on a known origin.
         origin = self._origin()
-        if _ALLOWED_ORIGINS is None:
-            # Remote mode: allow any origin
-            self.send_header("Access-Control-Allow-Origin", "*")
-        elif origin in _ALLOWED_ORIGINS:
+        if origin in _ALLOWED_ORIGINS:
             self.send_header("Access-Control-Allow-Origin", origin)
         else:
-            # Dev fallback: allow any localhost origin (non-browser clients / curl)
+            # Fallback for non-browser clients / curl (no/Origin not allowed):
+            # reflect the canonical localhost origin, never the caller's.
             self.send_header("Access-Control-Allow-Origin", f"http://localhost:{REPOCIV_PORT}")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-RepoCiv-Token")
@@ -676,18 +677,24 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self._err_json(404, "not found")
 
     def do_POST(self) -> None:
-        if self._rate_limited():
-            self._err_json(429, "rate limited")
-            return
-
-        # Token auth (POST always requires token if configured)
+        # Token auth first: an unauthenticated caller must not be able to
+        # consume another IP's rate-limit budget (or trip the limiter at all).
         if not self._check_token():
             self._err_json(401, "unauthorized")
             return
 
-        # Body size guard
-        length = int(self.headers.get("Content-Length", 0))
-        if length > _MAX_BODY:
+        if self._rate_limited():
+            self._err_json(429, "rate limited")
+            return
+
+        # Body size guard — tolerate a missing/garbage Content-Length header
+        # instead of crashing with an unhandled ValueError (500).
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except (TypeError, ValueError):
+            self._err_json(400, "invalid Content-Length")
+            return
+        if length < 0 or length > _MAX_BODY:
             self._err_json(413, "payload too large")
             return
 
