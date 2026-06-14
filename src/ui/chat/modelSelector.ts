@@ -37,10 +37,19 @@ let _selectedProvider = '';
 let _selectedModel = '';
 let _cursorAvailable = false;
 
-/** Return providers — server already filters to only configured providers,
- *  so this just returns the full list regardless of harness. */
+/** Providers visible for the current harness. The server lists every
+ *  configured provider; here we narrow to those with at least one model
+ *  compatible with the selected harness (each model carries a `harnesses`
+ *  list). 'auto' (cascade) shows everything. Some harnesses (e.g. cursor,
+ *  codex) declare no per-model compatibility in the registry — never collapse
+ *  to an empty list, so we fall back to the full list when nothing matches. */
 function _filteredProviders(): ProviderInfo[] {
-  return _allProviders;
+  const h = _selectedHarness;
+  if (!h || h === 'auto') return _allProviders;
+  const matching = _allProviders.filter((p) =>
+    p.models.some((m) => !m.harnesses?.length || m.harnesses.includes(h)),
+  );
+  return matching.length ? matching : _allProviders;
 }
 
 function newError(msg: string): Error {
@@ -363,16 +372,21 @@ function populateModels(savedModel?: string): void {
     modelSel.appendChild(opt);
   }
 
+  // Pick a live model. Honor savedModel unless it is a known-dead one
+  // (reachable === false); otherwise prefer the first reachable model so a
+  // provider switch never silently pins a model the picker itself forbids
+  // (R5). Fall back to the provider default only when nothing is reachable.
+  const isLive = (m: ModelInfo): boolean => m.reachable !== false;
+  let target = '';
   if (savedModel) {
-    const exists = provider.models.find((m) => m.id === savedModel);
-    if (exists) {
-      modelSel.value = savedModel;
-      _selectedModel = savedModel;
-      return;
-    }
+    const saved = provider.models.find((m) => m.id === savedModel);
+    if (saved && isLive(saved)) target = savedModel;
   }
-  modelSel.value = provider.defaultModel;
-  _selectedModel = provider.defaultModel;
+  if (!target) {
+    target = provider.models.find(isLive)?.id ?? provider.defaultModel;
+  }
+  modelSel.value = target;
+  _selectedModel = target;
 }
 
 // ─── Per-unit config storage ────────────────────────────────────────────────
@@ -382,6 +396,14 @@ function populateModels(savedModel?: string): void {
 
 function _storageKey(unitId: string | null): string {
   return unitId ? `repociv:chatConfig:${unitId}` : 'repociv:chatConfig';
+}
+
+// A consumer (the agent chip) registers here to mirror a unit's selection on
+// its tab whenever it is persisted. Kept as a callback rather than an import so
+// modelSelector has no dependency on agentChip (which imports modelSelector).
+let _onConfigPersisted: ((unitId: string | null) => void) | null = null;
+export function setConfigPersistedHandler(cb: (unitId: string | null) => void): void {
+  _onConfigPersisted = cb;
 }
 
 function persistSelection(unitId: string | null = null): void {
@@ -398,6 +420,7 @@ function persistSelection(unitId: string | null = null): void {
   } catch {
     // localStorage full or unavailable
   }
+  _onConfigPersisted?.(unitId);
 }
 
 function loadSelection(unitId: string | null = null): {
@@ -476,6 +499,13 @@ export function getSelectedConfig(): { harness: string; provider: string; model:
   return { harness: _selectedHarness, provider: _selectedProvider, model: _selectedModel };
 }
 
+/** The persisted harness/provider/model for a specific unit (per-unit key,
+ *  falling back to the global mirror). Used by the agent chip to label each
+ *  tab with its own configuration without touching the active selection. */
+export function getUnitConfig(unitId: string): { harness: string; provider: string; model: string } {
+  return loadSelection(unitId);
+}
+
 // ─── Programmatic apply API (shared by the DOM <select>s and slashPicker.ts) ──
 // These are the ONLY mutators of the selection triple. Each one updates the
 // matching <select>.value (so the dropdowns reflect a slash-driven change),
@@ -520,7 +550,19 @@ export function applyModelSelection(
 ): void {
   const modelSel = document.getElementById('model-selector') as HTMLSelectElement | null;
   _selectedModel = modelId;
-  if (modelSel) modelSel.value = modelId;
+  if (modelSel) {
+    // A power user can pin a model id that isn't in the fetched provider list
+    // (custom/unlisted). Assigning .value with no matching <option> silently
+    // blanks the dropdown, diverging it from getSelectedConfig(). Add a
+    // synthetic option so the dropdown shows the verbatim pinned model.
+    if (modelId && !Array.from(modelSel.options).some((o) => o.value === modelId)) {
+      const opt = document.createElement('option');
+      opt.value = modelId;
+      opt.textContent = `${modelId} (custom)`;
+      modelSel.appendChild(opt);
+    }
+    modelSel.value = modelId;
+  }
   persistSelection(unitId);
   updateStatusIndicator();
 }

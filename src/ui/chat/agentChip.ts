@@ -10,8 +10,17 @@ import {
   updateChatTargetIndicator,
   workingUnits,
   subscribeWorkingUnits,
+  chatHistory,
+  chatBuffers,
+  currentAgentBubble,
+  currentAgentMessageIndex,
 } from './state.ts';
-import { loadConfigForUnit } from './modelSelector.ts';
+import {
+  loadConfigForUnit,
+  getUnitConfig,
+  setConfigPersistedHandler,
+} from './modelSelector.ts';
+import { escapeHtml } from '../escapeHtml.ts';
 
 const AGENT_ICONS: Record<string, string> = {
   DAVI: '🛡',
@@ -23,14 +32,50 @@ const AGENT_ICONS: Record<string, string> = {
   CODEX: '⌨',
   CURSOR: '🖱',
 };
+/** Compact label for a chip's model line: the model id, else the provider,
+ *  else 'auto' (cascade). */
+function chipModelLabel(cfg: { harness: string; provider: string; model: string }): string {
+  if (cfg.model) return cfg.model;
+  if (cfg.provider && cfg.provider !== 'auto') return cfg.provider;
+  return 'auto';
+}
+
+/** Full harness · provider/model summary for the chip's tooltip. */
+function chipModelTitle(cfg: { harness: string; provider: string; model: string }): string {
+  return `${cfg.harness || 'auto'} · ${cfg.provider || 'auto'}/${cfg.model || 'default'}`;
+}
+
+/** Update the model line on an existing chip to match the unit's persisted
+ *  config. Registered as the modelSelector persist handler so any selection
+ *  change (dropdown, slash command, or picker) reflects on the active tab. */
+export function updateChipModel(unitId: string): void {
+  const container = document.getElementById('chat-agent-selector');
+  if (!container) return;
+  const chip = container.querySelector<HTMLElement>(`.chat-agent-chip[data-unit="${unitId}"]`);
+  const modelEl = chip?.querySelector<HTMLElement>('.chip-model');
+  if (!modelEl) return;
+  const cfg = getUnitConfig(unitId);
+  modelEl.textContent = chipModelLabel(cfg);
+  modelEl.title = chipModelTitle(cfg);
+}
+
+// Mirror every persisted selection onto its tab's model line.
+setConfigPersistedHandler((unitId) => {
+  if (unitId) updateChipModel(unitId);
+});
+
 /** Create a chip button with click handler attached. */
 export function createChip(unitId: string, isActive: boolean): HTMLElement {
   const btn = document.createElement('button');
   btn.className = `chat-agent-chip${isActive ? ' active' : ''}`;
   btn.dataset['unit'] = unitId;
+  const cfg = getUnitConfig(unitId);
   btn.innerHTML =
     `<span class="chip-icon">${AGENT_ICONS[unitId.toUpperCase()] ?? '◆'}</span>` +
+    `<span class="chip-text">` +
     `<span class="chip-name">${unitId.toUpperCase()}</span>` +
+    `<span class="chip-model" title="${escapeHtml(chipModelTitle(cfg))}">${escapeHtml(chipModelLabel(cfg))}</span>` +
+    `</span>` +
     `<span class="chip-working${workingUnits.has(unitId) ? ' active' : ''}" title="Trabajando en otra pestaña"></span>` +
     `<span class="chip-badge${agentsWithNewMessages.has(unitId) ? ' active' : ''}"></span>` +
     // The close button is hidden for the currently active chip (you
@@ -73,8 +118,7 @@ async function closeChip(unitId: string): Promise<void> {
       await handleChipClick(fallback.dataset['unit']!);
     } else {
       // No other chips; create a fresh H chip.
-      const { createChip: cc } = await import('./agentChip.ts');
-      const fresh = cc('H', true);
+      const fresh = createChip('H', true);
       container.appendChild(fresh);
       setActiveChatUnit('H');
       const { renderChatHistory } = await import('./history.ts');
@@ -85,8 +129,6 @@ async function closeChip(unitId: string): Promise<void> {
   chip.remove();
 
   // Clear chat history (in-memory + localStorage).
-  const { chatHistory, chatBuffers, currentAgentBubble, currentAgentMessageIndex } =
-    await import('./state.ts');
   chatHistory.delete(unitId);
   chatBuffers.delete(unitId);
   currentAgentBubble.delete(unitId);

@@ -50,6 +50,7 @@ import { selectHero, spawnAgent } from './spawn.ts';
 import { takeScreenshot } from './screenshot.ts';
 import { toggleLayerPanel, closeLayerPanel, isLayerPanelOpen } from '../layerPanel.ts';
 import { trackHotkey, trackPanelOpen } from '../analytics.ts';
+import { isPickerOpen } from '../chat/slashPicker.ts';
 
 export function wireHotkeys(
   renderer: Renderer,
@@ -60,6 +61,12 @@ export function wireHotkeys(
   document.addEventListener('keydown', (e) => {
     const target = e.target as HTMLElement;
     const inField = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+
+    // A modal slash-picker (/model · /harness · /provider) owns the keyboard
+    // while open: it handles Esc/arrows/Enter/digits/type-ahead itself, so no
+    // global hotkey (spawn letters, hero numbers, panel toggles, or the
+    // Esc-closes-panel branch) may fire underneath it.
+    if (isPickerOpen()) return;
 
     // Hotkey panels
     if (e.key === 'F7') {

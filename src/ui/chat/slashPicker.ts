@@ -148,7 +148,12 @@ function open(kind: PickerKind, unitId: string, append: AppendFn, initialFilter:
   };
 
   // ── Wire interactions ──
-  filterInput.addEventListener('keydown', onKeyDown);
+  // Keydown is bound to the backdrop, not the filter input, so the picker
+  // intercepts (and stopPropagation's) keys no matter which descendant holds
+  // focus — a row <button> reached by Tab would otherwise let Esc and the
+  // single-letter spawn hotkeys leak to the global handler. (Defense in depth:
+  // wireHotkeys also early-returns while isPickerOpen().)
+  backdrop.addEventListener('keydown', onKeyDown);
   filterInput.addEventListener('input', onFilterInput);
   backdrop.addEventListener('mousedown', (e) => {
     if (e.target === backdrop) close(); // click outside the box cancels
@@ -294,6 +299,15 @@ function onKeyDown(e: KeyboardEvent): void {
     e.preventDefault();
     e.stopPropagation();
     close();
+    return;
+  }
+
+  if (e.key === 'Tab') {
+    // Pin focus to the filter input — the list is driven by arrows/digits, and
+    // Tab must neither land on a row <button> nor escape the modal entirely.
+    e.preventDefault();
+    e.stopPropagation();
+    s.filterInput.focus();
     return;
   }
 

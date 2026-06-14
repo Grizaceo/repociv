@@ -21,17 +21,17 @@ const MOCK_PROVIDERS = {
     {
       id: 'openai-api', name: 'OpenAI', available: true, defaultModel: 'gpt-4o',
       models: [
-        { id: 'gpt-4o', name: 'GPT-4o', harnesses: ['hermes'], reachable: true },
-        { id: 'gpt-4o-mini', name: 'GPT-4o mini', harnesses: ['hermes'], reachable: true },
-        { id: 'o1', name: 'o1', harnesses: ['hermes'], reachable: false },
+        { id: 'gpt-4o', name: 'GPT-4o', harnesses: ['hermes', 'claude-code'], reachable: true },
+        { id: 'gpt-4o-mini', name: 'GPT-4o mini', harnesses: ['hermes', 'claude-code'], reachable: true },
+        { id: 'o1', name: 'o1', harnesses: ['hermes', 'claude-code'], reachable: false },
       ],
     },
     {
       id: 'anthropic', name: 'Anthropic', available: true, defaultModel: 'claude-opus-4-8',
       models: [
-        { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', harnesses: ['hermes'], reachable: true },
-        { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', harnesses: ['hermes'], reachable: true },
-        { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', harnesses: ['hermes'], reachable: true },
+        { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', harnesses: ['hermes', 'claude-code'], reachable: true },
+        { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', harnesses: ['hermes', 'claude-code'], reachable: true },
+        { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', harnesses: ['hermes', 'claude-code'], reachable: true },
       ],
     },
     {
@@ -135,6 +135,36 @@ test('/model picker: abre, filtra y aísla Esc del panel', async ({ page }) => {
   await expect(page.locator('#side-panel')).toBeVisible();
 });
 
+test('/model picker: aísla el teclado global (Tab fija foco; Esc y hotkeys no escapan)', async ({
+  page,
+}) => {
+  await boot(page);
+  await openChat(page);
+  await openModelPicker(page);
+
+  // Tab no saca el foco del picker: queda fijo en el input de filtro (no salta
+  // a una fila <button> ni escapa el modal).
+  await page.keyboard.press('Tab');
+  expect(await page.evaluate(() => document.activeElement?.className ?? '')).toContain(
+    'slash-picker-filter',
+  );
+
+  // Fuerza el foco a una fila <button> — el vector exacto del bug original: con
+  // el keydown sólo en el input, las teclas se filtraban al handler global.
+  await page.locator('.slash-picker-item').first().evaluate((el) => (el as HTMLElement).focus());
+
+  // 'h' (hotkey global → panel de Capas) NO debe abrir nada: el handler global
+  // se cortocircuita mientras el picker está abierto (isPickerOpen).
+  await page.keyboard.press('h');
+  await expect(page.locator('#layer-panel')).toBeHidden();
+  await expect(page.locator('.slash-picker')).toBeVisible();
+
+  // Esc cierra sólo el picker, no el panel lateral — aun con foco en la fila.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.slash-picker')).toBeHidden();
+  await expect(page.locator('#side-panel')).toBeVisible();
+});
+
 test('/model picker: number-pick aplica y confirma', async ({ page }) => {
   await boot(page);
   await openChat(page);
@@ -147,6 +177,28 @@ test('/model picker: number-pick aplica y confirma', async ({ page }) => {
   await expect(page.locator('#chat-messages')).toContainText('gpt-4o-mini');
   // El dropdown DOM quedó en sync con la elección por slash.
   await expect(page.locator('#model-selector')).toHaveValue('gpt-4o-mini');
+  // El chip activo muestra el modelo elegido en su línea (R3).
+  await expect(page.locator('.chat-agent-chip.active .chip-model')).toContainText('gpt-4o-mini');
+  await page.locator('#chat-agent-selector-row').screenshot({ path: 'e2e/_shots/chip-model-line.png' });
+});
+
+test('/model picker: el harness filtra los providers compatibles (R2)', async ({ page }) => {
+  await boot(page);
+  await openChat(page);
+
+  // Con hermes (default) todos los providers compatibles → 8 modelos.
+  await openModelPicker(page);
+  await expect(page.locator('.slash-picker-item')).toHaveCount(8);
+  await page.keyboard.press('Escape');
+
+  // Cambia a claude-code: ollama-cloud no declara ese harness, así que sus
+  // modelos desaparecen del picker (quedan OpenAI + Anthropic = 6).
+  await page.locator('#chat-input').fill('/harness claude-code');
+  await page.locator('#chat-input').press('Enter');
+  await expect(page.locator('#chat-messages')).toContainText('Harness →');
+
+  await openModelPicker(page);
+  await expect(page.locator('.slash-picker-item')).toHaveCount(6);
 });
 
 test('/harness picker: marca el harness activo', async ({ page }) => {

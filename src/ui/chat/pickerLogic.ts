@@ -200,17 +200,19 @@ function isSubsequence(q: string, hay: string): boolean {
 }
 
 /** Score a single option against a lowercased query. Higher is better; a
- *  negative result means "no match → exclude". Substring beats subsequence;
- *  a label-prefix match beats a mid-label match beats a sublabel/id match. */
+ *  negative result means "no match → exclude". Ranking tiers, best first:
+ *  label-prefix > mid-label (earlier wins) > a flat sublabel/id/provider hit
+ *  > subsequence fallback. The non-label (haystack-only) tier is deliberately
+ *  FLAT: deriving its score from the haystack index reorders rows by label
+ *  length (e.g. when filtering by a provider name), scrambling the declared
+ *  model order. A constant score lets filterOptions' stable a.i−b.i tiebreak
+ *  preserve the original order for those hits. */
 function scoreMatch(hay: string, label: string, q: string): number {
-  const idx = hay.indexOf(q);
-  if (idx >= 0) {
-    let score = 100 - Math.min(idx, 50);
-    if (label.startsWith(q)) score += 50;
-    else if (label.includes(q)) score += 20;
-    return score;
-  }
-  if (isSubsequence(q, hay)) return 10;
+  const lidx = label.indexOf(q);
+  if (lidx === 0) return 150; // label prefix — best
+  if (lidx > 0) return 100 - Math.min(lidx, 50); // mid-label — earlier is better
+  if (hay.indexOf(q) >= 0) return 60; // matched via id / sublabel / provider — flat
+  if (isSubsequence(q, hay)) return 10; // fuzzy fallback
   return -1;
 }
 

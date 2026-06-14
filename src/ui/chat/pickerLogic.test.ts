@@ -245,10 +245,13 @@ describe('filterOptions', () => {
     expect(r.map((o) => o.id)).toEqual(['gpt-4o', 'gpt-3.5']);
   });
 
-  it('matches by provider name', () => {
+  it('matches by provider name, preserving declared model order', () => {
+    // A provider-name query matches via the search haystack, not the label;
+    // the declared order (opus before haiku) must survive — it must not be
+    // reordered by label length.
     const r = filterOptions(opts, 'anthropic');
     expect(r.every((o) => o.provider === 'anthropic')).toBe(true);
-    expect(r.length).toBe(2);
+    expect(r.map((o) => o.id)).toEqual(['claude-opus-4-8', 'claude-haiku']);
   });
 
   it('ranks a label-prefix match above a mid-string match', () => {
@@ -312,6 +315,22 @@ describe('moveCursor', () => {
       { id: 'a', label: 'a', status: 'off', disabled: true, search: 'a' },
     ];
     expect(moveCursor(0, 1, allDisabled)).toBe(0);
+  });
+
+  it('lands on an enabled row from the initial -1 cursor', () => {
+    // slashPicker seeds cursor = firstSelectableIndex(), which is -1 when the
+    // filtered list has no selectable row; the next arrow feeds -1 into
+    // moveCursor — it must land on an enabled row, never loop.
+    expect(moveCursor(-1, 1, rows)).toBe(0);
+    expect(rows[moveCursor(-1, -1, rows)]!.disabled).toBeFalsy();
+  });
+
+  it('stays at -1 from -1 when every row is disabled (no infinite loop)', () => {
+    const allDisabled: PickerOption[] = [
+      { id: 'a', label: 'a', status: 'off', disabled: true, search: 'a' },
+      { id: 'b', label: 'b', status: 'off', disabled: true, search: 'b' },
+    ];
+    expect(moveCursor(-1, 1, allDisabled)).toBe(-1);
   });
 });
 

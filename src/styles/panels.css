@@ -789,9 +789,34 @@
   font-size: 12px;
   line-height: 1;
 }
+.chat-agent-chip .chip-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+  min-width: 0;
+}
 .chat-agent-chip .chip-name {
   letter-spacing: 0.05em;
   font-weight: 600;
+}
+/* Per-tab model line — shows which model that agent will use, kept tiny and
+   dim so the strip stays compact. Truncates long ids; full harness · provider/
+   model is in the title tooltip. */
+.chat-agent-chip .chip-model {
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--ui-text-dim);
+  opacity: 0.7;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-agent-chip.active .chip-model {
+  color: var(--ui-gold);
+  opacity: 0.9;
 }
 .chat-agent-chip .chip-badge {
   width: 6px;
