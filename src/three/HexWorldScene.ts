@@ -126,6 +126,10 @@ let sunLight: DirectionalLight | null = null;
 let atlasLoadStarted = false;
 let loadedTerrainAtlas: LoadedTerrainAtlas | null = null;
 
+// Fixed late-afternoon sun. Stable position is the whole point: the old
+// code re-set sunLight.position every frame and made shadows swim.
+const SUN_POSITION = { x: -1659, y: 1377, z: 1056 } as const;
+
 export function createHexWorldScene(): Scene {
   const scene = new Scene();
   scene.background = SKY_TOP.clone();
@@ -140,10 +144,8 @@ export function createHexWorldScene(): Scene {
   scene.add(new AmbientLight(0xdacfb6, 0.38));
   scene.add(new HemisphereLight(0xb0d8f0, 0x7aaa60, 0.34));
   sunLight = new DirectionalLight(0xffe7bd, 1.3);
-  // Initial position only — the per-frame sun arc in updateHexWorldScene
-  // owns position/intensity/color. Keep direction + ×8 distance in sync
-  // with the arc (see there for why distance matters to shadows).
-  sunLight.position.set(-880, 1240, 560);
+  // Fixed angle: updateHexWorldScene only breathes colour/intensity.
+  sunLight.position.set(SUN_POSITION.x, SUN_POSITION.y, SUN_POSITION.z);
   sunLight.castShadow = true;
   sunLight.shadow.mapSize.set(2048, 2048);
   sunLight.shadow.camera.left = -2800;
@@ -156,8 +158,8 @@ export function createHexWorldScene(): Scene {
   // without this the shadow window stays at the ±5-unit default and the
   // whole world renders unshadowed.
   sunLight.shadow.camera.updateProjectionMatrix();
-  sunLight.shadow.bias = -0.0004;
-  sunLight.shadow.normalBias = 1.5;
+  sunLight.shadow.bias = -0.0005;
+  sunLight.shadow.normalBias = 0.8;
   scene.add(sunLight);
   scene.add(sunLight.target);
   // Soft fill light from opposite side to reduce harsh shadows
@@ -883,16 +885,6 @@ export function updateHexWorldScene(
     const lodBias = opts.lod === 'low' ? 0.06 : opts.lod === 'medium' ? 0.03 : 0;
     sunLight.color.setRGB(1, (0.94 - lodBias) * warmth, (0.80 - lodBias * 2) * warmth);
     sunLight.intensity = 1.3 + 0.08 * Math.sin(t * 0.6);
-    // Slow arc across the sky. The ×8 distance keeps the same direction
-    // (directional shading is position-invariant) but matters for shadows:
-    // the ortho shadow camera sits AT the light, and anything behind its
-    // near plane fell out of the shadow map when the sun hovered ~200
-    // units from the origin — half the world rendered shadowless.
-    sunLight.position.set(
-      (-110 + 30 * Math.sin(t * 0.3)) * 8,
-      (155 + 20 * Math.sin(t * 0.2)) * 8,
-      (70 + 15 * Math.cos(t * 0.25)) * 8,
-    );
   }
 
   // Shoreline: geometry scan only on dirty frames (its inputs — terrain +

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { interpretUnitToFileDrag, interpretCardDropOnUnit } from './spatialDirectives.ts';
+import { interpretUnitDrag, interpretUnitToFileDrag, interpretCardDropOnUnit } from './spatialDirectives.ts';
 import type { Unit, Tile, City } from './types.ts';
 import type { Axial } from './hex.ts';
 import { draftCommand, type CommandDraft } from './commandSchema.ts';
@@ -76,6 +76,44 @@ function makeUnit(id: string, type: Unit['type'] = 'worker'): Unit {
     effectiveSpeed: 1,
   };
 }
+
+// ─── interpretUnitDrag ────────────────────────────────────────────────────────
+
+describe('interpretUnitDrag', () => {
+  const city = makeCity('repociv', 'repociv');
+  const cityTile = makeTile(city);
+  const unit = makeUnit('main', 'hero');
+
+  it('plain drag onto a city returns null so the renderer performs a local move with no modal', () => {
+    const result = interpretUnitDrag({
+      unit,
+      fromCoord: makeAxial(0, 0),
+      toTile: cityTile,
+      shiftHeld: false,
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it('shift+drag onto a city still creates an explicit run_tests directive', () => {
+    const result = interpretUnitDrag({
+      unit,
+      fromCoord: makeAxial(0, 0),
+      toTile: cityTile,
+      shiftHeld: true,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.draft.type).toBe('run_tests');
+    expect(result!.draft.target).toBe('repociv');
+    expect(result!.draft.payload).toMatchObject({
+      unit: 'main',
+      city: 'repociv',
+      mission: 'Ejecutar tests en repociv',
+      agentType: 'hero',
+    });
+  });
+});
 
 // ─── interpretUnitToFileDrag ─────────────────────────────────────────────────
 

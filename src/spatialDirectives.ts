@@ -60,11 +60,15 @@ export function interpretUnitDrag(params: {
     return null;
   }
 
-  // Shift+drag → run tests if they exist, otherwise inspect
-  const cmdType: CommandType = shiftHeld ? 'run_tests' : 'inspect_repo';
-  const missionText = shiftHeld
-    ? `Ejecutar tests en ${city.name}`
-    : `Inspeccionar repo ${city.name}`;
+  // Plain drag onto a city = local move, NO command, NO preview modal.
+  // Use the right-click menu when you actually want to dispatch a mission.
+  if (!shiftHeld) {
+    return null;
+  }
+
+  // Shift+drag → run tests (explicit, intentional, worth confirming).
+  const cmdType: CommandType = 'run_tests';
+  const missionText = `Ejecutar tests en ${city.name}`;
 
   const draft = draftCommand(cmdType, city.id, {
     unit: unit.id,
