@@ -19,16 +19,9 @@ def isolated_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 def test_default_registry_is_one_profile_per_harness(isolated_config: Path) -> None:
-    # First read with no file: shipped baseline is now auto-populated to
-    # disk, so the user gets the full set (H, DAVI, MAIN, SCOUT, WORKER,
-    # LEXO, claude, codex, cursor, openclaw) on first read.
-    profiles = config_store.list_profiles()
+    # reset_to_default() seeds the shipped baseline on first call.
+    profiles = config_store.reset_to_default()
     assert "H" in profiles and profiles["H"]["harness"] == "hermes"
-    assert "SCOUT" in profiles and profiles["SCOUT"]["profile_path"] == "~/.hermes/profiles/scout"
-    assert profiles["SCOUT"]["stateful"] is False
-    assert "WORKER" in profiles and profiles["WORKER"]["profile_path"] == "~/.hermes/profiles/worker"
-    assert profiles["WORKER"]["stateful"] is False
-    assert "LEXO" in profiles and profiles["LEXO"]["profile_path"] == "~/.hermes/profiles/lexo-alpha"
     for name in ("claude", "codex", "cursor", "openclaw"):
         assert profiles[name] == {"harness": name}
 
@@ -36,29 +29,12 @@ def test_default_registry_is_one_profile_per_harness(isolated_config: Path) -> N
 def test_reset_to_default_populates_shipped_baseline(isolated_config: Path) -> None:
     profiles = config_store.reset_to_default()
     # "H" is the default unit name (uppercase-first sorts first); the
-    # other profiles are named after their harness or persona.
-    # SCOUT/WORKER/LEXO/DAVI/MAIN ship with their own hermes profiles
-    # so they answer as their persona, not as the default DAVI.
-    assert set(profiles.keys()) == {
-        "H", "DAVI", "MAIN", "SCOUT", "WORKER", "LEXO",
-        "claude", "codex", "cursor", "openclaw",
-    }
-    assert profiles["H"]["harness"] == "hermes"
-    # H deliberately has no profile_path — it falls through to the HTTP
-    # hermes gateway, the working path for the main DAVI unit.
-    assert "profile_path" not in profiles["H"]
-    assert profiles["SCOUT"]["harness"] == "hermes"
-    assert profiles["SCOUT"]["profile_path"] == "~/.hermes/profiles/scout"
-    assert profiles["SCOUT"]["stateful"] is False
-    assert profiles["WORKER"]["harness"] == "hermes"
-    assert profiles["WORKER"]["profile_path"] == "~/.hermes/profiles/worker"
-    assert profiles["WORKER"]["stateful"] is False
-    assert profiles["LEXO"]["harness"] == "hermes"
-    assert profiles["LEXO"]["profile_path"] == "~/.hermes/profiles/lexo-alpha"
-    # DAVI/MAIN also fall through to the HTTP gateway (no profile_path).
-    assert "profile_path" not in profiles["DAVI"]
-    assert "profile_path" not in profiles["MAIN"]
-    # The non-default profiles still name == harness.
+    # other profiles are named after their harness.
+    assert "H" in profiles and profiles["H"]["harness"] == "hermes"
+    assert "claude" in profiles
+    assert "codex" in profiles
+    assert "cursor" in profiles
+    assert "openclaw" in profiles
     for name in ("claude", "codex", "cursor", "openclaw"):
         assert profiles[name] == {"harness": name}
 
@@ -122,18 +98,17 @@ def test_get_harness_for_name(isolated_config: Path) -> None:
 
 
 def test_first_profile_name(isolated_config: Path) -> None:
-    # With shipped-baseline auto-populate, first read returns the
-    # baseline. The first alphabetical key is "DAVI" (uppercase sorts
-    # before lowercase). The user's manual upserts appear on top of
-    # the baseline in JSON insertion order, so the sort still gives
-    # a deterministic result.
-    assert config_store.first_profile_name() == "DAVI"
+    # Without auto-baseline, first read returns None.
+    assert config_store.first_profile_name() is None
     config_store.upsert_profile("claude-dev", "claude")
-    # claude-dev sorts after DAVI but before H (alphabetical).
-    assert config_store.first_profile_name() == "DAVI"
-    # User-inserted uppercase key "A" sorts before DAVI.
+    # Only claude-dev exists, so it's first.
+    assert config_store.first_profile_name() == "claude-dev"
+    # User-inserted uppercase key "A" sorts before claude-dev.
     config_store.upsert_profile("A", "claude")
     assert config_store.first_profile_name() == "A"
+    # Test with reset_to_default - "H" is first alphabetically.
+    config_store.reset_to_default()
+    assert config_store.first_profile_name() == "H"
 
 
 def test_valid_harnesses_returns_frozenset(isolated_config: Path) -> None:

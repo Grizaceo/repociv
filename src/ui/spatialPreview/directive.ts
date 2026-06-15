@@ -177,14 +177,19 @@ export function showContextMenu(
     row.addEventListener('click', () => {
       const item = items[i]!;
       hideContextMenu();
+      // Handle action-based items (legacy unit context menu)
+      if (item.action) {
+        item.action();
+        return;
+      }
       // If prompt: show preview instead of direct send
-      if (item.draft.payload?.['promptUser']) {
+      if (item.draft?.payload?.['promptUser']) {
         showDirectivePreview(
           {
             gesture: 'right_click',
             sourceCoord: { q: 0, r: 0 },
             shiftHeld: false,
-            draft: item.draft,
+            draft: item.draft!,
             label: item.label,
             confidence: 1,
             userConfirmed: false,
@@ -193,7 +198,7 @@ export function showContextMenu(
           onSelect,
           () => {},
         );
-      } else {
+      } else if (item.draft) {
         onSelect(item.draft);
       }
     });

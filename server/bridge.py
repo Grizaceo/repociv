@@ -569,6 +569,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/api/foreign/repo-profile/cache": _routes.get_repo_profile_cache,
             "/api/foreign/reports": _routes.get_reports,
             "/api/labhub/status":    _routes.get_labhub_status,
+            "/api/profiles":         _routes.get_profiles,
         }
         if path in _GET_EXACT:
             status, body = _GET_EXACT[path](ctx)
@@ -725,6 +726,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/model/override": _routes.post_model_override,
             "/api/config/default-harness": _routes.post_default_harness,
             "/subagents/cancel": _routes.post_subagent_cancel,
+            "/api/profiles": _routes.post_profiles,
+            "/api/profiles/delete": _routes.post_profiles_delete,
         }
         if path in _POST_EXACT:
             status, resp = _POST_EXACT[path](body, {})

@@ -39,7 +39,8 @@ export interface SpatialDirective {
 export interface ContextMenuItem {
   label: string;
   icon: string;
-  draft: CommandDraft;
+  draft?: CommandDraft;
+  action?: () => void;
   risk: 'low' | 'medium' | 'high' | 'destructive';
   hotkey?: string;
 }
@@ -252,6 +253,43 @@ export function contextMenuForCity(city: City, selectedUnit: Unit | null): Conte
   }
 
   return candidates;
+}
+
+// ─── Context menu items for right-click on unit ──────────────────────────────
+export function contextMenuForUnit(
+  unit: Unit,
+  actions: { onMove: () => void; onBuild: () => void; onSleep: () => void; onInfo: () => void },
+): ContextMenuItem[] {
+  return [
+    {
+      label: `Mover ${unit.id}`,
+      icon: '↗',
+      risk: 'low',
+      hotkey: 'M',
+      action: actions.onMove,
+    },
+    {
+      label: `Construir con ${unit.id}`,
+      icon: '🔨',
+      risk: 'low',
+      hotkey: 'B',
+      action: actions.onBuild,
+    },
+    {
+      label: `Dormir ${unit.id}`,
+      icon: '💤',
+      risk: 'low',
+      hotkey: 'S',
+      action: actions.onSleep,
+    },
+    {
+      label: `Info ${unit.id}`,
+      icon: 'ℹ',
+      risk: 'low',
+      hotkey: 'I',
+      action: actions.onInfo,
+    },
+  ];
 }
 
 // ─── Drag unit → file (workbench assignment) ──────────────────────────────────
