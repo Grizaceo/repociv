@@ -300,8 +300,14 @@ export function rebuildCityClusters(
         wallMesh.setMatrixAt(wallIdx++, m);
       }
 
-      // Corner towers
-      const cornerAngles = [0, Math.PI / 2, Math.PI, Math.PI * 1.5];
+      // Corner towers: align with the 4 alternate hex VERTICES (not cardinal
+      // directions). The previous 4-cardinal placement put 2 of the towers
+      // at the midpoint of hex sides — no wall corner there, so the towers
+      // either floated in space or got occluded by the wall, reading as
+      // "misaligned" relative to the hexagonal fortification. Hex vertices
+      // are at 0°, 60°, 120°, 180°, 240°, 300°; alternate 4 = 0°, 60°,
+      // 180°, 240° (the ones that form a square inscribed in the hex).
+      const cornerAngles = [0, Math.PI / 3, Math.PI, (4 * Math.PI) / 3];
       for (const ca of cornerAngles) {
         const tx = base.x + Math.cos(ca) * HEX_SIZE * 0.42;
         const tz = base.z + Math.sin(ca) * HEX_SIZE * 0.42;
