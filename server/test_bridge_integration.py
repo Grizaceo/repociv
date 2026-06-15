@@ -18,7 +18,7 @@ def test_init_bridge_state_rebinds_persistent_paths(tmp_path):
         assert selected == tmp_path
         assert bridge.CONFIG_DIR == tmp_path
         assert bridge.MISSIONS_FILE == tmp_path / "missions.json"
-        bridge._ds.record_gesture("cmd-1", "drag", "DAVI", "unit_command", "repo")
+        bridge._ds.record_gesture("cmd-1", "drag", "MAIN", "unit_command", "repo")
         assert (tmp_path / "directive_records.jsonl").exists()
     finally:
         bridge.init_bridge_state(original_config_dir)
@@ -195,7 +195,7 @@ def test_approval_concurrent_requests_only_one_succeeds():
     CMD_ID = "test-approval-idempotency-001"
     bridge._add_approval({
         "id": CMD_ID, "type": "unit_command", "target": "test-repo",
-        "payload": {"unit": "DAVI", "mission": "smoke test"},
+        "payload": {"unit": "MAIN", "mission": "smoke test"},
         "created_by": "user", "risk": "low",
     })
 

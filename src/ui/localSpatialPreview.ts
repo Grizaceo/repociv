@@ -3,7 +3,6 @@
 // Pattern copied from spatialPreview.ts but tailored for grid interactions.
 
 import type { LocalRoom, LocalUnit, Workbench } from '../types.ts';
-import { DEFAULT_UNIT_NAME } from '../agentIdentity.ts';
 
 // ─── Tooltip elements ─────────────────────────────────────────────────────────
 let _unitTooltipEl: HTMLElement | null = null;
@@ -163,16 +162,16 @@ export function showLocalContextMenu(
   const items: string[] = [];
 
   // Agent dispatch items
-  const defaultAgent = idleAgents.find((a) => a.id === DEFAULT_UNIT_NAME || a.name === DEFAULT_UNIT_NAME);
+  const mainUnit = idleAgents.find((a) => a.id === 'MAIN' || a.name === 'MAIN');
   const wrk = idleAgents.find((a) => a.type === 'worker');
 
-  const hasDefault = true; // The default unit is always available to send
+  const hasMain = true; // MAIN is the primary agent, always allow sending
   const hasWorker = !!wrk || idleAgents.some((a) => a.id.toLowerCase().includes('worker'));
 
-  const defaultState = defaultAgent && defaultAgent.state && defaultAgent.state !== 'idle'
-    ? ` (${defaultAgent.state === 'working' ? 'Trabajando' : defaultAgent.state})`
+  const mainState = mainUnit && mainUnit.state && mainUnit.state !== 'idle'
+    ? ` (${mainUnit.state === 'working' ? 'Trabajando' : mainUnit.state})`
     : '';
-  const defaultLabel = `Enviar ${DEFAULT_UNIT_NAME.toUpperCase()}${defaultState}`;
+  const mainLabel = `Enviar MAIN${mainState}`;
 
   const workerState = wrk && wrk.state && wrk.state !== 'idle'
     ? ` (${wrk.state === 'working' ? 'Trabajando' : wrk.state})`
@@ -180,8 +179,8 @@ export function showLocalContextMenu(
   const workerLabel = `Enviar WORKER${workerState}`;
 
   items.push(`
-    <div class="lt-item${hasDefault ? '' : ' lt-disabled'}" data-action="${DEFAULT_UNIT_NAME}">
-      <span class="lt-icon">🧑‍🔧</span> ${defaultLabel}
+    <div class="lt-item${hasMain ? '' : ' lt-disabled'}" data-action="MAIN">
+      <span class="lt-icon">🧑‍🔧</span> ${mainLabel}
     </div>`);
   items.push(`
     <div class="lt-item${hasWorker ? '' : ' lt-disabled'}" data-action="WORKER">

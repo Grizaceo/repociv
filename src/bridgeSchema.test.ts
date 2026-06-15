@@ -3,7 +3,7 @@ import { parseBridgeEvent, describeBridgeEventError } from './bridgeSchema.ts';
 
 describe('parseBridgeEvent', () => {
   it('accepts a valid unit_spawn event', () => {
-    const evt = parseBridgeEvent({ type: 'unit_spawn', unit: 'DAVI', civ: 'capital', hex: [0, 0] });
+    const evt = parseBridgeEvent({ type: 'unit_spawn', unit: 'MAIN', civ: 'capital', hex: [0, 0] });
     expect(evt).not.toBeNull();
     expect(evt?.type).toBe('unit_spawn');
   });
@@ -11,7 +11,7 @@ describe('parseBridgeEvent', () => {
   it('accepts unit_spawn with optional fields', () => {
     const evt = parseBridgeEvent({
       type: 'unit_spawn',
-      unit: 'DAVI',
+      unit: 'MAIN',
       civ: 'capital',
       hex: [3, -1],
       mission: 'scout area',
@@ -65,7 +65,7 @@ describe('parseBridgeEvent', () => {
     const evt = parseBridgeEvent({
       type: 'mission_start',
       missionId: 'abc123',
-      unit: 'DAVI',
+      unit: 'MAIN',
       questName: 'Explorar',
     });
     expect(evt).not.toBeNull();
@@ -75,7 +75,7 @@ describe('parseBridgeEvent', () => {
     const evt = parseBridgeEvent({
       type: 'mission_complete',
       missionId: 'abc123',
-      unit: 'DAVI',
+      unit: 'MAIN',
       success: true,
       duration: 42,
     });
@@ -83,7 +83,7 @@ describe('parseBridgeEvent', () => {
   });
 
   it('accepts chat_chunk event', () => {
-    const evt = parseBridgeEvent({ type: 'chat_chunk', unit: 'DAVI', text: 'hello world' });
+    const evt = parseBridgeEvent({ type: 'chat_chunk', unit: 'MAIN', text: 'hello world' });
     expect(evt).not.toBeNull();
   });
 
@@ -102,7 +102,7 @@ describe('parseBridgeEvent', () => {
   });
 
   it('accepts unit_fatigue_update event', () => {
-    const evt = parseBridgeEvent({ type: 'unit_fatigue_update', unit: 'DAVI', fatigue: 80 });
+    const evt = parseBridgeEvent({ type: 'unit_fatigue_update', unit: 'MAIN', fatigue: 80 });
     expect(evt).not.toBeNull();
   });
 
@@ -126,7 +126,7 @@ describe('parseBridgeEvent', () => {
       type: 'subagent_spawn',
       subagentId: 'sub-abc',
       parentMissionId: 'm1',
-      parentUnit: 'DAVI',
+      parentUnit: 'MAIN',
       kind: 'explore',
       label: 'scan repo',
       hex: [0, 0],

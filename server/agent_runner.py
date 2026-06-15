@@ -67,101 +67,98 @@ def configure(*, send: SendFn | None = None, save: SaveMissionFn | None = None) 
 
 
 # ─── Agent configuration ──────────────────────────────────────────────────────
-# Comment block was moved above AGENT_CONFIGS.
+# Two categories:
 #
-# ─── AGENT_CONFIGS: keyed by harness, not by unit name ───────────────────
+#   Built-in agents (ship with RepoCiv, work out of the box):
+#     WORKER — stateless general executor (hermes profile: worker)
+#     SCOUT  — stateless read-only analyst (hermes profile: scout)
 #
-# The shipped unit types are now the same as the shipped harness names:
-# the baseline registry has one profile per harness, each named after
-# itself. The user can rename any profile (e.g. "H" → hermes), and the
-# runtime looks up the profile's harness to find the right entry here.
+#   Harness bypasses (unit type = harness selection, no independent identity):
+#     OPENCLAW — always routes to openclaw harness
+#     CLAUDE   — always routes to claude-code harness
+#     CODEX    — always routes to codex harness
 #
-# Per-profile overrides (personality, system_prompt, model, provider)
-# come from the profile registry, not from this table. They are merged
-# in at runtime by resolve_unit_config() below.
+#   Personal profiles (NOT shipped; each user adds their own):
+#     Example: MY_AGENT — create a Hermes profile at
+#     ~/.hermes/profiles/<name> and add an entry here with a "profile" key.
+#     The bridge will set HERMES_HOME to that profile directory and run the
+#     hermes CLI subprocess, giving the agent its own config, SOUL.md, skills,
+#     memory, and subagents.
 #
-# Two categories of harness here:
-#   1. Generic stateful/stateless flags for the local runtime (every entry)
-#   2. harness_specific hooks (only the ones that need them)
-#
-# To add a new harness: add it to the table AND to config_store._VALID_HARNESSES.
-# Adding a harness is a code change, not a config change — that's the
-# point of having a closed set of harness ids.
 AGENT_CONFIGS: dict[str, dict[str, Any]] = {
-    "hermes": {
-        "stateful": True,
-        "default_agent": "main",
-        "default_personality": "technical",
-        "profile_base": str(Path.home() / ".hermes"),
+    # ── Built-in agents ────────────────────────────────────────────────────────
+    "WORKER": {
+        "agent": "main", "personality": "concise", "stateful": False,
+        "profile": str(Path.home() / ".hermes" / "profiles" / "worker"),
+        "system": (
+            "You are a specialized execution agent. You have no memory of previous "
+            "sessions or workspace context beyond what is provided in this mission. "
+            "Solve the task using the minimum tokens necessary and return the result. "
+            "Do not ask clarifying questions; make reasonable assumptions and proceed."
+        ),
     },
-    "claude": {
-        "stateful": True,
+    "SCOUT": {
+        "agent": "main", "personality": "helpful", "stateful": False,
+        "profile": str(Path.home() / ".hermes" / "profiles" / "scout"),
+        "system": (
+            "You are a specialized exploration agent. You have no memory of previous "
+            "sessions or workspace context beyond what is provided in this mission. "
+            "Inspect code, files, and repositories, then return a brief and actionable "
+            "summary. Prioritize facts over opinions."
+        ),
     },
-    "codex": {
+
+    # ── Harness bypasses ───────────────────────────────────────────────────────
+    # These are routing aliases — the unit name selects the harness directly.
+    "OPENCLAW": {
+        "agent": "main", "stateful": True,
+    },
+    "CLAUDE": {
+        "stateful": True,   # enables --continue flag for session persistence
+    },
+    "CODEX": {
+        "stateful": False,  # codex exec is stateless by design; flag has no effect
+    },
+
+    # Cursor bypass (runs cursor CLI for agent execution)
+    "CURSOR": {
         "stateful": False,
     },
-    "cursor": {
-        "stateful": False,
-    },
-    "openclaw": {
-        "stateful": True,
-        "default_agent": "main",
-    },
+
+    # ── Personal profile example (not shipped) ─────────────────────────────────
+    # Copy and adapt this block to add your own Hermes-based agent.
+    # The "profile" key must point to a valid ~/.hermes/profiles/<name> directory.
+    #
+    # "MY_AGENT": {
+    #     "agent": "main", "stateful": True,
+    #     "profile": str(Path.home() / ".hermes" / "profiles" / "my-agent"),
+    #     "system": "Brief identity description passed to the agent.",
+    # },
 }
 
 
-# Fallback when a unit's harness is unknown (shouldn't happen in practice
-# because the profile registry validates harness names; this is the
-# last-resort safety net).
+# Fallback for unit types not in AGENT_CONFIGS (personal profiles not yet registered,
+# or any agent spawned with a custom unit-id). Acts like a generic stateful hermes agent.
 _DEFAULT_AGENT_CONFIG: dict[str, Any] = {
-    "stateful": False,
+    "agent": "main", "personality": "technical", "stateful": True,
 }
 
 
 def _get_agent_config(unit_id: str) -> dict[str, Any]:
-    """Resolve the runtime config for a unit.
-
-    Two layers:
-      1. The profile registry maps the unit's name to a harness. If the
-         unit is "H-1" and profile "H" has harness "hermes", the harness
-         is "hermes".
-      2. AGENT_CONFIGS[harness] gives the harness-level defaults.
-
-    The returned dict is harness defaults + per-profile overrides (model,
-    provider, personality, system_prompt) when set. The per-profile
-    fields live in config_store, not here.
-    """
-    from . import config_store as _cs  # local import — config_store is heavyweight
     base = unit_id.split("-")[0].upper()
-    profile = _cs.get_profile(base)
-    if profile is not None:
-        harness = profile.get("harness", base).lower()
-    else:
-        # Backward-compat: if the unit_id prefix matches a harness name
-        # directly (e.g. "hermes-1" without a registered profile), use it.
-        # This is the shipped baseline behavior.
-        harness = base.lower()
-    merged = dict(AGENT_CONFIGS.get(harness, _DEFAULT_AGENT_CONFIG))
-    if profile is not None:
-        for field in ("personality", "system_prompt", "model", "provider", "profile_path", "stateful"):
-            if profile.get(field) is not None:
-                merged[field] = profile[field]
-    return merged
-
-
-def _get_harness_for_unit(unit_id: str) -> str:
-    """Return the harness name for a unit_id (lowercased)."""
-    from . import config_store as _cs
-    base = unit_id.split("-")[0].upper()
-    profile = _cs.get_profile(base)
-    if profile is not None and "harness" in profile:
-        return profile["harness"].lower()
-    return base.lower()
+    return AGENT_CONFIGS.get(base, _DEFAULT_AGENT_CONFIG)
 
 
 def _infer_model_label(unit_id: str) -> str:
-    """Return a descriptive model label for token ledger based on harness."""
-    return _get_harness_for_unit(unit_id)
+    """Return a descriptive model label for token ledger based on unit type."""
+    base = unit_id.split("-")[0].upper()
+    label_map = {
+        "OPENCLAW": "openclaw",
+        "CLAUDE": "claude-code",
+        "CODEX": "codex",
+        "CURSOR": "cursor",
+    }
+    return label_map.get(base, os.environ.get("HERMES_MODEL", "claude-code"))
 
 
 def _repos_root() -> str:
@@ -340,63 +337,86 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
                        provider: str = "",
                        model: str = "") -> tuple[bool, str]:
     config = _get_agent_config(unit_id)
-    # Resolve the harness once: either from the explicit `harness` param
-    # (per-command override) or from the profile registry / base name.
-    effective_harness = (harness or "").strip().lower() or _get_harness_for_unit(unit_id)
+    base = unit_id.split("-")[0].upper()
+
+    # MAIN is the user's first unit — its harness is the one the user picked
+    # in onboarding (persisted in ~/.repociv/config.json). Fall back to the
+    # cascade if no choice was made.
+    if base == "MAIN" and not harness:
+        try:
+            from . import config_store as _cs  # noqa: WPS433
+            configured = _cs.get_default_harness()
+            if configured:
+                harness = configured
+                send_to_repociv({
+                    "type": "log",
+                    "msg": f"[{unit_id}] harness from config: {harness}",
+                    "level": "info",
+                })
+        except Exception:
+            pass
 
     if _container_mode_enabled():
         return _run_container_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
+    # OPENCLAW bypass: always direct to OpenClaw regardless of harness selector
+    if base == "OPENCLAW":
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: openclaw", "level": "info"})
+        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
+
+    # CLAUDE bypass: always direct to claude-code regardless of harness selector
+    if base == "CLAUDE":
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: claude-code (bypass)", "level": "info"})
+        return _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
+                                          model=model or provider)
+
+    # CODEX bypass: always direct to codex regardless of harness selector
+    if base == "CURSOR":
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: cursor (bypass)", "level": "info"})
+        return _run_cursor_agent_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model or provider)
+    if base == "CODEX":
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: codex (bypass)", "level": "info"})
+        return _run_codex_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
+                                    model=model or provider)
+
     # ── 3-layer dispatch: harness → provider → model ──────────────────────────
-    # If the user selected a specific harness (per-command or via the
-    # profile registry), use it directly. The provider+model are passed
-    # through to the harness runner so it can pick the right API endpoint
-    # and model ID.
-    if effective_harness:
-        send_to_repociv({
-            "type": "log", "msg": f"[{unit_id}] harness: {effective_harness}", "level": "info"
-        })
-        if effective_harness == "openclaw" and _has_openclaw():
+    # If the user selected a specific harness, use it directly.
+    # The provider+model are passed through to the harness runner so it can
+    # pick the right API endpoint and model ID.
+    if harness and harness != "auto":
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: {harness}", "level": "info"})
+        if harness == "openclaw" and _has_openclaw():
             return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                            model=model or provider)
-        if effective_harness == "claude" and _has_claude_code():
+        if harness == "claude-code" and _has_claude_code():
+            # For claude-code: if model includes provider prefix (e.g. openrouter/deepseek),
+            # pass it through — claude CLI --model accepts provider/model format
             return _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                               model=model or provider)
-        if effective_harness == "cursor" and _has_cursor():
+        if harness == "cursor" and _has_cursor():
             return _run_cursor_agent_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                                model=model or provider)
-        if effective_harness == "codex":
-            return _run_codex_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
-                                        model=model or provider)
-        if effective_harness == "hermes":
-            # Check profile first: agents with a profile_path need HERMES_HOME
+        if harness == "hermes":
+            # Check profile first: agents with a profile need HERMES_HOME
             # pointing at their profile dir, not the HTTP gateway which always
             # routes to the main profile.
-            if config.get("profile_path"):
+            if config.get("profile"):
                 if _has_hermes_cli():
-                    send_to_repociv({
-                        "type": "log", "msg": f"[{unit_id}] harness: hermes-cli (profile)", "level": "info"
-                    })
+                    send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: hermes-cli (profile)", "level": "info"})
                     return _run_hermes_cli_streaming(unit_id, mission_id, mission, config, working_dir,
                                                      city_id, model=model or provider)
-                send_to_repociv({
-                    "type": "log", "msg": f"[{unit_id}] perfil configurado pero hermes CLI no encontrado",
-                    "level": "warn"
-                })
+                send_to_repociv({"type": "log", "msg": f"[{unit_id}] perfil configurado pero hermes CLI no encontrado", "level": "warn"})
             return _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                          model=model or provider)
         # Unknown harness — fall through to cascade with a warning
-        send_to_repociv({
-            "type": "log", "msg": f"[{unit_id}] harness '{effective_harness}' no reconocido, usando cascade",
-            "level": "warn"
-        })
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness '{harness}' no reconocido, usando cascade", "level": "warn"})
 
     # ── Default cascade: hermes → claude-code → openclaw ────────────────────
 
-    # Agents with a profile path (e.g. LEXO → lexo-alpha) run via hermes CLI
-    # with HERMES_HOME pointed at their profile, giving them their own config,
-    # skills, SOUL.md, memory, subagents, etc.
-    if config.get("profile_path"):
+    # Agents with a profile path run via hermes CLI with HERMES_HOME pointed
+    # at their profile, giving them their own config, skills, SOUL.md, memory,
+    # subagents, etc.
+    if config.get("profile"):
         if _has_hermes_cli():
             send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: hermes-cli", "level": "info"})
             return _run_hermes_cli_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
@@ -580,7 +600,7 @@ def _run_hermes_cli_streaming(
         _es.record_output_chunk(mission_id, unit_id, text)
         return False, text.strip()
 
-    profile_path = config.get("profile_path", "")
+    profile_path = config.get("profile", "")
     if not profile_path:
         text = "[hermes-cli error] no profile path configured for this agent\n"
         send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})

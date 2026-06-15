@@ -59,37 +59,20 @@ def _init_from_disk() -> None:
     if n:
         print(f"[scheduler] Recovered {n} queued mission(s) from disk.")
 
-# ─── Concurrency limits per harness ────────────────────────────────────────
-# Keyed by harness (looked up from the profile registry per unit). The
-# shipped harnesses are the safe defaults; personal profiles inherit
-# their harness's limit.
-#
-# Rationale: hermes/openclaw are stateful orchestrators → 1 each.
-# Stateless harnesses (claude, codex, cursor) → 3 parallel.
+# ─── Concurrency limits per agent type ────────────────────────────────────────
+# WORKER can run multiple parallel tasks; others are single-threaded.
 AGENT_CONCURRENCY: dict[str, int] = {
-    "hermes":   1,
-    "claude":   3,
-    "codex":    3,
-    "cursor":   3,
-    "openclaw": 1,
+    "MAIN":     1,
+    "SCOUT":    2,   # read-only: safe to run 2 parallel scans (matches agent card)
+    "OPENCLAW": 1,
+    "WORKER":   3,   # stateless executor: safe to batch in parallel
 }
 
 _DEFAULT_CONCURRENCY = 1
 
 
 def _agent_base(unit_id: str) -> str:
-    """Return the harness for a unit_id (lowercased).
-
-    The profile registry maps the unit's name to a harness. Falls back
-    to the unit_id prefix as a harness name when no profile is registered
-    (backward-compat with the shipped baseline).
-    """
-    from . import config_store as _cs
-    base = unit_id.split("-")[0].upper()
-    profile = _cs.get_profile(base)
-    if profile is not None and "harness" in profile:
-        return profile["harness"].lower()
-    return base.lower()
+    return unit_id.split("-")[0].upper()
 
 
 # ─── Priority weights — loaded from shared/priority-weights.json ─────────────
@@ -285,7 +268,7 @@ def _dispatch_next() -> bool:
     with _queue_lock:
         _resort()
         for i, cmd in enumerate(_queue):
-            unit = cmd.get("payload", {}).get("unit") or "MAIN"
+            unit = cmd.get("payload", {}).get("unit", "MAIN")
             base = _agent_base(unit)
             if _acquire_slot(base):
                 cmd_to_run = dict(_queue.pop(i))  # explicit copy — safe across threads

@@ -187,7 +187,7 @@ def record_step_latency(
         repo:       Repository name.
         issue_id:   Issue identifier.
         step_idx:   Zero-based step index within the plan.
-        agent:      Agent harness that executed the step (e.g. "hermes", "claude").
+        agent:      Agent type that executed the step (e.g. "MAIN", "WORKER").
         duration_s: Wall-clock duration in seconds.
     """
     entry: dict[str, Any] = {
@@ -221,7 +221,7 @@ def get_step_latency_stats() -> dict[str, Any]:
           "p99": float,   — 99th-percentile duration in seconds
           "count": int,   — total number of samples
           "by_agent": {
-              "hermes":   {"p50": float, "p95": float, "p99": float, "count": int},
+              "MAIN":   {"p50": float, "p95": float, "p99": float, "count": int},
               "WORKER": {...},
               ...
           }

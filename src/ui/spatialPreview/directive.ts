@@ -4,7 +4,6 @@ import type { CommandDraft } from '../../commandSchema.ts';
 import { COMMAND_RISK } from '../../commandSchema.ts';
 import { fetchSuggestions, cmdTypeLabel, successRateColor } from '../../directiveLearner.ts';
 import { escapeHtml, positionEl, gestureIcon, riskStyle } from './helpers.ts';
-import { DEFAULT_UNIT_NAME } from '../../agentIdentity.ts';
 
 type ConfirmCb = (draft: CommandDraft) => void;
 type CancelCb = () => void;
@@ -88,7 +87,7 @@ export function showDirectivePreview(
   el.classList.remove('hidden');
 
   // Async-fetch suggestions and inject if available (non-blocking)
-  const agentId = String(directive.draft.payload?.['unit'] ?? DEFAULT_UNIT_NAME);
+  const agentId = String(directive.draft.payload?.['unit'] ?? 'MAIN');
   void fetchSuggestions(directive.gesture, agentId).then((suggestions) => {
     const box = el.querySelector<HTMLElement>('#sp-suggestions');
     if (!box || suggestions.length === 0) return;
@@ -178,13 +177,6 @@ export function showContextMenu(
     row.addEventListener('click', () => {
       const item = items[i]!;
       hideContextMenu();
-      // Local-action items (Mover/Construir/Dormir/Info) carry a callback
-      // instead of a draft. Run it and skip the command-bus dispatch.
-      if (item.action) {
-        item.action();
-        return;
-      }
-      if (!item.draft) return; // malformed item — no-op
       // If prompt: show preview instead of direct send
       if (item.draft.payload?.['promptUser']) {
         showDirectivePreview(

@@ -7,7 +7,6 @@ import type { Unit, Tile, City } from './types.ts';
 import type { Axial } from './hex.ts';
 import { draftCommand, type CommandDraft, type CommandType } from './commandSchema.ts';
 import { canExecute } from './agentCapabilities.ts';
-import { DEFAULT_UNIT_NAME } from './agentIdentity.ts';
 
 // ─── Core types ───────────────────────────────────────────────────────────────
 
@@ -37,25 +36,15 @@ export interface SpatialDirective {
 }
 
 // ─── Context menu item ────────────────────────────────────────────────────────
-// Either a `draft` (sent to the bridge as a command) or a local `action`
-// callback (renderer/game state mutation). The renderer picks which path
-// to take when the user clicks the item.
 export interface ContextMenuItem {
   label: string;
   icon: string;
-  draft?: CommandDraft;
-  action?: () => void;
+  draft: CommandDraft;
   risk: 'low' | 'medium' | 'high' | 'destructive';
   hotkey?: string;
 }
 
 // ─── Drag unit → city ─────────────────────────────────────────────────────────
-// Plain drag (no shift) = local move only. The unit's position updates
-// in the game state; no command is dispatched, no preview modal pops.
-// Mission dispatch happens via right-click → "Enviar unidad aquí"
-// (which sends execute_agent auto-safe, no approval gate).
-//
-// Shift+drag = run tests (medium-touch workflow that warrants a confirm).
 export function interpretUnitDrag(params: {
   unit: Unit;
   fromCoord: Axial;
@@ -70,19 +59,11 @@ export function interpretUnitDrag(params: {
     return null;
   }
 
-  // Plain drag onto a city = local move, NO command, NO preview modal.
-  // Cristóbal reported the preview/confirm modal here as an unnecessary
-  // "approval" — it's actually a confirmation step, but for the
-  // simple drop-on-city use case the user is right that the modal is
-  // friction. Use the right-click menu when you actually want to send
-  // a mission to the city.
-  if (!shiftHeld) {
-    return null;
-  }
-
-  // Shift+drag → run tests (explicit, intentional, worth confirming).
-  const cmdType: CommandType = 'run_tests';
-  const missionText = `Ejecutar tests en ${city.name}`;
+  // Shift+drag → run tests if they exist, otherwise inspect
+  const cmdType: CommandType = shiftHeld ? 'run_tests' : 'inspect_repo';
+  const missionText = shiftHeld
+    ? `Ejecutar tests en ${city.name}`
+    : `Inspeccionar repo ${city.name}`;
 
   const draft = draftCommand(cmdType, city.id, {
     unit: unit.id,
@@ -114,7 +95,7 @@ export function interpretCityToCityDrag(params: {
   selectedUnit: Unit | null;
 }): SpatialDirective | null {
   const { fromCity, toCity, fromCoord, toCoord, selectedUnit } = params;
-  const unit = selectedUnit?.id ?? DEFAULT_UNIT_NAME;
+  const unit = selectedUnit?.id ?? 'MAIN';
   const draft = draftCommand('execute_agent', `${fromCity.id}→${toCity.id}`, {
     unit,
     city: fromCity.id,
@@ -171,7 +152,7 @@ export function interpretAreaSelect(params: {
 // ─── Context menu items for right-click on city ──────────────────────────────
 // Items are filtered by the selected unit's capabilities and repo restrictions.
 export function contextMenuForCity(city: City, selectedUnit: Unit | null): ContextMenuItem[] {
-  const unit = selectedUnit?.id ?? DEFAULT_UNIT_NAME;
+  const unit = selectedUnit?.id ?? 'MAIN';
   const aType = selectedUnit?.type ?? 'hero';
 
   // Helper: only include if unit can execute this type on this city
@@ -179,14 +160,12 @@ export function contextMenuForCity(city: City, selectedUnit: Unit | null): Conte
 
   const candidates: ContextMenuItem[] = [];
 
-  // "Send unit here" — appears first when a unit is selected.
-  // risk: 'low' to skip the approval gate (D1 — local unit move is not
-  // a destructive action; the gate was triggering on every send).
+  // "Send unit here" — appears first when a unit is selected
   if (selectedUnit && allowed('execute_agent')) {
     candidates.push({
       label: `Enviar ${selectedUnit.id} aquí`,
       icon: '▶',
-      risk: 'low',
+      risk: 'medium',
       draft: draftCommand('execute_agent', city.id, {
         unit: selectedUnit.id,
         city: city.id,
@@ -256,48 +235,23 @@ export function contextMenuForCity(city: City, selectedUnit: Unit | null): Conte
     });
   }
 
-  return candidates;
-}
-
-// ─── Context menu items for right-click on a unit ────────────────────────────
-// Local actions: Mover / Construir / Dormir / Información. These are
-// renderer/game state mutations, not commands — they don't go through
-// the bridge approval queue. The 4 items mirror the old #unit-actions
-// panel buttons (M/B/S) plus a 4th Información action.
-export function contextMenuForUnit(
-  unit: Unit,
-  actions: { onMove: () => void; onBuild: () => void; onSleep: () => void; onInfo: () => void },
-): ContextMenuItem[] {
-  return [
-    {
-      label: `Mover ${unit.id}`,
-      icon: '↗',
-      risk: 'low',
-      hotkey: 'M',
-      action: actions.onMove,
-    },
-    {
-      label: `Construir con ${unit.id}`,
-      icon: '🔨',
-      risk: 'low',
-      hotkey: 'B',
-      action: actions.onBuild,
-    },
-    {
-      label: `Dormir ${unit.id}`,
-      icon: '☕',
-      risk: 'low',
-      hotkey: 'S',
-      action: actions.onSleep,
-    },
-    {
-      label: `Información de ${unit.id}`,
-      icon: 'ℹ',
+  // Always offer inspect as fallback (read-only is safe for all agents)
+  if (candidates.length === 0) {
+    candidates.push({
+      label: `Inspeccionar ${city.name}`,
+      icon: '🔍',
       risk: 'low',
       hotkey: 'I',
-      action: actions.onInfo,
-    },
-  ];
+      draft: draftCommand('inspect_repo', city.id, {
+        unit,
+        city: city.id,
+        mission: `Inspeccionar repo ${city.name}`,
+        agentType: aType,
+      }),
+    });
+  }
+
+  return candidates;
 }
 
 // ─── Drag unit → file (workbench assignment) ──────────────────────────────────

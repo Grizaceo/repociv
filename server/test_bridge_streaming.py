@@ -28,17 +28,17 @@ def test_run_hermes_streaming_emits_chat_chunk_on_transport_error(monkeypatch):
     monkeypatch.setattr(bridge, "send_to_repociv", lambda evt: sent.append(evt))
     monkeypatch.setattr(bridge._es, "record_output_chunk", lambda mission_id, unit_id, text: recorded.append((mission_id, unit_id, text)))
 
-    ok, output = bridge._run_hermes_streaming("DAVI", "m1", "hola")
+    ok, output = bridge._run_hermes_streaming("MAIN", "m1", "hola")
 
     assert ok is False
     assert "connection refused" in output
     assert sent == [{
         "type": "chat_chunk",
-        "unit": "DAVI",
+        "unit": "MAIN",
         "missionId": "m1",
         "text": "[hermes error] <urlopen error connection refused>\n",
     }]
-    assert recorded == [("m1", "DAVI", "[hermes error] <urlopen error connection refused>\n")]
+    assert recorded == [("m1", "MAIN", "[hermes error] <urlopen error connection refused>\n")]
 
 
 def test_send_to_repociv_chat_chunk_updates_session(monkeypatch, tmp_path):
@@ -46,10 +46,10 @@ def test_send_to_repociv_chat_chunk_updates_session(monkeypatch, tmp_path):
     monkeypatch.setattr(bridge, "_fanout_sse", lambda _event: None)
     monkeypatch.setattr(bridge.urllib.request, "urlopen", lambda *_args, **_kwargs: None)
 
-    bridge.send_to_repociv({"type": "chat_chunk", "unit": "DAVI", "missionId": "m9", "text": "hola"})
+    bridge.send_to_repociv({"type": "chat_chunk", "unit": "MAIN", "missionId": "m9", "text": "hola"})
 
-    canonical = bridge._sessions.get_or_create("DAVI")
-    recent = bridge._sessions.get_recent("DAVI", limit=1)
+    canonical = bridge._sessions.get_or_create("MAIN")
+    recent = bridge._sessions.get_recent("MAIN", limit=1)
     assert canonical["lastMissionId"] == "m9"
     assert canonical["messageCount"] == 1
     assert recent[0]["content"] == "hola"

@@ -2,7 +2,6 @@
 import type { GameState, Mission } from '../game.ts';
 import { bridgeUrl, bridgeHeaders } from '../bridgeEnv.ts';
 import { trapFocus } from './focusTrap.ts';
-import { DEFAULT_UNIT_NAME } from '../agentIdentity.ts';
 
 let questFilter: 'all' | 'running' | 'complete' | 'failed' = 'all';
 let _questCleanup: (() => void) | null = null;
@@ -41,7 +40,7 @@ export async function fetchPendingTracker(): Promise<Mission[]> {
     }>;
     return raw.map((r) => ({
       id: `pending-${r.id}`,
-      unit: DEFAULT_UNIT_NAME,
+      unit: 'MAIN',
       questName: `[${r.id}] ${r.title}`,
       status: 'running' as const,
       startedAt: Date.now(),

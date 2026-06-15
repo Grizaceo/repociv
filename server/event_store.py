@@ -41,48 +41,29 @@ def init(store_dir: Path) -> None:
     global _store_path
     store_dir.mkdir(parents=True, exist_ok=True)
     _store_path = store_dir / "events.jsonl"
-    _migrate_legacy_agent_names()
+    _migrate_legacy_davi()
 
 
-# One-shot migration: rewrite events.jsonl so historical events that
-# referenced the personal agent names "DAVI" / "LEXO" now point at
-# the first profile registered in the user's profile registry. The
-# migration is idempotent (a marker file short-circuits subsequent runs)
-# and is safe to run before the bridge accepts any new traffic.
-_MIGRATION_MARKER = ".migrated-legacy-agent-names"
-_LEGACY_AGENT_NAMES = frozenset({"DAVI", "LEXO"})
+# One-shot migration: rewrite the persisted JSONL so historical events
+# that referenced the legacy personal agent name "DAVI" now point at the
+# generic "MAIN" slot. The migration is idempotent (the marker file prevents
+# a second pass even if init() runs again) and is safe to run before the
+# bridge accepts any new traffic.
+_MIGRATION_MARKER = ".migrated-davi-to-main"
 _LEGACY_AGENT_FIELDS = ("actor", "unit", "unitId", "unit_id", "agentId", "agent_id")
 
 
-def _resolve_migration_destination() -> str:
-    """Pick the destination name for legacy personal agent references.
-
-    Strategy: use the first registered profile from the user's
-    profile registry. If no profiles are registered yet (fresh
-    install), fall back to "main" — the first profile name the user
-    will encounter during onboarding.
-    """
-    try:
-        from . import config_store as _cs  # local import — avoid cycles
-        first = _cs.first_profile_name()
-        if first:
-            return first
-    except Exception:
-        pass
-    return "main"
-
-
-def _migrate_legacy_agent_names() -> None:
+def _migrate_legacy_davi() -> None:
     global _store_path
     if _store_path is None:
         return
-    marker = _store_path.parent / _MIGRATION_MARKER
-    if marker.exists():
+    marker_path = _store_path.parent / _MIGRATION_MARKER
+    if marker_path.exists():
         return
     if not _store_path.exists():
-        marker.touch()
+        # Nothing to migrate, but write the marker so future boots are cheap.
+        marker_path.touch()
         return
-    destination = _resolve_migration_destination()
     try:
         rewritten = 0
         scanned = 0
@@ -99,34 +80,45 @@ def _migrate_legacy_agent_names() -> None:
                 except ValueError:
                     dst.write(raw)
                     continue
-                if _rewrite_legacy_agent(evt, destination):
+                if _rewrite_event_actor(evt):
                     rewritten += 1
                 dst.write(json.dumps(evt, ensure_ascii=False) + "\n")
         os.replace(tmp, _store_path)
-        marker.touch()
+        marker_path.touch()
         if rewritten:
+            # Best-effort: this message goes to stdout, the bridge logger may
+            # or may not be wired yet at init() time.
             print(
-                f"[event_store] migrated {rewritten}/{scanned} events to '{destination}'",
+                f"[event_store] migrated {rewritten}/{scanned} events: DAVI → MAIN",
                 flush=True,
             )
     except Exception as exc:  # pragma: no cover — defensive
-        print(f"[event_store] legacy agent migration skipped: {exc}", flush=True)
+        # If migration fails, leave the file untouched and let the bridge
+        # continue. The legacy "DAVI" name simply won't be routable anymore,
+        # which is exactly what we want for a personal profile cleanup.
+        print(f"[event_store] DAVI→MAIN migration skipped: {exc}", flush=True)
 
 
-def _rewrite_legacy_agent(evt: dict[str, Any], destination: str) -> bool:
+def _rewrite_event_actor(evt: dict[str, Any]) -> bool:
     """Return True if the event was rewritten."""
     changed = False
-    for field in _LEGACY_AGENT_FIELDS:
+    actor = evt.get("actor")
+    if actor == "DAVI":
+        evt["actor"] = "MAIN"
+        changed = True
+    # Some events carry the unit identifier under different keys depending on
+    # the producer (game UI, bridge, agent_runner). Normalize them all.
+    for field in _LEGACY_AGENT_FIELDS[1:]:
         value = evt.get(field)
-        if isinstance(value, str) and value in _LEGACY_AGENT_NAMES:
-            evt[field] = destination
+        if value == "DAVI":
+            evt[field] = "MAIN"
             changed = True
     data = evt.get("data")
     if isinstance(data, dict):
         for field in _LEGACY_AGENT_FIELDS:
             value = data.get(field)
-            if isinstance(value, str) and value in _LEGACY_AGENT_NAMES:
-                data[field] = destination
+            if value == "DAVI":
+                data[field] = "MAIN"
                 changed = True
     return changed
 

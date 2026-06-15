@@ -2,7 +2,6 @@
 import { type Renderer } from '../../renderer.ts';
 import { type GameState } from '../../game.ts';
 import { type BridgeEvents } from '../../bridge.ts';
-import { DEFAULT_UNIT_NAME } from '../../agentIdentity.ts';
 import { terminalPanel } from '../../terminalPanel.ts';
 import {
   hideUnitPanel,
@@ -159,10 +158,13 @@ export function wireHotkeys(
 
     if (inField) return;
 
-    // Spawn agents (Q/W/E/L/O/C/X)
+    // Spawn agents (Q/W/E/O/C/X).
+    // Q spawns the user's first unit (MAIN), which is configured during
+    // onboarding. L (LEXO) was removed when the personal profile was dropped
+    // from the shipped agent set.
     if (e.key.toLowerCase() === 'q') {
-      trackHotkey(`Q:spawn:${DEFAULT_UNIT_NAME}`);
-      return spawnAgent(DEFAULT_UNIT_NAME, state, renderer, bridge);
+      trackHotkey('Q:spawn:MAIN');
+      return spawnAgent('MAIN', state, renderer, bridge);
     }
     if (e.key.toLowerCase() === 'w') {
       trackHotkey('W:spawn:WORKER');
@@ -171,10 +173,6 @@ export function wireHotkeys(
     if (e.key.toLowerCase() === 'e') {
       trackHotkey('E:spawn:SCOUT');
       return spawnAgent('SCOUT', state, renderer, bridge);
-    }
-    if (e.key.toLowerCase() === 'l') {
-      trackHotkey('L:spawn:worker');
-      return spawnAgent('worker', state, renderer, bridge);
     }
     if (e.key.toLowerCase() === 'o') {
       trackHotkey('O:spawn:OPENCLAW');

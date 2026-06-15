@@ -125,7 +125,7 @@ describe('aStarPath — terrain costs', () => {
       makeTile(2, 0, 'plains'),
     ];
     const world = makeWorld(tiles);
-    for (const t of ['hero', 'worker', 'scout', 'lexo']) {
+    for (const t of ['hero', 'worker', 'scout', 'worker']) {
       const path = aStarPath({ q: 0, r: 0 }, { q: 2, r: 0 }, world, t);
       expect(path).toHaveLength(0);
     }

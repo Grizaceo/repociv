@@ -132,9 +132,9 @@ def test_select_agent_for_step(step_desc, expected):
     assert _se.select_agent_for_step(step_desc) == expected
 
 
-# ─── 4. Fallback to MAIN when no clear match ────────────────────────────────
+# ─── 4. Fallback to DAVI when no clear match ─────────────────────────────────
 
-def test_select_agent_for_step_fallback_to_main():
+def test_select_agent_for_step_fallback_to_davi():
     assert _se.select_agent_for_step("Discuss architectural implications") == "MAIN"
     assert _se.select_agent_for_step("Plan the roadmap for Q2") == "MAIN"
     assert _se.select_agent_for_step("Coordinate with the team") == "MAIN"

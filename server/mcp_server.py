@@ -113,7 +113,7 @@ def agents_list() -> Any:
     return _get("/agents")
 
 
-@mcp.tool(description="Devuelve la matriz de capacidades por tipo de agente (DAVI, WORKER, SCOUT, LEXO, CLAUDE, CODEX, OPENCLAW).")
+@mcp.tool(description="Devuelve la matriz de capacidades por tipo de agente (MAIN, WORKER, SCOUT, CLAUDE, CODEX, OPENCLAW; CURSOR si está configurado).")
 def agents_capabilities() -> Any:
     return _get("/agents/capabilities")
 

@@ -1,6 +1,6 @@
 """RepoCiv — P4: Production step executor — wires orchestrator to agent dispatch.
 
-Connects task_orchestrator (P3) to agent_runner (SCOUT/WORKER/DAVI).
+Connects task_orchestrator (P3) to agent_runner (SCOUT/WORKER/MAIN).
 Provides dispatch_plan_step for injection via _to.set_step_executor().
 
 Security integration (Fase 1.5):
@@ -86,8 +86,7 @@ WORKER_KEYWORDS: list[str] = [
 
 
 def select_agent_for_step(step_description: str) -> str:
-    """Heuristic role selection: SCOUT for analysis, WORKER for implementation,
-    MAIN as fallback (orchestrator role).
+    """Heuristic: SCOUT for analysis/inspection, WORKER for implementation, MAIN as fallback.
 
     Examples:
         "inspect the codebase"     → "SCOUT"
@@ -105,19 +104,13 @@ def select_agent_for_step(step_description: str) -> str:
 
 
 def _infer_task_type(agent: str) -> str:
-    """Map agent role to a default task_type for model routing.
-
-    The keys are ROLES (scout, worker, validator, main), not personal
-    agent names. Any user-registered profile can play any of these roles
-    at runtime; the role just hints at what kind of work the agent
-    should do.
-    """
+    """Map agent type to a default task_type for model routing."""
     mapping = {
         "MAIN":     "orchestrate",
         "HERMES":   "orchestrate",
         "WORKER":   "edit",
         "SCOUT":    "read",
-        "VALIDATOR": "edit",
+        "OPENCLAW": "edit",
     }
     return mapping.get(agent.upper(), "edit")
 
@@ -324,7 +317,7 @@ def dispatch_plan_step(
             _run_agent_once, repo, issue_id, step_description, step_meta,
         )
     else:
-        # Direct dispatch (no retry) for HERMES, OPENCLAW, DAVI, etc.
+        # Direct dispatch (no retry) for HERMES, OPENCLAW, MAIN, etc.
         run_id = _run_agent_once(repo, issue_id, step_description, step_meta)
 
     # ── Write handoff artifact ──────────────────────────────────────────────

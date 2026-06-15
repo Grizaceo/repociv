@@ -35,20 +35,22 @@ from . import signal_extractor as _se
 logger = logging.getLogger(__name__)
 
 # ─── Base agent→tier affinity (overridable by signals) ──────────────────────
+#
+# Only built-in shipped agents are listed here. Personal profiles (configured
+# via the user's first unit / onboarding harness selection) fall through to
+# the task_type default below.
 
 _BASE_TIERS: dict[str, str] = {
-    "hermes":   "PREMIUM",
+    "HERMES":   "PREMIUM",
     "WORKER":   "EQUILIBRIO",
     "SCOUT":    "ECONOMICO",
-    "HERMES":   "PREMIUM",
     "OPENCLAW": "EQUILIBRIO",
 }
 
 _BASE_ENFORCED: dict[str, bool] = {
-    "hermes":   False,
+    "HERMES":   False,
     "WORKER":   True,
     "SCOUT":    True,
-    "HERMES":   False,
     "OPENCLAW": False,
 }
 
@@ -96,7 +98,7 @@ def route_model(
     """Route to an optimal model using FrugalGPT cascade logic.
 
     Args:
-        agent_type:    e.g. "MAIN", "WORKER", "SCOUT", "HERMES", "CLAUDE", "CODEX", "CURSOR", "OPENCLAW"
+        agent_type:    e.g. "HERMES", "WORKER", "SCOUT", "OPENCLAW", "CLAUDE", "CODEX", "CURSOR", or a personal unit type from the user's first unit
         task_type:     e.g. "orchestrate", "edit", "read"
         context:       Optional dict with:
           - "mission_text": str, for signal extraction

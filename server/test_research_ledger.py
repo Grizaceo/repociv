@@ -110,7 +110,7 @@ def test_get_agent_believability_partial(ledger: ResearchLedger) -> None:
     for correct in [True, True, True, False, False]:
         ledger.record_prediction(
             mission_id="m3",
-            agent_name="DAVI",
+            agent_name="MAIN",
             predicted_outcome="PROCEED",
             confidence=0.8,
             actual_outcome="PROCEED" if correct else "DISCARD",
@@ -118,7 +118,7 @@ def test_get_agent_believability_partial(ledger: ResearchLedger) -> None:
         )
     scores = ledger.get_agent_believability()
     # 3/5 = 0.6
-    assert abs(scores["DAVI"] - 0.6) < 0.01
+    assert abs(scores["MAIN"] - 0.6) < 0.01
 
 
 # ── ingest_event (dual-write) ─────────────────────────────────────────────────

@@ -5,28 +5,28 @@ from server import sessions
 
 def test_get_or_create_creates_canonical_session(tmp_path):
     sessions.init(tmp_path)
-    data = sessions.get_or_create("DAVI", defaults={"runtimeId": "hermes-local", "repo": "repociv"})
+    data = sessions.get_or_create("MAIN", defaults={"runtimeId": "hermes-local", "repo": "repociv"})
 
-    assert data["unitId"] == "DAVI"
+    assert data["unitId"] == "MAIN"
     assert data["runtimeId"] == "hermes-local"
     assert data["repo"] == "repociv"
     assert data["messageCount"] == 0
 
-    saved = json.loads((tmp_path / "sessions" / "DAVI" / "canonical.json").read_text(encoding="utf-8"))
-    assert saved["unitId"] == "DAVI"
+    saved = json.loads((tmp_path / "sessions" / "MAIN" / "canonical.json").read_text(encoding="utf-8"))
+    assert saved["unitId"] == "MAIN"
 
 
 def test_append_message_updates_counts_and_transcript(tmp_path):
     sessions.init(tmp_path)
-    sessions.append_message("DAVI", "user", "hola", {"missionId": "m1"})
-    canonical = sessions.append_message("DAVI", "assistant", "respuesta", {"missionId": "m1"})
+    sessions.append_message("MAIN", "user", "hola", {"missionId": "m1"})
+    canonical = sessions.append_message("MAIN", "assistant", "respuesta", {"missionId": "m1"})
 
     assert canonical["messageCount"] == 2
     assert canonical["inputChars"] == 4
     assert canonical["outputChars"] == len("respuesta")
     assert canonical["lastMissionId"] == "m1"
 
-    lines = (tmp_path / "sessions" / "DAVI" / "transcript.jsonl").read_text(encoding="utf-8").splitlines()
+    lines = (tmp_path / "sessions" / "MAIN" / "transcript.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2
     first = json.loads(lines[0])
     second = json.loads(lines[1])

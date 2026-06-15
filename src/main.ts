@@ -12,6 +12,23 @@ import { type ScannedRepo } from './map.ts';
 import { Renderer } from './renderer.ts';
 import { BridgeEvents, syncGraphRelationFlags } from './bridge.ts';
 import { GameState } from './game.ts';
+
+// ─── First-unit slot ──────────────────────────────────────────────────────────
+// "MAIN" is the user's first unit — the slot configured during onboarding
+// (harness selection). It exists at boot in place of the historical hardcoded
+// "DAVI" spawn. Its capabilities and runtime identity are wired up by PR 2's
+// onboarding step; until then it spawns as a generic hero and the bridge
+// routes commands through the harness the user picked.
+export const DEFAULT_USER_UNIT_ID = 'MAIN';
+export const DEFAULT_USER_UNIT_NAME = 'Main';
+
+function getFirstUserUnit(state: GameState) {
+  return (
+    state.getUnit(DEFAULT_USER_UNIT_ID) ??
+    state.getAllUnits().find((u) => u.id === DEFAULT_USER_UNIT_ID) ??
+    state.getAllUnits()[0]
+  );
+}
 import {
   showLoadingProgress,
   hideLoadingScreen,
@@ -60,8 +77,6 @@ import { tileKey } from './types.ts';
 import type { LocalRoom, LocalNpc } from './types.ts';
 import { clearChat } from './ui/chat.ts';
 import { openOnboardingPanel } from './ui/onboardingPanel.ts';
-import { initCapabilities } from './capabilitiesClient.ts';
-import { DEFAULT_UNIT_NAME } from './agentIdentity.ts';
 import { axialToPixel } from './hex.ts';
 import { areMountainPropsSettled } from './three/MountainProps3D.ts';
 import { areForestPropsSettled } from './three/ForestProps3D.ts';
@@ -83,7 +98,6 @@ import { openWonderVignette } from './ui/wonderVignette.ts';
 import { bindOrdenDeBatalla } from './ui/ordenDeBatalla.ts';
 import { bindSubagentSessionPanel } from './ui/subagentSessionPanel.ts';
 import { bindSlashCommandState } from './ui/chat/slashCommands.ts';
-import { syncWorkingUnitsFromGameState } from './ui/chat/state.ts';
 import { getWonder } from './wonders/manifest.ts';
 import {
   inferCityLabStatus,
@@ -322,14 +336,6 @@ async function bootstrap() {
   // Initialize UI Libraries (Icons, Animations)
   initExternalLibs();
   mountGacetaWidget();
-
-  // Fetch the capability snapshot from the bridge. Sync callers (hotkey
-  // handlers, badge renderers) read the cached value; the fetch is awaited
-  // so the UI starts rendering with the real model, not the empty default.
-  void initCapabilities().catch((err) => {
-    // eslint-disable-next-line no-console -- intentional user-facing startup warning
-    console.warn('[repociv] initCapabilities failed; UI will run with no capability gate:', err);
-  });
 
   // Restore saved side panel width
   const savedWidth = localStorage.getItem('repociv-side-panel-width');
@@ -747,60 +753,15 @@ async function bootstrap() {
   }
 
   function _primeMissionComposerForCity(city: City): void {
-    const unit = state.getUnit(DEFAULT_UNIT_NAME) ?? state.getAllUnits()[0];
+    const unit = getFirstUserUnit(state);
     if (!unit) return;
     state.selectUnit(unit);
     renderer.selectUnit(unit);
     showUnitPanel(unit, state);
-    _wireUnitPanelButtons();
     const missionInput = document.getElementById('mission-input') as HTMLInputElement | null;
     if (missionInput) {
       missionInput.placeholder = `Misión para ${city.name} (${city.id})`;
       missionInput.focus();
-    }
-  }
-
-  // Wire the 4 unit-panel action buttons (Mover / Construir / Dormir /
-  // Información) to renderer actions. Done once at boot; buttons
-  // dispatch to the currently-selected unit. Symptom 2026-06-12:
-  // "los botones del agent panel parecieran no hacer nada".
-  let _unitPanelWired = false;
-  function _wireUnitPanelButtons(): void {
-    if (_unitPanelWired) return;
-    _unitPanelWired = true;
-    const move = document.getElementById('btn-move');
-    const build = document.getElementById('btn-build');
-    const sleep = document.getElementById('btn-sleep');
-    const info = document.getElementById('btn-info');
-    if (move) {
-      move.addEventListener('click', () => {
-        if (!state.selectedUnit) return;
-        renderer.setActionMode('move');
-      });
-    }
-    if (build) {
-      build.addEventListener('click', () => {
-        if (!state.selectedUnit) return;
-        renderer.setActionMode('build');
-      });
-    }
-    if (sleep) {
-      sleep.addEventListener('click', () => {
-        if (!state.selectedUnit) return;
-        renderer.sleepSelectedUnit();
-      });
-    }
-    if (info) {
-      info.addEventListener('click', () => {
-        const u = state.selectedUnit;
-        if (!u) return;
-        // Mirror the right-click "Información" entry: select the unit and
-        // fire the unit-select callback so any panel listening to it (the
-        // orden de batalla, etc.) re-renders with this unit.
-        state.selectUnit(u);
-        renderer.selectUnit(u);
-        showUnitPanel(u, state);
-      });
     }
   }
 
@@ -1027,7 +988,7 @@ async function bootstrap() {
             void recordGesture({
               commandId: res.commandId,
               gesture: directive.gesture,
-              agentId: String(draft.payload?.['unit'] ?? DEFAULT_UNIT_NAME),
+              agentId: String(draft.payload?.['unit'] ?? DEFAULT_USER_UNIT_ID),
               cmdType: draft.type,
               target: draft.target,
             });
@@ -1088,9 +1049,7 @@ async function bootstrap() {
       const agentUnit = action === 'WORKER'
         ? (state.getAllUnits().find((u) => u.type === 'worker' && u.state === 'idle') ??
            state.getAllUnits().find((u) => u.type === 'worker'))
-        : (state.getUnit(DEFAULT_UNIT_NAME) ??
-           state.getAllUnits().find((u) => u.id === DEFAULT_UNIT_NAME) ??
-           state.getAllUnits().find((u) => u.state === 'idle'));
+        : (getFirstUserUnit(state));
       const agentId = agentUnit?.id ?? action;
       // Resolve the actual repo filesystem path for bridge context
       const city = state.world.cities.find((c) => c.id === repoId);
@@ -1198,9 +1157,11 @@ async function bootstrap() {
     state.notifyUpdate();
   };
 
-  // Spawn DAVI as the default hero, near the capital if present
+  // Spawn MAIN as the default hero, near the capital if present.
+  // MAIN's runtime identity is configured by the onboarding step (PR 2):
+  // the user picks a harness, and the bridge routes MAIN through it.
   const spawnAt = capital ? capital.coord : { q: 0, r: 0 };
-  state.spawnUnit(DEFAULT_UNIT_NAME, DEFAULT_UNIT_NAME, 'hero', 'gris', spawnAt, 'En espera de misión');
+  state.spawnUnit(DEFAULT_USER_UNIT_ID, DEFAULT_USER_UNIT_NAME, 'hero', 'gris', spawnAt, 'En espera de misión');
 
   wireHUD(renderer, state, bridge, toggleView);
 
@@ -1217,11 +1178,6 @@ async function bootstrap() {
     if (state.selectedUnit) showUnitPanel(state.selectedUnit, state);
   };
   state.subscribe(refreshHero);
-  // Keep the chat chip working-spinner in sync with the game state. The
-  // spinner shows next to the agent name in the top tab so the user can
-  // see at-a-glance which agent is currently working — even when looking
-  // at a different agent's chat.
-  state.subscribe(() => syncWorkingUnitsFromGameState(state));
   bindOrdenDeBatalla(state);
   bindSubagentSessionPanel(state);
   bindSlashCommandState(state);

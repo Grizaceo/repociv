@@ -552,7 +552,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/directives/stats":   _routes.get_directives_stats,
             "/directives/suggest": _routes.get_directives_suggest,
             "/harnesses":          _routes.get_harnesses,
-            "/api/profiles":        _routes.get_profiles,
+            "/api/config/default-harness": _routes.get_default_harness,
             "/log":                _routes.get_log,
             "/tasks":              _routes.get_tasks,
             "/improve/reflect":    _routes.get_improve_reflect,
@@ -716,8 +716,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/api/graph-relations/refresh": _routes.post_graph_relations_refresh,
             "/session/reset":  _routes.post_session_reset,
             "/model/override": _routes.post_model_override,
-            "/api/profiles":         _routes.post_profiles,
-            "/api/profiles/delete":  _routes.post_profiles_delete,
+            "/api/config/default-harness": _routes.post_default_harness,
             "/subagents/cancel": _routes.post_subagent_cancel,
         }
         if path in _POST_EXACT:
@@ -1027,10 +1026,6 @@ if __name__ == "__main__":
     _sched.set_dispatcher(_scheduler_dispatch)
     # Wire fatigue state into scheduler priority scoring
     _sched.set_fatigue_provider(lambda unit_id: get_unit_fatigue(unit_id).get("fatigue"))
-    # Load any queued missions persisted on disk from a previous bridge
-    # incarnation. Without this, commands queued before a restart stay stuck
-    # in scheduler-queue.json forever — the in-memory queue starts empty.
-    _sched._init_from_disk()
     _sched.start_worker()
     _seed_initial_heartbeats()
 

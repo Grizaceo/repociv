@@ -11,7 +11,7 @@ import type { LocalMission } from './types.ts';
 function makeMission(overrides: Partial<LocalMission> = {}): LocalMission {
   return {
     id: 'test-1',
-    unitId: 'davi',
+    unitId: 'main',
     repoId: 'repociv',
     filePath: '/repos/repociv/src/foo.ts',
     fileName: 'foo.ts',

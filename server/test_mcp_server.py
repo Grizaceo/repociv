@@ -71,7 +71,7 @@ def test_agents_list_calls_correct_url():
 
 
 def test_agents_capabilities():
-    payload = {"capabilities": {"DAVI": ["commit", "execute"]}}
+    payload = {"capabilities": {"MAIN": ["commit", "execute"]}}
     with _mock_get(payload) as m:
         result = _mcp.agents_capabilities()
     assert "/agents/capabilities" in m.call_args[0][0]

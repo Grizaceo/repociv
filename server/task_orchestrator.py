@@ -620,7 +620,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                     })
 
                     # Record step latency
-                    _step_agent = str(step_meta.get("agent") or "MAIN")
+                    _step_agent = str(step_meta.get("agent", "MAIN"))
                     try:
                         _metrics.record_step_latency(
                             repo, issue_id, i, _step_agent,
@@ -646,7 +646,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
 
                 except Exception as step_err:
                     # Record latency even on failure
-                    _step_agent = str(step_meta.get("agent") or "MAIN")
+                    _step_agent = str(step_meta.get("agent", "MAIN"))
                     try:
                         _metrics.record_step_latency(
                             repo, issue_id, i, _step_agent,

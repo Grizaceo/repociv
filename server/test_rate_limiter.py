@@ -60,49 +60,49 @@ def test_token_bucket_does_not_exceed_capacity():
 
 # ─── RateLimiter tests ───────────────────────────────────────────────────────
 
-def test_rate_limiter_default_hermes_capacity():
-    """hermes bucket starts with capacity 5."""
+def test_rate_limiter_default_davi_capacity():
+    """DAVI bucket starts with capacity 5."""
     rl = RateLimiter()
-    bucket = rl._get_bucket("hermes")
+    bucket = rl._get_bucket("MAIN")
     assert bucket.capacity == 5
 
 
-def test_rate_limiter_default_claude_capacity():
-    """claude bucket starts with capacity 10."""
+def test_rate_limiter_default_worker_capacity():
+    """WORKER bucket starts with capacity 10."""
     rl = RateLimiter()
-    bucket = rl._get_bucket("claude")
+    bucket = rl._get_bucket("WORKER")
     assert bucket.capacity == 10
 
 
-def test_rate_limiter_default_cursor_capacity():
-    """cursor bucket starts with capacity 10."""
+def test_rate_limiter_default_scout_capacity():
+    """SCOUT bucket starts with capacity 20."""
     rl = RateLimiter()
-    bucket = rl._get_bucket("cursor")
-    assert bucket.capacity == 10
+    bucket = rl._get_bucket("SCOUT")
+    assert bucket.capacity == 20
 
 
 def test_rate_limiter_fallback_for_unknown_agent():
-    """Unknown harnesses use fallback capacity of 15."""
+    """Unknown agent types use fallback capacity of 15."""
     rl = RateLimiter()
-    bucket = rl._get_bucket("UNKNOWN_HARNESS_XYZ")
+    bucket = rl._get_bucket("UNKNOWN_AGENT_XYZ")
     assert bucket.capacity == 15
 
 
 def test_rate_limiter_case_insensitive():
-    """Harness lookup is case-insensitive."""
+    """Agent type lookup is case-insensitive."""
     rl = RateLimiter()
-    assert rl._get_bucket("hermes").capacity == rl._get_bucket("HERMES").capacity
-    assert rl._get_bucket("claude").capacity == rl._get_bucket("CLAUDE").capacity
+    assert rl._get_bucket("main").capacity == rl._get_bucket("MAIN").capacity
+    assert rl._get_bucket("worker").capacity == rl._get_bucket("WORKER").capacity
 
 
 def test_rate_limiter_buckets_independent():
-    """Consuming hermes tokens does not affect cursor or claude buckets."""
+    """Consuming DAVI tokens does not affect SCOUT or WORKER buckets."""
     rl = RateLimiter()
-    # Drain hermes (capacity=5)
+    # Drain DAVI (capacity=5)
     for _ in range(5):
-        rl.check_and_consume("hermes")
-    assert rl.check_and_consume("hermes") is False
-    # cursor should still be full
+        rl.check_and_consume("MAIN")
+    assert rl.check_and_consume("MAIN") is False
+    # SCOUT should still be full
     assert rl.check_and_consume("SCOUT") is True
     assert rl.check_and_consume("WORKER") is True
 

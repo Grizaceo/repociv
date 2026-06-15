@@ -1,4 +1,9 @@
-"""Tests for the events.jsonl migration: legacy DAVI/LEXO → first profile."""
+"""Tests for the one-shot events.jsonl migration DAVI → MAIN.
+
+The migration runs on event_store.init() and rewrites historical events
+that referenced the legacy personal agent name "DAVI" to the generic
+"MAIN" slot. The marker file makes the migration idempotent.
+"""
 from __future__ import annotations
 
 import json
@@ -7,17 +12,15 @@ from pathlib import Path
 import pytest
 
 from server import event_store
-from server import config_store
 
 
 @pytest.fixture
 def isolated_event_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    """Force the event store + config store to a fresh tmp directory."""
-    monkeypatch.setattr(event_store, "_store_path", tmp_path / "events.jsonl")
-    monkeypatch.setattr(config_store, "_config_path", lambda: tmp_path / "config.json")
+    """Force the event store to a fresh tmp directory and reset module state."""
+    monkeypatch.setattr(event_store, "_store_path", None)
     event_store.init(tmp_path)
     yield tmp_path
-    # Cleanup so subsequent tests don't see stale migration state.
+    # Clean up: remove marker + events so other tests can re-init in the same dir.
     marker = tmp_path / event_store._MIGRATION_MARKER
     if marker.exists():
         marker.unlink()
@@ -43,95 +46,78 @@ def _read_events(path: Path) -> list[dict]:
     return out
 
 
-def test_rewrites_davi_to_destination_in_actor(isolated_event_store: Path) -> None:
-    config_store.upsert_profile("H", "hermes")
-    changed = event_store._rewrite_legacy_agent(
-        {"actor": "DAVI", "data": {}}, destination="H"
+def test_rewrites_davi_actor_in_top_level_field(tmp_path: Path) -> None:
+    path = tmp_path / "events.jsonl"
+    _write_raw_events(path, [
+        {"type": "CommandCreated", "commandId": "c1", "actor": "DAVI", "data": {}},
+        {"type": "CommandCreated", "commandId": "c2", "actor": "MAIN", "data": {}},
+    ])
+    assert event_store._rewrite_event_actor({"actor": "DAVI", "data": {}}) is True
+    assert event_store._rewrite_event_actor({"actor": "MAIN", "data": {}}) is False
+    assert event_store._rewrite_event_actor({"actor": "WORKER", "data": {}}) is False
+
+
+def test_rewrites_davi_unit_in_data_dict(tmp_path: Path) -> None:
+    changed = event_store._rewrite_event_actor(
+        {"actor": "system", "data": {"unit": "DAVI"}}
     )
     assert changed is True
 
 
-def test_rewrites_lexo_in_nested_data(isolated_event_store: Path) -> None:
-    config_store.upsert_profile("bigboss", "claude")
-    changed = event_store._rewrite_legacy_agent(
-        {"actor": "system", "data": {"unitId": "LEXO"}}, destination="bigboss"
+def test_rewrites_davi_unit_at_top_level(tmp_path: Path) -> None:
+    changed = event_store._rewrite_event_actor(
+        {"actor": "system", "unitId": "DAVI", "data": {}}
     )
     assert changed is True
 
 
-def test_does_not_rewrite_unknown_agent(isolated_event_store: Path) -> None:
-    config_store.upsert_profile("H", "hermes")
-    changed = event_store._rewrite_legacy_agent(
-        {"actor": "OPENCLAW", "data": {}}, destination="H"
-    )
-    assert changed is False
+def test_migrate_skips_when_marker_present(
+    isolated_event_store: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # First init wrote the marker. Re-call init to make sure it short-circuits.
+    event_store.init(isolated_event_store)
+    # No .tmp file should have been left behind.
+    tmp = isolated_event_store / "events.jsonl.tmp"
+    assert not tmp.exists()
 
 
-def test_destination_defaults_to_main_when_no_profiles(isolated_event_store: Path) -> None:
-    # Auto-baseline: there's always a profile (DAVI is first alphabetically),
-    # so the destination is the first registered profile, not "main".
-    assert event_store._resolve_migration_destination() == "DAVI"
-
-
-def test_destination_uses_first_registered_profile(isolated_event_store: Path) -> None:
-    config_store.upsert_profile("H", "hermes")
-    config_store.upsert_profile("claude-dev", "claude")
-    # Sorted by key for determinism.
-    assert event_store._resolve_migration_destination() == "H"
-
-
-def test_migration_rewrites_existing_events_to_first_profile(isolated_event_store: Path) -> None:
-    config_store.upsert_profile("H", "hermes")
-    # Force re-migration (init() already wrote the marker and bailed).
-    marker = isolated_event_store / event_store._MIGRATION_MARKER
-    marker.unlink()
+def test_migrate_rewrites_legacy_events(isolated_event_store: Path) -> None:
     path = isolated_event_store / "events.jsonl"
     _write_raw_events(path, [
         {"type": "CommandCreated", "commandId": "c1", "actor": "DAVI", "data": {"unit": "DAVI"}},
-        {"type": "CommandCreated", "commandId": "c2", "actor": "H", "data": {}},
-        {"type": "AgentOutputChunk", "commandId": "c3", "actor": "LEXO", "data": {}},
+        {"type": "CommandCreated", "commandId": "c2", "actor": "MAIN", "data": {}},
+        {"type": "AgentOutputChunk", "commandId": "c3", "actor": "DAVI", "data": {}},
     ])
+    # Re-run init so the migration actually runs (first init created the marker
+    # and bailed). Force a re-migration by removing the marker.
+    marker = isolated_event_store / event_store._MIGRATION_MARKER
+    marker.unlink()
     event_store.init(isolated_event_store)
+
     rewritten = _read_events(path)
     actors = [e.get("actor") for e in rewritten]
-    assert actors == ["H", "H", "H"]
-    assert rewritten[0]["data"]["unit"] == "H"
+    assert actors == ["MAIN", "MAIN", "MAIN"]
 
 
-def test_migration_falls_back_to_main_when_no_profiles(isolated_event_store: Path) -> None:
-    # Drop any profile that might exist (none in this test).
-    marker = isolated_event_store / event_store._MIGRATION_MARKER
-    marker.unlink()
+def test_migrate_is_idempotent(isolated_event_store: Path) -> None:
     path = isolated_event_store / "events.jsonl"
     _write_raw_events(path, [
         {"type": "CommandCreated", "commandId": "c1", "actor": "DAVI", "data": {}},
     ])
-    event_store.init(isolated_event_store)
-    rewritten = _read_events(path)
-    # Auto-baseline means the first profile is "DAVI" (alphabetical) on
-    # first read, so the legacy "DAVI" actor gets rewritten to the
-    # default profile key (DAVI) — no longer falls back to "main".
-    assert rewritten[0]["actor"] == "DAVI"
-
-
-def test_migration_is_idempotent(isolated_event_store: Path) -> None:
-    config_store.upsert_profile("H", "hermes")
-    marker = isolated_event_store / event_store._MIGRATION_MARKER
-    marker.unlink()
-    path = isolated_event_store / "events.jsonl"
-    _write_raw_events(path, [
-        {"type": "CommandCreated", "commandId": "c1", "actor": "DAVI", "data": {}},
-    ])
-    event_store.init(isolated_event_store)
-    event_store.init(isolated_event_store)
-    rewritten = _read_events(path)
-    assert rewritten[0]["actor"] == "H"
-
-
-def test_migration_creates_marker_when_no_events(isolated_event_store: Path) -> None:
-    # No events.jsonl: just write the marker, no rewriting.
+    # Force re-migration twice; the second time the marker should skip it.
     marker = isolated_event_store / event_store._MIGRATION_MARKER
     marker.unlink()
     event_store.init(isolated_event_store)
+    event_store.init(isolated_event_store)
+    rewritten = _read_events(path)
+    assert rewritten[0]["actor"] == "MAIN"
+
+
+def test_migrate_creates_marker_when_no_events(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Don't go through the fixture — set up a fresh state with no events.
+    monkeypatch.setattr(event_store, "_store_path", None)
+    event_store.init(tmp_path)
+    marker = tmp_path / event_store._MIGRATION_MARKER
     assert marker.exists()
-    assert not (isolated_event_store / "events.jsonl").exists()
+    # events.jsonl was not created (nothing to migrate to)
+    assert not (tmp_path / "events.jsonl").exists()

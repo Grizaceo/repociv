@@ -11,8 +11,10 @@
 ## Qué es RepoCiv hoy
 
 Un dashboard hexagonal estilo Civilization V que **un usuario alpha de un solo asiento**
-corre localmente para coordinar sus propios agentes (DAVI, LEXO, WORKER, SCOUT, OPENCLAW) sobre los repos
-en `~/.hermes/workspace/repos/`.
+corre localmente para coordinar sus propios agentes sobre los repos
+en `~/.hermes/workspace/repos/`. Los agentes shipped (built-in) son WORKER
+y SCOUT; el resto se enrutan por harness (OPENCLAW, CLAUDE, CODEX, CURSOR)
+o se registran como perfil personal del usuario.
 
 Por debajo del juego hay un Agent OS real (Tensor Context, FrugalGPT Router,
 Swarm Engine, World Model, Security Harness 3-capas, SICA, Docker isolation).
