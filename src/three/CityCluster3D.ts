@@ -3,7 +3,7 @@ import {
   BoxGeometry,
   ConeGeometry,
   CylinderGeometry,
-  SphereGeometry,
+  ExtrudeGeometry,
   Group,
   InstancedMesh,
   Matrix4,
@@ -12,6 +12,8 @@ import {
   Color,
   Vector3,
   Quaternion,
+  Shape,
+  SphereGeometry,
 } from 'three';
 import { type City, type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
@@ -180,7 +182,42 @@ export function rebuildCityClusters(
     const bldMat = new MeshLambertMaterial({ color: new Color(0xc8c0b0) });
     const roofGeom = new ConeGeometry(HEX_SIZE * 0.10, HEX_SIZE * 0.12, 4);
     const roofMat = new MeshLambertMaterial({ color: new Color(0x9e5a45) });
-    const wallGeom = new BoxGeometry(HEX_SIZE * 0.55, HEX_SIZE * 0.08, HEX_SIZE * 0.02);
+    // Perimeter wall: a closed hexagonal RING (outer hex with inner hex hole,
+    // extruded). ONE geometry per city, not 6 separate boxes. The previous
+    // 6-box design left gaps at every corner, so walls read as 6 scattered
+    // dots instead of one continuous fortification.
+    {
+      const outerR = HEX_SIZE * 0.40;
+      const innerR = HEX_SIZE * 0.34;
+      const wallH = HEX_SIZE * 0.12;
+      const ring = new Shape();
+      for (let i = 0; i < 6; i++) {
+        const a = (Math.PI / 3) * i;
+        const x = Math.cos(a) * outerR;
+        const z = Math.sin(a) * outerR;
+        if (i === 0) ring.moveTo(x, z); else ring.lineTo(x, z);
+      }
+      ring.closePath();
+      const hole = new Shape();
+      for (let i = 0; i < 6; i++) {
+        const a = (Math.PI / 3) * i;
+        const x = Math.cos(a) * innerR;
+        const z = Math.sin(a) * innerR;
+        if (i === 0) hole.moveTo(x, z); else hole.lineTo(x, z);
+      }
+      hole.closePath();
+      ring.holes.push(hole);
+      // ExtrudeGeometry extrudes the shape (in its 2D plane) along +Z. We want
+      // the wall to lie flat on the ground (shape in X-Z) and grow upward in Y,
+      // so we rotate the geometry: X→X, Y→Z, Z→-Y after a -π/2 X-rotation.
+      const wall3d = new ExtrudeGeometry(ring, { depth: wallH, bevelEnabled: false });
+      wall3d.rotateX(-Math.PI / 2);
+      // After rotation the extrusion direction points -Y. Flip the Z coords
+      // so the wall extrudes upward instead of sinking into the ground.
+      wall3d.scale(1, 1, -1);
+      var ringWallGeom: ExtrudeGeometry = wall3d;
+    }
+    const wallGeom: ExtrudeGeometry = ringWallGeom;
     const wallMat = new MeshLambertMaterial({ color: new Color(0xb0a898) });
     const towerGeom = new CylinderGeometry(HEX_SIZE * 0.025, HEX_SIZE * 0.03, HEX_SIZE * 0.18, 6);
     const towerMat = new MeshLambertMaterial({ color: new Color(0xa09880) });
@@ -203,7 +240,9 @@ export function rebuildCityClusters(
       normalCities.reduce((s, c) => s + buildingCountForCity(c.population), 0) +
       capitals.length * satellitesPerCapital;
     const roofCount = bldCount;
-    const wallCount = normalCities.length * 6;   // 6 wall segments
+    // Perimeter wall: ONE closed hexagonal ring per city (was 6 separate
+    // box segments that left corner gaps → walls read as scattered dots).
+    const wallCount = normalCities.length;
     const towerCount = normalCities.length * 4;  // 4 corner towers
 
     clusterMesh = new InstancedMesh(bldGeom, bldMat, bldCount);
@@ -212,7 +251,6 @@ export function rebuildCityClusters(
     towerMesh   = new InstancedMesh(towerGeom, towerMat, towerCount);
 
     let bldIdx = 0, roofIdx = 0, wallIdx = 0, towerIdx = 0;
-    const q = new Quaternion();
 
     for (const city of normalCities) {
       const tile = getTile(tileKey(city.coord));
@@ -253,16 +291,13 @@ export function rebuildCityClusters(
         roofMesh.setMatrixAt(roofIdx++, roofM);
       }
 
-      // Perimeter walls (thin, around the tile edge)
-      const wallY = base.y + 3.2;
-      for (let wi = 0; wi < 6; wi++) {
-        const angle = (Math.PI / 3) * wi;
-        const wx = base.x + Math.cos(angle) * HEX_SIZE * 0.38;
-        const wz = base.z + Math.sin(angle) * HEX_SIZE * 0.38;
-        const wallM = new Matrix4().makeTranslation(wx, wallY, wz);
-        q.setFromAxisAngle(new Vector3(0, 1, 0), angle + Math.PI / 2);
-        wallM.multiply(new Matrix4().makeRotationFromQuaternion(q));
-        wallMesh.setMatrixAt(wallIdx++, wallM);
+      // Perimeter wall: ONE closed hexagonal ring centered on the city,
+      // raised to sit on top of the plaza. No more 6 separate boxes with
+      // corner gaps — those read as scattered dots.
+      const wallY = base.y + 5.5;
+      {
+        const m = new Matrix4().makeTranslation(base.x, wallY, base.z);
+        wallMesh.setMatrixAt(wallIdx++, m);
       }
 
       // Corner towers
