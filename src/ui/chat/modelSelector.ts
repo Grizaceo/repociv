@@ -37,10 +37,19 @@ let _selectedProvider = '';
 let _selectedModel = '';
 let _cursorAvailable = false;
 
-/** Return providers — server already filters to only configured providers,
- *  so this just returns the full list regardless of harness. */
+/** Providers visible for the current harness. The server lists every
+ *  configured provider; here we narrow to those with at least one model
+ *  compatible with the selected harness (each model carries a `harnesses`
+ *  list). 'auto' (cascade) shows everything. Some harnesses (e.g. cursor,
+ *  codex) declare no per-model compatibility in the registry — never collapse
+ *  to an empty list, so we fall back to the full list when nothing matches. */
 function _filteredProviders(): ProviderInfo[] {
-  return _allProviders;
+  const h = _selectedHarness;
+  if (!h || h === 'auto') return _allProviders;
+  const matching = _allProviders.filter((p) =>
+    p.models.some((m) => !m.harnesses?.length || m.harnesses.includes(h)),
+  );
+  return matching.length ? matching : _allProviders;
 }
 
 function newError(msg: string): Error {
@@ -55,42 +64,26 @@ export function initProviderSelectors(): void {
   const provSel = document.getElementById('provider-selector') as HTMLSelectElement | null;
   const modelSel = document.getElementById('model-selector') as HTMLSelectElement | null;
 
+  // The DOM <select>s and the in-chat slash picker (slashPicker.ts) both feed
+  // the same applyXSelection() functions below — that single path is what keeps
+  // dropdown state, getSelectedConfig() and the per-unit persistence in sync no
+  // matter which surface the user drives.
   if (harnessSel && !harnessSel.dataset['wired']) {
-    harnessSel.addEventListener('change', () => {
-      const prevHarness = _selectedHarness;
-      _selectedHarness = harnessSel.value;
-      persistSelection(getActiveChatUnit());
-      // Only re-render provider list if the harness changed the filter
-      if (_selectedHarness !== prevHarness) {
-        _reloadProviderSelector();
-      }
-      updateStatusIndicator();
-    });
+    harnessSel.addEventListener('change', () => applyHarnessSelection(harnessSel.value));
     harnessSel.dataset['wired'] = '1';
   }
   if (provSel && !provSel.dataset['wired']) {
-    provSel.addEventListener('change', () => {
-      _selectedProvider = provSel.value;
-      populateModels();
-      persistSelection(getActiveChatUnit());
-      updateStatusIndicator();
-      // Note: previously called switchHermesModel() here, but that hit
-      // the Hermes web server (:9119, TUI-only) instead of the gateway
-      // (:8642) and silently failed. The gateway honors the per-request
-      // `model` field on /v1/chat/completions, which is already carried
-      // in every chat draft's payload — so the next message will use
-      // the newly-selected model without any extra round-trip.
-    });
+    // Note: previously called switchHermesModel() here, but that hit the Hermes
+    // web server (:9119, TUI-only) instead of the gateway (:8642) and silently
+    // failed. The gateway honors the per-request `model` field on
+    // /v1/chat/completions, which is already carried in every chat draft's
+    // payload — so the next message uses the newly-selected model without any
+    // extra round-trip.
+    provSel.addEventListener('change', () => applyProviderSelection(provSel.value));
     provSel.dataset['wired'] = '1';
   }
   if (modelSel && !modelSel.dataset['wired']) {
-    modelSel.addEventListener('change', () => {
-      _selectedModel = modelSel.value;
-      persistSelection(getActiveChatUnit());
-      updateStatusIndicator();
-      // See provSel change comment — switchHermesModel is a no-op now;
-      // the model is applied per-request via the chat draft payload.
-    });
+    modelSel.addEventListener('change', () => applyModelSelection(modelSel.value));
     modelSel.dataset['wired'] = '1';
   }
 
@@ -379,16 +372,21 @@ function populateModels(savedModel?: string): void {
     modelSel.appendChild(opt);
   }
 
+  // Pick a live model. Honor savedModel unless it is a known-dead one
+  // (reachable === false); otherwise prefer the first reachable model so a
+  // provider switch never silently pins a model the picker itself forbids
+  // (R5). Fall back to the provider default only when nothing is reachable.
+  const isLive = (m: ModelInfo): boolean => m.reachable !== false;
+  let target = '';
   if (savedModel) {
-    const exists = provider.models.find((m) => m.id === savedModel);
-    if (exists) {
-      modelSel.value = savedModel;
-      _selectedModel = savedModel;
-      return;
-    }
+    const saved = provider.models.find((m) => m.id === savedModel);
+    if (saved && isLive(saved)) target = savedModel;
   }
-  modelSel.value = provider.defaultModel;
-  _selectedModel = provider.defaultModel;
+  if (!target) {
+    target = provider.models.find(isLive)?.id ?? provider.defaultModel;
+  }
+  modelSel.value = target;
+  _selectedModel = target;
 }
 
 // ─── Per-unit config storage ────────────────────────────────────────────────
@@ -398,6 +396,14 @@ function populateModels(savedModel?: string): void {
 
 function _storageKey(unitId: string | null): string {
   return unitId ? `repociv:chatConfig:${unitId}` : 'repociv:chatConfig';
+}
+
+// A consumer (the agent chip) registers here to mirror a unit's selection on
+// its tab whenever it is persisted. Kept as a callback rather than an import so
+// modelSelector has no dependency on agentChip (which imports modelSelector).
+let _onConfigPersisted: ((unitId: string | null) => void) | null = null;
+export function setConfigPersistedHandler(cb: (unitId: string | null) => void): void {
+  _onConfigPersisted = cb;
 }
 
 function persistSelection(unitId: string | null = null): void {
@@ -414,6 +420,7 @@ function persistSelection(unitId: string | null = null): void {
   } catch {
     // localStorage full or unavailable
   }
+  _onConfigPersisted?.(unitId);
 }
 
 function loadSelection(unitId: string | null = null): {
@@ -490,4 +497,93 @@ export function loadConfigForUnit(unitId: string): void {
 /** Get the currently selected harness, provider and model for sending to the bridge. */
 export function getSelectedConfig(): { harness: string; provider: string; model: string } {
   return { harness: _selectedHarness, provider: _selectedProvider, model: _selectedModel };
+}
+
+/** The persisted harness/provider/model for a specific unit (per-unit key,
+ *  falling back to the global mirror). Used by the agent chip to label each
+ *  tab with its own configuration without touching the active selection. */
+export function getUnitConfig(unitId: string): { harness: string; provider: string; model: string } {
+  return loadSelection(unitId);
+}
+
+// ─── Programmatic apply API (shared by the DOM <select>s and slashPicker.ts) ──
+// These are the ONLY mutators of the selection triple. Each one updates the
+// matching <select>.value (so the dropdowns reflect a slash-driven change),
+// persists per-unit, and refreshes the status dot — exactly what the old inline
+// change-listener bodies did, now callable from anywhere.
+
+/** Apply a harness choice. Re-filters the provider list when the harness
+ *  actually changed (mirrors the legacy listener). */
+export function applyHarnessSelection(
+  harnessId: string,
+  unitId: string | null = getActiveChatUnit(),
+): void {
+  const harnessSel = document.getElementById('harness-selector') as HTMLSelectElement | null;
+  const prev = _selectedHarness;
+  _selectedHarness = harnessId;
+  if (harnessSel) harnessSel.value = harnessId;
+  persistSelection(unitId);
+  if (harnessId !== prev) _reloadProviderSelector();
+  updateStatusIndicator();
+}
+
+/** Apply a provider choice. Repopulates the model list; pass `savedModel` to
+ *  pre-select a specific model (used by the model picker to set provider+model
+ *  atomically), otherwise the provider's default model is selected. */
+export function applyProviderSelection(
+  providerId: string,
+  unitId: string | null = getActiveChatUnit(),
+  savedModel?: string,
+): void {
+  const provSel = document.getElementById('provider-selector') as HTMLSelectElement | null;
+  _selectedProvider = providerId;
+  if (provSel) provSel.value = providerId;
+  populateModels(savedModel);
+  persistSelection(unitId);
+  updateStatusIndicator();
+}
+
+/** Apply a model choice within the current provider. */
+export function applyModelSelection(
+  modelId: string,
+  unitId: string | null = getActiveChatUnit(),
+): void {
+  const modelSel = document.getElementById('model-selector') as HTMLSelectElement | null;
+  _selectedModel = modelId;
+  if (modelSel) {
+    // A power user can pin a model id that isn't in the fetched provider list
+    // (custom/unlisted). Assigning .value with no matching <option> silently
+    // blanks the dropdown, diverging it from getSelectedConfig(). Add a
+    // synthetic option so the dropdown shows the verbatim pinned model.
+    if (modelId && !Array.from(modelSel.options).some((o) => o.value === modelId)) {
+      const opt = document.createElement('option');
+      opt.value = modelId;
+      opt.textContent = `${modelId} (custom)`;
+      modelSel.appendChild(opt);
+    }
+    modelSel.value = modelId;
+  }
+  persistSelection(unitId);
+  updateStatusIndicator();
+}
+
+/** Apply a provider+model pair atomically — the model picker offers models
+ *  across every provider, so choosing one may also switch the provider. */
+export function applyModelChoice(
+  providerId: string,
+  modelId: string,
+  unitId: string | null = getActiveChatUnit(),
+): void {
+  applyProviderSelection(providerId, unitId, modelId);
+}
+
+/** Raw harness list (already availability-annotated by the server). */
+export function getHarnessList(): HarnessInfo[] {
+  return _harnesses;
+}
+
+/** Providers visible for the current harness (server pre-filters to
+ *  configured providers, so this is the full list). */
+export function getProviderList(): ProviderInfo[] {
+  return _filteredProviders();
 }

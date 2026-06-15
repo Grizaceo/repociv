@@ -10,7 +10,16 @@
 //   }
 
 import { bridgeHeaders, bridgeUrl } from '../../bridgeEnv.ts';
-import { getSelectedConfig } from './modelSelector.ts';
+import {
+  getSelectedConfig,
+  getHarnessList,
+  getProviderList,
+  applyHarnessSelection,
+  applyProviderSelection,
+  applyModelSelection,
+} from './modelSelector.ts';
+import { parseSlash, classifyModelArgs } from './pickerLogic.ts';
+import { openModelPicker, openHarnessPicker, openProviderPicker } from './slashPicker.ts';
 import { resetChatHistory } from './history.ts';
 import type { GameState } from '../../game.ts';
 import { openSubagentSession } from '../subagentSessionPanel.ts';
@@ -45,12 +54,9 @@ export async function handleSlashCommand(
   unitId: string,
   append: AppendFn,
 ): Promise<boolean> {
-  const trimmed = text.trim();
-  if (!trimmed.startsWith('/')) return false;
-
-  const parts = trimmed.slice(1).split(/\s+/);
-  const cmd = (parts[0] ?? '').toLowerCase();
-  const args = parts.slice(1).join(' ');
+  const parsed = parseSlash(text);
+  if (!parsed) return false;
+  const { cmd, args } = parsed;
 
   const handler = _commands[cmd];
   if (handler) {
@@ -90,6 +96,8 @@ _register('status', {
       `• Harness: \`${harness || 'auto'}\``,
       `• Provider: \`${provider || 'auto'}\``,
       `• Modelo: \`${model || '(default)'}\``,
+      '',
+      'Cambia con `/model`, `/harness` o `/provider` — abren un picker (↑↓ · Enter · 1-9 · Esc).',
     ];
     append(unitId, lines.join('\n'), 'system');
     return true;
@@ -129,49 +137,86 @@ _register('new', {
 // ─── /model ──────────────────────────────────────────────────────────────────
 
 _register('model', {
-  description: 'Sin args: muestra modelo activo. Con args `<provider> <model>`: lo cambia.',
+  description: 'Abre el picker de modelos (`/model <texto>` para filtrar). Atajo: `/model <provider> <modelo>`.',
   run: async (args, unitId, append) => {
-    if (!args.trim()) {
-      // show current
-      const { harness, provider, model } = getSelectedConfig();
-      append(
-        unitId,
-        `**Modelo activo:** \`${provider || 'auto'}/${model || 'default'}\` (harness: ${harness || 'auto'})`,
-        'system',
-      );
-      return true;
-    }
-
-    const parts = args.trim().split(/\s+/);
-    if (parts.length < 2) {
-      append(
-        unitId,
-        '❌ Uso: `/model <provider> <modelo>` — ej. `/model ollama-cloud deepseek-v4-pro`',
-        'system',
-      );
-      return true;
-    }
-    const [provider, ...modelParts] = parts;
-    const model = modelParts.join(' ');
-
-    try {
-      const res = await fetch(bridgeUrl('/model/override'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...bridgeHeaders() },
-        body: JSON.stringify({ unit: unitId, provider, model }),
-      });
-      if (!res.ok) {
-        const err = await res.text().catch(() => `HTTP ${res.status}`);
-        append(unitId, `❌ Error al cambiar modelo: ${err}`, 'system');
+    // Power-user shortcut: `/model <provider> <modelo>` with an exact provider
+    // id applies immediately (and still pings /model/override for the Hermes
+    // harness path). Anything else is treated as a filter and opens the picker
+    // — so `/model gpt` or a typo never errors out, it just narrows the list.
+    const decision = classifyModelArgs(args, isKnownProvider);
+    if (decision.kind === 'apply') {
+      const { provider, model } = decision;
+      // Keep local selection (dropdowns + getSelectedConfig + persistence) in
+      // sync — the per-request `model` field on the next draft does the actual
+      // routing; the override POST is best-effort for the Hermes harness.
+      // Set provider first, then force the exact model: a power user may name a
+      // model that isn't in the fetched list (custom/unlisted id), in which case
+      // applyModelChoice alone would fall back to the provider default and drop
+      // their intent. applyModelSelection pins getSelectedConfig().model verbatim.
+      applyProviderSelection(provider, unitId);
+      applyModelSelection(model, unitId);
+      try {
+        const res = await fetch(bridgeUrl('/model/override'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...bridgeHeaders() },
+          body: JSON.stringify({ unit: unitId, provider, model }),
+        });
+        if (!res.ok) {
+          const err = await res.text().catch(() => `HTTP ${res.status}`);
+          append(unitId, `⚠️ Modelo aplicado localmente → \`${provider}/${model}\` (override: ${err})`, 'system');
+          return true;
+        }
+      } catch (e) {
+        append(unitId, `⚠️ Modelo aplicado localmente → \`${provider}/${model}\` (bridge: ${String(e)})`, 'system');
         return true;
       }
       append(unitId, `✅ Modelo cambiado → \`${provider}/${model}\``, 'system');
-    } catch (e) {
-      append(unitId, `❌ No se pudo conectar con el bridge: ${String(e)}`, 'system');
+      return true;
     }
+
+    // No exact provider pair → interactive picker, seeded with any filter text.
+    openModelPicker(unitId, append, decision.filter);
     return true;
   },
 });
+
+// ─── /harness ──────────────────────────────────────────────────────────────
+
+_register('harness', {
+  description: 'Abre el picker de harness/ejecutor (`/harness <texto>` para filtrar).',
+  run: async (args, unitId, append) => {
+    const a = args.trim();
+    // Exact id (or auto) applies instantly; otherwise open the picker seeded.
+    if (a && (a === 'auto' || getHarnessList().some((h) => h.id === a && h.available))) {
+      applyHarnessSelection(a, unitId);
+      append(unitId, `✅ Harness → \`${a}\``, 'system');
+      return true;
+    }
+    openHarnessPicker(unitId, append, a);
+    return true;
+  },
+});
+
+// ─── /provider ───────────────────────────────────────────────────────────────
+
+_register('provider', {
+  description: 'Abre el picker de proveedores (`/provider <texto>` para filtrar).',
+  run: async (args, unitId, append) => {
+    const a = args.trim();
+    if (a && (a === 'auto' || isKnownProvider(a))) {
+      applyProviderSelection(a, unitId);
+      append(unitId, `✅ Proveedor → \`${a}\``, 'system');
+      return true;
+    }
+    openProviderPicker(unitId, append, a);
+    return true;
+  },
+});
+
+/** True when `id` is a provider currently offered by the bridge. */
+function isKnownProvider(id: string): boolean {
+  return getProviderList().some((p) => p.id === id);
+}
 
 // ─── /subagent — open background subagent session viewer ─────────────────────
 
