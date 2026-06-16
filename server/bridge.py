@@ -562,6 +562,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/ws":                 _routes.get_ws_info,
             "/api/news/latest":    _routes.get_latest_news,
             "/api/wonders":        _routes.get_wonders,
+            "/api/wonders/launchable": _routes.get_wonder_launchable,
             "/wonders":            _routes.get_wonders,  # legacy alias
             "/api/graph-relations":       _routes.get_graph_relations,
             "/api/graph-relations/stats": _routes.get_graph_relations_stats,
@@ -598,12 +599,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return
 
         if path.startswith("/api/wonders/") or path.startswith("/wonders/"):
-            # Canonical: /api/wonders/{id}[/health]; legacy: /wonders/{id}[/health]
+            # Canonical: /api/wonders/{id}[/health|launch-status]; legacy: /wonders/{id}[...]
             prefix = "/api/wonders/" if path.startswith("/api/wonders/") else "/wonders/"
             rest = path[len(prefix):]
             parts = rest.split("/")
             if len(parts) >= 2 and parts[1] == "health":
                 status, body = _routes.get_wonder_health({"wonder_id": parts[0]})
+                self._respond(status, body)
+                return
+            if len(parts) >= 2 and parts[1] == "launch-status":
+                status, body = _routes.get_wonder_launch_status({"wonder_id": parts[0]})
                 self._respond(status, body)
                 return
             if parts[0]:
@@ -733,6 +738,20 @@ class BridgeHandler(BaseHTTPRequestHandler):
             status, resp = _POST_EXACT[path](body, {})
             self._respond(status, resp)
             return
+
+        # ─── Wonder auto-start (F2) ─────────────────────────────────────────────
+        if path.startswith("/api/wonders/") or path.startswith("/wonders/"):
+            prefix = "/api/wonders/" if path.startswith("/api/wonders/") else "/wonders/"
+            rest = path[len(prefix):]
+            parts = rest.split("/")
+            if len(parts) >= 2 and parts[1] == "launch":
+                status, resp = _routes.post_wonder_launch(body, {"wonder_id": parts[0]})
+                self._respond(status, resp)
+                return
+            if len(parts) >= 2 and parts[1] == "stop":
+                status, resp = _routes.post_wonder_stop(body, {"wonder_id": parts[0]})
+                self._respond(status, resp)
+                return
 
         # ── Prefix-match POST routes ───────────────────────────────────────────
         if path.startswith("/commands/") and path.endswith("/cancel"):
