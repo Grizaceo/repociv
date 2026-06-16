@@ -97,6 +97,7 @@ def fake_repos(tmp_path, monkeypatch):
                         argv=("python", "-m", "backend.library_bridge"),
                         cwd=str(lgb),
                         log="bibliotheca-bridge.log",
+                        env={"LGB_HOST": "0.0.0.0"},
                     ),
                     wonder_launcher.ProcSpec(
                         name="ui",
@@ -118,6 +119,7 @@ def fake_repos(tmp_path, monkeypatch):
                         argv=("npm", "start"),
                         cwd=str(lab),
                         log="institutum-dev.log",
+                        env={"BRIDGE_HOST": "0.0.0.0"},
                     ),
                 ),
                 api_url="http://127.0.0.1:5281",
@@ -685,3 +687,58 @@ def test_routes_launchable_lists_ids():
     assert s == 200
     assert b["ok"] is True
     assert sorted(b["launchable"]) == sorted(ALLOWED_IDS)
+
+
+# ─── ProcSpec.env (F2.2 — host binding for WSL2 / Tailscale) ────────────────
+
+
+def test_procspec_env_field_applied_at_spawn(fake_repos, fake_popen, monkeypatch):
+    """F2.2 regression: ProcSpec.env is merged into the spawned process env.
+
+    Uses the ``fake_popen`` fixture to inspect kwargs passed to Popen.
+    The bibliotheca bridge proc should have ``LGB_HOST=0.0.0.0`` in
+    its env (so the WSL2 browser can reach uvicorn).
+    """
+    monkeypatch.setattr(wonder_launcher, "_pid_alive", lambda pid: True)
+    monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: False)
+    launch_wonder("bibliotheca")
+    assert fake_popen["n"] >= 1
+    # Find the bridge proc (which has library_bridge in argv)
+    for argv, kwargs in fake_popen["spawned"]:
+        if any("library_bridge" in str(a) for a in argv):
+            env = kwargs.get("env") or {}
+            assert "LGB_HOST" in env
+            assert env["LGB_HOST"] == "0.0.0.0"
+            return
+    raise AssertionError(
+        f"did not find library_bridge proc in fake_popen spawns; got: {fake_popen['spawned']}"
+    )
+
+
+def test_institutum_dev_proc_env_sets_bridge_host(fake_repos, fake_popen, monkeypatch):
+    """F2.2 regression: institutum npm proc gets BRIDGE_HOST=0.0.0.0.
+
+    The env propagates through npm start → dev-start.sh → labhub
+    bridge. If labhub's bridge.py honors BRIDGE_HOST, uvicorn binds
+    to all interfaces.
+    """
+    monkeypatch.setattr(wonder_launcher, "_pid_alive", lambda pid: True)
+    monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: False)
+    launch_wonder("institutum")
+    assert fake_popen["n"] == 1
+    argv, kwargs = fake_popen["spawned"][0]
+    env = kwargs.get("env") or {}
+    assert "BRIDGE_HOST" in env
+    assert env["BRIDGE_HOST"] == "0.0.0.0"
+
+
+def test_procspec_env_default_is_empty():
+    """F2.2: ProcSpec default env is an empty dict, not shared mutable state."""
+    from server.wonder_launcher import ProcSpec
+
+    a = ProcSpec(name="x", argv=("a",), cwd="/tmp", log="x.log")
+    b = ProcSpec(name="y", argv=("y",), cwd="/tmp", log="y.log")
+    # Independent dicts
+    assert a.env is not b.env
+    assert a.env == {}
+    assert b.env == {}

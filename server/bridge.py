@@ -35,12 +35,21 @@ Uso:
 from __future__ import annotations
 
 import sys
+
 if __name__ == "__main__":
     # Alias the __main__ module to server.bridge to prevent duplicate loading and state bifurcation
     sys.modules["server.bridge"] = sys.modules["__main__"]
 
 from .sse_server import _fanout_sse, _register_sse_client, _unregister_sse_client, send_to_repociv  # noqa: F401 (_fanout_sse patched by tests)
-from .pending_tracker import load_pending_tasks, append_pending_task, change_pending_state, resolve_pending_task, edit_pending_task, delete_pending_task, PENDING_TRACKER  # noqa: F401 (re-exported for tests and external callers)
+from .pending_tracker import (
+    load_pending_tasks,
+    append_pending_task,
+    change_pending_state,
+    resolve_pending_task,
+    edit_pending_task,
+    delete_pending_task,
+    PENDING_TRACKER,
+)  # noqa: F401 (re-exported for tests and external callers)
 from .process_scanner import scan_active_processes, detect_lexo
 import hmac
 import json
@@ -69,6 +78,7 @@ def _load_dotenv() -> None:
     if hermes_env.exists():
         _load_dotenv_file(hermes_env)
 
+
 def _load_dotenv_file(env_path: Path) -> None:
     try:
         for raw in env_path.read_text(encoding="utf-8").splitlines():
@@ -87,7 +97,7 @@ def _load_dotenv_file(env_path: Path) -> None:
 _load_dotenv()
 
 REPOCIV_PORT = int(os.environ.get("REPOCIV_PORT", "5273"))
-BRIDGE_PORT  = int(os.environ.get("BRIDGE_PORT", "5274"))
+BRIDGE_PORT = int(os.environ.get("BRIDGE_PORT", "5274"))
 BRIDGE_WS_PORT = int(os.environ.get("BRIDGE_WS_PORT", "5275"))
 REPOCIV_TOKEN = os.environ.get("REPOCIV_TOKEN", "")  # empty = auth disabled (dev only)
 REPOCIV_REMOTE = os.environ.get("REPOCIV_REMOTE", "").lower() in ("true", "1", "yes")
@@ -95,33 +105,56 @@ REPOCIV_REMOTE = os.environ.get("REPOCIV_REMOTE", "").lower() in ("true", "1", "
 # ─── Remote mode: force 0.0.0.0 + require token ─────────────────────────────
 if REPOCIV_REMOTE and not REPOCIV_TOKEN:
     print("ERROR: REPOCIV_REMOTE=true requires REPOCIV_TOKEN to be set.")
-    print("Generate one with: python3 -c \"import secrets; print(secrets.token_hex(32))\"")
+    print('Generate one with: python3 -c "import secrets; print(secrets.token_hex(32))"')
     raise SystemExit(1)
 
 BRIDGE_HOST = "0.0.0.0" if REPOCIV_REMOTE else "127.0.0.1"
 
 CONFIG_DIR = Path(os.path.expanduser(os.environ.get("REPOCIV_CONFIG_DIR", "~/.repociv")))
-MISSIONS_FILE    = CONFIG_DIR / "missions.json"
-HERMES_ROOT      = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", "~/.hermes")))
+MISSIONS_FILE = CONFIG_DIR / "missions.json"
+HERMES_ROOT = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", "~/.hermes")))
+
+
+def _build_allowed_origins(
+    port: int, *, remote: bool, remote_origin: str, extra_origins: str
+) -> set[str]:
+    """Build the CORS allowed-origins set.
+
+    - Local mode (default): localhost + 127.0.0.1 on the given port.
+    - Remote mode: also accept ``remote_origin`` (e.g.
+      https://foo.example.com:5273) if non-empty.
+    - Always: ``extra_origins`` (comma-separated) is added. Use this for
+      WSL2/Tailscale setups where the browser hits the bridge at a
+      non-localhost IP (e.g. http://100.123.206.92:5273) that isn't in
+      REPOCIV_REMOTE mode.
+    """
+    out: set[str] = {
+        f"http://localhost:{port}",
+        f"http://127.0.0.1:{port}",
+    }
+    if remote and remote_origin:
+        out.add(remote_origin)
+    if extra_origins:
+        for o in extra_origins.split(","):
+            o = o.strip()
+            if o:
+                out.add(o)
+    return out
+
 
 # ─── CORS allowed origins ─────────────────────────────────────────────────────
-# Remote mode: allow the configured remote origin only (not wildcard).
-# REPOCIV_REMOTE_ORIGIN overrides; falls back to REPOCIV_PORT-based localhost
-# so that the Vite dev proxy keeps working even when remote=true.
-if REPOCIV_REMOTE:
-    _remote_origin = os.environ.get("REPOCIV_REMOTE_ORIGIN", "").strip()
-    _ALLOWED_ORIGINS: set[str] = (
-        {_remote_origin} if _remote_origin
-        else {
-            f"http://localhost:{REPOCIV_PORT}",
-            f"http://127.0.0.1:{REPOCIV_PORT}",
-        }
-    )
-else:
-    _ALLOWED_ORIGINS = {
-        f"http://localhost:{REPOCIV_PORT}",
-        f"http://127.0.0.1:{REPOCIV_PORT}",
-    }
+# Local mode: localhost + 127.0.0.1 (default).
+# Remote mode: also accept REPOCIV_REMOTE_ORIGIN.
+# Always: REPOCIV_CORS_ORIGINS (comma-separated) adds extra origins. Use
+# this for WSL2/Tailscale setups where the browser hits the bridge at a
+# non-localhost IP (e.g. http://100.123.206.92:5273) that isn't in
+# REPOCIV_REMOTE mode.
+_ALLOWED_ORIGINS: set[str] = _build_allowed_origins(
+    port=REPOCIV_PORT,
+    remote=REPOCIV_REMOTE,
+    remote_origin=os.environ.get("REPOCIV_REMOTE_ORIGIN", ""),
+    extra_origins=os.environ.get("REPOCIV_CORS_ORIGINS", ""),
+)
 
 # ─── Body size limit ──────────────────────────────────────────────────────────
 _MAX_BODY = 128 * 1024  # 128 KB
@@ -247,11 +280,15 @@ def get_unit_fatigue(unit_id: str) -> dict[str, Any]:
     return _fatigue_state_mod.get_unit_fatigue(unit_id)
 
 
-def update_unit_fatigue(unit_id: str, *, fatigue: int | None = None,
-                        effective_speed: float | None = None,
-                        is_resting: bool | None = None,
-                        rest_area_id: str | None = None,
-                        delta: int = 0) -> dict[str, Any]:
+def update_unit_fatigue(
+    unit_id: str,
+    *,
+    fatigue: int | None = None,
+    effective_speed: float | None = None,
+    is_resting: bool | None = None,
+    rest_area_id: str | None = None,
+    delta: int = 0,
+) -> dict[str, Any]:
     return _fatigue_state_mod.update_unit_fatigue(
         unit_id,
         fatigue=fatigue,
@@ -262,8 +299,9 @@ def update_unit_fatigue(unit_id: str, *, fatigue: int | None = None,
     )
 
 
-def discover_rest_area(rest_area_id: str, room_id: str, coord: tuple,
-                       recovery_rate: float = 8.0, capacity: int = 4) -> dict[str, Any]:
+def discover_rest_area(
+    rest_area_id: str, room_id: str, coord: tuple, recovery_rate: float = 8.0, capacity: int = 4
+) -> dict[str, Any]:
     return _fatigue_state_mod.discover_rest_area(
         rest_area_id,
         room_id,
@@ -285,9 +323,14 @@ def exit_rest_area(unit_id: str) -> None:
 def get_gpu_info() -> dict[str, Any] | None:
     try:
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=memory.used,memory.total,temperature.gpu",
-             "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=3,
+            [
+                "nvidia-smi",
+                "--query-gpu=memory.used,memory.total,temperature.gpu",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=3,
         )
         if result.returncode != 0:
             return None
@@ -304,42 +347,88 @@ def get_gpu_info() -> dict[str, Any] | None:
 def _configure_agent_runner() -> None:
     _agent_runner.configure(send=send_to_repociv, save=save_mission)
     from server import subagent_tracker as _st  # noqa: PLC0415
+
     _st.configure(send=send_to_repociv, add_approval=_add_approval)
 
 
-def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
-                             config: dict[str, Any],
-                             working_dir: str | None = None,
-                             city_id: str = "",
-                             model: str = "") -> tuple[bool, str]:
+def _run_openclaw_streaming(
+    unit_id: str,
+    mission_id: str,
+    mission: str,
+    config: dict[str, Any],
+    working_dir: str | None = None,
+    city_id: str = "",
+    model: str = "",
+) -> tuple[bool, str]:
     _configure_agent_runner()
-    return _agent_runner._run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model)
+    return _agent_runner._run_openclaw_streaming(
+        unit_id, mission_id, mission, config, working_dir, city_id, model
+    )
 
 
-def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
-                           config: dict[str, Any] | None = None,
-                           working_dir: str | None = None,
-                           city_id: str = "",
-                           model: str = "") -> tuple[bool, str]:
+def _run_hermes_streaming(
+    unit_id: str,
+    mission_id: str,
+    mission: str,
+    config: dict[str, Any] | None = None,
+    working_dir: str | None = None,
+    city_id: str = "",
+    model: str = "",
+) -> tuple[bool, str]:
     _configure_agent_runner()
-    return _agent_runner._run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model)
+    return _agent_runner._run_hermes_streaming(
+        unit_id, mission_id, mission, config, working_dir, city_id, model
+    )
 
-def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
-              command_id: str | None = None, harness: str = "", provider: str = "", model: str = "",
-              repo_path: str = "", file_path: str = "") -> None:
+
+def run_agent(
+    unit_id: str,
+    city_id: str,
+    mission: str,
+    agent_type: str = "hero",
+    command_id: str | None = None,
+    harness: str = "",
+    provider: str = "",
+    model: str = "",
+    repo_path: str = "",
+    file_path: str = "",
+) -> None:
     _configure_agent_runner()
-    return _agent_runner.run_agent(unit_id, city_id, mission, agent_type, command_id, harness=harness, provider=provider, model=model, repo_path=repo_path, file_path=file_path)
+    return _agent_runner.run_agent(
+        unit_id,
+        city_id,
+        mission,
+        agent_type,
+        command_id,
+        harness=harness,
+        provider=provider,
+        model=model,
+        repo_path=repo_path,
+        file_path=file_path,
+    )
 
 
-def _execute_streaming(unit_id: str, mission_id: str, mission: str,
-                       working_dir: str | None = None,
-                       city_id: str = "",
-                       harness: str = "",
-                       provider: str = "",
-                       model: str = "") -> tuple[bool, str]:
+def _execute_streaming(
+    unit_id: str,
+    mission_id: str,
+    mission: str,
+    working_dir: str | None = None,
+    city_id: str = "",
+    harness: str = "",
+    provider: str = "",
+    model: str = "",
+) -> tuple[bool, str]:
     _configure_agent_runner()
-    return _agent_runner._execute_streaming(unit_id, mission_id, mission, working_dir, city_id,
-                                             harness=harness, provider=provider, model=model)
+    return _agent_runner._execute_streaming(
+        unit_id,
+        mission_id,
+        mission,
+        working_dir,
+        city_id,
+        harness=harness,
+        provider=provider,
+        model=model,
+    )
 
 
 def _has_openclaw() -> bool:
@@ -371,8 +460,7 @@ def _handle_command(cmd: Command) -> dict[str, Any]:
     if cmd.status == "rejected":
         reason = block_reason or "blocked by policy"
         _es.record_rejected(cmd.id, reason)
-        return {"ok": False, "status": "rejected", "commandId": cmd.id,
-                "reason": reason}
+        return {"ok": False, "status": "rejected", "commandId": cmd.id, "reason": reason}
 
     # Attach context pack to payload so the agent starts with context
     agent_id = str(cmd.payload.get("unit", "MAIN"))
@@ -381,21 +469,29 @@ def _handle_command(cmd: Command) -> dict[str, Any]:
     if cmd.status == "waiting_approval":
         _es.record_waiting_approval(cmd.id)
         _add_approval(cmd.to_dict())
-        send_to_repociv({"type": "log",
-                         "msg": f"Aprobación requerida: {cmd.type} → {cmd.target}",
-                         "level": "warn"})
-        send_to_repociv({"type": "waiting_approval",
-                         "commandId": cmd.id,
-                         "commandType": cmd.type,
-                         "target": cmd.target,
-                         "risk": cmd.risk})
+        send_to_repociv(
+            {
+                "type": "log",
+                "msg": f"Aprobación requerida: {cmd.type} → {cmd.target}",
+                "level": "warn",
+            }
+        )
+        send_to_repociv(
+            {
+                "type": "waiting_approval",
+                "commandId": cmd.id,
+                "commandType": cmd.type,
+                "target": cmd.target,
+                "risk": cmd.risk,
+            }
+        )
         return {"ok": True, "status": "waiting_approval", "commandId": cmd.id}
 
     # auto-safe: enqueue in scheduler (priority-sorted dispatch)
     _es.record_queued(cmd.id)
-    send_to_repociv({"type": "log",
-                     "msg": f"Comando encolado: {cmd.type} → {cmd.target}",
-                     "level": "info"})
+    send_to_repociv(
+        {"type": "log", "msg": f"Comando encolado: {cmd.type} → {cmd.target}", "level": "info"}
+    )
 
     _sched.enqueue(cmd)
     return {"ok": True, "status": "queued", "commandId": cmd.id}
@@ -411,13 +507,16 @@ def _register_issue_run(payload: dict[str, Any], run_id: str) -> None:
 
 def _dispatch_command(cmd: Command) -> None:
     from server import subagent_tracker as _st  # noqa: PLC0415
+
     _command_executors.dispatch_command(
         cmd,
         run_agent=run_agent,
         send_to_repociv=send_to_repociv,
         append_pending_task=append_pending_task,
         save_mission=save_mission,
-        infer_adapter_for_command=lambda command_type, harness_id: _runtime_adapters.infer_adapter_for_command(command_type, harness_id),
+        infer_adapter_for_command=lambda command_type, harness_id: (
+            _runtime_adapters.infer_adapter_for_command(command_type, harness_id)
+        ),
         sessions_patch=_sessions.patch,
         sessions_append_message=_sessions.append_message,
         run_state_save=_run_state.save,
@@ -437,7 +536,6 @@ from . import http_routes as _routes  # noqa: E402
 
 
 class BridgeHandler(BaseHTTPRequestHandler):
-
     def _origin(self) -> str:
         return self.headers.get("Origin", "")
 
@@ -486,6 +584,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 params[k] = v
         # URL-decode values
         import urllib.parse as _up
+
         decoded: dict[str, str] = {}
         for k, v in params.items():
             decoded[k] = _up.unquote_plus(v)
@@ -536,41 +635,41 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         # ── Simple exact-match GET routes ──────────────────────────────────────
         _GET_EXACT: dict[str, Any] = {
-            "/health":             _routes.get_health,
-            "/ready":              _routes.get_ready,
-            "/missions":           _routes.get_missions,
-            "/subagents":          _routes.get_subagents,
-            "/gpu":                _routes.get_gpu,
-            "/pending":            _routes.get_pending,
-            "/context":            _routes.get_context,
-            "/approvals":          _routes.get_approvals,
-            "/agents":             _routes.get_agents,
+            "/health": _routes.get_health,
+            "/ready": _routes.get_ready,
+            "/missions": _routes.get_missions,
+            "/subagents": _routes.get_subagents,
+            "/gpu": _routes.get_gpu,
+            "/pending": _routes.get_pending,
+            "/context": _routes.get_context,
+            "/approvals": _routes.get_approvals,
+            "/agents": _routes.get_agents,
             "/agents/capabilities": _routes.get_agents_capabilities,
-            "/api/providers":      _routes.get_chat_config,
-            "/providers":          _routes.get_chat_config,
-            "/api/chat-config":    _routes.get_chat_config,
-            "/metrics":            _routes.get_metrics,
-            "/directives/stats":   _routes.get_directives_stats,
+            "/api/providers": _routes.get_chat_config,
+            "/providers": _routes.get_chat_config,
+            "/api/chat-config": _routes.get_chat_config,
+            "/metrics": _routes.get_metrics,
+            "/directives/stats": _routes.get_directives_stats,
             "/directives/suggest": _routes.get_directives_suggest,
-            "/harnesses":          _routes.get_harnesses,
+            "/harnesses": _routes.get_harnesses,
             "/api/config/default-harness": _routes.get_default_harness,
-            "/log":                _routes.get_log,
-            "/tasks":              _routes.get_tasks,
-            "/improve/reflect":    _routes.get_improve_reflect,
-            "/improve/proposals":  _routes.get_improve_proposals,
-            "/providers/live":     _routes.get_providers_live,
-            "/ws":                 _routes.get_ws_info,
-            "/api/news/latest":    _routes.get_latest_news,
-            "/api/wonders":        _routes.get_wonders,
+            "/log": _routes.get_log,
+            "/tasks": _routes.get_tasks,
+            "/improve/reflect": _routes.get_improve_reflect,
+            "/improve/proposals": _routes.get_improve_proposals,
+            "/providers/live": _routes.get_providers_live,
+            "/ws": _routes.get_ws_info,
+            "/api/news/latest": _routes.get_latest_news,
+            "/api/wonders": _routes.get_wonders,
             "/api/wonders/launchable": _routes.get_wonder_launchable,
-            "/wonders":            _routes.get_wonders,  # legacy alias
-            "/api/graph-relations":       _routes.get_graph_relations,
+            "/wonders": _routes.get_wonders,  # legacy alias
+            "/api/graph-relations": _routes.get_graph_relations,
             "/api/graph-relations/stats": _routes.get_graph_relations_stats,
             "/api/foreign/repo-profile": _routes.get_repo_profile,
             "/api/foreign/repo-profile/cache": _routes.get_repo_profile_cache,
             "/api/foreign/reports": _routes.get_reports,
-            "/api/labhub/status":    _routes.get_labhub_status,
-            "/api/profiles":         _routes.get_profiles,
+            "/api/labhub/status": _routes.get_labhub_status,
+            "/api/profiles": _routes.get_profiles,
         }
         if path in _GET_EXACT:
             status, body = _GET_EXACT[path](ctx)
@@ -601,7 +700,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/wonders/") or path.startswith("/wonders/"):
             # Canonical: /api/wonders/{id}[/health|launch-status]; legacy: /wonders/{id}[...]
             prefix = "/api/wonders/" if path.startswith("/api/wonders/") else "/wonders/"
-            rest = path[len(prefix):]
+            rest = path[len(prefix) :]
             parts = rest.split("/")
             if len(parts) >= 2 and parts[1] == "health":
                 status, body = _routes.get_wonder_health({"wonder_id": parts[0]})
@@ -631,7 +730,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         # ── Mission tree (subagent swarm log) ────────────────────────────────
         if path.startswith("/missions/") and path.endswith("/tree"):
-            mission_id = path[len("/missions/"):path.rfind("/tree")]
+            mission_id = path[len("/missions/") : path.rfind("/tree")]
             if mission_id:
                 ctx["mission_id"] = mission_id
                 status, body = _routes.get_mission_tree(ctx)
@@ -663,7 +762,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         # ── LabHub per-city status ───────────────────────────────────────────────
         if path.startswith("/api/labhub/status/"):
-            city_id = path[len("/api/labhub/status/"):].split("/")[0]
+            city_id = path[len("/api/labhub/status/") :].split("/")[0]
             if city_id:
                 ctx["city_id"] = city_id
                 status, body = _routes.get_city_lab_status(ctx)
@@ -672,7 +771,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         # ── File tree API for local view ──────────────────────────────────────────
         if path.startswith("/api/files/"):
-            repo_id = path[len("/api/files/"):].split("/")[0]
+            repo_id = path[len("/api/files/") :].split("/")[0]
             if repo_id:
                 ctx["path"] = self.path  # full path for extraction
                 ctx["repo_path"] = ""  # will be resolved from repo_id
@@ -715,19 +814,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
         # ── Simple exact-match POST routes ────────────────────────────────────
         _POST_EXACT: dict[str, Any] = {
             "/directives/record": _routes.post_directives_record,
-            "/commands":          _routes.post_commands,
-            "/pending/add":       _routes.post_pending_add,
-            "/pending/resolve":   _routes.post_pending_resolve,
-            "/pending/edit":      _routes.post_pending_edit,
-            "/pending/delete":    _routes.post_pending_delete,
-            "/pending/state":     _routes.post_pending_state,
-            "/api/news/read":     _routes.post_news_read,
-            "/api/news/scan":     _routes.post_news_scan,
+            "/commands": _routes.post_commands,
+            "/pending/add": _routes.post_pending_add,
+            "/pending/resolve": _routes.post_pending_resolve,
+            "/pending/edit": _routes.post_pending_edit,
+            "/pending/delete": _routes.post_pending_delete,
+            "/pending/state": _routes.post_pending_state,
+            "/api/news/read": _routes.post_news_read,
+            "/api/news/scan": _routes.post_news_scan,
             "/api/foreign/score": _routes.post_foreign_score,
             "/api/foreign/report": _routes.post_foreign_report,
             "/api/graph-relations/flags": _routes.post_graph_relations_flags,
             "/api/graph-relations/refresh": _routes.post_graph_relations_refresh,
-            "/session/reset":  _routes.post_session_reset,
+            "/session/reset": _routes.post_session_reset,
             "/model/override": _routes.post_model_override,
             "/api/config/default-harness": _routes.post_default_harness,
             "/subagents/cancel": _routes.post_subagent_cancel,
@@ -742,7 +841,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         # ─── Wonder auto-start (F2) ─────────────────────────────────────────────
         if path.startswith("/api/wonders/") or path.startswith("/wonders/"):
             prefix = "/api/wonders/" if path.startswith("/api/wonders/") else "/wonders/"
-            rest = path[len(prefix):]
+            rest = path[len(prefix) :]
             parts = rest.split("/")
             if len(parts) >= 2 and parts[1] == "launch":
                 status, resp = _routes.post_wonder_launch(body, {"wonder_id": parts[0]})
@@ -762,16 +861,22 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 removed = _pop_approval(cmd_id) is not None
                 if removed:
                     _es.record_rejected(cmd_id, "cancelled by user")
-            send_to_repociv({"type": "log",
-                             "msg": f"Comando cancelado: {cmd_id}" if removed else f"Comando no encontrado: {cmd_id}",
-                             "level": "warn" if removed else "info"})
+            send_to_repociv(
+                {
+                    "type": "log",
+                    "msg": f"Comando cancelado: {cmd_id}"
+                    if removed
+                    else f"Comando no encontrado: {cmd_id}",
+                    "level": "warn" if removed else "info",
+                }
+            )
             self._json({"ok": removed, "commandId": cmd_id})
             return
 
         if path.startswith("/tasks/") and path.endswith("/cancel"):
             # URL pattern: /tasks/<encoded_key>/cancel where key = "repo::ISSUE-id"
             # We support both /tasks/repo::ISSUE-1/cancel and /tasks/repo/ISSUE-1/cancel
-            inner = path[len("/tasks/"):path.rfind("/cancel")]
+            inner = path[len("/tasks/") : path.rfind("/cancel")]
             if "::" in inner:
                 parts = inner.split("::", 1)
                 task_repo, task_issue = parts[0], parts[1]
@@ -787,7 +892,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._json({"ok": cancelled, "key": f"{task_repo}::{task_issue}"})
             return
 
-
         # ─── Approval endpoints ───────────────────────────────────────────────
         if path.startswith("/approvals/") and path.endswith("/approve"):
             cmd_id = path.split("/")[2]
@@ -798,6 +902,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             _es.record_approved(cmd_id)
             # Rebuild command and dispatch
             from server.command_schema import Command as _Cmd
+
             cmd = _Cmd(
                 id=cmd_dict["id"],
                 type=cmd_dict["type"],
@@ -810,7 +915,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
             )
             _es.record_queued(cmd.id)
             _sched.enqueue(cmd)
-            send_to_repociv({"type": "log", "msg": f"Comando aprobado: {cmd.type}", "level": "success"})
+            send_to_repociv(
+                {"type": "log", "msg": f"Comando aprobado: {cmd.type}", "level": "success"}
+            )
             self._json({"ok": True, "status": "queued", "commandId": cmd_id})
             return
 
@@ -821,7 +928,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 self._json({"ok": False, "error": "approval not found"})
                 return
             _es.record_rejected(cmd_id, "user rejected")
-            send_to_repociv({"type": "log", "msg": f"Comando rechazado: {cmd_dict.get('type')}", "level": "warn"})
+            send_to_repociv(
+                {
+                    "type": "log",
+                    "msg": f"Comando rechazado: {cmd_dict.get('type')}",
+                    "level": "warn",
+                }
+            )
             self._json({"ok": True, "status": "rejected", "commandId": cmd_id})
             return
 
@@ -863,7 +976,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
             cmd_data = {
                 "type": "quest_add",
                 "target": body.get("title", "Sin título"),
-                "payload": {"title": body.get("title", "Sin título"), "description": body.get("description", "")},
+                "payload": {
+                    "title": body.get("title", "Sin título"),
+                    "description": body.get("description", ""),
+                },
                 "created_by": "user",
             }
             try:
@@ -880,15 +996,24 @@ class BridgeHandler(BaseHTTPRequestHandler):
             unit_id = body.get("unit", "")
             delta = int(body.get("delta", 0))
             entry = update_unit_fatigue(unit_id, delta=delta)
-            send_to_repociv({"type": "unit_fatigue_update", "unit": unit_id,
-                             "fatigue": entry["fatigue"], "maxFatigue": 100,
-                             "atRest": entry["isResting"], "restAreaId": entry["restAreaId"]})
+            send_to_repociv(
+                {
+                    "type": "unit_fatigue_update",
+                    "unit": unit_id,
+                    "fatigue": entry["fatigue"],
+                    "maxFatigue": 100,
+                    "atRest": entry["isResting"],
+                    "restAreaId": entry["restAreaId"],
+                }
+            )
             self._json({"ok": True})
             return
 
         if t == "discover_rest_area":
             ra_id = body.get("restAreaId", f"ra-{uuid.uuid4().hex[:6]}")
-            area = discover_rest_area(ra_id, body.get("roomId", ""), tuple(body.get("coord", [0, 0])))
+            area = discover_rest_area(
+                ra_id, body.get("roomId", ""), tuple(body.get("coord", [0, 0]))
+            )
             send_to_repociv({"type": "rest_area_discovered", "restArea": area})
             self._json({"ok": True})
             return
@@ -912,11 +1037,14 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 }
                 plan = _recovery.build_recovery_plan(harness, failure_context)
                 # Emit audit event
-                _es.record_event("HarnessRecoveryRequested", {
-                    "harness_id": harness_id,
-                    "reason": reason,
-                    "mode": plan.get("mode", ""),
-                })
+                _es.record_event(
+                    "HarnessRecoveryRequested",
+                    {
+                        "harness_id": harness_id,
+                        "reason": reason,
+                        "mode": plan.get("mode", ""),
+                    },
+                )
                 self._json(plan)
                 return
 
@@ -927,7 +1055,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
             if ok:
                 send_to_repociv({"type": "rest_area_entered", "unit": unit_id, "restAreaId": ra_id})
             else:
-                send_to_repociv({"type": "log", "msg": f"Rest area {ra_id} llena o no existe", "level": "warn"})
+                send_to_repociv(
+                    {"type": "log", "msg": f"Rest area {ra_id} llena o no existe", "level": "warn"}
+                )
             self._json({"ok": ok})
             return
 
@@ -937,7 +1067,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
             send_to_repociv({"type": "rest_area_exited", "unit": unit_id, "restAreaId": ""})
             self._json({"ok": True})
             return
-
 
         self._json({"ok": True, "ignored": t})
 
@@ -986,6 +1115,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
 def _scheduler_dispatch(cmd_dict: dict[str, Any]) -> None:
     """Called by scheduler worker for each dequeued command."""
     from server.command_schema import Command as _Cmd
+
     cmd = _Cmd(
         id=cmd_dict.get("id", ""),
         type=cmd_dict.get("type", ""),
@@ -1031,7 +1161,9 @@ def _recover_hung_commands() -> int:
             terminal.add(cid)
     hung = started - terminal
     for cid in hung:
-        _es.record_failed(cid, "recovered: bridge restarted mientras el comando estaba en ejecución")
+        _es.record_failed(
+            cid, "recovered: bridge restarted mientras el comando estaba en ejecución"
+        )
     return len(hung)
 
 
@@ -1060,6 +1192,7 @@ if __name__ == "__main__":
 
     # Wire P4 step executor → orchestrator (agent dispatch: SCOUT/WORKER/DAVI)
     from server.step_executor import dispatch_plan_step
+
     _to.set_step_executor(dispatch_plan_step)
 
     # Recover any commands that were running when the bridge last died
@@ -1077,6 +1210,7 @@ if __name__ == "__main__":
     def _ws_command_handler(data: dict[str, Any]) -> None:
         """Handle incoming commands from WebSocket clients."""
         from server.command_schema import validate_command, CommandValidationError
+
         cmd_type = data.get("type", "")
         if cmd_type == "command":
             raw = data.get("data", {})
@@ -1111,9 +1245,9 @@ if __name__ == "__main__":
                 cmd = validate_command(cmd_data)
                 _handle_command(cmd)
             except CommandValidationError as e:
-                send_to_repociv({"type": "log",
-                                 "msg": f"WS command rejected: {e}",
-                                 "level": "warn"})
+                send_to_repociv(
+                    {"type": "log", "msg": f"WS command rejected: {e}", "level": "warn"}
+                )
         elif cmd_type == "approval":
             cmd_id = data.get("id", "")
             approved = data.get("approved", True)
@@ -1121,19 +1255,25 @@ if __name__ == "__main__":
             if approved:
                 # Re-use the approval flow from do_POST
                 from server.command_schema import Command as _Cmd
+
                 cmd_dict = _pop_approval(cmd_id)
                 if cmd_dict:
                     cmd = _Cmd(
-                        id=cmd_dict["id"], type=cmd_dict["type"],
-                        target=cmd_dict["target"], payload=cmd_dict.get("payload", {}),
+                        id=cmd_dict["id"],
+                        type=cmd_dict["type"],
+                        target=cmd_dict["target"],
+                        payload=cmd_dict.get("payload", {}),
                         created_by=cmd_dict.get("created_by", "user"),
                         risk=cmd_dict.get("risk", "medium"),
-                        requires_approval=False, status="queued",
+                        requires_approval=False,
+                        status="queued",
                     )
                     _es.record_approved(cmd.id)
                     _es.record_queued(cmd.id)
                     _sched.enqueue(cmd)
-                    send_to_repociv({"type": "log", "msg": f"WS aprobado: {cmd.type}", "level": "success"})
+                    send_to_repociv(
+                        {"type": "log", "msg": f"WS aprobado: {cmd.type}", "level": "success"}
+                    )
             else:
                 _pop_approval(cmd_id)
                 _es.record_rejected(cmd_id, "user rejected (WS)")
@@ -1152,6 +1292,7 @@ if __name__ == "__main__":
         print("\nBridge: SIGTERM recibido — cerrando limpiamente.")
         # Shutdown HTTP immediately so systemd doesn't see a hung service
         threading.Thread(target=server.shutdown, daemon=True).start()
+
         # Persist learned directive templates with a hard timeout so a slow disk
         # or contested lock doesn't turn us into a zombie with an open socket.
         def _persist() -> None:
@@ -1162,9 +1303,11 @@ if __name__ == "__main__":
                     print(f"Bridge: {saved} directive templates persisted.")
             except Exception:
                 pass
+
         persist_thread = threading.Thread(target=_persist, daemon=True)
         persist_thread.start()
         persist_thread.join(timeout=3.0)
+
     signal.signal(signal.SIGTERM, _handle_sigterm)
 
     has_gpu = get_gpu_info() is not None
@@ -1180,7 +1323,9 @@ if __name__ == "__main__":
     print(f"│ Events:    {_es._store_path}  │")
     print(f"│ Missions:  {MISSIONS_FILE}    │")
     print("│ default:   hermes (luego claude-code, openclaw)                        │")
-    print(f"│ openclaw:  {'OK' if _has_openclaw() else 'NO'}                                      │")
+    print(
+        f"│ openclaw:  {'OK' if _has_openclaw() else 'NO'}                                      │"
+    )
     print(f"│ claude-code: {'OK' if _has_claude_code() else 'NO'}                              │")
     print(f"│ cursor:    {'OK' if _has_cursor() else 'NO'}                                    │")
     print(f"│ codex:     {'OK' if _has_codex() else 'NO'}                                    │")

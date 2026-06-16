@@ -40,7 +40,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -85,6 +85,12 @@ class ProcSpec:
     argv: tuple[str, ...]
     cwd: str
     log: str
+    # Extra env vars merged into the child's env at spawn time. Used to
+    # force hosts (LGB_HOST, BRIDGE_HOST) so the wonder's dev server binds
+    # to 0.0.0.0 in WSL2/Tailscale setups where the browser reaches
+    # WSL2 via its external IP (e.g. http://100.123.206.92:5173), not
+    # loopback. Default empty (no overrides).
+    env: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -109,6 +115,10 @@ WONDER_LAUNCH_SPECS: dict[str, WonderSpec] = {
                 argv=("python", "-m", "backend.library_bridge"),
                 cwd=BIBLIOTHECA_DIR,
                 log="bibliotheca-bridge.log",
+                # LGB's library_bridge.py reads LGB_HOST (default 127.0.0.1).
+                # Force 0.0.0.0 so the WSL2 browser can reach uvicorn at
+                # the WSL2 external IP (e.g. http://100.123.206.92:3001).
+                env={"LGB_HOST": "0.0.0.0"},
             ),
             ProcSpec(
                 name="ui",
@@ -130,6 +140,12 @@ WONDER_LAUNCH_SPECS: dict[str, WonderSpec] = {
                 argv=("npm", "start"),
                 cwd=INSTITUTUM_DIR,
                 log="institutum-dev.log",
+                # LabHub dev-start.sh spawns `python3 -m server.bridge`.
+                # Set BRIDGE_HOST=0.0.0.0 so LabHub's uvicorn binds to all
+                # interfaces (reachable from the WSL2 browser). If labhub's
+                # bridge.py doesn't honor BRIDGE_HOST, the fallback is to
+                # set LABHUB_BRIDGE_HOST=0.0.0.0 in labhub's own .env.
+                env={"BRIDGE_HOST": "0.0.0.0"},
             ),
         ),
         api_url=_env("VITE_WONDER_INSTITUTUM_API_URL", "http://127.0.0.1:5281"),
@@ -563,9 +579,15 @@ def launch_wonder(wonder_id: str) -> dict[str, Any]:
             if argv and Path(argv[0]).name in ("python", "python3"):
                 argv[0] = _resolve_python_executable(str(proc_cwd))
             try:
+                # Merge the proc_spec.env into the parent env so the
+                # child process can override LGB_HOST / BRIDGE_HOST to
+                # bind on 0.0.0.0 (WSL2 / Tailscale setups).
+                child_env = os.environ.copy()
+                child_env.update(proc_spec.env)
                 proc = subprocess.Popen(
                     argv,
                     cwd=str(proc_cwd),
+                    env=child_env,
                     stdout=log_fh,
                     stderr=subprocess.STDOUT,
                     stdin=subprocess.DEVNULL,
