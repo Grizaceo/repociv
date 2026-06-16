@@ -14,11 +14,12 @@ const _lgbHost = _defaultLgbHost();
 
 export const WONDER_BIBLIOTHECA_URL =
   import.meta.env.VITE_WONDER_BIBLIOTHECA_URL ?? `http://${_lgbHost}:5173`;
+/** Institutum (LabHub) UI — the Vite dev server. Bridge/API lives on :5281. */
 export const WONDER_INSTITUTUM_URL =
-  import.meta.env.VITE_WONDER_INSTITUTUM_URL ?? 'http://localhost:5281';
+  import.meta.env.VITE_WONDER_INSTITUTUM_URL ?? `http://${_lgbHost}:5280`;
 /** Backend API port for Institutum/LabHub health checks and metrics. */
 export const WONDER_INSTITUTUM_API_URL =
-  import.meta.env.VITE_WONDER_INSTITUTUM_API_URL ?? 'http://localhost:5281';
+  import.meta.env.VITE_WONDER_INSTITUTUM_API_URL ?? `http://${_lgbHost}:5281`;
 export const LGB_BACKEND_URL = import.meta.env.VITE_LGB_BACKEND_URL ?? `http://${_lgbHost}:3001`;
 
 export function lgbHealthUrl(base = LGB_BACKEND_URL): string {
@@ -32,6 +33,15 @@ const LGB_UI_FALLBACKS = [
   'http://localhost:5173',
   'http://127.0.0.1:3000',
   'http://localhost:3000',
+] as const;
+/** LabHub UI: Vite dev server. Bridge often binds 127.0.0.1 only; UI may be on Tailscale. */
+const INSTITUTUM_UI_FALLBACKS = [
+  'http://127.0.0.1:5280',
+  'http://localhost:5280',
+] as const;
+const INSTITUTUM_API_FALLBACKS = [
+  'http://127.0.0.1:5281',
+  'http://localhost:5281',
 ] as const;
 
 export function lgbBackendProbeUrls(): string[] {
@@ -52,7 +62,26 @@ export function lgbUiProbeUrls(): string[] {
   return urls;
 }
 
+export function institutumApiProbeUrls(): string[] {
+  const primary = WONDER_INSTITUTUM_API_URL.replace(/\/$/, '');
+  const urls = [primary];
+  for (const fb of INSTITUTUM_API_FALLBACKS) {
+    if (!urls.includes(fb)) urls.push(fb);
+  }
+  return urls;
+}
+
+export function institutumUiProbeUrls(): string[] {
+  const primary = WONDER_INSTITUTUM_URL.replace(/\/$/, '');
+  const urls = [primary];
+  for (const fb of INSTITUTUM_UI_FALLBACKS) {
+    if (!urls.includes(fb)) urls.push(fb);
+  }
+  return urls;
+}
+
 export type LgbReachability = { backend: boolean; ui: boolean };
+export type InstitutumReachability = { backend: boolean; ui: boolean };
 
 const PROBE_MS = 4000;
 
@@ -98,5 +127,36 @@ export async function findReachableLgbUiUrl(): Promise<string | null> {
 
 export async function checkLgbReachability(): Promise<LgbReachability> {
   const [backend, ui] = await Promise.all([checkLgbBackend(), checkLgbUi()]);
+  return { backend, ui };
+}
+
+// ─── Institutum (LabHub) reachability probes ──────────────────────────────────
+
+export function institutumHealthUrl(base: string = WONDER_INSTITUTUM_API_URL): string {
+  return `${base.replace(/\/$/, '')}/health`;
+}
+
+export async function checkInstitutumBackend(): Promise<boolean> {
+  for (const base of institutumApiProbeUrls()) {
+    if (await _probeReachable(institutumHealthUrl(base))) return true;
+  }
+  return false;
+}
+
+/** Vite dev UI (GET /). */
+export async function checkInstitutumUi(): Promise<boolean> {
+  return (await findReachableInstitutumUiUrl()) !== null;
+}
+
+export async function findReachableInstitutumUiUrl(): Promise<string | null> {
+  for (const base of institutumUiProbeUrls()) {
+    if (await _probeReachable(`${base}/`)) return base;
+    if (await _probeReachable(base)) return base;
+  }
+  return null;
+}
+
+export async function checkInstitutumReachability(): Promise<InstitutumReachability> {
+  const [backend, ui] = await Promise.all([checkInstitutumBackend(), checkInstitutumUi()]);
   return { backend, ui };
 }

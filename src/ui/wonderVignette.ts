@@ -1,10 +1,13 @@
 // ─── RepoCiv — Wonder Vignette (iframe wrapper with health-check) ──────────────
 import type { WonderType } from '../types.ts';
 import {
+  checkInstitutumReachability,
   checkLgbReachability,
+  findReachableInstitutumUiUrl,
   findReachableLgbUiUrl,
   LGB_BACKEND_URL,
   WONDER_BIBLIOTHECA_URL,
+  WONDER_INSTITUTUM_URL,
 } from '../wonderEnv.ts';
 import { getLayerState } from '../layers.ts';
 import { getWonder } from '../wonders/manifest.ts';
@@ -34,11 +37,17 @@ type EmptyReason =
   | 'lgb-offline'
   | 'lgb-backend-offline'
   | 'lgb-ui-offline'
+  | 'institutum-offline'
+  | 'institutum-backend-offline'
+  | 'institutum-ui-offline'
   | 'load-timeout'
   | 'offline'
   | 'degraded'
   | 'timeout'
   | 'no-permissions';
+
+/** Wonders that need separate UI/API reachability probes (vs single health endpoint). */
+const SPLIT_WONDERS = new Set<WonderType>(['bibliotheca', 'institutum']);
 
 interface VignetteState {
   x: number;
@@ -279,19 +288,39 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
   registerWonderOrigin(manifest);
   _attachWonderListener();
 
-  if (type === 'bibliotheca') {
-    const { backend, ui } = await checkLgbReachability();
+  if (SPLIT_WONDERS.has(type)) {
+    const { backend, ui } =
+      type === 'bibliotheca'
+        ? await checkLgbReachability()
+        : await checkInstitutumReachability();
     if (!ui && !backend) {
-      _showEmptyState(body, type, 'lgb-offline');
+      const reason: EmptyReason =
+        type === 'bibliotheca' ? 'lgb-offline' : 'institutum-offline';
+      _showEmptyState(body, type, reason);
       return;
     }
     if (!backend) {
-      _showEmptyState(body, type, 'lgb-backend-offline');
+      const reason: EmptyReason =
+        type === 'bibliotheca' ? 'lgb-backend-offline' : 'institutum-backend-offline';
+      _showEmptyState(body, type, reason);
       return;
     }
-    const resolvedUiUrl = await findReachableLgbUiUrl();
+    if (!ui) {
+      const reason: EmptyReason =
+        type === 'bibliotheca' ? 'lgb-ui-offline' : 'institutum-ui-offline';
+      _showEmptyState(body, type, reason);
+      return;
+    }
+    const resolvedUiUrl =
+      type === 'bibliotheca'
+        ? await findReachableLgbUiUrl()
+        : await findReachableInstitutumUiUrl();
+    const primaryUi =
+      type === 'bibliotheca'
+        ? (WONDER_BIBLIOTHECA_URL as string)
+        : (WONDER_INSTITUTUM_URL as string);
     const mountManifest =
-      resolvedUiUrl && resolvedUiUrl !== (manifest.ui.url ?? '').replace(/\/$/, '')
+      resolvedUiUrl && resolvedUiUrl !== primaryUi.replace(/\/$/, '')
         ? {
             ...manifest,
             ui: {
