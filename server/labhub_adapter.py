@@ -1,7 +1,7 @@
 """RepoCiv — LabHub Status Adapter (Fase 5A).
 
 Contract real de status vivo para Institutum/LabHub.
-Probes http://localhost:5281/health (Institutum backend).
+Probes http://localhost:5281/health (Institutum backend/bridge).
 If online, returns actual lab status per city.
 If offline, degrades to local inference (existing inference logic).
 
@@ -22,9 +22,16 @@ from typing import Any
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
+# API/bridge (FastAPI on :5281) — used for health probes only. Serves JSON, not the SPA.
 INSTITUTUM_API_URL: str = os.environ.get(
     "VITE_WONDER_INSTITUTUM_API_URL",
     "http://localhost:5281",
+).rstrip("/")
+# UI/SPA (Vite dev on :5280) — used for user-facing links (links.labhub) so the click
+# opens the app, not the JSON. Mirrors the TS split WONDER_INSTITUTUM_URL / _API_URL.
+INSTITUTUM_UI_URL: str = os.environ.get(
+    "VITE_WONDER_INSTITUTUM_URL",
+    "http://localhost:5280",
 ).rstrip("/")
 
 HEALTH_ENDPOINT = f"{INSTITUTUM_API_URL}/health"
@@ -158,7 +165,7 @@ def get_city_lab_status(
                     "lastMetric": str(last_metric) if last_metric else "Sin métrica",
                     "startedAt": started,
                     "links": {
-                        "labhub": INSTITUTUM_API_URL,
+                        "labhub": INSTITUTUM_UI_URL,
                         "logs": _logs_path_for_repo(repo_path),
                     },
                     "source": "live",
@@ -175,7 +182,7 @@ def get_city_lab_status(
             "lastMetric": "Institutum online, sin experimento para esta ciudad",
             "startedAt": None,
             "links": {
-                "labhub": INSTITUTUM_API_URL,
+                "labhub": INSTITUTUM_UI_URL,
                 "logs": _logs_path_for_repo(repo_path),
             },
             "source": "live",
@@ -186,7 +193,7 @@ def get_city_lab_status(
     inferred = _infer_local_status(city_id, active_buildings or [], active_units or [])
     inferred["institutumOnline"] = False
     inferred["links"] = {
-        "labhub": INSTITUTUM_API_URL if _probe_institutum() else None,
+        "labhub": INSTITUTUM_UI_URL if _probe_institutum() else None,
         "logs": _logs_path_for_repo(repo_path),
     }
     return inferred
@@ -210,7 +217,7 @@ def get_all_cities_lab_status(
     for city in cities:
         city_id = city.get("id", "")
         repo_path = city.get("repoPath") or city.get("name", "")
-        labhub_url = INSTITUTUM_API_URL if institutum_online else None
+        labhub_url = INSTITUTUM_UI_URL if institutum_online else None
 
         if institutum_online:
             # Match experiment

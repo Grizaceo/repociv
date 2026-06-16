@@ -166,7 +166,7 @@ Problemas puntuales a corregir antes de grandes features:
   - `src/localRenderer.ts`: `fillColor` debe ser `const`.
   - `src/renderer.ts`: `warmColor` y `vignetteColor` asignados sin uso posterior.
   - `src/ui/hudWiring/inputs.ts`: `_cityHere` asignado sin uso posterior.
-- LabHub esta vivo en puerto 5281, pero `src/wonderEnv.ts` usa por defecto `WONDER_INSTITUTUM_URL = http://localhost:5280`. Revisar si es intencional por env o drift.
+- LabHub: backend/API FastAPI en :5281, UI Vite en :5280. Resuelto en F1 (2026-06-16, commit e64c7dd): `WONDER_INSTITUTUM_URL` default ahora :5280 (UI), `WONDER_INSTITUTUM_API_URL` :5281 (API). Split UI/API probe añadido en `wonderEnv.ts` (Institutum espejo de LGB). Server `labhub_adapter.py` también corregido: `links.labhub` ahora usa `INSTITUTUM_UI_URL` (:5280) en vez de la API. Test drift-guard en `wonderEnv.test.ts` falla si alguien revierte el default a :5281.
 
 ---
 
@@ -386,9 +386,7 @@ Tareas:
    - O se baja `format:check` como gate no obligatorio hasta una pasada dedicada.
    - Recomendacion: correr Prettier en commit unico y no mezclar con features.
 
-4. Revisar puerto de LabHub.
-   - Confirmar si Institutum debe apuntar a 5281.
-   - Si si, actualizar `.env.example`, `src/wonderEnv.ts`, docs.
+4. ~~Revisar puerto de LabHub.~~ Resuelto en F1 (2026-06-16, commit e64c7dd): UI :5280, API :5281. Ver §169 arriba para detalle.
 
 Gates:
 
