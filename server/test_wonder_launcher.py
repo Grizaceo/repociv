@@ -444,6 +444,56 @@ def test_launch_does_not_adopt_when_nothing_up(fake_repos, fake_popen, monkeypat
     assert state["institutum"]["external"] is False
 
 
+def test_launch_does_not_adopt_when_only_api_up(fake_repos, fake_popen, monkeypatch, no_lockfile):
+    """F2.1 regression: half-up (API only) must NOT be adopted.
+
+    When the API is up but the UI is down (e.g. uvicorn alive but Vite
+    crashed) we need to spawn the UI process. If the launcher
+    adopted the half-up state, the UI would never be started and
+    the user would see a permanent degraded status.
+    """
+
+    def probe(url, timeout):
+        return "/api/health" in url or "/health" in url  # only API responds
+
+    monkeypatch.setattr(wonder_launcher, "_http_probe", probe)
+    monkeypatch.setattr(wonder_launcher, "_pid_alive", lambda pid: True)
+    launch_wonder("institutum")
+    # Spawned (did NOT adopt the half-up state).
+    assert fake_popen["n"] >= 1
+    state = json.loads((fake_repos["cfg"] / "wonders" / "launched.json").read_text())
+    assert state["institutum"]["external"] is False
+
+
+def test_launch_does_not_adopt_when_only_ui_up(fake_repos, fake_popen, monkeypatch, no_lockfile):
+    """F2.1 regression: half-up (UI only) must NOT be adopted.
+
+    The case that bit LabHub: Vite was alive on :5173, uvicorn was
+    dead on :3001. The old launcher adopted and recorded
+    external=true, leaving the API never started. The fix requires
+    BOTH api_ready and ui_ready to adopt, so a half-up LGB now
+    triggers a normal spawn (uvicorn gets started; the existing
+    Vite keeps running on :5173 with its proxy pointing at the
+    new uvicorn).
+    """
+
+    def probe(url, timeout):
+        return "/health" not in url  # only the UI root ("/") responds
+
+    monkeypatch.setattr(wonder_launcher, "_http_probe", probe)
+    monkeypatch.setattr(wonder_launcher, "_pid_alive", lambda pid: True)
+    launch_wonder("bibliotheca")
+    # Spawned (did NOT adopt the half-up state).
+    assert fake_popen["n"] >= 1
+    state = json.loads((fake_repos["cfg"] / "wonders" / "launched.json").read_text())
+    assert state["bibliotheca"]["external"] is False
+    # The uvicorn proc (the missing one for LGB) is among the spawned.
+    argv_first = fake_popen["spawned"][0][0]
+    assert "library_bridge" in str(argv_first) or "library_bridge" in str(
+        fake_popen["spawned"][1][0]
+    )
+
+
 def test_launch_adopt_picks_up_labhub_lockfile_pids(fake_repos, fake_popen, monkeypatch, tmp_path):
     """Hallazgo B + lockfile integration: adopt + record labhub PIDs.
 

@@ -291,21 +291,30 @@ def _resolve_python_executable(cwd: str) -> str:
 
 
 def _try_adopt_external(wonder_id: str, spec: WonderSpec) -> dict[str, Any] | None:
-    """If API+UI are already up (server started manually), adopt it.
+    """If API AND UI are both already up (server started manually), adopt it.
 
-    Records the PIDs we can recover (LabHub writes them to
-    ``~/.labhub/labhub.lock``; for Bibliotheca there's no equivalent
-    so the entry has no PIDs and the status still reports "ready"
-    because health-checks pass).
+    Requires BOTH api_ready AND ui_ready. Half-up (e.g. Vite running but
+    uvicorn dead, or vice versa) is treated as not adopted — the caller
+    will then spawn the missing procs. This avoids the "adopted in
+    degraded state" failure mode where LabHub's uvicorn could never
+    be started because the Vite was alive and locked the launcher out
+    of the spawn path.
 
-    Returns the new entry, or ``None`` if no external server is
-    detected (caller should spawn instead).
+    PIDs are recovered from the wonder-specific lockfile when
+    available (only institutum has one; bibliotheca has no
+    dev-start.sh, so the entry has no PIDs and we rely on health).
+
+    Returns the new entry, or ``None`` if the wonder is not fully
+    up (caller should spawn instead).
     """
     api_url = spec.api_url.rstrip("/") + spec.api_health_path
     ui_url = spec.ui_url.rstrip("/") + "/"
     api_ready = _http_probe(api_url, spec.api_timeout_s)
     ui_ready = _http_probe(ui_url, spec.ui_timeout_s)
-    if not (api_ready or ui_ready):
+    # F2.1 fix: require BOTH api and ui up to adopt. If only one is up
+    # (e.g. Vite alive but uvicorn dead), the launcher still spawns so
+    # the missing process gets started.
+    if not (api_ready and ui_ready):
         return None
 
     # Try to recover PIDs from the wonder-specific lockfile. Only
