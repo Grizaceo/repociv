@@ -310,7 +310,7 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
       return;
     }
     if (!backend) {
-      const launched = await _tryAutoStart(body, type, { allowAdopt: true });
+      const launched = await _tryAutoStart(body, type);
       if (launched) return;
       const reason: EmptyReason =
         type === 'bibliotheca' ? 'lgb-backend-offline' : 'institutum-backend-offline';
@@ -320,7 +320,7 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
     if (!ui) {
       // Backend up but UI not — try auto-start (the bridge can adopt
       // an externally-running LabHub via F2's lockfile parse).
-      const launched = await _tryAutoStart(body, type, { allowAdopt: true });
+      const launched = await _tryAutoStart(body, type);
       if (launched) return;
       const reason: EmptyReason =
         type === 'bibliotheca' ? 'lgb-ui-offline' : 'institutum-ui-offline';
@@ -583,23 +583,15 @@ async function _reloadBibliothecaRelations(): Promise<void> {
   }
 }
 
-function _tryAutoStart(
-  body: HTMLElement,
-  type: WonderType,
-  opts: { allowAdopt?: boolean } = {},
-): Promise<boolean> {
+function _tryAutoStart(body: HTMLElement, type: WonderType): Promise<boolean> {
   /** Attempt the F3 auto-start. Returns true if the iframe was mounted,
    * false if the user must fall back to the empty state. The caller
    * handles the false case.
    */
-  return _pollUntilReady(body, type, opts.allowAdopt ?? false);
+  return _pollUntilReady(body, type);
 }
 
-async function _pollUntilReady(
-  body: HTMLElement,
-  type: WonderType,
-  _allowAdopt: boolean,
-): Promise<boolean> {
+async function _pollUntilReady(body: HTMLElement, type: WonderType): Promise<boolean> {
   // Render an "in-flight" placeholder while we poll. The onUpdate
   // callback refreshes the body with the live launch-status.
   const renderProgress = (status: WonderLaunchStatus | null, terminalError?: string) => {
@@ -625,7 +617,7 @@ async function _pollUntilReady(
   renderProgress(null);
   try {
     const status = await pollWonderUntilReady(type, {
-      timeoutMs: 30_000,
+      timeoutMs: 45_000,
       intervalMs: 1_500,
       onUpdate: (s) => renderProgress(s),
     });

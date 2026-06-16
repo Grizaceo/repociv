@@ -122,7 +122,27 @@ export async function stopWonder(id: string): Promise<{ ok: boolean; id: string;
   return (await res.json().catch(() => ({ ok: false, id }))) as { ok: boolean; id: string; error?: string };
 }
 
-/** Poll launch-status until "ready" (or "degraded" if preferDegraded) or timeout. */
+/** Poll launch-status until the wonder is fully ready, or timeout.
+
+    Behaviour (F3.1 fix for audit hallazgos F3-1 + F3-2):
+      - The poll returns when ``status === 'ready'`` OR
+        ``status === 'already_running'`` (a previous launch is live
+        and adoptable). The cold-start "ready" includes both api and
+        ui being up.
+      - It does NOT return on ``degraded`` (only one of api/ui up)
+        because the vignette mounts an iframe based on the UI URL
+        and we want the full app, not a partial render. Continuing
+        to poll on degraded lets the Vite cold-compile finish.
+      - It does NOT cut on ``error`` either — with the backend
+        grace-period (F3.1-A) the transient "npm-died-but-children-
+        coming-up" window is now reported as ``starting`` not
+        ``error``, so the poller keeps waiting through that.
+      - Returns the LAST observed status when the deadline elapses
+        (typically ``starting`` or ``degraded``).
+
+    The grace period lives in the backend (20s); the client is
+    patient up to ``timeoutMs``.
+    */
 export async function pollWonderUntilReady(
   id: string,
   opts: LaunchOptions = {},
@@ -135,16 +155,19 @@ export async function pollWonderUntilReady(
   // returns the current status without spawning again).
   let status = await launchWonder(id);
   if (opts.onUpdate) opts.onUpdate(status);
-  if (isReadyOrDegraded(status)) return status;
-  if (status.error === 'unknown_wonder' || status.code === 'http_404') return status;
+  if (isFullyReady(status)) return status;
+  if (isTerminalRejection(status)) return status;
 
   while (Date.now() < deadline) {
     if (opts.signal?.aborted) return status;
     await new Promise<void>((resolve) => setTimeout(resolve, intervalMs));
     status = await getWonderLaunchStatus(id);
     if (opts.onUpdate) opts.onUpdate(status);
-    if (isReadyOrDegraded(status)) return status;
-    if (status.status === 'error') return status; // stop polling on terminal error
+    if (isFullyReady(status)) return status;
+    // Note: we keep polling on "starting", "degraded" AND "error"
+    // (during the backend grace period, "error" can briefly appear
+    // when npm dies before the children bind). Only the deadline
+    // or a real 4xx (unknown_wonder, remote_rejected) ends the wait.
   }
   return status; // timeout — return the last status (likely "starting")
 }
@@ -162,8 +185,28 @@ export function ensureWondersUp(
   }
 }
 
-function isReadyOrDegraded(s: WonderLaunchStatus): boolean {
-  return s.status === 'ready' || s.status === 'degraded' || s.status === 'already_running';
+function isFullyReady(s: WonderLaunchStatus): boolean {
+  // "ready"         — api + ui both up
+  // "already_running" — adopted, we recorded an external entry; safe
+  //                    to mount because the launcher already saw both
+  //                    endpoints healthy at adoption time.
+  return s.status === 'ready' || s.status === 'already_running';
+}
+
+function isTerminalRejection(s: WonderLaunchStatus): boolean {
+  // 4xx errors mean we'll never succeed by waiting — bail out so the
+  // caller can show an empty state with the right copy.
+  if (s.ok === false && s.code) {
+    return (
+      s.code === 'unknown_wonder' ||
+      s.code === 'remote_rejected' ||
+      s.code === 'repo_not_found' ||
+      s.code === 'http_404' ||
+      s.code === 'http_403' ||
+      s.code === 'http_412'
+    );
+  }
+  return false;
 }
 
 /** localStorage helpers for the autoStartWonders flag (default ON). */

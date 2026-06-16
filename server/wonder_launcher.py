@@ -379,6 +379,14 @@ def _build_status(wonder_id: str, entry: dict[str, Any] | None) -> dict[str, Any
       - "starting"  — neither up yet, PID(s) still alive
       - "error"     — neither up AND all spawned PIDs are gone
 
+    Grace period: a freshly-launched wonder whose PIDs have all exited
+    (the npm parent dies within ~1s of dev-start.sh forking the real
+    procs) is reported as "starting", not "error", for the first
+    ``_STARTUP_GRACE_S`` seconds. Without this, the F3 poller would
+    see "error" during the transient window between npm-died and
+    bridge-binded and abort the launch even though everything is
+    actually fine.
+
     Why: ``institutum`` spawns a single ``npm start`` whose child
     (dev-start.sh) launches bridge+Vite detached, then exits. The npm
     process dies in seconds while the children live. With the old
@@ -410,13 +418,21 @@ def _build_status(wonder_id: str, entry: dict[str, Any] | None) -> dict[str, Any
     api_ready = _http_probe(api_url.rstrip("/") + spec.api_health_path, spec.api_timeout_s)
     ui_ready = _http_probe(ui_url.rstrip("/") + "/", spec.ui_timeout_s)
 
+    started_at = entry.get("started_at")
+    in_grace_period = (
+        started_at is not None and (time.time() - float(started_at)) < _STARTUP_GRACE_S
+    )
+
     if api_ready and ui_ready:
         status = "ready"
         error_msg = None
     elif api_ready or ui_ready:
         status = "degraded"
         error_msg = None
-    elif pids and not any_alive:
+    elif pids and not any_alive and not in_grace_period:
+        # Real terminal error: procs were spawned, exited, and the
+        # grace period has elapsed (so this isn't just a slow
+        # cold-start where npm died before bridge bound).
         status = "error"
         error_msg = "all launched processes exited"
     else:
@@ -435,12 +451,22 @@ def _build_status(wonder_id: str, entry: dict[str, Any] | None) -> dict[str, Any
         "ui_ready": ui_ready,
         "ready": api_ready and ui_ready,
         "pids": pids,
-        "started_at": entry.get("started_at"),
+        "started_at": started_at,
         "api_url": api_url,
         "ui_url": ui_url,
         "log_tail": log_tail,
         "error": error_msg,
     }
+
+
+# ─── Errors ──────────────────────────────────────────────────────────────────
+
+
+# Grace window (seconds) during which a freshly-launched wonder whose
+# tracked PIDs have all exited is still reported as "starting" (not
+# "error"). 20s is enough to cover the npm-parent-dies-then-children-
+# come-up sequence of dev-start.sh.
+_STARTUP_GRACE_S = 20.0
 
 
 def launch_wonder(wonder_id: str) -> dict[str, Any]:

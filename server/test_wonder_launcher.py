@@ -12,10 +12,10 @@ Pattern: monkeypatch Popen / state file / env to keep the tests hermetic.
 """
 
 from __future__ import annotations
-
 import json
 import os
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -328,13 +328,58 @@ def test_status_degraded_when_only_api_up(fake_repos, fake_popen, monkeypatch):
 
 
 def test_status_error_when_all_pids_exited(fake_repos, fake_popen, monkeypatch):
-    # All PIDs gone AND health probes failing → real error.
+    # All PIDs gone AND health probes failing AND past the 20s grace
+    # period → real error.
     monkeypatch.setattr(wonder_launcher, "_pid_alive", lambda pid: False)
     monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: False)
     launch_wonder("institutum")
+    # Force the entry's started_at to be older than the grace period
+    # so the test doesn't depend on real wall-clock time.
+    state = json.loads((fake_repos["cfg"] / "wonders" / "launched.json").read_text())
+    state["institutum"]["started_at"] = time.time() - 30
+    (fake_repos["cfg"] / "wonders" / "launched.json").write_text(json.dumps(state))
+    # _build_status reads from the in-memory _launched cache; force a reload.
+    wonder_launcher._launched = {}
     s = wonder_launch_status("institutum")
     assert s["status"] == "error"
     assert s["error"] is not None
+
+
+def test_status_starting_during_grace_period_even_if_pids_exited(
+    fake_repos, fake_popen, monkeypatch
+):
+    """F3.1-A regression test (audit hallazgo F3-2).
+
+    During the first 20s after a launch, PIDs-dead + health-down
+    is reported as "starting" (not "error"). This is the cold-start
+    window for institutum: npm-dies-in-1s, dev-start.sh forks
+    bridge+vite detached, bridge binds :5281 ~3s later. Without
+    the grace period, the F3 poller would see "error" in that
+    window and abort the launch.
+    """
+    monkeypatch.setattr(wonder_launcher, "_pid_alive", lambda pid: False)
+    monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: False)
+    launch_wonder("institutum")
+    # started_at is `now` (just set by launch_wonder), so we're
+    # inside the 20s grace window.
+    s = wonder_launch_status("institutum")
+    assert s["status"] == "starting", f"expected starting during grace, got {s['status']!r}"
+    assert s["error"] is None
+
+
+def test_status_error_after_grace_period(fake_repos, fake_popen, monkeypatch):
+    """Same as test_status_error_when_all_pids_exited but explicit."""
+    monkeypatch.setattr(wonder_launcher, "_pid_alive", lambda pid: False)
+    monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: False)
+    launch_wonder("institutum")
+    # Backdate started_at past the 20s window.
+    state = json.loads((fake_repos["cfg"] / "wonders" / "launched.json").read_text())
+    state["institutum"]["started_at"] = time.time() - 60
+    (fake_repos["cfg"] / "wonders" / "launched.json").write_text(json.dumps(state))
+    # Force a fresh read from disk so the backdated started_at takes effect.
+    wonder_launcher._launched = {}
+    s = wonder_launch_status("institutum")
+    assert s["status"] == "error"
 
 
 def test_status_ready_when_parent_died_but_health_up(fake_repos, fake_popen, monkeypatch):

@@ -100,20 +100,51 @@ describe('wonderLauncher client (F3)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
-  it('pollWonderUntilReady stops on terminal error', async () => {
+  it('pollWonderUntilReady does NOT cut on transient error (keeps polling)', async () => {
+    // F3.1-B regression: the cold-start window for institutum can show
+    // status='error' briefly (npm died, bridge not bound yet) before the
+    // backend grace period settles. The poller must keep waiting
+    // through that — only true 4xx rejections (unknown_wonder,
+    // remote_rejected, repo_not_found) are terminal.
     fetchMock
       .mockResolvedValueOnce(  // first launch
         jsonResponse({ ok: true, id: 'institutum', status: 'starting', ready: false }),
       )
-      .mockResolvedValueOnce(  // status poll → error
+      .mockResolvedValueOnce(  // status poll → error (transient)
         jsonResponse({ ok: true, id: 'institutum', status: 'error', ready: false }),
+      )
+      .mockResolvedValueOnce(  // status poll → ready (eventually)
+        jsonResponse({ ok: true, id: 'institutum', status: 'ready', ready: true }),
       );
     const out = await pollWonderUntilReady('institutum', {
       intervalMs: 1,
       timeoutMs: 5_000,
     });
-    expect(out.status).toBe('error');
-    expect(fetchMock).toHaveBeenCalledTimes(2); // stopped, did not keep polling
+    expect(out.status).toBe('ready');
+    // Did NOT stop on the transient error — kept polling until ready.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('pollWonderUntilReady does NOT return on degraded (waits for ready)', async () => {
+    // F3.1-B regression: a degraded status (api up, ui cold-compiling)
+    // is not enough — the vignette mounts the iframe and the partial
+    // render is jarring. Keep polling.
+    fetchMock
+      .mockResolvedValueOnce(  // first launch
+        jsonResponse({ ok: true, id: 'institutum', status: 'starting', ready: false }),
+      )
+      .mockResolvedValueOnce(  // status poll → degraded
+        jsonResponse({ ok: true, id: 'institutum', status: 'degraded', ready: false }),
+      )
+      .mockResolvedValueOnce(  // status poll → ready
+        jsonResponse({ ok: true, id: 'institutum', status: 'ready', ready: true }),
+      );
+    const out = await pollWonderUntilReady('institutum', {
+      intervalMs: 1,
+      timeoutMs: 5_000,
+    });
+    expect(out.status).toBe('ready');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('pollWonderUntilReady calls onUpdate at each step', async () => {
@@ -148,12 +179,13 @@ describe('wonderLauncher client (F3)', () => {
   // ─── ensureWondersUp ──────────────────────────────────────────────────
 
   it('ensureWondersUp fires launch for each id, no await', async () => {
+    // Each poll returns ready on the first launch → no further polls.
     fetchMock.mockResolvedValue(
       jsonResponse({ ok: true, status: 'ready', ready: true }),
     );
     ensureWondersUp(['bibliotheca', 'institutum'], { intervalMs: 1, timeoutMs: 1_000 });
     // give the microtask queue a chance to flush
-    await new Promise((r) => setTimeout(r, 20));
+    await new Promise((r) => setTimeout(r, 50));
     // We expect at least one fetch per id (the first launch).
     const calls = fetchMock.mock.calls as Array<[unknown, RequestInit?]>;
     const urls = calls.map((c) => String(c[0]));
