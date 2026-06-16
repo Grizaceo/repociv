@@ -19,6 +19,10 @@ import {
   startWonderListener,
   stopWonderListener,
 } from '../wonders/postMessageBridge.ts';
+import {
+  pollWonderUntilReady,
+  type WonderLaunchStatus,
+} from '../wonders/wonderLauncher.ts';
 import type { WonderManifest } from '../wonders/types.ts';
 import { renderCapabilityBadge } from '../wonders/wonderBadges.ts';
 import {
@@ -293,19 +297,31 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
       type === 'bibliotheca'
         ? await checkLgbReachability()
         : await checkInstitutumReachability();
+
+    // Both down → try the auto-start (F3). If the user has the wonder
+    // repo present and we have a launchable spec, the bridge will
+    // either adopt the running instance or spawn the procs.
     if (!ui && !backend) {
+      const launched = await _tryAutoStart(body, type);
+      if (launched) return;
       const reason: EmptyReason =
         type === 'bibliotheca' ? 'lgb-offline' : 'institutum-offline';
       _showEmptyState(body, type, reason);
       return;
     }
     if (!backend) {
+      const launched = await _tryAutoStart(body, type, { allowAdopt: true });
+      if (launched) return;
       const reason: EmptyReason =
         type === 'bibliotheca' ? 'lgb-backend-offline' : 'institutum-backend-offline';
       _showEmptyState(body, type, reason);
       return;
     }
     if (!ui) {
+      // Backend up but UI not — try auto-start (the bridge can adopt
+      // an externally-running LabHub via F2's lockfile parse).
+      const launched = await _tryAutoStart(body, type, { allowAdopt: true });
+      if (launched) return;
       const reason: EmptyReason =
         type === 'bibliotheca' ? 'lgb-ui-offline' : 'institutum-ui-offline';
       _showEmptyState(body, type, reason);
@@ -567,6 +583,73 @@ async function _reloadBibliothecaRelations(): Promise<void> {
   }
 }
 
+function _tryAutoStart(
+  body: HTMLElement,
+  type: WonderType,
+  opts: { allowAdopt?: boolean } = {},
+): Promise<boolean> {
+  /** Attempt the F3 auto-start. Returns true if the iframe was mounted,
+   * false if the user must fall back to the empty state. The caller
+   * handles the false case.
+   */
+  return _pollUntilReady(body, type, opts.allowAdopt ?? false);
+}
+
+async function _pollUntilReady(
+  body: HTMLElement,
+  type: WonderType,
+  _allowAdopt: boolean,
+): Promise<boolean> {
+  // Render an "in-flight" placeholder while we poll. The onUpdate
+  // callback refreshes the body with the live launch-status.
+  const renderProgress = (status: WonderLaunchStatus | null, terminalError?: string) => {
+    const sub = terminalError
+      ? `No se pudo levantar la maravilla: ${terminalError}`
+      : status
+        ? status.error
+          ? `Error al levantar: ${status.error_message ?? status.error}`
+          : status.status === 'starting'
+            ? `Levantando procesos… (API ${status.api_ready ? '✓' : '…'} UI ${status.ui_ready ? '✓' : '…'})`
+            : status.status === 'degraded'
+              ? `Servidor parcial (API ${status.api_ready ? '✓' : '✗'} UI ${status.ui_ready ? '✓' : '✗'}). Reintentando…`
+              : `Estado: ${status.status}`
+        : 'Pidiendo al bridge que levante la maravilla…';
+    body.innerHTML = `
+      <div class="wonder-empty">
+        <div class="wonder-empty-icon">⚙️</div>
+        <div class="wonder-empty-title">Levantando la maravilla…</div>
+        <div class="wonder-empty-sub">${sub}</div>
+      </div>
+    `;
+  };
+  renderProgress(null);
+  try {
+    const status = await pollWonderUntilReady(type, {
+      timeoutMs: 30_000,
+      intervalMs: 1_500,
+      onUpdate: (s) => renderProgress(s),
+    });
+    if (status.ready && (status.status === 'ready' || status.status === 'already_running')) {
+      // Mount the iframe with the URL reported by the launcher (which
+      // may be the adopted one, not the primary UI URL).
+      const manifest = getWonder(type);
+      if (!manifest) return false;
+      const mountManifest =
+        status.ui_url && status.ui_url !== (manifest.ui.url ?? '').replace(/\/$/, '')
+          ? { ...manifest, ui: { ...manifest.ui, url: status.ui_url } }
+          : manifest;
+      _mountIframe(body, mountManifest, type);
+      return true;
+    }
+    // Timeout / error: surface a useful message; caller will empty-state.
+    renderProgress(status);
+    return false;
+  } catch (e) {
+    renderProgress(null, (e as Error)?.message ?? String(e));
+    return false;
+  }
+}
+
 function _emptySub(type: WonderType, reason?: EmptyReason): string {
   if (type === 'bibliotheca') {
     const ui = WONDER_BIBLIOTHECA_URL;
@@ -591,6 +674,32 @@ function _emptySub(type: WonderType, reason?: EmptyReason): string {
         return 'La maravilla respondió, pero negó permisos. Revisa headers, auth local o sandbox.';
       default:
         return 'La Biblioteca no respondió como debía. Revisa UI, backend o proxy local.';
+    }
+  }
+
+  if (type === 'institutum') {
+    const ui = WONDER_INSTITUTUM_URL;
+    switch (reason) {
+      case 'institutum-offline':
+        return (
+          `Levanta LabHub en otra terminal:<br>` +
+          `<code>cd ~/.hermes/workspace/repos/labhub && npm start</code> ` +
+          `(API :5281, UI :5280)<br>` +
+          `Si el repo no está, clónalo o ajusta <code>REPOCIV_WONDER_INSTITUTUM_DIR</code> en .env.`
+        );
+      case 'institutum-backend-offline':
+        return (
+          `La UI Vite de LabHub está caída, pero la API :5281 tampoco responde. ` +
+          `Re-arranca con <code>npm start</code> en labhub/ y revisa <code>~/.labhub/logs/</code>.`
+        );
+      case 'institutum-ui-offline':
+        return `La API responde, pero la UI Vite no en <code>${ui}</code>. Comprueba que <code>npm start</code> en labhub/ completó sin errores.`;
+      case 'load-timeout':
+        return `La UI en <code>${ui}</code> no cargó a tiempo. ¿Está Vite enlazado en :5280? Abre esa URL en una pestaña para depurar.`;
+      case 'no-permissions':
+        return 'LabHub respondió, pero negó permisos. Revisa headers o el sandbox del iframe.';
+      default:
+        return 'LabHub no respondió como debía. Revisa UI :5280 o API :5281.';
     }
   }
 

@@ -11,6 +11,10 @@ import {
 import { type ScannedRepo } from './map.ts';
 import { Renderer } from './renderer.ts';
 import { BridgeEvents, syncGraphRelationFlags } from './bridge.ts';
+import {
+  ensureWondersUp,
+  isAutoStartWondersEnabled,
+} from './wonders/wonderLauncher.ts';
 import { GameState } from './game.ts';
 
 // ─── First-unit slot ──────────────────────────────────────────────────────────
@@ -606,6 +610,20 @@ async function bootstrap() {
   setWebGLMetricsSource(() => renderer.getWebGLMetrics());
   startObservabilityPolling();
   startHarnessPolling();
+
+  // ══ Wonder auto-start (F3) ══
+  // Fire-and-forget: launch + poll Bibliotheca and LabHub in the
+  // background after the bridge is up. Default ON, can be disabled
+  // via localStorage key 'repociv:auto-start-wonders' = 'false'.
+  if (isAutoStartWondersEnabled()) {
+    ensureWondersUp(['bibliotheca', 'institutum'], {
+      timeoutMs: 60_000,
+      intervalMs: 1_500,
+    });
+    logEvent('⚙️ Levantando maravillas (auto-start)…', 'info');
+  } else {
+    logEvent('Auto-arranque de maravillas desactivado (localStorage).', 'info');
+  }
 
   // ══ Analytics wiring ══
   const analyticsPanels = {
