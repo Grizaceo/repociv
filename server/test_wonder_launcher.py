@@ -14,7 +14,9 @@ Pattern: monkeypatch Popen / state file / env to keep the tests hermetic.
 from __future__ import annotations
 
 import json
+import os
 import threading
+from pathlib import Path
 
 import pytest
 
@@ -31,6 +33,29 @@ from server.wonder_launcher import (
 
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def no_lockfile(tmp_path, monkeypatch):
+    """Ensure ~/.labhub/labhub.lock doesn't leak between tests.
+
+    The lockfile lives in the user's home dir, not in tmp_path, so
+    cross-test pollution is otherwise possible. Saves & restores.
+    """
+    from pathlib import Path
+
+    home = Path(os.path.expanduser("~"))
+    lock = home / ".labhub" / "labhub.lock"
+    saved = None
+    if lock.exists():
+        saved = lock.read_text()
+        lock.unlink()
+    try:
+        yield
+    finally:
+        if saved is not None:
+            lock.parent.mkdir(parents=True, exist_ok=True)
+            lock.write_text(saved)
 
 
 @pytest.fixture
@@ -303,12 +328,153 @@ def test_status_degraded_when_only_api_up(fake_repos, fake_popen, monkeypatch):
 
 
 def test_status_error_when_all_pids_exited(fake_repos, fake_popen, monkeypatch):
+    # All PIDs gone AND health probes failing → real error.
     monkeypatch.setattr(wonder_launcher, "_pid_alive", lambda pid: False)
     monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: False)
     launch_wonder("institutum")
     s = wonder_launch_status("institutum")
     assert s["status"] == "error"
     assert s["error"] is not None
+
+
+def test_status_ready_when_parent_died_but_health_up(fake_repos, fake_popen, monkeypatch):
+    """Hallazgo A regression test.
+
+    Reproduces the real Institutum case: ``npm start`` runs
+    dev-start.sh which forks bridge+Vite detached and exits. The npm
+    PID is dead within seconds. With the OLD state machine the
+    report was ``error``; with the fix, health-checks are the source
+    of truth so it must be ``ready``.
+    """
+    # Simulate npm parent dead, but health probes succeed.
+    monkeypatch.setattr(wonder_launcher, "_pid_alive", lambda pid: False)
+    monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: True)
+    launch_wonder("institutum")
+    s = wonder_launch_status("institutum")
+    assert s["status"] == "ready"
+    assert s["ready"] is True
+    assert s["error"] is None
+
+
+def test_status_degraded_when_parent_died_only_api_up(fake_repos, fake_popen, monkeypatch):
+    """Sibling regression: half-up is degraded, never error."""
+    monkeypatch.setattr(wonder_launcher, "_pid_alive", lambda pid: False)
+
+    def probe(url, timeout):
+        return "/health" in url  # only API responds
+
+    monkeypatch.setattr(wonder_launcher, "_http_probe", probe)
+    launch_wonder("institutum")
+    s = wonder_launch_status("institutum")
+    assert s["status"] == "degraded"
+    assert s["ready"] is False
+
+
+def test_launch_adopts_external_when_health_up(fake_repos, fake_popen, monkeypatch):
+    """Hallazgo B: pre-launch health check avoids double-spawn.
+
+    With both API and UI up, launch_wonder should NOT spawn — it
+    should record an "external" entry and return immediately.
+    """
+    monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: True)
+    result = launch_wonder("institutum")
+    assert fake_popen["n"] == 0  # no spawn
+    assert result["status"] == "ready"
+    assert result["ready"] is True
+    # State persisted, marked external
+    state = json.loads((fake_repos["cfg"] / "wonders" / "launched.json").read_text())
+    assert state["institutum"]["external"] is True
+
+
+def test_launch_does_not_adopt_when_nothing_up(fake_repos, fake_popen, monkeypatch, no_lockfile):
+    """Hallazgo B sibling: nothing responding → normal spawn."""
+    # Force health probes to fail for BOTH api and ui, and PIDs to be
+    # alive (the spawn is recent — would be true in production).
+    monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: False)
+    monkeypatch.setattr(wonder_launcher, "_pid_alive", lambda pid: True)
+    result = launch_wonder("institutum")
+    assert fake_popen["n"] == 1  # spawned
+    assert result["status"] == "starting"
+    state = json.loads((fake_repos["cfg"] / "wonders" / "launched.json").read_text())
+    assert state["institutum"]["external"] is False
+
+
+def test_launch_adopt_picks_up_labhub_lockfile_pids(fake_repos, fake_popen, monkeypatch, tmp_path):
+    """Hallazgo B + lockfile integration: adopt + record labhub PIDs.
+
+    The lockfile path is rewritten (via the env var) so we don't touch
+    the user's real ``~/.labhub/labhub.lock``.
+    """
+    # Use a tmp lockfile and tell the launcher where to look.
+    lock_dir = tmp_path / ".labhub"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / "labhub.lock"
+    lock_path.write_text("BRIDGE_PID=4242\nVITE_PID=4243\nBRIDGE_PORT=5281\nLABHUB_PORT=5280\n")
+    # Point _read_labhub_lockfile at our tmp lockfile by monkeypatching
+    # the resolve step. The function expands "~/.labhub/labhub.lock" so
+    # we override HOME to a tmp dir.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: True)
+    result = launch_wonder("institutum")
+    state = json.loads((fake_repos["cfg"] / "wonders" / "launched.json").read_text())
+    assert state["institutum"]["pids"] == {"bridge": 4242, "vite": 4243}
+    assert result["pids"] == {"bridge": 4242, "vite": 4243}
+
+
+def test_resolve_python_executable_prefers_venv(tmp_path):
+    # Fake a repo with backend/venv/bin/python
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    venv = repo / "backend" / "venv" / "bin"
+    venv.mkdir(parents=True)
+    fake = venv / "python"
+    fake.write_text("#!/bin/sh\n")
+    fake.chmod(0o755)
+    resolved = wonder_launcher._resolve_python_executable(str(repo))
+    assert resolved == str(fake)
+
+
+def test_resolve_python_executable_falls_back_to_python3(tmp_path):
+    repo = tmp_path / "no-venv"
+    repo.mkdir()
+    resolved = wonder_launcher._resolve_python_executable(str(repo))
+    assert resolved == "python3"
+
+
+def test_spawn_uses_venv_python_when_present(fake_repos, fake_popen, monkeypatch, tmp_path):
+    """Hallazgo D: launcher uses backend/venv/bin/python if present.
+
+    We create a fake venv under the lgb repo and assert the spawn
+    argv[0] points at it.
+    """
+    # Create venv under lgb repo
+    lgb = fake_repos["lgb"]
+    venv_python = lgb / "backend" / "venv" / "bin" / "python"
+    venv_python.parent.mkdir(parents=True, exist_ok=True)
+    venv_python.write_text("#!/bin/sh\n")
+    venv_python.chmod(0o755)
+    monkeypatch.setattr(wonder_launcher, "_pid_alive", lambda pid: True)
+    monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: False)
+    launch_wonder("bibliotheca")
+    # First proc is the bridge (python -m backend.library_bridge).
+    argv, kwargs = fake_popen["spawned"][0]
+    assert Path(argv[0]).resolve() == Path(str(venv_python)).resolve()
+
+
+def test_routes_wonder_id_from_url_takes_precedence_over_body():
+    """Hallazgo E: URL > body for wonder id."""
+    from server.routes import wonder_ops
+
+    # URL has bibliotheca, body says institutum → URL wins
+    s, b = wonder_ops.post_wonder_launch({"id": "institutum"}, {"wonder_id": "bibliotheca"})
+    # The launcher will reject bibliotheca only if the repo doesn't exist.
+    # In this test, the call goes to launch_wonder("bibliotheca"). The
+    # bibliotheca repo in the default test env doesn't exist, so we'd
+    # get a 412. The point is: it's bibliotheca (URL), not institutum (body).
+    assert s in (200, 404, 412)
+    # The validation should be on "bibliotheca" not "institutum"
+    if s != 200:
+        assert "bibliotheca" in str(b).lower() or b.get("code") == "repo_not_found"
 
 
 def test_status_unknown_id_raises_404():

@@ -26,13 +26,20 @@ def _ok(body: dict[str, Any]) -> tuple[int, Any]:
 
 
 def _wonder_id_from(body: dict[str, Any], ctx: dict[str, Any]) -> str:
-    """Extract wonder id from JSON body or path params.
+    """Extract wonder id from the URL path first, falling back to the body.
 
-    Both shapes are accepted so the same handler works for:
-      POST /api/wonders/{id}/launch   (id in URL prefix-match)
-      POST /api/wonders/launch        (id in body)
-    The same shape applies to /stop.
+    For prefix-match routes like ``/api/wonders/{id}/launch`` the bridge
+    passes ``ctx["wonder_id"]`` derived from the URL — the URL wins
+    over any body field to avoid surprises (POSTing
+    /api/wonders/bibliotheca/launch with ``{"id":"institutum"}`` is
+    a no-op for the URL, even though the allowlist would still accept
+    the body value).
+
+    For routes that don't have the id in the URL (e.g. an exact-match
+    /api/wonders/launch), the body is the only source.
     """
+    if isinstance(ctx, dict) and ctx.get("wonder_id"):
+        return str(ctx["wonder_id"])
     if body and isinstance(body, dict):
         bid = body.get("id") or body.get("wonder_id")
         if bid:
@@ -40,8 +47,6 @@ def _wonder_id_from(body: dict[str, Any], ctx: dict[str, Any]) -> str:
     params = ctx.get("params", {}) if isinstance(ctx, dict) else {}
     if params.get("id"):
         return str(params["id"])
-    if ctx.get("wonder_id"):
-        return str(ctx["wonder_id"])
     return ""
 
 

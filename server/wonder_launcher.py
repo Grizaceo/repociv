@@ -244,6 +244,95 @@ def _http_probe(url: str, timeout_s: float) -> bool:
         return False
 
 
+# ─── External adoption (Fix B: avoid clobbering manually-started servers) ─────
+
+
+def _read_labhub_lockfile() -> dict[str, int] | None:
+    """Parse the LabHub dev-start.sh lockfile (key=value format).
+
+    Returns {bridge: pid, vite: pid} if found, else None. Used to
+    "adopt" a manually-started LabHub instead of spawning a second
+    copy that would kill the running one (dev-start.sh kills the
+    ports first).
+    """
+    lock_path = Path(os.path.expanduser("~/.labhub/labhub.lock"))
+    if not lock_path.exists():
+        return None
+    out: dict[str, int] = {}
+    try:
+        for line in lock_path.read_text().splitlines():
+            if "=" not in line:
+                continue
+            key, val = line.split("=", 1)
+            key = key.strip().lower()
+            val = val.strip()
+            if key in ("bridge_pid", "vite_pid") and val.isdigit():
+                out["bridge" if key == "bridge_pid" else "vite"] = int(val)
+    except (OSError, ValueError):
+        return None
+    return out or None
+
+
+def _resolve_python_executable(cwd: str) -> str:
+    """Pick the best Python interpreter for a venv-aware spawn.
+
+    Prefers a repo-local venv (backend/venv/bin/python, .venv/bin/python)
+    so the spawned process inherits the right deps even when the parent
+    interpreter is a different one. Falls back to ``python3`` (POSIX) or
+    ``python`` (Windows-ish) so the launcher still works on a fresh
+    checkout before ``python -m venv`` has been run.
+    """
+    cwd_p = Path(cwd)
+    for venv_dir in (cwd_p / "backend" / "venv", cwd_p / ".venv"):
+        candidate = venv_dir / "bin" / "python"
+        if candidate.is_file():
+            return str(candidate)
+    return "python3"
+
+
+def _try_adopt_external(wonder_id: str, spec: WonderSpec) -> dict[str, Any] | None:
+    """If API+UI are already up (server started manually), adopt it.
+
+    Records the PIDs we can recover (LabHub writes them to
+    ``~/.labhub/labhub.lock``; for Bibliotheca there's no equivalent
+    so the entry has no PIDs and the status still reports "ready"
+    because health-checks pass).
+
+    Returns the new entry, or ``None`` if no external server is
+    detected (caller should spawn instead).
+    """
+    api_url = spec.api_url.rstrip("/") + spec.api_health_path
+    ui_url = spec.ui_url.rstrip("/") + "/"
+    api_ready = _http_probe(api_url, spec.api_timeout_s)
+    ui_ready = _http_probe(ui_url, spec.ui_timeout_s)
+    if not (api_ready or ui_ready):
+        return None
+
+    # Try to recover PIDs from the wonder-specific lockfile. Only
+    # institutum has one (labhub/scripts/dev-start.sh writes it).
+    # Bibliotheca has no dev-start.sh; we accept a no-PID entry and
+    # rely on health to confirm the server is up.
+    recovered_pids: dict[str, int] = {}
+    if wonder_id == "institutum":
+        from_lockfile = _read_labhub_lockfile()
+        if from_lockfile:
+            recovered_pids = from_lockfile
+
+    entry = {
+        "id": wonder_id,
+        "pids": recovered_pids,
+        "started_at": time.time(),
+        "api_url": spec.api_url,
+        "ui_url": spec.ui_url,
+        "log_files": [],
+        "external": True,  # mark as adopted, not launched-by-us
+    }
+    state = _load_state()
+    state[wonder_id] = entry
+    _save_state()
+    return entry
+
+
 # ─── Errors ──────────────────────────────────────────────────────────────────
 
 
@@ -281,12 +370,20 @@ def list_launchable() -> list[str]:
 def _build_status(wonder_id: str, entry: dict[str, Any] | None) -> dict[str, Any]:
     """Build the launch-status response for a wonder.
 
-    The status state-machine:
-      - "offline" — never launched (entry is None)
-      - "ready" — both API and UI respond; PIDs alive
-      - "starting" — PIDs alive but neither API nor UI responded yet
-      - "degraded" — one of API/UI up, the other down
-      - "error" — PIDs were spawned but all exited
+    State machine — health-checks are the source of truth, PID liveness
+    is only used to disambiguate "still warming up" from "process gone":
+
+      - "offline"   — never launched (entry is None)
+      - "ready"     — API + UI both respond
+      - "degraded"  — exactly one of API/UI up
+      - "starting"  — neither up yet, PID(s) still alive
+      - "error"     — neither up AND all spawned PIDs are gone
+
+    Why: ``institutum`` spawns a single ``npm start`` whose child
+    (dev-start.sh) launches bridge+Vite detached, then exits. The npm
+    process dies in seconds while the children live. With the old
+    "PID-alive is required" check, that path reported "error" even
+    though LabHub was perfectly healthy. Health wins.
     """
     spec = WONDER_LAUNCH_SPECS[wonder_id]
 
@@ -313,15 +410,15 @@ def _build_status(wonder_id: str, entry: dict[str, Any] | None) -> dict[str, Any
     api_ready = _http_probe(api_url.rstrip("/") + spec.api_health_path, spec.api_timeout_s)
     ui_ready = _http_probe(ui_url.rstrip("/") + "/", spec.ui_timeout_s)
 
-    if pids and not any_alive:
-        status = "error"
-        error_msg = "all launched processes exited"
-    elif api_ready and ui_ready:
+    if api_ready and ui_ready:
         status = "ready"
         error_msg = None
     elif api_ready or ui_ready:
         status = "degraded"
         error_msg = None
+    elif pids and not any_alive:
+        status = "error"
+        error_msg = "all launched processes exited"
     else:
         status = "starting"
         error_msg = None
@@ -384,9 +481,23 @@ def launch_wonder(wonder_id: str) -> dict[str, Any]:
     with _launch_lock:
         state = _load_state()
         existing = state.get(wonder_id)
-        if existing and any(_pid_alive(pid) for pid in existing.get("pids", {}).values()):
-            # Already running — no-op, return current status.
-            return _build_status(wonder_id, existing)
+        if existing:
+            # If we have a real PID alive (i.e. something we spawned is
+            # still running), treat as already-running.
+            if any(_pid_alive(pid) for pid in existing.get("pids", {}).values()):
+                return _build_status(wonder_id, existing)
+            # If we previously adopted an external server, also keep the
+            # entry (its health will be re-checked below).
+            if existing.get("external"):
+                return _build_status(wonder_id, existing)
+
+        # Pre-launch health check: if the user already started this
+        # wonder by hand, adopt it (no spawn, no clobber). LabHub
+        # specifically would kill the running instance because
+        # dev-start.sh kills the ports before relaunching.
+        adopted = _try_adopt_external(wonder_id, spec)
+        if adopted is not None:
+            return _build_status(wonder_id, adopted)
 
         # Spawn each proc; roll back partial spawn on any failure.
         spawned: dict[str, int] = {}
@@ -411,9 +522,14 @@ def launch_wonder(wonder_id: str) -> dict[str, Any]:
                     f"failed to open log {log_path}: {e}",
                     status=500,
                 )
+            # Resolve interpreter (e.g. python → backend/venv/bin/python)
+            # so the spawned process picks up the repo's deps.
+            argv = list(proc_spec.argv)
+            if argv and Path(argv[0]).name in ("python", "python3"):
+                argv[0] = _resolve_python_executable(str(proc_cwd))
             try:
                 proc = subprocess.Popen(
-                    list(proc_spec.argv),
+                    argv,
                     cwd=str(proc_cwd),
                     stdout=log_fh,
                     stderr=subprocess.STDOUT,
@@ -438,6 +554,7 @@ def launch_wonder(wonder_id: str) -> dict[str, Any]:
             "api_url": spec.api_url,
             "ui_url": spec.ui_url,
             "log_files": spawned_logs,
+            "external": False,
         }
         state[wonder_id] = entry
         _save_state()
