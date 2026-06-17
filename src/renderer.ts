@@ -1113,6 +1113,8 @@ export class Renderer {
         showStructure,
         showOps,
         showLabels,
+        showKnowledge,
+        showLabs,
       });
     } else {
       this.unitR.resetCoordProjector();

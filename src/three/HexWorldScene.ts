@@ -87,6 +87,12 @@ import {
 import { getTileYieldsGroup, rebuildTileYields, clearTileYields } from './TileYields3D.ts';
 import { getRiverGroup, rebuildRivers, clearRivers } from './Rivers3D.ts';
 import { createSkyDome, disposeSkyDome } from './SkyDome3D.ts';
+import {
+  getWonderPropsGroup,
+  rebuildWonderProps,
+  clearWonderProps,
+  setWonderVisible,
+} from './WonderProps3D.ts';
 
 export interface HexSceneRenderOptions {
   fogEnabled: boolean;
@@ -94,6 +100,8 @@ export interface HexSceneRenderOptions {
   showStructure: boolean;
   showOps: boolean;
   showLabels: boolean;
+  showKnowledge: boolean;
+  showLabs: boolean;
   animTime: number;
 }
 
@@ -178,6 +186,7 @@ export function createHexWorldScene(): Scene {
   scene.add(getTileYieldsGroup());
   scene.add(getUnitGroup());
   scene.add(getLabelGroup());
+  scene.add(getWonderPropsGroup());
 
   ensureTerrainAtlasLoad();
   // Props arriving flips areMountainPropsReady(), which participates in the
@@ -921,6 +930,14 @@ export function updateHexWorldScene(
   setUnitsVisible(true);
   rebuildUnits(state.world.units, (key) => state.world.tiles.get(key));
 
+  // Wonder 3D props (bibliotheca temple / institutum laboratorium). Layer
+  // gating mirrors the 2D canvas: bibliotheca under knowledge, institutum
+  // under labs. Both default-ON so the wonders stay visible when only the
+  // `structure` layer is enabled.
+  setWonderVisible('bibliotheca', opts.showKnowledge);
+  setWonderVisible('institutum',  opts.showLabs);
+  rebuildWonderProps(Array.from(state.world.tiles.values()));
+
   rebuildMapLabels(scene, state, opts.lod, opts.showLabels, (key) => state.world.tiles.get(key));
 }
 
@@ -932,6 +949,7 @@ export function disposeHexWorldScene(scene: Scene): void {
   clearResourceProps();
   clearTileYields();
   clearRivers();
+  clearWonderProps();
   disposeSkyDome();
   clearCityClusters();
   clearUnits();

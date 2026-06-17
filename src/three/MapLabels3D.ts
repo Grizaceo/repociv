@@ -2,10 +2,19 @@
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { Group, Scene } from 'three';
 import { type GameState } from '../game.ts';
-import { type Tile, tileKey } from '../types.ts';
+import { type Tile, tileKey, type WonderType } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+
+/** Short, all-caps label for a wonder type. Matches the 2D canvas style
+ *  (renderer.ts) so the WebGL and 2D views agree on what the wonder reads as. */
+function wonderLabel(t: WonderType): string | null {
+  if (t === 'bibliotheca') return 'BIBLIOTHECA';
+  if (t === 'institutum')  return 'LABHUB';
+  // gaceta has no tile in the current map (native, no district) → no label.
+  return null;
+}
 
 const labelGroup = new Group();
 labelGroup.name = 'map-labels';
@@ -68,7 +77,13 @@ function clearLabels(): void {
 
 function labelSignature(state: GameState, lod: string, show: boolean): string {
   if (!show) return 'off';
-  return `${lod}:${state.world.cities.map((c) => `${c.id}:${c.name}:${c.population}`).join('|')}`;
+  // Include wonder tiles in the signature so the wonder labels rebuild when
+  // the set of wonder districts changes.
+  const wonderSig = Array.from(state.world.tiles.values())
+    .filter((t) => t.revealed && t.district?.type === 'wonder' && t.district.wonderType)
+    .map((t) => `${tileKey(t.coord)}:${t.district!.wonderType}`)
+    .join('|');
+  return `${lod}:${state.world.cities.map((c) => `${c.id}:${c.name}:${c.population}`).join('|')}:wonders[${wonderSig}]`;
 }
 
 export function rebuildMapLabels(
@@ -126,6 +141,22 @@ export function rebuildMapLabels(
       hlabel.position.copy(hp);
       labelGroup.add(hlabel);
     }
+  }
+
+  // Wonder labels — one banner per district tile where district.type==='wonder'.
+  // Sits above the structure (the dais top) so the label doesn't overlap the
+  // gem/glow on the apex.
+  for (const tile of state.world.tiles.values()) {
+    if (!tile.revealed) continue;
+    if (tile.district?.type !== 'wonder' || !tile.district.wonderType) continue;
+    const label = wonderLabel(tile.district.wonderType);
+    if (!label) continue;
+    const elev = terrainElevation(tile.terrain);
+    const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    pos.y += HEX_SIZE * 0.65;
+    const lbl = makeLabel(label, 'map-label map-label-wonder');
+    lbl.position.copy(pos);
+    labelGroup.add(lbl);
   }
 
   if (!labelGroup.parent) scene.add(labelGroup);
