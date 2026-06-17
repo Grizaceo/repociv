@@ -74,6 +74,8 @@ from server.routes.wonder_ops import post_wonder_launch  # noqa: F401
 from server.routes.wonder_ops import post_wonder_stop  # noqa: F401
 from server.routes.wonder_ops import get_wonder_launch_status  # noqa: F401
 from server.routes.wonder_ops import get_wonder_launchable  # noqa: F401
+from server.routes.wonder_ops import post_wonder_connect  # noqa: F401
+from server.routes.wonder_ops import post_wonder_disconnect  # noqa: F401
 
 RouteContext = dict[str, Any]
 

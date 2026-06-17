@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -74,116 +75,11 @@ _STATIC_WONDER_MANIFESTS: list[dict[str, Any]] = [
         "events": {"emits": ["wonder.ready", "wonder.report.created"], "accepts": ["repociv.focus_city"]},
         "mcp": {"enabled": False, "server": None},
     },
-    {
-        "id": "bibliotheca",
-        "title": "Bibliotheca Alexandrina",
-        "kind": "iframe",
-        "category": "knowledge",
-        "version": "0.1.0",
-        "defaultEnabled": True,
-        "automationLevel": "passive",
-        "passiveMode": True,
-        "agenticMode": False,
-        "canSuggest": True,
-        "canAct": False,
-        "requiresConfirmation": True,
-        "health": {
-            "url": _env("VITE_LGB_BACKEND_URL", "http://127.0.0.1:3001") + "/api/health",
-            "timeoutMs": 4000,
-            "degradedAllowed": True,
-        },
-        "ui": {
-            "url": _env("VITE_WONDER_BIBLIOTHECA_URL", "http://127.0.0.1:5173"),
-            "preferredWidth": "70vw",
-            "preferredHeight": "75vh",
-            "sandbox": ["allow-scripts", "allow-same-origin", "allow-forms"],
-        },
-        "permissions": {
-            "readRepos": True,
-            "writeRepos": False,
-            "network": "loopback-only",
-            "requiresApprovalForMutations": True,
-        },
-        "optionalFeatures": [
-            {
-                "id": "graphSuggestions",
-                "label": "Sugerencias de relaciones",
-                "description": "El agente Astrónomo sugiere conexiones entre nodos",
-                "defaultEnabled": False,
-                "requiresUserOptIn": True,
-            },
-            {
-                "id": "aiRelationDiscovery",
-                "label": "Descubrimiento AI de relaciones",
-                "description": "Usa grafo offline para encontrar vínculos no obvios entre repos",
-                "defaultEnabled": False,
-                "requiresUserOptIn": True,
-            },
-        ],
-        "actions": [
-            {"id": "open", "label": "Entrar", "risk": "safe", "requiresUserOptIn": False},
-            {"id": "ask_agent", "label": "Preguntar a agente", "risk": "safe", "requiresUserOptIn": True},
-        ],
-        "events": {
-            "emits": ["wonder.ready", "wonder.selection", "wonder.report.created"],
-            "accepts": ["repociv.focus_city", "repociv.open_local_view"],
-        },
-        "mcp": {"enabled": False, "server": None},
-    },
-    {
-        "id": "institutum",
-        "title": "Institutum Laboratorium / LabHub",
-        "kind": "iframe",
-        "category": "lab",
-        "version": "0.1.0",
-        "defaultEnabled": True,
-        "automationLevel": "assist",
-        "passiveMode": True,
-        "agenticMode": True,
-        "canSuggest": True,
-        "canAct": False,
-        "requiresConfirmation": True,
-        "health": {
-            "url": _env("VITE_WONDER_INSTITUTUM_API_URL", "http://localhost:5281") + "/health",
-            "timeoutMs": 4000,
-            "degradedAllowed": True,
-        },
-        "ui": {
-            "url": _env("VITE_WONDER_INSTITUTUM_URL", "http://localhost:5280"),
-            "preferredWidth": "70vw",
-            "preferredHeight": "75vh",
-            "sandbox": ["allow-scripts", "allow-same-origin", "allow-forms"],
-        },
-        "permissions": {
-            "readRepos": False,
-            "writeRepos": False,
-            "network": "loopback-only",
-            "requiresApprovalForMutations": True,
-        },
-        "optionalFeatures": [
-            {
-                "id": "hardLocks",
-                "label": "Bloqueos duros",
-                "description": "Impide completamente la edición de ciudades con experimentos críticos",
-                "defaultEnabled": False,
-                "requiresUserOptIn": True,
-            }
-        ],
-        "actions": [
-            {"id": "open", "label": "Abrir Institutum", "risk": "safe", "requiresUserOptIn": False},
-            {
-                "id": "kill_experiment",
-                "label": "Detener experimento",
-                "risk": "manual",
-                "requiresUserOptIn": True,
-            },
-        ],
-        "events": {
-            "emits": ["wonder.ready", "labhub.experiment.started", "labhub.experiment.finished"],
-            "accepts": ["repociv.focus_city"],
-        },
-        "mcp": {"enabled": False, "server": None},
-    },
+    # NOTE: Bibliotheca and Institutum/LabHub are no longer built-in. They are
+    # connectable EXAMPLES (see src/wonders/exampleTemplates.ts). Out-of-the-box
+    # only La Gaceta (native) is registered; the user connects iframe wonders via
+    # POST /api/wonders/connect, which writes ~/.repociv/wonders/<id>.json picked
+    # up by _load_custom_manifests() below.
 ]
 
 
@@ -254,6 +150,80 @@ def list_wonders() -> list[dict[str, Any]]:
 def get_wonder(wonder_id: str) -> dict[str, Any] | None:
     """Return a single Wonder manifest by id, or None."""
     return _build_registry().get(wonder_id)
+
+
+# ─── Connect / disconnect (user-defined wonders) ──────────────────────────────
+
+_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+
+
+def _sanitize_id(raw: Any) -> str | None:
+    """Lowercase, allowlist-checked id. Blocks path traversal / weird chars."""
+    if not isinstance(raw, str):
+        return None
+    rid = raw.strip().lower()
+    return rid if _ID_RE.match(rid) else None
+
+
+def _expand_launch_paths(manifest: dict[str, Any]) -> None:
+    """Expand ~ and $ENV in launch.repo_dir + procs[].cwd in-place.
+
+    The launcher uses these paths verbatim (``Path(repo_dir)``), so we resolve
+    them server-side where $HOME is known. No-op when there is no launch block.
+    """
+    launch = manifest.get("launch")
+    if not isinstance(launch, dict):
+        return
+    rd = launch.get("repo_dir")
+    if isinstance(rd, str) and rd:
+        launch["repo_dir"] = os.path.expanduser(os.path.expandvars(rd))
+    procs = launch.get("procs")
+    if isinstance(procs, list):
+        for p in procs:
+            if isinstance(p, dict) and isinstance(p.get("cwd"), str) and p["cwd"]:
+                p["cwd"] = os.path.expanduser(os.path.expandvars(p["cwd"]))
+
+
+def save_custom_manifest(manifest: Any) -> tuple[dict[str, Any] | None, str | None]:
+    """Validate + persist a connected wonder to ~/.repociv/wonders/<id>.json.
+
+    Returns ``(manifest, None)`` on success or ``(None, reason)`` on validation
+    failure. Never raises on bad input — the route maps the reason to a 4xx.
+    """
+    if not isinstance(manifest, dict):
+        return None, "manifest must be a JSON object"
+    rid = _sanitize_id(manifest.get("id"))
+    if not rid:
+        return None, "invalid id (use [a-z0-9_-], max 64 chars, leading alnum)"
+    manifest = copy.deepcopy(manifest)
+    manifest["id"] = rid
+    if not _is_valid_manifest(manifest):
+        missing = sorted(_REQUIRED_TOP_LEVEL_KEYS - set(manifest.keys()))
+        return None, f"manifest missing required fields: {missing}"
+    _expand_launch_paths(manifest)
+    base = _custom_manifest_dir()
+    base.mkdir(parents=True, exist_ok=True)
+    path = base / f"{rid}.json"
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(path)
+    return manifest, None
+
+
+def delete_custom_manifest(wonder_id: Any) -> tuple[bool, str | None]:
+    """Remove ~/.repociv/wonders/<id>.json. Only touches the custom dir —
+    built-in manifests (gaceta) live in code and cannot be deleted here."""
+    rid = _sanitize_id(wonder_id)
+    if not rid:
+        return False, "invalid id"
+    path = _custom_manifest_dir() / f"{rid}.json"
+    if not path.exists():
+        return False, "not connected"
+    try:
+        path.unlink()
+    except OSError as e:
+        return False, str(e)
+    return True, None
 
 
 def check_wonder_health(wonder_id: str) -> dict[str, Any]:

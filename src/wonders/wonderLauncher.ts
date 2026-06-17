@@ -11,6 +11,8 @@
 // callers (wonderVignette, bootstrap) handle them via state, not exceptions.
 
 import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
+import { invalidateWondersCache } from './manifest.ts';
+import type { WonderManifest } from './types.ts';
 
 export type WonderLaunchStatusValue =
   | 'offline'
@@ -62,6 +64,7 @@ export async function launchWonder(id: string): Promise<WonderLaunchStatus> {
     res = await fetch(url, {
       method: 'POST',
       headers: bridgeHeaders({ 'Content-Type': 'application/json' }),
+      body: '{}',
     });
   } catch (e) {
     return {
@@ -118,8 +121,54 @@ export async function stopWonder(id: string): Promise<{ ok: boolean; id: string;
   const res = await fetch(url, {
     method: 'POST',
     headers: bridgeHeaders({ 'Content-Type': 'application/json' }),
+    body: '{}',
   });
   return (await res.json().catch(() => ({ ok: false, id }))) as { ok: boolean; id: string; error?: string };
+}
+
+export interface ConnectResult {
+  ok: boolean;
+  id?: string;
+  error?: string;
+}
+
+/** POST /api/wonders/connect — persist a manifest to ~/.repociv/wonders/<id>.json.
+ *  Invalidates the manifest cache so the next ensureWondersLoaded() refetches. */
+export async function connectWonder(manifest: WonderManifest): Promise<ConnectResult> {
+  try {
+    const res = await fetch(bridgeUrl('/api/wonders/connect'), {
+      method: 'POST',
+      headers: bridgeHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(manifest),
+    });
+    const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok || body.ok === false) {
+      return { ok: false, error: String(body.error ?? `HTTP ${res.status}`) };
+    }
+    invalidateWondersCache();
+    return { ok: true, id: String(body.id ?? manifest.id) };
+  } catch (e) {
+    return { ok: false, error: `failed to reach bridge: ${(e as Error).message ?? e}` };
+  }
+}
+
+/** POST /api/wonders/{id}/disconnect — remove the connected manifest. */
+export async function disconnectWonder(id: string): Promise<ConnectResult> {
+  try {
+    const res = await fetch(bridgeUrl(`/api/wonders/${encodeURIComponent(id)}/disconnect`), {
+      method: 'POST',
+      headers: bridgeHeaders({ 'Content-Type': 'application/json' }),
+      body: '{}',
+    });
+    const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok || body.ok === false) {
+      return { ok: false, error: String(body.error ?? `HTTP ${res.status}`) };
+    }
+    invalidateWondersCache();
+    return { ok: true, id };
+  } catch (e) {
+    return { ok: false, error: `failed to reach bridge: ${(e as Error).message ?? e}` };
+  }
 }
 
 /** Poll launch-status until the wonder is fully ready, or timeout.

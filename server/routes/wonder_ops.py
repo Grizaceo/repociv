@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from server import wonder_launcher
+from server import wonder_launcher, wonder_registry
 from server.wonder_launcher import WonderLauncherError
 
 
@@ -99,3 +99,39 @@ def post_wonder_stop(body: dict[str, Any], ctx: dict[str, Any]) -> tuple[int, An
 
 def get_wonder_launchable(_ctx: dict[str, Any]) -> tuple[int, Any]:
     return _ok({"launchable": wonder_launcher.list_launchable()})
+
+
+# ─── POST /api/wonders/connect ────────────────────────────────────────────────
+
+
+def post_wonder_connect(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
+    """Persist a user-connected wonder manifest and make it launchable.
+
+    Body: a WonderManifest (+ optional ``launch`` block). Writes
+    ~/.repociv/wonders/<id>.json and hot-reloads the launcher's custom specs
+    so auto-start works without a bridge restart. Loopback-only is enforced at
+    the launch layer; here we only gate the *launch* capability — connecting a
+    manifest is a local-disk write, already token-gated by do_POST.
+    """
+    manifest = body.get("manifest") if isinstance(body, dict) and "manifest" in body else body
+    saved, err = wonder_registry.save_custom_manifest(manifest)
+    if err is not None:
+        return _err(400, err, "invalid_manifest")
+    wonder_launcher.reload_custom_specs()
+    assert saved is not None
+    return _ok({"id": saved["id"], "manifest": saved})
+
+
+# ─── POST /api/wonders/{id}/disconnect ────────────────────────────────────────
+
+
+def post_wonder_disconnect(body: dict[str, Any], ctx: dict[str, Any]) -> tuple[int, Any]:
+    wonder_id = _wonder_id_from(body, ctx)
+    if not wonder_id:
+        return _err(400, "missing wonder id (in URL path or body.id)")
+    ok, err = wonder_registry.delete_custom_manifest(wonder_id)
+    if not ok:
+        code = 404 if err == "not connected" else 400
+        return _err(code, err or "disconnect failed", "disconnect_failed")
+    wonder_launcher.reload_custom_specs()
+    return _ok({"id": wonder_id})

@@ -49,11 +49,23 @@ describe('WonderProps3D', () => {
   it('rebuilds nothing when no wonder tiles are present', () => {
     rebuildWonderProps([plainSacredTile({ q: 0, r: 0 })]);
     const g = getWonderPropsGroup();
-    // Both sub-groups (bibliotheca, institutum) exist but are empty.
-    expect(g.children).toHaveLength(2);
+    // Three sub-groups (bibliotheca, institutum, generic) exist but are empty.
+    expect(g.children).toHaveLength(3);
     expect(g.children[0]!.children).toHaveLength(0);
     expect(g.children[1]!.children).toHaveLength(0);
+    expect(g.children[2]!.children).toHaveLength(0);
     expect(_wonderPropsSignature()).toBe('');
+  });
+
+  it('builds a generic monument for a user-connected wonder', () => {
+    const tiles = [wonderTile({ q: 0, r: -1 }, 'mi-servicio')];
+    rebuildWonderProps(tiles);
+    const g = getWonderPropsGroup();
+    // Sub-group 2 = generic
+    expect(g.children[0]!.children).toHaveLength(0);
+    expect(g.children[1]!.children).toHaveLength(0);
+    expect(g.children[2]!.children).toHaveLength(1);
+    expect(_wonderPropsSignature()).toContain('mi-servicio');
   });
 
   it('builds a bibliotheca instance on a bibliotheca wonder tile', () => {

@@ -1220,7 +1220,13 @@ export class Renderer {
             ctx.font = 'bold 10px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(w.wonderType === 'bibliotheca' ? 'B' : 'I', sx, sy + 1);
+            const glyph =
+              w.wonderType === 'bibliotheca'
+                ? 'B'
+                : w.wonderType === 'institutum'
+                  ? 'I'
+                  : (w.name?.[0] ?? 'W').toUpperCase();
+            ctx.fillText(glyph, sx, sy + 1);
           }
         }
       }

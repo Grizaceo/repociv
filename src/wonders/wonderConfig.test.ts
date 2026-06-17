@@ -7,6 +7,7 @@ import {
   loadWonderConfig,
   isFeatureEnabled,
 } from '../wonders/wonderConfig.ts';
+import { WONDER_EXAMPLES, getWonderExample } from '../wonders/exampleTemplates.ts';
 
 describe('wonder defaults', () => {
   describe('gaceta', () => {
@@ -56,17 +57,26 @@ describe('wonder defaults', () => {
   });
 });
 
-describe('WONDER_MANIFESTS', () => {
+describe('WONDER_MANIFESTS (static) + example templates', () => {
+  // bibliotheca/institutum are no longer hardcoded built-ins; they ship as
+  // connectable examples. Assertions about them now read the example manifests.
+  const biblio = getWonderExample('bibliotheca')!.manifest;
+  const inst = getWonderExample('institutum')!.manifest;
+
+  it('static registry ships only the native gaceta', () => {
+    expect(Object.keys(WONDER_MANIFESTS)).toEqual(['gaceta']);
+  });
+
   it('gaceta manifest automationLevel is passive', () => {
     expect(WONDER_MANIFESTS.gaceta.automationLevel).toBe('passive');
   });
 
-  it('bibliotheca manifest automationLevel is passive', () => {
-    expect(WONDER_MANIFESTS.bibliotheca.automationLevel).toBe('passive');
+  it('bibliotheca example automationLevel is passive', () => {
+    expect(biblio.automationLevel).toBe('passive');
   });
 
-  it('institutum manifest automationLevel is assist', () => {
-    expect(WONDER_MANIFESTS.institutum.automationLevel).toBe('assist');
+  it('institutum example automationLevel is assist', () => {
+    expect(inst.automationLevel).toBe('assist');
   });
 
   it('manifest capability flags match optionality model', () => {
@@ -74,18 +84,19 @@ describe('WONDER_MANIFESTS', () => {
     expect(WONDER_MANIFESTS.gaceta.agenticMode).toBe(false);
     expect(WONDER_MANIFESTS.gaceta.canAct).toBe(false);
 
-    expect(WONDER_MANIFESTS.bibliotheca.canSuggest).toBe(true);
-    expect(WONDER_MANIFESTS.bibliotheca.canAct).toBe(false);
-    expect(WONDER_MANIFESTS.bibliotheca.requiresConfirmation).toBe(true);
+    expect(biblio.canSuggest).toBe(true);
+    expect(biblio.canAct).toBe(false);
+    expect(biblio.requiresConfirmation).toBe(true);
 
-    expect(WONDER_MANIFESTS.institutum.agenticMode).toBe(true);
-    expect(WONDER_MANIFESTS.institutum.canSuggest).toBe(true);
-    expect(WONDER_MANIFESTS.institutum.canAct).toBe(false);
-    expect(WONDER_MANIFESTS.institutum.requiresConfirmation).toBe(true);
+    expect(inst.agenticMode).toBe(true);
+    expect(inst.canSuggest).toBe(true);
+    expect(inst.canAct).toBe(false);
+    expect(inst.requiresConfirmation).toBe(true);
   });
 
-  it('all optionalFeatures require opt-in', () => {
-    for (const manifest of Object.values(WONDER_MANIFESTS)) {
+  it('all optionalFeatures require opt-in (static + examples)', () => {
+    const manifests = [...Object.values(WONDER_MANIFESTS), ...WONDER_EXAMPLES.map((e) => e.manifest)];
+    for (const manifest of manifests) {
       for (const feature of manifest.optionalFeatures) {
         expect(feature.requiresUserOptIn).toBe(true);
         expect(feature.defaultEnabled).toBe(false);
@@ -106,13 +117,13 @@ describe('WONDER_MANIFESTS', () => {
   });
 
   it('institutum kill_experiment action requires opt-in', () => {
-    const action = WONDER_MANIFESTS.institutum.actions.find((a) => a.id === 'kill_experiment');
+    const action = inst.actions.find((a) => a.id === 'kill_experiment');
     expect(action).toBeDefined();
     expect(action!.requiresUserOptIn).toBe(true);
   });
 
   it('institutum hardLocks optional feature requires opt-in', () => {
-    const feature = WONDER_MANIFESTS.institutum.optionalFeatures.find((f) => f.id === 'hardLocks');
+    const feature = inst.optionalFeatures.find((f) => f.id === 'hardLocks');
     expect(feature).toBeDefined();
     expect(feature!.requiresUserOptIn).toBe(true);
     expect(feature!.defaultEnabled).toBe(false);

@@ -14,6 +14,11 @@ Cómo agregar tus propias Maravillas al launcher de RepoCiv.
 que describe los comandos CLI a lanzar. Reiniciás el bridge y tu
 maravilla aparece en `GET /api/wonders` con auto-start disponible.
 
+> **Atajo desde la UI:** **Palacio → pestaña "Maravillas"** trae tarjetas de
+> ejemplo (Bibliotheca, LabHub) con un botón **Conectar** que escribe ese JSON
+> por vos (vía `POST /api/wonders/connect`) y recarga el launcher sin reiniciar
+> el bridge. Nada viene pre-instalado: solo aparece lo que conectás.
+
 ---
 
 ## 1. Quick start (mínimo viable)
@@ -263,7 +268,7 @@ Logs en `~/.repociv/wonders/logs/<tu-log>`.
 | `spawn_failed` 500 | El binario en `argv[0]` no está en `$PATH` | Usá un path absoluto, o asegurate que el venv está activado |
 | Estado `error` después de 20s | Todos los procesos murieron y no responden los health-checks | Revisá `~/.repociv/wonders/logs/<log>` |
 | Estado `degraded` | Solo uno de api/ui responde | El Vite puede tardar en compilar; esperá. Si persiste, revisá que `ui_url` sea correcto |
-| Tu maravilla no aparece en el frontend | El `WONDER_MANIFESTS` del frontend está hardcodeado | Limitación conocida — el backend la ve y la puede lanzar, pero el UI list usa el manifest estático. Próxima iteración del frontend va a fetchear `/api/wonders` |
+| Tu maravilla no aparece en el frontend | El registry no se rehidrató | El frontend fetchea `GET /api/wonders` en el arranque, así que las custom **sí** aparecen. Si la conectaste con el dashboard abierto, recargá (o reabrí el Palacio); para que tome el tile del mapa, recargá la página |
 
 ---
 
