@@ -81,6 +81,7 @@ import { tileKey } from './types.ts';
 import type { LocalRoom, LocalNpc } from './types.ts';
 import { clearChat } from './ui/chat.ts';
 import { openOnboardingPanel } from './ui/onboardingPanel.ts';
+import { mountHermesStatusBanner } from './ui/hermesStatusBanner.ts';
 import { axialToPixel } from './hex.ts';
 import { areMountainPropsSettled } from './three/MountainProps3D.ts';
 import { areForestPropsSettled } from './three/ForestProps3D.ts';
@@ -294,6 +295,11 @@ async function bootstrap() {
   }, 3200);
 
   await openOnboardingPanel();
+
+  // Mount the Hermes degraded-mode banner (Fase 1 / audit 1.1). Runs
+  // its own poll loop; banner stays mounted across scene changes until
+  // Hermes comes back or the user dismisses for the session.
+  void mountHermesStatusBanner();
 
   const world = await generateWorld();
   // `?reveal=all` lifts fog of war for capture/audit sessions: the golden

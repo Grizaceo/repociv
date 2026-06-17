@@ -668,3 +668,20 @@ def post_model_override(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int
         return 400, {"error": "Both 'provider' and 'model' are required"}
     _ar.set_model_override(unit_id, provider, model)
     return 200, {"ok": True, "unit": unit_id, "provider": provider, "model": model}
+
+
+# ─── Hermes status (Fase 1 / audit 1.1) ──────────────────────────────────────
+# Endpoint that the frontend's "degraded mode" banner consults. Returns
+# a structured reachability object (always 200, even when Hermes is down,
+# so the UI can read the body and decide what to render). See
+# server/hermes_status.py for the probe + cache details.
+def get_hermes_status_route(_ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/hermes/status — Hermes reachability + cache metadata.
+
+    Always returns 200 with a structured body. The UI reads ``available``
+    to decide whether to show the "Hermes ausente" banner and
+    ``error`` / ``latencyMs`` to populate the degraded-mode details.
+    """
+    from server.hermes_status import probe_hermes
+    status = probe_hermes()
+    return 200, status

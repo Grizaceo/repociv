@@ -681,6 +681,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/improve/reflect": _routes.get_improve_reflect,
             "/improve/proposals": _routes.get_improve_proposals,
             "/providers/live": _routes.get_providers_live,
+            "/api/hermes/status": _routes.get_hermes_status_route,
             "/ws": _routes.get_ws_info,
             "/api/news/latest": _routes.get_latest_news,
             "/api/wonders": _routes.get_wonders,

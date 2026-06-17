@@ -46,6 +46,7 @@ from server.routes.core import post_pending_state  # noqa: F401
 from server.routes.core import _validate_unit_id  # noqa: F401
 from server.routes.core import post_session_reset  # noqa: F401
 from server.routes.core import post_model_override  # noqa: F401
+from server.routes.core import get_hermes_status_route  # noqa: F401
 from server.routes.tasks import get_tasks  # noqa: F401
 from server.routes.tasks import get_task_by_key  # noqa: F401
 from server.routes.tasks import get_improve_reflect  # noqa: F401
