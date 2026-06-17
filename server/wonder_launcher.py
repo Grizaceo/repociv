@@ -76,6 +76,157 @@ INSTITUTUM_DIR = _expand(
     )
 )
 
+# ─── Custom launch specs (user-defined marvelas) ──────────────────────────────
+#
+# Default wonder specs (``WONDER_LAUNCH_SPECS`` below) are hardcoded
+# for the two built-ins (bibliotheca, institutum). Users can add their
+# own marvelas by dropping a WonderManifest at
+# ``$REPOCIV_WONDERS_DIR/<id>.json`` (default ``~/.repociv/wonders/``)
+# with an OPTIONAL ``launch`` field that describes the CLI commands
+# to spawn. See ``docs/CUSTOM_WONDERS.md`` for the user-facing guide.
+#
+# Design notes:
+# - Custom specs are loaded at import time. Restart the bridge to
+#   pick up edits.
+# - On id conflict, the custom spec wins — lets users override
+#   bibliotheca/institutum defaults without code changes.
+# - Validation is strict: malformed specs are skipped (with a stderr
+#   warning), never crash the bridge.
+
+
+def _custom_wonders_dir() -> Path:
+    """Resolve the directory that holds user-defined wonder manifests.
+
+    Honors ``REPOCIV_WONDERS_DIR`` so tests can isolate the loader to
+    ``tmp_path``. Falls back to ``~/.repociv/wonders/``.
+    """
+    env_dir = os.environ.get("REPOCIV_WONDERS_DIR", "").strip()
+    if env_dir:
+        return Path(env_dir).expanduser()
+    return Path.home() / ".repociv" / "wonders"
+
+
+def _validate_launch_field(raw: Any) -> tuple[WonderSpec | None, str | None]:
+    """Parse + validate a ``launch`` dict from a custom wonder manifest.
+
+    Returns ``(spec, None)`` on success or ``(None, reason)`` on failure.
+    The reason is short, lowercase, and safe to log (no user data).
+    """
+    if not isinstance(raw, dict):
+        return None, "launch must be an object"
+    repo_dir = raw.get("repo_dir")
+    if not isinstance(repo_dir, str) or not repo_dir.strip():
+        return None, "launch.repo_dir missing or not a string"
+    raw_procs = raw.get("procs")
+    if not isinstance(raw_procs, list) or not raw_procs:
+        return None, "launch.procs missing or not a non-empty list"
+    procs: list[ProcSpec] = []
+    for i, p in enumerate(raw_procs):
+        if not isinstance(p, dict):
+            return None, f"launch.procs[{i}] not an object"
+        argv = p.get("argv")
+        if not isinstance(argv, list) or not argv:
+            return None, f"launch.procs[{i}].argv missing or empty"
+        if not all(isinstance(a, str) and a for a in argv):
+            return None, f"launch.procs[{i}].argv must be a list of non-empty strings"
+        name = str(p.get("name") or f"proc-{i}")
+        cwd = str(p.get("cwd") or repo_dir)
+        log = str(p.get("log") or f"{name}.log")
+        env_raw = p.get("env") or {}
+        if not isinstance(env_raw, dict):
+            return None, f"launch.procs[{i}].env must be an object"
+        env = {str(k): str(v) for k, v in env_raw.items()}
+        procs.append(
+            ProcSpec(name=name, argv=tuple(argv), cwd=cwd, log=log, env=env)
+        )
+    api_url = str(raw.get("api_url") or "http://127.0.0.1:1")
+    ui_url = str(raw.get("ui_url") or api_url)
+    api_health_path = str(raw.get("api_health_path") or "/health")
+    return (
+        WonderSpec(
+            id="<pending>",  # filled by caller from the manifest id
+            repo_dir=repo_dir,
+            procs=tuple(procs),
+            api_url=api_url,
+            api_health_path=api_health_path,
+            ui_url=ui_url,
+        ),
+        None,
+    )
+
+
+def _load_custom_launch_specs() -> dict[str, WonderSpec]:
+    """Read ``$REPOCIV_WONDERS_DIR/*.json`` and extract launch specs.
+
+    Each file is a WonderManifest; we read its optional ``launch``
+    field. Manifests without a launch field are ignored (they may
+    still be displayable via the registry's ``/wonders`` endpoint,
+    but they cannot be auto-launched).
+
+    Malformed entries are skipped with a stderr warning — the bridge
+    must keep running even if one manifest is broken.
+    """
+    out: dict[str, WonderSpec] = {}
+    base = _custom_wonders_dir()
+    if not base.exists() or not base.is_dir():
+        return out
+    for path in sorted(base.glob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as e:
+            print(
+                f"[wonder_launcher] skipping {path.name}: {e}",
+                file=__import__("sys").stderr,
+            )
+            continue
+        if not isinstance(data, dict):
+            print(
+                f"[wonder_launcher] skipping {path.name}: not a JSON object",
+                file=__import__("sys").stderr,
+            )
+            continue
+        wid = str(data.get("id") or path.stem)
+        launch_raw = data.get("launch")
+        if launch_raw is None:
+            continue  # display-only manifest; no auto-launch
+        spec, err = _validate_launch_field(launch_raw)
+        if err:
+            print(
+                f"[wonder_launcher] skipping launch spec in {path.name} (id={wid}): {err}",
+                file=__import__("sys").stderr,
+            )
+            continue
+        assert spec is not None
+        # Fill in the real id from the manifest (overrides the placeholder).
+        out[wid] = WonderSpec(
+            id=wid,
+            repo_dir=spec.repo_dir,
+            procs=spec.procs,
+            api_url=spec.api_url,
+            api_health_path=spec.api_health_path,
+            ui_url=spec.ui_url,
+        )
+        if wid in WONDER_LAUNCH_SPECS:
+            print(
+                f"[wonder_launcher] custom spec for {wid!r} overrides the built-in",
+                file=__import__("sys").stderr,
+            )
+    return out
+
+
+def reset_custom_specs_for_tests() -> None:
+    """Reload custom launch specs from disk. Tests use this after
+    monkeypatching ``REPOCIV_WONDERS_DIR`` to point at a tmp dir.
+    """
+    global _CUSTOM_LAUNCH_SPECS
+    _CUSTOM_LAUNCH_SPECS = _load_custom_launch_specs()
+
+
+def _effective_specs() -> dict[str, WonderSpec]:
+    """Base + custom, custom wins on conflict. Internal accessor."""
+    return {**WONDER_LAUNCH_SPECS, **_CUSTOM_LAUNCH_SPECS}
+
+
 # ─── Allowlist (server-side fixed argv — never from the client) ───────────────
 
 
@@ -155,6 +306,13 @@ WONDER_LAUNCH_SPECS: dict[str, WonderSpec] = {
 }
 
 ALLOWED_IDS: frozenset[str] = frozenset(WONDER_LAUNCH_SPECS.keys())
+
+
+# ─── Custom launch specs (loaded after base specs are defined) ───────────────
+# This MUST run after WONDER_LAUNCH_SPECS / WonderSpec are defined, since
+# _load_custom_launch_specs() instantiates WonderSpec objects. Done here
+# (not at the top of the module) so the dataclass is in scope.
+_CUSTOM_LAUNCH_SPECS: dict[str, WonderSpec] = _load_custom_launch_specs()
 
 
 # ─── State persistence ───────────────────────────────────────────────────────
@@ -379,17 +537,18 @@ class WonderLauncherError(Exception):
 
 
 def get_spec(wonder_id: str) -> WonderSpec:
-    if wonder_id not in WONDER_LAUNCH_SPECS:
+    specs = _effective_specs()
+    if wonder_id not in specs:
         raise WonderLauncherError(
             "unknown_wonder",
-            f"unknown wonder id: {wonder_id!r}. Allowed: {sorted(ALLOWED_IDS)}",
+            f"unknown wonder id: {wonder_id!r}. Allowed: {sorted(specs.keys())}",
             status=404,
         )
-    return WONDER_LAUNCH_SPECS[wonder_id]
+    return specs[wonder_id]
 
 
 def list_launchable() -> list[str]:
-    return sorted(ALLOWED_IDS)
+    return sorted(_effective_specs().keys())
 
 
 def _build_status(wonder_id: str, entry: dict[str, Any] | None) -> dict[str, Any]:
@@ -418,7 +577,7 @@ def _build_status(wonder_id: str, entry: dict[str, Any] | None) -> dict[str, Any
     "PID-alive is required" check, that path reported "error" even
     though LabHub was perfectly healthy. Health wins.
     """
-    spec = WONDER_LAUNCH_SPECS[wonder_id]
+    spec = get_spec(wonder_id)
 
     if entry is None:
         return {

@@ -26,6 +26,7 @@ from server.wonder_launcher import (
     WonderLauncherError,
     launch_wonder,
     list_launchable,
+    reset_custom_specs_for_tests,
     reset_state_for_tests,
     stop_wonder,
     wonder_launch_status,
@@ -742,3 +743,282 @@ def test_procspec_env_default_is_empty():
     assert a.env is not b.env
     assert a.env == {}
     assert b.env == {}
+
+
+# ─── Custom launch specs (P3 — user-defined marvelas) ───────────────────────
+
+
+@pytest.fixture
+def custom_wonder_dir(tmp_path, monkeypatch):
+    """Point REPOCIV_WONDERS_DIR at a tmp dir and reload the launcher cache.
+
+    Tests write a manifest JSON into this dir, then call
+    ``reset_custom_specs_for_tests()`` to make the launcher pick it up.
+    """
+    d = tmp_path / "wonders"
+    d.mkdir()
+    monkeypatch.setenv("REPOCIV_WONDERS_DIR", str(d))
+    yield d
+    # The launcher keeps the loaded specs in a module-level cache, so
+    # we also need to clear it for the next test (in case the next test
+    # uses a different dir).
+    monkeypatch.setattr(wonder_launcher, "_CUSTOM_LAUNCH_SPECS", {})
+    monkeypatch.delenv("REPOCIV_WONDERS_DIR", raising=False)
+
+
+def test_load_custom_specs_empty_when_dir_missing(tmp_path, monkeypatch):
+    """No dir → no specs, never crashes."""
+    monkeypatch.setenv("REPOCIV_WONDERS_DIR", str(tmp_path / "nonexistent"))
+    specs = wonder_launcher._load_custom_launch_specs()
+    assert specs == {}
+
+
+def test_load_custom_specs_ignores_manifest_without_launch(custom_wonder_dir):
+    """A manifest with no ``launch`` field is display-only — not auto-launchable.
+
+    The launcher skips it; the registry keeps it for /wonders.
+    """
+    (custom_wonder_dir / "mi-maravilla.json").write_text(
+        json.dumps(
+            {
+                "id": "mi-maravilla",
+                "title": "Mi Maravilla",
+                "kind": "iframe",
+                "category": "knowledge",
+                "version": "0.1.0",
+                "defaultEnabled": True,
+                "automationLevel": "passive",
+                "ui": {},
+                "permissions": {"readRepos": False, "writeRepos": False,
+                                "network": "loopback-only",
+                                "requiresApprovalForMutations": False},
+                "optionalFeatures": [],
+                "actions": [],
+                "events": {"emits": [], "accepts": []},
+                "mcp": {"enabled": False, "server": None},
+            }
+        )
+    )
+    specs = wonder_launcher._load_custom_launch_specs()
+    assert specs == {}
+
+
+def test_load_custom_specs_parses_valid_launch(custom_wonder_dir):
+    """A manifest with a valid ``launch`` field becomes a launchable spec."""
+    (custom_wonder_dir / "mi-maravilla.json").write_text(
+        json.dumps(
+            {
+                "id": "mi-maravilla",
+                "title": "Mi Maravilla",
+                "launch": {
+                    "repo_dir": "/tmp/mi-maravilla",
+                    "api_url": "http://127.0.0.1:9999",
+                    "api_health_path": "/api/health",
+                    "ui_url": "http://127.0.0.1:9998",
+                    "procs": [
+                        {
+                            "name": "bridge",
+                            "argv": ["python", "-m", "backend.bridge"],
+                            "log": "bridge.log",
+                            "env": {"MY_HOST": "0.0.0.0"},
+                        },
+                        {
+                            "name": "ui",
+                            "argv": ["npm", "run", "dev"],
+                            "cwd": "/tmp/mi-maravilla/frontend",
+                            "log": "ui.log",
+                        },
+                    ],
+                },
+            }
+        )
+    )
+    specs = wonder_launcher._load_custom_launch_specs()
+    assert "mi-maravilla" in specs
+    spec = specs["mi-maravilla"]
+    assert spec.id == "mi-maravilla"
+    assert spec.repo_dir == "/tmp/mi-maravilla"
+    assert spec.api_url == "http://127.0.0.1:9999"
+    assert spec.ui_url == "http://127.0.0.1:9998"
+    assert spec.api_health_path == "/api/health"
+    assert len(spec.procs) == 2
+    assert spec.procs[0].name == "bridge"
+    assert spec.procs[0].argv == ("python", "-m", "backend.bridge")
+    assert spec.procs[0].env == {"MY_HOST": "0.0.0.0"}
+    assert spec.procs[1].cwd == "/tmp/mi-maravilla/frontend"
+
+
+def test_load_custom_specs_rejects_malformed(custom_wonder_dir, capfd):
+    """Malformed launch specs are skipped (with a stderr warning), not crashed."""
+    (custom_wonder_dir / "bad1.json").write_text(json.dumps({"id": "bad1"}))  # no launch
+    (custom_wonder_dir / "bad2.json").write_text(
+        json.dumps({"id": "bad2", "launch": "not a dict"})
+    )
+    (custom_wonder_dir / "bad3.json").write_text(
+        json.dumps({"id": "bad3", "launch": {"repo_dir": "/tmp", "procs": []}})
+    )
+    (custom_wonder_dir / "bad4.json").write_text(json.dumps("not even a dict"))
+    (custom_wonder_dir / "bad5.json").write_text("{not valid json}")
+    specs = wonder_launcher._load_custom_launch_specs()
+    assert specs == {}
+    # We should have logged 4 warnings (bad2, bad3, bad4, bad5).
+    err = capfd.readouterr().err
+    assert "skipping launch spec in bad2.json" in err
+    assert "skipping launch spec in bad3.json" in err
+    assert "skipping bad4.json" in err
+    assert "skipping bad5.json" in err
+
+
+def test_load_custom_specs_uses_filename_as_id_fallback(custom_wonder_dir):
+    """If the manifest has no ``id``, use the filename stem."""
+    (custom_wonder_dir / "fallback-id.json").write_text(
+        json.dumps(
+            {
+                # no "id" field — fallback to stem
+                "title": "Fallback",
+                "launch": {
+                    "repo_dir": "/tmp/fb",
+                    "procs": [{"name": "x", "argv": ["echo", "hi"]}],
+                },
+            }
+        )
+    )
+    specs = wonder_launcher._load_custom_launch_specs()
+    assert "fallback-id" in specs
+    assert specs["fallback-id"].id == "fallback-id"
+
+
+def test_custom_spec_overrides_builtin(monkeypatch, tmp_path, capfd):
+    """A custom spec with the same id as a built-in wins (with a warning)."""
+    # Create a temp config dir + LGB repo so launch_wonder can find them
+    cfg = tmp_path / "cfg"
+    cfg.mkdir()
+    monkeypatch.setenv("REPOCIV_CONFIG_DIR", str(cfg))
+    custom = tmp_path / "wonders"
+    custom.mkdir()
+    monkeypatch.setenv("REPOCIV_WONDERS_DIR", str(custom))
+    lgb = tmp_path / "lgb"
+    lgb.mkdir()
+    (lgb / "frontend").mkdir()
+    monkeypatch.setenv("REPOCIV_WONDER_BIBLIOTHECA_DIR", str(lgb))
+    monkeypatch.setattr(
+        wonder_launcher, "WONDERS_DIR", cfg / "wonders"
+    )
+    monkeypatch.setattr(wonder_launcher, "LAUNCHED_JSON", cfg / "wonders" / "launched.json")
+    monkeypatch.setattr(wonder_launcher, "LOGS_DIR", cfg / "wonders" / "logs")
+    # Custom manifest that overrides the built-in bibliotheca
+    (custom / "bibliotheca.json").write_text(
+        json.dumps(
+            {
+                "id": "bibliotheca",
+                "title": "My Bibliotheca",
+                "launch": {
+                    "repo_dir": str(lgb),
+                    "api_url": "http://127.0.0.1:9999",
+                    "ui_url": "http://127.0.0.1:9998",
+                    "procs": [{"name": "x", "argv": ["echo", "custom"]}],
+                },
+            }
+        )
+    )
+    reset_custom_specs_for_tests()
+    # Should be in launchable
+    assert "bibliotheca" in list_launchable()
+    # The custom spec wins on the api_url field
+    spec = wonder_launcher.get_spec("bibliotheca")
+    assert spec.api_url == "http://127.0.0.1:9999"
+    # And a warning was logged
+    err = capfd.readouterr().err
+    assert "overrides the built-in" in err
+
+
+def test_list_launchable_includes_custom(custom_wonder_dir):
+    """list_launchable merges base + custom."""
+    (custom_wonder_dir / "extra1.json").write_text(
+        json.dumps({"id": "extra1", "launch": {"repo_dir": "/tmp",
+                                                "procs": [{"argv": ["true"]}]}})
+    )
+    (custom_wonder_dir / "extra2.json").write_text(
+        json.dumps({"id": "extra2", "launch": {"repo_dir": "/tmp",
+                                                "procs": [{"argv": ["true"]}]}})
+    )
+    reset_custom_specs_for_tests()
+    launchable = list_launchable()
+    assert "bibliotheca" in launchable
+    assert "institutum" in launchable
+    assert "extra1" in launchable
+    assert "extra2" in launchable
+
+
+def test_launch_wonder_uses_custom_spec(fake_repos, fake_popen, custom_wonder_dir, monkeypatch):
+    """End-to-end: a custom wonder with a valid launch spec actually spawns its procs."""
+    # Use a different fake repo per custom wonder
+    custom_repo = fake_repos["cfg"].parent / "mi-maravilla"
+    custom_repo.mkdir()
+    (custom_repo / "frontend").mkdir()
+    (custom_repo / "backend" / "maravilla_bridge").parent.mkdir(parents=True, exist_ok=True)
+    (custom_repo / "backend" / "maravilla_bridge").touch()
+    (custom_wonder_dir / "mi-maravilla.json").write_text(
+        json.dumps(
+            {
+                "id": "mi-maravilla",
+                "title": "Mi Maravilla",
+                "launch": {
+                    "repo_dir": str(custom_repo),
+                    "api_url": "http://127.0.0.1:9999",
+                    "ui_url": "http://127.0.0.1:9998",
+                    "procs": [
+                        {
+                            "name": "bridge",
+                            "argv": ["python", "-m", "backend.maravilla_bridge"],
+                            "cwd": str(custom_repo),
+                            "log": "mm-bridge.log",
+                            "env": {"MM_HOST": "0.0.0.0"},
+                        },
+                        {
+                            "name": "ui",
+                            "argv": ["npm", "run", "dev"],
+                            "cwd": str(custom_repo / "frontend"),
+                            "log": "mm-ui.log",
+                        },
+                    ],
+                },
+            }
+        )
+    )
+    reset_custom_specs_for_tests()
+    monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: False)
+    result = launch_wonder("mi-maravilla")
+    assert fake_popen["n"] == 2
+    pids = {p[0][0] if isinstance(p[0], list) else p[0][0] for p in fake_popen["spawned"]}
+    # Verify env propagation on the bridge proc
+    for argv, kwargs in fake_popen["spawned"]:
+        if "maravilla_bridge" in str(argv):
+            assert kwargs["env"].get("MM_HOST") == "0.0.0.0"
+            break
+    # Status reflects starting (no API/UI up)
+    assert result["status"] == "starting"
+    assert "bridge" in result["pids"]
+    assert "ui" in result["pids"]
+
+
+def test_launch_wonder_custom_spec_repo_not_found(custom_wonder_dir, fake_popen, monkeypatch):
+    """A custom wonder with a missing repo_dir returns 412, no spawn."""
+    (custom_wonder_dir / "ghost.json").write_text(
+        json.dumps(
+            {
+                "id": "ghost",
+                "launch": {
+                    "repo_dir": "/nonexistent/path/ghost",
+                    "procs": [{"name": "x", "argv": ["true"]}],
+                },
+            }
+        )
+    )
+    reset_custom_specs_for_tests()
+    with pytest.raises(WonderLauncherError) as exc:
+        launch_wonder("ghost")
+    assert exc.value.status == 412
+    assert "ghost" in exc.value.message.lower() or "not found" in exc.value.message.lower()
+    assert fake_popen["n"] == 0  # no spawn
+

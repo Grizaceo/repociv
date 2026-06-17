@@ -189,11 +189,18 @@ wonder.notification — notificación (info/warn/critical)
 
 ## 5. Cómo agregar una nueva Maravilla
 
+RepoCiv soporta dos modos de agregar Maravillas:
+
+### 5.1 Built-in (contribuir al repo)
+
+Para Maravillas que van a vivir en el código fuente de RepoCiv:
+
 1. Crear o identificar la app externa (o componente nativo)
-2. Declarar su `WonderManifest` en `src/wonders/wonderConfig.ts`
+2. Declarar su `WonderManifest` en `src/wonders/manifest.ts`
 3. Si es iframe, agregar URL en `src/wonderEnv.ts` con env var `VITE_WONDER_*_URL`
-4. Registrar en `WONDER_MANIFESTS`
-5. Actualizar capitalPanel.ts si necesita tab propia
+4. Si requiere auto-start, agregar `WonderSpec` + `ProcSpec` en
+   `server/wonder_launcher.py: WONDER_LAUNCH_SPECS`
+5. Actualizar `src/ui/capitalPanel.ts` si necesita tab propia
 6. Documentar en este archivo
 
 **NO agregar una nueva Maravilla antes de:**
@@ -201,10 +208,33 @@ wonder.notification — notificación (info/warn/critical)
 - Verificar que `npm run check` + lint + tests pasen
 - Documentar el flujo de opt-in
 
+### 5.2 Custom (user-defined, sin tocar el repo)
+
+Para Maravillas propias del usuario — apps personales, forks,
+experimentos — que viven como manifests en `~/.repociv/wonders/`:
+
+1. Crear `~/.repociv/wonders/<id>.json` con el `WonderManifest` +
+   campo opcional `launch` (ver [`CUSTOM_WONDERS.md`](./CUSTOM_WONDERS.md))
+2. Reiniciar el bridge
+3. La Maravilla aparece en `GET /api/wonders` y queda disponible
+   para `POST /api/wonders/<id>/launch`
+
+**Limitación conocida:** el frontend usa `WONDER_MANIFESTS` hardcodeado
+en `src/wonders/manifest.ts`, así que Maravillas custom NO aparecen
+en el listado UI de la capital. Sí funcionan para auto-start y
+health checks vía la API. Es una restricción intencional para
+mantener el contrato del frontend estable; ver roadmap.
+
+**Override de built-ins:** un manifest custom con `id: "bibliotheca"`
+(o `"institutum"`) gana al built-in. El bridge loguea un warning.
+Útil para forkear Maravillas built-in sin tocar el código.
+
 ---
 
 ## 6. Referencias
 
+- `docs/CUSTOM_WONDERS.md` — guía user-facing para Maravillas custom
+  (sin tocar el código de RepoCiv)
 - `docs/ROADMAP_IMPERIAL_WORKSHOP.md` — canon de producto
 - `src/wonders/types.ts` — tipos TypeScript del contrato
 - `src/wonders/wonderConfig.ts` — manifests y defaults
