@@ -586,6 +586,11 @@ export function rebuildTileDecor(
         ices.push(tile);
         break;
       case 'sacred':
+        // Wonder tiles (district.type==='wonder') are handled by
+        // WonderProps3D — the procedural temple / laboratorium replaces
+        // the generic standing-stones + altar + gem. Skip them here so
+        // we don't double-stack geometry on the same hex.
+        if (tile.district?.type === 'wonder') break;
         sacreds.push(tile);
         break;
       case 'plains':
