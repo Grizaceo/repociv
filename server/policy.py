@@ -84,6 +84,11 @@ def decide(cmd: Command) -> tuple[PolicyDecision, str]:
            by type, but this documents the extra gate).
          - privileged_external + high/destructive → stays approve.
       5. Type policy applies last (auto-safe / approve / blocked by type name).
+      6. **Risk floor** (audit 1.3): any command with ``risk="high"`` or
+         ``risk="destructive"`` is forced to ``"approve"`` regardless of
+         type policy. This closes the gap where a ``run_tests`` or
+         ``run_build`` command tagged high-risk used to skip the approval
+         queue because the type policy said auto-safe.
     """
     # Step 1: resolve the harness descriptor
     harness: dict | None = None
@@ -124,8 +129,20 @@ def decide(cmd: Command) -> tuple[PolicyDecision, str]:
 
     # Step 6: type policy
     if cmd.type in _TYPE_POLICY:
-        return _TYPE_POLICY[cmd.type], ""
-    return _RISK_DEFAULT.get(cmd.risk, "approve"), ""
+        decision: PolicyDecision = _TYPE_POLICY[cmd.type]
+    else:
+        decision = _RISK_DEFAULT.get(cmd.risk, "approve")
+
+    # Step 7: risk floor — high/destructive ALWAYS requires approval,
+    # regardless of type policy. Audit 1.3 invariant.
+    if cmd.risk in ("high", "destructive") and decision == "auto-safe":
+        return "approve", (
+            f"Command '{cmd.type}' on harness '{cmd.harness_id or '<inferred>'}' "
+            f"is tagged risk='{cmd.risk}' — risk floor requires approval "
+            f"even though type policy says auto-safe."
+        )
+
+    return decision, ""
 
 
 def apply_policy(cmd: Command) -> tuple[Command, str]:
