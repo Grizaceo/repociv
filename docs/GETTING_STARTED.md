@@ -345,7 +345,24 @@ el backend con variables `VITE_*` (ver `.env.example`).
 
 La Gran Biblioteca es un proyecto compañero opcional (repo separado, no incluido en RepoCiv).
 
-### Arranque local (dos terminales)
+### Arranque automático (recomendado, F1–F5, 2026-06-16 → 2026-06-17)
+
+A partir del merge de la Fase 1, **RepoCiv levanta las Maravillas por sí mismo**:
+
+1. Abrí RepoCiv con `./scripts/dev-start.sh` (igual que antes).
+2. Al boot, el bridge hace `POST /api/wonders/{bibliotheca,institutum}/launch`
+   en background, y la viñeta muestra "⚙️ Levantando la maravilla…" mientras
+   sondea `launch-status` hasta que `ready.api` **y** `ready.ui` respondan.
+3. Cuando `ready === true`, el iframe monta la URL UI resuelta
+   (Bibliotheca `:5173`, Institutum `:5280`).
+4. Si timeout (60s) o error, cae al empty state con botón "Levantar de nuevo".
+
+No necesitás abrir las terminales manuales de abajo. **Las terminales siguen
+siendo necesarias solo si querés desarrollar las Maravillas en aislamiento**
+(por ejemplo, ver sus logs de HMR en directo). En uso normal, dejá que
+RepoCiv las levante.
+
+### Arranque local (dos terminales, modo desarrollo)
 
 **Terminal 1 — La Gran Biblioteca** (repo `la-gran-biblioteca`):
 
