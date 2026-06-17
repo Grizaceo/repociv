@@ -109,6 +109,10 @@ const CAMERAS = [
   // flip (see tolerance notes below) lands on ~138 scattered edge pixels
   // here, so this camera carries its own ceiling.
   { name: '07-river-closeup', cam: '-624,0,1.8', reveal: true, tolerancePx: 170 },
+  // 08: wonders closeup (F5). auto+1.4 zooms out enough to fit the capital
+  // and both flanking wonders in one frame, so a single golden catches the
+  // temple (bibliotheca at q=-1) and laboratorium (institutum at q=+1).
+  { name: '08-wonders-closeup', cam: 'auto,1.4', reveal: true },
 ];
 
 async function main() {
