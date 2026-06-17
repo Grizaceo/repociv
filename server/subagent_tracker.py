@@ -7,6 +7,7 @@ import re
 import threading
 import time
 import uuid
+from dataclasses import asdict
 from typing import Any, Callable
 
 from server import event_store as _es
@@ -395,9 +396,9 @@ def on_task_spawn(
             status="waiting_approval",
             requires_approval=True,
         )
-        _es.record_created(cmd_id, unit_id, cmd.to_dict())
+        _es.record_created(cmd_id, unit_id, asdict(cmd))
         _es.record_waiting_approval(cmd_id)
-        _add_approval(cmd.to_dict())
+        _add_approval(asdict(cmd))
 
         _send({
             "type": "subagent_proposed",

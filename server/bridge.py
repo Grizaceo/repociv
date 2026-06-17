@@ -62,6 +62,7 @@ import threading
 import time
 import urllib.request  # noqa: F401 (patched by tests via bridge.urllib.request)
 import uuid
+from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -478,7 +479,7 @@ def _has_codex() -> bool:
 def _handle_command(cmd: Command) -> dict[str, Any]:
     """Apply policy, attach context pack, dispatch or queue command."""
     cmd, block_reason = _policy.apply_policy(cmd)
-    _es.record_created(cmd.id, cmd.created_by, cmd.to_dict())
+    _es.record_created(cmd.id, cmd.created_by, asdict(cmd))
 
     if cmd.status == "rejected":
         reason = block_reason or "blocked by policy"
@@ -491,7 +492,7 @@ def _handle_command(cmd: Command) -> dict[str, Any]:
 
     if cmd.status == "waiting_approval":
         _es.record_waiting_approval(cmd.id)
-        _add_approval(cmd.to_dict())
+        _add_approval(asdict(cmd))
         send_to_repociv(
             {
                 "type": "log",
