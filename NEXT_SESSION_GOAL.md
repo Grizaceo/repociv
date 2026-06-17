@@ -57,18 +57,28 @@ Después (clip nuevo `clip_20260615_193316_2.png`):
 - **Idioma del usuario:** español principalmente. Reporta en español, comandos y outputs en inglés tal cual.
 
 ## Próximas tareas concretas (en orden de probabilidad de que el usuario las pida)
+## Veredicto item 1 (sesión 2026-06-17, plaza-ring-diagnose-r2.py)
 
-1. **Investigar las 2 desalineaciones residuales** (plaza offset, asimetría de anillo) — generar clip fresco, correr subagente de análisis, decidir si son reales o artefactos de proyección.
-2. **Regenerar los goldens** (`e2e/golden/01-07.png`) con `node scripts/screenshot-3d-audit.mjs --update` para reflejar el render actual, así el CI no reporta falsos positivos de diff.
-3. **Resolver el stash viejo:** `git stash list` muestra 2 stashes de feat/chat-model-picker y feat/profile-registry que ya están mergeados a main. `git stash drop stash@{0} stash@{1}` si el usuario confirma.
-4. **Cerrar PR #4** en GitHub (ya no existe como rama, pero el PR queda abierto en la historia).
-5. **Continuar con Wonder 3D** (commit perdido en sesiones anteriores: `wonderVignette.ts`, `WonderProps3D.ts`, `wonder_services.py`) — el usuario lo mencionó como trabajo pendiente antes de esta sesión.
-6. **Mejorar la oficina local** (el commit `f40eb97` sobre ventanas en muros y el `placeWallWindows` están bien, pero hay room para mejorar sprites de sillas, decor, etc.).
+Render fresco + r2 contra 13 ciudades. Resultado:
 
-## Archivos clave a tocar si seguís con la muralla 3D
+| Métrica | Claim original | Resultado r2 | Veredicto |
+|---|---|---|---|
+| Plaza offset | "60 px" | 12/13 dentro de ±10 px del 14 px proyectado; 1 caso de 33.6 px (Plaza #3, size 105, **muralla 1 px**) | MAYORMENTE ARTEFACTO |
+| Ring asimetría | "38-112 px span, σ 16.3" | 8/13 regular (σ=0); 4/13 σ=2.8-4.2 (sparse detection); 1/13 σ=20.8 (Plaza #7 capital) | MAYORMENTE ARTEFACTO |
 
-- `src/three/CityCluster3D.ts` — el fix está en los commits acb2695 y c3e79b6; el resto del archivo (civic centre 105-180, spire 138-145, capital landmarks 147-160) es del iter11 restaurado.
-- `src/three/HexWorldScene.ts` — `SUN_POSITION` constante en línea 131, `sunLight.position.set(SUN_POSITION...)` en 148.
-- `src/three/Rivers3D.ts` — `edgeRoutePath` en línea ~185, color turquesa en ~338.
-- `src/spatialDirectives.ts` — `interpretUnitDrag` retorna null para drag normal a ciudad, shift+drag crea run_tests.
+**Conclusiones:**
+- Las 2 desalineaciones del goal son **mayormente proyección/sampling** — el fix de `c3e79b6` ya resolvió la geometría real.
+- Plaza #3: su "REAL MISALIGNMENT" es un **falso positivo del script**. La muralla se detectó como 1 solo píxel de grosor (`ring_min=ring_max=1, σ=0`) → el centroide de una muralla de 1 px es ultra-sensible al ruido, el offset real no es medible con esa resolución. No requiere fix.
+- Plaza #7 (capital, σ=20.8): la geometría es la del capital con spire + civic centre + landmark (iter11). El script mide features internos como si fueran muralla, inflando la varianza. No es bug, es geometría del capital.
+- **Item 1 cerrado sin fix** — el claim original ("quedo un pco desalineado si") se explica por la combinación de proyección isométrica + muestreo del script, no por un bug de geometría.
+
+**Deuda menor (no bloqueante):** agregar check `if rmin < 3 or (rmax-rmin) < 3: verdict = "INSUFFICIENT DATA"` en `plaza-ring-diagnose-r2.py` para no reportar "REAL MISALIGNMENT" sobre murallas de 1 px.
+
+Reporte completo: `.hermes/artifacts/3d-audit/alignment-report-r2.json`.
+
+## Próximas tareas concretas (en orden de probabilidad de que el usuario las pida)
+1. **F5 + F6 del plan 2026-06-16** — Maravillas 3D distintivas en el mapa (WonderProps3D procedural + suprimir decor genérico + wire/labels/pick/layer-gating + tests + goldens + docs). Ver `docs/plans/2026-06-16-wonder-autostart-and-3d.md`. Plan ya mergeado: F1-F4 + P3 + security + devops. Falta F5 + F6.
+
+## Archivos clave a tocar si seguís con F5/F6 (Wonder 3D)
+- `src/three/WonderProps3D.ts` — **NO EXISTE**, hay que crearlo. Patrón espejo de `CityProps3D.ts`. Procedural: bibliotheca (templo: dais + columnata + frontón) e institutum (lab: domo + obelisks + glow).
 - `src/three/CityCluster3D.test.ts`, `src/three/HexWorldScene.test.ts` — tests rojos que ahora son verdes, mantenerlos.
