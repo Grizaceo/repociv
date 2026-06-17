@@ -28,25 +28,9 @@ from typing import Any
 import httpx
 from mcp.server.fastmcp import FastMCP
 
-# ─── Env loader (inline para evitar side-effects de importar bridge.py) ───────
+# ─── Env loader (delegates to server._env to keep one source of truth) ───────
 
-def _load_dotenv() -> None:
-    for p in [Path(__file__).parent.parent / ".env", Path.home() / ".hermes" / ".env"]:
-        if not p.exists():
-            continue
-        try:
-            for raw in p.read_text(encoding="utf-8").splitlines():
-                line = raw.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, _, val = line.partition("=")
-                key = key.strip()
-                val = val.strip().strip('"').strip("'")
-                if key and key not in os.environ:
-                    os.environ[key] = val
-        except Exception:
-            pass
-
+from ._env import load_dotenv as _load_dotenv
 
 _load_dotenv()
 

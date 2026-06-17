@@ -16,6 +16,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Any, Callable
+from dataclasses import asdict
 
 from .command_schema import Command
 from . import event_store as _es
@@ -169,7 +170,7 @@ def set_dispatcher(fn: Callable[[dict[str, Any]], None]) -> None:
 def enqueue(cmd: Command) -> None:
     """Add a command to the priority queue."""
     with _queue_lock:
-        _queue.append(cmd.to_dict())
+        _queue.append(asdict(cmd))
         _resort()
         _dump_queue(_queue)
 

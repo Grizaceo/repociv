@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 # ─── Risk levels ──────────────────────────────────────────────────────────────
@@ -79,9 +79,6 @@ class Command:
     finished_at: float | None = None
     result: str = ""
     harness_id: str | None = None    # optional harness selected for this command
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 # ─── Validation ──────────────────────────────────────────────────────────────
