@@ -425,14 +425,36 @@ def get_providers_live(ctx: "RouteContext") -> tuple[int, Any]:
     provider_live = probe_results
 
     # ── 4. Merge with static provider registry ──
-    from server.provider_registry import _get_chat_config
+    from server.provider_registry import _get_chat_config, _hermes_models_payload
     chat_cfg = _get_chat_config()
     static_providers = {p["id"]: p for p in chat_cfg["providers"]}
+
+    # Use Hermes' own model inventory as the source of truth for reachability.
+    # The gateway /v1/models endpoint only returns the *active* model (usually
+    # one), so the previous `hermes_models` fallback marked everything else as
+    # unreachable even when Hermes can route to it. `build_models_payload` is
+    # the same data Hermes' GUI pickers consume, so any model that appears
+    # there is reachable by definition (Hermes is the actual inference path).
+    #
+    # Layered reachability:
+    #   1. The provider's own live probe (if we have a URL for it)
+    #   2. The active model list from the Hermes gateway
+    #   3. The full Hermes model inventory (parity layer — covers all 44
+    #      providers in build_models_payload, including ones without a probe)
+    hermes_inventory: set[str] = set()
+    try:
+        payload = _hermes_models_payload() or {}
+        for row in payload.get("providers", []) or []:
+            for mid in row.get("models") or []:
+                if mid:
+                    hermes_inventory.add(mid)
+    except Exception:
+        logging.exception("[/providers/live] _hermes_models_payload failed")
 
     providers_out = []
     for pid, p in static_providers.items():
         live_ids = provider_live.get(pid, [])
-        reachable_set = set(live_ids) | hermes_models
+        reachable_set = set(live_ids) | hermes_models | hermes_inventory
 
         models = []
         for m in p.get("models", []):
