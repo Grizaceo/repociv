@@ -268,6 +268,19 @@ init_bridge_state(CONFIG_DIR)
 # ─── Per-agent-type rate limiter ──────────────────────────────────────────────
 _agent_rate_limiter = _rl.RateLimiter()
 
+# ─── Per-endpoint rate limiter (Fase 1 / audit 1.2) ──────────────────────────
+# Tighter than the global per-IP limiter (60/60s in bridge.py). Caps the
+# aggregate cost of expensive endpoints across all callers so a
+# misbehaving tab or a burst of background work can't pin the CPU.
+#   post_commands                 — agent spawns (10/min burst)
+#   post_graph_relations_refresh  — full graph index rebuild (5/min burst)
+_endpoint_rate_limiter = _rl.EndpointRateLimiter(
+    capacities={
+        "post_commands": 10,
+        "post_graph_relations_refresh": 5,
+    },
+)
+
 # ─── Scheduler ────────────────────────────────────────────────────────────────
 from server import scheduler as _sched  # noqa: E402
 

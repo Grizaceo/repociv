@@ -530,12 +530,17 @@ def post_directives_record(body: dict[str, Any], ctx: "RouteContext") -> tuple[i
     return 200, {"ok": True}
 
 def post_commands(body: dict[str, Any], ctx: "RouteContext") -> tuple[int, Any]:
-    from server.bridge import _handle_command, _agent_rate_limiter
+    from server.bridge import _handle_command, _agent_rate_limiter, _endpoint_rate_limiter
     from server.command_schema import validate_command, CommandValidationError
     try:
         cmd = validate_command(body)
     except CommandValidationError as e:
         return 400, {"error": str(e)}
+    # Fase 1 / audit 1.2: per-endpoint cap (10/min). Defense in depth on
+    # top of the per-IP limit in do_POST — stops bursts of agent spawns
+    # from any number of callers.
+    if not _endpoint_rate_limiter.check_and_consume("post_commands"):
+        return 429, {"error": "rate_limit", "endpoint": "post_commands"}
     agent_type = str(cmd.payload.get("unit") or body.get("agentType") or "MAIN")
     if not _agent_rate_limiter.check_and_consume(agent_type):
         return 429, {"error": "rate_limit", "agent": agent_type}

@@ -160,11 +160,21 @@ def post_graph_relations_refresh(body: dict[str, Any], _ctx: dict[str, Any]) -> 
     cities = body.get("cities", [])
     repo_paths = body.get("repoPaths", [])
 
+    # Cheap validation first — don't burn rate-limit tokens on bad input.
+    if not cities and not repo_paths:
+        return 400, {"error": "Provide either 'cities' or 'repoPaths' in the request body"}
+
+    # Fase 1 / audit 1.2: per-endpoint cap (5/min). A full graph index
+    # rebuild reads + writes the whole index — one of the heaviest
+    # operations the bridge can do. Cap it so a stuck "refresh" button
+    # or a malicious extension can't pin the CPU.
+    from server.bridge import _endpoint_rate_limiter
+    if not _endpoint_rate_limiter.check_and_consume("post_graph_relations_refresh"):
+        return 429, {"error": "rate_limit", "endpoint": "post_graph_relations_refresh"}
+
     if cities:
         result = _cga.build_repo_index_from_cities(cities)
         return 200, result
-    elif repo_paths:
+    else:
         result = _gr.build_or_refresh_index(repo_paths)
         return 200, result
-    else:
-        return 400, {"error": "Provide either 'cities' or 'repoPaths' in the request body"}
