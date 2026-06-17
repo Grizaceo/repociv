@@ -26,6 +26,29 @@ docker compose up --build
 
 Open `http://localhost:5273` in your browser. On first load, RepoCiv shows the onboarding panel and lists the repositories found under `MAP_ROOT` so you can choose which ones should appear on the map.
 
+### Verifying the stack (audit 2.3)
+
+After `docker compose up -d`, run the smoke script. It checks 8 invariants
+end-to-end — UI reachable, workspace scan, bridge health, and the Hermes
+degraded-mode fallback (audit 1.1):
+
+```bash
+bash scripts/smoke-docker.sh
+#   ports: VITE=5273  BRIDGE=5274  WS=5275
+#   [...]
+#   OK  All 8 checks passed.
+#   Dashboard is live at: http://localhost:5273/
+```
+
+If your host has other services on 5273/5274/5275, shift the whole stack:
+
+```bash
+PORT_PREFIX=57 docker compose up -d
+PORT_PREFIX=57 bash scripts/smoke-docker.sh
+```
+
+Exit codes: `0` all checks pass · `1` one or more checks fail · `2` docker not available · `3` container not running. See the script header for details.
+
 Important Docker distinction:
 
 - `MAP_ROOT` chooses the **host folder** that is mounted into the container as `/workspace/repos`.

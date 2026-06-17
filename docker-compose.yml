@@ -25,10 +25,14 @@ services:
     # All three are required: the browser connects to 5273 for the UI and
     # directly to 5275 for the events WebSocket (the Vite proxy only covers
     # /bridge/*, not the standalone WS port).
+    #
+    # Host-side port is parameterized via env so a third party whose host
+    # has another service on 5274/5275 can shift the whole stack. The
+    # container-side port stays at 5274/5275 (matches the env defaults).
     ports:
-      - "127.0.0.1:5273:5273"   # Vite dev server (UI)
-      - "127.0.0.1:5274:5274"   # Bridge HTTP API
-      - "127.0.0.1:5275:5275"   # Bridge WebSocket (events)
+      - "127.0.0.1:${VITE_PORT:-5273}:5273"        # Vite dev server (UI)
+      - "127.0.0.1:${BRIDGE_PORT:-5274}:5274"     # Bridge HTTP API
+      - "127.0.0.1:${BRIDGE_WS_PORT:-5275}:5275"  # Bridge WebSocket (events)
 
     # MAP_ROOT is the folder whose subdirectories become cities on the hex map.
     # Bind-mount it read-only: the bridge only reads file metadata to render
