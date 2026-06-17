@@ -51,6 +51,7 @@ from .pending_tracker import (
     PENDING_TRACKER,
 )  # noqa: F401 (re-exported for tests and external callers)
 from .process_scanner import scan_active_processes, detect_lexo
+from ._env import load_dotenv as _load_dotenv  # noqa: F401 (re-export for tests)
 import hmac
 import json
 import os
@@ -66,33 +67,6 @@ from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-
-
-# ─── .env loader ─────────────────────────────────────────────────────────────
-def _load_dotenv() -> None:
-    # Load RepoCiv own .env first
-    env_path = Path(__file__).parent.parent / ".env"
-    if env_path.exists():
-        _load_dotenv_file(env_path)
-    # Then load Hermes .env (API keys for providers) — non-existing keys are skipped
-    hermes_env = Path.home() / ".hermes" / ".env"
-    if hermes_env.exists():
-        _load_dotenv_file(hermes_env)
-
-
-def _load_dotenv_file(env_path: Path) -> None:
-    try:
-        for raw in env_path.read_text(encoding="utf-8").splitlines():
-            line = raw.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, value = line.partition("=")
-            key = key.strip()
-            value = value.strip().strip('"').strip("'")
-            if key and key not in os.environ:
-                os.environ[key] = value
-    except Exception:
-        pass
 
 
 _load_dotenv()
