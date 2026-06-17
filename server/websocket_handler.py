@@ -44,7 +44,23 @@ logger = logging.getLogger("repociv.ws")
 BRIDGE_WS_PORT = int(os.environ.get("BRIDGE_WS_PORT", "5275"))
 REPOCIV_TOKEN = os.environ.get("REPOCIV_TOKEN", "")
 REPOCIV_REMOTE = os.environ.get("REPOCIV_REMOTE", "").lower() in ("true", "1", "yes")
+
+# ─── Bind + token policy (Fase 0 / audit 0.4) ────────────────────────────────
+# Single source of truth for the WS startup checks. Same helper is
+# also called from server/bridge.py so HTTP and WS never drift on
+# what counts as a safe config. See server/_security.py.
+#   1. REPOCIV_TOKEN set but < 32 chars  → SystemExit(1)
+#   2. BRIDGE_WS_HOST non-loopback + token empty  → SystemExit(1)
+#   3. loopback + token empty                    → UserWarning (dev default)
+from server._security import enforce_token_policy  # noqa: E402
+
 WS_HOST = "0.0.0.0" if REPOCIV_REMOTE else os.environ.get("BRIDGE_WS_HOST", "127.0.0.1")
+enforce_token_policy(
+    token=REPOCIV_TOKEN,
+    bind_host=WS_HOST,
+    remote=REPOCIV_REMOTE,
+    component="ws",
+)
 
 # Rate limit: 60 messages / 60s window per connection
 _RATE_LIMIT = 60

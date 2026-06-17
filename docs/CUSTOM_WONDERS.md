@@ -2,6 +2,13 @@
 
 Cómo agregar tus propias Maravillas al launcher de RepoCiv.
 
+> ⚠️ **Read [SECURITY.md](../SECURITY.md) first.** RepoCiv is single-operator;
+> the bridge trusts the holder of `REPOCIV_TOKEN` with arbitrary command
+> execution on the host. Custom wonders don't change that — the launcher
+> just calls `subprocess.Popen` with the argv you put in the manifest.
+> If you share your instance, your custom wonders can be triggered by
+> anyone with the token.
+
 **TL;DR.** Creás un archivo en `~/.repociv/wonders/<id>.json` con un
 [WonderManifest](../WONDER_CONTRACT.md) + un campo opcional `launch`
 que describe los comandos CLI a lanzar. Reiniciás el bridge y tu

@@ -102,13 +102,23 @@ BRIDGE_WS_PORT = int(os.environ.get("BRIDGE_WS_PORT", "5275"))
 REPOCIV_TOKEN = os.environ.get("REPOCIV_TOKEN", "")  # empty = auth disabled (dev only)
 REPOCIV_REMOTE = os.environ.get("REPOCIV_REMOTE", "").lower() in ("true", "1", "yes")
 
-# ─── Remote mode: force 0.0.0.0 + require token ─────────────────────────────
-if REPOCIV_REMOTE and not REPOCIV_TOKEN:
-    print("ERROR: REPOCIV_REMOTE=true requires REPOCIV_TOKEN to be set.")
-    print('Generate one with: python3 -c "import secrets; print(secrets.token_hex(32))"')
-    raise SystemExit(1)
+# ─── Bind + token policy (Fase 0 / audit 0.4) ────────────────────────────────
+# Single source of truth for the bridge startup checks. Same helper
+# is also called from server/websocket_handler.py so HTTP and WS never
+# drift on what counts as a safe config.
+#   1. REPOCIV_TOKEN set but < 32 chars  → SystemExit(1) + loud error
+#   2. bind non-loopback + token empty   → SystemExit(1) + loud error
+#   3. bind loopback + token empty       → UserWarning (dev default, not exit)
+# See server/_security.py for the full rules.
+from server._security import enforce_token_policy  # noqa: E402
 
 BRIDGE_HOST = "0.0.0.0" if REPOCIV_REMOTE else "127.0.0.1"
+enforce_token_policy(
+    token=REPOCIV_TOKEN,
+    bind_host=BRIDGE_HOST,
+    remote=REPOCIV_REMOTE,
+    component="bridge",
+)
 
 CONFIG_DIR = Path(os.path.expanduser(os.environ.get("REPOCIV_CONFIG_DIR", "~/.repociv")))
 MISSIONS_FILE = CONFIG_DIR / "missions.json"

@@ -3,6 +3,16 @@
 > A step-by-step tutorial for setting up RepoCiv for the first time,
 > navigating the hex map, and running your first agent mission.
 
+> ⚠️ **Single-operator model — DO NOT share your instance.**
+>
+> RepoCiv is designed for **one operator on one machine**. The bridge
+> trusts any request that presents a valid `REPOCIV_TOKEN`, and the
+> agent runner launches harnesses with `--dangerously-skip-permissions`.
+> Whoever holds the token can execute arbitrary commands on the host.
+> Exposing RepoCiv on a shared or public network is out of scope and
+> unsafe. See [SECURITY.md](../SECURITY.md#security-policy) for the
+> full model and remote-mode requirements.
+
 ---
 
 ## Prerequisites
