@@ -87,6 +87,10 @@ import {
   clearTileFlash,
 } from './TileFlash3D.ts';
 import {
+  getTilePopupGroup,
+  clearTilePopup,
+} from './TilePopup3D.ts';
+import {
   getResourcePropsGroup,
   ensureResourcePropsLoad,
   rebuildResourceProps,
@@ -198,6 +202,7 @@ export function createHexWorldScene(): Scene {
   scene.add(getTileYieldsGroup());
   scene.add(getUnitGroup());
   scene.add(getTileFlashGroup());
+  scene.add(getTilePopupGroup());
   scene.add(getLabelGroup());
   scene.add(getWonderPropsGroup());
 
@@ -979,6 +984,7 @@ export function disposeHexWorldScene(scene: Scene): void {
   clearCityClusters();
   clearUnits();
   clearTileFlash();
+  clearTilePopup();
   if (terrainMesh) {
     terrainGroup.remove(terrainMesh);
     terrainMesh.dispose();

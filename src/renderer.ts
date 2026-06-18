@@ -33,6 +33,7 @@ import {
   persistRenderMode,
   loadThreeMapRenderer,
 } from './three/renderMode.ts';
+import { showTilePopup, clearTilePopup } from './three/TilePopup3D.ts';
 
 type ThreeMapRendererType = import('./three/ThreeMapRenderer.ts').ThreeMapRenderer;
 
@@ -851,7 +852,19 @@ export class Renderer {
       this.onUnitSelect?.(null);
       this.onCitySelect?.(city.id);
       this.onTileInspect?.(city.name, city.coord, city.id);
+      // 3D tile popup: show billboard with city info in WebGL mode.
+      if (this.worldRenderMode === 'webgl' && tile) {
+        const garrison = this.state.world.units.filter(
+          (u) => u.cityId === city.id,
+        );
+        showTilePopup(tile, coord, city, garrison);
+      }
       return;
+    }
+
+    // Empty tile click: clear any existing 3D popup.
+    if (this.worldRenderMode === 'webgl') {
+      clearTilePopup();
     }
 
     this.selectedUnit = null;

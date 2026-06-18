@@ -69,7 +69,8 @@ export function rebuildTileYields(
 
     const elev = terrainElevation(tile.terrain);
     const pos = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-    pos.y += HEX_SIZE * 0.12;
+    // Position icons higher above city tiles so they float above buildings.
+    pos.y += tile.city ? HEX_SIZE * 0.55 : HEX_SIZE * 0.12;
 
     const spacing = HEX_SIZE * 0.14;
     const startX = -((icons.length - 1) * spacing) / 2;
