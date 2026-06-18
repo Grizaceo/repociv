@@ -50,6 +50,7 @@ import { takeScreenshot } from './screenshot.ts';
 import { toggleLayerPanel, closeLayerPanel, isLayerPanelOpen } from '../layerPanel.ts';
 import { trackHotkey, trackPanelOpen } from '../analytics.ts';
 import { isPickerOpen } from '../chat/slashPicker.ts';
+import { sharedIdleFinder } from '../idleAgentFinder.ts';
 
 export function wireHotkeys(
   renderer: Renderer,
@@ -233,6 +234,19 @@ export function wireHotkeys(
       const next = heroes[(idx + 1) % heroes.length]!;
       trackHotkey('Tab:cycle-hero');
       selectHero(next, renderer, state, bridge);
+      return;
+    }
+
+    // ,: focus camera on next idle unit (Age of Empires pattern)
+    if (e.key === ',') {
+      e.preventDefault();
+      if (document.body.classList.contains('local-view')) return;
+      const idle = sharedIdleFinder.nextIdle(state.getAllUnits());
+      if (idle) {
+        trackHotkey(',:find-idle');
+        renderer.focusOnCoord(idle.coord);
+        renderer.flashIdleHighlight(idle.coord);
+      }
       return;
     }
 

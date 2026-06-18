@@ -84,6 +84,7 @@ import { clearChat } from './ui/chat.ts';
 import { openOnboardingPanel } from './ui/onboardingPanel.ts';
 import { mountHermesStatusBanner } from './ui/hermesStatusBanner.ts';
 import { axialToPixel } from './hex.ts';
+import { sharedIdleFinder } from './ui/idleAgentFinder.ts';
 import { areMountainPropsSettled } from './three/MountainProps3D.ts';
 import { areForestPropsSettled } from './three/ForestProps3D.ts';
 import { areCityPropsSettled } from './three/CityProps3D.ts';
@@ -608,6 +609,32 @@ async function bootstrap() {
   document.getElementById('btn-replay')?.addEventListener('click', toggleReplayPanel);
   document.getElementById('btn-observability')?.addEventListener('click', toggleObservabilityPanel);
   document.getElementById('btn-tasks')?.addEventListener('click', toggleTaskPanel);
+
+  // ─── Idle agent finder (Age of Empires pattern) ─────────────────────
+  // Uses the shared singleton so the cycle index stays in sync with the
+  // `,` keyboard hotkey wired in hudWiring/hotkeys.ts.
+  const findIdleAgent = () => {
+    // Disable in local view
+    if (document.body.classList.contains('local-view')) return;
+    const units = state.getAllUnits();
+    const idle = sharedIdleFinder.nextIdle(units);
+    const btn = document.getElementById('btn-idle-agent');
+    if (!idle) {
+      // Flash red briefly
+      if (btn) {
+        btn.style.borderColor = '#c04040';
+        btn.style.color = '#c04040';
+        setTimeout(() => {
+          btn.style.borderColor = '';
+          btn.style.color = '';
+        }, 600);
+      }
+      return;
+    }
+    renderer.focusOnCoord(idle.coord);
+    renderer.flashIdleHighlight(idle.coord);
+  };
+  document.getElementById('btn-idle-agent')?.addEventListener('click', findIdleAgent);
   document.getElementById('btn-pending')?.addEventListener('click', togglePendingPanel);
   document.getElementById('btn-log')?.addEventListener('click', toggleLogPanel);
   document.getElementById('btn-wb-labels')?.addEventListener('click', () => {

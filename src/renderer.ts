@@ -34,6 +34,8 @@ import {
   loadThreeMapRenderer,
 } from './three/renderMode.ts';
 import { showTilePopup, clearTilePopup } from './three/TilePopup3D.ts';
+import { flashTile } from './three/TileFlash3D.ts';
+import { terrainElevation } from './isoHex.ts';
 
 type ThreeMapRendererType = import('./three/ThreeMapRenderer.ts').ThreeMapRenderer;
 
@@ -68,6 +70,9 @@ export class Renderer {
   private _frameTimeCount = 0;
   private _frameTimeAvg = 0;
   private _totalFrameCount = 0;
+  /** Idle-agent highlight: pulsing ring drawn for 1s after focusing an idle unit. */
+  private _idleHighlightCoord: Axial | null = null;
+  private _idleHighlightTime = 0;
   private _placingMode = false; // true when user is picking a hex on map
 
   /** Panel-driven city relocate (drag city on map; no full gestureMode fork). */
@@ -304,6 +309,18 @@ export class Renderer {
     const pos = axialToPixel(coord, HEX_SIZE);
     this.cam.x = pos.x;
     this.cam.y = pos.y;
+  }
+
+  /** Flash a pulsing ring on a tile for 1s (idle-agent finder highlight). */
+  flashIdleHighlight(coord: import('./hex.ts').Axial): void {
+    this._idleHighlightCoord = coord;
+    this._idleHighlightTime = 1.0; // 1 second
+    // In 3D mode, also fire the existing tile-flash system
+    if (this.worldRenderMode === 'webgl') {
+      const tile = this.state.world.tiles.get(tileKey(coord));
+      const elev = tile ? terrainElevation(tile.terrain) : 0;
+      flashTile(coord.q, coord.r, elev);
+    }
   }
 
   private pickAxial(wx: number, wy: number): Axial {
@@ -1498,6 +1515,29 @@ export class Renderer {
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.arc(sx, sy, glowSize, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // ── Idle-agent highlight: pulsing cyan ring for 1s ─────────────────
+    if (this._idleHighlightCoord && this._idleHighlightTime > 0) {
+      this._idleHighlightTime -= this._dt;
+      if (this._idleHighlightTime <= 0) {
+        this._idleHighlightCoord = null;
+        this._idleHighlightTime = 0;
+      } else {
+        const p = this.tilePixelPos(
+          this._idleHighlightCoord,
+          this.state.world.tiles.get(tileKey(this._idleHighlightCoord)),
+        );
+        const alpha = Math.min(1, this._idleHighlightTime);
+        const pulse = 0.4 + 0.3 * Math.sin(this.animTime * 6.0);
+        ctx.save();
+        ctx.strokeStyle = `rgba(100, 200, 255, ${alpha * pulse})`;
+        ctx.lineWidth = 3 / this.cam.zoom;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, HEX_SIZE * 0.7, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
       }
