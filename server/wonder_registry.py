@@ -21,10 +21,6 @@ from pathlib import Path
 from typing import Any
 
 
-def _env(name: str, fallback: str) -> str:
-    return os.environ.get(name, fallback)
-
-
 _STATIC_WONDER_MANIFESTS: list[dict[str, Any]] = [
     {
         "id": "gaceta",
