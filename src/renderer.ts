@@ -133,6 +133,10 @@ export class Renderer {
   onZonePaintedCb:
     | ((type: import('./types.ts').ZoneType, tiles: Array<{ x: number; y: number }>) => void)
     | null = null;
+  // P4: drag-to-assign callback
+  localDragAssignCb:
+    | ((unitId: string, workbenchTile: import('./types.ts').LocalTile) => void)
+    | null = null;
   onExitLocalView: (() => void) | null = null;
   private _localRendererCtor: (new (canvas: HTMLCanvasElement) => LocalRendererType) | null = null;
   private localWorldId: string | null = null;
@@ -1068,6 +1072,7 @@ export class Renderer {
       this.localR.onTileClick = (x, y, tile, sx, sy) => this.localTileClickCb?.(x, y, tile, sx, sy);
       this.localR.onUnitRendered = (unit, sx, sy) => this.localUnitRenderedCb?.(unit, sx, sy);
       this.localR.onZonePainted = (type, tiles) => this.onZonePaintedCb?.(type, tiles);
+      this.localR.onDragAssign = (unitId, tile) => this.localDragAssignCb?.(unitId, tile);
       this.localR.setInputActive(currentViewMode === 'local');
     }
 

@@ -1135,6 +1135,14 @@ async function bootstrap() {
     // Highlight selected local unit (future: show detail panel)
     showLocalUnitTooltip(unit, { x: _sx, y: _sy });
   };
+  // P4: Drag-to-assign — reuse queueLocalMission for the drag flow
+  renderer.localDragAssignCb = (unitId, tile) => {
+    const wb = tile.workbench;
+    if (!wb) return;
+    const localWorld = state.localWorld;
+    const repoId = localWorld?.repoId ?? wb.repoPath;
+    state.queueLocalMission(repoId, wb.filePath, wb.fileName, unitId);
+  };
   // Pan the local-view camera to the room matching `folderName`, or toast if it has no room of its own.
   const navigateToFolder = (folderName: string) => {
     const lw = state.getLocalWorld();

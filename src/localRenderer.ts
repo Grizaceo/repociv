@@ -141,6 +141,14 @@ export class LocalRenderer {
   private _zonePaintStart: { x: number; y: number } | null = null;
   private _zonePaintCurrent: { x: number; y: number } | null = null;
 
+  // ─── P4: Drag-to-assign agent to workbench ────────────────────────────────
+  private _dragAssignState: 'idle' | 'dragging' = 'idle';
+  private _dragAssignUnit: LocalUnit | null = null;
+  private _dragAssignMouseX = 0;
+  private _dragAssignMouseY = 0;
+  /** Called when agent is dropped on a workbench. */
+  onDragAssign: ((unitId: string, workbenchTile: LocalTile) => void) | null = null;
+
   setZonePaintMode(type: ZoneType | null): void {
     this._zonePaintMode = type;
     this._zonePaintStart = null;
@@ -365,6 +373,18 @@ export class LocalRenderer {
             this._zonePaintCurrent = { x: tile.x, y: tile.y };
           }
         } else {
+          // P4: Check if clicking a unit — start drag-to-assign
+          const rect = canvas.getBoundingClientRect();
+          const wx = e.clientX - rect.left;
+          const wy = e.clientY - rect.top;
+          const unit = this.getUnitAt(wx, wy);
+          if (unit && !unit.despawning) {
+            this._dragAssignState = 'dragging';
+            this._dragAssignUnit = unit;
+            this._dragAssignMouseX = wx;
+            this._dragAssignMouseY = wy;
+            return; // don't start camera drag
+          }
           // Normal camera drag
           this.isDragging = true;
           this.dragStart = { x: e.clientX, y: e.clientY };
@@ -381,6 +401,12 @@ export class LocalRenderer {
       const wy = e.clientY - rect.top;
       const tile = this.screenToTile(wx, wy);
       this.hoveredTile = tile;
+
+      // P4: Track drag-assign mouse position
+      if (this._dragAssignState === 'dragging') {
+        this._dragAssignMouseX = wx;
+        this._dragAssignMouseY = wy;
+      }
 
       // Zone painting: update current drag position
       if (this._zonePaintMode && this._zonePaintStart && tile) {
@@ -408,6 +434,24 @@ export class LocalRenderer {
       stopBubble(e);
       if (!this._inputActive) return;
       if (e.button === 0) {
+        // P4: Finalize drag-to-assign
+        if (this._dragAssignState === 'dragging' && this._dragAssignUnit) {
+          const rect = canvas.getBoundingClientRect();
+          const sx = e.clientX - rect.left;
+          const sy = e.clientY - rect.top;
+          const tile = this.screenToTile(sx, sy);
+          if (tile) {
+            const t = this.getTile(tile.x, tile.y);
+            if (t?.workbench) {
+              // Dropped on a workbench — fire callback
+              this.onDragAssign?.(this._dragAssignUnit.id, t);
+            }
+          }
+          // Reset drag state (cancel)
+          this._dragAssignState = 'idle';
+          this._dragAssignUnit = null;
+          return;
+        }
         if (this._zonePaintMode && this._zonePaintStart && this._zonePaintCurrent) {
           // Zone painting: finalize rectangle
           this._finalizeZonePaint();
@@ -493,6 +537,12 @@ export class LocalRenderer {
       }
       if (e.key === 'Escape') {
         e.preventDefault();
+        // P4: Cancel drag-to-assign
+        if (this._dragAssignState === 'dragging') {
+          this._dragAssignState = 'idle';
+          this._dragAssignUnit = null;
+          return;
+        }
         if (this._zonePaintMode) {
           this.setZonePaintMode(null);
           return;
@@ -926,6 +976,11 @@ export class LocalRenderer {
       ctx.lineWidth = 2 / cam.zoom;
       ctx.strokeRect(sx + 1, sy + 1, TILE_SIZE - 2, TILE_SIZE - 2);
       ctx.restore();
+    }
+
+    // P4: Draw drag-to-assign line + workbench highlight
+    if (this._dragAssignState === 'dragging' && this._dragAssignUnit) {
+      this.drawDragAssignOverlay();
     }
 
     ctx.restore();
@@ -2451,6 +2506,54 @@ export class LocalRenderer {
   }
 
   // P2: Workbench labels (2D mode)
+  // P4: Drag-to-assign visual overlay
+  private drawDragAssignOverlay() {
+    if (!this._dragAssignUnit || !this.world) return;
+    const { ctx, cam } = this;
+
+    const unit = this._dragAssignUnit;
+    let ux: number, uy: number;
+    if (unit.path.length > 0 && unit.pathIndex < unit.path.length) {
+      const from = unit.path[unit.pathIndex]!;
+      const to = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;
+      const t = unit.pathProgress;
+      ux = (from.x + (to.x - from.x) * t) * TILE_SIZE + TILE_SIZE / 2;
+      uy = (from.y + (to.y - from.y) * t) * TILE_SIZE + TILE_SIZE / 2;
+    } else {
+      ux = unit.gridX * TILE_SIZE + TILE_SIZE / 2;
+      uy = unit.gridY * TILE_SIZE + TILE_SIZE / 2;
+    }
+
+    const wx = (this._dragAssignMouseX - cam.cx) / cam.zoom + cam.x;
+    const wy = (this._dragAssignMouseY - cam.cy) / cam.zoom + cam.y;
+
+    ctx.save();
+    ctx.strokeStyle = unit.color;
+    ctx.lineWidth = 2 / cam.zoom;
+    ctx.setLineDash([6 / cam.zoom, 4 / cam.zoom]);
+    ctx.beginPath();
+    ctx.moveTo(ux, uy);
+    ctx.lineTo(wx, wy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const hoverTile = this.screenToTile(this._dragAssignMouseX, this._dragAssignMouseY);
+    if (hoverTile) {
+      const tile = this.getTile(hoverTile.x, hoverTile.y);
+      if (tile?.workbench) {
+        const sx = hoverTile.x * TILE_SIZE;
+        const sy = hoverTile.y * TILE_SIZE;
+        ctx.strokeStyle = '#22C55E';
+        ctx.lineWidth = 3 / cam.zoom;
+        ctx.strokeRect(sx + 1, sy + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+        const pulse = 0.3 + 0.2 * Math.sin(performance.now() / 200);
+        ctx.fillStyle = `rgba(34, 197, 94, ${pulse})`;
+        ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+      }
+    }
+    ctx.restore();
+  }
+
   private drawWorkbenchLabels2D(view: { x0: number; y0: number; x1: number; y1: number }) {
     if (!this.world) return;
     const { ctx, cam } = this;
