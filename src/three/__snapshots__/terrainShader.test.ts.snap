@@ -298,6 +298,7 @@ varying vec2  vWorldXZ;
 varying float vLocalY;
 varying vec2  vUv;
 varying float vTopFace;
+uniform float uTileHeight;
 float hash21(vec2 p) {
   p = fract(p * vec2(123.34, 456.21));
   p += dot(p, p + 45.32);
@@ -333,6 +334,16 @@ float ridge3(vec2 p) {
     a *= 0.5;
   }
   return s;
+}
+float terrainElevFromIndex(float idx) {
+  if (idx < 0.5) return 0.0;
+  else if (idx < 1.5) return 1.0;
+  else if (idx < 2.5) return 3.0;
+  else if (idx < 3.5) return 0.0;
+  else if (idx < 4.5) return -1.0;
+  else if (idx < 5.5) return 0.0;
+  else if (idx < 6.5) return 2.0;
+  return 0.0;
 }
 void main() {
   #include <begin_vertex>
@@ -372,6 +383,24 @@ void main() {
         // surface and the wave displacement (world-phase) keeps it seamless.
         if (abs(tidx - 4.0) < 0.5 && transformed.y > -1.0) {
           transformed.y = 0.0;
+        }
+
+        // P2: Biome-blend elevation transitions. When this tile's neighbor
+        // has a different elevation, blend the top-cap Y toward the midpoint
+        // so the transition is a smooth ramp, not a cliff. Both tiles agree
+        // on the shared edge height because both converge to the midpoint.
+        // Skip ocean/ice — coast mask handles those transitions separately.
+        float ntidx = floor(instanceNeighborTerrain + 0.5);
+        bool neighborIsWater = (ntidx > 3.5 && ntidx < 5.5);
+        if (!isOceanTile && !isIceTile && !neighborIsWater && transformed.y > -1.0) {
+          float thisElev = terrainElevFromIndex(tidx);
+          float neighborElev = terrainElevFromIndex(ntidx);
+          float elevDiff = neighborElev - thisElev;
+          if (abs(elevDiff) > 0.5) {
+            float radial = clamp(length(vLocalXZ) / uHexRadius, 0.0, 1.0);
+            float edgeBlend = smoothstep(0.55, 0.98, radial);
+            transformed.y += elevDiff * 0.5 * uTileHeight * edgeBlend;
+          }
         }
 
         // Top-cap micro-relief for all land biomes: FBM noise replaces

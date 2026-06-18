@@ -10,7 +10,7 @@ type Shader = any;
 import { Vector2 } from 'three';
 import { HEX_SIZE } from '../constants.ts';
 import { TILE_PRISM_HEIGHT } from './hexGeometry.ts';
-import { axialToWorld3D } from './axialToWorld3D.ts';
+import { axialToWorld3D, TILE_HEIGHT } from './axialToWorld3D.ts';
 import { AXIAL_DIRECTIONS } from '../hex.ts';
 import { type Terrain } from '../types.ts';
 
@@ -90,6 +90,7 @@ export function createTerrainMaterial(
     shader.uniforms.uTime             = { value: 0 };
     shader.uniforms.uHexRadius        = { value: HEX_SIZE };
     shader.uniforms.uPrismHeight      = { value: TILE_PRISM_HEIGHT };
+    shader.uniforms.uTileHeight       = { value: TILE_HEIGHT };
     shader.uniforms.uUseAtlas         = { value: options.terrainAtlas ? 1 : 0 };
     shader.uniforms.uTerrainAtlas     = { value: options.terrainAtlas ?? null };
     shader.uniforms.uNormalAtlas      = { value: options.normalAtlas ?? null };
@@ -118,6 +119,7 @@ export function createTerrainMaterial(
       'varying float vLocalY;\n' +
       'varying vec2  vUv;\n' +
       'varying float vTopFace;\n' +
+      'uniform float uTileHeight;\n' +
       // ── GLSL noise functions (public domain, hash-based value noise) ──────
       'float hash21(vec2 p) {\n' +
       '  p = fract(p * vec2(123.34, 456.21));\n' +
@@ -154,6 +156,16 @@ export function createTerrainMaterial(
       '    a *= 0.5;\n' +
       '  }\n' +
       '  return s;\n' +
+      '}\n' +
+      'float terrainElevFromIndex(float idx) {\n' +
+      '  if (idx < 0.5) return 0.0;\n' +
+      '  else if (idx < 1.5) return 1.0;\n' +
+      '  else if (idx < 2.5) return 3.0;\n' +
+      '  else if (idx < 3.5) return 0.0;\n' +
+      '  else if (idx < 4.5) return -1.0;\n' +
+      '  else if (idx < 5.5) return 0.0;\n' +
+      '  else if (idx < 6.5) return 2.0;\n' +
+      '  return 0.0;\n' +
       '}\n' +
       shader.vertexShader.replace(
         '#include <begin_vertex>',
@@ -194,6 +206,24 @@ export function createTerrainMaterial(
         // surface and the wave displacement (world-phase) keeps it seamless.
         if (abs(tidx - 4.0) < 0.5 && transformed.y > -1.0) {
           transformed.y = 0.0;
+        }
+
+        // P2: Biome-blend elevation transitions. When this tile's neighbor
+        // has a different elevation, blend the top-cap Y toward the midpoint
+        // so the transition is a smooth ramp, not a cliff. Both tiles agree
+        // on the shared edge height because both converge to the midpoint.
+        // Skip ocean/ice — coast mask handles those transitions separately.
+        float ntidx = floor(instanceNeighborTerrain + 0.5);
+        bool neighborIsWater = (ntidx > 3.5 && ntidx < 5.5);
+        if (!isOceanTile && !isIceTile && !neighborIsWater && transformed.y > -1.0) {
+          float thisElev = terrainElevFromIndex(tidx);
+          float neighborElev = terrainElevFromIndex(ntidx);
+          float elevDiff = neighborElev - thisElev;
+          if (abs(elevDiff) > 0.5) {
+            float radial = clamp(length(vLocalXZ) / uHexRadius, 0.0, 1.0);
+            float edgeBlend = smoothstep(0.55, 0.98, radial);
+            transformed.y += elevDiff * 0.5 * uTileHeight * edgeBlend;
+          }
         }
 
         // Top-cap micro-relief for all land biomes: FBM noise replaces
@@ -559,7 +589,7 @@ float terrainDetailNoise(vec2 p) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v25';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v26';
   return mat;
 }
 

@@ -23,7 +23,7 @@ describe('terrainShader', () => {
   it('exposes a versioned customProgramCacheKey', () => {
     const mat = createTerrainMaterial();
     // Bumping the version in terrainShader.ts must update this.
-    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v25');
+    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v26');
   });
 
   it('produces a stable fragment shader from onBeforeCompile', () => {
@@ -76,6 +76,9 @@ describe('terrainShader', () => {
     expect(capture.vertex).toContain('uHexRadius * 0.03');  // plains
     expect(capture.vertex).toContain('uHexRadius * 0.12');  // mountain
     expect(capture.vertex).toContain('uHexRadius * 0.08');  // hills
+    // P2: Elevation blend
+    expect(capture.vertex).toContain('terrainElevFromIndex');
+    expect(capture.vertex).toContain('elevDiff * 0.5 * uTileHeight');
     expect(capture.vertex).toMatchSnapshot();
   });
 });
