@@ -991,7 +991,15 @@ function ensureTerrainAtlasLoad(): void {
         terrainMaterial = null;
       }
     }
+    // Force rebuild on next updateHexWorldScene by clearing the signature.
+    // Also null the mesh so rebuildTerrainMesh can't early-return on the
+    // stale untextured mesh — it must recreate with the now-loaded atlas.
     tileCountSignature = '';
+    if (terrainMesh) {
+      terrainGroup.remove(terrainMesh);
+      terrainMesh.dispose();
+      terrainMesh = null;
+    }
   });
 }
 
@@ -1055,7 +1063,10 @@ export function updateHexWorldScene(
   // are the heavy ones (terrain mesh, ground plane, territory lines,
   // city clusters, units, labels). Skipping them on idle frames is
   // the entire point of the dirty-flag.
-  if (!stateDirty) return;
+  // Exception: if the terrain atlas just loaded (terrainMesh was nulled
+  // by ensureTerrainAtlasLoad), we must rebuild even on an idle frame.
+  const atlasJustLoaded = !terrainMesh && loadedTerrainAtlas !== null;
+  if (!stateDirty && !atlasJustLoaded) return;
   rebuildTerrainMesh(state, opts.fogEnabled, picker);
   rebuildGround(state);
   // Detect newly-revealed tiles and start fog fade-out transitions +
