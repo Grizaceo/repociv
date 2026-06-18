@@ -809,6 +809,30 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
       terrainMesh!.setColorAt(i, instanceColorForTile(tile, fogEnabled));
     });
     if (terrainMesh.instanceColor) terrainMesh.instanceColor.needsUpdate = true;
+    // P5: Update city colors for territory fill tint (territory may have changed)
+    const cityColorAttr = terrainMesh.geometry.getAttribute('instanceCityColor') as InstancedBufferAttribute | undefined;
+    if (cityColorAttr) {
+      const tileCityColor = new Map<string, [number, number, number]>();
+      for (const city of state.world.cities) {
+        const c = city.color;
+        if (!c) continue;
+        for (const coord of city.territory) tileCityColor.set(tileKey(coord), c);
+        tileCityColor.set(tileKey(city.coord), c);
+      }
+      tiles.forEach((tile, i) => {
+        const cc = tileCityColor.get(tileKey(tile.coord));
+        if (cc) {
+          cityColorAttr.array[i * 3] = cc[0];
+          cityColorAttr.array[i * 3 + 1] = cc[1];
+          cityColorAttr.array[i * 3 + 2] = cc[2];
+        } else {
+          cityColorAttr.array[i * 3] = 1;
+          cityColorAttr.array[i * 3 + 1] = 1;
+          cityColorAttr.array[i * 3 + 2] = 1;
+        }
+      });
+      cityColorAttr.needsUpdate = true;
+    }
     rebuildFogCover(state);
     return;
   }
@@ -834,6 +858,7 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
   const neighborIndices = new Float32Array(tiles.length);
   const coastMasks = new Float32Array(tiles.length);
   const oceanDepths = new Float32Array(tiles.length);
+  const cityColors = new Float32Array(tiles.length * 3);
   const instanceEntries: Array<{ instanceId: number; coord: Axial }> = [];
   const matrix = new Matrix4();
 
@@ -873,6 +898,18 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
     }
   }
 
+  // Build tileKey → city color map for territory fill tint (P5)
+  const tileCityColor = new Map<string, [number, number, number]>();
+  for (const city of state.world.cities) {
+    const c = city.color;
+    if (!c) continue;
+    for (const coord of city.territory) {
+      tileCityColor.set(tileKey(coord), c);
+    }
+    // City center tile
+    tileCityColor.set(tileKey(city.coord), c);
+  }
+
   tiles.forEach((tile, i) => {
     const elev = terrainElevation(tile.terrain);
     const pos = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
@@ -910,12 +947,24 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
       oceanDepths[i] = 0;
     }
     instanceEntries.push({ instanceId: i, coord: tile.coord });
+    // P5: Territory fill tint — look up city color for this tile
+    const cc = tileCityColor.get(tileKey(tile.coord));
+    if (cc) {
+      cityColors[i * 3] = cc[0];
+      cityColors[i * 3 + 1] = cc[1];
+      cityColors[i * 3 + 2] = cc[2];
+    } else {
+      cityColors[i * 3] = 1;
+      cityColors[i * 3 + 1] = 1;
+      cityColors[i * 3 + 2] = 1;
+    }
   });
 
   terrainMesh.geometry.setAttribute('instanceTerrain', new InstancedBufferAttribute(terrainIndices, 1));
   terrainMesh.geometry.setAttribute('instanceNeighborTerrain', new InstancedBufferAttribute(neighborIndices, 1));
   terrainMesh.geometry.setAttribute('instanceCoastMask', new InstancedBufferAttribute(coastMasks, 1));
   terrainMesh.geometry.setAttribute('instanceOceanDepth', new InstancedBufferAttribute(oceanDepths, 1));
+  terrainMesh.geometry.setAttribute('instanceCityColor', new InstancedBufferAttribute(cityColors, 3));
   terrainMesh.frustumCulled = false;
   terrainMesh.instanceMatrix.needsUpdate = true;
   if (terrainMesh.instanceColor) terrainMesh.instanceColor.needsUpdate = true;

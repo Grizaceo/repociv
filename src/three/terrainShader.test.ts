@@ -23,7 +23,7 @@ describe('terrainShader', () => {
   it('exposes a versioned customProgramCacheKey', () => {
     const mat = createTerrainMaterial();
     // Bumping the version in terrainShader.ts must update this.
-    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v26');
+    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v27');
   });
 
   it('produces a stable fragment shader from onBeforeCompile', () => {
@@ -79,6 +79,9 @@ describe('terrainShader', () => {
     // P2: Elevation blend
     expect(capture.vertex).toContain('terrainElevFromIndex');
     expect(capture.vertex).toContain('elevDiff * 0.5 * uTileHeight');
+    // P5: City color attribute and varying
+    expect(capture.vertex).toContain('attribute vec3 instanceCityColor');
+    expect(capture.vertex).toMatch(/vCityColor\s*=\s*instanceCityColor/);
     expect(capture.vertex).toMatchSnapshot();
   });
 });

@@ -110,6 +110,7 @@ export function createTerrainMaterial(
       'attribute float instanceNeighborTerrain;\n' +
       'attribute float instanceCoastMask;\n' +
       'attribute float instanceOceanDepth;\n' +
+      'attribute vec3 instanceCityColor;\n' +
       'varying float vTerrainIndex;\n' +
       'varying float vNeighborTerrainIndex;\n' +
       'varying float vCoastMask;\n' +
@@ -120,6 +121,7 @@ export function createTerrainMaterial(
       'varying vec2  vUv;\n' +
       'varying float vTopFace;\n' +
       'uniform float uTileHeight;\n' +
+      'varying vec3 vCityColor;\n' +
       // ── GLSL noise functions (public domain, hash-based value noise) ──────
       'float hash21(vec2 p) {\n' +
       '  p = fract(p * vec2(123.34, 456.21));\n' +
@@ -180,6 +182,7 @@ export function createTerrainMaterial(
         vUv           = uv;
         // normal.y > 0.5 in local space → top face
         vTopFace      = step(0.5, normal.y);
+        vCityColor    = instanceCityColor;
 
         // Differential elevation: scale prism height by biome
         float heightScale = 1.0;
@@ -285,6 +288,7 @@ export function createTerrainMaterial(
       'varying float vLocalY;\n' +
       'varying vec2  vUv;\n' +
       'varying float vTopFace;\n' +
+      'varying vec3  vCityColor;\n' +
       'uniform vec2  uCoastDir[6];\n' +
       'uniform float uTime;\n' +
       'uniform float uHexRadius;\n' +
@@ -416,6 +420,11 @@ float terrainDetailNoise(vec2 p) {
           // win almost completely there.
           float texMix = (tidx > 6.5) ? 0.93 : 0.82;
           diffuseColor.rgb = mix(diffuseColor.rgb, tex, texMix);
+        }
+        // P5: Territory fill tint — subtle city-colored wash on top face.
+        // vCityColor is [1,1,1] for unclaimed tiles (no tint).
+        if (vTopFace > 0.5) {
+          diffuseColor.rgb *= mix(vec3(1.0), vCityColor, 0.10);
         }
         // Radial vignette — very subtle
         if (vTopFace > 0.5) {
@@ -589,7 +598,7 @@ float terrainDetailNoise(vec2 p) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v26';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v27';
   return mat;
 }
 

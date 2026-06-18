@@ -10,6 +10,7 @@ varying vec2  vWorldXZ;
 varying float vLocalY;
 varying vec2  vUv;
 varying float vTopFace;
+varying vec3  vCityColor;
 uniform vec2  uCoastDir[6];
 uniform float uTime;
 uniform float uHexRadius;
@@ -134,6 +135,11 @@ void main() {
           // win almost completely there.
           float texMix = (tidx > 6.5) ? 0.93 : 0.82;
           diffuseColor.rgb = mix(diffuseColor.rgb, tex, texMix);
+        }
+        // P5: Territory fill tint — subtle city-colored wash on top face.
+        // vCityColor is [1,1,1] for unclaimed tiles (no tint).
+        if (vTopFace > 0.5) {
+          diffuseColor.rgb *= mix(vec3(1.0), vCityColor, 0.10);
         }
         // Radial vignette — very subtle
         if (vTopFace > 0.5) {
@@ -289,6 +295,7 @@ attribute float instanceTerrain;
 attribute float instanceNeighborTerrain;
 attribute float instanceCoastMask;
 attribute float instanceOceanDepth;
+attribute vec3 instanceCityColor;
 varying float vTerrainIndex;
 varying float vNeighborTerrainIndex;
 varying float vCoastMask;
@@ -299,6 +306,7 @@ varying float vLocalY;
 varying vec2  vUv;
 varying float vTopFace;
 uniform float uTileHeight;
+varying vec3 vCityColor;
 float hash21(vec2 p) {
   p = fract(p * vec2(123.34, 456.21));
   p += dot(p, p + 45.32);
@@ -357,6 +365,7 @@ void main() {
         vUv           = uv;
         // normal.y > 0.5 in local space → top face
         vTopFace      = step(0.5, normal.y);
+        vCityColor    = instanceCityColor;
 
         // Differential elevation: scale prism height by biome
         float heightScale = 1.0;
