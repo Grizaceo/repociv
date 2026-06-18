@@ -719,7 +719,9 @@ export class LocalRenderer {
 
     // ─── Isometric 2.5D Rendering Branch ───────────────────────────────
     if (this._isometric && world) {
-      if (!this.isoStaticLayer || this.isoStaticWorldId !== world.repoId) {
+      // P3: invalidate iso static layer when room visuals change (same key as 2D)
+      const isoCacheKey = `${world.repoId}:${world.rooms.reduce((n, r) => n + r.workbenches.length, 0)}:${world.rooms.filter((r) => r.highDensity).length}`;
+      if (!this.isoStaticLayer || this.isoStaticWorldId !== isoCacheKey) {
         this.rebuildIsoStaticLayer();
       }
       renderIsoModule({
@@ -985,7 +987,8 @@ export class LocalRenderer {
     this._isoStaticOffsetX = result.offsetX;
     this._isoStaticOffsetY = result.offsetY;
     this.isoStaticLayer = result.canvas;
-    this.isoStaticWorldId = world.repoId;
+    // P3: store full cache key (matches the invalidation check)
+    this.isoStaticWorldId = `${world.repoId}:${world.rooms.reduce((n, r) => n + r.workbenches.length, 0)}:${world.rooms.filter((r) => r.highDensity).length}`;
   }
 
   private visibleTileRect() {

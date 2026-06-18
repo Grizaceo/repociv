@@ -16,6 +16,8 @@ export function drawWindowLightRays(
   view: { x0: number; y0: number; x1: number; y1: number },
 ) {
   const { ctx, tileSize } = state;
+  const now = performance.now();
+  const shimmer = 0.85 + 0.15 * Math.sin(now / 3000); // P3: slow 3s shimmer
   for (let y = view.y0; y <= view.y1; y++) {
     for (let x = view.x0; x <= view.x1; x++) {
       const tile = world.grid[y]?.[x];
@@ -36,14 +38,16 @@ export function drawWindowLightRays(
         if (neighbor.type === 'floor' || neighbor.type === 'path') {
           const px = nx * tileSize;
           const py = ny * tileSize;
+          // P3: softer gradient with warm tint and shimmer
           const grad = ctx.createLinearGradient(
-            px + tileSize / 2 - dx * tileSize * 0.2,
-            py + tileSize / 2 - dy * tileSize * 0.2,
+            px + tileSize / 2 - dx * tileSize * 0.25,
+            py + tileSize / 2 - dy * tileSize * 0.25,
             px + tileSize / 2,
             py + tileSize / 2,
           );
-          grad.addColorStop(0, 'rgba(255, 255, 255, 0.18)');
-          grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+          grad.addColorStop(0, `rgba(255, 250, 235, ${0.22 * shimmer})`);
+          grad.addColorStop(0.5, `rgba(255, 245, 230, ${0.08 * shimmer})`);
+          grad.addColorStop(1, 'rgba(255, 245, 230, 0)');
           ctx.fillStyle = grad;
           ctx.fillRect(px, py, tileSize, tileSize);
         }

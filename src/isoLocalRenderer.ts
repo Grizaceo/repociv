@@ -1149,6 +1149,8 @@ function drawIsoPowerOverlay(state: IsoRenderState, world: LocalWorld, view: { x
 
 function drawIsoWindowLightRays(state: IsoRenderState, world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
   const { ctx } = state;
+  const now = performance.now();
+  const shimmer = 0.85 + 0.15 * Math.sin(now / 3000); // slow 3s shimmer
   for (let y = view.y0; y <= view.y1; y++) {
     for (let x = view.x0; x <= view.x1; x++) {
       const tile = world.grid[y]?.[x];
@@ -1168,16 +1170,18 @@ function drawIsoWindowLightRays(state: IsoRenderState, world: LocalWorld, view: 
         if (!neighbor) continue;
         if (neighbor.type === 'floor' || neighbor.type === 'path') {
           const base = isoProject(nx, ny);
+          // P3: softer, longer rays with shimmer
           const rayGrad = ctx.createRadialGradient(
-            base.px - dx * ISO_TILE_W * 0.15,
-            base.py - dy * ISO_TILE_H * 0.15,
+            base.px - dx * ISO_TILE_W * 0.2,
+            base.py - dy * ISO_TILE_H * 0.2,
             0,
             base.px,
             base.py,
-            ISO_TILE_W * 0.6,
+            ISO_TILE_W * 0.8, // wider radius for softer falloff
           );
-          rayGrad.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
-          rayGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+          rayGrad.addColorStop(0, `rgba(255, 250, 235, ${0.22 * shimmer})`);
+          rayGrad.addColorStop(0.5, `rgba(255, 245, 230, ${0.08 * shimmer})`);
+          rayGrad.addColorStop(1, 'rgba(255, 245, 230, 0)');
           ctx.fillStyle = rayGrad;
           const corners = isoTileCorners(nx, ny);
           ctx.beginPath();
