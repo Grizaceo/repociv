@@ -14,7 +14,7 @@ describe('HexWorldScene sun stability', () => {
     updateHexWorldScene(
       scene,
       {} as never,
-      { animTime: 0, lod: 'high', fogEnabled: true, showStructure: true, showOps: true, showLabels: true } as never,
+      { animTime: 0, dt: 0, lod: 'high', fogEnabled: true, showStructure: true, showOps: true, showLabels: true } as never,
       {} as never,
       false,
     );
@@ -23,7 +23,7 @@ describe('HexWorldScene sun stability', () => {
     updateHexWorldScene(
       scene,
       {} as never,
-      { animTime: 500, lod: 'high', fogEnabled: true, showStructure: true, showOps: true, showLabels: true } as never,
+      { animTime: 500, dt: 0, lod: 'high', fogEnabled: true, showStructure: true, showOps: true, showLabels: true } as never,
       {} as never,
       false,
     );

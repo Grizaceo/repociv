@@ -56,6 +56,7 @@ import {
   rebuildUnits,
   setUnitsVisible,
   clearUnits,
+  tickUnits,
 } from './UnitMesh3D.ts';
 import { rebuildMapLabels, getLabelGroup } from './MapLabels3D.ts';
 import { rebuildGroundPlane, getGroundMesh, disposeGroundMesh } from './GroundPlane3D.ts';
@@ -103,6 +104,10 @@ export interface HexSceneRenderOptions {
   showKnowledge: boolean;
   showLabs: boolean;
   animTime: number;
+  /** Delta time in seconds since the last frame. Drives per-frame
+   *  animations (unit spawn/despawn tweens, idle pulses, walking hops)
+   *  that progress independently of the dirty-flag rebuilds. */
+  dt: number;
 }
 
 const terrainGroup = new Group();
@@ -903,6 +908,10 @@ export function updateHexWorldScene(
   animateTerritoryPulse(opts.animTime);
   if (stateDirty) rebuildFoam(state, opts.animTime);
   animateFoamPulse(opts.animTime);
+  // Per-frame unit animations (spawn/despawn tweens, idle pulse, walking
+  // hop). Runs every frame regardless of dirty state — the tweens progress
+  // smoothly between rebuilds.
+  tickUnits(opts.animTime, opts.dt);
 
   // State-driven rebuilds: only when the world actually changed. These
   // are the heavy ones (terrain mesh, ground plane, territory lines,

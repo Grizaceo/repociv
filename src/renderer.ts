@@ -60,6 +60,8 @@ export class Renderer {
   private animTime = 0;
   /** Non-null = animTime pinned (deterministic golden captures, ?freeze=). */
   private _frozenAnimTime: number | null = null;
+  /** Delta time in seconds from the RAF loop, passed to 3D per-frame animations. */
+  private _dt = 0;
   // Phase D: WebGL frame metrics
   private _frameTimeSum = 0;
   private _frameTimeCount = 0;
@@ -971,6 +973,7 @@ export class Renderer {
       const frameStart = performance.now();
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
+      this._dt = dt;
       if (this._frozenAnimTime === null) {
         this.animTime += dt;
       } else {
@@ -1152,6 +1155,7 @@ export class Renderer {
       this.threeMap.render(this.state, this.cam, {
         fogEnabled: this.fogEnabled,
         animTime: this.animTime,
+        dt: this._dt,
         lod,
         showStructure,
         showOps,

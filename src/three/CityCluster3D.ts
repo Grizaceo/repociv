@@ -186,6 +186,7 @@ export function rebuildCityClusters(
     // extruded). ONE geometry per city, not 6 separate boxes. The previous
     // 6-box design left gaps at every corner, so walls read as 6 scattered
     // dots instead of one continuous fortification.
+    let ringWallGeom: ExtrudeGeometry;
     {
       const outerR = HEX_SIZE * 0.40;
       const innerR = HEX_SIZE * 0.34;
@@ -215,7 +216,7 @@ export function rebuildCityClusters(
       // After rotation the extrusion direction points -Y. Flip the Z coords
       // so the wall extrudes upward instead of sinking into the ground.
       wall3d.scale(1, 1, -1);
-      var ringWallGeom: ExtrudeGeometry = wall3d;
+      ringWallGeom = wall3d;
     }
     const wallGeom: ExtrudeGeometry = ringWallGeom;
     const wallMat = new MeshLambertMaterial({ color: new Color(0xb0a898) });
