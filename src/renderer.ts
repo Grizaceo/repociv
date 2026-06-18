@@ -165,6 +165,10 @@ export class Renderer {
   constructor(canvas: HTMLCanvasElement, state: GameState) {
     this.canvas = canvas;
     this.canvas.tabIndex = 0;
+    // Layer 3: explicit initial state for the localActive dataset.
+    // render() will keep it in sync with state.viewMode; this just
+    // makes the macro-view state observable on the canvas from frame 0.
+    this.canvas.dataset['localActive'] = 'false';
     this.ctx = canvas.getContext('2d')!;
     this.state = state;
     this.hexR = new HexRenderer(this.ctx);
@@ -343,8 +347,29 @@ export class Renderer {
   }
 
   private setupInput() {
+    // Phase 6+: when local view is active, the canvas is shared with
+    // LocalRenderer (same element, both register listeners). The local
+    // renderer is the legitimate owner of clicks in that mode, and its
+    // listeners use stopImmediatePropagation() to block propagation to
+    // other canvas listeners. We belt-and-suspenders this on our side
+    // with an early-return so we never run global pickAxial / gesture
+    // state logic while the user is interacting with the local 2D iso
+    // view. Symptom: "ciertas casillas en local view abren ventanas
+    // de otras ciudades" (2026-06-12, recurring).
+    const bailIfLocal = () => {
+      // Two-channel guard: state viewMode is the source of truth, and
+      // the canvas's data-local-active attribute is updated in render()
+      // as a parallel signal. Either one being set short-circuits the
+      // global click handlers. This is the Layer 1 + Layer 3 input
+      // isolation (Layer 2 is stopImmediatePropagation in localRenderer).
+      if (this.state.viewMode === 'local') return true;
+      if (this.canvas.dataset['localActive'] === 'true') return true;
+      return false;
+    };
+
     // ── mousedown: decide gesture mode ──────────────────────────────────────
     this.canvas.addEventListener('mousedown', (e) => {
+      if (bailIfLocal()) return;
       if (e.button !== 0) return;
       const rect = this.canvas.getBoundingClientRect();
       const wx = e.clientX - rect.left;
@@ -402,6 +427,7 @@ export class Renderer {
 
     // ── mousemove ────────────────────────────────────────────────────────────
     this.canvas.addEventListener('mousemove', (e) => {
+      if (bailIfLocal()) return;
       const rect = this.canvas.getBoundingClientRect();
       const wx = e.clientX - rect.left;
       const wy = e.clientY - rect.top;
@@ -465,6 +491,7 @@ export class Renderer {
 
     // ── mouseup: resolve gesture ─────────────────────────────────────────────
     this.canvas.addEventListener('mouseup', (e) => {
+      if (bailIfLocal()) return;
       if (e.button !== 0) return;
       const rect = this.canvas.getBoundingClientRect();
       const wx = e.clientX - rect.left;
@@ -588,6 +615,7 @@ export class Renderer {
     this.canvas.addEventListener(
       'wheel',
       (e) => {
+        if (bailIfLocal()) return;
         e.preventDefault();
         const factor = e.deltaY > 0 ? 0.9 : 1.1;
         const newZoom = Math.max(0.15, Math.min(4, this.cam.zoom * factor));
@@ -611,6 +639,7 @@ export class Renderer {
 
     // ── contextmenu (right-click): unit OR city menu ─────────────────────────
     this.canvas.addEventListener('contextmenu', (e) => {
+      if (bailIfLocal()) return;
       e.preventDefault();
       this.actionMode = 'none';
       const rect = this.canvas.getBoundingClientRect();
@@ -666,11 +695,13 @@ export class Renderer {
 
     // ── mouseleave: hide unit tooltip ────────────────────────────────────────
     this.canvas.addEventListener('mouseleave', () => {
+      if (bailIfLocal()) return;
       if (this.unitTooltipEl) this.unitTooltipEl.style.display = 'none';
     });
 
     // ── dblclick: enter RimWorld local view ──────────────────────────────────
     this.canvas.addEventListener('dblclick', (e) => {
+      if (bailIfLocal()) return;
       const rect = this.canvas.getBoundingClientRect();
       const wx = e.clientX - rect.left;
       const wy = e.clientY - rect.top;
@@ -760,6 +791,13 @@ export class Renderer {
   }
 
   private handleClick(e: MouseEvent) {
+    // Backstop: even if a code path bypasses the listener-level
+    // bailIfLocal() guard (e.g. a future refactor, or direct call from
+    // a test), refuse to do global click work while local view owns the
+    // canvas. This is Layer 3 of the local-view input isolation.
+    if (this.state.viewMode === 'local') return;
+    if (this.canvas.dataset['localActive'] === 'true') return;
+
     const rect = this.canvas.getBoundingClientRect();
     const wx = e.clientX - rect.left;
     const wy = e.clientY - rect.top;
@@ -1042,6 +1080,10 @@ export class Renderer {
       if (!document.body.classList.contains('local-view')) {
         document.body.classList.add('local-view');
       }
+      // Layer 3 input isolation: mirror view mode into a DOM attribute
+      // on the canvas so CSS and the bailIfLocal backstop have a
+      // second, framework-independent signal channel.
+      this.canvas.dataset['localActive'] = 'true';
       const frame = document.getElementById('local-view-frame');
       if (frame) frame.classList.remove('hidden');
       if (!this.localR) return; // still loading module — next frame will retry
@@ -1068,6 +1110,7 @@ export class Renderer {
 
     if (document.body.classList.contains('local-view')) {
       document.body.classList.remove('local-view');
+      this.canvas.dataset['localActive'] = 'false';
       const frame = document.getElementById('local-view-frame');
       if (frame) frame.classList.add('hidden');
       this.onExitLocalView?.();

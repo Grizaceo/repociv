@@ -338,12 +338,15 @@ export class LocalRenderer {
   setupInput() {
     const canvas = this.canvas;
 
-    // Local view owns clicks. Stop the event from bubbling to the global
-    // canvas's handlers, which would otherwise pick a tile using the
-    // GLOBAL grid coordinates (different scale + offset) and open a
-    // different city's panel. Symptom reported 2026-06-12: "ciertas
-    // casillas en local view abren ventanas de otras ciudades".
-    const stopBubble = (e: MouseEvent) => e.stopPropagation();
+    // Local view owns clicks. We must stop the event from reaching the
+    // GLOBAL renderer's listeners (which are registered on the same
+    // canvas, earlier than us, in render()'s setupInput). stopPropagation
+    // alone is insufficient: it only blocks bubbling to ancestor elements,
+    // not other listeners on the same target. stopImmediatePropagation
+    // also halts the remaining listeners on this canvas. The global
+    // renderer also early-returns via bailIfLocal() in setupInput, so
+    // these two mechanisms are defense in depth.
+    const stopBubble = (e: MouseEvent) => e.stopImmediatePropagation();
 
     canvas.addEventListener('mousedown', (e) => {
       stopBubble(e);
