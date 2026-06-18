@@ -65,9 +65,6 @@
           <button id="btn-observability" title="Observabilidad [F8]" aria-label="Panel de observabilidad">
             <i data-lucide="activity"></i><span class="obs-health-dot"></span>
           </button>
-          <button id="btn-tasks" title="Tareas activas [F9]" aria-label="Panel de tareas">
-            <i data-lucide="clipboard-list"></i>
-          </button>
           <button id="btn-pending" title="Pendientes del tracker" aria-label="Panel de pendientes">
             <i data-lucide="file-text"></i>
           </button>
@@ -76,12 +73,6 @@
           </button>
           <button id="btn-task-assign" title="Asignar tareas [J]" aria-label="Panel de asignación de tareas">
             <i data-lucide="crosshair"></i>
-          </button>
-          <button id="btn-timeline" title="Crónica de eventos [F10]" aria-label="Crónica de eventos">
-            <i data-lucide="scroll-text"></i>
-          </button>
-          <button id="btn-toggle-3d" title="Cambiar Vista 2D/3D [3]" aria-label="Cambiar vista 2D/3D">
-            <i data-lucide="box"></i>
           </button>
           <button id="btn-screenshot" title="Captura de Pantalla [F12]" aria-label="Captura de pantalla">
             <i data-lucide="camera"></i>
@@ -212,8 +203,19 @@
           <div id="event-log">
             <div id="log-messages"></div>
           </div>
+          <div id="minimap-button-strip">
+            <button id="btn-toggle-3d" title="Cambiar Vista 2D/3D [3]" aria-label="Cambiar vista 2D/3D">
+              <i data-lucide="box"></i>
+            </button>
+            <button id="btn-tasks" title="Tareas activas [F9]" aria-label="Panel de tareas">
+              <i data-lucide="clipboard-list"></i>
+            </button>
+            <button id="btn-timeline" title="Crónica de eventos [F10]" aria-label="Crónica de eventos">
+              <i data-lucide="scroll-text"></i>
+            </button>
+          </div>
           <div id="minimap-container">
-            <canvas id="minimap-canvas" width="220" height="160"></canvas>
+            <canvas id="minimap-canvas" width="280" height="200"></canvas>
           </div>
         </div>
       </footer>

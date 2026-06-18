@@ -440,8 +440,8 @@
 }
 
 #minimap-container {
-  width: 220px;
-  height: 160px;
+  width: 280px;
+  height: 200px;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   box-shadow: var(--shadow-deep);
@@ -452,6 +452,48 @@
 #minimap-canvas {
   display: block;
   cursor: crosshair;
+}
+
+/* ─── Minimap button strip (Civ V bottom-right cluster) ─────────────── */
+#minimap-button-strip {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+#minimap-button-strip button {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  color: var(--ui-text-dim);
+  cursor: pointer;
+  padding: 0;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+#minimap-button-strip button:hover {
+  border-color: var(--ui-gold, #c8a84b);
+  color: var(--ui-text);
+}
+
+#minimap-button-strip button:active {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+#minimap-button-strip button.hidden {
+  display: none;
+}
+
+#minimap-button-strip button i {
+  width: 16px;
+  height: 16px;
 }
 
 /* ─── Local-view floating controls (top-right, above minimap) ────────── */
@@ -503,7 +545,7 @@ body.local-view #local-view-controls {
   position: absolute;
   top: 48px;
   right: 0;
-  bottom: 200px;
+  bottom: 260px;
   width: 420px;
   background: var(--panel-bg);
   border-left: 1px solid var(--panel-border);
