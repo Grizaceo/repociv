@@ -91,6 +91,13 @@ import {
   clearTilePopup,
 } from './TilePopup3D.ts';
 import {
+  getFogTransitionGroup,
+  updateFogTransition,
+  tickFogTransition,
+  clearFogTransition,
+  _testResetPrevUnrevealed,
+} from './FogTransition3D.ts';
+import {
   getResourcePropsGroup,
   ensureResourcePropsLoad,
   rebuildResourceProps,
@@ -203,6 +210,7 @@ export function createHexWorldScene(): Scene {
   scene.add(getUnitGroup());
   scene.add(getTileFlashGroup());
   scene.add(getTilePopupGroup());
+  scene.add(getFogTransitionGroup());
   scene.add(getLabelGroup());
   scene.add(getWonderPropsGroup());
 
@@ -932,6 +940,8 @@ export function updateHexWorldScene(
   tickCities(opts.dt);
   // Per-frame tile flash fade-out. Frozen dt=0 keeps goldens stable.
   tickTileFlash(opts.dt);
+  // Per-frame fog transition fade-out + particle animation.
+  tickFogTransition(opts.dt);
 
   // State-driven rebuilds: only when the world actually changed. These
   // are the heavy ones (terrain mesh, ground plane, territory lines,
@@ -940,6 +950,13 @@ export function updateHexWorldScene(
   if (!stateDirty) return;
   rebuildTerrainMesh(state, opts.fogEnabled, picker);
   rebuildGround(state);
+  // Detect newly-revealed tiles and start fog fade-out transitions +
+  // city discovery particle bursts. Must run AFTER rebuildTerrainMesh
+  // (which calls rebuildFogCover) so the main fog cover is already updated.
+  updateFogTransition(
+    Array.from(state.world.tiles.values()),
+    (key) => state.world.tiles.get(key),
+  );
   rebuildTerritoryLines(state, opts.animTime, opts.showStructure, opts.lod);
 
   setDecorVisible(opts.showStructure || opts.showOps);
@@ -985,6 +1002,7 @@ export function disposeHexWorldScene(scene: Scene): void {
   clearUnits();
   clearTileFlash();
   clearTilePopup();
+  clearFogTransition();
   if (terrainMesh) {
     terrainGroup.remove(terrainMesh);
     terrainMesh.dispose();
