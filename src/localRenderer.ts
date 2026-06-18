@@ -23,7 +23,9 @@ import {
   ISO_TILE_H,
   ISO_TILE_W,
   ISO_WALL_H,
+  computeUnitDirAngle,
   drawIsoTile as drawIsoTileModule,
+  isUnitMoving,
   isoProject,
   isoUnproject,
   renderIso as renderIsoModule,
@@ -2265,19 +2267,15 @@ export class LocalRenderer {
     }
 
     // Determine motion vectors & angles
-    let dirAngle = 0;
-    let isMoving = false;
-    if (unit.path.length > 0 && unit.pathIndex < unit.path.length) {
-      isMoving = true;
-      const from = unit.path[unit.pathIndex]!;
-      const to = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;
-      dirAngle = Math.atan2(to.y - from.y, to.x - from.x);
-    } else if (unit.state === 'working_on_file' && unit.currentWorkbenchId) {
-      const wbTile = this.world?.grid
-        .flat()
-        .find((t) => t.workbench?.id === unit.currentWorkbenchId);
-      if (wbTile) dirAngle = Math.atan2(wbTile.y - unit.gridY, wbTile.x - unit.gridX);
-    }
+    //
+    // Pre-fix, working units were rotated to face the workbench
+    // (atan2(desk.y - unit.gridY, ...)) which made the 2D body sprite lie
+    // down — same bug the iso renderer had. Stationary units now keep
+    // their body upright; the shared computeUnitDirAngle() helper returns
+    // 0 for non-moving units. See isoLocalRenderer.ts for the rationale
+    // and isoLocalRenderer.test.ts for coverage.
+    const isMoving = isUnitMoving(unit);
+    const dirAngle = computeUnitDirAngle(unit);
 
     // Physically-correct Squash & Stretch (Fase 7)
     const speed = isMoving ? 3.6 * unit.effectiveSpeed : 0;

@@ -668,6 +668,34 @@ function drawIsoWindowTile(
   }
 }
 
+/** True when the unit is mid-walk along its current path. */
+export function isUnitMoving(unit: LocalUnit): boolean {
+  return unit.path.length > 0 && unit.pathIndex < unit.path.length;
+}
+
+/**
+ * Returns the angle (radians) used to rotate the unit's body in drawIsoUnit.
+ *
+ * Behavior:
+ *   - If the unit is mid-walk, return the direction of the current step
+ *     (atan2 of the delta from `path[pathIndex]` to the next waypoint).
+ *   - If the unit is stationary (working, idle, resting, etc.), return 0.
+ *
+ * Why 0 for stationary: the iso unit sprite is a 3D-looking prism stack
+ * (legs, torso, head, helmet) and rotating the whole body by 90° makes it
+ * look like it is lying down, not "facing" the desk. For an iso sprite
+ * the facing direction is implicit from the unit's position relative to
+ * the workbench (it sits in the chair, in front of the desk). We only
+ * rotate the body during walking, where the lean reads as "leaning into
+ * the step".
+ */
+export function computeUnitDirAngle(unit: LocalUnit): number {
+  if (!isUnitMoving(unit)) return 0;
+  const from = unit.path[unit.pathIndex]!;
+  const to = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;
+  return Math.atan2(to.y - from.y, to.x - from.x);
+}
+
 function drawIsoUnit(state: IsoRenderState, unit: LocalUnit, gx: number, gy: number) {
   const { ctx } = state;
   const base = isoProject(gx, gy);
@@ -678,17 +706,8 @@ function drawIsoUnit(state: IsoRenderState, unit: LocalUnit, gx: number, gy: num
     state.spawnZzz(ux, uy);
   }
 
-  let dirAngle = 0;
-  let isMoving = false;
-  if (unit.path.length > 0 && unit.pathIndex < unit.path.length) {
-    isMoving = true;
-    const from = unit.path[unit.pathIndex]!;
-    const to = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;
-    dirAngle = Math.atan2(to.y - from.y, to.x - from.x);
-  } else if (unit.state === 'working_on_file' && unit.currentWorkbenchId) {
-    const wbTile = state.world.grid.flat().find((t) => t.workbench?.id === unit.currentWorkbenchId);
-    if (wbTile) dirAngle = Math.atan2(wbTile.y - unit.gridY, wbTile.x - unit.gridX);
-  }
+  const isMoving = isUnitMoving(unit);
+  const dirAngle = computeUnitDirAngle(unit);
 
   const speed = isMoving ? 3.6 * unit.effectiveSpeed : 0;
   const Sf = 1 + Math.min(0.25, speed * 0.08);
