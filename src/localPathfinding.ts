@@ -36,6 +36,30 @@ export interface PathResult {
   cost: number; // total path cost
 }
 
+// ─── Seat lookup ──────────────────────────────────────────────────────────────
+// When an agent is sent to a workbench, they should walk to the chair in
+// front of the desk — not the desk tile itself. The desk tile is the place
+// you double-click to open the folder; the chair tile (one step in the
+// desk's facing direction) is where the agent visibly sits. Returns the
+// desk position as a fallback if no chair neighbor exists (edge cases:
+// mis-laid out rooms, hand-edited worlds, future desk types without a
+// chair).
+export function chairTileForWorkbench(
+  world: LocalWorld,
+  deskX: number,
+  deskY: number,
+): { x: number; y: number } {
+  const tile = world.grid[deskY]?.[deskX];
+  const facing = tile?.facing ?? 's';
+  const dx = facing === 'e' ? 1 : facing === 'w' ? -1 : 0;
+  const dy = facing === 's' ? 1 : facing === 'n' ? -1 : 0;
+  const candidate = world.grid[deskY + dy]?.[deskX + dx];
+  if (candidate?.type === 'chair') {
+    return { x: deskX + dx, y: deskY + dy };
+  }
+  return { x: deskX, y: deskY };
+}
+
 // ─── A* on 2D grid ─────────────────────────────────────────────────────────────
 export function findPath(
   world: LocalWorld,

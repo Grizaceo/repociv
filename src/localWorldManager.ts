@@ -5,7 +5,7 @@
 import type { Unit, LocalWorld, LocalUnit, LocalTile, LocalMission, ViewMode } from './types.ts';
 import { UNIT_COLORS } from './types.ts';
 import { generateLocalWorldFromApi, buildMockLocalWorld, BATTERY_STORED } from './localMap.ts';
-import { findPath, findNearestWorkbench } from './localPathfinding.ts';
+import { findPath, findNearestWorkbench, chairTileForWorkbench } from './localPathfinding.ts';
 import { peekNextMission } from './priorityMatrix.ts';
 import { logger } from './logger.ts';
 
@@ -454,7 +454,11 @@ export class LocalWorldManager {
       queued.workbench = best.workbench;
     }
 
-    const pathResult = findPath(this.localWorld, unit.gridX, unit.gridY, wbX, wbY);
+    // Phase 6 fix: walk to the chair in front of the desk, not the desk
+    // tile itself. The desk tile is the click-target for opening the
+    // folder; the chair is the visible seat for the agent.
+    const seat = chairTileForWorkbench(this.localWorld, wbX, wbY);
+    const pathResult = findPath(this.localWorld, unit.gridX, unit.gridY, seat.x, seat.y);
     if (!pathResult) return;
 
     unit.currentWorkbenchId = wbId;
@@ -497,7 +501,10 @@ export class LocalWorldManager {
       queued.workbench = best.workbench;
     }
 
-    const pathResult = findPath(this.localWorld, unit.gridX, unit.gridY, wbX, wbY);
+    // Phase 6 fix: walk to the chair in front of the desk, not the desk
+    // tile itself. See _dispatchQueuedMission for the rationale.
+    const seat = chairTileForWorkbench(this.localWorld, wbX, wbY);
+    const pathResult = findPath(this.localWorld, unit.gridX, unit.gridY, seat.x, seat.y);
     if (!pathResult) return;
 
     unit.currentWorkbenchId = wbId;

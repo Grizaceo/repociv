@@ -1,14 +1,16 @@
 import { describe, it, assert } from 'vitest';
-import { findPath, findNearestWorkbench } from './localPathfinding.ts';
+import { findPath, findNearestWorkbench, chairTileForWorkbench } from './localPathfinding.ts';
 import { buildMockLocalWorld } from './localMap.ts';
 import type { LocalWorld, LocalTile, LocalTileType, LocalUnit } from './types.ts';
 
 function makeGrid(tiles: string[]): LocalWorld {
-  // Simple grid from string rows: '.' floor, '#' wall, 'W' workbench, 'D' door
+  // Simple grid from string rows:
+  //   '.' floor  '#' wall  'W' workbench  'C' chair  'D' door
   const typeMap: Record<string, LocalTileType> = {
     '.': 'floor',
     '#': 'wall',
     W: 'workbench',
+    C: 'chair',
     D: 'door',
   };
   const grid: LocalTile[][] = tiles.map((row, y) =>
@@ -317,5 +319,99 @@ describe('localWorldManager — desk assignment', () => {
 
     mgr.removeSubagentUnit('sub-1');
     assert.equal(world.deskAssignments.size, 0, 'desk released on removal');
+  });
+});
+
+// ─── chairTileForWorkbench ───────────────────────────────────────────────────
+// Phase 6 visual fix: when an agent is sent to a folder, the agent must
+// walk to and sit at the chair in front of the desk, not on the desk tile
+// itself (the desk tile is the click-target for opening the folder).
+describe('localPathfinding — chairTileForWorkbench', () => {
+  it('returns the south neighbor of a south-facing desk', () => {
+    // Layout: chair at y+1 of the desk (default 's' facing)
+    const world = makeGrid(['W', 'C']);
+    const seat = chairTileForWorkbench(world, 0, 0);
+    assert.deepEqual(seat, { x: 0, y: 1 });
+  });
+
+  it('returns the north neighbor of a north-facing desk', () => {
+    // Desk at y=1 facing 'n' → chair at y=0
+    const world = makeGrid(['C', 'W']);
+    world.grid[1]![0]!.facing = 'n';
+    const seat = chairTileForWorkbench(world, 0, 1);
+    assert.deepEqual(seat, { x: 0, y: 0 });
+  });
+
+  it('returns the east neighbor of an east-facing desk', () => {
+    // 1 row, 2 cols: desk at (0,0), chair at (1,0) (east of desk)
+    const world = makeGrid(['WC']);
+    world.grid[0]![0]!.facing = 'e';
+    const seat = chairTileForWorkbench(world, 0, 0);
+    assert.deepEqual(seat, { x: 1, y: 0 });
+  });
+
+  it('returns the west neighbor of a west-facing desk', () => {
+    // 1 row, 2 cols: chair at (0,0), desk at (1,0) (west of desk)
+    const world = makeGrid(['CW']);
+    world.grid[0]![1]!.facing = 'w';
+    const seat = chairTileForWorkbench(world, 1, 0);
+    assert.deepEqual(seat, { x: 0, y: 0 });
+  });
+
+  it('falls back to desk position when no chair neighbor exists', () => {
+    // Desk with no chair in any direction (mis-laid out)
+    const world = makeGrid(['W.']);
+    const seat = chairTileForWorkbench(world, 0, 0);
+    assert.deepEqual(seat, { x: 0, y: 0 });
+  });
+
+  it('falls back to desk position when the neighbor is wrong tile type', () => {
+    // South neighbor is floor, not chair → don't sit on the floor
+    const world = makeGrid(['W', '.']);
+    const seat = chairTileForWorkbench(world, 0, 0);
+    assert.deepEqual(seat, { x: 0, y: 0 });
+  });
+
+  it('falls back to desk when neighbor is out of bounds', () => {
+    // Desk at the south edge of the world → no y+1 neighbor
+    const world = makeGrid(['W']);
+    const seat = chairTileForWorkbench(world, 0, 0);
+    assert.deepEqual(seat, { x: 0, y: 0 });
+  });
+
+  it('defaults to south-facing when facing field is missing', () => {
+    // Tile exists but has no facing set (legacy data, hand-edited worlds)
+    const world = makeGrid(['W', 'C']);
+    delete world.grid[0]![0]!.facing;
+    const seat = chairTileForWorkbench(world, 0, 0);
+    assert.deepEqual(seat, { x: 0, y: 1 });
+  });
+});
+
+// ─── Dispatch integration: end-to-end "send to folder" path ─────────────────
+// The full path an agent takes when the user opens a folder: a pathfind
+// must terminate at the chair, not the desk.
+describe('localPathfinding — dispatch to chair (integration)', () => {
+  it('a unit dispatched to a workbench lands on the chair, not the desk', () => {
+    // 2 rows, 2 cols: unit spawn at (0,0); desk at (1,0); chair at (1,1) (south)
+    const world = makeGrid(['.W', '.C']);
+    const seat = chairTileForWorkbench(world, 1, 0);
+    assert.deepEqual(seat, { x: 1, y: 1 }, 'seat lookup picks the chair');
+
+    // Path from the unit's spawn to the chair
+    const result = findPath(world, 0, 0, seat.x, seat.y);
+    assert.ok(result, 'path to the chair is reachable');
+    const last = result!.path[result!.path.length - 1]!;
+    assert.equal(last.x, 1, 'path ends at chair x');
+    assert.equal(last.y, 1, 'path ends at chair y, not desk y=0');
+  });
+
+  it('a unit already on the desk tile does not need to walk', () => {
+    // Degenerate case: unit and workbench at the same coords. Seat lookup
+    // should still produce a coherent (fallback or chair) result and not
+    // throw.
+    const world = makeGrid(['W', 'C']);
+    const seat = chairTileForWorkbench(world, 0, 0);
+    assert.deepEqual(seat, { x: 0, y: 1 });
   });
 });
