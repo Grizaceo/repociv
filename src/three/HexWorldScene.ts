@@ -135,10 +135,9 @@ let terrainMesh: InstancedMesh | null = null;
 let fogCoverMesh: InstancedMesh | null = null;
 let fogPuffMesh: InstancedMesh | null = null;
 let fogCoverSignature = '';
-let territoryInner: LineSegments | null = null;
-let territoryCapitalInner: LineSegments | null = null;
-let territoryGlow: LineSegments | null = null;
-let territoryLod: 'low' | 'medium' | 'high' = 'medium';
+// Per-city territory borders. Each entry is one LineSegments with that
+// city's color. Caps at 50 cities; beyond that, falls back to single-color.
+let territoryLines: LineSegments[] = [];
 let shorelineRings: LineSegments | null = null;
 let shorelineSignature = '';
 // Per-vertex base data for the in-place pulse: [cx, cy, cz, ux, uz] × vertex.
@@ -257,31 +256,21 @@ function dominantNeighborTerrain(
 }
 
 function clearTerritoryLines(): void {
-  for (const line of [territoryInner, territoryCapitalInner, territoryGlow]) {
-    if (!line) continue;
+  for (const line of territoryLines) {
     terrainGroup.remove(line);
     line.geometry.dispose();
     (line.material as LineBasicMaterial).dispose();
   }
-  territoryInner = null;
-  territoryCapitalInner = null;
-  territoryGlow = null;
+  territoryLines = [];
 }
 
 function animateTerritoryPulse(animTime: number): void {
-  if (!territoryInner && !territoryCapitalInner && !territoryGlow) return;
+  if (territoryLines.length === 0) return;
   const pulse = 0.90 + 0.06 * Math.sin(animTime * 2.2);
-  if (territoryInner) {
-    const mat = territoryInner.material as LineBasicMaterial;
-    mat.opacity = (territoryLod === 'high' ? 0.45 : 0.38) * pulse;
-  }
-  if (territoryCapitalInner) {
-    const mat = territoryCapitalInner.material as LineBasicMaterial;
-    mat.opacity = (territoryLod === 'high' ? 0.50 : 0.42) * pulse;
-  }
-  if (territoryGlow) {
-    const mat = territoryGlow.material as LineBasicMaterial;
-    mat.opacity = 0.12 * pulse;
+  for (const line of territoryLines) {
+    const mat = line.material as LineBasicMaterial;
+    const baseOpacity = (mat.userData.baseOpacity as number) ?? 0.45;
+    mat.opacity = baseOpacity * pulse;
   }
 }
 
@@ -293,104 +282,174 @@ function rebuildTerritoryLines(
 ): void {
   clearTerritoryLines();
   if (!visible) return;
-  territoryLod = lod;
 
   const allTerritory = new Set<string>();
   for (const city of state.world.cities) {
     for (const c of city.territory) allTerritory.add(tileKey(c));
   }
 
-  const normalInner: number[] = [];
-  const capitalInner: number[] = [];
-  const glowSegments: number[] = [];
   const getTile = (c: Axial) => state.world.tiles.get(tileKey(c));
+  const cities = state.world.cities.filter((c) => c.territory.length > 0);
+  const usePerCity = cities.length <= 50;
 
-  for (const city of state.world.cities) {
-    if (city.territory.length === 0) continue;
-    const inTerritory = new Set(city.territory.map((c) => tileKey(c)));
-    const innerSegments = city.isCapital ? capitalInner : normalInner;
+  if (usePerCity) {
+    // Per-city borders: each city gets its own LineSegments with its color.
+    cities.forEach((city, cityIdx) => {
+      const innerSegments: number[] = [];
+      const glowSegments: number[] = [];
+      const inTerritory = new Set(city.territory.map((c) => tileKey(c)));
+      // Y offset per city to avoid z-fighting on shared edges.
+      const yOff = cityIdx * 0.05;
 
-    for (const coord of city.territory) {
-      const tile = getTile(coord);
-      const elev = tile ? terrainElevation(tile.terrain) : 0;
-      for (let d = 0; d < 6; d++) {
-        const neighbor = {
-          q: coord.q + AXIAL_DIRECTIONS[d]!.q,
-          r: coord.r + AXIAL_DIRECTIONS[d]!.r,
-        };
-        const nKey = tileKey(neighbor);
-        if (lod === 'low') {
-          if (allTerritory.has(nKey)) continue;
-        } else if (inTerritory.has(nKey)) {
-          continue;
+      for (const coord of city.territory) {
+        const tile = getTile(coord);
+        const elev = tile ? terrainElevation(tile.terrain) : 0;
+        for (let d = 0; d < 6; d++) {
+          const neighbor = {
+            q: coord.q + AXIAL_DIRECTIONS[d]!.q,
+            r: coord.r + AXIAL_DIRECTIONS[d]!.r,
+          };
+          const nKey = tileKey(neighbor);
+          if (lod === 'low') {
+            if (allTerritory.has(nKey)) continue;
+          } else if (inTerritory.has(nKey)) {
+            continue;
+          }
+          const e = DIR_TO_EDGE[d]!;
+          const center = axialToWorld3D(coord.q, coord.r, elev);
+          const a1 = hexCornerAngle3D(e);
+          const a2 = hexCornerAngle3D((e + 1) % 6);
+          const x1 = center.x + HEX_SIZE * Math.cos(a1);
+          const z1 = center.z + HEX_SIZE * Math.sin(a1);
+          const x2 = center.x + HEX_SIZE * Math.cos(a2);
+          const z2 = center.z + HEX_SIZE * Math.sin(a2);
+          const y = center.y + 1.5 + yOff;
+          innerSegments.push(x1, y, z1, x2, y, z2);
+          const mx = (x1 + x2) * 0.5;
+          const mz = (z1 + z2) * 0.5;
+          const dx = mx - center.x;
+          const dz = mz - center.z;
+          const len = Math.hypot(dx, dz) || 1;
+          const push = HEX_SIZE * 0.02;
+          glowSegments.push(
+            x1 + (dx / len) * push, y, z1 + (dz / len) * push,
+            x2 + (dx / len) * push, y, z2 + (dz / len) * push,
+          );
         }
-        const e = DIR_TO_EDGE[d]!;
-        const center = axialToWorld3D(coord.q, coord.r, elev);
-        const a1 = hexCornerAngle3D(e);
-        const a2 = hexCornerAngle3D((e + 1) % 6);
-        const x1 = center.x + HEX_SIZE * Math.cos(a1);
-        const z1 = center.z + HEX_SIZE * Math.sin(a1);
-        const x2 = center.x + HEX_SIZE * Math.cos(a2);
-        const z2 = center.z + HEX_SIZE * Math.sin(a2);
-        const y = center.y + 1.5;
-        innerSegments.push(x1, y, z1, x2, y, z2);
-        const mx = (x1 + x2) * 0.5;
-        const mz = (z1 + z2) * 0.5;
-        const dx = mx - center.x;
-        const dz = mz - center.z;
-        const len = Math.hypot(dx, dz) || 1;
-        const push = HEX_SIZE * 0.02;
-        glowSegments.push(
-          x1 + (dx / len) * push, y, z1 + (dz / len) * push,
-          x2 + (dx / len) * push, y, z2 + (dz / len) * push,
-        );
+      }
+
+      if (innerSegments.length === 0) return;
+
+      // City color (fallback to gold if undefined)
+      const c = city.color ?? [0.725, 0.588, 0.329]; // 0xb99654
+      const color = new Color(c[0], c[1], c[2]);
+      // Capital: brighter version (mix with white 15%)
+      if (city.isCapital) {
+        color.lerp(new Color(1, 1, 1), 0.15);
+      }
+      const baseOpacity = city.isCapital
+        ? (lod === 'high' ? 0.60 : 0.52)
+        : (lod === 'high' ? 0.55 : 0.45);
+
+      // Inner line
+      const innerGeom = new BufferGeometry();
+      innerGeom.setAttribute('position', new Float32BufferAttribute(innerSegments, 3));
+      const innerMat = new LineBasicMaterial({
+        color,
+        transparent: true,
+        opacity: baseOpacity,
+        linewidth: city.isCapital ? 3 : 2,
+      });
+      innerMat.userData.baseOpacity = baseOpacity;
+      const innerLine = new LineSegments(innerGeom, innerMat);
+      terrainGroup.add(innerLine);
+      territoryLines.push(innerLine);
+
+      // Glow line (same color, lower opacity, slightly wider)
+      const glowGeom = new BufferGeometry();
+      glowGeom.setAttribute('position', new Float32BufferAttribute(glowSegments, 3));
+      const glowMat = new LineBasicMaterial({
+        color: color.clone(),
+        transparent: true,
+        opacity: 0.15,
+        linewidth: city.isCapital ? 4 : 3,
+      });
+      glowMat.userData.baseOpacity = 0.15;
+      const glowLine = new LineSegments(glowGeom, glowMat);
+      terrainGroup.add(glowLine);
+      territoryLines.push(glowLine);
+    });
+  } else {
+    // Fallback: >50 cities — single-color gold borders (old behavior)
+    const innerSegments: number[] = [];
+    const glowSegments: number[] = [];
+    for (const city of cities) {
+      const inTerritory = new Set(city.territory.map((c) => tileKey(c)));
+      for (const coord of city.territory) {
+        const tile = getTile(coord);
+        const elev = tile ? terrainElevation(tile.terrain) : 0;
+        for (let d = 0; d < 6; d++) {
+          const neighbor = {
+            q: coord.q + AXIAL_DIRECTIONS[d]!.q,
+            r: coord.r + AXIAL_DIRECTIONS[d]!.r,
+          };
+          const nKey = tileKey(neighbor);
+          if (lod === 'low') {
+            if (allTerritory.has(nKey)) continue;
+          } else if (inTerritory.has(nKey)) {
+            continue;
+          }
+          const e = DIR_TO_EDGE[d]!;
+          const center = axialToWorld3D(coord.q, coord.r, elev);
+          const a1 = hexCornerAngle3D(e);
+          const a2 = hexCornerAngle3D((e + 1) % 6);
+          const x1 = center.x + HEX_SIZE * Math.cos(a1);
+          const z1 = center.z + HEX_SIZE * Math.sin(a1);
+          const x2 = center.x + HEX_SIZE * Math.cos(a2);
+          const z2 = center.z + HEX_SIZE * Math.sin(a2);
+          const y = center.y + 1.5;
+          innerSegments.push(x1, y, z1, x2, y, z2);
+          const mx = (x1 + x2) * 0.5;
+          const mz = (z1 + z2) * 0.5;
+          const dx = mx - center.x;
+          const dz = mz - center.z;
+          const len = Math.hypot(dx, dz) || 1;
+          const push = HEX_SIZE * 0.02;
+          glowSegments.push(
+            x1 + (dx / len) * push, y, z1 + (dz / len) * push,
+            x2 + (dx / len) * push, y, z2 + (dz / len) * push,
+          );
+        }
       }
     }
-  }
-
-  if (normalInner.length === 0 && capitalInner.length === 0) return;
-
-  if (normalInner.length > 0) {
-    const innerGeom = new BufferGeometry();
-    innerGeom.setAttribute('position', new Float32BufferAttribute(normalInner, 3));
-    territoryInner = new LineSegments(
-      innerGeom,
-      new LineBasicMaterial({
+    if (innerSegments.length > 0) {
+      const innerGeom = new BufferGeometry();
+      innerGeom.setAttribute('position', new Float32BufferAttribute(innerSegments, 3));
+      const innerMat = new LineBasicMaterial({
         color: new Color(0xb99654),
         transparent: true,
         opacity: lod === 'high' ? 0.45 : 0.38,
         linewidth: 2,
-      }),
-    );
-    terrainGroup.add(territoryInner);
-  }
-  if (capitalInner.length > 0) {
-    const capGeom = new BufferGeometry();
-    capGeom.setAttribute('position', new Float32BufferAttribute(capitalInner, 3));
-    territoryCapitalInner = new LineSegments(
-      capGeom,
-      new LineBasicMaterial({
+      });
+      innerMat.userData.baseOpacity = lod === 'high' ? 0.45 : 0.38;
+      const innerLine = new LineSegments(innerGeom, innerMat);
+      terrainGroup.add(innerLine);
+      territoryLines.push(innerLine);
+
+      const glowGeom = new BufferGeometry();
+      glowGeom.setAttribute('position', new Float32BufferAttribute(glowSegments, 3));
+      const glowMat = new LineBasicMaterial({
         color: new Color(0xf0d060),
         transparent: true,
-        opacity: lod === 'high' ? 0.50 : 0.42,
-        linewidth: 2,
-      }),
-    );
-    terrainGroup.add(territoryCapitalInner);
+        opacity: 0.12,
+        linewidth: 3,
+      });
+      glowMat.userData.baseOpacity = 0.12;
+      const glowLine = new LineSegments(glowGeom, glowMat);
+      terrainGroup.add(glowLine);
+      territoryLines.push(glowLine);
+    }
   }
-
-  const glowGeom = new BufferGeometry();
-  glowGeom.setAttribute('position', new Float32BufferAttribute(glowSegments, 3));
-  territoryGlow = new LineSegments(
-    glowGeom,
-    new LineBasicMaterial({
-      color: new Color(0xf0d060),
-      transparent: true,
-      opacity: 0.12,
-      linewidth: 3,
-    }),
-  );
-  terrainGroup.add(territoryGlow);
 }
 
 /** Shoreline rings: rebuild geometry only when ocean tiles change.
