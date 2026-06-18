@@ -74,11 +74,22 @@ export class HexRenderer {
 
     try {
       // ── Terrain atlas → CanvasPatterns ──
+      // Patterns are scaled to 128px so they tile at a reasonable density
+      // on ~52px hex tiles. At native 1024px, each hex only shows a tiny
+      // crop of the texture, making adjacent tiles look like different solid colors.
       const terrainImg = await loadImage(manifest.terrainAtlas);
       const cellSize = manifest.cellSize;
+      const PATTERN_SIZE = 128;
       for (const [name, rect] of Object.entries(manifest.terrainRects)) {
         const tileCanvas = extractToCanvas(terrainImg, rect, cellSize);
-        const pattern = this.ctx.createPattern(tileCanvas, 'repeat');
+        // Downscale to PATTERN_SIZE for better tiling on hex grid
+        const scaledCanvas = document.createElement('canvas');
+        scaledCanvas.width = PATTERN_SIZE;
+        scaledCanvas.height = PATTERN_SIZE;
+        const sctx = scaledCanvas.getContext('2d')!;
+        sctx.imageSmoothingEnabled = true;
+        sctx.drawImage(tileCanvas, 0, 0, PATTERN_SIZE, PATTERN_SIZE);
+        const pattern = this.ctx.createPattern(scaledCanvas, 'repeat');
         if (pattern) {
           this.patterns[name] = pattern;
         }
