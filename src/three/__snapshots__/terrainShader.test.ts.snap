@@ -298,6 +298,42 @@ varying vec2  vWorldXZ;
 varying float vLocalY;
 varying vec2  vUv;
 varying float vTopFace;
+float hash21(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+float valueNoise2D(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  float a = hash21(i);
+  float b = hash21(i + vec2(1.0, 0.0));
+  float c = hash21(i + vec2(0.0, 1.0));
+  float d = hash21(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+float fbm3(vec2 p) {
+  float s = 0.0;
+  float a = 0.5;
+  for (int i = 0; i < 3; i++) {
+    s += a * valueNoise2D(p);
+    p *= 2.0;
+    a *= 0.5;
+  }
+  return s;
+}
+float ridge3(vec2 p) {
+  float s = 0.0;
+  float a = 0.5;
+  for (int i = 0; i < 3; i++) {
+    float n = 1.0 - abs(valueNoise2D(p) * 2.0 - 1.0);
+    s += a * n * n;
+    p *= 2.0;
+    a *= 0.5;
+  }
+  return s;
+}
 void main() {
   #include <begin_vertex>
         vTerrainIndex = instanceTerrain;
@@ -338,19 +374,40 @@ void main() {
           transformed.y = 0.0;
         }
 
-        // Cheap top-cap relief for hills/mountain: low-poly undulation so
-        // elevated tiles stop being perfect mesas (iter3 gap #4). Static
-        // world-position phase (no uTime): two same-biome neighbors displace
-        // their shared edge identically, so tops stay continuous; the whole
-        // cap (top fan + bevel + side-top ring, every vertex above the
-        // bevel) moves together, so the prism stays watertight. Amplitude
-        // 5% of hexRadius — within the ≤8% contract.
-        bool reliefBiome = abs(tidx - 2.0) < 0.5 || abs(tidx - 6.0) < 0.5;
-        if (reliefBiome && transformed.y > -1.0) {
-          vec2 reliefPos = instanceMatrix[3].xz + transformed.xz;
-          float relief = sin(reliefPos.x * 0.085) * cos(reliefPos.y * 0.097)
-                       + 0.6 * sin(reliefPos.x * 0.21 + reliefPos.y * 0.16);
-          transformed.y += relief * (uHexRadius * 0.05);
+        // Top-cap micro-relief for all land biomes: FBM noise replaces
+        // the old sin/cos mesa-breaker. World-space phase (no uTime)
+        // keeps same-biome neighbors continuous; only top cap + bevel
+        // (y > -1.0) moves so prisms stay watertight.
+        bool isOceanTile = abs(tidx - 4.0) < 0.5;
+        bool isIceTile = abs(tidx - 5.0) < 0.5;
+        if (!isOceanTile && !isIceTile && transformed.y > -1.0) {
+          vec2 noisePos = instanceMatrix[3].xz + transformed.xz;
+          if (tidx < 0.5) {
+            // plains: gentle rolling, 3% hexRadius
+            float r = (fbm3(noisePos * 0.04) - 0.5) * 2.0;
+            transformed.y += r * (uHexRadius * 0.03);
+          } else if (tidx < 1.5) {
+            // forest: slightly more varied, 4%
+            float r = (fbm3(noisePos * 0.05) - 0.5) * 2.0;
+            transformed.y += r * (uHexRadius * 0.04);
+          } else if (tidx < 2.5) {
+            // mountain: jagged peaks, 12%, ridge noise
+            float r = ridge3(noisePos * 0.06);
+            transformed.y += r * (uHexRadius * 0.12);
+          } else if (tidx < 3.5) {
+            // desert: dune-like swells, 5%, anisotropic
+            vec2 dunePos = vec2(noisePos.x * 0.03 + noisePos.y * 0.08, noisePos.y * 0.02);
+            float r = (fbm3(dunePos) - 0.5) * 2.0;
+            transformed.y += r * (uHexRadius * 0.05);
+          } else if (tidx < 6.5) {
+            // hills: clear ridgelines, 8%, ridge noise
+            float r = ridge3(noisePos * 0.055);
+            transformed.y += r * (uHexRadius * 0.08);
+          } else if (tidx < 7.5) {
+            // sacred: gentle, 3%
+            float r = (fbm3(noisePos * 0.045) - 0.5) * 2.0;
+            transformed.y += r * (uHexRadius * 0.03);
+          }
         }
 
         // Ocean wave animation: gentle vertical displacement. Phase runs on

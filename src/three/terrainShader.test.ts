@@ -23,7 +23,7 @@ describe('terrainShader', () => {
   it('exposes a versioned customProgramCacheKey', () => {
     const mat = createTerrainMaterial();
     // Bumping the version in terrainShader.ts must update this.
-    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v24');
+    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v25');
   });
 
   it('produces a stable fragment shader from onBeforeCompile', () => {
@@ -68,6 +68,14 @@ describe('terrainShader', () => {
     // most common shader regression we see on three upgrades.
     expect(capture.vertex).toContain('heightScale = 1.58');   // mountain
     expect(capture.vertex).toContain('heightScale = 0.70');   // ocean
+    // P1: FBM noise functions for per-biome micro-relief
+    expect(capture.vertex).toContain('float fbm3(vec2 p)');
+    expect(capture.vertex).toContain('float ridge3(vec2 p)');
+    expect(capture.vertex).toContain('float valueNoise2D(vec2 p)');
+    // Per-biome displacement amplitudes
+    expect(capture.vertex).toContain('uHexRadius * 0.03');  // plains
+    expect(capture.vertex).toContain('uHexRadius * 0.12');  // mountain
+    expect(capture.vertex).toContain('uHexRadius * 0.08');  // hills
     expect(capture.vertex).toMatchSnapshot();
   });
 });

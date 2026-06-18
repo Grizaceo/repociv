@@ -118,6 +118,43 @@ export function createTerrainMaterial(
       'varying float vLocalY;\n' +
       'varying vec2  vUv;\n' +
       'varying float vTopFace;\n' +
+      // ── GLSL noise functions (public domain, hash-based value noise) ──────
+      'float hash21(vec2 p) {\n' +
+      '  p = fract(p * vec2(123.34, 456.21));\n' +
+      '  p += dot(p, p + 45.32);\n' +
+      '  return fract(p.x * p.y);\n' +
+      '}\n' +
+      'float valueNoise2D(vec2 p) {\n' +
+      '  vec2 i = floor(p);\n' +
+      '  vec2 f = fract(p);\n' +
+      '  vec2 u = f * f * (3.0 - 2.0 * f);\n' +
+      '  float a = hash21(i);\n' +
+      '  float b = hash21(i + vec2(1.0, 0.0));\n' +
+      '  float c = hash21(i + vec2(0.0, 1.0));\n' +
+      '  float d = hash21(i + vec2(1.0, 1.0));\n' +
+      '  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);\n' +
+      '}\n' +
+      'float fbm3(vec2 p) {\n' +
+      '  float s = 0.0;\n' +
+      '  float a = 0.5;\n' +
+      '  for (int i = 0; i < 3; i++) {\n' +
+      '    s += a * valueNoise2D(p);\n' +
+      '    p *= 2.0;\n' +
+      '    a *= 0.5;\n' +
+      '  }\n' +
+      '  return s;\n' +
+      '}\n' +
+      'float ridge3(vec2 p) {\n' +
+      '  float s = 0.0;\n' +
+      '  float a = 0.5;\n' +
+      '  for (int i = 0; i < 3; i++) {\n' +
+      '    float n = 1.0 - abs(valueNoise2D(p) * 2.0 - 1.0);\n' +
+      '    s += a * n * n;\n' +
+      '    p *= 2.0;\n' +
+      '    a *= 0.5;\n' +
+      '  }\n' +
+      '  return s;\n' +
+      '}\n' +
       shader.vertexShader.replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
@@ -159,19 +196,40 @@ export function createTerrainMaterial(
           transformed.y = 0.0;
         }
 
-        // Cheap top-cap relief for hills/mountain: low-poly undulation so
-        // elevated tiles stop being perfect mesas (iter3 gap #4). Static
-        // world-position phase (no uTime): two same-biome neighbors displace
-        // their shared edge identically, so tops stay continuous; the whole
-        // cap (top fan + bevel + side-top ring, every vertex above the
-        // bevel) moves together, so the prism stays watertight. Amplitude
-        // 5% of hexRadius — within the ≤8% contract.
-        bool reliefBiome = abs(tidx - 2.0) < 0.5 || abs(tidx - 6.0) < 0.5;
-        if (reliefBiome && transformed.y > -1.0) {
-          vec2 reliefPos = instanceMatrix[3].xz + transformed.xz;
-          float relief = sin(reliefPos.x * 0.085) * cos(reliefPos.y * 0.097)
-                       + 0.6 * sin(reliefPos.x * 0.21 + reliefPos.y * 0.16);
-          transformed.y += relief * (uHexRadius * 0.05);
+        // Top-cap micro-relief for all land biomes: FBM noise replaces
+        // the old sin/cos mesa-breaker. World-space phase (no uTime)
+        // keeps same-biome neighbors continuous; only top cap + bevel
+        // (y > -1.0) moves so prisms stay watertight.
+        bool isOceanTile = abs(tidx - 4.0) < 0.5;
+        bool isIceTile = abs(tidx - 5.0) < 0.5;
+        if (!isOceanTile && !isIceTile && transformed.y > -1.0) {
+          vec2 noisePos = instanceMatrix[3].xz + transformed.xz;
+          if (tidx < 0.5) {
+            // plains: gentle rolling, 3% hexRadius
+            float r = (fbm3(noisePos * 0.04) - 0.5) * 2.0;
+            transformed.y += r * (uHexRadius * 0.03);
+          } else if (tidx < 1.5) {
+            // forest: slightly more varied, 4%
+            float r = (fbm3(noisePos * 0.05) - 0.5) * 2.0;
+            transformed.y += r * (uHexRadius * 0.04);
+          } else if (tidx < 2.5) {
+            // mountain: jagged peaks, 12%, ridge noise
+            float r = ridge3(noisePos * 0.06);
+            transformed.y += r * (uHexRadius * 0.12);
+          } else if (tidx < 3.5) {
+            // desert: dune-like swells, 5%, anisotropic
+            vec2 dunePos = vec2(noisePos.x * 0.03 + noisePos.y * 0.08, noisePos.y * 0.02);
+            float r = (fbm3(dunePos) - 0.5) * 2.0;
+            transformed.y += r * (uHexRadius * 0.05);
+          } else if (tidx < 6.5) {
+            // hills: clear ridgelines, 8%, ridge noise
+            float r = ridge3(noisePos * 0.055);
+            transformed.y += r * (uHexRadius * 0.08);
+          } else if (tidx < 7.5) {
+            // sacred: gentle, 3%
+            float r = (fbm3(noisePos * 0.045) - 0.5) * 2.0;
+            transformed.y += r * (uHexRadius * 0.03);
+          }
         }
 
         // Ocean wave animation: gentle vertical displacement. Phase runs on
@@ -501,7 +559,7 @@ float terrainDetailNoise(vec2 p) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v24';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v25';
   return mat;
 }
 
