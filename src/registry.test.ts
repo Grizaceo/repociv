@@ -88,6 +88,7 @@ describe('SubagentRegistry', () => {
       kind: 'worker',
       label: 'Test',
       status: 'running',
+      risk: 'low',
       ephemeralUnitId: 'eu-1',
       targetCityId: 'city-1',
       startedAt: Date.now(),
