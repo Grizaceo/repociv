@@ -74,8 +74,10 @@ export function cityLevel(city: City): number {
 
 // Visual scaling per level: spire height multiplier, wall completeness (0-1),
 // and plaza radius multiplier.
+// Level 0 still has full walls (a hamlet with a palisade) — walls only get
+// taller/more complete at higher levels, never disappear.
 const LEVEL_SPIRE_SCALE = [0.3, 0.55, 0.80, 1.0];
-const LEVEL_WALL_COMPLETENESS = [0.0, 0.4, 0.75, 1.0];
+const LEVEL_WALL_COMPLETENESS = [1.0, 1.0, 1.0, 1.0];
 const LEVEL_PLAZA_SCALE  = [0.50, 0.68, 0.85, 1.0];
 
 export function getCityGroup(): Group {

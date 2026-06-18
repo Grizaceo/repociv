@@ -138,7 +138,7 @@ describe('CityCluster3D growth state', () => {
   });
 
   it('higher level cities have more city group children (walls visible)', () => {
-    // Level 0: walls are underground (scale 0), but the mesh still exists.
+    // Level 0: walls are full height (hamlet palisade), mesh exists.
     const city0 = makeCity('alpha', 0, 0, []);
     rebuildCityClusters([city0], getTile, 'high');
     const count0 = getCityGroup().children.length;
