@@ -50,6 +50,7 @@ import {
   rebuildCityClusters,
   setCitiesVisible,
   clearCityClusters,
+  tickCities,
 } from './CityCluster3D.ts';
 import {
   getUnitGroup,
@@ -912,6 +913,10 @@ export function updateHexWorldScene(
   // hop). Runs every frame regardless of dirty state — the tweens progress
   // smoothly between rebuilds.
   tickUnits(opts.animTime, opts.dt);
+  // Per-frame city growth animations (spire rise tween). Invalidates the
+  // city signature when a tween is in progress so the next dirty frame
+  // rebuilds with updated spire heights.
+  tickCities(opts.dt);
 
   // State-driven rebuilds: only when the world actually changed. These
   // are the heavy ones (terrain mesh, ground plane, territory lines,

@@ -1,4 +1,8 @@
 // ─── Civ-style city clusters with walls, towers, and pitched roofs ──────────
+// City growth: 4 levels (0-3) driven by completed building count. Each level
+// increases spire height, wall ring completeness, and plaza radius. The spire
+// rise animation (0→1 over 800ms) is driven by tickCities(dt), called every
+// frame from updateHexWorldScene.
 import {
   BoxGeometry,
   ConeGeometry,
@@ -41,6 +45,39 @@ let spireMesh: InstancedMesh | null = null;
 let capitalLandmarkMesh: InstancedMesh | null = null;
 let lastSignature = '';
 
+// ─── City growth state ─────────────────────────────────────────────────────
+// Per-city animation state for the spire rise tween (0→1 over 800ms when a
+// city levels up). tickCities advances these every frame.
+interface CityGrowthEntry {
+  cityId: string;
+  level: number;
+  /** Spire rise tween: 0→1 over SPIRE_RISE_DURATION. 1 = fully grown. */
+  spireRise: number;
+}
+
+const cityGrowth = new Map<string, CityGrowthEntry>();
+const SPIRE_RISE_DURATION = 0.8; // 800ms
+
+// ─── City level computation ────────────────────────────────────────────────
+// 4 levels (0-3) driven by completed building count.
+//   0: no buildings complete (hamlet)
+//   1: 1-2 buildings complete (village)
+//   2: 3-5 buildings complete (town)
+//   3: 6+ buildings complete (city)
+export function cityLevel(city: City): number {
+  const completed = (city.buildings ?? []).filter((b) => b.state === 'complete').length;
+  if (completed >= 6) return 3;
+  if (completed >= 3) return 2;
+  if (completed >= 1) return 1;
+  return 0;
+}
+
+// Visual scaling per level: spire height multiplier, wall completeness (0-1),
+// and plaza radius multiplier.
+const LEVEL_SPIRE_SCALE = [0.3, 0.55, 0.80, 1.0];
+const LEVEL_WALL_COMPLETENESS = [0.0, 0.4, 0.75, 1.0];
+const LEVEL_PLAZA_SCALE  = [0.50, 0.68, 0.85, 1.0];
+
 export function getCityGroup(): Group {
   return cityGroup;
 }
@@ -53,7 +90,8 @@ function citySignature(cities: City[]): string {
         c.population <= 120 ? 'b' :
         c.population <= 350 ? 'c' :
         c.population <= 800 ? 'd' : 'e';
-      return `${c.id}:${c.coord.q},${c.coord.r}:${c.isCapital ? 1 : 0}:${bucket}`;
+      const lvl = cityLevel(c);
+      return `${c.id}:${c.coord.q},${c.coord.r}:${c.isCapital ? 1 : 0}:${bucket}:L${lvl}`;
     })
     .join('|');
 }
@@ -77,6 +115,25 @@ export function rebuildCityClusters(
   const signature = `${lod}:${citySignature(cities)}`;
   if (signature === lastSignature) return;
   lastSignature = signature;
+
+  // ── Update growth state: detect level changes, start spire rise ────────
+  for (const city of cities) {
+    const lvl = cityLevel(city);
+    const existing = cityGrowth.get(city.id);
+    if (!existing) {
+      // First time seeing this city: start at full rise for its level.
+      cityGrowth.set(city.id, { cityId: city.id, level: lvl, spireRise: 1 });
+    } else if (existing.level !== lvl) {
+      // Level changed: restart the spire rise tween from 0.
+      existing.level = lvl;
+      existing.spireRise = 0;
+    }
+  }
+  // Clean up cities that no longer exist.
+  const cityIds = new Set(cities.map((c) => c.id));
+  for (const id of cityGrowth.keys()) {
+    if (!cityIds.has(id)) cityGrowth.delete(id);
+  }
 
   clearCityClusters();
 
@@ -104,6 +161,7 @@ export function rebuildCityClusters(
   const capitals = cities.filter((c) => c.isCapital);
 
   // ── Civic centre: stepped stone plaza + monuments ──────────────────────────
+  // Plaza radius and spire height scale with city level.
   {
     const plazaGeom = new CylinderGeometry(HEX_SIZE * 0.30, HEX_SIZE * 0.46, HEX_SIZE * 0.10, 14);
     const plazaMat = new MeshStandardMaterial({ color: new Color(0xc9bfa6), roughness: 0.92 });
@@ -133,19 +191,26 @@ export function rebuildCityClusters(
       const tile = getTile(tileKey(city.coord));
       const elev = tile ? terrainElevation(tile.terrain) : 0;
       const base = axialToWorld3D(city.coord.q, city.coord.r, elev);
-      plazaMesh.setMatrixAt(
-        plazaIdx++,
-        new Matrix4().makeTranslation(base.x, base.y + 1.5, base.z),
-      );
+      const lvl = cityLevel(city);
+      const growth = cityGrowth.get(city.id);
+      const rise = growth?.spireRise ?? 1;
+      const plazaScale = LEVEL_PLAZA_SCALE[lvl]!;
+
+      // Plaza: scale the instance by level multiplier.
+      const plazaM = new Matrix4().makeTranslation(base.x, base.y + 1.5, base.z);
+      plazaM.scale(new Vector3(plazaScale, 1, plazaScale));
+      plazaMesh.setMatrixAt(plazaIdx++, plazaM);
+
       if (!city.isCapital && spireMesh) {
-        spireMesh.setMatrixAt(
-          spireIdx++,
-          new Matrix4().makeTranslation(
-            base.x,
-            base.y + 4 + HEX_SIZE * 0.21,
-            base.z + HEX_SIZE * 0.24,
-          ),
+        // Spire: height scales with level × rise tween.
+        const spireHScale = LEVEL_SPIRE_SCALE[lvl]! * rise;
+        const spireM = new Matrix4().makeTranslation(
+          base.x,
+          base.y + 4 + HEX_SIZE * 0.21 * spireHScale,
+          base.z + HEX_SIZE * 0.24,
         );
+        spireM.scale(new Vector3(1, spireHScale, 1));
+        spireMesh.setMatrixAt(spireIdx++, spireM);
       } else if (city.isCapital && capitalLandmarkMesh) {
         const h = hashCoord(city.coord.q, city.coord.r);
         const axis = (h % 6) * (Math.PI / 3);
@@ -223,7 +288,7 @@ export function rebuildCityClusters(
     const towerGeom = new CylinderGeometry(HEX_SIZE * 0.025, HEX_SIZE * 0.03, HEX_SIZE * 0.18, 6);
     const towerMat = new MeshLambertMaterial({ color: new Color(0xa09880) });
 
-    // Density keyed by population (files in repo). Max 5 buildings per city.
+    // Density keyed on population (files in repo). Max 5 buildings per city.
     function buildingCountForCity(pop: number): number {
       if (pop <= 30) return 1;
       if (pop <= 120) return 2;
@@ -243,6 +308,10 @@ export function rebuildCityClusters(
     const roofCount = bldCount;
     // Perimeter wall: ONE closed hexagonal ring per city (was 6 separate
     // box segments that left corner gaps → walls read as scattered dots).
+    // Wall completeness: level 0 = no walls, level 1+ = walls present.
+    // The ring geometry is always created; the scale.y = 0 trick hides
+    // incomplete walls (they're underground). A per-instance Y-scale
+    // controls how much of the wall is visible.
     const wallCount = normalCities.length;
     const towerCount = normalCities.length * 4;  // 4 corner towers
 
@@ -259,6 +328,8 @@ export function rebuildCityClusters(
       const base = axialToWorld3D(city.coord.q, city.coord.r, elev);
       const h = hashCoord(city.coord.q, city.coord.r);
       const count = buildingCountForCity(city.population);
+      const lvl = cityLevel(city);
+      const wallComplete = LEVEL_WALL_COMPLETENESS[lvl]!;
 
       // Building footprints — clustered toward centre so walls read as a perimeter
       const offsets: Array<[number, number, number]> = [
@@ -293,26 +364,24 @@ export function rebuildCityClusters(
       }
 
       // Perimeter wall: ONE closed hexagonal ring centered on the city,
-      // raised to sit on top of the plaza. No more 6 separate boxes with
-      // corner gaps — those read as scattered dots.
+      // raised to sit on top of the plaza. Wall completeness scales the
+      // instance Y so incomplete walls are underground (invisible).
       const wallY = base.y + 5.5;
       {
         const m = new Matrix4().makeTranslation(base.x, wallY, base.z);
+        // Scale Y by wall completeness: 0 = fully underground, 1 = full height.
+        m.scale(new Vector3(1, wallComplete, 1));
         wallMesh.setMatrixAt(wallIdx++, m);
       }
 
-      // Corner towers: align with the 4 alternate hex VERTICES (not cardinal
-      // directions). The previous 4-cardinal placement put 2 of the towers
-      // at the midpoint of hex sides — no wall corner there, so the towers
-      // either floated in space or got occluded by the wall, reading as
-      // "misaligned" relative to the hexagonal fortification. Hex vertices
-      // are at 0°, 60°, 120°, 180°, 240°, 300°; alternate 4 = 0°, 60°,
-      // 180°, 240° (the ones that form a square inscribed in the hex).
+      // Corner towers: only render when walls are at least 40% complete.
       const cornerAngles = [0, Math.PI / 3, Math.PI, (4 * Math.PI) / 3];
+      const towerYScale = Math.max(0, wallComplete);
       for (const ca of cornerAngles) {
         const tx = base.x + Math.cos(ca) * HEX_SIZE * 0.42;
         const tz = base.z + Math.sin(ca) * HEX_SIZE * 0.42;
         const towerM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.09, tz);
+        towerM.scale(new Vector3(1, towerYScale, 1));
         towerMesh.setMatrixAt(towerIdx++, towerM);
       }
     }
@@ -464,6 +533,34 @@ export function rebuildCityClusters(
   }
 }
 
+/** Per-frame animation: advance spire rise tweens for cities that leveled up.
+ *  Called every frame from updateHexWorldScene, independent of dirty state.
+ *  When dt=0 (frozen animTime), tweens freeze — goldens stay deterministic.
+ *  The tween completion triggers a signature change (spireRise goes 0→1) which
+ *  forces a rebuild on the next dirty frame, applying the full-height spire. */
+export function tickCities(dt: number): void {
+  let needsRebuild = false;
+  for (const entry of cityGrowth.values()) {
+    if (entry.spireRise < 1) {
+      entry.spireRise += dt / SPIRE_RISE_DURATION;
+      if (entry.spireRise >= 1) {
+        entry.spireRise = 1;
+      }
+      // The spire height is baked into the instance matrix at rebuild time.
+      // We need a rebuild to update the visual. The cheapest way: invalidate
+      // the signature. But we can't call rebuildCityClusters here because we
+      // don't have the cities/tiles. Instead, we set a flag that the next
+      // updateHexWorldScene picks up.
+      needsRebuild = true;
+    }
+  }
+  if (needsRebuild) {
+    // Invalidate the signature so the next rebuildCityClusters call
+    // reconstructs with updated spire heights.
+    lastSignature += '~';
+  }
+}
+
 export function clearCityClusters(): void {
   while (cityGroup.children.length > 0) {
     const child = cityGroup.children[0] as InstancedMesh;
@@ -483,8 +580,21 @@ export function clearCityClusters(): void {
   plazaMesh = null;
   spireMesh = null;
   capitalLandmarkMesh = null;
+  // Note: cityGrowth is NOT cleared here — it persists across rebuilds
+  // so that spire rise tweens survive the signature-change rebuild.
+  // Use _testClearGrowth() in tests to reset state between cases.
 }
 
 export function setCitiesVisible(visible: boolean): void {
   cityGroup.visible = visible;
+}
+
+// ─── Test-only exports ─────────────────────────────────────────────────────
+export function _testGetGrowth(cityId: string): CityGrowthEntry | undefined {
+  return cityGrowth.get(cityId);
+}
+
+export function _testClearGrowth(): void {
+  cityGrowth.clear();
+  lastSignature = '';
 }
