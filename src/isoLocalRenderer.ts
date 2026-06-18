@@ -218,29 +218,62 @@ export function renderIso(state: IsoRenderState) {
     }
   }
 
-  if (!lodLow && state.workbenchLabelOverlay) {
-    for (let y = view.y0; y <= view.y1; y++) {
-      for (let x = view.x0; x <= view.x1; x++) {
-        const tile = world.grid[y]?.[x];
-        if (tile?.type !== 'workbench' || !tile.workbench) continue;
-        const base = isoProject(x, y);
-        const name = tile.workbench.fileName;
-        const short = name.length > 8 ? name.slice(0, 6) + '..' : name;
-        const textW = ctx.measureText(short).width + 6;
-        const labelW = Math.max(24, textW);
-        const labelH = 8;
-        const lx = base.px - labelW / 2;
-        const ly = base.py - ISO_WALL_H - 8;
-        ctx.fillStyle = 'rgba(20, 20, 30, 0.8)';
-        ctx.beginPath();
-        ctx.roundRect(lx, ly, labelW, labelH, 2);
-        ctx.fill();
-        ctx.fillStyle = '#E2E8F0';
-        ctx.font = `bold 5px ${monoFont(state)}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(short, base.px, ly + labelH / 2);
+  // P2: Workbench labels — auto-visible when zoomed in, respect manual toggle
+  if (!lodLow) {
+    const cam = state.cam;
+    // Auto-show labels when zoom >= 0.7, or when overlay is manually toggled on
+    const labelAlpha = state.workbenchLabelOverlay
+      ? 1
+      : Math.max(0, Math.min(1, (cam.zoom - 0.5) / 0.3)); // fade 0.5→0.8
+    if (labelAlpha > 0.02) {
+      for (let y = view.y0; y <= view.y1; y++) {
+        for (let x = view.x0; x <= view.x1; x++) {
+          const tile = world.grid[y]?.[x];
+          if (tile?.type !== 'workbench' || !tile.workbench) continue;
+          // Skip high-density rooms (cluster pills handle those)
+          const room = tile.roomId ? world.rooms.find((r) => r.id === tile.roomId) : undefined;
+          if (room && room.workbenches.length >= 3) continue;
+
+          const base = isoProject(x, y);
+          const name = tile.workbench.fileName;
+          const short = name.length > 10 ? name.slice(0, 8) + '..' : name;
+          ctx.font = `bold 5px ${monoFont(state)}`;
+          const textW = ctx.measureText(short).width + 6;
+          const labelW = Math.max(24, textW);
+          const labelH = 8;
+          // Y offset scales with zoom to avoid overlapping agent sprites
+          const yOffset = ISO_WALL_H + 6 + (cam.zoom > 1.2 ? 4 : 0);
+          const lx = base.px - labelW / 2;
+          const ly = base.py - yOffset;
+
+          ctx.save();
+          ctx.globalAlpha = labelAlpha;
+          ctx.fillStyle = 'rgba(20, 20, 30, 0.8)';
+          ctx.beginPath();
+          ctx.roundRect(lx, ly, labelW, labelH, 2);
+          ctx.fill();
+          // Extension color dot
+          const extCol = extColorFor(tile.workbench.extension);
+          ctx.fillStyle = extCol;
+          ctx.beginPath();
+          ctx.arc(lx + 4, ly + labelH / 2, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#E2E8F0';
+          ctx.font = `bold 5px ${monoFont(state)}`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(short, base.px + 2, ly + labelH / 2);
+          ctx.restore();
+        }
       }
+    }
+  }
+
+  // P2: Hover tooltip for workbench — full path, ext dot, test badge
+  if (state.hoveredTile) {
+    const ht = world.grid[state.hoveredTile.y]?.[state.hoveredTile.x];
+    if (ht?.type === 'workbench' && ht.workbench) {
+      drawIsoWorkbenchTooltip(state, ht.workbench);
     }
   }
 
@@ -1411,5 +1444,96 @@ function drawIsoWorkbenchCluster(
     const label = `${ext.toUpperCase().slice(0, 3)} ×${count}`;
     ctx.fillText(label, px + pillW / 2, py + pillH / 2);
   }
+  ctx.restore();
+}
+
+// ─── P2: Workbench label helpers ──────────────────────────────────────────────
+
+function extColorFor(ext: string, state?: IsoRenderState): string {
+  if (state?.extColor && state.extColor[ext]) return state.extColor[ext]!;
+  // Fallback common colors
+  const fallbacks: Record<string, string> = {
+    ts: '#4a9bd4', tsx: '#4a9bd4', js: '#e8c44a', py: '#4a9', json: '#e8a44a',
+    md: '#8ab4f8', css: '#a855f7', html: '#e87a4a', sh: '#22c55e',
+  };
+  return fallbacks[ext] ?? '#888';
+}
+
+function drawIsoWorkbenchTooltip(state: IsoRenderState, wb: import('./types.ts').Workbench): void {
+  const { ctx, cam } = state;
+  const ht = state.hoveredTile!;
+  const base = isoProject(ht.x, ht.y);
+
+  // Screen position for tooltip (untransformed — drawn after ctx.restore)
+  // We're still inside the camera transform, so convert to screen coords
+  const sx = (base.px - cam.x) * cam.zoom + cam.cx;
+  const sy = (base.py - cam.y) * cam.zoom + cam.cy;
+
+  // Tooltip dimensions
+  const padX = 8;
+  const padY = 6;
+  const lineHeight = 11;
+  const extCol = extColorFor(wb.extension, state);
+
+  // Build tooltip text
+  const fileName = wb.fileName;
+  const extLabel = wb.extension.toUpperCase();
+  const testBadge = wb.isTest ? ' [TEST]' : '';
+  const pathShort = wb.filePath.length > 40
+    ? '...' + wb.filePath.slice(-37)
+    : wb.filePath;
+
+  const titleLine = `${fileName}${testBadge}`;
+  const pathLine = pathShort;
+  const extLine = `Type: ${extLabel}`;
+
+  ctx.save();
+  // Reset transform to draw in screen space
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.font = `bold 10px ${monoFont(state)}`;
+  const titleW = ctx.measureText(titleLine).width;
+  ctx.font = `8px ${monoFont(state)}`;
+  const pathW = ctx.measureText(pathLine).width;
+  const extW = ctx.measureText(extLine).width;
+  const maxW = Math.max(titleW, pathW, extW);
+  const tooltipW = maxW + padX * 2;
+  const tooltipH = lineHeight * 3 + padY * 2;
+
+  // Position: above the hovered tile, clamped to screen
+  let tx = sx - tooltipW / 2;
+  let ty = sy - tooltipH - 12;
+  tx = Math.max(4, Math.min(tx, ctx.canvas.width - tooltipW - 4));
+  if (ty < 4) ty = sy + 12; // flip below if no room above
+
+  // Background
+  ctx.fillStyle = 'rgba(15, 15, 22, 0.95)';
+  ctx.beginPath();
+  ctx.roundRect(tx, ty, tooltipW, tooltipH, 4);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(200, 200, 200, 0.2)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Title line (with ext color dot)
+  ctx.fillStyle = extCol;
+  ctx.beginPath();
+  ctx.arc(tx + padX + 2, ty + padY + 6, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.font = `bold 10px ${monoFont(state)}`;
+  ctx.fillStyle = '#F0F0F0';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(titleLine, tx + padX + 10, ty + padY + 6);
+
+  // Path line
+  ctx.font = `8px ${monoFont(state)}`;
+  ctx.fillStyle = '#A0A0A0';
+  ctx.fillText(pathLine, tx + padX, ty + padY + 6 + lineHeight);
+
+  // Ext line
+  ctx.fillStyle = extCol;
+  ctx.fillText(extLine, tx + padX, ty + padY + 6 + lineHeight * 2);
+
   ctx.restore();
 }

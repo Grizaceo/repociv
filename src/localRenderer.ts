@@ -871,9 +871,22 @@ export class LocalRenderer {
       }
     }
 
+    // P2: Workbench labels (2D mode) — auto-visible when zoomed in
+    if (!lodLow) {
+      this.drawWorkbenchLabels2D(view);
+    }
+
     // Draw local units
     for (const unit of localUnits) {
       this.drawLocalUnit(unit);
+    }
+
+    // P2: Hover tooltip for workbench (2D mode)
+    if (this.hoveredTile) {
+      const ht = this.getTile(this.hoveredTile.x, this.hoveredTile.y);
+      if (ht?.workbench) {
+        this.drawWorkbenchTooltip2D(ht.workbench);
+      }
     }
 
     // Update and draw particles (suppressed in clean mode & low LOD)
@@ -2432,6 +2445,125 @@ export class LocalRenderer {
       const sy = (uy + bobbingY - this.cam.y) * this.cam.zoom + this.cam.cy;
       this.onUnitRendered(unit, sx, sy);
     }
+  }
+
+  // P2: Workbench labels (2D mode)
+  private drawWorkbenchLabels2D(view: { x0: number; y0: number; x1: number; y1: number }) {
+    if (!this.world) return;
+    const { ctx, cam } = this;
+    // Auto-show when zoom >= 0.7, or when overlay is toggled on
+    const labelAlpha = this._workbenchLabelOverlay
+      ? 1
+      : Math.max(0, Math.min(1, (cam.zoom - 0.5) / 0.3));
+    if (labelAlpha < 0.02) return;
+
+    for (let y = view.y0; y <= view.y1; y++) {
+      for (let x = view.x0; x <= view.x1; x++) {
+        const tile = this.world.grid[y]![x]!;
+        if (tile.type !== 'workbench' || !tile.workbench) continue;
+        // Skip high-density rooms
+        const room = tile.roomId ? this.world.rooms.find((r) => r.id === tile.roomId) : undefined;
+        if (room && room.workbenches.length >= 3) continue;
+
+        const px = x * TILE_SIZE;
+        const py = y * TILE_SIZE;
+        const s = TILE_SIZE;
+        const name = tile.workbench.fileName;
+        const short = name.length > 10 ? name.slice(0, 8) + '..' : name;
+
+        ctx.save();
+        ctx.globalAlpha = labelAlpha;
+        // Y offset above the tile, scales with zoom
+        const yOff = 14 + (cam.zoom > 1.2 ? 4 : 0);
+        ctx.font = `bold 7px ${this.tokens.fontMono}`;
+        const textW = ctx.measureText(short).width + 8;
+        const labelW = Math.max(24, textW);
+        const lx = px + s / 2 - labelW / 2;
+        const ly = py - yOff;
+
+        ctx.fillStyle = 'rgba(20, 20, 30, 0.85)';
+        ctx.beginPath();
+        ctx.roundRect(lx, ly, labelW, 10, 2);
+        ctx.fill();
+
+        // Extension color dot
+        const extCol = EXT_COLOR[tile.workbench.extension] ?? '#888';
+        ctx.fillStyle = extCol;
+        ctx.beginPath();
+        ctx.arc(lx + 5, ly + 5, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#E2E8F0';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(short, px + s / 2 + 2, ly + 5);
+        ctx.restore();
+      }
+    }
+  }
+
+  // P2: Hover tooltip for workbench (2D mode)
+  private drawWorkbenchTooltip2D(wb: NonNullable<LocalTile['workbench']>) {
+    if (!this.world || !this.hoveredTile) return;
+    const { ctx, cam, canvas } = this;
+    const px = this.hoveredTile.x * TILE_SIZE + TILE_SIZE / 2;
+    const py = this.hoveredTile.y * TILE_SIZE;
+
+    // Convert to screen coords
+    const sx = (px - cam.x) * cam.zoom + cam.cx;
+    const sy = (py - cam.y) * cam.zoom + cam.cy;
+
+    const padX = 8, padY = 6, lineHeight = 11;
+    const extCol = EXT_COLOR[wb.extension] ?? '#888';
+    const fileName = wb.fileName;
+    const testBadge = wb.isTest ? ' [TEST]' : '';
+    const pathShort = wb.filePath.length > 40 ? '...' + wb.filePath.slice(-37) : wb.filePath;
+    const titleLine = `${fileName}${testBadge}`;
+    const extLine = `Type: ${wb.extension.toUpperCase()}`;
+
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.font = `bold 10px ${this.tokens.fontMono}`;
+    const titleW = ctx.measureText(titleLine).width;
+    ctx.font = `8px ${this.tokens.fontMono}`;
+    const pathW = ctx.measureText(pathShort).width;
+    const extW = ctx.measureText(extLine).width;
+    const maxW = Math.max(titleW, pathW, extW);
+    const tooltipW = maxW + padX * 2;
+    const tooltipH = lineHeight * 3 + padY * 2;
+
+    let tx = sx - tooltipW / 2;
+    let ty = sy - tooltipH - 12;
+    tx = Math.max(4, Math.min(tx, canvas.width - tooltipW - 4));
+    if (ty < 4) ty = sy + 12;
+
+    ctx.fillStyle = 'rgba(15, 15, 22, 0.95)';
+    ctx.beginPath();
+    ctx.roundRect(tx, ty, tooltipW, tooltipH, 4);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 200, 200, 0.2)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Ext color dot
+    ctx.fillStyle = extCol;
+    ctx.beginPath();
+    ctx.arc(tx + padX + 2, ty + padY + 6, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.font = `bold 10px ${this.tokens.fontMono}`;
+    ctx.fillStyle = '#F0F0F0';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(titleLine, tx + padX + 10, ty + padY + 6);
+
+    ctx.font = `8px ${this.tokens.fontMono}`;
+    ctx.fillStyle = '#A0A0A0';
+    ctx.fillText(pathShort, tx + padX, ty + padY + 6 + lineHeight);
+
+    ctx.fillStyle = extCol;
+    ctx.fillText(extLine, tx + padX, ty + padY + 6 + lineHeight * 2);
+    ctx.restore();
   }
 
   private spawnSpark(x: number, y: number, color: string) {
