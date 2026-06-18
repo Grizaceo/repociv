@@ -175,16 +175,33 @@ export class LocalRenderer {
     return this._temperatureOverlay;
   }
 
-  // ─── Fade Transition (300ms) ──────────────────────────────────────
+  // ─── P5: Transition polish ───────────────────────────────────────────────
   private _transitionState: 'entering' | 'active' | 'exiting' | null = null;
   private _transitionStartTime = 0;
-  private readonly _transitionDuration = 300; // ms
+  private readonly _enterDuration = 400; // ms (P5: was 300)
+  private readonly _exitDuration = 300; // ms
+
+  // P5: Camera intro zoom (0.8 → 1.0 over 600ms on enter)
+  private _introZoomActive = false;
+  private _introZoomStart = 0;
+  private readonly _introZoomDuration = 600;
+  private readonly _introZoomFrom = 0.8;
+  private readonly _introZoomTo = 1.0;
+
+  // P5: Loading indicator for large repos
+  private _loadingIndicator = false;
+  setLoadingIndicator(active: boolean): void {
+    this._loadingIndicator = active;
+  }
 
   /** Call when local view is being entered (from macro view). */
   startEnterTransition(): void {
     this._inputActive = true;
     this._transitionState = 'entering';
     this._transitionStartTime = performance.now();
+    // P5: start camera intro zoom
+    this._introZoomActive = true;
+    this._introZoomStart = performance.now();
   }
 
   /** Call when local view is being exited (back to macro view). */
@@ -206,10 +223,11 @@ export class LocalRenderer {
   private _getTransitionAlpha(): number {
     if (!this._transitionState || this._transitionState === 'active') return 1;
     const elapsed = performance.now() - this._transitionStartTime;
-    const progress = Math.min(elapsed / this._transitionDuration, 1);
     if (this._transitionState === 'entering') {
+      const progress = Math.min(elapsed / this._enterDuration, 1);
       return progress; // 0 -> 1
     } else if (this._transitionState === 'exiting') {
+      const progress = Math.min(elapsed / this._exitDuration, 1);
       return 1 - progress; // 1 -> 0
     }
     return 1;
@@ -725,6 +743,14 @@ export class LocalRenderer {
       if (t >= 1) this._camAnim = null;
     }
 
+    // P5: Camera intro zoom (0.8 → 1.0 over 600ms)
+    if (this._introZoomActive) {
+      const t = Math.min(1, (now - this._introZoomStart) / this._introZoomDuration);
+      const ease = 1 - Math.pow(1 - t, 3); // cubic ease-out
+      this.cam.zoom = this._introZoomFrom + (this._introZoomTo - this._introZoomFrom) * ease;
+      if (t >= 1) this._introZoomActive = false;
+    }
+
     // FPS counter (for debug overlay)
     this._fpsFrames++;
     if (now - this._fpsLastTime >= 1000) {
@@ -766,6 +792,11 @@ export class LocalRenderer {
     ctx.translate(cam.cx, cam.cy);
     ctx.scale(cam.zoom, cam.zoom);
     ctx.translate(-cam.x, -cam.y);
+
+    // P5: Loading indicator while local world generates
+    if (this._loadingIndicator) {
+      this.drawLoadingIndicator();
+    }
 
     // ─── Isometric 2.5D Rendering Branch ───────────────────────────────
     if (this._isometric && world) {
@@ -2506,6 +2537,42 @@ export class LocalRenderer {
   }
 
   // P2: Workbench labels (2D mode)
+  // P5: Loading indicator (animated spinner)
+  private drawLoadingIndicator() {
+    const { ctx, canvas } = this;
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const now = performance.now();
+
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    // Semi-transparent backdrop
+    ctx.fillStyle = 'rgba(255, 248, 243, 0.6)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Spinner ring
+    const radius = 24;
+    const angle = now / 400;
+    for (let i = 0; i < 8; i++) {
+      const a = angle + (i / 8) * Math.PI * 2;
+      const alpha = 0.3 + 0.7 * (i / 8);
+      ctx.fillStyle = `rgba(160, 120, 64, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(a) * radius, cy + Math.sin(a) * radius, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // "Generating office..." text
+    ctx.fillStyle = '#5C4033';
+    ctx.font = `bold 14px ${this.tokens.fontMono}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Generating office...', cx, cy + radius + 20);
+
+    ctx.restore();
+  }
+
   // P4: Drag-to-assign visual overlay
   private drawDragAssignOverlay() {
     if (!this._dragAssignUnit || !this.world) return;
