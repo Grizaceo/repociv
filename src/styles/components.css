@@ -461,16 +461,24 @@
   gap: 4px;
   align-items: center;
   justify-content: flex-end;
+  padding: 4px 6px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--shadow-deep);
+  /* Subtle separator: bottom border on strip, minimap gets its own border */
+  margin-bottom: 0;
 }
 
 #minimap-button-strip button {
+  position: relative;
   width: 32px;
   height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: var(--panel-radius);
   color: var(--ui-text-dim);
   cursor: pointer;
@@ -481,6 +489,7 @@
 #minimap-button-strip button:hover {
   border-color: var(--ui-gold, #c8a84b);
   color: var(--ui-text);
+  background: rgba(200, 168, 75, 0.08);
 }
 
 #minimap-button-strip button:active {
@@ -494,6 +503,60 @@
 #minimap-button-strip button i {
   width: 16px;
   height: 16px;
+}
+
+/* ─── Button badges (task count, idle count) ──────────────────────── */
+#minimap-button-strip .btn-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ui-gold, #c8a84b);
+  color: #1a1208;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 7px;
+  box-shadow: 0 0 0 2px var(--panel-bg);
+  pointer-events: none;
+}
+
+#minimap-button-strip .btn-badge:empty {
+  display: none;
+}
+
+#minimap-button-strip .btn-badge.active {
+  background: #4ecb71;
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--panel-bg), 0 0 0 0 rgba(78, 203, 113, 0.4); }
+  50% { box-shadow: 0 0 0 2px var(--panel-bg), 0 0 0 4px rgba(78, 203, 113, 0); }
+}
+
+/* ─── Short-screen protection (≤600px height) ───────────────────── */
+@media (max-height: 600px) {
+  #minimap-container {
+    width: 200px;
+    height: 140px;
+  }
+  #minimap-canvas {
+    width: 200px;
+    height: 140px;
+  }
+  #event-log {
+    height: 60px;
+  }
+  #minimap-button-strip button {
+    width: 28px;
+    height: 28px;
+  }
 }
 
 /* ─── Local-view floating controls (top-right, above minimap) ────────── */

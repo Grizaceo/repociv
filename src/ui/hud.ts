@@ -102,6 +102,20 @@ export function updateResource(id: 'gold' | 'science' | 'production', value: num
   if (el) el.textContent = value.toLocaleString();
 }
 
+/** Update the task-count and idle-agent-count badges on the bottom-right button strip. */
+export function updateBadges(activeTasks: number, idleCount: number): void {
+  const tasksBadge = document.getElementById('btn-tasks-badge');
+  if (tasksBadge) {
+    tasksBadge.textContent = activeTasks > 99 ? '99+' : String(activeTasks);
+    tasksBadge.classList.toggle('active', activeTasks > 0);
+  }
+  const idleBadge = document.getElementById('btn-idle-agent-badge');
+  if (idleBadge) {
+    idleBadge.textContent = idleCount > 99 ? '99+' : String(idleCount);
+    idleBadge.classList.toggle('active', idleCount > 0);
+  }
+}
+
 const LOG_MAX = 8;
 export function logEvent(
   msg: string,

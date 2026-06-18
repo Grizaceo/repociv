@@ -42,6 +42,7 @@ import {
   renderHeroBar,
   initExternalLibs,
   updateResource,
+  updateBadges,
   toggleTimelinePanel,
   toggleApprovalPanel,
   startApprovalPolling,
@@ -428,6 +429,17 @@ async function bootstrap() {
   updateResource('gold', world.resources.gold);
   updateResource('science', world.resources.science);
   updateResource('production', world.resources.production);
+
+  // Initial badges: task count + idle agent count
+  const initialIdle = state.getAllUnits().filter((u) => u.state === 'idle').length;
+  const initialTasks = Array.from(state.missions.values()).filter((m) => m.status === 'running').length;
+  updateBadges(initialTasks, initialIdle);
+  // Refresh badges periodically (catches agent state changes)
+  setInterval(() => {
+    const idle = state.getAllUnits().filter((u) => u.state === 'idle').length;
+    const tasks = Array.from(state.missions.values()).filter((m) => m.status === 'running').length;
+    updateBadges(tasks, idle);
+  }, 3000);
 
   const canvas = document.getElementById('main-canvas') as HTMLCanvasElement;
   const renderer = new Renderer(canvas, state);
