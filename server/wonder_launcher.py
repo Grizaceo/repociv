@@ -39,6 +39,7 @@ import subprocess
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -214,12 +215,22 @@ def _load_custom_launch_specs() -> dict[str, WonderSpec]:
     return out
 
 
+def reload_custom_specs() -> None:
+    """Re-read custom launch specs from disk into the in-memory cache.
+
+    Called after a connect/disconnect mutation (POST /api/wonders/connect)
+    so a freshly-written manifest's ``launch`` block becomes launchable
+    without a bridge restart.
+    """
+    global _CUSTOM_LAUNCH_SPECS
+    _CUSTOM_LAUNCH_SPECS = _load_custom_launch_specs()
+
+
 def reset_custom_specs_for_tests() -> None:
     """Reload custom launch specs from disk. Tests use this after
     monkeypatching ``REPOCIV_WONDERS_DIR`` to point at a tmp dir.
     """
-    global _CUSTOM_LAUNCH_SPECS
-    _CUSTOM_LAUNCH_SPECS = _load_custom_launch_specs()
+    reload_custom_specs()
 
 
 def _effective_specs() -> dict[str, WonderSpec]:
@@ -256,6 +267,14 @@ class WonderSpec:
     ui_timeout_s: float = 4.0
 
 
+# LGB's Vite UI port is derived from VITE_WONDER_BIBLIOTHECA_URL so the spawn
+# port, the adoption probe, and the iframe URL never drift apart. We pass it
+# explicitly with --strictPort so Vite FAILS LOUDLY (in the log) if the port is
+# taken instead of silently auto-incrementing to 5174/5175 — the silent drift
+# was why RepoCiv ended up pointing the iframe at another project's server.
+_LGB_UI_URL = _env("VITE_WONDER_BIBLIOTHECA_URL", "http://127.0.0.1:5173")
+_LGB_UI_PORT = str(urllib.parse.urlparse(_LGB_UI_URL).port or 5173)
+
 WONDER_LAUNCH_SPECS: dict[str, WonderSpec] = {
     "bibliotheca": WonderSpec(
         id="bibliotheca",
@@ -273,14 +292,14 @@ WONDER_LAUNCH_SPECS: dict[str, WonderSpec] = {
             ),
             ProcSpec(
                 name="ui",
-                argv=("npm", "run", "dev"),
+                argv=("npm", "run", "dev", "--", "--port", _LGB_UI_PORT, "--strictPort"),
                 cwd=os.path.join(BIBLIOTHECA_DIR, "frontend"),
                 log="bibliotheca-ui.log",
             ),
         ),
         api_url=_env("VITE_LGB_BACKEND_URL", "http://127.0.0.1:3001"),
         api_health_path="/api/health",
-        ui_url=_env("VITE_WONDER_BIBLIOTHECA_URL", "http://127.0.0.1:5173"),
+        ui_url=_LGB_UI_URL,
     ),
     "institutum": WonderSpec(
         id="institutum",

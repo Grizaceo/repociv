@@ -802,11 +802,18 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._err_json(413, "payload too large")
             return
 
-        try:
-            body = json.loads(self.rfile.read(length))
-        except Exception:
-            self._err_json(400, "invalid JSON")
-            return
+        raw = self.rfile.read(length) if length else b""
+        if not raw or not raw.strip():
+            # Empty body is valid for endpoints that take their args from the
+            # URL (e.g. POST /api/wonders/{id}/launch|stop|disconnect). Treat it
+            # as an empty object instead of a 400 "invalid JSON".
+            body = {}
+        else:
+            try:
+                body = json.loads(raw)
+            except Exception:
+                self._err_json(400, "invalid JSON")
+                return
 
         path = self.path.split("?")[0]
 
@@ -831,6 +838,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/subagents/cancel": _routes.post_subagent_cancel,
             "/api/profiles": _routes.post_profiles,
             "/api/profiles/delete": _routes.post_profiles_delete,
+            "/api/wonders/connect": _routes.post_wonder_connect,
         }
         if path in _POST_EXACT:
             status, resp = _POST_EXACT[path](body, {})
@@ -848,6 +856,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 return
             if len(parts) >= 2 and parts[1] == "stop":
                 status, resp = _routes.post_wonder_stop(body, {"wonder_id": parts[0]})
+                self._respond(status, resp)
+                return
+            if len(parts) >= 2 and parts[1] == "disconnect":
+                status, resp = _routes.post_wonder_disconnect(body, {"wonder_id": parts[0]})
                 self._respond(status, resp)
                 return
 

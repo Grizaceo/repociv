@@ -6,15 +6,15 @@
 // - Invalid manifests are skipped, never crash the app
 // - Future: merge with user-provided ~/.repociv/wonders/*.json via backend
 
-import {
-  LGB_BACKEND_URL,
-  WONDER_BIBLIOTHECA_URL,
-  WONDER_INSTITUTUM_API_URL,
-  WONDER_INSTITUTUM_URL,
-} from '../wonderEnv.ts';
+import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import type { WonderManifest } from './types.ts';
 import type { WonderType } from '../types.ts';
 
+// Native fallback only. The iframe wonders (Bibliotheca, LabHub, and any
+// user-connected service) are NOT hardcoded here anymore — they live in the
+// backend registry (~/.repociv/wonders/*.json, served by GET /api/wonders)
+// and are hydrated at runtime via loadWonders(). Out-of-the-box only La Gaceta
+// (native) is active; examples to connect live in ./exampleTemplates.ts.
 export const WONDER_MANIFESTS = {
   gaceta: {
     id: 'gaceta',
@@ -67,120 +67,11 @@ export const WONDER_MANIFESTS = {
     ],
     mcp: { enabled: false, server: null },
   },
-  bibliotheca: {
-    id: 'bibliotheca',
-    title: 'Bibliotheca Alexandrina',
-    kind: 'iframe',
-    category: 'knowledge',
-    version: '0.1.0',
-    defaultEnabled: true,
-    automationLevel: 'passive',
-    passiveMode: true,
-    agenticMode: false,
-    canSuggest: true,
-    canAct: false,
-    requiresConfirmation: true,
-    ui: {
-      url: WONDER_BIBLIOTHECA_URL,
-      preferredWidth: '70vw',
-      preferredHeight: '75vh',
-      sandbox: ['allow-scripts', 'allow-same-origin', 'allow-forms'],
-    },
-    health: {
-      url: `${LGB_BACKEND_URL}/api/health`,
-      timeoutMs: 4000,
-      degradedAllowed: true,
-    },
-    permissions: {
-      readRepos: true,
-      writeRepos: false,
-      network: 'loopback-only',
-      requiresApprovalForMutations: true,
-    },
-    optionalFeatures: [
-      {
-        id: 'graphSuggestions',
-        label: 'Sugerencias de relaciones',
-        description: 'El agente Astrónomo sugiere conexiones entre nodos',
-        defaultEnabled: false,
-        requiresUserOptIn: true,
-      },
-      {
-        id: 'aiRelationDiscovery',
-        label: 'Descubrimiento AI de relaciones',
-        description: 'Usa grafo offline para encontrar vínculos no obvios entre repos',
-        defaultEnabled: false,
-        requiresUserOptIn: true,
-      },
-    ],
-    events: {
-      emits: ['wonder.ready', 'wonder.selection', 'wonder.report.created'],
-      accepts: ['repociv.focus', 'repociv.open_local_view', 'repociv.graph_suggestions'],
-    },
-    actions: [
-      { id: 'open', label: 'Entrar', risk: 'safe', requiresUserOptIn: false },
-      { id: 'ask_agent', label: 'Preguntar a agente', risk: 'safe', requiresUserOptIn: true },
-    ],
-    mcp: { enabled: false, server: null },
-  },
-  institutum: {
-    id: 'institutum',
-    title: 'Institutum Laboratorium / LabHub',
-    kind: 'iframe',
-    category: 'lab',
-    version: '0.1.0',
-    defaultEnabled: true,
-    automationLevel: 'assist',
-    passiveMode: true,
-    agenticMode: true,
-    canSuggest: true,
-    canAct: false,
-    requiresConfirmation: true,
-    ui: {
-      url: WONDER_INSTITUTUM_URL,
-      preferredWidth: '70vw',
-      preferredHeight: '75vh',
-      sandbox: ['allow-scripts', 'allow-same-origin', 'allow-forms'],
-    },
-    health: {
-      url: `${WONDER_INSTITUTUM_API_URL}/health`,
-      timeoutMs: 4000,
-      degradedAllowed: true,
-    },
-    permissions: {
-      readRepos: false,
-      writeRepos: false,
-      network: 'loopback-only',
-      requiresApprovalForMutations: true,
-    },
-    optionalFeatures: [
-      {
-        id: 'hardLocks',
-        label: 'Bloqueos duros',
-        description: 'Impide completamente la edición de ciudades con experimentos críticos',
-        defaultEnabled: false,
-        requiresUserOptIn: true,
-      },
-    ],
-    events: {
-      emits: ['wonder.ready', 'labhub.experiment.started', 'labhub.experiment.finished'],
-      accepts: ['repociv.focus_city'],
-    },
-    actions: [
-      { id: 'open', label: 'Abrir Institutum', risk: 'safe', requiresUserOptIn: false },
-      {
-        id: 'kill_experiment',
-        label: 'Detener experimento',
-        risk: 'manual',
-        requiresUserOptIn: true,
-      },
-    ],
-    mcp: { enabled: false, server: null },
-  },
 } as const satisfies Record<string, WonderManifest>;
 
 const _registry: Map<string, WonderManifest> = new Map();
 let _initialized = false;
+let _loaded = false;
 
 function _validateManifest(m: WonderManifest): boolean {
   if (!m.id || !m.title || !m.kind || !m.category || !m.version) return false;
@@ -198,9 +89,57 @@ function _ensureInit(): void {
   _initialized = true;
 }
 
+/** Hydrate the registry from the backend (GET /api/wonders), which merges the
+ *  user's connected wonders (~/.repociv/wonders/*.json) with any built-ins.
+ *  Idempotent: only refetches when ``force`` or after invalidation. On any
+ *  failure (bridge down) the static gaceta fallback stays in place so the UI
+ *  never crashes. Returns the current manifest list. */
+export async function loadWonders(force = false): Promise<WonderManifest[]> {
+  _ensureInit();
+  if (_loaded && !force) return listWonders();
+  try {
+    const res = await fetch(bridgeUrl('/api/wonders'), { headers: bridgeHeaders() });
+    if (res.ok) {
+      const data = (await res.json()) as unknown;
+      if (Array.isArray(data)) {
+        _registry.clear();
+        for (const raw of data) {
+          const m = raw as WonderManifest;
+          if (_validateManifest(m)) _registry.set(m.id, m);
+        }
+        // gaceta is native (no backend health/launch); guarantee it survives
+        // even if the backend registry omits it.
+        if (!_registry.has('gaceta')) _registry.set('gaceta', WONDER_MANIFESTS.gaceta);
+        _initialized = true;
+      }
+    }
+  } catch {
+    // bridge unreachable — keep the static fallback already seeded above.
+  }
+  _loaded = true;
+  return listWonders();
+}
+
+/** Bootstrap helper: hydrate once before building the capital panel / map. */
+export function ensureWondersLoaded(): Promise<WonderManifest[]> {
+  return loadWonders(false);
+}
+
+/** Force a refetch on the next ensureWondersLoaded()/loadWonders() call —
+ *  used after connect/disconnect mutations so the UI reflects disk state. */
+export function invalidateWondersCache(): void {
+  _loaded = false;
+}
+
 export function listWonders(): WonderManifest[] {
   _ensureInit();
   return Array.from(_registry.values());
+}
+
+/** iframe wonders currently registered (connected) — drives map placement
+ *  and auto-launch. Excludes native wonders (gaceta) which have no server. */
+export function listIframeWonders(): WonderManifest[] {
+  return listWonders().filter((m) => m.kind === 'iframe');
 }
 
 export function getWonder(id: string): WonderManifest | undefined {

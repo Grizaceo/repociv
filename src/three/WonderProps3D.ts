@@ -39,8 +39,13 @@ const bibliothecaGroup = new Group();
 bibliothecaGroup.name = 'wonder-bibliotheca';
 const institutumGroup = new Group();
 institutumGroup.name = 'wonder-institutum';
+// Holds every user-connected wonder that isn't one of the two built-in
+// examples — rendered with a neutral monument silhouette.
+const genericGroup = new Group();
+genericGroup.name = 'wonder-generic';
 wonderGroup.add(bibliothecaGroup);
 wonderGroup.add(institutumGroup);
+wonderGroup.add(genericGroup);
 
 export function getWonderPropsGroup(): Group {
   return wonderGroup;
@@ -112,15 +117,17 @@ function buildBibliotheca(): Group {
     g.add(col);
   }
 
-  // Pediment: low triangular prism (use a 3-sided cylinder + 90° rotation)
+  // Pediment: low triangular prism sitting on top of the columns, point up.
+  // CylinderGeometry(0, pedW, pedH, 3, 1) is a 3-sided cone (point at y=+pedH/2,
+  // base at y=-pedH/2). It already has the right vertical orientation by default
+  // — no rotation needed. We narrow it in Z (scale.z = pedL/pedW) to make it
+  // a flat triangular prism instead of a tetrahedral cone.
   const pedW = HEX_SIZE * 0.50;
   const pedH = HEX_SIZE * 0.08;
   const pedL = HEX_SIZE * 0.16;
   const ped  = new Mesh(new CylinderGeometry(0, pedW, pedH, 3, 1), roofMat);
-  ped.rotation.x = Math.PI / 2;
-  ped.rotation.z = Math.PI;
-  ped.scale.set(1, pedL / pedH, 1);
-  ped.position.y = topDais + colH + pedH * 0.5;
+  ped.scale.set(1, 1, pedL / pedW);
+  ped.position.y = topDais + colH + pedH * 0.5;  // base sits flush on the columns
   ped.castShadow = true;
   g.add(ped);
 
@@ -211,6 +218,67 @@ function buildInstitutum(): Group {
   return g;
 }
 
+/**
+ * Generic connected wonder — neutral monument for any user-defined iframe
+ * service that isn't one of the two built-in examples. Stepped dais + central
+ * obelisk + emissive node so it reads as "a wonder" without claiming a
+ * specific identity. Deliberately distinct from the temple/laboratorium.
+ */
+function buildGenericWonder(): Group {
+  const g = new Group();
+  g.name = 'wonder-generic-inst';
+
+  const stoneMat = new MeshStandardMaterial({
+    color: new Color(0xb9b2a4),
+    roughness: 0.74,
+    metalness: 0.06,
+  });
+  const obMat = new MeshStandardMaterial({
+    color: new Color(0x9aa0ad),
+    roughness: 0.5,
+    metalness: 0.16,
+  });
+  const nodeMat = new MeshStandardMaterial({
+    color: new Color(0x7fb0e8),
+    emissive: new Color(0x2f6fae),
+    emissiveIntensity: 0.6,
+    roughness: 0.2,
+    metalness: 0.3,
+    transparent: true,
+    opacity: 0.82,
+  });
+
+  // 2-tier dais
+  const daisHeights = [0.05, 0.05];
+  const daisRadii = [0.38, 0.28];
+  let stacked = 0;
+  for (let i = 0; i < 2; i++) {
+    const h = HEX_SIZE * daisHeights[i]!;
+    const r = HEX_SIZE * daisRadii[i]!;
+    const dais = new Mesh(new CylinderGeometry(r, r * 1.05, h, 6), stoneMat);
+    dais.position.y = stacked + h * 0.5;
+    dais.castShadow = true;
+    dais.receiveShadow = true;
+    g.add(dais);
+    stacked += h;
+  }
+
+  // Central obelisk (tapered)
+  const obH = HEX_SIZE * 0.42;
+  const obelisk = new Mesh(new ConeGeometry(HEX_SIZE * 0.11, obH, 4), obMat);
+  obelisk.position.y = stacked + obH * 0.5;
+  obelisk.rotation.y = Math.PI / 4;
+  obelisk.castShadow = true;
+  g.add(obelisk);
+
+  // Emissive node at the apex
+  const node = new Mesh(new SphereGeometry(HEX_SIZE * 0.05, 8, 6), nodeMat);
+  node.position.y = stacked + obH + HEX_SIZE * 0.03;
+  g.add(node);
+
+  return g;
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 function wonderSignature(tiles: Tile[]): string {
@@ -247,6 +315,7 @@ export function rebuildWonderProps(tiles: Tile[]): void {
   if (tiles.length === 0) {
     clearGroupContents(bibliothecaGroup);
     clearGroupContents(institutumGroup);
+    clearGroupContents(genericGroup);
     lastSignature = '';
     return;
   }
@@ -257,6 +326,7 @@ export function rebuildWonderProps(tiles: Tile[]): void {
 
   clearGroupContents(bibliothecaGroup);
   clearGroupContents(institutumGroup);
+  clearGroupContents(genericGroup);
 
   // Build each wonder instance at its tile centre
   for (const tile of tiles) {
@@ -266,6 +336,10 @@ export function rebuildWonderProps(tiles: Tile[]): void {
     const elev = terrainElevation(tile.terrain);
     const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
 
+    // 'gaceta' is native (no server, no structure) — never rendered as a prop
+    // even if some tile carried it.
+    if (tile.district.wonderType === 'gaceta') continue;
+
     if (tile.district.wonderType === 'bibliotheca') {
       const inst = buildBibliotheca();
       inst.position.set(pos.x, pos.y, pos.z);
@@ -274,27 +348,34 @@ export function rebuildWonderProps(tiles: Tile[]): void {
       const inst = buildInstitutum();
       inst.position.set(pos.x, pos.y, pos.z);
       institutumGroup.add(inst);
+    } else {
+      // Any user-connected wonder → neutral monument.
+      const inst = buildGenericWonder();
+      inst.position.set(pos.x, pos.y, pos.z);
+      genericGroup.add(inst);
     }
-    // 'gaceta' has no tile in the current map (native, no district) → skip.
   }
 }
 
 export function clearWonderProps(): void {
   clearGroupContents(bibliothecaGroup);
   clearGroupContents(institutumGroup);
+  clearGroupContents(genericGroup);
   lastSignature = '';
 }
 
 /**
  * Per-wonder visibility — bibliotheca under `knowledge` layer, institutum
- * under `labs` layer. Mirrors the 2D canvas gating (renderer.ts:1190-1225).
+ * under `labs` layer, generic (user-connected) wonders under `structure`.
+ * Mirrors the 2D canvas gating (renderer.ts:1190-1225).
  */
 export function setWonderVisible(
-  type: 'bibliotheca' | 'institutum',
+  type: 'bibliotheca' | 'institutum' | 'generic',
   visible: boolean,
 ): void {
   if (type === 'bibliotheca') bibliothecaGroup.visible = visible;
-  else institutumGroup.visible = visible;
+  else if (type === 'institutum') institutumGroup.visible = visible;
+  else genericGroup.visible = visible;
 }
 
 /** @internal test hook — exposes the current signature so tests can assert

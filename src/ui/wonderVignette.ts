@@ -350,12 +350,13 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
   }
 
   const health = await _checkWonderHealth(manifest);
-  if (health === 'timeout') {
-    _showEmptyState(body, type, 'timeout');
-    return;
-  }
-  if (health === 'offline') {
-    _showEmptyState(body, type, 'offline');
+  if (health === 'timeout' || health === 'offline') {
+    // Generic connected wonder is down — try the auto-start (the bridge will
+    // launch it if it has a launch spec, or 404 fast if it doesn't, in which
+    // case we fall through to the empty state).
+    const launched = await _tryAutoStart(body, type);
+    if (launched) return;
+    _showEmptyState(body, type, health);
     return;
   }
   if (health === 'degraded') {

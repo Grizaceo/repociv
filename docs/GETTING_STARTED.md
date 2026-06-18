@@ -337,13 +337,30 @@ npm run check
 
 ---
 
-## Maravilla Bibliotheca (La Gran Biblioteca)
+## Maravillas (conectar servicios iframe)
 
-RepoCiv embeds **La Gran Biblioteca** (repo hermano `la-gran-biblioteca`) in a
-viñeta iframe. LGB no se modifica desde RepoCiv; solo enlazas su UI y compruebas
-el backend con variables `VITE_*` (ver `.env.example`).
+**Nada viene pre-instalado.** El mapa arranca solo con La Gaceta (nativa).
+Cualquier servicio web local apto para iframe — un dashboard, una app, un
+panel — se conecta como **Maravilla** y RepoCiv puede levantarlo y embeberlo
+sin que abras terminales.
 
-La Gran Biblioteca es un proyecto compañero opcional (repo separado, no incluido en RepoCiv).
+**Conectar:** abrí el **Palacio** (doble clic en la capital) → pestaña
+**Maravillas**. Verás la guía y dos **ejemplos** apuntando a sus repos públicos:
+
+- **La Gran Biblioteca** — grafo de conocimiento sobre tus repos.
+  Repo: https://github.com/Grizaceo/la-gran-biblioteca
+- **LabHub / Institutum** — laboratorio de experimentos.
+  Repo: https://github.com/Grizaceo/labhub
+
+Si ya tenés el repo del ejemplo en disco, pulsá **Conectar** y RepoCiv escribe
+su manifiesto en `~/.repociv/wonders/<id>.json`, lo muestra como pestaña + tile
+en el mapa, y levanta su servidor al abrirlo. Para conectar un servicio propio,
+ver [`CUSTOM_WONDERS.md`](./CUSTOM_WONDERS.md).
+
+### Bibliotheca (La Gran Biblioteca) — ejemplo
+
+Una vez conectada, RepoCiv la enlaza como iframe (la UI no se modifica) y
+comprueba su backend con variables `VITE_*` (ver `.env.example`).
 
 ### Arranque automático (recomendado, F1–F5, 2026-06-16 → 2026-06-17)
 

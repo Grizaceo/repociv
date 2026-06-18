@@ -936,6 +936,7 @@ export function updateHexWorldScene(
   // `structure` layer is enabled.
   setWonderVisible('bibliotheca', opts.showKnowledge);
   setWonderVisible('institutum',  opts.showLabs);
+  setWonderVisible('generic',     opts.showStructure);
   rebuildWonderProps(Array.from(state.world.tiles.values()));
 
   rebuildMapLabels(scene, state, opts.lod, opts.showLabels, (key) => state.world.tiles.get(key));

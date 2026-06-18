@@ -189,45 +189,51 @@ wonder.notification — notificación (info/warn/critical)
 
 ## 5. Cómo agregar una nueva Maravilla
 
-RepoCiv soporta dos modos de agregar Maravillas:
+> **Modelo (desde 2026-06-17):** solo **La Gaceta** (nativa) viene activa.
+> Bibliotheca y LabHub ya **no** son built-ins: son **ejemplos conectables**
+> (`src/wonders/exampleTemplates.ts`). Cualquier servicio iframe se conecta del
+> mismo modo — escribiendo un manifest a `~/.repociv/wonders/<id>.json`. El
+> frontend hidrata el registry vía `GET /api/wonders` en el arranque, así que
+> las Maravillas conectadas aparecen en la UI sin tocar el código.
 
-### 5.1 Built-in (contribuir al repo)
+### 5.1 Conectar (recomendado — el usuario, sin tocar el repo)
 
-Para Maravillas que van a vivir en el código fuente de RepoCiv:
+Desde la UI: **Palacio → pestaña "Maravillas"**. Hay tarjetas de ejemplo
+(Bibliotheca, LabHub) con su repo público y un botón **Conectar**; o conectás
+un servicio propio con su `WonderManifest`. Bajo el capó:
 
-1. Crear o identificar la app externa (o componente nativo)
-2. Declarar su `WonderManifest` en `src/wonders/manifest.ts`
-3. Si es iframe, agregar URL en `src/wonderEnv.ts` con env var `VITE_WONDER_*_URL`
-4. Si requiere auto-start, agregar `WonderSpec` + `ProcSpec` en
-   `server/wonder_launcher.py: WONDER_LAUNCH_SPECS`
-5. Actualizar `src/ui/capitalPanel.ts` si necesita tab propia
-6. Documentar en este archivo
+- `POST /api/wonders/connect` con el `WonderManifest` (+ `launch` opcional) en
+  el body → valida, sanitiza el `id` (`[a-z0-9_-]`), expande `~`/`$ENV` en
+  `launch.repo_dir`/`procs[].cwd`, y escribe `~/.repociv/wonders/<id>.json`.
+  Recarga el launcher en caliente (sin reiniciar el bridge).
+- `POST /api/wonders/<id>/disconnect` → borra ese JSON (solo del dir del
+  usuario; los built-in en código no se tocan).
+- Loopback-only + token-gated (igual que `launch`).
 
-**NO agregar una nueva Maravilla antes de:**
-- Tener el contrato estable con 2-3 ejemplos reales funcionando
-- Verificar que `npm run check` + lint + tests pasen
-- Documentar el flujo de opt-in
+A mano (sin UI): creá `~/.repociv/wonders/<id>.json` y reiniciá el bridge — ver
+[`CUSTOM_WONDERS.md`](./CUSTOM_WONDERS.md). Aparece en `GET /api/wonders` y queda
+disponible para `POST /api/wonders/<id>/launch`.
 
-### 5.2 Custom (user-defined, sin tocar el repo)
+### 5.2 Built-in / ejemplo (contribuir al repo)
 
-Para Maravillas propias del usuario — apps personales, forks,
-experimentos — que viven como manifests en `~/.repociv/wonders/`:
+Para Maravillas que viven en el código fuente:
 
-1. Crear `~/.repociv/wonders/<id>.json` con el `WonderManifest` +
-   campo opcional `launch` (ver [`CUSTOM_WONDERS.md`](./CUSTOM_WONDERS.md))
-2. Reiniciar el bridge
-3. La Maravilla aparece en `GET /api/wonders` y queda disponible
-   para `POST /api/wonders/<id>/launch`
+- **Nativa** (como Gaceta): declarar el `WonderManifest` en
+  `src/wonders/manifest.ts` (`WONDER_MANIFESTS`) y en
+  `server/wonder_registry.py` (`_STATIC_WONDER_MANIFESTS`).
+- **Ejemplo conectable** (como Bibliotheca/LabHub): añadir a
+  `src/wonders/exampleTemplates.ts` (`WONDER_EXAMPLES`) con su `repoUrl` +
+  descripción; si requiere auto-start, añadir `WonderSpec` en
+  `server/wonder_launcher.py: WONDER_LAUNCH_SPECS`. NO se registra estático: el
+  usuario lo conecta desde la guía.
 
-**Limitación conocida:** el frontend usa `WONDER_MANIFESTS` hardcodeado
-en `src/wonders/manifest.ts`, así que Maravillas custom NO aparecen
-en el listado UI de la capital. Sí funcionan para auto-start y
-health checks vía la API. Es una restricción intencional para
-mantener el contrato del frontend estable; ver roadmap.
+**NO agregar una nueva Maravilla antes de:** contrato estable con ejemplos
+reales funcionando · `npm run check` + lint + tests verdes · flujo de opt-in
+documentado.
 
 **Override de built-ins:** un manifest custom con `id: "bibliotheca"`
-(o `"institutum"`) gana al built-in. El bridge loguea un warning.
-Útil para forkear Maravillas built-in sin tocar el código.
+(o `"institutum"`) gana sobre el launch spec built-in. El bridge loguea un
+warning. Útil para apuntar un ejemplo a un fork propio sin tocar el código.
 
 ---
 

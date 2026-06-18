@@ -1,84 +1,151 @@
 // ─── RepoCiv — Wonder Manifest Registry Tests ─────────────────────────────────
 //
 // Tests for src/wonders/manifest.ts — the runtime registry layer.
+//
+// New model (2026-06-17): only the native gaceta is hardcoded. iframe wonders
+// (bibliotheca, institutum, and user-connected services) are hydrated from the
+// backend via loadWonders() (GET /api/wonders). So the synchronous registry is
+// gaceta-only by default; loadWonders() merges whatever the bridge returns.
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { getWonderExample } from './exampleTemplates.ts';
 
-// We need to reset the registry between tests since it uses module-level state.
-// The registry is lazy-initialized on first call via _ensureInit().
-// To reset it, we invalidate the module cache.
+// Reset module-level registry state between tests.
 function resetRegistryImport() {
   vi.resetModules();
+}
+
+/** A fake /api/wonders payload: gaceta + the two examples + one custom. */
+function fakeBackendManifests() {
+  const biblio = getWonderExample('bibliotheca')!.manifest;
+  const inst = getWonderExample('institutum')!.manifest;
+  return [
+    { ...biblio },
+    { ...inst },
+    {
+      id: 'mi-servicio',
+      title: 'Mi Servicio',
+      kind: 'iframe',
+      category: 'knowledge',
+      version: '0.1.0',
+      defaultEnabled: true,
+      automationLevel: 'passive',
+      passiveMode: true,
+      agenticMode: false,
+      canSuggest: false,
+      canAct: false,
+      requiresConfirmation: true,
+      ui: { url: 'http://127.0.0.1:9998' },
+      permissions: {
+        readRepos: false,
+        writeRepos: false,
+        network: 'loopback-only',
+        requiresApprovalForMutations: true,
+      },
+      optionalFeatures: [],
+      actions: [{ id: 'open', label: 'Abrir', risk: 'safe', requiresUserOptIn: false }],
+      events: { emits: ['wonder.ready'], accepts: [] },
+      mcp: { enabled: false, server: null },
+    },
+  ];
 }
 
 describe('wonder manifest registry', () => {
   beforeEach(() => {
     resetRegistryImport();
   });
-
-  describe('listWonders', () => {
-    it('returns all registered wonders', async () => {
-      const { listWonders } = await import('./manifest.ts');
-      const wonders = listWonders();
-      expect(wonders.length).toBeGreaterThanOrEqual(3);
-      const ids = wonders.map((w) => w.id);
-      expect(ids).toContain('gaceta');
-      expect(ids).toContain('bibliotheca');
-      expect(ids).toContain('institutum');
-    });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  describe('getWonder', () => {
-    it('returns manifest for known wonder id', async () => {
+  describe('static (un-hydrated) registry', () => {
+    it('lists only the native gaceta out of the box', async () => {
+      const { listWonders } = await import('./manifest.ts');
+      const ids = listWonders().map((w) => w.id);
+      expect(ids).toEqual(['gaceta']);
+    });
+
+    it('getWonder returns the native gaceta', async () => {
       const { getWonder } = await import('./manifest.ts');
       const gaceta = getWonder('gaceta');
       expect(gaceta).toBeDefined();
-      expect(gaceta!.id).toBe('gaceta');
-      expect(gaceta!.title).toBe('La Gaceta Imperial');
       expect(gaceta!.kind).toBe('native');
       expect(gaceta!.category).toBe('news');
     });
 
-    it('returns manifest for bibliotheca', async () => {
+    it('iframe wonders are absent until hydrated', async () => {
       const { getWonder } = await import('./manifest.ts');
-      const biblio = getWonder('bibliotheca');
-      expect(biblio).toBeDefined();
-      expect(biblio!.id).toBe('bibliotheca');
-      expect(biblio!.kind).toBe('iframe');
-      expect(biblio!.category).toBe('knowledge');
+      expect(getWonder('bibliotheca')).toBeUndefined();
+      expect(getWonder('institutum')).toBeUndefined();
     });
 
-    it('returns manifest for institutum', async () => {
-      const { getWonder } = await import('./manifest.ts');
-      const inst = getWonder('institutum');
-      expect(inst).toBeDefined();
-      expect(inst!.id).toBe('institutum');
-      expect(inst!.kind).toBe('iframe');
-      expect(inst!.category).toBe('lab');
+    it('listIframeWonders is empty until hydrated', async () => {
+      const { listIframeWonders } = await import('./manifest.ts');
+      expect(listIframeWonders()).toEqual([]);
+    });
+  });
+
+  describe('loadWonders (hydration from /api/wonders)', () => {
+    it('merges the backend manifests into the registry', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => ({ ok: true, json: async () => fakeBackendManifests() })),
+      );
+      const { loadWonders, getWonder, listIframeWonders } = await import('./manifest.ts');
+      await loadWonders();
+      expect(getWonder('bibliotheca')).toBeDefined();
+      expect(getWonder('institutum')).toBeDefined();
+      expect(getWonder('mi-servicio')).toBeDefined();
+      const iframeIds = listIframeWonders().map((w) => w.id).sort();
+      expect(iframeIds).toEqual(['bibliotheca', 'institutum', 'mi-servicio']);
     });
 
+    it('always keeps native gaceta even if backend omits it', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => ({ ok: true, json: async () => fakeBackendManifests() })),
+      );
+      const { loadWonders, getWonder } = await import('./manifest.ts');
+      await loadWonders();
+      expect(getWonder('gaceta')).toBeDefined();
+    });
+
+    it('falls back to the static gaceta when the bridge is unreachable', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          throw new Error('network down');
+        }),
+      );
+      const { loadWonders, listWonders } = await import('./manifest.ts');
+      await loadWonders();
+      expect(listWonders().map((w) => w.id)).toEqual(['gaceta']);
+    });
+
+    it('invalidateWondersCache forces a refetch', async () => {
+      const fetchMock = vi.fn(async () => ({ ok: true, json: async () => fakeBackendManifests() }));
+      vi.stubGlobal('fetch', fetchMock);
+      const { loadWonders, invalidateWondersCache } = await import('./manifest.ts');
+      await loadWonders();
+      await loadWonders(); // cached → no second fetch
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      invalidateWondersCache();
+      await loadWonders();
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('getWonder', () => {
     it('returns undefined for unknown id', async () => {
       const { getWonder } = await import('./manifest.ts');
       expect(getWonder('nonexistent')).toBeUndefined();
     });
-
-    it('labhub key resolves institutum manifest', async () => {
-      // WONDER_MANIFESTS uses 'institutum' as key; 'labhub' is a legacy alias
-      // used by isFeatureEnabled but not as a registry key.
-      // Verify that institutum is registered and accessible.
-      const { getWonder } = await import('./manifest.ts');
-      const inst = getWonder('institutum');
-      expect(inst).toBeDefined();
-      expect(inst!.id).toBe('institutum');
-      expect(inst!.title).toContain('Institutum');
-    });
   });
 
   describe('isWonderEnabled', () => {
-    it('returns true for default-enabled wonders', async () => {
+    it('returns true for the native gaceta', async () => {
       const { isWonderEnabled } = await import('./manifest.ts');
       expect(isWonderEnabled('gaceta')).toBe(true);
-      expect(isWonderEnabled('bibliotheca')).toBe(true);
     });
 
     it('returns false for unknown wonders', async () => {
@@ -88,10 +155,9 @@ describe('wonder manifest registry', () => {
   });
 
   describe('getWonderActions', () => {
-    it('returns actions for a wonder', async () => {
+    it('returns actions for gaceta', async () => {
       const { getWonderActions } = await import('./manifest.ts');
       const actions = getWonderActions('gaceta');
-      expect(actions.length).toBeGreaterThanOrEqual(2);
       const ids = actions.map((a) => a.id);
       expect(ids).toContain('open');
       expect(ids).toContain('foreign_relations_report');
@@ -106,17 +172,14 @@ describe('wonder manifest registry', () => {
   describe('getWonderOptionalFeatures', () => {
     it('returns optional features for gaceta', async () => {
       const { getWonderOptionalFeatures } = await import('./manifest.ts');
-      const features = getWonderOptionalFeatures('gaceta');
-      expect(features.length).toBeGreaterThanOrEqual(2);
-      const ids = features.map((f) => f.id);
+      const ids = getWonderOptionalFeatures('gaceta').map((f) => f.id);
       expect(ids).toContain('foreignRelationsReport');
       expect(ids).toContain('autoSummaries');
     });
 
     it('all optional features require opt-in by default', async () => {
       const { getWonderOptionalFeatures } = await import('./manifest.ts');
-      const features = getWonderOptionalFeatures('gaceta');
-      for (const f of features) {
+      for (const f of getWonderOptionalFeatures('gaceta')) {
         expect(f.requiresUserOptIn).toBe(true);
         expect(f.defaultEnabled).toBe(false);
       }
@@ -150,7 +213,7 @@ describe('wonder manifest registry', () => {
     });
   });
 
-  describe('capability flags', () => {
+  describe('capability flags (gaceta)', () => {
     it('gaceta starts fully passive — no agentic, no suggestions', async () => {
       const { getWonder } = await import('./manifest.ts');
       const gaceta = getWonder('gaceta')!;
@@ -160,46 +223,10 @@ describe('wonder manifest registry', () => {
       expect(gaceta.canAct).toBe(false);
       expect(gaceta.requiresConfirmation).toBe(false);
     });
-
-    it('bibliotheca is passive but can suggest (opt-in)', async () => {
-      const { getWonder } = await import('./manifest.ts');
-      const biblio = getWonder('bibliotheca')!;
-      expect(biblio.passiveMode).toBe(true);
-      expect(biblio.agenticMode).toBe(false);
-      expect(biblio.canSuggest).toBe(true);
-      expect(biblio.canAct).toBe(false);
-      expect(biblio.requiresConfirmation).toBe(true);
-    });
-
-    it('institutum is assist-level with agentic suggestions', async () => {
-      const { getWonder } = await import('./manifest.ts');
-      const inst = getWonder('institutum')!;
-      expect(inst.passiveMode).toBe(true);
-      expect(inst.agenticMode).toBe(true);
-      expect(inst.canSuggest).toBe(true);
-      expect(inst.canAct).toBe(false);
-      expect(inst.requiresConfirmation).toBe(true);
-      expect(inst.automationLevel).toBe('assist');
-    });
-  });
-
-  describe('automation levels', () => {
-    it('gaceta and bibliotheca default to passive automation', async () => {
-      const { getWonder } = await import('./manifest.ts');
-      expect(getWonder('gaceta')!.automationLevel).toBe('passive');
-      expect(getWonder('bibliotheca')!.automationLevel).toBe('passive');
-    });
-
-    it('institutum defaults to assist automation', async () => {
-      const { getWonder } = await import('./manifest.ts');
-      expect(getWonder('institutum')!.automationLevel).toBe('assist');
-    });
   });
 
   describe('validation', () => {
-    it('registry never crashes on invalid manifests', async () => {
-      // The registry silently skips invalid manifests via _validateManifest.
-      // As long as the default config is valid, listWonders should work.
+    it('registry never crashes on access', async () => {
       const { listWonders, getWonder } = await import('./manifest.ts');
       expect(() => listWonders()).not.toThrow();
       expect(() => getWonder('gaceta')).not.toThrow();

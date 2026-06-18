@@ -136,7 +136,10 @@ export interface District {
 // ─── Building & Wonder ─────────────────────────────────────────────────────
 export type BuildingState = 'planned' | 'building' | 'complete' | 'failed';
 
-export type WonderType = 'gaceta' | 'bibliotheca' | 'institutum';
+// Known built-in/example ids keep autocomplete; `(string & {})` widens the
+// type to accept arbitrary user-connected wonder ids (custom iframe services)
+// without losing literal hints or breaking `=== 'bibliotheca'` narrowing.
+export type WonderType = 'gaceta' | 'bibliotheca' | 'institutum' | (string & {});
 
 export interface Building {
   id: string;

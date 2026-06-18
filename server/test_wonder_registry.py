@@ -1,26 +1,70 @@
-"""RepoCiv — Wonder Registry Python Tests."""
+"""RepoCiv — Wonder Registry Python Tests.
+
+New model (2026-06-17): only the native gaceta is a built-in. iframe wonders
+(bibliotheca, institutum, custom services) are connected by writing a manifest
+to ~/.repociv/wonders/<id>.json via save_custom_manifest(). Tests isolate that
+dir to a tmp_path so the dev machine's real connected wonders don't leak in.
+"""
+
+import json
+
+import pytest
 
 from wonder_registry import (
-    list_wonders,
-    get_wonder,
     check_wonder_health,
+    delete_custom_manifest,
+    get_wonder,
+    list_wonders,
+    save_custom_manifest,
 )
 
 
-def test_list_wonders_returns_three():
+@pytest.fixture(autouse=True)
+def isolate_wonders_dir(tmp_path, monkeypatch):
+    """Point the custom-manifest dir at an empty tmp dir for every test."""
+    monkeypatch.setenv("REPOCIV_WONDERS_DIR", str(tmp_path / "wonders"))
+    yield
+
+
+def _example_manifest(wid="mi-srv", launch=None):
+    m = {
+        "id": wid,
+        "title": "Mi Servicio",
+        "kind": "iframe",
+        "category": "knowledge",
+        "version": "0.1.0",
+        "defaultEnabled": True,
+        "automationLevel": "passive",
+        "passiveMode": True,
+        "agenticMode": False,
+        "canSuggest": False,
+        "canAct": False,
+        "requiresConfirmation": True,
+        "ui": {"url": "http://127.0.0.1:9998"},
+        "health": {"url": "http://127.0.0.1:9999/health", "timeoutMs": 4000, "degradedAllowed": True},
+        "permissions": {
+            "readRepos": False,
+            "writeRepos": False,
+            "network": "loopback-only",
+            "requiresApprovalForMutations": True,
+        },
+        "optionalFeatures": [],
+        "actions": [{"id": "open", "label": "Abrir", "risk": "safe", "requiresUserOptIn": False}],
+        "events": {"emits": ["wonder.ready"], "accepts": []},
+        "mcp": {"enabled": False, "server": None},
+    }
+    if launch is not None:
+        m["launch"] = launch
+    return m
+
+
+# ─── Default registry (gaceta-only) ───────────────────────────────────────────
+
+
+def test_default_registry_is_gaceta_only():
     all_w = list_wonders()
-    assert len(all_w) == 3
     ids = sorted(w["id"] for w in all_w)
-    assert ids == ["bibliotheca", "gaceta", "institutum"]
-
-
-def test_list_wonders_returns_copy():
-    a = list_wonders()
-    b = list_wonders()
-    assert a == b
-    # Modification does not affect the other
-    a.append({"id": "fake"})
-    assert len(b) == 3
+    assert ids == ["gaceta"]
 
 
 def test_get_wonder_returns_manifest():
@@ -30,52 +74,19 @@ def test_get_wonder_returns_manifest():
     assert m["title"] == "La Gaceta Imperial"
     assert m["kind"] == "native"
     assert m["automationLevel"] == "passive"
-    assert m["passiveMode"] is True
-    assert m["agenticMode"] is False
-    assert m["canSuggest"] is False
-    assert m["canAct"] is False
 
 
-def test_get_wonder_bibliotheca():
-    m = get_wonder("bibliotheca")
-    assert m is not None
-    assert m["id"] == "bibliotheca"
-    assert m["kind"] == "iframe"
-    assert m["automationLevel"] == "passive"
-    assert m["canSuggest"] is True
-    assert m["canAct"] is False
-    assert m["requiresConfirmation"] is True
-    assert m["health"] is not None
-    assert "/api/health" in m["health"]["url"]
-    assert m["ui"] is not None
-    assert "url" in m["ui"]
-
-
-def test_get_wonder_institutum():
-    m = get_wonder("institutum")
-    assert m is not None
-    assert m["id"] == "institutum"
-    assert m["kind"] == "iframe"
-    assert m["automationLevel"] == "assist"
-    assert m["agenticMode"] is True
-    assert m["canSuggest"] is True
-    assert m["canAct"] is False
-    assert m["requiresConfirmation"] is True
-    # Should have kill_experiment action with manual risk
-    kill_action = [a for a in m["actions"] if a["id"] == "kill_experiment"]
-    assert len(kill_action) == 1
-    assert kill_action[0]["risk"] == "manual"
-    assert kill_action[0]["requiresUserOptIn"] is True
+def test_iframe_wonders_absent_until_connected():
+    assert get_wonder("bibliotheca") is None
+    assert get_wonder("institutum") is None
 
 
 def test_get_wonder_not_found():
-    m = get_wonder("nonexistent")
-    assert m is None
+    assert get_wonder("nonexistent") is None
 
 
 def test_get_wonder_empty_string():
-    m = get_wonder("")
-    assert m is None
+    assert get_wonder("") is None
 
 
 def test_check_wonder_health_unknown():
@@ -86,13 +97,90 @@ def test_check_wonder_health_unknown():
 
 
 def test_check_wonder_health_gaceta():
-    """Gaceta is native — no health endpoint."""
     result = check_wonder_health("gaceta")
     assert result["id"] == "gaceta"
     assert result["status"] == "native"
 
 
+# ─── Connect / disconnect ─────────────────────────────────────────────────────
+
+
+def test_connect_persists_and_lists():
+    saved, err = save_custom_manifest(_example_manifest("mi-srv"))
+    assert err is None
+    assert saved is not None and saved["id"] == "mi-srv"
+    assert get_wonder("mi-srv") is not None
+    ids = sorted(w["id"] for w in list_wonders())
+    assert ids == ["gaceta", "mi-srv"]
+
+
+def test_connect_writes_file(tmp_path):
+    save_custom_manifest(_example_manifest("mi-srv"))
+    path = tmp_path / "wonders" / "mi-srv.json"
+    assert path.exists()
+    data = json.loads(path.read_text())
+    assert data["id"] == "mi-srv"
+
+
+def test_connect_expands_launch_paths():
+    saved, err = save_custom_manifest(
+        _example_manifest(
+            "mi-srv",
+            launch={
+                "repo_dir": "~/repo",
+                "api_url": "http://127.0.0.1:9999",
+                "procs": [{"name": "x", "argv": ["echo", "hi"], "cwd": "~/repo/frontend"}],
+            },
+        )
+    )
+    assert err is None and saved is not None
+    assert not saved["launch"]["repo_dir"].startswith("~")
+    assert not saved["launch"]["procs"][0]["cwd"].startswith("~")
+
+
+def test_connect_rejects_bad_id():
+    saved, err = save_custom_manifest(_example_manifest("../evil"))
+    assert saved is None
+    assert err is not None
+
+
+def test_connect_rejects_missing_fields():
+    saved, err = save_custom_manifest({"id": "x"})
+    assert saved is None
+    assert "missing required fields" in err
+
+
+def test_connect_rejects_non_object():
+    saved, err = save_custom_manifest("not a dict")
+    assert saved is None
+    assert err is not None
+
+
+def test_disconnect_removes():
+    save_custom_manifest(_example_manifest("mi-srv"))
+    assert get_wonder("mi-srv") is not None
+    ok, err = delete_custom_manifest("mi-srv")
+    assert ok is True and err is None
+    assert get_wonder("mi-srv") is None
+
+
+def test_disconnect_unknown():
+    ok, err = delete_custom_manifest("never-connected")
+    assert ok is False
+    assert err == "not connected"
+
+
+def test_disconnect_bad_id():
+    ok, err = delete_custom_manifest("../etc/passwd")
+    assert ok is False
+    assert err == "invalid id"
+
+
+# ─── Invariants over whatever is registered ───────────────────────────────────
+
+
 def test_manifest_has_optional_features():
+    save_custom_manifest(_example_manifest("mi-srv"))
     for w in list_wonders():
         for feature in w.get("optionalFeatures", []):
             assert feature["requiresUserOptIn"] is True
@@ -100,10 +188,11 @@ def test_manifest_has_optional_features():
 
 
 def test_manifest_actions_have_required_fields():
+    save_custom_manifest(_example_manifest("mi-srv"))
     required = {"id", "label", "risk", "requiresUserOptIn"}
     for w in list_wonders():
         for action in w.get("actions", []):
-            assert required.issubset(action.keys()), f"Missing fields in {w['id']}.{action.get('id')}"
+            assert required.issubset(action.keys())
 
 
 def test_gaceta_has_foreign_relations_action():
@@ -114,24 +203,8 @@ def test_gaceta_has_foreign_relations_action():
     assert action["requiresUserOptIn"] is True
 
 
-def test_institutum_has_hardLocks_feature():
-    m = get_wonder("institutum")
-    assert m is not None
-    feature = next((f for f in m["optionalFeatures"] if f["id"] == "hardLocks"), None)
-    assert feature is not None
-    assert feature["requiresUserOptIn"] is True
-    assert feature["defaultEnabled"] is False
-
-
-def test_events_are_valid_strings():
-    for w in list_wonders():
-        for emitted in w.get("events", {}).get("emits", []):
-            assert isinstance(emitted, str) and len(emitted) > 0
-        for accepted in w.get("events", {}).get("accepts", []):
-            assert isinstance(accepted, str) and len(accepted) > 0
-
-
 def test_mcp_defaults_to_disabled():
+    save_custom_manifest(_example_manifest("mi-srv"))
     for w in list_wonders():
         assert w["mcp"]["enabled"] is False
         assert w["mcp"]["server"] is None

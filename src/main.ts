@@ -7,6 +7,7 @@ import {
   addCityToWorld,
   removeCityFromWorld,
   fetchScannedRepos,
+  syncWorldWonders,
 } from './map.ts';
 import { type ScannedRepo } from './map.ts';
 import { Renderer } from './renderer.ts';
@@ -103,7 +104,7 @@ import { openWonderVignette } from './ui/wonderVignette.ts';
 import { bindOrdenDeBatalla } from './ui/ordenDeBatalla.ts';
 import { bindSubagentSessionPanel } from './ui/subagentSessionPanel.ts';
 import { bindSlashCommandState } from './ui/chat/slashCommands.ts';
-import { getWonder } from './wonders/manifest.ts';
+import { getWonder, ensureWondersLoaded, listIframeWonders } from './wonders/manifest.ts';
 import {
   inferCityLabStatus,
   resolveCityLabStatus,
@@ -301,6 +302,11 @@ async function bootstrap() {
   // Hermes comes back or the user dismisses for the session.
   void mountHermesStatusBanner();
 
+  // Hydrate the wonder registry from the bridge (GET /api/wonders) BEFORE
+  // world-gen so connected iframe wonders get their map tiles. Non-fatal: on
+  // bridge-down it falls back to the native gaceta-only static registry.
+  await ensureWondersLoaded();
+
   const world = await generateWorld();
   // `?reveal=all` lifts fog of war for capture/audit sessions: the golden
   // macro cameras (05/06) need every biome visible — without it, low-zoom
@@ -338,6 +344,22 @@ async function bootstrap() {
     }
     // Refresh construction panel city list
     refreshCityList();
+  });
+
+  // A Maravilla was connected/disconnected (capitalPanel) → reconcile the live
+  // world so its tile/structure appears (or disappears) on the map immediately,
+  // without a full reload. Also kick off its auto-start so the iframe is ready.
+  window.addEventListener('repociv:wonders-changed', (e: Event) => {
+    void (async () => {
+      await ensureWondersLoaded();
+      if (syncWorldWonders(state.world)) {
+        state.notifyUpdate();
+      }
+      const connectedId = (e as CustomEvent).detail?.connectedId as string | undefined;
+      if (connectedId && isAutoStartWondersEnabled()) {
+        ensureWondersUp([connectedId], { timeoutMs: 60_000, intervalMs: 1_500 });
+      }
+    })();
   });
 
   // Clean up chat buffer when a unit is removed from the world.
@@ -617,16 +639,20 @@ async function bootstrap() {
   startObservabilityPolling();
   startHarnessPolling();
 
-  // ══ Wonder auto-start (F3) ══
-  // Fire-and-forget: launch + poll Bibliotheca and LabHub in the
-  // background after the bridge is up. Default ON, can be disabled
-  // via localStorage key 'repociv:auto-start-wonders' = 'false'.
+  // ══ Wonder auto-start ══
+  // Fire-and-forget: launch + poll every CONNECTED iframe wonder (whatever the
+  // user wrote to ~/.repociv/wonders/, hydrated above) that isn't explicitly
+  // disabled. Out-of-the-box this is empty — nothing is pre-installed; the user
+  // connects wonders from the Maravillas guide. Default ON, disable via
+  // localStorage key 'repociv:auto-start-wonders' = 'false'.
   if (isAutoStartWondersEnabled()) {
-    ensureWondersUp(['bibliotheca', 'institutum'], {
-      timeoutMs: 60_000,
-      intervalMs: 1_500,
-    });
-    logEvent('⚙️ Levantando maravillas (auto-start)…', 'info');
+    const autoStartIds = listIframeWonders()
+      .filter((m) => m.defaultEnabled !== false)
+      .map((m) => m.id);
+    if (autoStartIds.length > 0) {
+      ensureWondersUp(autoStartIds, { timeoutMs: 60_000, intervalMs: 1_500 });
+      logEvent(`⚙️ Levantando maravillas (auto-start): ${autoStartIds.join(', ')}…`, 'info');
+    }
   } else {
     logEvent('Auto-arranque de maravillas desactivado (localStorage).', 'info');
   }

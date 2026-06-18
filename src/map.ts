@@ -25,6 +25,136 @@ import {
 } from './types.ts';
 import { loadManualLayout, updateManualRepoCoord } from './manualLayout.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
+import { listIframeWonders } from './wonders/manifest.ts';
+import type { WonderManifest } from './wonders/types.ts';
+
+// ─── Wonder placement ───────────────────────────────────────────────────────
+/** Canonical home tiles for the two example wonders so connecting/disconnecting
+ *  one never shuffles the other (and goldens stay stable). Any other connected
+ *  wonder takes the next free ring tile around the capital. */
+const WONDER_PREFERRED_COORDS: Record<string, Axial> = {
+  bibliotheca: { q: -1, r: 0 },
+  institutum: { q: 1, r: 0 },
+};
+
+export interface WonderPlacement {
+  manifest: WonderManifest;
+  coord: Axial;
+}
+
+/** Assign a hex coordinate to each connected iframe wonder around the capital
+ *  (0,0). Deterministic: preferred slots first, then a spiral ring (skipping
+ *  the reserved preferred slots) for everything else. */
+export function assignWonderCoords(wonders: WonderManifest[]): WonderPlacement[] {
+  const ring = spiralCoords({ q: 0, r: 0 }, 19).slice(1); // outward, skip center
+  const reservedPref = new Set(Object.values(WONDER_PREFERRED_COORDS).map(tileKey));
+  const used = new Set<string>();
+  const out: WonderPlacement[] = [];
+
+  for (const manifest of wonders) {
+    const pref = WONDER_PREFERRED_COORDS[manifest.id];
+    if (pref) {
+      out.push({ manifest, coord: pref });
+      used.add(tileKey(pref));
+    }
+  }
+  let cursor = 0;
+  for (const manifest of wonders) {
+    if (WONDER_PREFERRED_COORDS[manifest.id]) continue;
+    while (cursor < ring.length) {
+      const coord = ring[cursor++]!;
+      const key = tileKey(coord);
+      if (used.has(key) || reservedPref.has(key)) continue;
+      out.push({ manifest, coord });
+      used.add(key);
+      break;
+    }
+  }
+  return out;
+}
+
+/** Build the capital's wonder building + district for one placement. Shared by
+ *  world-gen and the runtime sync so both stay in lockstep. */
+function makeWonderEntities(
+  manifest: WonderManifest,
+  coord: Axial,
+): { building: Building; district: District } {
+  return {
+    building: {
+      id: `wonder-${manifest.id}`,
+      name: manifest.title,
+      type: 'wonder',
+      wonderType: manifest.id,
+      cityId: CAPITAL_ID,
+      progress: 100,
+      durationSeconds: 0,
+      elapsedSeconds: 0,
+      state: 'complete',
+    },
+    district: {
+      id: `district-${manifest.id}`,
+      name: manifest.title,
+      type: 'wonder',
+      coord,
+      wonderType: manifest.id,
+    },
+  };
+}
+
+/** Reconcile the live world's capital wonders with the currently-connected
+ *  iframe wonders (listIframeWonders). Adds tiles/districts/buildings for newly
+ *  connected wonders and reverts tiles for disconnected ones — so a Maravilla
+ *  shows up on the map the moment it's connected, without a full reload.
+ *  Returns true if anything changed. */
+export function syncWorldWonders(world: World): boolean {
+  const capital = world.cities.find((c) => c.isCapital);
+  if (!capital) return false;
+
+  const placements = assignWonderCoords(listIframeWonders());
+  const desired = new Map(placements.map((p) => [p.manifest.id, p]));
+  const present = new Set(
+    (capital.districts ?? []).filter((d) => d.type === 'wonder').map((d) => d.wonderType),
+  );
+  let changed = false;
+
+  // Remove wonders no longer connected → revert their tile to plains territory.
+  for (const d of (capital.districts ?? []).filter((dd) => dd.type === 'wonder')) {
+    if (d.wonderType && !desired.has(d.wonderType)) {
+      const t = world.tiles.get(tileKey(d.coord));
+      if (t) {
+        t.district = undefined;
+        t.terrain = 'plains';
+      }
+      changed = true;
+    }
+  }
+  capital.districts = (capital.districts ?? []).filter(
+    (d) => d.type !== 'wonder' || (d.wonderType !== undefined && desired.has(d.wonderType)),
+  );
+  capital.buildings = (capital.buildings ?? []).filter(
+    (b) => b.type !== 'wonder' || (b.wonderType !== undefined && desired.has(b.wonderType)),
+  );
+
+  // Add newly connected wonders.
+  for (const { manifest, coord } of placements) {
+    if (present.has(manifest.id)) continue;
+    const { building, district } = makeWonderEntities(manifest, coord);
+    capital.districts.push(district);
+    capital.buildings.push(building);
+    world.tiles.set(tileKey(coord), {
+      coord,
+      terrain: 'sacred',
+      district,
+      resources: { gold: 0, science: 3, production: 3 },
+      inFog: false,
+      revealed: true,
+    });
+    changed = true;
+  }
+
+  capital.wonders = (capital.buildings ?? []).filter((b) => b.type === 'wonder');
+  return changed;
+}
 
 // ─── Terrain inference ──────────────────────────────────────────────────────
 const EXTENSION_WEIGHT: Record<string, Terrain> = {
@@ -846,10 +976,14 @@ export async function generateWorld(): Promise<World> {
   const cityCoords = spiralCoords({ q: 0, r: 0 }, maxAutoCoords);
   const occupiedCoords = new Set<string>();
   const cityCoordLookup = new Map<string, Axial>();
-  // Reserve capital + wonder district hexes so repos don't land on them
+  // Reserve capital + connected-wonder district hexes so repos don't land on
+  // them. Wonders are whatever the user connected (hydrated before world-gen);
+  // out-of-the-box this is empty (nothing pre-installed).
+  const wonderPlacements = assignWonderCoords(listIframeWonders());
   occupiedCoords.add(tileKey({ q: 0, r: 0 })); // capital
-  occupiedCoords.add(tileKey({ q: -1, r: 0 })); // Bibliotheca
-  occupiedCoords.add(tileKey({ q: 1, r: 0 })); // LabHub
+  for (const wp of wonderPlacements) {
+    occupiedCoords.add(tileKey(wp.coord));
+  }
   let autoCoordCursor = 0;
   for (const repo of cityRepos) {
     if (repo.manualCoord) {
@@ -1013,46 +1147,17 @@ export async function generateWorld(): Promise<World> {
 
   // ─── Spawn Capital + Wonder Districts ────────────────────────────────────────
   const capCoord: Axial = { q: 0, r: 0 };
-  const bibliothecaCoord: Axial = { q: -1, r: 0 }; // west neighbor
-  const institutumCoord: Axial = { q: 1, r: 0 }; // east neighbor
 
-  const bibliotheca: Building = {
-    id: 'wonder-bibliotheca',
-    name: 'Bibliotheca Alexandrina',
-    type: 'wonder',
-    wonderType: 'bibliotheca',
-    cityId: CAPITAL_ID,
-    progress: 100,
-    durationSeconds: 0,
-    elapsedSeconds: 0,
-    state: 'complete',
-  };
-  const institutum: Building = {
-    id: 'wonder-institutum',
-    name: 'Institutum Scientiarum',
-    type: 'wonder',
-    wonderType: 'institutum',
-    cityId: CAPITAL_ID,
-    progress: 100,
-    durationSeconds: 0,
-    elapsedSeconds: 0,
-    state: 'complete',
-  };
-
-  const bibliothecaDistrict: District = {
-    id: 'district-bibliotheca',
-    name: 'Bibliotheca Alexandrina',
-    type: 'wonder',
-    coord: bibliothecaCoord,
-    wonderType: 'bibliotheca',
-  };
-  const institutumDistrict: District = {
-    id: 'district-institutum',
-    name: 'LabHub',
-    type: 'wonder',
-    coord: institutumCoord,
-    wonderType: 'institutum',
-  };
+  // One district/building/tile per connected iframe wonder (dynamic — see
+  // assignWonderCoords). Empty out-of-the-box; the user connects wonders from
+  // the Maravillas guide and they appear here on the next world-gen.
+  const wonderBuildings: Building[] = [];
+  const wonderDistricts: District[] = [];
+  for (const { manifest, coord } of wonderPlacements) {
+    const { building, district } = makeWonderEntities(manifest, coord);
+    wonderBuildings.push(building);
+    wonderDistricts.push(district);
+  }
 
   const territory = spiralCoords(capCoord, 7).slice(1, 7); // 6 neighbours at radius 1
 
@@ -1062,9 +1167,9 @@ export async function generateWorld(): Promise<World> {
     coord: capCoord,
     population: 1,
     territory,
-    districts: [bibliothecaDistrict, institutumDistrict],
-    buildings: [bibliotheca, institutum],
-    wonders: [bibliotheca, institutum],
+    districts: wonderDistricts,
+    buildings: wonderBuildings,
+    wonders: wonderBuildings,
     isCapital: true,
   };
   cities.push(capitalCity);
@@ -1079,25 +1184,17 @@ export async function generateWorld(): Promise<World> {
     revealed: true,
   });
 
-  // Bibliotheca wonder district tile
-  tiles.set(tileKey(bibliothecaCoord), {
-    coord: bibliothecaCoord,
-    terrain: 'sacred',
-    district: bibliothecaDistrict,
-    resources: { gold: 0, science: 5, production: 0 },
-    inFog: false,
-    revealed: true,
-  });
-
-  // Institutum wonder district tile
-  tiles.set(tileKey(institutumCoord), {
-    coord: institutumCoord,
-    terrain: 'sacred',
-    district: institutumDistrict,
-    resources: { gold: 0, science: 0, production: 5 },
-    inFog: false,
-    revealed: true,
-  });
+  // Wonder district tiles (sacred terrain)
+  for (const district of wonderDistricts) {
+    tiles.set(tileKey(district.coord), {
+      coord: district.coord,
+      terrain: 'sacred',
+      district,
+      resources: { gold: 0, science: 3, production: 3 },
+      inFog: false,
+      revealed: true,
+    });
+  }
 
   // Claim remaining territory tiles for the capital
   for (const t of territory) {

@@ -238,3 +238,44 @@ def test_approval_concurrent_requests_only_one_succeeds():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def _post_empty(base, path):
+    """POST with an empty body (Content-Length: 0) — the shape that the
+    launch/stop/disconnect buttons send. Must NOT 400 'invalid JSON'."""
+    req = urllib.request.Request(
+        base + path,
+        data=b"",
+        method="POST",
+        headers=_auth_headers({"Content-Type": "application/json"}),
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            return resp.status, json.loads(resp.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read() or b"{}")
+
+
+def test_empty_body_post_launch_parses_as_empty_object():
+    """Regression: empty-body POST used to crash json.loads -> 400 invalid JSON,
+    which blocked the 'Levantar' button. Now it parses as {} and routes."""
+    server, base = _start_test_server()
+    try:
+        status, body = _post_empty(base, "/api/wonders/nonexistent/launch")
+        assert not (status == 400 and body.get("error") == "invalid JSON")
+        assert status == 404
+        assert body.get("code") == "unknown_wonder"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_empty_body_post_disconnect_unknown_is_404():
+    server, base = _start_test_server()
+    try:
+        status, body = _post_empty(base, "/api/wonders/nonexistent/disconnect")
+        assert not (status == 400 and body.get("error") == "invalid JSON")
+        assert status == 404
+    finally:
+        server.shutdown()
+        server.server_close()

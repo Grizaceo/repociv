@@ -292,11 +292,18 @@ Persiste **en memoria** hasta que el bridge se reinicie o se invoque otro `/mode
 
 | Method | Path | Descripción |
 |--------|------|-------------|
-| GET | `/api/wonders` | Listar todos los Wonder manifests registrados |
+| GET | `/api/wonders` | Listar todos los Wonder manifests registrados (gaceta + conectadas) |
 | GET | `/api/wonders/<id>` | Obtener un Wonder manifest por ID |
 | GET | `/api/wonders/<id>/health` | Health check de un Wonder específico |
+| GET | `/api/wonders/launchable` | IDs con launch spec disponible |
+| GET | `/api/wonders/<id>/launch-status` | Estado de arranque (offline/starting/ready/…) |
+| POST | `/api/wonders/connect` | Conectar: persiste un `WonderManifest` en `~/.repociv/wonders/<id>.json` |
+| POST | `/api/wonders/<id>/disconnect` | Desconectar: borra el manifest del usuario |
+| POST | `/api/wonders/<id>/launch` | Levanta los procesos del Wonder (idempotente, loopback-only) |
+| POST | `/api/wonders/<id>/stop` | Detiene los procesos del Wonder |
 
 > Legacy: `/wonders`, `/wonders/{id}`, `/wonders/{id}/health` siguen funcionando como aliases.
+> Los POST son token-gated y rechazados en modo remoto (`REPOCIV_REMOTE=true`).
 
 **`/api/wonders`**
 ```json

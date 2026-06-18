@@ -306,7 +306,18 @@ export function computeWorldSignature(state: GameState): string {
     fogged,
     cities.length,
     units.length,
-    cities.map((c) => `${c.id}:${c.name}:${c.territory.length}`).join('|'),
+    // Include wonder districts so connecting/disconnecting a wonder at runtime
+    // (which replaces a territory tile in place — tiles.size unchanged) still
+    // flips the dirty flag and rebuilds the wonder props.
+    cities
+      .map(
+        (c) =>
+          `${c.id}:${c.name}:${c.territory.length}:${(c.districts ?? [])
+            .filter((d) => d.type === 'wonder')
+            .map((d) => d.wonderType)
+            .join(',')}`,
+      )
+      .join('|'),
     units.map((u) => `${u.id}:${u.coord.q},${u.coord.r}:${u.state}`).join('|'),
   ].join('#');
 }
