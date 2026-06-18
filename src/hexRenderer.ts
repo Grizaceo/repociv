@@ -103,8 +103,8 @@ export class HexRenderer {
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
       const angle = (Math.PI / 180) * (60 * i - 30);
-      const x = cx + size * 0.92 * Math.cos(angle);
-      const y = cy + size * 0.92 * Math.sin(angle);
+      const x = cx + size * 0.99 * Math.cos(angle);
+      const y = cy + size * 0.99 * Math.sin(angle);
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.closePath();
@@ -399,8 +399,8 @@ export class HexRenderer {
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
       const angle = (Math.PI / 180) * (60 * i - 30);
-      const x = cx + size * 0.92 * Math.cos(angle);
-      const y = cy + size * 0.92 * Math.sin(angle);
+      const x = cx + size * 0.99 * Math.cos(angle);
+      const y = cy + size * 0.99 * Math.sin(angle);
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.closePath();
@@ -451,8 +451,8 @@ export class HexRenderer {
       for (let i = 0; i < 6; i++) {
         const angle = (Math.PI / 180) * (60 * i - 30);
         corners.push({
-          x: pos.x + HEX_SIZE * 0.92 * Math.cos(angle),
-          y: pos.y + HEX_SIZE * 0.92 * Math.sin(angle),
+          x: pos.x + HEX_SIZE * 0.99 * Math.cos(angle),
+          y: pos.y + HEX_SIZE * 0.99 * Math.sin(angle),
         });
       }
 

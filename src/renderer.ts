@@ -1065,7 +1065,7 @@ export class Renderer {
     if (webglMode) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     } else {
-      ctx.fillStyle = '#050505';
+      ctx.fillStyle = '#0d0f08';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
