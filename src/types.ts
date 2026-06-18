@@ -122,6 +122,8 @@ export interface City {
   wonders?: Building[]; // Edificios tipo wonder construidos en esta ciudad
   currentProject?: Building; // what's being built right now
   isCapital: boolean;
+  /** Per-city territory border color (RGB 0-1). Assigned deterministically from city.id. */
+  color?: [number, number, number];
 }
 
 export interface District {

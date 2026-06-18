@@ -672,6 +672,30 @@ export async function reconnectCities(world: World): Promise<void> {
   invalidatePathCache();
 }
 
+// ─── Per-city territory color palette ─────────────────────────────────
+/** Distinct colors that read well against golden-hour terrain. RGB 0-1. */
+const CITY_PALETTE: [number, number, number][] = [
+  [0.15, 0.35, 0.75], // deep blue
+  [0.70, 0.15, 0.20], // crimson
+  [0.10, 0.55, 0.55], // teal
+  [0.45, 0.25, 0.65], // purple
+  [0.80, 0.45, 0.15], // orange
+  [0.15, 0.55, 0.30], // emerald
+  [0.75, 0.30, 0.45], // rose
+  [0.35, 0.40, 0.50], // slate
+  [0.60, 0.50, 0.15], // amber
+  [0.20, 0.50, 0.70], // sky blue
+];
+
+/** Deterministic per-city color from a hash of the city id. */
+export function cityColorFromId(id: string): [number, number, number] {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0;
+  }
+  return CITY_PALETTE[Math.abs(hash) % CITY_PALETTE.length]!;
+}
+
 // ─── Dynamic city add/remove helpers ────────────────────────────────
 export function addCityToWorld(
   world: World,
@@ -688,6 +712,7 @@ export function addCityToWorld(
     districts: [],
     buildings: [],
     isCapital: false,
+    color: cityColorFromId(repo.path),
   };
   world.cities.push(city);
   // Add city tile to world.tiles
@@ -1053,6 +1078,7 @@ export async function generateWorld(): Promise<World> {
       districts,
       buildings: [],
       isCapital: false,
+      color: cityColorFromId(repo.name),
     };
     cities.push(city);
 
@@ -1171,6 +1197,7 @@ export async function generateWorld(): Promise<World> {
     buildings: wonderBuildings,
     wonders: wonderBuildings,
     isCapital: true,
+    color: cityColorFromId(CAPITAL_ID),
   };
   cities.push(capitalCity);
 
