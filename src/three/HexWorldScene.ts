@@ -81,6 +81,12 @@ import {
 } from './CityProps3D.ts';
 import { ensureUnitPropsLoad } from './UnitProps3D.ts';
 import {
+  getTileFlashGroup,
+  flashTile,
+  tickTileFlash,
+  clearTileFlash,
+} from './TileFlash3D.ts';
+import {
   getResourcePropsGroup,
   ensureResourcePropsLoad,
   rebuildResourceProps,
@@ -191,6 +197,7 @@ export function createHexWorldScene(): Scene {
   scene.add(getResourcePropsGroup());
   scene.add(getTileYieldsGroup());
   scene.add(getUnitGroup());
+  scene.add(getTileFlashGroup());
   scene.add(getLabelGroup());
   scene.add(getWonderPropsGroup());
 
@@ -910,13 +917,16 @@ export function updateHexWorldScene(
   if (stateDirty) rebuildFoam(state, opts.animTime);
   animateFoamPulse(opts.animTime);
   // Per-frame unit animations (spawn/despawn tweens, idle pulse, walking
-  // hop). Runs every frame regardless of dirty state — the tweens progress
-  // smoothly between rebuilds.
-  tickUnits(opts.animTime, opts.dt);
+  // hop, movement tween). Runs every frame regardless of dirty state.
+  // The onTileStep callback triggers a yellow tile flash when a unit
+  // steps onto a new tile during the movement tween.
+  tickUnits(opts.animTime, opts.dt, (q, r, elev) => flashTile(q, r, elev));
   // Per-frame city growth animations (spire rise tween). Invalidates the
   // city signature when a tween is in progress so the next dirty frame
   // rebuilds with updated spire heights.
   tickCities(opts.dt);
+  // Per-frame tile flash fade-out. Frozen dt=0 keeps goldens stable.
+  tickTileFlash(opts.dt);
 
   // State-driven rebuilds: only when the world actually changed. These
   // are the heavy ones (terrain mesh, ground plane, territory lines,
@@ -968,6 +978,7 @@ export function disposeHexWorldScene(scene: Scene): void {
   disposeSkyDome();
   clearCityClusters();
   clearUnits();
+  clearTileFlash();
   if (terrainMesh) {
     terrainGroup.remove(terrainMesh);
     terrainMesh.dispose();

@@ -43,6 +43,16 @@ interface UnitEntry {
   hopY: number;
   /** Whether this unit is currently moving (drives hop animation). */
   moving: boolean;
+  /** Current interpolated world position (updated by movement tween). */
+  currentPos: { x: number; y: number; z: number };
+  /** Path for movement tween (axial coords). */
+  path: { q: number; r: number }[];
+  /** Current step in path. */
+  pathIndex: number;
+  /** Progress between path[pathIndex] and path[pathIndex+1] (0-1). */
+  pathProgress: number;
+  /** Elevation getter for path positions. */
+  getTileElev: (q: number, r: number) => number;
 }
 
 export type { UnitEntry, UnitLifeState };
@@ -224,10 +234,16 @@ export function rebuildUnits(
 
     const existing = unitEntries.get(unit.id);
     if (existing && existing.lifeState !== 'despawning') {
-      // Reposition existing unit (smooth lerp handled in tickUnits for moving
-      // state; instant snap for teleports / non-moving repositions).
-      existing.group.position.set(pos.x, targetY, pos.z);
+      // Update path/movement state for the tween.
       existing.moving = unit.state === 'moving';
+      existing.path = unit.path ? [...unit.path] : [];
+      existing.pathIndex = unit.pathIndex;
+      existing.pathProgress = unit.pathProgress;
+      // Snap to current coord (the movement tween in tickUnits will
+      // interpolate from pathProgress if moving).
+      existing.currentPos = { x: pos.x, y: targetY, z: pos.z };
+      existing.group.position.set(pos.x, targetY, pos.z);
+      existing.group.userData.baseY = targetY;
       // Collect meshes for shadow/picking consumers.
       const meshes: Mesh[] = [];
       existing.group.traverse((child) => {
@@ -242,6 +258,9 @@ export function rebuildUnits(
     fig.position.set(pos.x, targetY, pos.z);
     fig.scale.setScalar(0);
 
+    // Store the base position for movement tween + hop composition.
+    fig.userData.basePos = { x: pos.x, y: targetY, z: pos.z };
+
     const meshes: Mesh[] = [];
     fig.traverse((child) => { if ((child as Mesh).isMesh) meshes.push(child as Mesh); });
 
@@ -253,6 +272,14 @@ export function rebuildUnits(
       idlePhase: Math.random() * Math.PI * 2,
       hopY: 0,
       moving: unit.state === 'moving',
+      currentPos: { x: pos.x, y: targetY, z: pos.z },
+      path: unit.path ? [...unit.path] : [],
+      pathIndex: unit.pathIndex,
+      pathProgress: unit.pathProgress,
+      getTileElev: (q: number, r: number) => {
+        const t = getTile(tileKey({ q, r }));
+        return t ? terrainElevation(t.terrain) : 0;
+      },
     };
     unitEntries.set(unit.id, entry);
     unitGroup.add(fig);
@@ -293,11 +320,28 @@ const IDLE_PULSE_SCALE = 1.05;
 // Walking hop: 12px up, 200ms ease-in-out per step.
 const HOP_HEIGHT = 12;
 const HOP_DURATION = 0.20;
+// Movement tween: ease-in-out lerp between path tiles. The game logic
+// advances pathProgress at 2.5 hex/s; we mirror that here so the 3D
+// figurine moves smoothly between dirty-flag rebuilds (which only fire
+// when coord changes, not every pathProgress step).
+const MOVEMENT_SPEED = 2.5; // hexes per second
 
-/** Per-frame animation: spawn/despawn tweens, idle pulse, walking hop.
- *  Called every frame from updateHexWorldScene, independent of dirty state.
- *  When animTime is frozen (golden capture), dt=0 so tweens freeze too. */
-export function tickUnits(animTime: number, dt: number): void {
+function easeInOutSine(t: number): number {
+  return -(Math.cos(Math.PI * t) - 1) / 2;
+}
+
+/** Per-frame animation: spawn/despawn tweens, idle pulse, walking hop,
+ *  movement tween. Called every frame from updateHexWorldScene,
+ *  independent of dirty state. When animTime is frozen (golden capture),
+ *  dt=0 so tweens freeze too.
+ *  @param onTileStep Optional callback fired when a unit steps onto a new
+ *  tile during the movement tween (used by HexWorldScene to trigger tile
+ *  flash). Receives (q, r, elev). */
+export function tickUnits(
+  animTime: number,
+  dt: number,
+  onTileStep?: (q: number, r: number, elev: number) => void,
+): void {
   const toRemove: string[] = [];
 
   for (const [id, entry] of unitEntries) {
@@ -321,35 +365,70 @@ export function tickUnits(animTime: number, dt: number): void {
       const s = easeInCubic(entry.tween);
       entry.group.scale.setScalar(s);
     } else {
-      // Alive: idle pulse + walking hop.
-      // The idle pulse is a subtle scale oscillation on the whole figurine.
-      // We bake it into the group scale so it composes with spawn/despawn.
-      // For alive units, scale is always 1.0 base + pulse.
+      // Alive: movement tween + idle pulse + walking hop.
+
+      // ── Movement tween: interpolate position along the path ──────────
+      if (entry.moving && entry.path.length > 1 && entry.pathIndex < entry.path.length - 1) {
+        // Advance local pathProgress at the same rate as the game logic.
+        entry.pathProgress += dt * MOVEMENT_SPEED;
+        if (entry.pathProgress >= 1) {
+          entry.pathProgress = 0;
+          entry.pathIndex++;
+          // Trigger tile flash on the tile the unit just stepped onto.
+          if (onTileStep && entry.pathIndex < entry.path.length) {
+            const stepped = entry.path[entry.pathIndex]!;
+            const steppedElev = entry.getTileElev(stepped.q, stepped.r);
+            onTileStep(stepped.q, stepped.r, steppedElev);
+          }
+          if (entry.pathIndex >= entry.path.length - 1) {
+            // Arrived at destination — snap to final position.
+            const dest = entry.path[entry.path.length - 1]!;
+            const destElev = entry.getTileElev(dest.q, dest.r);
+            const destPos = axialToWorld3D(dest.q, dest.r, destElev);
+            const destY = destPos.y + HEX_SIZE * 0.05;
+            entry.currentPos = { x: destPos.x, y: destY, z: destPos.z };
+            entry.moving = false;
+          }
+        }
+        if (entry.moving && entry.pathIndex < entry.path.length - 1) {
+          const from = entry.path[entry.pathIndex]!;
+          const to = entry.path[entry.pathIndex + 1]!;
+          const fromElev = entry.getTileElev(from.q, from.r);
+          const toElev = entry.getTileElev(to.q, to.r);
+          const fromPos = axialToWorld3D(from.q, from.r, fromElev);
+          const toPos = axialToWorld3D(to.q, to.r, toElev);
+          const t = easeInOutSine(entry.pathProgress);
+          const x = fromPos.x + (toPos.x - fromPos.x) * t;
+          const y = fromPos.y + (toPos.y - fromPos.y) * t + HEX_SIZE * 0.05;
+          const z = fromPos.z + (toPos.z - fromPos.z) * t;
+          entry.currentPos = { x, y, z };
+        }
+      }
+
+      // Apply current position + hop offset.
+      entry.group.position.set(
+        entry.currentPos.x,
+        entry.currentPos.y + entry.hopY,
+        entry.currentPos.z,
+      );
+      entry.group.userData.baseY = entry.currentPos.y;
+
+      // ── Idle pulse + walking hop ──────────────────────────────────────
       const pulse = 1 + (IDLE_PULSE_SCALE - 1) * 0.5 * (1 + Math.sin(
         animTime * (2 * Math.PI / IDLE_PULSE_PERIOD) + entry.idlePhase,
       ));
       entry.group.scale.setScalar(pulse);
 
-      // Walking hop: per-step vertical bounce when moving.
       if (entry.moving) {
         const hopPhase = (animTime / HOP_DURATION) % 1;
-        // Ease-in-out sine for the hop arc.
         entry.hopY = HOP_HEIGHT * Math.sin(hopPhase * Math.PI);
       } else {
-        // Settle back to ground.
         if (entry.hopY > 0.1) {
           entry.hopY *= 0.8;
         } else {
           entry.hopY = 0;
         }
       }
-      // Apply hop as a Y offset on top of the base position.
-      // We store the base Y in the group's position and add hopY each frame.
-      // Since we can't easily separate base from hop in the group position,
-      // we use userData to track the base Y.
-      const baseY = (entry.group.userData.baseY as number) ?? entry.group.position.y;
-      entry.group.userData.baseY = baseY;
-      entry.group.position.y = baseY + entry.hopY;
     }
   }
 
@@ -359,7 +438,6 @@ export function tickUnits(animTime: number, dt: number): void {
   }
 
   // Rebuild unitObjects array to match current entries.
-  // (Only needed if entries were removed.)
   if (toRemove.length > 0) {
     unitObjects.length = 0;
     for (const entry of unitEntries.values()) {

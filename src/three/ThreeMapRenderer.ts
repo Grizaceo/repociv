@@ -49,6 +49,10 @@ export class ThreeMapRenderer {
   private width = 1;
   private height = 1;
   private lastTileSignature = '';
+  // Camera micro-pan: when a unit is moving, the camera yaws ~5° toward
+  // the active unit. After movement stops, it returns over 400ms.
+  private _panYaw = 0; // current yaw offset in radians
+  private _panReturnTimer = 0; // seconds remaining on the return-to-center tween
   // Dirty-rate telemetry: % of frames that triggered the heavy rebuilds.
   // Idle should sit near 0% — anything above ~5% means the signature has
   // a false positive (some input flapping per frame).
@@ -104,20 +108,56 @@ export class ThreeMapRenderer {
     this.camera.updateProjectionMatrix();
   }
 
-  /** Sync perspective Civ camera with 2D map Camera struct. */
+  /** Sync perspective Civ camera with 2D map Camera struct.
+   *  Applies the micro-pan yaw offset (toward active moving unit). */
   syncCamera(cam: MapCamera): void {
     this.target.set(cam.x, 0, cam.y);
     const dist = CAMERA_BASE_DISTANCE / cam.zoom;
+    // Base camera position, then rotate around the target by the pan yaw.
+    const baseX = this.target.x - dist * Math.cos(CAMERA_TILT);
+    const baseZ = this.target.z + dist * 0.38;
+    // Rotate (baseX, baseZ) around (target.x, target.z) by _panYaw.
+    const dx = baseX - this.target.x;
+    const dz = baseZ - this.target.z;
+    const cos = Math.cos(this._panYaw);
+    const sin = Math.sin(this._panYaw);
     this.camera.position.set(
-      this.target.x - dist * Math.cos(CAMERA_TILT),
+      this.target.x + dx * cos - dz * sin,
       this.target.y + dist * Math.sin(CAMERA_TILT),
-      this.target.z + dist * 0.38,
+      this.target.z + dx * sin + dz * cos,
     );
     this.camera.lookAt(this.target);
     this.camera.updateMatrixWorld();
   }
 
   render(state: GameState, cam: MapCamera, opts: HexSceneRenderOptions): void {
+    // ── Camera micro-pan: yaw ~5° toward the active moving unit ──────────
+    // When a unit is moving, pan the camera toward it. After movement
+    // stops, the pan returns to 0 over 400ms. Frozen dt=0 keeps goldens
+    // stable (pan freezes at its current value).
+    const PAN_MAX_YAW = 5 * (Math.PI / 180); // 5° in radians
+    const PAN_RETURN_DURATION = 0.4; // 400ms
+    const movingUnit = state.world.units.find((u) => u.state === 'moving');
+    if (movingUnit && opts.dt > 0) {
+      // Pan toward the moving unit's position relative to the camera target.
+      const unitTile = state.world.tiles.get(tileKey(movingUnit.coord));
+      const elev = unitTile ? terrainElevation(unitTile.terrain) : 0;
+      const unitWorld = axialToWorld3D(movingUnit.coord.q, movingUnit.coord.r, elev);
+      const dx = unitWorld.x - cam.x;
+      const dz = unitWorld.z - cam.y;
+      const angle = Math.atan2(dz, dx);
+      // Blend toward the target yaw (not instant — smooth ease over ~200ms).
+      const targetYaw = Math.sign(angle) * Math.min(Math.abs(angle) * 0.15, PAN_MAX_YAW);
+      this._panYaw += (targetYaw - this._panYaw) * Math.min(1, opts.dt * 5);
+      this._panReturnTimer = PAN_RETURN_DURATION;
+    } else if (this._panReturnTimer > 0 && opts.dt > 0) {
+      // Returning to center after movement stops.
+      this._panReturnTimer -= opts.dt;
+      const t = Math.max(0, this._panReturnTimer / PAN_RETURN_DURATION);
+      this._panYaw *= t;
+      if (this._panReturnTimer <= 0) this._panYaw = 0;
+    }
+
     this.syncCamera(cam);
     // Keep the gradient sky centered on the camera (it must never clip).
     updateSkyDome(this.camera.position);
