@@ -447,6 +447,51 @@ def test_launch_does_not_adopt_when_nothing_up(fake_repos, fake_popen, monkeypat
     assert state["institutum"]["external"] is False
 
 
+def test_launch_respawns_when_stale_external_entry_is_down(fake_repos, fake_popen, monkeypatch):
+    """Bug: a stale external adoption must not permanently block relaunch.
+
+    Repro of "Bibliotheca no lanza": a hand-started server is adopted
+    (external entry, no PIDs), then dies. A second launch must re-probe
+    health and — finding the server down — spawn the missing procs
+    instead of returning the stale entry forever.
+    """
+    # 1) Adopt: both API and UI up → external entry, no spawn.
+    monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: True)
+    first = launch_wonder("bibliotheca")
+    assert fake_popen["n"] == 0
+    assert first["status"] == "ready"
+    state = json.loads((fake_repos["cfg"] / "wonders" / "launched.json").read_text())
+    assert state["bibliotheca"]["external"] is True
+    assert state["bibliotheca"]["pids"] == {}
+
+    # 2) The hand-started server dies. Relaunch must heal by spawning.
+    monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: False)
+    monkeypatch.setattr(wonder_launcher, "_pid_alive", lambda pid: True)
+    second = launch_wonder("bibliotheca")
+    assert fake_popen["n"] == 2  # bridge + ui re-spawned
+    assert set(second["pids"].keys()) == {"bridge", "ui"}
+    state = json.loads((fake_repos["cfg"] / "wonders" / "launched.json").read_text())
+    assert state["bibliotheca"]["external"] is False
+
+
+def test_launch_keeps_external_entry_when_still_healthy(fake_repos, fake_popen, monkeypatch):
+    """Guard: a still-healthy external adoption must NOT re-spawn.
+
+    The stale-entry fix must only kick in when the adopted server is
+    unhealthy; while both endpoints respond, the second launch stays a
+    no-op no-spawn so we never clobber a live hand-started server.
+    """
+    monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: True)
+    launch_wonder("bibliotheca")
+    assert fake_popen["n"] == 0
+    # Server is still up on the second call → no spawn, stays external.
+    result = launch_wonder("bibliotheca")
+    assert fake_popen["n"] == 0
+    assert result["status"] == "ready"
+    state = json.loads((fake_repos["cfg"] / "wonders" / "launched.json").read_text())
+    assert state["bibliotheca"]["external"] is True
+
+
 def test_launch_does_not_adopt_when_only_api_up(fake_repos, fake_popen, monkeypatch, no_lockfile):
     """F2.1 regression: half-up (API only) must NOT be adopted.
 

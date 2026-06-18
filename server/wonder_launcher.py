@@ -715,10 +715,19 @@ def launch_wonder(wonder_id: str) -> dict[str, Any]:
             # still running), treat as already-running.
             if any(_pid_alive(pid) for pid in existing.get("pids", {}).values()):
                 return _build_status(wonder_id, existing)
-            # If we previously adopted an external server, also keep the
-            # entry (its health will be re-checked below).
+            # An adopted (external) entry has no PIDs we can poll
+            # (bibliotheca was hand-started, so the entry tracks no PIDs).
+            # It is only trustworthy while the external server stays
+            # healthy — so re-probe. If it's still fully up, keep it; if it
+            # has since died or gone half-up, fall through to re-adopt (it
+            # may have come back) or spawn the missing procs. Without this,
+            # a stale external entry would permanently block relaunch and
+            # the wonder could never come back ("its health will be
+            # re-checked below" — which it now actually is).
             if existing.get("external"):
-                return _build_status(wonder_id, existing)
+                status = _build_status(wonder_id, existing)
+                if status["ready"]:
+                    return status
 
         # Pre-launch health check: if the user already started this
         # wonder by hand, adopt it (no spawn, no clobber). LabHub
