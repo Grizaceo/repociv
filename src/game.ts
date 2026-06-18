@@ -20,6 +20,8 @@ import { aStarPath, invalidatePathCache } from './pathfinding.ts';
 import { axialDistance, axialNeighbours } from './hex.ts';
 import { getConfig } from './gameConfig.ts';
 import { LocalWorldManager } from './localWorldManager.ts';
+import { MissionRegistry } from './missionLifecycle.ts';
+import { SubagentRegistry } from './subagentManager.ts';
 
 // ─── Clock speed ──────────────────────────────────────────────────────────────
 const TICK_MS = 16; // ~60 fps
@@ -70,6 +72,9 @@ export class GameState {
   subagentProgress = new Map<string, string[]>();
   completedSubagents: SubagentRun[] = [];
   highlightedSubagentId: string | null = null;
+  // Extracted registries (see missionLifecycle.ts, subagentManager.ts)
+  private _missions: MissionRegistry;
+  private _subagents: SubagentRegistry;
   // Listener for state changes (used by UI to refresh hero bar / quest board)
   private listeners: Array<() => void> = [];
 
@@ -95,6 +100,30 @@ export class GameState {
       () => this.notify(),
       () => this.getAllUnits()[0],
       (id: string) => this.getUnit(id),
+    );
+    // Subagent + mission registries — pure data owners, see their
+    // respective files. GameState exposes the public API via
+    // delegation methods below; the data members are still the
+    // canonical references for external readers.
+    this._missions = new MissionRegistry(
+      { active: this.missions },
+      { notify: () => this.notify() },
+    );
+    this._subagents = new SubagentRegistry(
+      {
+        active: this.subagents,
+        completed: this.completedSubagents,
+        progress: this.subagentProgress,
+        highlighted: this.highlightedSubagentId,
+      },
+      {
+        notify: () => this.notify(),
+        removeUnit: (id) => this.removeUnit(id),
+        removeLocalUnit: (id) => this._local.removeSubagentUnit(id ?? ''),
+        clearHighlight: (id) => {
+          if (this.highlightedSubagentId === id) this.highlightedSubagentId = null;
+        },
+      },
     );
     // Index existing units and buildings
     for (const u of world.units) this.unitMap.set(u.id, u);
@@ -407,74 +436,27 @@ export class GameState {
   }
 
   registerSubagent(run: SubagentRun): void {
-    this.subagents.set(run.id, run);
-    this.notify();
+    this._subagents.register(run);
   }
 
   updateSubagent(id: string, patch: Partial<SubagentRun>): void {
-    const existing = this.subagents.get(id);
-    if (!existing) return;
-    this.subagents.set(id, { ...existing, ...patch });
-    this.notify();
+    this._subagents.update(id, patch);
   }
 
   appendSubagentProgress(id: string, text: string): void {
-    const buf = this.subagentProgress.get(id) ?? [];
-    buf.push(text.slice(0, 256));
-    if (buf.length > 20) buf.shift();
-    this.subagentProgress.set(id, buf);
-    const existing = this.subagents.get(id);
-    if (existing) {
-      this.subagents.set(id, { ...existing, lastProgressAt: Date.now() });
-    }
-    this.notify();
+    this._subagents.appendProgress(id, text);
   }
 
   completeSubagent(id: string, success: boolean, summary: string): void {
-    this._finishSubagent(id, success ? 'complete' : 'failed', summary);
+    this._subagents.complete(id, success, summary);
   }
 
   cancelSubagent(id: string, summary = 'cancelled'): void {
-    this._finishSubagent(id, 'cancelled', summary);
-  }
-
-  private _finishSubagent(
-    id: string,
-    status: 'complete' | 'failed' | 'cancelled',
-    summary: string,
-  ): void {
-    const run = this.subagents.get(id);
-    if (!run) return;
-    const finished: SubagentRun = {
-      ...run,
-      status,
-      completedAt: Date.now(),
-      summary,
-    };
-    this.subagents.delete(id);
-    this.completedSubagents.unshift(finished);
-    this.completedSubagents = this.completedSubagents.slice(0, 50);
-    const ephemeralId = run.ephemeralUnitId ?? finished.ephemeralUnitId;
-    if (ephemeralId) this.removeUnit(ephemeralId);
-    this._local.removeSubagentUnit(ephemeralId ?? id);
-    if (this.highlightedSubagentId === id) this.highlightedSubagentId = null;
-    this.notify();
+    this._subagents.cancel(id, summary);
   }
 
   resolveSubagentId(preferredId?: string | null, unitId?: string): string | null {
-    if (
-      preferredId &&
-      (this.subagents.has(preferredId) || this.completedSubagents.some((s) => s.id === preferredId))
-    ) {
-      return preferredId;
-    }
-    if (unitId) {
-      const active = this.getSubagentsOfUnit(unitId).filter((s) => s.status === 'running');
-      if (active.length) return active[0]!.id;
-      const recent = this.completedSubagents.filter((s) => s.parentUnitId === unitId);
-      if (recent.length) return recent[0]!.id;
-    }
-    return this.highlightedSubagentId;
+    return this._subagents.resolveId(preferredId, unitId);
   }
 
   revealHexes(hexes: [number, number][], cityId?: string): void {
@@ -619,23 +601,11 @@ export class GameState {
 
   // ─── Mission tracking ────────────────────────────────────────────────────
   startMission(id: string, unit: string, questName: string) {
-    this.missions.set(id, {
-      id,
-      unit,
-      questName,
-      status: 'running',
-      startedAt: Date.now(),
-      completedAt: null,
-    });
-    this.notify();
+    this._missions.start(id, unit, questName);
   }
 
   completeMission(id: string, success: boolean) {
-    const m = this.missions.get(id);
-    if (!m) return;
-    m.status = success ? 'complete' : 'failed';
-    m.completedAt = Date.now();
-    this.notify();
+    this._missions.complete(id, success);
   }
 
   // ─── Tick count for animations ─────────────────────────────────────────────

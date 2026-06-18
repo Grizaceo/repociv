@@ -60,11 +60,18 @@ type HandlerByType = {
 // ─── Lazy imports (code-split, keep initial bundle small) ────────────────────
 // Celebrate the mission payoff canvas overlay on success — used by
 // mission_complete. Static import would pull ui/payoffs into the bridge
-// bundle even on first paint.
+// bundle even on first paint. Errors swallowed (canvas overlay is a
+// nice-to-have; the mission is already reported as complete via the
+// notification + sound).
 async function celebrateMission(): Promise<void> {
-  const mod = await import('./ui/payoffs.ts');
-  const canvas = document.getElementById('main-canvas') as HTMLCanvasElement | null;
-  if (canvas) mod.celebrateMission(canvas);
+  try {
+    const mod = await import('./ui/payoffs.ts');
+    const canvas = document.getElementById('main-canvas') as HTMLCanvasElement | null;
+    if (canvas) mod.celebrateMission(canvas);
+  } catch {
+    // Swallowed: the overlay is best-effort. Common in test env where
+    // `document` is undefined, and in SSR / partial bootstraps.
+  }
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────────
