@@ -117,15 +117,17 @@ function buildBibliotheca(): Group {
     g.add(col);
   }
 
-  // Pediment: low triangular prism (use a 3-sided cylinder + 90° rotation)
+  // Pediment: low triangular prism sitting on top of the columns, point up.
+  // CylinderGeometry(0, pedW, pedH, 3, 1) is a 3-sided cone (point at y=+pedH/2,
+  // base at y=-pedH/2). It already has the right vertical orientation by default
+  // — no rotation needed. We narrow it in Z (scale.z = pedL/pedW) to make it
+  // a flat triangular prism instead of a tetrahedral cone.
   const pedW = HEX_SIZE * 0.50;
   const pedH = HEX_SIZE * 0.08;
   const pedL = HEX_SIZE * 0.16;
   const ped  = new Mesh(new CylinderGeometry(0, pedW, pedH, 3, 1), roofMat);
-  ped.rotation.x = Math.PI / 2;
-  ped.rotation.z = Math.PI;
-  ped.scale.set(1, pedL / pedH, 1);
-  ped.position.y = topDais + colH + pedH * 0.5;
+  ped.scale.set(1, 1, pedL / pedW);
+  ped.position.y = topDais + colH + pedH * 0.5;  // base sits flush on the columns
   ped.castShadow = true;
   g.add(ped);
 

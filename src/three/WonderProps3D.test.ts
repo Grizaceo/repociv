@@ -100,7 +100,6 @@ describe('WonderProps3D', () => {
   });
 
   it('skips gaceta (no tile in the current map)', () => {
-    // If somehow a gaceta tile exists, it should not add to either sub-group.
     const tiles = [wonderTile({ q: 0, r: 0 }, 'gaceta')];
     rebuildWonderProps(tiles);
     const g = getWonderPropsGroup();
@@ -117,18 +116,48 @@ describe('WonderProps3D', () => {
   });
 
   it('produces distinct geometry for bibliotheca vs institutum', () => {
-    // Bibliotheca = 3 dais + 6 columns + 1 pediment + 1 gem = 11 meshes.
-    // Institutum = 1 dais + 4 obelisks + 1 dome + 1 glow = 7 meshes.
     rebuildWonderProps([wonderTile({ q: -1, r: 0 }, 'bibliotheca')]);
     const biblioCount = countMeshes(getWonderPropsGroup().children[0]!);
     clearWonderProps();
-
     rebuildWonderProps([wonderTile({ q:  1, r: 0 }, 'institutum')]);
     const instCount = countMeshes(getWonderPropsGroup().children[1]!);
-
     expect(biblioCount).toBeGreaterThan(instCount);
     expect(biblioCount).toBe(11);
     expect(instCount).toBe(7);
+  });
+
+  it('pediment on bibliotheca stands vertical (point up, base on columns)', () => {
+    // Regression guard: the pediment was originally created with
+    //   rotation.x = π/2, rotation.z = π
+    //   scale.set(1, pedL / pedH, 1)
+    // which laid the triangular cone horizontal (point along Z) and
+    // stretched the wrong axis. The fix uses no rotation and narrows
+    // along Z (scale.z = pedL / pedW). This test asserts the mesh
+    // transform is exactly the intended vertical-prism shape.
+    rebuildWonderProps([wonderTile({ q: -1, r: 0 }, 'bibliotheca')]);
+    const biblio = getWonderPropsGroup().children[0]!;
+    expect(biblio.children).toHaveLength(1);
+
+    const inst = biblio.children[0]! as import('three').Group;
+    const cones = inst.children.filter((c) => {
+      const m = c as import('three').Mesh;
+      if (!m.isMesh) return false;
+      const g = m.geometry as import('three').BufferGeometry;
+      const params = (g as unknown as { parameters?: { radialSegments?: number } }).parameters;
+      return params?.radialSegments === 3;
+    });
+    expect(cones).toHaveLength(1);
+    const pediment = cones[0] as import('three').Mesh;
+
+    // (a) No rotation — cone's primary axis stays on +Y (point up).
+    expect(pediment.rotation.x).toBe(0);
+    expect(pediment.rotation.y).toBe(0);
+    expect(pediment.rotation.z).toBe(0);
+
+    // (b) Scale narrows Z (prism shape), leaves X and Y alone.
+    expect(pediment.scale.x).toBe(1);
+    expect(pediment.scale.y).toBe(1);
+    expect(pediment.scale.z).toBeCloseTo(0.16 / 0.5, 5);
   });
 
   it('rebuilds only on signature change (dirty-check)', () => {
@@ -136,9 +165,6 @@ describe('WonderProps3D', () => {
     rebuildWonderProps(tiles);
     const firstSig = _wonderPropsSignature();
     expect(firstSig).not.toBe('');
-
-    // Second call with the same input: signature unchanged, no rebuild.
-    // (We assert indirectly by checking the children count is stable.)
     rebuildWonderProps([...tiles]);
     expect(_wonderPropsSignature()).toBe(firstSig);
     expect(getWonderPropsGroup().children[0]!.children).toHaveLength(1);
@@ -147,9 +173,6 @@ describe('WonderProps3D', () => {
   it('clears on signature change so old wonders do not linger', () => {
     rebuildWonderProps([wonderTile({ q: -1, r: 0 }, 'bibliotheca')]);
     expect(getWonderPropsGroup().children[0]!.children).toHaveLength(1);
-
-    // Switch the tile's wonderType → bibliotheca sub-group should clear,
-    // institutum sub-group should get a new instance.
     rebuildWonderProps([wonderTile({ q: -1, r: 0 }, 'institutum')]);
     expect(getWonderPropsGroup().children[0]!.children).toHaveLength(0);
     expect(getWonderPropsGroup().children[1]!.children).toHaveLength(1);
@@ -163,15 +186,12 @@ describe('WonderProps3D', () => {
     const g = getWonderPropsGroup();
     expect(g.children[0]!.visible).toBe(true);
     expect(g.children[1]!.visible).toBe(true);
-
     setWonderVisible('bibliotheca', false);
     expect(g.children[0]!.visible).toBe(false);
     expect(g.children[1]!.visible).toBe(true);
-
     setWonderVisible('institutum', false);
     expect(g.children[0]!.visible).toBe(false);
     expect(g.children[1]!.visible).toBe(false);
-
     setWonderVisible('bibliotheca', true);
     setWonderVisible('institutum', true);
     expect(g.children[0]!.visible).toBe(true);
@@ -184,7 +204,6 @@ describe('WonderProps3D', () => {
       wonderTile({ q:  1, r: 0 }, 'institutum'),
     ]);
     expect(_wonderPropsSignature()).not.toBe('');
-
     clearWonderProps();
     expect(_wonderPropsSignature()).toBe('');
     expect(getWonderPropsGroup().children[0]!.children).toHaveLength(0);
@@ -192,7 +211,6 @@ describe('WonderProps3D', () => {
   });
 });
 
-/** Count meshes (not groups) inside an arbitrary root. */
 function countMeshes(root: import('three').Object3D): number {
   let count = 0;
   root.traverse((obj) => {
