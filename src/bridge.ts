@@ -3,7 +3,7 @@
 // Sends user commands to bridge.py at http://localhost:5274.
 // Handles reconnect with exponential backoff + demo mode fallback.
 
-import { type GameState, pickDetachmentHex } from './game.ts';
+import { type GameState } from './game.ts';
 import { type BridgeEvent, type CDailyArticle } from './types.ts';
 import type { SuggestionRelation as WonderSuggestionRelation } from './wonders/types.ts';
 import { logger } from './logger.ts';
@@ -14,14 +14,15 @@ import {
   appendApprovalCard,
   setBridgeStatus,
   setOperationTicker,
-  updateGpuBar,
   showNotification,
+  updateGpuBar,
 } from './ui/index.ts';
 import { cfg } from './gameConfig.ts';
 import { approveCommand } from './commandBus.ts';
 import { terminalPanel } from './terminalPanel.ts';
 import { bridgeHeaders, bridgeUrl, BRIDGE_URL, BRIDGE_TOKEN } from './bridgeEnv.ts';
 import { RepoCivWebSocket } from './websocket.ts';
+import { dispatchBridgeEvent, type MessageContext } from './bridgeMessageHandlers.ts';
 
 const DEMO_INTERVAL_MS = 30_000;
 const OFFLINE_DEMO_THRESHOLD_MS = 10_000;
@@ -289,302 +290,37 @@ export class BridgeEvents {
   }
 
   handleBridgeEvent(evt: BridgeEvent) {
-    switch (evt.type) {
-      case 'unit_spawn': {
-        const parent = evt.parentUnit ? this.state.getUnit(evt.parentUnit) : undefined;
-        let spawnCoord = { q: evt.hex[0], r: evt.hex[1] };
-        if (parent && evt.hex[0] === 0 && evt.hex[1] === 0) {
-          const childIndex = this.state
-            .getChildrenOfUnit(parent.id)
-            .filter((c) => c.ephemeral).length;
-          spawnCoord = pickDetachmentHex(this.state, parent.coord, childIndex);
-        }
-        const unit = this.state.spawnUnit(
-          evt.unit,
-          evt.unit,
-          evt.unitType ?? 'hero',
-          evt.civ,
-          spawnCoord,
-          evt.mission,
-          evt.cityId,
-          {
-            parentUnitId: evt.parentUnit,
-            ephemeral: evt.ephemeral,
-            subagentRunId: evt.subagentRunId,
-          },
-        );
-        if (evt.ephemeral && evt.cityId && evt.unitType === 'caravan') {
-          const targetCity = this.state.world.cities.find((c) => c.id === evt.cityId);
-          if (targetCity) this.state.moveUnit(unit.id, targetCity.coord);
-        }
-        logEvent(`Unidad ${unit.name} apareció en el mapa`, 'success');
-        break;
-      }
-      case 'unit_move':
-        this.state.moveUnit(evt.unit, { q: evt.to[0], r: evt.to[1] });
-        break;
-      case 'unit_despawn': {
-        const ok = this.state.removeUnit(evt.unit);
-        if (ok) logEvent(`Unidad ${evt.unit} desapareció del mapa`, 'warn');
-        break;
-      }
-      case 'unit_state':
-        this.state.setUnitState(evt.unit, evt.state);
-        if (evt.state === 'working') setOperationTicker(true, `${evt.unit} trabajando…`);
-        else if (evt.state === 'idle') setOperationTicker(false);
-        break;
-      case 'unit_work':
-        if (evt.cityId) this.state.setUnitCity(evt.unit, evt.cityId);
-        this.state.setUnitWorkProgress(evt.unit, evt.progress);
-        break;
-      case 'building_start':
-        this.state.startBuilding(
-          evt.city,
-          evt.building,
-          evt.building,
-          evt.durationSeconds,
-          evt.buildingType ?? 'building',
-        );
-        logEvent(`◆ ${evt.building}`, 'info');
-        break;
-      case 'building_complete':
-        this.state.completeBuilding(evt.city, evt.building);
-        this.state.invalidatePathCache();
-        logEvent(`✓ ${evt.building}`, 'success');
-        showNotification({
-          type: 'success',
-          title: 'Construcción completada',
-          body: `${evt.city} → ${evt.building}`,
-        });
-        playSound('complete');
-        break;
-      case 'building_failed':
-        this.state.failBuilding(evt.city, evt.building);
-        logEvent(`✗ ${evt.building}`, 'warn');
-        showNotification({
-          type: 'error',
-          title: 'Construcción fallida',
-          body: `${evt.city} → ${evt.building}`,
-        });
-        break;
-      case 'mission_start':
-        this.state.startMission(evt.missionId, evt.unit, evt.questName);
-        logEvent(`▶ ${evt.questName}`, 'info');
-        break;
-      case 'mission_complete': {
-        this.state.completeMission(evt.missionId, evt.success);
-        setOperationTicker(false);
-        const durLabel =
-          evt.duration >= 60 ? `${Math.round(evt.duration / 60)}m` : `${evt.duration}s`;
-        showNotification({
-          type: evt.success ? 'success' : 'error',
-          title: evt.success ? 'Misión completada' : 'Misión fallida',
-          body: `${evt.unit} · ${durLabel}`,
-          unit: evt.unit,
-          ttl: evt.success ? 6000 : 8000,
-        });
-        if (evt.success) {
-          playSound('mission');
-          // Visual celebration — lazy import keeps payoffs out of the initial bundle
-          const canvas = document.getElementById('main-canvas') as HTMLCanvasElement | null;
-          if (canvas) {
-            import('./ui/payoffs.ts').then(({ celebrateMission }) => {
-              celebrateMission(canvas);
-            });
-          }
-        }
-        break;
-      }
-      case 'chat_chunk':
-        appendChatChunk(evt.unit, evt.text);
-        terminalPanel.write(`[${evt.unit}] ${evt.text}`);
-        break;
-      case 'log':
-        logEvent(evt.msg, evt.level ?? 'info');
-        break;
-      case 'resource_update': {
-        const el = document.querySelector<HTMLElement>(`#res-${evt.resource} .res-value`);
-        if (el) {
-          const prev = parseInt(el.textContent?.replace(/[^\d]/g, '') ?? '0', 10);
-          el.textContent = (prev + evt.delta).toLocaleString();
-        }
-        break;
-      }
-      // Phase 9: XCOM Context Fatigue events
-      case 'unit_fatigue_update': {
-        this.state.updateUnitFatigue(
-          evt.unit,
-          evt.fatigue,
-          evt.maxFatigue ?? 100,
-          evt.atRest ?? false,
-          evt.restAreaId ?? null,
-        );
-        break;
-      }
-      case 'unit_sent_to_rest': {
-        this.state.updateUnitFatigue(
-          evt.unit,
-          evt.fatigue,
-          evt.maxFatigue,
-          evt.atRest,
-          evt.restAreaId,
-        );
-        logEvent(`🛌 ${evt.unit} enviado a descanso`, 'info');
-        break;
-      }
-      case 'rest_area_discovered': {
-        const ra = evt.restArea;
-        this.state.addRestArea({
-          id: ra.id,
-          roomId: ra.roomId,
-          coord: { q: ra.coord[0], r: ra.coord[1] },
-          recoveryRate: ra.recoveryRate,
-          capacity: ra.capacity,
-          unitsInside: ra.unitsInside,
-        });
-        logEvent(`☕ Área de descanso descubierta: ${ra.roomId}`, 'info');
-        break;
-      }
-      case 'rest_area_entered': {
-        this.state.setUnitResting(evt.unit, true, evt.restAreaId);
-        logEvent(`${evt.unit} entró al área de descanso`, 'info');
-        break;
-      }
-      case 'rest_area_exited': {
-        this.state.setUnitResting(evt.unit, false);
-        logEvent(`${evt.unit} salió del área de descanso`, 'info');
-        break;
-      }
-      case 'waiting_approval': {
-        // Auto-approve execute_agent (chat) when the setting is on — user already
-        // expressed intent by typing and sending the message.
-        if (evt.commandType === 'execute_agent' && cfg.trust.autoApproveChat) {
-          void approveCommand(evt.commandId);
-          break;
-        }
-        logEvent(
-          `⏳ Aprobación requerida: ${evt.commandType} → ${evt.target} [${evt.risk}]`,
-          'warn',
-        );
-        const approvalUnit = evt.target;
-        appendApprovalCard(approvalUnit, evt.commandId, evt.commandType, evt.target, evt.risk);
-        break;
-      }
-      case 'context_exhausted': {
-        logEvent(`⚠ Contexto agotado para ${evt.unit}`, 'warn');
-        break;
-      }
-      case 'fog_reveal':
-        this.state.revealHexes(evt.hexes, evt.cityId);
-        logEvent(`🌫 Niebla disipada (${evt.hexes.length} hexes)`, 'info');
-        break;
-      case 'subagent_spawn': {
-        const parentUnit = this.state.getUnit(evt.parentUnit);
-        const spawnStatus = evt.status ?? 'running';
-        this.state.registerSubagent({
-          id: evt.subagentId,
-          parentMissionId: evt.parentMissionId,
-          parentUnitId: evt.parentUnit,
-          kind: evt.kind,
-          label: evt.label,
-          status: spawnStatus,
-          risk: evt.risk as import('./types.ts').SubagentRisk,
-          targetCityId: evt.targetCityId,
-          ephemeralUnitId: evt.ephemeralUnitId,
-          startedAt: Date.now(),
-          unitType: evt.unitType,
-          parentHarness: evt.parentHarness,
-          harness: evt.harness ?? evt.parentHarness,
-          lastProgressAt: Date.now(),
-        });
-        if (spawnStatus === 'running') {
-          const childIndex = parentUnit
-            ? this.state.getChildrenOfUnit(parentUnit.id).filter((c) => c.ephemeral).length
-            : 0;
-          const coord = parentUnit
-            ? pickDetachmentHex(this.state, parentUnit.coord, childIndex)
-            : { q: evt.hex[0], r: evt.hex[1] };
-          this.state.spawnUnit(
-            evt.ephemeralUnitId,
-            evt.label.slice(0, 12) || evt.kind,
-            evt.unitType ?? 'scout',
-            'capital',
-            coord,
-            evt.label,
-            evt.targetCityId,
-            {
-              parentUnitId: evt.parentUnit,
-              ephemeral: true,
-              subagentRunId: evt.subagentId,
-            },
-          );
-          this.state.syncSubagentSpawn({
-            ephemeralUnitId: evt.ephemeralUnitId,
-            parentUnitId: evt.parentUnit,
-            kind: evt.kind,
-            label: evt.label,
-            repoId: evt.targetCityId ?? parentUnit?.cityId ?? '',
-          });
-          this.state.setUnitState(evt.ephemeralUnitId, 'working');
-          logEvent(`◈ Detachment: ${evt.label.slice(0, 40)}`, 'info');
-        } else {
-          logEvent(
-            `◈ Detachment propuesto: ${evt.label.slice(0, 40)} (pendiente aprobación)`,
-            'info',
-          );
-        }
-        break;
-      }
-      case 'subagent_progress': {
-        const progressText = evt.text ?? evt.phase ?? '…';
-        this.state.appendSubagentProgress(evt.subagentId, progressText);
-        let run = this.state.subagents.get(evt.subagentId);
-        if (run?.status === 'proposed') {
-          this.state.updateSubagent(evt.subagentId, {
-            status: 'running',
-            lastProgressAt: Date.now(),
-          });
-          run = this.state.subagents.get(evt.subagentId);
-        } else if (run) {
-          this.state.updateSubagent(evt.subagentId, { lastProgressAt: Date.now() });
-        }
-        if (run?.ephemeralUnitId) {
-          this.state.setUnitState(run.ephemeralUnitId, 'working');
-        }
-        break;
-      }
-      case 'subagent_complete':
-        if (evt.outputFilePath) {
-          this.state.updateSubagent(evt.subagentId, { outputFilePath: evt.outputFilePath });
-        }
-        this.state.completeSubagent(evt.subagentId, evt.success, evt.summary);
-        logEvent(
-          evt.success
-            ? `✓ Subagente completado (${Math.round(evt.duration)}s)`
-            : `✗ Subagente falló`,
-          evt.success ? 'success' : 'warn',
-        );
-        break;
-      case 'subagent_proposed':
-        this.state.registerSubagent({
-          id: evt.subagentId,
-          parentMissionId: evt.parentMissionId,
-          parentUnitId: evt.parentUnit,
-          kind: evt.kind,
-          label: evt.label,
-          status: 'proposed',
-          risk: evt.risk as import('./types.ts').SubagentRisk,
-          startedAt: Date.now(),
-        });
-        logEvent(`⏳ Subagente propuesto [${evt.risk}]: ${evt.label.slice(0, 40)}`, 'warn');
-        break;
-      case 'subagent_cancel':
-        this.state.cancelSubagent(evt.subagentId, 'cancelled by user (Recall)');
-        logEvent(`Subagente cancelado: ${evt.subagentId}`, 'warn');
-        break;
-      default:
-        break;
+    // Pure dispatch — all per-event logic lives in bridgeMessageHandlers.ts.
+    // The BridgeEvents class only owns transport, health, and demo mode;
+    // event interpretation is its own concern.
+    dispatchBridgeEvent(this.getMessageContext(), evt);
+  }
+
+  /**
+   * Builds the context object that bridgeMessageHandlers.ts receives on
+   * every dispatch. Built once and cached — the captured references are
+   * top-level functions and the same GameState instance, so the
+   * context never changes after start().
+   */
+  private _ctx: MessageContext | null = null;
+  private getMessageContext(): MessageContext {
+    if (this._ctx === null) {
+      const ctx: MessageContext = {
+        state: this.state,
+        logEvent,
+        setOperationTicker,
+        appendChatChunk,
+        appendApprovalCard,
+        showNotification,
+        terminalPanel,
+        playSound,
+        approveCommand,
+        cfg,
+      };
+      this._ctx = ctx;
+      return ctx;
     }
+    return this._ctx;
   }
 
   async sendApproval(commandId: string, approved: boolean) {
