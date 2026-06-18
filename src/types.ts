@@ -586,6 +586,9 @@ export interface LocalUnit {
   assignedTask?: AgentTask | null; // player-assigned job focus (frontend-only)
   ephemeral?: boolean; // subagent detachment in local view
   assignedDesk?: { x: number; y: number } | null; // stable desk assignment in their room
+  // P1 polish: despawn fade-out
+  fadeAlpha?: number; // 1.0 default, decreasing to 0 during despawn
+  despawning?: boolean; // true while fading out before removal
 }
 
 export interface LocalNpc {

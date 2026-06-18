@@ -712,12 +712,27 @@ function drawIsoUnit(state: IsoRenderState, unit: LocalUnit, gx: number, gy: num
   const speed = isMoving ? 3.6 * unit.effectiveSpeed : 0;
   const Sf = 1 + Math.min(0.25, speed * 0.08);
   const Sc = 1 / Sf;
-  const bobbingY = isMoving ? Math.sin(unit.pathProgress * Math.PI * 2) * 3 : 0;
+  // Per-step bounce: smooth ease-in-out per tile transition (P1)
+  const bobbingY = isMoving ? Math.sin(unit.pathProgress * Math.PI) * 3 : 0;
+
+  // Idle breathing: subtle scale oscillation 0.98→1.02 over 2s cycle (P1)
+  let breatheScale = 1;
+  if (!isMoving && (unit.state === 'idle_in_room' || unit.state === 'resting')) {
+    const now2 = performance.now();
+    breatheScale = 1 + Math.sin(now2 / 1000 * Math.PI) * 0.02;
+  }
+
+  // Despawn fade-out alpha (P1)
+  const fadeAlpha = unit.despawning ? Math.max(0, unit.fadeAlpha ?? 1) : 1;
+  if (fadeAlpha <= 0) return;
+
   const scale = ISO_TILE_W / 64;
 
   ctx.save();
+  ctx.globalAlpha = fadeAlpha;
   ctx.translate(ux, uy + bobbingY - ISO_WALL_H * 0.3);
   if (unit.ephemeral) ctx.scale(0.8, 0.8);
+  ctx.scale(breatheScale, breatheScale);
 
   const isHovered = state.hoveredUnit?.id === unit.id;
   if (isHovered) {

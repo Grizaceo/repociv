@@ -297,11 +297,12 @@ describe('localWorldManager — desk assignment', () => {
     assert.equal(lastResort!.x, 0, 'nearest taken desk wins as fallback');
   });
 
-  it('releases desk assignments when a subagent unit is removed', async () => {
+  it('releases desk assignments when a subagent unit is removed (after despawn fade)', async () => {
     const { LocalWorldManager } = await import('./localWorldManager.ts');
     const mgr = new LocalWorldManager(() => {}, () => undefined);
     const world = makeGrid(['W.']);
     (mgr as unknown as { localWorld: unknown }).localWorld = world;
+    (mgr as unknown as { viewMode: string }).viewMode = 'local';
 
     const unit = {
       id: 'sub-1', name: 'S', unitType: 'worker', color: '#8ab4f8',
@@ -317,8 +318,17 @@ describe('localWorldManager — desk assignment', () => {
     mgr.assignDesk(unit);
     assert.equal(world.deskAssignments.size, 1, 'subagent got a desk');
 
+    // P1: removeSubagentUnit now triggers despawn fade, not instant removal.
+    // The desk is released after the fade completes (~300ms = ~19 ticks).
     mgr.removeSubagentUnit('sub-1');
-    assert.equal(world.deskAssignments.size, 0, 'desk released on removal');
+    // Desk still held during fade
+    assert.equal(world.deskAssignments.size, 1, 'desk held during despawn fade');
+
+    // Tick through the fade (~25 ticks to clear 300ms)
+    for (let i = 0; i < 25; i++) {
+      mgr.tick(16);
+    }
+    assert.equal(world.deskAssignments.size, 0, 'desk released after fade completes');
   });
 });
 

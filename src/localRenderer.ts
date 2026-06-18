@@ -2267,13 +2267,6 @@ export class LocalRenderer {
     }
 
     // Determine motion vectors & angles
-    //
-    // Pre-fix, working units were rotated to face the workbench
-    // (atan2(desk.y - unit.gridY, ...)) which made the 2D body sprite lie
-    // down — same bug the iso renderer had. Stationary units now keep
-    // their body upright; the shared computeUnitDirAngle() helper returns
-    // 0 for non-moving units. See isoLocalRenderer.ts for the rationale
-    // and isoLocalRenderer.test.ts for coverage.
     const isMoving = isUnitMoving(unit);
     const dirAngle = computeUnitDirAngle(unit);
 
@@ -2282,12 +2275,26 @@ export class LocalRenderer {
     const Sf = 1 + Math.min(0.25, speed * 0.08); // cap at 1.25 max stretch
     const Sc = 1 / Sf;
 
-    // Harmonic bobbing vertically during walks
-    const bobbingY = isMoving ? Math.sin(unit.pathProgress * Math.PI * 2) * 2.5 : 0;
+    // Per-step bounce: smooth ease-in-out per tile transition (P1)
+    // sin(progress * PI) gives a single smooth arch per tile, peaking at midstep
+    const bobbingY = isMoving ? Math.sin(unit.pathProgress * Math.PI) * 2.5 : 0;
+
+    // Idle breathing: subtle scale oscillation 0.98→1.02 over 2s cycle (P1)
+    let breatheScale = 1;
+    if (!isMoving && (unit.state === 'idle_in_room' || unit.state === 'resting')) {
+      const now = performance.now();
+      breatheScale = 1 + Math.sin(now / 1000 * Math.PI) * 0.02; // 2s period, ±2%
+    }
+
+    // Despawn fade-out alpha (P1)
+    const fadeAlpha = unit.despawning ? Math.max(0, unit.fadeAlpha ?? 1) : 1;
+    if (fadeAlpha <= 0) return;
 
     ctx.save();
+    ctx.globalAlpha = fadeAlpha;
     ctx.translate(ux, uy + bobbingY);
     if (unit.ephemeral) ctx.scale(0.8, 0.8);
+    ctx.scale(breatheScale, breatheScale);
 
     // Selection ring in cozy warm tone
     const isHovered = this._hoveredUnit?.id === unit.id;

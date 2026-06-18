@@ -186,22 +186,25 @@ export class LocalWorldManager {
       }
     }
 
-    // 3. Dispatch idle unit → next queued mission (~every 500ms)
+    // 3. Despawn fade-out: advance alpha, remove when done
+    this._tickDespawnFades();
+
+    // 4. Dispatch idle unit → next queued mission (~every 500ms)
     if (this.localTickCount % 30 === 0) {
       this._dispatchNextMission();
     }
 
-    // 4. Power System tick (every 100ms = ~6 ticks)
+    // 5. Power System tick (every 100ms = ~6 ticks)
     if (this.localTickCount % 6 === 0) {
       this._tickPowerSystem();
     }
 
-    // 5. Rest System tick (every 200ms = ~12 ticks)
+    // 6. Rest System tick (every 200ms = ~12 ticks)
     if (this.localTickCount % 12 === 0) {
       this._tickRestSystem();
     }
 
-    // 6. Temperature System tick (every 500ms = ~30 ticks)
+    // 7. Temperature System tick (every 500ms = ~30 ticks)
     if (this.localTickCount % 30 === 0) {
       this._tickTemperatureSystem();
     }
@@ -592,6 +595,43 @@ export class LocalWorldManager {
     if (next) this._assignMissionToUnit(next);
   }
 
+  // ─── P1 polish: despawn fade-out ──────────────────────────────────────────
+
+  /** Start the despawn sequence for a unit (fade alpha 1→0 over ~300ms). */
+  despawnUnit(unitId: string): void {
+    const unit = this.localUnits.find((u) => u.id === unitId);
+    if (!unit || unit.despawning) return;
+    unit.despawning = true;
+    unit.fadeAlpha = 1;
+    unit.state = 'idle_in_room';
+    unit.path = [];
+    unit.pathIndex = 0;
+    unit.pathProgress = 0;
+  }
+
+  private _tickDespawnFades(): void {
+    const TICK_MS = 16;
+    const FADE_DURATION_MS = 300;
+    const fadePerTick = (TICK_MS / FADE_DURATION_MS) * (16 / TICK_MS); // ~dt-normalized
+    const toRemove: string[] = [];
+
+    for (const unit of this.localUnits) {
+      if (!unit.despawning || unit.fadeAlpha === undefined) continue;
+      unit.fadeAlpha -= fadePerTick;
+      if (unit.fadeAlpha <= 0) {
+        toRemove.push(unit.id);
+      }
+    }
+
+    if (toRemove.length > 0) {
+      this.localUnits = this.localUnits.filter((u) => !toRemove.includes(u.id));
+      for (const id of toRemove) {
+        this.releaseDesks(id);
+      }
+      this.notify();
+    }
+  }
+
   private _completeLocalMission(unitId: string): void {
     const unit = this.localUnits.find((u) => u.id === unitId);
     if (!unit) return;
@@ -661,12 +701,10 @@ export class LocalWorldManager {
   }
 
   removeSubagentUnit(unitId: string): void {
-    const before = this.localUnits.length;
-    this.localUnits = this.localUnits.filter((u) => u.id !== unitId);
-    if (this.localUnits.length !== before) {
-      this.releaseDesks(unitId);
-      this.notify();
-    }
+    // P1: use despawn fade-out instead of instant removal
+    const unit = this.localUnits.find((u) => u.id === unitId);
+    if (!unit || unit.despawning) return;
+    this.despawnUnit(unitId);
   }
 
   private _tickTemperatureSystem(): void {
