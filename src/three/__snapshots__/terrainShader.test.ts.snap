@@ -240,10 +240,26 @@ void main() {
         // teal (a global warm shift greened it).
         {
           float glum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-          diffuseColor.rgb = mix(vec3(glum), diffuseColor.rgb, 1.14);
+          // v28: a touch more vibrance — the Civ V map reads as saturated
+          // painted gouache, not pastel watercolour.
+          diffuseColor.rgb = mix(vec3(glum), diffuseColor.rgb, 1.18);
           bool gradeWater = (tidx > 3.5 && tidx < 4.5) || (tidx > 4.5 && tidx < 5.5);
           if (!gradeWater) {
             diffuseColor.rgb *= vec3(1.06, 1.01, 0.94);
+            // v28 biome colour script: nudge each land biome toward its Civ V
+            // signature so they separate at a glance instead of reading as one
+            // warm-brown mass. Each per-biome nudge is within ±4%; the
+            // cumulative grade (vibrance × warm lift × nudge ≈ 1.25 worst case)
+            // is held in gamut by the clamp below.
+            if (tidx < 0.5) {                       // plains — meadow green-gold
+              diffuseColor.rgb *= vec3(1.01, 1.035, 0.93);
+            } else if (tidx < 1.5) {                // forest — deeper rich green
+              diffuseColor.rgb *= vec3(0.96, 1.03, 0.94);
+            } else if (tidx > 2.5 && tidx < 3.5) {  // desert — pale warm sand
+              diffuseColor.rgb *= vec3(1.04, 1.005, 0.90);
+            } else if (tidx > 5.5 && tidx < 6.5) {  // hills — sunlit olive
+              diffuseColor.rgb *= vec3(1.02, 1.02, 0.92);
+            }
           }
           diffuseColor.rgb = clamp(diffuseColor.rgb, 0.0, 1.0);
         }

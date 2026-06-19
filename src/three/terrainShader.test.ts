@@ -23,7 +23,7 @@ describe('terrainShader', () => {
   it('exposes a versioned customProgramCacheKey', () => {
     const mat = createTerrainMaterial();
     // Bumping the version in terrainShader.ts must update this.
-    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v27');
+    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v28');
   });
 
   it('produces a stable fragment shader from onBeforeCompile', () => {

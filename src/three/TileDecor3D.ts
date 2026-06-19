@@ -240,8 +240,9 @@ function buildHills(tiles: Tile[]): void {
 
   const bumpGeom = new SphereGeometry(HEX_SIZE * 0.30, 12, 8);
   // Baked-atlas hills mean (191,209,141) × 0.82 — same family as the
-  // terrain cell, darkened just enough to read as relief.
-  const bumpMat  = new MeshLambertMaterial({ color: new Color(0x9dab74) });
+  // terrain cell, darkened just enough to read as relief. White base so the
+  // per-instance mottling (setColorAt) reads as the literal bump colour.
+  const bumpMat  = new MeshLambertMaterial({ color: new Color(0xffffff) });
 
   const total    = tiles.length * 4;
   const bumpMesh = new InstancedMesh(bumpGeom, bumpMat, total);
@@ -253,18 +254,32 @@ function buildHills(tiles: Tile[]): void {
     [ -0.06, 0.38,  0.20, 0.74 ],
   ];
 
+  // Civ V hills aren't a flat olive plate — sunlit crowns and shaded folds.
+  // Mottle each bump around the base tone (0x9dab74) with hash-stable
+  // brightness + a slight warm/cool swing so adjacent bumps separate.
+  const base = new Color(0x9dab74);
+  const tint = new Color();
   let idx = 0;
   const mat = new Matrix4();
   for (const tile of tiles) {
     const elev = terrainElevation(tile.terrain);
     const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    const h    = hashCoord(tile.coord.q, tile.coord.r);
+    let b = 0;
     for (const [ox, oy, oz, sc] of offsets) {
       mat.makeScale(sc * 1.1, sc * 0.48, sc * 1.0);
       mat.setPosition(pos.x + ox * HEX_SIZE, pos.y - 1 + oy * HEX_SIZE * 0.30, pos.z + oz * HEX_SIZE);
-      bumpMesh.setMatrixAt(idx++, mat.clone());
+      bumpMesh.setMatrixAt(idx, mat.clone());
+      const bright = 0.84 + ((h + b * 7) % 11) / 11 * 0.30;   // 0.84..1.14
+      const warm   = ((h >> 2) + b) % 2 === 0 ? 1.05 : 0.95;  // sun vs shade
+      tint.setRGB(base.r * bright * warm, base.g * bright, base.b * bright * 0.96);
+      bumpMesh.setColorAt(idx, tint);
+      idx++;
+      b++;
     }
   }
   bumpMesh.instanceMatrix.needsUpdate = true;
+  if (bumpMesh.instanceColor) bumpMesh.instanceColor.needsUpdate = true;
   addMesh(bumpMesh);
 }
 
@@ -279,8 +294,9 @@ function buildDesert(tiles: Tile[]): void {
   // give relief without competing with the baked dune bands.
   const duneGeom = new SphereGeometry(HEX_SIZE * 0.22, 14, 10);
   // Baked-atlas desert mean (209,196,163) × 1.07 — sun-catching sand in
-  // the same warm-gray family as the dune bands, not saturated yellow.
-  const duneMat  = new MeshLambertMaterial({ color: new Color(0xe0d2ae) });
+  // the same warm-gray family as the dune bands, not saturated yellow. White
+  // base so per-instance mottling (setColorAt) is the literal dune colour.
+  const duneMat  = new MeshLambertMaterial({ color: new Color(0xffffff) });
 
   const MOUNDS = 3;
   const duneMesh = new InstancedMesh(duneGeom, duneMat, tiles.length * MOUNDS);
@@ -291,6 +307,10 @@ function buildDesert(tiles: Tile[]): void {
     [-0.02,  0.20],
   ];
 
+  // Sand catches and loses the sun in bands — mottle each mound around the
+  // base tone so the desert reads as drifting dunes, not one flat sheet.
+  const duneBase = new Color(0xe0d2ae);
+  const duneTint = new Color();
   let idx = 0;
   const mat = new Matrix4();
   const scaleV = new Vector3();
@@ -313,10 +333,15 @@ function buildDesert(tiles: Tile[]): void {
         rot,
         scaleV,
       );
-      duneMesh.setMatrixAt(idx++, mat.clone());
+      duneMesh.setMatrixAt(idx, mat.clone());
+      const bright = 0.90 + ((h + d * 13) % 9) / 9 * 0.16;   // 0.90..1.06
+      duneTint.setRGB(duneBase.r * bright, duneBase.g * bright, duneBase.b * bright * 0.98);
+      duneMesh.setColorAt(idx, duneTint);
+      idx++;
     }
   }
   duneMesh.instanceMatrix.needsUpdate = true;
+  if (duneMesh.instanceColor) duneMesh.instanceColor.needsUpdate = true;
   addMesh(duneMesh);
 }
 

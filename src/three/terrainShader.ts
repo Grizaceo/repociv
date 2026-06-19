@@ -525,10 +525,26 @@ float terrainDetailNoise(vec2 p) {
         // teal (a global warm shift greened it).
         {
           float glum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-          diffuseColor.rgb = mix(vec3(glum), diffuseColor.rgb, 1.14);
+          // v28: a touch more vibrance — the Civ V map reads as saturated
+          // painted gouache, not pastel watercolour.
+          diffuseColor.rgb = mix(vec3(glum), diffuseColor.rgb, 1.18);
           bool gradeWater = (tidx > 3.5 && tidx < 4.5) || (tidx > 4.5 && tidx < 5.5);
           if (!gradeWater) {
             diffuseColor.rgb *= vec3(1.06, 1.01, 0.94);
+            // v28 biome colour script: nudge each land biome toward its Civ V
+            // signature so they separate at a glance instead of reading as one
+            // warm-brown mass. Each per-biome nudge is within ±4%; the
+            // cumulative grade (vibrance × warm lift × nudge ≈ 1.25 worst case)
+            // is held in gamut by the clamp below.
+            if (tidx < 0.5) {                       // plains — meadow green-gold
+              diffuseColor.rgb *= vec3(1.01, 1.035, 0.93);
+            } else if (tidx < 1.5) {                // forest — deeper rich green
+              diffuseColor.rgb *= vec3(0.96, 1.03, 0.94);
+            } else if (tidx > 2.5 && tidx < 3.5) {  // desert — pale warm sand
+              diffuseColor.rgb *= vec3(1.04, 1.005, 0.90);
+            } else if (tidx > 5.5 && tidx < 6.5) {  // hills — sunlit olive
+              diffuseColor.rgb *= vec3(1.02, 1.02, 0.92);
+            }
           }
           diffuseColor.rgb = clamp(diffuseColor.rgb, 0.0, 1.0);
         }`,
@@ -598,7 +614,7 @@ float terrainDetailNoise(vec2 p) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v27';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v28';
   return mat;
 }
 
@@ -629,5 +645,9 @@ export function updateTerrainShaderAtlas(
 
 /** Sky / horizon palette — warm Civ V afternoon. */
 export const SKY_TOP     = new Color(0x89b5d4);   // was 0x7a9ec8 — warmer blue
-export const SKY_HORIZON = new Color(0x9ab870);   // was 0x8aab85 — greener mid
-export const FOG_DENSITY = 0.00019;               // v22: ACES + sun boost already model depth; the old haze went milky at mid-zoom
+// v28: the FogExp2 tone was green (0x9ab870) while the sky-dome haze is warm
+// cream-gold (SKY_HAZE 0xddd0aa) — distant terrain dissolved into a green band
+// that fought the sky instead of melting into golden-hour haze. Realign the
+// fog to the dome's warm horizon so atmospheric perspective reads Civ V.
+export const SKY_HORIZON = new Color(0xd2c290);   // warm sand-gold, matches SkyDome SKY_HAZE
+export const FOG_DENSITY = 0.00021;               // a hair denser now that the haze is warm (warm tone resists the milkiness that forced v22 down)

@@ -1,7 +1,9 @@
 // ─── Three.js scene: terrain instancing, lights, territory, sub-groups ─────
 import {
+  AdditiveBlending,
   AmbientLight,
   DirectionalLight,
+  DoubleSide,
   FogExp2,
   Group,
   HemisphereLight,
@@ -9,6 +11,8 @@ import {
   InstancedMesh,
   LineSegments,
   Matrix4,
+  Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   MeshLambertMaterial,
   LineBasicMaterial,
@@ -135,9 +139,17 @@ let terrainMesh: InstancedMesh | null = null;
 let fogCoverMesh: InstancedMesh | null = null;
 let fogPuffMesh: InstancedMesh | null = null;
 let fogCoverSignature = '';
-// Per-city territory borders. Each entry is one LineSegments with that
-// city's color. Caps at 50 cities; beyond that, falls back to single-color.
-let territoryLines: LineSegments[] = [];
+// Per-city territory borders. Each entry is one ribbon Mesh (a flat colored
+// band lying on the terrain) with that city's color — Civ V's glowing culture
+// borders. WebGL caps line width at 1px, so LineSegments borders were
+// invisible at strategic zoom; ribbons are real geometry that read at any
+// distance. Caps at 50 cities; beyond that, falls back to single-color.
+let territoryBorders: Mesh[] = [];
+// Dirty-flag for the borders: they depend on territory shape, per-city colour,
+// capital flag, the structure-layer toggle, and LOD — but NOT on unit movement,
+// which also flips the global signature. Without this gate every unit step
+// rebuilt all border geometry. Mirrors shorelineSignature.
+let territorySignature = '';
 let shorelineRings: LineSegments | null = null;
 let shorelineSignature = '';
 // Per-vertex base data for the in-place pulse: [cx, cy, cz, ux, uz] × vertex.
@@ -256,22 +268,129 @@ function dominantNeighborTerrain(
 }
 
 function clearTerritoryLines(): void {
-  for (const line of territoryLines) {
-    terrainGroup.remove(line);
-    line.geometry.dispose();
-    (line.material as LineBasicMaterial).dispose();
+  for (const mesh of territoryBorders) {
+    terrainGroup.remove(mesh);
+    mesh.geometry.dispose();
+    (mesh.material as MeshBasicMaterial).dispose();
   }
-  territoryLines = [];
+  territoryBorders = [];
 }
 
 function animateTerritoryPulse(animTime: number): void {
-  if (territoryLines.length === 0) return;
-  const pulse = 0.90 + 0.06 * Math.sin(animTime * 2.2);
-  for (const line of territoryLines) {
-    const mat = line.material as LineBasicMaterial;
-    const baseOpacity = (mat.userData.baseOpacity as number) ?? 0.45;
+  if (territoryBorders.length === 0) return;
+  const pulse = 0.90 + 0.07 * Math.sin(animTime * 2.2);
+  for (const mesh of territoryBorders) {
+    const mat = mesh.material as MeshBasicMaterial;
+    const baseOpacity = (mat.userData.baseOpacity as number) ?? 0.5;
     mat.opacity = baseOpacity * pulse;
   }
+}
+
+// ── Civ V culture-border ribbon ────────────────────────────────────────────
+// Borders are flat bands lying on the terrain, not 1px lines. Each boundary
+// edge becomes a quad biased slightly INTO the owner's territory (Civ V's
+// border hugs the inside of the frontier). A wider additive-blended glow band
+// underneath gives the signature neon halo.
+const BORDER_BAND_W = HEX_SIZE * 0.115;
+const BORDER_GLOW_W = HEX_SIZE * 0.34;
+
+interface BorderEdge {
+  x1: number; z1: number; x2: number; z2: number;
+  cx: number; cz: number; y: number;
+}
+
+/** Build a flat ribbon (XZ plane, at each edge's y) from boundary edges.
+ *  `width` is the band thickness; `inset` shifts the band toward the tile
+ *  centre so it reads as the owner's inner frontier. Ends are mitre-extended
+ *  by half-width so consecutive segments close the corner gaps. */
+function buildRibbonGeometry(edges: BorderEdge[], width: number, inset: number): BufferGeometry {
+  // Pre-sized: 2 triangles × 3 verts × 3 coords = 18 floats per edge.
+  const pos = new Float32Array(edges.length * 18);
+  const hw = width * 0.5;
+  let o = 0;
+  for (const e of edges) {
+    let tx = e.x2 - e.x1;
+    let tz = e.z2 - e.z1;
+    const len = Math.hypot(tx, tz) || 1;
+    tx /= len;
+    tz /= len;
+    // Edge normal in XZ; flip so it points toward the tile centre (inward).
+    let nx = -tz;
+    let nz = tx;
+    const midx = (e.x1 + e.x2) * 0.5;
+    const midz = (e.z1 + e.z2) * 0.5;
+    if (nx * (e.cx - midx) + nz * (e.cz - midz) < 0) {
+      nx = -nx;
+      nz = -nz;
+    }
+    // Mitre-extend the ends along the tangent so corners don't gap.
+    const ax = e.x1 - tx * hw;
+    const az = e.z1 - tz * hw;
+    const bx = e.x2 + tx * hw;
+    const bz = e.z2 + tz * hw;
+    // Band spans [inset - hw, inset + hw] along the inward normal.
+    const o1 = inset - hw;
+    const o2 = inset + hw;
+    const p1x = ax + nx * o1, p1z = az + nz * o1;
+    const p2x = ax + nx * o2, p2z = az + nz * o2;
+    const p3x = bx + nx * o2, p3z = bz + nz * o2;
+    const p4x = bx + nx * o1, p4z = bz + nz * o1;
+    pos[o++] = p1x; pos[o++] = e.y; pos[o++] = p1z;
+    pos[o++] = p2x; pos[o++] = e.y; pos[o++] = p2z;
+    pos[o++] = p3x; pos[o++] = e.y; pos[o++] = p3z;
+    pos[o++] = p1x; pos[o++] = e.y; pos[o++] = p1z;
+    pos[o++] = p3x; pos[o++] = e.y; pos[o++] = p3z;
+    pos[o++] = p4x; pos[o++] = e.y; pos[o++] = p4z;
+  }
+  const geom = new BufferGeometry();
+  geom.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  return geom;
+}
+
+/** Add the solid band + additive glow ribbon meshes for one set of boundary
+ *  edges in a single colour. Registered in `territoryBorders` for pulse +
+ *  disposal. */
+function addBorderRibbon(edges: BorderEdge[], color: Color, bandOpacity: number): void {
+  if (edges.length === 0) return;
+
+  // Glow first (renders under the band), additive for the neon halo.
+  const glowGeom = buildRibbonGeometry(edges, BORDER_GLOW_W, BORDER_GLOW_W * 0.18);
+  const glowMat = new MeshBasicMaterial({
+    color: color.clone().lerp(new Color(1, 1, 1), 0.18),
+    transparent: true,
+    opacity: 0.16,
+    depthWrite: false,
+    blending: AdditiveBlending,
+    side: DoubleSide,
+    fog: false,
+    // Culture borders are UI overlays, not lit surfaces — ACES tone mapping
+    // desaturated the distinct civ colours into a uniform tan. Render pure.
+    toneMapped: false,
+  });
+  glowMat.userData.baseOpacity = 0.16;
+  const glowMesh = new Mesh(glowGeom, glowMat);
+  glowMesh.renderOrder = 2;
+  glowMesh.frustumCulled = false;
+  terrainGroup.add(glowMesh);
+  territoryBorders.push(glowMesh);
+
+  // Solid colored band.
+  const bandGeom = buildRibbonGeometry(edges, BORDER_BAND_W, BORDER_BAND_W * 0.28);
+  const bandMat = new MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: bandOpacity,
+    depthWrite: false,
+    side: DoubleSide,
+    fog: false,
+    toneMapped: false,
+  });
+  bandMat.userData.baseOpacity = bandOpacity;
+  const bandMesh = new Mesh(bandGeom, bandMat);
+  bandMesh.renderOrder = 3;
+  bandMesh.frustumCulled = false;
+  terrainGroup.add(bandMesh);
+  territoryBorders.push(bandMesh);
 }
 
 function rebuildTerritoryLines(
@@ -280,6 +399,24 @@ function rebuildTerritoryLines(
   visible: boolean,
   lod: 'low' | 'medium' | 'high',
 ): void {
+  // Signature gate: skip the full clear+regroup+rebuild on dirty frames where
+  // only unit positions changed (the common case). Granularity matches the
+  // global world signature (per-city coord + territory size), plus colour,
+  // capital, the visible toggle and LOD — everything border geometry reads.
+  const sig = visible
+    ? `${lod}:` +
+      state.world.cities
+        .map(
+          (c) =>
+            `${tileKey(c.coord)};${c.territory.length};${c.isCapital ? 1 : 0};${
+              c.color ? c.color.join(',') : ''
+            }`,
+        )
+        .join('|')
+    : 'hidden';
+  if (sig === territorySignature) return;
+  territorySignature = sig;
+
   clearTerritoryLines();
   if (!visible) return;
 
@@ -290,165 +427,83 @@ function rebuildTerritoryLines(
 
   const getTile = (c: Axial) => state.world.tiles.get(tileKey(c));
   const cities = state.world.cities.filter((c) => c.territory.length > 0);
-  const usePerCity = cities.length <= 50;
 
-  if (usePerCity) {
-    // Per-city borders: each city gets its own LineSegments with its color.
-    cities.forEach((city, cityIdx) => {
-      const innerSegments: number[] = [];
-      const glowSegments: number[] = [];
-      const inTerritory = new Set(city.territory.map((c) => tileKey(c)));
-      // Y offset per city to avoid z-fighting on shared edges.
-      const yOff = cityIdx * 0.05;
-
-      for (const coord of city.territory) {
-        const tile = getTile(coord);
-        const elev = tile ? terrainElevation(tile.terrain) : 0;
-        for (let d = 0; d < 6; d++) {
-          const neighbor = {
-            q: coord.q + AXIAL_DIRECTIONS[d]!.q,
-            r: coord.r + AXIAL_DIRECTIONS[d]!.r,
-          };
-          const nKey = tileKey(neighbor);
-          if (lod === 'low') {
-            if (allTerritory.has(nKey)) continue;
-          } else if (inTerritory.has(nKey)) {
-            continue;
-          }
-          const e = DIR_TO_EDGE[d]!;
-          const center = axialToWorld3D(coord.q, coord.r, elev);
-          const a1 = hexCornerAngle3D(e);
-          const a2 = hexCornerAngle3D((e + 1) % 6);
-          const x1 = center.x + HEX_SIZE * Math.cos(a1);
-          const z1 = center.z + HEX_SIZE * Math.sin(a1);
-          const x2 = center.x + HEX_SIZE * Math.cos(a2);
-          const z2 = center.z + HEX_SIZE * Math.sin(a2);
-          const y = center.y + 1.5 + yOff;
-          innerSegments.push(x1, y, z1, x2, y, z2);
-          const mx = (x1 + x2) * 0.5;
-          const mz = (z1 + z2) * 0.5;
-          const dx = mx - center.x;
-          const dz = mz - center.z;
-          const len = Math.hypot(dx, dz) || 1;
-          const push = HEX_SIZE * 0.02;
-          glowSegments.push(
-            x1 + (dx / len) * push, y, z1 + (dz / len) * push,
-            x2 + (dx / len) * push, y, z2 + (dz / len) * push,
-          );
+  // Collect the boundary edges of a city's territory as flat ribbon segments.
+  const collectEdges = (
+    territory: Axial[],
+    inTerritory: Set<string>,
+    yOff: number,
+  ): BorderEdge[] => {
+    const edges: BorderEdge[] = [];
+    for (const coord of territory) {
+      const tile = getTile(coord);
+      const elev = tile ? terrainElevation(tile.terrain) : 0;
+      const center = axialToWorld3D(coord.q, coord.r, elev);
+      for (let d = 0; d < 6; d++) {
+        const nKey = tileKey({
+          q: coord.q + AXIAL_DIRECTIONS[d]!.q,
+          r: coord.r + AXIAL_DIRECTIONS[d]!.r,
+        });
+        // Draw an edge only where territory meets non-territory. At low LOD
+        // we merge against ALL territory (one outer empire outline); higher
+        // LOD outlines each city against its own frontier.
+        if (lod === 'low') {
+          if (allTerritory.has(nKey)) continue;
+        } else if (inTerritory.has(nKey)) {
+          continue;
         }
-      }
-
-      if (innerSegments.length === 0) return;
-
-      // City color (fallback to gold if undefined)
-      const c = city.color ?? [0.725, 0.588, 0.329]; // 0xb99654
-      const color = new Color(c[0], c[1], c[2]);
-      // Capital: brighter version (mix with white 15%)
-      if (city.isCapital) {
-        color.lerp(new Color(1, 1, 1), 0.15);
-      }
-      const baseOpacity = city.isCapital
-        ? (lod === 'high' ? 0.60 : 0.52)
-        : (lod === 'high' ? 0.55 : 0.45);
-
-      // Inner line
-      const innerGeom = new BufferGeometry();
-      innerGeom.setAttribute('position', new Float32BufferAttribute(innerSegments, 3));
-      const innerMat = new LineBasicMaterial({
-        color,
-        transparent: true,
-        opacity: baseOpacity,
-        linewidth: city.isCapital ? 3 : 2,
-      });
-      innerMat.userData.baseOpacity = baseOpacity;
-      const innerLine = new LineSegments(innerGeom, innerMat);
-      terrainGroup.add(innerLine);
-      territoryLines.push(innerLine);
-
-      // Glow line (same color, lower opacity, slightly wider)
-      const glowGeom = new BufferGeometry();
-      glowGeom.setAttribute('position', new Float32BufferAttribute(glowSegments, 3));
-      const glowMat = new LineBasicMaterial({
-        color: color.clone(),
-        transparent: true,
-        opacity: 0.15,
-        linewidth: city.isCapital ? 4 : 3,
-      });
-      glowMat.userData.baseOpacity = 0.15;
-      const glowLine = new LineSegments(glowGeom, glowMat);
-      terrainGroup.add(glowLine);
-      territoryLines.push(glowLine);
-    });
-  } else {
-    // Fallback: >50 cities — single-color gold borders (old behavior)
-    const innerSegments: number[] = [];
-    const glowSegments: number[] = [];
-    for (const city of cities) {
-      const inTerritory = new Set(city.territory.map((c) => tileKey(c)));
-      for (const coord of city.territory) {
-        const tile = getTile(coord);
-        const elev = tile ? terrainElevation(tile.terrain) : 0;
-        for (let d = 0; d < 6; d++) {
-          const neighbor = {
-            q: coord.q + AXIAL_DIRECTIONS[d]!.q,
-            r: coord.r + AXIAL_DIRECTIONS[d]!.r,
-          };
-          const nKey = tileKey(neighbor);
-          if (lod === 'low') {
-            if (allTerritory.has(nKey)) continue;
-          } else if (inTerritory.has(nKey)) {
-            continue;
-          }
-          const e = DIR_TO_EDGE[d]!;
-          const center = axialToWorld3D(coord.q, coord.r, elev);
-          const a1 = hexCornerAngle3D(e);
-          const a2 = hexCornerAngle3D((e + 1) % 6);
-          const x1 = center.x + HEX_SIZE * Math.cos(a1);
-          const z1 = center.z + HEX_SIZE * Math.sin(a1);
-          const x2 = center.x + HEX_SIZE * Math.cos(a2);
-          const z2 = center.z + HEX_SIZE * Math.sin(a2);
-          const y = center.y + 1.5;
-          innerSegments.push(x1, y, z1, x2, y, z2);
-          const mx = (x1 + x2) * 0.5;
-          const mz = (z1 + z2) * 0.5;
-          const dx = mx - center.x;
-          const dz = mz - center.z;
-          const len = Math.hypot(dx, dz) || 1;
-          const push = HEX_SIZE * 0.02;
-          glowSegments.push(
-            x1 + (dx / len) * push, y, z1 + (dz / len) * push,
-            x2 + (dx / len) * push, y, z2 + (dz / len) * push,
-          );
-        }
+        const e = DIR_TO_EDGE[d]!;
+        const a1 = hexCornerAngle3D(e);
+        const a2 = hexCornerAngle3D((e + 1) % 6);
+        edges.push({
+          x1: center.x + HEX_SIZE * Math.cos(a1),
+          z1: center.z + HEX_SIZE * Math.sin(a1),
+          x2: center.x + HEX_SIZE * Math.cos(a2),
+          z2: center.z + HEX_SIZE * Math.sin(a2),
+          cx: center.x,
+          cz: center.z,
+          // Ribbons sit above the hex grid (+1.5) and micro-relief so they
+          // never get buried; small per-city offset avoids z-fight on shared
+          // frontiers between two empires.
+          y: center.y + 2.4 + yOff,
+        });
       }
     }
-    if (innerSegments.length > 0) {
-      const innerGeom = new BufferGeometry();
-      innerGeom.setAttribute('position', new Float32BufferAttribute(innerSegments, 3));
-      const innerMat = new LineBasicMaterial({
-        color: new Color(0xb99654),
-        transparent: true,
-        opacity: lod === 'high' ? 0.45 : 0.38,
-        linewidth: 2,
-      });
-      innerMat.userData.baseOpacity = lod === 'high' ? 0.45 : 0.38;
-      const innerLine = new LineSegments(innerGeom, innerMat);
-      terrainGroup.add(innerLine);
-      territoryLines.push(innerLine);
+    return edges;
+  };
 
-      const glowGeom = new BufferGeometry();
-      glowGeom.setAttribute('position', new Float32BufferAttribute(glowSegments, 3));
-      const glowMat = new LineBasicMaterial({
-        color: new Color(0xf0d060),
-        transparent: true,
-        opacity: 0.12,
-        linewidth: 3,
-      });
-      glowMat.userData.baseOpacity = 0.12;
-      const glowLine = new LineSegments(glowGeom, glowMat);
-      terrainGroup.add(glowLine);
-      territoryLines.push(glowLine);
+  // Group boundary edges by render colour, then emit one merged ribbon per
+  // colour. This keeps the border draw-call count bounded (≈palette size +
+  // capitals) no matter how many cities — a real workspace has dozens, and
+  // the old per-city path fell back to a single flat gold past 50, throwing
+  // away every civ colour. Capitals form their own brighter group.
+  interface BorderGroup { color: Color; capital: boolean; edges: BorderEdge[] }
+  const groups = new Map<string, BorderGroup>();
+  cities.forEach((city, cityIdx) => {
+    const inTerritory = new Set(city.territory.map((c) => tileKey(c)));
+    // Tiny per-city y stagger so two same-colour empires sharing a frontier
+    // don't z-fight once their edges land in the same merged geometry. Wraps
+    // at 64 (well above realistic same-colour city counts) so the cumulative
+    // lift stays sub-0.4u and never separates a ribbon from its terrain.
+    const edges = collectEdges(city.territory, inTerritory, (cityIdx % 64) * 0.006);
+    if (edges.length === 0) return;
+    const cc = city.color ?? [0.725, 0.588, 0.329]; // 0xb99654 fallback
+    const color = new Color(cc[0], cc[1], cc[2]);
+    if (city.isCapital) color.lerp(new Color(1, 1, 1), 0.18);
+    const key = `${city.isCapital ? 'cap' : 'c'}:${color.getHexString()}`;
+    let g = groups.get(key);
+    if (!g) {
+      g = { color, capital: Boolean(city.isCapital), edges: [] };
+      groups.set(key, g);
     }
+    for (const e of edges) g.edges.push(e);
+  });
+
+  for (const g of groups.values()) {
+    const baseOpacity = g.capital
+      ? (lod === 'high' ? 0.85 : 0.78)
+      : (lod === 'high' ? 0.72 : 0.62);
+    addBorderRibbon(g.edges, g.color, baseOpacity);
   }
 }
 
@@ -1167,6 +1222,7 @@ export function disposeHexWorldScene(scene: Scene): void {
   fogCoverSignature = '';
   groundSignature = '';
   tileCountSignature = '';
+  territorySignature = '';
   if (groundMeshRef) {
     terrainGroup.remove(groundMeshRef);
     disposeGroundMesh();

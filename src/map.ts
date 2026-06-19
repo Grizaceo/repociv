@@ -673,27 +673,36 @@ export async function reconnectCities(world: World): Promise<void> {
 }
 
 // ─── Per-city territory color palette ─────────────────────────────────
-/** Distinct colors that read well against golden-hour terrain. RGB 0-1. */
+/** Vivid, evenly-hued Civ V player colors — saturated enough that the
+ *  culture-border ribbons read as distinct empires against golden-hour
+ *  terrain, not as roads. RGB 0-1. The old palette clustered three warm
+ *  tones (orange/amber/gold) that were hard to tell apart and blended
+ *  into tan terrain. */
 const CITY_PALETTE: [number, number, number][] = [
-  [0.15, 0.35, 0.75], // deep blue
-  [0.70, 0.15, 0.20], // crimson
-  [0.10, 0.55, 0.55], // teal
-  [0.45, 0.25, 0.65], // purple
-  [0.80, 0.45, 0.15], // orange
-  [0.15, 0.55, 0.30], // emerald
-  [0.75, 0.30, 0.45], // rose
-  [0.35, 0.40, 0.50], // slate
-  [0.60, 0.50, 0.15], // amber
-  [0.20, 0.50, 0.70], // sky blue
+  [0.20, 0.45, 0.95], // royal blue
+  [0.93, 0.23, 0.25], // red
+  [0.10, 0.72, 0.68], // teal
+  [0.62, 0.30, 0.86], // violet
+  [0.98, 0.55, 0.12], // orange
+  [0.28, 0.78, 0.32], // green
+  [0.96, 0.36, 0.70], // pink
+  [0.96, 0.82, 0.22], // gold
+  [0.18, 0.72, 0.96], // cyan
+  [0.62, 0.82, 0.20], // lime
 ];
 
-/** Deterministic per-city color from a hash of the city id. */
+/** Deterministic per-city color from a hash of the city id. FNV-1a + an
+ *  avalanche step distributes near-identical ids (repos that share a long
+ *  path prefix) across the palette far better than the old djb2 `% n`,
+ *  which collided three sibling repos onto one color. */
 export function cityColorFromId(id: string): [number, number, number] {
-  let hash = 0;
+  let hash = 2166136261;
   for (let i = 0; i < id.length; i++) {
-    hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0;
+    hash ^= id.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
   }
-  return CITY_PALETTE[Math.abs(hash) % CITY_PALETTE.length]!;
+  hash = (hash ^ (hash >>> 13)) >>> 0;
+  return CITY_PALETTE[hash % CITY_PALETTE.length]!;
 }
 
 // ─── Dynamic city add/remove helpers ────────────────────────────────
