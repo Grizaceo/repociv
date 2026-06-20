@@ -54,10 +54,10 @@ describe('resolveInitialRenderMode', () => {
     expect(resolveInitialRenderMode()).toBe('flat');
   });
 
-  it('persisted webgl is session-only: returns webgl but rewrites storage to flat', () => {
+  it('persisted webgl is sticky: returns webgl and leaves storage untouched (B5)', () => {
     const store = setup('', { [STORAGE_KEY]: 'webgl' });
     expect(resolveInitialRenderMode()).toBe('webgl');
-    expect(store.get(STORAGE_KEY)).toBe('flat');
+    expect(store.get(STORAGE_KEY)).toBe('webgl');
   });
 
   it('legacy iso25d migrates to webgl and is rewritten in storage', () => {
@@ -66,17 +66,17 @@ describe('resolveInitialRenderMode', () => {
     expect(store.get(STORAGE_KEY)).toBe('webgl');
   });
 
-  it('no URL and no storage defaults to flat (2D canonical)', () => {
+  it('no URL and no storage defaults to webgl (3D first impression — B5)', () => {
     setup('');
-    expect(resolveInitialRenderMode()).toBe('flat');
+    expect(resolveInitialRenderMode()).toBe('webgl');
   });
 
-  it('unknown persisted value falls back to flat (defensive)', () => {
+  it('unknown persisted value falls back to the webgl default (defensive)', () => {
     setup('', { [STORAGE_KEY]: 'totally-bogus' });
-    expect(resolveInitialRenderMode()).toBe('flat');
+    expect(resolveInitialRenderMode()).toBe('webgl');
   });
 
-  it('rejects an unknown ?renderer value and falls through to storage/default', () => {
+  it('rejects an unknown ?renderer value and falls through to a persisted flat', () => {
     setup('?renderer=hologram', { [STORAGE_KEY]: 'flat' });
     expect(resolveInitialRenderMode()).toBe('flat');
   });
