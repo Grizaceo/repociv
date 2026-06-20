@@ -64,6 +64,7 @@ import {
   fetchPendingTracker,
 } from './ui/index.ts';
 import { mountGacetaWidget } from './ui/gacetaWidget.ts';
+import { startMcpStatusPolling } from './ui/mcpStatus.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { wireHUD, selectHero } from './ui/hudWiring.ts';
 import { initHudMode } from './ui/hudMode.ts';
@@ -744,6 +745,7 @@ async function bootstrap() {
   bridge.rendererRef = renderer;
   bridge.start();
   startApprovalPolling();
+  startMcpStatusPolling();
   setWebGLMetricsSource(() => renderer.getWebGLMetrics());
   startObservabilityPolling();
   startHarnessPolling();

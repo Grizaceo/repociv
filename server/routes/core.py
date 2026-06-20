@@ -108,7 +108,7 @@ def _extract_model_ids(data: Any, url: str) -> list[str]:
 
 def get_health(ctx: "RouteContext") -> tuple[int, Any]:
     from server.agent_runner import _has_claude_code, _has_openclaw, _has_cursor, _has_codex
-    from server.bridge import _sched, get_gpu_info, _es
+    from server.bridge import _sched, get_gpu_info, _es, mcp_status
     agent_status = _sched.get_agent_status()
     queue_depth = len(_sched.queue_snapshot())
     gpu = get_gpu_info()
@@ -120,6 +120,7 @@ def get_health(ctx: "RouteContext") -> tuple[int, Any]:
         "claudeCode": _has_claude_code(),
         "cursor": _has_cursor(),
         "codex": _has_codex(),
+        "mcp": mcp_status(),
         "defaultTransport": "hermes",
         "agents": {
             "active": sum(1 for a in agent_status if a.get("status") == "active"),

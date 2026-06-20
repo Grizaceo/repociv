@@ -237,6 +237,30 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   opacity: 0.6;
 }
 
+/* MCP connectivity indicator (plan C2) — mirrors bridge-status styling. */
+#mcp-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid;
+  cursor: default;
+  letter-spacing: 0.06em;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+#mcp-status.mcp-online {
+  color: var(--civ-science, #6fb1d6);
+  border-color: rgba(111, 177, 214, 0.4);
+  background: rgba(111, 177, 214, 0.1);
+}
+#mcp-status.mcp-offline {
+  color: var(--ui-text-dim);
+  border-color: var(--ui-border);
+  background: transparent;
+  opacity: 0.6;
+}
+
 /* ─── GPU Bar ─────────────────────────────────────────────────────── */
 #gpu-bar {
   display: flex;

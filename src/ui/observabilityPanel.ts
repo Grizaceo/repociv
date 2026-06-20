@@ -4,6 +4,7 @@
 import { openRecoveryPanel } from './recoveryPanel';
 import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
+import { successRatePct, formatTokens, formatCostUsd } from './observabilityFormat.ts';
 // Criterion: open RepoCiv → within 10 s know if the system is healthy.
 
 const POLL_MS = 5_000;
@@ -46,6 +47,14 @@ interface Metrics {
   circuitOpenCount?: number;
   stepLatency?: { p50: number; p95: number; count: number };
   hookStats?: { total: number; failures: number };
+  tokenBudget?: {
+    total_prompt_tokens: number;
+    total_completion_tokens: number;
+    total_tokens: number;
+    total_cost_estimate: number;
+    budget_used_pct: number | null;
+    budget_violated: boolean | null;
+  };
   ts: number;
 }
 
@@ -194,9 +203,36 @@ function _render() {
       ${_metric('Tasa error', `${errPct}%`, errPct > 30 ? 'crit' : errPct > 10 ? 'warn' : 'ok')}
       ${_metric('Completadas', String(m.completedCount), 'ok')}
       ${_metric('Falladas', String(m.failedCount), m.failedCount > 0 ? 'warn' : 'ok')}
+      ${(() => {
+        const sr = successRatePct(m.completedCount, m.failedCount);
+        return sr != null ? _metric('Tasa éxito', `${sr}%`, sr < 70 ? 'warn' : 'ok') : '';
+      })()}
       ${m.durationP50 != null ? _metric('P50 dur.', `${m.durationP50}s`, 'ok') : ''}
       ${m.durationP95 != null ? _metric('P95 dur.', `${m.durationP95}s`, m.durationP95 > 60 ? 'warn' : 'ok') : ''}
     </div>
+
+    <!-- Token spend (real telemetry, not the cosmetic resource bar) — plan C3 -->
+    ${
+      m.tokenBudget && m.tokenBudget.total_tokens > 0
+        ? `
+    <div class="obs-section-title">Tokens</div>
+    <div class="obs-metrics-grid">
+      ${_metric('Total', formatTokens(m.tokenBudget.total_tokens), 'ok')}
+      ${_metric('Prompt', formatTokens(m.tokenBudget.total_prompt_tokens), 'ok')}
+      ${_metric('Salida', formatTokens(m.tokenBudget.total_completion_tokens), 'ok')}
+      ${_metric('Costo est.', formatCostUsd(m.tokenBudget.total_cost_estimate), 'ok')}
+      ${
+        m.tokenBudget.budget_used_pct != null
+          ? _metric(
+              'Budget',
+              `${Math.round(m.tokenBudget.budget_used_pct)}%`,
+              m.tokenBudget.budget_violated ? 'crit' : m.tokenBudget.budget_used_pct > 80 ? 'warn' : 'ok',
+            )
+          : ''
+      }
+    </div>`
+        : ''
+    }
 
     <!-- Step latency (orchestrator steps) -->
     ${

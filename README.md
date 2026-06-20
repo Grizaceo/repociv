@@ -215,6 +215,22 @@ RepoCiv también se expone como **MCP server por stdio** (`server/mcp_server.py`
 
 43 tools cubriendo 15 dominios con tools MCP: agents, commands, approvals, pending, context, GPU, wonders, graph-relations, foreign-relations y más. Ver [docs/MCP.md](docs/MCP.md).
 
+> **Indicador en el HUD.** Cuando un cliente MCP está operando el dashboard, el HUD
+> muestra `MCP ●` (verde) junto al estado del bridge; `MCP ○` (atenuado) cuando no
+> hubo actividad MCP en los últimos 60 s. La señal es real: el bridge marca cada
+> request que llega etiquetada por el servidor MCP (`X-RepoCiv-Client: mcp`).
+
+**Recetas** (desde otra ventana de Claude Code / Cursor con el MCP registrado):
+
+- **Mandar trabajo sin tocar el mapa:** "Lista los agentes (`agents_list`), elegí
+  el de cola más corta y mandale un comando (`command_submit`) para correr los tests
+  del repo X." El resultado aparece en vivo en el dashboard.
+- **Triage de aprobaciones:** "Mostrame las aprobaciones pendientes (`approvals_list`)
+  y aprobá (`approval_approve`) las de riesgo bajo." Los comandos `risk=high` quedan
+  en cola hasta que los liberás.
+- **Salud del imperio:** "Dame `agents_health` + `gpu_status` + `metrics_snapshot`
+  y resumí qué agente está saturado." Mutating tools requieren `REPOCIV_TOKEN`.
+
 ---
 
 ## Priority Matrix

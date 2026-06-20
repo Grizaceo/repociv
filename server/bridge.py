@@ -535,6 +535,28 @@ def _dispatch_command(cmd: Command) -> None:
 from . import http_routes as _routes  # noqa: E402
 
 
+# ── MCP client liveness ───────────────────────────────────────────────────────
+# The stdio MCP server (server/mcp_server.py) proxies every tool call to this
+# bridge over HTTP, tagging requests with `X-RepoCiv-Client: mcp`. We stamp when
+# such a request last arrived so the HUD can show a truthful "MCP conectado"
+# indicator: a client is live iff a tagged request landed within the window.
+_LAST_MCP_SEEN: float = 0.0
+MCP_LIVENESS_WINDOW_S: float = 60.0
+
+
+def mark_mcp_seen() -> None:
+    global _LAST_MCP_SEEN
+    _LAST_MCP_SEEN = time.time()
+
+
+def mcp_status() -> dict[str, Any]:
+    last = _LAST_MCP_SEEN
+    return {
+        "connected": last > 0.0 and (time.time() - last) < MCP_LIVENESS_WINDOW_S,
+        "lastSeen": last,
+    }
+
+
 class BridgeHandler(BaseHTTPRequestHandler):
     def _origin(self) -> str:
         return self.headers.get("Origin", "")
@@ -614,6 +636,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = self.path.split("?")[0]
+        if self.headers.get("X-RepoCiv-Client", "") == "mcp":
+            mark_mcp_seen()
         params = self._parse_qs()
         ctx: dict[str, Any] = {"params": params}
 
@@ -788,6 +812,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if not self._check_token():
             self._err_json(401, "unauthorized")
             return
+
+        if self.headers.get("X-RepoCiv-Client", "") == "mcp":
+            mark_mcp_seen()
 
         if self._rate_limited():
             self._err_json(429, "rate limited")

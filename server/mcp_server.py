@@ -43,7 +43,9 @@ _BRIDGE_DOWN = f"RepoCiv bridge no responde en :{BRIDGE_PORT} — ejecuta `npm s
 
 
 def _headers(mutating: bool = False) -> dict[str, str]:
-    h: dict[str, str] = {"Accept": "application/json"}
+    # Tag every bridge call so it can surface a truthful "MCP conectado" HUD
+    # indicator (the bridge stamps the last time it saw an mcp-tagged request).
+    h: dict[str, str] = {"Accept": "application/json", "X-RepoCiv-Client": "mcp"}
     if mutating:
         if not TOKEN:
             raise ValueError("REPOCIV_TOKEN no configurado — mutating tools requieren token")
