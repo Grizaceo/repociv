@@ -335,4 +335,59 @@ describe('generateWorld', () => {
     expect(world.cities.some((city) => city.id === 'repo-a')).toBe(true);
     expect(world.cities.some((city) => city.id === 'repo-b')).toBe(false);
   });
+
+  it('skips manual-layout repos missing from the workspace scan (no /api/files 404)', async () => {
+    window.localStorage.setItem(
+      'repociv:manual-layout:v1',
+      JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            repoPath: 'mcp-servers',
+            repoName: 'mcp-servers',
+            coord: { q: 4, r: -2 },
+            addedAt: 1,
+            source: 'manual',
+          },
+        ],
+      }),
+    );
+
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === '/api/repos') {
+        return {
+          ok: true,
+          json: async () => [
+            {
+              name: 'repociv',
+              path: 'repo:encoded-repociv',
+              repoPath: '/workspace/repociv',
+              population: 20,
+              extensions: { ts: 10 },
+              gold: 40,
+              lastCommitDays: 1,
+              isLegacy: false,
+              hasGit: true,
+            },
+          ],
+        };
+      }
+      if (input === '/api/repos/selected') {
+        return { ok: true, json: async () => [] };
+      }
+      if (input.startsWith('/api/files/')) {
+        return { ok: true, json: async () => ({ files: [] }) };
+      }
+      if (input.startsWith('/api/skill-health/') || input.startsWith('/api/session-tint/')) {
+        return { ok: false, json: async () => ({}) };
+      }
+      throw new Error(`unexpected fetch ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const world = await generateWorld();
+
+    expect(world.cities.some((city) => city.id === 'mcp-servers')).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/files/mcp-servers');
+  });
 });

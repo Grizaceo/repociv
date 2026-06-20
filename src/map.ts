@@ -363,6 +363,36 @@ function repoMatchesSelection(repo: Pick<ScannedRepo, 'path' | 'repoPath'>, sele
   return selectionKeysForRepo(repo).some((key) => selection.has(key));
 }
 
+function repoMatchesDisk(
+  repo: Pick<ScannedRepo, 'path' | 'repoPath' | 'name'>,
+  disk: Pick<ScannedRepo, 'path' | 'repoPath' | 'name'>,
+): boolean {
+  if (repo.name === disk.name) return true;
+  return selectionKeysForRepo(repo).some((key) => selectionKeysForRepo(disk).includes(key));
+}
+
+function findRepoOnDisk(
+  repo: Pick<ScannedRepo, 'path' | 'repoPath' | 'name'>,
+  diskRepos: ScannedRepo[],
+): ScannedRepo | undefined {
+  return diskRepos.find((disk) => repoMatchesDisk(repo, disk));
+}
+
+function reconcileRepoWithDisk(repo: ScannedRepo, diskRepos: ScannedRepo[]): ScannedRepo | null {
+  const disk = findRepoOnDisk(repo, diskRepos);
+  if (!disk) return null;
+  return {
+    ...disk,
+    manualCoord: repo.manualCoord ?? disk.manualCoord,
+  };
+}
+
+function filterReposToDisk(repos: ScannedRepo[], diskRepos: ScannedRepo[]): ScannedRepo[] {
+  return repos
+    .map((repo) => reconcileRepoWithDisk(repo, diskRepos) ?? repo)
+    .filter((repo) => findRepoOnDisk(repo, diskRepos));
+}
+
 function selectionIncludesValue(selection: Set<string>, value: string | undefined): boolean {
   return typeof value === 'string' && value.length > 0 && selection.has(value);
 }
@@ -483,9 +513,9 @@ export async function fetchSelectedRepos(): Promise<ScannedRepo[]> {
 }
 
 // ─── Top-level subdirs detection (best-effort from extensions distribution) ─
-async function fetchSubdirs(repoName: string): Promise<{ name: string; terrain: Terrain }[]> {
+async function fetchSubdirs(repoId: string): Promise<{ name: string; terrain: Terrain }[]> {
   try {
-    const res = await fetch(`/api/files/${repoName}`);
+    const res = await fetch(`/api/files/${encodeURIComponent(repoId)}`);
     if (!res.ok) return [];
     const data = (await res.json()) as { files: string[] };
     // Group files by top-level directory
@@ -628,8 +658,8 @@ export async function reconnectCities(world: World): Promise<void> {
     // Fetch folder structure for the disconnected city's repo
     let folderStructure: string[] = [];
     try {
-      const repoName = city.name;
-      const res = await fetch(`/api/files/${encodeURIComponent(repoName)}`);
+      const repoId = city.repoPath ?? city.id;
+      const res = await fetch(`/api/files/${encodeURIComponent(repoId)}`);
       if (res.ok) {
         const data = (await res.json()) as { files: string[] };
         // Extract unique top-level folders
@@ -898,19 +928,21 @@ export async function generateWorld(): Promise<World> {
   const cities: City[] = [];
   const selectedRepoPaths = loadSelectedRepoPaths();
 
-  // Non-blocking full scan: surfaces workspace errors without preventing the
-  // selected-repos flow from rendering the map.
-  void fetchScannedRepos().catch((e) => {
+  // Workspace scan is the source of truth for which repos exist on this machine.
+  let diskRepos: ScannedRepo[] | null = null;
+  try {
+    diskRepos = await fetchScannedRepos();
+  } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     logger.error('[map] /api/repos failed', e);
     showMapLoadError(`No pude cargar repos reales: ${message}`);
-  });
+  }
 
   // Fetch real repos
   let repos: ScannedRepo[] = [];
   try {
     if (selectedRepoPaths !== null && selectedRepoPaths.size > 0) {
-      repos = (await fetchScannedRepos()).filter((repo) => repoMatchesSelection(repo, selectedRepoPaths));
+      repos = (diskRepos ?? []).filter((repo) => repoMatchesSelection(repo, selectedRepoPaths));
     } else {
       repos = await fetchSelectedRepos();
       saveSelectedRepoPaths(repos.map((repo) => repo.path));
@@ -940,18 +972,38 @@ export async function generateWorld(): Promise<World> {
   const manualRepoMap = new Map<string, Axial>();
   for (const entry of manualLayout.entries) {
     manualRepoMap.set(entry.repoPath, { q: entry.coord.q, r: entry.coord.r });
-    if (!repos.some((repo) => repo.path === entry.repoPath)) {
-      repos.push({
-        name: entry.repoName,
-        path: entry.repoPath,
-        population: 0,
-        extensions: {},
-        gold: 0,
-        lastCommitDays: 999,
-        isLegacy: false,
-        hasGit: false,
-      });
+    const coord = { q: entry.coord.q, r: entry.coord.r };
+    const existing = repos.find(
+      (repo) =>
+        repo.path === entry.repoPath ||
+        repo.repoPath === entry.repoPath ||
+        repo.name === entry.repoName ||
+        (entry.repoFsPath && repo.repoPath === entry.repoFsPath),
+    );
+    if (existing) {
+      existing.manualCoord = coord;
+      continue;
     }
+    const ghost: ScannedRepo = {
+      name: entry.repoName,
+      path: entry.repoPath,
+      repoPath: entry.repoFsPath,
+      population: 0,
+      extensions: {},
+      gold: 0,
+      lastCommitDays: 999,
+      isLegacy: false,
+      hasGit: false,
+      manualCoord: coord,
+    };
+    const onDisk = diskRepos ? findRepoOnDisk(ghost, diskRepos) : undefined;
+    if (onDisk) {
+      repos.push({ ...onDisk, manualCoord: coord });
+    }
+  }
+
+  if (diskRepos) {
+    repos = filterReposToDisk(repos, diskRepos);
   }
   // Sort: preserve selection order if available, otherwise most-populated first → capital
   if (selectedRepoPaths !== null) {
