@@ -153,6 +153,32 @@ export interface Camera {
   zoom: number; // 1 = 100%, clamped
 }
 
+// Shared pan/zoom transforms. The world↔screen math was duplicated verbatim
+// across renderer.ts / localRenderer.ts / isoLocalRenderer.ts; centralizing it
+// here (next to the Camera type) keeps the three renderers from drifting and
+// gives the transform its own unit coverage (see hex.test.ts).
+
+/** World-space point → canvas pixel under the camera's pan/zoom. */
+export function worldToScreen(cam: Camera, wx: number, wy: number): { sx: number; sy: number } {
+  return {
+    sx: (wx - cam.x) * cam.zoom + cam.cx,
+    sy: (wy - cam.y) * cam.zoom + cam.cy,
+  };
+}
+
+/** Canvas pixel → world-space point. Exact inverse of worldToScreen. */
+export function screenToWorld(cam: Camera, sx: number, sy: number): { wx: number; wy: number } {
+  return {
+    wx: (sx - cam.cx) / cam.zoom + cam.x,
+    wy: (sy - cam.cy) / cam.zoom + cam.y,
+  };
+}
+
+/** Clamp a zoom level into [min, max]. */
+export function clampZoom(zoom: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, zoom));
+}
+
 // ─── Spiral: place cities in outward expanding ring pattern ─────────────────
 // Uses axialRing's convention: ring k starts k steps in direction 4 (SW).
 export function spiralCoords(center: Axial, count: number): Axial[] {

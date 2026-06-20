@@ -77,6 +77,41 @@ check_props_budget() {
 }
 run_step "asset budget (props ≤1.5MB)"    check_props_budget
 
+# Eager-bundle budget: the JS the browser downloads on first paint (the app
+# defaults to the 2D 'flat' renderer) must stay lean. Three.js (vendor-three,
+# ~157KB gzip) MUST stay lazy — it only loads for ?renderer=webgl / hotkey 3.
+# This guards against a regression like the static-import leak that pulled
+# Three into the eager graph (fixed 2026-06). Reuses the dist/ from the
+# `vite build` step above.
+check_eager_bundle_budget() {
+  local index="dist/index.html"
+  if [[ ! -f "${index}" ]]; then
+    echo "dist/index.html missing — vite build must run first"
+    return 1
+  fi
+  # Three must never be in the eager (modulepreload/entry) set.
+  if grep -q 'vendor-three' "${index}"; then
+    echo "vendor-three is referenced by index.html — Three.js leaked into the eager 2D bundle"
+    return 1
+  fi
+  # Sum gzip sizes of every /assets/*.js the entry eagerly pulls.
+  local total=0 path f gz
+  while IFS= read -r path; do
+    f="dist${path}"
+    [[ -f "${f}" ]] || continue
+    gz=$(gzip -c "${f}" | wc -c)
+    total=$((total + gz))
+  done < <(grep -oE '/assets/[A-Za-z0-9_.-]+\.js' "${index}" | sort -u)
+  local limit=$((185 * 1024))
+  local kb=$((total / 1024))
+  if (( total > limit )); then
+    echo "eager JS ${kb}KB gzip > 185KB budget — something heavy entered the initial 2D load"
+    return 1
+  fi
+  echo "eager JS: ${kb}KB gzip (budget 185KB; Three.js stays lazy)"
+}
+run_step "bundle budget (eager JS ≤185KB)" check_eager_bundle_budget
+
 # Tooling (non-blocking: report only)
 log "knip (report only)"
 if npx --no-install knip --exclude duplicates 2>&1; then

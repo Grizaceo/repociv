@@ -7,6 +7,10 @@ import {
   spiralCoords,
   axialNeighbours,
   axialEquals,
+  worldToScreen,
+  screenToWorld,
+  clampZoom,
+  type Camera,
 } from './hex.ts';
 
 describe('axialDistance', () => {
@@ -153,5 +157,42 @@ describe('axialNeighbours', () => {
     for (const n of nb) {
       expect(axialDistance({ q: 3, r: -2 }, n)).toBe(1);
     }
+  });
+});
+
+describe('camera transforms (worldToScreen / screenToWorld / clampZoom)', () => {
+  const cam: Camera = { x: 100, y: 50, cx: 400, cy: 300, zoom: 2 };
+
+  it('worldToScreen applies pan then zoom around the canvas center', () => {
+    // World center maps to the canvas center.
+    expect(worldToScreen(cam, 100, 50)).toEqual({ sx: 400, sy: 300 });
+    // +10 world units right at zoom 2 → +20 px from center.
+    expect(worldToScreen(cam, 110, 50)).toEqual({ sx: 420, sy: 300 });
+  });
+
+  it('screenToWorld is the exact inverse of worldToScreen', () => {
+    for (const [wx, wy] of [
+      [0, 0],
+      [123.5, -45.25],
+      [100, 50],
+      [-999, 777],
+    ] as const) {
+      const { sx, sy } = worldToScreen(cam, wx, wy);
+      const back = screenToWorld(cam, sx, sy);
+      expect(back.wx).toBeCloseTo(wx, 9);
+      expect(back.wy).toBeCloseTo(wy, 9);
+    }
+  });
+
+  it('screenToWorld maps the canvas center back to the world center', () => {
+    expect(screenToWorld(cam, 400, 300)).toEqual({ wx: 100, wy: 50 });
+  });
+
+  it('clampZoom keeps values inside [min, max]', () => {
+    expect(clampZoom(2, 0.15, 4)).toBe(2);
+    expect(clampZoom(0.01, 0.15, 4)).toBe(0.15);
+    expect(clampZoom(99, 0.15, 4)).toBe(4);
+    expect(clampZoom(0.15, 0.15, 4)).toBe(0.15);
+    expect(clampZoom(4, 0.15, 4)).toBe(4);
   });
 });

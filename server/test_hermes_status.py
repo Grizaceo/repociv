@@ -13,14 +13,11 @@ from __future__ import annotations
 
 import json
 import os
-import time
-from unittest.mock import patch
 
 import pytest
 
 from server import hermes_status
 from server.hermes_status import (
-    _CACHE_TTL,
     probe_hermes,
     reset_cache_for_tests,
     resolve_hermes_base,
@@ -179,7 +176,6 @@ def test_do_probe_5xx_returns_unavailable(monkeypatch):
 
 
 def test_do_probe_timeout_returns_unavailable(monkeypatch):
-    import urllib.error
 
     def boom(req, timeout):
         raise TimeoutError("simulated timeout")

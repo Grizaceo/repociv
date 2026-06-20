@@ -34,6 +34,7 @@ full spec.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 import threading
@@ -44,6 +45,8 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # ─── Env helpers ─────────────────────────────────────────────────────────────
 
@@ -175,15 +178,11 @@ def _load_custom_launch_specs() -> dict[str, WonderSpec]:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as e:
-            print(
-                f"[wonder_launcher] skipping {path.name}: {e}",
-                file=__import__("sys").stderr,
-            )
+            logger.warning(f"[wonder_launcher] skipping {path.name}: {e}")
             continue
         if not isinstance(data, dict):
-            print(
-                f"[wonder_launcher] skipping {path.name}: not a JSON object",
-                file=__import__("sys").stderr,
+            logger.warning(
+                f"[wonder_launcher] skipping {path.name}: not a JSON object"
             )
             continue
         wid = str(data.get("id") or path.stem)
@@ -192,9 +191,8 @@ def _load_custom_launch_specs() -> dict[str, WonderSpec]:
             continue  # display-only manifest; no auto-launch
         spec, err = _validate_launch_field(launch_raw)
         if err:
-            print(
-                f"[wonder_launcher] skipping launch spec in {path.name} (id={wid}): {err}",
-                file=__import__("sys").stderr,
+            logger.warning(
+                f"[wonder_launcher] skipping launch spec in {path.name} (id={wid}): {err}"
             )
             continue
         assert spec is not None
@@ -208,9 +206,8 @@ def _load_custom_launch_specs() -> dict[str, WonderSpec]:
             ui_url=spec.ui_url,
         )
         if wid in WONDER_LAUNCH_SPECS:
-            print(
-                f"[wonder_launcher] custom spec for {wid!r} overrides the built-in",
-                file=__import__("sys").stderr,
+            logger.warning(
+                f"[wonder_launcher] custom spec for {wid!r} overrides the built-in"
             )
     return out
 

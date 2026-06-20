@@ -26,16 +26,16 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\""
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@eslint/js": "10.0.1",
     "@playwright/test": "^1.59.1",
     "@types/three": "^0.175.0",
     "@vitest/coverage-v8": "^4.1.8",
-    "eslint": "^10.2.1",
+    "eslint": "10.2.1",
     "eslint-config-prettier": "^10.1.8",
     "knip": "^6.13.1",
-    "prettier": "^3.8.3",
+    "prettier": "3.8.3",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.59.1",
+    "typescript-eslint": "8.59.1",
     "vite": "^6.2.0",
     "vitest": "^4.1.8"
   },

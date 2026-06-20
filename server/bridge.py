@@ -41,15 +41,17 @@ if __name__ == "__main__":
     sys.modules["server.bridge"] = sys.modules["__main__"]
 
 from .sse_server import _fanout_sse, _register_sse_client, _unregister_sse_client, send_to_repociv  # noqa: F401 (_fanout_sse patched by tests)
+# Re-exported for tests and external callers (`from server.bridge import ...`).
+# ruff wants the F401 suppression per-name, not on the closing paren.
 from .pending_tracker import (
-    load_pending_tasks,
+    load_pending_tasks,  # noqa: F401
     append_pending_task,
-    change_pending_state,
-    resolve_pending_task,
-    edit_pending_task,
-    delete_pending_task,
-    PENDING_TRACKER,
-)  # noqa: F401 (re-exported for tests and external callers)
+    change_pending_state,  # noqa: F401
+    resolve_pending_task,  # noqa: F401
+    edit_pending_task,  # noqa: F401
+    delete_pending_task,  # noqa: F401
+    PENDING_TRACKER,  # noqa: F401
+)
 from .process_scanner import scan_active_processes, detect_lexo
 from ._env import load_dotenv as _load_dotenv  # noqa: F401 (re-export for tests)
 import hmac

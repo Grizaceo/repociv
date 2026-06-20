@@ -1,8 +1,12 @@
-# `docs/archive/` — Documentos-germen conservados
+# `docs/archive/` — Documentos conservados
 
-Esta carpeta ya no es un cementerio. Tras el merge del 2026-05-01 quedan
-**solo los 5 documentos con valor de referencia independiente** — los que
-pueden volver a consultarse aunque ya no representen la operación diaria.
+Esta carpeta ya no es un cementerio. Conserva dos grupos: (1) los documentos
+**de referencia independiente** que pueden volver a consultarse aunque ya no
+representen la operación diaria, y (2) **cierres de fase y audits** ya
+superados, archivados a medida que se completan (no se borran porque registran
+cómo se verificó cada gate).
+
+### Referencia independiente
 
 | Documento | Por qué se conserva |
 |---|---|
@@ -11,6 +15,16 @@ pueden volver a consultarse aunque ya no representen la operación diaria.
 | `ROADMAP_RIMWORLD_FROSTPUNK.md` | Visión de los 2 paradigmas (Civ macro + RimWorld micro) + capa XCOM. Define **explícitamente** la condición para reanimar Frostpunk (tracking real de tokens desde OpenClaw). Importante para la futura branch multi-device. |
 | `VISUAL_WORKFLOW_IDEATION.md` | Tabla de paradigmas evaluados: qué se decidió implementar, qué se descartó y por qué. Memoria de decisión, evita re-debate. |
 | `PLAN_AGENTCRAFT_PARITY.md` | Gap analysis original vs AgentCraft. Referencia útil cuando se abra la branch multi-device, para no perseguir paridad cosmética. |
+
+### Cierres de fase y audits (superados)
+
+| Documento | Qué fue |
+|---|---|
+| `FASE1_CLOSURE.md` | Cierre de Fase 1. |
+| `PHASE_1_VERIFICATION.md` | Audit detallada de los gates de Fase 1. |
+| `AUDIT_RECOMMENDATIONS.md` | Recomendaciones de un audit previo, ya aplicadas o re-evaluadas. |
+| `local_view_beautification_plan.md` | Plan de embellecimiento de la vista local, ya ejecutado. |
+| `onboarding-repo-selection.md` | Plan del onboarding de selección de repos, ya implementado. |
 
 ## Lo que se borró (y dónde encontrarlo)
 

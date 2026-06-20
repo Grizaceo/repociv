@@ -8,6 +8,7 @@ import {
   TextureLoader,
 } from 'three';
 import { type Terrain } from '../types.ts';
+import { logger } from '../logger.ts';
 
 export interface TerrainAtlasMeta {
   version: number;
@@ -90,7 +91,11 @@ export function loadTerrainAtlas(): Promise<LoadedTerrainAtlas | null> {
       }
 
       return { meta, texture, normalTexture, roughnessTexture };
-    } catch {
+    } catch (err) {
+      logger.warn(
+        '[RepoCiv] terrain atlas failed to load — 3D map uses flat vertex colors until fixed. Run: npm run assets:3d',
+        err,
+      );
       return null;
     }
   })();

@@ -1,8 +1,11 @@
+import logging
 import os
 from pathlib import Path
 from typing import Any
 import re
 import time
+
+logger = logging.getLogger(__name__)
 
 HERMES_ROOT = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", "~/.hermes")))
 PENDING_TRACKER = HERMES_ROOT / "workspace" / "PENDING_TRACKER.md"
@@ -223,7 +226,7 @@ def append_pending_task(title: str, priority: str = "MEDIA") -> str | None:
 
         return new_id
     except Exception as e:
-        print(f"[bridge] No pude escribir PENDING_TRACKER: {e}")
+        logger.error(f"[bridge] No pude escribir PENDING_TRACKER: {e}")
         return None
 
 
@@ -310,7 +313,7 @@ def resolve_pending_task(item_id: str) -> bool:
         PENDING_TRACKER.write_text("\n".join(new_content_lines) + "\n", encoding="utf-8")
         return True
     except Exception as e:
-        print(f"[bridge] No pude resolver pendiente: {e}")
+        logger.error(f"[bridge] No pude resolver pendiente: {e}")
         return False
 
 
@@ -441,7 +444,7 @@ def edit_pending_task(item_id: str, title: str | None = None,
         PENDING_TRACKER.write_text("\n".join(lines) + "\n", encoding="utf-8")
         return True
     except Exception as e:
-        print(f"[bridge] No pude editar pendiente: {e}")
+        logger.error(f"[bridge] No pude editar pendiente: {e}")
         return False
 
 
@@ -474,7 +477,7 @@ def delete_pending_task(item_id: str) -> bool:
         PENDING_TRACKER.write_text("\n".join(remaining) + "\n", encoding="utf-8")
         return True
     except Exception as e:
-        print(f"[bridge] No pude eliminar pendiente: {e}")
+        logger.error(f"[bridge] No pude eliminar pendiente: {e}")
         return False
 
 
@@ -504,7 +507,7 @@ def change_pending_state(item_id: str, new_state: str) -> bool:
                 return True
         return False
     except Exception as e:
-        print(f"[bridge] No pude cambiar estado: {e}")
+        logger.error(f"[bridge] No pude cambiar estado: {e}")
         return False
 
 
