@@ -67,6 +67,8 @@ import { mountGacetaWidget } from './ui/gacetaWidget.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { wireHUD, selectHero } from './ui/hudWiring.ts';
 import { initHudMode } from './ui/hudMode.ts';
+import { initCommandPalette } from './ui/commandPalette.ts';
+import { registerHudCommands } from './ui/hudWiring/commands.ts';
 import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
 import {
   showLocalUnitTooltip,
@@ -1330,6 +1332,8 @@ async function bootstrap() {
 
   wireHUD(renderer, state, bridge, toggleView);
   initHudMode();
+  initCommandPalette();
+  registerHudCommands(state, renderer, bridge, toggleView);
 
   // Load pending tracker missions at boot
   fetchPendingTracker().then((pending) => {
