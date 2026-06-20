@@ -685,6 +685,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/api/hermes/status": _routes.get_hermes_status_route,
             "/ws": _routes.get_ws_info,
             "/api/news/latest": _routes.get_latest_news,
+            "/api/news/sources": _routes.get_news_sources,
             "/api/wonders": _routes.get_wonders,
             "/api/wonders/launchable": _routes.get_wonder_launchable,
             "/wonders": _routes.get_wonders,  # legacy alias
@@ -857,6 +858,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/pending/state": _routes.post_pending_state,
             "/api/news/read": _routes.post_news_read,
             "/api/news/scan": _routes.post_news_scan,
+            "/api/news/sources/add": _routes.post_news_source_add,
+            "/api/news/sources/remove": _routes.post_news_source_remove,
             "/api/foreign/score": _routes.post_foreign_score,
             "/api/foreign/report": _routes.post_foreign_report,
             "/api/graph-relations/flags": _routes.post_graph_relations_flags,

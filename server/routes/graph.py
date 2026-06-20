@@ -137,6 +137,81 @@ def post_news_scan(body: dict[str, Any], ctx: dict[str, Any]) -> tuple[int, Any]
     except Exception as e:
         return 500, {"ok": False, "error": str(e)}
 
+
+def _run_blogwatcher(cmd: list[str], timeout: int) -> tuple[int, Any]:
+    """Shell out to blogwatcher-cli, mirroring post_news_scan's error handling."""
+    import subprocess
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return 200, {
+            "ok": result.returncode == 0,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "returncode": result.returncode,
+        }
+    except FileNotFoundError:
+        return 500, {"ok": False, "error": "blogwatcher-cli no encontrado"}
+    except subprocess.TimeoutExpired:
+        return 500, {"ok": False, "error": f"Timeout ({timeout}s) ejecutando blogwatcher-cli"}
+    except Exception as e:
+        return 500, {"ok": False, "error": str(e)}
+
+
+def get_news_sources(ctx: dict[str, Any]) -> tuple[int, Any]:
+    """GET /api/news/sources — list tracked blogs (news sources) from the DB."""
+    db_path = _resolve_cdaily_db()
+    if not db_path.exists():
+        return 200, []
+    try:
+        with closing(sqlite3.connect(str(db_path))) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            rows = None
+            for query in [
+                "SELECT id, name, url FROM blogs ORDER BY name COLLATE NOCASE",
+                "SELECT id, name, '' AS url FROM blogs ORDER BY name COLLATE NOCASE",
+            ]:
+                try:
+                    cur.execute(query)
+                    rows = cur.fetchall()
+                    break
+                except sqlite3.OperationalError:
+                    continue
+            if rows is None:
+                return 500, {"error": "No se pudo leer la tabla de blogs"}
+        return 200, [
+            {"id": r["id"], "name": r["name"] or "", "url": r["url"] or ""} for r in rows
+        ]
+    except Exception as e:
+        return 500, {"error": f"Error al leer la base de datos de CDaily: {e}"}
+
+
+def post_news_source_add(body: dict[str, Any], ctx: dict[str, Any]) -> tuple[int, Any]:
+    """POST /api/news/sources/add — track a new blog via blogwatcher-cli.
+
+    Body: {name, url, feedUrl?}. The CLI auto-discovers the feed and keeps its
+    SSRF protection on (we never pass --unsafe-client).
+    """
+    name = str(body.get("name") or "").strip()
+    url = str(body.get("url") or "").strip()
+    feed_url = str(body.get("feedUrl") or "").strip()
+    if not name or not url:
+        return 400, {"ok": False, "error": "Se requieren 'name' y 'url'"}
+    cmd = ["blogwatcher-cli", "add", name, url, "--db", str(_resolve_cdaily_db())]
+    if feed_url:
+        cmd += ["--feed-url", feed_url]
+    return _run_blogwatcher(cmd, timeout=60)
+
+
+def post_news_source_remove(body: dict[str, Any], ctx: dict[str, Any]) -> tuple[int, Any]:
+    """POST /api/news/sources/remove — stop tracking a blog by name."""
+    name = str(body.get("name") or "").strip()
+    if not name:
+        return 400, {"ok": False, "error": "Se requiere 'name'"}
+    cmd = ["blogwatcher-cli", "remove", name, "-y", "--db", str(_resolve_cdaily_db())]
+    return _run_blogwatcher(cmd, timeout=30)
+
+
 def get_wonders(ctx: "RouteContext") -> tuple[int, Any]:
     """GET /wonders — list all registered Wonder manifests."""
     return 200, _wr.list_wonders()

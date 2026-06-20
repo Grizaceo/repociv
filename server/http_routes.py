@@ -56,6 +56,9 @@ from server.routes.graph import _infer_category  # noqa: F401
 from server.routes.graph import get_latest_news  # noqa: F401
 from server.routes.graph import post_news_read  # noqa: F401
 from server.routes.graph import post_news_scan  # noqa: F401
+from server.routes.graph import get_news_sources  # noqa: F401
+from server.routes.graph import post_news_source_add  # noqa: F401
+from server.routes.graph import post_news_source_remove  # noqa: F401
 from server.routes.graph import get_wonders  # noqa: F401
 from server.routes.graph import get_wonder_by_id  # noqa: F401
 from server.routes.graph import get_wonder_health  # noqa: F401

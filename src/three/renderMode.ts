@@ -20,20 +20,23 @@ export function resolveInitialRenderMode(): WorldRenderMode {
   // Defensive: reject unknown values persisted by older builds.
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored === 'flat') return 'flat';
-  if (stored === 'webgl') {
-    // WebGL is session-only (hotkey 3 / URL); restoring from storage
-    // caused blank maps in the past. Rewrite to flat so the next
-    // reload is predictable.
-    localStorage.setItem(STORAGE_KEY, 'flat');
-    return 'webgl';
-  }
+  // A persisted webgl choice is now sticky (plan B5): 3D is the default view, so
+  // honouring an explicit 3D preference across reloads is consistent. (The old
+  // session-only "rewrite to flat" made sense when flat was the default and
+  // webgl was experimental; the runtime fallback in main.ts now covers the
+  // GPU-less / blank-map case that motivated it.)
+  if (stored === 'webgl') return 'webgl';
   // Legacy 'iso25d' value from a previous install: upgrade in place
   // and surface the 3D view (better than the old canvas extrusion).
   if (stored === 'iso25d') {
     localStorage.setItem(STORAGE_KEY, 'webgl');
     return 'webgl';
   }
-  return 'flat';
+  // Default (no URL, nothing persisted): 3D first impression (plan B5, owner
+  // decision 2026-06-20). Sells the Civ V metaphor far better than flat 2D.
+  // Safe on GPU-less machines — main.ts boots WebGL and, on context failure,
+  // the renderer stays in `flat` and a toast explains the downgrade.
+  return 'webgl';
 }
 
 export function persistRenderMode(mode: WorldRenderMode): void {

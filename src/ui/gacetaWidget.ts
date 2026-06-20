@@ -1,6 +1,14 @@
 // ─── RepoCiv — Gaceta Widget (multi-mode: widget top-left OR panel) ──────────
 import type { CDailyArticle } from '../types.ts';
-import { getLatestNews, markNewsAsRead, scanNews } from '../bridge.ts';
+import {
+  getLatestNews,
+  markNewsAsRead,
+  scanNews,
+  getNewsSources,
+  addNewsSource,
+  removeNewsSource,
+  type NewsSource,
+} from '../bridge.ts';
 import { openForeignRelationsPanel } from './foreignRelationsPanel.ts';
 
 const REFRESH_MS = 300_000;
@@ -89,6 +97,18 @@ export function mountGacetaWidget(opts: MountOpts = {}): void {
     });
   }
 
+  const sourcesBtn = widget.querySelector('#gaceta-sources-btn') as HTMLElement | null;
+  sourcesBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    void _toggleSources();
+  });
+  const sourcesEl = widget.querySelector('#gaceta-sources') as HTMLElement | null;
+  sourcesEl?.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    if (t.classList.contains('gaceta-src-add-btn')) void _addSource();
+    else if (t.classList.contains('gaceta-src-remove')) void _removeSource(t.dataset['name'] ?? '');
+  });
+
   window.addEventListener('repociv:city-selected', ((e: CustomEvent) => {
     const detail = e.detail as { cityId: string; repoPath?: string };
     _selectedCityId = detail.cityId;
@@ -124,7 +144,9 @@ function _buildHTML(mode: 'widget' | 'panel'): string {
       <div class="gaceta-blogs"></div>
       <div class="gaceta-toolbar">
         <button class="gaceta-fr-btn" id="gaceta-fr-btn" disabled title="Selecciona una noticia primero">🌍 Informe RR.EE.</button>
+        <button class="gaceta-sources-btn" id="gaceta-sources-btn" title="Gestionar fuentes de noticias">⚙ Fuentes</button>
       </div>
+      <div class="gaceta-sources" id="gaceta-sources" hidden></div>
       <ul class="gaceta-list"></ul>
       ${isWidget ? '<a href="#" class="gaceta-link-full">Ver todo en CDaily →</a>' : ''}
     </div>
@@ -140,6 +162,87 @@ async function _doScan(): Promise<void> {
   widget?.classList.remove('spinning');
   _scanning = false;
   if (res.ok) await _refresh();
+}
+
+// ─── Source management (D2): add/remove news sources via blogwatcher-cli ──────
+let _sourcesOpen = false;
+
+async function _toggleSources(): Promise<void> {
+  const el = document.getElementById('gaceta-sources');
+  if (!el) return;
+  _sourcesOpen = !_sourcesOpen;
+  el.hidden = !_sourcesOpen;
+  if (_sourcesOpen) await _loadSources();
+}
+
+async function _loadSources(): Promise<void> {
+  const el = document.getElementById('gaceta-sources');
+  if (!el) return;
+  el.innerHTML = '<div class="gaceta-src-msg">Cargando fuentes…</div>';
+  _renderSources(await getNewsSources());
+}
+
+function _renderSources(sources: NewsSource[]): void {
+  const el = document.getElementById('gaceta-sources');
+  if (!el) return;
+  const rows = sources
+    .map(
+      (s) => `<li class="gaceta-src-row">
+        <span class="gaceta-src-name-lbl" title="${esc(s.url)}">${esc(s.name)}</span>
+        <button class="gaceta-src-remove" data-name="${esc(s.name)}" title="Quitar fuente">✕</button>
+      </li>`,
+    )
+    .join('');
+  el.innerHTML = `
+    <div class="gaceta-src-add">
+      <input type="text" class="gaceta-src-name" placeholder="Nombre" aria-label="Nombre de la fuente" />
+      <input type="text" class="gaceta-src-url" placeholder="https://blog.example.com" aria-label="URL de la fuente" />
+      <button class="gaceta-src-add-btn" type="button">+ Añadir</button>
+    </div>
+    <ul class="gaceta-src-list">${rows || '<li class="gaceta-src-empty">Sin fuentes</li>'}</ul>
+    <div class="gaceta-src-msg" hidden></div>
+  `;
+}
+
+function _setSrcMsg(msg: string): void {
+  const el = document.querySelector('.gaceta-src-msg') as HTMLElement | null;
+  if (el) {
+    el.textContent = msg;
+    el.hidden = false;
+  }
+}
+
+async function _addSource(): Promise<void> {
+  const nameEl = document.querySelector('.gaceta-src-name') as HTMLInputElement | null;
+  const urlEl = document.querySelector('.gaceta-src-url') as HTMLInputElement | null;
+  const name = nameEl?.value.trim() ?? '';
+  const url = urlEl?.value.trim() ?? '';
+  if (!name || !url) {
+    _setSrcMsg('Nombre y URL requeridos');
+    return;
+  }
+  _setSrcMsg('Añadiendo… (descubriendo feed)');
+  const res = await addNewsSource(name, url);
+  if (res.ok) {
+    await _loadSources();
+    _setSrcMsg(`Añadida: ${name} ✓`);
+    await _refresh();
+  } else {
+    _setSrcMsg(res.error ?? 'Error al añadir la fuente');
+  }
+}
+
+async function _removeSource(name: string): Promise<void> {
+  if (!name) return;
+  _setSrcMsg(`Quitando ${name}…`);
+  const res = await removeNewsSource(name);
+  if (res.ok) {
+    await _loadSources();
+    _setSrcMsg(`Quitada: ${name} ✓`);
+    await _refresh();
+  } else {
+    _setSrcMsg(res.error ?? 'Error al quitar la fuente');
+  }
 }
 
 async function _refresh(): Promise<void> {

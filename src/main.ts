@@ -187,7 +187,7 @@ const loadSteps = [
   'Analizando repos...',
   'Construyendo mapa hexagonal...',
   'Pintando texturas de Civilización...',
-  'Inicializando bridge a DAVI...',
+  'Inicializando bridge al agente principal...',
   'Imperio listo.',
 ];
 
