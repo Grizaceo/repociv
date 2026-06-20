@@ -65,6 +65,26 @@ def test_health_endpoint_returns_liveness_shape():
         assert isinstance(data["agents"].get("queueDepth"), int)
         assert "gpu" in data
         assert "eventStore" in data
+        # MCP liveness block (plan C2)
+        assert "mcp" in data
+        assert isinstance(data["mcp"].get("connected"), bool)
+        assert isinstance(data["mcp"].get("lastSeen"), (int, float))
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_health_reports_mcp_liveness_after_tagged_request():
+    """A request tagged X-RepoCiv-Client: mcp flips health.mcp.connected → True."""
+    server, base = _start_test_server()
+    try:
+        tagged = urllib.request.Request(f"{base}/health", headers={"X-RepoCiv-Client": "mcp"})
+        with urllib.request.urlopen(tagged, timeout=2):
+            pass
+        with urllib.request.urlopen(f"{base}/health", timeout=2) as resp:
+            data = json.loads(resp.read().decode())
+        assert data["mcp"]["connected"] is True
+        assert data["mcp"]["lastSeen"] > 0
     finally:
         server.shutdown()
         server.server_close()
