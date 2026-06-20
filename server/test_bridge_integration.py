@@ -299,3 +299,41 @@ def test_empty_body_post_disconnect_unknown_is_404():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_news_sources_list_shape():
+    """GET /api/news/sources returns a list of {id, name, url} (plan D2)."""
+    server, base = _start_test_server()
+    try:
+        req = urllib.request.Request(f"{base}/api/news/sources", headers=_auth_headers())
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read().decode())
+        assert isinstance(data, list)
+        for item in data[:3]:
+            assert "id" in item and "name" in item and "url" in item
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_news_source_add_requires_name_and_url():
+    """Validation runs before any blogwatcher-cli call — empty body → 400, no mutation."""
+    server, base = _start_test_server()
+    try:
+        status, body = _post_empty(base, "/api/news/sources/add")
+        assert status == 400
+        assert body.get("ok") is False
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_news_source_remove_requires_name():
+    server, base = _start_test_server()
+    try:
+        status, body = _post_empty(base, "/api/news/sources/remove")
+        assert status == 400
+        assert body.get("ok") is False
+    finally:
+        server.shutdown()
+        server.server_close()

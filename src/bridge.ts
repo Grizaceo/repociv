@@ -458,6 +458,53 @@ export async function scanNews(): Promise<{ ok: boolean; error?: string }> {
   }
 }
 
+export interface NewsSource {
+  id: number;
+  name: string;
+  url: string;
+}
+
+export async function getNewsSources(): Promise<NewsSource[]> {
+  try {
+    const res = await fetch(bridgeUrl('/api/news/sources'), { headers: bridgeHeaders() });
+    if (!res.ok) return [];
+    return (await res.json()) as NewsSource[];
+  } catch {
+    return [];
+  }
+}
+
+export async function addNewsSource(
+  name: string,
+  url: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(bridgeUrl('/api/news/sources/add'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...bridgeHeaders() },
+      body: JSON.stringify({ name, url }),
+    });
+    const data = (await res.json()) as { ok?: boolean; error?: string };
+    return { ok: data.ok ?? res.ok, error: data.error };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+export async function removeNewsSource(name: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(bridgeUrl('/api/news/sources/remove'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...bridgeHeaders() },
+      body: JSON.stringify({ name }),
+    });
+    const data = (await res.json()) as { ok?: boolean; error?: string };
+    return { ok: data.ok ?? res.ok, error: data.error };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
 // ─── Foreign Relations API ─────────────────────────────────────────────────────
 // (getRepoProfile / scoreArticleRepo wrappers removed — no frontend callers;
 //  the backend endpoints remain reachable via MCP and HTTP.)
