@@ -37,11 +37,17 @@ export class MissionRegistry {
     this.ops.notify();
   }
 
-  complete(id: string, success: boolean): void {
+  /** Returns true only on a real running→terminal transition, so callers can
+   *  guard side effects (e.g. analytics) against duplicate/replayed events.
+   *  Missions are never GC'd, so a re-delivered complete would otherwise
+   *  re-fire; behaviour (status/notify) is unchanged. */
+  complete(id: string, success: boolean): boolean {
     const m = this.s.active.get(id);
-    if (!m) return;
+    if (!m) return false;
+    const wasRunning = m.status === 'running';
     m.status = success ? 'complete' : 'failed';
     m.completedAt = Date.now();
     this.ops.notify();
+    return wasRunning;
   }
 }

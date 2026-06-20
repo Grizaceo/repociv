@@ -1,5 +1,6 @@
 // ─── HUD button + input wiring (non-hotkey) ─────────────────────────────────
 import { tileKey, type Unit } from '../../types.ts';
+import { trackMessageSent } from '../analytics.ts';
 import { type Renderer } from '../../renderer.ts';
 import { type GameState } from '../../game.ts';
 import { type BridgeEvents } from '../../bridge.ts';
@@ -146,6 +147,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
 
     if (!isSidePanelOpen()) openSidePanel(unit);
     appendUserMessage(unit.id, text);
+    trackMessageSent(unit.id);
 
     // CHAT PATH: chat del usuario al agente seleccionado. Usamos execute_agent para
     // distinguir el flujo conversacional del legacy unit_command, reduciendo ambigüedad

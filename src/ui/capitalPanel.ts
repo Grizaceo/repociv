@@ -1,5 +1,5 @@
 // ─── RepoCiv — Capital Palacio Panel (tabs from Wonder Registry) ──────────────
-import { getAnalytics } from './analytics.ts';
+import { getAnalytics, getPanelUsageReport } from './analytics.ts';
 import { getStoredEraLabel } from './eraSystem.ts';
 import { mountGacetaWidget } from './gacetaWidget.ts';
 import { openWonderVignette } from './wonderVignette.ts';
@@ -343,6 +343,14 @@ function _renderStats(container: HTMLElement) {
   const a = getAnalytics();
   const era = getStoredEraLabel();
   const wonderCount = listWonders().length;
+  const usage = getPanelUsageReport();
+  const unused = usage.filter((u) => u.opens === 0);
+  const podaRows = usage
+    .map(
+      (u) =>
+        `<li class="poda-row${u.opens === 0 ? ' poda-unused' : ''}"><span class="poda-panel">${u.panel}</span><span class="poda-count">${u.opens}</span></li>`,
+    )
+    .join('');
   container.innerHTML = `
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-value">${Object.values(a.panelsOpened).reduce((s, v) => s + v, 0)}</div><div class="stat-label">Paneles abiertos</div></div>
@@ -352,6 +360,11 @@ function _renderStats(container: HTMLElement) {
       <div class="stat-card"><div class="stat-value">${a.approvalsGiven}</div><div class="stat-label">Aprobaciones</div></div>
       <div class="stat-card"><div class="stat-value">${era || 'Desconocida'}</div><div class="stat-label">Era actual</div></div>
       <div class="stat-card"><div class="stat-value">${wonderCount}</div><div class="stat-label">Maravillas registradas</div></div>
+      <div class="stat-card"><div class="stat-value">${unused.length}/${usage.length}</div><div class="stat-label">Paneles sin uso</div></div>
+    </div>
+    <div class="poda-report">
+      <div class="poda-title">Uso de superficie · candidatos a poda (0 = nunca abierto)</div>
+      <ul class="poda-list">${podaRows}</ul>
     </div>
   `;
 }

@@ -100,6 +100,43 @@ export function getAnalytics(): Readonly<AnalyticsData> {
   return Object.freeze({ ...data });
 }
 
+// ─── Poda (panel pruning) support ─────────────────────────────────────────────
+// Canonical list of poda-relevant panels — keep in sync with the toolbar/hotkey
+// wiring. A panel here with 0 opens after weeks of real use is a deletion
+// candidate per docs/SCOPE.md "Roadmap de poda". side-panel (chat) and terminal
+// are core surfaces, intentionally excluded.
+export const KNOWN_PANELS = [
+  'approvals',
+  'observability',
+  'replay',
+  'timeline',
+  'quest-board',
+  'harness',
+  'recovery',
+  'tasks',
+  'task-assign',
+  'pending',
+  'log',
+  'layers',
+  'ledger',
+  'priority',
+  'settings',
+  'construction',
+] as const;
+
+export interface PanelUsage {
+  panel: string;
+  opens: number;
+}
+
+/** Per-panel open counts over every KNOWN_PANEL, least-used first — the poda
+ *  view. A 0 here = the panel was never opened this/last sessions. */
+export function getPanelUsageReport(): PanelUsage[] {
+  return KNOWN_PANELS.map((panel) => ({ panel, opens: data.panelsOpened[panel] ?? 0 })).sort(
+    (a, b) => a.opens - b.opens || a.panel.localeCompare(b.panel),
+  );
+}
+
 export function getTopAgents(n = 3): [string, number][] {
   return Object.entries(data.messagesSent)
     .sort((a, b) => b[1] - a[1])

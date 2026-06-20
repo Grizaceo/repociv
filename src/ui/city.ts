@@ -4,6 +4,7 @@ import type { CityLabStatus } from '../labhubStatus.ts';
 import { formatLabStatusLabel, formatLabSourceLabel } from '../labhubStatus.ts';
 import { trapFocus } from './focusTrap.ts';
 import { getLatestNews, markNewsAsRead } from '../bridge.ts';
+import { trackCityVisit } from './analytics.ts';
 
 let _cityPanelCleanup: (() => void) | null = null;
 
@@ -49,6 +50,11 @@ export function openCityPanel(
 ) {
   const panel = document.getElementById('city-panel');
   if (!panel) return;
+  // Count cold opens AND city→city switches, but not same-city data refreshes
+  // (openCityPanel runs twice per open: loading state, then async labStatus).
+  if (panel.classList.contains('hidden') || panel.dataset['cityId'] !== city.id) {
+    trackCityVisit();
+  }
   panel.classList.remove('hidden');
   panel.dataset['cityId'] = city.id;
   panel.dataset['cityName'] = city.name;

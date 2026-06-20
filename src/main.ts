@@ -731,7 +731,10 @@ async function bootstrap() {
   });
   document.getElementById('btn-harnesses')?.addEventListener('click', () => {
     toggleHarnessPanel();
-    if (isHarnessPanelOpen()) startHarnessPolling();
+    if (isHarnessPanelOpen()) {
+      startHarnessPolling();
+      trackPanelOpen('harness');
+    }
   });
 
   const bridge = new BridgeEvents(state);

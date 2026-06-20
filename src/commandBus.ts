@@ -4,6 +4,7 @@
 
 import type { CommandDraft, CommandResponse, CommandStatus } from './commandSchema.ts';
 import { bridgeHeaders, bridgeUrl } from './bridgeEnv.ts';
+import { trackCommand, trackApproval } from './ui/analytics.ts';
 
 // ─── In-flight command tracking ───────────────────────────────────────────────
 export interface CommandRecord {
@@ -52,6 +53,7 @@ export async function sendCommand(draft: CommandDraft): Promise<CommandResponse>
     };
     _commands.set(data.commandId, record);
     _notify();
+    trackCommand();
   }
 
   return data;
@@ -74,7 +76,10 @@ export async function approveCommand(commandId: string): Promise<boolean> {
       body: '{}',
     });
     const data = (await resp.json()) as { ok: boolean };
-    if (data.ok) updateCommandStatus(commandId, 'queued');
+    if (data.ok) {
+      updateCommandStatus(commandId, 'queued');
+      trackApproval();
+    }
     return data.ok;
   } catch {
     return false;
