@@ -65,6 +65,21 @@
   display: none;
 }
 
+/* ─── HUD density: Quick (default) vs Advanced (B1) ──────────────────────── */
+/* In Quick mode (body without .hud-advanced) the advanced toolbar buttons are
+   hidden — progressive disclosure. Hotkeys still reach the panels.
+   !important: some buttons (#btn-replay, #btn-observability) set display via an
+   ID rule (specificity 1,0,0) that would otherwise win over this hide utility. */
+body:not(.hud-advanced) [data-hud-tier='advanced'] {
+  display: none !important;
+}
+/* The toggle reads as "active" (gold) when Advanced is on. */
+#btn-hud-mode.active {
+  color: var(--ui-gold-bright);
+  border-color: var(--ui-gold);
+  background: rgba(200, 168, 75, 0.12);
+}
+
 .resource {
   display: flex;
   align-items: center;

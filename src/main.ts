@@ -66,6 +66,7 @@ import {
 import { mountGacetaWidget } from './ui/gacetaWidget.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { wireHUD, selectHero } from './ui/hudWiring.ts';
+import { initHudMode } from './ui/hudMode.ts';
 import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
 import {
   showLocalUnitTooltip,
@@ -1328,6 +1329,7 @@ async function bootstrap() {
   state.spawnUnit(DEFAULT_USER_UNIT_ID, DEFAULT_USER_UNIT_NAME, 'hero', 'gris', spawnAt, 'En espera de misión');
 
   wireHUD(renderer, state, bridge, toggleView);
+  initHudMode();
 
   // Load pending tracker missions at boot
   fetchPendingTracker().then((pending) => {
