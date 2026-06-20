@@ -46,7 +46,7 @@ describe('P4: drag-to-assign state machine', () => {
 
   it('state machine: ESC cancels drag without firing callback', () => {
     let state: 'idle' | 'dragging' = 'dragging';
-    let callbackFired = false;
+    const callbackFired = false;
 
     // ESC handler
     if (state === 'dragging') {

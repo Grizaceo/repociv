@@ -23,7 +23,7 @@ describe('terrainShader', () => {
   it('exposes a versioned customProgramCacheKey', () => {
     const mat = createTerrainMaterial();
     // Bumping the version in terrainShader.ts must update this.
-    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v28');
+    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v36');
   });
 
   it('produces a stable fragment shader from onBeforeCompile', () => {
@@ -40,7 +40,8 @@ describe('terrainShader', () => {
     // for. We pin the presence of stable anchors so a silent
     // truncation of the string-replace blocks fails loudly.)
     expect(capture.fragment).toContain('uniform float uTime;');
-    expect(capture.fragment).toContain('uniform sampler2D uTerrainAtlas;');
+    expect(capture.fragment).toContain('uSideOutDir[6]');
+    expect(capture.fragment).toContain('if (bit > 0.5) discard');
     expect(capture.fragment).toContain('uniform sampler2D uNormalAtlas;');
     // The texture-binding block the chunk-replace adds. The function
     // definition is the stable bit; the call sites (which use
@@ -78,9 +79,12 @@ describe('terrainShader', () => {
     expect(capture.vertex).toContain('uHexRadius * 0.08');  // hills
     // P2: Elevation blend
     expect(capture.vertex).toContain('terrainElevFromIndex');
+    expect(capture.vertex).toContain('bool isOceanTile = abs(tidx - 4.0)');
+    expect(capture.vertex).toMatch(/bool isOceanTile[\s\S]*if \(!isOceanTile && !isIceTile && !neighborIsWater/);
     expect(capture.vertex).toContain('elevDiff * 0.5 * uTileHeight');
     // P5: City color attribute and varying
-    expect(capture.vertex).toContain('attribute vec3 instanceCityColor');
+    expect(capture.vertex).toContain('attribute float instanceSideCullMask');
+    expect(capture.vertex).toContain('vSideCullMask = instanceSideCullMask');
     expect(capture.vertex).toMatch(/vCityColor\s*=\s*instanceCityColor/);
     expect(capture.vertex).toMatchSnapshot();
   });

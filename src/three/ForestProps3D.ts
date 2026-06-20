@@ -26,19 +26,39 @@ type PropVariant = MergedGlb;
 type PropsState = 'idle' | 'loading' | 'ready' | 'failed';
 
 const PROP_IDS = ['forest-pine-0', 'forest-pine-1', 'forest-pine-2'] as const;
-const TREES_PER_TILE = 9;
+const TREES_PER_TILE = 11;
 
+// Trees reach toward the hex rim (~0.43 circumradius) so adjacent forest tiles'
+// canopies meet at the shared edge and read as one continuous woodland — Civ V's
+// forests flow across tiles, they don't sit as a tight clump in each hex centre.
+// Kept clear of the full rim (1.0) so canopies stay on their own cap at steps.
 const treeOffsets: Array<[number, number]> = [
-  [-0.20, 0.14],
-  [0.22, -0.16],
-  [-0.06, -0.22],
-  [0.16, 0.20],
-  [-0.28, -0.06],
-  [0.30, 0.04],
-  [0.00, 0.02],
-  [-0.10, 0.30],
-  [0.08, -0.32],
+  [-0.18, 0.12],
+  [0.20, -0.14],
+  [-0.05, -0.20],
+  [0.14, 0.18],
+  [0.0, 0.0],
+  [-0.40, 0.16],
+  [0.40, 0.02],
+  [0.10, 0.42],
+  [-0.16, -0.42],
+  [0.30, -0.30],
+  [-0.32, -0.20],
 ];
+
+/**
+ * Per-tree canopy tint. Civ V forests read as a mottled DEEP green that recedes
+ * into the grassland — never a warm, bright dot. The green channel always
+ * dominates (R < G) and total luminance stays below the grass biome, so on the
+ * strategic overview forests sink in as shade instead of popping as the golden
+ * rosettes the old warm+bright formula (R up to 1.14) produced.
+ */
+export function forestCanopyTint(h: number, t: number): [number, number, number] {
+  const vb = 0.62 + ((h * 7 + t * 13) % 7) * 0.035; // 0.62..0.83 base green
+  const vw = ((h * 3 + t * 5) % 5) * 0.02; // 0..0.08 subtle mottle
+  // R factor 0.82..0.90 stays strictly below 1.0 → green-dominant for every tree.
+  return [vb * (0.82 + vw), vb, vb * 0.78];
+}
 
 let variants: PropVariant[] | null = null;
 let state: PropsState = 'idle';
@@ -126,8 +146,8 @@ export function rebuildForestProps(tiles: Tile[]): void {
       for (let t = 0; t < TREES_PER_TILE; t++) {
         const [ox, oz] = treeOffsets[t]!;
         const scale = 0.80 + ((h + t * 3) % 5) * 0.06;
-        const jx = (((h >> (t & 7)) % 9) - 4) * 0.012;
-        const jz = (((h >> ((t + 3) & 7)) % 9) - 4) * 0.012;
+        const jx = (((h >> (t & 7)) % 9) - 4) * 0.020;
+        const jz = (((h >> ((t + 3) & 7)) % 9) - 4) * 0.020;
         const rotSteps = (h + t) % 6;
         pos.set(
           base.x + (ox + jx) * HEX_SIZE,
@@ -138,11 +158,9 @@ export function rebuildForestProps(tiles: Tile[]): void {
         const s = HEX_SIZE * 0.24 * scale;
         scl.set(s, s, s);
         matrix.compose(pos, quat, scl);
-        // Per-tree canopy tint: Civ V forests read as a mottled deep green,
-        // not a uniform flat fill. Vary brightness and warmth by hash.
-        const vb = 0.78 + ((h * 7 + t * 13) % 7) * 0.05; // 0.78..1.08
-        const vw = ((h * 3 + t * 5) % 5) * 0.04; // 0..0.16 warm shift
-        tint.setRGB(vb * (0.9 + vw), vb, vb * 0.92);
+        // Deep green canopy that recedes into the grass (see forestCanopyTint).
+        const [tr, tg, tb] = forestCanopyTint(h, t);
+        tint.setRGB(tr, tg, tb);
         mesh.setColorAt(i, tint);
         mesh.setMatrixAt(i++, matrix);
       }

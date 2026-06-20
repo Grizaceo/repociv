@@ -5,6 +5,7 @@ exports[`terrainShader > produces a stable fragment shader from onBeforeCompile 
 varying float vNeighborTerrainIndex;
 varying float vCoastMask;
 varying float vOceanDepth;
+varying float vSideCullMask;
 varying vec2  vLocalXZ;
 varying vec2  vWorldXZ;
 varying float vLocalY;
@@ -12,6 +13,7 @@ varying vec2  vUv;
 varying float vTopFace;
 varying vec3  vCityColor;
 uniform vec2  uCoastDir[6];
+uniform vec2  uSideOutDir[6];
 uniform float uTime;
 uniform float uHexRadius;
 uniform float uPrismHeight;
@@ -32,9 +34,10 @@ vec2 terrainAtlasUv(float idx, vec2 tileUv) {
 }
 
 vec2 terrainMacroUv(float idx, vec2 tileUv, vec2 worldXZ) {
-  float scale = mix(3.2, 4.8, clamp(idx / 7.0, 0.0, 1.0));
+  float scale = mix(2.4, 3.6, clamp(idx / 7.0, 0.0, 1.0));
   vec2 worldUv = fract(worldXZ / (uHexRadius * scale) + vec2(idx * 0.137, idx * 0.173));
-  return mix(tileUv, worldUv, 0.78);
+  // Per-hex atlas detail reads more natural than one world-spanning wash.
+  return mix(tileUv, worldUv, 0.38);
 }
 
 float terrainDetailNoise(vec2 p) {
@@ -44,6 +47,29 @@ float terrainDetailNoise(vec2 p) {
 }
 void main() {
   #include <color_fragment>
+        // Drop side faces shared with a same-elevation neighbor — each prism
+        // no longer renders a vertical wall on interior edges, so the terrain
+        // cap reads as one painted surface instead of a honeycomb of blocks.
+        if (vTopFace < 0.5) {
+          float cullMask = floor(vSideCullMask + 0.5);
+          float plen = length(vLocalXZ);
+          if (plen > 0.02) {
+            vec2 dir = vLocalXZ / plen;
+            float bestDot = -1.0;
+            int bestK = 0;
+            for (int k = 0; k < 6; k++) {
+              float d = dot(dir, uSideOutDir[k]);
+              if (d > bestDot) {
+                bestDot = d;
+                bestK = k;
+              }
+            }
+            if (bestDot > 0.62) {
+              float bit = mod(floor(cullMask / pow(2.0, float(bestK))), 2.0);
+              if (bit > 0.5) discard;
+            }
+          }
+        }
         float tidx  = floor(vTerrainIndex + 0.5);
         float ntidx = floor(vNeighborTerrainIndex + 0.5);
         float radial = clamp(length(vLocalXZ) / uHexRadius, 0.0, 1.0);
@@ -59,8 +85,8 @@ void main() {
           // Desert: compress local contrast and bias toward Civ V pale sand —
           // the raw atlas cell reads as plowed brown furrows otherwise.
           if (tidx > 2.5 && tidx < 3.5) {
-            tex = mix(vec3(lum), tex, 0.78);
-            tex = mix(tex, vec3(0.80, 0.71, 0.50), 0.30);
+            tex = mix(vec3(lum), tex, 0.88);
+            tex = mix(tex, vec3(0.80, 0.71, 0.50), 0.12);
           }
           // Sacred: Civ V natural-wonder feel — pale gilded stone. The raw
           // cell (and the #1e1530 palette) read as dark violet bruises that
@@ -79,8 +105,8 @@ void main() {
             float nLum = dot(nTex, vec3(0.299, 0.587, 0.114));
             nTex = mix(vec3(nLum), nTex, 1.12);
             if (ntidx > 2.5 && ntidx < 3.5) {
-              nTex = mix(vec3(nLum), nTex, 0.78);
-              nTex = mix(nTex, vec3(0.80, 0.71, 0.50), 0.30);
+              nTex = mix(vec3(nLum), nTex, 0.88);
+              nTex = mix(nTex, vec3(0.80, 0.71, 0.50), 0.12);
             }
             if (ntidx > 6.5) {
               float nslum = dot(nTex, vec3(0.299, 0.587, 0.114));
@@ -94,23 +120,32 @@ void main() {
             }
             tex = mix(tex, nTex, edgeBlend * 0.62);
           }
-          // High-frequency detail tap (land only): the baked atlas blurs at
-          // mid zoom; re-sampling the same cell at ~3.7× world frequency and
-          // overlaying its luminance deviation restores painted grain
-          // without new assets. Centered ≈1.0 so overall tone holds.
-          if (tidx < 3.5 || tidx > 5.5) {
+          // High-frequency detail tap: restore painted grain at every zoom.
+          if (tidx < 4.5 || (tidx > 5.5 && tidx < 7.5)) {
             vec2 dUv = fract(vWorldXZ / (uHexRadius * 1.27) + vec2(tidx * 0.311, tidx * 0.293));
             vec3 dTex = texture2D(uTerrainAtlas, terrainAtlasUv(tidx, dUv)).rgb;
             float dLum = dot(dTex, vec3(0.299, 0.587, 0.114));
-            tex *= 0.86 + 0.28 * dLum;
+            // Mean-preserving grain: same +/- amplitude, average multiplier 1.0
+            // (the old 0.82+0.36*dLum averaged ~0.9, dimming every land biome
+            // before the *1.15 brighten + ACES — a documented "muddy" pass).
+            tex *= 1.0 + 0.18 * (dLum - 0.5);
           }
           // Civ V sea gradient: vivid turquoise on the shelf → deep saturated
           // blue offshore. instanceOceanDepth = BFS hops from the nearest
           // coast (0 = coastal, 1 = open sea); the old flat teal only varied
           // inside coastal tiles via the edge gradient below.
           if (tidx > 3.5 && tidx < 4.5) {
-            vec3 seaTint = mix(vec3(0.30, 0.63, 0.66), vec3(0.05, 0.28, 0.60), vOceanDepth);
-            tex = mix(tex, seaTint, 0.66);
+            // Smooth depth gradient dominates so the sea reads as one continuous
+            // surface, not a quilt of faceted blue cells. shallow→deep brightened
+            // toward Civ V's vivid teal shelf and a saturated (not navy) offshore.
+            vec3 shallow = vec3(0.30, 0.63, 0.66);
+            vec3 deep    = vec3(0.10, 0.38, 0.72);
+            vec3 seaTint = mix(shallow, deep, vOceanDepth);
+            // Large-scale world-space tonal drift crosses hex boundaries, masking
+            // the per-tile depth steps that made adjacent ocean hexes read distinct.
+            float seaDrift = terrainDetailNoise(vWorldXZ * 0.6);
+            seaTint *= mix(0.95, 1.06, seaDrift);
+            tex = mix(tex, seaTint, 0.9);
           }
           // Top-face brightening so atlas colours read through warm PBR lights
           tex *= 1.15;
@@ -119,31 +154,50 @@ void main() {
           // Subtle world-space microvariation so broad top faces feel like terrain, not flat panels.
           float detail = terrainDetailNoise(vWorldXZ);
           if (tidx < 0.5) {
-            tex *= mix(0.985, 1.035, detail);
-            tex = mix(tex, tex * vec3(0.96, 1.03, 0.95), 0.10 * detail);
+            tex *= mix(0.975, 1.045, detail);
+            tex = mix(tex, tex * vec3(0.96, 1.03, 0.95), 0.14 * detail);
           } else if (tidx < 1.5) {
-            tex *= mix(0.97, 1.02, detail);
-            tex = mix(tex, tex * vec3(0.94, 1.02, 0.95), 0.12 * detail);
+            tex *= mix(0.96, 1.03, detail);
+            tex = mix(tex, tex * vec3(0.94, 1.02, 0.95), 0.16 * detail);
           } else if (tidx < 2.5) {
-            tex *= mix(0.96, 1.015, detail);
-            tex = mix(tex, tex * vec3(0.97, 0.99, 1.01), 0.10 * detail);
+            tex *= mix(0.94, 1.02, detail);
+            tex = mix(tex, tex * vec3(0.97, 0.99, 1.01), 0.14 * detail);
+          } else if (tidx < 3.5) {
+            tex *= mix(0.96, 1.04, detail);
+            tex = mix(tex, tex * vec3(1.02, 0.98, 0.92), 0.12 * detail);
           } else if (tidx < 6.5) {
-            tex *= mix(0.985, 1.025, detail);
+            tex *= mix(0.975, 1.035, detail);
+            tex = mix(tex, tex * vec3(0.97, 1.02, 0.94), 0.12 * detail);
           }
-          // Sacred's palette fill (#1e1530) is near-black: at the default 0.82
-          // mix its 18% leak still muddies the gilded look, so let the atlas
-          // win almost completely there.
-          float texMix = (tidx > 6.5) ? 0.93 : 0.82;
+          float texMix = (tidx > 6.5) ? 0.94 : 0.91;
           diffuseColor.rgb = mix(diffuseColor.rgb, tex, texMix);
+        } else if (vTopFace > 0.5) {
+          // Atlas still loading or missing — vertex fill alone reads as a
+          // flat paint bucket; world noise breaks up the monotony.
+          float detail = terrainDetailNoise(vWorldXZ);
+          diffuseColor.rgb *= mix(0.86, 1.14, detail);
         }
         // P5: Territory fill tint — subtle city-colored wash on top face.
         // vCityColor is [1,1,1] for unclaimed tiles (no tint).
         if (vTopFace > 0.5) {
           diffuseColor.rgb *= mix(vec3(1.0), vCityColor, 0.10);
         }
-        // Radial vignette — very subtle
-        if (vTopFace > 0.5) {
-          diffuseColor.rgb *= mix(1.03, 0.985, radial * radial);
+        // Hex-edge AO + sun-side bias on caps — LAND only. On water these
+        // per-hex gradients darkened each cell's middle and lit its rim, which
+        // is what made the sea read as a faceted quilt of hexagons; water stays
+        // flat so it reads as one continuous surface.
+        bool isWaterTop = (tidx > 3.5 && tidx < 5.5);
+        if (vTopFace > 0.5 && !isWaterTop) {
+          // AO darkens the rim ONLY where this tile borders a different biome or
+          // elevation — a soft contact shadow at real seams. The old code ran a
+          // uniform centre-dark/rim-bright vignette on EVERY tile, stamping a
+          // lattice of discs; same-biome interiors now stay flat → continuous.
+          if (vNeighborTerrainIndex >= 0.0 && abs(ntidx - tidx) > 0.5) {
+            float edgeAo = smoothstep(0.62, 0.98, radial);
+            diffuseColor.rgb *= mix(1.0, 0.93, edgeAo);
+          }
+          float sunBias = 0.04 * dot(normalize(vLocalXZ + vec2(0.001)), vec2(0.72, 0.42));
+          diffuseColor.rgb *= 1.0 + sunBias;
         }
         // Side faces: Civ V cliffs. The raw palette fill went near-black on
         // shaded flanks (forest fill is 0x2d5a27), which read as black wedges
@@ -186,9 +240,11 @@ void main() {
             diffuseColor.rgb *= cliffShade;
           }
         }
-        // Ocean shimmer
-        bool isOcean = (diffuseColor.b > diffuseColor.r * 1.05 &&
-                        diffuseColor.g < diffuseColor.b * 0.92);
+        // Ocean shimmer — gate by terrain index, not a colour heuristic. The
+        // old test (b > r*1.05 && g < b*0.92) excluded the bright teal shelf
+        // (0.63 not < 0.607), denying sparkle to exactly Civ V's signature
+        // shallow water; only the darkest deep sea qualified.
+        bool isOcean = (tidx > 3.5 && tidx < 4.5);
         if (isOcean && vTopFace > 0.5) {
           float wave  = 0.06 * sin(uTime * 1.8 + vLocalXZ.x * 0.09 + vLocalXZ.y * 0.07);
           float wave2 = 0.03 * sin(uTime * 2.6 - vLocalXZ.x * 0.05 + vLocalXZ.y * 0.11);
@@ -311,11 +367,13 @@ attribute float instanceTerrain;
 attribute float instanceNeighborTerrain;
 attribute float instanceCoastMask;
 attribute float instanceOceanDepth;
+attribute float instanceSideCullMask;
 attribute vec3 instanceCityColor;
 varying float vTerrainIndex;
 varying float vNeighborTerrainIndex;
 varying float vCoastMask;
 varying float vOceanDepth;
+varying float vSideCullMask;
 varying vec2  vLocalXZ;
 varying vec2  vWorldXZ;
 varying float vLocalY;
@@ -375,6 +433,7 @@ void main() {
         vNeighborTerrainIndex = instanceNeighborTerrain;
         vCoastMask    = instanceCoastMask;
         vOceanDepth   = instanceOceanDepth;
+        vSideCullMask = instanceSideCullMask;
         vLocalXZ      = vec2(position.x, position.z);
         vWorldXZ      = instanceMatrix[3].xz + transformed.xz;
         vLocalY       = transformed.y;
@@ -400,15 +459,17 @@ void main() {
           transformed.y *= heightScale;
         }
 
-        // Ocean: flatten the bevel groove. Adjacent water tiles each dip
-        // BEVEL_DEPTH at their rim, and from a low camera the V-groove
-        // between them reads as black notches on the sea silhouette. Water
-        // has no need for the bevel (it exists to soften land prism edges),
-        // so lift the whole top cap to y=0 — the sea becomes one continuous
-        // surface and the wave displacement (world-phase) keeps it seamless.
-        if (abs(tidx - 4.0) < 0.5 && transformed.y > -1.0) {
+        // Flatten the bevel groove on every tile. Adjacent prisms each dip
+        // BEVEL_DEPTH at their rim; from the gameplay camera the V-groove
+        // between them reads as brown notches (ground plane bleeding through).
+        // Lift the whole top cap to y=0 so same-elevation neighbors share
+        // one continuous surface; ocean wave displacement stays world-phase.
+        if (transformed.y > -1.0) {
           transformed.y = 0.0;
         }
+
+        bool isOceanTile = abs(tidx - 4.0) < 0.5;
+        bool isIceTile = abs(tidx - 5.0) < 0.5;
 
         // P2: Biome-blend elevation transitions. When this tile's neighbor
         // has a different elevation, blend the top-cap Y toward the midpoint
@@ -432,8 +493,6 @@ void main() {
         // the old sin/cos mesa-breaker. World-space phase (no uTime)
         // keeps same-biome neighbors continuous; only top cap + bevel
         // (y > -1.0) moves so prisms stay watertight.
-        bool isOceanTile = abs(tidx - 4.0) < 0.5;
-        bool isIceTile = abs(tidx - 5.0) < 0.5;
         if (!isOceanTile && !isIceTile && transformed.y > -1.0) {
           vec2 noisePos = instanceMatrix[3].xz + transformed.xz;
           if (tidx < 0.5) {

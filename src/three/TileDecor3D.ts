@@ -3,7 +3,6 @@ import {
   ConeGeometry,
   CylinderGeometry,
   BoxGeometry,
-  SphereGeometry,
   InstancedMesh,
   Matrix4,
   Quaternion,
@@ -227,122 +226,27 @@ function buildForests(tiles: Tile[]): void {
   cone1Mesh.instanceMatrix.needsUpdate = true;
   cone2Mesh.instanceMatrix.needsUpdate = true;
   cone3Mesh.instanceMatrix.needsUpdate = true;
+  for (const m of [trunkMesh, cone1Mesh, cone2Mesh, cone3Mesh]) {
+    m.castShadow = true;
+    m.receiveShadow = true;
+  }
   addMesh(trunkMesh);
   addMesh(cone1Mesh);
   addMesh(cone2Mesh);
   addMesh(cone3Mesh);
 }
 
-// ── Hills: 3 overlapping rounded bumps ──────────────────────────────────────
+// ── Hills: relief comes from terrainShader ridge noise + elevation step ─────
+// Opaque bump spheres painted over the atlas and read as flat tan plates.
 
-function buildHills(tiles: Tile[]): void {
-  if (tiles.length === 0) return;
-
-  const bumpGeom = new SphereGeometry(HEX_SIZE * 0.30, 12, 8);
-  // Baked-atlas hills mean (191,209,141) × 0.82 — same family as the
-  // terrain cell, darkened just enough to read as relief. White base so the
-  // per-instance mottling (setColorAt) reads as the literal bump colour.
-  const bumpMat  = new MeshLambertMaterial({ color: new Color(0xffffff) });
-
-  const total    = tiles.length * 4;
-  const bumpMesh = new InstancedMesh(bumpGeom, bumpMat, total);
-
-  const offsets: Array<[number, number, number, number]> = [
-    [  0.00, 0.52,  0.00, 1.00 ],
-    [ -0.22, 0.44,  0.14, 0.86 ],
-    [  0.20, 0.44, -0.12, 0.82 ],
-    [ -0.06, 0.38,  0.20, 0.74 ],
-  ];
-
-  // Civ V hills aren't a flat olive plate — sunlit crowns and shaded folds.
-  // Mottle each bump around the base tone (0x9dab74) with hash-stable
-  // brightness + a slight warm/cool swing so adjacent bumps separate.
-  const base = new Color(0x9dab74);
-  const tint = new Color();
-  let idx = 0;
-  const mat = new Matrix4();
-  for (const tile of tiles) {
-    const elev = terrainElevation(tile.terrain);
-    const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-    const h    = hashCoord(tile.coord.q, tile.coord.r);
-    let b = 0;
-    for (const [ox, oy, oz, sc] of offsets) {
-      mat.makeScale(sc * 1.1, sc * 0.48, sc * 1.0);
-      mat.setPosition(pos.x + ox * HEX_SIZE, pos.y - 1 + oy * HEX_SIZE * 0.30, pos.z + oz * HEX_SIZE);
-      bumpMesh.setMatrixAt(idx, mat.clone());
-      const bright = 0.84 + ((h + b * 7) % 11) / 11 * 0.30;   // 0.84..1.14
-      const warm   = ((h >> 2) + b) % 2 === 0 ? 1.05 : 0.95;  // sun vs shade
-      tint.setRGB(base.r * bright * warm, base.g * bright, base.b * bright * 0.96);
-      bumpMesh.setColorAt(idx, tint);
-      idx++;
-      b++;
-    }
-  }
-  bumpMesh.instanceMatrix.needsUpdate = true;
-  if (bumpMesh.instanceColor) bumpMesh.instanceColor.needsUpdate = true;
-  addMesh(bumpMesh);
+function buildHills(_tiles: Tile[]): void {
+  // Intentionally empty — see terrainShader hills ridge displacement.
 }
 
 // ── Desert: low rounded dune mounds ──────────────────────────────────────────
 
-function buildDesert(tiles: Tile[]): void {
-  if (tiles.length === 0) return;
-
-  // Soft squashed-sphere mounds. The old decor was cone frustums rotated 90°
-  // to lie flat as "ridges" — from the play camera they read as tipped-over
-  // mountains. Civ V desert is mostly texture; a few wide, very low mounds
-  // give relief without competing with the baked dune bands.
-  const duneGeom = new SphereGeometry(HEX_SIZE * 0.22, 14, 10);
-  // Baked-atlas desert mean (209,196,163) × 1.07 — sun-catching sand in
-  // the same warm-gray family as the dune bands, not saturated yellow. White
-  // base so per-instance mottling (setColorAt) is the literal dune colour.
-  const duneMat  = new MeshLambertMaterial({ color: new Color(0xffffff) });
-
-  const MOUNDS = 3;
-  const duneMesh = new InstancedMesh(duneGeom, duneMat, tiles.length * MOUNDS);
-
-  const spots: Array<[number, number]> = [
-    [-0.14, -0.08],
-    [ 0.16,  0.10],
-    [-0.02,  0.20],
-  ];
-
-  // Sand catches and loses the sun in bands — mottle each mound around the
-  // base tone so the desert reads as drifting dunes, not one flat sheet.
-  const duneBase = new Color(0xe0d2ae);
-  const duneTint = new Color();
-  let idx = 0;
-  const mat = new Matrix4();
-  const scaleV = new Vector3();
-  const up = new Vector3(0, 1, 0);
-  for (const tile of tiles) {
-    const elev = terrainElevation(tile.terrain);
-    const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-    const h    = hashCoord(tile.coord.q, tile.coord.r);
-    for (let d = 0; d < MOUNDS; d++) {
-      const [ox, oz] = spots[d]!;
-      const scale = 0.72 + ((h + d * 7) % 5) * 0.09;
-      const rot = new Quaternion().setFromAxisAngle(
-        up, ((h + d * 37) % 180) * (Math.PI / 180),
-      );
-      // Wide × very low × elongated — a dune, not a boulder. The sphere
-      // centre sits near the tile top so the lower half stays buried.
-      scaleV.set(scale * 1.5, scale * 0.22, scale * 0.9);
-      mat.compose(
-        new Vector3(pos.x + ox * HEX_SIZE, pos.y + 0.6, pos.z + oz * HEX_SIZE),
-        rot,
-        scaleV,
-      );
-      duneMesh.setMatrixAt(idx, mat.clone());
-      const bright = 0.90 + ((h + d * 13) % 9) / 9 * 0.16;   // 0.90..1.06
-      duneTint.setRGB(duneBase.r * bright, duneBase.g * bright, duneBase.b * bright * 0.98);
-      duneMesh.setColorAt(idx, duneTint);
-      idx++;
-    }
-  }
-  duneMesh.instanceMatrix.needsUpdate = true;
-  if (duneMesh.instanceColor) duneMesh.instanceColor.needsUpdate = true;
-  addMesh(duneMesh);
+function buildDesert(_tiles: Tile[]): void {
+  // Atlas desert cell carries dune bands; opaque mounds painted tan over it.
 }
 
 // ── Ice: crystalline spikes + flat base platform ─────────────────────────────
@@ -360,18 +264,9 @@ function buildIce(tiles: Tile[]): void {
     metalness: 0.1,
   });
 
-  // Base slab: thin flat box — exact baked-atlas ice mean (207,229,240)
-  // so the platform melts into the cell instead of reading paper-white.
-  const slabGeom  = new BoxGeometry(HEX_SIZE * 0.60, HEX_SIZE * 0.05, HEX_SIZE * 0.60);
-  const slabMat   = new MeshLambertMaterial({
-    color: new Color(0xcfe5f0),
-    transparent: true,
-    opacity: 0.80,
-  });
-
+  // Base slab removed — atlas ice cell carries the platform colour.
   const total     = tiles.length * 4;
   const spikeMesh = new InstancedMesh(spikeGeom, spikeMat, total);
-  const slabMesh  = new InstancedMesh(slabGeom,  slabMat,  tiles.length);
 
   const spikePos: Array<[number, number]> = [
     [ 0.00,  0.00],
@@ -388,9 +283,7 @@ function buildIce(tiles: Tile[]): void {
     const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
     const h    = hashCoord(tile.coord.q, tile.coord.r);
 
-    // Slab
-    mat.makeTranslation(pos.x, pos.y + 0.6, pos.z);
-    slabMesh.setMatrixAt(i, mat.clone());
+    // Slab omitted — terrain atlas visible underneath.
 
     // Spikes
     for (let s = 0; s < 4; s++) {
@@ -402,8 +295,6 @@ function buildIce(tiles: Tile[]): void {
     }
   }
   spikeMesh.instanceMatrix.needsUpdate = true;
-  slabMesh.instanceMatrix.needsUpdate  = true;
-  addMesh(slabMesh);
   addMesh(spikeMesh);
 }
 

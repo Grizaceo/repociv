@@ -1,6 +1,5 @@
 // ─── Three.js scene: terrain instancing, lights, territory, sub-groups ─────
 import {
-  AdditiveBlending,
   AmbientLight,
   DirectionalLight,
   DoubleSide,
@@ -291,8 +290,7 @@ function animateTerritoryPulse(animTime: number): void {
 // edge becomes a quad biased slightly INTO the owner's territory (Civ V's
 // border hugs the inside of the frontier). A wider additive-blended glow band
 // underneath gives the signature neon halo.
-const BORDER_BAND_W = HEX_SIZE * 0.115;
-const BORDER_GLOW_W = HEX_SIZE * 0.34;
+const BORDER_BAND_W = HEX_SIZE * 0.10;
 
 interface BorderEdge {
   x1: number; z1: number; x2: number; z2: number;
@@ -303,7 +301,7 @@ interface BorderEdge {
  *  `width` is the band thickness; `inset` shifts the band toward the tile
  *  centre so it reads as the owner's inner frontier. Ends are mitre-extended
  *  by half-width so consecutive segments close the corner gaps. */
-function buildRibbonGeometry(edges: BorderEdge[], width: number, inset: number): BufferGeometry {
+export function buildRibbonGeometry(edges: BorderEdge[], width: number, inset: number): BufferGeometry {
   // Pre-sized: 2 triangles × 3 verts × 3 coords = 18 floats per edge.
   const pos = new Float32Array(edges.length * 18);
   const hw = width * 0.5;
@@ -347,42 +345,28 @@ function buildRibbonGeometry(edges: BorderEdge[], width: number, inset: number):
   return geom;
 }
 
-/** Add the solid band + additive glow ribbon meshes for one set of boundary
- *  edges in a single colour. Registered in `territoryBorders` for pulse +
- *  disposal. */
+/** Add a thin culture-border band. No additive glow — it read as neon UI
+ *  overlay on the terrain and fought the ground for depth. */
 function addBorderRibbon(edges: BorderEdge[], color: Color, bandOpacity: number): void {
   if (edges.length === 0) return;
 
-  // Glow first (renders under the band), additive for the neon halo.
-  const glowGeom = buildRibbonGeometry(edges, BORDER_GLOW_W, BORDER_GLOW_W * 0.18);
-  const glowMat = new MeshBasicMaterial({
-    color: color.clone().lerp(new Color(1, 1, 1), 0.18),
-    transparent: true,
-    opacity: 0.16,
-    depthWrite: false,
-    blending: AdditiveBlending,
-    side: DoubleSide,
-    fog: false,
-    // Culture borders are UI overlays, not lit surfaces — ACES tone mapping
-    // desaturated the distinct civ colours into a uniform tan. Render pure.
-    toneMapped: false,
-  });
-  glowMat.userData.baseOpacity = 0.16;
-  const glowMesh = new Mesh(glowGeom, glowMat);
-  glowMesh.renderOrder = 2;
-  glowMesh.frustumCulled = false;
-  terrainGroup.add(glowMesh);
-  territoryBorders.push(glowMesh);
-
-  // Solid colored band.
-  const bandGeom = buildRibbonGeometry(edges, BORDER_BAND_W, BORDER_BAND_W * 0.28);
+  // Thinner band, fully inside the owner's frontier: with inset >= half-width
+  // the span [inset-hw, inset+hw] starts at +0.6 (never negative = no overhang
+  // into the neighbour's tile), so each civ paints only its own side of the
+  // seam. Civ V borders hug the inside edge, they don't straddle it.
+  const w = BORDER_BAND_W * 0.7;
+  const bandGeom = buildRibbonGeometry(edges, w, w * 0.5 + HEX_SIZE * 0.012);
   const bandMat = new MeshBasicMaterial({
     color,
     transparent: true,
     opacity: bandOpacity,
     depthWrite: false,
+    depthTest: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -4,
     side: DoubleSide,
-    fog: false,
+    fog: true,
     toneMapped: false,
   });
   bandMat.userData.baseOpacity = bandOpacity;
@@ -418,12 +402,7 @@ function rebuildTerritoryLines(
   territorySignature = sig;
 
   clearTerritoryLines();
-  if (!visible) return;
-
-  const allTerritory = new Set<string>();
-  for (const city of state.world.cities) {
-    for (const c of city.territory) allTerritory.add(tileKey(c));
-  }
+  if (!visible || lod !== 'high') return;
 
   const getTile = (c: Axial) => state.world.tiles.get(tileKey(c));
   const cities = state.world.cities.filter((c) => c.territory.length > 0);
@@ -444,14 +423,10 @@ function rebuildTerritoryLines(
           q: coord.q + AXIAL_DIRECTIONS[d]!.q,
           r: coord.r + AXIAL_DIRECTIONS[d]!.r,
         });
-        // Draw an edge only where territory meets non-territory. At low LOD
-        // we merge against ALL territory (one outer empire outline); higher
-        // LOD outlines each city against its own frontier.
-        if (lod === 'low') {
-          if (allTerritory.has(nKey)) continue;
-        } else if (inTerritory.has(nKey)) {
-          continue;
-        }
+        // Outline each city against its own frontier: draw an edge only where
+        // the city's territory meets a tile it doesn't own. Ribbons render at
+        // high LOD only, so the merged-empire (low-LOD) outline path is gone.
+        if (inTerritory.has(nKey)) continue;
         const e = DIR_TO_EDGE[d]!;
         const a1 = hexCornerAngle3D(e);
         const a2 = hexCornerAngle3D((e + 1) % 6);
@@ -462,10 +437,10 @@ function rebuildTerritoryLines(
           z2: center.z + HEX_SIZE * Math.sin(a2),
           cx: center.x,
           cz: center.z,
-          // Ribbons sit above the hex grid (+1.5) and micro-relief so they
-          // never get buried; small per-city offset avoids z-fight on shared
-          // frontiers between two empires.
-          y: center.y + 2.4 + yOff,
+          // Ribbon rides just above the tile cap (depthTest + polygonOffset
+          // keep it from z-fighting). The old +6.0 floated it ~half a tile up,
+          // reading as a neon UI overlay instead of paint on the ground.
+          y: center.y + 1.8 + yOff,
         });
       }
     }
@@ -501,8 +476,8 @@ function rebuildTerritoryLines(
 
   for (const g of groups.values()) {
     const baseOpacity = g.capital
-      ? (lod === 'high' ? 0.85 : 0.78)
-      : (lod === 'high' ? 0.72 : 0.62);
+      ? (lod === 'high' ? 0.52 : 0.44)
+      : (lod === 'high' ? 0.40 : 0.34);
     addBorderRibbon(g.edges, g.color, baseOpacity);
   }
 }
@@ -847,9 +822,12 @@ function rebuildHexGrid(state: GameState, visible: boolean, lod: 'low' | 'medium
   const geom = new BufferGeometry();
   geom.setAttribute('position', new Float32BufferAttribute(segments, 3));
   const mat = new LineBasicMaterial({
-    color: 0xffffff,
+    // Warm-dark groove, not cold white. At <5% white the grid read as nothing
+    // (or cold speckle) over warm terrain; a faint earth-dark line reads as a
+    // recessed seam UNDER the paint — Civ V's lattice that ties tiles together.
+    color: 0x3a2f22,
     transparent: true,
-    opacity: lod === 'high' ? 0.045 : lod === 'medium' ? 0.030 : 0.015,
+    opacity: lod === 'high' ? 0.10 : lod === 'medium' ? 0.07 : 0.035,
     linewidth: 1,
   });
   hexGridLines = new LineSegments(geom, mat);
@@ -899,19 +877,25 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
     terrainMesh = null;
   }
 
-  if (!terrainMaterial) terrainMaterial = createTerrainMaterial({
-    terrainAtlas: loadedTerrainAtlas?.texture ?? null,
-    normalAtlas: loadedTerrainAtlas?.normalTexture ?? null,
-    roughnessAtlas: loadedTerrainAtlas?.roughnessTexture ?? null,
-  });
+  if (!terrainMaterial || !!(terrainMaterial.userData as { atlasBound?: boolean }).atlasBound !== !!loadedTerrainAtlas?.texture) {
+    if (terrainMaterial) terrainMaterial.dispose();
+    terrainMaterial = createTerrainMaterial({
+      terrainAtlas: loadedTerrainAtlas?.texture ?? null,
+      normalAtlas: loadedTerrainAtlas?.normalTexture ?? null,
+      roughnessAtlas: loadedTerrainAtlas?.roughnessTexture ?? null,
+    });
+    (terrainMaterial.userData as { atlasBound?: boolean }).atlasBound = !!loadedTerrainAtlas?.texture;
+  }
   // Clone shared geometry so we can safely attach an instanceTerrain attribute
   const clonedGeom = sharedHexGeometry.clone();
   terrainMesh = new InstancedMesh(clonedGeom, terrainMaterial, tiles.length);
   terrainMesh.receiveShadow = true;
+  terrainMesh.castShadow = false;
 
   const terrainIndices = new Float32Array(tiles.length);
   const neighborIndices = new Float32Array(tiles.length);
   const coastMasks = new Float32Array(tiles.length);
+  const sideCullMasks = new Float32Array(tiles.length);
   const oceanDepths = new Float32Array(tiles.length);
   const cityColors = new Float32Array(tiles.length * 3);
   const instanceEntries: Array<{ instanceId: number; coord: Axial }> = [];
@@ -983,6 +967,13 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
       if (n && (n.terrain === 'ocean') !== selfOcean) mask |= 1 << k;
     });
     coastMasks[i] = mask;
+    // Cull side faces where a neighbor shares the same elevation step.
+    let sideCull = 0;
+    AXIAL_DIRECTIONS.forEach((d, k) => {
+      const n = getTile(tileKey({ q: tile.coord.q + d.q, r: tile.coord.r + d.r }));
+      if (n && terrainElevation(n.terrain) === elev) sideCull |= 1 << k;
+    });
+    sideCullMasks[i] = sideCull;
     // Average the integer BFS hop count with the ocean neighbors': raw
     // per-tile hops render as hex-shaped depth bands on the open sea;
     // fractional averages read as one continuous deep→shallow gradient.
@@ -1018,6 +1009,7 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
   terrainMesh.geometry.setAttribute('instanceTerrain', new InstancedBufferAttribute(terrainIndices, 1));
   terrainMesh.geometry.setAttribute('instanceNeighborTerrain', new InstancedBufferAttribute(neighborIndices, 1));
   terrainMesh.geometry.setAttribute('instanceCoastMask', new InstancedBufferAttribute(coastMasks, 1));
+  terrainMesh.geometry.setAttribute('instanceSideCullMask', new InstancedBufferAttribute(sideCullMasks, 1));
   terrainMesh.geometry.setAttribute('instanceOceanDepth', new InstancedBufferAttribute(oceanDepths, 1));
   terrainMesh.geometry.setAttribute('instanceCityColor', new InstancedBufferAttribute(cityColors, 3));
   terrainMesh.frustumCulled = false;

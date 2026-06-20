@@ -15,6 +15,7 @@ describe('createHexPrismGeometry', () => {
       }
     }
     // Bevel geometry: inner top (4) + top bevel ring (12) = 16 upward-facing tris
+    // Full-radius top: 4 upward-facing tris only
     expect(upwardCount).toBeGreaterThanOrEqual(4);
   });
 
@@ -31,11 +32,11 @@ describe('createHexPrismGeometry', () => {
     }
   });
 
-  it('has more vertices than a plain prism due to bevel rings', () => {
-    const plainCount = createHexPrismGeometry(50, 8).getAttribute('position').count;
-    // Plain hex prism = 4 top + 4 bottom + 12 side = 20 triangles = 60 vertices
-    // Beveled = 4 inner top + 4 bottom + 24 bevel + 12 side = 44 triangles = 132 vertices
-    expect(plainCount).toBeGreaterThan(60);
+  it('uses a full-radius top face for seamless flat-top tiling', () => {
+    const geom = createHexPrismGeometry(50, 8);
+    const count = geom.getAttribute('position').count;
+    // Full-radius prism: 4 top + 4 bottom + 12 side = 20 triangles = 60 vertices
+    expect(count).toBe(60);
   });
 
   it('exports shared geometry with default size', () => {

@@ -20,7 +20,7 @@ import {
 const SKY_ZENITH = new Color(0x6fa3cf);
 /** Horizon haze — warm cream-gold, matches the warmed FogExp2 tone so
  *  distant terrain dissolves into the sky instead of against it. */
-const SKY_HAZE = new Color(0xddd0aa);
+const SKY_HAZE = new Color(0xe2d4ad);
 
 // Radius must stay inside the camera far plane (4000 in ThreeMapRenderer);
 // the dome is re-centered on the camera every frame so it never clips.
