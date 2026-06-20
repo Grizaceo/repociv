@@ -5234,6 +5234,48 @@ kbd {
   margin-top: 4px;
 }
 
+/* ─── Poda report (panel-usage telemetry → SCOPE pruning) ─────────────────── */
+.poda-report {
+  margin-top: 14px;
+}
+.poda-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim, #8a7a5a);
+  margin-bottom: 8px;
+}
+.poda-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px 12px;
+}
+.poda-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+}
+.poda-panel {
+  color: var(--text-dim, #8a7a5a);
+}
+.poda-count {
+  font-weight: bold;
+  color: var(--clr-gold, #c8a84b);
+}
+.poda-row.poda-unused {
+  background: rgba(120, 30, 30, 0.28);
+}
+.poda-row.poda-unused .poda-panel,
+.poda-row.poda-unused .poda-count {
+  color: #d98a8a;
+}
+
 /* ─── Wonder Vignette ──────────────────────────────────────────────────────── */
 .wonder-vignette {
   position: fixed;

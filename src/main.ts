@@ -66,6 +66,9 @@ import {
 import { mountGacetaWidget } from './ui/gacetaWidget.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { wireHUD, selectHero } from './ui/hudWiring.ts';
+import { initHudMode } from './ui/hudMode.ts';
+import { initCommandPalette } from './ui/commandPalette.ts';
+import { registerHudCommands } from './ui/hudWiring/commands.ts';
 import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
 import {
   showLocalUnitTooltip,
@@ -86,11 +89,6 @@ import { openOnboardingPanel } from './ui/onboardingPanel.ts';
 import { mountHermesStatusBanner } from './ui/hermesStatusBanner.ts';
 import { axialToPixel } from './hex.ts';
 import { sharedIdleFinder } from './ui/idleAgentFinder.ts';
-import { areMountainPropsSettled } from './three/MountainProps3D.ts';
-import { areForestPropsSettled } from './three/ForestProps3D.ts';
-import { areCityPropsSettled } from './three/CityProps3D.ts';
-import { areUnitPropsSettled } from './three/UnitProps3D.ts';
-import { areResourcePropsSettled } from './three/ResourceProps3D.ts';
 import {
   setRendererRef,
   notifyTilePicked,
@@ -128,8 +126,59 @@ import {
   isCleanMode,
 } from './ui/layerPanel.ts';
 import { resolveInitialRenderMode } from './three/renderMode.ts';
-import { computeRiverPaths } from './three/Rivers3D.ts';
 import { HEX_SIZE } from './constants.ts';
+import { logger } from './logger.ts';
+
+// ─── Lazy 3D debug/capture probes ─────────────────────────────────────────────
+// The `are*PropsSettled` and river-stats hooks below live in Three.js-importing
+// modules. They are debug/test instrumentation invoked only by the headless
+// capture/probe scripts (always in WebGL mode), so we load them lazily to keep
+// Three.js out of the eager 2D-canonical bundle.
+//
+// Contract for callers: these probes are POLL-until-ready. The first call kicks
+// off the dynamic import and returns the not-ready sentinel synchronously —
+// `false` for the settled-probes and `[]` for getRiverStats (NOTE: an empty
+// array here means "probes not loaded yet", not "no rivers"; poll until it goes
+// non-empty, like the capture harness does via waitForFunction). Once the import
+// resolves, every probe reflects real state. On import failure we log, reset the
+// promise, and let the next poll retry (mirrors renderer.ts ensureThreeMap).
+type ThreeProbes = {
+  areMountainPropsSettled: () => boolean;
+  areForestPropsSettled: () => boolean;
+  areCityPropsSettled: () => boolean;
+  areUnitPropsSettled: () => boolean;
+  areResourcePropsSettled: () => boolean;
+  computeRiverPaths: (typeof import('./three/Rivers3D.ts'))['computeRiverPaths'];
+};
+let threeProbes: ThreeProbes | null = null;
+let threeProbesPromise: Promise<void> | null = null;
+function ensureThreeProbes(): void {
+  if (threeProbes || threeProbesPromise) return;
+  threeProbesPromise = Promise.all([
+    import('./three/MountainProps3D.ts'),
+    import('./three/ForestProps3D.ts'),
+    import('./three/CityProps3D.ts'),
+    import('./three/UnitProps3D.ts'),
+    import('./three/ResourceProps3D.ts'),
+    import('./three/Rivers3D.ts'),
+  ])
+    .then(([mountain, forest, city, unit, resource, rivers]) => {
+      threeProbes = {
+        areMountainPropsSettled: mountain.areMountainPropsSettled,
+        areForestPropsSettled: forest.areForestPropsSettled,
+        areCityPropsSettled: city.areCityPropsSettled,
+        areUnitPropsSettled: unit.areUnitPropsSettled,
+        areResourcePropsSettled: resource.areResourcePropsSettled,
+        computeRiverPaths: rivers.computeRiverPaths,
+      };
+    })
+    .catch((err) => {
+      // Reset so a later poll can retry instead of being wedged forever, and
+      // swallow the rejection (no unhandled-rejection toast for a debug hook).
+      logger.warn('[RepoCiv] 3D probe modules failed to load — will retry on next poll', err);
+      threeProbesPromise = null;
+    });
+}
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 const loadSteps = [
@@ -488,11 +537,26 @@ async function bootstrap() {
     isTerrainAtlasReady: () => renderer.isTerrainAtlasReady(),
     // Settled (ready OR failed): capture scripts wait on this so a golden
     // never races the async mountain-glb load.
-    areMountainPropsSettled: () => areMountainPropsSettled(),
-    areForestPropsSettled: () => areForestPropsSettled(),
-    areCityPropsSettled: () => areCityPropsSettled(),
-    areUnitPropsSettled: () => areUnitPropsSettled(),
-    areResourcePropsSettled: () => areResourcePropsSettled(),
+    areMountainPropsSettled: () => {
+      ensureThreeProbes();
+      return threeProbes?.areMountainPropsSettled() ?? false;
+    },
+    areForestPropsSettled: () => {
+      ensureThreeProbes();
+      return threeProbes?.areForestPropsSettled() ?? false;
+    },
+    areCityPropsSettled: () => {
+      ensureThreeProbes();
+      return threeProbes?.areCityPropsSettled() ?? false;
+    },
+    areUnitPropsSettled: () => {
+      ensureThreeProbes();
+      return threeProbes?.areUnitPropsSettled() ?? false;
+    },
+    areResourcePropsSettled: () => {
+      ensureThreeProbes();
+      return threeProbes?.areResourcePropsSettled() ?? false;
+    },
     getWebGLMetrics: () => renderer.getWebGLMetrics(),
     getShadowDebug: () => renderer.getShadowDebug(),
     getGlobalUnits: () =>
@@ -568,8 +632,10 @@ async function bootstrap() {
       }
       return { total: state.world.tiles.size, revealed, byTerrain, samplePos, cleanSamplePos, resourceTiers, crystalPos };
     },
-    getRiverStats: () =>
-      computeRiverPaths(state.world.tiles).map((p) => {
+    getRiverStats: () => {
+      ensureThreeProbes();
+      const paths = threeProbes?.computeRiverPaths(state.world.tiles) ?? [];
+      return paths.map((p) => {
         const mid = p.points[Math.floor(p.points.length / 2)]!;
         return {
           tiles: p.points.length,
@@ -577,7 +643,8 @@ async function bootstrap() {
           mid: { x: Math.round(mid.x), z: Math.round(mid.z) },
           mouth: p.mouth ? { x: Math.round(p.mouth.x), z: Math.round(p.mouth.z) } : null,
         };
-      }),
+      });
+    },
     openLocalView: (cityId: string) => {
       const city = state.world.cities.find((item) => item.id === cityId && !item.isCapital);
       if (!city) return false;
@@ -667,7 +734,10 @@ async function bootstrap() {
   });
   document.getElementById('btn-harnesses')?.addEventListener('click', () => {
     toggleHarnessPanel();
-    if (isHarnessPanelOpen()) startHarnessPolling();
+    if (isHarnessPanelOpen()) {
+      startHarnessPolling();
+      trackPanelOpen('harness');
+    }
   });
 
   const bridge = new BridgeEvents(state);
@@ -1261,6 +1331,9 @@ async function bootstrap() {
   state.spawnUnit(DEFAULT_USER_UNIT_ID, DEFAULT_USER_UNIT_NAME, 'hero', 'gris', spawnAt, 'En espera de misión');
 
   wireHUD(renderer, state, bridge, toggleView);
+  initHudMode();
+  initCommandPalette();
+  registerHudCommands(state, renderer, bridge, toggleView);
 
   // Load pending tracker missions at boot
   fetchPendingTracker().then((pending) => {

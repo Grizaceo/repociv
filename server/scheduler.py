@@ -11,6 +11,7 @@ Priority-based queue with:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 import time
@@ -20,6 +21,8 @@ from dataclasses import asdict
 
 from .command_schema import Command
 from . import event_store as _es
+
+logger = logging.getLogger(__name__)
 
 # ─── Queue persistence (Fase 4) ──────────────────────────────────────────────
 _CONFIG_DIR = Path(os.path.expanduser(os.environ.get("REPOCIV_CONFIG_DIR", "~/.repociv")))
@@ -58,7 +61,7 @@ def _init_from_disk() -> None:
         _resort()
     n = len(filtered)
     if n:
-        print(f"[scheduler] Recovered {n} queued mission(s) from disk.")
+        logger.info(f"[scheduler] Recovered {n} queued mission(s) from disk.")
 
 # ─── Concurrency limits per agent type ────────────────────────────────────────
 # WORKER can run multiple parallel tasks; others are single-threaded.
@@ -311,5 +314,5 @@ def _worker_loop() -> None:
             while dispatched:
                 dispatched = _dispatch_next()
         except Exception as e:
-            print(f"[scheduler] error: {e}")
+            logger.error(f"[scheduler] error: {e}")
         time.sleep(2)

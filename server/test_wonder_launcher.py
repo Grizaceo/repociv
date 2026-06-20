@@ -13,6 +13,7 @@ Pattern: monkeypatch Popen / state file / env to keep the tests hermetic.
 
 from __future__ import annotations
 import json
+import logging
 import os
 import threading
 import time
@@ -893,8 +894,9 @@ def test_load_custom_specs_parses_valid_launch(custom_wonder_dir):
     assert spec.procs[1].cwd == "/tmp/mi-maravilla/frontend"
 
 
-def test_load_custom_specs_rejects_malformed(custom_wonder_dir, capfd):
-    """Malformed launch specs are skipped (with a stderr warning), not crashed."""
+def test_load_custom_specs_rejects_malformed(custom_wonder_dir, caplog):
+    """Malformed launch specs are skipped (with a logged warning), not crashed."""
+    caplog.set_level(logging.WARNING)
     (custom_wonder_dir / "bad1.json").write_text(json.dumps({"id": "bad1"}))  # no launch
     (custom_wonder_dir / "bad2.json").write_text(
         json.dumps({"id": "bad2", "launch": "not a dict"})
@@ -907,11 +909,10 @@ def test_load_custom_specs_rejects_malformed(custom_wonder_dir, capfd):
     specs = wonder_launcher._load_custom_launch_specs()
     assert specs == {}
     # We should have logged 4 warnings (bad2, bad3, bad4, bad5).
-    err = capfd.readouterr().err
-    assert "skipping launch spec in bad2.json" in err
-    assert "skipping launch spec in bad3.json" in err
-    assert "skipping bad4.json" in err
-    assert "skipping bad5.json" in err
+    assert "skipping launch spec in bad2.json" in caplog.text
+    assert "skipping launch spec in bad3.json" in caplog.text
+    assert "skipping bad4.json" in caplog.text
+    assert "skipping bad5.json" in caplog.text
 
 
 def test_load_custom_specs_uses_filename_as_id_fallback(custom_wonder_dir):
@@ -933,8 +934,9 @@ def test_load_custom_specs_uses_filename_as_id_fallback(custom_wonder_dir):
     assert specs["fallback-id"].id == "fallback-id"
 
 
-def test_custom_spec_overrides_builtin(monkeypatch, tmp_path, capfd):
+def test_custom_spec_overrides_builtin(monkeypatch, tmp_path, caplog):
     """A custom spec with the same id as a built-in wins (with a warning)."""
+    caplog.set_level(logging.WARNING)
     # Create a temp config dir + LGB repo so launch_wonder can find them
     cfg = tmp_path / "cfg"
     cfg.mkdir()
@@ -973,8 +975,7 @@ def test_custom_spec_overrides_builtin(monkeypatch, tmp_path, capfd):
     spec = wonder_launcher.get_spec("bibliotheca")
     assert spec.api_url == "http://127.0.0.1:9999"
     # And a warning was logged
-    err = capfd.readouterr().err
-    assert "overrides the built-in" in err
+    assert "overrides the built-in" in caplog.text
 
 
 def test_list_launchable_includes_custom(custom_wonder_dir):
@@ -1035,7 +1036,6 @@ def test_launch_wonder_uses_custom_spec(fake_repos, fake_popen, custom_wonder_di
     monkeypatch.setattr(wonder_launcher, "_http_probe", lambda *a, **kw: False)
     result = launch_wonder("mi-maravilla")
     assert fake_popen["n"] == 2
-    pids = {p[0][0] if isinstance(p[0], list) else p[0][0] for p in fake_popen["spawned"]}
     # Verify env propagation on the bridge proc
     for argv, kwargs in fake_popen["spawned"]:
         if "maravilla_bridge" in str(argv):

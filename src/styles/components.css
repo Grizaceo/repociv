@@ -65,6 +65,101 @@
   display: none;
 }
 
+/* ─── HUD density: Quick (default) vs Advanced (B1) ──────────────────────── */
+/* In Quick mode (body without .hud-advanced) the advanced toolbar buttons are
+   hidden — progressive disclosure. Hotkeys still reach the panels.
+   !important: some buttons (#btn-replay, #btn-observability) set display via an
+   ID rule (specificity 1,0,0) that would otherwise win over this hide utility. */
+body:not(.hud-advanced) [data-hud-tier='advanced'] {
+  display: none !important;
+}
+/* The toggle reads as "active" (gold) when Advanced is on. */
+#btn-hud-mode.active {
+  color: var(--ui-gold-bright);
+  border-color: var(--ui-gold);
+  background: rgba(200, 168, 75, 0.12);
+}
+
+/* ─── Command palette (Ctrl/Cmd-K) — C1 ──────────────────────────────────── */
+.cmdk-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+}
+.cmdk-overlay.hidden {
+  display: none;
+}
+.cmdk-panel {
+  width: min(560px, 92vw);
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-dark, #1a1410);
+  border: 1px solid var(--ui-gold, #c8a84b);
+  border-radius: 8px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+.cmdk-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ui-border, #4a3a1a);
+  color: var(--ui-text, #e8dcc0);
+  font-family: var(--font-ui, sans-serif);
+  font-size: 15px;
+  padding: 14px 16px;
+  outline: none;
+}
+.cmdk-input::placeholder {
+  color: var(--ui-text-dim, #8a7a5a);
+}
+.cmdk-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  overflow-y: auto;
+}
+.cmdk-group {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ui-text-dim, #8a7a5a);
+  padding: 8px 16px 4px;
+}
+.cmdk-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  color: var(--ui-text, #e8dcc0);
+  font-size: 13px;
+}
+.cmdk-item.selected,
+.cmdk-item:hover {
+  background: rgba(200, 168, 75, 0.16);
+  color: var(--ui-gold-bright, #e6c45e);
+}
+.cmdk-hint {
+  font-size: 11px;
+  color: var(--ui-text-dim, #8a7a5a);
+  border: 1px solid var(--ui-border, #4a3a1a);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-left: 12px;
+}
+.cmdk-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--ui-text-dim, #8a7a5a);
+  font-size: 13px;
+}
+
 .resource {
   display: flex;
   align-items: center;

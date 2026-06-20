@@ -73,6 +73,13 @@ export default defineConfig(({ mode }) => {
             if (!id.includes('/node_modules/')) {
               return undefined;
             }
+            // Three.js (~600 kB) is only reached via the dynamic import in
+            // renderMode.ts (ThreeMapRenderer). Give it its own chunk so the
+            // catch-all 'vendor' below — which a statically-imported dep keeps
+            // eager — doesn't drag Three into the initial 2D-canonical load.
+            if (id.includes('/three/')) {
+              return 'vendor-three';
+            }
             if (id.includes('/lucide/')) {
               return 'vendor-icons';
             }

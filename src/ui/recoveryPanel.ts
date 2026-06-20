@@ -6,6 +6,7 @@
 import type { RecoveryPlan } from '../recoveryClient';
 import { requestRecoveryPlan } from '../recoveryClient';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
+import { trackPanelOpen } from './analytics.ts';
 
 // ─── Module state ───────────────────────────────────────────────────────────────
 let _panel: HTMLElement | null = null;
@@ -40,6 +41,7 @@ export async function openRecoveryPanel(
   _currentHarnessId = harnessId;
   _currentReason = reason;
   _currentPlan = null;
+  if (!_visible) trackPanelOpen('recovery');
   _visible = true;
 
   showPanel(_getOrCreate());

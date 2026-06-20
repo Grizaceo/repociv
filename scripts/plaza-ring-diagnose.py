@@ -11,11 +11,8 @@ the predicted projection offset.
 """
 import json
 import sys
-import time
-import urllib.request
 
 import numpy as np
-import subprocess
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 from scipy import ndimage
@@ -111,8 +108,6 @@ def find_interior_hole(wall_cluster):
     h, w = wall_cluster.shape
     # Interior = not wall
     interior = ~wall_cluster
-    # Exclude regions that touch the bbox edge (those are the "outside")
-    bbox = wall_cluster
     labeled, n = ndimage.label(interior, structure=np.ones((3, 3)))
     if n == 0:
         return None

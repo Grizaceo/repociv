@@ -1,6 +1,7 @@
 // ─── RepoCiv — Game State ─────────────────────────────────────────────────────
 
 import { logger } from './logger.ts';
+import { trackMissionComplete } from './ui/analytics.ts';
 import {
   type World,
   type Unit,
@@ -605,7 +606,10 @@ export class GameState {
   }
 
   completeMission(id: string, success: boolean) {
-    this._missions.complete(id, success);
+    const transitioned = this._missions.complete(id, success);
+    // Only count a real running→complete transition, so a replayed/duplicate
+    // mission_complete event from the bridge stream doesn't inflate the metric.
+    if (success && transitioned) trackMissionComplete();
   }
 
   // ─── Tick count for animations ─────────────────────────────────────────────

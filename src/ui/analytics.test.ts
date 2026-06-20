@@ -32,6 +32,29 @@ describe('local analytics', () => {
     });
   });
 
+  it('reports panel usage over all KNOWN_PANELS, least-used first (poda view)', async () => {
+    stubStorage();
+    const analytics = await import('./analytics.ts');
+
+    analytics.trackPanelOpen('observability');
+    analytics.trackPanelOpen('observability');
+    analytics.trackPanelOpen('approvals');
+
+    const report = analytics.getPanelUsageReport();
+    // Every canonical panel is present exactly once.
+    expect(report.length).toBe(analytics.KNOWN_PANELS.length);
+    expect(report.map((r) => r.panel).sort()).toEqual([...analytics.KNOWN_PANELS].sort());
+    // Opened ones carry their counts.
+    const byName = Object.fromEntries(report.map((r) => [r.panel, r.opens]));
+    expect(byName['observability']).toBe(2);
+    expect(byName['approvals']).toBe(1);
+    // Sorted least-used first: a never-opened panel leads, the most-used trails.
+    expect(report[0]!.opens).toBe(0);
+    expect(report[report.length - 1]!.panel).toBe('observability');
+    // Unused panels (poda candidates) are exactly the untouched ones.
+    expect(report.filter((r) => r.opens === 0).length).toBe(analytics.KNOWN_PANELS.length - 2);
+  });
+
   it('migrates older analytics payloads without hotkeys', async () => {
     const store = stubStorage({
       'repociv:analytics': JSON.stringify({

@@ -37,6 +37,14 @@ repos:
         always_run: true
         require_serial: true
 
+      - id: ruff
+        name: Ruff (lint Python — same scope as scripts/check.sh and CI)
+        entry: bash -c 'source .venv/bin/activate && ruff check server/ scripts/'
+        language: system
+        files: ^(server|scripts)/.*\.py$
+        pass_filenames: false
+        require_serial: true
+
       - id: pytest
         name: pytest (Python tests)
         entry: bash -c 'source .venv/bin/activate && pytest --tb=short -q'

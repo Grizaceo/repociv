@@ -43,6 +43,7 @@ describe('P5: transition polish', () => {
 
   it('transition state machine: null → entering → active → exiting → null', () => {
     let state: 'entering' | 'active' | 'exiting' | null = null;
+    expect(state).toBeNull();
 
     // Start enter
     state = 'entering';

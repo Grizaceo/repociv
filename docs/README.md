@@ -18,7 +18,7 @@
 | [`EVOLUTION.md`](EVOLUTION.md) | Línea de tiempo cronológica del proyecto, con citas a documentos originales |
 | [`implementation_plan.md`](implementation_plan.md) | Plan maestro v2.0 — Fases 0-5 cerradas con Gates verificables |
 | [`DATA_SOURCES.md`](DATA_SOURCES.md) | Fuentes de verdad: Event Store (JSONL) ↔ Ledger (DuckDB) ↔ Workspace Issues ↔ Sessions |
-| [`PHASE_1_VERIFICATION.md`](PHASE_1_VERIFICATION.md) | Audit detallada de los Gates de Fase 1 |
+| [`archive/PHASE_1_VERIFICATION.md`](archive/PHASE_1_VERIFICATION.md) | Audit detallada de los Gates de Fase 1 (histórico, archivado) |
 | [`AUDIT_DELTA_ADDENDUM.md`](AUDIT_DELTA_ADDENDUM.md) | Patrones avanzados (eBPF, Landlock, P2P mesh) — explícitamente bloqueados por SCOPE hasta el dogfooding |
 
 ## Snapshots (no editar después de creados)
@@ -31,7 +31,7 @@
 
 | Carpeta | Contenido |
 |---|---|
-| [`archive/`](archive/) | 5 documentos-germen conservados por valor de referencia (CIV5 visual + AgentCraft parity + roadmap RimWorld/Frostpunk + ideación de paradigmas). El resto del histórico vive en git. |
+| [`archive/`](archive/) | Documentos conservados: 5 de referencia (CIV5 visual + AgentCraft parity + roadmap RimWorld/Frostpunk + ideación de paradigmas) + cierres de fase y audits superados. Ver [`archive/README.md`](archive/README.md). El resto del histórico vive en git. |
 
 ## Regla de oro
 

@@ -50,6 +50,7 @@ import { takeScreenshot } from './screenshot.ts';
 import { toggleLayerPanel, closeLayerPanel, isLayerPanelOpen } from '../layerPanel.ts';
 import { trackHotkey, trackPanelOpen } from '../analytics.ts';
 import { isPickerOpen } from '../chat/slashPicker.ts';
+import { isCommandPaletteOpen } from '../commandPalette.ts';
 import { sharedIdleFinder } from '../idleAgentFinder.ts';
 
 export function wireHotkeys(
@@ -67,6 +68,11 @@ export function wireHotkeys(
     // global hotkey (spawn letters, hero numbers, panel toggles, or the
     // Esc-closes-panel branch) may fire underneath it.
     if (isPickerOpen()) return;
+
+    // Same for the command palette (Ctrl/Cmd-K): while open it is modal, so no
+    // global hotkey — especially the F7/F8/F10 branches below, which run before
+    // the inField guard — may fire and open a panel behind the overlay.
+    if (isCommandPaletteOpen()) return;
 
     // Hotkey panels
     if (e.key === 'F7') {

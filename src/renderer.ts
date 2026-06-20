@@ -1,5 +1,12 @@
 // ─── RepoCiv — Renderer (orquestador) ────────────────────────────────────────
-import { type Axial, worldToAxial, axialToPixel, type Camera } from './hex.ts';
+import {
+  type Axial,
+  worldToAxial,
+  axialToPixel,
+  type Camera,
+  screenToWorld,
+  clampZoom,
+} from './hex.ts';
 import { logger } from './logger.ts';
 import { type Unit, type Tile, type City, tileKey } from './types.ts';
 import { type GameState } from './game.ts';
@@ -33,9 +40,13 @@ import {
   persistRenderMode,
   loadThreeMapRenderer,
 } from './three/renderMode.ts';
-import { showTilePopup, clearTilePopup } from './three/TilePopup3D.ts';
-import { flashTile } from './three/TileFlash3D.ts';
 import { terrainElevation } from './isoHex.ts';
+
+// 3D tile overlays — loaded lazily alongside the WebGL renderer (see the
+// threeLoadPromise block) so Three.js stays in its own lazy chunk and never
+// enters the eager 2D-canonical bundle. Both are no-ops until WebGL is active.
+let tilePopupMod: typeof import('./three/TilePopup3D.ts') | null = null;
+let tileFlashMod: typeof import('./three/TileFlash3D.ts') | null = null;
 
 type ThreeMapRendererType = import('./three/ThreeMapRenderer.ts').ThreeMapRenderer;
 
@@ -260,7 +271,13 @@ export class Renderer {
         if (!this.threeContainer) {
           throw new Error('#three-container not found');
         }
-        const ThreeMapRenderer = await loadThreeMapRenderer();
+        const [ThreeMapRenderer, popupMod, flashMod] = await Promise.all([
+          loadThreeMapRenderer(),
+          import('./three/TilePopup3D.ts'),
+          import('./three/TileFlash3D.ts'),
+        ]);
+        tilePopupMod = popupMod;
+        tileFlashMod = flashMod;
         this.threeMap = new ThreeMapRenderer(this.threeContainer);
       })();
     }
@@ -319,7 +336,7 @@ export class Renderer {
     if (this.worldRenderMode === 'webgl') {
       const tile = this.state.world.tiles.get(tileKey(coord));
       const elev = tile ? terrainElevation(tile.terrain) : 0;
-      flashTile(coord.q, coord.r, elev);
+      tileFlashMod?.flashTile(coord.q, coord.r, elev);
     }
   }
 
@@ -642,21 +659,15 @@ export class Renderer {
         if (bailIfLocal()) return;
         e.preventDefault();
         const factor = e.deltaY > 0 ? 0.9 : 1.1;
-        const newZoom = Math.max(0.15, Math.min(4, this.cam.zoom * factor));
+        const newZoom = clampZoom(this.cam.zoom * factor, 0.15, 4);
         const rect = this.canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
         const my = e.clientY - rect.top;
-        const before = {
-          x: (mx - this.cam.cx) / this.cam.zoom + this.cam.x,
-          y: (my - this.cam.cy) / this.cam.zoom + this.cam.y,
-        };
+        const before = screenToWorld(this.cam, mx, my);
         this.cam.zoom = newZoom;
-        const after = {
-          x: (mx - this.cam.cx) / this.cam.zoom + this.cam.x,
-          y: (my - this.cam.cy) / this.cam.zoom + this.cam.y,
-        };
-        this.cam.x += before.x - after.x;
-        this.cam.y += before.y - after.y;
+        const after = screenToWorld(this.cam, mx, my);
+        this.cam.x += before.wx - after.wx;
+        this.cam.y += before.wy - after.wy;
       },
       { passive: false },
     );
@@ -779,8 +790,7 @@ export class Renderer {
     const exact = this.getTileAt(wx, wy)?.city ?? null;
     if (exact) return exact;
 
-    const worldX = (wx - this.cam.cx) / this.cam.zoom + this.cam.x;
-    const worldY = (wy - this.cam.cy) / this.cam.zoom + this.cam.y;
+    const { wx: worldX, wy: worldY } = screenToWorld(this.cam, wx, wy);
     const threshold = HEX_SIZE * 0.95;
 
     let best: City | null = null;
@@ -878,14 +888,14 @@ export class Renderer {
         const garrison = this.state.world.units.filter(
           (u) => u.cityId === city.id,
         );
-        showTilePopup(tile, coord, city, garrison);
+        tilePopupMod?.showTilePopup(tile, coord, city, garrison);
       }
       return;
     }
 
     // Empty tile click: clear any existing 3D popup.
     if (this.worldRenderMode === 'webgl') {
-      clearTilePopup();
+      tilePopupMod?.clearTilePopup();
     }
 
     this.selectedUnit = null;
@@ -1225,6 +1235,29 @@ export class Renderer {
 
       const shouldDrawDecor = showStructure || showOps;
       const showTextLabels = showLabels && !lodLow;
+
+      // Declutter (B4): at medium (overview) zoom, labelling every city is a
+      // wall of overlapping pills. Show labels only for the prominent ones —
+      // capitals, the selected / hovered city, and the largest few by size.
+      // Zooming in (lodHigh) still reveals every label.
+      let medLabelIds: Set<string> | null = null;
+      if (lodMed && showTextLabels) {
+        const MED_LABEL_CAP = 8;
+        const cities = this.state.world.cities;
+        medLabelIds = new Set(
+          [...cities]
+            .sort((a, b) => b.population - a.population)
+            .slice(0, MED_LABEL_CAP)
+            .map((c) => c.id),
+        );
+        for (const c of cities) if (c.isCapital) medLabelIds.add(c.id);
+        if (this.selectedCity) medLabelIds.add(this.selectedCity.id);
+        const hoveredCity = this.hoveredHex
+          ? this.state.world.tiles.get(tileKey(this.hoveredHex))?.city
+          : null;
+        if (hoveredCity) medLabelIds.add(hoveredCity.id);
+      }
+
       for (const tile of allTiles) {
         if (!shouldDrawDecor && !showTextLabels) continue;
 
@@ -1242,13 +1275,20 @@ export class Renderer {
         }
 
         if (lodMed) {
-          if (tile.city && showTextLabels) {
+          const labelThisCity = tile.city ? (medLabelIds?.has(tile.city.id) ?? true) : false;
+          if (tile.city && showTextLabels && labelThisCity) {
             this.hexR.drawCityLabel(tile.city, axialToPixel(tile.coord, HEX_SIZE), activeBuilding);
           }
-          if (tile.city && tile.skillHealth && showTextLabels) {
+          if (tile.city && tile.skillHealth && showTextLabels && labelThisCity) {
             this.hexR.drawSkillHealth(tile, axialToPixel(tile.coord, HEX_SIZE));
           }
-          if (tile.city && tile.city.districts && tile.city.districts.length > 0 && showTextLabels) {
+          if (
+            tile.city &&
+            tile.city.districts &&
+            tile.city.districts.length > 0 &&
+            showTextLabels &&
+            labelThisCity
+          ) {
             for (const dist of tile.city.districts) {
               this.hexR.drawDistrictLabel(dist.name, axialToPixel(dist.coord, HEX_SIZE));
             }

@@ -51,6 +51,14 @@ Métricas concretas para considerar el alpha "exitoso":
 - Cerrar bugs y deudas técnicas que aparezcan durante el dogfooding.
 - Mejoras visuales menores (assets, animaciones, tooltips) que hagan el
   alpha-test más placentero — pero sin reescribir capas grandes.
+- **Los DOS renderers son trunk oficial.** El Canvas 2D (`flat`) es el modo
+  por defecto y canónico; el WebGL/Three.js (`webgl`) es opt-in por
+  `?renderer=webgl` o hotkey `3`. Decisión del owner (2026-06): lo oficial no
+  es "2D o 3D" sino **poder alternar entre ambos sin fricción**. El invariante
+  de switching está cubierto por un test no-GPU (`src/three/renderMode.test.ts`,
+  máquina de estados de persistencia/migración) y por el e2e informativo
+  `e2e/render-mode-parity.spec.ts` (boot real, requiere GPU). Three.js carga
+  lazy: nunca entra al bundle eager del modo 2D (chunk `vendor-three`).
 - Documentar lo que se aprende del uso real en `docs/implementation_plan.md`
   o en un futuro `docs/DOGFOODING_NOTES.md`.
 
@@ -59,10 +67,11 @@ Métricas concretas para considerar el alpha "exitoso":
 > Branch paralela = no afecta el alpha-test diario. Se mergea solo cuando
 > está estable Y aporta valor demostrado.
 
-- **`feat/3d-renderer`** — explorar Three.js / WebGL como render alternativo.
-  Branch independiente, puede romperse libremente. El Canvas 2D sigue
-  siendo el render canónico hasta que el 3D demuestre paridad funcional
-  (no solo estética).
+> **Nota (2026-06):** `feat/3d-renderer` ya **no** es branch paralela — el
+> render 3D se integró a `main` y es oficial (ver arriba). El Canvas 2D dejó
+> de ser el único canónico; ahora la regla es paridad de switching, no
+> "2D-only hasta paridad funcional".
+
 - **`feat/multi-device-mobile`** — el celular como segundo cliente vía
   PWA o app liviana. Útil porque el usuario alpha va a probar desde el
   teléfono, así que tiene sentido empezar a probar el contacto entre

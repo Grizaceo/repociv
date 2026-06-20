@@ -7,6 +7,7 @@ import {
 } from '../map';
 import { upsertManualRepoEntry, removeManualRepoEntry, loadManualLayout } from '../manualLayout';
 import { showNotification } from './notificationBanner';
+import { trackPanelOpen } from './analytics.ts';
 
 let isOpen = false;
 let _rendererRef: {
@@ -65,6 +66,7 @@ export function closeConstructionPanel(): void {
 
 export function openConstructionPanel(): void {
   _rendererRef?.setCityRelocateMode(false);
+  if (!isOpen) trackPanelOpen('construction');
   isOpen = true;
   let panel = getPanel();
   if (!panel) {
