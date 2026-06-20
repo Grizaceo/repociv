@@ -1,4 +1,4 @@
-// ─── Ground plane: continuous earth base beneath all hex tiles ───────────────
+// ─── Ground plane: dark earth fill beneath hex tiles (gap + map-edge void) ───
 import {
   CircleGeometry,
   Mesh,
@@ -11,8 +11,9 @@ import { HEX_SIZE } from '../constants.ts';
 
 let groundMesh: Mesh | null = null;
 
-/** Rebuild a large earth-coloured disc beneath the map so hexes don’t look like
- *  floating islands. Size scales with the tile bounding box. */
+/** Dark olive earth disc — fills sub-pixel hex gaps and the map rim. Sits well
+ *  below prism bottoms so it never z-fights caps; warm fog no longer reads as
+ *  the floor when tiles don't quite meet. */
 export function rebuildGroundPlane(state: GameState): void {
   if (groundMesh) {
     groundMesh.geometry.dispose();
@@ -23,7 +24,6 @@ export function rebuildGroundPlane(state: GameState): void {
   const tiles = Array.from(state.world.tiles.values());
   if (tiles.length === 0) return;
 
-  // Compute bounding box in world XZ
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const tile of tiles) {
     const pos = axialToWorld3D(tile.coord.q, tile.coord.r, 0);
@@ -35,24 +35,22 @@ export function rebuildGroundPlane(state: GameState): void {
 
   const cx = (minX + maxX) / 2;
   const cz = (minZ + maxZ) / 2;
-  const radius = Math.max(maxX - minX, maxZ - minZ) / 2 + HEX_SIZE * 4;
+  const radius = Math.max(maxX - minX, maxZ - minZ) / 2 + HEX_SIZE * 5;
 
-  const geom = new CircleGeometry(radius, 64);
-  geom.rotateX(-Math.PI / 2); // face upward
+  const geom = new CircleGeometry(radius, 72);
+  geom.rotateX(-Math.PI / 2);
 
   const mat = new MeshStandardMaterial({
-    color: new Color(0x6f6a54), // muted olive-umber so gaps feel like earth, not raw brown cardboard
-    roughness: 0.98,
+    color: new Color(0x4a5540),
+    roughness: 0.96,
     metalness: 0.0,
+    fog: true,
   });
 
   groundMesh = new Mesh(geom, mat);
-  // Below the ocean top face (elev -1 → y = -TILE_HEIGHT): the old
-  // -TILE_PRISM_HEIGHT*0.22 (-5.28) sat ABOVE the ocean tops and buried the
-  // entire ocean ring under the disc — the map read as land floating on a
-  // brown void, and the shoreline foam (gap #2) was invisible at every coast.
-  groundMesh.position.set(cx, -TILE_HEIGHT - 2.5, cz);
+  groundMesh.position.set(cx, -TILE_HEIGHT * 3 - 8, cz);
   groundMesh.receiveShadow = true;
+  groundMesh.renderOrder = -200;
 }
 
 export function getGroundMesh(): Mesh | null {
@@ -66,4 +64,3 @@ export function disposeGroundMesh(): void {
     groundMesh = null;
   }
 }
-
