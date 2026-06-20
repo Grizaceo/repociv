@@ -1235,6 +1235,29 @@ export class Renderer {
 
       const shouldDrawDecor = showStructure || showOps;
       const showTextLabels = showLabels && !lodLow;
+
+      // Declutter (B4): at medium (overview) zoom, labelling every city is a
+      // wall of overlapping pills. Show labels only for the prominent ones —
+      // capitals, the selected / hovered city, and the largest few by size.
+      // Zooming in (lodHigh) still reveals every label.
+      let medLabelIds: Set<string> | null = null;
+      if (lodMed && showTextLabels) {
+        const MED_LABEL_CAP = 8;
+        const cities = this.state.world.cities;
+        medLabelIds = new Set(
+          [...cities]
+            .sort((a, b) => b.population - a.population)
+            .slice(0, MED_LABEL_CAP)
+            .map((c) => c.id),
+        );
+        for (const c of cities) if (c.isCapital) medLabelIds.add(c.id);
+        if (this.selectedCity) medLabelIds.add(this.selectedCity.id);
+        const hoveredCity = this.hoveredHex
+          ? this.state.world.tiles.get(tileKey(this.hoveredHex))?.city
+          : null;
+        if (hoveredCity) medLabelIds.add(hoveredCity.id);
+      }
+
       for (const tile of allTiles) {
         if (!shouldDrawDecor && !showTextLabels) continue;
 
@@ -1252,13 +1275,20 @@ export class Renderer {
         }
 
         if (lodMed) {
-          if (tile.city && showTextLabels) {
+          const labelThisCity = tile.city ? (medLabelIds?.has(tile.city.id) ?? true) : false;
+          if (tile.city && showTextLabels && labelThisCity) {
             this.hexR.drawCityLabel(tile.city, axialToPixel(tile.coord, HEX_SIZE), activeBuilding);
           }
-          if (tile.city && tile.skillHealth && showTextLabels) {
+          if (tile.city && tile.skillHealth && showTextLabels && labelThisCity) {
             this.hexR.drawSkillHealth(tile, axialToPixel(tile.coord, HEX_SIZE));
           }
-          if (tile.city && tile.city.districts && tile.city.districts.length > 0 && showTextLabels) {
+          if (
+            tile.city &&
+            tile.city.districts &&
+            tile.city.districts.length > 0 &&
+            showTextLabels &&
+            labelThisCity
+          ) {
             for (const dist of tile.city.districts) {
               this.hexR.drawDistrictLabel(dist.name, axialToPixel(dist.coord, HEX_SIZE));
             }
