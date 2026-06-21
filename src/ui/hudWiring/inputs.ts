@@ -1,6 +1,7 @@
 // ─── HUD button + input wiring (non-hotkey) ─────────────────────────────────
 import { tileKey, type Unit } from '../../types.ts';
 import { trackMessageSent } from '../analytics.ts';
+import { agentTooltip } from '../agentGlossary.ts';
 import { type Renderer } from '../../renderer.ts';
 import { type GameState } from '../../game.ts';
 import { type BridgeEvents } from '../../bridge.ts';
@@ -31,10 +32,12 @@ import { sendCommand } from '../../commandBus.ts';
 export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeEvents): void {
   const missionInput = document.getElementById('mission-input') as HTMLInputElement;
 
-  // ─── Spawn buttons (Q/W/E/L) ────────────────────────────────────────────
+  // ─── Spawn buttons (Q/W/E/O/C/X) ────────────────────────────────────────
   document.querySelectorAll<HTMLButtonElement>('.spawn-btn').forEach((btn) => {
+    const type = btn.dataset['type'] as string;
+    // Teaching tooltip (plan B3): explain each agent on hover instead of jargon.
+    btn.title = agentTooltip(type);
     btn.addEventListener('click', () => {
-      const type = btn.dataset['type'] as string;
       spawnAgent(type, state, renderer, bridge);
     });
   });
