@@ -107,11 +107,23 @@ export function axialToPixel(a: Axial, size: number): { x: number; y: number } {
   return { x, y };
 }
 
-export function pixelToAxial(px: number, py: number, size: number): Axial {
+/** Flat-top pixel point → fractional axial coords (no rounding). This is the
+ *  single home for the inverse-layout formula: `pixelToAxial` (2D) rounds it,
+ *  and the 3D renderer's `world3DToAxialFraction` delegates here, so the two
+ *  never drift. Returns {0,0} for a degenerate size to avoid NaN/Infinity. */
+export function pixelToAxialFraction(
+  px: number,
+  py: number,
+  size: number,
+): { q: number; r: number } {
   if (size <= 0) return { q: 0, r: 0 };
   const q = ((2 / 3) * px) / size;
   const r = ((-1 / 3) * px + (SQRT3 / 3) * py) / size;
-  return axialRound({ q, r });
+  return { q, r };
+}
+
+export function pixelToAxial(px: number, py: number, size: number): Axial {
+  return axialRound(pixelToAxialFraction(px, py, size));
 }
 
 // ─── Pixel ↔ Axial with camera offset ──────────────────────────────────────

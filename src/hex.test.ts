@@ -7,6 +7,9 @@ import {
   spiralCoords,
   axialNeighbours,
   axialEquals,
+  axialToPixel,
+  pixelToAxial,
+  pixelToAxialFraction,
   worldToScreen,
   screenToWorld,
   clampZoom,
@@ -157,6 +160,40 @@ describe('axialNeighbours', () => {
     for (const n of nb) {
       expect(axialDistance({ q: 3, r: -2 }, n)).toBe(1);
     }
+  });
+});
+
+describe('pixelToAxialFraction', () => {
+  it('is the exact (unrounded) source for pixelToAxial', () => {
+    const size = 16;
+    for (const [px, py] of [
+      [0, 0],
+      [37.5, -12.25],
+      [-128, 64],
+      [1000, 999],
+    ] as const) {
+      const frac = pixelToAxialFraction(px, py, size);
+      expect(pixelToAxial(px, py, size)).toEqual(axialRound(frac));
+    }
+  });
+
+  it('round-trips against axialToPixel (no rounding error at hex centers)', () => {
+    const size = 24;
+    for (const coord of [
+      { q: 0, r: 0 },
+      { q: 3, r: -2 },
+      { q: -5, r: 4 },
+    ]) {
+      const { x, y } = axialToPixel(coord, size);
+      const frac = pixelToAxialFraction(x, y, size);
+      expect(frac.q).toBeCloseTo(coord.q, 9);
+      expect(frac.r).toBeCloseTo(coord.r, 9);
+    }
+  });
+
+  it('guards a degenerate size instead of returning NaN', () => {
+    expect(pixelToAxialFraction(10, 10, 0)).toEqual({ q: 0, r: 0 });
+    expect(pixelToAxialFraction(10, 10, -4)).toEqual({ q: 0, r: 0 });
   });
 });
 
