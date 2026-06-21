@@ -9,6 +9,7 @@ import {
   drawIsoSofa as renderIsoSofa,
   drawIsoStairs as renderIsoStairs,
 } from './isoOfficeRenderer.ts';
+import { worldToScreen } from './hex.ts';
 
 export { ISO_TILE_W, ISO_TILE_H, ISO_WALL_H };
 export const isoProject = officeIsoProject;
@@ -854,8 +855,7 @@ function drawIsoUnit(state: IsoRenderState, unit: LocalUnit, gx: number, gy: num
   ctx.restore();
 
   if (state.onUnitRendered) {
-    const sx = (ux - state.cam.x) * state.cam.zoom + state.cam.cx;
-    const sy = (uy + bobbingY - state.cam.y) * state.cam.zoom + state.cam.cy;
+    const { sx, sy } = worldToScreen(state.cam, ux, uy + bobbingY);
     state.onUnitRendered(unit, sx, sy);
   }
 }
@@ -1470,8 +1470,7 @@ function drawIsoWorkbenchTooltip(state: IsoRenderState, wb: import('./types.ts')
 
   // Screen position for tooltip (untransformed — drawn after ctx.restore)
   // We're still inside the camera transform, so convert to screen coords
-  const sx = (base.px - cam.x) * cam.zoom + cam.cx;
-  const sy = (base.py - cam.y) * cam.zoom + cam.cy;
+  const { sx, sy } = worldToScreen(cam, base.px, base.py);
 
   // Tooltip dimensions
   const padX = 8;

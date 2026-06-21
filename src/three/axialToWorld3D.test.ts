@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Vector3 } from 'three';
-import { axialToPixel, pixelToAxial, axialRound } from '../hex.ts';
+import { axialToPixel, pixelToAxial, pixelToAxialFraction, axialRound } from '../hex.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { terrainElevation } from '../isoHex.ts';
 import {
@@ -45,5 +45,15 @@ describe('axialToWorld3D', () => {
   it('returns a Vector3 instance', () => {
     const v = axialToWorld3D(0, 0, 0);
     expect(v).toBeInstanceOf(Vector3);
+  });
+
+  it('world3DToAxialFraction delegates to the shared 2D fraction at HEX_SIZE', () => {
+    for (const [x, z] of [
+      [0, 0],
+      [50.5, -22.25],
+      [-300, 175],
+    ] as const) {
+      expect(world3DToAxialFraction(x, z)).toEqual(pixelToAxialFraction(x, z, HEX_SIZE));
+    }
   });
 });
