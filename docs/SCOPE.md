@@ -106,6 +106,11 @@ Tras 4-8 semanas de uso real, ejecutar este audit:
    se abren. Cualquier panel con 0 invocaciones en 4 semanas → candidato a borrar.
    Sospechosos iniciales: Replay, Observability, Quest Board, Recovery, Harness,
    Timeline (todos juntos pueden ser 2/3 de la superficie de UI).
+   *Implementado (plan A2/D3):* `src/ui/analytics.ts` registra `trackPanelOpen` /
+   `trackHotkey`; `getPanelUsageReport()` (sobre la lista canónica `KNOWN_PANELS`)
+   ordena de menos a más usado y se muestra en la **Ficha de la Capital →
+   "candidatos a poda (0 = nunca abierto)"**. Tras 4-8 semanas, leer ese reporte
+   para ejecutar esta poda.
 
 2. **Telemetría de endpoints del bridge** — qué rutas se llaman desde el
    frontend. Endpoints muertos → borrar.

@@ -363,7 +363,7 @@ function _renderStats(container: HTMLElement) {
       <div class="stat-card"><div class="stat-value">${unused.length}/${usage.length}</div><div class="stat-label">Paneles sin uso</div></div>
     </div>
     <div class="poda-report">
-      <div class="poda-title">Uso de superficie · candidatos a poda (0 = nunca abierto)</div>
+      <div class="poda-title">Uso de superficie · candidatos a poda (0 = nunca abierto) · ver docs/SCOPE.md §"Roadmap de poda"</div>
       <ul class="poda-list">${podaRows}</ul>
     </div>
   `;
