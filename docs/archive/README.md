@@ -23,8 +23,30 @@ cómo se verificó cada gate).
 | `FASE1_CLOSURE.md` | Cierre de Fase 1. |
 | `PHASE_1_VERIFICATION.md` | Audit detallada de los gates de Fase 1. |
 | `AUDIT_RECOMMENDATIONS.md` | Recomendaciones de un audit previo, ya aplicadas o re-evaluadas. |
+| `AUDIT_2026-06-19.md` | Auditoría general (build/seguridad/arquitectura/deuda). P0-P1 + P2.3/P2.4 + governance aplicados; P2.1 (hex-core + route registry) cerrado 2026-06. |
 | `local_view_beautification_plan.md` | Plan de embellecimiento de la vista local, ya ejecutado. |
 | `onboarding-repo-selection.md` | Plan del onboarding de selección de repos, ya implementado. |
+
+### Planes implementados (`plans/`)
+
+Planes de implementación fechados cuyo trabajo ya está en `main`, movidos desde
+`docs/plans/`. Se conservan como registro de cómo se construyó cada feature.
+
+| Plan | Feature |
+|---|---|
+| `2026-05-06-repociv-corrected-master-plan.md` | Plan maestro corregido (dirección original). |
+| `2026-05-06-repociv-surgical-file-changes.md` | Cambios quirúrgicos de archivos del plan maestro. |
+| `2026-05-11-agent-auto-discovery.md` | Auto-descubrimiento de agentes. |
+| `2026-05-21-phase3-remaining.md` | Cierre de los pendientes de la Fase 3. |
+| `2026-05-24-capital-wonder-gaceta-implementation.md` | Maravilla capital + Gaceta. |
+| `2026-05-24-gaceta-improvements.md` | Mejoras de la Gaceta. |
+| `2026-06-17-wonders-generic-iframe-catalog.md` | Catálogo genérico de Maravillas vía iframe. |
+| `SWARM_CIV_FOLLOWUP.md` | Follow-up del swarm Civ. |
+| `city_builder_drag_drop_refactor.md` | Refactor drag-and-drop del city builder. |
+
+> Siguen **vivos** en `docs/plans/` (no archivados): `2026-06-16-wonder-autostart-and-3d.md`
+> (faltan F5/F6, citado por `server/wonder_launcher.py`) y `rivers-plan.md`
+> (citado por `src/three/Rivers3D.ts`).
 
 ## Lo que se borró (y dónde encontrarlo)
 

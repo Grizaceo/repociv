@@ -17,7 +17,7 @@
 
 ### PASO 0: APLICAR PLAN GACETA EXISTENTE
 
-Implementar las 3 mejoras del archivo `docs/plans/2026-05-24-gaceta-improvements.md`.
+Implementar las 3 mejoras del archivo `docs/archive/plans/2026-05-24-gaceta-improvements.md`.
 
 **0.1 Redimensionamiento libre en `src/styles/gaceta.css`**
 
