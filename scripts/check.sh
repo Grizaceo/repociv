@@ -4,7 +4,7 @@
 # Runs all checks that the project considers blocking:
 #   1. tsc --noEmit          (TypeScript types)
 #   2. eslint --max-warnings=0 (TS/TSX lint, zero warnings)
-#   3. vitest run            (TS unit tests)
+#   3. vitest run --coverage (TS unit tests + enforced coverage floor)
 #   4. vite build            (production bundle smoke)
 #   5. ruff check server/    (Python lint)
 #   6. pytest -q             (Python unit tests)
@@ -40,7 +40,7 @@ run_step() {
 # Frontend
 run_step "tsc --noEmit"                   npx --no-install tsc --noEmit
 run_step "eslint (max-warnings=0)"       npm run -s lint
-run_step "vitest run"                     npx --no-install vitest run
+run_step "vitest run --coverage"          npx --no-install vitest run --coverage
 run_step "vite build"                     npx --no-install vite build
 
 # Backend
