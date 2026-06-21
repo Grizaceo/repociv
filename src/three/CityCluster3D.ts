@@ -248,7 +248,7 @@ export function rebuildCityClusters(
     const bldGeom = new BoxGeometry(HEX_SIZE * 0.12, HEX_SIZE * 0.28, HEX_SIZE * 0.12);
     const bldMat = new MeshLambertMaterial({ color: new Color(0xc8c0b0) });
     const roofGeom = new ConeGeometry(HEX_SIZE * 0.10, HEX_SIZE * 0.12, 4);
-    const roofMat = new MeshLambertMaterial({ color: new Color(0x9e5a45) });
+    const roofMat = new MeshLambertMaterial({ color: new Color(0xb0563a) });
     // Perimeter wall: a closed hexagonal RING (outer hex with inner hex hole,
     // extruded). ONE geometry per city, not 6 separate boxes. The previous
     // 6-box design left gaps at every corner, so walls read as 6 scattered
@@ -290,13 +290,15 @@ export function rebuildCityClusters(
     const towerGeom = new CylinderGeometry(HEX_SIZE * 0.025, HEX_SIZE * 0.03, HEX_SIZE * 0.18, 6);
     const towerMat = new MeshLambertMaterial({ color: new Color(0xa09880) });
 
-    // Density keyed on population (files in repo). Max 5 buildings per city.
+    // Density keyed on population (files in repo). Civ V cities read as a dense
+    // cluster of dwellings inside the walls, not a handful of huts — so the caps
+    // are generous (max 11, matching the `offsets` ring layout below).
     function buildingCountForCity(pop: number): number {
-      if (pop <= 30) return 1;
-      if (pop <= 120) return 2;
-      if (pop <= 350) return 3;
-      if (pop <= 800) return 4;
-      return 5;
+      if (pop <= 30) return 3;
+      if (pop <= 120) return 5;
+      if (pop <= 350) return 7;
+      if (pop <= 800) return 9;
+      return 11;
     }
 
     // Capitals with the GLB keep get 3 village-style satellite houses so
@@ -333,13 +335,24 @@ export function rebuildCityClusters(
       const lvl = cityLevel(city);
       const wallComplete = LEVEL_WALL_COMPLETENESS[lvl]!;
 
-      // Building footprints — clustered toward centre so walls read as a perimeter
+      // Building footprints — concentric rings inside the wall (inner radius
+      // 0.34·HEX). Centre tower + inner ring + outer ring = 11 dwellings, all
+      // kept within ~0.24·HEX of centre so the 0.12·HEX footprints stay clear of
+      // the perimeter wall. Heights vary for a layered Civ-V silhouette.
       const offsets: Array<[number, number, number]> = [
-        [0,       0,    1.00],
-        [-0.10,   0.08, 0.82],
-        [0.12,   -0.06, 0.88],
-        [0.05,    0.14, 0.72],
-        [-0.08,  -0.10, 0.68],
+        [0, 0, 1.0],
+        // inner ring (r≈0.13)
+        [0.092, 0.092, 0.85],
+        [-0.092, 0.092, 0.78],
+        [-0.092, -0.092, 0.88],
+        [0.092, -0.092, 0.72],
+        // outer ring (r≈0.24)
+        [0.24, 0, 0.7],
+        [0.12, 0.208, 0.66],
+        [-0.12, 0.208, 0.74],
+        [-0.24, 0, 0.68],
+        [-0.12, -0.208, 0.62],
+        [0.12, -0.208, 0.76],
       ];
       for (let bi = 0; bi < count; bi++) {
         const [ox, oz, ht] = offsets[bi]!;
