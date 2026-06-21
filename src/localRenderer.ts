@@ -12,6 +12,7 @@ import {
   type LocalParticle,
 } from './localParticles.ts';
 import { buildIsoStaticLayer, buildStaticLayer } from './localStaticLayers.ts';
+import { worldToScreen, screenToWorld, clampZoom } from './hex.ts';
 import {
   drawPowerOverlay as drawPowerOverlayModule,
   drawTemperatureOverlay as drawTemperatureOverlayModule,
@@ -520,21 +521,15 @@ export class LocalRenderer {
         if (!this._inputActive) return;
         e.preventDefault();
         const factor = e.deltaY > 0 ? 0.9 : 1.1;
-        const newZoom = Math.max(0.2, Math.min(4, this.cam.zoom * factor));
+        const newZoom = clampZoom(this.cam.zoom * factor, 0.2, 4);
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
         const my = e.clientY - rect.top;
-        const before = {
-          x: (mx - this.cam.cx) / this.cam.zoom + this.cam.x,
-          y: (my - this.cam.cy) / this.cam.zoom + this.cam.y,
-        };
+        const before = screenToWorld(this.cam, mx, my);
         this.cam.zoom = newZoom;
-        const after = {
-          x: (mx - this.cam.cx) / this.cam.zoom + this.cam.x,
-          y: (my - this.cam.cy) / this.cam.zoom + this.cam.y,
-        };
-        this.cam.x += before.x - after.x;
-        this.cam.y += before.y - after.y;
+        const after = screenToWorld(this.cam, mx, my);
+        this.cam.x += before.wx - after.wx;
+        this.cam.y += before.wy - after.wy;
       },
       { passive: false },
     );
@@ -619,8 +614,7 @@ export class LocalRenderer {
   }
 
   private screenToTile(sx: number, sy: number): { x: number; y: number } | null {
-    const wx = (sx - this.cam.cx) / this.cam.zoom + this.cam.x;
-    const wy = (sy - this.cam.cy) / this.cam.zoom + this.cam.y;
+    const { wx, wy } = screenToWorld(this.cam, sx, sy);
     if (this._isometric) {
       const iso = isoUnproject(wx, wy);
       return { x: Math.floor(iso.x), y: Math.floor(iso.y) };
@@ -639,8 +633,7 @@ export class LocalRenderer {
   /** Hit-test for local units (ported from macro getUnitAt pattern). */
   private getUnitAt(screenX: number, screenY: number): LocalUnit | null {
     if (!this.world || this._localUnits.length === 0) return null;
-    const wx = (screenX - this.cam.cx) / this.cam.zoom + this.cam.x;
-    const wy = (screenY - this.cam.cy) / this.cam.zoom + this.cam.y;
+    const { wx, wy } = screenToWorld(this.cam, screenX, screenY);
 
     if (this._isometric) {
       // In isometric mode, find the unit whose iso-projected position is nearest
@@ -684,8 +677,7 @@ export class LocalRenderer {
   /** Hit-test for stationary NPCs. */
   private getNpcAt(screenX: number, screenY: number): import('./types.ts').LocalNpc | null {
     if (!this.world || !this.world.npcs || this.world.npcs.length === 0) return null;
-    const wx = (screenX - this.cam.cx) / this.cam.zoom + this.cam.x;
-    const wy = (screenY - this.cam.cy) / this.cam.zoom + this.cam.y;
+    const { wx, wy } = screenToWorld(this.cam, screenX, screenY);
 
     if (this._isometric) {
       const threshold = ISO_TILE_W * 0.18;
@@ -851,10 +843,8 @@ export class LocalRenderer {
     if (world) {
       const worldPxW = world.width * TILE_SIZE;
       const worldPxH = world.height * TILE_SIZE;
-      const left = (0 - cam.cx) / cam.zoom + cam.x;
-      const top = (0 - cam.cy) / cam.zoom + cam.y;
-      const right = (canvas.width - cam.cx) / cam.zoom + cam.x;
-      const bottom = (canvas.height - cam.cy) / cam.zoom + cam.y;
+      const { wx: left, wy: top } = screenToWorld(cam, 0, 0);
+      const { wx: right, wy: bottom } = screenToWorld(cam, canvas.width, canvas.height);
 
       if (left < 0 || top < 0 || right > worldPxW || bottom > worldPxH) {
         const S = TILE_SIZE;
@@ -935,9 +925,11 @@ export class LocalRenderer {
       if (room.workbenches.length > placed && room.workbenches.length >= 3) {
         // Anchor at the room's top edge (over the wall, next to the room
         // label) so the summary never covers the desks themselves.
-        const sx =
-          ((room.x + room.width / 2) * TILE_SIZE - this.cam.x) * this.cam.zoom + this.cam.cx;
-        const sy = (room.y * TILE_SIZE - this.cam.y) * this.cam.zoom + this.cam.cy;
+        const { sx, sy } = worldToScreen(
+          this.cam,
+          (room.x + room.width / 2) * TILE_SIZE,
+          room.y * TILE_SIZE,
+        );
         drawWorkbenchClusterPanel(
           this.assetState(),
           sx,
@@ -1082,12 +1074,16 @@ export class LocalRenderer {
     const { canvas, cam } = this;
 
     if (this._isometric) {
-      // Screen corners → iso grid, then expand margin generously
+      // Screen corners → world → iso grid, then expand margin generously
+      const tl = screenToWorld(cam, 0, 0);
+      const tr = screenToWorld(cam, canvas.width, 0);
+      const bl = screenToWorld(cam, 0, canvas.height);
+      const br = screenToWorld(cam, canvas.width, canvas.height);
       const corners = [
-        isoUnproject((0 - cam.cx) / cam.zoom + cam.x, (0 - cam.cy) / cam.zoom + cam.y),
-        isoUnproject((canvas.width - cam.cx) / cam.zoom + cam.x, (0 - cam.cy) / cam.zoom + cam.y),
-        isoUnproject((0 - cam.cx) / cam.zoom + cam.x, (canvas.height - cam.cy) / cam.zoom + cam.y),
-        isoUnproject((canvas.width - cam.cx) / cam.zoom + cam.x, (canvas.height - cam.cy) / cam.zoom + cam.y),
+        isoUnproject(tl.wx, tl.wy),
+        isoUnproject(tr.wx, tr.wy),
+        isoUnproject(bl.wx, bl.wy),
+        isoUnproject(br.wx, br.wy),
       ];
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       for (const c of corners) {
@@ -1105,10 +1101,8 @@ export class LocalRenderer {
     }
 
     // Screen bounds to world coordinates
-    const left = (0 - cam.cx) / cam.zoom + cam.x;
-    const top = (0 - cam.cy) / cam.zoom + cam.y;
-    const right = (canvas.width - cam.cx) / cam.zoom + cam.x;
-    const bottom = (canvas.height - cam.cy) / cam.zoom + cam.y;
+    const { wx: left, wy: top } = screenToWorld(cam, 0, 0);
+    const { wx: right, wy: bottom } = screenToWorld(cam, canvas.width, canvas.height);
 
     const x0 = Math.max(0, Math.floor(left / TILE_SIZE));
     const y0 = Math.max(0, Math.floor(top / TILE_SIZE));
@@ -2530,8 +2524,7 @@ export class LocalRenderer {
     ctx.restore();
 
     if (this.onUnitRendered) {
-      const sx = (ux - this.cam.x) * this.cam.zoom + this.cam.cx;
-      const sy = (uy + bobbingY - this.cam.y) * this.cam.zoom + this.cam.cy;
+      const { sx, sy } = worldToScreen(this.cam, ux, uy + bobbingY);
       this.onUnitRendered(unit, sx, sy);
     }
   }
@@ -2591,8 +2584,7 @@ export class LocalRenderer {
       uy = unit.gridY * TILE_SIZE + TILE_SIZE / 2;
     }
 
-    const wx = (this._dragAssignMouseX - cam.cx) / cam.zoom + cam.x;
-    const wy = (this._dragAssignMouseY - cam.cy) / cam.zoom + cam.y;
+    const { wx, wy } = screenToWorld(cam, this._dragAssignMouseX, this._dragAssignMouseY);
 
     ctx.save();
     ctx.strokeStyle = unit.color;
@@ -2683,8 +2675,7 @@ export class LocalRenderer {
     const py = this.hoveredTile.y * TILE_SIZE;
 
     // Convert to screen coords
-    const sx = (px - cam.x) * cam.zoom + cam.cx;
-    const sy = (py - cam.y) * cam.zoom + cam.cy;
+    const { sx, sy } = worldToScreen(cam, px, py);
 
     const padX = 8, padY = 6, lineHeight = 11;
     const extCol = EXT_COLOR[wb.extension] ?? '#888';
