@@ -65,6 +65,7 @@ import {
 } from './ui/index.ts';
 import { mountGacetaWidget } from './ui/gacetaWidget.ts';
 import { startMcpStatusPolling } from './ui/mcpStatus.ts';
+import { maybeStartFirstRunTour } from './ui/firstRunTour.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { wireHUD, selectHero } from './ui/hudWiring.ts';
 import { initHudMode } from './ui/hudMode.ts';
@@ -749,6 +750,10 @@ async function bootstrap() {
   setWebGLMetricsSource(() => renderer.getWebGLMetrics());
   startObservabilityPolling();
   startHarnessPolling();
+
+  // First-run coachmark tour (plan B2): teach the core loop once. Delayed so
+  // the canvas/HUD have settled and any onboarding panel has resolved.
+  setTimeout(() => maybeStartFirstRunTour(), 1800);
 
   // ══ Wonder auto-start ══
   // Fire-and-forget: launch + poll every CONNECTED iframe wonder (whatever the
