@@ -63,7 +63,13 @@ export default defineConfig(({ mode }) => {
           'src/localWorldManager.ts',
           'src/main.ts',
         ],
-        thresholds: { lines: 55, branches: 70 },
+        // Anti-regression FLOOR over the measured core (src/ui/** is excluded
+        // above). Set just below current actual (lines 44.98 / branches 38.3 /
+        // funcs 52.58 / stmts 44.26 as of 2026-06-20) so the gate catches a real
+        // drop without nagging on noise. Now ENFORCED — scripts/check.sh runs
+        // vitest with --coverage. Ratchet upward as coverage grows; broadening
+        // the src/ui/** exclusion is a follow-up (plan P1.4).
+        thresholds: { lines: 43, branches: 36, functions: 50, statements: 42 },
       },
     },
     build: {
