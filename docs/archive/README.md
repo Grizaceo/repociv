@@ -23,6 +23,7 @@ cómo se verificó cada gate).
 | `FASE1_CLOSURE.md` | Cierre de Fase 1. |
 | `PHASE_1_VERIFICATION.md` | Audit detallada de los gates de Fase 1. |
 | `AUDIT_RECOMMENDATIONS.md` | Recomendaciones de un audit previo, ya aplicadas o re-evaluadas. |
+| `AUDIT_2026-06-19.md` | Auditoría general (build/seguridad/arquitectura/deuda). P0-P1 + P2.3/P2.4 + governance aplicados; P2.1 (hex-core + route registry) cerrado 2026-06. |
 | `local_view_beautification_plan.md` | Plan de embellecimiento de la vista local, ya ejecutado. |
 | `onboarding-repo-selection.md` | Plan del onboarding de selección de repos, ya implementado. |
 

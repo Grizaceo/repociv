@@ -2,7 +2,7 @@
 
 > Fecha: 2026-06-20. Basado en evaluación de la **UI real** (capturas vía
 > kimi-webbridge sobre Chrome con GPU: modo 2D `flat` por defecto y 3D
-> `?renderer=webgl`) + el audit `docs/AUDIT_2026-06-19.md`.
+> `?renderer=webgl`) + el audit `docs/archive/AUDIT_2026-06-19.md`.
 > Dirección acordada con el owner: subir **utilidad** sin romper scope, robándole
 > a Civ V su **disclosure progresivo** (no solo su estética).
 
