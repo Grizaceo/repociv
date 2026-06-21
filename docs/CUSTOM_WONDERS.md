@@ -10,7 +10,7 @@ Cómo agregar tus propias Maravillas al launcher de RepoCiv.
 > anyone with the token.
 
 **TL;DR.** Creás un archivo en `~/.repociv/wonders/<id>.json` con un
-[WonderManifest](../WONDER_CONTRACT.md) + un campo opcional `launch`
+[WonderManifest](WONDER_CONTRACT.md) + un campo opcional `launch`
 que describe los comandos CLI a lanzar. Reiniciás el bridge y tu
 maravilla aparece en `GET /api/wonders` con auto-start disponible.
 
@@ -289,7 +289,7 @@ y reiniciá el bridge.
 
 ## 8. Referencias
 
-- [`WONDER_CONTRACT.md`](../WONDER_CONTRACT.md) — schema del manifest
+- [`WONDER_CONTRACT.md`](WONDER_CONTRACT.md) — schema del manifest
 - [`server/wonder_launcher.py`](../../server/wonder_launcher.py) — implementación
 - [`server/wonder_registry.py`](../../server/wonder_registry.py) — registry
 - `server/tests/test_wonder_launcher.py` — tests con custom specs (9 nuevos)
