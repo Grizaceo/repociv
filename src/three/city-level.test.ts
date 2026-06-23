@@ -71,8 +71,20 @@ describe('cityLevel', () => {
   });
 
   it('returns 2 for 3-5 completed buildings', () => {
-    expect(cityLevel(makeCity('a', 0, 0, [makeBuilding('b1'), makeBuilding('b2'), makeBuilding('b3')]))).toBe(2);
-    expect(cityLevel(makeCity('a', 0, 0, [makeBuilding('b1'), makeBuilding('b2'), makeBuilding('b3'), makeBuilding('b4'), makeBuilding('b5')]))).toBe(2);
+    expect(
+      cityLevel(makeCity('a', 0, 0, [makeBuilding('b1'), makeBuilding('b2'), makeBuilding('b3')])),
+    ).toBe(2);
+    expect(
+      cityLevel(
+        makeCity('a', 0, 0, [
+          makeBuilding('b1'),
+          makeBuilding('b2'),
+          makeBuilding('b3'),
+          makeBuilding('b4'),
+          makeBuilding('b5'),
+        ]),
+      ),
+    ).toBe(2);
   });
 
   it('returns 3 for 6+ completed buildings', () => {

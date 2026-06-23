@@ -220,8 +220,12 @@ export function findNearestWorkbench(
     const owner = world.deskAssignments.get(`${x},${y}`);
     return owner !== undefined && owner !== forUnitId;
   };
-  let fallback: { x: number; y: number; workbench: LocalTile['workbench']; distance: number } | null =
-    null;
+  let fallback: {
+    x: number;
+    y: number;
+    workbench: LocalTile['workbench'];
+    distance: number;
+  } | null = null;
 
   const cost = (x: number, y: number): number => {
     const t = grid[y]?.[x];
@@ -239,9 +243,7 @@ export function findNearestWorkbench(
   // workbench-bearing tile — first pop is the nearest walkable
   // workbench, not the nearest by air-distance.
   const dist = new Map<number, number>();
-  const heap: Array<{ x: number; y: number; d: number }> = [
-    { x: fromX, y: fromY, d: 0 },
-  ];
+  const heap: Array<{ x: number; y: number; d: number }> = [{ x: fromX, y: fromY, d: 0 }];
   const k = (x: number, y: number) => y * W + x;
   dist.set(k(fromX, fromY), 0);
 

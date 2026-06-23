@@ -717,10 +717,10 @@ export interface StockpileFilter {
 
 // ─── Joy / Needs / Mood ────────────────────────────────────────────────────────
 export interface UnitNeeds {
-  rest: number;       // 0-100 (100 = rested)
-  food: number;       // 0-100
-  joy: number;        // 0-100
-  comfort: number;    // 0-100 (room impressiveness)
+  rest: number; // 0-100 (100 = rested)
+  food: number; // 0-100
+  joy: number; // 0-100
+  comfort: number; // 0-100 (room impressiveness)
 }
 
 export interface Thought {
@@ -774,7 +774,8 @@ export interface LocalWorldRimWorld extends LocalWorld {
 
 // ─── LocalTileType extended ────────────────────────────────────────────────────
 // Adding power/climate/zone tile types
-export type LocalTileTypeExtended = LocalTileType
+export type LocalTileTypeExtended =
+  | LocalTileType
   | 'conduit'
   | 'power_source'
   | 'power_consumer'

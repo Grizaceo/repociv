@@ -83,16 +83,8 @@ import {
   clearCityProps,
 } from './CityProps3D.ts';
 import { ensureUnitPropsLoad } from './UnitProps3D.ts';
-import {
-  getTileFlashGroup,
-  flashTile,
-  tickTileFlash,
-  clearTileFlash,
-} from './TileFlash3D.ts';
-import {
-  getTilePopupGroup,
-  clearTilePopup,
-} from './TilePopup3D.ts';
+import { getTileFlashGroup, flashTile, tickTileFlash, clearTileFlash } from './TileFlash3D.ts';
+import { getTilePopupGroup, clearTilePopup } from './TilePopup3D.ts';
 import {
   getFogTransitionGroup,
   updateFogTransition,
@@ -277,7 +269,7 @@ function clearTerritoryLines(): void {
 
 function animateTerritoryPulse(animTime: number): void {
   if (territoryBorders.length === 0) return;
-  const pulse = 0.90 + 0.07 * Math.sin(animTime * 2.2);
+  const pulse = 0.9 + 0.07 * Math.sin(animTime * 2.2);
   for (const mesh of territoryBorders) {
     const mat = mesh.material as MeshBasicMaterial;
     const baseOpacity = (mat.userData.baseOpacity as number) ?? 0.5;
@@ -290,18 +282,27 @@ function animateTerritoryPulse(animTime: number): void {
 // edge becomes a quad biased slightly INTO the owner's territory (Civ V's
 // border hugs the inside of the frontier). A wider additive-blended glow band
 // underneath gives the signature neon halo.
-const BORDER_BAND_W = HEX_SIZE * 0.10;
+const BORDER_BAND_W = HEX_SIZE * 0.1;
 
 interface BorderEdge {
-  x1: number; z1: number; x2: number; z2: number;
-  cx: number; cz: number; y: number;
+  x1: number;
+  z1: number;
+  x2: number;
+  z2: number;
+  cx: number;
+  cz: number;
+  y: number;
 }
 
 /** Build a flat ribbon (XZ plane, at each edge's y) from boundary edges.
  *  `width` is the band thickness; `inset` shifts the band toward the tile
  *  centre so it reads as the owner's inner frontier. Ends are mitre-extended
  *  by half-width so consecutive segments close the corner gaps. */
-export function buildRibbonGeometry(edges: BorderEdge[], width: number, inset: number): BufferGeometry {
+export function buildRibbonGeometry(
+  edges: BorderEdge[],
+  width: number,
+  inset: number,
+): BufferGeometry {
   // Pre-sized: 2 triangles × 3 verts × 3 coords = 18 floats per edge.
   const pos = new Float32Array(edges.length * 18);
   const hw = width * 0.5;
@@ -329,16 +330,32 @@ export function buildRibbonGeometry(edges: BorderEdge[], width: number, inset: n
     // Band spans [inset - hw, inset + hw] along the inward normal.
     const o1 = inset - hw;
     const o2 = inset + hw;
-    const p1x = ax + nx * o1, p1z = az + nz * o1;
-    const p2x = ax + nx * o2, p2z = az + nz * o2;
-    const p3x = bx + nx * o2, p3z = bz + nz * o2;
-    const p4x = bx + nx * o1, p4z = bz + nz * o1;
-    pos[o++] = p1x; pos[o++] = e.y; pos[o++] = p1z;
-    pos[o++] = p2x; pos[o++] = e.y; pos[o++] = p2z;
-    pos[o++] = p3x; pos[o++] = e.y; pos[o++] = p3z;
-    pos[o++] = p1x; pos[o++] = e.y; pos[o++] = p1z;
-    pos[o++] = p3x; pos[o++] = e.y; pos[o++] = p3z;
-    pos[o++] = p4x; pos[o++] = e.y; pos[o++] = p4z;
+    const p1x = ax + nx * o1,
+      p1z = az + nz * o1;
+    const p2x = ax + nx * o2,
+      p2z = az + nz * o2;
+    const p3x = bx + nx * o2,
+      p3z = bz + nz * o2;
+    const p4x = bx + nx * o1,
+      p4z = bz + nz * o1;
+    pos[o++] = p1x;
+    pos[o++] = e.y;
+    pos[o++] = p1z;
+    pos[o++] = p2x;
+    pos[o++] = e.y;
+    pos[o++] = p2z;
+    pos[o++] = p3x;
+    pos[o++] = e.y;
+    pos[o++] = p3z;
+    pos[o++] = p1x;
+    pos[o++] = e.y;
+    pos[o++] = p1z;
+    pos[o++] = p3x;
+    pos[o++] = e.y;
+    pos[o++] = p3z;
+    pos[o++] = p4x;
+    pos[o++] = e.y;
+    pos[o++] = p4z;
   }
   const geom = new BufferGeometry();
   geom.setAttribute('position', new Float32BufferAttribute(pos, 3));
@@ -452,7 +469,11 @@ function rebuildTerritoryLines(
   // capitals) no matter how many cities — a real workspace has dozens, and
   // the old per-city path fell back to a single flat gold past 50, throwing
   // away every civ colour. Capitals form their own brighter group.
-  interface BorderGroup { color: Color; capital: boolean; edges: BorderEdge[] }
+  interface BorderGroup {
+    color: Color;
+    capital: boolean;
+    edges: BorderEdge[];
+  }
   const groups = new Map<string, BorderGroup>();
   cities.forEach((city, cityIdx) => {
     const inTerritory = new Set(city.territory.map((c) => tileKey(c)));
@@ -475,9 +496,7 @@ function rebuildTerritoryLines(
   });
 
   for (const g of groups.values()) {
-    const baseOpacity = g.capital
-      ? (lod === 'high' ? 0.52 : 0.44)
-      : (lod === 'high' ? 0.40 : 0.34);
+    const baseOpacity = g.capital ? (lod === 'high' ? 0.52 : 0.44) : lod === 'high' ? 0.4 : 0.34;
     addBorderRibbon(g.edges, g.color, baseOpacity);
   }
 }
@@ -614,8 +633,18 @@ function rebuildFoam(state: GameState, _animTime: number): void {
       tx /= tl;
       tz /= tl;
       foamPositions.push({ x: mx, y: center.y + 1.0, z: mz, s: 1.0 });
-      foamPositions.push({ x: mx + tx * HEX_SIZE * 0.22, y: center.y + 1.0, z: mz + tz * HEX_SIZE * 0.22, s: 0.55 });
-      foamPositions.push({ x: mx - tx * HEX_SIZE * 0.22, y: center.y + 1.0, z: mz - tz * HEX_SIZE * 0.22, s: 0.55 });
+      foamPositions.push({
+        x: mx + tx * HEX_SIZE * 0.22,
+        y: center.y + 1.0,
+        z: mz + tz * HEX_SIZE * 0.22,
+        s: 0.55,
+      });
+      foamPositions.push({
+        x: mx - tx * HEX_SIZE * 0.22,
+        y: center.y + 1.0,
+        z: mz - tz * HEX_SIZE * 0.22,
+        s: 0.55,
+      });
     }
   }
 
@@ -644,8 +673,7 @@ function rebuildFoam(state: GameState, _animTime: number): void {
  *  Deterministic under ?freeze (input is animTime). */
 function animateFoamPulse(animTime: number): void {
   if (!foamMesh) return;
-  (foamMesh.material as MeshLambertMaterial).opacity =
-    0.45 + 0.15 * Math.sin(animTime * 1.7);
+  (foamMesh.material as MeshLambertMaterial).opacity = 0.45 + 0.15 * Math.sin(animTime * 1.7);
 }
 
 function rebuildGround(state: GameState): void {
@@ -718,7 +746,7 @@ function rebuildFogCover(state: GameState): void {
   // lid into Civ V's billowing unexplored cover. Hash-deterministic
   // placement (same coords → same puffs → SHA-stable goldens), static —
   // no per-frame cost, the fog reads volumetric from the play camera.
-  const puffGeom = new SphereGeometry(HEX_SIZE * 0.30, 8, 6);
+  const puffGeom = new SphereGeometry(HEX_SIZE * 0.3, 8, 6);
   const puffMat = new MeshLambertMaterial({
     color: 0xdde3e1,
     emissive: 0x767d80,
@@ -728,9 +756,9 @@ function rebuildFogCover(state: GameState): void {
   const PUFFS = 3;
   fogPuffMesh = new InstancedMesh(puffGeom, puffMat, unrevealed.length * PUFFS);
   const puffSpots: Array<[number, number]> = [
-    [-0.18, -0.10],
-    [0.20, 0.06],
-    [-0.02, 0.20],
+    [-0.18, -0.1],
+    [0.2, 0.06],
+    [-0.02, 0.2],
   ];
   const pPos = new Vector3();
   const pQuat = new Quaternion();
@@ -745,12 +773,8 @@ function rebuildFogCover(state: GameState): void {
       const [ox, oz] = puffSpots[p]!;
       const jx = (((h >> (p * 2)) % 9) - 4) * 0.015;
       const jz = (((h >> (p * 2 + 3)) % 9) - 4) * 0.015;
-      const sc = 0.85 + ((h >> (p + 5)) % 5) * 0.10;
-      pPos.set(
-        pos.x + (ox + jx) * HEX_SIZE,
-        pos.y + 2.5,
-        pos.z + (oz + jz) * HEX_SIZE,
-      );
+      const sc = 0.85 + ((h >> (p + 5)) % 5) * 0.1;
+      pPos.set(pos.x + (ox + jx) * HEX_SIZE, pos.y + 2.5, pos.z + (oz + jz) * HEX_SIZE);
       pQuat.setFromAxisAngle(up, ((h + p * 53) % 6) * (Math.PI / 3));
       pScl.set(sc * 1.35, sc * 0.42, sc * 1.0);
       matrix.compose(pPos, pQuat, pScl);
@@ -811,8 +835,12 @@ function rebuildHexGrid(state: GameState, visible: boolean, lod: 'low' | 'medium
       const a1 = hexCornerAngle3D(e);
       const a2 = hexCornerAngle3D((e + 1) % 6);
       segments.push(
-        center.x + HEX_SIZE * Math.cos(a1), y, center.z + HEX_SIZE * Math.sin(a1),
-        center.x + HEX_SIZE * Math.cos(a2), y, center.z + HEX_SIZE * Math.sin(a2),
+        center.x + HEX_SIZE * Math.cos(a1),
+        y,
+        center.z + HEX_SIZE * Math.sin(a1),
+        center.x + HEX_SIZE * Math.cos(a2),
+        y,
+        center.z + HEX_SIZE * Math.sin(a2),
       );
     }
   }
@@ -827,7 +855,7 @@ function rebuildHexGrid(state: GameState, visible: boolean, lod: 'low' | 'medium
     // recessed seam UNDER the paint — Civ V's lattice that ties tiles together.
     color: 0x3a2f22,
     transparent: true,
-    opacity: lod === 'high' ? 0.10 : lod === 'medium' ? 0.07 : 0.035,
+    opacity: lod === 'high' ? 0.1 : lod === 'medium' ? 0.07 : 0.035,
     linewidth: 1,
   });
   hexGridLines = new LineSegments(geom, mat);
@@ -843,7 +871,9 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
     });
     if (terrainMesh.instanceColor) terrainMesh.instanceColor.needsUpdate = true;
     // P5: Update city colors for territory fill tint (territory may have changed)
-    const cityColorAttr = terrainMesh.geometry.getAttribute('instanceCityColor') as InstancedBufferAttribute | undefined;
+    const cityColorAttr = terrainMesh.geometry.getAttribute('instanceCityColor') as
+      | InstancedBufferAttribute
+      | undefined;
     if (cityColorAttr) {
       const tileCityColor = new Map<string, [number, number, number]>();
       for (const city of state.world.cities) {
@@ -877,14 +907,19 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
     terrainMesh = null;
   }
 
-  if (!terrainMaterial || !!(terrainMaterial.userData as { atlasBound?: boolean }).atlasBound !== !!loadedTerrainAtlas?.texture) {
+  if (
+    !terrainMaterial ||
+    !!(terrainMaterial.userData as { atlasBound?: boolean }).atlasBound !==
+      !!loadedTerrainAtlas?.texture
+  ) {
     if (terrainMaterial) terrainMaterial.dispose();
     terrainMaterial = createTerrainMaterial({
       terrainAtlas: loadedTerrainAtlas?.texture ?? null,
       normalAtlas: loadedTerrainAtlas?.normalTexture ?? null,
       roughnessAtlas: loadedTerrainAtlas?.roughnessTexture ?? null,
     });
-    (terrainMaterial.userData as { atlasBound?: boolean }).atlasBound = !!loadedTerrainAtlas?.texture;
+    (terrainMaterial.userData as { atlasBound?: boolean }).atlasBound =
+      !!loadedTerrainAtlas?.texture;
   }
   // Clone shared geometry so we can safely attach an instanceTerrain attribute
   const clonedGeom = sharedHexGeometry.clone();
@@ -1006,12 +1041,30 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
     }
   });
 
-  terrainMesh.geometry.setAttribute('instanceTerrain', new InstancedBufferAttribute(terrainIndices, 1));
-  terrainMesh.geometry.setAttribute('instanceNeighborTerrain', new InstancedBufferAttribute(neighborIndices, 1));
-  terrainMesh.geometry.setAttribute('instanceCoastMask', new InstancedBufferAttribute(coastMasks, 1));
-  terrainMesh.geometry.setAttribute('instanceSideCullMask', new InstancedBufferAttribute(sideCullMasks, 1));
-  terrainMesh.geometry.setAttribute('instanceOceanDepth', new InstancedBufferAttribute(oceanDepths, 1));
-  terrainMesh.geometry.setAttribute('instanceCityColor', new InstancedBufferAttribute(cityColors, 3));
+  terrainMesh.geometry.setAttribute(
+    'instanceTerrain',
+    new InstancedBufferAttribute(terrainIndices, 1),
+  );
+  terrainMesh.geometry.setAttribute(
+    'instanceNeighborTerrain',
+    new InstancedBufferAttribute(neighborIndices, 1),
+  );
+  terrainMesh.geometry.setAttribute(
+    'instanceCoastMask',
+    new InstancedBufferAttribute(coastMasks, 1),
+  );
+  terrainMesh.geometry.setAttribute(
+    'instanceSideCullMask',
+    new InstancedBufferAttribute(sideCullMasks, 1),
+  );
+  terrainMesh.geometry.setAttribute(
+    'instanceOceanDepth',
+    new InstancedBufferAttribute(oceanDepths, 1),
+  );
+  terrainMesh.geometry.setAttribute(
+    'instanceCityColor',
+    new InstancedBufferAttribute(cityColors, 3),
+  );
   terrainMesh.frustumCulled = false;
   terrainMesh.instanceMatrix.needsUpdate = true;
   if (terrainMesh.instanceColor) terrainMesh.instanceColor.needsUpdate = true;
@@ -1028,7 +1081,12 @@ function ensureTerrainAtlasLoad(): void {
     if (atlas) {
       // Try hot-update if shader already compiled
       if (terrainMaterial) {
-        updateTerrainShaderAtlas(terrainMaterial, atlas.texture, atlas.normalTexture, atlas.roughnessTexture);
+        updateTerrainShaderAtlas(
+          terrainMaterial,
+          atlas.texture,
+          atlas.normalTexture,
+          atlas.roughnessTexture,
+        );
       }
       // Always dispose + null so the next rebuild creates a fresh material via
       // createTerrainMaterial({terrainAtlas: atlas.texture, ...}) — this avoids
@@ -1081,7 +1139,7 @@ export function updateHexWorldScene(
     // bathes in late gold like Civ V's continent view — and relaxes when
     // zoomed in so close-up materials stay true to the atlas palette.
     const lodBias = opts.lod === 'low' ? 0.06 : opts.lod === 'medium' ? 0.03 : 0;
-    sunLight.color.setRGB(1, (0.94 - lodBias) * warmth, (0.80 - lodBias * 2) * warmth);
+    sunLight.color.setRGB(1, (0.94 - lodBias) * warmth, (0.8 - lodBias * 2) * warmth);
     sunLight.intensity = 1.3 + 0.08 * Math.sin(t * 0.6);
   }
 
@@ -1119,10 +1177,7 @@ export function updateHexWorldScene(
   // Detect newly-revealed tiles and start fog fade-out transitions +
   // city discovery particle bursts. Must run AFTER rebuildTerrainMesh
   // (which calls rebuildFogCover) so the main fog cover is already updated.
-  updateFogTransition(
-    Array.from(state.world.tiles.values()),
-    (key) => state.world.tiles.get(key),
-  );
+  updateFogTransition(Array.from(state.world.tiles.values()), (key) => state.world.tiles.get(key));
   rebuildTerritoryLines(state, opts.animTime, opts.showStructure, opts.lod);
 
   setDecorVisible(opts.showStructure || opts.showOps);
@@ -1147,8 +1202,8 @@ export function updateHexWorldScene(
   // under labs. Both default-ON so the wonders stay visible when only the
   // `structure` layer is enabled.
   setWonderVisible('bibliotheca', opts.showKnowledge);
-  setWonderVisible('institutum',  opts.showLabs);
-  setWonderVisible('generic',     opts.showStructure);
+  setWonderVisible('institutum', opts.showLabs);
+  setWonderVisible('generic', opts.showStructure);
   rebuildWonderProps(Array.from(state.world.tiles.values()));
 
   rebuildMapLabels(scene, state, opts.lod, opts.showLabels, (key) => state.world.tiles.get(key));
@@ -1225,8 +1280,8 @@ export function disposeHexWorldScene(scene: Scene): void {
     terrainMaterial = null;
   }
   tileCountSignature = '';
-  fogCoverSignature  = '';
-  foamSignature      = '';
-  groundSignature    = '';
+  fogCoverSignature = '';
+  foamSignature = '';
+  groundSignature = '';
   scene.clear();
 }

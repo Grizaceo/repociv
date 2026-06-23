@@ -1,9 +1,5 @@
 // ─── Instanced terrain material: atlas texture + normal-map bump + Civ V lighting ──
-import {
-  Color,
-  MeshStandardMaterial,
-  Texture,
-} from 'three';
+import { Color, MeshStandardMaterial, Texture } from 'three';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Shader = any;
@@ -39,40 +35,40 @@ const SIDE_OUT_DIRS: Vector2[] = AXIAL_DIRECTIONS.map((d) => {
 
 /** Stable terrain-to-atlas index mapping. Keep in sync with terrain-atlas-3d.json. */
 export const TERRAIN_ATLAS_INDEX: Record<Terrain, number> = {
-  plains:   0,
-  forest:   1,
+  plains: 0,
+  forest: 1,
   mountain: 2,
-  desert:   3,
-  ocean:    4,
-  ice:      5,
-  hills:    6,
-  sacred:   7,
+  desert: 3,
+  ocean: 4,
+  ice: 5,
+  hills: 6,
+  sacred: 7,
 };
 
 /** Per-biome prism height scale (local Y multiplier in vertex shader).
  *  At TILE_PRISM_HEIGHT=24, scale=1.0 makes hills (elev=2) prism bottom touch plains (elev=0) top.
  *  Scales >1.0 add extra depth for drama; mountain needs ≥1.5 to bridge 3-step gap. */
 export const TERRAIN_HEIGHT_SCALE: Record<Terrain, number> = {
-  plains:   1.0,
-  forest:   1.0,
+  plains: 1.0,
+  forest: 1.0,
   mountain: 1.58,
-  desert:   1.0,
-  ocean:    0.70,
-  ice:      0.90,
-  hills:    1.12,
-  sacred:   1.0,
+  desert: 1.0,
+  ocean: 0.7,
+  ice: 0.9,
+  hills: 1.12,
+  sacred: 1.0,
 };
 
 /** Elevation in world units (coordinates with terrainElevation() in isoHex.ts). */
 export const TERRAIN_ELEVATION_WORLD: Record<Terrain, number> = {
-  plains:   0,
-  forest:   1,
+  plains: 0,
+  forest: 1,
   mountain: 3,
-  desert:   0,
-  ocean:   -1,
-  ice:      0,
-  hills:    2,
-  sacred:   0,
+  desert: 0,
+  ocean: -1,
+  ice: 0,
+  hills: 2,
+  sacred: 0,
 };
 
 export interface TerrainMaterialOptions {
@@ -83,9 +79,7 @@ export interface TerrainMaterialOptions {
   atlasRows?: number;
 }
 
-export function createTerrainMaterial(
-  options: TerrainMaterialOptions = {},
-): MeshStandardMaterial {
+export function createTerrainMaterial(options: TerrainMaterialOptions = {}): MeshStandardMaterial {
   // Note: roughnessAtlas is handled per-biome inside the shader via uRoughnessAtlas,
   // NOT via mat.roughnessMap (which would use wrong raw-tile UVs instead of atlas UVs).
   const mat = new MeshStandardMaterial({
@@ -96,20 +90,20 @@ export function createTerrainMaterial(
 
   mat.onBeforeCompile = (shader: Shader) => {
     // ── Uniforms ─────────────────────────────────────────────────────────────
-    shader.uniforms.uTime             = { value: 0 };
-    shader.uniforms.uHexRadius        = { value: HEX_SIZE };
-    shader.uniforms.uPrismHeight      = { value: TILE_PRISM_HEIGHT };
-    shader.uniforms.uTileHeight       = { value: TILE_HEIGHT };
-    shader.uniforms.uUseAtlas         = { value: options.terrainAtlas ? 1 : 0 };
-    shader.uniforms.uTerrainAtlas     = { value: options.terrainAtlas ?? null };
-    shader.uniforms.uNormalAtlas      = { value: options.normalAtlas ?? null };
-    shader.uniforms.uUseNormalAtlas   = { value: options.normalAtlas ? 1 : 0 };
-    shader.uniforms.uRoughnessAtlas   = { value: options.roughnessAtlas ?? null };
-    shader.uniforms.uUseRoughAtlas    = { value: options.roughnessAtlas ? 1 : 0 };
-    shader.uniforms.uAtlasColumns     = { value: options.atlasColumns ?? 4 };
-    shader.uniforms.uAtlasRows        = { value: options.atlasRows ?? 3 };
-    shader.uniforms.uCoastDir         = { value: COAST_EDGE_DIRS };
-    shader.uniforms.uSideOutDir       = { value: SIDE_OUT_DIRS };
+    shader.uniforms.uTime = { value: 0 };
+    shader.uniforms.uHexRadius = { value: HEX_SIZE };
+    shader.uniforms.uPrismHeight = { value: TILE_PRISM_HEIGHT };
+    shader.uniforms.uTileHeight = { value: TILE_HEIGHT };
+    shader.uniforms.uUseAtlas = { value: options.terrainAtlas ? 1 : 0 };
+    shader.uniforms.uTerrainAtlas = { value: options.terrainAtlas ?? null };
+    shader.uniforms.uNormalAtlas = { value: options.normalAtlas ?? null };
+    shader.uniforms.uUseNormalAtlas = { value: options.normalAtlas ? 1 : 0 };
+    shader.uniforms.uRoughnessAtlas = { value: options.roughnessAtlas ?? null };
+    shader.uniforms.uUseRoughAtlas = { value: options.roughnessAtlas ? 1 : 0 };
+    shader.uniforms.uAtlasColumns = { value: options.atlasColumns ?? 4 };
+    shader.uniforms.uAtlasRows = { value: options.atlasRows ?? 3 };
+    shader.uniforms.uCoastDir = { value: COAST_EDGE_DIRS };
+    shader.uniforms.uSideOutDir = { value: SIDE_OUT_DIRS };
     (mat.userData as { shader?: Shader }).shader = shader;
 
     // ── Vertex ────────────────────────────────────────────────────────────────
@@ -344,11 +338,14 @@ float terrainDetailNoise(vec2 p) {
 }
 `;
 
-    shader.fragmentShader = uniformDecl + atlasUvFn + shader.fragmentShader
-      // ── Colour from atlas (top face only) ──────────────────────────────────
-      .replace(
-        '#include <color_fragment>',
-        `#include <color_fragment>
+    shader.fragmentShader =
+      uniformDecl +
+      atlasUvFn +
+      shader.fragmentShader
+        // ── Colour from atlas (top face only) ──────────────────────────────────
+        .replace(
+          '#include <color_fragment>',
+          `#include <color_fragment>
         // Drop side faces shared with a same-elevation neighbor — each prism
         // no longer renders a vertical wall on interior edges, so the terrain
         // cap reads as one painted surface instead of a honeycomb of blocks.
@@ -628,24 +625,24 @@ float terrainDetailNoise(vec2 p) {
           }
           diffuseColor.rgb = clamp(diffuseColor.rgb, 0.0, 1.0);
         }`,
-      )
-      // ── Side-face emissive lift ──────────────────────────────────────────────
-      // Flanks facing away from the sun only get ambient light and went
-      // near-black regardless of albedo. A fraction of the cliff diffuse as
-      // self-illumination keeps every flank readable (Civ V cliffs are never
-      // black) while preserving directional shading on top of it. Scaled by
-      // the diffuse itself, so fog-dimmed tiles keep dim flanks.
-      .replace(
-        '#include <emissivemap_fragment>',
-        `#include <emissivemap_fragment>
+        )
+        // ── Side-face emissive lift ──────────────────────────────────────────────
+        // Flanks facing away from the sun only get ambient light and went
+        // near-black regardless of albedo. A fraction of the cliff diffuse as
+        // self-illumination keeps every flank readable (Civ V cliffs are never
+        // black) while preserving directional shading on top of it. Scaled by
+        // the diffuse itself, so fog-dimmed tiles keep dim flanks.
+        .replace(
+          '#include <emissivemap_fragment>',
+          `#include <emissivemap_fragment>
         if (vTopFace < 0.5) {
           totalEmissiveRadiance += diffuseColor.rgb * 0.38;
         }`,
-      )
-      // ── Per-biome roughness from atlas (correct atlas UV, not raw tile UV) ──
-      .replace(
-        '#include <roughnessmap_fragment>',
-        `#include <roughnessmap_fragment>
+        )
+        // ── Per-biome roughness from atlas (correct atlas UV, not raw tile UV) ──
+        .replace(
+          '#include <roughnessmap_fragment>',
+          `#include <roughnessmap_fragment>
         if (uUseRoughAtlas > 0 && vTopFace > 0.5) {
           float _rtidx = floor(vTerrainIndex + 0.5);
           vec2 rmacroUv = terrainMacroUv(_rtidx, vUv, vWorldXZ);
@@ -663,11 +660,11 @@ float terrainDetailNoise(vec2 p) {
             roughnessFactor = mix(0.30, 0.17, vOceanDepth);
           }
         }`,
-      )
-      // ── Normal-map perturbation from atlas ──────────────────────────────────
-      .replace(
-        '#include <normal_fragment_maps>',
-        `#include <normal_fragment_maps>
+        )
+        // ── Normal-map perturbation from atlas ──────────────────────────────────
+        .replace(
+          '#include <normal_fragment_maps>',
+          `#include <normal_fragment_maps>
         if (uUseNormalAtlas > 0 && vTopFace > 0.5) {
           float _ntidx = floor(vTerrainIndex + 0.5);
           float _nntidx = floor(vNeighborTerrainIndex + 0.5);
@@ -686,7 +683,7 @@ float terrainDetailNoise(vec2 p) {
           // Blend atlas normal into surface normal (TBN for a flat-top hex is identity-ish)
           normal = normalize(normal + vec3(nTex.x * 0.55, nTex.z, nTex.y * 0.55));
         }`,
-      );
+        );
   };
 
   // Cache key: bump on any GLSL change so the GPU program is
@@ -716,23 +713,23 @@ export function updateTerrainShaderAtlas(
 ): void {
   const shader = (mat.userData as { shader?: Shader }).shader;
   if (!shader) return;
-  shader.uniforms.uUseAtlas.value     = texture ? 1 : 0;
+  shader.uniforms.uUseAtlas.value = texture ? 1 : 0;
   shader.uniforms.uTerrainAtlas.value = texture;
   if (normalTexture !== undefined) {
     shader.uniforms.uUseNormalAtlas.value = normalTexture ? 1 : 0;
-    shader.uniforms.uNormalAtlas.value    = normalTexture;
+    shader.uniforms.uNormalAtlas.value = normalTexture;
   }
   if (roughnessTexture !== undefined) {
-    shader.uniforms.uUseRoughAtlas.value   = roughnessTexture ? 1 : 0;
-    shader.uniforms.uRoughnessAtlas.value  = roughnessTexture;
+    shader.uniforms.uUseRoughAtlas.value = roughnessTexture ? 1 : 0;
+    shader.uniforms.uRoughnessAtlas.value = roughnessTexture;
   }
 }
 
 /** Sky / horizon palette — warm Civ V afternoon. */
-export const SKY_TOP     = new Color(0x89b5d4);   // was 0x7a9ec8 — warmer blue
+export const SKY_TOP = new Color(0x89b5d4); // was 0x7a9ec8 — warmer blue
 // v28: the FogExp2 tone was green (0x9ab870) while the sky-dome haze is warm
 // cream-gold (SKY_HAZE 0xddd0aa) — distant terrain dissolved into a green band
 // that fought the sky instead of melting into golden-hour haze. Realign the
 // fog to the dome's warm horizon so atmospheric perspective reads Civ V.
-export const SKY_HORIZON = new Color(0xe2d4ad);   // warm cream-gold haze (was green-grey 0xc4ccb8, which tinted distance sickly)
-export const FOG_DENSITY = 0.00045;               // real aerial perspective at strategic zoom (was 0.00014 — barely visible)
+export const SKY_HORIZON = new Color(0xe2d4ad); // warm cream-gold haze (was green-grey 0xc4ccb8, which tinted distance sickly)
+export const FOG_DENSITY = 0.00045; // real aerial perspective at strategic zoom (was 0.00014 — barely visible)

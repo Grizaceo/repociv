@@ -67,7 +67,8 @@ function buildHarnessOption(id: string): HarnessOption {
     },
     claude: {
       name: 'Claude Code',
-      description: 'Claude Code CLI. Coding agent completo, sin memoria persistente entre sesiones.',
+      description:
+        'Claude Code CLI. Coding agent completo, sin memoria persistente entre sesiones.',
     },
     codex: {
       name: 'Codex',
@@ -201,17 +202,23 @@ function renderHarnessStep(state: OnboardingState): string {
 
 function stepLabel(step: OnboardingStep): string {
   switch (step) {
-    case 'harness': return '2 de 4';
-    case 'select':  return '3 de 4';
-    case 'review':  return '4 de 4';
+    case 'harness':
+      return '2 de 4';
+    case 'select':
+      return '3 de 4';
+    case 'review':
+      return '4 de 4';
   }
 }
 
 function stepTitle(step: OnboardingStep): string {
   switch (step) {
-    case 'harness': return 'Elige el motor de tu primera unidad';
-    case 'select':  return 'Elige que repos quieres ver en el mapa';
-    case 'review':  return 'Revisa tu seleccion antes de continuar';
+    case 'harness':
+      return 'Elige el motor de tu primera unidad';
+    case 'select':
+      return 'Elige que repos quieres ver en el mapa';
+    case 'review':
+      return 'Revisa tu seleccion antes de continuar';
   }
 }
 
@@ -255,7 +262,7 @@ function render(state: OnboardingState, onContinue: () => void): void {
   const listMarkup = isHarnessStep
     ? renderHarnessStep(state)
     : isReviewStep
-    ? `<div class="repo-onboarding-review">
+      ? `<div class="repo-onboarding-review">
           <h3>Resumen</h3>
           <p>Vas a mostrar <strong>${selectedCount}</strong> repos en el mapa.</p>
           <div class="repo-onboarding-review-list">
@@ -270,7 +277,7 @@ function render(state: OnboardingState, onContinue: () => void): void {
             ${selectedCount > 12 ? `<div class="repo-onboarding-more">+${selectedCount - 12} mas</div>` : ''}
           </div>
         </div>`
-    : `<div class="repo-onboarding-toolbar">
+      : `<div class="repo-onboarding-toolbar">
           <input id="repo-onboarding-search" type="search" placeholder="Buscar repositorio..." value="${state.query}" />
           <button id="repo-onboarding-pick-folder" class="btn-secondary" type="button" ${state.isPickingFolder ? 'disabled' : ''}>
             ${state.isPickingFolder ? 'Abriendo selector...' : 'Seleccionar carpeta del mapa'}
@@ -333,7 +340,10 @@ function render(state: OnboardingState, onContinue: () => void): void {
       </header>
       <div class="repo-onboarding-content">
         <div class="repo-onboarding-main">${listMarkup}</div>
-        ${isHarnessStep ? '' : `<aside class="repo-onboarding-summary">
+        ${
+          isHarnessStep
+            ? ''
+            : `<aside class="repo-onboarding-summary">
           <h3>Resumen rapido</h3>
           <p>Total detectados: <strong>${state.repos.length}</strong></p>
           <p>Total seleccionados: <strong>${selectedCount}</strong></p>
@@ -342,7 +352,8 @@ function render(state: OnboardingState, onContinue: () => void): void {
               ? '<p class="repo-onboarding-warning">Selecciona al menos un repositorio para continuar.</p>'
               : ''
           }
-        </aside>`}
+        </aside>`
+        }
       </div>
       <footer class="repo-onboarding-footer">
         <button id="repo-onboarding-back" type="button" class="btn-secondary" ${

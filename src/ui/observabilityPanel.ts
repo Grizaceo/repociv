@@ -226,7 +226,11 @@ function _render() {
           ? _metric(
               'Budget',
               `${Math.round(m.tokenBudget.budget_used_pct)}%`,
-              m.tokenBudget.budget_violated ? 'crit' : m.tokenBudget.budget_used_pct > 80 ? 'warn' : 'ok',
+              m.tokenBudget.budget_violated
+                ? 'crit'
+                : m.tokenBudget.budget_used_pct > 80
+                  ? 'warn'
+                  : 'ok',
             )
           : ''
       }

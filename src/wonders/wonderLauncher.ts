@@ -106,9 +106,7 @@ export async function launchWonder(id: string): Promise<WonderLaunchStatus> {
 }
 
 /** GET /api/wonders/{id}/launch-status → current status. */
-export async function getWonderLaunchStatus(
-  id: string,
-): Promise<WonderLaunchStatus> {
+export async function getWonderLaunchStatus(id: string): Promise<WonderLaunchStatus> {
   const url = bridgeUrl(`/api/wonders/${encodeURIComponent(id)}/launch-status`);
   const res = await fetch(url, { headers: bridgeHeaders() });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
@@ -123,7 +121,11 @@ export async function stopWonder(id: string): Promise<{ ok: boolean; id: string;
     headers: bridgeHeaders({ 'Content-Type': 'application/json' }),
     body: '{}',
   });
-  return (await res.json().catch(() => ({ ok: false, id }))) as { ok: boolean; id: string; error?: string };
+  return (await res.json().catch(() => ({ ok: false, id }))) as {
+    ok: boolean;
+    id: string;
+    error?: string;
+  };
 }
 
 export interface ConnectResult {
@@ -222,10 +224,7 @@ export async function pollWonderUntilReady(
 }
 
 /** Fire-and-forget: launch + poll each id in the background. */
-export function ensureWondersUp(
-  ids: readonly string[],
-  opts: LaunchOptions = {},
-): void {
+export function ensureWondersUp(ids: readonly string[], opts: LaunchOptions = {}): void {
   for (const id of ids) {
     pollWonderUntilReady(id, opts).catch((e) => {
       // eslint-disable-next-line no-console

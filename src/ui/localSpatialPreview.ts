@@ -84,17 +84,19 @@ export function showWhiteboardPanel(
 
   const subFolders = room.subFolderNames ?? [];
   const subList = subFolders.length
-    ? subFolders.map((n) => `
+    ? subFolders
+        .map(
+          (n) => `
       <div class="lt-wb-nav" data-folder="${_esc(n)}">
         <span class="lt-wb-nav-icon">📁</span>
         <span class="lt-wb-nav-name">${_esc(n)}</span>
       </div>
-    `).join('')
+    `,
+        )
+        .join('')
     : '<div class="lt-wb-empty">Sin subcarpetas</div>';
 
-  const openBtn = onOpenFolder
-    ? `<button class="lt-wb-open-btn">📂 Abrir carpeta</button>`
-    : '';
+  const openBtn = onOpenFolder ? `<button class="lt-wb-open-btn">📂 Abrir carpeta</button>` : '';
 
   el.innerHTML = `
     <div class="lt-arrow"></div>
@@ -168,14 +170,16 @@ export function showLocalContextMenu(
   const hasMain = true; // MAIN is the primary agent, always allow sending
   const hasWorker = !!wrk || idleAgents.some((a) => a.id.toLowerCase().includes('worker'));
 
-  const mainState = mainUnit && mainUnit.state && mainUnit.state !== 'idle'
-    ? ` (${mainUnit.state === 'working' ? 'Trabajando' : mainUnit.state})`
-    : '';
+  const mainState =
+    mainUnit && mainUnit.state && mainUnit.state !== 'idle'
+      ? ` (${mainUnit.state === 'working' ? 'Trabajando' : mainUnit.state})`
+      : '';
   const mainLabel = `Enviar MAIN${mainState}`;
 
-  const workerState = wrk && wrk.state && wrk.state !== 'idle'
-    ? ` (${wrk.state === 'working' ? 'Trabajando' : wrk.state})`
-    : '';
+  const workerState =
+    wrk && wrk.state && wrk.state !== 'idle'
+      ? ` (${wrk.state === 'working' ? 'Trabajando' : wrk.state})`
+      : '';
   const workerLabel = `Enviar WORKER${workerState}`;
 
   items.push(`

@@ -80,7 +80,7 @@ describe('UnitMesh3D lifecycle — spawn', () => {
     expect(entry.group.scale.x).toBeLessThan(1);
 
     // 300ms total: spawn complete.
-    tickUnits(0.30, 0.15);
+    tickUnits(0.3, 0.15);
     expect(entry.lifeState).toBe('alive');
     // Easing makes it ~1.0 but the idle pulse immediately takes over.
     expect(entry.group.scale.x).toBeGreaterThan(0.95);
@@ -101,7 +101,7 @@ describe('UnitMesh3D lifecycle — despawn', () => {
   it('removed units enter despawning state and shrink to 0 over 200ms', () => {
     // Spawn first.
     rebuildUnits([makeUnit('u1', 0, 0)], getTile);
-    tickUnits(0.30, 0.30); // complete spawn
+    tickUnits(0.3, 0.3); // complete spawn
     expect(_testGetEntry('u1')!.lifeState).toBe('alive');
 
     // Remove unit.
@@ -110,12 +110,12 @@ describe('UnitMesh3D lifecycle — despawn', () => {
     expect(entry.lifeState).toBe('despawning');
 
     // 100ms (halfway): scale between 0 and 1.
-    tickUnits(0.40, 0.10);
+    tickUnits(0.4, 0.1);
     expect(entry.group.scale.x).toBeGreaterThan(0);
     expect(entry.group.scale.x).toBeLessThan(1);
 
     // 200ms total: entry removed.
-    tickUnits(0.50, 0.10);
+    tickUnits(0.5, 0.1);
     expect(_testGetEntry('u1')).toBeUndefined();
     expect(_testEntryCount()).toBe(0);
   });
@@ -124,7 +124,7 @@ describe('UnitMesh3D lifecycle — despawn', () => {
 describe('UnitMesh3D lifecycle — idle pulse', () => {
   it('alive units oscillate scale around 1 with a subtle pulse', () => {
     rebuildUnits([makeUnit('u1', 0, 0)], getTile);
-    tickUnits(0.30, 0.30); // complete spawn
+    tickUnits(0.3, 0.3); // complete spawn
 
     const entry = _testGetEntry('u1')!;
     expect(entry.lifeState).toBe('alive');
@@ -151,7 +151,7 @@ describe('UnitMesh3D lifecycle — idle pulse', () => {
 describe('UnitMesh3D lifecycle — walking hop', () => {
   it('moving units get a vertical Y offset that oscillates', () => {
     rebuildUnits([makeUnit('u1', 0, 0, 'moving')], getTile);
-    tickUnits(0.30, 0.30); // complete spawn
+    tickUnits(0.3, 0.3); // complete spawn
 
     const entry = _testGetEntry('u1')!;
     const baseY = entry.group.position.y;
@@ -169,7 +169,7 @@ describe('UnitMesh3D lifecycle — walking hop', () => {
 
   it('idle units do not hop (Y stays at base)', () => {
     rebuildUnits([makeUnit('u1', 0, 0, 'idle')], getTile);
-    tickUnits(0.30, 0.30); // complete spawn
+    tickUnits(0.3, 0.3); // complete spawn
 
     const entry = _testGetEntry('u1')!;
     const baseY = entry.group.position.y;

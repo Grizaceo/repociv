@@ -27,10 +27,7 @@ import {
   contextMenuForUnit,
   type SpatialDirective,
 } from './spatialDirectives.ts';
-import {
-  hideDirectivePreview,
-  hideContextMenu,
-} from './ui/spatialPreview.ts';
+import { hideDirectivePreview, hideContextMenu } from './ui/spatialPreview.ts';
 import { relocateCity, canRelocateCityTo } from './map.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { HEX_SIZE } from './constants.ts';
@@ -266,8 +263,7 @@ export class Renderer {
     if (this.threeMap) return;
     if (!this.threeLoadPromise) {
       this.threeLoadPromise = (async () => {
-        this.threeContainer =
-          this.threeContainer ?? document.getElementById('three-container');
+        this.threeContainer = this.threeContainer ?? document.getElementById('three-container');
         if (!this.threeContainer) {
           throw new Error('#three-container not found');
         }
@@ -885,9 +881,7 @@ export class Renderer {
       this.onTileInspect?.(city.name, city.coord, city.id);
       // 3D tile popup: show billboard with city info in WebGL mode.
       if (this.worldRenderMode === 'webgl' && tile) {
-        const garrison = this.state.world.units.filter(
-          (u) => u.cityId === city.id,
-        );
+        const garrison = this.state.world.units.filter((u) => u.cityId === city.id);
         tilePopupMod?.showTilePopup(tile, coord, city, garrison);
       }
       return;
@@ -1033,7 +1027,7 @@ export class Renderer {
         this._totalFrameCount++;
         // Rolling average every 60 frames
         if (this._frameTimeCount >= 60) {
-          this._frameTimeAvg = Math.round(this._frameTimeSum / this._frameTimeCount * 100) / 100;
+          this._frameTimeAvg = Math.round((this._frameTimeSum / this._frameTimeCount) * 100) / 100;
           this._frameTimeSum = 0;
           this._frameTimeCount = 0;
         }
@@ -1046,7 +1040,6 @@ export class Renderer {
     };
     this.rafId = requestAnimationFrame(loop);
   }
-
 
   private screenOverlayState(): ScreenOverlayState {
     return {
@@ -1064,7 +1057,8 @@ export class Renderer {
       hoveredHex: this.hoveredHex,
       tiles: this.state.world.tiles,
       tilePixelPos: (coord, tile) => this.tilePixelPos(coord, tile),
-      canRelocateTo: (hex) => this.draggedCity ? canRelocateCityTo(this.state.world, this.draggedCity, hex) : false,
+      canRelocateTo: (hex) =>
+        this.draggedCity ? canRelocateCityTo(this.state.world, this.draggedCity, hex) : false,
     };
   }
 
@@ -1299,7 +1293,11 @@ export class Renderer {
         if (lodHigh) {
           if (isClean) {
             if (tile.city && showTextLabels) {
-              this.hexR.drawCityLabel(tile.city, axialToPixel(tile.coord, HEX_SIZE), activeBuilding);
+              this.hexR.drawCityLabel(
+                tile.city,
+                axialToPixel(tile.coord, HEX_SIZE),
+                activeBuilding,
+              );
             }
             if (tile.city && tile.skillHealth && showTextLabels) {
               this.hexR.drawSkillHealth(tile, axialToPixel(tile.coord, HEX_SIZE));
@@ -1315,7 +1313,10 @@ export class Renderer {
     if (showStructure) {
       const capital = this.state.world.cities.find((c) => c.isCapital);
       if (capital) {
-        const cp = this.tilePixelPos(capital.coord, this.state.world.tiles.get(tileKey(capital.coord)));
+        const cp = this.tilePixelPos(
+          capital.coord,
+          this.state.world.tiles.get(tileKey(capital.coord)),
+        );
         if (capital.wonders) {
           for (let i = 0; i < Math.min(capital.wonders.length, 2); i++) {
             const w = capital.wonders[i]!;
@@ -1381,7 +1382,7 @@ export class Renderer {
           const dist = Math.hypot(op.x - cp.x, op.y - cp.y);
           if (dist > HEX_SIZE * 12) continue; // don't draw across the whole map
           const knowledgeAlpha = webglMode
-            ? 0.018 + 0.010 * Math.sin(this.animTime * 0.8 + cp.x + op.x)
+            ? 0.018 + 0.01 * Math.sin(this.animTime * 0.8 + cp.x + op.x)
             : 0.08 + 0.04 * Math.sin(this.animTime * 0.8 + cp.x + op.x);
           ctx.strokeStyle = `rgba(74, 144, 200, ${knowledgeAlpha})`;
           ctx.lineWidth = webglMode ? 0.35 : 0.5;
@@ -1415,7 +1416,7 @@ export class Renderer {
         ctx.fillText('🔬', cp.x + HEX_SIZE * 0.8, cp.y + HEX_SIZE * 0.6);
         // Pulsing ring around lab cities with active experiments
         if (hasActiveExp) {
-          ctx.strokeStyle = `rgba(34, 197, 94, ${webglMode ? pulse * 0.20 : pulse * 0.5})`;
+          ctx.strokeStyle = `rgba(34, 197, 94, ${webglMode ? pulse * 0.2 : pulse * 0.5})`;
           ctx.lineWidth = webglMode ? 1 : 2;
           ctx.beginPath();
           ctx.arc(cp.x, cp.y, HEX_SIZE * 0.85, 0, Math.PI * 2);
@@ -1453,7 +1454,11 @@ export class Renderer {
     if (this.showGrid) {
       ctx.setLineDash(webglMode ? [3, 12] : [4, 8]);
       for (const tile of this.state.world.tiles.values()) {
-        this.drawHexHighlight(tile.coord, webglMode ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.08)', webglMode ? 0.8 : 1);
+        this.drawHexHighlight(
+          tile.coord,
+          webglMode ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.08)',
+          webglMode ? 0.8 : 1,
+        );
       }
       ctx.setLineDash([]);
     }
@@ -1482,17 +1487,17 @@ export class Renderer {
 
     // Units (base layer — canvas in 2D modes; 3D capsules in webgl) + badges
     if (!webglMode) {
-    for (const unit of this.state.world.units) {
-      if (unit.ephemeral && !this._shouldDrawEphemeralOnMap(unit)) continue;
-      this.unitR.drawUnit(unit, this.animTime, this.selectedUnit?.id ?? null, unit.ephemeral);
-      const childCount = this.state.getChildrenOfUnit(unit.id).filter((c) => c.ephemeral).length;
-      if (childCount > 0) {
-        this.unitR.drawSubagentCountBadge(unit, childCount, this.animTime);
+      for (const unit of this.state.world.units) {
+        if (unit.ephemeral && !this._shouldDrawEphemeralOnMap(unit)) continue;
+        this.unitR.drawUnit(unit, this.animTime, this.selectedUnit?.id ?? null, unit.ephemeral);
+        const childCount = this.state.getChildrenOfUnit(unit.id).filter((c) => c.ephemeral).length;
+        if (childCount > 0) {
+          this.unitR.drawSubagentCountBadge(unit, childCount, this.animTime);
+        }
+        if (showOps && !isClean && lod !== 'low') {
+          this.unitR.drawUnitBadge(unit, this.animTime);
+        }
       }
-      if (showOps && !isClean && lod !== 'low') {
-        this.unitR.drawUnitBadge(unit, this.animTime);
-      }
-    }
     } else if (showOps && !isClean && lod !== 'low') {
       for (const unit of this.state.world.units) {
         if (unit.ephemeral && !this._shouldDrawEphemeralOnMap(unit)) continue;
@@ -1542,7 +1547,10 @@ export class Renderer {
           sx = from.x + (to.x - from.x) * t;
           sy = from.y + (to.y - from.y) * t;
         } else {
-          const p = this.tilePixelPos(selUnit.coord, this.state.world.tiles.get(tileKey(selUnit.coord)));
+          const p = this.tilePixelPos(
+            selUnit.coord,
+            this.state.world.tiles.get(tileKey(selUnit.coord)),
+          );
           sx = p.x;
           sy = p.y;
         }
@@ -1720,16 +1728,28 @@ export class Renderer {
     const webgl = this.worldRenderMode === 'webgl';
     // Hysteresis: different thresholds for zooming in vs out
     if (this._lastLod === 'low') {
-      if (this.cam.zoom >= (webgl ? 0.55 : 0.55)) { this._lastLod = 'medium'; return 'medium'; }
+      if (this.cam.zoom >= (webgl ? 0.55 : 0.55)) {
+        this._lastLod = 'medium';
+        return 'medium';
+      }
       return 'low';
     }
     if (this._lastLod === 'medium') {
-      if (this.cam.zoom < (webgl ? 0.45 : 0.45)) { this._lastLod = 'low'; return 'low'; }
-      if (this.cam.zoom >= (webgl ? 1.05 : 1.25)) { this._lastLod = 'high'; return 'high'; }
+      if (this.cam.zoom < (webgl ? 0.45 : 0.45)) {
+        this._lastLod = 'low';
+        return 'low';
+      }
+      if (this.cam.zoom >= (webgl ? 1.05 : 1.25)) {
+        this._lastLod = 'high';
+        return 'high';
+      }
       return 'medium';
     }
     // high
-    if (this.cam.zoom < (webgl ? 0.95 : 1.15)) { this._lastLod = 'medium'; return 'medium'; }
+    if (this.cam.zoom < (webgl ? 0.95 : 1.15)) {
+      this._lastLod = 'medium';
+      return 'medium';
+    }
     return 'high';
   }
 

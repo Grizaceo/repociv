@@ -142,11 +142,11 @@ describe('FogTransition3D — particle burst', () => {
     expect(_testParticleCount()).toBe(1);
 
     // Tick 400ms (halfway): still active.
-    tickFogTransition(0.40);
+    tickFogTransition(0.4);
     expect(_testParticleCount()).toBe(1);
 
     // Tick another 400ms: complete.
-    tickFogTransition(0.40);
+    tickFogTransition(0.4);
     expect(_testParticleCount()).toBe(0);
   });
 

@@ -42,9 +42,7 @@ export function mergeGlbScene(scene: Group, maxMeshes = Infinity): MergedGlb {
   let geometry: BufferGeometry | null;
   if (perMaterial.length === 1) {
     geometry = perMaterial[0]!;
-    const count = geometry.index
-      ? geometry.index.count
-      : geometry.getAttribute('position').count;
+    const count = geometry.index ? geometry.index.count : geometry.getAttribute('position').count;
     geometry.addGroup(0, count, 0);
   } else {
     geometry = mergeGeometries(perMaterial, true);

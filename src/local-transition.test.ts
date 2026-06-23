@@ -63,8 +63,7 @@ describe('P5: transition polish', () => {
   });
 
   it('isTransitionComplete: true when active or null', () => {
-    const isComplete = (state: string | null) =>
-      state === null || state === 'active';
+    const isComplete = (state: string | null) => state === null || state === 'active';
 
     expect(isComplete(null)).toBe(true);
     expect(isComplete('active')).toBe(true);
@@ -74,7 +73,9 @@ describe('P5: transition polish', () => {
 
   it('loading indicator: setLoadingIndicator toggles state', () => {
     let loading = false;
-    const setLoading = (active: boolean) => { loading = active; };
+    const setLoading = (active: boolean) => {
+      loading = active;
+    };
 
     expect(loading).toBe(false);
     setLoading(true);

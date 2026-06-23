@@ -71,11 +71,7 @@ export class SubagentRegistry {
     this._finish(id, 'cancelled', summary);
   }
 
-  private _finish(
-    id: string,
-    status: 'complete' | 'failed' | 'cancelled',
-    summary: string,
-  ): void {
+  private _finish(id: string, status: 'complete' | 'failed' | 'cancelled', summary: string): void {
     const run = this.s.active.get(id);
     if (!run) return;
     const finished: SubagentRun = {
@@ -102,8 +98,7 @@ export class SubagentRegistry {
   resolveId(preferredId?: string | null, unitId?: string): string | null {
     if (
       preferredId &&
-      (this.s.active.has(preferredId) ||
-        (this.s.completed ?? []).some((s) => s.id === preferredId))
+      (this.s.active.has(preferredId) || (this.s.completed ?? []).some((s) => s.id === preferredId))
     ) {
       return preferredId;
     }
@@ -112,9 +107,7 @@ export class SubagentRegistry {
         (s) => s.parentUnitId === unitId && s.status === 'running',
       );
       if (active.length) return active[0]!.id;
-      const recent = (this.s.completed ?? []).filter(
-        (s) => s.parentUnitId === unitId,
-      );
+      const recent = (this.s.completed ?? []).filter((s) => s.parentUnitId === unitId);
       if (recent.length) return recent[0]!.id;
     }
     return this.s.highlighted;

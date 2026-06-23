@@ -83,9 +83,7 @@ const HANDLERS: HandlerByType = {
     const parent = evt.parentUnit ? ctx.state.getUnit(evt.parentUnit) : undefined;
     let spawnCoord = { q: evt.hex[0], r: evt.hex[1] };
     if (parent && evt.hex[0] === 0 && evt.hex[1] === 0) {
-      const childIndex = ctx.state
-        .getChildrenOfUnit(parent.id)
-        .filter((c) => c.ephemeral).length;
+      const childIndex = ctx.state.getChildrenOfUnit(parent.id).filter((c) => c.ephemeral).length;
       spawnCoord = pickDetachmentHex(ctx.state, parent.coord, childIndex);
     }
     const unit = ctx.state.spawnUnit(
@@ -178,8 +176,7 @@ const HANDLERS: HandlerByType = {
   mission_complete(ctx, evt) {
     ctx.state.completeMission(evt.missionId, evt.success);
     ctx.setOperationTicker(false);
-    const durLabel =
-      evt.duration >= 60 ? `${Math.round(evt.duration / 60)}m` : `${evt.duration}s`;
+    const durLabel = evt.duration >= 60 ? `${Math.round(evt.duration / 60)}m` : `${evt.duration}s`;
     ctx.showNotification({
       type: evt.success ? 'success' : 'error',
       title: evt.success ? 'Misión completada' : 'Misión fallida',
@@ -262,13 +259,7 @@ const HANDLERS: HandlerByType = {
   },
 
   unit_sent_to_rest(ctx, evt) {
-    ctx.state.updateUnitFatigue(
-      evt.unit,
-      evt.fatigue,
-      evt.maxFatigue,
-      evt.atRest,
-      evt.restAreaId,
-    );
+    ctx.state.updateUnitFatigue(evt.unit, evt.fatigue, evt.maxFatigue, evt.atRest, evt.restAreaId);
     ctx.logEvent(`🛌 ${evt.unit} enviado a descanso`, 'info');
   },
 
@@ -369,9 +360,7 @@ const HANDLERS: HandlerByType = {
     }
     ctx.state.completeSubagent(evt.subagentId, evt.success, evt.summary);
     ctx.logEvent(
-      evt.success
-        ? `✓ Subagente completado (${Math.round(evt.duration)}s)`
-        : `✗ Subagente falló`,
+      evt.success ? `✓ Subagente completado (${Math.round(evt.duration)}s)` : `✗ Subagente falló`,
       evt.success ? 'success' : 'warn',
     );
   },

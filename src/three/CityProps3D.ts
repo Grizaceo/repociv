@@ -92,7 +92,7 @@ export function rebuildCityProps(
     const rotSteps = h % 6;
     pos.set(base.x, base.y + 2, base.z);
     quat.setFromAxisAngle(up, rotSteps * (Math.PI / 3));
-    const s = HEX_SIZE * 0.40;
+    const s = HEX_SIZE * 0.4;
     scl.set(s, s, s);
     matrix.compose(pos, quat, scl);
     mesh.setMatrixAt(i, matrix);

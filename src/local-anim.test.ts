@@ -8,19 +8,22 @@ import type { Unit } from './types.ts';
 
 function makeManager(): LocalWorldManager {
   const notify = vi.fn();
-  const getFirstUnit = vi.fn((): Unit | undefined => ({
-    id: 'MAIN',
-    name: 'MAIN',
-    type: 'hero',
-    q: 0,
-    r: 0,
-    color: '#4af',
-    mission: null,
-    fatigue: 100,
-    maxFatigue: 100,
-    isResting: false,
-    effectiveSpeed: 1,
-  } as unknown as Unit));
+  const getFirstUnit = vi.fn(
+    (): Unit | undefined =>
+      ({
+        id: 'MAIN',
+        name: 'MAIN',
+        type: 'hero',
+        q: 0,
+        r: 0,
+        color: '#4af',
+        mission: null,
+        fatigue: 100,
+        maxFatigue: 100,
+        isResting: false,
+        effectiveSpeed: 1,
+      }) as unknown as Unit,
+  );
   const getMacroUnit = vi.fn((id: string) =>
     id === 'MAIN'
       ? ({
@@ -145,7 +148,7 @@ describe('P1: agent movement polish', () => {
 
   it('idle breathing: sin(t) oscillates in [0.98, 1.02] range', () => {
     // 2s cycle: sin(now / 1000 * PI) has period 2s (sin reaches 2π at t=2000)
-    const breathe = (now: number) => 1 + Math.sin(now / 1000 * Math.PI) * 0.02;
+    const breathe = (now: number) => 1 + Math.sin((now / 1000) * Math.PI) * 0.02;
 
     // At t=0: scale = 1
     expect(breathe(0)).toBeCloseTo(1);
@@ -173,7 +176,10 @@ describe('P1: agent movement polish', () => {
     const unit = mgr.getLocalUnit('MAIN')!;
 
     // Give it a path
-    unit.path = [{ x: 1, y: 1 }, { x: 2, y: 2 }];
+    unit.path = [
+      { x: 1, y: 1 },
+      { x: 2, y: 2 },
+    ];
     unit.pathIndex = 0;
     unit.pathProgress = 0.5;
     unit.state = 'walking_to_workbench';

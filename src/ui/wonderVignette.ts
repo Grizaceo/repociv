@@ -19,10 +19,7 @@ import {
   startWonderListener,
   stopWonderListener,
 } from '../wonders/postMessageBridge.ts';
-import {
-  pollWonderUntilReady,
-  type WonderLaunchStatus,
-} from '../wonders/wonderLauncher.ts';
+import { pollWonderUntilReady, type WonderLaunchStatus } from '../wonders/wonderLauncher.ts';
 import type { WonderManifest } from '../wonders/types.ts';
 import { renderCapabilityBadge } from '../wonders/wonderBadges.ts';
 import {
@@ -294,9 +291,7 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
 
   if (SPLIT_WONDERS.has(type)) {
     const { backend, ui } =
-      type === 'bibliotheca'
-        ? await checkLgbReachability()
-        : await checkInstitutumReachability();
+      type === 'bibliotheca' ? await checkLgbReachability() : await checkInstitutumReachability();
 
     // Both down → try the auto-start (F3). If the user has the wonder
     // repo present and we have a launchable spec, the bridge will
@@ -304,8 +299,7 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
     if (!ui && !backend) {
       const launched = await _tryAutoStart(body, type);
       if (launched) return;
-      const reason: EmptyReason =
-        type === 'bibliotheca' ? 'lgb-offline' : 'institutum-offline';
+      const reason: EmptyReason = type === 'bibliotheca' ? 'lgb-offline' : 'institutum-offline';
       _showEmptyState(body, type, reason);
       return;
     }
@@ -328,9 +322,7 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
       return;
     }
     const resolvedUiUrl =
-      type === 'bibliotheca'
-        ? await findReachableLgbUiUrl()
-        : await findReachableInstitutumUiUrl();
+      type === 'bibliotheca' ? await findReachableLgbUiUrl() : await findReachableInstitutumUiUrl();
     const primaryUi =
       type === 'bibliotheca'
         ? (WONDER_BIBLIOTHECA_URL as string)

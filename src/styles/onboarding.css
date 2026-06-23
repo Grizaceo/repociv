@@ -29,7 +29,10 @@
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.02);
   cursor: pointer;
-  transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    transform 120ms ease;
 }
 
 .harness-card:hover {
@@ -37,7 +40,7 @@
   background: rgba(212, 165, 116, 0.05);
 }
 
-.harness-card input[type="radio"] {
+.harness-card input[type='radio'] {
   position: absolute;
   opacity: 0;
   pointer-events: none;
@@ -50,7 +53,7 @@
 }
 
 .harness-card--recommended::before {
-  content: "";
+  content: '';
   display: block;
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--civ-gold, #d4a574), transparent);

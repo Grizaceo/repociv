@@ -49,9 +49,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-
 // ─── buildHermesBannerHtml ────────────────────────────────────────────────
-
 
 describe('buildHermesBannerHtml', () => {
   it('returns null when Hermes is up', () => {

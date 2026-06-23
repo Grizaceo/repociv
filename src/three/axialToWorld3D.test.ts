@@ -3,11 +3,7 @@ import { Vector3 } from 'three';
 import { axialToPixel, pixelToAxial, pixelToAxialFraction, axialRound } from '../hex.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { terrainElevation } from '../isoHex.ts';
-import {
-  axialToWorld3D,
-  world3DToAxialFraction,
-  TILE_HEIGHT,
-} from './axialToWorld3D.ts';
+import { axialToWorld3D, world3DToAxialFraction, TILE_HEIGHT } from './axialToWorld3D.ts';
 
 describe('axialToWorld3D', () => {
   it('maps 2D pixel coords to XZ with Y from elevation', () => {

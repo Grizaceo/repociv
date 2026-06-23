@@ -35,7 +35,8 @@ export class LocalWorldManager {
     if (!this.localWorld || this.localWorld.repoId !== repoId) {
       this.localWorld = await generateLocalWorldFromApi(repoId);
       if (this.localUnits.length === 0) {
-        const entrance = this.localWorld.rooms.find((r) => r.zoneType === 'reception') ?? this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
+        const entrance = this.localWorld.rooms.find((r) => r.zoneType === 'reception') ??
+          this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
         const heroUnit = this.getFirstUnit();
         this.localUnits.push({
           id: heroUnit?.id ?? 'MAIN',
@@ -77,7 +78,8 @@ export class LocalWorldManager {
     if (!this.localWorld || this.localWorld.repoId !== repoId) {
       this.localWorld = buildMockLocalWorld(repoId);
       if (this.localUnits.length === 0) {
-        const entrance = this.localWorld.rooms.find((r) => r.zoneType === 'reception') ?? this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
+        const entrance = this.localWorld.rooms.find((r) => r.zoneType === 'reception') ??
+          this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
         this.localUnits.push({
           id: 'MAIN',
           name: 'MAIN',
@@ -219,7 +221,11 @@ export class LocalWorldManager {
         unit.fatigue = Math.max(0, unit.fatigue - 0.5); // fatigue drain per tick
       } else if (unit.state === 'resting') {
         // Recovery handled by rest area
-      } else if (unit.state === 'idle_in_room' || unit.state === 'walking_to_workbench' || unit.state === 'walking_to_room') {
+      } else if (
+        unit.state === 'idle_in_room' ||
+        unit.state === 'walking_to_workbench' ||
+        unit.state === 'walking_to_room'
+      ) {
         unit.fatigue = Math.max(0, unit.fatigue - 0.1); // slow drain while idle/moving
       }
 
@@ -230,7 +236,7 @@ export class LocalWorldManager {
 
       // Resting units recover fatigue
       if (unit.state === 'resting' && unit.restingRoomId) {
-        const restArea = this.localWorld.restAreas.find(ra => ra.id === unit.restingRoomId);
+        const restArea = this.localWorld.restAreas.find((ra) => ra.id === unit.restingRoomId);
         if (restArea) {
           const recoveryPerTick = (restArea.recoveryRate / 1000) * TICK_MS * 12; // per 12-tick interval
           unit.fatigue = Math.min(unit.maxFatigue, unit.fatigue + recoveryPerTick);
@@ -250,10 +256,11 @@ export class LocalWorldManager {
   }
 
   private _sendUnitToRest(unit: LocalUnit): void {
-    if (!this.localWorld || !this.localWorld.restAreas || this.localWorld.restAreas.length === 0) return;
+    if (!this.localWorld || !this.localWorld.restAreas || this.localWorld.restAreas.length === 0)
+      return;
 
     // Find available rest area with capacity
-    let bestRest: typeof this.localWorld.restAreas[0] | null = null;
+    let bestRest: (typeof this.localWorld.restAreas)[0] | null = null;
     let bestDist = Infinity;
 
     for (const rest of this.localWorld.restAreas) {
@@ -293,7 +300,7 @@ export class LocalWorldManager {
     unit.state = 'idle_in_room';
     unit.isResting = false;
     unit.restingRoomId = undefined;
-    restArea.unitsInside = restArea.unitsInside.filter(id => id !== unit.id);
+    restArea.unitsInside = restArea.unitsInside.filter((id) => id !== unit.id);
   }
 
   private _tickPowerSystem(): void {
@@ -310,7 +317,7 @@ export class LocalWorldManager {
       } else if (src.type === 'solar') {
         // Solar varies with "time of day" simulation
         const hour = (Date.now() / 3600000) % 24;
-        const solarFactor = hour > 6 && hour < 18 ? Math.sin((hour - 6) / 12 * Math.PI) : 0;
+        const solarFactor = hour > 6 && hour < 18 ? Math.sin(((hour - 6) / 12) * Math.PI) : 0;
         generated += src.outputWatts * solarFactor;
       } else if (src.type === 'wind') {
         // Wind is random-ish
@@ -333,8 +340,8 @@ export class LocalWorldManager {
       // Charge batteries
       for (const src of pg.sources) {
         if (src.type === 'battery' && src.fuel !== undefined) {
-          src.fuel = Math.min(100, src.fuel + (netWatts / BATTERY_STORED) * 100 * (1/600)); // per tick
-          pg.storedWatts = Math.round(src.fuel / 100 * BATTERY_STORED);
+          src.fuel = Math.min(100, src.fuel + (netWatts / BATTERY_STORED) * 100 * (1 / 600)); // per tick
+          pg.storedWatts = Math.round((src.fuel / 100) * BATTERY_STORED);
         }
       }
     } else if (netWatts < 0) {
@@ -342,9 +349,9 @@ export class LocalWorldManager {
       const deficit = Math.abs(netWatts);
       for (const src of pg.sources) {
         if (src.type === 'battery' && src.fuel !== undefined && src.fuel > 0) {
-          const draw = Math.min(deficit, src.fuel / 100 * BATTERY_STORED * (1/600));
+          const draw = Math.min(deficit, (src.fuel / 100) * BATTERY_STORED * (1 / 600));
           src.fuel = Math.max(0, src.fuel - (draw / BATTERY_STORED) * 100 * 600);
-          pg.storedWatts = Math.round(src.fuel / 100 * BATTERY_STORED);
+          pg.storedWatts = Math.round((src.fuel / 100) * BATTERY_STORED);
         }
       }
     }
@@ -352,7 +359,14 @@ export class LocalWorldManager {
     // Power outage incident if severe deficit
     if (pg.consumedWatts > pg.generatedWatts + pg.storedWatts * 0.1 && Math.random() < 0.001) {
       // Could trigger incident system later
-      logger.warn('[Power] Grid overload! Consumed:', pg.consumedWatts, 'Generated:', pg.generatedWatts, 'Stored:', pg.storedWatts);
+      logger.warn(
+        '[Power] Grid overload! Consumed:',
+        pg.consumedWatts,
+        'Generated:',
+        pg.generatedWatts,
+        'Stored:',
+        pg.storedWatts,
+      );
     }
   }
 
@@ -391,8 +405,8 @@ export class LocalWorldManager {
     if (!unit && this.localWorld) {
       // Spawn unit at the reception entrance
       const macroUnit = this.getMacroUnit?.(unitId);
-      const entrance = this.localWorld.rooms.find((r) =>
-        r.zoneType === 'reception') ?? this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
+      const entrance = this.localWorld.rooms.find((r) => r.zoneType === 'reception') ??
+        this.localWorld.rooms[0] ?? { x: 1, y: 1, w: 4, h: 4 };
       const gx = entrance.x + Math.floor(entrance.w / 2);
       const gy = entrance.y + Math.floor(entrance.h / 2);
       const color = macroUnit ? (UNIT_COLORS[macroUnit.type] ?? '#4af') : '#4af';
@@ -534,11 +548,22 @@ export class LocalWorldManager {
       const deskKey = `${unit.assignedDesk.x},${unit.assignedDesk.y}`;
       const owner = this.localWorld.deskAssignments.get(deskKey);
       if (!owner || owner === unit.id) {
-        const pathResult = findPath(this.localWorld, unit.gridX, unit.gridY, unit.assignedDesk.x, unit.assignedDesk.y);
+        const pathResult = findPath(
+          this.localWorld,
+          unit.gridX,
+          unit.gridY,
+          unit.assignedDesk.x,
+          unit.assignedDesk.y,
+        );
         if (pathResult) {
           const tile = this.localWorld.grid[unit.assignedDesk.y]?.[unit.assignedDesk.x];
           if (tile?.workbench) {
-            return { x: unit.assignedDesk.x, y: unit.assignedDesk.y, workbench: tile.workbench, distance: pathResult.cost };
+            return {
+              x: unit.assignedDesk.x,
+              y: unit.assignedDesk.y,
+              workbench: tile.workbench,
+              distance: pathResult.cost,
+            };
           }
         }
       }

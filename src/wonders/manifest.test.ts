@@ -96,7 +96,9 @@ describe('wonder manifest registry', () => {
       expect(getWonder('bibliotheca')).toBeDefined();
       expect(getWonder('institutum')).toBeDefined();
       expect(getWonder('mi-servicio')).toBeDefined();
-      const iframeIds = listIframeWonders().map((w) => w.id).sort();
+      const iframeIds = listIframeWonders()
+        .map((w) => w.id)
+        .sort();
       expect(iframeIds).toEqual(['bibliotheca', 'institutum', 'mi-servicio']);
     });
 

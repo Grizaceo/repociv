@@ -262,7 +262,11 @@ describe('generateWorld', () => {
           ],
         };
       }
-      if (input.startsWith('/api/files/') || input.startsWith('/api/skill-health/') || input.startsWith('/api/session-tint/')) {
+      if (
+        input.startsWith('/api/files/') ||
+        input.startsWith('/api/skill-health/') ||
+        input.startsWith('/api/session-tint/')
+      ) {
         return { ok: false, json: async () => ({}) };
       }
       throw new Error(`unexpected fetch ${input}`);

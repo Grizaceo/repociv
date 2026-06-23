@@ -6,14 +6,7 @@
 // no post-processing. (Bloom was evaluated for iter7 and skipped: an
 // EffectComposer pass re-renders the frame off-screen — measurable cost,
 // golden churn — for a subtle gain at this painterly art style.)
-import {
-  BackSide,
-  Color,
-  Mesh,
-  ShaderMaterial,
-  SphereGeometry,
-  Vector3,
-} from 'three';
+import { BackSide, Color, Mesh, ShaderMaterial, SphereGeometry, Vector3 } from 'three';
 
 /** Zenith blue — slightly deeper than the old flat SKY_TOP so the gradient
  *  has somewhere to go. */

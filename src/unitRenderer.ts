@@ -155,9 +155,7 @@ export class UnitRenderer {
     let ux: number, uy: number;
     if (unit.state === 'moving' && unit.path.length > 0 && unit.pathIndex < unit.path.length) {
       const from = this.tilePos(unit.path[unit.pathIndex]!);
-      const to = this.tilePos(
-        unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!,
-      );
+      const to = this.tilePos(unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!);
       ux = lerp(from.x, to.x, unit.pathProgress);
       uy = lerp(from.y, to.y, unit.pathProgress);
     } else {

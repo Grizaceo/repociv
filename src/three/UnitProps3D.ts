@@ -5,12 +5,7 @@
 // preserves every part with its baked local transform. UnitMesh3D consumes
 // the parts per unit, cloning materials to tint them with the agent color —
 // geometries stay shared and are never disposed per rebuild.
-import {
-  BufferGeometry,
-  Material,
-  Matrix4,
-  Mesh,
-} from 'three';
+import { BufferGeometry, Material, Matrix4, Mesh } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 export type UnitPropPart = {

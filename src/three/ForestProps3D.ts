@@ -3,14 +3,7 @@
 // as separate indexed meshes. The loader merges the FIRST tree into a single
 // two-group geometry (group 0 = trunk, group 1 = canopies) so InstancedMesh
 // renders full trees — brown trunk, green conical canopy — in two draw calls.
-import {
-  Color,
-  Group,
-  InstancedMesh,
-  Matrix4,
-  Quaternion,
-  Vector3,
-} from 'three';
+import { Color, Group, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGlbScene, type MergedGlb } from './mergeGlbScene.ts';
 import { type Tile, tileKey } from '../types.ts';
@@ -34,16 +27,16 @@ const TREES_PER_TILE = 11;
 // Kept clear of the full rim (1.0) so canopies stay on their own cap at steps.
 const treeOffsets: Array<[number, number]> = [
   [-0.18, 0.12],
-  [0.20, -0.14],
-  [-0.05, -0.20],
+  [0.2, -0.14],
+  [-0.05, -0.2],
   [0.14, 0.18],
   [0.0, 0.0],
-  [-0.40, 0.16],
-  [0.40, 0.02],
-  [0.10, 0.42],
+  [-0.4, 0.16],
+  [0.4, 0.02],
+  [0.1, 0.42],
   [-0.16, -0.42],
-  [0.30, -0.30],
-  [-0.32, -0.20],
+  [0.3, -0.3],
+  [-0.32, -0.2],
 ];
 
 /**
@@ -129,11 +122,7 @@ export function rebuildForestProps(tiles: Tile[]): void {
     if (group.length === 0) return;
     const variant = variants![vi]!;
     const instanceCount = group.length * TREES_PER_TILE;
-    const mesh = new InstancedMesh(
-      variant.geometry,
-      variant.materials,
-      instanceCount,
-    );
+    const mesh = new InstancedMesh(variant.geometry, variant.materials, instanceCount);
     mesh.castShadow = true;
     mesh.receiveShadow = false;
 
@@ -145,15 +134,11 @@ export function rebuildForestProps(tiles: Tile[]): void {
 
       for (let t = 0; t < TREES_PER_TILE; t++) {
         const [ox, oz] = treeOffsets[t]!;
-        const scale = 0.80 + ((h + t * 3) % 5) * 0.06;
-        const jx = (((h >> (t & 7)) % 9) - 4) * 0.020;
-        const jz = (((h >> ((t + 3) & 7)) % 9) - 4) * 0.020;
+        const scale = 0.8 + ((h + t * 3) % 5) * 0.06;
+        const jx = (((h >> (t & 7)) % 9) - 4) * 0.02;
+        const jz = (((h >> ((t + 3) & 7)) % 9) - 4) * 0.02;
         const rotSteps = (h + t) % 6;
-        pos.set(
-          base.x + (ox + jx) * HEX_SIZE,
-          base.y + 1.5,
-          base.z + (oz + jz) * HEX_SIZE,
-        );
+        pos.set(base.x + (ox + jx) * HEX_SIZE, base.y + 1.5, base.z + (oz + jz) * HEX_SIZE);
         quat.setFromAxisAngle(up, rotSteps * (Math.PI / 3));
         const s = HEX_SIZE * 0.24 * scale;
         scl.set(s, s, s);

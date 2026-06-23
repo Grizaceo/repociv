@@ -67,20 +67,22 @@ describe('terrainShader', () => {
     // Per-biome scaling block — a silent loss of one of these lines
     // (e.g. when three.js's <begin_vertex> chunk is renamed) is the
     // most common shader regression we see on three upgrades.
-    expect(capture.vertex).toContain('heightScale = 1.58');   // mountain
-    expect(capture.vertex).toContain('heightScale = 0.70');   // ocean
+    expect(capture.vertex).toContain('heightScale = 1.58'); // mountain
+    expect(capture.vertex).toContain('heightScale = 0.70'); // ocean
     // P1: FBM noise functions for per-biome micro-relief
     expect(capture.vertex).toContain('float fbm3(vec2 p)');
     expect(capture.vertex).toContain('float ridge3(vec2 p)');
     expect(capture.vertex).toContain('float valueNoise2D(vec2 p)');
     // Per-biome displacement amplitudes
-    expect(capture.vertex).toContain('uHexRadius * 0.03');  // plains
-    expect(capture.vertex).toContain('uHexRadius * 0.12');  // mountain
-    expect(capture.vertex).toContain('uHexRadius * 0.08');  // hills
+    expect(capture.vertex).toContain('uHexRadius * 0.03'); // plains
+    expect(capture.vertex).toContain('uHexRadius * 0.12'); // mountain
+    expect(capture.vertex).toContain('uHexRadius * 0.08'); // hills
     // P2: Elevation blend
     expect(capture.vertex).toContain('terrainElevFromIndex');
     expect(capture.vertex).toContain('bool isOceanTile = abs(tidx - 4.0)');
-    expect(capture.vertex).toMatch(/bool isOceanTile[\s\S]*if \(!isOceanTile && !isIceTile && !neighborIsWater/);
+    expect(capture.vertex).toMatch(
+      /bool isOceanTile[\s\S]*if \(!isOceanTile && !isIceTile && !neighborIsWater/,
+    );
     expect(capture.vertex).toContain('elevDiff * 0.5 * uTileHeight');
     // P5: City color attribute and varying
     expect(capture.vertex).toContain('attribute float instanceSideCullMask');

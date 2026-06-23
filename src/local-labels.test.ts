@@ -26,8 +26,7 @@ describe('P2: workbench labels and tooltips', () => {
   });
 
   it('filename truncation: >10 chars → 8 chars + ".."', () => {
-    const truncate = (name: string) =>
-      name.length > 10 ? name.slice(0, 8) + '..' : name;
+    const truncate = (name: string) => (name.length > 10 ? name.slice(0, 8) + '..' : name);
 
     expect(truncate('game.ts')).toBe('game.ts');
     expect(truncate('localRenderer.ts')).toBe('localRen..');
@@ -37,18 +36,24 @@ describe('P2: workbench labels and tooltips', () => {
   });
 
   it('file path truncation: >40 chars → "..." + last 37', () => {
-    const truncate = (path: string) =>
-      path.length > 40 ? '...' + path.slice(-37) : path;
+    const truncate = (path: string) => (path.length > 40 ? '...' + path.slice(-37) : path);
 
     expect(truncate('/short/path/game.ts')).toBe('/short/path/game.ts');
-    expect(truncate('/very/long/path/to/some/repository/src/localRenderer.ts').length).toBeLessThanOrEqual(40);
+    expect(
+      truncate('/very/long/path/to/some/repository/src/localRenderer.ts').length,
+    ).toBeLessThanOrEqual(40);
     expect(truncate('/very/long/path/to/some/repository/src/localRenderer.ts')).toMatch(/^\.\.\./);
   });
 
   it('extension color dot: known extensions have colors', () => {
     const EXT_COLOR: Record<string, string> = {
-      ts: '#4a9bd4', tsx: '#4a9bd4', js: '#e8c44a', py: '#4a9',
-      json: '#e8a44a', md: '#8ab4f8', css: '#a855f7',
+      ts: '#4a9bd4',
+      tsx: '#4a9bd4',
+      js: '#e8c44a',
+      py: '#4a9',
+      json: '#e8a44a',
+      md: '#8ab4f8',
+      css: '#a855f7',
     };
 
     expect(EXT_COLOR['ts']).toBeDefined();

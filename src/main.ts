@@ -12,10 +12,7 @@ import {
 import { type ScannedRepo } from './map.ts';
 import { Renderer } from './renderer.ts';
 import { BridgeEvents, syncGraphRelationFlags } from './bridge.ts';
-import {
-  ensureWondersUp,
-  isAutoStartWondersEnabled,
-} from './wonders/wonderLauncher.ts';
+import { ensureWondersUp, isAutoStartWondersEnabled } from './wonders/wonderLauncher.ts';
 import { GameState } from './game.ts';
 
 // ─── First-unit slot ──────────────────────────────────────────────────────────
@@ -223,8 +220,14 @@ type RepoCivDebugApi = {
     byTerrain: Record<string, number>;
     samplePos: Record<string, { x: number; y: number }>;
     resourceTiers: {
-      gold8: number; science4: number; production3: number; crystal: number;
-      freeGold8: number; freeSci4: number; freeProd3: number; freeAny: number;
+      gold8: number;
+      science4: number;
+      production3: number;
+      crystal: number;
+      freeGold8: number;
+      freeSci4: number;
+      freeProd3: number;
+      freeAny: number;
     };
     crystalPos: { x: number; y: number } | null;
     cleanSamplePos: Record<string, { x: number; y: number }>;
@@ -483,7 +486,9 @@ async function bootstrap() {
 
   // Initial badges: task count + idle agent count
   const initialIdle = state.getAllUnits().filter((u) => u.state === 'idle').length;
-  const initialTasks = Array.from(state.missions.values()).filter((m) => m.status === 'running').length;
+  const initialTasks = Array.from(state.missions.values()).filter(
+    (m) => m.status === 'running',
+  ).length;
   updateBadges(initialTasks, initialIdle);
   // Refresh badges periodically (catches agent state changes)
   setInterval(() => {
@@ -581,11 +586,24 @@ async function bootstrap() {
       // that need an uncontaminated top-face pixel patch per biome.
       const cleanSamplePos: Record<string, { x: number; y: number }> = {};
       const cleanFallback: Record<string, { x: number; y: number }> = {};
-      const dirs: Array<[number, number]> = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+      const dirs: Array<[number, number]> = [
+        [1, 0],
+        [1, -1],
+        [0, -1],
+        [-1, 0],
+        [-1, 1],
+        [0, 1],
+      ];
       let revealed = 0;
       const resourceTiers = {
-        gold8: 0, science4: 0, production3: 0, crystal: 0,
-        freeGold8: 0, freeSci4: 0, freeProd3: 0, freeAny: 0,
+        gold8: 0,
+        science4: 0,
+        production3: 0,
+        crystal: 0,
+        freeGold8: 0,
+        freeSci4: 0,
+        freeProd3: 0,
+        freeAny: 0,
       };
       let crystalPos: { x: number; y: number } | null = null;
       for (const t of state.world.tiles.values()) {
@@ -618,7 +636,9 @@ async function bootstrap() {
           }
           if (!cleanSamplePos[t.terrain]) {
             const allSame = dirs.every((d) => {
-              const n = state.world.tiles.get(tileKey({ q: t.coord.q + d[0], r: t.coord.r + d[1] }));
+              const n = state.world.tiles.get(
+                tileKey({ q: t.coord.q + d[0], r: t.coord.r + d[1] }),
+              );
               return n !== undefined && n.terrain === t.terrain && !n.city && !n.district;
             });
             if (allSame) {
@@ -632,7 +652,15 @@ async function bootstrap() {
           cleanSamplePos[terrain] = cleanFallback[terrain];
         }
       }
-      return { total: state.world.tiles.size, revealed, byTerrain, samplePos, cleanSamplePos, resourceTiers, crystalPos };
+      return {
+        total: state.world.tiles.size,
+        revealed,
+        byTerrain,
+        samplePos,
+        cleanSamplePos,
+        resourceTiers,
+        crystalPos,
+      };
     },
     getRiverStats: () => {
       ensureThreeProbes();
@@ -650,7 +678,9 @@ async function bootstrap() {
     openLocalView: (cityId: string) => {
       const city = state.world.cities.find((item) => item.id === cityId && !item.isCapital);
       if (!city) return false;
-      window.dispatchEvent(new CustomEvent('repociv:open-local-view-request', { detail: { cityId } }));
+      window.dispatchEvent(
+        new CustomEvent('repociv:open-local-view-request', { detail: { cityId } }),
+      );
       return true;
     },
     // Test hook: dispatch a mission to a local-view workbench and report unit
@@ -1212,10 +1242,11 @@ async function bootstrap() {
       if (!(await _confirmLabSensitiveAction(repoId, `Editar/local mission sobre ${wb.fileName}`)))
         return;
       // Resolve which agent will receive the mission: prefer idle, fallback to busy ones
-      const agentUnit = action === 'WORKER'
-        ? (state.getAllUnits().find((u) => u.type === 'worker' && u.state === 'idle') ??
-           state.getAllUnits().find((u) => u.type === 'worker'))
-        : (getFirstUserUnit(state));
+      const agentUnit =
+        action === 'WORKER'
+          ? (state.getAllUnits().find((u) => u.type === 'worker' && u.state === 'idle') ??
+            state.getAllUnits().find((u) => u.type === 'worker'))
+          : getFirstUserUnit(state);
       const agentId = agentUnit?.id ?? action;
       // Resolve the actual repo filesystem path for bridge context
       const city = state.world.cities.find((c) => c.id === repoId);
@@ -1262,7 +1293,9 @@ async function bootstrap() {
   // Pan the local-view camera to the room matching `folderName`, or toast if it has no room of its own.
   const navigateToFolder = (folderName: string) => {
     const lw = state.getLocalWorld();
-    const target = lw?.rooms.find((r: LocalRoom) => r.folderName === folderName || r.label === folderName);
+    const target = lw?.rooms.find(
+      (r: LocalRoom) => r.folderName === folderName || r.label === folderName,
+    );
     if (target) {
       renderer.animateCameraToGrid(target.x + target.width / 2, target.y + target.height / 2, 500);
     } else {
@@ -1276,7 +1309,9 @@ async function bootstrap() {
       showWhiteboardPanel(
         room,
         { x: sx, y: sy },
-        (folderPath) => { bridge.send('open_file', { filePath: folderPath }); },
+        (folderPath) => {
+          bridge.send('open_file', { filePath: folderPath });
+        },
         navigateToFolder,
       );
     }
@@ -1298,7 +1333,9 @@ async function bootstrap() {
         showWhiteboardPanel(
           room,
           { x: sx, y: sy },
-          (folderPath) => { bridge.send('open_file', { filePath: folderPath }); },
+          (folderPath) => {
+            bridge.send('open_file', { filePath: folderPath });
+          },
           navigateToFolder,
         );
       }
@@ -1335,7 +1372,14 @@ async function bootstrap() {
   // MAIN's runtime identity is configured by the onboarding step (PR 2):
   // the user picks a harness, and the bridge routes MAIN through it.
   const spawnAt = capital ? capital.coord : { q: 0, r: 0 };
-  state.spawnUnit(DEFAULT_USER_UNIT_ID, DEFAULT_USER_UNIT_NAME, 'hero', 'gris', spawnAt, 'En espera de misión');
+  state.spawnUnit(
+    DEFAULT_USER_UNIT_ID,
+    DEFAULT_USER_UNIT_NAME,
+    'hero',
+    'gris',
+    spawnAt,
+    'En espera de misión',
+  );
 
   wireHUD(renderer, state, bridge, toggleView);
   initHudMode();

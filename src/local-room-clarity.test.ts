@@ -49,7 +49,10 @@ describe('P3: room visual clarity', () => {
 
   it('static layer cache key: includes repoId + workbench count + highDensity count', () => {
     // This is the exact formula used in localRenderer.ts
-    const buildCacheKey = (repoId: string, rooms: { workbenches: unknown[]; highDensity?: boolean }[]) =>
+    const buildCacheKey = (
+      repoId: string,
+      rooms: { workbenches: unknown[]; highDensity?: boolean }[],
+    ) =>
       `${repoId}:${rooms.reduce((n, r) => n + r.workbenches.length, 0)}:${rooms.filter((r) => r.highDensity).length}`;
 
     // Same repo, different workbench counts → different keys

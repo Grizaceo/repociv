@@ -1,10 +1,5 @@
 // ─── Ground plane: dark earth fill beneath hex tiles (gap + map-edge void) ───
-import {
-  CircleGeometry,
-  Mesh,
-  MeshStandardMaterial,
-  Color,
-} from 'three';
+import { CircleGeometry, Mesh, MeshStandardMaterial, Color } from 'three';
 import { type GameState } from '../game.ts';
 import { axialToWorld3D, TILE_HEIGHT } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
@@ -24,7 +19,10 @@ export function rebuildGroundPlane(state: GameState): void {
   const tiles = Array.from(state.world.tiles.values());
   if (tiles.length === 0) return;
 
-  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  let minX = Infinity,
+    maxX = -Infinity,
+    minZ = Infinity,
+    maxZ = -Infinity;
   for (const tile of tiles) {
     const pos = axialToWorld3D(tile.coord.q, tile.coord.r, 0);
     minX = Math.min(minX, pos.x);

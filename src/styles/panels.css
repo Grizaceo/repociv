@@ -882,8 +882,12 @@
   animation: chip-spin 0.8s linear infinite;
 }
 @keyframes chip-spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .chat-scroll-btn:hover {
@@ -4669,7 +4673,9 @@ kbd {
   font-family: var(--lt-font-mono);
   font-size: 12px;
   color: var(--lt-zinc-400);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   pointer-events: auto;
   min-width: 160px;
   animation: ltElasticIn 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -4704,7 +4710,9 @@ kbd {
   border-radius: 3px;
   border-left: 2px solid transparent;
   cursor: pointer;
-  transition: background 120ms cubic-bezier(0.16, 1, 0.3, 1), border-color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    background 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 120ms cubic-bezier(0.16, 1, 0.3, 1);
   color: var(--lt-zinc-50);
   font-size: 11px;
 }
@@ -6062,7 +6070,7 @@ kbd {
   color: #f8e8c8;
   border-bottom: 2px solid var(--gold-bright, #f0c060);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
-  font-family: var(--ui-font-mono, "Cinzel", "Consolas", monospace);
+  font-family: var(--ui-font-mono, 'Cinzel', 'Consolas', monospace);
   font-size: 12px;
   padding: 0;
   max-height: 60vh;
@@ -6126,7 +6134,7 @@ kbd {
 .hermes-degraded-banner .hermes-banner-steps li {
   margin: 2px 0;
   line-height: 1.35;
-  font-family: var(--ui-font-mono, "Consolas", monospace);
+  font-family: var(--ui-font-mono, 'Consolas', monospace);
   font-size: 11px;
 }
 .hermes-degraded-banner .hermes-banner-meta {
@@ -6136,7 +6144,7 @@ kbd {
   line-height: 1.4;
 }
 .hermes-degraded-banner .hermes-banner-meta code {
-  font-family: var(--ui-font-mono, "Consolas", monospace);
+  font-family: var(--ui-font-mono, 'Consolas', monospace);
   background: rgba(0, 0, 0, 0.3);
   padding: 1px 4px;
   border-radius: 3px;
@@ -6150,7 +6158,7 @@ kbd {
   color: #1a1a1a;
   border: none;
   padding: 5px 12px;
-  font-family: var(--ui-font-mono, "Cinzel", "Consolas", monospace);
+  font-family: var(--ui-font-mono, 'Cinzel', 'Consolas', monospace);
   font-weight: 700;
   font-size: 11px;
   border-radius: 3px;

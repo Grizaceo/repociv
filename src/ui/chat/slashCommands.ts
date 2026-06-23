@@ -137,7 +137,8 @@ _register('new', {
 // ─── /model ──────────────────────────────────────────────────────────────────
 
 _register('model', {
-  description: 'Abre el picker de modelos (`/model <texto>` para filtrar). Atajo: `/model <provider> <modelo>`.',
+  description:
+    'Abre el picker de modelos (`/model <texto>` para filtrar). Atajo: `/model <provider> <modelo>`.',
   run: async (args, unitId, append) => {
     // Power-user shortcut: `/model <provider> <modelo>` with an exact provider
     // id applies immediately (and still pings /model/override for the Hermes
@@ -163,11 +164,19 @@ _register('model', {
         });
         if (!res.ok) {
           const err = await res.text().catch(() => `HTTP ${res.status}`);
-          append(unitId, `⚠️ Modelo aplicado localmente → \`${provider}/${model}\` (override: ${err})`, 'system');
+          append(
+            unitId,
+            `⚠️ Modelo aplicado localmente → \`${provider}/${model}\` (override: ${err})`,
+            'system',
+          );
           return true;
         }
       } catch (e) {
-        append(unitId, `⚠️ Modelo aplicado localmente → \`${provider}/${model}\` (bridge: ${String(e)})`, 'system');
+        append(
+          unitId,
+          `⚠️ Modelo aplicado localmente → \`${provider}/${model}\` (bridge: ${String(e)})`,
+          'system',
+        );
         return true;
       }
       append(unitId, `✅ Modelo cambiado → \`${provider}/${model}\``, 'system');

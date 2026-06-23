@@ -14,12 +14,7 @@ import {
   _testGetEntry,
   _testEntryCount,
 } from './UnitMesh3D.ts';
-import {
-  clearTileFlash,
-  flashTile,
-  getTileFlashGroup,
-  tickTileFlash,
-} from './TileFlash3D.ts';
+import { clearTileFlash, flashTile, getTileFlashGroup, tickTileFlash } from './TileFlash3D.ts';
 import type { Unit, Tile } from '../types.ts';
 
 function makeUnit(
@@ -76,9 +71,13 @@ afterEach(() => {
 
 describe('Movement tween', () => {
   it('moving unit interpolates position between path tiles', () => {
-    const path = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }];
+    const path = [
+      { q: 0, r: 0 },
+      { q: 1, r: 0 },
+      { q: 2, r: 0 },
+    ];
     rebuildUnits([makeUnit('u1', 0, 0, path, 'moving')], getTile);
-    tickUnits(0.30, 0.30); // complete spawn
+    tickUnits(0.3, 0.3); // complete spawn
 
     const entry = _testGetEntry('u1')!;
     expect(entry.moving).toBe(true);
@@ -87,7 +86,7 @@ describe('Movement tween', () => {
     const startX = entry.currentPos.x;
 
     // Tick forward — the unit should move toward tile (1,0).
-    tickUnits(0.40, 0.10);
+    tickUnits(0.4, 0.1);
     // After 0.1s at 2.5 hex/s, pathProgress = 0.25. The unit should be
     // 25% of the way from tile 0 to tile 1.
     expect(entry.pathProgress).toBeGreaterThan(0);
@@ -97,16 +96,16 @@ describe('Movement tween', () => {
     expect(entry.currentPos.x).not.toBe(startX);
 
     // Continue ticking until we arrive at tile 1.
-    tickUnits(0.50, 0.10);
-    tickUnits(0.60, 0.10);
-    tickUnits(0.70, 0.10);
+    tickUnits(0.5, 0.1);
+    tickUnits(0.6, 0.1);
+    tickUnits(0.7, 0.1);
     // By now pathProgress should have wrapped at least once (0.4s * 2.5 = 1.0).
     expect(entry.pathIndex).toBeGreaterThanOrEqual(1);
   });
 
   it('idle unit does not move (position stays at coord)', () => {
     rebuildUnits([makeUnit('u1', 0, 0, [], 'idle')], getTile);
-    tickUnits(0.30, 0.30); // complete spawn
+    tickUnits(0.3, 0.3); // complete spawn
 
     const entry = _testGetEntry('u1')!;
     const startX = entry.currentPos.x;
@@ -120,9 +119,13 @@ describe('Movement tween', () => {
   });
 
   it('frozen dt=0 does not advance movement tween', () => {
-    const path = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }];
+    const path = [
+      { q: 0, r: 0 },
+      { q: 1, r: 0 },
+      { q: 2, r: 0 },
+    ];
     rebuildUnits([makeUnit('u1', 0, 0, path, 'moving')], getTile);
-    tickUnits(0.30, 0.30); // complete spawn
+    tickUnits(0.3, 0.3); // complete spawn
 
     const entry = _testGetEntry('u1')!;
     const startProgress = entry.pathProgress;
@@ -152,11 +155,11 @@ describe('Tile flash', () => {
     expect(getTileFlashGroup().children.length).toBe(1);
 
     // Tick 100ms (halfway): still visible.
-    tickTileFlash(0.10);
+    tickTileFlash(0.1);
     expect(getTileFlashGroup().children.length).toBe(1);
 
     // Tick another 100ms: expired.
-    tickTileFlash(0.10);
+    tickTileFlash(0.1);
     expect(getTileFlashGroup().children.length).toBe(0);
   });
 
@@ -168,9 +171,13 @@ describe('Tile flash', () => {
   });
 
   it('tile flash is triggered when a unit steps onto a new tile', () => {
-    const path = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }];
+    const path = [
+      { q: 0, r: 0 },
+      { q: 1, r: 0 },
+      { q: 2, r: 0 },
+    ];
     rebuildUnits([makeUnit('u1', 0, 0, path, 'moving')], getTile);
-    tickUnits(0.30, 0.30); // complete spawn
+    tickUnits(0.3, 0.3); // complete spawn
 
     // Clear any existing flashes.
     clearTileFlash();
@@ -178,8 +185,8 @@ describe('Tile flash', () => {
 
     // Tick enough for pathProgress to wrap past 1 (0.4s * 2.5 = 1.0 hex).
     // Use the flashTile callback.
-    tickUnits(0.40, 0.40, (q, r, _elev) => flashTile(q, r, 0));
-    tickUnits(0.50, 0.10, (q, r, _elev) => flashTile(q, r, 0));
+    tickUnits(0.4, 0.4, (q, r, _elev) => flashTile(q, r, 0));
+    tickUnits(0.5, 0.1, (q, r, _elev) => flashTile(q, r, 0));
 
     // At least one flash should have been triggered.
     expect(getTileFlashGroup().children.length).toBeGreaterThan(0);

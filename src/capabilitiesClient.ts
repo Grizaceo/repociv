@@ -61,7 +61,10 @@ export function setFullCapabilitiesForTesting(): void {
  * (e.g. "scout cannot delete_file") instead of a blanket allow.
  */
 export function setCapabilitiesForAgentsForTesting(
-  agents: Record<string, { capabilities: string[]; skills?: string[]; skillLabels?: Record<string, string> }>,
+  agents: Record<
+    string,
+    { capabilities: string[]; skills?: string[]; skillLabels?: Record<string, string> }
+  >,
 ): void {
   const agentsOut: Record<string, CapabilitiesAgent> = {};
   for (const [name, info] of Object.entries(agents)) {
@@ -92,9 +95,7 @@ export function getCapabilitiesSnapshot(): CapabilitiesSnapshot {
   return cached;
 }
 
-export function setCapabilitiesSnapshotForTesting(
-  snapshot: CapabilitiesSnapshot,
-): void {
+export function setCapabilitiesSnapshotForTesting(snapshot: CapabilitiesSnapshot): void {
   cached = snapshot;
   lastFetched = Date.now();
 }

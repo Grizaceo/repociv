@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { City, Tile } from '../types.ts';
-import {
-  clearTileDecor,
-  getTileDecorGroup,
-  rebuildTileDecor,
-} from './TileDecor3D.ts';
+import { clearTileDecor, getTileDecorGroup, rebuildTileDecor } from './TileDecor3D.ts';
 
 function baseCity(): City {
   return {

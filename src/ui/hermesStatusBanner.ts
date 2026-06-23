@@ -74,9 +74,7 @@ export function buildHermesBannerHtml(status: HermesStatus): string | null {
       <p>El bridge está corriendo pero Hermes (el harness de LLM) no responde. Las siguientes features quedan afectadas hasta que Hermes esté disponible:</p>
       <ul class="hermes-banner-features">
         ${features
-          .map(
-            (f) => `<li><strong>${escapeHtml(f.label)}</strong> — ${escapeHtml(f.impact)}</li>`,
-          )
+          .map((f) => `<li><strong>${escapeHtml(f.label)}</strong> — ${escapeHtml(f.impact)}</li>`)
           .join('')}
       </ul>
       <details>

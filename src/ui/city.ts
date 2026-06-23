@@ -270,7 +270,10 @@ async function fetchCityFiles(repoName: string) {
         ? '<div class="city-item" style="color:var(--text-dim)">vacío</div>'
         : data.files
             .slice(0, 12)
-            .map((f) => `<div class="city-item" style="padding:1px 0" title="${esc(f)}">${esc(f)}</div>`)
+            .map(
+              (f) =>
+                `<div class="city-item" style="padding:1px 0" title="${esc(f)}">${esc(f)}</div>`,
+            )
             .join('');
   } catch {
     filesEl.innerHTML =

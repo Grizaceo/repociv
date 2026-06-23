@@ -76,9 +76,9 @@ export function cityLevel(city: City): number {
 // and plaza radius multiplier.
 // Level 0 still has full walls (a hamlet with a palisade) — walls only get
 // taller/more complete at higher levels, never disappear.
-const LEVEL_SPIRE_SCALE = [0.3, 0.55, 0.80, 1.0];
+const LEVEL_SPIRE_SCALE = [0.3, 0.55, 0.8, 1.0];
 const LEVEL_WALL_COMPLETENESS = [1.0, 1.0, 1.0, 1.0];
-const LEVEL_PLAZA_SCALE  = [0.50, 0.68, 0.85, 1.0];
+const LEVEL_PLAZA_SCALE = [0.5, 0.68, 0.85, 1.0];
 
 export function getCityGroup(): Group {
   return cityGroup;
@@ -88,10 +88,15 @@ function citySignature(cities: City[]): string {
   return cities
     .map((c) => {
       const bucket =
-        c.population <= 30 ? 'a' :
-        c.population <= 120 ? 'b' :
-        c.population <= 350 ? 'c' :
-        c.population <= 800 ? 'd' : 'e';
+        c.population <= 30
+          ? 'a'
+          : c.population <= 120
+            ? 'b'
+            : c.population <= 350
+              ? 'c'
+              : c.population <= 800
+                ? 'd'
+                : 'e';
       const lvl = cityLevel(c);
       return `${c.id}:${c.coord.q},${c.coord.r}:${c.isCapital ? 1 : 0}:${bucket}:L${lvl}`;
     })
@@ -165,11 +170,16 @@ export function rebuildCityClusters(
   // ── Civic centre: stepped stone plaza + monuments ──────────────────────────
   // Plaza radius and spire height scale with city level.
   {
-    const plazaGeom = new CylinderGeometry(HEX_SIZE * 0.30, HEX_SIZE * 0.46, HEX_SIZE * 0.10, 14);
+    const plazaGeom = new CylinderGeometry(HEX_SIZE * 0.3, HEX_SIZE * 0.46, HEX_SIZE * 0.1, 14);
     const plazaMat = new MeshStandardMaterial({ color: new Color(0xc9bfa6), roughness: 0.92 });
     const spireGeom = new CylinderGeometry(HEX_SIZE * 0.013, HEX_SIZE * 0.032, HEX_SIZE * 0.46, 6);
     const spireMat = new MeshStandardMaterial({ color: new Color(0xe4ddca), roughness: 0.5 });
-    const landmarkGeom = new CylinderGeometry(HEX_SIZE * 0.022, HEX_SIZE * 0.046, HEX_SIZE * 0.38, 6);
+    const landmarkGeom = new CylinderGeometry(
+      HEX_SIZE * 0.022,
+      HEX_SIZE * 0.046,
+      HEX_SIZE * 0.38,
+      6,
+    );
     const landmarkMat = new MeshStandardMaterial({
       color: new Color(0xd9cca2),
       roughness: 0.55,
@@ -188,7 +198,9 @@ export function rebuildCityClusters(
       capitalLandmarkMesh.castShadow = true;
     }
 
-    let plazaIdx = 0, spireIdx = 0, landmarkIdx = 0;
+    let plazaIdx = 0,
+      spireIdx = 0,
+      landmarkIdx = 0;
     for (const city of cities) {
       const tile = getTile(tileKey(city.coord));
       const elev = tile ? terrainElevation(tile.terrain) : 0;
@@ -247,7 +259,7 @@ export function rebuildCityClusters(
     // Taller, thinner blocks so they read as buildings rather than dunes
     const bldGeom = new BoxGeometry(HEX_SIZE * 0.12, HEX_SIZE * 0.28, HEX_SIZE * 0.12);
     const bldMat = new MeshLambertMaterial({ color: new Color(0xc8c0b0) });
-    const roofGeom = new ConeGeometry(HEX_SIZE * 0.10, HEX_SIZE * 0.12, 4);
+    const roofGeom = new ConeGeometry(HEX_SIZE * 0.1, HEX_SIZE * 0.12, 4);
     // flatShading on the 4-sided roof cone so each triangular face has a
     // hard normal — reads as a pitched terracotta roof, not a smooth wand.
     const roofMat = new MeshStandardMaterial({
@@ -261,7 +273,7 @@ export function rebuildCityClusters(
     // dots instead of one continuous fortification.
     let ringWallGeom: ExtrudeGeometry;
     {
-      const outerR = HEX_SIZE * 0.40;
+      const outerR = HEX_SIZE * 0.4;
       const innerR = HEX_SIZE * 0.34;
       const wallH = HEX_SIZE * 0.12;
       const ring = new Shape();
@@ -269,7 +281,8 @@ export function rebuildCityClusters(
         const a = (Math.PI / 3) * i;
         const x = Math.cos(a) * outerR;
         const z = Math.sin(a) * outerR;
-        if (i === 0) ring.moveTo(x, z); else ring.lineTo(x, z);
+        if (i === 0) ring.moveTo(x, z);
+        else ring.lineTo(x, z);
       }
       ring.closePath();
       const hole = new Shape();
@@ -277,7 +290,8 @@ export function rebuildCityClusters(
         const a = (Math.PI / 3) * i;
         const x = Math.cos(a) * innerR;
         const z = Math.sin(a) * innerR;
-        if (i === 0) hole.moveTo(x, z); else hole.lineTo(x, z);
+        if (i === 0) hole.moveTo(x, z);
+        else hole.lineTo(x, z);
       }
       hole.closePath();
       ring.holes.push(hole);
@@ -323,14 +337,17 @@ export function rebuildCityClusters(
     // incomplete walls (they're underground). A per-instance Y-scale
     // controls how much of the wall is visible.
     const wallCount = normalCities.length;
-    const towerCount = normalCities.length * 4;  // 4 corner towers
+    const towerCount = normalCities.length * 4; // 4 corner towers
 
     clusterMesh = new InstancedMesh(bldGeom, bldMat, bldCount);
-    roofMesh    = new InstancedMesh(roofGeom, roofMat, roofCount);
-    wallMesh    = new InstancedMesh(wallGeom, wallMat, wallCount);
-    towerMesh   = new InstancedMesh(towerGeom, towerMat, towerCount);
+    roofMesh = new InstancedMesh(roofGeom, roofMat, roofCount);
+    wallMesh = new InstancedMesh(wallGeom, wallMat, wallCount);
+    towerMesh = new InstancedMesh(towerGeom, towerMat, towerCount);
 
-    let bldIdx = 0, roofIdx = 0, wallIdx = 0, towerIdx = 0;
+    let bldIdx = 0,
+      roofIdx = 0,
+      wallIdx = 0,
+      towerIdx = 0;
 
     for (const city of normalCities) {
       const tile = getTile(tileKey(city.coord));
@@ -379,7 +396,10 @@ export function rebuildCityClusters(
         );
         roofM.scale(new Vector3(1, 1, 1));
         // Rotate roof to align with building
-        const rot = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), ((h + bldIdx) % 4) * (Math.PI / 4));
+        const rot = new Quaternion().setFromAxisAngle(
+          new Vector3(0, 1, 0),
+          ((h + bldIdx) % 4) * (Math.PI / 4),
+        );
         roofM.multiply(new Matrix4().makeRotationFromQuaternion(rot));
         roofMesh.setMatrixAt(roofIdx++, roofM);
       }
@@ -418,7 +438,7 @@ export function rebuildCityClusters(
         const h = hashCoord(city.coord.q, city.coord.r);
         for (let si = 0; si < satellitesPerCapital; si++) {
           const angle = satAngles[si]! + (h % 6) * (Math.PI / 3);
-          const r = HEX_SIZE * (0.50 + ((h >> (si + 2)) % 3) * 0.04);
+          const r = HEX_SIZE * (0.5 + ((h >> (si + 2)) % 3) * 0.04);
           const sx = base.x + Math.cos(angle) * r;
           const sz = base.z + Math.sin(angle) * r;
           const ht = 0.58 + ((h >> si) % 3) * 0.09;
@@ -451,7 +471,7 @@ export function rebuildCityClusters(
 
   // ── Capitals: glTF prop when loaded; procedural fallback otherwise ─────────
   if (capitals.length > 0 && !areCityPropsReady()) {
-    const bldGeom = new BoxGeometry(HEX_SIZE * 0.20, HEX_SIZE * 0.55, HEX_SIZE * 0.20);
+    const bldGeom = new BoxGeometry(HEX_SIZE * 0.2, HEX_SIZE * 0.55, HEX_SIZE * 0.2);
     const bldMat = new MeshStandardMaterial({
       color: new Color(0xd4c8b8),
       emissive: new Color(0x504840),
@@ -477,7 +497,7 @@ export function rebuildCityClusters(
       metalness: 0.25,
       flatShading: true,
     });
-    const wallGeom = new BoxGeometry(HEX_SIZE * 0.70, HEX_SIZE * 0.10, HEX_SIZE * 0.025);
+    const wallGeom = new BoxGeometry(HEX_SIZE * 0.7, HEX_SIZE * 0.1, HEX_SIZE * 0.025);
     const wallMat = new MeshStandardMaterial({ color: new Color(0xb8b0a0), roughness: 0.7 });
     const towerGeom = new CylinderGeometry(HEX_SIZE * 0.035, HEX_SIZE * 0.04, HEX_SIZE * 0.24, 6);
     const towerMat = new MeshStandardMaterial({ color: new Color(0xa8a090), roughness: 0.6 });
@@ -491,17 +511,20 @@ export function rebuildCityClusters(
 
     const bldCount = capitals.length;
     const roofCount = capitals.length;
-    const wallCount = capitals.length * 8;  // 8 wall segments for more complex shape
+    const wallCount = capitals.length * 8; // 8 wall segments for more complex shape
     const towerCount = capitals.length * 6; // 6 towers
 
-    capitalMesh     = new InstancedMesh(bldGeom, bldMat, bldCount);
+    capitalMesh = new InstancedMesh(bldGeom, bldMat, bldCount);
     capitalRoofMesh = new InstancedMesh(roofGeom, roofMat, roofCount);
     capitalDomeMesh = new InstancedMesh(domeGeom, domeMat, capitals.length);
     capitalWallMesh = new InstancedMesh(wallGeom, wallMat, wallCount);
     capitalTowerMesh = new InstancedMesh(towerGeom, towerMat, towerCount);
-    capitalStar     = new InstancedMesh(starGeom, starMat, capitals.length);
+    capitalStar = new InstancedMesh(starGeom, starMat, capitals.length);
 
-    let bldIdx = 0, roofIdx = 0, wallIdx = 0, towerIdx = 0;
+    let bldIdx = 0,
+      roofIdx = 0,
+      wallIdx = 0,
+      towerIdx = 0;
     const q = new Quaternion();
 
     for (const city of capitals) {

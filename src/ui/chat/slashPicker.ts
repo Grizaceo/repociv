@@ -189,7 +189,9 @@ function render(): void {
   s.listEl.replaceChildren();
 
   if (s.options.length === 0) {
-    s.listEl.appendChild(emptyRow('Aún no hay opciones disponibles — espera a que cargue el bridge.'));
+    s.listEl.appendChild(
+      emptyRow('Aún no hay opciones disponibles — espera a que cargue el bridge.'),
+    );
     s.footEl.textContent = 'Esc cerrar';
     return;
   }

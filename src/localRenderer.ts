@@ -2,7 +2,15 @@
 import type { LocalWorld, LocalTile, LocalRoom, LocalUnit, ZoneType } from './types.ts';
 import { loadOfficeAtlas } from './officeAtlas.ts';
 import { darkenHex } from './isoOfficeRenderer.ts';
-import { EXT_COLOR, adjustBrightness as _adjustBrightness, drawRoomLabel as drawRoomLabelModule, drawSofaTile as drawSofaTileModule, drawWatercoolerTile as drawWatercoolerTileModule, drawWindowTile as drawWindowTileModule, drawWorkbenchClusterPanel } from './local2dAssets.ts';
+import {
+  EXT_COLOR,
+  adjustBrightness as _adjustBrightness,
+  drawRoomLabel as drawRoomLabelModule,
+  drawSofaTile as drawSofaTileModule,
+  drawWatercoolerTile as drawWatercoolerTileModule,
+  drawWindowTile as drawWindowTileModule,
+  drawWorkbenchClusterPanel,
+} from './local2dAssets.ts';
 import {
   createParticlePool,
   spawnBreath as spawnBreathParticle,
@@ -252,7 +260,14 @@ export class LocalRenderer {
   private _inputActive = true;
 
   // Camera animation (smooth pan)
-  private _camAnim: { targetX: number; targetY: number; startTime: number; duration: number; fromX: number; fromY: number } | null = null;
+  private _camAnim: {
+    targetX: number;
+    targetY: number;
+    startTime: number;
+    duration: number;
+    fromX: number;
+    fromY: number;
+  } | null = null;
 
   setInputActive(active: boolean): void {
     this._inputActive = active;
@@ -267,7 +282,9 @@ export class LocalRenderer {
 
   // Interaction
   hoveredTile: { x: number; y: number } | null = null;
-  onTileClick: ((x: number, y: number, tile: LocalTile | null, screenX: number, screenY: number) => void) | null = null;
+  onTileClick:
+    | ((x: number, y: number, tile: LocalTile | null, screenX: number, screenY: number) => void)
+    | null = null;
   onTileHover: ((x: number, y: number, tile: LocalTile | null) => void) | null = null;
   onTileDblClick: ((x: number, y: number, tile: LocalTile | null) => void) | null = null;
 
@@ -276,7 +293,9 @@ export class LocalRenderer {
   onWorkbenchClick: ((tile: LocalTile, screenX: number, screenY: number) => void) | null = null;
   onLocalUnitHover: ((unit: LocalUnit | null, screenX: number, screenY: number) => void) | null =
     null;
-  onNpcClick: ((npc: import('./types.ts').LocalNpc, screenX: number, screenY: number) => void) | null = null;
+  onNpcClick:
+    | ((npc: import('./types.ts').LocalNpc, screenX: number, screenY: number) => void)
+    | null = null;
   // Phase 9: per-frame bubble position update
   onUnitRendered: ((unit: LocalUnit, screenX: number, screenY: number) => void) | null = null;
   // Phase 9 (transition): notifies parent when the exit transition completes
@@ -347,12 +366,14 @@ export class LocalRenderer {
         const c1 = isoProject(world.width, 0);
         const c2 = isoProject(0, world.height);
         const c3 = isoProject(world.width, world.height);
-        this.cam.x = (Math.min(c0.px, c1.px, c2.px, c3.px) + Math.max(c0.px, c1.px, c2.px, c3.px)) / 2;
-        this.cam.y = (Math.min(c0.py, c1.py, c2.py, c3.py) + Math.max(c0.py, c1.py, c2.py, c3.py)) / 2;
+        this.cam.x =
+          (Math.min(c0.px, c1.px, c2.px, c3.px) + Math.max(c0.px, c1.px, c2.px, c3.px)) / 2;
+        this.cam.y =
+          (Math.min(c0.py, c1.py, c2.py, c3.py) + Math.max(c0.py, c1.py, c2.py, c3.py)) / 2;
       }
     } else {
-      this.cam.x = world.width * TILE_SIZE / 2;
-      this.cam.y = world.height * TILE_SIZE / 2;
+      this.cam.x = (world.width * TILE_SIZE) / 2;
+      this.cam.y = (world.height * TILE_SIZE) / 2;
     }
   }
 
@@ -592,7 +613,8 @@ export class LocalRenderer {
   }
 
   private _finalizeZonePaint(): void {
-    if (!this._zonePaintMode || !this._zonePaintStart || !this._zonePaintCurrent || !this.world) return;
+    if (!this._zonePaintMode || !this._zonePaintStart || !this._zonePaintCurrent || !this.world)
+      return;
 
     const x0 = Math.min(this._zonePaintStart.x, this._zonePaintCurrent.x);
     const y0 = Math.min(this._zonePaintStart.y, this._zonePaintCurrent.y);
@@ -828,8 +850,12 @@ export class LocalRenderer {
       });
       ctx.restore();
       const grad = ctx.createRadialGradient(
-        canvas.width / 2, canvas.height / 2, 0,
-        canvas.width / 2, canvas.height / 2, canvas.width,
+        canvas.width / 2,
+        canvas.height / 2,
+        0,
+        canvas.width / 2,
+        canvas.height / 2,
+        canvas.width,
       );
       grad.addColorStop(0, 'rgba(255, 248, 243, 0)');
       grad.addColorStop(0.65, 'rgba(255, 240, 230, 0)');
@@ -1050,16 +1076,22 @@ export class LocalRenderer {
       zoneLight: ISO_ZONE_LIGHT,
       isoProject,
       drawIsoTile: (ctx, tile, x, y, currentWorld) => {
-        drawIsoTileModule({
-          ctx,
-          world: currentWorld,
-          tokens: this.tokens,
-          extColor: EXT_COLOR,
-          doorOpenStates: this.doorOpenStates,
-          spawnZzz: () => {},
-          spawnBreath: () => {},
-          darkenHex: (hex, pct) => darkenHex(hex, pct),
-        }, tile, x, y, currentWorld);
+        drawIsoTileModule(
+          {
+            ctx,
+            world: currentWorld,
+            tokens: this.tokens,
+            extColor: EXT_COLOR,
+            doorOpenStates: this.doorOpenStates,
+            spawnZzz: () => {},
+            spawnBreath: () => {},
+            darkenHex: (hex, pct) => darkenHex(hex, pct),
+          },
+          tile,
+          x,
+          y,
+          currentWorld,
+        );
       },
     });
     this._isoStaticOffsetX = result.offsetX;
@@ -1085,7 +1117,10 @@ export class LocalRenderer {
         isoUnproject(bl.wx, bl.wy),
         isoUnproject(br.wx, br.wy),
       ];
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
       for (const c of corners) {
         minX = Math.min(minX, c.x);
         minY = Math.min(minY, c.y);
@@ -1239,7 +1274,14 @@ export class LocalRenderer {
 
   /** Phase E: draw a compact cluster of file-type pills for high-density rooms.
    *  cx, cy are in tile coords; ctx already has camera transform applied. */
-  private drawFloorBackground(tile: LocalTile, px: number, py: number, s: number, inRoom: boolean, zone?: string) {
+  private drawFloorBackground(
+    tile: LocalTile,
+    px: number,
+    py: number,
+    s: number,
+    inRoom: boolean,
+    zone?: string,
+  ) {
     const { ctx } = this;
     if (!inRoom) {
       // ─── Corridor / common area — soft cream carpet ────────────────────
@@ -1270,13 +1312,13 @@ export class LocalRenderer {
 
     // ─── Room floors — Cozy Pastel palette ────────────────────────────────
     const baseColors: Record<string, string> = {
-      team_cluster: '#F5D0C5',   // soft rose office carpet
-      meeting: '#B09060',        // warm light wood
-      focus: '#E8F5D6',          // matcha green acoustic
-      break: '#D0C0A0',          // warm lemon kitchen tile
-      infra: '#E2E8F0',          // cool gray server floor
-      reception: '#F5F0E8',      // polished marble cream
-      biophilic: '#D4E8D0',      // sage green natural
+      team_cluster: '#F5D0C5', // soft rose office carpet
+      meeting: '#B09060', // warm light wood
+      focus: '#E8F5D6', // matcha green acoustic
+      break: '#D0C0A0', // warm lemon kitchen tile
+      infra: '#E2E8F0', // cool gray server floor
+      reception: '#F5F0E8', // polished marble cream
+      biophilic: '#D4E8D0', // sage green natural
     };
 
     const baseColor = baseColors[zone ?? 'team_cluster'] ?? '#F5D0C5';
@@ -1306,8 +1348,8 @@ export class LocalRenderer {
       ctx.beginPath();
       ctx.moveTo(px + s / 3, py);
       ctx.lineTo(px + s / 3, py + s);
-      ctx.moveTo(px + 2 * s / 3, py);
-      ctx.lineTo(px + 2 * s / 3, py + s);
+      ctx.moveTo(px + (2 * s) / 3, py);
+      ctx.lineTo(px + (2 * s) / 3, py + s);
       ctx.stroke();
     }
 
@@ -1655,8 +1697,8 @@ export class LocalRenderer {
         ctx.beginPath();
         ctx.moveTo(px + s / 3, py);
         ctx.lineTo(px + s / 3, py + s);
-        ctx.moveTo(px + 2 * s / 3, py);
-        ctx.lineTo(px + 2 * s / 3, py + s);
+        ctx.moveTo(px + (2 * s) / 3, py);
+        ctx.lineTo(px + (2 * s) / 3, py + s);
         ctx.stroke();
         ctx.strokeStyle = 'rgba(200, 170, 140, 0.5)';
         ctx.lineWidth = 1;
@@ -1887,7 +1929,7 @@ export class LocalRenderer {
 
     // Tiny soft blinking LED
     const now = performance.now();
-    ctx.fillStyle = (now % 1000 < 500) ? 'rgba(168, 213, 162, 0.6)' : 'rgba(180, 190, 200, 0.3)';
+    ctx.fillStyle = now % 1000 < 500 ? 'rgba(168, 213, 162, 0.6)' : 'rgba(180, 190, 200, 0.3)';
     ctx.beginPath();
     ctx.arc(px + s / 2, py + s / 2, 2, 0, Math.PI * 2);
     ctx.fill();
@@ -2106,7 +2148,7 @@ export class LocalRenderer {
     ctx.fill();
     // Soft indicator
     const now = performance.now();
-    ctx.fillStyle = (now % 2000 < 1000) ? '#608860' : '#D4E8D0';
+    ctx.fillStyle = now % 2000 < 1000 ? '#608860' : '#D4E8D0';
     ctx.beginPath();
     ctx.arc(px + s / 2, py + 6, 2, 0, Math.PI * 2);
     ctx.fill();
@@ -2190,7 +2232,11 @@ export class LocalRenderer {
     ctx.lineWidth = 0.5;
     ctx.stroke();
     // Colorful marker scribbles
-    const colors = ['rgba(248, 187, 208, 0.4)', 'rgba(168, 213, 162, 0.4)', 'rgba(186, 230, 253, 0.4)'];
+    const colors = [
+      'rgba(248, 187, 208, 0.4)',
+      'rgba(168, 213, 162, 0.4)',
+      'rgba(186, 230, 253, 0.4)',
+    ];
     ctx.lineWidth = 0.5;
     for (let i = 0; i < 3; i++) {
       ctx.strokeStyle = colors[i]!;
@@ -2379,7 +2425,7 @@ export class LocalRenderer {
     let breatheScale = 1;
     if (!isMoving && (unit.state === 'idle_in_room' || unit.state === 'resting')) {
       const now = performance.now();
-      breatheScale = 1 + Math.sin(now / 1000 * Math.PI) * 0.02; // 2s period, ±2%
+      breatheScale = 1 + Math.sin((now / 1000) * Math.PI) * 0.02; // 2s period, ±2%
     }
 
     // Despawn fade-out alpha (P1)
@@ -2677,7 +2723,9 @@ export class LocalRenderer {
     // Convert to screen coords
     const { sx, sy } = worldToScreen(cam, px, py);
 
-    const padX = 8, padY = 6, lineHeight = 11;
+    const padX = 8,
+      padY = 6,
+      lineHeight = 11;
     const extCol = EXT_COLOR[wb.extension] ?? '#888';
     const fileName = wb.fileName;
     const testBadge = wb.isTest ? ' [TEST]' : '';
@@ -2739,7 +2787,12 @@ export class LocalRenderer {
   }
 
   private updateAndDrawParticles(dt: number) {
-    updateAndDrawLocalParticles(this.ctx, this.particles, dt, this.tokens.fontMono || "'JetBrains Mono', monospace");
+    updateAndDrawLocalParticles(
+      this.ctx,
+      this.particles,
+      dt,
+      this.tokens.fontMono || "'JetBrains Mono', monospace",
+    );
   }
 
   private overlayState() {
@@ -2801,6 +2854,4 @@ export class LocalRenderer {
       : { px: gridX * TILE_SIZE, py: gridY * TILE_SIZE };
     this.animateCameraTo(p.px, p.py, duration);
   }
-
 }
-

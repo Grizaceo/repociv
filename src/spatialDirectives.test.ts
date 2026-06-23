@@ -1,21 +1,30 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { interpretUnitDrag, interpretUnitToFileDrag, interpretCardDropOnUnit } from './spatialDirectives.ts';
+import {
+  interpretUnitDrag,
+  interpretUnitToFileDrag,
+  interpretCardDropOnUnit,
+} from './spatialDirectives.ts';
 import type { Unit, Tile, City } from './types.ts';
 import type { Axial } from './hex.ts';
 import { draftCommand, type CommandDraft } from './commandSchema.ts';
 import { setCapabilitiesForAgentsForTesting } from './capabilitiesClient.ts';
 
 const ALL_CAPS = [
-  'inspect_repo', 'read_file', 'run_tests', 'run_build',
-  'edit_file', 'create_branch', 'git_commit',
-  'execute_agent', 'quest_add', 'unit_command', 'e2e_probe',
+  'inspect_repo',
+  'read_file',
+  'run_tests',
+  'run_build',
+  'edit_file',
+  'create_branch',
+  'git_commit',
+  'execute_agent',
+  'quest_add',
+  'unit_command',
+  'e2e_probe',
   'send_message',
 ];
 
-const ARMY_CAPS = [
-  'inspect_repo', 'read_file', 'run_tests', 'run_build',
-  'execute_agent',
-];
+const ARMY_CAPS = ['inspect_repo', 'read_file', 'run_tests', 'run_build', 'execute_agent'];
 
 beforeEach(() => {
   setCapabilitiesForAgentsForTesting({

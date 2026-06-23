@@ -3,7 +3,21 @@
 // BFS traversal assigns each folder a rectangular "room" proportional to its file count.
 // Files become "workbench" tiles inside their room.
 
-import type { LocalWorld, LocalRoom, LocalTile, LocalTileType, Workbench, PowerGrid, PowerSource, PowerConsumer, LocalRestArea, RoomClimate, ClimateDevice, Vent, OfficeZoneType } from './types.ts';
+import type {
+  LocalWorld,
+  LocalRoom,
+  LocalTile,
+  LocalTileType,
+  Workbench,
+  PowerGrid,
+  PowerSource,
+  PowerConsumer,
+  LocalRestArea,
+  RoomClimate,
+  ClimateDevice,
+  Vent,
+  OfficeZoneType,
+} from './types.ts';
 import {
   applyOfficeLayout,
   isLayoutReservedTile,
@@ -54,7 +68,7 @@ export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
   // ─── Reception / Spawn Hall (lobby before any departmental rooms) ──────────
   const totalFiles = countFiles(root, MAX_DEPTH);
   const lobbyW = Math.max(8, Math.min(14, Math.ceil(Math.sqrt(totalFiles * 0.6))));
-  const lobbyH = Math.max(6, Math.min(10, Math.ceil(totalFiles / lobbyW * 0.4)));
+  const lobbyH = Math.max(6, Math.min(10, Math.ceil((totalFiles / lobbyW) * 0.4)));
   const lobbyPlaced = placeRoom(gridWidth, gridHeight, rooms, lobbyW, lobbyH, WALL_THICKNESS);
   if (!lobbyPlaced.fits) {
     const newSize = expandGrid(gridWidth, gridHeight, lobbyW, lobbyH, 'vertical_overflow');
@@ -135,7 +149,12 @@ export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
   }
 
   // ─── Power System: place conduits + generators/batteries/solar ──────────────
-  const { powerGrid, powerSources, powerConsumers } = placePowerSystem(grid, rooms, gridWidth, gridHeight);
+  const { powerGrid, powerSources, powerConsumers } = placePowerSystem(
+    grid,
+    rooms,
+    gridWidth,
+    gridHeight,
+  );
 
   // ─── Rest Areas: place beds in bedroom/barracks rooms ───────────────────────
   const restAreas = placeRestAreas(grid, rooms, gridWidth, gridHeight);
@@ -143,7 +162,21 @@ export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
   // ─── Temperature System: place heaters/coolers/vents ─────────────────────────
   const roomClimates = placeTemperatureSystem(grid, rooms, gridWidth, gridHeight);
 
-  return { repoId, grid, rooms, width: gridWidth, height: gridHeight, workbenches, powerGrid, powerSources, powerConsumers, restAreas, roomClimates, npcs, deskAssignments: new Map() };
+  return {
+    repoId,
+    grid,
+    rooms,
+    width: gridWidth,
+    height: gridHeight,
+    workbenches,
+    powerGrid,
+    powerSources,
+    powerConsumers,
+    restAreas,
+    roomClimates,
+    npcs,
+    deskAssignments: new Map(),
+  };
 }
 
 // ─── Browser API entry point: convert flat path list → FileNode tree ──────────
@@ -279,7 +312,11 @@ function collectFiles(node: FileNode | undefined, remainingDepth: number): FileN
 }
 
 // ─── Office Zone Classification (Phase 2) ────────────────────────────────────
-function classifyFolderZone(folderName: string, folderPath: string, depth: number): { zoneType: OfficeZoneType; zoneLabel: string } {
+function classifyFolderZone(
+  folderName: string,
+  folderPath: string,
+  depth: number,
+): { zoneType: OfficeZoneType; zoneLabel: string } {
   const name = folderName.toLowerCase();
   const path = folderPath.toLowerCase();
 
@@ -291,51 +328,96 @@ function classifyFolderZone(folderName: string, folderPath: string, depth: numbe
 
   // Team clusters: core code directories
   if (
-    name === 'src' || name === 'lib' || name === 'app' || name === 'core' ||
-    name === 'api' || name === 'services' || name === 'components' || name === 'modules' ||
-    name === 'ui' || name === 'frontend' || name === 'backend' || name === 'client' || name === 'server'
+    name === 'src' ||
+    name === 'lib' ||
+    name === 'app' ||
+    name === 'core' ||
+    name === 'api' ||
+    name === 'services' ||
+    name === 'components' ||
+    name === 'modules' ||
+    name === 'ui' ||
+    name === 'frontend' ||
+    name === 'backend' ||
+    name === 'client' ||
+    name === 'server'
   ) {
     return { zoneType: 'team_cluster', zoneLabel: 'Engineering' };
   }
 
   // Meeting / knowledge sharing
   if (
-    name === 'docs' || name === 'doc' || name === 'wiki' || name === 'guides' ||
-    name === 'tutorials' || name === 'handbook' || name === 'knowledge'
+    name === 'docs' ||
+    name === 'doc' ||
+    name === 'wiki' ||
+    name === 'guides' ||
+    name === 'tutorials' ||
+    name === 'handbook' ||
+    name === 'knowledge'
   ) {
     return { zoneType: 'meeting', zoneLabel: 'Knowledge' };
   }
 
   // Focus / quiet verification
   if (
-    name === 'tests' || name === 'test' || name === 'spec' || name === 'e2e' ||
-    name === 'integration' || name === 'unit' || name === 'qa' || name === 'coverage'
+    name === 'tests' ||
+    name === 'test' ||
+    name === 'spec' ||
+    name === 'e2e' ||
+    name === 'integration' ||
+    name === 'unit' ||
+    name === 'qa' ||
+    name === 'coverage'
   ) {
     return { zoneType: 'focus', zoneLabel: 'Focus' };
   }
 
   // Infra / server room
   if (
-    name === 'config' || name === 'ci' || name === 'deploy' || name === 'infra' ||
-    name === 'infrastructure' || name === 'terraform' || name === 'docker' ||
-    name === 'kubernetes' || name === 'k8s' || name === 'helm' || name === 'ansible' ||
-    name === '.github' || name === 'scripts' || name === 'build' || name === 'dist' || name === 'out'
+    name === 'config' ||
+    name === 'ci' ||
+    name === 'deploy' ||
+    name === 'infra' ||
+    name === 'infrastructure' ||
+    name === 'terraform' ||
+    name === 'docker' ||
+    name === 'kubernetes' ||
+    name === 'k8s' ||
+    name === 'helm' ||
+    name === 'ansible' ||
+    name === '.github' ||
+    name === 'scripts' ||
+    name === 'build' ||
+    name === 'dist' ||
+    name === 'out'
   ) {
     return { zoneType: 'infra', zoneLabel: 'Infrastructure' };
   }
 
   // Break / exploration
   if (
-    name === 'examples' || name === 'demo' || name === 'playground' || name === 'samples' ||
-    name === 'storybook' || name === 'showcase' || name === 'experiments'
+    name === 'examples' ||
+    name === 'demo' ||
+    name === 'playground' ||
+    name === 'samples' ||
+    name === 'storybook' ||
+    name === 'showcase' ||
+    name === 'experiments'
   ) {
     return { zoneType: 'break', zoneLabel: 'Innovation' };
   }
 
   // Biophilic / assets
   if (
-    name === 'public' || name === 'assets' || name === 'static' || name === 'images' ||
-    name === 'fonts' || name === 'media' || name === 'resources' || name === 'styles' || name === 'css'
+    name === 'public' ||
+    name === 'assets' ||
+    name === 'static' ||
+    name === 'images' ||
+    name === 'fonts' ||
+    name === 'media' ||
+    name === 'resources' ||
+    name === 'styles' ||
+    name === 'css'
   ) {
     return { zoneType: 'biophilic', zoneLabel: 'Design' };
   }
@@ -437,9 +519,7 @@ function makeRoom(
 ): LocalRoom {
   const { zoneType, zoneLabel } = classifyFolderZone(folder.name, folder.path, folder.depth);
   const subFolderNames =
-    folder.node.children
-      ?.filter((c) => c.type === 'dir')
-      .map((c) => c.name) ?? [];
+    folder.node.children?.filter((c) => c.type === 'dir').map((c) => c.name) ?? [];
   return {
     id: folder.path,
     label: folder.name,
@@ -593,10 +673,7 @@ function furnishRooms(
       floors.filter((f) => {
         const wx = f.x + dx;
         const wy = f.y + dy;
-        return (
-          inBounds(wx, wy, gridW, gridH) &&
-          grid[wy]![wx]!.type === 'wall'
-        );
+        return inBounds(wx, wy, gridW, gridH) && grid[wy]![wx]!.type === 'wall';
       });
 
     switch (zone) {
@@ -633,7 +710,11 @@ function furnishRooms(
         }
         const isFreeFloor = (x: number, y: number) => {
           const t = grid[y]![x]!;
-          return t.type === 'floor' && !isLayoutReservedTile(t) && !(npcTile && npcTile.x === x && npcTile.y === y);
+          return (
+            t.type === 'floor' &&
+            !isLayoutReservedTile(t) &&
+            !(npcTile && npcTile.x === x && npcTile.y === y)
+          );
         };
         // Anchor furniture lives on the walkway ring, like the reference
         // office: a watercooler against the north wall near the NE corner
@@ -666,9 +747,10 @@ function furnishRooms(
           place(center.x + 1, center.y, 'meeting_room');
         }
         // Whiteboard on one wall
-        const wbCandidates = wallAdjacentFloors(0, -1).length > 0
-          ? wallAdjacentFloors(0, -1)
-          : wallAdjacentFloors(0, 1);
+        const wbCandidates =
+          wallAdjacentFloors(0, -1).length > 0
+            ? wallAdjacentFloors(0, -1)
+            : wallAdjacentFloors(0, 1);
         if (wbCandidates.length > 0) {
           const mid = Math.floor(wbCandidates.length / 2);
           place(wbCandidates[mid]!.x, wbCandidates[mid]!.y, 'whiteboard');
@@ -693,9 +775,10 @@ function furnishRooms(
           }
         }
         // Whiteboard for quiet notes
-        const wbCandidates = wallAdjacentFloors(0, -1).length > 0
-          ? wallAdjacentFloors(0, -1)
-          : wallAdjacentFloors(0, 1);
+        const wbCandidates =
+          wallAdjacentFloors(0, -1).length > 0
+            ? wallAdjacentFloors(0, -1)
+            : wallAdjacentFloors(0, 1);
         if (wbCandidates.length > 0) {
           place(wbCandidates[0]!.x, wbCandidates[0]!.y, 'whiteboard');
         }
@@ -733,10 +816,7 @@ function furnishRooms(
           const startIdx = Math.floor((southWall.length - 2) / 2);
           const f1 = southWall[startIdx]!;
           const f2 = southWall[startIdx + 1]!;
-          if (
-            grid[f1.y]![f1.x]!.type === 'floor' &&
-            grid[f2.y]![f2.x]!.type === 'floor'
-          ) {
+          if (grid[f1.y]![f1.x]!.type === 'floor' && grid[f2.y]![f2.x]!.type === 'floor') {
             place(f1.x, f1.y, 'sofa');
             place(f2.x, f2.y, 'sofa');
           } else {
@@ -790,10 +870,11 @@ function furnishRooms(
         // to 'window' rendered as wall-height glass blocks mid-room.
         placeWallWindows(grid, room, gridW, gridH);
         // Planters flanking reception
-        const flanks = floors.filter((f) =>
-          Math.abs(f.x - floors[centerIdx]!.x) <= 1 &&
-          Math.abs(f.y - floors[centerIdx]!.y) <= 1 &&
-          !(f.x === floors[centerIdx]!.x && f.y === floors[centerIdx]!.y)
+        const flanks = floors.filter(
+          (f) =>
+            Math.abs(f.x - floors[centerIdx]!.x) <= 1 &&
+            Math.abs(f.y - floors[centerIdx]!.y) <= 1 &&
+            !(f.x === floors[centerIdx]!.x && f.y === floors[centerIdx]!.y),
         );
         for (const f of flanks.slice(0, 2)) {
           if (grid[f.y]![f.x]!.type === 'floor') place(f.x, f.y, 'planter');
@@ -970,7 +1051,8 @@ function placePowerSystem(
     // 4. Place power consumers for each workbench in this room
     for (const wb of room.workbenches) {
       // Find workbench tile position
-      let wbX = -1, wbY = -1;
+      let wbX = -1,
+        wbY = -1;
       for (let ry = room.y + WALL_THICKNESS; ry < room.y + room.height - WALL_THICKNESS; ry++) {
         for (let rx = room.x + WALL_THICKNESS; rx < room.x + room.width - WALL_THICKNESS; rx++) {
           if (inBounds(rx, ry, gridW, gridH)) {
@@ -1007,7 +1089,7 @@ function placePowerSystem(
     conduits,
     sources,
     consumers,
-    storedWatts: sources.find(s => s.type === 'battery')?.fuel ? BATTERY_STORED : 0,
+    storedWatts: sources.find((s) => s.type === 'battery')?.fuel ? BATTERY_STORED : 0,
     generatedWatts,
     consumedWatts,
   };
@@ -1026,10 +1108,14 @@ function pickPowerSourceType(room: LocalRoom): 'generator' | 'battery' | 'solar'
 
 function getSourceWatts(type: 'generator' | 'battery' | 'solar' | 'wind'): number {
   switch (type) {
-    case 'generator': return GENERATOR_WATTS;
-    case 'battery': return 0; // batteries store, don't generate
-    case 'solar': return SOLAR_WATTS;
-    case 'wind': return SOLAR_WATTS;
+    case 'generator':
+      return GENERATOR_WATTS;
+    case 'battery':
+      return 0; // batteries store, don't generate
+    case 'solar':
+      return SOLAR_WATTS;
+    case 'wind':
+      return SOLAR_WATTS;
   }
 }
 
@@ -1185,19 +1271,27 @@ function placeTemperatureSystem(
 
   for (const room of rooms) {
     const name = room.folderName.toLowerCase();
-    
+
     // Decide climate devices based on room type
     let hasHeater = false;
     let hasCooler = false;
     const isServerRoom = name === 'server' || name === 'servers' || name === 'data';
     const isColdStorage = name === 'archive' || name === 'archives' || name === 'cold';
     const isHotRoom = name === 'build' || name === 'dist' || name === 'out' || isServerRoom;
-    const isLivingSpace = name === 'bedroom' || name === 'barracks' || name === 'living' || name === 'lounge';
+    const isLivingSpace =
+      name === 'bedroom' || name === 'barracks' || name === 'living' || name === 'lounge';
 
     if (isColdStorage) hasCooler = true;
-    else if (isHotRoom) hasCooler = true; // servers need cooling
-    else if (isLivingSpace) { hasHeater = true; hasCooler = true; } // comfort
-    else if (Math.random() < 0.3) { hasHeater = true; hasCooler = true; } // random climate control
+    else if (isHotRoom)
+      hasCooler = true; // servers need cooling
+    else if (isLivingSpace) {
+      hasHeater = true;
+      hasCooler = true;
+    } // comfort
+    else if (Math.random() < 0.3) {
+      hasHeater = true;
+      hasCooler = true;
+    } // random climate control
 
     const heaters: ClimateDevice[] = [];
     const coolers: ClimateDevice[] = [];
@@ -1248,20 +1342,21 @@ function placeTemperatureSystem(
     // Find adjacent rooms and place vents on shared walls
     for (const otherRoom of rooms) {
       if (otherRoom.id === room.id) continue;
-      
+
       // Check if rooms are adjacent horizontally
-      const horizontalAdjacent = 
+      const horizontalAdjacent =
         (room.x + room.width === otherRoom.x || otherRoom.x + otherRoom.width === room.x) &&
         !(room.y + room.height <= otherRoom.y || otherRoom.y + otherRoom.height <= room.y);
-      
+
       // Check if rooms are adjacent vertically
-      const verticalAdjacent = 
+      const verticalAdjacent =
         (room.y + room.height === otherRoom.y || otherRoom.y + otherRoom.height === room.y) &&
         !(room.x + room.width <= otherRoom.x || otherRoom.x + otherRoom.width <= room.x);
 
       if (horizontalAdjacent || verticalAdjacent) {
         // Place vent on shared wall
-        let vx = -1, vy = -1;
+        let vx = -1,
+          vy = -1;
         if (horizontalAdjacent) {
           // Vent on vertical shared wall
           vx = room.x + room.width === otherRoom.x ? room.x + room.width - 1 : room.x;
@@ -1271,7 +1366,7 @@ function placeTemperatureSystem(
           vy = room.y + room.height === otherRoom.y ? room.y + room.height - 1 : room.y;
           vx = Math.max(room.x + WALL_THICKNESS, otherRoom.x + WALL_THICKNESS);
         }
-        
+
         if (vx !== -1 && inBounds(vx, vy, gridW, gridH)) {
           const tile = grid[vy]?.[vx];
           if (tile != null && tile.type === 'wall') {

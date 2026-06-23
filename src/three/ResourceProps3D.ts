@@ -166,7 +166,7 @@ export function rebuildResourceProps(tiles: Tile[]): void {
 
   clearResourceProps();
   if (crystals.length > 0) instanceParts(crystalParts, crystals, 0.26);
-  if (sacreds.length > 0) instanceParts(markerParts, sacreds, 0.30);
+  if (sacreds.length > 0) instanceParts(markerParts, sacreds, 0.3);
 }
 
 export function clearResourceProps(): void {

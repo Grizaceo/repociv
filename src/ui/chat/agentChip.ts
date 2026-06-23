@@ -15,11 +15,7 @@ import {
   currentAgentBubble,
   currentAgentMessageIndex,
 } from './state.ts';
-import {
-  loadConfigForUnit,
-  getUnitConfig,
-  setConfigPersistedHandler,
-} from './modelSelector.ts';
+import { loadConfigForUnit, getUnitConfig, setConfigPersistedHandler } from './modelSelector.ts';
 import { escapeHtml } from '../escapeHtml.ts';
 
 const AGENT_ICONS: Record<string, string> = {
@@ -102,18 +98,14 @@ export function createChip(unitId: string, isActive: boolean): HTMLElement {
 async function closeChip(unitId: string): Promise<void> {
   const container = document.getElementById('chat-agent-selector');
   if (!container) return;
-  const chip = container.querySelector<HTMLElement>(
-    `.chat-agent-chip[data-unit="${unitId}"]`,
-  );
+  const chip = container.querySelector<HTMLElement>(`.chat-agent-chip[data-unit="${unitId}"]`);
   if (!chip) return;
 
   // If the closed chip was the active chat, switch to the H default
   // (or any remaining chip) so the user has somewhere to type.
   if (getActiveChatUnit() === unitId) {
     const remaining = container.querySelectorAll<HTMLElement>('.chat-agent-chip');
-    const fallback = Array.from(remaining).find(
-      (c) => c.dataset['unit'] !== unitId,
-    );
+    const fallback = Array.from(remaining).find((c) => c.dataset['unit'] !== unitId);
     if (fallback) {
       await handleChipClick(fallback.dataset['unit']!);
     } else {

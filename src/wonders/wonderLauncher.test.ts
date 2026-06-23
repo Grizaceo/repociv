@@ -68,10 +68,10 @@ describe('wonderLauncher client (F3)', () => {
   // ─── pollWonderUntilReady ──────────────────────────────────────────────
 
   it('pollWonderUntilReady returns immediately when first call is ready', async () => {
-    fetchMock
-      .mockResolvedValueOnce(  // launchWonder
-        jsonResponse({ ok: true, id: 'institutum', status: 'ready', ready: true }),
-      );
+    fetchMock.mockResolvedValueOnce(
+      // launchWonder
+      jsonResponse({ ok: true, id: 'institutum', status: 'ready', ready: true }),
+    );
     // (no further polls expected)
     const out = await pollWonderUntilReady('institutum', {
       intervalMs: 1,
@@ -83,13 +83,16 @@ describe('wonderLauncher client (F3)', () => {
 
   it('pollWonderUntilReady polls until ready (starting → ready)', async () => {
     fetchMock
-      .mockResolvedValueOnce(  // first launch
+      .mockResolvedValueOnce(
+        // first launch
         jsonResponse({ ok: true, id: 'bibliotheca', status: 'starting', ready: false }),
       )
-      .mockResolvedValueOnce(  // status poll 1
+      .mockResolvedValueOnce(
+        // status poll 1
         jsonResponse({ ok: true, id: 'bibliotheca', status: 'starting', ready: false }),
       )
-      .mockResolvedValueOnce(  // status poll 2
+      .mockResolvedValueOnce(
+        // status poll 2
         jsonResponse({ ok: true, id: 'bibliotheca', status: 'ready', ready: true }),
       );
     const out = await pollWonderUntilReady('bibliotheca', {
@@ -107,13 +110,16 @@ describe('wonderLauncher client (F3)', () => {
     // through that — only true 4xx rejections (unknown_wonder,
     // remote_rejected, repo_not_found) are terminal.
     fetchMock
-      .mockResolvedValueOnce(  // first launch
+      .mockResolvedValueOnce(
+        // first launch
         jsonResponse({ ok: true, id: 'institutum', status: 'starting', ready: false }),
       )
-      .mockResolvedValueOnce(  // status poll → error (transient)
+      .mockResolvedValueOnce(
+        // status poll → error (transient)
         jsonResponse({ ok: true, id: 'institutum', status: 'error', ready: false }),
       )
-      .mockResolvedValueOnce(  // status poll → ready (eventually)
+      .mockResolvedValueOnce(
+        // status poll → ready (eventually)
         jsonResponse({ ok: true, id: 'institutum', status: 'ready', ready: true }),
       );
     const out = await pollWonderUntilReady('institutum', {
@@ -130,13 +136,16 @@ describe('wonderLauncher client (F3)', () => {
     // is not enough — the vignette mounts the iframe and the partial
     // render is jarring. Keep polling.
     fetchMock
-      .mockResolvedValueOnce(  // first launch
+      .mockResolvedValueOnce(
+        // first launch
         jsonResponse({ ok: true, id: 'institutum', status: 'starting', ready: false }),
       )
-      .mockResolvedValueOnce(  // status poll → degraded
+      .mockResolvedValueOnce(
+        // status poll → degraded
         jsonResponse({ ok: true, id: 'institutum', status: 'degraded', ready: false }),
       )
-      .mockResolvedValueOnce(  // status poll → ready
+      .mockResolvedValueOnce(
+        // status poll → ready
         jsonResponse({ ok: true, id: 'institutum', status: 'ready', ready: true }),
       );
     const out = await pollWonderUntilReady('institutum', {
@@ -180,9 +189,7 @@ describe('wonderLauncher client (F3)', () => {
 
   it('ensureWondersUp fires launch for each id, no await', async () => {
     // Each poll returns ready on the first launch → no further polls.
-    fetchMock.mockResolvedValue(
-      jsonResponse({ ok: true, status: 'ready', ready: true }),
-    );
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true, status: 'ready', ready: true }));
     ensureWondersUp(['bibliotheca', 'institutum'], { intervalMs: 1, timeoutMs: 1_000 });
     // give the microtask queue a chance to flush
     await new Promise((r) => setTimeout(r, 50));
@@ -198,9 +205,7 @@ describe('wonderLauncher client (F3)', () => {
     fetchMock.mockRejectedValue(new TypeError('boom'));
     // Must not throw synchronously and must not surface an unhandled
     // rejection that escapes the .catch() in ensureWondersUp.
-    expect(() =>
-      ensureWondersUp(['institutum'], { intervalMs: 1, timeoutMs: 100 }),
-    ).not.toThrow();
+    expect(() => ensureWondersUp(['institutum'], { intervalMs: 1, timeoutMs: 100 })).not.toThrow();
     await new Promise((r) => setTimeout(r, 150));
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();

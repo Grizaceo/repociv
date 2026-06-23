@@ -211,23 +211,105 @@ describe('localPathfinding — findNearestWorkbench', () => {
 describe('localWorldManager — desk assignment', () => {
   it('assigns unique desks to units in same room', async () => {
     const { LocalWorldManager } = await import('./localWorldManager.ts');
-    const mgr = new LocalWorldManager(() => {}, () => undefined);
+    const mgr = new LocalWorldManager(
+      () => {},
+      () => undefined,
+    );
     // Room with 2 workbench tiles: both (0,0) and (1,0) are desks
-    const wb0 = { id: 'wb-0', filePath: '/f/0', fileName: 'f0.ts', extension: 'ts', isTest: false, repoPath: 'test' };
-    const wb1 = { id: 'wb-1', filePath: '/f/1', fileName: 'f1.ts', extension: 'ts', isTest: false, repoPath: 'test' };
-    const grid: LocalTile[][] = [[
-      { x: 0, y: 0, type: 'workbench', roomId: 'r1', workbench: wb0 },
-      { x: 1, y: 0, type: 'workbench', roomId: 'r1', workbench: wb1 },
-    ]];
+    const wb0 = {
+      id: 'wb-0',
+      filePath: '/f/0',
+      fileName: 'f0.ts',
+      extension: 'ts',
+      isTest: false,
+      repoPath: 'test',
+    };
+    const wb1 = {
+      id: 'wb-1',
+      filePath: '/f/1',
+      fileName: 'f1.ts',
+      extension: 'ts',
+      isTest: false,
+      repoPath: 'test',
+    };
+    const grid: LocalTile[][] = [
+      [
+        { x: 0, y: 0, type: 'workbench', roomId: 'r1', workbench: wb0 },
+        { x: 1, y: 0, type: 'workbench', roomId: 'r1', workbench: wb1 },
+      ],
+    ];
     const world: LocalWorld = {
-      repoId: 'test', grid, rooms: [{ id: 'r1', label: 'R', x: 0, y: 0, width: 2, height: 1, w: 2, h: 1, folderPath: '/r', folderName: 'r', workbenches: [wb0, wb1] }],
-      width: 2, height: 1, workbenches: [wb0, wb1], deskAssignments: new Map(),
+      repoId: 'test',
+      grid,
+      rooms: [
+        {
+          id: 'r1',
+          label: 'R',
+          x: 0,
+          y: 0,
+          width: 2,
+          height: 1,
+          w: 2,
+          h: 1,
+          folderPath: '/r',
+          folderName: 'r',
+          workbenches: [wb0, wb1],
+        },
+      ],
+      width: 2,
+      height: 1,
+      workbenches: [wb0, wb1],
+      deskAssignments: new Map(),
     };
     (mgr as unknown as { localWorld: unknown }).localWorld = world;
 
     // Two units in same room
-    const u1: LocalUnit = { id: 'u1', name: 'A', unitType: 'worker', color: '#f00', gridX: 0, gridY: 0, targetX: null, targetY: null, path: [], pathIndex: 0, pathProgress: 0, state: 'idle_in_room', mission: null, workProgress: 0, macroUnitId: 'u1', currentWorkbenchId: null, currentRoomId: 'r1', fatigue: 100, maxFatigue: 100, isResting: false, effectiveSpeed: 1 };
-    const u2: LocalUnit = { id: 'u2', name: 'B', unitType: 'worker', color: '#0f0', gridX: 0, gridY: 0, targetX: null, targetY: null, path: [], pathIndex: 0, pathProgress: 0, state: 'idle_in_room', mission: null, workProgress: 0, macroUnitId: 'u2', currentWorkbenchId: null, currentRoomId: 'r1', fatigue: 100, maxFatigue: 100, isResting: false, effectiveSpeed: 1 };
+    const u1: LocalUnit = {
+      id: 'u1',
+      name: 'A',
+      unitType: 'worker',
+      color: '#f00',
+      gridX: 0,
+      gridY: 0,
+      targetX: null,
+      targetY: null,
+      path: [],
+      pathIndex: 0,
+      pathProgress: 0,
+      state: 'idle_in_room',
+      mission: null,
+      workProgress: 0,
+      macroUnitId: 'u1',
+      currentWorkbenchId: null,
+      currentRoomId: 'r1',
+      fatigue: 100,
+      maxFatigue: 100,
+      isResting: false,
+      effectiveSpeed: 1,
+    };
+    const u2: LocalUnit = {
+      id: 'u2',
+      name: 'B',
+      unitType: 'worker',
+      color: '#0f0',
+      gridX: 0,
+      gridY: 0,
+      targetX: null,
+      targetY: null,
+      path: [],
+      pathIndex: 0,
+      pathProgress: 0,
+      state: 'idle_in_room',
+      mission: null,
+      workProgress: 0,
+      macroUnitId: 'u2',
+      currentWorkbenchId: null,
+      currentRoomId: 'r1',
+      fatigue: 100,
+      maxFatigue: 100,
+      isResting: false,
+      effectiveSpeed: 1,
+    };
 
     mgr.assignDesk(u1);
     mgr.assignDesk(u2);
@@ -263,19 +345,37 @@ describe('localWorldManager — desk assignment', () => {
   it('falls back to a desk outside the room when the spawn room has none', async () => {
     // Units spawn in the reception, which has no workbenches by design.
     const { LocalWorldManager } = await import('./localWorldManager.ts');
-    const mgr = new LocalWorldManager(() => {}, () => undefined);
+    const mgr = new LocalWorldManager(
+      () => {},
+      () => undefined,
+    );
     const world = makeGrid(['..W']);
     world.grid[0]![0]!.roomId = 'lobby';
     world.grid[0]![2]!.roomId = 'r2';
     (mgr as unknown as { localWorld: unknown }).localWorld = world;
 
     const unit = {
-      id: 'hero', name: 'H', unitType: 'hero', color: '#4af',
-      gridX: 0, gridY: 0, targetX: null, targetY: null,
-      path: [], pathIndex: 0, pathProgress: 0, state: 'idle_in_room',
-      mission: null, workProgress: 0, macroUnitId: 'hero',
-      currentWorkbenchId: null, currentRoomId: 'lobby',
-      fatigue: 100, maxFatigue: 100, isResting: false, effectiveSpeed: 1,
+      id: 'hero',
+      name: 'H',
+      unitType: 'hero',
+      color: '#4af',
+      gridX: 0,
+      gridY: 0,
+      targetX: null,
+      targetY: null,
+      path: [],
+      pathIndex: 0,
+      pathProgress: 0,
+      state: 'idle_in_room',
+      mission: null,
+      workProgress: 0,
+      macroUnitId: 'hero',
+      currentWorkbenchId: null,
+      currentRoomId: 'lobby',
+      fatigue: 100,
+      maxFatigue: 100,
+      isResting: false,
+      effectiveSpeed: 1,
     } as LocalUnit;
 
     mgr.assignDesk(unit);
@@ -299,18 +399,36 @@ describe('localWorldManager — desk assignment', () => {
 
   it('releases desk assignments when a subagent unit is removed (after despawn fade)', async () => {
     const { LocalWorldManager } = await import('./localWorldManager.ts');
-    const mgr = new LocalWorldManager(() => {}, () => undefined);
+    const mgr = new LocalWorldManager(
+      () => {},
+      () => undefined,
+    );
     const world = makeGrid(['W.']);
     (mgr as unknown as { localWorld: unknown }).localWorld = world;
     (mgr as unknown as { viewMode: string }).viewMode = 'local';
 
     const unit = {
-      id: 'sub-1', name: 'S', unitType: 'worker', color: '#8ab4f8',
-      gridX: 1, gridY: 0, targetX: null, targetY: null,
-      path: [], pathIndex: 0, pathProgress: 0, state: 'working_on_file',
-      mission: null, workProgress: 0, macroUnitId: 'MAIN',
-      currentWorkbenchId: null, currentRoomId: null,
-      fatigue: 100, maxFatigue: 100, isResting: false, effectiveSpeed: 1,
+      id: 'sub-1',
+      name: 'S',
+      unitType: 'worker',
+      color: '#8ab4f8',
+      gridX: 1,
+      gridY: 0,
+      targetX: null,
+      targetY: null,
+      path: [],
+      pathIndex: 0,
+      pathProgress: 0,
+      state: 'working_on_file',
+      mission: null,
+      workProgress: 0,
+      macroUnitId: 'MAIN',
+      currentWorkbenchId: null,
+      currentRoomId: null,
+      fatigue: 100,
+      maxFatigue: 100,
+      isResting: false,
+      effectiveSpeed: 1,
       ephemeral: true,
     } as LocalUnit;
     (mgr as unknown as { localUnits: LocalUnit[] }).localUnits = [unit];
