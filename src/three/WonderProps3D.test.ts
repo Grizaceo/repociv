@@ -122,18 +122,16 @@ describe('WonderProps3D', () => {
     rebuildWonderProps([wonderTile({ q:  1, r: 0 }, 'institutum')]);
     const instCount = countMeshes(getWonderPropsGroup().children[1]!);
     expect(biblioCount).toBeGreaterThan(instCount);
-    expect(biblioCount).toBe(11);
+    expect(biblioCount).toBe(12);
     expect(instCount).toBe(7);
   });
 
-  it('pediment on bibliotheca stands vertical (point up, base on columns)', () => {
-    // Regression guard: the pediment was originally created with
-    //   rotation.x = π/2, rotation.z = π
-    //   scale.set(1, pedL / pedH, 1)
-    // which laid the triangular cone horizontal (point along Z) and
-    // stretched the wrong axis. The fix uses no rotation and narrows
-    // along Z (scale.z = pedL / pedW). This test asserts the mesh
-    // transform is exactly the intended vertical-prism shape.
+  it('roof on bibliotheca is a hex pyramid standing point-up above the columns', () => {
+    // The roof replaced an off-axis triangular pediment that read as a stray
+    // wedge on the hexagonal colonnade. It is now a six-sided cone (matching
+    // the column ring) sitting point-up on the entablature. This guards that
+    // shape: exactly one ConeGeometry, hex base, apex on +Y, eaves above the
+    // dais top.
     rebuildWonderProps([wonderTile({ q: -1, r: 0 }, 'bibliotheca')]);
     const biblio = getWonderPropsGroup().children[0]!;
     expect(biblio.children).toHaveLength(1);
@@ -141,23 +139,30 @@ describe('WonderProps3D', () => {
     const inst = biblio.children[0]! as import('three').Group;
     const cones = inst.children.filter((c) => {
       const m = c as import('three').Mesh;
-      if (!m.isMesh) return false;
-      const g = m.geometry as import('three').BufferGeometry;
-      const params = (g as unknown as { parameters?: { radialSegments?: number } }).parameters;
-      return params?.radialSegments === 3;
+      return m.isMesh && (m.geometry as import('three').BufferGeometry).type === 'ConeGeometry';
     });
     expect(cones).toHaveLength(1);
-    const pediment = cones[0] as import('three').Mesh;
+    const roof = cones[0] as import('three').Mesh;
 
-    // (a) No rotation — cone's primary axis stays on +Y (point up).
-    expect(pediment.rotation.x).toBe(0);
-    expect(pediment.rotation.y).toBe(0);
-    expect(pediment.rotation.z).toBe(0);
+    // (a) Hexagonal base — matches the six columns.
+    const params = (roof.geometry as unknown as { parameters?: { radialSegments?: number } }).parameters;
+    expect(params?.radialSegments).toBe(6);
 
-    // (b) Scale narrows Z (prism shape), leaves X and Y alone.
-    expect(pediment.scale.x).toBe(1);
-    expect(pediment.scale.y).toBe(1);
-    expect(pediment.scale.z).toBeCloseTo(0.16 / 0.5, 5);
+    // (b) Apex stays on +Y: no tilt on X or Z (a Y spin is allowed for the
+    //     hex flat-to-gap alignment).
+    expect(roof.rotation.x).toBe(0);
+    expect(roof.rotation.z).toBe(0);
+
+    // (c) Sits above the colonnade — higher than every stone cylinder
+    //     (the 3 dais tiers, 6 columns, entablature). The gem finial is a
+    //     sphere above the roof and is intentionally excluded.
+    const cylinders = inst.children.filter(
+      (c) =>
+        (c as import('three').Mesh).isMesh &&
+        ((c as import('three').Mesh).geometry as import('three').BufferGeometry).type === 'CylinderGeometry',
+    );
+    const maxCylinder = Math.max(...cylinders.map((c) => c.position.y));
+    expect(roof.position.y).toBeGreaterThan(maxCylinder);
   });
 
   it('rebuilds only on signature change (dirty-check)', () => {

@@ -1,9 +1,12 @@
 // ─── Low-poly mountain props (glTF, iter3 gap #3 pilot) ─────────────────────
-// Replaces the procedural cone decor on mountain tiles with Blender-modeled
-// faceted peaks (public/assets/3d/props/mountain-{0,1,2}.glb, built by
-// scripts/blender/make_props.py). One InstancedMesh per variant; placement
-// is a deterministic hash of the tile coord (variant + 60°-step rotation +
-// scale jitter), so rebuilds and golden captures are stable.
+// Replaces the procedural cone decor on mountain tiles with faceted, snow-capped
+// peaks (public/assets/3d/props/mountain-{0,1,2}.glb). The active producer is
+// scripts/make_mountain_props.mjs (no Blender needed — three.js GLTFExporter),
+// which models craggy flat-shaded crags in the iter13 relief style; the older
+// smooth-cone Blender variant lives in scripts/blender/make_props.py. One
+// InstancedMesh per variant; placement is a deterministic hash of the tile
+// coord (variant + 60°-step rotation + scale jitter), so rebuilds and golden
+// captures are stable.
 import {
   BufferGeometry,
   Group,

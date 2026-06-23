@@ -534,7 +534,11 @@ float terrainDetailNoise(vec2 p) {
               cliffCol = earth * clamp(0.25 + 1.3 * ctlum, 0.0, 1.25);
             }
             diffuseColor.rgb = mix(diffuseColor.rgb, cliffCol * clamp(0.60 + 0.9 * dlum, 0.0, 1.15), 0.85);
-            float cliffShade = mix(1.0, 0.80, smoothstep(0.08, 1.0, cliffT));
+            // Cliff shade: keep the base bright (real cliffs get ambient bounce
+            // from the ground) and only darken slightly toward the mid-cliff.
+            // The old 1.0→0.80 gradient stamped a dark ring at the bottom of
+            // every elevated tile — mountains looked like they sat on a dark halo.
+            float cliffShade = mix(1.0, 0.92, smoothstep(0.15, 0.70, cliffT));
             diffuseColor.rgb *= cliffShade;
           }
         }
@@ -683,7 +687,7 @@ float terrainDetailNoise(vec2 p) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v36';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v37';
   // Terrain MUST receive the scene FogExp2: the ground plane and sky dome
   // fade into SKY_HORIZON at distance, so terrain that opted out (the old
   // `mat.fog = false`) popped against the haze instead of dissolving into it.
