@@ -141,3 +141,19 @@ def test_get_harness_by_id_absent_ctx_key_returns_404():
     # Defensive: handler must not KeyError if ctx lacks harness_id entirely.
     status, body = get_harness_by_id({})
     assert status == 404
+
+
+def test_get_harness_by_id_reexported_in_http_routes():
+    # The bridge calls ``_routes.get_harness_by_id`` (the http_routes shim),
+    # NOT routes.core directly (bridge.py:684). The other tests import from
+    # routes.core, so they would still pass if the re-export were dropped —
+    # but the bridge would 500 again. Pin the bridge's actual call path.
+    import http_routes as _routes
+
+    assert callable(_routes.get_harness_by_id)
+    status, body = _routes.get_harness_by_id({"harness_id": "hermes-local"})
+    assert status == 200
+    assert body["id"] == "hermes-local"
+    status, body = _routes.get_harness_by_id({"harness_id": "nope"})
+    assert status == 404
+    assert set(body.keys()) == {"error", "cause", "hint"}
