@@ -144,19 +144,17 @@ def terrain_rgb_np(name: str, base: tuple, U, V, seed: int):
                     b0 + canopy * 0.45 + leaf_var * 0.12 + 0.02)
 
     if name == 'mountain':
-        dist    = np.hypot(U - 0.5, V - 0.5) * 2.0
-        strata  = 0.14 * np.sin(dist * 55 + n * 4 + seed) + 0.07 * (n2 - 0.5)
-        snow_t  = np.where(dist < 0.24, 1.0, np.maximum(0.0, (0.40 - dist) / 0.16))
-        volcanic = np.maximum(0.0, (dist - 0.72) / 0.28)
-        rock    = 0.10 * (n - 0.5) + strata
-        # Darker rock with warm shadow
-        br      = (r0 + rock - 0.02) * (1.0 - volcanic * 0.25)
-        bg      = (g0 + rock - 0.02) * (1.0 - volcanic * 0.20)
-        bb      = (b0 + rock - 0.02) * (1.0 - volcanic * 0.15)
-        # Snow: creamy white with slight blue shadow, not pure white
-        return (br + (0.92 - br) * snow_t,
-                bg + (0.94 - bg) * snow_t,
-                bb + (0.98 - bb) * snow_t)
+        # Flat tile-top ROCK for the 3D map. A snow-capped GLB peak prop sits
+        # ON this tile, so the cell must read as rocky ground, NOT a top-down
+        # mountain. The old radial design — sin(dist*55) strata rings + a
+        # circular centre snow cap + a volcanic rim — baked a concentric
+        # bullseye that rendered as the dark "depression ring" around every
+        # peak on the flat hex cap. Now: mottled rock from fbm, no radial term.
+        rock  = 0.13 * (n - 0.5) + 0.06 * (n2 - 0.5)
+        fleck = np.maximum(0.0, n3 - 0.62) * 0.10   # bright mineral specks
+        return (r0 + rock + fleck,
+                g0 + rock + fleck * 0.95,
+                b0 + rock + fleck * 0.85)
 
     if name == 'desert':
         dune_raw = np.sin(U * 22 + V * 6 + seed) + 0.6 * np.sin(U * 9 - V * 14)
@@ -224,9 +222,9 @@ def terrain_roughness_np(name: str, U, V, seed: int):
     if name == 'ocean':
         var += np.sin(U * 20 + V * 8 + seed) * 0.06
     if name == 'mountain':
-        dist     = np.hypot(U - 0.5, V - 0.5) * 2.0
-        snow_zone = np.where(dist < 0.28, 1.0, np.maximum(0.0, (0.38 - dist) / 0.10))
-        var -= snow_zone * 0.10
+        # Plain rocky roughness — no radial snow zone (snow lives on the GLB
+        # peak prop, not on this flat tile cap).
+        var += (fbm_np(U * 20, V * 20, seed + 7, 2) - 0.5) * 0.06
     return clamp01(base + var)
 
 
@@ -244,8 +242,9 @@ def terrain_normal_np(name: str, U, V, seed: int):
             else:
                 return fbm_np(uu * 6, vv * 6, seed, 4) * 0.35 + fbm_np(uu * 14, vv * 14, seed + 3, 2) * 0.15
         if name == 'mountain':
-            strata = 0.3 * np.sin(vv * 60 + fbm_np(uu * 4, vv * 4, seed, 3) * 4)
-            return fbm_np(uu * 5, vv * 5, seed, 4) * 0.3 + strata * 0.4 + vv * 0.5
+            # Rocky crags from fbm — no horizontal strata bands and no vertical
+            # vv-slope (the tile cap is flat ground under the peak prop).
+            return fbm_np(uu * 7, vv * 7, seed, 4) * 0.35 + fbm_np(uu * 16, vv * 16, seed + 3, 3) * 0.15
         if name == 'desert':
             return (0.5 * np.sin(uu * 22 + vv * 6 + seed) + fbm_np(uu * 12, vv * 12, seed, 3) * 0.3)
         if name == 'ocean':
