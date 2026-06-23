@@ -45,8 +45,8 @@ Planes de implementación fechados cuyo trabajo ya está en `main`, movidos desd
 | `city_builder_drag_drop_refactor.md` | Refactor drag-and-drop del city builder. |
 
 > Siguen **vivos** en `docs/plans/` (no archivados): `2026-06-16-wonder-autostart-and-3d.md`
-> (faltan F5/F6, citado por `server/wonder_launcher.py`) y `rivers-plan.md`
-> (citado por `src/three/Rivers3D.ts`).
+> (F1–F6 ya en `main`; se conserva porque `server/wonder_launcher.py` lo cita como
+> spec viva del lanzador, §1.1) y `rivers-plan.md` (citado por `src/three/Rivers3D.ts`).
 
 ## Lo que se borró (y dónde encontrarlo)
 

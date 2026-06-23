@@ -47,6 +47,7 @@ shared/provider-registry.json
 
 # Internal maintainer docs (not part of the public project)
 TODOS.md
+NEXT_SESSION_GOAL.md
 REFACTOR_PLAN.md
 WORKER_FIX_PLAN.md
 CODEX_HARNESS_INTEGRATION.md
