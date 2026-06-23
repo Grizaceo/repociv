@@ -28,6 +28,7 @@ from server.routes.core import get_metrics  # noqa: F401
 from server.routes.core import get_directives_stats  # noqa: F401
 from server.routes.core import get_directives_suggest  # noqa: F401
 from server.routes.core import get_harnesses  # noqa: F401
+from server.routes.core import get_harness_by_id  # noqa: F401
 from server.routes.core import get_default_harness  # noqa: F401
 from server.routes.core import post_default_harness  # noqa: F401
 from server.routes.core import get_profiles  # noqa: F401
