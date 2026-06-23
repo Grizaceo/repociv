@@ -7,6 +7,7 @@ from harness_registry import (
     infer_harness_for_command,
     _reset_cache,
 )
+from routes.core import get_harness_by_id
 
 
 @pytest.fixture(autouse=True)
@@ -108,3 +109,35 @@ def test_nemoclaw_sandbox_is_sandboxed():
     assert h["trustLevel"] == "sandboxed"
     assert h["transport"] == "http"
     assert "view_logs" in h["recoveryModes"]
+
+
+# ── GET /harnesses/{id} route handler (regression: used to 500) ─────────────────
+# bridge.py dispatches /harnesses/{id} to routes.core.get_harness_by_id, which
+# did not exist → AttributeError → 500. These pin the 200/404 contract.
+
+def test_get_harness_by_id_known_returns_200_bare_descriptor():
+    status, body = get_harness_by_id({"harness_id": "hermes-local"})
+    assert status == 200
+    # 200 body is the bare descriptor (recoveryClient.getHarness consumes it directly)
+    assert body["id"] == "hermes-local"
+    assert "trustLevel" in body
+
+
+def test_get_harness_by_id_unknown_returns_404_envelope_not_500():
+    status, body = get_harness_by_id({"harness_id": "does-not-exist"})
+    assert status == 404
+    assert set(body.keys()) == {"error", "cause", "hint"}
+    assert "does-not-exist" in body["error"]
+
+
+def test_get_harness_by_id_missing_id_returns_404():
+    # Trailing-slash path → bridge passes harness_id="". Must 404, never crash.
+    status, body = get_harness_by_id({"harness_id": ""})
+    assert status == 404
+    assert set(body.keys()) == {"error", "cause", "hint"}
+
+
+def test_get_harness_by_id_absent_ctx_key_returns_404():
+    # Defensive: handler must not KeyError if ctx lacks harness_id entirely.
+    status, body = get_harness_by_id({})
+    assert status == 404

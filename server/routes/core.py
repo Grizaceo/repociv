@@ -257,6 +257,27 @@ def get_harnesses(ctx: "RouteContext") -> tuple[int, Any]:
     return 200, _hr.list_harnesses()
 
 
+def get_harness_by_id(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /harnesses/{id} — return a single harness descriptor by id.
+
+    The bridge fills ``ctx['harness_id']`` from the path segment. Returns the
+    bare descriptor (mirroring ``get_harnesses``' unwrapped list shape, which
+    ``recoveryClient.getHarness`` consumes directly) on 200, or a structured
+    404 envelope when no harness matches — never an unhandled 500.
+    """
+    from server import harness_registry as _hr
+    harness_id = ctx.get("harness_id", "")
+    harness = _hr.get_harness(harness_id)
+    if harness is None:
+        return _error(
+            404,
+            f"harness '{harness_id}' not found",
+            "no registered harness has this id",
+            "GET /harnesses to list the valid harness ids",
+        )
+    return 200, harness
+
+
 def get_default_harness(_ctx: "RouteContext") -> tuple[int, Any]:
     """GET /api/config/default-harness — return the user's chosen default harness.
 
