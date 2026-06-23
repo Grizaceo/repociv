@@ -17,7 +17,7 @@ import {
   Vector3,
   Quaternion,
   Shape,
-  SphereGeometry,
+  IcosahedronGeometry,
 } from 'three';
 import { type City, type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
@@ -248,7 +248,13 @@ export function rebuildCityClusters(
     const bldGeom = new BoxGeometry(HEX_SIZE * 0.12, HEX_SIZE * 0.28, HEX_SIZE * 0.12);
     const bldMat = new MeshLambertMaterial({ color: new Color(0xc8c0b0) });
     const roofGeom = new ConeGeometry(HEX_SIZE * 0.10, HEX_SIZE * 0.12, 4);
-    const roofMat = new MeshLambertMaterial({ color: new Color(0xb0563a) });
+    // flatShading on the 4-sided roof cone so each triangular face has a
+    // hard normal — reads as a pitched terracotta roof, not a smooth wand.
+    const roofMat = new MeshStandardMaterial({
+      color: new Color(0xb0563a),
+      roughness: 0.65,
+      flatShading: true,
+    });
     // Perimeter wall: a closed hexagonal RING (outer hex with inner hex hole,
     // extruded). ONE geometry per city, not 6 separate boxes. The previous
     // 6-box design left gaps at every corner, so walls read as 6 scattered
@@ -452,14 +458,24 @@ export function rebuildCityClusters(
       emissiveIntensity: 0.18,
     });
     const roofGeom = new ConeGeometry(HEX_SIZE * 0.14, HEX_SIZE * 0.16, 4);
-    const roofMat = new MeshStandardMaterial({ color: new Color(0xa86048), roughness: 0.5 });
-    const domeGeom = new SphereGeometry(HEX_SIZE * 0.11, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+    // flatShading on the capital roof so the 4 triangular faces have hard
+    // normals — matches the normal-city roof treatment.
+    const roofMat = new MeshStandardMaterial({
+      color: new Color(0xa86048),
+      roughness: 0.5,
+      flatShading: true,
+    });
+    // Capital dome: low-poly icosahedron flattened, not a smooth sphere.
+    // The old SphereGeometry(12,8,PI/2) was a perfect plastic hemisphere.
+    const domeGeom = new IcosahedronGeometry(HEX_SIZE * 0.12, 0);
+    domeGeom.scale(1, 0.55, 1);
     const domeMat = new MeshStandardMaterial({
       color: new Color(0xe8dcc8),
       emissive: new Color(0x605840),
       emissiveIntensity: 0.12,
       roughness: 0.3,
       metalness: 0.25,
+      flatShading: true,
     });
     const wallGeom = new BoxGeometry(HEX_SIZE * 0.70, HEX_SIZE * 0.10, HEX_SIZE * 0.025);
     const wallMat = new MeshStandardMaterial({ color: new Color(0xb8b0a0), roughness: 0.7 });

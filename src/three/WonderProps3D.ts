@@ -19,7 +19,8 @@ import {
   Group,
   Mesh,
   MeshStandardMaterial,
-  SphereGeometry,
+  IcosahedronGeometry,
+  OctahedronGeometry,
   Color,
   Vector3,
 } from 'three';
@@ -76,10 +77,13 @@ function buildBibliotheca(): Group {
     roughness: 0.62,
     metalness: 0.08,
   });
+  // Warm bronze-terracotta roof — the old cold blue-grey (0x8a9bb0) read as a
+  // stray grey blob perched on the columns; a warm roof tone contrasts with
+  // the cream stone and clearly says "roof".
   const roofMat = new MeshStandardMaterial({
-    color: new Color(0x8a9bb0),
-    roughness: 0.50,
-    metalness: 0.10,
+    color: new Color(0xb06a3a),
+    roughness: 0.55,
+    metalness: 0.15,
   });
   const gemMat = new MeshStandardMaterial({
     color: new Color(0xe8c66a),
@@ -117,26 +121,40 @@ function buildBibliotheca(): Group {
     g.add(col);
   }
 
-  // Pediment: low triangular prism sitting on top of the columns, point up.
-  // CylinderGeometry(0, pedW, pedH, 3, 1) is a 3-sided cone (point at y=+pedH/2,
-  // base at y=-pedH/2). It already has the right vertical orientation by default
-  // — no rotation needed. We narrow it in Z (scale.z = pedL/pedW) to make it
-  // a flat triangular prism instead of a tetrahedral cone.
-  const pedW = HEX_SIZE * 0.50;
-  const pedH = HEX_SIZE * 0.08;
-  const pedL = HEX_SIZE * 0.16;
-  const ped  = new Mesh(new CylinderGeometry(0, pedW, pedH, 3, 1), roofMat);
-  ped.scale.set(1, 1, pedL / pedW);
-  ped.position.y = topDais + colH + pedH * 0.5;  // base sits flush on the columns
-  ped.castShadow = true;
-  g.add(ped);
+  const colTop = topDais + colH;
 
-  // Glow gem at apex
+  // Entablature: a hexagonal frieze band capping the colonnade, tying the six
+  // columns into one temple top. Replaces the loose triangular pediment that
+  // sat askew on the hex ring and read as a stray wedge.
+  const entR = HEX_SIZE * 0.255;
+  const entH = HEX_SIZE * 0.055;
+  const entablature = new Mesh(
+    new CylinderGeometry(entR, entR * 1.04, entH, 6),
+    colMat,
+  );
+  entablature.position.y = colTop + entH * 0.5;
+  entablature.rotation.y = Math.PI / 6; // hex flats face the column gaps
+  entablature.castShadow = true;
+  g.add(entablature);
+
+  // Roof: a clean six-sided low pyramid with eaves overhanging the
+  // entablature. Its hexagonal base matches the column ring, so it reads as a
+  // proper tholos/temple roof instead of a mismatched flat triangle.
+  const roofR = HEX_SIZE * 0.30;
+  const roofH = HEX_SIZE * 0.21;
+  const roof = new Mesh(new ConeGeometry(roofR, roofH, 6), roofMat);
+  roof.position.y = colTop + entH + roofH * 0.5;
+  roof.rotation.y = Math.PI / 6;
+  roof.castShadow = true;
+  g.add(roof);
+
+  // Glow gem finial at the roof apex — faceted octahedron for consistency
+  // with the iter13 flat-shaded style (the old small sphere read as a marble).
   const gem = new Mesh(
-    new SphereGeometry(HEX_SIZE * 0.045, 8, 6),
+    new OctahedronGeometry(HEX_SIZE * 0.05, 0),
     gemMat,
   );
-  gem.position.y = topDais + colH + pedH + HEX_SIZE * 0.04;
+  gem.position.y = colTop + entH + roofH + HEX_SIZE * 0.03;
   g.add(gem);
 
   return g;
@@ -144,8 +162,10 @@ function buildBibliotheca(): Group {
 
 /**
  * Institutum Scientiarum (LabHub) — laboratorium silhouette.
- * Flat dais + 4 corner obelisks + central dome + large emissive glow at the
- * top. Echoes the 2D canvas flask (renderer.ts:624-766).
+ * Stepped dais + 4 corner spires (faceted hex towers, not smooth cones) +
+ * central faceted dome (low-poly icosahedron, not smooth sphere) + large
+ * emissive crystal (octahedron, not smooth sphere) at the top.
+ * Echoes the 2D canvas flask (renderer.ts:624-766).
  */
 function buildInstitutum(): Group {
   const g = new Group();
@@ -156,15 +176,17 @@ function buildInstitutum(): Group {
     roughness: 0.72,
     metalness: 0.06,
   });
-  const obMat = new MeshStandardMaterial({
+  const spireMat = new MeshStandardMaterial({
     color: new Color(0x6e7d5a),
     roughness: 0.55,
     metalness: 0.12,
+    flatShading: true,
   });
   const domeMat = new MeshStandardMaterial({
     color: new Color(0xd4cba8),
     roughness: 0.45,
     metalness: 0.18,
+    flatShading: true,
   });
   const glowMat = new MeshStandardMaterial({
     color: new Color(0x6bd8a8),
@@ -174,6 +196,7 @@ function buildInstitutum(): Group {
     metalness: 0.25,
     transparent: true,
     opacity: 0.78,
+    flatShading: true,
   });
 
   // Flat dais
@@ -185,34 +208,45 @@ function buildInstitutum(): Group {
   dais.receiveShadow = true;
   g.add(dais);
 
-  // 4 corner obelisks (tall thin cones) on the rim
-  const obH = HEX_SIZE * 0.36;
-  const obR = HEX_SIZE * 0.045;
-  const obRing = HEX_SIZE * 0.26;
+  // 4 corner spires — faceted hex towers that taper to a point, replacing
+  // the old smooth 5-segment cones that read as paper wands. A 6-sided
+  // cylinder with a low radialSegments + flatShading gives the craggy
+  // obelisk silhouette the iter13 style demands.
+  const spireH = HEX_SIZE * 0.36;
+  const spireRTop = HEX_SIZE * 0.015;
+  const spireRBase = HEX_SIZE * 0.055;
+  const spireRing = HEX_SIZE * 0.26;
   for (let i = 0; i < 4; i++) {
     const ang = (Math.PI * 2 / 4) * i + Math.PI / 4;
-    const ob  = new Mesh(new ConeGeometry(obR, obH, 5), obMat);
-    ob.position.set(Math.cos(ang) * obRing, daisH + obH * 0.5, Math.sin(ang) * obRing);
-    ob.castShadow = true;
-    g.add(ob);
+    const spire = new Mesh(
+      new CylinderGeometry(spireRTop, spireRBase, spireH, 6),
+      spireMat,
+    );
+    spire.position.set(Math.cos(ang) * spireRing, daisH + spireH * 0.5, Math.sin(ang) * spireRing);
+    spire.castShadow = true;
+    g.add(spire);
   }
 
-  // Central dome (top half of a sphere, flat side down)
-  const domeR = HEX_SIZE * 0.20;
-  const dome  = new Mesh(
-    new SphereGeometry(domeR, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
-    domeMat,
-  );
-  dome.position.y = daisH;
+  // Central dome: a low-poly icosahedron (detail=0 → 20 flat triangles)
+  // flattened to ~60% height so it reads as a dome, not a ball. The old
+  // smooth SphereGeometry(12,8) was a perfect hemisphere that looked like
+  // a plastic bowl under the warm PBR lights.
+  const domeR = HEX_SIZE * 0.22;
+  const domeGeom = new IcosahedronGeometry(domeR, 0);
+  // Flatten vertically → dome shape
+  domeGeom.scale(1, 0.55, 1);
+  const dome = new Mesh(domeGeom, domeMat);
+  dome.position.y = daisH + domeR * 0.55 * 0.5;
   dome.castShadow = true;
   g.add(dome);
 
-  // Glow core at top of dome (the "experiment")
+  // Glow crystal at top of dome — an octahedron reads as a faceted gem,
+  // not a smooth marble. The old SphereGeometry(10,8) was a polished orb.
   const glow = new Mesh(
-    new SphereGeometry(HEX_SIZE * 0.075, 10, 8),
+    new OctahedronGeometry(HEX_SIZE * 0.08, 0),
     glowMat,
   );
-  glow.position.y = daisH + domeR + HEX_SIZE * 0.02;
+  glow.position.y = daisH + domeR * 0.55 + HEX_SIZE * 0.04;
   g.add(glow);
 
   return g;
@@ -221,8 +255,10 @@ function buildInstitutum(): Group {
 /**
  * Generic connected wonder — neutral monument for any user-defined iframe
  * service that isn't one of the two built-in examples. Stepped dais + central
- * obelisk + emissive node so it reads as "a wonder" without claiming a
- * specific identity. Deliberately distinct from the temple/laboratorium.
+ * faceted spire + emissive crystal node so it reads as "a wonder" without
+ * claiming a specific identity. Deliberately distinct from the
+ * temple/laboratorium. Uses flat-shaded low-poly geometry (iter13 style)
+ * instead of smooth cones/spheres.
  */
 function buildGenericWonder(): Group {
   const g = new Group();
@@ -233,10 +269,11 @@ function buildGenericWonder(): Group {
     roughness: 0.74,
     metalness: 0.06,
   });
-  const obMat = new MeshStandardMaterial({
+  const spireMat = new MeshStandardMaterial({
     color: new Color(0x9aa0ad),
     roughness: 0.5,
     metalness: 0.16,
+    flatShading: true,
   });
   const nodeMat = new MeshStandardMaterial({
     color: new Color(0x7fb0e8),
@@ -246,6 +283,7 @@ function buildGenericWonder(): Group {
     metalness: 0.3,
     transparent: true,
     opacity: 0.82,
+    flatShading: true,
   });
 
   // 2-tier dais
@@ -263,17 +301,27 @@ function buildGenericWonder(): Group {
     stacked += h;
   }
 
-  // Central obelisk (tapered)
-  const obH = HEX_SIZE * 0.42;
-  const obelisk = new Mesh(new ConeGeometry(HEX_SIZE * 0.11, obH, 4), obMat);
-  obelisk.position.y = stacked + obH * 0.5;
-  obelisk.rotation.y = Math.PI / 4;
-  obelisk.castShadow = true;
-  g.add(obelisk);
+  // Central spire — a faceted hex tower tapering to a point, replacing the
+  // old 4-sided smooth cone. flatShading + 6 segments gives the craggy
+  // obelisk silhouette the iter13 style demands.
+  const spireH = HEX_SIZE * 0.42;
+  const spireTopR = HEX_SIZE * 0.015;
+  const spireBaseR = HEX_SIZE * 0.07;
+  const spire = new Mesh(
+    new CylinderGeometry(spireTopR, spireBaseR, spireH, 6),
+    spireMat,
+  );
+  spire.position.y = stacked + spireH * 0.5;
+  spire.castShadow = true;
+  g.add(spire);
 
-  // Emissive node at the apex
-  const node = new Mesh(new SphereGeometry(HEX_SIZE * 0.05, 8, 6), nodeMat);
-  node.position.y = stacked + obH + HEX_SIZE * 0.03;
+  // Emissive crystal at the apex — an octahedron reads as a faceted gem
+  // instead of the old smooth sphere that looked like a marble.
+  const node = new Mesh(
+    new OctahedronGeometry(HEX_SIZE * 0.06, 0),
+    nodeMat,
+  );
+  node.position.y = stacked + spireH + HEX_SIZE * 0.03;
   g.add(node);
 
   return g;

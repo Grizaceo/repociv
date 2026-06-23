@@ -36,8 +36,12 @@ vec2 terrainAtlasUv(float idx, vec2 tileUv) {
 vec2 terrainMacroUv(float idx, vec2 tileUv, vec2 worldXZ) {
   float scale = mix(2.4, 3.6, clamp(idx / 7.0, 0.0, 1.0));
   vec2 worldUv = fract(worldXZ / (uHexRadius * scale) + vec2(idx * 0.137, idx * 0.173));
-  // Per-hex atlas detail reads more natural than one world-spanning wash.
-  return mix(tileUv, worldUv, 0.38);
+  // Per-hex atlas detail (62% tile UV) reads natural on LAND. But on WATER
+  // (ocean idx 4, ice idx 5) the per-hex UV stamps the same atlas cell + normal
+  // into every hex, so the open sea reads as a honeycomb quilt. Water must be a
+  // continuous surface → push it almost fully to world-space UV.
+  bool water = (idx > 3.5 && idx < 5.5);
+  return mix(tileUv, worldUv, water ? 0.93 : 0.38);
 }
 
 float terrainDetailNoise(vec2 p) {
@@ -236,7 +240,11 @@ void main() {
               cliffCol = earth * clamp(0.25 + 1.3 * ctlum, 0.0, 1.25);
             }
             diffuseColor.rgb = mix(diffuseColor.rgb, cliffCol * clamp(0.60 + 0.9 * dlum, 0.0, 1.15), 0.85);
-            float cliffShade = mix(1.0, 0.80, smoothstep(0.08, 1.0, cliffT));
+            // Cliff shade: keep the base bright (real cliffs get ambient bounce
+            // from the ground) and only darken slightly toward the mid-cliff.
+            // The old 1.0→0.80 gradient stamped a dark ring at the bottom of
+            // every elevated tile — mountains looked like they sat on a dark halo.
+            float cliffShade = mix(1.0, 0.92, smoothstep(0.15, 0.70, cliffT));
             diffuseColor.rgb *= cliffShade;
           }
         }
@@ -246,8 +254,11 @@ void main() {
         // shallow water; only the darkest deep sea qualified.
         bool isOcean = (tidx > 3.5 && tidx < 4.5);
         if (isOcean && vTopFace > 0.5) {
-          float wave  = 0.06 * sin(uTime * 1.8 + vLocalXZ.x * 0.09 + vLocalXZ.y * 0.07);
-          float wave2 = 0.03 * sin(uTime * 2.6 - vLocalXZ.x * 0.05 + vLocalXZ.y * 0.11);
+          // World-space phase (NOT vLocalXZ): per-tile local coords reset the
+          // shimmer at every hex boundary, which stamped the same wave into each
+          // cell and added to the honeycomb quilt. World coords flow across tiles.
+          float wave  = 0.06 * sin(uTime * 1.8 + vWorldXZ.x * 0.09 + vWorldXZ.y * 0.07);
+          float wave2 = 0.03 * sin(uTime * 2.6 - vWorldXZ.x * 0.05 + vWorldXZ.y * 0.11);
           diffuseColor.rgb += vec3(wave * 0.3, wave * 0.25 + wave2 * 0.4, wave + wave2 * 1.2);
         }
         // Civ V shoreline ring: foam band hugging each edge where ocean

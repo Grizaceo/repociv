@@ -31,6 +31,14 @@ export default defineConfig(({ mode }) => {
       port: vitePort,
       strictPort: true,
       host: true,
+      // The dev-server HMR watcher must not traverse the Python venv or the
+      // build/e2e output trees — under WSL2's inotify that exhausts watchers
+      // (ENOSPC) and crashes `npm run dev` mid-startup. node_modules is
+      // already ignored by default; these are the repo-local trees that
+      // aren't.
+      watch: {
+        ignored: ['**/.venv/**', '**/dist/**', '**/.hermes/**', '**/e2e/**'],
+      },
       proxy: {
         '/bridge': {
           target: `http://localhost:${env.BRIDGE_PORT ?? '5274'}`,

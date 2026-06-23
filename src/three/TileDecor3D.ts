@@ -58,6 +58,11 @@ export function getTileDecorGroup(): Group {
 //  ConeGeometry default: tip at +height/2 (up), base at -height/2 (down).
 //  We position the cone CENTER so that base sits at tile surface:
 //    center_Y = tileY + ROCK_H/2        → base at tileY, tip at tileY + ROCK_H
+//
+//  Fallback cones: kept in the craggy iter13 style — flatShading + low
+//  radialSegments so the silhouette is faceted, not a smooth paper cone.
+//  When the GLB craggy peaks load (MountainProps3D), these are skipped;
+//  they only appear if the async glb load fails.
 
 const ROCK_H   = HEX_SIZE * 0.82;   // taller so mountains read vertical from gameplay camera
 const ROCK_R   = HEX_SIZE * 0.16;   // slimmer base so peaks don't look like horizontal boulders
@@ -67,20 +72,22 @@ const SNOW_R   = HEX_SIZE * 0.075;  // tighter cap base
 function buildMountains(tiles: Array<{ tile: Tile; variant: number }>): void {
   if (tiles.length === 0) return;
 
-  const rockGeom = new ConeGeometry(ROCK_R, ROCK_H, 6);
+  const rockGeom = new ConeGeometry(ROCK_R, ROCK_H, 5);
   const rockMat  = new MeshStandardMaterial({
     color:    new Color(0x7a7870),
     roughness: 0.85,
     metalness: 0.04,
+    flatShading: true,
   });
 
-  const snowGeom = new ConeGeometry(SNOW_R, SNOW_H, 6);
+  const snowGeom = new ConeGeometry(SNOW_R, SNOW_H, 5);
   const snowMat  = new MeshStandardMaterial({
     color:    new Color(0xf0f2f8),
     emissive: new Color(0xc8d4e8),
     emissiveIntensity: 0.18,
     roughness: 0.50,
     metalness: 0.0,
+    flatShading: true,
   });
 
   const PEAKS = 2;
