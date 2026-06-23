@@ -143,7 +143,10 @@ export function computeRiverPaths(tiles: Map<string, Tile>): RiverPath[] {
       if (next.terrain === 'ocean') {
         // Mouth: stop at the shared edge, reaching slightly into the sea.
         const landTop = axialToWorld3D(
-          current.coord.q, current.coord.r, terrainElevation(current.terrain));
+          current.coord.q,
+          current.coord.r,
+          terrainElevation(current.terrain),
+        );
         // Ocean tops sit at elevation −1 (y = −12, bevel flattened to the
         // cap): drop the mouth to just above the water so the last span
         // reads as a short cascade down the coastal cliff, not a ribbon
@@ -153,9 +156,9 @@ export function computeRiverPaths(tiles: Map<string, Tile>): RiverPath[] {
         // surface (+0.5, was +1.0) so the ribbon dips into the ocean and
         // merges gaplessly instead of hovering over a coastal seam.
         mouth = new Vector3(
-          landTop.x + (sea.x - landTop.x) * 0.70,
+          landTop.x + (sea.x - landTop.x) * 0.7,
           sea.y + 0.5,
-          landTop.z + (sea.z - landTop.z) * 0.70,
+          landTop.z + (sea.z - landTop.z) * 0.7,
         );
         break;
       }
@@ -196,7 +199,10 @@ function tileCenterWorld(t: Tile): Vector3 {
  *      lying on actual edges.
  *  Only the spring head keeps the source-tile center (a river is born at a
  *  tile); the whole body hugs edges. Deterministic — same layout, same path. */
-function edgeRoutePath(path: Tile[], mouth: Vector3 | null): {
+function edgeRoutePath(
+  path: Tile[],
+  mouth: Vector3 | null,
+): {
   points: Vector3[];
   revealed: boolean[];
 } {
@@ -211,7 +217,13 @@ function edgeRoutePath(path: Tile[], mouth: Vector3 | null): {
     revealed.push(a.revealed && b.revealed);
     const c = path[i + 2];
     if (c && axialDistance(a.coord, c.coord) === 1) {
-      points.push(ca.clone().add(cb).add(tileCenterWorld(c)).multiplyScalar(1 / 3));
+      points.push(
+        ca
+          .clone()
+          .add(cb)
+          .add(tileCenterWorld(c))
+          .multiplyScalar(1 / 3),
+      );
       revealed.push(a.revealed && b.revealed && c.revealed);
     }
   }
@@ -238,12 +250,14 @@ function meander(points: Vector3[], revealed: boolean[]): { pts: Vector3[]; rev:
     const len = Math.hypot(dx, dz) || 1;
     // Perpendicular offset, ±0.20 hex, deterministic per segment position.
     const h = hashCoord(Math.round(a.x + b.x), Math.round(a.z + b.z));
-    const amp = ((h % 7) - 3) / 3 * HEX_SIZE * 0.20;
-    pts.push(new Vector3(
-      (a.x + b.x) / 2 + (-dz / len) * amp,
-      (a.y + b.y) / 2,
-      (a.z + b.z) / 2 + (dx / len) * amp,
-    ));
+    const amp = (((h % 7) - 3) / 3) * HEX_SIZE * 0.2;
+    pts.push(
+      new Vector3(
+        (a.x + b.x) / 2 + (-dz / len) * amp,
+        (a.y + b.y) / 2,
+        (a.z + b.z) / 2 + (dx / len) * amp,
+      ),
+    );
     rev.push(revealed[i]! && revealed[i + 1]!);
   }
   return { pts, rev };
@@ -345,7 +359,7 @@ export function rebuildRivers(tiles: Map<string, Tile>): void {
     roughness: 0.22,
     metalness: 0.05,
     emissive: new Color(0x0e3338),
-    emissiveIntensity: 0.40,
+    emissiveIntensity: 0.4,
   });
   const mesh = new Mesh(geom, mat);
   riverGroup.add(mesh);

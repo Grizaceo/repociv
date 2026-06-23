@@ -16,7 +16,7 @@ import { hexCornerAngle3D, axialToWorld3D } from './axialToWorld3D.ts';
 const flashGroup = new Group();
 flashGroup.name = 'tile-flash';
 
-const FLASH_DURATION = 0.20; // 200ms
+const FLASH_DURATION = 0.2; // 200ms
 const FLASH_COLOR = 0xffe040;
 const FLASH_MAX_OPACITY = 0.8;
 
@@ -49,8 +49,12 @@ export function flashTile(q: number, r: number, elev: number): void {
     const a2 = hexCornerAngle3D((i + 1) % 6);
     const y = center.y + 1.5;
     segments.push(
-      center.x + HEX_SIZE * Math.cos(a1), y, center.z + HEX_SIZE * Math.sin(a1),
-      center.x + HEX_SIZE * Math.cos(a2), y, center.z + HEX_SIZE * Math.sin(a2),
+      center.x + HEX_SIZE * Math.cos(a1),
+      y,
+      center.z + HEX_SIZE * Math.sin(a1),
+      center.x + HEX_SIZE * Math.cos(a2),
+      y,
+      center.z + HEX_SIZE * Math.sin(a2),
     );
   }
 

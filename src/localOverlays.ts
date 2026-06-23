@@ -96,7 +96,8 @@ export function drawPowerOverlay(
   }
 
   for (const src of pg.sources) {
-    if (src.tileX < view.x0 || src.tileX > view.x1 || src.tileY < view.y0 || src.tileY > view.y1) continue;
+    if (src.tileX < view.x0 || src.tileX > view.x1 || src.tileY < view.y0 || src.tileY > view.y1)
+      continue;
 
     const px = src.tileX * tileSize;
     const py = src.tileY * tileSize;
@@ -121,7 +122,13 @@ export function drawPowerOverlay(
   }
 
   for (const cons of pg.consumers) {
-    if (cons.tileX < view.x0 || cons.tileX > view.x1 || cons.tileY < view.y0 || cons.tileY > view.y1) continue;
+    if (
+      cons.tileX < view.x0 ||
+      cons.tileX > view.x1 ||
+      cons.tileY < view.y0 ||
+      cons.tileY > view.y1
+    )
+      continue;
 
     const px = cons.tileX * tileSize;
     const py = cons.tileY * tileSize;
@@ -174,7 +181,8 @@ export function drawTemperatureOverlay(
   ctx.globalAlpha = 0.5;
 
   function tempToColor(temp: number): string {
-    const comfortMin = 16, comfortMax = 26;
+    const comfortMin = 16,
+      comfortMax = 26;
     if (temp <= comfortMin) {
       const t = Math.max(0, (temp + 20) / (comfortMin + 20));
       const r = Math.round(0 + t * 0);
@@ -197,21 +205,32 @@ export function drawTemperatureOverlay(
   }
 
   for (const [roomId, climate] of climates) {
-    const room = world.rooms.find(r => r.id === roomId);
+    const room = world.rooms.find((r) => r.id === roomId);
     if (!room) continue;
 
     const roomCenterX = (room.x + room.width / 2) * tileSize;
     const roomCenterY = (room.y + room.height / 2) * tileSize;
 
-    if (roomCenterX < view.x0 * tileSize || roomCenterX > view.x1 * tileSize ||
-        roomCenterY < view.y0 * tileSize || roomCenterY > view.y1 * tileSize) continue;
+    if (
+      roomCenterX < view.x0 * tileSize ||
+      roomCenterX > view.x1 * tileSize ||
+      roomCenterY < view.y0 * tileSize ||
+      roomCenterY > view.y1 * tileSize
+    )
+      continue;
 
     const color = tempToColor(climate.temperature);
-    
+
     ctx.fillStyle = color;
     ctx.globalAlpha = 0.3;
     ctx.beginPath();
-    ctx.arc(roomCenterX, roomCenterY, Math.max(room.width, room.height) * tileSize * 0.35, 0, Math.PI * 2);
+    ctx.arc(
+      roomCenterX,
+      roomCenterY,
+      Math.max(room.width, room.height) * tileSize * 0.35,
+      0,
+      Math.PI * 2,
+    );
     ctx.fill();
 
     ctx.globalAlpha = 1;
@@ -220,12 +239,16 @@ export function drawTemperatureOverlay(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`${climate.temperature.toFixed(1)}°C`, roomCenterX, roomCenterY);
-    
+
     if (Math.abs(climate.temperature - climate.targetTemperature) > 0.5) {
       ctx.fillStyle = '#FBBF24';
       ctx.font = `9px ${state.tokens.fontMono}`;
       const arrow = climate.temperature < climate.targetTemperature ? '▲' : '▼';
-      ctx.fillText(`${arrow} ${climate.targetTemperature.toFixed(1)}°C`, roomCenterX, roomCenterY + 18);
+      ctx.fillText(
+        `${arrow} ${climate.targetTemperature.toFixed(1)}°C`,
+        roomCenterX,
+        roomCenterY + 18,
+      );
     }
 
     if (climate.temperature < 10 && Math.random() < 0.02) {
@@ -236,11 +259,17 @@ export function drawTemperatureOverlay(
   }
 
   for (const [roomId, climate] of climates) {
-    const room = world.rooms.find(r => r.id === roomId);
+    const room = world.rooms.find((r) => r.id === roomId);
     if (!room) continue;
 
     for (const heater of climate.heaters) {
-      if (heater.tileX < view.x0 || heater.tileX > view.x1 || heater.tileY < view.y0 || heater.tileY > view.y1) continue;
+      if (
+        heater.tileX < view.x0 ||
+        heater.tileX > view.x1 ||
+        heater.tileY < view.y0 ||
+        heater.tileY > view.y1
+      )
+        continue;
       const px = heater.tileX * tileSize;
       const py = heater.tileY * tileSize;
       const s = tileSize;
@@ -252,13 +281,24 @@ export function drawTemperatureOverlay(
       for (let i = 0; i < 3; i++) {
         ctx.beginPath();
         ctx.moveTo(centerX - 6 + i * 6, py + s);
-        ctx.quadraticCurveTo(centerX + 4 * Math.sin(now / 100 + i), py + s - 8, centerX - 6 + i * 6, py + s - 16);
+        ctx.quadraticCurveTo(
+          centerX + 4 * Math.sin(now / 100 + i),
+          py + s - 8,
+          centerX - 6 + i * 6,
+          py + s - 16,
+        );
         ctx.stroke();
       }
     }
 
     for (const cooler of climate.coolers) {
-      if (cooler.tileX < view.x0 || cooler.tileX > view.x1 || cooler.tileY < view.y0 || cooler.tileY > view.y1) continue;
+      if (
+        cooler.tileX < view.x0 ||
+        cooler.tileX > view.x1 ||
+        cooler.tileY < view.y0 ||
+        cooler.tileY > view.y1
+      )
+        continue;
       const px = cooler.tileX * tileSize;
       const py = cooler.tileY * tileSize;
       const s = tileSize;
@@ -268,7 +308,7 @@ export function drawTemperatureOverlay(
       ctx.fillStyle = `rgba(100, 181, 246, ${0.4 + 0.3 * Math.sin(now / 150)})`;
       for (let i = 0; i < 4; i++) {
         const px2 = centerX + (i - 1.5) * 4;
-        const py2 = py + s - 3 - (now / 80 + i * 0.5) % 10;
+        const py2 = py + s - 3 - ((now / 80 + i * 0.5) % 10);
         ctx.beginPath();
         ctx.arc(px2, py2, 2, 0, Math.PI * 2);
         ctx.fill();
@@ -277,7 +317,13 @@ export function drawTemperatureOverlay(
 
     for (const vent of climate.vents) {
       if (!vent.open) continue;
-      if (vent.tileX < view.x0 || vent.tileX > view.x1 || vent.tileY < view.y0 || vent.tileY > view.y1) continue;
+      if (
+        vent.tileX < view.x0 ||
+        vent.tileX > view.x1 ||
+        vent.tileY < view.y0 ||
+        vent.tileY > view.y1
+      )
+        continue;
       const px = vent.tileX * tileSize;
       const py = vent.tileY * tileSize;
       const s = tileSize;
@@ -316,7 +362,9 @@ export function drawZones(
     const color = zoneColors[zone.type] || '#888';
     const alpha = 0.15;
 
-    ctx.fillStyle = `${color}${Math.round(alpha * 255).toString(16).padStart(2, '0')}`;
+    ctx.fillStyle = `${color}${Math.round(alpha * 255)
+      .toString(16)
+      .padStart(2, '0')}`;
     for (const tile of zone.tiles) {
       if (tile.x < view.x0 || tile.x > view.x1 || tile.y < view.y0 || tile.y > view.y1) continue;
       const px = tile.x * tileSize;

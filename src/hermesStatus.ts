@@ -42,9 +42,7 @@ const FALLBACK: HermesStatus = {
  * ``error: 'bridge_unreachable'`` so the UI can render the banner
  * even when the bridge itself is gone.
  */
-export async function checkHermesStatus(
-  signal?: AbortSignal,
-): Promise<HermesStatus> {
+export async function checkHermesStatus(signal?: AbortSignal): Promise<HermesStatus> {
   const url = bridgeUrl('/api/hermes/status');
   let res: Response;
   try {

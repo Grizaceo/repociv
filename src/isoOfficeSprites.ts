@@ -10,8 +10,8 @@ export const ISO_PARTITION_H = 12;
 
 export function isoProject(x: number, y: number, z = 0): { px: number; py: number } {
   return {
-    px: (x - y) * ISO_TILE_W / 2,
-    py: (x + y) * ISO_TILE_H / 2 - z * ISO_WALL_H,
+    px: ((x - y) * ISO_TILE_W) / 2,
+    py: ((x + y) * ISO_TILE_H) / 2 - z * ISO_WALL_H,
   };
 }
 

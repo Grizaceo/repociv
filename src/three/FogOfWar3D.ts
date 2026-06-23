@@ -20,11 +20,7 @@ const scratchGrey = new Color();
  *  Civ V fog of war is desaturated dusk, not a navy bruise: the legacy
  *  fogTint() lerped toward slate 0x2a2a35, which tinted every fogged tile
  *  blue-purple. Desaturate-then-dim keeps the biome hue readable under fog. */
-export function instanceColorForTile(
-  tile: Tile,
-  fogEnabled: boolean,
-  target = new Color(),
-): Color {
+export function instanceColorForTile(tile: Tile, fogEnabled: boolean, target = new Color()): Color {
   const baseHex = TERRAIN_COLOR[tile.terrain]?.fill ?? TERRAIN_COLOR.plains.fill;
   target.set(baseHex);
   const alpha = tileFogAlpha(tile, fogEnabled);

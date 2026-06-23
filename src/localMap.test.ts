@@ -125,10 +125,7 @@ describe('localMap — Office Furnishing', () => {
     const deskWorkbenches = world.grid
       .flat()
       .filter(
-        (t) =>
-          t.roomId === srcRoom!.id &&
-          t.type === 'workbench' &&
-          t.decor === 'desk_bundle',
+        (t) => t.roomId === srcRoom!.id && t.type === 'workbench' && t.decor === 'desk_bundle',
       );
     assert.ok(deskWorkbenches.length > 0, 'team_cluster should have desk-aligned workbenches');
   });
@@ -173,9 +170,7 @@ describe('localMap — Office Furnishing', () => {
 
   it('does not overwrite workbench tiles with furniture', () => {
     const world = buildMockLocalWorld('test-repo');
-    const workbenchTiles = world.grid
-      .flat()
-      .filter((t) => t.type === 'workbench');
+    const workbenchTiles = world.grid.flat().filter((t) => t.type === 'workbench');
     assert.ok(workbenchTiles.length > 0, 'should have workbench tiles');
 
     for (const tile of workbenchTiles) {

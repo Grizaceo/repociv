@@ -7,11 +7,13 @@ import { type Axial } from '../hex.ts';
 // Minimal GameState factory that satisfies the contract used by
 // computeWorldSignature. We only need world.tiles / world.cities /
 // world.units; the rest of GameState is irrelevant.
-function makeState(opts: {
-  tiles?: Array<[Axial, Tile]>;
-  cities?: City[];
-  units?: Unit[];
-} = {}): GameState {
+function makeState(
+  opts: {
+    tiles?: Array<[Axial, Tile]>;
+    cities?: City[];
+    units?: Unit[];
+  } = {},
+): GameState {
   const tiles = new Map<Axial, Tile>();
   for (const [k, v] of opts.tiles ?? []) tiles.set(k, v);
   return {
@@ -135,7 +137,10 @@ describe('computeWorldSignature', () => {
     const tiles: Array<[Axial, Tile]> = [];
     for (let q = 0; q < 40; q++) {
       for (let r = 0; r < 30; r++) {
-        tiles.push([{ q, r }, { ...mkTile(q, r), revealed: (q + r) % 3 !== 0 }]);
+        tiles.push([
+          { q, r },
+          { ...mkTile(q, r), revealed: (q + r) % 3 !== 0 },
+        ]);
       }
     }
     const units = Array.from({ length: 60 }, (_, i) => mkUnit(`u${i}`, i % 40, i % 30));

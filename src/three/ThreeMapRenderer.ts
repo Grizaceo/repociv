@@ -212,7 +212,11 @@ export class ThreeMapRenderer {
   }
 
   /** Hex corner outline in map world space for canvas overlay. */
-  projectHexOutline(coord: Axial, state: GameState, cam: MapCamera): Array<{ x: number; y: number }> {
+  projectHexOutline(
+    coord: Axial,
+    state: GameState,
+    cam: MapCamera,
+  ): Array<{ x: number; y: number }> {
     const tile = state.world.tiles.get(tileKey(coord));
     const elev = tile ? terrainElevation(tile.terrain) : 0;
     const center = axialToWorld3D(coord.q, coord.r, elev);

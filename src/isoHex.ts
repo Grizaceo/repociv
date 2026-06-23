@@ -59,4 +59,3 @@ export function screenToAxial(
 export function hexCornerAngle(index: number): number {
   return (Math.PI / 180) * (60 * index - 30);
 }
-

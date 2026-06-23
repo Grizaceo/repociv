@@ -54,9 +54,7 @@ export function ensureMountainPropsLoad(onSettled?: () => void): void {
   if (state !== 'idle') return;
   state = 'loading';
   const loader = new GLTFLoader();
-  Promise.all(
-    [0, 1, 2].map((i) => loader.loadAsync(`/assets/3d/props/mountain-${i}.glb`)),
-  )
+  Promise.all([0, 1, 2].map((i) => loader.loadAsync(`/assets/3d/props/mountain-${i}.glb`)))
     .then((gltfs) => {
       variants = gltfs.map((gltf) => {
         let found: Mesh | null = null;
@@ -90,9 +88,7 @@ export function rebuildMountainProps(tiles: Tile[]): void {
   // Unrevealed peaks would poke through the fog-cover clouds — skip them
   // (TileDecor3D applies the same filter to the cone fallback).
   const mountains = tiles.filter((t) => t.terrain === 'mountain' && t.revealed);
-  const signature = mountains
-    .map((t) => `${tileKey(t.coord)}:${t.city ? 1 : 0}`)
-    .join('|');
+  const signature = mountains.map((t) => `${tileKey(t.coord)}:${t.city ? 1 : 0}`).join('|');
   if (signature === lastSignature && activeMeshes.length > 0) return;
   if (signature === lastSignature && mountains.length === 0) return;
   lastSignature = signature;
@@ -124,12 +120,12 @@ export function rebuildMountainProps(tiles: Tile[]): void {
       const base = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
       // 60°-step rotation + small scale jitter, all from the coord hash.
       const rotSteps = (h >> 3) % 6;
-      const jitter = 0.40 + ((h >> 5) % 5) * 0.02; // 0.40..0.48 × HEX_SIZE
+      const jitter = 0.4 + ((h >> 5) % 5) * 0.02; // 0.40..0.48 × HEX_SIZE
       // City mountain tiles shrink and shift to the rim so the city stays
       // readable (same intent as the old cone decor's city branch).
       const cityScale = tile.city ? 0.62 : 1.0;
       const offAngle = ((h >> 7) % 6) * (Math.PI / 3) + Math.PI / 6;
-      const offMag = tile.city ? HEX_SIZE * 0.30 : 0;
+      const offMag = tile.city ? HEX_SIZE * 0.3 : 0;
       pos.set(
         base.x + Math.cos(offAngle) * offMag,
         base.y + 1.5,

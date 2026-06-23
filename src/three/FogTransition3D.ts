@@ -157,8 +157,12 @@ function startParticleBurst(q: number, r: number): void {
     const a2 = hexCornerAngle3D((i + 1) % 6);
     const y = center.y + 1.5;
     segments.push(
-      center.x + HEX_SIZE * 0.3 * Math.cos(a1), y, center.z + HEX_SIZE * 0.3 * Math.sin(a1),
-      center.x + HEX_SIZE * 0.3 * Math.cos(a2), y, center.z + HEX_SIZE * 0.3 * Math.sin(a2),
+      center.x + HEX_SIZE * 0.3 * Math.cos(a1),
+      y,
+      center.z + HEX_SIZE * 0.3 * Math.sin(a1),
+      center.x + HEX_SIZE * 0.3 * Math.cos(a2),
+      y,
+      center.z + HEX_SIZE * 0.3 * Math.sin(a2),
     );
   }
   const ringGeom = new BufferGeometry();
@@ -221,7 +225,7 @@ export function tickFogTransition(dt: number): void {
       const a1 = hexCornerAngle3D(j);
       const a2 = hexCornerAngle3D((j + 1) % 6);
       const y = center.y + 1.5;
-      arr[j * 6]     = center.x + HEX_SIZE * ringScale * Math.cos(a1);
+      arr[j * 6] = center.x + HEX_SIZE * ringScale * Math.cos(a1);
       arr[j * 6 + 1] = y;
       arr[j * 6 + 2] = center.z + HEX_SIZE * ringScale * Math.sin(a1);
       arr[j * 6 + 3] = center.x + HEX_SIZE * ringScale * Math.cos(a2);

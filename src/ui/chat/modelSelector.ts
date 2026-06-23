@@ -502,7 +502,11 @@ export function getSelectedConfig(): { harness: string; provider: string; model:
 /** The persisted harness/provider/model for a specific unit (per-unit key,
  *  falling back to the global mirror). Used by the agent chip to label each
  *  tab with its own configuration without touching the active selection. */
-export function getUnitConfig(unitId: string): { harness: string; provider: string; model: string } {
+export function getUnitConfig(unitId: string): {
+  harness: string;
+  provider: string;
+  model: string;
+} {
   return loadSelection(unitId);
 }
 

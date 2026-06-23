@@ -21,13 +21,20 @@ export function drawIsoPrism(
 ) {
   const bY = -zBase * scale;
   const tY = -zTop * scale;
-  const bx1 = cx + hw * scale, by1 = bY;
-  const bx2 = cx, by2 = bY + hd * scale;
-  const bx3 = cx - hw * scale, by3 = bY;
-  const tx0 = cx, ty0 = tY - hd * scale;
-  const tx1 = cx + hw * scale, ty1 = tY;
-  const tx2 = cx, ty2 = tY + hd * scale;
-  const tx3 = cx - hw * scale, ty3 = tY;
+  const bx1 = cx + hw * scale,
+    by1 = bY;
+  const bx2 = cx,
+    by2 = bY + hd * scale;
+  const bx3 = cx - hw * scale,
+    by3 = bY;
+  const tx0 = cx,
+    ty0 = tY - hd * scale;
+  const tx1 = cx + hw * scale,
+    ty1 = tY;
+  const tx2 = cx,
+    ty2 = tY + hd * scale;
+  const tx3 = cx - hw * scale,
+    ty3 = tY;
 
   ctx.fillStyle = darkenHex(color, 20);
   ctx.beginPath();
@@ -57,7 +64,12 @@ export function drawIsoPrism(
   ctx.fill();
 }
 
-export function drawIsoSofa(ctx: CanvasRenderingContext2D, isoProject: IsoProjectFn, gx: number, gy: number) {
+export function drawIsoSofa(
+  ctx: CanvasRenderingContext2D,
+  isoProject: IsoProjectFn,
+  gx: number,
+  gy: number,
+) {
   const base = isoProject(gx, gy);
   ctx.fillStyle = '#B08090';
   ctx.beginPath();
@@ -77,7 +89,12 @@ export function drawIsoSofa(ctx: CanvasRenderingContext2D, isoProject: IsoProjec
   ctx.fill();
 }
 
-export function drawIsoServerRack(ctx: CanvasRenderingContext2D, isoProject: IsoProjectFn, gx: number, gy: number) {
+export function drawIsoServerRack(
+  ctx: CanvasRenderingContext2D,
+  isoProject: IsoProjectFn,
+  gx: number,
+  gy: number,
+) {
   const base = isoProject(gx, gy);
   const now = performance.now();
   ctx.fillStyle = '#1e293b';
@@ -96,7 +113,12 @@ export function drawIsoServerRack(ctx: CanvasRenderingContext2D, isoProject: Iso
   }
 }
 
-export function drawIsoMeetingTable(ctx: CanvasRenderingContext2D, isoProject: IsoProjectFn, gx: number, gy: number) {
+export function drawIsoMeetingTable(
+  ctx: CanvasRenderingContext2D,
+  isoProject: IsoProjectFn,
+  gx: number,
+  gy: number,
+) {
   const base = isoProject(gx, gy);
   ctx.fillStyle = 'rgba(232, 197, 150, 0.7)';
   ctx.beginPath();
@@ -118,7 +140,12 @@ export function drawIsoMeetingTable(ctx: CanvasRenderingContext2D, isoProject: I
   ctx.fill();
 }
 
-export function drawIsoPhoneBooth(ctx: CanvasRenderingContext2D, isoProject: IsoProjectFn, gx: number, gy: number) {
+export function drawIsoPhoneBooth(
+  ctx: CanvasRenderingContext2D,
+  isoProject: IsoProjectFn,
+  gx: number,
+  gy: number,
+) {
   const base = isoProject(gx, gy);
   ctx.fillStyle = '#B0C0B0';
   ctx.beginPath();
@@ -138,7 +165,12 @@ export function drawIsoPhoneBooth(ctx: CanvasRenderingContext2D, isoProject: Iso
   ctx.fill();
 }
 
-export function drawIsoBreakArea(ctx: CanvasRenderingContext2D, isoProject: IsoProjectFn, gx: number, gy: number) {
+export function drawIsoBreakArea(
+  ctx: CanvasRenderingContext2D,
+  isoProject: IsoProjectFn,
+  gx: number,
+  gy: number,
+) {
   const base = isoProject(gx, gy);
   ctx.fillStyle = '#FAF0E6';
   ctx.fillRect(base.px - 10, base.py - 4, 20, 6);
@@ -151,7 +183,12 @@ export function drawIsoBreakArea(ctx: CanvasRenderingContext2D, isoProject: IsoP
   ctx.fillRect(base.px + 4, base.py - 12, 6, 5);
 }
 
-export function drawIsoStairs(ctx: CanvasRenderingContext2D, isoProject: IsoProjectFn, gx: number, gy: number) {
+export function drawIsoStairs(
+  ctx: CanvasRenderingContext2D,
+  isoProject: IsoProjectFn,
+  gx: number,
+  gy: number,
+) {
   const base = isoProject(gx, gy);
   for (let i = 0; i < 4; i++) {
     const r = 232 + i * 3;

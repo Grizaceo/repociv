@@ -102,9 +102,6 @@ export function loadTerrainAtlas(): Promise<LoadedTerrainAtlas | null> {
   return cached;
 }
 
-export function terrainAtlasIndex(
-  meta: TerrainAtlasMeta | null,
-  terrain: Terrain,
-): number {
+export function terrainAtlasIndex(meta: TerrainAtlasMeta | null, terrain: Terrain): number {
   return meta?.terrains[terrain]?.index ?? 0;
 }

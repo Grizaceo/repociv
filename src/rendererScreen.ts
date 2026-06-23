@@ -55,12 +55,7 @@ export function renderScreenOverlays(s: ScreenOverlayState): void {
     }
   }
   if (s.draggedCity && s.cityGhostScreenPos && s.relocateDragActive) {
-    renderCityDragGhost(
-      ctx,
-      s.cityGhostScreenPos.x,
-      s.cityGhostScreenPos.y,
-      s.draggedCity.name,
-    );
+    renderCityDragGhost(ctx, s.cityGhostScreenPos.x, s.cityGhostScreenPos.y, s.draggedCity.name);
     if (s.hoveredHex) {
       const toTile = s.tiles.get(tileKey(s.hoveredHex));
       const ok = s.canRelocateTo(s.hoveredHex);

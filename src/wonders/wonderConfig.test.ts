@@ -95,7 +95,10 @@ describe('WONDER_MANIFESTS (static) + example templates', () => {
   });
 
   it('all optionalFeatures require opt-in (static + examples)', () => {
-    const manifests = [...Object.values(WONDER_MANIFESTS), ...WONDER_EXAMPLES.map((e) => e.manifest)];
+    const manifests = [
+      ...Object.values(WONDER_MANIFESTS),
+      ...WONDER_EXAMPLES.map((e) => e.manifest),
+    ];
     for (const manifest of manifests) {
       for (const feature of manifest.optionalFeatures) {
         expect(feature.requiresUserOptIn).toBe(true);

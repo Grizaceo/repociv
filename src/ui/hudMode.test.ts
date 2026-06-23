@@ -72,7 +72,10 @@ describe('hudMode', () => {
         throw new Error('blocked');
       },
     });
-    vi.stubGlobal('document', { body: { classList: { toggle: () => false } }, getElementById: () => null });
+    vi.stubGlobal('document', {
+      body: { classList: { toggle: () => false } },
+      getElementById: () => null,
+    });
     const m = await import('./hudMode.ts');
     expect(m.getHudMode()).toBe('quick');
     // setHudMode must not throw even when persistence fails.

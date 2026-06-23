@@ -1,5 +1,12 @@
 import type { LocalNpc, LocalRoom, LocalTile, LocalUnit, LocalWorld, ZoneType } from './types.ts';
-import { drawIsoOfficeSprite, type IsoOfficeDrawContext, ISO_TILE_W, ISO_TILE_H, ISO_WALL_H, isoProject as officeIsoProject } from './isoOfficeSprites.ts';
+import {
+  drawIsoOfficeSprite,
+  type IsoOfficeDrawContext,
+  ISO_TILE_W,
+  ISO_TILE_H,
+  ISO_WALL_H,
+  isoProject as officeIsoProject,
+} from './isoOfficeSprites.ts';
 import {
   drawIsoBreakArea as renderIsoBreakArea,
   drawIsoMeetingTable as renderIsoMeetingTable,
@@ -96,7 +103,9 @@ interface IsoTileRenderState {
   fpsValue?: number;
 }
 
-function monoFont(state: Pick<IsoRenderState, 'tokens'> | Pick<IsoTileRenderState, 'tokens'>): string {
+function monoFont(
+  state: Pick<IsoRenderState, 'tokens'> | Pick<IsoTileRenderState, 'tokens'>,
+): string {
   return state.tokens.fontMono ?? "'JetBrains Mono', monospace";
 }
 
@@ -152,17 +161,20 @@ export function renderIso(state: IsoRenderState) {
         tile.type === 'vent' // drawn as wall in the static layer
       )
         continue;
-      const z = tile.type === 'door' || tile.type === 'window' ? 2 : tile.type === 'workbench' ? 1 : 0;
+      const z =
+        tile.type === 'door' || tile.type === 'window' ? 2 : tile.type === 'workbench' ? 1 : 0;
       tiles.push({ x, y, tile, z });
     }
   }
   tiles.sort((a, b) => {
-    const d = (a.x + a.y) - (b.x + b.y);
+    const d = a.x + a.y - (b.x + b.y);
     return d !== 0 ? d : a.z - b.z;
   });
 
   const activeWbIds = new Set(
-    localUnits.filter((u) => u.state === 'working_on_file' && u.currentWorkbenchId).map((u) => u.currentWorkbenchId),
+    localUnits
+      .filter((u) => u.state === 'working_on_file' && u.currentWorkbenchId)
+      .map((u) => u.currentWorkbenchId),
   );
 
   // Desks always render individually — the area-scaled grid layout
@@ -184,7 +196,9 @@ export function renderIso(state: IsoRenderState) {
   }
 
   const npcEntries = (world.npcs ?? [])
-    .filter((n) => n.gridX >= view.x0 && n.gridX <= view.x1 && n.gridY >= view.y0 && n.gridY <= view.y1)
+    .filter(
+      (n) => n.gridX >= view.x0 && n.gridX <= view.x1 && n.gridY >= view.y0 && n.gridY <= view.y1,
+    )
     .map((n) => ({ npc: n, sortKey: n.gridX + n.gridY }));
   npcEntries.sort((a, b) => a.sortKey - b.sortKey);
   for (const { npc } of npcEntries) {
@@ -314,7 +328,8 @@ export function drawIsoTile(
   const floorKey = zone ?? 'team_cluster';
   let floorColor = ISO_FLOOR[floorKey] || ISO_FLOOR.team_cluster || '#B8B8B8';
   if (tile.type === 'path' || tile.type === 'aisle') floorColor = ISO_FLOOR.path || '#B8B8B8';
-  if (!tile.roomId && tile.type !== 'path' && tile.type !== 'aisle') floorColor = ISO_FLOOR.outside || '#A8A8A8';
+  if (!tile.roomId && tile.type !== 'path' && tile.type !== 'aisle')
+    floorColor = ISO_FLOOR.outside || '#A8A8A8';
 
   ctx.fillStyle = floorColor;
   ctx.beginPath();
@@ -376,7 +391,9 @@ export function drawIsoTile(
     const south = world.grid[gridY + 1]?.[gridX];
     const east = world.grid[gridY]?.[gridX + 1];
     const west = world.grid[gridY]?.[gridX - 1];
-    const doorNeighbors = [north, south, east, west].filter((n): n is LocalTile => n?.type === 'door');
+    const doorNeighbors = [north, south, east, west].filter(
+      (n): n is LocalTile => n?.type === 'door',
+    );
     if (doorNeighbors.length > 0) {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
       ctx.lineWidth = 2;
@@ -519,8 +536,20 @@ function drawIsoWallTile(
   const left = corners[3]!;
   const topCap = isoTileCorners(gridX, gridY, 1);
 
-  const faceColor = isConcrete ? '#A0A8B8' : isWood ? '#C4A880' : isGlass ? 'rgba(160, 190, 210, 0.35)' : ISO_WALL_FACE;
-  const sideColor = isConcrete ? '#9098A8' : isWood ? '#B49870' : isGlass ? 'rgba(140, 175, 200, 0.3)' : ISO_WALL_SIDE;
+  const faceColor = isConcrete
+    ? '#A0A8B8'
+    : isWood
+      ? '#C4A880'
+      : isGlass
+        ? 'rgba(160, 190, 210, 0.35)'
+        : ISO_WALL_FACE;
+  const sideColor = isConcrete
+    ? '#9098A8'
+    : isWood
+      ? '#B49870'
+      : isGlass
+        ? 'rgba(140, 175, 200, 0.3)'
+        : ISO_WALL_SIDE;
 
   if (hasNorthFace) {
     ctx.fillStyle = faceColor;
@@ -628,46 +657,60 @@ function drawIsoDoor(
     const pt = (t: number, down = 0) => ({ x: tl.x + dx * t, y: tl.y + dy * t + down });
 
     ctx.fillStyle = frameColor;
-    for (const [t0, t1] of [[0, 0.06], [0.94, 1]] as [number, number][]) {
-      const a = pt(t0), b = pt(t1);
+    for (const [t0, t1] of [
+      [0, 0.06],
+      [0.94, 1],
+    ] as [number, number][]) {
+      const a = pt(t0),
+        b = pt(t1);
       ctx.beginPath();
-      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-      ctx.lineTo(b.x, b.y + WH); ctx.lineTo(a.x, a.y + WH);
-      ctx.closePath(); ctx.fill();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.lineTo(b.x, b.y + WH);
+      ctx.lineTo(a.x, a.y + WH);
+      ctx.closePath();
+      ctx.fill();
     }
 
     const slide = openPct * 0.42;
     ctx.fillStyle = panelColor;
     const lEnd = 0.5 - slide;
     if (lEnd > 0.06) {
-      const a = pt(0.06, 2), b = pt(lEnd, 2);
+      const a = pt(0.06, 2),
+        b = pt(lEnd, 2);
       ctx.beginPath();
-      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-      ctx.lineTo(b.x, b.y + WH - 4); ctx.lineTo(a.x, a.y + WH - 4);
-      ctx.closePath(); ctx.fill();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.lineTo(b.x, b.y + WH - 4);
+      ctx.lineTo(a.x, a.y + WH - 4);
+      ctx.closePath();
+      ctx.fill();
     }
     const rStart = 0.5 + slide;
     if (rStart < 0.94) {
-      const a = pt(rStart, 2), b = pt(0.94, 2);
+      const a = pt(rStart, 2),
+        b = pt(0.94, 2);
       ctx.beginPath();
-      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-      ctx.lineTo(b.x, b.y + WH - 4); ctx.lineTo(a.x, a.y + WH - 4);
-      ctx.closePath(); ctx.fill();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.lineTo(b.x, b.y + WH - 4);
+      ctx.lineTo(a.x, a.y + WH - 4);
+      ctx.closePath();
+      ctx.fill();
     }
 
     ctx.fillStyle = isGlass ? '#90A8B8' : '#806840';
     const h = pt(openPct < 0.5 ? 0.44 : 0.56, WH / 2);
-    ctx.beginPath(); ctx.arc(h.x, h.y, 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.arc(h.x, h.y, 1.5, 0, Math.PI * 2);
+    ctx.fill();
   };
 
   if (hasNorthFace) drawOnFace(left, bottom);
   if (hasWestFace) drawOnFace(bottom, right);
 }
 
-function drawIsoWindowTile(
-  state: IsoTileRenderState,
-  corners: Array<{ x: number; y: number }>,
-) {
+function drawIsoWindowTile(state: IsoTileRenderState, corners: Array<{ x: number; y: number }>) {
   const { ctx } = state;
   const bottom = corners[2]!;
   const left = corners[3]!;
@@ -753,7 +796,7 @@ function drawIsoUnit(state: IsoRenderState, unit: LocalUnit, gx: number, gy: num
   let breatheScale = 1;
   if (!isMoving && (unit.state === 'idle_in_room' || unit.state === 'resting')) {
     const now2 = performance.now();
-    breatheScale = 1 + Math.sin(now2 / 1000 * Math.PI) * 0.02;
+    breatheScale = 1 + Math.sin((now2 / 1000) * Math.PI) * 0.02;
   }
 
   // Despawn fade-out alpha (P1)
@@ -781,14 +824,28 @@ function drawIsoUnit(state: IsoRenderState, unit: LocalUnit, gx: number, gy: num
   ctx.rotate(dirAngle);
   ctx.scale(Sf, Sc);
 
-  const drawPrism = (cx: number, zBase: number, zTop: number, hw: number, hd: number, color: string) =>
-    renderIsoPrism(ctx, cx, zBase, zTop, hw, hd, color, scale);
+  const drawPrism = (
+    cx: number,
+    zBase: number,
+    zTop: number,
+    hw: number,
+    hd: number,
+    color: string,
+  ) => renderIsoPrism(ctx, cx, zBase, zTop, hw, hd, color, scale);
 
   const shadowOffX = 1.5 * scale;
   const shadowOffY = 3 * scale;
   ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
   ctx.beginPath();
-  ctx.ellipse(shadowOffX, shadowOffY + 1 * scale, ISO_TILE_W * 0.22, ISO_TILE_H * 0.18, 0, 0, Math.PI * 2);
+  ctx.ellipse(
+    shadowOffX,
+    shadowOffY + 1 * scale,
+    ISO_TILE_W * 0.22,
+    ISO_TILE_H * 0.18,
+    0,
+    0,
+    Math.PI * 2,
+  );
   ctx.fill();
   ctx.fillStyle = ISO_SHADOW;
   ctx.beginPath();
@@ -834,7 +891,13 @@ function drawIsoUnit(state: IsoRenderState, unit: LocalUnit, gx: number, gy: num
     ctx.strokeStyle = state.tokens.success || '#22C55E';
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.arc(0, 0, ISO_TILE_W * 0.28, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * unit.workProgress) / 100);
+    ctx.arc(
+      0,
+      0,
+      ISO_TILE_W * 0.28,
+      -Math.PI / 2,
+      -Math.PI / 2 + (Math.PI * 2 * unit.workProgress) / 100,
+    );
     ctx.stroke();
   }
 
@@ -953,7 +1016,11 @@ function drawIsoHoveredTile(state: IsoRenderState, hovered: { x: number; y: numb
   ctx.restore();
 }
 
-function drawIsoZones(state: IsoRenderState, world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
+function drawIsoZones(
+  state: IsoRenderState,
+  world: LocalWorld,
+  view: { x0: number; y0: number; x1: number; y1: number },
+) {
   const { ctx } = state;
   if (!world.zones) return;
   const zoneColors: Record<string, string> = {
@@ -1009,7 +1076,10 @@ function drawIsoZones(state: IsoRenderState, world: LocalWorld, view: { x0: numb
   }
 }
 
-function drawIsoZonePaintPreview(state: IsoRenderState, view: { x0: number; y0: number; x1: number; y1: number }) {
+function drawIsoZonePaintPreview(
+  state: IsoRenderState,
+  view: { x0: number; y0: number; x1: number; y1: number },
+) {
   const { ctx } = state;
   if (!state.zonePaintStart || !state.zonePaintCurrent) return;
   const x0 = Math.min(state.zonePaintStart.x, state.zonePaintCurrent.x);
@@ -1068,7 +1138,11 @@ function drawIsoZonePaintPreview(state: IsoRenderState, view: { x0: number; y0: 
   ctx.fillText(`${w}×${h} (${w * h} tiles)`, (c1[0]!.x + c2[2]!.x) / 2, c1[0]!.y - 8);
 }
 
-function drawIsoPowerOverlay(state: IsoRenderState, world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
+function drawIsoPowerOverlay(
+  state: IsoRenderState,
+  world: LocalWorld,
+  view: { x0: number; y0: number; x1: number; y1: number },
+) {
   const { ctx } = state;
   const pg = world.powerGrid;
   if (!pg) return;
@@ -1098,7 +1172,8 @@ function drawIsoPowerOverlay(state: IsoRenderState, world: LocalWorld, view: { x
   }
 
   for (const src of pg.sources) {
-    if (src.tileX < view.x0 || src.tileX > view.x1 || src.tileY < view.y0 || src.tileY > view.y1) continue;
+    if (src.tileX < view.x0 || src.tileX > view.x1 || src.tileY < view.y0 || src.tileY > view.y1)
+      continue;
     const base = isoProject(src.tileX, src.tileY);
     const now = performance.now();
     const pulse = 0.5 + 0.5 * Math.sin(now / 500);
@@ -1115,7 +1190,13 @@ function drawIsoPowerOverlay(state: IsoRenderState, world: LocalWorld, view: { x
   }
 
   for (const cons of pg.consumers) {
-    if (cons.tileX < view.x0 || cons.tileX > view.x1 || cons.tileY < view.y0 || cons.tileY > view.y1) continue;
+    if (
+      cons.tileX < view.x0 ||
+      cons.tileX > view.x1 ||
+      cons.tileY < view.y0 ||
+      cons.tileY > view.y1
+    )
+      continue;
     const base = isoProject(cons.tileX, cons.tileY);
     const barW = ISO_TILE_W * 0.6;
     const barH = 3;
@@ -1147,7 +1228,11 @@ function drawIsoPowerOverlay(state: IsoRenderState, world: LocalWorld, view: { x
   ctx.restore();
 }
 
-function drawIsoWindowLightRays(state: IsoRenderState, world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
+function drawIsoWindowLightRays(
+  state: IsoRenderState,
+  world: LocalWorld,
+  view: { x0: number; y0: number; x1: number; y1: number },
+) {
   const { ctx } = state;
   const now = performance.now();
   const shimmer = 0.85 + 0.15 * Math.sin(now / 3000); // slow 3s shimmer
@@ -1197,7 +1282,11 @@ function drawIsoWindowLightRays(state: IsoRenderState, world: LocalWorld, view: 
   }
 }
 
-function drawIsoTemperatureOverlay(state: IsoRenderState, world: LocalWorld, view: { x0: number; y0: number; x1: number; y1: number }) {
+function drawIsoTemperatureOverlay(
+  state: IsoRenderState,
+  world: LocalWorld,
+  view: { x0: number; y0: number; x1: number; y1: number },
+) {
   const { ctx } = state;
   const climates = world.roomClimates;
   if (!climates) return;
@@ -1205,9 +1294,12 @@ function drawIsoTemperatureOverlay(state: IsoRenderState, world: LocalWorld, vie
   ctx.globalAlpha = 0.5;
 
   function tempToColor(temp: number): string {
-    const comfortMin = 16, comfortMax = 26;
-    if (temp <= comfortMin) return `rgb(80, ${Math.round(100 + (temp + 20) / (comfortMin + 20) * 155)}, 220)`;
-    if (temp >= comfortMax) return `rgb(220, ${Math.round(255 * (1 - Math.min(1, (temp - comfortMax) / (50 - comfortMax))))}, 0)`;
+    const comfortMin = 16,
+      comfortMax = 26;
+    if (temp <= comfortMin)
+      return `rgb(80, ${Math.round(100 + ((temp + 20) / (comfortMin + 20)) * 155)}, 220)`;
+    if (temp >= comfortMax)
+      return `rgb(220, ${Math.round(255 * (1 - Math.min(1, (temp - comfortMax) / (50 - comfortMax))))}, 0)`;
     const t = (temp - comfortMin) / (comfortMax - comfortMin);
     return `rgb(${Math.round(200 * (1 - t))}, 255, ${Math.round(200 * (1 - t))}`;
   }
@@ -1253,7 +1345,13 @@ function drawIsoTemperatureOverlay(state: IsoRenderState, world: LocalWorld, vie
     const room = world.rooms.find((r) => r.id === roomId);
     if (!room) continue;
     for (const heater of climate.heaters) {
-      if (heater.tileX < view.x0 || heater.tileX > view.x1 || heater.tileY < view.y0 || heater.tileY > view.y1) continue;
+      if (
+        heater.tileX < view.x0 ||
+        heater.tileX > view.x1 ||
+        heater.tileY < view.y0 ||
+        heater.tileY > view.y1
+      )
+        continue;
       const base = isoProject(heater.tileX, heater.tileY);
       const now = performance.now();
       ctx.strokeStyle = `rgba(239, 83, 80, ${0.4 + 0.3 * Math.sin(now / 120)})`;
@@ -1261,18 +1359,29 @@ function drawIsoTemperatureOverlay(state: IsoRenderState, world: LocalWorld, vie
       for (let i = 0; i < 3; i++) {
         ctx.beginPath();
         ctx.moveTo(base.px - 6 + i * 6, base.py + ISO_TILE_H / 2);
-        ctx.quadraticCurveTo(base.px + 4 * Math.sin(now / 100 + i), base.py + ISO_TILE_H / 2 - 8, base.px - 6 + i * 6, base.py + ISO_TILE_H / 2 - 16);
+        ctx.quadraticCurveTo(
+          base.px + 4 * Math.sin(now / 100 + i),
+          base.py + ISO_TILE_H / 2 - 8,
+          base.px - 6 + i * 6,
+          base.py + ISO_TILE_H / 2 - 16,
+        );
         ctx.stroke();
       }
     }
     for (const cooler of climate.coolers) {
-      if (cooler.tileX < view.x0 || cooler.tileX > view.x1 || cooler.tileY < view.y0 || cooler.tileY > view.y1) continue;
+      if (
+        cooler.tileX < view.x0 ||
+        cooler.tileX > view.x1 ||
+        cooler.tileY < view.y0 ||
+        cooler.tileY > view.y1
+      )
+        continue;
       const base = isoProject(cooler.tileX, cooler.tileY);
       const now = performance.now();
       ctx.fillStyle = `rgba(100, 181, 246, ${0.4 + 0.3 * Math.sin(now / 150)})`;
       for (let i = 0; i < 4; i++) {
         const px2 = base.px + (i - 1.5) * 4;
-        const py2 = base.py + ISO_TILE_H / 2 - 3 - (now / 80 + i * 0.5) % 10;
+        const py2 = base.py + ISO_TILE_H / 2 - 3 - ((now / 80 + i * 0.5) % 10);
         ctx.beginPath();
         ctx.arc(px2, py2, 2, 0, Math.PI * 2);
         ctx.fill();
@@ -1280,7 +1389,13 @@ function drawIsoTemperatureOverlay(state: IsoRenderState, world: LocalWorld, vie
     }
     for (const vent of climate.vents) {
       if (!vent.open) continue;
-      if (vent.tileX < view.x0 || vent.tileX > view.x1 || vent.tileY < view.y0 || vent.tileY > view.y1) continue;
+      if (
+        vent.tileX < view.x0 ||
+        vent.tileX > view.x1 ||
+        vent.tileY < view.y0 ||
+        vent.tileY > view.y1
+      )
+        continue;
       const base = isoProject(vent.tileX, vent.tileY);
       ctx.fillStyle = `rgba(144, 164, 174, ${0.6 + 0.3 * Math.sin(performance.now() / 200)})`;
       ctx.font = `${ISO_TILE_W * 0.18}px ${monoFont(state)}`;
@@ -1457,8 +1572,15 @@ function extColorFor(ext: string, state?: IsoRenderState): string {
   if (state?.extColor && state.extColor[ext]) return state.extColor[ext]!;
   // Fallback common colors
   const fallbacks: Record<string, string> = {
-    ts: '#4a9bd4', tsx: '#4a9bd4', js: '#e8c44a', py: '#4a9', json: '#e8a44a',
-    md: '#8ab4f8', css: '#a855f7', html: '#e87a4a', sh: '#22c55e',
+    ts: '#4a9bd4',
+    tsx: '#4a9bd4',
+    js: '#e8c44a',
+    py: '#4a9',
+    json: '#e8a44a',
+    md: '#8ab4f8',
+    css: '#a855f7',
+    html: '#e87a4a',
+    sh: '#22c55e',
   };
   return fallbacks[ext] ?? '#888';
 }
@@ -1482,9 +1604,7 @@ function drawIsoWorkbenchTooltip(state: IsoRenderState, wb: import('./types.ts')
   const fileName = wb.fileName;
   const extLabel = wb.extension.toUpperCase();
   const testBadge = wb.isTest ? ' [TEST]' : '';
-  const pathShort = wb.filePath.length > 40
-    ? '...' + wb.filePath.slice(-37)
-    : wb.filePath;
+  const pathShort = wb.filePath.length > 40 ? '...' + wb.filePath.slice(-37) : wb.filePath;
 
   const titleLine = `${fileName}${testBadge}`;
   const pathLine = pathShort;

@@ -6,7 +6,14 @@ vi.mock('three/examples/jsm/renderers/CSS2DRenderer.js', async () => {
   const { Object3D } = await import('three');
   class MockCSS2DObject extends Object3D {
     element: HTMLElement;
-    center = { x: 0, y: 0, set(x: number, y: number) { this.x = x; this.y = y; } };
+    center = {
+      x: 0,
+      y: 0,
+      set(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+      },
+    };
     constructor(el: HTMLElement) {
       super();
       this.element = el;
@@ -24,14 +31,20 @@ const fakeElement = (): HTMLElement => {
     className: '',
     style: {},
     parentNode: null as HTMLElement | null,
-    get innerHTML() { return this._innerHTML; },
+    get innerHTML() {
+      return this._innerHTML;
+    },
     set innerHTML(v: string) {
       this._innerHTML = v;
       // Crude HTML strip to derive textContent.
       this._textContent = v.replace(/<[^>]*>/g, '');
     },
-    get textContent() { return this._textContent; },
-    set textContent(v: string) { this._textContent = v; },
+    get textContent() {
+      return this._textContent;
+    },
+    set textContent(v: string) {
+      this._textContent = v;
+    },
   };
   return el as unknown as HTMLElement;
 };
@@ -39,12 +52,7 @@ const fakeElement = (): HTMLElement => {
   createElement: vi.fn(fakeElement) as unknown as typeof document.createElement,
 } as unknown as typeof document;
 
-import {
-  clearTilePopup,
-  getTilePopupGroup,
-  showTilePopup,
-  isPopupVisible,
-} from './TilePopup3D.ts';
+import { clearTilePopup, getTilePopupGroup, showTilePopup, isPopupVisible } from './TilePopup3D.ts';
 import type { Tile, City, Unit } from '../types.ts';
 
 function makeTile(q: number, r: number, city?: City): Tile {
@@ -129,8 +137,8 @@ describe('TilePopup3D', () => {
       element: { textContent: string };
     };
     expect(popup.element.textContent).toContain('10'); // gold
-    expect(popup.element.textContent).toContain('5');  // science
-    expect(popup.element.textContent).toContain('3');  // production
+    expect(popup.element.textContent).toContain('5'); // science
+    expect(popup.element.textContent).toContain('3'); // production
   });
 
   it('popup shows garrison count', () => {

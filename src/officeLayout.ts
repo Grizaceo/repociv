@@ -1,13 +1,7 @@
 // ─── RepoCiv — Office cubicle layout templates ───────────────────────────────
 // Places desks, chairs, partitions, and aisles; assigns workbenches to desk cells.
 
-import type {
-  LocalRoom,
-  LocalTile,
-  LocalTileType,
-  CubicleFacing,
-  CubiclePlan,
-} from './types.ts';
+import type { LocalRoom, LocalTile, LocalTileType, CubicleFacing, CubiclePlan } from './types.ts';
 
 export const MIN_AISLE_WIDTH = 2;
 /** Visual cap: a room never renders more than this many desks. Folders with
@@ -37,7 +31,13 @@ function inBounds(x: number, y: number, w: number, h: number): boolean {
   return x >= 0 && y >= 0 && x < w && y < h;
 }
 
-function isFloorTile(grid: LocalTile[][], x: number, y: number, gridW: number, gridH: number): boolean {
+function isFloorTile(
+  grid: LocalTile[][],
+  x: number,
+  y: number,
+  gridW: number,
+  gridH: number,
+): boolean {
   if (!inBounds(x, y, gridW, gridH)) return false;
   const tile = grid[y]![x]!;
   return tile.type === 'floor';

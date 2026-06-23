@@ -288,8 +288,12 @@ function _renderExampleCard(ex: WonderExample): HTMLElement {
     </div>
     <p class="wec-status" data-status="${ex.manifest.id}"></p>
   `;
-  card.querySelector<HTMLElement>('.wec-connect')?.addEventListener('click', () => void _connectExample(ex));
-  card.querySelector<HTMLElement>('.wec-disconnect')?.addEventListener('click', () => void _disconnectExample(ex));
+  card
+    .querySelector<HTMLElement>('.wec-connect')
+    ?.addEventListener('click', () => void _connectExample(ex));
+  card
+    .querySelector<HTMLElement>('.wec-disconnect')
+    ?.addEventListener('click', () => void _disconnectExample(ex));
   card.querySelector<HTMLElement>('.wec-open')?.addEventListener('click', () => {
     const m = getWonder(ex.manifest.id);
     if (m) openWonderVignette(m);

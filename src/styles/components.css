@@ -602,7 +602,10 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   color: var(--ui-text-dim);
   cursor: pointer;
   padding: 0;
-  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 #minimap-button-strip button:hover {
@@ -655,8 +658,17 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
 }
 
 @keyframes badge-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px var(--panel-bg), 0 0 0 0 rgba(78, 203, 113, 0.4); }
-  50% { box-shadow: 0 0 0 2px var(--panel-bg), 0 0 0 4px rgba(78, 203, 113, 0); }
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px var(--panel-bg),
+      0 0 0 0 rgba(78, 203, 113, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px var(--panel-bg),
+      0 0 0 4px rgba(78, 203, 113, 0);
+  }
 }
 
 /* ─── Short-screen protection (≤600px height) ───────────────────── */
@@ -703,7 +715,10 @@ body.local-view #local-view-controls {
   display: flex;
   align-items: center;
   gap: 4px;
-  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 #btn-wb-labels:hover {

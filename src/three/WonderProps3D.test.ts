@@ -91,7 +91,7 @@ describe('WonderProps3D', () => {
   it('builds both wonders when both wonder tiles are present', () => {
     const tiles = [
       wonderTile({ q: -1, r: 0 }, 'bibliotheca'),
-      wonderTile({ q:  1, r: 0 }, 'institutum'),
+      wonderTile({ q: 1, r: 0 }, 'institutum'),
     ];
     rebuildWonderProps(tiles);
     const g = getWonderPropsGroup();
@@ -119,7 +119,7 @@ describe('WonderProps3D', () => {
     rebuildWonderProps([wonderTile({ q: -1, r: 0 }, 'bibliotheca')]);
     const biblioCount = countMeshes(getWonderPropsGroup().children[0]!);
     clearWonderProps();
-    rebuildWonderProps([wonderTile({ q:  1, r: 0 }, 'institutum')]);
+    rebuildWonderProps([wonderTile({ q: 1, r: 0 }, 'institutum')]);
     const instCount = countMeshes(getWonderPropsGroup().children[1]!);
     expect(biblioCount).toBeGreaterThan(instCount);
     expect(biblioCount).toBe(12);
@@ -145,7 +145,8 @@ describe('WonderProps3D', () => {
     const roof = cones[0] as import('three').Mesh;
 
     // (a) Hexagonal base — matches the six columns.
-    const params = (roof.geometry as unknown as { parameters?: { radialSegments?: number } }).parameters;
+    const params = (roof.geometry as unknown as { parameters?: { radialSegments?: number } })
+      .parameters;
     expect(params?.radialSegments).toBe(6);
 
     // (b) Apex stays on +Y: no tilt on X or Z (a Y spin is allowed for the
@@ -159,7 +160,8 @@ describe('WonderProps3D', () => {
     const cylinders = inst.children.filter(
       (c) =>
         (c as import('three').Mesh).isMesh &&
-        ((c as import('three').Mesh).geometry as import('three').BufferGeometry).type === 'CylinderGeometry',
+        ((c as import('three').Mesh).geometry as import('three').BufferGeometry).type ===
+          'CylinderGeometry',
     );
     const maxCylinder = Math.max(...cylinders.map((c) => c.position.y));
     expect(roof.position.y).toBeGreaterThan(maxCylinder);
@@ -186,7 +188,7 @@ describe('WonderProps3D', () => {
   it('setWonderVisible toggles per-wonder sub-group visibility', () => {
     rebuildWonderProps([
       wonderTile({ q: -1, r: 0 }, 'bibliotheca'),
-      wonderTile({ q:  1, r: 0 }, 'institutum'),
+      wonderTile({ q: 1, r: 0 }, 'institutum'),
     ]);
     const g = getWonderPropsGroup();
     expect(g.children[0]!.visible).toBe(true);
@@ -206,7 +208,7 @@ describe('WonderProps3D', () => {
   it('clearWonderProps disposes all meshes and resets the signature', () => {
     rebuildWonderProps([
       wonderTile({ q: -1, r: 0 }, 'bibliotheca'),
-      wonderTile({ q:  1, r: 0 }, 'institutum'),
+      wonderTile({ q: 1, r: 0 }, 'institutum'),
     ]);
     expect(_wonderPropsSignature()).not.toBe('');
     clearWonderProps();

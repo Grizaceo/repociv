@@ -45,12 +45,7 @@ export class HexPicker {
   }
 
   /** Test helper: pick from normalized device coords without DOM. */
-  pickNdc(
-    mesh: InstancedMesh,
-    camera: Camera,
-    ndcX: number,
-    ndcY: number,
-  ): Axial | null {
+  pickNdc(mesh: InstancedMesh, camera: Camera, ndcX: number, ndcY: number): Axial | null {
     this.ndc.set(ndcX, ndcY);
     this.raycaster.setFromCamera(this.ndc, camera);
     const hits = this.raycaster.intersectObject(mesh, false);

@@ -35,14 +35,8 @@ const LGB_UI_FALLBACKS = [
   'http://localhost:3000',
 ] as const;
 /** LabHub UI: Vite dev server. Bridge often binds 127.0.0.1 only; UI may be on Tailscale. */
-const INSTITUTUM_UI_FALLBACKS = [
-  'http://127.0.0.1:5280',
-  'http://localhost:5280',
-] as const;
-const INSTITUTUM_API_FALLBACKS = [
-  'http://127.0.0.1:5281',
-  'http://localhost:5281',
-] as const;
+const INSTITUTUM_UI_FALLBACKS = ['http://127.0.0.1:5280', 'http://localhost:5280'] as const;
+const INSTITUTUM_API_FALLBACKS = ['http://127.0.0.1:5281', 'http://localhost:5281'] as const;
 
 export function lgbBackendProbeUrls(): string[] {
   const primary = LGB_BACKEND_URL.replace(/\/$/, '');

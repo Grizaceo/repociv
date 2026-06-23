@@ -40,11 +40,7 @@ describe('CityCluster3D civic framing', () => {
     const city = makeCity('alpha', 0, 0);
     const tiles = new Map<string, Tile>([['0,0', makeTile(0, 0)]]);
 
-    rebuildCityClusters(
-      [city],
-      (key) => tiles.get(key),
-      'high',
-    );
+    rebuildCityClusters([city], (key) => tiles.get(key), 'high');
 
     // Expected layers for one non-capital city in the restored Civ V stack:
     // plaza, spire, buildings, roofs, walls, towers.

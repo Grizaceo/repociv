@@ -50,7 +50,13 @@ interface IsoStaticLayerOptions {
   extColor: Record<string, string>;
   zoneLight: Record<string, string>;
   isoProject: (x: number, y: number, z?: number) => { px: number; py: number };
-  drawIsoTile: (ctx: CanvasRenderingContext2D, tile: LocalTile, x: number, y: number, world: LocalWorld) => void;
+  drawIsoTile: (
+    ctx: CanvasRenderingContext2D,
+    tile: LocalTile,
+    x: number,
+    y: number,
+    world: LocalWorld,
+  ) => void;
 }
 
 function isDynamicIsoFurniture(tile: LocalTile): boolean {

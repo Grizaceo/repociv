@@ -359,7 +359,10 @@ function selectionKeysForRepo(repo: Pick<ScannedRepo, 'path' | 'repoPath'>): str
   return keys;
 }
 
-function repoMatchesSelection(repo: Pick<ScannedRepo, 'path' | 'repoPath'>, selection: Set<string>): boolean {
+function repoMatchesSelection(
+  repo: Pick<ScannedRepo, 'path' | 'repoPath'>,
+  selection: Set<string>,
+): boolean {
   return selectionKeysForRepo(repo).some((key) => selection.has(key));
 }
 
@@ -464,7 +467,10 @@ export async function fetchSelectionForRoot(rootPath: string): Promise<Set<strin
   return new Set(root?.selectedRepoPaths ?? []);
 }
 
-export async function persistRootSelection(rootPath: string, repoIds: string[]): Promise<Set<string>> {
+export async function persistRootSelection(
+  rootPath: string,
+  repoIds: string[],
+): Promise<Set<string>> {
   const res = await fetch('/api/repo-selections', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -709,16 +715,16 @@ export async function reconnectCities(world: World): Promise<void> {
  *  tones (orange/amber/gold) that were hard to tell apart and blended
  *  into tan terrain. */
 const CITY_PALETTE: [number, number, number][] = [
-  [0.20, 0.45, 0.95], // royal blue
+  [0.2, 0.45, 0.95], // royal blue
   [0.93, 0.23, 0.25], // red
-  [0.10, 0.72, 0.68], // teal
-  [0.62, 0.30, 0.86], // violet
+  [0.1, 0.72, 0.68], // teal
+  [0.62, 0.3, 0.86], // violet
   [0.98, 0.55, 0.12], // orange
   [0.28, 0.78, 0.32], // green
-  [0.96, 0.36, 0.70], // pink
+  [0.96, 0.36, 0.7], // pink
   [0.96, 0.82, 0.22], // gold
   [0.18, 0.72, 0.96], // cyan
-  [0.62, 0.82, 0.20], // lime
+  [0.62, 0.82, 0.2], // lime
 ];
 
 /** Deterministic per-city color from a hash of the city id. FNV-1a + an
@@ -1012,7 +1018,8 @@ export async function generateWorld(): Promise<World> {
     const orderedRepos: ScannedRepo[] = [];
     for (const path of selectedOrder) {
       const found = repos.find(
-        (r) => selectionIncludesValue(selectedRepoPaths, path) && selectionKeysForRepo(r).includes(path),
+        (r) =>
+          selectionIncludesValue(selectedRepoPaths, path) && selectionKeysForRepo(r).includes(path),
       );
       if (found && !orderedRepos.some((repo) => repo.path === found.path)) orderedRepos.push(found);
     }

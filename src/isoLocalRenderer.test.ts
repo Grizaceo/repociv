@@ -36,7 +36,13 @@ function makeUnit(overrides: Partial<LocalUnit> = {}): LocalUnit {
 
 describe('isUnitMoving', () => {
   it('returns true when the path has steps and pathIndex is in range', () => {
-    const u = makeUnit({ path: [{ x: 0, y: 0 }, { x: 1, y: 0 }], pathIndex: 0 });
+    const u = makeUnit({
+      path: [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+      ],
+      pathIndex: 0,
+    });
     expect(isUnitMoving(u)).toBe(true);
   });
 
@@ -87,7 +93,11 @@ describe('computeUnitDirAngle', () => {
 
   it('returns the direction of motion for a unit walking east', () => {
     const u = makeUnit({
-      path: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }],
+      path: [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 2, y: 0 },
+      ],
       pathIndex: 0,
     });
     // atan2(0, 1) = 0 → facing east (no rotation)
@@ -96,7 +106,11 @@ describe('computeUnitDirAngle', () => {
 
   it('returns the direction of motion for a unit walking south', () => {
     const u = makeUnit({
-      path: [{ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 0, y: 2 }],
+      path: [
+        { x: 0, y: 0 },
+        { x: 0, y: 1 },
+        { x: 0, y: 2 },
+      ],
       pathIndex: 0,
     });
     // atan2(1, 0) = π/2 → facing south
@@ -105,7 +119,10 @@ describe('computeUnitDirAngle', () => {
 
   it('returns the direction of motion for a unit walking north', () => {
     const u = makeUnit({
-      path: [{ x: 0, y: 1 }, { x: 0, y: 0 }],
+      path: [
+        { x: 0, y: 1 },
+        { x: 0, y: 0 },
+      ],
       pathIndex: 0,
     });
     // atan2(-1, 0) = -π/2 → facing north
@@ -114,7 +131,10 @@ describe('computeUnitDirAngle', () => {
 
   it('returns the direction of motion for a unit walking west', () => {
     const u = makeUnit({
-      path: [{ x: 1, y: 0 }, { x: 0, y: 0 }],
+      path: [
+        { x: 1, y: 0 },
+        { x: 0, y: 0 },
+      ],
       pathIndex: 0,
     });
     // atan2(0, -1) = π → facing west
@@ -124,7 +144,12 @@ describe('computeUnitDirAngle', () => {
   it('uses the current step (pathIndex), not the destination', () => {
     // Unit is at step 0 of 3, the direction is determined by step 0 → step 1
     const u = makeUnit({
-      path: [{ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }],
+      path: [
+        { x: 0, y: 0 },
+        { x: 0, y: 1 },
+        { x: 1, y: 1 },
+        { x: 2, y: 1 },
+      ],
       pathIndex: 0,
     });
     expect(computeUnitDirAngle(u)).toBeCloseTo(Math.PI / 2, 5);
@@ -132,7 +157,11 @@ describe('computeUnitDirAngle', () => {
 
   it('uses the final step direction when pathIndex is at the penultimate entry', () => {
     const u = makeUnit({
-      path: [{ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 0, y: 2 }],
+      path: [
+        { x: 0, y: 0 },
+        { x: 0, y: 1 },
+        { x: 0, y: 2 },
+      ],
       pathIndex: 1,
     });
     // From step 1 (0,1) to step 2 (0,2): direction is south (π/2)

@@ -23,7 +23,9 @@ describe('commandMatchesQuery', () => {
   });
 
   it('also matches against group and hint', () => {
-    expect(commandMatchesQuery(cmd({ group: 'Agente', label: 'Desplegar SCOUT' }), 'agente')).toBe(true);
+    expect(commandMatchesQuery(cmd({ group: 'Agente', label: 'Desplegar SCOUT' }), 'agente')).toBe(
+      true,
+    );
     expect(commandMatchesQuery(cmd({ hint: 'F8', label: 'Observabilidad' }), 'f8')).toBe(true);
   });
 

@@ -162,7 +162,10 @@ function installBrowserGlobals() {
 
   vi.stubGlobal('MouseEvent', FakeMouseEvent);
   vi.stubGlobal('ResizeObserver', FakeResizeObserver);
-  vi.stubGlobal('getComputedStyle', vi.fn(() => fakeStyle));
+  vi.stubGlobal(
+    'getComputedStyle',
+    vi.fn(() => fakeStyle),
+  );
   vi.stubGlobal('document', {
     body: { classList: bodyClassList },
     documentElement: { style: fakeStyle },
@@ -238,8 +241,10 @@ function makeFakeCanvas() {
     fire: (type: string, ev: Event) => {
       for (const l of listeners[type] ?? []) {
         l(ev);
-        if ((ev as unknown as { immediatePropagationStopped?: boolean })
-          .immediatePropagationStopped) break;
+        if (
+          (ev as unknown as { immediatePropagationStopped?: boolean }).immediatePropagationStopped
+        )
+          break;
       }
     },
   };

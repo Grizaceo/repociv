@@ -29,9 +29,7 @@ let lastSignature = '';
 const activeMeshes: InstancedMesh[] = [];
 
 function decorSignature(tiles: Tile[]): string {
-  return tiles
-    .map((t) => `${tileKey(t.coord)}:${t.terrain}:${t.revealed ? 1 : 0}`)
-    .join('|');
+  return tiles.map((t) => `${tileKey(t.coord)}:${t.terrain}:${t.revealed ? 1 : 0}`).join('|');
 }
 
 function hashCoord(q: number, r: number): number {
@@ -64,28 +62,28 @@ export function getTileDecorGroup(): Group {
 //  When the GLB craggy peaks load (MountainProps3D), these are skipped;
 //  they only appear if the async glb load fails.
 
-const ROCK_H   = HEX_SIZE * 0.82;   // taller so mountains read vertical from gameplay camera
-const ROCK_R   = HEX_SIZE * 0.16;   // slimmer base so peaks don't look like horizontal boulders
-const SNOW_H   = HEX_SIZE * 0.26;   // slightly taller cap to keep tip contrast visible
-const SNOW_R   = HEX_SIZE * 0.075;  // tighter cap base
+const ROCK_H = HEX_SIZE * 0.82; // taller so mountains read vertical from gameplay camera
+const ROCK_R = HEX_SIZE * 0.16; // slimmer base so peaks don't look like horizontal boulders
+const SNOW_H = HEX_SIZE * 0.26; // slightly taller cap to keep tip contrast visible
+const SNOW_R = HEX_SIZE * 0.075; // tighter cap base
 
 function buildMountains(tiles: Array<{ tile: Tile; variant: number }>): void {
   if (tiles.length === 0) return;
 
   const rockGeom = new ConeGeometry(ROCK_R, ROCK_H, 5);
-  const rockMat  = new MeshStandardMaterial({
-    color:    new Color(0x7a7870),
+  const rockMat = new MeshStandardMaterial({
+    color: new Color(0x7a7870),
     roughness: 0.85,
     metalness: 0.04,
     flatShading: true,
   });
 
   const snowGeom = new ConeGeometry(SNOW_R, SNOW_H, 5);
-  const snowMat  = new MeshStandardMaterial({
-    color:    new Color(0xf0f2f8),
+  const snowMat = new MeshStandardMaterial({
+    color: new Color(0xf0f2f8),
     emissive: new Color(0xc8d4e8),
     emissiveIntensity: 0.18,
-    roughness: 0.50,
+    roughness: 0.5,
     metalness: 0.0,
     flatShading: true,
   });
@@ -100,7 +98,7 @@ function buildMountains(tiles: Array<{ tile: Tile; variant: number }>): void {
   snowMesh.castShadow = true;
 
   let idx = 0;
-  const q  = new Quaternion();
+  const q = new Quaternion();
   const sv = new Vector3();
   const pv = new Vector3();
 
@@ -112,20 +110,24 @@ function buildMountains(tiles: Array<{ tile: Tile; variant: number }>): void {
 
     const offsets: Array<[number, number, number]> = tile.city
       ? [
-          [ 0.26, 0, -0.20 ],
-          [-0.24, 0,  0.18 ],
+          [0.26, 0, -0.2],
+          [-0.24, 0, 0.18],
         ]
       : [
-          [ 0.00, 0,  0.00 ],
-          [-0.16, 0,  0.12 ],
+          [0.0, 0, 0.0],
+          [-0.16, 0, 0.12],
         ];
 
     for (let p = 0; p < PEAKS; p++) {
       const [ox, , oz] = offsets[p]!;
       // City mountain tiles keep the center readable by pushing slimmer peaks to the rim.
-      const sc    = tile.city
-        ? (p === 0 ? 0.66 + (variant % 4) * 0.03 : 0.54 + (variant % 3) * 0.03)
-        : (p === 0 ? 0.92 + (variant % 5) * 0.04 : 0.66 + (variant % 4) * 0.03);
+      const sc = tile.city
+        ? p === 0
+          ? 0.66 + (variant % 4) * 0.03
+          : 0.54 + (variant % 3) * 0.03
+        : p === 0
+          ? 0.92 + (variant % 5) * 0.04
+          : 0.66 + (variant % 4) * 0.03;
       const rockH = ROCK_H * sc;
       const snowH = SNOW_H * sc;
       const tx = base.x + ox * HEX_SIZE;
@@ -159,33 +161,33 @@ function buildForests(tiles: Tile[]): void {
   if (tiles.length === 0) return;
   const TREES_PER_TILE = 7;
 
-  const trunkGeom  = new CylinderGeometry(HEX_SIZE * 0.018, HEX_SIZE * 0.025, HEX_SIZE * 0.18, 5);
-  const trunkMat   = new MeshLambertMaterial({ color: new Color(0x3a2810) });
+  const trunkGeom = new CylinderGeometry(HEX_SIZE * 0.018, HEX_SIZE * 0.025, HEX_SIZE * 0.18, 5);
+  const trunkMat = new MeshLambertMaterial({ color: new Color(0x3a2810) });
 
   // Three cone tiers (bottom to top, each smaller)
-  const cone1Geom  = new ConeGeometry(HEX_SIZE * 0.095, HEX_SIZE * 0.22, 7);
-  const cone2Geom  = new ConeGeometry(HEX_SIZE * 0.075, HEX_SIZE * 0.20, 7);
-  const cone3Geom  = new ConeGeometry(HEX_SIZE * 0.055, HEX_SIZE * 0.17, 7);
+  const cone1Geom = new ConeGeometry(HEX_SIZE * 0.095, HEX_SIZE * 0.22, 7);
+  const cone2Geom = new ConeGeometry(HEX_SIZE * 0.075, HEX_SIZE * 0.2, 7);
+  const cone3Geom = new ConeGeometry(HEX_SIZE * 0.055, HEX_SIZE * 0.17, 7);
   const foliageMat = new MeshLambertMaterial({ color: new Color(0x1a4214) });
-  const topMat     = new MeshLambertMaterial({ color: new Color(0x1e5218) });
+  const topMat = new MeshLambertMaterial({ color: new Color(0x1e5218) });
 
   const total = tiles.length * TREES_PER_TILE;
-  const trunkMesh  = new InstancedMesh(trunkGeom, trunkMat,  total);
-  const cone1Mesh  = new InstancedMesh(cone1Geom, foliageMat, total);
-  const cone2Mesh  = new InstancedMesh(cone2Geom, foliageMat, total);
-  const cone3Mesh  = new InstancedMesh(cone3Geom, topMat,     total);
+  const trunkMesh = new InstancedMesh(trunkGeom, trunkMat, total);
+  const cone1Mesh = new InstancedMesh(cone1Geom, foliageMat, total);
+  const cone2Mesh = new InstancedMesh(cone2Geom, foliageMat, total);
+  const cone3Mesh = new InstancedMesh(cone3Geom, topMat, total);
 
   // Tree positions relative to tile centre (in fraction of HEX_SIZE).
   // 7 per tile so the canopy reads as a Civ V clump, not 4 lone pines;
   // per-tile hash jitter below breaks the repeated-stamp look.
   const treeOffsets: Array<[number, number]> = [
-    [-0.20,  0.14],
-    [ 0.22, -0.16],
+    [-0.2, 0.14],
+    [0.22, -0.16],
     [-0.06, -0.22],
-    [ 0.16,  0.20],
+    [0.16, 0.2],
     [-0.28, -0.06],
-    [ 0.30,  0.04],
-    [ 0.00,  0.02],
+    [0.3, 0.04],
+    [0.0, 0.02],
   ];
 
   let idx = 0;
@@ -193,16 +195,16 @@ function buildForests(tiles: Tile[]): void {
   for (const tile of tiles) {
     const elev = terrainElevation(tile.terrain);
     const base = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-    const h    = hashCoord(tile.coord.q, tile.coord.r);
+    const h = hashCoord(tile.coord.q, tile.coord.r);
 
     for (let t = 0; t < TREES_PER_TILE; t++) {
       const [ox, oz] = treeOffsets[t]!;
-      const scale    = 0.80 + ((h + t * 3) % 5) * 0.06;
-      const jx       = (((h >> (t & 7)) % 9) - 4) * 0.012;
-      const jz       = (((h >> ((t + 3) & 7)) % 9) - 4) * 0.012;
-      const tx       = base.x + (ox + jx) * HEX_SIZE;
-      const tz       = base.z + (oz + jz) * HEX_SIZE;
-      const ty       = base.y;
+      const scale = 0.8 + ((h + t * 3) % 5) * 0.06;
+      const jx = (((h >> (t & 7)) % 9) - 4) * 0.012;
+      const jz = (((h >> ((t + 3) & 7)) % 9) - 4) * 0.012;
+      const tx = base.x + (ox + jx) * HEX_SIZE;
+      const tz = base.z + (oz + jz) * HEX_SIZE;
+      const ty = base.y;
 
       const trunkH = HEX_SIZE * 0.18 * scale;
 
@@ -213,7 +215,7 @@ function buildForests(tiles: Tile[]): void {
 
       // Bottom cone tier
       mat.makeScale(scale, scale, scale);
-      mat.setPosition(tx, ty + trunkH + HEX_SIZE * 0.10 * scale, tz);
+      mat.setPosition(tx, ty + trunkH + HEX_SIZE * 0.1 * scale, tz);
       cone1Mesh.setMatrixAt(idx, mat.clone());
 
       // Mid cone tier
@@ -263,22 +265,22 @@ function buildIce(tiles: Tile[]): void {
 
   // Spike: sharp 4-sided crystal
   const spikeGeom = new ConeGeometry(HEX_SIZE * 0.045, HEX_SIZE * 0.32, 4);
-  const spikeMat  = new MeshStandardMaterial({
-    color:     new Color(0xd8eef8),
-    emissive:  new Color(0x8ab8d8),
+  const spikeMat = new MeshStandardMaterial({
+    color: new Color(0xd8eef8),
+    emissive: new Color(0x8ab8d8),
     emissiveIntensity: 0.15,
     roughness: 0.2,
     metalness: 0.1,
   });
 
   // Base slab removed — atlas ice cell carries the platform colour.
-  const total     = tiles.length * 4;
+  const total = tiles.length * 4;
   const spikeMesh = new InstancedMesh(spikeGeom, spikeMat, total);
 
   const spikePos: Array<[number, number]> = [
-    [ 0.00,  0.00],
-    [-0.16,  0.12],
-    [ 0.18, -0.10],
+    [0.0, 0.0],
+    [-0.16, 0.12],
+    [0.18, -0.1],
     [-0.08, -0.18],
   ];
 
@@ -287,17 +289,21 @@ function buildIce(tiles: Tile[]): void {
   for (let i = 0; i < tiles.length; i++) {
     const tile = tiles[i]!;
     const elev = terrainElevation(tile.terrain);
-    const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-    const h    = hashCoord(tile.coord.q, tile.coord.r);
+    const pos = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    const h = hashCoord(tile.coord.q, tile.coord.r);
 
     // Slab omitted — terrain atlas visible underneath.
 
     // Spikes
     for (let s = 0; s < 4; s++) {
       const [ox, oz] = spikePos[s]!;
-      const scale    = 0.65 + ((h + s * 11) % 7) * 0.06;
+      const scale = 0.65 + ((h + s * 11) % 7) * 0.06;
       mat.makeScale(scale, scale, scale);
-      mat.setPosition(pos.x + ox * HEX_SIZE, pos.y + 1.2 + scale * HEX_SIZE * 0.15, pos.z + oz * HEX_SIZE);
+      mat.setPosition(
+        pos.x + ox * HEX_SIZE,
+        pos.y + 1.2 + scale * HEX_SIZE * 0.15,
+        pos.z + oz * HEX_SIZE,
+      );
       spikeMesh.setMatrixAt(spikeIdx++, mat.clone());
     }
   }
@@ -316,8 +322,8 @@ function buildSacred(tiles: Tile[]): void {
 
   // Standing stones — weathered gilded-stone monoliths (matches shader v20 sacred)
   const stoneGeom = new BoxGeometry(HEX_SIZE * 0.085, HEX_SIZE * 0.28, HEX_SIZE * 0.055);
-  const stoneMat  = new MeshStandardMaterial({
-    color:    new Color(0x9a8f76),
+  const stoneMat = new MeshStandardMaterial({
+    color: new Color(0x9a8f76),
     emissive: new Color(0x4a3d22),
     emissiveIntensity: 0.14,
     roughness: 0.88,
@@ -328,19 +334,19 @@ function buildSacred(tiles: Tile[]): void {
   let gemMesh: InstancedMesh | null = null;
   if (!glbMarker) {
     // Altar cube at centre (procedural fallback while the GLB is absent)
-    const altarGeom = new BoxGeometry(HEX_SIZE * 0.18, HEX_SIZE * 0.10, HEX_SIZE * 0.18);
-    const altarMat  = new MeshStandardMaterial({
-      color:    new Color(0xa89878),
+    const altarGeom = new BoxGeometry(HEX_SIZE * 0.18, HEX_SIZE * 0.1, HEX_SIZE * 0.18);
+    const altarMat = new MeshStandardMaterial({
+      color: new Color(0xa89878),
       emissive: new Color(0x584820),
-      emissiveIntensity: 0.20,
+      emissiveIntensity: 0.2,
       roughness: 0.72,
       metalness: 0.08,
     });
 
     // Floating gem above altar
     const gemGeom = new BoxGeometry(HEX_SIZE * 0.08, HEX_SIZE * 0.08, HEX_SIZE * 0.08);
-    const gemMat  = new MeshStandardMaterial({
-      color:    new Color(0xe8c66a),
+    const gemMat = new MeshStandardMaterial({
+      color: new Color(0xe8c66a),
       emissive: new Color(0xa8842e),
       emissiveIntensity: 0.45,
       roughness: 0.18,
@@ -349,7 +355,7 @@ function buildSacred(tiles: Tile[]): void {
       opacity: 0.72,
     });
     altarMesh = new InstancedMesh(altarGeom, altarMat, tiles.length);
-    gemMesh   = new InstancedMesh(gemGeom,   gemMat,   tiles.length);
+    gemMesh = new InstancedMesh(gemGeom, gemMat, tiles.length);
   }
 
   const STONES = 6;
@@ -359,14 +365,14 @@ function buildSacred(tiles: Tile[]): void {
   const mat = new Matrix4();
   for (const tile of tiles) {
     const elev = terrainElevation(tile.terrain);
-    const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    const pos = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
 
     // Stone ring
     for (let s = 0; s < STONES; s++) {
-      const angle  = (Math.PI * 2 / STONES) * s;
-      const radius = HEX_SIZE * 0.30;
-      const tx     = pos.x + Math.cos(angle) * radius;
-      const tz     = pos.z + Math.sin(angle) * radius;
+      const angle = ((Math.PI * 2) / STONES) * s;
+      const radius = HEX_SIZE * 0.3;
+      const tx = pos.x + Math.cos(angle) * radius;
+      const tz = pos.z + Math.sin(angle) * radius;
       const stoneH = HEX_SIZE * 0.28;
       mat.makeRotationY(angle + Math.PI / 2);
       mat.setPosition(tx, pos.y + stoneH * 0.5 + 1, tz);
@@ -390,7 +396,7 @@ function buildSacred(tiles: Tile[]): void {
   addMesh(stoneMesh);
   if (altarMesh && gemMesh) {
     altarMesh.instanceMatrix.needsUpdate = true;
-    gemMesh.instanceMatrix.needsUpdate   = true;
+    gemMesh.instanceMatrix.needsUpdate = true;
     addMesh(altarMesh);
     addMesh(gemMesh);
   }
@@ -401,18 +407,18 @@ function buildSacred(tiles: Tile[]): void {
 function buildGrass(tiles: Tile[]): void {
   if (tiles.length === 0) return;
 
-  const geom = new BoxGeometry(HEX_SIZE * 0.16, HEX_SIZE * 0.10, HEX_SIZE * 0.05);
+  const geom = new BoxGeometry(HEX_SIZE * 0.16, HEX_SIZE * 0.1, HEX_SIZE * 0.05);
   // Baked-atlas plains mean (186,219,132) × 0.85 — grass tufts one shade
   // under the cell instead of the old saturated green.
-  const mat  = new MeshLambertMaterial({ color: new Color(0x9eba70) });
+  const mat = new MeshLambertMaterial({ color: new Color(0x9eba70) });
   const mesh = new InstancedMesh(geom, mat, tiles.length * 2);
 
   let idx = 0;
   const m = new Matrix4();
   for (const tile of tiles) {
     const elev = terrainElevation(tile.terrain);
-    const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-    const h    = hashCoord(tile.coord.q, tile.coord.r);
+    const pos = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    const h = hashCoord(tile.coord.q, tile.coord.r);
     for (let g = 0; g < 2; g++) {
       const angle = ((h + g * 17) % 36) * (Math.PI / 18);
       m.makeTranslation(
@@ -436,8 +442,8 @@ function buildFarms(tiles: Tile[]): void {
   // 0x4e7832 box was darker than the grass and pockmarked every plains
   // span with green rectangles. Two thin wheat strips per farm, rotated
   // together by the coord hash.
-  const geom = new BoxGeometry(HEX_SIZE * 0.40, HEX_SIZE * 0.045, HEX_SIZE * 0.13);
-  const mat  = new MeshLambertMaterial({ color: new Color(0xbfa14f) });
+  const geom = new BoxGeometry(HEX_SIZE * 0.4, HEX_SIZE * 0.045, HEX_SIZE * 0.13);
+  const mat = new MeshLambertMaterial({ color: new Color(0xbfa14f) });
   const mesh = new InstancedMesh(geom, mat, tiles.length * 2);
 
   const m = new Matrix4();
@@ -445,9 +451,9 @@ function buildFarms(tiles: Tile[]): void {
   let idx = 0;
   for (const tile of tiles) {
     const elev = terrainElevation(tile.terrain);
-    const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-    const h    = hashCoord(tile.coord.q, tile.coord.r);
-    const rot  = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), (h % 12) * (Math.PI / 6));
+    const pos = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    const h = hashCoord(tile.coord.q, tile.coord.r);
+    const rot = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), (h % 12) * (Math.PI / 6));
     for (const s of [-1, 1]) {
       const off = new Vector3(0, 0, s * HEX_SIZE * 0.085).applyQuaternion(rot);
       m.compose(new Vector3(pos.x + off.x, pos.y + 1.0, pos.z + off.z), rot, one);
@@ -479,13 +485,13 @@ export function rebuildTileDecor(
   clearTileDecor();
 
   const mountains: Array<{ tile: Tile; variant: number }> = [];
-  const forests:   Tile[] = [];
-  const hills:     Tile[] = [];
-  const deserts:   Tile[] = [];
-  const ices:      Tile[] = [];
-  const sacreds:   Tile[] = [];
-  const grass:     Tile[] = [];
-  const farms:     Tile[] = [];
+  const forests: Tile[] = [];
+  const hills: Tile[] = [];
+  const deserts: Tile[] = [];
+  const ices: Tile[] = [];
+  const sacreds: Tile[] = [];
+  const grass: Tile[] = [];
+  const farms: Tile[] = [];
 
   for (const tile of tiles) {
     if (!tile.revealed) continue;
@@ -553,11 +559,11 @@ export function setDecorVisible(visible: boolean): void {
 export function _terrainNeedsDecor(terrain: Terrain): boolean {
   return (
     terrain === 'mountain' ||
-    terrain === 'forest'   ||
-    terrain === 'plains'   ||
-    terrain === 'hills'    ||
-    terrain === 'desert'   ||
-    terrain === 'ice'      ||
+    terrain === 'forest' ||
+    terrain === 'plains' ||
+    terrain === 'hills' ||
+    terrain === 'desert' ||
+    terrain === 'ice' ||
     terrain === 'sacred'
   );
 }

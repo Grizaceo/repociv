@@ -32,7 +32,6 @@ const UP: HermesStatus = {
 
 // ─── normalizeHermesStatus ─────────────────────────────────────────────────
 
-
 describe('normalizeHermesStatus', () => {
   it('parses a well-formed down object', () => {
     expect(normalizeHermesStatus(DOWN)).toEqual(DOWN);
@@ -71,9 +70,7 @@ describe('normalizeHermesStatus', () => {
   });
 });
 
-
 // ─── listAffectedFeatures / formatActivationSteps ─────────────────────────
-
 
 describe('listAffectedFeatures', () => {
   it('returns at least 3 high-signal features', () => {

@@ -97,7 +97,7 @@ function buildBibliotheca(): Group {
 
   // 3-tier stepped dais (each smaller as it rises)
   const daisHeights = [0.04, 0.05, 0.05];
-  const daisRadii   = [0.42, 0.34, 0.26];
+  const daisRadii = [0.42, 0.34, 0.26];
   for (let i = 0; i < 3; i++) {
     const h = HEX_SIZE * daisHeights[i]!;
     const r = HEX_SIZE * daisRadii[i]!;
@@ -110,11 +110,11 @@ function buildBibliotheca(): Group {
   const topDais = HEX_SIZE * (daisHeights[0]! + daisHeights[1]! + daisHeights[2]!);
 
   // 6 columns on a hex ring at the top dais
-  const colR    = HEX_SIZE * 0.030;
-  const colH    = HEX_SIZE * 0.34;
-  const colRing = HEX_SIZE * 0.20;
+  const colR = HEX_SIZE * 0.03;
+  const colH = HEX_SIZE * 0.34;
+  const colRing = HEX_SIZE * 0.2;
   for (let i = 0; i < 6; i++) {
-    const ang = (Math.PI * 2 / 6) * i;
+    const ang = ((Math.PI * 2) / 6) * i;
     const col = new Mesh(new CylinderGeometry(colR, colR, colH, 8), colMat);
     col.position.set(Math.cos(ang) * colRing, topDais + colH * 0.5, Math.sin(ang) * colRing);
     col.castShadow = true;
@@ -128,10 +128,7 @@ function buildBibliotheca(): Group {
   // sat askew on the hex ring and read as a stray wedge.
   const entR = HEX_SIZE * 0.255;
   const entH = HEX_SIZE * 0.055;
-  const entablature = new Mesh(
-    new CylinderGeometry(entR, entR * 1.04, entH, 6),
-    colMat,
-  );
+  const entablature = new Mesh(new CylinderGeometry(entR, entR * 1.04, entH, 6), colMat);
   entablature.position.y = colTop + entH * 0.5;
   entablature.rotation.y = Math.PI / 6; // hex flats face the column gaps
   entablature.castShadow = true;
@@ -140,7 +137,7 @@ function buildBibliotheca(): Group {
   // Roof: a clean six-sided low pyramid with eaves overhanging the
   // entablature. Its hexagonal base matches the column ring, so it reads as a
   // proper tholos/temple roof instead of a mismatched flat triangle.
-  const roofR = HEX_SIZE * 0.30;
+  const roofR = HEX_SIZE * 0.3;
   const roofH = HEX_SIZE * 0.21;
   const roof = new Mesh(new ConeGeometry(roofR, roofH, 6), roofMat);
   roof.position.y = colTop + entH + roofH * 0.5;
@@ -150,10 +147,7 @@ function buildBibliotheca(): Group {
 
   // Glow gem finial at the roof apex — faceted octahedron for consistency
   // with the iter13 flat-shaded style (the old small sphere read as a marble).
-  const gem = new Mesh(
-    new OctahedronGeometry(HEX_SIZE * 0.05, 0),
-    gemMat,
-  );
+  const gem = new Mesh(new OctahedronGeometry(HEX_SIZE * 0.05, 0), gemMat);
   gem.position.y = colTop + entH + roofH + HEX_SIZE * 0.03;
   g.add(gem);
 
@@ -192,7 +186,7 @@ function buildInstitutum(): Group {
     color: new Color(0x6bd8a8),
     emissive: new Color(0x2a9c70),
     emissiveIntensity: 0.65,
-    roughness: 0.20,
+    roughness: 0.2,
     metalness: 0.25,
     transparent: true,
     opacity: 0.78,
@@ -202,7 +196,7 @@ function buildInstitutum(): Group {
   // Flat dais
   const daisH = HEX_SIZE * 0.05;
   const daisR = HEX_SIZE * 0.36;
-  const dais  = new Mesh(new CylinderGeometry(daisR, daisR * 1.04, daisH, 6), daisMat);
+  const dais = new Mesh(new CylinderGeometry(daisR, daisR * 1.04, daisH, 6), daisMat);
   dais.position.y = daisH * 0.5;
   dais.castShadow = true;
   dais.receiveShadow = true;
@@ -217,11 +211,8 @@ function buildInstitutum(): Group {
   const spireRBase = HEX_SIZE * 0.055;
   const spireRing = HEX_SIZE * 0.26;
   for (let i = 0; i < 4; i++) {
-    const ang = (Math.PI * 2 / 4) * i + Math.PI / 4;
-    const spire = new Mesh(
-      new CylinderGeometry(spireRTop, spireRBase, spireH, 6),
-      spireMat,
-    );
+    const ang = ((Math.PI * 2) / 4) * i + Math.PI / 4;
+    const spire = new Mesh(new CylinderGeometry(spireRTop, spireRBase, spireH, 6), spireMat);
     spire.position.set(Math.cos(ang) * spireRing, daisH + spireH * 0.5, Math.sin(ang) * spireRing);
     spire.castShadow = true;
     g.add(spire);
@@ -242,10 +233,7 @@ function buildInstitutum(): Group {
 
   // Glow crystal at top of dome — an octahedron reads as a faceted gem,
   // not a smooth marble. The old SphereGeometry(10,8) was a polished orb.
-  const glow = new Mesh(
-    new OctahedronGeometry(HEX_SIZE * 0.08, 0),
-    glowMat,
-  );
+  const glow = new Mesh(new OctahedronGeometry(HEX_SIZE * 0.08, 0), glowMat);
   glow.position.y = daisH + domeR * 0.55 + HEX_SIZE * 0.04;
   g.add(glow);
 
@@ -307,20 +295,14 @@ function buildGenericWonder(): Group {
   const spireH = HEX_SIZE * 0.42;
   const spireTopR = HEX_SIZE * 0.015;
   const spireBaseR = HEX_SIZE * 0.07;
-  const spire = new Mesh(
-    new CylinderGeometry(spireTopR, spireBaseR, spireH, 6),
-    spireMat,
-  );
+  const spire = new Mesh(new CylinderGeometry(spireTopR, spireBaseR, spireH, 6), spireMat);
   spire.position.y = stacked + spireH * 0.5;
   spire.castShadow = true;
   g.add(spire);
 
   // Emissive crystal at the apex — an octahedron reads as a faceted gem
   // instead of the old smooth sphere that looked like a marble.
-  const node = new Mesh(
-    new OctahedronGeometry(HEX_SIZE * 0.06, 0),
-    nodeMat,
-  );
+  const node = new Mesh(new OctahedronGeometry(HEX_SIZE * 0.06, 0), nodeMat);
   node.position.y = stacked + spireH + HEX_SIZE * 0.03;
   g.add(node);
 
@@ -382,7 +364,7 @@ export function rebuildWonderProps(tiles: Tile[]): void {
     if (tile.district?.type !== 'wonder' || !tile.district.wonderType) continue;
 
     const elev = terrainElevation(tile.terrain);
-    const pos  = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
+    const pos = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
 
     // 'gaceta' is native (no server, no structure) — never rendered as a prop
     // even if some tile carried it.

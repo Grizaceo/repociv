@@ -79,7 +79,7 @@ function buildGlbFigurine(isHero: boolean, col: Color): Group {
     if (i === 0) {
       mat.color.lerp(col, 0.45);
       mat.emissive.copy(col);
-      mat.emissiveIntensity = isHero ? 0.40 : 0.22;
+      mat.emissiveIntensity = isHero ? 0.4 : 0.22;
     } else {
       mat.color.copy(col);
       mat.emissive.copy(col);
@@ -93,7 +93,7 @@ function buildGlbFigurine(isHero: boolean, col: Color): Group {
   });
   // GLB is ~1.1 Blender units tall (scale baked); bring it to the same
   // visual height as the old procedural figurine (~0.33 × HEX_SIZE).
-  const s = HEX_SIZE * (isHero ? 0.36 : 0.30);
+  const s = HEX_SIZE * (isHero ? 0.36 : 0.3);
   group.scale.setScalar(s);
   // Outer wrapper stays unscaled so the hero crown keeps absolute sizing.
   const wrapper = new Group();
@@ -153,9 +153,7 @@ function buildUnitFigurine(unit: Unit): Group {
   });
 
   // Base: flat disc (feet)
-  const baseGeom = new CylinderGeometry(
-    HEX_SIZE * 0.10, HEX_SIZE * 0.13, HEX_SIZE * 0.04, 8,
-  );
+  const baseGeom = new CylinderGeometry(HEX_SIZE * 0.1, HEX_SIZE * 0.13, HEX_SIZE * 0.04, 8);
   const base = new Mesh(baseGeom, bodyMat);
   base.position.y = HEX_SIZE * 0.02;
   base.castShadow = true;
@@ -177,7 +175,7 @@ function buildUnitFigurine(unit: Unit): Group {
   group.add(head);
 
   if (isHero) {
-    addHeroCrown(group, col, head.position.y + headR + HEX_SIZE * 0.10);
+    addHeroCrown(group, col, head.position.y + headR + HEX_SIZE * 0.1);
   }
 
   return group;
@@ -196,10 +194,7 @@ function disposeFigurine(group: Group): void {
   });
 }
 
-export function rebuildUnits(
-  units: Unit[],
-  getTile: (key: string) => Tile | undefined,
-): void {
+export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | undefined): void {
   const visibleUnits = units.filter((unit) => {
     const tile = getTile(tileKey(unit.coord));
     return !tile || tile.revealed;
@@ -207,9 +202,9 @@ export function rebuildUnits(
 
   // The props flag participates so the capsule→GLB swap happens the frame
   // the async load finishes, even when no unit moved.
-  const signature = `uprops${areUnitPropsReady() ? 1 : 0}#` + visibleUnits
-    .map((u) => `${u.id}:${u.coord.q},${u.coord.r}:${u.state}`)
-    .join('|');
+  const signature =
+    `uprops${areUnitPropsReady() ? 1 : 0}#` +
+    visibleUnits.map((u) => `${u.id}:${u.coord.q},${u.coord.r}:${u.state}`).join('|');
   if (signature === lastSignature) return;
   lastSignature = signature;
 
@@ -229,7 +224,7 @@ export function rebuildUnits(
   for (const unit of visibleUnits) {
     const tile = getTile(tileKey(unit.coord));
     const elev = tile ? terrainElevation(tile.terrain) : 0;
-    const pos  = axialToWorld3D(unit.coord.q, unit.coord.r, elev);
+    const pos = axialToWorld3D(unit.coord.q, unit.coord.r, elev);
     const targetY = pos.y + HEX_SIZE * 0.05;
 
     const existing = unitEntries.get(unit.id);
@@ -262,7 +257,9 @@ export function rebuildUnits(
     fig.userData.basePos = { x: pos.x, y: targetY, z: pos.z };
 
     const meshes: Mesh[] = [];
-    fig.traverse((child) => { if ((child as Mesh).isMesh) meshes.push(child as Mesh); });
+    fig.traverse((child) => {
+      if ((child as Mesh).isMesh) meshes.push(child as Mesh);
+    });
 
     const entry: UnitEntry = {
       group: fig,
@@ -312,14 +309,14 @@ function easeInCubic(t: number): number {
 }
 
 // Spawn/despawn durations (seconds).
-const SPAWN_DURATION = 0.30;
-const DESPAWN_DURATION = 0.20;
+const SPAWN_DURATION = 0.3;
+const DESPAWN_DURATION = 0.2;
 // Idle pulse: 1.05× scale on base ring every 4s.
 const IDLE_PULSE_PERIOD = 4.0;
 const IDLE_PULSE_SCALE = 1.05;
 // Walking hop: 12px up, 200ms ease-in-out per step.
 const HOP_HEIGHT = 12;
-const HOP_DURATION = 0.20;
+const HOP_DURATION = 0.2;
 // Movement tween: ease-in-out lerp between path tiles. The game logic
 // advances pathProgress at 2.5 hex/s; we mirror that here so the 3D
 // figurine moves smoothly between dirty-flag rebuilds (which only fire
@@ -414,9 +411,11 @@ export function tickUnits(
       entry.group.userData.baseY = entry.currentPos.y;
 
       // ── Idle pulse + walking hop ──────────────────────────────────────
-      const pulse = 1 + (IDLE_PULSE_SCALE - 1) * 0.5 * (1 + Math.sin(
-        animTime * (2 * Math.PI / IDLE_PULSE_PERIOD) + entry.idlePhase,
-      ));
+      const pulse =
+        1 +
+        (IDLE_PULSE_SCALE - 1) *
+          0.5 *
+          (1 + Math.sin(animTime * ((2 * Math.PI) / IDLE_PULSE_PERIOD) + entry.idlePhase));
       entry.group.scale.setScalar(pulse);
 
       if (entry.moving) {
