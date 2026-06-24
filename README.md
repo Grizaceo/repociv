@@ -13,7 +13,7 @@
 
 ![Vista macro 2D](docs/design/screenshots/macro-2d-view.jpg) | ![Vista 3D WebGL pulida](docs/design/screenshots/3d-polished-overview.png)
 --- | ---
-*Mapa hexagonal 2D plano — el clásico, rápido y completo.* | *Render 3D WebGL (Three.js r175) — unidades con spawn/despawn, ciudades que crecen por niveles, niebla de guerra con transiciones.*
+*Mapa hexagonal 2D plano — el clásico, rápido y completo.* | *Render 3D WebGL (Three.js r175) — pase low-poly facetado estilo Civ V: biomas, bosques densos, ciudades amuralladas y hora dorada. Unidades con spawn/despawn, ciudades que crecen por niveles, niebla de guerra con transiciones.*
 
 ![Demo: agente responde desde el mapa](docs/design/screenshots/demo-chat-untracked-files.jpg)
 *Haz clic en una ciudad del mapa, pregúntale a tu agente qué hay ahí — el agente inspecciona el repo real y responde.*
