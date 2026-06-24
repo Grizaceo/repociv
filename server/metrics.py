@@ -68,14 +68,21 @@ def _percentile(values: list[float], pct: float) -> float | None:
 
 # ─── Error rate ───────────────────────────────────────────────────────────────
 
-def _compute_error_rate(events: list[dict[str, Any]], window: int = 50) -> float:
+def _compute_error_rate(
+    events: list[dict[str, Any]], window: int = 50, min_sample: int = 5
+) -> float:
     smoke_ids = _smoke_command_ids(events)
     terminal = [
         e for e in events[-window:]
         if e.get("type") in ("CommandCompleted", "CommandFailed", "CommandRejected")
         and _event_command_id(e) not in smoke_ids
     ]
-    if not terminal:
+    # Sample floor: a count-based window with too few terminal commands makes
+    # the rate hypersensitive — e.g. 2 stale external-auth failures and nothing
+    # else read as errorRate 1.0 and flipped health to "critical" while the
+    # system sat idle (the "cría lobos" bug). Below the floor, report 0.0 rather
+    # than escalate on noise; the real rate kicks in once enough commands run.
+    if len(terminal) < min_sample:
         return 0.0
     failures = sum(1 for e in terminal if e.get("type") in ("CommandFailed", "CommandRejected"))
     return round(failures / len(terminal), 3)

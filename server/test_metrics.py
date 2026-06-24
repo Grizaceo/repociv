@@ -4,6 +4,7 @@ import pytest
 from server.metrics import (
     compute_metrics,
     _compute_model_usage,
+    _compute_error_rate,
     record_step_latency,
     get_step_latency_stats,
     _latency_samples,
@@ -178,6 +179,43 @@ def test_compute_metrics_ignores_smoke_failures_for_health():
     assert result["errorRate"] == 0.0
     assert result["failedCount"] == 0
     assert result["recentFailures"] == []
+
+
+# ─── _compute_error_rate — sample floor (anti "cría lobos") ──────────────────
+
+def _terminal(cmd_id: str, failed: bool) -> dict:
+    return {
+        "type": "CommandFailed" if failed else "CommandCompleted",
+        "data": {"id": cmd_id},
+        "timestamp": 1,
+    }
+
+
+def test_error_rate_below_sample_floor_is_zero():
+    # 2 terminal failures and nothing else: a naive count window reports 1.0.
+    # Below the 5-command floor we report 0.0 instead of crying wolf.
+    events = [_terminal("c1", True), _terminal("c2", True)]
+    assert _compute_error_rate(events) == 0.0
+
+
+def test_error_rate_at_sample_floor_uses_real_rate():
+    # 5 terminal commands (floor met), 2 failed → real 0.4, not suppressed.
+    events = [_terminal(f"c{i}", i < 2) for i in range(5)]
+    assert _compute_error_rate(events) == 0.4
+
+
+def test_error_rate_all_pass_above_floor_is_zero():
+    events = [_terminal(f"c{i}", False) for i in range(6)]
+    assert _compute_error_rate(events) == 0.0
+
+
+def test_compute_metrics_two_stale_failures_not_critical():
+    # The exact "cría lobos" scenario from DOGFOODING_NOTES: a couple of old
+    # external-auth failures and an idle system must NOT report health critical.
+    events = [_terminal("old-1", True), _terminal("old-2", True)]
+    result = compute_metrics(events, _DUMMY_AGENTS, queue_depth=0)
+    assert result["errorRate"] == 0.0
+    assert result["health"] == "ok"
 
 
 # ─── Step latency — record_step_latency / get_step_latency_stats ─────────────
