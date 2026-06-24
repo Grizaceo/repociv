@@ -11,9 +11,9 @@
 **Stack:** TypeScript + Vite (Canvas 2D + WebGL/Three.js) · Python HTTP bridge · DuckDB/JSONL local ledger
 **Compatible with:** [Hermes Agent](https://hermes-agent.nousresearch.com) (Nous Research) — drop-in in any existing setup
 
-![Macro 2D view](docs/design/screenshots/macro-2d-view.jpg) | ![Macro 3D WebGL view](docs/design/screenshots/global-3d-view.jpg)
+![Macro 2D view](docs/design/screenshots/macro-2d-view.jpg) | ![Polished 3D WebGL view](docs/design/screenshots/3d-polished-overview.png)
 --- | ---
-*Flat hexagonal map — classic, fast, feature-complete.* | *3D WebGL render (Three.js r175) — 🚧 in active development.*
+*Flat hexagonal map — classic, fast, feature-complete.* | *3D WebGL render (Three.js r175) — faceted low-poly Civ V pass: biomes, dense forests, walled cities, golden hour. Units spawn/despawn, cities grow by tier, fog of war transitions.*
 
 ![Demo: agent responds from the map](docs/design/screenshots/demo-chat-untracked-files.jpg)
 *Click a city on the map, ask your agent what's there — the agent inspects the real repo and answers.*
