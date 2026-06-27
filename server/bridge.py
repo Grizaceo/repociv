@@ -165,24 +165,20 @@ def _rate_check(ip: str) -> bool:
         return True
 
 
-# ─── Approval queue ───────────────────────────────────────────────────────────
-_approval_lock = threading.Lock()
-_approvals: dict[str, dict[str, Any]] = {}  # command_id → command dict
+# ─── Approval queue (disk-backed via approval_store) ─────────────────────────
+from server import approval_store as _approval_store  # noqa: E402
 
 
 def _add_approval(cmd_dict: dict[str, Any]) -> None:
-    with _approval_lock:
-        _approvals[cmd_dict["id"]] = cmd_dict
+    _approval_store.add_approval(cmd_dict)
 
 
 def _get_approvals() -> list[dict[str, Any]]:
-    with _approval_lock:
-        return list(_approvals.values())
+    return _approval_store.get_approvals()
 
 
 def _pop_approval(cmd_id: str) -> dict[str, Any] | None:
-    with _approval_lock:
-        return _approvals.pop(cmd_id, None)
+    return _approval_store.pop_approval(cmd_id)
 
 
 # ─── Event store init
@@ -876,47 +872,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
         # ─── Approval endpoints ───────────────────────────────────────────────
         if path.startswith("/approvals/") and path.endswith("/approve"):
             cmd_id = path.split("/")[2]
-            cmd_dict = _pop_approval(cmd_id)
-            if not cmd_dict:
-                self._json({"ok": False, "error": "approval not found"})
-                return
-            _es.record_approved(cmd_id)
-            # Rebuild command and dispatch
-            from server.command_schema import Command as _Cmd
-
-            cmd = _Cmd(
-                id=cmd_dict["id"],
-                type=cmd_dict["type"],
-                target=cmd_dict["target"],
-                payload=cmd_dict.get("payload", {}),
-                created_by=cmd_dict.get("created_by", "user"),
-                risk=cmd_dict.get("risk", "medium"),
-                requires_approval=False,
-                status="queued",
-            )
-            _es.record_queued(cmd.id)
-            _sched.enqueue(cmd)
-            send_to_repociv(
-                {"type": "log", "msg": f"Comando aprobado: {cmd.type}", "level": "success"}
-            )
-            self._json({"ok": True, "status": "queued", "commandId": cmd_id})
+            self._json(_approval_store.resolve_approval(cmd_id, approved=True))
             return
 
         if path.startswith("/approvals/") and path.endswith("/reject"):
             cmd_id = path.split("/")[2]
-            cmd_dict = _pop_approval(cmd_id)
-            if not cmd_dict:
-                self._json({"ok": False, "error": "approval not found"})
-                return
-            _es.record_rejected(cmd_id, "user rejected")
-            send_to_repociv(
-                {
-                    "type": "log",
-                    "msg": f"Comando rechazado: {cmd_dict.get('type')}",
-                    "level": "warn",
-                }
+            self._json(
+                _approval_store.resolve_approval(
+                    cmd_id, approved=False, reject_reason="user rejected"
+                )
             )
-            self._json({"ok": True, "status": "rejected", "commandId": cmd_id})
             return
 
         # ─── Legacy root POST (unit_command / quest_add / fatigue) ───────────
@@ -1229,37 +1194,6 @@ if __name__ == "__main__":
                 send_to_repociv(
                     {"type": "log", "msg": f"WS command rejected: {e}", "level": "warn"}
                 )
-        elif cmd_type == "approval":
-            cmd_id = data.get("id", "")
-            approved = data.get("approved", True)
-            # Delegate to existing approval logic via scheduler
-            if approved:
-                # Re-use the approval flow from do_POST
-                from server.command_schema import Command as _Cmd
-
-                cmd_dict = _pop_approval(cmd_id)
-                if cmd_dict:
-                    cmd = _Cmd(
-                        id=cmd_dict["id"],
-                        type=cmd_dict["type"],
-                        target=cmd_dict["target"],
-                        payload=cmd_dict.get("payload", {}),
-                        created_by=cmd_dict.get("created_by", "user"),
-                        risk=cmd_dict.get("risk", "medium"),
-                        requires_approval=False,
-                        status="queued",
-                    )
-                    _es.record_approved(cmd.id)
-                    _es.record_queued(cmd.id)
-                    _sched.enqueue(cmd)
-                    send_to_repociv(
-                        {"type": "log", "msg": f"WS aprobado: {cmd.type}", "level": "success"}
-                    )
-            else:
-                _pop_approval(cmd_id)
-                _es.record_rejected(cmd_id, "user rejected (WS)")
-                send_to_repociv({"type": "log", "msg": f"WS rechazado: {cmd_id}", "level": "warn"})
-
     ws_set_command_callback(_ws_command_handler)
 
     # Start WS server in a daemon thread — use BRIDGE_HOST for remote support
