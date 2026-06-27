@@ -257,7 +257,28 @@ async def _handle_incoming(ws: websockets.asyncio.server.ServerConnection, messa
             await ws.send(json.dumps({"type": "auth_error", "msg": "invalid token"}))
         return
 
-    if msg_type in ("command", "approval", "unit_command"):
+    if msg_type == "approval":
+        from server import approval_store
+
+        cmd_id = data.get("id", "")
+        approved = data.get("approved", True)
+        try:
+            result = approval_store.resolve_approval(
+                cmd_id,
+                approved=approved,
+                reject_reason="user rejected (WS)",
+                log_approved=f"WS aprobado: {cmd_id}",
+                log_rejected=f"WS rechazado: {cmd_id}",
+            )
+            if result.get("ok"):
+                await ws.send(json.dumps({"type": "ack", "id": cmd_id}))
+            else:
+                await ws.send(json.dumps({"type": "error", "msg": result.get("error", "unknown")}))
+        except Exception as e:
+            await ws.send(json.dumps({"type": "error", "msg": str(e)}))
+        return
+
+    if msg_type in ("command", "unit_command"):
         # Forward to bridge command handler
         cb = _command_callback
         if cb:
