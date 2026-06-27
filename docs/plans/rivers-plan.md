@@ -1,5 +1,7 @@
 # Plan: Ríos estilo Civ V (edge ribbons)
 
+> ⚠️ **Documento histórico — puede estar desactualizado.** Para el scope y decisiones actuales del trunk, ver [SCOPE.md](../SCOPE.md).
+
 ## Estado
 No existe campo de ríos en `Tile` ni generación de ríos en `map.ts`.
 

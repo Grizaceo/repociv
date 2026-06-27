@@ -30,7 +30,7 @@ La fantasia de producto es:
 
 El problema actual no es falta de profundidad grafica. Es exceso de señales simultaneas.
 
-Se permite "3D ligero" solo como 2.5D Canvas:
+Se permite "3D ligero" como 2.5D Canvas:
 
 - sombras direccionales;
 - elevacion por capas;
@@ -41,7 +41,7 @@ Se permite "3D ligero" solo como 2.5D Canvas:
 - niebla/atenuacion de distancia;
 - animaciones livianas.
 
-No se mete Three.js/WebGL al trunk en esta etapa. Si se explora, sigue en branch paralela `feat/3d-renderer` y entra solo si demuestra paridad funcional.
+**Canon actual (2026-06, ver [SCOPE.md](./SCOPE.md)):** los **dos** renderers son trunk oficial — Canvas 2D (`flat`, por defecto) y WebGL/Three.js (`webgl`, opt-in con hotkey `3` o `?renderer=webgl`). La regla no es "2D-only hasta paridad" sino **alternar entre ambos sin fricción**; Three.js carga lazy (chunk `vendor-three`, nunca en el bundle eager del modo 2D).
 
 ### P2. Capas de informacion
 

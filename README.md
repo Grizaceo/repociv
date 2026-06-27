@@ -90,7 +90,15 @@ npm install
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+
+# Assets (obligatorio antes del primer arranque — no están en git)
+npm run assets
+npm run assets:3d
 ```
+
+> **Assets obligatorios.** Los atlases PNG/WebP y texturas 3D no se versionan en git.
+> Tras clonar, ejecuta `npm run assets` y `npm run assets:3d` antes de `npm run dev`
+> o el mapa puede aparecer sin terreno, props u oficina isométrica.
 
 ### 2. Configurar
 
@@ -171,7 +179,7 @@ REPOCIV_MAP_ROOT=~/projects
        └─ ...
 ```
 
-- **Macro:** hex map en 2D o 3D WebGL (tecla `3` o botón en barra superior)
+- **Macro:** hex map en 2D (por defecto) o 3D WebGL — tecla `3` o botón en barra superior alterna `flat` ↔ `webgl`
 - **Local:** doble-click en una ciudad → oficina isométrica 2.5D generada desde la estructura del repo
   - **Salas** = carpetas, coloreadas por zona (`team_cluster` azul, `focus` violeta, `break` verde, `infra` concreto)
   - **Workbenches** (`×`) = archivos priorizados por la Priority Matrix — A* cacheado (≤300 hexes)
@@ -179,7 +187,7 @@ REPOCIV_MAP_ROOT=~/projects
   - **Puertas isométricas** = paneles deslizantes con perspectiva correcta
   - **NPCs manager** = figuras estacionarias frente a pizarras; click → info de sala
   - **Unidades** = prismos 2.5D animados que caminan entre workbenches
-- `Space` o tecla `3` alterna entre las dos vistas
+- `Esc` sale de la vista local y vuelve al mapa macro
 
 ---
 
@@ -189,11 +197,13 @@ RepoCiv expone un **bridge HTTP + WebSocket** al que cualquier agente se puede c
 
 ```bash
 # El bridge escucha en localhost:5274 por default
-# Eventos que entiende:
-POST /api/command          # enviar misión a un agente
-GET  /api/agents           # listar agentes activos
-GET  /api/pending          # cola de aprobaciones pendientes
-POST /api/approve/:id      # aprobar/rechazar una acción
+# Endpoints principales:
+POST /commands                    # enviar comando al bus
+GET  /agents                      # listar agentes activos
+GET  /pending                     # cola de tareas pendientes
+GET  /approvals                   # comandos esperando aprobación
+POST /approvals/<id>/approve      # aprobar comando pendiente
+POST /approvals/<id>/reject       # rechazar comando pendiente
 ```
 
 Ver [docs/API.md](docs/API.md) para la referencia completa.
@@ -213,7 +223,7 @@ RepoCiv también se expone como **MCP server por stdio** (`server/mcp_server.py`
 }
 ```
 
-43 tools cubriendo 15 dominios con tools MCP: agents, commands, approvals, pending, context, GPU, wonders, graph-relations, foreign-relations y más. Ver [docs/MCP.md](docs/MCP.md).
+44 tools cubriendo 15 dominios con tools MCP: agents, commands, approvals, pending, context, GPU, wonders, graph-relations, foreign-relations y más. Ver [docs/MCP.md](docs/MCP.md).
 
 > **Indicador en el HUD.** Cuando un cliente MCP está operando el dashboard, el HUD
 > muestra `MCP ●` (verde) junto al estado del bridge; `MCP ○` (atenuado) cuando no
@@ -285,7 +295,7 @@ Sirve para auditar sesiones largas sin abrir logs externos: es el "story so far"
 
 | Tecla | Acción |
 |-------|--------|
-| `Q` `W` `E` `O` | Spawn orchestrator / WORKER / SCOUT / OPENCLAW |
+| `Q` `W` `E` `O` `C` `X` `R` | Spawn MAIN / WORKER / SCOUT / OPENCLAW / CLAUDE / CODEX / CURSOR |
 | `1`–`9` | Seleccionar héroe por slot |
 | `Space` | Ciclar al siguiente héroe idle |
 | `Tab` | Ciclar todos los héroes |
@@ -299,9 +309,11 @@ Sirve para auditar sesiones largas sin abrir logs externos: es el "story so far"
 | `A` | Aprobaciones pendientes |
 | `T` | Terminal panel |
 | `N` | Gaceta de noticias |
-| `3` | Alternar vista Macro ↔ Local |
+| `3` | Alternar render 2D (`flat`) ↔ WebGL (`webgl`) |
 | `F11` | Settings Panel |
 | `?` | Keyboard help |
+
+**Vista local:** doble-click en una ciudad para entrar; `Esc` para volver al mapa macro.
 
 ---
 
@@ -339,7 +351,7 @@ server/
 ├── bridge.py            FastAPI bridge (entry point: python -m server.bridge)
 ├── http_routes.py       Todos los endpoints HTTP
 ├── websocket_handler.py WebSocket bidireccional
-├── mcp_server.py        MCP stdio server (43 tools)
+├── mcp_server.py        MCP stdio server (44 tools)
 ├── agent_runner.py      Ejecuta agentes (Hermes, Claude, Codex, OpenRouter…)
 ├── process_scanner.py   Detecta procesos → spawns automáticos
 ├── task_orchestrator.py Cola de tareas con prioridad
@@ -351,10 +363,11 @@ server/
 ## Tests
 
 ```bash
-# Frontend (Vitest) — 423 tests
-npm test -- --run
+# Suite completa (types, lint, tests, build, budgets)
+./scripts/check.sh
 
-# Backend (pytest) — 661 passed, 1 skipped
+# O por separado:
+npm test -- --run
 python3 -m pytest server/ -q
 ```
 
@@ -381,7 +394,7 @@ python3 -m pytest server/ -q
 |-----|-----------|
 | [docs/SCOPE.md](docs/SCOPE.md) | Qué es y qué no es el proyecto |
 | [docs/API.md](docs/API.md) | Referencia completa de endpoints |
-| [docs/MCP.md](docs/MCP.md) | MCP server — 43 tools, ejemplos |
+| [docs/MCP.md](docs/MCP.md) | MCP server — 44 tools, ejemplos |
 | [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | Tutorial paso a paso |
 | [docs/REMOTE_ACCESS.md](docs/REMOTE_ACCESS.md) | Acceso remoto via Tailscale |
 | [docs/EVOLUTION.md](docs/EVOLUTION.md) | Historia del proyecto |

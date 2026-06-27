@@ -21,9 +21,10 @@
 |------------|----------------|---------------|
 | Node.js | 20.x | `node --version` |
 | npm | 10.x | `npm --version` |
-| Python | 3.12 | `python3 --version` |
+| Python | 3.11 | `python3 --version` |
 | pip | 24.x | `pip --version` |
 | Git | 2.x | `git --version` |
+| DuckDB | (via pip) | `python3 -c "import duckdb"` |
 
 Optional but recommended:
 - **tmux** (for the dev-start script with split panes)
@@ -51,6 +52,17 @@ npm install
 This installs TypeScript, Vite, Vitest, Valibot (schema validation),
 xterm.js (terminal panel), and Lucide (icons).
 
+### Generate assets (mandatory before first run)
+
+PNG/WebP atlases and 3D textures are **not** tracked in git. Generate them once after clone:
+
+```bash
+npm run assets
+npm run assets:3d
+```
+
+Without this step the map may render without terrain, props, or the isometric office view.
+
 ---
 
 ## Step 3: Install Backend Dependencies
@@ -62,7 +74,7 @@ pip install -r requirements.txt
 ```
 
 Packages installed: pytest, httpx, aiohttp, requests, pydantic,
-duckdb, PyYAML.
+duckdb (required for the event ledger), PyYAML.
 
 The `.venv` directory is gitignored. You need to activate it in every
 terminal where you run the bridge (`source .venv/bin/activate`).
@@ -171,7 +183,7 @@ If the map is blank or shows "Bridge offline", go to Troubleshooting below.
 
 | Key | Action |
 |-----|--------|
-| Q/W/E/O/C/X | Spawn MAIN / WORKER / SCOUT / OPENCLAW / CLAUDE / CODEX |
+| Q/W/E/O/C/X/R | Spawn MAIN / WORKER / SCOUT / OPENCLAW / CLAUDE / CODEX / CURSOR |
 | 1-9 | Select agent by roster slot |
 | Space | Cycle to next idle agent |
 | Tab | Cycle through all agents |
@@ -193,11 +205,13 @@ If the map is blank or shows "Bridge offline", go to Troubleshooting below.
 
 ### Switching to Local View
 
-1. Double-click a city (or select it and press **3**)
+1. **Double-click** a city on the macro map
 2. The view zooms into the city interior
 3. Files and directories are shown as workbenches on a grid
 4. Agents walk between workbenches based on priority scores
-5. Press **Space** or **3** again to return to the macro map
+5. Press **Esc** to return to the macro map
+
+> **Note:** key `3` toggles 2D (`flat`) ↔ WebGL (`webgl`) on the macro map — it does not enter local view.
 
 ---
 
@@ -213,13 +227,10 @@ Here is how to start a mission manually:
 curl -X POST http://localhost:5274/commands \
   -H "Content-Type: application/json" \
   -d '{
-    "type": "mission_start",
-    "target": "davi",
+    "type": "inspect_repo",
+    "target": "my-repo",
     "payload": {
-      "repo": "my-repo",
-      "file": "README.md",
-      "task": "review this file for outdated documentation",
-      "priority": "HIGH"
+      "task": "review this repo for outdated documentation"
     }
   }'
 ```
@@ -267,7 +278,7 @@ To recover fatigue:
 3. The agent will walk to a rest tile and recover over time
 4. Press S again to wake it up when rested
 
-Rest Areas are visible in the Local View (press Space inside a city).
+Rest Areas are visible in local view (double-click a city to enter).
 Each Rest Area has a capacity and recovery rate, configurable in the
 Settings panel (F11).
 
@@ -281,7 +292,7 @@ Settings panel (F11).
 |---------|--------------|-----|
 | `Address already in use` | Port 5274 occupied | Kill existing process: `kill $(lsof -t -i:5274)` or change `BRIDGE_PORT` in `.env` |
 | `ModuleNotFoundError` | Missing dependency | `source .venv/bin/activate && pip install -r requirements.txt` |
-| `duckdb not found` | Missing DuckDB | `pip install duckdb` — DuckDB is optional, bridge runs without analytics |
+| `duckdb not found` | Missing DuckDB | `pip install duckdb` — DuckDB is **required** for the event ledger |
 
 ### Frontend shows "Bridge offline"
 
@@ -324,15 +335,16 @@ REPOCIV_DATA_DIR=/tmp/repociv-test python3 -m pytest server/ -q
 ## Running Tests
 
 ```bash
+# Full check (typecheck + lint + tests + build + budgets)
+./scripts/check.sh
+
+# Or individually:
 # Frontend tests (Vitest)
 npm test -- --run
 
 # Backend tests (pytest)
 source .venv/bin/activate
 python3 -m pytest server/ -q
-
-# Full check (typecheck + test + build)
-npm run check
 ```
 
 ---
