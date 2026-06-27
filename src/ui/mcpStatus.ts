@@ -4,6 +4,7 @@
 // path short-circuits the HTTP fetch while the WebSocket is connected — the MCP
 // indicator must stay fresh regardless of transport, so it owns its own cadence.
 import { bridgeUrl, bridgeHeaders } from '../bridgeEnv.ts';
+import { isPollRegistered, registerPoll, type PollUnregister } from './pollScheduler.ts';
 
 const POLL_MS = 10_000;
 
@@ -51,17 +52,17 @@ export async function pollMcpStatusOnce(fetchImpl: typeof fetch = fetch): Promis
   }
 }
 
-let timer = 0;
+const POLL_ID = 'mcp-status';
+let stopPoll: PollUnregister | null = null;
 
 export function startMcpStatusPolling(): void {
-  if (timer) return;
-  void pollMcpStatusOnce();
-  timer = window.setInterval(() => void pollMcpStatusOnce(), POLL_MS);
+  if (isPollRegistered(POLL_ID) || stopPoll) return;
+  stopPoll = registerPoll(POLL_ID, () => void pollMcpStatusOnce(), POLL_MS);
 }
 
 export function stopMcpStatusPolling(): void {
-  if (timer) {
-    clearInterval(timer);
-    timer = 0;
+  if (stopPoll) {
+    stopPoll();
+    stopPoll = null;
   }
 }

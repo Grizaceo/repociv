@@ -23,14 +23,15 @@ import { terminalPanel } from './terminalPanel.ts';
 import { bridgeHeaders, bridgeUrl, BRIDGE_URL, BRIDGE_TOKEN } from './bridgeEnv.ts';
 import { RepoCivWebSocket } from './websocket.ts';
 import { dispatchBridgeEvent, type MessageContext } from './bridgeMessageHandlers.ts';
+import { registerPoll, type PollUnregister } from './ui/pollScheduler.ts';
 
 const DEMO_INTERVAL_MS = 30_000;
 const OFFLINE_DEMO_THRESHOLD_MS = 10_000;
 
 export class BridgeEvents {
   private state: GameState;
-  private healthInterval = 0;
-  private gpuInterval = 0;
+  private stopHealthPoll: PollUnregister | null = null;
+  private stopGpuPoll: PollUnregister | null = null;
   private reconnectDelay = 1000;
   private offlineSince: number | null = null;
   private demoInterval: ReturnType<typeof setInterval> | null = null;
@@ -64,11 +65,13 @@ export class BridgeEvents {
       });
     }
     this.checkHealth();
-    this.healthInterval = window.setInterval(() => this.checkHealth(), 5000);
-    window.setTimeout(() => {
-      this.fetchGpu();
-      this.gpuInterval = window.setInterval(() => this.fetchGpu(), 5000);
-    }, 2500);
+    this.stopHealthPoll = registerPoll('bridge:health', () => void this.checkHealth(), 5_000, {
+      immediate: false,
+    });
+    this.stopGpuPoll = registerPoll('bridge:gpu', () => void this.fetchGpu(), 5_000, {
+      immediate: false,
+      phaseMs: 2_500,
+    });
   }
 
   /** Discover the WebSocket URL from the bridge /ws endpoint */
@@ -367,8 +370,14 @@ export class BridgeEvents {
 
   stop() {
     this.stopped = true;
-    clearInterval(this.healthInterval);
-    clearInterval(this.gpuInterval);
+    if (this.stopHealthPoll) {
+      this.stopHealthPoll();
+      this.stopHealthPoll = null;
+    }
+    if (this.stopGpuPoll) {
+      this.stopGpuPoll();
+      this.stopGpuPoll = null;
+    }
     if (this.sseReconnectTimer) {
       clearTimeout(this.sseReconnectTimer);
       this.sseReconnectTimer = 0;
