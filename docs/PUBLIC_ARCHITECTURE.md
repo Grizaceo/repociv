@@ -53,7 +53,7 @@ nodes per path: 300 hexes.
 - Fog of war (configurable per agent type)
 - Minimap in corner (compressed view of entire map)
 
-### Macro / Local View (Space key)
+### Macro / Local View (key `3`)
 
 RepoCiv has two spatial levels:
 
@@ -67,9 +67,9 @@ RepoCiv has two spatial levels:
 ```
 
 - **Macro**: the workspace-level hex map. Each tile is a repo.
-- **Local**: press Space (or 3) on a selected city to zoom into its interior.
-  Files become workbenches. Agents walk between them based on priority score.
-  A* pathfinding works on the local grid too (src/localPathfinding.ts).
+- **Local**: select a city and press `3` (or double-click) to zoom into its
+  interior. Files become workbenches. Agents walk between them based on priority
+  score. A* pathfinding works on the local grid too (src/localPathfinding.ts).
 
 ---
 
@@ -132,8 +132,10 @@ RepoCiv ships with 21 panels. The most actively used:
 - **Quest Board**: active missions and their status
 - **Timeline Panel**: chronological view of all events
 
-Key shortcuts: Q/W/E/L/O to spawn agents, Space to cycle idle, P for
-priority, F6-F11 for various panels, ? for full keyboard help.
+Key shortcuts: `Q`/`W`/`E`/`O`/`C`/`X` to spawn MAIN / WORKER / SCOUT /
+OPENCLAW / CLAUDE / CODEX; `Space` cycles idle agents; `P` priority; `A`
+approvals; `T` terminal; `F6` ledger; `F7` replay; `F8` observability;
+`F9` quest board; `F10` timeline; `F11` settings; `?` full keyboard help.
 
 ---
 
