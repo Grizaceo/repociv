@@ -300,13 +300,21 @@ export function pickFolderWithSystemDialog(): string {
   );
 }
 
-function resolveRepoPathFromId(repoIdOrPath: string, currentMapRoot: string): string | null {
-  const decodedId = decodeRepoId(decodeURIComponent(repoIdOrPath));
-  if (decodedId && repoExists(decodedId)) return decodedId;
-  const direct = resolve(expandUser(decodeURIComponent(repoIdOrPath)));
-  if (repoExists(direct)) return direct;
-  const legacy = join(currentMapRoot, decodeURIComponent(repoIdOrPath));
-  if (repoExists(legacy)) return legacy;
+export function resolveRepoPathFromId(repoIdOrPath: string, currentMapRoot: string): string | null {
+  const decodedRaw = decodeURIComponent(repoIdOrPath);
+  const decodedId = decodeRepoId(decodedRaw);
+  if (decodedId && repoExists(decodedId)) return resolve(decodedId);
+  if (decodedRaw.startsWith('/') || decodedRaw.startsWith('~')) {
+    const direct = resolve(expandUser(decodedRaw));
+    if (repoExists(direct)) return direct;
+    return null;
+  }
+  // Plain ids are single folder names under the active root — reject traversal.
+  if (decodedRaw.includes('/') || decodedRaw.includes('\\') || decodedRaw.includes('..')) {
+    return null;
+  }
+  const legacy = join(currentMapRoot, decodedRaw);
+  if (repoExists(legacy)) return resolve(legacy);
   return null;
 }
 
