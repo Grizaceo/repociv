@@ -37,6 +37,15 @@ def test_graph_relations_default_limit():
     mock_cga.get_city_relations.assert_called_once_with("repo1", [], limit=10)
 
 
+def test_graph_relations_accepts_repo_id_alias():
+    with patch("http_routes._cga") as mock_cga:
+        mock_cga.get_city_relations.return_value = []
+        status, body = routes.get_graph_relations({"params": {"repoId": "repo1"}})
+    assert status == 200
+    assert body["cityId"] == "repo1"
+    mock_cga.get_city_relations.assert_called_once_with("repo1", [], limit=10)
+
+
 def test_graph_relations_custom_limit():
     with patch("http_routes._cga") as mock_cga:
         mock_cga.get_city_relations.return_value = []
@@ -97,6 +106,16 @@ def test_graph_relations_evidence_success():
         )
     assert status == 200
     assert body == mock_evidence
+    mock_cga.get_city_evidence.assert_called_once_with("r1", "r2", [])
+
+
+def test_graph_relations_evidence_accepts_source_target_id_aliases():
+    with patch("http_routes._cga") as mock_cga:
+        mock_cga.get_city_evidence.return_value = {}
+        status, _ = routes.get_graph_relations_evidence(
+            {"params": {"sourceId": "r1", "targetId": "r2"}}
+        )
+    assert status == 200
     mock_cga.get_city_evidence.assert_called_once_with("r1", "r2", [])
 
 

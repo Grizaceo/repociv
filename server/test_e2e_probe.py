@@ -17,6 +17,24 @@ def test_e2e_probe_validates_as_low_risk_command():
     assert cmd.risk == "low"
 
 
+def test_validate_command_honors_client_supplied_risk():
+    cmd = validate_command({
+        "type": "run_tests",
+        "target": "my-repo",
+        "risk": "high",
+    })
+    assert cmd.risk == "high"
+
+
+def test_validate_command_falls_back_for_invalid_risk():
+    cmd = validate_command({
+        "type": "run_tests",
+        "target": "my-repo",
+        "risk": "bananas",
+    })
+    assert cmd.risk == "low"
+
+
 def test_e2e_probe_is_auto_safe_policy():
     cmd = validate_command({
         "type": "e2e_probe",

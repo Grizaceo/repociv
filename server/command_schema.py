@@ -113,7 +113,12 @@ def validate_command(data: dict[str, Any]) -> Command:
     if len(payload) > _MAX_PAYLOAD_KEYS:
         raise CommandValidationError(f"payload has too many keys (max {_MAX_PAYLOAD_KEYS})")
 
-    risk: Risk = COMMAND_RISK.get(cmd_type, "medium")  # unknown types default medium
+    default_risk: Risk = COMMAND_RISK.get(cmd_type, "medium")  # unknown types default medium
+    supplied_risk = data.get("risk")
+    if isinstance(supplied_risk, str) and supplied_risk in ("low", "medium", "high", "destructive"):
+        risk: Risk = supplied_risk  # type: ignore[assignment]
+    else:
+        risk = default_risk
     created_by = str(data.get("created_by", "user"))[:64]
 
     # Harness selection: top-level field or nested inside payload
