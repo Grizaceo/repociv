@@ -70,6 +70,21 @@ def test_agents_list_calls_correct_url():
     assert result == payload
 
 
+def test_get_sends_token_when_configured():
+    with _token_env("read-token"), _mock_get({"agents": []}) as m:
+        _mcp.agents_list()
+    headers_sent = m.call_args[1]["headers"]
+    assert headers_sent.get("X-RepoCiv-Token") == "read-token"
+    assert headers_sent.get("X-RepoCiv-Client") == "mcp"
+
+
+def test_get_omits_token_when_unconfigured():
+    with _no_token(), _mock_get({"agents": []}) as m:
+        _mcp.agents_list()
+    headers_sent = m.call_args[1]["headers"]
+    assert "X-RepoCiv-Token" not in headers_sent
+
+
 def test_agents_capabilities():
     payload = {"capabilities": {"MAIN": ["commit", "execute"]}}
     with _mock_get(payload) as m:
@@ -375,3 +390,24 @@ def test_mutating_no_token_raises_before_http_call():
             with pytest.raises(ValueError):
                 _mcp.pending_add("task x")
         m.assert_not_called()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GRAPH RELATIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_graph_relations_list_uses_repo_id_param():
+    with _mock_get({"relations": []}) as m:
+        _mcp.graph_relations_list("my-repo", limit=5, min_score=0.2)
+    params = m.call_args[1]["params"]
+    assert params["repoId"] == "my-repo"
+    assert params["limit"] == 5
+    assert params["minScore"] == 0.2
+
+
+def test_graph_relations_evidence_uses_source_target_ids():
+    with _mock_get({"score": 0.5}) as m:
+        _mcp.graph_relations_evidence("repo-a", "repo-b")
+    params = m.call_args[1]["params"]
+    assert params["sourceId"] == "repo-a"
+    assert params["targetId"] == "repo-b"

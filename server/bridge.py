@@ -1049,7 +1049,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._json({"ok": True})
             return
 
-        self._json({"ok": True, "ignored": t})
+        self._err_json(404, f"unknown POST type: {t}" if t else "not found")
 
     def _sse_stream(self) -> None:
         client: queue.Queue[dict[str, Any] | None] = queue.Queue()

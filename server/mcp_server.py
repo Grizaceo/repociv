@@ -46,10 +46,11 @@ def _headers(mutating: bool = False) -> dict[str, str]:
     # Tag every bridge call so it can surface a truthful "MCP conectado" HUD
     # indicator (the bridge stamps the last time it saw an mcp-tagged request).
     h: dict[str, str] = {"Accept": "application/json", "X-RepoCiv-Client": "mcp"}
-    if mutating:
-        if not TOKEN:
-            raise ValueError("REPOCIV_TOKEN no configurado — mutating tools requieren token")
+    if mutating and not TOKEN:
+        raise ValueError("REPOCIV_TOKEN no configurado — mutating tools requieren token")
+    if TOKEN:
         h["X-RepoCiv-Token"] = TOKEN
+    if mutating:
         h["Content-Type"] = "application/json"
     return h
 

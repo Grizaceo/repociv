@@ -93,7 +93,7 @@ def get_graph_relations(ctx: dict[str, Any]) -> tuple[int, Any]:
         cities (list, optional): serialized city list for name resolution.
     """
     params = ctx.get("params", {})
-    city_id = params.get("cityId", "")
+    city_id = params.get("cityId") or params.get("repoId") or ""
     if not city_id:
         return 400, {"error": "cityId is required"}
 
@@ -127,8 +127,8 @@ def get_graph_relations_evidence(ctx: dict[str, Any]) -> tuple[int, Any]:
         cities (list, optional): serialized city list for name resolution.
     """
     params = ctx.get("params", {})
-    from_id = ctx.get("from_id", params.get("fromId", ""))
-    to_id = ctx.get("to_id", params.get("toId", ""))
+    from_id = ctx.get("from_id") or params.get("fromId") or params.get("sourceId") or ""
+    to_id = ctx.get("to_id") or params.get("toId") or params.get("targetId") or ""
 
     if not from_id or not to_id:
         return 400, {"error": "fromId and toId are required"}

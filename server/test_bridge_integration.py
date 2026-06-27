@@ -337,3 +337,28 @@ def test_news_source_remove_requires_name():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def _post_json(base, path, payload):
+    req = urllib.request.Request(
+        base + path,
+        data=json.dumps(payload).encode(),
+        method="POST",
+        headers=_auth_headers({"Content-Type": "application/json"}),
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            return resp.status, json.loads(resp.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read() or b"{}")
+
+
+def test_unknown_legacy_post_type_returns_404():
+    server, base = _start_test_server()
+    try:
+        status, body = _post_json(base, "/", {"type": "totally_unknown_type"})
+        assert status == 404
+        assert body.get("error") == "unknown POST type: totally_unknown_type"
+    finally:
+        server.shutdown()
+        server.server_close()
