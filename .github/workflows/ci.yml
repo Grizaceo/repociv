@@ -47,17 +47,13 @@ jobs:
         # The same script we use locally — single source of truth.
         run: bash scripts/check.sh
 
-  # ── Informative visual job (NOT blocking) ──────────────────────────────────
-  # Playwright e2e boots bridge + vite itself (playwright.config webServer).
-  # The golden comparison is SHA-exact against hashes captured on the dev
-  # box's GPU; the runner's software rasterizer (SwiftShader) produces
-  # different bytes for identical scenes, so a mismatch here is expected
-  # and informative only — check the uploaded artifacts when it flags.
-  visual:
-    name: e2e + goldens (informative)
+  # ── Playwright e2e (blocking) ──────────────────────────────────────────────
+  # Boots bridge + vite via playwright.config webServer. Golden hash comparison
+  # stays informative (GPU-dependent); the step below uses `|| true`.
+  e2e:
+    name: e2e (Playwright)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v4
@@ -89,7 +85,7 @@ jobs:
       - name: Run e2e
         run: npx playwright test
 
-      - name: Run golden captures (hash comparison is dev-box-specific)
+      - name: Run golden captures (informative; GPU-dependent)
         run: |
           npm run dev -- --host 127.0.0.1 --port 5273 &
           for i in $(seq 1 30); do

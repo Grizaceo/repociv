@@ -7,8 +7,8 @@ contributions should be small, focused, and dogfooding-driven.
 
 ### Prerequisites
 
-- Node.js 22+
-- Python 3.12+
+- Node.js 20+ (see `.nvmrc`)
+- Python 3.11+ (see `.python-version`)
 - A running Hermes Agent instance (optional, for live agent features)
 
 ### Setup
