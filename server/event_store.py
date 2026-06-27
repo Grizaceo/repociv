@@ -10,16 +10,20 @@ Event types persisted:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 import time
 import uuid
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 
+_logger = logging.getLogger(__name__)
 _lock = threading.Lock()
 _store_path: Path | None = None
+_REVERSE_CHUNK = 8192
 
 # ── Dual-write to DuckDB Ledger (best-effort) ─────────────────────────────────
 # Imported lazily to avoid circular imports and to allow the ledger to be
@@ -27,14 +31,18 @@ _store_path: Path | None = None
 def _ledger_ingest(event: dict[str, Any]) -> None:
     """Forward a terminal event to the ResearchLedger (best-effort).
 
-    Never raises. If DuckDB is unavailable the event is silently skipped.
+    Never raises. If DuckDB is unavailable the event is logged and skipped.
     The JSONL write already succeeded at this point.
     """
     try:
         from server import research_ledger as _rl  # noqa: PLC0415
         _rl.get_ledger().ingest_event(event)
     except Exception:
-        pass  # ledger failure must never break the event store
+        _logger.warning(
+            "ledger ingest failed for %s event",
+            event.get("type"),
+            exc_info=True,
+        )
 
 
 def init(store_dir: Path) -> None:
@@ -211,27 +219,57 @@ def record_subagent_complete(subagent_id: str, run: dict[str, Any]) -> None:
     _ledger_ingest({"type": "SubagentCompleted", "commandId": subagent_id, "data": evt_data})
 
 
+def _iter_lines_reverse(path: Path) -> Iterator[str]:
+    """Yield non-empty JSONL lines from newest to oldest."""
+    with path.open("rb") as f:
+        f.seek(0, os.SEEK_END)
+        pos = f.tell()
+        if pos == 0:
+            return
+        pending = b""
+        while pos > 0:
+            read_size = min(_REVERSE_CHUNK, pos)
+            pos -= read_size
+            f.seek(pos)
+            pending = f.read(read_size) + pending
+            while b"\n" in pending:
+                line, pending = pending.rsplit(b"\n", 1)
+                text = line.decode("utf-8").strip()
+                if text:
+                    yield text
+        text = pending.decode("utf-8").strip()
+        if text:
+            yield text
+
+
 def read_events(since: float = 0.0, limit: int = 500) -> list[dict[str, Any]]:
-    """Return events newer than `since` (unix timestamp), up to `limit`."""
+    """Return events newer than `since` (unix timestamp), up to `limit`.
+
+    Reads from the tail of the JSONL file backwards so callers with a recent
+    ``since`` filter do not load the entire audit log into memory.
+    """
     if _store_path is None or not _store_path.exists():
         return []
-    results: list[dict[str, Any]] = []
+    if limit <= 0:
+        return []
+    collected: list[dict[str, Any]] = []
     with _lock:
         try:
-            lines = _store_path.read_text(encoding="utf-8").splitlines()
+            for line in _iter_lines_reverse(_store_path):
+                try:
+                    evt = json.loads(line)
+                except Exception:
+                    continue
+                ts = evt.get("timestamp", 0)
+                if ts < since:
+                    break
+                collected.append(evt)
+                if len(collected) >= limit:
+                    break
         except Exception:
             return []
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            evt = json.loads(line)
-        except Exception:
-            continue
-        if evt.get("timestamp", 0) >= since:
-            results.append(evt)
-    return results[-limit:]
+    collected.reverse()
+    return collected
 
 
 def command_id(event: dict[str, Any]) -> str:
