@@ -3,6 +3,7 @@
 // Pattern copied from spatialPreview.ts but tailored for grid interactions.
 
 import type { LocalRoom, LocalUnit, Workbench } from '../types.ts';
+import { escapeHtml } from './escapeHtml.ts';
 
 // ─── Tooltip elements ─────────────────────────────────────────────────────────
 let _unitTooltipEl: HTMLElement | null = null;
@@ -29,10 +30,10 @@ export function showLocalUnitTooltip(unit: LocalUnit, screenPos: { x: number; y:
 
   el.innerHTML = `
     <div class="lt-arrow"></div>
-    <div class="lt-header" style="color:${unit.color}">${unit.name}</div>
-    <div class="lt-row">En: <b>${roomLabel}</b></div>
-    <div class="lt-row">Estado: ${status[unit.state] ?? unit.state}</div>
-    ${unit.currentWorkbenchId ? '<div class="lt-row">Archivo: ' + (unit.mission ?? '—') + '</div>' : ''}
+    <div class="lt-header" style="color:${escapeHtml(unit.color)}">${escapeHtml(unit.name)}</div>
+    <div class="lt-row">En: <b>${escapeHtml(roomLabel)}</b></div>
+    <div class="lt-row">Estado: ${escapeHtml(status[unit.state] ?? unit.state)}</div>
+    ${unit.currentWorkbenchId ? '<div class="lt-row">Archivo: ' + escapeHtml(unit.mission ?? '—') + '</div>' : ''}
   `;
   _position(el, screenPos);
   el.classList.remove('hidden');
@@ -49,8 +50,8 @@ export function showLocalWorkbenchTooltip(wb: Workbench, screenPos: { x: number;
 
   el.innerHTML = `
     <div class="lt-arrow"></div>
-    <div class="lt-header">${_esc(wb.fileName)}</div>
-    <div class="lt-row">Ext: <b>.${_esc(wb.extension)}</b></div>
+    <div class="lt-header">${escapeHtml(wb.fileName)}</div>
+    <div class="lt-row">Ext: <b>.${escapeHtml(wb.extension)}</b></div>
     ${wb.isTest ? '<div class="lt-row" style="color:#c8a84b">🧪 Test file</div>' : ''}
   `;
   _position(el, screenPos);
@@ -87,9 +88,9 @@ export function showWhiteboardPanel(
     ? subFolders
         .map(
           (n) => `
-      <div class="lt-wb-nav" data-folder="${_esc(n)}">
+      <div class="lt-wb-nav" data-folder="${escapeHtml(n)}">
         <span class="lt-wb-nav-icon">📁</span>
-        <span class="lt-wb-nav-name">${_esc(n)}</span>
+        <span class="lt-wb-nav-name">${escapeHtml(n)}</span>
       </div>
     `,
         )
@@ -100,7 +101,7 @@ export function showWhiteboardPanel(
 
   el.innerHTML = `
     <div class="lt-arrow"></div>
-    <div class="lt-header">📋 ${_esc(room.zoneLabel ?? room.folderName)}</div>
+    <div class="lt-header">📋 ${escapeHtml(room.zoneLabel ?? room.folderName)}</div>
     <div class="lt-wb-section">
       <div class="lt-wb-badge">${room.workbenches.length} archivo${room.workbenches.length === 1 ? '' : 's'}</div>
       ${openBtn}
@@ -206,7 +207,7 @@ export function showLocalContextMenu(
 
   el.innerHTML =
     `
-    <div class="lt-header">${_esc(wb.fileName)}</div>
+    <div class="lt-header">${escapeHtml(wb.fileName)}</div>
     <div class="lt-arrow"></div>` + items.join('');
   _position(el, screenPos);
   el.classList.remove('hidden');
@@ -248,7 +249,7 @@ export function showLocalMissionPreview(
 
   el.innerHTML = `
     <div class="lt-arrow"></div>
-    <div class="lt-header">¿Enviar ${agentName} a ${_esc(fileName)}?</div>
+    <div class="lt-header">¿Enviar ${escapeHtml(agentName)} a ${escapeHtml(fileName)}?</div>
     <div class="lt-actions">
       <button id="lt-confirm" class="lt-btn-confirm">✔ Confirmar</button>
       <button id="lt-cancel" class="lt-btn-cancel">✗ Cancelar</button>
@@ -281,7 +282,7 @@ export async function showGitForFile(
   // Show loading immediately
   el.innerHTML = `
     <div class="lt-arrow"></div>
-    <div class="lt-header">📜 ${_esc(filePath.split('/').pop() ?? filePath)}</div>
+    <div class="lt-header">📜 ${escapeHtml(filePath.split('/').pop() ?? filePath)}</div>
     <div class="lt-git-body"><span class="lt-loading">Cargando git…</span></div>
   `;
   _position(el, screenPos);
@@ -298,10 +299,10 @@ export async function showGitForFile(
     };
 
     const logHtml = (data.log ?? []).length
-      ? `<div class="lt-git-section"><h5>Commits recientes</h5>${data.log!.map((l) => `<div class="lt-git-line">${_esc(l)}</div>`).join('')}</div>`
+      ? `<div class="lt-git-section"><h5>Commits recientes</h5>${data.log!.map((l) => `<div class="lt-git-line">${escapeHtml(l)}</div>`).join('')}</div>`
       : '';
     const blameHtml = (data.blame ?? []).length
-      ? `<div class="lt-git-section"><h5>Blame (primeras líneas)</h5>${data.blame!.map((b) => `<div class="lt-git-line"><span class="lt-git-num">${b.line}</span> ${_esc(b.author)} · ${_esc(b.date)}</div>`).join('')}</div>`
+      ? `<div class="lt-git-section"><h5>Blame (primeras líneas)</h5>${data.blame!.map((b) => `<div class="lt-git-line"><span class="lt-git-num">${b.line}</span> ${escapeHtml(b.author)} · ${escapeHtml(b.date)}</div>`).join('')}</div>`
       : '';
 
     el.querySelector('.lt-git-body')!.innerHTML =
@@ -354,11 +355,4 @@ function _position(el: HTMLElement, pos: { x: number; y: number }) {
   el.style.left = `${x}px`;
   el.style.top = `${y}px`;
   el.style.visibility = 'visible';
-}
-
-function _esc(s: string): string {
-  return String(s).replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-  );
 }

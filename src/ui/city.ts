@@ -5,15 +5,9 @@ import { formatLabStatusLabel, formatLabSourceLabel } from '../labhubStatus.ts';
 import { trapFocus } from './focusTrap.ts';
 import { getLatestNews, markNewsAsRead } from '../bridge.ts';
 import { trackCityVisit } from './analytics.ts';
+import { escapeHtml } from './escapeHtml.ts';
 
 let _cityPanelCleanup: (() => void) | null = null;
-
-function esc(s: string): string {
-  return s.replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-  );
-}
 
 function setText(id: string, text: string) {
   const e = document.getElementById(id);
@@ -106,9 +100,9 @@ export function openCityPanel(
       const sourceLabel = formatLabSourceLabel(labStatus);
       const sourceColor = labStatus.source === 'live' ? 'var(--ui-green)' : 'var(--ui-accent-gold)';
       labStatusEl.innerHTML = [
-        `<div class="city-item" style="color:var(--ui-green)">🔬 ${esc(formatLabStatusLabel(labStatus))}</div>`,
-        `<div class="city-item" style="color:var(--text-dim);font-size:11px">${esc(labStatus.lastMetric || labStatus.labId)}</div>`,
-        `<div class="city-item" style="color:${sourceColor};font-size:10px">${esc(sourceLabel)}</div>`,
+        `<div class="city-item" style="color:var(--ui-green)">🔬 ${escapeHtml(formatLabStatusLabel(labStatus))}</div>`,
+        `<div class="city-item" style="color:var(--text-dim);font-size:11px">${escapeHtml(labStatus.lastMetric || labStatus.labId)}</div>`,
+        `<div class="city-item" style="color:${sourceColor};font-size:10px">${escapeHtml(sourceLabel)}</div>`,
       ].join('');
     }
   }
@@ -153,7 +147,7 @@ export function openCityPanel(
                 ? 'var(--civ-happiness)'
                 : 'var(--text-primary)';
           const pct = b.state === 'building' ? ` (${Math.round(b.progress)}%)` : '';
-          return `<div class="city-item" style="color:${color}" title="${esc(b.name)}${pct}">${icon} ${esc(b.name)}${pct}</div>`;
+          return `<div class="city-item" style="color:${color}" title="${escapeHtml(b.name)}${pct}">${icon} ${escapeHtml(b.name)}${pct}</div>`;
         })
         .join('');
     }
@@ -186,9 +180,9 @@ async function fetchCityGit(repoName: string) {
       data.changes.length === 0 ? 'clean' : `${data.changes.length} cambios`,
     );
     gitDetailsEl.innerHTML = [
-      `<div class="city-item" style="color:var(--gold-bright)">⎇ ${esc(data.branch)}</div>`,
+      `<div class="city-item" style="color:var(--gold-bright)">⎇ ${escapeHtml(data.branch)}</div>`,
       hash
-        ? `<div class="city-item" style="color:var(--text-dim); font-size:11px">${esc(hash)} · ${esc(subject ?? '')} · ${esc(ago ?? '')}</div>`
+        ? `<div class="city-item" style="color:var(--text-dim); font-size:11px">${escapeHtml(hash)} · ${escapeHtml(subject ?? '')} · ${escapeHtml(ago ?? '')}</div>`
         : '',
       ...data.changes.slice(0, 8).map((c) => {
         const code = c.trim()[0] ?? '?';
@@ -200,7 +194,7 @@ async function fetchCityGit(repoName: string) {
               : code === 'D'
                 ? 'var(--civ-happiness)'
                 : 'var(--text-dim)';
-        return `<div class="city-item" style="color:${color}" title="${esc(c)}">${esc(c)}</div>`;
+        return `<div class="city-item" style="color:${color}" title="${escapeHtml(c)}">${escapeHtml(c)}</div>`;
       }),
     ].join('');
   } catch {
@@ -228,9 +222,9 @@ async function fetchCityFiles(repoName: string) {
         .map(
           (art) => `
         <div class="city-item" style="border-bottom:1px solid var(--ui-border);padding:6px 0;margin-bottom:4px;">
-          <div style="font-size:11px;color:var(--ui-accent-gold);font-weight:bold;">📰 ${esc(art.blogName)}</div>
+          <div style="font-size:11px;color:var(--ui-accent-gold);font-weight:bold;">📰 ${escapeHtml(art.blogName)}</div>
           <div style="font-size:13px;font-weight:500;margin:2px 0;">
-            <a href="${esc(art.url)}" target="_blank" style="color:var(--text-primary);text-decoration:none;border-bottom:1px dashed var(--text-dim);">${esc(art.title)}</a>
+            <a href="${escapeHtml(art.url)}" target="_blank" style="color:var(--text-primary);text-decoration:none;border-bottom:1px dashed var(--text-dim);">${escapeHtml(art.title)}</a>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px;">
             <span style="font-size:10px;color:var(--text-dim);">${new Date(art.publishedDate).toLocaleDateString()}</span>
@@ -272,7 +266,7 @@ async function fetchCityFiles(repoName: string) {
             .slice(0, 12)
             .map(
               (f) =>
-                `<div class="city-item" style="padding:1px 0" title="${esc(f)}">${esc(f)}</div>`,
+                `<div class="city-item" style="padding:1px 0" title="${escapeHtml(f)}">${escapeHtml(f)}</div>`,
             )
             .join('');
   } catch {

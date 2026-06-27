@@ -10,6 +10,7 @@ import { type Tile, type City, type Unit } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+import { escapeHtml } from '../ui/escapeHtml.ts';
 
 const popupGroup = new Group();
 popupGroup.name = 'tile-popup';
@@ -70,23 +71,4 @@ export function clearTilePopup(): void {
 /** Check if a popup is currently shown. */
 export function isPopupVisible(): boolean {
   return activePopup !== null;
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => {
-    switch (c) {
-      case '&':
-        return '&amp;';
-      case '<':
-        return '&lt;';
-      case '>':
-        return '&gt;';
-      case '"':
-        return '&quot;';
-      case "'":
-        return '&#39;';
-      default:
-        return c;
-    }
-  });
 }

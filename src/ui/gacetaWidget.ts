@@ -10,6 +10,7 @@ import {
   type NewsSource,
 } from '../bridge.ts';
 import { openForeignRelationsPanel } from './foreignRelationsPanel.ts';
+import { escapeHtml } from './escapeHtml.ts';
 
 const REFRESH_MS = 300_000;
 const TEASER_ROTATE_MS = 30_000;
@@ -27,13 +28,6 @@ let _scanning = false;
 let _selectedArticleIds = new Set<number>();
 let _selectedCityId: string | null = null;
 let _selectedRepoPath: string | null = null;
-
-function esc(s: string): string {
-  return s.replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-  );
-}
 
 interface MountOpts {
   target?: string;
@@ -188,8 +182,8 @@ function _renderSources(sources: NewsSource[]): void {
   const rows = sources
     .map(
       (s) => `<li class="gaceta-src-row">
-        <span class="gaceta-src-name-lbl" title="${esc(s.url)}">${esc(s.name)}</span>
-        <button class="gaceta-src-remove" data-name="${esc(s.name)}" title="Quitar fuente">✕</button>
+        <span class="gaceta-src-name-lbl" title="${escapeHtml(s.url)}">${escapeHtml(s.name)}</span>
+        <button class="gaceta-src-remove" data-name="${escapeHtml(s.name)}" title="Quitar fuente">✕</button>
       </li>`,
     )
     .join('');
@@ -281,7 +275,7 @@ function _renderTeaser(): void {
     return;
   }
   const a = _articles[_teaserIdx]!;
-  teaser.innerHTML = `[${esc(a.blogName)}] ${esc(a.title)}`;
+  teaser.innerHTML = `[${escapeHtml(a.blogName)}] ${escapeHtml(a.title)}`;
 }
 
 function _renderBadge(): void {
@@ -329,7 +323,7 @@ function _renderCategories(): void {
     `<span class="gaceta-chip ${_selectedCategory === 'all' ? 'active' : ''}" data-cat="all">[Todo]</span>`,
     ...cats.map(
       (c) =>
-        `<span class="gaceta-chip ${_selectedCategory === c.name ? 'active' : ''}" data-cat="${esc(c.name)}">[${esc(c.emoji)} ${esc(c.name)}]</span>`,
+        `<span class="gaceta-chip ${_selectedCategory === c.name ? 'active' : ''}" data-cat="${escapeHtml(c.name)}">[${escapeHtml(c.emoji)} ${escapeHtml(c.name)}]</span>`,
     ),
   ].join('');
   bar.querySelectorAll('.gaceta-chip').forEach((chip) => {
@@ -355,7 +349,7 @@ function _renderBlogs(): void {
     `<span class="gaceta-chip ${_selectedBlog === 'all' ? 'active' : ''}" data-blog="all">[Todos los blogs]</span>`,
     ...blogs.map(
       (blog) =>
-        `<span class="gaceta-chip ${_selectedBlog === blog ? 'active' : ''}" data-blog="${esc(blog)}">[${esc(blog)}]</span>`,
+        `<span class="gaceta-chip ${_selectedBlog === blog ? 'active' : ''}" data-blog="${escapeHtml(blog)}">[${escapeHtml(blog)}]</span>`,
     ),
   ].join('');
   bar.querySelectorAll('.gaceta-chip').forEach((chip) => {
@@ -402,8 +396,8 @@ function _renderList(refreshFilters = true): void {
     .map(
       (a) => `
     <li class="gaceta-item ${_selectedArticleIds.has(a.id) ? 'gaceta-item-selected' : ''}" data-article-id="${a.id}">
-      <span class="gaceta-item-meta">${a.emoji ? esc(a.emoji) + ' ' : ''}${esc(a.blogName)} · ${new Date(a.publishedDate).toLocaleDateString()}${a.category ? ` · ${esc(a.category)}` : ''}</span>
-      <a class="gaceta-item-title" href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>
+      <span class="gaceta-item-meta">${a.emoji ? escapeHtml(a.emoji) + ' ' : ''}${escapeHtml(a.blogName)} · ${new Date(a.publishedDate).toLocaleDateString()}${a.category ? ` · ${escapeHtml(a.category)}` : ''}</span>
+      <a class="gaceta-item-title" href="${escapeHtml(a.url)}" target="_blank" rel="noopener">${escapeHtml(a.title)}</a>
       <div class="gaceta-item-row">
         <button class="gaceta-mark-read" data-id="${a.id}">✓ Leído</button>
         <span class="gaceta-select-hint">↻ click para ${_selectedArticleIds.has(a.id) ? 'deseleccionar' : 'seleccionar'}</span>

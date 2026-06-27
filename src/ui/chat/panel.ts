@@ -8,7 +8,7 @@ import {
   getSidePanelCleanup,
   setSidePanelCleanup,
 } from './state.ts';
-import { escapeHtml } from './clipboard.ts';
+import { escapeHtml } from '../escapeHtml.ts';
 import { renderChatHistory, renderChatBuffer } from './history.ts';
 import { initAgentSelector } from './agentSelector.ts';
 import { initProviderSelectors } from './modelSelector.ts';
@@ -99,11 +99,11 @@ export function wireSideTabs(onTabChange: (tab: string) => void): void {
 export async function loadGitInfo(repoName: string): Promise<void> {
   const target = document.getElementById('git-info');
   if (!target) return;
-  target.innerHTML = `<div class="git-line" style="color:var(--text-dim)">consultando manuscritos de ${repoName}...</div>`;
+  target.innerHTML = `<div class="git-line" style="color:var(--text-dim)">consultando manuscritos de ${escapeHtml(repoName)}...</div>`;
   try {
     const res = await fetch(`/api/git/${encodeURIComponent(repoName)}`);
     if (!res.ok) {
-      target.innerHTML = `<div class="git-line" style="color:var(--civ-happiness)">${repoName} no es un territorio git.</div>`;
+      target.innerHTML = `<div class="git-line" style="color:var(--civ-happiness)">${escapeHtml(repoName)} no es un territorio git.</div>`;
       return;
     }
     const data = (await res.json()) as { branch: string; lastCommit: string; changes: string[] };
@@ -131,14 +131,14 @@ export async function loadGitInfo(repoName: string): Promise<void> {
       ${changesHtml}
     `;
   } catch (e) {
-    target.innerHTML = `<div class="git-line" style="color:var(--civ-happiness)">Error: ${String(e)}</div>`;
+    target.innerHTML = `<div class="git-line" style="color:var(--civ-happiness)">Error: ${escapeHtml(String(e))}</div>`;
   }
 }
 
 export async function loadFilesInfo(repoName: string): Promise<void> {
   const target = document.getElementById('files-info');
   if (!target) return;
-  target.innerHTML = `<div class="file-row" style="color:var(--text-dim)">explorando archivos de ${repoName}...</div>`;
+  target.innerHTML = `<div class="file-row" style="color:var(--text-dim)">explorando archivos de ${escapeHtml(repoName)}...</div>`;
   try {
     const res = await fetch(`/api/files/${encodeURIComponent(repoName)}`);
     if (!res.ok) {
@@ -153,6 +153,6 @@ export async function loadFilesInfo(repoName: string): Promise<void> {
             .map((f) => `<div class="file-row" style="padding:2px 0">${escapeHtml(f)}</div>`)
             .join('');
   } catch (e) {
-    target.innerHTML = `<div class="file-row" style="color:var(--civ-happiness)">Error: ${String(e)}</div>`;
+    target.innerHTML = `<div class="file-row" style="color:var(--civ-happiness)">Error: ${escapeHtml(String(e))}</div>`;
   }
 }
