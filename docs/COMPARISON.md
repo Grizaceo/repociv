@@ -27,7 +27,7 @@
 
 | Feature | AgentCraft | RepoCiv | Notes |
 |---------|------------|---------|-------|
-| Map renderer | Three.js 3D | Canvas 2D | AgentCraft is visually richer. RepoCiv is deliberately 2D for readability. |
+| Map renderer | Three.js 3D | Canvas 2D + optional WebGL/Three.js | AgentCraft is visually richer out of the box. RepoCiv defaults to 2D for readability; WebGL mode (`3`) adds a Civ V-style 3D pass. |
 | Hex/tile grid | 3D hex map | 2D hex map (Civ V style) | Both use hex grids. Different visual depth. |
 | City visualization | Buildings on 3D terrain | Flat hex tiles with labels | AgentCraft wins on visual impact. |
 | Agent units | 3D hero models with skins | Colored circles with type icons | RepoCiv prioritizes readability over cosmetics. |
@@ -112,8 +112,9 @@
    want agents to appear on a map without configuration, AgentCraft is
    the choice.
 
-3. **3D renderer.** Three.js 3D is more visually impressive than Canvas 2D.
-   If the visual experience matters to you, AgentCraft looks better.
+3. **3D renderer.** Three.js 3D is more visually impressive than RepoCiv's
+   default Canvas 2D view. RepoCiv ships an optional WebGL pass (`3`), but
+   AgentCraft's 3D is still more polished out of the box.
 
 4. **Community features.** Achievements, skins, skill scrolls, and multiplayer
    are real features that make AgentCraft feel alive. RepoCiv deliberately
