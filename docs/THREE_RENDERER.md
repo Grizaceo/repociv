@@ -1,5 +1,7 @@
 # Three.js WebGL Map Renderer
 
+> ⚠️ **Documento histórico — puede estar desactualizado.** El render WebGL/Three.js es **oficial en trunk** (opt-in con `3` o `?renderer=webgl`). Ver [SCOPE.md](./SCOPE.md) para el canon actual.
+
 Experimental **global map** renderer on branch `feat/3d-renderer`. The default trunk view remains **iso25d** unless you opt in.
 
 Local office view (`localRenderer`) stays **Canvas 2D** — unchanged.

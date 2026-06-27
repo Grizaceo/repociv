@@ -48,23 +48,18 @@ Run `npm test -- --run` and `python3 -m pytest server/ -q` for current counts.
 
 These are the pain points identified during daily use:
 
-**1. WebSocket bidirectional transport**
-SSE is one-way (server -> client). For approval flows, streaming agent
-output, and real-time terminal, bidirectional WebSocket is needed.
-The SSE fallback will be maintained for backward compatibility.
-
-**2. Remote access via Tailscale**
+**1. Remote access via Tailscale**
 The dashboard currently runs only on localhost. Serving it over Tailscale
 with proper auth allows mobile and laptop access without exposing the
 bridge to the public internet. Required for true daily use.
 
-**3. Gran Biblioteca — The Agent Component Catalog**
+**2. Gran Biblioteca — The Agent Component Catalog**
 A catalog of pre-built, domain-specific agent components (legal agent,
 cybersecurity scanner, protein design assistant, financial analyst) with
 standardized interfaces for plug-and-play reuse. Each component is a
 self-contained skill that can be dropped into any agent stack.
 
-**4. One-liner installer**
+**3. One-liner installer**
 The current setup (clone + npm install + venv + pip + two terminals) is too
 many steps. Target: `npx @repociv/cli` or `brew install repociv`.
 

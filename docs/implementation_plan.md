@@ -1,5 +1,7 @@
 # Plan Maestro Definitivo: RepoCiv v2.0 — Agent OS Industrial (Post-Review)
 
+> ⚠️ **Documento histórico — puede estar desactualizado.** Para el scope y decisiones actuales del trunk, ver [SCOPE.md](./SCOPE.md).
+
 **Fecha:** 2026-05-01 · **Revisión:** Incorpora 3 ajustes críticos de reseña DAVI + 6 repos adicionales + recalibración 10 semanas
 
 ---

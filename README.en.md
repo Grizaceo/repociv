@@ -62,7 +62,15 @@ npm install
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+
+# Assets (mandatory before first run — not tracked in git)
+npm run assets
+npm run assets:3d
 ```
+
+> **Mandatory assets.** PNG/WebP atlases and 3D textures are not versioned in git.
+> After cloning, run `npm run assets` and `npm run assets:3d` before `npm run dev`
+> or the map may render without terrain, props, or the isometric office view.
 
 ### 2. Configure
 
@@ -142,11 +150,11 @@ REPOCIV_MAP_ROOT=~/projects
        └─ ...
 ```
 
-- **Macro:** hex map in 2D or 3D WebGL (key `3` or toolbar button to toggle)
+- **Macro:** hex map in 2D (default) or 3D WebGL — key `3` or toolbar button toggles `flat` ↔ `webgl`
 - **Local:** double-click a city → interior isometric office view
   - **Workbenches** are files/folders prioritized by the Priority Matrix
   - **Units** walk toward workbenches with cached A* (≤300 hexes)
-- `Space` or key `3` toggles between the two views
+- `Esc` exits local view and returns to the macro map
 
 ---
 
@@ -156,11 +164,13 @@ RepoCiv exposes an **HTTP + WebSocket bridge** that any agent can connect to:
 
 ```bash
 # The bridge listens on localhost:5274 by default
-# Endpoints it understands:
-POST /api/command          # send a mission to an agent
-GET  /api/agents           # list active agents
-GET  /api/pending          # pending approval queue
-POST /api/approve/:id      # approve/reject an action
+# Main endpoints:
+POST /commands                    # submit a command to the bus
+GET  /agents                      # list active agents
+GET  /pending                     # pending task queue
+GET  /approvals                   # commands awaiting approval
+POST /approvals/<id>/approve      # approve a pending command
+POST /approvals/<id>/reject       # reject a pending command
 ```
 
 See [docs/API.md](docs/API.md) for the full reference.
@@ -180,7 +190,7 @@ RepoCiv is also exposed as an **MCP server over stdio** (`server/mcp_server.py`)
 }
 ```
 
-43 tools covering 15 domains with MCP tools: agents, commands, approvals, pending, context, GPU, wonders, graph-relations, foreign-relations and more. See [docs/MCP.md](docs/MCP.md).
+44 tools covering 15 domains with MCP tools: agents, commands, approvals, pending, context, GPU, wonders, graph-relations, foreign-relations and more. See [docs/MCP.md](docs/MCP.md).
 
 ---
 
@@ -236,7 +246,7 @@ It is useful for auditing long sessions without opening external logs: the "stor
 
 | Key | Action |
 |-----|--------|
-| `Q` `W` `E` `O` | Spawn orchestrator / WORKER / SCOUT / OPENCLAW |
+| `Q` `W` `E` `O` `C` `X` `R` | Spawn MAIN / WORKER / SCOUT / OPENCLAW / CLAUDE / CODEX / CURSOR |
 | `1`–`9` | Select hero by slot |
 | `Space` | Cycle to next idle hero |
 | `Tab` | Cycle all heroes |
@@ -250,9 +260,11 @@ It is useful for auditing long sessions without opening external logs: the "stor
 | `A` | Pending approvals |
 | `T` | Terminal panel |
 | `N` | News gazette |
-| `3` | Toggle Macro ↔ Local view |
+| `3` | Toggle 2D (`flat`) ↔ WebGL (`webgl`) render |
 | `F11` | Settings panel |
 | `?` | Keyboard help |
+
+**Local view:** double-click a city to enter; `Esc` to return to the macro map.
 
 ---
 
@@ -290,7 +302,7 @@ server/
 ├── bridge.py            FastAPI bridge (entry point: python -m server.bridge)
 ├── http_routes.py       All HTTP endpoints
 ├── websocket_handler.py Bidirectional WebSocket
-├── mcp_server.py        MCP stdio server (43 tools)
+├── mcp_server.py        MCP stdio server (44 tools)
 ├── agent_runner.py      Runs agents (Hermes, Claude, Codex, OpenRouter…)
 ├── process_scanner.py   Detects processes → automatic spawns
 ├── task_orchestrator.py Priority task queue
@@ -302,10 +314,11 @@ server/
 ## Tests
 
 ```bash
-# Frontend (Vitest) — 423 tests
-npm test -- --run
+# Full suite (types, lint, tests, build, budgets)
+./scripts/check.sh
 
-# Backend (pytest) — 661 passed, 1 skipped
+# Or individually:
+npm test -- --run
 python3 -m pytest server/ -q
 ```
 
@@ -332,7 +345,7 @@ python3 -m pytest server/ -q
 |-----|----------|
 | [docs/SCOPE.md](docs/SCOPE.md) | What the project is and isn't |
 | [docs/API.md](docs/API.md) | Full endpoint reference |
-| [docs/MCP.md](docs/MCP.md) | MCP server — 43 tools, examples |
+| [docs/MCP.md](docs/MCP.md) | MCP server — 44 tools, examples |
 | [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | Step-by-step tutorial |
 | [docs/REMOTE_ACCESS.md](docs/REMOTE_ACCESS.md) | Remote access via Tailscale |
 | [docs/EVOLUTION.md](docs/EVOLUTION.md) | Project history |
