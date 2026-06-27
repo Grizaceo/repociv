@@ -20,12 +20,15 @@ import {
   listAffectedFeatures,
   type HermesStatus,
 } from '../hermesStatus.ts';
+import { registerPoll, type PollUnregister } from './pollScheduler.ts';
 
 const BANNER_ID = 'hermes-degraded-banner';
 const SESSION_DISMISS_KEY = 'repociv:hermes-banner-dismissed';
 const POLL_MS = 30_000; // bridge cache is 30s; no point polling faster
 
-let _pollHandle: number | null = null;
+const POLL_ID = 'hermes-banner';
+
+let _stopPoll: PollUnregister | null = null;
 
 export function isHermesBannerDismissed(): boolean {
   try {
@@ -118,44 +121,48 @@ export async function mountHermesStatusBanner(): Promise<void> {
       document.getElementById('app')?.prepend(el);
     }
   }
-  // Poll loop
-  if (_pollHandle != null) return;
-  _pollHandle = window.setInterval(async () => {
-    try {
-      const next = await checkHermesStatus();
-      const existing = document.getElementById(BANNER_ID);
-      if (next.available) {
-        existing?.remove();
-        return;
-      }
-      if (existing) {
-        // Re-render in case error/url changed
-        const html = buildHermesBannerHtml(next);
-        if (html) {
-          existing.innerHTML = html;
-          wireBannerEvents(existing);
-        } else {
-          // Was dismissed this session
-          existing.remove();
-        }
-      } else {
-        const html = buildHermesBannerHtml(next);
-        if (html) {
-          const el = renderBanner(html);
-          document.getElementById('app')?.prepend(el);
-        }
-      }
-    } catch {
-      // Network blip — leave the previous banner as-is
+  // Poll loop (first paint above; scheduler handles subsequent ticks)
+  if (_stopPoll) return;
+  _stopPoll = registerPoll(POLL_ID, () => void _pollHermesBanner(), POLL_MS, {
+    immediate: false,
+  });
+}
+
+async function _pollHermesBanner(): Promise<void> {
+  try {
+    const next = await checkHermesStatus();
+    const existing = document.getElementById(BANNER_ID);
+    if (next.available) {
+      existing?.remove();
+      return;
     }
-  }, POLL_MS);
+    if (existing) {
+      // Re-render in case error/url changed
+      const html = buildHermesBannerHtml(next);
+      if (html) {
+        existing.innerHTML = html;
+        wireBannerEvents(existing);
+      } else {
+        // Was dismissed this session
+        existing.remove();
+      }
+    } else {
+      const html = buildHermesBannerHtml(next);
+      if (html) {
+        const el = renderBanner(html);
+        document.getElementById('app')?.prepend(el);
+      }
+    }
+  } catch {
+    // Network blip — leave the previous banner as-is
+  }
 }
 
 /** Stop the poll loop. Tests use this to clean up between cases. */
 export function unmountHermesStatusBanner(): void {
-  if (_pollHandle != null) {
-    window.clearInterval(_pollHandle);
-    _pollHandle = null;
+  if (_stopPoll) {
+    _stopPoll();
+    _stopPoll = null;
   }
   document.getElementById(BANNER_ID)?.remove();
 }

@@ -9,12 +9,13 @@ import {
 } from './recoveryPanel';
 import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
+import { registerPoll, type PollUnregister } from './pollScheduler.ts';
 
 const POLL_MS = 15_000; // harnesses don't change often — poll slowly
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 let _panel: HTMLElement | null = null;
-let _timer: ReturnType<typeof setInterval> | 0 = 0;
+let _stopPoll: PollUnregister | null = null;
 let _visible = false;
 let _harnesses: HarnessDescriptor[] = [];
 
@@ -41,10 +42,7 @@ export function toggleHarnessPanel() {
 
 export function startHarnessPolling() {
   _stopPolling();
-  void _fetch();
-  _timer = setInterval(() => {
-    void _fetch();
-  }, POLL_MS);
+  _stopPoll = registerPoll('harness', () => void _fetch(), POLL_MS);
 }
 
 export function stopHarnessPolling() {
@@ -53,9 +51,9 @@ export function stopHarnessPolling() {
 
 // ─── Polling ──────────────────────────────────────────────────────────────────
 function _stopPolling() {
-  if (_timer) {
-    clearInterval(_timer);
-    _timer = 0;
+  if (_stopPoll) {
+    _stopPoll();
+    _stopPoll = null;
   }
 }
 

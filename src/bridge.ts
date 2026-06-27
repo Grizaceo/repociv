@@ -23,26 +23,29 @@ import { terminalPanel } from './terminalPanel.ts';
 import { bridgeHeaders, bridgeUrl, BRIDGE_URL, BRIDGE_TOKEN } from './bridgeEnv.ts';
 import { RepoCivWebSocket } from './websocket.ts';
 import { dispatchBridgeEvent, type MessageContext } from './bridgeMessageHandlers.ts';
+import { registerPoll, type PollUnregister } from './ui/pollScheduler.ts';
 
 const DEMO_INTERVAL_MS = 30_000;
 const OFFLINE_DEMO_THRESHOLD_MS = 10_000;
 
 export class BridgeEvents {
   private state: GameState;
-  private healthInterval = 0;
+  private stopHealthPoll: PollUnregister | null = null;
+  private stopGpuPoll: PollUnregister | null = null;
   private reconnectDelay = 1000;
   private offlineSince: number | null = null;
   private demoInterval: ReturnType<typeof setInterval> | null = null;
   private lastHealthFlags: { cursor?: boolean } = {};
-  private gpuInterval = 0;
   rendererRef: { panTo: (x: number, y: number) => void } | null = null;
 
   // ─── Transports ──────────────────────────────────────────────────────────
   private ws: RepoCivWebSocket | null = null;
   private sse: EventSource | null = null;
   private sseConnected = false;
+  private sseReconnectTimer = 0;
   private wsConnected = false;
   private wsEnabled = true; // Set false after WS connection fails
+  private stopped = false;
   bridgeOnline = false;
 
   // Resolved WS URL — discovered by fetching /ws endpoint or configured
@@ -53,6 +56,7 @@ export class BridgeEvents {
   }
 
   start() {
+    this.stopped = false;
     // Try to discover WS endpoint first, fall back to SSE
     this._discoverWs();
     if (import.meta.hot) {
@@ -61,12 +65,13 @@ export class BridgeEvents {
       });
     }
     this.checkHealth();
-    this.healthInterval = window.setInterval(() => this.checkHealth(), 5000);
-    // Stagger GPU poll so both timers don't fire simultaneously
-    window.setTimeout(() => {
-      this.fetchGpu();
-      this.gpuInterval = window.setInterval(() => this.fetchGpu(), 5000);
-    }, 2500);
+    this.stopHealthPoll = registerPoll('bridge:health', () => void this.checkHealth(), 5_000, {
+      immediate: false,
+    });
+    this.stopGpuPoll = registerPoll('bridge:gpu', () => void this.fetchGpu(), 5_000, {
+      immediate: false,
+      phaseMs: 2_500,
+    });
   }
 
   /** Discover the WebSocket URL from the bridge /ws endpoint */
@@ -122,16 +127,13 @@ export class BridgeEvents {
     });
 
     this.ws.onMessage((data) => {
-      if (!this.wsConnected) {
-        this.wsConnected = true;
-        this.sseConnected = false;
-      }
       this.handleRaw(data);
     });
 
     this.ws.onStatusChange((status) => {
       if (status === 'connected') {
         this.wsConnected = true;
+        this.sseConnected = false;
         this.reconnectDelay = 1000;
         this.onBridgeOnline('hermes');
       } else if (status === 'disconnected' || status === 'auth_failed') {
@@ -155,10 +157,13 @@ export class BridgeEvents {
   // ─── SSE transport (fallback) ───────────────────────────────────────────
 
   private connectSSE() {
+    if (this.stopped) return;
     if (this.sse) this.sse.close();
     try {
       // EventSource cannot send custom headers — bridge accepts the token
-      // via query param for the SSE stream only.
+      // via query param for the SSE stream only. Limitation: the token may
+      // appear in browser history, proxy logs, and Referer headers; a
+      // short-lived ticket would require server support (not available yet).
       const tokenQs = BRIDGE_TOKEN ? `?token=${encodeURIComponent(BRIDGE_TOKEN)}` : '';
       const src = new EventSource(bridgeUrl('/events') + tokenQs);
       this.sse = src;
@@ -184,9 +189,13 @@ export class BridgeEvents {
         this.sseConnected = false;
         src.close();
         if (this.sse === src) this.sse = null;
+        if (this.stopped) return;
         const delay = this.reconnectDelay;
         this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000);
-        window.setTimeout(() => this.connectSSE(), delay);
+        this.sseReconnectTimer = window.setTimeout(() => {
+          this.sseReconnectTimer = 0;
+          this.connectSSE();
+        }, delay);
       };
     } catch (err) {
       this.sseConnected = false;
@@ -225,6 +234,11 @@ export class BridgeEvents {
               ? 'openclaw'
               : 'hermes';
         this.lastHealthFlags = { cursor: data.cursor };
+        // Bridge recovered over HTTP — retry WS if we previously fell back to SSE.
+        if (!this.wsEnabled && !this.stopped) {
+          this.wsEnabled = true;
+          this._connectWs();
+        }
         this.onBridgeOnline(mode);
         return;
       }
@@ -355,8 +369,19 @@ export class BridgeEvents {
   }
 
   stop() {
-    clearInterval(this.healthInterval);
-    clearInterval(this.gpuInterval);
+    this.stopped = true;
+    if (this.stopHealthPoll) {
+      this.stopHealthPoll();
+      this.stopHealthPoll = null;
+    }
+    if (this.stopGpuPoll) {
+      this.stopGpuPoll();
+      this.stopGpuPoll = null;
+    }
+    if (this.sseReconnectTimer) {
+      clearTimeout(this.sseReconnectTimer);
+      this.sseReconnectTimer = 0;
+    }
     this.ws?.close();
     this.ws = null;
     this.wsConnected = false;

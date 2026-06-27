@@ -7,6 +7,7 @@ import { approveCommand, rejectCommand } from '../commandBus.ts';
 import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
 import { renderEmptyState, clearEmptyState } from './emptyStates.ts';
+import { registerPoll, type PollUnregister } from './pollScheduler.ts';
 
 const POLL_MS = 3_000;
 
@@ -22,7 +23,7 @@ interface ApprovalItem {
 
 let _panel: HTMLElement | null = null;
 let _badge: HTMLElement | null = null;
-let _pollTimer = 0;
+let _stopPoll: PollUnregister | null = null;
 let _visible = false;
 let _items: ApprovalItem[] = [];
 
@@ -49,8 +50,7 @@ export function toggleApprovalPanel() {
 
 export function startApprovalPolling() {
   _stopPolling();
-  _fetchApprovals();
-  _pollTimer = window.setInterval(_fetchApprovals, POLL_MS);
+  _stopPoll = registerPoll('approvals', () => void _fetchApprovals(), POLL_MS);
 }
 
 export function stopApprovalPolling() {
@@ -59,9 +59,9 @@ export function stopApprovalPolling() {
 
 // ─── Polling ──────────────────────────────────────────────────────────────────
 function _stopPolling() {
-  if (_pollTimer) {
-    clearInterval(_pollTimer);
-    _pollTimer = 0;
+  if (_stopPoll) {
+    _stopPoll();
+    _stopPoll = null;
   }
 }
 

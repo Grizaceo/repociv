@@ -5,6 +5,7 @@ import { openRecoveryPanel } from './recoveryPanel';
 import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
 import { successRatePct, formatTokens, formatCostUsd } from './observabilityFormat.ts';
+import { registerPoll, type PollUnregister } from './pollScheduler.ts';
 // Criterion: open RepoCiv → within 10 s know if the system is healthy.
 
 const POLL_MS = 5_000;
@@ -60,7 +61,7 @@ interface Metrics {
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 let _panel: HTMLElement | null = null;
-let _timer = 0;
+let _stopPoll: PollUnregister | null = null;
 let _visible = false;
 let _metrics: Metrics | null = null;
 let _offline = false;
@@ -98,10 +99,7 @@ export function toggleObservabilityPanel() {
 
 export function startObservabilityPolling() {
   _stopPolling();
-  void _fetch();
-  _timer = window.setInterval(() => {
-    void _fetch();
-  }, POLL_MS);
+  _stopPoll = registerPoll('observability', () => void _fetch(), POLL_MS);
 }
 
 export function stopObservabilityPolling() {
@@ -110,9 +108,9 @@ export function stopObservabilityPolling() {
 
 // ─── Polling ──────────────────────────────────────────────────────────────────
 function _stopPolling() {
-  if (_timer) {
-    clearInterval(_timer);
-    _timer = 0;
+  if (_stopPoll) {
+    _stopPoll();
+    _stopPoll = null;
   }
 }
 
