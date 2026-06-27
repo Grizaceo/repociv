@@ -5,6 +5,7 @@
 
 import type { CDailyArticle, ForeignRelationsReport } from '../types.ts';
 import { generateForeignReport, listForeignReports, getForeignReport } from '../bridge.ts';
+import { escapeHtml } from './escapeHtml.ts';
 
 const STORAGE_LAST_REPORT = 'repociv-last-report';
 
@@ -27,13 +28,6 @@ const _state: PanelState = {
   recentReports: [],
   error: null,
 };
-
-function esc(s: string): string {
-  return s.replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-  );
-}
 
 function _impactEmoji(impact: string): string {
   switch (impact) {
@@ -127,11 +121,11 @@ function _renderSummary(): string {
   return `
     <div class="fr-article-summary">
       <div class="fr-article-meta">
-        <span>${esc(first.emoji ?? '📰')} ${esc(first.blogName)} · ${new Date(first.publishedDate).toLocaleDateString()}</span>
+        <span>${escapeHtml(first.emoji ?? '📰')} ${escapeHtml(first.blogName)} · ${new Date(first.publishedDate).toLocaleDateString()}</span>
       </div>
-      <div class="fr-article-title">${count === 1 ? esc(first.title) : `${esc(first.title)} + ${count - 1} noticia(s)`}</div>
+      <div class="fr-article-title">${count === 1 ? escapeHtml(first.title) : `${escapeHtml(first.title)} + ${count - 1} noticia(s)`}</div>
       <div class="fr-article-meta">${count} noticia(s) seleccionada(s)</div>
-      ${first.category ? `<span class="fr-category-badge">[${esc(first.category)}]</span>` : ''}
+      ${first.category ? `<span class="fr-category-badge">[${escapeHtml(first.category)}]</span>` : ''}
     </div>
   `;
 }
@@ -147,11 +141,11 @@ function _renderGenerateArea(): string {
       <div class="fr-target-info">
         <div class="fr-target-row">
           <span>🎯 Ciudad destino:</span>
-          <input type="text" id="fr-city-id" class="fr-input" value="${esc(cityValue)}" placeholder="repociv / financial-lab / nombre de ciudad" />
+          <input type="text" id="fr-city-id" class="fr-input" value="${escapeHtml(cityValue)}" placeholder="repociv / financial-lab / nombre de ciudad" />
         </div>
         <div class="fr-target-row">
           <span>📁 Repositorio:</span>
-          <input type="text" id="fr-repo-path" class="fr-input" value="${esc(repoValue)}" placeholder="~/workspace/repos/..." />
+          <input type="text" id="fr-repo-path" class="fr-input" value="${escapeHtml(repoValue)}" placeholder="~/workspace/repos/..." />
         </div>
       </div>
       <div class="fr-actions">
@@ -159,7 +153,7 @@ function _renderGenerateArea(): string {
           ${_state.generating ? '⏳ Generando...' : `🔍 Generar Informe (${count})`}
         </button>
       </div>
-      ${_state.error ? `<div class="fr-error">${esc(_state.error)}</div>` : ''}
+      ${_state.error ? `<div class="fr-error">${escapeHtml(_state.error)}</div>` : ''}
     </div>
   `;
 }
@@ -176,25 +170,25 @@ function _renderReportHTML(): string {
       <button id="fr-back-btn" class="fr-btn fr-btn-secondary">← Volver</button>
 
       <div class="fr-report-header">
-        <h3>${esc(r.title)}</h3>
+        <h3>${escapeHtml(r.title)}</h3>
       </div>
 
       <div class="fr-report-meta">
-        <span class="fr-meta-badge">${_impactEmoji(r.impact)} Impacto: ${r.impact}</span>
+        <span class="fr-meta-badge">${_impactEmoji(r.impact)} Impacto: ${escapeHtml(r.impact)}</span>
         <span class="fr-meta-badge">📊 Confianza: ${conf} (${(r.confidence * 100).toFixed(0)}%)</span>
-        <span class="fr-meta-badge">🤖 ${esc(r.agentId)}</span>
+        <span class="fr-meta-badge">🤖 ${escapeHtml(r.agentId)}</span>
         ${!hasLLM ? '<span class="fr-meta-badge fr-meta-warn">⚠ Solo heurísticas</span>' : ''}
         <span class="fr-meta-badge">🆔 ${r.id.slice(0, 8)}</span>
       </div>
 
       <div class="fr-report-section">
         <h4>Resumen</h4>
-        <p>${esc(r.summary)}</p>
+        <p>${escapeHtml(r.summary)}</p>
       </div>
 
       <div class="fr-report-section">
         <h4>Por qué importa</h4>
-        <p>${esc(r.impact === 'none' ? 'La relación actual es débil o no clara.' : `El reporte detecta impacto ${r.impact} sobre ${r.targetCityId}.`)}</p>
+        <p>${escapeHtml(r.impact === 'none' ? 'La relación actual es débil o no clara.' : `El reporte detecta impacto ${r.impact} sobre ${r.targetCityId}.`)}</p>
       </div>
 
       <div class="fr-report-section">
@@ -210,8 +204,8 @@ function _renderReportHTML(): string {
               (e) => `
             <li>
               <span class="fr-evidence-type">${e.type === 'article' ? '📰' : e.type === 'repo_file' ? '📁' : e.type === 'event' ? '🔔' : '🔗'}</span>
-              <span class="fr-evidence-ref">${esc(e.ref)}</span>
-              ${e.quote ? `<span class="fr-evidence-quote"> — ${esc(e.quote.slice(0, 120))}</span>` : ''}
+              <span class="fr-evidence-ref">${escapeHtml(e.ref)}</span>
+              ${e.quote ? `<span class="fr-evidence-quote"> — ${escapeHtml(e.quote.slice(0, 120))}</span>` : ''}
             </li>
           `,
             )
@@ -226,8 +220,8 @@ function _renderReportHTML(): string {
             .map(
               (rec) => `
             <li>
-              <span class="fr-rec-risk ${rec.risk}">[${rec.risk}]</span>
-              <span>${esc(rec.label)}</span>
+              <span class="fr-rec-risk ${escapeHtml(rec.risk)}">[${escapeHtml(rec.risk)}]</span>
+              <span>${escapeHtml(rec.label)}</span>
             </li>
           `,
             )
@@ -240,7 +234,7 @@ function _renderReportHTML(): string {
           ? `
       <div class="fr-report-section">
         <h4>Informe completo</h4>
-        <pre class="fr-markdown">${esc(r.markdown.slice(0, 2500))}</pre>
+        <pre class="fr-markdown">${escapeHtml(r.markdown.slice(0, 2500))}</pre>
       </div>
       `
           : ''
@@ -328,9 +322,9 @@ function _renderRecentReports(): void {
       ${reports
         .map(
           (r) => `
-        <div class="fr-recent-item" data-id="${esc(r.id)}">
-          <span>${_impactEmoji(r.impact)} ${esc(r.title.slice(0, 60))}</span>
-          <span class="fr-recent-meta">${esc(r.targetCityId)} · ${_confidenceLabel(r.confidence)}</span>
+        <div class="fr-recent-item" data-id="${escapeHtml(r.id)}">
+          <span>${_impactEmoji(r.impact)} ${escapeHtml(r.title.slice(0, 60))}</span>
+          <span class="fr-recent-meta">${escapeHtml(r.targetCityId)} · ${_confidenceLabel(r.confidence)}</span>
         </div>
       `,
         )

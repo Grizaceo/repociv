@@ -28,6 +28,7 @@ import {
   type SpatialDirective,
 } from './spatialDirectives.ts';
 import { hideDirectivePreview, hideContextMenu } from './ui/spatialPreview.ts';
+import { escapeHtml } from './ui/escapeHtml.ts';
 import { relocateCity, canRelocateCityTo } from './map.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { HEX_SIZE } from './constants.ts';
@@ -1774,15 +1775,15 @@ export class Renderer {
             : unit.type === 'scout'
               ? '◈'
               : '◆';
-      parts.push(`<span class="bc-segment ${unit.type}">${unit.name}</span>`);
+      parts.push(`<span class="bc-segment ${unit.type}">${escapeHtml(unit.name)}</span>`);
       if (unit.state) {
         parts.push(`<span class="bc-separator">·</span>`);
-        parts.push(`<span class="bc-segment" style="opacity:0.7">${unit.state}</span>`);
+        parts.push(`<span class="bc-segment" style="opacity:0.7">${escapeHtml(unit.state)}</span>`);
       }
       if (unit.mission) {
         parts.push(`<span class="bc-separator">·</span>`);
         parts.push(
-          `<span class="bc-segment" style="opacity:0.6">${unit.mission.slice(0, 30)}</span>`,
+          `<span class="bc-segment" style="opacity:0.6">${escapeHtml(unit.mission.slice(0, 30))}</span>`,
         );
       }
       const swarm = this.state.getChildrenOfUnit(unit.id).filter((c) => c.ephemeral).length;
@@ -1792,7 +1793,7 @@ export class Renderer {
       }
     } else if (city) {
       iconChar = city.isCapital ? '★' : '⬡';
-      parts.push(`<span class="bc-segment city">${city.name}</span>`);
+      parts.push(`<span class="bc-segment city">${escapeHtml(city.name)}</span>`);
       if (city.population) {
         parts.push(`<span class="bc-separator">·</span>`);
         parts.push(`<span class="bc-segment" style="opacity:0.7">pop ${city.population}</span>`);
@@ -1852,21 +1853,21 @@ export class Renderer {
       building: 'Building',
     };
     const lines = [
-      `<strong>${unit.name}</strong>`,
-      `State: ${stateLabel[unit.state] ?? unit.state}`,
+      `<strong>${escapeHtml(unit.name)}</strong>`,
+      `State: ${escapeHtml(stateLabel[unit.state] ?? unit.state)}`,
     ];
     if (unit.ephemeral && unit.parentUnitId) {
       const run = unit.subagentRunId ? this.state.subagents.get(unit.subagentRunId) : undefined;
       const kind = run?.kind ?? unit.type;
       const harness = run?.harness ?? run?.parentHarness ?? '';
       const parent = this.state.getUnit(unit.parentUnitId);
-      const harnessBit = harness ? ` · ${harness}` : '';
+      const harnessBit = harness ? ` · ${escapeHtml(harness)}` : '';
       lines.unshift(
-        `Detachment · ${kind}${harnessBit} · padre: ${parent?.name ?? unit.parentUnitId}`,
+        `Detachment · ${escapeHtml(kind)}${harnessBit} · padre: ${escapeHtml(parent?.name ?? unit.parentUnitId)}`,
       );
     }
-    if (unit.mission) lines.push(`Mission: ${unit.mission}`);
-    if (unit.cityId) lines.push(`Repo: ${unit.cityId}`);
+    if (unit.mission) lines.push(`Mission: ${escapeHtml(unit.mission)}`);
+    if (unit.cityId) lines.push(`Repo: ${escapeHtml(unit.cityId)}`);
     this.unitTooltipEl.innerHTML = lines.join('<br>');
     this.unitTooltipEl.style.display = 'block';
     this.unitTooltipEl.style.left = `${clientX + 14}px`;
