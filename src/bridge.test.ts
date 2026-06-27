@@ -616,14 +616,26 @@ describe('BridgeEvents handleBridgeEvent', () => {
     bridge.stop();
   });
 
-  it('stop() closes SSE connection', async () => {
+  it('stop() clears health/gpu intervals and prevents SSE reconnect', async () => {
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+
     const state = makeState();
     const bridge = new BridgeEvents(state);
     bridge.start();
-    await vi.advanceTimersByTimeAsync(100);
-    const src = FakeEventSource.instances[0]!;
+
+    await vi.advanceTimersByTimeAsync(3000);
     bridge.stop();
-    expect(src.closed).toBe(true);
+
+    expect(clearIntervalSpy).toHaveBeenCalled();
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+
+    const sseCountBefore = FakeEventSource.instances.length;
+    vi.advanceTimersByTime(60_000);
+    expect(FakeEventSource.instances.length).toBe(sseCountBefore);
+
+    clearIntervalSpy.mockRestore();
+    clearTimeoutSpy.mockRestore();
   });
 });
 
@@ -683,6 +695,12 @@ class FakeWebSocket {
   open() {
     this.readyState = FakeWebSocket.OPEN;
     this._onopen?.();
+  }
+
+  /** Complete WS auth handshake (server sends auth_ok) */
+  authenticate() {
+    this.open();
+    this.message({ type: 'auth_ok' });
   }
 
   /** Simulate server sending a message */
@@ -765,7 +783,7 @@ describe('BridgeEvents WS transport', () => {
     await vi.advanceTimersByTimeAsync(200);
 
     const ws = FakeWebSocket.instances[0]!;
-    ws.open();
+    ws.authenticate();
     ws.message({ type: 'unit_spawn', unit: 'MAIN', civ: 'gris', hex: [0, 0] });
 
     expect(state.spawned).toEqual(['MAIN']);
@@ -799,7 +817,7 @@ describe('BridgeEvents WS transport', () => {
     await vi.advanceTimersByTimeAsync(200);
 
     const ws = FakeWebSocket.instances[0]!;
-    ws.open();
+    ws.authenticate();
 
     // Clear the auth message sent on open
     ws.sentMessages = [];
@@ -822,7 +840,7 @@ describe('BridgeEvents WS transport', () => {
     await vi.advanceTimersByTimeAsync(200);
 
     const ws = FakeWebSocket.instances[0]!;
-    ws.open();
+    ws.authenticate();
 
     // Clear the auth message sent on open
     ws.sentMessages = [];
