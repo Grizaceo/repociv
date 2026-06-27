@@ -38,7 +38,6 @@ export class RepoCivWebSocket {
   private closed = false;
   private messageHandlers: Set<MessageHandler> = new Set();
   private statusHandlers: Set<StatusHandler> = new Set();
-  private healthInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(config: WsConfig) {
     this.config = {
@@ -93,9 +92,9 @@ export class RepoCivWebSocket {
 
   // ─── Send ───────────────────────────────────────────────────────────────
 
-  /** Send a JSON message. Returns false if not connected. */
+  /** Send a JSON message. Returns false if not connected and authenticated. */
   send(data: Record<string, unknown>): boolean {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    if (!this.isConnected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
       logger.warn('[ws] cannot send — not connected');
       return false;
     }
@@ -176,13 +175,14 @@ export class RepoCivWebSocket {
     if (!this.ws) return;
     const token = this.config.token;
     if (token) {
-      this.send({ type: 'auth', token });
-      // Wait for auth_ok response; temporarily handle it in message loop
-      // If auth fails, connection will be closed by server
-      this._setStatus('connected'); // Optimistic — server rejects if invalid
-    } else {
-      this._setStatus('connected');
+      // Auth handshake uses raw socket send — status stays 'connecting' until auth_ok.
+      try {
+        this.ws.send(JSON.stringify({ type: 'auth', token }));
+      } catch (err) {
+        logger.warn('[ws] auth send error:', err);
+      }
     }
+    // Dev mode (no token): server auto-sends auth_ok; remain 'connecting' until then.
   }
 
   private _handleMessage(data: Record<string, unknown>): void {
@@ -196,8 +196,11 @@ export class RepoCivWebSocket {
       return;
     }
 
-    // auth_ok is a protocol-level handshake — consume silently
-    if (msgType === 'auth_ok') return;
+    // auth_ok completes the handshake — only then are we fully connected
+    if (msgType === 'auth_ok') {
+      this._setStatus('connected');
+      return;
+    }
 
     // Handle pong (server heartbeat response)
     if (msgType === 'pong') return;
@@ -239,10 +242,6 @@ export class RepoCivWebSocket {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
-    }
-    if (this.healthInterval) {
-      clearInterval(this.healthInterval);
-      this.healthInterval = null;
     }
   }
 }
