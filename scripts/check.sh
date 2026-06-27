@@ -4,10 +4,11 @@
 # Runs all checks that the project considers blocking:
 #   1. tsc --noEmit          (TypeScript types)
 #   2. eslint --max-warnings=0 (TS/TSX lint, zero warnings)
-#   3. vitest run --coverage (TS unit tests + enforced coverage floor)
-#   4. vite build            (production bundle smoke)
-#   5. ruff check server/    (Python lint)
-#   6. pytest -q             (Python unit tests)
+#   3. prettier --check      (TS/TSX/CSS formatting)
+#   4. vitest run --coverage (TS unit tests + enforced coverage floor)
+#   5. vite build            (production bundle smoke)
+#   6. ruff check server/    (Python lint)
+#   7. pytest --cov=server   (Python unit tests + coverage floor)
 #
 # Exit code is the first failure (or 0 on full green). Designed to be
 # idempotent and safe to run repeatedly. No `set -e` global because we
@@ -40,13 +41,14 @@ run_step() {
 # Frontend
 run_step "tsc --noEmit"                   npx --no-install tsc --noEmit
 run_step "eslint (max-warnings=0)"       npm run -s lint
+run_step "prettier --check"              npm run -s format:check
 run_step "vitest run --coverage"          npx --no-install vitest run --coverage
 run_step "vite build"                     npx --no-install vite build
 
 # Backend
 run_step "ruff check server/"             ruff check server/
 run_step "ruff check scripts/"            ruff check scripts/
-run_step "pytest -q"                      pytest -q
+run_step "pytest --cov=server (≥50%)"     pytest --cov=server --cov-fail-under=50 -q
 
 # Asset budget: the 3 terrain atlas PNGs must stay under 6MB combined.
 # (The Blender/numpy generators can silently fatten them; tracked binaries
