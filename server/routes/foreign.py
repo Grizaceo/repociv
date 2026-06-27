@@ -219,10 +219,48 @@ def delete_report_by_id(ctx: dict[str, Any], _body: dict[str, Any]) -> tuple[int
                       "Check existing reports: GET /api/foreign/reports")
     return 200, {"ok": True, "deleted": report_id}
 
+_FILE_TREE_MAX_DEPTH = 32
+_FILE_TREE_MAX_FILES = 10_000
+_FILE_TREE_SKIP_NAMES = frozenset({"__pycache__", "node_modules", "dist", "build", ".git"})
+
+
+class _FileTreeLimitExceeded(Exception):
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(message)
+
+
+def _configured_repos_root() -> Path:
+    from server import repo_roots_state as _rrs
+
+    state_root = _rrs.active_root()
+    if state_root:
+        return Path(os.path.expanduser(state_root)).resolve()
+    map_root = (
+        os.environ.get("REPOCIV_MAP_ROOT")
+        or os.environ.get("REPOCIV_REPOS_ROOT")
+        or os.environ.get("WORKSPACE_ROOT")
+        or str(Path.home() / ".hermes" / "workspace" / "repos")
+    )
+    return Path(os.path.expanduser(map_root)).resolve()
+
+
+def _path_under_root(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def _symlink_stays_under_root(entry: Path, repos_root: Path) -> bool:
+    if not entry.is_symlink():
+        return True
+    return _path_under_root(entry, repos_root)
+
+
 def get_repo_file_tree(ctx: "RouteContext") -> tuple[int, Any]:
     """GET /api/files/{repoId} — return file tree for local view generation."""
-    from pathlib import Path
-
     from server import repo_roots_state as _rrs
 
     def _extract_repo_id(raw_path: str) -> str:
@@ -258,23 +296,40 @@ def get_repo_file_tree(ctx: "RouteContext") -> tuple[int, Any]:
         return 400, {"error": "Missing repo path"}
 
     try:
+        repos_root = _configured_repos_root()
         repo_path = Path(path).expanduser().resolve()
+        if not _path_under_root(repo_path, repos_root):
+            return _error(
+                403,
+                "Repository path outside allowed root",
+                f"Resolved path {repo_path} is not under {repos_root}",
+                "Use a repository under the configured workspace root",
+            )
         if not repo_path.is_dir():
             return 404, {"error": f"Repository not found: {path}"}
 
         files: list[str] = []
 
-        # Build file tree
-        def build_tree(dir_path: Path, rel_path: str = "") -> dict:
+        def build_tree(dir_path: Path, rel_path: str = "", depth: int = 0) -> dict:
+            if depth > _FILE_TREE_MAX_DEPTH:
+                raise _FileTreeLimitExceeded(
+                    f"Directory tree exceeds max depth ({_FILE_TREE_MAX_DEPTH})"
+                )
             node = {"name": dir_path.name or dir_path.name, "path": rel_path, "type": "dir", "children": []}
             try:
                 for item in sorted(dir_path.iterdir(), key=lambda x: (x.is_file(), x.name.lower())):
-                    if item.name.startswith(".") or item.name in ("__pycache__", "node_modules", "dist", "build", ".git"):
+                    if item.name.startswith(".") or item.name in _FILE_TREE_SKIP_NAMES:
+                        continue
+                    if not _symlink_stays_under_root(item, repos_root):
                         continue
                     item_rel = os.path.join(rel_path, item.name)
                     if item.is_dir():
-                        node["children"].append(build_tree(item, item_rel))
+                        node["children"].append(build_tree(item, item_rel, depth + 1))
                     else:
+                        if len(files) >= _FILE_TREE_MAX_FILES:
+                            raise _FileTreeLimitExceeded(
+                                f"Directory tree exceeds max file count ({_FILE_TREE_MAX_FILES})"
+                            )
                         files.append(item_rel)
                         node["children"].append({
                             "name": item.name,
@@ -288,5 +343,7 @@ def get_repo_file_tree(ctx: "RouteContext") -> tuple[int, Any]:
         tree = build_tree(repo_path, repo_path.name)
         return 200, {"tree": tree, "files": files, "repoId": repo_id or repo_path.name}
 
+    except _FileTreeLimitExceeded as exc:
+        return 400, {"error": exc.message}
     except Exception as e:
         return 500, {"error": str(e)}
