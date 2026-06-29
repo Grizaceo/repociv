@@ -34,6 +34,9 @@ from server.routes.core import post_default_harness  # noqa: F401
 from server.routes.core import get_profiles  # noqa: F401
 from server.routes.core import post_profiles  # noqa: F401
 from server.routes.core import post_profiles_delete  # noqa: F401
+from server.routes.core import get_profile_identity  # noqa: F401
+from server.routes.core import post_profile_identity  # noqa: F401
+from server.routes.core import get_profile_harness_options  # noqa: F401
 from server.routes.core import get_providers_live  # noqa: F401
 from server.routes.core import get_log  # noqa: F401
 from server.routes.core import get_ws_info  # noqa: F401

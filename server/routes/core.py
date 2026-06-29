@@ -339,6 +339,10 @@ def post_profiles(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]
             profile_path=body.get("profile_path"),
             model=body.get("model"),
             provider=body.get("provider"),
+            harness_ref=body.get("harness_ref"),
+            display_name=body.get("display_name"),
+            identity_mode=body.get("identity_mode"),
+            slot_order=body.get("slot_order"),
         )
     except ValueError as exc:
         return 400, {"error": str(exc)}
@@ -364,6 +368,76 @@ def post_profiles_delete(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[in
     if not deleted:
         return 404, {"error": f"profile {name!r} not found"}
     return 200, {"ok": True}
+
+
+def get_profile_identity(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/profiles/{name}/identity — read identity (Alma) for a profile.
+
+    URL param: name (profile name)
+    Response 200: { "content": str, "path": str, "exists": bool }
+    Response 404: { "error": "profile not found" }
+    """
+    from server import config_store as _cs
+    from server import profile_identity as _pi
+    params = ctx.get("params", {})
+    name = str(params.get("name") or "").strip()
+    if not name:
+        return 400, {"error": "profile name is required"}
+    profile = _cs.get_profile(name)
+    if profile is None:
+        return 404, {"error": f"profile {name!r} not found"}
+    harness = profile.get("harness", "")
+    harness_ref = profile.get("harness_ref", "default")
+    identity_mode = profile.get("identity_mode", "managed")
+    return 200, _pi.read_identity(name, harness, harness_ref, identity_mode)
+
+
+def post_profile_identity(body: dict[str, Any], ctx: dict[str, Any]) -> tuple[int, Any]:
+    """POST /api/profiles/{name}/identity — write identity (Alma) for a profile.
+
+    URL param: name (profile name)
+    Body: { "content": "<markdown text>" }
+    Response 200: { "ok": bool, "path": str }
+    """
+    from server import config_store as _cs
+    from server import profile_identity as _pi
+    params = ctx.get("params", {})
+    name = str(params.get("name") or "").strip()
+    if not name:
+        return 400, {"error": "profile name is required"}
+    profile = _cs.get_profile(name)
+    if profile is None:
+        return 404, {"error": f"profile {name!r} not found"}
+    content = body.get("content")
+    if not isinstance(content, str):
+        return 400, {"error": "content must be a string"}
+    harness = profile.get("harness", "")
+    harness_ref = profile.get("harness_ref", "default")
+    identity_mode = profile.get("identity_mode", "managed")
+    result = _pi.write_identity(name, harness, content, harness_ref, identity_mode)
+    if not result.get("ok"):
+        return 500, result
+    return 200, result
+
+
+def get_profile_harness_options(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/profiles/{name}/harness-options — list available harness_ref values.
+
+    URL param: name (profile name)
+    Response 200: { "options": [str, ...], "harness": str }
+    """
+    from server import config_store as _cs
+    from server import profile_identity as _pi
+    params = ctx.get("params", {})
+    name = str(params.get("name") or "").strip()
+    if not name:
+        return 400, {"error": "profile name is required"}
+    profile = _cs.get_profile(name)
+    if profile is None:
+        return 404, {"error": f"profile {name!r} not found"}
+    harness = profile.get("harness", "")
+    options = _pi.list_harness_options(harness)
+    return 200, {"options": options, "harness": harness}
 
 
 def get_providers_live(ctx: "RouteContext") -> tuple[int, Any]:
