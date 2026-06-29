@@ -97,6 +97,28 @@ enforce_token_policy(
     component="bridge",
 )
 
+
+def _ensure_port_free(host: str, port: int, label: str) -> None:
+    """Fail fast with a helpful hint when HTTP/WS ports are already bound."""
+    import socket
+    import sys
+
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        probe.bind((host, port))
+    except OSError as exc:
+        print(
+            f"\n✗ Puerto {port} ({label}) ya está en uso en {host}.\n"
+            f"  Probablemente hay otro bridge corriendo.\n"
+            f"  Solución:  npm run stop\n"
+            f"  O manual:   fuser -k {port}/tcp\n",
+            file=sys.stderr,
+        )
+        raise SystemExit(1) from exc
+    finally:
+        probe.close()
+
 CONFIG_DIR = Path(os.path.expanduser(os.environ.get("REPOCIV_CONFIG_DIR", "~/.repociv")))
 MISSIONS_FILE = CONFIG_DIR / "missions.json"
 HERMES_ROOT = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", "~/.hermes")))
@@ -744,6 +766,20 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 self._respond(status, body)
                 return
 
+        # ── Profile identity / harness-options ──────────────────────────────────
+        if path.startswith("/api/profiles/"):
+            parts = path.split("/")  # ['', 'api', 'profiles', '<name>', '<sub>']
+            if len(parts) >= 5 and parts[4] == "identity":
+                ctx["params"] = {"name": parts[3]}
+                status, body = _routes.get_profile_identity(ctx)
+                self._respond(status, body)
+                return
+            if len(parts) >= 5 and parts[4] == "harness-options":
+                ctx["params"] = {"name": parts[3]}
+                status, body = _routes.get_profile_harness_options(ctx)
+                self._respond(status, body)
+                return
+
         # ── LabHub per-city status ───────────────────────────────────────────────
         if path.startswith("/api/labhub/status/"):
             city_id = path[len("/api/labhub/status/") :].split("/")[0]
@@ -810,6 +846,15 @@ class BridgeHandler(BaseHTTPRequestHandler):
             status, resp = _registry.POST_EXACT[path](body, {})
             self._respond(status, resp)
             return
+
+        # ── Profile identity write ────────────────────────────────────────────
+        if path.startswith("/api/profiles/") and path.endswith("/identity"):
+            parts = path.split("/")  # ['', 'api', 'profiles', '<name>', 'identity']
+            if len(parts) >= 5:
+                pctx = {"params": {"name": parts[3]}}
+                status, resp = _routes.post_profile_identity(body, pctx)
+                self._respond(status, resp)
+                return
 
         # ─── Wonder auto-start (F2) ─────────────────────────────────────────────
         if path.startswith("/api/wonders/") or path.startswith("/wonders/"):
@@ -1195,6 +1240,9 @@ if __name__ == "__main__":
                     {"type": "log", "msg": f"WS command rejected: {e}", "level": "warn"}
                 )
     ws_set_command_callback(_ws_command_handler)
+
+    _ensure_port_free(BRIDGE_HOST, BRIDGE_WS_PORT, "WebSocket")
+    _ensure_port_free(BRIDGE_HOST, BRIDGE_PORT, "HTTP")
 
     # Start WS server in a daemon thread — use BRIDGE_HOST for remote support
     ws_thread = start_ws_server(host=BRIDGE_HOST, port=BRIDGE_WS_PORT)

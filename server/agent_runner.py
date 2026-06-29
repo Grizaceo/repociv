@@ -144,9 +144,88 @@ _DEFAULT_AGENT_CONFIG: dict[str, Any] = {
 }
 
 
+def _find_registry_profile(unit_id: str) -> tuple[str, dict[str, Any]] | None:
+    """Return (registry_name, profile_dict) for a unit id, or None."""
+    try:
+        from . import config_store as _cs  # noqa: WPS433
+    except Exception:
+        return None
+    base = unit_id.split("-")[0]
+    for key in (unit_id, base, base.upper(), base.lower()):
+        profile = _cs.get_profile(key)
+        if profile is not None:
+            return key, profile
+    for name, profile in _cs.list_profiles().items():
+        if name.upper() == base.upper():
+            return name, profile
+    return None
+
+
+def _apply_identity_overlay(unit_id: str, config: dict[str, Any]) -> dict[str, Any]:
+    """Prepend Alma / identity file content to the system prompt when present."""
+    found = _find_registry_profile(unit_id)
+    if not found:
+        return config
+    pname, profile = found
+    try:
+        from . import profile_identity as _pi  # noqa: WPS433
+        identity = _pi.read_identity(
+            pname,
+            profile.get("harness", "hermes"),
+            profile.get("harness_ref", "default"),
+            profile.get("identity_mode", "managed"),
+        )
+        content = (identity.get("content") or "").strip()
+        if not content:
+            return config
+        out = dict(config)
+        existing = (out.get("system") or "").strip()
+        block = f"## Alma / identidad del agente\n{content}"
+        out["system"] = f"{existing}\n\n{block}" if existing else block
+        return out
+    except Exception:
+        return config
+
+
 def _get_agent_config(unit_id: str) -> dict[str, Any]:
+    """Resolve agent config for a unit.
+
+    Priority:
+    1. config_store registry (user-registered profiles)
+    2. AGENT_CONFIGS (built-in agents and harness bypasses)
+    3. _DEFAULT_AGENT_CONFIG (fallback)
+
+    The registry profile is merged with AGENT_CONFIGS so that built-in
+    presets (stateful, agent name, system prompt) are preserved unless
+    the profile overrides them. Registry fields map to config keys as:
+      profile["harness_ref"] → config["harness_ref"]  (new — used by dispatch)
+      profile["model"]       → skipped (handled by run_agent caller)
+      profile["system_prompt"] → config["system"] (overrides default prompt)
+    """
     base = unit_id.split("-")[0].upper()
-    return AGENT_CONFIGS.get(base, _DEFAULT_AGENT_CONFIG)
+    builtin = AGENT_CONFIGS.get(base, _DEFAULT_AGENT_CONFIG)
+
+    # Try registry lookup using base name (UPPERCASE) and exact unit_id
+    try:
+        found = _find_registry_profile(unit_id)
+        if found:
+            _pname, registry_profile = found
+            config = dict(builtin)  # start from built-in
+            harness_ref = registry_profile.get("harness_ref", "default")
+            if harness_ref and harness_ref != "default":
+                config["harness_ref"] = harness_ref
+            if registry_profile.get("system_prompt"):
+                config["system"] = registry_profile["system_prompt"]
+            if registry_profile.get("profile_path"):
+                config["profile"] = registry_profile["profile_path"]
+            elif harness_ref and harness_ref != "default" and registry_profile.get("harness") == "hermes":
+                from pathlib import Path as _Path
+                config["profile"] = str(_Path.home() / ".hermes" / "profiles" / harness_ref)
+            return _apply_identity_overlay(unit_id, config)
+    except Exception:
+        pass
+
+    return _apply_identity_overlay(unit_id, dict(builtin))
 
 
 def _infer_model_label(unit_id: str) -> str:
@@ -339,9 +418,23 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
     config = _get_agent_config(unit_id)
     base = unit_id.split("-")[0].upper()
 
-    # MAIN is the user's first unit — its harness is the one the user picked
-    # in onboarding (persisted in ~/.repociv/config.json). Fall back to the
-    # cascade if no choice was made.
+    # Resolve harness from registry if not provided by payload.
+    # For any unit, if the registry has a harness entry, use it.
+    if not harness:
+        try:
+            from . import config_store as _cs  # noqa: WPS433
+            profile = _cs.get_profile(unit_id) or _cs.get_profile(base) or _cs.get_profile(base.lower())
+            if profile and profile.get("harness"):
+                harness = _cs.normalize_harness_id(profile["harness"])
+                send_to_repociv({
+                    "type": "log",
+                    "msg": f"[{unit_id}] harness from registry: {harness}",
+                    "level": "info",
+                })
+        except Exception:
+            pass
+
+    # MAIN fallback: use configured default harness if still unset
     if base == "MAIN" and not harness:
         try:
             from . import config_store as _cs  # noqa: WPS433
@@ -356,13 +449,21 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
         except Exception:
             pass
 
+    # Normalise "claude-code" alias → "claude"
+    if harness == "claude-code":
+        harness = "claude"
+
+    # Resolve harness_ref from config (set by _get_agent_config from registry)
+    harness_ref = config.get("harness_ref", "default")
+
     if _container_mode_enabled():
         return _run_container_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
 
     # OPENCLAW bypass: always direct to OpenClaw regardless of harness selector
     if base == "OPENCLAW":
         send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: openclaw", "level": "info"})
-        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
+        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
+                                       harness_ref=harness_ref)
 
     # CLAUDE bypass: always direct to claude-code regardless of harness selector
     if base == "CLAUDE":
@@ -377,7 +478,7 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
     if base == "CODEX":
         send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: codex (bypass)", "level": "info"})
         return _run_codex_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
-                                    model=model or provider)
+                                    model=model or provider, harness_ref=harness_ref)
 
     # ── 3-layer dispatch: harness → provider → model ──────────────────────────
     # If the user selected a specific harness, use it directly.
@@ -387,8 +488,8 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
         send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: {harness}", "level": "info"})
         if harness == "openclaw" and _has_openclaw():
             return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
-                                           model=model or provider)
-        if harness == "claude-code" and _has_claude_code():
+                                           model=model or provider, harness_ref=harness_ref)
+        if harness in ("claude", "claude-code") and _has_claude_code():
             # For claude-code: if model includes provider prefix (e.g. openrouter/deepseek),
             # pass it through — claude CLI --model accepts provider/model format
             return _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
@@ -396,6 +497,9 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
         if harness == "cursor" and _has_cursor():
             return _run_cursor_agent_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                                model=model or provider)
+        if harness == "codex" and _has_codex():
+            return _run_codex_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
+                                        model=model or provider, harness_ref=harness_ref)
         if harness == "hermes":
             # Check profile first: agents with a profile need HERMES_HOME
             # pointing at their profile dir, not the HTTP gateway which always
@@ -437,7 +541,8 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
 
     if _has_openclaw():
         send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: openclaw (fallback)", "level": "info"})
-        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model or provider)
+        return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
+                                       model=model or provider, harness_ref=harness_ref)
 
     msg = "[offline] Ningún adaptador de agente disponible (hermes, claude-code, openclaw). Sin ejecución real.\n"
     send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": msg})
@@ -864,7 +969,8 @@ def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
                              config: dict[str, Any],
                              working_dir: str | None = None,
                              city_id: str = "",
-                             model: str = "") -> tuple[bool, str]:
+                             model: str = "",
+                             harness_ref: str = "") -> tuple[bool, str]:
     if config.get("stateful", True):
         session_id = f"repociv-{unit_id.lower()}"
     else:
@@ -880,9 +986,14 @@ def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
     spatial = _spatial_context_block(city_id, working_dir)
     cd_cmd = f"cd {working_dir}\n\n" if working_dir else ""
     full_message = f"{spatial}\n\n{cd_cmd}{mission}"
-    cmd = [openclaw_bin, "agent", "--agent", config["agent"],
+
+    # Resolve agent id: harness_ref from registry > config["agent"] > "main"
+    agent_id = (harness_ref or "").strip()
+    if not agent_id or agent_id == "default":
+        agent_id = config.get("agent", "main")
+
+    cmd = [openclaw_bin, "agent", "--agent", agent_id,
            "--session-id", session_id, "--message", full_message]
-    # If a specific model was requested via UI, pass it to openclaw
     if model:
         cmd.extend(["--model", model])
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=working_dir or None)
@@ -900,7 +1011,8 @@ def _run_codex_streaming(unit_id: str, mission_id: str, mission: str,
                           config: dict[str, Any],
                           working_dir: str | None = None,
                           city_id: str = "",
-                          model: str = "") -> tuple[bool, str]:
+                          model: str = "",
+                          harness_ref: str = "") -> tuple[bool, str]:
     codex_bin = _find_codex()
     if not codex_bin:
         text = "[codex error] binary not found in PATH, ~/.npm-global/bin or ~/.local/bin\n"
@@ -923,6 +1035,9 @@ def _run_codex_streaming(unit_id: str, mission_id: str, mission: str,
         "--output-last-message",
         last_message_path,
     ]
+    # Pass --profile flag if a non-default harness_ref is set
+    if harness_ref and harness_ref != "default":
+        cmd.extend(["--profile", harness_ref])
     if model:
         cmd.extend(["-m", model])
     cmd.append(full_prompt)

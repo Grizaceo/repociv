@@ -23,10 +23,20 @@ function resolveMapRoot(mode: string): string {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const repocivToken = env.VITE_REPOCIV_TOKEN ?? env.REPOCIV_TOKEN ?? '';
+  const bridgeToken = env.VITE_BRIDGE_TOKEN ?? repocivToken;
   const vitePort = parseInt(env.VITE_PORT ?? '5273', 10);
   const mapRoot = resolveMapRoot(mode);
   return {
     plugins: [repocivPlugin(mapRoot)],
+    define: {
+      ...(repocivToken && !env.VITE_REPOCIV_TOKEN
+        ? { 'import.meta.env.VITE_REPOCIV_TOKEN': JSON.stringify(repocivToken) }
+        : {}),
+      ...(bridgeToken && !env.VITE_BRIDGE_TOKEN
+        ? { 'import.meta.env.VITE_BRIDGE_TOKEN': JSON.stringify(bridgeToken) }
+        : {}),
+    },
     server: {
       port: vitePort,
       strictPort: true,

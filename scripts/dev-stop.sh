@@ -14,6 +14,7 @@ fi
 CONFIG_DIR="${REPOCIV_CONFIG_DIR:-$HOME/.repociv}"
 CONFIG_DIR="${CONFIG_DIR/#\~/$HOME}"
 LOCKFILE="$CONFIG_DIR/repociv.lock"
+BRIDGE_WS_PORT="${BRIDGE_WS_PORT:-5275}"
 REPOCIV_PORT="${REPOCIV_PORT:-${VITE_PORT:-5273}}"
 
 _kill() {
@@ -36,7 +37,7 @@ _kill() {
 if [[ ! -f "$LOCKFILE" ]]; then
   echo "⚠ No se encontró lockfile en $LOCKFILE — nada que detener."
   # Still try to kill anything on the ports
-  for PORT in "${BRIDGE_PORT:-5274}" "${REPOCIV_PORT:-5273}"; do
+  for PORT in "${BRIDGE_PORT:-5274}" "${BRIDGE_WS_PORT:-5275}" "${REPOCIV_PORT:-5273}"; do
     PID=$(lsof -ti tcp:"$PORT" 2>/dev/null || true)
     [[ -n "$PID" ]] && kill "$PID" 2>/dev/null && echo "  ⏹ Puerto $PORT liberado (PID $PID)"
   done

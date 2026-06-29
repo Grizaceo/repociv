@@ -406,3 +406,54 @@ def test_resolve_city_path_decodes_repo_id(monkeypatch, tmp_path):
 
     repo_id = "repo:" + __import__("base64").urlsafe_b64encode(str(repo).encode("utf-8")).decode("ascii").rstrip("=")
     assert agent_runner._resolve_city_path(repo_id) == str(repo)
+
+
+def test_get_agent_config_merges_registry_and_identity(monkeypatch):
+    profile = {
+        "name": "reviewer",
+        "harness": "codex",
+        "harness_ref": "ops",
+        "system_prompt": "You review code.",
+        "identity_mode": "managed",
+    }
+    monkeypatch.setattr(
+        agent_runner,
+        "_find_registry_profile",
+        lambda uid: ("reviewer", profile),
+    )
+    monkeypatch.setattr(
+        "server.profile_identity.read_identity",
+        lambda *a, **k: {
+            "content": "Always be terse.",
+            "path": "/tmp/AGENTS.md",
+            "exists": True,
+        },
+    )
+
+    cfg = agent_runner._get_agent_config("reviewer-1")
+    assert cfg["harness_ref"] == "ops"
+    assert cfg["system"] == "You review code.\n\n## Alma / identidad del agente\nAlways be terse."
+
+
+def test_run_codex_streaming_passes_profile_flag(monkeypatch):
+    captured = {}
+
+    def fake_popen(cmd, **kwargs):
+        captured["cmd"] = cmd
+        class Proc:
+            returncode = 0
+            def communicate(self, timeout=None):
+                return (b"ok", b"")
+        return Proc()
+
+    monkeypatch.setattr(agent_runner, "_find_codex", lambda: "/usr/bin/codex")
+    monkeypatch.setattr(agent_runner.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(agent_runner, "send_to_repociv", lambda evt: None)
+    monkeypatch.setattr(agent_runner._es, "record_output_chunk", lambda *a: None)
+
+    agent_runner._run_codex_streaming(
+        "CODEX", "m1", "task", {}, "/tmp", "", harness_ref="my-profile",
+    )
+    assert "--profile" in captured["cmd"]
+    assert "my-profile" in captured["cmd"]
+

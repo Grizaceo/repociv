@@ -20,8 +20,12 @@ if [[ -f .env ]]; then
 fi
 
 BRIDGE_PORT="${BRIDGE_PORT:-5274}"
+BRIDGE_WS_PORT="${BRIDGE_WS_PORT:-5275}"
 REPOCIV_PORT="${REPOCIV_PORT:-${VITE_PORT:-5273}}"
 export VITE_PORT="${VITE_PORT:-$REPOCIV_PORT}"
+# Mirror bridge auth token into Vite so the UI can call mutating endpoints.
+export VITE_REPOCIV_TOKEN="${VITE_REPOCIV_TOKEN:-${REPOCIV_TOKEN:-}}"
+export VITE_BRIDGE_TOKEN="${VITE_BRIDGE_TOKEN:-${REPOCIV_TOKEN:-}}"
 WITH_MCP=0
 for arg in "$@"; do [[ "$arg" == "--with-mcp" ]] && WITH_MCP=1; done
 CONFIG_DIR="${REPOCIV_CONFIG_DIR:-$HOME/.repociv}"
@@ -67,7 +71,7 @@ if [[ -f "$LOCKFILE" ]]; then
 fi
 
 # ─── Kill anything still on the ports ─────────────────────────────────────────
-for PORT in "$BRIDGE_PORT" "$REPOCIV_PORT"; do
+for PORT in "$BRIDGE_PORT" "$BRIDGE_WS_PORT" "$REPOCIV_PORT"; do
   PID=$(lsof -ti tcp:"$PORT" 2>/dev/null || true)
   if [[ -n "$PID" ]]; then
     echo "  → Puerto $PORT ocupado por PID $PID — terminando…"
