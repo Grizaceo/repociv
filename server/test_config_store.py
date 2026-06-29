@@ -23,7 +23,8 @@ def test_default_registry_is_one_profile_per_harness(isolated_config: Path) -> N
     profiles = config_store.reset_to_default()
     assert "H" in profiles and profiles["H"]["harness"] == "hermes"
     for name in ("claude", "codex", "cursor", "openclaw"):
-        assert profiles[name] == {"harness": name}
+        assert name in profiles
+        assert profiles[name]["harness"] == name
 
 
 def test_reset_to_default_populates_shipped_baseline(isolated_config: Path) -> None:
@@ -36,7 +37,7 @@ def test_reset_to_default_populates_shipped_baseline(isolated_config: Path) -> N
     assert "cursor" in profiles
     assert "openclaw" in profiles
     for name in ("claude", "codex", "cursor", "openclaw"):
-        assert profiles[name] == {"harness": name}
+        assert profiles[name]["harness"] == name
 
 
 def test_upsert_profile_creates_entry(isolated_config: Path) -> None:
@@ -194,3 +195,52 @@ def test_upsert_persists_to_disk(isolated_config: Path) -> None:
     raw = json.loads((isolated_config / "config.json").read_text())
     assert raw["profiles"]["H"] == {"harness": "hermes", "model": "opus-4-5"}
     assert raw["version"] == 1
+
+
+def test_upsert_profile_new_fields(isolated_config: Path) -> None:
+    entry = config_store.upsert_profile(
+        "reviewer",
+        "claude",
+        harness_ref="default",
+        display_name="Code Reviewer",
+        identity_mode="managed",
+        slot_order=2,
+    )
+    assert entry["harness"] == "claude"
+    assert entry["harness_ref"] == "default"
+    assert entry["display_name"] == "Code Reviewer"
+    assert entry["identity_mode"] == "managed"
+    assert entry["slot_order"] == 2
+    # Round-trip persistence
+    loaded = config_store.get_profile("reviewer")
+    assert loaded is not None
+    assert loaded["slot_order"] == 2
+    assert loaded["identity_mode"] == "managed"
+
+
+def test_upsert_profile_rejects_invalid_identity_mode(isolated_config: Path) -> None:
+    with pytest.raises(ValueError, match="identity_mode"):
+        config_store.upsert_profile("H", "hermes", identity_mode="unknown")
+
+
+def test_harness_alias_normalization(isolated_config: Path) -> None:
+    entry = config_store.upsert_profile("H", "claude-code")
+    assert entry["harness"] == "claude"
+
+
+def test_get_set_default_harness(isolated_config: Path) -> None:
+    # Before setting: should be None
+    assert config_store.get_default_harness() is None
+    # Set a valid harness
+    result = config_store.set_default_harness("claude")
+    assert result == "claude"
+    assert config_store.get_default_harness() == "claude"
+    # Alias normalisation
+    result = config_store.set_default_harness("claude-code")
+    assert result == "claude"
+    assert config_store.get_default_harness() == "claude"
+
+
+def test_set_default_harness_rejects_unknown(isolated_config: Path) -> None:
+    with pytest.raises(ValueError, match="unknown harness"):
+        config_store.set_default_harness("gpt-99")

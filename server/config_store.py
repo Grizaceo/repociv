@@ -47,7 +47,28 @@ _VALID_HARNESSES: frozenset[str] = frozenset({
 # don't need a config_store update.
 _OPTIONAL_FIELDS: frozenset[str] = frozenset({
     "personality", "system_prompt", "profile_path", "model", "provider",
+    # v2 profile fields (agent_profile_command_bar feature)
+    "harness_ref", "display_name",
 })
+_OPTIONAL_INT_FIELDS: frozenset[str] = frozenset({
+    "slot_order",
+})
+_OPTIONAL_ENUM_FIELDS: dict[str, frozenset[str]] = {
+    "identity_mode": frozenset({"native", "managed"}),
+}
+
+# Canonical harness ID map: normalises display aliases → registry id.
+# The registry always stores the short slug; dispatch resolves variants.
+HARNESS_ALIASES: dict[str, str] = {
+    "claude-code": "claude",
+    "claude_code": "claude",
+}
+
+
+def normalize_harness_id(harness: str) -> str:
+    """Normalise harness aliases to canonical registry IDs."""
+    h = harness.strip().lower()
+    return HARNESS_ALIASES.get(h, h)
 
 # Filesystem layout
 # ───────────────────────────────────────────────────────────────────────────
@@ -95,7 +116,7 @@ def _validate_name(name: str) -> str:
 def _validate_harness(harness: str) -> str:
     if not isinstance(harness, str) or not harness.strip():
         raise ValueError("harness must be a non-empty string")
-    normalized = harness.strip().lower()
+    normalized = normalize_harness_id(harness)
     if normalized not in _VALID_HARNESSES:
         raise ValueError(
             f"unknown harness {harness!r}; expected one of: "
@@ -116,6 +137,26 @@ def _normalize_profile(raw: dict[str, Any], name: str) -> dict[str, Any]:
             if not isinstance(value, str):
                 raise ValueError(
                     f"profile {name!r}: field {field!r} must be a string"
+                )
+            out[field] = value
+    for field in _OPTIONAL_INT_FIELDS:
+        if field in raw and raw[field] is not None:
+            value = raw[field]
+            if not isinstance(value, int):
+                try:
+                    value = int(value)
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        f"profile {name!r}: field {field!r} must be an integer"
+                    )
+            out[field] = value
+    for field, allowed in _OPTIONAL_ENUM_FIELDS.items():
+        if field in raw and raw[field] is not None:
+            value = str(raw[field])
+            if value not in allowed:
+                raise ValueError(
+                    f"profile {name!r}: field {field!r} must be one of: "
+                    f"{', '.join(sorted(allowed))}"
                 )
             out[field] = value
     return out
@@ -186,11 +227,11 @@ def _default_profiles() -> dict[str, dict[str, Any]]:
     after their harness for clarity in /agents/capabilities.
     """
     return {
-        "H": {"harness": "hermes"},
-        "claude": {"harness": "claude"},
-        "codex": {"harness": "codex"},
-        "cursor": {"harness": "cursor"},
-        "openclaw": {"harness": "openclaw"},
+        "H": {"harness": "hermes", "harness_ref": "default", "display_name": "MAIN", "slot_order": 0},
+        "claude": {"harness": "claude", "harness_ref": "default", "slot_order": 1},
+        "codex": {"harness": "codex", "harness_ref": "default", "slot_order": 2},
+        "cursor": {"harness": "cursor", "harness_ref": "default", "slot_order": 3},
+        "openclaw": {"harness": "openclaw", "harness_ref": "default", "slot_order": 4},
     }
 
 
@@ -235,6 +276,10 @@ def upsert_profile(
     profile_path: str | None = None,
     model: str | None = None,
     provider: str | None = None,
+    harness_ref: str | None = None,
+    display_name: str | None = None,
+    identity_mode: str | None = None,
+    slot_order: int | None = None,
 ) -> dict[str, Any]:
     """Create or update a profile. Returns the normalized profile entry."""
     clean_name = _validate_name(name)
@@ -250,6 +295,19 @@ def upsert_profile(
         entry["model"] = str(model)
     if provider is not None:
         entry["provider"] = str(provider)
+    if harness_ref is not None:
+        entry["harness_ref"] = str(harness_ref)
+    if display_name is not None:
+        entry["display_name"] = str(display_name)
+    if identity_mode is not None:
+        allowed = _OPTIONAL_ENUM_FIELDS["identity_mode"]
+        if identity_mode not in allowed:
+            raise ValueError(
+                f"identity_mode must be one of: {', '.join(sorted(allowed))}"
+            )
+        entry["identity_mode"] = identity_mode
+    if slot_order is not None:
+        entry["slot_order"] = int(slot_order)
     raw = _read_raw()
     profiles = raw.get("profiles", {})
     if not isinstance(profiles, dict):
@@ -287,3 +345,26 @@ def reset_to_default() -> dict[str, dict[str, Any]]:
 def valid_harnesses() -> frozenset[str]:
     """The set of harness ids accepted by the registry."""
     return _VALID_HARNESSES
+
+
+def get_default_harness() -> str | None:
+    """Return the user's preferred default harness (stored in config.json).
+
+    Written by onboarding (POST /api/config/default-harness). Returns None
+    if the user has not yet chosen, in which case the bridge falls back to
+    its own cascade (hermes → claude-code → openclaw).
+    """
+    raw = _read_raw()
+    harness = raw.get("default_harness")
+    if isinstance(harness, str) and harness.strip().lower() in _VALID_HARNESSES:
+        return harness.strip().lower()
+    return None
+
+
+def set_default_harness(harness: str) -> str:
+    """Persist the user's preferred default harness. Returns the normalised value."""
+    normalized = _validate_harness(harness)
+    raw = _read_raw()
+    raw["default_harness"] = normalized
+    _write_raw(raw)
+    return normalized

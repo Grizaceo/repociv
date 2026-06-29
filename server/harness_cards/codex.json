@@ -20,5 +20,19 @@
   "bypass": true,
   "note": "CODEX always routes directly to this harness regardless of the harness selector in the UI.",
   "timeout_s": 600,
-  "status": "stable"
+  "status": "stable",
+  "profile_binding": {
+    "harness_ref_semantics": "Name of a Codex profile (--profile <name>). Maps to ~/.codex/<harness_ref>.config.toml. Use 'default' to omit --profile and run with Codex global defaults.",
+    "identity_mode": {
+      "native": "Edit ~/.codex/<harness_ref>.config.toml or global AGENTS.md at ~/.codex/AGENTS.md",
+      "managed": "Read/write ~/.repociv/profiles/<name>/AGENTS.md; inject via system_prompt prepend on dispatch"
+    },
+    "identity_file": "AGENTS.md",
+    "identity_path_native_global": "~/.codex/AGENTS.md",
+    "identity_path_managed": "~/.repociv/profiles/{name}/AGENTS.md",
+    "dispatch_flag": "--profile {harness_ref} (omit if harness_ref is 'default')",
+    "harness_options_cmd": "codex profiles list",
+    "harness_options_note": "Lists available Codex profile names; falls back to listing ~/.codex/*.config.toml filenames",
+    "default_identity_mode": "managed"
+  }
 }

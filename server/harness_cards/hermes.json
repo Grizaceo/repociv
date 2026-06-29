@@ -35,5 +35,17 @@
   "built_in_agents": ["WORKER", "SCOUT"],
   "concurrency": "configurable per agent via AGENT_CONCURRENCY in scheduler.py",
   "timeout_s": 600,
-  "status": "stable"
+  "status": "stable",
+  "profile_binding": {
+    "harness_ref_semantics": "Name of subdirectory under ~/.hermes/profiles/<harness_ref> OR absolute validated path. Use 'default' to omit HERMES_HOME and let the subprocess use its own default config.",
+    "identity_mode": {
+      "native": "Read/write SOUL.md inside the profile dir at ~/.hermes/profiles/<harness_ref>/SOUL.md",
+      "managed": "Read/write ~/.repociv/profiles/<name>/identity.md; inject via system_prompt on dispatch"
+    },
+    "identity_file": "SOUL.md",
+    "identity_path_template": "~/.hermes/profiles/{harness_ref}/SOUL.md",
+    "dispatch_env": "HERMES_HOME=~/.hermes/profiles/{harness_ref}",
+    "harness_options_cmd": null,
+    "harness_options_note": "List subdirs of ~/.hermes/profiles/ to show available profiles"
+  }
 }

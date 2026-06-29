@@ -19,5 +19,19 @@
   "bypass": true,
   "note": "OPENCLAW always routes directly to this harness regardless of the harness selector in the UI.",
   "timeout_s": 600,
-  "status": "stable"
+  "status": "stable",
+  "profile_binding": {
+    "harness_ref_semantics": "Agent id passed to --agent flag (e.g. 'main', 'reviewer', custom id from `openclaw agents list`). Use 'default' to omit --agent and use openclaw default.",
+    "identity_mode": {
+      "native": "Edit agent.md for the agent at ~/.openclaw/agents/<harness_ref>/agent.md",
+      "managed": "Read/write ~/.repociv/profiles/<name>/identity.md; inject via --message prepend"
+    },
+    "identity_file": "agent.md",
+    "identity_path_native": "~/.openclaw/agents/{harness_ref}/agent.md",
+    "identity_path_managed": "~/.repociv/profiles/{name}/identity.md",
+    "dispatch_flag": "--agent {harness_ref}",
+    "harness_options_cmd": "openclaw agents list",
+    "harness_options_note": "Lists available agent ids; result is JSON array [{id, name, ...}]",
+    "default_identity_mode": "native"
+  }
 }

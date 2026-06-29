@@ -45,5 +45,18 @@
   "cascade_position": "manual selection only — not part of the default hermes→claude→openclaw fallback chain",
   "requires": "Cursor Pro subscription + cursor-agent binary",
   "timeout_s": 600,
-  "status": "implemented — pending flag validation against cursor-agent --help"
+  "status": "implemented — pending flag validation against cursor-agent --help",
+  "profile_binding": {
+    "harness_ref_semantics": "'default' uses the cursor-agent IDE workspace context. 'managed:<name>' injects identity from ~/.repociv/profiles/<name>/identity.md via --system-prompt (if supported) or prepended to prompt.",
+    "identity_mode": {
+      "native": "Edit .cursor/rules/*.mdc in the active repo workspace, or user rules in ~/.cursor/settings/",
+      "managed": "Read/write ~/.repociv/profiles/<name>/identity.md; inject via prompt prepend on dispatch"
+    },
+    "identity_file": "identity.md",
+    "identity_path_managed": "~/.repociv/profiles/{name}/identity.md",
+    "dispatch_injection": "Prepend identity content to the prompt passed to cursor-agent",
+    "harness_options_cmd": null,
+    "harness_options_note": "No native profile list. Managed profiles are dirs under ~/.repociv/profiles/ with harness=cursor",
+    "default_identity_mode": "managed"
+  }
 }

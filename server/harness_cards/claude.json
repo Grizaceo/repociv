@@ -21,5 +21,19 @@
   "bypass": true,
   "note": "CLAUDE always routes directly to this harness regardless of the harness selector in the UI.",
   "timeout_s": 600,
-  "status": "stable"
+  "status": "stable",
+  "profile_binding": {
+    "harness_ref_semantics": "'default' uses the Claude CLI's own active session context (cwd-based). 'managed:<name>' injects identity from ~/.repociv/profiles/<name>/CLAUDE.md via system_prompt. No native --profile flag exists in claude CLI.",
+    "identity_mode": {
+      "native": "Edit ~/.claude/CLAUDE.md (user-level memory) — affects all Claude sessions globally",
+      "managed": "Read/write ~/.repociv/profiles/<name>/CLAUDE.md; inject via system_prompt prepend on dispatch"
+    },
+    "identity_file": "CLAUDE.md",
+    "identity_path_native": "~/.claude/CLAUDE.md",
+    "identity_path_managed": "~/.repociv/profiles/{name}/CLAUDE.md",
+    "dispatch_injection": "Prepend identity file content to system_prompt passed in the prompt arg",
+    "harness_options_cmd": null,
+    "harness_options_note": "No native profile list. Managed profiles are dirs under ~/.repociv/profiles/ with harness=claude",
+    "default_identity_mode": "managed"
+  }
 }
