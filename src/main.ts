@@ -48,11 +48,9 @@ import {
   setWebGLMetricsSource,
   toggleHarnessPanel,
   startHarnessPolling,
-  toggleReplayPanel,
   toggleTaskPanel,
   togglePendingPanel,
   toggleLogPanel,
-  toggleTaskAssignPanel,
   isHarnessPanelOpen,
   closeSidePanel,
   openCityPanel,
@@ -99,7 +97,6 @@ import { getStoredEraLabel } from './ui/eraSystem.ts';
 import { logEvent } from './ui/hud.ts';
 import { trackPanelOpen } from './ui/analytics.ts';
 import { initBubbleLayer, updateBubble, clearAllBubbles } from './ui/actionBubbles.ts';
-import { openWonderVignette } from './ui/wonderVignette.ts';
 import { bindOrdenDeBatalla } from './ui/ordenDeBatalla.ts';
 import { bindSubagentSessionPanel } from './ui/subagentSessionPanel.ts';
 import { bindSlashCommandState } from './ui/chat/slashCommands.ts';
@@ -717,7 +714,9 @@ async function bootstrap() {
   document.getElementById('btn-toggle-3d')?.addEventListener('click', toggleView);
   document.getElementById('btn-timeline')?.addEventListener('click', toggleTimelinePanel);
   document.getElementById('btn-approvals')?.addEventListener('click', toggleApprovalPanel);
-  document.getElementById('btn-replay')?.addEventListener('click', toggleReplayPanel);
+  document.getElementById('btn-replay')?.addEventListener('click', () => {
+    void import('./ui/replayPanel.ts').then((m) => m.toggleReplayPanel());
+  });
   document.getElementById('btn-observability')?.addEventListener('click', toggleObservabilityPanel);
   document.getElementById('btn-tasks')?.addEventListener('click', toggleTaskPanel);
 
@@ -757,11 +756,13 @@ async function bootstrap() {
     }
   });
   document.getElementById('btn-task-assign')?.addEventListener('click', () => {
-    toggleTaskAssignPanel(
-      () => state.getLocalUnits(),
-      (unitId, task) => {
-        state.setLocalUnitTask(unitId, task);
-      },
+    void import('./ui/taskAssignPanel.ts').then((m) =>
+      m.toggleTaskAssignPanel(
+        () => state.getLocalUnits(),
+        (unitId, task) => {
+          if (task !== null) state.setLocalUnitTask(unitId, task);
+        },
+      ),
     );
   });
   document.getElementById('btn-harnesses')?.addEventListener('click', () => {
@@ -887,7 +888,7 @@ async function bootstrap() {
     if (!manifest) return;
     const existing = document.querySelector<HTMLElement>('#wonder-vignette');
     if (!existing || existing.dataset['wonderType'] !== 'bibliotheca') {
-      await openWonderVignette(manifest);
+      await import('./ui/wonderVignette.ts').then((m) => m.openWonderVignette(manifest));
     }
     await _syncBibliothecaFocusIfOpen(city, mode);
   }
@@ -973,16 +974,18 @@ async function bootstrap() {
   function _openInstitutumForCity(city: City): void {
     const manifest = getWonder('institutum');
     if (!manifest) return;
-    void openWonderVignette(manifest).then(() => {
-      const vignette = document.querySelector<HTMLElement>('#wonder-vignette');
-      const iframe = vignette?.querySelector<HTMLIFrameElement>('iframe');
-      if (!iframe) return;
-      postContextToWonder(iframe, manifest, {
-        cityId: city.id,
-        selectedRepo: city.repoPath,
-        theme: document.documentElement.dataset['theme'] ?? 'imperial-dark',
+    import('./ui/wonderVignette.ts').then((m) => {
+      m.openWonderVignette(manifest).then(() => {
+        const vignette = document.querySelector<HTMLElement>('#wonder-vignette');
+        const iframe = vignette?.querySelector<HTMLIFrameElement>('iframe');
+        if (!iframe) return;
+        postContextToWonder(iframe, manifest, {
+          cityId: city.id,
+          selectedRepo: city.repoPath,
+          theme: document.documentElement.dataset['theme'] ?? 'imperial-dark',
+        });
+        postFocusToWonder(iframe, manifest, city.id, 'macro');
       });
-      postFocusToWonder(iframe, manifest, city.id, 'macro');
     });
   }
 
@@ -1385,6 +1388,13 @@ async function bootstrap() {
   initHudMode();
   initCommandPalette();
   registerHudCommands(state, renderer, bridge, toggleView);
+
+  // Init profile strip (async — non-blocking)
+  import('./ui/agentProfileStrip.ts').then(({ initProfileStrip, openNewProfileWizard }) => {
+    void initProfileStrip();
+    const newBtn = document.getElementById('spawn-new-profile');
+    if (newBtn) newBtn.addEventListener('click', () => void openNewProfileWizard());
+  });
 
   // Load pending tracker missions at boot
   fetchPendingTracker().then((pending) => {

@@ -1,0 +1,39 @@
+/* ─── Warm Welcome Salute (post-loading) ───────────────────────── */
+#imperial-welcome {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  text-align: center;
+  z-index: 600;
+  opacity: 0;
+  transition:
+    opacity 0.8s ease,
+    transform 0.8s ease;
+}
+#imperial-welcome.visible {
+  opacity: 1;
+  transform: translate(-50%, -55%);
+}
+#imperial-welcome .salute-icon {
+  font-size: var(--text-3xl);
+  filter: drop-shadow(0 0 12px rgba(245, 213, 128, 0.3));
+}
+#imperial-welcome .salute-line {
+  font-family: var(--font-ui);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--ui-gold-bright);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-top: var(--space-5);
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.9);
+}
+#imperial-welcome .salute-sub {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--ui-text-dim);
+  margin-top: var(--space-3);
+  font-style: italic;
+}

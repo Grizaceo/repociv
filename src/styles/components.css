@@ -447,16 +447,17 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
 /* ─── Command Bar (Horizontal Slot System) ────────────────────────── */
 #command-bar {
   flex: 1;
-  max-width: 700px;
-  height: 100px;
+  max-width: 720px;
+  min-height: 132px;
   background: var(--glass-bg);
   border: 1px solid var(--panel-border);
   backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  padding: 12px;
+  gap: 10px;
+  padding: 10px 14px 12px;
   position: relative;
   box-shadow: var(--shadow-deep);
   border-radius: 4px 4px 0 0;
@@ -464,13 +465,15 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
 
 #hero-bar-slots {
   display: flex;
-  gap: 12px;
-  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  width: 100%;
 }
 
 .hero-slot {
-  width: 52px;
-  height: 52px;
+  width: 68px;
+  height: 68px;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   display: flex;
@@ -479,6 +482,7 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   cursor: pointer;
   transition: var(--transition-fast);
   position: relative;
+  flex-shrink: 0;
 }
 
 .hero-slot:hover {
@@ -494,22 +498,22 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
 
 .slot-num {
   position: absolute;
-  top: -6px;
+  top: -8px;
   left: -4px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--gold-mid);
   font-weight: 700;
   text-shadow: 0 0 4px #000;
 }
 .hero-slot-sprite {
-  font-size: 26px;
+  font-size: 32px;
 }
 .slot-state {
   position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 8px;
-  height: 8px;
+  bottom: 4px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   border: 1px solid #000;
 }
@@ -517,14 +521,16 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
 .hero-bar-spawn {
   display: flex;
   gap: 8px;
+  width: 100%;
 }
 .spawn-btn {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   color: var(--gold-mid);
-  width: 36px;
-  height: 32px;
-  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  font-size: 18px;
   cursor: pointer;
   transition: var(--transition-fast);
   font-family: var(--font-ui);
@@ -535,6 +541,240 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   border-color: var(--gold-bright);
   background: var(--panel-hover);
   color: var(--gold-bright);
+}
+
+/* ─── Hero slot fatigue bar ─────────────────────────────────────────── */
+.hero-fatigue-wrap {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.hero-fatigue-bar {
+  height: 100%;
+  width: 100%;
+  transition:
+    width 0.4s ease,
+    background 0.4s ease;
+}
+
+.fatigue-rest-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* ─── Command Bar two-column layout ─────────────────────────────────── */
+.command-bar-inner {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  align-items: flex-start;
+}
+
+.command-bar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ─── Profile Strip (right column in command bar) ───────────────────── */
+.profile-strip-container {
+  width: 220px;
+  min-width: 180px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: var(--font-ui);
+}
+
+.pstrip-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.pstrip-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ui-text-dim, #8a7a5a);
+}
+
+.pstrip-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ui-gold, #c8a84b);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pstrip-row {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.pstrip-select,
+.pstrip-input {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--ui-border, #4a3a1a);
+  color: var(--ui-text, #e8dcc0);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 3px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  height: 26px;
+}
+
+.pstrip-select:focus,
+.pstrip-input:focus {
+  outline: none;
+  border-color: var(--ui-gold, #c8a84b);
+}
+
+.pstrip-ref {
+  max-width: 90px;
+}
+
+.pstrip-btn {
+  background: transparent;
+  border: 1px solid var(--ui-border, #4a3a1a);
+  color: var(--ui-text-dim, #8a7a5a);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  height: 26px;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+  white-space: nowrap;
+}
+
+.pstrip-btn:hover {
+  color: var(--ui-gold-bright, #e6c45e);
+  border-color: var(--ui-gold, #c8a84b);
+  background: rgba(200, 168, 75, 0.08);
+}
+
+.pstrip-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.pstrip-save {
+  color: var(--civ-food, #71b871);
+  border-color: rgba(113, 184, 113, 0.35);
+}
+.pstrip-save:hover {
+  background: rgba(113, 184, 113, 0.1);
+  color: #8fd68f;
+  border-color: var(--civ-food, #71b871);
+}
+
+/* Alma drawer */
+.pstrip-alma-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.pstrip-alma-drawer.hidden {
+  display: none;
+}
+
+.pstrip-alma-text {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--ui-border, #4a3a1a);
+  color: var(--ui-text, #e8dcc0);
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  padding: 6px 8px;
+  border-radius: 3px;
+  resize: vertical;
+  min-height: 72px;
+  max-height: 160px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pstrip-alma-text:focus {
+  outline: none;
+  border-color: var(--ui-gold, #c8a84b);
+}
+
+.pstrip-alma-actions {
+  display: flex;
+  gap: 5px;
+  justify-content: flex-end;
+}
+
+/* Profile slot variant (shown in hero-bar-slots) */
+.hero-slot.profile-slot {
+  flex-direction: column;
+  gap: 2px;
+  height: 58px;
+  width: 58px;
+}
+
+.hero-slot.profile-slot.dragging {
+  opacity: 0.45;
+}
+
+.hero-slot.profile-slot.drag-over {
+  outline: 2px dashed var(--ui-gold, #c8a84b);
+  outline-offset: 2px;
+}
+
+.pstrip-model {
+  min-width: 110px;
+  flex: 1;
+}
+
+.slot-profile-name {
+  font-size: 9px;
+  color: var(--ui-text-dim, #8a7a5a);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 54px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* ─── Spawn buttons: Nuevo + harness shortcuts ───────────────────────── */
+.spawn-btn.spawn-new-profile {
+  background: rgba(200, 168, 75, 0.06);
+  border-color: rgba(200, 168, 75, 0.35);
+  color: var(--gold-mid, #c8a84b);
+  font-size: 13px;
+  font-weight: 600;
+}
+.spawn-btn.spawn-new-profile:hover {
+  background: rgba(200, 168, 75, 0.15);
+  border-color: var(--gold-bright, #e6c45e);
 }
 
 /* ─── Right HUD: Log & Minimap ───────────────────────────────────────── */

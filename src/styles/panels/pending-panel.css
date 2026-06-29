@@ -1,0 +1,329 @@
+/* ─── Group ───────────────────────────────────────────────────────────── */
+.pending-group {
+  margin-bottom: 8px;
+}
+.pending-group-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--gold-mid);
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(90, 74, 46, 0.4);
+  margin-bottom: 4px;
+}
+
+/* ─── Item ────────────────────────────────────────────────────────────── */
+.pending-item {
+  border: 1px solid transparent;
+  border-radius: 3px;
+  margin-bottom: 2px;
+  transition: border-color 0.15s;
+}
+.pending-item:hover {
+  border-color: rgba(90, 74, 46, 0.5);
+}
+.pending-item.expanded {
+  border-color: var(--ui-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.pending-item-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: text;
+}
+.pending-id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  flex-shrink: 0;
+  min-width: 30px;
+}
+.pending-source-badge {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+.pending-source-local {
+  background: color-mix(in oklch, var(--state-success) 20%, transparent);
+  color: var(--state-success);
+  border: 1px solid color-mix(in oklch, var(--state-success) 35%, transparent);
+}
+.pending-source-hermes {
+  background: color-mix(in oklch, var(--ui-text-dim) 15%, transparent);
+  color: var(--ui-text-dim);
+  border: 1px solid color-mix(in oklch, var(--ui-text-dim) 25%, transparent);
+}
+.pending-title {
+  flex: 1;
+  font-size: 11px;
+  color: var(--ui-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pending-state {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.btn-resolve {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid rgba(91, 155, 91, 0.3);
+  color: #5b9b5b;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 1px 5px;
+  opacity: 0.6;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
+}
+.btn-resolve:hover {
+  opacity: 1;
+  background: rgba(91, 155, 91, 0.15);
+  border-color: #5b9b5b;
+}
+
+/* ─── Detail ──────────────────────────────────────────────────────────── */
+.pending-detail {
+  padding: 4px 8px 8px 44px;
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  line-height: 1.5;
+  border-top: 1px solid rgba(90, 74, 46, 0.2);
+  white-space: pre-wrap;
+}
+
+/* ─── Form ────────────────────────────────────────────────────────────── */
+.pending-form {
+  border-top: 1px solid var(--ui-border);
+  padding: 8px;
+  margin-top: 4px;
+}
+.pending-form-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ui-text-dim);
+  margin-bottom: 6px;
+}
+.pending-form-row {
+  display: flex;
+  gap: 4px;
+}
+.pending-form-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  font-size: 11px;
+  padding: 4px 6px;
+  font-family: var(--font-ui);
+  outline: none;
+  min-width: 0;
+}
+.pending-form-input:focus {
+  border-color: var(--ui-gold);
+}
+.pending-form-select {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  font-size: 11px;
+  padding: 4px;
+  font-family: var(--font-ui);
+  outline: none;
+  flex-shrink: 0;
+  width: 68px;
+}
+.pending-form-btn {
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  color: var(--ui-gold);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.pending-form-btn:hover {
+  background: rgba(212, 175, 55, 0.28);
+}
+
+/* ─── State selector ───────────────────────────────────────────────────── */
+.pending-state-select {
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(90, 74, 46, 0.4);
+  color: var(--ui-text);
+  font-size: 10px;
+  padding: 2px 3px;
+  font-family: var(--font-ui);
+  outline: none;
+  cursor: pointer;
+  width: 28px;
+  text-align: center;
+  appearance: auto;
+}
+.pending-state-select:focus {
+  border-color: var(--ui-gold);
+}
+
+/* ─── Action buttons ───────────────────────────────────────────────────── */
+.btn-edit {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid rgba(100, 149, 237, 0.3);
+  color: #6495ed;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 1px 5px;
+  opacity: 0.6;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
+}
+.btn-edit:hover {
+  opacity: 1;
+  background: rgba(100, 149, 237, 0.15);
+  border-color: #6495ed;
+}
+
+.btn-delete {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid rgba(220, 80, 80, 0.3);
+  color: #dc5050;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 1px 5px;
+  opacity: 0.6;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
+}
+.btn-delete:hover {
+  opacity: 1;
+  background: rgba(220, 80, 80, 0.15);
+  border-color: #dc5050;
+}
+
+/* ─── Edit form ────────────────────────────────────────────────────────── */
+.pending-edit {
+  padding: 6px 8px 8px 12px;
+  border-top: 1px solid rgba(90, 74, 46, 0.2);
+  background: rgba(255, 255, 255, 0.02);
+}
+.pending-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.edit-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ui-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  width: 52px;
+  flex-shrink: 0;
+}
+.edit-title {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  font-size: 11px;
+  padding: 3px 6px;
+  font-family: var(--font-ui);
+  outline: none;
+  min-width: 0;
+}
+.edit-title:focus {
+  border-color: var(--ui-gold);
+}
+.edit-priority {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  font-size: 11px;
+  padding: 3px;
+  font-family: var(--font-ui);
+  outline: none;
+  flex-shrink: 0;
+  width: 68px;
+}
+.edit-detail {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  font-size: 11px;
+  padding: 3px 6px;
+  font-family: var(--font-ui);
+  outline: none;
+  resize: vertical;
+  min-height: 50px;
+}
+.edit-detail:focus {
+  border-color: var(--ui-gold);
+}
+.edit-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.btn-save-edit {
+  background: rgba(91, 155, 91, 0.2);
+  border: 1px solid rgba(91, 155, 91, 0.4);
+  color: #5b9b5b;
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  border-radius: 3px;
+}
+.btn-save-edit:hover {
+  background: rgba(91, 155, 91, 0.35);
+}
+.btn-cancel-edit {
+  background: rgba(220, 80, 80, 0.15);
+  border: 1px solid rgba(220, 80, 80, 0.3);
+  color: #dc5050;
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  border-radius: 3px;
+}
+.btn-cancel-edit:hover {
+  background: rgba(220, 80, 80, 0.25);
+}
+
+/* ─── Editing state ───────────────────────────────────────────────────── */
+.pending-item.editing {
+  border-color: var(--ui-gold);
+  background: rgba(212, 175, 55, 0.04);
+}

@@ -45,8 +45,9 @@ import {
 } from '../index.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from '../settingsPanel.ts';
 import { closeConstructionPanel, isConstructionPanelOpen } from '../constructionPanel.ts';
-import { selectHero, spawnAgent } from './spawn.ts';
+import { selectHero, spawnAgent, spawnFromProfile } from './spawn.ts';
 import { takeScreenshot } from './screenshot.ts';
+import { getSelectedProfile } from '../agentProfileStrip.ts';
 import { toggleLayerPanel, closeLayerPanel, isLayerPanelOpen } from '../layerPanel.ts';
 import { trackHotkey, trackPanelOpen } from '../analytics.ts';
 import { isPickerOpen } from '../chat/slashPicker.ts';
@@ -174,9 +175,22 @@ export function wireHotkeys(
 
     // Spawn agents (Q/W/E/O/C/X).
     // Q spawns the user's first unit (MAIN), which is configured during
-    // onboarding. L (LEXO) was removed when the personal profile was dropped
-    // from the shipped agent set.
+    // onboarding. N opens the new profile wizard.
+    if (e.key.toLowerCase() === 'n') {
+      trackHotkey('N:new-profile');
+      // Delegate to profile strip wizard (loaded lazily)
+      void import('../agentProfileStrip.ts').then(({ openNewProfileWizard }) => {
+        void openNewProfileWizard();
+      });
+      return;
+    }
     if (e.key.toLowerCase() === 'q') {
+      // If a profile is selected in the strip, spawn from it; else fall back to MAIN
+      const selectedProfile = getSelectedProfile();
+      if (selectedProfile) {
+        trackHotkey(`Q:spawn-profile:${selectedProfile.name}`);
+        return spawnFromProfile(selectedProfile, state, renderer, bridge);
+      }
       trackHotkey('Q:spawn:MAIN');
       return spawnAgent('MAIN', state, renderer, bridge);
     }

@@ -24,7 +24,7 @@ import { handleSlashCommand } from '../chat/slashCommands.ts';
 import { openSubagentSession } from '../subagentSessionPanel.ts';
 import { toggleSettingsPanel } from '../settingsPanel.ts';
 import { toggleConstructionPanel } from '../constructionPanel.ts';
-import { spawnAgent } from './spawn.ts';
+import { spawnAgent, spawnHarnessTemplate } from './spawn.ts';
 import { takeScreenshot } from './screenshot.ts';
 import type { CommandDraft, CommandType } from '../../commandSchema.ts';
 import { sendCommand } from '../../commandBus.ts';
@@ -32,12 +32,22 @@ import { sendCommand } from '../../commandBus.ts';
 export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeEvents): void {
   const missionInput = document.getElementById('mission-input') as HTMLInputElement;
 
-  // ─── Spawn buttons (Q/W/E/O/C/X) ────────────────────────────────────────
-  document.querySelectorAll<HTMLButtonElement>('.spawn-btn').forEach((btn) => {
+  // ─── Spawn buttons (Q/W/E/O/C/X) — skip + Nuevo (no data-type) ─────────────
+  document.querySelectorAll<HTMLButtonElement>('.spawn-btn[data-type]').forEach((btn) => {
     const type = btn.dataset['type'] as string;
     // Teaching tooltip (plan B3): explain each agent on hover instead of jargon.
     btn.title = agentTooltip(type);
     btn.addEventListener('click', () => {
+      const harnessTemplates: Record<string, 'openclaw' | 'claude' | 'codex'> = {
+        OPENCLAW: 'openclaw',
+        CLAUDE: 'claude',
+        CODEX: 'codex',
+      };
+      const harness = harnessTemplates[type];
+      if (harness) {
+        void spawnHarnessTemplate(harness, type, state, renderer, bridge);
+        return;
+      }
       spawnAgent(type, state, renderer, bridge);
     });
   });

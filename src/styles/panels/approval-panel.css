@@ -1,0 +1,262 @@
+/* ─── Approval Panel (Sprint B) ───────────────────────────────────────────── */
+.ap-panel {
+  position: absolute;
+  top: 56px;
+  right: 8px;
+  width: 380px;
+  max-height: 65vh;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 2px solid var(--state-approval);
+  border-radius: var(--panel-radius);
+  z-index: 48;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-deep);
+  transition:
+    transform var(--transition-slow),
+    opacity var(--transition-slow),
+    display var(--transition-slow) allow-discrete;
+  opacity: 1;
+  transform: translateY(0);
+}
+.ap-panel.hidden {
+  display: none !important;
+  transform: translateY(20px);
+  opacity: 0;
+  pointer-events: none;
+}
+@starting-style {
+  .ap-panel:not(.hidden) {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+}
+
+.ap-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid color-mix(in oklch, var(--state-approval) 30%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--state-approval) 12%, transparent),
+    transparent
+  );
+}
+.ap-title {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--state-approval);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+#ap-close {
+  background: transparent;
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text-dim);
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
+  font-size: 14px;
+}
+#ap-close:hover {
+  color: var(--ui-gold);
+  border-color: var(--ui-gold);
+}
+
+.ap-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ap-item {
+  background: var(--ui-dark);
+  border: 1px solid color-mix(in oklch, var(--state-approval) 30%, transparent);
+  border-radius: 4px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ap-item-header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ap-type {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ui-gold-bright);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.ap-risk {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  margin-left: auto;
+}
+.ap-risk[data-risk='destructive'] {
+  color: var(--state-error);
+}
+.ap-risk[data-risk='high'] {
+  color: var(--state-approval);
+}
+.ap-risk[data-risk='medium'] {
+  color: var(--state-warn);
+}
+.ap-risk[data-risk='low'] {
+  color: var(--state-success);
+}
+
+.ap-payload-expand {
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ap-payload-expand:hover {
+  color: var(--ui-text);
+}
+.ap-payload-full {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-top: 4px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.ap-approve.confirming {
+  background: color-mix(in oklch, var(--state-error) 30%, transparent);
+  border-color: var(--state-error);
+  color: var(--state-error);
+}
+.ap-age {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+}
+
+.ap-target {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ui-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ap-payload {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ap-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.ap-approve,
+.ap-reject {
+  flex: 1;
+  padding: 5px;
+  border-radius: 3px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  cursor: pointer;
+  border: 1px solid;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.ap-approve {
+  background: rgba(91, 155, 91, 0.15);
+  border-color: #5b9b5b;
+  color: #5b9b5b;
+}
+.ap-approve:hover {
+  background: #5b9b5b;
+  color: #fff;
+}
+.ap-reject {
+  background: rgba(212, 91, 91, 0.15);
+  border-color: #d45b5b;
+  color: #d45b5b;
+}
+.ap-reject:hover {
+  background: #d45b5b;
+  color: #fff;
+}
+.ap-approve:disabled,
+.ap-reject:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ap-empty {
+  text-align: center;
+  color: var(--ui-text-dim);
+  padding: 30px;
+  font-style: italic;
+  font-size: 13px;
+}
+
+/* ─── Approval badge on top bar button ─────────────────────────────────────── */
+#btn-approvals {
+  position: relative;
+  background: var(--ui-dark);
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  color: var(--ui-text-dim);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+#btn-approvals:hover {
+  border-color: var(--ui-gold);
+  color: var(--ui-gold);
+}
+.approval-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  background: #d45b5b;
+  border-radius: 8px;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: #fff;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  font-weight: 700;
+}
+.approval-badge-active {
+  display: flex;
+  animation: pulse 1.5s infinite;
+}

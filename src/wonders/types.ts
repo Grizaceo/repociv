@@ -7,12 +7,12 @@
 
 // ─── Core Wonder Contract ────────────────────────────────────────────────────
 
-export type WonderKind = 'native' | 'iframe';
-export type WonderCategory = 'knowledge' | 'operations' | 'news' | 'lab';
-export type AutomationLevel = 'passive' | 'assist' | 'auto';
-export type WonderActionRisk = 'safe' | 'approval' | 'manual';
+type WonderKind = 'native' | 'iframe';
+type WonderCategory = 'knowledge' | 'operations' | 'news' | 'lab';
+type AutomationLevel = 'passive' | 'assist' | 'auto';
+type WonderActionRisk = 'safe' | 'approval' | 'manual';
 
-export interface FeatureFlag {
+interface FeatureFlag {
   id: string;
   label: string;
   description: string;
@@ -20,39 +20,39 @@ export interface FeatureFlag {
   requiresUserOptIn: boolean;
 }
 
-export interface WonderAction {
+interface WonderAction {
   id: string;
   label: string;
   risk: WonderActionRisk;
   requiresUserOptIn: boolean;
 }
 
-export interface WonderEvent {
+interface WonderEvent {
   emits: string[];
   accepts: string[];
 }
 
-export interface WonderUiConfig {
+interface WonderUiConfig {
   url?: string;
   preferredWidth?: string;
   preferredHeight?: string;
   sandbox?: string[];
 }
 
-export interface WonderHealthConfig {
+interface WonderHealthConfig {
   url: string;
   timeoutMs: number;
   degradedAllowed: boolean;
 }
 
-export interface WonderPermissions {
+interface WonderPermissions {
   readRepos: boolean;
   writeRepos: boolean;
   network: 'loopback-only' | 'none';
   requiresApprovalForMutations: boolean;
 }
 
-export interface WonderMcpConfig {
+interface WonderMcpConfig {
   enabled: boolean;
   server: string | null;
 }
@@ -79,8 +79,7 @@ export interface WonderManifest {
   mcp: WonderMcpConfig;
 }
 
-// Back-compat alias used by existing code/tests
-export type WonderOptionalFeature = FeatureFlag;
+// (WonderOptionalFeature back-compat alias removed — unused)
 
 // ─── postMessage Bridge Contract ─────────────────────────────────────────────
 

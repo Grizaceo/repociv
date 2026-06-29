@@ -1,0 +1,26 @@
+/* ─── Imperial Error Toast (Whimsy Injector) ───────────────────── */
+#global-error-toast {
+  position: fixed;
+  bottom: var(--space-5);
+  left: var(--space-5);
+  max-width: 560px;
+  padding: var(--space-5);
+  background: rgba(10, 6, 4, 0.95) !important;
+  color: var(--ui-text) !important;
+  font-family: var(--font-body) !important;
+  font-size: var(--text-sm) !important;
+  z-index: 9999 !important;
+  border: var(--border-medium) solid oklch(0.55 0.22 25) !important;
+  border-left: var(--border-thick) solid var(--ui-gold-bright) !important;
+  border-radius: 0 var(--panel-radius) var(--panel-radius) 0 !important;
+  box-shadow: var(--shadow-glow);
+  display: none;
+}
+#global-error-toast::before {
+  content: '🦅 ';
+  font-size: var(--text-lg);
+  margin-right: var(--space-3);
+}
+#global-error-toast[data-herald='true'] {
+  border-left-color: var(--civ-gold) !important;
+}

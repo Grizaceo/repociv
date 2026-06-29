@@ -1,0 +1,54 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   RepoCiv — Empty States & Delight (Whimsy + Storyteller) v2
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Empty states ─────────────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-9);
+  gap: var(--space-4);
+  text-align: center;
+  animation: slideUp 0.4s ease;
+}
+.empty-icon {
+  font-size: var(--text-3xl);
+  filter: drop-shadow(0 0 8px rgba(200, 168, 75, 0.25));
+}
+.empty-title {
+  font-family: var(--font-ui);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--ui-gold-bright);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.empty-message {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--ui-text-dim);
+  line-height: 1.5;
+  max-width: 280px;
+}
+.empty-action {
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-7);
+  background: var(--panel-bg);
+  border: var(--border-thin) solid var(--ui-border);
+  border-radius: var(--panel-radius);
+  color: var(--ui-gold-bright);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.empty-action:hover {
+  background: var(--panel-hover);
+  border-color: var(--ui-gold);
+}

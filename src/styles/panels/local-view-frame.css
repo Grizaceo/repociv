@@ -1,0 +1,126 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Settings Panel — CSS faltante
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#settings-panel {
+  position: absolute;
+  top: 56px;
+  right: 8px;
+  width: 380px;
+  max-height: 65vh;
+  background: var(--ui-panel-bg);
+  border: 2px solid var(--ui-border);
+  border-radius: 6px;
+  z-index: 48;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.9);
+  animation: slideUp 0.2s ease;
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+#settings-panel.hidden {
+  display: none;
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+.settings-header h3 {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ui-gold-bright);
+  margin: 0;
+}
+.settings-header button {
+  background: none;
+  border: none;
+  color: var(--ui-text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+}
+.settings-header button:hover {
+  color: var(--ui-gold-bright);
+}
+
+.settings-body {
+  overflow-y: auto;
+  padding: 12px;
+  flex: 1;
+  color: var(--ui-text);
+}
+
+.settings-section {
+  margin-bottom: 16px;
+}
+.settings-section h4 {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gold-mid);
+  margin: 0 0 8px 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(90, 74, 46, 0.3);
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+.settings-row label {
+  font-size: 11px;
+  color: var(--ui-text);
+}
+.settings-row input[type='number'],
+.settings-row input[type='text'],
+.settings-row select {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  font-size: 11px;
+  padding: 3px 6px;
+  font-family: var(--font-ui);
+  outline: none;
+  width: 140px;
+}
+.settings-row input:focus,
+.settings-row select:focus {
+  border-color: var(--ui-gold);
+}
+.settings-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.settings-actions button {
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  color: var(--ui-gold);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  transition: background 0.15s;
+}
+.settings-actions button:hover {
+  background: rgba(212, 175, 55, 0.28);
+}
+.settings-actions button.danger {
+  background: rgba(212, 75, 75, 0.15);
+  border-color: rgba(212, 75, 75, 0.35);
+  color: #d44b4b;
+}
+.settings-actions button.danger:hover {
+  background: rgba(212, 75, 75, 0.28);
+}

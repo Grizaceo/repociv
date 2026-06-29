@@ -1,0 +1,669 @@
+/* ─── City Panel ──────────────────────────────────────────────────────────── */
+#city-panel {
+  position: absolute;
+  /* components.css still carries a legacy #city-panel rule with top: 50%;
+     with both top and bottom set the panel stretches to a fixed 320px and
+     crushes the body. Neutralize top here (this file loads last). */
+  top: auto;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  max-height: 55vh;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 2px solid var(--ui-gold);
+  border-radius: var(--panel-radius);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-deep);
+  transition:
+    transform var(--transition-slow),
+    opacity var(--transition-slow),
+    display var(--transition-slow) allow-discrete;
+  opacity: 1;
+}
+#city-panel.hidden {
+  display: none !important;
+  transform: translate(-50%, 20px);
+  opacity: 0;
+  pointer-events: none;
+}
+@starting-style {
+  #city-panel:not(.hidden) {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+}
+
+.city-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ui-border);
+  background: linear-gradient(180deg, rgba(200, 168, 75, 0.12), transparent);
+}
+.city-panel-header--draggable {
+  cursor: move;
+}
+.city-panel-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.city-panel-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.city-star {
+  color: var(--ui-gold-bright);
+  font-size: 16px;
+}
+.city-star.hidden {
+  display: none;
+}
+#city-panel-name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ui-gold-bright);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.city-pop {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  letter-spacing: 0.05em;
+}
+#city-panel-close,
+#city-panel-minimize {
+  background: transparent;
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text-dim);
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+#city-panel-close:hover,
+#city-panel-minimize:hover {
+  color: var(--ui-gold);
+  border-color: var(--ui-gold);
+}
+
+.city-panel-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-dark);
+}
+.city-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--ui-text-dim);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 7px 0;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+.city-tab:hover {
+  color: var(--ui-text);
+}
+.city-tab.active {
+  color: var(--ui-gold-bright);
+  border-bottom-color: var(--ui-gold);
+  background: rgba(200, 168, 75, 0.05);
+}
+
+#city-panel-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  min-height: 160px;
+}
+.city-pane {
+  position: absolute;
+  inset: 0;
+  display: none;
+  overflow-y: auto;
+  padding: 12px 14px;
+}
+.city-pane.active {
+  display: block;
+}
+
+/* Overview pane */
+.city-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.city-stat {
+  background: var(--ui-dark);
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  padding: 8px 10px;
+}
+.city-stat-label {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ui-text-dim);
+  margin-bottom: 3px;
+}
+.city-stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ui-gold-bright);
+  font-family: var(--font-ui);
+}
+.city-mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.city-section-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ui-text-dim);
+  margin-bottom: 6px;
+}
+.city-project {
+  background: var(--ui-dark);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+.city-project-name {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ui-gold-bright);
+  margin-bottom: 8px;
+}
+.city-project-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  margin-top: 4px;
+}
+
+.city-progress-bar {
+  height: 6px;
+  background: #2a1e0a;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+}
+.city-progress-fill {
+  height: 100%;
+  background: #5b9b5b;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.city-progress-fill.wonder {
+  background: var(--ui-gold);
+}
+
+/* Districts pane */
+.city-district-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--ui-border);
+}
+.city-district-row:last-child {
+  border-bottom: none;
+}
+.city-district-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.city-district-name {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--ui-gold-bright);
+  font-weight: 600;
+}
+.city-district-type {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  margin-top: 2px;
+}
+
+/* Buildings pane */
+.city-building-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--ui-border);
+}
+.city-building-row:last-child {
+  border-bottom: none;
+}
+.city-building-state {
+  font-size: 14px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.city-building-state.complete {
+  color: #5b9b5b;
+}
+.city-building-state.building {
+  color: #c8a84b;
+}
+.city-building-state.failed {
+  color: #d45b5b;
+}
+.city-building-state.planned {
+  color: #888;
+}
+.city-building-info {
+  flex: 1;
+}
+.city-building-name {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--ui-text);
+  margin-bottom: 4px;
+}
+.city-building-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  margin-top: 3px;
+}
+
+.city-empty {
+  text-align: center;
+  color: var(--ui-text-dim);
+  padding: 30px 16px;
+  font-style: italic;
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+/* ─── City Panel Body & Stats (from index.html, no prior CSS) ─── */
+.city-panel-body {
+  /* flex-basis auto (not 0) so the panel grows with its content up to the
+     #city-panel max-height, instead of squishing the body and forcing an
+     early scrollbar. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.city-stats-row {
+  display: flex;
+  gap: 16px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.city-stats-row span {
+  color: var(--ui-text);
+}
+
+.city-cols {
+  display: flex;
+  gap: 12px;
+}
+
+.city-col {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Rows inside the git / files / missions / lab columns. Without an explicit
+   rule these inherit nothing: long unbroken paths overflow the column and
+   collide with the neighboring one. One line per item, ellipsized. */
+.city-item {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Composite items (e.g. the CDAILY news cards) nest divs inside .city-item;
+   let those wrap instead of clipping mid-word. */
+.city-item > div {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.city-col-title {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ui-text-dim);
+  margin-bottom: 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.city-res {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ui-text-dim);
+  padding: 2px 0;
+}
+
+.res-val {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 12px;
+}
+.res-val.gold {
+  color: var(--civ-gold);
+}
+.res-val.sci {
+  color: var(--civ-science);
+}
+.res-val.prod {
+  color: var(--civ-production);
+}
+
+.city-git-header {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  white-space: nowrap;
+}
+
+.city-repo-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  opacity: 0.7;
+}
+
+/* ─── City Panel Footer Buttons ───────────────────────────────── */
+.city-panel-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.city-panel-footer button {
+  background: rgba(200, 168, 75, 0.08);
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  color: var(--ui-text-dim);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  padding: 4px 10px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.city-panel-footer button:hover {
+  background: var(--panel-hover);
+  border-color: var(--ui-gold);
+  color: var(--ui-gold-bright);
+}
+
+#btn-city-close {
+  margin-left: auto;
+  padding: 4px 8px;
+}
+
+/* Quest Board */
+#quest-board {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px;
+  max-height: 70vh;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 3px solid var(--ui-gold);
+  border-radius: var(--panel-radius);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-deep);
+  transition:
+    transform var(--transition-slow),
+    opacity var(--transition-slow),
+    display var(--transition-slow) allow-discrete;
+  opacity: 1;
+}
+#quest-board.hidden {
+  display: none !important;
+  transform: translate(-50%, -45%);
+  opacity: 0;
+  pointer-events: none;
+}
+@starting-style {
+  #quest-board:not(.hidden) {
+    transform: translate(-50%, -45%);
+    opacity: 0;
+  }
+}
+
+.board-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 2px solid var(--ui-border);
+  background: linear-gradient(180deg, var(--ui-border), transparent);
+}
+.board-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ui-gold-bright);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.board-header button {
+  background: transparent;
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text-dim);
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 3px;
+  font-size: 14px;
+}
+.board-header button:hover {
+  color: var(--ui-gold);
+  border-color: var(--ui-gold);
+}
+
+.board-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-dark);
+}
+.quest-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--ui-text-dim);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 8px 0;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.quest-tab.active {
+  color: var(--ui-gold-bright);
+  border-bottom-color: var(--ui-gold);
+}
+
+#quest-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.quest-item {
+  background: var(--ui-dark);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+.quest-item .quest-status {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.quest-item .quest-status.running {
+  background: #5b9bd5;
+  animation: pulse 1s infinite;
+}
+.quest-item .quest-status.complete {
+  background: #5b9b5b;
+}
+.quest-item .quest-status.failed {
+  background: #d45b5b;
+}
+.quest-item .quest-name {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--ui-gold-bright);
+  font-weight: 600;
+}
+.quest-item .quest-meta {
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  font-family: var(--font-mono);
+}
+.quest-item .quest-mission {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--ui-text);
+  font-family: var(--font-body);
+  font-style: italic;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--ui-border);
+  opacity: 0.85;
+}
+.quest-empty {
+  text-align: center;
+  color: var(--ui-text-dim);
+  padding: 40px;
+  font-style: italic;
+}
+
+/* Keyboard help overlay */
+#keyboard-help {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 8, 4, 0.85);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#keyboard-help.hidden {
+  display: none;
+}
+.kbh-content {
+  background: var(--ui-panel-bg);
+  border: 3px solid var(--ui-gold);
+  border-radius: 6px;
+  width: 600px;
+  max-width: 90vw;
+}
+.kbh-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 20px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ui-text);
+  line-height: 1.9;
+}
+.kbh-section h4 {
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--ui-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--ui-border);
+  padding-bottom: 4px;
+}
+kbd {
+  display: inline-block;
+  background: var(--ui-dark);
+  border: 1px solid var(--ui-border-light);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ui-gold-bright);
+  min-width: 20px;
+  text-align: center;
+  margin-right: 6px;
+}

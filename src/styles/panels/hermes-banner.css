@@ -1,0 +1,113 @@
+/* ─── Hermes degraded-mode banner (Fase 1 / audit 1.1) ────────────────────
+   Persistent top strip shown when /api/hermes/status reports
+   available=false. Self-contained so it doesn't depend on any
+   other panel being open. */
+.hermes-degraded-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9000;
+  background: linear-gradient(180deg, rgba(140, 30, 30, 0.95) 0%, rgba(110, 22, 22, 0.92) 100%);
+  color: #f8e8c8;
+  border-bottom: 2px solid var(--gold-bright, #f0c060);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  font-family: var(--ui-font-mono, 'Cinzel', 'Consolas', monospace);
+  font-size: 12px;
+  padding: 0;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.hermes-degraded-banner .hermes-banner-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 6px 16px;
+  border-bottom: 1px solid rgba(240, 192, 96, 0.25);
+}
+.hermes-degraded-banner .hermes-banner-icon {
+  font-size: 18px;
+}
+.hermes-degraded-banner .hermes-banner-close {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid rgba(240, 192, 96, 0.35);
+  color: #f8e8c8;
+  font-size: 18px;
+  line-height: 1;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+.hermes-degraded-banner .hermes-banner-close:hover {
+  background: rgba(240, 192, 96, 0.15);
+}
+.hermes-degraded-banner .hermes-banner-body {
+  padding: 8px 16px 6px 16px;
+}
+.hermes-degraded-banner .hermes-banner-body p {
+  margin: 0 0 6px 0;
+  line-height: 1.4;
+}
+.hermes-degraded-banner .hermes-banner-features {
+  margin: 4px 0 8px 20px;
+  padding: 0;
+}
+.hermes-degraded-banner .hermes-banner-features li {
+  margin: 2px 0;
+  line-height: 1.35;
+}
+.hermes-degraded-banner details {
+  margin: 4px 0 6px 0;
+}
+.hermes-degraded-banner details summary {
+  cursor: pointer;
+  color: var(--gold-bright, #f0c060);
+  font-weight: 600;
+  padding: 2px 0;
+  user-select: none;
+}
+.hermes-degraded-banner .hermes-banner-steps {
+  margin: 6px 0 6px 22px;
+  padding: 0;
+}
+.hermes-degraded-banner .hermes-banner-steps li {
+  margin: 2px 0;
+  line-height: 1.35;
+  font-family: var(--ui-font-mono, 'Consolas', monospace);
+  font-size: 11px;
+}
+.hermes-degraded-banner .hermes-banner-meta {
+  font-size: 10px;
+  color: rgba(248, 232, 200, 0.7);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.hermes-degraded-banner .hermes-banner-meta code {
+  font-family: var(--ui-font-mono, 'Consolas', monospace);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.hermes-degraded-banner .hermes-banner-footer {
+  padding: 6px 16px 8px 16px;
+  border-top: 1px solid rgba(240, 192, 96, 0.15);
+}
+.hermes-degraded-banner .hermes-banner-refresh {
+  background: var(--gold-bright, #f0c060);
+  color: #1a1a1a;
+  border: none;
+  padding: 5px 12px;
+  font-family: var(--ui-font-mono, 'Cinzel', 'Consolas', monospace);
+  font-weight: 700;
+  font-size: 11px;
+  border-radius: 3px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.hermes-degraded-banner .hermes-banner-refresh:hover {
+  filter: brightness(1.1);
+}

@@ -1,0 +1,138 @@
+/* ─── Fase 5: Spatial directive preview card ────────────────────────────────── */
+.sp-card {
+  position: fixed;
+  z-index: 9000;
+  min-width: 220px;
+  max-width: 320px;
+  background: rgba(12, 12, 14, 0.96);
+  border: 1px solid var(--ui-gold);
+  border-radius: 6px;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(200, 168, 75, 0.15);
+  padding: 10px 14px 12px;
+  font-family: var(--font-ui);
+  color: var(--ui-text);
+  pointer-events: auto;
+  transition: opacity 0.1s;
+}
+.sp-card.hidden {
+  display: none;
+}
+
+.sp-arrow {
+  position: absolute;
+  left: -7px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-right: 7px solid var(--ui-gold);
+}
+
+.sp-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.sp-gesture {
+  font-size: 18px;
+  opacity: 0.85;
+}
+.sp-label {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sp-conf {
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  font-family: var(--font-mono);
+}
+
+.sp-cmd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.sp-cmd-type {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ui-text-dim);
+}
+.sp-risk {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.sp-approval-warn {
+  font-size: 10px;
+  color: var(--state-approval);
+  margin-bottom: 6px;
+}
+
+.sp-prompt-row {
+  margin: 6px 0;
+}
+.sp-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  color: var(--ui-text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  padding: 5px 8px;
+  outline: none;
+}
+.sp-input:focus {
+  border-color: var(--ui-gold);
+}
+
+.sp-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.sp-btn-confirm,
+.sp-btn-cancel {
+  flex: 1;
+  padding: 5px;
+  border-radius: 3px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  cursor: pointer;
+  border: 1px solid;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.sp-btn-confirm {
+  background: rgba(91, 155, 91, 0.15);
+  border-color: #5b9b5b;
+  color: #5b9b5b;
+}
+.sp-btn-confirm:hover {
+  background: #5b9b5b;
+  color: #fff;
+}
+.sp-btn-cancel {
+  background: rgba(212, 91, 91, 0.1);
+  border-color: #d45b5b;
+  color: #d45b5b;
+}
+.sp-btn-cancel:hover {
+  background: #d45b5b;
+  color: #fff;
+}

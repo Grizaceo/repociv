@@ -39,43 +39,6 @@ export interface ForeignRelationsReport {
   llmUnavailable?: boolean;
 }
 
-export interface RepoProfile {
-  repoPath: string;
-  repoName: string;
-  readmePreview: string;
-  manifestSnippet: string | null;
-  manifestType: string | null;
-  topLevelDirs: string[];
-  recentFilesCount: number;
-  recentFiles: string[];
-  skillTags: string[];
-  isGitRepo: boolean;
-}
-
-export interface ArticleRepoScore {
-  score: number;
-  confidence: string;
-  shouldTriggerLLM: boolean;
-  dimensions: {
-    keywordOverlap: number;
-    tfidfScore: number;
-    categoryFit: number;
-    manifestFit: number;
-    eventFit: number;
-  };
-}
-
-export interface ForeignScoreResponse {
-  scoring: ArticleRepoScore;
-  profile: {
-    repoName: string;
-    repoPath: string;
-    topLevelDirs: string[];
-    recentFilesCount: number;
-    skillTags: string[];
-  };
-}
-
 // ─── Terrain types (inferred from repo contents) ─────────────────────────────
 export type Terrain =
   | 'plains' // .ts/.tsx/.js/.jsx — web/frontend
@@ -102,7 +65,7 @@ export interface Tile {
   folderStructure?: string[]; // Lista de rutas de carpetas del repo principal
 }
 
-export interface TileResources {
+interface TileResources {
   gold: number; // commits / lines added
   science: number; // test coverage / validations
   production: number; // features / PRs
@@ -136,7 +99,7 @@ export interface District {
 }
 
 // ─── Building & Wonder ─────────────────────────────────────────────────────
-export type BuildingState = 'planned' | 'building' | 'complete' | 'failed';
+type BuildingState = 'planned' | 'building' | 'complete' | 'failed';
 
 // Known built-in/example ids keep autocomplete; `(string & {})` widens the
 // type to accept arbitrary user-connected wonder ids (custom iframe services)
@@ -161,7 +124,7 @@ export interface Building {
 }
 
 // ─── Unit / Agent ───────────────────────────────────────────────────────────
-export type UnitType =
+type UnitType =
   | 'hero'
   | 'worker'
   | 'scout'
@@ -230,7 +193,7 @@ export interface World {
   restAreas: RestArea[]; // Phase 9: Context Fatigue
 }
 
-export type SubagentStatus = 'proposed' | 'running' | 'complete' | 'failed' | 'cancelled';
+type SubagentStatus = 'proposed' | 'running' | 'complete' | 'failed' | 'cancelled';
 export type SubagentRisk = 'low' | 'medium' | 'high' | 'destructive';
 
 export interface SubagentRun {
@@ -550,7 +513,7 @@ export interface LocalWorld {
 // ─── Local Unit State (Phase 7a) ───────────────────────────────────────────────
 export type AgentTask = 'explore' | 'plan' | 'debug' | 'code' | 'adversarial_review';
 
-export type LocalUnitState =
+type LocalUnitState =
   | 'idle_in_room'
   | 'walking_to_workbench'
   | 'walking_to_room'
@@ -642,7 +605,6 @@ export interface MapLayerState {
 }
 
 // ─── Power System (RimWorld-style) ─────────────────────────────────────────────
-export type PowerTileType = 'conduit' | 'generator' | 'battery' | 'solar' | 'wind' | 'consumer';
 
 export interface PowerGrid {
   conduits: Set<string>; // "x,y" keys
@@ -701,7 +663,7 @@ export interface Vent {
 // ─── Stockpile / Zoning System ─────────────────────────────────────────────────
 export type ZoneType = 'stockpile' | 'growing' | 'recreation' | 'bedroom' | 'dining' | 'hospital';
 
-export interface Zone {
+interface Zone {
   id: string;
   type: ZoneType;
   tiles: Array<{ x: number; y: number }>;
@@ -709,83 +671,15 @@ export interface Zone {
   priority: number; // 1-4
 }
 
-export interface StockpileFilter {
+interface StockpileFilter {
   category: 'code' | 'test' | 'config' | 'doc' | 'asset' | 'binary';
   extensions: string[];
   allowed: boolean;
 }
 
-// ─── Joy / Needs / Mood ────────────────────────────────────────────────────────
-export interface UnitNeeds {
-  rest: number; // 0-100 (100 = rested)
-  food: number; // 0-100
-  joy: number; // 0-100
-  comfort: number; // 0-100 (room impressiveness)
-}
-
-export interface Thought {
-  text: string;
-  moodImpact: number; // -50 a +50
-  timestamp: number;
-  source: 'environment' | 'social' | 'work' | 'health';
-}
-
-// ─── Research ──────────────────────────────────────────────────────────────────
-export interface ResearchProject {
-  id: string;
-  name: string;
-  description: string;
-  cost: number; // science points
-  progress: number;
-  unlocked: string[]; // feature flags
-  requiredTech: string[];
-}
-
-// ─── Incidents ─────────────────────────────────────────────────────────────────
-export type IncidentType =
-  | 'code_review_raid'
-  | 'dependency_rot'
-  | 'burnout'
-  | 'inspiration'
-  | 'power_outage'
-  | 'thermal_shock';
-
-export interface Incident {
-  id: string;
-  type: IncidentType;
-  severity: 'minor' | 'major' | 'critical';
-  message: string;
-  affectedRooms: string[];
-  affectedUnits: string[];
-  startedAt: number;
-  expiresAt: number | null;
-  resolved: boolean;
-}
-
-// ─── Extended LocalWorld with RimWorld systems ─────────────────────────────────
-export interface LocalWorldRimWorld extends LocalWorld {
-  powerGrid?: PowerGrid;
-  roomClimates?: Map<string, RoomClimate>;
-  zones?: Zone[];
-  researchProjects?: ResearchProject[];
-  incidents?: Incident[];
-  storytellerState?: 'randy_random' | 'cassandra_classic' | 'phoebe_chill';
-}
-
-// ─── LocalTileType extended ────────────────────────────────────────────────────
-// Adding power/climate/zone tile types
-export type LocalTileTypeExtended =
-  | LocalTileType
-  | 'conduit'
-  | 'power_source'
-  | 'power_consumer'
-  | 'heater'
-  | 'cooler'
-  | 'vent'
-  | 'stockpile'
-  | 'joy_object'
-  | 'bed'
-  | 'research_bench';
+// ─── Extended LocalWorld with RimWorld systems (unused — removed) ────────────
+// LocalWorldRimWorld, UnitNeeds, Thought, ResearchProject, IncidentType,
+// Incident, and LocalTileTypeExtended were removed as dead code.
 
 // ─── Renderer state ────────────────────────────────────────────────────────────
 

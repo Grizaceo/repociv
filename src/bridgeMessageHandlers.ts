@@ -20,7 +20,7 @@
 
 import type { GameState } from './game.ts';
 import { pickDetachmentHex } from './game.ts';
-import type { BridgeEvent, CDailyArticle } from './types.ts';
+import type { BridgeEvent, SubagentRisk } from './types.ts';
 import { logger } from './logger.ts';
 import {
   logEvent,
@@ -289,7 +289,7 @@ const HANDLERS: HandlerByType = {
       kind: evt.kind,
       label: evt.label,
       status: spawnStatus,
-      risk: evt.risk as import('./types.ts').SubagentRisk,
+      risk: evt.risk as SubagentRisk,
       targetCityId: evt.targetCityId,
       ephemeralUnitId: evt.ephemeralUnitId,
       startedAt: Date.now(),
@@ -373,7 +373,7 @@ const HANDLERS: HandlerByType = {
       kind: evt.kind,
       label: evt.label,
       status: 'proposed',
-      risk: evt.risk as import('./types.ts').SubagentRisk,
+      risk: evt.risk as SubagentRisk,
       startedAt: Date.now(),
     });
     ctx.logEvent(`⏳ Subagente propuesto [${evt.risk}]: ${evt.label.slice(0, 40)}`, 'warn');
@@ -397,9 +397,3 @@ export function dispatchBridgeEvent(ctx: MessageContext, evt: BridgeEvent): void
   }
   handler(ctx, evt);
 }
-
-// Re-export CDailyArticle so bridge.ts can keep its existing public API
-// (UI panels import it from there). Without this re-export the import
-// chain breaks — the type was previously defined here, so the move is
-// invisible to consumers.
-export type { CDailyArticle };

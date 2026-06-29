@@ -1,0 +1,274 @@
+/* ─── Fase 7: Observability panel ────────────────────────────────────────────── */
+.obs-panel {
+  position: fixed;
+  top: 48px;
+  right: 10px;
+  width: 340px;
+  max-height: calc(100vh - 60px);
+  z-index: 8500;
+  background: rgba(10, 10, 12, 0.97);
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-ui);
+  overflow: hidden;
+}
+.obs-panel.hidden {
+  display: none;
+}
+
+.obs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ui-border);
+  flex-shrink: 0;
+}
+.obs-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ui-text-dim);
+  letter-spacing: 0.08em;
+}
+.obs-header button {
+  background: none;
+  border: none;
+  color: var(--ui-text-dim);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.obs-header button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ui-text);
+}
+
+.obs-body {
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Health banner */
+.obs-health-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid;
+}
+.obs-health-icon {
+  font-size: 14px;
+}
+.obs-health-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ui-text);
+  flex: 1;
+}
+.obs-health-ts {
+  font-size: 9px;
+  color: var(--ui-text-dim);
+  font-family: var(--font-mono);
+}
+
+/* Circuit breaker open badge */
+.obs-circuit-badge {
+  background: #d44b4b22;
+  border: 1px solid #d44b4b;
+  color: #d44b4b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  border-radius: 3px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+/* Section titles */
+.obs-section-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--ui-text-dim);
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 3px;
+  margin-top: 4px;
+}
+
+/* Agent grid */
+.obs-agent-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.obs-agent-card {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 3px;
+  font-size: 11px;
+}
+.obs-agent-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.obs-agent-id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ui-gold);
+  width: 64px;
+}
+.obs-agent-state {
+  color: var(--ui-text-dim);
+  font-size: 10px;
+  flex: 1;
+}
+.obs-agent-task {
+  font-size: 9px;
+  color: var(--ui-text-dim);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+
+/* Metrics grid */
+.obs-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+.obs-metric {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 3px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.obs-metric-value {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+.obs-metric-label {
+  font-size: 9px;
+  color: var(--ui-text-dim);
+  margin-top: 2px;
+  text-align: center;
+}
+
+/* Tool calls */
+.obs-tool-calls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.obs-tc-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+  padding: 3px 7px;
+  font-size: 10px;
+}
+.obs-tc-agent {
+  font-family: var(--font-mono);
+  color: var(--ui-gold);
+}
+.obs-tc-count {
+  color: var(--ui-text);
+  font-weight: 700;
+}
+
+/* Failures */
+.obs-failures {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.obs-failure-item {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 4px 6px;
+  background: rgba(212, 75, 75, 0.06);
+  border-left: 2px solid #d44b4b;
+  border-radius: 2px;
+  font-size: 10px;
+}
+.obs-fail-id {
+  font-family: var(--font-mono);
+  color: var(--ui-text-dim);
+  flex-shrink: 0;
+}
+.obs-fail-age {
+  color: var(--ui-text-dim);
+  flex-shrink: 0;
+  min-width: 28px;
+}
+.obs-fail-err {
+  color: #d47b7b;
+  word-break: break-all;
+}
+
+.obs-empty {
+  color: var(--ui-text-dim);
+  font-size: 11px;
+  text-align: center;
+  padding: 8px;
+}
+.obs-offline {
+  color: var(--state-approval);
+  font-size: 11px;
+  text-align: center;
+  padding: 16px;
+}
+
+/* Health dot on top bar button */
+#btn-observability {
+  position: relative;
+  background: var(--ui-dark);
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  color: var(--ui-text-dim);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+#btn-observability:hover {
+  border-color: var(--ui-gold);
+  color: var(--ui-gold);
+}
+.obs-health-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #666;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+}

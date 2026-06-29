@@ -880,10 +880,9 @@ export class Renderer {
       this.onUnitSelect?.(null);
       this.onCitySelect?.(city.id);
       this.onTileInspect?.(city.name, city.coord, city.id);
-      // 3D tile popup: show billboard with city info in WebGL mode.
-      if (this.worldRenderMode === 'webgl' && tile) {
-        const garrison = this.state.world.units.filter((u) => u.cityId === city.id);
-        tilePopupMod?.showTilePopup(tile, coord, city, garrison);
+      // City panel (onCitySelect) is enough — no 3D billboard overlay.
+      if (this.worldRenderMode === 'webgl') {
+        tilePopupMod?.clearTilePopup();
       }
       return;
     }

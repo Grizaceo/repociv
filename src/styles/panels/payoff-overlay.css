@@ -1,0 +1,7 @@
+/* ─── Payoff canvas overlay ────────────────────────────────────── */
+#payoff-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+}

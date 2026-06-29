@@ -591,3 +591,70 @@ export function getHarnessList(): HarnessInfo[] {
 export function getProviderList(): ProviderInfo[] {
   return _filteredProviders();
 }
+
+/** Load provider registry if the chat selector has not run yet. */
+export async function ensureProvidersLoaded(): Promise<void> {
+  if (_allProviders.length) return;
+  try {
+    const r = await fetch(bridgeUrl('/providers'), { headers: bridgeHeaders() });
+    if (!r.ok) return;
+    const data = (await r.json()) as {
+      harnesses: HarnessInfo[];
+      providers: ProviderInfo[];
+    };
+    _harnesses = data.harnesses ?? [];
+    _allProviders = data.providers ?? [];
+  } catch {
+    // strip falls back to free-text model id
+  }
+}
+
+function _registryHarnessId(harness: string): string {
+  if (harness === 'claude') return 'claude-code';
+  return harness;
+}
+
+/** Model ids compatible with a harness (for profile strip). 0 external selects). */
+export function listModelsForHarness(harness: string): { id: string; name: string }[] {
+  const hid = _registryHarnessId(harness);
+  const seen = new Map<string, string>();
+  for (const p of _allProviders) {
+    for (const m of p.models) {
+      const compatible =
+        !m.harnesses?.length || m.harnesses.includes(hid) || m.harnesses.includes(harness);
+      if (compatible) seen.set(m.id, m.name || m.id);
+    }
+  }
+  return [...seen.entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Populate a `<select>` with models for the given harness. */
+export function populateProfileStripModelSelect(
+  selectEl: HTMLSelectElement,
+  harness: string,
+  currentModel?: string,
+): void {
+  const models = listModelsForHarness(harness);
+  selectEl.innerHTML = '';
+  const defaultOpt = document.createElement('option');
+  defaultOpt.value = '';
+  defaultOpt.textContent = models.length ? '(default)' : '(escribe id)';
+  selectEl.appendChild(defaultOpt);
+  for (const m of models) {
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = m.name;
+    selectEl.appendChild(opt);
+  }
+  if (currentModel && [...selectEl.options].some((o) => o.value === currentModel)) {
+    selectEl.value = currentModel;
+  } else if (currentModel) {
+    const custom = document.createElement('option');
+    custom.value = currentModel;
+    custom.textContent = currentModel;
+    custom.selected = true;
+    selectEl.appendChild(custom);
+  }
+}

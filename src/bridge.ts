@@ -599,23 +599,10 @@ export interface GraphRelationCandidate extends WonderSuggestionRelation {
   toCityId?: string;
 }
 
-export interface GraphRelationsResponse {
+interface GraphRelationsResponse {
   cityId: string;
   count: number;
   relations: GraphRelationCandidate[];
-}
-
-export interface GraphRelationEvidence {
-  from_id: string;
-  to_id: string;
-  exists: boolean;
-  relation?: GraphRelationCandidate;
-  jaccard_scores?: Record<string, number>;
-  coactivity?: { score: number; evidence: string[] };
-  fromCityName?: string;
-  toCityName?: string;
-  fromRepoPath?: string;
-  toRepoPath?: string;
 }
 
 export interface GraphRelationStats {
