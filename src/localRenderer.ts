@@ -540,7 +540,7 @@ export class LocalRenderer {
       extColor: EXT_COLOR,
       zoneLight: ISO_ZONE_LIGHT,
       isoProject: isoProjectFn,
-      drawIsoTile: (ctx: any, tile: any, x: number, y: number, currentWorld: any) => {
+      drawIsoTile: (ctx: CanvasRenderingContext2D, tile: LocalTile, x: number, y: number, currentWorld: LocalWorld) => {
         drawIsoTileModule(
           {
             ctx,

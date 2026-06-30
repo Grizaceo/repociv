@@ -156,7 +156,7 @@ def list_harness_options(harness: str) -> list[str]:
                     capture_output=True, text=True, timeout=8,
                 )
                 if result.returncode == 0:
-                    lines = [l.strip() for l in result.stdout.splitlines() if l.strip()]
+                    lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
                     if lines:
                         return lines
             except Exception:

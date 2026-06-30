@@ -224,6 +224,7 @@ async function _reorderProfile(fromName: string, toName: string): Promise<void> 
     invalidateProfileCache();
     await refreshProfiles();
   } catch (err) {
+    // eslint-disable-next-line no-console
     console.error('[ProfileStrip] reorder error:', err);
   }
 }
@@ -324,6 +325,7 @@ async function _handleSave(): Promise<void> {
       saveBtn.textContent = '✗';
       saveBtn.disabled = false;
     }
+    // eslint-disable-next-line no-console
     console.error('[ProfileStrip] save error:', err);
     setTimeout(() => {
       if (saveBtn) {
@@ -389,6 +391,7 @@ async function _handleAlmaSave(): Promise<void> {
       }
     }, 1500);
   } catch (err) {
+    // eslint-disable-next-line no-console
     console.error('[ProfileStrip] alma save error:', err);
     if (saveBtn) {
       saveBtn.textContent = '✗';
