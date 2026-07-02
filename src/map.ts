@@ -518,6 +518,65 @@ export async function fetchSelectedRepos(): Promise<ScannedRepo[]> {
   return (await res.json()) as ScannedRepo[];
 }
 
+// ─── Multi-root API ──────────────────────────────────────────────────────────
+
+export interface MapRootInfo {
+  path: string;
+  label?: string;
+  isActive: boolean;
+  repoCount: number;
+  selectedCount: number;
+  addedAt: string;
+  lastSeen: string;
+}
+
+export interface MapRootsResponse {
+  activeRoot: string;
+  roots: MapRootInfo[];
+}
+
+export async function fetchMapRoots(): Promise<MapRootsResponse> {
+  const res = await fetch('/api/map-roots');
+  if (!res.ok) throw new Error(`/api/map-roots HTTP ${res.status}`);
+  return (await res.json()) as MapRootsResponse;
+}
+
+export async function addMapRoot(rootPath: string, label?: string): Promise<{ ok: boolean; totalRepos: number }> {
+  const res = await fetch('/api/map-roots', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: rootPath, label }),
+  });
+  if (!res.ok) throw new Error(`/api/map-roots HTTP ${res.status}`);
+  return (await res.json()) as { ok: boolean; totalRepos: number };
+}
+
+export async function activateMapRoot(rootPath: string): Promise<{ ok: boolean }> {
+  const res = await fetch('/api/map-roots/activate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: rootPath }),
+  });
+  if (!res.ok) throw new Error(`/api/map-roots/activate HTTP ${res.status}`);
+  return (await res.json()) as { ok: boolean };
+}
+
+export async function removeMapRoot(rootPath: string): Promise<{ ok: boolean; totalRepos: number }> {
+  const res = await fetch('/api/map-roots/remove', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: rootPath }),
+  });
+  if (!res.ok) throw new Error(`/api/map-roots/remove HTTP ${res.status}`);
+  return (await res.json()) as { ok: boolean; totalRepos: number };
+}
+
+export async function pickMapRootFolder(): Promise<{ ok: boolean; root: string; totalRepos: number }> {
+  const res = await fetch('/api/map-roots/pick', { method: 'POST' });
+  if (!res.ok) throw new Error(`/api/map-roots/pick HTTP ${res.status}`);
+  return (await res.json()) as { ok: boolean; root: string; totalRepos: number };
+}
+
 // ─── Top-level subdirs detection (best-effort from extensions distribution) ─
 async function fetchSubdirs(repoId: string): Promise<{ name: string; terrain: Terrain }[]> {
   try {

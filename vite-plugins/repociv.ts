@@ -108,9 +108,9 @@ export function gitStats(repo: string): { commits: number; days: number; hasGit:
   }
 }
 
-export function makeScanWorkspace(getMapRoot: () => string) {
+export function makeScanWorkspace(getMapRoot: () => string, getMapRoots?: () => string[]) {
   let cachedRepos: ScannedRepo[] | null = null;
-  let cachedRoot: string | null = null;
+  let cachedRootsKey: string | null = null;
   let cwdReal: string | null = null;
   try {
     cwdReal = realpathSync(process.cwd());
@@ -118,9 +118,7 @@ export function makeScanWorkspace(getMapRoot: () => string) {
     cwdReal = resolve(process.cwd());
   }
 
-  function scanWorkspace(): ScannedRepo[] {
-    const mapRoot = getMapRoot();
-    if (cachedRepos && cachedRoot === mapRoot) return cachedRepos;
+  function scanSingleRoot(mapRoot: string): ScannedRepo[] {
     const repos: ScannedRepo[] = [];
     if (!existsSync(mapRoot)) return repos;
     for (const entry of readdirSync(mapRoot)) {
@@ -138,7 +136,27 @@ export function makeScanWorkspace(getMapRoot: () => string) {
       const repo = scanRepoPath(full, mapRoot);
       repos.push(repo);
     }
-    cachedRoot = mapRoot;
+    return repos;
+  }
+
+  function scanWorkspace(): ScannedRepo[] {
+    // Multi-root: scan all roots and deduplicate by resolved path
+    const roots = getMapRoots ? getMapRoots() : [getMapRoot()];
+    const rootsKey = roots.slice().sort().join('\0');
+    if (cachedRepos && cachedRootsKey === rootsKey) return cachedRepos;
+
+    const seen = new Set<string>();
+    const repos: ScannedRepo[] = [];
+    for (const root of roots) {
+      for (const repo of scanSingleRoot(root)) {
+        const key = repo.repoPath ?? repo.path;
+        if (!seen.has(key)) {
+          seen.add(key);
+          repos.push(repo);
+        }
+      }
+    }
+    cachedRootsKey = rootsKey;
     cachedRepos = repos;
     return repos;
   }
@@ -147,7 +165,7 @@ export function makeScanWorkspace(getMapRoot: () => string) {
     scanWorkspace,
     clearCache: () => {
       cachedRepos = null;
-      cachedRoot = null;
+      cachedRootsKey = null;
     },
   };
 }
@@ -344,7 +362,8 @@ export function repocivPlugin(mapRoot: string): Plugin {
   let rootsState = ensureRoot(loadState(resolve(mapRoot)), resolve(mapRoot));
   saveState(rootsState);
   const getCurrentMapRoot = () => rootsState.activeRoot;
-  const { scanWorkspace, clearCache } = makeScanWorkspace(getCurrentMapRoot);
+  const getAllMapRoots = () => Object.keys(rootsState.roots).filter((r) => existsSync(r));
+  const { scanWorkspace, clearCache } = makeScanWorkspace(getCurrentMapRoot, getAllMapRoots);
   const persistState = () => {
     saveState(rootsState);
     clearCache();
@@ -548,6 +567,131 @@ export function repocivPlugin(mapRoot: string): Plugin {
         respondJson(res, { ok: true, repo: scanRepoPath(resolved, dirname(resolved)) });
       } catch (e) {
         res.statusCode = 500;
+        respondJson(res, { error: String(e) });
+      }
+      return;
+    }
+
+    // ── Multi-root management ─────────────────────────────────────────────────
+    if (path === '/api/map-roots' && req.method === 'GET') {
+      const roots = Object.entries(rootsState.roots).map(([rootPath, entry]) => ({
+        path: rootPath,
+        label: entry.label,
+        isActive: rootPath === rootsState.activeRoot,
+        repoCount: existsSync(rootPath)
+          ? readdirSync(rootPath).filter((e) => {
+              try { return statSync(join(rootPath, e)).isDirectory() && !e.startsWith('.'); }
+              catch { return false; }
+            }).length
+          : 0,
+        selectedCount: entry.selectedRepoPaths.length,
+        addedAt: entry.addedAt,
+        lastSeen: entry.lastSeen,
+      }));
+      respondJson(res, { activeRoot: rootsState.activeRoot, roots });
+      return;
+    }
+
+    if (path === '/api/map-roots' && req.method === 'POST') {
+      try {
+        const body = await readRequestBody(req);
+        const payload = JSON.parse(body) as { path?: string; label?: string };
+        const requested = String(payload.path ?? '').trim();
+        const resolved = resolve(expandUser(requested));
+        if (!requested) {
+          res.statusCode = 400;
+          respondJson(res, { error: 'path requerido' });
+          return;
+        }
+        if (!repoExists(resolved)) {
+          res.statusCode = 400;
+          respondJson(res, { error: 'path no es carpeta valida' });
+          return;
+        }
+        ensureRoot(rootsState, resolved, payload.label);
+        persistState();
+        respondJson(res, {
+          ok: true,
+          activeRoot: rootsState.activeRoot,
+          root: resolved,
+          totalRepos: scanWorkspace().length,
+        });
+      } catch (e) {
+        res.statusCode = 500;
+        respondJson(res, { error: String(e) });
+      }
+      return;
+    }
+
+    if (path === '/api/map-roots/activate' && req.method === 'POST') {
+      try {
+        const body = await readRequestBody(req);
+        const payload = JSON.parse(body) as { path?: string };
+        const requested = String(payload.path ?? '').trim();
+        const resolved = resolve(expandUser(requested));
+        if (!rootsState.roots[resolved]) {
+          res.statusCode = 404;
+          respondJson(res, { error: 'root no registrado' });
+          return;
+        }
+        rootsState.activeRoot = resolved;
+        persistState();
+        respondJson(res, { ok: true, activeRoot: rootsState.activeRoot });
+      } catch (e) {
+        res.statusCode = 500;
+        respondJson(res, { error: String(e) });
+      }
+      return;
+    }
+
+    if (path === '/api/map-roots/remove' && req.method === 'POST') {
+      try {
+        const body = await readRequestBody(req);
+        const payload = JSON.parse(body) as { path?: string };
+        const requested = String(payload.path ?? '').trim();
+        const resolved = resolve(expandUser(requested));
+        if (!rootsState.roots[resolved]) {
+          res.statusCode = 404;
+          respondJson(res, { error: 'root no registrado' });
+          return;
+        }
+        delete rootsState.roots[resolved];
+        // If we removed the active root, switch to the first remaining one
+        if (rootsState.activeRoot === resolved) {
+          const remaining = Object.keys(rootsState.roots);
+          rootsState.activeRoot = remaining[0] ?? '';
+        }
+        persistState();
+        respondJson(res, {
+          ok: true,
+          activeRoot: rootsState.activeRoot,
+          totalRepos: scanWorkspace().length,
+        });
+      } catch (e) {
+        res.statusCode = 500;
+        respondJson(res, { error: String(e) });
+      }
+      return;
+    }
+
+    if (path === '/api/map-roots/pick' && req.method === 'POST') {
+      try {
+        const pickedPath = resolve(pickFolderWithSystemDialog());
+        if (!repoExists(pickedPath)) {
+          res.statusCode = 400;
+          respondJson(res, { error: 'carpeta invalida' });
+          return;
+        }
+        ensureRoot(rootsState, pickedPath);
+        persistState();
+        respondJson(res, {
+          ok: true,
+          activeRoot: rootsState.activeRoot,
+          root: pickedPath,
+          totalRepos: scanWorkspace().length,
+        });
+      } catch (e) {
+        res.statusCode = 400;
         respondJson(res, { error: String(e) });
       }
       return;

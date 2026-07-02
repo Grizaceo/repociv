@@ -6,6 +6,12 @@ import {
   persistRootSelection,
   saveSelectedRepoPaths,
   type ScannedRepo,
+  type MapRootInfo,
+  fetchMapRoots,
+  addMapRoot,
+  activateMapRoot,
+  removeMapRoot,
+  pickMapRootFolder,
 } from '../map.ts';
 
 const ROOT_ID = 'repo-onboarding';
@@ -30,6 +36,10 @@ interface OnboardingState {
   isSavingHarness: boolean;
   error: string | null;
   mapRoot: string;
+  // Multi-root support
+  roots: MapRootInfo[];
+  isLoadingRoots: boolean;
+  newRootPath: string;
   // Harness selection
   harnessOptions: HarnessOption[];
   selectedHarness: string | null;
@@ -99,17 +109,6 @@ async function fetchCurrentMapRoot(): Promise<string> {
 
 async function pickMapRoot(): Promise<string> {
   const res = await fetch('/api/map-root/pick', { method: 'POST' });
-  const data = (await res.json()) as { path?: string; error?: string };
-  if (!res.ok || !data.path) throw new Error(data.error ?? `HTTP ${res.status}`);
-  return data.path;
-}
-
-async function setMapRoot(path: string): Promise<string> {
-  const res = await fetch('/api/map-root', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path }),
-  });
   const data = (await res.json()) as { path?: string; error?: string };
   if (!res.ok || !data.path) throw new Error(data.error ?? `HTTP ${res.status}`);
   return data.path;
@@ -287,10 +286,36 @@ function render(state: OnboardingState, onContinue: () => void): void {
           <span class="repo-onboarding-count">${selectedCount} seleccionados</span>
         </div>
         <div class="repo-onboarding-map-root">
-          Carpeta actual: <code>${state.mapRoot}</code>
-          <div class="repo-onboarding-map-root-actions">
-            <input id="repo-onboarding-map-root-input" type="text" value="${state.mapRoot}" placeholder="/ruta/a/carpeta" />
-            <button id="repo-onboarding-map-root-apply" class="btn-secondary" type="button">Aplicar ruta</button>
+          <div class="repo-onboarding-roots-header">
+            <h4>Carpetas del mapa</h4>
+            <div class="repo-onboarding-roots-actions">
+              <input id="repo-onboarding-new-root-input" type="text" value="${state.newRootPath}" placeholder="/ruta/a/carpeta" />
+              <button id="repo-onboarding-add-root" class="btn-secondary" type="button">Agregar</button>
+              <button id="repo-onboarding-pick-root" class="btn-secondary" type="button" ${state.isPickingFolder ? 'disabled' : ''}>
+                ${state.isPickingFolder ? '...' : 'Examinar'}
+              </button>
+            </div>
+          </div>
+          <div class="repo-onboarding-roots-list">
+            ${state.isLoadingRoots
+              ? '<div class="repo-onboarding-state">Cargando carpetas...</div>'
+              : state.roots.length === 0
+                ? '<div class="repo-onboarding-state">No hay carpetas configuradas.</div>'
+                : state.roots.map((root) => `
+                  <div class="repo-onboarding-root-item ${root.isActive ? 'repo-onboarding-root-item--active' : ''}">
+                    <div class="repo-onboarding-root-info">
+                      <span class="repo-onboarding-root-path">${root.path}</span>
+                      <span class="repo-onboarding-root-meta">${root.repoCount} repos · ${root.selectedCount} seleccionados</span>
+                    </div>
+                    <div class="repo-onboarding-root-actions">
+                      ${!root.isActive
+                        ? `<button class="btn-secondary btn-sm" data-activate-root="${root.path}" type="button">Activar</button>`
+                        : '<span class="repo-onboarding-root-badge">Activa</span>'}
+                      <button class="btn-secondary btn-sm btn-danger" data-remove-root="${root.path}" type="button">×</button>
+                    </div>
+                  </div>
+                `).join('')
+            }
           </div>
         </div>
         <div class="repo-onboarding-list">
@@ -483,27 +508,102 @@ function render(state: OnboardingState, onContinue: () => void): void {
       })();
     });
 
+  // ── Multi-root handlers ────────────────────────────────────────────────────
+
+  // Add root from text input
   root
-    .querySelector<HTMLButtonElement>('#repo-onboarding-map-root-apply')
+    .querySelector<HTMLButtonElement>('#repo-onboarding-add-root')
     ?.addEventListener('click', () => {
-      const input = root.querySelector<HTMLInputElement>('#repo-onboarding-map-root-input');
+      const input = root.querySelector<HTMLInputElement>('#repo-onboarding-new-root-input');
       const path = String(input?.value ?? '').trim();
       if (!path) return;
+      void (async () => {
+        try {
+          await addMapRoot(path);
+          state.newRootPath = '';
+          await hydrateRoots(state, onContinue);
+          await hydrateRepos(state, onContinue);
+        } catch (error) {
+          state.error = `No pudimos agregar la carpeta (${error instanceof Error ? error.message : 'error desconocido'}).`;
+          render(state, onContinue);
+        }
+      })();
+    });
+
+  // Pick root folder via system dialog
+  root
+    .querySelector<HTMLButtonElement>('#repo-onboarding-pick-root')
+    ?.addEventListener('click', () => {
       void (async () => {
         state.isPickingFolder = true;
         render(state, onContinue);
         try {
-          state.mapRoot = await setMapRoot(path);
-          state.query = '';
-          state.selected.clear();
+          await pickMapRootFolder();
+          await hydrateRoots(state, onContinue);
           await hydrateRepos(state, onContinue);
         } catch (error) {
-          state.error = `No pudimos aplicar la ruta (${error instanceof Error ? error.message : 'error desconocido'}).`;
+          state.error = `No pudimos abrir el selector (${error instanceof Error ? error.message : 'error desconocido'}).`;
         } finally {
           state.isPickingFolder = false;
           render(state, onContinue);
         }
       })();
+    });
+
+  // Activate root
+  root.querySelectorAll<HTMLButtonElement>('[data-activate-root]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const rootPath = btn.dataset['activateRoot'];
+      if (!rootPath) return;
+      void (async () => {
+        try {
+          await activateMapRoot(rootPath);
+          state.mapRoot = rootPath;
+          state.query = '';
+          state.selected.clear();
+          await hydrateRoots(state, onContinue);
+          await hydrateRepos(state, onContinue);
+        } catch (error) {
+          state.error = `No pudimos activar la carpeta (${error instanceof Error ? error.message : 'error desconocido'}).`;
+          render(state, onContinue);
+        }
+      })();
+    });
+  });
+
+  // Remove root
+  root.querySelectorAll<HTMLButtonElement>('[data-remove-root]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const rootPath = btn.dataset['removeRoot'];
+      if (!rootPath) return;
+      void (async () => {
+        try {
+          await removeMapRoot(rootPath);
+          await hydrateRoots(state, onContinue);
+          await hydrateRepos(state, onContinue);
+        } catch (error) {
+          state.error = `No pudimos quitar la carpeta (${error instanceof Error ? error.message : 'error desconocido'}).`;
+          render(state, onContinue);
+        }
+      })();
+    });
+  });
+
+  // Update newRootPath on input
+  root
+    .querySelector<HTMLInputElement>('#repo-onboarding-new-root-input')
+    ?.addEventListener('input', (event) => {
+      state.newRootPath = (event.target as HTMLInputElement).value;
+    });
+
+  // Enter key on root input adds the root
+  root
+    .querySelector<HTMLInputElement>('#repo-onboarding-new-root-input')
+    ?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        root.querySelector<HTMLButtonElement>('#repo-onboarding-add-root')?.click();
+      }
     });
 
   root.querySelectorAll<HTMLInputElement>('input[data-repo-path]').forEach((checkbox) => {
@@ -567,12 +667,15 @@ export async function runRepoOnboarding(): Promise<void> {
       isSavingHarness: false,
       error: null,
       mapRoot,
+      roots: [],
+      isLoadingRoots: true,
+      newRootPath: '',
       harnessOptions: [],
       selectedHarness: null,
       harnessError: null,
     };
     render(state, resolve);
-    void hydrateHarness(state, resolve).then(() => hydrateRepos(state, resolve));
+    void hydrateHarness(state, resolve).then(() => hydrateRepos(state, resolve)).then(() => hydrateRoots(state, resolve));
   });
 }
 
@@ -603,6 +706,18 @@ async function hydrateHarness(state: OnboardingState, onContinue: () => void): P
     state.harnessError = `No pudimos listar los harnesses (${
       error instanceof Error ? error.message : 'error desconocido'
     }).`;
+  }
+  render(state, onContinue);
+}
+
+async function hydrateRoots(state: OnboardingState, onContinue: () => void): Promise<void> {
+  try {
+    const data = await fetchMapRoots();
+    state.roots = data.roots;
+    state.mapRoot = data.activeRoot;
+    state.isLoadingRoots = false;
+  } catch {
+    state.isLoadingRoots = false;
   }
   render(state, onContinue);
 }

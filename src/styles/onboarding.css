@@ -193,24 +193,106 @@
   color: var(--text-dim);
 }
 
-.repo-onboarding-map-root-actions {
-  margin-top: 8px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+.repo-onboarding-roots-header {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
+  margin-bottom: 8px;
 }
 
-.repo-onboarding-map-root-actions input {
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--panel-border);
-  background: rgba(0, 0, 0, 0.45);
+.repo-onboarding-roots-header h4 {
+  margin: 0;
+  font-size: 13px;
   color: var(--civ-text-beige);
 }
 
-.repo-onboarding-map-root code {
-  color: var(--gold-mid);
+.repo-onboarding-roots-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.repo-onboarding-roots-actions input {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--civ-text-beige);
+  font-size: 12px;
+  width: 200px;
+}
+
+.repo-onboarding-roots-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.repo-onboarding-root-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+}
+
+.repo-onboarding-root-item--active {
+  border-color: var(--ui-gold, #c8a84b);
+  background: rgba(200, 168, 75, 0.08);
+}
+
+.repo-onboarding-root-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.repo-onboarding-root-path {
+  font-size: 12px;
+  color: var(--civ-text-beige);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: monospace;
+}
+
+.repo-onboarding-root-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.repo-onboarding-root-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.repo-onboarding-root-badge {
+  font-size: 11px;
+  color: var(--ui-gold, #c8a84b);
+  font-weight: 600;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 11px;
+  height: 26px;
+}
+
+.btn-danger {
+  color: #e74c3c;
+  border-color: rgba(231, 76, 60, 0.3);
+}
+
+.btn-danger:hover {
+  background: rgba(231, 76, 60, 0.15);
+  border-color: #e74c3c;
 }
 
 .repo-onboarding-item {
