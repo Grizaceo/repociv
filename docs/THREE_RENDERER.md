@@ -107,6 +107,27 @@ The WebGL terrain shader uses:
       needed — the blender bake IS the blur. If `npm run assets:3d` was
       triggered accidentally, run `bake_atlas.py --group a` to restore.
 
+### Prop GLBs (Blender, deterministic)
+
+Low-poly props under `public/assets/3d/props/` are generated headless
+(driver+payload pattern, explicit LCG, ≤300 tris each, ≤1.5MB dir total
+gated in `check.sh`):
+
+```bash
+npm run assets:props
+# or individually:
+python3 scripts/blender/make_props.py              # mountain-{0,1,2}
+python3 scripts/blender/make_props_vegetation.py   # desert palms/rocks, ice shards, hill shrubs
+python3 scripts/blender/make_props_city.py         # city-hamlet/village/town centrepieces
+```
+
+Both vegetation/city scripts accept `--preview` to render a Cycles CPU
+contact sheet under `.hermes/artifacts/`. Consumers:
+
+- `TerrainScatter3D.ts` — hash-gated sparse scatter on desert/ice/hills
+- `CityProps3D.ts` — capital keep + per-`cityLevel()` centrepiece
+- `MountainProps3D.ts` / `ForestProps3D.ts` — unchanged
+
 ### Preview atlas (optional)
 
 ```bash

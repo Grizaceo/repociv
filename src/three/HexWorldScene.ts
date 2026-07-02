@@ -98,6 +98,12 @@ import {
   rebuildResourceProps,
   clearResourceProps,
 } from './ResourceProps3D.ts';
+import {
+  getTerrainScatterGroup,
+  ensureTerrainScatterLoad,
+  rebuildTerrainScatter,
+  clearTerrainScatter,
+} from './TerrainScatter3D.ts';
 import { getTileYieldsGroup, rebuildTileYields, clearTileYields } from './TileYields3D.ts';
 import { getRiverGroup, rebuildRivers, clearRivers } from './Rivers3D.ts';
 import { createSkyDome, disposeSkyDome } from './SkyDome3D.ts';
@@ -208,6 +214,7 @@ export function createHexWorldScene(): Scene {
   scene.add(getCityGroup());
   scene.add(getCityPropsGroup());
   scene.add(getResourcePropsGroup());
+  scene.add(getTerrainScatterGroup());
   scene.add(getTileYieldsGroup());
   scene.add(getUnitGroup());
   scene.add(getTileFlashGroup());
@@ -225,6 +232,7 @@ export function createHexWorldScene(): Scene {
   ensureCityPropsLoad();
   ensureUnitPropsLoad();
   ensureResourcePropsLoad();
+  ensureTerrainScatterLoad();
 
   return scene;
 }
@@ -1187,6 +1195,7 @@ export function updateHexWorldScene(
   rebuildMountainProps(Array.from(state.world.tiles.values()));
   rebuildForestProps(Array.from(state.world.tiles.values()));
   rebuildResourceProps(Array.from(state.world.tiles.values()));
+  rebuildTerrainScatter(Array.from(state.world.tiles.values()));
   rebuildRivers(state.world.tiles);
 
   setCitiesVisible(opts.showStructure);
@@ -1215,6 +1224,7 @@ export function disposeHexWorldScene(scene: Scene): void {
   clearForestProps();
   clearCityProps();
   clearResourceProps();
+  clearTerrainScatter();
   clearTileYields();
   clearRivers();
   clearWonderProps();

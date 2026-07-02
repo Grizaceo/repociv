@@ -150,6 +150,9 @@ async function main() {
   await page.goto(`${baseURL}/`, { waitUntil: 'domcontentloaded' });
   await page.evaluate((seed) => {
     window.localStorage.setItem('repociv:selected-repos:v1', JSON.stringify(seed));
+    // First-run tour overlay dims the whole frame — skip it, goldens are
+    // about the 3D world, not onboarding chrome.
+    window.localStorage.setItem('repociv:tour-seen:v1', '1');
     // Force flat -> webgl on first frame so the URL ?renderer=webgl is
     // the only thing that controls it. This keeps the test
     // independent of any leftover state from a previous run.
@@ -246,6 +249,13 @@ async function main() {
         { timeout: 15_000 },
       )
       .catch(() => console.error('[AUDIT] resource props never settled — capturing anyway'));
+    await page
+      .waitForFunction(
+        () => window.__repocivDebug?.isTerrainScatterSettled?.() !== false,
+        null,
+        { timeout: 15_000 },
+      )
+      .catch(() => console.error('[AUDIT] terrain scatter never settled — capturing anyway'));
     // Fixed settle time: a few frames to compile shaders, run the first
     // dirty rebuild with the atlas-backed material, and settle CSS2D labels.
     await page.waitForTimeout(1500);

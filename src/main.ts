@@ -144,6 +144,7 @@ type ThreeProbes = {
   areCityPropsSettled: () => boolean;
   areUnitPropsSettled: () => boolean;
   areResourcePropsSettled: () => boolean;
+  isTerrainScatterSettled: () => boolean;
   computeRiverPaths: (typeof import('./three/Rivers3D.ts'))['computeRiverPaths'];
 };
 let threeProbes: ThreeProbes | null = null;
@@ -156,15 +157,17 @@ function ensureThreeProbes(): void {
     import('./three/CityProps3D.ts'),
     import('./three/UnitProps3D.ts'),
     import('./three/ResourceProps3D.ts'),
+    import('./three/TerrainScatter3D.ts'),
     import('./three/Rivers3D.ts'),
   ])
-    .then(([mountain, forest, city, unit, resource, rivers]) => {
+    .then(([mountain, forest, city, unit, resource, scatter, rivers]) => {
       threeProbes = {
         areMountainPropsSettled: mountain.areMountainPropsSettled,
         areForestPropsSettled: forest.areForestPropsSettled,
         areCityPropsSettled: city.areCityPropsSettled,
         areUnitPropsSettled: unit.areUnitPropsSettled,
         areResourcePropsSettled: resource.areResourcePropsSettled,
+        isTerrainScatterSettled: scatter.isTerrainScatterSettled,
         computeRiverPaths: rivers.computeRiverPaths,
       };
     })
@@ -195,6 +198,7 @@ type RepoCivDebugApi = {
   areCityPropsSettled: () => boolean;
   areUnitPropsSettled: () => boolean;
   areResourcePropsSettled: () => boolean;
+  isTerrainScatterSettled: () => boolean;
   getGlobalUnits: () => Array<{
     id: string;
     type: string;
@@ -560,6 +564,10 @@ async function bootstrap() {
     areResourcePropsSettled: () => {
       ensureThreeProbes();
       return threeProbes?.areResourcePropsSettled() ?? false;
+    },
+    isTerrainScatterSettled: () => {
+      ensureThreeProbes();
+      return threeProbes?.isTerrainScatterSettled() ?? false;
     },
     getWebGLMetrics: () => renderer.getWebGLMetrics(),
     getShadowDebug: () => renderer.getShadowDebug(),
