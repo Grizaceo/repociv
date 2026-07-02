@@ -995,6 +995,15 @@ export class Renderer {
     return this.threeMap?.getShadowDebug() ?? null;
   }
 
+  /** Post-processing toggle passthrough (QA / capture scripts). */
+  setPostFxEnabled(enabled: boolean): void {
+    this.threeMap?.setPostFxEnabled(enabled);
+  }
+
+  isPostFxEnabled(): boolean {
+    return this.threeMap?.isPostFxEnabled() ?? false;
+  }
+
   /** Phase D: WebGL frame metrics for observability panel. */
   getWebGLMetrics(): { frameTimeAvg: number; frameCount: number; dirtyRatePct: number } | null {
     if (this.worldRenderMode !== 'webgl') return null;

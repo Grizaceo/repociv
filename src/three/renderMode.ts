@@ -43,6 +43,23 @@ export function persistRenderMode(mode: WorldRenderMode): void {
   localStorage.setItem(STORAGE_KEY, mode);
 }
 
+// ─── Post-processing toggle (vignette + warm grade + bloom) ─────────────────
+// Default ON — the graded warm look IS the Civ V read. URL param wins over
+// the persisted choice so captures/debug can pin it per navigation.
+const POSTFX_KEY = 'repociv:postfx';
+
+export function resolveInitialPostFx(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  const urlValue = params.get('postfx');
+  if (urlValue === '0' || urlValue === 'off') return false;
+  if (urlValue === '1' || urlValue === 'on') return true;
+  return localStorage.getItem(POSTFX_KEY) !== '0';
+}
+
+export function persistPostFx(enabled: boolean): void {
+  localStorage.setItem(POSTFX_KEY, enabled ? '1' : '0');
+}
+
 export async function loadThreeMapRenderer(): Promise<
   typeof import('./ThreeMapRenderer.ts').ThreeMapRenderer
 > {

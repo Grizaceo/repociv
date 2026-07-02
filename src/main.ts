@@ -212,6 +212,8 @@ type RepoCivDebugApi = {
     y: number;
   }>;
   getWebGLMetrics: () => { frameTimeAvg: number; frameCount: number; dirtyRatePct: number } | null;
+  setPostFxEnabled: (enabled: boolean) => void;
+  isPostFxEnabled: () => boolean;
   getShadowDebug: () => {
     shadowMapEnabled: boolean;
     sunCastShadow: boolean;
@@ -578,6 +580,8 @@ async function bootstrap() {
       return threeProbes?.areWonderPropsSettled() ?? false;
     },
     getWebGLMetrics: () => renderer.getWebGLMetrics(),
+    setPostFxEnabled: (enabled: boolean) => renderer.setPostFxEnabled(enabled),
+    isPostFxEnabled: () => renderer.isPostFxEnabled(),
     getShadowDebug: () => renderer.getShadowDebug(),
     getGlobalUnits: () =>
       state.world.units.map((u) => {

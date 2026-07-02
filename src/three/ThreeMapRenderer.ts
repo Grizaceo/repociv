@@ -30,6 +30,8 @@ import { areForestPropsReady } from './ForestProps3D.ts';
 import { areCityPropsReady } from './CityProps3D.ts';
 import { isTerrainScatterReady } from './TerrainScatter3D.ts';
 import { areWonderGlbReady } from './WonderProps3D.ts';
+import { PostFX3D } from './PostFX3D.ts';
+import { resolveInitialPostFx, persistPostFx } from './renderMode.ts';
 import { axialToWorld3D, hexCornerAngle3D } from './axialToWorld3D.ts';
 import { initLabelRenderer, renderLabels, disposeLabels } from './MapLabels3D.ts';
 import { updateSkyDome } from './SkyDome3D.ts';
@@ -61,6 +63,8 @@ export class ThreeMapRenderer {
   private _dirtyFrames = 0;
   private _windowFrames = 0;
   private _dirtyRatePct = 0;
+  // Post-processing (vignette + warm grade + bloom). null = plain render.
+  private postFx: PostFX3D | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -90,6 +94,26 @@ export class ThreeMapRenderer {
     this.resizeObserver = new ResizeObserver(() => this.handleResize());
     this.resizeObserver.observe(container);
     this.handleResize();
+
+    if (resolveInitialPostFx()) {
+      this.setPostFxEnabled(true, { persist: false });
+    }
+  }
+
+  /** Toggle the post-processing chain at runtime. */
+  setPostFxEnabled(enabled: boolean, opts: { persist?: boolean } = {}): void {
+    if (enabled === (this.postFx !== null)) return;
+    if (enabled) {
+      this.postFx = new PostFX3D(this.renderer, this.scene, this.camera, this.width, this.height);
+    } else {
+      this.postFx?.dispose();
+      this.postFx = null;
+    }
+    if (opts.persist !== false) persistPostFx(enabled);
+  }
+
+  isPostFxEnabled(): boolean {
+    return this.postFx !== null;
   }
 
   private handleResize(): void {
@@ -106,6 +130,7 @@ export class ThreeMapRenderer {
       this.height = Math.max(1, rect.height);
     }
     this.renderer.setSize(this.width, this.height, false);
+    this.postFx?.setSize(this.width, this.height);
     this.camera.aspect = this.width / this.height;
     this.camera.updateProjectionMatrix();
   }
@@ -196,7 +221,8 @@ export class ThreeMapRenderer {
 
     updateHexWorldScene(this.scene, state, opts, this.picker, stateDirty);
 
-    this.renderer.render(this.scene, this.camera);
+    if (this.postFx) this.postFx.render();
+    else this.renderer.render(this.scene, this.camera);
     renderLabels(this.scene, this.camera, this.width, this.height);
   }
 
@@ -316,6 +342,8 @@ export class ThreeMapRenderer {
 
   dispose(): void {
     this.resizeObserver.disconnect();
+    this.postFx?.dispose();
+    this.postFx = null;
     disposeLabels(this.container);
     disposeHexWorldScene(this.scene);
     this.renderer.dispose();
