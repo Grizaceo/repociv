@@ -114,6 +114,12 @@ import {
   clearWonderProps,
   setWonderVisible,
 } from './WonderProps3D.ts';
+import {
+  getAmbientLifeGroup,
+  rebuildAmbientLife,
+  tickAmbientLife,
+  disposeAmbientLife,
+} from './AmbientLife3D.ts';
 
 export interface HexSceneRenderOptions {
   fogEnabled: boolean;
@@ -223,6 +229,7 @@ export function createHexWorldScene(): Scene {
   scene.add(getFogTransitionGroup());
   scene.add(getLabelGroup());
   scene.add(getWonderPropsGroup());
+  scene.add(getAmbientLifeGroup());
 
   ensureTerrainAtlasLoad();
   // Props arriving flips areMountainPropsReady(), which participates in the
@@ -1176,6 +1183,9 @@ export function updateHexWorldScene(
   tickTileFlash(opts.dt);
   // Per-frame fog transition fade-out + particle animation.
   tickFogTransition(opts.dt);
+  // Ambient life (flags, gulls, chimney smoke): animTime-driven so ?freeze
+  // pins it; hidden (and skipped) below high LOD.
+  tickAmbientLife(opts.animTime, opts.lod);
 
   // State-driven rebuilds: only when the world actually changed. These
   // are the heavy ones (terrain mesh, ground plane, territory lines,
@@ -1220,6 +1230,10 @@ export function updateHexWorldScene(
   setWonderVisible('generic', opts.showStructure);
   rebuildWonderProps(Array.from(state.world.tiles.values()));
 
+  rebuildAmbientLife(Array.from(state.world.tiles.values()), state.world.cities, (key) =>
+    state.world.tiles.get(key),
+  );
+
   rebuildMapLabels(scene, state, opts.lod, opts.showLabels, (key) => state.world.tiles.get(key));
 }
 
@@ -1233,6 +1247,7 @@ export function disposeHexWorldScene(scene: Scene): void {
   clearTileYields();
   clearRivers();
   clearWonderProps();
+  disposeAmbientLife();
   disposeSkyDome();
   clearCityClusters();
   clearUnits();

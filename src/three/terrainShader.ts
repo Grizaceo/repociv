@@ -630,12 +630,15 @@ vec3 prepTerrainTex(float idx, vec3 tex) {
           float foamPulse = 0.82 + 0.18 * sin(uTime * 1.7 + vWorldXZ.x * 0.045 + vWorldXZ.y * 0.038);
           float foamAmt = ring * foamPulse * (selfOcean ? 0.78 : 0.34);
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.66, 0.90, 0.90), foamAmt);
-          // Second, fainter foam band further out on the water — Civ V coasts
-          // break twice. Offset phase so the two bands don't pulse in lockstep.
+          // Second foam band further out — Civ V coasts break twice. The band
+          // ROLLS toward the shore (its window slides with time) instead of
+          // just pulsing in place, so breakers read as arriving waves.
           if (selfOcean) {
-            float ring2 = smoothstep(0.46, 0.58, edgeT) * (1.0 - smoothstep(0.60, 0.72, edgeT));
+            float roll = 0.05 * sin(uTime * 0.9 + vWorldXZ.x * 0.02 + vWorldXZ.y * 0.017);
+            float b0 = 0.46 + roll;
+            float ring2 = smoothstep(b0, b0 + 0.12, edgeT) * (1.0 - smoothstep(b0 + 0.14, b0 + 0.26, edgeT));
             float foamPulse2 = 0.78 + 0.22 * sin(uTime * 1.3 + vWorldXZ.x * 0.052 - vWorldXZ.y * 0.041 + 1.9);
-            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.48, 0.80, 0.84), ring2 * foamPulse2 * 0.22);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.48, 0.80, 0.84), ring2 * foamPulse2 * 0.26);
           }
         }
         // ── Final Civ V grade ──────────────────────────────────────────────
@@ -740,7 +743,7 @@ vec3 prepTerrainTex(float idx, vec3 tex) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v39';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v40';
   // Terrain MUST receive the scene FogExp2: the ground plane and sky dome
   // fade into SKY_HORIZON at distance, so terrain that opted out (the old
   // `mat.fog = false`) popped against the haze instead of dissolving into it.
