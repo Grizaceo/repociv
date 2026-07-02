@@ -256,6 +256,13 @@ async function main() {
         { timeout: 15_000 },
       )
       .catch(() => console.error('[AUDIT] terrain scatter never settled — capturing anyway'));
+    await page
+      .waitForFunction(
+        () => window.__repocivDebug?.areWonderPropsSettled?.() !== false,
+        null,
+        { timeout: 15_000 },
+      )
+      .catch(() => console.error('[AUDIT] wonder props never settled — capturing anyway'));
     // Fixed settle time: a few frames to compile shaders, run the first
     // dirty rebuild with the atlas-backed material, and settle CSS2D labels.
     await page.waitForTimeout(1500);

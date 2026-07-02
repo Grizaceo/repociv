@@ -1,11 +1,14 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { BufferAttribute, BufferGeometry, MeshStandardMaterial } from 'three';
 import type { District, Tile, WonderType } from '../types.ts';
 import {
   areWonderPropsReady,
+  areWonderGlbReady,
   clearWonderProps,
   getWonderPropsGroup,
   rebuildWonderProps,
   setWonderVisible,
+  _injectWonderGlbForTest,
   _wonderPropsSignature,
 } from './WonderProps3D.ts';
 
@@ -39,7 +42,18 @@ function plainSacredTile(coord: { q: number; r: number }): Tile {
 
 afterEach(() => {
   clearWonderProps();
+  _injectWonderGlbForTest(null);
 });
+
+function fakeMergedGlb() {
+  const geometry = new BufferGeometry();
+  geometry.setAttribute(
+    'position',
+    new BufferAttribute(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), 3),
+  );
+  geometry.addGroup(0, 3, 0);
+  return { geometry, materials: [new MeshStandardMaterial()] };
+}
 
 describe('WonderProps3D', () => {
   it('areWonderPropsReady() returns true (procedural, no async load)', () => {
@@ -203,6 +217,85 @@ describe('WonderProps3D', () => {
     setWonderVisible('institutum', true);
     expect(g.children[0]!.visible).toBe(true);
     expect(g.children[1]!.visible).toBe(true);
+  });
+
+  describe('GLB swap-in', () => {
+    it('uses the loaded GLB instead of the procedural builder once ready', () => {
+      const biblio = fakeMergedGlb();
+      const inst = fakeMergedGlb();
+      _injectWonderGlbForTest(
+        new Map([
+          ['bibliotheca', biblio],
+          ['institutum', inst],
+        ]),
+      );
+      expect(areWonderGlbReady()).toBe(true);
+
+      rebuildWonderProps([
+        wonderTile({ q: -1, r: 0 }, 'bibliotheca'),
+        wonderTile({ q: 1, r: 0 }, 'institutum'),
+      ]);
+      const g = getWonderPropsGroup();
+      // One GLB mesh per wonder — not the 12/7-mesh procedural groups.
+      expect(countMeshes(g.children[0]!)).toBe(1);
+      expect(countMeshes(g.children[1]!)).toBe(1);
+      const biblioMesh = g.children[0]!.children[0] as import('three').Mesh;
+      expect(biblioMesh.geometry).toBe(biblio.geometry);
+      expect(biblioMesh.userData.sharedAsset).toBe(true);
+    });
+
+    it('clearWonderProps keeps shared GLB assets alive for later rebuilds', () => {
+      const biblio = fakeMergedGlb();
+      _injectWonderGlbForTest(new Map([['bibliotheca', biblio]]));
+      const tiles = [wonderTile({ q: -1, r: 0 }, 'bibliotheca')];
+      rebuildWonderProps(tiles);
+      // BufferGeometry.dispose() only dispatches a 'dispose' event (attributes
+      // stay readable), so listen for the event — the only observable signal.
+      const geomDispose = vi.fn();
+      const matDispose = vi.fn();
+      biblio.geometry.addEventListener('dispose', geomDispose);
+      biblio.materials[0]!.addEventListener('dispose', matDispose);
+      clearWonderProps();
+      expect(geomDispose).not.toHaveBeenCalled();
+      expect(matDispose).not.toHaveBeenCalled();
+      rebuildWonderProps(tiles);
+      const mesh = getWonderPropsGroup().children[0]!.children[0] as import('three').Mesh;
+      expect(mesh.geometry).toBe(biblio.geometry);
+    });
+
+    it('clearWonderProps still disposes procedural (non-shared) meshes', () => {
+      // No GLB injected — the procedural temple is built.
+      rebuildWonderProps([wonderTile({ q: -1, r: 0 }, 'bibliotheca')]);
+      const inst = getWonderPropsGroup().children[0]!.children[0] as import('three').Group;
+      const disposeSpy = vi.fn();
+      inst.traverse((obj) => {
+        const m = obj as import('three').Mesh;
+        if (m.isMesh) m.geometry.addEventListener('dispose', disposeSpy);
+      });
+      clearWonderProps();
+      expect(disposeSpy).toHaveBeenCalled();
+    });
+
+    it('clears a stale procedural wonder when the GLB resolves after the last wonder tile vanished', () => {
+      // Ghost regression: '' is both the "empty world" signature and (before
+      // the FORCE_REBUILD sentinel) the swap-in reset value. Sequence: build a
+      // procedural temple, GLB arrives (resets lastSignature), then the wonder
+      // district disappears while OTHER tiles remain. The temple must go.
+      rebuildWonderProps([wonderTile({ q: -1, r: 0 }, 'bibliotheca')]);
+      expect(getWonderPropsGroup().children[0]!.children).toHaveLength(1);
+      _injectWonderGlbForTest(new Map([['bibliotheca', fakeMergedGlb()]]));
+      rebuildWonderProps([plainSacredTile({ q: 0, r: 0 })]);
+      expect(getWonderPropsGroup().children[0]!.children).toHaveLength(0);
+    });
+
+    it('generic wonders stay procedural even when GLBs are loaded', () => {
+      _injectWonderGlbForTest(new Map([['bibliotheca', fakeMergedGlb()]]));
+      rebuildWonderProps([wonderTile({ q: 0, r: -1 }, 'mi-servicio')]);
+      const generic = getWonderPropsGroup().children[2]!;
+      expect(generic.children).toHaveLength(1);
+      // Procedural monument = several meshes, none tagged as shared asset.
+      expect(countMeshes(generic)).toBeGreaterThan(1);
+    });
   });
 
   it('clearWonderProps disposes all meshes and resets the signature', () => {

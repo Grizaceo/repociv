@@ -29,6 +29,7 @@ import { areResourcePropsReady } from './ResourceProps3D.ts';
 import { areForestPropsReady } from './ForestProps3D.ts';
 import { areCityPropsReady } from './CityProps3D.ts';
 import { isTerrainScatterReady } from './TerrainScatter3D.ts';
+import { areWonderGlbReady } from './WonderProps3D.ts';
 import { axialToWorld3D, hexCornerAngle3D } from './axialToWorld3D.ts';
 import { initLabelRenderer, renderLabels, disposeLabels } from './MapLabels3D.ts';
 import { updateSkyDome } from './SkyDome3D.ts';
@@ -180,7 +181,8 @@ export class ThreeMapRenderer {
       `:cprops${areCityPropsReady() ? 1 : 0}` +
       `:uprops${areUnitPropsReady() ? 1 : 0}` +
       `:rprops${areResourcePropsReady() ? 1 : 0}` +
-      `:sprops${isTerrainScatterReady() ? 1 : 0}`;
+      `:sprops${isTerrainScatterReady() ? 1 : 0}` +
+      `:wprops${areWonderGlbReady() ? 1 : 0}`;
     const stateDirty = tileSignature !== this.lastTileSignature;
     this.lastTileSignature = tileSignature;
 

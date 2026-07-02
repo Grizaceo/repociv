@@ -1,4 +1,4 @@
-// ─── RepoCiv — Wonder 3D props (procedural, low-poly, no asset deps) ─────────
+// ─── RepoCiv — Wonder 3D props (Blender GLB + procedural fallback) ───────────
 //
 // Distinguishes Bibliotheca (temple) and Institutum (laboratorium) as distinct
 // 3D structures in the WebGL map, replacing the generic "sacred tile" decor
@@ -6,8 +6,10 @@
 //
 // Pattern mirrors CityProps3D.ts: a single Group, dirty-check by tile signature,
 // `rebuildWonderProps(tiles)` rebuilds only on signature change, `clearWonderProps()`
-// disposes cleanly. Procedural-first (no GLB dependency) so this lands without
-// the asset-forge pipeline; F7 (GLB swap-in) is a later optimisation.
+// disposes cleanly. The two built-in wonders swap in painted Blender GLBs
+// (scripts/blender/make_props_wonders.py) once `ensureWonderPropsLoad()`
+// resolves; until then — and forever for user-connected generic wonders —
+// the procedural builders below carry the silhouette.
 //
 // Layer gating: `setWonderVisible(type, visible)` toggles per-wonder visibility
 // independently, matching the 2D canvas behaviour where bibliotheca gates on
@@ -24,6 +26,8 @@ import {
   Color,
   Vector3,
 } from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeGlbScene, type MergedGlb } from './mergeGlbScene.ts';
 import { type Tile } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
@@ -34,6 +38,12 @@ wonderGroup.name = 'wonder-props';
 
 let lastSignature = '';
 const activeMeshes: Mesh[] = [];
+
+// The GLB swap-in must force exactly one rebuild. '' can't be the reset value:
+// it is ALSO the legitimate signature of a world with zero wonder tiles, and a
+// collision would early-return past the rebuild, leaving the stale procedural
+// meshes parented as ghosts. '\0' can never appear in a real signature.
+const FORCE_REBUILD = '\u0000';
 
 // Sub-groups so we can hide one wonder type independently of the other
 const bibliothecaGroup = new Group();
@@ -53,7 +63,73 @@ export function getWonderPropsGroup(): Group {
 }
 
 export function areWonderPropsReady(): boolean {
-  return true; // procedural — no async load
+  return true; // procedural fallback — a wonder can always be drawn
+}
+
+// ─── Blender GLB swap-in ─────────────────────────────────────────────────────
+
+type GlbState = 'idle' | 'loading' | 'ready' | 'failed';
+type GlbWonder = 'bibliotheca' | 'institutum';
+
+const GLB_IDS: Record<GlbWonder, string> = {
+  bibliotheca: 'wonder-bibliotheca-0',
+  institutum: 'wonder-institutum-0',
+};
+
+let glbState: GlbState = 'idle';
+let glbVariants: Map<GlbWonder, MergedGlb> | null = null;
+
+/** True once the painted Blender GLBs replaced the procedural builders —
+ *  participates in the renderer's dirty signature so the swap-in triggers
+ *  exactly one rebuild. */
+export function areWonderGlbReady(): boolean {
+  return glbState === 'ready';
+}
+
+export function areWonderPropsSettled(): boolean {
+  return glbState === 'ready' || glbState === 'failed';
+}
+
+export function ensureWonderPropsLoad(onSettled?: () => void): void {
+  if (glbState !== 'idle') return;
+  glbState = 'loading';
+  const loader = new GLTFLoader();
+  const kinds = Object.keys(GLB_IDS) as GlbWonder[];
+  Promise.all(kinds.map((k) => loader.loadAsync(`/assets/3d/props/${GLB_IDS[k]}.glb`)))
+    .then((gltfs) => {
+      glbVariants = new Map(kinds.map((k, i) => [k, mergeGlbScene(gltfs[i]!.scene)]));
+      glbState = 'ready';
+      lastSignature = FORCE_REBUILD; // next rebuild must swap in the GLBs
+      onSettled?.();
+    })
+    .catch(() => {
+      glbVariants = null;
+      glbState = 'failed';
+      onSettled?.();
+    });
+}
+
+/** @internal test hook — vitest has no fetch/GLTFLoader, so tests inject
+ *  merged geometry directly to exercise the GLB path. */
+export function _injectWonderGlbForTest(map: Map<GlbWonder, MergedGlb> | null): void {
+  glbVariants = map;
+  glbState = map ? 'ready' : 'idle';
+  lastSignature = FORCE_REBUILD;
+}
+
+/** GLB-backed wonder instance. Geometry/materials belong to the loaded asset
+ *  (shared across rebuilds), so the mesh is tagged for dispose to skip. */
+function buildGlbWonder(kind: GlbWonder): Mesh {
+  const variant = glbVariants!.get(kind)!;
+  const mesh = new Mesh(variant.geometry, variant.materials);
+  mesh.name = `${kind}-glb`;
+  mesh.userData.sharedAsset = true;
+  mesh.castShadow = true;
+  mesh.receiveShadow = false;
+  // Model space: footprint radius ~1, base at y=0 on the tile top face.
+  const s = HEX_SIZE * 0.5;
+  mesh.scale.set(s, s, s);
+  return mesh;
 }
 
 // ─── Procedural geometries ───────────────────────────────────────────────────
@@ -319,6 +395,9 @@ function wonderSignature(tiles: Tile[]): string {
 }
 
 function disposeMesh(m: Mesh): void {
+  // GLB-backed meshes share the loaded asset's geometry/materials across
+  // rebuilds — disposing them would break every later rebuild.
+  if (m.userData.sharedAsset) return;
   m.geometry.dispose();
   const mat = m.material;
   if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
@@ -370,13 +449,15 @@ export function rebuildWonderProps(tiles: Tile[]): void {
     // even if some tile carried it.
     if (tile.district.wonderType === 'gaceta') continue;
 
+    // Painted Blender GLBs once loaded; procedural silhouettes until then.
+    const glbReady = glbState === 'ready' && glbVariants !== null;
     if (tile.district.wonderType === 'bibliotheca') {
-      const inst = buildBibliotheca();
-      inst.position.set(pos.x, pos.y, pos.z);
+      const inst = glbReady ? buildGlbWonder('bibliotheca') : buildBibliotheca();
+      inst.position.set(pos.x, pos.y + (glbReady ? 1.5 : 0), pos.z);
       bibliothecaGroup.add(inst);
     } else if (tile.district.wonderType === 'institutum') {
-      const inst = buildInstitutum();
-      inst.position.set(pos.x, pos.y, pos.z);
+      const inst = glbReady ? buildGlbWonder('institutum') : buildInstitutum();
+      inst.position.set(pos.x, pos.y + (glbReady ? 1.5 : 0), pos.z);
       institutumGroup.add(inst);
     } else {
       // Any user-connected wonder → neutral monument.

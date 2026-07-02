@@ -19,7 +19,7 @@
     "backup": "bash scripts/backup-events.sh",
     "assets:3d": "bash scripts/generate-3d-textures.sh",
     "assets:office": "python3 scripts/generate-office-atlas.py",
-    "assets:props": "python3 scripts/blender/make_props.py && python3 scripts/blender/make_props_vegetation.py && python3 scripts/blender/make_props_city.py",
+    "assets:props": "python3 scripts/blender/make_props.py && python3 scripts/blender/make_props_vegetation.py && python3 scripts/blender/make_props_city.py && python3 scripts/blender/make_props_wonders.py",
     "assets": "npm run assets:3d && npm run assets:office",
     "lint": "eslint src --ext .ts,.tsx --max-warnings=0",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",

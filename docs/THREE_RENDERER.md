@@ -117,16 +117,25 @@ gated in `check.sh`):
 npm run assets:props
 # or individually:
 python3 scripts/blender/make_props.py              # mountain-{0,1,2}
-python3 scripts/blender/make_props_vegetation.py   # desert palms/rocks, ice shards, hill shrubs
+python3 scripts/blender/make_props_vegetation.py   # desert palms/rocks, ice shards, hill shrubs, forest deciduous
 python3 scripts/blender/make_props_city.py         # city-hamlet/village/town centrepieces
+python3 scripts/blender/make_props_wonders.py      # wonder temple (bibliotheca) + laboratorium (institutum)
 ```
 
-Both vegetation/city scripts accept `--preview` to render a Cycles CPU
-contact sheet under `.hermes/artifacts/`. Consumers:
+The vegetation/city/wonders scripts accept `--preview` to render a Cycles
+CPU contact sheet under `.hermes/artifacts/`. Consumers:
 
 - `TerrainScatter3D.ts` — hash-gated sparse scatter on desert/ice/hills
 - `CityProps3D.ts` — capital keep + per-`cityLevel()` centrepiece
-- `MountainProps3D.ts` / `ForestProps3D.ts` — unchanged
+- `ForestProps3D.ts` — pines mixed with `forest-deciduous-*` broadleafs
+  per `forestTreeKind(hash, slot)` (~1/3 deciduous), both tinted by
+  `forestCanopyTint`
+- `WonderProps3D.ts` — swaps the procedural temple/laboratorium for the
+  painted GLBs once loaded (procedural stays as fallback and for generic
+  user-connected wonders). NOTE: wonders gate on the `knowledge`/`labs`
+  layers (default OFF) — enable them in the layer panel (F6) or seed
+  `repociv_layers` in localStorage when capturing.
+- `MountainProps3D.ts` — unchanged
 
 ### Preview atlas (optional)
 

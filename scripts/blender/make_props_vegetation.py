@@ -4,10 +4,12 @@
 Models Civ V-style vegetation/decor for the empty biomes and exports
 deterministic binary glTF to public/assets/3d/props/:
 
-    desert-palm-0/1  — bent-trunk palms with drooping kite fronds
-    desert-rock-0/1  — faceted tan boulder clusters
-    ice-shard-0/1    — angular blue-white pressure-ridge shards
-    shrub-0/1        — low green dome bushes (hills scatter)
+    desert-palm-0/1       — bent-trunk palms with drooping kite fronds
+    desert-rock-0/1       — faceted tan boulder clusters
+    ice-shard-0/1         — angular blue-white pressure-ridge shards
+    shrub-0/1             — low green dome bushes (hills scatter)
+    forest-deciduous-0/1  — broadleaf trees (trunk + blobby faceted canopy),
+                            mixed in with the pines by ForestProps3D
 
 Run via:
     python3 scripts/blender/make_props_vegetation.py \
@@ -25,10 +27,11 @@ Determinism contract (same as make_props.py):
     - Geometry from explicit pydata; no modifiers, no bmesh state.
     - glTF export settings pinned; same Blender build -> same bytes.
 
-Model space (consumed by src/three/TerrainScatter3D.ts):
+Model space (consumed by src/three/TerrainScatter3D.ts and ForestProps3D.ts):
     - Y-up after export (export_yup=True).
     - Footprint radius ~1.0; heights: palm ~1.7, rock ~0.55,
-      shard ~1.1, shrub ~0.45. Base (y=0) sits ON the tile top face.
+      shard ~1.1, shrub ~0.45, deciduous ~1.5. Base (y=0) sits ON the
+      tile top face.
 
 Budgets: <=300 tris per prop, props dir total gated at 1.5MB in check.sh.
 """
@@ -59,6 +62,8 @@ PROPS = [
     ("ice-shard-1", "shard", 601),
     ("shrub-0", "shrub", 701),
     ("shrub-1", "shrub", 809),
+    ("forest-deciduous-0", "deciduous", 907),
+    ("forest-deciduous-1", "deciduous", 1013),
 ]
 
 
@@ -96,6 +101,13 @@ ICE_LO = (0.62, 0.76, 0.88)    # blue base
 ICE_HI = (0.93, 0.97, 1.00)    # white crest
 SHRUB_LO = (0.26, 0.40, 0.16)
 SHRUB_HI = (0.44, 0.58, 0.24)
+# Deciduous canopy bakes BRIGHTER than the target on-screen green: the
+# renderer multiplies every forest tree by forestCanopyTint (~0.5-0.8 per
+# channel), so these values land at the same deep mottled green as the pines.
+DECID_TRUNK_LO = (0.34, 0.24, 0.14)
+DECID_TRUNK_HI = (0.48, 0.36, 0.22)
+DECID_LEAF_LO = (0.40, 0.58, 0.24)
+DECID_LEAF_HI = (0.62, 0.80, 0.36)
 
 
 def lerp3(a, b, t):
@@ -286,6 +298,95 @@ def build_shard(rng):
     return mb
 
 
+def add_blob(mb, rng, cx, cy, cz, radius, lo, hi, n=6):
+    """Closed faceted blob: bottom vertex + 2 rings + apex. 4n tris.
+
+    Unlike add_dome this floats — it has no base cap at z=0 — so it works
+    as a leaf cluster hovering on a trunk."""
+    verts, faces, colors = [], [], []
+    phase = rng.range(0.0, 2.0 * math.pi)
+    verts.append((cx, cy, cz - radius * rng.range(0.70, 0.90)))
+    colors.append(lerp3(lo, hi, 0.10 + 0.15 * rng.next01()))
+    for tier, (tr, tz) in enumerate(((1.0, -0.22), (0.78, 0.42))):
+        for k in range(n):
+            ang = phase + (2.0 * math.pi * k) / n + rng.range(-0.14, 0.14)
+            rr = radius * tr * (1.0 + rng.range(-0.16, 0.16))
+            zz = cz + radius * tz * (1.0 + rng.range(-0.12, 0.12))
+            verts.append((cx + rr * math.cos(ang), cy + rr * math.sin(ang), zz))
+            shade = 0.35 + 0.4 * tier + 0.3 * rng.next01()
+            colors.append(lerp3(lo, hi, min(1.0, shade)))
+    verts.append((cx + radius * rng.range(-0.10, 0.10),
+                  cy + radius * rng.range(-0.10, 0.10),
+                  cz + radius * rng.range(0.72, 0.92)))
+    colors.append(lerp3(lo, hi, 0.88 + 0.12 * rng.next01()))
+    bottom, apex = 0, 2 * n + 1
+    lo_ring, hi_ring = 1, 1 + n
+    for k in range(n):
+        k2 = (k + 1) % n
+        faces.append((bottom, lo_ring + k2, lo_ring + k))
+        faces.append((lo_ring + k, lo_ring + k2, hi_ring + k2))
+        faces.append((lo_ring + k, hi_ring + k2, hi_ring + k))
+        faces.append((hi_ring + k, hi_ring + k2, apex))
+    mb.add(verts, faces, colors)
+
+
+def add_deciduous_trunk(mb, rng, height):
+    """Tapered trunk: 4 stacked pentagon rings with a slight lean.
+
+    Returns the (x, y, z) of the top ring centroid for canopy anchoring."""
+    n = 5
+    segs = 4
+    lean_ang = rng.range(0.0, 2.0 * math.pi)
+    lean_amt = rng.range(0.04, 0.12)
+    verts, faces, colors = [], [], []
+    for s in range(segs + 1):
+        t = s / segs
+        z = t * height
+        off = lean_amt * t * t
+        cx = off * math.cos(lean_ang)
+        cy = off * math.sin(lean_ang)
+        rad = 0.11 * (1.0 - 0.5 * t)
+        for k in range(n):
+            ang = (2.0 * math.pi * k) / n + rng.range(-0.08, 0.08)
+            rr = rad * (1.0 + rng.range(-0.14, 0.14))
+            verts.append((cx + rr * math.cos(ang), cy + rr * math.sin(ang), z))
+            colors.append(lerp3(DECID_TRUNK_LO, DECID_TRUNK_HI,
+                                0.3 + 0.7 * rng.next01()))
+    for s in range(segs):
+        a0, b0 = s * n, (s + 1) * n
+        for k in range(n):
+            k2 = (k + 1) % n
+            faces.append((a0 + k, a0 + k2, b0 + k2))
+            faces.append((a0 + k, b0 + k2, b0 + k))
+    top = verts[-n:]
+    cx = sum(v[0] for v in top) / n
+    cy = sum(v[1] for v in top) / n
+    mb.add(verts, faces, colors)
+    return (cx, cy, height)
+
+
+def build_deciduous(rng):
+    """Broadleaf tree: short trunk + 3-4 clustered leaf blobs. ~150 tris."""
+    mb = MeshBuilder()
+    trunk_h = rng.range(0.50, 0.65)
+    ax, ay, az = add_deciduous_trunk(mb, rng, trunk_h)
+    crown_r = rng.range(0.42, 0.52)
+    # main crown blob sits directly on the trunk top
+    add_blob(mb, rng, ax, ay, az + crown_r * 0.55, crown_r,
+             DECID_LEAF_LO, DECID_LEAF_HI)
+    n_side = 2 + int(rng.next01() * 2)  # 2-3 side blobs
+    for _ in range(n_side):
+        ang = rng.range(0.0, 2.0 * math.pi)
+        dist = rng.range(0.55, 0.85) * crown_r
+        side_r = crown_r * rng.range(0.55, 0.75)
+        add_blob(mb, rng,
+                 ax + dist * math.cos(ang),
+                 ay + dist * math.sin(ang),
+                 az + crown_r * rng.range(0.35, 0.75),
+                 side_r, DECID_LEAF_LO, DECID_LEAF_HI)
+    return mb
+
+
 def build_shrub(rng):
     mb = MeshBuilder()
     n_blobs = 2 + int(rng.next01() * 2)   # 2-3 blobs
@@ -304,6 +405,7 @@ BUILDERS = {
     "rock": build_rock,
     "shard": build_shard,
     "shrub": build_shrub,
+    "deciduous": build_deciduous,
 }
 
 
@@ -362,9 +464,10 @@ def export_glb(obj, out):
 
 
 def render_preview(objs, path):
-    """Contact sheet: props on a 4x2 grid, sun light, ortho camera."""
+    """Contact sheet: props on a 4-wide grid, sun light, ortho camera."""
     spacing = 2.6
     cols = 4
+    rows = (len(objs) + cols - 1) // cols
     for i, obj in enumerate(objs):
         obj.location = ((i % cols) * spacing, -(i // cols) * spacing, 0.0)
 
@@ -378,7 +481,7 @@ def render_preview(objs, path):
     cam_data.ortho_scale = cols * spacing + 1.5
     cam = bpy.data.objects.new("cam", cam_data)
     cx = (cols - 1) * spacing / 2.0
-    cy = -spacing / 2.0
+    cy = -(rows - 1) * spacing / 2.0
     cam.location = (cx, cy - 9.0, 7.5)
     cam.rotation_euler = (math.radians(52), 0.0, 0.0)
     bpy.context.collection.objects.link(cam)
@@ -389,7 +492,7 @@ def render_preview(objs, path):
     scene.cycles.device = 'CPU'
     scene.cycles.samples = 32
     scene.render.resolution_x = 1280
-    scene.render.resolution_y = 640
+    scene.render.resolution_y = 320 * rows
     scene.render.filepath = path
     world = bpy.data.worlds.new("w")
     world.use_nodes = True
