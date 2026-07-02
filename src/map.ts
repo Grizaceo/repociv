@@ -541,7 +541,10 @@ export async function fetchMapRoots(): Promise<MapRootsResponse> {
   return (await res.json()) as MapRootsResponse;
 }
 
-export async function addMapRoot(rootPath: string, label?: string): Promise<{ ok: boolean; totalRepos: number }> {
+export async function addMapRoot(
+  rootPath: string,
+  label?: string,
+): Promise<{ ok: boolean; totalRepos: number }> {
   const res = await fetch('/api/map-roots', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -561,7 +564,9 @@ export async function activateMapRoot(rootPath: string): Promise<{ ok: boolean }
   return (await res.json()) as { ok: boolean };
 }
 
-export async function removeMapRoot(rootPath: string): Promise<{ ok: boolean; totalRepos: number }> {
+export async function removeMapRoot(
+  rootPath: string,
+): Promise<{ ok: boolean; totalRepos: number }> {
   const res = await fetch('/api/map-roots/remove', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -571,7 +576,11 @@ export async function removeMapRoot(rootPath: string): Promise<{ ok: boolean; to
   return (await res.json()) as { ok: boolean; totalRepos: number };
 }
 
-export async function pickMapRootFolder(): Promise<{ ok: boolean; root: string; totalRepos: number }> {
+export async function pickMapRootFolder(): Promise<{
+  ok: boolean;
+  root: string;
+  totalRepos: number;
+}> {
   const res = await fetch('/api/map-roots/pick', { method: 'POST' });
   if (!res.ok) throw new Error(`/api/map-roots/pick HTTP ${res.status}`);
   return (await res.json()) as { ok: boolean; root: string; totalRepos: number };

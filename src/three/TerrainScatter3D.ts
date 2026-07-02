@@ -53,7 +53,15 @@ const DESERT_RECIPES: Array<ScatterRecipe[] | null> = [
   null,
   null,
   null,
-  [{ prop: 'desert-palm-0', placements: [{ offset: [-0.12, 0.08], scale: 1.0 }, { offset: [0.22, -0.14], scale: 0.85 }] }],
+  [
+    {
+      prop: 'desert-palm-0',
+      placements: [
+        { offset: [-0.12, 0.08], scale: 1.0 },
+        { offset: [0.22, -0.14], scale: 0.85 },
+      ],
+    },
+  ],
   null,
   [{ prop: 'desert-rock-0', placements: [{ offset: [0.1, 0.16], scale: 1.0 }] }],
   null,
@@ -81,12 +89,28 @@ const ICE_RECIPES: Array<ScatterRecipe[] | null> = [
 
 const HILLS_RECIPES: Array<ScatterRecipe[] | null> = [
   null,
-  [{ prop: 'shrub-0', placements: [{ offset: [0.18, -0.1], scale: 1.0 }, { offset: [-0.24, 0.2], scale: 0.75 }] }],
+  [
+    {
+      prop: 'shrub-0',
+      placements: [
+        { offset: [0.18, -0.1], scale: 1.0 },
+        { offset: [-0.24, 0.2], scale: 0.75 },
+      ],
+    },
+  ],
   null,
   [{ prop: 'shrub-1', placements: [{ offset: [-0.1, -0.24], scale: 0.9 }] }],
   [{ prop: 'shrub-0', placements: [{ offset: [0.05, 0.26], scale: 0.8 }] }],
   null,
-  [{ prop: 'shrub-1', placements: [{ offset: [0.28, 0.12], scale: 1.05 }, { offset: [-0.18, -0.12], scale: 0.7 }] }],
+  [
+    {
+      prop: 'shrub-1',
+      placements: [
+        { offset: [0.28, 0.12], scale: 1.05 },
+        { offset: [-0.18, -0.12], scale: 0.7 },
+      ],
+    },
+  ],
   null,
 ];
 
@@ -160,8 +184,7 @@ export function rebuildTerrainScatter(tiles: Tile[]): void {
     (t) => t.revealed && !t.city && RECIPES_BY_TERRAIN[t.terrain] !== undefined,
   );
   const signature = scatterTiles.map((t) => `${tileKey(t.coord)}:${t.terrain}`).join('|');
-  if (signature === lastSignature && (activeMeshes.length > 0 || scatterTiles.length === 0))
-    return;
+  if (signature === lastSignature && (activeMeshes.length > 0 || scatterTiles.length === 0)) return;
   lastSignature = signature;
 
   clearTerrainScatter();

@@ -79,9 +79,7 @@ export function rebuildCityProps(
     return;
   }
 
-  const signature = cities
-    .map((c) => `${c.id}:${c.isCapital ? 1 : 0}:L${cityLevel(c)}`)
-    .join('|');
+  const signature = cities.map((c) => `${c.id}:${c.isCapital ? 1 : 0}:L${cityLevel(c)}`).join('|');
   if (signature === lastSignature && activeMeshes.length > 0) return;
   if (signature === lastSignature && cities.length === 0) return;
   lastSignature = signature;

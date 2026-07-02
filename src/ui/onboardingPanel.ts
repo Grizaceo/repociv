@@ -297,24 +297,31 @@ function render(state: OnboardingState, onContinue: () => void): void {
             </div>
           </div>
           <div class="repo-onboarding-roots-list">
-            ${state.isLoadingRoots
-              ? '<div class="repo-onboarding-state">Cargando carpetas...</div>'
-              : state.roots.length === 0
-                ? '<div class="repo-onboarding-state">No hay carpetas configuradas.</div>'
-                : state.roots.map((root) => `
+            ${
+              state.isLoadingRoots
+                ? '<div class="repo-onboarding-state">Cargando carpetas...</div>'
+                : state.roots.length === 0
+                  ? '<div class="repo-onboarding-state">No hay carpetas configuradas.</div>'
+                  : state.roots
+                      .map(
+                        (root) => `
                   <div class="repo-onboarding-root-item ${root.isActive ? 'repo-onboarding-root-item--active' : ''}">
                     <div class="repo-onboarding-root-info">
                       <span class="repo-onboarding-root-path">${root.path}</span>
                       <span class="repo-onboarding-root-meta">${root.repoCount} repos · ${root.selectedCount} seleccionados</span>
                     </div>
                     <div class="repo-onboarding-root-actions">
-                      ${!root.isActive
-                        ? `<button class="btn-secondary btn-sm" data-activate-root="${root.path}" type="button">Activar</button>`
-                        : '<span class="repo-onboarding-root-badge">Activa</span>'}
+                      ${
+                        !root.isActive
+                          ? `<button class="btn-secondary btn-sm" data-activate-root="${root.path}" type="button">Activar</button>`
+                          : '<span class="repo-onboarding-root-badge">Activa</span>'
+                      }
                       <button class="btn-secondary btn-sm btn-danger" data-remove-root="${root.path}" type="button">×</button>
                     </div>
                   </div>
-                `).join('')
+                `,
+                      )
+                      .join('')
             }
           </div>
         </div>
@@ -675,7 +682,9 @@ export async function runRepoOnboarding(): Promise<void> {
       harnessError: null,
     };
     render(state, resolve);
-    void hydrateHarness(state, resolve).then(() => hydrateRepos(state, resolve)).then(() => hydrateRoots(state, resolve));
+    void hydrateHarness(state, resolve)
+      .then(() => hydrateRepos(state, resolve))
+      .then(() => hydrateRoots(state, resolve));
   });
 }
 
