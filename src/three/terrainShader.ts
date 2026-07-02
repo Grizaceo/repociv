@@ -110,14 +110,15 @@ export function createTerrainMaterial(options: TerrainMaterialOptions = {}): Mes
     shader.vertexShader =
       'uniform float uTime;\n' +
       'uniform float uHexRadius;\n' +
+      'uniform vec2 uCoastDir[6];\n' +
       'attribute float instanceTerrain;\n' +
-      'attribute float instanceNeighborTerrain;\n' +
+      'attribute float instanceNeighborPacked;\n' +
       'attribute float instanceCoastMask;\n' +
       'attribute float instanceOceanDepth;\n' +
       'attribute float instanceSideCullMask;\n' +
       'attribute vec3 instanceCityColor;\n' +
       'varying float vTerrainIndex;\n' +
-      'varying float vNeighborTerrainIndex;\n' +
+      'varying float vNeighborPacked;\n' +
       'varying float vCoastMask;\n' +
       'varying float vOceanDepth;\n' +
       'varying float vSideCullMask;\n' +
@@ -175,11 +176,21 @@ export function createTerrainMaterial(options: TerrainMaterialOptions = {}): Mes
       '  else if (idx < 6.5) return 2.0;\n' +
       '  return 0.0;\n' +
       '}\n' +
+      // Base-8 digit k of the packed per-edge neighbor terrain (AXIAL_DIRECTIONS
+      // order). Exact for 6 digits: values stay far below the float32 mantissa.
+      'float neighborIdxAt(float packed, int k) {\n' +
+      '  float p = floor(packed + 0.5);\n' +
+      '  for (int i = 0; i < 6; i++) {\n' +
+      '    if (i == k) return mod(p, 8.0);\n' +
+      '    p = floor(p / 8.0);\n' +
+      '  }\n' +
+      '  return 0.0;\n' +
+      '}\n' +
       shader.vertexShader.replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
         vTerrainIndex = instanceTerrain;
-        vNeighborTerrainIndex = instanceNeighborTerrain;
+        vNeighborPacked = instanceNeighborPacked;
         vCoastMask    = instanceCoastMask;
         vOceanDepth   = instanceOceanDepth;
         vSideCullMask = instanceSideCullMask;
@@ -220,21 +231,33 @@ export function createTerrainMaterial(options: TerrainMaterialOptions = {}): Mes
         bool isOceanTile = abs(tidx - 4.0) < 0.5;
         bool isIceTile = abs(tidx - 5.0) < 0.5;
 
-        // P2: Biome-blend elevation transitions. When this tile's neighbor
-        // has a different elevation, blend the top-cap Y toward the midpoint
-        // so the transition is a smooth ramp, not a cliff. Both tiles agree
-        // on the shared edge height because both converge to the midpoint.
-        // Skip ocean/ice — coast mask handles those transitions separately.
-        float ntidx = floor(instanceNeighborTerrain + 0.5);
-        bool neighborIsWater = (ntidx > 3.5 && ntidx < 5.5);
-        if (!isOceanTile && !isIceTile && !neighborIsWater && transformed.y > -1.0) {
+        // P2: Biome-blend elevation transitions, PER EDGE. Where a neighbor
+        // has a different elevation, the top-cap Y ramps toward the shared
+        // edge's midpoint — both tiles converge there, so the transition is
+        // a smooth ramp, not a cliff. uCoastDir[k] is pre-scaled so
+        // dot(local, dir) == 1.0 exactly at edge k; that dot is the ramp's
+        // falloff. The old code used ONE dominant neighbor for the whole
+        // rim, so a tile between hills and plains ramped every edge the same.
+        // Skip water neighbors — the coast mask owns those transitions.
+        if (!isOceanTile && !isIceTile && transformed.y > -1.0) {
           float thisElev = terrainElevFromIndex(tidx);
-          float neighborElev = terrainElevFromIndex(ntidx);
-          float elevDiff = neighborElev - thisElev;
-          if (abs(elevDiff) > 0.5) {
-            float radial = clamp(length(vLocalXZ) / uHexRadius, 0.0, 1.0);
-            float edgeBlend = smoothstep(0.55, 0.98, radial);
-            transformed.y += elevDiff * 0.5 * uTileHeight * edgeBlend;
+          float rampSum = 0.0;
+          float rampW = 0.0;
+          for (int k = 0; k < 6; k++) {
+            float nIdx = neighborIdxAt(instanceNeighborPacked, k);
+            if (abs(nIdx - tidx) < 0.5) continue;
+            if (nIdx > 3.5 && nIdx < 5.5) continue; // ocean/ice
+            float elevDiff = terrainElevFromIndex(nIdx) - thisElev;
+            if (abs(elevDiff) < 0.5) continue;
+            float edgeT = clamp(dot(vLocalXZ, uCoastDir[k]), 0.0, 1.0);
+            float w = smoothstep(0.55, 0.98, edgeT);
+            rampSum += w * elevDiff;
+            rampW += w;
+          }
+          if (rampW > 0.001) {
+            // weighted-average diff × midpoint × falloff (falloff saturates at
+            // 1 so corner vertices between two ramping edges don't overshoot)
+            transformed.y += (rampSum / rampW) * 0.5 * uTileHeight * min(rampW, 1.0);
           }
         }
 
@@ -287,7 +310,7 @@ export function createTerrainMaterial(options: TerrainMaterialOptions = {}): Mes
     // ── Fragment uniforms declaration ─────────────────────────────────────────
     const uniformDecl =
       'varying float vTerrainIndex;\n' +
-      'varying float vNeighborTerrainIndex;\n' +
+      'varying float vNeighborPacked;\n' +
       'varying float vCoastMask;\n' +
       'varying float vOceanDepth;\n' +
       'varying float vSideCullMask;\n' +
@@ -336,6 +359,35 @@ float terrainDetailNoise(vec2 p) {
   float b = sin(p.x * 0.113 + 1.7) * cos(p.y * 0.097 - 0.8);
   return 0.5 + 0.5 * (0.65 * a + 0.35 * b);
 }
+
+// Base-8 digit k of the packed per-edge neighbor terrain (AXIAL_DIRECTIONS
+// order — same packing as the vertex stage).
+float neighborIdxAt(float packed, int k) {
+  float p = floor(packed + 0.5);
+  for (int i = 0; i < 6; i++) {
+    if (i == k) return mod(p, 8.0);
+    p = floor(p / 8.0);
+  }
+  return 0.0;
+}
+
+// Shared per-biome albedo prep: dark-floor lift, saturation push, and the
+// desert/sacred palette corrections. One home for the tile's own texture AND
+// every neighbor sample, so a biome looks identical on its side of a blend.
+vec3 prepTerrainTex(float idx, vec3 tex) {
+  tex = max(tex, vec3(0.08));
+  float lum = dot(tex, vec3(0.299, 0.587, 0.114));
+  tex = mix(vec3(lum), tex, 1.12);
+  if (idx > 2.5 && idx < 3.5) {
+    tex = mix(vec3(lum), tex, 0.88);
+    tex = mix(tex, vec3(0.80, 0.71, 0.50), 0.12);
+  }
+  if (idx > 6.5) {
+    float slum = dot(tex, vec3(0.299, 0.587, 0.114));
+    tex = mix(tex, vec3(0.85, 0.77, 0.55) * (0.55 + 0.9 * slum), 0.78);
+  }
+  return tex;
+}
 `;
 
     shader.fragmentShader =
@@ -370,54 +422,45 @@ float terrainDetailNoise(vec2 p) {
           }
         }
         float tidx  = floor(vTerrainIndex + 0.5);
-        float ntidx = floor(vNeighborTerrainIndex + 0.5);
         float radial = clamp(length(vLocalXZ) / uHexRadius, 0.0, 1.0);
+        // Per-edge neighbor blend weight, shared by albedo/AO/normal below.
+        // Each differing edge contributes its own falloff (1.0 exactly at
+        // that edge); corners naturally mix the two adjacent neighbors.
+        float nBlendW[6];
+        float nBlendSum = 0.0;
+        for (int k = 0; k < 6; k++) {
+          float nIdx = neighborIdxAt(vNeighborPacked, k);
+          float w = 0.0;
+          if (abs(nIdx - tidx) > 0.5) {
+            float edgeT = clamp(dot(vLocalXZ, uCoastDir[k]), 0.0, 1.0);
+            w = smoothstep(0.58, 0.96, edgeT);
+            // Forest↔mountain reads best with a wider mutual bleed.
+            bool mountainForestPair =
+              ((tidx > 1.5 && tidx < 2.5) && (nIdx > 0.5 && nIdx < 1.5)) ||
+              ((tidx > 0.5 && tidx < 1.5) && (nIdx > 1.5 && nIdx < 2.5));
+            if (mountainForestPair) w = min(1.0, w * 1.30);
+          }
+          nBlendW[k] = w;
+          nBlendSum += w;
+        }
         if (uUseAtlas > 0 && vTopFace > 0.5) {
           vec2 macroUv = terrainMacroUv(tidx, vUv, vWorldXZ);
           vec2 auv = terrainAtlasUv(tidx, macroUv);
-          vec3 tex = texture2D(uTerrainAtlas, auv).rgb;
-          // Lift very dark textures so no biome goes black under warm lights
-          tex = max(tex, vec3(0.08));
-          // Mild saturation push only — enough to read biomes, not enough to look sticker-like
-          float lum = dot(tex, vec3(0.299, 0.587, 0.114));
-          tex = mix(vec3(lum), tex, 1.12);
-          // Desert: compress local contrast and bias toward Civ V pale sand —
-          // the raw atlas cell reads as plowed brown furrows otherwise.
-          if (tidx > 2.5 && tidx < 3.5) {
-            tex = mix(vec3(lum), tex, 0.88);
-            tex = mix(tex, vec3(0.80, 0.71, 0.50), 0.12);
-          }
-          // Sacred: Civ V natural-wonder feel — pale gilded stone. The raw
-          // cell (and the #1e1530 palette) read as dark violet bruises that
-          // dominated every overview shot.
-          if (tidx > 6.5) {
-            float slum = dot(tex, vec3(0.299, 0.587, 0.114));
-            tex = mix(tex, vec3(0.85, 0.77, 0.55) * (0.55 + 0.9 * slum), 0.78);
-          }
-          // Neighbour biome blend at hex edges
-          float edgeBlend = smoothstep(0.58, 0.96, radial);
-          if (ntidx >= 0.0 && abs(ntidx - tidx) > 0.5) {
-            vec2 nMacroUv = terrainMacroUv(ntidx, vUv, vWorldXZ);
-            vec2 nauv = terrainAtlasUv(ntidx, nMacroUv);
-            vec3 nTex = texture2D(uTerrainAtlas, nauv).rgb;
-            nTex = max(nTex, vec3(0.08));
-            float nLum = dot(nTex, vec3(0.299, 0.587, 0.114));
-            nTex = mix(vec3(nLum), nTex, 1.12);
-            if (ntidx > 2.5 && ntidx < 3.5) {
-              nTex = mix(vec3(nLum), nTex, 0.88);
-              nTex = mix(nTex, vec3(0.80, 0.71, 0.50), 0.12);
+          vec3 tex = prepTerrainTex(tidx, texture2D(uTerrainAtlas, auv).rgb);
+          // Directional neighbor blend: each edge pulls its OWN biome's
+          // texture into the rim. The old single-dominant-neighbor blend
+          // smeared one biome around the entire hex ("cada hex corta seco" —
+          // or worse, cut against the wrong biome on 5 of 6 edges).
+          if (nBlendSum > 0.001) {
+            vec3 nAccum = vec3(0.0);
+            for (int k = 0; k < 6; k++) {
+              if (nBlendW[k] < 0.001) continue;
+              float nIdx = neighborIdxAt(vNeighborPacked, k);
+              vec2 nMacroUv = terrainMacroUv(nIdx, vUv, vWorldXZ);
+              vec3 nTex = prepTerrainTex(nIdx, texture2D(uTerrainAtlas, terrainAtlasUv(nIdx, nMacroUv)).rgb);
+              nAccum += nBlendW[k] * nTex;
             }
-            if (ntidx > 6.5) {
-              float nslum = dot(nTex, vec3(0.299, 0.587, 0.114));
-              nTex = mix(nTex, vec3(0.85, 0.77, 0.55) * (0.55 + 0.9 * nslum), 0.78);
-            }
-            bool mountainForestPair =
-              ((tidx > 1.5 && tidx < 2.5) && (ntidx > 0.5 && ntidx < 1.5)) ||
-              ((tidx > 0.5 && tidx < 1.5) && (ntidx > 1.5 && ntidx < 2.5));
-            if (mountainForestPair) {
-              edgeBlend = min(1.0, edgeBlend * 1.30);
-            }
-            tex = mix(tex, nTex, edgeBlend * 0.62);
+            tex = mix(tex, nAccum / nBlendSum, min(nBlendSum, 1.0) * 0.62);
           }
           // High-frequency detail tap: restore painted grain at every zoom.
           if (tidx < 4.5 || (tidx > 5.5 && tidx < 7.5)) {
@@ -487,12 +530,11 @@ float terrainDetailNoise(vec2 p) {
         // flat so it reads as one continuous surface.
         bool isWaterTop = (tidx > 3.5 && tidx < 5.5);
         if (vTopFace > 0.5 && !isWaterTop) {
-          // AO darkens the rim ONLY where this tile borders a different biome or
-          // elevation — a soft contact shadow at real seams. The old code ran a
-          // uniform centre-dark/rim-bright vignette on EVERY tile, stamping a
-          // lattice of discs; same-biome interiors now stay flat → continuous.
-          if (vNeighborTerrainIndex >= 0.0 && abs(ntidx - tidx) > 0.5) {
-            float edgeAo = smoothstep(0.62, 0.98, radial);
+          // AO darkens the rim ONLY toward edges that border a different
+          // biome — a soft contact shadow at real seams, per edge. Same-biome
+          // edges and interiors stay flat → continuous surface.
+          if (nBlendSum > 0.001) {
+            float edgeAo = min(nBlendSum, 1.0) * smoothstep(0.62, 0.98, radial);
             diffuseColor.rgb *= mix(1.0, 0.93, edgeAo);
           }
           float sunBias = 0.04 * dot(normalize(vLocalXZ + vec2(0.001)), vec2(0.72, 0.42));
@@ -667,18 +709,25 @@ float terrainDetailNoise(vec2 p) {
           `#include <normal_fragment_maps>
         if (uUseNormalAtlas > 0 && vTopFace > 0.5) {
           float _ntidx = floor(vTerrainIndex + 0.5);
-          float _nntidx = floor(vNeighborTerrainIndex + 0.5);
           vec2 nmacroUv = terrainMacroUv(_ntidx, vUv, vWorldXZ);
           vec2 nauv  = terrainAtlasUv(_ntidx, nmacroUv);
           vec3 nTex  = texture2D(uNormalAtlas, nauv).rgb * 2.0 - 1.0;
-          // Blend neighbor normal at edges
-          float _radial = clamp(length(vLocalXZ) / uHexRadius, 0.0, 1.0);
-          float _edgeBlend = smoothstep(0.58, 0.96, _radial);
-          if (_nntidx >= 0.0 && abs(_nntidx - _ntidx) > 0.5) {
-            vec2 nnmacroUv = terrainMacroUv(_nntidx, vUv, vWorldXZ);
-            vec2 nnauv = terrainAtlasUv(_nntidx, nnmacroUv);
-            vec3 nNeighbor = texture2D(uNormalAtlas, nnauv).rgb * 2.0 - 1.0;
-            nTex = mix(nTex, nNeighbor, _edgeBlend * 0.62);
+          // Directional neighbor normal blend — same per-edge weights as the
+          // albedo, so the relief agrees with the color on every edge.
+          float _wSum = 0.0;
+          vec3 _nAccum = vec3(0.0);
+          for (int k = 0; k < 6; k++) {
+            float _nIdx = neighborIdxAt(vNeighborPacked, k);
+            if (abs(_nIdx - _ntidx) < 0.5) continue;
+            float _edgeT = clamp(dot(vLocalXZ, uCoastDir[k]), 0.0, 1.0);
+            float _w = smoothstep(0.58, 0.96, _edgeT);
+            if (_w < 0.001) continue;
+            vec2 _nnUv = terrainAtlasUv(_nIdx, terrainMacroUv(_nIdx, vUv, vWorldXZ));
+            _nAccum += _w * (texture2D(uNormalAtlas, _nnUv).rgb * 2.0 - 1.0);
+            _wSum += _w;
+          }
+          if (_wSum > 0.001) {
+            nTex = mix(nTex, _nAccum / _wSum, min(_wSum, 1.0) * 0.62);
           }
           // Blend atlas normal into surface normal (TBN for a flat-top hex is identity-ish)
           normal = normalize(normal + vec3(nTex.x * 0.55, nTex.z, nTex.y * 0.55));
@@ -691,7 +740,7 @@ float terrainDetailNoise(vec2 p) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v38';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v39';
   // Terrain MUST receive the scene FogExp2: the ground plane and sky dome
   // fade into SKY_HORIZON at distance, so terrain that opted out (the old
   // `mat.fog = false`) popped against the haze instead of dissolving into it.

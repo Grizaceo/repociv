@@ -246,26 +246,29 @@ export function createHexWorldScene(): Scene {
  *  borders and foam on the wrong side of the hex for 5 of 6 directions. */
 const DIR_TO_EDGE = [0, 5, 4, 3, 2, 1] as const;
 
-/** Determine dominant neighbor terrain for edge blending. */
-function dominantNeighborTerrain(
+/** Pack all six neighbors' terrain indices into one float, base-8 digit per
+ *  AXIAL_DIRECTIONS slot (indices are 0-7, so 6×3 bits = 18 bits — exact in a
+ *  float32 mantissa). Directions with no neighbor, or a same-terrain
+ *  neighbor, encode the tile's OWN index: the shader skips digits equal to
+ *  the tile terrain, so "self" doubles as "no blend on this edge". This
+ *  replaced a single dominant-neighbor scalar that blended one texture into
+ *  the whole rim — a tile with desert east and forest west smeared the same
+ *  biome into both edges. */
+export function packNeighborTerrains(
   tile: { coord: Axial; terrain: string },
   getTile: (key: string) => { terrain: string } | undefined,
 ): number {
-  const counts = new Map<string, number>();
-  for (const d of AXIAL_DIRECTIONS) {
+  const self = TERRAIN_ATLAS_INDEX[tile.terrain as keyof typeof TERRAIN_ATLAS_INDEX] ?? 0;
+  let packed = 0;
+  for (let k = AXIAL_DIRECTIONS.length - 1; k >= 0; k--) {
+    const d = AXIAL_DIRECTIONS[k]!;
     const n = getTile(tileKey({ q: tile.coord.q + d.q, r: tile.coord.r + d.r }));
-    if (!n || n.terrain === tile.terrain) continue;
-    counts.set(n.terrain, (counts.get(n.terrain) ?? 0) + 1);
+    const idx = n
+      ? (TERRAIN_ATLAS_INDEX[n.terrain as keyof typeof TERRAIN_ATLAS_INDEX] ?? self)
+      : self;
+    packed = packed * 8 + idx;
   }
-  let best = -1;
-  let bestCount = 0;
-  for (const [terrain, count] of counts) {
-    if (count > bestCount) {
-      bestCount = count;
-      best = TERRAIN_ATLAS_INDEX[terrain as keyof typeof TERRAIN_ATLAS_INDEX] ?? -1;
-    }
-  }
-  return best;
+  return packed;
 }
 
 function clearTerritoryLines(): void {
@@ -1001,7 +1004,7 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
     terrainMesh!.setMatrixAt(i, matrix);
     terrainMesh!.setColorAt(i, instanceColorForTile(tile, fogEnabled));
     terrainIndices[i] = TERRAIN_ATLAS_INDEX[tile.terrain];
-    neighborIndices[i] = dominantNeighborTerrain(tile, getTile);
+    neighborIndices[i] = packNeighborTerrains(tile, getTile);
     // 6-bit mask (AXIAL_DIRECTIONS order) of edges where ocean meets land —
     // drives the Civ V shoreline foam ring in terrainShader.ts. Both sides
     // of the boundary get their bit so the foam straddles the shared edge.
@@ -1056,7 +1059,7 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
     new InstancedBufferAttribute(terrainIndices, 1),
   );
   terrainMesh.geometry.setAttribute(
-    'instanceNeighborTerrain',
+    'instanceNeighborPacked',
     new InstancedBufferAttribute(neighborIndices, 1),
   );
   terrainMesh.geometry.setAttribute(

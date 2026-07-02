@@ -23,7 +23,7 @@ describe('terrainShader', () => {
   it('exposes a versioned customProgramCacheKey', () => {
     const mat = createTerrainMaterial();
     // Bumping the version in terrainShader.ts must update this.
-    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v38');
+    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v39');
   });
 
   it('produces a stable fragment shader from onBeforeCompile', () => {
@@ -62,7 +62,7 @@ describe('terrainShader', () => {
     // scaling.
     expect(capture.vertex).toContain('uniform float uTime;');
     expect(capture.vertex).toContain('attribute float instanceTerrain;');
-    expect(capture.vertex).toContain('attribute float instanceNeighborTerrain;');
+    expect(capture.vertex).toContain('attribute float instanceNeighborPacked;');
     expect(capture.vertex).toContain('float heightScale = ');
     // Per-biome scaling block — a silent loss of one of these lines
     // (e.g. when three.js's <begin_vertex> chunk is renamed) is the
@@ -81,9 +81,11 @@ describe('terrainShader', () => {
     expect(capture.vertex).toContain('terrainElevFromIndex');
     expect(capture.vertex).toContain('bool isOceanTile = abs(tidx - 4.0)');
     expect(capture.vertex).toMatch(
-      /bool isOceanTile[\s\S]*if \(!isOceanTile && !isIceTile && !neighborIsWater/,
+      /bool isOceanTile[\s\S]*if \(!isOceanTile && !isIceTile && transformed\.y > -1\.0\)/,
     );
-    expect(capture.vertex).toContain('elevDiff * 0.5 * uTileHeight');
+    // Per-edge ramp: weighted-average elevation diff toward each edge midpoint
+    expect(capture.vertex).toContain('(rampSum / rampW) * 0.5 * uTileHeight');
+    expect(capture.vertex).toContain('neighborIdxAt(instanceNeighborPacked, k)');
     // P5: City color attribute and varying
     expect(capture.vertex).toContain('attribute float instanceSideCullMask');
     expect(capture.vertex).toContain('vSideCullMask = instanceSideCullMask');
