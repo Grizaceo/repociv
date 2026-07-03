@@ -26,7 +26,9 @@ const PROP_IDS = ['city-capital-0', 'city-hamlet-0', 'city-village-0', 'city-tow
 // cityLevel() 0-3 → variant index into PROP_IDS (town serves levels 2 and 3).
 const LEVEL_VARIANT = [1, 2, 3, 3] as const;
 // Level 3 towns are the same GLB scaled up — a non-capital "city".
-const LEVEL_SCALE = [0.3, 0.32, 0.34, 0.4] as const;
+// Scale increased from [0.3, 0.32, 0.34, 0.4] to fill the hex tile better
+// now that procedural buildings are suppressed when GLB is loaded.
+const LEVEL_SCALE = [0.55, 0.62, 0.72, 0.85] as const;
 
 let variants: PropVariant[] | null = null;
 let state: PropsState = 'idle';
@@ -91,7 +93,7 @@ export function rebuildCityProps(
   const byVariant: Array<Array<{ city: City; scale: number }>> = PROP_IDS.map(() => []);
   for (const city of cities) {
     if (city.isCapital) {
-      byVariant[0]!.push({ city, scale: 0.4 });
+      byVariant[0]!.push({ city, scale: 0.6 });
     } else {
       const lvl = cityLevel(city);
       byVariant[LEVEL_VARIANT[lvl]!]!.push({ city, scale: LEVEL_SCALE[lvl]! });
