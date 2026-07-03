@@ -512,7 +512,7 @@ export function rebuildTileDecor(
         deserts.push(tile);
         break;
       case 'ice':
-        ices.push(tile);
+        if (!tile.city) ices.push(tile);
         break;
       case 'sacred':
         // Wonder tiles (district.type==='wonder') are handled by
