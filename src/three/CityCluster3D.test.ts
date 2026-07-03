@@ -43,7 +43,7 @@ describe('CityCluster3D civic framing', () => {
     rebuildCityClusters([city], (key) => tiles.get(key), 'high');
 
     // Expected layers for one non-capital city in the restored Civ V stack:
-    // plaza, spire, buildings, roofs, walls, towers.
-    expect(getCityGroup().children.length).toBe(6);
+    // plaza, spire, buildings, roofs, walls, towers, towerRoofs.
+    expect(getCityGroup().children.length).toBe(7);
   });
 });
