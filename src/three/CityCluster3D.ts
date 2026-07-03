@@ -190,11 +190,15 @@ export function rebuildCityClusters(
 
     plazaMesh = new InstancedMesh(plazaGeom, plazaMat, cities.length);
     plazaMesh.receiveShadow = true;
-    if (normalCities.length > 0) {
+    // Spire/landmark only when GLB props are NOT loaded — otherwise the
+    // GLB city model already provides the visual focal point and the
+    // procedural spire renders as a stray white cone on top of it.
+    const hideProceduralFocal = areCityPropsReady();
+    if (normalCities.length > 0 && !hideProceduralFocal) {
       spireMesh = new InstancedMesh(spireGeom, spireMat, normalCities.length);
       spireMesh.castShadow = true;
     }
-    if (capitals.length > 0) {
+    if (capitals.length > 0 && !hideProceduralFocal) {
       capitalLandmarkMesh = new InstancedMesh(landmarkGeom, landmarkMat, capitals.length * 2);
       capitalLandmarkMesh.castShadow = true;
     }
@@ -344,9 +348,14 @@ export function rebuildCityClusters(
     // monolith). The procedural-capital fallback builds its own compound,
     // so satellites only apply while the glTF prop is live.
     const satellitesPerCapital = areCityPropsReady() ? 3 : 0;
-    const bldCount =
-      normalCities.reduce((s, c) => s + buildingCountForCity(c.population), 0) +
-      capitals.length * satellitesPerCapital;
+    // When GLB city props are loaded, normal cities use their GLB model
+    // instead of procedural boxes — so no procedural buildings for them.
+    // The spire/landmark and procedural buildings are fallback visuals.
+    const propsReady = areCityPropsReady();
+    const bldCount = propsReady
+      ? capitals.length * satellitesPerCapital
+      : normalCities.reduce((s, c) => s + buildingCountForCity(c.population), 0) +
+        capitals.length * satellitesPerCapital;
     const roofCount = bldCount;
     // Perimeter wall: ONE closed hexagonal ring per city (was 6 separate
     // box segments that left corner gaps → walls read as scattered dots).
@@ -375,7 +384,7 @@ export function rebuildCityClusters(
       const elev = tile ? terrainElevation(tile.terrain) : 0;
       const base = axialToWorld3D(city.coord.q, city.coord.r, elev);
       const h = hashCoord(city.coord.q, city.coord.r);
-      const count = buildingCountForCity(city.population);
+      const count = propsReady ? 0 : buildingCountForCity(city.population);
       const lvl = cityLevel(city);
       const wallComplete = LEVEL_WALL_COMPLETENESS[lvl]!;
 
