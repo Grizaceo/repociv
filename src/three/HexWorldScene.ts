@@ -79,6 +79,7 @@ import {
 import {
   getCityPropsGroup,
   ensureCityPropsLoad,
+  areCityPropsSettled,
   rebuildCityProps,
   clearCityProps,
 } from './CityProps3D.ts';
@@ -171,6 +172,7 @@ let terrainMaterial: MeshStandardMaterial | null = null;
 let sunLight: DirectionalLight | null = null;
 let atlasLoadStarted = false;
 let loadedTerrainAtlas: LoadedTerrainAtlas | null = null;
+let areCityPropsSettledCalled = false;
 
 // Fixed late-afternoon sun. Stable position is the whole point: the old
 // code re-set sunLight.position every frame and made shadows swim.
@@ -1193,8 +1195,12 @@ export function updateHexWorldScene(
   // the entire point of the dirty-flag.
   // Exception: if the terrain atlas just loaded (terrainMesh was nulled
   // by ensureTerrainAtlasLoad), we must rebuild even on an idle frame.
+  // Same for city/forest/mountain props: their async GLB load settling
+  // must trigger a rebuild or the props never get instanced.
   const atlasJustLoaded = !terrainMesh && loadedTerrainAtlas !== null;
-  if (!stateDirty && !atlasJustLoaded) return;
+  const propsJustLoaded = !areCityPropsSettledCalled && areCityPropsSettled();
+  if (propsJustLoaded) areCityPropsSettledCalled = true;
+  if (!stateDirty && !atlasJustLoaded && !propsJustLoaded) return;
   rebuildTerrainMesh(state, opts.fogEnabled, picker);
   rebuildGround(state);
   // Detect newly-revealed tiles and start fog fade-out transitions +
@@ -1254,6 +1260,7 @@ export function disposeHexWorldScene(scene: Scene): void {
   clearTileFlash();
   clearTilePopup();
   clearFogTransition();
+  areCityPropsSettledCalled = false;
   if (terrainMesh) {
     terrainGroup.remove(terrainMesh);
     terrainMesh.dispose();
