@@ -19,7 +19,6 @@ import {
   InstancedMesh,
   Matrix4,
   Mesh,
-  MeshLambertMaterial,
   MeshStandardMaterial,
   Color,
   SphereGeometry,
@@ -355,11 +354,11 @@ export function rebuildRivers(tiles: Map<string, Tile>): void {
   // soft wet-specular glint from the fixed afternoon sun; the teal emissive
   // gives shallow water a faint inner glow without going neon.
   const mat = new MeshStandardMaterial({
-    color: new Color(0x4ca1a8),
-    roughness: 0.22,
-    metalness: 0.05,
-    emissive: new Color(0x0e3338),
-    emissiveIntensity: 0.4,
+    color: new Color(0x3a8a92),
+    roughness: 0.12,
+    metalness: 0.15,
+    emissive: new Color(0x0a2830),
+    emissiveIntensity: 0.6,
   });
   const mesh = new Mesh(geom, mat);
   riverGroup.add(mesh);
@@ -367,11 +366,15 @@ export function rebuildRivers(tiles: Map<string, Tile>): void {
   // Mouth foam: a few pale dots where the river meets the sea, echoing the
   // coast-ring foam from the terrain shader.
   if (mouths.length > 0) {
-    const foamGeom = new SphereGeometry(HEX_SIZE * 0.055, 6, 4);
-    const foamMat = new MeshLambertMaterial({
-      color: 0xe8f8ff,
+    const foamGeom = new SphereGeometry(HEX_SIZE * 0.06, 6, 4);
+    const foamMat = new MeshStandardMaterial({
+      color: 0xf0faff,
+      roughness: 0.25,
+      metalness: 0.0,
+      emissive: new Color(0xa0d0e0),
+      emissiveIntensity: 0.8,
       transparent: true,
-      opacity: 0.6,
+      opacity: 0.7,
     });
     const foam = new InstancedMesh(foamGeom, foamMat, mouths.length * 3);
     const m = new Matrix4();
