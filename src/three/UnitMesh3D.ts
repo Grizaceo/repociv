@@ -66,24 +66,22 @@ export function getUnitGroup(): Group {
 const HERO_TYPES = new Set(['hero', 'lexo', 'claude', 'codex', 'cursor', 'openclaw']);
 
 /** Forge GLB figurine: shared geometry, per-unit tinted material clones.
- *  The body keeps the sculpted GLB shading and lerps toward the agent
- *  color (Civ V piece + player color in one), the banner takes the full
- *  agent color so ownership reads at distance. */
+ *  The GLB worker has 5 material slots (skin, shirt, pants, tool wood,
+ *  tool metal). We preserve the sculpted GLB colours and only tint the
+ *  shirt (part index 1, the largest body area) toward the agent colour
+ *  so ownership reads at a glance without nuking the whole figurine. */
 function buildGlbFigurine(isHero: boolean, col: Color): Group {
   const group = new Group();
   const parts = getUnitPropParts()!;
   parts.forEach((part, i) => {
     const mat = (part.material as MeshStandardMaterial).clone();
-    // Part 0 is the body cylinder; later parts (banner cone, head) carry
-    // the accent material in the forge build.
-    if (i === 0) {
-      mat.color.lerp(col, 0.45);
+    // Part 1 = shirt/torso → tint with agent colour (Civ V player colour).
+    // All other parts keep their original GLB colours so the worker still
+    // reads as a person (skin, pants, wooden pickaxe, iron head).
+    if (i === 1) {
+      mat.color.lerp(col, 0.55);
       mat.emissive.copy(col);
       mat.emissiveIntensity = isHero ? 0.4 : 0.22;
-    } else {
-      mat.color.copy(col);
-      mat.emissive.copy(col);
-      mat.emissiveIntensity = isHero ? 0.55 : 0.35;
     }
     const mesh = new Mesh(part.geometry, mat);
     mesh.applyMatrix4(part.matrix);
@@ -91,9 +89,12 @@ function buildGlbFigurine(isHero: boolean, col: Color): Group {
     mesh.castShadow = true;
     group.add(mesh);
   });
-  // GLB is ~1.1 Blender units tall (scale baked); bring it to the same
-  // visual height as the old procedural figurine (~0.33 × HEX_SIZE).
-  const s = HEX_SIZE * (isHero ? 0.36 : 0.3);
+  // GLB is ~1.15 Blender units tall (feet at Z=0, origin at bottom).
+  // Scale to be clearly visible among mountain props (ROCK_H ≈ HEX_SIZE*0.82)
+  // without dominating the tile. 0.38 gives ~22.7 units tall — between the
+  // mountain base (pos.y+2) and the snow cap (pos.y+44), so the worker
+  // reads as standing among the peaks rather than buried by them.
+  const s = HEX_SIZE * (isHero ? 0.44 : 0.38);
   group.scale.setScalar(s);
   // Outer wrapper stays unscaled so the hero crown keeps absolute sizing.
   const wrapper = new Group();
@@ -225,7 +226,11 @@ export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | und
     const tile = getTile(tileKey(unit.coord));
     const elev = tile ? terrainElevation(tile.terrain) : 0;
     const pos = axialToWorld3D(unit.coord.q, unit.coord.r, elev);
-    const targetY = pos.y + HEX_SIZE * 0.05;
+    // GLB worker has feet at Z=0 (origin at bottom of bounding box).
+    // The hex prism top face sits at pos.y (Y=0 local in the geometry),
+    // so pos.y alone puts the worker standing on the tile surface.
+    // A tiny lift (HEX_SIZE * 0.02) prevents Z-fighting with the terrain cap.
+    const targetY = pos.y + HEX_SIZE * 0.02;
 
     const existing = unitEntries.get(unit.id);
     if (existing && existing.lifeState !== 'despawning') {

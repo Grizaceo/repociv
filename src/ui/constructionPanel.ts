@@ -8,6 +8,7 @@ import {
 import { upsertManualRepoEntry, removeManualRepoEntry, loadManualLayout } from '../manualLayout';
 import { showNotification } from './notificationBanner';
 import { trackPanelOpen } from './analytics.ts';
+import { resetTourState } from './firstRunTour.ts';
 
 let isOpen = false;
 let _rendererRef: {
@@ -260,6 +261,7 @@ function buildDOM(): void {
   </div>
   <footer class="construction-panel-footer">
     <button id="construction-cancel" class="btn-secondary" type="button">Cancelar</button>
+    <button id="construction-onboarding-reset" class="btn-secondary" type="button" title="Re-lanza la visita guiada para nuevos usuarios">Reiniciar visita guiada</button>
   </footer>
     </div>
   `;
@@ -268,6 +270,15 @@ function buildDOM(): void {
   const close = () => closeConstructionPanel();
   panel.querySelector<HTMLButtonElement>('#construction-close')?.addEventListener('click', close);
   panel.querySelector<HTMLButtonElement>('#construction-cancel')?.addEventListener('click', close);
+
+  // Reboot onboarding tour from the Construction panel (user-requested reset)
+  panel.querySelector<HTMLButtonElement>('#construction-onboarding-reset')
+    ?.addEventListener('click', () => {
+      // Call resetTourState immediately (clears storage + launches tour).
+      // The construction panel stays open so the user can manage cities while
+      // the coachmark takes them through the canvas.
+      resetTourState();
+    });
 
   const pathInput = panel.querySelector<HTMLInputElement>('#construction-repo-path')!;
   const error = panel.querySelector<HTMLElement>('#construction-error')!;

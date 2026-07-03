@@ -453,11 +453,13 @@ export function rebuildWonderProps(tiles: Tile[]): void {
     const glbReady = glbState === 'ready' && glbVariants !== null;
     if (tile.district.wonderType === 'bibliotheca') {
       const inst = glbReady ? buildGlbWonder('bibliotheca') : buildBibliotheca();
-      inst.position.set(pos.x, pos.y + (glbReady ? 1.5 : 0), pos.z);
+      // GLB has feet at Z=0 (Blender export with origin at bottom); procedural
+      // builders also start at Y=0. No vertical offset needed either way.
+      inst.position.set(pos.x, pos.y, pos.z);
       bibliothecaGroup.add(inst);
     } else if (tile.district.wonderType === 'institutum') {
       const inst = glbReady ? buildGlbWonder('institutum') : buildInstitutum();
-      inst.position.set(pos.x, pos.y + (glbReady ? 1.5 : 0), pos.z);
+      inst.position.set(pos.x, pos.y, pos.z);
       institutumGroup.add(inst);
     } else {
       // Any user-connected wonder → neutral monument.

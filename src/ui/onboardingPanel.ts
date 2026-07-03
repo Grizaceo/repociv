@@ -456,6 +456,7 @@ function render(state: OnboardingState, onContinue: () => void): void {
           try {
             const union = await persistRootSelection(state.mapRoot, [...state.selected]);
             saveSelectedRepoPaths([...union]);
+            root.dataset.closed = '1';
             root.remove();
             onContinue();
           } catch (error) {

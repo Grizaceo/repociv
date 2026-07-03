@@ -504,6 +504,33 @@
   align-self: center;
 }
 
+.btn-secondary {
+  /* Secondary action — same family as .btn-accent but quieter so primary
+  actions (.btn-accent, .btn-primary) keep visual weight. Defined here
+  because the class is shared across construction/login/onboarding panels
+  with no single owner file. */
+  background: rgba(212, 165, 116, 0.08);
+  border: 1px solid rgba(212, 165, 116, 0.35);
+  color: var(--text-bright, #e6dccc);
+  padding: 8px 14px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 2px;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.btn-secondary:hover {
+  background: rgba(212, 165, 116, 0.18);
+  border-color: rgba(212, 165, 116, 0.55);
+  color: var(--ui-gold-bright, #f7d488);
+}
+
 .construction-divider {
   height: 1px;
   background: rgba(212, 165, 116, 0.2);

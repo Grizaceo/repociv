@@ -125,7 +125,26 @@ export function startFirstRunTour(steps: TourStep[] = TOUR_STEPS): void {
 /** Show the tour only on a genuine first run (and not over the onboarding panel). */
 export function maybeStartFirstRunTour(): void {
   if (!shouldShowTour()) return;
+  // The onboarding panel creates #repo-onboarding on demand but never adds the
+  // `hidden` class on close — classList.contains('hidden') is unreliable here.
+  // Instead we look at the explicit data attribute the panel sets when it closes,
+  // and fall back to "panel absent" as the success path.
   const onboarding = document.getElementById('repo-onboarding');
-  if (onboarding && !onboarding.classList.contains('hidden')) return;
+  if (onboarding && onboarding.dataset.closed !== '1') return;
+  startFirstRunTour();
+}
+
+/**
+ * Reset the "already seen" flag and immediately re-launch the tour.
+ * Intended for the in-app button on the construction panel — gives users a way
+ * to re-trigger onboarding without clearing localStorage from devtools.
+ */
+export function resetTourState(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  _end();
   startFirstRunTour();
 }
