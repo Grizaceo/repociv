@@ -32,6 +32,7 @@ let clusterMesh: InstancedMesh | null = null;
 let roofMesh: InstancedMesh | null = null;
 let wallMesh: InstancedMesh | null = null;
 let towerMesh: InstancedMesh | null = null;
+let towerRoofMesh: InstancedMesh | null = null;
 let capitalMesh: InstancedMesh | null = null;
 let capitalRoofMesh: InstancedMesh | null = null;
 let capitalDomeMesh: InstancedMesh | null = null;
@@ -271,11 +272,14 @@ export function rebuildCityClusters(
     // extruded). ONE geometry per city, not 6 separate boxes. The previous
     // 6-box design left gaps at every corner, so walls read as 6 scattered
     // dots instead of one continuous fortification.
+    //
+    // iter14: thicker wall (0.08 gap → visible battlement), taller (0.18),
+    // PBR flatShaded material to match the mountain/forest prop style.
     let ringWallGeom: ExtrudeGeometry;
     {
-      const outerR = HEX_SIZE * 0.4;
+      const outerR = HEX_SIZE * 0.42;
       const innerR = HEX_SIZE * 0.34;
-      const wallH = HEX_SIZE * 0.12;
+      const wallH = HEX_SIZE * 0.18;
       const ring = new Shape();
       for (let i = 0; i < 6; i++) {
         const a = (Math.PI / 3) * i;
@@ -295,20 +299,34 @@ export function rebuildCityClusters(
       }
       hole.closePath();
       ring.holes.push(hole);
-      // ExtrudeGeometry extrudes the shape (in its 2D plane) along +Z. We want
-      // the wall to lie flat on the ground (shape in X-Z) and grow upward in Y,
-      // so we rotate the geometry: X→X, Y→Z, Z→-Y after a -π/2 X-rotation.
       const wall3d = new ExtrudeGeometry(ring, { depth: wallH, bevelEnabled: false });
       wall3d.rotateX(-Math.PI / 2);
-      // After rotation the extrusion direction points -Y. Flip the Z coords
-      // so the wall extrudes upward instead of sinking into the ground.
       wall3d.scale(1, 1, -1);
       ringWallGeom = wall3d;
     }
     const wallGeom: ExtrudeGeometry = ringWallGeom;
-    const wallMat = new MeshLambertMaterial({ color: new Color(0xb0a898) });
-    const towerGeom = new CylinderGeometry(HEX_SIZE * 0.025, HEX_SIZE * 0.03, HEX_SIZE * 0.18, 6);
-    const towerMat = new MeshLambertMaterial({ color: new Color(0xa09880) });
+    // PBR flatShaded stone — matches the mountain/forest prop materials.
+    const wallMat = new MeshStandardMaterial({
+      color: new Color(0x9a9080),
+      roughness: 0.82,
+      metalness: 0.04,
+      flatShading: true,
+    });
+    // Towers: hexagonal prisms with flatShading — chunky and readable.
+    const towerGeom = new CylinderGeometry(HEX_SIZE * 0.035, HEX_SIZE * 0.045, HEX_SIZE * 0.28, 6);
+    const towerMat = new MeshStandardMaterial({
+      color: new Color(0x8a8270),
+      roughness: 0.80,
+      metalness: 0.04,
+      flatShading: true,
+    });
+    // Tower roof — small cone cap so towers read as watchtowers, not stumps.
+    const towerRoofGeom = new ConeGeometry(HEX_SIZE * 0.05, HEX_SIZE * 0.10, 6);
+    const towerRoofMat = new MeshStandardMaterial({
+      color: new Color(0x6a4030),
+      roughness: 0.72,
+      flatShading: true,
+    });
 
     // Density keyed on population (files in repo). Civ V cities read as a dense
     // cluster of dwellings inside the walls, not a handful of huts — so the caps
@@ -337,17 +355,20 @@ export function rebuildCityClusters(
     // incomplete walls (they're underground). A per-instance Y-scale
     // controls how much of the wall is visible.
     const wallCount = normalCities.length;
-    const towerCount = normalCities.length * 4; // 4 corner towers
+    const towerCount = normalCities.length * 6; // 6 towers (one per hex vertex)
+    const towerRoofCount = towerCount;
 
     clusterMesh = new InstancedMesh(bldGeom, bldMat, bldCount);
     roofMesh = new InstancedMesh(roofGeom, roofMat, roofCount);
     wallMesh = new InstancedMesh(wallGeom, wallMat, wallCount);
     towerMesh = new InstancedMesh(towerGeom, towerMat, towerCount);
+    towerRoofMesh = new InstancedMesh(towerRoofGeom, towerRoofMat, towerRoofCount);
 
     let bldIdx = 0,
       roofIdx = 0,
       wallIdx = 0,
-      towerIdx = 0;
+      towerIdx = 0,
+      towerRoofIdx = 0;
 
     for (const city of normalCities) {
       const tile = getTile(tileKey(city.coord));
@@ -415,15 +436,20 @@ export function rebuildCityClusters(
         wallMesh.setMatrixAt(wallIdx++, m);
       }
 
-      // Corner towers: only render when walls are at least 40% complete.
-      const cornerAngles = [0, Math.PI / 3, Math.PI, (4 * Math.PI) / 3];
+      // Corner towers: 6 towers (one per hex vertex), with conical roofs.
+      const towerAngles = [0, Math.PI / 3, (2 * Math.PI) / 3, Math.PI, (4 * Math.PI) / 3, (5 * Math.PI) / 3];
       const towerYScale = Math.max(0, wallComplete);
-      for (const ca of cornerAngles) {
+      for (const ca of towerAngles) {
         const tx = base.x + Math.cos(ca) * HEX_SIZE * 0.42;
         const tz = base.z + Math.sin(ca) * HEX_SIZE * 0.42;
-        const towerM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.09, tz);
+        const towerM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.14, tz);
         towerM.scale(new Vector3(1, towerYScale, 1));
         towerMesh.setMatrixAt(towerIdx++, towerM);
+
+        // Tower roof cone sits on top of the tower.
+        const roofM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.14 + HEX_SIZE * 0.28 * towerYScale + HEX_SIZE * 0.05, tz);
+        roofM.scale(new Vector3(1, towerYScale, 1));
+        towerRoofMesh.setMatrixAt(towerRoofIdx++, roofM);
       }
     }
 
@@ -461,12 +487,14 @@ export function rebuildCityClusters(
     roofMesh.instanceMatrix.needsUpdate = true;
     wallMesh.instanceMatrix.needsUpdate = true;
     towerMesh.instanceMatrix.needsUpdate = true;
+    towerRoofMesh.instanceMatrix.needsUpdate = true;
     clusterMesh.castShadow = true;
     roofMesh.castShadow = true;
     cityGroup.add(clusterMesh);
     cityGroup.add(roofMesh);
     cityGroup.add(wallMesh);
     cityGroup.add(towerMesh);
+    cityGroup.add(towerRoofMesh);
   }
 
   // ── Capitals: glTF prop when loaded; procedural fallback otherwise ─────────
@@ -497,10 +525,59 @@ export function rebuildCityClusters(
       metalness: 0.25,
       flatShading: true,
     });
-    const wallGeom = new BoxGeometry(HEX_SIZE * 0.7, HEX_SIZE * 0.1, HEX_SIZE * 0.025);
-    const wallMat = new MeshStandardMaterial({ color: new Color(0xb8b0a0), roughness: 0.7 });
-    const towerGeom = new CylinderGeometry(HEX_SIZE * 0.035, HEX_SIZE * 0.04, HEX_SIZE * 0.24, 6);
-    const towerMat = new MeshStandardMaterial({ color: new Color(0xa8a090), roughness: 0.6 });
+    // Capital walls: same hexagonal ring as normal cities but larger and
+    // with a second inner ring for a layered fortification look.
+    // iter14: replaced the 8-segment box approach (gaps, mismatched tower
+    // angles, flat planes) with the continuous ExtrudeGeometry ring.
+    let capitalRingGeom: ExtrudeGeometry;
+    {
+      const outerR = HEX_SIZE * 0.5;
+      const innerR = HEX_SIZE * 0.42;
+      const wallH = HEX_SIZE * 0.22;
+      const ring = new Shape();
+      for (let i = 0; i < 6; i++) {
+        const a = (Math.PI / 3) * i;
+        const x = Math.cos(a) * outerR;
+        const z = Math.sin(a) * outerR;
+        if (i === 0) ring.moveTo(x, z);
+        else ring.lineTo(x, z);
+      }
+      ring.closePath();
+      const hole = new Shape();
+      for (let i = 0; i < 6; i++) {
+        const a = (Math.PI / 3) * i;
+        const x = Math.cos(a) * innerR;
+        const z = Math.sin(a) * innerR;
+        if (i === 0) hole.moveTo(x, z);
+        else hole.lineTo(x, z);
+      }
+      hole.closePath();
+      ring.holes.push(hole);
+      const wall3d = new ExtrudeGeometry(ring, { depth: wallH, bevelEnabled: false });
+      wall3d.rotateX(-Math.PI / 2);
+      wall3d.scale(1, 1, -1);
+      capitalRingGeom = wall3d;
+    }
+    const wallGeom = capitalRingGeom;
+    const wallMat = new MeshStandardMaterial({
+      color: new Color(0x9a9080),
+      roughness: 0.82,
+      metalness: 0.04,
+      flatShading: true,
+    });
+    const towerGeom = new CylinderGeometry(HEX_SIZE * 0.04, HEX_SIZE * 0.05, HEX_SIZE * 0.34, 6);
+    const towerMat = new MeshStandardMaterial({
+      color: new Color(0x8a8270),
+      roughness: 0.80,
+      metalness: 0.04,
+      flatShading: true,
+    });
+    const towerRoofGeom = new ConeGeometry(HEX_SIZE * 0.06, HEX_SIZE * 0.12, 6);
+    const towerRoofMat = new MeshStandardMaterial({
+      color: new Color(0x6a4030),
+      roughness: 0.72,
+      flatShading: true,
+    });
 
     const starGeom = new ConeGeometry(HEX_SIZE * 0.09, HEX_SIZE * 0.16, 4);
     const starMat = new MeshStandardMaterial({
@@ -511,8 +588,9 @@ export function rebuildCityClusters(
 
     const bldCount = capitals.length;
     const roofCount = capitals.length;
-    const wallCount = capitals.length * 8; // 8 wall segments for more complex shape
-    const towerCount = capitals.length * 6; // 6 towers
+    const wallCount = capitals.length;
+    const towerCount = capitals.length * 6; // 6 towers (one per hex vertex)
+    const towerRoofCount = capitals.length * 6;
 
     capitalMesh = new InstancedMesh(bldGeom, bldMat, bldCount);
     capitalRoofMesh = new InstancedMesh(roofGeom, roofMat, roofCount);
@@ -521,11 +599,13 @@ export function rebuildCityClusters(
     capitalTowerMesh = new InstancedMesh(towerGeom, towerMat, towerCount);
     capitalStar = new InstancedMesh(starGeom, starMat, capitals.length);
 
+    // Capital tower roofs — separate instanced mesh for the conical caps.
+    const capitalTowerRoofMesh = new InstancedMesh(towerRoofGeom, towerRoofMat, towerRoofCount);
+
     let bldIdx = 0,
       roofIdx = 0,
       wallIdx = 0,
       towerIdx = 0;
-    const q = new Quaternion();
 
     for (const city of capitals) {
       const tile = getTile(tileKey(city.coord));
@@ -545,25 +625,22 @@ export function rebuildCityClusters(
       const domeM = new Matrix4().makeTranslation(base.x, domeY, base.z);
       capitalDomeMesh.setMatrixAt(bldIdx - 1, domeM); // reuse index
 
-      // Complex walls (octagonal-ish, 8 segments)
-      const wallY = base.y + 4.5;
-      for (let wi = 0; wi < 8; wi++) {
-        const angle = (Math.PI / 4) * wi;
-        const wx = base.x + Math.cos(angle) * HEX_SIZE * 0.48;
-        const wz = base.z + Math.sin(angle) * HEX_SIZE * 0.48;
-        const wallM = new Matrix4().makeTranslation(wx, wallY, wz);
-        q.setFromAxisAngle(new Vector3(0, 1, 0), angle + Math.PI / 2);
-        wallM.multiply(new Matrix4().makeRotationFromQuaternion(q));
-        capitalWallMesh.setMatrixAt(wallIdx++, wallM);
-      }
+      // Continuous hexagonal wall ring — one instance, no gaps.
+      const wallY = base.y + 5.5;
+      const wallM = new Matrix4().makeTranslation(base.x, wallY, base.z);
+      capitalWallMesh.setMatrixAt(wallIdx++, wallM);
 
-      // 6 towers (corners + midpoints)
+      // 6 towers (one per hex vertex) with conical roofs.
+      let capTowerRoofIdx = 0;
       for (let ti = 0; ti < 6; ti++) {
         const angle = (Math.PI / 3) * ti;
-        const tx = base.x + Math.cos(angle) * HEX_SIZE * 0.52;
-        const tz = base.z + Math.sin(angle) * HEX_SIZE * 0.52;
-        const towerM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.12, tz);
+        const tx = base.x + Math.cos(angle) * HEX_SIZE * 0.5;
+        const tz = base.z + Math.sin(angle) * HEX_SIZE * 0.5;
+        const towerM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.17, tz);
         capitalTowerMesh.setMatrixAt(towerIdx++, towerM);
+
+        const roofM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.17 + HEX_SIZE * 0.34 + HEX_SIZE * 0.06, tz);
+        capitalTowerRoofMesh.setMatrixAt(capTowerRoofIdx++, roofM);
       }
 
       // Star on top of dome
@@ -577,12 +654,14 @@ export function rebuildCityClusters(
     capitalDomeMesh.instanceMatrix.needsUpdate = true;
     capitalWallMesh.instanceMatrix.needsUpdate = true;
     capitalTowerMesh.instanceMatrix.needsUpdate = true;
+    capitalTowerRoofMesh.instanceMatrix.needsUpdate = true;
     capitalStar.instanceMatrix.needsUpdate = true;
     cityGroup.add(capitalMesh);
     cityGroup.add(capitalRoofMesh);
     cityGroup.add(capitalDomeMesh);
     cityGroup.add(capitalWallMesh);
     cityGroup.add(capitalTowerMesh);
+    cityGroup.add(capitalTowerRoofMesh);
     cityGroup.add(capitalStar);
   }
 }
@@ -625,6 +704,7 @@ export function clearCityClusters(): void {
   roofMesh = null;
   wallMesh = null;
   towerMesh = null;
+  towerRoofMesh = null;
   capitalMesh = null;
   capitalRoofMesh = null;
   capitalDomeMesh = null;
