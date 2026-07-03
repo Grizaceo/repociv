@@ -426,9 +426,8 @@ export function rebuildCityClusters(
       }
 
       // Perimeter wall: ONE closed hexagonal ring centered on the city,
-      // raised to sit on top of the plaza. Wall completeness scales the
-      // instance Y so incomplete walls are underground (invisible).
-      const wallY = base.y + 5.5;
+      // sitting on top of the plaza (plaza top ≈ base.y + 1.5 + HEX_SIZE*0.05).
+      const wallY = base.y + 4.2;
       {
         const m = new Matrix4().makeTranslation(base.x, wallY, base.z);
         // Scale Y by wall completeness: 0 = fully underground, 1 = full height.
@@ -446,8 +445,8 @@ export function rebuildCityClusters(
         towerM.scale(new Vector3(1, towerYScale, 1));
         towerMesh.setMatrixAt(towerIdx++, towerM);
 
-        // Tower roof cone sits on top of the tower.
-        const roofM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.14 + HEX_SIZE * 0.28 * towerYScale + HEX_SIZE * 0.05, tz);
+        // Tower roof cone sits on top of the tower (half-height offset).
+        const roofM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.14 + HEX_SIZE * 0.14 * towerYScale + HEX_SIZE * 0.05, tz);
         roofM.scale(new Vector3(1, towerYScale, 1));
         towerRoofMesh.setMatrixAt(towerRoofIdx++, roofM);
       }
@@ -639,7 +638,7 @@ export function rebuildCityClusters(
         const towerM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.17, tz);
         capitalTowerMesh.setMatrixAt(towerIdx++, towerM);
 
-        const roofM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.17 + HEX_SIZE * 0.34 + HEX_SIZE * 0.06, tz);
+        const roofM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.17 + HEX_SIZE * 0.17 + HEX_SIZE * 0.06, tz);
         capitalTowerRoofMesh.setMatrixAt(capTowerRoofIdx++, roofM);
       }
 
