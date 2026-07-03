@@ -193,6 +193,8 @@ export function rebuildCityClusters(
     // Spire/landmark only when GLB props are NOT loaded — otherwise the
     // GLB city model already provides the visual focal point and the
     // procedural spire renders as a stray white cone on top of it.
+    // Plaza: also suppressed when GLB is loaded — the GLB has its own
+    // base/steps and the procedural plaza reads as a sand mound on top.
     const hideProceduralFocal = areCityPropsReady();
     if (normalCities.length > 0 && !hideProceduralFocal) {
       spireMesh = new InstancedMesh(spireGeom, spireMat, normalCities.length);
@@ -216,8 +218,11 @@ export function rebuildCityClusters(
       const plazaScale = LEVEL_PLAZA_SCALE[lvl]!;
 
       // Plaza: scale the instance by level multiplier.
+      // When GLB is loaded, shrink plaza to 0 so it's invisible — the
+      // GLB provides its own base and the procedural plaza clips through it.
       const plazaM = new Matrix4().makeTranslation(base.x, base.y + 1.5, base.z);
-      plazaM.scale(new Vector3(plazaScale, 1, plazaScale));
+      const plazaActualScale = hideProceduralFocal ? 0.0001 : plazaScale;
+      plazaM.scale(new Vector3(plazaActualScale, 1, plazaActualScale));
       plazaMesh.setMatrixAt(plazaIdx++, plazaM);
 
       if (!city.isCapital && spireMesh) {
