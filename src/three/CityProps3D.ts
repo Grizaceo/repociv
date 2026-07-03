@@ -26,9 +26,8 @@ const PROP_IDS = ['city-capital-0', 'city-hamlet-0', 'city-village-0', 'city-tow
 // cityLevel() 0-3 → variant index into PROP_IDS (town serves levels 2 and 3).
 const LEVEL_VARIANT = [1, 2, 3, 3] as const;
 // Level 3 towns are the same GLB scaled up — a non-capital "city".
-// Scale increased from [0.3, 0.32, 0.34, 0.4] to fill the hex tile better
-// now that procedural buildings are suppressed when GLB is loaded.
-const LEVEL_SCALE = [0.55, 0.62, 0.72, 0.85] as const;
+// Scale increased to fill hex tile and read as a village cluster.
+const LEVEL_SCALE = [0.75, 0.85, 0.95, 1.1] as const;
 
 let variants: PropVariant[] | null = null;
 let state: PropsState = 'idle';
@@ -90,13 +89,27 @@ export function rebuildCityProps(
   if (cities.length === 0) return;
 
   // Bucket cities per variant: capitals → keep, others → level centrepiece.
-  const byVariant: Array<Array<{ city: City; scale: number }>> = PROP_IDS.map(() => []);
+  // Non-capital cities get 2 satellite copies (smaller, offset) so the tile
+  // reads as a village cluster, not a single building in an empty hex.
+  const SATELLITE_OFFSETS: Array<[number, number, number]> = [
+    [0.0, 0.0, 1.0],       // main instance — centre, full scale
+    [0.22, -0.18, 0.55],   // satellite 1 — offset, smaller
+    [-0.20, 0.22, 0.45],   // satellite 2 — offset other side, smaller
+  ];
+  const byVariant: Array<Array<{ city: City; scale: number; offset: [number, number] }>> =
+    PROP_IDS.map(() => []);
   for (const city of cities) {
     if (city.isCapital) {
-      byVariant[0]!.push({ city, scale: 0.6 });
+      byVariant[0]!.push({ city, scale: 0.8, offset: [0, 0] });
+      // Capital gets 2 satellite copies too
+      byVariant[0]!.push({ city, scale: 0.4, offset: [0.25, -0.15] });
+      byVariant[0]!.push({ city, scale: 0.35, offset: [-0.22, 0.20] });
     } else {
       const lvl = cityLevel(city);
-      byVariant[LEVEL_VARIANT[lvl]!]!.push({ city, scale: LEVEL_SCALE[lvl]! });
+      const baseScale = LEVEL_SCALE[lvl]!;
+      for (const [ox, oz, ss] of SATELLITE_OFFSETS) {
+        byVariant[LEVEL_VARIANT[lvl]!]!.push({ city, scale: baseScale * ss, offset: [ox, oz] });
+      }
     }
   }
 
@@ -113,13 +126,14 @@ export function rebuildCityProps(
     mesh.castShadow = true;
     mesh.receiveShadow = false;
 
-    group.forEach(({ city, scale }, i) => {
+    group.forEach(({ city, scale, offset }, i) => {
       const tile = getTile(tileKey(city.coord));
       const elev = tile ? terrainElevation(tile.terrain) : 0;
       const base = axialToWorld3D(city.coord.q, city.coord.r, elev);
       const h = hashCoord(city.coord.q, city.coord.r);
       const rotSteps = h % 6;
-      pos.set(base.x, base.y + 2, base.z);
+      const [ox, oz] = offset;
+      pos.set(base.x + ox * HEX_SIZE, base.y + 2, base.z + oz * HEX_SIZE);
       quat.setFromAxisAngle(up, rotSteps * (Math.PI / 3));
       const s = HEX_SIZE * scale;
       scl.set(s, s, s);
