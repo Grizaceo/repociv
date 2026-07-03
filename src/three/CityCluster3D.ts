@@ -288,7 +288,7 @@ export function rebuildCityClusters(
     {
       const outerR = HEX_SIZE * 0.42;
       const innerR = HEX_SIZE * 0.34;
-      const wallH = HEX_SIZE * 0.18;
+      const wallH = HEX_SIZE * 0.08;
       const ring = new Shape();
       for (let i = 0; i < 6; i++) {
         const a = (Math.PI / 3) * i;
@@ -544,9 +544,9 @@ export function rebuildCityClusters(
     // angles, flat planes) with the continuous ExtrudeGeometry ring.
     let capitalRingGeom: ExtrudeGeometry;
     {
-      const outerR = HEX_SIZE * 0.5;
+      const outerR = HEX_SIZE * 0.48;
       const innerR = HEX_SIZE * 0.42;
-      const wallH = HEX_SIZE * 0.22;
+      const wallH = HEX_SIZE * 0.10;
       const ring = new Shape();
       for (let i = 0; i < 6; i++) {
         const a = (Math.PI / 3) * i;
@@ -647,8 +647,8 @@ export function rebuildCityClusters(
       let capTowerRoofIdx = 0;
       for (let ti = 0; ti < 6; ti++) {
         const angle = (Math.PI / 3) * ti;
-        const tx = base.x + Math.cos(angle) * HEX_SIZE * 0.5;
-        const tz = base.z + Math.sin(angle) * HEX_SIZE * 0.5;
+        const tx = base.x + Math.cos(angle) * HEX_SIZE * 0.48;
+        const tz = base.z + Math.sin(angle) * HEX_SIZE * 0.48;
         const towerM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.17, tz);
         capitalTowerMesh.setMatrixAt(towerIdx++, towerM);
 

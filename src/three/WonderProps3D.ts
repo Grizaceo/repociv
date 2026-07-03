@@ -451,20 +451,20 @@ export function rebuildWonderProps(tiles: Tile[]): void {
 
     // Painted Blender GLBs once loaded; procedural silhouettes until then.
     const glbReady = glbState === 'ready' && glbVariants !== null;
+    // Y align with city props (base.y + 4.2) so wonders sit flush on the
+    // tile surface — not buried under the terrain mesh's FBM noise.
+    const wonderY = pos.y + 4.2;
     if (tile.district.wonderType === 'bibliotheca') {
       const inst = glbReady ? buildGlbWonder('bibliotheca') : buildBibliotheca();
-      // GLB has feet at Z=0 (Blender export with origin at bottom); procedural
-      // builders also start at Y=0. No vertical offset needed either way.
-      inst.position.set(pos.x, pos.y, pos.z);
+      inst.position.set(pos.x, wonderY, pos.z);
       bibliothecaGroup.add(inst);
     } else if (tile.district.wonderType === 'institutum') {
       const inst = glbReady ? buildGlbWonder('institutum') : buildInstitutum();
-      inst.position.set(pos.x, pos.y, pos.z);
+      inst.position.set(pos.x, wonderY, pos.z);
       institutumGroup.add(inst);
     } else {
-      // Any user-connected wonder → neutral monument.
       const inst = buildGenericWonder();
-      inst.position.set(pos.x, pos.y, pos.z);
+      inst.position.set(pos.x, wonderY, pos.z);
       genericGroup.add(inst);
     }
   }
