@@ -93,8 +93,8 @@ export function rebuildCityProps(
   // reads as a village cluster, not a single building in an empty hex.
   const SATELLITE_OFFSETS: Array<[number, number, number]> = [
     [0.0, 0.0, 1.0],       // main instance — centre, full scale
-    [0.22, -0.18, 0.55],   // satellite 1 — offset, smaller
-    [-0.20, 0.22, 0.45],   // satellite 2 — offset other side, smaller
+    [0.16, -0.13, 0.55],   // satellite 1 — closer to centre, smaller
+    [-0.14, 0.16, 0.45],   // satellite 2 — other side, smaller
   ];
   const byVariant: Array<Array<{ city: City; scale: number; offset: [number, number] }>> =
     PROP_IDS.map(() => []);
@@ -102,8 +102,8 @@ export function rebuildCityProps(
     if (city.isCapital) {
       byVariant[0]!.push({ city, scale: 0.8, offset: [0, 0] });
       // Capital gets 2 satellite copies too
-      byVariant[0]!.push({ city, scale: 0.4, offset: [0.25, -0.15] });
-      byVariant[0]!.push({ city, scale: 0.35, offset: [-0.22, 0.20] });
+      byVariant[0]!.push({ city, scale: 0.4, offset: [0.18, -0.12] });
+      byVariant[0]!.push({ city, scale: 0.35, offset: [-0.16, 0.14] });
     } else {
       const lvl = cityLevel(city);
       const baseScale = LEVEL_SCALE[lvl]!;
@@ -133,7 +133,7 @@ export function rebuildCityProps(
       const h = hashCoord(city.coord.q, city.coord.r);
       const rotSteps = h % 6;
       const [ox, oz] = offset;
-      pos.set(base.x + ox * HEX_SIZE, base.y + 2, base.z + oz * HEX_SIZE);
+      pos.set(base.x + ox * HEX_SIZE, base.y + 4.2, base.z + oz * HEX_SIZE);
       quat.setFromAxisAngle(up, rotSteps * (Math.PI / 3));
       const s = HEX_SIZE * scale;
       scl.set(s, s, s);
