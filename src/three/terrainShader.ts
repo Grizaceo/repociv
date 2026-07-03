@@ -619,12 +619,17 @@ vec3 prepTerrainTex(float idx, vec3 tex) {
           // turquoise across the half of the tile nearest the coast, so the
           // sea reads deep→shallow instead of one flat blue.
           if (selfOcean) {
-            float shallow = smoothstep(0.05, 0.95, edgeT);
-            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.30, 0.66, 0.68), shallow * 0.50);
+            float shallow = smoothstep(0.02, 0.92, edgeT);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.28, 0.64, 0.70), shallow * 0.58);
             // Sandy seabed showing through right at the waterline — the
-            // Civ V coast signature is blue → teal → warm sandy green.
-            float seabed = smoothstep(0.72, 0.98, edgeT);
-            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.52, 0.72, 0.58), seabed * 0.30);
+            // Civ V coast signature is blue -> teal -> warm sandy green.
+            float seabed = smoothstep(0.68, 0.97, edgeT);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.58, 0.75, 0.55), seabed * 0.38);
+          } else {
+            // Land side: warm sand transition at waterline — Civ V coasts
+            // show a thin beach band where land meets sea.
+            float sandT = smoothstep(0.82, 0.98, edgeT);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.58, 0.42), sandT * 0.35);
           }
           float ring = smoothstep(0.74, 0.97, edgeT);
           float foamPulse = 0.82 + 0.18 * sin(uTime * 1.7 + vWorldXZ.x * 0.045 + vWorldXZ.y * 0.038);
@@ -743,7 +748,7 @@ vec3 prepTerrainTex(float idx, vec3 tex) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v40';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v41';
   // Terrain MUST receive the scene FogExp2: the ground plane and sky dome
   // fade into SKY_HORIZON at distance, so terrain that opted out (the old
   // `mat.fog = false`) popped against the haze instead of dissolving into it.
