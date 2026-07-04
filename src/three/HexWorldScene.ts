@@ -137,6 +137,16 @@ export interface HexSceneRenderOptions {
   dt: number;
 }
 
+export function wonderVisibilityForLayers(
+  opts: Pick<HexSceneRenderOptions, 'showStructure' | 'showKnowledge' | 'showLabs'>,
+): { bibliotheca: boolean; institutum: boolean; generic: boolean } {
+  return {
+    bibliotheca: opts.showStructure || opts.showKnowledge,
+    institutum: opts.showStructure || opts.showLabs,
+    generic: opts.showStructure,
+  };
+}
+
 const terrainGroup = new Group();
 terrainGroup.name = 'terrain';
 
@@ -1227,13 +1237,15 @@ export function updateHexWorldScene(
   setUnitsVisible(true);
   rebuildUnits(state.world.units, (key) => state.world.tiles.get(key));
 
-  // Wonder 3D props (bibliotheca temple / institutum laboratorium). Layer
-  // gating mirrors the 2D canvas: bibliotheca under knowledge, institutum
-  // under labs. Both default-ON so the wonders stay visible when only the
-  // `structure` layer is enabled.
-  setWonderVisible('bibliotheca', opts.showKnowledge);
-  setWonderVisible('institutum', opts.showLabs);
-  setWonderVisible('generic', opts.showStructure);
+  // Wonder 3D props (bibliotheca temple / institutum laboratorium).
+  // Built-in wonders are STRUCTURES first and domain-specific second: keep
+  // them visible whenever the structure layer is visible, even if the user has
+  // hidden knowledge/labs overlays. Otherwise the 3D map shows the wonder tile
+  // with no wonder model, which reads as "Bibliotheca/Institutum disappeared".
+  const wonderVisibility = wonderVisibilityForLayers(opts);
+  setWonderVisible('bibliotheca', wonderVisibility.bibliotheca);
+  setWonderVisible('institutum', wonderVisibility.institutum);
+  setWonderVisible('generic', wonderVisibility.generic);
   rebuildWonderProps(Array.from(state.world.tiles.values()));
 
   rebuildAmbientLife(Array.from(state.world.tiles.values()), state.world.cities, (key) =>

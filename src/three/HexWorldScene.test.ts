@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DirectionalLight } from 'three';
 
-import { createHexWorldScene, disposeHexWorldScene, updateHexWorldScene } from './HexWorldScene.ts';
+import {
+  createHexWorldScene,
+  disposeHexWorldScene,
+  updateHexWorldScene,
+  wonderVisibilityForLayers,
+} from './HexWorldScene.ts';
 
 describe('HexWorldScene sun stability', () => {
   it('keeps the directional sun position fixed across updates so city walls do not visually swim', () => {
@@ -51,5 +56,22 @@ describe('HexWorldScene sun stability', () => {
     expect(afterSecond.toArray()).toEqual(start.toArray());
 
     disposeHexWorldScene(scene);
+  });
+});
+
+describe('HexWorldScene wonder layer visibility', () => {
+  it('keeps built-in wonder models visible when the structure layer is visible', () => {
+    expect(
+      wonderVisibilityForLayers({ showStructure: true, showKnowledge: false, showLabs: false }),
+    ).toEqual({ bibliotheca: true, institutum: true, generic: true });
+  });
+
+  it('allows domain layers to show built-in wonders even when structure is hidden', () => {
+    expect(
+      wonderVisibilityForLayers({ showStructure: false, showKnowledge: true, showLabs: false }),
+    ).toEqual({ bibliotheca: true, institutum: false, generic: false });
+    expect(
+      wonderVisibilityForLayers({ showStructure: false, showKnowledge: false, showLabs: true }),
+    ).toEqual({ bibliotheca: false, institutum: true, generic: false });
   });
 });
