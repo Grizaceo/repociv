@@ -24,6 +24,7 @@ import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { areCityPropsReady } from './CityProps3D.ts';
+import { PROP_SURFACE_CLEARANCE, terrainSurfaceY } from './terrainSurfaceY.ts';
 
 const cityGroup = new Group();
 cityGroup.name = 'cities';
@@ -388,6 +389,7 @@ export function rebuildCityClusters(
       const tile = getTile(tileKey(city.coord));
       const elev = tile ? terrainElevation(tile.terrain) : 0;
       const base = axialToWorld3D(city.coord.q, city.coord.r, elev);
+      const surfaceY = tile ? terrainSurfaceY(tile) : base.y;
       const h = hashCoord(city.coord.q, city.coord.r);
       const count = propsReady ? 0 : buildingCountForCity(city.population);
       const lvl = cityLevel(city);
@@ -416,14 +418,14 @@ export function rebuildCityClusters(
         const [ox, oz, ht] = offsets[bi]!;
         const m = new Matrix4().makeTranslation(
           base.x + ox * HEX_SIZE,
-          base.y + 4 + ht * 7 + (h % 4),
+          surfaceY + 4 + ht * 7 + (h % 4),
           base.z + oz * HEX_SIZE,
         );
         m.scale(new Vector3(1, ht, 1));
         clusterMesh.setMatrixAt(bldIdx++, m);
 
         // Triangular roof on top
-        const roofY = base.y + 4 + ht * 7 + (h % 4) + HEX_SIZE * 0.28 * ht * 0.5 + HEX_SIZE * 0.04;
+        const roofY = surfaceY + 4 + ht * 7 + (h % 4) + HEX_SIZE * 0.28 * ht * 0.5 + HEX_SIZE * 0.04;
         const roofM = new Matrix4().makeTranslation(
           base.x + ox * HEX_SIZE,
           roofY,
@@ -441,7 +443,7 @@ export function rebuildCityClusters(
 
       // Perimeter wall: ONE closed hexagonal ring centered on the city,
       // sitting on top of the plaza (plaza top ≈ base.y + 1.5 + HEX_SIZE*0.05).
-      const wallY = base.y + 4.2;
+      const wallY = surfaceY + PROP_SURFACE_CLEARANCE;
       {
         const m = new Matrix4().makeTranslation(base.x, wallY, base.z);
         // Scale Y by wall completeness: 0 = fully underground, 1 = full height.
@@ -474,6 +476,7 @@ export function rebuildCityClusters(
         const tile = getTile(tileKey(city.coord));
         const elev = tile ? terrainElevation(tile.terrain) : 0;
         const base = axialToWorld3D(city.coord.q, city.coord.r, elev);
+        const surfaceY = tile ? terrainSurfaceY(tile) : base.y;
         const h = hashCoord(city.coord.q, city.coord.r);
         for (let si = 0; si < satellitesPerCapital; si++) {
           const angle = satAngles[si]! + (h % 6) * (Math.PI / 3);
@@ -481,10 +484,10 @@ export function rebuildCityClusters(
           const sx = base.x + Math.cos(angle) * r;
           const sz = base.z + Math.sin(angle) * r;
           const ht = 0.58 + ((h >> si) % 3) * 0.09;
-          const m = new Matrix4().makeTranslation(sx, base.y + 4 + ht * 7, sz);
+          const m = new Matrix4().makeTranslation(sx, surfaceY + 4 + ht * 7, sz);
           m.scale(new Vector3(1, ht, 1));
           clusterMesh.setMatrixAt(bldIdx++, m);
-          const roofY = base.y + 4 + ht * 7 + HEX_SIZE * 0.28 * ht * 0.5 + HEX_SIZE * 0.04;
+          const roofY = surfaceY + 4 + ht * 7 + HEX_SIZE * 0.28 * ht * 0.5 + HEX_SIZE * 0.04;
           const roofM = new Matrix4().makeTranslation(sx, roofY, sz);
           const rot = new Quaternion().setFromAxisAngle(
             new Vector3(0, 1, 0),
@@ -624,12 +627,13 @@ export function rebuildCityClusters(
       const tile = getTile(tileKey(city.coord));
       const elev = tile ? terrainElevation(tile.terrain) : 0;
       const base = axialToWorld3D(city.coord.q, city.coord.r, elev);
+      const surfaceY = tile ? terrainSurfaceY(tile) : base.y;
 
       // Main building — taller so the capital silhouette dominates
-      capitalMesh.setMatrixAt(bldIdx++, new Matrix4().makeTranslation(base.x, base.y + 16, base.z));
+      capitalMesh.setMatrixAt(bldIdx++, new Matrix4().makeTranslation(base.x, surfaceY + 16, base.z));
 
       // Roof on main building
-      const roofY = base.y + 16 + HEX_SIZE * 0.55 * 0.5 + HEX_SIZE * 0.08;
+      const roofY = surfaceY + 16 + HEX_SIZE * 0.55 * 0.5 + HEX_SIZE * 0.08;
       const roofM = new Matrix4().makeTranslation(base.x, roofY, base.z);
       capitalRoofMesh.setMatrixAt(roofIdx++, roofM);
 
@@ -639,7 +643,7 @@ export function rebuildCityClusters(
       capitalDomeMesh.setMatrixAt(bldIdx - 1, domeM); // reuse index
 
       // Continuous hexagonal wall ring — one instance, no gaps.
-      const wallY = base.y + 5.5;
+      const wallY = surfaceY + PROP_SURFACE_CLEARANCE;
       const wallM = new Matrix4().makeTranslation(base.x, wallY, base.z);
       capitalWallMesh.setMatrixAt(wallIdx++, wallM);
 

@@ -32,6 +32,7 @@ import { type Tile } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+import { PROP_SURFACE_CLEARANCE, terrainSurfaceY } from './terrainSurfaceY.ts';
 
 const wonderGroup = new Group();
 wonderGroup.name = 'wonder-props';
@@ -451,9 +452,7 @@ export function rebuildWonderProps(tiles: Tile[]): void {
 
     // Painted Blender GLBs once loaded; procedural silhouettes until then.
     const glbReady = glbState === 'ready' && glbVariants !== null;
-    // Y align with city props (base.y + 4.2) so wonders sit flush on the
-    // tile surface — not buried under the terrain mesh's FBM noise.
-    const wonderY = pos.y + 4.2;
+    const wonderY = terrainSurfaceY(tile) + PROP_SURFACE_CLEARANCE;
     if (tile.district.wonderType === 'bibliotheca') {
       const inst = glbReady ? buildGlbWonder('bibliotheca') : buildBibliotheca();
       inst.position.set(pos.x, wonderY, pos.z);

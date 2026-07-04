@@ -12,6 +12,7 @@ import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { cityLevel } from './CityCluster3D.ts';
+import { PROP_SURFACE_CLEARANCE, terrainSurfaceY } from './terrainSurfaceY.ts';
 
 const propsGroup = new Group();
 propsGroup.name = 'city-props';
@@ -122,6 +123,8 @@ export function rebuildCityProps(
   byVariant.forEach((group, vi) => {
     if (group.length === 0) return;
     const variant = variants![vi]!;
+    variant.geometry.computeBoundingBox();
+    const minY = variant.geometry.boundingBox?.min.y ?? 0;
     const mesh = new InstancedMesh(variant.geometry, variant.materials, group.length);
     mesh.castShadow = true;
     mesh.receiveShadow = false;
@@ -133,9 +136,14 @@ export function rebuildCityProps(
       const h = hashCoord(city.coord.q, city.coord.r);
       const rotSteps = h % 6;
       const [ox, oz] = offset;
-      pos.set(base.x + ox * HEX_SIZE, base.y + 4.2, base.z + oz * HEX_SIZE);
+      const localX = ox * HEX_SIZE;
+      const localZ = oz * HEX_SIZE;
       quat.setFromAxisAngle(up, rotSteps * (Math.PI / 3));
       const s = HEX_SIZE * scale;
+      const y = tile
+        ? terrainSurfaceY(tile, localX, localZ) - minY * s + PROP_SURFACE_CLEARANCE
+        : base.y - minY * s + PROP_SURFACE_CLEARANCE;
+      pos.set(base.x + localX, y, base.z + localZ);
       scl.set(s, s, s);
       matrix.compose(pos, quat, scl);
       mesh.setMatrixAt(i, matrix);

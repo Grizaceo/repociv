@@ -21,6 +21,7 @@ import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { areUnitPropsReady, getUnitPropParts } from './UnitProps3D.ts';
+import { terrainSurfaceY } from './terrainSurfaceY.ts';
 
 const unitGroup = new Group();
 unitGroup.name = 'units';
@@ -53,11 +54,15 @@ interface UnitEntry {
   pathProgress: number;
   /** Elevation getter for path positions. */
   getTileElev: (q: number, r: number) => number;
+  /** Shader-mirrored visual surface Y getter for path positions. */
+  getTileSurfaceY: (q: number, r: number) => number;
 }
 
 export type { UnitEntry, UnitLifeState };
 
 const unitEntries = new Map<string, UnitEntry>();
+
+const UNIT_SURFACE_CLEARANCE = HEX_SIZE * 0.04;
 
 export function getUnitGroup(): Group {
   return unitGroup;
@@ -226,11 +231,11 @@ export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | und
     const tile = getTile(tileKey(unit.coord));
     const elev = tile ? terrainElevation(tile.terrain) : 0;
     const pos = axialToWorld3D(unit.coord.q, unit.coord.r, elev);
-    // GLB worker has feet at Z=0 (origin at bottom of bounding box).
-    // The hex prism top face sits at pos.y (Y=0 local in the geometry),
-    // so pos.y alone puts the worker standing on the tile surface.
-    // A tiny lift (HEX_SIZE * 0.02) prevents Z-fighting with the terrain cap.
-    const targetY = pos.y + HEX_SIZE * 0.02;
+    // CPU mirror of the shader-displaced terrain top. The old pos.y-only
+    // placement ignored FBM dunes/ridges, so units sank into hills/desert.
+    const targetY = tile
+      ? terrainSurfaceY(tile) + UNIT_SURFACE_CLEARANCE
+      : pos.y + UNIT_SURFACE_CLEARANCE;
 
     const existing = unitEntries.get(unit.id);
     if (existing && existing.lifeState !== 'despawning') {
@@ -281,6 +286,11 @@ export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | und
       getTileElev: (q: number, r: number) => {
         const t = getTile(tileKey({ q, r }));
         return t ? terrainElevation(t.terrain) : 0;
+      },
+      getTileSurfaceY: (q: number, r: number) => {
+        const t = getTile(tileKey({ q, r }));
+        if (!t) return axialToWorld3D(q, r, 0).y + UNIT_SURFACE_CLEARANCE;
+        return terrainSurfaceY(t) + UNIT_SURFACE_CLEARANCE;
       },
     };
     unitEntries.set(unit.id, entry);
@@ -387,7 +397,7 @@ export function tickUnits(
             const dest = entry.path[entry.path.length - 1]!;
             const destElev = entry.getTileElev(dest.q, dest.r);
             const destPos = axialToWorld3D(dest.q, dest.r, destElev);
-            const destY = destPos.y + HEX_SIZE * 0.05;
+            const destY = entry.getTileSurfaceY(dest.q, dest.r);
             entry.currentPos = { x: destPos.x, y: destY, z: destPos.z };
             entry.moving = false;
           }
@@ -401,7 +411,9 @@ export function tickUnits(
           const toPos = axialToWorld3D(to.q, to.r, toElev);
           const t = easeInOutSine(entry.pathProgress);
           const x = fromPos.x + (toPos.x - fromPos.x) * t;
-          const y = fromPos.y + (toPos.y - fromPos.y) * t + HEX_SIZE * 0.05;
+          const fromY = entry.getTileSurfaceY(from.q, from.r);
+          const toY = entry.getTileSurfaceY(to.q, to.r);
+          const y = fromY + (toY - fromY) * t;
           const z = fromPos.z + (toPos.z - fromPos.z) * t;
           entry.currentPos = { x, y, z };
         }
