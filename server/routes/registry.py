@@ -60,6 +60,12 @@ GET_EXACT: dict[str, Callable[..., Any]] = {
     "/api/foreign/reports": _routes.get_reports,
     "/api/labhub/status": _routes.get_labhub_status,
     "/api/profiles": _routes.get_profiles,
+    # Onboarding: multi-root + repo selections
+    "/api/map-roots": _routes.get_map_roots,
+    "/api/map-root": _routes.get_map_root,
+    "/api/repo-selections": _routes.get_repo_selections,
+    "/api/repos": _routes.get_scanned_repos,
+    "/api/repos/selected": _routes.get_selected_repos,
 }
 
 # ── POST: no path params, matched by exact string ──────────────────────────────
@@ -86,4 +92,13 @@ POST_EXACT: dict[str, Callable[..., Any]] = {
     "/api/profiles": _routes.post_profiles,
     "/api/profiles/delete": _routes.post_profiles_delete,
     "/api/wonders/connect": _routes.post_wonder_connect,
+    # Onboarding POST: multi-root + repo selections
+    "/api/map-roots": _routes.post_add_map_root,
+    "/api/map-roots/activate": _routes.post_activate_map_root,
+    "/api/map-roots/remove": _routes.post_remove_map_root,
+    "/api/map-roots/pick": _routes.post_pick_map_root,
+    "/api/map-root/pick": _routes.post_pick_map_root,
+    "/api/repo-selections": _routes.post_persist_selection,
+    "/api/repo-selections/add": _routes.post_add_selected_repo,
+    "/api/repo-selections/remove": _routes.post_remove_selected_repo,
 }
