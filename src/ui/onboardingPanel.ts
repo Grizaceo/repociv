@@ -1,6 +1,6 @@
 import {
   fetchRepoSelectionState,
-  fetchAllRootsRepos,
+  fetchScannedRepos,
   loadSelectedRepoPaths,
   persistRootSelection,
   saveSelectedRepoPaths,
@@ -738,10 +738,10 @@ async function hydrateRepos(state: OnboardingState, onContinue: () => void): Pro
   state.error = null;
   render(state, onContinue);
   try {
-    // Fetch repos from ALL registered roots, not just the active one.
-    // This enables true multi-root selection: you see repos from every
-    // folder you've added simultaneously.
-    state.repos = sortRepos(await fetchAllRootsRepos());
+    // /api/repos (vite plugin) already scans ALL registered roots and
+    // returns the union with deduplication. No need for a separate
+    // all-roots endpoint.
+    state.repos = sortRepos(await fetchScannedRepos());
 
     // Load selections from all roots and merge them — the user's
     // accumulated selection across roots is preserved.
@@ -751,11 +751,25 @@ async function hydrateRepos(state: OnboardingState, onContinue: () => void): Pro
       for (const p of root.selectedRepoPaths) allSelected.add(p);
     }
 
-    // Keep only paths that exist in the scanned repos
-    const availablePaths = new Set(state.repos.map((repo) => repo.path));
-    const keptSelection = new Set(
-      [...allSelected].filter((path) => availablePaths.has(path)),
-    );
+    // selectedRepoPaths from the state are absolute filesystem paths.
+    // repo.path is an encoded repo ID (repo:base64). We need to match
+    // against repo.repoPath (the absolute path) instead.
+    const availableByPath = new Map<string, ScannedRepo>();
+    for (const repo of state.repos) {
+      if (repo.repoPath) availableByPath.set(repo.repoPath, repo);
+    }
+    const keptSelection = new Set<string>();
+    for (const selectedPath of allSelected) {
+      // The selection may store either encoded IDs or absolute paths.
+      // Match against both repo.path (encoded) and repo.repoPath (absolute).
+      if (state.repos.some((r) => r.path === selectedPath)) {
+        keptSelection.add(selectedPath);
+      } else if (availableByPath.has(selectedPath)) {
+        // Map the absolute path back to the encoded repo ID for consistency
+        const repo = availableByPath.get(selectedPath)!;
+        keptSelection.add(repo.path);
+      }
+    }
 
     state.selected =
       keptSelection.size > 0 || state.repos.length === 0

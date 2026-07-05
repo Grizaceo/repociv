@@ -188,21 +188,3 @@ def post_graph_relations_refresh(body: dict[str, Any], _ctx: dict[str, Any]) -> 
     else:
         result = _gr.build_or_refresh_index(repo_paths)
         return 200, result
-
-# ── Onboarding routes (multi-root + repo selections) ──────────────────────────────
-
-from server.routes.onboarding import (  # noqa: E402
-    get_map_roots,
-    get_map_root,
-    get_repo_selections,
-    get_scanned_repos,
-    get_selected_repos,
-    get_all_roots_repos,
-    post_add_map_root,
-    post_activate_map_root,
-    post_remove_map_root,
-    post_pick_map_root,
-    post_persist_selection,
-    post_add_selected_repo,
-    post_remove_selected_repo,
-)
