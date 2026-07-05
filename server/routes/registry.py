@@ -66,6 +66,7 @@ GET_EXACT: dict[str, Callable[..., Any]] = {
     "/api/repo-selections": _routes.get_repo_selections,
     "/api/repos": _routes.get_scanned_repos,
     "/api/repos/selected": _routes.get_selected_repos,
+    "/api/repos/all-roots": _routes.get_all_roots_repos,
 }
 
 # ── POST: no path params, matched by exact string ──────────────────────────────

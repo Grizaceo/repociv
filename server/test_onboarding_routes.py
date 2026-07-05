@@ -14,6 +14,7 @@ from server.routes.onboarding import (
     get_repo_selections,
     get_scanned_repos,
     get_selected_repos,
+    get_all_roots_repos,
     post_add_map_root,
     post_activate_map_root,
     post_remove_map_root,
@@ -351,5 +352,47 @@ def test_get_selected_repos_empty_selection(
     _rrs.add_root(str(fake_workspace))
     _rrs.set_active_root(str(fake_workspace))
     status, body = get_selected_repos({})
+    assert status == 200
+    assert body["repos"] == []
+
+
+def test_get_all_roots_repos_multiroot(
+    isolated_state: Path, fake_workspace: Path
+) -> None:
+    """GET /api/repos/all-roots returns repos from ALL roots, not just active."""
+    # Create a second fake workspace
+    second_root = fake_workspace.parent / "second_workspace"
+    second_root.mkdir()
+    (second_root / "repo-gamma").mkdir()
+    (second_root / "repo-gamma" / ".git").mkdir()
+    (second_root / "repo-delta").mkdir()
+
+    _rrs.add_root(str(fake_workspace))
+    _rrs.add_root(str(second_root))
+
+    # Don't set active root to second — the point is we get repos from both
+    status, body = get_all_roots_repos({})
+    assert status == 200
+    repos = body["repos"]
+    names = [r["name"] for r in repos]
+    # Should have repos from BOTH roots
+    assert "repo-alpha" in names  # from fake_workspace
+    assert "repo-beta" in names   # from fake_workspace
+    assert "repo-gamma" in names  # from second_root
+    assert "repo-delta" in names  # from second_root
+    # Each repo should have rootPath set
+    for r in repos:
+        assert "rootPath" in r
+        assert r["rootPath"]  # non-empty
+    # Verify rootPath matches the actual root
+    alpha = [r for r in repos if r["name"] == "repo-alpha"][0]
+    gamma = [r for r in repos if r["name"] == "repo-gamma"][0]
+    assert alpha["rootPath"] == str(fake_workspace)
+    assert gamma["rootPath"] == str(second_root)
+
+
+def test_get_all_roots_repos_empty(isolated_state: Path) -> None:
+    """No roots registered → empty list."""
+    status, body = get_all_roots_repos({})
     assert status == 200
     assert body["repos"] == []

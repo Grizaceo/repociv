@@ -242,6 +242,25 @@ def get_selected_repos(ctx: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     return _ok({"repos": filtered})
 
 
+def get_all_roots_repos(ctx: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    """GET /api/repos/all-roots — scan ALL registered roots and return the union.
+
+    Each repo dict includes ``rootPath`` so the UI can group by root.
+    This is the endpoint the onboarding panel uses for true multi-root
+    selection: you see repos from every folder you've added, not just
+    the active one.
+    """
+    state = load_state()
+    roots = state.get("roots", {})
+    all_repos: list[dict[str, Any]] = []
+    for root_path in roots:
+        repos = _scan_repos_in_root(root_path)
+        for r in repos:
+            r["rootPath"] = root_path
+        all_repos.extend(repos)
+    return _ok({"repos": all_repos})
+
+
 # ── POST handlers ──────────────────────────────────────────────────────────────
 
 

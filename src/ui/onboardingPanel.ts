@@ -1,7 +1,6 @@
 import {
   fetchRepoSelectionState,
-  fetchScannedRepos,
-  fetchSelectionForRoot,
+  fetchAllRootsRepos,
   loadSelectedRepoPaths,
   persistRootSelection,
   saveSelectedRepoPaths,
@@ -149,6 +148,16 @@ function getOwnerPath(repo: ScannedRepo): string {
   return parts.slice(0, -1).join('/');
 }
 
+function groupReposByRoot(repos: ScannedRepo[]): Map<string, ScannedRepo[]> {
+  const groups = new Map<string, ScannedRepo[]>();
+  for (const repo of repos) {
+    const key = repo.rootPath ?? getOwnerPath(repo);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(repo);
+  }
+  return groups;
+}
+
 function ensureRoot(): HTMLElement {
   const existing = document.getElementById(ROOT_ID);
   if (existing) return existing;
@@ -244,6 +253,59 @@ function nextDisabled(
   }
   if (selectedCount === 0 || state.isLoading || !!state.error || emptyRepos) return 'disabled';
   return '';
+}
+
+function renderRepoListGrouped(filtered: ScannedRepo[], state: OnboardingState): string {
+  const groups = groupReposByRoot(filtered);
+  if (groups.size <= 1) {
+    // Single root — no grouping needed, flat list
+    return filtered
+      .map((repo) => {
+        const checked = state.selected.has(repo.path) ? 'checked' : '';
+        return `<label class="repo-onboarding-item">
+          <input type="checkbox" data-repo-path="${repo.path}" ${checked} />
+          <div class="repo-onboarding-item-main">
+            <div class="repo-onboarding-item-title">${repo.name}</div>
+            <div class="repo-onboarding-item-sub">${getOwnerPath(repo)}</div>
+          </div>
+          <div class="repo-onboarding-item-meta">${formatActivity(repo.lastCommitDays)}</div>
+        </label>`;
+      })
+      .join('');
+  }
+  // Multiple roots — group with headers
+  const sections: string[] = [];
+  for (const [rootPath, repos] of groups) {
+    const label = rootPath.split('/').filter(Boolean).pop() ?? rootPath;
+    const allChecked = repos.every((r) => state.selected.has(r.path));
+    const someChecked = repos.some((r) => state.selected.has(r.path));
+    const indeterminate = someChecked && !allChecked;
+    const items = repos
+      .map((repo) => {
+        const checked = state.selected.has(repo.path) ? 'checked' : '';
+        return `<label class="repo-onboarding-item">
+          <input type="checkbox" data-repo-path="${repo.path}" ${checked} />
+          <div class="repo-onboarding-item-main">
+            <div class="repo-onboarding-item-title">${repo.name}</div>
+            <div class="repo-onboarding-item-sub">${getOwnerPath(repo)}</div>
+          </div>
+          <div class="repo-onboarding-item-meta">${formatActivity(repo.lastCommitDays)}</div>
+        </label>`;
+      })
+      .join('');
+    sections.push(`<div class="repo-onboarding-root-group">
+      <div class="repo-onboarding-root-group-header">
+        <label class="repo-onboarding-root-group-toggle">
+          <input type="checkbox" class="root-group-select-all" data-root-path="${rootPath}"
+            ${allChecked ? 'checked' : ''} ${indeterminate ? 'data-indeterminate="1"' : ''} />
+          <span class="repo-onboarding-root-group-label">${label}</span>
+        </label>
+        <span class="repo-onboarding-root-group-count">${repos.length} repos</span>
+      </div>
+      <div class="repo-onboarding-root-group-items">${items}</div>
+    </div>`);
+  }
+  return sections.join('');
 }
 
 function render(state: OnboardingState, onContinue: () => void): void {
@@ -344,19 +406,7 @@ function render(state: OnboardingState, onContinue: () => void): void {
                         <p>No hay resultados para esa busqueda.</p>
                         <button id="repo-onboarding-clear-search" class="btn-secondary" type="button">Limpiar busqueda</button>
                       </div>`
-                    : filtered
-                        .map((repo) => {
-                          const checked = state.selected.has(repo.path) ? 'checked' : '';
-                          return `<label class="repo-onboarding-item">
-                            <input type="checkbox" data-repo-path="${repo.path}" ${checked} />
-                            <div class="repo-onboarding-item-main">
-                              <div class="repo-onboarding-item-title">${repo.name}</div>
-                              <div class="repo-onboarding-item-sub">${getOwnerPath(repo)}</div>
-                            </div>
-                            <div class="repo-onboarding-item-meta">${formatActivity(repo.lastCommitDays)}</div>
-                          </label>`;
-                        })
-                        .join('')
+                    : renderRepoListGrouped(filtered, state)
           }
         </div> `;
 
@@ -454,7 +504,25 @@ function render(state: OnboardingState, onContinue: () => void): void {
       ?.addEventListener('click', () => {
         void (async () => {
           try {
-            const union = await persistRootSelection(state.mapRoot, [...state.selected]);
+            // Multi-root persist: group selected repos by their rootPath
+            // and save each group to its corresponding root.
+            const byRoot = new Map<string, string[]>();
+            for (const repo of state.repos) {
+              if (!state.selected.has(repo.path)) continue;
+              const rootPath = repo.rootPath ?? state.mapRoot;
+              if (!byRoot.has(rootPath)) byRoot.set(rootPath, []);
+              byRoot.get(rootPath)!.push(repo.path);
+            }
+            // If no rootPath info (legacy), fall back to active root
+            if (byRoot.size === 0 && state.selected.size > 0) {
+              byRoot.set(state.mapRoot, [...state.selected]);
+            }
+            // Persist each root's selection
+            let union: Set<string> = new Set();
+            for (const [rootPath, repoIds] of byRoot) {
+              const result = await persistRootSelection(rootPath, repoIds);
+              union = new Set([...union, ...result]);
+            }
             saveSelectedRepoPaths([...union]);
             root.dataset.closed = '1';
             root.remove();
@@ -505,7 +573,7 @@ function render(state: OnboardingState, onContinue: () => void): void {
         try {
           state.mapRoot = await pickMapRoot();
           state.query = '';
-          state.selected.clear();
+          // NOTE: intentionally do NOT clear selection — multi-root accumulates
           await hydrateRepos(state, onContinue);
         } catch (error) {
           state.error = `No pudimos abrir el selector de carpetas (${error instanceof Error ? error.message : 'error desconocido'}).`;
@@ -558,7 +626,8 @@ function render(state: OnboardingState, onContinue: () => void): void {
       })();
     });
 
-  // Activate root
+  // Activate root — does NOT clear selection (multi-root: you keep
+  // your selections from other roots and add more from this one)
   root.querySelectorAll<HTMLButtonElement>('[data-activate-root]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const rootPath = btn.dataset['activateRoot'];
@@ -568,7 +637,8 @@ function render(state: OnboardingState, onContinue: () => void): void {
           await activateMapRoot(rootPath);
           state.mapRoot = rootPath;
           state.query = '';
-          state.selected.clear();
+          // NOTE: intentionally do NOT clear state.selected —
+          // the user's selections from other roots are preserved.
           await hydrateRoots(state, onContinue);
           await hydrateRepos(state, onContinue);
         } catch (error) {
@@ -627,6 +697,32 @@ function render(state: OnboardingState, onContinue: () => void): void {
     });
   });
 
+  // ── Select-all-in-group toggles (multi-root grouping) ────────────────────
+  root.querySelectorAll<HTMLInputElement>('.root-group-select-all').forEach((toggle) => {
+    // Set indeterminate state if needed
+    if (toggle.dataset['indeterminate'] === '1') {
+      toggle.indeterminate = true;
+    }
+    toggle.addEventListener('change', () => {
+      const groupRoot = toggle.dataset['rootPath'];
+      if (!groupRoot) return;
+      const groupRepos = state.repos.filter(
+        (r) => (r.rootPath ?? getOwnerPath(r)) === groupRoot,
+      );
+      if (toggle.checked) {
+        for (const r of groupRepos) state.selected.add(r.path);
+      } else {
+        for (const r of groupRepos) state.selected.delete(r.path);
+      }
+      const countNode = root.querySelector('.repo-onboarding-count');
+      if (countNode) countNode.textContent = `${state.selected.size} seleccionados`;
+      const nextButton = root.querySelector<HTMLButtonElement>('#repo-onboarding-next');
+      if (nextButton) nextButton.disabled = state.selected.size === 0;
+      // Re-render to update individual checkboxes
+      render(state, onContinue);
+    });
+  });
+
   root.querySelector<HTMLButtonElement>('#repo-onboarding-next')?.addEventListener('click', () => {
     state.step = 'review';
     render(state, onContinue);
@@ -642,13 +738,25 @@ async function hydrateRepos(state: OnboardingState, onContinue: () => void): Pro
   state.error = null;
   render(state, onContinue);
   try {
-    state.repos = sortRepos(await fetchScannedRepos());
-    const rootSelection = await fetchSelectionForRoot(state.mapRoot);
-    const previousSelection = rootSelection.size > 0 ? rootSelection : new Set(state.selected);
+    // Fetch repos from ALL registered roots, not just the active one.
+    // This enables true multi-root selection: you see repos from every
+    // folder you've added simultaneously.
+    state.repos = sortRepos(await fetchAllRootsRepos());
+
+    // Load selections from all roots and merge them — the user's
+    // accumulated selection across roots is preserved.
+    const selectionState = await fetchRepoSelectionState();
+    const allSelected = new Set<string>();
+    for (const root of selectionState.roots) {
+      for (const p of root.selectedRepoPaths) allSelected.add(p);
+    }
+
+    // Keep only paths that exist in the scanned repos
     const availablePaths = new Set(state.repos.map((repo) => repo.path));
     const keptSelection = new Set(
-      [...previousSelection].filter((path) => availablePaths.has(path)),
+      [...allSelected].filter((path) => availablePaths.has(path)),
     );
+
     state.selected =
       keptSelection.size > 0 || state.repos.length === 0
         ? keptSelection

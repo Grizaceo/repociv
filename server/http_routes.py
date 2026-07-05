@@ -197,6 +197,7 @@ from server.routes.onboarding import (  # noqa: E402
     get_repo_selections,
     get_scanned_repos,
     get_selected_repos,
+    get_all_roots_repos,
     post_add_map_root,
     post_activate_map_root,
     post_remove_map_root,

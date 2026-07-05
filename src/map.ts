@@ -512,6 +512,13 @@ export async function fetchScannedRepos(): Promise<ScannedRepo[]> {
   return (await res.json()) as ScannedRepo[];
 }
 
+export async function fetchAllRootsRepos(): Promise<ScannedRepo[]> {
+  const res = await fetch('/api/repos/all-roots');
+  if (!res.ok) throw new Error(`/api/repos/all-roots HTTP ${res.status}`);
+  const data = (await res.json()) as { repos: ScannedRepo[] };
+  return data.repos;
+}
+
 export async function fetchSelectedRepos(): Promise<ScannedRepo[]> {
   const res = await fetch('/api/repos/selected');
   if (!res.ok) throw new Error(`/api/repos/selected HTTP ${res.status}`);

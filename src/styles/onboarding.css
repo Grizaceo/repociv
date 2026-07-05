@@ -605,3 +605,49 @@
 }
 
 /* Cursor crosshair for placing mode is set inline by renderer */
+
+/* ── Multi-root grouping ──────────────────────────────────────────────────── */
+
+.repo-onboarding-root-group {
+  margin-bottom: 12px;
+  border: 1px solid rgba(200, 168, 75, 0.2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.repo-onboarding-root-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: rgba(200, 168, 75, 0.08);
+  border-bottom: 1px solid rgba(200, 168, 75, 0.15);
+}
+
+.repo-onboarding-root-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ui-text, #e8d5a0);
+}
+
+.repo-onboarding-root-group-toggle input[type="checkbox"] {
+  accent-color: var(--ui-gold, #c8a84b);
+}
+
+.repo-onboarding-root-group-label {
+  user-select: none;
+}
+
+.repo-onboarding-root-group-count {
+  font-size: 11px;
+  color: var(--ui-text-dim, #a89060);
+  white-space: nowrap;
+}
+
+.repo-onboarding-root-group-items {
+  padding: 4px 0;
+}
