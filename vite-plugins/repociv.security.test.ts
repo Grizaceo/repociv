@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  fetchBridgeFileTree,
   isTrustedJsonMutation,
   resolveRepoPathFromId,
   resolveRepoRelativeFile,
@@ -178,6 +179,34 @@ describe('Vite mutation authentication boundary', () => {
         '',
       ),
     ).toBe(false);
+  });
+});
+
+describe('Vite file API bridge ownership', () => {
+  it('proxies the exact file route with the configured token', async () => {
+    const calls: Array<[string | URL | Request, RequestInit | undefined]> = [];
+    const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      calls.push([input, init]);
+      return new Response(JSON.stringify({ files: ['src/main.ts'] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    const response = await fetchBridgeFileTree(
+      '/api/files/repo%3Aabc',
+      'http://127.0.0.1:5274',
+      'test-token',
+      fakeFetch,
+    );
+
+    expect(response.status).toBe(200);
+    expect(calls).toEqual([
+      [
+        'http://127.0.0.1:5274/api/files/repo%3Aabc',
+        { headers: { 'X-RepoCiv-Token': 'test-token' } },
+      ],
+    ]);
   });
 });
 

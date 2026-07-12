@@ -187,6 +187,7 @@ def _migrate_legacy_default_harness() -> None:
     of "claude", the upgraded registry has one entry: "claude" → claude.
     """
     marker = _config_path().parent / _LEGACY_MIGRATION_MARKER
+    marker.parent.mkdir(parents=True, exist_ok=True)
     if marker.exists():
         return
     raw = _read_raw()

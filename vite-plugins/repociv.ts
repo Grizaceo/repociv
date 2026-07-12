@@ -539,6 +539,17 @@ function respondJson(
 
 // ─── Main plugin factory ──────────────────────────────────────────────────────
 
+export async function fetchBridgeFileTree(
+  rawUrl: string,
+  bridgeBase: string,
+  token: string,
+  fetcher: typeof fetch = fetch,
+): Promise<Response> {
+  const headers: Record<string, string> = {};
+  if (token) headers['X-RepoCiv-Token'] = token;
+  return fetcher(`${bridgeBase}${rawUrl}`, { headers });
+}
+
 export function repocivPlugin(mapRoot: string): Plugin {
   let server: { ws: { send: (msg: object) => void } } | undefined;
   const expectedToken =
@@ -546,6 +557,10 @@ export function repocivPlugin(mapRoot: string): Plugin {
     process.env['VITE_REPOCIV_TOKEN']?.trim() ??
     process.env['VITE_BRIDGE_TOKEN']?.trim() ??
     '';
+  const bridgeBase = (
+    process.env['REPOCIV_BRIDGE_URL']?.trim() ||
+    `http://127.0.0.1:${process.env['BRIDGE_PORT']?.trim() || '5274'}`
+  ).replace(/\/$/, '');
   const rootsState = ensureRoot(loadState(resolve(mapRoot)), resolve(mapRoot));
   saveState(rootsState);
   const getCurrentMapRoot = () => rootsState.activeRoot;
@@ -1002,38 +1017,18 @@ export function repocivPlugin(mapRoot: string): Plugin {
     }
 
     if (path.startsWith('/api/files/') && req.method === 'GET') {
-      const name = path.slice('/api/files/'.length);
-      const repoPath = resolveSelectedRepoPath(name, rootsState);
-      if (!repoPath || !existsSync(repoPath)) {
-        res.statusCode = 404;
-        res.end(JSON.stringify({ error: 'Not found' }));
-        return;
-      }
       try {
-        const files: string[] = [];
-        const walk = (d: string, rel: string, depth: number) => {
-          if (depth > 3 || files.length > 200) return;
-          for (const e of readdirSync(d)) {
-            if (SKIP_DIRS.has(e) || e.startsWith('.')) continue;
-            const full = join(d, e);
-            let st;
-            try {
-              st = statSync(full);
-            } catch {
-              continue;
-            }
-            const r = rel ? `${rel}/${e}` : e;
-            if (st.isDirectory()) walk(full, r, depth + 1);
-            else files.push(r);
-            if (files.length > 200) return;
-          }
-        };
-        walk(repoPath, '', 0);
+        const upstream = await fetchBridgeFileTree(rawUrl, bridgeBase, expectedToken);
+        res.statusCode = upstream.status;
+        res.setHeader(
+          'Content-Type',
+          upstream.headers.get('content-type') ?? 'application/json',
+        );
+        res.end(Buffer.from(await upstream.arrayBuffer()));
+      } catch (error) {
+        res.statusCode = 502;
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ files }));
-      } catch (e) {
-        res.statusCode = 500;
-        res.end(JSON.stringify({ error: String(e) }));
+        res.end(JSON.stringify({ error: `RepoCiv bridge unavailable: ${String(error)}` }));
       }
       return;
     }

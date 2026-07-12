@@ -1,7 +1,11 @@
 [Unit]
-Description=RepoCiv event store backup
-Documentation=file:%h/.hermes/workspace/repos/repociv/deploy/systemd/README.md
+Description=RepoCiv state/config backup
+Documentation=file:%h/.hermes/workspace/ACTIVE/repociv/deploy/systemd/README.md
+After=repociv-bridge.service
 
 [Service]
 Type=oneshot
-ExecStart=%h/.hermes/workspace/repos/repociv/scripts/repociv-backup.sh
+WorkingDirectory=%h/.hermes/workspace/ACTIVE/repociv
+EnvironmentFile=-%h/.hermes/workspace/ACTIVE/repociv/.env
+ExecStart=%h/.hermes/workspace/ACTIVE/repociv/scripts/repociv-backup.sh
+NoNewPrivileges=true

@@ -25,7 +25,13 @@ from . import event_store as _es
 logger = logging.getLogger(__name__)
 
 # ─── Queue persistence (Fase 4) ──────────────────────────────────────────────
-_CONFIG_DIR = Path(os.path.expanduser(os.environ.get("REPOCIV_CONFIG_DIR", "~/.repociv")))
+_STATE_ROOT = (
+    os.environ.get("REPOCIV_STATE_DIR")
+    or os.environ.get("REPOCIV_DATA_DIR")
+    or os.environ.get("REPOCIV_CONFIG_DIR")
+    or "~/.repociv"
+)
+_CONFIG_DIR = Path(os.path.expanduser(_STATE_ROOT))
 _CONFIG_DIR.mkdir(exist_ok=True, parents=True)
 _QUEUE_FILE = _CONFIG_DIR / "scheduler-queue.json"
 _queue_file_lock = threading.Lock()
@@ -47,7 +53,10 @@ def _load_queue() -> list[dict[str, Any]]:
 def _dump_queue(queue: list[dict[str, Any]]) -> None:
     """Atomically write queue state to disk."""
     with _queue_file_lock:
-        _QUEUE_FILE.write_text(json.dumps(queue, indent=2, ensure_ascii=False))
+        _QUEUE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _QUEUE_FILE.with_suffix(_QUEUE_FILE.suffix + ".tmp")
+        tmp.write_text(json.dumps(queue, indent=2, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, _QUEUE_FILE)
 
 
 def _init_from_disk() -> None:
@@ -55,10 +64,16 @@ def _init_from_disk() -> None:
     global _queue
     persisted = _load_queue()
     terminal = {"completed", "failed", "cancelled", "rejected"}
-    filtered = [c for c in persisted if c.get("status") not in terminal]
+    filtered = [dict(command) for command in persisted if command.get("status") not in terminal]
+    for command in filtered:
+        if command.get("status") in {"running", "dispatching"}:
+            command["status"] = "queued"
+            command.pop("started_at", None)
     with _queue_lock:
         _queue = filtered
         _resort()
+        if filtered != persisted:
+            _dump_queue(_queue)
     n = len(filtered)
     if n:
         logger.info(f"[scheduler] Recovered {n} queued mission(s) from disk.")
@@ -124,24 +139,34 @@ def set_dispatcher(fn: Callable[[dict[str, Any]], None]) -> None:
     _dispatcher = fn
 
 
-def enqueue(cmd: Command) -> None:
-    """Add a command to the priority queue."""
+def enqueue(cmd: Command) -> bool:
+    """Durably add a command once. Return True only for a new queue item."""
     with _queue_lock:
-        _queue.append(asdict(cmd))
-        _resort()
-        _dump_queue(_queue)
+        if any(item.get("id") == cmd.id for item in _queue):
+            return False
+        candidate = [*_queue, asdict(cmd)]
+        candidate[-1]["status"] = "queued"
+        candidate.sort(key=lambda item: _priority_score(item, time.time()), reverse=True)
+        _dump_queue(candidate)
+        _queue[:] = candidate
+    return True
 
 
 def cancel(command_id: str) -> bool:
-    """Remove a queued command. Returns True if found and removed."""
+    """Transactionally remove a queued command. Running commands are not cancelled."""
     with _queue_lock:
-        before = len(_queue)
-        _queue[:] = [c for c in _queue if c.get("id") != command_id]
-        removed = len(_queue) < before
-    if removed:
-        _es.record_failed(command_id, "cancelled by user")
-        _dump_queue(_queue)
-    return removed
+        candidate = [
+            item
+            for item in _queue
+            if not (item.get("id") == command_id and item.get("status", "queued") == "queued")
+        ]
+        removed = len(candidate) < len(_queue)
+        if not removed:
+            return False
+        _dump_queue(candidate)
+        _queue[:] = candidate
+    _es.record_failed(command_id, "cancelled by user")
+    return True
 
 
 def queue_snapshot() -> list[dict[str, Any]]:
@@ -220,29 +245,58 @@ def _release_slot(agent_base: str) -> None:
 
 
 def _dispatch_next() -> bool:
-    """Pick highest-priority queued command that has a free agent slot. Returns True if dispatched."""
+    """Durably mark the highest-priority queued command running, then dispatch it."""
     cmd_to_run: dict[str, Any] | None = None
-    base_to_run: str = ""
+    base_to_run = ""
+    command_id = ""
     with _queue_lock:
         _resort()
-        for i, cmd in enumerate(_queue):
-            unit = cmd.get("payload", {}).get("unit", "MAIN")
+        for index, command in enumerate(_queue):
+            if command.get("status", "queued") != "queued":
+                continue
+            unit = command.get("payload", {}).get("unit", "MAIN")
             base = _agent_base(unit)
-            if _acquire_slot(base):
-                cmd_to_run = dict(_queue.pop(i))  # explicit copy — safe across threads
-                base_to_run = base
-                _dump_queue(_queue)
-                break
+            if not _acquire_slot(base):
+                continue
+            candidate = [dict(item) for item in _queue]
+            candidate[index]["status"] = "running"
+            candidate[index]["started_at"] = time.time()
+            try:
+                _dump_queue(candidate)
+            except Exception:
+                _release_slot(base)
+                raise
+            _queue[:] = candidate
+            cmd_to_run = dict(candidate[index])
+            base_to_run = base
+            command_id = str(cmd_to_run.get("id") or "")
+            break
         else:
             return False
 
     def _run() -> None:
         heartbeat(base_to_run)
-        _es.record_started(cmd_to_run.get("id", ""))
+        _es.record_started(command_id)
         try:
-            if _dispatcher:
-                _dispatcher(cmd_to_run)
+            if _dispatcher is None:
+                raise RuntimeError("scheduler dispatcher is not configured")
+            _dispatcher(cmd_to_run)
+        except Exception as exc:
+            logger.exception("[scheduler] dispatch failed for %s", command_id)
+            _es.record_failed(command_id, str(exc))
         finally:
+            with _queue_lock:
+                candidate = [item for item in _queue if item.get("id") != command_id]
+                try:
+                    _dump_queue(candidate)
+                except Exception:
+                    logger.exception(
+                        "[scheduler] could not persist completion removal for %s; "
+                        "running item remains recoverable",
+                        command_id,
+                    )
+                else:
+                    _queue[:] = candidate
             _release_slot(base_to_run)
             heartbeat(base_to_run)
 

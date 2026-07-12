@@ -7,7 +7,7 @@ Servicios systemd para ejecutar RepoCiv de forma permanente en WSL.
 - `repociv-bridge.service`: Backend API (Python, puerto 5274)
 - `repociv-frontend.service`: Vite dev server (Node, puerto 5273)
 - `repociv.target`: Target combinado para gestionar ambos servicios juntos
-- `repociv-backup.service` + `repociv-backup.timer`: backup cada 6h de `~/.repociv`
+- `repociv-backup.service` + `repociv-backup.timer`: snapshot verificable cada 6h de state, config y selección de repos
 
 ## Instalación
 
@@ -76,11 +76,11 @@ systemctl --user restart repociv.target
 
 ### Permisos de escritura
 
-Si hay errores de "Read-only file system" en ~/.repociv:
+Si hay errores de "Read-only file system" en los directorios configurados por `REPOCIV_STATE_DIR`, `REPOCIV_CONFIG_DIR` o `REPOCIV_BACKUP_DIR`:
 
-1. Verificar que ProtectHome=no esté en los service files
-2. Verificar permisos: `ls -la ~/.repociv`
-3. Corregir: `chmod 755 ~/.repociv`
+1. Verificar las rutas efectivas en `.env`.
+2. Verificar que el usuario del servicio tenga lectura/escritura.
+3. Ejecutar `systemctl --user start repociv-backup.service` y revisar `ExecMainStatus=0`.
 
 ### Logs completos
 
@@ -94,7 +94,7 @@ Los servicios están configurados con:
 - `Restart=on-failure`: Reinicio automático en caso de fallo
 - `RestartSec=5`: Espera 5 segundos entre reintentos
 - Habilitados en el user session: sobreviven a reboot de WSL
-- `repociv-backup.timer`: respalda `events.jsonl`, `missions.json`, `scheduler-queue.json`, `directive_records.jsonl` y `directive_templates.json` en `~/.repociv/backups/`, con rotación de 30 días.
+- `repociv-backup.timer`: respalda el state root completo relevante (events, missions, approvals, scheduler, sessions, run-state, ledger), config (`profiles.json`) y el registro Vite de roots/repos. Cada snapshot incluye `SHA256SUMS`, se publica atómicamente y rota a 30 días.
 
 ## Healthcheck
 

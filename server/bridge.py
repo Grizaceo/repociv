@@ -123,7 +123,13 @@ def _ensure_port_free(host: str, port: int, label: str) -> None:
     finally:
         probe.close()
 
-CONFIG_DIR = Path(os.path.expanduser(os.environ.get("REPOCIV_CONFIG_DIR", "~/.repociv")))
+_STATE_ROOT = (
+    os.environ.get("REPOCIV_STATE_DIR")
+    or os.environ.get("REPOCIV_DATA_DIR")
+    or os.environ.get("REPOCIV_CONFIG_DIR")
+    or "~/.repociv"
+)
+CONFIG_DIR = Path(os.path.expanduser(_STATE_ROOT))
 MISSIONS_FILE = CONFIG_DIR / "missions.json"
 HERMES_ROOT = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", "~/.hermes")))
 

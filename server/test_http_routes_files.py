@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+from pathlib import Path
 
 from server import http_routes
 from server.routes import foreign as foreign_routes
@@ -12,9 +13,16 @@ def _encode_repo_id(path: str) -> str:
 
 
 def _write_state(monkeypatch, tmp_path, root: str) -> None:
+    selected = [str(entry) for entry in Path(root).iterdir() if entry.is_dir() or entry.is_symlink()]
     state_file = tmp_path / "state.json"
     state_file.write_text(
-        json.dumps({"version": 1, "activeRoot": root, "roots": {root: {"selectedRepoPaths": []}}}),
+        json.dumps(
+            {
+                "version": 1,
+                "activeRoot": root,
+                "roots": {root: {"selectedRepoPaths": selected}},
+            }
+        ),
         encoding="utf-8",
     )
     monkeypatch.setenv("REPOCIV_STATE_FILE", str(state_file))
@@ -67,7 +75,7 @@ def test_get_repo_file_tree_rejects_repo_symlink_outside_root(monkeypatch, tmp_p
     status, body = http_routes.get_repo_file_tree({"path": "/api/files/evil"})
 
     assert status == 403
-    assert "outside allowed root" in body["error"]
+    assert "must be selected" in body["error"]
 
 
 def test_get_repo_file_tree_skips_symlink_escape_inside_repo(monkeypatch, tmp_path):
@@ -102,7 +110,7 @@ def test_get_repo_file_tree_rejects_encoded_path_outside_root(monkeypatch, tmp_p
     status, body = http_routes.get_repo_file_tree({"path": f"/api/files/{repo_id}"})
 
     assert status == 403
-    assert "outside allowed root" in body["error"]
+    assert "must be selected" in body["error"]
 
 
 def test_get_repo_file_tree_rejects_excessive_depth(monkeypatch, tmp_path):

@@ -1,17 +1,18 @@
 [Unit]
 Description=RepoCiv Bridge Server (Backend API)
-Documentation=file:%h/.hermes/workspace/repos/repociv/deploy/systemd/README.md
+Documentation=file:%h/.hermes/workspace/ACTIVE/repociv/deploy/systemd/README.md
 After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/.hermes/workspace/repos/repociv
-ExecStart=/usr/bin/python3 -m server.bridge
+WorkingDirectory=%h/.hermes/workspace/ACTIVE/repociv
+EnvironmentFile=-%h/.hermes/workspace/ACTIVE/repociv/.env
+ExecStart=%h/.miniconda/bin/python3 -m server.bridge
 Restart=on-failure
 RestartSec=5
-Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=PATH=%h/.miniconda/bin:/usr/local/bin:/usr/bin:/bin:/usr/lib/wsl/lib
 Environment=PYTHONUNBUFFERED=1
-Environment=PYTHONPATH=%h/.hermes/workspace/repos/repociv
+Environment=PYTHONPATH=%h/.hermes/workspace/ACTIVE/repociv
 
 # Logging
 StandardOutput=journal

@@ -1,17 +1,19 @@
 [Unit]
 Description=RepoCiv Frontend (Vite Dev Server)
-Documentation=file:%h/.hermes/workspace/repos/repociv/deploy/systemd/README.md
+Documentation=file:%h/.hermes/workspace/ACTIVE/repociv/deploy/systemd/README.md
 After=network.target repociv-bridge.service
 Requires=repociv-bridge.service
 
 [Service]
 Type=simple
-WorkingDirectory=%h/.hermes/workspace/repos/repociv
+WorkingDirectory=%h/.hermes/workspace/ACTIVE/repociv
+EnvironmentFile=-%h/.hermes/workspace/ACTIVE/repociv/.env
 ExecStart=/usr/bin/npm run dev
 Restart=on-failure
 RestartSec=5
-Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:%h/.local/bin
 Environment=NODE_ENV=development
+Environment=NODE_OPTIONS=--dns-result-order=ipv4first
 
 # Logging
 StandardOutput=journal

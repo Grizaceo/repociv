@@ -245,21 +245,6 @@ class _FileTreeLimitExceeded(Exception):
         super().__init__(message)
 
 
-def _configured_repos_root() -> Path:
-    from server import repo_roots_state as _rrs
-
-    state_root = _rrs.active_root()
-    if state_root:
-        return Path(os.path.expanduser(state_root)).resolve()
-    map_root = (
-        os.environ.get("REPOCIV_MAP_ROOT")
-        or os.environ.get("REPOCIV_REPOS_ROOT")
-        or os.environ.get("WORKSPACE_ROOT")
-        or str(Path.home() / ".hermes" / "workspace" / "repos")
-    )
-    return Path(os.path.expanduser(map_root)).resolve()
-
-
 def _path_under_root(path: Path, root: Path) -> bool:
     try:
         path.resolve().relative_to(root.resolve())
@@ -279,49 +264,20 @@ def get_repo_file_tree(ctx: "RouteContext") -> tuple[int, Any]:
     from server import repo_roots_state as _rrs
 
     def _extract_repo_id(raw_path: str) -> str:
-        repo_path = raw_path.split("?", 1)[0]
-        return repo_path[len("/api/files/") :] if repo_path.startswith("/api/files/") else ""
+        request_path = raw_path.split("?", 1)[0]
+        return request_path[len("/api/files/") :] if request_path.startswith("/api/files/") else ""
 
-    def _resolve_repo_path(repo_id: str, explicit_path: str) -> str:
-        if explicit_path:
-            return explicit_path
-        decoded = _rrs.decode_repo_id(repo_id)
-        if decoded:
-            return decoded
-        # Plain ids are single folder names under the active root — reject traversal
-        if "/" in repo_id or "\\" in repo_id or ".." in repo_id:
-            return ""
-        active_root = _rrs.active_root()
-        if active_root:
-            return os.path.join(active_root, repo_id)
-        map_root = (
-            os.environ.get("REPOCIV_MAP_ROOT")
-            or os.environ.get("REPOCIV_REPOS_ROOT")
-            or os.environ.get("WORKSPACE_ROOT")
-            or str(Path.home() / ".hermes" / "workspace" / "repos")
-        )
-        return os.path.join(os.path.expanduser(map_root), repo_id)
-
-    path = str(ctx.get("repo_path", "") or "")
-    full_path = str(ctx.get("path", "") or "")
-    repo_id = _extract_repo_id(full_path)
-    path = _resolve_repo_path(repo_id, path)
-
-    if not path:
-        return 400, {"error": "Missing repo path"}
+    explicit_path = str(ctx.get("repo_path", "") or "")
+    repo_id = _extract_repo_id(str(ctx.get("path", "") or ""))
+    selected_path = _rrs.resolve_selected_repo(repo_id, explicit_path)
+    if selected_path is None:
+        return 403, {"error": "repository must be selected in RepoCiv"}
 
     try:
-        repos_root = _configured_repos_root()
-        repo_path = Path(path).expanduser().resolve()
-        if not _path_under_root(repo_path, repos_root):
-            return _error(
-                403,
-                "Repository path outside allowed root",
-                f"Resolved path {repo_path} is not under {repos_root}",
-                "Use a repository under the configured workspace root",
-            )
+        repo_path = Path(selected_path)
+        repos_root = repo_path
         if not repo_path.is_dir():
-            return 404, {"error": f"Repository not found: {path}"}
+            return 404, {"error": f"Repository not found: {selected_path}"}
 
         files: list[str] = []
 
