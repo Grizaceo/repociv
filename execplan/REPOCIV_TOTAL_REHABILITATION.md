@@ -43,7 +43,7 @@ Baseline gate results:
 - [x] (2026-07-12) Produce total audit, feature matrix and visual/UX audit.
 - [x] (2026-07-12) Create branch `audit/repociv-total-rehabilitation-20260712` without discarding WIP.
 - [x] (2026-07-12) Milestone 0 — cycle 1 (Claude) `VERIFIED=false`, cycle 2 (Claude) `VERIFIED=true`; delayed delegate returned `VERIFIED=false`; all E1–E10 corrections landed; final independent cycle returned `VERIFIED=true`, `BLOCKERS=[]`.
-- [ ] Milestone 0.5 — split and commit preserved WIP before any further Milestone 2–4 implementation. Milestone 1's first commit was staged surgically against the forensic WIP baseline; no prior WIP hunk entered it.
+- [x] (2026-07-12) Milestone 0.5 — WIP split into `dfcd0d4` (simulation/subsystem prune, canonical gate green), `ad23712` (config path regression, 26 tests), and `a34aa71` (public docs/archive). Broken E2E WIP was DEFERRED, not committed: 7/20 passed; patch SHA-256 `ece2a80a74f0250536dc0e62fcef77a3220769b34be0f03ace557aea5374f217`.
 - [ ] Milestone 1 — partial: argv-only Git, root/file containment, loopback bind and 17 focused tests are committed; selected-repository membership, Origin/mutation authentication and wildcard-CORS removal remain open.
 - [ ] Milestone 1.5 — secure Python HTTP/SSE/WS/MCP browser boundary.
 - [ ] Milestone 2 — confine command payloads, selected repos, profiles, MCP reads and session IDs; define server-owned risk.
