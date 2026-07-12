@@ -1,8 +1,8 @@
 # RepoCiv — Public Architecture
 
 > A deep dive into how RepoCiv works: the hex map engine, bridge protocol,
-> model router, agent cards, priority matrix, fatigue system, and how a
-> mission travels from the hexagonal map to a real agent.
+> model router, agent cards, priority matrix, and how a mission travels from
+> the hexagonal map to a real agent.
 
 ---
 
@@ -14,9 +14,9 @@ intuitive. The game metaphor is deliberate and functional:
 
 - **Spatial reasoning over list-based UIs**: seeing agents as units walking
   between repo-cities is faster than scanning log files.
-- **Game mechanics as system mechanics**: fatigue, priority, and resource
-  constraints are mapped to game loops that the user already understands
-  intuitively from playing Civilization V, XCOM, or RimWorld.
+- **Game mechanics as system mechanics**: priority and resource constraints
+  are mapped to game loops that the user already understands intuitively from
+  playing Civilization V or RimWorld.
 - **Dogfooding-driven**: every feature exists because its creator needed it.
   No features are designed for hypothetical users.
 
@@ -100,24 +100,6 @@ Default weights can be reconfigured at runtime through the Settings panel (P key
 The urgency labels are exposed in the Priority Panel (P key toggle) and
 influence which cities glow on the hex map.
 
-### Fatigue System
-
-Inspired by XCOM's stamina mechanic. Each agent has linear fatigue:
-
-```
-fatiguePercent = currentFatigue / maxFatigue   (0.0 -> 1.0)
-effectiveSpeed = fatiguePercent                 (speed = energy ratio)
-```
-
-- Fatigue increases when the agent works (mission execution)
-- Fatigue decreases when the agent rests in a Rest Area
-- Rest Areas are tiles in the local view where agents recover
-- Visual feedback: yellow bar at 60%, red bar at 30%
-- Configurable thresholds via Settings panel
-
-The model is deliberately simple: no magic thresholds, no hidden curves.
-Fatigue does what it says.
-
 ### HUD & Panels
 
 RepoCiv ships with 21 panels. The most actively used:
@@ -126,7 +108,6 @@ RepoCiv ships with 21 panels. The most actively used:
 - **Side Panel**: detailed agent info, mission history, logs
 - **Priority Panel**: urgency scores per file with CRIT/HIGH/NORM/LOW labels
 - **Approval Panel**: Y/N approval for commands requiring human sign-off
-- **Terminal Panel**: xterm.js-based terminal inside the browser
 - **Settings Panel**: runtime toggles for thresholds, display options
 - **Ledger Panel**: read-only query view of the DuckDB analytics store
 - **Quest Board**: active missions and their status
@@ -134,7 +115,7 @@ RepoCiv ships with 21 panels. The most actively used:
 
 Key shortcuts: `Q`/`W`/`E`/`O`/`C`/`X` to spawn MAIN / WORKER / SCOUT /
 OPENCLAW / CLAUDE / CODEX; `Space` cycles idle agents; `P` priority; `A`
-approvals; `T` terminal; `F6` ledger; `F7` replay; `F8` observability;
+approvals; `F6` ledger; `F7` replay; `F8` observability;
 `F9` quest board; `F10` timeline; `F11` settings; `?` full keyboard help.
 
 ---
@@ -193,20 +174,10 @@ processing. Invalid events are rejected with a 400 status.
 | GET | /events | SSE event stream |
 | GET | /gpu | GPU stats (VRAM, temp) |
 | GET | /metrics | Computed metrics |
-| GET | /context | Fatigue + rest area state |
 
 ---
 
 ## Layer 4: Agent OS Backend
-
-### Tensor Context
-
-A structured context packaging system that assembles the right information
-for each agent before execution. It composes:
-- Current workspace state (what repos exist, what changed)
-- Agent-specific memory and skill definitions
-- Mission scope and constraints
-- Token budget awareness
 
 ### FrugalGPT Router
 
@@ -219,17 +190,6 @@ Model selection based on task complexity and remaining token budget:
 
 This prevents using expensive frontier models for trivial tasks and
 guarantees the system stays within token budget.
-
-### Swarm Engine
-
-For missions that require multiple perspectives, the Swarm Engine:
-1. Decomposes the task into subtasks
-2. Assigns each subtask to the best-suited agent
-3. Runs them in parallel where possible
-4. Aggregates results back into a unified output
-
-Supports consensus mode (multiple agents vote on the same question) and
-parallel mode (each agent works on a different slice).
 
 ### Agent Cards
 
@@ -248,7 +208,7 @@ interface AgentCard {
 ```
 
 Agent Cards define what each agent can do, which model it uses by default,
-how many parallel tasks it handles, and what roles it fills in the swarm.
+how many parallel tasks it handles, and what roles it fills in the orchestrator.
 
 ### SICA (Self-Improving Cognitive Architecture)
 
@@ -310,28 +270,23 @@ FRONTEND                          BACKEND (Python)                  AGENT (Herme
                               |
                         7. FrugalGPT Router selects model
                               |
-                        8. Tensor Context packages context
+                        8. Security Harness gates operation
                               |
-                        9. Security Harness gates operation
-                              |
-                        10. Swarm Engine dispatches
-                              |
-                         11. Executor calls agent
-                              ------------------------>    12. Agent receives
+                        9. Executor calls agent
+                              ------------------------>    10. Agent receives
                                                               mission context
                                                               |
-                                                           13. Agent works
+                                                           11. Agent works
                                                               |
-                        14. SSE streams progress <-----------  (streaming events)
+                        12. SSE streams progress <-----------  (streaming events)
                               |
-15. Unit walks toward     <---  SSE event: unit_moved
+13. Unit walks toward     <---  SSE event: unit_moved
     city on hex map
                               |
-16. SSE: mission_done    <---  17. Result written to
+14. SSE: mission_done    <---  15. Result written to
                                  Event Store + DuckDB
                                  |
-18. Unit arrives at city.
-    Fatigue decreases.
+16. Unit arrives at city.
     Priority Matrix re-ranks.
 ```
 
@@ -348,8 +303,6 @@ with AgentCraft's space. Here is what makes RepoCiv different:
   type has its own capability set; the user's MAIN slot inherits from the
   harness they picked). AgentCraft does not expose this.
 - **Priority Matrix**: urgency-driven scheduling vs FIFO queues.
-- **Fatigue System**: agents that tire from work and need to rest.
-  Prevents context saturation naturally.
 - **Reconciliation layer**: detects drift between event store, sessions,
   and run state. No other tool publishes this.
 - **Multi-model routing**: selects the cheapest adequate model per task,
@@ -368,7 +321,7 @@ with AgentCraft's space. Here is what makes RepoCiv different:
 - **Community**: achievements, skins, skill scrolls, soundtracks.
 
 **Bottom line:** RepoCiv's backend is more sophisticated in several
-dimensions (policy, scheduling, routing, fatigue, audit). AgentCraft's
+dimensions (policy, scheduling, routing, audit). AgentCraft's
 frontend, onboarding, and community features are more polished. Both
 projects are actively evolving.
 

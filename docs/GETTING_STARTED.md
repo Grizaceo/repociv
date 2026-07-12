@@ -50,7 +50,7 @@ npm install
 ```
 
 This installs TypeScript, Vite, Vitest, Valibot (schema validation),
-xterm.js (terminal panel), and Lucide (icons).
+and Lucide (icons).
 
 ### Generate assets (mandatory before first run)
 
@@ -193,7 +193,6 @@ If the map is blank or shows "Bridge offline", go to Troubleshooting below.
 | P | Open Priority Matrix panel |
 | Enter | Open side panel |
 | M | Enter Move mode (click target hex) |
-| S | Send selected unit to rest |
 | ? | Show keyboard help overlay |
 
 ### Spawning Your First Agent
@@ -255,32 +254,10 @@ curl -X POST http://localhost:5274/commands \
 ### What Happens Next
 
 1. A unit on the map will start walking toward the target city
-2. The agent's fatigue bar will decrease as it travels
-3. Once at the city, the agent enters "Working" state
-4. SSE events stream progress back to the UI
-5. When complete, the mission is logged in the Event Store
-6. You can see mission history in the Timeline panel (F10)
-
----
-
-## Managing Agent Fatigue
-
-Agents have a fatigue system (XCOM-style). The more they work, the slower
-they become:
-
-- **Green bar**: agent is rested (fatigue > 60%)
-- **Yellow bar**: agent is tired (fatigue between 30-60%)
-- **Red bar**: agent is exhausted (fatigue < 30%)
-
-To recover fatigue:
-1. Select the tired agent
-2. Press S to send it to a Rest Area
-3. The agent will walk to a rest tile and recover over time
-4. Press S again to wake it up when rested
-
-Rest Areas are visible in local view (double-click a city to enter).
-Each Rest Area has a capacity and recovery rate, configurable in the
-Settings panel (F11).
+2. Once at the city, the agent enters "Working" state
+3. SSE events stream progress back to the UI
+4. When complete, the mission is logged in the Event Store
+5. You can see mission history in the Timeline panel (F10)
 
 ---
 

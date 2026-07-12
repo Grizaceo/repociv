@@ -128,8 +128,8 @@ REPOCIV_MAP_ROOT=~/projects
 │  Minimap Renderer   (src/minimapRenderer.ts) │     minimap, units, cities
 ├─────────────────────────────────────────────┤
 │  GameState  (src/game.ts)                   │  ← Simulation loop,
-│  Priority Matrix (src/priorityMatrix.ts)     │     fatigue, mission queues,
-│  Fatigue System  (src/fatigue.ts)            │     A* pathfinding
+│  Priority Matrix (src/priorityMatrix.ts)     │     mission queues,
+│  Pathfinding   (src/pathfinding.ts)          │     A* macro + local
 ├─────────────────────────────────────────────┤
 │  Bridge  (src/bridge.ts + server/bridge.py) │  ← HTTP/WebSocket → agent runtime
 │  localMap.ts + localPathfinding.ts           │     Process scanner, task queue
@@ -190,7 +190,7 @@ RepoCiv is also exposed as an **MCP server over stdio** (`server/mcp_server.py`)
 }
 ```
 
-44 tools covering 15 domains with MCP tools: agents, commands, approvals, pending, context, GPU, wonders, graph-relations, foreign-relations and more. See [docs/MCP.md](docs/MCP.md).
+42 tools covering 14 domains with MCP tools: agents, commands, approvals, pending, GPU, wonders, graph-relations, foreign-relations and more. See [docs/MCP.md](docs/MCP.md).
 
 ---
 
@@ -214,18 +214,6 @@ score = (ageWeight × ageScore)
 | `LOW`  | score < 30 |
 
 Press `P` to open the Priority Panel. API: `computePriorityScore(fileNode, weights)` in `src/priorityMatrix.ts`.
-
----
-
-## Fatigue System
-
-Units have XCOM-style fatigue: working drains them, resting in a RestArea restores them.
-
-```
-effectiveSpeed = currentFatigue / maxFatigue   (0.0 → 1.0)
-```
-
-Thresholds configurable in the `Settings Panel` (`F11`) or in `src/gameConfig.ts`.
 
 ---
 
@@ -258,7 +246,6 @@ It is useful for auditing long sessions without opening external logs: the "stor
 | `G` | Toggle grid |
 | `V` | Toggle fog of war |
 | `A` | Pending approvals |
-| `T` | Terminal panel |
 | `N` | News gazette |
 | `3` | Toggle 2D (`flat`) ↔ WebGL (`webgl`) render |
 | `F11` | Settings panel |
@@ -284,7 +271,6 @@ It is useful for auditing long sessions without opening external logs: the "stor
 src/
 ├── game.ts              GameState, mission, loop, spawn
 ├── gameConfig.ts        Config singleton (localStorage + thresholds)
-├── fatigue.ts           getUnitFatigue, removeRestArea
 ├── priorityMatrix.ts    computePriorityScore
 ├── map.ts               generateWorld (repos → hex tiles)
 ├── hex.ts               Axial coords, hex math
@@ -302,7 +288,7 @@ server/
 ├── bridge.py            FastAPI bridge (entry point: python -m server.bridge)
 ├── http_routes.py       All HTTP endpoints
 ├── websocket_handler.py Bidirectional WebSocket
-├── mcp_server.py        MCP stdio server (44 tools)
+├── mcp_server.py        MCP stdio server (42 tools)
 ├── agent_runner.py      Runs agents (Hermes, Claude, Codex, OpenRouter…)
 ├── process_scanner.py   Detects processes → automatic spawns
 ├── task_orchestrator.py Priority task queue
@@ -345,7 +331,7 @@ python3 -m pytest server/ -q
 |-----|----------|
 | [docs/SCOPE.md](docs/SCOPE.md) | What the project is and isn't |
 | [docs/API.md](docs/API.md) | Full endpoint reference |
-| [docs/MCP.md](docs/MCP.md) | MCP server — 44 tools, examples |
+| [docs/MCP.md](docs/MCP.md) | MCP server — 42 tools, examples |
 | [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | Step-by-step tutorial |
 | [docs/REMOTE_ACCESS.md](docs/REMOTE_ACCESS.md) | Remote access via Tailscale |
 | [docs/EVOLUTION.md](docs/EVOLUTION.md) | Project history |

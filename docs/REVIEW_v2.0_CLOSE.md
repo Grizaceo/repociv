@@ -34,9 +34,8 @@ Hay **dos cilindros distintos** que la gente confunde y conviene no confundir:
 (visto desde fuera, sin acceso a su código) **no muestra que tenga**:
 
 - Priority Matrix con scoring multi-factor (age + tests + debt + ext + size)
-- Fatigue System estilo XCOM con thresholds configurables
 - Security Harness de 3 capas con secrets/IOC/drift/quarantine atómica
-- Swarm Engine con voto ponderado por believability del Ledger
+- Mission-based orchestration (Swarm Engine removido en Phase 1 cleanup)
 - World Model shadow→active con calibración Spearman
 - FrugalGPT cascade con believability-adjusted routing
 - Hooks YAML declarativos por repo (`repociv.yaml`)

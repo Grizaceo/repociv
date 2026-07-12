@@ -43,8 +43,8 @@
 | OpenCode CLI | Native hooks | Passive bridge | Same gap. |
 | Cursor | Native hooks | Passive bridge | Same gap. |
 | OpenClaw | Native hooks | Supported as a passive agent | Equivalent. |
-| Custom agents | Via skill definitions | Agent Cards + Swarm Engine | RepoCiv has a more programmable model. |
-| Multi-agent orchestration | Task delegation via missions | Swarm Engine + Consensus Engine | RepoCiv has dedicated orchestration primitives. |
+| Custom agents | Via skill definitions | Agent Cards | RepoCiv has a more programmable model. |
+| Multi-agent orchestration | Task delegation via missions | Mission-based orchestration | RepoCiv has dedicated orchestration primitives. |
 
 ### Backend Capabilities
 
@@ -52,7 +52,7 @@
 |---------|------------|---------|-------|
 | Policy engine | Not exposed | Granular capability model per agent | **RepoCiv unique.** |
 | Priority scheduling | FIFO queues | Urgency-driven Priority Matrix | **RepoCiv unique.** Weighted scoring by age, tests, churn, extensions, size. |
-| Fatigue system | Not present | XCOM-style linear fatigue with rest areas | **RepoCiv unique.** Agents tire from work. |
+| Fatigue system | Not present | Removed (Phase 1 cleanup) | Pruned — added complexity without dogfooding value. |
 | Model router | Fixed model per session | FrugalGPT Router (cost-aware selection) | **RepoCiv unique.** Selects cheapest adequate model per task. |
 | Auth model | Not documented | Token-based with rate limiting | RepoCiv is more transparent about its security model. |
 | Audit trail | Not published | Append-only JSONL + DuckDB rebuildable ledger | **RepoCiv unique.** Immutable event store that survives crashes. |
@@ -72,7 +72,7 @@
 
 | Feature | AgentCraft | RepoCiv | Notes |
 |---------|------------|---------|-------|
-| Terminal integration | PTY multi-tab | xterm.js single tab | Both have terminal. AgentCraft's is more developed. |
+| Terminal integration | PTY multi-tab | Removed (xterm.js pruned in Phase 1) | AgentCraft wins. Terminal panel was low-value dogfooding. |
 | Plan review | Full-screen with diff highlights | Modal approval panel (Y/N) | AgentCraft is more polished. |
 | Git diff viewer | Multi-session filtered diff | Not yet | AgentCraft wins. |
 | Keyboard shortcuts | Not documented | 30+ hotkeys with ? overlay | RepoCiv is more keyboard-driven. |
@@ -137,11 +137,9 @@
    incoming task by age, test coverage, churn risk, file extension, and
    file size. This means the most urgent work always surfaces first.
 
-3. **Fatigue System.** No other agent coordination tool models agent fatigue.
-   RepoCiv's XCOM-style system prevents context saturation naturally:
-   agents work, tire, walk to rest areas, recover, and resume. This is
-   especially valuable for long-running agents that would otherwise
-   accumulate context drift.
+3. **Fatigue System (removed).** The XCOM-style fatigue system was pruned in
+   Phase 1 cleanup (2026-07). It added complexity without dogfooding value;
+   the agent coordination model works better without simulated fatigue.
 
 4. **Audit trail.** RepoCiv's append-only JSONL event store is an immutable
    audit log. If anything goes wrong, you can replay every event. The

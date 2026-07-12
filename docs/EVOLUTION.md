@@ -58,7 +58,7 @@ En paralelo se cierra el debate de **qué paradigmas visuales adoptar**:
 |---|---|---|
 | **Civ V (RTS macro)** | ✅ Implementado | Vista global del workspace |
 | **RimWorld (micro local)** | ✅ Roadmapped (Phase 6-7) | Zoom-in al repo como grid de habitaciones |
-| **XCOM (fatiga)** | ✅ Capa económica única | Saturación de contexto stateful |
+| **XCOM (fatiga)** | ✅ Implementado → podado (Fase 1 cleanup 2026-07) | Saturación de contexto; no aportó en dogfooding |
 | **Frostpunk (economía tokens)** | ⏸ Diferido | Espera tracking real de tokens desde OpenClaw |
 | Factorio / Zachtronics / Slay-the-Spire | ❌ Descartados | Compiten con el IDE o con el sistema de prioridades |
 
@@ -133,26 +133,25 @@ del renderer, rediseño de UI.
 
 ## 2026-05-01 · Agent OS Industrial — `implementation_plan.md` v2.0
 
-RepoCiv escribe el manifiesto: convertir RepoCiv en el primer sistema que
-implementa el paradigma "Agent OS" (MemGPT) con el rigor de control de
-LangGraph y la especialización de roles de CrewAI. El plan incorpora SOTA
-externo (SICA, MemGPT, A2A, FrugalGPT, Darwin Gödel Machine) y patrones
-internos del workspace `.hermes` (ART research_ledger, LexO tensor_umj,
+RepoCiv escribe el manifiesto: convertir RepoCiv en un Agent OS industrial
+con el rigor de control de LangGraph y la especialización de roles de CrewAI.
+El plan incorpora SOTA externo (SICA, A2A, FrugalGPT, Darwin Gödel Machine) y
+patrones internos del workspace `.hermes` (ART research_ledger,
 Cybersecurity-Lab scanners, Homeostatic-Runtime policy, etc.).
 
 Resultado: 6 fases ejecutadas en 1 día (sí, en 1 día, no 10 semanas como
 estimaba el plan original). Todas las Gates F0-F5 marcadas ✓ y verificables
 con `pytest server/`.
 
-| Fase | Entregable | Líneas | Tests |
-|---|---|---|---|
-| F0 | DuckDB Ledger + Token Ledger + StrEnum phases | ~800 | 23 |
-| F1 | TensorContext + repociv_hooks YAML + worktrees + sentinel A2O | ~900 | 35 |
-| F1.5 | Security Harness 3 capas (gate / audit / runtime) | ~770 | 30 |
-| F2 | FrugalGPT Router + SignalExtractor + Agent Cards | ~700 | 53 |
-| F3 | Swarm Engine ConsensusEngine | ~270 | 11 |
-| F4 | World Model shadow→active | ~450 | 18 |
-| F5 | SICA Self-Improvement + Container Runtime + Dockerfile.agent | ~900 | 25 |
+| Fase | Entregado en v2.0 | Estado en trunk (2026-07) |
+|---|---|---|
+| F0 | DuckDB Ledger + Token Ledger + StrEnum phases | ✅ activo |
+| F1 | Worktrees + hooks YAML + sentinel A2O | ✅ activo (Tensor Context **podado**) |
+| F1.5 | Security Harness 3 capas (gate / audit / runtime) | ✅ activo |
+| F2 | FrugalGPT Router + SignalExtractor + Agent Cards | ✅ activo |
+| F3 | Swarm Engine multi-agente | ❌ **retirado** (Fase 1 cleanup) |
+| F4 | World Model shadow→active | ✅ activo |
+| F5 | SICA Self-Improvement + Container Runtime + Dockerfile.agent | ✅ activo (SICA read-only) |
 
 - 📄 `PROPOSED_IMPROVEMENTS_REPOCIV.md` — manifiesto inicial (semilla del
   plan vivo).

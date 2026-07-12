@@ -16,11 +16,18 @@ en `~/.hermes/workspace/repos/`. Los agentes shipped (built-in) son WORKER
 y SCOUT; el resto se enrutan por harness (OPENCLAW, CLAUDE, CODEX, CURSOR)
 o se registran como perfil personal del usuario.
 
-Por debajo del juego hay un Agent OS real (Tensor Context, FrugalGPT Router,
-Swarm Engine, World Model, Security Harness 3-capas, SICA, Docker isolation).
+Por debajo del juego hay un Agent OS real (FrugalGPT Router, World Model,
+Security Harness 3-capas, SICA, Docker isolation).
+
+> **Fase 1 cleanup (2026-07):** se podaron del trunk Context Fatigue/XCOM
+> (`src/fatigue.ts`, `GET /context`, tool MCP `context_fatigue`), Tensor Context
+> (`server/tensor_context.py`), Swarm Engine (`server/swarm_engine.py`) y el
+> panel terminal xterm. La poda confirma la regla del alpha: infra que no aporta
+> en dogfooding diario sale; el resto se mantiene hasta nueva evidencia.
+
 La razón de tener tanta infraestructura "industrial" siendo un solo usuario
-es **deliberada**: el alpha-test sirve precisamente para descubrir cuáles de
-esas capas aportan valor real y cuáles se destilan o se borran después.
+sigue siendo **deliberada**: el alpha-test descubre cuáles capas aportan valor
+real y cuáles se destilan o se borran después.
 
 Versión: **v2.0 — congelada en scope hasta que el dogfooding diga otra cosa.**
 
@@ -46,7 +53,7 @@ Métricas concretas para considerar el alpha "exitoso":
 
 ## Lo que **sí** está en scope ahora
 
-- Mejorar lo que **ya** se usa (renderer, hex grid, fatiga, priority matrix,
+- Mejorar lo que **ya** se usa (renderer, hex grid, priority matrix,
   task orchestrator, security harness, container runtime).
 - Cerrar bugs y deudas técnicas que aparezcan durante el dogfooding.
 - Mejoras visuales menores (assets, animaciones, tooltips) que hagan el
@@ -115,10 +122,11 @@ Tras 4-8 semanas de uso real, ejecutar este audit:
 2. **Telemetría de endpoints del bridge** — qué rutas se llaman desde el
    frontend. Endpoints muertos → borrar.
 
-3. **Audit de módulos del backend** — `self_improve.py`, `world_model.py`,
-   `swarm_engine.py`, `tensor_context.py` son los candidatos a evaluar.
-   Si la telemetría del Ledger no muestra impacto medible (tokens ahorrados,
-   accuracy mejorada), se mueven a `experimental/` o se borran.
+3. **Audit de módulos del backend** — `self_improve.py`, `world_model.py`
+   son los candidatos a evaluar. (`swarm_engine.py`, `tensor_context.py` ya
+   fueron podados en Fase 1 cleanup.) Si la telemetría del Ledger no muestra
+   impacto medible (tokens ahorrados, accuracy mejorada), el resto se mueve a
+   `experimental/` o se borra.
 
 El objetivo de la poda **no** es achicar por achicar — es bajar la
 superficie de mantenimiento a lo que efectivamente se usa.

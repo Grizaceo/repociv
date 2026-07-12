@@ -21,19 +21,22 @@ These components are used daily and have passing test suites:
 - Agent unit spawning and visualizing (shipped agents + harness routing aliases)
 - A* pathfinding with per-unit-type caching (<=300 hexes explored)
 - Priority Matrix (urgency-driven file scoring)
-- Fatigue System (XCOM-style linear model with rest areas)
 - Macro/Local view switching (workspace -> per-repo interior)
 - HTTP bridge with token auth and rate limiting
 - 4-store persistence (JSONL event store, DuckDB ledger, sessions, issues)
 - GPU monitoring (VRAM + temperature via nvidia-smi)
 - Tech debt scanner
 - SSE real-time event streaming
-- 21 UI panels (terminal, priority, approval, ledger, quest, timeline, etc.)
+- 21 UI panels (priority, approval, ledger, quest, timeline, etc.)
 - Systemd integration for persistent operation
 - Security Harness (3-layer: gate, audit, runtime)
 - FrugalGPT Router (cost-aware model selection)
-- Swarm Engine (parallel multi-agent execution)
 - SICA self-improvement (read-only proposal generation)
+
+> **Removed in Phase 1 cleanup (2026-07):** Fatigue System (XCOM-style),
+> Swarm Engine, Tensor Context, and the xterm.js terminal panel were pruned
+> because they added maintenance cost without dogfooding value. The codebase
+> is leaner for it.
 
 ### Test coverage
 

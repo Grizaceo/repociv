@@ -157,8 +157,8 @@ REPOCIV_MAP_ROOT=~/projects
 │  Minimap Renderer   (src/minimapRenderer.ts) │     minimapa, unidades, ciudades
 ├─────────────────────────────────────────────┤
 │  GameState  (src/game.ts)                   │  ← Loop de simulación,
-│  Priority Matrix (src/priorityMatrix.ts)     │     fatiga, colas misión,
-│  Fatigue System  (src/fatigue.ts)            │     Pathfinding A*
+│  Priority Matrix (src/priorityMatrix.ts)     │     colas misión,
+│  Pathfinding   (src/pathfinding.ts)          │     A* macro + local
 ├─────────────────────────────────────────────┤
 │  Bridge  (src/bridge.ts + server/bridge.py) │  ← HTTP/WebSocket → agent runtime
 │  localMap.ts + localPathfinding.ts           │     Process scanner, task queue
@@ -223,7 +223,7 @@ RepoCiv también se expone como **MCP server por stdio** (`server/mcp_server.py`
 }
 ```
 
-44 tools cubriendo 15 dominios con tools MCP: agents, commands, approvals, pending, context, GPU, wonders, graph-relations, foreign-relations y más. Ver [docs/MCP.md](docs/MCP.md).
+42 tools cubriendo 14 dominios con tools MCP: agents, commands, approvals, pending, GPU, wonders, graph-relations, foreign-relations y más. Ver [docs/MCP.md](docs/MCP.md).
 
 > **Indicador en el HUD.** Cuando un cliente MCP está operando el dashboard, el HUD
 > muestra `MCP ●` (verde) junto al estado del bridge; `MCP ○` (atenuado) cuando no
@@ -266,18 +266,6 @@ Presiona `P` para abrir el Priority Panel. API: `computePriorityScore(fileNode, 
 
 ---
 
-## Fatigue System
-
-Las unidades tienen fatiga al estilo XCOM: trabajar la agota, descansar en un RestArea la recupera.
-
-```
-effectiveSpeed = currentFatigue / maxFatigue   (0.0 → 1.0)
-```
-
-Thresholds configurables en `Settings Panel` (`F11`) o en `src/gameConfig.ts`.
-
----
-
 ## Gaceta de noticias
 
 Cada acción del sistema (misión completada, aprobación solicitada, agente que entra o sale, error, info) se registra como un **evento** en la **Gaceta**, un feed cronológico visible dentro del tablero. Funciona como un mini-log visual estilo "newspaper" de Civilization.
@@ -307,7 +295,6 @@ Sirve para auditar sesiones largas sin abrir logs externos: es el "story so far"
 | `G` | Toggle grid |
 | `V` | Toggle fog of war |
 | `A` | Aprobaciones pendientes |
-| `T` | Terminal panel |
 | `N` | Gaceta de noticias |
 | `3` | Alternar render 2D (`flat`) ↔ WebGL (`webgl`) |
 | `F11` | Settings Panel |
@@ -333,7 +320,6 @@ Sirve para auditar sesiones largas sin abrir logs externos: es el "story so far"
 src/
 ├── game.ts              GameState, misión, loop, spawn
 ├── gameConfig.ts        Config singleton (localStorage + thresholds)
-├── fatigue.ts           getUnitFatigue, removeRestArea
 ├── priorityMatrix.ts    computePriorityScore
 ├── map.ts               generateWorld (repos → hex tiles)
 ├── hex.ts               Axial coords, hex math
@@ -351,7 +337,7 @@ server/
 ├── bridge.py            FastAPI bridge (entry point: python -m server.bridge)
 ├── http_routes.py       Todos los endpoints HTTP
 ├── websocket_handler.py WebSocket bidireccional
-├── mcp_server.py        MCP stdio server (44 tools)
+├── mcp_server.py        MCP stdio server (42 tools)
 ├── agent_runner.py      Ejecuta agentes (Hermes, Claude, Codex, OpenRouter…)
 ├── process_scanner.py   Detecta procesos → spawns automáticos
 ├── task_orchestrator.py Cola de tareas con prioridad
@@ -394,7 +380,7 @@ python3 -m pytest server/ -q
 |-----|-----------|
 | [docs/SCOPE.md](docs/SCOPE.md) | Qué es y qué no es el proyecto |
 | [docs/API.md](docs/API.md) | Referencia completa de endpoints |
-| [docs/MCP.md](docs/MCP.md) | MCP server — 44 tools, ejemplos |
+| [docs/MCP.md](docs/MCP.md) | MCP server — 42 tools, ejemplos |
 | [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | Tutorial paso a paso |
 | [docs/REMOTE_ACCESS.md](docs/REMOTE_ACCESS.md) | Acceso remoto via Tailscale |
 | [docs/EVOLUTION.md](docs/EVOLUTION.md) | Historia del proyecto |

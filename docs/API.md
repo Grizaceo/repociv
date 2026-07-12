@@ -258,11 +258,10 @@ Persiste **en memoria** hasta que el bridge se reinicie o se invoque otro `/mode
 
 ---
 
-### Contexto & Directivas
+### Directivas & tech-debt
 
 | Method | Path | Descripción |
 |--------|------|-------------|
-| GET | `/context` | Estado XCOM (fatigue, rest areas) |
 | GET | `/techdebt` | Scan de tech-debt across repos |
 | GET | `/directives/stats` | Estadísticas de directivas |
 | GET | `/directives/suggest` | Sugerencias de directivas (`?gesture=&agent=`) |

@@ -58,9 +58,9 @@ curl "http://127.0.0.1:5274/api/graph-relations?repoId=repociv&limit=5"
 curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/path/to/workspace/repociv"
 ```
 
-## Tools disponibles (44 tools, 15 dominios con tools MCP)
+## Tools disponibles (42 tools, 14 dominios con tools MCP)
 
-> Conteo verificado 2026-06-27 contra `server/mcp_server.py`: 44 funciones decoradas con `@mcp.tool()`. La sección "Subagents" abajo lista endpoints del bridge sin tools MCP dedicadas (no se cuenta como dominio MCP).
+> Conteo verificado contra `server/mcp_server.py`: 42 funciones decoradas con `@mcp.tool()`. La sección "Subagents" abajo lista endpoints del bridge sin tools MCP dedicadas (no se cuenta como dominio MCP).
 
 ### Agents — estado del imperio
 | Tool | Descripción |
@@ -100,11 +100,6 @@ curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/path/to/workspace
 | `pending_edit(id, ...)` | **[MUTATES]** Edita campos |
 | `pending_state(id, state)` | **[MUTATES]** Cambia estado |
 | `pending_delete(id)` | **[MUTATES]** Elimina tarea |
-
-### Context / Fatiga XCOM
-| Tool | Descripción |
-|------|-------------|
-| `context_fatigue` | Fatiga y áreas de descanso por unidad |
 
 ### Observabilidad
 | Tool | Descripción |
