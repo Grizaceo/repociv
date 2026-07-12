@@ -75,11 +75,16 @@ def test_ingest_event_completed(ledger: ResearchLedger) -> None:
         "timestamp": 1746100000.0,
         "actor": "WORKER-1",
         "data": {
+            "repoPath": "/workspace/repo-a",
+            "unitId": "WORKER",
+            "commandType": "execute_agent",
             "model": "claude-haiku-3-5",
             "tokensIn": 800,
             "tokensOut": 200,
             "costEstimate": 0.00045,
+            "startedAt": 1746100000.0,
             "finishedAt": 1746100010.0,
+            "durationS": 10.0,
             "result": "Done.",
         },
     }
@@ -89,6 +94,10 @@ def test_ingest_event_completed(ledger: ResearchLedger) -> None:
     row = rows[0]
     assert row["id"] == "cmd1"
     assert row["outcome"] == "success"
+    assert row["repo"] == "/workspace/repo-a"
+    assert row["agent"] == "WORKER"
+    assert row["phase"] == "execute_agent"
+    assert row["duration_s"] == pytest.approx(10.0)
     assert row["prompt_tokens"] == 800
 
 

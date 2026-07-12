@@ -138,6 +138,11 @@ def command_submit(
     return _post("/commands", body)
 
 
+@mcp.tool(description="Evidencia canónica de un comando: lifecycle v1, evento terminal, refs y run-state.")
+def command_evidence(id: str) -> Any:
+    return _get(f"/commands/{id}/artifacts")
+
+
 @mcp.tool(description="[MUTATES] Cancela un comando en estado queued o waiting_approval.")
 def command_cancel(id: str) -> Any:
     return _post(f"/commands/{id}/cancel")

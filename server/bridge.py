@@ -663,6 +663,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 self._respond(status, body)
                 return
 
+        if path.startswith("/commands/") and path.endswith("/artifacts"):
+            command_id = path[len("/commands/") : path.rfind("/artifacts")]
+            status, body = _routes.get_command_artifacts({"command_id": command_id})
+            self._respond(status, body)
+            return
+
         if path.startswith("/tasks/"):
             parts = path.split("/")[2:]
             if len(parts) >= 3 and parts[2] == "circuit-status":

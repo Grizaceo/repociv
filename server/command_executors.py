@@ -49,7 +49,7 @@ def dispatch_command(
     sessions_append_message: Callable[..., Any],
     run_state_save: Callable[[str, dict[str, Any]], Any],
     event_record_output_chunk: Callable[[str, str, str], Any],
-    event_record_completed: Callable[[str, str], Any],
+    event_record_completed: Callable[..., Any],
     event_record_failed: Callable[[str, str], Any],
     record_outcome: Callable[[str, str, float], Any],
     register_issue_run_fn: Callable[[dict[str, Any], str], None],
@@ -107,7 +107,20 @@ def dispatch_command(
         send_to_repociv({'type': 'mission_start', 'missionId': cmd.id, 'unit': unit, 'questName': quest_name})
         send_to_repociv({'type': 'chat_chunk', 'unit': unit, 'text': text, 'missionId': cmd.id})
         event_record_output_chunk(cmd.id, unit, text)
-        event_record_completed(cmd.id, text)
+        event_record_completed(
+            cmd.id,
+            text,
+            {
+                'repoPath': str(cmd.target or ''),
+                'unitId': unit,
+                'commandType': 'e2e_probe',
+                'durationS': 0.0,
+                'artifactRefs': [
+                    {'kind': 'run_state', 'id': cmd.id},
+                    {'kind': 'session', 'id': unit},
+                ],
+            },
+        )
         send_to_repociv({'type': 'mission_complete', 'missionId': cmd.id, 'unit': unit, 'success': True, 'duration': 0})
         send_to_repociv({'type': 'log', 'msg': text, 'level': 'success'})
         register_issue_run_fn(payload, cmd.id)

@@ -621,6 +621,23 @@ def post_directives_record(body: dict[str, Any], ctx: "RouteContext") -> tuple[i
                            extra_ctx if extra_ctx else None)
     return 200, {"ok": True}
 
+def get_command_artifacts(ctx: "RouteContext") -> tuple[int, Any]:
+    from server import event_store as _es
+    from server import run_state as _run_state
+
+    command_id = str(ctx.get("command_id") or "").strip()
+    if not command_id:
+        return 400, {"error": "command_id is required"}
+    evidence = _es.command_evidence(command_id)
+    if evidence is None:
+        return 404, {"error": f"command {command_id!r} not found"}
+    try:
+        state = _run_state.load(command_id)
+    except RuntimeError:
+        state = None
+    return 200, {**evidence, "runState": state}
+
+
 def _validate_command_target(cmd: Any) -> str | None:
     if cmd.type != "execute_agent":
         return None

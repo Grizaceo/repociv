@@ -1,81 +1,84 @@
-"""RepoCiv — Context Pack builder (Fase 6).
-
-Builds a minimal, structured context dict that accompanies every dispatched
-command so the executing agent doesn't start blind.
-
-The pack is attached to cmd.payload['_context'] before dispatch.
-It is read-only signal — the agent may use it but nothing in RepoCiv depends on
-the agent honoring it.
-
-Fase 1 addition: context-pack data is attached to dispatched commands via
-``build_context_pack()``; no tensor/directive bridge.
-"""
+"""RepoCiv — minimal context pack built from canonical Event Store v1 events."""
 from __future__ import annotations
 
 from typing import Any
 
 
+def _event_values(event: dict[str, Any]) -> list[str]:
+    raw_data = event.get("data")
+    data: dict[str, Any] = raw_data if isinstance(raw_data, dict) else {}
+    raw_payload = data.get("payload")
+    payload: dict[str, Any] = raw_payload if isinstance(raw_payload, dict) else {}
+    return [
+        str(event.get("commandId") or event.get("command_id") or ""),
+        str(data.get("target") or ""),
+        str(data.get("repoPath") or ""),
+        str(data.get("unitId") or ""),
+        str(payload.get("city") or ""),
+        str(payload.get("repoPath") or ""),
+        str(payload.get("unit") or ""),
+    ]
+
+
+def _matches_target(event: dict[str, Any], target: str) -> bool:
+    needle = target.strip().lower()
+    return bool(needle) and any(needle in value.lower() for value in _event_values(event))
+
+
 def build_context_pack(
     agent_id: str,
     target: str,
-    event_store: Any,          # event_store module with read_events()
+    event_store: Any,
     max_events: int = 10,
 ) -> dict[str, Any]:
-    """
-    Return a minimal context dict for a mission.
-
-    Fields:
-      agent_id      — who is executing
-      target        — repo/city id
-      recent_events — last N events for this target
-      last_status   — 'ok' | 'failed' | 'unknown'
-      last_error    — last failure message, if any
-      test_status   — 'passed' | 'failed' | 'unknown'
-    """
+    """Return target-specific recent events and truthful last/test outcomes."""
     all_events = event_store.read_events(since=0, limit=500)
+    target_events = [event for event in all_events if _matches_target(event, target)]
+    recent = target_events[-max_events:]
 
-    # Filter events relevant to this target
-    target_events = [
-        e for e in all_events
-        if target.lower() in str(e.get("command_id", "")).lower()
-        or target.lower() in str(e.get("target", "")).lower()
-        or target.lower() in str(e.get("payload", {}).get("city", "")).lower()
-    ]
-
-    recent = target_events[-max_events:] if target_events else []
-
-    # Determine last outcome
     last_status = "unknown"
     last_error = ""
-    for ev in reversed(all_events[-200:]):
-        etype = ev.get("type", "")
-        if etype == "CommandCompleted":
+    for event in reversed(target_events):
+        raw_data = event.get("data")
+        data: dict[str, Any] = raw_data if isinstance(raw_data, dict) else {}
+        event_type = event.get("type", "")
+        if event_type == "CommandCompleted":
             last_status = "ok"
             break
-        if etype == "CommandFailed":
+        if event_type in {"CommandFailed", "CommandRejected"}:
             last_status = "failed"
-            last_error = ev.get("error", ev.get("result", ""))
+            last_error = str(data.get("error") or data.get("reason") or "")
             break
 
-    # Infer test status from recent completed run_tests events
     test_status = "unknown"
-    for ev in reversed(all_events[-200:]):
-        if ev.get("type") == "CommandCompleted" and "run_tests" in str(ev.get("command_id", "")):
-            result = ev.get("result", "")
-            test_status = "failed" if ("fail" in result.lower() or "error" in result.lower()) else "passed"
-            break
+    for event in reversed(target_events):
+        if event.get("type") not in {"CommandCompleted", "CommandFailed"}:
+            continue
+        raw_data = event.get("data")
+        data: dict[str, Any] = raw_data if isinstance(raw_data, dict) else {}
+        if data.get("commandType") != "run_tests":
+            continue
+        test_status = "passed" if event.get("type") == "CommandCompleted" else "failed"
+        break
 
     return {
-        "agent_id":    agent_id,
-        "target":      target,
-        "recent_events": [_slim(e) for e in recent],
+        "agent_id": agent_id,
+        "target": target,
+        "recent_events": [_slim(event) for event in recent],
         "last_status": last_status,
-        "last_error":  last_error,
+        "last_error": last_error,
         "test_status": test_status,
     }
 
 
-def _slim(ev: dict[str, Any]) -> dict[str, Any]:
-    """Keep only the fields that matter for agent context."""
-    return {k: ev[k] for k in ("type", "ts", "command_id", "result", "error")
-            if k in ev}
+def _slim(event: dict[str, Any]) -> dict[str, Any]:
+    raw_data = event.get("data")
+    data: dict[str, Any] = raw_data if isinstance(raw_data, dict) else {}
+    return {
+        "schemaVersion": int(event.get("schemaVersion") or 0),
+        "type": str(event.get("type") or ""),
+        "commandId": str(event.get("commandId") or event.get("command_id") or ""),
+        "timestamp": float(event.get("timestamp") or event.get("ts") or 0.0),
+        "actor": str(event.get("actor") or ""),
+        "data": data,
+    }

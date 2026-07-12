@@ -24,6 +24,7 @@ _logger = logging.getLogger(__name__)
 _lock = threading.Lock()
 _store_path: Path | None = None
 _REVERSE_CHUNK = 8192
+_command_contexts: dict[str, dict[str, Any]] = {}
 
 # ── Dual-write to DuckDB Ledger (best-effort) ─────────────────────────────────
 # Imported lazily to avoid circular imports and to allow the ledger to be
@@ -49,6 +50,7 @@ def init(store_dir: Path) -> None:
     global _store_path
     store_dir.mkdir(parents=True, exist_ok=True)
     _store_path = store_dir / "events.jsonl"
+    _command_contexts.clear()
     _migrate_legacy_davi()
 
 
@@ -142,6 +144,7 @@ def _append(event: dict[str, Any]) -> None:
 
 def _event(event_type: str, command_id: str, actor: str, data: dict[str, Any]) -> dict[str, Any]:
     return {
+        "schemaVersion": 1,
         "id": str(uuid.uuid4())[:12],
         "commandId": command_id,
         "type": event_type,
@@ -153,7 +156,77 @@ def _event(event_type: str, command_id: str, actor: str, data: dict[str, Any]) -
 
 # ─── Public API ───────────────────────────────────────────────────────────────
 
+def _context_from_command(cmd_dict: dict[str, Any]) -> dict[str, Any]:
+    raw_payload = cmd_dict.get("payload")
+    payload: dict[str, Any] = raw_payload if isinstance(raw_payload, dict) else {}
+    return {
+        "commandType": str(cmd_dict.get("type") or ""),
+        "target": str(cmd_dict.get("target") or ""),
+        "repoPath": str(payload.get("repoPath") or payload.get("cwd") or ""),
+        "unitId": str(payload.get("unit") or "MAIN"),
+        "model": str(payload.get("model") or ""),
+        "startedAt": 0.0,
+    }
+
+
+def _load_command_context(command_id: str) -> dict[str, Any]:
+    cached = _command_contexts.get(command_id)
+    if cached is not None:
+        return dict(cached)
+    context: dict[str, Any] = {}
+    for event in read_command_events(command_id):
+        if event.get("type") == "CommandCreated":
+            context.update(_context_from_command(event.get("data") or {}))
+        elif event.get("type") == "CommandStarted":
+            context["startedAt"] = float((event.get("data") or {}).get("startedAt") or 0.0)
+    if context:
+        _command_contexts[command_id] = dict(context)
+    return context
+
+
+def _terminal_event(
+    command_id: str,
+    event_type: str,
+    *,
+    result: str = "",
+    error: str = "",
+    reason: str = "",
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    context = _load_command_context(command_id)
+    extra = dict(metadata or {})
+    finished_at = float(extra.pop("finishedAt", 0.0) or time.time())
+    started_at = float(extra.pop("startedAt", 0.0) or context.get("startedAt") or finished_at)
+    duration_s = float(extra.pop("durationS", 0.0) or max(0.0, finished_at - started_at))
+    outcome_by_type = {
+        "CommandCompleted": ("completed", "success"),
+        "CommandFailed": ("failed", "failed"),
+        "CommandRejected": ("rejected", "rejected"),
+    }
+    status, outcome = outcome_by_type[event_type]
+    artifact_refs = extra.pop("artifactRefs", [])
+    data = {
+        "status": status,
+        "outcome": outcome,
+        "commandType": str(extra.pop("commandType", "") or context.get("commandType") or ""),
+        "target": str(extra.pop("target", "") or context.get("target") or ""),
+        "repoPath": str(extra.pop("repoPath", "") or context.get("repoPath") or ""),
+        "unitId": str(extra.pop("unitId", "") or context.get("unitId") or "MAIN"),
+        "model": str(extra.pop("model", "") or context.get("model") or ""),
+        "startedAt": started_at,
+        "finishedAt": finished_at,
+        "durationS": duration_s,
+        "result": result[:1024],
+        "error": error[:1024],
+        "reason": reason[:1024],
+        "artifactRefs": artifact_refs if isinstance(artifact_refs, list) else [],
+        **extra,
+    }
+    return _event(event_type, command_id, data["unitId"], data)
+
+
 def record_created(command_id: str, actor: str, cmd_dict: dict[str, Any]) -> None:
+    _command_contexts[command_id] = _context_from_command(cmd_dict)
     _append(_event("CommandCreated", command_id, actor, cmd_dict))
 
 
@@ -169,28 +242,42 @@ def record_approved(command_id: str, approver: str = "user") -> None:
     _append(_event("CommandApproved", command_id, approver, {}))
 
 
-def record_rejected(command_id: str, reason: str = "") -> None:
-    evt = _event("CommandRejected", command_id, "system", {"reason": reason})
+def record_rejected(
+    command_id: str, reason: str = "", metadata: dict[str, Any] | None = None
+) -> None:
+    evt = _terminal_event(
+        command_id, "CommandRejected", reason=reason, metadata=metadata
+    )
     _append(evt)
     _ledger_ingest(evt)
 
 
 def record_started(command_id: str) -> None:
-    _append(_event("CommandStarted", command_id, "system", {"startedAt": time.time()}))
+    started_at = time.time()
+    context = _load_command_context(command_id)
+    context["startedAt"] = started_at
+    _command_contexts[command_id] = context
+    _append(_event("CommandStarted", command_id, "system", {"startedAt": started_at}))
 
 
 def record_output_chunk(command_id: str, actor: str, text: str) -> None:
     _append(_event("AgentOutputChunk", command_id, actor, {"text": text[:2048]}))
 
 
-def record_completed(command_id: str, result: str = "") -> None:
-    evt = _event("CommandCompleted", command_id, "system", {"result": result[:1024], "finishedAt": time.time()})
+def record_completed(
+    command_id: str, result: str = "", metadata: dict[str, Any] | None = None
+) -> None:
+    evt = _terminal_event(
+        command_id, "CommandCompleted", result=result, metadata=metadata
+    )
     _append(evt)
     _ledger_ingest(evt)
 
 
-def record_failed(command_id: str, error: str = "") -> None:
-    evt = _event("CommandFailed", command_id, "system", {"error": error[:1024], "finishedAt": time.time()})
+def record_failed(
+    command_id: str, error: str = "", metadata: dict[str, Any] | None = None
+) -> None:
+    evt = _terminal_event(command_id, "CommandFailed", error=error, metadata=metadata)
     _append(evt)
     _ledger_ingest(evt)
 
@@ -198,6 +285,7 @@ def record_failed(command_id: str, error: str = "") -> None:
 def record_event(event_type: str, data: dict[str, Any]) -> None:
     """Record a free-form named event (e.g. 'HarnessRecoveryRequested')."""
     _append({
+        "schemaVersion": 1,
         "id": str(uuid.uuid4())[:12],
         "commandId": "",
         "type": event_type,
@@ -221,23 +309,22 @@ def record_subagent_complete(subagent_id: str, run: dict[str, Any]) -> None:
 
 def _iter_lines_reverse(path: Path) -> Iterator[str]:
     """Yield non-empty JSONL lines from newest to oldest."""
-    with path.open("rb") as f:
-        f.seek(0, os.SEEK_END)
-        pos = f.tell()
-        if pos == 0:
-            return
-        pending = b""
-        while pos > 0:
-            read_size = min(_REVERSE_CHUNK, pos)
-            pos -= read_size
-            f.seek(pos)
-            pending = f.read(read_size) + pending
-            while b"\n" in pending:
-                line, pending = pending.rsplit(b"\n", 1)
-                text = line.decode("utf-8").strip()
+    with path.open("rb") as stream:
+        stream.seek(0, os.SEEK_END)
+        position = stream.tell()
+        buffer = b""
+        while position > 0:
+            read_size = min(_REVERSE_CHUNK, position)
+            position -= read_size
+            stream.seek(position)
+            buffer = stream.read(read_size) + buffer
+            parts = buffer.split(b"\n")
+            buffer = parts[0]
+            for raw_line in reversed(parts[1:]):
+                text = raw_line.decode("utf-8").strip()
                 if text:
                     yield text
-        text = pending.decode("utf-8").strip()
+        text = buffer.decode("utf-8").strip()
         if text:
             yield text
 
@@ -270,6 +357,48 @@ def read_events(since: float = 0.0, limit: int = 500) -> list[dict[str, Any]]:
             return []
     collected.reverse()
     return collected
+
+
+def read_command_events(command_id: str) -> list[dict[str, Any]]:
+    if _store_path is None or not _store_path.exists() or not command_id:
+        return []
+    collected: list[dict[str, Any]] = []
+    with _lock:
+        try:
+            for line in _iter_lines_reverse(_store_path):
+                try:
+                    event = json.loads(line)
+                except Exception:
+                    continue
+                if command_id == str(event.get("commandId") or event.get("command_id") or ""):
+                    collected.append(event)
+                    if event.get("type") == "CommandCreated":
+                        break
+        except Exception:
+            return []
+    collected.reverse()
+    return collected
+
+
+def command_evidence(command_id: str) -> dict[str, Any] | None:
+    events = read_command_events(command_id)
+    if not events:
+        return None
+    terminal_types = {"CommandCompleted", "CommandFailed", "CommandRejected"}
+    terminal = next((event for event in reversed(events) if event.get("type") in terminal_types), None)
+    created = next((event for event in events if event.get("type") == "CommandCreated"), None)
+    terminal_data = terminal.get("data") if isinstance(terminal, dict) else {}
+    if not isinstance(terminal_data, dict):
+        terminal_data = {}
+    artifact_refs = terminal_data.get("artifactRefs")
+    return {
+        "schemaVersion": 1,
+        "commandId": command_id,
+        "createdEvent": created,
+        "terminalEvent": terminal,
+        "artifactRefs": artifact_refs if isinstance(artifact_refs, list) else [],
+        "events": events,
+    }
 
 
 def command_id(event: dict[str, Any]) -> str:

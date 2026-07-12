@@ -41,6 +41,7 @@ from server.routes.core import get_log  # noqa: F401
 from server.routes.core import get_ws_info  # noqa: F401
 from server.routes.core import post_directives_record  # noqa: F401
 from server.routes.core import post_commands  # noqa: F401
+from server.routes.core import get_command_artifacts  # noqa: F401
 from server.routes.core import post_pending_add  # noqa: F401
 from server.routes.core import post_pending_resolve  # noqa: F401
 from server.routes.core import post_pending_edit  # noqa: F401

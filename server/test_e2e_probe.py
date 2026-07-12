@@ -78,3 +78,9 @@ def test_e2e_probe_dispatch_emits_mission_and_chat_events(monkeypatch, tmp_path)
     log_text = log_path.read_text(encoding="utf-8")
     assert "CommandCompleted" in log_text
     assert "probe-cmd-1" in log_text
+    evidence = bridge._es.command_evidence("probe-cmd-1")
+    assert evidence is not None
+    assert evidence["artifactRefs"] == [
+        {"kind": "run_state", "id": "probe-cmd-1"},
+        {"kind": "session", "id": "MAIN"},
+    ]

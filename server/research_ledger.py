@@ -250,12 +250,16 @@ class ResearchLedger:
 
         started_at = float(data.get("startedAt", ts))
         finished_at = float(data.get("finishedAt", ts))
-        duration_s = max(0.0, finished_at - started_at) if started_at else 0.0
+        duration_s = float(data.get("durationS") or 0.0)
+        if duration_s <= 0.0:
+            duration_s = max(0.0, finished_at - started_at) if started_at else 0.0
 
         self.record_cycle(
             mission_id=mission_id,
-            agent=actor,
+            repo=str(data.get("repoPath") or ""),
+            agent=str(data.get("unitId") or actor),
             model=str(data.get("model", "")),
+            phase=str(data.get("commandType") or ""),
             prompt_tokens=int(data.get("tokensIn") or 0),
             completion_tokens=int(data.get("tokensOut") or 0),
             cost_estimate=float(data.get("costEstimate") or 0.0),
