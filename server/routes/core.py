@@ -621,6 +621,33 @@ def post_directives_record(body: dict[str, Any], ctx: "RouteContext") -> tuple[i
                            extra_ctx if extra_ctx else None)
     return 200, {"ok": True}
 
+def _validate_command_target(cmd: Any) -> str | None:
+    if cmd.type != "execute_agent":
+        return None
+    from server import agent_runner as _runner
+    from server import repo_roots_state as _rrs
+
+    payload = cmd.payload
+    unit = str(payload.get("unit") or "MAIN").split("-")[0].upper()
+    harness = str(payload.get("harness") or "").strip().lower()
+    raw_repo = str(payload.get("repoPath") or "").strip()
+    if not raw_repo:
+        if unit == "MAIN" and harness in {"", "auto", "hermes"}:
+            return None
+        return "execute_agent requires repoPath for non-MAIN or CLI harnesses"
+    selected = _rrs.resolve_selected_repo(str(payload.get("city") or cmd.target), raw_repo)
+    if selected is None:
+        return "repoPath must reference a selected RepoCiv repository"
+    payload["repoPath"] = selected
+    file_path = str(payload.get("filePath") or "").strip()
+    if file_path:
+        try:
+            _runner.resolve_absolute_file_path(selected, file_path)
+        except ValueError as exc:
+            return str(exc)
+    return None
+
+
 def post_commands(body: dict[str, Any], ctx: "RouteContext") -> tuple[int, Any]:
     from server.bridge import _handle_command, _agent_rate_limiter, _endpoint_rate_limiter
     from server.command_schema import validate_command, CommandValidationError
@@ -628,6 +655,9 @@ def post_commands(body: dict[str, Any], ctx: "RouteContext") -> tuple[int, Any]:
         cmd = validate_command(body)
     except CommandValidationError as e:
         return 400, {"error": str(e)}
+    target_error = _validate_command_target(cmd)
+    if target_error:
+        return 403, {"error": target_error}
     # Fase 1 / audit 1.2: per-endpoint cap (10/min). Defense in depth on
     # top of the per-IP limit in do_POST — stops bursts of agent spawns
     # from any number of callers.

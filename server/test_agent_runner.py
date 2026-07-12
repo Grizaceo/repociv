@@ -69,7 +69,11 @@ def test_run_agent_persists_session_and_run_state(monkeypatch, tmp_path):
     monkeypatch.setattr(agent_runner._es, "record_completed", lambda mission_id, result='': completions.append((mission_id, result)))
     monkeypatch.setattr(agent_runner._es, "record_failed", lambda mission_id, error='': failures.append((mission_id, error)))
     monkeypatch.setattr(agent_runner._ds, "record_outcome", lambda mission_id, status, duration: outcomes.append((mission_id, status)))
-    monkeypatch.setattr(agent_runner, "_resolve_city_path", lambda city_id: f"/tmp/{city_id}")
+    monkeypatch.setattr(
+        agent_runner,
+        "resolve_agent_working_dir",
+        lambda city_id, repo_path="": f"/tmp/{city_id}",
+    )
     monkeypatch.setattr(
         agent_runner,
         "_execute_streaming",
@@ -139,7 +143,14 @@ def test_execute_streaming_cursor_bypass_uses_cursor_agent(monkeypatch):
 
     monkeypatch.setattr(agent_runner, "_run_cursor_agent_streaming", fake_cursor_runner)
 
-    ok, output = agent_runner._execute_streaming("CURSOR", "m-cur", "inspect repo", city_id="repociv", model="gpt-5.4")
+    ok, output = agent_runner._execute_streaming(
+        "CURSOR",
+        "m-cur",
+        "inspect repo",
+        working_dir="/tmp/repociv",
+        city_id="repociv",
+        model="gpt-5.4",
+    )
 
     assert ok is True
     assert output == "ok"
@@ -295,7 +306,7 @@ def test_run_cursor_agent_streaming_model_flag(monkeypatch, tmp_path):
     assert "--model" in captured_cmd
     assert "claude-opus-4-5" in captured_cmd
     assert "--workspace" in captured_cmd
-    assert "--trust" in captured_cmd
+    assert "--trust" not in captured_cmd
     assert "--print" in captured_cmd
 
 
@@ -399,7 +410,19 @@ def test_resolve_city_path_decodes_repo_id(monkeypatch, tmp_path):
     repo.mkdir()
     state_file = tmp_path / "state.json"
     state_file.write_text(
-        json.dumps({"version": 1, "activeRoot": str(tmp_path), "roots": {}}),
+        json.dumps(
+            {
+                "version": 1,
+                "activeRoot": str(tmp_path),
+                "roots": {
+                    str(tmp_path): {
+                        "selectedRepoPaths": [str(repo)],
+                        "addedAt": "2026-07-12T00:00:00Z",
+                        "lastSeen": "2026-07-12T00:00:00Z",
+                    }
+                },
+            }
+        ),
         encoding="utf-8",
     )
     monkeypatch.setenv("REPOCIV_STATE_FILE", str(state_file))
@@ -456,4 +479,6 @@ def test_run_codex_streaming_passes_profile_flag(monkeypatch):
     )
     assert "--profile" in captured["cmd"]
     assert "my-profile" in captured["cmd"]
+    assert "--dangerously-bypass-approvals-and-sandbox" not in captured["cmd"]
+    assert captured["cmd"][captured["cmd"].index("--sandbox") + 1] == "workspace-write"
 

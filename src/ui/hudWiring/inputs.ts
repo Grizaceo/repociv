@@ -28,6 +28,7 @@ import { spawnAgent, spawnHarnessTemplate } from './spawn.ts';
 import { takeScreenshot } from './screenshot.ts';
 import type { CommandDraft, CommandType } from '../../commandSchema.ts';
 import { sendCommand } from '../../commandBus.ts';
+import { buildExecuteAgentPayload } from './executeAgentPayload.ts';
 
 export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeEvents): void {
   const missionInput = document.getElementById('mission-input') as HTMLInputElement;
@@ -168,22 +169,21 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     const chatCommandType: CommandType = 'execute_agent';
     const targetForCommand = unit.id;
 
+    // Include 3-layer config from chat UI: harness + provider + model.
+    const { harness, provider, model } = getSelectedConfig();
     const draft: CommandDraft = {
       type: chatCommandType,
       target: targetForCommand,
-      payload: {
-        unit: unit.id,
-        city: resolvedCity?.id ?? 'main',
-        mission: text,
-        agentType: unit.type,
-      },
+      payload: buildExecuteAgentPayload(
+        resolvedCity ?? null,
+        unit.id,
+        text,
+        harness,
+        model,
+        provider,
+        unit.type,
+      ),
     };
-
-    // Include 3-layer config from chat UI: harness + provider + model
-    const { harness, provider, model } = getSelectedConfig();
-    if (harness && harness !== 'auto') draft.payload!.harness = harness;
-    if (provider && provider !== 'auto') draft.payload!.provider = provider;
-    if (model) draft.payload!.model = model;
 
     // Update target indicator to reflect actual dispatch target
     const indicator = document.getElementById('chat-target-indicator');

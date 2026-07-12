@@ -216,11 +216,12 @@ def _get_agent_config(unit_id: str) -> dict[str, Any]:
                 config["harness_ref"] = harness_ref
             if registry_profile.get("system_prompt"):
                 config["system"] = registry_profile["system_prompt"]
-            if registry_profile.get("profile_path"):
-                config["profile"] = registry_profile["profile_path"]
-            elif harness_ref and harness_ref != "default" and registry_profile.get("harness") == "hermes":
+            if harness_ref and harness_ref != "default" and registry_profile.get("harness") == "hermes":
                 from pathlib import Path as _Path
-                config["profile"] = str(_Path.home() / ".hermes" / "profiles" / harness_ref)
+                from . import profile_identity as _pi
+
+                if harness_ref in _pi.list_harness_options("hermes"):
+                    config["profile"] = str(_Path.home() / ".hermes" / "profiles" / harness_ref)
             return _apply_identity_overlay(unit_id, config)
     except Exception:
         pass
@@ -253,12 +254,21 @@ def _repos_root() -> str:
     return os.path.expanduser(root)
 
 
+def _path_is_within(path: str, root: str) -> bool:
+    try:
+        return os.path.commonpath([path, root]) == root
+    except ValueError:
+        return False
+
+
+def resolve_agent_working_dir(city_id: str, repo_path: str = "") -> str | None:
+    if not repo_path and city_id.lower() == "main":
+        return None
+    return _rrs.resolve_selected_repo(city_id, repo_path)
+
+
 def _resolve_city_path(city_id: str) -> str | None:
-    decoded = _rrs.decode_repo_id(city_id)
-    if decoded and os.path.isdir(decoded):
-        return decoded
-    candidate = os.path.join(_repos_root(), city_id)
-    return candidate if os.path.isdir(candidate) else None
+    return resolve_agent_working_dir(city_id)
 
 
 def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
@@ -286,20 +296,12 @@ def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
 def resolve_absolute_file_path(repo_path: str, file_path: str) -> str:
     if not file_path:
         return ""
-    if os.path.isabs(file_path):
-        return file_path
-    
-    # Normalize path separators
-    file_path = file_path.replace("\\", "/")
-    repo_path = repo_path.replace("\\", "/")
-    
-    repo_name = os.path.basename(repo_path)
-    parts = file_path.split("/")
-    if parts and parts[0] == repo_name:
-        parts = parts[1:]
-    
-    rel_path = "/".join(parts)
-    return os.path.normpath(os.path.join(repo_path, rel_path))
+    repo_real = os.path.realpath(repo_path)
+    candidate = file_path if os.path.isabs(file_path) else os.path.join(repo_real, file_path)
+    candidate_real = os.path.realpath(candidate)
+    if not _path_is_within(candidate_real, repo_real):
+        raise ValueError("file path is outside selected repo")
+    return candidate_real
 
 
 def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
@@ -309,9 +311,32 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
     mission_id = command_id or str(uuid.uuid4())[:8]
     quest_name = generate_quest_name(mission)
     started_at = time.time()
-    working_dir = repo_path or _resolve_city_path(city_id)
-    if file_path and working_dir:
-        abs_file_path = resolve_absolute_file_path(working_dir, file_path)
+    working_dir = resolve_agent_working_dir(city_id, repo_path)
+    if repo_path and not working_dir:
+        error = "repoPath is not a selected RepoCiv repository"
+        _es.record_failed(mission_id, error)
+        send_to_repociv({"type": "log", "msg": error, "level": "error"})
+        send_to_repociv({
+            "type": "mission_complete",
+            "missionId": mission_id,
+            "unit": unit_id,
+            "success": False,
+            "duration": 0,
+            "error": error,
+        })
+        return
+    if file_path:
+        if not working_dir:
+            error = "filePath requires a selected repository"
+            _es.record_failed(mission_id, error)
+            send_to_repociv({"type": "log", "msg": error, "level": "error"})
+            return
+        try:
+            abs_file_path = resolve_absolute_file_path(working_dir, file_path)
+        except ValueError as exc:
+            _es.record_failed(mission_id, str(exc))
+            send_to_repociv({"type": "log", "msg": str(exc), "level": "error"})
+            return
         mission = f"Trabaja en el archivo: `{abs_file_path}`\nInstrucción: {mission}"
 
     if not working_dir:
@@ -417,6 +442,32 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
                        model: str = "") -> tuple[bool, str]:
     config = _get_agent_config(unit_id)
     base = unit_id.split("-")[0].upper()
+
+    security = _security_harness.get_harness()
+    gate = security.pre_dispatch_gate(mission)
+    if gate.blocked:
+        text = f"[security blocked] {gate.reason}\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, text.strip()
+
+    if not working_dir:
+        if base != "MAIN" or harness not in ("", "auto", "hermes"):
+            text = "[security blocked] selected repository required for CLI agent execution\n"
+            send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+            _es.record_output_chunk(mission_id, unit_id, text)
+            return False, text.strip()
+        # Repo-less MAIN is conversational only: direct Hermes HTTP, no CLI
+        # cascade and no inherited bridge working directory.
+        return _run_hermes_streaming(
+            unit_id,
+            mission_id,
+            mission,
+            config,
+            None,
+            city_id,
+            model=model or provider,
+        )
 
     # Resolve harness from registry if not provided by payload.
     # For any unit, if the registry has a harness entry, use it.
@@ -793,7 +844,7 @@ def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
     full_prompt = (
         f"{system_prompt}{spatial}\n\n{cd_cmd}{mission}" if system_prompt else f"{spatial}\n\n{cd_cmd}{mission}"
     )
-    cmd = [claude_bin, "--print", "--dangerously-skip-permissions"]
+    cmd = [claude_bin, "--print"]
     if swarm_track_enabled():
         cmd.extend(["--output-format", "stream-json"])
     if model:
@@ -935,7 +986,7 @@ def _run_cursor_agent_streaming(
     full_prompt = f"{spatial}\n\n{cd_cmd}{mission}"
 
     # TODO: validate these flags against `cursor-agent --help` once installed
-    cmd = [cursor_bin, "--print", "--trust", "--output-format", "stream-json"]
+    cmd = [cursor_bin, "--print", "--output-format", "stream-json"]
     if model:
         cmd.extend(["--model", model])
     if working_dir:
@@ -1031,7 +1082,8 @@ def _run_codex_streaming(unit_id: str, mission_id: str, mission: str,
     cmd = [
         codex_bin,
         "exec",
-        "--dangerously-bypass-approvals-and-sandbox",
+        "--sandbox",
+        "workspace-write",
         "--output-last-message",
         last_message_path,
     ]

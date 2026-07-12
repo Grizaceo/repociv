@@ -45,3 +45,61 @@ def decode_repo_id(repo_id: str) -> str | None:
         return os.path.expanduser(decoded)
     except Exception:
         return None
+
+
+def _is_within(path: str, root: str) -> bool:
+    try:
+        return os.path.commonpath([path, root]) == root
+    except ValueError:
+        return False
+
+
+def resolve_selected_repo(repo_id_or_name: str, explicit_path: str = "") -> str | None:
+    state = load_state()
+    roots = state.get("roots", {})
+    if not isinstance(roots, dict):
+        return None
+
+    candidate = os.path.expanduser(explicit_path.strip()) if explicit_path.strip() else ""
+    if not candidate:
+        candidate = decode_repo_id(repo_id_or_name) or ""
+    if not candidate:
+        if any(separator in repo_id_or_name for separator in ("/", "\\")) or repo_id_or_name in {
+            ".",
+            "..",
+        }:
+            return None
+        matches: list[str] = []
+        for entry in roots.values():
+            if not isinstance(entry, dict):
+                continue
+            selected = entry.get("selectedRepoPaths", [])
+            if isinstance(selected, list):
+                matches.extend(
+                    str(item)
+                    for item in selected
+                    if isinstance(item, str) and os.path.basename(item) == repo_id_or_name
+                )
+        if len(matches) != 1:
+            return None
+        candidate = matches[0]
+
+    candidate_abs = os.path.abspath(os.path.expanduser(candidate))
+    for root_path, entry in roots.items():
+        if not isinstance(root_path, str) or not isinstance(entry, dict):
+            continue
+        selected = entry.get("selectedRepoPaths", [])
+        if not isinstance(selected, list):
+            continue
+        if not any(
+            isinstance(item, str)
+            and os.path.abspath(os.path.expanduser(item)) == candidate_abs
+            for item in selected
+        ):
+            continue
+        root_real = os.path.realpath(os.path.expanduser(root_path))
+        candidate_real = os.path.realpath(candidate_abs)
+        if os.path.isdir(candidate_real) and _is_within(candidate_real, root_real):
+            return candidate_real
+        return None
+    return None

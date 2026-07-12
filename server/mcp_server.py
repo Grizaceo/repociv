@@ -421,7 +421,7 @@ def graph_relations_stats() -> Any:
 
 @mcp.tool(description=(
     "Perfil de un repo: stack detectado, tipo de proyecto, entidades clave, "
-    "señales de actividad. repo_path: ruta absoluta al repo."
+    "señales de actividad. repo_path: ruta absoluta de un repositorio previamente seleccionado en RepoCiv."
 ))
 def foreign_repo_profile(repo_path: str) -> Any:
     return _get("/api/foreign/repo-profile", {"repoPath": repo_path})

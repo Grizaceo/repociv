@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -46,7 +47,7 @@ _VALID_HARNESSES: frozenset[str] = frozenset({
 # unknown fields are passed through untouched so future additions
 # don't need a config_store update.
 _OPTIONAL_FIELDS: frozenset[str] = frozenset({
-    "personality", "system_prompt", "profile_path", "model", "provider",
+    "personality", "system_prompt", "model", "provider",
     # v2 profile fields (agent_profile_command_bar feature)
     "harness_ref", "display_name",
 })
@@ -63,6 +64,7 @@ HARNESS_ALIASES: dict[str, str] = {
     "claude-code": "claude",
     "claude_code": "claude",
 }
+_SAFE_REF_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 
 def normalize_harness_id(harness: str) -> str:
@@ -129,6 +131,8 @@ def _normalize_profile(raw: dict[str, Any], name: str) -> dict[str, Any]:
     """Validate a single profile entry. Raises ValueError on bad data."""
     if not isinstance(raw, dict):
         raise ValueError(f"profile {name!r} must be an object")
+    if raw.get("profile_path") is not None:
+        raise ValueError("profile_path is not supported; use a discovered harness_ref")
     harness = _validate_harness(raw.get("harness", ""))
     out: dict[str, Any] = {"harness": harness}
     for field in _OPTIONAL_FIELDS:
@@ -137,6 +141,10 @@ def _normalize_profile(raw: dict[str, Any], name: str) -> dict[str, Any]:
             if not isinstance(value, str):
                 raise ValueError(
                     f"profile {name!r}: field {field!r} must be a string"
+                )
+            if field == "harness_ref" and not _SAFE_REF_RE.fullmatch(value):
+                raise ValueError(
+                    f"profile {name!r}: harness_ref must be a safe discovered identifier"
                 )
             out[field] = value
     for field in _OPTIONAL_INT_FIELDS:
@@ -210,7 +218,8 @@ def _load() -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     for name, entry in profiles.items():
         try:
-            out[str(name)] = _normalize_profile(entry, str(name))
+            safe_name = _validate_name(str(name))
+            out[safe_name] = _normalize_profile(entry, safe_name)
         except ValueError:
             # Skip malformed entries rather than crash; the user can
             # re-add them via the onboarding UI or a config edit.
@@ -284,13 +293,15 @@ def upsert_profile(
     """Create or update a profile. Returns the normalized profile entry."""
     clean_name = _validate_name(name)
     clean_harness = _validate_harness(harness)
+    if profile_path is not None:
+        raise ValueError("profile_path is not supported; use a discovered harness_ref")
+    if harness_ref is not None and not _SAFE_REF_RE.fullmatch(str(harness_ref)):
+        raise ValueError("harness_ref must be a safe discovered identifier")
     entry: dict[str, Any] = {"harness": clean_harness}
     if personality is not None:
         entry["personality"] = str(personality)
     if system_prompt is not None:
         entry["system_prompt"] = str(system_prompt)
-    if profile_path is not None:
-        entry["profile_path"] = str(profile_path)
     if model is not None:
         entry["model"] = str(model)
     if provider is not None:

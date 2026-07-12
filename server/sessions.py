@@ -6,6 +6,7 @@ This is intentionally local-first and human-inspectable.
 from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,13 @@ from . import locks as _locks
 
 
 _base_dir: Path | None = None
+_SAFE_UNIT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+
+
+def _validate_unit_id(unit_id: str) -> str:
+    if not isinstance(unit_id, str) or not _SAFE_UNIT_ID.fullmatch(unit_id):
+        raise ValueError("invalid unit id")
+    return unit_id
 
 
 def init(store_dir: Path) -> None:
@@ -29,7 +37,7 @@ def _require_base() -> Path:
 
 
 def _session_dir(unit_id: str) -> Path:
-    return _require_base() / unit_id
+    return _require_base() / _validate_unit_id(unit_id)
 
 
 def _canonical_path(unit_id: str) -> Path:

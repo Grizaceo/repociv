@@ -30,6 +30,20 @@ def test_resolve_native_hermes_soul(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     assert path == hermes / "SOUL.md"
 
 
+def test_identity_paths_reject_profile_and_ref_traversal(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    profiles = tmp_path / "hermes" / "profiles"
+    (profiles / "known").mkdir(parents=True)
+    monkeypatch.setattr(pi, "_HERMES_PROFILES_DIR", profiles)
+    with pytest.raises(ValueError, match="profile_name"):
+        pi.resolve_identity_path("../../escape", "hermes", "default", "managed")
+    with pytest.raises(ValueError, match="harness_ref"):
+        pi.resolve_identity_path("MAIN", "hermes", "../../escape", "native")
+    with pytest.raises(ValueError, match="discovered"):
+        pi.resolve_identity_path("MAIN", "hermes", "unknown", "native")
+
+
 def test_write_and_read_identity(repociv_home: Path) -> None:
     result = pi.write_identity(
         "codex-ops",

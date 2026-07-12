@@ -160,7 +160,7 @@ def test_audit_high_risk_invariant():
         ("git_commit",   "approve"),
         ("send_message", "approve"),
         ("delete_file",  "approve"),
-        ("execute_agent","auto-safe"),
+        ("execute_agent","approve"),
     ],
 )
 def test_type_policy_table(cmd_type: str, expected: str):

@@ -142,6 +142,11 @@ def decide(cmd: Command) -> tuple[PolicyDecision, str]:
             f"even though type policy says auto-safe."
         )
 
+    # Repository/CLI agent execution is never auto-safe. Repo-less MAIN→Hermes
+    # conversation remains low risk and keeps the direct chat path frictionless.
+    if cmd.type == "execute_agent" and cmd.risk != "low" and decision == "auto-safe":
+        return "approve", "Agent execution with repository effects requires approval."
+
     return decision, ""
 
 

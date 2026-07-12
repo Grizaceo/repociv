@@ -13,6 +13,7 @@ RouteContext = dict[str, Any]
 from server import labhub_adapter as _labhub  # noqa: E402
 
 from server import repo_profile as _rp  # noqa: E402
+from server import repo_roots_state as _rrs  # noqa: E402
 from server import foreign_relations as _fr  # noqa: E402
 from server import report_store as _rs  # noqa: E402
 
@@ -51,6 +52,11 @@ def get_all_cities_lab_status(ctx: "RouteContext") -> tuple[int, Any]:
         return 400, {"error": "cities must be a JSON array"}
     return 200, _labhub.get_all_cities_lab_status(cities)
 
+def _selected_repo_path(raw_path: Any) -> str | None:
+    path = str(raw_path or "").strip()
+    return _rrs.resolve_selected_repo(path, path) if path else None
+
+
 def get_repo_profile(ctx: "RouteContext") -> tuple[int, Any]:
     """GET /api/foreign/repo-profile — build profile for a repo path.
 
@@ -63,10 +69,13 @@ def get_repo_profile(ctx: "RouteContext") -> tuple[int, Any]:
         return _error(400, "repoPath is required",
                       "Query parameter 'repoPath' is missing",
                       "Use /api/foreign/repo-profile?repoPath=/absolute/path/to/repo")
-    profile = _rp.build_profile(repo_path)
+    selected_path = _selected_repo_path(repo_path)
+    if selected_path is None:
+        return 403, {"error": "repoPath must reference a selected RepoCiv repository"}
+    profile = _rp.build_profile(selected_path)
     if profile is None:
-        return _error(404, f"Repo path not found or not a directory: {repo_path}",
-                      f"Path does not exist or is not a directory: {repo_path}",
+        return _error(404, f"Repo path not found or not a directory: {selected_path}",
+                      f"Path does not exist or is not a directory: {selected_path}",
                       "Verify the repo path exists and is a directory")
     return 200, profile
 
@@ -97,10 +106,13 @@ def post_foreign_score(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int,
                       "Request body missing required fields",
                       "Send { article: {...}, repoPath: '/path/to/repo' }")
 
-    profile = _rp.build_profile(repo_path)
+    selected_path = _selected_repo_path(repo_path)
+    if selected_path is None:
+        return 403, {"error": "repoPath must reference a selected RepoCiv repository"}
+    profile = _rp.build_profile(selected_path)
     if profile is None:
-        return _error(404, f"Repo path not found: {repo_path}",
-                      f"Cannot build profile for '{repo_path}' — path does not exist or is not a directory",
+        return _error(404, f"Repo path not found: {selected_path}",
+                      f"Cannot build profile for '{selected_path}' — path does not exist or is not a directory",
                       "Send a valid repo path that exists on the filesystem")
 
     scoring = _fr.score_article_repo(article, profile, events=events if events else None)
@@ -142,10 +154,13 @@ def post_foreign_report(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int
                       "Request body missing required fields",
                       "Send { article: {...}|articles: [...], repoPath: '/path/to/repo' }")
 
-    profile = _rp.build_profile(repo_path)
+    selected_path = _selected_repo_path(repo_path)
+    if selected_path is None:
+        return 403, {"error": "repoPath must reference a selected RepoCiv repository"}
+    profile = _rp.build_profile(selected_path)
     if profile is None:
-        return _error(404, f"Repo path not found: {repo_path}",
-                      f"Cannot build profile for '{repo_path}' — path does not exist or is not a directory",
+        return _error(404, f"Repo path not found: {selected_path}",
+                      f"Cannot build profile for '{selected_path}' — path does not exist or is not a directory",
                       "Send a valid repo path that exists on the filesystem")
 
     primary_article = dict(articles[0])
@@ -172,7 +187,7 @@ def post_foreign_report(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int
     article_ids = [str(a.get("id", "")) for a in articles if a.get("id") is not None]
     report["articleIds"] = article_ids
     report["targetCityId"] = target_city_id or profile["repoName"]
-    report["targetRepoPath"] = repo_path
+    report["targetRepoPath"] = selected_path
 
     # Persist
     saved = _rs.save_report(report)

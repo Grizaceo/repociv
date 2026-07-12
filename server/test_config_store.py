@@ -78,6 +78,15 @@ def test_upsert_profile_rejects_bad_name(isolated_config: Path) -> None:
         config_store.upsert_profile("a" * 33, "hermes")
 
 
+def test_upsert_profile_rejects_arbitrary_profile_path_and_unsafe_ref(
+    isolated_config: Path,
+) -> None:
+    with pytest.raises(ValueError, match="profile_path"):
+        config_store.upsert_profile("H", "hermes", profile_path="/tmp/arbitrary")
+    with pytest.raises(ValueError, match="harness_ref"):
+        config_store.upsert_profile("H", "hermes", harness_ref="../../escape")
+
+
 def test_delete_profile(isolated_config: Path) -> None:
     config_store.upsert_profile("H", "hermes")
     assert config_store.delete_profile("H") is True

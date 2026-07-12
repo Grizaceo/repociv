@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -43,6 +44,13 @@ _CLAUDE_USER_DIR = Path.home() / ".claude"
 _CODEX_DIR = Path.home() / ".codex"
 _OPENCLAW_AGENTS_DIR = Path.home() / ".openclaw" / "agents"
 _CURSOR_RULES_DIR = Path.home() / ".cursor" / "rules"
+_SAFE_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+def _safe_identifier(value: str, field: str) -> str:
+    if not isinstance(value, str) or not _SAFE_IDENTIFIER.fullmatch(value):
+        raise ValueError(f"{field} must be a safe discovered identifier")
+    return value
 
 
 # ─── Path resolution ──────────────────────────────────────────────────────────
@@ -62,7 +70,12 @@ def resolve_identity_path(
     Does NOT create the file; use write_identity() for that.
     """
     mode = identity_mode or "managed"
+    profile_name = _safe_identifier(profile_name, "profile_name")
     h = harness.strip().lower()
+    if mode == "native" and h in {"hermes", "openclaw"} and harness_ref != "default":
+        harness_ref = _safe_identifier(harness_ref, "harness_ref")
+        if harness_ref not in list_harness_options(h):
+            raise ValueError(f"harness_ref {harness_ref!r} is not discovered for {h}")
 
     if h == "hermes":
         if mode == "native" and harness_ref and harness_ref != "default":
