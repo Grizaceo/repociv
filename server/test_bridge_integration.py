@@ -42,7 +42,7 @@ def _auth_headers(extra=None):
     /approvals, /missions, /metrics, /commands (POST), /approve (POST).
     Auth-exempt routes (no header needed): /health, /ready.
     """
-    headers = dict(extra or {})
+    headers = {"Origin": f"http://localhost:{bridge.REPOCIV_PORT}", **dict(extra or {})}
     if bridge.REPOCIV_TOKEN:
         headers["X-RepoCiv-Token"] = bridge.REPOCIV_TOKEN
     return headers

@@ -299,6 +299,7 @@ class TestPendingEndpoints:
                 data=data,
                 headers={
                     "Content-Type": "application/json",
+                    "Origin": "http://localhost:5273",
                     "X-RepoCiv-Token": "test-token-fixture-not-a-secret",
                 },
                 method="POST",
@@ -478,6 +479,7 @@ class TestNewPendingEndpoints:
                 data=data,
                 headers={
                     "Content-Type": "application/json",
+                    "Origin": "http://localhost:5273",
                     "X-RepoCiv-Token": "test-token-fixture-not-a-secret",
                 },
                 method="POST",

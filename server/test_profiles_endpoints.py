@@ -43,7 +43,10 @@ def bridge(monkeypatch: pytest.MonkeyPatch, tmp_path):
 
 def _post(bridge, path: str, body: dict, *, token: str = "") -> tuple[int, dict]:
     data = json.dumps(body).encode()
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        "Content-Type": "application/json",
+        "Origin": "http://localhost:5273",
+    }
     if token:
         headers["X-RepoCiv-Token"] = token
     req = urllib.request.Request(

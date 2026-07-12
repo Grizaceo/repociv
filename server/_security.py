@@ -12,8 +12,8 @@ Enforced invariants (Fase 0 / audit 0.4):
      MUST be set (not empty). Refuses to start instead of warning —
      the warning is easy to miss in a long boot log.
   3. If ``REPOCIV_TOKEN`` is empty in local (loopback) mode, emit a
-     ``UserWarning`` so the operator sees it in the boot log. Loopback
-     auth-off is the documented dev default but should not be invisible.
+     ``UserWarning``: browser mutations and streams remain same-origin-only,
+     but non-browser clients need a token.
 
 The "warning vs refuse" decision for case (2) follows the audit's
 stronger option (refuse). The warning-vs-exit split between (1) and
@@ -37,9 +37,10 @@ Usage from bridge.py / websocket_handler.py:
 
 from __future__ import annotations
 
+import hmac
 import sys
 import warnings
-from typing import Final
+from typing import Final, Iterable
 
 #: Minimum acceptable token length when REPOCIV_TOKEN is set. Picked to
 #: match the docs and the existing remote-mode check; 32 hex chars =
@@ -104,6 +105,49 @@ def _emit_no_token_non_loopback_error(
     raise SystemExit(1)
 
 
+def build_allowed_origins(
+    port: int, *, remote: bool, remote_origin: str, extra_origins: str
+) -> set[str]:
+    origins = {f"http://localhost:{port}", f"http://127.0.0.1:{port}"}
+    if remote and remote_origin.strip():
+        origins.add(remote_origin.strip())
+    origins.update(origin.strip() for origin in extra_origins.split(",") if origin.strip())
+    return origins
+
+
+def _token_matches(received: str, expected: str) -> bool:
+    return bool(received and expected) and hmac.compare_digest(
+        received.encode("utf-8"), expected.encode("utf-8")
+    )
+
+
+def is_trusted_mutation(
+    *,
+    expected_token: str,
+    received_token: str,
+    origin: str,
+    content_type: str,
+    allowed_origins: Iterable[str],
+) -> bool:
+    media_type = content_type.partition(";")[0].strip().lower()
+    if media_type != "application/json":
+        return False
+    if expected_token:
+        return _token_matches(received_token, expected_token)
+    return bool(origin) and origin in set(allowed_origins)
+
+
+def is_trusted_stream(
+    expected_token: str,
+    received_token: str,
+    origin: str,
+    allowed_origins: Iterable[str],
+) -> bool:
+    if expected_token:
+        return _token_matches(received_token, expected_token)
+    return bool(origin) and origin in set(allowed_origins)
+
+
 def enforce_token_policy(
     *,
     token: str,
@@ -142,10 +186,9 @@ def enforce_token_policy(
     if not token and _is_loopback_bind(bind_host):
         warnings.warn(
             f"[{component}] REPOCIV_TOKEN is empty. The bridge is bound to "
-            f"{bind_host!r} and auth is DISABLED — any process on this host "
-            f"can drive the agent runner. This is the documented dev default; "
-            f"set REPOCIV_TOKEN to a {MIN_TOKEN_LENGTH}+ char secret for "
-            f"anything beyond local single-operator use.",
+            f"{bind_host!r}; browser mutations and streams are restricted to "
+            f"allowlisted Origins. Set REPOCIV_TOKEN to a {MIN_TOKEN_LENGTH}+ char "
+            f"secret for MCP, CLI, remote, or other non-browser clients.",
             UserWarning,
             stacklevel=2,
         )

@@ -20,7 +20,8 @@ Rate limit:
   60 messages per 60s per connection (in-memory sliding window).
 
 Security:
-  - Requires X-RepoCiv-Token on connect if REPOCIV_TOKEN is set.
+  - With REPOCIV_TOKEN: requires an auth message with the shared token.
+  - Without a token: accepts only allowlisted browser Origins.
   - Rate limited per connection.
 """
 
@@ -52,7 +53,7 @@ REPOCIV_REMOTE = os.environ.get("REPOCIV_REMOTE", "").lower() in ("true", "1", "
 #   1. REPOCIV_TOKEN set but < 32 chars  → SystemExit(1)
 #   2. BRIDGE_WS_HOST non-loopback + token empty  → SystemExit(1)
 #   3. loopback + token empty                    → UserWarning (dev default)
-from server._security import enforce_token_policy  # noqa: E402
+from server._security import build_allowed_origins, enforce_token_policy  # noqa: E402
 
 WS_HOST = "0.0.0.0" if REPOCIV_REMOTE else os.environ.get("BRIDGE_WS_HOST", "127.0.0.1")
 enforce_token_policy(
@@ -60,6 +61,13 @@ enforce_token_policy(
     bind_host=WS_HOST,
     remote=REPOCIV_REMOTE,
     component="ws",
+)
+REPOCIV_PORT = int(os.environ.get("REPOCIV_PORT", "5273"))
+_ALLOWED_ORIGINS = build_allowed_origins(
+    REPOCIV_PORT,
+    remote=REPOCIV_REMOTE,
+    remote_origin=os.environ.get("REPOCIV_REMOTE_ORIGIN", ""),
+    extra_origins=os.environ.get("REPOCIV_CORS_ORIGINS", ""),
 )
 
 # Rate limit: 60 messages / 60s window per connection
@@ -164,13 +172,19 @@ def broadcast(event: dict[str, Any]) -> None:
 async def _auth_ws(ws: websockets.asyncio.server.ServerConnection) -> bool:
     """Authenticate incoming WS connection.
 
-    If REPOCIV_TOKEN is empty (dev mode), auto-authenticate and send auth_ok.
+    If REPOCIV_TOKEN is empty, only an allowlisted browser Origin is accepted.
     Otherwise, the client must send an auth message within 5s:
       {"type": "auth", "token": "..."}
     """
     if not REPOCIV_TOKEN:
+        request = getattr(ws, "request", None)
+        headers = getattr(request, "headers", {})
+        origin = headers.get("Origin", "") if headers is not None else ""
+        if origin not in _ALLOWED_ORIGINS:
+            await ws.send(json.dumps({"type": "auth_error", "msg": "origin not allowed"}))
+            return False
         await ws.send(json.dumps({"type": "auth_ok"}))
-        return True  # Dev mode: auto-auth
+        return True
     try:
         msg = await asyncio.wait_for(ws.recv(), timeout=5.0)
         if isinstance(msg, bytes):

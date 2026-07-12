@@ -86,7 +86,12 @@ REPOCIV_REMOTE = os.environ.get("REPOCIV_REMOTE", "").lower() in ("true", "1", "
 #   2. bind non-loopback + token empty   → SystemExit(1) + loud error
 #   3. bind loopback + token empty       → UserWarning (dev default, not exit)
 # See server/_security.py for the full rules.
-from server._security import enforce_token_policy  # noqa: E402
+from server._security import (  # noqa: E402
+    build_allowed_origins,
+    enforce_token_policy,
+    is_trusted_mutation,
+    is_trusted_stream,
+)
 
 BRIDGE_HOST = "0.0.0.0" if REPOCIV_REMOTE else "127.0.0.1"
 enforce_token_policy(
@@ -126,28 +131,13 @@ HERMES_ROOT = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", "~/.hermes")
 def _build_allowed_origins(
     port: int, *, remote: bool, remote_origin: str, extra_origins: str
 ) -> set[str]:
-    """Build the CORS allowed-origins set.
-
-    - Local mode (default): localhost + 127.0.0.1 on the given port.
-    - Remote mode: also accept ``remote_origin`` (e.g.
-      https://foo.example.com:5273) if non-empty.
-    - Always: ``extra_origins`` (comma-separated) is added. Use this for
-      WSL2/Tailscale setups where the browser hits the bridge at a
-      non-localhost IP (e.g. http://100.123.206.92:5273) that isn't in
-      REPOCIV_REMOTE mode.
-    """
-    out: set[str] = {
-        f"http://localhost:{port}",
-        f"http://127.0.0.1:{port}",
-    }
-    if remote and remote_origin:
-        out.add(remote_origin)
-    if extra_origins:
-        for o in extra_origins.split(","):
-            o = o.strip()
-            if o:
-                out.add(o)
-    return out
+    """Compatibility wrapper around the shared HTTP/WS trust policy."""
+    return build_allowed_origins(
+        port,
+        remote=remote,
+        remote_origin=remote_origin,
+        extra_origins=extra_origins,
+    )
 
 
 # ─── CORS allowed origins ─────────────────────────────────────────────────────
@@ -533,28 +523,27 @@ class BridgeHandler(BaseHTTPRequestHandler):
         return self.headers.get("Origin", "")
 
     def _cors(self) -> None:
-        # _ALLOWED_ORIGINS is always a concrete set (localhost pair, or the
-        # configured REPOCIV_REMOTE_ORIGIN). We never emit a wildcard ACAO:
-        # auth is token-based and credentials/headers depend on a known origin.
         origin = self._origin()
         if origin in _ALLOWED_ORIGINS:
             self.send_header("Access-Control-Allow-Origin", origin)
-        else:
-            # Fallback for non-browser clients / curl (no/Origin not allowed):
-            # reflect the canonical localhost origin, never the caller's.
-            self.send_header("Access-Control-Allow-Origin", f"http://localhost:{REPOCIV_PORT}")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-RepoCiv-Token")
         self.send_header("Vary", "Origin")
 
     def _check_token(self) -> bool:
-        """Return True if the request carries a valid token (or token is not configured)."""
         if not REPOCIV_TOKEN:
-            return True  # auth disabled in dev
+            return True
         received = self.headers.get("X-RepoCiv-Token", "")
-        # Constant-time comparison to avoid a timing oracle on the token
-        # (relevant when REPOCIV_REMOTE=true exposes auth over the network).
         return hmac.compare_digest(received.encode("utf-8"), REPOCIV_TOKEN.encode("utf-8"))
+
+    def _check_mutation_trust(self) -> bool:
+        return is_trusted_mutation(
+            expected_token=REPOCIV_TOKEN,
+            received_token=self.headers.get("X-RepoCiv-Token", ""),
+            origin=self._origin(),
+            content_type=self.headers.get("Content-Type", ""),
+            allowed_origins=_ALLOWED_ORIGINS,
+        )
 
     def _client_ip(self) -> str:
         return self.client_address[0] if self.client_address else "unknown"
@@ -563,7 +552,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
         return not _rate_check(self._client_ip())
 
     def do_OPTIONS(self) -> None:
-        self.send_response(200)
+        if self._origin() not in _ALLOWED_ORIGINS:
+            self._err_json(403, "origin not allowed")
+            return
+        self.send_response(204)
         self._cors()
         self.end_headers()
 
@@ -612,21 +604,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
         params = self._parse_qs()
         ctx: dict[str, Any] = {"params": params}
 
-        # Health and ready endpoints are exempt from token auth (used by monitors)
-        if path not in ("/health", "/ready") and not self._check_token():
-            # EventSource cannot send custom headers — accept the token via
-            # query param for the SSE stream only.
-            sse_token_ok = (
-                path == "/events"
-                and bool(REPOCIV_TOKEN)
-                and hmac.compare_digest(
-                    params.get("token", "").encode("utf-8"),
-                    REPOCIV_TOKEN.encode("utf-8"),
-                )
-            )
-            if not sse_token_ok:
+        if path == "/events":
+            stream_token = self.headers.get("X-RepoCiv-Token", "") or params.get("token", "")
+            if not is_trusted_stream(
+                REPOCIV_TOKEN,
+                stream_token,
+                self._origin(),
+                _ALLOWED_ORIGINS,
+            ):
                 self._err_json(401, "unauthorized")
                 return
+        elif path not in ("/health", "/ready") and not self._check_token():
+            self._err_json(401, "unauthorized")
+            return
 
         # ── Simple exact-match GET routes (table: routes/registry.py) ──────────
         if path in _registry.GET_EXACT:
@@ -754,10 +744,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self._err_json(404, "not found")
 
     def do_POST(self) -> None:
-        # Token auth first: an unauthenticated caller must not be able to
-        # consume another IP's rate-limit budget (or trip the limiter at all).
-        if not self._check_token():
-            self._err_json(401, "unauthorized")
+        if not self._check_mutation_trust():
+            media_type = self.headers.get("Content-Type", "").partition(";")[0].strip().lower()
+            if media_type != "application/json":
+                self._err_json(415, "application/json required")
+            else:
+                self._err_json(401 if REPOCIV_TOKEN else 403, "unauthorized")
             return
 
         if self.headers.get("X-RepoCiv-Client", "") == "mcp":
@@ -1177,7 +1169,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, _handle_sigterm)
 
     has_gpu = get_gpu_info() is not None
-    auth_status = "ON" if REPOCIV_TOKEN else "OFF (dev)"
+    auth_status = "TOKEN" if REPOCIV_TOKEN else "ORIGIN-ONLY"
     mode_str = "REMOTE" if REPOCIV_REMOTE else "LOCAL"
     bind_url = f"http://{BRIDGE_HOST}:{BRIDGE_PORT}"
     ws_url = f"ws://{BRIDGE_HOST}:{BRIDGE_WS_PORT}"

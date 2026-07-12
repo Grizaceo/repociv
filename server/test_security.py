@@ -19,7 +19,10 @@ import pytest
 from server._security import (
     MIN_TOKEN_LENGTH,
     _is_loopback_bind,
+    build_allowed_origins,
     enforce_token_policy,
+    is_trusted_mutation,
+    is_trusted_stream,
 )
 
 
@@ -29,6 +32,59 @@ from server._security import (
 def test_min_token_length_is_32():
     """Audit 0.4 says "exigir ≥32 chars siempre que haya token"."""
     assert MIN_TOKEN_LENGTH == 32
+
+
+def test_browser_trust_requires_json_and_same_origin_when_token_empty():
+    origins = build_allowed_origins(5273, remote=False, remote_origin="", extra_origins="")
+    assert is_trusted_mutation(
+        expected_token="",
+        received_token="",
+        origin="http://127.0.0.1:5273",
+        content_type="application/json; charset=utf-8",
+        allowed_origins=origins,
+    )
+    assert not is_trusted_mutation(
+        expected_token="",
+        received_token="",
+        origin="https://evil.example",
+        content_type="application/json",
+        allowed_origins=origins,
+    )
+    assert not is_trusted_mutation(
+        expected_token="",
+        received_token="",
+        origin="http://127.0.0.1:5273",
+        content_type="text/plain",
+        allowed_origins=origins,
+    )
+
+
+def test_configured_token_is_required_even_for_same_origin_mutation():
+    origins = {"http://127.0.0.1:5273"}
+    token = "x" * 32
+    assert not is_trusted_mutation(
+        expected_token=token,
+        received_token="",
+        origin="http://127.0.0.1:5273",
+        content_type="application/json",
+        allowed_origins=origins,
+    )
+    assert is_trusted_mutation(
+        expected_token=token,
+        received_token=token,
+        origin="",
+        content_type="application/json",
+        allowed_origins=origins,
+    )
+
+
+def test_sse_trust_uses_origin_without_token_or_query_token_when_configured():
+    origins = {"http://127.0.0.1:5273"}
+    assert is_trusted_stream("", "", "http://127.0.0.1:5273", origins)
+    assert not is_trusted_stream("", "", "https://evil.example", origins)
+    token = "y" * 32
+    assert is_trusted_stream(token, token, "", origins)
+    assert not is_trusted_stream(token, "", "http://127.0.0.1:5273", origins)
 
 
 @pytest.mark.parametrize(
