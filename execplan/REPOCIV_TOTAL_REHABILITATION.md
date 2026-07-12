@@ -42,14 +42,16 @@ Baseline gate results:
 - [x] (2026-07-12) Contrast clean HEAD, WIP and controlled runtime.
 - [x] (2026-07-12) Produce total audit, feature matrix and visual/UX audit.
 - [x] (2026-07-12) Create branch `audit/repociv-total-rehabilitation-20260712` without discarding WIP.
-- [x] (2026-07-12) Milestone 0 — adversarial review cycle 1 `VERIFIED=false`; four plan gaps corrected; cycle 2 `VERIFIED=true` with no blockers.
-- [x] (2026-07-12) Milestone 1 — Git uses argv-only execution, repo/file containment rejects traversal and symlink escape, 17 focused tests pass, build passes, and isolated Vite bound `127.0.0.1:5383` with HTTP 200.
-- [ ] Milestone 2 — confine command payloads, repo/file paths, profiles, MCP reads and session IDs.
-- [ ] Milestone 3 — make one essential task lifecycle reachable and truthful.
-- [ ] Milestone 4 — align terminal events, context and ledger attribution.
-- [ ] Milestone 5 — integrate deliberate WIP pruning and simplify duplicate UI contracts.
-- [ ] Milestone 6 — repair mobile/accessibility/runtime noise without harming visual character.
-- [ ] Milestone 7 — stabilize E2E, run full/fresh gates, align docs and final independent verification.
+- [x] (2026-07-12) Milestone 0 — cycle 1 (Claude) `VERIFIED=false`, cycle 2 (Claude) `VERIFIED=true`; delayed delegate returned `VERIFIED=false`; all E1–E10 corrections landed; final independent cycle returned `VERIFIED=true`, `BLOCKERS=[]`.
+- [ ] Milestone 0.5 — split and commit preserved WIP before any further Milestone 2–4 implementation. Milestone 1's first commit was staged surgically against the forensic WIP baseline; no prior WIP hunk entered it.
+- [ ] Milestone 1 — partial: argv-only Git, root/file containment, loopback bind and 17 focused tests are committed; selected-repository membership, Origin/mutation authentication and wildcard-CORS removal remain open.
+- [ ] Milestone 1.5 — secure Python HTTP/SSE/WS/MCP browser boundary.
+- [ ] Milestone 2 — confine command payloads, selected repos, profiles, MCP reads and session IDs; define server-owned risk.
+- [ ] Milestone 3 — make one essential task lifecycle and versioned evidence/ledger chain reachable and truthful.
+- [ ] Milestone 4 — transactional approval/scheduler, state/backup and API ownership consolidation.
+- [ ] Milestone 5 — simplify duplicate UI contracts after replacement E2E passes.
+- [ ] Milestone 6 — repair mobile/accessibility/runtime noise with reproducible fixtures.
+- [ ] Milestone 7 — self-contained fresh-install verification, docs and final independent review.
 
 ## Surprises & Discoveries
 
@@ -91,6 +93,18 @@ Knip reports module-boundary noise and test seams as well as dead code. Only exp
 
 No new multi-tenancy, SaaS, training, agent swarm, news features, wonders or self-improvement systems are added. Gaceta/wonders/era may remain secondary if removing them risks unrelated visual regressions; they are not allowed to block the core flow.
 
+### D8 — Selected repository is explicit membership, not broad-root containment
+
+The canonical resolver accepts only a realpath that is a member of RepoCiv's selected repository set. That set is the union of persisted `selectedRepoPaths` and repositories returned by the canonical scanner for a user-selected root; scanner output is persisted before task dispatch. A root itself, arbitrary descendant, sibling, symlink escape or merely-existing absolute path is not membership. HTTP, MCP, Vite and agent execution call the same resolver contract: `resolve_selected_repo(repo_id_or_path) -> realpath | SelectedRepoError(code='not_selected'|'missing'|'escape')`. Multi-root fixtures must cover one selected repo per root and one unselected repo under each root.
+
+### D9 — Loopback is not authentication
+
+Browser mutations require both JSON Content-Type and either a valid token or trusted same-origin Origin. Foreign Origin and no-cors `text/plain` are rejected. WebSocket validates Origin before auto-auth; SSE never emits wildcard CORS. Vite, Python HTTP, WS and MCP use one allowlist derived from configured frontend origin(s). Empty development token does not mean unauthenticated mutation.
+
+### D10 — Risk is server-owned
+
+Clients may raise risk but never lower it. The server infers effective risk from command type, selected harness capabilities and requested scope. Repo-less Hermes conversation and read-only inspect are low; sandboxed repo writes are medium and wait for approval unless an explicit per-command user approval is present; unsandboxed/native mutation, external messaging, commit and deletion are high/destructive and always wait. Default adapters receive no permission-bypass flags. Clicking Send proposes work; it is not blanket approval for later risky tool actions.
+
 ## Milestone 0 — Adversarial plan validation
 
 Submit the three audit documents and this ExecPlan to an independent reviewer. The rubric must check:
@@ -107,7 +121,20 @@ Repeat at most three cycles. Record `verified=true` before Milestone 1.
 
 Acceptance: review result explicitly says `verified=true`, or every objection is resolved in `Decision Log` with concrete evidence.
 
-## Milestone 1 — P0 Vite filesystem boundary
+## Milestone 0.5 — Preserve atomic rollback boundaries
+
+Before any further implementation, temporarily separate the uncommitted 2A edits from the preserved WIP, then split the original WIP using the forensic WIP clone as the exact baseline. Commit in dependency order:
+
+1. tooling/lint/dependency cleanup;
+2. fatigue/tensor/swarm removal plus live updates to `docs/implementation_plan.md`, `docs/DATA_SOURCES.md` and any other consumer-facing references;
+3. local simulation and terminal-panel simplification;
+4. renderer/city/terrain visual changes;
+5. E2E/debug-contract changes;
+6. public documentation alignment.
+
+For every commit, stage only `HEAD→forensic-WIP` hunks belonging to that concern, inspect `git diff --cached`, run directed gates and record the hash in `Progress`. If a file mixes concerns, use WIP-relative patches; do not stage the whole file. Milestone 1 commit `1073194` is the only historical exception: it was staged from `forensic-WIP→working-tree`, and a cached-diff guard proved no threshold/terminal/xterm WIP hunk entered the commit. No Milestone 2–4 commit may proceed until this split is complete.
+
+## Milestone 1 — P0 local browser/filesystem boundary
 
 ### Changes
 
@@ -116,8 +143,10 @@ Acceptance: review result explicitly says `verified=true`, or every objection is
   - add a pure `resolveRepoRelativeFile(repoPath, file)` containment helper;
   - reject absolute paths, traversal, NUL and resolved paths outside repo;
   - preserve existing response schemas;
-  - confine every decoded repo ID itself to a configured selected root before any filesystem or git operation;
-  - reject arbitrary encoded absolute repos, sibling paths and symlink escapes.
+  - resolve repo IDs only through canonical selected-repository membership, never arbitrary configured-root descendants;
+  - reject arbitrary encoded absolute repos, unselected repos, sibling paths and symlink escapes;
+  - reject foreign `Origin` on every API mutation and remove wildcard CORS;
+  - require JSON Content-Type plus same-origin or valid token for mutation; no-cors `text/plain` is 415/403.
 - `vite.config.ts`
   - bind `127.0.0.1` by default;
   - permit non-loopback only behind an explicit environment flag documented as unsupported without a trusted proxy.
@@ -138,20 +167,36 @@ No request-controlled value reaches a shell parser; dev server listens only on 1
 
 ### Commit
 
-`refactor: confine local filesystem api`
+`refactor: confine local filesystem api` plus follow-up `refactor: authenticate local browser mutations`.
+
+## Milestone 1.5 — P0 Python HTTP, SSE, WebSocket and MCP boundary
+
+### Changes
+
+- `server/bridge.py`: mutation POSTs require `application/json` and either trusted Origin or valid bearer/token header, even when the configured token is empty; no wildcard CORS; explicit 403/415.
+- `server/websocket_handler.py`: validate Origin during handshake before auto-auth; an empty token is not sufficient for foreign or missing browser Origin.
+- SSE/read endpoints emit only configured same-origin CORS or none.
+- MCP mutation tools call the same command validator/policy and selected-repo resolver; MCP does not bypass the browser policy merely because it is local.
+- Tests cover trusted same-origin, foreign Origin, missing Origin with/without token, `text/plain`, WS handshake, SSE headers and HTTP/WS/MCP mutation parity.
+
+Observable result: a foreign webpage cannot submit or auto-authenticate a command against localhost; a configured local frontend and authenticated CLI/MCP client still work.
+
+Commit: `refactor: secure local bridge transports`.
 
 ## Milestone 2 — P0 command and session confinement
 
 ### Changes
 
-- `server/command_schema.py`
+- `server/command_schema.py` and `server/policy.py`
   - reject unknown types;
   - validate payload strings and per-command required fields;
   - safe unit identifier pattern;
-  - explicit `repoPath` and `filePath` contracts.
+  - explicit `repoPath` and `filePath` contracts;
+  - clients can raise but never lower risk;
+  - infer `execute_agent` risk from adapter capabilities and mutation scope, with medium/high tasks entering `waiting_approval`.
 - `server/agent_runner.py`
-  - resolve allowed roots from configured RepoCiv roots;
-  - require working directory to exist and be contained;
+  - resolve through canonical selected-repository membership, not a broad allowed root;
+  - require working directory to exist, be selected and be realpath-contained;
   - require file path containment;
   - fail closed before spawning any CLI.
 - `src/ui/hudWiring/inputs.ts` and city/map types
@@ -205,7 +250,7 @@ Use `/commands` and `execute_agent` as the sole task start contract. A task payl
 - `src/ui/hudWiring/inputs.ts`: consume the selected city's real `repoPath` contract landed in Milestone 2; do not create a second target-resolution path.
 - `src/map.ts` / types as needed: preserve repo identity/path on city.
 - `server/command_schema.py`: require fields for `execute_agent`.
-- `server/command_executors.py`: emit terminal event and evidence under the same command ID.
+- `server/command_executors.py`, `server/event_store.py`, `server/context_pack.py` and `server/research_ledger.py`: define and emit one versioned lifecycle envelope under the same command ID with actor, repo ID/path, unit, harness/model, start/end, status and result/error; expose evidence artifact/query by command ID and ingest that exact envelope into the ledger.
 - `server/approval_store.py` and `server/scheduler.py`: make approval→enqueue→dispatch transitions idempotent and failure-safe; a failed enqueue/dispatcher records terminal failure and never silently drops the command.
 - `src/bridge.ts`: send rejection to `/reject`, never `/approve`; cover HTTP fallback and WS parity.
 - `src/ui/taskPanel.ts` and `taskAssignPanel.ts`: merge into a thin view over actual commands or remove simulated task choices if no longer consumed.
@@ -227,24 +272,25 @@ Use `/commands` and `execute_agent` as the sole task start contract. A task payl
 
 `feat: connect selected repos to agent tasks`
 
-## Milestone 4 — P1 event/context/ledger contract
+## Milestone 4 — P1 transactional reliability, API ownership and persistence
 
 ### Changes
 
-- Define one versioned terminal event envelope in `server/event_store.py`.
-- Update `context_pack.py` to consume camelCase/nested data or centralize deserialization.
-- Update `research_ledger.py` to join lifecycle events by command ID and preserve actor, repo, model, start/end and result/error.
-- Make `ack` a valid transport-only message or consume it before domain schema validation in `src/bridge.ts` / `bridgeSchema.ts`.
-- Contract tests use real serialized events, not hand-shaped legacy dicts.
+- Failure-injection hardening for `approval_store.py` and `scheduler.py`: durable state is not removed until enqueue/thread start succeeds; retries are idempotent; failures become recoverable or terminal events.
+- Move filesystem/repo-selection ownership to authenticated Python routes. Vite endpoints remain thin same-origin adapters only until HTTP/MCP/UI replacement E2E passes, then are removed in a separate commit.
+- `profile_identity.py` and `config_store.py` accept discovered profile IDs, enforce profile-root containment and reject `harness_ref` traversal in every read/write route.
+- Define the versioned terminal event envelope in Milestone 3; Milestone 4 only migrates remaining legacy consumers and removes adapters after parity tests.
+- Consume transport `ack` before domain validation in `src/bridge.ts` / `bridgeSchema.ts`.
+- Add failure-injection, profile traversal, API parity and real serialized-event adapter tests.
 
 ### Commands
 
-    pytest -q server/test_event_store.py server/test_context_pack.py server/test_research_ledger.py
+    pytest -q server/test_event_store.py server/test_context_pack.py server/test_research_ledger.py server/test_approval_store.py server/test_scheduler.py server/test_config_store.py server/test_profile_identity.py
     npx vitest run src/bridge.test.ts src/bridgeSchema.test.ts
 
 ### Commit
 
-`refactor: align task events and ledger evidence`
+`refactor: harden local state transitions`
 
 ### Persistence sub-milestone
 
@@ -257,6 +303,22 @@ Use `/commands` and `execute_agent` as the sole task start contract. A task payl
 Commit: `refactor: unify local state and backups`.
 
 ## Milestone 5 — Integrate WIP pruning and simplify surface
+
+### Duplicate-feature disposition before deletion
+
+| Capability | Surviving owner | Temporary adapter | Removal condition |
+|---|---|---|---|
+| Task start | `src/ui/hudWiring/inputs.ts` → `/commands` `execute_agent` | `taskAssignPanel.ts` may translate legacy choices | Core selected-repo E2E passes through canonical command |
+| Task status/approval | command status + `approvalPanel.ts`; `taskPanel.ts` becomes a read-only view | workspace issue phases | Real command queued/running/terminal/reject UI E2E passes |
+| Cancellation | `POST /commands/:id/cancel` and MCP `command_cancel` | legacy task cancel route | HTTP/WS/MCP parity and scheduler recovery tests pass |
+| Work evidence | `run_state` + versioned event artifact query by command ID | workspace issue artifacts | Ledger attribution E2E passes |
+| MCP tasks | `command_submit`, status/query, approval/reject/cancel | `task_*` tools | Canonical MCP lifecycle test passes |
+| Onboarding | `src/ui/onboardingPanel.ts` only | command palette links into same panel | New-user screenshot and keyboard E2E pass |
+| Chronicle/log/timeline | versioned event store + `timelinePanel.ts` view; ledger is analytics | replay/legacy log adapters | Event envelope migration and query tests pass |
+| Filesystem/repo selection | authenticated Python routes + canonical resolver | Vite same-origin adapters | UI and MCP replacement E2E pass |
+| Pending/priority/construction | secondary manual planning views, never task execution | none | Keep only if consumer/reducer tests pass |
+
+No route, panel, artifact store or MCP tool in the adapter column is deleted in the same commit that introduces its replacement.
 
 Split existing WIP by concern; do not create one mega-commit.
 
@@ -291,12 +353,16 @@ Acceptance: no deleted symbol is referenced by source/tests/docs live/API/MCP; e
 - Mobile CSS: no horizontal document overflow at 390×844; one bottom sheet/drawer; target size ≥44 px.
 - Respect reduced motion for decorative animation and idle loops.
 
-### Tests
+### Reproducible visual fixture and tests
 
-- DOM accessibility tests for labels/roles.
-- Playwright viewport assertion: `scrollWidth <= innerWidth`.
-- Runtime console assertion: no automatic 412, no invalid `ack` warning.
-- Baseline/post screenshots for flat, WebGL, local and mobile.
+- Generate a fixed 12-repository fixture with stable names, file counts, git metadata and city coordinates under a temporary selected root.
+- Capture flat at fixed camera/zoom, WebGL at fixed camera transform, local at fixed selected repo/tile and mobile at 390×844.
+- Start the canonical capture with a healthy bridge and no degraded banner; fail if a runtime warning/invalid-event overlay remains.
+- Compare with Playwright screenshot baselines: `maxDiffPixelRatio <= 0.02` for flat/local/mobile and `<= 0.05` for WebGL; masks are limited to timestamps/cursor only.
+- Human reviewer rubric must answer yes/no for: every building/prop contacts terrain; doors/windows/chimneys/flags remain visible at baseline scale; labels are legible and non-overlapping; city walls do not intersect buildings; the 12-city count is visible in captured state.
+- DOM accessibility tests cover labels/roles.
+- Playwright asserts `scrollWidth <= innerWidth`.
+- Runtime console asserts no automatic 412 and no invalid `ack` warning.
 
 ### Commit split
 
@@ -313,14 +379,22 @@ Acceptance: no deleted symbol is referenced by source/tests/docs live/API/MCP; e
     npm audit --package-lock-only
     git diff --check
 
-Fresh clone/worktree:
+Fresh clone/worktree is self-contained and does not reuse the working tree's virtualenv or state:
 
     git clone --no-hardlinks <local-repo> <temporary-dir>
+    cd <temporary-dir>
     npm ci
+    python3 -m venv .venv
+    .venv/bin/python -m pip install -r requirements.txt
+    npx playwright install chromium
+    export PATH="$PWD/.venv/bin:$PATH"
+    export REPOCIV_DATA_DIR="$(mktemp -d)" REPOCIV_CONFIG_DIR="$(mktemp -d)" XDG_STATE_HOME="$(mktemp -d)"
+    export REPOCIV_TOKEN=<temporary-nonempty-token> REPOCIV_PORT=<free-port> BRIDGE_PORT=<free-port> BRIDGE_WS_PORT=<free-port>
+    export REPOCIV_ALLOWED_ORIGINS="http://127.0.0.1:<frontend-port>"
     bash scripts/check.sh
     npx playwright test --project=chromium
 
-Runtime verification uses isolated ports/state, real selected repos, deterministic harmless task executor and screenshots. Wait at least 15 seconds before judging map load.
+Then start bridge/frontend on those temporary ports, create/select a temporary git repo through the user-visible/API path, submit a deterministic harmless command, exercise approval/rejection/cancel/evidence/ledger through UI, HTTP and MCP without `window.__repocivDebug`, capture the reproducible visual fixture, and tear down only those processes/state roots. Wait at least 15 seconds before judging map load.
 
 Final checker is independent from implementer and verifies every accepted finding. Maximum three correction cycles per persistent finding.
 
