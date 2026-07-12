@@ -124,14 +124,16 @@ describe('repociv path helpers', () => {
 
   it('resolveRepoPathFromId resolves encoded ids and plain folder names under map root', () => {
     const mapRoot = resolve(fixture.mapRoot);
-    expect(resolveRepoPathFromId(encodeRepoId(fixture.repoA), mapRoot)).toBe(resolve(fixture.repoA));
+    expect(resolveRepoPathFromId(encodeRepoId(fixture.repoA), mapRoot)).toBe(
+      resolve(fixture.repoA),
+    );
     expect(resolveRepoPathFromId('repo-a', mapRoot)).toBe(resolve(fixture.repoA));
   });
 
-  it('resolveRepoPathFromId does not escape map root via legacy join', () => {
+  it('resolveRepoPathFromId never accepts an encoded repo outside configured roots', () => {
     const mapRoot = resolve(fixture.mapRoot);
     expect(resolveRepoPathFromId('outside', mapRoot)).toBeNull();
-    expect(resolveRepoPathFromId(encodeRepoId(fixture.outside), mapRoot)).toBe(resolve(fixture.outside));
+    expect(resolveRepoPathFromId(encodeRepoId(fixture.outside), mapRoot)).toBeNull();
   });
 });
 
@@ -146,7 +148,11 @@ describe('/api/map-root handlers', () => {
     const plugin = repocivPlugin(fixture.mapRoot);
     let captured: Connect.NextHandleFunction | undefined;
     plugin.configureServer!({
-      middlewares: { use: (fn: Connect.NextHandleFunction) => { captured = fn; } },
+      middlewares: {
+        use: (fn: Connect.NextHandleFunction) => {
+          captured = fn;
+        },
+      },
       ws: { send: () => {} },
     } as never);
     if (!captured) throw new Error('middleware not registered');
@@ -166,7 +172,12 @@ describe('/api/map-root handlers', () => {
   });
 
   it('POST rejects empty, missing, and non-directory paths', async () => {
-    const empty = await invokeHandler(handler, 'POST', '/api/map-root', JSON.stringify({ path: '  ' }));
+    const empty = await invokeHandler(
+      handler,
+      'POST',
+      '/api/map-root',
+      JSON.stringify({ path: '  ' }),
+    );
     expect(empty.statusCode).toBe(400);
     expect(JSON.parse(empty.body).error).toBe('path requerido');
 

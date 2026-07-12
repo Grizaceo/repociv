@@ -14,9 +14,9 @@
 //   - /event POST         — bridge event relay → Vite HMR WS
 
 import type { Plugin, Connect } from 'vite';
-import { execSync } from 'node:child_process';
-import { readdirSync, statSync, existsSync, readFileSync, realpathSync } from 'node:fs';
-import { join, basename, dirname, resolve } from 'node:path';
+import { execFileSync, execSync } from 'node:child_process';
+import { readdirSync, statSync, lstatSync, existsSync, readFileSync, realpathSync } from 'node:fs';
+import { join, basename, dirname, resolve, relative, isAbsolute, sep } from 'node:path';
 import { homedir, platform } from 'node:os';
 import type { ScannedRepo } from '../src/map.ts';
 import {
@@ -35,8 +35,6 @@ import skipDirsJson from '../shared/skip-dirs.json' with { type: 'json' };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-
-
 // ─── Path helpers ─────────────────────────────────────────────────────────────
 
 export const SKIP_DIRS = new Set(skipDirsJson);
@@ -45,6 +43,101 @@ export function expandUser(p: string): string {
   if (p === '~') return homedir();
   if (p.startsWith('~/')) return join(homedir(), p.slice(2));
   return p;
+}
+
+type GitExecutor = (
+  file: string,
+  args: string[],
+  options: { encoding: 'utf8'; stdio: ['ignore', 'pipe', 'ignore'] },
+) => string | Buffer;
+
+export function runGit(
+  repoPath: string,
+  args: string[],
+  execute: GitExecutor = execFileSync,
+): string {
+  const output = execute('git', ['-C', resolve(repoPath), ...args], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  return String(output).trim();
+}
+
+function tryRunGit(repoPath: string, args: string[]): string {
+  try {
+    return runGit(repoPath, args);
+  } catch {
+    return '';
+  }
+}
+
+function isContainedPath(candidatePath: string, rootPath: string): boolean {
+  const rel = relative(rootPath, candidatePath);
+  return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel));
+}
+
+function realContainedPath(candidatePath: string, roots: string[]): string | null {
+  try {
+    const candidateReal = realpathSync(candidatePath);
+    for (const root of roots) {
+      try {
+        const rootReal = realpathSync(root);
+        if (isContainedPath(candidateReal, rootReal)) return candidateReal;
+      } catch {
+        // Ignore stale configured roots.
+      }
+    }
+  } catch {
+    // Missing or unreadable candidates are not selectable repos.
+  }
+  return null;
+}
+
+export function resolveRepoRelativeFile(repoPath: string, filePath: string): string | null {
+  if (!filePath || filePath.includes('\0') || filePath.includes('\\')) return null;
+  if (isAbsolute(filePath) || /^[A-Za-z]:[\\/]/.test(filePath)) return null;
+
+  let repoReal: string;
+  try {
+    repoReal = realpathSync(repoPath);
+  } catch {
+    return null;
+  }
+
+  const candidate = resolve(repoReal, filePath);
+  if (!isContainedPath(candidate, repoReal)) return null;
+
+  // Walk existing path segments with lstat so broken symlinks are visible and
+  // symlinked directories cannot redirect a later missing file outside.
+  let cursor = repoReal;
+  for (const segment of relative(repoReal, candidate).split(sep).filter(Boolean)) {
+    cursor = join(cursor, segment);
+    try {
+      if (lstatSync(cursor).isSymbolicLink()) {
+        const resolvedLink = realpathSync(cursor);
+        if (!isContainedPath(resolvedLink, repoReal)) return null;
+      }
+    } catch {
+      // Missing regular paths are valid for historical git queries, but a
+      // broken symlink is not: lstat succeeds and realpath throws above.
+      try {
+        if (lstatSync(cursor).isSymbolicLink()) return null;
+      } catch {
+        break;
+      }
+    }
+  }
+
+  // Resolve the closest existing ancestor as a second containment check.
+  let existing = candidate;
+  while (!existsSync(existing) && existing !== repoReal) existing = dirname(existing);
+  try {
+    if (!isContainedPath(realpathSync(existing), repoReal)) return null;
+  } catch {
+    return null;
+  }
+
+  return relative(repoReal, candidate).split(sep).join('/');
 }
 
 // ─── Repo scanning ────────────────────────────────────────────────────────────
@@ -76,7 +169,11 @@ export function countFiles(dir: string, exts: Record<string, number>, depth = 0)
       if (SKIP_DIRS.has(entry) || entry.startsWith('.')) continue;
       const full = join(dir, entry);
       let st;
-      try { st = statSync(full); } catch { continue; }
+      try {
+        st = statSync(full);
+      } catch {
+        continue;
+      }
       if (st.isDirectory()) {
         total += countFiles(full, exts, depth + 1);
       } else if (st.isFile()) {
@@ -88,19 +185,17 @@ export function countFiles(dir: string, exts: Record<string, number>, depth = 0)
         }
       }
     }
-  } catch { /* unreadable */ }
+  } catch {
+    /* unreadable */
+  }
   return total;
 }
 
 export function gitStats(repo: string): { commits: number; days: number; hasGit: boolean } {
   if (!existsSync(join(repo, '.git'))) return { commits: 0, days: 999, hasGit: false };
   try {
-    const commits = parseInt(
-      execSync(`git -C "${repo}" rev-list --count HEAD 2>/dev/null || echo 0`,
-        { encoding: 'utf8' }).trim(), 10) || 0;
-    const lastTs = parseInt(
-      execSync(`git -C "${repo}" log -1 --format=%ct 2>/dev/null || echo 0`,
-        { encoding: 'utf8' }).trim(), 10) || 0;
+    const commits = parseInt(tryRunGit(repo, ['rev-list', '--count', 'HEAD']), 10) || 0;
+    const lastTs = parseInt(tryRunGit(repo, ['log', '-1', '--format=%ct']), 10) || 0;
     const days = lastTs === 0 ? 999 : Math.floor((Date.now() / 1000 - lastTs) / 86400);
     return { commits, days, hasGit: true };
   } catch {
@@ -124,7 +219,11 @@ export function makeScanWorkspace(getMapRoot: () => string, getMapRoots?: () => 
     for (const entry of readdirSync(mapRoot)) {
       const full = join(mapRoot, entry);
       let st;
-      try { st = statSync(full); } catch { continue; }
+      try {
+        st = statSync(full);
+      } catch {
+        continue;
+      }
       if (!st.isDirectory()) continue;
       if (entry.startsWith('.')) continue;
       try {
@@ -175,7 +274,9 @@ export function makeScanWorkspace(getMapRoot: () => string, getMapRoots?: () => 
 export function readRequestBody(req: Connect.IncomingMessage): Promise<string> {
   return new Promise((resolveBody) => {
     let body = '';
-    req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+    req.on('data', (chunk: Buffer) => {
+      body += chunk.toString();
+    });
     req.on('end', () => resolveBody(body));
   });
 }
@@ -318,22 +419,33 @@ export function pickFolderWithSystemDialog(): string {
   );
 }
 
-export function resolveRepoPathFromId(repoIdOrPath: string, currentMapRoot: string): string | null {
-  const decodedRaw = decodeURIComponent(repoIdOrPath);
+export function resolveRepoPathFromId(
+  repoIdOrPath: string,
+  currentMapRoot: string,
+  allowedRoots: string[] = [currentMapRoot],
+): string | null {
+  let decodedRaw: string;
+  try {
+    decodedRaw = decodeURIComponent(repoIdOrPath);
+  } catch {
+    return null;
+  }
   const decodedId = decodeRepoId(decodedRaw);
-  if (decodedId && repoExists(decodedId)) return resolve(decodedId);
-  if (decodedRaw.startsWith('/') || decodedRaw.startsWith('~')) {
-    const direct = resolve(expandUser(decodedRaw));
-    if (repoExists(direct)) return direct;
+  if (decodedId) return realContainedPath(decodedId, allowedRoots);
+
+  // Plain ids are single folder names under the active root — reject traversal
+  // and never accept direct absolute paths from an HTTP route.
+  if (
+    decodedRaw.startsWith('/') ||
+    decodedRaw.startsWith('~') ||
+    decodedRaw.includes('/') ||
+    decodedRaw.includes('\\') ||
+    decodedRaw.includes('..') ||
+    decodedRaw.includes('\0')
+  ) {
     return null;
   }
-  // Plain ids are single folder names under the active root — reject traversal.
-  if (decodedRaw.includes('/') || decodedRaw.includes('\\') || decodedRaw.includes('..')) {
-    return null;
-  }
-  const legacy = join(currentMapRoot, decodedRaw);
-  if (repoExists(legacy)) return resolve(legacy);
-  return null;
+  return realContainedPath(join(currentMapRoot, decodedRaw), allowedRoots);
 }
 
 function scanSelectedRepos(state: ReturnType<typeof loadState>): ScannedRepo[] {
@@ -350,7 +462,10 @@ function scanSelectedRepos(state: ReturnType<typeof loadState>): ScannedRepo[] {
   return repos;
 }
 
-function respondJson(res: { setHeader: (name: string, value: string) => void; end: (body: string) => void }, body: unknown): void {
+function respondJson(
+  res: { setHeader: (name: string, value: string) => void; end: (body: string) => void },
+  body: unknown,
+): void {
   res.setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify(body));
 }
@@ -359,7 +474,7 @@ function respondJson(res: { setHeader: (name: string, value: string) => void; en
 
 export function repocivPlugin(mapRoot: string): Plugin {
   let server: { ws: { send: (msg: object) => void } } | undefined;
-  let rootsState = ensureRoot(loadState(resolve(mapRoot)), resolve(mapRoot));
+  const rootsState = ensureRoot(loadState(resolve(mapRoot)), resolve(mapRoot));
   saveState(rootsState);
   const getCurrentMapRoot = () => rootsState.activeRoot;
   const getAllMapRoots = () => Object.keys(rootsState.roots).filter((r) => existsSync(r));
@@ -376,7 +491,9 @@ export function repocivPlugin(mapRoot: string): Plugin {
     // Bridge events from bridge.py → frontend HMR websocket
     if (path === '/event' && req.method === 'POST') {
       let body = '';
-      req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+      req.on('data', (chunk: Buffer) => {
+        body += chunk.toString();
+      });
       req.on('end', () => {
         try {
           const event = JSON.parse(body);
@@ -404,7 +521,11 @@ export function repocivPlugin(mapRoot: string): Plugin {
 
     if (path === '/api/repos/refresh' && req.method === 'POST') {
       clearCache();
-      respondJson(res, { ok: true, count: scanWorkspace().length, selectedCount: scanSelectedRepos(rootsState).length });
+      respondJson(res, {
+        ok: true,
+        count: scanWorkspace().length,
+        selectedCount: scanSelectedRepos(rootsState).length,
+      });
       return;
     }
 
@@ -416,16 +537,22 @@ export function repocivPlugin(mapRoot: string): Plugin {
     if (path === '/api/repo-selections' && req.method === 'POST') {
       try {
         const body = await readRequestBody(req);
-        const payload = JSON.parse(body) as { rootPath?: string; selectedRepoIds?: string[]; selectedRepoPaths?: string[] };
-        const rootPath = resolve(expandUser(String(payload.rootPath ?? rootsState.activeRoot ?? '').trim()));
+        const payload = JSON.parse(body) as {
+          rootPath?: string;
+          selectedRepoIds?: string[];
+          selectedRepoPaths?: string[];
+        };
+        const rootPath = resolve(
+          expandUser(String(payload.rootPath ?? rootsState.activeRoot ?? '').trim()),
+        );
         if (!rootPath || !repoExists(rootPath)) {
           res.statusCode = 400;
           respondJson(res, { error: 'rootPath no es carpeta valida' });
           return;
         }
         const repoPaths = [
-          ...((payload.selectedRepoIds ?? []).map((item) => decodeRepoId(String(item)) ?? '')),
-          ...((payload.selectedRepoPaths ?? []).map((item) => String(item))),
+          ...(payload.selectedRepoIds ?? []).map((item) => decodeRepoId(String(item)) ?? ''),
+          ...(payload.selectedRepoPaths ?? []).map((item) => String(item)),
         ]
           .map((item) => item.trim())
           .filter((item) => item.length > 0 && repoExists(item));
@@ -445,7 +572,11 @@ export function repocivPlugin(mapRoot: string): Plugin {
         const payload = JSON.parse(body) as { repoId?: string; repoPath?: string };
         const repoPath = payload.repoPath
           ? resolve(expandUser(String(payload.repoPath)))
-          : resolveRepoPathFromId(String(payload.repoId ?? ''), rootsState.activeRoot);
+          : resolveRepoPathFromId(
+              String(payload.repoId ?? ''),
+              rootsState.activeRoot,
+              getAllMapRoots(),
+            );
         if (!repoPath) {
           res.statusCode = 400;
           respondJson(res, { error: 'repoId/repoPath invalido' });
@@ -467,7 +598,11 @@ export function repocivPlugin(mapRoot: string): Plugin {
         const payload = JSON.parse(body) as { repoId?: string; repoPath?: string };
         const repoPath = payload.repoPath
           ? resolve(expandUser(String(payload.repoPath)))
-          : resolveRepoPathFromId(String(payload.repoId ?? ''), rootsState.activeRoot);
+          : resolveRepoPathFromId(
+              String(payload.repoId ?? ''),
+              rootsState.activeRoot,
+              getAllMapRoots(),
+            );
         if (!repoPath) {
           res.statusCode = 400;
           respondJson(res, { error: 'repoId/repoPath invalido' });
@@ -580,8 +715,11 @@ export function repocivPlugin(mapRoot: string): Plugin {
         isActive: rootPath === rootsState.activeRoot,
         repoCount: existsSync(rootPath)
           ? readdirSync(rootPath).filter((e) => {
-              try { return statSync(join(rootPath, e)).isDirectory() && !e.startsWith('.'); }
-              catch { return false; }
+              try {
+                return statSync(join(rootPath, e)).isDirectory() && !e.startsWith('.');
+              } catch {
+                return false;
+              }
             }).length
           : 0,
         selectedCount: entry.selectedRepoPaths.length,
@@ -699,7 +837,7 @@ export function repocivPlugin(mapRoot: string): Plugin {
 
     if (path.startsWith('/api/git/') && req.method === 'GET') {
       const name = path.slice('/api/git/'.length);
-      const repoPath = resolveRepoPathFromId(name, rootsState.activeRoot);
+      const repoPath = resolveRepoPathFromId(name, rootsState.activeRoot, getAllMapRoots());
       if (!repoPath || !existsSync(join(repoPath, '.git'))) {
         res.statusCode = 404;
         res.end(JSON.stringify({ error: 'No git repo' }));
@@ -710,15 +848,23 @@ export function repocivPlugin(mapRoot: string): Plugin {
         const file = qs.get('file');
 
         if (file) {
-          // Per-file git history + blame
-          const logRaw = execSync(
-            `git -C "${repoPath}" log --oneline -n 5 -- "${file}" 2>/dev/null || true`,
-            { encoding: 'utf8' },
-          ).trim();
-          const blameRaw = execSync(
-            `git -C "${repoPath}" blame -L 1,15 --porcelain -- "${file}" 2>/dev/null || true`,
-            { encoding: 'utf8' },
-          ).trim();
+          const safeFile = resolveRepoRelativeFile(repoPath, file);
+          if (!safeFile) {
+            res.statusCode = 400;
+            respondJson(res, { error: 'file path invalido' });
+            return;
+          }
+          // Per-file git history + blame. The requested path remains one argv
+          // element; no shell parser is involved.
+          const logRaw = tryRunGit(repoPath, ['log', '--oneline', '-n', '5', '--', safeFile]);
+          const blameRaw = tryRunGit(repoPath, [
+            'blame',
+            '-L',
+            '1,15',
+            '--porcelain',
+            '--',
+            safeFile,
+          ]);
 
           const log = logRaw ? logRaw.split('\n').filter(Boolean) : [];
           const blame: Array<{ line: number; author: string; date: string }> = [];
@@ -747,19 +893,18 @@ export function repocivPlugin(mapRoot: string): Plugin {
           return;
         }
 
-        // Repo-wide git summary (existing behaviour)
-        const status = execSync(`git -C "${repoPath}" status --short 2>/dev/null || true`,
-          { encoding: 'utf8' }).trim();
-        const branch = execSync(`git -C "${repoPath}" branch --show-current 2>/dev/null || echo`,
-          { encoding: 'utf8' }).trim();
-        const lastCommit = execSync(
-          `git -C "${repoPath}" log -1 --pretty=format:'%h|%s|%ar' 2>/dev/null || echo`,
-          { encoding: 'utf8' }).trim();
+        // Repo-wide git summary.
+        const status = tryRunGit(repoPath, ['status', '--short']);
+        const branch = tryRunGit(repoPath, ['branch', '--show-current']);
+        const lastCommit = tryRunGit(repoPath, ['log', '-1', '--pretty=format:%h|%s|%ar']);
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({
-          branch, lastCommit,
-          changes: status.split('\n').filter(Boolean).slice(0, 50),
-        }));
+        res.end(
+          JSON.stringify({
+            branch,
+            lastCommit,
+            changes: status.split('\n').filter(Boolean).slice(0, 50),
+          }),
+        );
       } catch (e) {
         res.statusCode = 500;
         res.end(JSON.stringify({ error: String(e) }));
@@ -769,7 +914,7 @@ export function repocivPlugin(mapRoot: string): Plugin {
 
     if (path.startsWith('/api/files/') && req.method === 'GET') {
       const name = path.slice('/api/files/'.length);
-      const repoPath = resolveRepoPathFromId(name, rootsState.activeRoot);
+      const repoPath = resolveRepoPathFromId(name, rootsState.activeRoot, getAllMapRoots());
       if (!repoPath || !existsSync(repoPath)) {
         res.statusCode = 404;
         res.end(JSON.stringify({ error: 'Not found' }));
@@ -783,7 +928,11 @@ export function repocivPlugin(mapRoot: string): Plugin {
             if (SKIP_DIRS.has(e) || e.startsWith('.')) continue;
             const full = join(d, e);
             let st;
-            try { st = statSync(full); } catch { continue; }
+            try {
+              st = statSync(full);
+            } catch {
+              continue;
+            }
             const r = rel ? `${rel}/${e}` : e;
             if (st.isDirectory()) walk(full, r, depth + 1);
             else files.push(r);
@@ -809,7 +958,9 @@ export function repocivPlugin(mapRoot: string): Plugin {
           const days = (Date.now() - statSync(skillPath).mtimeMs) / 86_400_000;
           health = days < 7 ? 'ok' : days < 30 ? 'stale' : 'broken';
         }
-      } catch { /* keep broken */ }
+      } catch {
+        /* keep broken */
+      }
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ health }));
       return;
@@ -821,7 +972,7 @@ export function repocivPlugin(mapRoot: string): Plugin {
       let tint: 'bright' | 'normal' | 'fog' = 'fog';
       try {
         if (existsSync(sessDir)) {
-          const files = readdirSync(sessDir).filter(f => f.endsWith('.jsonl'));
+          const files = readdirSync(sessDir).filter((f) => f.endsWith('.jsonl'));
           let latestMs = 0;
           for (const f of files) {
             try {
@@ -830,14 +981,18 @@ export function repocivPlugin(mapRoot: string): Plugin {
                 const ms = statSync(join(sessDir, f)).mtimeMs;
                 if (ms > latestMs) latestMs = ms;
               }
-            } catch { /* skip */ }
+            } catch {
+              /* skip */
+            }
           }
           if (latestMs > 0) {
             const days = (Date.now() - latestMs) / 86_400_000;
             tint = days < 7 ? 'bright' : days < 30 ? 'normal' : 'fog';
           }
         }
-      } catch { /* keep fog */ }
+      } catch {
+        /* keep fog */
+      }
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ tint }));
       return;

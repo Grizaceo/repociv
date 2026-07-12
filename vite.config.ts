@@ -21,8 +21,17 @@ function resolveMapRoot(mode: string): string {
   return resolve(expandUser(raw));
 }
 
+export function resolveViteHost(env: Record<string, string | undefined>): string {
+  return String(env.REPOCIV_REMOTE ?? '')
+    .trim()
+    .toLowerCase() === 'true'
+    ? '0.0.0.0'
+    : '127.0.0.1';
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const runtimeEnv = { ...env, REPOCIV_REMOTE: process.env.REPOCIV_REMOTE ?? env.REPOCIV_REMOTE };
   const repocivToken = env.VITE_REPOCIV_TOKEN ?? env.REPOCIV_TOKEN ?? '';
   const bridgeToken = env.VITE_BRIDGE_TOKEN ?? repocivToken;
   const vitePort = parseInt(env.VITE_PORT ?? '5273', 10);
@@ -40,7 +49,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: vitePort,
       strictPort: true,
-      host: true,
+      host: resolveViteHost(runtimeEnv),
       // The dev-server HMR watcher must not traverse the Python venv or the
       // build/e2e output trees — under WSL2's inotify that exhausts watchers
       // (ENOSPC) and crashes `npm run dev` mid-startup. node_modules is

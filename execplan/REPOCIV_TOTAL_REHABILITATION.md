@@ -43,7 +43,7 @@ Baseline gate results:
 - [x] (2026-07-12) Produce total audit, feature matrix and visual/UX audit.
 - [x] (2026-07-12) Create branch `audit/repociv-total-rehabilitation-20260712` without discarding WIP.
 - [x] (2026-07-12) Milestone 0 — adversarial review cycle 1 `VERIFIED=false`; four plan gaps corrected; cycle 2 `VERIFIED=true` with no blockers.
-- [ ] Milestone 1 — close Vite shell injection and loopback boundary.
+- [x] (2026-07-12) Milestone 1 — Git uses argv-only execution, repo/file containment rejects traversal and symlink escape, 17 focused tests pass, build passes, and isolated Vite bound `127.0.0.1:5383` with HTTP 200.
 - [ ] Milestone 2 — confine command payloads, repo/file paths, profiles, MCP reads and session IDs.
 - [ ] Milestone 3 — make one essential task lifecycle reachable and truthful.
 - [ ] Milestone 4 — align terminal events, context and ledger attribution.
