@@ -3,8 +3,14 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { resolveRepoPathFromId, resolveRepoRelativeFile, runGit } from './repociv.ts';
-import { encodeRepoId } from './repoRootsState.ts';
+import {
+  isTrustedJsonMutation,
+  resolveRepoPathFromId,
+  resolveRepoRelativeFile,
+  resolveSelectedRepoPath,
+  runGit,
+} from './repociv.ts';
+import { encodeRepoId, type RepoRootsState } from './repoRootsState.ts';
 import { resolveViteHost } from '../vite.config.ts';
 
 describe('RepoCiv Vite filesystem security boundary', () => {
@@ -46,6 +52,50 @@ describe('RepoCiv Vite filesystem security boundary', () => {
     );
   });
 
+  it('requires canonical selection membership, not mere root containment', () => {
+    const state: RepoRootsState = {
+      version: 1,
+      activeRoot: selectedRoot,
+      roots: {
+        [selectedRoot]: {
+          selectedRepoPaths: [],
+          addedAt: '2026-07-12T00:00:00Z',
+          lastSeen: '2026-07-12T00:00:00Z',
+        },
+      },
+    };
+    expect(resolveSelectedRepoPath(encodeRepoId(repo), state)).toBeNull();
+
+    state.roots[selectedRoot]!.selectedRepoPaths = [repo];
+    expect(resolveSelectedRepoPath(encodeRepoId(repo), state)).toBe(realpathSync(repo));
+  });
+
+  it('supports selected repositories from multiple roots and rejects symlink escape', () => {
+    const secondRoot = join(fixtureRoot, 'second-root');
+    const secondRepo = join(secondRoot, 'repo-c');
+    const linkedRepo = join(selectedRoot, 'linked-outside');
+    mkdirSync(join(secondRepo, '.git'), { recursive: true });
+    symlinkSync(outsideRepo, linkedRepo, 'dir');
+    const state: RepoRootsState = {
+      version: 1,
+      activeRoot: selectedRoot,
+      roots: {
+        [selectedRoot]: {
+          selectedRepoPaths: [linkedRepo],
+          addedAt: '2026-07-12T00:00:00Z',
+          lastSeen: '2026-07-12T00:00:00Z',
+        },
+        [secondRoot]: {
+          selectedRepoPaths: [secondRepo],
+          addedAt: '2026-07-12T00:00:00Z',
+          lastSeen: '2026-07-12T00:00:00Z',
+        },
+      },
+    };
+    expect(resolveSelectedRepoPath(encodeRepoId(secondRepo), state)).toBe(realpathSync(secondRepo));
+    expect(resolveSelectedRepoPath(encodeRepoId(linkedRepo), state)).toBeNull();
+  });
+
   it('rejects absolute, traversal, NUL and symlink-escape file paths', () => {
     const outsideFile = join(fixtureRoot, 'outside', 'secret.txt');
     const linkedFile = join(repo, 'linked-secret.txt');
@@ -83,6 +133,51 @@ describe('RepoCiv Vite filesystem security boundary', () => {
       literalFile,
     ]);
     expect(execute.mock.calls[0]?.[2]).toMatchObject({ encoding: 'utf8' });
+  });
+});
+
+describe('Vite mutation authentication boundary', () => {
+  const baseHeaders = {
+    host: '127.0.0.1:5273',
+    'content-type': 'application/json',
+  };
+
+  it('accepts same-origin JSON and rejects a foreign browser Origin', () => {
+    expect(isTrustedJsonMutation({ ...baseHeaders, origin: 'http://127.0.0.1:5273' }, '')).toBe(
+      true,
+    );
+    expect(isTrustedJsonMutation({ ...baseHeaders, origin: 'https://evil.example' }, '')).toBe(
+      false,
+    );
+  });
+
+  it('accepts a configured token for non-browser clients but rejects empty-token requests', () => {
+    expect(isTrustedJsonMutation(baseHeaders, '')).toBe(false);
+    expect(
+      isTrustedJsonMutation(
+        { ...baseHeaders, 'x-repociv-token': 'test-token-32-characters-minimum' },
+        'test-token-32-characters-minimum',
+      ),
+    ).toBe(true);
+    expect(
+      isTrustedJsonMutation(
+        { ...baseHeaders, 'x-repociv-token': 'wrong' },
+        'test-token-32-characters-minimum',
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects text/plain even when Origin is same-host', () => {
+    expect(
+      isTrustedJsonMutation(
+        {
+          host: '127.0.0.1:5273',
+          origin: 'http://127.0.0.1:5273',
+          'content-type': 'text/plain',
+        },
+        '',
+      ),
+    ).toBe(false);
   });
 });
 

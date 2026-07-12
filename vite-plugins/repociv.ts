@@ -18,6 +18,7 @@ import { execFileSync, execSync } from 'node:child_process';
 import { readdirSync, statSync, lstatSync, existsSync, readFileSync, realpathSync } from 'node:fs';
 import { join, basename, dirname, resolve, relative, isAbsolute, sep } from 'node:path';
 import { homedir, platform } from 'node:os';
+import { timingSafeEqual } from 'node:crypto';
 import type { ScannedRepo } from '../src/map.ts';
 import {
   addRepoSelection,
@@ -30,6 +31,7 @@ import {
   saveState,
   setRootSelection,
   summarizeState,
+  type RepoRootsState,
 } from './repoRootsState.ts';
 import skipDirsJson from '../shared/skip-dirs.json' with { type: 'json' };
 
@@ -91,6 +93,71 @@ function realContainedPath(candidatePath: string, roots: string[]): string | nul
     // Missing or unreadable candidates are not selectable repos.
   }
   return null;
+}
+
+export function resolveSelectedRepoPath(
+  repoIdOrName: string,
+  state: RepoRootsState,
+): string | null {
+  let decoded: string | null;
+  try {
+    const raw = decodeURIComponent(repoIdOrName);
+    decoded = decodeRepoId(raw);
+    if (!decoded && !raw.includes('/') && !raw.includes('\\') && raw !== '.' && raw !== '..') {
+      const matches = Object.values(state.roots)
+        .flatMap((entry) => entry.selectedRepoPaths)
+        .filter((repoPath) => basename(repoPath) === raw);
+      if (matches.length === 1) decoded = matches[0] ?? null;
+    }
+  } catch {
+    return null;
+  }
+  if (!decoded) return null;
+
+  const resolvedDecoded = resolve(expandUser(decoded));
+  for (const [rootPath, entry] of Object.entries(state.roots)) {
+    const selected = entry.selectedRepoPaths.find(
+      (repoPath) => resolve(expandUser(repoPath)) === resolvedDecoded,
+    );
+    if (!selected) continue;
+    const candidate = realContainedPath(selected, [rootPath]);
+    return candidate && repoExists(candidate) ? candidate : null;
+  }
+  return null;
+}
+
+type MutationHeaders = Record<string, string | string[] | undefined>;
+
+function firstHeader(headers: MutationHeaders, name: string): string {
+  const value = headers[name] ?? headers[name.toLowerCase()];
+  return Array.isArray(value) ? (value[0] ?? '') : (value ?? '');
+}
+
+function tokenMatches(actual: string, expected: string): boolean {
+  if (!actual || !expected) return false;
+  const actualBytes = Buffer.from(actual);
+  const expectedBytes = Buffer.from(expected);
+  return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
+}
+
+export function isTrustedJsonMutation(headers: MutationHeaders, expectedToken: string): boolean {
+  const contentType = firstHeader(headers, 'content-type').split(';', 1)[0]?.trim().toLowerCase();
+  if (contentType !== 'application/json') return false;
+
+  if (tokenMatches(firstHeader(headers, 'x-repociv-token'), expectedToken)) return true;
+
+  const host = firstHeader(headers, 'host').trim().toLowerCase();
+  const origin = firstHeader(headers, 'origin').trim();
+  if (!host || !origin) return false;
+  try {
+    const parsed = new URL(origin);
+    return (
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+      parsed.host.toLowerCase() === host
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function resolveRepoRelativeFile(repoPath: string, filePath: string): string | null {
@@ -474,6 +541,11 @@ function respondJson(
 
 export function repocivPlugin(mapRoot: string): Plugin {
   let server: { ws: { send: (msg: object) => void } } | undefined;
+  const expectedToken =
+    process.env['REPOCIV_TOKEN']?.trim() ??
+    process.env['VITE_REPOCIV_TOKEN']?.trim() ??
+    process.env['VITE_BRIDGE_TOKEN']?.trim() ??
+    '';
   const rootsState = ensureRoot(loadState(resolve(mapRoot)), resolve(mapRoot));
   saveState(rootsState);
   const getCurrentMapRoot = () => rootsState.activeRoot;
@@ -488,6 +560,24 @@ export function repocivPlugin(mapRoot: string): Plugin {
     const rawUrl = req.url ?? '';
     const path = rawUrl.split('?')[0] ?? rawUrl;
 
+    const protectedMutation =
+      req.method === 'POST' && (path === '/event' || path.startsWith('/api/'));
+    if (
+      protectedMutation &&
+      !isTrustedJsonMutation((req.headers ?? {}) as MutationHeaders, expectedToken)
+    ) {
+      const contentType = firstHeader((req.headers ?? {}) as MutationHeaders, 'content-type')
+        .split(';', 1)[0]
+        ?.trim()
+        .toLowerCase();
+      res.statusCode = contentType === 'application/json' ? 403 : 415;
+      respondJson(res, {
+        error:
+          res.statusCode === 415 ? 'application/json required' : 'trusted Origin or token required',
+      });
+      return;
+    }
+
     // Bridge events from bridge.py → frontend HMR websocket
     if (path === '/event' && req.method === 'POST') {
       let body = '';
@@ -499,7 +589,6 @@ export function repocivPlugin(mapRoot: string): Plugin {
           const event = JSON.parse(body);
           server?.ws.send({ type: 'custom', event: 'bridge:event', data: event });
           res.setHeader('Content-Type', 'application/json');
-          res.setHeader('Access-Control-Allow-Origin', '*');
           res.end(JSON.stringify({ ok: true }));
         } catch {
           res.statusCode = 400;
@@ -837,7 +926,7 @@ export function repocivPlugin(mapRoot: string): Plugin {
 
     if (path.startsWith('/api/git/') && req.method === 'GET') {
       const name = path.slice('/api/git/'.length);
-      const repoPath = resolveRepoPathFromId(name, rootsState.activeRoot, getAllMapRoots());
+      const repoPath = resolveSelectedRepoPath(name, rootsState);
       if (!repoPath || !existsSync(join(repoPath, '.git'))) {
         res.statusCode = 404;
         res.end(JSON.stringify({ error: 'No git repo' }));
@@ -914,7 +1003,7 @@ export function repocivPlugin(mapRoot: string): Plugin {
 
     if (path.startsWith('/api/files/') && req.method === 'GET') {
       const name = path.slice('/api/files/'.length);
-      const repoPath = resolveRepoPathFromId(name, rootsState.activeRoot, getAllMapRoots());
+      const repoPath = resolveSelectedRepoPath(name, rootsState);
       if (!repoPath || !existsSync(repoPath)) {
         res.statusCode = 404;
         res.end(JSON.stringify({ error: 'Not found' }));

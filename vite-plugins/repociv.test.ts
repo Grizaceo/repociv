@@ -40,6 +40,14 @@ function mockRequest(method: string, url: string, body?: string): Connect.Incomi
   const req = new EventEmitter() as Connect.IncomingMessage;
   req.method = method;
   req.url = url;
+  req.headers =
+    method === 'POST'
+      ? {
+          host: '127.0.0.1:5273',
+          origin: 'http://127.0.0.1:5273',
+          'content-type': 'application/json',
+        }
+      : { host: '127.0.0.1:5273' };
   queueMicrotask(() => {
     if (body !== undefined) req.emit('data', Buffer.from(body));
     req.emit('end');
@@ -200,6 +208,18 @@ describe('/api/map-root handlers', () => {
     );
     expect(notDir.statusCode).toBe(400);
     expect(JSON.parse(notDir.body).error).toBe('path no es carpeta valida');
+  });
+
+  it('POST /event relays same-origin JSON without wildcard CORS', async () => {
+    const res = await invokeHandler(
+      handler,
+      'POST',
+      '/event',
+      JSON.stringify({ type: 'mission_start', missionId: 'm-1' }),
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Access-Control-Allow-Origin']).toBeUndefined();
+    expect(JSON.parse(res.body)).toEqual({ ok: true });
   });
 
   it('POST accepts a valid directory and persists it as active root', async () => {
