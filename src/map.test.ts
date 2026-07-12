@@ -67,7 +67,6 @@ function minimalWorldWithCity(center: Axial, target: Axial): { world: World; cit
     buildings: [],
     resources: { gold: 0, science: 0, production: 0 },
     generatedAt: 0,
-    restAreas: [],
   };
   return { world, city };
 }
@@ -129,10 +128,6 @@ describe('canRelocateCityTo', () => {
       color: '#fff',
       movesLeft: 2,
       maxMoves: 2,
-      fatigue: 100,
-      maxFatigue: 100,
-      isResting: false,
-      effectiveSpeed: 1,
     });
     expect(canRelocateCityTo(world, city, { q: 2, r: 0 })).toBe(false);
   });

@@ -29,7 +29,6 @@ GET_EXACT: dict[str, Callable[..., Any]] = {
     "/subagents": _routes.get_subagents,
     "/gpu": _routes.get_gpu,
     "/pending": _routes.get_pending,
-    "/context": _routes.get_context,
     "/approvals": _routes.get_approvals,
     "/agents": _routes.get_agents,
     "/agents/capabilities": _routes.get_agents_capabilities,

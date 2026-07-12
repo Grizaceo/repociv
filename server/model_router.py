@@ -164,20 +164,8 @@ def route_model(
             if tier_order.index(adjusted_tier) > tier_order.index(base_tier):
                 base_tier = adjusted_tier
 
-    # ─── Step 6: Apply believability weighting ───────────────────────────────
+    # ─── Step 6: Build routing response ───────────────────────────────────────
     final_tier = base_tier
-    believability_penalty = ""
-    if research_ledger:
-        believability = research_ledger.get_agent_believability().get(agent_upper, 1.0)
-        # If agent has < 50% believability, escalate to next tier
-        if believability < 0.5:
-            tier_order = ["ECONOMICO", "EQUILIBRIO", "PREMIUM"]
-            if final_tier != "PREMIUM":
-                idx = tier_order.index(final_tier)
-                final_tier = tier_order[idx + 1]
-                believability_penalty = f" (escalated due to agent believability {believability:.1%})"
-
-    # ─── Step 7: Build routing response ───────────────────────────────────────
     model = _se.tier_to_model(final_tier)
     cascade_chain = _se.tier_to_cascade_chain(final_tier)
     enforced = _BASE_ENFORCED.get(agent_upper, _DEFAULT_ENFORCED)
@@ -194,8 +182,6 @@ def route_model(
         reason_parts.append("cost_critical")
     if signals.complexity > 0.7:
         reason_parts.append(f"high_complexity={signals.complexity:.1f}")
-    if believability_penalty:
-        reason_parts.append(believability_penalty.strip())
     if not enforced:
         reason_parts.append("recommended")
 

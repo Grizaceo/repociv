@@ -59,10 +59,6 @@ export class LocalWorldManager {
             this.localWorld.grid[entrance.y + Math.floor(entrance.h / 2)]?.[
               entrance.x + Math.floor(entrance.w / 2)
             ]?.roomId ?? null,
-          fatigue: heroUnit?.fatigue ?? 100,
-          maxFatigue: heroUnit?.maxFatigue ?? 100,
-          isResting: heroUnit?.isResting ?? false,
-          effectiveSpeed: heroUnit?.effectiveSpeed ?? 1,
         });
         this.assignDesk(this.localUnits[this.localUnits.length - 1]!);
       }
@@ -98,10 +94,6 @@ export class LocalWorldManager {
           macroUnitId: 'MAIN',
           currentWorkbenchId: null,
           currentRoomId: this.localWorld.grid[entrance.y + 1]?.[entrance.x + 1]?.roomId ?? null,
-          fatigue: 100,
-          maxFatigue: 100,
-          isResting: false,
-          effectiveSpeed: 1,
         });
         this.assignDesk(this.localUnits[this.localUnits.length - 1]!);
       }
@@ -139,7 +131,7 @@ export class LocalWorldManager {
     for (const unit of this.localUnits) {
       // 1. Advance moving units (workbench)
       if (unit.state === 'walking_to_workbench' && unit.pathIndex < unit.path.length) {
-        unit.pathProgress += 0.06 * unit.effectiveSpeed * scale;
+        unit.pathProgress += 0.06 * scale;
         if (unit.pathProgress >= 1) {
           unit.pathProgress = 0;
           const step = unit.path[unit.pathIndex]!;
@@ -153,27 +145,6 @@ export class LocalWorldManager {
             unit.path = [];
             unit.pathIndex = 0;
             unit.state = unit.currentWorkbenchId ? 'working_on_file' : 'idle_in_room';
-            unit.workProgress = 0;
-          }
-        }
-      }
-
-      // 1b. Advance moving units (rest/bed)
-      if (unit.state === 'walking_to_room' && unit.pathIndex < unit.path.length) {
-        unit.pathProgress += 0.06 * unit.effectiveSpeed * scale;
-        if (unit.pathProgress >= 1) {
-          unit.pathProgress = 0;
-          const step = unit.path[unit.pathIndex]!;
-          unit.gridX = step.x;
-          unit.gridY = step.y;
-          const tile = this.localWorld?.grid[unit.gridY]?.[unit.gridX];
-          unit.currentRoomId = tile?.roomId ?? null;
-          unit.pathIndex++;
-          if (unit.pathIndex >= unit.path.length) {
-            unit.path = [];
-            unit.pathIndex = 0;
-            unit.state = 'resting';
-            unit.isResting = true;
             unit.workProgress = 0;
           }
         }
@@ -201,106 +172,10 @@ export class LocalWorldManager {
       this._tickPowerSystem();
     }
 
-    // 6. Rest System tick (every 200ms = ~12 ticks)
-    if (this.localTickCount % 12 === 0) {
-      this._tickRestSystem();
-    }
-
-    // 7. Temperature System tick (every 500ms = ~30 ticks)
+    // 6. Temperature System tick (every 500ms = ~30 ticks)
     if (this.localTickCount % 30 === 0) {
       this._tickTemperatureSystem();
     }
-  }
-
-  private _tickRestSystem(): void {
-    if (!this.localWorld || !this.localWorld.restAreas) return;
-
-    for (const unit of this.localUnits) {
-      // Fatigue decreases while working, increases while resting
-      if (unit.state === 'working_on_file') {
-        unit.fatigue = Math.max(0, unit.fatigue - 0.5); // fatigue drain per tick
-      } else if (unit.state === 'resting') {
-        // Recovery handled by rest area
-      } else if (
-        unit.state === 'idle_in_room' ||
-        unit.state === 'walking_to_workbench' ||
-        unit.state === 'walking_to_room'
-      ) {
-        unit.fatigue = Math.max(0, unit.fatigue - 0.1); // slow drain while idle/moving
-      }
-
-      // Auto-seek rest when fatigue < 30 and not already resting
-      if (unit.fatigue < 30 && unit.state !== 'resting' && unit.state !== 'walking_to_room') {
-        this._sendUnitToRest(unit);
-      }
-
-      // Resting units recover fatigue
-      if (unit.state === 'resting' && unit.restingRoomId) {
-        const restArea = this.localWorld.restAreas.find((ra) => ra.id === unit.restingRoomId);
-        if (restArea) {
-          const recoveryPerTick = (restArea.recoveryRate / 1000) * TICK_MS * 12; // per 12-tick interval
-          unit.fatigue = Math.min(unit.maxFatigue, unit.fatigue + recoveryPerTick);
-
-          // Leave rest when fully recovered
-          if (unit.fatigue >= unit.maxFatigue * 0.95) {
-            this._exitRest(unit, restArea);
-          }
-        } else {
-          // Rest area gone, exit rest
-          unit.state = 'idle_in_room';
-          unit.isResting = false;
-          unit.restingRoomId = undefined;
-        }
-      }
-    }
-  }
-
-  private _sendUnitToRest(unit: LocalUnit): void {
-    if (!this.localWorld || !this.localWorld.restAreas || this.localWorld.restAreas.length === 0)
-      return;
-
-    // Find available rest area with capacity
-    let bestRest: (typeof this.localWorld.restAreas)[0] | null = null;
-    let bestDist = Infinity;
-
-    for (const rest of this.localWorld.restAreas) {
-      if (rest.unitsInside.length >= rest.capacity) continue;
-
-      // Find nearest bed tile
-      for (const bedTile of rest.tiles) {
-        const dist = Math.abs(unit.gridX - bedTile.x) + Math.abs(unit.gridY - bedTile.y);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestRest = rest;
-        }
-      }
-    }
-
-    if (!bestRest) return;
-
-    // Pick a free bed
-    const freeBed = bestRest.tiles.find(() => !bestRest.unitsInside.includes(unit.id));
-    if (!freeBed) return;
-
-    // Path to bed
-    const pathResult = findPath(this.localWorld, unit.gridX, unit.gridY, freeBed.x, freeBed.y);
-    if (!pathResult) return;
-
-    unit.path = pathResult.path;
-    unit.pathIndex = 0;
-    unit.pathProgress = 0;
-    unit.state = 'walking_to_room';
-    unit.targetX = freeBed.x;
-    unit.targetY = freeBed.y;
-    unit.restingRoomId = bestRest.id;
-    bestRest.unitsInside.push(unit.id);
-  }
-
-  private _exitRest(unit: LocalUnit, restArea: { id: string; unitsInside: string[] }): void {
-    unit.state = 'idle_in_room';
-    unit.isResting = false;
-    unit.restingRoomId = undefined;
-    restArea.unitsInside = restArea.unitsInside.filter((id) => id !== unit.id);
   }
 
   private _tickPowerSystem(): void {
@@ -429,10 +304,6 @@ export class LocalWorldManager {
         macroUnitId: unitId,
         currentWorkbenchId: null,
         currentRoomId: this.localWorld.grid[gy]?.[gx]?.roomId ?? null,
-        fatigue: macroUnit?.fatigue ?? 100,
-        maxFatigue: macroUnit?.maxFatigue ?? 100,
-        isResting: macroUnit?.isResting ?? false,
-        effectiveSpeed: macroUnit?.effectiveSpeed ?? 1,
       };
       this.localUnits.push(unit);
       this.assignDesk(unit);
@@ -483,7 +354,6 @@ export class LocalWorldManager {
     unit.pathIndex = 0;
     unit.pathProgress = 0;
     unit.state = 'walking_to_workbench';
-    unit.isResting = false;
     queued.unitId = unit.id;
     queued.workbenchId = wbId;
     queued.status = 'walking';
@@ -715,10 +585,6 @@ export class LocalWorldManager {
       macroUnitId: payload.parentUnitId,
       currentWorkbenchId: null,
       currentRoomId: room?.id ?? null,
-      fatigue: 100,
-      maxFatigue: 100,
-      isResting: false,
-      effectiveSpeed: 1,
       ephemeral: true,
     });
     this.assignDesk(this.localUnits[this.localUnits.length - 1]!);

@@ -86,28 +86,12 @@ try:
     _WEIGHTS: dict[str, float] = json.loads(_WEIGHTS_FILE.read_text())
 except (OSError, json.JSONDecodeError):
     # Fallback if file is missing or corrupt
-    _WEIGHTS = {"age": 20, "test": 15, "debt": 25, "extension": 5, "fatigue": 15}
+    _WEIGHTS = {"age": 20, "test": 15, "debt": 25, "extension": 5}
 _EXT_SCORE = {"ts": 3, "tsx": 3, "js": 2, "jsx": 2, "py": 1, "rs": 1, "go": 1,
                "json": -1, "yaml": -1, "yml": -1, "md": -1, "css": -1}
 
-# Fatigue provider — set by bridge.py so scheduler can query unit fatigue.
-_fatigue_provider: Callable[[str], int | None] | None = None
-
-
-def set_fatigue_provider(fn: Callable[[str], int | None]) -> None:
-    """Register a function that returns fatigue (0-100) for a unit id, or None."""
-    global _fatigue_provider
-    _fatigue_provider = fn
-
-
 def _priority_score(cmd: dict[str, Any], now: float) -> float:
-    """Calculate task priority with age, debt, fatigue, and agent believability (Fase 2).
-    
-    Believability weighting (new in Fase 2):
-      - Unreliable agents (believability < 0.5) get deprioritized
-      - Multiplier: 0.5 + 0.5 * believability (range 0.5–1.0)
-      - This ensures failing agents don't monopolize the queue
-    """
+    """Calculate task priority with age, debt, and extension weights."""
     age_min = (now - cmd.get("created_at", now)) / 60.0
     target: str = cmd.get("target", "")
     score = _WEIGHTS["age"] * (1 + age_min / 10)  # linear growth
@@ -117,36 +101,6 @@ def _priority_score(cmd: dict[str, Any], now: float) -> float:
         score += _WEIGHTS["debt"]
     ext = target.rsplit(".", 1)[-1].lower() if "." in target else ""
     score += _WEIGHTS["extension"] * _EXT_SCORE.get(ext, 0)
-
-    # ─── Phase 9: XCOM Context Fatigue ───────────────────────────────
-    # Fatigued units get lower priority so rested units are dispatched first.
-    if _fatigue_provider is not None:
-        unit_id = cmd.get("payload", {}).get("unit", "")
-        if unit_id:
-            fatigue = _fatigue_provider(unit_id)
-            if fatigue is not None:
-                # fatigue 100 = fresh → multiplier 1.0
-                # fatigue 0   = exhausted → multiplier ~0.0
-                fatigue_ratio = max(0.0, min(1.0, fatigue / 100.0))
-                score *= (0.3 + 0.7 * fatigue_ratio)  # floor at 0.3 so exhausted units still get served
-
-    # ─── Fase 2: Agent Believability Weighting ──────────────────────
-    # Query research ledger to adjust priority based on agent reliability
-    try:
-        from . import research_ledger as _rl
-        ledger = _rl.get_instance()
-        if ledger:
-            agent_type = cmd.get("payload", {}).get("agent_type", "")
-            if agent_type:
-                agent_upper = agent_type.upper()
-                believability_scores = ledger.get_agent_believability()
-                believability = believability_scores.get(agent_upper, 1.0)
-                # Multiplier ranges from 0.5 (unreliable) to 1.0 (reliable)
-                believability_multiplier = 0.5 + 0.5 * believability
-                score *= believability_multiplier
-    except (ImportError, Exception):
-        # If ledger unavailable, use default (no adjustment)
-        pass
 
     return round(score, 2)
 

@@ -14,7 +14,7 @@ Endpoints:
   GET  /missions                  — persisted missions list
   GET  /gpu                       — VRAM + temp via nvidia-smi
   GET  /pending                   — tasks from PENDING_TRACKER.md
-  GET  /context                   — XCOM fatigue state
+  GET  /approvals                 — pending approval queue
   GET  /events                    — event store replay (?since=<unix_ts>)
   GET  /approvals                 — commands waiting_approval
   GET  /agents                    — agent status + heartbeat + queue depth
@@ -64,7 +64,6 @@ import subprocess
 import threading
 import time
 import urllib.request  # noqa: F401 (patched by tests via bridge.urllib.request)
-import uuid
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -224,7 +223,6 @@ from server import agent_runner as _agent_runner  # noqa: E402
 from server import task_orchestrator as _to  # noqa: E402
 from server import rate_limiter as _rl  # noqa: E402
 from server import missions_store as _missions_store  # noqa: E402
-from server import fatigue_state as _fatigue_state_mod  # noqa: E402
 from server import command_executors as _command_executors  # noqa: E402
 
 _BRIDGE_STATE_CONFIG_DIR: Path | None = None
@@ -289,52 +287,6 @@ def save_mission(mission: dict[str, Any]) -> None:
     _missions_store.save_mission(mission)
 
 
-# ─── XCOM Context Fatigue state ───────────────────────────────────────────────
-_fatigue_state = _fatigue_state_mod._fatigue_state
-_rest_areas = _fatigue_state_mod._rest_areas
-
-
-def get_unit_fatigue(unit_id: str) -> dict[str, Any]:
-    return _fatigue_state_mod.get_unit_fatigue(unit_id)
-
-
-def update_unit_fatigue(
-    unit_id: str,
-    *,
-    fatigue: int | None = None,
-    effective_speed: float | None = None,
-    is_resting: bool | None = None,
-    rest_area_id: str | None = None,
-    delta: int = 0,
-) -> dict[str, Any]:
-    return _fatigue_state_mod.update_unit_fatigue(
-        unit_id,
-        fatigue=fatigue,
-        effective_speed=effective_speed,
-        is_resting=is_resting,
-        rest_area_id=rest_area_id,
-        delta=delta,
-    )
-
-
-def discover_rest_area(
-    rest_area_id: str, room_id: str, coord: tuple, recovery_rate: float = 8.0, capacity: int = 4
-) -> dict[str, Any]:
-    return _fatigue_state_mod.discover_rest_area(
-        rest_area_id,
-        room_id,
-        coord,
-        recovery_rate=recovery_rate,
-        capacity=capacity,
-    )
-
-
-def enter_rest_area(unit_id: str, rest_area_id: str) -> bool:
-    return _fatigue_state_mod.enter_rest_area(unit_id, rest_area_id)
-
-
-def exit_rest_area(unit_id: str) -> None:
-    _fatigue_state_mod.exit_rest_area(unit_id)
 
 
 # ─── GPU info ─────────────────────────────────────────────────────────────────
@@ -929,7 +881,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             )
             return
 
-        # ─── Legacy root POST (unit_command / quest_add / fatigue) ───────────
+        # ─── Legacy root POST (unit_command / quest_add) ───────────
         t = body.get("type")
 
         if t == "unit_command":
@@ -982,33 +934,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._json({"ok": True})
             return
 
-        # ─── Fatigue commands (Phase 9) ───────────────────────────────────────
-        if t == "unit_fatigue_delta":
-            unit_id = body.get("unit", "")
-            delta = int(body.get("delta", 0))
-            entry = update_unit_fatigue(unit_id, delta=delta)
-            send_to_repociv(
-                {
-                    "type": "unit_fatigue_update",
-                    "unit": unit_id,
-                    "fatigue": entry["fatigue"],
-                    "maxFatigue": 100,
-                    "atRest": entry["isResting"],
-                    "restAreaId": entry["restAreaId"],
-                }
-            )
-            self._json({"ok": True})
-            return
-
-        if t == "discover_rest_area":
-            ra_id = body.get("restAreaId", f"ra-{uuid.uuid4().hex[:6]}")
-            area = discover_rest_area(
-                ra_id, body.get("roomId", ""), tuple(body.get("coord", [0, 0]))
-            )
-            send_to_repociv({"type": "rest_area_discovered", "restArea": area})
-            self._json({"ok": True})
-            return
-
         # ─── Recovery command ─────────────────────────────────────────────────────
         # POST /harnesses/<id>/recovery-command
         if path.startswith("/harnesses/") and path.endswith("/recovery-command"):
@@ -1038,26 +963,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 )
                 self._json(plan)
                 return
-
-        if t == "enter_rest_area":
-            unit_id = body.get("unit", "")
-            ra_id = body.get("restAreaId", "")
-            ok = enter_rest_area(unit_id, ra_id)
-            if ok:
-                send_to_repociv({"type": "rest_area_entered", "unit": unit_id, "restAreaId": ra_id})
-            else:
-                send_to_repociv(
-                    {"type": "log", "msg": f"Rest area {ra_id} llena o no existe", "level": "warn"}
-                )
-            self._json({"ok": ok})
-            return
-
-        if t == "exit_rest_area":
-            unit_id = body.get("unit", "")
-            exit_rest_area(unit_id)
-            send_to_repociv({"type": "rest_area_exited", "unit": unit_id, "restAreaId": ""})
-            self._json({"ok": True})
-            return
 
         self._err_json(404, f"unknown POST type: {t}" if t else "not found")
 
@@ -1176,8 +1081,6 @@ def _seed_initial_heartbeats() -> None:
 # ─── Main ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     _sched.set_dispatcher(_scheduler_dispatch)
-    # Wire fatigue state into scheduler priority scoring
-    _sched.set_fatigue_provider(lambda unit_id: get_unit_fatigue(unit_id).get("fatigue"))
     _sched.start_worker()
     _seed_initial_heartbeats()
 

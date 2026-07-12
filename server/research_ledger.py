@@ -15,9 +15,7 @@ Design principles:
 
 Tables:
   missions           — one row per completed/failed mission
-  agent_predictions  — swarm debate signals (Fase 3); believability scoring
-  world_model_predictions — shadow/active context utility predictions (Fase 4)
-  world_model_history     — observed DC utility outcomes for calibration
+  subagent_runs      — ephemeral subagent tracking (Swarm Civ UI)
 """
 from __future__ import annotations
 
@@ -61,59 +59,6 @@ CREATE TABLE IF NOT EXISTS missions (
 )
 """
 
-_DDL_AGENT_PREDICTIONS_SEQ = (
-    "CREATE SEQUENCE IF NOT EXISTS agent_predictions_id_seq START 1"
-)
-
-_DDL_AGENT_PREDICTIONS = """
-CREATE TABLE IF NOT EXISTS agent_predictions (
-    id              INTEGER DEFAULT nextval('agent_predictions_id_seq') PRIMARY KEY,
-    mission_id      TEXT REFERENCES missions(id),
-    agent_name      TEXT,
-    predicted_outcome TEXT,
-    confidence      REAL,
-    actual_outcome  TEXT,
-    is_correct      BOOLEAN,
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
-"""
-
-_DDL_WORLD_MODEL_PREDICTIONS_SEQ = (
-    "CREATE SEQUENCE IF NOT EXISTS world_model_predictions_id_seq START 1"
-)
-
-_DDL_WORLD_MODEL_PREDICTIONS = """
-CREATE TABLE IF NOT EXISTS world_model_predictions (
-    id              INTEGER DEFAULT nextval('world_model_predictions_id_seq') PRIMARY KEY,
-    mission_id      TEXT,
-    dc_id           TEXT,
-    mode            TEXT,
-    fitness_hat     REAL,
-    uncertainty     REAL,
-    selected        BOOLEAN,
-    predicted_rank  INTEGER,
-    actual_utility  REAL,
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
-"""
-
-_DDL_WORLD_MODEL_HISTORY_SEQ = (
-    "CREATE SEQUENCE IF NOT EXISTS world_model_history_id_seq START 1"
-)
-
-_DDL_WORLD_MODEL_HISTORY = """
-CREATE TABLE IF NOT EXISTS world_model_history (
-    id              INTEGER DEFAULT nextval('world_model_history_id_seq') PRIMARY KEY,
-    mission_id      TEXT,
-    dc_id           TEXT,
-    actual_utility  REAL,
-    tokens          INTEGER,
-    selected        BOOLEAN,
-    compressed      BOOLEAN,
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
-"""
-
 _DDL_SUBAGENT_RUNS = """
 CREATE TABLE IF NOT EXISTS subagent_runs (
     id                TEXT PRIMARY KEY,
@@ -136,7 +81,7 @@ CREATE TABLE IF NOT EXISTS subagent_runs (
 
 
 class ResearchLedger:
-    """Analytics ledger for RepoCiv missions and agent believability.
+    """Analytics ledger for RepoCiv missions.
 
     Usage::
 
@@ -152,8 +97,6 @@ class ResearchLedger:
             cost_estimate=0.00185,
             duration_s=12.3,
         )
-        scores = ledger.get_agent_believability()
-        # → {"WORKER": 0.9, "SCOUT": 1.0}  (1.0 = no history → benefit of doubt)
     """
 
     def __init__(self, state_dir: Path | str | None = None) -> None:
@@ -181,12 +124,6 @@ class ResearchLedger:
     def _init_schema(self) -> None:
         assert self._conn is not None
         self._conn.execute(_DDL_MISSIONS)
-        self._conn.execute(_DDL_AGENT_PREDICTIONS_SEQ)
-        self._conn.execute(_DDL_AGENT_PREDICTIONS)
-        self._conn.execute(_DDL_WORLD_MODEL_PREDICTIONS_SEQ)
-        self._conn.execute(_DDL_WORLD_MODEL_PREDICTIONS)
-        self._conn.execute(_DDL_WORLD_MODEL_HISTORY_SEQ)
-        self._conn.execute(_DDL_WORLD_MODEL_HISTORY)
         self._conn.execute(_DDL_SUBAGENT_RUNS)
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_subagent_parent ON subagent_runs(parent_mission_id)"
@@ -327,232 +264,6 @@ class ResearchLedger:
             error_summary=str(data.get("error", ""))[:512],
         )
 
-    # ── Believability engine ──────────────────────────────────────────────────
-
-    def get_agent_believability(self) -> dict[str, float]:
-        """Return accuracy-based believability score per agent type.
-
-        Agents with no prediction history return ``1.0`` (benefit of the doubt).
-        Scores are clamped to [0.1, 1.0] so even a consistently wrong agent
-        retains a small weight.
-
-        Returns:
-            Dict mapping agent name to score in [0.1, 1.0].
-        """
-        if not self.available:
-            return {}
-        with self._lock:
-            try:
-                rows = self._conn.execute(
-                    """
-                    SELECT agent_name,
-                           COUNT(*) AS total,
-                           SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correct
-                    FROM agent_predictions
-                    WHERE is_correct IS NOT NULL
-                    GROUP BY agent_name
-                    """
-                ).fetchall()
-            except Exception as exc:
-                logger.warning("ResearchLedger.get_agent_believability: %s", exc)
-                return {}
-
-        return {
-            name: max(0.1, correct / total)
-            for name, total, correct in rows
-            if total > 0
-        }
-
-    def record_prediction(
-        self,
-        *,
-        mission_id: str,
-        agent_name: str,
-        predicted_outcome: str,
-        confidence: float,
-        actual_outcome: str | None = None,
-        is_correct: bool | None = None,
-    ) -> None:
-        """Record a swarm agent prediction (used in Fase 3).
-
-        Args:
-            mission_id:        Mission this prediction is about.
-            agent_name:        Specialist agent making the prediction.
-            predicted_outcome: E.g. ``"PROCEED"`` or ``"DISCARD"``.
-            confidence:        Confidence in [0.0, 1.0].
-            actual_outcome:    Filled in after the mission completes (optional).
-            is_correct:        Whether prediction matched actual_outcome.
-        """
-        if not self.available:
-            return
-        with self._lock:
-            try:
-                existing = self._conn.execute(
-                    "SELECT COUNT(*) FROM missions WHERE id = ?",
-                    (mission_id,),
-                ).fetchone()[0]
-                if not existing:
-                    self._conn.execute(
-                        """
-                        INSERT INTO missions (id, agent, phase, outcome)
-                        VALUES (?, ?, ?, ?)
-                        """,
-                        (mission_id, "SWARM", "swarm-debate", "prediction"),
-                    )
-                self._conn.execute(
-                    """
-                    INSERT INTO agent_predictions
-                        (mission_id, agent_name, predicted_outcome, confidence,
-                         actual_outcome, is_correct)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (mission_id, agent_name.upper() if agent_name else "",
-                     predicted_outcome, float(confidence),
-                     actual_outcome, is_correct),
-                )
-            except Exception as exc:
-                logger.warning("ResearchLedger.record_prediction: %s", exc)
-
-    # ── World Model calibration tables ────────────────────────────────────────
-
-    def record_world_model_prediction(
-        self,
-        *,
-        mission_id: str,
-        dc_id: str,
-        mode: str,
-        fitness_hat: float,
-        uncertainty: float,
-        selected: bool,
-        predicted_rank: int | None = None,
-        actual_utility: float | None = None,
-    ) -> None:
-        """Record a World Model prediction for shadow/active calibration."""
-        if not self.available:
-            return
-        with self._lock:
-            try:
-                self._conn.execute(
-                    """
-                    INSERT INTO world_model_predictions
-                        (mission_id, dc_id, mode, fitness_hat, uncertainty,
-                         selected, predicted_rank, actual_utility)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        mission_id, dc_id, mode, float(fitness_hat),
-                        float(uncertainty), bool(selected), predicted_rank,
-                        actual_utility,
-                    ),
-                )
-            except Exception as exc:
-                logger.warning("ResearchLedger.record_world_model_prediction: %s", exc)
-
-    def record_world_model_history(
-        self,
-        *,
-        mission_id: str,
-        dc_id: str,
-        actual_utility: float,
-        tokens: int = 0,
-        selected: bool = True,
-        compressed: bool = False,
-    ) -> None:
-        """Record observed DC utility used to calibrate/promo the World Model."""
-        if not self.available:
-            return
-        with self._lock:
-            try:
-                self._conn.execute(
-                    """
-                    INSERT INTO world_model_history
-                        (mission_id, dc_id, actual_utility, tokens, selected, compressed)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        mission_id, dc_id, float(actual_utility),
-                        max(0, int(tokens)), bool(selected), bool(compressed),
-                    ),
-                )
-            except Exception as exc:
-                logger.warning("ResearchLedger.record_world_model_history: %s", exc)
-
-    def get_world_model_predictions(self, limit: int = 500) -> list[dict[str, Any]]:
-        """Return recent World Model predictions as dictionaries."""
-        if not self.available:
-            return []
-        with self._lock:
-            try:
-                rows = self._conn.execute(
-                    """
-                    SELECT mission_id, dc_id, mode, fitness_hat, uncertainty,
-                           selected, predicted_rank, actual_utility, created_at
-                    FROM world_model_predictions
-                    ORDER BY created_at DESC
-                    LIMIT ?
-                    """,
-                    (limit,),
-                ).fetchall()
-                cols = [
-                    "mission_id", "dc_id", "mode", "fitness_hat", "uncertainty",
-                    "selected", "predicted_rank", "actual_utility", "created_at",
-                ]
-                return [dict(zip(cols, row)) for row in rows]
-            except Exception as exc:
-                logger.warning("ResearchLedger.get_world_model_predictions: %s", exc)
-                return []
-
-    def get_world_model_history(self, limit: int = 500) -> list[dict[str, Any]]:
-        """Return recent observed World Model utility history."""
-        if not self.available:
-            return []
-        with self._lock:
-            try:
-                rows = self._conn.execute(
-                    """
-                    SELECT mission_id, dc_id, actual_utility, tokens, selected,
-                           compressed, created_at
-                    FROM world_model_history
-                    ORDER BY created_at DESC
-                    LIMIT ?
-                    """,
-                    (limit,),
-                ).fetchall()
-                cols = [
-                    "mission_id", "dc_id", "actual_utility", "tokens",
-                    "selected", "compressed", "created_at",
-                ]
-                return [dict(zip(cols, row)) for row in rows]
-            except Exception as exc:
-                logger.warning("ResearchLedger.get_world_model_history: %s", exc)
-                return []
-
-    def get_world_model_calibration_samples(
-        self,
-        limit: int = 500,
-    ) -> list[dict[str, Any]]:
-        """Return predictions that have observed utility for calibration."""
-        if not self.available:
-            return []
-        with self._lock:
-            try:
-                rows = self._conn.execute(
-                    """
-                    SELECT dc_id, fitness_hat, actual_utility
-                    FROM world_model_predictions
-                    WHERE actual_utility IS NOT NULL
-                    ORDER BY created_at DESC
-                    LIMIT ?
-                    """,
-                    (limit,),
-                ).fetchall()
-                return [
-                    {"dc_id": dc_id, "fitness_hat": fitness_hat, "actual_utility": actual}
-                    for dc_id, fitness_hat, actual in rows
-                ]
-            except Exception as exc:
-                logger.warning("ResearchLedger.get_world_model_calibration_samples: %s", exc)
-                return []
     # ── Query helpers ─────────────────────────────────────────────────────────
 
     def record_subagent_run(self, run: dict[str, Any]) -> None:

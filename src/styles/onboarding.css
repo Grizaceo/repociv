@@ -634,7 +634,7 @@
   color: var(--ui-text, #e8d5a0);
 }
 
-.repo-onboarding-root-group-toggle input[type="checkbox"] {
+.repo-onboarding-root-group-toggle input[type='checkbox'] {
   accent-color: var(--ui-gold, #c8a84b);
 }
 

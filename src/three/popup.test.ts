@@ -94,10 +94,6 @@ function makeUnit(id: string, cityId: string): Unit {
     color: '#4488ff',
     movesLeft: 2,
     maxMoves: 2,
-    fatigue: 100,
-    maxFatigue: 100,
-    isResting: false,
-    effectiveSpeed: 1,
     cityId,
   };
 }

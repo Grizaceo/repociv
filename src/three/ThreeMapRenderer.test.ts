@@ -50,10 +50,6 @@ const mkUnit = (id: string, q: number, r: number): Unit => ({
   color: '#fff',
   movesLeft: 1,
   maxMoves: 1,
-  fatigue: 0,
-  maxFatigue: 100,
-  isResting: false,
-  effectiveSpeed: 1,
 });
 
 const mkTile = (q: number, r: number): Tile => ({

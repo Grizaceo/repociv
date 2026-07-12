@@ -1,7 +1,6 @@
 // ─── RepoCiv — Unit panel & hero bar (Civ V Aesthetic) ─────────────────────────
 import type { GameState } from '../game.ts';
 import type { Unit, UnitState } from '../types.ts';
-import { cfg } from '../gameConfig.ts';
 import { renderCapabilityBadges, clearCapabilityBadges } from './capabilityBadges.ts';
 import {
   renderOrdenDeBatalla,
@@ -93,27 +92,13 @@ export function renderHeroBar(state: GameState, onSelect: (u: Unit) => void) {
     slot.className = 'hero-slot';
     if (state.selectedUnit?.id === unit.id) slot.classList.add('selected');
 
-    // Phase 9: fatigue bar — color shifts green→yellow→red as fatigue drops
-    // Thresholds now driven by gameConfig.ts (Phase 10.2)
-    const pct = unit.fatigue / unit.maxFatigue;
-    const { warnThreshold, criticalThreshold } = cfg.fatigue;
-    const fbar = pct > criticalThreshold ? '#4caf50' : pct > warnThreshold ? '#ff9800' : '#f44336';
-    const fPct = Math.round(pct * 100);
-    const restBadge = unit.isResting
-      ? `<span class="fatigue-rest-badge" title="${unit.name} descansando">☕</span>`
-      : '';
-
     slot.innerHTML = `
       <span class="slot-num">${idx + 1}</span>
       <span class="hero-slot-sprite">${unit.name[0]}</span>
       <span class="slot-state" style="background:${unitStateColor(unit.state)}"></span>
-      <div class="hero-fatigue-wrap" title="Contexto: ${fPct}%">
-        <div class="hero-fatigue-bar" style="width:${fPct}%;background:${fbar}"></div>
-      </div>
-      ${restBadge}
     `;
 
-    slot.title = `${unit.name} — ${unit.state} | Contexto ${fPct}%${unit.isResting ? ' (descansando)' : ''}`;
+    slot.title = `${unit.name} — ${unit.state}`;
     slot.addEventListener('click', () => onSelect(unit));
     slots.appendChild(slot);
   });

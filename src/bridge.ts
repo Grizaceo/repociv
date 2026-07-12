@@ -19,7 +19,6 @@ import {
 } from './ui/index.ts';
 import { cfg } from './gameConfig.ts';
 import { approveCommand } from './commandBus.ts';
-import { terminalPanel } from './terminalPanel.ts';
 import { bridgeHeaders, bridgeUrl, BRIDGE_URL, BRIDGE_TOKEN } from './bridgeEnv.ts';
 import { RepoCivWebSocket } from './websocket.ts';
 import { dispatchBridgeEvent, type MessageContext } from './bridgeMessageHandlers.ts';
@@ -326,7 +325,6 @@ export class BridgeEvents {
         appendChatChunk,
         appendApprovalCard,
         showNotification,
-        terminalPanel,
         playSound,
         approveCommand,
         cfg,

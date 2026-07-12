@@ -70,9 +70,6 @@ function makeState() {
     }),
     appendSubagentProgress: vi.fn(),
     syncSubagentSpawn: vi.fn(),
-    updateUnitFatigue: vi.fn(),
-    addRestArea: vi.fn(),
-    setUnitResting: vi.fn(),
   } as unknown as ConstructorParameters<typeof BridgeEvents>[0] & {
     spawned: string[];
     moved: string[];

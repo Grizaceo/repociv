@@ -31,7 +31,6 @@ import {
 } from './ui/index.ts';
 import { cfg } from './gameConfig.ts';
 import { approveCommand } from './commandBus.ts';
-import { terminalPanel } from './terminalPanel.ts';
 
 // ─── Context ────────────────────────────────────────────────────────────────
 // Everything a handler might need from the outside world. The BridgeEvents
@@ -44,7 +43,6 @@ export interface MessageContext {
   setOperationTicker: typeof setOperationTicker;
   appendChatChunk: typeof appendChatChunk;
   appendApprovalCard: typeof appendApprovalCard;
-  terminalPanel: typeof terminalPanel;
   playSound: (type: 'move' | 'complete' | 'mission') => void;
   approveCommand: typeof approveCommand;
   cfg: typeof cfg;
@@ -193,7 +191,6 @@ const HANDLERS: HandlerByType = {
   // ─── Chat & logs ─────────────────────────────────────────────────────
   chat_chunk(ctx, evt) {
     ctx.appendChatChunk(evt.unit, evt.text);
-    ctx.terminalPanel.write(`[${evt.unit}] ${evt.text}`);
   },
 
   log(ctx, evt) {
@@ -218,49 +215,6 @@ const HANDLERS: HandlerByType = {
 
   city_founder(_ctx, _evt) {
     // Future: foundation animation / city-create UI event. No-op today.
-  },
-
-  context_exhausted(ctx, evt) {
-    ctx.logEvent(`⚠ Contexto agotado para ${evt.unit}`, 'warn');
-  },
-
-  // ─── Fatigue & rest areas (Phase 9) ──────────────────────────────────
-  rest_area_discovered(ctx, evt) {
-    const ra = evt.restArea;
-    ctx.state.addRestArea({
-      id: ra.id,
-      roomId: ra.roomId,
-      coord: { q: ra.coord[0], r: ra.coord[1] },
-      recoveryRate: ra.recoveryRate,
-      capacity: ra.capacity,
-      unitsInside: ra.unitsInside,
-    });
-    ctx.logEvent(`☕ Área de descanso descubierta: ${ra.roomId}`, 'info');
-  },
-
-  rest_area_entered(ctx, evt) {
-    ctx.state.setUnitResting(evt.unit, true, evt.restAreaId);
-    ctx.logEvent(`${evt.unit} entró al área de descanso`, 'info');
-  },
-
-  rest_area_exited(ctx, evt) {
-    ctx.state.setUnitResting(evt.unit, false);
-    ctx.logEvent(`${evt.unit} salió del área de descanso`, 'info');
-  },
-
-  unit_fatigue_update(ctx, evt) {
-    ctx.state.updateUnitFatigue(
-      evt.unit,
-      evt.fatigue,
-      evt.maxFatigue ?? 100,
-      evt.atRest ?? false,
-      evt.restAreaId ?? null,
-    );
-  },
-
-  unit_sent_to_rest(ctx, evt) {
-    ctx.state.updateUnitFatigue(evt.unit, evt.fatigue, evt.maxFatigue, evt.atRest, evt.restAreaId);
-    ctx.logEvent(`🛌 ${evt.unit} enviado a descanso`, 'info');
   },
 
   // ─── Approvals ──────────────────────────────────────────────────────

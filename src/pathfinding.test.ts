@@ -25,7 +25,6 @@ function makeWorld(tiles: [string, Tile][]): World {
     buildings: [],
     resources: { gold: 0, science: 0, production: 0 },
     generatedAt: Date.now(),
-    restAreas: [], // Phase 9
   };
 }
 

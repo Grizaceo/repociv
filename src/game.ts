@@ -18,8 +18,7 @@ import {
 } from './types.ts';
 import type { Axial } from './hex.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
-import { axialDistance, axialNeighbours } from './hex.ts';
-import { getConfig } from './gameConfig.ts';
+import { axialNeighbours } from './hex.ts';
 import { LocalWorldManager } from './localWorldManager.ts';
 import { MissionRegistry } from './missionLifecycle.ts';
 import { SubagentRegistry } from './subagentManager.ts';
@@ -245,91 +244,6 @@ export class GameState {
     }
   }
 
-  // ─── Phase 9: XCOM Context Fatigue ─────────────────────────────────────────
-  updateUnitFatigue(
-    unitId: string,
-    fatigue: number,
-    maxFatigue: number,
-    atRest: boolean,
-    restAreaId: string | null,
-  ) {
-    const unit = this.unitMap.get(unitId);
-    if (unit) {
-      unit.fatigue = fatigue;
-      unit.maxFatigue = maxFatigue;
-      unit.isResting = atRest;
-      unit.restingRoomId = restAreaId ?? undefined;
-      unit.effectiveSpeed = maxFatigue > 0 ? fatigue / maxFatigue : 1;
-      this.notify();
-    }
-  }
-
-  setUnitResting(unitId: string, isResting: boolean, restAreaId?: string) {
-    const unit = this.unitMap.get(unitId);
-    if (unit) {
-      unit.isResting = isResting;
-      unit.restingRoomId = isResting ? restAreaId : undefined;
-      this.notify();
-    }
-  }
-
-  getUnitFatigue(unitId: string): {
-    unit: string;
-    fatigue: number;
-    maxFatigue: number;
-    effectiveSpeed: number;
-    isResting: boolean;
-    restingRoomId: string | undefined;
-  } | null {
-    const unit = this.unitMap.get(unitId);
-    if (!unit) return null;
-    return {
-      unit: unit.id,
-      fatigue: unit.fatigue,
-      maxFatigue: unit.maxFatigue,
-      effectiveSpeed: unit.effectiveSpeed,
-      isResting: unit.isResting,
-      restingRoomId: unit.restingRoomId ?? undefined,
-    };
-  }
-
-  addRestArea(restArea: import('./types').RestArea) {
-    const existing = this.world.restAreas.find((r) => r.id === restArea.id);
-    if (!existing) {
-      this.world.restAreas.push(restArea);
-      this.notify();
-    }
-  }
-
-  removeRestArea(restAreaId: string) {
-    const idx = this.world.restAreas.findIndex((r) => r.id === restAreaId);
-    if (idx !== -1) {
-      this.world.restAreas.splice(idx, 1);
-      this.notify();
-    }
-  }
-
-  getRestAreaNear(coord: Axial, radius = 3): import('./types').RestArea | undefined {
-    return this.world.restAreas.find((ra) => axialDistance(ra.coord, coord) <= radius);
-  }
-
-  decayUnitFatigue(unitId: string, delta: number) {
-    const unit = this.unitMap.get(unitId);
-    if (!unit) return;
-    unit.fatigue = Math.max(0, Math.min(unit.maxFatigue, unit.fatigue + delta));
-    unit.effectiveSpeed = Math.round((unit.fatigue / unit.maxFatigue) * 1000) / 1000;
-    const cfg = getConfig();
-    // Auto-warn below configurable threshold (was hardcoded at 20%)
-    if (
-      unit.fatigue <= unit.maxFatigue * cfg.fatigue.autoWarnBelow &&
-      unit.fatigue > 0 &&
-      !unit.isResting
-    ) {
-      logger.warn(`[fatigue] ${unit.name} contexto bajo (${unit.fatigue}%)`);
-    }
-    this.notify();
-  }
-
   // ─── Spawn unit ────────────────────────────────────────────────────────────
   spawnUnit(
     id: string,
@@ -365,11 +279,6 @@ export class GameState {
       color,
       movesLeft: 4,
       maxMoves: 4,
-      fatigue: 100,
-      maxFatigue: 100,
-      isResting: false,
-      restingRoomId: undefined,
-      effectiveSpeed: 1.0,
       parentUnitId: opts?.parentUnitId,
       ephemeral: opts?.ephemeral,
       subagentRunId: opts?.subagentRunId,

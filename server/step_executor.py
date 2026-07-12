@@ -25,7 +25,6 @@ from . import model_router as _mr
 from . import workspace_issue as _wi
 from . import step_retry as _sr
 from . import security_harness as _sec
-from .tensor_context import ContextDirective, TensorContext, DEONTIC_MUST, DEONTIC_SHOULD
 
 logger = logging.getLogger(__name__)
 
@@ -144,21 +143,13 @@ def build_step_mission(
     prior_artifacts: list[tuple[str, str]] | None = None,
     latest_handoff: dict[str, Any] | None = None,
 ) -> str:
-    """Build a self-contained agent mission using TensorContext.
+    """Build a self-contained agent mission via direct concatenation.
 
-    Assembles the prompt from three layers:
-      1. Base DC (must_include): step instruction + spec context header.
-      2. Prior artifact DCs (should_include): accumulated outputs from earlier
-         steps, capped by ``_MAX_PRIOR_TOKENS`` chars and ``_MAX_PRIOR_ARTIFACTS``
-         entries, then budget-pruned to fit ``_MISSION_BUDGET_TOKENS``.
-      3. Handoff DC (should_include): latest structured handoff from previous role.
-
-    The assembled prompt is designed to be self-sufficient — the agent should
-    not need to ask clarifying questions.
+    Assembles the prompt from three layers, truncated to ``_MISSION_BUDGET_TOKENS``
+    chars (~4 chars/token) with priority: base instruction > handoff > artifacts.
     """
-    tc = TensorContext()
+    max_chars = _MISSION_BUDGET_TOKENS * 4
 
-    # Base DC: step instruction + spec context header (always included)
     base_text = (
         "Ejecutá esta tarea del plan de implementación:\n\n"
         f"{step}\n\n"
@@ -166,29 +157,9 @@ def build_step_mission(
         f"{spec_context}\n\n"
         "Entregá el resultado directamente. No preguntes; ejecutá y reportá."
     )
-    base_dc = ContextDirective(
-        text=base_text,
-        metadata={"source": "step", "type": "instruction"},
-        deontic=DEONTIC_MUST,
-    )
 
-    # Prior artifact DCs (should_include — pruned to fit remaining budget)
-    extra_dcs: list[ContextDirective] = []
-    if prior_artifacts:
-        relevant = _select_relevant_artifacts(
-            prior_artifacts, _MAX_PRIOR_TOKENS, _MAX_PRIOR_ARTIFACTS
-        )
-        for name, content in relevant:
-            extra_dcs.append(ContextDirective(
-                text=(
-                    f"Artefactos de pasos anteriores (contexto acumulativo):"
-                    f"\n### {name}\n{content}"
-                ),
-                metadata={"source": "artifact", "name": name, "type": "prior_output"},
-                deontic=DEONTIC_SHOULD,
-            ))
+    sections: list[tuple[int, str]] = [(0, base_text)]
 
-    # Handoff DC: structured context from previous role
     if latest_handoff:
         handoff_role = latest_handoff.get("role", "unknown")
         handoff_work = latest_handoff.get("completedWork", [])
@@ -202,13 +173,31 @@ def build_step_mission(
             handoff_text += f"Riesgos abiertos: {', '.join(handoff_risks)}\n"
         if handoff_next:
             handoff_text += f"Acción recomendada: {handoff_next}\n"
-        extra_dcs.append(ContextDirective(
-            text=handoff_text,
-            metadata={"source": "handoff", "role": handoff_role, "type": "role_handoff"},
-            deontic=DEONTIC_SHOULD,
-        ))
+        sections.append((1, handoff_text))
 
-    return tc.build_mission_prompt(base_dc, extra_dcs, budget=_MISSION_BUDGET_TOKENS)
+    if prior_artifacts:
+        relevant = _select_relevant_artifacts(
+            prior_artifacts, _MAX_PRIOR_TOKENS, _MAX_PRIOR_ARTIFACTS
+        )
+        for name, content in relevant:
+            sections.append((
+                2,
+                f"Artefactos de pasos anteriores (contexto acumulativo):"
+                f"\n### {name}\n{content}",
+            ))
+
+    # Budget: always include base; trim lower-priority sections from the end.
+    result = base_text
+    remaining = max_chars - len(base_text)
+    for _prio, text in sorted(sections[1:], key=lambda item: item[0]):
+        if remaining <= 0:
+            break
+        snippet = text[:remaining]
+        if snippet:
+            result = f"{result}\n\n{snippet}"
+            remaining -= len(snippet) + 2
+
+    return result[:max_chars]
 
 
 # ─── Step dispatcher (the main injection point) ───────────────────────────────

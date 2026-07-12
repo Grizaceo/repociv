@@ -2,6 +2,11 @@
 
 > ⚠️ **Documento histórico — puede estar desactualizado.** Para el scope y decisiones actuales del trunk, ver [SCOPE.md](./SCOPE.md).
 
+> **Fase 1 cleanup (2026-07):** las fases de **Tensor Context** (F1) y **Swarm Engine**
+> (F3) quedaron **retiradas** del trunk — módulos y endpoints podados tras dogfooding.
+> El resto de este plan describe lo que se construyó en v2.0; no reintroducir tensor/swarm
+> sin nueva evidencia en `docs/SCOPE.md`.
+
 **Fecha:** 2026-05-01 · **Revisión:** Incorpora 3 ajustes críticos de reseña DAVI + 6 repos adicionales + recalibración 10 semanas
 
 ---
@@ -56,19 +61,19 @@ RepoCiv nació inspirado en [AgentCraft](https://getagentcraft.com) — el orque
 | **Isolated Agent Containers** (Docker/Apple Containers) | ❌ No existe | **CRÍTICO** | **Fase 5: Docker isolation** |
 | **Git Worktrees** (spawn heroes in worktrees) | ❌ Mencionado en plan original pero no implementado | **IMPORTANTE** | **Fase 1: operacionalizar** |
 | **Skill Scrolls** (collectible skills from skills.sh) | ❌ No existe | Medio | Mapear a `directive_learner.py` skills |
-| **Scheduled Tasks** (cron-like intervals) | ✅ `scheduler.py` con priority queue + fatigue | ✅ RepoCiv es **superior** aquí — tiene fatigue system XCOM | Mantener |
+| **Scheduled Tasks** (cron-like intervals) | ✅ `scheduler.py` con priority queue | ✅ RepoCiv es **superior** aquí | Mantener |
 | **Remote Access / Mobile PWA** | ❌ Solo localhost | Medio | Fuera de scope v2.0 |
 | **Agent Teams / Alliance Hall** | ❌ No existe | Bajo | Fuera de scope v2.0 |
 | **Multi-Agent CLI support** (Claude Code, OpenCode, Cursor) | ✅ `runtime_adapters.py` con adapters múltiples | Paridad | Mantener |
 | **Fog of War** | ✅ Implementado en renderer | Paridad | — |
 | **Achievements / Race Skins** | ❌ No existe | Cosmético | Fuera de scope v2.0 |
 | **Model Routing inteligente** | ✅ `model_router.py` (tabla estática) | AC **no tiene esto** — RepoCiv ya es superior | **Fase 2: hacerlo dinámico** |
-| **Swarm Debate / Believability** | ❌ No existe | AC **no tiene esto** | **Fase 3: ventaja competitiva** |
-| **Context Algebra / Tensor** | ❌ No existe | AC **no tiene esto** | **Fase 1: ventaja competitiva** |
+| **Swarm Debate / Believability** | ❌ Retirado (Fase 1 cleanup 2026-07) | — | ~~Fase 3~~ **retired** |
+| **Context Algebra / Tensor** | ❌ Retirado (Fase 1 cleanup 2026-07) | — | ~~Fase 1~~ **retired** |
 | **Self-Improvement Loop** | ❌ No existe | AC **no tiene esto** | **Fase 5: ventaja competitiva** |
 
 > [!IMPORTANT]
-> RepoCiv ya supera a AgentCraft en: scheduling con fatigue, priority matrix, model routing, bridge auth, event store, y reconciliación de estado. Lo que le falta es **aislamiento Docker** y **worktrees**. Lo que lo haría **estrictamente superior** son las 6 capas nuevas que este plan introduce.
+> RepoCiv ya supera a AgentCraft en: scheduling, priority matrix, model routing, bridge auth, event store, y reconciliación de estado. Lo que le falta es **aislamiento Docker** y **worktrees**. Lo que lo haría **estrictamente superior** son las capas nuevas que este plan introduce (router, security harness, SICA, world model).
 
 ### 0.2 Fuentes SOTA Externas Incorporadas
 
@@ -124,7 +129,10 @@ Del `orchestrator-audit/AUDIT_REPORT.md` (543 líneas, 22 fuentes, 6 hallazgos p
 
 ---
 
-## 1. Tensor de Contexto — El Álgebra de Prompts
+## 1. Tensor de Contexto — El Álgebra de Prompts *(retirado — Fase 1 cleanup 2026-07)*
+
+> `server/tensor_context.py` fue podado del trunk. Esta sección se conserva como
+> registro histórico del plan v2.0; no reimplementar sin aprobación en SCOPE.
 
 ### 1.1 Concepto Central
 
@@ -283,7 +291,10 @@ Estos cards se almacenan en `server/agent_cards/` y son consumidos por el router
 
 ---
 
-## 4. Swarm Engine — Debate Multi-Agente
+## 4. Swarm Engine — Debate Multi-Agente *(retirado — Fase 1 cleanup 2026-07)*
+
+> `server/swarm_engine.py` fue podado del trunk. Subagent tracking (Swarm Civ UI)
+> sigue vía bridge HTTP; ver `docs/MCP.md` § Subagents.
 
 ### 4.1 Portado de ART `swarm.py` + Financial-Lab success_memory
 
@@ -532,7 +543,9 @@ graph TD
 
 ---
 
-### Fase 1: Tensor Context + Worktrees + Hooks (Semanas 3-4)
+### Fase 1: Tensor Context + Worktrees + Hooks (Semanas 3-4) — **RETIRADA (2026-07)**
+
+> Tensor Context podado. Worktrees, hooks YAML y sentinel A2O permanecen en trunk.
 
 **Crear:**
 - `server/tensor_context.py` — `ContextDirective` + `TensorContext` engine (MVP scope)
@@ -611,7 +624,10 @@ graph TD
 
 ---
 
-### Fase 3: Swarm Engine (Semanas 6-7)
+### Fase 3: Swarm Engine (Semanas 6-7) — **RETIRADA (2026-07)**
+
+> `swarm_engine.py` y ConsensusEngine podados. Gate F3 cumplida en su momento;
+> el módulo ya no está en trunk.
 
 **Crear:**
 - `server/swarm_engine.py` — ConsensusEngine + 3 specialist agents

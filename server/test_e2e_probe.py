@@ -49,10 +49,10 @@ def test_e2e_probe_is_auto_safe_policy():
     assert reason == ""
 
 
-def test_e2e_probe_dispatch_emits_mission_chat_and_terminal_events(monkeypatch, tmp_path):
+def test_e2e_probe_dispatch_emits_mission_and_chat_events(monkeypatch, tmp_path):
     events: list[dict] = []
     monkeypatch.setattr(bridge, "send_to_repociv", lambda event: events.append(event))
-    bridge._es.init(tmp_path)
+    bridge.init_bridge_state(tmp_path)
 
     cmd = validate_command({
         "type": "e2e_probe",
@@ -73,5 +73,8 @@ def test_e2e_probe_dispatch_emits_mission_chat_and_terminal_events(monkeypatch, 
     assert "probe-test" in events[1]["text"]
     assert events[2]["success"] is True
 
-    stored = bridge._es.read_events(since=0)
-    assert any(evt["type"] == "CommandCompleted" and evt["commandId"] == "probe-cmd-1" for evt in stored)
+    log_path = tmp_path / "events.jsonl"
+    assert log_path.exists()
+    log_text = log_path.read_text(encoding="utf-8")
+    assert "CommandCompleted" in log_text
+    assert "probe-cmd-1" in log_text

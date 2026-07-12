@@ -18,10 +18,6 @@ function makeManager(): LocalWorldManager {
         r: 0,
         color: '#4af',
         mission: null,
-        fatigue: 100,
-        maxFatigue: 100,
-        isResting: false,
-        effectiveSpeed: 1,
       }) as unknown as Unit,
   );
   const getMacroUnit = vi.fn((id: string) =>
@@ -34,10 +30,6 @@ function makeManager(): LocalWorldManager {
           r: 0,
           color: '#4af',
           mission: null,
-          fatigue: 100,
-          maxFatigue: 100,
-          isResting: false,
-          effectiveSpeed: 1,
         } as unknown as Unit)
       : undefined,
   );

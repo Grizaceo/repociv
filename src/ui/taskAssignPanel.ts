@@ -88,9 +88,7 @@ function _render(): void {
   const units = _getUnits ? _getUnits() : [];
 
   // Only rebuild DOM if data changed (compare lightweight snapshot)
-  const snapshot = units
-    .map((u) => `${u.id}|${u.state}|${u.fatigue}|${u.assignedTask ?? ''}`)
-    .join(';');
+  const snapshot = units.map((u) => `${u.id}|${u.state}|${u.assignedTask ?? ''}`).join(';');
   if (snapshot === _lastSnapshot) return;
   _lastSnapshot = snapshot;
 
@@ -101,7 +99,6 @@ function _render(): void {
 
   body.innerHTML = units
     .map((u) => {
-      const fatiguePct = Math.round((u.fatigue / u.maxFatigue) * 100);
       const icon = STATUS_ICON[u.state] ?? '?';
       const optionsHtml = TASK_OPTIONS.map(
         (opt) =>
@@ -116,9 +113,6 @@ function _render(): void {
           <span class="task-assign-state">${_esc(u.state.replace(/_/g, ' '))}</span>
         </div>
         <div class="task-assign-meta">
-          <div class="task-assign-fatigue" title="Fatiga ${fatiguePct}%">
-            <div class="task-assign-fatigue-bar" style="width:${fatiguePct}%"></div>
-          </div>
           <select class="task-assign-select" data-unit-id="${u.id}">
             <option value="" ${!u.assignedTask ? 'selected' : ''}>— Auto —</option>
             ${optionsHtml}

@@ -32,10 +32,6 @@ function makeUnit(id: string, q: number, r: number, state: 'idle' | 'moving' = '
     color: '#4488ff',
     movesLeft: 2,
     maxMoves: 2,
-    fatigue: 100,
-    maxFatigue: 100,
-    isResting: false,
-    effectiveSpeed: 1,
   };
 }
 

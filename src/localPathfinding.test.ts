@@ -282,10 +282,6 @@ describe('localWorldManager — desk assignment', () => {
       macroUnitId: 'u1',
       currentWorkbenchId: null,
       currentRoomId: 'r1',
-      fatigue: 100,
-      maxFatigue: 100,
-      isResting: false,
-      effectiveSpeed: 1,
     };
     const u2: LocalUnit = {
       id: 'u2',
@@ -305,10 +301,6 @@ describe('localWorldManager — desk assignment', () => {
       macroUnitId: 'u2',
       currentWorkbenchId: null,
       currentRoomId: 'r1',
-      fatigue: 100,
-      maxFatigue: 100,
-      isResting: false,
-      effectiveSpeed: 1,
     };
 
     mgr.assignDesk(u1);
@@ -372,10 +364,6 @@ describe('localWorldManager — desk assignment', () => {
       macroUnitId: 'hero',
       currentWorkbenchId: null,
       currentRoomId: 'lobby',
-      fatigue: 100,
-      maxFatigue: 100,
-      isResting: false,
-      effectiveSpeed: 1,
     } as LocalUnit;
 
     mgr.assignDesk(unit);
@@ -425,10 +413,6 @@ describe('localWorldManager — desk assignment', () => {
       macroUnitId: 'MAIN',
       currentWorkbenchId: null,
       currentRoomId: null,
-      fatigue: 100,
-      maxFatigue: 100,
-      isResting: false,
-      effectiveSpeed: 1,
       ephemeral: true,
     } as LocalUnit;
     (mgr as unknown as { localUnits: LocalUnit[] }).localUnits = [unit];

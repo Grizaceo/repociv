@@ -1339,16 +1339,7 @@ async function bootstrap() {
       );
     }
   };
-  // ─── Kiosk click → discover rest area with 1.25x bonus ───────────────────
-  renderer.localTileClickCb = (x, y, tile, sx, sy) => {
-    if (tile?.type === 'kiosk') {
-      bridge.send('discover_rest_area', {
-        restAreaId: `kiosk-${x}-${y}`,
-        roomId: 'kiosk',
-        coord: [x, y],
-      });
-      return;
-    }
+  renderer.localTileClickCb = (_x, _y, tile, sx, sy) => {
     if (tile?.type === 'whiteboard') {
       const localWorld = state.getLocalWorld();
       const room = localWorld?.rooms.find((r: LocalRoom) => r.id === tile.roomId);

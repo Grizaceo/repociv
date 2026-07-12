@@ -156,12 +156,6 @@ export interface Unit {
   color: string;
   movesLeft: number; // remaining movement points this "turn"
   maxMoves: number;
-  // ─── Phase 9: XCOM Context Fatigue ───────────────────────────────
-  fatigue: number; // 0–100 (100 = fresh, 0 = exhausted)
-  maxFatigue: number; // always 100
-  isResting: boolean; // true when in a rest area
-  restingRoomId?: string; // which rest area room they're recovering in
-  effectiveSpeed: number; // speed after fatigue penalty (computed)
   trailPositions?: { q: number; r: number }[]; // last 5 hex positions (index 0=oldest, 4=most recent)
   // ─── Swarm Civ: subagent detachments ─────────────────────────────
   parentUnitId?: string;
@@ -190,7 +184,6 @@ export interface World {
   buildings: Building[];
   resources: TileResources;
   generatedAt: number;
-  restAreas: RestArea[]; // Phase 9: Context Fatigue
 }
 
 type SubagentStatus = 'proposed' | 'running' | 'complete' | 'failed' | 'cancelled';
@@ -219,26 +212,6 @@ export interface SubagentRun {
   lastProgressAt?: number;
   /** Background Task output_file when reported by harness. */
   outputFilePath?: string;
-}
-
-// ─── Rest Area (Phase 9: XCOM Context Fatigue) ─────────────────────────────
-export interface RestArea {
-  id: string;
-  roomId: string; // maps to LocalRoom.id
-  coord: Axial; // hex center
-  recoveryRate: number; // fatigue restored per second (default 8)
-  capacity: number; // max units at once
-  unitsInside: string[]; // unit ids currently resting
-}
-
-// ─── Local Rest Area (RimWorld-style bedroom/barracks) ────────────────────────
-export interface LocalRestArea {
-  id: string;
-  roomId: string; // maps to LocalRoom.id
-  tiles: Array<{ x: number; y: number }>; // bed tiles
-  recoveryRate: number; // fatigue restored per second (default 10)
-  capacity: number; // max units at once = bed count
-  unitsInside: string[]; // unit ids currently resting
 }
 
 // ─── Bridge Events (from bridge.py → RepoCiv) ───────────────────────────────
@@ -285,37 +258,6 @@ export type BridgeEvent =
   | { type: 'building_progress'; city: string; building: string; progress: number }
   | { type: 'building_complete'; city: string; building: string; missionId?: string }
   | { type: 'building_failed'; city: string; building: string; missionId?: string }
-  // Phase 9: Context Fatigue events
-  | {
-      type: 'rest_area_discovered';
-      restArea: {
-        id: string;
-        roomId: string;
-        coord: [number, number];
-        recoveryRate: number;
-        capacity: number;
-        unitsInside: string[];
-      };
-    }
-  | { type: 'rest_area_entered'; unit: string; restAreaId: string }
-  | { type: 'rest_area_exited'; unit: string; restAreaId: string }
-  | {
-      type: 'unit_fatigue_update';
-      unit: string;
-      fatigue: number;
-      maxFatigue?: number;
-      atRest?: boolean;
-      restAreaId?: string | null;
-    }
-  | {
-      type: 'unit_sent_to_rest';
-      unit: string;
-      restAreaId: string;
-      fatigue: number;
-      maxFatigue: number;
-      atRest: boolean;
-    }
-  | { type: 'context_exhausted'; unit: string; hex: [number, number] }
   | { type: 'city_founder'; name: string; hex: [number, number] }
   | { type: 'resource_update'; resource: 'gold' | 'science' | 'production'; delta: number }
   | { type: 'fog_reveal'; hexes: [number, number][]; sourceSubagentId?: string; cityId?: string }
@@ -500,8 +442,6 @@ export interface LocalWorld {
   powerConsumers?: PowerConsumer[];
   // Zoning System
   zones?: Zone[];
-  // Rest Areas (bedrooms/barracks)
-  restAreas?: LocalRestArea[];
   // Temperature System
   roomClimates?: Map<string, RoomClimate>;
   // Stationary NPCs (managers, receptionists)
@@ -542,12 +482,6 @@ export interface LocalUnit {
   currentWorkbenchId: string | null;
   // Spatial awareness: which room the unit is currently inside
   currentRoomId?: string | null;
-  // ─── Phase 9: XCOM Context Fatigue ───────────────────────────────
-  fatigue: number; // 0–100 (100 = fresh, 0 = exhausted)
-  maxFatigue: number; // always 100
-  isResting: boolean; // true when resting in a rest area room
-  restingRoomId?: string;
-  effectiveSpeed: number; // local grid movement speed after fatigue penalty
   assignedTask?: AgentTask | null; // player-assigned job focus (frontend-only)
   ephemeral?: boolean; // subagent detachment in local view
   assignedDesk?: { x: number; y: number } | null; // stable desk assignment in their room

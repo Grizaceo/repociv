@@ -272,7 +272,8 @@ function buildDOM(): void {
   panel.querySelector<HTMLButtonElement>('#construction-cancel')?.addEventListener('click', close);
 
   // Reboot onboarding tour from the Construction panel (user-requested reset)
-  panel.querySelector<HTMLButtonElement>('#construction-onboarding-reset')
+  panel
+    .querySelector<HTMLButtonElement>('#construction-onboarding-reset')
     ?.addEventListener('click', () => {
       // Call resetTourState immediately (clears storage + launches tour).
       // The construction panel stays open so the user can manage cities while

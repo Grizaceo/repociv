@@ -543,33 +543,6 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   color: var(--gold-bright);
 }
 
-/* ─── Hero slot fatigue bar ─────────────────────────────────────────── */
-.hero-fatigue-wrap {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: rgba(0, 0, 0, 0.55);
-  overflow: hidden;
-}
-
-.hero-fatigue-bar {
-  height: 100%;
-  width: 100%;
-  transition:
-    width 0.4s ease,
-    background 0.4s ease;
-}
-
-.fatigue-rest-badge {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  font-size: 10px;
-  line-height: 1;
-}
-
 /* ─── Command Bar two-column layout ─────────────────────────────────── */
 .command-bar-inner {
   display: flex;

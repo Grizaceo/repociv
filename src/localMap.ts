@@ -12,7 +12,6 @@ import type {
   PowerGrid,
   PowerSource,
   PowerConsumer,
-  LocalRestArea,
   RoomClimate,
   ClimateDevice,
   Vent,
@@ -156,9 +155,6 @@ export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
     gridHeight,
   );
 
-  // ─── Rest Areas: place beds in bedroom/barracks rooms ───────────────────────
-  const restAreas = placeRestAreas(grid, rooms, gridWidth, gridHeight);
-
   // ─── Temperature System: place heaters/coolers/vents ─────────────────────────
   const roomClimates = placeTemperatureSystem(grid, rooms, gridWidth, gridHeight);
 
@@ -172,7 +168,6 @@ export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
     powerGrid,
     powerSources,
     powerConsumers,
-    restAreas,
     roomClimates,
     npcs,
     deskAssignments: new Map(),
@@ -1157,108 +1152,7 @@ function connectToConduit(
   }
 }
 
-// ─── Rest Areas Placement (Office Redesign) ────────────────────────────────────
-function placeRestAreas(
-  grid: LocalTile[][],
-  rooms: LocalRoom[],
-  gridW: number,
-  gridH: number,
-): LocalRestArea[] {
-  const restAreas: LocalRestArea[] = [];
-
-  for (const room of rooms) {
-    const zone = room.zoneType ?? 'team_cluster';
-
-    // Office-style rest areas: sofas in break rooms, phone booths in focus rooms
-    const isBreak = zone === 'break';
-    const isFocus = zone === 'focus';
-    const isBedroom =
-      room.folderName.toLowerCase() === 'bedroom' ||
-      room.folderName.toLowerCase() === 'barracks' ||
-      room.folderName.toLowerCase() === 'sleep' ||
-      room.folderName.toLowerCase() === 'rest';
-    const isSmallRoom = room.workbenches.length <= 2 && room.width * room.height <= 36;
-
-    if (!isBreak && !isFocus && !isBedroom && !isSmallRoom) continue;
-
-    // Collect rest tile positions
-    const restTiles: Array<{ x: number; y: number }> = [];
-
-    if (isBreak || isBedroom || isSmallRoom) {
-      // Use existing sofa tiles in break rooms, or place beds in bedrooms
-      const targetType: LocalTileType = isBreak ? 'sofa' : 'bed';
-
-      // Scan room interior for target tiles (already placed by furnishing) or floor tiles
-      for (let ry = room.y + WALL_THICKNESS; ry < room.y + room.height - WALL_THICKNESS; ry++) {
-        for (let rx = room.x + WALL_THICKNESS; rx < room.x + room.width - WALL_THICKNESS; rx++) {
-          if (!inBounds(rx, ry, gridW, gridH)) continue;
-          const tile = grid[ry]![rx]!;
-          if (tile.type === targetType) {
-            restTiles.push({ x: rx, y: ry });
-          }
-        }
-      }
-
-      // Fallback: if no target tiles found, place beds on floor tiles (legacy behavior)
-      if (restTiles.length === 0 && !isBreak) {
-        const innerX0 = room.x + WALL_THICKNESS;
-        const innerY0 = room.y + WALL_THICKNESS;
-        const innerX1 = room.x + room.width - WALL_THICKNESS - 1;
-        const innerY1 = room.y + room.height - WALL_THICKNESS - 1;
-        const innerW = innerX1 - innerX0 + 1;
-        const innerH = innerY1 - innerY0 + 1;
-
-        const maxBeds = isBedroom ? Math.max(2, Math.floor(Math.min(innerW, innerH) / 2)) : 1;
-
-        if (innerW >= innerH) {
-          for (let i = 0; i < maxBeds && innerX0 + i * 2 + 1 <= innerX1; i++) {
-            const bx = innerX0 + i * 2 + 1;
-            const by = innerY1;
-            if (inBounds(bx, by, gridW, gridH) && grid[by]?.[bx]?.type === 'floor') {
-              grid[by][bx].type = 'bed';
-              restTiles.push({ x: bx, y: by });
-            }
-          }
-        } else {
-          for (let i = 0; i < maxBeds && innerY0 + i * 2 + 1 <= innerY1; i++) {
-            const bx = innerX1;
-            const by = innerY0 + i * 2 + 1;
-            if (inBounds(bx, by, gridW, gridH) && grid[by]?.[bx]?.type === 'floor') {
-              grid[by][bx].type = 'bed';
-              restTiles.push({ x: bx, y: by });
-            }
-          }
-        }
-      }
-    }
-
-    if (isFocus) {
-      // Use phone_booth tiles as rest areas (focus pods)
-      for (let ry = room.y + WALL_THICKNESS; ry < room.y + room.height - WALL_THICKNESS; ry++) {
-        for (let rx = room.x + WALL_THICKNESS; rx < room.x + room.width - WALL_THICKNESS; rx++) {
-          if (!inBounds(rx, ry, gridW, gridH)) continue;
-          const tile = grid[ry]![rx]!;
-          if (tile.type === 'phone_booth') {
-            restTiles.push({ x: rx, y: ry });
-          }
-        }
-      }
-    }
-
-    if (restTiles.length > 0) {
-      restAreas.push({
-        id: `rest-${room.id}`,
-        roomId: room.id,
-        tiles: restTiles,
-        recoveryRate: 10, // fatigue per second
-        capacity: restTiles.length,
-        unitsInside: [],
-      });
-    }
-  }
-
-  return restAreas;
-}
+// ─── Rest Areas: removed (phone_booth tiles remain decorative) ─────────────
 
 // ─── Temperature System Placement ─────────────────────────────────────────────
 function placeTemperatureSystem(

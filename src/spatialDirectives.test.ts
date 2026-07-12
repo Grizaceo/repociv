@@ -79,10 +79,6 @@ function makeUnit(id: string, type: Unit['type'] = 'worker'): Unit {
     color: '#fff',
     movesLeft: 2,
     maxMoves: 2,
-    fatigue: 100,
-    maxFatigue: 100,
-    isResting: false,
-    effectiveSpeed: 1,
   };
 }
 

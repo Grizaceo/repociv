@@ -196,10 +196,6 @@ def get_pending(ctx: "RouteContext") -> tuple[int, Any]:
     local_items = load_local_tasks()
     return 200, hermes_items + local_items
 
-def get_context(ctx: "RouteContext") -> tuple[int, Any]:
-    from server.bridge import _fatigue_state, _rest_areas
-    return 200, {"ok": True, "fatigue": _fatigue_state, "restAreas": _rest_areas}
-
 def get_approvals(ctx: "RouteContext") -> tuple[int, Any]:
     from server.bridge import _get_approvals
     return 200, _get_approvals()

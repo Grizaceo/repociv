@@ -67,7 +67,6 @@ function makeWorld(overrides?: Partial<World>): World {
     buildings: [],
     resources: { gold: 0, science: 0, production: 0, culture: 0 } as World['resources'],
     generatedAt: Date.now(),
-    restAreas: [],
     ...overrides,
   };
 }
@@ -92,10 +91,6 @@ describe('GameState construction', () => {
           color: '#fff',
           movesLeft: 4,
           maxMoves: 4,
-          fatigue: 100,
-          maxFatigue: 100,
-          isResting: false,
-          effectiveSpeed: 1,
         },
       ],
     });
@@ -142,14 +137,6 @@ describe('GameState.spawnUnit', () => {
     const u1 = gs.spawnUnit('WORKER', 'LexO', 'hero', 'capital', { q: 0, r: 0 });
     const u2 = gs.spawnUnit('WORKER', 'LexO', 'hero', 'capital', { q: 1, r: 1 });
     expect(u1).toBe(u2);
-  });
-
-  it('initialises unit with default fatigue values', () => {
-    const u = gs.spawnUnit('S1', 'Scout', 'scout', 'capital', { q: 0, r: 0 });
-    // freshly spawned units start at full fatigue (100)
-    expect(u.fatigue).toBe(100);
-    expect(u.maxFatigue).toBeGreaterThan(0);
-    expect(u.isResting).toBe(false);
   });
 });
 
@@ -271,42 +258,6 @@ describe('GameState.subscribe / notify', () => {
     unsub();
     gs.spawnUnit('N2', 'N2', 'scout', 'capital', { q: 0, r: 0 });
     expect(cb).not.toHaveBeenCalled();
-  });
-});
-
-describe('GameState.fatigue', () => {
-  let gs: GameState;
-  beforeEach(() => {
-    gs = new GameState(makeWorld());
-    gs.spawnUnit('F1', 'F', 'worker', 'capital', { q: 0, r: 0 });
-  });
-
-  it('updateUnitFatigue sets fatigue on unit', () => {
-    // updateUnitFatigue(unitId, fatigue, maxFatigue, atRest, restAreaId)
-    gs.updateUnitFatigue('F1', 40, 100, false, null);
-    const info = gs.getUnitFatigue('F1');
-    expect(info).not.toBeNull();
-    expect(info!.fatigue).toBe(40);
-  });
-
-  it('decayUnitFatigue changes fatigue field', () => {
-    gs.updateUnitFatigue('F1', 50, 100, false, null);
-    const before = gs.getUnitFatigue('F1')!.fatigue;
-    gs.decayUnitFatigue('F1', 10);
-    const after = gs.getUnitFatigue('F1')!.fatigue;
-    expect(after).not.toBe(before);
-  });
-
-  it('setUnitResting toggles resting flag', () => {
-    gs.setUnitResting('F1', true);
-    expect(gs.getUnit('F1')!.isResting).toBe(true);
-    gs.setUnitResting('F1', false);
-    expect(gs.getUnit('F1')!.isResting).toBe(false);
-  });
-
-  it('getUnitFatigue returns null for unknown unit', () => {
-    const f = gs.getUnitFatigue('nobody');
-    expect(f).toBeNull();
   });
 });
 

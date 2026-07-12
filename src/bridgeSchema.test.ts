@@ -101,26 +101,6 @@ describe('parseBridgeEvent', () => {
     expect(parseBridgeEvent(42)).toBeNull();
   });
 
-  it('accepts unit_fatigue_update event', () => {
-    const evt = parseBridgeEvent({ type: 'unit_fatigue_update', unit: 'MAIN', fatigue: 80 });
-    expect(evt).not.toBeNull();
-  });
-
-  it('accepts rest_area_discovered event', () => {
-    const evt = parseBridgeEvent({
-      type: 'rest_area_discovered',
-      restArea: {
-        id: 'ra1',
-        roomId: 'r0',
-        coord: [1, 1],
-        recoveryRate: 8,
-        capacity: 4,
-        unitsInside: [],
-      },
-    });
-    expect(evt).not.toBeNull();
-  });
-
   it('accepts subagent_spawn event', () => {
     const evt = parseBridgeEvent({
       type: 'subagent_spawn',

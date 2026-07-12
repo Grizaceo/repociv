@@ -179,48 +179,6 @@ const Schemas = [
     missionId: v.optional(v.string()),
   }),
   v.object({
-    type: v.literal('unit_fatigue_update'),
-    unit: v.string(),
-    fatigue: v.number(),
-    maxFatigue: v.optional(v.number()),
-    atRest: v.optional(v.boolean()),
-    restAreaId: v.optional(v.union([v.string(), v.null()])),
-  }),
-  v.object({
-    type: v.literal('unit_sent_to_rest'),
-    unit: v.string(),
-    restAreaId: v.string(),
-    fatigue: v.number(),
-    maxFatigue: v.number(),
-    atRest: v.boolean(),
-  }),
-  v.object({
-    type: v.literal('rest_area_discovered'),
-    restArea: v.object({
-      id: v.string(),
-      roomId: v.string(),
-      coord: Hex,
-      recoveryRate: v.number(),
-      capacity: v.number(),
-      unitsInside: v.array(v.string()),
-    }),
-  }),
-  v.object({
-    type: v.literal('rest_area_entered'),
-    unit: v.string(),
-    restAreaId: v.string(),
-  }),
-  v.object({
-    type: v.literal('rest_area_exited'),
-    unit: v.string(),
-    restAreaId: v.string(),
-  }),
-  v.object({
-    type: v.literal('context_exhausted'),
-    unit: v.string(),
-    hex: Hex,
-  }),
-  v.object({
     type: v.literal('log'),
     msg: v.string(),
     level: v.optional(LogLevel),

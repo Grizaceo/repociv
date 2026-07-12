@@ -26,10 +26,6 @@ function makeUnit(overrides: Partial<LocalUnit> = {}): LocalUnit {
     macroUnitId: 'u',
     currentWorkbenchId: null,
     currentRoomId: 'r1',
-    fatigue: 100,
-    maxFatigue: 100,
-    isResting: false,
-    effectiveSpeed: 1,
     ...overrides,
   } as LocalUnit;
 }
@@ -64,7 +60,7 @@ describe('computeUnitDirAngle', () => {
   });
 
   it('returns 0 for a resting unit (regression: pre-fix this was 0 too)', () => {
-    const u = makeUnit({ state: 'resting', isResting: true });
+    const u = makeUnit({ state: 'resting' });
     expect(computeUnitDirAngle(u)).toBe(0);
   });
 

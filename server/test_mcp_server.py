@@ -228,18 +228,6 @@ def test_pending_state_body():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# CONTEXT / FATIGUE
-# ══════════════════════════════════════════════════════════════════════════════
-
-def test_context_fatigue():
-    payload = {"fatigue": {"DAVI-1": {"fatigue": 2}}, "restAreas": []}
-    with _mock_get(payload) as m:
-        result = _mcp.context_fatigue()
-    assert m.call_args[0][0].endswith("/context")
-    assert "fatigue" in result
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 # OBSERVABILITY
 # ══════════════════════════════════════════════════════════════════════════════
 

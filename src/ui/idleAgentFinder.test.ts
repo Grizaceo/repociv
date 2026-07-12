@@ -17,10 +17,6 @@ function makeUnit(id: string, state: Unit['state'] = 'idle'): Unit {
     color: '#fff',
     movesLeft: 4,
     maxMoves: 4,
-    fatigue: 100,
-    maxFatigue: 100,
-    isResting: false,
-    effectiveSpeed: 1,
   };
 }
 

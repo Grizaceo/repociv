@@ -786,7 +786,7 @@ function drawIsoUnit(state: IsoRenderState, unit: LocalUnit, gx: number, gy: num
   const isMoving = isUnitMoving(unit);
   const dirAngle = computeUnitDirAngle(unit);
 
-  const speed = isMoving ? 3.6 * unit.effectiveSpeed : 0;
+  const speed = isMoving ? 3.6 : 0;
   const Sf = 1 + Math.min(0.25, speed * 0.08);
   const Sc = 1 / Sf;
   // Per-step bounce: smooth ease-in-out per tile transition (P1)
@@ -1443,8 +1443,6 @@ function drawIsoDebugOverlay(state: IsoRenderState, world: LocalWorld, localUnit
       `${unit.name}`,
       `st: ${unit.state}`,
       `pos: ${unit.gridX},${unit.gridY}`,
-      `fat: ${Math.round(unit.fatigue)}`,
-      `spd: ${unit.effectiveSpeed.toFixed(1)}`,
     ];
     if (unit.mission) lines.push(`mission: ${unit.mission.slice(0, 12)}`);
     if (unit.currentWorkbenchId) lines.push(`wb: ${unit.currentWorkbenchId.slice(0, 8)}`);

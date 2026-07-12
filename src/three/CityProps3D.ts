@@ -93,9 +93,9 @@ export function rebuildCityProps(
   // Non-capital cities get 2 satellite copies (smaller, offset) so the tile
   // reads as a village cluster, not a single building in an empty hex.
   const SATELLITE_OFFSETS: Array<[number, number, number]> = [
-    [0.0, 0.0, 1.0],       // main instance — centre, full scale
-    [0.16, -0.13, 0.55],   // satellite 1 — closer to centre, smaller
-    [-0.14, 0.16, 0.45],   // satellite 2 — other side, smaller
+    [0.0, 0.0, 1.0], // main instance — centre, full scale
+    [0.16, -0.13, 0.55], // satellite 1 — closer to centre, smaller
+    [-0.14, 0.16, 0.45], // satellite 2 — other side, smaller
   ];
   const byVariant: Array<Array<{ city: City; scale: number; offset: [number, number] }>> =
     PROP_IDS.map(() => []);

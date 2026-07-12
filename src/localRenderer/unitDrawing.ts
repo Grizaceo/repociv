@@ -106,7 +106,7 @@ export function drawLocalUnit(
   const dirAngle = computeUnitDirAngle(unit);
 
   // Squash & Stretch
-  const speed = moving ? 3.6 * unit.effectiveSpeed : 0;
+  const speed = moving ? 3.6 : 0;
   const Sf = 1 + Math.min(0.25, speed * 0.08);
   const Sc = 1 / Sf;
 

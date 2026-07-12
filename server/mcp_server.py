@@ -226,15 +226,6 @@ def pending_delete(id: str) -> Any:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# CONTEXT / FATIGUE (XCOM)
-# ══════════════════════════════════════════════════════════════════════════════
-
-@mcp.tool(description="Estado de fatiga y áreas de descanso (sistema XCOM): por unidad → fatigue int, rest areas.")
-def context_fatigue() -> Any:
-    return _get("/context")
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 # OBSERVABILITY
 # ══════════════════════════════════════════════════════════════════════════════
 

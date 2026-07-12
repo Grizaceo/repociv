@@ -65,62 +65,6 @@ def test_record_cycle_upserts_on_duplicate_id(ledger: ResearchLedger) -> None:
     assert rows[0]["outcome"] == "failed"
 
 
-# ── get_agent_believability ───────────────────────────────────────────────────
-
-def test_get_agent_believability_no_history_returns_empty(ledger: ResearchLedger) -> None:
-    """No prediction rows → empty dict (caller defaults to 1.0 per agent)."""
-    result = ledger.get_agent_believability()
-    assert result == {}
-
-
-def test_get_agent_believability_all_correct(ledger: ResearchLedger, tmp_path: Path) -> None:
-    ledger.record_cycle(mission_id="m1", outcome="success")
-    for _ in range(5):
-        ledger.record_prediction(
-            mission_id="m1",
-            agent_name="WORKER",
-            predicted_outcome="PROCEED",
-            confidence=0.9,
-            actual_outcome="PROCEED",
-            is_correct=True,
-        )
-    scores = ledger.get_agent_believability()
-    assert "WORKER" in scores
-    assert abs(scores["WORKER"] - 1.0) < 0.01
-
-
-def test_get_agent_believability_none_correct(ledger: ResearchLedger) -> None:
-    ledger.record_cycle(mission_id="m2", outcome="failed")
-    for _ in range(4):
-        ledger.record_prediction(
-            mission_id="m2",
-            agent_name="SCOUT",
-            predicted_outcome="PROCEED",
-            confidence=0.5,
-            actual_outcome="DISCARD",
-            is_correct=False,
-        )
-    scores = ledger.get_agent_believability()
-    # 0 correct / 4 total → 0.0 → clamped to 0.1
-    assert abs(scores["SCOUT"] - 0.1) < 0.01
-
-
-def test_get_agent_believability_partial(ledger: ResearchLedger) -> None:
-    ledger.record_cycle(mission_id="m3", outcome="success")
-    for correct in [True, True, True, False, False]:
-        ledger.record_prediction(
-            mission_id="m3",
-            agent_name="MAIN",
-            predicted_outcome="PROCEED",
-            confidence=0.8,
-            actual_outcome="PROCEED" if correct else "DISCARD",
-            is_correct=correct,
-        )
-    scores = ledger.get_agent_believability()
-    # 3/5 = 0.6
-    assert abs(scores["MAIN"] - 0.6) < 0.01
-
-
 # ── ingest_event (dual-write) ─────────────────────────────────────────────────
 
 def test_ingest_event_completed(ledger: ResearchLedger) -> None:

@@ -386,20 +386,6 @@
   padding-left: 20px;
 }
 
-.task-assign-fatigue {
-  flex: 1;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 2px;
-  overflow: hidden;
-}
-.task-assign-fatigue-bar {
-  height: 100%;
-  background: var(--lt-success);
-  border-radius: 2px;
-  transition: width 0.2s ease;
-}
-
 .task-assign-select {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid var(--lt-border);

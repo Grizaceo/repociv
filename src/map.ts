@@ -1380,7 +1380,6 @@ export async function generateWorld(): Promise<World> {
     buildings: [],
     resources: { gold: totalGold, science: totalScience, production: totalProduction },
     generatedAt: Date.now(),
-    restAreas: [],
   };
 
   // Recalculate territories dynamically to prevent overlaps (Civilization Voronoi)

@@ -15,9 +15,6 @@ class FakeLedger:
             {"outcome": "failed", "error_summary": "css style regression"},
         ]
 
-    def get_agent_believability(self) -> dict[str, float]:
-        return {"WORKER": 0.25}
-
     def get_mission_stats(self, limit: int = 100) -> list[dict]:
         return self.stats[-limit:]
 
@@ -37,7 +34,6 @@ def test_reflect_detects_pattern_from_ledger_fixture(tmp_path: Path) -> None:
     patterns = engine.reflect()
 
     assert patterns
-    assert any(pattern.kind == "low_believability" for pattern in patterns)
     assert any(pattern.kind == "repeated_failure_term" for pattern in patterns)
 
 

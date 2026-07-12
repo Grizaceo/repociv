@@ -87,7 +87,6 @@ function capitalWorld(): World {
     buildings: [],
     resources: { gold: 0, science: 0, production: 0 },
     generatedAt: 0,
-    restAreas: [],
   };
 }
 

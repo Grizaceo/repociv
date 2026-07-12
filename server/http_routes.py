@@ -19,7 +19,6 @@ from server.routes.core import get_subagents  # noqa: F401
 from server.routes.core import get_mission_tree  # noqa: F401
 from server.routes.core import get_gpu  # noqa: F401
 from server.routes.core import get_pending  # noqa: F401
-from server.routes.core import get_context  # noqa: F401
 from server.routes.core import get_approvals  # noqa: F401
 from server.routes.core import get_agents  # noqa: F401
 from server.routes.core import get_agents_capabilities  # noqa: F401

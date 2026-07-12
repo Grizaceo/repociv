@@ -2,7 +2,6 @@
 import { type Renderer } from '../../renderer.ts';
 import { type GameState } from '../../game.ts';
 import { type BridgeEvents } from '../../bridge.ts';
-import { terminalPanel } from '../../terminalPanel.ts';
 import {
   hideUnitPanel,
   renderHeroBar,
@@ -106,10 +105,6 @@ export function wireHotkeys(
       }
       if (isLedgerOpen()) {
         closeLedger();
-        return;
-      }
-      if (terminalPanel.isVisible()) {
-        terminalPanel.hide();
         return;
       }
       if (isReplayPanelOpen()) {
@@ -324,11 +319,6 @@ export function wireHotkeys(
         trackHotkey('A:approvals');
         if (!isApprovalPanelOpen()) trackPanelOpen('approvals');
         toggleApprovalPanel();
-        break;
-      case 't':
-        trackHotkey('T:terminal');
-        if (!terminalPanel.isVisible()) trackPanelOpen('terminal');
-        void terminalPanel.toggle();
         break;
       case 'p':
         trackHotkey('P:priority');

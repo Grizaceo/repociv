@@ -132,18 +132,6 @@ class SelfImprovementEngine:
         """Read ledger + latency metrics and return reproducible patterns."""
         patterns: list[ImprovementPattern] = []
 
-        believability = {}
-        if hasattr(self.ledger, "get_agent_believability"):
-            believability = self.ledger.get_agent_believability() or {}
-        for agent, score in believability.items():
-            if float(score) < 0.5:
-                patterns.append(ImprovementPattern(
-                    kind="low_believability",
-                    summary=f"{agent} believability is below 50%",
-                    evidence={"agent": agent, "believability": float(score)},
-                    confidence=round(1.0 - float(score), 3),
-                ))
-
         stats = []
         if hasattr(self.ledger, "get_mission_stats"):
             stats = self.ledger.get_mission_stats(limit=100) or []
