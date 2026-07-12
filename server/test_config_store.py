@@ -244,3 +244,39 @@ def test_get_set_default_harness(isolated_config: Path) -> None:
 def test_set_default_harness_rejects_unknown(isolated_config: Path) -> None:
     with pytest.raises(ValueError, match="unknown harness"):
         config_store.set_default_harness("gpt-99")
+
+
+# ── Regression: env-var ~ expansion ──────────────────────────────────────────
+# Bug: REPOCIV_CONFIG_DIR=~/.repociv was stored as a literal string with
+# the tilde unexpanded. Path("~/.repociv") creates a directory literally
+# named "~", not the user's home. This test exercises the real
+# _config_path() (not the monkeypatched one from isolated_config).
+def test_config_path_expands_tilde_in_env_var(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """REPOCIV_CONFIG_DIR with a ~ prefix must expand to the home directory."""
+    fake_home = tmp_path / "fakehome"
+    fake_home.mkdir()
+    monkeypatch.setenv("HOME", str(fake_home))
+    monkeypatch.setenv("REPOCIV_CONFIG_DIR", "~/.repociv")
+    # Call the REAL _config_path, not a monkeypatched override.
+    path = config_store._config_path()
+    assert "~" not in str(path), f"tilde not expanded: {path}"
+    assert str(path) == str(fake_home / ".repociv" / "config.json")
+
+
+def test_config_path_expands_tilde_write_read_roundtrip(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Write + read must work end-to-end when REPOCIV_CONFIG_DIR uses ~."""
+    fake_home = tmp_path / "fakehome"
+    fake_home.mkdir()
+    monkeypatch.setenv("HOME", str(fake_home))
+    monkeypatch.setenv("REPOCIV_CONFIG_DIR", "~/.repociv")
+    # Write through the real path.
+    config_store._write_raw({"version": 1, "profiles": {"H": {"harness": "hermes"}}})
+    raw = config_store._read_raw()
+    assert raw["profiles"]["H"]["harness"] == "hermes"
+    # File must exist under fake_home, not under a literal "~" directory.
+    assert (fake_home / ".repociv" / "config.json").exists()
+    assert not (tmp_path / "~").exists(), "literal ~ directory was created"

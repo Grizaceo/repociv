@@ -77,7 +77,7 @@ def _config_path() -> Path:
     base = os.environ.get(_CONFIG_DIR_ENV) or os.path.join(
         os.path.expanduser("~"), ".repociv"
     )
-    return Path(base) / _CONFIG_FILENAME
+    return Path(os.path.expanduser(base)) / _CONFIG_FILENAME
 
 
 def _read_raw() -> dict[str, Any]:
