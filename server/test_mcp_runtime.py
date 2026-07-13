@@ -149,10 +149,11 @@ def test_mcp_stdio_real_command_approval_evidence(tmp_path: Path) -> None:
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
             try:
-                if httpx.get(f"{base}/health", timeout=0.25).status_code == 200:
+                if httpx.get(f"{base}/health", timeout=1.0).status_code == 200:
                     break
-            except httpx.ConnectError:
-                time.sleep(0.05)
+            except httpx.RequestError:
+                pass
+            time.sleep(0.05)
         else:
             raise AssertionError("real bridge did not become healthy")
 
