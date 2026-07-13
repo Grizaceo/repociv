@@ -59,6 +59,7 @@ def test_run_agent_persists_session_and_run_state(monkeypatch, tmp_path):
     completions = []
     failures = []
     outcomes = []
+    terminal_order = []
 
     agent_runner._sessions.init(tmp_path)
     agent_runner._run_state.init(tmp_path)
@@ -66,7 +67,14 @@ def test_run_agent_persists_session_and_run_state(monkeypatch, tmp_path):
     monkeypatch.setattr(agent_runner, "save_mission", lambda mission: saved.append(dict(mission)))
     monkeypatch.setattr(agent_runner, "send_to_repociv", lambda evt: sent.append(dict(evt)))
     monkeypatch.setattr(agent_runner._es, "record_started", lambda mission_id: None)
-    monkeypatch.setattr(agent_runner._es, "record_completed", lambda mission_id, result='', metadata=None: completions.append((mission_id, result)))
+    monkeypatch.setattr(
+        agent_runner._es,
+        "record_completed",
+        lambda mission_id, result='', metadata=None: (
+            terminal_order.append("event"),
+            completions.append((mission_id, result)),
+        ),
+    )
     monkeypatch.setattr(agent_runner._es, "record_failed", lambda mission_id, error='', metadata=None: failures.append((mission_id, error)))
     monkeypatch.setattr(agent_runner._ds, "record_outcome", lambda mission_id, status, duration: outcomes.append((mission_id, status)))
     monkeypatch.setattr(
@@ -79,6 +87,14 @@ def test_run_agent_persists_session_and_run_state(monkeypatch, tmp_path):
         "_execute_streaming",
         lambda *args, **kwargs: (True, "done"),
     )
+    original_patch = agent_runner._run_state.patch
+
+    def ordered_patch(mission_id, **updates):
+        if updates.get("status") == "completed":
+            terminal_order.append("run_state")
+        return original_patch(mission_id, **updates)
+
+    monkeypatch.setattr(agent_runner._run_state, "patch", ordered_patch)
 
     agent_runner.run_agent("MAIN", "repociv", "arregla tests", command_id="m42")
 
@@ -95,6 +111,7 @@ def test_run_agent_persists_session_and_run_state(monkeypatch, tmp_path):
     assert completions == [("m42", "done")]
     assert failures == []
     assert outcomes == [("m42", "success")]
+    assert terminal_order == ["run_state", "event"]
 
 
 def test_fixture_harness_requires_explicit_opt_in(monkeypatch, tmp_path):

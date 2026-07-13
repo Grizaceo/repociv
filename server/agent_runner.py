@@ -418,8 +418,6 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
         ],
     }
     if success:
-        _es.record_completed(mission_id, output[-500:], terminal_metadata)
-        _ds.record_outcome(mission_id, "success", duration)
         _run_state.patch(
             mission_id,
             status="completed",
@@ -427,11 +425,11 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
             finishedAt=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             result=output[-500:],
         )
+        _es.record_completed(mission_id, output[-500:], terminal_metadata)
+        _ds.record_outcome(mission_id, "success", duration)
         send_to_repociv({"type": "building_complete", "city": city_id, "building": quest_name, "missionId": mission_id})
         send_to_repociv({"type": "log", "msg": f"{unit_id} completó: {quest_name}", "level": "success"})
     else:
-        _es.record_failed(mission_id, output[-500:], terminal_metadata)
-        _ds.record_outcome(mission_id, "failure", duration)
         _run_state.patch(
             mission_id,
             status="failed",
@@ -439,6 +437,8 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
             finishedAt=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             error=output[-500:],
         )
+        _es.record_failed(mission_id, output[-500:], terminal_metadata)
+        _ds.record_outcome(mission_id, "failure", duration)
         send_to_repociv({"type": "building_failed", "city": city_id, "building": quest_name, "missionId": mission_id})
         send_to_repociv({"type": "log", "msg": f"{unit_id} falló en: {quest_name}", "level": "warn"})
 
