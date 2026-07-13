@@ -87,13 +87,12 @@ def test_ws_rejects_missing_origin_when_dev_token_is_empty(ws_server):
         assert data["type"] == "auth_error"
 
 
-def test_ws_rejects_foreign_origin_even_with_valid_token(ws_server, monkeypatch):
+def test_ws_rejects_foreign_origin_before_auth_in_token_mode(ws_server, monkeypatch):
     monkeypatch.setattr(wsh, "REPOCIV_TOKEN", "test-token-32-characters-minimum")
     port = ws_server
     with websockets.sync.client.connect(
         f"ws://127.0.0.1:{port}", origin="https://evil.example"
     ) as ws:
-        ws.send(json.dumps({"type": "auth", "token": "test-token-32-characters-minimum"}))
         data = json.loads(ws.recv(timeout=5))
         assert data == {"type": "auth_error", "msg": "origin not allowed"}
 
