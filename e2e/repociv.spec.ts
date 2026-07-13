@@ -98,6 +98,22 @@ test.describe('RepoCiv e2e visual', () => {
     );
   });
 
+  test('mobile 390px: sin overflow de documento y bottom sheet usable', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await bootRepoCiv(page);
+
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth))
+      .toBeLessThanOrEqual(0);
+    await expect(page.locator('#hud-right')).toBeHidden();
+    await expect(page.locator('#command-bar')).toBeVisible();
+
+    const primaryTarget = await page.locator('#spawn-new-profile').boundingBox();
+    expect(primaryTarget).not.toBeNull();
+    expect(primaryTarget?.width ?? 0).toBeGreaterThanOrEqual(44);
+    expect(primaryTarget?.height ?? 0).toBeGreaterThanOrEqual(44);
+  });
+
   test('flujo bridge: comando seguro produce evidencia y CommandCompleted visibles', async ({
     page,
   }) => {
