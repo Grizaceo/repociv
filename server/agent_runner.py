@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import uuid
@@ -350,6 +351,7 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
         })
 
     runtime = _runtime_adapters.default_agent_runtime(unit_id)
+    runtime_id = "fixture" if harness == "fixture" else runtime.harness_id
 
     mission_record: dict[str, Any] = {
         "id": mission_id, "unit": unit_id, "city": city_id, "mission": mission,
@@ -360,7 +362,7 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
     _es.record_started(mission_id)
     _sessions.patch(
         unit_id,
-        runtimeId=runtime.harness_id,
+        runtimeId=runtime_id,
         repo=city_id,
         workingDirectory=working_dir or "",
         summary=quest_name,
@@ -369,7 +371,7 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
     _sessions.append_message(unit_id, "user", mission, {"missionId": mission_id, "city": city_id})
     _run_state.save(mission_id, {
         "unitId": unit_id,
-        "runtimeId": runtime.harness_id,
+        "runtimeId": runtime_id,
         "repo": city_id,
         "commandType": "execute_agent",
         "phase": "executing",
@@ -445,6 +447,57 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
                      "success": success, "duration": int(duration)})
 
 
+def _run_fixture_agent_streaming(
+    unit_id: str,
+    mission_id: str,
+    mission: str,
+    working_dir: str,
+    city_id: str,
+) -> tuple[bool, str]:
+    """Execute a deterministic, opt-in E2E harness as a real child process."""
+    if os.environ.get("REPOCIV_E2E_FIXTURE_HARNESS", "").lower() not in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return False, "fixture harness disabled"
+
+    script = (
+        "from pathlib import Path\n"
+        "import sys\n"
+        "readme = Path('README.md')\n"
+        "label = readme.read_text(encoding='utf-8').splitlines()[0].lstrip('# ').strip() "
+        "if readme.is_file() else '<missing-readme>'\n"
+        "print(f'FIXTURE_AGENT_EXECUTED cwd={Path.cwd().name} repo={label} mission={sys.argv[1]}')\n"
+    )
+    proc = subprocess.Popen(
+        [sys.executable, "-c", script, mission],
+        cwd=working_dir,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        shell=False,
+    )
+    chunks: list[str] = []
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        chunks.append(line)
+        send_to_repociv(
+            {
+                "type": "chat_chunk",
+                "unit": unit_id,
+                "missionId": mission_id,
+                "text": line,
+            }
+        )
+        _es.record_output_chunk(mission_id, unit_id, line)
+    return_code = proc.wait(timeout=10)
+    output = "".join(chunks)
+    if return_code != 0 and not output:
+        output = f"fixture harness exited {return_code}"
+    return return_code == 0, output
+
+
 def _execute_streaming(unit_id: str, mission_id: str, mission: str,
                        working_dir: str | None = None,
                        city_id: str = "",
@@ -478,6 +531,11 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
             None,
             city_id,
             model=model or provider,
+        )
+
+    if harness == "fixture":
+        return _run_fixture_agent_streaming(
+            unit_id, mission_id, mission, working_dir, city_id
         )
 
     # Resolve harness from registry if not provided by payload.

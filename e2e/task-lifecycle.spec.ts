@@ -6,6 +6,11 @@ const token = process.env.REPOCIV_TOKEN ?? '';
 const repoPath = process.cwd();
 const rootPath = dirname(repoPath);
 
+type CommandEvidence = {
+  terminalEvent?: { type?: string; data?: { repoPath?: string } };
+  runState?: { runtimeId?: string; status?: string; result?: string };
+};
+
 function encodeRepoId(path: string): string {
   return `repo:${Buffer.from(path).toString('base64url')}`;
 }
@@ -22,28 +27,61 @@ test('canonical task lifecycle exposes evidence and cancellation', async ({ page
   });
   expect(selection.ok()).toBeTruthy();
 
-  const probe = await request.post(`${bridgeBase}/commands`, {
+  const realCommand = await request.post(`${bridgeBase}/commands`, {
     headers,
     data: {
-      id: 'e2e-evidence-command',
-      type: 'e2e_probe',
-      target: 'main',
-      payload: { unit: 'MAIN', marker: 'timeline-evidence' },
+      type: 'execute_agent',
+      target: 'repociv',
+      risk: 'low',
+      payload: {
+        unit: 'WORKER',
+        city: encodeRepoId(repoPath),
+        repoPath,
+        mission: 'inspect selected repo through real fixture subprocess',
+        harness: 'fixture',
+      },
     },
   });
-  expect(probe.ok()).toBeTruthy();
-  const probeId = (await probe.json()).commandId as string;
-  expect(probeId).toBeTruthy();
+  expect(realCommand.ok()).toBeTruthy();
+  const realBody = await realCommand.json();
+  expect(realBody.status).toBe('waiting_approval');
+  const realId = realBody.commandId as string;
+  expect(realId).toBeTruthy();
 
+  const approval = await request.post(`${bridgeBase}/approvals/${realId}/approve`, {
+    headers,
+    data: {},
+  });
+  expect(approval.ok()).toBeTruthy();
+  expect((await approval.json()).status).toBe('queued');
+
+  let realEvidence: CommandEvidence | undefined;
   await expect
     .poll(async () => {
-      const response = await request.get(`${bridgeBase}/commands/${probeId}/artifacts`, {
+      const response = await request.get(`${bridgeBase}/commands/${realId}/artifacts`, {
         headers,
       });
       if (!response.ok()) return '';
-      return (await response.json()).terminalEvent?.type ?? '';
+      realEvidence = await response.json();
+      return realEvidence?.terminalEvent?.type ?? '';
     })
     .toBe('CommandCompleted');
+
+  expect(realEvidence?.runState?.runtimeId).toBe('fixture');
+  expect(realEvidence?.runState?.status).toBe('completed');
+  expect(realEvidence?.runState?.result).toContain('FIXTURE_AGENT_EXECUTED');
+  expect(realEvidence?.runState?.result).toContain('mission=inspect selected repo');
+  expect(realEvidence?.terminalEvent?.data?.repoPath).toBe(repoPath);
+
+  await expect
+    .poll(async () => {
+      const response = await request.get(`${bridgeBase}/missions/${realId}/tree`, { headers });
+      if (!response.ok()) return '';
+      const tree = await response.json();
+      if (tree.mission?.repo !== repoPath) return '';
+      return tree.mission?.outcome ?? '';
+    })
+    .toBe('success');
 
   const queued = await request.post(`${bridgeBase}/commands`, {
     headers,
@@ -83,7 +121,7 @@ test('canonical task lifecycle exposes evidence and cancellation', async ({ page
   await expect(waitingRow.locator('.tl-type')).toHaveText('Rejected');
   await expect(waitingRow.locator('.tl-cancel-btn')).toHaveCount(0);
 
-  const evidenceRow = page.locator(`.tl-entry[data-cmd="${probeId}"]`);
+  const evidenceRow = page.locator(`.tl-entry[data-cmd="${realId}"]`);
   await expect(evidenceRow).toBeVisible();
   const evidenceButton = evidenceRow.locator('.tl-evidence-btn');
   await evidenceButton.evaluate((button) => (button as HTMLButtonElement).click());

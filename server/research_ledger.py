@@ -22,10 +22,18 @@ from __future__ import annotations
 import logging
 import os
 import threading
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+def _json_scalar(value: Any) -> Any:
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    return value
+
 
 _DEFAULT_STATE_DIR = Path.home() / ".repociv"
 
@@ -360,7 +368,10 @@ class ResearchLedger:
                     "summary", "duration_s", "created_at", "completed_at", "parent_harness",
                     "harness",
                 ]
-                return [dict(zip(cols, row)) for row in rows]
+                return [
+                    {key: _json_scalar(value) for key, value in zip(cols, row)}
+                    for row in rows
+                ]
             except Exception as exc:
                 logger.warning("ResearchLedger.list_subagent_runs: %s", exc)
                 return []
@@ -379,7 +390,8 @@ class ResearchLedger:
                     if row:
                         mission_row = {
                             "id": row[0], "repo": row[1], "agent": row[2],
-                            "outcome": row[3], "duration_s": row[4], "created_at": row[5],
+                            "outcome": row[3], "duration_s": row[4],
+                            "created_at": _json_scalar(row[5]),
                         }
                 except Exception:
                     pass
@@ -405,7 +417,10 @@ class ResearchLedger:
                 cols = ["id", "repo", "agent", "model", "phase", "outcome",
                         "prompt_tokens", "completion_tokens", "cost_estimate",
                         "duration_s", "created_at"]
-                return [dict(zip(cols, row)) for row in rows]
+                return [
+                    {key: _json_scalar(value) for key, value in zip(cols, row)}
+                    for row in rows
+                ]
             except Exception as exc:
                 logger.warning("ResearchLedger.get_mission_stats: %s", exc)
                 return []

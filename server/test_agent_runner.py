@@ -97,6 +97,41 @@ def test_run_agent_persists_session_and_run_state(monkeypatch, tmp_path):
     assert outcomes == [("m42", "success")]
 
 
+def test_fixture_harness_requires_explicit_opt_in(monkeypatch, tmp_path):
+    monkeypatch.delenv("REPOCIV_E2E_FIXTURE_HARNESS", raising=False)
+
+    ok, output = agent_runner._run_fixture_agent_streaming(
+        "WORKER", "fixture-disabled", "inspect repo", str(tmp_path), "repo"
+    )
+
+    assert ok is False
+    assert "disabled" in output
+
+
+def test_fixture_harness_executes_real_subprocess_in_selected_repo(monkeypatch, tmp_path):
+    monkeypatch.setenv("REPOCIV_E2E_FIXTURE_HARNESS", "1")
+    (tmp_path / "README.md").write_text("# Fixture Repo\n", encoding="utf-8")
+    sent = []
+    recorded = []
+    monkeypatch.setattr(agent_runner, "send_to_repociv", lambda event: sent.append(event))
+    monkeypatch.setattr(
+        agent_runner._es,
+        "record_output_chunk",
+        lambda mission_id, unit_id, text: recorded.append((mission_id, unit_id, text)),
+    )
+
+    ok, output = agent_runner._run_fixture_agent_streaming(
+        "WORKER", "fixture-real", "inspect selected repo", str(tmp_path), "repo"
+    )
+
+    assert ok is True
+    assert "FIXTURE_AGENT_EXECUTED" in output
+    assert "repo=Fixture Repo" in output
+    assert "mission=inspect selected repo" in output
+    assert sent[-1]["type"] == "chat_chunk"
+    assert recorded[-1] == ("fixture-real", "WORKER", output)
+
+
 # ─── cursor-agent harness ──────────────────────────────────────────────────────
 
 def test_find_cursor_agent_returns_none_when_not_installed(monkeypatch):

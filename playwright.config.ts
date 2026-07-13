@@ -43,7 +43,10 @@ export default defineConfig({
       url: `${bridgeURL}/health`,
       reuseExistingServer: true,
       timeout: 15_000,
-      env: process.env as Record<string, string>,
+      env: {
+        ...(process.env as Record<string, string>),
+        REPOCIV_E2E_FIXTURE_HARNESS: '1',
+      },
     },
     {
       command: `npm run dev -- --host 127.0.0.1 --port ${uiPort}`,

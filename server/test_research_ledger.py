@@ -1,6 +1,7 @@
 """Tests for server/research_ledger.py (Fase 0)."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -44,6 +45,21 @@ def test_record_cycle_stores_mission(ledger: ResearchLedger) -> None:
     assert row["outcome"] == "success"
     assert row["prompt_tokens"] == 1200
     assert row["completion_tokens"] == 450
+
+
+def test_mission_tree_is_json_serializable(ledger: ResearchLedger) -> None:
+    ledger.record_cycle(
+        mission_id="json-tree",
+        repo="/selected/repo",
+        agent="WORKER",
+        outcome="success",
+    )
+
+    tree = ledger.get_mission_tree("json-tree")
+
+    assert tree["mission"]["repo"] == "/selected/repo"
+    assert isinstance(tree["mission"]["created_at"], str)
+    assert json.loads(json.dumps(tree))["mission"]["outcome"] == "success"
 
 
 def test_record_cycle_survives_restart(tmp_path: Path) -> None:
