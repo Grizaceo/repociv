@@ -969,7 +969,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self._cors()
         self.end_headers()
-        self.wfile.write(payload)
+        try:
+            self.wfile.write(payload)
+        except (BrokenPipeError, ConnectionResetError, TimeoutError):
+            # The browser may close polling/stream requests while a response is
+            # being written. The response is already committed; this is a normal
+            # client disconnect, not a bridge failure.
+            pass
 
     def log_message(self, *_args) -> None:
         pass
