@@ -17,6 +17,12 @@
   padding: 0;
   max-height: 60vh;
   overflow-y: auto;
+  pointer-events: none;
+}
+.hermes-degraded-banner button,
+.hermes-degraded-banner a,
+.hermes-degraded-banner summary {
+  pointer-events: auto;
 }
 .hermes-degraded-banner .hermes-banner-header {
   display: flex;

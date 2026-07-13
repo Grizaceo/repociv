@@ -93,6 +93,26 @@ def test_grouped_slugs_carry_group_id() -> None:
 # ─── T5: fallback legacy when Hermes import broken ─────────────────────────
 
 
+def test_payload_failure_is_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    import server.provider_registry as pr
+
+    calls = 0
+
+    def fail_payload(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        raise RuntimeError("optional dependency unavailable")
+
+    monkeypatch.setattr(pr, "_HERMES_IMPORT_OK", True)
+    monkeypatch.setattr(pr, "build_models_payload", fail_payload)
+    monkeypatch.setattr(pr, "load_picker_context", lambda: {})
+    monkeypatch.setattr(pr, "_hermes_payload_cache", None)
+
+    assert pr._hermes_models_payload() is None
+    assert pr._hermes_models_payload() is None
+    assert calls == 1
+
+
 def test_fallback_when_hermes_unimportable(monkeypatch: pytest.MonkeyPatch) -> None:
     import server.provider_registry as pr
 

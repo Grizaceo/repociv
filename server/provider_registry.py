@@ -53,7 +53,7 @@ except Exception as _exc:  # noqa: BLE001 — any failure -> legacy fallback
 # Cache for the raw Hermes payload (same data Hermes GUI pickers consume).
 # build_models_payload can hit the network (model cache refresh); 60 s TTL
 # keeps /providers cheap without going stale on model additions.
-_hermes_payload_cache: tuple[float, dict] | None = None
+_hermes_payload_cache: tuple[float, dict[str, Any] | None] | None = None
 _HERMES_PAYLOAD_TTL = 60.0
 # ───────────────────────────────────────────────────────────────────────────
 
@@ -287,16 +287,35 @@ def _hermes_models_payload() -> dict[str, Any] | None:
             pricing=False,  # not consumed by RepoCiv UI; skip network
             capabilities=False,  # not consumed by RepoCiv UI; skip network
         )
-    except Exception:
-        logging.exception("[provider_registry] build_models_payload failed")
+    except Exception as exc:
+        logging.warning(
+            "[provider_registry] Hermes inventory unavailable; using fallback: %s",
+            exc,
+        )
+        _hermes_payload_cache = (now, None)
         return None
     _hermes_payload_cache = (now, payload)
     return payload
 
 
+def _provider_group(slug: str) -> str:
+    if provider_group_for_slug is not None:
+        return provider_group_for_slug(slug) or ""
+    for group, members in {
+        "minimax": {"minimax", "minimax-oauth"},
+        "kimi": {"kimi", "kimi-coding"},
+        "xai": {"xai"},
+    }.items():
+        if slug in members:
+            return group
+    return ""
+
+
 def _legacy_get_providers() -> dict[str, Any]:
     """Pre-v2.1 behavior: dynamic + static merge of shared registry + YAML."""
     _, providers = _build_dynamic_providers()
+    for provider in providers:
+        provider["group"] = _provider_group(str(provider.get("id") or ""))
 
     # Pick default provider: first available configured one, then any available.
     # Slugs updated to canonical Hermes names; legacy aliases kept for backward
@@ -345,7 +364,6 @@ def _get_providers() -> dict[str, Any]:
 
     cfg = _read_hermes_yaml() or {}
     yaml_providers = cfg.get("providers", {}) or {}
-    assert provider_group_for_slug is not None  # only reached if import OK
 
     # The currently active model (e.g. "MiniMax-M3") — used for default_model
     # of the row whose slug matches `payload["provider"]`.
@@ -388,7 +406,7 @@ def _get_providers() -> dict[str, Any]:
             "env": row.get("key_env") or ycfg.get("api_key_env") or "",
             "defaultModel": default_model,
             "models": models,
-            "group": provider_group_for_slug(slug) or "",
+            "group": _provider_group(slug),
             "warning": row.get("warning") or "",
         })
 
