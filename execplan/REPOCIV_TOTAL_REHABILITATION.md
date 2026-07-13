@@ -49,9 +49,9 @@ Baseline gate results:
 - [x] (2026-07-12) Milestone 2 — unknown/nested payload rejection; server-owned risk with approval floor; selected-repo/file/session confinement; profile name/ref discovery; foreign/MCP selected read boundary; all CLI permission bypass flags removed; pre-dispatch gate covers default adapter; UI payload carries canonical repoPath. Full gates: 879 backend passed (+1 skipped), 833 frontend passed, `tsc`/build green. Runtime: selected CLI submitted as `waiting_approval` despite client `risk=low`; unselected and file traversal returned 403; selected foreign read 200/unselected 403; approval cancelled before adapter execution.
 - [x] (2026-07-12) Milestone 3 — canonical `execute_agent` lifecycle and Event Store v1 envelope; terminal events carry repo/unit/type/status/duration/result/error/artifact refs; restart reconstructs context from JSONL; reverse-reader corruption fixed; `GET /commands/{id}/artifacts` and MCP `command_evidence` join terminal lifecycle with run-state; context_pack consumes nested camelCase; DuckDB ledger receives repo/unit/type/outcome/duration. Full backend: 884 passed (+1 skipped). Runtime `e2e_probe`: queued→CommandCompleted, run-state completed, refs present, ledger row matched same commandId.
 - [x] (2026-07-12) Milestone 4 — approval claim is concurrent-safe; durable enqueue precedes approval deletion; scheduler queue is atomic/idempotent and keeps running items recoverable across crash; failure injection covers enqueue/dequeue/dispatcher/approval cleanup; one state-root cascade; atomic state/config/Vite backup with SHA256 and restore test; Python owns selected `/api/files` and Vite proxies authenticated; installed systemd units use ACTIVE repo/.env, timer enabled, backup Result=success, bridge/frontend active and healthy after removing one stale bridge PID. Full backend: 893 passed (+1 skipped); frontend: 834 passed; build/tsc green.
-- [ ] (2026-07-12) Milestone 5 — implementation landed: removed legacy `task_orchestrator`/`step_executor`/self-improve task surface, duplicate task panels/routes/MCP tools and stale docs; `timelinePanel` now owns canonical command status, compact evidence and cancellation/rejection. Canonical `scripts/check.sh` is green (828 backend passed +1 skipped; frontend/type/lint/format/build/budgets green). Closure remains blocked on replacement Playwright E2E: evidence renders, but the UI-originated approval-reject POST reaches the bridge only around the 30 s test timeout; direct and Vite-proxied curl complete in <1 s. Trace inspection is pending explicit authorization after extraction was blocked.
-- [ ] Milestone 6 — repair mobile/accessibility/runtime noise with reproducible fixtures.
-- [ ] Milestone 7 — self-contained fresh-install verification, docs and final independent review.
+- [x] (2026-07-13) Milestone 5 — canonical task lifecycle closed: legacy task surface removed; `timelinePanel` owns status/evidence/cancellation; provider/harness picker is keyboard-contained; app readiness is observable; 22/22 Playwright tests pass with real server-side repository selection.
+- [x] (2026-07-13) Milestone 6 — mobile/accessibility/runtime hardening closed: 390 px document overflow eliminated; HUD compacted to one bottom sheet; file-tree IDs URL-decoded and large repos return bounded partial trees; WS envelopes/acks/Origin fixed; office atlas manifest is lazy with procedural fallback; degraded Hermes mode remains usable and logs one compact fallback warning.
+- [x] (2026-07-13) Milestone 7 — first fresh clone `--no-hardlinks` passed `npm ci`, venv+requirements, `scripts/check.sh` and 22/22 E2E on a 12-repo fixture. An independent adversarial review then returned `VERIFIED=false` with six concrete blockers; all were remediated in `1a5f9dc..39b5db4`: real `execute_agent` approval/process/evidence/DuckDB E2E, fail-closed local files, real double-click local entry, docs/runtime alignment, real MCP stdio lifecycle, blocking dependency/secret/security audit, artifact atomicity and command-bus coverage. The canonical gate on code HEAD `39b5db4` is green: 826 Vitest, 837 Pytest + 1 skip, Python coverage 78%, 53 focused frontend security tests, 123 focused backend security tests + 1 skip, zero npm/Python advisories and no high-confidence tracked/history credentials except one fingerprinted, rotated local bearer from historical docs.
 
 ## Surprises & Discoveries
 
@@ -62,6 +62,15 @@ Baseline gate results:
 - The recurrent DOM exposes 79 visible controls. Feature bloat is visible as interaction count, not merely file count.
 - New-user runtime correctly shows onboarding; earlier claims that onboarding was unreachable were false and are rejected.
 - Vitest WIP floors are lines 40%, branches 35%, functions 50%, statements 39%, and pass. The audit must not report the older HEAD threshold as current WIP truth.
+- Playwright trace/video on animated WebGL caused `GPU stall due to ReadPixels`; performance probes must not record every canvas frame.
+- E2E seeds that wrote only localStorage produced false green local views: Python correctly rejected unselected file trees and the UI silently used fallback data. Canonical tests now persist `/api/repo-selections`, use `repoPath` (not encoded `path`) and require all selected `/api/files` responses <400.
+- Python must URL-decode encoded repo IDs before membership checks. Large selected repos (SAIR exceeded 10k files) must return a bounded partial tree, not a fatal 400.
+- A clean clone with token/port env exposed non-hermetic unit gates; `scripts/check.sh` now unsets runtime-only env for Vitest/Pytest while E2E validates tokenized runtime separately.
+- Hermes may be present on `PYTHONPATH` while optional dependencies are absent. Provider inventory now caches this failure for 60 s, uses a complete grouped fallback and emits one compact warning instead of repeated tracebacks.
+- The degraded-mode banner was visually informative but pointer-modal; it now lets map/HUD interactions pass through while retaining interactive banner controls.
+- A synthetic `e2e_probe` can prove transport wiring but not the essential product flow. The closing E2E now submits canonical `execute_agent`, approves it, runs an opt-in argv-only subprocess fixture inside the selected repo, inspects the terminal artifact and verifies the same command in DuckDB. The fixture is disabled unless `REPOCIV_E2E_FIXTURE_HARNESS=1`.
+- The real MCP stdio probe exposed an artifact race: `CommandCompleted` became visible before run-state reached `completed`. Terminal run-state now persists before the terminal event, making the latter the observable commit point.
+- The historical Git scan found one 62-character RepoCiv-local bearer in old remote-access docs. It differs from the current token and is allowlisted only by SHA-256 fingerprint as rotated; new credentials at that path still fail the gate.
 
 ## Decision Log
 
@@ -108,6 +117,22 @@ Clients may raise risk but never lower it. The server infers effective risk from
 ### D11 — Filesystem API ownership is split by capability, not duplicated
 
 Python bridge is the single implementation owner of `/api/files/:repoId`, including selected-repo membership, limits and symlink confinement. Vite only proxies that route with the shared token; runtime equality is tested. Vite remains owner of browser-local root selection, repo scanning and Git display because moving these local developer UX operations to Python would add a second migration surface without reducing trust after Milestone 1's same-origin/token boundary. The old Python/Vite duplicate file-tree implementation is removed.
+
+### D12 — Security limits truncate useful reads; they do not force fake data
+
+Selected file trees remain bounded by depth and file-count budgets, but an oversized real repository returns `200` with `truncated=true` and a reason. Failing the entire request with `400` is rejected because local view silently fell back to simulated files and produced a false-green core flow.
+
+### D13 — Hotkey `0` owns renderer cycling
+
+Keys `1–9` remain direct hero selection. The old `3` renderer branch was unreachable behind that handler and `F3` collides with browser Find Next. `0` is unclaimed, visible in the HUD/help, tested and persisted.
+
+### D14 — Degraded integrations inform without becoming modal
+
+Missing optional Hermes dependencies activate an explicit degraded banner and grouped static provider fallback. The banner must not intercept map/HUD pointer events; its own close/retry/details controls remain interactive. Repeated optional-integration tracebacks are rejected in favor of one cached warning per TTL.
+
+### D15 — Test fixtures may execute real process boundaries, never replace production data
+
+The canonical E2E uses the normal `execute_agent` command, approval store, scheduler, agent runner, event store, artifact route and DuckDB ledger. Its deterministic `fixture` harness is available only under an explicit E2E environment flag and executes a real subprocess with argv-only semantics in the selected repository. In contrast, the local map no longer falls back to `buildMockLocalWorld` on API failure: it remains in macro view and shows an explicit error. Debug-only `openLocalView` is not an E2E success path.
 
 ## Milestone 0 — Adversarial plan validation
 
@@ -428,4 +453,35 @@ Acceptance:
 
 ## Outcomes & Retrospective
 
-To be completed after verification. It must state what shipped, rejected decisions, exact gate counts, bundle/resource/mobile metrics, screenshot paths, residual risks and rollback commits. It must not say “should work”.
+### Shipped
+
+- Core flow is real and observable: select real repo → persist server membership → inspect bounded file tree → enter local view → submit tokenized command → approval/evidence/cancellation → `CommandCompleted`/`Rejected` in canonical timeline.
+- HTTP/SSE/WS/MCP trust boundaries share selected-repo, token/Origin and server-owned-risk contracts. Vite filesystem operations use argv-only `execFileSync`; foreign WS Origin receives `auth_error`; no shell strings remain in the plugin.
+- 2D, WebGL and local renderers are preserved. Renderer cycle is hotkey `0`; WebGL stays lazy under the 185 KB eager budget. Office atlas manifest/image load only on local-view demand with procedural fallback.
+- Mobile 390 px uses one bottom sheet, hides secondary HUD, retains 44 px primary targets and has document `scrollWidth == innerWidth == 390`.
+
+### Rejected decisions
+
+- Renderer rewrite, broad-root repository trust, client-supplied risk downgrade, blanket send-as-approval, a second Python/Vite file-tree implementation, restoring fatigue/tensor/swarm, and hiding degraded integration failure were all rejected.
+- Raising test timeouts or accepting localStorage-only repo seeds was rejected after traces showed false-green fallback behavior.
+
+### Final verification snapshot (code `39b5db4`, closure documentation commit follows, 2026-07-13)
+
+- Fresh-clone closure repeats `git clone --no-hardlinks`, `npm ci`, new Python venv + `requirements.txt`, fresh Playwright Chromium and the 12-repo fixture on the final documentation commit; logs live under `/tmp/repociv-final-*`.
+- `scripts/check.sh`: TypeScript, ESLint, Prettier, build, Ruff, budgets, security and coverage green; Vitest **826/826** (79 files); Pytest **837 passed, 1 skipped**, **78%** line coverage.
+- Focused blocking security audit: npm and Python dependency audits report zero known vulnerabilities; high-confidence scan of tracked files and reachable Git history is green; frontend transport/security **53/53**; backend auth/traversal/symlink/CORS/WS **123 passed, 1 skipped**.
+- Budgets: terrain atlas **5288 KB / 6 MB**, props **224 KB / 1.5 MB**, eager JS below **185 KB gzip**.
+- Canonical lifecycle tests execute `execute_agent` through approval, selected-repo subprocess, terminal artifact and DuckDB mission row. A separate stdio MCP client lists **38 tools** and exercises `command_submit → approval_approve → command_evidence` against a real bridge.
+- Playwright remains **22/22** in the clean-clone suite; local entry no longer calls `window.__repocivDebug.openLocalView`, and the directed real-double-click suite passes **4/4** at **30.2 FPS** or better.
+- Visual probe over 12 real selected repos is refreshed on the final HEAD for flat/WebGL/local/mobile; required result is 0 page errors, 0 console errors, 0 failed requests and 0 HTTP >=400, with mobile 390/390. Evidence: `/home/gris/.hermes/workspace/reports/repociv/2026-07-13_visual_post/`.
+
+### Residual risks (non-blocking)
+
+- `knip` remains report-only and lists a large export surface; this is explicit debt, not evidence of dead runtime code.
+- Clean environments without complete Hermes optional dependencies emit one compact degraded-mode warning and use grouped static provider fallback. The app remains interactive.
+- Flat-map triangular negative space and parchment side geometry are inherited from the protected baseline, not a new regression. WebGL/local contact and alignment passed visual review.
+- WSL shell startup prints an unrelated Conda plugin traceback even when commands succeed; fresh verification used the project venv and captured gate/E2E exit codes independently.
+
+### Rollback
+
+The branch remains atomically reversible. Security/runtime/UX/tooling closure commits are `eeb7585`, `6422202`, `bbabf89`, `9198afc`, `41ea111`, `008800c`, `06eedcf` and `2cf0c8b`; earlier milestone boundaries are recorded in Progress. Revert only the smallest owning commit, then rerun `scripts/check.sh` and 22 E2E.
