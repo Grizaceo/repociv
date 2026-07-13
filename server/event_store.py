@@ -202,6 +202,7 @@ def _terminal_event(
         "CommandCompleted": ("completed", "success"),
         "CommandFailed": ("failed", "failed"),
         "CommandRejected": ("rejected", "rejected"),
+        "CommandCancelled": ("cancelled", "cancelled"),
     }
     status, outcome = outcome_by_type[event_type]
     artifact_refs = extra.pop("artifactRefs", [])
@@ -247,6 +248,18 @@ def record_rejected(
 ) -> None:
     evt = _terminal_event(
         command_id, "CommandRejected", reason=reason, metadata=metadata
+    )
+    _append(evt)
+    _ledger_ingest(evt)
+
+
+def record_cancelled(
+    command_id: str,
+    reason: str = "user cancelled",
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    evt = _terminal_event(
+        command_id, "CommandCancelled", reason=reason, metadata=metadata
     )
     _append(evt)
     _ledger_ingest(evt)
@@ -384,7 +397,7 @@ def command_evidence(command_id: str) -> dict[str, Any] | None:
     events = read_command_events(command_id)
     if not events:
         return None
-    terminal_types = {"CommandCompleted", "CommandFailed", "CommandRejected"}
+    terminal_types = {"CommandCompleted", "CommandFailed", "CommandRejected", "CommandCancelled"}
     terminal = next((event for event in reversed(events) if event.get("type") in terminal_types), None)
     created = next((event for event in events if event.get("type") == "CommandCreated"), None)
     terminal_data = terminal.get("data") if isinstance(terminal, dict) else {}

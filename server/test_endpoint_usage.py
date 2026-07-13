@@ -26,5 +26,4 @@ def test_endpoint_usage_records_and_persists(tmp_path):
 def test_endpoint_usage_normalizes_dynamic_paths():
     assert endpoint_usage.normalize_path("/approvals/cmd-1/approve") == "/approvals/:id/approve"
     assert endpoint_usage.normalize_path("/api/wonders/bibliotheca/health") == "/api/wonders/:id/health"
-    assert endpoint_usage.normalize_path("/tasks/repo/ISSUE-1/circuit-status") == "/tasks/:repo/:issue/circuit-status"
     assert endpoint_usage.normalize_path("/api/labhub/status/city-1") == "/api/labhub/status/:city_id"

@@ -81,13 +81,10 @@ curl http://localhost:5274/ready
 | GET | `/missions` | Lista de misiones persistidas |
 | GET | `/missions/<id>/tree` | Árbol de subagentes de una misión (swarm log) |
 | GET | `/pending` | Tareas desde `PENDING_TRACKER.md` + tareas locales (L-prefixed) |
-| GET | `/tasks` | Tareas activas del orquestador |
-| GET | `/tasks/<repo>/<issueId>` | Status de una tarea por clave (repo + issue) |
-| GET | `/tasks/<repo>/<issueId>/circuit-status` | Estado del circuit breaker para una tarea |
-| POST | `/tasks/<repo>/<issueId>/cancel` | Cancelar una tarea activa |
+| GET | `/commands/<id>/artifacts` | Lifecycle v1, evento terminal, refs y run-state por commandId |
 | GET | `/approvals` | Comandos esperando aprobación |
 | POST | `/commands` | Intake del Command Bus |
-| POST | `/commands/<id>/cancel` | Cancelar comando en cola |
+| POST | `/commands/<id>/cancel` | Cancelar comando queued/waiting_approval |
 | POST | `/approvals/<id>/approve` | Aprobar comando pendiente |
 | POST | `/approvals/<id>/reject` | Rechazar comando pendiente |
 | POST | `/pending/add` | Agregar tarea (body: `{title, priority}`) |
@@ -101,15 +98,7 @@ curl http://localhost:5274/ready
 
 Response 200: árbol del swarm log de la misión desde research_ledger, con `runState` (snapshot de run_state) embebido si existe. 400 si `mission_id` vacío.
 
-**`/tasks/<repo>/<issueId>`** — Path params:
-- `<repo>` (str, required): nombre o path del repo.
-- `<issueId>` (str, required): ID de la issue/quest.
-
-Response 200: estado actual de la tarea desde el task orchestrator. Acepta clave encoded con `::` (ej: `/tasks/repo::ISSUE-1`) además del path con segmentos.
-
-**`/tasks/<repo>/<issueId>/circuit-status`** — Mismos path params. Devuelve el estado del circuit breaker (abierto/cerrado, conteo de fallos, próximo retry) en lugar del status normal.
-
-**`/tasks/<repo>/<issueId>/cancel`** — Mismos path params. Cancela la tarea activa. Response 200: `{"ok": true|false, "taskKey": "..."}`. Idempotente: si la tarea no existe, devuelve `ok: false`.
+**`/commands/<id>/artifacts`** — Devuelve lifecycle v1, CommandCreated, evento terminal, `artifactRefs` y `runState` por el mismo `commandId`. 404 si no existe evidencia.
 
 ---
 
@@ -152,15 +141,6 @@ Acepta también `subagent_id` como alias. Response 200: `{"ok": true|false, "sub
 | GET | `/metrics` | Métricas calculadas (eventos, agentes, GPU) |
 | GET | `/events` | Event store replay (`?since=<unix_ts>`) |
 | GET | `/log` | Logs recientes del bridge |
-
----
-
-### Mejora Auto-dirigida (SICA)
-
-| Method | Path | Descripción |
-|--------|------|-------------|
-| GET | `/improve/reflect` | Patrones de mejora observados |
-| GET | `/improve/proposals` | Propuestas scopeadas y validadas |
 
 ---
 

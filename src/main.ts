@@ -48,7 +48,6 @@ import {
   setWebGLMetricsSource,
   toggleHarnessPanel,
   startHarnessPolling,
-  toggleTaskPanel,
   togglePendingPanel,
   toggleLogPanel,
   isHarnessPanelOpen,
@@ -738,7 +737,6 @@ async function bootstrap() {
     void import('./ui/replayPanel.ts').then((m) => m.toggleReplayPanel());
   });
   document.getElementById('btn-observability')?.addEventListener('click', toggleObservabilityPanel);
-  document.getElementById('btn-tasks')?.addEventListener('click', toggleTaskPanel);
 
   // ─── Idle agent finder (Age of Empires pattern) ─────────────────────
   // Uses the shared singleton so the cycle index stays in sync with the
@@ -774,16 +772,6 @@ async function bootstrap() {
       btn.classList.toggle('active', active);
       btn.title = active ? 'Ocultar etiquetas de archivos [T]' : 'Etiquetas de archivos [T]';
     }
-  });
-  document.getElementById('btn-task-assign')?.addEventListener('click', () => {
-    void import('./ui/taskAssignPanel.ts').then((m) =>
-      m.toggleTaskAssignPanel(
-        () => state.getLocalUnits(),
-        (unitId, task) => {
-          if (task !== null) state.setLocalUnitTask(unitId, task);
-        },
-      ),
-    );
   });
   document.getElementById('btn-harnesses')?.addEventListener('click', () => {
     toggleHarnessPanel();
@@ -829,7 +817,6 @@ async function bootstrap() {
     'btn-approvals': 'approvals',
     'btn-timeline': 'timeline',
     'btn-observability': 'observability',
-    'btn-tasks': 'tasks',
     'btn-pending': 'pending',
     'btn-log': 'log',
     'btn-settings': 'settings',

@@ -20,8 +20,6 @@ Endpoints:
   GET  /agents                    — agent status + heartbeat + queue depth
   GET  /agents/capabilities       — capability model (Fase 6)
   GET  /metrics                   — observability metrics (Fase 7)
-  GET  /improve/reflect           — SICA: list observed improvement patterns
-  GET  /improve/proposals         — SICA: list scoped, schema-valid proposals
   POST /commands                  — new Command Bus intake
   POST /commands/<id>/cancel      — cancel a queued command
   POST /approvals/<id>/approve    — approve a pending command
@@ -216,7 +214,6 @@ from server import harness_registry as _hr  # noqa: E402
 from server import recovery as _recovery  # noqa: E402
 from server import runtime_adapters as _runtime_adapters  # noqa: E402
 from server import agent_runner as _agent_runner  # noqa: E402
-from server import task_orchestrator as _to  # noqa: E402
 from server import rate_limiter as _rl  # noqa: E402
 from server import missions_store as _missions_store  # noqa: E402
 from server import command_executors as _command_executors  # noqa: E402
@@ -491,7 +488,6 @@ def _dispatch_command(cmd: Command) -> None:
         event_record_failed=_es.record_failed,
         record_outcome=_ds.record_outcome,
         register_issue_run_fn=_register_issue_run,
-        task_run=_to.run_task,
         subagent_approve_spawn=_st.approve_spawn,
         subagent_request_dispatch=_st.request_dispatch,
     )
@@ -675,19 +671,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._respond(status, body)
             return
 
-        if path.startswith("/tasks/"):
-            parts = path.split("/")[2:]
-            if len(parts) >= 3 and parts[2] == "circuit-status":
-                ctx["repo"], ctx["issue_id"], ctx["circuit"] = parts[0], parts[1], True
-            elif len(parts) >= 2:
-                ctx["repo"], ctx["issue_id"], ctx["circuit"] = parts[0], parts[1], False
-            else:
-                self._err_json(404, "invalid task path")
-                return
-            status, body = _routes.get_task_by_key(ctx)
-            self._respond(status, body)
-            return
-
         # ── Mission tree (subagent swarm log) ────────────────────────────────
         if path.startswith("/missions/") and path.endswith("/tree"):
             mission_id = path[len("/missions/") : path.rfind("/tree")]
@@ -849,25 +832,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 }
             )
             self._json({"ok": removed, "commandId": cmd_id})
-            return
-
-        if path.startswith("/tasks/") and path.endswith("/cancel"):
-            # URL pattern: /tasks/<encoded_key>/cancel where key = "repo::ISSUE-id"
-            # We support both /tasks/repo::ISSUE-1/cancel and /tasks/repo/ISSUE-1/cancel
-            inner = path[len("/tasks/") : path.rfind("/cancel")]
-            if "::" in inner:
-                parts = inner.split("::", 1)
-                task_repo, task_issue = parts[0], parts[1]
-            else:
-                # fallback: /tasks/<repo>/<issueId>/cancel (3 path segments)
-                segments = [s for s in inner.split("/") if s]
-                if len(segments) >= 2:
-                    task_repo, task_issue = segments[0], segments[1]
-                else:
-                    self._err_json(400, "invalid task key")
-                    return
-            cancelled = _to.cancel_task(task_repo, task_issue)
-            self._json({"ok": cancelled, "key": f"{task_repo}::{task_issue}"})
             return
 
         # ─── Approval endpoints ───────────────────────────────────────────────
@@ -1087,11 +1051,6 @@ if __name__ == "__main__":
     _sched.set_dispatcher(_scheduler_dispatch)
     _sched.start_worker()
     _seed_initial_heartbeats()
-
-    # Wire P4 step executor → orchestrator (agent dispatch: SCOUT/WORKER/DAVI)
-    from server.step_executor import dispatch_plan_step
-
-    _to.set_step_executor(dispatch_plan_step)
 
     # Recover any commands that were running when the bridge last died
     recovered = _recover_hung_commands()

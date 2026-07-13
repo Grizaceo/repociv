@@ -151,7 +151,7 @@ con `pytest server/`.
 | F2 | FrugalGPT Router + SignalExtractor + Agent Cards | ✅ activo |
 | F3 | Swarm Engine multi-agente | ❌ **retirado** (Fase 1 cleanup) |
 | F4 | World Model shadow→active | ✅ activo |
-| F5 | SICA Self-Improvement + Container Runtime + Dockerfile.agent | ✅ activo (SICA read-only) |
+| F5 | SICA Self-Improvement | ❌ **retirado** (2026-07: proponía edits sobre step_executor eliminado) |
 
 - 📄 `PROPOSED_IMPROVEMENTS_REPOCIV.md` — manifiesto inicial (semilla del
   plan vivo).
@@ -173,11 +173,8 @@ no de expansión**:
 - `server/rebuild_ledger.py` cierra el invariante de `DATA_SOURCES.md`:
   si el DuckDB se corrompe, se reconstruye desde `events.jsonl` con
   `python -m server.rebuild_ledger`. Idempotente.
-- SICA self-improvement queda **dormido pero accesible**: `GET /improve/
-  reflect` y `GET /improve/proposals` (read-only) lo exponen para que el
-  alpha tester los inspeccione manualmente. La ruta de aplicación
-  automática no se conecta hasta que la calidad de las propuestas se
-  haya observado en uso real.
+- SICA self-improvement y sus endpoints `/improve/*` se retiraron en 2026-07;
+  duplicaban el ciclo humano de auditoría y apuntaban a módulos ya eliminados.
 - 22 documentos de `docs/archive/` se condensan en este `EVOLUTION.md` +
   5 documentos-germen conservados. El historial completo sigue disponible
   en git.

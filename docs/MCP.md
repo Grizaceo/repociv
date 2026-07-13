@@ -75,6 +75,7 @@ curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/path/to/workspace
 |------|-------------|
 | `command_submit(type, target, ...)` | Envía un comando al bus. `risk=high` → va a approvals primero |
 | `command_cancel(id)` | Cancela un comando en cola |
+| `command_evidence(id)` | Lifecycle v1, terminal, refs y run-state por commandId |
 
 **Types válidos:** `inspect_repo`, `read_file`, `run_tests`, `run_build`, `edit_file`, `create_branch`, `git_commit`, `delete_file`, `execute_agent`, `send_message`
 
@@ -105,13 +106,7 @@ curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/path/to/workspace
 | Tool | Descripción |
 |------|-------------|
 | `gpu_status` | VRAM, temperatura (nvidia-smi) |
-| `metrics_snapshot` | Throughput, latencia, circuitos abiertos |
-
-### Self-improvement / SICA
-| Tool | Descripción |
-|------|-------------|
-| `improve_reflect` | Patrones observados con confianza |
-| `improve_proposals` | Propuestas de mejora pendientes |
+| `metrics_snapshot` | Throughput, latencia, profundidad de cola y endpoints |
 
 ### Providers & Harnesses `[MUTATES parcial]`
 | Tool | Descripción |
@@ -120,13 +115,6 @@ curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/path/to/workspace
 | `providers_live` | Alcanzabilidad en vivo de cada modelo |
 | `harnesses_list` | 7 harnesses (incluye `claude-code-local`, `codex-local`) |
 | `harness_recovery(harness_id, ...)` | **[MUTATES]** Plan de recovery para harness caído |
-
-### Tasks P3 `[MUTATES parcial]`
-| Tool | Descripción |
-|------|-------------|
-| `tasks_list` | Tareas de orquestación P3 activas |
-| `task_get(repo, issue_id)` | Estado de tarea específica |
-| `task_cancel(repo, issue_id)` | **[MUTATES]** Cancela tarea P3 |
 
 ### Directives `[MUTATES parcial]`
 | Tool | Descripción |
@@ -163,8 +151,6 @@ Campos opcionales en `subagent_spawn`: `parentHarness`, `harness` (mismo harness
 | `hermes-cli` | Best-effort JSON/líneas en stdout | Sin formato estable → badge “limited” en UI |
 | `hermes` HTTP | No | Sin SSE de subtareas aún |
 | `openclaw` / `codex` | No | Solo etiqueta harness en UI si padre usa ese runner |
-
-`subagent_dispatch` (comando bridge) está registrado pero devuelve `not_implemented` (fase 2).
 
 ## Política de approvals
 

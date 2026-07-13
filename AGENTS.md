@@ -22,8 +22,8 @@ When working here, do NOT assume you are in the Hermes upstream repo. You are in
 RepoCiv expone su bridge como un **MCP server por stdio** (`server/mcp_server.py`).
 Esto permite que otras ventanas de Claude Code, Cursor o Codex CLI operen el dashboard como agentes externos.
 
-- 42 tools cubriendo 14 dominios del bridge con tools MCP (agents, commands, approvals, pending, context, GPU, SICA, providers, tasks, directives, events, WebSocket, wonders, graph-relations, foreign-relations)
-- Tools `[MUTATES]` requieren `REPOCIV_TOKEN`; read-only no requieren token
+- Tools MCP canónicos para agentes, commands, approvals, pending, context, GPU, providers/harnesses, directives, events, WebSocket, wonders, graph-relations y foreign-relations
+- Tools `[MUTATES]` requieren `REPOCIV_TOKEN`; si hay token configurado, los reads también lo envían. Sin token, el bridge local limita mutaciones/streams a Origin allowlisted.
 - Los approvals del bridge **no se bypasean** — `command_submit` con `risk=high` cae en cola igual que desde la UI
 
 Para conectar desde otra sesión de Claude Code, añadir en `~/.claude.json`:

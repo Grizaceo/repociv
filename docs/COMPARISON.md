@@ -150,11 +150,7 @@
    that can handle each task, not just the user's configured default.
    Over a week of daily use, this saves real money on API calls.
 
-6. **Self-improvement.** SICA (Self-Improving Cognitive Architecture)
-   observes usage patterns and generates proposals. Not automatic, not
-   magic, but a genuine feedback loop that improves the system over time.
-
-7. **Transparency.** RepoCiv is MIT open source. Every line of code is
+6. **Transparency.** RepoCiv is MIT open source. Every line of code is
    readable and modifiable. The comparison you are reading now is an
    example: RepoCiv documents where it falls short because that is how
    open source should work.

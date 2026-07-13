@@ -64,6 +64,18 @@ _TASK_TIER: dict[str, str] = {
 }
 
 
+def infer_task_type(agent: str) -> str:
+    """Map an agent type to the model router's task vocabulary."""
+    mapping = {
+        "MAIN": "orchestrate",
+        "HERMES": "orchestrate",
+        "WORKER": "edit",
+        "SCOUT": "read",
+        "OPENCLAW": "edit",
+    }
+    return mapping.get(agent.upper(), "edit")
+
+
 
 def _get_ledgers() -> tuple[Any, Any]:
     """Lazy-import ledgers to avoid circular dependencies.

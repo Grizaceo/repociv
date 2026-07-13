@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import time
@@ -53,7 +52,6 @@ def dispatch_command(
     event_record_failed: Callable[[str, str], Any],
     record_outcome: Callable[[str, str, float], Any],
     register_issue_run_fn: Callable[[dict[str, Any], str], None],
-    task_run: Callable[[str, str], dict[str, Any]],
     subagent_approve_spawn: Callable[[str], Any],
     subagent_request_dispatch: Callable[..., dict[str, Any]],
 ) -> None:
@@ -216,27 +214,6 @@ def dispatch_command(
         send_to_repociv({'type': 'log', 'msg': f'Inspeccionando: {city_name}', 'level': 'info'})
         event_record_completed(cmd.id, 'tile inspected')
         record_outcome(cmd.id, 'success', 0.0)
-        return
-
-    if cmd.type == 'task_run':
-        repo = str(payload.get('repo', cmd.target))
-        issue_id = str(payload.get('issueId') or payload.get('issue_id') or '')
-        if not issue_id:
-            event_record_failed(cmd.id, 'task_run requires issueId in payload')
-            return
-        try:
-            result = task_run(repo, issue_id)
-            event_record_completed(cmd.id, json.dumps({'phase': result.get('phase'), 'repo': repo, 'issueId': issue_id}))
-            send_to_repociv({
-                'type': 'task_complete', 'repo': repo, 'issueId': issue_id,
-                'phase': result.get('phase'), 'missionId': cmd.id,
-            })
-        except Exception as e:
-            event_record_failed(cmd.id, str(e))
-            send_to_repociv({
-                'type': 'task_failed', 'repo': repo, 'issueId': issue_id,
-                'error': str(e), 'missionId': cmd.id,
-            })
         return
 
     send_to_repociv({'type': 'log', 'msg': f'Comando {cmd.type} sin executor — sin ejecución real', 'level': 'warn'})

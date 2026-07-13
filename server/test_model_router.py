@@ -1,8 +1,7 @@
 """Tests for server/model_router.py — Fase 2 (FrugalGPT Cascade)."""
 from __future__ import annotations
 
-from server.model_router import route_model, get_agent_cards_path
-from server.step_executor import _infer_task_type
+from server.model_router import infer_task_type, route_model, get_agent_cards_path
 
 
 # ─── Core routing table ───────────────────────────────────────────────────────
@@ -177,30 +176,30 @@ def test_reason_includes_signal_info():
     assert any(kw in reason for kw in ["quality", "critical", "security"])
 
 
-# ─── step_executor._infer_task_type integration ───────────────────────────────
+# ─── model_router.infer_task_type ─────────────────────────────────────────────
 
 def test_infer_task_type_main():
-    assert _infer_task_type("MAIN") == "orchestrate"
+    assert infer_task_type("MAIN") == "orchestrate"
 
 
 def test_infer_task_type_worker():
-    assert _infer_task_type("WORKER") == "edit"
+    assert infer_task_type("WORKER") == "edit"
 
 
 def test_infer_task_type_scout():
-    assert _infer_task_type("SCOUT") == "read"
+    assert infer_task_type("SCOUT") == "read"
 
 
 def test_infer_task_type_hermes():
-    assert _infer_task_type("HERMES") == "orchestrate"
+    assert infer_task_type("HERMES") == "orchestrate"
 
 
 def test_infer_task_type_openclaw():
-    assert _infer_task_type("OPENCLAW") == "edit"
+    assert infer_task_type("OPENCLAW") == "edit"
 
 
 def test_infer_task_type_unknown_defaults_to_edit():
-    assert _infer_task_type("UNKNOWN") == "edit"
+    assert infer_task_type("UNKNOWN") == "edit"
 
 
 # Note: SCOUT already covers the "read" mapping (test_infer_task_type_scout).

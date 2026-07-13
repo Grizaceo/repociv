@@ -245,22 +245,6 @@ def test_metrics_snapshot():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# IMPROVE / SICA
-# ══════════════════════════════════════════════════════════════════════════════
-
-def test_improve_reflect():
-    with _mock_get({"patterns": []}) as m:
-        _mcp.improve_reflect()
-    assert "/improve/reflect" in m.call_args[0][0]
-
-
-def test_improve_proposals():
-    with _mock_get({"proposals": []}) as m:
-        _mcp.improve_proposals()
-    assert "/improve/proposals" in m.call_args[0][0]
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 # PROVIDERS & HARNESSES
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -288,28 +272,6 @@ def test_harness_recovery_url_and_body():
     assert "/harnesses/hermes-local/recovery-command" in m.call_args[0][0]
     body = json.loads(m.call_args[1]["content"])
     assert body["reason"] == "command_failed"
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TASKS (P3)
-# ══════════════════════════════════════════════════════════════════════════════
-
-def test_tasks_list():
-    with _mock_get([]) as m:
-        _mcp.tasks_list()
-    assert m.call_args[0][0].endswith("/tasks")
-
-
-def test_task_get_url():
-    with _mock_get({"status": "running"}) as m:
-        _mcp.task_get("my-repo", "42")
-    assert "/tasks/my-repo/42" in m.call_args[0][0]
-
-
-def test_task_cancel_url():
-    with _token_env(), _mock_post({"ok": True}) as m:
-        _mcp.task_cancel("my-repo", "42")
-    assert "/tasks/my-repo/42/cancel" in m.call_args[0][0]
 
 
 # ══════════════════════════════════════════════════════════════════════════════

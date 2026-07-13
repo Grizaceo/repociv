@@ -245,20 +245,6 @@ def metrics_snapshot() -> Any:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SELF-IMPROVEMENT / SICA
-# ══════════════════════════════════════════════════════════════════════════════
-
-@mcp.tool(description="SICA: patrones de comportamiento observados con confianza y evidencia.")
-def improve_reflect() -> Any:
-    return _get("/improve/reflect")
-
-
-@mcp.tool(description="SICA: propuestas de mejora scopeadas y schema-valid pendientes de revisión.")
-def improve_proposals() -> Any:
-    return _get("/improve/proposals")
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 # PROVIDERS & HARNESSES  [MUTATES parcial]
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -293,25 +279,6 @@ def harness_recovery(
         f"/harnesses/{harness_id}/recovery-command",
         {"reason": reason, "command_type": command_type, "target": target, "details": details},
     )
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TASKS (P3 orchestration)  [MUTATES parcial]
-# ══════════════════════════════════════════════════════════════════════════════
-
-@mcp.tool(description="Lista todas las tareas de orquestación P3 activas.")
-def tasks_list() -> Any:
-    return _get("/tasks")
-
-
-@mcp.tool(description="Estado detallado de una tarea P3 específica (repo + issue_id).")
-def task_get(repo: str, issue_id: str) -> Any:
-    return _get(f"/tasks/{repo}/{issue_id}")
-
-
-@mcp.tool(description="[MUTATES] Cancela la ejecución de una tarea P3 activa.")
-def task_cancel(repo: str, issue_id: str) -> Any:
-    return _post(f"/tasks/{repo}/{issue_id}/cancel")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -46,12 +46,6 @@ def normalize_path(path: str) -> str:
         return "/commands/:id/cancel"
     if parts[0] == "approvals" and len(parts) >= 3 and parts[2] in {"approve", "reject"}:
         return f"/approvals/:id/{parts[2]}"
-    if parts[0] == "tasks" and len(parts) >= 2:
-        if parts[-1] == "cancel":
-            return "/tasks/:key/cancel"
-        if parts[-1] == "circuit-status":
-            return "/tasks/:repo/:issue/circuit-status"
-        return "/tasks/:repo/:issue"
     if parts[:2] == ["api", "wonders"] and len(parts) >= 3:
         return "/api/wonders/:id/health" if len(parts) >= 4 and parts[3] == "health" else "/api/wonders/:id"
     if parts[0] == "wonders" and len(parts) >= 2:

@@ -230,7 +230,7 @@ class ResearchLedger:
             data = event.get("data") or {}
             self.record_subagent_run(data)
             return
-        if etype not in ("CommandCompleted", "CommandFailed", "CommandRejected"):
+        if etype not in {"CommandCompleted", "CommandFailed", "CommandRejected", "CommandCancelled"}:
             return
 
         mission_id = event.get("commandId") or event.get("id", "")
@@ -245,6 +245,7 @@ class ResearchLedger:
             "CommandCompleted": "success",
             "CommandFailed":    "failed",
             "CommandRejected":  "rejected",
+            "CommandCancelled": "cancelled",
         }
         outcome = outcome_map[etype]
 

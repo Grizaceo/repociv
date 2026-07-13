@@ -146,3 +146,42 @@
   font-size: 10px;
   color: var(--ui-text-dim);
 }
+
+.tl-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tl-actions button {
+  border: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--ui-text);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font: 10px var(--font-mono);
+  cursor: pointer;
+}
+
+.tl-cancel-btn {
+  color: var(--ui-danger, #d45b5b) !important;
+}
+
+.tl-evidence {
+  display: none;
+  max-height: 180px;
+  margin: 6px 0 0;
+  padding: 8px;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: var(--ui-text-dim);
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 4px;
+  font: 9px/1.35 var(--font-mono);
+}
+
+.tl-evidence:not(:empty) {
+  display: block;
+}

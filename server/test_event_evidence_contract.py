@@ -91,6 +91,18 @@ def test_terminal_context_survives_process_cache_loss(monkeypatch, tmp_path: Pat
     assert terminal["data"]["durationS"] >= 0
 
 
+def test_cancelled_is_a_terminal_evidence_event(monkeypatch, tmp_path: Path):
+    event_store.init(tmp_path)
+    monkeypatch.setattr(event_store, "_ledger_ingest", lambda _event: None)
+    cmd = make_command("cancel-1")
+    event_store.record_created(cmd.id, "user", asdict(cmd))
+    event_store.record_cancelled(cmd.id, "user cancelled")
+    evidence = event_store.command_evidence(cmd.id)
+    assert evidence is not None
+    assert evidence["terminalEvent"]["type"] == "CommandCancelled"
+    assert evidence["terminalEvent"]["data"]["status"] == "cancelled"
+
+
 def test_context_pack_reads_canonical_nested_event_shape(monkeypatch, tmp_path: Path):
     event_store.init(tmp_path)
     monkeypatch.setattr(event_store, "_ledger_ingest", lambda _event: None)

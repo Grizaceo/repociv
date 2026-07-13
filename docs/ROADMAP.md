@@ -31,7 +31,7 @@ These components are used daily and have passing test suites:
 - Systemd integration for persistent operation
 - Security Harness (3-layer: gate, audit, runtime)
 - FrugalGPT Router (cost-aware model selection)
-- SICA self-improvement (read-only proposal generation)
+- Event Store v1 + evidence by commandId
 
 > **Removed in Phase 1 cleanup (2026-07):** Fatigue System (XCOM-style),
 > Swarm Engine, Tensor Context, and the xterm.js terminal panel were pruned

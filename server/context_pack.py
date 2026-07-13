@@ -45,6 +45,10 @@ def build_context_pack(
         if event_type == "CommandCompleted":
             last_status = "ok"
             break
+        if event_type == "CommandCancelled":
+            last_status = "cancelled"
+            last_error = str(data.get("reason") or "")
+            break
         if event_type in {"CommandFailed", "CommandRejected"}:
             last_status = "failed"
             last_error = str(data.get("error") or data.get("reason") or "")

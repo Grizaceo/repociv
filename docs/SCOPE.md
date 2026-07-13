@@ -17,7 +17,7 @@ y SCOUT; el resto se enrutan por harness (OPENCLAW, CLAUDE, CODEX, CURSOR)
 o se registran como perfil personal del usuario.
 
 Por debajo del juego hay un Agent OS real (FrugalGPT Router, World Model,
-Security Harness 3-capas, SICA, Docker isolation).
+Security Harness 3-capas, Event Store v1 y approvals durables).
 
 > **Fase 1 cleanup (2026-07):** se podaron del trunk Context Fatigue/XCOM
 > (`src/fatigue.ts`, `GET /context`, tool MCP `context_fatigue`), Tensor Context
@@ -99,7 +99,7 @@ Listado heredado del `implementation_plan.md` §10 + ajustes de esta etapa:
 - ❌ eBPF / Linux Landlock / LD_PRELOAD (`AUDIT_DELTA_ADDENDUM.md` §A) —
   excelentes para producción multi-tenant, sobredimensionados para single-user
 - ❌ Economic Survival Model con créditos por agente (`AUDIT_DELTA_ADDENDUM.md` §C)
-- ❌ SICA con apply automático (queda dormido, accesible solo por GET)
+- ❌ SICA self-improvement (retirado; el aprendizaje operativo vive en auditoría humana + Event Store)
 - ❌ Cualquier feature nueva que no responda a un dolor observado durante el
   dogfooding
 

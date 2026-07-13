@@ -219,7 +219,7 @@ def get_chat_config(ctx: "RouteContext") -> tuple[int, Any]:
     return 200, _get_chat_config(harness=harness if harness else None)
 
 def get_metrics(ctx: "RouteContext") -> tuple[int, Any]:
-    from server.bridge import _es, _sched, get_gpu_info, _to
+    from server.bridge import _es, _sched, get_gpu_info
     from server.metrics import compute_metrics
     from server import endpoint_usage as _endpoint_usage
     events = _es.read_events(since=0, limit=500)
@@ -227,7 +227,6 @@ def get_metrics(ctx: "RouteContext") -> tuple[int, Any]:
     queue_depth = len(_sched.queue_snapshot())
     gpu = get_gpu_info()
     payload = compute_metrics(events, agent_status, queue_depth, gpu)
-    payload["circuitOpenCount"] = _to.count_circuit_open()
     payload["endpointUsage"] = _endpoint_usage.get_stats(limit=25)
     return 200, payload
 

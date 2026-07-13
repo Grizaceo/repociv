@@ -210,18 +210,9 @@ interface AgentCard {
 Agent Cards define what each agent can do, which model it uses by default,
 how many parallel tasks it handles, and what roles it fills in the orchestrator.
 
-### SICA (Self-Improving Cognitive Architecture)
-
-SICA observes usage patterns and generates proposals for improvement. It is
-**read-only by design**: proposals are suggestions for the human operator to
-review and apply manually. No automatic code modification.
-
-- `GET /improve/reflect` — patterns observed in usage
-- `GET /improve/proposals` — concrete, scoped improvement suggestions
-
 ### Persistence Layer
 
-RepoCiv uses **4 stores**, each with a distinct purpose:
+RepoCiv uses **3 stores**, each with a distinct purpose:
 
 ```
 +-------------------------------------------------------------------+
@@ -232,11 +223,8 @@ RepoCiv uses **4 stores**, each with a distinct purpose:
 |                              | from Event Store. NOT source of     |
 |                              | truth.                              |
 +-------------------------------------------------------------------+
-| Workspace Issues             | Per-issue state: spec, plan,        |
-| (~/.repociv/issues/)         | artifacts, outputs. User-owned.     |
-+-------------------------------------------------------------------+
-| Sessions + RunState          | Active sessions + agent snapshots.  |
-| (~/.repociv/sessions/)       | Volatile: purged on restart.        |
+| Sessions + RunState          | Durable per-agent sessions and current      |
+| (~/.repociv/sessions/)       | execution snapshots. Backed up with state.  |
 +-------------------------------------------------------------------+
 ```
 

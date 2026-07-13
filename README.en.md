@@ -288,10 +288,10 @@ server/
 ├── bridge.py            FastAPI bridge (entry point: python -m server.bridge)
 ├── http_routes.py       All HTTP endpoints
 ├── websocket_handler.py Bidirectional WebSocket
-├── mcp_server.py        MCP stdio server (42 tools)
+├── mcp_server.py        MCP stdio server (canonical tools)
 ├── agent_runner.py      Runs agents (Hermes, Claude, Codex, OpenRouter…)
 ├── process_scanner.py   Detects processes → automatic spawns
-├── task_orchestrator.py Priority task queue
+├── event_store.py       Durable lifecycle v1 + evidence
 └── security_harness.py  Command validation (3 layers)
 ```
 

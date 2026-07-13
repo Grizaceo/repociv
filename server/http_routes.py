@@ -51,10 +51,6 @@ from server.routes.core import _validate_unit_id  # noqa: F401
 from server.routes.core import post_session_reset  # noqa: F401
 from server.routes.core import post_model_override  # noqa: F401
 from server.routes.core import get_hermes_status_route  # noqa: F401
-from server.routes.tasks import get_tasks  # noqa: F401
-from server.routes.tasks import get_task_by_key  # noqa: F401
-from server.routes.tasks import get_improve_reflect  # noqa: F401
-from server.routes.tasks import get_improve_proposals  # noqa: F401
 from server.routes.graph import _resolve_cdaily_db  # noqa: F401
 from server.routes.graph import _infer_category  # noqa: F401
 from server.routes.graph import get_latest_news  # noqa: F401

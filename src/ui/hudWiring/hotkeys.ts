@@ -33,14 +33,10 @@ import {
   toggleLedger,
   closeLedger,
   isLedgerOpen,
-  closeTaskPanel,
-  isTaskPanelOpen,
   closePendingPanel,
   isPendingPanelOpen,
   closeLogPanel,
   isLogPanelOpen,
-  toggleTaskAssignPanel,
-  isTaskAssignPanelOpen,
 } from '../index.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from '../settingsPanel.ts';
 import { closeConstructionPanel, isConstructionPanelOpen } from '../constructionPanel.ts';
@@ -113,10 +109,6 @@ export function wireHotkeys(
       }
       if (isObservabilityPanelOpen()) {
         closeObservabilityPanel();
-        return;
-      }
-      if (isTaskPanelOpen()) {
-        closeTaskPanel();
         return;
       }
       if (isPendingPanelOpen()) {
@@ -326,16 +318,6 @@ export function wireHotkeys(
         togglePriorityPanel(state.getMissionQueue(), (missionId) => {
           state.dispatchMissionById(missionId);
         });
-        break;
-      case 'j':
-        trackHotkey('J:task-assign');
-        if (!isTaskAssignPanelOpen()) trackPanelOpen('task-assign');
-        toggleTaskAssignPanel(
-          () => state.getLocalUnits(),
-          (unitId, task) => {
-            state.setLocalUnitTask(unitId, task);
-          },
-        );
         break;
       case 'h':
         trackHotkey('H:layers');

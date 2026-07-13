@@ -107,12 +107,7 @@ export function updateResource(id: 'gold' | 'science' | 'production', value: num
 }
 
 /** Update the task-count and idle-agent-count badges on the bottom-right button strip. */
-export function updateBadges(activeTasks: number, idleCount: number): void {
-  const tasksBadge = document.getElementById('btn-tasks-badge');
-  if (tasksBadge) {
-    tasksBadge.textContent = activeTasks > 99 ? '99+' : String(activeTasks);
-    tasksBadge.classList.toggle('active', activeTasks > 0);
-  }
+export function updateBadges(_activeTasks: number, idleCount: number): void {
   const idleBadge = document.getElementById('btn-idle-agent-badge');
   if (idleBadge) {
     idleBadge.textContent = idleCount > 99 ? '99+' : String(idleCount);

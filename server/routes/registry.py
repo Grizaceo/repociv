@@ -11,7 +11,7 @@ every domain handler from ``routes/*``. Importing it here adds no new import
 cycle: ``http_routes`` and the ``routes/*`` modules only import ``bridge`` lazily
 (inside functions), so this module loads cleanly at import time.
 
-Note: parameterised / prefix routes (``/tasks/{repo}/{id}``, ``/api/wonders/{id}``,
+Note: other parameterised / prefix routes (``/api/wonders/{id}``,
 ``/harnesses/{id}``, …) still dispatch imperatively in ``bridge.py`` because they
 mutate the request context; only the no-param exact matches live here.
 """
@@ -41,9 +41,6 @@ GET_EXACT: dict[str, Callable[..., Any]] = {
     "/harnesses": _routes.get_harnesses,
     "/api/config/default-harness": _routes.get_default_harness,
     "/log": _routes.get_log,
-    "/tasks": _routes.get_tasks,
-    "/improve/reflect": _routes.get_improve_reflect,
-    "/improve/proposals": _routes.get_improve_proposals,
     "/providers/live": _routes.get_providers_live,
     "/api/hermes/status": _routes.get_hermes_status_route,
     "/ws": _routes.get_ws_info,

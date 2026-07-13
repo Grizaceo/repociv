@@ -113,8 +113,6 @@ export const KNOWN_PANELS = [
   'quest-board',
   'harness',
   'recovery',
-  'tasks',
-  'task-assign',
   'pending',
   'log',
   'layers',

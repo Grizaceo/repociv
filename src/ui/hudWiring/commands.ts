@@ -14,12 +14,10 @@ import {
   toggleObservabilityPanel,
   toggleReplayPanel,
   toggleTimelinePanel,
-  toggleTaskPanel,
   togglePendingPanel,
   toggleLogPanel,
   toggleHarnessPanel,
   toggleLedger,
-  toggleTaskAssignPanel,
 } from '../index.ts';
 import { toggleSettingsPanel } from '../settingsPanel.ts';
 import { toggleLayerPanel } from '../layerPanel.ts';
@@ -74,16 +72,9 @@ export function registerHudCommands(
       run: () => toggleApprovalPanel(),
     },
     {
-      id: 'p-tasks',
-      group: 'Panel',
-      label: 'Tareas activas',
-      hint: 'F9',
-      run: () => toggleTaskPanel(),
-    },
-    {
       id: 'p-timeline',
       group: 'Panel',
-      label: 'Crónica de eventos',
+      label: 'Tareas, estado y evidencia',
       hint: 'F10',
       run: () => toggleTimelinePanel(),
     },
@@ -115,17 +106,6 @@ export function registerHudCommands(
       label: 'Gran Libro',
       hint: 'F6',
       run: () => toggleLedger(state),
-    },
-    {
-      id: 'p-task-assign',
-      group: 'Panel',
-      label: 'Asignar tareas',
-      hint: 'J',
-      run: () =>
-        toggleTaskAssignPanel(
-          () => state.getLocalUnits(),
-          (unitId, task) => state.setLocalUnitTask(unitId, task),
-        ),
     },
     {
       id: 'p-layers',
