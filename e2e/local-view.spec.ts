@@ -112,54 +112,20 @@ async function waitForCityScreenPositions(
   return positions;
 }
 
-async function getFirstSelectableCityId(page: Page): Promise<string | null> {
-  const response = await page.request.get('/api/repos');
-  expect(response.ok(), await response.text()).toBeTruthy();
-  const repos = (await response.json()) as Array<{ name?: string }>;
-  return (
-    repos
-      .map((repo) => repo.name)
-      .find(
-        (name): name is string =>
-          typeof name === 'string' && name.length > 0 && !/repociv/i.test(name),
-      ) ?? null
-  );
-}
-
 async function tryEnterLocalView(page: Page): Promise<boolean> {
   const positions = await waitForCityScreenPositions(page);
-  if (positions.length > 0) {
-    for (const pos of positions) {
-      await page.mouse.dblclick(pos.x, pos.y);
-      await page.waitForTimeout(300);
+  for (const pos of positions) {
+    await page.mouse.dblclick(pos.x, pos.y);
+    await page.waitForTimeout(300);
 
-      const localFrame = page.locator('#local-view-frame');
-      const isVisible = await localFrame.isVisible().catch(() => false);
-
-      if (isVisible) {
-        return true;
-      }
+    const localFrame = page.locator('#local-view-frame');
+    const isVisible = await localFrame.isVisible().catch(() => false);
+    if (isVisible) {
+      await page.locator('#main-canvas').focus();
+      return true;
     }
   }
-
-  const fallbackCityId = positions[0]?.cityId ?? (await getFirstSelectableCityId(page));
-  if (!fallbackCityId) return false;
-
-  const openedViaDebug = await page.evaluate((cityId) => {
-    return (
-      (
-        window as Window & {
-          __repocivDebug?: { openLocalView?: (id: string) => boolean };
-        }
-      ).__repocivDebug?.openLocalView?.(cityId) ?? false
-    );
-  }, fallbackCityId);
-  if (!openedViaDebug) return false;
-
-  const localFrame = page.locator('#local-view-frame');
-  await expect(localFrame).toBeVisible({ timeout: 5000 });
-  await page.locator('#main-canvas').focus();
-  return true;
+  return false;
 }
 
 test.describe('RepoCiv Local View (RimWorld-style)', () => {
