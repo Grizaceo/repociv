@@ -14,7 +14,7 @@
 //   - /event POST         — bridge event relay → Vite HMR WS
 
 import type { Plugin, Connect } from 'vite';
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { readdirSync, statSync, lstatSync, existsSync, readFileSync, realpathSync } from 'node:fs';
 import { join, basename, dirname, resolve, relative, isAbsolute, sep } from 'node:path';
 import { homedir, platform } from 'node:os';
@@ -353,7 +353,7 @@ export function readRequestBody(req: Connect.IncomingMessage): Promise<string> {
 function convertWindowsPathToWsl(path: string): string {
   const normalized = path.replace(/\r/g, '').trim();
   try {
-    return execSync(`wslpath -u "${normalized.replace(/"/g, '\\"')}"`, { encoding: 'utf8' }).trim();
+    return execFileSync('wslpath', ['-u', normalized], { encoding: 'utf8' }).trim();
   } catch {
     const driveMatch = /^([a-zA-Z]):[\\/](.*)$/.exec(normalized);
     if (!driveMatch) return normalized;
@@ -363,9 +363,9 @@ function convertWindowsPathToWsl(path: string): string {
   }
 }
 
-function tryPickWithCommand(command: string): string | null {
+function tryPickWithCommand(executable: string, args: string[]): string | null {
   try {
-    const output = execSync(command, { encoding: 'utf8' }).trim();
+    const output = execFileSync(executable, args, { encoding: 'utf8' }).trim();
     return output.length > 0 ? output : null;
   } catch {
     return null;
@@ -374,30 +374,25 @@ function tryPickWithCommand(command: string): string | null {
 
 function canRunCommand(binary: string): boolean {
   try {
-    execSync(`command -v "${binary}"`, { stdio: 'ignore' });
+    if (binary.endsWith('.exe')) {
+      execFileSync(binary, ['-NoProfile', '-Command', 'exit'], { stdio: 'ignore' });
+    } else {
+      execFileSync('which', [binary], { stdio: 'ignore' });
+    }
     return true;
   } catch {
-    if (binary.endsWith('.exe')) {
-      try {
-        execSync(`"${binary}" -NoProfile -Command exit`, { stdio: 'ignore' });
-        return true;
-      } catch {
-        return false;
-      }
-    }
     return false;
   }
 }
 
-function buildEncodedPowershellCommand(executable: string, script: string): string {
+function buildEncodedPowershellArgs(script: string): string[] {
   const encoded = Buffer.from(script, 'utf16le').toString('base64');
-  return `${executable} -NoProfile -STA -EncodedCommand ${encoded}`;
+  return ['-NoProfile', '-STA', '-EncodedCommand', encoded];
 }
 
 function tryPickWithWindowsDialog(executable: string): string | null {
   const commands = [
-    buildEncodedPowershellCommand(
-      executable,
+    buildEncodedPowershellArgs(
       [
         'Add-Type -AssemblyName System.Windows.Forms',
         'Add-Type -TypeDefinition "using System; using System.Runtime.InteropServices; public static class WinFg { [DllImport(\\"user32.dll\\")] public static extern bool AllowSetForegroundWindow(uint pid); [DllImport(\\"user32.dll\\")] public static extern bool SetForegroundWindow(IntPtr h); }"',
@@ -419,8 +414,7 @@ function tryPickWithWindowsDialog(executable: string): string | null {
         'if ($picked -ne $null) { $picked }',
       ].join('; '),
     ),
-    buildEncodedPowershellCommand(
-      executable,
+    buildEncodedPowershellArgs(
       [
         'Add-Type -AssemblyName System.Windows.Forms',
         '$shell = New-Object -ComObject Shell.Application',
@@ -429,8 +423,8 @@ function tryPickWithWindowsDialog(executable: string): string | null {
       ].join('; '),
     ),
   ];
-  for (const command of commands) {
-    const picked = tryPickWithCommand(command);
+  for (const args of commands) {
+    const picked = tryPickWithCommand(executable, args);
     if (picked) return picked;
   }
   return null;
@@ -439,8 +433,9 @@ function tryPickWithWindowsDialog(executable: string): string | null {
 export function pickFolderWithSystemDialog(): string {
   const os = platform();
   if (os === 'darwin') {
-    const output = execSync(
-      `osascript -e 'POSIX path of (choose folder with prompt "Selecciona la carpeta raiz del mapa")'`,
+    const output = execFileSync(
+      'osascript',
+      ['-e', 'POSIX path of (choose folder with prompt "Selecciona la carpeta raiz del mapa")'],
       { encoding: 'utf8' },
     ).trim();
     if (!output) throw new Error('Dialogo cancelado');
@@ -459,20 +454,22 @@ export function pickFolderWithSystemDialog(): string {
     if (windowsPicked) return convertWindowsPathToWsl(windowsPicked);
   }
 
-  const linuxCandidateCommands: string[] = [];
+  const linuxCandidateCommands: Array<{ executable: string; args: string[] }> = [];
   if (canRunCommand('zenity')) {
-    linuxCandidateCommands.push(
-      `zenity --file-selection --directory --title="Selecciona la carpeta raiz del mapa"`,
-    );
+    linuxCandidateCommands.push({
+      executable: 'zenity',
+      args: ['--file-selection', '--directory', '--title=Selecciona la carpeta raiz del mapa'],
+    });
   }
   if (canRunCommand('kdialog')) {
-    linuxCandidateCommands.push(
-      `kdialog --getexistingdirectory "${homedir()}" "Selecciona la carpeta raiz del mapa"`,
-    );
+    linuxCandidateCommands.push({
+      executable: 'kdialog',
+      args: ['--getexistingdirectory', homedir(), 'Selecciona la carpeta raiz del mapa'],
+    });
   }
 
-  for (const command of linuxCandidateCommands) {
-    const picked = tryPickWithCommand(command);
+  for (const { executable, args } of linuxCandidateCommands) {
+    const picked = tryPickWithCommand(executable, args);
     if (picked) return picked;
   }
 
@@ -1020,10 +1017,7 @@ export function repocivPlugin(mapRoot: string): Plugin {
       try {
         const upstream = await fetchBridgeFileTree(rawUrl, bridgeBase, expectedToken);
         res.statusCode = upstream.status;
-        res.setHeader(
-          'Content-Type',
-          upstream.headers.get('content-type') ?? 'application/json',
-        );
+        res.setHeader('Content-Type', upstream.headers.get('content-type') ?? 'application/json');
         res.end(Buffer.from(await upstream.arrayBuffer()));
       } catch (error) {
         res.statusCode = 502;

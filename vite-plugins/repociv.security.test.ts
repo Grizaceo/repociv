@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,6 +15,11 @@ import { encodeRepoId, type RepoRootsState } from './repoRootsState.ts';
 import { resolveViteHost } from '../vite.config.ts';
 
 describe('RepoCiv Vite filesystem security boundary', () => {
+  it('never executes shell command strings', () => {
+    const source = readFileSync(new URL('./repociv.ts', import.meta.url), 'utf8');
+    expect(source).not.toContain('execSync(');
+  });
+
   let fixtureRoot: string;
   let selectedRoot: string;
   let repo: string;
