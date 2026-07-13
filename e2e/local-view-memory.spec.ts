@@ -20,8 +20,9 @@ async function seedRepoSelection(page: Page) {
     selectedRepoPaths.length,
     'expected /api/repos to return selectable repos',
   ).toBeGreaterThan(0);
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.evaluate((paths) => {
+  await page.addInitScript((paths) => {
+    window.localStorage.setItem('repociv:tour-seen:v1', '1');
+    window.localStorage.setItem('repociv:renderer', 'flat');
     window.localStorage.setItem(
       'repociv:selected-repos:v1',
       JSON.stringify({
@@ -41,6 +42,7 @@ async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}
 
   await page.goto('/');
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
+  await expect(page.locator('html[data-app-ready="1"]')).toBeAttached({ timeout: 20_000 });
   if (
     await page
       .locator('#repo-onboarding')

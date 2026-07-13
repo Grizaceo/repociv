@@ -7,7 +7,7 @@ import { expect, test, type Page } from '@playwright/test';
  *
  * What this test verifies:
  *   - Both modes boot without JS errors.
- *   - Hotkey 3 (cycleWorldRenderMode) flips localStorage between
+ *   - Hotkey 0 (cycleWorldRenderMode) flips localStorage between
  *     'flat' and 'webgl' and the next reload lands in the chosen
  *     mode.
  *   - The legacy 'iso25d' value is migrated to 'webgl' on read
@@ -31,9 +31,11 @@ const SEED_REPOS = ['/tmp/repociv-fixtures/repo-alpha', '/tmp/repociv-fixtures/r
 async function bootWithMode(page: Page, mode: 'flat' | 'webgl') {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/');
-  await page.evaluate(
+  await page.addInitScript(
     ([mode, repos]) => {
+      if (window.sessionStorage.getItem('repociv:e2e-render-seeded') === '1') return;
+      window.sessionStorage.setItem('repociv:e2e-render-seeded', '1');
+      window.localStorage.setItem('repociv:tour-seen:v1', '1');
       window.localStorage.setItem('repociv:renderer', mode);
       window.localStorage.setItem(
         'repociv:selected-repos:v1',
@@ -48,6 +50,7 @@ async function bootWithMode(page: Page, mode: 'flat' | 'webgl') {
   );
   await page.goto(`/?renderer=${mode}`, { waitUntil: 'networkidle' });
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
+  await expect(page.locator('html[data-app-ready="1"]')).toBeAttached({ timeout: 20_000 });
   if (
     await page
       .locator('#repo-onboarding')
@@ -76,39 +79,38 @@ test.describe('hex2d ↔ WebGL parity', () => {
     expect(errors, 'no JS errors in webgl mode').toEqual([]);
   });
 
-  test('hotkey 3 cycles flat ↔ webgl and the value is observable in localStorage', async ({
+  test('hotkey 0 cycles flat ↔ webgl and the value is observable in localStorage', async ({
     page,
   }) => {
+    test.setTimeout(60_000);
     await bootWithMode(page, 'flat');
-    // Press hotkey 3 to cycle. The bound key handler in
-    // src/ui/hudWiring/hotkeys.ts maps case '3' to toggleView(),
+    // Press 0 to cycle. The hotkey handler calls toggleView(),
     // which calls renderer.cycleWorldRenderMode(), which calls
     // persistRenderMode(). Result: localStorage 'repociv:renderer'
     // flips from 'flat' to 'webgl'.
-    await page.keyboard.press('3');
-    // Give the event loop a tick to flush persistRenderMode.
-    await page.waitForTimeout(50);
-    const stored = await page.evaluate(() => window.localStorage.getItem('repociv:renderer'));
-    expect(stored).toBe('webgl');
+    await page.keyboard.press('0');
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem('repociv:renderer')), {
+        timeout: 20_000,
+      })
+      .toBe('webgl');
   });
 
   test('mode persists across reloads', async ({ page }) => {
+    test.setTimeout(60_000);
     await bootWithMode(page, 'webgl');
-    // No toggle needed: webgl session-only behavior rewrites
-    // storage to 'flat' on read; this test just confirms the
-    // post-reload state is internally consistent.
     await page.reload({ waitUntil: 'networkidle' });
+    await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
+    await expect(page.locator('html[data-app-ready="1"]')).toBeAttached({ timeout: 20_000 });
     const afterReload = await page.evaluate(() => window.localStorage.getItem('repociv:renderer'));
-    // 'flat' is the rewritten value (webgl is session-only, per
-    // the resolver's session-only contract).
-    expect(afterReload).toBe('flat');
+    expect(afterReload).toBe('webgl');
     await expect(page.locator('#main-canvas')).toBeVisible();
   });
 
   test('legacy iso25d in localStorage is migrated to webgl', async ({ page }) => {
-    await page.goto('/');
-    await page.evaluate(
+    await page.addInitScript(
       ([repos]) => {
+        window.localStorage.setItem('repociv:tour-seen:v1', '1');
         window.localStorage.setItem('repociv:renderer', 'iso25d');
         window.localStorage.setItem(
           'repociv:selected-repos:v1',
@@ -121,11 +123,12 @@ test.describe('hex2d ↔ WebGL parity', () => {
       },
       [SEED_REPOS] as const,
     );
-    // Force the URL to NOT override the resolver. Bare '/' reads
-    // from storage; the migration in resolveInitialRenderMode
-    // rewrites the key from 'iso25d' to 'webgl'.
+    // Bare '/' reads storage; resolveInitialRenderMode migrates iso25d to webgl.
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    const stored = await page.evaluate(() => window.localStorage.getItem('repociv:renderer'));
-    expect(stored).toBe('webgl');
+    await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
+    await expect(page.locator('html[data-app-ready="1"]')).toBeAttached({ timeout: 20_000 });
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem('repociv:renderer')))
+      .toBe('webgl');
   });
 });

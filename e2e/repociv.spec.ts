@@ -20,8 +20,9 @@ async function seedRepoSelection(page: Page) {
     selectedRepoPaths.length,
     'expected /api/repos to return selectable repos',
   ).toBeGreaterThan(0);
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.evaluate((paths) => {
+  await page.addInitScript((paths) => {
+    window.localStorage.setItem('repociv:tour-seen:v1', '1');
+    window.localStorage.setItem('repociv:renderer', 'flat');
     window.localStorage.setItem(
       'repociv:selected-repos:v1',
       JSON.stringify({
@@ -41,6 +42,7 @@ async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}
 
   await page.goto('/');
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
+  await expect(page.locator('html[data-app-ready="1"]')).toBeAttached({ timeout: 20_000 });
   if (
     await page
       .locator('#repo-onboarding')
@@ -59,7 +61,7 @@ async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}
 }
 
 test.describe('RepoCiv e2e visual', () => {
-  test('carga inicial: mapa, bridge vivo, HUD de recursos y DAVI', async ({ page }) => {
+  test('carga inicial: mapa, bridge vivo, HUD de recursos y MAIN', async ({ page }) => {
     await bootRepoCiv(page);
 
     const canvasBox = await page.locator('#main-canvas').boundingBox();
@@ -71,7 +73,7 @@ test.describe('RepoCiv e2e visual', () => {
     await expect(page.locator('#res-science .res-value')).not.toHaveText('');
     await expect(page.locator('#res-production .res-value')).not.toHaveText('');
 
-    await expect(page.locator('#hero-bar-slots .hero-slot[title^="DAVI"]')).toBeVisible();
+    await expect(page.locator('#hero-bar-slots .hero-slot[title^="Main"]')).toBeVisible();
     await expect(page.locator('#bridge-status')).toHaveText(/hermes|openclaw/i, {
       timeout: 20_000,
     });
@@ -80,11 +82,12 @@ test.describe('RepoCiv e2e visual', () => {
   test('regresiones visuales básicas: sin toggle 3D roto y paneles abren', async ({ page }) => {
     await bootRepoCiv(page);
 
-    await expect(page.locator('#btn-toggle-3d')).toBeHidden();
+    await expect(page.locator('#btn-toggle-3d')).toBeVisible();
+    await expect(page.locator('#btn-toggle-3d')).toBeEnabled();
 
     await page.locator('#btn-timeline').click();
     await expect(page.locator('#timeline-panel')).toBeVisible();
-    await expect(page.locator('#timeline-panel')).toContainText(/CRÓNICA|Event Timeline/);
+    await expect(page.locator('#timeline-panel')).toContainText(/TAREAS — ESTADO Y EVIDENCIA/);
 
     await page.locator('#btn-approvals').click();
     await expect(page.locator('#approval-panel')).toBeVisible();
@@ -93,12 +96,12 @@ test.describe('RepoCiv e2e visual', () => {
     );
   });
 
-  test('flujo bridge: comando seguro produce mission_start, chat_chunk y mission_complete visibles', async ({
+  test('flujo bridge: comando seguro produce evidencia y CommandCompleted visibles', async ({
     page,
   }) => {
     await bootRepoCiv(page);
 
-    await page.locator('#hero-bar-slots .hero-slot[title^="DAVI"]').click();
+    await page.locator('#hero-bar-slots .hero-slot[title^="Main"]').click();
     await page.keyboard.press('Enter');
     await expect(page.locator('#side-panel')).toBeVisible();
 
@@ -108,7 +111,7 @@ test.describe('RepoCiv e2e visual', () => {
       data: {
         type: 'e2e_probe',
         target: 'repociv-e2e',
-        payload: { unit: 'DAVI', marker },
+        payload: { unit: 'MAIN', marker },
         created_by: 'playwright',
       },
     });
@@ -116,19 +119,31 @@ test.describe('RepoCiv e2e visual', () => {
     const command = (await response.json()) as { status: string; commandId: string };
     expect(command.status).toBe('queued');
 
+    await expect
+      .poll(async () => {
+        const artifacts = await page.request.get(
+          `${bridgeURL}/commands/${command.commandId}/artifacts`,
+          { headers: bridgeHeaders() },
+        );
+        if (!artifacts.ok()) return '';
+        const body = (await artifacts.json()) as { terminalEvent?: { type?: string } };
+        return body.terminalEvent?.type ?? '';
+      })
+      .toBe('CommandCompleted');
+
+    await page.locator('#side-panel-close').click();
+    await expect(page.locator('#side-panel')).toBeHidden();
     await page.locator('#btn-timeline').click();
     await expect(page.locator('#timeline-panel')).toBeVisible();
-    await expect(page.locator('#log-messages')).toContainText(`E2E probe completado: ${marker}`, {
-      timeout: 10_000,
-    });
-    await expect(page.locator('#timeline-panel')).toContainText('Command Completed', {
-      timeout: 10_000,
-    });
+    const commandRow = page.locator(`.tl-entry[data-cmd="${command.commandId}"]`);
+    await expect(commandRow).toBeVisible();
+    await expect(commandRow.locator('.tl-type')).toHaveText('Completed');
   });
 
   test('error de /api/repos queda visible y no deja pantalla vacía', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await page.evaluate(() => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('repociv:tour-seen:v1', '1');
+      window.localStorage.setItem('repociv:renderer', 'flat');
       window.localStorage.setItem(
         'repociv:selected-repos:v1',
         JSON.stringify({

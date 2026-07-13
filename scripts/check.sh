@@ -79,9 +79,9 @@ check_props_budget() {
 }
 run_step "asset budget (props ≤1.5MB)"    check_props_budget
 
-# Eager-bundle budget: the JS the browser downloads on first paint (the app
-# defaults to the 2D 'flat' renderer) must stay lean. Three.js (vendor-three,
-# ~157KB gzip) MUST stay lazy — it only loads for ?renderer=webgl / hotkey 3.
+# Eager-bundle budget: the synchronous JS graph downloaded on first paint must
+# stay lean. Three.js (vendor-three, ~157KB gzip) MUST remain a dynamic chunk,
+# loaded only when the WebGL renderer initializes (default/URL/0 selection).
 # This guards against a regression like the static-import leak that pulled
 # Three into the eager graph (fixed 2026-06). Reuses the dist/ from the
 # `vite build` step above.

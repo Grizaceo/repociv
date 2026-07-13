@@ -69,27 +69,18 @@ test('canonical task lifecycle exposes evidence and cancellation', async ({ page
 
   await page.addInitScript(() => {
     localStorage.setItem('repociv:tour-seen:v1', '1');
+    localStorage.setItem('repociv:renderer', 'flat');
     localStorage.setItem('repociv:auto-start-wonders', 'false');
   });
   await page.goto('/');
+  await expect(page.locator('html[data-app-ready="1"]')).toBeAttached({ timeout: 20_000 });
   await expect(page.locator('#hero-bar-slots .hero-slot').first()).toBeVisible();
   await page.locator('#btn-timeline').click();
 
-  const waitingRow = page
-    .locator('.tl-entry')
-    .filter({ has: page.locator('.tl-cancel-btn') })
-    .first();
+  const waitingRow = page.locator(`.tl-entry[data-cmd="${waitingId}"]`);
   await expect(waitingRow).toContainText(waitingId);
-  const clicked = await page.evaluate((commandId) => {
-    const row = [...document.querySelectorAll<HTMLElement>('.tl-entry')].find((entry) =>
-      entry.textContent?.includes(commandId),
-    );
-    const button = row?.querySelector<HTMLButtonElement>('.tl-cancel-btn');
-    button?.click();
-    return Boolean(button);
-  }, waitingId);
-  expect(clicked).toBe(true);
-  await expect(waitingRow.locator('.tl-type')).toHaveText('CommandRejected');
+  await waitingRow.locator('.tl-cancel-btn').click();
+  await expect(waitingRow.locator('.tl-type')).toHaveText('Rejected');
   await expect(waitingRow.locator('.tl-cancel-btn')).toHaveCount(0);
 
   const evidenceRow = page.locator(`.tl-entry[data-cmd="${probeId}"]`);

@@ -1411,6 +1411,7 @@ async function bootstrap() {
   bindSubagentSessionPanel(state);
   bindSlashCommandState(state);
   refreshHero();
+  document.documentElement.dataset.appReady = '1';
 }
 
 // ─── Start ────────────────────────────────────────────────────────────────────

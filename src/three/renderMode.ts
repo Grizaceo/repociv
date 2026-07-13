@@ -5,8 +5,8 @@
 // view, and parity with WebGL was always going to be a maintenance
 // trap. Users with `iso25d` persisted in localStorage are silently
 // migrated to `webgl` (we don't drop them on the floor; we just give
-// them the better view). WebGL itself is session-only (URL/hotkey
-// activation) — we still rewrite storage so reloads land in `flat`.
+// them the better view). WebGL is sticky once selected; runtime context
+// failure still falls back safely to `flat`.
 export type WorldRenderMode = 'flat' | 'webgl';
 
 const STORAGE_KEY = 'repociv:renderer';

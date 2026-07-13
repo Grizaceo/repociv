@@ -215,7 +215,7 @@ export class Renderer {
     await this.hexR.loadAssets();
   }
 
-  /** Toggle global map between flat 2D hex and WebGL (hotkey 2).
+  /** Toggle global map between flat 2D hex and WebGL (hotkey 0).
    *  With iso25d retired, the toggle is the only fast way to flip
    *  between the two surviving world renderers. */
   toggleWorldRenderMode(): WorldRenderMode {
@@ -224,7 +224,7 @@ export class Renderer {
     return next;
   }
 
-  /** Cycle world render mode (hotkey 3). Currently the same as toggle. */
+  /** Cycle world render mode (hotkey 0). Currently the same as toggle. */
   cycleWorldRenderMode(): WorldRenderMode {
     return this.toggleWorldRenderMode();
   }

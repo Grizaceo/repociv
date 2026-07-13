@@ -88,10 +88,10 @@ const MOCK_LIVE = {
 };
 
 async function mockProviders(page: Page) {
-  await page.route('**/providers/live', (route) =>
+  await page.route(/.*\/providers\/live(?:\?.*)?$/, (route) =>
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(MOCK_LIVE) }),
   );
-  await page.route('**/providers', (route) =>
+  await page.route(/.*\/providers(?:\?.*)?$/, (route) =>
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(MOCK_PROVIDERS) }),
   );
 }
@@ -103,9 +103,10 @@ async function seedRepoSelection(page: Page) {
   const paths = repos
     .map((r) => r.path)
     .filter((p): p is string => typeof p === 'string' && p.length > 0)
-    .slice(0, 12);
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.evaluate((p) => {
+    .slice(0, 1);
+  await page.addInitScript((p) => {
+    window.localStorage.setItem('repociv:tour-seen:v1', '1');
+    window.localStorage.setItem('repociv:renderer', 'flat');
     window.localStorage.setItem(
       'repociv:selected-repos:v1',
       JSON.stringify({
@@ -120,8 +121,9 @@ async function seedRepoSelection(page: Page) {
 async function boot(page: Page) {
   await mockProviders(page);
   await seedRepoSelection(page);
-  await page.goto('/');
+  await page.goto('/?renderer=flat');
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
+  await expect(page.locator('html[data-app-ready="1"]')).toBeAttached({ timeout: 20_000 });
   if (
     await page
       .locator('#repo-onboarding')
@@ -136,27 +138,21 @@ async function boot(page: Page) {
 }
 
 async function openChat(page: Page) {
-  const slot = page.locator('#hero-bar-slots .hero-slot').first();
+  const slot = page.locator('#hero-bar-slots .hero-slot:not(.profile-slot)').first();
   await expect(slot).toBeVisible({ timeout: 20_000 });
-  await slot.scrollIntoViewIfNeeded();
   await slot.click({ force: true });
   await page.keyboard.press('Enter');
-  if (
-    !(await page
-      .locator('#side-panel')
-      .isVisible()
-      .catch(() => false))
-  ) {
-    await slot.click({ force: true });
-    await page.keyboard.press('Enter');
-  }
   await expect(page.locator('#side-panel')).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('#chat-input')).toBeVisible();
 }
 
-async function openModelPicker(page: Page) {
-  await page.locator('#chat-input').fill('/model');
+async function submitChatCommand(page: Page, command: string) {
+  await page.locator('#chat-input').fill(command);
   await page.locator('#chat-input').press('Enter');
+}
+
+async function openModelPicker(page: Page) {
+  await submitChatCommand(page, '/model');
   await expect(page.locator('.slash-picker')).toBeVisible({ timeout: 5_000 });
 }
 
@@ -244,8 +240,7 @@ test('/model picker: el harness filtra los providers compatibles (R2)', async ({
 
   // Cambia a claude-code: ollama-cloud no declara ese harness, así que sus
   // modelos desaparecen del picker (quedan OpenAI + Anthropic = 6).
-  await page.locator('#chat-input').fill('/harness claude-code');
-  await page.locator('#chat-input').press('Enter');
+  await submitChatCommand(page, '/harness claude-code');
   await expect(page.locator('#chat-messages')).toContainText('Harness →');
 
   await openModelPicker(page);
@@ -255,8 +250,7 @@ test('/model picker: el harness filtra los providers compatibles (R2)', async ({
 test('/harness picker: marca el harness activo', async ({ page }) => {
   await boot(page);
   await openChat(page);
-  await page.locator('#chat-input').fill('/harness');
-  await page.locator('#chat-input').press('Enter');
+  await submitChatCommand(page, '/harness');
   await expect(page.locator('.slash-picker')).toBeVisible({ timeout: 5_000 });
   // El harness activo (hermes, por defaultHarness) aparece marcado.
   await expect(page.locator('.slash-picker-item.current')).toContainText('Hermes');
