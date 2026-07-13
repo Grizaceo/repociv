@@ -112,6 +112,23 @@ test.describe('RepoCiv e2e visual', () => {
     expect(primaryTarget).not.toBeNull();
     expect(primaryTarget?.width ?? 0).toBeGreaterThanOrEqual(44);
     expect(primaryTarget?.height ?? 0).toBeGreaterThanOrEqual(44);
+
+    const hudMode = page.locator('#btn-hud-mode');
+    await hudMode.scrollIntoViewIfNeeded();
+    await expect(hudMode).toBeInViewport();
+    await hudMode.click();
+    await expect(hudMode).toHaveAttribute('aria-pressed', 'true');
+    await hudMode.click();
+    await expect(hudMode).toHaveAttribute('aria-pressed', 'false');
+
+    const themeToggle = page.locator('#btn-theme-toggle');
+    await themeToggle.scrollIntoViewIfNeeded();
+    await expect(themeToggle).toBeInViewport();
+
+    const lastSpawn = page.locator('.hero-bar-spawn .spawn-btn[data-type="CODEX"]');
+    await lastSpawn.scrollIntoViewIfNeeded();
+    await expect(lastSpawn).toBeInViewport();
+    await expect(lastSpawn).toBeEnabled();
   });
 
   test('flujo bridge: comando seguro produce evidencia y CommandCompleted visibles', async ({

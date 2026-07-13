@@ -52,6 +52,7 @@ import {
   toggleLogPanel,
   isHarnessPanelOpen,
   closeSidePanel,
+  closeCityPanel,
   openCityPanel,
   loadGitInfo,
   loadFilesInfo,
@@ -902,11 +903,18 @@ async function bootstrap() {
 
   function _enterLocalViewForCity(city: City): void {
     bridge.send('enter_local', { target: city.id, repoId: city.id, rootPath: city.repoPath });
-    state.enterLocalView(city.id).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.error(`[RepoCiv] Local view unavailable for ${city.name}: ${message}`);
-      showToast(`Vista local no disponible: ${message}`, 8000);
-    });
+    state
+      .enterLocalView(city.id)
+      .then(() => {
+        _selectedCityId = null;
+        closeSidePanel();
+        closeCityPanel();
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.error(`[RepoCiv] Local view unavailable for ${city.name}: ${message}`);
+        showToast(`Vista local no disponible: ${message}`, 8000);
+      });
     initBubbleLayer();
   }
 

@@ -140,6 +140,8 @@ test.describe('RepoCiv Local View (RimWorld-style)', () => {
 
     const localFrame = page.locator('#local-view-frame');
     await expect(localFrame).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('#side-panel')).toBeHidden();
+    await expect(page.locator('#city-panel')).toBeHidden();
 
     const canvases = page.locator('canvas');
     await expect(canvases).toHaveCount(2, { timeout: 5000 });
