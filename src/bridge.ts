@@ -102,6 +102,13 @@ export class BridgeEvents {
   }
 
   private handleRaw(data: unknown) {
+    if (
+      typeof data === 'object' &&
+      data !== null &&
+      ['ack', 'pong', 'auth_ok'].includes(String((data as { type?: unknown }).type ?? ''))
+    ) {
+      return;
+    }
     const evt = parseBridgeEvent(data);
     if (!evt) {
       const reason = describeBridgeEventError(data);

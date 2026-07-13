@@ -788,6 +788,22 @@ describe('BridgeEvents WS transport', () => {
     bridge.stop();
   });
 
+  it('ignores WS transport acknowledgements without domain warnings', async () => {
+    const warnSpy = vi.spyOn(loggerMod.logger, 'warn').mockImplementation(() => {});
+    const state = makeState();
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+
+    await vi.advanceTimersByTimeAsync(200);
+
+    const ws = FakeWebSocket.instances[0]!;
+    ws.authenticate();
+    ws.message({ type: 'ack', id: 'cmd-1' });
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    bridge.stop();
+  });
+
   it('falls back to SSE when WS connection fails', async () => {
     // Make WS fail: fetch fails + WebSocket fails synchronously
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('bridge not reachable')));

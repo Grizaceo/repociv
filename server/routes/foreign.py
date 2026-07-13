@@ -239,12 +239,6 @@ _FILE_TREE_MAX_FILES = 10_000
 _FILE_TREE_SKIP_NAMES = frozenset({"__pycache__", "node_modules", "dist", "build", ".git"})
 
 
-class _FileTreeLimitExceeded(Exception):
-    def __init__(self, message: str) -> None:
-        self.message = message
-        super().__init__(message)
-
-
 def _path_under_root(path: Path, root: Path) -> bool:
     try:
         path.resolve().relative_to(root.resolve())
@@ -280,15 +274,28 @@ def get_repo_file_tree(ctx: "RouteContext") -> tuple[int, Any]:
             return 404, {"error": f"Repository not found: {selected_path}"}
 
         files: list[str] = []
+        truncated_reason: str | None = None
 
         def build_tree(dir_path: Path, rel_path: str = "", depth: int = 0) -> dict:
+            nonlocal truncated_reason
+            node = {
+                "name": dir_path.name or dir_path.name,
+                "path": rel_path,
+                "type": "dir",
+                "children": [],
+            }
+            if truncated_reason is not None:
+                node["truncated"] = True
+                return node
             if depth > _FILE_TREE_MAX_DEPTH:
-                raise _FileTreeLimitExceeded(
-                    f"Directory tree exceeds max depth ({_FILE_TREE_MAX_DEPTH})"
-                )
-            node = {"name": dir_path.name or dir_path.name, "path": rel_path, "type": "dir", "children": []}
+                truncated_reason = f"Directory tree exceeds max depth ({_FILE_TREE_MAX_DEPTH})"
+                node["truncated"] = True
+                return node
             try:
                 for item in sorted(dir_path.iterdir(), key=lambda x: (x.is_file(), x.name.lower())):
+                    if truncated_reason is not None:
+                        node["truncated"] = True
+                        break
                     if item.name.startswith(".") or item.name in _FILE_TREE_SKIP_NAMES:
                         continue
                     if not _symlink_stays_under_root(item, repos_root):
@@ -298,23 +305,29 @@ def get_repo_file_tree(ctx: "RouteContext") -> tuple[int, Any]:
                         node["children"].append(build_tree(item, item_rel, depth + 1))
                     else:
                         if len(files) >= _FILE_TREE_MAX_FILES:
-                            raise _FileTreeLimitExceeded(
+                            truncated_reason = (
                                 f"Directory tree exceeds max file count ({_FILE_TREE_MAX_FILES})"
                             )
+                            node["truncated"] = True
+                            break
                         files.append(item_rel)
-                        node["children"].append({
-                            "name": item.name,
-                            "path": item_rel,
-                            "type": "file"
-                        })
+                        node["children"].append(
+                            {"name": item.name, "path": item_rel, "type": "file"}
+                        )
             except PermissionError:
                 pass
             return node
 
         tree = build_tree(repo_path, repo_path.name)
-        return 200, {"tree": tree, "files": files, "repoId": repo_id or repo_path.name}
+        body: dict[str, Any] = {
+            "tree": tree,
+            "files": files,
+            "repoId": repo_id or repo_path.name,
+            "truncated": truncated_reason is not None,
+        }
+        if truncated_reason is not None:
+            body["truncatedReason"] = truncated_reason
+        return 200, body
 
-    except _FileTreeLimitExceeded as exc:
-        return 400, {"error": exc.message}
     except Exception as e:
         return 500, {"error": str(e)}

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { syncServerRepoSelection } from './helpers/repo-selection.ts';
 
 const bridgeURL =
   process.env.VITE_BRIDGE_URL ?? `http://127.0.0.1:${process.env.BRIDGE_PORT ?? 5274}`;
@@ -11,15 +12,16 @@ function bridgeHeaders(): Record<string, string> {
 async function seedRepoSelection(page: Page) {
   const response = await page.request.get('/api/repos');
   expect(response.ok(), await response.text()).toBeTruthy();
-  const repos = (await response.json()) as Array<{ path?: string }>;
+  const repos = (await response.json()) as Array<{ repoPath?: string }>;
   const selectedRepoPaths = repos
-    .map((repo) => repo.path)
+    .map((repo) => repo.repoPath)
     .filter((path): path is string => typeof path === 'string' && path.length > 0)
     .slice(0, 12);
   expect(
     selectedRepoPaths.length,
     'expected /api/repos to return selectable repos',
   ).toBeGreaterThan(0);
+  await syncServerRepoSelection(page, selectedRepoPaths);
   await page.addInitScript((paths) => {
     window.localStorage.setItem('repociv:tour-seen:v1', '1');
     window.localStorage.setItem('repociv:renderer', 'flat');

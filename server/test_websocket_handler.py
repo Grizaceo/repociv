@@ -132,6 +132,23 @@ def test_ws_multiple_clients_receive_broadcast(ws_server):
             ws.close()
 
 
+def test_ws_command_envelope_is_unwrapped_before_dispatch(ws_server):
+    captured = []
+    previous = wsh._command_callback
+    wsh.set_command_callback(captured.append)
+    try:
+        with _connect(ws_server) as ws:
+            ws.recv(timeout=5)  # auth_ok
+            command = {"type": "enter_local", "target": "city-1", "repoId": "repo-1"}
+            ws.send(json.dumps({"type": "command", "data": command}))
+            ack = json.loads(ws.recv(timeout=5))
+
+        assert captured == [command]
+        assert ack == {"type": "ack", "id": ""}
+    finally:
+        wsh._command_callback = previous
+
+
 def test_ws_unknown_message_type(ws_server):
     """Server responds with error for unknown message types."""
     port = ws_server

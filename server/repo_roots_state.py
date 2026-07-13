@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 
 def _state_file() -> Path:
@@ -55,6 +56,7 @@ def _is_within(path: str, root: str) -> bool:
 
 
 def resolve_selected_repo(repo_id_or_name: str, explicit_path: str = "") -> str | None:
+    repo_id_or_name = unquote(repo_id_or_name)
     state = load_state()
     roots = state.get("roots", {})
     if not isinstance(roots, dict):

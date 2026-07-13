@@ -293,12 +293,18 @@ async def _handle_incoming(ws: websockets.asyncio.server.ServerConnection, messa
         return
 
     if msg_type in ("command", "unit_command"):
-        # Forward to bridge command handler
+        # The browser transport wraps legacy commands as
+        # {type: "command", data: {type, ...payload}}. Unwrap before handing
+        # the command to the HTTP-compatible callback.
+        command_data = data.get("data", data)
+        if not isinstance(command_data, dict):
+            await ws.send(json.dumps({"type": "error", "msg": "command data must be an object"}))
+            return
         cb = _command_callback
         if cb:
             try:
-                cb(data)
-                await ws.send(json.dumps({"type": "ack", "id": data.get("id", "")}))
+                cb(command_data)
+                await ws.send(json.dumps({"type": "ack", "id": command_data.get("id", "")}))
             except Exception as e:
                 await ws.send(json.dumps({"type": "error", "msg": str(e)}))
         else:

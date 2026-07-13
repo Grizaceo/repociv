@@ -901,7 +901,7 @@ async function bootstrap() {
   }
 
   function _enterLocalViewForCity(city: City): void {
-    bridge.send('enter_local', { repoId: city.id, rootPath: city.repoPath });
+    bridge.send('enter_local', { target: city.id, repoId: city.id, rootPath: city.repoPath });
     state.enterLocalView(city.id).catch(() => state.enterLocalViewMock(city.id));
     initBubbleLayer();
   }

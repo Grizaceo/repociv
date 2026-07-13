@@ -3,6 +3,7 @@
 // renders a deterministic list even when this dev bridge has no API keys.
 // Screenshots land in e2e/_shots/ (gitignored) for PR review.
 import { expect, test, type Page } from '@playwright/test';
+import { syncServerRepoSelection } from './helpers/repo-selection.ts';
 
 // Synthetic provider universe so the picker renders a populated list even when
 // this dev bridge has no API keys configured (the real client code consumes
@@ -99,11 +100,13 @@ async function mockProviders(page: Page) {
 async function seedRepoSelection(page: Page) {
   const response = await page.request.get('/api/repos');
   expect(response.ok(), await response.text()).toBeTruthy();
-  const repos = (await response.json()) as Array<{ path?: string }>;
+  const repos = (await response.json()) as Array<{ repoPath?: string }>;
   const paths = repos
-    .map((r) => r.path)
+    .map((r) => r.repoPath)
     .filter((p): p is string => typeof p === 'string' && p.length > 0)
     .slice(0, 1);
+  expect(paths).toHaveLength(1);
+  await syncServerRepoSelection(page, paths);
   await page.addInitScript((p) => {
     window.localStorage.setItem('repociv:tour-seen:v1', '1');
     window.localStorage.setItem('repociv:renderer', 'flat');

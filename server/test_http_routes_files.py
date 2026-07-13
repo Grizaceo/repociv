@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 from pathlib import Path
+from urllib.parse import quote
 
 from server import http_routes
 from server.routes import foreign as foreign_routes
@@ -62,6 +63,25 @@ def test_get_repo_file_tree_decodes_repo_id_and_returns_tree_and_files(monkeypat
     assert body["tree"]["path"] == "beta"
 
 
+def test_get_repo_file_tree_accepts_url_encoded_repo_id_from_frontend(monkeypatch, tmp_path):
+    root = tmp_path / "workspace"
+    root.mkdir()
+    repo = root / "gamma"
+    (repo / "src").mkdir(parents=True)
+    (repo / "src" / "app.ts").write_text("export {}\n", encoding="utf-8")
+    repo_id = _encode_repo_id(str(repo))
+
+    _write_state(monkeypatch, tmp_path, str(root))
+
+    status, body = http_routes.get_repo_file_tree(
+        {"path": f"/api/files/{quote(repo_id, safe='')}"}
+    )
+
+    assert status == 200
+    assert body["repoId"] == quote(repo_id, safe="")
+    assert "gamma/src/app.ts" in body["files"]
+
+
 def test_get_repo_file_tree_rejects_repo_symlink_outside_root(monkeypatch, tmp_path):
     root = tmp_path / "workspace"
     root.mkdir()
@@ -113,7 +133,7 @@ def test_get_repo_file_tree_rejects_encoded_path_outside_root(monkeypatch, tmp_p
     assert "must be selected" in body["error"]
 
 
-def test_get_repo_file_tree_rejects_excessive_depth(monkeypatch, tmp_path):
+def test_get_repo_file_tree_truncates_excessive_depth(monkeypatch, tmp_path):
     root = tmp_path / "workspace"
     repo = root / "deep"
     path = repo
@@ -125,11 +145,12 @@ def test_get_repo_file_tree_rejects_excessive_depth(monkeypatch, tmp_path):
 
     status, body = http_routes.get_repo_file_tree({"path": "/api/files/deep"})
 
-    assert status == 400
-    assert "max depth" in body["error"]
+    assert status == 200
+    assert body["truncated"] is True
+    assert "max depth" in body["truncatedReason"]
 
 
-def test_get_repo_file_tree_rejects_too_many_files(monkeypatch, tmp_path):
+def test_get_repo_file_tree_truncates_too_many_files(monkeypatch, tmp_path):
     root = tmp_path / "workspace"
     repo = root / "many"
     repo.mkdir(parents=True)
@@ -141,5 +162,7 @@ def test_get_repo_file_tree_rejects_too_many_files(monkeypatch, tmp_path):
 
     status, body = http_routes.get_repo_file_tree({"path": "/api/files/many"})
 
-    assert status == 400
-    assert "max file count" in body["error"]
+    assert status == 200
+    assert len(body["files"]) == 5
+    assert body["truncated"] is True
+    assert "max file count" in body["truncatedReason"]

@@ -1,4 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import { syncServerRepoSelection } from './helpers/repo-selection.ts';
+
+// Video/trace record every canvas frame and invalidate the rAF performance probe.
+// Visual and trace coverage remain in repociv/render/memory suites.
+test.use({ trace: 'off', video: 'off' });
 
 const bridgeURL =
   process.env.VITE_BRIDGE_URL ?? `http://127.0.0.1:${process.env.BRIDGE_PORT ?? 5274}`;
@@ -8,18 +13,19 @@ function bridgeHeaders(): Record<string, string> {
   return bridgeToken ? { 'X-RepoCiv-Token': bridgeToken } : {};
 }
 
-async function seedRepoSelection(page: Page) {
+async function seedRepoSelection(page: Page): Promise<number> {
   const response = await page.request.get('/api/repos');
   expect(response.ok(), await response.text()).toBeTruthy();
-  const repos = (await response.json()) as Array<{ path?: string }>;
+  const repos = (await response.json()) as Array<{ repoPath?: string }>;
   const selectedRepoPaths = repos
-    .map((repo) => repo.path)
+    .map((repo) => repo.repoPath)
     .filter((path): path is string => typeof path === 'string' && path.length > 0)
     .slice(0, 12);
   expect(
     selectedRepoPaths.length,
     'expected /api/repos to return selectable repos',
   ).toBeGreaterThan(0);
+  await syncServerRepoSelection(page, selectedRepoPaths);
   await page.addInitScript((paths) => {
     window.localStorage.setItem('repociv:tour-seen:v1', '1');
     window.localStorage.setItem('repociv:renderer', 'flat');
@@ -32,13 +38,20 @@ async function seedRepoSelection(page: Page) {
       }),
     );
   }, selectedRepoPaths);
+  return selectedRepoPaths.length;
 }
 
 async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}) {
   const pageErrors: string[] = [];
+  const fileResponses: Array<{ url: string; status: number }> = [];
   page.on('pageerror', (err) => pageErrors.push(err.message));
+  page.on('response', (response) => {
+    if (response.url().includes('/api/files/')) {
+      fileResponses.push({ url: response.url(), status: response.status() });
+    }
+  });
 
-  if (options.seedSelection !== false) await seedRepoSelection(page);
+  const selectedCount = options.seedSelection === false ? 0 : await seedRepoSelection(page);
 
   await page.goto('/');
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
@@ -57,6 +70,15 @@ async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}
     await expect(page.locator('#repo-onboarding')).toBeHidden({ timeout: 20_000 });
   }
   await expect(page.locator('#main-canvas')).toBeVisible();
+  if (selectedCount > 0) {
+    await expect
+      .poll(() => fileResponses.length, { timeout: 30_000 })
+      .toBeGreaterThanOrEqual(selectedCount);
+    expect(
+      fileResponses.filter((response) => response.status >= 400),
+      'all selected repositories must load real file trees',
+    ).toEqual([]);
+  }
   expect(pageErrors, 'sin errores JS no capturados durante bootstrap').toEqual([]);
 }
 
