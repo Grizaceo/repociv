@@ -28,10 +28,6 @@ export class LocalWorldManager {
   // ─── Phase 6: View transition ──────────────────────────────────────────────
 
   async enterLocalView(repoId: string): Promise<LocalWorld> {
-    if (this.viewMode !== 'local') {
-      this.viewMode = 'local';
-      this.notify();
-    }
     if (!this.localWorld || this.localWorld.repoId !== repoId) {
       this.localWorld = await generateLocalWorldFromApi(repoId);
       if (this.localUnits.length === 0) {
@@ -62,6 +58,10 @@ export class LocalWorldManager {
         });
         this.assignDesk(this.localUnits[this.localUnits.length - 1]!);
       }
+    }
+    if (this.viewMode !== 'local') {
+      this.viewMode = 'local';
+      this.notify();
     }
     return this.localWorld;
   }

@@ -201,22 +201,28 @@ export function buildLocalWorldFromPaths(repoId: string, filePaths: string[]): L
   return buildLocalWorld(repoId, root);
 }
 
-// ─── Async: fetch file list from bridge API, build world ─────────────────────
+// ─── Async: fetch a real file tree from the selected-repo API ─────────────────
 export async function generateLocalWorldFromApi(repoId: string): Promise<LocalWorld> {
+  let res: Response;
   try {
-    const res = await fetch(`/api/files/${encodeURIComponent(repoId)}`);
-    if (res.ok) {
-      const data = (await res.json()) as { files?: string[]; tree?: FileNode };
-      if (data.tree) return buildLocalWorld(repoId, data.tree);
-      if (data.files) return buildLocalWorldFromPaths(repoId, data.files);
-    }
-  } catch {
-    // fall through to mock
+    res = await fetch(`/api/files/${encodeURIComponent(repoId)}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`file tree request failed (network): ${message}`, { cause: error });
   }
-  return buildMockLocalWorld(repoId);
+
+  if (!res.ok) {
+    const detail = (await res.text()).slice(0, 240);
+    throw new Error(`file tree request failed (${res.status}): ${detail}`);
+  }
+
+  const data = (await res.json()) as { files?: string[]; tree?: FileNode };
+  if (data.tree) return buildLocalWorld(repoId, data.tree);
+  if (data.files) return buildLocalWorldFromPaths(repoId, data.files);
+  throw new Error('file tree response missing tree or files');
 }
 
-// ─── Mock builder (for tests and fallback) ────────────────────────────────────
+// ─── Mock builder (explicit test/demo use only; never a runtime fallback) ─────
 export function buildMockLocalWorld(repoId = 'repociv'): LocalWorld {
   const root: FileNode = {
     name: repoId,

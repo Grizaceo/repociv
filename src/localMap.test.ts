@@ -1,6 +1,44 @@
-import { describe, it, assert } from 'vitest';
-import { buildMockLocalWorld, buildLocalWorldFromPaths } from './localMap.ts';
+import { describe, it, assert, vi, afterEach, expect } from 'vitest';
+import {
+  buildMockLocalWorld,
+  buildLocalWorldFromPaths,
+  generateLocalWorldFromApi,
+} from './localMap.ts';
 import { measureAisleWidth, MAX_DESKS_PER_ROOM } from './officeLayout.ts';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('localMap — real API boundary', () => {
+  it('rejects an HTTP failure instead of returning a simulated world', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 403,
+        text: async () => '{"error":"not selected"}',
+      })),
+    );
+
+    await expect(generateLocalWorldFromApi('repo:blocked')).rejects.toThrow(
+      /file tree request failed \(403\).*not selected/,
+    );
+  });
+
+  it('rejects a malformed successful payload instead of returning a simulated world', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      })),
+    );
+
+    await expect(generateLocalWorldFromApi('repo:empty')).rejects.toThrow(/missing tree or files/);
+  });
+});
 
 describe('localMap — buildMockLocalWorld', () => {
   it('returns a LocalWorld with width/height > 0', () => {
