@@ -124,6 +124,23 @@ test.describe('RepoCiv e2e visual', () => {
     const bannerClose = page.getByRole('button', { name: 'Cerrar banner' });
     if (await bannerClose.isVisible()) await bannerClose.click();
 
+    await expect(page.locator('#era-display')).toBeHidden();
+    await expect(page.locator('#mcp-status')).toBeHidden();
+    await expect(page.locator('#hotkeys-ribbon')).toBeHidden();
+    await expect(page.locator('#bridge-status')).toBeVisible();
+    const [topBarBox, resourcesBox, actionsBox] = await Promise.all([
+      page.locator('#top-bar').boundingBox(),
+      page.locator('.top-bar-left').boundingBox(),
+      page.locator('.top-bar-right').boundingBox(),
+    ]);
+    expect(topBarBox?.height ?? 0).toBeGreaterThanOrEqual(48);
+    expect(resourcesBox).not.toBeNull();
+    expect(actionsBox).not.toBeNull();
+    expect((resourcesBox?.x ?? 0) + (resourcesBox?.width ?? 0)).toBeLessThanOrEqual(
+      (actionsBox?.x ?? 0) + 1,
+    );
+    expect((actionsBox?.x ?? 0) + (actionsBox?.width ?? 0)).toBeLessThanOrEqual(390);
+
     const hudMode = page.locator('#btn-hud-mode');
     await hudMode.scrollIntoViewIfNeeded();
     await expect(hudMode).toBeInViewport();

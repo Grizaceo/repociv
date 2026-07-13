@@ -905,10 +905,40 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
 
 /* ─── Compact viewport: one bottom sheet, no document overflow ─────── */
 @media (max-width: 600px) {
+  :root {
+    --header-height: 48px;
+  }
+
   #top-bar {
     max-width: 100vw;
-    overflow-x: auto;
+    padding: 0 8px;
+    overflow-x: hidden;
     overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+  }
+
+  #era-display,
+  #gpu-bar,
+  #mcp-status,
+  #hotkeys-ribbon {
+    display: none !important;
+  }
+
+  .top-bar-left {
+    flex: 0 0 auto;
+    gap: 2px;
+  }
+
+  .resource {
+    gap: 4px;
+    padding: 2px 4px;
+  }
+
+  .top-bar-right {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: calc(100vw - 124px);
+    margin-left: auto;
     overscroll-behavior-inline: contain;
   }
 
