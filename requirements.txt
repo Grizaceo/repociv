@@ -28,5 +28,10 @@ duckdb>=1.0
 # repo_config, repociv_hooks) lo prefieren a su fallback.
 PyYAML>=6.0
 
+# Security dependency audit (blocking gate: scripts/security-audit.sh)
+# pip itself is audited; keep above the 2026 advisories reported for 25.3.
+pip>=26.1.2
+pip-audit==2.10.1
+
 # Linter (CI gate; also used locally via scripts/check.sh)
 ruff==0.15.5

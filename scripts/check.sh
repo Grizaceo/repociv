@@ -119,6 +119,10 @@ check_eager_bundle_budget() {
 }
 run_step "bundle budget (eager JS ≤185KB)" check_eager_bundle_budget
 
+# Security is blocking: dependency advisories, tracked/history secrets, and the
+# focused auth/path/transport regression suites must all pass.
+run_step "security audit"                    scripts/security-audit.sh
+
 # Tooling (non-blocking: report only)
 log "knip (report only)"
 if npx --no-install knip --exclude duplicates 2>&1; then
