@@ -64,6 +64,12 @@ async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}
 
 test.describe('RepoCiv e2e visual', () => {
   test('carga inicial: mapa, bridge vivo, HUD de recursos y MAIN', async ({ page }) => {
+    const wsAuthErrors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error' && message.text().includes('[ws] auth failed')) {
+        wsAuthErrors.push(message.text());
+      }
+    });
     await bootRepoCiv(page);
 
     const canvasBox = await page.locator('#main-canvas').boundingBox();
@@ -79,6 +85,8 @@ test.describe('RepoCiv e2e visual', () => {
     await expect(page.locator('#bridge-status')).toHaveText(/hermes|openclaw/i, {
       timeout: 20_000,
     });
+    await page.waitForTimeout(5_500);
+    expect(wsAuthErrors, 'WebSocket debe autenticar con VITE_BRIDGE_TOKEN').toEqual([]);
   });
 
   test('regresiones visuales básicas: sin toggle 3D roto y paneles abren', async ({ page }) => {

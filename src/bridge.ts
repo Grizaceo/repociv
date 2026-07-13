@@ -19,7 +19,13 @@ import {
 } from './ui/index.ts';
 import { cfg } from './gameConfig.ts';
 import { approveCommand } from './commandBus.ts';
-import { bridgeHeaders, bridgeUrl, BRIDGE_URL, BRIDGE_TOKEN } from './bridgeEnv.ts';
+import {
+  bridgeHeaders,
+  bridgeUrl,
+  bridgeWebSocketToken,
+  BRIDGE_URL,
+  BRIDGE_TOKEN,
+} from './bridgeEnv.ts';
 import { RepoCivWebSocket } from './websocket.ts';
 import { dispatchBridgeEvent, type MessageContext } from './bridgeMessageHandlers.ts';
 import { registerPoll, type PollUnregister } from './ui/pollScheduler.ts';
@@ -126,7 +132,7 @@ export class BridgeEvents {
     if (!this.wsEnabled) return;
     if (this.ws) this.ws.close();
 
-    const token = BRIDGE_URL ? '' : (bridgeHeaders()['X-RepoCiv-Token'] ?? '');
+    const token = bridgeWebSocketToken();
     this.ws = new RepoCivWebSocket({
       url: this.wsUrl,
       token,

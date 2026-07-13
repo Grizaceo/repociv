@@ -29,3 +29,8 @@ export function hermesWebUrl(path = ''): string {
 export function bridgeHeaders(extra: Record<string, string> = {}): Record<string, string> {
   return BRIDGE_TOKEN ? { ...extra, 'X-RepoCiv-Token': BRIDGE_TOKEN } : extra;
 }
+
+/** WebSocket auth uses the same token as HTTP/SSE, including direct bridge URLs. */
+export function bridgeWebSocketToken(): string {
+  return BRIDGE_TOKEN;
+}
