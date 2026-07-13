@@ -42,13 +42,18 @@ run_step() {
 run_step "tsc --noEmit"                   npx --no-install tsc --noEmit
 run_step "eslint (max-warnings=0)"       npm run -s lint
 run_step "prettier --check"              npm run -s format:check
-run_step "vitest run --coverage"          npx --no-install vitest run --coverage
+run_step "vitest run --coverage" \
+  env -u VITE_BRIDGE_URL -u VITE_BRIDGE_TOKEN -u VITE_REPOCIV_TOKEN -u REPOCIV_TOKEN \
+  npx --no-install vitest run --coverage
 run_step "vite build"                     npx --no-install vite build
 
 # Backend
 run_step "ruff check server/"             ruff check server/
 run_step "ruff check scripts/"            ruff check scripts/
-run_step "pytest --cov=server (≥50%)"     pytest --cov=server --cov-fail-under=50 -q
+run_step "pytest --cov=server (≥50%)" \
+  env -u REPOCIV_TOKEN -u REPOCIV_REMOTE -u REPOCIV_CORS_ORIGINS \
+      -u REPOCIV_PORT -u BRIDGE_PORT -u BRIDGE_WS_PORT \
+  pytest --cov=server --cov-fail-under=50 -q
 
 # Asset budget: the 3 terrain atlas PNGs must stay under 6MB combined.
 # (The Blender/numpy generators can silently fatten them; tracked binaries
