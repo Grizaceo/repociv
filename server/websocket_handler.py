@@ -172,15 +172,19 @@ def broadcast(event: dict[str, Any]) -> None:
 async def _auth_ws(ws: websockets.asyncio.server.ServerConnection) -> bool:
     """Authenticate incoming WS connection.
 
-    If REPOCIV_TOKEN is empty, only an allowlisted browser Origin is accepted.
-    Otherwise, the client must send an auth message within 5s:
-      {"type": "auth", "token": "..."}
+    Foreign browser Origins are always rejected. Same-origin browsers and
+    originless non-browser clients must additionally authenticate when a token
+    is configured.
     """
+    request = getattr(ws, "request", None)
+    headers = getattr(request, "headers", {})
+    origin = headers.get("Origin", "") if headers is not None else ""
+    if origin and origin not in _ALLOWED_ORIGINS:
+        await ws.send(json.dumps({"type": "auth_error", "msg": "origin not allowed"}))
+        return False
+
     if not REPOCIV_TOKEN:
-        request = getattr(ws, "request", None)
-        headers = getattr(request, "headers", {})
-        origin = headers.get("Origin", "") if headers is not None else ""
-        if origin not in _ALLOWED_ORIGINS:
+        if not origin:
             await ws.send(json.dumps({"type": "auth_error", "msg": "origin not allowed"}))
             return False
         await ws.send(json.dumps({"type": "auth_ok"}))
