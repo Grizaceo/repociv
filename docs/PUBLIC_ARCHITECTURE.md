@@ -53,7 +53,7 @@ nodes per path: 300 hexes.
 - Fog of war (configurable per agent type)
 - Minimap in corner (compressed view of entire map)
 
-### Macro / Local View (key `3`)
+### Macro / Local View
 
 RepoCiv has two spatial levels:
 
@@ -67,7 +67,7 @@ RepoCiv has two spatial levels:
 ```
 
 - **Macro**: the workspace-level hex map. Each tile is a repo.
-- **Local**: select a city and press `3` (or double-click) to zoom into its
+- **Local**: double-click a city to zoom into its
   interior. Files become workbenches. Agents walk between them based on priority
   score. A* pathfinding works on the local grid too (src/localPathfinding.ts).
 

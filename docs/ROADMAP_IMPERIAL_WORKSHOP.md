@@ -41,7 +41,7 @@ Se permite "3D ligero" como 2.5D Canvas:
 - niebla/atenuacion de distancia;
 - animaciones livianas.
 
-**Canon actual (2026-06, ver [SCOPE.md](./SCOPE.md)):** los **dos** renderers son trunk oficial — Canvas 2D (`flat`, por defecto) y WebGL/Three.js (`webgl`, opt-in con hotkey `3` o `?renderer=webgl`). La regla no es "2D-only hasta paridad" sino **alternar entre ambos sin fricción**; Three.js carga lazy (chunk `vendor-three`, nunca en el bundle eager del modo 2D).
+**Canon actual (2026-06, ver [SCOPE.md](./SCOPE.md)):** los **dos** renderers son trunk oficial — Canvas 2D (`flat`, por defecto) y WebGL/Three.js (`webgl`, opt-in con hotkey `0` o `?renderer=webgl`). La regla no es "2D-only hasta paridad" sino **alternar entre ambos sin fricción**; Three.js carga lazy (chunk `vendor-three`, nunca en el bundle eager del modo 2D).
 
 ### P2. Capas de informacion
 

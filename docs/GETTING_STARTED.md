@@ -210,7 +210,7 @@ If the map is blank or shows "Bridge offline", go to Troubleshooting below.
 4. Agents walk between workbenches based on priority scores
 5. Press **Esc** to return to the macro map
 
-> **Note:** key `3` toggles 2D (`flat`) ↔ WebGL (`webgl`) on the macro map — it does not enter local view.
+> **Note:** key `0` toggles 2D (`flat`) ↔ WebGL (`webgl`) on the macro map — it does not enter local view.
 
 ---
 

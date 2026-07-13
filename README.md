@@ -91,14 +91,13 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# Assets (obligatorio antes del primer arranque — no están en git)
-npm run assets
-npm run assets:3d
+# Los assets runtime vienen versionados. Solo regenera al modificarlos:
+# npm run assets && npm run assets:3d
 ```
 
-> **Assets obligatorios.** Los atlases PNG/WebP y texturas 3D no se versionan en git.
-> Tras clonar, ejecuta `npm run assets` y `npm run assets:3d` antes de `npm run dev`
-> o el mapa puede aparecer sin terreno, props u oficina isométrica.
+> **Assets reproducibles y versionados.** El fresh clone ya contiene los atlases PNG/WebP,
+> texturas y GLB necesarios para arrancar. `npm run assets` y `npm run assets:3d`
+> regeneran esos archivos cuando se modifica el pipeline visual; no son requisito de instalación.
 
 ### 2. Configurar
 
@@ -179,7 +178,7 @@ REPOCIV_MAP_ROOT=~/projects
        └─ ...
 ```
 
-- **Macro:** hex map en 2D (por defecto) o 3D WebGL — tecla `3` o botón en barra superior alterna `flat` ↔ `webgl`
+- **Macro:** hex map en 2D (por defecto) o 3D WebGL — tecla `0` o botón en barra superior alterna `flat` ↔ `webgl`
 - **Local:** doble-click en una ciudad → oficina isométrica 2.5D generada desde la estructura del repo
   - **Salas** = carpetas, coloreadas por zona (`team_cluster` azul, `focus` violeta, `break` verde, `infra` concreto)
   - **Workbenches** (`×`) = archivos priorizados por la Priority Matrix — A* cacheado (≤300 hexes)
@@ -223,7 +222,7 @@ RepoCiv también se expone como **MCP server por stdio** (`server/mcp_server.py`
 }
 ```
 
-42 tools cubriendo 14 dominios con tools MCP: agents, commands, approvals, pending, GPU, wonders, graph-relations, foreign-relations y más. Ver [docs/MCP.md](docs/MCP.md).
+38 tools cubriendo 14 dominios con tools MCP: agents, commands, approvals, pending, GPU, wonders, graph-relations, foreign-relations y más. Ver [docs/MCP.md](docs/MCP.md).
 
 > **Indicador en el HUD.** Cuando un cliente MCP está operando el dashboard, el HUD
 > muestra `MCP ●` (verde) junto al estado del bridge; `MCP ○` (atenuado) cuando no
@@ -296,7 +295,7 @@ Sirve para auditar sesiones largas sin abrir logs externos: es el "story so far"
 | `V` | Toggle fog of war |
 | `A` | Aprobaciones pendientes |
 | `N` | Gaceta de noticias |
-| `3` | Alternar render 2D (`flat`) ↔ WebGL (`webgl`) |
+| `0` | Alternar render 2D (`flat`) ↔ WebGL (`webgl`) |
 | `F11` | Settings Panel |
 | `?` | Keyboard help |
 
@@ -380,7 +379,7 @@ python3 -m pytest server/ -q
 |-----|-----------|
 | [docs/SCOPE.md](docs/SCOPE.md) | Qué es y qué no es el proyecto |
 | [docs/API.md](docs/API.md) | Referencia completa de endpoints |
-| [docs/MCP.md](docs/MCP.md) | MCP server — 42 tools, ejemplos |
+| [docs/MCP.md](docs/MCP.md) | MCP server — 38 tools, ejemplos |
 | [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | Tutorial paso a paso |
 | [docs/REMOTE_ACCESS.md](docs/REMOTE_ACCESS.md) | Acceso remoto via Tailscale |
 | [docs/EVOLUTION.md](docs/EVOLUTION.md) | Historia del proyecto |

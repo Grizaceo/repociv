@@ -63,14 +63,13 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# Assets (mandatory before first run — not tracked in git)
-npm run assets
-npm run assets:3d
+# Runtime assets are tracked. Regenerate only when changing them:
+# npm run assets && npm run assets:3d
 ```
 
-> **Mandatory assets.** PNG/WebP atlases and 3D textures are not versioned in git.
-> After cloning, run `npm run assets` and `npm run assets:3d` before `npm run dev`
-> or the map may render without terrain, props, or the isometric office view.
+> **Reproducible, versioned assets.** A fresh clone already includes the PNG/WebP atlases,
+> textures, and GLBs required at runtime. Run `npm run assets` and `npm run assets:3d`
+> only when changing the visual asset pipeline, not as an installation prerequisite.
 
 ### 2. Configure
 
@@ -150,7 +149,7 @@ REPOCIV_MAP_ROOT=~/projects
        └─ ...
 ```
 
-- **Macro:** hex map in 2D (default) or 3D WebGL — key `3` or toolbar button toggles `flat` ↔ `webgl`
+- **Macro:** hex map in 2D (default) or 3D WebGL — key `0` or toolbar button toggles `flat` ↔ `webgl`
 - **Local:** double-click a city → interior isometric office view
   - **Workbenches** are files/folders prioritized by the Priority Matrix
   - **Units** walk toward workbenches with cached A* (≤300 hexes)
@@ -190,7 +189,7 @@ RepoCiv is also exposed as an **MCP server over stdio** (`server/mcp_server.py`)
 }
 ```
 
-42 tools covering 14 domains with MCP tools: agents, commands, approvals, pending, GPU, wonders, graph-relations, foreign-relations and more. See [docs/MCP.md](docs/MCP.md).
+38 tools covering 14 domains with MCP tools: agents, commands, approvals, pending, GPU, wonders, graph-relations, foreign-relations and more. See [docs/MCP.md](docs/MCP.md).
 
 ---
 
@@ -247,7 +246,7 @@ It is useful for auditing long sessions without opening external logs: the "stor
 | `V` | Toggle fog of war |
 | `A` | Pending approvals |
 | `N` | News gazette |
-| `3` | Toggle 2D (`flat`) ↔ WebGL (`webgl`) render |
+| `0` | Toggle 2D (`flat`) ↔ WebGL (`webgl`) render |
 | `F11` | Settings panel |
 | `?` | Keyboard help |
 
@@ -331,7 +330,7 @@ python3 -m pytest server/ -q
 |-----|----------|
 | [docs/SCOPE.md](docs/SCOPE.md) | What the project is and isn't |
 | [docs/API.md](docs/API.md) | Full endpoint reference |
-| [docs/MCP.md](docs/MCP.md) | MCP server — 42 tools, examples |
+| [docs/MCP.md](docs/MCP.md) | MCP server — 38 tools, examples |
 | [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | Step-by-step tutorial |
 | [docs/REMOTE_ACCESS.md](docs/REMOTE_ACCESS.md) | Remote access via Tailscale |
 | [docs/EVOLUTION.md](docs/EVOLUTION.md) | Project history |

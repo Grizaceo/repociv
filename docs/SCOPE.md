@@ -60,7 +60,7 @@ Métricas concretas para considerar el alpha "exitoso":
   alpha-test más placentero — pero sin reescribir capas grandes.
 - **Los DOS renderers son trunk oficial.** El Canvas 2D (`flat`) es el modo
   por defecto y canónico; el WebGL/Three.js (`webgl`) es opt-in por
-  `?renderer=webgl` o hotkey `3`. Decisión del owner (2026-06): lo oficial no
+  `?renderer=webgl` o hotkey `0`. Decisión del owner (2026-06): lo oficial no
   es "2D o 3D" sino **poder alternar entre ambos sin fricción**. El invariante
   de switching está cubierto por un test no-GPU (`src/three/renderMode.test.ts`,
   máquina de estados de persistencia/migración) y por el e2e informativo

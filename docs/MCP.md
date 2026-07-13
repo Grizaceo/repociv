@@ -58,9 +58,9 @@ curl "http://127.0.0.1:5274/api/graph-relations?repoId=repociv&limit=5"
 curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/path/to/workspace/repociv"
 ```
 
-## Tools disponibles (42 tools, 14 dominios con tools MCP)
+## Tools disponibles (38 tools, 14 dominios con tools MCP)
 
-> Conteo verificado contra `server/mcp_server.py`: 42 funciones decoradas con `@mcp.tool()`. La sección "Subagents" abajo lista endpoints del bridge sin tools MCP dedicadas (no se cuenta como dominio MCP).
+> Conteo verificado contra `server/mcp_server.py`: 38 funciones decoradas con `@mcp.tool()`. La sección "Subagents" abajo lista endpoints del bridge sin tools MCP dedicadas (no se cuenta como dominio MCP).
 
 ### Agents — estado del imperio
 | Tool | Descripción |
@@ -170,7 +170,7 @@ Todas las tools marcadas `[MUTATES]` requieren que `REPOCIV_TOKEN` esté configu
 ValueError: REPOCIV_TOKEN no configurado — mutating tools requieren token
 ```
 
-**Read-only tools y auth del bridge:** cuando el bridge tiene `REPOCIV_TOKEN` configurado, **todos** los GET autenticados (salvo `/health` y `/ready`) exigen el header `X-RepoCiv-Token`. El MCP server hoy solo envía token en tools `[MUTATES]`; las read-only tools pueden fallar con `401` si el token está activo. Comportamiento previsto (M2): el MCP enviará `X-RepoCiv-Token` en **todas** las llamadas cuando `REPOCIV_TOKEN` esté definido. Con token vacío (dev localhost), read-only funciona sin header — igual que el browser abriendo el dashboard.
+**Read-only tools y auth del bridge:** cuando el bridge tiene `REPOCIV_TOKEN` configurado, **todos** los GET autenticados (salvo `/health` y `/ready`) exigen `X-RepoCiv-Token`. El cliente MCP centraliza HTTP en `_get()`/`_post()` y envía ese header en **todas** las llamadas cuando `REPOCIV_TOKEN` está definido; las tools read-only y mutating siguen la misma política. Con token vacío (dev localhost), el header se omite.
 
 ### Wonders — Maravillas del mapa
 | Tool | Descripción |
