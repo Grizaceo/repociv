@@ -11,7 +11,10 @@ function loadDotEnv(path = '.env') {
     if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue;
     const [key, ...rest] = trimmed.split('=');
     if (!key) continue;
-    const value = rest.join('=').trim().replace(/^['"]|['"]$/g, '');
+    const value = rest
+      .join('=')
+      .trim()
+      .replace(/^['"]|['"]$/g, '');
     if (process.env[key] === undefined) process.env[key] = value;
   }
 }
@@ -37,6 +40,9 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
+  /* E2E shares one real bridge, scheduler, ledger and selected-repo store.
+   * Parallel workers would overwrite that global state and produce false 403/401/timeline failures. */
+  workers: 1,
   webServer: [
     {
       command: `python3 -m server.bridge`,
@@ -56,7 +62,5 @@ export default defineConfig({
       env: process.env as Record<string, string>,
     },
   ],
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-  ],
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });
