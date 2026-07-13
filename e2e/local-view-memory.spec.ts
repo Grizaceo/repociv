@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const bridgeURL = process.env.VITE_BRIDGE_URL ?? `http://127.0.0.1:${process.env.BRIDGE_PORT ?? 5274}`;
+const bridgeURL =
+  process.env.VITE_BRIDGE_URL ?? `http://127.0.0.1:${process.env.BRIDGE_PORT ?? 5274}`;
 const bridgeToken = process.env.VITE_BRIDGE_TOKEN ?? process.env.REPOCIV_TOKEN ?? '';
 
 function bridgeHeaders(): Record<string, string> {
@@ -15,7 +16,10 @@ async function seedRepoSelection(page: Page) {
     .map((repo) => repo.path)
     .filter((path): path is string => typeof path === 'string' && path.length > 0)
     .slice(0, 12);
-  expect(selectedRepoPaths.length, 'expected /api/repos to return selectable repos').toBeGreaterThan(0);
+  expect(
+    selectedRepoPaths.length,
+    'expected /api/repos to return selectable repos',
+  ).toBeGreaterThan(0);
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.evaluate((paths) => {
     window.localStorage.setItem(
@@ -31,13 +35,18 @@ async function seedRepoSelection(page: Page) {
 
 async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}) {
   const pageErrors: string[] = [];
-  page.on('pageerror', err => pageErrors.push(err.message));
+  page.on('pageerror', (err) => pageErrors.push(err.message));
 
   if (options.seedSelection !== false) await seedRepoSelection(page);
 
   await page.goto('/');
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
-  if (await page.locator('#repo-onboarding').isVisible().catch(() => false)) {
+  if (
+    await page
+      .locator('#repo-onboarding')
+      .isVisible()
+      .catch(() => false)
+  ) {
     await expect(page.locator('#repo-onboarding-next')).toBeEnabled({ timeout: 20_000 });
     await page.locator('#repo-onboarding-next').click();
     await expect(page.locator('#repo-onboarding-title')).toContainText(/Revisa tu seleccion/);
@@ -49,7 +58,9 @@ async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}
   expect(pageErrors, 'sin errores JS no capturados durante bootstrap').toEqual([]);
 }
 
-async function getActualCityScreenPositions(page: Page): Promise<Array<{ cityId: string; x: number; y: number }>> {
+async function getActualCityScreenPositions(
+  page: Page,
+): Promise<Array<{ cityId: string; x: number; y: number }>> {
   return await page.evaluate(() => {
     return (
       (
@@ -81,9 +92,14 @@ async function getFirstSelectableCityId(page: Page): Promise<string | null> {
   const response = await page.request.get('/api/repos');
   expect(response.ok(), await response.text()).toBeTruthy();
   const repos = (await response.json()) as Array<{ name?: string }>;
-  return repos
-    .map((repo) => repo.name)
-    .find((name): name is string => typeof name === 'string' && name.length > 0 && !/repociv/i.test(name)) ?? null;
+  return (
+    repos
+      .map((repo) => repo.name)
+      .find(
+        (name): name is string =>
+          typeof name === 'string' && name.length > 0 && !/repociv/i.test(name),
+      ) ?? null
+  );
 }
 
 async function tryEnterLocalView(page: Page): Promise<boolean> {
@@ -174,7 +190,9 @@ test.describe('RepoCiv Local View - Memory Leak Test', () => {
 
       const currentHeap = await getJSHeapSize(page);
       heapSamples.push(currentHeap);
-      console.log(`Heap at ${((Date.now() - startTime) / 1000).toFixed(0)}s: ${(currentHeap / 1024 / 1024).toFixed(2)} MB`);
+      console.log(
+        `Heap at ${((Date.now() - startTime) / 1000).toFixed(0)}s: ${(currentHeap / 1024 / 1024).toFixed(2)} MB`,
+      );
     }
 
     // Final GC and measurement
@@ -194,7 +212,10 @@ test.describe('RepoCiv Local View - Memory Leak Test', () => {
 
     // Allow up to 50 MB growth (generous for 30s with particle systems, animations, etc.)
     // The particle pool is fixed at 64, offscreen canvas is reused, so growth should be minimal
-    expect(heapGrowthMB, `Memory leak detected: heap grew ${heapGrowthMB.toFixed(2)} MB`).toBeLessThan(50);
+    expect(
+      heapGrowthMB,
+      `Memory leak detected: heap grew ${heapGrowthMB.toFixed(2)} MB`,
+    ).toBeLessThan(50);
 
     // Also check that heap doesn't show consistent upward trend
     // (simple linear regression slope should be near zero or negative)
@@ -210,7 +231,10 @@ test.describe('RepoCiv Local View - Memory Leak Test', () => {
       console.log(`Heap trend slope: ${slopeMBPerSample.toFixed(4)} MB per 5s sample`);
 
       // Slope should be minimal (less than 1 MB per 5s interval)
-      expect(Math.abs(slopeMBPerSample), `Heap trending upward: ${slopeMBPerSample.toFixed(4)} MB/sample`).toBeLessThan(1);
+      expect(
+        Math.abs(slopeMBPerSample),
+        `Heap trending upward: ${slopeMBPerSample.toFixed(4)} MB/sample`,
+      ).toBeLessThan(1);
     }
   });
 
@@ -258,6 +282,9 @@ test.describe('RepoCiv Local View - Memory Leak Test', () => {
     console.log(`Heap diff after exit: ${diffMB.toFixed(2)} MB`);
 
     // Allow small variance but not significant retention
-    expect(Math.abs(diffMB), `Particle cleanup failed: heap diff ${diffMB.toFixed(2)} MB`).toBeLessThan(10);
+    expect(
+      Math.abs(diffMB),
+      `Particle cleanup failed: heap diff ${diffMB.toFixed(2)} MB`,
+    ).toBeLessThan(10);
   });
 });

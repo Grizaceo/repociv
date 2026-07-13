@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const bridgeURL = process.env.VITE_BRIDGE_URL ?? `http://127.0.0.1:${process.env.BRIDGE_PORT ?? 5274}`;
+const bridgeURL =
+  process.env.VITE_BRIDGE_URL ?? `http://127.0.0.1:${process.env.BRIDGE_PORT ?? 5274}`;
 const bridgeToken = process.env.VITE_BRIDGE_TOKEN ?? process.env.REPOCIV_TOKEN ?? '';
 
 function bridgeHeaders(): Record<string, string> {
@@ -15,7 +16,10 @@ async function seedRepoSelection(page: Page) {
     .map((repo) => repo.path)
     .filter((path): path is string => typeof path === 'string' && path.length > 0)
     .slice(0, 12);
-  expect(selectedRepoPaths.length, 'expected /api/repos to return selectable repos').toBeGreaterThan(0);
+  expect(
+    selectedRepoPaths.length,
+    'expected /api/repos to return selectable repos',
+  ).toBeGreaterThan(0);
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.evaluate((paths) => {
     window.localStorage.setItem(
@@ -31,13 +35,18 @@ async function seedRepoSelection(page: Page) {
 
 async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}) {
   const pageErrors: string[] = [];
-  page.on('pageerror', err => pageErrors.push(err.message));
+  page.on('pageerror', (err) => pageErrors.push(err.message));
 
   if (options.seedSelection !== false) await seedRepoSelection(page);
 
   await page.goto('/');
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
-  if (await page.locator('#repo-onboarding').isVisible().catch(() => false)) {
+  if (
+    await page
+      .locator('#repo-onboarding')
+      .isVisible()
+      .catch(() => false)
+  ) {
     await expect(page.locator('#repo-onboarding-next')).toBeEnabled({ timeout: 20_000 });
     await page.locator('#repo-onboarding-next').click();
     await expect(page.locator('#repo-onboarding-title')).toContainText(/Revisa tu seleccion/);
@@ -63,7 +72,9 @@ test.describe('RepoCiv e2e visual', () => {
     await expect(page.locator('#res-production .res-value')).not.toHaveText('');
 
     await expect(page.locator('#hero-bar-slots .hero-slot[title^="DAVI"]')).toBeVisible();
-    await expect(page.locator('#bridge-status')).toHaveText(/hermes|openclaw/i, { timeout: 20_000 });
+    await expect(page.locator('#bridge-status')).toHaveText(/hermes|openclaw/i, {
+      timeout: 20_000,
+    });
   });
 
   test('regresiones visuales básicas: sin toggle 3D roto y paneles abren', async ({ page }) => {
@@ -77,10 +88,14 @@ test.describe('RepoCiv e2e visual', () => {
 
     await page.locator('#btn-approvals').click();
     await expect(page.locator('#approval-panel')).toBeVisible();
-    await expect(page.locator('#approval-panel')).toContainText(/APROBACIONES|No hay aprobaciones|Aprobar/);
+    await expect(page.locator('#approval-panel')).toContainText(
+      /APROBACIONES|No hay aprobaciones|Aprobar/,
+    );
   });
 
-  test('flujo bridge: comando seguro produce mission_start, chat_chunk y mission_complete visibles', async ({ page }) => {
+  test('flujo bridge: comando seguro produce mission_start, chat_chunk y mission_complete visibles', async ({
+    page,
+  }) => {
     await bootRepoCiv(page);
 
     await page.locator('#hero-bar-slots .hero-slot[title^="DAVI"]').click();
@@ -98,13 +113,17 @@ test.describe('RepoCiv e2e visual', () => {
       },
     });
     expect(response.ok(), await response.text()).toBeTruthy();
-    const command = await response.json() as { status: string; commandId: string };
+    const command = (await response.json()) as { status: string; commandId: string };
     expect(command.status).toBe('queued');
 
     await page.locator('#btn-timeline').click();
     await expect(page.locator('#timeline-panel')).toBeVisible();
-    await expect(page.locator('#log-messages')).toContainText(`E2E probe completado: ${marker}`, { timeout: 10_000 });
-    await expect(page.locator('#timeline-panel')).toContainText('Command Completed', { timeout: 10_000 });
+    await expect(page.locator('#log-messages')).toContainText(`E2E probe completado: ${marker}`, {
+      timeout: 10_000,
+    });
+    await expect(page.locator('#timeline-panel')).toContainText('Command Completed', {
+      timeout: 10_000,
+    });
   });
 
   test('error de /api/repos queda visible y no deja pantalla vacía', async ({ page }) => {
@@ -119,7 +138,7 @@ test.describe('RepoCiv e2e visual', () => {
         }),
       );
     });
-    await page.route('**/api/repos', route => route.fulfill({ status: 500, body: 'boom' }));
+    await page.route('**/api/repos', (route) => route.fulfill({ status: 500, body: 'boom' }));
     await bootRepoCiv(page, { seedSelection: false });
 
     await expect(page.locator('#map-load-error')).toBeVisible();

@@ -8,7 +8,10 @@ async function seedRepoSelection(page: Page) {
     .map((repo) => repo.path)
     .filter((path): path is string => typeof path === 'string' && path.length > 0)
     .slice(0, 12);
-  expect(selectedRepoPaths.length, 'expected /api/repos to return selectable repos').toBeGreaterThan(0);
+  expect(
+    selectedRepoPaths.length,
+    'expected /api/repos to return selectable repos',
+  ).toBeGreaterThan(0);
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.evaluate((paths) => {
     window.localStorage.setItem(
@@ -24,13 +27,18 @@ async function seedRepoSelection(page: Page) {
 
 async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}) {
   const pageErrors: string[] = [];
-  page.on('pageerror', err => pageErrors.push(err.message));
+  page.on('pageerror', (err) => pageErrors.push(err.message));
 
   if (options.seedSelection !== false) await seedRepoSelection(page);
 
   await page.goto('/');
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
-  if (await page.locator('#repo-onboarding').isVisible().catch(() => false)) {
+  if (
+    await page
+      .locator('#repo-onboarding')
+      .isVisible()
+      .catch(() => false)
+  ) {
     await expect(page.locator('#repo-onboarding-next')).toBeEnabled({ timeout: 20_000 });
     await page.locator('#repo-onboarding-next').click();
     await expect(page.locator('#repo-onboarding-title')).toContainText(/Revisa tu seleccion/);
@@ -100,7 +108,12 @@ test.describe('Debug Local View - get actual city positions from game state', ()
       const HEX_SIZE = 48;
       const SQRT3 = Math.sqrt(3);
 
-      function pixelToAxial(px: number, py: number, size: number, cam: any): { q: number; r: number } {
+      function pixelToAxial(
+        px: number,
+        py: number,
+        size: number,
+        cam: any,
+      ): { q: number; r: number } {
         if (size <= 0) return { q: 0, r: 0 };
         const q = ((2 / 3) * px) / size;
         const r = ((-1 / 3) * px + (SQRT3 / 3) * py) / size;
@@ -172,7 +185,8 @@ test.describe('Debug Local View - get actual city positions from game state', ()
     ];
 
     for (const pos of testPoints) {
-      if (pos.x < box.x || pos.x > box.x + box.width || pos.y < box.y || pos.y > box.y + box.height) continue;
+      if (pos.x < box.x || pos.x > box.x + box.width || pos.y < box.y || pos.y > box.y + box.height)
+        continue;
 
       await page.mouse.dblclick(pos.x, pos.y);
       await page.waitForTimeout(300);

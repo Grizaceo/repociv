@@ -8,7 +8,10 @@ async function seedRepoSelection(page: Page) {
     .map((repo) => repo.path)
     .filter((path): path is string => typeof path === 'string' && path.length > 0)
     .slice(0, 12);
-  expect(selectedRepoPaths.length, 'expected /api/repos to return selectable repos').toBeGreaterThan(0);
+  expect(
+    selectedRepoPaths.length,
+    'expected /api/repos to return selectable repos',
+  ).toBeGreaterThan(0);
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.evaluate((paths) => {
     window.localStorage.setItem(
@@ -24,13 +27,18 @@ async function seedRepoSelection(page: Page) {
 
 async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}) {
   const pageErrors: string[] = [];
-  page.on('pageerror', err => pageErrors.push(err.message));
+  page.on('pageerror', (err) => pageErrors.push(err.message));
 
   if (options.seedSelection !== false) await seedRepoSelection(page);
 
   await page.goto('/');
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
-  if (await page.locator('#repo-onboarding').isVisible().catch(() => false)) {
+  if (
+    await page
+      .locator('#repo-onboarding')
+      .isVisible()
+      .catch(() => false)
+  ) {
     await expect(page.locator('#repo-onboarding-next')).toBeEnabled({ timeout: 20_000 });
     await page.locator('#repo-onboarding-next').click();
     await expect(page.locator('#repo-onboarding-title')).toContainText(/Revisa tu seleccion/);

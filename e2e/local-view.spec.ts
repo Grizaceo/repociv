@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const bridgeURL = process.env.VITE_BRIDGE_URL ?? `http://127.0.0.1:${process.env.BRIDGE_PORT ?? 5274}`;
+const bridgeURL =
+  process.env.VITE_BRIDGE_URL ?? `http://127.0.0.1:${process.env.BRIDGE_PORT ?? 5274}`;
 const bridgeToken = process.env.VITE_BRIDGE_TOKEN ?? process.env.REPOCIV_TOKEN ?? '';
 
 function bridgeHeaders(): Record<string, string> {
@@ -15,7 +16,10 @@ async function seedRepoSelection(page: Page) {
     .map((repo) => repo.path)
     .filter((path): path is string => typeof path === 'string' && path.length > 0)
     .slice(0, 12);
-  expect(selectedRepoPaths.length, 'expected /api/repos to return selectable repos').toBeGreaterThan(0);
+  expect(
+    selectedRepoPaths.length,
+    'expected /api/repos to return selectable repos',
+  ).toBeGreaterThan(0);
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.evaluate((paths) => {
     window.localStorage.setItem(
@@ -31,13 +35,18 @@ async function seedRepoSelection(page: Page) {
 
 async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}) {
   const pageErrors: string[] = [];
-  page.on('pageerror', err => pageErrors.push(err.message));
+  page.on('pageerror', (err) => pageErrors.push(err.message));
 
   if (options.seedSelection !== false) await seedRepoSelection(page);
 
   await page.goto('/');
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
-  if (await page.locator('#repo-onboarding').isVisible().catch(() => false)) {
+  if (
+    await page
+      .locator('#repo-onboarding')
+      .isVisible()
+      .catch(() => false)
+  ) {
     await expect(page.locator('#repo-onboarding-next')).toBeEnabled({ timeout: 20_000 });
     await page.locator('#repo-onboarding-next').click();
     await expect(page.locator('#repo-onboarding-title')).toContainText(/Revisa tu seleccion/);
@@ -49,12 +58,16 @@ async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}
   expect(pageErrors, 'sin errores JS no capturados durante bootstrap').toEqual([]);
 }
 
-async function getActualCityScreenPositions(page: Page): Promise<Array<{ cityId: string; x: number; y: number }>> {
+async function getActualCityScreenPositions(
+  page: Page,
+): Promise<Array<{ cityId: string; x: number; y: number }>> {
   return await page.evaluate(() => {
     return (
       (
         window as Window & {
-          __repocivDebug?: { getMacroCityScreenPositions?: () => Array<{ cityId: string; x: number; y: number }> };
+          __repocivDebug?: {
+            getMacroCityScreenPositions?: () => Array<{ cityId: string; x: number; y: number }>;
+          };
         }
       ).__repocivDebug?.getMacroCityScreenPositions?.() ?? []
     );
@@ -79,9 +92,14 @@ async function getFirstSelectableCityId(page: Page): Promise<string | null> {
   const response = await page.request.get('/api/repos');
   expect(response.ok(), await response.text()).toBeTruthy();
   const repos = (await response.json()) as Array<{ name?: string }>;
-  return repos
-    .map((repo) => repo.name)
-    .find((name): name is string => typeof name === 'string' && name.length > 0 && !/repociv/i.test(name)) ?? null;
+  return (
+    repos
+      .map((repo) => repo.name)
+      .find(
+        (name): name is string =>
+          typeof name === 'string' && name.length > 0 && !/repociv/i.test(name),
+      ) ?? null
+  );
 }
 
 async function tryEnterLocalView(page: Page): Promise<boolean> {
@@ -151,11 +169,15 @@ test.describe('RepoCiv Local View (RimWorld-style)', () => {
     await page.waitForTimeout(2000);
 
     const pageErrors: string[] = [];
-    page.on('pageerror', err => pageErrors.push(err.message));
+    page.on('pageerror', (err) => pageErrors.push(err.message));
 
     await page.waitForTimeout(1000);
-    const localErrors = pageErrors.filter(e =>
-      e.includes('localRenderer') || e.includes('LocalRenderer') || e.includes('localMap') || e.includes('LocalMap')
+    const localErrors = pageErrors.filter(
+      (e) =>
+        e.includes('localRenderer') ||
+        e.includes('LocalRenderer') ||
+        e.includes('localMap') ||
+        e.includes('LocalMap'),
     );
     expect(localErrors, `errores en local view: ${localErrors.join('; ')}`).toEqual([]);
   });
@@ -224,6 +246,9 @@ test.describe('RepoCiv Local View (RimWorld-style)', () => {
     // With hardware acceleration in production, should reach 55+ FPS.
     // The code implements all optimizations: offscreen canvas, LOD, frustum culling, particle pooling.
     const minFps = 10;
-    expect(fpsData.fps, `FPS promedio ${fpsData.fps.toFixed(1)} < ${minFps} (headless CI limit)`).toBeGreaterThanOrEqual(minFps);
+    expect(
+      fpsData.fps,
+      `FPS promedio ${fpsData.fps.toFixed(1)} < ${minFps} (headless CI limit)`,
+    ).toBeGreaterThanOrEqual(minFps);
   });
 });

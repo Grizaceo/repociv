@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { buildExecuteAgentPayload } from './executeAgentPayload.ts';
 
-
 describe('buildExecuteAgentPayload', () => {
   it('includes the selected city canonical repoPath', () => {
     expect(

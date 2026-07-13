@@ -41,14 +41,22 @@ test.describe('Debug Local View', () => {
     if (response.ok()) {
       const repos = await response.json();
       console.log('Repos from API:', repos.length);
-      repos.slice(0, 5).forEach((r: any) => console.log(`  - ${r.name} (${r.path}): pop=${r.population}`));
+      repos
+        .slice(0, 5)
+        .forEach((r: any) => console.log(`  - ${r.name} (${r.path}): pop=${r.population}`));
     }
 
     // Try to access the game state via the renderer
     const rendererInfo = await page.evaluate(() => {
       // Check if there's any global reference to the renderer or state
       const anyWindow = window as any;
-      const keys = Object.keys(anyWindow).filter(k => k.toLowerCase().includes('repociv') || k.toLowerCase().includes('renderer') || k.toLowerCase().includes('state') || k.toLowerCase().includes('game'));
+      const keys = Object.keys(anyWindow).filter(
+        (k) =>
+          k.toLowerCase().includes('repociv') ||
+          k.toLowerCase().includes('renderer') ||
+          k.toLowerCase().includes('state') ||
+          k.toLowerCase().includes('game'),
+      );
       return { globalKeys: keys };
     });
 
@@ -84,7 +92,7 @@ test.describe('Debug Local View', () => {
       canvas.dispatchEvent(dblClickEvent);
 
       // Wait a bit
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 500));
 
       // Check if local view frame appeared
       const localFrame = document.getElementById('local-view-frame');
@@ -119,7 +127,7 @@ test.describe('Debug Local View', () => {
       });
       canvas.dispatchEvent(dblClickEvent);
 
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 500));
 
       const localFrame = document.getElementById('local-view-frame');
       return {

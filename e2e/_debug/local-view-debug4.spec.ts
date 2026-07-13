@@ -8,7 +8,10 @@ async function seedRepoSelection(page: Page) {
     .map((repo) => repo.path)
     .filter((path): path is string => typeof path === 'string' && path.length > 0)
     .slice(0, 12);
-  expect(selectedRepoPaths.length, 'expected /api/repos to return selectable repos').toBeGreaterThan(0);
+  expect(
+    selectedRepoPaths.length,
+    'expected /api/repos to return selectable repos',
+  ).toBeGreaterThan(0);
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.evaluate((paths) => {
     window.localStorage.setItem(
@@ -24,13 +27,18 @@ async function seedRepoSelection(page: Page) {
 
 async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}) {
   const pageErrors: string[] = [];
-  page.on('pageerror', err => pageErrors.push(err.message));
+  page.on('pageerror', (err) => pageErrors.push(err.message));
 
   if (options.seedSelection !== false) await seedRepoSelection(page);
 
   await page.goto('/');
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
-  if (await page.locator('#repo-onboarding').isVisible().catch(() => false)) {
+  if (
+    await page
+      .locator('#repo-onboarding')
+      .isVisible()
+      .catch(() => false)
+  ) {
     await expect(page.locator('#repo-onboarding-next')).toBeEnabled({ timeout: 20_000 });
     await page.locator('#repo-onboarding-next').click();
     await expect(page.locator('#repo-onboarding-title')).toContainText(/Revisa tu seleccion/);
@@ -56,27 +64,36 @@ test.describe('Debug Local View - using game spiralCoords', () => {
 
       // Game's exact AXIAL_DIRECTIONS from src/hex.ts
       const AXIAL_DIRECTIONS = [
-        { q: +1, r: 0 },   // E (0)
-        { q: +1, r: -1 },  // NE (1)
-        { q: 0, r: -1 },   // NW (2)
-        { q: -1, r: 0 },   // W (3)
-        { q: -1, r: +1 },  // SW (4)
-        { q: 0, r: +1 },   // SE (5)
+        { q: +1, r: 0 }, // E (0)
+        { q: +1, r: -1 }, // NE (1)
+        { q: 0, r: -1 }, // NW (2)
+        { q: -1, r: 0 }, // W (3)
+        { q: -1, r: +1 }, // SW (4)
+        { q: 0, r: +1 }, // SE (5)
       ];
 
-      function axialAdd(a: { q: number; r: number }, b: { q: number; r: number }): { q: number; r: number } {
+      function axialAdd(
+        a: { q: number; r: number },
+        b: { q: number; r: number },
+      ): { q: number; r: number } {
         return { q: a.q + b.q, r: a.r + b.r };
       }
       function axialScale(a: { q: number; r: number }, k: number): { q: number; r: number } {
         return { q: a.q * k, r: a.r * k };
       }
-      function axialNeighbour(hex: { q: number; r: number }, dir: number): { q: number; r: number } {
+      function axialNeighbour(
+        hex: { q: number; r: number },
+        dir: number,
+      ): { q: number; r: number } {
         const d = AXIAL_DIRECTIONS[dir];
         return { q: hex.q + d.q, r: hex.r + d.r };
       }
 
       // Game's exact spiralCoords from src/hex.ts
-      function spiralCoords(center: { q: number; r: number }, count: number): { q: number; r: number }[] {
+      function spiralCoords(
+        center: { q: number; r: number },
+        count: number,
+      ): { q: number; r: number }[] {
         if (count === 0) return [];
         const results: { q: number; r: number }[] = [center];
         for (let k = 1; results.length < count; k++) {
@@ -91,7 +108,10 @@ test.describe('Debug Local View - using game spiralCoords', () => {
         return results;
       }
 
-      function axialToPixel(a: { q: number; r: number }, HEX_SIZE: number): { x: number; y: number } {
+      function axialToPixel(
+        a: { q: number; r: number },
+        HEX_SIZE: number,
+      ): { x: number; y: number } {
         const SQRT3 = Math.sqrt(3);
         const x = HEX_SIZE * ((3 / 2) * a.q);
         const y = HEX_SIZE * ((SQRT3 / 2) * a.q + SQRT3 * a.r);
@@ -104,7 +124,9 @@ test.describe('Debug Local View - using game spiralCoords', () => {
         const selected = localStorage.getItem('repociv:selected-repos:v1');
         if (selected) {
           const data = JSON.parse(selected);
-          const nonCapital = data.selectedRepoPaths.filter((p: string) => !p.toLowerCase().includes('repociv'));
+          const nonCapital = data.selectedRepoPaths.filter(
+            (p: string) => !p.toLowerCase().includes('repociv'),
+          );
           maxCities = Math.min(nonCapital.length, 12);
         }
       } catch {}
@@ -127,7 +149,7 @@ test.describe('Debug Local View - using game spiralCoords', () => {
           y: screenY,
           cityId: `city-${i}`,
           coord: { q: coord.q, r: coord.r },
-          ring
+          ring,
         });
       }
       return positions;
@@ -137,7 +159,9 @@ test.describe('Debug Local View - using game spiralCoords', () => {
 
     // Now try double-clicking each position and check for local view frame
     for (const pos of positions) {
-      console.log(`Trying city ${pos.cityId} at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) ring ${pos.ring} coord (${pos.coord.q}, ${pos.coord.r})`);
+      console.log(
+        `Trying city ${pos.cityId} at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) ring ${pos.ring} coord (${pos.coord.q}, ${pos.coord.r})`,
+      );
 
       await page.mouse.dblclick(pos.x, pos.y);
       await page.waitForTimeout(500);

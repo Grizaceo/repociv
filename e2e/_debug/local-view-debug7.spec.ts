@@ -8,7 +8,10 @@ async function seedRepoSelection(page: Page) {
     .map((repo) => repo.path)
     .filter((path): path is string => typeof path === 'string' && path.length > 0)
     .slice(0, 12);
-  expect(selectedRepoPaths.length, 'expected /api/repos to return selectable repos').toBeGreaterThan(0);
+  expect(
+    selectedRepoPaths.length,
+    'expected /api/repos to return selectable repos',
+  ).toBeGreaterThan(0);
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.evaluate((paths) => {
     window.localStorage.setItem(
@@ -24,13 +27,18 @@ async function seedRepoSelection(page: Page) {
 
 async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}) {
   const pageErrors: string[] = [];
-  page.on('pageerror', err => pageErrors.push(err.message));
+  page.on('pageerror', (err) => pageErrors.push(err.message));
 
   if (options.seedSelection !== false) await seedRepoSelection(page);
 
   await page.goto('/');
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
-  if (await page.locator('#repo-onboarding').isVisible().catch(() => false)) {
+  if (
+    await page
+      .locator('#repo-onboarding')
+      .isVisible()
+      .catch(() => false)
+  ) {
     await expect(page.locator('#repo-onboarding-next')).toBeEnabled({ timeout: 20_000 });
     await page.locator('#repo-onboarding-next').click();
     await expect(page.locator('#repo-onboarding-title')).toContainText(/Revisa tu seleccion/);
@@ -69,12 +77,13 @@ test.describe('Debug Local View - access game state directly', () => {
 
       // For now, let's just return what we can find
       return {
-        windowKeys: Object.keys(anyWindow).filter(k =>
-          k.toLowerCase().includes('renderer') ||
-          k.toLowerCase().includes('state') ||
-          k.toLowerCase().includes('game') ||
-          k.toLowerCase().includes('repociv')
-        )
+        windowKeys: Object.keys(anyWindow).filter(
+          (k) =>
+            k.toLowerCase().includes('renderer') ||
+            k.toLowerCase().includes('state') ||
+            k.toLowerCase().includes('game') ||
+            k.toLowerCase().includes('repociv'),
+        ),
       };
     });
 
@@ -133,16 +142,20 @@ test.describe('Debug Local View - access game state directly', () => {
     const testResult = await page.evaluate(() => {
       // Replicate the game's exact city placement algorithm
       const AXIAL_DIRECTIONS = [
-        { q: +1, r: 0 },   // E (0)
-        { q: +1, r: -1 },  // NE (1)
-        { q: 0, r: -1 },   // NW (2)
-        { q: -1, r: 0 },   // W (3)
-        { q: -1, r: +1 },  // SW (4)
-        { q: 0, r: +1 },   // SE (5)
+        { q: +1, r: 0 }, // E (0)
+        { q: +1, r: -1 }, // NE (1)
+        { q: 0, r: -1 }, // NW (2)
+        { q: -1, r: 0 }, // W (3)
+        { q: -1, r: +1 }, // SW (4)
+        { q: 0, r: +1 }, // SE (5)
       ];
 
-      function axialAdd(a: any, b: any) { return { q: a.q + b.q, r: a.r + b.r }; }
-      function axialScale(a: any, k: number) { return { q: a.q * k, r: a.r * k }; }
+      function axialAdd(a: any, b: any) {
+        return { q: a.q + b.q, r: a.r + b.r };
+      }
+      function axialScale(a: any, k: number) {
+        return { q: a.q * k, r: a.r * k };
+      }
       function axialNeighbour(hex: any, dir: number) {
         const d = AXIAL_DIRECTIONS[dir];
         return { q: hex.q + d.q, r: hex.r + d.r };
@@ -150,7 +163,7 @@ test.describe('Debug Local View - access game state directly', () => {
       function axialDistance(a: any, b: any) {
         const dq = a.q - b.q;
         const dr = a.r - b.r;
-        const ds = (-a.q - a.r) - (-b.q - b.r);
+        const ds = -a.q - a.r - (-b.q - b.r);
         return (Math.abs(dq) + Math.abs(dr) + Math.abs(ds)) / 2;
       }
 
@@ -201,7 +214,11 @@ test.describe('Debug Local View - access game state directly', () => {
         }
       }
 
-      return Array.from(cityCoordLookup.entries()).map(([repo, coord]) => ({ repo, q: coord.q, r: coord.r }));
+      return Array.from(cityCoordLookup.entries()).map(([repo, coord]) => ({
+        repo,
+        q: coord.q,
+        r: coord.r,
+      }));
     });
 
     console.log('Simulated game city positions:', JSON.stringify(testResult, null, 2));
@@ -226,7 +243,9 @@ test.describe('Debug Local View - access game state directly', () => {
       const screenX = box.x + (worldPos.x - cam.x) * cam.zoom + cam.cx;
       const screenY = box.y + (worldPos.y - cam.y) * cam.zoom + cam.cy;
 
-      console.log(`Trying ${city.repo} at (${city.q}, ${city.r}) -> screen (${screenX.toFixed(1)}, ${screenY.toFixed(1)})`);
+      console.log(
+        `Trying ${city.repo} at (${city.q}, ${city.r}) -> screen (${screenX.toFixed(1)}, ${screenY.toFixed(1)})`,
+      );
 
       await page.mouse.dblclick(screenX, screenY);
       await page.waitForTimeout(300);

@@ -8,7 +8,10 @@ async function seedRepoSelection(page: Page) {
     .map((repo) => repo.path)
     .filter((path): path is string => typeof path === 'string' && path.length > 0)
     .slice(0, 12);
-  expect(selectedRepoPaths.length, 'expected /api/repos to return selectable repos').toBeGreaterThan(0);
+  expect(
+    selectedRepoPaths.length,
+    'expected /api/repos to return selectable repos',
+  ).toBeGreaterThan(0);
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.evaluate((paths) => {
     window.localStorage.setItem(
@@ -24,13 +27,18 @@ async function seedRepoSelection(page: Page) {
 
 async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}) {
   const pageErrors: string[] = [];
-  page.on('pageerror', err => pageErrors.push(err.message));
+  page.on('pageerror', (err) => pageErrors.push(err.message));
 
   if (options.seedSelection !== false) await seedRepoSelection(page);
 
   await page.goto('/');
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
-  if (await page.locator('#repo-onboarding').isVisible().catch(() => false)) {
+  if (
+    await page
+      .locator('#repo-onboarding')
+      .isVisible()
+      .catch(() => false)
+  ) {
     await expect(page.locator('#repo-onboarding-next')).toBeEnabled({ timeout: 20_000 });
     await page.locator('#repo-onboarding-next').click();
     await expect(page.locator('#repo-onboarding-title')).toContainText(/Revisa tu seleccion/);
@@ -61,7 +69,10 @@ test.describe('Debug Local View - click tracing', () => {
         return { x, y };
       }
 
-      function spiralCoords(center: { q: number; r: number }, count: number): { q: number; r: number }[] {
+      function spiralCoords(
+        center: { q: number; r: number },
+        count: number,
+      ): { q: number; r: number }[] {
         if (count <= 0) return [];
         const results: { q: number; r: number }[] = [];
         let q = center.q;
@@ -98,7 +109,9 @@ test.describe('Debug Local View - click tracing', () => {
         const selected = localStorage.getItem('repociv:selected-repos:v1');
         if (selected) {
           const data = JSON.parse(selected);
-          const nonCapital = data.selectedRepoPaths.filter((p: string) => !p.toLowerCase().includes('repociv'));
+          const nonCapital = data.selectedRepoPaths.filter(
+            (p: string) => !p.toLowerCase().includes('repociv'),
+          );
           maxCities = Math.min(nonCapital.length, 12);
         }
       } catch {}
@@ -117,7 +130,7 @@ test.describe('Debug Local View - click tracing', () => {
           y: screenY,
           cityId: `city-${i}`,
           coord: { q: coord.q, r: coord.r },
-          ring: Math.max(Math.abs(coord.q), Math.abs(coord.r), Math.abs(-coord.q - coord.r))
+          ring: Math.max(Math.abs(coord.q), Math.abs(coord.r), Math.abs(-coord.q - coord.r)),
         });
       }
       return positions;
@@ -127,7 +140,9 @@ test.describe('Debug Local View - click tracing', () => {
 
     // Now try double-clicking each position and check for local view frame
     for (const pos of positions) {
-      console.log(`Trying city ${pos.cityId} at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) ring ${pos.ring} coord (${pos.coord.q}, ${pos.coord.r})`);
+      console.log(
+        `Trying city ${pos.cityId} at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) ring ${pos.ring} coord (${pos.coord.q}, ${pos.coord.r})`,
+      );
 
       await page.mouse.dblclick(pos.x, pos.y);
       await page.waitForTimeout(500);

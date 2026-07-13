@@ -26,10 +26,7 @@ import { expect, test, type Page } from '@playwright/test';
  * on 5274. The Playwright config is responsible for that.
  */
 
-const SEED_REPOS = [
-  '/tmp/repociv-fixtures/repo-alpha',
-  '/tmp/repociv-fixtures/repo-beta',
-];
+const SEED_REPOS = ['/tmp/repociv-fixtures/repo-alpha', '/tmp/repociv-fixtures/repo-beta'];
 
 async function bootWithMode(page: Page, mode: 'flat' | 'webgl') {
   const errors: string[] = [];
@@ -51,7 +48,12 @@ async function bootWithMode(page: Page, mode: 'flat' | 'webgl') {
   );
   await page.goto(`/?renderer=${mode}`, { waitUntil: 'networkidle' });
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
-  if (await page.locator('#repo-onboarding').isVisible().catch(() => false)) {
+  if (
+    await page
+      .locator('#repo-onboarding')
+      .isVisible()
+      .catch(() => false)
+  ) {
     const nextBtn = page.locator('#repo-onboarding-next');
     await expect(nextBtn).toBeEnabled({ timeout: 20_000 });
     await nextBtn.click();
@@ -86,9 +88,7 @@ test.describe('hex2d ↔ WebGL parity', () => {
     await page.keyboard.press('3');
     // Give the event loop a tick to flush persistRenderMode.
     await page.waitForTimeout(50);
-    const stored = await page.evaluate(() =>
-      window.localStorage.getItem('repociv:renderer'),
-    );
+    const stored = await page.evaluate(() => window.localStorage.getItem('repociv:renderer'));
     expect(stored).toBe('webgl');
   });
 
@@ -98,9 +98,7 @@ test.describe('hex2d ↔ WebGL parity', () => {
     // storage to 'flat' on read; this test just confirms the
     // post-reload state is internally consistent.
     await page.reload({ waitUntil: 'networkidle' });
-    const afterReload = await page.evaluate(() =>
-      window.localStorage.getItem('repociv:renderer'),
-    );
+    const afterReload = await page.evaluate(() => window.localStorage.getItem('repociv:renderer'));
     // 'flat' is the rewritten value (webgl is session-only, per
     // the resolver's session-only contract).
     expect(afterReload).toBe('flat');
@@ -127,9 +125,7 @@ test.describe('hex2d ↔ WebGL parity', () => {
     // from storage; the migration in resolveInitialRenderMode
     // rewrites the key from 'iso25d' to 'webgl'.
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    const stored = await page.evaluate(() =>
-      window.localStorage.getItem('repociv:renderer'),
-    );
+    const stored = await page.evaluate(() => window.localStorage.getItem('repociv:renderer'));
     expect(stored).toBe('webgl');
   });
 });
