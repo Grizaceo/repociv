@@ -113,6 +113,9 @@ test.describe('RepoCiv e2e visual', () => {
     expect(primaryTarget?.width ?? 0).toBeGreaterThanOrEqual(44);
     expect(primaryTarget?.height ?? 0).toBeGreaterThanOrEqual(44);
 
+    const bannerClose = page.getByRole('button', { name: 'Cerrar banner' });
+    if (await bannerClose.isVisible()) await bannerClose.click();
+
     const hudMode = page.locator('#btn-hud-mode');
     await hudMode.scrollIntoViewIfNeeded();
     await expect(hudMode).toBeInViewport();
