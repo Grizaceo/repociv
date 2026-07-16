@@ -81,6 +81,8 @@ export function setRendererRef(renderer: {
 
 export function closeConstructionPanel(): void {
   isOpen = false;
+  inspectRequestId += 1;
+  renderParentMapPreview(null);
   _rendererRef?.setCityRelocateMode(false);
   // Do NOT clear _onPickTileCb here — placing mode keeps callback alive while panel is closed.
   getPanel()?.classList.add('hidden');
@@ -105,7 +107,7 @@ export function openConstructionPanel(): void {
   refreshCityList();
   refreshRepoSelect();
   requestAnimationFrame(() => {
-    panel?.querySelector<HTMLInputElement>('#construction-repo-path')?.focus();
+    if (isOpen) panel?.querySelector<HTMLInputElement>('#construction-repo-path')?.focus();
   });
 }
 

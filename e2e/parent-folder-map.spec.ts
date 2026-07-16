@@ -237,4 +237,11 @@ test('empty parents are non-actionable and stale inspections cannot overwrite th
   await page.waitForTimeout(220);
   await expect(parentMap).toContainText('/workspace/FAST');
   await expect(parentMap).not.toContainText('/workspace/SLOW');
+
+  await pathInput.fill('/workspace/SLOW/slow');
+  await page.locator('#construction-inspect-repo').click();
+  await page.locator('#construction-close').click();
+  await page.waitForTimeout(220);
+  await page.locator('#btn-construction').click();
+  await expect(parentMap).toBeHidden();
 });
