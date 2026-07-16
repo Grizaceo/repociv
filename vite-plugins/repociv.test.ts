@@ -36,7 +36,12 @@ type MockResponse = {
   end: (body: string) => void;
 };
 
-function mockRequest(method: string, url: string, body?: string): Connect.IncomingMessage {
+function mockRequest(
+  method: string,
+  url: string,
+  body?: string,
+  headers: Record<string, string> = {},
+): Connect.IncomingMessage {
   const req = new EventEmitter() as Connect.IncomingMessage;
   req.method = method;
   req.url = url;
@@ -46,8 +51,9 @@ function mockRequest(method: string, url: string, body?: string): Connect.Incomi
           host: '127.0.0.1:5273',
           origin: 'http://127.0.0.1:5273',
           'content-type': 'application/json',
+          ...headers,
         }
-      : { host: '127.0.0.1:5273' };
+      : { host: '127.0.0.1:5273', ...headers };
   queueMicrotask(() => {
     if (body !== undefined) req.emit('data', Buffer.from(body));
     req.emit('end');
@@ -75,8 +81,9 @@ async function invokeHandler(
   method: string,
   url: string,
   body?: string,
+  headers: Record<string, string> = {},
 ): Promise<MockResponse> {
-  const req = mockRequest(method, url, body);
+  const req = mockRequest(method, url, body, headers);
   const res = mockResponse();
   let nextCalled = false;
   await handler(req, res as unknown as Connect.ServerResponse, () => {
@@ -84,6 +91,21 @@ async function invokeHandler(
   });
   expect(nextCalled).toBe(false);
   return res;
+}
+
+function createPluginHandler(mapRoot: string): Connect.NextHandleFunction {
+  const plugin = repocivPlugin(mapRoot);
+  let captured: Connect.NextHandleFunction | undefined;
+  plugin.configureServer!({
+    middlewares: {
+      use: (fn: Connect.NextHandleFunction) => {
+        captured = fn;
+      },
+    },
+    ws: { send: () => {} },
+  } as never);
+  if (!captured) throw new Error('middleware not registered');
+  return captured;
 }
 
 describe('repociv path helpers', () => {
@@ -149,27 +171,28 @@ describe('repociv API handlers', () => {
   let fixture: ReturnType<typeof makeFixture>;
   let handler: Connect.NextHandleFunction;
   const prevStateFile = process.env['REPOCIV_STATE_FILE'];
+  const prevTokens = {
+    REPOCIV_TOKEN: process.env['REPOCIV_TOKEN'],
+    VITE_REPOCIV_TOKEN: process.env['VITE_REPOCIV_TOKEN'],
+    VITE_BRIDGE_TOKEN: process.env['VITE_BRIDGE_TOKEN'],
+  };
 
   beforeEach(() => {
     fixture = makeFixture();
     process.env['REPOCIV_STATE_FILE'] = join(fixture.root, 'state.json');
-    const plugin = repocivPlugin(fixture.mapRoot);
-    let captured: Connect.NextHandleFunction | undefined;
-    plugin.configureServer!({
-      middlewares: {
-        use: (fn: Connect.NextHandleFunction) => {
-          captured = fn;
-        },
-      },
-      ws: { send: () => {} },
-    } as never);
-    if (!captured) throw new Error('middleware not registered');
-    handler = captured;
+    delete process.env['REPOCIV_TOKEN'];
+    delete process.env['VITE_REPOCIV_TOKEN'];
+    delete process.env['VITE_BRIDGE_TOKEN'];
+    handler = createPluginHandler(fixture.mapRoot);
   });
 
   afterEach(() => {
     if (prevStateFile === undefined) delete process.env['REPOCIV_STATE_FILE'];
     else process.env['REPOCIV_STATE_FILE'] = prevStateFile;
+    for (const [name, value] of Object.entries(prevTokens)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
     rmSync(fixture.root, { recursive: true, force: true });
   });
 
@@ -243,6 +266,7 @@ describe('repociv API handlers', () => {
     mkdirSync(repoB, { recursive: true });
     mkdirSync(join(fixture.mapRoot, 'node_modules'), { recursive: true });
     mkdirSync(join(fixture.mapRoot, 'dist'), { recursive: true });
+    mkdirSync(join(fixture.mapRoot, 'coverage'), { recursive: true });
     mkdirSync(join(fixture.mapRoot, '.hidden-repo'), { recursive: true });
     const outside = join(fixture.root, 'outside-repo');
     mkdirSync(outside, { recursive: true });
@@ -265,7 +289,59 @@ describe('repociv API handlers', () => {
     expect(body.parentMap.repos.map((repo) => repo.name).sort()).toEqual(['repo-a', 'repo-b']);
   });
 
+  it('requires the configured token for the parent-map mutation', async () => {
+    const previousToken = process.env['REPOCIV_TOKEN'];
+    const token = 'parent-map-test-token-32-characters';
+    process.env['REPOCIV_TOKEN'] = token;
+    try {
+      const tokenHandler = createPluginHandler(fixture.mapRoot);
+      const body = JSON.stringify({ path: fixture.repoA });
+
+      const missing = await invokeHandler(tokenHandler, 'POST', '/api/map-from-parent', body);
+      expect(missing.statusCode).toBe(401);
+
+      const invalid = await invokeHandler(tokenHandler, 'POST', '/api/map-from-parent', body, {
+        'x-repociv-token': 'wrong-token',
+      });
+      expect(invalid.statusCode).toBe(401);
+
+      const valid = await invokeHandler(tokenHandler, 'POST', '/api/map-from-parent', body, {
+        'x-repociv-token': token,
+      });
+      expect(valid.statusCode).toBe(200);
+    } finally {
+      if (previousToken === undefined) delete process.env['REPOCIV_TOKEN'];
+      else process.env['REPOCIV_TOKEN'] = previousToken;
+    }
+  });
+
+  it.each(['/api/repo/inspect', '/api/map-from-parent'])(
+    'rejects malformed JSON and non-string paths on %s',
+    async (endpoint) => {
+      const malformed = await invokeHandler(handler, 'POST', endpoint, '{');
+      expect(malformed.statusCode).toBe(400);
+      expect(JSON.parse(malformed.body).error).toBe('JSON invalido');
+
+      const wrongType = await invokeHandler(
+        handler,
+        'POST',
+        endpoint,
+        JSON.stringify({ path: 42 }),
+      );
+      expect(wrongType.statusCode).toBe(400);
+      expect(JSON.parse(wrongType.body).error).toBe('path debe ser string');
+    },
+  );
+
   it('POST /api/map-from-parent atomically activates the parent and selects its children', async () => {
+    const seeded = await invokeHandler(
+      handler,
+      'POST',
+      '/api/repo-selections',
+      JSON.stringify({ rootPath: fixture.mapRoot, selectedRepoPaths: [fixture.repoA] }),
+    );
+    expect(seeded.statusCode).toBe(200);
+
     const collectionRoot = join(fixture.root, 'collection');
     const repoOne = join(collectionRoot, 'one');
     const repoTwo = join(collectionRoot, 'two');
@@ -296,14 +372,21 @@ describe('repociv API handlers', () => {
     const state = JSON.parse(stateRes.body) as {
       activeRoot: string;
       roots: Array<{ path: string; selectedRepoPaths: string[] }>;
+      selectedRepoPaths: string[];
     };
     expect(state.activeRoot).toBe(resolve(collectionRoot));
     expect(
       state.roots.find((root) => root.path === resolve(collectionRoot))?.selectedRepoPaths.sort(),
     ).toEqual([resolve(repoOne), resolve(repoTwo)].sort());
+    expect(
+      state.roots.find((root) => root.path === resolve(fixture.mapRoot))?.selectedRepoPaths,
+    ).toEqual([]);
+    expect(state.selectedRepoPaths.sort()).toEqual([resolve(repoOne), resolve(repoTwo)].sort());
   });
 
   it('POST /api/map-from-parent rejects an empty eligible parent without changing state', async () => {
+    const beforeRes = await invokeHandler(handler, 'GET', '/api/repo-selections');
+    const before = JSON.parse(beforeRes.body);
     const technicalRoot = join(fixture.root, 'technical-only');
     const nodeModules = join(technicalRoot, 'node_modules');
     mkdirSync(nodeModules, { recursive: true });
@@ -319,6 +402,6 @@ describe('repociv API handlers', () => {
     expect(JSON.parse(res.body).error).toBe('carpeta madre sin subcarpetas elegibles');
 
     const stateRes = await invokeHandler(handler, 'GET', '/api/repo-selections');
-    expect(JSON.parse(stateRes.body).activeRoot).toBe(resolve(fixture.mapRoot));
+    expect(JSON.parse(stateRes.body)).toEqual(before);
   });
 });

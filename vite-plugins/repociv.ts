@@ -22,6 +22,7 @@ import { timingSafeEqual } from 'node:crypto';
 import type { ScannedRepo } from '../src/map.ts';
 import {
   addRepoSelection,
+  createExclusiveRootSelectionState,
   decodeRepoId,
   encodeRepoId,
   ensureRoot,
@@ -375,18 +376,44 @@ export function applyParentFolderMap(
   inputPath: string,
   scanWorkspace: WorkspaceScanner,
   state: RepoRootsState,
-): ParentFolderMapPreview & { selectedRepoIds: string[]; selectedRepoPaths: string[] } {
+): ParentFolderMapPreview & {
+  selectedRepoIds: string[];
+  selectedRepoPaths: string[];
+  nextState: RepoRootsState;
+} {
   const { parentMap } = inspectParentFolderMap(inputPath, scanWorkspace);
   if (parentMap.repos.length === 0) {
     throw new Error('carpeta madre sin subcarpetas elegibles');
   }
   const selectedRepoPaths = parentMap.repos.map((repo) => repo.repoPath ?? repo.path);
-  setRootSelection(state, parentMap.rootPath, selectedRepoPaths);
   return {
     ...parentMap,
     selectedRepoIds: parentMap.repos.map((repo) => repo.path),
     selectedRepoPaths,
+    nextState: createExclusiveRootSelectionState(state, parentMap.rootPath, selectedRepoPaths),
   };
+}
+
+export type PathPayloadResult =
+  | { ok: true; path: string }
+  | { ok: false; error: 'JSON invalido' | 'path requerido' | 'path debe ser string' };
+
+export function parsePathPayload(body: string): PathPayloadResult {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    return { ok: false, error: 'JSON invalido' };
+  }
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return { ok: false, error: 'path debe ser string' };
+  }
+  const path = (payload as { path?: unknown }).path;
+  if (path === undefined || path === '') return { ok: false, error: 'path requerido' };
+  if (typeof path !== 'string') return { ok: false, error: 'path debe ser string' };
+  const trimmed = path.trim();
+  if (!trimmed) return { ok: false, error: 'path requerido' };
+  return { ok: true, path: trimmed };
 }
 
 // ─── Request body helper ──────────────────────────────────────────────────────
@@ -611,7 +638,7 @@ export function repocivPlugin(mapRoot: string): Plugin {
     process.env['REPOCIV_BRIDGE_URL']?.trim() ||
     `http://127.0.0.1:${process.env['BRIDGE_PORT']?.trim() || '5274'}`
   ).replace(/\/$/, '');
-  const rootsState = ensureRoot(loadState(resolve(mapRoot)), resolve(mapRoot));
+  let rootsState = ensureRoot(loadState(resolve(mapRoot)), resolve(mapRoot));
   saveState(rootsState);
   const getCurrentMapRoot = () => rootsState.activeRoot;
   const getAllMapRoots = () => Object.keys(rootsState.roots).filter((r) => existsSync(r));
@@ -627,10 +654,24 @@ export function repocivPlugin(mapRoot: string): Plugin {
 
     const protectedMutation =
       req.method === 'POST' && (path === '/event' || path.startsWith('/api/'));
+    const mutationHeaders = (req.headers ?? {}) as MutationHeaders;
+    const strictParentMapToken =
+      path === '/api/map-from-parent' && req.method === 'POST' && expectedToken.length > 0;
     if (
-      protectedMutation &&
-      !isTrustedJsonMutation((req.headers ?? {}) as MutationHeaders, expectedToken)
+      strictParentMapToken &&
+      !tokenMatches(firstHeader(mutationHeaders, 'x-repociv-token'), expectedToken)
     ) {
+      const contentType = firstHeader(mutationHeaders, 'content-type')
+        .split(';', 1)[0]
+        ?.trim()
+        .toLowerCase();
+      res.statusCode = contentType === 'application/json' ? 401 : 415;
+      respondJson(res, {
+        error: res.statusCode === 415 ? 'application/json required' : 'valid token required',
+      });
+      return;
+    }
+    if (protectedMutation && !isTrustedJsonMutation(mutationHeaders, expectedToken)) {
       const contentType = firstHeader((req.headers ?? {}) as MutationHeaders, 'content-type')
         .split(';', 1)[0]
         ?.trim()
@@ -840,14 +881,13 @@ export function repocivPlugin(mapRoot: string): Plugin {
     if (path === '/api/repo/inspect' && req.method === 'POST') {
       try {
         const body = await readRequestBody(req);
-        const payload = JSON.parse(body) as { path?: string };
-        const requested = String(payload.path ?? '').trim();
-        const resolved = resolve(expandUser(requested));
-        if (!requested) {
+        const payload = parsePathPayload(body);
+        if (!payload.ok) {
           res.statusCode = 400;
-          respondJson(res, { error: 'path requerido' });
+          respondJson(res, { error: payload.error });
           return;
         }
+        const resolved = resolve(expandUser(payload.path));
         if (!repoExists(resolved)) {
           res.statusCode = 404;
           respondJson(res, { error: 'path no es carpeta valida' });
@@ -864,21 +904,22 @@ export function repocivPlugin(mapRoot: string): Plugin {
     if (path === '/api/map-from-parent' && req.method === 'POST') {
       try {
         const body = await readRequestBody(req);
-        const payload = JSON.parse(body) as { path?: string };
-        const requested = String(payload.path ?? '').trim();
-        const resolved = resolve(expandUser(requested));
-        if (!requested) {
+        const payload = parsePathPayload(body);
+        if (!payload.ok) {
           res.statusCode = 400;
-          respondJson(res, { error: 'path requerido' });
+          respondJson(res, { error: payload.error });
           return;
         }
+        const resolved = resolve(expandUser(payload.path));
         if (!repoExists(resolved)) {
           res.statusCode = 404;
           respondJson(res, { error: 'path no es carpeta valida' });
           return;
         }
-        const result = applyParentFolderMap(resolved, scanWorkspace, rootsState);
-        persistState();
+        const { nextState, ...result } = applyParentFolderMap(resolved, scanWorkspace, rootsState);
+        saveState(nextState);
+        rootsState = nextState;
+        clearCache();
         respondJson(res, { ok: true, ...result });
       } catch (e) {
         const error = e instanceof Error ? e.message : String(e);

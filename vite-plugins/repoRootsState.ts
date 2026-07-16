@@ -91,7 +91,9 @@ export function loadState(defaultRoot: string): RepoRootsState {
       normalized[rootPath] = {
         label: typeof entry?.label === 'string' ? entry.label : undefined,
         selectedRepoPaths: Array.isArray(entry?.selectedRepoPaths)
-          ? entry.selectedRepoPaths.filter((item): item is string => typeof item === 'string' && item.length > 0)
+          ? entry.selectedRepoPaths.filter(
+              (item): item is string => typeof item === 'string' && item.length > 0,
+            )
           : [],
         addedAt: typeof entry?.addedAt === 'string' ? entry.addedAt : nowIso(),
         lastSeen: typeof entry?.lastSeen === 'string' ? entry.lastSeen : nowIso(),
@@ -119,7 +121,11 @@ export function saveState(state: RepoRootsState): RepoRootsState {
   return state;
 }
 
-export function ensureRoot(state: RepoRootsState, rootPath: string, label?: string): RepoRootsState {
+export function ensureRoot(
+  state: RepoRootsState,
+  rootPath: string,
+  label?: string,
+): RepoRootsState {
   const resolved = resolve(rootPath);
   const existing = state.roots[resolved];
   state.activeRoot = resolved;
@@ -158,9 +164,32 @@ export function setRootSelection(
 ): RepoRootsState {
   ensureRoot(state, rootPath);
   const root = state.roots[resolve(rootPath)]!;
-  root.selectedRepoPaths = Array.from(new Set(repoPaths.map((item) => resolve(item)).filter((item) => item.length > 0)));
+  root.selectedRepoPaths = Array.from(
+    new Set(repoPaths.map((item) => resolve(item)).filter((item) => item.length > 0)),
+  );
   root.lastSeen = nowIso();
   return state;
+}
+
+export function createExclusiveRootSelectionState(
+  state: RepoRootsState,
+  rootPath: string,
+  repoPaths: string[],
+): RepoRootsState {
+  const next: RepoRootsState = {
+    version: 1,
+    activeRoot: state.activeRoot,
+    roots: Object.fromEntries(
+      Object.entries(state.roots).map(([path, entry]) => [
+        path,
+        {
+          ...entry,
+          selectedRepoPaths: [],
+        },
+      ]),
+    ),
+  };
+  return setRootSelection(next, rootPath, repoPaths);
 }
 
 export function addRepoSelection(state: RepoRootsState, repoPath: string): RepoRootsState {
@@ -178,7 +207,9 @@ export function addRepoSelection(state: RepoRootsState, repoPath: string): RepoR
 export function removeRepoSelection(state: RepoRootsState, repoPath: string): RepoRootsState {
   const resolvedRepoPath = resolve(repoPath);
   for (const root of Object.values(state.roots)) {
-    root.selectedRepoPaths = root.selectedRepoPaths.filter((item) => resolve(item) !== resolvedRepoPath);
+    root.selectedRepoPaths = root.selectedRepoPaths.filter(
+      (item) => resolve(item) !== resolvedRepoPath,
+    );
   }
   return state;
 }

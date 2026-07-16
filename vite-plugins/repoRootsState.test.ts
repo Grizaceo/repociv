@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   addRepoSelection,
+  createExclusiveRootSelectionState,
   decodeRepoId,
   encodeRepoId,
   loadState,
@@ -65,6 +66,21 @@ describe('repoRootsState persistence', () => {
     expect(onDisk.roots[resolve(mapRoot)]?.selectedRepoPaths.sort()).toEqual(
       [resolve(repoA), resolve(repoB)].sort(),
     );
+  });
+
+  it('builds an exclusive replacement without mutating the current state', () => {
+    const current = setRootSelection(loadState(mapRoot), mapRoot, [repoA]);
+    const nextRoot = join(tempRoot, 'next-workspace');
+    const repoC = join(nextRoot, 'repo-c');
+    mkdirSync(repoC, { recursive: true });
+
+    const next = createExclusiveRootSelectionState(current, nextRoot, [repoC]);
+
+    expect(current.activeRoot).toBe(resolve(mapRoot));
+    expect(current.roots[resolve(mapRoot)]?.selectedRepoPaths).toEqual([resolve(repoA)]);
+    expect(next.activeRoot).toBe(resolve(nextRoot));
+    expect(next.roots[resolve(mapRoot)]?.selectedRepoPaths).toEqual([]);
+    expect(next.roots[resolve(nextRoot)]?.selectedRepoPaths).toEqual([resolve(repoC)]);
   });
 
   it('add/remove selection mutations survive reload', () => {
