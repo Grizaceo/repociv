@@ -521,6 +521,10 @@
   line-height: 1.45;
 }
 
+.construction-parent-map .construction-parent-map-empty {
+  color: var(--ui-gold-bright, #f7d488);
+}
+
 .construction-parent-map .btn-accent {
   justify-self: stretch;
 }

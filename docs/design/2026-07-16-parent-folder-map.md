@@ -13,7 +13,7 @@ After a user inspects a folder in the construction panel, RepoCiv offers to repl
 
 `generateWorld()` already places repositories with a deterministic hex spiral and a minimum city distance of three. A second auto-layout algorithm would duplicate behavior and drift.
 
-`RepoRootsState.setRootSelection()` already performs the required state transition: it registers the root, marks it active, replaces that root's selection, and persists the state with a temporary file plus atomic rename.
+`RepoRootsState.setRootSelection()` already performs the in-memory root transition. The parent-map operation builds an exclusive draft, persists it with a temporary file plus atomic rename, and only then replaces the live state reference.
 
 ## User flow
 
@@ -21,8 +21,8 @@ After a user inspects a folder in the construction panel, RepoCiv offers to repl
 2. “Inspect route” returns the inspected repository plus a parent-map preview.
 3. The panel shows the parent path, eligible child count, and up to five child names.
 4. The user chooses “Use parent folder as map”.
-5. The server validates the inspected path again, scans the parent, marks the parent as the active root, selects every eligible direct child, and persists once.
-6. The client saves the returned selection and reloads the page.
+5. The server validates the inspected path again, scans the parent, clears selections under previous roots in a draft, marks the parent as active, selects every eligible direct child, and persists once.
+6. The client reloads. Startup rehydrates browser selection from the canonical server state.
 7. `generateWorld()` lays out selected repositories. Existing manual coordinates override automatic coordinates only for matching repositories.
 
 The existing manual placement controls remain available.
@@ -53,7 +53,7 @@ The endpoint remains read-only.
 
 ### `POST /api/map-from-parent`
 
-This mutation requires the normal RepoCiv mutation token.
+When a RepoCiv mutation token is configured, this endpoint requires a valid `X-RepoCiv-Token` header and returns HTTP 401 for a missing or invalid token. Same-origin fallback is allowed only when no token is configured.
 
 Request:
 
@@ -86,7 +86,7 @@ The scan keeps non-Git directories because RepoCiv models folders, not only Git 
 
 ## State and manual coordinates
 
-The operation replaces the active map selection with the parent's eligible children. It does not union them with previous roots.
+The operation replaces the canonical map selection with the parent's eligible children. Registered roots remain available, but their previous selections are cleared so server fallback cannot reconstruct a union.
 
 The operation never deletes `repociv:manual-layout:v1`. A selected repository with a saved manual coordinate keeps that coordinate. A selected repository without one receives the existing automatic coordinate. Manual entries outside the selected map remain stored but do not become cities solely because they exist in manual-layout storage.
 
@@ -130,7 +130,7 @@ test_strategy:
       framework: "vitest"
       dependencies: ["temporary root-state file", "temporary directory tree"]
       gate: "Gate 2"
-    - rationale: "The construction-panel action is a user-facing primary navigation path and must prove request, localStorage update, and reload in a browser."
+    - rationale: "The construction-panel action is a user-facing primary navigation path and must prove request, canonical server reconciliation, and reload in a browser."
       type: "e2e"
       size: "large"
       framework: "Playwright"
@@ -174,7 +174,7 @@ test_strategy:
 
 ### AC-3 and AC-4
 
-- [e2e] The construction panel displays the preview, posts the inspected path, saves returned IDs, and reloads.
+- [e2e] The construction panel displays the preview, posts the inspected path with mutation auth, reloads, and rehydrates selection from the server.
 - [e2e] The reloaded world exposes one macro city per returned repository.
 
 ### AC-5 and AC-6

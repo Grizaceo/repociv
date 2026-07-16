@@ -5,6 +5,7 @@ import {
   saveSelectedRepoPaths,
   type ScannedRepo,
 } from '../map';
+import { bridgeHeaders } from '../bridgeEnv.ts';
 import { upsertManualRepoEntry, removeManualRepoEntry, loadManualLayout } from '../manualLayout';
 import { showNotification } from './notificationBanner';
 import { trackPanelOpen } from './analytics.ts';
@@ -20,6 +21,8 @@ let _rendererRef: {
 let _onPickTileCb: ((coord: { q: number; r: number }) => void) | null = null;
 let selectedRepo: ScannedRepo | null = null;
 let selectedParentMap: ParentFolderMapPreview | null = null;
+let inspectRequestId = 0;
+let focusBeforeOpen: HTMLElement | null = null;
 
 // Callbacks for dynamic city add/delete (no reload)
 type CityAddedCallback = (repo: ScannedRepo, coord: { q: number; r: number }) => void;
@@ -81,11 +84,17 @@ export function closeConstructionPanel(): void {
   _rendererRef?.setCityRelocateMode(false);
   // Do NOT clear _onPickTileCb here — placing mode keeps callback alive while panel is closed.
   getPanel()?.classList.add('hidden');
+  const restoreTarget = focusBeforeOpen;
+  focusBeforeOpen = null;
+  restoreTarget?.focus();
 }
 
 export function openConstructionPanel(): void {
   _rendererRef?.setCityRelocateMode(false);
-  if (!isOpen) trackPanelOpen('construction');
+  if (!isOpen) {
+    trackPanelOpen('construction');
+    focusBeforeOpen = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }
   isOpen = true;
   let panel = getPanel();
   if (!panel) {
@@ -95,6 +104,9 @@ export function openConstructionPanel(): void {
   panel?.classList.remove('hidden');
   refreshCityList();
   refreshRepoSelect();
+  requestAnimationFrame(() => {
+    panel?.querySelector<HTMLInputElement>('#construction-repo-path')?.focus();
+  });
 }
 
 export function toggleConstructionPanel(): void {
@@ -123,7 +135,7 @@ async function inspectRepoPath(path: string): Promise<RepoInspectResponse> {
 async function loadParentFolderMap(path: string): Promise<ParentFolderMapApplyResponse> {
   const res = await fetch('/api/map-from-parent', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: bridgeHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ path }),
   });
   const data = (await res.json()) as ParentFolderMapApplyResponse;
@@ -222,6 +234,19 @@ function renderParentMapPreview(preview: ParentFolderMapPreview | null): void {
 
   const sample = preview.repos.slice(0, 5);
   const remaining = preview.repos.length - sample.length;
+  const hasRepos = preview.repos.length > 0;
+  const repoSummary = hasRepos
+    ? `<div class="construction-parent-map-repos">
+        ${sample.map((repo) => `<span>${escapeHtml(repo.name)}</span>`).join('')}
+        ${remaining > 0 ? `<span>+${remaining} más</span>` : ''}
+      </div>`
+    : '<p class="construction-parent-map-empty">No hay subcarpetas elegibles para construir un mapa.</p>';
+  const action = hasRepos
+    ? `<p>Reemplaza el mapa actual y distribuye las ciudades automáticamente. Las posiciones manuales coincidentes se conservan.</p>
+      <button id="construction-load-parent-map" class="btn-accent" type="button">
+        Recargar mapa y distribuir automáticamente
+      </button>`
+    : '';
   container.innerHTML = `
     <div class="construction-parent-map-heading">
       <div>
@@ -230,16 +255,11 @@ function renderParentMapPreview(preview: ParentFolderMapPreview | null): void {
       </div>
       <span class="construction-parent-map-count">${preview.repos.length} carpetas</span>
     </div>
-    <div class="construction-parent-map-repos">
-      ${sample.map((repo) => `<span>${escapeHtml(repo.name)}</span>`).join('')}
-      ${remaining > 0 ? `<span>+${remaining} más</span>` : ''}
-    </div>
-    <p>Reemplaza el mapa actual y distribuye las ciudades automáticamente. Las posiciones manuales coincidentes se conservan.</p>
-    <button id="construction-load-parent-map" class="btn-accent" type="button">
-      Recargar mapa y distribuir automáticamente
-    </button>
+    ${repoSummary}
+    ${action}
   `;
   container.classList.remove('hidden');
+  if (!hasRepos) return;
 
   container
     .querySelector<HTMLButtonElement>('#construction-load-parent-map')
@@ -255,7 +275,6 @@ function renderParentMapPreview(preview: ParentFolderMapPreview | null): void {
           const result = await loadParentFolderMap(selectedRepo.repoPath ?? selectedRepo.path);
           const selection = result.selectedRepoPaths ?? result.selectedRepoIds ?? [];
           if (selection.length === 0) throw new Error('El servidor devolvió una selección vacía');
-          saveSelectedRepoPaths(selection);
           window.location.reload();
         } catch (cause) {
           button.disabled = false;
@@ -289,9 +308,17 @@ function refreshRepoSelect(): void {
   }
 
   // Also fetch repo names (try to get from /api/repos)
-  select.innerHTML =
-    '<option value="">-- Selecciona un repo --</option>' +
-    unplaced.map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+  select.replaceChildren();
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '-- Selecciona un repo --';
+  select.appendChild(placeholder);
+  for (const path of unplaced) {
+    const option = document.createElement('option');
+    option.value = path;
+    option.textContent = path;
+    select.appendChild(option);
+  }
 }
 
 function buildDOM(): void {
@@ -300,10 +327,13 @@ function buildDOM(): void {
   const panel = document.createElement('div');
   panel.id = 'construction-panel';
   panel.className = 'construction-panel hidden';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'true');
+  panel.setAttribute('aria-labelledby', 'construction-panel-title');
   panel.innerHTML = `
     <div class="construction-panel-card">
       <header class="construction-panel-header">
-        <h3>Modo construcción</h3>
+        <h3 id="construction-panel-title">Modo construcción</h3>
         <button id="construction-close" class="icon-btn" aria-label="Cerrar">✕</button>
       </header>
       <div class="construction-panel-body">
@@ -336,7 +366,7 @@ function buildDOM(): void {
             </div>
           </div>
       <div id="construction-preview" class="construction-preview">Selecciona un repositorio y elige una casilla en el mapa.</div>
-      <div id="construction-error" class="construction-error hidden"></div>
+      <div id="construction-error" class="construction-error hidden" role="alert" aria-live="assertive"></div>
     </div>
 
     <div class="construction-divider"></div>
@@ -359,6 +389,29 @@ function buildDOM(): void {
   const close = () => closeConstructionPanel();
   panel.querySelector<HTMLButtonElement>('#construction-close')?.addEventListener('click', close);
   panel.querySelector<HTMLButtonElement>('#construction-cancel')?.addEventListener('click', close);
+  panel.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      close();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = Array.from(
+      panel.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((element) => element.offsetParent !== null);
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!first || !last) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
 
   // Reboot onboarding tour from the Construction panel (user-requested reset)
   panel
@@ -372,6 +425,11 @@ function buildDOM(): void {
 
   const pathInput = panel.querySelector<HTMLInputElement>('#construction-repo-path')!;
   const error = panel.querySelector<HTMLElement>('#construction-error')!;
+  pathInput.addEventListener('input', () => {
+    inspectRequestId += 1;
+    selectedRepo = null;
+    renderParentMapPreview(null);
+  });
 
   panel
     .querySelector<HTMLButtonElement>('#construction-pick-repo')
@@ -444,16 +502,19 @@ function buildDOM(): void {
   panel
     .querySelector<HTMLButtonElement>('#construction-inspect-repo')
     ?.addEventListener('click', () => {
+      const requestId = ++inspectRequestId;
       void (async () => {
         error.classList.add('hidden');
         try {
           const p = pathInput.value.trim();
           if (!p) throw new Error('Ruta vacia');
           const inspected = await inspectRepoPath(p);
+          if (requestId !== inspectRequestId || pathInput.value.trim() !== p) return;
           selectedRepo = inspected.repo ?? null;
           renderParentMapPreview(inspected.parentMap ?? null);
           if (selectedRepo) pathInput.value = selectedRepo.repoPath ?? selectedRepo.path;
         } catch (e) {
+          if (requestId !== inspectRequestId) return;
           renderParentMapPreview(null);
           error.textContent = `No se pudo inspeccionar la ruta (${e instanceof Error ? e.message : 'error desconocido'}).`;
           error.classList.remove('hidden');

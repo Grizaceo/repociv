@@ -4,7 +4,7 @@
 
 **Goal:** Add an atomic “Use parent folder as map” flow to the construction panel while preserving manual placement.
 
-**Architecture:** Extend inspection with a read-only parent preview. Add one authenticated mutation that derives the parent server-side, scans eligible children, and commits `RepoRootsState.setRootSelection()`. Reuse `generateWorld()` for placement and treat manual coordinates as overrides only for selected repositories.
+**Architecture:** Extend inspection with a read-only parent preview. Add one authenticated mutation that derives the parent server-side, scans eligible children, builds an exclusive state draft, persists it, and swaps the live reference only after success. Reuse `generateWorld()` for placement and treat manual coordinates as overrides only for selected repositories.
 
 **Tech stack:** TypeScript 5.9, Vite 6 plugin middleware, Vitest 4, Playwright 1.59, Three.js 0.175.
 
@@ -49,7 +49,7 @@
 2. Assert that success activates the derived parent and selects every eligible child.
 3. Assert that an empty parent throws before state mutation.
 4. Run the focused test and confirm red.
-5. Implement the operation with one `setRootSelection()` call.
+5. Implement the operation with one exclusive state draft and one persisted state write.
 6. Register the authenticated route with 400, 404, 422, and 500 responses matching existing middleware conventions.
 7. Run plugin and root-state tests; confirm green.
 
@@ -57,7 +57,7 @@
 
 **Files:**
 - Modify: `src/ui/constructionPanel.ts`
-- Modify: `src/styles.css`
+- Modify: `src/styles/onboarding.css`
 - Create: `e2e/parent-folder-map.spec.ts`
 
 **Interfaces:**
@@ -67,7 +67,7 @@
 1. Add a failing Playwright flow with intercepted inspection, apply, selection-state, and repositories endpoints.
 2. Open Construction, inspect a path, and expect parent path, child count, sample names, and action copy.
 3. Click the action and assert the apply request contains only the inspected path.
-4. Assert localStorage receives the server-returned IDs and the page reloads.
+4. Assert the page reloads and startup rehydrates localStorage from canonical server state.
 5. Implement typed API helpers and the preview block.
 6. Add loading, empty, and error states without native dialogs.
 7. Keep “New city”, tile selection, relocation, and removal controls unchanged.
@@ -92,7 +92,7 @@
 ### Task 5: Verify the complete flow
 
 **Files:**
-- Create: `docs/audits/2026-07-16-3d-parent-folder-map.md`
+- Create: `docs/audits/2026-07-16-3d-visual-and-parent-folder-map.md`
 - Do not commit generated PNGs unless the repository already tracks audit images.
 
 1. Run focused Vitest suites.
@@ -111,7 +111,7 @@
 The feature is complete only when:
 
 - the focused RED tests became GREEN;
-- `scripts/check.sh` exits 0;
+- all repository-isolated subgates in `scripts/check.sh` pass; any global-environment audit failure is reproduced and documented separately;
 - the focused E2E proves preview, apply, reload, and city count;
 - the live 3D capture contains the expected cities;
 - manual placement remains visible and callable;

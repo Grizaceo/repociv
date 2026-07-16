@@ -48,6 +48,7 @@ async function boot(page: Page) {
 test('inspected folder can replace the map with its parent siblings', async ({ page }) => {
   let applied = false;
   let applyPayload: unknown = null;
+  let applyTokenHeader = '';
 
   await page.addInitScript(() => {
     window.localStorage.setItem('repociv:tour-seen:v1', '1');
@@ -96,6 +97,7 @@ test('inspected folder can replace the map with its parent siblings', async ({ p
   );
   await page.route('**/api/map-from-parent', async (route) => {
     applyPayload = route.request().postDataJSON();
+    applyTokenHeader = route.request().headers()['x-repociv-token'] ?? '';
     applied = true;
     return json(route, {
       ok: true,
@@ -109,6 +111,8 @@ test('inspected folder can replace the map with its parent siblings', async ({ p
   await boot(page);
   await page.locator('#btn-construction').click();
   await expect(page.locator('#construction-panel')).toBeVisible();
+  await expect(page.locator('#construction-panel')).toHaveAttribute('role', 'dialog');
+  await expect(page.locator('#construction-panel')).toHaveAttribute('aria-modal', 'true');
 
   await page.locator('#construction-repo-path').fill('/workspace/ACTIVE/alpha-city');
   await page.locator('#construction-inspect-repo').click();
@@ -127,6 +131,7 @@ test('inspected folder can replace the map with its parent siblings', async ({ p
   await expect(page.locator('html[data-app-ready="1"]')).toBeAttached({ timeout: 20_000 });
 
   expect(applyPayload).toEqual({ path: '/workspace/ACTIVE/alpha-city' });
+  expect(Boolean(applyTokenHeader)).toBe(true);
   const selectedPaths = await page.evaluate(() => {
     const raw = window.localStorage.getItem('repociv:selected-repos:v1');
     return raw ? (JSON.parse(raw).selectedRepoPaths as string[]) : [];
@@ -148,4 +153,88 @@ test('inspected folder can replace the map with its parent siblings', async ({ p
 
   await page.locator('#btn-construction').click();
   await expect(page.locator('#construction-pick-tile')).toBeVisible();
+});
+
+test('empty parents are non-actionable and stale inspections cannot overwrite the latest path', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('repociv:tour-seen:v1', '1');
+    window.localStorage.setItem('repociv:renderer', 'flat');
+    window.localStorage.setItem('repociv:hud-mode', 'advanced');
+    window.localStorage.setItem(
+      'repociv:selected-repos:v1',
+      JSON.stringify({
+        version: 1,
+        selectedRepoPaths: ['/workspace/OLD/old-repo'],
+        filters: { owners: [], topics: [], languages: [] },
+      }),
+    );
+  });
+  await page.route('**/api/repo-selections', (route) =>
+    json(route, {
+      activeRoot: '/workspace/OLD',
+      roots: [
+        {
+          path: '/workspace/OLD',
+          selectedRepoIds: [oldRepo.path],
+          selectedRepoPaths: [oldRepo.repoPath],
+        },
+      ],
+      selectedRepoIds: [oldRepo.path],
+      selectedRepoPaths: [oldRepo.repoPath],
+      hasSelections: true,
+    }),
+  );
+  await page.route('**/api/repos', (route) => json(route, [oldRepo]));
+  await page.route('**/api/repos/selected', (route) => json(route, [oldRepo]));
+  await page.route('**/api/files/**', (route) => json(route, { files: [] }));
+  await page.route('**/api/skill-health/**', (route) => json(route, { health: 'ok' }));
+  await page.route('**/api/session-tint/**', (route) => json(route, { tint: 'bright' }));
+  await page.route('**/api/repo/inspect', async (route) => {
+    const { path } = route.request().postDataJSON() as { path: string };
+    const repo = {
+      ...oldRepo,
+      name: path.split('/').pop() ?? path,
+      path: `repo:${path}`,
+      repoPath: path,
+      rootPath: path.toLowerCase().includes('/fast/') ? '/workspace/FAST' : '/workspace/SLOW',
+    };
+    if (path.endsWith('/empty')) {
+      return json(route, {
+        ok: true,
+        repo,
+        parentMap: { rootPath: '/workspace/EMPTY', repos: [] },
+      });
+    }
+    if (path.endsWith('/slow')) await new Promise((resolve) => setTimeout(resolve, 180));
+    return json(route, {
+      ok: true,
+      repo,
+      parentMap: { rootPath: repo.rootPath, repos: [repo] },
+    });
+  });
+
+  await boot(page);
+  await page.locator('#btn-construction').click();
+  const pathInput = page.locator('#construction-repo-path');
+  const parentMap = page.locator('#construction-parent-map');
+
+  await pathInput.fill('/workspace/EMPTY/empty');
+  await page.locator('#construction-inspect-repo').click();
+  await expect(parentMap).toContainText('0 carpetas');
+  await expect(parentMap).toContainText('No hay subcarpetas elegibles');
+  await expect(page.locator('#construction-load-parent-map')).toHaveCount(0);
+  await expect(page.locator('#construction-pick-tile')).toBeVisible();
+
+  await pathInput.fill('/workspace/SLOW/slow');
+  await expect(parentMap).toBeHidden();
+  await page.locator('#construction-inspect-repo').click();
+  await page.waitForTimeout(20);
+  await pathInput.fill('/workspace/FAST/fast');
+  await page.locator('#construction-inspect-repo').click();
+  await expect(parentMap).toContainText('/workspace/FAST');
+  await page.waitForTimeout(220);
+  await expect(parentMap).toContainText('/workspace/FAST');
+  await expect(parentMap).not.toContainText('/workspace/SLOW');
 });

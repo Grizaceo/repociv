@@ -7,7 +7,7 @@ Base: `c09187ba5406275f957074a7d417464f2db13cef`
 
 ## Verdict
 
-The parent-folder map flow is functionally implemented and visually usable. Inspecting a real folder now previews its parent and eligible direct children; applying the action atomically makes the parent active, selects the children, stores the browser selection, reloads, and delegates placement to the existing deterministic hex-spiral layout. Manual placement remains visible and matching manual coordinates remain authoritative.
+The parent-folder map flow is functionally implemented and visually usable. Inspecting a real folder now previews its parent and eligible direct children; applying the action persists an exclusive canonical selection, makes the parent active, reloads, reconciles browser storage from the server, and delegates placement to the existing deterministic hex-spiral layout. Manual placement remains visible and matching manual coordinates remain authoritative.
 
 No feature-specific visual blocker was found at 1440×900. The 3D view still has material P1/P2 presentation debt: dense-map camera framing clips peripheral cities at medium zoom, HUD panels conceal substantial territory, and city assets lack enough scale/detail contrast at close range.
 
@@ -70,11 +70,13 @@ The two 403 responses are an isolation artifact: the browser intercepted the sta
 1. `POST /api/repo/inspect` returns the inspected repository plus a parent-map preview.
 2. The preview scans only direct child directories and excludes hidden/technical directories plus symlink targets whose real path escapes the parent root.
 3. The construction panel shows the parent path, eligible count, a five-name sample, explicit replacement semantics, and the automatic reload button.
-4. `POST /api/map-from-parent` resolves the inspected path, derives the real parent, scans eligible children, sets the parent as active, selects all children, and persists once.
-5. The frontend stores returned paths and reloads.
+4. `POST /api/map-from-parent` resolves the inspected path, derives the real parent, scans eligible children, creates an exclusive state draft, persists it, and only then swaps live state.
+5. The frontend sends mutation auth and reloads; startup reconciles localStorage from server state.
 6. `generateWorld()` performs the automatic placement; no competing layout algorithm was introduced.
 7. Existing manual coordinates apply only to repositories inside the explicit selection. Unselected manual entries remain stored but no longer resurrect unrelated cities.
 8. Existing manual controls remain visible after the reload.
+9. When a token is configured, the mutation requires it even for same-origin requests; the client sends it through `bridgeHeaders()`.
+10. Empty parents are non-actionable, malformed payloads return 400, and stale inspection responses cannot overwrite the latest path.
 
 ## Acceptance evidence
 
@@ -82,12 +84,12 @@ The two 403 responses are an isolation artifact: the browser intercepted the sta
 |---|---|---|
 | AC-1 Preview after inspection | Pass | Live preview returned parent + 52 children; UI screenshot shows card |
 | AC-2 All eligible siblings | Pass | Handler tests; live scan excludes technical dirs and realpath escapes; 52-repo regression fixture |
-| AC-3 One persistent mutation | Pass | One `setRootSelection()` and one `saveState()` in apply route |
+| AC-3 One persistent mutation | Pass | Exclusive draft, one `saveState()`, then live-state swap |
 | AC-4 Existing auto-layout reused | Pass | No new layout function; 52 selected repos create 52 unique coordinates |
 | AC-5 Manual placement preserved | Pass | Manual button visible post-reload; matching coordinate test passes |
-| AC-6 Replace rather than union | Pass | Unselected manual repository no longer enters world |
-| AC-7 Honest failure | Pass | Empty eligible parent returns 422 without state change; UI restores button and displays error |
-| AC-8 Browser path | Pass | Focused Playwright path passes on fresh Vite port 5283 |
+| AC-6 Replace rather than union | Pass | Previous-root selections are cleared and unselected manual repositories no longer enter world |
+| AC-7 Honest failure | Pass | Empty eligible parent returns 422 without state change; UI shows no action; malformed payloads return 400 |
+| AC-8 Browser path | Pass | Two focused Playwright paths pass on fresh Vite port 5283, including token header and stale-response protection |
 
 ## Visual findings
 
@@ -119,12 +121,12 @@ The two 403 responses are an isolation artifact: the browser intercepted the sta
 | `npm run lint` | Pass |
 | `npm run format:check` | Pass |
 | `npx tsc --noEmit` | Pass |
-| `npm test` | 80 files, 832 tests passed |
+| `npm test` | 80 files, 836 tests passed |
 | Full Python suite in `scripts/check.sh` | 837 passed, 1 skipped; 77.72% coverage |
 | Build + eager bundle budget | Pass; 142 KB gzip, limit 185 KB |
 | Terrain atlas budget | Pass; 5,288 KB, limit 6 MB |
 | Prop GLB budget | Pass; 224 KB, limit 1.5 MB |
-| Focused Playwright feature E2E | Pass on fresh Vite 5283 |
+| Focused Playwright feature E2E | 2 passed on fresh Vite 5283 |
 | Secret scan | Pass; no high-confidence credentials |
 | Frontend security tests | 53 passed |
 | Backend security tests | 123 passed, 1 skipped |
