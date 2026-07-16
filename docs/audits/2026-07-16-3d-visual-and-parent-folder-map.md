@@ -3,7 +3,7 @@
 Date: 2026-07-16
 Branch: `feat/parent-folder-map-autolayout`
 Implementation capture HEAD: `7ac3a7392560b24917fccc1dfff490b270603ab4`
-Final hardened code HEAD: `dd362be0c9691e1555b5e5301aea3c3ea15ad785`
+Final hardened code HEAD: `8fa284a1d1ab9ab9afcb55562eee2e43af6a6d03`
 Base: `c09187ba5406275f957074a7d417464f2db13cef`
 
 ## Verdict
@@ -78,6 +78,7 @@ The two 403 responses are an isolation artifact: the browser intercepted the sta
 8. Existing manual controls remain visible after the reload.
 9. When a token is configured, the mutation requires it even for same-origin requests; the client sends it through `bridgeHeaders()`.
 10. Empty parents are non-actionable, malformed payloads return 400, and stale inspection responses cannot overwrite the latest path.
+11. Injected persistence failure returns 500 while leaving the live selection state byte-for-byte equivalent at the API boundary.
 
 ## Acceptance evidence
 
@@ -122,7 +123,7 @@ The two 403 responses are an isolation artifact: the browser intercepted the sta
 | `npm run lint` | Pass |
 | `npm run format:check` | Pass |
 | `npx tsc --noEmit` | Pass |
-| `npm test` | 80 files, 836 tests passed |
+| `npm test` | 80 files, 837 tests passed |
 | Full Python suite in `scripts/check.sh` | 837 passed, 1 skipped; 77.72% coverage |
 | Build + eager bundle budget | Pass; 142 KB gzip, limit 185 KB |
 | Terrain atlas budget | Pass; 5,288 KB, limit 6 MB |
