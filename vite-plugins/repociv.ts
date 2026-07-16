@@ -283,23 +283,28 @@ export function makeScanWorkspace(getMapRoot: () => string, getMapRoots?: () => 
   function scanSingleRoot(mapRoot: string): ScannedRepo[] {
     const repos: ScannedRepo[] = [];
     if (!existsSync(mapRoot)) return repos;
+    let mapRootReal: string;
+    try {
+      mapRootReal = realpathSync(mapRoot);
+    } catch {
+      return repos;
+    }
     for (const entry of readdirSync(mapRoot)) {
       const full = join(mapRoot, entry);
       let st;
+      let fullReal: string;
       try {
         st = statSync(full);
+        fullReal = realpathSync(full);
       } catch {
         continue;
       }
       if (!st.isDirectory()) continue;
       if (entry.startsWith('.') || SKIP_DIRS.has(entry)) continue;
-      try {
-        if (cwdReal && realpathSync(full) === cwdReal) continue;
-      } catch {
-        /* skip compare */
-      }
+      if (fullReal === mapRootReal || !isContainedPath(fullReal, mapRootReal)) continue;
+      if (cwdReal && fullReal === cwdReal) continue;
       if (entry === 'repociv') continue;
-      const repo = scanRepoPath(full, mapRoot);
+      const repo = scanRepoPath(fullReal, mapRootReal);
       repos.push(repo);
     }
     return repos;

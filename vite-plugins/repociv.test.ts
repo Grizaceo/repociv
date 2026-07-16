@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { Connect } from 'vite';
@@ -244,6 +244,9 @@ describe('repociv API handlers', () => {
     mkdirSync(join(fixture.mapRoot, 'node_modules'), { recursive: true });
     mkdirSync(join(fixture.mapRoot, 'dist'), { recursive: true });
     mkdirSync(join(fixture.mapRoot, '.hidden-repo'), { recursive: true });
+    const outside = join(fixture.root, 'outside-repo');
+    mkdirSync(outside, { recursive: true });
+    symlinkSync(outside, join(fixture.mapRoot, 'linked-outside'), 'dir');
 
     const res = await invokeHandler(
       handler,

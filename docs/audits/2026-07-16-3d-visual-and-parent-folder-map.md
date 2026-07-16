@@ -68,7 +68,7 @@ The two 403 responses are an isolation artifact: the browser intercepted the sta
 ## Feature behavior
 
 1. `POST /api/repo/inspect` returns the inspected repository plus a parent-map preview.
-2. The preview scans only direct child directories and excludes hidden/technical directories.
+2. The preview scans only direct child directories and excludes hidden/technical directories plus symlink targets whose real path escapes the parent root.
 3. The construction panel shows the parent path, eligible count, a five-name sample, explicit replacement semantics, and the automatic reload button.
 4. `POST /api/map-from-parent` resolves the inspected path, derives the real parent, scans eligible children, sets the parent as active, selects all children, and persists once.
 5. The frontend stores returned paths and reloads.
@@ -81,7 +81,7 @@ The two 403 responses are an isolation artifact: the browser intercepted the sta
 | Criterion | Result | Evidence |
 |---|---|---|
 | AC-1 Preview after inspection | Pass | Live preview returned parent + 52 children; UI screenshot shows card |
-| AC-2 All eligible siblings | Pass | Handler tests; live scan excludes technical dirs; 52-repo regression fixture |
+| AC-2 All eligible siblings | Pass | Handler tests; live scan excludes technical dirs and realpath escapes; 52-repo regression fixture |
 | AC-3 One persistent mutation | Pass | One `setRootSelection()` and one `saveState()` in apply route |
 | AC-4 Existing auto-layout reused | Pass | No new layout function; 52 selected repos create 52 unique coordinates |
 | AC-5 Manual placement preserved | Pass | Manual button visible post-reload; matching coordinate test passes |
