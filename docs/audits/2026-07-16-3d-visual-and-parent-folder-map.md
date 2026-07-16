@@ -3,6 +3,7 @@
 Date: 2026-07-16
 Branch: `feat/parent-folder-map-autolayout`
 Implementation capture HEAD: `7ac3a7392560b24917fccc1dfff490b270603ab4`
+Final hardened code HEAD: `dd362be0c9691e1555b5e5301aea3c3ea15ad785`
 Base: `c09187ba5406275f957074a7d417464f2db13cef`
 
 ## Verdict
@@ -127,6 +128,7 @@ The two 403 responses are an isolation artifact: the browser intercepted the sta
 | Terrain atlas budget | Pass; 5,288 KB, limit 6 MB |
 | Prop GLB budget | Pass; 224 KB, limit 1.5 MB |
 | Focused Playwright feature E2E | 2 passed on fresh Vite 5283 |
+| Live parent-map auth boundary | Missing token → 401; valid token + malformed JSON → 400 without state mutation |
 | Secret scan | Pass; no high-confidence credentials |
 | Frontend security tests | 53 passed |
 | Backend security tests | 123 passed, 1 skipped |
@@ -137,6 +139,10 @@ The two 403 responses are an isolation artifact: the browser intercepted the sta
 ### Canonical gate caveat
 
 `scripts/check.sh` exits 1 only at `python -m pip_audit`. The command audits DAVI's global Conda environment rather than a RepoCiv dependency lock and reports 96 known vulnerabilities in 34 globally installed packages. This branch changes no Python or Node dependency manifest. Every security subgate after the global dependency audit was rerun manually and passed. The gate is therefore not green, but the red result is environmental/pre-existing rather than introduced by this feature.
+
+### Token rotation during verification
+
+An exact-value E2E assertion exposed the previous local RepoCiv token in test output. The token was immediately rotated in `.env`, all RepoCiv/Vite token variables present there were synchronized, the stack was restarted, and subsequent tests assert only header presence. No token value is recorded in this report.
 
 ## Limitations
 
