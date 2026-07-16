@@ -297,7 +297,7 @@ describe('repociv API handlers', () => {
 
   it('requires the configured token for the parent-map mutation', async () => {
     const previousToken = process.env['REPOCIV_TOKEN'];
-    const token = 'parent-map-test-token-32-characters';
+    const token = `test-${'x'.repeat(32)}`;
     process.env['REPOCIV_TOKEN'] = token;
     try {
       const tokenHandler = createPluginHandler(fixture.mapRoot);
