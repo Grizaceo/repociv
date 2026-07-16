@@ -19,6 +19,7 @@ let _rendererRef: {
 } | null = null;
 let _onPickTileCb: ((coord: { q: number; r: number }) => void) | null = null;
 let selectedRepo: ScannedRepo | null = null;
+let selectedParentMap: ParentFolderMapPreview | null = null;
 
 // Callbacks for dynamic city add/delete (no reload)
 type CityAddedCallback = (repo: ScannedRepo, coord: { q: number; r: number }) => void;
@@ -38,6 +39,23 @@ export function setOnCityDeletedCb(cb: CityDeletedCallback): void {
 interface RepoPickResponse {
   ok: boolean;
   repo?: ScannedRepo;
+  error?: string;
+}
+
+interface ParentFolderMapPreview {
+  rootPath: string;
+  repos: ScannedRepo[];
+}
+
+interface RepoInspectResponse extends RepoPickResponse {
+  parentMap?: ParentFolderMapPreview;
+}
+
+interface ParentFolderMapApplyResponse {
+  ok: boolean;
+  rootPath?: string;
+  selectedRepoIds?: string[];
+  selectedRepoPaths?: string[];
   error?: string;
 }
 
@@ -91,15 +109,26 @@ async function pickRepoFromSystem(): Promise<ScannedRepo> {
   return data.repo;
 }
 
-async function inspectRepoPath(path: string): Promise<ScannedRepo> {
+async function inspectRepoPath(path: string): Promise<RepoInspectResponse> {
   const res = await fetch('/api/repo/inspect', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path }),
   });
-  const data = (await res.json()) as RepoPickResponse;
+  const data = (await res.json()) as RepoInspectResponse;
   if (!res.ok || !data.repo) throw new Error(data.error ?? `HTTP ${res.status}`);
-  return data.repo;
+  return data;
+}
+
+async function loadParentFolderMap(path: string): Promise<ParentFolderMapApplyResponse> {
+  const res = await fetch('/api/map-from-parent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  });
+  const data = (await res.json()) as ParentFolderMapApplyResponse;
+  if (!res.ok || !data.rootPath) throw new Error(data.error ?? `HTTP ${res.status}`);
+  return data;
 }
 
 async function upsertSelection(repoPath: string): Promise<void> {
@@ -181,6 +210,65 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
+function renderParentMapPreview(preview: ParentFolderMapPreview | null): void {
+  selectedParentMap = preview;
+  const container = document.getElementById('construction-parent-map');
+  if (!container) return;
+  if (!preview) {
+    container.innerHTML = '';
+    container.classList.add('hidden');
+    return;
+  }
+
+  const sample = preview.repos.slice(0, 5);
+  const remaining = preview.repos.length - sample.length;
+  container.innerHTML = `
+    <div class="construction-parent-map-heading">
+      <div>
+        <span class="construction-parent-map-eyebrow">Mapa de carpeta madre</span>
+        <strong>${escapeHtml(preview.rootPath)}</strong>
+      </div>
+      <span class="construction-parent-map-count">${preview.repos.length} carpetas</span>
+    </div>
+    <div class="construction-parent-map-repos">
+      ${sample.map((repo) => `<span>${escapeHtml(repo.name)}</span>`).join('')}
+      ${remaining > 0 ? `<span>+${remaining} más</span>` : ''}
+    </div>
+    <p>Reemplaza el mapa actual y distribuye las ciudades automáticamente. Las posiciones manuales coincidentes se conservan.</p>
+    <button id="construction-load-parent-map" class="btn-accent" type="button">
+      Recargar mapa y distribuir automáticamente
+    </button>
+  `;
+  container.classList.remove('hidden');
+
+  container
+    .querySelector<HTMLButtonElement>('#construction-load-parent-map')
+    ?.addEventListener('click', (event) => {
+      void (async () => {
+        const button = event.currentTarget as HTMLButtonElement;
+        const error = document.getElementById('construction-error');
+        error?.classList.add('hidden');
+        if (!selectedRepo || !selectedParentMap) return;
+        button.disabled = true;
+        button.textContent = 'Recargando mapa…';
+        try {
+          const result = await loadParentFolderMap(selectedRepo.repoPath ?? selectedRepo.path);
+          const selection = result.selectedRepoPaths ?? result.selectedRepoIds ?? [];
+          if (selection.length === 0) throw new Error('El servidor devolvió una selección vacía');
+          saveSelectedRepoPaths(selection);
+          window.location.reload();
+        } catch (cause) {
+          button.disabled = false;
+          button.textContent = 'Recargar mapa y distribuir automáticamente';
+          if (error) {
+            error.textContent = `No se pudo recargar el mapa (${cause instanceof Error ? cause.message : 'error desconocido'}).`;
+            error.classList.remove('hidden');
+          }
+        }
+      })();
+    });
+}
+
 function refreshRepoSelect(): void {
   const select = document.getElementById('construction-repo-select') as HTMLSelectElement;
   if (!select) return;
@@ -240,6 +328,7 @@ function buildDOM(): void {
               <button id="construction-inspect-repo" class="btn-secondary" type="button">Inspeccionar ruta</button>
             </div>
           </div>
+          <div id="construction-parent-map" class="construction-parent-map hidden" aria-live="polite"></div>
           <div class="construction-row">
             <div class="construction-inline">
               <button id="construction-pick-tile" class="btn-accent" type="button">🎯 Elegir casilla en mapa</button>
@@ -291,6 +380,7 @@ function buildDOM(): void {
         error.classList.add('hidden');
         try {
           selectedRepo = await pickRepoFromSystem();
+          renderParentMapPreview(null);
           pathInput.value = selectedRepo.repoPath ?? selectedRepo.path;
           // Also update dropdown
           const select = document.getElementById('construction-repo-select') as HTMLSelectElement;
@@ -322,6 +412,7 @@ function buildDOM(): void {
   panel
     .querySelector<HTMLSelectElement>('#construction-repo-select')
     ?.addEventListener('change', () => {
+      renderParentMapPreview(null);
       const select = document.getElementById('construction-repo-select') as HTMLSelectElement;
       const path = select.value;
       if (!path) {
@@ -358,9 +449,12 @@ function buildDOM(): void {
         try {
           const p = pathInput.value.trim();
           if (!p) throw new Error('Ruta vacia');
-          selectedRepo = await inspectRepoPath(p);
-          pathInput.value = selectedRepo.repoPath ?? selectedRepo.path;
+          const inspected = await inspectRepoPath(p);
+          selectedRepo = inspected.repo ?? null;
+          renderParentMapPreview(inspected.parentMap ?? null);
+          if (selectedRepo) pathInput.value = selectedRepo.repoPath ?? selectedRepo.path;
         } catch (e) {
+          renderParentMapPreview(null);
           error.textContent = `No se pudo inspeccionar la ruta (${e instanceof Error ? e.message : 'error desconocido'}).`;
           error.classList.remove('hidden');
         }
