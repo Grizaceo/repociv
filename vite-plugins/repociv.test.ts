@@ -145,7 +145,7 @@ describe('repociv path helpers', () => {
   });
 });
 
-describe('/api/map-root handlers', () => {
+describe('repociv API handlers', () => {
   let fixture: ReturnType<typeof makeFixture>;
   let handler: Connect.NextHandleFunction;
   const prevStateFile = process.env['REPOCIV_STATE_FILE'];
@@ -236,5 +236,86 @@ describe('/api/map-root handlers', () => {
 
     const getRes = await invokeHandler(handler, 'GET', '/api/map-root');
     expect(JSON.parse(getRes.body).path).toBe(resolve(fixture.outside));
+  });
+
+  it('POST /api/repo/inspect previews eligible siblings under the parent folder', async () => {
+    const repoB = join(fixture.mapRoot, 'repo-b');
+    mkdirSync(repoB, { recursive: true });
+    mkdirSync(join(fixture.mapRoot, 'node_modules'), { recursive: true });
+    mkdirSync(join(fixture.mapRoot, 'dist'), { recursive: true });
+    mkdirSync(join(fixture.mapRoot, '.hidden-repo'), { recursive: true });
+
+    const res = await invokeHandler(
+      handler,
+      'POST',
+      '/api/repo/inspect',
+      JSON.stringify({ path: fixture.repoA }),
+    );
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as {
+      repo: { repoPath: string };
+      parentMap: { rootPath: string; repos: Array<{ name: string; repoPath: string }> };
+    };
+    expect(body.repo.repoPath).toBe(resolve(fixture.repoA));
+    expect(body.parentMap.rootPath).toBe(resolve(fixture.mapRoot));
+    expect(body.parentMap.repos.map((repo) => repo.name).sort()).toEqual(['repo-a', 'repo-b']);
+  });
+
+  it('POST /api/map-from-parent atomically activates the parent and selects its children', async () => {
+    const collectionRoot = join(fixture.root, 'collection');
+    const repoOne = join(collectionRoot, 'one');
+    const repoTwo = join(collectionRoot, 'two');
+    mkdirSync(repoOne, { recursive: true });
+    mkdirSync(repoTwo, { recursive: true });
+    mkdirSync(join(collectionRoot, 'node_modules'), { recursive: true });
+
+    const res = await invokeHandler(
+      handler,
+      'POST',
+      '/api/map-from-parent',
+      JSON.stringify({ path: repoOne }),
+    );
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as {
+      rootPath: string;
+      selectedRepoIds: string[];
+      selectedRepoPaths: string[];
+    };
+    expect(body.rootPath).toBe(resolve(collectionRoot));
+    expect(body.selectedRepoPaths.sort()).toEqual([resolve(repoOne), resolve(repoTwo)].sort());
+    expect(body.selectedRepoIds.sort()).toEqual(
+      [encodeRepoId(resolve(repoOne)), encodeRepoId(resolve(repoTwo))].sort(),
+    );
+
+    const stateRes = await invokeHandler(handler, 'GET', '/api/repo-selections');
+    const state = JSON.parse(stateRes.body) as {
+      activeRoot: string;
+      roots: Array<{ path: string; selectedRepoPaths: string[] }>;
+    };
+    expect(state.activeRoot).toBe(resolve(collectionRoot));
+    expect(
+      state.roots.find((root) => root.path === resolve(collectionRoot))?.selectedRepoPaths.sort(),
+    ).toEqual([resolve(repoOne), resolve(repoTwo)].sort());
+  });
+
+  it('POST /api/map-from-parent rejects an empty eligible parent without changing state', async () => {
+    const technicalRoot = join(fixture.root, 'technical-only');
+    const nodeModules = join(technicalRoot, 'node_modules');
+    mkdirSync(nodeModules, { recursive: true });
+
+    const res = await invokeHandler(
+      handler,
+      'POST',
+      '/api/map-from-parent',
+      JSON.stringify({ path: nodeModules }),
+    );
+
+    expect(res.statusCode).toBe(422);
+    expect(JSON.parse(res.body).error).toBe('carpeta madre sin subcarpetas elegibles');
+
+    const stateRes = await invokeHandler(handler, 'GET', '/api/repo-selections');
+    expect(JSON.parse(stateRes.body).activeRoot).toBe(resolve(fixture.mapRoot));
   });
 });

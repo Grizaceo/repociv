@@ -292,7 +292,7 @@ export function makeScanWorkspace(getMapRoot: () => string, getMapRoots?: () => 
         continue;
       }
       if (!st.isDirectory()) continue;
-      if (entry.startsWith('.')) continue;
+      if (entry.startsWith('.') || SKIP_DIRS.has(entry)) continue;
       try {
         if (cwdReal && realpathSync(full) === cwdReal) continue;
       } catch {
@@ -305,11 +305,12 @@ export function makeScanWorkspace(getMapRoot: () => string, getMapRoots?: () => 
     return repos;
   }
 
-  function scanWorkspace(): ScannedRepo[] {
+  function scanWorkspace(overrideRoots?: string[]): ScannedRepo[] {
     // Multi-root: scan all roots and deduplicate by resolved path
-    const roots = getMapRoots ? getMapRoots() : [getMapRoot()];
+    const roots = overrideRoots ?? (getMapRoots ? getMapRoots() : [getMapRoot()]);
     const rootsKey = roots.slice().sort().join('\0');
-    if (cachedRepos && cachedRootsKey === rootsKey) return cachedRepos;
+    const useCache = overrideRoots === undefined;
+    if (useCache && cachedRepos && cachedRootsKey === rootsKey) return cachedRepos;
 
     const seen = new Set<string>();
     const repos: ScannedRepo[] = [];
@@ -322,8 +323,10 @@ export function makeScanWorkspace(getMapRoot: () => string, getMapRoots?: () => 
         }
       }
     }
-    cachedRootsKey = rootsKey;
-    cachedRepos = repos;
+    if (useCache) {
+      cachedRootsKey = rootsKey;
+      cachedRepos = repos;
+    }
     return repos;
   }
 
@@ -333,6 +336,51 @@ export function makeScanWorkspace(getMapRoot: () => string, getMapRoots?: () => 
       cachedRepos = null;
       cachedRootsKey = null;
     },
+  };
+}
+
+type WorkspaceScanner = (overrideRoots?: string[]) => ScannedRepo[];
+
+export interface ParentFolderMapPreview {
+  rootPath: string;
+  repos: ScannedRepo[];
+}
+
+export interface ParentFolderMapInspection {
+  repo: ScannedRepo;
+  parentMap: ParentFolderMapPreview;
+}
+
+export function inspectParentFolderMap(
+  inputPath: string,
+  scanWorkspace: WorkspaceScanner,
+): ParentFolderMapInspection {
+  const resolvedPath = realpathSync(resolve(expandUser(inputPath)));
+  const rootPath = dirname(resolvedPath);
+  return {
+    repo: scanRepoPath(resolvedPath, rootPath),
+    parentMap: {
+      rootPath,
+      repos: scanWorkspace([rootPath]),
+    },
+  };
+}
+
+export function applyParentFolderMap(
+  inputPath: string,
+  scanWorkspace: WorkspaceScanner,
+  state: RepoRootsState,
+): ParentFolderMapPreview & { selectedRepoIds: string[]; selectedRepoPaths: string[] } {
+  const { parentMap } = inspectParentFolderMap(inputPath, scanWorkspace);
+  if (parentMap.repos.length === 0) {
+    throw new Error('carpeta madre sin subcarpetas elegibles');
+  }
+  const selectedRepoPaths = parentMap.repos.map((repo) => repo.repoPath ?? repo.path);
+  setRootSelection(state, parentMap.rootPath, selectedRepoPaths);
+  return {
+    ...parentMap,
+    selectedRepoIds: parentMap.repos.map((repo) => repo.path),
+    selectedRepoPaths,
   };
 }
 
@@ -796,14 +844,41 @@ export function repocivPlugin(mapRoot: string): Plugin {
           return;
         }
         if (!repoExists(resolved)) {
-          res.statusCode = 400;
+          res.statusCode = 404;
           respondJson(res, { error: 'path no es carpeta valida' });
           return;
         }
-        respondJson(res, { ok: true, repo: scanRepoPath(resolved, dirname(resolved)) });
+        respondJson(res, { ok: true, ...inspectParentFolderMap(resolved, scanWorkspace) });
       } catch (e) {
         res.statusCode = 500;
         respondJson(res, { error: String(e) });
+      }
+      return;
+    }
+
+    if (path === '/api/map-from-parent' && req.method === 'POST') {
+      try {
+        const body = await readRequestBody(req);
+        const payload = JSON.parse(body) as { path?: string };
+        const requested = String(payload.path ?? '').trim();
+        const resolved = resolve(expandUser(requested));
+        if (!requested) {
+          res.statusCode = 400;
+          respondJson(res, { error: 'path requerido' });
+          return;
+        }
+        if (!repoExists(resolved)) {
+          res.statusCode = 404;
+          respondJson(res, { error: 'path no es carpeta valida' });
+          return;
+        }
+        const result = applyParentFolderMap(resolved, scanWorkspace, rootsState);
+        persistState();
+        respondJson(res, { ok: true, ...result });
+      } catch (e) {
+        const error = e instanceof Error ? e.message : String(e);
+        res.statusCode = error === 'carpeta madre sin subcarpetas elegibles' ? 422 : 500;
+        respondJson(res, { error });
       }
       return;
     }
