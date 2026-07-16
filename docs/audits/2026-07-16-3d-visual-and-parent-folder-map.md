@@ -145,6 +145,10 @@ The two 403 responses are an isolation artifact: the browser intercepted the sta
 
 An exact-value E2E assertion exposed the previous local RepoCiv token in test output. The token was immediately rotated in `.env`, all RepoCiv/Vite token variables present there were synchronized, the stack was restarted, and subsequent tests assert only header presence. No token value is recorded in this report.
 
+### Final adversarial verification
+
+Delegation `deleg_2615714f` performed a read-only contract review of the hardened implementation and returned `verified: true` with no remaining blockers. It confirmed token auth, exclusive canonical selection, save-before-live-swap rollback behavior, absence of a second localStorage write, symlink/coverage exclusions, malformed/empty/race handling, accessibility, safe option construction, and documentation consistency. The only non-blocking findings were the visual P1/P2 debt and the global-environment `pip-audit` caveat already recorded here.
+
 ## Limitations
 
 - The actual user selection state was not replaced during screenshot generation. Mutation behavior is covered by handler integration tests and the isolated browser flow.
