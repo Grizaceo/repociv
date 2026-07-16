@@ -1058,6 +1058,9 @@ export async function generateWorld(): Promise<World> {
       existing.manualCoord = coord;
       continue;
     }
+    // An explicit selection scopes the world. Keep unrelated manual entries in
+    // storage, but do not resurrect them as cities outside the selected map.
+    if (selectedRepoPaths !== null) continue;
     const ghost: ScannedRepo = {
       name: entry.repoName,
       path: entry.repoPath,

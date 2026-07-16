@@ -335,6 +335,89 @@ describe('generateWorld', () => {
     expect(world.cities.some((city) => city.id === 'repo-b')).toBe(false);
   });
 
+  it('applies matching manual coordinates without leaking unselected manual repos', async () => {
+    window.localStorage.setItem(
+      'repociv:selected-repos:v1',
+      JSON.stringify({
+        version: 1,
+        selectedRepoPaths: ['repo:encoded-a'],
+        filters: { owners: [], topics: [], languages: [] },
+      }),
+    );
+    window.localStorage.setItem(
+      'repociv:manual-layout:v1',
+      JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            repoPath: 'repo:encoded-a',
+            repoFsPath: '/workspace/repo-a',
+            repoName: 'repo-a',
+            coord: { q: 7, r: -3 },
+            addedAt: 1,
+            source: 'manual',
+          },
+          {
+            repoPath: 'repo:encoded-b',
+            repoFsPath: '/workspace/repo-b',
+            repoName: 'repo-b',
+            coord: { q: 9, r: 2 },
+            addedAt: 2,
+            source: 'manual',
+          },
+        ],
+      }),
+    );
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        if (input === '/api/repos') {
+          return {
+            ok: true,
+            json: async () => [
+              {
+                name: 'repo-a',
+                path: 'repo:encoded-a',
+                repoPath: '/workspace/repo-a',
+                population: 20,
+                extensions: { ts: 10 },
+                gold: 40,
+                lastCommitDays: 1,
+                isLegacy: false,
+                hasGit: true,
+              },
+              {
+                name: 'repo-b',
+                path: 'repo:encoded-b',
+                repoPath: '/workspace/repo-b',
+                population: 12,
+                extensions: { py: 6 },
+                gold: 30,
+                lastCommitDays: 2,
+                isLegacy: false,
+                hasGit: true,
+              },
+            ],
+          };
+        }
+        if (
+          input.startsWith('/api/files/') ||
+          input.startsWith('/api/skill-health/') ||
+          input.startsWith('/api/session-tint/')
+        ) {
+          return { ok: false, json: async () => ({}) };
+        }
+        throw new Error(`unexpected fetch ${input}`);
+      }),
+    );
+
+    const world = await generateWorld();
+
+    expect(world.cities.find((city) => city.id === 'repo-a')?.coord).toEqual({ q: 7, r: -3 });
+    expect(world.cities.some((city) => city.id === 'repo-b')).toBe(false);
+  });
+
   it('skips manual-layout repos missing from the workspace scan (no /api/files 404)', async () => {
     window.localStorage.setItem(
       'repociv:manual-layout:v1',
