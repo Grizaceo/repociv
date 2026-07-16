@@ -12,7 +12,7 @@ import {
   resolveRepoPathFromId,
   scanRepoPath,
 } from './repociv.ts';
-import { decodeRepoId, encodeRepoId } from './repoRootsState.ts';
+import { decodeRepoId, encodeRepoId, type RepoRootsState } from './repoRootsState.ts';
 
 function makeFixture() {
   const root = mkdtempSync(join(tmpdir(), 'repociv-vite-plugin-'));
@@ -93,8 +93,14 @@ async function invokeHandler(
   return res;
 }
 
-function createPluginHandler(mapRoot: string): Connect.NextHandleFunction {
-  const plugin = repocivPlugin(mapRoot);
+function createPluginHandler(
+  mapRoot: string,
+  saveStateOverride?: (state: RepoRootsState) => RepoRootsState,
+): Connect.NextHandleFunction {
+  const plugin = repocivPlugin(
+    mapRoot,
+    saveStateOverride ? { saveState: saveStateOverride } : undefined,
+  );
   let captured: Connect.NextHandleFunction | undefined;
   plugin.configureServer!({
     middlewares: {
@@ -382,6 +388,39 @@ describe('repociv API handlers', () => {
       state.roots.find((root) => root.path === resolve(fixture.mapRoot))?.selectedRepoPaths,
     ).toEqual([]);
     expect(state.selectedRepoPaths.sort()).toEqual([resolve(repoOne), resolve(repoTwo)].sort());
+  });
+
+  it('keeps live state unchanged when exclusive persistence fails', async () => {
+    let failPersistence = false;
+    const transactionHandler = createPluginHandler(fixture.mapRoot, (state) => {
+      if (failPersistence) throw new Error('simulated persistence failure');
+      return state;
+    });
+    const seeded = await invokeHandler(
+      transactionHandler,
+      'POST',
+      '/api/repo-selections',
+      JSON.stringify({ rootPath: fixture.mapRoot, selectedRepoPaths: [fixture.repoA] }),
+    );
+    expect(seeded.statusCode).toBe(200);
+    const beforeRes = await invokeHandler(transactionHandler, 'GET', '/api/repo-selections');
+    const before = JSON.parse(beforeRes.body);
+
+    const collectionRoot = join(fixture.root, 'persistence-target');
+    const repo = join(collectionRoot, 'repo');
+    mkdirSync(repo, { recursive: true });
+    failPersistence = true;
+    const result = await invokeHandler(
+      transactionHandler,
+      'POST',
+      '/api/map-from-parent',
+      JSON.stringify({ path: repo }),
+    );
+    expect(result.statusCode).toBe(500);
+    expect(JSON.parse(result.body).error).toContain('simulated persistence failure');
+
+    const afterRes = await invokeHandler(transactionHandler, 'GET', '/api/repo-selections');
+    expect(JSON.parse(afterRes.body)).toEqual(before);
   });
 
   it('POST /api/map-from-parent rejects an empty eligible parent without changing state', async () => {

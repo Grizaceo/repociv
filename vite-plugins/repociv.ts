@@ -627,8 +627,16 @@ export async function fetchBridgeFileTree(
   return fetcher(`${bridgeBase}${rawUrl}`, { headers });
 }
 
-export function repocivPlugin(mapRoot: string): Plugin {
+export interface RepoCivPluginDependencies {
+  saveState?: (state: RepoRootsState) => RepoRootsState;
+}
+
+export function repocivPlugin(
+  mapRoot: string,
+  dependencies: RepoCivPluginDependencies = {},
+): Plugin {
   let server: { ws: { send: (msg: object) => void } } | undefined;
+  const persistStateToDisk = dependencies.saveState ?? saveState;
   const expectedToken =
     process.env['REPOCIV_TOKEN']?.trim() ??
     process.env['VITE_REPOCIV_TOKEN']?.trim() ??
@@ -639,12 +647,12 @@ export function repocivPlugin(mapRoot: string): Plugin {
     `http://127.0.0.1:${process.env['BRIDGE_PORT']?.trim() || '5274'}`
   ).replace(/\/$/, '');
   let rootsState = ensureRoot(loadState(resolve(mapRoot)), resolve(mapRoot));
-  saveState(rootsState);
+  persistStateToDisk(rootsState);
   const getCurrentMapRoot = () => rootsState.activeRoot;
   const getAllMapRoots = () => Object.keys(rootsState.roots).filter((r) => existsSync(r));
   const { scanWorkspace, clearCache } = makeScanWorkspace(getCurrentMapRoot, getAllMapRoots);
   const persistState = () => {
-    saveState(rootsState);
+    persistStateToDisk(rootsState);
     clearCache();
   };
 
@@ -917,7 +925,7 @@ export function repocivPlugin(mapRoot: string): Plugin {
           return;
         }
         const { nextState, ...result } = applyParentFolderMap(resolved, scanWorkspace, rootsState);
-        saveState(nextState);
+        persistStateToDisk(nextState);
         rootsState = nextState;
         clearCache();
         respondJson(res, { ok: true, ...result });
