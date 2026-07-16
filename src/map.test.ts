@@ -335,6 +335,52 @@ describe('generateWorld', () => {
     expect(world.cities.some((city) => city.id === 'repo-b')).toBe(false);
   });
 
+  it('auto-places 52 selected sibling repos without coordinate collisions', async () => {
+    const repos = Array.from({ length: 52 }, (_, index) => ({
+      name: `repo-${String(index).padStart(2, '0')}`,
+      path: `repo:encoded-${index}`,
+      repoPath: `/workspace/ACTIVE/repo-${String(index).padStart(2, '0')}`,
+      rootPath: '/workspace/ACTIVE',
+      language: 'TypeScript',
+      totalFiles: index + 1,
+      sourceFiles: index + 1,
+      testFiles: 0,
+      docFiles: 0,
+      totalLines: (index + 1) * 10,
+      extensions: {},
+      testRatio: 0,
+      docRatio: 0,
+      lastCommitDays: 1,
+      isLegacy: false,
+      hasGit: true,
+    }));
+    window.localStorage.setItem(
+      'repociv:selected-repos:v1',
+      JSON.stringify({
+        version: 1,
+        selectedRepoPaths: repos.map((repo) => repo.repoPath),
+      }),
+    );
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === '/api/repos') return { ok: true, json: async () => repos };
+      if (input.startsWith('/api/files/')) {
+        return { ok: true, json: async () => ({ files: [] }) };
+      }
+      if (input.startsWith('/api/skill-health/') || input.startsWith('/api/session-tint/')) {
+        return { ok: false, json: async () => ({}) };
+      }
+      throw new Error(`unexpected fetch ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const world = await generateWorld();
+    const repoCities = world.cities.filter((city) => city.repoPath);
+    const coordinates = new Set(repoCities.map((city) => `${city.coord.q},${city.coord.r}`));
+
+    expect(repoCities).toHaveLength(52);
+    expect(coordinates.size).toBe(52);
+  });
+
   it('applies matching manual coordinates without leaking unselected manual repos', async () => {
     window.localStorage.setItem(
       'repociv:selected-repos:v1',
