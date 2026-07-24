@@ -460,6 +460,40 @@ def _handle_command(cmd: Command) -> dict[str, Any]:
     return {"ok": True, "status": "queued", "commandId": cmd.id}
 
 
+def _normalize_ws_command(data: dict[str, Any]) -> dict[str, Any]:
+    """Shape a WebSocket command dict into what ``validate_command`` expects.
+
+    ``websocket_handler`` already strips the transport envelope
+    (``{type: "command", data: {...}}``) and hands the inner command dict to the
+    callback, so ``data`` here is the flat command (``{type, unit, city,
+    mission, ...}``). ``unit_command``/``execute_agent`` get the same
+    flat→nested ``{type, target, payload}`` mapping the HTTP POST path uses; any
+    other type passes through unchanged. Kept at module scope (the live handler
+    is a closure under ``__main__``) so the contract is unit-testable.
+    """
+    raw_type = data.get("type", "")
+    if raw_type in ("unit_command", "execute_agent"):
+        return {
+            "type": raw_type,
+            "target": data.get("city", "main"),
+            "payload": {
+                "unit": data.get("unit", "MAIN"),
+                "city": data.get("city", "main"),
+                "mission": data.get("mission", ""),
+                "agentType": data.get("agentType", "hero"),
+                "harness": data.get("harness", ""),
+                "provider": data.get("provider", ""),
+                "model": data.get("model", ""),
+                "repoPath": data.get("repoPath", ""),
+                "filePath": data.get("filePath", ""),
+                "fileName": data.get("fileName", ""),
+                "cwd": data.get("cwd", ""),
+            },
+            "created_by": "user",
+        }
+    return data
+
+
 def _default_mission_for_command(cmd: Command) -> str:
     return _command_executors.default_mission_for_command(cmd)
 
@@ -1071,46 +1105,21 @@ if __name__ == "__main__":
 
     # Wire bridge command dispatch for incoming WS commands
     def _ws_command_handler(data: dict[str, Any]) -> None:
-        """Handle incoming commands from WebSocket clients."""
-        from server.command_schema import validate_command, CommandValidationError
+        """Handle incoming commands from WebSocket clients.
 
-        cmd_type = data.get("type", "")
-        if cmd_type == "command":
-            raw = data.get("data", {})
-            # Normalize: the frontend sends flat fields (unit, city, mission, ...)
-            # but validate_command expects { type, target, payload: {...} }.
-            # Mirror the same normalization done in the legacy HTTP POST handler
-            # at lines ~849-862 so WS and HTTP produce identical Command objects.
-            raw_type = raw.get("type", "")
-            if raw_type in ("unit_command", "execute_agent"):
-                # Build Command-compatible structure
-                cmd_data = {
-                    "type": raw_type,
-                    "target": raw.get("city", "main"),
-                    "payload": {
-                        "unit": raw.get("unit", "MAIN"),
-                        "city": raw.get("city", "main"),
-                        "mission": raw.get("mission", ""),
-                        "agentType": raw.get("agentType", "hero"),
-                        "harness": raw.get("harness", ""),
-                        "provider": raw.get("provider", ""),
-                        "model": raw.get("model", ""),
-                        "repoPath": raw.get("repoPath", ""),
-                        "filePath": raw.get("filePath", ""),
-                        "fileName": raw.get("fileName", ""),
-                        "cwd": raw.get("cwd", ""),
-                    },
-                    "created_by": "user",
-                }
-            else:
-                cmd_data = raw  # passthrough for other types
-            try:
-                cmd = validate_command(cmd_data)
-                _handle_command(cmd)
-            except CommandValidationError as e:
-                send_to_repociv(
-                    {"type": "log", "msg": f"WS command rejected: {e}", "level": "warn"}
-                )
+        ``websocket_handler`` already unwraps the ``{type: "command", data:{...}}``
+        transport envelope and hands us the inner command dict, so ``data`` is the
+        flat command. Normalize via ``_normalize_ws_command`` (shared, tested) and
+        dispatch, producing the same Command object the HTTP POST path does.
+        """
+        cmd_data = _normalize_ws_command(data)
+        try:
+            cmd = validate_command(cmd_data)
+            _handle_command(cmd)
+        except CommandValidationError as e:
+            send_to_repociv(
+                {"type": "log", "msg": f"WS command rejected: {e}", "level": "warn"}
+            )
     ws_set_command_callback(_ws_command_handler)
 
     _ensure_port_free(BRIDGE_HOST, BRIDGE_WS_PORT, "WebSocket")

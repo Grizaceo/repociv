@@ -159,6 +159,66 @@ def test_ws_command_envelope_is_unwrapped_before_dispatch(ws_server):
         wsh._command_callback = previous
 
 
+def test_ws_command_normalize_produces_dispatchable_command():
+    """Regression: the WS command path must dispatch, not silently drop.
+
+    websocket_handler unwraps ``{type:"command", data:{...}}`` to the inner dict
+    and hands that to the callback, so bridge._normalize_ws_command must shape
+    the *inner* command into a valid Command. A prior double-unwrap re-checked
+    the already-consumed outer ``"command"`` type, so every WS command was
+    ack'd but never validated/dispatched (silent no-op). This exercises the
+    layer-2 contract the older stub-callback test never reached.
+    """
+    from server.bridge import _normalize_ws_command
+    from server.command_schema import validate_command
+
+    # Shape 1 — browser envelope {type:"command", data:{...flat...}}.
+    envelope = {
+        "type": "command",
+        "data": {
+            "type": "unit_command",
+            "unit": "MAIN",
+            "city": "main",
+            "mission": "do the thing",
+            "harness": "claude",
+        },
+    }
+    inner = envelope.get("data", envelope)  # what websocket_handler passes to cb
+    normalized = _normalize_ws_command(inner)
+    assert normalized["type"] == "unit_command"
+    assert normalized["target"] == "main"
+    assert normalized["payload"]["unit"] == "MAIN"
+    assert normalized["payload"]["mission"] == "do the thing"
+    assert normalized["payload"]["harness"] == "claude"
+    cmd = validate_command(normalized)  # must not raise
+    assert cmd.type == "unit_command"
+
+    # Shape 2 — flat command (WebSocketClient.sendCommand sends this directly,
+    # no envelope; websocket_handler's data.get("data", data) returns it as-is).
+    flat = {
+        "type": "execute_agent",
+        "unit": "SCOUT",
+        "city": "repo-x",
+        "mission": "scan",
+        "repoPath": "/tmp/repo-x",
+    }
+    inner2 = flat.get("data", flat)
+    normalized2 = _normalize_ws_command(inner2)
+    assert normalized2["type"] == "execute_agent"
+    assert normalized2["payload"]["repoPath"] == "/tmp/repo-x"
+    cmd2 = validate_command(normalized2)  # must not raise
+    assert cmd2.type == "execute_agent"
+
+
+def test_ws_command_normalize_passes_through_unknown_types():
+    """Non unit_command/execute_agent types are returned unchanged for their
+    own validator path (no accidental flat→nested remap)."""
+    from server.bridge import _normalize_ws_command
+
+    payload = {"type": "quest_add", "target": "main", "title": "x"}
+    assert _normalize_ws_command(payload) == payload
+
+
 def test_ws_unknown_message_type(ws_server):
     """Server responds with error for unknown message types."""
     port = ws_server
