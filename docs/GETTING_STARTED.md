@@ -73,8 +73,10 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Packages installed: pytest, httpx, aiohttp, requests, pydantic,
-duckdb (required for the event ledger), PyYAML.
+Packages installed: mcp, httpx, websockets, duckdb (required for the
+event ledger), PyYAML, plus the test/lint tooling (pytest, pytest-cov,
+ruff, pip-audit). `aiohttp`/`requests` are no longer used and are not
+installed.
 
 The `.venv` directory is gitignored. You need to activate it in every
 terminal where you run the bridge (`source .venv/bin/activate`).

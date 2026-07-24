@@ -456,6 +456,29 @@ Stream continuo de eventos del sistema. Reconecta automáticamente en el fronten
 
 ---
 
+## Local endpoints (Vite plugin)
+
+Estos endpoints los sirve el **plugin del dev-server de Vite**
+(`vite-plugins/repociv.ts`), **no** el bridge de Python. Son la superficie
+local del navegador para descubrir repos, gestionar la selección y leer árboles
+de archivos. Git se invoca argv-only (`execFileSync`); las mutaciones exigen
+`Content-Type: application/json` más same-origin de confianza o token válido
+(incluso con token vacío en dev); los paths se resuelven con
+`realpath` + contención de symlinks y membresía de repo seleccionado.
+
+| Method | Path | Descripción |
+|--------|------|-------------|
+| GET  | `/api/repos` | Escanea las raíces del workspace y lista repos descubiertos (bajo demanda) |
+| GET  | `/api/repo-selections` | Selección de repos persistida + raíces activas |
+| POST | `/api/repo-selections` | Reemplaza la selección (exclusiva) — body `{ paths: string[] }` |
+| POST | `/api/repo-selections/add` | Agrega repos a la selección |
+| POST | `/api/repo-selections/remove` | Quita repos de la selección |
+| POST | `/api/repo/inspect` | Inspecciona un path; devuelve el repo + un preview del *parent-folder map* (parent + hijos directos elegibles) — body `{ path: string }` |
+| POST | `/api/map-from-parent` | Deriva el parent server-side, escanea hijos elegibles, arma un draft de selección exclusiva, lo persiste y **solo entonces** swapea el estado vivo. Devuelve root + IDs/paths seleccionados. Errores: 400 (payload malformado), 404 (path inexistente), 422 (parent sin hijos elegibles), 500 (fallo de persistencia — estado vivo intacto) — body `{ path: string }` |
+| GET  | `/api/files/:repoId` | Árbol de archivos acotado de un repo seleccionado (depth/file-count budget; `truncated=true` + motivo cuando excede, nunca 400) |
+
+---
+
 ## CORS
 
 Restringido a:

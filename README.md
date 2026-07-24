@@ -269,7 +269,7 @@ Presiona `P` para abrir el Priority Panel. API: `computePriorityScore(fileNode, 
 
 Cada acción del sistema (misión completada, aprobación solicitada, agente que entra o sale, error, info) se registra como un **evento** en la **Gaceta**, un feed cronológico visible dentro del tablero. Funciona como un mini-log visual estilo "newspaper" de Civilization.
 
-- Pulsa `N` para abrir/cerrar el panel de la Gaceta
+- La Gaceta es un panel del HUD (sin hotkey dedicado); se actualiza en vivo con cada evento
 - Los eventos se ordenan por timestamp, más recientes arriba
 - Filtros por tipo: `mission`, `approval`, `agent`, `error`, `info`
 - Doble click en un evento salta al contexto (ej. el agente o archivo implicado)
@@ -292,9 +292,10 @@ Sirve para auditar sesiones largas sin abrir logs externos: es el "story so far"
 | `S` | Dormir unidad seleccionada |
 | `B` | Modo Build |
 | `G` | Toggle grid |
+| `H` | Toggle capas (layers panel) |
 | `V` | Toggle fog of war |
 | `A` | Aprobaciones pendientes |
-| `N` | Gaceta de noticias |
+| `N` | Nuevo perfil (wizard) |
 | `0` | Alternar render 2D (`flat`) ↔ WebGL (`webgl`) |
 | `F11` | Settings Panel |
 | `?` | Keyboard help |

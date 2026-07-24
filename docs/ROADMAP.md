@@ -4,6 +4,11 @@
 > explicitly not in scope. This roadmap is honest, not aspirational:
 > no dates, no promises. Just direction.
 
+> **⚠️ Historical snapshot (May 2026).** Some items below have shipped since
+> (notably the 3D/WebGL renderer). The current scope authority is
+> [`docs/SCOPE.md`](SCOPE.md); when this file disagrees with SCOPE.md, SCOPE.md
+> wins.
+
 ---
 
 ## Current Status: v0.1.0 alpha — May 2026
@@ -102,15 +107,15 @@ architecture from a personal dashboard to a team platform. That is what
 AgentCraft and DevOps tools are for. RepoCiv stays focused on the
 individual researcher or developer.
 
-### 3D Renderer (Three.js / WebGL)
+### ~~3D Renderer (Three.js / WebGL)~~ — SHIPPED, no longer out of scope
 
-Canvas 2D is deliberately chosen over Three.js 3D. 3D adds complexity
-(lighting, camera controls, asset pipeline) without adding information
-density for an operational dashboard. The spatial metaphor works because
-it is readable at a glance, not because it is immersive. A 3D renderer
-branch exists (`feat/3d-renderer`) for experimentation, but it will
-not replace the 2D renderer until it proves functional parity, not just
-visual appeal.
+> **Update (2026-06): this item is obsolete.** The WebGL/Three.js renderer was
+> integrated into `main` and is **official trunk**, opt-in via `?renderer=webgl`
+> or hotkey `0`. Both renderers ship: Canvas 2D (`flat`) is the default and
+> canonical, WebGL (`webgl`) is opt-in, and the canonical rule is *switching
+> parity between the two*, not "2D-only until parity". Three.js stays lazy (a
+> `vendor-three` dynamic chunk) so it never enters the eager 2D bundle. See
+> [`docs/SCOPE.md`](SCOPE.md) — the current scope authority — for the live rule.
 
 ### Achievements / Skins / Gamification
 

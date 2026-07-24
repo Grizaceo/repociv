@@ -29,7 +29,11 @@ La razón de tener tanta infraestructura "industrial" siendo un solo usuario
 sigue siendo **deliberada**: el alpha-test descubre cuáles capas aportan valor
 real y cuáles se destilan o se borran después.
 
-Versión: **v2.0 — congelada en scope hasta que el dogfooding diga otra cosa.**
+> **Versión de release:** `v0.1.0-alpha` (fuente de verdad: `package.json`).
+> El rótulo **"v2.0"** que aparece en este repo (p. ej. `REVIEW_v2.0_CLOSE.md`)
+> es el nombre del **hito interno de scope/arquitectura** — la generación
+> "Agent OS Industrial" —, **no** la versión de release. Congelado en scope
+> hasta que el dogfooding diga otra cosa.
 
 ---
 

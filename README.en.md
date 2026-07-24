@@ -220,7 +220,7 @@ Press `P` to open the Priority Panel. API: `computePriorityScore(fileNode, weigh
 
 Every system action (mission completed, approval requested, agent entering or leaving, error, info) is recorded as an **event** in the **Gazette**, a chronological feed rendered inside the board. It works like a Civilization-style "newspaper" mini-log.
 
-- Press `N` to toggle the Gazette panel
+- The Gazette is a HUD panel (no dedicated hotkey); it updates live with each event
 - Events are ordered by timestamp, newest on top
 - Filters by type: `mission`, `approval`, `agent`, `error`, `info`
 - Double-click on an event jumps to context (e.g. the agent or file involved)
@@ -243,9 +243,10 @@ It is useful for auditing long sessions without opening external logs: the "stor
 | `S` | Sleep selected unit |
 | `B` | Build mode |
 | `G` | Toggle grid |
+| `H` | Toggle layers panel |
 | `V` | Toggle fog of war |
 | `A` | Pending approvals |
-| `N` | News gazette |
+| `N` | New profile (wizard) |
 | `0` | Toggle 2D (`flat`) ↔ WebGL (`webgl`) render |
 | `F11` | Settings panel |
 | `?` | Keyboard help |

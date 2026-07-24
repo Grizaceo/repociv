@@ -1,6 +1,9 @@
 # RepoCiv — Implementation Plan (Current)
 
-**Status:** live index · **Updated:** 2026-07-12
+**Status:** live index · **Updated:** 2026-07-24
+
+> **Retomando el repo en frío? Empieza por [`STATE.md`](STATE.md)** — estado
+> actual, realidad de la rama, gate y cómo correr.
 
 The executable rehabilitation plan is:
 

@@ -53,6 +53,9 @@ WORKER_FIX_PLAN.md
 CODEX_HARNESS_INTEGRATION.md
 README_PUBLICO.md
 execplan/
+# ...except the completed rehabilitation plan, intentionally tracked as the
+# canonical record of what shipped (referenced by docs/STATE.md).
+!execplan/REPOCIV_TOTAL_REHABILITATION.md
 
 # Logs
 *.log
