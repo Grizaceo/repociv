@@ -10,8 +10,14 @@ cd "${REPO_ROOT}"
 printf '\n== npm dependency audit (high+) ==\n'
 npm audit --audit-level=high
 
-printf '\n== Python dependency audit ==\n'
-python -m pip_audit --progress-spinner=off
+printf '\n== Python dependency audit (RepoCiv lock, hermetic) ==\n'
+# Audit RepoCiv's own pinned dependency closure (requirements.lock), NOT the
+# ambient interpreter's environment. `python` may resolve to a global/conda
+# env full of unrelated packages, which made this gate machine-dependent and
+# spuriously red. `-r requirements.lock --no-deps` keeps it deterministic and
+# scoped to RepoCiv's declared, fully-pinned deps regardless of which
+# interpreter runs it. Regenerate the lock with: pip-compile requirements.txt
+python -m pip_audit -r requirements.lock --no-deps --progress-spinner=off
 
 printf '\n== tracked files + Git history secret scan ==\n'
 python scripts/scan_git_secrets.py
