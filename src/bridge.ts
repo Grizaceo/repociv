@@ -145,6 +145,18 @@ export class BridgeEvents {
     this.ws.onStatusChange((status) => {
       if (status === 'connected') {
         this.wsConnected = true;
+        // WebSocket is authoritative — tear down any SSE fallback so bridge
+        // events aren't delivered (and counted) twice. Merely flipping
+        // sseConnected=false was a no-op: neither consumer reads it as a gate,
+        // so a still-open EventSource kept double-processing every event.
+        if (this.sseReconnectTimer) {
+          window.clearTimeout(this.sseReconnectTimer);
+          this.sseReconnectTimer = 0;
+        }
+        if (this.sse) {
+          this.sse.close();
+          this.sse = null;
+        }
         this.sseConnected = false;
         this.reconnectDelay = 1000;
         this.onBridgeOnline('hermes');
