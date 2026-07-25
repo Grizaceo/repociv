@@ -191,6 +191,32 @@ export function clampZoom(zoom: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, zoom));
 }
 
+/**
+ * Zoom that fits a world-space bounding box into a viewport, leaving a margin.
+ *
+ * `boundsW/H` are world-space units (the caller should pre-pad them so wall
+ * rings and labels around edge cities also fit). `viewportW/H` are canvas
+ * pixels. `marginFrac` (<1) keeps content off the edges — 0.8 fills 80% of the
+ * viewport. The result is clamped to `[min, max]`; degenerate inputs
+ * (non-finite or non-positive bounds/viewport) return `fallback` so callers can
+ * keep their current zoom rather than snap to a garbage value.
+ */
+export function computeFitZoom(
+  boundsW: number,
+  boundsH: number,
+  viewportW: number,
+  viewportH: number,
+  opts: { min: number; max: number; marginFrac: number; fallback: number },
+): number {
+  const { min, max, marginFrac, fallback } = opts;
+  if (!(boundsW > 0) || !(boundsH > 0) || !(viewportW > 0) || !(viewportH > 0)) {
+    return fallback;
+  }
+  const fit = Math.min((viewportW * marginFrac) / boundsW, (viewportH * marginFrac) / boundsH);
+  if (!Number.isFinite(fit) || fit <= 0) return fallback;
+  return clampZoom(fit, min, max);
+}
+
 // ─── Spiral: place cities in outward expanding ring pattern ─────────────────
 // Uses axialRing's convention: ring k starts k steps in direction 4 (SW).
 export function spiralCoords(center: Axial, count: number): Axial[] {

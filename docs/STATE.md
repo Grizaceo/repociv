@@ -111,15 +111,21 @@ Config: copiar `.env.example → .env`. Variable clave: `REPOCIV_MAP_ROOT`
 
 ## 6. Issues conocidos diferidos (no bloquean el gate)
 
-- **Deuda visual 3D (P1/P2)** del audit 2026-07-16: el fit de cámara en mapas
-  densos clipa ciudades periféricas; los paneles de HUD ocultan mucho mapa;
-  jerarquía de silueta de ciudad débil a media/corta distancia. Documentada, no
-  reparada (mezclar rediseño de cámara/HUD/assets con este feature oscurecería
-  el review).
-- **`src/main.ts` (~L387):** el callback de "agregar ciudad" es async pero se
-  invoca como void; si `/api/repos` falla justo al colocar una ciudad, la
-  entrada queda persistida pero la ciudad no entra al mundo vivo hasta recargar
-  (y salta el banner global de unhandledrejection). Edge case, pre-existente.
+- **✅ Resuelto (2026-07-25):** el callback async de "agregar ciudad"
+  (`src/main.ts`) ahora maneja errores inline y degrada con datos locales — sin
+  unhandledrejection ni ciudad perdida.
+- **✅ Resuelto (2026-07-25):** P1.1 fit de cámara — `focusOnWorldBounds` ahora
+  ajusta el zoom a los bounds de las ciudades (`computeFitZoom`, testeado) para
+  no clipar las periféricas. **A QA:** seleccionar ≥2 repos y confirmar que
+  todas las ciudades entran en el viewport sin clip; si el margen se siente muy
+  suelto/apretado, tunear `marginFrac` (0.75) en `renderer.ts:focusOnWorldBounds`.
+- **Deuda visual 3D restante (P1/P2, del audit 2026-07-16)** — trabajo estético
+  iterativo, ideal para el loop de QA con Blender:
+  - P1.2 oclusión de HUD (los paneles tapan mucho mapa);
+  - P1.3 jerarquía de silueta de ciudad débil a media/corta distancia;
+  - P2 grosor de listones de territorio, patrón "grid" de la textura de terreno,
+    solape de labels, separación de verdes de bioma, labels Bibliotheca/LabHub
+    despegadas, legibilidad de detalles de ciudad en zoom cercano.
 - **cursor-agent:** flags/formato de stream sin verificar contra una instalación
   real (`server/agent_runner.py`). Caveats documentados, no bugs activos.
 - **knip:** report-only; sus ~174 "unused exports" son ruido de

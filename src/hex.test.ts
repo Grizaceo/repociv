@@ -13,6 +13,7 @@ import {
   worldToScreen,
   screenToWorld,
   clampZoom,
+  computeFitZoom,
   type Camera,
 } from './hex.ts';
 
@@ -231,5 +232,38 @@ describe('camera transforms (worldToScreen / screenToWorld / clampZoom)', () => 
     expect(clampZoom(99, 0.15, 4)).toBe(4);
     expect(clampZoom(0.15, 0.15, 4)).toBe(0.15);
     expect(clampZoom(4, 0.15, 4)).toBe(4);
+  });
+});
+
+describe('computeFitZoom', () => {
+  const opts = { min: 0.15, max: 1.4, marginFrac: 0.75, fallback: 1 };
+
+  it('zooms out so a wide spread fits the viewport', () => {
+    // A 4000-unit-wide spread must fit a 1280px viewport at 75% margin:
+    // (1280*0.75)/4000 = 0.24. Smaller than 1 → the map is pulled back.
+    const z = computeFitZoom(4000, 2000, 1280, 720, opts);
+    expect(z).toBeCloseTo(0.24, 5);
+    expect(z).toBeLessThan(1);
+  });
+
+  it('uses the tighter of the two axes', () => {
+    // Tall, narrow bounds → the vertical axis binds: (720*0.75)/3000 = 0.18.
+    const z = computeFitZoom(500, 3000, 1280, 720, opts);
+    expect(z).toBeCloseTo(0.18, 5);
+  });
+
+  it('caps zoom-in for small spreads at max', () => {
+    // Two nearby cities → fit wants to zoom way in; clamp to max, not 10x.
+    expect(computeFitZoom(50, 50, 1280, 720, opts)).toBe(1.4);
+  });
+
+  it('never drops below min', () => {
+    expect(computeFitZoom(999999, 999999, 1280, 720, opts)).toBe(0.15);
+  });
+
+  it('returns the fallback for degenerate inputs (unsized canvas / no spread)', () => {
+    expect(computeFitZoom(0, 0, 1280, 720, opts)).toBe(1); // single city, zero bounds
+    expect(computeFitZoom(2000, 1000, 0, 0, opts)).toBe(1); // canvas not yet sized
+    expect(computeFitZoom(NaN, 1000, 1280, 720, opts)).toBe(1);
   });
 });

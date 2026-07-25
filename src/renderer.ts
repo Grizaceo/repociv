@@ -6,6 +6,7 @@ import {
   type Camera,
   screenToWorld,
   clampZoom,
+  computeFitZoom,
 } from './hex.ts';
 import { logger } from './logger.ts';
 import { type Unit, type Tile, type City, tileKey } from './types.ts';
@@ -294,14 +295,22 @@ export class Renderer {
     await this.setWorldRenderMode(mode);
   }
 
-  /** Center macro camera on world tile bounds (fallback when no capital). */
+  /** Center macro camera on world bounds and fit the zoom so peripheral cities
+   *  are not clipped (fallback when no capital is focused). Prefers the bounding
+   *  box of actual cities — the content the user cares about — and falls back to
+   *  all tiles when there are no cities yet. Any explicit `?cam=` overrides this
+   *  afterwards (applyCameraFromUrl runs later), so golden captures are stable. */
   focusOnWorldBounds(): void {
+    const cities = this.state.world.cities;
+    const points =
+      cities.length > 0
+        ? cities.map((c) => axialToPixel(c.coord, HEX_SIZE))
+        : [...this.state.world.tiles.values()].map((t) => axialToPixel(t.coord, HEX_SIZE));
     let minX = Infinity;
     let maxX = -Infinity;
     let minY = Infinity;
     let maxY = -Infinity;
-    for (const tile of this.state.world.tiles.values()) {
-      const pos = axialToPixel(tile.coord, HEX_SIZE);
+    for (const pos of points) {
       minX = Math.min(minX, pos.x);
       maxX = Math.max(maxX, pos.x);
       minY = Math.min(minY, pos.y);
@@ -310,6 +319,23 @@ export class Renderer {
     if (!Number.isFinite(minX)) return;
     this.cam.x = (minX + maxX) / 2;
     this.cam.y = (minY + maxY) / 2;
+
+    // Bounds-aware zoom: fit every city (plus room for wall rings/labels) into
+    // the viewport instead of a fixed default that clipped edge cities on dense
+    // selections. Only with ≥2 cities and a sized canvas; single-city / pre-size
+    // keeps the current zoom. Margin is deliberately generous so the tilted 3D
+    // camera (which sees less ground per zoom than the flat 2D one) still shows
+    // the whole spread.
+    if (cities.length >= 2 && this.cam.cx > 0 && this.cam.cy > 0) {
+      const PAD = HEX_SIZE * 3; // wall rings + labels around edge cities
+      this.cam.zoom = computeFitZoom(
+        maxX - minX + PAD * 2,
+        maxY - minY + PAD * 2,
+        this.cam.cx * 2,
+        this.cam.cy * 2,
+        { min: 0.15, max: 1.4, marginFrac: 0.75, fallback: this.cam.zoom },
+      );
+    }
   }
 
   /** Center macro camera on an axial hex (works before WebGL is loaded).
