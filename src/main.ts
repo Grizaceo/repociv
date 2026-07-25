@@ -385,15 +385,27 @@ async function bootstrap() {
 
   // Set up dynamic city add/delete callbacks from constructionPanel
   setOnCityAddedCb(async (repo: ScannedRepo, coord) => {
-    // Fetch repo data to get population, terrain, etc.
-    const repos = await fetchScannedRepos();
-    const repoData = repos.find((r) => r.path === repo.path) ?? repo;
-    // Add city to world
-    addCityToWorld(state.world, repoData, coord);
-    // Reconnect cities to ensure pathfinding works
-    await reconnectCities(state.world);
-    // Notify state update to refresh UI/renderer
-    state.notifyUpdate();
+    // The callback is invoked as void from constructionPanel, so any rejection
+    // here would surface as a global unhandledrejection banner and leave the
+    // just-persisted selection without a live city. Handle failures inline and
+    // degrade gracefully instead.
+    try {
+      // Enrich with fresh scan data (population, terrain, ...) when available;
+      // if the rescan fails, fall back to the repo we were handed so the city
+      // still appears rather than being lost until a manual reload.
+      let repoData: ScannedRepo = repo;
+      try {
+        const repos = await fetchScannedRepos();
+        repoData = repos.find((r) => r.path === repo.path) ?? repo;
+      } catch (err) {
+        logger.warn('[main] rescan falló al agregar ciudad; uso datos locales:', err);
+      }
+      addCityToWorld(state.world, repoData, coord);
+      await reconnectCities(state.world); // ensure pathfinding works
+      state.notifyUpdate(); // refresh UI/renderer
+    } catch (err) {
+      logger.warn('[main] no se pudo agregar la ciudad al mundo:', err);
+    }
   });
 
   setOnCityDeletedCb((repoPath: string) => {
