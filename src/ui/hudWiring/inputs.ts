@@ -178,7 +178,13 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     const targetForCommand = 'MAIN';
 
     // Include 3-layer config from chat UI: harness + provider + model.
-    const { harness, provider, model } = getSelectedConfig();
+    // Note: harness is forced to '' (auto) for chat dispatch because the
+    // bridge validator only accepts unit=MAIN with harness in {'', 'auto',
+    // 'hermes'}. Any other harness ('hermes-cli', 'cursor', etc.) requires
+    // a registered repoPath, which chat doesn't provide. The model+provider
+    // are still forwarded so the chat execution still respects user choice
+    // inside the 'auto' fallback path of the bridge.
+    const { provider, model } = getSelectedConfig();
     const draft: CommandDraft = {
       type: chatCommandType,
       target: targetForCommand,
@@ -186,7 +192,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
         resolvedCity ?? null,
         'MAIN',
         text,
-        harness,
+        '', // harness forced empty — bridge treats '' and 'auto' identically
         model,
         provider,
         unit.type,
@@ -211,10 +217,17 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
       .then((res) => {
         if (!res.ok) {
           const detail = res.reason || res.status || `HTTP error (status ${res.status})`;
+          // eslint-disable-next-line no-console
+          console.warn('[chat] command rejected', { draft, res, detail });
           appendSystemMessage(unit.id, `❌ Comando rechazado: ${detail}`);
+        } else {
+          // eslint-disable-next-line no-console
+          console.info('[chat] command queued', { commandId: res.commandId, status: res.status });
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[chat] sendCommand threw', err, { draft });
         appendSystemMessage(unit.id, '❌ No se pudo enviar el mensaje al bridge.');
       });
     state.setUnitState(unit.id, 'working');
