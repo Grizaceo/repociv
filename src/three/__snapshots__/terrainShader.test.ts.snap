@@ -35,13 +35,17 @@ vec2 terrainAtlasUv(float idx, vec2 tileUv) {
 
 vec2 terrainMacroUv(float idx, vec2 tileUv, vec2 worldXZ) {
   float scale = mix(2.4, 3.6, clamp(idx / 7.0, 0.0, 1.0));
-  vec2 worldUv = fract(worldXZ / (uHexRadius * scale) + vec2(idx * 0.137, idx * 0.173));
-  // Per-hex atlas detail (62% tile UV) reads natural on LAND. But on WATER
-  // (ocean idx 4, ice idx 5) the per-hex UV stamps the same atlas cell + normal
-  // into every hex, so the open sea reads as a honeycomb quilt. Water must be a
-  // continuous surface → push it almost fully to world-space UV.
+  // Rotate the world sampling frame ~31° off the hex/camera axes before fract().
+  // The fract() tiling seams (the atlas cells are blocky and a few carry crack
+  // lattices) otherwise line up into an axis-aligned RECTANGULAR grid that
+  // competes with the hex structure (audit 2026-07-16 P2). Off-axis sampling
+  // hides the "rectangular" read; the land weight is eased so the seams that
+  // remain are softer. Water stays near-fully world-space (continuous sea).
+  const mat2 kMacroRot = mat2(0.857, -0.515, 0.515, 0.857); // ~31°
+  vec2 worldUv = fract((kMacroRot * worldXZ) / (uHexRadius * scale)
+                       + vec2(idx * 0.137, idx * 0.173));
   bool water = (idx > 3.5 && idx < 5.5);
-  return mix(tileUv, worldUv, water ? 0.93 : 0.38);
+  return mix(tileUv, worldUv, water ? 0.93 : 0.26);
 }
 
 float terrainDetailNoise(vec2 p) {
@@ -145,13 +149,17 @@ void main() {
             tex = mix(tex, nAccum / nBlendSum, min(nBlendSum, 1.0) * 0.62);
           }
           // High-frequency detail tap: restore painted grain at every zoom.
+          // Grain now comes from CONTINUOUS world-space noise instead of
+          // re-sampling the atlas cell through fract(vWorldXZ / const), which
+          // stamped the same cell in an axis-aligned rectangular grid whose
+          // seams read as a lattice competing with the hex structure
+          // (audit 2026-07-16 P2). Two incommensurate octaves break any single
+          // period; terrainDetailNoise is seamless so no grid survives.
           if (tidx < 4.5 || (tidx > 5.5 && tidx < 7.5)) {
-            vec2 dUv = fract(vWorldXZ / (uHexRadius * 1.27) + vec2(tidx * 0.311, tidx * 0.293));
-            vec3 dTex = texture2D(uTerrainAtlas, terrainAtlasUv(tidx, dUv)).rgb;
-            float dLum = dot(dTex, vec3(0.299, 0.587, 0.114));
-            // Mean-preserving grain: same +/- amplitude, average multiplier 1.0
-            // (the old 0.82+0.36*dLum averaged ~0.9, dimming every land biome
-            // before the *1.15 brighten + ACES — a documented "muddy" pass).
+            vec2 grainOff = vec2(tidx * 7.31, tidx * 5.17);
+            float dLum = 0.6 * terrainDetailNoise(vWorldXZ * 2.30 + grainOff)
+                       + 0.4 * terrainDetailNoise(vWorldXZ * 3.70 - grainOff);
+            // Mean-preserving grain: same +/- amplitude, average multiplier 1.0.
             tex *= 1.0 + 0.18 * (dLum - 0.5);
           }
           // Civ V sea gradient: vivid turquoise on the shelf → deep saturated
@@ -372,7 +380,11 @@ void main() {
         if (vTopFace > 0.5) {
           float _gtidx = floor(vTerrainIndex + 0.5);
           if (_gtidx > 3.5 && _gtidx < 4.5) {
-            roughnessFactor = mix(0.30, 0.17, vOceanDepth);
+            // Wet but STABLE: a broader specular lobe than the old 0.30→0.17
+            // mirror finish. That near-mirror roughness over the wave normal
+            // map produced a sharp sun glint that aliased into crawling
+            // flicker (bloom amplified it). A soft sheen holds steady instead.
+            roughnessFactor = mix(0.44, 0.32, vOceanDepth);
           }
         }
   #include <normal_fragment_maps>
@@ -398,6 +410,13 @@ void main() {
           if (_wSum > 0.001) {
             nTex = mix(nTex, _nAccum / _wSum, min(_wSum, 1.0) * 0.62);
           }
+          // Water: damp the perturbation hard. A low-roughness sea over the
+          // high-frequency atlas normal made the specular glint sparkle and
+          // flicker; a near-flat sheet keeps one soft, stable sun reflection
+          // (the wave feel comes from the vertex displacement + diffuse
+          // shimmer, not from crawling specular).
+          float _normStrength = (_ntidx > 3.5 && _ntidx < 4.5) ? 0.20 : 1.0;
+          nTex *= _normStrength;
           // Blend atlas normal into surface normal (TBN for a flat-top hex is identity-ish)
           normal = normalize(normal + vec3(nTex.x * 0.55, nTex.z, nTex.y * 0.55));
         }
