@@ -55,6 +55,24 @@ def _is_within(path: str, root: str) -> bool:
         return False
 
 
+def _canonical(path: str) -> str:
+    """Resolve a path through symlinks and bind mounts to its inode-level path.
+
+    Two paths that point at the same filesystem object (e.g. a bind-mount
+    view of the same directory under two different parents) collapse to
+    the same canonical string. Lets the validator accept any logically
+    equivalent prefix for the same selected repo.
+    """
+    if not path:
+        return ""
+    try:
+        return os.path.realpath(os.path.expanduser(path))
+    except Exception:
+        # If realpath fails (e.g. path no longer exists), fall back to abspath
+        # so we at least compare on normalized strings rather than crashing.
+        return os.path.abspath(os.path.expanduser(path))
+
+
 def resolve_selected_repo(repo_id_or_name: str, explicit_path: str = "") -> str | None:
     repo_id_or_name = unquote(repo_id_or_name)
     state = load_state()
@@ -86,7 +104,7 @@ def resolve_selected_repo(repo_id_or_name: str, explicit_path: str = "") -> str 
             return None
         candidate = matches[0]
 
-    candidate_abs = os.path.abspath(os.path.expanduser(candidate))
+    candidate_real = _canonical(candidate)
     for root_path, entry in roots.items():
         if not isinstance(root_path, str) or not isinstance(entry, dict):
             continue
@@ -94,13 +112,13 @@ def resolve_selected_repo(repo_id_or_name: str, explicit_path: str = "") -> str 
         if not isinstance(selected, list):
             continue
         if not any(
-            isinstance(item, str)
-            and os.path.abspath(os.path.expanduser(item)) == candidate_abs
+            isinstance(item, str) and _canonical(item) == candidate_real
             for item in selected
         ):
             continue
-        root_real = os.path.realpath(os.path.expanduser(root_path))
-        candidate_real = os.path.realpath(candidate_abs)
+        root_real = _canonical(root_path)
+        # candidate_real was set above via _canonical(candidate) — no need
+        # to re-realpath here.
         if os.path.isdir(candidate_real) and _is_within(candidate_real, root_real):
             return candidate_real
         return None
