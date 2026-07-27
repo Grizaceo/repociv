@@ -23,6 +23,7 @@ from server.mission_harness import MissionHarnessContext, log_swarm_tracking_cap
 from server import directive_store as _ds
 from server import sessions as _sessions
 from server import container_runtime as _container_runtime
+from server._env_filter import redact_env_for_spawn
 from server import run_state as _run_state
 from server import runtime_adapters as _runtime_adapters
 from server import security_harness as _security_harness
@@ -732,8 +733,9 @@ def _run_hermes_cli_streaming(
 
     # Override HERMES_HOME to the profile path so the subprocess loads
     # the correct config, skills, memory, etc.
-    env = os.environ.copy()
-    env["HERMES_HOME"] = profile_path
+    parent_env = os.environ.copy()
+    parent_env["HERMES_HOME"] = profile_path
+    env = redact_env_for_spawn(parent_env, extra_keep={"HERMES_HOME"})
 
     send_to_repociv({
         "type": "chat_chunk", "unit": unit_id, "missionId": mission_id,
@@ -802,7 +804,8 @@ def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
         cmd.append("--continue")
     cmd.append(full_prompt)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            text=True, bufsize=1, cwd=working_dir or None)
+                            text=True, bufsize=1, cwd=working_dir or None,
+                            env=redact_env_for_spawn())
     output_buf: list[str] = []
     assert proc.stdout is not None
     ctx = _harness_ctx(unit_id, mission_id, city_id, "claude-code", working_dir, model=model)
@@ -996,7 +999,8 @@ def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
            "--session-id", session_id, "--message", full_message]
     if model:
         cmd.extend(["--model", model])
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=working_dir or None)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=working_dir or None,
+                            env=redact_env_for_spawn())
     output_buf: list[str] = []
     assert proc.stdout is not None
     for line in proc.stdout:
@@ -1048,6 +1052,7 @@ def _run_codex_streaming(unit_id: str, mission_id: str, mission: str,
         stderr=subprocess.PIPE,
         text=True,
         cwd=working_dir or None,
+        env=redact_env_for_spawn(),
     )
     _, stderr_text = proc.communicate(timeout=600)
 

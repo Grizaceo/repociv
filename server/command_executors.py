@@ -6,6 +6,7 @@ import subprocess
 import time
 from typing import Any, Callable
 
+from server._env_filter import redact_env_for_spawn
 from server.command_schema import Command
 
 
@@ -184,12 +185,18 @@ def dispatch_command(
             wpath_result = subprocess.run(['wslpath', '-w', fp], capture_output=True, text=True, timeout=3)
             if wpath_result.returncode == 0:
                 win_path = wpath_result.stdout.strip()
+                # Strip sensitive env vars before opening native apps
+                # (explorer.exe / code / xdg-open). Native app spawns
+                # inherit the parent env by default — redaction keeps
+                # API keys out of arbitrary processes a single click
+                # could launch.
+                safe_env = redact_env_for_spawn()
                 if is_dir:
-                    subprocess.Popen(['explorer.exe', win_path])
+                    subprocess.Popen(['explorer.exe', win_path], env=safe_env)
                 else:
-                    subprocess.Popen(['code', '--reuse-window', fp])
+                    subprocess.Popen(['code', '--reuse-window', fp], env=safe_env)
             else:
-                subprocess.Popen(['xdg-open', fp])
+                subprocess.Popen(['xdg-open', fp], env=redact_env_for_spawn())
             send_to_repociv({'type': 'log', 'msg': f'Abriendo: {fp}', 'level': 'info'})
             event_record_completed(cmd.id, fp)
             record_outcome(cmd.id, 'success', 0.0)

@@ -46,6 +46,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from server._env_filter import redact_env_for_spawn
+
 logger = logging.getLogger(__name__)
 
 # ─── Env helpers ─────────────────────────────────────────────────────────────
@@ -765,9 +767,18 @@ def launch_wonder(wonder_id: str) -> dict[str, Any]:
             try:
                 # Merge the proc_spec.env into the parent env so the
                 # child process can override LGB_HOST / BRIDGE_HOST to
-                # bind on 0.0.0.0 (WSL2 / Tailscale setups).
-                child_env = os.environ.copy()
-                child_env.update(proc_spec.env)
+                # bind on 0.0.0.0 (WSL2 / Tailscale setups). Sensitive
+                # keys (ANTHROPIC_API_KEY, *_SECRET, etc.) are redacted
+                # via _env_filter.redact_env_for_spawn so they don't leak
+                # into the spawned child.
+                parent_env = os.environ.copy()
+                parent_env.update(proc_spec.env)
+                child_env = redact_env_for_spawn(
+                    parent_env,
+                    # proc_spec.env is operator-specified, so its keys are
+                    # already trusted and should not be re-redacted.
+                    extra_keep=list(proc_spec.env.keys()),
+                )
                 proc = subprocess.Popen(
                     argv,
                     cwd=str(proc_cwd),

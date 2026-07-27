@@ -10,9 +10,12 @@ Modes per command (in priority order):
 """
 from __future__ import annotations
 
+import logging
 from typing import Literal
 from .command_schema import Command, Risk
 from . import harness_registry as _hr
+
+logger = logging.getLogger(__name__)
 
 PolicyDecision = Literal["auto-safe", "approve", "blocked"]
 
@@ -74,6 +77,10 @@ def decide(cmd: Command) -> tuple[PolicyDecision, str]:
     """Return (decision, reason) for a command.
 
     Policy logic (in evaluation order):
+      0. Optional YAML overlay (server.policies_yaml) — if a rule matches
+         cmd.type / cmd.risk / cmd.harness_id, its effect is authoritative.
+         The opt-in overlay only loads if ``$REPOCIV_CONFIG_DIR/policies.d/``
+         exists; absence is a no-op.
       1. Reference-only harness → always blocked, regardless of type.
       2. Explicit harness: verify cmd_type is in allowedActions / not in blockedActions.
          If not capable, block.
@@ -90,6 +97,30 @@ def decide(cmd: Command) -> tuple[PolicyDecision, str]:
          ``run_build`` command tagged high-risk used to skip the approval
          queue because the type policy said auto-safe.
     """
+    # Step 0: opt-in YAML overlay (omnigent-style). If a rule matches,
+    # its decision is authoritative for this command. Lazy-loaded on
+    # first call; cached for the process lifetime. Absence of the
+    # policies.d directory is a no-op (zero impact on legacy callers).
+    try:
+        from . import policies_yaml as _policies_yaml
+        overlay_state = _policies_yaml.ensure_loaded()
+    except ImportError:
+        _policies_yaml = None  # type: ignore[assignment]
+        overlay_state = None
+    except Exception as exc:  # pragma: no cover - defensive: never let overlay break decide()
+        logger.warning("policy_yaml overlay failed to load: %s", exc)
+        _policies_yaml = None  # type: ignore[assignment]
+        overlay_state = None
+    if overlay_state is not None and overlay_state.rules and _policies_yaml is not None:
+        overlay_match = _policies_yaml.evaluate(
+            overlay_state,
+            cmd_type=cmd.type,
+            risk=cmd.risk,
+            harness_id=cmd.harness_id,
+        )
+        if overlay_match is not None:
+            return overlay_match.decision, overlay_match.reason
+
     # Step 1: resolve the harness descriptor
     harness: dict | None = None
     if cmd.harness_id:
