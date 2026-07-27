@@ -103,18 +103,24 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     const unit = targetUnit ?? state.selectedUnit;
     if (!unit || !input || !input.value.trim()) return;
 
-    // 2) Resolve city: if the target unit is on the map, use its position;
-    //    otherwise default to "main" (virtual agent not yet spawned)
-    let resolvedCity = state.world.cities[0];
+    // 2) Resolve city: pick one whose repoPath we can actually send to the
+    //    backend. Sending execute_agent with an empty repoPath is rejected
+    //    by the bridge when target != MAIN; fall back through cities[0] only
+    //    when none carry a real path.
+    let resolvedCity = state.world.cities.find((c) => c.repoPath?.trim());
     if (!prefersSelector || targetUnit) {
       const lookupCoord = unit.targetCoord ?? unit.coord;
       const tile = state.world.tiles.get(tileKey(lookupCoord));
-      resolvedCity =
+      const cityFromTile =
         tile?.city ??
         state.world.cities.find((c) =>
           c.territory.some((t) => t.q === lookupCoord.q && t.r === lookupCoord.r),
-        ) ??
-        state.world.cities[0];
+        );
+      if (cityFromTile?.repoPath?.trim()) {
+        resolvedCity = cityFromTile;
+      } else if (!resolvedCity) {
+        resolvedCity = cityFromTile ?? state.world.cities[0];
+      }
     }
 
     const text = input.value.trim();
