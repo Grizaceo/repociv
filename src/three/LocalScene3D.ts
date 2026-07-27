@@ -926,6 +926,84 @@ export class LocalScene3D {
 
   // ─── ADW workflow rendering (Phase C) ─────────────────────────────────────────
 
+  /** Phase D: set a node's runtime state (idle/running/pass/fail) and animate */
+  setAdwNodeState(nodeId: string, state: 'idle' | 'running' | 'pass' | 'fail'): void {
+    const mesh = this.adwNodeMeshes.get(nodeId);
+    if (!mesh) return;
+    const material = mesh.material as MeshStandardMaterial;
+    const baseColor = ADW_NODE_COLORS[(mesh.userData['adwNodeType'] as AdwNodeType) ?? 'code'] ?? 0x888888;
+
+    switch (state) {
+      case 'idle':
+        material.emissiveIntensity = 0.15;
+        material.emissive.setHex(baseColor);
+        break;
+      case 'running':
+        material.emissiveIntensity = 0.4;
+        material.emissive.setHex(0x4a8fb5);
+        break;
+      case 'pass':
+        material.emissiveIntensity = 0.6;
+        material.emissive.setHex(0x4a8f4a);
+        break;
+      case 'fail':
+        material.emissiveIntensity = 0.6;
+        material.emissive.setHex(0xb04a4a);
+        break;
+    }
+  }
+
+  /** Phase D: spawn an artifact sprite that travels from source to target node */
+  spawnAdwArtifact(
+    fromNodeId: string,
+    toNodeId: string,
+    onComplete?: () => void,
+  ): void {
+    const sourceMesh = this.adwNodeMeshes.get(fromNodeId);
+    const targetMesh = this.adwNodeMeshes.get(toNodeId);
+    if (!sourceMesh || !targetMesh) return;
+
+    // Create a small plane mesh as the "papel/document"
+    const geom = new PlaneGeometry(4, 5);
+    const mat = new MeshStandardMaterial({
+      color: 0xfff5e0,
+      emissive: 0xffd080,
+      emissiveIntensity: 0.3,
+      side: 2, // DoubleSide
+    });
+    const artifact = new Mesh(geom, mat);
+    artifact.position.copy(sourceMesh.position);
+    this.adwGroup.add(artifact);
+
+    // Tween to target over ~1.5s
+    const startTime = performance.now();
+    const duration = 1500;
+    const startPos = sourceMesh.position.clone();
+    const endPos = targetMesh.position.clone();
+
+    const tick = () => {
+      const elapsed = performance.now() - startTime;
+      const t = Math.min(1, elapsed / duration);
+      const eased = 1 - Math.pow(1 - t, 2); // ease-out quad
+
+      artifact.position.lerpVectors(startPos, endPos, eased);
+
+      // Add a slight arc (parabola)
+      const arcHeight = 15;
+      artifact.position.y += Math.sin(t * Math.PI) * arcHeight;
+
+      if (t < 1) {
+        requestAnimationFrame(tick);
+      } else {
+        this.adwGroup.remove(artifact);
+        geom.dispose();
+        mat.dispose();
+        onComplete?.();
+      }
+    };
+    requestAnimationFrame(tick);
+  }
+
   loadAdwGraph(nodes: AdwNode3D[], edges: AdwEdge3D[]): void {
     // Clear old ADW meshes
     while (this.adwGroup.children.length > 0) {
