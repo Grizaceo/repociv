@@ -20,6 +20,8 @@ import { isLayerVisible } from './layers.ts';
 import { updateLodDisplay } from './ui/layerPanel.ts';
 // LocalRenderer is lazy-loaded on first local-view entry to keep main bundle small.
 type LocalRendererType = import('./localRenderer.ts').LocalRenderer;
+type LocalScene3DType = import('./three/LocalScene3D.ts').LocalScene3D;
+type LocalViewRenderer = LocalRendererType | LocalScene3DType;
 import {
   interpretUnitDrag,
   interpretCityToCityDrag,
@@ -112,7 +114,7 @@ export class Renderer {
   private hexR: HexRenderer;
   private unitR: UnitRenderer;
   private minimapR: MinimapRenderer;
-  private localR: LocalRendererType | null = null; // Phase 6: RimWorld 2D view
+  private localR: LocalViewRenderer | null = null; // Phase 6: RimWorld view (2D or 3D)
   private threeMap: ThreeMapRendererType | null = null;
   private threeContainer: HTMLElement | null = null;
   private threeLoadPromise: Promise<void> | null = null;
@@ -395,8 +397,15 @@ export class Renderer {
 
   async preloadLocalRenderer() {
     if (this._localRendererCtor) return;
-    const mod = await import('./localRenderer.ts');
-    this._localRendererCtor = mod.LocalRenderer;
+    if (this.worldRenderMode === 'webgl') {
+      // Use Three.js local view renderer when WebGL is active
+      const mod = await import('./three/LocalScene3D.ts');
+      this._localRendererCtor = mod.LocalScene3D as unknown as new (canvas: HTMLCanvasElement) => LocalRendererType;
+    } else {
+      // Use Canvas 2D local view renderer (canonical)
+      const mod = await import('./localRenderer.ts');
+      this._localRendererCtor = mod.LocalRenderer;
+    }
   }
 
   private resize() {
