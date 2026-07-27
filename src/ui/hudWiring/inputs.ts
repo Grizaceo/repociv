@@ -168,12 +168,12 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     if (!isSidePanelOpen()) openSidePanel(unit);
     appendUserMessage(unit.id, text);
     trackMessageSent(unit.id);
-
-    // CHAT PATH: chat del usuario al agente seleccionado. Usamos execute_agent para
-    // distinguir el flujo conversacional del legacy unit_command, reduciendo ambigüedad
-    // en type-policy, logs y aprobaciones.
     const chatCommandType: CommandType = 'execute_agent';
-    const targetForCommand = unit.id;
+    // The bridge accepts chat dispatch under the generic 'MAIN' target
+    // — it's the umbrella handler. The actual target unit is conveyed
+    // in payload.unit so any specific agent can be reached without
+    // triggering the 'repoPath required for non-MAIN targets' rejection.
+    const targetForCommand = 'MAIN';
 
     // Include 3-layer config from chat UI: harness + provider + model.
     const { harness, provider, model } = getSelectedConfig();
