@@ -7,11 +7,17 @@
 import {
   AmbientLight,
   BoxGeometry,
+  BufferGeometry,
   Color,
+  ConeGeometry,
+  CylinderGeometry,
   DirectionalLight,
+  Float32BufferAttribute,
   Group,
   HemisphereLight,
   InstancedMesh,
+  LineBasicMaterial,
+  LineSegments,
   Matrix4,
   Mesh,
   MeshLambertMaterial,
@@ -21,6 +27,7 @@ import {
   PointLight,
   Raycaster,
   Scene,
+  SphereGeometry,
   Vector2,
   Vector3,
   WebGLRenderer,
@@ -28,6 +35,44 @@ import {
   type Object3D,
 } from 'three';
 import type { LocalNpc, LocalRoom, LocalTile, LocalUnit, LocalWorld, ZoneType } from '../types.ts';
+
+// ─── ADW types (Phase C) ─────────────────────────────────────────────────────
+export type AdwNodeType = 'trigger' | 'engineer' | 'agent' | 'code' | 'sandbox' | 'artifact' | 'ship';
+export type AdwEdgeKind = 'flow' | 'pass' | 'fail' | 'approve' | 'reject' | 'route';
+
+export interface AdwNode3D {
+  id: string;
+  type: AdwNodeType;
+  label: string;
+  x: number; // grid position on floor 2
+  y: number;
+}
+
+export interface AdwEdge3D {
+  id: string;
+  source: string;
+  target: string;
+  kind: AdwEdgeKind;
+}
+
+const ADW_NODE_COLORS: Record<AdwNodeType, number> = {
+  trigger: 0x4a9e8e,
+  engineer: 0xd49b3a,
+  agent: 0x6b8fb5,
+  code: 0x7a8b9e,
+  sandbox: 0xc47a4a,
+  artifact: 0xb070b0,
+  ship: 0x4a8f4a,
+};
+
+const ADW_EDGE_COLORS: Record<AdwEdgeKind, number> = {
+  flow: 0x4a8fb5,
+  pass: 0x4a8f4a,
+  fail: 0xb04a4a,
+  approve: 0xd4a830,
+  reject: 0xc47a4a,
+  route: 0x9a8ab0,
+};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -93,6 +138,14 @@ export class LocalScene3D {
 
   private world: LocalWorld | null = null;
   private localUnits: LocalUnit[] = [];
+
+  // ADW workflow floor (Phase C)
+  private adwGroup: Group = new Group();
+  private adwNodeMeshes: Map<string, Mesh> = new Map();
+  private adwEdgeLines: Mesh[] = [];
+  private adwGraph: { nodes: AdwNode3D[]; edges: AdwEdge3D[] } | null = null;
+  /** @internal used by picking to resolve ADW node clicks */
+  getAdwGraph() { return this.adwGraph; }
 
   // Scene groups
   private floorGroup: Group;
@@ -214,6 +267,11 @@ export class LocalScene3D {
     this.agentGroup = new Group();
     this.agentGroup.name = 'agents';
     this.scene.add(this.agentGroup);
+
+    // ADW workflow group (Phase C) — positioned at floor 1 height
+    this.adwGroup.name = 'adw-workflow';
+    this.adwGroup.position.y = this.floorHeight;
+    this.scene.add(this.adwGroup);
 
     // Reusable geometry
     this.floorGeometry = new PlaneGeometry(TILE_W, TILE_H);
@@ -864,6 +922,92 @@ export class LocalScene3D {
     const pos = this.instanceToTile.get(instanceId);
     if (!pos) return null;
     return this.world.grid[pos.y]?.[pos.x] ?? null;
+  }
+
+  // ─── ADW workflow rendering (Phase C) ─────────────────────────────────────────
+
+  loadAdwGraph(nodes: AdwNode3D[], edges: AdwEdge3D[]): void {
+    // Clear old ADW meshes
+    while (this.adwGroup.children.length > 0) {
+      const child = this.adwGroup.children[0]!;
+      this.adwGroup.remove(child);
+    }
+    this.adwNodeMeshes.clear();
+    this.adwEdgeLines = [];
+
+    this.adwGraph = { nodes, edges };
+
+    // Render nodes as meshes by type
+    for (const node of nodes) {
+      const mesh = this.createAdwNodeMesh(node);
+      this.adwGroup.add(mesh);
+      this.adwNodeMeshes.set(node.id, mesh);
+    }
+
+    // Render edges as line segments
+    for (const edge of edges) {
+      const sourceMesh = this.adwNodeMeshes.get(edge.source);
+      const targetMesh = this.adwNodeMeshes.get(edge.target);
+      if (!sourceMesh || !targetMesh) continue;
+
+      const sourcePos = sourceMesh.position;
+      const targetPos = targetMesh.position;
+
+      // Simple line geometry (straight for now; curves in Phase D)
+      const points = new Float32Array([
+        sourcePos.x, sourcePos.y, sourcePos.z,
+        targetPos.x, targetPos.y, targetPos.z,
+      ]);
+      const geom = new BufferGeometry();
+      geom.setAttribute('position', new Float32BufferAttribute(points, 3));
+      const mat = new LineBasicMaterial({ color: ADW_EDGE_COLORS[edge.kind] ?? 0x888888 });
+      const line = new LineSegments(geom, mat);
+      this.adwGroup.add(line);
+      this.adwEdgeLines.push(line as unknown as Mesh);
+    }
+  }
+
+  private createAdwNodeMesh(node: AdwNode3D): Mesh {
+    const color = ADW_NODE_COLORS[node.type] ?? 0x888888;
+    const material = new MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 0.15,
+    });
+
+    // Different geometry per node type
+    let geometry: BufferGeometry;
+    switch (node.type) {
+      case 'trigger':
+        geometry = new ConeGeometry(8, 12, 3);
+        break;
+      case 'engineer':
+        geometry = new BoxGeometry(12, 14, 12);
+        break;
+      case 'agent':
+        geometry = new SphereGeometry(8, 16, 12);
+        break;
+      case 'code':
+        geometry = new BoxGeometry(10, 10, 10);
+        break;
+      case 'sandbox':
+        geometry = new BoxGeometry(16, 8, 16);
+        break;
+      case 'artifact':
+        geometry = new PlaneGeometry(12, 12);
+        break;
+      case 'ship':
+        geometry = new CylinderGeometry(6, 8, 12, 8);
+        break;
+      default:
+        geometry = new BoxGeometry(10, 10, 10);
+    }
+
+    const mesh = new Mesh(geometry, material);
+    mesh.position.set(node.x * TILE_W, 0, node.y * TILE_H);
+    mesh.castShadow = true;
+    mesh.userData = { adwNodeId: node.id, adwNodeType: node.type, adwLabel: node.label };
+    return mesh;
   }
 
   // ─── Cleanup ──────────────────────────────────────────────────────────────────
