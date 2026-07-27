@@ -125,6 +125,13 @@ export class LocalScene3D {
   private raycaster: Raycaster;
   private ndc: Vector2;
 
+  // Multi-floor support (Phase B)
+  private currentFloor = 0;
+  private floorHeight = 100; // world units between floors
+  private floorTweenProgress = 1; // 1 = settled, 0 = just started switching
+  private floorTweenFrom = 0;
+  private floorTweenTo = 0;
+
   // Input state
   private inputActive = false;
   private isDragging = false;
@@ -340,6 +347,18 @@ export class LocalScene3D {
       if (!this.inputActive) return;
       e.preventDefault();
     });
+
+    // Floor switching (Phase B): PgUp/PgDn
+    this.canvas.addEventListener('keydown', (e) => {
+      if (!this.inputActive) return;
+      if (e.key === 'PageUp') {
+        e.preventDefault();
+        this.switchFloor(this.currentFloor + 1);
+      } else if (e.key === 'PageDown') {
+        e.preventDefault();
+        this.switchFloor(this.currentFloor - 1);
+      }
+    });
   }
 
   setInputActive(active: boolean): void {
@@ -361,6 +380,12 @@ export class LocalScene3D {
     } else if (this.transitionDirection === 'exit') {
       this.transitionProgress = Math.max(0, this.transitionProgress - dt * 4);
       if (this.transitionProgress <= 0) this.transitionDirection = 'none';
+    }
+
+    // Floor tween (Phase B)
+    if (this.floorTweenProgress < 1) {
+      this.floorTweenProgress = Math.min(1, this.floorTweenProgress + dt * 3);
+      this.updateCamera();
     }
 
     // Update agent positions
@@ -672,6 +697,26 @@ export class LocalScene3D {
     };
   }
 
+  // ─── Floor switching (Phase B) ────────────────────────────────────────────────
+
+  switchFloor(targetFloor: number): void {
+    const clamped = Math.max(0, Math.min(1, targetFloor)); // 0=bodega, 1=workflow
+    if (clamped === this.currentFloor) return;
+    this.floorTweenFrom = this.currentFloor;
+    this.floorTweenTo = clamped;
+    this.floorTweenProgress = 0;
+    this.currentFloor = clamped;
+  }
+
+  private getFloorY(): number {
+    // Interpolate floor Y position during tween
+    if (this.floorTweenProgress >= 1) return this.currentFloor * this.floorHeight;
+    const eased = 1 - Math.pow(1 - this.floorTweenProgress, 3); // ease-out cubic
+    const fromY = this.floorTweenFrom * this.floorHeight;
+    const toY = this.floorTweenTo * this.floorHeight;
+    return fromY + (toY - fromY) * eased;
+  }
+
   // ─── Camera ───────────────────────────────────────────────────────────────────
 
   private updateCamera(): void {
@@ -693,7 +738,7 @@ export class LocalScene3D {
       dist * Math.sin(angle),
       this.cam.y + dist * Math.cos(angle),
     );
-    this.camera.lookAt(this.cam.x, 0, this.cam.y);
+    this.camera.lookAt(this.cam.x, this.getFloorY(), this.cam.y);
   }
 
   resize(): void {

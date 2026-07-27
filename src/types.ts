@@ -436,6 +436,9 @@ export interface LocalWorld {
   width: number; // in tiles
   height: number;
   workbenches: Workbench[];
+  // Multi-floor support (Phase B): which floor this world belongs to.
+  // Floor 0 = bodega (files, current default), Floor 1 = ADW workflow floor.
+  floor?: number;
   // Power System (RimWorld-style)
   powerGrid?: PowerGrid;
   powerSources?: PowerSource[];
