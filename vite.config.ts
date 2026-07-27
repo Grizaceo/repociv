@@ -62,6 +62,14 @@ export default defineConfig(({ mode }) => {
       watch: {
         ignored: ['**/.venv/**', '**/dist/**', '**/.hermes/**', '**/e2e/**'],
       },
+      // Allow Tailscale Serve / Funnel to proxy the dev server.
+      // *.tail*.ts.net and the bare IP wildcard.
+      allowedHosts: [
+        'localhost',
+        '127.0.0.1',
+        'desktop-h8ud3d2-1.tail7b473b.ts.net',
+        '.ts.net',
+      ],
       proxy: {
         '/bridge': {
           target: `http://localhost:${env.BRIDGE_PORT ?? '5274'}`,
