@@ -79,11 +79,27 @@ export class BridgeEvents {
     });
   }
 
-  /** Discover the WebSocket URL from the bridge /ws endpoint */
+  /** Discover the WebSocket URL from the bridge /ws endpoint.
+   *
+   *  In dev (no VITE_BRIDGE_URL), the WS goes through Vite's /bridge proxy
+   *  (ws: true) so the browser never needs to reach the bridge's WS port
+   *  directly — fixes WSL2 localhost mismatch where the browser in Windows
+   *  can reach Vite (5273) but not the raw bridge WS port (5275).
+   *
+   *  In prod (VITE_BRIDGE_URL set), connect directly to the bridge WS.
+   *  The bridge /ws endpoint can still override with a explicit wsUrl. */
   private async _discoverWs() {
+    // In dev the WS goes through Vite's /bridge proxy (ws passthrough).
+    // Using window.location.host means the browser connects to whatever
+    // host it loaded the page from (localhost, 172.x, etc.) — no hardcoded
+    // localhost:5275 that WSL2 may not forward.
+    const devWsProxy = `ws://${
+      typeof window !== 'undefined' && window.location?.host
+        ? window.location.host
+        : 'localhost:5273'
+    }/bridge/ws`;
+
     try {
-      const BRIDGE_WS_PORT = 5275; // Matches BRIDGE_WS_PORT default in Python
-      // Try to fetch /ws endpoint for the port; fall back to default
       const res = await fetch(bridgeUrl('/ws'), {
         method: 'GET',
         headers: bridgeHeaders(),
@@ -93,14 +109,25 @@ export class BridgeEvents {
           wsUrl?: string;
           wsPort?: number;
         };
-        this.wsUrl = info.wsUrl ?? `ws://localhost:${BRIDGE_WS_PORT}`;
+        if (info.wsUrl) {
+          // Bridge can force a URL (e.g. remote deployments).
+          this.wsUrl = info.wsUrl;
+        } else if (BRIDGE_URL) {
+          // Prod: direct to bridge WS port (default 5275).
+          const wsPort = info.wsPort ?? 5275;
+          const base = BRIDGE_URL.replace(/^http/, 'ws');
+          this.wsUrl = `${base.replace(/:\d+$/, '')}:${wsPort}`;
+        } else {
+          // Dev: go through Vite's /bridge proxy (ws passthrough).
+          this.wsUrl = devWsProxy;
+        }
       } else {
-        // Use configured BRIDGE_URL + default WS port
-        const base = BRIDGE_URL || `http://localhost:${BRIDGE_WS_PORT}`;
-        this.wsUrl = base.replace(/^http/, 'ws');
+        this.wsUrl = BRIDGE_URL
+          ? BRIDGE_URL.replace(/^http/, 'ws').replace(/:\d+$/, ':5275')
+          : devWsProxy;
       }
     } catch {
-      this.wsUrl = `ws://localhost:5275`;
+      this.wsUrl = devWsProxy;
     }
 
     // Try WS first
