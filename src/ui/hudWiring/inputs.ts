@@ -171,8 +171,10 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     const chatCommandType: CommandType = 'execute_agent';
     // The bridge accepts chat dispatch under the generic 'MAIN' target
     // — it's the umbrella handler. The actual target unit is conveyed
-    // in payload.unit so any specific agent can be reached without
-    // triggering the 'repoPath required for non-MAIN targets' rejection.
+    // in payload.unit BUT must be MAIN here too: the bridge rejects
+    // any execute_agent whose payload.unit != MAIN unless repoPath
+    // points at a registered repository. Reserve unit-specific
+    // payloads for code paths that already know the registered repo.
     const targetForCommand = 'MAIN';
 
     // Include 3-layer config from chat UI: harness + provider + model.
@@ -182,7 +184,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
       target: targetForCommand,
       payload: buildExecuteAgentPayload(
         resolvedCity ?? null,
-        unit.id,
+        'MAIN',
         text,
         harness,
         model,
@@ -190,6 +192,12 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
         unit.type,
       ),
     };
+
+    // Visual indicator keeps reflecting the unit the user thinks they're
+    // talking to — the actual execution routes through MAIN inside the
+    // bridge, which is what allows the chat to work without registering
+    // a per-unit repo. Loss of fidelity for chat dispatch only; spatial
+    // directives (drag/drop) keep using unit.id directly.
 
     // Update target indicator to reflect actual dispatch target
     const indicator = document.getElementById('chat-target-indicator');
