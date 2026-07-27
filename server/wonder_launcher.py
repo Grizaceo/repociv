@@ -67,17 +67,21 @@ LOGS_DIR = WONDERS_DIR / "logs"
 
 REPOCIV_REMOTE = _env("REPOCIV_REMOTE", "").lower() in ("true", "1", "yes")
 
+# Map/repos root — same env chain the rest of RepoCiv uses, so the built-in
+# wonder repos follow wherever the workspace lives instead of a hardcoded
+# ~/.hermes/workspace/repos. Falls back to the active workspace.
+_MAP_ROOT = _expand(
+    _env("REPOCIV_MAP_ROOT", "")
+    or _env("REPOCIV_REPOS_ROOT", "")
+    or _env("WORKSPACE_ROOT", "")
+    or "~/.hermes/workspace/ACTIVE"
+)
+
 BIBLIOTHECA_DIR = _expand(
-    _env(
-        "REPOCIV_WONDER_BIBLIOTHECA_DIR",
-        "~/.hermes/workspace/repos/la-gran-biblioteca",
-    )
+    _env("REPOCIV_WONDER_BIBLIOTHECA_DIR", os.path.join(_MAP_ROOT, "la-gran-biblioteca"))
 )
 INSTITUTUM_DIR = _expand(
-    _env(
-        "REPOCIV_WONDER_INSTITUTUM_DIR",
-        "~/.hermes/workspace/repos/labhub",
-    )
+    _env("REPOCIV_WONDER_INSTITUTUM_DIR", os.path.join(_MAP_ROOT, "labhub"))
 )
 
 # ─── Custom launch specs (user-defined marvelas) ──────────────────────────────

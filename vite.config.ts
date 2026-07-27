@@ -4,9 +4,13 @@ import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { repocivPlugin, expandUser } from './vite-plugins/repociv.ts';
 
-const DEFAULT_MAP_ROOT = join(homedir(), '.hermes', 'workspace', 'repos');
+// Last-resort default only — the real root is env-driven (REPOCIV_MAP_ROOT etc,
+// set in .env) and further overridable at runtime by the user via the root
+// picker / parent-folder map. Points at the active workspace so a fresh setup
+// shows live repos instead of a stale/empty folder.
+const DEFAULT_MAP_ROOT = join(homedir(), '.hermes', 'workspace', 'ACTIVE');
 
-/** Imperial map scan root: REPOCIV_MAP_ROOT → WORKSPACE_ROOT → REPOCIV_REPOS_ROOT → Hermes repos. */
+/** Imperial map scan root: REPOCIV_MAP_ROOT → WORKSPACE_ROOT → REPOCIV_REPOS_ROOT → default. */
 function resolveMapRoot(mode: string): string {
   const env = loadEnv(mode, process.cwd(), '');
   const pick = (key: string): string | undefined => {

@@ -56,9 +56,15 @@ _DEFAULT_CONFIG: dict[str, Any] = {
     },
 }
 
-# HERMES workspace root — overridable via env var or set_hermes_root() in tests
+# HERMES workspace root — overridable via env var or set_hermes_root() in tests.
+# Falls back through the same map-root env chain the rest of RepoCiv uses (so it
+# follows the active workspace) instead of a hardcoded ~/.hermes/workspace/repos.
 _HERMES_ROOT: Path = Path(
-    os.environ.get("HERMES_ROOT", str(Path.home() / ".hermes" / "workspace" / "repos"))
+    os.environ.get("HERMES_ROOT")
+    or os.environ.get("REPOCIV_MAP_ROOT")
+    or os.environ.get("REPOCIV_REPOS_ROOT")
+    or os.environ.get("WORKSPACE_ROOT")
+    or str(Path.home() / ".hermes" / "workspace" / "ACTIVE")
 )
 
 
