@@ -196,7 +196,8 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     void sendCommand(draft)
       .then((res) => {
         if (!res.ok) {
-          appendSystemMessage(unit.id, `❌ Comando rechazado: ${res.reason || res.status}`);
+          const detail = res.reason || res.status || `HTTP error (status ${res.status})`;
+          appendSystemMessage(unit.id, `❌ Comando rechazado: ${detail}`);
         }
       })
       .catch(() => {

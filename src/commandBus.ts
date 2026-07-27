@@ -33,14 +33,44 @@ export async function sendCommand(draft: CommandDraft): Promise<CommandResponse>
       body: JSON.stringify(draft),
     });
   } catch (err) {
-    return { ok: false, status: 'failed', commandId: '', reason: String(err) };
+    return { ok: false, status: 'failed', commandId: '', reason: `network: ${String(err)}` };
   }
 
-  let data: CommandResponse;
+  let body: unknown;
   try {
-    data = (await resp.json()) as CommandResponse;
+    body = await resp.json();
   } catch {
     return { ok: false, status: 'failed', commandId: '', reason: `HTTP ${resp.status}` };
+  }
+
+  const data = body as Partial<CommandResponse> & { error?: string };
+
+  // Bridge may reject with 4xx returning {error: "..."} only (no ok/status/reason).
+  // Normalise those into the CommandResponse shape the UI expects.
+  // (resp.ok may be undefined in test mocks — only treat 4xx/5xx as failure.)
+  if (typeof resp.status === 'number' && resp.status >= 400) {
+    return {
+      ok: false,
+      status: 'rejected',
+      commandId: '',
+      reason: data.error ?? `HTTP ${resp.status}`,
+    };
+  }
+  if (data.ok === false) {
+    return {
+      ok: false,
+      status: data.status ?? 'rejected',
+      commandId: data.commandId ?? '',
+      reason: data.reason ?? data.error,
+    };
+  }
+  if (data.ok !== true) {
+    return {
+      ok: false,
+      status: 'failed',
+      commandId: '',
+      reason: data.error ?? `malformed response: ${JSON.stringify(body).slice(0, 120)}`,
+    };
   }
 
   if (data.commandId) {
@@ -48,7 +78,7 @@ export async function sendCommand(draft: CommandDraft): Promise<CommandResponse>
       id: data.commandId,
       type: draft.type,
       target: draft.target,
-      status: data.status,
+      status: data.status ?? 'queued',
       sentAt: Date.now(),
     };
     _commands.set(data.commandId, record);
@@ -56,7 +86,12 @@ export async function sendCommand(draft: CommandDraft): Promise<CommandResponse>
     trackCommand();
   }
 
-  return data;
+  return {
+    ok: data.ok ?? false,
+    status: data.status ?? 'failed',
+    commandId: data.commandId ?? '',
+    reason: data.reason,
+  } as CommandResponse;
 }
 
 // ─── Update a command's status (called when bridge events arrive) ─────────────
