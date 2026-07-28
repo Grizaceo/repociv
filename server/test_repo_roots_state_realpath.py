@@ -6,6 +6,7 @@ the state-stored path even though they resolve to the same directory.
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
 import tempfile
@@ -75,6 +76,25 @@ def test_path_with_trailing_slash_passes(fake_state):
 def test_dotdot_is_rejected(fake_state):
     out = rrs.resolve_selected_repo("ignored",
         str(Path(fake_state["activeRoot"]) / "CARCOSA" / ".." / ".."))
+    assert out is None
+
+
+def test_encoded_explicit_path_decodes(fake_state):
+    """Chronic chat 403: UI sometimes sends repo:<base64> as explicit_path.
+
+    resolve_selected_repo must decode that before filesystem/canonical checks
+    so existing worlds with encoded city.repoPath still validate.
+    """
+    carcosa = Path(fake_state["activeRoot"]) / "CARCOSA"
+    encoded = base64.urlsafe_b64encode(str(carcosa).encode()).decode().rstrip("=")
+    out = rrs.resolve_selected_repo("ignored", f"repo:{encoded}")
+    assert out is not None
+    assert out.endswith("CARCOSA")
+
+
+def test_encoded_explicit_path_unselected_still_rejected(fake_state):
+    encoded = base64.urlsafe_b64encode(b"/tmp/not-selected").decode().rstrip("=")
+    out = rrs.resolve_selected_repo("ignored", f"repo:{encoded}")
     assert out is None
 
 

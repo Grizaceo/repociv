@@ -80,7 +80,11 @@ def resolve_selected_repo(repo_id_or_name: str, explicit_path: str = "") -> str 
     if not isinstance(roots, dict):
         return None
 
-    candidate = os.path.expanduser(explicit_path.strip()) if explicit_path.strip() else ""
+    explicit = explicit_path.strip()
+    if explicit.startswith("repo:"):
+        candidate = decode_repo_id(explicit) or ""
+    else:
+        candidate = os.path.expanduser(explicit) if explicit else ""
     if not candidate:
         candidate = decode_repo_id(repo_id_or_name) or ""
     if not candidate:

@@ -1208,7 +1208,7 @@ export async function generateWorld(): Promise<World> {
       id: repo.name,
       name: repo.name,
       coord,
-      repoPath: repo.path,
+      repoPath: repo.repoPath ?? repo.path,
       population: repo.population,
       territory: [], // recalculated below
       districts,

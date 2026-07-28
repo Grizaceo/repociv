@@ -338,6 +338,10 @@ describe('generateWorld', () => {
 
     expect(world.cities.some((city) => city.id === 'repo-a')).toBe(true);
     expect(world.cities.some((city) => city.id === 'repo-b')).toBe(false);
+    const cityA = world.cities.find((city) => city.id === 'repo-a');
+    // Prefer absolute repoPath over encoded id (repo:...) so chat/execute
+    // validate against selected filesystem paths.
+    expect(cityA?.repoPath).toBe('/workspace/repo-a');
   });
 
   it('skips manual-layout repos missing from the workspace scan (no /api/files 404)', async () => {

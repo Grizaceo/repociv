@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -271,6 +272,34 @@ def _resolve_city_path(city_id: str) -> str | None:
     return resolve_agent_working_dir(city_id)
 
 
+def _session_city_slug(city_id: str) -> str:
+    """Normalize city id for Hermes/OpenClaw session keys (unit+city isolation)."""
+    slug = re.sub(r"[^a-z0-9]+", "-", (city_id or "").strip().lower()).strip("-")
+    return slug
+
+
+def _build_stateful_session_id(
+    unit_id: str,
+    city_id: str = "",
+    mission_id: str = "",
+    *,
+    stateful: bool = True,
+) -> str:
+    """Session id for harness adapters.
+
+    Stateful sessions are scoped by unit+city so chatting in CARCOSA does not
+    continue a prior LabHub (or any other city) thread on the same MAIN unit.
+    Stateless / empty / ``main`` cities keep the legacy unit-only key.
+    """
+    unit = (unit_id or "main").strip().lower() or "main"
+    if not stateful:
+        return f"repociv-{unit}-{mission_id}"
+    city = _session_city_slug(city_id)
+    if city and city != "main":
+        return f"repociv-{unit}-{city}"
+    return f"repociv-{unit}"
+
+
 def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
     """Facts about which repo/city this mission targets — models must not invent a fixed home repo."""
     root = _repos_root()
@@ -289,7 +318,9 @@ def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
         f"- **Ciudad / target (`city_id`):** `{city_id}`\n"
         f"{path_line}\n"
         f"- **Raiz de repos (`REPOCIV_MAP_ROOT` / `REPOCIV_REPOS_ROOT` / `WORKSPACE_ROOT`):** `{root}`\n"
-        f"- **Ruta esperada para este target:** `{expected}`\n")
+        f"- **Ruta esperada para este target:** `{expected}`\n"
+        "- **Alcance:** responde solo sobre esta ciudad/repo y su cwd. "
+        "No uses historial, archivos ni estado de otras ciudades.\n")
 
 
 
@@ -777,8 +808,9 @@ def _run_hermes_cli_streaming(
     # Stateful agents (LEXO) persist conversation history across missions via
     # --continue <name>. Stateless agents (WORKER, SCOUT) get a fresh context
     # each mission — omitting --continue is intentional.
+    # Session name is unit+city so city moves do not leak prior-repo history.
     if config.get("stateful", True):
-        session_name = f"repociv-{unit_id.lower().split('-')[0]}"
+        session_name = _build_stateful_session_id(unit_id, city_id, mission_id, stateful=True)
         cmd.extend(["--continue", session_name])
 
     # Override HERMES_HOME to the profile path so the subprocess loads
@@ -1024,10 +1056,9 @@ def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
                              city_id: str = "",
                              model: str = "",
                              harness_ref: str = "") -> tuple[bool, str]:
-    if config.get("stateful", True):
-        session_id = f"repociv-{unit_id.lower()}"
-    else:
-        session_id = f"repociv-{unit_id.lower()}-{mission_id}"
+    session_id = _build_stateful_session_id(
+        unit_id, city_id, mission_id, stateful=config.get("stateful", True),
+    )
 
     openclaw_bin = _find_openclaw()
     if not openclaw_bin:
@@ -1147,11 +1178,11 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
     HERMES_MODEL = model or (_override["model"] if _override else None) or os.environ.get("HERMES_MODEL", "hermes-agent")
 
     cfg = config if config is not None else _get_agent_config(unit_id)
-    # Build session_id matching _run_openclaw_streaming logic for consistency
-    if cfg.get("stateful", True):
-        session_id = f"repociv-{unit_id.lower()}"
-    else:
-        session_id = f"repociv-{unit_id.lower()}-{mission_id}"
+    # Build session_id matching _run_openclaw_streaming logic for consistency.
+    # Include city so MAIN chat in CARCOSA does not continue a LabHub thread.
+    session_id = _build_stateful_session_id(
+        unit_id, city_id, mission_id, stateful=cfg.get("stateful", True),
+    )
 
     spatial = _spatial_context_block(city_id, working_dir)
     system_content = cfg.get("system", "Eres un agente util.") + spatial

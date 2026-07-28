@@ -4,6 +4,23 @@ from urllib.error import URLError
 from server import agent_runner
 
 
+def test_build_stateful_session_id_scopes_by_city():
+    assert agent_runner._build_stateful_session_id("MAIN", "CARCOSA") == "repociv-main-carcosa"
+    assert agent_runner._build_stateful_session_id("MAIN", "labhub") == "repociv-main-labhub"
+    assert agent_runner._build_stateful_session_id("MAIN", "main") == "repociv-main"
+    assert agent_runner._build_stateful_session_id("MAIN", "") == "repociv-main"
+    assert agent_runner._build_stateful_session_id(
+        "MAIN", "CARCOSA", "m9", stateful=False,
+    ) == "repociv-main-m9"
+
+
+def test_spatial_context_block_scopes_to_city(tmp_path, monkeypatch):
+    monkeypatch.setattr(agent_runner, "_repos_root", lambda: str(tmp_path))
+    block = agent_runner._spatial_context_block("CARCOSA", str(tmp_path / "CARCOSA"))
+    assert "CARCOSA" in block
+    assert "otras ciudades" in block
+
+
 def test_run_hermes_streaming_sends_working_directory(monkeypatch, tmp_path):
     captured = {}
     sent = []
@@ -19,17 +36,22 @@ def test_run_hermes_streaming_sends_working_directory(monkeypatch, tmp_path):
 
     def fake_urlopen(req, timeout=0):
         captured["payload"] = req.data
+        captured["headers"] = dict(req.headers)
         return FakeResponse()
 
     monkeypatch.setattr(agent_runner.urllib.request, "urlopen", fake_urlopen)
     monkeypatch.setattr(agent_runner, "send_to_repociv", lambda evt: sent.append(evt))
     monkeypatch.setattr(agent_runner._es, "record_output_chunk", lambda mission_id, unit_id, text: recorded.append((mission_id, unit_id, text)))
 
-    ok, output = agent_runner._run_hermes_streaming("MAIN", "m1", "hola", working_dir=str(tmp_path))
+    ok, output = agent_runner._run_hermes_streaming(
+        "MAIN", "m1", "hola", working_dir=str(tmp_path), city_id="CARCOSA",
+    )
 
     assert ok is True
     assert output == "ok"
     assert f'"working_directory": "{tmp_path}"'.encode() in captured["payload"]
+    assert captured["headers"].get("X-hermes-session-id") == "repociv-main-carcosa" or \
+        captured["headers"].get("X-Hermes-Session-Id") == "repociv-main-carcosa"
     assert sent[-1] == {"type": "chat_chunk", "unit": "MAIN", "missionId": "m1", "text": "ok"}
     assert recorded[-1] == ("m1", "MAIN", "ok")
 
@@ -69,7 +91,7 @@ def test_run_agent_persists_session_and_run_state(monkeypatch, tmp_path):
     monkeypatch.setattr(agent_runner._es, "record_completed", lambda mission_id, result='': completions.append((mission_id, result)))
     monkeypatch.setattr(agent_runner._es, "record_failed", lambda mission_id, error='': failures.append((mission_id, error)))
     monkeypatch.setattr(agent_runner._ds, "record_outcome", lambda mission_id, status, duration: outcomes.append((mission_id, status)))
-    monkeypatch.setattr(agent_runner, "_resolve_city_path", lambda city_id: f"/tmp/{city_id}")
+    monkeypatch.setattr(agent_runner, "resolve_agent_working_dir", lambda city_id, repo_path="": f"/tmp/{city_id}")
     monkeypatch.setattr(
         agent_runner,
         "_execute_streaming",
