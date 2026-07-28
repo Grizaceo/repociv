@@ -18,6 +18,7 @@ import { approveCommand, rejectCommand } from '../../commandBus.ts';
 export function renderChatHistory(unitId: string): void {
   const container = document.getElementById('chat-messages');
   if (!container) return;
+  container.dataset['activeUnit'] = unitId;
   container.innerHTML = '';
 
   const history = chatHistory.get(unitId) ?? [];
@@ -30,6 +31,7 @@ export function renderChatHistory(unitId: string): void {
     const msgEl = document.createElement('div');
     msgEl.className = `chat-msg ${msg.role}`;
     msgEl.dataset['raw'] = msg.text;
+    msgEl.dataset['unit'] = unitId;
     msgEl.innerHTML = `<div class="chat-msg-head">
       <div class="chat-msg-meta">
         <span>${msg.role === 'user' ? 'TÚ' : unitId.toUpperCase()} · ${msg.timestamp}</span>
@@ -39,6 +41,12 @@ export function renderChatHistory(unitId: string): void {
     <div class="chat-body">${msg.role === 'user' ? escapeHtml(msg.text) : renderMarkdown(msg.text)}</div>`;
     container.appendChild(msgEl);
   }
+}
+
+/** True when #chat-messages is currently showing this unit's transcript. */
+function isChatDomBoundTo(unitId: string): boolean {
+  const container = document.getElementById('chat-messages');
+  return !!container && container.dataset['activeUnit'] === unitId && getActiveChatUnit() === unitId;
 }
 
 /** Mark an agent as having new messages (for notification badge) */
@@ -56,13 +64,10 @@ export function appendChatChunk(unitId: string, text: string): void {
   const newText = prev + text;
   chatBuffers.set(unitId, newText);
 
-  const activeChatUnit = getActiveChatUnit();
-
-  // If this agent is not the active one, mark it as having new messages
-  // and update history so the full text is available when switching back
-  if (activeChatUnit !== unitId) {
+  // If this agent is not the active one OR the shared DOM still shows another
+  // unit's transcript, keep the chunk in that unit's history only (badge).
+  if (!isChatDomBoundTo(unitId)) {
     markAgentHasNewMessages(unitId);
-    // Ensure chip exists
     ensureChipExists(unitId);
     const history = chatHistory.get(unitId) ?? [];
     const idx = currentAgentMessageIndex.get(unitId);
@@ -73,38 +78,37 @@ export function appendChatChunk(unitId: string, text: string): void {
         chatHistory.set(unitId, history);
       }
     }
+    return;
   }
 
-  if (activeChatUnit === unitId) {
-    ensureLiveAgentBubble(unitId);
-    const history = chatHistory.get(unitId) ?? [];
-    const idx = currentAgentMessageIndex.get(unitId);
-    if (idx !== undefined && idx >= 0 && idx < history.length) {
-      const msg = history[idx];
-      if (!msg) return;
-      history[idx] = { role: msg.role, text: newText, timestamp: msg.timestamp };
-      chatHistory.set(unitId, history);
-    }
-    // Read scroll position before any DOM write to avoid forced reflow
-    const container = document.getElementById('chat-messages');
-    const isNearBottom = container
-      ? container.scrollTop + container.clientHeight >= container.scrollHeight - 50
-      : false;
+  ensureLiveAgentBubble(unitId);
+  const history = chatHistory.get(unitId) ?? [];
+  const idx = currentAgentMessageIndex.get(unitId);
+  if (idx !== undefined && idx >= 0 && idx < history.length) {
+    const msg = history[idx];
+    if (!msg) return;
+    history[idx] = { role: msg.role, text: newText, timestamp: msg.timestamp };
+    chatHistory.set(unitId, history);
+  }
+  // Read scroll position before any DOM write to avoid forced reflow
+  const container = document.getElementById('chat-messages');
+  const isNearBottom = container
+    ? container.scrollTop + container.clientHeight >= container.scrollHeight - 50
+    : false;
 
-    const bubble = currentAgentBubble.get(unitId);
-    if (bubble) {
-      const body = bubble.querySelector<HTMLElement>('.chat-body');
-      if (body) body.innerHTML = renderMarkdown(newText);
-      bubble.dataset['raw'] = newText;
-      const errBtn = bubble.querySelector<HTMLElement>('.chat-error-btn');
-      if (errBtn) {
-        errBtn.classList.toggle('hidden', !hasErrorLine(newText));
-      }
+  const bubble = currentAgentBubble.get(unitId);
+  if (bubble) {
+    const body = bubble.querySelector<HTMLElement>('.chat-body');
+    if (body) body.innerHTML = renderMarkdown(newText);
+    bubble.dataset['raw'] = newText;
+    const errBtn = bubble.querySelector<HTMLElement>('.chat-error-btn');
+    if (errBtn) {
+      errBtn.classList.toggle('hidden', !hasErrorLine(newText));
     }
+  }
 
-    if (container && isNearBottom) {
-      container.scrollTop = container.scrollHeight;
-    }
+  if (container && isNearBottom) {
+    container.scrollTop = container.scrollHeight;
   }
 }
 
@@ -112,9 +116,7 @@ export function appendUserMessage(unitId: string, text: string): void {
   const container = document.getElementById('chat-messages');
   if (!container) return;
 
-  const activeChatUnit = getActiveChatUnit();
-
-  if (activeChatUnit !== unitId) {
+  if (!isChatDomBoundTo(unitId)) {
     markAgentHasNewMessages(unitId);
     // Ensure chip exists
     ensureChipExists(unitId);
@@ -268,6 +270,11 @@ export function appendApprovalCard(
   target: string,
   risk: string,
 ): void {
+  if (!isChatDomBoundTo(unitId)) {
+    markAgentHasNewMessages(unitId);
+    ensureChipExists(unitId);
+    return;
+  }
   const container = document.getElementById('chat-messages');
   if (!container) return;
 

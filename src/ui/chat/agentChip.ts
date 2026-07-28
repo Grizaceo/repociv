@@ -159,43 +159,56 @@ export function ensureChipExists(unitId: string): void {
   container.appendChild(createChip(unitId, isActive));
 }
 
-/** Switch active agent + refresh UI. */
-export async function handleChipClick(unitId: string): Promise<void> {
-  if (unitId === getActiveChatUnit()) return;
+function syncChipActiveState(unitId: string): void {
+  const container = document.getElementById('chat-agent-selector');
+  if (!container) return;
+  for (const chip of container.querySelectorAll<HTMLElement>('.chat-agent-chip')) {
+    const isActive = chip.dataset['unit'] === unitId;
+    chip.classList.toggle('active', isActive);
+    if (isActive) {
+      const badge = chip.querySelector<HTMLElement>('.chip-badge');
+      if (badge) badge.classList.remove('active');
+    }
+  }
+}
+
+/**
+ * Switch the visible chat transcript to `unitId`.
+ * Always re-renders history when `force` is true, or when the active unit changes —
+ * critical so SCOUT messages never append on top of MAIN's DOM.
+ */
+export async function switchToChatUnit(
+  unitId: string,
+  opts: { force?: boolean } = {},
+): Promise<void> {
+  const alreadyActive = unitId === getActiveChatUnit();
+  if (alreadyActive && !opts.force) {
+    ensureChipExists(unitId);
+    syncChipActiveState(unitId);
+    updateChatTargetIndicator();
+    return;
+  }
 
   setActiveChatUnit(unitId);
   agentsWithNewMessages.delete(unitId);
+  ensureChipExists(unitId);
+  syncChipActiveState(unitId);
 
-  const container = document.getElementById('chat-agent-selector');
-  if (container) {
-    for (const chip of container.querySelectorAll<HTMLElement>('.chat-agent-chip')) {
-      const isActive = chip.dataset['unit'] === unitId;
-      chip.classList.toggle('active', isActive);
-      if (isActive) {
-        const badge = chip.querySelector<HTMLElement>('.chip-badge');
-        if (badge) badge.classList.remove('active');
-      }
-    }
-  }
-
-  // Dynamic import breaks the init-time cycle with history.ts
-  const { renderChatHistory } = await import('./history.ts');
+  const { renderChatHistory, renderChatBuffer } = await import('./history.ts');
   renderChatHistory(unitId);
+  renderChatBuffer(unitId);
 
-  // Restore saved harness/provider/model config for this agent.
   loadConfigForUnit(unitId);
-
   updateChatTargetIndicator();
 
   const nameEl = document.getElementById('side-hero-name');
   if (nameEl) nameEl.textContent = unitId.toUpperCase();
-  // The side-hero-state element should reflect the actual state of the
-  // unit whose chat is now active. Previously this was hardcoded to
-  // 'IDLE' which left the label stale when switching from a working
-  // agent to an idle one (e.g. user has H working, switches to SCOUT
-  // tab, the panel still says "WORKING" because nothing updated it).
-  // Read the live state from workingUnits and re-render accordingly.
   updateSideHeroState(unitId);
+}
+
+/** Switch active agent + refresh UI (chip click). */
+export async function handleChipClick(unitId: string): Promise<void> {
+  await switchToChatUnit(unitId);
 }
 
 /** Re-render the side-hero-state element for the given unit.

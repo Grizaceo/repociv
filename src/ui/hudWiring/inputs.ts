@@ -1,5 +1,5 @@
 // ─── HUD button + input wiring (non-hotkey) ─────────────────────────────────
-import { tileKey, type Unit } from '../../types.ts';
+import { tileKey } from '../../types.ts';
 import { trackMessageSent } from '../analytics.ts';
 import { agentTooltip } from '../agentGlossary.ts';
 import { type Renderer } from '../../renderer.ts';
@@ -29,6 +29,8 @@ import { takeScreenshot } from './screenshot.ts';
 import type { CommandDraft, CommandType } from '../../commandSchema.ts';
 import { sendCommand } from '../../commandBus.ts';
 import { buildExecuteAgentPayload } from './executeAgentPayload.ts';
+import { findUnitForChatId, resolveChatDispatchUnitId } from './resolveChatDispatchUnit.ts';
+import { switchToChatUnit } from '../chat/agentChip.ts';
 
 export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeEvents): void {
   const missionInput = document.getElementById('mission-input') as HTMLInputElement;
@@ -73,42 +75,24 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
   const chatInput = document.getElementById('chat-input') as HTMLInputElement | null;
 
   const sendMessage = async (input: HTMLInputElement | null) => {
-    // 1) Resolve target unit: honor the user's explicit agent choice.
-    // Priority:
-    //   a) Active chip when the side panel is open (visible to the user).
-    //   b) Last chip persisted to localStorage when the panel is closed —
-    //      otherwise we'd dispatch to state.selectedUnit while openSidePanel()
-    //      below restores the saved chip, splitting dispatch from the UI and
-    //      making a second parallel message silently land on the wrong agent.
-    const chipActive = document.querySelector<HTMLElement>('.chat-agent-chip.active');
-    let selectorUnitId: string | undefined = isSidePanelOpen()
-      ? chipActive?.dataset['unit']
-      : undefined;
-    if (!selectorUnitId && !isSidePanelOpen()) {
-      const saved = (() => {
-        try {
-          return localStorage.getItem('repociv:lastChatUnit');
-        } catch {
-          return null;
-        }
-      })();
-      if (saved && state.getUnit(saved)) selectorUnitId = saved;
-    }
-    const prefersSelector = !!selectorUnitId && selectorUnitId !== state.selectedUnit?.id;
+    if (!input || !input.value.trim()) return;
 
-    let targetUnit: Unit | null = null;
-    if (prefersSelector && selectorUnitId) {
-      targetUnit = state.getUnit(selectorUnitId) ?? null;
-    }
-    const unit = targetUnit ?? state.selectedUnit;
-    if (!unit || !input || !input.value.trim()) return;
+    // Chat tab / chip is the source of truth — never fall back to board MAIN
+    // while the user is viewing SCOUT/WORKER (that was collapsing replies).
+    const chatUnitId = resolveChatDispatchUnitId(state);
+    if (!chatUnitId) return;
 
-    // 2) Resolve city: pick one whose repoPath we can actually send to the
-    //    backend. Sending execute_agent with an empty repoPath is rejected
-    //    by the bridge when target != MAIN; fall back through cities[0] only
-    //    when none carry a real path.
+    const matched = findUnitForChatId(state, chatUnitId);
+    const unit = matched ?? state.selectedUnit ?? null;
+    // Prefer the living unit id when chip said "SCOUT" but board has "SCOUT-1".
+    const dispatchUnitId = matched?.id ?? chatUnitId;
+    // Force chip + transcript swap BEFORE any append — otherwise SCOUT
+    // bubbles paint on top of MAIN's uncleared #chat-messages DOM.
+    await switchToChatUnit(dispatchUnitId, { force: true });
+
+    // City under the chatting unit (or any city with a real repoPath).
     let resolvedCity = state.world.cities.find((c) => c.repoPath?.trim());
-    if (!prefersSelector || targetUnit) {
+    if (unit) {
       const lookupCoord = unit.targetCoord ?? unit.coord;
       const tile = state.world.tiles.get(tileKey(lookupCoord));
       const cityFromTile =
@@ -127,9 +111,12 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
 
     // ─── Slash-command interceptor ─────────────────────────────────────────
     if (text.startsWith('/')) {
-      if (!isSidePanelOpen()) openSidePanel(unit);
+      if (!isSidePanelOpen()) {
+        if (unit && unit.id === dispatchUnitId) await openSidePanel(unit);
+        else document.getElementById('side-panel')?.classList.remove('hidden');
+      }
       const appendFn = (uid: string, msg: string) => appendSystemMessage(uid, msg);
-      const handled = await handleSlashCommand(text, unit.id, appendFn);
+      const handled = await handleSlashCommand(text, dispatchUnitId, appendFn);
       if (handled) {
         input.value = '';
         return;
@@ -137,7 +124,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
       // /retry falls through (handled=false) — re-use last message from history
       const lastUserMsg = (() => {
         try {
-          const raw = localStorage.getItem(`repociv:lastMsg:${unit.id}`);
+          const raw = localStorage.getItem(`repociv:lastMsg:${dispatchUnitId}`);
           return raw ?? '';
         } catch {
           return '';
@@ -145,11 +132,11 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
       })();
       if (text.toLowerCase().startsWith('/retry')) {
         if (lastUserMsg && !lastUserMsg.startsWith('/')) {
-          appendSystemMessage(unit.id, '🔄 Reenviando último mensaje...');
+          appendSystemMessage(dispatchUnitId, '🔄 Reenviando último mensaje...');
           input.value = lastUserMsg;
           sendMessage(input);
         } else {
-          appendSystemMessage(unit.id, '❌ No hay mensaje anterior para reenviar.');
+          appendSystemMessage(dispatchUnitId, '❌ No hay mensaje anterior para reenviar.');
         }
         input.value = '';
         return;
@@ -160,58 +147,54 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
 
     // Persist last message for /retry
     try {
-      localStorage.setItem(`repociv:lastMsg:${unit.id}`, text);
+      localStorage.setItem(`repociv:lastMsg:${dispatchUnitId}`, text);
     } catch {
       /* ignore */
     }
 
-    if (!isSidePanelOpen()) openSidePanel(unit);
-    appendUserMessage(unit.id, text);
-    trackMessageSent(unit.id);
+    if (!isSidePanelOpen()) {
+      // Never open the panel bound to a different board unit than dispatch —
+      // that re-rendered MAIN over SCOUT and mixed the shared chat DOM.
+      if (unit && unit.id === dispatchUnitId) {
+        await openSidePanel(unit);
+      } else {
+        document.getElementById('side-panel')?.classList.remove('hidden');
+        await switchToChatUnit(dispatchUnitId, { force: true });
+      }
+    }
+    appendUserMessage(dispatchUnitId, text);
+    trackMessageSent(dispatchUnitId);
     const chatCommandType: CommandType = 'execute_agent';
-    // The bridge accepts chat dispatch under the generic 'MAIN' target
-    // — it's the umbrella handler. The actual target unit is conveyed
-    // in payload.unit BUT must be MAIN here too: the bridge rejects
-    // any execute_agent whose payload.unit != MAIN unless repoPath
-    // points at a registered repository. Reserve unit-specific
-    // payloads for code paths that already know the registered repo.
-    const targetForCommand = 'MAIN';
+    const targetForCommand = dispatchUnitId;
 
     // Include 3-layer config from chat UI: harness + provider + model.
-    // Note: harness is forced to '' (auto) for chat dispatch because the
-    // bridge validator only accepts unit=MAIN with harness in {'', 'auto',
-    // 'hermes'}. Any other harness ('hermes-cli', 'cursor', etc.) requires
-    // a registered repoPath, which chat doesn't provide. The model+provider
-    // are still forwarded so the chat execution still respects user choice
-    // inside the 'auto' fallback path of the bridge.
+    // Chat keeps harness as '' (auto/hermes path) so repo-less turns stay
+    // allowed for any unit; model+provider still forward user choice.
     const { provider, model } = getSelectedConfig();
     const draft: CommandDraft = {
       type: chatCommandType,
       target: targetForCommand,
       payload: buildExecuteAgentPayload(
         resolvedCity ?? null,
-        'MAIN',
+        dispatchUnitId,
         text,
         '', // harness forced empty — bridge treats '' and 'auto' identically
         model,
         provider,
-        unit.type,
+        unit?.type ?? '',
       ),
     };
-
-    // Visual indicator keeps reflecting the unit the user thinks they're
-    // talking to — the actual execution routes through MAIN inside the
-    // bridge, which is what allows the chat to work without registering
-    // a per-unit repo. Loss of fidelity for chat dispatch only; spatial
-    // directives (drag/drop) keep using unit.id directly.
 
     // Update target indicator to reflect actual dispatch target
     const indicator = document.getElementById('chat-target-indicator');
     if (indicator) {
       const icon = document.querySelector('.chat-agent-chip.active .chip-icon')?.textContent ?? '⬡';
-      indicator.textContent = `${icon} ${unit.id.toUpperCase()}`;
-      indicator.title = `Enviando a: ${unit.id.toUpperCase()}`;
+      indicator.textContent = `${icon} ${dispatchUnitId.toUpperCase()}`;
+      indicator.title = `Enviando a: ${dispatchUnitId.toUpperCase()}`;
     }
+
+    // eslint-disable-next-line no-console
+    console.info('[chat] dispatch', { dispatchUnitId, city: resolvedCity?.id, draft });
 
     void sendCommand(draft)
       .then((res) => {
@@ -219,18 +202,22 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
           const detail = res.reason || res.status || `HTTP error (status ${res.status})`;
           // eslint-disable-next-line no-console
           console.warn('[chat] command rejected', { draft, res, detail });
-          appendSystemMessage(unit.id, `❌ Comando rechazado: ${detail}`);
+          appendSystemMessage(dispatchUnitId, `❌ Comando rechazado: ${detail}`);
         } else {
           // eslint-disable-next-line no-console
-          console.info('[chat] command queued', { commandId: res.commandId, status: res.status });
+          console.info('[chat] command queued', {
+            commandId: res.commandId,
+            status: res.status,
+            unit: dispatchUnitId,
+          });
         }
       })
       .catch((err) => {
         // eslint-disable-next-line no-console
         console.error('[chat] sendCommand threw', err, { draft });
-        appendSystemMessage(unit.id, '❌ No se pudo enviar el mensaje al bridge.');
+        appendSystemMessage(dispatchUnitId, '❌ No se pudo enviar el mensaje al bridge.');
       });
-    state.setUnitState(unit.id, 'working');
+    if (unit) state.setUnitState(unit.id, 'working');
     input.value = '';
   };
 

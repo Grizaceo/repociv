@@ -83,6 +83,24 @@ def test_command_target_validation_fails_fast_on_unselected_or_repo_less_cli(
     )
     assert "repoPath" in (_validate_command_target(repo_less_cli) or "")
 
+    repo_less_worker = validate_command(
+        {
+            "type": "execute_agent",
+            "target": "WORKER",
+            "payload": {"unit": "WORKER", "mission": "Status check"},
+        }
+    )
+    assert _validate_command_target(repo_less_worker) is None
+
+    repo_less_scout = validate_command(
+        {
+            "type": "execute_agent",
+            "target": "SCOUT",
+            "payload": {"unit": "SCOUT", "mission": "Scout status", "harness": "hermes"},
+        }
+    )
+    assert _validate_command_target(repo_less_scout) is None
+
 
 def test_agent_workdir_requires_persisted_selection(monkeypatch, tmp_path: Path):
     root = tmp_path / "root"

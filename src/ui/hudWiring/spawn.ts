@@ -24,9 +24,10 @@ export function selectHero(
   showUnitPanel(unit, state);
   renderHeroBar(state, (u) => selectHero(u, renderer, state, _bridge));
 
-  // Auto-open side panel & load city context if hero is on a city
+  // Only sync chat when the side panel is already open. Map-only clicks must
+  // not overwrite the active chat tab (that sent SCOUT replies into MAIN).
   if (isSidePanelOpen()) {
-    openSidePanel(unit);
+    void openSidePanel(unit);
     const cityHere = state.world.cities.find(
       (c) => c.coord.q === unit.coord.q && c.coord.r === unit.coord.r,
     );

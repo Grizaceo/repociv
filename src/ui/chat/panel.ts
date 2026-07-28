@@ -2,24 +2,21 @@
 import type { Unit } from '../../types.ts';
 import { trapFocus } from '../focusTrap.ts';
 import {
-  setActiveChatUnit,
-  chatHistory,
   updateChatTargetIndicator,
   getSidePanelCleanup,
   setSidePanelCleanup,
 } from './state.ts';
 import { escapeHtml } from '../escapeHtml.ts';
-import { renderChatHistory, renderChatBuffer } from './history.ts';
 import { initAgentSelector } from './agentSelector.ts';
 import { initProviderSelectors } from './modelSelector.ts';
+import { switchToChatUnit } from './agentChip.ts';
 
-export function openSidePanel(unit: Unit): void {
+export async function openSidePanel(unit: Unit): Promise<void> {
   const panel = document.getElementById('side-panel');
   if (!panel) return;
   panel.classList.remove('hidden');
   getSidePanelCleanup()?.();
   setSidePanelCleanup(trapFocus(panel));
-  setActiveChatUnit(unit.id);
 
   const setText = (id: string, value: string) => {
     const el = document.getElementById(id);
@@ -35,14 +32,9 @@ export function openSidePanel(unit: Unit): void {
 
   initProviderSelectors();
 
-  // Chat target: prefer saved chip preference so the user's last-selected
-  // conversation survives panel close/reopen. Falls back to hex-selected unit.
-  const savedChatUnit = localStorage.getItem('repociv:lastChatUnit');
-  const chatTargetId = savedChatUnit && chatHistory.has(savedChatUnit) ? savedChatUnit : unit.id;
-  setActiveChatUnit(chatTargetId);
-  initAgentSelector(chatTargetId);
-  renderChatHistory(chatTargetId);
-  renderChatBuffer(chatTargetId);
+  // Bind chips + transcript to this unit (independent chat per agent).
+  initAgentSelector(unit.id);
+  await switchToChatUnit(unit.id, { force: true });
   updateChatTargetIndicator();
 
   const chatContainer = document.getElementById('chat-messages');

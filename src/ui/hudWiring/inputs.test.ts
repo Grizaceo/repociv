@@ -35,4 +35,13 @@ describe('buildExecuteAgentPayload', () => {
       harness: 'hermes',
     });
   });
+
+  it('preserves non-MAIN unit ids for independent chat routing', () => {
+    expect(buildExecuteAgentPayload(null, 'SCOUT', 'Scout the area', '', '')).toMatchObject({
+      city: 'main',
+      repoPath: '',
+      unit: 'SCOUT',
+      mission: 'Scout the area',
+    });
+  });
 });

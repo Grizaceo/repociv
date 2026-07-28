@@ -277,7 +277,7 @@ export function wireHotkeys(
       trackHotkey('Enter:side-panel');
       if (!isSidePanelOpen()) trackPanelOpen('side-panel');
       if (isSidePanelOpen()) closeSidePanel();
-      else openSidePanel(unit);
+      else void openSidePanel(unit);
       return;
     }
 

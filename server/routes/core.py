@@ -633,11 +633,12 @@ def _validate_command_target(cmd: Any) -> str | None:
     from server import repo_roots_state as _rrs
 
     payload = cmd.payload
-    unit = str(payload.get("unit") or "MAIN").split("-")[0].upper()
     harness = str(payload.get("harness") or "").strip().lower()
     raw_repo = str(payload.get("repoPath") or "").strip()
     if not raw_repo:
-        if unit == "MAIN" and harness in {"", "auto", "hermes"}:
+        # Chat/hermes path: any unit may talk without a registered repoPath.
+        # CLI harnesses (claude/cursor/codex/…) still require a selected repo.
+        if harness in {"", "auto", "hermes"}:
             return None
         return "execute_agent requires repoPath for non-MAIN or CLI harnesses"
     selected = _rrs.resolve_selected_repo(str(payload.get("city") or cmd.target), raw_repo)
