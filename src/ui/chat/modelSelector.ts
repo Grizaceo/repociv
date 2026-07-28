@@ -278,33 +278,13 @@ function fetchBridgeHealth(): void {
 }
 
 function updateSwarmBadge(): void {
+  // Swarm tracking is not actually wired up to the chat dispatch — it's an
+  // aspirational feature that displays misleading status. Hide the badge
+  // entirely until it's a real, observable behaviour.
   const wrapper = document.getElementById('model-selector-wrapper');
   if (!wrapper) return;
-  let badge = wrapper.querySelector<HTMLElement>('.swarm-tracking-badge');
-  if (!badge) {
-    badge = document.createElement('span');
-    badge.className = 'swarm-tracking-badge';
-    wrapper.appendChild(badge);
-  }
-  const harness = _selectedHarness || 'auto';
-  if (harness === 'auto') {
-    badge.textContent = _cursorAvailable ? 'Swarm: on (cursor)' : 'Swarm: off';
-    return;
-  }
-  if (isSwarmTrackingAvailable(harness)) {
-    badge.textContent = `Swarm: on (${harness})`;
-    return;
-  }
-  if (harness === 'hermes' || harness === 'hermes-cli') {
-    badge.textContent = `Swarm: limited (${harness})`;
-    return;
-  }
-  badge.textContent = 'Swarm: off';
-  badge.title = isSwarmTrackingAvailable(harness)
-    ? 'Task subagents con run_in_background se trackean en Orden de batalla'
-    : _cursorAvailable
-      ? 'Selecciona harness cursor para ver detachments en el mapa'
-      : 'cursor-agent no instalado — Swarm tracking no disponible';
+  const badge = wrapper.querySelector<HTMLElement>('.swarm-tracking-badge');
+  if (badge) badge.remove();
 }
 
 /** Update the small status dot / tooltip showing current provider health. */

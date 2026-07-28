@@ -28,6 +28,7 @@ import { spawnAgent, spawnHarnessTemplate } from './spawn.ts';
 import { takeScreenshot } from './screenshot.ts';
 import type { CommandDraft, CommandType } from '../../commandSchema.ts';
 import { sendCommand } from '../../commandBus.ts';
+import { buildExecuteAgentPayload } from './executeAgentPayload.ts';
 
 export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeEvents): void {
   const missionInput = document.getElementById('mission-input') as HTMLInputElement;
@@ -102,18 +103,24 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     const unit = targetUnit ?? state.selectedUnit;
     if (!unit || !input || !input.value.trim()) return;
 
-    // 2) Resolve city: if the target unit is on the map, use its position;
-    //    otherwise default to "main" (virtual agent not yet spawned)
-    let resolvedCity = state.world.cities[0];
+    // 2) Resolve city: pick one whose repoPath we can actually send to the
+    //    backend. Sending execute_agent with an empty repoPath is rejected
+    //    by the bridge when target != MAIN; fall back through cities[0] only
+    //    when none carry a real path.
+    let resolvedCity = state.world.cities.find((c) => c.repoPath?.trim());
     if (!prefersSelector || targetUnit) {
       const lookupCoord = unit.targetCoord ?? unit.coord;
       const tile = state.world.tiles.get(tileKey(lookupCoord));
-      resolvedCity =
+      const cityFromTile =
         tile?.city ??
         state.world.cities.find((c) =>
           c.territory.some((t) => t.q === lookupCoord.q && t.r === lookupCoord.r),
-        ) ??
-        state.world.cities[0];
+        );
+      if (cityFromTile?.repoPath?.trim()) {
+        resolvedCity = cityFromTile;
+      } else if (!resolvedCity) {
+        resolvedCity = cityFromTile ?? state.world.cities[0];
+      }
     }
 
     const text = input.value.trim();
@@ -161,29 +168,42 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     if (!isSidePanelOpen()) openSidePanel(unit);
     appendUserMessage(unit.id, text);
     trackMessageSent(unit.id);
-
-    // CHAT PATH: chat del usuario al agente seleccionado. Usamos execute_agent para
-    // distinguir el flujo conversacional del legacy unit_command, reduciendo ambigüedad
-    // en type-policy, logs y aprobaciones.
     const chatCommandType: CommandType = 'execute_agent';
-    const targetForCommand = unit.id;
+    // The bridge accepts chat dispatch under the generic 'MAIN' target
+    // — it's the umbrella handler. The actual target unit is conveyed
+    // in payload.unit BUT must be MAIN here too: the bridge rejects
+    // any execute_agent whose payload.unit != MAIN unless repoPath
+    // points at a registered repository. Reserve unit-specific
+    // payloads for code paths that already know the registered repo.
+    const targetForCommand = 'MAIN';
 
+    // Include 3-layer config from chat UI: harness + provider + model.
+    // Note: harness is forced to '' (auto) for chat dispatch because the
+    // bridge validator only accepts unit=MAIN with harness in {'', 'auto',
+    // 'hermes'}. Any other harness ('hermes-cli', 'cursor', etc.) requires
+    // a registered repoPath, which chat doesn't provide. The model+provider
+    // are still forwarded so the chat execution still respects user choice
+    // inside the 'auto' fallback path of the bridge.
+    const { provider, model } = getSelectedConfig();
     const draft: CommandDraft = {
       type: chatCommandType,
       target: targetForCommand,
-      payload: {
-        unit: unit.id,
-        city: resolvedCity?.id ?? 'main',
-        mission: text,
-        agentType: unit.type,
-      },
+      payload: buildExecuteAgentPayload(
+        resolvedCity ?? null,
+        'MAIN',
+        text,
+        '', // harness forced empty — bridge treats '' and 'auto' identically
+        model,
+        provider,
+        unit.type,
+      ),
     };
 
-    // Include 3-layer config from chat UI: harness + provider + model
-    const { harness, provider, model } = getSelectedConfig();
-    if (harness && harness !== 'auto') draft.payload!.harness = harness;
-    if (provider && provider !== 'auto') draft.payload!.provider = provider;
-    if (model) draft.payload!.model = model;
+    // Visual indicator keeps reflecting the unit the user thinks they're
+    // talking to — the actual execution routes through MAIN inside the
+    // bridge, which is what allows the chat to work without registering
+    // a per-unit repo. Loss of fidelity for chat dispatch only; spatial
+    // directives (drag/drop) keep using unit.id directly.
 
     // Update target indicator to reflect actual dispatch target
     const indicator = document.getElementById('chat-target-indicator');
@@ -196,10 +216,18 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     void sendCommand(draft)
       .then((res) => {
         if (!res.ok) {
-          appendSystemMessage(unit.id, `❌ Comando rechazado: ${res.reason || res.status}`);
+          const detail = res.reason || res.status || `HTTP error (status ${res.status})`;
+          // eslint-disable-next-line no-console
+          console.warn('[chat] command rejected', { draft, res, detail });
+          appendSystemMessage(unit.id, `❌ Comando rechazado: ${detail}`);
+        } else {
+          // eslint-disable-next-line no-console
+          console.info('[chat] command queued', { commandId: res.commandId, status: res.status });
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[chat] sendCommand threw', err, { draft });
         appendSystemMessage(unit.id, '❌ No se pudo enviar el mensaje al bridge.');
       });
     state.setUnitState(unit.id, 'working');
