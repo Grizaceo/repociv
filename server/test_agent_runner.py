@@ -56,6 +56,69 @@ def test_run_hermes_streaming_sends_working_directory(monkeypatch, tmp_path):
     assert recorded[-1] == ("m1", "MAIN", "ok")
 
 
+def test_run_hermes_streaming_sends_provider_and_model(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+        def __exit__(self, *_args):
+            return False
+        def read(self):
+            return b'{"choices":[{"message":{"content":"ok"}}]}'
+
+    def fake_urlopen(req, timeout=0):
+        captured["body"] = json.loads(req.data.decode())
+        return FakeResponse()
+
+    monkeypatch.setattr(agent_runner.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(agent_runner, "send_to_repociv", lambda _evt: None)
+    monkeypatch.setattr(agent_runner._es, "record_output_chunk", lambda *_a, **_k: None)
+    agent_runner._model_overrides.clear()
+
+    ok, _ = agent_runner._run_hermes_streaming(
+        "SCOUT",
+        "m2",
+        "ping",
+        model="MiniMax-M3",
+        provider="minimax",
+        city_id="CARCOSA",
+    )
+
+    assert ok is True
+    assert captured["body"]["model"] == "MiniMax-M3"
+    assert captured["body"]["provider"] == "minimax"
+
+
+def test_run_hermes_streaming_payload_beats_override(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+        def __exit__(self, *_args):
+            return False
+        def read(self):
+            return b'{"choices":[{"message":{"content":"ok"}}]}'
+
+    def fake_urlopen(req, timeout=0):
+        captured["body"] = json.loads(req.data.decode())
+        return FakeResponse()
+
+    monkeypatch.setattr(agent_runner.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(agent_runner, "send_to_repociv", lambda _evt: None)
+    monkeypatch.setattr(agent_runner._es, "record_output_chunk", lambda *_a, **_k: None)
+    agent_runner.set_model_override("MAIN", "openai", "gpt-stale")
+
+    ok, _ = agent_runner._run_hermes_streaming(
+        "MAIN", "m3", "ping", model="fresh-model", provider="anthropic",
+    )
+
+    assert ok is True
+    assert captured["body"]["model"] == "fresh-model"
+    assert captured["body"]["provider"] == "anthropic"
+
+
 def test_run_hermes_streaming_emits_visible_error(monkeypatch):
     sent = []
     recorded = []
@@ -150,18 +213,21 @@ def test_run_cursor_agent_streaming_missing_binary(monkeypatch):
     assert sent[0]["type"] == "chat_chunk"
 
 
-def test_execute_streaming_cursor_bypass_uses_cursor_agent(monkeypatch):
+def test_execute_streaming_cursor_bypass_uses_cursor_agent(monkeypatch, tmp_path):
     called = {}
     monkeypatch.setattr(agent_runner, "_container_mode_enabled", lambda: False)
     monkeypatch.setattr(agent_runner, "send_to_repociv", lambda evt: None)
 
-    def fake_cursor_runner(unit_id, mission_id, mission, config, working_dir=None, city_id="", model=""):
+    def fake_cursor_runners(unit_id, mission_id, mission, config, working_dir=None, city_id="", model=""):
         called["args"] = (unit_id, mission_id, mission, city_id, model)
         return True, "ok"
 
-    monkeypatch.setattr(agent_runner, "_run_cursor_agent_streaming", fake_cursor_runner)
+    monkeypatch.setattr(agent_runner, "_run_cursor_agent_streaming", fake_cursor_runners)
 
-    ok, output = agent_runner._execute_streaming("CURSOR", "m-cur", "inspect repo", city_id="repociv", model="gpt-5.4")
+    ok, output = agent_runner._execute_streaming(
+        "CURSOR", "m-cur", "inspect repo",
+        working_dir=str(tmp_path), city_id="repociv", model="gpt-5.4",
+    )
 
     assert ok is True
     assert output == "ok"

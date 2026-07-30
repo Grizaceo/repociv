@@ -483,12 +483,14 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
         return False, text.strip()
 
     if not working_dir:
-        if base != "MAIN" or harness not in ("", "auto", "hermes"):
+        # Align with _validate_command_target: hermes/auto may run without a
+        # selected repo for any unit; CLI harnesses still need a cwd.
+        if harness not in ("", "auto", "hermes"):
             text = "[security blocked] selected repository required for CLI agent execution\n"
             send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
             _es.record_output_chunk(mission_id, unit_id, text)
             return False, text.strip()
-        # Repo-less MAIN is conversational only: direct Hermes HTTP, no CLI
+        # Repo-less chat is conversational only: direct Hermes HTTP, no CLI
         # cascade and no inherited bridge working directory.
         return _run_hermes_streaming(
             unit_id,
@@ -497,7 +499,8 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
             config,
             None,
             city_id,
-            model=model or provider,
+            model=model,
+            provider=provider,
         )
 
     # Resolve harness from registry if not provided by payload.
@@ -593,7 +596,7 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
                                                      city_id, model=model or provider)
                 send_to_repociv({"type": "log", "msg": f"[{unit_id}] perfil configurado pero hermes CLI no encontrado", "level": "warn"})
             return _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
-                                         model=model or provider)
+                                         model=model, provider=provider)
         # Unknown harness — fall through to cascade with a warning
         send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness '{harness}' no reconocido, usando cascade", "level": "warn"})
 
@@ -610,7 +613,10 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
         send_to_repociv({"type": "log", "msg": f"[{unit_id}] perfil configurado pero hermes CLI no encontrado — cayendo a HTTP", "level": "warn"})
 
     send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: hermes", "level": "info"})
-    success, output = _run_hermes_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model or provider)
+    success, output = _run_hermes_streaming(
+        unit_id, mission_id, mission, config, working_dir, city_id,
+        model=model, provider=provider,
+    )
     if success:
         return success, output
 
@@ -1170,12 +1176,26 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
                            config: dict[str, Any] | None = None,
                            working_dir: str | None = None,
                            city_id: str = "",
-                           model: str = "") -> tuple[bool, str]:
+                           model: str = "",
+                           provider: str = "") -> tuple[bool, str]:
     HERMES_URL   = os.environ.get("HERMES_URL",   "http://localhost:8642/v1/chat/completions")
     HERMES_KEY   = os.environ.get("HERMES_KEY", "")
-    # Priority: explicit payload model → per-unit override → env default
-    _override = _model_overrides.get(unit_id)
-    HERMES_MODEL = model or (_override["model"] if _override else None) or os.environ.get("HERMES_MODEL", "hermes-agent")
+    # Priority: explicit payload → per-unit /model/override → env default.
+    # Hermes gateway ignores bare `model` unless `provider` is also set (or
+    # direct_model_requests is enabled upstream). Always pair them when we have
+    # a real provider selection.
+    _override = _model_overrides.get(unit_id) or {}
+    eff_model = (
+        (model or "").strip()
+        or str(_override.get("model") or "").strip()
+        or os.environ.get("HERMES_MODEL", "hermes-agent")
+    )
+    eff_provider = (
+        (provider or "").strip()
+        or str(_override.get("provider") or "").strip()
+    )
+    if eff_provider.lower() in {"", "auto"}:
+        eff_provider = ""
 
     cfg = config if config is not None else _get_agent_config(unit_id)
     # Build session_id matching _run_openclaw_streaming logic for consistency.
@@ -1197,7 +1217,7 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
     else:
         user_content = mission
     payload: dict[str, Any] = {
-        "model": HERMES_MODEL,
+        "model": eff_model,
         "messages": [
             {"role": "system", "content": system_content},
             {"role": "user", "content": user_content},
@@ -1205,6 +1225,10 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
         "stream": False,
         "max_tokens": 4096,
     }
+    # Hermes gateway ignores bare `model` unless `provider` is also set (or
+    # direct_model_requests is enabled upstream). Pair them when selected.
+    if eff_provider:
+        payload["provider"] = eff_provider
     if working_dir:
         payload["working_directory"] = working_dir
     try:
@@ -1227,7 +1251,7 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
         usage = result.get("usage") or {}
         if usage.get("prompt_tokens") or usage.get("completion_tokens"):
             _token_ledger.get_ledger().log_usage(
-                model=HERMES_MODEL,
+                model=eff_model,
                 prompt_tokens=int(usage.get("prompt_tokens", 0)),
                 completion_tokens=int(usage.get("completion_tokens", 0)),
             )

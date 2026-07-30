@@ -73,12 +73,11 @@ export function initProviderSelectors(): void {
     harnessSel.dataset['wired'] = '1';
   }
   if (provSel && !provSel.dataset['wired']) {
-    // Note: previously called switchHermesModel() here, but that hit the Hermes
-    // web server (:9119, TUI-only) instead of the gateway (:8642) and silently
-    // failed. The gateway honors the per-request `model` field on
-    // /v1/chat/completions, which is already carried in every chat draft's
-    // payload — so the next message uses the newly-selected model without any
-    // extra round-trip.
+    // Provider/model ride on the next execute_agent payload. Hermes HTTP
+    // needs both `provider` and `model` in the gateway body — the bridge
+    // pairs them in _run_hermes_streaming. Dropdown changes are local until
+    // the next message (power-user `/model <provider> <model>` also POSTs
+    // /model/override as a sticky fallback).
     provSel.addEventListener('change', () => applyProviderSelection(provSel.value));
     provSel.dataset['wired'] = '1';
   }

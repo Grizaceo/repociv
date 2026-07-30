@@ -168,9 +168,26 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     const targetForCommand = dispatchUnitId;
 
     // Include 3-layer config from chat UI: harness + provider + model.
-    // Chat keeps harness as '' (auto/hermes path) so repo-less turns stay
-    // allowed for any unit; model+provider still forward user choice.
-    const { provider, model } = getSelectedConfig();
+    // Hermes HTTP needs provider+model together; CLI harnesses need a city
+    // with repoPath (bridge rejects otherwise — surface that to the user).
+    const { harness, provider, model } = getSelectedConfig();
+    const selectedHarness = harness && harness !== 'auto' ? harness : '';
+    const cliHarnesses = new Set([
+      'claude',
+      'claude-code',
+      'cursor',
+      'codex',
+      'openclaw',
+      'hermes-cli',
+    ]);
+    if (cliHarnesses.has(selectedHarness) && !resolvedCity?.repoPath?.trim()) {
+      appendSystemMessage(
+        dispatchUnitId,
+        `❌ Harness \`${selectedHarness}\` requiere una ciudad con repo seleccionado. Elige hermes/auto o mueve el agente a una ciudad.`,
+      );
+      input.value = '';
+      return;
+    }
     const draft: CommandDraft = {
       type: chatCommandType,
       target: targetForCommand,
@@ -178,7 +195,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
         resolvedCity ?? null,
         dispatchUnitId,
         text,
-        '', // harness forced empty — bridge treats '' and 'auto' identically
+        selectedHarness,
         model,
         provider,
         unit?.type ?? '',
@@ -194,7 +211,14 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     }
 
     // eslint-disable-next-line no-console
-    console.info('[chat] dispatch', { dispatchUnitId, city: resolvedCity?.id, draft });
+    console.info('[chat] dispatch', {
+      dispatchUnitId,
+      city: resolvedCity?.id,
+      harness: selectedHarness || 'auto',
+      provider,
+      model,
+      draft,
+    });
 
     void sendCommand(draft)
       .then((res) => {

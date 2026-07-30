@@ -44,4 +44,15 @@ describe('buildExecuteAgentPayload', () => {
       mission: 'Scout the area',
     });
   });
+
+  it('forwards selected harness when not auto', () => {
+    expect(
+      buildExecuteAgentPayload(null, 'MAIN', 'hi', 'hermes', 'MiniMax-M3', 'minimax'),
+    ).toMatchObject({
+      unit: 'MAIN',
+      harness: 'hermes',
+      model: 'MiniMax-M3',
+      provider: 'minimax',
+    });
+  });
 });
