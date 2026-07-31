@@ -247,6 +247,10 @@ export class LocalRenderer {
   isTemperatureOverlay(): boolean {
     return this._temperatureOverlay;
   }
+  /** Phase A: expose camera state for LocalScene3D sync. */
+  getCam(): CameraState {
+    return this.cam;
+  }
   setLoadingIndicator(v: boolean): void {
     this._loadingIndicator = v;
   }

@@ -37,6 +37,7 @@ import {
   type WorldRenderMode,
   persistRenderMode,
   loadThreeMapRenderer,
+  loadLocalScene3D,
 } from './three/renderMode.ts';
 import { terrainElevation } from './isoHex.ts';
 
@@ -47,6 +48,7 @@ let tilePopupMod: typeof import('./three/TilePopup3D.ts') | null = null;
 let tileFlashMod: typeof import('./three/TileFlash3D.ts') | null = null;
 
 type ThreeMapRendererType = import('./three/ThreeMapRenderer.ts').ThreeMapRenderer;
+type LocalScene3DType = import('./three/LocalScene3D.ts').LocalScene3D;
 
 export class Renderer {
   private canvas: HTMLCanvasElement;
@@ -115,6 +117,10 @@ export class Renderer {
   private threeMap: ThreeMapRendererType | null = null;
   private threeContainer: HTMLElement | null = null;
   private threeLoadPromise: Promise<void> | null = null;
+  // Phase A: 3D local view
+  private localScene3D: LocalScene3DType | null = null;
+  private localScene3DLoadPromise: Promise<void> | null = null;
+  private localScene3DContainer: HTMLElement | null = null;
   private _previousViewMode: 'macro' | 'local' | null = null; // Track view mode for transitions
   private _localExitInProgress = false;
   // Callbacks for local view (applied lazily when localR is instantiated)
@@ -253,6 +259,7 @@ export class Renderer {
     this.worldRenderMode = mode;
     persistRenderMode(mode);
     this.threeMap?.setActive(false);
+    this.localScene3D?.setActive(false); // Phase A: deactivate 3D local on flat
     this.canvas.classList.remove('webgl-overlay');
   }
 
@@ -286,6 +293,42 @@ export class Renderer {
     }
     if (!this.threeMap) {
       throw new Error('ThreeMapRenderer failed to initialize');
+    }
+  }
+
+  /** Phase A: lazily instantiate the 3D local scene (weak x2 fallback to 2D). */
+  private async ensureLocalScene3D(): Promise<void> {
+    if (this.localScene3D) return;
+    if (!this.localScene3DLoadPromise) {
+      this.localScene3DLoadPromise = (async () => {
+        this.localScene3DContainer =
+          document.getElementById('local-scene-container') ??
+          document.getElementById('three-container');
+        if (!this.localScene3DContainer) {
+          throw new Error('#local-scene-container or #three-container not found');
+        }
+        const LocalScene3D = await loadLocalScene3D();
+        this.localScene3D = new LocalScene3D(this.localScene3DContainer);
+        // Wire callbacks (same as LocalRenderer wiring above)
+        this.localScene3D.callbacks.onTileClick = (x, y, tile, sx, sy) =>
+          this.localTileClickCb?.(x, y, tile, sx, sy);
+        this.localScene3D.callbacks.onLocalUnitClick = this.localUnitClickCb;
+        this.localScene3D.callbacks.onWorkbenchClick = this.localWorkbenchClickCb;
+        this.localScene3D.callbacks.onLocalUnitHover = (unit, sx, sy) =>
+          this.localUnitHoverCb?.(unit, sx, sy);
+        this.localScene3D.callbacks.onNpcClick = this.localNpcClickCb;
+        this.localScene3D.callbacks.onUnitRendered = (unit, sx, sy) =>
+          this.localUnitRenderedCb?.(unit, sx, sy);
+        this.localScene3D.callbacks.onDragAssign = (unitId, tile) =>
+          this.localDragAssignCb?.(unitId, tile);
+        this.localScene3D.callbacks.onRequestExit = () => this.state.enterMacroView();
+      })();
+    }
+    try {
+      await this.localScene3DLoadPromise;
+    } catch (err) {
+      this.localScene3DLoadPromise = null;
+      throw err;
     }
   }
 
@@ -1127,6 +1170,45 @@ export class Renderer {
 
     if (currentViewMode === 'local') {
       this.threeMap?.setActive(false);
+
+      // ── 3D local view (Phase A) ──────────────────────────────────────────
+      const webglLocal = this.worldRenderMode === 'webgl';
+      if (webglLocal) {
+        if (!this.localScene3D && !this.localScene3DLoadPromise) {
+          void this.ensureLocalScene3D().catch((err) => {
+            logger.error('[Renderer] Local 3D init failed, falling back to 2D', err);
+          });
+        }
+        if (this.localScene3D && this.state.localWorld) {
+          if (this.state.localWorld.repoId !== this.localWorldId) {
+            this.localScene3D.setWorld(this.state.localWorld);
+            this.localWorldId = this.state.localWorld.repoId;
+          }
+          this.localScene3D.setActive(true);
+          this.localScene3D.setAgentsForPicking(this.state.getLocalUnits(), this.state.localWorld.npcs ?? []);
+          // Build LocalCamState from the 2D local renderer's camera (or default)
+          const cam2d = this.localR?.getCam?.() ?? { x: 0, y: 0, zoom: 1, cx: 0, cy: 0 };
+          this.localScene3D.render(
+            cam2d,
+            this.state.getLocalUnits(),
+            this.state.localWorld.npcs ?? [],
+            {
+              dt: this._dt,
+              workbenchLabelOverlay: this.localR?.isWorkbenchLabelsVisible?.() ?? false,
+              powerOverlay: this.localR?.isPowerOverlay?.() ?? false,
+              temperatureOverlay: this.localR?.isTemperatureOverlay?.() ?? false,
+            },
+          );
+          // 2D local renderer still draws overlays (tooltips, bubbles, labels)
+          this.localR?.setInputActive(false);
+          this.localR?.render(this.state.getLocalUnits());
+          return;
+        }
+        // localScene3D not ready yet — fall through to 2D as transient
+      }
+
+      // ── 2D local view (flat mode or 3D fallback) ──────────────────────────
+      this.localScene3D?.setActive(false);
       this.localR?.setInputActive(true);
       if (!document.body.classList.contains('local-view')) {
         document.body.classList.add('local-view');
@@ -1158,6 +1240,8 @@ export class Renderer {
       this.localR.render(this.state.getLocalUnits());
       return;
     }
+    // Phase A: deactivate 3D local scene on exit
+    this.localScene3D?.setActive(false);
 
     if (document.body.classList.contains('local-view')) {
       document.body.classList.remove('local-view');
