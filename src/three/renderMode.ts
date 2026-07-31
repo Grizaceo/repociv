@@ -66,3 +66,10 @@ export async function loadThreeMapRenderer(): Promise<
   const mod = await import('./ThreeMapRenderer.ts');
   return mod.ThreeMapRenderer;
 }
+
+export async function loadLocalScene3D(): Promise<
+  typeof import('./LocalScene3D.ts').LocalScene3D
+> {
+  const mod = await import('./LocalScene3D.ts');
+  return mod.LocalScene3D;
+}
