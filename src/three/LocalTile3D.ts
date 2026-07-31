@@ -76,6 +76,11 @@ export class LocalTile3D {
     return this.group;
   }
 
+  /** Expose floor InstancedMesh for raycast picking. */
+  getFloorMesh(): InstancedMesh | null {
+    return this.floorMesh;
+  }
+
   /** Rebuild all InstancedMeshes if the world signature changed.
    *  Returns true if a rebuild happened, false if cached. */
   rebuild(world: LocalWorld, opts: LocalTile3DOptions): boolean {
