@@ -473,3 +473,19 @@ describe('LocalRenderer input isolation — stopImmediatePropagation on the canv
     expect(listeners['mousedown']?.length ?? 0).toBeGreaterThan(0);
   });
 });
+
+// ─── LocalRenderer panBy ──────────────────────────────────────────────────────
+describe('LocalRenderer panBy', () => {
+  it('pans the camera by screen-space px divided by zoom', async () => {
+    const { LocalRenderer } = await import('./localRenderer.ts');
+    const { canvas } = makeFakeCanvas();
+    const lr = new LocalRenderer(canvas);
+    const beforeX = lr.getCam().x;
+    const beforeY = lr.getCam().y;
+    const zoom = lr.getCam().zoom;
+    lr.panBy(48, -24);
+    const after = lr.getCam();
+    expect(after.x).toBeCloseTo(beforeX + 48 / zoom);
+    expect(after.y).toBeCloseTo(beforeY - 24 / zoom);
+  });
+});

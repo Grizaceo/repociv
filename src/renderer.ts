@@ -809,8 +809,31 @@ export class Renderer {
       }
     });
 
-    // ── Esc: return to macro view ────────────────────────────────────────────
+    // ── Keyboard: arrows pan map (macro + local view), Esc returns ──────────
     window.addEventListener('keydown', (e) => {
+      // Never hijack typing in inputs/textareas
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      const step = e.shiftKey ? 96 : 48; // px at zoom=1; shift = fast
+      let dx = 0;
+      let dy = 0;
+      switch (e.key) {
+        case 'ArrowUp': dy = -step; break;
+        case 'ArrowDown': dy = step; break;
+        case 'ArrowLeft': dx = -step; break;
+        case 'ArrowRight': dx = step; break;
+      }
+      if (dx !== 0 || dy !== 0) {
+        e.preventDefault();
+        if (this.state.viewMode === 'local') {
+          this.localR?.panBy(dx, dy);
+        } else {
+          // Macro view: pan the hex camera (world units per px / zoom)
+          this.cam.x += dx / this.cam.zoom;
+          this.cam.y += dy / this.cam.zoom;
+        }
+        return;
+      }
       if (e.key === 'Escape' && this.state.viewMode === 'local') {
         this.state.enterMacroView();
       }

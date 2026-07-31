@@ -251,6 +251,12 @@ export class LocalRenderer {
   getCam(): CameraState {
     return this.cam;
   }
+  /** Pan the local-view camera by a screen-space delta (px at zoom=1). */
+  panBy(dx: number, dy: number): void {
+    this.cam.x += dx / this.cam.zoom;
+    this.cam.y += dy / this.cam.zoom;
+    this._camAnim = null;
+  }
   setLoadingIndicator(v: boolean): void {
     this._loadingIndicator = v;
   }
