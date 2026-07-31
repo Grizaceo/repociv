@@ -107,6 +107,7 @@ export class LocalTile3D {
       }
     }
     return [
+      world.repoId,
       world.width, world.height, world.rooms.length,
       world.workbenches.length, tileHash,
       opts.workbenchLabelOverlay ? 1 : 0,

@@ -66,8 +66,11 @@ export class LocalScene3D {
     onRequestExit: null,
   };
 
+  private abortController: AbortController;
+
   constructor(container: HTMLElement) {
     this.container = container;
+    this.abortController = new AbortController();
     this.renderer = new WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = ACESFilmicToneMapping;
@@ -179,6 +182,7 @@ export class LocalScene3D {
 
   private setupInput(): void {
     const canvas = this.renderer.domElement;
+    const signal = this.abortController.signal;
 
     // Click handler: pick tile, determine type, fire callback
     canvas.addEventListener('click', (e: MouseEvent) => {
@@ -221,7 +225,7 @@ export class LocalScene3D {
       if (this.callbacks.onTileClick) {
         this.callbacks.onTileClick(gx, gy, tile, sx, sy);
       }
-    });
+    }, { signal });
 
     // Right-click: exit local view
     canvas.addEventListener('contextmenu', (e: MouseEvent) => {
@@ -229,7 +233,7 @@ export class LocalScene3D {
       if (this.callbacks.onRequestExit) {
         this.callbacks.onRequestExit();
       }
-    });
+    }, { signal });
 
     // Hover: pick tile, find unit, fire onLocalUnitHover
     let hoverThrottle = 0;
@@ -257,7 +261,7 @@ export class LocalScene3D {
       if (this.callbacks.onLocalUnitHover) {
         this.callbacks.onLocalUnitHover(unit, sx, sy);
       }
-    });
+    }, { signal });
   }
 
   private _hoveredUnits: LocalUnit[] = [];
@@ -284,6 +288,7 @@ export class LocalScene3D {
   }
 
   dispose(): void {
+    this.abortController.abort();
     this.resizeObserver.disconnect();
     this.tile3D.dispose();
     this.agent3D.dispose();
