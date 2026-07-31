@@ -76,6 +76,10 @@ export class Renderer {
   private _frozenAnimTime: number | null = null;
   /** Delta time in seconds from the RAF loop, passed to 3D per-frame animations. */
   private _dt = 0;
+  /** Pan keys currently held (RTS-style continuous scroll). */
+  private panDirs = new Set<'up' | 'down' | 'left' | 'right'>();
+  /** Shift held while panning → faster scroll. */
+  private _panFast = false;
   // Phase D: WebGL frame metrics
   private _frameTimeSum = 0;
   private _frameTimeCount = 0;
@@ -809,34 +813,41 @@ export class Renderer {
       }
     });
 
-    // ── Keyboard: arrows pan map (macro + local view), Esc returns ──────────
+    // ── Keyboard: arrows/WASD smooth pan (macro + local), Esc returns ───────
+    const panKey = (e: KeyboardEvent): 'up' | 'down' | 'left' | 'right' | null => {
+      if (e.ctrlKey || e.altKey || e.metaKey) return null;
+      switch (e.key) {
+        case 'ArrowUp': case 'w': case 'W': return 'up';
+        case 'ArrowDown': case 's': case 'S': return 'down';
+        case 'ArrowLeft': case 'a': case 'A': return 'left';
+        case 'ArrowRight': case 'd': case 'D': return 'right';
+        default: return null;
+      }
+    };
     window.addEventListener('keydown', (e) => {
       // Never hijack typing in inputs/textareas
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      const step = e.shiftKey ? 96 : 48; // px at zoom=1; shift = fast
-      let dx = 0;
-      let dy = 0;
-      switch (e.key) {
-        case 'ArrowUp': dy = -step; break;
-        case 'ArrowDown': dy = step; break;
-        case 'ArrowLeft': dx = -step; break;
-        case 'ArrowRight': dx = step; break;
-      }
-      if (dx !== 0 || dy !== 0) {
+      const dir = panKey(e);
+      if (dir) {
         e.preventDefault();
-        if (this.state.viewMode === 'local') {
-          this.localR?.panBy(dx, dy);
-        } else {
-          // Macro view: pan the hex camera (world units per px / zoom)
-          this.cam.x += dx / this.cam.zoom;
-          this.cam.y += dy / this.cam.zoom;
-        }
+        this.panDirs.add(dir);
         return;
       }
+      if (e.key === 'Shift') this._panFast = true;
       if (e.key === 'Escape' && this.state.viewMode === 'local') {
         this.state.enterMacroView();
       }
+    });
+    window.addEventListener('keyup', (e) => {
+      const dir = panKey(e);
+      if (dir) this.panDirs.delete(dir);
+      if (e.key === 'Shift') this._panFast = false;
+    });
+    // If the window loses focus while a pan key is held, release it so the
+    // map doesn't keep scrolling when the user alt-tabs away.
+    window.addEventListener('blur', () => {
+      this.panDirs.clear();
+      this._panFast = false;
     });
   }
 
@@ -1080,6 +1091,37 @@ export class Renderer {
     };
   }
 
+  /**
+   * RTS-style continuous camera pan driven by held keys (arrows/WASD).
+   * Speed is screen-space px/s at zoom=1 so the visible scroll rate is
+   * constant regardless of zoom; diagonals are normalized so moving
+   * diagonally isn't ~41% faster than straight (AoE/StarCraft behavior).
+   */
+  private applyKeyboardPan(dt: number): void {
+    if (this.panDirs.size === 0) return;
+    const baseSpeed = 520; // px/s at zoom=1
+    const speed = this._panFast ? baseSpeed * 1.8 : baseSpeed;
+    let dx = 0;
+    let dy = 0;
+    if (this.panDirs.has('left')) dx -= 1;
+    if (this.panDirs.has('right')) dx += 1;
+    if (this.panDirs.has('up')) dy -= 1;
+    if (this.panDirs.has('down')) dy += 1;
+    if (dx !== 0 && dy !== 0) {
+      const inv = Math.SQRT1_2;
+      dx *= inv;
+      dy *= inv;
+    }
+    const px = dx * speed * dt;
+    const py = dy * speed * dt;
+    if (this.state.viewMode === 'local') {
+      this.localR?.panBy(px, py);
+    } else {
+      this.cam.x += px / this.cam.zoom;
+      this.cam.y += py / this.cam.zoom;
+    }
+  }
+
   start() {
     let lastTime = performance.now();
     const loop = (now: number) => {
@@ -1087,6 +1129,7 @@ export class Renderer {
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
       this._dt = dt;
+      this.applyKeyboardPan(dt);
       if (this._frozenAnimTime === null) {
         this.animTime += dt;
       } else {

@@ -57,7 +57,7 @@
           </div>
           <div id="bridge-status" class="bridge-offline" title="Bridge.py status">⚡ bridge</div>
           <div id="mcp-status" class="mcp-offline" title="MCP inactivo — ver docs/MCP.md">MCP ○</div>
-          <button id="btn-approvals" title="Aprobaciones pendientes [A]" aria-label="Aprobaciones pendientes">
+          <button id="btn-approvals" title="Aprobaciones pendientes [Ctrl+A]" aria-label="Aprobaciones pendientes">
             <i data-lucide="triangle-alert"></i><span class="approval-badge"></span>
           </button>
           <button id="btn-replay" data-hud-tier="advanced" title="Replay de directivas [F7]" aria-label="Replay de directivas">
@@ -180,7 +180,7 @@
           <div id="unit-actions">
             <button id="btn-move" data-hotkey="m" aria-label="Mover unidad [M]">Mover</button>
             <button id="btn-build" data-hotkey="b" aria-label="Construir edificio [B]">Construir</button>
-            <button id="btn-sleep" data-hotkey="s" aria-label="Poner unidad a dormir [S]">Dormir</button>
+            <button id="btn-sleep" data-hotkey="ctrl+s" aria-label="Poner unidad a dormir [Ctrl+S]">Dormir</button>
             <button id="btn-info" data-hotkey="i" aria-label="Información de la unidad [I]">Info</button>
           </div>
           <div id="mission-input-row">
@@ -193,12 +193,12 @@
           <div id="hero-bar-slots"></div>
           <div class="hero-bar-spawn">
             <button class="spawn-btn spawn-new-profile" id="spawn-new-profile" title="Nuevo perfil [N]" aria-label="Crear nuevo perfil">+ Nuevo</button>
-            <button class="spawn-btn" data-type="MAIN" title="Agente principal [Q]" aria-label="Desplegar agente principal">Q</button>
-            <button class="spawn-btn" data-type="WORKER" title="Worker [W]" aria-label="Desplegar agente Worker">W</button>
-            <button class="spawn-btn" data-type="SCOUT" title="Scout [E]" aria-label="Desplegar agente Scout">E</button>
-            <button class="spawn-btn" data-type="OPENCLAW" title="OpenClaw [O]" aria-label="Plantilla OpenClaw">O</button>
-            <button class="spawn-btn" data-type="CLAUDE" title="Claude Code [C]" aria-label="Plantilla Claude">C</button>
-            <button class="spawn-btn" data-type="CODEX" title="Codex [X]" aria-label="Plantilla Codex">X</button>
+            <button class="spawn-btn" data-type="MAIN" title="Agente principal [Ctrl+Q]" aria-label="Desplegar agente principal">Q</button>
+            <button class="spawn-btn" data-type="WORKER" title="Worker [Ctrl+Shift+W]" aria-label="Desplegar agente Worker">W</button>
+            <button class="spawn-btn" data-type="SCOUT" title="Scout [Ctrl+E]" aria-label="Desplegar agente Scout">E</button>
+            <button class="spawn-btn" data-type="OPENCLAW" title="OpenClaw [Ctrl+O]" aria-label="Plantilla OpenClaw">O</button>
+            <button class="spawn-btn" data-type="CLAUDE" title="Claude Code [Ctrl+C]" aria-label="Plantilla Claude">C</button>
+            <button class="spawn-btn" data-type="CODEX" title="Codex [Ctrl+X]" aria-label="Plantilla Codex">X</button>
           </div>
         </div>
 
@@ -313,10 +313,18 @@
           <div class="kbh-grid">
             <div class="kbh-section">
               <h4>Spawn agentes</h4>
-              <kbd>Q</kbd> Spawn agente principal<br>
-              <kbd>W</kbd> Spawn Worker<br>
-              <kbd>E</kbd> Spawn Scout<br>
-              <kbd>O</kbd> Spawn openclaw<br>
+              <kbd>Ctrl</kbd>+<kbd>Q</kbd> Spawn agente principal<br>
+              <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> Spawn Worker<br>
+              <kbd>Ctrl</kbd>+<kbd>E</kbd> Spawn Scout<br>
+              <kbd>Ctrl</kbd>+<kbd>O</kbd> Spawn openclaw<br>
+              <kbd>Ctrl</kbd>+<kbd>C</kbd> Spawn Claude<br>
+              <kbd>Ctrl</kbd>+<kbd>X</kbd> Spawn Codex<br>
+              <kbd>R</kbd> Spawn Cursor<br>
+            </div>
+            <div class="kbh-section">
+              <h4>Cámara</h4>
+              <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / flechas Mover mapa<br>
+              <kbd>Shift</kbd> + teclas Mover rápido<br>
             </div>
             <div class="kbh-section">
               <h4>Selección</h4>
@@ -330,7 +338,7 @@
               <h4>Acciones</h4>
               <kbd>M</kbd> Modo mover<br>
               <kbd>B</kbd> Modo construir<br>
-              <kbd>S</kbd> Dormir unidad<br>
+              <kbd>Ctrl</kbd>+<kbd>S</kbd> Dormir unidad<br>
               <kbd>Enter</kbd> Toggle side panel<br>
             </div>
             <div class="kbh-section">
@@ -343,7 +351,7 @@
               <kbd>V</kbd> Fog of war<br>
               <kbd>F9</kbd> Quest Board<br>
               <kbd>F10</kbd> Crónica / Timeline<br>
-              <kbd>A</kbd> Aprobaciones<br>
+              <kbd>Ctrl</kbd>+<kbd>A</kbd> Aprobaciones<br>
               <kbd>F12</kbd> Screenshot PNG<br>
               <kbd>?</kbd> Esta ayuda<br>
             </div>
@@ -353,7 +361,8 @@
 
       <!-- Hotkeys Legend -->
       <div id="hotkeys-ribbon">
-        <span><kbd>Q/W/E/O/C/X</kbd> spawn</span>
+        <span><kbd>WASD</kbd>/<kbd>←↑↓→</kbd> mover mapa</span>
+        <span><kbd>Ctrl</kbd>+<kbd>Q/W/E/O/C/X</kbd> spawn</span>
         <span><kbd>1-9</kbd> selección</span>
         <span><kbd>Enter</kbd> chat</span>
         <span><kbd>H</kbd> capas</span>

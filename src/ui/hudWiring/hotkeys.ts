@@ -173,10 +173,12 @@ export function wireHotkeys(
 
     if (inField) return;
 
-    // Spawn agents (Q/W/E/O/C/X).
-    // Q spawns the user's first unit (MAIN), which is configured during
-    // onboarding. N opens the new profile wizard.
-    if (e.key.toLowerCase() === 'n') {
+    // Spawn agents (Ctrl+Q/W/E/O/C/X). WASD is reserved for camera panning,
+    // so every spawn hotkey now requires Ctrl. Ctrl+W would close the browser
+    // tab (not interceptable), so WORKER uses Ctrl+Shift+W; Ctrl+R would
+    // reload the page, so CURSOR stays on bare R. N opens the new profile
+    // wizard.
+    if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.altKey && !e.metaKey) {
       trackHotkey('N:new-profile');
       // Delegate to profile strip wizard (loaded lazily)
       void import('../agentProfileStrip.ts').then(({ openNewProfileWizard }) => {
@@ -184,37 +186,43 @@ export function wireHotkeys(
       });
       return;
     }
-    if (e.key.toLowerCase() === 'q') {
+    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'q') {
+      e.preventDefault();
       // If a profile is selected in the strip, spawn from it; else fall back to MAIN
       const selectedProfile = getSelectedProfile();
       if (selectedProfile) {
-        trackHotkey(`Q:spawn-profile:${selectedProfile.name}`);
+        trackHotkey(`Ctrl+Q:spawn-profile:${selectedProfile.name}`);
         return spawnFromProfile(selectedProfile, state, renderer, bridge);
       }
-      trackHotkey('Q:spawn:MAIN');
+      trackHotkey('Ctrl+Q:spawn:MAIN');
       return spawnAgent('MAIN', state, renderer, bridge);
     }
-    if (e.key.toLowerCase() === 'w') {
-      trackHotkey('W:spawn:WORKER');
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'w') {
+      e.preventDefault();
+      trackHotkey('Ctrl+Shift+W:spawn:WORKER');
       return spawnAgent('WORKER', state, renderer, bridge);
     }
-    if (e.key.toLowerCase() === 'e') {
-      trackHotkey('E:spawn:SCOUT');
+    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'e') {
+      e.preventDefault();
+      trackHotkey('Ctrl+E:spawn:SCOUT');
       return spawnAgent('SCOUT', state, renderer, bridge);
     }
-    if (e.key.toLowerCase() === 'o') {
-      trackHotkey('O:spawn:OPENCLAW');
+    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'o') {
+      e.preventDefault();
+      trackHotkey('Ctrl+O:spawn:OPENCLAW');
       return spawnAgent('OPENCLAW', state, renderer, bridge);
     }
-    if (e.key.toLowerCase() === 'c') {
-      trackHotkey('C:spawn:CLAUDE');
+    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'c') {
+      e.preventDefault();
+      trackHotkey('Ctrl+C:spawn:CLAUDE');
       return spawnAgent('CLAUDE', state, renderer, bridge);
     }
-    if (e.key.toLowerCase() === 'x') {
-      trackHotkey('X:spawn:CODEX');
+    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'x') {
+      e.preventDefault();
+      trackHotkey('Ctrl+X:spawn:CODEX');
       return spawnAgent('CODEX', state, renderer, bridge);
     }
-    if (e.key.toLowerCase() === 'r') {
+    if (!e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'r') {
       trackHotkey('R:spawn:CURSOR');
       return spawnAgent('CURSOR', state, renderer, bridge);
     }
@@ -288,7 +296,10 @@ export function wireHotkeys(
         renderer.setActionMode('move');
         break;
       case 's':
-        trackHotkey('S:sleep-unit');
+        // Ctrl+S: sleep unit (bare S is reserved for camera pan down)
+        if (!e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) break;
+        e.preventDefault();
+        trackHotkey('Ctrl+S:sleep-unit');
         renderer.sleepSelectedUnit();
         break;
       case 'b':
@@ -321,7 +332,10 @@ export function wireHotkeys(
         toggleView();
         break;
       case 'a':
-        trackHotkey('A:approvals');
+        // Ctrl+A: approvals panel (bare A is reserved for camera pan left)
+        if (!e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) break;
+        e.preventDefault();
+        trackHotkey('Ctrl+A:approvals');
         if (!isApprovalPanelOpen()) trackPanelOpen('approvals');
         toggleApprovalPanel();
         break;
