@@ -92,6 +92,7 @@ export function renderHeroBar(state: GameState, onSelect: (u: Unit) => void) {
     const slot = document.createElement('div');
     slot.className = 'hero-slot';
     if (state.selectedUnit?.id === unit.id) slot.classList.add('selected');
+    if (unit.hidden) slot.classList.add('hidden-unit');
 
     // Phase 9: fatigue bar — color shifts green→yellow→red as fatigue drops
     // Thresholds now driven by gameConfig.ts (Phase 10.2)
@@ -113,7 +114,7 @@ export function renderHeroBar(state: GameState, onSelect: (u: Unit) => void) {
       ${restBadge}
     `;
 
-    slot.title = `${unit.name} — ${unit.state} | Contexto ${fPct}%${unit.isResting ? ' (descansando)' : ''}`;
+    slot.title = `${unit.name} — ${unit.state} | Contexto ${fPct}%${unit.isResting ? ' (descansando)' : ''}${unit.hidden ? ' | Oculto del mapa (clic para mostrar)' : ''}`;
     slot.addEventListener('click', () => onSelect(unit));
     slots.appendChild(slot);
   });

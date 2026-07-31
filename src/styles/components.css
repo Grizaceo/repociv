@@ -496,6 +496,16 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   outline: 1px solid var(--gold-bright);
 }
 
+.hero-slot.hidden-unit {
+  opacity: 0.45;
+  border-style: dashed;
+  filter: grayscale(0.6);
+}
+.hero-slot.hidden-unit:hover {
+  opacity: 0.9;
+  filter: grayscale(0);
+}
+
 .slot-num {
   position: absolute;
   top: -8px;

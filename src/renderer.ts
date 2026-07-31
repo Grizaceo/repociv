@@ -15,6 +15,7 @@ import { UnitRenderer } from './unitRenderer.ts';
 import { MinimapRenderer } from './minimapRenderer.ts';
 import { openWonderVignette } from './ui/wonderVignette.ts';
 import { openCapitalPanel } from './ui/capitalPanel.ts';
+import { hideUnitPanel } from './ui/panel.ts';
 import { isLayerVisible } from './layers.ts';
 import { updateLodDisplay } from './ui/layerPanel.ts';
 // LocalRenderer is lazy-loaded on first local-view entry to keep main bundle small.
@@ -750,6 +751,17 @@ export class Renderer {
             this.selectedUnit = hitUnit;
             this.state.selectUnit(hitUnit);
             this.onUnitSelect?.(hitUnit);
+          },
+          onHide: () => {
+            // Visual dismiss: removes the unit from the macro map but keeps
+            // it alive in state (missions/chat/backend untouched). Restore
+            // with U, or by selecting it from the hero bar.
+            this.state.hideUnit(hitUnit.id);
+            if (this.selectedUnit?.id === hitUnit.id) {
+              this.selectedUnit = null;
+              this.state.selectUnit(null);
+              hideUnitPanel();
+            }
           },
         });
         this.onContextMenu?.(items, { x: e.clientX, y: e.clientY });
@@ -1632,13 +1644,14 @@ export class Renderer {
     // Unit trails (ops layer; also suppressed in clean mode & low LOD)
     if (showOps && !isClean && lod !== 'low') {
       for (const unit of this.state.world.units) {
+        if (unit.hidden) continue;
         this.unitR.drawUnitTrail(unit);
       }
       // Parent → ephemeral subagent tether lines
       for (const child of this.state.world.units) {
-        if (!child.parentUnitId || !child.ephemeral) continue;
+        if (child.hidden || !child.parentUnitId || !child.ephemeral) continue;
         const parent = this.state.getUnit(child.parentUnitId);
-        if (!parent) continue;
+        if (!parent || parent.hidden) continue;
         if (!this._shouldDrawEphemeralOnMap(child)) continue;
         this.unitR.drawSubagentLink(parent, child, this.animTime);
       }
@@ -1647,6 +1660,7 @@ export class Renderer {
     // Units (base layer — canvas in 2D modes; 3D capsules in webgl) + badges
     if (!webglMode) {
       for (const unit of this.state.world.units) {
+        if (unit.hidden) continue;
         if (unit.ephemeral && !this._shouldDrawEphemeralOnMap(unit)) continue;
         this.unitR.drawUnit(unit, this.animTime, this.selectedUnit?.id ?? null, unit.ephemeral);
         const childCount = this.state.getChildrenOfUnit(unit.id).filter((c) => c.ephemeral).length;
@@ -1659,6 +1673,7 @@ export class Renderer {
       }
     } else if (showOps && !isClean && lod !== 'low') {
       for (const unit of this.state.world.units) {
+        if (unit.hidden) continue;
         if (unit.ephemeral && !this._shouldDrawEphemeralOnMap(unit)) continue;
         this.unitR.drawUnitBadge(unit, this.animTime);
         const childCount = this.state.getChildrenOfUnit(unit.id).filter((c) => c.ephemeral).length;

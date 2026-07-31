@@ -19,6 +19,8 @@ export function selectHero(
   state: GameState,
   _bridge: BridgeEvents,
 ): void {
+  // Selecting a hidden unit from the hero bar restores it on the map.
+  if (unit.hidden) state.unhideUnit(unit.id);
   state.selectUnit(unit);
   renderer.selectUnit(unit);
   showUnitPanel(unit, state);

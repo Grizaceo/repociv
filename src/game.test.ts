@@ -168,6 +168,39 @@ describe('GameState.removeUnit', () => {
   });
 });
 
+describe('GameState hide/unhide (visual dismiss)', () => {
+  it('hideUnit marks the unit hidden, clears selection, and hides it from getUnitAt', () => {
+    const gs = new GameState(makeWorld());
+    const u = gs.spawnUnit('H1', 'Hidden', 'worker', 'capital', { q: 3, r: -1 });
+    gs.selectUnit(u);
+    gs.hideUnit('H1');
+    expect(u.hidden).toBe(true);
+    expect(gs.selectedUnit).toBeNull();
+    expect(gs.getUnitAt({ q: 3, r: -1 })).toBeNull();
+  });
+
+  it('unhideUnit restores visibility and getUnitAt finds it again', () => {
+    const gs = new GameState(makeWorld());
+    const u = gs.spawnUnit('H2', 'Back', 'scout', 'capital', { q: -2, r: 4 });
+    gs.hideUnit('H2');
+    expect(gs.getUnitAt({ q: -2, r: 4 })).toBeNull();
+    gs.unhideUnit('H2');
+    expect(u.hidden).toBe(false);
+    expect(gs.getUnitAt({ q: -2, r: 4 })?.id).toBe('H2');
+  });
+
+  it('unhideAllUnits reveals every hidden unit', () => {
+    const gs = new GameState(makeWorld());
+    gs.spawnUnit('A1', 'A', 'worker', 'capital', { q: 0, r: 1 });
+    gs.spawnUnit('B1', 'B', 'worker', 'capital', { q: 0, r: 2 });
+    gs.hideUnit('A1');
+    gs.hideUnit('B1');
+    expect(gs.getHiddenUnits()).toHaveLength(2);
+    gs.unhideAllUnits();
+    expect(gs.getHiddenUnits()).toHaveLength(0);
+  });
+});
+
 describe('GameState.moveUnit', () => {
   it('returns false when A* finds no path (mocked to [])', () => {
     // aStarPath is mocked to return [] — path.length < 2, so moveUnit returns false

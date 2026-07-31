@@ -167,6 +167,10 @@ export interface Unit {
   parentUnitId?: string;
   ephemeral?: boolean;
   subagentRunId?: string;
+  // ─── Hidden from map (right-click dismiss) — agent keeps running ──
+  // Visual-only: the unit is not drawn/pickable on the macro map but
+  // stays alive in state (missions, chat, backend process untouched).
+  hidden?: boolean;
 }
 
 export const UNIT_COLORS: Record<string, string> = {

@@ -361,6 +361,10 @@ export function wireHotkeys(
           },
         );
         break;
+      case 'u':
+        trackHotkey('U:unhide-all');
+        state.unhideAllUnits();
+        break;
       case 'h':
         trackHotkey('H:layers');
         if (!isLayerPanelOpen()) trackPanelOpen('layers');

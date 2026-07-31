@@ -262,7 +262,13 @@ export function contextMenuForCity(city: City, selectedUnit: Unit | null): Conte
 // ─── Context menu items for right-click on unit ──────────────────────────────
 export function contextMenuForUnit(
   unit: Unit,
-  actions: { onMove: () => void; onBuild: () => void; onSleep: () => void; onInfo: () => void },
+  actions: {
+    onMove: () => void;
+    onBuild: () => void;
+    onSleep: () => void;
+    onInfo: () => void;
+    onHide?: () => void;
+  },
 ): ContextMenuItem[] {
   return [
     {
@@ -293,6 +299,17 @@ export function contextMenuForUnit(
       hotkey: 'I',
       action: actions.onInfo,
     },
+    ...(actions.onHide
+      ? [
+          {
+            label: `Ocultar ${unit.id} del mapa`,
+            icon: '🙈',
+            risk: 'low',
+            hotkey: 'H',
+            action: actions.onHide,
+          } satisfies ContextMenuItem,
+        ]
+      : []),
   ];
 }
 

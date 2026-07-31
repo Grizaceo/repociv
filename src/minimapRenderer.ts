@@ -83,6 +83,7 @@ export class MinimapRenderer {
 
     // Draw dynamic units layer
     for (const u of this.state.world.units) {
+      if (u.hidden) continue;
       const x = padX + (u.coord.q - minQ) * cellW;
       const y = padY + (u.coord.r - minR) * cellH + (u.coord.q - minQ) * cellH * 0.5;
       ctx.fillStyle = u.color;

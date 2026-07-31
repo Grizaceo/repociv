@@ -228,7 +228,7 @@ export class GameState {
   // ─── Query: unit at hex ────────────────────────────────────────────────────
   getUnitAt(coord: Axial): Unit | null {
     const key = tileKey(coord);
-    return this.world.units.find((u) => tileKey(u.coord) === key) ?? null;
+    return this.world.units.find((u) => tileKey(u.coord) === key && !u.hidden) ?? null;
   }
 
   // ─── Selection ─────────────────────────────────────────────────────────────
@@ -243,6 +243,39 @@ export class GameState {
       unit.state = state;
       this.notify();
     }
+  }
+
+  // ─── Hide/unhide (visual dismiss from macro map; agent keeps running) ──────
+  hideUnit(unitId: string) {
+    const unit = this.unitMap.get(unitId);
+    if (unit) {
+      unit.hidden = true;
+      if (this.selectedUnit?.id === unitId) this.selectedUnit = null;
+      this.notify();
+    }
+  }
+
+  unhideUnit(unitId: string) {
+    const unit = this.unitMap.get(unitId);
+    if (unit) {
+      unit.hidden = false;
+      this.notify();
+    }
+  }
+
+  unhideAllUnits() {
+    let changed = false;
+    for (const unit of this.world.units) {
+      if (unit.hidden) {
+        unit.hidden = false;
+        changed = true;
+      }
+    }
+    if (changed) this.notify();
+  }
+
+  getHiddenUnits(): Unit[] {
+    return this.world.units.filter((u) => u.hidden);
   }
 
   // ─── Phase 9: XCOM Context Fatigue ─────────────────────────────────────────
