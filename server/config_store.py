@@ -74,10 +74,15 @@ def normalize_harness_id(harness: str) -> str:
 # ───────────────────────────────────────────────────────────────────────────
 
 def _config_path() -> Path:
+    # expanduser es obligatorio: `.env` define REPOCIV_CONFIG_DIR=~/.repociv y
+    # sin expandir se crea un directorio literal llamado "~" en el cwd, lo que
+    # rompe GET /api/profiles con FileNotFoundError y tumbó 19 tests E2E
+    # (bug introducido en c83a577, 2026-06-15; detectado 2026-07-11).
+    # bridge.py:122 ya expandía; esta ruta divergía. Ver test_config_store.py.
     base = os.environ.get(_CONFIG_DIR_ENV) or os.path.join(
         os.path.expanduser("~"), ".repociv"
     )
-    return Path(base) / _CONFIG_FILENAME
+    return Path(os.path.expanduser(base)) / _CONFIG_FILENAME
 
 
 def _read_raw() -> dict[str, Any]:

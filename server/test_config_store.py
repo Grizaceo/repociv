@@ -244,3 +244,41 @@ def test_get_set_default_harness(isolated_config: Path) -> None:
 def test_set_default_harness_rejects_unknown(isolated_config: Path) -> None:
     with pytest.raises(ValueError, match="unknown harness"):
         config_store.set_default_harness("gpt-99")
+
+
+# ── Regresión: expansión de `~` en REPOCIV_CONFIG_DIR ───────────────────────
+# El `isolated_config` de arriba mockea `_config_path`, así que NINGÚN test
+# ejercitaba la función real. Por eso pasó desapercibido que usaba
+# `Path(base)` sin expandir: `.env` define `REPOCIV_CONFIG_DIR=~/.repociv`,
+# se creaba un directorio literal "~" en el cwd y `GET /api/profiles` moría
+# con FileNotFoundError → 19 tests E2E en rojo (c83a577, 15-jun-2026;
+# diagnosticado 11-jul; corregido 05-ago).
+# Estos tests llaman a `_config_path()` SIN mock, a propósito.
+
+def test_config_path_expands_tilde(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(config_store._CONFIG_DIR_ENV, "~/.repociv")
+    path = config_store._config_path()
+    assert "~" not in str(path), f"`~` sin expandir en {path}"
+    assert path.is_absolute()
+    assert str(path).startswith(os.path.expanduser("~"))
+
+
+def test_config_path_matches_bridge_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """config_store y bridge.py deben resolver el MISMO directorio.
+
+    La divergencia era la causa raíz: bridge.py:122 expandía y
+    config_store.py no, así que cada uno leía un archivo distinto.
+    """
+    monkeypatch.setenv(config_store._CONFIG_DIR_ENV, "~/.repociv")
+    bridge_dir = Path(os.path.expanduser(os.environ["REPOCIV_CONFIG_DIR"]))
+    assert config_store._config_path().parent == bridge_dir
+
+
+def test_config_path_absolute_dir_unchanged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Una ruta absoluta debe pasar intacta (expanduser es no-op)."""
+    monkeypatch.setenv(config_store._CONFIG_DIR_ENV, str(tmp_path))
+    assert config_store._config_path().parent == tmp_path
