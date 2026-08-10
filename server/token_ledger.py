@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -69,6 +70,10 @@ class TokenLedger:
         self._completion_tokens: int = 0
         self._cost_estimate: float = 0.0
 
+        # Per-agent usage (agent id → {prompt, completion, lastAt}) — feeds the
+        # XCOM fatigue provider: tokens consumed = work done, idle time = rest.
+        self._agent_tokens: dict[str, dict[str, Any]] = {}
+
         self._state_dir.mkdir(parents=True, exist_ok=True)
         self._load()
 
@@ -85,6 +90,17 @@ class TokenLedger:
         self._prompt_tokens = int(data.get("total_prompt_tokens", 0))
         self._completion_tokens = int(data.get("total_completion_tokens", 0))
         self._cost_estimate = float(data.get("total_cost_estimate", 0.0))
+        raw_agents = data.get("per_agent", {})
+        if isinstance(raw_agents, dict):
+            self._agent_tokens = {
+                str(agent): {
+                    "prompt": int(entry.get("prompt", 0)),
+                    "completion": int(entry.get("completion", 0)),
+                    "lastAt": float(entry.get("lastAt", 0.0)),
+                }
+                for agent, entry in raw_agents.items()
+                if isinstance(entry, dict)
+            }
 
     def _save(self) -> None:
         """Must be called with self._lock held."""
@@ -94,6 +110,7 @@ class TokenLedger:
                     "total_prompt_tokens": self._prompt_tokens,
                     "total_completion_tokens": self._completion_tokens,
                     "total_cost_estimate": round(self._cost_estimate, 8),
+                    "per_agent": self._agent_tokens,
                 }, indent=2),
                 encoding="utf-8",
             )
@@ -117,6 +134,7 @@ class TokenLedger:
         model: str,
         prompt_tokens: int,
         completion_tokens: int,
+        agent: str = "",
     ) -> None:
         """Record token usage for a single agent call.
 
@@ -126,6 +144,9 @@ class TokenLedger:
             model:             Model name (e.g. ``"claude-sonnet-4-5"``).
             prompt_tokens:     Input token count.
             completion_tokens: Output token count.
+            agent:             Agent/unit id that consumed the tokens (e.g.
+                               ``"WORKER"``). Empty string keeps the legacy
+                               global-only behavior.
         """
         prompt_tokens = max(0, int(prompt_tokens))
         completion_tokens = max(0, int(completion_tokens))
@@ -136,12 +157,56 @@ class TokenLedger:
             self._prompt_tokens += prompt_tokens
             self._completion_tokens += completion_tokens
             self._cost_estimate += cost
+            if agent:
+                entry = self._agent_tokens.setdefault(agent, {"prompt": 0, "completion": 0, "lastAt": 0.0})
+                entry["prompt"] += prompt_tokens
+                entry["completion"] += completion_tokens
+                entry["lastAt"] = time.time()
             self._save()
 
         logger.debug(
             "TokenLedger: %s +%d/%d tokens  est $%.5f",
             model, prompt_tokens, completion_tokens, cost,
         )
+
+    def get_agent_usage(self, agent: str) -> dict[str, Any]:
+        """Return per-agent token usage: {prompt, completion, total, lastAt}.
+
+        Unknown agents return zeros with ``lastAt=0`` (never worked).
+        """
+        with self._lock:
+            entry = self._agent_tokens.get(agent)
+            if not entry:
+                return {"prompt": 0, "completion": 0, "total": 0, "lastAt": 0.0}
+            return {
+                "prompt": entry["prompt"],
+                "completion": entry["completion"],
+                "total": entry["prompt"] + entry["completion"],
+                "lastAt": entry["lastAt"],
+            }
+
+    def get_agent_fatigue(self, agent: str, window_s: float = 3600.0, max_tokens: int = 200_000) -> int:
+        """XCOM-style fatigue (0–100) from token consumption.
+
+        Fatigue = tokens consumed by *agent* in the last ``window_s``, mapped
+        linearly onto 0–100 against ``max_tokens``. Tokens older than the
+        window decay away (rest), so an agent that stops working recovers.
+        Returns 100 (fresh) for unknown agents.
+        """
+        usage = self.get_agent_usage(agent)
+        if usage["lastAt"] <= 0:
+            return 100
+        age_s = time.time() - usage["lastAt"]
+        if age_s >= window_s:
+            return 100
+        # Linear decay: tokens consumed at the start of the window count less.
+        # lastAt is the most recent call, so weight by recency of the last call.
+        recency = 1.0 - (age_s / window_s)
+        consumed = usage["total"] * recency
+        if max_tokens <= 0:
+            return 100
+        fatigue = max(0, min(100, int(100 - (consumed / max_tokens) * 100)))
+        return fatigue
 
     def get_summary(self) -> dict[str, Any]:
         """Return a snapshot of accumulated totals (thread-safe)."""

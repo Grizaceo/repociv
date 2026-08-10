@@ -21,14 +21,14 @@ describe('local analytics', () => {
     const store = stubStorage();
     const analytics = await import('./analytics.ts');
 
-    analytics.trackHotkey('F6:ledger');
-    analytics.trackHotkey('F6:ledger');
     analytics.trackHotkey('P:priority');
+    analytics.trackHotkey('P:priority');
+    analytics.trackHotkey('T:terminal');
 
     const saved = JSON.parse(store['repociv:analytics']!);
     expect(saved.hotkeysUsed).toEqual({
-      'F6:ledger': 2,
-      'P:priority': 1,
+      'P:priority': 2,
+      'T:terminal': 1,
     });
   });
 
@@ -36,8 +36,8 @@ describe('local analytics', () => {
     stubStorage();
     const analytics = await import('./analytics.ts');
 
-    analytics.trackPanelOpen('observability');
-    analytics.trackPanelOpen('observability');
+    analytics.trackPanelOpen('harness');
+    analytics.trackPanelOpen('harness');
     analytics.trackPanelOpen('approvals');
 
     const report = analytics.getPanelUsageReport();
@@ -46,11 +46,11 @@ describe('local analytics', () => {
     expect(report.map((r) => r.panel).sort()).toEqual([...analytics.KNOWN_PANELS].sort());
     // Opened ones carry their counts.
     const byName = Object.fromEntries(report.map((r) => [r.panel, r.opens]));
-    expect(byName['observability']).toBe(2);
+    expect(byName['harness']).toBe(2);
     expect(byName['approvals']).toBe(1);
     // Sorted least-used first: a never-opened panel leads, the most-used trails.
     expect(report[0]!.opens).toBe(0);
-    expect(report[report.length - 1]!.panel).toBe('observability');
+    expect(report[report.length - 1]!.panel).toBe('harness');
     // Unused panels (poda candidates) are exactly the untouched ones.
     expect(report.filter((r) => r.opens === 0).length).toBe(analytics.KNOWN_PANELS.length - 2);
   });

@@ -225,6 +225,7 @@ from server import task_orchestrator as _to  # noqa: E402
 from server import rate_limiter as _rl  # noqa: E402
 from server import missions_store as _missions_store  # noqa: E402
 from server import fatigue_state as _fatigue_state_mod  # noqa: E402
+from server import token_ledger as _token_ledger  # noqa: E402
 from server import command_executors as _command_executors  # noqa: E402
 
 _BRIDGE_STATE_CONFIG_DIR: Path | None = None
@@ -1176,8 +1177,16 @@ def _seed_initial_heartbeats() -> None:
 # ─── Main ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     _sched.set_dispatcher(_scheduler_dispatch)
-    # Wire fatigue state into scheduler priority scoring
-    _sched.set_fatigue_provider(lambda unit_id: get_unit_fatigue(unit_id).get("fatigue"))
+    # Wire fatigue into scheduler priority scoring. Source of truth is token
+    # consumption (XCOM: work = tokens, rest = idle time); an explicit manual
+    # fatigue value (unit_fatigue_delta) still overrides it.
+    def _fatigue_for(unit_id: str) -> int:
+        manual = get_unit_fatigue(unit_id).get("fatigue")
+        if manual != 100:
+            return int(manual)
+        return _token_ledger.get_ledger().get_agent_fatigue(unit_id)
+
+    _sched.set_fatigue_provider(_fatigue_for)
     _sched.start_worker()
     _seed_initial_heartbeats()
 

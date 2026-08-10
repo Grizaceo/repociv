@@ -14,8 +14,6 @@ import {
   wireSideTabs,
   loadGitInfo,
   loadFilesInfo,
-  closeQuestBoard,
-  wireQuestBoardTabs,
   toggleKeyboardHelp,
   wireCityPanel,
   getSelectedConfig,
@@ -305,10 +303,6 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
 
   // ─── City panel ──────────────────────────────────────────────────────────
   wireCityPanel();
-
-  // ─── Quest board ─────────────────────────────────────────────────────────
-  document.getElementById('quest-board-close')?.addEventListener('click', closeQuestBoard);
-  wireQuestBoardTabs(state);
 
   // ─── Keyboard help close ─────────────────────────────────────────────────
   document.getElementById('kbh-close')?.addEventListener('click', () => toggleKeyboardHelp(false));

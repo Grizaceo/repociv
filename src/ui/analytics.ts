@@ -107,10 +107,6 @@ export function getAnalytics(): Readonly<AnalyticsData> {
 // are core surfaces, intentionally excluded.
 export const KNOWN_PANELS = [
   'approvals',
-  'observability',
-  'replay',
-  'timeline',
-  'quest-board',
   'harness',
   'recovery',
   'tasks',
@@ -118,7 +114,6 @@ export const KNOWN_PANELS = [
   'pending',
   'log',
   'layers',
-  'ledger',
   'priority',
   'settings',
   'construction',

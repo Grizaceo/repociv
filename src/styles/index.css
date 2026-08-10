@@ -10,14 +10,11 @@
 @import './panels/unit-panel.css';
 @import './panels/model-selectors.css';
 @import './panels/city-panel.css';
-@import './panels/timeline-panel.css';
 @import './panels/approval-panel.css';
 @import './panels/spatial-directive.css';
 @import './panels/context-menu.css';
 @import './panels/capability-badges.css';
-@import './panels/observability.css';
 @import './panels/suggestions.css';
-@import './panels/replay-panel.css';
 @import './panels/pending-panel.css';
 @import './panels/task-assign.css';
 @import './panels/local-spatial.css';

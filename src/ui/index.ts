@@ -5,7 +5,6 @@ export * from './quest.ts';
 export * from './keyboard.ts';
 export * from './city.ts';
 export { showNotification } from './notificationBanner.ts';
-export { toggleLedger, openLedger, closeLedger, isLedgerOpen } from './ledger.ts';
 export {
   openPriorityPanel,
   closePriorityPanel,
@@ -13,12 +12,6 @@ export {
   togglePriorityPanel,
 } from './priorityPanel.ts';
 export { openSettingsPanel, closeSettingsPanel, toggleSettingsPanel } from './settingsPanel.ts';
-export {
-  openTimelinePanel,
-  closeTimelinePanel,
-  isTimelinePanelOpen,
-  toggleTimelinePanel,
-} from './timelinePanel.ts';
 export {
   openApprovalPanel,
   closeApprovalPanel,
@@ -28,15 +21,6 @@ export {
   stopApprovalPolling,
 } from './approvalPanel.ts';
 export {
-  openObservabilityPanel,
-  closeObservabilityPanel,
-  isObservabilityPanelOpen,
-  toggleObservabilityPanel,
-  startObservabilityPolling,
-  stopObservabilityPolling,
-  setWebGLMetricsSource,
-} from './observabilityPanel.ts';
-export {
   openHarnessPanel,
   closeHarnessPanel,
   isHarnessPanelOpen,
@@ -45,12 +29,6 @@ export {
   stopHarnessPolling,
 } from './harnessPanel';
 export { openRecoveryPanel, closeRecoveryPanel, isRecoveryPanelOpen } from './recoveryPanel';
-export {
-  openReplayPanel,
-  closeReplayPanel,
-  isReplayPanelOpen,
-  toggleReplayPanel,
-} from './replayPanel';
 export { openTaskPanel, closeTaskPanel, isTaskPanelOpen, toggleTaskPanel } from './taskPanel';
 export {
   openTaskAssignPanel,

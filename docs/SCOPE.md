@@ -48,6 +48,11 @@ Métricas concretas para considerar el alpha "exitoso":
 
 - Mejorar lo que **ya** se usa (renderer, hex grid, fatiga, priority matrix,
   task orchestrator, security harness, container runtime).
+- **Fatiga XCOM (2026-08-10):** la fatiga ahora se deriva de **tokens
+  consumidos por agente** (`token_ledger.get_agent_fatigue`, ventana 1h,
+  max 200k tokens) en vez de un estado manual que nadie alimentaba. El
+  scheduler prioriza agentes frescos (multiplicador 0.3–1.0, peso 15).
+  Un `unit_fatigue_delta` manual explícito sigue teniendo prioridad.
 - Cerrar bugs y deudas técnicas que aparezcan durante el dogfooding.
 - Mejoras visuales menores (assets, animaciones, tooltips) que hagan el
   alpha-test más placentero — pero sin reescribir capas grandes.
@@ -104,13 +109,18 @@ Tras 4-8 semanas de uso real, ejecutar este audit:
 
 1. **Telemetría de paneles** — registrar qué hotkeys se usan y cuáles paneles
    se abren. Cualquier panel con 0 invocaciones en 4 semanas → candidato a borrar.
-   Sospechosos iniciales: Replay, Observability, Quest Board, Recovery, Harness,
-   Timeline (todos juntos pueden ser 2/3 de la superficie de UI).
    *Implementado (plan A2/D3):* `src/ui/analytics.ts` registra `trackPanelOpen` /
    `trackHotkey`; `getPanelUsageReport()` (sobre la lista canónica `KNOWN_PANELS`)
    ordena de menos a más usado y se muestra en la **Ficha de la Capital →
-   "candidatos a poda (0 = nunca abierto)"**. Tras 4-8 semanas, leer ese reporte
-   para ejecutar esta poda.
+   "candidatos a poda (0 = nunca abierto)"**.
+
+   **Poda ejecutada (2026-08-10):** se eliminaron **Replay, Observability,
+   Timeline, Quest Board y Gran Libro (Ledger)** — paneles sin tráfico de
+   endpoint en la telemetría real (`~/.repociv/endpoint_usage.json`) y en la
+   lista de sospechosos original. **Recovery se conservó**: no es un panel
+   toggle sino contextual (se abre desde Harness y desde fallos de comando
+   para generar planes de recuperación). `KNOWN_PANELS` quedó en 11 entradas.
+   La telemetría de paneles sigue activa para la próxima ronda de poda.
 
 2. **Telemetría de endpoints del bridge** — qué rutas se llaman desde el
    frontend. Endpoints muertos → borrar.

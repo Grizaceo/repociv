@@ -60,12 +60,6 @@
           <button id="btn-approvals" title="Aprobaciones pendientes [Ctrl+A]" aria-label="Aprobaciones pendientes">
             <i data-lucide="triangle-alert"></i><span class="approval-badge"></span>
           </button>
-          <button id="btn-replay" data-hud-tier="advanced" title="Replay de directivas [F7]" aria-label="Replay de directivas">
-            <i data-lucide="rotate-ccw"></i>
-          </button>
-          <button id="btn-observability" data-hud-tier="advanced" title="Observabilidad [F8]" aria-label="Panel de observabilidad">
-            <i data-lucide="activity"></i><span class="obs-health-dot"></span>
-          </button>
           <button id="btn-pending" data-hud-tier="advanced" title="Pendientes del tracker" aria-label="Panel de pendientes">
             <i data-lucide="file-text"></i>
           </button>
@@ -215,9 +209,6 @@
               <i data-lucide="clipboard-list"></i>
               <span class="btn-badge" id="btn-tasks-badge" aria-hidden="true"></span>
             </button>
-            <button id="btn-timeline" title="Crónica de eventos [F10]" aria-label="Crónica de eventos">
-              <i data-lucide="scroll-text"></i>
-            </button>
             <button id="btn-idle-agent" title="Buscar agente idle [,]" aria-label="Buscar agente idle">
               <i data-lucide="radar"></i>
               <span class="btn-badge" id="btn-idle-agent-badge" aria-hidden="true"></span>
@@ -282,24 +273,6 @@
           <button id="btn-city-institutum" aria-label="Abrir Institutum o LabHub">Abrir Institutum</button>
           <button id="btn-city-logs" aria-label="Abrir logs asociados">Ver logs</button>
           <button id="btn-city-close" aria-label="Cerrar panel de ciudad">✕</button>
-        </div>
-      </div>
-
-      <!-- Quest Board (F9) -->
-      <div id="quest-board" class="hidden">
-        <div class="board-header">
-          <div class="board-title">★ QUEST BOARD — Imperio RepoCiv ★</div>
-          <button id="quest-board-close" aria-label="Cerrar tablero de misiones">✕</button>
-        </div>
-        <div class="board-tabs">
-          <button class="quest-tab active" data-filter="all" aria-label="Mostrar todas las misiones">Todas <span class="qb-badge" id="qb-badge-all">0</span></button>
-          <button class="quest-tab" data-filter="running" aria-label="Mostrar misiones en curso">En curso <span class="qb-badge" id="qb-badge-run">0</span></button>
-          <button class="quest-tab" data-filter="complete" aria-label="Mostrar misiones completas">Completas <span class="qb-badge" id="qb-badge-done">0</span></button>
-          <button class="quest-tab" data-filter="failed" aria-label="Mostrar misiones fallidas">Fallidas <span class="qb-badge" id="qb-badge-fail">0</span></button>
-        </div>
-        <div id="quest-list"></div>
-        <div class="board-footer">
-          <button id="btn-new-quest" aria-label="Crear nueva misión">+ Nueva misión</button>
         </div>
       </div>
 

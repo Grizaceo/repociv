@@ -40,12 +40,8 @@ import {
   initExternalLibs,
   updateResource,
   updateBadges,
-  toggleTimelinePanel,
   toggleApprovalPanel,
   startApprovalPolling,
-  toggleObservabilityPanel,
-  startObservabilityPolling,
-  setWebGLMetricsSource,
   toggleHarnessPanel,
   startHarnessPolling,
   toggleTaskPanel,
@@ -732,12 +728,7 @@ async function bootstrap() {
 
   document.getElementById('btn-toggle-3d')?.classList.remove('hidden');
   document.getElementById('btn-toggle-3d')?.addEventListener('click', toggleView);
-  document.getElementById('btn-timeline')?.addEventListener('click', toggleTimelinePanel);
   document.getElementById('btn-approvals')?.addEventListener('click', toggleApprovalPanel);
-  document.getElementById('btn-replay')?.addEventListener('click', () => {
-    void import('./ui/replayPanel.ts').then((m) => m.toggleReplayPanel());
-  });
-  document.getElementById('btn-observability')?.addEventListener('click', toggleObservabilityPanel);
   document.getElementById('btn-tasks')?.addEventListener('click', toggleTaskPanel);
 
   // ─── Idle agent finder (Age of Empires pattern) ─────────────────────
@@ -798,8 +789,6 @@ async function bootstrap() {
   bridge.start();
   startApprovalPolling();
   startMcpStatusPolling();
-  setWebGLMetricsSource(() => renderer.getWebGLMetrics());
-  startObservabilityPolling();
   startHarnessPolling();
 
   // First-run coachmark tour (plan B2): teach the core loop once. Delayed so
@@ -827,8 +816,6 @@ async function bootstrap() {
   // ══ Analytics wiring ══
   const analyticsPanels = {
     'btn-approvals': 'approvals',
-    'btn-timeline': 'timeline',
-    'btn-observability': 'observability',
     'btn-tasks': 'tasks',
     'btn-pending': 'pending',
     'btn-log': 'log',

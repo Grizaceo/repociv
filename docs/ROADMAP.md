@@ -28,7 +28,9 @@ These components are used daily and have passing test suites:
 - GPU monitoring (VRAM + temperature via nvidia-smi)
 - Tech debt scanner
 - SSE real-time event streaming
-- 21 UI panels (terminal, priority, approval, ledger, quest, timeline, etc.)
+- 11 UI panels (terminal, priority, approval, ledger, quest, timeline, etc.)
+  — 5 panels pruned 2026-08-10 (replay, observability, timeline, quest board,
+  ledger) after endpoint telemetry showed zero usage; recovery kept (contextual)
 - Systemd integration for persistent operation
 - Security Harness (3-layer: gate, audit, runtime)
 - FrugalGPT Router (cost-aware model selection)
@@ -101,13 +103,16 @@ individual researcher or developer.
 
 ### 3D Renderer (Three.js / WebGL)
 
-Canvas 2D is deliberately chosen over Three.js 3D. 3D adds complexity
-(lighting, camera controls, asset pipeline) without adding information
-density for an operational dashboard. The spatial metaphor works because
-it is readable at a glance, not because it is immersive. A 3D renderer
-branch exists (`feat/3d-renderer`) for experimentation, but it will
-not replace the 2D renderer until it proves functional parity, not just
-visual appeal.
+> **Updated 2026-06:** the 3D renderer is no longer "not in scope" — it was
+> integrated into `main` and is official. See `docs/SCOPE.md` for the current
+> rule: both renderers are trunk, switching between them must be frictionless.
+
+Canvas 2D was deliberately chosen as the default for information density, and
+that reasoning still holds for the default view. The WebGL/Three.js renderer
+(`?renderer=webgl` or hotkey `3`) is opt-in and lazy-loaded (chunk
+`vendor-three`, never in the eager 2D bundle). The 3D local view
+(`LocalScene3D`, Phase A) is also on trunk. The rule is parity of switching,
+not "2D-only until functional parity".
 
 ### Achievements / Skins / Gamification
 

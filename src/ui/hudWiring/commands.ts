@@ -11,14 +11,10 @@ import { registerCommands, registerCommandProvider } from '../commandPalette.ts'
 import { toggleHudMode } from '../hudMode.ts';
 import {
   toggleApprovalPanel,
-  toggleObservabilityPanel,
-  toggleReplayPanel,
-  toggleTimelinePanel,
   toggleTaskPanel,
   togglePendingPanel,
   toggleLogPanel,
   toggleHarnessPanel,
-  toggleLedger,
   toggleTaskAssignPanel,
 } from '../index.ts';
 import { toggleSettingsPanel } from '../settingsPanel.ts';
@@ -81,27 +77,6 @@ export function registerHudCommands(
       run: () => toggleTaskPanel(),
     },
     {
-      id: 'p-timeline',
-      group: 'Panel',
-      label: 'Crónica de eventos',
-      hint: 'F10',
-      run: () => toggleTimelinePanel(),
-    },
-    {
-      id: 'p-observability',
-      group: 'Panel',
-      label: 'Observabilidad',
-      hint: 'F8',
-      run: () => toggleObservabilityPanel(),
-    },
-    {
-      id: 'p-replay',
-      group: 'Panel',
-      label: 'Replay de directivas',
-      hint: 'F7',
-      run: () => toggleReplayPanel(),
-    },
-    {
       id: 'p-pending',
       group: 'Panel',
       label: 'Pendientes del tracker',
@@ -109,13 +84,6 @@ export function registerHudCommands(
     },
     { id: 'p-log', group: 'Panel', label: 'Log en vivo', run: () => toggleLogPanel() },
     { id: 'p-harness', group: 'Panel', label: 'Harness', run: () => toggleHarnessPanel() },
-    {
-      id: 'p-ledger',
-      group: 'Panel',
-      label: 'Gran Libro',
-      hint: 'F6',
-      run: () => toggleLedger(state),
-    },
     {
       id: 'p-task-assign',
       group: 'Panel',

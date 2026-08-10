@@ -158,3 +158,59 @@ def test_concurrent_log_usage_is_thread_safe(tmp_path: Path) -> None:
     assert s["total_completion_tokens"] == 250
 
 
+# ── Per-agent tracking (XCOM fatigue source) ─────────────────────────────────
+
+def test_log_usage_tracks_per_agent(ledger: TokenLedger) -> None:
+    ledger.log_usage("claude-haiku", 100, 50, agent="WORKER")
+    ledger.log_usage("claude-sonnet", 200, 100, agent="WORKER")
+    ledger.log_usage("claude-haiku", 10, 5, agent="SCOUT")
+
+    w = ledger.get_agent_usage("WORKER")
+    assert w["prompt"] == 300
+    assert w["completion"] == 150
+    assert w["total"] == 450
+    assert w["lastAt"] > 0
+
+    s = ledger.get_agent_usage("SCOUT")
+    assert s["total"] == 15
+
+    # Unknown agent: zeros, never worked.
+    assert ledger.get_agent_usage("nobody") == {"prompt": 0, "completion": 0, "total": 0, "lastAt": 0.0}
+
+
+def test_agent_usage_persists_across_instances(tmp_path: Path) -> None:
+    l1 = TokenLedger(state_dir=tmp_path)
+    l1.log_usage("claude-haiku", 100, 50, agent="WORKER")
+
+    l2 = TokenLedger(state_dir=tmp_path)
+    assert l2.get_agent_usage("WORKER")["total"] == 150
+
+
+def test_agent_fatigue_fresh_for_unknown_agent(ledger: TokenLedger) -> None:
+    assert ledger.get_agent_fatigue("nobody") == 100
+
+
+def test_agent_fatigue_drops_with_tokens(ledger: TokenLedger) -> None:
+    # 100k tokens consumed recently against a 200k max → 50% fatigue.
+    ledger.log_usage("claude-haiku", 100_000, 0, agent="WORKER")
+    fatigue = ledger.get_agent_fatigue("WORKER", window_s=3600.0, max_tokens=200_000)
+    assert fatigue == 50
+
+
+def test_agent_fatigue_recovers_after_window(ledger: TokenLedger, monkeypatch) -> None:
+    import time as _time
+
+    ledger.log_usage("claude-haiku", 100_000, 0, agent="WORKER")
+    # Simulate the agent resting: advance the clock past the window.
+    real_time = _time.time
+    monkeypatch.setattr(_time, "time", lambda: real_time() + 7200.0)
+    assert ledger.get_agent_fatigue("WORKER", window_s=3600.0, max_tokens=200_000) == 100
+
+
+def test_agent_fatigue_manual_override_wins(ledger: TokenLedger) -> None:
+    # A heavy consumer still reports fresh if the manual fatigue state says so —
+    # the bridge provider prefers explicit values over token-derived ones.
+    ledger.log_usage("claude-haiku", 100_000, 0, agent="WORKER")
+    assert ledger.get_agent_fatigue("WORKER", window_s=3600.0, max_tokens=200_000) < 100
+
+

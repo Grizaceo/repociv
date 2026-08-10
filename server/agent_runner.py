@@ -429,6 +429,7 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
         model=_infer_model_label(unit_id),
         prompt_tokens=max(1, len(mission) // 4),
         completion_tokens=max(1, len(output) // 4),
+        agent=unit_id,
     )
 
     mission_record.update({"completedAt": time.time(), "status": "complete" if success else "failed",
@@ -1254,6 +1255,7 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
                 model=eff_model,
                 prompt_tokens=int(usage.get("prompt_tokens", 0)),
                 completion_tokens=int(usage.get("completion_tokens", 0)),
+                agent=unit_id,
             )
         for i in range(0, len(content), 40):
             chunk = content[i:i + 40]

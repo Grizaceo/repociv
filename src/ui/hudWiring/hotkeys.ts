@@ -9,31 +9,14 @@ import {
   openSidePanel,
   closeSidePanel,
   isSidePanelOpen,
-  openQuestBoard,
-  closeQuestBoard,
-  isQuestBoardOpen,
-  fetchPersistedMissions,
-  renderQuestBoard,
   toggleKeyboardHelp,
   closeCityPanel,
   isCityPanelOpen,
   togglePriorityPanel,
   isPriorityPanelOpen,
-  toggleTimelinePanel,
-  closeTimelinePanel,
-  isTimelinePanelOpen,
   toggleApprovalPanel,
   closeApprovalPanel,
   isApprovalPanelOpen,
-  toggleObservabilityPanel,
-  closeObservabilityPanel,
-  isObservabilityPanelOpen,
-  toggleReplayPanel,
-  closeReplayPanel,
-  isReplayPanelOpen,
-  toggleLedger,
-  closeLedger,
-  isLedgerOpen,
   closeTaskPanel,
   isTaskPanelOpen,
   closePendingPanel,
@@ -76,48 +59,13 @@ export function wireHotkeys(
     if (isCommandPaletteOpen()) return;
 
     // Hotkey panels
-    if (e.key === 'F7') {
-      e.preventDefault();
-      trackHotkey('F7:replay');
-      if (!isReplayPanelOpen()) trackPanelOpen('replay');
-      toggleReplayPanel();
-      return;
-    }
-    if (e.key === 'F8') {
-      e.preventDefault();
-      trackHotkey('F8:observability');
-      if (!isObservabilityPanelOpen()) trackPanelOpen('observability');
-      toggleObservabilityPanel();
-      return;
-    }
-    if (e.key === 'F10') {
-      e.preventDefault();
-      trackHotkey('F10:timeline');
-      if (!isTimelinePanelOpen()) trackPanelOpen('timeline');
-      toggleTimelinePanel();
-      return;
-    }
-
-    // Esc: close overlays
     if (e.key === 'Escape') {
       if (isLayerPanelOpen()) {
         closeLayerPanel();
         return;
       }
-      if (isLedgerOpen()) {
-        closeLedger();
-        return;
-      }
       if (terminalPanel.isVisible()) {
         terminalPanel.hide();
-        return;
-      }
-      if (isReplayPanelOpen()) {
-        closeReplayPanel();
-        return;
-      }
-      if (isObservabilityPanelOpen()) {
-        closeObservabilityPanel();
         return;
       }
       if (isTaskPanelOpen()) {
@@ -136,16 +84,8 @@ export function wireHotkeys(
         closeApprovalPanel();
         return;
       }
-      if (isTimelinePanelOpen()) {
-        closeTimelinePanel();
-        return;
-      }
       if (isCityPanelOpen()) {
         closeCityPanel();
-        return;
-      }
-      if (isQuestBoardOpen()) {
-        closeQuestBoard();
         return;
       }
       const help = document.getElementById('keyboard-help');
@@ -374,29 +314,6 @@ export function wireHotkeys(
         trackHotkey('?:keyboard-help');
         toggleKeyboardHelp();
         break;
-    }
-
-    if (e.key === 'F6') {
-      e.preventDefault();
-      trackHotkey('F6:ledger');
-      if (!isLedgerOpen()) trackPanelOpen('ledger');
-      toggleLedger(state, (cityId) => {
-        const city = state.world.cities.find((c) => c.id === cityId);
-        if (city) renderer.centerOn(city.coord);
-      });
-    }
-
-    if (e.key === 'F9') {
-      e.preventDefault();
-      trackHotkey('F9:quest-board');
-      if (!isQuestBoardOpen()) trackPanelOpen('quest-board');
-      if (isQuestBoardOpen()) closeQuestBoard();
-      else
-        (async () => {
-          const persisted = await fetchPersistedMissions();
-          openQuestBoard(state);
-          renderQuestBoard(state, persisted);
-        })();
     }
 
     if (e.key === 'F11') {
