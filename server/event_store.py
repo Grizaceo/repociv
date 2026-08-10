@@ -233,7 +233,7 @@ def _iter_lines_reverse(path: Path) -> Iterator[str]:
             f.seek(pos)
             pending = f.read(read_size) + pending
             while b"\n" in pending:
-                line, pending = pending.rsplit(b"\n", 1)
+                pending, line = pending.rsplit(b"\n", 1)
                 text = line.decode("utf-8").strip()
                 if text:
                     yield text

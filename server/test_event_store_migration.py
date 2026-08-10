@@ -121,3 +121,41 @@ def test_migrate_creates_marker_when_no_events(tmp_path: Path, monkeypatch: pyte
     assert marker.exists()
     # events.jsonl was not created (nothing to migrate to)
     assert not (tmp_path / "events.jsonl").exists()
+
+
+def test_read_events_round_trips_multiple_lines(isolated_event_store: Path) -> None:
+    """read_events must return every persisted event, newest last.
+
+    Regression: the tail-read iterator swapped the rsplit() halves, so any
+    file with >= 2 lines was read as one malformed line and read_events
+    silently returned [] (breaking /api/events, context packs, and
+    restart recovery). See commit 4223d2d.
+    """
+    path = isolated_event_store / "events.jsonl"
+    _write_raw_events(path, [
+        {"type": "CommandCreated", "commandId": "c1", "actor": "MAIN", "data": {}},
+        {"type": "CommandCompleted", "commandId": "c1", "actor": "system", "data": {}},
+        {"type": "CommandCreated", "commandId": "c2", "actor": "MAIN", "data": {}},
+    ])
+
+    events = event_store.read_events(since=0)
+
+    assert [e["commandId"] for e in events] == ["c1", "c1", "c2"]
+    assert [e["type"] for e in events] == [
+        "CommandCreated",
+        "CommandCompleted",
+        "CommandCreated",
+    ]
+
+
+def test_read_events_respects_since_and_limit(isolated_event_store: Path) -> None:
+    path = isolated_event_store / "events.jsonl"
+    _write_raw_events(path, [
+        {"type": "CommandCreated", "commandId": "c1", "actor": "MAIN", "data": {}, "timestamp": 100.0},
+        {"type": "CommandCreated", "commandId": "c2", "actor": "MAIN", "data": {}, "timestamp": 200.0},
+        {"type": "CommandCreated", "commandId": "c3", "actor": "MAIN", "data": {}, "timestamp": 300.0},
+    ])
+
+    assert [e["commandId"] for e in event_store.read_events(since=150.0)] == ["c2", "c3"]
+    # limit counts from the tail: the newest N events, oldest first.
+    assert [e["commandId"] for e in event_store.read_events(since=0, limit=2)] == ["c2", "c3"]

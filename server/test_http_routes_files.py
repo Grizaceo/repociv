@@ -11,10 +11,16 @@ def _encode_repo_id(path: str) -> str:
     return "repo:" + base64.urlsafe_b64encode(path.encode("utf-8")).decode("ascii").rstrip("=")
 
 
-def _write_state(monkeypatch, tmp_path, root: str) -> None:
+def _write_state(monkeypatch, tmp_path, root: str, selected: list[str] | None = None) -> None:
     state_file = tmp_path / "state.json"
     state_file.write_text(
-        json.dumps({"version": 1, "activeRoot": root, "roots": {root: {"selectedRepoPaths": []}}}),
+        json.dumps(
+            {
+                "version": 1,
+                "activeRoot": root,
+                "roots": {root: {"selectedRepoPaths": selected or []}},
+            }
+        ),
         encoding="utf-8",
     )
     monkeypatch.setenv("REPOCIV_STATE_FILE", str(state_file))
@@ -26,7 +32,7 @@ def test_get_repo_file_tree_uses_active_root_for_plain_repo_id(monkeypatch, tmp_
     (repo / "src").mkdir(parents=True)
     (repo / "src" / "main.ts").write_text("console.log('ok')\n", encoding="utf-8")
 
-    _write_state(monkeypatch, tmp_path, str(root))
+    _write_state(monkeypatch, tmp_path, str(root), selected=[str(repo)])
 
     status, body = http_routes.get_repo_file_tree({"path": "/api/files/alpha"})
 
@@ -44,7 +50,7 @@ def test_get_repo_file_tree_decodes_repo_id_and_returns_tree_and_files(monkeypat
     (repo / "docs" / "README.md").write_text("# beta\n", encoding="utf-8")
     repo_id = _encode_repo_id(str(repo))
 
-    _write_state(monkeypatch, tmp_path, str(root))
+    _write_state(monkeypatch, tmp_path, str(root), selected=[str(repo)])
 
     status, body = http_routes.get_repo_file_tree({"path": f"/api/files/{repo_id}"})
 
@@ -62,12 +68,13 @@ def test_get_repo_file_tree_rejects_repo_symlink_outside_root(monkeypatch, tmp_p
     (outside / "leak.txt").write_text("secret\n", encoding="utf-8")
     (root / "evil").symlink_to(outside)
 
-    _write_state(monkeypatch, tmp_path, str(root))
+    # Even a selected repo whose realpath escapes the root is rejected.
+    _write_state(monkeypatch, tmp_path, str(root), selected=[str(root / "evil")])
 
     status, body = http_routes.get_repo_file_tree({"path": "/api/files/evil"})
 
     assert status == 403
-    assert "outside allowed root" in body["error"]
+    assert "repository must be selected" in body["error"]
 
 
 def test_get_repo_file_tree_skips_symlink_escape_inside_repo(monkeypatch, tmp_path):
@@ -80,7 +87,7 @@ def test_get_repo_file_tree_skips_symlink_escape_inside_repo(monkeypatch, tmp_pa
     (outside / "secret.txt").write_text("secret\n", encoding="utf-8")
     (repo / "escape").symlink_to(outside)
 
-    _write_state(monkeypatch, tmp_path, str(root))
+    _write_state(monkeypatch, tmp_path, str(root), selected=[str(repo)])
 
     status, body = http_routes.get_repo_file_tree({"path": "/api/files/alpha"})
 
@@ -102,7 +109,7 @@ def test_get_repo_file_tree_rejects_encoded_path_outside_root(monkeypatch, tmp_p
     status, body = http_routes.get_repo_file_tree({"path": f"/api/files/{repo_id}"})
 
     assert status == 403
-    assert "outside allowed root" in body["error"]
+    assert "repository must be selected" in body["error"]
 
 
 def test_get_repo_file_tree_rejects_excessive_depth(monkeypatch, tmp_path):
@@ -113,7 +120,7 @@ def test_get_repo_file_tree_rejects_excessive_depth(monkeypatch, tmp_path):
         path.mkdir(parents=True, exist_ok=True)
         path = path / f"level{i}"
 
-    _write_state(monkeypatch, tmp_path, str(root))
+    _write_state(monkeypatch, tmp_path, str(root), selected=[str(repo)])
 
     status, body = http_routes.get_repo_file_tree({"path": "/api/files/deep"})
 
@@ -129,7 +136,7 @@ def test_get_repo_file_tree_rejects_too_many_files(monkeypatch, tmp_path):
     for i in range(6):
         (repo / f"file{i}.txt").write_text(f"{i}\n", encoding="utf-8")
 
-    _write_state(monkeypatch, tmp_path, str(root))
+    _write_state(monkeypatch, tmp_path, str(root), selected=[str(repo)])
 
     status, body = http_routes.get_repo_file_tree({"path": "/api/files/many"})
 

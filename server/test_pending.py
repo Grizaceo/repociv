@@ -261,10 +261,12 @@ class TestPendingEndpoints:
 
     def _do_get(self, path):
         """Simulate a GET request and return (status, json_body)."""
+        from server import bridge as _bridge
         from server.bridge import ThreadingHTTPServer, BridgeHandler
         import threading
         import urllib.request
 
+        _bridge.REPOCIV_TOKEN = "test-token-fixture-not-a-secret"
         server = ThreadingHTTPServer(("localhost", 0), BridgeHandler)
         port = server.server_address[1]
         t = threading.Thread(target=server.serve_forever, daemon=True)
@@ -284,10 +286,12 @@ class TestPendingEndpoints:
 
     def _do_post(self, path, body):
         """Simulate a POST request and return (status, json_body)."""
+        from server import bridge as _bridge
         from server.bridge import ThreadingHTTPServer, BridgeHandler
         import threading
         import urllib.request
 
+        _bridge.REPOCIV_TOKEN = "test-token-fixture-not-a-secret"
         server = ThreadingHTTPServer(("localhost", 0), BridgeHandler)
         port = server.server_address[1]
         t = threading.Thread(target=server.serve_forever, daemon=True)
@@ -463,10 +467,12 @@ class TestChangePendingState:
 
 class TestNewPendingEndpoints:
     def _do_post(self, path, body):
+        from server import bridge as _bridge
         from server.bridge import ThreadingHTTPServer, BridgeHandler
         import threading
         import urllib.request
 
+        _bridge.REPOCIV_TOKEN = "test-token-fixture-not-a-secret"
         server = ThreadingHTTPServer(("localhost", 0), BridgeHandler)
         port = server.server_address[1]
         t = threading.Thread(target=server.serve_forever, daemon=True)
