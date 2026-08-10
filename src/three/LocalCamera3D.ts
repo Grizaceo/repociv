@@ -14,20 +14,16 @@ const CAMERA_ELEVATION = Math.atan(ISO_TILE_H / ISO_TILE_W);
 const CAMERA_AZIMUTH = Math.PI / 4; // 45° — looking down the X+Z diagonal
 
 export interface LocalCamState {
-  x: number;      // pan target X (world units)
-  y: number;      // pan target Z (world units, mapped from 2D cam.y)
-  zoom: number;   // zoom multiplier (1 = 1:1 with 2D)
-  cx: number;     // canvas center X (pixels)
-  cy: number;     // canvas center Y (pixels)
+  x: number; // pan target X (world units)
+  y: number; // pan target Z (world units, mapped from 2D cam.y)
+  zoom: number; // zoom multiplier (1 = 1:1 with 2D)
+  cx: number; // canvas center X (pixels)
+  cy: number; // canvas center Y (pixels)
 }
 
 /** Convert a local grid (x, y, z) to 3D world coordinates. */
 export function localGridToWorld3D(x: number, y: number, z: number = 0): Vector3 {
-  return new Vector3(
-    (x - y) * (ISO_TILE_W / 2),
-    z * ISO_WALL_H,
-    (x + y) * (ISO_TILE_H / 2),
-  );
+  return new Vector3((x - y) * (ISO_TILE_W / 2), z * ISO_WALL_H, (x + y) * (ISO_TILE_H / 2));
 }
 
 /** Inverse: 3D world XZ → grid (x, y) fractional. */
@@ -68,8 +64,8 @@ export class LocalCamera3D {
     this.target.set(cam.x, 0, cam.y);
 
     // Ortho zoom: divide frustum by zoom factor
-    const halfW = (this.width / 2) / cam.zoom;
-    const halfH = (this.height / 2) / cam.zoom;
+    const halfW = this.width / 2 / cam.zoom;
+    const halfH = this.height / 2 / cam.zoom;
     this.camera.left = -halfW;
     this.camera.right = halfW;
     this.camera.top = halfH;

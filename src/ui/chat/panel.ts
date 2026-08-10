@@ -1,11 +1,7 @@
 // ─── Side panel lifecycle + tab wiring + git/files loaders ──────────────────
 import type { Unit } from '../../types.ts';
 import { trapFocus } from '../focusTrap.ts';
-import {
-  updateChatTargetIndicator,
-  getSidePanelCleanup,
-  setSidePanelCleanup,
-} from './state.ts';
+import { updateChatTargetIndicator, getSidePanelCleanup, setSidePanelCleanup } from './state.ts';
 import { escapeHtml } from '../escapeHtml.ts';
 import { initAgentSelector } from './agentSelector.ts';
 import { initProviderSelectors } from './modelSelector.ts';

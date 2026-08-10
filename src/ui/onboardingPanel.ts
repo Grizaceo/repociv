@@ -706,9 +706,7 @@ function render(state: OnboardingState, onContinue: () => void): void {
     toggle.addEventListener('change', () => {
       const groupRoot = toggle.dataset['rootPath'];
       if (!groupRoot) return;
-      const groupRepos = state.repos.filter(
-        (r) => (r.rootPath ?? getOwnerPath(r)) === groupRoot,
-      );
+      const groupRepos = state.repos.filter((r) => (r.rootPath ?? getOwnerPath(r)) === groupRoot);
       if (toggle.checked) {
         for (const r of groupRepos) state.selected.add(r.path);
       } else {

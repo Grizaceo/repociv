@@ -43,7 +43,10 @@ function fakeContainer(): HTMLElement {
   const children: HTMLElement[] = [];
   const classList = new Set<string>();
   return {
-    appendChild: vi.fn((c: HTMLElement) => { children.push(c); return c; }),
+    appendChild: vi.fn((c: HTMLElement) => {
+      children.push(c);
+      return c;
+    }),
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
     classList: {
       toggle: (name: string, on?: boolean) => {
@@ -69,8 +72,13 @@ function makeWorld(w = 2, h = 2): LocalWorld {
     grid.push(row);
   }
   return {
-    repoId: 'test', grid, rooms: [], width: w, height: h,
-    workbenches: [], deskAssignments: new Map(),
+    repoId: 'test',
+    grid,
+    rooms: [],
+    width: w,
+    height: h,
+    workbenches: [],
+    deskAssignments: new Map(),
   };
 }
 
@@ -115,11 +123,12 @@ describe('LocalScene3D', () => {
     const world = makeWorld(4, 3);
     scene.setWorld(world);
     scene.setActive(true);
-    scene.render(
-      { x: 0, y: 0, zoom: 1, cx: 100, cy: 100 },
-      [], [],
-      { dt: 0.016, workbenchLabelOverlay: false, powerOverlay: false, temperatureOverlay: false },
-    );
+    scene.render({ x: 0, y: 0, zoom: 1, cx: 100, cy: 100 }, [], [], {
+      dt: 0.016,
+      workbenchLabelOverlay: false,
+      powerOverlay: false,
+      temperatureOverlay: false,
+    });
     scene.dispose();
   });
 
@@ -128,22 +137,24 @@ describe('LocalScene3D', () => {
     const world = makeWorld();
     scene.setWorld(world);
     // not active — render should silently return
-    scene.render(
-      { x: 0, y: 0, zoom: 1, cx: 50, cy: 50 },
-      [], [],
-      { dt: 0.016, workbenchLabelOverlay: false, powerOverlay: false, temperatureOverlay: false },
-    );
+    scene.render({ x: 0, y: 0, zoom: 1, cx: 50, cy: 50 }, [], [], {
+      dt: 0.016,
+      workbenchLabelOverlay: false,
+      powerOverlay: false,
+      temperatureOverlay: false,
+    });
     scene.dispose();
   });
 
   it('render is a no-op without world', async () => {
     const scene = await makeScene();
     scene.setActive(true);
-    scene.render(
-      { x: 0, y: 0, zoom: 1, cx: 50, cy: 50 },
-      [], [],
-      { dt: 0.016, workbenchLabelOverlay: false, powerOverlay: false, temperatureOverlay: false },
-    );
+    scene.render({ x: 0, y: 0, zoom: 1, cx: 50, cy: 50 }, [], [], {
+      dt: 0.016,
+      workbenchLabelOverlay: false,
+      powerOverlay: false,
+      temperatureOverlay: false,
+    });
     scene.dispose();
   });
 
@@ -176,16 +187,41 @@ describe('LocalScene3D', () => {
 
   it('setAgentsForPicking stores units and npcs without crash', async () => {
     const scene = await makeScene();
-    const units: LocalUnit[] = [{
-      id: 'u1', name: 'A', unitType: 'worker', color: '#fff',
-      gridX: 0, gridY: 0, targetX: null, targetY: null, path: [], pathIndex: 0,
-      pathProgress: 0, state: 'idle_in_room', mission: null, workProgress: 0,
-      macroUnitId: 'm1', currentWorkbenchId: null,
-      fatigue: 100, maxFatigue: 100, isResting: false, effectiveSpeed: 1.0,
-    }];
-    const npcs: LocalNpc[] = [{
-      id: 'n1', name: 'M', color: '#fff', gridX: 1, gridY: 1, roomId: 'r1', type: 'manager',
-    }];
+    const units: LocalUnit[] = [
+      {
+        id: 'u1',
+        name: 'A',
+        unitType: 'worker',
+        color: '#fff',
+        gridX: 0,
+        gridY: 0,
+        targetX: null,
+        targetY: null,
+        path: [],
+        pathIndex: 0,
+        pathProgress: 0,
+        state: 'idle_in_room',
+        mission: null,
+        workProgress: 0,
+        macroUnitId: 'm1',
+        currentWorkbenchId: null,
+        fatigue: 100,
+        maxFatigue: 100,
+        isResting: false,
+        effectiveSpeed: 1.0,
+      },
+    ];
+    const npcs: LocalNpc[] = [
+      {
+        id: 'n1',
+        name: 'M',
+        color: '#fff',
+        gridX: 1,
+        gridY: 1,
+        roomId: 'r1',
+        type: 'manager',
+      },
+    ];
     scene.setAgentsForPicking(units, npcs);
     scene.dispose();
   });
@@ -201,18 +237,36 @@ describe('LocalScene3D', () => {
     const scene = await makeScene();
     scene.setWorld(makeWorld(3, 3));
     scene.setActive(true);
-    const units: LocalUnit[] = [{
-      id: 'u1', name: 'A', unitType: 'worker', color: '#fff',
-      gridX: 1, gridY: 1, targetX: null, targetY: null, path: [], pathIndex: 0,
-      pathProgress: 0, state: 'idle_in_room', mission: null, workProgress: 0,
-      macroUnitId: 'm1', currentWorkbenchId: null,
-      fatigue: 100, maxFatigue: 100, isResting: false, effectiveSpeed: 1.0,
-    }];
-    scene.render(
-      { x: 50, y: 50, zoom: 1, cx: 150, cy: 150 },
-      units, [],
-      { dt: 0.016, workbenchLabelOverlay: false, powerOverlay: false, temperatureOverlay: false },
-    );
+    const units: LocalUnit[] = [
+      {
+        id: 'u1',
+        name: 'A',
+        unitType: 'worker',
+        color: '#fff',
+        gridX: 1,
+        gridY: 1,
+        targetX: null,
+        targetY: null,
+        path: [],
+        pathIndex: 0,
+        pathProgress: 0,
+        state: 'idle_in_room',
+        mission: null,
+        workProgress: 0,
+        macroUnitId: 'm1',
+        currentWorkbenchId: null,
+        fatigue: 100,
+        maxFatigue: 100,
+        isResting: false,
+        effectiveSpeed: 1.0,
+      },
+    ];
+    scene.render({ x: 50, y: 50, zoom: 1, cx: 150, cy: 150 }, units, [], {
+      dt: 0.016,
+      workbenchLabelOverlay: false,
+      powerOverlay: false,
+      temperatureOverlay: false,
+    });
     scene.dispose();
   });
 });

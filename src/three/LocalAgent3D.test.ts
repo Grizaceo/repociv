@@ -157,7 +157,10 @@ describe('LocalAgent3D', () => {
       id: 'u1',
       gridX: 0,
       gridY: 0,
-      path: [{ x: 0, y: 0 }, { x: 4, y: 0 }],
+      path: [
+        { x: 0, y: 0 },
+        { x: 4, y: 0 },
+      ],
       pathIndex: 0,
       pathProgress: 0.5,
       state: 'walking_to_room',

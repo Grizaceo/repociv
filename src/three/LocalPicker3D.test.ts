@@ -92,7 +92,9 @@ describe('LocalPicker3D', () => {
     // screen center
     const result = picker.pick(floor, cam, 800, 600, 400, 300);
     // NDC center (0,0) — may or may not hit, but should not throw
-    expect(result === null || (typeof result.x === 'number' && typeof result.y === 'number')).toBe(true);
+    expect(result === null || (typeof result.x === 'number' && typeof result.y === 'number')).toBe(
+      true,
+    );
   });
 
   it('returns null for empty mesh with 0 instances', () => {

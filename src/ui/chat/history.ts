@@ -46,7 +46,9 @@ export function renderChatHistory(unitId: string): void {
 /** True when #chat-messages is currently showing this unit's transcript. */
 function isChatDomBoundTo(unitId: string): boolean {
   const container = document.getElementById('chat-messages');
-  return !!container && container.dataset['activeUnit'] === unitId && getActiveChatUnit() === unitId;
+  return (
+    !!container && container.dataset['activeUnit'] === unitId && getActiveChatUnit() === unitId
+  );
 }
 
 /** Mark an agent as having new messages (for notification badge) */

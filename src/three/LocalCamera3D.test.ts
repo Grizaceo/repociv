@@ -41,7 +41,13 @@ describe('localGridToWorld3D', () => {
 
 describe('world3DToLocalGrid — round trip', () => {
   it('inverts localGridToWorld3D for integer coords', () => {
-    for (const pair of [[0, 0], [1, 0], [0, 1], [3, 2], [-1, 4]]) {
+    for (const pair of [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [3, 2],
+      [-1, 4],
+    ]) {
       const gx = pair[0]!;
       const gy = pair[1]!;
       const w = localGridToWorld3D(gx, gy, 0);

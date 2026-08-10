@@ -28,7 +28,9 @@ export interface LocalSceneRenderOptions {
 }
 
 export interface LocalSceneCallbacks {
-  onTileClick: ((x: number, y: number, tile: LocalTile | null, sx: number, sy: number) => void) | null;
+  onTileClick:
+    | ((x: number, y: number, tile: LocalTile | null, sx: number, sy: number) => void)
+    | null;
   onLocalUnitClick: ((unit: LocalUnit, sx: number, sy: number) => void) | null;
   onWorkbenchClick: ((tile: LocalTile, sx: number, sy: number) => void) | null;
   onLocalUnitHover: ((unit: LocalUnit | null, sx: number, sy: number) => void) | null;
@@ -137,10 +139,21 @@ export class LocalScene3D {
     const centerX = (world.width / 2) * (ISO_TILE_W / 2);
     const centerY = (world.height / 2) * (ISO_TILE_H / 2);
     // Initial camera state — will be overridden by syncCamera each frame
-    this.camera3D.syncCamera({ x: centerX, y: centerY, zoom: 1, cx: this.width / 2, cy: this.height / 2 });
+    this.camera3D.syncCamera({
+      x: centerX,
+      y: centerY,
+      zoom: 1,
+      cx: this.width / 2,
+      cy: this.height / 2,
+    });
   }
 
-  render(cam: LocalCamState, units: LocalUnit[], npcs: LocalNpc[], opts: LocalSceneRenderOptions): void {
+  render(
+    cam: LocalCamState,
+    units: LocalUnit[],
+    npcs: LocalNpc[],
+    opts: LocalSceneRenderOptions,
+  ): void {
     if (!this.world || !this.active) return;
 
     // Rebuild tiles if dirty
@@ -163,7 +176,14 @@ export class LocalScene3D {
   pickTile(screenX: number, screenY: number): { x: number; y: number } | null {
     const floorMesh = this.tile3D.getFloorMesh();
     if (!floorMesh) return null;
-    return this.picker.pick(floorMesh, this.camera3D.getCamera(), this.width, this.height, screenX, screenY);
+    return this.picker.pick(
+      floorMesh,
+      this.camera3D.getCamera(),
+      this.width,
+      this.height,
+      screenX,
+      screenY,
+    );
   }
 
   setActive(active: boolean): void {
@@ -185,83 +205,95 @@ export class LocalScene3D {
     const signal = this.abortController.signal;
 
     // Click handler: pick tile, determine type, fire callback
-    canvas.addEventListener('click', (e: MouseEvent) => {
-      if (!this.world || !this.active) return;
-      const rect = canvas.getBoundingClientRect();
-      const sx = e.clientX - rect.left;
-      const sy = e.clientY - rect.top;
+    canvas.addEventListener(
+      'click',
+      (e: MouseEvent) => {
+        if (!this.world || !this.active) return;
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
 
-      const grid = this.pickTile(sx, sy);
-      if (!grid) return;
+        const grid = this.pickTile(sx, sy);
+        if (!grid) return;
 
-      // Round to integer grid coords
-      const gx = Math.floor(grid.x);
-      const gy = Math.floor(grid.y);
+        // Round to integer grid coords
+        const gx = Math.floor(grid.x);
+        const gy = Math.floor(grid.y);
 
-      // Find tile at grid position
-      const tile = this.world.grid[gy]?.[gx] ?? null;
+        // Find tile at grid position
+        const tile = this.world.grid[gy]?.[gx] ?? null;
 
-      // Check for unit at this position first
-      const unit = this.findUnitAt(gx, gy);
-      if (unit && this.callbacks.onLocalUnitClick) {
-        this.callbacks.onLocalUnitClick(unit, sx, sy);
-        return;
-      }
+        // Check for unit at this position first
+        const unit = this.findUnitAt(gx, gy);
+        if (unit && this.callbacks.onLocalUnitClick) {
+          this.callbacks.onLocalUnitClick(unit, sx, sy);
+          return;
+        }
 
-      // Check for NPC
-      const npc = this.findNpcAt(gx, gy);
-      if (npc && this.callbacks.onNpcClick) {
-        this.callbacks.onNpcClick(npc, sx, sy);
-        return;
-      }
+        // Check for NPC
+        const npc = this.findNpcAt(gx, gy);
+        if (npc && this.callbacks.onNpcClick) {
+          this.callbacks.onNpcClick(npc, sx, sy);
+          return;
+        }
 
-      // Workbench click
-      if (tile?.type === 'workbench' && this.callbacks.onWorkbenchClick) {
-        this.callbacks.onWorkbenchClick(tile, sx, sy);
-        return;
-      }
+        // Workbench click
+        if (tile?.type === 'workbench' && this.callbacks.onWorkbenchClick) {
+          this.callbacks.onWorkbenchClick(tile, sx, sy);
+          return;
+        }
 
-      // Default: tile click
-      if (this.callbacks.onTileClick) {
-        this.callbacks.onTileClick(gx, gy, tile, sx, sy);
-      }
-    }, { signal });
+        // Default: tile click
+        if (this.callbacks.onTileClick) {
+          this.callbacks.onTileClick(gx, gy, tile, sx, sy);
+        }
+      },
+      { signal },
+    );
 
     // Right-click: exit local view
-    canvas.addEventListener('contextmenu', (e: MouseEvent) => {
-      e.preventDefault();
-      if (this.callbacks.onRequestExit) {
-        this.callbacks.onRequestExit();
-      }
-    }, { signal });
+    canvas.addEventListener(
+      'contextmenu',
+      (e: MouseEvent) => {
+        e.preventDefault();
+        if (this.callbacks.onRequestExit) {
+          this.callbacks.onRequestExit();
+        }
+      },
+      { signal },
+    );
 
     // Hover: pick tile, find unit, fire onLocalUnitHover
     let hoverThrottle = 0;
-    canvas.addEventListener('mousemove', (e: MouseEvent) => {
-      if (!this.world || !this.active) return;
-      const now = performance.now();
-      if (now - hoverThrottle < 50) return; // throttle to ~20fps
-      hoverThrottle = now;
+    canvas.addEventListener(
+      'mousemove',
+      (e: MouseEvent) => {
+        if (!this.world || !this.active) return;
+        const now = performance.now();
+        if (now - hoverThrottle < 50) return; // throttle to ~20fps
+        hoverThrottle = now;
 
-      const rect = canvas.getBoundingClientRect();
-      const sx = e.clientX - rect.left;
-      const sy = e.clientY - rect.top;
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
 
-      const grid = this.pickTile(sx, sy);
-      if (!grid) {
-        if (this.callbacks.onLocalUnitHover) {
-          this.callbacks.onLocalUnitHover(null, sx, sy);
+        const grid = this.pickTile(sx, sy);
+        if (!grid) {
+          if (this.callbacks.onLocalUnitHover) {
+            this.callbacks.onLocalUnitHover(null, sx, sy);
+          }
+          return;
         }
-        return;
-      }
 
-      const gx = Math.floor(grid.x);
-      const gy = Math.floor(grid.y);
-      const unit = this.findUnitAt(gx, gy);
-      if (this.callbacks.onLocalUnitHover) {
-        this.callbacks.onLocalUnitHover(unit, sx, sy);
-      }
-    }, { signal });
+        const gx = Math.floor(grid.x);
+        const gy = Math.floor(grid.y);
+        const unit = this.findUnitAt(gx, gy);
+        if (this.callbacks.onLocalUnitHover) {
+          this.callbacks.onLocalUnitHover(unit, sx, sy);
+        }
+      },
+      { signal },
+    );
   }
 
   private _hoveredUnits: LocalUnit[] = [];

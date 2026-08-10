@@ -326,12 +326,12 @@ export function rebuildCityClusters(
     const towerGeom = new CylinderGeometry(HEX_SIZE * 0.035, HEX_SIZE * 0.045, HEX_SIZE * 0.28, 6);
     const towerMat = new MeshStandardMaterial({
       color: new Color(0x8a8270),
-      roughness: 0.80,
+      roughness: 0.8,
       metalness: 0.04,
       flatShading: true,
     });
     // Tower roof — small cone cap so towers read as watchtowers, not stumps.
-    const towerRoofGeom = new ConeGeometry(HEX_SIZE * 0.05, HEX_SIZE * 0.10, 6);
+    const towerRoofGeom = new ConeGeometry(HEX_SIZE * 0.05, HEX_SIZE * 0.1, 6);
     const towerRoofMat = new MeshStandardMaterial({
       color: new Color(0x6a4030),
       roughness: 0.72,
@@ -425,7 +425,8 @@ export function rebuildCityClusters(
         clusterMesh.setMatrixAt(bldIdx++, m);
 
         // Triangular roof on top
-        const roofY = surfaceY + 4 + ht * 7 + (h % 4) + HEX_SIZE * 0.28 * ht * 0.5 + HEX_SIZE * 0.04;
+        const roofY =
+          surfaceY + 4 + ht * 7 + (h % 4) + HEX_SIZE * 0.28 * ht * 0.5 + HEX_SIZE * 0.04;
         const roofM = new Matrix4().makeTranslation(
           base.x + ox * HEX_SIZE,
           roofY,
@@ -452,7 +453,14 @@ export function rebuildCityClusters(
       }
 
       // Corner towers: 6 towers (one per hex vertex), with conical roofs.
-      const towerAngles = [0, Math.PI / 3, (2 * Math.PI) / 3, Math.PI, (4 * Math.PI) / 3, (5 * Math.PI) / 3];
+      const towerAngles = [
+        0,
+        Math.PI / 3,
+        (2 * Math.PI) / 3,
+        Math.PI,
+        (4 * Math.PI) / 3,
+        (5 * Math.PI) / 3,
+      ];
       const towerYScale = Math.max(0, wallComplete);
       for (const ca of towerAngles) {
         const tx = base.x + Math.cos(ca) * HEX_SIZE * 0.42;
@@ -462,7 +470,11 @@ export function rebuildCityClusters(
         towerMesh.setMatrixAt(towerIdx++, towerM);
 
         // Tower roof cone sits on top of the tower (half-height offset).
-        const roofM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.14 + HEX_SIZE * 0.14 * towerYScale + HEX_SIZE * 0.05, tz);
+        const roofM = new Matrix4().makeTranslation(
+          tx,
+          wallY + HEX_SIZE * 0.14 + HEX_SIZE * 0.14 * towerYScale + HEX_SIZE * 0.05,
+          tz,
+        );
         roofM.scale(new Vector3(1, towerYScale, 1));
         towerRoofMesh.setMatrixAt(towerRoofIdx++, roofM);
       }
@@ -549,7 +561,7 @@ export function rebuildCityClusters(
     {
       const outerR = HEX_SIZE * 0.48;
       const innerR = HEX_SIZE * 0.42;
-      const wallH = HEX_SIZE * 0.10;
+      const wallH = HEX_SIZE * 0.1;
       const ring = new Shape();
       for (let i = 0; i < 6; i++) {
         const a = (Math.PI / 3) * i;
@@ -584,7 +596,7 @@ export function rebuildCityClusters(
     const towerGeom = new CylinderGeometry(HEX_SIZE * 0.04, HEX_SIZE * 0.05, HEX_SIZE * 0.34, 6);
     const towerMat = new MeshStandardMaterial({
       color: new Color(0x8a8270),
-      roughness: 0.80,
+      roughness: 0.8,
       metalness: 0.04,
       flatShading: true,
     });
@@ -630,7 +642,10 @@ export function rebuildCityClusters(
       const surfaceY = tile ? terrainSurfaceY(tile) : base.y;
 
       // Main building — taller so the capital silhouette dominates
-      capitalMesh.setMatrixAt(bldIdx++, new Matrix4().makeTranslation(base.x, surfaceY + 16, base.z));
+      capitalMesh.setMatrixAt(
+        bldIdx++,
+        new Matrix4().makeTranslation(base.x, surfaceY + 16, base.z),
+      );
 
       // Roof on main building
       const roofY = surfaceY + 16 + HEX_SIZE * 0.55 * 0.5 + HEX_SIZE * 0.08;
@@ -656,7 +671,11 @@ export function rebuildCityClusters(
         const towerM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.17, tz);
         capitalTowerMesh.setMatrixAt(towerIdx++, towerM);
 
-        const roofM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.17 + HEX_SIZE * 0.17 + HEX_SIZE * 0.06, tz);
+        const roofM = new Matrix4().makeTranslation(
+          tx,
+          wallY + HEX_SIZE * 0.17 + HEX_SIZE * 0.17 + HEX_SIZE * 0.06,
+          tz,
+        );
         capitalTowerRoofMesh.setMatrixAt(capTowerRoofIdx++, roofM);
       }
 

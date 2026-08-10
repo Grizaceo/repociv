@@ -22,23 +22,34 @@ import { localGridToWorld3D, ISO_TILE_W, ISO_WALL_H } from './LocalCamera3D.ts';
 
 // Zone floor colors (matching isoLocalRenderer.ts ISO_FLOOR map)
 const ZONE_FLOOR_COLORS: Record<string, number> = {
-  team_cluster: 0x6B8FB5,
-  meeting: 0xD49B3A,
-  focus: 0x4A8F4A,
-  break: 0xC47A4A,
-  infra: 0x7A8B9E,
-  reception: 0xC4B8A0,
-  biophilic: 0x4A9E8E,
-  path: 0xB8B8B8,
-  outside: 0xA8A8A8,
+  team_cluster: 0x6b8fb5,
+  meeting: 0xd49b3a,
+  focus: 0x4a8f4a,
+  break: 0xc47a4a,
+  infra: 0x7a8b9e,
+  reception: 0xc4b8a0,
+  biophilic: 0x4a9e8e,
+  path: 0xb8b8b8,
+  outside: 0xa8a8a8,
 };
 
 // Extension → color map (matching isoLocalRenderer.ts ext color system)
 const EXT_COLORS: Record<string, number> = {
-  ts: 0x4A8FB5, tsx: 0x4A8FB5, js: 0xD4B04A, jsx: 0xD4B04A,
-  py: 0x4A9E5A, go: 0x4AB8C4, rs: 0xC45A4A, java: 0xB06A2A,
-  md: 0x8A8A8A, json: 0x9A9A6A, yaml: 0x9A9A6A, yml: 0x9A9A6A,
-  css: 0xC47AC4, html: 0xC44A4A, sh: 0x4A8F4A,
+  ts: 0x4a8fb5,
+  tsx: 0x4a8fb5,
+  js: 0xd4b04a,
+  jsx: 0xd4b04a,
+  py: 0x4a9e5a,
+  go: 0x4ab8c4,
+  rs: 0xc45a4a,
+  java: 0xb06a2a,
+  md: 0x8a8a8a,
+  json: 0x9a9a6a,
+  yaml: 0x9a9a6a,
+  yml: 0x9a9a6a,
+  css: 0xc47ac4,
+  html: 0xc44a4a,
+  sh: 0x4a8f4a,
 };
 
 export interface LocalTile3DOptions {
@@ -108,8 +119,11 @@ export class LocalTile3D {
     }
     return [
       world.repoId,
-      world.width, world.height, world.rooms.length,
-      world.workbenches.length, tileHash,
+      world.width,
+      world.height,
+      world.rooms.length,
+      world.workbenches.length,
+      tileHash,
       opts.workbenchLabelOverlay ? 1 : 0,
       opts.powerOverlay ? 1 : 0,
       opts.temperatureOverlay ? 1 : 0,
@@ -123,9 +137,9 @@ export class LocalTile3D {
         const tile = world.grid[y]?.[x];
         if (!tile) continue;
         if (tile.type !== 'floor' && tile.type !== 'path' && tile.type !== 'aisle') continue;
-        const room = tile.roomId ? world.rooms.find(r => r.id === tile.roomId) : null;
+        const room = tile.roomId ? world.rooms.find((r) => r.id === tile.roomId) : null;
         const zoneType = room?.zoneType ?? 'path';
-        const color = ZONE_FLOOR_COLORS[zoneType] ?? 0xB8B8B8;
+        const color = ZONE_FLOOR_COLORS[zoneType] ?? 0xb8b8b8;
         floorTiles.push({ x, y, color });
       }
     }
@@ -170,7 +184,7 @@ export class LocalTile3D {
     if (wallTiles.length === 0) return;
 
     const geom = new BoxGeometry(ISO_TILE_W, ISO_WALL_H * 2, ISO_TILE_W);
-    const mat = new MeshStandardMaterial({ color: 0xC8C8C8, roughness: 0.8 });
+    const mat = new MeshStandardMaterial({ color: 0xc8c8c8, roughness: 0.8 });
     this.geometries.push(geom);
     this.materials.push(mat);
 
@@ -217,7 +231,7 @@ export class LocalTile3D {
       _q.identity();
       _matrix.compose(_pos, _q, _scale);
       this.workbenchMesh.setMatrixAt(i, _matrix);
-      color.setHex(EXT_COLORS[wb.ext] ?? 0x8A8A8A);
+      color.setHex(EXT_COLORS[wb.ext] ?? 0x8a8a8a);
       this.workbenchMesh.setColorAt(i, color);
     }
     this.workbenchMesh.instanceMatrix.needsUpdate = true;
@@ -237,7 +251,7 @@ export class LocalTile3D {
     if (doors.length === 0) return;
 
     const geom = new BoxGeometry(ISO_TILE_W * 0.8, ISO_WALL_H * 1.5, ISO_TILE_W * 0.3);
-    const mat = new MeshStandardMaterial({ color: 0xB89860, roughness: 0.7 });
+    const mat = new MeshStandardMaterial({ color: 0xb89860, roughness: 0.7 });
     this.geometries.push(geom);
     this.materials.push(mat);
 
@@ -259,25 +273,144 @@ export class LocalTile3D {
   // Furniture types that share box geometry — grouped for efficiency
   private static FURNITURE_SPECS: Array<{
     types: Set<LocalTileType>;
-    w: number; h: number; d: number;
+    w: number;
+    h: number;
+    d: number;
     y: number;
     color: number;
     geom: 'box' | 'cylinder';
     key: string;
   }> = [
-    { types: new Set(['chair']), w: 20, h: 6, d: 20, y: 3, color: 0x8B6B4A, geom: 'box', key: 'chair' },
-    { types: new Set(['planter']), w: 16, h: 24, d: 16, y: 12, color: 0x4A9E8E, geom: 'cylinder', key: 'planter' },
-    { types: new Set(['whiteboard']), w: ISO_TILE_W * 0.8, h: 20, d: 4, y: 10, color: 0xF0F0F0, geom: 'box', key: 'whiteboard' },
-    { types: new Set(['server_rack']), w: 24, h: 40, d: 24, y: 20, color: 0x7A8B9E, geom: 'box', key: 'server_rack' },
-    { types: new Set(['sofa']), w: 40, h: 12, d: 20, y: 6, color: 0xC47A4A, geom: 'box', key: 'sofa' },
-    { types: new Set(['meeting_room']), w: ISO_TILE_W, h: 6, d: ISO_TILE_W, y: 3, color: 0xD49B3A, geom: 'box', key: 'meeting_room' },
-    { types: new Set(['phone_booth']), w: 20, h: ISO_WALL_H * 1.5, d: 20, y: ISO_WALL_H * 0.75, color: 0x4A8F4A, geom: 'box', key: 'phone_booth' },
-    { types: new Set(['break_area']), w: 40, h: 12, d: 40, y: 6, color: 0xC47A4A, geom: 'box', key: 'break_area' },
-    { types: new Set(['reception']), w: ISO_TILE_W * 0.8, h: 12, d: ISO_TILE_W * 0.5, y: 6, color: 0xC4B8A0, geom: 'box', key: 'reception' },
-    { types: new Set(['standing_desk']), w: 28, h: 16, d: 20, y: 8, color: 0x8B7355, geom: 'box', key: 'standing_desk' },
-    { types: new Set(['watercooler']), w: 8, h: 20, d: 8, y: 10, color: 0x5BA3D0, geom: 'cylinder', key: 'watercooler' },
-    { types: new Set(['cubicle_partition']), w: ISO_TILE_W, h: ISO_WALL_H * 0.5, d: 4, y: ISO_WALL_H * 0.25, color: 0xA8B0C0, geom: 'box', key: 'cubicle_partition' },
-    { types: new Set(['research_bench']), w: ISO_TILE_W * 0.7, h: 8, d: ISO_TILE_W * 0.7, y: 4, color: 0x9A8FC4, geom: 'box', key: 'research_bench' },
+    {
+      types: new Set(['chair']),
+      w: 20,
+      h: 6,
+      d: 20,
+      y: 3,
+      color: 0x8b6b4a,
+      geom: 'box',
+      key: 'chair',
+    },
+    {
+      types: new Set(['planter']),
+      w: 16,
+      h: 24,
+      d: 16,
+      y: 12,
+      color: 0x4a9e8e,
+      geom: 'cylinder',
+      key: 'planter',
+    },
+    {
+      types: new Set(['whiteboard']),
+      w: ISO_TILE_W * 0.8,
+      h: 20,
+      d: 4,
+      y: 10,
+      color: 0xf0f0f0,
+      geom: 'box',
+      key: 'whiteboard',
+    },
+    {
+      types: new Set(['server_rack']),
+      w: 24,
+      h: 40,
+      d: 24,
+      y: 20,
+      color: 0x7a8b9e,
+      geom: 'box',
+      key: 'server_rack',
+    },
+    {
+      types: new Set(['sofa']),
+      w: 40,
+      h: 12,
+      d: 20,
+      y: 6,
+      color: 0xc47a4a,
+      geom: 'box',
+      key: 'sofa',
+    },
+    {
+      types: new Set(['meeting_room']),
+      w: ISO_TILE_W,
+      h: 6,
+      d: ISO_TILE_W,
+      y: 3,
+      color: 0xd49b3a,
+      geom: 'box',
+      key: 'meeting_room',
+    },
+    {
+      types: new Set(['phone_booth']),
+      w: 20,
+      h: ISO_WALL_H * 1.5,
+      d: 20,
+      y: ISO_WALL_H * 0.75,
+      color: 0x4a8f4a,
+      geom: 'box',
+      key: 'phone_booth',
+    },
+    {
+      types: new Set(['break_area']),
+      w: 40,
+      h: 12,
+      d: 40,
+      y: 6,
+      color: 0xc47a4a,
+      geom: 'box',
+      key: 'break_area',
+    },
+    {
+      types: new Set(['reception']),
+      w: ISO_TILE_W * 0.8,
+      h: 12,
+      d: ISO_TILE_W * 0.5,
+      y: 6,
+      color: 0xc4b8a0,
+      geom: 'box',
+      key: 'reception',
+    },
+    {
+      types: new Set(['standing_desk']),
+      w: 28,
+      h: 16,
+      d: 20,
+      y: 8,
+      color: 0x8b7355,
+      geom: 'box',
+      key: 'standing_desk',
+    },
+    {
+      types: new Set(['watercooler']),
+      w: 8,
+      h: 20,
+      d: 8,
+      y: 10,
+      color: 0x5ba3d0,
+      geom: 'cylinder',
+      key: 'watercooler',
+    },
+    {
+      types: new Set(['cubicle_partition']),
+      w: ISO_TILE_W,
+      h: ISO_WALL_H * 0.5,
+      d: 4,
+      y: ISO_WALL_H * 0.25,
+      color: 0xa8b0c0,
+      geom: 'box',
+      key: 'cubicle_partition',
+    },
+    {
+      types: new Set(['research_bench']),
+      w: ISO_TILE_W * 0.7,
+      h: 8,
+      d: ISO_TILE_W * 0.7,
+      y: 4,
+      color: 0x9a8fc4,
+      geom: 'box',
+      key: 'research_bench',
+    },
   ];
 
   private buildFurnitureMeshes(world: LocalWorld): void {
@@ -292,9 +425,10 @@ export class LocalTile3D {
       }
       if (tiles.length === 0) continue;
 
-      const geom: BufferGeometry = spec.geom === 'cylinder'
-        ? new CylinderGeometry(spec.w, spec.w * 1.25, spec.h)
-        : new BoxGeometry(spec.w, spec.h, spec.d);
+      const geom: BufferGeometry =
+        spec.geom === 'cylinder'
+          ? new CylinderGeometry(spec.w, spec.w * 1.25, spec.h)
+          : new BoxGeometry(spec.w, spec.h, spec.d);
       const mat = new MeshStandardMaterial({ color: spec.color, roughness: 0.7 });
       this.geometries.push(geom);
       this.materials.push(mat);
@@ -318,10 +452,26 @@ export class LocalTile3D {
   }
 
   private disposeMeshes(): void {
-    if (this.floorMesh) { this.group.remove(this.floorMesh); this.floorMesh.dispose(); this.floorMesh = null; }
-    if (this.wallMesh) { this.group.remove(this.wallMesh); this.wallMesh.dispose(); this.wallMesh = null; }
-    if (this.workbenchMesh) { this.group.remove(this.workbenchMesh); this.workbenchMesh.dispose(); this.workbenchMesh = null; }
-    if (this.doorMesh) { this.group.remove(this.doorMesh); this.doorMesh.dispose(); this.doorMesh = null; }
+    if (this.floorMesh) {
+      this.group.remove(this.floorMesh);
+      this.floorMesh.dispose();
+      this.floorMesh = null;
+    }
+    if (this.wallMesh) {
+      this.group.remove(this.wallMesh);
+      this.wallMesh.dispose();
+      this.wallMesh = null;
+    }
+    if (this.workbenchMesh) {
+      this.group.remove(this.workbenchMesh);
+      this.workbenchMesh.dispose();
+      this.workbenchMesh = null;
+    }
+    if (this.doorMesh) {
+      this.group.remove(this.doorMesh);
+      this.doorMesh.dispose();
+      this.doorMesh = null;
+    }
     for (const mesh of this.furnitureMeshes.values()) {
       this.group.remove(mesh);
       mesh.dispose();

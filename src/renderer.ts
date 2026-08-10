@@ -829,11 +829,24 @@ export class Renderer {
     const panKey = (e: KeyboardEvent): 'up' | 'down' | 'left' | 'right' | null => {
       if (e.ctrlKey || e.altKey || e.metaKey) return null;
       switch (e.key) {
-        case 'ArrowUp': case 'w': case 'W': return 'up';
-        case 'ArrowDown': case 's': case 'S': return 'down';
-        case 'ArrowLeft': case 'a': case 'A': return 'left';
-        case 'ArrowRight': case 'd': case 'D': return 'right';
-        default: return null;
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          return 'up';
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          return 'down';
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          return 'left';
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          return 'right';
+        default:
+          return null;
       }
     };
     window.addEventListener('keydown', (e) => {
@@ -1263,7 +1276,10 @@ export class Renderer {
             this.localWorldId = this.state.localWorld.repoId;
           }
           this.localScene3D.setActive(true);
-          this.localScene3D.setAgentsForPicking(this.state.getLocalUnits(), this.state.localWorld.npcs ?? []);
+          this.localScene3D.setAgentsForPicking(
+            this.state.getLocalUnits(),
+            this.state.localWorld.npcs ?? [],
+          );
           // Build LocalCamState from the 2D local renderer's camera (or default)
           const cam2d = this.localR?.getCam?.() ?? { x: 0, y: 0, zoom: 1, cx: 0, cy: 0 };
           this.localScene3D.render(

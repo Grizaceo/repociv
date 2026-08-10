@@ -43,8 +43,8 @@ export function rebuildGroundPlane(state: GameState): void {
   // Per-vertex color: warm dark earth in center, fading to near-black at rim
   const posAttr = geom.getAttribute('position');
   const colors: number[] = [];
-  const baseColor = new Color(0x4a5540);   // dark olive earth
-  const rimColor = new Color(0x1a1a18);    // near-black void
+  const baseColor = new Color(0x4a5540); // dark olive earth
+  const rimColor = new Color(0x1a1a18); // near-black void
   for (let i = 0; i < posAttr.count; i++) {
     const x = posAttr.getX(i);
     const z = posAttr.getZ(i);

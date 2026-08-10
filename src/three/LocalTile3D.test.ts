@@ -2,7 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { LocalTile3D } from './LocalTile3D.ts';
 import type { LocalWorld, LocalTile, LocalRoom, Workbench } from '../types.ts';
 
-function makeTile(x: number, y: number, type: LocalTile['type'], extra: Partial<LocalTile> = {}): LocalTile {
+function makeTile(
+  x: number,
+  y: number,
+  type: LocalTile['type'],
+  extra: Partial<LocalTile> = {},
+): LocalTile {
   return { x, y, type, roomId: extra.roomId ?? null, workbench: extra.workbench ?? null, ...extra };
 }
 
@@ -13,8 +18,8 @@ function makeWorld(opts: {
   rooms?: LocalRoom[];
   workbenches?: Workbench[];
 }): LocalWorld {
-  const width = opts.width ?? (opts.grid?.[0]?.length ?? 0);
-  const height = opts.height ?? (opts.grid?.length ?? 0);
+  const width = opts.width ?? opts.grid?.[0]?.length ?? 0;
+  const height = opts.height ?? opts.grid?.length ?? 0;
   return {
     repoId: 'test-repo',
     grid: opts.grid ?? [],
@@ -60,9 +65,7 @@ describe('LocalTile3D', () => {
   });
 
   it('creates floor mesh for floor tiles', () => {
-    const grid: LocalTile[][] = [
-      [makeTile(0, 0, 'floor'), makeTile(1, 0, 'path')],
-    ];
+    const grid: LocalTile[][] = [[makeTile(0, 0, 'floor'), makeTile(1, 0, 'path')]];
     const world = makeWorld({ grid, width: 2, height: 1 });
     const opts = { workbenchLabelOverlay: false, powerOverlay: false, temperatureOverlay: false };
 
@@ -88,12 +91,14 @@ describe('LocalTile3D', () => {
 
   it('creates workbench mesh with extension color', () => {
     const wb: Workbench = {
-      id: '1', filePath: '/test.ts', fileName: 'test.ts', extension: 'ts',
-      isTest: false, repoPath: 'test',
+      id: '1',
+      filePath: '/test.ts',
+      fileName: 'test.ts',
+      extension: 'ts',
+      isTest: false,
+      repoPath: 'test',
     };
-    const grid: LocalTile[][] = [
-      [makeTile(0, 0, 'workbench', { workbench: wb })],
-    ];
+    const grid: LocalTile[][] = [[makeTile(0, 0, 'workbench', { workbench: wb })]];
     const world = makeWorld({ grid, width: 1, height: 1, workbenches: [wb] });
     const opts = { workbenchLabelOverlay: false, powerOverlay: false, temperatureOverlay: false };
 
@@ -105,9 +110,18 @@ describe('LocalTile3D', () => {
 
   it('creates furniture meshes for various types', () => {
     const types: LocalTile['type'][] = [
-      'chair', 'planter', 'whiteboard', 'server_rack', 'sofa',
-      'meeting_room', 'phone_booth', 'break_area', 'reception',
-      'standing_desk', 'watercooler', 'cubicle_partition',
+      'chair',
+      'planter',
+      'whiteboard',
+      'server_rack',
+      'sofa',
+      'meeting_room',
+      'phone_booth',
+      'break_area',
+      'reception',
+      'standing_desk',
+      'watercooler',
+      'cubicle_partition',
     ];
     const grid: LocalTile[][] = [types.map((t, i) => makeTile(i, 0, t))];
     const world = makeWorld({ grid, width: types.length, height: 1 });

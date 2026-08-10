@@ -83,8 +83,10 @@ export class LocalAgent3D {
     return [
       units.length,
       npcs.length,
-      units.map(u => `${u.id}:${u.gridX},${u.gridY}:${u.state}:${u.despawning ? 'd' : 'a'}`).join('|'),
-      npcs.map(n => `${n.id}:${n.gridX},${n.gridY}`).join('|'),
+      units
+        .map((u) => `${u.id}:${u.gridX},${u.gridY}:${u.state}:${u.despawning ? 'd' : 'a'}`)
+        .join('|'),
+      npcs.map((n) => `${n.id}:${n.gridX},${n.gridY}`).join('|'),
     ].join('#');
   }
 
@@ -170,7 +172,10 @@ export class LocalAgent3D {
       roughness: 0.55,
       metalness: isHero ? 0.35 : 0.1,
     });
-    const base = new Mesh(new CylinderGeometry(HEX_SIZE * 0.1, HEX_SIZE * 0.13, HEX_SIZE * 0.04, 8), bodyMat);
+    const base = new Mesh(
+      new CylinderGeometry(HEX_SIZE * 0.1, HEX_SIZE * 0.13, HEX_SIZE * 0.04, 8),
+      bodyMat,
+    );
     base.position.y = HEX_SIZE * 0.02;
     base.castShadow = true;
     group.add(base);
@@ -201,7 +206,7 @@ export class LocalAgent3D {
       despawning: boolean;
     };
     const allAgents: AgentAnim[] = [
-      ...units.map(u => ({
+      ...units.map((u) => ({
         id: u.id,
         gridX: u.gridX,
         gridY: u.gridY,
@@ -212,7 +217,7 @@ export class LocalAgent3D {
         fadeAlpha: u.fadeAlpha ?? 1.0,
         despawning: u.despawning ?? false,
       })),
-      ...npcs.map(n => ({
+      ...npcs.map((n) => ({
         id: n.id,
         gridX: n.gridX,
         gridY: n.gridY,
@@ -237,7 +242,7 @@ export class LocalAgent3D {
     // their tween to complete so they can be removed.
     for (const [id, entry] of this.entries) {
       if (entry.lifeState !== 'despawning') continue;
-      if (allAgents.some(a => a.id === id)) continue;
+      if (allAgents.some((a) => a.id === id)) continue;
       // Advance despawn tween only; no path/moving/idle needed.
       entry.tween -= dt * 5;
       if (entry.tween <= 0) {
@@ -250,7 +255,17 @@ export class LocalAgent3D {
   }
 
   private tickOne(
-    agent: { id: string; gridX: number; gridY: number; path: Array<{ x: number; y: number }>; pathIndex: number; pathProgress: number; moving: boolean; fadeAlpha: number; despawning: boolean },
+    agent: {
+      id: string;
+      gridX: number;
+      gridY: number;
+      path: Array<{ x: number; y: number }>;
+      pathIndex: number;
+      pathProgress: number;
+      moving: boolean;
+      fadeAlpha: number;
+      despawning: boolean;
+    },
     entry: AgentEntry,
     dt: number,
   ): void {
@@ -320,7 +335,7 @@ export class LocalAgent3D {
         const m = obj as Mesh;
         if (m.isMesh) {
           if (!m.userData.sharedGeometry) m.geometry.dispose();
-          if (Array.isArray(m.material)) m.material.forEach(mt => mt.dispose());
+          if (Array.isArray(m.material)) m.material.forEach((mt) => mt.dispose());
           else m.material.dispose();
         }
       });
