@@ -1176,6 +1176,15 @@ body.local-view #local-view-controls {
   padding: 12px;
   font-size: 13px;
   outline: none;
+  font-family: inherit;
+  resize: none;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  min-height: 42px;
+  max-height: 160px;
+  line-height: 1.4;
 }
 #chat-input:focus {
   border-color: var(--gold-mid);

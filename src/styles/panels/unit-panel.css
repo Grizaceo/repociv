@@ -221,6 +221,14 @@
   font-size: 12px;
   padding: 5px 8px;
   outline: none;
+  resize: none;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  min-height: 28px;
+  max-height: 160px;
+  line-height: 1.4;
 }
 #chat-input:focus {
   border-color: var(--ui-gold);

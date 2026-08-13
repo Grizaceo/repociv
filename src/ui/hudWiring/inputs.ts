@@ -70,9 +70,18 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
   });
 
   // ─── Mission / Chat input (shared logic) ────────────────────────────────
-  const chatInput = document.getElementById('chat-input') as HTMLInputElement | null;
+  const chatInput = document.getElementById('chat-input') as HTMLTextAreaElement | null;
 
-  const sendMessage = async (input: HTMLInputElement | null) => {
+  // Auto-grow the chat textarea so long messages expand downward (like the
+  // Hermes app) instead of overflowing to the right. Resets after send.
+  const autoResizeChat = () => {
+    if (!chatInput) return;
+    chatInput.style.height = 'auto';
+    chatInput.style.height = `${Math.min(chatInput.scrollHeight, 160)}px`;
+  };
+  chatInput?.addEventListener('input', autoResizeChat);
+
+  const sendMessage = async (input: HTMLInputElement | HTMLTextAreaElement | null) => {
     if (!input || !input.value.trim()) return;
 
     // Chat tab / chip is the source of truth — never fall back to board MAIN
@@ -241,6 +250,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
       });
     if (unit) state.setUnitState(unit.id, 'working');
     input.value = '';
+    input.style.height = 'auto';
   };
 
   document
@@ -275,7 +285,9 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
       tryOpenSubagentSession(e);
       return;
     }
-    if (e.key === 'Enter') {
+    // Enter sends; Shift+Enter inserts a newline (multi-line drafting).
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
       e.stopPropagation();
       sendMessage(chatInput);
     }
