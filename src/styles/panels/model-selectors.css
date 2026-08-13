@@ -114,6 +114,14 @@
 }
 
 /* Chat tab */
+#chat-messages {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+}
+#chat-input-row {
+  flex-shrink: 0;
+}
 #chat-messages,
 #chat-messages .chat-msg,
 #git-info,

@@ -72,14 +72,33 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
   // ─── Mission / Chat input (shared logic) ────────────────────────────────
   const chatInput = document.getElementById('chat-input') as HTMLTextAreaElement | null;
 
-  // Auto-grow the chat textarea so long messages expand downward (like the
-  // Hermes app) instead of overflowing to the right. Resets after send.
+  // Auto-grow the chat textarea so long messages expand upward from the
+  // anchored input row (like the Hermes app) instead of overflowing to the
+  // right. Resets after send. scrollHeight excludes the border, so with
+  // box-sizing:border-box we must add it back or the last line clips.
   const autoResizeChat = () => {
     if (!chatInput) return;
     chatInput.style.height = 'auto';
-    chatInput.style.height = `${Math.min(chatInput.scrollHeight, 160)}px`;
+    const cs = window.getComputedStyle(chatInput);
+    const borderY =
+      (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    const target = chatInput.scrollHeight + borderY;
+    chatInput.style.height = `${Math.min(target, 160)}px`;
   };
   chatInput?.addEventListener('input', autoResizeChat);
+
+  // Re-fit after the panel is dragged wider/narrower: wrapping changes and a
+  // textarea that fit one line may now need two (and vice versa). Only react
+  // to width changes so we don't loop on our own height writes.
+  let lastResizeWidth = -1;
+  const fitObserver = new ResizeObserver((entries) => {
+    const entry = entries[0];
+    if (!entry) return;
+    if (Math.abs(entry.contentRect.width - lastResizeWidth) <= 1) return;
+    lastResizeWidth = entry.contentRect.width;
+    autoResizeChat();
+  });
+  if (chatInput) fitObserver.observe(chatInput);
 
   const sendMessage = async (input: HTMLInputElement | HTMLTextAreaElement | null) => {
     if (!input || !input.value.trim()) return;

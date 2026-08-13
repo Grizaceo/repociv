@@ -190,10 +190,12 @@
 /* Chat input (side panel) */
 #chat-input-row {
   display: flex;
+  align-items: flex-end;
   gap: 6px;
   padding: 8px;
   border-top: 1px solid var(--ui-border);
   background: rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
 }
 #chat-target-indicator {
   display: flex;

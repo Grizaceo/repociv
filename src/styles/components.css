@@ -1164,8 +1164,10 @@ body.local-view #local-view-controls {
   padding: 14px;
   border-top: 1px solid var(--panel-border);
   display: flex;
+  align-items: flex-end;
   gap: 10px;
   background: rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
 }
 
 #chat-input {
