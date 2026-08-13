@@ -76,6 +76,18 @@ def test_get_board_unknown_slug_falls_back_to_active(kanban_root: Path) -> None:
     assert board["active"] is True
 
 
+@pytest.mark.parametrize("slug", ["../outside", "a/b", "a\\b", ".", "..", "x y"])
+def test_get_board_rejects_malformed_slug_and_cannot_traverse(kanban_root: Path, slug: str) -> None:
+    _make_board(kanban_root, "default", [{"id": "safe", "title": "Safe", "status": "todo"}])
+    (kanban_root / "current").write_text("default", encoding="utf-8")
+
+    board = kb.get_board(slug)
+
+    assert board["slug"] == "default"
+    assert [task["id"] for task in board["columns"]["todo"]] == ["safe"]
+    assert kb._board_db_path(slug) is None
+
+
 def test_get_board_missing_store_returns_empty(kanban_root: Path) -> None:
     (kanban_root / "current").write_text("ghost", encoding="utf-8")
 

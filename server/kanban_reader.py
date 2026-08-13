@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,12 @@ _TASK_FIELDS = (
     "id", "title", "status", "assignee", "priority", "created_at",
     "started_at", "completed_at", "last_failure_error", "consecutive_failures",
 )
+
+# Match Hermes' canonical board-slug contract without importing its runtime:
+# lowercase alphanumerics, hyphens, and underscores; 1–64 chars; no leading
+# separator. Board names originate in a query parameter, so never compose a
+# filesystem path from an unvalidated value.
+_BOARD_SLUG_RE = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}\Z")
 
 
 def _kanban_dir() -> Path:
@@ -47,21 +54,34 @@ def _current_board_slug() -> str:
     return "default"
 
 
-def _board_db_path(slug: str) -> Path:
-    if slug == "default":
+def _normalise_board_slug(raw: str) -> str | None:
+    """Return a canonical, path-safe board slug, or ``None`` if malformed."""
+    slug = raw.strip().lower()
+    return slug if _BOARD_SLUG_RE.fullmatch(slug) else None
+
+
+def _board_db_path(slug: str) -> Path | None:
+    """Return the DB path for a validated board slug, never a traversed path."""
+    normalised = _normalise_board_slug(slug)
+    if normalised is None:
+        return None
+    if normalised == "default":
         return _kanban_dir() / "kanban.db"
-    return _kanban_dir() / "boards" / slug / "kanban.db"
+    return _kanban_dir() / "boards" / normalised / "kanban.db"
 
 
 def _board_meta(slug: str) -> dict[str, Any]:
-    meta_path = _kanban_dir() / "boards" / slug / "board.json"
+    normalised = _normalise_board_slug(slug)
+    if normalised is None:
+        return {}
+    meta_path = _kanban_dir() / "boards" / normalised / "board.json"
     try:
         data = json.loads(meta_path.read_text(encoding="utf-8"))
         if isinstance(data, dict):
             return data
     except (OSError, ValueError):
         pass
-    return {"slug": slug, "name": slug}
+    return {"slug": normalised, "name": normalised}
 
 
 def list_boards() -> list[dict[str, Any]]:
@@ -73,8 +93,9 @@ def list_boards() -> list[dict[str, Any]]:
     boards_dir = root / "boards"
     if boards_dir.is_dir():
         for entry in sorted(boards_dir.iterdir()):
-            if entry.is_dir() and (entry / "kanban.db").exists():
-                boards.append(_board_meta(entry.name))
+            slug = _normalise_board_slug(entry.name)
+            if entry.is_dir() and slug and (entry / "kanban.db").exists():
+                boards.append(_board_meta(slug))
     for board in boards:
         board["counts"] = _status_counts(board["slug"])
     return boards
@@ -82,7 +103,7 @@ def list_boards() -> list[dict[str, Any]]:
 
 def _status_counts(slug: str) -> dict[str, int]:
     db_path = _board_db_path(slug)
-    if not db_path.exists():
+    if db_path is None or not db_path.exists():
         return {}
     try:
         con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
@@ -102,16 +123,17 @@ def get_board(slug: str = "") -> dict[str, Any]:
     fall back to the active board. Returns ``None``-safe shape: missing
     stores yield empty columns, never an error.
     """
-    active = _current_board_slug()
-    target = slug or active
+    active = _normalise_board_slug(_current_board_slug()) or "default"
+    requested = _normalise_board_slug(slug) if slug else None
+    target = requested or active
     db_path = _board_db_path(target)
-    if not db_path.exists():
+    if db_path is None or not db_path.exists():
         # Unknown slug → fall back to the active board so the panel never
         # renders empty because of a stale slug.
         if target != active:
             target = active
             db_path = _board_db_path(target)
-    if not db_path.exists():
+    if db_path is None or not db_path.exists():
         return {
             "slug": target,
             "name": target,
