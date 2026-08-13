@@ -813,3 +813,23 @@ def get_hermes_status_route(_ctx: "RouteContext") -> tuple[int, Any]:
     from server.hermes_status import probe_hermes
     status = probe_hermes()
     return 200, status
+
+
+def get_kanban(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/kanban — Hermes kanban board (read-only).
+
+    Query params:
+        board (str, optional): board slug; omitted → the active board.
+    """
+    from server import kanban_reader as _kb
+
+    params = ctx.get("params") or {}
+    slug = str(params.get("board", "") or "").strip()
+    return 200, _kb.get_board(slug)
+
+
+def get_kanban_boards(_ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/kanban/boards — every board on disk with status counts."""
+    from server import kanban_reader as _kb
+
+    return 200, {"boards": _kb.list_boards()}

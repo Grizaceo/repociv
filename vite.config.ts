@@ -41,6 +41,9 @@ export default defineConfig(({ mode }) => {
       port: vitePort,
       strictPort: true,
       host: true,
+      // Allow tunneled/Tailscale hosts (Pinggy, tailnet IPs) — Vite rejects
+      // unknown Host headers with 403 otherwise.
+      allowedHosts: true,
       // The dev-server HMR watcher must not traverse the Python venv or the
       // build/e2e output trees — under WSL2's inotify that exhausts watchers
       // (ENOSPC) and crashes `npm run dev` mid-startup. node_modules is

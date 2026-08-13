@@ -47,6 +47,8 @@ GET_EXACT: dict[str, Callable[..., Any]] = {
     "/improve/proposals": _routes.get_improve_proposals,
     "/providers/live": _routes.get_providers_live,
     "/api/hermes/status": _routes.get_hermes_status_route,
+    "/api/kanban": _routes.get_kanban,
+    "/api/kanban/boards": _routes.get_kanban_boards,
     "/ws": _routes.get_ws_info,
     "/api/news/latest": _routes.get_latest_news,
     "/api/news/sources": _routes.get_news_sources,

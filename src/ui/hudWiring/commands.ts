@@ -16,6 +16,7 @@ import {
   toggleLogPanel,
   toggleHarnessPanel,
   toggleTaskAssignPanel,
+  toggleKanbanPanel,
 } from '../index.ts';
 import { toggleSettingsPanel } from '../settingsPanel.ts';
 import { toggleLayerPanel } from '../layerPanel.ts';
@@ -84,6 +85,13 @@ export function registerHudCommands(
     },
     { id: 'p-log', group: 'Panel', label: 'Log en vivo', run: () => toggleLogPanel() },
     { id: 'p-harness', group: 'Panel', label: 'Harness', run: () => toggleHarnessPanel() },
+    {
+      id: 'p-kanban',
+      group: 'Panel',
+      label: 'Kanban de Hermes',
+      hint: 'F6',
+      run: () => toggleKanbanPanel(),
+    },
     {
       id: 'p-task-assign',
       group: 'Panel',

@@ -117,6 +117,7 @@ export const KNOWN_PANELS = [
   'priority',
   'settings',
   'construction',
+  'kanban',
 ] as const;
 
 export interface PanelUsage {

@@ -25,6 +25,9 @@ import {
   isLogPanelOpen,
   toggleTaskAssignPanel,
   isTaskAssignPanelOpen,
+  toggleKanbanPanel,
+  closeKanbanPanel,
+  isKanbanPanelOpen,
 } from '../index.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from '../settingsPanel.ts';
 import { closeConstructionPanel, isConstructionPanelOpen } from '../constructionPanel.ts';
@@ -82,6 +85,10 @@ export function wireHotkeys(
       }
       if (isApprovalPanelOpen()) {
         closeApprovalPanel();
+        return;
+      }
+      if (isKanbanPanelOpen()) {
+        closeKanbanPanel();
         return;
       }
       if (isCityPanelOpen()) {
@@ -314,6 +321,12 @@ export function wireHotkeys(
         trackHotkey('?:keyboard-help');
         toggleKeyboardHelp();
         break;
+    }
+
+    if (e.key === 'F6') {
+      e.preventDefault();
+      trackHotkey('F6:kanban');
+      toggleKanbanPanel();
     }
 
     if (e.key === 'F11') {

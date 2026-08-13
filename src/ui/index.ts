@@ -43,6 +43,12 @@ export {
   togglePendingPanel,
 } from './pendingPanel';
 export { openLogPanel, closeLogPanel, isLogPanelOpen, toggleLogPanel } from './logPanel.ts';
+export {
+  openKanbanPanel,
+  closeKanbanPanel,
+  isKanbanPanelOpen,
+  toggleKanbanPanel,
+} from './kanbanPanel.ts';
 
 // Re-export specific initialization helpers
 export { initExternalLibs } from './hud.ts';
