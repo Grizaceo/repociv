@@ -338,6 +338,7 @@ def resolve_absolute_file_path(repo_path: str, file_path: str) -> str:
 def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
               command_id: str | None = None, harness: str = "",
               provider: str = "", model: str = "",
+              profile: str = "",
               repo_path: str = "", file_path: str = "") -> None:
     mission_id = command_id or str(uuid.uuid4())[:8]
     quest_name = generate_quest_name(mission)
@@ -418,7 +419,8 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
     send_to_repociv({"type": "unit_state", "unit": unit_id, "state": "working"})
 
     success, output = _execute_streaming(unit_id, mission_id, mission, working_dir, city_id,
-                                         harness=harness, provider=provider, model=model)
+                                         harness=harness, provider=provider, model=model,
+                                         profile_ref=profile)
 
     duration = time.time() - started_at
 
@@ -471,8 +473,14 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
                        city_id: str = "",
                        harness: str = "",
                        provider: str = "",
-                       model: str = "") -> tuple[bool, str]:
+                       model: str = "",
+                       profile_ref: str = "") -> tuple[bool, str]:
     config = _get_agent_config(unit_id)
+    # A profile chosen in the chat header overrides the registry-resolved
+    # profile path (registry wins only when the payload has none).
+    if profile_ref:
+        config = dict(config)
+        config["profile"] = os.path.expanduser(profile_ref)
     base = unit_id.split("-")[0].upper()
 
     security = _security_harness.get_harness()

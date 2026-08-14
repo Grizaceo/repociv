@@ -162,6 +162,17 @@ export async function listHarnessOptions(name: string): Promise<string[]> {
   return data.options ?? [];
 }
 
+/** List native profiles for a harness (e.g. hermes → ~/.hermes/profiles/*). */
+export async function listHarnessProfiles(harness: string): Promise<string[]> {
+  const resp = await fetch(
+    bridgeUrl(`/api/harness-profiles?harness=${encodeURIComponent(harness)}`),
+    { headers: bridgeHeaders() },
+  );
+  if (!resp.ok) return [];
+  const data = (await resp.json()) as { profiles?: string[] };
+  return data.profiles ?? [];
+}
+
 // ─── Runtime chatConfig merge ─────────────────────────────────────────────────
 // The unit panel stores per-unit harness/model/provider in localStorage.
 // This helper merges a RepoCivProfile into that runtime config.

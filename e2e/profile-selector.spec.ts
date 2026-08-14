@@ -94,6 +94,14 @@ async function mockProfiles(page: Page) {
   await page.route('**/api/profiles', (route) =>
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(MOCK_PROFILES) }),
   );
+  // Native harness profiles (hermes → ~/.hermes/profiles/*). Deterministic
+  // list so the "Perfiles nativos" section renders a fixed set.
+  await page.route('**/api/harness-profiles?*', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ profiles: ['main', 'lexo-alpha'], harness: 'hermes' }),
+    }),
+  );
 }
 
 async function seedRepoSelection(page: Page) {
@@ -160,11 +168,12 @@ test('profile selector: aparece en el header del chat con la etiqueta y perfiles
   await expect(sel).toBeVisible();
   // La etiqueta dice "PERFIL" — el select se entiende como selector de perfiles.
   await expect(page.locator('.profile-selector-label')).toHaveText('PERFIL');
-  // Con harness hermes activo: solo DAVI (hermes) + la opción "config manual".
+  // Con harness hermes activo: manual + DAVI (hermes) + separador + 2 nativos.
   // LEXO (claude) NO aparece hasta que el harness del panel sea claude.
-  await expect(sel.locator('option')).toHaveCount(2);
-  await expect(sel.locator('option[value="davi"]')).toContainText('DAVI');
+  await expect(sel.locator('option[value="davi"]')).toHaveCount(1);
   await expect(sel.locator('option[value="lexo"]')).toHaveCount(0);
+  await expect(sel.locator('option[value="~/.hermes/profiles/main"]')).toHaveCount(1);
+  await expect(sel.locator('option[value="~/.hermes/profiles/lexo-alpha"]')).toHaveCount(1);
   await page.locator('#side-panel').screenshot({ path: 'e2e/_shots/profile-selector.png' });
 });
 
@@ -206,6 +215,23 @@ test('profile selector: elegir un perfil aplica harness/provider/model al chat a
   );
   // El selector sigue mostrando el perfil aplicado (match exacto).
   await expect(page.locator('#profile-selector')).toHaveValue('lexo');
+});
+
+test('profile selector: elegir un perfil nativo de hermes aplica harness hermes + profile', async ({
+  page,
+}) => {
+  await boot(page);
+  await openChat(page);
+
+  const sel = page.locator('#profile-selector');
+  await expect(sel).toBeVisible();
+
+  // Elegir un perfil nativo (sección "Perfiles nativos").
+  await sel.selectOption('~/.hermes/profiles/lexo-alpha');
+  // Aplica harness hermes (el perfil nativo corre con hermes-cli).
+  await expect(page.locator('#harness-selector')).toHaveValue('hermes');
+  // El selector sigue mostrando el perfil nativo elegido.
+  await expect(sel).toHaveValue('~/.hermes/profiles/lexo-alpha');
 });
 
 test('profile selector: cambiar la config manualmente deselecciona el perfil', async ({

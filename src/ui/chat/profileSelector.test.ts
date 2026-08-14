@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { findMatchingProfile, filterProfilesByHarness } from './profileSelector.ts';
+import {
+  findMatchingProfile,
+  filterProfilesByHarness,
+  findMatchingNativeProfile,
+} from './profileSelector.ts';
 import type { RepoCivProfile } from '../../agentProfile.ts';
 
 const PROFILES: RepoCivProfile[] = [
@@ -125,5 +129,23 @@ describe('filterProfilesByHarness', () => {
     const snapshot = [...PROFILES];
     filterProfilesByHarness(PROFILES, 'claude-code');
     expect(PROFILES).toEqual(snapshot);
+  });
+});
+
+describe('findMatchingNativeProfile', () => {
+  const NATIVE = ['main', 'lexo-alpha', 'procurador'];
+
+  it('matches the canonical ~/.hermes/profiles/<name> path', () => {
+    expect(findMatchingNativeProfile(NATIVE, '~/.hermes/profiles/lexo-alpha')).toBe('lexo-alpha');
+  });
+
+  it('matches an absolute path ending in /profiles/<name>', () => {
+    expect(findMatchingNativeProfile(NATIVE, '/home/gris/.hermes/profiles/main')).toBe('main');
+  });
+
+  it('returns null for an empty or unknown path', () => {
+    expect(findMatchingNativeProfile(NATIVE, '')).toBeNull();
+    expect(findMatchingNativeProfile(NATIVE, '~/.hermes/profiles/unknown')).toBeNull();
+    expect(findMatchingNativeProfile([], '~/.hermes/profiles/main')).toBeNull();
   });
 });

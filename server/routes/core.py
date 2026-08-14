@@ -440,6 +440,24 @@ def get_profile_harness_options(ctx: "RouteContext") -> tuple[int, Any]:
     return 200, {"options": options, "harness": harness}
 
 
+def get_harness_profiles(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/harness-profiles?harness=hermes — list native profiles for a harness.
+
+    For hermes: subdirs of ~/.hermes/profiles/ (main, lexo-alpha, ...) — the
+    same profiles the Hermes app shows in its own profile selector. For
+    codex/openclaw: best-effort via list_harness_options.
+    Response 200: { "profiles": [str, ...], "harness": str }
+    """
+    from server import profile_identity as _pi
+
+    params = ctx.get("params", {})
+    harness = str(params.get("harness") or "").strip().lower()
+    if not harness:
+        return 400, {"error": "harness query param is required"}
+    options = _pi.list_harness_options(harness)
+    return 200, {"profiles": options, "harness": harness}
+
+
 def get_providers_live(ctx: "RouteContext") -> tuple[int, Any]:
     """Fetch live model reachability from each provider's own API.
 

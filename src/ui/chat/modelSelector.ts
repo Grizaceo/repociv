@@ -35,6 +35,7 @@ let _allProviders: ProviderInfo[] = []; // unfiltered — full list from server
 let _selectedHarness = '';
 let _selectedProvider = '';
 let _selectedModel = '';
+let _selectedProfile = ''; // native profile path (e.g. ~/.hermes/profiles/lexo-alpha)
 let _cursorAvailable = false;
 
 /** Providers visible for the current harness. The server lists every
@@ -398,6 +399,7 @@ function persistSelection(unitId: string | null = null): void {
       harness: _selectedHarness,
       provider: _selectedProvider,
       model: _selectedModel,
+      profile: _selectedProfile,
     });
     localStorage.setItem(_storageKey(unitId), data);
     // Always mirror to the global key so new chips without saved config
@@ -413,21 +415,35 @@ export function loadSelection(unitId: string | null = null): {
   harness: string;
   provider: string;
   model: string;
+  profile: string;
 } {
   try {
     // Try per-unit key first, fall back to global, then legacy key.
     const perUnit = unitId ? localStorage.getItem(_storageKey(unitId)) : null;
     const raw = perUnit ?? localStorage.getItem('repociv:chatConfig');
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw) as {
+        harness?: string;
+        provider?: string;
+        model?: string;
+        profile?: string;
+      };
+      return {
+        harness: parsed.harness ?? '',
+        provider: parsed.provider ?? '',
+        model: parsed.model ?? '',
+        profile: parsed.profile ?? '',
+      };
+    }
     const old = localStorage.getItem('repociv:provider');
     if (old) {
       const parsed = JSON.parse(old);
-      return { harness: '', provider: parsed.provider || '', model: parsed.model || '' };
+      return { harness: '', provider: parsed.provider || '', model: parsed.model || '', profile: '' };
     }
   } catch {
     // ignore
   }
-  return { harness: '', provider: '', model: '' };
+  return { harness: '', provider: '', model: '', profile: '' };
 }
 
 /**
@@ -473,6 +489,7 @@ export function loadConfigForUnit(unitId: string): void {
   }
 
   populateModels(saved.model);
+  _selectedProfile = saved.profile ?? '';
   updateStatusIndicator();
 
   // Notify consumers (profile selector) so the profile dropdown re-filters
@@ -484,9 +501,19 @@ export function loadConfigForUnit(unitId: string): void {
   if (wrapper) wrapper.dataset['configUnit'] = unitId;
 }
 
-/** Get the currently selected harness, provider and model for sending to the bridge. */
-export function getSelectedConfig(): { harness: string; provider: string; model: string } {
-  return { harness: _selectedHarness, provider: _selectedProvider, model: _selectedModel };
+/** Get the currently selected harness, provider, model and profile for sending to the bridge. */
+export function getSelectedConfig(): {
+  harness: string;
+  provider: string;
+  model: string;
+  profile: string;
+} {
+  return {
+    harness: _selectedHarness,
+    provider: _selectedProvider,
+    model: _selectedModel,
+    profile: _selectedProfile,
+  };
 }
 
 /** The persisted harness/provider/model for a specific unit (per-unit key,
@@ -518,6 +545,19 @@ export function applyHarnessSelection(
   if (harnessSel) harnessSel.value = harnessId;
   persistSelection(unitId);
   if (harnessId !== prev) _reloadProviderSelector();
+  updateStatusIndicator();
+}
+
+/** Apply a native profile path (e.g. ~/.hermes/profiles/lexo-alpha) to the
+ *  active chat unit. The profile is persisted with the config triple and
+ *  sent to the bridge so the hermes-cli adapter runs with HERMES_HOME
+ *  pointing at that profile. */
+export function applyProfileSelection(
+  profilePath: string,
+  unitId: string | null = getActiveChatUnit(),
+): void {
+  _selectedProfile = profilePath;
+  persistSelection(unitId);
   updateStatusIndicator();
 }
 

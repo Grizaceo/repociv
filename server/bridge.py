@@ -409,6 +409,7 @@ def run_agent(
     harness: str = "",
     provider: str = "",
     model: str = "",
+    profile: str = "",
     repo_path: str = "",
     file_path: str = "",
 ) -> None:
@@ -422,6 +423,7 @@ def run_agent(
         harness=harness,
         provider=provider,
         model=model,
+        profile=profile,
         repo_path=repo_path,
         file_path=file_path,
     )
@@ -768,6 +770,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 return
 
         # ── Profile identity / harness-options ──────────────────────────────────
+        if path == "/api/harness-profiles":
+            status, body = _routes.get_harness_profiles(ctx)
+            self._respond(status, body)
+            return
         if path.startswith("/api/profiles/"):
             parts = path.split("/")  # ['', 'api', 'profiles', '<name>', '<sub>']
             if len(parts) >= 5 and parts[4] == "identity":
@@ -1232,6 +1238,7 @@ if __name__ == "__main__":
                         "harness": raw.get("harness", ""),
                         "provider": raw.get("provider", ""),
                         "model": raw.get("model", ""),
+                        "profile": raw.get("profile", ""),
                         "repoPath": raw.get("repoPath", ""),
                         "filePath": raw.get("filePath", ""),
                         "fileName": raw.get("fileName", ""),

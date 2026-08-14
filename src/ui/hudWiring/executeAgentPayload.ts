@@ -8,6 +8,7 @@ export function buildExecuteAgentPayload(
   model = '',
   provider = '',
   agentType = '',
+  profile = '',
 ): Record<string, unknown> {
   // Always send a real repoPath when the city has one. Chat may target any
   // unit (MAIN/WORKER/SCOUT/…); the bridge allows hermes/auto without a
@@ -22,5 +23,6 @@ export function buildExecuteAgentPayload(
   if (harness && harness !== 'auto') payload['harness'] = harness;
   if (provider && provider !== 'auto') payload['provider'] = provider;
   if (model) payload['model'] = model;
+  if (profile) payload['profile'] = profile;
   return payload;
 }

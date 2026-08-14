@@ -204,7 +204,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     // Include 3-layer config from chat UI: harness + provider + model.
     // Hermes HTTP needs provider+model together; CLI harnesses need a city
     // with repoPath (bridge rejects otherwise — surface that to the user).
-    const { harness, provider, model } = getSelectedConfig();
+    const { harness, provider, model, profile } = getSelectedConfig();
     const selectedHarness = harness && harness !== 'auto' ? harness : '';
     const cliHarnesses = new Set([
       'claude',
@@ -233,6 +233,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
         model,
         provider,
         unit?.type ?? '',
+        profile,
       ),
     };
 

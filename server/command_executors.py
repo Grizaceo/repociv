@@ -74,10 +74,12 @@ def dispatch_command(
         harness = str(payload.get('harness', ''))
         provider = str(payload.get('provider', ''))
         model = str(payload.get('model', ''))
+        profile = str(payload.get('profile', ''))
         repo_path = str(payload.get('repoPath') or payload.get('cwd') or '')
         file_path = str(payload.get('filePath') or '')
         run_agent(unit, city, mission, agent_type, cmd.id,
                   harness=harness, provider=provider, model=model,
+                  profile=profile,
                   repo_path=repo_path, file_path=file_path)
         register_issue_run_fn(payload, cmd.id)
         return
