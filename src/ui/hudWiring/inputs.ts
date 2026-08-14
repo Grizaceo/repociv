@@ -78,7 +78,11 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
   // box-sizing:border-box we must add it back or the last line clips.
   const autoResizeChat = () => {
     if (!chatInput) return;
-    chatInput.style.height = 'auto';
+    // Collapse to 0px (not 'auto') so the browser is forced to recompute the
+    // layout; scrollHeight then reflects the true content height. Using 'auto'
+    // can return a stale/previous height the first time the textarea grows,
+    // which clips the top line until the next keystroke.
+    chatInput.style.height = '0px';
     const cs = window.getComputedStyle(chatInput);
     const borderY =
       (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
