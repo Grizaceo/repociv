@@ -25,6 +25,40 @@
   align-items: center;
 }
 
+/* Profile selector — top layer above harness/provider/model. Same visual
+   language as the provider selects, slightly emphasized (it's the "who"
+   layer). */
+.profile-selector-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.profile-selector-row select {
+  flex: 1;
+  min-width: 0;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--ui-gold);
+  border-radius: 3px;
+  color: var(--ui-gold-bright);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  padding: 2px 4px;
+  outline: none;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+.profile-selector-row select:focus {
+  border-color: var(--ui-gold-bright);
+}
+
+.profile-selector-row select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .provider-selectors select {
   flex: 1;
   min-width: 0;

@@ -378,11 +378,13 @@ function _storageKey(unitId: string | null): string {
 }
 
 // A consumer (the agent chip) registers here to mirror a unit's selection on
-// its tab whenever it is persisted. Kept as a callback rather than an import so
-// modelSelector has no dependency on agentChip (which imports modelSelector).
-let _onConfigPersisted: ((unitId: string | null) => void) | null = null;
+// its tab whenever it is persisted. Kept as a callback set rather than an
+// import so modelSelector has no dependency on agentChip (which imports
+// modelSelector). Multiple consumers may register (chip mirror + profile
+// selector sync).
+const _onConfigPersisted = new Set<(unitId: string | null) => void>();
 export function setConfigPersistedHandler(cb: (unitId: string | null) => void): void {
-  _onConfigPersisted = cb;
+  _onConfigPersisted.add(cb);
 }
 
 function persistSelection(unitId: string | null = null): void {
@@ -399,10 +401,10 @@ function persistSelection(unitId: string | null = null): void {
   } catch {
     // localStorage full or unavailable
   }
-  _onConfigPersisted?.(unitId);
+  _onConfigPersisted.forEach((cb) => cb(unitId));
 }
 
-function loadSelection(unitId: string | null = null): {
+export function loadSelection(unitId: string | null = null): {
   harness: string;
   provider: string;
   model: string;

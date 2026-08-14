@@ -5,6 +5,7 @@ import { updateChatTargetIndicator, getSidePanelCleanup, setSidePanelCleanup } f
 import { escapeHtml } from '../escapeHtml.ts';
 import { initAgentSelector } from './agentSelector.ts';
 import { initProviderSelectors } from './modelSelector.ts';
+import { initProfileSelector } from './profileSelector.ts';
 import { switchToChatUnit } from './agentChip.ts';
 
 export async function openSidePanel(unit: Unit): Promise<void> {
@@ -27,6 +28,7 @@ export async function openSidePanel(unit: Unit): Promise<void> {
   }
 
   initProviderSelectors();
+  void initProfileSelector();
 
   // Bind chips + transcript to this unit (independent chat per agent).
   initAgentSelector(unit.id);

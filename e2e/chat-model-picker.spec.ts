@@ -4,6 +4,10 @@
 // Screenshots land in e2e/_shots/ (gitignored) for PR review.
 import { expect, test, type Page } from '@playwright/test';
 
+// The full boot (repos + map + bridge) plus opening the chat takes longer
+// than Playwright's 30s default on this machine.
+test.setTimeout(90_000);
+
 // Synthetic provider universe so the picker renders a populated list even when
 // this dev bridge has no API keys configured (the real client code consumes
 // these exactly as it would the live bridge response).
@@ -78,6 +82,9 @@ async function seedRepoSelection(page: Page) {
       'repociv:selected-repos:v1',
       JSON.stringify({ version: 1, selectedRepoPaths: p, filters: { owners: [], topics: [], languages: [] } }),
     );
+    // Skip the first-run coachmark tour: its card captures the Enter key
+    // that the chat-opening flow needs.
+    window.localStorage.setItem('repociv:tour-seen:v1', '1');
   }, paths);
 }
 
@@ -95,13 +102,19 @@ async function boot(page: Page) {
 }
 
 async function openChat(page: Page) {
-  const slot = page.locator('#hero-bar-slots .hero-slot').first();
+  // Exclude .profile-slot: profile slots only select a profile, they do not
+  // open the chat. The first unit slot is the initial unit.
+  const slot = page.locator('#hero-bar-slots .hero-slot:not(.profile-slot)').first();
   await expect(slot).toBeVisible({ timeout: 20_000 });
   await slot.scrollIntoViewIfNeeded();
   await slot.click({ force: true });
+  // The Enter hotkey lives on the canvas; focus it without clicking (a click
+  // could select a different city/unit).
+  await page.locator('#main-canvas').focus();
   await page.keyboard.press('Enter');
   if (!(await page.locator('#side-panel').isVisible().catch(() => false))) {
     await slot.click({ force: true });
+    await page.locator('#main-canvas').focus();
     await page.keyboard.press('Enter');
   }
   await expect(page.locator('#side-panel')).toBeVisible({ timeout: 10_000 });
