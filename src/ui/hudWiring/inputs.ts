@@ -88,6 +88,10 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
       (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
     const target = chatInput.scrollHeight + borderY;
     chatInput.style.height = `${Math.min(target, 160)}px`;
+    // The browser scrolls the textarea internally to keep the caret visible
+    // the moment a newline is inserted (before this handler runs). Once the
+    // height is correct, reset the scroll so the first line is never clipped.
+    chatInput.scrollTop = 0;
   };
   chatInput?.addEventListener('input', autoResizeChat);
 
@@ -273,7 +277,8 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
       });
     if (unit) state.setUnitState(unit.id, 'working');
     input.value = '';
-    input.style.height = 'auto';
+    input.style.height = '0px';
+    input.scrollTop = 0;
   };
 
   document
