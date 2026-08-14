@@ -27,11 +27,27 @@
 
 /* Profile selector — top layer above harness/provider/model. Same visual
    language as the provider selects, slightly emphasized (it's the "who"
-   layer). */
+   layer). The label makes it explicit this is a profile picker, and the
+   dropdown lists only profiles compatible with the panel's active harness. */
 .profile-selector-row {
   display: flex;
   gap: 4px;
   align-items: center;
+}
+
+.profile-selector-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: var(--ui-gold-bright);
+  text-transform: uppercase;
+  opacity: 0.9;
+  flex-shrink: 0;
+  padding: 2px 4px;
+  border: 1px solid rgba(200, 168, 75, 0.35);
+  border-radius: 3px;
+  background: rgba(200, 168, 75, 0.08);
+  cursor: help;
 }
 
 .profile-selector-row select {

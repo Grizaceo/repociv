@@ -150,7 +150,7 @@ async function openChat(page: Page) {
   await expect(page.locator('#chat-input')).toBeVisible();
 }
 
-test('profile selector: aparece en el header del chat con los perfiles del registry', async ({
+test('profile selector: aparece en el header del chat con la etiqueta y perfiles filtrados por harness', async ({
   page,
 }) => {
   await boot(page);
@@ -158,11 +158,33 @@ test('profile selector: aparece en el header del chat con los perfiles del regis
 
   const sel = page.locator('#profile-selector');
   await expect(sel).toBeVisible();
-  // Los dos perfiles mockeados + la opción "config manual".
-  await expect(sel.locator('option')).toHaveCount(3);
+  // La etiqueta dice "PERFIL" — el select se entiende como selector de perfiles.
+  await expect(page.locator('.profile-selector-label')).toHaveText('PERFIL');
+  // Con harness hermes activo: solo DAVI (hermes) + la opción "config manual".
+  // LEXO (claude) NO aparece hasta que el harness del panel sea claude.
+  await expect(sel.locator('option')).toHaveCount(2);
   await expect(sel.locator('option[value="davi"]')).toContainText('DAVI');
-  await expect(sel.locator('option[value="lexo"]')).toContainText('LEXO');
+  await expect(sel.locator('option[value="lexo"]')).toHaveCount(0);
   await page.locator('#side-panel').screenshot({ path: 'e2e/_shots/profile-selector.png' });
+});
+
+test('profile selector: cambiar el harness del panel filtra los perfiles disponibles', async ({
+  page,
+}) => {
+  await boot(page);
+  await openChat(page);
+
+  const sel = page.locator('#profile-selector');
+  await expect(sel).toBeVisible();
+  // Hermes activo → solo DAVI.
+  await expect(sel.locator('option[value="davi"]')).toHaveCount(1);
+  await expect(sel.locator('option[value="lexo"]')).toHaveCount(0);
+
+  // Cambiar el harness del panel a claude-code → ahora LEXO (claude) aparece
+  // y DAVI (hermes) desaparece.
+  await page.locator('#harness-selector').selectOption('claude-code');
+  await expect(sel.locator('option[value="davi"]')).toHaveCount(0);
+  await expect(sel.locator('option[value="lexo"]')).toHaveCount(1);
 });
 
 test('profile selector: elegir un perfil aplica harness/provider/model al chat activo', async ({
@@ -171,7 +193,9 @@ test('profile selector: elegir un perfil aplica harness/provider/model al chat a
   await boot(page);
   await openChat(page);
 
-  // LEXO: harness claude → registry claude-code, provider anthropic, modelo sonnet.
+  // LEXO es de harness claude: primero hay que estar en claude-code para que
+  // aparezca en el filtro (el perfil por sí solo también aplica el harness).
+  await page.locator('#harness-selector').selectOption('claude-code');
   await page.locator('#profile-selector').selectOption('lexo');
   await expect(page.locator('#harness-selector')).toHaveValue('claude-code');
   await expect(page.locator('#provider-selector')).toHaveValue('anthropic');
@@ -190,6 +214,7 @@ test('profile selector: cambiar la config manualmente deselecciona el perfil', a
   await boot(page);
   await openChat(page);
 
+  await page.locator('#harness-selector').selectOption('claude-code');
   await page.locator('#profile-selector').selectOption('lexo');
   await expect(page.locator('#harness-selector')).toHaveValue('claude-code');
 

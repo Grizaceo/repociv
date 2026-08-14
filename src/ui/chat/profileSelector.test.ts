@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { findMatchingProfile } from './profileSelector.ts';
+import { findMatchingProfile, filterProfilesByHarness } from './profileSelector.ts';
 import type { RepoCivProfile } from '../../agentProfile.ts';
 
 const PROFILES: RepoCivProfile[] = [
@@ -96,5 +96,34 @@ describe('findMatchingProfile', () => {
 
   it('returns null for an empty profile list', () => {
     expect(findMatchingProfile([], { harness: 'hermes', provider: '', model: '' })).toBeNull();
+  });
+});
+
+describe('filterProfilesByHarness', () => {
+  it('keeps only profiles whose harness matches (registry id form)', () => {
+    // Panel harness selector uses registry ids: 'claude-code' filters the
+    // 'claude' profile (normalized) and drops hermes ones.
+    const filtered = filterProfilesByHarness(PROFILES, 'claude-code');
+    expect(filtered.map((p) => p.name)).toEqual(['lexo']);
+  });
+
+  it('keeps only hermes profiles when the panel harness is hermes', () => {
+    const filtered = filterProfilesByHarness(PROFILES, 'hermes');
+    expect(filtered.map((p) => p.name).sort()).toEqual(['auto-profile', 'davi']);
+  });
+
+  it('shows every profile when the harness is auto or empty', () => {
+    expect(filterProfilesByHarness(PROFILES, 'auto')).toHaveLength(PROFILES.length);
+    expect(filterProfilesByHarness(PROFILES, '')).toHaveLength(PROFILES.length);
+  });
+
+  it('returns nothing for an unknown harness', () => {
+    expect(filterProfilesByHarness(PROFILES, 'codex')).toHaveLength(0);
+  });
+
+  it('does not mutate the input list', () => {
+    const snapshot = [...PROFILES];
+    filterProfilesByHarness(PROFILES, 'claude-code');
+    expect(PROFILES).toEqual(snapshot);
   });
 });

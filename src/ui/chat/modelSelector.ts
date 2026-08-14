@@ -249,6 +249,11 @@ function finishInit(data: { defaultHarness: string; defaultProvider: string }): 
   // Populate provider selector (filtered by harness)
   _reloadProviderSelector();
   updateStatusIndicator();
+
+  // Notify consumers (profile selector) that the initial selection is now
+  // established: the harness filter for profiles depends on _selectedHarness,
+  // which was unknown while the /providers fetch was in flight.
+  _onConfigPersisted.forEach((cb) => cb(activeUnit));
 }
 
 /** Whether /health reports cursor-agent installed (Swarm tracking possible). */
@@ -469,6 +474,10 @@ export function loadConfigForUnit(unitId: string): void {
 
   populateModels(saved.model);
   updateStatusIndicator();
+
+  // Notify consumers (profile selector) so the profile dropdown re-filters
+  // by this unit's harness and re-matches its config.
+  _onConfigPersisted.forEach((cb) => cb(unitId));
 
   // Stamp active unit on the wrapper so CSS can show a label like "CFG: CLAUDE".
   const wrapper = document.getElementById('model-selector-wrapper');

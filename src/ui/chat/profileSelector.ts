@@ -28,6 +28,7 @@ import {
   applyModelSelection,
   setConfigPersistedHandler,
   loadSelection,
+  getSelectedConfig,
 } from './modelSelector.ts';
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -42,6 +43,9 @@ const HARNESS_TO_REGISTRY: Record<string, string> = { claude: 'claude-code' };
 function registryHarnessId(h: string): string {
   return HARNESS_TO_REGISTRY[h] ?? h;
 }
+function norm(v: string | undefined): string {
+  return (v ?? '').trim();
+}
 
 // ─── Matching ─────────────────────────────────────────────────────────────────
 
@@ -53,7 +57,6 @@ export function findMatchingProfile(
   profiles: RepoCivProfile[],
   config: { harness: string; provider: string; model: string },
 ): RepoCivProfile | null {
-  const norm = (v: string | undefined): string => (v ?? '').trim();
   return (
     profiles.find(
       (p) =>
@@ -61,6 +64,21 @@ export function findMatchingProfile(
         norm(p.provider) === norm(config.provider) &&
         norm(p.model) === norm(config.model),
     ) ?? null
+  );
+}
+
+/** Profiles whose harness matches the given (registry-id) harness. 'auto'
+ *  shows every profile. Unknown harness ids show nothing (the panel's
+ *  harness dropdown drives the filter, and a profile for a harness that is
+ *  not even selectable should not be offered here). */
+export function filterProfilesByHarness(
+  profiles: RepoCivProfile[],
+  harnessRegistryId: string,
+): RepoCivProfile[] {
+  const hid = norm(harnessRegistryId);
+  if (!hid || hid === 'auto') return [...profiles];
+  return profiles.filter(
+    (p) => registryHarnessId(norm(p.harness)) === hid,
   );
 }
 
@@ -72,12 +90,23 @@ function _selectEl(): HTMLSelectElement | null {
 
 function _populateOptions(select: HTMLSelectElement): void {
   select.innerHTML = '';
+  // First option is a prompt, not a value: the select reflects the active
+  // profile only when the unit's config matches one exactly; otherwise it
+  // shows the manual-config state.
   const manual = document.createElement('option');
   manual.value = '';
   manual.textContent = '— (config manual)';
   select.appendChild(manual);
 
-  const sorted = [..._profiles].sort(
+  // Filter by the panel's active harness: in "hermes" only hermes profiles
+  // are offered, in "claude-code" only claude profiles, in "auto" all of
+  // them. Profiles for other harnesses never appear here — they are not
+  // applicable to this panel's harness and would apply a config the user
+  // cannot see.
+  const active = getSelectedConfig().harness;
+  const visible = filterProfilesByHarness(_profiles, active);
+
+  const sorted = [...visible].sort(
     (a, b) => (a.slot_order ?? 99) - (b.slot_order ?? 99),
   );
   for (const p of sorted) {
@@ -86,6 +115,14 @@ function _populateOptions(select: HTMLSelectElement): void {
     const meta = HARNESS_META[p.harness] ?? { emoji: '?', label: p.harness };
     opt.textContent = `${meta.emoji} ${p.display_name ?? p.name}`;
     select.appendChild(opt);
+  }
+
+  // When the harness filter hides the currently selected profile, the
+  // selection must not silently point at a hidden value: fall back to the
+  // manual state (the config itself is unchanged, only the dropdown view).
+  const current = select.value;
+  if (current && !sorted.some((p) => p.name === current)) {
+    select.value = '';
   }
 }
 
@@ -151,8 +188,12 @@ export function syncProfileSelector(unitId: string | null): void {
 }
 
 // Re-sync when the config changes through any surface (dropdowns, slash
-// commands, profile apply): if the user diverges from the shown profile, the
+// commands, profile apply): the dropdown repopulates with the harness filter
+// (a harness switch changes which profiles are applicable) and then the
+// selection is re-matched — if the user diverges from the shown profile, the
 // select falls back to "— (config manual)".
 setConfigPersistedHandler((unitId) => {
+  const select = _selectEl();
+  if (select) _populateOptions(select);
   syncProfileSelector(unitId);
 });
