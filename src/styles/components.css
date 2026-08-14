@@ -1067,6 +1067,18 @@ body.local-view #local-view-controls {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* El texto del chat con el agente debe ser SIEMPRE seleccionable: el panel
+   lateral hereda user-select:none de #hud-overlay, así que forzamos text en
+   todo el árbol de mensajes (incluido el markdown renderizado). */
+#chat-messages,
+#chat-messages * {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 
 .chat-msg {

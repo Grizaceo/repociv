@@ -782,6 +782,52 @@ def _has_hermes_cli() -> bool:
     return _find_hermes_cli() is not None
 
 
+def _hermes_session_state_file() -> Path:
+    """State file mapping (profile|unit|city) → real hermes session id.
+
+    hermes-cli's `--continue <name>` resolves by session *title* or *id*,
+    and our synthetic names (repociv-main-<city>) never match either, so
+    stateful agents must remember the real session id printed at the end of
+    each run (`session_id: <id>`) and resume with `--resume <id>`.
+    """
+    config_dir = os.environ.get("REPOCIV_CONFIG_DIR", str(Path.home() / ".repociv"))
+    return Path(config_dir).expanduser() / "hermes-sessions.json"
+
+
+def _hermes_session_key(profile_path: str, unit_id: str, city_id: str) -> str:
+    profile = os.path.basename(os.path.expanduser(profile_path).rstrip("/")) or "default"
+    unit = (unit_id or "main").strip().lower() or "main"
+    city = _session_city_slug(city_id)
+    return f"{profile}|{unit}|{city}"
+
+
+def _load_hermes_session_id(profile_path: str, unit_id: str, city_id: str) -> str:
+    try:
+        data = json.loads(_hermes_session_state_file().read_text(encoding="utf-8"))
+        return str(data.get(_hermes_session_key(profile_path, unit_id, city_id), ""))
+    except Exception:
+        return ""
+
+
+def _save_hermes_session_id(profile_path: str, unit_id: str, city_id: str, session_id: str) -> None:
+    if not session_id:
+        return
+    try:
+        path = _hermes_session_state_file()
+        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        data[_hermes_session_key(profile_path, unit_id, city_id)] = session_id
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _extract_hermes_session_id(output: str) -> str:
+    """hermes chat -Q prints `session_id: <id>` at the end of a run."""
+    m = re.search(r"session_id:\s*([A-Za-z0-9_]+)", output)
+    return m.group(1) if m else ""
+
+
 def _run_hermes_cli_streaming(
     unit_id: str, mission_id: str, mission: str,
     config: dict[str, Any],
@@ -821,12 +867,15 @@ def _run_hermes_cli_streaming(
         cmd.extend(["-m", model])
 
     # Stateful agents (LEXO) persist conversation history across missions via
-    # --continue <name>. Stateless agents (WORKER, SCOUT) get a fresh context
-    # each mission — omitting --continue is intentional.
-    # Session name is unit+city so city moves do not leak prior-repo history.
+    # --resume <real session id>. Stateless agents (WORKER, SCOUT) get a fresh
+    # context each mission — omitting resume is intentional.
+    # Session key is profile+unit+city so city moves do not leak prior-repo
+    # history, and different profiles never share a thread.
+    session_id = ""
     if config.get("stateful", True):
-        session_name = _build_stateful_session_id(unit_id, city_id, mission_id, stateful=True)
-        cmd.extend(["--continue", session_name])
+        session_id = _load_hermes_session_id(profile_path, unit_id, city_id)
+        if session_id:
+            cmd.extend(["--resume", session_id])
 
     # Override HERMES_HOME to the profile path so the subprocess loads
     # the correct config, skills, memory, etc.
@@ -855,7 +904,13 @@ def _run_hermes_cli_streaming(
         _es.record_output_chunk(mission_id, unit_id, line)
 
     proc.wait(timeout=600)
-    return proc.returncode == 0, "".join(output_buf)
+    output = "".join(output_buf)
+    # Remember the real session id so the next mission can --resume it.
+    if config.get("stateful", True):
+        _save_hermes_session_id(
+            profile_path, unit_id, city_id, _extract_hermes_session_id(output)
+        )
+    return proc.returncode == 0, output
 
 
 def _has_claude_code() -> bool:
