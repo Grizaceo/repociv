@@ -32,6 +32,7 @@
 @import './panels/wonder-capability.css';
 @import './panels/slash-picker.css';
 @import './panels/hermes-banner.css';
+@import './panels/assembly.css';
 @import './gaceta.css';
 
 /* Global layout — #app sizing lives in reset.css (100vh); do not override with height:100%. */

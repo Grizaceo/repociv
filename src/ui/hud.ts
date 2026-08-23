@@ -24,6 +24,7 @@ import {
   SunMoon,
   Terminal,
   TriangleAlert,
+  Users,
   XCircle,
   createIcons,
 } from 'lucide';
@@ -52,6 +53,7 @@ const lucideIcons = {
   SunMoon,
   Terminal,
   TriangleAlert,
+  Users,
   XCircle,
 };
 

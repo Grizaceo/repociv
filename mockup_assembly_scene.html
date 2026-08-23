@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>RepoCiv · Asamblea (mockup escena Among Us)</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: radial-gradient(120% 120% at 50% 20%, #1b2433 0%, #0d1117 70%);
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    overflow: hidden;
+  }
+  #stage { display: block; width: 100vw; height: 100vh; }
+  .hint {
+    position: fixed; left: 14px; bottom: 12px;
+    color: #8b98a9; font-size: 12px; letter-spacing: .02em;
+    background: rgba(13,17,23,.6); padding: 6px 10px; border-radius: 8px;
+    border: 1px solid #2a3340;
+  }
+  .hint b { color: #c9d4e3; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div class="hint">MOCKUP ESTÁTICO · escena Asamblea (metáfora Among Us) · burbujas con <b>fillText</b> (sin innerHTML) · identidad real vía <b>avatar_kind</b> (pet/face) del roster</div>
+<script>
+// ─── Contrato real de /api/roster (snapshot mock; en el render real se fetchea) ───
+// avatar_kind ∈ "pet" | "face" | "asset" | null
+//   pet → retrato = spritesheet (pet.spritesheet_path); label = pet.displayName
+//   face → retrato = face_url (assets/avatar.png)
+//   null → glyph (AGENT_ICONS / inicial)
+// En este mockup los `faceUrl`/`petUrl` van en null (sin red); el bean dibuja el
+// color de respaldo + inicial, pero el render real pasa la URL y la recorta.
+const BOTS = [
+  { name: "shadow-davi", avatar_kind: "pet",  pet: { displayName: "Shadow" }, faceUrl: null, petUrl: null, ring: "#ffd34d", speaking: true,  bubble: "Solicito 200 de oro para la expedición norte." },
+  { name: "lexo-alpha",  avatar_kind: "face", faceUrl: null, pet: null, ring: null, speaking: false, bubble: "Patrullando el sector 7, sin anomalías." },
+  { name: "cobalt",      avatar_kind: "face", faceUrl: null, pet: null, ring: null, speaking: false, bubble: "Cierre de red verificado: loopback OK." },
+  { name: "eidos",       avatar_kind: "pet",  pet: { displayName: "Squirrel Girl" }, faceUrl: null, petUrl: null, ring: null, speaking: false, bubble: "Revisando el grafo de dependencias…" },
+  { name: "qa-oracle",   avatar_kind: "face", faceUrl: null, pet: null, ring: null, speaking: false, bubble: "38/38 tests en verde. Sin regresiones." },
+];
+
+// Color de respaldo por bot (solo cuando no hay imagen cargada aún).
+const FALLBACK = {
+  "shadow-davi": "#f2c14e", "lexo-alpha": "#4fd6c9", "cobalt": "#7c5cff",
+  "eidos": "#ff5d6c", "qa-oracle": "#43d17a",
+};
+
+const canvas = document.getElementById("stage");
+const ctx = canvas.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  canvas.style.width = W + "px"; canvas.style.height = H + "px";
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  draw();
+}
+window.addEventListener("resize", resize);
+
+// ─── Dibujo de un "bean" (tripulante Among Us) ───
+function drawBean(cx, cy, r, color, ring) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  // sombra
+  ctx.beginPath();
+  ctx.ellipse(0, r * 1.05, r * 0.85, r * 0.22, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fill();
+  // cuerpo bean: caparazón + base
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.62, r * 0.55);
+  ctx.lineTo(-r * 0.78, -r * 0.1);
+  ctx.quadraticCurveTo(-r * 0.85, -r * 1.15, 0, -r * 1.15);
+  ctx.quadraticCurveTo(r * 0.85, -r * 1.15, r * 0.78, -r * 0.1);
+  ctx.lineTo(r * 0.62, r * 0.55);
+  ctx.quadraticCurveTo(r * 0.55, r * 0.85, 0, r * 0.85);
+  ctx.quadraticCurveTo(-r * 0.55, r * 0.85, -r * 0.62, r * 0.55);
+  ctx.closePath();
+  const g = ctx.createLinearGradient(0, -r * 1.15, 0, r * 0.85);
+  g.addColorStop(0, "#ffffff");
+  g.addColorStop(0.18, color);
+  g.addColorStop(1, shade(color, -0.35));
+  ctx.fillStyle = g;
+  ctx.fill();
+  // visor
+  ctx.beginPath();
+  ctx.ellipse(r * 0.18, -r * 0.35, r * 0.42, r * 0.5, -0.35, 0, Math.PI * 2);
+  const vg = ctx.createLinearGradient(0, -r * 0.8, 0, r * 0.0);
+  vg.addColorStop(0, "#dff6ff");
+  vg.addColorStop(1, "#7fb6cf");
+  ctx.fillStyle = vg;
+  ctx.fill();
+  ctx.lineWidth = r * 0.08;
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.stroke();
+  // anillo de identidad (DAVI)
+  if (ring) {
+    ctx.beginPath();
+    ctx.ellipse(0, -r * 0.1, r * 1.02, r * 1.32, 0, 0, Math.PI * 2);
+    ctx.lineWidth = r * 0.12;
+    ctx.strokeStyle = ring;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// burbuja de texto con fillText (texto plano, SIN innerHTML)
+function drawBubble(cx, cy, text, active) {
+  ctx.save();
+  ctx.font = "600 13px 'Trebuchet MS', system-ui, sans-serif";
+  const maxW = 210;
+  const lines = wrapText(ctx, text, maxW);
+  const padX = 12, padY = 8, lh = 17;
+  let boxW = 0;
+  for (const l of lines) boxW = Math.max(boxW, ctx.measureText(l).width);
+  boxW += padX * 2;
+  const boxH = lines.length * lh + padY * 2;
+  const bx = cx - boxW / 2;
+  const by = cy - boxH - 6;
+  // cola
+  ctx.beginPath();
+  ctx.moveTo(cx - 7, by + boxH);
+  ctx.lineTo(cx + 7, by + boxH);
+  ctx.lineTo(cx, by + boxH + 12);
+  ctx.closePath();
+  ctx.fillStyle = active ? "#fff7e0" : "#eef3fa";
+  ctx.fill();
+  // cuerpo
+  roundRect(bx, by, boxW, boxH, 12);
+  ctx.fillStyle = active ? "#fff7e0" : "#eef3fa";
+  ctx.fill();
+  if (active) { ctx.lineWidth = 2; ctx.strokeStyle = "#ffd34d"; ctx.stroke(); }
+  ctx.fillStyle = "#1b2433";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  lines.forEach((l, i) => ctx.fillText(l, bx + padX, by + padY + i * lh));
+  ctx.restore();
+}
+
+// helpers
+function wrapText(c, text, max) {
+  const words = text.split(" ");
+  const out = []; let line = "";
+  for (const w of words) {
+    const test = line ? line + " " + w : w;
+    if (c.measureText(test).width > max && line) { out.push(line); line = w; }
+    else line = test;
+  }
+  if (line) out.push(line);
+  return out;
+}
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function shade(hex, amt) {
+  const c = hex.replace("#", "");
+  let r = parseInt(c.substr(0,2),16), g = parseInt(c.substr(2,2),16), b = parseInt(c.substr(4,2),16);
+  r = Math.max(0, Math.min(255, Math.round(r + r*amt)));
+  g = Math.max(0, Math.min(255, Math.round(g + g*amt)));
+  b = Math.max(0, Math.min(255, Math.round(b + b*amt)));
+  return "#" + [r,g,b].map(v => v.toString(16).padStart(2,"0")).join("");
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2 + 10;
+  // mesa circular
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, Math.min(W,H)*0.16, Math.min(W,H)*0.12, 0, 0, Math.PI*2);
+  ctx.fillStyle = "#223043";
+  ctx.fill();
+  ctx.lineWidth = 4; ctx.strokeStyle = "#33445a"; ctx.stroke();
+  // botón EMERGENCY
+  ctx.beginPath();
+  ctx.arc(cx, cy, 22, 0, Math.PI*2);
+  ctx.fillStyle = "#c2363f"; ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.font = "700 12px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("!", cx, cy + 1);
+
+  const n = BOTS.length;
+  const R = Math.min(W, H) * 0.27;
+  BOTS.forEach((bot, i) => {
+    const ang = -Math.PI / 2 + (i / n) * Math.PI * 2;
+    const px = cx + Math.cos(ang) * R;
+    const py = cy + Math.sin(ang) * R * 0.86;
+    const r = 34;
+    // Color de respaldo (en render real: recorta el retrato pet/face encima).
+    const bodyColor = FALLBACK[bot.name] || "#8b98a9";
+    drawBean(px, py, r, bodyColor, bot.ring);
+    // label: pet.displayName si es pet, sino el handle — fillText plano (XSS-safe)
+    const label = bot.avatar_kind === "pet" && bot.pet ? bot.pet.displayName : bot.name;
+    ctx.fillStyle = bot.speaking ? "#ffd34d" : "#c9d4e3";
+    ctx.font = "700 11px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.fillText(label, px, py + r * 0.95 + 6);
+    // burbuja solo al que habla (mock) — en render real: las que tienen mensaje
+    if (bot.bubble) drawBubble(px, py - r, bot.bubble, bot.speaking);
+  });
+
+  // título
+  ctx.fillStyle = "#e7eef7"; ctx.font = "700 18px system-ui"; ctx.textAlign = "left"; ctx.textBaseline = "top";
+  ctx.fillText("ASAMBLEA · Bot Mode", 18, 16);
+}
+
+resize();
+</script>
+</body>
+</html>

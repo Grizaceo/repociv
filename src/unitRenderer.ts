@@ -3,9 +3,63 @@ import { axialToPixel, type Axial } from './hex.ts';
 import { type Unit, type Building, tileKey } from './types.ts';
 import { type GameState } from './game.ts';
 import { HEX_SIZE } from './constants.ts';
+import { resolveBotIdentity, getRosterMap, getAvatarImage, type RosterEntry } from './avatarClient.ts';
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
+}
+
+// Per-unit resolved identity (lazy async resolve, cached so drawUnit stays sync).
+// Uses resolveBotIdentity() — the SAME resolver the assembly scene uses — so a
+// bot looks identical on the hex grid and in the assembly (consistent identity).
+const unitIdentityCache = new Map<string, string | null>();
+const unitAvatarPending = new Set<string>();
+
+/**
+ * Draw the Bot Mode identity (pet/face) of a unit as a circular avatar over the
+ * unit's body. `unitId` is matched case/separator-insensitively against the roster
+ * name (so both "DAVI" and "SHADOW-DAVI" resolve to the "shadow-davi" profile).
+ * Falls back silently to the existing initials glyph when no avatar is wired.
+ */
+function drawUnitAvatar(unit: Unit, ctx: CanvasRenderingContext2D): void {
+  const cached = unitIdentityCache.get(unit.id);
+  if (cached === undefined && !unitAvatarPending.has(unit.id)) {
+    unitAvatarPending.add(unit.id);
+    void getRosterMap()
+      .then((map) => {
+        const entry: RosterEntry | null = map.get(normalizeName(unit.id)) ?? null;
+        return resolveBotIdentity(entry).imageUrl;
+      })
+      .then((url) => {
+        unitIdentityCache.set(unit.id, url);
+        unitAvatarPending.delete(unit.id);
+      })
+      .catch(() => {
+        unitIdentityCache.set(unit.id, null);
+        unitAvatarPending.delete(unit.id);
+      });
+    return;
+  }
+  if (!cached) return;
+
+  const img = getAvatarImage(cached);
+  if (!img) return; // not loaded yet → initials show through
+
+  const r = HEX_SIZE * 0.18;
+  // Clip to a circle so non-square pet/face images read as a badge.
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+  ctx.drawImage(img, -r, -r, r * 2, r * 2);
+  ctx.restore();
+}
+
+// Local name normalizer mirroring avatarClient.normalize (kept here to avoid an
+// extra export churn); matches "DAVI"/"SHADOW-DAVI" → "shadow-davi".
+function normalizeName(key: string): string {
+  return key.toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
 export class UnitRenderer {
@@ -240,6 +294,10 @@ export class UnitRenderer {
       ctx.strokeStyle = unit.color;
       ctx.lineWidth = 1.8;
       ctx.stroke();
+
+      // Bot Mode identity (pet/face) — drawn over the body. Falls back to the
+      // initials below when no avatar is wired for this unit.
+      drawUnitAvatar(unit, ctx);
 
       // Initials (only on the front-most unit or all if small)
       ctx.fillStyle = unit.color;

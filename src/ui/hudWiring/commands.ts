@@ -22,6 +22,7 @@ import { toggleSettingsPanel } from '../settingsPanel.ts';
 import { toggleLayerPanel } from '../layerPanel.ts';
 import { toggleConstructionPanel } from '../constructionPanel.ts';
 import { takeScreenshot } from './screenshot.ts';
+import { toggleAssemblyRoom } from '../../assemblyScene.ts';
 
 // Agent spawn types and their toolbar hotkeys — MUST mirror the bindings in
 // hudWiring/hotkeys.ts (q/w/e/o/c/x/r). The hint badges are shown to the user,
@@ -129,6 +130,13 @@ export function registerHudCommands(
       label: 'Captura de pantalla',
       hint: 'F12',
       run: () => takeScreenshot(renderer),
+    },
+    {
+      id: 'a-assembly',
+      group: 'Asamblea',
+      label: 'Abrir Asamblea (sala de Bot Mode)',
+      hint: 'F7',
+      run: () => void toggleAssemblyRoom(),
     },
   ]);
 

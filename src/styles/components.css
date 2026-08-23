@@ -533,6 +533,53 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   gap: 8px;
   width: 100%;
 }
+.botmode-menu {
+  z-index: 1200;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  max-height: 280px;
+  overflow-y: auto;
+  min-width: 200px;
+  padding: 4px;
+}
+.botmode-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.botmode-item:hover {
+  background: var(--accent-muted, rgba(255, 215, 0, 0.12));
+}
+.botmode-kind {
+  font-size: 14px;
+  opacity: 0.8;
+}
+.botmode-empty {
+  color: var(--text-dim);
+  font-style: italic;
+  cursor: default;
+  justify-content: flex-start;
+}
+.botmode-error {
+  color: #ff6b6b;
+  font-style: normal;
+  cursor: default;
+  justify-content: flex-start;
+  white-space: normal;
+}
 .spawn-btn {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);

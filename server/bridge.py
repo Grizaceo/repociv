@@ -774,6 +774,32 @@ class BridgeHandler(BaseHTTPRequestHandler):
             status, body = _routes.get_harness_profiles(ctx)
             self._respond(status, body)
             return
+        # ── Bot Mode assembly integration (read-only roster + presence) ──
+        if path == "/api/roster":
+            status, body = _routes.get_roster(ctx)
+            self._respond(status, body)
+            return
+        if path == "/api/presence":
+            status, body = _routes.get_presence(ctx)
+            self._respond(status, body)
+            return
+        if path.startswith("/api/roster/asset/"):
+            asset = path[len("/api/roster/asset/"):]
+            ctx["asset"] = asset
+            status, payload = _routes.get_roster_asset(ctx)
+            if status == 200 and isinstance(payload, (bytes, bytearray)):
+                self.send_response(200)
+                ctype = "image/png"
+                if asset.endswith(".webp"):
+                    ctype = "image/webp"
+                self.send_header("Content-Type", ctype)
+                self._cors()
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(bytes(payload))
+                return
+            self._respond(status, payload if isinstance(payload, dict) else {"error": "not found"})
+            return
         if path.startswith("/api/profiles/"):
             parts = path.split("/")  # ['', 'api', 'profiles', '<name>', '<sub>']
             if len(parts) >= 5 and parts[4] == "identity":
@@ -784,15 +810,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
             if len(parts) >= 5 and parts[4] == "harness-options":
                 ctx["params"] = {"name": parts[3]}
                 status, body = _routes.get_profile_harness_options(ctx)
-                self._respond(status, body)
-                return
-
-        # ── LabHub per-city status ───────────────────────────────────────────────
-        if path.startswith("/api/labhub/status/"):
-            city_id = path[len("/api/labhub/status/") :].split("/")[0]
-            if city_id:
-                ctx["city_id"] = city_id
-                status, body = _routes.get_city_lab_status(ctx)
                 self._respond(status, body)
                 return
 
@@ -860,6 +877,29 @@ class BridgeHandler(BaseHTTPRequestHandler):
             if len(parts) >= 5:
                 pctx = {"params": {"name": parts[3]}}
                 status, resp = _routes.post_profile_identity(body, pctx)
+                self._respond(status, resp)
+                return
+
+        # ─── Bot Mode room relay (participation, not config) ────────────────
+        # POST /api/rooms/<name>/message — relay a message into a Bot Mode
+        # group chat. Isolated shell-out; never writes profile.yaml. Token-gated
+        # by do_POST. Mirrors hermes-bot-mode/SKILL.md group-chat send.
+        if path.startswith("/api/rooms/") and path.endswith("/message"):
+            parts = path.split("/")
+            # ['', 'api', 'rooms', '<name>', 'message']
+            if len(parts) >= 5 and parts[4] == "message":
+                ctx = {"room": parts[3]}
+                status, resp = _routes.post_room_message(body, ctx)
+                self._respond(status, resp)
+                return
+
+        # GET /api/rooms/<name>/messages — read-only relay log for a room
+        if path.startswith("/api/rooms/") and path.endswith("/messages"):
+            parts = path.split("/")
+            # ['', 'api', 'rooms', '<name>', 'messages']
+            if len(parts) >= 5 and parts[4] == "messages":
+                ctx = {"room": parts[3]}
+                status, resp = _routes.get_room_messages(ctx)
                 self._respond(status, resp)
                 return
 

@@ -4,13 +4,20 @@ from __future__ import annotations
 import json as _json_lib
 import logging
 import os
+import shutil
+import subprocess
 import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any
 
 RouteContext = dict[str, Any]
+
+# Hermes CLI used by the Bot Mode room relay (post_room_message). Resolved at
+# call time via PATH; the hermes-agent venv bin is on PATH in this environment.
+HERMES_CLI = shutil.which("hermes") or "hermes"
 
 # ─── providers-live cache (avoids blocking the HTTP thread for up to 40s) ─────
 _providers_live_cache: dict | None = None
@@ -446,7 +453,14 @@ def get_harness_profiles(ctx: "RouteContext") -> tuple[int, Any]:
     For hermes: subdirs of ~/.hermes/profiles/ (main, lexo-alpha, ...) — the
     same profiles the Hermes app shows in its own profile selector. For
     codex/openclaw: best-effort via list_harness_options.
-    Response 200: { "profiles": [str, ...], "harness": str }
+
+    Response 200:
+        {"profiles": [str, ...], "harness": str}
+    With ?with_identity=1 (hermes only) each entry is enriched with the
+    real identity already computed by get_roster (avatar_kind / avatar_url /
+    pet / face_url) — single source of truth, no catalogue duplication, no
+    profile.yaml read. Read-only; names come from list_harness_options
+    (profile dir names, valid slugs — never concatenated into a path).
     """
     from server import profile_identity as _pi
 
@@ -455,7 +469,355 @@ def get_harness_profiles(ctx: "RouteContext") -> tuple[int, Any]:
     if not harness:
         return 400, {"error": "harness query param is required"}
     options = _pi.list_harness_options(harness)
+
+    want_identity = str(params.get("with_identity") or "").lower() in ("1", "true", "yes")
+    if want_identity and harness == "hermes":
+        # Reuse get_roster's computed identity (single source, read-only).
+        _, body = get_roster({"params": {"harness": "hermes"}})
+        by_name = {b["name"]: b for b in body.get("bots", [])}
+        profiles = [
+            {
+                "name": name,
+                "avatar_kind": by_name.get(name, {}).get("avatar_kind"),
+                "avatar_url": by_name.get(name, {}).get("avatar_url"),
+                "pet": by_name.get(name, {}).get("pet"),
+                "face_url": by_name.get(name, {}).get("face_url"),
+            }
+            for name in options
+        ]
+        return 200, {"profiles": profiles, "harness": harness}
+
     return 200, {"profiles": options, "harness": harness}
+
+
+# ─── Bot Mode assembly integration ───────────────────────────────────────────
+# Three read-only-ish endpoints that let the RepoCiv "assembly" view consume
+# the Hermes Bot Mode roster as the single source of truth (no catalogue
+# duplication). Design constraints (red-team, @cobalt / @user):
+#   * The bridge NEVER writes profile.yaml / memberships / routines.
+#   * Avatars live in Bot Mode plugin storage, NOT in profile.yaml, so the
+#     bridge cannot synthesise an avatarUrl from ~/.hermes/profiles/<name>/*.
+#     We therefore expose only a coarse, safe signal (avatar_kind) plus an
+#     opt-in static asset for a known identity (DAVI), and let the frontend
+#     fall back to its own AGENT_ICONS sprite. We never serve arbitrary
+#     profile-internal files (path-traversal / metadata leak risk).
+#   * Presence is best-effort and DERIVED from the bridge's own send log — we
+#     do NOT proxy gateway RPCs (profiles.status is an MCP tool, not an HTTP
+#     endpoint) and `hermes process list` does not exist.
+import threading as _threading
+
+# DAVI's known static render asset on the Windows host (verified present by
+# red-team). Served by the bridge as a same-origin static file so the frontend
+# never reaches into ~/.hermes/profiles or the Windows filesystem directly.
+_DAVI_AVATAR = "/api/roster/asset/davi_avatar_render.png"
+
+_roster_lock = _threading.Lock()
+# name -> unix ts of last room message we relayed (best-effort presence)
+_presence_last_send: dict[str, float] = {}
+_PRESENCE_WINDOW = 90.0  # seconds; matches Bot Mode "active now" window
+
+# room_name -> list of message dicts (best-effort relay log). Bounded so a
+# chatty room can't grow this without bound. The bridge never reads the bot's
+# own session store; it only keeps what it relayed itself (the authored
+# message + the captured stdout response). No profile.yaml, no external state.
+_room_messages: dict[str, list[dict]] = {}
+_room_messages_lock = _threading.Lock()
+_ROOM_HISTORY_MAX = 100
+_ROOM_HISTORY_TTL = 3600.0  # seconds; drop messages older than this on read
+
+
+def _slug_ok(s: str) -> bool:
+    """Allow only alnum / dash / underscore — blocks any path separator."""
+    return bool(s) and all(ch.isalnum() or ch in "-_" for ch in s)
+
+
+def get_roster(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/roster?harness=hermes — Bot Mode roster (read-only).
+
+    Response 200: {
+      "harness": str,
+      "bots": [ {
+        "name": str, "is_bot": true,
+        "avatar_kind": "pet" | "face" | "asset" | null,
+        "avatar_url":  str | null,            # asset allowlist URL
+        "pet":  {"id","displayName","description"} | null,
+        "face_url": str | null                # /api/roster/asset/<name>/avatar.png
+      } ]
+    }
+
+    Identity is REAL and consistent across views: each bot exposes its Hermes
+    identity (a pet spritesheet and/or its face avatar.png), read read-only
+    from profiles/<name>/{pets/<pet>,assets/avatar.png}.
+      - shadow-davi keeps the curated DAVI render asset (avatar_kind "asset").
+      - a bot with a pet gets avatar_kind "pet" (eidos) — richest identity.
+      - every other bot with assets/avatar.png gets avatar_kind "face".
+      - only bots with NEITHER fall back to null (frontend glyph). Today all
+        25 profiles have assets/avatar.png, so everyone has a real identity.
+
+    Read-only: never writes profile.yaml / memberships. Paths confined to the
+    profiles dir and slug-validated (no traversal possible).
+    """
+    from server import profile_identity as _pi
+    from server.bridge import HERMES_ROOT  # type: ignore
+
+    params = ctx.get("params", {})
+    harness = str(params.get("harness") or "hermes").strip().lower()
+    names = _pi.list_harness_options(harness)
+    profiles_dir = HERMES_ROOT / "profiles"
+    # Canonical pet preference per profile (first match wins); else first by name.
+    # shadow-davi has its real pet "shadow" (hedgehog), so it gets avatar_kind
+    # "pet" like any other pet-bearing bot — consistent identity everywhere.
+    preferred_pet = {"eidos": "squirrel-girl-marvel", "shadow-davi": "shadow"}
+    bots = []
+    for name in names:
+        pet_detail = None
+        pet_url = None
+        pet_dir = profiles_dir / name / "pets"
+        if pet_dir.is_dir():
+            pet_ids = sorted(p.parent.name for p in pet_dir.glob("*/pet.json"))
+            canon = next((p for p in pet_ids if p == preferred_pet.get(name)), None)
+            if canon is None and pet_ids:
+                canon = pet_ids[0]
+            if canon:
+                pj = pet_dir / canon / "pet.json"
+                try:
+                    meta = _json_lib.loads(pj.read_text())
+                except Exception:
+                    meta = {}
+                pet_detail = {
+                    "id": meta.get("id") or canon,
+                    "displayName": meta.get("displayName", canon),
+                    "description": meta.get("description", ""),
+                }
+                pet_url = f"/api/roster/asset/{name}/pet/{canon}.webp"
+        face_url = None
+        if (profiles_dir / name / "assets" / "avatar.png").is_file():
+            face_url = f"/api/roster/asset/{name}/avatar.png"
+        if pet_detail:
+            bots.append(
+                {
+                    "name": name,
+                    "is_bot": True,
+                    "avatar_kind": "pet",
+                    "avatar_url": pet_url,
+                    "pet": pet_detail,
+                    "face_url": face_url,
+                }
+            )
+        elif face_url:
+            bots.append(
+                {
+                    "name": name,
+                    "is_bot": True,
+                    "avatar_kind": "face",
+                    "avatar_url": face_url,
+                    "face_url": face_url,
+                }
+            )
+        else:
+            bots.append(
+                {"name": name, "is_bot": True, "avatar_kind": None, "avatar_url": None}
+            )
+    return 200, {"harness": harness, "bots": bots}
+
+
+def get_roster_asset(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/roster/asset/<file> — serve opt-in identity assets.
+
+    Allowlist (no traversal, slug-validated, files confined to the profiles
+    dir):
+      - "davi_avatar_render.png"   (legacy curated DAVI render)
+      - "<name>/avatar.png"        (a bot's face, kind "face")
+      - "<name>/pet/<petid>.webp"  (a bot's pet spritesheet, kind "pet")
+
+    Returns (200, bytes) on success. Read-only; never writes profile.yaml.
+    """
+    from server.bridge import HERMES_ROOT  # type: ignore
+
+    asset = str(ctx.get("asset", "")).strip().lstrip("/")
+    profiles_dir = HERMES_ROOT / "profiles"
+
+    # Legacy single-file allowlist (DAVI render)
+    if asset == "davi_avatar_render.png":
+        candidates = [
+            "/mnt/c/Users/usuario/Desktop/davi_avatar_render.png",
+            str(HERMES_ROOT / "profiles" / "davi" / "davi_avatar_render.png"),
+        ]
+        for c in candidates:
+            p = Path(c)
+            if p.is_file():
+                return 200, p.read_bytes()
+        return 404, {"error": "asset not found"}
+
+    parts = asset.split("/")
+    if len(parts) == 2 and parts[1] == "avatar.png":
+        name = parts[0]
+        if not _slug_ok(name):
+            return 400, {"error": "invalid name"}
+        p = profiles_dir / name / "assets" / "avatar.png"
+        if p.is_file():
+            return 200, p.read_bytes()
+        return 404, {"error": "asset not found"}
+
+    if len(parts) == 3 and parts[1] == "pet" and parts[2].endswith(".webp"):
+        name = parts[0]
+        petid = parts[2].removesuffix(".webp")  # drop the extension exactly
+        if not _slug_ok(name) or not _slug_ok(petid):
+            return 400, {"error": "invalid name"}
+        # Force the basename to spritesheet.webp so no other file can be served.
+        p = profiles_dir / name / "pets" / petid / "spritesheet.webp"
+        if p.is_file():
+            return 200, p.read_bytes()
+        return 404, {"error": "asset not found"}
+
+    return 404, {"error": "unknown asset"}
+
+
+def _record_presence(name: str) -> None:
+    with _roster_lock:
+        _presence_last_send[name] = time.time()
+
+
+def get_presence(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/presence — best-effort "active now" derived from THIS bridge's
+    own relay log (not gateway RPC). A bot is 'active' if this bridge relayed
+    a room message for it within the last _PRESENCE_WINDOW seconds.
+
+    Response 200: {
+      "active": [name, ...],
+      "since": {name: unix_ts, ...},
+      "window_seconds": float,
+      "derived": true
+    }
+    """
+    now = time.time()
+    with _roster_lock:
+        active = [
+            n for n, ts in _presence_last_send.items() if now - ts < _PRESENCE_WINDOW
+        ]
+        since = dict(_presence_last_send)
+    return 200, {
+        "active": active,
+        "since": since,
+        "window_seconds": _PRESENCE_WINDOW,
+        "derived": True,
+    }
+
+
+def post_room_message(body: dict, ctx: "RouteContext") -> tuple[int, Any]:
+    """POST /api/rooms/<name>/message — participate in a Bot Mode group chat.
+
+    This is PARTICIPATION, not configuration: it shells out to the Hermes CLI
+    bot chat (per-message handoff), isolated in its own route. It never writes
+    profile.yaml, memberships, or routines. Mirrors the Bot Mode group-chat
+    send described in hermes-bot-mode/SKILL.md.
+
+    Body: {"message": str, "from_bot": str}
+      message   — text to send into the room
+      from_bot  — REQUIRED sender bot profile name (must be a real profile,
+                  e.g. "davi", "lexo-alpha"). We deliberately do NOT default to
+                  a fabricated profile ("user"/"hermes" are not real profiles,
+                  see hermes profile list) — a missing from_bot is a 400, so the
+                  caller (the assembly composer) must send a valid bot identity.
+    Returns 200 {"ok": true, "relayed": true} or 4xx/5xx on failure.
+    """
+    name = str(ctx.get("room", "")).strip()
+    if not name:
+        return 400, {"ok": False, "error": "room name required"}
+    message = str(body.get("message", "")).strip()
+    if not message:
+        return 400, {"ok": False, "error": "message required"}
+    from_bot = str(body.get("from_bot") or "").strip()
+    if not from_bot:
+        # No fabricated default: a dead profile ("user"/"hermes") would make
+        # the shell-out fail with a 502. Reject and let the caller supply a
+        # real bot profile (the assembly composer always sends from_bot).
+        return 400, {"ok": False, "error": "from_bot is required (a real bot profile)"}
+
+    # Isolate the shell-out. We only ever invoke the hermes CLI bot-chat path;
+    # never touch profile files. Validate the room name to a safe slug.
+    if not all(ch.isalnum() or ch in "-_" for ch in name):
+        return 400, {"ok": False, "error": "invalid room name"}
+    if not all(ch.isalnum() or ch in "-_" for ch in from_bot):
+        return 400, {"ok": False, "error": "invalid from_bot"}
+
+    cli = [
+        str(HERMES_CLI),
+        "-p",
+        from_bot,
+        "chat",
+        "--in",
+        "~",
+        "-c",
+        name,
+        "--create-if-missing",
+        "-Q",
+        "-q",
+        f"Message from 🤖 {from_bot}: {message}",
+    ]
+    try:
+        _record_presence(from_bot)
+        # A real `hermes chat` agent turn (group chat send) can take well over
+        # 30s to spin up and respond, so we give it a generous budget. This is
+        # a best-effort relay, not a tight request/response.
+        result = subprocess.run(cli, capture_output=True, text=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        return 504, {"ok": False, "error": "relay timed out (bot did not respond in 120s)"}
+    except Exception as exc:  # noqa: BLE001
+        return 500, {"ok": False, "error": f"relay failed: {exc}"}
+    if result.returncode != 0:
+        return 502, {"ok": False, "error": result.stderr.strip() or "relay failed"}
+
+    # Capture the bot's authored message + its response text (from -Q stdout)
+    # into the per-room relay log. The frontend reads this via
+    # GET /api/rooms/{name}/messages to float bubbles over each pet. We never
+    # read the bot's own session file; we only keep what we relayed ourselves.
+    _append_room_message(
+        name,
+        from_bot,
+        message,
+        (result.stdout or "").strip(),
+    )
+    return 200, {"ok": True, "relayed": True}
+
+
+def _append_room_message(room: str, sender: str, text: str, response: str) -> None:
+    """Append a relayed exchange to the (bounded) per-room log."""
+    msg = {
+        "ts": time.time(),
+        "room": room,
+        "from": sender,
+        "text": text,
+        "response": response,
+    }
+    with _room_messages_lock:
+        log = _room_messages.setdefault(room, [])
+        log.append(msg)
+        if len(log) > _ROOM_HISTORY_MAX:
+            del log[: len(log) - _ROOM_HISTORY_MAX]
+
+
+def get_room_messages(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/rooms/<name>/messages — best-effort relay log for a room.
+
+    Read-only. Returns the exchanges this bridge relayed (authored message +
+    captured bot response). Does NOT read the bot's session store, profile.yaml,
+    or any file under ~/.hermes/profiles. Bounded by _ROOM_HISTORY_MAX and
+    pruned by _ROOM_HISTORY_TTL on read. Auth-gated by the bridge (401 without
+    token), same as the other assembly routes.
+    """
+    name = str(ctx.get("room", "")).strip()
+    if not name:
+        return 400, {"ok": False, "error": "room name required"}
+    if not all(ch.isalnum() or ch in "-_" for ch in name):
+        return 400, {"ok": False, "error": "invalid room name"}
+    now = time.time()
+    with _room_messages_lock:
+        raw = _room_messages.get(name, [])
+        msgs = [m for m in raw if now - float(m.get("ts", 0)) <= _ROOM_HISTORY_TTL]
+        if len(msgs) != len(raw):
+            _room_messages[name] = msgs
+    return 200, {"room": name, "messages": msgs}
 
 
 def get_providers_live(ctx: "RouteContext") -> tuple[int, Any]:

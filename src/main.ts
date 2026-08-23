@@ -104,6 +104,7 @@ import {
 } from './wonders/postMessageBridge.ts';
 import { findCityByWonderSelection, findNearbyCities } from './wonders/bibliothecaBridge.ts';
 import { loadWonderConfig, isFeatureEnabled } from './wonders/wonderConfig.ts';
+import { toggleAssemblyRoom } from './assemblyScene.ts';
 import type { City } from './types.ts';
 import {
   toggleLayerPanel,
@@ -724,6 +725,7 @@ async function bootstrap() {
   document.getElementById('btn-toggle-3d')?.addEventListener('click', toggleView);
   document.getElementById('btn-approvals')?.addEventListener('click', toggleApprovalPanel);
   document.getElementById('btn-tasks')?.addEventListener('click', toggleTaskPanel);
+  document.getElementById('btn-assembly')?.addEventListener('click', () => void toggleAssemblyRoom());
 
   // ─── Idle agent finder (Age of Empires pattern) ─────────────────────
   // Uses the shared singleton so the cycle index stays in sync with the
@@ -1296,6 +1298,11 @@ async function bootstrap() {
     void initProfileStrip();
     const newBtn = document.getElementById('spawn-new-profile');
     if (newBtn) newBtn.addEventListener('click', () => void openNewProfileWizard());
+  });
+
+  // Init Bot Mode spawner (async — non-blocking)
+  import('./ui/botModeSpawner.ts').then(({ initBotModeSpawner }) => {
+    initBotModeSpawner(state, renderer, bridge);
   });
 
   // Load pending tracker missions at boot

@@ -38,6 +38,11 @@ from server.routes.core import get_profile_identity  # noqa: F401
 from server.routes.core import post_profile_identity  # noqa: F401
 from server.routes.core import get_profile_harness_options  # noqa: F401
 from server.routes.core import get_harness_profiles  # noqa: F401
+from server.routes.core import get_roster  # noqa: F401
+from server.routes.core import get_roster_asset  # noqa: F401
+from server.routes.core import get_presence  # noqa: F401
+from server.routes.core import post_room_message  # noqa: F401
+from server.routes.core import get_room_messages  # noqa: F401
 from server.routes.core import get_providers_live  # noqa: F401
 from server.routes.core import get_log  # noqa: F401
 from server.routes.core import get_ws_info  # noqa: F401
