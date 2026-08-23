@@ -40,9 +40,12 @@ export default defineConfig(({ mode }) => {
     server: {
       port: vitePort,
       strictPort: true,
-      host: true,
-      // Allow tunneled/Tailscale hosts (Pinggy, tailnet IPs) — Vite rejects
-      // unknown Host headers with 403 otherwise.
+      // Loopback-only: la UI de RepoCiv no se expone al tailnet/WSL-LAN.
+      // El bind 0.0.0.0 previo era la misma exposicion que el gateway (:8742).
+      // Se accede via 127.0.0.1:5273 / localhost:5273.
+      host: '127.0.0.1',
+      // allowedHosts:true se mantiene inofensivo porque el bind ya es loopback
+      // (solo acepta conexiones que lleguen a 127.0.0.1); no es vector de exposicion.
       allowedHosts: true,
       // The dev-server HMR watcher must not traverse the Python venv or the
       // build/e2e output trees — under WSL2's inotify that exhausts watchers
