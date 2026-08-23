@@ -15,8 +15,6 @@
 import {
   LGB_BACKEND_URL,
   WONDER_BIBLIOTHECA_URL,
-  WONDER_INSTITUTUM_API_URL,
-  WONDER_INSTITUTUM_URL,
 } from '../wonderEnv.ts';
 import type { WonderManifest } from './types.ts';
 
@@ -99,71 +97,8 @@ const BIBLIOTHECA: WonderExample = {
   },
 };
 
-const INSTITUTUM: WonderExample = {
-  repoUrl: 'https://github.com/Grizaceo/labhub',
-  description:
-    'LabHub — laboratorio de experimentos: lanza, monitorea y compara corridas ' +
-    'sobre tus repos, con bloqueos opcionales sobre ciudades en trabajo crítico.',
-  defaultRepoDir: '~/.hermes/workspace/repos/labhub',
-  bootSummary: 'API :5281 · UI :5280 (npm start → dev-start.sh)',
-  manifest: {
-    id: 'institutum',
-    title: 'Institutum Laboratorium / LabHub',
-    kind: 'iframe',
-    category: 'lab',
-    version: '0.1.0',
-    defaultEnabled: true,
-    automationLevel: 'assist',
-    passiveMode: true,
-    agenticMode: true,
-    canSuggest: true,
-    canAct: false,
-    requiresConfirmation: true,
-    ui: {
-      url: WONDER_INSTITUTUM_URL,
-      preferredWidth: '70vw',
-      preferredHeight: '75vh',
-      sandbox: ['allow-scripts', 'allow-same-origin', 'allow-forms'],
-    },
-    health: {
-      url: `${WONDER_INSTITUTUM_API_URL}/health`,
-      timeoutMs: 4000,
-      degradedAllowed: true,
-    },
-    permissions: {
-      readRepos: false,
-      writeRepos: false,
-      network: 'loopback-only',
-      requiresApprovalForMutations: true,
-    },
-    optionalFeatures: [
-      {
-        id: 'hardLocks',
-        label: 'Bloqueos duros',
-        description: 'Impide completamente la edición de ciudades con experimentos críticos',
-        defaultEnabled: false,
-        requiresUserOptIn: true,
-      },
-    ],
-    events: {
-      emits: ['wonder.ready', 'labhub.experiment.started', 'labhub.experiment.finished'],
-      accepts: ['repociv.focus_city'],
-    },
-    actions: [
-      { id: 'open', label: 'Abrir Institutum', risk: 'safe', requiresUserOptIn: false },
-      {
-        id: 'kill_experiment',
-        label: 'Detener experimento',
-        risk: 'manual',
-        requiresUserOptIn: true,
-      },
-    ],
-    mcp: { enabled: false, server: null },
-  },
-};
-
 /** Connectable example wonders, shown in the onboarding guide. */
-export const WONDER_EXAMPLES: readonly WonderExample[] = [BIBLIOTHECA, INSTITUTUM];
+export const WONDER_EXAMPLES: readonly WonderExample[] = [BIBLIOTHECA];
 
 export function getWonderExample(id: string): WonderExample | undefined {
   return WONDER_EXAMPLES.find((e) => e.manifest.id === id);

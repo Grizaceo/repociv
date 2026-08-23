@@ -7,7 +7,7 @@
 // Users can override these via localStorage key: repociv_wonder_config
 // Format: JSON matching WondersConfig shape (partial OK — merged with defaults).
 
-import type { WondersConfig, GacetaConfig, BibliothecaConfig, LabHubConfig } from './types.ts';
+import type { WondersConfig, GacetaConfig, BibliothecaConfig } from './types.ts';
 export { WONDER_MANIFESTS } from './manifest.ts';
 
 const DEFAULT_GACETA: GacetaConfig = {
@@ -22,17 +22,9 @@ const DEFAULT_BIBLIOTHECA: BibliothecaConfig = {
   aiRelationDiscovery: false,
 };
 
-const DEFAULT_LABHUB: LabHubConfig = {
-  showActiveExperiments: true,
-  warnBeforeCityEdit: true,
-  softLocks: true,
-  hardLocks: false,
-};
-
 export const WONDER_DEFAULTS: WondersConfig = {
   gaceta: DEFAULT_GACETA,
   bibliotheca: DEFAULT_BIBLIOTHECA,
-  labhub: DEFAULT_LABHUB,
 };
 
 const STORAGE_KEY = 'repociv_wonder_config';
@@ -58,7 +50,6 @@ export function loadWonderConfig(): WondersConfig {
     return {
       gaceta: { ...DEFAULT_GACETA, ...(parsed.gaceta ?? {}) },
       bibliotheca: { ...DEFAULT_BIBLIOTHECA, ...(parsed.bibliotheca ?? {}) },
-      labhub: { ...DEFAULT_LABHUB, ...(parsed.labhub ?? {}) },
     };
   } catch {
     return WONDER_DEFAULTS;
@@ -107,21 +98,6 @@ export function isFeatureEnabled(
       }
     }
     case 'institutum':
-    case 'labhub': {
-      const lab = config.labhub;
-      switch (featureId) {
-        case 'showActiveExperiments':
-          return lab.showActiveExperiments;
-        case 'warnBeforeCityEdit':
-          return lab.warnBeforeCityEdit;
-        case 'softLocks':
-          return lab.softLocks;
-        case 'hardLocks':
-          return lab.hardLocks;
-        default:
-          return false;
-      }
-    }
     default:
       return false;
   }

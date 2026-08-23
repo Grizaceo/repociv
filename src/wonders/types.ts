@@ -142,15 +142,7 @@ export interface BibliothecaConfig {
   aiRelationDiscovery: boolean;
 }
 
-export interface LabHubConfig {
-  showActiveExperiments: boolean;
-  warnBeforeCityEdit: boolean;
-  softLocks: boolean;
-  hardLocks: boolean;
-}
-
 export interface WondersConfig {
   gaceta: GacetaConfig;
   bibliotheca: BibliothecaConfig;
-  labhub: LabHubConfig;
 }

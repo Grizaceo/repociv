@@ -10,48 +10,10 @@ from server.routes.core import _error
 
 RouteContext = dict[str, Any]
 
-from server import labhub_adapter as _labhub  # noqa: E402
-
 from server import repo_profile as _rp  # noqa: E402
 from server import repo_roots_state as _rrs  # noqa: E402
 from server import foreign_relations as _fr  # noqa: E402
 from server import report_store as _rs  # noqa: E402
-
-def get_labhub_status(ctx: "RouteContext") -> tuple[int, Any]:
-    """GET /api/labhub/status — overall Institutum reachability."""
-    return 200, _labhub.get_labhub_overall_status()
-
-def get_city_lab_status(ctx: "RouteContext") -> tuple[int, Any]:
-    """GET /api/labhub/status/{city_id} — lab status for a specific city.
-
-    Query params:
-        repoPath (str, optional): repo path for log link derivation.
-    """
-    city_id = ctx.get("city_id", "")
-    if not city_id:
-        return 400, {"error": "city_id is required"}
-    params = ctx.get("params", {})
-    repo_path = params.get("repoPath", "")
-    return 200, _labhub.get_city_lab_status(city_id, repo_path=str(repo_path) if repo_path else None)
-
-def get_all_cities_lab_status(ctx: "RouteContext") -> tuple[int, Any]:
-    """GET /api/labhub/status — batch lab status for all cities.
-
-    Query params:
-        cities (str, required): JSON-serialized list of city dicts with id, repoPath.
-    """
-    params = ctx.get("params", {})
-    cities_raw = params.get("cities", "")
-    if not cities_raw:
-        return 400, {"error": "cities query param required (JSON array)"}
-    try:
-        cities = _json_lib.loads(str(cities_raw))
-    except (_json_lib.JSONDecodeError, TypeError, ValueError):
-        return 400, {"error": "cities must be valid JSON array"}
-    if not isinstance(cities, list):
-        return 400, {"error": "cities must be a JSON array"}
-    return 200, _labhub.get_all_cities_lab_status(cities)
-
 
 def _selected_repo_path(raw_path: Any) -> str | None:
     path = str(raw_path or "").strip()

@@ -56,10 +56,8 @@ def normalize_path(path: str) -> str:
         return "/api/wonders/:id/health" if len(parts) >= 4 and parts[3] == "health" else "/api/wonders/:id"
     if parts[0] == "wonders" and len(parts) >= 2:
         return "/wonders/:id/health" if len(parts) >= 3 and parts[2] == "health" else "/wonders/:id"
-    if parts[:3] == ["api", "foreign", "reports"] and len(parts) >= 4:
+    if parts[:2] == ["api", "foreign", "reports"] and len(parts) >= 4:
         return "/api/foreign/reports/:id"
-    if parts[:2] == ["api", "labhub"] and len(parts) >= 3 and parts[2] == "status":
-        return "/api/labhub/status/:city_id" if len(parts) >= 4 else "/api/labhub/status"
     if parts[:2] == ["api", "graph-relations"] and len(parts) >= 3:
         return "/api/graph-relations/:from_id/evidence" if parts[-1] == "evidence" else path
     if parts[0] == "harnesses" and len(parts) >= 2:

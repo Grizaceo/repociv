@@ -60,7 +60,6 @@ GET_EXACT: dict[str, Callable[..., Any]] = {
     "/api/foreign/repo-profile": _routes.get_repo_profile,
     "/api/foreign/repo-profile/cache": _routes.get_repo_profile_cache,
     "/api/foreign/reports": _routes.get_reports,
-    "/api/labhub/status": _routes.get_labhub_status,
     "/api/profiles": _routes.get_profiles,
 }
 

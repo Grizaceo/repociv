@@ -69,9 +69,6 @@ from server.routes.graph import post_news_source_remove  # noqa: F401
 from server.routes.graph import get_wonders  # noqa: F401
 from server.routes.graph import get_wonder_by_id  # noqa: F401
 from server.routes.graph import get_wonder_health  # noqa: F401
-from server.routes.foreign import get_labhub_status  # noqa: F401
-from server.routes.foreign import get_city_lab_status  # noqa: F401
-from server.routes.foreign import get_all_cities_lab_status  # noqa: F401
 from server.routes.foreign import get_repo_profile  # noqa: F401
 from server.routes.foreign import get_repo_profile_cache  # noqa: F401
 from server.routes.foreign import post_foreign_score  # noqa: F401

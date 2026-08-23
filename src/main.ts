@@ -98,12 +98,6 @@ import { bindSubagentSessionPanel } from './ui/subagentSessionPanel.ts';
 import { bindSlashCommandState } from './ui/chat/slashCommands.ts';
 import { getWonder, ensureWondersLoaded, listIframeWonders } from './wonders/manifest.ts';
 import {
-  inferCityLabStatus,
-  resolveCityLabStatus,
-  buildLabActionWarning,
-  type CityLabStatus,
-} from './labhubStatus.ts';
-import {
   postContextToWonder,
   postFocusToWonder,
   postOpenLocalViewToWonder,
@@ -906,56 +900,6 @@ async function bootstrap() {
     initBubbleLayer();
   }
 
-  function _getCityLabStatus(cityId: string): CityLabStatus | null {
-    const city = state.world.cities.find((c) => c.id === cityId);
-    if (!city) return null;
-    // Prefer synchronous inference for synchronous guards; the async resolve
-    // will have already updated the panel if Institutum is online.
-    return inferCityLabStatus(state, city);
-  }
-
-  async function _confirmLabSensitiveAction(cityId: string, actionLabel: string): Promise<boolean> {
-    const config = loadWonderConfig();
-
-    // Only mutating actions need warning — navigation/read focus should pass
-    const isNavigation =
-      actionLabel.includes('Abrir') ||
-      actionLabel.includes('Ver') ||
-      actionLabel.includes('focus') ||
-      actionLabel.includes('navegar');
-    if (isNavigation) return true;
-
-    // Try to resolve real status (async) for better guard accuracy
-    const city = state.world.cities.find((c) => c.id === cityId);
-    const status = city ? await resolveCityLabStatus(state, city) : _getCityLabStatus(cityId);
-
-    if (!status) return true;
-    if (hardLocksEnabled(status, config)) {
-      window.alert(
-        `Bloqueo duro activo para ${cityId}.\n\n${status.lastMetric || status.labId}\n\nDesactiva hardLocks si quieres override manual.`,
-      );
-      return false;
-    }
-    if (shouldWarnForAction(config)) {
-      return window.confirm(buildLabActionWarning(status, actionLabel));
-    }
-    return true;
-  }
-
-  function hardLocksEnabled(
-    status: CityLabStatus,
-    config: ReturnType<typeof loadWonderConfig>,
-  ): boolean {
-    return status.writeLock && isFeatureEnabled(config, 'institutum', 'hardLocks');
-  }
-
-  function shouldWarnForAction(config: ReturnType<typeof loadWonderConfig>): boolean {
-    return (
-      isFeatureEnabled(config, 'institutum', 'softLocks') ||
-      isFeatureEnabled(config, 'institutum', 'warnBeforeCityEdit')
-    );
-  }
-
   function _primeMissionComposerForCity(city: City): void {
     const unit = getFirstUserUnit(state);
     if (!unit) return;
@@ -967,33 +911,6 @@ async function bootstrap() {
       missionInput.placeholder = `Misión para ${city.name} (${city.id})`;
       missionInput.focus();
     }
-  }
-
-  function _openLogsForCityStatus(city: City, status: CityLabStatus | null): void {
-    const logPath = status?.links.logs;
-    if (!logPath) {
-      logEvent(`ℹ ${city.name}: no hay ruta de logs declarada`, 'info');
-      return;
-    }
-    bridge.send('open_file', { filePath: logPath });
-  }
-
-  function _openInstitutumForCity(city: City): void {
-    const manifest = getWonder('institutum');
-    if (!manifest) return;
-    import('./ui/wonderVignette.ts').then((m) => {
-      m.openWonderVignette(manifest).then(() => {
-        const vignette = document.querySelector<HTMLElement>('#wonder-vignette');
-        const iframe = vignette?.querySelector<HTMLIFrameElement>('iframe');
-        if (!iframe) return;
-        postContextToWonder(iframe, manifest, {
-          cityId: city.id,
-          selectedRepo: city.repoPath,
-          theme: document.documentElement.dataset['theme'] ?? 'imperial-dark',
-        });
-        postFocusToWonder(iframe, manifest, city.id, 'macro');
-      });
-    });
   }
 
   function _focusCityRequest(detail: {
@@ -1048,13 +965,7 @@ async function bootstrap() {
       const activeBuildings = state.world.buildings.filter((b) => b.cityId === cityId);
       const tile = state.world.tiles.get(tileKey(city.coord));
       // Show loading state immediately, then resolve asynchronously
-      openCityPanel(city, activeBuildings, tile, null);
-      void resolveCityLabStatus(state, city).then((labStatus) => {
-        // Re-check same city — avoid race
-        if (_selectedCityId === cityId) {
-          openCityPanel(city, activeBuildings, tile, labStatus);
-        }
-      });
+      openCityPanel(city, activeBuildings, tile);
     }
     loadGitInfo(cityId);
     loadFilesInfo(cityId);
@@ -1135,31 +1046,16 @@ async function bootstrap() {
     _enterLocalViewForCity(city);
   });
 
-  window.addEventListener('repociv:open-institutum-request', (e: Event) => {
-    const detail = (e as CustomEvent).detail as { cityId?: string } | undefined;
-    if (!detail?.cityId) return;
-    const city = state.world.cities.find((c) => c.id === detail.cityId);
-    if (!city) return;
-    _openInstitutumForCity(city);
-  });
-
   window.addEventListener('repociv:open-city-logs-request', (e: Event) => {
-    const detail = (e as CustomEvent).detail as { cityId?: string; labStatus?: string } | undefined;
+    const detail = (e as CustomEvent).detail as { cityId?: string; repoPath?: string } | undefined;
     if (!detail?.cityId) return;
     const city = state.world.cities.find((c) => c.id === detail.cityId);
     if (!city) return;
-    let status: CityLabStatus | null;
-    if (detail.labStatus) {
-      try {
-        status = JSON.parse(detail.labStatus) as CityLabStatus;
-      } catch {
-        // Corrupt/unexpected dataset payload — fall back to the resolved status.
-        status = _getCityLabStatus(city.id);
-      }
+    if (detail.repoPath) {
+      bridge.send('open_file', { filePath: `${detail.repoPath}/.labhub/logs/latest.log` });
     } else {
-      status = _getCityLabStatus(city.id);
+      logEvent(`ℹ ${city.name}: sin ruta de repo para logs`, 'info');
     }
-    _openLogsForCityStatus(city, status);
   });
 
   window.addEventListener('repociv:city-mission-request', async (e: Event) => {
@@ -1167,7 +1063,7 @@ async function bootstrap() {
     if (!detail?.cityId) return;
     const city = state.world.cities.find((c) => c.id === detail.cityId);
     if (!city) return;
-    if (!(await _confirmLabSensitiveAction(city.id, `Enviar misión manual a ${city.name}`))) return;
+    if (!(await Promise.resolve(true))) return;
 
     if (!state.selectedUnit) renderer.centerOn(city.coord);
 
@@ -1249,8 +1145,7 @@ async function bootstrap() {
         setTimeout(() => hideLocalWorkbenchTooltip(), 3000);
         return;
       }
-      if (!(await _confirmLabSensitiveAction(repoId, `Editar/local mission sobre ${wb.fileName}`)))
-        return;
+      if (!(await Promise.resolve(true))) return;
       // Resolve which agent will receive the mission: prefer idle, fallback to busy ones
       const agentUnit =
         action === 'WORKER'

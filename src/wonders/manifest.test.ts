@@ -18,10 +18,8 @@ function resetRegistryImport() {
 /** A fake /api/wonders payload: gaceta + the two examples + one custom. */
 function fakeBackendManifests() {
   const biblio = getWonderExample('bibliotheca')!.manifest;
-  const inst = getWonderExample('institutum')!.manifest;
   return [
     { ...biblio },
-    { ...inst },
     {
       id: 'mi-servicio',
       title: 'Mi Servicio',
@@ -94,12 +92,11 @@ describe('wonder manifest registry', () => {
       const { loadWonders, getWonder, listIframeWonders } = await import('./manifest.ts');
       await loadWonders();
       expect(getWonder('bibliotheca')).toBeDefined();
-      expect(getWonder('institutum')).toBeDefined();
       expect(getWonder('mi-servicio')).toBeDefined();
       const iframeIds = listIframeWonders()
         .map((w) => w.id)
         .sort();
-      expect(iframeIds).toEqual(['bibliotheca', 'institutum', 'mi-servicio']);
+      expect(iframeIds).toEqual(['bibliotheca', 'mi-servicio']);
     });
 
     it('always keeps native gaceta even if backend omits it', async () => {
