@@ -65,6 +65,13 @@ services:
       REPOCIV_TOKEN: ""
       REPOCIV_REMOTE: ""
 
+      # ─── Nebius Token Factory (hackathon B1) ──────────────────────────────
+      # Direct sponsor inference path (Stage 1). NEBIUS_API_KEY comes from the
+      # host .env (gitignored) and must never be baked into the image or a
+      # commit. Provider switch flips tier routing to the Nemotron models.
+      NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
+      REPOCIV_INFERENCE_PROVIDER: ${REPOCIV_INFERENCE_PROVIDER:-hermes}
+
     # Run as non-root for defense in depth. The image already creates the
     # repociv user in Dockerfile.agent — but this image is separate, so we
     # add it here too if missing. Kept commented for simplicity; uncomment
