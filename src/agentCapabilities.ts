@@ -4,12 +4,13 @@
 
 import type { CommandType } from './commandSchema.ts';
 
-export type AgentBase = 'MAIN' | 'WORKER' | 'SCOUT' | 'OPENCLAW' | 'CLAUDE' | 'CODEX' | 'CURSOR';
+export type AgentBase = 'MAIN' | 'WORKER' | 'SCOUT' | 'PRAETORIAN' | 'OPENCLAW' | 'CLAUDE' | 'CODEX' | 'CURSOR';
 
 const AGENT_BASE_ALIASES: Record<string, AgentBase> = {
   MAIN: 'MAIN',
   WORKER: 'WORKER',
   SCOUT: 'SCOUT',
+  PRAETORIAN: 'PRAETORIAN',
   OPENCLAW: 'OPENCLAW',
   CLAUDE: 'CLAUDE',
   CODEX: 'CODEX',
@@ -30,6 +31,7 @@ export const AGENT_CAPABILITIES: Record<AgentBase, CommandType[]> = {
   MAIN: [],
   WORKER: ['inspect_repo', 'read_file', 'run_tests', 'run_build', 'edit_file', 'create_branch'],
   SCOUT: ['inspect_repo', 'read_file'],
+  PRAETORIAN: ['inspect_repo', 'read_file', 'run_tests'],
   OPENCLAW: ['inspect_repo', 'read_file', 'run_tests', 'run_build', 'execute_agent'],
   CLAUDE: [
     'inspect_repo',
@@ -70,6 +72,7 @@ export const AGENT_SKILLS: Record<AgentBase, SkillBadge[]> = {
     { key: 'code_editor', label: 'Edición', icon: '✏' },
   ],
   SCOUT: [{ key: 'inspection', label: 'Inspección', icon: '🔍' }],
+  PRAETORIAN: [{ key: 'deep_reasoning', label: 'Razonamiento', icon: '🧠' }],
   OPENCLAW: [
     { key: 'transport', label: 'Transporte', icon: '▶' },
     { key: 'orchestration', label: 'Orquestación', icon: '◈' },

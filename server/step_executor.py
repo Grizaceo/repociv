@@ -85,15 +85,29 @@ WORKER_KEYWORDS: list[str] = [
 ]
 
 
+PRAETORIAN_KEYWORDS: list[str] = [
+    # Narrow by design: generic planning/coordination stays with MAIN.
+    # PRAETORIAN is for expensive deep reasoning after cheaper tiers fail.
+    "root cause", "root-cause", "postmortem", "incident", "escalat",
+    "arbitrat", "adjudicat", "trade-off", "tradeoff", "threat model",
+    "failure mode", "risk analysis", "final design decision",
+]
+
+
 def select_agent_for_step(step_description: str) -> str:
-    """Heuristic: SCOUT for analysis/inspection, WORKER for implementation, MAIN as fallback.
+    """Heuristic: SCOUT for analysis/inspection, WORKER for implementation,
+    PRAETORIAN for deep reasoning, MAIN as fallback (the player, not a field unit).
 
     Examples:
         "inspect the codebase"     → "SCOUT"
         "implement login handler"  → "WORKER"
+        "root cause of the flaky tests" → "PRAETORIAN"
         "discuss roadmap"          → "MAIN"
     """
     step_lower = step_description.lower()
+    for kw in PRAETORIAN_KEYWORDS:
+        if kw in step_lower:
+            return "PRAETORIAN"
     for kw in SCOUT_KEYWORDS:
         if kw in step_lower:
             return "SCOUT"
@@ -110,8 +124,9 @@ def _infer_task_type(agent: str) -> str:
         "HERMES":   "orchestrate",
         "WORKER":   "edit",
         "SCOUT":    "read",
+        "PRAETORIAN": "orchestrate",
         "OPENCLAW": "edit",
-    }
+        }
     return mapping.get(agent.upper(), "edit")
 
 

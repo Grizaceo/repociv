@@ -169,6 +169,11 @@ export function wireHotkeys(
       trackHotkey('Ctrl+X:spawn:CODEX');
       return spawnAgent('CODEX', state, renderer, bridge);
     }
+    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'g') {
+      e.preventDefault();
+      trackHotkey('Ctrl+G:spawn:PRAETORIAN');
+      return spawnAgent('PRAETORIAN', state, renderer, bridge);
+    }
     if (!e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'r') {
       trackHotkey('R:spawn:CURSOR');
       return spawnAgent('CURSOR', state, renderer, bridge);

@@ -29,6 +29,11 @@ AGENT_CAPABILITIES: dict[str, list[str]] = {
     "SCOUT": [
         "inspect_repo", "read_file",
     ],
+    # Praetorian — elite reasoner: deep diagnostics, arbitration, escalation.
+    # Read/analyze/tests by default; never commits (Tier PREMIUM files the bills).
+    "PRAETORIAN": [
+        "inspect_repo", "read_file", "run_tests",
+    ],
     # Transport / force — execution and transport, no editing
     "OPENCLAW": [
         "inspect_repo", "read_file", "run_tests", "run_build", "execute_agent",
@@ -114,6 +119,7 @@ _AGENT_BASE_ALIASES = {
     "MAIN": "MAIN",
     "WORKER": "WORKER",
     "SCOUT": "SCOUT",
+    "PRAETORIAN": "PRAETORIAN",
     "OPENCLAW": "OPENCLAW",
     "CLAUDE": "CLAUDE",
     "CODEX": "CODEX",

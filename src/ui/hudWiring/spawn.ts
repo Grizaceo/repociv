@@ -77,6 +77,7 @@ export function spawnFromProfile(
     cursor: 'cursor',
     hermes: 'hero',
     openclaw: 'hero',
+    praetorian: 'praetorian',
   };
   const type = typeMap[profile.harness] ?? 'hero';
   const unit = state.spawnUnit(
@@ -152,6 +153,7 @@ export function spawnAgent(
     CLAUDE: 'claude',
     CODEX: 'codex',
     CURSOR: 'cursor',
+    PRAETORIAN: 'praetorian',
   };
   const type = typeMap[base] ?? 'hero';
   const unit = state.spawnUnit(unitId, unitId, type, 'capital', coord, 'En espera de misión');

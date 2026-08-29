@@ -1,0 +1,12 @@
+{
+  "id": "PRAETORIAN",
+  "name": "Praetorian",
+  "role": "elite reasoner",
+  "description": "Deep-reasoning specialist for root-cause analysis, escalation and arbitration. Runs the most expensive tier; spawned rarely, deliberate always. Read/analyze/tests by default — never commits.",
+  "harness": "hermes-local",
+  "profile": "~/.hermes/profiles/praetorian",
+  "stateful": true,
+  "tier_default": "PREMIUM",
+  "tier_enforced": false,
+  "keywords_hint": ["root cause", "postmortem", "incident", "escalate", "arbitrate", "threat model", "failure mode"]
+}

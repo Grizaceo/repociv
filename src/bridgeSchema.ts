@@ -17,6 +17,7 @@ const UnitType = v.picklist([
   'openclaw',
   'claude',
   'codex',
+  'praetorian',
 ]);
 const UnitState = v.picklist(['idle', 'moving', 'working', 'sleeping', 'building']);
 const Resource = v.picklist(['gold', 'science', 'production']);

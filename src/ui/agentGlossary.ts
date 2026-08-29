@@ -13,6 +13,8 @@ const GLOSSARY: Record<string, string> = {
     'OpenClaw — agente de transporte propio (sin fallback a Hermes). Mantiene estado entre misiones. [O]',
   CLAUDE: 'Claude — agente vía CLI de Claude Code. Elegí modelo en su chat. [C]',
   CODEX: 'Codex — agente vía CLI de Codex. Elegí modelo en su chat. [X]',
+  PRAETORIAN:
+    'Praetorian — razonador de élite (Ultra): root-cause, arbitraje y escaladas. Stateful; consulta y testea, nunca commitea. [G]',
   CURSOR: 'Cursor — agente vía cursor-agent; habilita tracking de subagentes (Swarm).',
 };
 

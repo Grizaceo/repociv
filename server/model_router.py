@@ -41,17 +41,19 @@ logger = logging.getLogger(__name__)
 # the task_type default below.
 
 _BASE_TIERS: dict[str, str] = {
-    "HERMES":   "PREMIUM",
-    "WORKER":   "EQUILIBRIO",
-    "SCOUT":    "ECONOMICO",
-    "OPENCLAW": "EQUILIBRIO",
+    "HERMES":     "PREMIUM",
+    "WORKER":     "EQUILIBRIO",
+    "SCOUT":      "ECONOMICO",
+    "PRAETORIAN": "PREMIUM",
+    "OPENCLAW":   "EQUILIBRIO",
 }
 
 _BASE_ENFORCED: dict[str, bool] = {
-    "HERMES":   False,
-    "WORKER":   True,
-    "SCOUT":    True,
-    "OPENCLAW": False,
+    "HERMES":     False,
+    "WORKER":     True,
+    "SCOUT":      True,
+    "PRAETORIAN": False,
+    "OPENCLAW":   False,
 }
 
 _DEFAULT_BASE_TIER = "EQUILIBRIO"

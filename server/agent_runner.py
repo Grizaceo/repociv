@@ -127,6 +127,12 @@ AGENT_CONFIGS: dict[str, dict[str, Any]] = {
         "stateful": False,
     },
 
+    "PRAETORIAN": {
+        # stateful: Ultra carries mission context across steps; the other two
+        # tiers stay stateless so cheap enjambres can be spawned freely.
+        "agent": "main", "personality": "concise", "stateful": True,
+        "profile": str(Path.home() / ".hermes" / "profiles" / "praetorian"),
+    },
     # ── Personal profile example (not shipped) ─────────────────────────────────
     # Copy and adapt this block to add your own Hermes-based agent.
     # The "profile" key must point to a valid ~/.hermes/profiles/<name> directory.
@@ -236,6 +242,7 @@ def _infer_model_label(unit_id: str) -> str:
     label_map = {
         "OPENCLAW": "openclaw",
         "CLAUDE": "claude-code",
+        "PRAETORIAN": "praetorian",
         "CODEX": "codex",
         "CURSOR": "cursor",
     }

@@ -134,6 +134,7 @@ type UnitType =
   | 'openclaw'
   | 'claude'
   | 'codex'
+  | 'praetorian'
   | 'cursor';
 
 export type UnitState = 'idle' | 'moving' | 'working' | 'sleeping' | 'building';
@@ -184,6 +185,7 @@ export const UNIT_COLORS: Record<string, string> = {
   claude: '#d4a574',
   codex: '#e87d7d',
   cursor: '#a0d6c8',
+  praetorian: '#c77dff',
 };
 
 // ─── World ──────────────────────────────────────────────────────────────────

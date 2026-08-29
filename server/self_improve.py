@@ -202,8 +202,14 @@ class SelfImprovementEngine:
             )
         else:
             agent = str(pattern.evidence.get("agent", "WORKER")).upper()
-            keyword = "verify" if agent == "WORKER" else "review"
-            list_name = "WORKER_KEYWORDS" if agent == "WORKER" else "SCOUT_KEYWORDS"
+            # Keyword bucket per dispatch family; unknown agents keep the
+            # historical SCOUT/review default so behavior is unchanged.
+            buckets = {
+                "WORKER": ("verify", "WORKER_KEYWORDS"),
+                "SCOUT": ("review", "SCOUT_KEYWORDS"),
+                "PRAETORIAN": ("escalate", "PRAETORIAN_KEYWORDS"),
+            }
+            keyword, list_name = buckets.get(agent, ("review", "SCOUT_KEYWORDS"))
             improvement = Improvement(
                 id=f"sica-{agent.lower()}-keyword-{keyword}",
                 target_type="keyword",
