@@ -305,3 +305,34 @@ def test_openclaw_not_enforced_sets_recommended_model_key():
         meta["recommended_model"] = routing["model"]
     assert "recommended_model" in meta
     assert meta["recommended_model"] == "claude-sonnet-4-5"
+
+
+# --- provider-aware routing (hackathon A4) ----------------------------------
+def test_route_model_nemotron_when_token_factory(monkeypatch):
+    """With REPOCIV_INFERENCE_PROVIDER=nebius, route_model resolves Nemotron
+    model IDs and enforced semantics stay unchanged."""
+    from server import model_router as _mr
+    monkeypatch.setenv("REPOCIV_INFERENCE_PROVIDER", "nebius")
+    r = _mr.route_model("SCOUT", "read")
+    assert r["model"] == "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    assert r["enforced"] is True          # SCOUT implemented=True still locks tier
+    assert r["tier"] == "ECONOMICO"
+    assert r["fallback_chain"][0] == "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+
+
+def test_route_model_praetorian_override_wins(monkeypatch):
+    """Per-unit override_tier wins over provider defaults (decided 2026-08-29)."""
+    from server import model_router as _mr
+    monkeypatch.setenv("REPOCIV_INFERENCE_PROVIDER", "nebius")
+    r = _mr.route_model("PRAETORIAN", "edit", override_tier="ECONOMICO")
+    assert r["model"] == "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+    assert r["enforced"] is False          # PRAETORIAN is recommended, not enforced
+    assert r["tier"] == "ECONOMICO"
+
+
+def test_route_model_premium_cascade_single_element(monkeypatch):
+    """Cascade from PREMIUM stays single-element (Opus trap: demo must start at scout)."""
+    from server import signal_extractor as _se
+    monkeypatch.setenv("REPOCIV_INFERENCE_PROVIDER", "nebius")
+    chain = _se.tier_to_cascade_chain("PREMIUM")
+    assert chain == ["nvidia/Nemotron-3-Ultra-550b-a55b"]
