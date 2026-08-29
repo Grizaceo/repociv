@@ -63,6 +63,30 @@ export default defineConfig(({ mode }) => {
           secure: false,
           rewrite: (path) => path.replace(/^\/bridge/, ''),
         },
+        // WebSocket bridge transport proxied through Vite so the *Windows*
+        // browser can reach the WSL-loopback WS port (5275). A raw
+        // `ws://localhost:5275` from the browser resolves to Windows-localhost
+        // and never connects, which left bridgeOnline=false → "Puente Cerrado"
+        // → reload loop. Dev client connects to /repociv-ws (Vite loopback).
+        '/repociv-ws': {
+          target: `ws://localhost:${env.BRIDGE_WS_PORT ?? '5275'}`,
+          changeOrigin: true,
+          ws: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/repociv-ws/, ''),
+        },
+        // Hermes dashboard (runs on the Tailscale IP by design, for the
+        // Windows Desktop app). Proxied so the RepoCiv browser can reach it
+        // without leaving Vite's loopback origin. Does NOT touch the
+        // hermes-dashboard service; dev server stays bound to 127.0.0.1.
+        '/dashboard': {
+          // Default neutro: la IP real del tailnet va en .env local
+          // (HERMES_DASHBOARD_URL, gitignored) — nunca hardcodeada en repo.
+          target: env.HERMES_DASHBOARD_URL ?? 'http://127.0.0.1:9119',
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/dashboard/, ''),
+        },
       },
     },
     test: {

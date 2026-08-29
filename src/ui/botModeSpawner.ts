@@ -93,6 +93,22 @@ function onOutsideClick(e: Event): void {
   closeMenu();
 }
 
+/** Nudge an open menu back inside the viewport (narrow/short screens). */
+function clampMenuToViewport(menu: HTMLElement): void {
+  const m = 8; // keep at least this far from every viewport edge
+  const r = menu.getBoundingClientRect();
+  if (r.width === 0 && r.height === 0) return; // not laid out yet
+  let dx = 0;
+  if (r.right > window.innerWidth - m) dx = window.innerWidth - m - r.right;
+  if (r.left + dx < m) dx = m - r.left;
+  let dy = 0;
+  if (r.top < m) dy = m - r.top;
+  if (dx !== 0 || dy !== 0) {
+    menu.style.left = `${r.left + dx}px`;
+    menu.style.bottom = `${Math.max(m, window.innerHeight - (r.bottom + dy))}px`;
+  }
+}
+
 /** Open (or rebuild) the Bot Mode dropdown listing real bots with identity. */
 async function openBotModeMenu(state: GameState, renderer: Renderer, bridge: BridgeEvents): Promise<void> {
   if (_menuEl) {
@@ -108,11 +124,16 @@ async function openBotModeMenu(state: GameState, renderer: Renderer, bridge: Bri
   if (trigger) {
     const rect = trigger.getBoundingClientRect();
     menu.style.position = 'fixed';
+    // El botón vive en #command-bar, dockeado al borde INFERIOR de la pantalla.
+    // Abrir hacia abajo (top = rect.bottom) empuja el menú fuera del viewport:
+    // solo se ve una franja ilegible. Abrimos HACIA ARRIBA: el borde inferior
+    // del menú queda 6px sobre el borde superior del botón.
     menu.style.left = `${rect.left}px`;
-    menu.style.top = `${rect.bottom + 6}px`;
+    menu.style.bottom = `${window.innerHeight - rect.top + 6}px`;
   }
   document.body.appendChild(menu);
   _menuEl = menu;
+  clampMenuToViewport(menu);
   // Defer so this same click doesn't immediately close it.
   setTimeout(() => document.addEventListener('click', onOutsideClick, true), 0);
 
@@ -120,8 +141,9 @@ async function openBotModeMenu(state: GameState, renderer: Renderer, bridge: Bri
   loading.className = 'botmode-item botmode-empty';
   loading.textContent = 'Cargando bots…';
   menu.appendChild(loading);
+  clampMenuToViewport(menu);
 
-  let bots: RosterEntry[] = [];
+  let bots: RosterEntry[];
   try {
     bots = await fetchBotModeBots();
   } catch (err) {
@@ -133,6 +155,7 @@ async function openBotModeMenu(state: GameState, renderer: Renderer, bridge: Bri
     errItem.textContent = `⚠ ${String(err)}`;
     errItem.title = 'Revisá que el bundle de Vite tenga el token (Ctrl+Shift+R)';
     menu.appendChild(errItem);
+    clampMenuToViewport(menu);
     return;
   }
   loading.remove();
@@ -167,6 +190,7 @@ async function openBotModeMenu(state: GameState, renderer: Renderer, bridge: Bri
     });
     menu.appendChild(item);
   }
+  clampMenuToViewport(menu);
 }
 
 /**
