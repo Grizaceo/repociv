@@ -7,3 +7,4 @@ explaining what was built inside the window.
 - PRAETORIAN base unit added (924d086): third dispatch family SCOUT/WORKER/PRAETORIAN, tier-visible roster
 - Hackathon update log created (3e25fd5): in-window tracking starts
 - First-class Nebius Token Factory client (server/nebius_client.py) + tests (5): Tier cascade Nemotron Nano/Super/Ultra, cost+latency accounting. Gate 982 passed/2 skipped. Deviation note: _post_with_retries returns the response object (consumer calls raise_for_status()+json()) to match the plan's own test seam; plan's verbatim snippet returned resp.json() contradicting its test.
+- Provider-aware tier mapping in signal_extractor (+2 tests): get_inference_provider(), provider_tier_mapping(), tier_to_model/tier_to_cascade_chain switch to Nemotron IDs when REPOCIV_INFERENCE_PROVIDER=nebius. Gate 984 passed/2 skipped.

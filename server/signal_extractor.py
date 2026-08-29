@@ -14,6 +14,7 @@ Signals extracted:
 """
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 
@@ -219,21 +220,28 @@ class SignalExtractor:
         return "EQUILIBRIO"
 
 
-def tier_to_model(tier: str) -> str:
-    """Map tier name to actual Claude model identifier.
+def get_inference_provider() -> str:
+    """Which runtime executes tier models: 'hermes' (CLI gateway) or 'nebius' (Token Factory, direct)."""
+    return (os.environ.get("REPOCIV_INFERENCE_PROVIDER") or "hermes").strip().lower()
 
-    Args:
-        tier: "ECONOMICO", "EQUILIBRIO", or "PREMIUM"
 
-    Returns:
-        Model name like "claude-haiku-3-5" or "claude-opus-4-5"
-    """
-    mapping = {
+def provider_tier_mapping() -> dict[str, str]:
+    """Tier -> model-id mapping for the ACTIVE inference provider (default hermes)."""
+    if get_inference_provider() == "nebius":
+        from .nebius_client import NEBIUS_MODELS
+        return dict(NEBIUS_MODELS)
+    # legacy Hermes/Claude mapping (unchanged default)
+    return {
         "ECONOMICO": "claude-haiku-3-5",
         "EQUILIBRIO": "claude-sonnet-4-5",
         "PREMIUM": "claude-opus-4-5",
     }
-    return mapping.get(tier, "claude-sonnet-4-5")
+
+
+def tier_to_model(tier: str) -> str:
+    """Return the model for a tier at the active inference provider."""
+    mapping = provider_tier_mapping()
+    return mapping.get(tier, mapping.get("EQUILIBRIO", "claude-sonnet-4-5"))
 
 
 def tier_to_cascade_chain(tier: str) -> list[str]:
@@ -245,6 +253,12 @@ def tier_to_cascade_chain(tier: str) -> list[str]:
     Returns:
         List of models in fallback order (cheapest first, most powerful last).
     """
+    if get_inference_provider() == "nebius":
+        from .nebius_client import NEBIUS_MODELS
+        models = [NEBIUS_MODELS["ECONOMICO"], NEBIUS_MODELS["EQUILIBRIO"], NEBIUS_MODELS["PREMIUM"]]
+        order = {"ECONOMICO": 0, "EQUILIBRIO": 1, "PREMIUM": 2}
+        i = order.get(tier, 0)
+        return models[i:]
     chains = {
         "ECONOMICO": ["claude-haiku-3-5", "claude-sonnet-4-5", "claude-opus-4-5"],
         "EQUILIBRIO": ["claude-sonnet-4-5", "claude-opus-4-5"],
