@@ -30,6 +30,7 @@ from server import runtime_adapters as _runtime_adapters
 from server import security_harness as _security_harness
 from server import token_ledger as _token_ledger
 from server import repo_roots_state as _rrs
+from server.nebius_client import chat_nebius_cascade  # A3: direct Token Factory path (test seam = module attr)
 from server.quest import generate_quest_name
 
 SendFn = Callable[[dict[str, Any]], None]
@@ -475,6 +476,76 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
                      "success": success, "duration": int(duration)})
 
 
+def run_nebius_agent(
+    mission: str,
+    working_dir: str | None = None,
+    system_prompt: str | None = None,
+    tier: str = "ECONOMICO",
+    timeout_s: int = 120,
+) -> dict[str, Any]:
+    """Direct Nebius Token Factory agent run (A3) — no CLI delegation.
+
+    Stage-1-critical visible sponsor path: the Nemotron call goes straight to
+    api.tokenfactory.nebius.com (no subprocess). Same result shape as the
+    other runners plus provider/tier metadata for the observable-routing plane.
+    """
+    if system_prompt:
+        system = system_prompt
+    else:
+        try:
+            system = _get_agent_config("SCOUT").get("system") or "You are a helpful agent."
+        except Exception:
+            system = "You are a helpful agent."
+    messages: list[dict[str, str]] = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": f"cd {working_dir}\n\n{mission}" if working_dir else mission},
+    ]
+    try:
+        out = chat_nebius_cascade(messages, tier=tier, timeout_s=float(timeout_s))
+    except Exception as exc:
+        err = f"[nebius error] {exc}"
+        return {
+            "success": False, "content": err, "output": err,
+            "usage_tokens": 0, "model": "", "latency_ms": 0,
+            "cost_usd": 0.0, "fallback_from": None, "provider": "nebius",
+        }
+    usage = out.get("usage") or {}
+    prompt_tokens = int(usage.get("prompt_tokens", 0) or 0)
+    completion_tokens = int(usage.get("completion_tokens", 0) or 0)
+    try:
+        _token_ledger.get_ledger().log_usage(
+            model=str(out.get("model", "")),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            agent="nebius",
+        )
+    except Exception:
+        pass
+    content = str(out.get("content", ""))
+    return {
+        "success": True,
+        "content": content,
+        "output": content,
+        "usage_tokens": prompt_tokens + completion_tokens,
+        "model": str(out.get("model", "")),
+        "latency_ms": int(out.get("latency_ms", 0) or 0),
+        "cost_usd": float(out.get("cost_estimate_usd", 0.0) or 0.0),
+        "fallback_from": out.get("fallback_from"),
+        "provider": "nebius",
+        "tier": str(out.get("tier") or tier),
+    }
+
+
+# Per-run metadata for the observable-routing plane (A5 reads this to surface
+# model/cost/latency on the step event without changing runner signatures).
+_LAST_NEBIUS_RUN: dict[str, Any] = {}
+
+
+def last_nebius_run() -> dict[str, Any]:
+    """Metadata of the most recent direct Nebius run (possibly empty)."""
+    return dict(_LAST_NEBIUS_RUN)
+
+
 def _execute_streaming(unit_id: str, mission_id: str, mission: str,
                        working_dir: str | None = None,
                        city_id: str = "",
@@ -559,6 +630,33 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
 
     if _container_mode_enabled():
         return _run_container_streaming(unit_id, mission_id, mission, config, working_dir, city_id)
+
+    # ── A3: direct Nebius Token Factory path (Stage-1 visible sponsor call) ──
+    # When REPOCIV_INFERENCE_PROVIDER=nebius and the unit is one of the three
+    # tier families, run the model DIRECTLY (no CLI delegation). Route tier
+    # via model_router so overrides (PRAETORIAN) and enforced semantics hold.
+    from server.signal_extractor import get_inference_provider  # lazily: avoids import cycle at module load
+    if get_inference_provider() == "nebius" and base in {"SCOUT", "WORKER", "PRAETORIAN"}:
+        from server import model_router as _mr_a3
+        _task_type = "read" if base == "SCOUT" else ("edit" if base == "WORKER" else "orchestrate")
+        _routing = _mr_a3.route_model(base, _task_type)
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: nebius-direct ({_routing['model']})", "level": "info"})
+        out = run_nebius_agent(
+            mission,
+            working_dir=working_dir,
+            system_prompt=config.get("system"),
+            tier=_routing["tier"],
+            timeout_s=120,
+        )
+        from server.nebius_client import NEBIUS_BASE_URL
+        _LAST_NEBIUS_RUN.clear()
+        _LAST_NEBIUS_RUN.update({**out, "unit_id": unit_id, "mission_id": mission_id, "base_url": NEBIUS_BASE_URL})
+        for i in range(0, len(out.get("content", "")), 40):
+            chunk = out["content"][i:i + 40]
+            send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": chunk})
+            _es.record_output_chunk(mission_id, unit_id, chunk)
+            time.sleep(0.04)
+        return bool(out.get("success")), str(out.get("content", ""))
 
     # OPENCLAW bypass: always direct to OpenClaw regardless of harness selector
     if base == "OPENCLAW":

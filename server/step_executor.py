@@ -302,6 +302,20 @@ def dispatch_plan_step(
     else:
         step_meta["recommended_model"] = routing["model"]
 
+    # A3: warn when the provider is nebius but the unit is a harness bypass
+    # (CLAUDE/CODEX/CURSOR/OPENCLAW) — those runners bypass the Nebius direct
+    # path by design; the mission still runs via the selected harness.
+    try:
+        from server.signal_extractor import get_inference_provider
+        if get_inference_provider() == "nebius" and agent.upper() in {"CLAUDE", "CODEX", "CURSOR", "OPENCLAW"}:
+            logger.info(
+                "provider=nebius but agent %s uses a harness bypass runner — "
+                "Nebius direct path not applicable for this step",
+                agent,
+            )
+    except Exception:
+        pass
+
     # SCOUT and WORKER use retry_step for automatic model escalation on failure.
     # HERMES and OPENCLAW are not escalated (enforced=False — the user chooses).
     _should_retry = routing["enforced"] and agent.upper() in ("SCOUT", "WORKER")
