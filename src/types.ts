@@ -172,6 +172,8 @@ export interface Unit {
   // Visual-only: the unit is not drawn/pickable on the macro map but
   // stays alive in state (missions, chat, backend process untouched).
   hidden?: boolean;
+  // ─── Observable-routing plane (A5): inference tier of the unit's dispatch ──
+  tier?: string; // "ECONOMICO" | "EQUILIBRIO" | "PREMIUM" when known
 }
 
 export const UNIT_COLORS: Record<string, string> = {
@@ -560,6 +562,8 @@ export interface LocalUnit {
   // P1 polish: despawn fade-out
   fadeAlpha?: number; // 1.0 default, decreasing to 0 during despawn
   despawning?: boolean; // true while fading out before removal
+  // ─── Observable-routing plane (A5): inference tier for the tier ring ────────
+  tier?: string; // "ECONOMICO" | "EQUILIBRIO" | "PREMIUM" when known
 }
 
 export interface LocalNpc {

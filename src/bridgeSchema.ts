@@ -36,6 +36,7 @@ const Schemas = [
     parentUnit: v.optional(v.string()),
     ephemeral: v.optional(v.boolean()),
     subagentRunId: v.optional(v.string()),
+    tier: v.optional(v.string()),
   }),
   v.object({
     type: v.literal('unit_move'),

@@ -325,6 +325,7 @@ const HANDLERS: HandlerByType = {
         kind: evt.kind,
         label: evt.label,
         repoId: evt.targetCityId ?? parentUnit?.cityId ?? '',
+        tier: (evt as { tier?: string }).tier,
       });
       ctx.state.setUnitState(evt.ephemeralUnitId, 'working');
       ctx.logEvent(`◈ Detachment: ${evt.label.slice(0, 40)}`, 'info');

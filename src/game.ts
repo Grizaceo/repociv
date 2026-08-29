@@ -582,6 +582,7 @@ export class GameState {
     kind: string;
     label: string;
     repoId: string;
+    tier?: string; // A5: inference tier for the tier ring
   }): void {
     this._local.syncSubagentSpawn(payload);
   }

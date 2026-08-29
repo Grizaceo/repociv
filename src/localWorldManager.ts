@@ -683,6 +683,7 @@ export class LocalWorldManager {
     kind: string;
     label: string;
     repoId: string;
+    tier?: string; // A5: inference tier for the kind ring
   }): void {
     if (this.viewMode !== 'local' || !this.localWorld) return;
     if (payload.repoId && this.localWorld.repoId !== payload.repoId) return;
@@ -720,6 +721,8 @@ export class LocalWorldManager {
       isResting: false,
       effectiveSpeed: 1,
       ephemeral: true,
+      // A5: tier from the spawn payload (nebius-direct) for the tier ring
+      tier: payload.tier,
     });
     this.assignDesk(this.localUnits[this.localUnits.length - 1]!);
     this.notify();

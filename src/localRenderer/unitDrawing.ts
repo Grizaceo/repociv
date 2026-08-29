@@ -232,6 +232,26 @@ export function drawLocalUnit(
     ctx.stroke();
   }
 
+  // ─── A5: tier ring (observable-routing plane) ──────────────────────────────
+  // Ring color = unit color (identity stays color; power = ring).
+  // 1px ECONOMICO · 2px EQUILIBRIO · 4px + glow PREMIUM.
+  if (unit.tier) {
+    const ringWidth =
+      unit.tier === 'PREMIUM' ? 4 : unit.tier === 'EQUILIBRIO' ? 2 : 1;
+    ctx.save();
+    if (unit.tier === 'PREMIUM') {
+      ctx.shadowColor = unit.color;
+      ctx.shadowBlur = 6;
+    }
+    ctx.strokeStyle = unit.color;
+    ctx.lineWidth = ringWidth;
+    ctx.globalAlpha = 0.9 * fadeAlpha;
+    ctx.beginPath();
+    ctx.arc(0, 0, TILE_SIZE * 0.62, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // Status icon
   const statusIcon: Record<string, string> = {
     idle_in_room: '◌',

@@ -324,6 +324,9 @@ def dispatch_plan_step(
         _repo: str, _issue_id: str, _step: str, _meta: dict,
     ) -> str:
         _rid = f"step-{uuid.uuid4().hex[:8]}"
+        # Fresh-telemetry invariant: forget any previous nebius result so
+        # last_nebius_run() only ever reflects THIS step's dispatch.
+        _agent_runner.clear_last_nebius_run()
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _executor:
             _future = _executor.submit(
                 _agent_runner.run_agent,
@@ -348,6 +351,47 @@ def dispatch_plan_step(
     else:
         # Direct dispatch (no retry) for HERMES, OPENCLAW, MAIN, etc.
         run_id = _run_agent_once(repo, issue_id, step_description, step_meta)
+
+    # ── A5: surface routing telemetry on the step event ─────────────────────
+    # Attach provider/model/latency/cost of the ACTIVE runtime for this step.
+    # last_nebius_run() is only trusted because it was cleared just before
+    # dispatch below — a stale nebius result from a previous step must never
+    # be attributed to a step that ran on another provider.
+    try:
+        from server import agent_runner as _ar_a5
+        from server import event_store as _es_a5
+        from server import signal_extractor as _se_a5
+        _neb = _ar_a5.last_nebius_run()
+        _meta_telemetry: dict[str, Any]
+        if _neb:
+            _meta_telemetry = {
+                "provider": "nebius",
+                "model": str(_neb.get("model", "")),
+                "latency_ms": int(_neb.get("latency_ms", 0) or 0),
+                "cost_usd": float(_neb.get("cost_usd", 0.0) or 0.0),
+                "fallback_from": _neb.get("fallback_from"),
+                "unit_id": str(_neb.get("unit_id", "")),
+                "base_url": str(_neb.get("base_url", "")),
+            }
+            _es_a5.record_event(
+                "inference_telemetry",
+                {
+                    "run_id": run_id,
+                    "provider": "nebius",
+                    "model": _meta_telemetry["model"],
+                    "latency_ms": _meta_telemetry["latency_ms"],
+                    "cost_usd": _meta_telemetry["cost_usd"],
+                    "fallback_from": _meta_telemetry["fallback_from"],
+                },
+            )
+        else:
+            _meta_telemetry = {
+                "provider": _se_a5.get_inference_provider(),
+                "model": routing["model"],
+            }
+        step_meta["inference_telemetry"] = _meta_telemetry
+    except Exception as _telem_err:  # telemetry must never break a step
+        logger.warning("telemetry attach failed for %s: %s", step_description[:60], _telem_err)
 
     # ── Write handoff artifact ──────────────────────────────────────────────
     try:

@@ -546,6 +546,13 @@ def last_nebius_run() -> dict[str, Any]:
     return dict(_LAST_NEBIUS_RUN)
 
 
+def clear_last_nebius_run() -> None:
+    """Forget the last direct Nebius run (call before dispatching a new step
+    so telemetry from a previous nebius run is never attributed to a step
+    that ran on a different provider)."""
+    _LAST_NEBIUS_RUN.clear()
+
+
 def _execute_streaming(unit_id: str, mission_id: str, mission: str,
                        working_dir: str | None = None,
                        city_id: str = "",

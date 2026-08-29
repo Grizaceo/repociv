@@ -194,6 +194,9 @@ def _emit_unit_spawn(run: dict[str, Any]) -> None:
         "parentUnit": run["parentUnitId"],
         "ephemeral": True,
         "subagentRunId": run["id"],
+        # A5 observable-routing plane: tier of the unit's first dispatch, when
+        # known at spawn time (nebius-direct path). Optional downstream.
+        "tier": run.get("tier") or run.get("enrich", {}).get("tier"),
     })
 
 
