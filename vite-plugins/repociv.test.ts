@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { Connect } from 'vite';
@@ -77,6 +77,18 @@ async function invokeHandler(
   expect(nextCalled).toBe(false);
   return res;
 }
+
+describe('shell execution boundary', () => {
+  // The /git endpoint interpolates a caller-supplied `file` query parameter into
+  // its git invocation. While that ran through a shell string, the value could
+  // close the quoting and append commands. Everything now goes through
+  // execFileSync with an argv array, and this locks it in: a single execSync
+  // reintroduced anywhere in the plugin fails the suite.
+  it('never executes shell command strings', () => {
+    const source = readFileSync(new URL('./repociv.ts', import.meta.url), 'utf8');
+    expect(source).not.toContain('execSync(');
+  });
+});
 
 describe('repociv path helpers', () => {
   let fixture: ReturnType<typeof makeFixture>;

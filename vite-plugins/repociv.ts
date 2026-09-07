@@ -14,7 +14,7 @@
 //   - /event POST         — bridge event relay → Vite HMR WS
 
 import type { Plugin, Connect } from 'vite';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { readdirSync, statSync, existsSync, readFileSync, realpathSync } from 'node:fs';
 import { join, basename, dirname, resolve } from 'node:path';
 import { homedir, platform } from 'node:os';
@@ -92,15 +92,26 @@ export function countFiles(dir: string, exts: Record<string, number>, depth = 0)
   return total;
 }
 
+/** Run a binary with an argv array and return trimmed stdout, or '' on any
+ *  failure. Replaces the old shell-string pattern (`cmd ... 2>/dev/null ||
+ *  true`): with no shell there is nothing to quote, so a path or a
+ *  query-string value can never become part of the command. */
+function runOut(executable: string, args: string[]): string {
+  try {
+    return execFileSync(executable, args, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return '';
+  }
+}
+
 export function gitStats(repo: string): { commits: number; days: number; hasGit: boolean } {
   if (!existsSync(join(repo, '.git'))) return { commits: 0, days: 999, hasGit: false };
   try {
-    const commits = parseInt(
-      execSync(`git -C "${repo}" rev-list --count HEAD 2>/dev/null || echo 0`,
-        { encoding: 'utf8' }).trim(), 10) || 0;
-    const lastTs = parseInt(
-      execSync(`git -C "${repo}" log -1 --format=%ct 2>/dev/null || echo 0`,
-        { encoding: 'utf8' }).trim(), 10) || 0;
+    const commits = parseInt(runOut('git', ['-C', repo, 'rev-list', '--count', 'HEAD']), 10) || 0;
+    const lastTs = parseInt(runOut('git', ['-C', repo, 'log', '-1', '--format=%ct']), 10) || 0;
     const days = lastTs === 0 ? 999 : Math.floor((Date.now() / 1000 - lastTs) / 86400);
     return { commits, days, hasGit: true };
   } catch {
@@ -185,7 +196,7 @@ export function readRequestBody(req: Connect.IncomingMessage): Promise<string> {
 function convertWindowsPathToWsl(path: string): string {
   const normalized = path.replace(/\r/g, '').trim();
   try {
-    return execSync(`wslpath -u "${normalized.replace(/"/g, '\\"')}"`, { encoding: 'utf8' }).trim();
+    return execFileSync('wslpath', ['-u', normalized], { encoding: 'utf8' }).trim();
   } catch {
     const driveMatch = /^([a-zA-Z]):[\\/](.*)$/.exec(normalized);
     if (!driveMatch) return normalized;
@@ -195,41 +206,32 @@ function convertWindowsPathToWsl(path: string): string {
   }
 }
 
-function tryPickWithCommand(command: string): string | null {
-  try {
-    const output = execSync(command, { encoding: 'utf8' }).trim();
-    return output.length > 0 ? output : null;
-  } catch {
-    return null;
-  }
+function tryPickWithCommand(executable: string, args: string[]): string | null {
+  const output = runOut(executable, args);
+  return output.length > 0 ? output : null;
 }
 
 function canRunCommand(binary: string): boolean {
   try {
-    execSync(`command -v "${binary}"`, { stdio: 'ignore' });
+    if (binary.endsWith('.exe')) {
+      execFileSync(binary, ['-NoProfile', '-Command', 'exit'], { stdio: 'ignore' });
+    } else {
+      execFileSync('which', [binary], { stdio: 'ignore' });
+    }
     return true;
   } catch {
-    if (binary.endsWith('.exe')) {
-      try {
-        execSync(`"${binary}" -NoProfile -Command exit`, { stdio: 'ignore' });
-        return true;
-      } catch {
-        return false;
-      }
-    }
     return false;
   }
 }
 
-function buildEncodedPowershellCommand(executable: string, script: string): string {
+function buildEncodedPowershellArgs(script: string): string[] {
   const encoded = Buffer.from(script, 'utf16le').toString('base64');
-  return `${executable} -NoProfile -STA -EncodedCommand ${encoded}`;
+  return ['-NoProfile', '-STA', '-EncodedCommand', encoded];
 }
 
 function tryPickWithWindowsDialog(executable: string): string | null {
   const commands = [
-    buildEncodedPowershellCommand(
-      executable,
+    buildEncodedPowershellArgs(
       [
         'Add-Type -AssemblyName System.Windows.Forms',
         'Add-Type -TypeDefinition "using System; using System.Runtime.InteropServices; public static class WinFg { [DllImport(\\"user32.dll\\")] public static extern bool AllowSetForegroundWindow(uint pid); [DllImport(\\"user32.dll\\")] public static extern bool SetForegroundWindow(IntPtr h); }"',
@@ -251,8 +253,7 @@ function tryPickWithWindowsDialog(executable: string): string | null {
         'if ($picked -ne $null) { $picked }',
       ].join('; '),
     ),
-    buildEncodedPowershellCommand(
-      executable,
+    buildEncodedPowershellArgs(
       [
         'Add-Type -AssemblyName System.Windows.Forms',
         '$shell = New-Object -ComObject Shell.Application',
@@ -261,8 +262,8 @@ function tryPickWithWindowsDialog(executable: string): string | null {
       ].join('; '),
     ),
   ];
-  for (const command of commands) {
-    const picked = tryPickWithCommand(command);
+  for (const args of commands) {
+    const picked = tryPickWithCommand(executable, args);
     if (picked) return picked;
   }
   return null;
@@ -271,8 +272,9 @@ function tryPickWithWindowsDialog(executable: string): string | null {
 export function pickFolderWithSystemDialog(): string {
   const os = platform();
   if (os === 'darwin') {
-    const output = execSync(
-      `osascript -e 'POSIX path of (choose folder with prompt "Selecciona la carpeta raiz del mapa")'`,
+    const output = execFileSync(
+      'osascript',
+      ['-e', 'POSIX path of (choose folder with prompt "Selecciona la carpeta raiz del mapa")'],
       { encoding: 'utf8' },
     ).trim();
     if (!output) throw new Error('Dialogo cancelado');
@@ -291,20 +293,22 @@ export function pickFolderWithSystemDialog(): string {
     if (windowsPicked) return convertWindowsPathToWsl(windowsPicked);
   }
 
-  const linuxCandidateCommands: string[] = [];
+  const linuxCandidateCommands: Array<{ executable: string; args: string[] }> = [];
   if (canRunCommand('zenity')) {
-    linuxCandidateCommands.push(
-      `zenity --file-selection --directory --title="Selecciona la carpeta raiz del mapa"`,
-    );
+    linuxCandidateCommands.push({
+      executable: 'zenity',
+      args: ['--file-selection', '--directory', '--title=Selecciona la carpeta raiz del mapa'],
+    });
   }
   if (canRunCommand('kdialog')) {
-    linuxCandidateCommands.push(
-      `kdialog --getexistingdirectory "${homedir()}" "Selecciona la carpeta raiz del mapa"`,
-    );
+    linuxCandidateCommands.push({
+      executable: 'kdialog',
+      args: ['--getexistingdirectory', homedir(), 'Selecciona la carpeta raiz del mapa'],
+    });
   }
 
-  for (const command of linuxCandidateCommands) {
-    const picked = tryPickWithCommand(command);
+  for (const { executable, args } of linuxCandidateCommands) {
+    const picked = tryPickWithCommand(executable, args);
     if (picked) return picked;
   }
 
@@ -711,14 +715,19 @@ export function repocivPlugin(mapRoot: string): Plugin {
 
         if (file) {
           // Per-file git history + blame
-          const logRaw = execSync(
-            `git -C "${repoPath}" log --oneline -n 5 -- "${file}" 2>/dev/null || true`,
-            { encoding: 'utf8' },
-          ).trim();
-          const blameRaw = execSync(
-            `git -C "${repoPath}" blame -L 1,15 --porcelain -- "${file}" 2>/dev/null || true`,
-            { encoding: 'utf8' },
-          ).trim();
+          // `file` is attacker-controlled (query string). As one argv entry
+          // after `--` it can never be reinterpreted as shell.
+          const logRaw = runOut('git', ['-C', repoPath, 'log', '--oneline', '-n', '5', '--', file]);
+          const blameRaw = runOut('git', [
+            '-C',
+            repoPath,
+            'blame',
+            '-L',
+            '1,15',
+            '--porcelain',
+            '--',
+            file,
+          ]);
 
           const log = logRaw ? logRaw.split('\n').filter(Boolean) : [];
           const blame: Array<{ line: number; author: string; date: string }> = [];
@@ -748,13 +757,15 @@ export function repocivPlugin(mapRoot: string): Plugin {
         }
 
         // Repo-wide git summary (existing behaviour)
-        const status = execSync(`git -C "${repoPath}" status --short 2>/dev/null || true`,
-          { encoding: 'utf8' }).trim();
-        const branch = execSync(`git -C "${repoPath}" branch --show-current 2>/dev/null || echo`,
-          { encoding: 'utf8' }).trim();
-        const lastCommit = execSync(
-          `git -C "${repoPath}" log -1 --pretty=format:'%h|%s|%ar' 2>/dev/null || echo`,
-          { encoding: 'utf8' }).trim();
+        const status = runOut('git', ['-C', repoPath, 'status', '--short']);
+        const branch = runOut('git', ['-C', repoPath, 'branch', '--show-current']);
+        const lastCommit = runOut('git', [
+          '-C',
+          repoPath,
+          'log',
+          '-1',
+          '--pretty=format:%h|%s|%ar',
+        ]);
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({
           branch, lastCommit,
