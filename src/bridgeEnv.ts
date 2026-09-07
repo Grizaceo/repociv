@@ -29,3 +29,12 @@ export function hermesWebUrl(path = ''): string {
 export function bridgeHeaders(extra: Record<string, string> = {}): Record<string, string> {
   return BRIDGE_TOKEN ? { ...extra, 'X-RepoCiv-Token': BRIDGE_TOKEN } : extra;
 }
+
+/** WebSocket auth uses the same token as HTTP/SSE, including direct bridge URLs.
+ *  _connectWs used to blank the token whenever VITE_BRIDGE_URL was set, so a
+ *  configured token plus a direct bridge URL — the Docker Compose and public
+ *  demo shape — could never authenticate: the server answered auth_error and
+ *  the client fell back to SSE for the rest of the session. (from 78dd598) */
+export function bridgeWebSocketToken(): string {
+  return BRIDGE_TOKEN;
+}
