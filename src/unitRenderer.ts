@@ -3,7 +3,13 @@ import { axialToPixel, type Axial } from './hex.ts';
 import { type Unit, type Building, tileKey } from './types.ts';
 import { type GameState } from './game.ts';
 import { HEX_SIZE } from './constants.ts';
-import { resolveBotIdentity, getRosterMap, getAvatarImage, type RosterEntry } from './avatarClient.ts';
+import {
+  resolveBotIdentity,
+  getRosterMap,
+  getAvatarImage,
+  type AvatarKind,
+  type RosterEntry,
+} from './avatarClient.ts';
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -12,8 +18,16 @@ function lerp(a: number, b: number, t: number): number {
 // Per-unit resolved identity (lazy async resolve, cached so drawUnit stays sync).
 // Uses resolveBotIdentity() — the SAME resolver the assembly scene uses — so a
 // bot looks identical on the hex grid and in the assembly (consistent identity).
-const unitIdentityCache = new Map<string, string | null>();
+const unitIdentityCache = new Map<string, { url: string; kind: AvatarKind } | null>();
 const unitAvatarPending = new Set<string>();
+
+// Hermes pet sheets are a fixed grid of animation frames, 8 across by 9 down.
+// The frame SIZE varies per sheet, so derive it instead of hardcoding it.
+// Drawing the sheet whole — the previous behaviour — squeezed all 72 frames
+// into a ~7px circle: the pet was technically on the board and entirely
+// unreadable.
+const PET_SHEET_COLS = 8;
+const PET_SHEET_ROWS = 9;
 
 /**
  * Draw the Bot Mode identity (pet/face) of a unit as a circular avatar over the
@@ -28,10 +42,11 @@ function drawUnitAvatar(unit: Unit, ctx: CanvasRenderingContext2D): void {
     void getRosterMap()
       .then((map) => {
         const entry: RosterEntry | null = map.get(normalizeName(unit.id)) ?? null;
-        return resolveBotIdentity(entry).imageUrl;
+        const identity = resolveBotIdentity(entry);
+        return identity.imageUrl ? { url: identity.imageUrl, kind: identity.kind } : null;
       })
-      .then((url) => {
-        unitIdentityCache.set(unit.id, url);
+      .then((identity) => {
+        unitIdentityCache.set(unit.id, identity);
         unitAvatarPending.delete(unit.id);
       })
       .catch(() => {
@@ -42,7 +57,7 @@ function drawUnitAvatar(unit: Unit, ctx: CanvasRenderingContext2D): void {
   }
   if (!cached) return;
 
-  const img = getAvatarImage(cached);
+  const img = getAvatarImage(cached.url);
   if (!img) return; // not loaded yet → initials show through
 
   const r = HEX_SIZE * 0.18;
@@ -52,7 +67,14 @@ function drawUnitAvatar(unit: Unit, ctx: CanvasRenderingContext2D): void {
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.closePath();
   ctx.clip();
-  ctx.drawImage(img, -r, -r, r * 2, r * 2);
+  if (cached.kind === 'pet' && img.naturalWidth > 0) {
+    // A pet's avatar_url IS the spritesheet — draw one frame out of it.
+    const fw = img.naturalWidth / PET_SHEET_COLS;
+    const fh = img.naturalHeight / PET_SHEET_ROWS;
+    ctx.drawImage(img, 0, 0, fw, fh, -r, -r, r * 2, r * 2);
+  } else {
+    ctx.drawImage(img, -r, -r, r * 2, r * 2);
+  }
   ctx.restore();
 }
 
