@@ -32,3 +32,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Tests use lambdas freely for monkeypatch fixtures; legacy `pass` style.
 "server/test_*.py" = ["E731"]
+# Blender generator scripts are written in compact statement-per-semicolon
+# style so vertex/face tables can be pasted into Blender's console in chunks.
+# Style-only rules; real defects (F-rules, E722, E741) stay enforced.
+"scripts/blender/*.py" = ["E701", "E702"]

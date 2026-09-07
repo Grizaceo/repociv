@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rebuild all 25 RepoCiv GLB assets with proper per-asset export.
+"""Rebuild all RepoCiv GLB assets with proper per-asset export.
 
 Each asset is built and exported individually so GLB files contain
 ONLY the intended mesh — not every object in the scene.
@@ -9,7 +9,6 @@ Run via Blender MCP execute_code (copy-paste chunks) or via:
 """
 import bpy
 import math
-import sys
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,7 +31,7 @@ def make_mat(name, bc, rough, metal=0.0, em_c=None, em_s=0.0):
     if em_c:
         try:
             bsdf.inputs["Emission Color"].default_value = (em_c[0], em_c[1], em_c[2], 1.0)
-        except:
+        except Exception:
             bsdf.inputs["Emission"].default_value = (em_c[0], em_c[1], em_c[2], 1.0)
         bsdf.inputs["Emission Strength"].default_value = em_s
     return mat
@@ -361,10 +360,10 @@ def build_worker():
     head_f = box_faces(h); nh = len(head_f)
     leg_f = []
     for lx in [-0.06, 0.04]:
-        l = len(verts)
+        lg = len(verts)
         verts += [(lx-0.03,-0.04,0),(lx+0.03,-0.04,0),(lx+0.03,0.04,0),(lx-0.03,0.04,0),
                   (lx-0.03,-0.04,0.20),(lx+0.03,-0.04,0.20),(lx+0.03,0.04,0.20),(lx-0.03,0.04,0.20)]
-        leg_f += box_faces(l)
+        leg_f += box_faces(lg)
     nl = len(leg_f)
     arm_f = []
     for ax in [-0.12, 0.10]:
@@ -468,105 +467,6 @@ def build_deciduous(vi):
     export_glb(f'forest-deciduous-{vi}')
     clear_scene()
 
-def build_bibliotheca():
-    verts = []; stone_f = []
-    b = 0
-    verts += [(-0.40,-0.25,0),(0.40,-0.25,0),(0.40,0.25,0),(-0.40,0.25,0),
-              (-0.40,-0.25,0.05),(0.40,-0.25,0.05),(0.40,0.25,0.05),(-0.40,0.25,0.05)]
-    stone_f += [(b,b+1,b+2),(b,b+2,b+3),(b+4,b+6,b+5),(b+4,b+7,b+6),(b,b+4,b+5),(b,b+5,b+1),
-                (b+1,b+5,b+6),(b+1,b+6,b+2),(b+2,b+6,b+7),(b+2,b+7,b+3),(b+3,b+7,b+4),(b+3,b+4,b)]
-    col_h = 0.35; col_r = 0.04; n_col = 6
-    for (cx, cy) in [(-0.25,-0.15),(0.25,-0.15),(-0.25,0.15),(0.25,0.15)]:
-        c_base = len(verts)
-        for si in range(2):
-            z = si * col_h
-            for i in range(n_col):
-                angle = (i / n_col) * math.tau
-                verts.append((cx+math.cos(angle)*col_r, cy+math.sin(angle)*col_r, 0.05+z))
-        for i in range(n_col):
-            i2 = (i + 1) % n_col
-            stone_f += [(c_base+i, c_base+i2, c_base+n_col+i), (c_base+i2, c_base+n_col+i2, c_base+n_col+i)]
-    r_base = len(verts); rz = 0.05 + col_h
-    verts += [(-0.30,-0.20,rz),(0.30,-0.20,rz),(0.30,0.20,rz),(-0.30,0.20,rz),
-              (-0.30,-0.20,rz+0.05),(0.30,-0.20,rz+0.05),(0.30,0.20,rz+0.05),(-0.30,0.20,rz+0.05)]
-    stone_f += [(r_base,r_base+1,r_base+2),(r_base,r_base+2,r_base+3),(r_base+4,r_base+6,r_base+5),(r_base+4,r_base+7,r_base+6),
-                (r_base,r_base+4,r_base+5),(r_base,r_base+5,r_base+1),(r_base+1,r_base+5,r_base+6),(r_base+1,r_base+6,r_base+2),
-                (r_base+2,r_base+6,r_base+7),(r_base+2,r_base+7,r_base+3),(r_base+3,r_base+7,r_base+4),(r_base+3,r_base+4,r_base)]
-    n_stone = len(stone_f)
-    # Dome
-    d_base = len(verts); dz = rz + 0.05; dr = 0.12
-    verts += [(0,0,dz+0.15), (dr,0,dz), (0,dr,dz), (-dr,0,dz), (0,-dr,dz), (0,0,dz-0.036)]
-    gold_f = [(d_base,d_base+1,d_base+2),(d_base,d_base+2,d_base+4),(d_base,d_base+4,d_base+3),(d_base,d_base+3,d_base+1),
-              (d_base+5,d_base+2,d_base+1),(d_base+5,d_base+4,d_base+2),(d_base+5,d_base+3,d_base+4),(d_base+5,d_base+1,d_base+3)]
-    n_gold = len(gold_f)
-    # Door
-    door_base = len(verts)
-    verts += [(-0.08,-0.20,0.05),(0.08,-0.20,0.05),(0.08,-0.20,0.17),(-0.08,-0.20,0.17)]
-    door_f = [(door_base,door_base+1,door_base+2),(door_base,door_base+2,door_base+3)]
-    n_door = len(door_f)
-    
-    mats = [
-        (make_mat('wb-stone', (0.72,0.68,0.58), 0.80, 0.02), n_stone),
-        (make_mat('wb-gold', (0.82,0.62,0.22), 0.18, 0.78, (0.20,0.14,0.05), 0.4), n_gold),
-        (make_mat('wb-door', (0.12,0.08,0.05), 0.90, 0.0, (0.08,0.05,0.02), 0.3), n_door),
-    ]
-    add_mesh_to_scene('wonder-bibliotheca-0', verts, stone_f + gold_f + door_f, mats)
-    export_glb('wonder-bibliotheca-0')
-    clear_scene()
-
-def build_institutum():
-    verts = []; stone_f = []
-    b = 0
-    verts += [(-0.35,-0.22,0),(0.35,-0.22,0),(0.35,0.22,0),(-0.35,0.22,0),
-              (-0.35,-0.22,0.04),(0.35,-0.22,0.04),(0.35,0.22,0.04),(-0.35,0.22,0.04)]
-    stone_f += [(b,b+1,b+2),(b,b+2,b+3),(b+4,b+6,b+5),(b+4,b+7,b+6),(b,b+4,b+5),(b,b+5,b+1),
-                (b+1,b+5,b+6),(b+1,b+6,b+2),(b+2,b+6,b+7),(b+2,b+7,b+3),(b+3,b+7,b+4),(b+3,b+4,b)]
-    col_h = 0.30; col_r = 0.035; n_col = 6
-    for (cx, cy) in [(-0.22,-0.12),(0,-0.12),(0.22,-0.12),(-0.22,0.12),(0,0.12),(0.22,0.12)]:
-        c_base = len(verts)
-        for si in range(2):
-            z = si * col_h
-            for i in range(n_col):
-                angle = (i / n_col) * math.tau
-                verts.append((cx+math.cos(angle)*col_r, cy+math.sin(angle)*col_r, 0.04+z))
-        for i in range(n_col):
-            i2 = (i + 1) % n_col
-            stone_f += [(c_base+i, c_base+i2, c_base+n_col+i), (c_base+i2, c_base+n_col+i2, c_base+n_col+i)]
-    r_base = len(verts); rz = 0.04 + col_h
-    verts += [(-0.28,-0.18,rz),(0.28,-0.18,rz),(0.28,0.18,rz),(-0.28,0.18,rz),
-              (-0.28,-0.18,rz+0.04),(0.28,-0.18,rz+0.04),(0.28,0.18,rz+0.04),(-0.28,0.18,rz+0.04)]
-    stone_f += [(r_base,r_base+1,r_base+2),(r_base,r_base+2,r_base+3),(r_base+4,r_base+6,r_base+5),(r_base+4,r_base+7,r_base+6),
-                (r_base,r_base+4,r_base+5),(r_base,r_base+5,r_base+1),(r_base+1,r_base+5,r_base+6),(r_base+1,r_base+6,r_base+2),
-                (r_base+2,r_base+6,r_base+7),(r_base+2,r_base+7,r_base+3),(r_base+3,r_base+7,r_base+4),(r_base+3,r_base+4,r_base)]
-    n_stone = len(stone_f)
-    # Obelisk
-    ob_base = len(verts); ob_h = 0.35; ob_r = 0.05; n_ob = 4
-    for i in range(n_ob):
-        angle = (i / n_ob) * math.tau
-        verts.append((math.cos(angle)*ob_r, math.sin(angle)*ob_r, rz+0.04))
-    ob_mid = len(verts)
-    for i in range(n_ob):
-        angle = (i / n_ob) * math.tau; r_top = ob_r * 0.5
-        verts.append((math.cos(angle)*r_top, math.sin(angle)*r_top, rz+0.04+ob_h*0.7))
-    ob_tip = len(verts); verts.append((0, 0, rz+0.04+ob_h))
-    gold_f = []
-    for i in range(n_ob):
-        i2 = (i + 1) % n_ob
-        gold_f += [(ob_base+i, ob_mid+i, ob_base+i2), (ob_base+i2, ob_mid+i, ob_mid+i2)]
-    for i in range(n_ob):
-        i2 = (i + 1) % n_ob; gold_f.append((ob_mid+i, ob_tip, ob_mid+i2))
-    n_gold = len(gold_f)
-    
-    mats = [
-        (make_mat('wi-marble', (0.85,0.83,0.78), 0.40, 0.02), n_stone),
-        (make_mat('wi-gold', (0.80,0.60,0.20), 0.18, 0.80, (0.18,0.12,0.04), 0.4), n_gold),
-    ]
-    add_mesh_to_scene('wonder-institutum-0', verts, stone_f + gold_f, mats)
-    export_glb('wonder-institutum-0')
-    clear_scene()
-
-# ── MAIN ─────────────────────────────────────────────────────────────────────
-
 def main():
     clear_scene()
     
@@ -612,12 +512,7 @@ def main():
     for vi in range(2):
         build_deciduous(vi)
     
-    # Wonders
-    print("=== WONDERS ===")
-    build_bibliotheca()
-    build_institutum()
-    
-    print("\n=== ALL 22 ASSETS REBUILT AND EXPORTED ===")
+    print("\n=== ALL ASSETS REBUILT AND EXPORTED ===")
 
 if __name__ == '__main__':
     main()

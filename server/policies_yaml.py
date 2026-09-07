@@ -68,7 +68,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Literal
+from typing import Any, Literal
 
 _logger = logging.getLogger(__name__)
 
@@ -197,7 +197,6 @@ def _parse_rule(raw: dict[str, Any], source: Path) -> PolicyRule:
             raise PolicyOverlayError(
                 f"{source}:{name}: risk_levels entry {r!r} not in {_VALID_RISK_LEVELS}"
             )
-    risk_levels = tuple(risk_levels_raw)
     # `risk_levels_raw` was already filtered through _VALID_RISK_LEVELS so the
     # tuple is genuinely Runtime[RiskLevel, ...]; cast preserved through frozen
     # dataclass by AnnotatedField-style declaration below.

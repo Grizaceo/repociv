@@ -1,7 +1,6 @@
 """RepoCiv HTTP route handlers split by domain (Phase 4)."""
 from __future__ import annotations
 
-import json as _json_lib
 import os
 from pathlib import Path
 from typing import Any

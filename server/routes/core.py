@@ -6,6 +6,7 @@ import logging
 import os
 import shutil
 import subprocess
+import threading as _threading
 import time
 import urllib.error
 import urllib.request
@@ -504,8 +505,6 @@ def get_harness_profiles(ctx: "RouteContext") -> tuple[int, Any]:
 #   * Presence is best-effort and DERIVED from the bridge's own send log — we
 #     do NOT proxy gateway RPCs (profiles.status is an MCP tool, not an HTTP
 #     endpoint) and `hermes process list` does not exist.
-import threading as _threading
-
 # DAVI's known static render asset on the Windows host (verified present by
 # red-team). Served by the bridge as a same-origin static file so the frontend
 # never reaches into ~/.hermes/profiles or the Windows filesystem directly.

@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 from collections.abc import Iterable, MutableMapping
 from typing import Final
 

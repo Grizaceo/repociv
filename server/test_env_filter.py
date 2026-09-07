@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 
-import pytest
 
 from server._env_filter import (
     DEFAULT_DENYLIST,

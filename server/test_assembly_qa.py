@@ -18,7 +18,6 @@ config vivo del gateway.
 
 from __future__ import annotations
 
-import json
 import subprocess
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -65,7 +64,6 @@ class TestGetRosterContract:
     def mock_profile_identity(self):
         """Mock profile_identity para que list_harness_options devuelva
         nombres deterministas incluyendo shadow-davi."""
-        import server.routes.core as _core
 
         class _MockProfileIdentity:
             def list_harness_options(self, harness):
@@ -80,7 +78,6 @@ class TestGetRosterContract:
         # reemplazando la referencia dentro de la función.
         # Usamos patch.object sobre el módulo y cross-patch el nombre
         # en el namespace donde get_roster lo usa.
-        import server.routes.core as routes_core
 
         # La forma más simple: mockear el módulo profile_identity completo
         # y asegurar que get_roster lo vea.
@@ -414,9 +411,6 @@ class TestPostRoomMessageContract:
     def test_shell_out_command_is_list_not_string(self):
         """El comando se pasa como lista a subprocess.run (no shell=True),
         lo que evita injection de comandos."""
-        body = {"message": "test", "from_bot": "lexo-alpha"}
-        ctx: RouteContext = {"room": "asamblea-test"}
-
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = ""
