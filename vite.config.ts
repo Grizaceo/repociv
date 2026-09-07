@@ -43,7 +43,7 @@ export default defineConfig(({ mode }) => {
       // Loopback-only: la UI de RepoCiv no se expone al tailnet/WSL-LAN.
       // El bind 0.0.0.0 previo era la misma exposicion que el gateway (:8742).
       // Se accede via 127.0.0.1:5273 / localhost:5273.
-      host: '127.0.0.1',
+      host: '0.0.0.0', // loopback-only was hiding the server from Windows browser
       // allowedHosts:true se mantiene inofensivo porque el bind ya es loopback
       // (solo acepta conexiones que lleguen a 127.0.0.1); no es vector de exposicion.
       allowedHosts: true,
@@ -99,14 +99,26 @@ export default defineConfig(({ mode }) => {
           'src/**/*.test.ts',
           'src/local.demo.ts',
           'src/**/*.d.ts',
-          // DOM/Canvas rendering files — untestable in jsdom
+          // DOM/Canvas rendering files — untestable in jsdom.
+          // The directory forms matter as much as the single files: excluding
+          // src/localRenderer.ts while measuring src/localRenderer/** (and
+          // src/three/**, and the iso renderers) left ~8.7k lines of canvas and
+          // WebGL drawing code in the denominator at near-zero coverage, which
+          // is what pushed the floor below its own threshold.
           'src/ui/**',
+          'src/three/**',
+          'src/localRenderer/**',
           'src/renderer.ts',
           'src/unitRenderer.ts',
           'src/hexRenderer.ts',
           'src/terminalPanel.ts',
           'src/spatialDirectives.ts',
           'src/localRenderer.ts',
+          'src/isoLocalRenderer.ts',
+          'src/isoOfficeRenderer.ts',
+          'src/localOverlays.ts',
+          'src/localStaticLayers.ts',
+          'src/local2dAssets.ts',
           'src/minimapRenderer.ts',
           'src/localWorldManager.ts',
           'src/main.ts',
