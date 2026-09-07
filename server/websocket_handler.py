@@ -52,7 +52,7 @@ REPOCIV_REMOTE = os.environ.get("REPOCIV_REMOTE", "").lower() in ("true", "1", "
 #   1. REPOCIV_TOKEN set but < 32 chars  → SystemExit(1)
 #   2. BRIDGE_WS_HOST non-loopback + token empty  → SystemExit(1)
 #   3. loopback + token empty                    → UserWarning (dev default)
-from server._security import enforce_token_policy  # noqa: E402
+from server._security import build_allowed_origins, enforce_token_policy  # noqa: E402
 
 WS_HOST = "0.0.0.0" if REPOCIV_REMOTE else os.environ.get("BRIDGE_WS_HOST", "127.0.0.1")
 enforce_token_policy(
@@ -60,6 +60,20 @@ enforce_token_policy(
     bind_host=WS_HOST,
     remote=REPOCIV_REMOTE,
     component="ws",
+)
+
+# ─── Origin allowlist ────────────────────────────────────────────────────────
+# WebSockets are NOT subject to CORS: the browser will happily open
+# ws://localhost:5275 from any page the user is visiting, and the handshake
+# succeeds before any application code runs. Without this check, and with the
+# shipped default of an empty REPOCIV_TOKEN (.env.example, docker-compose.yml),
+# any site could drive _handle_incoming → set_command_callback. Same env vars
+# and same builder as the HTTP bridge's CORS list, on purpose.
+_ALLOWED_ORIGINS: set[str] = build_allowed_origins(
+    int(os.environ.get("REPOCIV_PORT", "5273")),
+    remote=REPOCIV_REMOTE,
+    remote_origin=os.environ.get("REPOCIV_REMOTE_ORIGIN", ""),
+    extra_origins=os.environ.get("REPOCIV_CORS_ORIGINS", ""),
 )
 
 # Rate limit: 60 messages / 60s window per connection
@@ -164,13 +178,28 @@ def broadcast(event: dict[str, Any]) -> None:
 async def _auth_ws(ws: websockets.asyncio.server.ServerConnection) -> bool:
     """Authenticate incoming WS connection.
 
-    If REPOCIV_TOKEN is empty (dev mode), auto-authenticate and send auth_ok.
-    Otherwise, the client must send an auth message within 5s:
-      {"type": "auth", "token": "..."}
+    A browser Origin outside the allowlist is rejected outright, token or no
+    token — that is the cross-site hijacking case, and a valid token does not
+    make a foreign page trustworthy. Beyond that: with REPOCIV_TOKEN empty
+    (dev mode) an allowlisted browser is accepted, and every other client must
+    send {"type": "auth", "token": "..."} within 5s.
     """
+    request = getattr(ws, "request", None)
+    headers = getattr(request, "headers", None)
+    origin = headers.get("Origin", "") if headers is not None else ""
+    if origin and origin not in _ALLOWED_ORIGINS:
+        await ws.send(json.dumps({"type": "auth_error", "msg": "origin not allowed"}))
+        return False
+
     if not REPOCIV_TOKEN:
+        # No token configured: an allowlisted browser Origin is the only
+        # evidence available, so an originless client (curl, a script, another
+        # process on the box) gets nothing.
+        if not origin:
+            await ws.send(json.dumps({"type": "auth_error", "msg": "origin not allowed"}))
+            return False
         await ws.send(json.dumps({"type": "auth_ok"}))
-        return True  # Dev mode: auto-auth
+        return True
     try:
         msg = await asyncio.wait_for(ws.recv(), timeout=5.0)
         if isinstance(msg, bytes):

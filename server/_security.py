@@ -151,8 +151,29 @@ def enforce_token_policy(
         )
 
 
+def build_allowed_origins(
+    port: int, *, remote: bool, remote_origin: str, extra_origins: str
+) -> set[str]:
+    """Build the browser-Origin allowlist shared by the HTTP bridge and the WS
+    server. Keeping one implementation is the point: WebSockets are not covered
+    by CORS, so the WS handler has to enforce this itself, and an allowlist that
+    drifts from the HTTP one is a hole nobody notices.
+
+    - Always: localhost + 127.0.0.1 on ``port``.
+    - Remote mode: ``remote_origin`` when non-empty.
+    - Always: comma-separated ``extra_origins`` (WSL2/Tailscale setups where the
+      browser reaches the bridge on a non-loopback IP).
+    """
+    origins = {f"http://localhost:{port}", f"http://127.0.0.1:{port}"}
+    if remote and remote_origin.strip():
+        origins.add(remote_origin.strip())
+    origins.update(origin.strip() for origin in extra_origins.split(",") if origin.strip())
+    return origins
+
+
 __all__ = [
     "MIN_TOKEN_LENGTH",
+    "build_allowed_origins",
     "enforce_token_policy",
     "_is_loopback_bind",  # exported for tests
 ]

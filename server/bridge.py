@@ -87,7 +87,7 @@ REPOCIV_REMOTE = os.environ.get("REPOCIV_REMOTE", "").lower() in ("true", "1", "
 #   2. bind non-loopback + token empty   → SystemExit(1) + loud error
 #   3. bind loopback + token empty       → UserWarning (dev default, not exit)
 # See server/_security.py for the full rules.
-from server._security import enforce_token_policy  # noqa: E402
+from server._security import build_allowed_origins, enforce_token_policy  # noqa: E402
 
 BRIDGE_HOST = "0.0.0.0" if REPOCIV_REMOTE else "127.0.0.1"
 enforce_token_policy(
@@ -127,28 +127,13 @@ HERMES_ROOT = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", "~/.hermes")
 def _build_allowed_origins(
     port: int, *, remote: bool, remote_origin: str, extra_origins: str
 ) -> set[str]:
-    """Build the CORS allowed-origins set.
-
-    - Local mode (default): localhost + 127.0.0.1 on the given port.
-    - Remote mode: also accept ``remote_origin`` (e.g.
-      https://foo.example.com:5273) if non-empty.
-    - Always: ``extra_origins`` (comma-separated) is added. Use this for
-      WSL2/Tailscale setups where the browser hits the bridge at a
-      non-localhost IP (e.g. http://100.123.206.92:5273) that isn't in
-      REPOCIV_REMOTE mode.
-    """
-    out: set[str] = {
-        f"http://localhost:{port}",
-        f"http://127.0.0.1:{port}",
-    }
-    if remote and remote_origin:
-        out.add(remote_origin)
-    if extra_origins:
-        for o in extra_origins.split(","):
-            o = o.strip()
-            if o:
-                out.add(o)
-    return out
+    """CORS allowed-origins set. Thin alias over the shared builder in
+    ``server/_security.py`` so the HTTP allowlist and the WebSocket one are
+    literally the same code. Kept as a module-level name because
+    ``test_bridge_cors.py`` exercises it directly."""
+    return build_allowed_origins(
+        port, remote=remote, remote_origin=remote_origin, extra_origins=extra_origins
+    )
 
 
 # ─── CORS allowed origins ─────────────────────────────────────────────────────

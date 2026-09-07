@@ -16,6 +16,11 @@ import websockets.sync.client
 
 from server import websocket_handler as wsh
 
+# The handler rejects any connection whose Origin is not allowlisted, and (in
+# dev mode, no token) any connection with no Origin at all. Tests therefore
+# connect as a browser on the default RepoCiv port would.
+_DEV_ORIGIN = "http://localhost:5273"
+
 
 def _find_free_port():
     """Get a free port from the OS (avoids random collisions)."""
@@ -68,16 +73,41 @@ def test_ws_connect_dev_mode(ws_server):
     Dev mode auto-authenticates and sends auth_ok immediately.
     """
     port = ws_server
-    with websockets.sync.client.connect(f"ws://127.0.0.1:{port}") as ws:
+    with websockets.sync.client.connect(f"ws://127.0.0.1:{port}", origin=_DEV_ORIGIN) as ws:
         msg = ws.recv(timeout=5)
         data = json.loads(msg)
         assert data["type"] == "auth_ok"
 
 
+def test_ws_rejects_missing_origin_when_dev_token_is_empty(ws_server):
+    """No token configured means the Origin is the only evidence there is, so a
+    client that sends none (curl, a script, any other process on the box) is
+    refused rather than auto-authenticated."""
+    port = ws_server
+    with websockets.sync.client.connect(f"ws://127.0.0.1:{port}") as ws:
+        data = json.loads(ws.recv(timeout=5))
+        assert data == {"type": "auth_error", "msg": "origin not allowed"}
+
+
+def test_ws_rejects_foreign_origin_even_with_valid_token(ws_server, monkeypatch):
+    """Cross-site WebSocket hijacking: WebSockets bypass CORS, so a page the
+    user happens to have open can open a socket to localhost. A correct token
+    does not make a foreign origin trustworthy."""
+    monkeypatch.setattr(wsh, "REPOCIV_TOKEN", "test-token-32-characters-minimum")
+    port = ws_server
+    with websockets.sync.client.connect(
+        f"ws://127.0.0.1:{port}", origin="https://evil.example"
+    ) as ws:
+        # Rejected on the Origin alone — the server never gets as far as asking
+        # for a token, so there is nothing to send.
+        data = json.loads(ws.recv(timeout=5))
+        assert data == {"type": "auth_error", "msg": "origin not allowed"}
+
+
 def test_ws_send_and_receive_ping_pong(ws_server):
     """Client sends ping, server responds with pong."""
     port = ws_server
-    with websockets.sync.client.connect(f"ws://127.0.0.1:{port}") as ws:
+    with websockets.sync.client.connect(f"ws://127.0.0.1:{port}", origin=_DEV_ORIGIN) as ws:
         ws.recv(timeout=5)  # auth_ok
         ws.send(json.dumps({"type": "ping"}))
         msg = ws.recv(timeout=5)
@@ -88,7 +118,7 @@ def test_ws_send_and_receive_ping_pong(ws_server):
 def test_ws_broadcast_reaches_client(ws_server):
     """Events broadcast via wsh.broadcast() reach connected clients."""
     port = ws_server
-    with websockets.sync.client.connect(f"ws://127.0.0.1:{port}") as ws:
+    with websockets.sync.client.connect(f"ws://127.0.0.1:{port}", origin=_DEV_ORIGIN) as ws:
         ws.recv(timeout=5)  # auth_ok
         # Broadcast from sync code
         wsh.broadcast({"type": "log", "msg": "test broadcast", "level": "info"})
@@ -103,7 +133,7 @@ def test_ws_multiple_clients_receive_broadcast(ws_server):
     port = ws_server
     clients = []
     for _ in range(3):
-        ws = websockets.sync.client.connect(f"ws://127.0.0.1:{port}")
+        ws = websockets.sync.client.connect(f"ws://127.0.0.1:{port}", origin=_DEV_ORIGIN)
         ws.recv(timeout=5)  # auth_ok
         clients.append(ws)
 
@@ -122,7 +152,7 @@ def test_ws_multiple_clients_receive_broadcast(ws_server):
 def test_ws_unknown_message_type(ws_server):
     """Server responds with error for unknown message types."""
     port = ws_server
-    with websockets.sync.client.connect(f"ws://127.0.0.1:{port}") as ws:
+    with websockets.sync.client.connect(f"ws://127.0.0.1:{port}", origin=_DEV_ORIGIN) as ws:
         ws.recv(timeout=5)  # auth_ok
         ws.send(json.dumps({"type": "unknown_type", "foo": "bar"}))
         msg = ws.recv(timeout=5)
@@ -134,7 +164,7 @@ def test_ws_unknown_message_type(ws_server):
 def test_ws_invalid_json(ws_server):
     """Server responds with error for invalid JSON."""
     port = ws_server
-    with websockets.sync.client.connect(f"ws://127.0.0.1:{port}") as ws:
+    with websockets.sync.client.connect(f"ws://127.0.0.1:{port}", origin=_DEV_ORIGIN) as ws:
         ws.recv(timeout=5)  # auth_ok
         ws.send(b"not json at all")
         msg = ws.recv(timeout=5)
@@ -168,7 +198,9 @@ def test_ws_auth_with_token():
             pytest.fail(f"WS server did not start on port {port} within 5s")
 
         # Connect without auth — should receive auth_error
-        ws = websockets.sync.client.connect(f"ws://127.0.0.1:{port}", close_timeout=10)
+        ws = websockets.sync.client.connect(
+            f"ws://127.0.0.1:{port}", origin=_DEV_ORIGIN, close_timeout=10
+        )
         try:
             msg = ws.recv(timeout=10)
             data = json.loads(msg)
@@ -177,7 +209,7 @@ def test_ws_auth_with_token():
             ws.close()
 
         # Connect with correct token — should succeed
-        ws = websockets.sync.client.connect(f"ws://127.0.0.1:{port}")
+        ws = websockets.sync.client.connect(f"ws://127.0.0.1:{port}", origin=_DEV_ORIGIN)
         ws.send(json.dumps({"type": "auth", "token": "test-token-123"}))
         msg = ws.recv(timeout=5)
         data = json.loads(msg)
@@ -194,7 +226,7 @@ def test_ws_auth_with_token():
 def test_ws_rate_limit(ws_server):
     """Sending >60 messages in 60s triggers rate limit."""
     port = ws_server
-    with websockets.sync.client.connect(f"ws://127.0.0.1:{port}") as ws:
+    with websockets.sync.client.connect(f"ws://127.0.0.1:{port}", origin=_DEV_ORIGIN) as ws:
         ws.recv(timeout=5)  # auth_ok
         for i in range(61):
             ws.send(json.dumps({"type": "ping"}))
