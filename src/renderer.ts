@@ -39,6 +39,7 @@ import {
   persistRenderMode,
   loadThreeMapRenderer,
   loadLocalScene3D,
+  resolveLocalScene3DEnabled,
 } from './three/renderMode.ts';
 import { terrainElevation } from './isoHex.ts';
 
@@ -164,7 +165,13 @@ export class Renderer {
     | null = null;
   onExitLocalView: (() => void) | null = null;
   private _localRendererCtor: (new (canvas: HTMLCanvasElement) => LocalRendererType) | null = null;
-  private localWorldId: string | null = null;
+  // One latch PER renderer. A single shared `localWorldId` was a race the 2D
+  // path always won: LocalScene3D arrives via dynamic import, so frame 1 falls
+  // through to the 2D renderer, which sets the latch — and by the time the 3D
+  // scene exists the id already matches, so its setWorld() is never called and
+  // it renders an empty scene forever.
+  private localWorldId2D: string | null = null;
+  private localWorldId3D: string | null = null;
   /** Cached tile list sorted by Y — recomputed only when tile count changes. */
   private _tilesYSorted: Tile[] = [];
   private _tilesYSortedSize = -1;
@@ -1263,7 +1270,7 @@ export class Renderer {
       this.threeMap?.setActive(false);
 
       // ── 3D local view (Phase A) ──────────────────────────────────────────
-      const webglLocal = this.worldRenderMode === 'webgl';
+      const webglLocal = this.worldRenderMode === 'webgl' && resolveLocalScene3DEnabled();
       if (webglLocal) {
         if (!this.localScene3D && !this.localScene3DLoadPromise) {
           void this.ensureLocalScene3D().catch((err) => {
@@ -1271,9 +1278,9 @@ export class Renderer {
           });
         }
         if (this.localScene3D && this.state.localWorld) {
-          if (this.state.localWorld.repoId !== this.localWorldId) {
+          if (this.state.localWorld.repoId !== this.localWorldId3D) {
             this.localScene3D.setWorld(this.state.localWorld);
-            this.localWorldId = this.state.localWorld.repoId;
+            this.localWorldId3D = this.state.localWorld.repoId;
           }
           this.localScene3D.setActive(true);
           this.localScene3D.setAgentsForPicking(
@@ -1314,9 +1321,9 @@ export class Renderer {
       const frame = document.getElementById('local-view-frame');
       if (frame) frame.classList.remove('hidden');
       if (!this.localR) return; // still loading module — next frame will retry
-      if (this.state.localWorld && this.state.localWorld.repoId !== this.localWorldId) {
+      if (this.state.localWorld && this.state.localWorld.repoId !== this.localWorldId2D) {
         this.localR.setWorld(this.state.localWorld);
-        this.localWorldId = this.state.localWorld.repoId;
+        this.localWorldId2D = this.state.localWorld.repoId;
       }
       this.localR.render(this.state.getLocalUnits());
 

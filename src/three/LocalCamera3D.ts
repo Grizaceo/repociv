@@ -1,17 +1,35 @@
 // ─── Local view: Three.js OrthographicCamera isometric setup ────────────────
-// Maps the existing 2D iso projection (isoOfficeSprites.ts) into 3D world
-// coordinates so an OrthographicCamera at ~26.57° elevation reproduces the
-// exact same diamond grid.  Zoom and pan are driven by syncing with the 2D
-// LocalRenderer.cam state.
+// The office grid lives in 3D as a FLAT SQUARE LATTICE. The camera does the
+// isometric projection — that is the whole reason to have a 3D scene.
+//
+// This used to bake the 2D iso projection into world XZ and then look at it
+// with an iso camera, projecting twice: the office came out sheared, mis-scaled
+// and off-centre from the 2D view it is supposed to mirror. Grid space is now
+// square (x → +X, y → +Z, one ISO_TILE_W per step), which also lets the tile
+// boxes tile edge to edge instead of overlapping.
+//
+// Zoom and pan still sync with the 2D LocalRenderer.cam so switching between
+// the two renderers does not move the view.
 
 import { OrthographicCamera, Vector3 } from 'three';
 
 import { ISO_TILE_W, ISO_TILE_H, ISO_WALL_H } from '../isoOfficeSprites.ts';
 
-// Camera angle: the 2D iso projection has a 2:1 diamond (64:32),
-// which corresponds to atan(1/2) ≈ 26.57° elevation.
-const CAMERA_ELEVATION = Math.atan(ISO_TILE_H / ISO_TILE_W);
+// Camera angle. For a 2:1 pixel-iso diamond the elevation is asin(1/2) = 30°,
+// NOT atan(h/w) = 26.57°: what has to come out 2:1 is the ratio of the screen
+// projections of one grid step, and that ratio is sin(elevation). At 26.57°
+// the lattice projected 1:2.24 and every tile was subtly too tall.
+const CAMERA_ELEVATION = Math.asin(0.5);
 const CAMERA_AZIMUTH = Math.PI / 4; // 45° — looking down the X+Z diagonal
+
+/** One grid step in 3D world units. Square lattice: the camera, not the
+ *  coordinates, produces the diamond. */
+export const LOCAL_TILE_3D = ISO_TILE_W;
+
+/** A 45° camera sees a world-space step as `step / cos(45°)` on screen, so the
+ *  ortho frustum has to be widened by √2 for the 3D view to match the 2D one
+ *  pixel for pixel at the same zoom. */
+const ISO_FRUSTUM_SCALE = Math.SQRT2;
 
 export interface LocalCamState {
   x: number; // pan target X (world units)
@@ -21,17 +39,21 @@ export interface LocalCamState {
   cy: number; // canvas center Y (pixels)
 }
 
-/** Convert a local grid (x, y, z) to 3D world coordinates. */
+/** Local grid (x, y, z) → 3D world. Square lattice on the XZ plane. */
 export function localGridToWorld3D(x: number, y: number, z: number = 0): Vector3 {
-  return new Vector3((x - y) * (ISO_TILE_W / 2), z * ISO_WALL_H, (x + y) * (ISO_TILE_H / 2));
+  return new Vector3(x * LOCAL_TILE_3D, z * ISO_WALL_H, y * LOCAL_TILE_3D);
 }
 
-/** Inverse: 3D world XZ → grid (x, y) fractional. */
+/** Inverse: 3D world XZ → fractional grid (x, y). */
 export function world3DToLocalGrid(wx: number, wz: number): { x: number; y: number } {
-  // Invert: wx = (x - y) * 32, wz = (x + y) * 16
-  // → x = (wx/32 + wz/16) / 2, y = (wz/16 - wx/32) / 2
-  const a = wx / (ISO_TILE_W / 2);
-  const b = wz / (ISO_TILE_H / 2);
+  return { x: wx / LOCAL_TILE_3D, y: wz / LOCAL_TILE_3D };
+}
+
+/** The 2D renderer pans in iso-projected pixel space; the 3D scene lives in
+ *  square grid space. Unproject so both cameras look at the same tile. */
+export function isoPixelToGrid(px: number, py: number): { x: number; y: number } {
+  const a = px / (ISO_TILE_W / 2);
+  const b = py / (ISO_TILE_H / 2);
   return { x: (a + b) / 2, y: (b - a) / 2 };
 }
 
@@ -61,11 +83,14 @@ export class LocalCamera3D {
 
   /** Sync camera with the 2D LocalCamState (x, y, zoom from LocalRenderer.cam). */
   syncCamera(cam: LocalCamState): void {
-    this.target.set(cam.x, 0, cam.y);
+    // cam.x/cam.y arrive in the 2D renderer's iso-projected pixel space.
+    const g = isoPixelToGrid(cam.x, cam.y);
+    this.target.set(g.x * LOCAL_TILE_3D, 0, g.y * LOCAL_TILE_3D);
 
-    // Ortho zoom: divide frustum by zoom factor
-    const halfW = this.width / 2 / cam.zoom;
-    const halfH = this.height / 2 / cam.zoom;
+    // Ortho zoom: divide the frustum by zoom, then widen by the iso factor so
+    // one grid step covers the same pixels here as it does in the 2D view.
+    const halfW = ((this.width / 2) * ISO_FRUSTUM_SCALE) / cam.zoom;
+    const halfH = ((this.height / 2) * ISO_FRUSTUM_SCALE) / cam.zoom;
     this.camera.left = -halfW;
     this.camera.right = halfW;
     this.camera.top = halfH;

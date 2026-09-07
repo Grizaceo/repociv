@@ -60,6 +60,25 @@ export function persistPostFx(enabled: boolean): void {
   localStorage.setItem(POSTFX_KEY, enabled ? '1' : '0');
 }
 
+// ─── Local sector renderer choice (2D iso vs 3D scene) ──────────────────────
+// The 2D isometric renderer owns the local sector. The 3D scene (LocalScene3D
+// + LocalTile3D + LocalAgent3D) is a real but unfinished second implementation:
+// it renders correctly now, but it has no zone colouring, its walls are opaque
+// slabs that hide the interior, and the 2D renderer still paints an opaque
+// background over it every frame. Until that layering contract is settled,
+// shipping it as the default would be a regression over a view that already
+// looks right.
+//
+// Opt in with ?local3d=1 (or repociv:local3d=1 in localStorage) to work on it.
+const LOCAL3D_KEY = 'repociv:local3d';
+
+export function resolveLocalScene3DEnabled(): boolean {
+  const urlValue = new URLSearchParams(window.location.search).get('local3d');
+  if (urlValue === '0' || urlValue === 'off') return false;
+  if (urlValue === '1' || urlValue === 'on') return true;
+  return localStorage.getItem(LOCAL3D_KEY) === '1';
+}
+
 export async function loadThreeMapRenderer(): Promise<
   typeof import('./ThreeMapRenderer.ts').ThreeMapRenderer
 > {

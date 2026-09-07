@@ -3,10 +3,16 @@ import {
   LocalCamera3D,
   localGridToWorld3D,
   world3DToLocalGrid,
+  isoPixelToGrid,
+  LOCAL_TILE_3D,
   ISO_TILE_W,
   ISO_TILE_H,
   ISO_WALL_H,
 } from './LocalCamera3D.ts';
+
+/** The 3D frustum is widened by this so one grid step covers the same pixels
+ *  as it does in the 2D iso view (a 45° camera foreshortens by cos 45°). */
+const ISO_FRUSTUM_SCALE = Math.SQRT2;
 
 describe('localGridToWorld3D', () => {
   it('maps (0,0,0) to the origin', () => {
@@ -16,18 +22,26 @@ describe('localGridToWorld3D', () => {
     expect(v.z).toBe(0);
   });
 
-  it('maps (1,0,0) one tile along the iso horizontal axis', () => {
+  // The lattice is SQUARE in world space; the camera makes the diamond. A
+  // projection baked in here would be applied twice.
+  it('maps grid +x to world +X, one tile', () => {
     const v = localGridToWorld3D(1, 0, 0);
-    expect(v.x).toBe(ISO_TILE_W / 2);
+    expect(v.x).toBe(LOCAL_TILE_3D);
     expect(v.y).toBe(0);
-    expect(v.z).toBe(ISO_TILE_H / 2);
+    expect(v.z).toBe(0);
   });
 
-  it('maps (0,1,0) along the iso diagonal', () => {
+  it('maps grid +y to world +Z, one tile', () => {
     const v = localGridToWorld3D(0, 1, 0);
-    expect(v.x).toBe(-ISO_TILE_W / 2);
+    expect(v.x).toBe(0);
     expect(v.y).toBe(0);
-    expect(v.z).toBe(ISO_TILE_H / 2);
+    expect(v.z).toBe(LOCAL_TILE_3D);
+  });
+
+  it('keeps tiles exactly one box apart so floors tile edge to edge', () => {
+    const a = localGridToWorld3D(3, 5, 0);
+    const b = localGridToWorld3D(4, 5, 0);
+    expect(b.x - a.x).toBe(ISO_TILE_W);
   });
 
   it('maps elevation via z * ISO_WALL_H', () => {
@@ -36,6 +50,28 @@ describe('localGridToWorld3D', () => {
     expect(v.y).toBe(ISO_WALL_H);
     expect(v.x).toBe(ground.x);
     expect(v.z).toBe(ground.z);
+  });
+});
+
+describe('isoPixelToGrid', () => {
+  // The 2D renderer pans in iso pixels; the 3D scene lives in square grid
+  // space. Without this unprojection both cameras drift apart on pan.
+  it('inverts the 2D iso projection', () => {
+    for (const pair of [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [4, 3],
+      [-2, 5],
+    ]) {
+      const gx = pair[0]!;
+      const gy = pair[1]!;
+      const px = (gx - gy) * (ISO_TILE_W / 2);
+      const py = (gx + gy) * (ISO_TILE_H / 2);
+      const back = isoPixelToGrid(px, py);
+      expect(back.x).toBeCloseTo(gx, 9);
+      expect(back.y).toBeCloseTo(gy, 9);
+    }
   });
 });
 
@@ -72,8 +108,8 @@ describe('LocalCamera3D', () => {
     const cam = new LocalCamera3D(800, 600);
     cam.syncCamera({ x: 0, y: 0, zoom: 2, cx: 400, cy: 300 });
     const c = cam.getCamera();
-    expect(c.right).toBe(200);
-    expect(c.top).toBe(150);
+    expect(c.right).toBeCloseTo(200 * ISO_FRUSTUM_SCALE, 6);
+    expect(c.top).toBeCloseTo(150 * ISO_FRUSTUM_SCALE, 6);
   });
 
   it('syncCamera moves the target', () => {
@@ -90,7 +126,7 @@ describe('LocalCamera3D', () => {
     cam.resize(1000, 500);
     cam.syncCamera({ x: 0, y: 0, zoom: 1, cx: 500, cy: 250 });
     const c = cam.getCamera();
-    expect(c.right).toBe(500);
-    expect(c.top).toBe(250);
+    expect(c.right).toBeCloseTo(500 * ISO_FRUSTUM_SCALE, 6);
+    expect(c.top).toBeCloseTo(250 * ISO_FRUSTUM_SCALE, 6);
   });
 });
