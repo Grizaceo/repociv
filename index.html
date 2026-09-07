@@ -191,8 +191,26 @@
 
         <!-- Command Bar (All Heroes) -->
         <div id="command-bar">
-          <div id="hero-bar-slots"></div>
+          <div id="hero-bar-header">
+            <span id="hero-bar-zone" class="hero-zone-label">En campo</span>
+            <span id="hero-bar-hint" class="hero-zone-hint">1–9 selecciona · Tab cicla</span>
+          </div>
+          <!-- First-frame content: bootstrap() only reaches renderHeroBar after
+               onboarding, world generation and asset loading, so an empty
+               container here is what the user stares at on open. renderHeroBar
+               replaces this wholesale on its first run. -->
+          <div id="hero-bar-slots">
+            <div class="hero-empty">
+              <svg class="hero-empty-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6 13.6 4.8V11.2L8 14.4 2.4 11.2V4.8Z"/></svg>
+              <div class="hero-empty-copy">
+                <span class="hero-empty-title">Desplegando el mapa…</span>
+                <span class="hero-empty-hint">Los agentes en campo aparecen acá.</span>
+              </div>
+            </div>
+          </div>
           <div class="hero-bar-spawn">
+            <div id="profile-launchers" class="profile-launchers"></div>
+            <span class="hero-bar-divider" aria-hidden="true"></span>
             <button class="spawn-btn spawn-new-profile" id="spawn-new-profile" title="Nuevo perfil [N]" aria-label="Crear nuevo perfil">+ Nuevo</button>
             <button class="spawn-btn spawn-botmode" id="spawn-botmode" title="Spawnear bot de Bot Mode" aria-label="Spawnear bot del Bot Mode">➕ Bot</button>
             <button class="spawn-btn" data-type="MAIN" title="Agente principal [Ctrl+Q]" aria-label="Desplegar agente principal">Q</button>

@@ -1320,6 +1320,11 @@ async function bootstrap() {
     if (state.selectedUnit) showUnitPanel(state.selectedUnit, state);
   };
   state.subscribe(refreshHero);
+  // Draw once up front: subscribing alone left the bar's container literally
+  // empty until the first state notify arrived — measured at ~10 s from load,
+  // which is the whole first impression of the session. With nothing to draw
+  // yet this paints the empty state, which names the next action.
+  refreshHero();
   bindOrdenDeBatalla(state);
   bindSubagentSessionPanel(state);
   bindSlashCommandState(state);

@@ -82,28 +82,28 @@ function buildDOM() {
 
       <!-- ── FATIGUE THRESHOLDS ────────────────────────────────────────────── -->
       <section class="settings-section">
-        <h3 class="settings-section-title">Fatiga — Umbrales</h3>
+        <h3 class="settings-section-title">Contexto — Umbrales</h3>
 
         <div class="setting-row">
           <label class="setting-label" for="set-fatigue-warn">
-            Bajo ⚠ <span id="set-fatigue-warn-val" class="setting-val">30%</span>
+            Bajo ⚠ <span id="set-fatigue-warn-val" class="setting-val">60%</span>
           </label>
           <input type="range" id="set-fatigue-warn" class="setting-range"
-            min="5" max="80" value="30" step="5" />
+            min="20" max="90" value="60" step="5" />
           <span class="setting-desc">Barra naranja cuando contexto &lt; este valor</span>
         </div>
 
         <div class="setting-row">
           <label class="setting-label" for="set-fatigue-crit">
-            Crítico ☠ <span id="set-fatigue-crit-val" class="setting-val">60%</span>
+            Crítico ☠ <span id="set-fatigue-crit-val" class="setting-val">15%</span>
           </label>
           <input type="range" id="set-fatigue-crit" class="setting-range"
-            min="10" max="95" value="60" step="5" />
+            min="5" max="50" value="15" step="5" />
           <span class="setting-desc">Barra roja cuando contexto &lt; este valor</span>
         </div>
 
         <div class="setting-hint">
-          ⚡ Umbral crítico debe ser ≥ umbral bajo
+          ⚡ El contexto baja de verde a naranja a rojo, así que crítico ≤ bajo
         </div>
       </section>
 

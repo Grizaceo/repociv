@@ -160,11 +160,13 @@ export async function refreshProfiles(): Promise<void> {
 // ─── Slot rendering ───────────────────────────────────────────────────────────
 
 function _renderSlots(): void {
-  // Inject profile slots into the hero-bar-slots div (above spawn buttons)
-  const slotsContainer = _el('hero-bar-slots');
+  // Profiles are LAUNCHERS, not agents: they live in the spawn row next to the
+  // Q/W/E buttons that do the same job, never mixed in with the live-agent
+  // chips. Sharing #hero-bar-slots also meant renderHeroBar's innerHTML reset
+  // wiped them on every state tick, with nothing subscribed to put them back.
+  const slotsContainer = _el('profile-launchers');
   if (!slotsContainer) return;
 
-  // Remove existing profile slots (keep hero slots added by renderHeroBar)
   slotsContainer.querySelectorAll('.profile-slot').forEach((el) => el.remove());
 
   const sorted = Object.values(_profiles).sort(
@@ -173,7 +175,7 @@ function _renderSlots(): void {
 
   sorted.forEach((profile) => {
     const slot = document.createElement('div');
-    slot.className = 'hero-slot profile-slot';
+    slot.className = 'profile-slot';
     if (profile.name === _selectedName) slot.classList.add('selected');
     slot.title = `${profile.display_name ?? profile.name} [${profile.harness}]`;
     slot.dataset['name'] = profile.name;
@@ -181,7 +183,7 @@ function _renderSlots(): void {
     const meta = HARNESS_META[profile.harness] ?? { emoji: '?', label: profile.harness };
     const label = profile.display_name ?? profile.name;
     slot.innerHTML = `
-      <span class="hero-slot-sprite" style="font-size:22px;">${meta.emoji}</span>
+      <span class="slot-profile-glyph">${meta.emoji}</span>
       <span class="slot-profile-name">${label.substring(0, 4)}</span>
     `;
     slot.addEventListener('click', () => selectProfile(profile.name));
@@ -202,7 +204,7 @@ function _renderSlots(): void {
       const fromName = e.dataTransfer?.getData('text/plain');
       if (fromName && fromName !== profile.name) void _reorderProfile(fromName, profile.name);
     });
-    slotsContainer.prepend(slot);
+    slotsContainer.appendChild(slot);
   });
 }
 

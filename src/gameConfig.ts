@@ -5,11 +5,15 @@ import { logger } from './logger.ts';
 import * as v from 'valibot';
 
 export interface GameConfig {
-  // Fatigue thresholds (as fractions 0–1)
+  // Remaining-context thresholds, as fractions 0–1 of a unit's context budget.
+  // The scale runs one way: 1 = fresh, 0 = exhausted, and each threshold is the
+  // point BELOW which the bar changes colour. So critical <= warn, always.
+  // (Kept under the `fatigue` key for localStorage compatibility; the values are
+  // remaining context, which is what the UI has always labelled them.)
   fatigue: {
-    warnThreshold: number; // Below this → orange bar (default 0.3 = 30%)
-    criticalThreshold: number; // Below this → red bar (default 0.6 = 60% matches panel.ts hardcode)
-    autoWarnBelow: number; // Console.warn when fatigue drops below this (default 0.2 = 20%)
+    warnThreshold: number; // Below this → orange bar (default 0.6 = 60%)
+    criticalThreshold: number; // Below this → red bar (default 0.15 = 15%)
+    autoWarnBelow: number; // Console.warn when context drops below this (default 0.2 = 20%)
   };
   // Animation
   animations: {
@@ -53,8 +57,8 @@ const GameConfigSchema = v.object({
 
 const DEFAULT_CONFIG: GameConfig = {
   fatigue: {
-    warnThreshold: 0.3, // was hardcoded in panel.ts:71
-    criticalThreshold: 0.6, // was hardcoded in panel.ts:71
+    warnThreshold: 0.6, // below 60% context → orange
+    criticalThreshold: 0.15, // below 15% context → red
     autoWarnBelow: 0.2, // was hardcoded in game.ts:217
   },
   animations: {
@@ -91,7 +95,25 @@ export function loadConfig(): GameConfig {
     _cached = { ...DEFAULT_CONFIG };
   }
   if (!_cached) _cached = { ...DEFAULT_CONFIG };
+  _cached = normalizeThresholds(_cached);
   return _cached;
+}
+
+/** Both thresholds are "colour changes below this", so critical must sit at or
+ *  below warn. Configs written before that convention stored them the other way
+ *  round (warn 0.3 / critical 0.6); swapping restores the user's intent instead
+ *  of silently collapsing the orange band to nothing. */
+export function normalizeThresholds(config: GameConfig): GameConfig {
+  const { warnThreshold, criticalThreshold } = config.fatigue;
+  if (criticalThreshold <= warnThreshold) return config;
+  return {
+    ...config,
+    fatigue: {
+      ...config.fatigue,
+      warnThreshold: criticalThreshold,
+      criticalThreshold: warnThreshold,
+    },
+  };
 }
 
 /** Read current config (alias used by gameplay systems). */
@@ -101,7 +123,8 @@ export function getConfig(): GameConfig {
 
 /** Persist config to localStorage */
 export function saveConfig(cfg: GameConfig): void {
-  _cached = cfg;
+  _cached = normalizeThresholds(cfg);
+  cfg = _cached;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
   } catch {

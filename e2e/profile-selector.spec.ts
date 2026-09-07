@@ -144,7 +144,7 @@ async function boot(page: Page) {
  *  scroll-into-view hangs on the command-bar layout once the profile strip
  *  is injected, while a direct DOM click works reliably. */
 async function openChat(page: Page) {
-  const slot = page.locator('#hero-bar-slots .hero-slot:not(.profile-slot)').first();
+  const slot = page.locator('#hero-bar-slots .hero-chip').first();
   await expect(slot).toBeVisible({ timeout: 20_000 });
   // force:true skips Playwright's scroll-into-view (which hangs on the
   // command-bar layout once the profile strip is injected). The slot click

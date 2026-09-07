@@ -104,7 +104,7 @@ async function boot(page: Page) {
 async function openChat(page: Page) {
   // Exclude .profile-slot: profile slots only select a profile, they do not
   // open the chat. The first unit slot is the initial unit.
-  const slot = page.locator('#hero-bar-slots .hero-slot:not(.profile-slot)').first();
+  const slot = page.locator('#hero-bar-slots .hero-chip').first();
   await expect(slot).toBeVisible({ timeout: 20_000 });
   await slot.scrollIntoViewIfNeeded();
   await slot.click({ force: true });

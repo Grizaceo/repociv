@@ -50,7 +50,7 @@ async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}
 }
 
 test.describe('RepoCiv e2e visual', () => {
-  test('carga inicial: mapa, bridge vivo, HUD de recursos y DAVI', async ({ page }) => {
+  test('carga inicial: mapa, bridge vivo, HUD de recursos y barra de agentes', async ({ page }) => {
     await bootRepoCiv(page);
 
     const canvasBox = await page.locator('#main-canvas').boundingBox();
@@ -62,7 +62,7 @@ test.describe('RepoCiv e2e visual', () => {
     await expect(page.locator('#res-science .res-value')).not.toHaveText('');
     await expect(page.locator('#res-production .res-value')).not.toHaveText('');
 
-    await expect(page.locator('#hero-bar-slots .hero-slot[title^="DAVI"]')).toBeVisible();
+    await expect(page.locator('#hero-bar-slots .hero-chip').first()).toBeVisible();
     await expect(page.locator('#bridge-status')).toHaveText(/hermes|openclaw/i, { timeout: 20_000 });
   });
 
@@ -83,7 +83,10 @@ test.describe('RepoCiv e2e visual', () => {
   test('flujo bridge: comando seguro produce mission_start, chat_chunk y mission_complete visibles', async ({ page }) => {
     await bootRepoCiv(page);
 
-    await page.locator('#hero-bar-slots .hero-slot[title^="DAVI"]').click();
+    const heroChip = page.locator('#hero-bar-slots .hero-chip').first();
+    await heroChip.click();
+    const heroUnitId = (await heroChip.getAttribute('data-unit-id')) ?? '';
+    expect(heroUnitId).not.toBe('');
     await page.keyboard.press('Enter');
     await expect(page.locator('#side-panel')).toBeVisible();
 
@@ -93,7 +96,7 @@ test.describe('RepoCiv e2e visual', () => {
       data: {
         type: 'e2e_probe',
         target: 'repociv-e2e',
-        payload: { unit: 'DAVI', marker },
+        payload: { unit: heroUnitId, marker },
         created_by: 'playwright',
       },
     });

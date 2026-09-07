@@ -34,6 +34,7 @@ import { closeConstructionPanel, isConstructionPanelOpen } from '../construction
 import { selectHero, spawnAgent, spawnFromProfile } from './spawn.ts';
 import { takeScreenshot } from './screenshot.ts';
 import { getSelectedProfile } from '../agentProfileStrip.ts';
+import { heroBarRoster, heroBarVisible } from '../heroBarUnits.ts';
 import { toggleLayerPanel, closeLayerPanel, isLayerPanelOpen } from '../layerPanel.ts';
 import { trackHotkey, trackPanelOpen } from '../analytics.ts';
 import { isPickerOpen } from '../chat/slashPicker.ts';
@@ -179,10 +180,11 @@ export function wireHotkeys(
       return spawnAgent('CURSOR', state, renderer, bridge);
     }
 
-    // Hero selection 1–9
+    // Hero selection 1–9 — heroBarVisible is what renderHeroBar draws and
+    // numbers, so badge N and key N always resolve to the same unit.
     if (/^[1-9]$/.test(e.key)) {
       const idx = parseInt(e.key, 10) - 1;
-      const heroes = state.getAllUnits();
+      const heroes = heroBarVisible(state);
       const target = heroes[idx];
       if (target) {
         trackHotkey(`${e.key}:select-hero`);
@@ -194,7 +196,7 @@ export function wireHotkeys(
     // Space: cycle to idle hero
     if (e.key === ' ') {
       e.preventDefault();
-      const heroes = state.getAllUnits().filter((u) => u.state === 'idle');
+      const heroes = heroBarRoster(state).filter((u) => u.state === 'idle');
       if (heroes.length === 0) return;
       const cur = state.selectedUnit;
       const idx = cur ? heroes.findIndex((h) => h.id === cur.id) : -1;
@@ -207,7 +209,7 @@ export function wireHotkeys(
     // Tab: cycle through all heroes
     if (e.key === 'Tab') {
       e.preventDefault();
-      const heroes = state.getAllUnits();
+      const heroes = heroBarRoster(state);
       if (heroes.length === 0) return;
       const cur = state.selectedUnit;
       const idx = cur ? heroes.findIndex((h) => h.id === cur.id) : -1;
