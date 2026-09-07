@@ -5,7 +5,7 @@ import { TERRAIN_COLOR } from './map.ts';
 import { HEX_SIZE } from './constants.ts';
 
 export class MinimapRenderer {
-  private bounds = { minQ: 0, maxQ: 0, minR: 0, maxR: 0 };
+  private bounds = { minQ: 0, maxQ: 0, minR: 0, maxR: 0, minS: 0, maxS: 0 };
   private cacheCanvas = document.createElement('canvas');
   private isDirty = true;
   private lastFog = true;
@@ -27,7 +27,20 @@ export class MinimapRenderer {
       if (tile.coord.r < minR) minR = tile.coord.r;
       if (tile.coord.r > maxR) maxR = tile.coord.r;
     }
-    this.bounds = { minQ, maxQ, minR, maxR };
+    // The draw projection offsets each row by q/2 (the axial shear). Bounds
+    // measured on raw r therefore describe a box the drawing does not fit in:
+    // tiles at high q were pushed past the bottom edge and clipped, which is
+    // what turned the minimap into a diagonal wedge with a black corner.
+    // Measure the projected row instead, so the fit is over what is drawn.
+    let minS = Infinity;
+    let maxS = -Infinity;
+    for (const tile of this.state.world.tiles.values()) {
+      if (tile.terrain === 'ocean' && !tile.revealed) continue;
+      const sv = tile.coord.r - minR + (tile.coord.q - minQ) * 0.5;
+      if (sv < minS) minS = sv;
+      if (sv > maxS) maxS = sv;
+    }
+    this.bounds = { minQ, maxQ, minR, maxR, minS, maxS };
     return revealedCount;
   }
 
@@ -38,7 +51,7 @@ export class MinimapRenderer {
     if (!ctx) return;
 
     const revealedCount = this.computeBounds();
-    const { minQ, maxQ, minR, maxR } = this.bounds;
+    const { minQ, maxQ, minR } = this.bounds;
     if (!isFinite(minQ)) return;
 
     if (
@@ -53,7 +66,9 @@ export class MinimapRenderer {
     const padX = 2,
       padY = 2;
     const cellW = (mm.width - padX * 2) / Math.max(1, maxQ - minQ + 1);
-    const cellH = (mm.height - padY * 2) / Math.max(1, maxR - minR + 1);
+    const cellH = (mm.height - padY * 2) / Math.max(1, this.bounds.maxS - this.bounds.minS + 1);
+    const rowY = (q: number, r: number) =>
+      padY + (r - minR + (q - minQ) * 0.5 - this.bounds.minS) * cellH;
 
     if (this.isDirty) {
       this.cacheCanvas.width = mm.width;
@@ -66,8 +81,10 @@ export class MinimapRenderer {
         const c = TERRAIN_COLOR[tile.terrain]!;
         cctx.fillStyle = tile.inFog && fogEnabled ? '#1a1208' : c.fill;
         const x = padX + (tile.coord.q - minQ) * cellW;
-        const y = padY + (tile.coord.r - minR) * cellH + (tile.coord.q - minQ) * cellH * 0.5;
-        cctx.fillRect(x, y, Math.max(1, cellW), Math.max(1, cellH));
+        const y = rowY(tile.coord.q, tile.coord.r);
+        // Overdraw by a hair: adjacent cells otherwise leave sub-pixel seams
+        // that read as a grid the main map does not have.
+        cctx.fillRect(x, y, Math.max(1, cellW) + 0.5, Math.max(1, cellH) + 0.5);
         if (tile.city) {
           cctx.fillStyle = tile.city.isCapital ? '#f0c050' : '#c8a84b';
           cctx.fillRect(x - 1, y - 1, Math.max(2, cellW + 2), Math.max(2, cellH + 2));
@@ -85,7 +102,7 @@ export class MinimapRenderer {
     for (const u of this.state.world.units) {
       if (u.hidden) continue;
       const x = padX + (u.coord.q - minQ) * cellW;
-      const y = padY + (u.coord.r - minR) * cellH + (u.coord.q - minQ) * cellH * 0.5;
+      const y = rowY(u.coord.q, u.coord.r);
       ctx.fillStyle = u.color;
       ctx.fillRect(x - 1, y - 1, 4, 4);
     }
@@ -117,14 +134,14 @@ export class MinimapRenderer {
   click(mx: number, my: number, cam: Camera) {
     const mm = document.getElementById('minimap-canvas') as HTMLCanvasElement | null;
     if (!mm) return;
-    const { minQ, maxQ, minR, maxR } = this.bounds;
+    const { minQ, maxQ, minR } = this.bounds;
     if (!isFinite(minQ)) return;
     const padX = 2,
       padY = 2;
     const cellW = (mm.width - padX * 2) / Math.max(1, maxQ - minQ + 1);
-    const cellH = (mm.height - padY * 2) / Math.max(1, maxR - minR + 1);
+    const cellH = (mm.height - padY * 2) / Math.max(1, this.bounds.maxS - this.bounds.minS + 1);
     const q = (mx - padX) / cellW + minQ;
-    const r = (my - padY - (q - minQ) * cellH * 0.5) / cellH + minR;
+    const r = (my - padY) / cellH + this.bounds.minS - (q - minQ) * 0.5 + minR;
     cam.x = HEX_SIZE * 1.5 * q;
     cam.y = HEX_SIZE * ((Math.sqrt(3) / 2) * q + Math.sqrt(3) * r);
   }

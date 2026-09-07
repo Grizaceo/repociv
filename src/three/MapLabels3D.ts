@@ -1,6 +1,6 @@
 // ─── CSS2D city / district labels for WebGL map ─────────────────────────────
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { Group, Scene } from 'three';
+import { Group, Scene, Vector3 } from 'three';
 import { type GameState } from '../game.ts';
 import { type Tile, tileKey, type WonderType } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
@@ -38,12 +38,13 @@ export function getLabelGroup(): Group {
   return labelGroup;
 }
 
-function makeLabel(text: string, className: string): CSS2DObject {
+function makeLabel(text: string, className: string, priority = 1): CSS2DObject {
   const el = document.createElement('div');
   el.className = className;
   el.textContent = text;
   const obj = new CSS2DObject(el);
   obj.center.set(0.5, 1);
+  obj.userData['priority'] = priority;
   return obj;
 }
 
@@ -70,6 +71,9 @@ function makeCityBanner(city: {
 
   const obj = new CSS2DObject(root);
   obj.center.set(0.5, 1);
+  // Capitals outrank cities, cities outrank districts: when two labels fight
+  // for the same pixels the more important one survives.
+  obj.userData['priority'] = city.isCapital ? 3 : 2;
   return obj;
 }
 
@@ -166,6 +170,77 @@ export function rebuildMapLabels(
   if (!labelGroup.parent) scene.add(labelGroup);
 }
 
+/** Screen band the HUD owns at the top of the viewport: the resource strip and
+ *  the hotkey ribbon. A 3D label projected into it collides with chrome the
+ *  user needs, so it is dropped rather than drawn behind. */
+const HUD_TOP_BAND_PX = 78;
+/** Extra breathing room around each kept label before the next one is culled. */
+const LABEL_GUTTER_PX = 6;
+
+const _projected = new Vector3();
+
+/** Cached element size. Reading offsetWidth per label per frame forces a
+ *  layout flush and stalls the render loop; labels only change size when their
+ *  text changes, which happens on rebuild, not per frame. */
+function labelSize(el: HTMLElement): { w: number; h: number } {
+  const cached = (el as HTMLElement & { _rcSize?: { w: number; h: number } })._rcSize;
+  if (cached && cached.w > 0) return cached;
+  const size = { w: el.offsetWidth, h: el.offsetHeight };
+  (el as HTMLElement & { _rcSize?: { w: number; h: number } })._rcSize = size;
+  return size;
+}
+
+/** Hide labels that land under the HUD or on top of a higher-priority label.
+ *
+ *  Civ V never draws two overlapping place names; without this the map's top
+ *  strip turns into a pile of repo names stacked on the hotkey ribbon, which is
+ *  exactly what a 10-repo workspace produced. Positions come from projecting
+ *  the label's world position — no getBoundingClientRect, so no layout thrash. */
+function declutterLabels(camera: import('three').Camera, width: number, height: number): void {
+  type Box = { l: number; t: number; r: number; b: number };
+  const kept: Box[] = [];
+
+  const entries = labelGroup.children
+    .filter((o): o is CSS2DObject => o instanceof CSS2DObject)
+    .map((obj) => {
+      _projected.setFromMatrixPosition(obj.matrixWorld).project(camera);
+      return {
+        obj,
+        el: obj.element as HTMLElement,
+        priority: (obj.userData['priority'] as number) ?? 1,
+        x: (_projected.x * 0.5 + 0.5) * width,
+        y: (-_projected.y * 0.5 + 0.5) * height,
+        behind: _projected.z > 1,
+      };
+    })
+    // Highest priority first, then top-down, so the survivor of an overlap is
+    // deterministic across frames and labels don't flicker as the camera moves.
+    .sort((a, b) => b.priority - a.priority || a.y - b.y);
+
+  for (const e of entries) {
+    if (e.behind) {
+      e.el.style.visibility = 'hidden';
+      continue;
+    }
+    const { w, h } = labelSize(e.el);
+    // center is (0.5, 1): the anchor sits at the label's bottom edge.
+    const box: Box = {
+      l: e.x - w / 2 - LABEL_GUTTER_PX,
+      t: e.y - h - LABEL_GUTTER_PX,
+      r: e.x + w / 2 + LABEL_GUTTER_PX,
+      b: e.y + LABEL_GUTTER_PX,
+    };
+    const underHud = box.t < HUD_TOP_BAND_PX;
+    const collides = kept.some((k) => box.l < k.r && box.r > k.l && box.t < k.b && box.b > k.t);
+    if (underHud || collides) {
+      e.el.style.visibility = 'hidden';
+      continue;
+    }
+    e.el.style.visibility = '';
+    kept.push(box);
+  }
+}
+
 export function renderLabels(
   scene: Scene,
   camera: import('three').Camera,
@@ -175,6 +250,7 @@ export function renderLabels(
   if (!cssRenderer) return;
   cssRenderer.setSize(width, height);
   cssRenderer.render(scene, camera);
+  declutterLabels(camera, width, height);
 }
 
 export function disposeLabels(_container: HTMLElement): void {

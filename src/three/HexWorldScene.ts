@@ -522,7 +522,10 @@ function rebuildTerritoryLines(
   });
 
   for (const g of groups.values()) {
-    const baseOpacity = g.capital ? (lod === 'high' ? 0.52 : 0.44) : lod === 'high' ? 0.4 : 0.34;
+    // Raised alongside the palette desaturation (see CITY_PALETTE): at the old
+    // opacities a muted hue drops below the terrain's own value noise and
+    // ownership stops reading. Higher alpha on a muted colour is still not neon.
+    const baseOpacity = g.capital ? (lod === 'high' ? 0.74 : 0.62) : lod === 'high' ? 0.6 : 0.5;
     addBorderRibbon(g.edges, g.color, baseOpacity);
   }
 }
@@ -876,12 +879,17 @@ function rebuildHexGrid(state: GameState, visible: boolean, lod: 'low' | 'medium
   const geom = new BufferGeometry();
   geom.setAttribute('position', new Float32BufferAttribute(segments, 3));
   const mat = new LineBasicMaterial({
-    // Warm-dark groove, not cold white. At <5% white the grid read as nothing
-    // (or cold speckle) over warm terrain; a faint earth-dark line reads as a
+    // Warm-dark groove, not cold white: a faint earth-dark line reads as a
     // recessed seam UNDER the paint — Civ V's lattice that ties tiles together.
+    //
+    // The old opacities (0.10/0.07/0.035) were tuned by eye against a darker
+    // build and are invisible on the current terrain: a hex map you cannot
+    // count hexes on. These read as a seam without becoming a wireframe.
+    // Low LOD stays faint on purpose — at that zoom a hex is a few pixels and
+    // a stronger line turns into moire.
     color: 0x3a2f22,
     transparent: true,
-    opacity: lod === 'high' ? 0.1 : lod === 'medium' ? 0.07 : 0.035,
+    opacity: lod === 'high' ? 0.3 : lod === 'medium' ? 0.2 : 0.08,
     linewidth: 1,
   });
   hexGridLines = new LineSegments(geom, mat);

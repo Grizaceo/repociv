@@ -826,6 +826,14 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   align-items: center;
 }
 
+/* Selects absorb the squeeze instead of the buttons. Without min-width:0 a
+   flex item refuses to shrink below its content width and pushes its siblings
+   out of the row. */
+.pstrip-row .pstrip-select {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .pstrip-select,
 .pstrip-input {
   background: rgba(0, 0, 0, 0.4);
@@ -861,6 +869,11 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   border-radius: 3px;
   cursor: pointer;
   height: 26px;
+  /* A button whose label is clipped ("Guard…") reads as a rendering fault, not
+     as a compact layout. The row's select is the elastic element; the labels
+     are not. */
+  flex-shrink: 0;
+  white-space: nowrap;
   transition:
     color var(--transition-fast),
     border-color var(--transition-fast),
@@ -1495,10 +1508,20 @@ kbd {
   gap: 14px;
   font-family: var(--font-ui);
   font-size: 10px;
-  color: var(--text-dim);
+  /* The ribbon floats directly over the 3D map. With no ground of its own it
+     was unreadable the moment the camera sat on bright terrain — which, on a
+     grassland map, is most of the time. A scrim of its own is what makes HUD
+     text survive an arbitrary background. */
+  color: var(--text);
+  background: linear-gradient(to bottom, rgb(10 8 6 / 76%), rgb(10 8 6 / 62%));
+  padding: 4px 12px 5px;
+  border-radius: 0 0 6px 6px;
+  border: 1px solid rgb(200 168 75 / 14%);
+  border-top: none;
+  backdrop-filter: blur(3px);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  opacity: 0.7;
+  opacity: 0.94;
   pointer-events: none;
 }
 

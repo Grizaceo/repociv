@@ -758,17 +758,23 @@ export async function reconnectCities(world: World): Promise<void> {
  *  terrain, not as roads. RGB 0-1. The old palette clustered three warm
  *  tones (orange/amber/gold) that were hard to tell apart and blended
  *  into tan terrain. */
+// Heraldic, not screen-primary. These drive the culture-border ribbons and the
+// city flags, both of which render UNLIT and with `toneMapped: false` — they
+// bypass the tone curve every other surface goes through, so a saturated value
+// here lands on the map at full strength and reads as a debug quad rather than
+// a banner. Pulled ~30% off saturation and into the warm-earth value range of
+// the terrain, keeping ten separable hues so cities stay tellable apart.
 const CITY_PALETTE: [number, number, number][] = [
-  [0.2, 0.45, 0.95], // royal blue
-  [0.93, 0.23, 0.25], // red
-  [0.1, 0.72, 0.68], // teal
-  [0.62, 0.3, 0.86], // violet
-  [0.98, 0.55, 0.12], // orange
-  [0.28, 0.78, 0.32], // green
-  [0.96, 0.36, 0.7], // pink
-  [0.96, 0.82, 0.22], // gold
-  [0.18, 0.72, 0.96], // cyan
-  [0.62, 0.82, 0.2], // lime
+  [0.29, 0.44, 0.72], // azul heráldico
+  [0.78, 0.3, 0.28], // rojo óxido
+  [0.24, 0.58, 0.55], // verdemar
+  [0.51, 0.36, 0.63], // púrpura apagado
+  [0.85, 0.53, 0.24], // ámbar quemado
+  [0.36, 0.6, 0.34], // verde bandera
+  [0.79, 0.44, 0.55], // rosa palo
+  [0.87, 0.72, 0.33], // oro viejo
+  [0.33, 0.63, 0.76], // celeste
+  [0.6, 0.66, 0.32], // oliva
 ];
 
 /** Deterministic per-city color from a hash of the city id. FNV-1a + an

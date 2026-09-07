@@ -39,9 +39,12 @@ function hashCoord(q: number, r: number): number {
 
 // ─── City flags ──────────────────────────────────────────────────────────────
 
-const FLAG_POLE_H = HEX_SIZE * 0.78;
-const FLAG_W = HEX_SIZE * 0.3;
-const FLAG_H = HEX_SIZE * 0.19;
+// Sized to read as heraldry from strategic zoom without becoming a bedsheet up
+// close: at 0.30 the cloth spanned a third of a tile and dominated any framing
+// that included a city.
+const FLAG_POLE_H = HEX_SIZE * 0.66;
+const FLAG_W = HEX_SIZE * 0.2;
+const FLAG_H = HEX_SIZE * 0.13;
 
 /** Cloth wave: amplitude grows toward the free edge (uv.x=1), pinned at the
  *  pole (uv.x=0). Brightness follows the wave slope so folds read without
