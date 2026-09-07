@@ -310,8 +310,8 @@ Persiste **en memoria** hasta que el bridge se reinicie o se invoque otro `/mode
 {
   "wonders": [
     {
-      "id": "bibliotheca",
-      "name": "Bibliotheca",
+      "id": "mi-servicio",
+      "name": "Mi Servicio",
       "tier": 1,
       "status": "active"
     }
@@ -322,7 +322,7 @@ Persiste **en memoria** hasta que el bridge se reinicie o se invoque otro `/mode
 **`/api/wonders/<id>/health`**
 ```json
 {
-  "id": "bibliotheca",
+  "id": "mi-servicio",
   "status": "healthy",
   "lastCheck": "2026-05-27T00:00:00Z"
 }
@@ -411,21 +411,6 @@ Persiste **en memoria** hasta que el bridge se reinicie o se invoque otro `/mode
   "graphRelations": []
 }
 ```
-
----
-
-### LabHub (Institutum)
-
-| Method | Path | Descripción |
-|--------|------|-------------|
-| GET | `/api/labhub/status` | Estado general de reachability del Institutum |
-| GET | `/api/labhub/status/<city_id>` | Estado de laboratorio para una ciudad |
-| GET | `/api/labhub/status/batch` | Estado batch de todos los laboratorios |
-
-**`/api/labhub/status/<city_id>`** — Query params:
-- `repoPath` (str, optional): path del repo para link de logs.
-
----
 
 ### CDaily (Noticias)
 

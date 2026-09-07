@@ -60,18 +60,8 @@ describe('HexWorldScene sun stability', () => {
 });
 
 describe('HexWorldScene wonder layer visibility', () => {
-  it('keeps built-in wonder models visible when the structure layer is visible', () => {
-    expect(
-      wonderVisibilityForLayers({ showStructure: true, showKnowledge: false, showLabs: false }),
-    ).toEqual({ bibliotheca: true, institutum: true, generic: true });
-  });
-
-  it('allows domain layers to show built-in wonders even when structure is hidden', () => {
-    expect(
-      wonderVisibilityForLayers({ showStructure: false, showKnowledge: true, showLabs: false }),
-    ).toEqual({ bibliotheca: true, institutum: false, generic: false });
-    expect(
-      wonderVisibilityForLayers({ showStructure: false, showKnowledge: false, showLabs: true }),
-    ).toEqual({ bibliotheca: false, institutum: true, generic: false });
+  it('shows wonder models exactly when the structure layer is visible', () => {
+    expect(wonderVisibilityForLayers({ showStructure: true })).toEqual({ generic: true });
+    expect(wonderVisibilityForLayers({ showStructure: false })).toEqual({ generic: false });
   });
 });

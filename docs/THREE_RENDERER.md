@@ -119,7 +119,6 @@ npm run assets:props
 python3 scripts/blender/make_props.py              # mountain-{0,1,2}
 python3 scripts/blender/make_props_vegetation.py   # desert palms/rocks, ice shards, hill shrubs, forest deciduous
 python3 scripts/blender/make_props_city.py         # city-hamlet/village/town centrepieces
-python3 scripts/blender/make_props_wonders.py      # wonder temple (bibliotheca) + laboratorium (institutum)
 ```
 
 The vegetation/city/wonders scripts accept `--preview` to render a Cycles

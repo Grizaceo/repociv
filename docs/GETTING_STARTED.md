@@ -357,89 +357,32 @@ panel — se conecta como **Maravilla** y RepoCiv puede levantarlo y embeberlo
 sin que abras terminales.
 
 **Conectar:** abrí el **Palacio** (doble clic en la capital) → pestaña
-**Maravillas**. Verás la guía y dos **ejemplos** apuntando a sus repos públicos:
+**Maravillas**. RepoCiv **no trae ninguna pre-instalada**: la pestaña es la guía
+para conectar la tuya. El manifiesto se escribe en `~/.repociv/wonders/<id>.json`
+y describe la URL del iframe, el health-check, y un bloque opcional `launch`
+con el comando que RepoCiv usa para levantar su servidor. Guía completa en
+[`CUSTOM_WONDERS.md`](./CUSTOM_WONDERS.md).
 
-- **La Gran Biblioteca** — grafo de conocimiento sobre tus repos.
-  Repo: https://github.com/Grizaceo/la-gran-biblioteca
-- **LabHub / Institutum** — laboratorio de experimentos.
-  Repo: https://github.com/Grizaceo/labhub
+Una vez conectada, aparece como pestaña del Palacio y como tile propio en el
+anillo alrededor de la capital.
 
-Si ya tenés el repo del ejemplo en disco, pulsá **Conectar** y RepoCiv escribe
-su manifiesto en `~/.repociv/wonders/<id>.json`, lo muestra como pestaña + tile
-en el mapa, y levanta su servidor al abrirlo. Para conectar un servicio propio,
-ver [`CUSTOM_WONDERS.md`](./CUSTOM_WONDERS.md).
+### Arranque automático
 
-### Bibliotheca (La Gran Biblioteca) — ejemplo
+Si tu manifiesto lleva bloque `launch`, RepoCiv levanta la maravilla sola:
 
-Una vez conectada, RepoCiv la enlaza como iframe (la UI no se modifica) y
-comprueba su backend con variables `VITE_*` (ver `.env.example`).
+1. Abrí RepoCiv con `./scripts/dev-start.sh`.
+2. Al boot, el bridge hace `POST /api/wonders/<id>/launch` en background, y la
+   viñeta muestra "⚙️ Levantando la maravilla…" mientras sondea `launch-status`
+   hasta que `ready.api` **y** `ready.ui` respondan.
+3. Cuando `ready === true`, el iframe monta la URL UI resuelta.
+4. Si hay timeout (60s) o error, cae al empty state con botón "Levantar de nuevo".
 
-### Arranque automático (recomendado, F1–F5, 2026-06-16 → 2026-06-17)
+Si ya arrancaste el servidor a mano, RepoCiv lo **adopta** en vez de spawnear
+una segunda copia: la comprobación de salud previa al launch detecta que API y
+UI ya responden.
 
-A partir del merge de la Fase 1, **RepoCiv levanta las Maravillas por sí mismo**:
-
-1. Abrí RepoCiv con `./scripts/dev-start.sh` (igual que antes).
-2. Al boot, el bridge hace `POST /api/wonders/{bibliotheca,institutum}/launch`
-   en background, y la viñeta muestra "⚙️ Levantando la maravilla…" mientras
-   sondea `launch-status` hasta que `ready.api` **y** `ready.ui` respondan.
-3. Cuando `ready === true`, el iframe monta la URL UI resuelta
-   (Bibliotheca `:5173`, Institutum `:5280`).
-4. Si timeout (60s) o error, cae al empty state con botón "Levantar de nuevo".
-
-No necesitás abrir las terminales manuales de abajo. **Las terminales siguen
-siendo necesarias solo si querés desarrollar las Maravillas en aislamiento**
-(por ejemplo, ver sus logs de HMR en directo). En uso normal, dejá que
-RepoCiv las levante.
-
-### Arranque local (dos terminales, modo desarrollo)
-
-**Terminal 1 — La Gran Biblioteca** (repo `la-gran-biblioteca`):
-
-```bash
-python -m backend.library_bridge
-cd frontend && npm run dev
-```
-
-Bridge/API en `:3001`, UI Vite en `http://127.0.0.1:5173`.
-
-**Terminal 2 — RepoCiv:**
-
-```bash
-./scripts/dev-start.sh
-```
-
-Abre RepoCiv en el puerto de tu `.env` (p. ej. `VITE_PORT=5273` →
-`http://127.0.0.1:5273`).
-
-### Usar la maravilla en el mapa
-
-1. En el mapa imperial, localiza la capital y el icono **B** (Bibliotheca).
-2. Doble clic en **B**, o abre el **Palacio** (doble clic en la capital) → pestaña
-   **Bibliotheca** → **Entrar a la Bibliotheca**.
-3. La viñeta carga el iframe apuntando a `VITE_WONDER_BIBLIOTHECA_URL` (por defecto
-   `:5173`). RepoCiv solo hace health-check a `VITE_LGB_BACKEND_URL/api/health`
-   (`:3001`); si el backend no responde, verás un aviso para arrancar LGB.
-
-LGB sigue usable en paralelo en `http://127.0.0.1:5173` sin RepoCiv.
-
-### Tailscale / remoto
-
-Si abres LGB en `http://<tailscale-ip>:5173`, en `.env` de RepoCiv:
-
-```bash
-VITE_WONDER_BIBLIOTHECA_URL=http://<tailscale-ip>:5173
-VITE_LGB_BACKEND_URL=http://127.0.0.1:3001
-```
-
-El iframe usa la IP Tailscale; el health-check usa `127.0.0.1:3001` porque el bridge
-suele escuchar solo en loopback y Vite en `:5173` ya hace proxy de `/api` → `:3001`.
-
-Reinicia Vite de RepoCiv tras cambiar `.env`.
-
-Solo si RepoCiv y LGB están en **máquinas distintas** necesitas `LGB_HOST=0.0.0.0` en
-la-gran-biblioteca y `VITE_LGB_BACKEND_URL=http://<ip>:3001`.
-
-Con Docker LGB en el host: `VITE_WONDER_BIBLIOTHECA_URL=http://127.0.0.1:3000`.
+Sin bloque `launch`, la maravilla se embebe igual pero tenés que arrancar su
+servidor vos.
 
 ---
 

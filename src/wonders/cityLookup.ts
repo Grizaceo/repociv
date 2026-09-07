@@ -1,9 +1,10 @@
+// ─── RepoCiv — City lookup helpers ───────────────────────────────────────────
+// Fuzzy resolution of an external selection (an id, a repo path, a node path)
+// onto one of the map's cities. Used by the generic `repociv:focus-city-request`
+// wiring and by any connected wonder that emits a selection.
 import type { City } from '../types.ts';
-import type { GraphRelationCandidate } from '../bridge.ts';
 
 export type CityBridgeCandidate = Pick<City, 'id' | 'name' | 'repoPath'>;
-
-export type RelationFeedbackState = Record<string, { accepted: boolean; rejected: boolean }>;
 
 function _normalizeToken(value: string): string {
   return value
@@ -96,32 +97,4 @@ export function findNearbyCities(
     .filter((entry) => entry.score > 0.15)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
-}
-
-export function relationFeedbackKey(fromId: string, toId: string): string {
-  return `${fromId}:${toId}`;
-}
-
-export function rankRelationsWithFeedback(
-  relations: GraphRelationCandidate[],
-  feedback: RelationFeedbackState,
-): GraphRelationCandidate[] {
-  return relations
-    .map((relation) => {
-      const state = feedback[relationFeedbackKey(relation.fromId, relation.toId)];
-      if (!state) return { ...relation };
-      const scoreBoost = state.accepted ? 0.15 : state.rejected ? -0.25 : 0;
-      return {
-        ...relation,
-        accepted: state.accepted,
-        rejected: state.rejected,
-        score: Math.max(0, Math.min(1, relation.score + scoreBoost)),
-      };
-    })
-    .sort((a, b) => {
-      const aRank = a.accepted ? 2 : a.rejected ? 0 : 1;
-      const bRank = b.accepted ? 2 : b.rejected ? 0 : 1;
-      if (aRank !== bRank) return bRank - aRank;
-      return b.score - a.score;
-    });
 }

@@ -7,7 +7,6 @@ and the graph_relations.py index/scoring engine.
 Functions:
     build_repo_index_from_cities(cities)  — extract repo_base_paths, build/refresh index
     get_city_relations(city_id, cities, limit) — candidate relations for a city, mapped to city names
-    get_bibliotheca_relations(repo_paths, limit) — direct repo-path lookup
     get_city_evidence(from_city_id, to_city_id, cities) — evidence between two cities
 """
 
@@ -31,14 +30,6 @@ def _repo_paths_from_cities(cities: list[dict[str, Any]]) -> list[str]:
         if rp.strip():
             paths.append(rp.strip())
     return paths
-
-
-def _city_name_for_id(city_id: str, cities_by_id: dict[str, dict[str, Any]]) -> str:
-    """Return the city name for a given city ID, or the ID as fallback."""
-    c = cities_by_id.get(city_id)
-    if c:
-        return c.get("name", city_id)
-    return city_id
 
 
 def _repo_id_from_city(city: dict[str, Any]) -> str | None:
@@ -130,44 +121,6 @@ def get_city_relations(
             cand["toCityId"] = cand_repo_id
 
     return candidates
-
-
-def get_bibliotheca_relations(
-    repo_paths: list[str],
-    limit: int = 10,
-) -> list[dict[str, Any]]:
-    """Direct repo-path lookup for candidate relations.
-
-    Builds an index over the given repo paths (if not already built) and
-    returns candidate relations for each path.
-
-    Args:
-        repo_paths: List of absolute repo base paths.
-        limit: Maximum candidates per repo (default 10).
-
-    Returns:
-        List of candidate relation dicts for all repos.
-    """
-    if not repo_paths:
-        return []
-
-    # Build index if needed
-    _gr.build_or_refresh_index(repo_paths)
-
-    all_candidates: list[dict[str, Any]] = []
-    seen_pairs: set[tuple[str, str]] = set()
-
-    for rp in repo_paths:
-        repo_id = _gr._repo_id_from_path(rp)
-        candidates = _gr.get_candidates(repo_id, limit=limit)
-        for cand in candidates:
-            pair = (repo_id, cand.get("repoId", ""))
-            if pair not in seen_pairs:
-                seen_pairs.add(pair)
-                cand["fromRepoPath"] = rp
-                all_candidates.append(cand)
-
-    return all_candidates
 
 
 def get_city_evidence(

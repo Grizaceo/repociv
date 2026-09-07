@@ -33,16 +33,10 @@ const LAYERS: LayerDef[] = [
     desc: 'Tareas, detachments subagente (líneas padre→hijo), aprobaciones',
   },
   {
-    id: 'knowledge',
-    label: 'Conocimiento',
-    icon: '📖',
-    desc: 'Conexiones de Bibliotheca, overlays de saber',
-  },
-  {
     id: 'labs',
     label: 'Laboratorios',
     icon: '🔬',
-    desc: 'Actividad de LabHub, experimentos activos, indicadores de entrenamiento',
+    desc: 'Construcciones y experimentos activos en cada ciudad',
   },
   {
     id: 'security',

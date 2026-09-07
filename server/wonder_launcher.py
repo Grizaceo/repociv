@@ -1,7 +1,7 @@
 """RepoCiv — Wonder Launcher (auto-start for iframe Wonders).
 
-Spawns the underlying servers for iframe-based Wonders (Bibliotheca,
-Institutum/LabHub) and tracks their PIDs so:
+Spawns the underlying servers for user-connected iframe Wonders and
+tracks their PIDs so:
   - the client can poll launch-status (F3)
   - subsequent launches are idempotent (no duplicate PIDs)
   - stop_wonder() can kill the process group cleanly
@@ -9,8 +9,8 @@ Institutum/LabHub) and tracks their PIDs so:
 Security model
 --------------
 - ``WONDER_LAUNCH_SPECS`` is the allowlist; client cannot pass argv.
-- ``cwd`` is resolved from env (REPOCIV_WONDER_BIBLIOTHECA_DIR /
-  _INSTITUTUM_DIR) — never from a request body.
+- ``cwd`` comes from the manifest on disk (~/.repociv/wonders/<id>.json),
+  never from a request body.
 - Spawn is REJECTED in remote mode (REPOCIV_REMOTE=true): the launcher
   is loopback-only. On a remote session the user must start the
   wonder's server manually on the host.
@@ -69,24 +69,11 @@ LOGS_DIR = WONDERS_DIR / "logs"
 
 REPOCIV_REMOTE = _env("REPOCIV_REMOTE", "").lower() in ("true", "1", "yes")
 
-BIBLIOTHECA_DIR = _expand(
-    _env(
-        "REPOCIV_WONDER_BIBLIOTHECA_DIR",
-        "~/.hermes/workspace/repos/la-gran-biblioteca",
-    )
-)
-INSTITUTUM_DIR = _expand(
-    _env(
-        "REPOCIV_WONDER_INSTITUTUM_DIR",
-        "~/.hermes/workspace/repos/labhub",
-    )
-)
-
 # ─── Custom launch specs (user-defined marvelas) ──────────────────────────────
 #
-# Default wonder specs (``WONDER_LAUNCH_SPECS`` below) are hardcoded
-# for the two built-ins (bibliotheca, institutum). Users can add their
-# own marvelas by dropping a WonderManifest at
+# ``WONDER_LAUNCH_SPECS`` below ships empty: RepoCiv has no built-in
+# launchable wonders. Users add their own marvelas by dropping a
+# WonderManifest at
 # ``$REPOCIV_WONDERS_DIR/<id>.json`` (default ``~/.repociv/wonders/``)
 # with an OPTIONAL ``launch`` field that describes the CLI commands
 # to spawn. See ``docs/CUSTOM_WONDERS.md`` for the user-facing guide.
@@ -94,8 +81,6 @@ INSTITUTUM_DIR = _expand(
 # Design notes:
 # - Custom specs are loaded at import time. Restart the bridge to
 #   pick up edits.
-# - On id conflict, the custom spec wins — lets users override
-#   bibliotheca/institutum defaults without code changes.
 # - Validation is strict: malformed specs are skipped (with a stderr
 #   warning), never crash the bridge.
 
@@ -247,10 +232,9 @@ class ProcSpec:
     cwd: str
     log: str
     # Extra env vars merged into the child's env at spawn time. Used to
-    # force hosts (LGB_HOST, BRIDGE_HOST) so the wonder's dev server binds
-    # to 0.0.0.0 in WSL2/Tailscale setups where the browser reaches
-    # WSL2 via its external IP (e.g. http://100.123.206.92:5173), not
-    # loopback. Default empty (no overrides).
+    # force a bind host so the wonder's dev server listens on 0.0.0.0 in
+    # WSL2/Tailscale setups where the browser reaches WSL2 via its
+    # external IP, not loopback. Default empty (no overrides).
     env: dict[str, str] = field(default_factory=dict)
 
 
@@ -266,62 +250,9 @@ class WonderSpec:
     ui_timeout_s: float = 4.0
 
 
-# LGB's Vite UI port is derived from VITE_WONDER_BIBLIOTHECA_URL so the spawn
-# port, the adoption probe, and the iframe URL never drift apart. We pass it
-# explicitly with --strictPort so Vite FAILS LOUDLY (in the log) if the port is
-# taken instead of silently auto-incrementing to 5174/5175 — the silent drift
-# was why RepoCiv ended up pointing the iframe at another project's server.
-_LGB_UI_URL = _env("VITE_WONDER_BIBLIOTHECA_URL", "http://127.0.0.1:5173")
-_LGB_UI_PORT = str(urllib.parse.urlparse(_LGB_UI_URL).port or 5173)
-
-WONDER_LAUNCH_SPECS: dict[str, WonderSpec] = {
-    "bibliotheca": WonderSpec(
-        id="bibliotheca",
-        repo_dir=BIBLIOTHECA_DIR,
-        procs=(
-            ProcSpec(
-                name="bridge",
-                argv=("python", "-m", "backend.library_bridge"),
-                cwd=BIBLIOTHECA_DIR,
-                log="bibliotheca-bridge.log",
-                # LGB's library_bridge.py reads LGB_HOST (default 127.0.0.1).
-                # Force 0.0.0.0 so the WSL2 browser can reach uvicorn at
-                # the WSL2 external IP (e.g. http://100.123.206.92:3001).
-                env={"LGB_HOST": "0.0.0.0"},
-            ),
-            ProcSpec(
-                name="ui",
-                argv=("npm", "run", "dev", "--", "--port", _LGB_UI_PORT, "--strictPort"),
-                cwd=os.path.join(BIBLIOTHECA_DIR, "frontend"),
-                log="bibliotheca-ui.log",
-            ),
-        ),
-        api_url=_env("VITE_LGB_BACKEND_URL", "http://127.0.0.1:3001"),
-        api_health_path="/api/health",
-        ui_url=_LGB_UI_URL,
-    ),
-    "institutum": WonderSpec(
-        id="institutum",
-        repo_dir=INSTITUTUM_DIR,
-        procs=(
-            ProcSpec(
-                name="dev",
-                argv=("npm", "start"),
-                cwd=INSTITUTUM_DIR,
-                log="institutum-dev.log",
-                # LabHub dev-start.sh spawns `python3 -m server.bridge`.
-                # Set BRIDGE_HOST=0.0.0.0 so LabHub's uvicorn binds to all
-                # interfaces (reachable from the WSL2 browser). If labhub's
-                # bridge.py doesn't honor BRIDGE_HOST, the fallback is to
-                # set LABHUB_BRIDGE_HOST=0.0.0.0 in labhub's own .env.
-                env={"BRIDGE_HOST": "0.0.0.0"},
-            ),
-        ),
-        api_url=_env("VITE_WONDER_INSTITUTUM_API_URL", "http://127.0.0.1:5281"),
-        api_health_path="/health",
-        ui_url=_env("VITE_WONDER_INSTITUTUM_URL", "http://127.0.0.1:5280"),
-    ),
-}
+# No built-in launchable wonders: every spec comes from the user's own
+# ~/.repociv/wonders/<id>.json (see _load_custom_launch_specs below).
+WONDER_LAUNCH_SPECS: dict[str, WonderSpec] = {}
 
 ALLOWED_IDS: frozenset[str] = frozenset(WONDER_LAUNCH_SPECS.keys())
 
@@ -439,32 +370,6 @@ def _http_probe(url: str, timeout_s: float) -> bool:
 # ─── External adoption (Fix B: avoid clobbering manually-started servers) ─────
 
 
-def _read_labhub_lockfile() -> dict[str, int] | None:
-    """Parse the LabHub dev-start.sh lockfile (key=value format).
-
-    Returns {bridge: pid, vite: pid} if found, else None. Used to
-    "adopt" a manually-started LabHub instead of spawning a second
-    copy that would kill the running one (dev-start.sh kills the
-    ports first).
-    """
-    lock_path = Path(os.path.expanduser("~/.labhub/labhub.lock"))
-    if not lock_path.exists():
-        return None
-    out: dict[str, int] = {}
-    try:
-        for line in lock_path.read_text().splitlines():
-            if "=" not in line:
-                continue
-            key, val = line.split("=", 1)
-            key = key.strip().lower()
-            val = val.strip()
-            if key in ("bridge_pid", "vite_pid") and val.isdigit():
-                out["bridge" if key == "bridge_pid" else "vite"] = int(val)
-    except (OSError, ValueError):
-        return None
-    return out or None
-
-
 def _resolve_python_executable(cwd: str) -> str:
     """Pick the best Python interpreter for a venv-aware spawn.
 
@@ -485,16 +390,14 @@ def _resolve_python_executable(cwd: str) -> str:
 def _try_adopt_external(wonder_id: str, spec: WonderSpec) -> dict[str, Any] | None:
     """If API AND UI are both already up (server started manually), adopt it.
 
-    Requires BOTH api_ready AND ui_ready. Half-up (e.g. Vite running but
-    uvicorn dead, or vice versa) is treated as not adopted — the caller
+    Requires BOTH api_ready AND ui_ready. Half-up (e.g. the UI running but
+    the API dead, or vice versa) is treated as not adopted — the caller
     will then spawn the missing procs. This avoids the "adopted in
-    degraded state" failure mode where LabHub's uvicorn could never
-    be started because the Vite was alive and locked the launcher out
-    of the spawn path.
+    degraded state" failure mode where the API could never be started
+    because the UI was alive and locked the launcher out of the spawn path.
 
-    PIDs are recovered from the wonder-specific lockfile when
-    available (only institutum has one; bibliotheca has no
-    dev-start.sh, so the entry has no PIDs and we rely on health).
+    An adopted entry carries no PIDs (we did not spawn it): health is what
+    confirms the server is up, and stop_wonder() cannot kill it.
 
     Returns the new entry, or ``None`` if the wonder is not fully
     up (caller should spawn instead).
@@ -509,19 +412,9 @@ def _try_adopt_external(wonder_id: str, spec: WonderSpec) -> dict[str, Any] | No
     if not (api_ready and ui_ready):
         return None
 
-    # Try to recover PIDs from the wonder-specific lockfile. Only
-    # institutum has one (labhub/scripts/dev-start.sh writes it).
-    # Bibliotheca has no dev-start.sh; we accept a no-PID entry and
-    # rely on health to confirm the server is up.
-    recovered_pids: dict[str, int] = {}
-    if wonder_id == "institutum":
-        from_lockfile = _read_labhub_lockfile()
-        if from_lockfile:
-            recovered_pids = from_lockfile
-
     entry = {
         "id": wonder_id,
-        "pids": recovered_pids,
+        "pids": {},
         "started_at": time.time(),
         "api_url": spec.api_url,
         "ui_url": spec.ui_url,
@@ -589,11 +482,11 @@ def _build_status(wonder_id: str, entry: dict[str, Any] | None) -> dict[str, Any
     bridge-binded and abort the launch even though everything is
     actually fine.
 
-    Why: ``institutum`` spawns a single ``npm start`` whose child
-    (dev-start.sh) launches bridge+Vite detached, then exits. The npm
-    process dies in seconds while the children live. With the old
-    "PID-alive is required" check, that path reported "error" even
-    though LabHub was perfectly healthy. Health wins.
+    Why: a wonder whose launch command is a wrapper script (e.g. a single
+    ``npm start`` whose child detaches a server and a dev-server, then
+    exits) leaves no long-lived PID. The wrapper dies in seconds while its
+    children live. With a "PID-alive is required" check, that path reports
+    "error" even though the wonder is perfectly healthy. Health wins.
     """
     spec = get_spec(wonder_id)
 
@@ -714,8 +607,8 @@ def launch_wonder(wonder_id: str) -> dict[str, Any]:
             # still running), treat as already-running.
             if any(_pid_alive(pid) for pid in existing.get("pids", {}).values()):
                 return _build_status(wonder_id, existing)
-            # An adopted (external) entry has no PIDs we can poll
-            # (bibliotheca was hand-started, so the entry tracks no PIDs).
+            # An adopted (external) entry has no PIDs we can poll — it was
+            # hand-started, so the entry tracks none.
             # It is only trustworthy while the external server stays
             # healthy — so re-probe. If it's still fully up, keep it; if it
             # has since died or gone half-up, fall through to re-adopt (it
@@ -729,9 +622,8 @@ def launch_wonder(wonder_id: str) -> dict[str, Any]:
                     return status
 
         # Pre-launch health check: if the user already started this
-        # wonder by hand, adopt it (no spawn, no clobber). LabHub
-        # specifically would kill the running instance because
-        # dev-start.sh kills the ports before relaunching.
+        # wonder by hand, adopt it (no spawn, no clobber) — a launch script
+        # that frees its ports first would otherwise kill the live instance.
         adopted = _try_adopt_external(wonder_id, spec)
         if adopted is not None:
             return _build_status(wonder_id, adopted)
@@ -766,8 +658,8 @@ def launch_wonder(wonder_id: str) -> dict[str, Any]:
                 argv[0] = _resolve_python_executable(str(proc_cwd))
             try:
                 # Merge the proc_spec.env into the parent env so the
-                # child process can override LGB_HOST / BRIDGE_HOST to
-                # bind on 0.0.0.0 (WSL2 / Tailscale setups). Sensitive
+                # child process can override its bind host to listen on
+                # 0.0.0.0 (WSL2 / Tailscale setups). Sensitive
                 # keys (ANTHROPIC_API_KEY, *_SECRET, etc.) are redacted
                 # via _env_filter.redact_env_for_spawn so they don't leak
                 # into the spawned child.

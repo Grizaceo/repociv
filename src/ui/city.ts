@@ -274,18 +274,7 @@ export function wireCityPanel() {
         detail: {
           cityId,
           repoPath: panel?.dataset['repoPath'] ?? '',
-          labStatus: panel?.dataset['labStatus'] ?? '',
         },
-      }),
-    );
-  });
-  document.getElementById('btn-city-bibliotheca')?.addEventListener('click', () => {
-    const panel = document.getElementById('city-panel');
-    const cityId = panel?.dataset['cityId'];
-    if (!cityId) return;
-    window.dispatchEvent(
-      new CustomEvent('repociv:open-bibliotheca-request', {
-        detail: { cityId, repoPath: panel?.dataset['repoPath'] ?? '' },
       }),
     );
   });
@@ -296,19 +285,6 @@ export function wireCityPanel() {
     window.dispatchEvent(
       new CustomEvent('repociv:open-local-view-request', {
         detail: { cityId, repoPath: panel?.dataset['repoPath'] ?? '' },
-      }),
-    );
-  });
-  document.getElementById('btn-city-logs')?.addEventListener('click', () => {
-    const panel = document.getElementById('city-panel');
-    const cityId = panel?.dataset['cityId'];
-    if (!cityId) return;
-    window.dispatchEvent(
-      new CustomEvent('repociv:open-city-logs-request', {
-        detail: {
-          cityId,
-          repoPath: panel?.dataset['repoPath'] ?? '',
-        },
       }),
     );
   });

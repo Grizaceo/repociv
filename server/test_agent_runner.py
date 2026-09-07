@@ -8,7 +8,7 @@ from server import agent_runner
 
 def test_build_stateful_session_id_scopes_by_city():
     assert agent_runner._build_stateful_session_id("MAIN", "CARCOSA") == "repociv-main-carcosa"
-    assert agent_runner._build_stateful_session_id("MAIN", "labhub") == "repociv-main-labhub"
+    assert agent_runner._build_stateful_session_id("MAIN", "carcosa") == "repociv-main-carcosa"
     assert agent_runner._build_stateful_session_id("MAIN", "main") == "repociv-main"
     assert agent_runner._build_stateful_session_id("MAIN", "") == "repociv-main"
     assert agent_runner._build_stateful_session_id(

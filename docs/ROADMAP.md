@@ -55,7 +55,7 @@ The dashboard currently runs only on localhost. Serving it over Tailscale
 with proper auth allows mobile and laptop access without exposing the
 bridge to the public internet. Required for true daily use.
 
-**2. Gran Biblioteca — The Agent Component Catalog**
+**2. The Agent Component Catalog**
 A catalog of pre-built, domain-specific agent components (legal agent,
 cybersecurity scanner, protein design assistant, financial analyst) with
 standardized interfaces for plug-and-play reuse. Each component is a

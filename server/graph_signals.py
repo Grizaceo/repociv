@@ -72,7 +72,7 @@ _ENTITY_PATTERNS = re.compile(
     r'security|vulnerability|cve|exploit|malware|yara|pentest|'
     r'linux|windows|macos|cross.?platform|'
     r'dashboard|visualization|canvas|game|simulation|'
-    r'hermes|repociv|bibliotheca'
+    r'hermes|repociv'
     r')\b'
 )
 

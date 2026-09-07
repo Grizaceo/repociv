@@ -1,12 +1,7 @@
 // ─── RepoCiv — PostMessage Bridge for Wonder iframes ─────────────────────────
 // Two-way communication between RepoCiv and iframe-based Wonders.
 
-import type {
-  RepoCivToWonderMessage,
-  SuggestionRelation,
-  WonderManifest,
-  WonderToRepoCivMessage,
-} from './types.ts';
+import type { RepoCivToWonderMessage, WonderManifest, WonderToRepoCivMessage } from './types.ts';
 
 const ALLOWED_ORIGINS = new Set<string>();
 
@@ -49,8 +44,7 @@ function _isHostMessage(data: unknown): data is RepoCivToWonderMessage {
     t === 'repociv.context' ||
     t === 'repociv.focus' ||
     t === 'repociv.layer' ||
-    t === 'repociv.open_local_view' ||
-    t === 'repociv.graph_suggestions'
+    t === 'repociv.open_local_view'
   );
 }
 
@@ -113,15 +107,6 @@ export function postOpenLocalViewToWonder(
   repoPath: string,
 ): void {
   postToWonder(iframe, manifest, { type: 'repociv.open_local_view', repoPath });
-}
-
-export function postGraphSuggestionsToWonder(
-  iframe: HTMLIFrameElement,
-  manifest: WonderManifest,
-  relations: SuggestionRelation[],
-  enabled: boolean,
-): void {
-  postToWonder(iframe, manifest, { type: 'repociv.graph_suggestions', relations, enabled });
 }
 
 type WonderMessageHandler = {

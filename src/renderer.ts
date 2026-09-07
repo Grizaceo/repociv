@@ -800,7 +800,7 @@ export class Renderer {
       const tile = this.state.world.tiles.get(tileKey(coord));
       const city = tile?.city ?? this.getCityAtScreen(wx, wy);
 
-      // Priority 1: wonder district hex (Bibliotheca / LabHub tiles)
+      // Priority 1: wonder district hex
       if (tile?.district?.type === 'wonder' && tile.district.wonderType) {
         openWonderVignette(tile.district.wonderType as import('./types').WonderType);
         return;
@@ -1360,7 +1360,6 @@ export class Renderer {
     // ─── Layer gates (applied to each rendering pass) ─────────────────
     const showStructure = isLayerVisible('structure');
     const showOps = isLayerVisible('ops');
-    const showKnowledge = isLayerVisible('knowledge');
     const showLabs = isLayerVisible('labs');
     const showSecurity = isLayerVisible('security');
     const showLabels = isLayerVisible('labels');
@@ -1386,7 +1385,6 @@ export class Renderer {
         showStructure,
         showOps,
         showLabels,
-        showKnowledge,
         showLabs,
       });
     } else {
@@ -1507,22 +1505,13 @@ export class Renderer {
         if (capital.wonders) {
           for (let i = 0; i < Math.min(capital.wonders.length, 2); i++) {
             const w = capital.wonders[i]!;
-            // Only show the sprite if its specific layer is enabled
-            const spriteAllowed =
-              (w.wonderType === 'bibliotheca' && showKnowledge) ||
-              (w.wonderType === 'institutum' && showLabs) ||
-              (w.wonderType === 'gaceta' && showKnowledge) ||
-              (w.wonderType !== 'bibliotheca' &&
-                w.wonderType !== 'institutum' &&
-                w.wonderType !== 'gaceta');
-            if (!spriteAllowed && showStructure) continue; // still show under structure
             const sx = cp.x + (i === 0 ? -1 : 1) * HEX_SIZE * 0.55;
             const sy = cp.y - HEX_SIZE * 0.5;
             const r = 9;
             ctx.beginPath();
             ctx.arc(sx, sy, r, 0, Math.PI * 2);
-            ctx.fillStyle = w.wonderType === 'bibliotheca' ? '#1a3a5c' : '#2d5a27';
-            ctx.strokeStyle = w.wonderType === 'bibliotheca' ? '#4a90c8' : '#6bc86b';
+            ctx.fillStyle = '#3a3020';
+            ctx.strokeStyle = '#c8a84b';
             ctx.lineWidth = 2;
             ctx.fill();
             ctx.stroke();
@@ -1530,68 +1519,20 @@ export class Renderer {
             ctx.font = 'bold 10px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            const glyph =
-              w.wonderType === 'bibliotheca'
-                ? 'B'
-                : w.wonderType === 'institutum'
-                  ? 'I'
-                  : (w.name?.[0] ?? 'W').toUpperCase();
+            const glyph = (w.name?.[0] ?? 'W').toUpperCase();
             ctx.fillText(glyph, sx, sy + 1);
           }
         }
       }
     }
 
-    // Pass 2.6: Knowledge — bibliotheca connection indicators
-    if (showKnowledge) {
-      // Precompute knowledge city positions once to avoid O(n²) per-frame wonders scan
-      const knowledgePts = this.state.world.cities
-        .filter((c) => c.wonders?.some((w) => w.wonderType === 'bibliotheca'))
-        .map((c) => ({
-          id: c.id,
-          p: this.tilePixelPos(c.coord, this.state.world.tiles.get(tileKey(c.coord))),
-        }));
-
-      for (const { p: cp } of knowledgePts) {
-        // Glowing book icon
-        ctx.save();
-        ctx.globalAlpha = webglMode
-          ? 0.18 + 0.06 * Math.sin(this.animTime * 1.5 + cp.x)
-          : 0.35 + 0.15 * Math.sin(this.animTime * 1.5 + cp.x);
-        ctx.fillStyle = '#4a90c8';
-        ctx.font = 'bold 11px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('📖', cp.x + HEX_SIZE * 0.8, cp.y - HEX_SIZE * 0.55);
-        // Thin connection lines between knowledge cities
-        for (const { p: op } of knowledgePts) {
-          if (op === cp) continue;
-          const dist = Math.hypot(op.x - cp.x, op.y - cp.y);
-          if (dist > HEX_SIZE * 12) continue; // don't draw across the whole map
-          const knowledgeAlpha = webglMode
-            ? 0.018 + 0.01 * Math.sin(this.animTime * 0.8 + cp.x + op.x)
-            : 0.08 + 0.04 * Math.sin(this.animTime * 0.8 + cp.x + op.x);
-          ctx.strokeStyle = `rgba(74, 144, 200, ${knowledgeAlpha})`;
-          ctx.lineWidth = webglMode ? 0.35 : 0.5;
-          ctx.setLineDash(webglMode ? [2, 10] : [3, 6]);
-          ctx.beginPath();
-          ctx.moveTo(cp.x, cp.y);
-          ctx.lineTo(op.x, op.y);
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
-        ctx.restore();
-      }
-    }
-
-    // Pass 2.7: Labs — active experiment indicators
+    // Pass 2.7: Labs — active construction / experiment indicators
     if (showLabs) {
       for (const city of this.state.world.cities) {
-        const hasLab = city.wonders?.some((w) => w.wonderType === 'institutum');
         const hasActiveExp = this.state.world.buildings.some(
           (b) => b.cityId === city.id && b.state === 'building',
         );
-        if (!hasLab && !hasActiveExp) continue;
+        if (!hasActiveExp) continue;
         const cp = this.tilePixelPos(city.coord, this.state.world.tiles.get(tileKey(city.coord)));
         const pulse = 0.4 + 0.3 * Math.sin(this.animTime * 3.0);
         ctx.save();

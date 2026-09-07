@@ -1,33 +1,23 @@
 // ─── RepoCiv — Wonder 3D props (Blender GLB + procedural fallback) ───────────
 //
-// Distinguishes Bibliotheca (temple) and Institutum (laboratorium) as distinct
-// 3D structures in the WebGL map, replacing the generic "sacred tile" decor
-// that `buildSacred()` in TileDecor3D produces for every district.type==='wonder'.
+// Renders a neutral monument on every district.type==='wonder' tile, replacing
+// the generic "sacred tile" decor that `buildSacred()` in TileDecor3D produces.
 //
 // Pattern mirrors CityProps3D.ts: a single Group, dirty-check by tile signature,
 // `rebuildWonderProps(tiles)` rebuilds only on signature change, `clearWonderProps()`
-// disposes cleanly. The two built-in wonders swap in painted Blender GLBs
-// (scripts/blender/make_props_wonders.py) once `ensureWonderPropsLoad()`
-// resolves; until then — and forever for user-connected generic wonders —
-// the procedural builders below carry the silhouette.
-//
-// Layer gating: `setWonderVisible(type, visible)` toggles per-wonder visibility
-// independently, matching the 2D canvas behaviour where bibliotheca gates on
-// the `knowledge` layer and institutum on the `labs` layer.
+// disposes cleanly. Wonders are user-connected iframe services, so there is no
+// per-product model — the procedural builder below carries the silhouette and
+// visibility follows the `structure` layer.
 
 import {
-  ConeGeometry,
   CylinderGeometry,
   Group,
   Mesh,
   MeshStandardMaterial,
-  IcosahedronGeometry,
   OctahedronGeometry,
   Color,
   Vector3,
 } from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { mergeGlbScene, type MergedGlb } from './mergeGlbScene.ts';
 import { type Tile } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
@@ -40,23 +30,9 @@ wonderGroup.name = 'wonder-props';
 let lastSignature = '';
 const activeMeshes: Mesh[] = [];
 
-// The GLB swap-in must force exactly one rebuild. '' can't be the reset value:
-// it is ALSO the legitimate signature of a world with zero wonder tiles, and a
-// collision would early-return past the rebuild, leaving the stale procedural
-// meshes parented as ghosts. '\0' can never appear in a real signature.
-const FORCE_REBUILD = '\u0000';
-
-// Sub-groups so we can hide one wonder type independently of the other
-const bibliothecaGroup = new Group();
-bibliothecaGroup.name = 'wonder-bibliotheca';
-const institutumGroup = new Group();
-institutumGroup.name = 'wonder-institutum';
-// Holds every user-connected wonder that isn't one of the two built-in
-// examples — rendered with a neutral monument silhouette.
+// Holds every connected wonder — rendered with a neutral monument silhouette.
 const genericGroup = new Group();
 genericGroup.name = 'wonder-generic';
-wonderGroup.add(bibliothecaGroup);
-wonderGroup.add(institutumGroup);
 wonderGroup.add(genericGroup);
 
 export function getWonderPropsGroup(): Group {
@@ -64,266 +40,23 @@ export function getWonderPropsGroup(): Group {
 }
 
 export function areWonderPropsReady(): boolean {
-  return true; // procedural fallback — a wonder can always be drawn
+  return true; // procedural — a wonder can always be drawn
 }
 
-// ─── Blender GLB swap-in ─────────────────────────────────────────────────────
-
-type GlbState = 'idle' | 'loading' | 'ready' | 'failed';
-type GlbWonder = 'bibliotheca' | 'institutum';
-
-const GLB_IDS: Record<GlbWonder, string> = {
-  bibliotheca: 'wonder-bibliotheca-0',
-  institutum: 'wonder-institutum-0',
-};
-
-let glbState: GlbState = 'idle';
-let glbVariants: Map<GlbWonder, MergedGlb> | null = null;
-
-/** True once the painted Blender GLBs replaced the procedural builders —
- *  participates in the renderer's dirty signature so the swap-in triggers
- *  exactly one rebuild. */
-export function areWonderGlbReady(): boolean {
-  return glbState === 'ready';
-}
-
+/** Debug/capture probe: procedural props have no async load, so they are
+ *  settled as soon as the module is live. Kept as a named probe because the
+ *  screenshot tooling waits on it before framing a shot. */
 export function areWonderPropsSettled(): boolean {
-  return glbState === 'ready' || glbState === 'failed';
-}
-
-export function ensureWonderPropsLoad(onSettled?: () => void): void {
-  if (glbState !== 'idle') return;
-  glbState = 'loading';
-  const loader = new GLTFLoader();
-  const kinds = Object.keys(GLB_IDS) as GlbWonder[];
-  Promise.all(kinds.map((k) => loader.loadAsync(`/assets/3d/props/${GLB_IDS[k]}.glb`)))
-    .then((gltfs) => {
-      glbVariants = new Map(kinds.map((k, i) => [k, mergeGlbScene(gltfs[i]!.scene)]));
-      glbState = 'ready';
-      lastSignature = FORCE_REBUILD; // next rebuild must swap in the GLBs
-      onSettled?.();
-    })
-    .catch(() => {
-      glbVariants = null;
-      glbState = 'failed';
-      onSettled?.();
-    });
-}
-
-/** @internal test hook — vitest has no fetch/GLTFLoader, so tests inject
- *  merged geometry directly to exercise the GLB path. */
-export function _injectWonderGlbForTest(map: Map<GlbWonder, MergedGlb> | null): void {
-  glbVariants = map;
-  glbState = map ? 'ready' : 'idle';
-  lastSignature = FORCE_REBUILD;
-}
-
-/** GLB-backed wonder instance. Geometry/materials belong to the loaded asset
- *  (shared across rebuilds), so the mesh is tagged for dispose to skip. */
-function buildGlbWonder(kind: GlbWonder): Mesh {
-  const variant = glbVariants!.get(kind)!;
-  const mesh = new Mesh(variant.geometry, variant.materials);
-  mesh.name = `${kind}-glb`;
-  mesh.userData.sharedAsset = true;
-  mesh.castShadow = true;
-  mesh.receiveShadow = false;
-  // Model space: footprint radius ~1, base at y=0 on the tile top face.
-  const s = HEX_SIZE * 0.5;
-  mesh.scale.set(s, s, s);
-  return mesh;
+  return true;
 }
 
 // ─── Procedural geometries ───────────────────────────────────────────────────
 
 /**
- * Bibliotheca Alexandrina — temple silhouette.
- * 3-tier stepped dais + 6-column hex ring + low pediment + small emissive gem
- * at the apex. Echoes the 2D canvas temple (renderer.ts:624-766).
- */
-function buildBibliotheca(): Group {
-  const g = new Group();
-  g.name = 'bibliotheca';
-
-  const stoneMat = new MeshStandardMaterial({
-    color: new Color(0xc9bfa6),
-    roughness: 0.78,
-    metalness: 0.04,
-  });
-  const colMat = new MeshStandardMaterial({
-    color: new Color(0xe6dcc2),
-    roughness: 0.62,
-    metalness: 0.08,
-  });
-  // Warm bronze-terracotta roof — the old cold blue-grey (0x8a9bb0) read as a
-  // stray grey blob perched on the columns; a warm roof tone contrasts with
-  // the cream stone and clearly says "roof".
-  const roofMat = new MeshStandardMaterial({
-    color: new Color(0xb06a3a),
-    roughness: 0.55,
-    metalness: 0.15,
-  });
-  const gemMat = new MeshStandardMaterial({
-    color: new Color(0xe8c66a),
-    emissive: new Color(0xa8842e),
-    emissiveIntensity: 0.55,
-    roughness: 0.18,
-    metalness: 0.35,
-    transparent: true,
-    opacity: 0.85,
-  });
-
-  // 3-tier stepped dais (each smaller as it rises)
-  const daisHeights = [0.04, 0.05, 0.05];
-  const daisRadii = [0.42, 0.34, 0.26];
-  for (let i = 0; i < 3; i++) {
-    const h = HEX_SIZE * daisHeights[i]!;
-    const r = HEX_SIZE * daisRadii[i]!;
-    const dais = new Mesh(new CylinderGeometry(r, r * 1.05, h, 6), stoneMat);
-    dais.position.y = h * 0.5 + i * h;
-    dais.castShadow = true;
-    dais.receiveShadow = true;
-    g.add(dais);
-  }
-  const topDais = HEX_SIZE * (daisHeights[0]! + daisHeights[1]! + daisHeights[2]!);
-
-  // 6 columns on a hex ring at the top dais
-  const colR = HEX_SIZE * 0.03;
-  const colH = HEX_SIZE * 0.34;
-  const colRing = HEX_SIZE * 0.2;
-  for (let i = 0; i < 6; i++) {
-    const ang = ((Math.PI * 2) / 6) * i;
-    const col = new Mesh(new CylinderGeometry(colR, colR, colH, 8), colMat);
-    col.position.set(Math.cos(ang) * colRing, topDais + colH * 0.5, Math.sin(ang) * colRing);
-    col.castShadow = true;
-    g.add(col);
-  }
-
-  const colTop = topDais + colH;
-
-  // Entablature: a hexagonal frieze band capping the colonnade, tying the six
-  // columns into one temple top. Replaces the loose triangular pediment that
-  // sat askew on the hex ring and read as a stray wedge.
-  const entR = HEX_SIZE * 0.255;
-  const entH = HEX_SIZE * 0.055;
-  const entablature = new Mesh(new CylinderGeometry(entR, entR * 1.04, entH, 6), colMat);
-  entablature.position.y = colTop + entH * 0.5;
-  entablature.rotation.y = Math.PI / 6; // hex flats face the column gaps
-  entablature.castShadow = true;
-  g.add(entablature);
-
-  // Roof: a clean six-sided low pyramid with eaves overhanging the
-  // entablature. Its hexagonal base matches the column ring, so it reads as a
-  // proper tholos/temple roof instead of a mismatched flat triangle.
-  const roofR = HEX_SIZE * 0.3;
-  const roofH = HEX_SIZE * 0.21;
-  const roof = new Mesh(new ConeGeometry(roofR, roofH, 6), roofMat);
-  roof.position.y = colTop + entH + roofH * 0.5;
-  roof.rotation.y = Math.PI / 6;
-  roof.castShadow = true;
-  g.add(roof);
-
-  // Glow gem finial at the roof apex — faceted octahedron for consistency
-  // with the iter13 flat-shaded style (the old small sphere read as a marble).
-  const gem = new Mesh(new OctahedronGeometry(HEX_SIZE * 0.05, 0), gemMat);
-  gem.position.y = colTop + entH + roofH + HEX_SIZE * 0.03;
-  g.add(gem);
-
-  return g;
-}
-
-/**
- * Institutum Scientiarum (LabHub) — laboratorium silhouette.
- * Stepped dais + 4 corner spires (faceted hex towers, not smooth cones) +
- * central faceted dome (low-poly icosahedron, not smooth sphere) + large
- * emissive crystal (octahedron, not smooth sphere) at the top.
- * Echoes the 2D canvas flask (renderer.ts:624-766).
- */
-function buildInstitutum(): Group {
-  const g = new Group();
-  g.name = 'institutum';
-
-  const daisMat = new MeshStandardMaterial({
-    color: new Color(0xb5a892),
-    roughness: 0.72,
-    metalness: 0.06,
-  });
-  const spireMat = new MeshStandardMaterial({
-    color: new Color(0x6e7d5a),
-    roughness: 0.55,
-    metalness: 0.12,
-    flatShading: true,
-  });
-  const domeMat = new MeshStandardMaterial({
-    color: new Color(0xd4cba8),
-    roughness: 0.45,
-    metalness: 0.18,
-    flatShading: true,
-  });
-  const glowMat = new MeshStandardMaterial({
-    color: new Color(0x6bd8a8),
-    emissive: new Color(0x2a9c70),
-    emissiveIntensity: 0.65,
-    roughness: 0.2,
-    metalness: 0.25,
-    transparent: true,
-    opacity: 0.78,
-    flatShading: true,
-  });
-
-  // Flat dais
-  const daisH = HEX_SIZE * 0.05;
-  const daisR = HEX_SIZE * 0.36;
-  const dais = new Mesh(new CylinderGeometry(daisR, daisR * 1.04, daisH, 6), daisMat);
-  dais.position.y = daisH * 0.5;
-  dais.castShadow = true;
-  dais.receiveShadow = true;
-  g.add(dais);
-
-  // 4 corner spires — faceted hex towers that taper to a point, replacing
-  // the old smooth 5-segment cones that read as paper wands. A 6-sided
-  // cylinder with a low radialSegments + flatShading gives the craggy
-  // obelisk silhouette the iter13 style demands.
-  const spireH = HEX_SIZE * 0.36;
-  const spireRTop = HEX_SIZE * 0.015;
-  const spireRBase = HEX_SIZE * 0.055;
-  const spireRing = HEX_SIZE * 0.26;
-  for (let i = 0; i < 4; i++) {
-    const ang = ((Math.PI * 2) / 4) * i + Math.PI / 4;
-    const spire = new Mesh(new CylinderGeometry(spireRTop, spireRBase, spireH, 6), spireMat);
-    spire.position.set(Math.cos(ang) * spireRing, daisH + spireH * 0.5, Math.sin(ang) * spireRing);
-    spire.castShadow = true;
-    g.add(spire);
-  }
-
-  // Central dome: a low-poly icosahedron (detail=0 → 20 flat triangles)
-  // flattened to ~60% height so it reads as a dome, not a ball. The old
-  // smooth SphereGeometry(12,8) was a perfect hemisphere that looked like
-  // a plastic bowl under the warm PBR lights.
-  const domeR = HEX_SIZE * 0.22;
-  const domeGeom = new IcosahedronGeometry(domeR, 0);
-  // Flatten vertically → dome shape
-  domeGeom.scale(1, 0.55, 1);
-  const dome = new Mesh(domeGeom, domeMat);
-  dome.position.y = daisH + domeR * 0.55 * 0.5;
-  dome.castShadow = true;
-  g.add(dome);
-
-  // Glow crystal at top of dome — an octahedron reads as a faceted gem,
-  // not a smooth marble. The old SphereGeometry(10,8) was a polished orb.
-  const glow = new Mesh(new OctahedronGeometry(HEX_SIZE * 0.08, 0), glowMat);
-  glow.position.y = daisH + domeR * 0.55 + HEX_SIZE * 0.04;
-  g.add(glow);
-
-  return g;
-}
-
-/**
- * Generic connected wonder — neutral monument for any user-defined iframe
- * service that isn't one of the two built-in examples. Stepped dais + central
- * faceted spire + emissive crystal node so it reads as "a wonder" without
- * claiming a specific identity. Deliberately distinct from the
- * temple/laboratorium. Uses flat-shaded low-poly geometry (iter13 style)
- * instead of smooth cones/spheres.
+ * Connected wonder — neutral monument for any user-defined iframe service.
+ * Stepped dais + central faceted spire + emissive crystal node so it reads as
+ * "a wonder" without claiming a specific identity. Uses flat-shaded low-poly
+ * geometry (iter13 style) instead of smooth cones/spheres.
  */
 function buildGenericWonder(): Group {
   const g = new Group();
@@ -396,9 +129,6 @@ function wonderSignature(tiles: Tile[]): string {
 }
 
 function disposeMesh(m: Mesh): void {
-  // GLB-backed meshes share the loaded asset's geometry/materials across
-  // rebuilds — disposing them would break every later rebuild.
-  if (m.userData.sharedAsset) return;
   m.geometry.dispose();
   const mat = m.material;
   if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
@@ -423,8 +153,6 @@ function clearGroupContents(g: Group): void {
 
 export function rebuildWonderProps(tiles: Tile[]): void {
   if (tiles.length === 0) {
-    clearGroupContents(bibliothecaGroup);
-    clearGroupContents(institutumGroup);
     clearGroupContents(genericGroup);
     lastSignature = '';
     return;
@@ -434,8 +162,6 @@ export function rebuildWonderProps(tiles: Tile[]): void {
   if (sig === lastSignature) return;
   lastSignature = sig;
 
-  clearGroupContents(bibliothecaGroup);
-  clearGroupContents(institutumGroup);
   clearGroupContents(genericGroup);
 
   // Build each wonder instance at its tile centre
@@ -450,44 +176,21 @@ export function rebuildWonderProps(tiles: Tile[]): void {
     // even if some tile carried it.
     if (tile.district.wonderType === 'gaceta') continue;
 
-    // Painted Blender GLBs once loaded; procedural silhouettes until then.
-    const glbReady = glbState === 'ready' && glbVariants !== null;
     const wonderY = terrainSurfaceY(tile) + PROP_SURFACE_CLEARANCE;
-    if (tile.district.wonderType === 'bibliotheca') {
-      const inst = glbReady ? buildGlbWonder('bibliotheca') : buildBibliotheca();
-      inst.position.set(pos.x, wonderY, pos.z);
-      bibliothecaGroup.add(inst);
-    } else if (tile.district.wonderType === 'institutum') {
-      const inst = glbReady ? buildGlbWonder('institutum') : buildInstitutum();
-      inst.position.set(pos.x, wonderY, pos.z);
-      institutumGroup.add(inst);
-    } else {
-      const inst = buildGenericWonder();
-      inst.position.set(pos.x, wonderY, pos.z);
-      genericGroup.add(inst);
-    }
+    const inst = buildGenericWonder();
+    inst.position.set(pos.x, wonderY, pos.z);
+    genericGroup.add(inst);
   }
 }
 
 export function clearWonderProps(): void {
-  clearGroupContents(bibliothecaGroup);
-  clearGroupContents(institutumGroup);
   clearGroupContents(genericGroup);
   lastSignature = '';
 }
 
-/**
- * Per-wonder visibility — bibliotheca under `knowledge` layer, institutum
- * under `labs` layer, generic (user-connected) wonders under `structure`.
- * Mirrors the 2D canvas gating (renderer.ts:1190-1225).
- */
-export function setWonderVisible(
-  type: 'bibliotheca' | 'institutum' | 'generic',
-  visible: boolean,
-): void {
-  if (type === 'bibliotheca') bibliothecaGroup.visible = visible;
-  else if (type === 'institutum') institutumGroup.visible = visible;
-  else genericGroup.visible = visible;
+/** Wonder prop visibility — follows the `structure` layer. */
+export function setWonderVisible(visible: boolean): void {
+  genericGroup.visible = visible;
 }
 
 /** @internal test hook — exposes the current signature so tests can assert

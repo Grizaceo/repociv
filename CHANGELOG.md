@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **Bibliotheca (La Gran Biblioteca) y LabHub/Institutum retiradas** — ninguna de las dos llegó a dar utilidad real, así que salen de RepoCiv por completo. Se va: `src/wonderEnv.ts` (+ test) con todos los probes LGB/Institutum, `src/ui/relationsPanel.ts`, `src/wonders/exampleTemplates.ts`, las specs hardcodeadas y la adopción por lockfile de LabHub en `server/wonder_launcher.py` (839 → 732 líneas, `WONDER_LAUNCH_SPECS` queda vacío por diseño), los props 3D por producto y su carga de GLB en `src/three/WonderProps3D.ts` (503 → 208 líneas, todas las maravillas comparten ahora un monumento neutro), los dos GLB de `public/assets/3d/props/`, `scripts/blender/make_props_wonders.py`, los tiles reservados `(-1,0)`/`(1,0)` en `map.ts`, la capa de mapa `knowledge` (su único render era el overlay de conexiones de Bibliotheca), los botones "Ver en Bibliotheca" y "Ver logs" del panel de ciudad (el segundo solo abría `.labhub/logs/latest.log`), el bloque `VITE_WONDER_*` de `.env.example`, y la sección `/api/labhub/status` de `docs/API.md` — esos endpoints ya no existían en el servidor.
+- **Lo que NO se fue:** el andamiaje genérico de Maravillas (catálogo, registro en `~/.repociv/wonders/*.json`, panel de capital, viñeta iframe, launcher, auto-arranque), La Gaceta Imperial, y el índice de relaciones entre repos (`graph_relations*`, `graph_scoring`, `graph_index`, `city_graph_adapter`) — ese motor indexa los repos del propio usuario, no era de Bibliotheca. Solo se borró su accesor muerto `get_bibliotheca_relations()` (cero llamadores).
+- `WonderType` pasa de `'gaceta' | 'bibliotheca' | 'institutum' | (string & {})` a `'gaceta' | (string & {})`. `WondersConfig` pierde `bibliotheca`; `isFeatureEnabled` devuelve `false` para ids retirados. Tests: 911 vitest y 1033 pytest verdes.
+
 ### Added
 
 - **Onboarding harness pick step** — paso 2 de 4 del panel inicial. El usuario elige el harness que corre su primera unidad (MAIN) entre Hermes (recomendado), Claude Code, Codex, Cursor y OpenClaw. La elección persiste en `~/.repociv/config.json` y se usa al rutear comandos sobre MAIN. Visitantes recurrentes ven su selección previa. Endpoint `GET/POST /api/config/default-harness` (auth por token).

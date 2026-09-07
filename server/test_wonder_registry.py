@@ -1,7 +1,7 @@
 """RepoCiv — Wonder Registry Python Tests.
 
 New model (2026-06-17): only the native gaceta is a built-in. iframe wonders
-(bibliotheca, institutum, custom services) are connected by writing a manifest
+(custom services) are connected by writing a manifest
 to ~/.repociv/wonders/<id>.json via save_custom_manifest(). Tests isolate that
 dir to a tmp_path so the dev machine's real connected wonders don't leak in.
 """
@@ -77,8 +77,8 @@ def test_get_wonder_returns_manifest():
 
 
 def test_iframe_wonders_absent_until_connected():
-    assert get_wonder("bibliotheca") is None
-    assert get_wonder("institutum") is None
+    assert get_wonder("mi-servicio") is None
+    assert get_wonder("otro-servicio") is None
 
 
 def test_get_wonder_not_found():

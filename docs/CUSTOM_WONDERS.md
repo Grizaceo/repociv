@@ -14,10 +14,10 @@ Cómo agregar tus propias Maravillas al launcher de RepoCiv.
 que describe los comandos CLI a lanzar. Reiniciás el bridge y tu
 maravilla aparece en `GET /api/wonders` con auto-start disponible.
 
-> **Atajo desde la UI:** **Palacio → pestaña "Maravillas"** trae tarjetas de
-> ejemplo (Bibliotheca, LabHub) con un botón **Conectar** que escribe ese JSON
-> por vos (vía `POST /api/wonders/connect`) y recarga el launcher sin reiniciar
-> el bridge. Nada viene pre-instalado: solo aparece lo que conectás.
+> **Atajo desde la UI:** **Palacio → pestaña "Maravillas"** conecta un servicio
+> vía `POST /api/wonders/connect`, que escribe ese JSON por vos y recarga el
+> launcher sin reiniciar el bridge. Nada viene pre-instalado: RepoCiv no trae
+> ninguna maravilla iframe de fábrica — solo aparece lo que conectás.
 
 ---
 
@@ -167,7 +167,7 @@ interface ProcSpec {
 
   // Env vars adicionales. Se mergean con el env del bridge. Útil
   // para forzar bind a 0.0.0.0 cuando accedés desde Tailscale / WSL2
-  // (ej: {"LGB_HOST": "0.0.0.0"}).
+  // (ej: {"BRIDGE_HOST": "0.0.0.0"}).
   env?: Record<string, string>;
 }
 ```
@@ -272,22 +272,7 @@ Logs en `~/.repociv/wonders/logs/<tu-log>`.
 
 ---
 
-## 7. Override de maravillas built-in
-
-Si ponés un manifest con `id: "bibliotheca"` (o `"institutum"`),
-**gana tu versión**. El bridge loguea un warning a stderr:
-
-```
-[wonder_launcher] custom spec for 'bibliotheca' overrides the built-in
-```
-
-Útil si querés apuntar la maravilla built-in a un fork propio sin
-tocar el código de RepoCiv. Para volver al default, borrá el archivo
-y reiniciá el bridge.
-
----
-
-## 8. Referencias
+## 7. Referencias
 
 - [`WONDER_CONTRACT.md`](WONDER_CONTRACT.md) — schema del manifest
 - [`server/wonder_launcher.py`](../../server/wonder_launcher.py) — implementación

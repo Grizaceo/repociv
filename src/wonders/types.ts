@@ -83,37 +83,11 @@ export interface WonderManifest {
 
 // ─── postMessage Bridge Contract ─────────────────────────────────────────────
 
-export interface SuggestionRelation {
-  fromId: string;
-  fromName: string;
-  toId: string;
-  toName: string;
-  relationType:
-    | 'shared_dependency'
-    | 'shared_entity'
-    | 'temporal_coactivity'
-    | 'conceptual_overlap'
-    | 'imports_or_links'
-    | 'same_lab_family'
-    | 'security_relevance'
-    | 'unknown_but_interesting';
-  score: number;
-  evidence: string[];
-  suggestedActions: ('linkear' | 'ignorar' | 'abrir_ambos' | 'crear_nota')[];
-  accepted?: boolean;
-  rejected?: boolean;
-  fromCityName?: string;
-  toCityName?: string;
-  fromRepoPath?: string;
-  toRepoPath?: string;
-}
-
 export type RepoCivToWonderMessage =
   | { type: 'repociv.context'; cityId?: string; selectedRepo?: string; theme: string }
   | { type: 'repociv.focus'; cityId: string; mode: 'macro' | 'local' }
   | { type: 'repociv.layer'; layer: string; enabled: boolean }
-  | { type: 'repociv.open_local_view'; repoPath: string }
-  | { type: 'repociv.graph_suggestions'; relations: SuggestionRelation[]; enabled: boolean };
+  | { type: 'repociv.open_local_view'; repoPath: string };
 
 export type WonderToRepoCivMessage =
   | { type: 'wonder.ready'; id: string }
@@ -136,13 +110,6 @@ export interface GacetaConfig {
   autoSummaries: boolean;
 }
 
-export interface BibliothecaConfig {
-  fileNavigation: boolean;
-  graphSuggestions: boolean;
-  aiRelationDiscovery: boolean;
-}
-
 export interface WondersConfig {
   gaceta: GacetaConfig;
-  bibliotheca: BibliothecaConfig;
 }

@@ -174,7 +174,7 @@ test.describe('Debug Local View - access game state directly', () => {
       const maxAutoCoords = 200;
       const cityCoords = spiralCoords(center, maxAutoCoords);
 
-      const occupiedCoords = new Set(['0,0', '-1,0', '1,0']); // capital, bibliotheca, labhub
+      const occupiedCoords = new Set(['0,0', '-1,0', '1,0']); // capital + the first two wonder ring tiles
       const cityCoordLookup = new Map();
 
       // Simulate placing 12 cities (from our selected repos)

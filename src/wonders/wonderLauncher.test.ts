@@ -34,15 +34,15 @@ describe('wonderLauncher client (F3)', () => {
 
   it('launchWonder POSTs to /api/wonders/{id}/launch and returns the body', async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ ok: true, id: 'institutum', status: 'starting', ready: false }),
+      jsonResponse({ ok: true, id: 'mi-servicio', status: 'starting', ready: false }),
     );
-    const out = await launchWonder('institutum');
+    const out = await launchWonder('mi-servicio');
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url).toBe('/bridge/api/wonders/institutum/launch');
+    expect(url).toBe('/bridge/api/wonders/mi-servicio/launch');
     expect((init as RequestInit).method).toBe('POST');
     expect((init as RequestInit).headers).toMatchObject({ 'Content-Type': 'application/json' });
-    expect(out.id).toBe('institutum');
+    expect(out.id).toBe('mi-servicio');
     expect(out.status).toBe('starting');
   });
 
@@ -50,7 +50,7 @@ describe('wonderLauncher client (F3)', () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ ok: false, code: 'repo_not_found', error: 'wonder repo not found' }, 412),
     );
-    const out = await launchWonder('institutum');
+    const out = await launchWonder('mi-servicio');
     expect(out.ok).toBe(false);
     expect(out.error).toBe('repo_not_found');
     // The body's code field is preferred over the synthetic http_* fallback.
@@ -59,7 +59,7 @@ describe('wonderLauncher client (F3)', () => {
 
   it('launchWonder returns ok=false on network error without throwing', async () => {
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
-    const out = await launchWonder('institutum');
+    const out = await launchWonder('mi-servicio');
     expect(out.ok).toBe(false);
     expect(out.error).toBe('network');
     expect(out.error_message).toContain('Failed to fetch');
@@ -70,10 +70,10 @@ describe('wonderLauncher client (F3)', () => {
   it('pollWonderUntilReady returns immediately when first call is ready', async () => {
     fetchMock.mockResolvedValueOnce(
       // launchWonder
-      jsonResponse({ ok: true, id: 'institutum', status: 'ready', ready: true }),
+      jsonResponse({ ok: true, id: 'mi-servicio', status: 'ready', ready: true }),
     );
     // (no further polls expected)
-    const out = await pollWonderUntilReady('institutum', {
+    const out = await pollWonderUntilReady('mi-servicio', {
       intervalMs: 1,
       timeoutMs: 5_000,
     });
@@ -85,17 +85,17 @@ describe('wonderLauncher client (F3)', () => {
     fetchMock
       .mockResolvedValueOnce(
         // first launch
-        jsonResponse({ ok: true, id: 'bibliotheca', status: 'starting', ready: false }),
+        jsonResponse({ ok: true, id: 'otro-servicio', status: 'starting', ready: false }),
       )
       .mockResolvedValueOnce(
         // status poll 1
-        jsonResponse({ ok: true, id: 'bibliotheca', status: 'starting', ready: false }),
+        jsonResponse({ ok: true, id: 'otro-servicio', status: 'starting', ready: false }),
       )
       .mockResolvedValueOnce(
         // status poll 2
-        jsonResponse({ ok: true, id: 'bibliotheca', status: 'ready', ready: true }),
+        jsonResponse({ ok: true, id: 'otro-servicio', status: 'ready', ready: true }),
       );
-    const out = await pollWonderUntilReady('bibliotheca', {
+    const out = await pollWonderUntilReady('otro-servicio', {
       intervalMs: 1,
       timeoutMs: 5_000,
     });
@@ -104,7 +104,7 @@ describe('wonderLauncher client (F3)', () => {
   });
 
   it('pollWonderUntilReady does NOT cut on transient error (keeps polling)', async () => {
-    // F3.1-B regression: the cold-start window for institutum can show
+    // F3.1-B regression: the cold-start window for a wonder can show
     // status='error' briefly (npm died, bridge not bound yet) before the
     // backend grace period settles. The poller must keep waiting
     // through that — only true 4xx rejections (unknown_wonder,
@@ -112,17 +112,17 @@ describe('wonderLauncher client (F3)', () => {
     fetchMock
       .mockResolvedValueOnce(
         // first launch
-        jsonResponse({ ok: true, id: 'institutum', status: 'starting', ready: false }),
+        jsonResponse({ ok: true, id: 'mi-servicio', status: 'starting', ready: false }),
       )
       .mockResolvedValueOnce(
         // status poll → error (transient)
-        jsonResponse({ ok: true, id: 'institutum', status: 'error', ready: false }),
+        jsonResponse({ ok: true, id: 'mi-servicio', status: 'error', ready: false }),
       )
       .mockResolvedValueOnce(
         // status poll → ready (eventually)
-        jsonResponse({ ok: true, id: 'institutum', status: 'ready', ready: true }),
+        jsonResponse({ ok: true, id: 'mi-servicio', status: 'ready', ready: true }),
       );
-    const out = await pollWonderUntilReady('institutum', {
+    const out = await pollWonderUntilReady('mi-servicio', {
       intervalMs: 1,
       timeoutMs: 5_000,
     });
@@ -138,17 +138,17 @@ describe('wonderLauncher client (F3)', () => {
     fetchMock
       .mockResolvedValueOnce(
         // first launch
-        jsonResponse({ ok: true, id: 'institutum', status: 'starting', ready: false }),
+        jsonResponse({ ok: true, id: 'mi-servicio', status: 'starting', ready: false }),
       )
       .mockResolvedValueOnce(
         // status poll → degraded
-        jsonResponse({ ok: true, id: 'institutum', status: 'degraded', ready: false }),
+        jsonResponse({ ok: true, id: 'mi-servicio', status: 'degraded', ready: false }),
       )
       .mockResolvedValueOnce(
         // status poll → ready
-        jsonResponse({ ok: true, id: 'institutum', status: 'ready', ready: true }),
+        jsonResponse({ ok: true, id: 'mi-servicio', status: 'ready', ready: true }),
       );
-    const out = await pollWonderUntilReady('institutum', {
+    const out = await pollWonderUntilReady('mi-servicio', {
       intervalMs: 1,
       timeoutMs: 5_000,
     });
@@ -159,13 +159,13 @@ describe('wonderLauncher client (F3)', () => {
   it('pollWonderUntilReady calls onUpdate at each step', async () => {
     fetchMock
       .mockResolvedValueOnce(
-        jsonResponse({ ok: true, id: 'institutum', status: 'starting', ready: false }),
+        jsonResponse({ ok: true, id: 'mi-servicio', status: 'starting', ready: false }),
       )
       .mockResolvedValueOnce(
-        jsonResponse({ ok: true, id: 'institutum', status: 'ready', ready: true }),
+        jsonResponse({ ok: true, id: 'mi-servicio', status: 'ready', ready: true }),
       );
     const updates: string[] = [];
-    await pollWonderUntilReady('institutum', {
+    await pollWonderUntilReady('mi-servicio', {
       intervalMs: 1,
       timeoutMs: 5_000,
       onUpdate: (s) => updates.push(s.status),
@@ -190,14 +190,14 @@ describe('wonderLauncher client (F3)', () => {
   it('ensureWondersUp fires launch for each id, no await', async () => {
     // Each poll returns ready on the first launch → no further polls.
     fetchMock.mockResolvedValue(jsonResponse({ ok: true, status: 'ready', ready: true }));
-    ensureWondersUp(['bibliotheca', 'institutum'], { intervalMs: 1, timeoutMs: 1_000 });
+    ensureWondersUp(['otro-servicio', 'mi-servicio'], { intervalMs: 1, timeoutMs: 1_000 });
     // give the microtask queue a chance to flush
     await new Promise((r) => setTimeout(r, 50));
     // We expect at least one fetch per id (the first launch).
     const calls = fetchMock.mock.calls as Array<[unknown, RequestInit?]>;
     const urls = calls.map((c) => String(c[0]));
-    expect(urls.some((u) => u.includes('/api/wonders/bibliotheca/launch'))).toBe(true);
-    expect(urls.some((u) => u.includes('/api/wonders/institutum/launch'))).toBe(true);
+    expect(urls.some((u) => u.includes('/api/wonders/otro-servicio/launch'))).toBe(true);
+    expect(urls.some((u) => u.includes('/api/wonders/mi-servicio/launch'))).toBe(true);
   });
 
   it('ensureWondersUp swallows errors (logs to console.warn, no throw)', async () => {
@@ -205,7 +205,7 @@ describe('wonderLauncher client (F3)', () => {
     fetchMock.mockRejectedValue(new TypeError('boom'));
     // Must not throw synchronously and must not surface an unhandled
     // rejection that escapes the .catch() in ensureWondersUp.
-    expect(() => ensureWondersUp(['institutum'], { intervalMs: 1, timeoutMs: 100 })).not.toThrow();
+    expect(() => ensureWondersUp(['mi-servicio'], { intervalMs: 1, timeoutMs: 100 })).not.toThrow();
     await new Promise((r) => setTimeout(r, 150));
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
@@ -215,19 +215,19 @@ describe('wonderLauncher client (F3)', () => {
 
   it('getWonderLaunchStatus GETs the status endpoint', async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ ok: true, id: 'institutum', status: 'ready', ready: true }),
+      jsonResponse({ ok: true, id: 'mi-servicio', status: 'ready', ready: true }),
     );
-    const out = await getWonderLaunchStatus('institutum');
+    const out = await getWonderLaunchStatus('mi-servicio');
     const firstCall = fetchMock.mock.calls[0]!;
-    expect(firstCall[0]).toBe('/bridge/api/wonders/institutum/launch-status');
+    expect(firstCall[0]).toBe('/bridge/api/wonders/mi-servicio/launch-status');
     expect(out.status).toBe('ready');
   });
 
   it('stopWonder POSTs to /stop', async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true, id: 'institutum' }));
-    const out = await stopWonder('institutum');
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true, id: 'mi-servicio' }));
+    const out = await stopWonder('mi-servicio');
     const firstCall = fetchMock.mock.calls[0]!;
-    expect(firstCall[0]).toBe('/bridge/api/wonders/institutum/stop');
+    expect(firstCall[0]).toBe('/bridge/api/wonders/mi-servicio/stop');
     expect((firstCall[1] as RequestInit).method).toBe('POST');
     expect(out.ok).toBe(true);
   });

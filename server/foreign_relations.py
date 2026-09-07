@@ -6,7 +6,7 @@ Cheap local scoring between a news article and a target repo using:
   2. Lexical overlap / simple TF-IDF
   3. Category/source metadata matching
   4. Recent events (optional — fed by caller)
-  5. Bibliotheca relations (optional — only if caller enables graphSuggestions)
+  5. Repo graph relations (optional — only if the caller enables graphSuggestions)
 
 Only if the score exceeds a threshold, the LLM is invoked to write the final report.
 If score is below threshold, returns a low-confidence "impact low/unclear" response.
@@ -332,7 +332,7 @@ def _build_report_prompt(
             lines.append(f"- {ev.get('summary', ev.get('text', str(ev)))[:200]}")
 
     if graph_relations:
-        lines.extend(["", "## Relaciones de grafo (Bibliotheca)"])
+        lines.extend(["", "## Relaciones de grafo entre repos"])
         for rel in graph_relations[:5]:
             lines.append(f"- {rel.get('label', str(rel))}")
 

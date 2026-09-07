@@ -11,7 +11,7 @@ import {
 } from './map.ts';
 import { type ScannedRepo } from './map.ts';
 import { Renderer } from './renderer.ts';
-import { BridgeEvents, syncGraphRelationFlags } from './bridge.ts';
+import { BridgeEvents } from './bridge.ts';
 import { ensureWondersUp, isAutoStartWondersEnabled } from './wonders/wonderLauncher.ts';
 import { GameState } from './game.ts';
 
@@ -96,14 +96,8 @@ import { initBubbleLayer, updateBubble, clearAllBubbles } from './ui/actionBubbl
 import { bindOrdenDeBatalla } from './ui/ordenDeBatalla.ts';
 import { bindSubagentSessionPanel } from './ui/subagentSessionPanel.ts';
 import { bindSlashCommandState } from './ui/chat/slashCommands.ts';
-import { getWonder, ensureWondersLoaded, listIframeWonders } from './wonders/manifest.ts';
-import {
-  postContextToWonder,
-  postFocusToWonder,
-  postOpenLocalViewToWonder,
-} from './wonders/postMessageBridge.ts';
-import { findCityByWonderSelection, findNearbyCities } from './wonders/bibliothecaBridge.ts';
-import { loadWonderConfig, isFeatureEnabled } from './wonders/wonderConfig.ts';
+import { ensureWondersLoaded, listIframeWonders } from './wonders/manifest.ts';
+import { findCityByWonderSelection, findNearbyCities } from './wonders/cityLookup.ts';
 import { toggleAssemblyRoom } from './assemblyScene.ts';
 import type { City } from './types.ts';
 import {
@@ -856,52 +850,12 @@ async function bootstrap() {
     );
   }
 
-  function _syncGraphRelationOptInFlags(): void {
-    const config = loadWonderConfig();
-    const graphSuggestions = isFeatureEnabled(config, 'bibliotheca', 'graphSuggestions');
-    const aiRelationDiscovery =
-      graphSuggestions && isFeatureEnabled(config, 'bibliotheca', 'aiRelationDiscovery');
-    void syncGraphRelationFlags({ graphSuggestions, aiRelationDiscovery });
-  }
-
-  async function _syncBibliothecaFocusIfOpen(
-    city: City,
-    mode: 'macro' | 'local' = 'macro',
-  ): Promise<void> {
-    const manifest = getWonder('bibliotheca');
-    if (!manifest) return;
-    const vignette = document.querySelector<HTMLElement>('#wonder-vignette');
-    if (!vignette || vignette.dataset['wonderType'] !== 'bibliotheca') return;
-    const iframe = vignette.querySelector<HTMLIFrameElement>('iframe');
-    if (!iframe) return;
-    postContextToWonder(iframe, manifest, {
-      cityId: city.id,
-      selectedRepo: city.repoPath,
-      theme: document.documentElement.dataset['theme'] ?? 'imperial-dark',
-    });
-    postFocusToWonder(iframe, manifest, city.id, mode);
-    if (mode === 'local' && city.repoPath) {
-      postOpenLocalViewToWonder(iframe, manifest, city.repoPath);
-    }
-  }
-
-  async function _openBibliothecaForCity(
-    city: City,
-    mode: 'macro' | 'local' = 'macro',
-  ): Promise<void> {
-    const manifest = getWonder('bibliotheca');
-    if (!manifest) return;
-    const existing = document.querySelector<HTMLElement>('#wonder-vignette');
-    if (!existing || existing.dataset['wonderType'] !== 'bibliotheca') {
-      await import('./ui/wonderVignette.ts').then((m) => m.openWonderVignette(manifest));
-    }
-    await _syncBibliothecaFocusIfOpen(city, mode);
-  }
-
   function _enterLocalViewForCity(city: City): void {
     bridge.send('enter_local', { repoId: city.id, rootPath: city.repoPath });
     state.enterLocalView(city.id).catch(() => state.enterLocalViewMock(city.id));
     initBubbleLayer();
+    // Any wonder that is open follows us into the local view.
+    void import('./ui/wonderVignette.ts').then((m) => m.pushContextToOpenWonder('local'));
   }
 
   function _primeMissionComposerForCity(city: City): void {
@@ -979,13 +933,8 @@ async function bootstrap() {
         detail: { cityId, repoPath: state.world.cities.find((c) => c.id === cityId)?.repoPath },
       }),
     );
-    const selectedCity = state.world.cities.find((c) => c.id === cityId);
-    if (selectedCity) {
-      void _syncBibliothecaFocusIfOpen(selectedCity, 'macro');
-    }
   };
   _publishWonderContext(null);
-  _syncGraphRelationOptInFlags();
 
   // Listener para "Ver feed completo →" desde el widget Gaceta
   window.addEventListener('repociv:open-city', (e: Event) => {
@@ -999,13 +948,13 @@ async function bootstrap() {
     if (target && renderer.onCitySelect) renderer.onCitySelect(target.id);
   });
 
-  // ─── Fase 4: Bibliotheca ↔ RepoCiv bidirectional focus (wiring real + fallback) ──
+  // ─── Wonder ↔ RepoCiv bidirectional focus (generic, any connected wonder) ──
   window.addEventListener('repociv:wonder-focus-city', (e: Event) => {
     const detail = (e as CustomEvent).detail as
       | { cityId: string; mode: 'macro' | 'local' }
       | undefined;
     if (!detail?.cityId) return;
-    _focusCityRequest({ cityId: detail.cityId, mode: detail.mode, source: 'Bibliotheca focus' });
+    _focusCityRequest({ cityId: detail.cityId, mode: detail.mode, source: 'Wonder focus' });
   });
 
   window.addEventListener('repociv:wonder-selection', (e: Event) => {
@@ -1016,7 +965,7 @@ async function bootstrap() {
     _focusCityRequest({
       cityId: detail?.nodeId,
       nodePath: detail?.nodePath,
-      source: `Bibliotheca ${detail?.nodeType ?? 'selection'}`,
+      source: `Wonder ${detail?.nodeType ?? 'selection'}`,
     });
   });
 
@@ -1034,32 +983,12 @@ async function bootstrap() {
     _focusCityRequest(detail);
   });
 
-  window.addEventListener('repociv:open-bibliotheca-request', (e: Event) => {
-    const detail = (e as CustomEvent).detail as { cityId?: string; repoPath?: string } | undefined;
-    if (!detail?.cityId) return;
-    const city = state.world.cities.find((c) => c.id === detail.cityId);
-    if (!city) return;
-    void _openBibliothecaForCity(city, 'macro');
-  });
-
   window.addEventListener('repociv:open-local-view-request', (e: Event) => {
     const detail = (e as CustomEvent).detail as { cityId?: string; repoPath?: string } | undefined;
     if (!detail?.cityId) return;
     const city = state.world.cities.find((c) => c.id === detail.cityId);
     if (!city) return;
     _enterLocalViewForCity(city);
-  });
-
-  window.addEventListener('repociv:open-city-logs-request', (e: Event) => {
-    const detail = (e as CustomEvent).detail as { cityId?: string; repoPath?: string } | undefined;
-    if (!detail?.cityId) return;
-    const city = state.world.cities.find((c) => c.id === detail.cityId);
-    if (!city) return;
-    if (detail.repoPath) {
-      bridge.send('open_file', { filePath: `${detail.repoPath}/.labhub/logs/latest.log` });
-    } else {
-      logEvent(`ℹ ${city.name}: sin ruta de repo para logs`, 'info');
-    }
   });
 
   window.addEventListener('repociv:city-mission-request', async (e: Event) => {

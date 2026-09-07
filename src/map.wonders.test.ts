@@ -13,7 +13,7 @@ import type { WonderManifest } from './wonders/types.ts';
 function iframeManifest(id: string): WonderManifest {
   return {
     id,
-    title: id === 'bibliotheca' ? 'Bibliotheca Alexandrina' : id,
+    title: id,
     kind: 'iframe',
     category: 'knowledge',
     version: '0.1.0',
@@ -98,34 +98,34 @@ afterEach(() => {
 
 describe('syncWorldWonders', () => {
   it('adds a connected wonder as a sacred district tile on the capital', async () => {
-    await hydrate(['bibliotheca']);
+    await hydrate(['mi-servicio']);
     const world = capitalWorld();
     const changed = syncWorldWonders(world);
     expect(changed).toBe(true);
 
-    const coord = assignWonderCoords([iframeManifest('bibliotheca')])[0]!.coord;
+    const coord = assignWonderCoords([iframeManifest('mi-servicio')])[0]!.coord;
     const tile = world.tiles.get(tileKey(coord))!;
     expect(tile.terrain).toBe('sacred');
     expect(tile.district?.type).toBe('wonder');
-    expect(tile.district?.wonderType).toBe('bibliotheca');
+    expect(tile.district?.wonderType).toBe('mi-servicio');
 
     const capital = world.cities.find((c) => c.isCapital)!;
-    expect(capital.districts.some((d) => d.wonderType === 'bibliotheca')).toBe(true);
-    expect(capital.wonders?.some((b) => b.wonderType === 'bibliotheca')).toBe(true);
+    expect(capital.districts.some((d) => d.wonderType === 'mi-servicio')).toBe(true);
+    expect(capital.wonders?.some((b) => b.wonderType === 'mi-servicio')).toBe(true);
   });
 
   it('is idempotent — re-syncing the same set changes nothing', async () => {
-    await hydrate(['bibliotheca']);
+    await hydrate(['mi-servicio']);
     const world = capitalWorld();
     expect(syncWorldWonders(world)).toBe(true);
     expect(syncWorldWonders(world)).toBe(false);
   });
 
   it('reverts the tile to plains when a wonder is disconnected', async () => {
-    await hydrate(['bibliotheca']);
+    await hydrate(['mi-servicio']);
     const world = capitalWorld();
     syncWorldWonders(world);
-    const coord = assignWonderCoords([iframeManifest('bibliotheca')])[0]!.coord;
+    const coord = assignWonderCoords([iframeManifest('mi-servicio')])[0]!.coord;
 
     await hydrate([]); // disconnect everything
     const changed = syncWorldWonders(world);

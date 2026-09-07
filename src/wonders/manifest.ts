@@ -10,11 +10,11 @@ import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import type { WonderManifest } from './types.ts';
 import type { WonderType } from '../types.ts';
 
-// Native fallback only. The iframe wonders (Bibliotheca, LabHub, and any
-// user-connected service) are NOT hardcoded here anymore — they live in the
-// backend registry (~/.repociv/wonders/*.json, served by GET /api/wonders)
-// and are hydrated at runtime via loadWonders(). Out-of-the-box only La Gaceta
-// (native) is active; examples to connect live in ./exampleTemplates.ts.
+// Native fallback only. iframe wonders (any user-connected service) are NOT
+// hardcoded here — they live in the backend registry (~/.repociv/wonders/*.json,
+// served by GET /api/wonders) and are hydrated at runtime via loadWonders().
+// Out-of-the-box only La Gaceta (native) is active; see docs/CUSTOM_WONDERS.md
+// to connect your own.
 export const WONDER_MANIFESTS = {
   gaceta: {
     id: 'gaceta',
@@ -177,8 +177,4 @@ export function resolveWonderUrl(type: WonderType): string {
   return getWonder(type)?.ui.url ?? '';
 }
 
-export const KNOWN_WONDER_TYPES: readonly WonderType[] = [
-  'gaceta',
-  'bibliotheca',
-  'institutum',
-] as const;
+export const KNOWN_WONDER_TYPES: readonly WonderType[] = ['gaceta'] as const;

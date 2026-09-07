@@ -4,6 +4,14 @@ Fecha: 2026-05-25
 Estado: canonico para la siguiente etapa de producto alpha
 Reemplaza como foco operativo a planes sueltos de integración visual, pero no reemplaza `SCOPE.md`: si este documento contradice `SCOPE.md`, gana `SCOPE.md`.
 
+> ⚠️ **Histórico (2026-09-07).** Bibliotheca (La Gran Biblioteca) y
+> Institutum/LabHub se **retiraron de RepoCiv**: no dieron utilidad real. Todo
+> lo que este documento dice sobre esas dos maravillas es registro de lo que se
+> planeó, no de lo que existe. Lo que sobrevive es el andamiaje genérico de
+> Maravillas (cualquier servicio iframe del usuario) y La Gaceta. El foco del
+> producto es la barra de agentes, repos-como-ciudades y los chats de agentes
+> sobre Hermes. Ver `docs/WONDER_CONTRACT.md` para el contrato vigente.
+
 ---
 
 ## 0. Tesis

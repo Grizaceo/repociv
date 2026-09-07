@@ -6,8 +6,7 @@ import { openWonderVignette } from './wonderVignette.ts';
 import { listWonders, getWonder, ensureWondersLoaded } from '../wonders/manifest.ts';
 import type { WonderManifest } from '../wonders/types.ts';
 import { renderCapabilityBadge, renderCapabilityPanel } from '../wonders/wonderBadges.ts';
-import { WONDER_EXAMPLES, type WonderExample } from '../wonders/exampleTemplates.ts';
-import { connectWonder, disconnectWonder, launchWonder } from '../wonders/wonderLauncher.ts';
+import { disconnectWonder, launchWonder } from '../wonders/wonderLauncher.ts';
 import { showNotification } from './notificationBanner.ts';
 
 const STORAGE_TAB = 'repociv-capital-tab';
@@ -21,8 +20,8 @@ interface TabEntry {
   render: (container: HTMLElement) => void;
 }
 
-function _wonderIcon(id: string): string {
-  return id === 'bibliotheca' ? '📚' : id === 'institutum' ? '🧪' : '🏛';
+function _wonderIcon(_id: string): string {
+  return '🏛';
 }
 
 function _buildTabs(): TabEntry[] {
@@ -166,12 +165,7 @@ function _renderGaceta(container: HTMLElement) {
 
 function _renderWonderTab(container: HTMLElement, m: WonderManifest) {
   const short = m.title.split('/')[0]!.trim();
-  const statsText =
-    m.id === 'bibliotheca'
-      ? 'Grafo de conocimiento: escaneando...'
-      : m.id === 'institutum'
-        ? `Labs activos: consulta en curso [${m.automationLevel}]`
-        : `Servicio conectado [${m.kind} · ${m.automationLevel}]`;
+  const statsText = `Servicio conectado [${m.kind} · ${m.automationLevel}]`;
   const canLaunch = m.kind === 'iframe';
 
   const badgesHtml = renderCapabilityBadge(m);
@@ -247,100 +241,10 @@ function _renderWondersGuide(container: HTMLElement) {
     <p class="wonders-guide-intro" style="opacity:.85">
       Para conectar un servicio propio, deja un manifiesto en
       <code>~/.repociv/wonders/&lt;id&gt;.json</code> (ver
-      <code>docs/CUSTOM_WONDERS.md</code>) y reinicia el bridge — o usa los
-      ejemplos de abajo como punto de partida.
+      <code>docs/CUSTOM_WONDERS.md</code>) y reinicia el bridge.
     </p>
-    <h3 class="wonders-guide-h3">Ejemplos (repos públicos)</h3>
-    <div class="wonders-example-cards"></div>
   `;
   container.appendChild(wrap);
-
-  const cards = wrap.querySelector<HTMLElement>('.wonders-example-cards')!;
-  for (const ex of WONDER_EXAMPLES) {
-    cards.appendChild(_renderExampleCard(ex));
-  }
-}
-
-function _renderExampleCard(ex: WonderExample): HTMLElement {
-  const connected = getWonder(ex.manifest.id) !== undefined;
-  const card = document.createElement('div');
-  card.className = 'wonder-example-card';
-  card.dataset['id'] = ex.manifest.id;
-  card.innerHTML = `
-    <div class="wec-head">
-      <span class="wec-icon">${_wonderIcon(ex.manifest.id)}</span>
-      <span class="wec-title">${ex.manifest.title}</span>
-      ${connected ? '<span class="wec-badge wec-connected">Conectada ✓</span>' : '<span class="wec-badge">Ejemplo</span>'}
-    </div>
-    <p class="wec-desc">${ex.description}</p>
-    <p class="wec-meta">
-      <a class="wec-repo" href="${ex.repoUrl}" target="_blank" rel="noreferrer noopener">${ex.repoUrl.replace('https://', '')}</a>
-    </p>
-    <p class="wec-boot"><code>${ex.bootSummary}</code></p>
-    <p class="wec-dir">repo: <code>${ex.defaultRepoDir}</code></p>
-    <div class="wec-actions">
-      ${
-        connected
-          ? `<button class="wec-btn wec-open" data-id="${ex.manifest.id}">Abrir</button>
-             <button class="wec-btn wec-disconnect" data-id="${ex.manifest.id}">Desconectar</button>`
-          : `<button class="wec-btn wec-connect" data-id="${ex.manifest.id}">Conectar</button>`
-      }
-    </div>
-    <p class="wec-status" data-status="${ex.manifest.id}"></p>
-  `;
-  card
-    .querySelector<HTMLElement>('.wec-connect')
-    ?.addEventListener('click', () => void _connectExample(ex));
-  card
-    .querySelector<HTMLElement>('.wec-disconnect')
-    ?.addEventListener('click', () => void _disconnectExample(ex));
-  card.querySelector<HTMLElement>('.wec-open')?.addEventListener('click', () => {
-    const m = getWonder(ex.manifest.id);
-    if (m) openWonderVignette(m);
-  });
-  return card;
-}
-
-function _cardStatus(id: string, text: string) {
-  const el = _panel?.querySelector<HTMLElement>(`[data-status="${id}"]`);
-  if (el) el.textContent = text;
-}
-
-async function _connectExample(ex: WonderExample) {
-  _cardStatus(ex.manifest.id, 'Conectando…');
-  const res = await connectWonder(ex.manifest);
-  if (!res.ok) {
-    _cardStatus(ex.manifest.id, `✗ ${res.error ?? 'no se pudo conectar'}`);
-    return;
-  }
-  await ensureWondersLoaded();
-  showNotification({
-    type: 'success',
-    title: 'Maravilla conectada',
-    body: `${ex.manifest.title} aparece en el mapa y como pestaña. RepoCiv está levantando su servidor…`,
-  });
-  window.dispatchEvent(
-    new CustomEvent('repociv:wonders-changed', { detail: { connectedId: ex.manifest.id } }),
-  );
-  _activeTab = `tab-${ex.manifest.id}`;
-  _rebuildTabsBar();
-}
-
-async function _disconnectExample(ex: WonderExample) {
-  _cardStatus(ex.manifest.id, 'Desconectando…');
-  const res = await disconnectWonder(ex.manifest.id);
-  if (!res.ok) {
-    _cardStatus(ex.manifest.id, `✗ ${res.error ?? 'no se pudo desconectar'}`);
-    return;
-  }
-  await ensureWondersLoaded();
-  showNotification({
-    type: 'success',
-    title: 'Maravilla desconectada',
-    body: `${ex.manifest.title} ya no aparece en el mapa.`,
-  });
-  window.dispatchEvent(new CustomEvent('repociv:wonders-changed', { detail: {} }));
-  _rebuildTabsBar();
 }
 
 function _renderStats(container: HTMLElement) {

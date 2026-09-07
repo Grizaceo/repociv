@@ -8,12 +8,9 @@ import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 
 /** Short, all-caps label for a wonder type. Matches the 2D canvas style
- *  (renderer.ts) so the WebGL and 2D views agree on what the wonder reads as.
- *  Built-ins keep their canonical short names; user-connected wonders fall
- *  back to the district name (= manifest title). */
+ *  (renderer.ts) so the WebGL and 2D views agree on what the wonder reads as:
+ *  the district name, which is the manifest title. */
 function wonderLabel(t: WonderType, fallbackName?: string): string | null {
-  if (t === 'bibliotheca') return 'BIBLIOTHECA';
-  if (t === 'institutum') return 'LABHUB';
   if (t === 'gaceta') return null; // native, no tile
   const name = (fallbackName ?? '').trim();
   return name ? name.toUpperCase() : null;

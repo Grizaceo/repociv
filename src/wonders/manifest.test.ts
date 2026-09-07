@@ -2,24 +2,46 @@
 //
 // Tests for src/wonders/manifest.ts — the runtime registry layer.
 //
-// New model (2026-06-17): only the native gaceta is hardcoded. iframe wonders
-// (bibliotheca, institutum, and user-connected services) are hydrated from the
-// backend via loadWonders() (GET /api/wonders). So the synchronous registry is
-// gaceta-only by default; loadWonders() merges whatever the bridge returns.
+// Model: only the native gaceta is hardcoded. iframe wonders (user-connected
+// services) are hydrated from the backend via loadWonders() (GET /api/wonders).
+// So the synchronous registry is gaceta-only by default; loadWonders() merges
+// whatever the bridge returns.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { getWonderExample } from './exampleTemplates.ts';
 
 // Reset module-level registry state between tests.
 function resetRegistryImport() {
   vi.resetModules();
 }
 
-/** A fake /api/wonders payload: gaceta + the two examples + one custom. */
+/** A fake /api/wonders payload: two user-connected iframe services. */
 function fakeBackendManifests() {
-  const biblio = getWonderExample('bibliotheca')!.manifest;
   return [
-    { ...biblio },
+    {
+      id: 'otro-servicio',
+      title: 'Otro Servicio',
+      kind: 'iframe',
+      category: 'knowledge',
+      version: '0.1.0',
+      defaultEnabled: true,
+      automationLevel: 'passive',
+      passiveMode: true,
+      agenticMode: false,
+      canSuggest: true,
+      canAct: false,
+      requiresConfirmation: true,
+      ui: { url: 'http://127.0.0.1:9997' },
+      permissions: {
+        readRepos: true,
+        writeRepos: false,
+        network: 'loopback-only',
+        requiresApprovalForMutations: true,
+      },
+      optionalFeatures: [],
+      actions: [{ id: 'open', label: 'Abrir', risk: 'safe', requiresUserOptIn: false }],
+      events: { emits: ['wonder.ready'], accepts: [] },
+      mcp: { enabled: false, server: null },
+    },
     {
       id: 'mi-servicio',
       title: 'Mi Servicio',
@@ -73,8 +95,8 @@ describe('wonder manifest registry', () => {
 
     it('iframe wonders are absent until hydrated', async () => {
       const { getWonder } = await import('./manifest.ts');
-      expect(getWonder('bibliotheca')).toBeUndefined();
-      expect(getWonder('institutum')).toBeUndefined();
+      expect(getWonder('otro-servicio')).toBeUndefined();
+      expect(getWonder('mi-servicio')).toBeUndefined();
     });
 
     it('listIframeWonders is empty until hydrated', async () => {
@@ -91,12 +113,12 @@ describe('wonder manifest registry', () => {
       );
       const { loadWonders, getWonder, listIframeWonders } = await import('./manifest.ts');
       await loadWonders();
-      expect(getWonder('bibliotheca')).toBeDefined();
+      expect(getWonder('otro-servicio')).toBeDefined();
       expect(getWonder('mi-servicio')).toBeDefined();
       const iframeIds = listIframeWonders()
         .map((w) => w.id)
         .sort();
-      expect(iframeIds).toEqual(['bibliotheca', 'mi-servicio']);
+      expect(iframeIds).toEqual(['mi-servicio', 'otro-servicio']);
     });
 
     it('always keeps native gaceta even if backend omits it', async () => {

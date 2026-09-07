@@ -296,7 +296,7 @@ def _build_stateful_session_id(
     """Session id for harness adapters.
 
     Stateful sessions are scoped by unit+city so chatting in CARCOSA does not
-    continue a prior LabHub (or any other city) thread on the same MAIN unit.
+    continue a prior thread from another city on the same MAIN unit.
     Stateless / empty / ``main`` cities keep the legacy unit-only key.
     """
     unit = (unit_id or "main").strip().lower() or "main"
@@ -1375,7 +1375,7 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
 
     cfg = config if config is not None else _get_agent_config(unit_id)
     # Build session_id matching _run_openclaw_streaming logic for consistency.
-    # Include city so MAIN chat in CARCOSA does not continue a LabHub thread.
+    # Include city so MAIN chat in one city does not continue another city's thread.
     session_id = _build_stateful_session_id(
         unit_id, city_id, mission_id, stateful=cfg.get("stateful", True),
     )

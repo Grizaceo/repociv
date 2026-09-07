@@ -71,9 +71,8 @@ _STATIC_WONDER_MANIFESTS: list[dict[str, Any]] = [
         "events": {"emits": ["wonder.ready", "wonder.report.created"], "accepts": ["repociv.focus_city"]},
         "mcp": {"enabled": False, "server": None},
     },
-    # NOTE: Bibliotheca and Institutum/LabHub are no longer built-in. They are
-    # connectable EXAMPLES (see src/wonders/exampleTemplates.ts). Out-of-the-box
-    # only La Gaceta (native) is registered; the user connects iframe wonders via
+    # NOTE: RepoCiv ships no built-in iframe wonders. Out-of-the-box only La
+    # Gaceta (native) is registered; the user connects iframe wonders via
     # POST /api/wonders/connect, which writes ~/.repociv/wonders/<id>.json picked
     # up by _load_custom_manifests() below.
 ]

@@ -103,8 +103,8 @@ type BuildingState = 'planned' | 'building' | 'complete' | 'failed';
 
 // Known built-in/example ids keep autocomplete; `(string & {})` widens the
 // type to accept arbitrary user-connected wonder ids (custom iframe services)
-// without losing literal hints or breaking `=== 'bibliotheca'` narrowing.
-export type WonderType = 'gaceta' | 'bibliotheca' | 'institutum' | (string & {});
+// without losing literal hints or breaking `=== 'gaceta'` narrowing.
+export type WonderType = 'gaceta' | (string & {});
 
 export interface Building {
   id: string;
@@ -605,8 +605,7 @@ export type MapLayerId =
   | 'base' // terrain, cities, agents — always on
   | 'structure' // folder structure, buildings, wonder sprites
   | 'ops' // tasks, active experiments, approvals, failures
-  | 'knowledge' // bibliotheca relations, suggested connections
-  | 'labs' // lab warnings, experiment activity indicators
+  | 'labs' // active construction / experiment indicators
   | 'security' // lab alarms, experiment locks, perimeter alerts
   | 'labels'; // city labels, district labels, folder labels
 
@@ -698,7 +697,6 @@ export const DEFAULT_MAP_LAYERS: MapLayerState = {
     base: true,
     structure: true,
     ops: false,
-    knowledge: false,
     labs: false,
     security: false,
     labels: true,

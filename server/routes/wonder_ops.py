@@ -31,7 +31,7 @@ def _wonder_id_from(body: dict[str, Any], ctx: dict[str, Any]) -> str:
     For prefix-match routes like ``/api/wonders/{id}/launch`` the bridge
     passes ``ctx["wonder_id"]`` derived from the URL — the URL wins
     over any body field to avoid surprises (POSTing
-    /api/wonders/bibliotheca/launch with ``{"id":"institutum"}`` is
+    /api/wonders/alfa/launch with ``{"id":"beta"}`` is
     a no-op for the URL, even though the allowlist would still accept
     the body value).
 

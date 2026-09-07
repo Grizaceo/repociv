@@ -387,7 +387,7 @@ def wonders_list() -> Any:
     return _get("/api/wonders")
 
 
-@mcp.tool(description="Devuelve el manifiesto completo de una Maravilla por ID (ej: 'bibliotheca', 'gaceta', 'institutum').")
+@mcp.tool(description="Devuelve el manifiesto completo de una Maravilla por ID (ej: 'gaceta').")
 def wonders_get(wonder_id: str) -> Any:
     return _get(f"/api/wonders/{wonder_id}")
 

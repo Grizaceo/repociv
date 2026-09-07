@@ -9,7 +9,7 @@ Documento vivo. Si contradice `SCOPE.md` o `ROADMAP_IMPERIAL_WORKSHOP.md`, los r
 Una Maravilla es una utilidad integrada en RepoCiv. Puede ser:
 
 - **Nativa**: construida dentro del mismo frontend (ej: La Gaceta)
-- **iframe**: app externa embebedida (ej: La Gran Biblioteca, Institutum/LabHub)
+- **iframe**: app externa embebida (cualquier servicio web local del usuario)
 
 Toda Maravilla, sin importar su tipo, declara un **WonderManifest** que describe:
 
@@ -27,7 +27,7 @@ Toda Maravilla, sin importar su tipo, declara un **WonderManifest** que describe
 
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|-----------|-------------|
-| `id` | `string` | sí | Identificador único (ej: `bibliotheca`) |
+| `id` | `string` | sí | Identificador único (ej: `mi-servicio`) |
 | `title` | `string` | sí | Nombre visible en UI |
 | `kind` | `"native" \| "iframe"` | sí | Tipo de integración |
 | `category` | `"knowledge" \| "operations" \| "news" \| "lab"` | sí | Categoría funcional |
@@ -54,8 +54,8 @@ Toda Maravilla, sin importar su tipo, declara un **WonderManifest** que describe
 
 **Niveles**:
 
-- `passive`: solo muestra información. No sugiere ni actúa. Default para Gaceta y Bibliotheca.
-- `assist`: sugiere pero no ejecuta. El usuario confirma. Default para LabHub warnings.
+- `passive`: solo muestra información. No sugiere ni actúa. Default para Gaceta.
+- `assist`: sugiere pero no ejecuta. El usuario confirma.
 - `auto`: ejecuta acciones seguras automáticamente. Solo para acciones declaradas `risk: "safe"`. No se usa inicialmente.
 
 ### 2.4 Features opcionales
@@ -154,8 +154,7 @@ La Maravilla debe **sentirse** integrada, pero su uso avanzado debe ser **siempr
 | Maravilla | `automationLevel` | `passiveMode` | Features agentivas |
 |-----------|-------------------|---------------|-------------------|
 | Gaceta/CDaily | `passive` | `true` | Todo OFF |
-| Bibliotheca | `passive` | `true` | Todo OFF |
-| LabHub/Institutum | `assist` | `true` | Warnings ON, soft-locks ON, hard-locks OFF |
+| Cualquier maravilla conectada | lo que declare su manifiesto | `true` | Todo OFF hasta opt-in explícito |
 
 ---
 
@@ -189,51 +188,43 @@ wonder.notification — notificación (info/warn/critical)
 
 ## 5. Cómo agregar una nueva Maravilla
 
-> **Modelo (desde 2026-06-17):** solo **La Gaceta** (nativa) viene activa.
-> Bibliotheca y LabHub ya **no** son built-ins: son **ejemplos conectables**
-> (`src/wonders/exampleTemplates.ts`). Cualquier servicio iframe se conecta del
-> mismo modo — escribiendo un manifest a `~/.repociv/wonders/<id>.json`. El
-> frontend hidrata el registry vía `GET /api/wonders` en el arranque, así que
-> las Maravillas conectadas aparecen en la UI sin tocar el código.
+> **Modelo (desde 2026-09-07):** solo **La Gaceta** (nativa) viene activa.
+> RepoCiv no trae **ninguna** maravilla iframe built-in. Cualquier servicio
+> iframe se conecta escribiendo un manifest a `~/.repociv/wonders/<id>.json`.
+> El frontend hidrata el registry vía `GET /api/wonders` en el arranque, así
+> que las Maravillas conectadas aparecen en la UI sin tocar el código.
 
 ### 5.1 Conectar (recomendado — el usuario, sin tocar el repo)
 
-Desde la UI: **Palacio → pestaña "Maravillas"**. Hay tarjetas de ejemplo
-(Bibliotheca, LabHub) con su repo público y un botón **Conectar**; o conectás
-un servicio propio con su `WonderManifest`. Bajo el capó:
+Desde la UI: **Palacio → pestaña "Maravillas"**, que conecta un servicio
+propio con su `WonderManifest`. Bajo el capó:
 
 - `POST /api/wonders/connect` con el `WonderManifest` (+ `launch` opcional) en
   el body → valida, sanitiza el `id` (`[a-z0-9_-]`), expande `~`/`$ENV` en
   `launch.repo_dir`/`procs[].cwd`, y escribe `~/.repociv/wonders/<id>.json`.
   Recarga el launcher en caliente (sin reiniciar el bridge).
 - `POST /api/wonders/<id>/disconnect` → borra ese JSON (solo del dir del
-  usuario; los built-in en código no se tocan).
+  usuario; la Gaceta nativa, declarada en código, no se toca).
 - Loopback-only + token-gated (igual que `launch`).
 
 A mano (sin UI): creá `~/.repociv/wonders/<id>.json` y reiniciá el bridge — ver
 [`CUSTOM_WONDERS.md`](./CUSTOM_WONDERS.md). Aparece en `GET /api/wonders` y queda
 disponible para `POST /api/wonders/<id>/launch`.
 
-### 5.2 Built-in / ejemplo (contribuir al repo)
+### 5.2 Nativa (contribuir al repo)
 
-Para Maravillas que viven en el código fuente:
+Una Maravilla **nativa** vive en el código y no tiene servidor propio (hoy
+solo La Gaceta): declarar el `WonderManifest` en `src/wonders/manifest.ts`
+(`WONDER_MANIFESTS`) y en `server/wonder_registry.py`
+(`_STATIC_WONDER_MANIFESTS`).
 
-- **Nativa** (como Gaceta): declarar el `WonderManifest` en
-  `src/wonders/manifest.ts` (`WONDER_MANIFESTS`) y en
-  `server/wonder_registry.py` (`_STATIC_WONDER_MANIFESTS`).
-- **Ejemplo conectable** (como Bibliotheca/LabHub): añadir a
-  `src/wonders/exampleTemplates.ts` (`WONDER_EXAMPLES`) con su `repoUrl` +
-  descripción; si requiere auto-start, añadir `WonderSpec` en
-  `server/wonder_launcher.py: WONDER_LAUNCH_SPECS`. NO se registra estático: el
-  usuario lo conecta desde la guía.
+Las Maravillas iframe NO se contribuyen al repo: se conectan como manifest
+del usuario (§5.1). `WONDER_LAUNCH_SPECS` en `server/wonder_launcher.py` es
+un dict vacío por diseño.
 
 **NO agregar una nueva Maravilla antes de:** contrato estable con ejemplos
 reales funcionando · `npm run check` + lint + tests verdes · flujo de opt-in
 documentado.
-
-**Override de built-ins:** un manifest custom con `id: "bibliotheca"`
-(o `"institutum"`) gana sobre el launch spec built-in. El bridge loguea un
-warning. Útil para apuntar un ejemplo a un fork propio sin tocar el código.
 
 ---
 
@@ -250,12 +241,12 @@ warning. Útil para apuntar un ejemplo a un fork propio sin tocar el código.
 
 ## 7. Lifecycle / Auto-arranque (F1–F5, 2026-06-16 → 2026-06-17)
 
-RepoCiv ahora levanta por sí mismo los procesos de las Maravillas iframe
-(`bibliotheca`/`institutum`) en lugar de requerir terminales manuales. El
+RepoCiv levanta por sí mismo los procesos de las Maravillas iframe que
+declaren un bloque `launch`, en lugar de requerir terminales manuales. El
 ciclo de vida tiene tres fases:
 
 ### 7.1 Boot
-- `main.ts::bootstrap()` corre `ensureWondersUp(['bibliotheca','institutum'])` en background tras `bridge.start()`.
+- `main.ts::bootstrap()` corre `ensureWondersUp(<ids conectados>)` en background tras `bridge.start()`.
 - `ensureWondersUp` llama `POST /api/wonders/<id>/launch` (no-bloqueante) y arranca `pollWonderUntilReady` en paralelo.
 - El render del mapa **no espera** a las Maravillas — el boot sigue fluido.
 
@@ -263,8 +254,7 @@ ciclo de vida tiene tres fases:
 - `pollWonderUntilReady(id, { timeoutMs=60000, intervalMs=1500 })` sondea
   `GET /api/wonders/<id>/launch-status` hasta que `ready.api` **y**
   `ready.ui` respondan OK.
-- Bibliotheca: API `:3001/api/health` + UI `:5173/`.
-- Institutum: API `:5281/health` + UI `:5280/` (split UI/API resuelto en F1, commit `e64c7dd`).
+- Las URLs de API y UI salen del manifiesto (`launch.api_url` / `launch.ui_url`).
 - Mientras tanto, la viñeta muestra "⚙️ Levantando la maravilla…".
 
 ### 7.3 Mount
@@ -278,21 +268,18 @@ ciclo de vida tiene tres fases:
 - **Loopback only:** `REPOCIV_REMOTE=true` rechaza `POST /launch` con 4xx.
 - **Token-gated:** todos los POST requieren `REPOCIV_TOKEN` (ya en `do_POST`).
 - **Allowlist:** solo ids en `WONDER_LAUNCH_SPECS` + argv fijo del lado servidor.
-- **cwd configurables:** `REPOCIV_WONDER_BIBLIOTHECA_DIR` y `REPOCIV_WONDER_INSTITUTUM_DIR` (defaults a `~/.hermes/workspace/repos/la-gran-biblioteca` y `~/.hermes/workspace/repos/labhub`).
+- **cwd desde el manifiesto:** `launch.repo_dir` / `procs[].cwd` del JSON en `~/.repociv/wonders/`, nunca del body de la request.
 
-### 7.6 Representación 3D en el mapa (F5, 2026-06-17)
+### 7.6 Representación 3D en el mapa
 
-`src/three/WonderProps3D.ts` renderiza cada Maravilla como una estructura
-3D distintiva en lugar del decor genérico `sacred tile`:
+`src/three/WonderProps3D.ts` renderiza cada Maravilla conectada como un
+monumento neutro en lugar del decor genérico `sacred tile`: dais escalonado +
+aguja facetada + nodo emisivo en el ápice, geometría procedural low-poly.
+No hay modelo por producto — las maravillas son servicios del usuario, así que
+la silueta es la misma para todas y la identidad la lleva la etiqueta.
 
-| Maravilla | Geometría procedural (sin GLB) |
-|-----------|----------------------------------|
-| `bibliotheca` (q=-1) | Templo: 3 dais escalonados + 6 columnas en hex ring + frontón + gema emisiva en el ápice |
-| `institutum` (q=+1)  | Laboratorium: dais plano + 4 obeliscos en las esquinas + domo + núcleo emisivo |
-
-- Layer gating: `bibliotheca` bajo `knowledge`, `institutum` bajo `labs`
-  (espejo del 2D en `renderer.ts:1190-1225`).
-- Etiquetas CSS2D: `BIBLIOTHECA` y `LABHUB` sobre cada Maravilla.
+- Layer gating: los monumentos siguen la capa `structure`.
+- Etiquetas CSS2D: el nombre del distrito (= título del manifiesto).
 - Click 3D → `openWonderVignette(wonderType)` (mismo handler que el 2D).
 - `e2e/golden/08-wonders-closeup.png` es el golden dedicado.
-- Plan para F7 (futuro): swap a GLBs vía `repociv-3d-asset-forge`.
+

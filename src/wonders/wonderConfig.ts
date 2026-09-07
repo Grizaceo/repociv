@@ -7,7 +7,7 @@
 // Users can override these via localStorage key: repociv_wonder_config
 // Format: JSON matching WondersConfig shape (partial OK — merged with defaults).
 
-import type { WondersConfig, GacetaConfig, BibliothecaConfig } from './types.ts';
+import type { WondersConfig, GacetaConfig } from './types.ts';
 export { WONDER_MANIFESTS } from './manifest.ts';
 
 const DEFAULT_GACETA: GacetaConfig = {
@@ -16,15 +16,8 @@ const DEFAULT_GACETA: GacetaConfig = {
   autoSummaries: false,
 };
 
-const DEFAULT_BIBLIOTHECA: BibliothecaConfig = {
-  fileNavigation: true,
-  graphSuggestions: false,
-  aiRelationDiscovery: false,
-};
-
 export const WONDER_DEFAULTS: WondersConfig = {
   gaceta: DEFAULT_GACETA,
-  bibliotheca: DEFAULT_BIBLIOTHECA,
 };
 
 const STORAGE_KEY = 'repociv_wonder_config';
@@ -47,10 +40,7 @@ export function loadWonderConfig(): WondersConfig {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return WONDER_DEFAULTS;
     const parsed = parsePartial<Partial<WondersConfig>>(raw, {});
-    return {
-      gaceta: { ...DEFAULT_GACETA, ...(parsed.gaceta ?? {}) },
-      bibliotheca: { ...DEFAULT_BIBLIOTHECA, ...(parsed.bibliotheca ?? {}) },
-    };
+    return { gaceta: { ...DEFAULT_GACETA, ...(parsed.gaceta ?? {}) } };
   } catch {
     return WONDER_DEFAULTS;
   }
@@ -84,20 +74,6 @@ export function isFeatureEnabled(
           return false;
       }
     }
-    case 'bibliotheca': {
-      const bib = config.bibliotheca;
-      switch (featureId) {
-        case 'fileNavigation':
-          return bib.fileNavigation;
-        case 'graphSuggestions':
-          return bib.graphSuggestions;
-        case 'aiRelationDiscovery':
-          return bib.aiRelationDiscovery;
-        default:
-          return false;
-      }
-    }
-    case 'institutum':
     default:
       return false;
   }

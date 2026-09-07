@@ -1,19 +1,9 @@
 // ─── RepoCiv — Wonder Vignette (iframe wrapper with health-check) ──────────────
 import type { WonderType } from '../types.ts';
-import {
-  checkInstitutumReachability,
-  checkLgbReachability,
-  findReachableInstitutumUiUrl,
-  findReachableLgbUiUrl,
-  LGB_BACKEND_URL,
-  WONDER_BIBLIOTHECA_URL,
-  WONDER_INSTITUTUM_URL,
-} from '../wonderEnv.ts';
 import { getLayerState } from '../layers.ts';
 import { getWonder } from '../wonders/manifest.ts';
 import {
   postContextToWonder,
-  postGraphSuggestionsToWonder,
   postLayerToWonder,
   registerWonderOrigin,
   startWonderListener,
@@ -22,33 +12,11 @@ import {
 import { pollWonderUntilReady, type WonderLaunchStatus } from '../wonders/wonderLauncher.ts';
 import type { WonderManifest } from '../wonders/types.ts';
 import { renderCapabilityBadge } from '../wonders/wonderBadges.ts';
-import {
-  renderRelationsPanel,
-  renderRelationsPanelLoading,
-  renderRelationsPanelError,
-} from './relationsPanel.ts';
-import { loadWonderConfig, isFeatureEnabled } from '../wonders/wonderConfig.ts';
-import { fetchGraphRelations, syncGraphRelationFlags } from '../bridge.ts';
-import { rankRelationsWithFeedback, relationFeedbackKey } from '../wonders/bibliothecaBridge.ts';
 
 const STORAGE_POS = (t: WonderType) => `repociv-vignette-pos-${t}`;
 const IFRAME_LOAD_TIMEOUT_MS = 25000;
 
-type EmptyReason =
-  | 'lgb-offline'
-  | 'lgb-backend-offline'
-  | 'lgb-ui-offline'
-  | 'institutum-offline'
-  | 'institutum-backend-offline'
-  | 'institutum-ui-offline'
-  | 'load-timeout'
-  | 'offline'
-  | 'degraded'
-  | 'timeout'
-  | 'no-permissions';
-
-/** Wonders that need separate UI/API reachability probes (vs single health endpoint). */
-const SPLIT_WONDERS = new Set<WonderType>(['bibliotheca', 'institutum']);
+type EmptyReason = 'offline' | 'degraded' | 'timeout' | 'no-permissions';
 
 interface VignetteState {
   x: number;
@@ -87,9 +55,6 @@ let _vignette: HTMLElement | null = null;
 let _activeType: WonderType | null = null;
 let _dragging = false;
 let _dragOffset = { x: 0, y: 0 };
-let _bibliothecaRelationsContainer: HTMLElement | null = null;
-let _bibliothecaIframe: HTMLIFrameElement | null = null;
-let _bibliothecaManifest: WonderManifest | null = null;
 let _contextListenerAttached = false;
 let _dragMoveHandler: ((e: MouseEvent) => void) | null = null;
 let _dragUpHandler: (() => void) | null = null;
@@ -108,7 +73,7 @@ const _runtimeContext: {
 function _wonderTitle(manifest: WonderManifest | undefined, type: WonderType): string {
   if (manifest) return manifest.title;
   if (type === 'gaceta') return 'La Gaceta Imperial';
-  return type === 'bibliotheca' ? 'Bibliotheca Alexandrina' : 'Institutum Scientiarum';
+  return type;
 }
 
 function _attachWonderListener(): void {
@@ -155,17 +120,6 @@ function _ensureContextListener(): void {
     _runtimeContext.cities = detail?.cities ?? [];
     _runtimeContext.selectedCityId = detail?.selectedCityId ?? null;
     _runtimeContext.selectedRepoPath = detail?.selectedRepoPath ?? null;
-
-    if (_bibliothecaIframe && _bibliothecaManifest) {
-      postContextToWonder(_bibliothecaIframe, _bibliothecaManifest, {
-        cityId: _runtimeContext.selectedCityId ?? undefined,
-        selectedRepo: _runtimeContext.selectedRepoPath ?? undefined,
-        theme: document.documentElement.dataset['theme'] ?? 'imperial-dark',
-      });
-    }
-    if (_activeType === 'bibliotheca' && _bibliothecaRelationsContainer) {
-      void _reloadBibliothecaRelations();
-    }
   });
 }
 
@@ -289,58 +243,6 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
   registerWonderOrigin(manifest);
   _attachWonderListener();
 
-  if (SPLIT_WONDERS.has(type)) {
-    const { backend, ui } =
-      type === 'bibliotheca' ? await checkLgbReachability() : await checkInstitutumReachability();
-
-    // Both down → try the auto-start (F3). If the user has the wonder
-    // repo present and we have a launchable spec, the bridge will
-    // either adopt the running instance or spawn the procs.
-    if (!ui && !backend) {
-      const launched = await _tryAutoStart(body, type);
-      if (launched) return;
-      const reason: EmptyReason = type === 'bibliotheca' ? 'lgb-offline' : 'institutum-offline';
-      _showEmptyState(body, type, reason);
-      return;
-    }
-    if (!backend) {
-      const launched = await _tryAutoStart(body, type);
-      if (launched) return;
-      const reason: EmptyReason =
-        type === 'bibliotheca' ? 'lgb-backend-offline' : 'institutum-backend-offline';
-      _showEmptyState(body, type, reason);
-      return;
-    }
-    if (!ui) {
-      // Backend up but UI not — try auto-start (the bridge can adopt
-      // an externally-running LabHub via F2's lockfile parse).
-      const launched = await _tryAutoStart(body, type);
-      if (launched) return;
-      const reason: EmptyReason =
-        type === 'bibliotheca' ? 'lgb-ui-offline' : 'institutum-ui-offline';
-      _showEmptyState(body, type, reason);
-      return;
-    }
-    const resolvedUiUrl =
-      type === 'bibliotheca' ? await findReachableLgbUiUrl() : await findReachableInstitutumUiUrl();
-    const primaryUi =
-      type === 'bibliotheca'
-        ? (WONDER_BIBLIOTHECA_URL as string)
-        : (WONDER_INSTITUTUM_URL as string);
-    const mountManifest =
-      resolvedUiUrl && resolvedUiUrl !== primaryUi.replace(/\/$/, '')
-        ? {
-            ...manifest,
-            ui: {
-              ...manifest.ui,
-              url: resolvedUiUrl,
-            },
-          }
-        : manifest;
-    _mountIframe(body, mountManifest, type);
-    return;
-  }
-
   const health = await _checkWonderHealth(manifest);
   if (health === 'timeout' || health === 'offline') {
     // Generic connected wonder is down — try the auto-start (the bridge will
@@ -381,9 +283,6 @@ export function closeWonderVignette(): void {
     _vignette.remove();
     _vignette = null;
   }
-  _bibliothecaRelationsContainer = null;
-  _bibliothecaIframe = null;
-  _bibliothecaManifest = null;
   _activeType = null;
 }
 
@@ -424,20 +323,13 @@ function _mountIframe(body: HTMLElement, manifest: WonderManifest, type: WonderT
     ></iframe>
   `;
   const iframe = body.querySelector('iframe')!;
-  if (type === 'bibliotheca') {
-    _bibliothecaIframe = iframe;
-    _bibliothecaManifest = manifest;
-  }
   let settled = false;
   const fail = (reason?: EmptyReason) => {
     if (settled) return;
     settled = true;
     _showEmptyState(body, type, reason);
   };
-  const loadTimer = setTimeout(
-    () => fail(type === 'bibliotheca' ? 'load-timeout' : 'timeout'),
-    IFRAME_LOAD_TIMEOUT_MS,
-  );
+  const loadTimer = setTimeout(() => fail('timeout'), IFRAME_LOAD_TIMEOUT_MS);
   iframe.addEventListener('load', () => {
     if (settled) return;
     settled = true;
@@ -450,130 +342,8 @@ function _mountIframe(body: HTMLElement, manifest: WonderManifest, type: WonderT
     for (const [layer, enabled] of Object.entries(getLayerState().layers)) {
       postLayerToWonder(iframe, manifest, layer, enabled);
     }
-
-    // Mount relations panel for Bibliotheca only when graphSuggestions was explicitly enabled.
-    if (type === 'bibliotheca') {
-      const config = loadWonderConfig();
-      const gsEnabled = isFeatureEnabled(config, 'bibliotheca', 'graphSuggestions');
-      postGraphSuggestionsToWonder(iframe, manifest, [], gsEnabled);
-      if (gsEnabled) {
-        _mountBibliothecaRelations(body);
-      }
-    }
   });
   iframe.addEventListener('error', () => fail('offline'));
-}
-
-// ─── Feedback persistence ─────────────────────────────────────────────────────
-const RELATION_FEEDBACK_KEY = 'repociv_relation_feedback';
-
-function _loadRelationFeedback(): Record<string, { accepted: boolean; rejected: boolean }> {
-  try {
-    const raw = localStorage.getItem(RELATION_FEEDBACK_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function _saveRelationFeedback(key: string, state: { accepted: boolean; rejected: boolean }): void {
-  try {
-    const stored = _loadRelationFeedback();
-    stored[key] = state;
-    localStorage.setItem(RELATION_FEEDBACK_KEY, JSON.stringify(stored));
-  } catch {
-    // localStorage full — silent
-  }
-}
-
-// ─── Bibliotheca Relations Panel ──────────────────────────────────────────────
-
-function _mountBibliothecaRelations(body: HTMLElement): void {
-  const container = document.createElement('div');
-  container.id = 'bibliotheca-relations';
-  container.style.cssText = 'border-top: 1px solid rgba(200, 168, 75, 0.2); margin-top: 4px;';
-  body.appendChild(container);
-  _bibliothecaRelationsContainer = container;
-  void _reloadBibliothecaRelations();
-}
-
-async function _reloadBibliothecaRelations(): Promise<void> {
-  const container = _bibliothecaRelationsContainer;
-  if (!container) return;
-
-  const config = loadWonderConfig();
-  const gsEnabled = isFeatureEnabled(config, 'bibliotheca', 'graphSuggestions');
-  const aiEnabled = gsEnabled && isFeatureEnabled(config, 'bibliotheca', 'aiRelationDiscovery');
-  void syncGraphRelationFlags({ graphSuggestions: gsEnabled, aiRelationDiscovery: aiEnabled });
-  if (!gsEnabled) {
-    container.remove();
-    _bibliothecaRelationsContainer = null;
-    if (_bibliothecaIframe && _bibliothecaManifest) {
-      postGraphSuggestionsToWonder(_bibliothecaIframe, _bibliothecaManifest, [], false);
-    }
-    return;
-  }
-
-  const cities = _runtimeContext.cities;
-  if (cities.length === 0) {
-    renderRelationsPanelError(
-      container,
-      'Bibliotheca no tiene ciudades cargadas desde RepoCiv todavía',
-    );
-    return;
-  }
-
-  const targetCity = _runtimeContext.selectedCityId ?? cities[0]?.id;
-  if (!targetCity) {
-    renderRelationsPanelError(container, 'Selecciona una ciudad en RepoCiv para ver relaciones');
-    return;
-  }
-
-  renderRelationsPanelLoading(container);
-
-  try {
-    const relations = rankRelationsWithFeedback(
-      await fetchGraphRelations(targetCity, cities, 15),
-      _loadRelationFeedback(),
-    );
-
-    if (_bibliothecaIframe && _bibliothecaManifest) {
-      postGraphSuggestionsToWonder(_bibliothecaIframe, _bibliothecaManifest, relations, true);
-    }
-
-    renderRelationsPanel(relations, container, {
-      onAccept: (rel) => {
-        _saveRelationFeedback(relationFeedbackKey(rel.fromId, rel.toId), {
-          accepted: true,
-          rejected: false,
-        });
-        void _reloadBibliothecaRelations();
-      },
-      onReject: (rel) => {
-        _saveRelationFeedback(relationFeedbackKey(rel.fromId, rel.toId), {
-          accepted: false,
-          rejected: true,
-        });
-        void _reloadBibliothecaRelations();
-      },
-      onGoToCity: (rel) => {
-        window.dispatchEvent(
-          new CustomEvent('repociv:focus-city-request', {
-            detail: { cityId: rel.toId, repoPath: rel.toRepoPath, source: 'relations-panel' },
-          }),
-        );
-      },
-      onOpenBoth: (rel) => {
-        window.dispatchEvent(
-          new CustomEvent('repociv:open-local-view-request', {
-            detail: { cityId: rel.toId, repoPath: rel.toRepoPath, source: 'relations-panel' },
-          }),
-        );
-      },
-    });
-  } catch {
-    renderRelationsPanelError(container, 'No se pudieron cargar las relaciones locales');
-  }
 }
 
 function _tryAutoStart(body: HTMLElement, type: WonderType): Promise<boolean> {
@@ -635,59 +405,7 @@ async function _pollUntilReady(body: HTMLElement, type: WonderType): Promise<boo
   }
 }
 
-function _emptySub(type: WonderType, reason?: EmptyReason): string {
-  if (type === 'bibliotheca') {
-    const ui = WONDER_BIBLIOTHECA_URL;
-    const api = LGB_BACKEND_URL;
-    switch (reason) {
-      case 'lgb-offline':
-        return (
-          `Arranca La Gran Biblioteca en otra terminal:<br>` +
-          `<code>python -m backend.library_bridge</code> (API ${api})<br>` +
-          `<code>cd frontend && npm run dev</code> (UI ${ui})`
-        );
-      case 'lgb-backend-offline':
-        return (
-          `La UI vive, pero el backend no responde en <code>${api}/api/health</code>. ` +
-          `Levanta <code>python -m backend.library_bridge</code> o corrige el proxy.`
-        );
-      case 'lgb-ui-offline':
-        return `El backend responde, pero la UI no en <code>${ui}</code>. Ejecuta <code>cd frontend && npm run dev</code> en la-gran-biblioteca.`;
-      case 'load-timeout':
-        return `La UI en <code>${ui}</code> no cargó a tiempo. Comprueba que Vite esté arriba y abre esa URL en una pestaña.`;
-      case 'no-permissions':
-        return 'La maravilla respondió, pero negó permisos. Revisa headers, auth local o sandbox.';
-      default:
-        return 'La Biblioteca no respondió como debía. Revisa UI, backend o proxy local.';
-    }
-  }
-
-  if (type === 'institutum') {
-    const ui = WONDER_INSTITUTUM_URL;
-    switch (reason) {
-      case 'institutum-offline':
-        return (
-          `Levanta LabHub en otra terminal:<br>` +
-          `<code>cd ~/.hermes/workspace/repos/labhub && npm start</code> ` +
-          `(API :5281, UI :5280)<br>` +
-          `Si el repo no está, clónalo o ajusta <code>REPOCIV_WONDER_INSTITUTUM_DIR</code> en .env.`
-        );
-      case 'institutum-backend-offline':
-        return (
-          `La UI Vite de LabHub está caída, pero la API :5281 tampoco responde. ` +
-          `Re-arranca con <code>npm start</code> en labhub/ y revisa <code>~/.labhub/logs/</code>.`
-        );
-      case 'institutum-ui-offline':
-        return `La API responde, pero la UI Vite no en <code>${ui}</code>. Comprueba que <code>npm start</code> en labhub/ completó sin errores.`;
-      case 'load-timeout':
-        return `La UI en <code>${ui}</code> no cargó a tiempo. ¿Está Vite enlazado en :5280? Abre esa URL en una pestaña para depurar.`;
-      case 'no-permissions':
-        return 'LabHub respondió, pero negó permisos. Revisa headers o el sandbox del iframe.';
-      default:
-        return 'LabHub no respondió como debía. Revisa UI :5280 o API :5281.';
-    }
-  }
-
+function _emptySub(_type: WonderType, reason?: EmptyReason): string {
   switch (reason) {
     case 'degraded':
       return 'La maravilla respondió degradada. RepoCiv no la abre a ciegas para evitar una UI rota.';

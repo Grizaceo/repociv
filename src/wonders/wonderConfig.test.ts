@@ -7,7 +7,6 @@ import {
   loadWonderConfig,
   isFeatureEnabled,
 } from '../wonders/wonderConfig.ts';
-import { WONDER_EXAMPLES, getWonderExample } from '../wonders/exampleTemplates.ts';
 
 describe('wonder defaults', () => {
   describe('gaceta', () => {
@@ -23,27 +22,9 @@ describe('wonder defaults', () => {
       expect(WONDER_DEFAULTS.gaceta.autoSummaries).toBe(false);
     });
   });
-
-  describe('bibliotheca', () => {
-    it('fileNavigation defaults to true', () => {
-      expect(WONDER_DEFAULTS.bibliotheca.fileNavigation).toBe(true);
-    });
-
-    it('graphSuggestions defaults to false', () => {
-      expect(WONDER_DEFAULTS.bibliotheca.graphSuggestions).toBe(false);
-    });
-
-    it('aiRelationDiscovery defaults to false', () => {
-      expect(WONDER_DEFAULTS.bibliotheca.aiRelationDiscovery).toBe(false);
-    });
-  });
 });
 
-describe('WONDER_MANIFESTS (static) + example templates', () => {
-  // bibliotheca/institutum are no longer hardcoded built-ins; they ship as
-  // connectable examples. Assertions about them now read the example manifests.
-  const biblio = getWonderExample('bibliotheca')!.manifest;
-
+describe('WONDER_MANIFESTS (static)', () => {
   it('static registry ships only the native gaceta', () => {
     expect(Object.keys(WONDER_MANIFESTS)).toEqual(['gaceta']);
   });
@@ -52,25 +33,14 @@ describe('WONDER_MANIFESTS (static) + example templates', () => {
     expect(WONDER_MANIFESTS.gaceta.automationLevel).toBe('passive');
   });
 
-  it('bibliotheca example automationLevel is passive', () => {
-    expect(biblio.automationLevel).toBe('passive');
-  });
-
   it('manifest capability flags match optionality model', () => {
     expect(WONDER_MANIFESTS.gaceta.passiveMode).toBe(true);
     expect(WONDER_MANIFESTS.gaceta.agenticMode).toBe(false);
     expect(WONDER_MANIFESTS.gaceta.canAct).toBe(false);
-
-    expect(biblio.canSuggest).toBe(true);
-    expect(biblio.canAct).toBe(false);
-    expect(biblio.requiresConfirmation).toBe(true);
   });
 
-  it('all optionalFeatures require opt-in (static + examples)', () => {
-    const manifests = [
-      ...Object.values(WONDER_MANIFESTS),
-      ...WONDER_EXAMPLES.map((e) => e.manifest),
-    ];
+  it('all optionalFeatures require opt-in', () => {
+    const manifests = Object.values(WONDER_MANIFESTS);
     for (const manifest of manifests) {
       for (const feature of manifest.optionalFeatures) {
         expect(feature.requiresUserOptIn).toBe(true);
@@ -95,17 +65,15 @@ describe('WONDER_MANIFESTS (static) + example templates', () => {
 describe('isFeatureEnabled', () => {
   it('returns true for enabled defaults', () => {
     expect(isFeatureEnabled(WONDER_DEFAULTS, 'gaceta', 'showNews')).toBe(true);
-    expect(isFeatureEnabled(WONDER_DEFAULTS, 'bibliotheca', 'fileNavigation')).toBe(true);
   });
 
   it('returns false for opt-in features with defaults', () => {
     expect(isFeatureEnabled(WONDER_DEFAULTS, 'gaceta', 'foreignRelationsReport')).toBe(false);
     expect(isFeatureEnabled(WONDER_DEFAULTS, 'gaceta', 'autoSummaries')).toBe(false);
-    expect(isFeatureEnabled(WONDER_DEFAULTS, 'bibliotheca', 'graphSuggestions')).toBe(false);
-    expect(isFeatureEnabled(WONDER_DEFAULTS, 'bibliotheca', 'aiRelationDiscovery')).toBe(false);
   });
 
-  it('institutum legacy id now resolves to false (LabHub retired)', () => {
+  it('retired wonder ids resolve to false', () => {
+    expect(isFeatureEnabled(WONDER_DEFAULTS, 'bibliotheca', 'graphSuggestions')).toBe(false);
     expect(isFeatureEnabled(WONDER_DEFAULTS, 'institutum', 'showActiveExperiments')).toBe(false);
   });
 
@@ -134,6 +102,5 @@ describe('loadWonderConfig', () => {
     const config = loadWonderConfig();
     expect(config.gaceta.showNews).toBe(true);
     expect(config.gaceta.foreignRelationsReport).toBe(false);
-    expect(config.bibliotheca.fileNavigation).toBe(true);
   });
 });

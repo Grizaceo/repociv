@@ -29,46 +29,22 @@ import { listIframeWonders } from './wonders/manifest.ts';
 import type { WonderManifest } from './wonders/types.ts';
 
 // ─── Wonder placement ───────────────────────────────────────────────────────
-/** Canonical home tiles for the two example wonders so connecting/disconnecting
- *  one never shuffles the other (and goldens stay stable). Any other connected
- *  wonder takes the next free ring tile around the capital. */
-const WONDER_PREFERRED_COORDS: Record<string, Axial> = {
-  bibliotheca: { q: -1, r: 0 },
-  institutum: { q: 1, r: 0 },
-};
-
 export interface WonderPlacement {
   manifest: WonderManifest;
   coord: Axial;
 }
 
 /** Assign a hex coordinate to each connected iframe wonder around the capital
- *  (0,0). Deterministic: preferred slots first, then a spiral ring (skipping
- *  the reserved preferred slots) for everything else. */
+ *  (0,0). Deterministic: wonders take successive tiles of an outward spiral in
+ *  registry order, so the same set of connected wonders always lands the same
+ *  way and goldens stay stable. */
 export function assignWonderCoords(wonders: WonderManifest[]): WonderPlacement[] {
   const ring = spiralCoords({ q: 0, r: 0 }, 19).slice(1); // outward, skip center
-  const reservedPref = new Set(Object.values(WONDER_PREFERRED_COORDS).map(tileKey));
-  const used = new Set<string>();
   const out: WonderPlacement[] = [];
-
-  for (const manifest of wonders) {
-    const pref = WONDER_PREFERRED_COORDS[manifest.id];
-    if (pref) {
-      out.push({ manifest, coord: pref });
-      used.add(tileKey(pref));
-    }
-  }
   let cursor = 0;
   for (const manifest of wonders) {
-    if (WONDER_PREFERRED_COORDS[manifest.id]) continue;
-    while (cursor < ring.length) {
-      const coord = ring[cursor++]!;
-      const key = tileKey(coord);
-      if (used.has(key) || reservedPref.has(key)) continue;
-      out.push({ manifest, coord });
-      used.add(key);
-      break;
-    }
+    if (cursor >= ring.length) break;
+    out.push({ manifest, coord: ring[cursor++]! });
   }
   return out;
 }

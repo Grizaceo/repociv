@@ -195,7 +195,7 @@ ValueError: REPOCIV_TOKEN no configurado — mutating tools requieren token
 | Tool | Descripción |
 |------|-------------|
 | `wonders_list` | Todas las Maravillas registradas con estado y configuración |
-| `wonders_get(wonder_id)` | Manifiesto de una Maravilla por ID (bibliotheca, gaceta, institutum) |
+| `wonders_get(wonder_id)` | Manifiesto de una Maravilla por ID (gaceta, o cualquier servicio conectado) |
 | `wonder_health(wonder_id)` | Health check: iframe accesible, puerto activo, latencia |
 
 ### Graph Relations — grafo de repos

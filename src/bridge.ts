@@ -5,7 +5,6 @@
 
 import { type GameState } from './game.ts';
 import { type BridgeEvent, type CDailyArticle } from './types.ts';
-import type { SuggestionRelation as WonderSuggestionRelation } from './wonders/types.ts';
 import { logger } from './logger.ts';
 import { parseBridgeEvent, describeBridgeEventError } from './bridgeSchema.ts';
 import {
@@ -600,65 +599,6 @@ export async function getForeignReport(
 }
 
 // ─── Graph Relations API ──────────────────────────────────────────────────────
-
-export interface GraphRelationCandidate extends WonderSuggestionRelation {
-  toCityId?: string;
-}
-
-interface GraphRelationsResponse {
-  cityId: string;
-  count: number;
-  relations: GraphRelationCandidate[];
-}
-
-export interface GraphRelationStats {
-  nodes: number;
-  edges: number;
-  last_updated: number;
-  flags: { graphSuggestions: boolean; aiRelationDiscovery: boolean };
-}
-
-export async function fetchGraphRelations(
-  cityId: string,
-  cities: Array<{ id: string; name: string; repoPath?: string }>,
-  limit = 10,
-): Promise<GraphRelationCandidate[]> {
-  try {
-    const params = new URLSearchParams({ cityId, limit: String(limit) });
-    if (cities.length > 0) {
-      params.set('cities', JSON.stringify(cities));
-    }
-    const res = await fetch(bridgeUrl(`/api/graph-relations?${params.toString()}`), {
-      headers: bridgeHeaders(),
-    });
-    if (!res.ok) return [];
-    const data = (await res.json()) as GraphRelationsResponse;
-    return data.relations ?? [];
-  } catch {
-    return [];
-  }
-}
-
-export async function syncGraphRelationFlags(payload: {
-  graphSuggestions?: boolean;
-  aiRelationDiscovery?: boolean;
-}): Promise<{ ok: boolean; flags?: GraphRelationStats['flags']; error?: string }> {
-  try {
-    const res = await fetch(bridgeUrl('/api/graph-relations/flags'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...bridgeHeaders() },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-    return (await res.json()) as {
-      ok: boolean;
-      flags?: GraphRelationStats['flags'];
-      error?: string;
-    };
-  } catch (e) {
-    return { ok: false, error: String(e) };
-  }
-}
-
-// (fetchGraphRelationEvidence / fetchGraphRelationStats / refreshGraphRelationIndex
-// wrappers removed — no frontend callers; the backend endpoints remain.)
+// No frontend client: the repo-relation index is reachable through the bridge
+// endpoints (/api/graph-relations*) and the MCP tools. The only UI that ever
+// consumed it was the Bibliotheca relations panel, retired 2026-09-07.

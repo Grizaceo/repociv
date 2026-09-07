@@ -97,7 +97,7 @@ def post_foreign_report(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int
         repoPath (str): path to the target repo
         targetCityId (str): city ID for the target (optional, auto-detected if omitted)
         events (list, optional): recent events for context
-        graphRelations (list, optional): bibliotheca graph relations
+        graphRelations (list, optional): repo graph relations
         agentId (str, optional): agent identifier (default 'diplomat')
     """
     article = body.get("article", {})

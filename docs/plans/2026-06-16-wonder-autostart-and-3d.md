@@ -1,5 +1,13 @@
 # Plan — Auto-arranque de Maravillas + Estructuras 3D en el mapa
 
+> ⚠️ **Histórico (2026-09-07).** Bibliotheca (La Gran Biblioteca) y
+> Institutum/LabHub se **retiraron de RepoCiv**: no dieron utilidad real. Todo
+> lo que este documento dice sobre esas dos maravillas es registro de lo que se
+> planeó, no de lo que existe. Lo que sobrevive es el andamiaje genérico de
+> Maravillas (cualquier servicio iframe del usuario) y La Gaceta. El foco del
+> producto es la barra de agentes, repos-como-ciudades y los chats de agentes
+> sobre Hermes. Ver `docs/WONDER_CONTRACT.md` para el contrato vigente.
+
 Fecha: 2026-06-16
 Alcance acordado con el usuario:
 1. **Auto-arranque**: RepoCiv debe levantar por sí mismo los servidores de `institutum` (LabHub) y `bibliotheca` (La Gran Biblioteca) y abrirlos en sus iframes, **sin depender de que estén corriendo de antemano**. Modo elegido: **arranque automático al abrir**.

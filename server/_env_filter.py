@@ -14,8 +14,8 @@ helper every spawn path can use. It removes:
     ``_TOKEN``, ``_PASSWORD`` that is NOT explicitly kept by the
     caller.
 
-Callers can opt back in with ``extra_keep={...}`` (e.g. the LGB
-launcher legitimately needs ``LGB_HOST`` / ``BRIDGE_HOST`` to bind
+Callers can opt back in with ``extra_keep={...}`` (e.g. the wonder
+launcher legitimately needs a bind host such as ``BRIDGE_HOST`` to bind
 on 0.0.0.0). ``redact_env_for_spawn`` is idempotent: redacting an
 already-redacted env returns the same dict (with the same redacted
 count log, so the operation is observable without leaking values).
@@ -129,7 +129,7 @@ def redact_env_for_spawn(
     :param parent_env: source environment. Defaults to ``os.environ``.
     :param extra_keep: variable names (case-insensitive) the caller wants
         preserved even if they match the heuristic denylist (e.g.
-        ``LGB_HOST``).
+        ``BRIDGE_HOST``).
     :param redact_value: replacement string for sensitive values; use
         empty string if you want the var removed entirely. Defaults to
         a non-empty placeholder so the spawn can distinguish "missing"
