@@ -164,6 +164,47 @@
   border-radius: 3px;
   font-size: 12px;
 }
+.wonder-connect-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text, #d8c9a0);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(200, 168, 75, 0.28);
+  border-radius: 6px;
+  padding: 10px;
+}
+.wonder-connect-input:focus {
+  outline: none;
+  border-color: rgba(200, 168, 75, 0.6);
+}
+.wonder-connect-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.wonder-connect-btn {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 12px;
+  background: var(--clr-gold, #c8a84b);
+  color: #111;
+}
+.wonder-connect-btn:hover {
+  filter: brightness(1.12);
+}
+.wonder-connect-status {
+  font-size: 11px;
+  color: var(--text-dim, #8a7a5a);
+  min-height: 14px;
+}
 
 /* Stats grid */
 .stats-grid {

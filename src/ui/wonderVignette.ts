@@ -4,7 +4,9 @@ import { getLayerState } from '../layers.ts';
 import { getWonder } from '../wonders/manifest.ts';
 import {
   postContextToWonder,
+  postFocusToWonder,
   postLayerToWonder,
+  postOpenLocalViewToWonder,
   registerWonderOrigin,
   startWonderListener,
   stopWonderListener,
@@ -56,6 +58,9 @@ let _activeType: WonderType | null = null;
 let _dragging = false;
 let _dragOffset = { x: 0, y: 0 };
 let _contextListenerAttached = false;
+/** The currently-mounted wonder iframe + its manifest, so city selection keeps
+ *  reaching the wonder after the initial load. Null while no iframe is up. */
+let _mounted: { iframe: HTMLIFrameElement; manifest: WonderManifest } | null = null;
 let _dragMoveHandler: ((e: MouseEvent) => void) | null = null;
 let _dragUpHandler: (() => void) | null = null;
 let _vignetteRO: ResizeObserver | null = null;
@@ -120,7 +125,29 @@ function _ensureContextListener(): void {
     _runtimeContext.cities = detail?.cities ?? [];
     _runtimeContext.selectedCityId = detail?.selectedCityId ?? null;
     _runtimeContext.selectedRepoPath = detail?.selectedRepoPath ?? null;
+    pushContextToOpenWonder();
   });
+}
+
+/** Push the current city context (and focus) into whatever wonder is open.
+ *  No-op when nothing is mounted. This is the generic half of the contract:
+ *  every connected wonder that declares `repociv.focus` in `events.accepts`
+ *  follows the user's city selection, not just one hardcoded product. */
+export function pushContextToOpenWonder(mode: 'macro' | 'local' = 'macro'): void {
+  if (!_mounted) return;
+  const { iframe, manifest } = _mounted;
+  postContextToWonder(iframe, manifest, {
+    cityId: _runtimeContext.selectedCityId ?? undefined,
+    selectedRepo: _runtimeContext.selectedRepoPath ?? undefined,
+    theme: document.documentElement.dataset['theme'] ?? 'imperial-dark',
+  });
+  const cityId = _runtimeContext.selectedCityId;
+  if (!cityId) return;
+  postFocusToWonder(iframe, manifest, cityId, mode);
+  const repoPath = _runtimeContext.selectedRepoPath;
+  if (mode === 'local' && repoPath) {
+    postOpenLocalViewToWonder(iframe, manifest, repoPath);
+  }
 }
 
 export async function openWonderVignette(input: WonderType | WonderManifest): Promise<void> {
@@ -283,6 +310,7 @@ export function closeWonderVignette(): void {
     _vignette.remove();
     _vignette = null;
   }
+  _mounted = null;
   _activeType = null;
 }
 
@@ -323,6 +351,7 @@ function _mountIframe(body: HTMLElement, manifest: WonderManifest, type: WonderT
     ></iframe>
   `;
   const iframe = body.querySelector('iframe')!;
+  _mounted = { iframe, manifest };
   let settled = false;
   const fail = (reason?: EmptyReason) => {
     if (settled) return;
@@ -334,11 +363,7 @@ function _mountIframe(body: HTMLElement, manifest: WonderManifest, type: WonderT
     if (settled) return;
     settled = true;
     clearTimeout(loadTimer);
-    postContextToWonder(iframe, manifest, {
-      cityId: _runtimeContext.selectedCityId ?? undefined,
-      selectedRepo: _runtimeContext.selectedRepoPath ?? undefined,
-      theme: document.documentElement.dataset['theme'] ?? 'imperial-dark',
-    });
+    pushContextToOpenWonder();
     for (const [layer, enabled] of Object.entries(getLayerState().layers)) {
       postLayerToWonder(iframe, manifest, layer, enabled);
     }

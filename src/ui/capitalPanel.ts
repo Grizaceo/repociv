@@ -6,7 +6,7 @@ import { openWonderVignette } from './wonderVignette.ts';
 import { listWonders, getWonder, ensureWondersLoaded } from '../wonders/manifest.ts';
 import type { WonderManifest } from '../wonders/types.ts';
 import { renderCapabilityBadge, renderCapabilityPanel } from '../wonders/wonderBadges.ts';
-import { disconnectWonder, launchWonder } from '../wonders/wonderLauncher.ts';
+import { connectWonder, disconnectWonder, launchWonder } from '../wonders/wonderLauncher.ts';
 import { showNotification } from './notificationBanner.ts';
 
 const STORAGE_TAB = 'repociv-capital-tab';
@@ -239,12 +239,60 @@ function _renderWondersGuide(container: HTMLElement) {
       sin abrir terminales. Nada viene pre-instalado: conecta lo que uses.
     </p>
     <p class="wonders-guide-intro" style="opacity:.85">
-      Para conectar un servicio propio, deja un manifiesto en
-      <code>~/.repociv/wonders/&lt;id&gt;.json</code> (ver
-      <code>docs/CUSTOM_WONDERS.md</code>) y reinicia el bridge.
+      Pega el <code>WonderManifest</code> del servicio (con su bloque
+      <code>launch</code> opcional). Se guarda en
+      <code>~/.repociv/wonders/&lt;id&gt;.json</code> y el launcher lo recarga en
+      caliente. Formato completo en <code>docs/CUSTOM_WONDERS.md</code>.
     </p>
+    <textarea class="wonder-connect-input" spellcheck="false" rows="9"
+      placeholder='{"id":"mi-servicio","title":"Mi Servicio","kind":"iframe","category":"operations","version":"0.1.0","ui":{"url":"http://127.0.0.1:9000"}}'></textarea>
+    <div class="wonder-connect-actions">
+      <button class="wonder-connect-btn">Conectar</button>
+      <span class="wonder-connect-status"></span>
+    </div>
   `;
   container.appendChild(wrap);
+
+  const input = wrap.querySelector<HTMLTextAreaElement>('.wonder-connect-input')!;
+  const status = wrap.querySelector<HTMLElement>('.wonder-connect-status')!;
+  wrap.querySelector<HTMLElement>('.wonder-connect-btn')?.addEventListener('click', () => {
+    void _connectFromManifestText(input.value, status);
+  });
+}
+
+/** Parse + POST a pasted manifest. Validation errors stay in the panel — the
+ *  bridge does the authoritative check, this only catches malformed JSON and
+ *  the two fields the UI cannot work without. */
+async function _connectFromManifestText(raw: string, status: HTMLElement): Promise<void> {
+  let manifest: WonderManifest;
+  try {
+    manifest = JSON.parse(raw) as WonderManifest;
+  } catch (e) {
+    status.textContent = `✗ JSON inválido: ${(e as Error).message}`;
+    return;
+  }
+  if (!manifest?.id || !manifest?.title) {
+    status.textContent = '✗ El manifiesto necesita al menos `id` y `title`.';
+    return;
+  }
+  status.textContent = 'Conectando…';
+  const res = await connectWonder(manifest);
+  if (!res.ok) {
+    status.textContent = `✗ ${res.error ?? 'no se pudo conectar'}`;
+    return;
+  }
+  await ensureWondersLoaded();
+  status.textContent = '';
+  showNotification({
+    type: 'success',
+    title: 'Maravilla conectada',
+    body: `${manifest.title} aparece en el mapa y como pestaña.`,
+  });
+  window.dispatchEvent(
+    new CustomEvent('repociv:wonders-changed', { detail: { connectedId: manifest.id } }),
+  );
+  _activeTab = `tab-${manifest.id}`;
+  _rebuildTabsBar();
 }
 
 function _renderStats(container: HTMLElement) {
