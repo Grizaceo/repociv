@@ -72,9 +72,7 @@ function keyOf(entry: RosterEntry): string {
  * Fetch (and cache) the Bot Mode roster from the bridge. Uses the bridge token
  * already configured in the frontend (bridgeHeaders). Never reads profile internals.
  */
-export async function getRosterMap(
-  harness = 'hermes',
-): Promise<Map<string, RosterEntry>> {
+export async function getRosterMap(harness = 'hermes'): Promise<Map<string, RosterEntry>> {
   if (rosterCache) return rosterCache;
   if (rosterPromise) return rosterPromise;
 

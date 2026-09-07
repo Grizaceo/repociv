@@ -91,9 +91,7 @@ export function filterProfilesByHarness(
 ): RepoCivProfile[] {
   const hid = norm(harnessRegistryId);
   if (!hid || hid === 'auto') return [...profiles];
-  return profiles.filter(
-    (p) => registryHarnessId(norm(p.harness)) === hid,
-  );
+  return profiles.filter((p) => registryHarnessId(norm(p.harness)) === hid);
 }
 
 /** The native profile name whose path matches config.profile, or null. */
@@ -130,9 +128,7 @@ function _populateOptions(select: HTMLSelectElement): void {
 
   // Registry profiles filtered by the panel's active harness.
   const visible = filterProfilesByHarness(_profiles, active);
-  const sorted = [...visible].sort(
-    (a, b) => (a.slot_order ?? 99) - (b.slot_order ?? 99),
-  );
+  const sorted = [...visible].sort((a, b) => (a.slot_order ?? 99) - (b.slot_order ?? 99));
   for (const p of sorted) {
     const opt = document.createElement('option');
     opt.value = p.name;
@@ -145,8 +141,7 @@ function _populateOptions(select: HTMLSelectElement): void {
   // Only offered when the harness is hermes (or auto): native profiles are
   // per-harness and the hermes-cli adapter is the only one that consumes a
   // profile path from the chat config.
-  const showNative =
-    !active || active === 'auto' || registryHarnessId(active) === 'hermes';
+  const showNative = !active || active === 'auto' || registryHarnessId(active) === 'hermes';
   if (showNative && _nativeProfiles.length > 0) {
     const sep = document.createElement('option');
     sep.disabled = true;

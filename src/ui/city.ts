@@ -34,11 +34,7 @@ const SKILL_LABEL: Record<string, string> = {
   broken: '✗ Roto',
 };
 
-export function openCityPanel(
-  city: City,
-  activeBuildings: Building[],
-  tile?: Tile,
-) {
+export function openCityPanel(city: City, activeBuildings: Building[], tile?: Tile) {
   const panel = document.getElementById('city-panel');
   if (!panel) return;
   // Count cold opens AND city→city switches, but not same-city data refreshes

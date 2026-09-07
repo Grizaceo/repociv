@@ -438,7 +438,12 @@ export function loadSelection(unitId: string | null = null): {
     const old = localStorage.getItem('repociv:provider');
     if (old) {
       const parsed = JSON.parse(old);
-      return { harness: '', provider: parsed.provider || '', model: parsed.model || '', profile: '' };
+      return {
+        harness: '',
+        provider: parsed.provider || '',
+        model: parsed.model || '',
+        profile: '',
+      };
     }
   } catch {
     // ignore

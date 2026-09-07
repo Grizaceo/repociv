@@ -52,9 +52,9 @@ describe('findMatchingProfile', () => {
   });
 
   it('matches a profile with empty provider/model only against an equally-empty config', () => {
-    expect(
-      findMatchingProfile(PROFILES, { harness: 'hermes', provider: '', model: '' }),
-    ).toEqual(PROFILES[2]);
+    expect(findMatchingProfile(PROFILES, { harness: 'hermes', provider: '', model: '' })).toEqual(
+      PROFILES[2],
+    );
     // A config with a provider must NOT match the auto profile.
     expect(
       findMatchingProfile(PROFILES, { harness: 'hermes', provider: 'openai-api', model: '' }),
@@ -94,8 +94,9 @@ describe('findMatchingProfile', () => {
     const padded: RepoCivProfile[] = [
       { name: 'p', harness: 'hermes', provider: ' ollama-cloud ', model: ' m ' },
     ];
-    expect(findMatchingProfile(padded, { harness: 'hermes', provider: 'ollama-cloud', model: 'm' }))
-      .toEqual(padded[0]);
+    expect(
+      findMatchingProfile(padded, { harness: 'hermes', provider: 'ollama-cloud', model: 'm' }),
+    ).toEqual(padded[0]);
   });
 
   it('returns null for an empty profile list', () => {

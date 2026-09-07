@@ -20,7 +20,12 @@ import { type GameState } from '../game.ts';
 import { type BridgeEvents } from '../bridge.ts';
 import { type RepoCivProfile } from '../agentProfile.ts';
 import { bridgeUrl, bridgeHeaders } from '../bridgeEnv.ts';
-import { type RosterEntry, type AvatarKind, type RosterPet, resolveBotIdentity } from '../avatarClient.ts';
+import {
+  type RosterEntry,
+  type AvatarKind,
+  type RosterPet,
+  resolveBotIdentity,
+} from '../avatarClient.ts';
 import { spawnFromProfile } from './hudWiring/spawn.ts';
 import { logEvent } from './hud.ts';
 
@@ -41,10 +46,9 @@ interface BotModeIdentity {
  * same source / slug-confine / no-profile.yaml guarantees apply).
  */
 async function fetchBotModeBots(): Promise<RosterEntry[]> {
-  const resp = await fetch(
-    bridgeUrl('/api/harness-profiles?harness=hermes&with_identity=1'),
-    { headers: bridgeHeaders() },
-  );
+  const resp = await fetch(bridgeUrl('/api/harness-profiles?harness=hermes&with_identity=1'), {
+    headers: bridgeHeaders(),
+  });
   if (!resp.ok) throw new Error(`GET /api/harness-profiles → ${resp.status}`);
   const data = (await resp.json()) as {
     profiles?: BotModeIdentity[];
@@ -62,7 +66,13 @@ async function fetchBotModeBots(): Promise<RosterEntry[]> {
 }
 
 /** Build a RepoCivProfile for a Bot Mode bot and spawn it onto the grid. */
-function spawnBotModeBot(name: string, rosterLabel: string, state: GameState, renderer: Renderer, bridge: BridgeEvents): void {
+function spawnBotModeBot(
+  name: string,
+  rosterLabel: string,
+  state: GameState,
+  renderer: Renderer,
+  bridge: BridgeEvents,
+): void {
   const profile: RepoCivProfile = {
     name,
     harness: 'hermes',
@@ -110,7 +120,11 @@ function clampMenuToViewport(menu: HTMLElement): void {
 }
 
 /** Open (or rebuild) the Bot Mode dropdown listing real bots with identity. */
-async function openBotModeMenu(state: GameState, renderer: Renderer, bridge: BridgeEvents): Promise<void> {
+async function openBotModeMenu(
+  state: GameState,
+  renderer: Renderer,
+  bridge: BridgeEvents,
+): Promise<void> {
   if (_menuEl) {
     closeMenu();
     return;
@@ -196,7 +210,11 @@ async function openBotModeMenu(state: GameState, renderer: Renderer, bridge: Bri
 /**
  * Wire the "➕ Bot" button. Safe to call once during startup.
  */
-export function initBotModeSpawner(state: GameState, renderer: Renderer, bridge: BridgeEvents): void {
+export function initBotModeSpawner(
+  state: GameState,
+  renderer: Renderer,
+  bridge: BridgeEvents,
+): void {
   const btn = document.getElementById('spawn-botmode');
   if (!btn) return;
   btn.addEventListener('click', (e) => {

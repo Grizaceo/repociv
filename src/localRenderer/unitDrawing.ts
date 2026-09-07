@@ -236,8 +236,7 @@ export function drawLocalUnit(
   // Ring color = unit color (identity stays color; power = ring).
   // 1px ECONOMICO · 2px EQUILIBRIO · 4px + glow PREMIUM.
   if (unit.tier) {
-    const ringWidth =
-      unit.tier === 'PREMIUM' ? 4 : unit.tier === 'EQUILIBRIO' ? 2 : 1;
+    const ringWidth = unit.tier === 'PREMIUM' ? 4 : unit.tier === 'EQUILIBRIO' ? 2 : 1;
     ctx.save();
     if (unit.tier === 'PREMIUM') {
       ctx.shadowColor = unit.color;

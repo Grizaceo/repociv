@@ -56,7 +56,9 @@ const bubbles = new Map<string, Bubble>();
 function ensureMounted(): void {
   if (sceneCanvas) return;
   const base = document.getElementById('main-canvas');
-  const parent = (base?.parentElement ?? document.getElementById('app') ?? document.body) as HTMLElement;
+  const parent = (base?.parentElement ??
+    document.getElementById('app') ??
+    document.body) as HTMLElement;
 
   sceneCanvas = document.createElement('canvas');
   sceneCanvas.id = 'assembly-scene';
@@ -87,19 +89,27 @@ function ensureMounted(): void {
   sizeOverlay();
 
   // Eventos del composer.
-  composerEl.querySelector('#assembly-close')?.addEventListener('click', () => void toggleAssemblyRoom());
-  composerEl.querySelector('#assembly-send')?.addEventListener('click', () => void sendFromComposer());
-  composerEl.querySelector<HTMLTextAreaElement>('#assembly-input')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      void sendFromComposer();
-    }
-  });
-  composerEl.querySelector<HTMLSelectElement>('#assembly-room-select')?.addEventListener('change', (e) => {
-    currentRoom = (e.target as HTMLSelectElement).value || 'asamblea';
-    bubbles.clear();
-    void pollRoom();
-  });
+  composerEl
+    .querySelector('#assembly-close')
+    ?.addEventListener('click', () => void toggleAssemblyRoom());
+  composerEl
+    .querySelector('#assembly-send')
+    ?.addEventListener('click', () => void sendFromComposer());
+  composerEl
+    .querySelector<HTMLTextAreaElement>('#assembly-input')
+    ?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        void sendFromComposer();
+      }
+    });
+  composerEl
+    .querySelector<HTMLSelectElement>('#assembly-room-select')
+    ?.addEventListener('change', (e) => {
+      currentRoom = (e.target as HTMLSelectElement).value || 'asamblea';
+      bubbles.clear();
+      void pollRoom();
+    });
 }
 
 function sizeOverlay(): void {
@@ -125,7 +135,10 @@ async function loadRoster(): Promise<void> {
   const speakSel = composerEl?.querySelector<HTMLSelectElement>('#assembly-speak-as');
   if (speakSel) {
     speakSel.innerHTML = rosterEntries
-      .map((b) => `<option value="${escapeAttr(b.name)}">${escapeHtml(b.name)}${b.is_bot ? '' : ' (humano)'}</option>`)
+      .map(
+        (b) =>
+          `<option value="${escapeAttr(b.name)}">${escapeHtml(b.name)}${b.is_bot ? '' : ' (humano)'}</option>`,
+      )
       .join('');
     const firstBot = rosterEntries.find((b) => b.is_bot) ?? rosterEntries[0];
     speakingAs = firstBot?.name ?? null;
@@ -239,7 +252,13 @@ function drawScene(): void {
 }
 
 /** Bean estilo Among Us con el retrato recortado (identidad real). */
-function drawBean(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, ident: BotIdentity): void {
+function drawBean(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  ident: BotIdentity,
+): void {
   const bodyColor = ident.kind === null ? '#8b98a9' : '#5b6b7d';
   // Anillo distintivo para bots con pet real.
   if (ident.kind === 'pet') {
@@ -308,7 +327,7 @@ function drawBubble(ctx: CanvasRenderingContext2D, cx: number, cy: number, text:
   const bh = lines.length * lineH + padY * 2;
   let bx = cx - bw / 2;
   let by = cy - bh - 6;
-  bx = Math.max(8, Math.min(bx, (ctx.canvas.width / (ctx.getTransform().a || 1)) - bw - 8));
+  bx = Math.max(8, Math.min(bx, ctx.canvas.width / (ctx.getTransform().a || 1) - bw - 8));
   by = Math.max(44, by);
 
   roundRect(ctx, bx, by, bw, bh, 10);
@@ -325,7 +344,14 @@ function drawBubble(ctx: CanvasRenderingContext2D, cx: number, cy: number, text:
   ctx.restore();
 }
 
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): void {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -390,7 +416,10 @@ export async function toggleAssemblyRoom(): Promise<void> {
 
 // ─── escapes (texto plano; sin innerHTML para datos del bot) ──────────────────
 function escapeHtml(s: string): string {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+  return s.replace(
+    /[&<>"]/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string,
+  );
 }
 function escapeAttr(s: string): string {
   return escapeHtml(s);

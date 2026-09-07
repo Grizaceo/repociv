@@ -84,8 +84,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     // which clips the top line until the next keystroke.
     chatInput.style.height = '0px';
     const cs = window.getComputedStyle(chatInput);
-    const borderY =
-      (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    const borderY = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
     const target = chatInput.scrollHeight + borderY;
     chatInput.style.height = `${Math.min(target, 160)}px`;
     // The browser scrolls the textarea internally to keep the caret visible

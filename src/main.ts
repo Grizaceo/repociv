@@ -725,7 +725,9 @@ async function bootstrap() {
   document.getElementById('btn-toggle-3d')?.addEventListener('click', toggleView);
   document.getElementById('btn-approvals')?.addEventListener('click', toggleApprovalPanel);
   document.getElementById('btn-tasks')?.addEventListener('click', toggleTaskPanel);
-  document.getElementById('btn-assembly')?.addEventListener('click', () => void toggleAssemblyRoom());
+  document
+    .getElementById('btn-assembly')
+    ?.addEventListener('click', () => void toggleAssemblyRoom());
 
   // ─── Idle agent finder (Age of Empires pattern) ─────────────────────
   // Uses the shared singleton so the cycle index stays in sync with the

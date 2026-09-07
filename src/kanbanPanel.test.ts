@@ -68,9 +68,10 @@ function nonEmptyColumns(board: KanbanBoard): [string, KanbanTask[]][] {
 function renderCard(t: KanbanTask): string {
   const assignee = t.assignee ? `<span class="kb-assignee">${escapeHtml(t.assignee)}</span>` : '';
   const prio = t.priority > 0 ? `<span class="kb-prio">${t.priority}</span>` : '';
-  const fail = t.consecutive_failures > 0
-    ? `<span class="kb-fail" title="${escapeHtml(t.last_failure_error ?? '')}">✗${t.consecutive_failures}</span>`
-    : '';
+  const fail =
+    t.consecutive_failures > 0
+      ? `<span class="kb-fail" title="${escapeHtml(t.last_failure_error ?? '')}">✗${t.consecutive_failures}</span>`
+      : '';
   return `
     <div class="kb-card" data-status="${escapeHtml(t.status)}">
       <div class="kb-card-title">${escapeHtml(t.title)}</div>
