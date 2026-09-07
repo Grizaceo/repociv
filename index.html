@@ -17,6 +17,10 @@
 
     <!-- Capas de UI y overlays -->
     <div id="three-container"></div>
+    <!-- The local (RimWorld-style) 3D scene needs its OWN mount. Sharing
+         #three-container made both renderers toggle the same .active class,
+         so entering the local view could never hide the macro map. -->
+    <div id="local-scene-container"></div>
 
     <!-- Diegetic local-view monitor frame (toggled by renderer) -->
     <div id="local-view-frame" class="hidden">

@@ -620,11 +620,20 @@ export class LocalRenderer {
       this.staticWorldId = cacheKey;
     }
 
+    // Ground the sector on a dark, faintly warm slate rather than the old
+    // paper-white (#FFF8F3). Three reasons it was wrong: it blew out every part
+    // of the frame the office does not cover, it fought the diegetic monitor
+    // framing around it (gold-on-black brackets, scanlines, LOCAL SECTOR), and
+    // it made the local view read as a different application than the map you
+    // just came from. Dark ground also lets the light floors and desks carry
+    // the eye, which is the whole point of the view.
     ctx.globalAlpha = transitionAlpha;
-    ctx.fillStyle = '#FFF8F3';
+    ctx.fillStyle = '#14171C';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.globalAlpha = 1;
 
+    // Vignette: lift the centre slightly and sink the corners, so the office
+    // sits in a pool of light instead of on a flat field.
     const bgGrad = ctx.createRadialGradient(
       canvas.width / 2,
       canvas.height / 2,
@@ -633,9 +642,9 @@ export class LocalRenderer {
       canvas.height / 2,
       Math.max(canvas.width, canvas.height) * 0.7,
     );
-    bgGrad.addColorStop(0, 'rgba(255, 248, 243, 0)');
-    bgGrad.addColorStop(0.7, 'rgba(255, 240, 230, 0.3)');
-    bgGrad.addColorStop(1, 'rgba(250, 230, 220, 0.5)');
+    bgGrad.addColorStop(0, 'rgba(86, 96, 112, 0.22)');
+    bgGrad.addColorStop(0.55, 'rgba(40, 46, 56, 0.12)');
+    bgGrad.addColorStop(1, 'rgba(4, 6, 9, 0.55)');
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 

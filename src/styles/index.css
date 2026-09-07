@@ -66,6 +66,23 @@
   pointer-events: auto;
 }
 
+/* Mirrors #three-container. Two WebGL scenes, two mounts: the macro map and
+   the local sector each own their visibility, so switching views actually
+   swaps what is on screen instead of stacking both canvases. */
+#local-scene-container {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+  background: #10141a;
+  z-index: 1;
+}
+
+#local-scene-container.active {
+  visibility: visible;
+  pointer-events: auto;
+}
+
 #hud-overlay {
   position: absolute;
   inset: 0;

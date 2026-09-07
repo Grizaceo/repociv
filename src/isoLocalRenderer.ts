@@ -30,7 +30,11 @@ const ISO_FLOOR: Record<string, string> = {
   reception: '#C4B8A0',
   biophilic: '#4A9E8E',
   path: '#B8B8B8',
-  outside: '#A8A8A8',
+  // Ground with no room on it. At #A8A8A8 it painted a light-grey slab over
+  // every part of the grid the office does not use, which on the dark sector
+  // ground reads as a hole in the floor rather than as unbuilt space. Keep it
+  // just above the backdrop so the tile grid still reads, and no brighter.
+  outside: '#232830',
 };
 const ISO_WALL_FACE = '#C8C8C8';
 const ISO_WALL_SIDE = '#B0B0B0';
@@ -329,7 +333,7 @@ export function drawIsoTile(
   let floorColor = ISO_FLOOR[floorKey] || ISO_FLOOR.team_cluster || '#B8B8B8';
   if (tile.type === 'path' || tile.type === 'aisle') floorColor = ISO_FLOOR.path || '#B8B8B8';
   if (!tile.roomId && tile.type !== 'path' && tile.type !== 'aisle')
-    floorColor = ISO_FLOOR.outside || '#A8A8A8';
+    floorColor = ISO_FLOOR.outside || '#232830';
 
   ctx.fillStyle = floorColor;
   ctx.beginPath();

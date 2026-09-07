@@ -851,7 +851,11 @@ async function bootstrap() {
   }
 
   function _enterLocalViewForCity(city: City): void {
-    bridge.send('enter_local', { repoId: city.id, rootPath: city.repoPath });
+    // No bridge command here. Entering a sector is a view change, not an intent
+    // the executor acts on: `enter_local` is not in CommandType and carries no
+    // `target`, so every entry fired a rejected command and surfaced
+    // "WS command rejected: Missing required fields: {'target'}" to the user.
+    // The local world is built client-side from GET /api/files/<repoId>.
     state.enterLocalView(city.id).catch(() => state.enterLocalViewMock(city.id));
     initBubbleLayer();
     // Any wonder that is open follows us into the local view.

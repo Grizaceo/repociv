@@ -1048,6 +1048,13 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   border-right: 1px solid var(--panel-border);
 }
 
+/* The minimap renders the macro world. Inside a local sector it shows a map of
+   somewhere the user is not, which is worse than showing nothing. */
+body.local-view #minimap-container,
+body.local-view #minimap-button-strip {
+  display: none;
+}
+
 #minimap-container {
   width: 280px;
   height: 200px;
