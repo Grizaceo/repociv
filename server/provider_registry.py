@@ -107,13 +107,17 @@ def _read_hermes_yaml() -> dict[str, Any] | None:
     """Read ~/.hermes/config.yaml and return the parsed config (best-effort)."""
     import yaml  # PyYAML — available in hermes venv
 
-    hermes_root = Path(os.environ.get("HERMES_ROOT", str(Path.home() / ".hermes")))
+    # expanduser: HERMES_ROOT is often "~/.hermes" (e.g. from a systemd
+    # EnvironmentFile, which does NOT expand ~), which Path() would treat as a
+    # relative path and never find. bridge.py already expanduser's HERMES_ROOT;
+    # this keeps the two consistent so config is read the same way everywhere.
+    hermes_root = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", str(Path.home() / ".hermes"))))
     config_path = hermes_root / "config.yaml"
 
     # Also check the RepoCiv .env override
     config_from_env = os.environ.get("HERMES_ROOT")
     if config_from_env:
-        alt = Path(config_from_env) / "config.yaml"
+        alt = Path(os.path.expanduser(config_from_env)) / "config.yaml"
         if alt.exists():
             config_path = alt
 
