@@ -35,8 +35,9 @@ Versión: **v2.0 — congelada en scope hasta que el dogfooding diga otra cosa.*
 Métricas concretas para considerar el alpha "exitoso":
 
 - El usuario alpha abre RepoCiv ≥ 5 días por semana de forma espontánea (sin recordatorio).
-- Al menos 3 de los 21 paneles de UI se invocan habitualmente. Los demás
-  son candidatos a poda (ver §"Roadmap de poda" abajo).
+- Al menos 3 de los 11 paneles de UI (tras la poda de 2026-08-10) se invocan
+  habitualmente. Los que no, son candidatos a la próxima ronda de poda (ver
+  §"Roadmap de poda" abajo).
 - El bridge se mantiene corriendo como systemd unit por ≥ 7 días sin
   intervención manual.
 - Los endpoints `GET /improve/proposals` muestran al menos una propuesta

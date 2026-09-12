@@ -84,7 +84,7 @@ export function registerHudCommands(
       label: 'Pendientes del tracker',
       run: () => togglePendingPanel(),
     },
-    { id: 'p-log', group: 'Panel', label: 'Log en vivo', run: () => toggleLogPanel() },
+    { id: 'p-log', group: 'Panel', label: 'Log en vivo', hint: 'F10', run: () => toggleLogPanel() },
     { id: 'p-harness', group: 'Panel', label: 'Harness', run: () => toggleHarnessPanel() },
     {
       id: 'p-kanban',
