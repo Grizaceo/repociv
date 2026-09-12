@@ -7,6 +7,7 @@ concerns repeatedly.
 """
 from __future__ import annotations
 
+import shlex
 import subprocess
 import urllib.request
 from dataclasses import dataclass
@@ -39,9 +40,12 @@ class RuntimeAdapter:
             return {"ok": health.get("status") not in {"unhealthy", "error"}, "kind": kind, "status": health.get("status", "unknown")}
         if kind == "command":
             command = str(health.get("command", "")).strip()
-            if not command:
+            argv = shlex.split(command)
+            if not argv:
                 return {"ok": False, "kind": kind, "status": "missing-command"}
-            proc = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=5)
+            # argv + shell=False: harness descriptors are server-controlled, but a
+            # health command must never reach a shell (no metacharacter execution).
+            proc = subprocess.run(argv, capture_output=True, text=True, timeout=5)
             return {"ok": proc.returncode == 0, "kind": kind, "status": "healthy" if proc.returncode == 0 else "failed", "output": (proc.stdout or proc.stderr).strip()[:200]}
         if kind == "http":
             url = str(health.get("url", "")).strip()

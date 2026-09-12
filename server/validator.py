@@ -14,6 +14,7 @@ Verdicts:
 
 from __future__ import annotations
 
+import shlex
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -270,8 +271,18 @@ def _run_build_check(repo: str, issue_id: str) -> dict[str, Any]:
                 "detail": "No buildCommand configured, skipping",
             }
         repo_path = Path(cfg.get("path", "."))
+        # argv + shell=False: buildCommand comes from the repo config file and must
+        # never be interpreted by a shell (no metacharacter/command injection).
+        argv = shlex.split(build_cmd)
+        if not argv:
+            return {
+                "id": "build-clean",
+                "label": "Build is clean",
+                "passed": True,
+                "detail": "No buildCommand configured, skipping",
+            }
         result = subprocess.run(
-            build_cmd, shell=True, cwd=str(repo_path),
+            argv, cwd=str(repo_path),
             capture_output=True, text=True, timeout=120,
         )
         if result.returncode == 0:
