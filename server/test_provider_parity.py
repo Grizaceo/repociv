@@ -98,6 +98,9 @@ def test_fallback_when_hermes_unimportable(monkeypatch: pytest.MonkeyPatch) -> N
     # Also clear module-level cache used by _get_chat_config.
     if hasattr(pr, "_cache") and pr._cache is not None:
         monkeypatch.setattr(pr, "_cache", None)
+    # Hermetic: don't read the developer's live ~/.hermes/config.yaml — its shape
+    # changes as Hermes rewrites it, which used to flip this test green/red.
+    monkeypatch.setattr(pr, "_read_hermes_yaml", lambda: {})
 
     data = pr._get_providers()
     assert data.get("hermesParity") is False
@@ -108,10 +111,31 @@ def test_fallback_when_hermes_unimportable(monkeypatch: pytest.MonkeyPatch) -> N
 # ─── T6: shape of chat-config intact (UI contract) ────────────────────────
 
 
-def test_chat_config_shape_for_ui() -> None:
-    from server.provider_registry import _get_chat_config
+def test_chat_config_shape_for_ui(monkeypatch: pytest.MonkeyPatch) -> None:
+    import server.provider_registry as pr
 
-    cfg = _get_chat_config()
+    # Hermetic UI-contract check: force the legacy path and stub the live config
+    # so the shape is validated without the network or the developer's
+    # ~/.hermes/config.yaml. The dict-shaped `models:` also regression-guards the
+    # KeyError fixed in _yaml_model_ids.
+    monkeypatch.setattr(pr, "_HERMES_IMPORT_OK", False)
+    monkeypatch.setattr(pr, "_hermes_payload_cache", None)
+    if hasattr(pr, "_cache") and pr._cache is not None:
+        monkeypatch.setattr(pr, "_cache", None)
+    monkeypatch.setattr(
+        pr,
+        "_read_hermes_yaml",
+        lambda: {
+            "providers": {
+                "kiraai": {
+                    "api_key_env": "KIRAAI_KEY",
+                    "models": {"qwen/q-free": {}, "qwen/q-pro": {}},
+                }
+            }
+        },
+    )
+
+    cfg = pr._get_chat_config()
     for key in ("harnesses", "defaultHarness", "defaultProvider", "providers"):
         assert key in cfg, f"chat_config missing top-level key: {key}"
     assert cfg["providers"], "chat_config.providers must be non-empty"

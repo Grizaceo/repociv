@@ -39,7 +39,7 @@ if _HERMES_AGENT.exists() and str(_HERMES_AGENT) not in sys.path:
 
 try:
     from hermes_cli.inventory import build_models_payload, load_picker_context
-    from hermes_cli.models import provider_group_for_slug
+    from hermes_cli.models_catalog_static import provider_group_for_slug
 
     _HERMES_IMPORT_OK = True
     _HERMES_IMPORT_ERROR: str | None = None
@@ -129,6 +129,21 @@ def _read_hermes_yaml() -> dict[str, Any] | None:
         return None
 
 
+def _yaml_model_ids(yaml_models: Any) -> list[str]:
+    """Normalize a hermes-config ``models:`` field to a list of model-id strings.
+
+    Accepts the historical list-of-strings shape *and* a mapping whose keys are
+    the model ids (as ``kiraai`` uses in ~/.hermes/config.yaml). A mapping used
+    to crash ``_build_dynamic_providers`` with ``KeyError: 0`` on
+    ``yaml_models[0]`` — see server/test_provider_parity.py.
+    """
+    if isinstance(yaml_models, dict):
+        return [str(k) for k in yaml_models]
+    if isinstance(yaml_models, list):
+        return [str(m) for m in yaml_models]
+    return []
+
+
 def _build_dynamic_providers() -> tuple[list[dict], list[dict]]:
     """
     Build harness + provider lists by cross-referencing:
@@ -204,7 +219,7 @@ def _build_dynamic_providers() -> tuple[list[dict], list[dict]]:
             hp = hermes_providers[pid]
             yaml_models = hp.get("models", [])
             known_ids = {m["id"] for m in models}
-            for m_name in yaml_models:
+            for m_name in _yaml_model_ids(yaml_models):
                 if m_name not in known_ids:
                     models.append({
                         "id": m_name,
@@ -239,12 +254,12 @@ def _build_dynamic_providers() -> tuple[list[dict], list[dict]]:
         env_var = ""
         if "api_key_env" in hp:
             env_var = hp["api_key_env"]
-        yaml_models = hp.get("models", [])
+        model_ids = _yaml_model_ids(hp.get("models", []))
         models = [
             {"id": m, "name": m, "harnesses": ["hermes", "openclaw"]}
-            for m in yaml_models
+            for m in model_ids
         ]
-        default_model = hp.get("default_model", yaml_models[0] if yaml_models else "")
+        default_model = hp.get("default_model", model_ids[0] if model_ids else "")
         available = bool(os.environ.get(env_var, "")) if env_var else True
 
         providers_out.append({
