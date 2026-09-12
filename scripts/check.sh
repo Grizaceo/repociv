@@ -122,6 +122,19 @@ else
   printf "\033[1;33m[INFO]\033[0m knip found items (non-blocking)\\n"
 fi
 
+# mypy — gradual typing on server/ (non-blocking report; see [tool.mypy] in
+# pyproject.toml). Skipped gracefully where mypy isn't installed. Findings are
+# type-annotation imprecision on working code, not bugs; ratchet to blocking as
+# modules get annotated.
+log "mypy server/ (report only)"
+if ! command -v mypy >/dev/null 2>&1; then
+  printf "\033[1;33m[INFO]\033[0m mypy not installed — skipping (pip install mypy)\\n"
+elif mypy server/ 2>&1; then
+  printf "\033[1;32m[OK]\033[0m   mypy\\n"
+else
+  printf "\033[1;33m[INFO]\033[0m mypy found type issues (non-blocking)\\n"
+fi
+
 # Summary
 if (( ${#failures[@]} > 0 )); then
   printf "\n\033[1;31m%d check(s) failed:\033[0m\n" "${#failures[@]}"

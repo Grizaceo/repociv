@@ -102,7 +102,7 @@ def append_message(unit_id: str, role: str, content: str, meta: dict[str, Any] |
     meta = meta or {}
     with _locks.hold(f"session:{unit_id}"):
         canonical = get_or_create(unit_id)
-        entry = {
+        entry: dict[str, Any] = {
             "ts": _now_iso(),
             "role": role,
             "content": content,

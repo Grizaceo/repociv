@@ -36,3 +36,20 @@ ignore = [
 # style so vertex/face tables can be pasted into Blender's console in chunks.
 # Style-only rules; real defects (F-rules, E722, E741) stay enforced.
 "scripts/blender/*.py" = ["E701", "E702"]
+
+# ─── mypy (gradual typing on server/) ────────────────────────────────────────
+# Started 2026-09-12 (audit Fase 2). Lenient config so it is adoptable now:
+#   - ignore_missing_imports: no third-party stubs installed (duckdb, yaml, mcp…).
+#   - disable no-redef: server uses the `try: import X / except: X = None` optional-
+#     import fallback pervasively (~110 sites); that pattern is not a real redef.
+# It runs as a NON-BLOCKING report in scripts/check.sh for now (like knip) — the
+# residual findings are type-annotation imprecision on working code, not bugs.
+# Ratchet toward blocking as modules are annotated.
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+# no-redef: the optional-import fallback pattern (see above).
+# import-untyped: third-party deps ship no stubs (PyYAML etc.); installing
+#   types-* just for mypy is not worth a dependency. Suppress the stub hints.
+disable_error_code = ["no-redef", "import-untyped"]
+exclude = '(^|/)(test_.*|conftest)\.py$'

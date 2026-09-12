@@ -77,13 +77,13 @@ _ENTITY_PATTERNS = re.compile(
 )
 
 # Package manifest file names and their dependency extractors
-_MANIFEST_PARSERS: dict[str, tuple[re.Pattern, ...]] = {  # type: ignore[assignment]
+_MANIFEST_PARSERS: dict[str, tuple[re.Pattern[str], int, str]] = {
     "package.json": (re.compile(r'"(?:dependencies|devDependencies|peerDependencies)"\s*:\s*\{([^}]+)\}'), 0, "npm"),
     "Cargo.toml": (re.compile(r'^\[dependencies\]\s*$(.+?)(?:^\[|\Z)', re.MULTILINE | re.DOTALL), 0, "cargo"),
     "requirements.txt": (re.compile(r'^([a-zA-Z_][\w.-]*)', re.MULTILINE), 0, "pip"),
     "pyproject.toml": (re.compile(r'(?:dependencies|optional-dependencies)\s*=\s*\[\s*([^\]]+)\]'), 0, "pdm"),
     "go.mod": (re.compile(r'^\s+([a-zA-Z_][\w./-]+)\s+v?\d+\.', re.MULTILINE), 0, "go_mod"),
-    "Gemfile": (re.compile(r"^\s*gem\s+['\"]([\w-]+)['\"]"), re.MULTILINE, 0, "gem"),
+    "Gemfile": (re.compile(r"^\s*gem\s+['\"]([\w-]+)['\"]", re.MULTILINE), 0, "gem"),
 }
 
 # ─── Lock ──────────────────────────────────────────────────────────────────────

@@ -1213,7 +1213,7 @@ if __name__ == "__main__":
     # fatigue value (unit_fatigue_delta) still overrides it.
     def _fatigue_for(unit_id: str) -> int:
         manual = get_unit_fatigue(unit_id).get("fatigue")
-        if manual != 100:
+        if manual is not None and manual != 100:
             return int(manual)
         return _token_ledger.get_ledger().get_agent_fatigue(unit_id)
 
