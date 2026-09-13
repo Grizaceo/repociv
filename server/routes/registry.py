@@ -43,8 +43,6 @@ GET_EXACT: dict[str, Callable[..., Any]] = {
     "/api/config/default-harness": _routes.get_default_harness,
     "/log": _routes.get_log,
     "/tasks": _routes.get_tasks,
-    "/improve/reflect": _routes.get_improve_reflect,
-    "/improve/proposals": _routes.get_improve_proposals,
     "/providers/live": _routes.get_providers_live,
     "/api/hermes/status": _routes.get_hermes_status_route,
     "/api/kanban": _routes.get_kanban,

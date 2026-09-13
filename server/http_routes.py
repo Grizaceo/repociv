@@ -61,8 +61,6 @@ from server.routes.core import get_kanban  # noqa: F401
 from server.routes.core import get_kanban_boards  # noqa: F401
 from server.routes.tasks import get_tasks  # noqa: F401
 from server.routes.tasks import get_task_by_key  # noqa: F401
-from server.routes.tasks import get_improve_reflect  # noqa: F401
-from server.routes.tasks import get_improve_proposals  # noqa: F401
 from server.routes.graph import _resolve_cdaily_db  # noqa: F401
 from server.routes.graph import _infer_category  # noqa: F401
 from server.routes.graph import get_latest_news  # noqa: F401

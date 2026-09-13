@@ -220,17 +220,6 @@ Model selection based on task complexity and remaining token budget:
 This prevents using expensive frontier models for trivial tasks and
 guarantees the system stays within token budget.
 
-### Swarm Engine
-
-For missions that require multiple perspectives, the Swarm Engine:
-1. Decomposes the task into subtasks
-2. Assigns each subtask to the best-suited agent
-3. Runs them in parallel where possible
-4. Aggregates results back into a unified output
-
-Supports consensus mode (multiple agents vote on the same question) and
-parallel mode (each agent works on a different slice).
-
 ### Agent Cards
 
 Every agent in RepoCiv has a typed definition:
@@ -249,15 +238,6 @@ interface AgentCard {
 
 Agent Cards define what each agent can do, which model it uses by default,
 how many parallel tasks it handles, and what roles it fills in the swarm.
-
-### SICA (Self-Improving Cognitive Architecture)
-
-SICA observes usage patterns and generates proposals for improvement. It is
-**read-only by design**: proposals are suggestions for the human operator to
-review and apply manually. No automatic code modification.
-
-- `GET /improve/reflect` — patterns observed in usage
-- `GET /improve/proposals` — concrete, scoped improvement suggestions
 
 ### Persistence Layer
 
@@ -314,10 +294,8 @@ FRONTEND                          BACKEND (Python)                  AGENT (Herme
                               |
                         9. Security Harness gates operation
                               |
-                        10. Swarm Engine dispatches
-                              |
-                         11. Executor calls agent
-                              ------------------------>    12. Agent receives
+                        10. Executor calls agent
+                              ------------------------>    11. Agent receives
                                                               mission context
                                                               |
                                                            13. Agent works

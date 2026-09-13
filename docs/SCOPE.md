@@ -126,10 +126,14 @@ Tras 4-8 semanas de uso real, ejecutar este audit:
 2. **Telemetría de endpoints del bridge** — qué rutas se llaman desde el
    frontend. Endpoints muertos → borrar.
 
-3. **Audit de módulos del backend** — `self_improve.py`, `world_model.py`,
-   `swarm_engine.py`, `tensor_context.py` son los candidatos a evaluar.
-   Si la telemetría del Ledger no muestra impacto medible (tokens ahorrados,
-   accuracy mejorada), se mueven a `experimental/` o se borran.
+3. **Audit de módulos del backend** — evaluados 2026-09-13:
+   - `self_improve.py` (SICA) y `swarm_engine.py` → **retirados** (0 tráfico:
+     `/improve/proposals` 1 llamada histórica; el debate swarm ~nunca activado).
+   - `tensor_context.py` → **conservado**: es load-bearing (arma el contexto de
+     cada misión de agente en `step_executor`), pese a estar en esta lista.
+   - `world_model.py`, `frugal_router.py` → ya no existían.
+   Metodología: si la telemetría no muestra impacto medible, se mueve a
+   `experimental/` o se borra.
 
 El objetivo de la poda **no** es achicar por achicar — es bajar la
 superficie de mantenimiento a lo que efectivamente se usa.

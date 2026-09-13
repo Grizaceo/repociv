@@ -112,12 +112,6 @@ curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/path/to/workspace
 | `gpu_status` | VRAM, temperatura (nvidia-smi) |
 | `metrics_snapshot` | Throughput, latencia, circuitos abiertos |
 
-### Self-improvement / SICA
-| Tool | Descripción |
-|------|-------------|
-| `improve_reflect` | Patrones observados con confianza |
-| `improve_proposals` | Propuestas de mejora pendientes |
-
 ### Providers & Harnesses `[MUTATES parcial]`
 | Tool | Descripción |
 |------|-------------|

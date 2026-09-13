@@ -155,15 +155,6 @@ Acepta también `subagent_id` como alias. Response 200: `{"ok": true|false, "sub
 
 ---
 
-### Mejora Auto-dirigida (SICA)
-
-| Method | Path | Descripción |
-|--------|------|-------------|
-| GET | `/improve/reflect` | Patrones de mejora observados |
-| GET | `/improve/proposals` | Propuestas scopeadas y validadas |
-
----
-
 ### Configuración
 
 | Method | Path | Descripción |

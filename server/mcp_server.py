@@ -249,20 +249,6 @@ def metrics_snapshot() -> Any:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SELF-IMPROVEMENT / SICA
-# ══════════════════════════════════════════════════════════════════════════════
-
-@mcp.tool(description="SICA: patrones de comportamiento observados con confianza y evidencia.")
-def improve_reflect() -> Any:
-    return _get("/improve/reflect")
-
-
-@mcp.tool(description="SICA: propuestas de mejora scopeadas y schema-valid pendientes de revisión.")
-def improve_proposals() -> Any:
-    return _get("/improve/proposals")
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 # PROVIDERS & HARNESSES  [MUTATES parcial]
 # ══════════════════════════════════════════════════════════════════════════════
 

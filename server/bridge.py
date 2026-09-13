@@ -20,8 +20,6 @@ Endpoints:
   GET  /agents                    — agent status + heartbeat + queue depth
   GET  /agents/capabilities       — capability model (Fase 6)
   GET  /metrics                   — observability metrics (Fase 7)
-  GET  /improve/reflect           — SICA: list observed improvement patterns
-  GET  /improve/proposals         — SICA: list scoped, schema-valid proposals
   POST /commands                  — new Command Bus intake
   POST /commands/<id>/cancel      — cancel a queued command
   POST /approvals/<id>/approve    — approve a pending command

@@ -257,22 +257,6 @@ def test_metrics_snapshot():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# IMPROVE / SICA
-# ══════════════════════════════════════════════════════════════════════════════
-
-def test_improve_reflect():
-    with _mock_get({"patterns": []}) as m:
-        _mcp.improve_reflect()
-    assert "/improve/reflect" in m.call_args[0][0]
-
-
-def test_improve_proposals():
-    with _mock_get({"proposals": []}) as m:
-        _mcp.improve_proposals()
-    assert "/improve/proposals" in m.call_args[0][0]
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 # PROVIDERS & HARNESSES
 # ══════════════════════════════════════════════════════════════════════════════
 
