@@ -854,6 +854,26 @@ export function repocivPlugin(mapRoot: string): Plugin {
       return;
     }
 
+    // An unmatched /api/* is a routing mistake, never a page request. Without
+    // this guard it falls through to Vite's SPA fallback, which answers with
+    // index.html and a 200 — so a caller that forgot bridgeUrl() reads it as
+    // success and only fails later, parsing HTML as JSON, often inside a bare
+    // catch. That is exactly how the onboarding harness GET silently discarded
+    // the saved preference on every visit. Fail loudly and name the fix.
+    //
+    //   bare /api/x      → this middleware   (Vite-plugin routes only)
+    //   bridgeUrl('/api/x') → /bridge/api/x → proxy → Python bridge :5274
+    if (path.startsWith('/api/')) {
+      res.statusCode = 404;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(
+        JSON.stringify({
+          error: `No Vite-plugin API route for ${path}. If this is a bridge route, call it via bridgeUrl('${path}').`,
+        }),
+      );
+      return;
+    }
+
     next();
   };
 

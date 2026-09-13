@@ -12,6 +12,8 @@ import {
   removeMapRoot,
   pickMapRootFolder,
 } from '../map.ts';
+import { bridgeUrl, bridgeHeaders } from '../bridgeEnv.ts';
+import { logger } from '../logger.ts';
 
 const ROOT_ID = 'repo-onboarding';
 
@@ -817,15 +819,21 @@ async function hydrateHarness(state: OnboardingState, onContinue: () => void): P
     // selected. Otherwise default to hermes (the recommended choice).
     if (!state.selectedHarness) {
       try {
-        const res = await fetch('/api/config/default-harness');
+        // Bridge route, not a Vite-plugin route: it MUST go through bridgeUrl().
+        // A bare '/api/...' fetch lands on the Vite origin, which answers with
+        // index.html and a 200, so res.ok passes and res.json() then throws.
+        const res = await fetch(bridgeUrl('/api/config/default-harness'), {
+          headers: bridgeHeaders(),
+        });
         if (res.ok) {
           const data = (await res.json()) as { harness?: string | null };
           if (data.harness && options.some((o) => o.id === data.harness)) {
             state.selectedHarness = data.harness;
           }
         }
-      } catch {
+      } catch (error) {
         // server not reachable; the user can still pick manually
+        logger.warn('[onboarding] could not read saved harness:', error);
       }
       if (!state.selectedHarness) {
         const recommended = options.find((o) => o.recommended);
@@ -853,9 +861,9 @@ async function hydrateRoots(state: OnboardingState, onContinue: () => void): Pro
 }
 
 async function persistHarnessSelection(harness: string): Promise<void> {
-  const res = await fetch('/api/config/default-harness', {
+  const res = await fetch(bridgeUrl('/api/config/default-harness'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...bridgeHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ harness }),
   });
   if (!res.ok) {
