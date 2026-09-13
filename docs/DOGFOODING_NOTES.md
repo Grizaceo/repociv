@@ -5,6 +5,44 @@
 
 ---
 
+## 2026-09-13
+
+- Flujo probado: pasada de dogfooding/QA (Fase 4 del audit) sobre la app viva
+  (bridge+vite en systemd, `127.0.0.1:5273`), post Fase 0-3, enfocada **solo** en
+  las 4 cosas que el owner definió como core value. Manejada con Playwright real
+  (eventos de teclado, no synthetic).
+- **Qué funciona (las 4 cosas core están sanas):**
+  1. **Barra de agentes:** `Ctrl+Q/E/Shift+W` spawnean MAIN/SCOUT/WORKER → aparecen
+     como chips en el hero bar (0→3 verificado); no page errors.
+  2. **Repos-como-ciudades:** 49 ciudades legibles con nombre (CARCOSA, CAPITAL,
+     AGENTIC-LAB, docs, engme…).
+  3. **Affordances espaciales:** el badge de conteo por ciudad funciona (se ve un
+     "2" sobre el CAPITAL); `Space` cicla entre héroes idle (breadcrumb cambió
+     WORKER→Main); el breadcrumb de selección refleja el contexto ("⬡ MAIN·idle·
+     En espera de misión") → recall OK.
+  4. **Chat Hermes end-to-end:** seleccionar unidad (click chip) → `Enter` abre el
+     side-panel con `#chat-input` → mandar mensaje → `POST /bridge/commands`. El
+     event store confirma el round-trip completo: `execute_agent` → `AgentOutputChunk`
+     → `CommandCompleted result="hola"`. La UI muestra mi mensaje, la burbuja de
+     MAIN, y un ticker "MAIN trabajando…".
+- **Fricción encontrada (para uso diario):**
+  - **[media-alta] Latencia del chat de MAIN ~55s** para responder "hola".
+    `CommandStarted`→`CommandCompleted` = 55s: cada mensaje **cold-bootea una sesión
+    de agente completa** (los AgentOutputChunk muestran preámbulo de identidad/misión
+    + cwd + session_id antes del "hola"). Mitigado por el ticker "trabajando…", pero
+    doloroso para chats rápidos. Es arquitectural (MAIN = agente pesado), no un bug.
+    *Recomendación:* para quick-chats, un perfil/modelo más liviano (el selector
+    Hermes/provider ya existe en el header del chat), o sesiones warm reusables.
+  - **[baja] Naming de chips:** todo agente spawneado se rotula "Agente Principal N"
+    sin importar el tipo (un SCOUT dice "SCOUT Agente Principal 2") — identidad confusa.
+  - **[baja] Discoverability del chat:** hay que **seleccionar** una unidad (click en
+    el chip) y *luego* `Enter`; durante la carga el hero bar muestra un placeholder
+    "Desplegando el mapa…" que se puede cliquear por error. Una vez abierto, el empty
+    state ("SILENCIO EN LA SALA DEL TRONO — escribe un decreto…") guía bien.
+- Veredicto: **las 4 cosas core funcionan** tras Fase 0-3; la app está en condiciones
+  de uso diario. La fricción #1 es la latencia del chat de MAIN (arquitectural). Nada
+  bloqueante; ningún error de página en toda la pasada.
+
 ## 2026-05-28
 
 - Flujo probado: sesión de evaluación de roadmap + corrida del loop de sanidad (check / lint / format / pytest / healthcheck / smoke-test) contra el sistema vivo en systemd.
