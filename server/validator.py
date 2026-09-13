@@ -273,13 +273,15 @@ def _run_build_check(repo: str, issue_id: str) -> dict[str, Any]:
         repo_path = Path(cfg.get("path", "."))
         # argv + shell=False: buildCommand comes from the repo config file and must
         # never be interpreted by a shell (no metacharacter/command injection).
+        # Compound commands (&&, ||, |, redirects) are NOT supported by design —
+        # configure a single command, or point buildCommand at a script.
         argv = shlex.split(build_cmd)
         if not argv:
             return {
                 "id": "build-clean",
                 "label": "Build is clean",
                 "passed": True,
-                "detail": "No buildCommand configured, skipping",
+                "detail": "buildCommand is blank, skipping",
             }
         result = subprocess.run(
             argv, cwd=str(repo_path),

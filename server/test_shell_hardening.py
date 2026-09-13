@@ -80,3 +80,30 @@ def test_validator_build_check_whitespace_command_skips(monkeypatch) -> None:
     assert result["passed"] is True
     assert "skipping" in result["detail"]
     assert "args" not in rec  # subprocess.run must not run for a whitespace command
+
+
+def test_healthcheck_missing_binary_degrades_not_raises() -> None:
+    """shell=False raises FileNotFoundError where shell=True returned rc=127; a
+    missing health binary must degrade to ok:False, never raise out of healthcheck()."""
+    adapter = ra.RuntimeAdapter(
+        harness_id="x",
+        descriptor={"health": {"kind": "command", "command": "no-such-binary-xyz-42 --check"}},
+    )
+
+    result = adapter.healthcheck()  # must not raise
+
+    assert result["ok"] is False
+    assert result["status"] == "failed"
+
+
+def test_healthcheck_unbalanced_quote_degrades_not_raises() -> None:
+    """shlex.split raises ValueError on an unbalanced quote; that must degrade too."""
+    adapter = ra.RuntimeAdapter(
+        harness_id="x",
+        descriptor={"health": {"kind": "command", "command": "echo 'unterminated"}},
+    )
+
+    result = adapter.healthcheck()  # must not raise
+
+    assert result["ok"] is False
+    assert result["status"] in ("missing-command", "failed")
