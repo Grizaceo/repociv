@@ -18,7 +18,8 @@ from playwright.sync_api import sync_playwright
 from scipy import ndimage
 from PIL import Image
 
-OUT = Path("/home/gris/.hermes/workspace/repos/repociv/.hermes/artifacts/3d-audit")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+OUT = REPO_ROOT / ".hermes" / "artifacts" / "3d-audit"
 OUT.mkdir(parents=True, exist_ok=True)
 
 

@@ -141,7 +141,7 @@ describe('findMatchingNativeProfile', () => {
   });
 
   it('matches an absolute path ending in /profiles/<name>', () => {
-    expect(findMatchingNativeProfile(NATIVE, '/home/gris/.hermes/profiles/main')).toBe('main');
+    expect(findMatchingNativeProfile(NATIVE, '/home/gris96/.hermes/profiles/main')).toBe('main');
   });
 
   it('returns null for an empty or unknown path', () => {
