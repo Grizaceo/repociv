@@ -24,6 +24,7 @@ import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { areCityPropsReady } from './CityProps3D.ts';
+import { areCityWallsReady } from './CityWalls3D.ts';
 import { PROP_SURFACE_CLEARANCE, terrainSurfaceY } from './terrainSurfaceY.ts';
 
 const cityGroup = new Group();
@@ -370,7 +371,7 @@ export function rebuildCityClusters(
     // incomplete walls (they're underground). A per-instance Y-scale
     // controls how much of the wall is visible.
     const wallCount = normalCities.length;
-    const towerCount = normalCities.length * 6; // 6 towers (one per hex vertex)
+    const towerCount = areCityWallsReady() ? 0 : normalCities.length * 6; // 6 towers (one per hex vertex)
     const towerRoofCount = towerCount;
 
     clusterMesh = new InstancedMesh(bldGeom, bldMat, bldCount);
@@ -444,8 +445,10 @@ export function rebuildCityClusters(
 
       // Perimeter wall: ONE closed hexagonal ring centered on the city,
       // sitting on top of the plaza (plaza top ≈ base.y + 1.5 + HEX_SIZE*0.05).
-      const wallY = surfaceY + PROP_SURFACE_CLEARANCE;
-      {
+      // Suppressed when the KayKit modular wall kit is live — otherwise the
+      // procedural ring and the modular pieces z-fight on the same radius.
+      if (!areCityWallsReady()) {
+        const wallY = surfaceY + PROP_SURFACE_CLEARANCE;
         const m = new Matrix4().makeTranslation(base.x, wallY, base.z);
         // Scale Y by wall completeness: 0 = fully underground, 1 = full height.
         m.scale(new Vector3(1, wallComplete, 1));
@@ -453,26 +456,34 @@ export function rebuildCityClusters(
       }
 
       // Corner towers: 6 towers (one per hex vertex), with conical roofs.
-      const towerAngles = [
-        0,
-        Math.PI / 3,
-        (2 * Math.PI) / 3,
-        Math.PI,
-        (4 * Math.PI) / 3,
-        (5 * Math.PI) / 3,
-      ];
+      // Skipped entirely when the KayKit wall kit is live — its own faction
+      // towers sit at these same vertices.
+      const towerAngles = areCityWallsReady()
+        ? []
+        : [
+            0,
+            Math.PI / 3,
+            (2 * Math.PI) / 3,
+            Math.PI,
+            (4 * Math.PI) / 3,
+            (5 * Math.PI) / 3,
+          ];
       const towerYScale = Math.max(0, wallComplete);
       for (const ca of towerAngles) {
         const tx = base.x + Math.cos(ca) * HEX_SIZE * 0.42;
         const tz = base.z + Math.sin(ca) * HEX_SIZE * 0.42;
-        const towerM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.14, tz);
+        const towerM = new Matrix4().makeTranslation(
+          tx,
+          surfaceY + PROP_SURFACE_CLEARANCE + HEX_SIZE * 0.14,
+          tz,
+        );
         towerM.scale(new Vector3(1, towerYScale, 1));
         towerMesh.setMatrixAt(towerIdx++, towerM);
 
         // Tower roof cone sits on top of the tower (half-height offset).
         const roofM = new Matrix4().makeTranslation(
           tx,
-          wallY + HEX_SIZE * 0.14 + HEX_SIZE * 0.14 * towerYScale + HEX_SIZE * 0.05,
+          surfaceY + PROP_SURFACE_CLEARANCE + HEX_SIZE * 0.14 + HEX_SIZE * 0.14 * towerYScale + HEX_SIZE * 0.05,
           tz,
         );
         roofM.scale(new Vector3(1, towerYScale, 1));

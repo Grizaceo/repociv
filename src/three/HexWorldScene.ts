@@ -83,6 +83,13 @@ import {
   rebuildCityProps,
   clearCityProps,
 } from './CityProps3D.ts';
+import {
+  getCityWallsGroup,
+  ensureCityWallsLoad,
+  areCityWallsSettled,
+  rebuildCityWalls,
+  clearCityWalls,
+} from './CityWalls3D.ts';
 import { ensureUnitPropsLoad } from './UnitProps3D.ts';
 import { getTileFlashGroup, flashTile, tickTileFlash, clearTileFlash } from './TileFlash3D.ts';
 import { getTilePopupGroup, clearTilePopup } from './TilePopup3D.ts';
@@ -178,6 +185,7 @@ let sunLight: DirectionalLight | null = null;
 let atlasLoadStarted = false;
 let loadedTerrainAtlas: LoadedTerrainAtlas | null = null;
 let areCityPropsSettledCalled = false;
+let areCityWallsSettledCalled = false;
 
 // Fixed late-afternoon sun. Stable position is the whole point: the old
 // code re-set sunLight.position every frame and made shadows swim.
@@ -227,6 +235,7 @@ export function createHexWorldScene(): Scene {
   scene.add(getForestPropsGroup());
   scene.add(getCityGroup());
   scene.add(getCityPropsGroup());
+  scene.add(getCityWallsGroup());
   scene.add(getResourcePropsGroup());
   scene.add(getTerrainScatterGroup());
   scene.add(getTileYieldsGroup());
@@ -245,6 +254,7 @@ export function createHexWorldScene(): Scene {
   ensureMountainPropsLoad();
   ensureForestPropsLoad();
   ensureCityPropsLoad();
+  ensureCityWallsLoad();
   ensureUnitPropsLoad();
   ensureResourcePropsLoad();
   ensureTerrainScatterLoad();
@@ -1212,7 +1222,9 @@ export function updateHexWorldScene(
   const atlasJustLoaded = !terrainMesh && loadedTerrainAtlas !== null;
   const propsJustLoaded = !areCityPropsSettledCalled && areCityPropsSettled();
   if (propsJustLoaded) areCityPropsSettledCalled = true;
-  if (!stateDirty && !atlasJustLoaded && !propsJustLoaded) return;
+  const wallsJustLoaded = !areCityWallsSettledCalled && areCityWallsSettled();
+  if (wallsJustLoaded) areCityWallsSettledCalled = true;
+  if (!stateDirty && !atlasJustLoaded && !propsJustLoaded && !wallsJustLoaded) return;
   rebuildTerrainMesh(state, opts.fogEnabled, picker);
   rebuildGround(state);
   // Detect newly-revealed tiles and start fog fade-out transitions +
@@ -1234,6 +1246,7 @@ export function updateHexWorldScene(
   setCitiesVisible(opts.showStructure);
   rebuildCityClusters(state.world.cities, (key) => state.world.tiles.get(key), opts.lod);
   rebuildCityProps(state.world.cities, (key) => state.world.tiles.get(key), opts.lod);
+  rebuildCityWalls(state.world.cities, (key) => state.world.tiles.get(key), opts.lod);
   rebuildTileYields(Array.from(state.world.tiles.values()), opts.lod, opts.showStructure);
 
   setUnitsVisible(true);
@@ -1256,6 +1269,7 @@ export function disposeHexWorldScene(scene: Scene): void {
   clearMountainProps();
   clearForestProps();
   clearCityProps();
+  clearCityWalls();
   clearResourceProps();
   clearTerrainScatter();
   clearTileYields();
@@ -1269,6 +1283,7 @@ export function disposeHexWorldScene(scene: Scene): void {
   clearTilePopup();
   clearFogTransition();
   areCityPropsSettledCalled = false;
+  areCityWallsSettledCalled = false;
   if (terrainMesh) {
     terrainGroup.remove(terrainMesh);
     terrainMesh.dispose();
