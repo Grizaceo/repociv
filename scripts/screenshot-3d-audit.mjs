@@ -116,7 +116,11 @@ const CAMERAS = [
 ];
 
 async function main() {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    // CFT chrome (full) — headless-shell build can't be fetched on this host.
+    channel: process.env.PLAYWRIGHT_CHROMIUM_CHANNEL ?? 'chromium',
+  });
   const context = await browser.newContext({
     viewport: { width: 1280, height: 720 },
     deviceScaleFactor: 1,
