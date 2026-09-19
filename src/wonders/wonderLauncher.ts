@@ -14,6 +14,19 @@ import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import { invalidateWondersCache } from './manifest.ts';
 import type { WonderManifest } from './types.ts';
 
+/**
+ * URL to mount once the launcher reports ready. Prefer the launcher's URL
+ * (it may be an adopted server, not the manifest's) — unless ui.url is
+ * relative: that wonder is served through RepoCiv's own origin
+ * (/wonder-proxy/<id>/, vite-plugins/wonderProxy.ts), and the launcher's
+ * loopback URL would point at the viewer's own machine when RepoCiv is opened
+ * from another host.
+ */
+export function resolveMountUrl(manifestUrl: string, launcherUiUrl: string | undefined): string {
+  if (!launcherUiUrl || manifestUrl.startsWith('/')) return manifestUrl;
+  return launcherUiUrl === manifestUrl.replace(/\/$/, '') ? manifestUrl : launcherUiUrl;
+}
+
 export type WonderLaunchStatusValue =
   | 'offline'
   | 'starting'

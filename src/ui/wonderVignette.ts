@@ -11,7 +11,11 @@ import {
   startWonderListener,
   stopWonderListener,
 } from '../wonders/postMessageBridge.ts';
-import { pollWonderUntilReady, type WonderLaunchStatus } from '../wonders/wonderLauncher.ts';
+import {
+  pollWonderUntilReady,
+  resolveMountUrl,
+  type WonderLaunchStatus,
+} from '../wonders/wonderLauncher.ts';
 import type { WonderManifest } from '../wonders/types.ts';
 import { renderCapabilityBadge } from '../wonders/wonderBadges.ts';
 
@@ -410,14 +414,16 @@ async function _pollUntilReady(body: HTMLElement, type: WonderType): Promise<boo
       onUpdate: (s) => renderProgress(s),
     });
     if (status.ready && (status.status === 'ready' || status.status === 'already_running')) {
-      // Mount the iframe with the URL reported by the launcher (which
-      // may be the adopted one, not the primary UI URL).
+      // Mount the iframe with the URL reported by the launcher (which may be
+      // the adopted one) unless ui.url is same-origin — see resolveMountUrl.
       const manifest = getWonder(type);
       if (!manifest) return false;
+      const manifestUrl = manifest.ui.url ?? '';
+      const mountUrl = resolveMountUrl(manifestUrl, status.ui_url);
       const mountManifest =
-        status.ui_url && status.ui_url !== (manifest.ui.url ?? '').replace(/\/$/, '')
-          ? { ...manifest, ui: { ...manifest.ui, url: status.ui_url } }
-          : manifest;
+        mountUrl === manifestUrl
+          ? manifest
+          : { ...manifest, ui: { ...manifest.ui, url: mountUrl } };
       _mountIframe(body, mountManifest, type);
       return true;
     }

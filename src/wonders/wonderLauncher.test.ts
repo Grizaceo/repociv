@@ -6,6 +6,7 @@ import {
   isAutoStartWondersEnabled,
   launchWonder,
   pollWonderUntilReady,
+  resolveMountUrl,
   setAutoStartWondersEnabled,
   stopWonder,
 } from './wonderLauncher.ts';
@@ -279,5 +280,23 @@ describe('wonderLauncher client (F3)', () => {
       });
       expect(isAutoStartWondersEnabled()).toBe(true);
     });
+  });
+});
+
+describe('resolveMountUrl', () => {
+  it('prefers the launcher URL for absolute manifests (adopted servers)', () => {
+    expect(resolveMountUrl('http://127.0.0.1:9998/', 'http://127.0.0.1:9998')).toBe(
+      'http://127.0.0.1:9998/',
+    );
+    expect(resolveMountUrl('http://127.0.0.1:9998', 'http://127.0.0.1:9997')).toBe(
+      'http://127.0.0.1:9997',
+    );
+    expect(resolveMountUrl('http://127.0.0.1:9998', '')).toBe('http://127.0.0.1:9998');
+    expect(resolveMountUrl('http://127.0.0.1:9998', undefined)).toBe('http://127.0.0.1:9998');
+  });
+
+  it('keeps a relative (same-origin proxied) ui.url', () => {
+    const rel = '/wonder-proxy/ghostdesk/?auto=1&path=wonder-proxy/ghostdesk/websockify';
+    expect(resolveMountUrl(rel, 'http://127.0.0.1:6080')).toBe(rel);
   });
 });

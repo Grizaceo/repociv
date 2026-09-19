@@ -3,6 +3,7 @@ import { defineConfig, loadEnv } from 'vite';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { repocivPlugin, expandUser } from './vite-plugins/repociv.ts';
+import { wonderProxyConfig } from './vite-plugins/wonderProxy.ts';
 
 const DEFAULT_MAP_ROOT = join(homedir(), '.hermes', 'workspace', 'repos');
 
@@ -87,6 +88,10 @@ export default defineConfig(({ mode }) => {
           secure: false,
           rewrite: (path) => path.replace(/^\/dashboard/, ''),
         },
+        // Iframe wonders served on this origin (/wonder-proxy/<id>/, ws too) so
+        // they work from other machines while the service stays on loopback.
+        // Opt-in per wonder via REPOCIV_WONDER_PROXIES — see vite-plugins/wonderProxy.ts.
+        ...wonderProxyConfig(env.REPOCIV_WONDER_PROXIES),
       },
     },
     test: {
