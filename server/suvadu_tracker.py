@@ -1,9 +1,15 @@
-"""Suvadu → RepoCiv: external AI-agent sessions as ephemeral map units.
+"""External AI-agent sessions → RepoCiv: ephemeral map units + Agents panel.
 
-Suvadu (`suv`, github.com/AppachiTech/suvadu) records the Claude Code / Codex /
-Cursor / OpenCode sessions that run on this machine, whoever launched them.
-This module polls its CLI every ~30 s and mirrors the recently active sessions
-onto the map:
+Two sources feed one tracker (``AgentSource``):
+
+  * Suvadu (`suv`, github.com/AppachiTech/suvadu) records the Claude Code /
+    Codex / Cursor / OpenCode sessions that run on this machine, whoever
+    launched them (``SuvaduSource``, below).
+  * Hermes keeps its own sessions in ``~/.hermes/state.db`` and one state.db
+    per profile (``server/hermes_sessions.py``).
+
+The tracker polls every ~30 s and mirrors the recently active sessions onto
+the map:
 
   * spawn   — a session with activity in the last WINDOW minutes becomes an
               ephemeral unit ``ext-<agent>-<native_id[:8]>`` in the city whose
@@ -43,7 +49,7 @@ import subprocess
 import threading
 import time
 from dataclasses import dataclass, replace
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Protocol, Sequence
 
 SendFn = Callable[[dict[str, Any]], None]
 RepoPathsFn = Callable[[], list[str]]
@@ -64,8 +70,12 @@ _UNIT_TYPES = {"claude-code": "claude", "claude": "claude", "codex": "codex"}
 _DEFAULT_UNIT_TYPE = "scout"
 
 
-class SuvaduError(Exception):
-    """A `suv` call failed. ``str(err)`` is a short code safe for /health."""
+class SourceError(Exception):
+    """A source could not be read. ``str(err)`` is a short code safe for /health."""
+
+
+class SuvaduError(SourceError):
+    """A `suv` call failed."""
 
 
 # ─── Config ──────────────────────────────────────────────────────────────────
@@ -144,6 +154,15 @@ class Observation:
     total_tokens: int | None
     parent_id: str | None = None
     imported: bool = True  # False: seen only through the history heartbeat
+    # Set by sources other than Suvadu; the defaults describe a Suvadu session.
+    source: str = "suvadu"
+    unit_id: str = ""  # "" → unit_id_for(agent, native_id)
+    unit_type: str = ""  # "" → unit_type_for(agent)
+    label: str = ""  # "" → "<agent> · <model>"
+    section: str = ""  # "" → map + Activos; "cron" / "gateway" → panel only
+    ended: bool = False  # the source knows the session is over → off the map
+    profile: str = ""
+    origin: str = ""  # how the session was started (Hermes: cli, desktop, cron…)
 
 
 def _as_int(value: Any) -> int | None:
@@ -396,7 +415,17 @@ def unit_type_for(agent: str) -> str:
 
 
 def _mission_for(obs: Observation) -> str:
+    if obs.label:
+        return obs.label
     return f"{obs.agent} · {obs.model}" if obs.model else obs.agent
+
+
+def _unit_id(obs: Observation) -> str:
+    return obs.unit_id or unit_id_for(obs.agent, obs.native_id)
+
+
+def _unit_type(obs: Observation) -> str:
+    return obs.unit_type or unit_type_for(obs.agent)
 
 
 def transcript_path(agent: str, native_id: str, *, home: str | None = None) -> str | None:
@@ -442,6 +471,127 @@ def _chat_message(event: Any) -> dict[str, Any] | None:
     }
 
 
+# ─── Sources ─────────────────────────────────────────────────────────────────
+class AgentSource(Protocol):
+    """Where external sessions come from. ``poll`` runs on the tracker thread;
+    ``refresh`` / ``chat`` run on HTTP threads, only for sessions the tracker
+    listed."""
+
+    name: str
+
+    def poll(self) -> list[Observation]:
+        """Sessions seen now (metadata only). Raises SourceError when unreadable."""
+        ...
+
+    def status(self) -> dict[str, Any]:
+        """Source-specific health fields for /health — no session data."""
+        ...
+
+    def refresh(self, obs: Observation) -> str:
+        """Make the source's copy of the chat fresher, if it needs that."""
+        ...
+
+    def chat(self, obs: Observation, *, limit: int) -> dict[str, Any]:
+        """``{"messages", "hasMore", "available"[, "error"]}``, oldest first.
+        May raise SourceError."""
+        ...
+
+
+class SuvaduSource:
+    """``suv agent sessions`` plus the live ``suv history`` heartbeat."""
+
+    name = "suvadu"
+
+    def __init__(
+        self,
+        run: RunFn,
+        clock: Callable[[], float] = time.time,
+        *,
+        owned_ids: Callable[[], frozenset[str]] = frozenset,
+    ) -> None:
+        """``owned_ids``: native ids of the Claude sessions RepoCiv launched
+        itself (server/claude_sessions.py) — their mission unit already shows them."""
+        self._run = run
+        self._clock = clock
+        self._owned_ids = owned_ids
+        self._heartbeat: bool | None = None
+        self._imported_at: dict[str, float] = {}
+
+    def poll(self) -> list[Observation]:
+        self._heartbeat = None
+        sessions = parse_sessions(self._run(["agent", "sessions", "--limit", str(_SESSIONS_LIMIT)]))
+        try:
+            beats = parse_history(
+                self._run(["history", "--executor", "agent", "--json", "-n", str(_HISTORY_LIMIT)])
+            )
+        except Exception:
+            beats, self._heartbeat = {}, False
+        else:
+            self._heartbeat = True
+        observations = merge(sessions, beats)
+        try:
+            owned = self._owned_ids()
+        except Exception:
+            owned = frozenset()
+        if not owned:
+            return observations
+        def mine(session: str | None) -> bool:
+            return bool(session) and (session in owned or _native_of(session or "") in owned)
+
+        # Skip RepoCiv's own missions and the subagents they spawned.
+        return [obs for obs in observations if obs.native_id not in owned and not mine(obs.parent_id)]
+
+    def status(self) -> dict[str, Any]:
+        return {"heartbeat": self._heartbeat}
+
+    def refresh(self, obs: Observation) -> str:
+        """Ask Suvadu to re-import the native transcript (it only does so itself on
+        prompt/stop, so a long turn would otherwise read stale)."""
+        now = self._clock()
+        if now - self._imported_at.get(obs.session_id, 0.0) < _IMPORT_MIN_INTERVAL_S:
+            return "throttled"
+        path = transcript_path(obs.agent, obs.native_id)
+        if path is None:
+            return "no_transcript"
+        self._imported_at[obs.session_id] = now
+        try:
+            self._run(["agent", "import-session", path])
+        except Exception:
+            return "failed"
+        return "ok"
+
+    def chat(self, obs: Observation, *, limit: int) -> dict[str, Any]:
+        """Last ``limit`` prompts/responses, paging back from the end."""
+        session_id = obs.session_id
+        try:
+            head = json.loads(self._run(["agent", "session", session_id, "--limit", "1"]))
+            total = _as_int((head.get("session") or {}).get("event_count")) or 0
+        except (ValueError, AttributeError) as exc:
+            raise SuvaduError("bad_json") from exc  # SuvaduError itself (e.g. not imported) propagates
+        out: dict[str, Any] = {}
+        messages: list[dict[str, Any]] = []
+        offset = max(0, total - _EVENT_PAGE)
+        try:
+            for _ in range(_MAX_EVENT_PAGES):
+                page = json.loads(self._run([
+                    "agent", "session", session_id,
+                    "--limit", str(_EVENT_PAGE), "--offset", str(offset),
+                ]))
+                batch = [m for m in map(_chat_message, page.get("events") or []) if m]
+                messages = batch + messages
+                if len(messages) >= limit or offset == 0:
+                    break
+                offset = max(0, offset - _EVENT_PAGE)
+        except (SuvaduError, ValueError, AttributeError) as exc:
+            out["error"] = str(exc) if isinstance(exc, SuvaduError) else "bad_json"
+        out.update(
+            available=True,
+            hasMore=offset > 0 or len(messages) > limit,
+            messages=messages[-limit:],
+        )
+        return out
+
+
 # ─── Tracker ─────────────────────────────────────────────────────────────────
 class ExternalAgentTracker:
     """Owns the ext-* units. poll_once() is the only writer; snapshot() reads."""
@@ -454,47 +604,44 @@ class ExternalAgentTracker:
         repo_paths: RepoPathsFn = selected_repo_paths,
         run: RunFn | None = None,
         clock: Callable[[], float] = time.time,
+        sources: Sequence[AgentSource] | None = None,
     ) -> None:
+        """``sources`` defaults to Suvadu alone, driven by ``run`` (or the real CLI)."""
         self.config = config
         self._send = send
         self._repo_paths = repo_paths
-        self._run: RunFn = run or (lambda args: run_suv(config.bin_path, args, config.timeout_s))
         self._clock = clock
+        if sources is None:
+            suv_run: RunFn = run or (lambda args: run_suv(config.bin_path, args, config.timeout_s))
+            sources = [SuvaduSource(suv_run, clock)]
+        self._sources: dict[str, AgentSource] = {src.name: src for src in sources}
         self._lock = threading.Lock()
         self._units: dict[str, dict[str, Any]] = {}  # session_id → unit record
         self._rows: list[dict[str, Any]] = []  # recent sessions, Agents panel
-        self._natives: dict[str, tuple[str, str]] = {}  # session_id → (agent, native_id)
-        self._imported_at: dict[str, float] = {}
-        self._last_obs: list[Observation] = []
-        self._status: dict[str, Any] = {
-            "ok": None,
-            "error": None,
-            "heartbeat": None,
-            "lastPollAt": None,
+        self._listed: dict[str, Observation] = {}  # session_id → its row's observation
+        self._last_obs: dict[str, list[Observation]] = {}  # per source
+        self._status: dict[str, dict[str, Any]] = {
+            name: {"ok": None, "error": None, "lastPollAt": None} for name in self._sources
         }
 
     # -- polling -------------------------------------------------------------
     def poll_once(self) -> None:
-        """One poll cycle. Never raises."""
-        try:
-            sessions = parse_sessions(self._run(["agent", "sessions", "--limit", str(_SESSIONS_LIMIT)]))
-        except SuvaduError as exc:
-            self._set_status(ok=False, error=str(exc), heartbeat=None)
-            observations = self._last_obs  # age out what we already show
-        except Exception:
-            self._set_status(ok=False, error="unexpected", heartbeat=None)
-            observations = self._last_obs
-        else:
-            heartbeat_ok = True
+        """One poll cycle over every source. Never raises; a failing source keeps
+        its last observations so its units age out instead of vanishing."""
+        observations: list[Observation] = []
+        for name, source in self._sources.items():
             try:
-                beats = parse_history(
-                    self._run(["history", "--executor", "agent", "--json", "-n", str(_HISTORY_LIMIT)])
-                )
+                seen = source.poll()
+            except SourceError as exc:
+                self._set_status(name, ok=False, error=str(exc))
+                seen = self._last_obs.get(name, [])
             except Exception:
-                beats, heartbeat_ok = {}, False
-            observations = merge(sessions, beats)
-            self._last_obs = observations
-            self._set_status(ok=True, error=None, heartbeat=heartbeat_ok)
+                self._set_status(name, ok=False, error="unexpected")
+                seen = self._last_obs.get(name, [])
+            else:
+                self._last_obs[name] = seen
+                self._set_status(name, ok=True, error=None)
+            observations.extend(seen)
         try:
             repo_paths = self._repo_paths()
         except Exception:
@@ -516,10 +663,11 @@ class ExternalAgentTracker:
         working_ms = self.config.working_s * 1000
         desired: dict[str, Observation] = {}
         for obs in observations:
-            if now_ms - obs.last_activity_ms <= window_ms:
-                prev = desired.get(obs.session_id)
-                if prev is None or obs.last_activity_ms > prev.last_activity_ms:
-                    desired[obs.session_id] = obs
+            if obs.section or obs.ended or now_ms - obs.last_activity_ms > window_ms:
+                continue  # panel-only, finished, or quiet for too long
+            prev = desired.get(obs.session_id)
+            if prev is None or obs.last_activity_ms > prev.last_activity_ms:
+                desired[obs.session_id] = obs
 
         candidates = city_candidates(repo_paths)
         cities: dict[str, tuple[str, str]] = {}
@@ -545,8 +693,8 @@ class ExternalAgentTracker:
                     rec = None
                 if rec is None:
                     rec = {
-                        "unit": unit_id_for(obs.agent, obs.native_id),
-                        "unitType": unit_type_for(obs.agent),
+                        "unit": _unit_id(obs),
+                        "unitType": _unit_type(obs),
                         "cityId": city_id,
                         "state": "idle",  # GameState.spawnUnit starts every unit idle
                     }
@@ -566,7 +714,7 @@ class ExternalAgentTracker:
                     eventCount=obs.event_count,
                     totalTokens=obs.total_tokens,
                 )
-            self._rows, self._natives = self._recent_rows(observations, now_ms, city_of)
+            self._rows, self._listed = self._recent_rows(observations, now_ms, city_of)
         return events
 
     def _recent_rows(
@@ -574,27 +722,43 @@ class ExternalAgentTracker:
         observations: list[Observation],
         now_ms: int,
         city_of: Callable[[str], tuple[str, str]],
-    ) -> tuple[list[dict[str, Any]], dict[str, tuple[str, str]]]:
-        """Every session active within recent_s, newest first (caller holds the lock)."""
+    ) -> tuple[list[dict[str, Any]], dict[str, Observation]]:
+        """Every session active within recent_s, newest first (caller holds the lock).
+
+        A panel-only session (``section``) never has a unit; it still reads as
+        working / idle while it is live, like the map ones."""
         recent_ms = self.config.recent_s * 1000
+        window_ms = self.config.window_s * 1000
+        working_ms = self.config.working_s * 1000
         rows: list[dict[str, Any]] = []
-        natives: dict[str, tuple[str, str]] = {}
+        listed: dict[str, Observation] = {}
         for obs in sorted(observations, key=lambda o: o.last_activity_ms, reverse=True):
-            if obs.session_id in natives or now_ms - obs.last_activity_ms > recent_ms:
+            age_ms = max(0, now_ms - obs.last_activity_ms)
+            if obs.session_id in listed or age_ms > recent_ms:
                 continue
-            natives[obs.session_id] = (obs.agent, obs.native_id)
+            listed[obs.session_id] = obs
             city_id, repo = city_of(obs.cwd)
             rec = self._units.get(obs.session_id)
+            if rec is not None:
+                active, state = True, rec["state"]
+            elif obs.section and not obs.ended and age_ms <= window_ms:
+                active, state = True, "working" if age_ms <= working_ms else "idle"
+            else:
+                active, state = False, "inactive"
             rows.append({
                 "sessionId": obs.session_id,
+                "source": obs.source,
                 "agent": obs.agent,
+                "profile": obs.profile,
+                "origin": obs.origin,
+                "section": obs.section,
                 "model": obs.model,
                 "repo": repo,
                 "cityId": city_id,
-                "active": rec is not None,
-                "state": rec["state"] if rec is not None else "inactive",
+                "active": active,
+                "state": state,
                 "unit": rec["unit"] if rec is not None else None,
-                "unitType": unit_type_for(obs.agent),
+                "unitType": _unit_type(obs),
                 "firstActivityAt": obs.first_activity_ms,
                 "lastActivityAt": obs.last_activity_ms,
                 "commandCount": obs.command_count,
@@ -603,7 +767,7 @@ class ExternalAgentTracker:
                 "subagent": obs.parent_id is not None,
                 "imported": obs.imported,
             })
-        return rows, natives
+        return rows, listed
 
     @staticmethod
     def _spawn_event(rec: dict[str, Any], obs: Observation) -> dict[str, Any]:
@@ -619,13 +783,36 @@ class ExternalAgentTracker:
         }
 
     # -- read side -----------------------------------------------------------
-    def _set_status(self, *, ok: bool, error: str | None, heartbeat: bool | None) -> None:
+    def _set_status(self, name: str, *, ok: bool, error: str | None) -> None:
         with self._lock:
-            self._status.update(ok=ok, error=error, heartbeat=heartbeat, lastPollAt=self._clock())
+            self._status[name].update(ok=ok, error=error, lastPollAt=self._clock())
+
+    def source(self, name: str) -> AgentSource | None:
+        return self._sources.get(name)
+
+    def source_ok(self, name: str) -> bool:
+        with self._lock:
+            return bool(self._status.get(name, {}).get("ok"))
 
     def status(self) -> dict[str, Any]:
+        """Overall health plus one entry per source. ``ok`` is true only when every
+        source's last poll worked; ``error`` is the first failing source's code."""
+        extras = {name: src.status() for name, src in self._sources.items()}
         with self._lock:
-            return {"enabled": True, **self._status, "units": len(self._units)}
+            per = {name: {**st, **extras[name]} for name, st in self._status.items()}
+            units = len(self._units)
+        oks = [st["ok"] for st in per.values()]
+        errors = [st["error"] for st in per.values() if st["error"]]
+        polls = [st["lastPollAt"] for st in per.values() if st["lastPollAt"] is not None]
+        return {
+            "enabled": True,
+            "ok": None if not oks or None in oks else all(oks),
+            "error": errors[0] if errors else None,
+            "heartbeat": per.get("suvadu", {}).get("heartbeat"),
+            "lastPollAt": max(polls) if polls else None,
+            "units": units,
+            "sources": per,
+        }
 
     def agents(self) -> list[dict[str, Any]]:
         with self._lock:
@@ -637,65 +824,41 @@ class ExternalAgentTracker:
             return [dict(row) for row in self._rows]
 
     # -- chat (on demand, never broadcast) -----------------------------------
-    def refresh_transcript(self, session_id: str) -> str:
-        """Ask Suvadu to re-import the native transcript (it only does so itself on
-        prompt/stop, so a long turn would otherwise read stale)."""
+    def _listed_source(self, session_id: str) -> tuple[Observation, AgentSource] | None:
         with self._lock:
-            known = self._natives.get(session_id)
-        if known is None:
+            obs = self._listed.get(session_id)
+        source = self._sources.get(obs.source) if obs is not None else None
+        return (obs, source) if obs is not None and source is not None else None
+
+    def refresh_transcript(self, session_id: str) -> str:
+        """Ask the session's source for a fresher chat (Suvadu re-imports)."""
+        found = self._listed_source(session_id)
+        if found is None:
             return "unknown_session"
-        now = self._clock()
-        if now - self._imported_at.get(session_id, 0.0) < _IMPORT_MIN_INTERVAL_S:
-            return "throttled"
-        path = transcript_path(*known)
-        if path is None:
-            return "no_transcript"
-        self._imported_at[session_id] = now
+        obs, source = found
         try:
-            self._run(["agent", "import-session", path])
+            return source.refresh(obs)
         except Exception:
             return "failed"
-        return "ok"
 
     def chat(self, session_id: str, *, limit: int = 80, refresh: bool = False) -> tuple[int, dict[str, Any]]:
-        """Last ``limit`` prompts/responses of a listed session, oldest first."""
+        """Last ``limit`` chat messages of a listed session, oldest first."""
         with self._lock:
             row = next((dict(r) for r in self._rows if r["sessionId"] == session_id), None)
-        if row is None:
+        found = self._listed_source(session_id)
+        if row is None or found is None:
             return 404, {"error": "unknown_session", "sessionId": session_id}
+        obs, source = found
         limit = max(1, min(limit, 400))
         body: dict[str, Any] = {"session": row, "messages": [], "hasMore": False, "available": False}
         if refresh:
             body["refresh"] = self.refresh_transcript(session_id)
         try:
-            head = json.loads(self._run(["agent", "session", session_id, "--limit", "1"]))
-            total = _as_int((head.get("session") or {}).get("event_count")) or 0
-        except SuvaduError as exc:
-            body["error"] = str(exc)  # e.g. not imported yet
-            return 200, body
-        except (ValueError, AttributeError):
-            body["error"] = "bad_json"
-            return 200, body
-        messages: list[dict[str, Any]] = []
-        offset = max(0, total - _EVENT_PAGE)
-        try:
-            for _ in range(_MAX_EVENT_PAGES):
-                page = json.loads(self._run([
-                    "agent", "session", session_id,
-                    "--limit", str(_EVENT_PAGE), "--offset", str(offset),
-                ]))
-                batch = [m for m in map(_chat_message, page.get("events") or []) if m]
-                messages = batch + messages
-                if len(messages) >= limit or offset == 0:
-                    break
-                offset = max(0, offset - _EVENT_PAGE)
-        except (SuvaduError, ValueError, AttributeError) as exc:
-            body["error"] = str(exc) if isinstance(exc, SuvaduError) else "bad_json"
-        body.update(
-            available=True,
-            hasMore=offset > 0 or len(messages) > limit,
-            messages=messages[-limit:],
-        )
+            body.update(source.chat(obs, limit=limit))
+        except SourceError as exc:
+            body["error"] = str(exc)  # e.g. not imported yet, db locked
+        except Exception:
+            body["error"] = "unexpected"
         return 200, body
 
 
@@ -710,7 +873,18 @@ def start(send: SendFn, config: TrackerConfig | None = None) -> bool:
     cfg = config or TrackerConfig.from_env()
     if not cfg.enabled or _thread is not None:
         return False
-    tracker = ExternalAgentTracker(cfg, send=send)
+    from server import claude_sessions, hermes_sessions  # noqa: PLC0415
+
+    sources: list[AgentSource] = [
+        SuvaduSource(
+            lambda args: run_suv(cfg.bin_path, args, cfg.timeout_s),
+            owned_ids=claude_sessions.owned_ids,
+        ),
+    ]
+    hermes = hermes_sessions.source_from_env(recent_s=cfg.recent_s, window_s=cfg.window_s)
+    if hermes is not None:
+        sources.append(hermes)
+    tracker = ExternalAgentTracker(cfg, send=send, sources=sources)
 
     def _loop() -> None:
         time.sleep(3)
@@ -719,9 +893,20 @@ def start(send: SendFn, config: TrackerConfig | None = None) -> bool:
             time.sleep(cfg.poll_s)
 
     _tracker = tracker
-    _thread = threading.Thread(target=_loop, name="suvadu-tracker", daemon=True)
+    _thread = threading.Thread(target=_loop, name="external-agents-tracker", daemon=True)
     _thread.start()
     return True
+
+
+def covers_hermes_profile(profile: str) -> bool:
+    """True when the Hermes source is up and reads ``profile``: that profile's
+    sessions are already on the map, so a ps-based detector would duplicate them."""
+    tracker = _tracker
+    if tracker is None or not tracker.source_ok("hermes"):
+        return False
+    source = tracker.source("hermes")
+    reads = getattr(source, "reads_profile", None)
+    return bool(reads(profile)) if callable(reads) else False
 
 
 def status() -> dict[str, Any]:

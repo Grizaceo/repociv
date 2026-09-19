@@ -16,8 +16,8 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 // Per-unit resolved identity (lazy async resolve, cached so drawUnit stays sync).
-// Uses resolveBotIdentity() — the SAME resolver the assembly scene uses — so a
-// bot looks identical on the hex grid and in the assembly (consistent identity).
+// Uses resolveBotIdentity() — the SAME resolver the "➕ Bot" spawner uses — so a
+// bot looks identical on the hex grid and in the spawner menu (consistent identity).
 const unitIdentityCache = new Map<string, { url: string; kind: AvatarKind } | null>();
 const unitAvatarPending = new Set<string>();
 

@@ -1,6 +1,7 @@
-// ─── External agents (Suvadu) — rehydration on bridge (re)connect ───────────
+// ─── External agents (Suvadu, Hermes) — rehydration on bridge (re)connect ───
 // server/suvadu_tracker.py mirrors the Claude Code / Codex / Cursor sessions
-// that Suvadu sees on this machine as ephemeral `ext-*` units, via plain
+// that Suvadu sees on this machine, and the Hermes sessions in its state.db
+// files (server/hermes_sessions.py), as ephemeral `ext-*` units, via plain
 // unit_spawn / unit_state / unit_despawn events. Those events are
 // fire-and-forget: a browser that connects (or reconnects) after a spawn would
 // never see the unit. So on every connect the bridge client fetches the
@@ -12,7 +13,7 @@ import { bridgeHeaders, bridgeUrl } from './bridgeEnv.ts';
 import type { BridgeEvent, City } from './types.ts';
 import { escapeHtml } from './ui/escapeHtml.ts';
 
-/** Every unit owned by the Suvadu tracker has this id prefix. */
+/** Every unit owned by the external-agents tracker has this id prefix. */
 export const EXTERNAL_UNIT_PREFIX = 'ext-';
 
 export function isExternalAgentUnit(unitId: string): boolean {
@@ -81,10 +82,24 @@ export async function fetchExternalAgents(): Promise<ExternalAgentRow[] | null> 
 // on the map or not. Chat text comes on demand from
 // GET /api/external-agents/<session>/chat (never broadcast over SSE/WS).
 
+/**
+ * Where a session is listed. `''` — on the map while active (Activos / Últimas
+ * 24 h); `cron` / `gateway` — Hermes cron jobs and gateway chats (Telegram…),
+ * listed in their own panel sections and never put on the map.
+ */
+export type SessionSection = '' | 'cron' | 'gateway';
+
 /** One row of GET /api/external-agents/sessions (metadata only). */
 export interface ExternalSessionRow {
   sessionId: string;
+  /** `suvadu` or `hermes`; older bridges omit it (→ suvadu). */
+  source?: string;
   agent: string;
+  /** Hermes profile (`default`, `cobalt`, `lexo-alpha`…). */
+  profile?: string;
+  /** How a Hermes session started: cli, desktop, tui, cron, telegram… */
+  origin?: string;
+  section?: SessionSection;
   model: string;
   repo: string;
   cityId: string;
@@ -102,8 +117,10 @@ export interface ExternalSessionRow {
 }
 
 export interface ExternalChatMessage {
-  role: 'user' | 'assistant';
+  /** `tool` — a run of tool calls, reduced to the tool names (Hermes). */
+  role: 'user' | 'assistant' | 'tool';
   text: string;
+  tools?: string[];
   at: number | null;
   truncated: boolean;
   turn: string | null;
@@ -116,6 +133,8 @@ export interface ExternalChat {
   available: boolean;
   error?: string;
   refresh?: string;
+  /** Session title (Hermes) — content-derived, so only sent with the chat. */
+  title?: string | null;
 }
 
 export async function fetchExternalSessions(): Promise<ExternalSessionRow[] | null> {
@@ -201,14 +220,20 @@ export function placeOnMap(
   return { kind: 'off-map', city: capital };
 }
 
+/** Map sessions split into active / recent; cron and gateway ones apart. */
 export function partitionSessions(rows: readonly ExternalSessionRow[]): {
   active: ExternalSessionRow[];
   recent: ExternalSessionRow[];
+  cron: ExternalSessionRow[];
+  gateway: ExternalSessionRow[];
 } {
   const byRecency = [...rows].sort((a, b) => b.lastActivityAt - a.lastActivityAt);
+  const onMap = byRecency.filter((r) => !r.section);
   return {
-    active: byRecency.filter((r) => r.active),
-    recent: byRecency.filter((r) => !r.active),
+    active: onMap.filter((r) => r.active),
+    recent: onMap.filter((r) => !r.active),
+    cron: byRecency.filter((r) => r.section === 'cron'),
+    gateway: byRecency.filter((r) => r.section === 'gateway'),
   };
 }
 
@@ -220,15 +245,32 @@ const AGENT_LABELS: Record<string, string> = {
   opencode: 'OpenCode',
   pi: 'pi.dev',
   antigravity: 'Antigravity',
+  hermes: 'Hermes',
 };
 
 export function agentLabel(agent: string): string {
   return AGENT_LABELS[agent.toLowerCase()] ?? agent;
 }
 
-/** "claude-opus-5" → "opus-5"; "gpt-5-codex" stays. */
+/** Card title: the agent, plus the profile for Hermes ("Hermes · cobalt"). */
+export function sessionLabel(row: Pick<ExternalSessionRow, 'agent' | 'profile'>): string {
+  const label = agentLabel(row.agent);
+  return row.profile ? `${label} · ${row.profile}` : label;
+}
+
+/** "claude-opus-5" → "opus-5"; "meituan/longcat-2.0:free" → "longcat-2.0:free"; "gpt-5-codex" stays. */
 export function shortModel(model: string): string {
-  return model.replace(/^claude-/, '').replace(/-\d{8}$/, '');
+  return model
+    .replace(/^.*\//, '')
+    .replace(/^claude-/, '')
+    .replace(/-\d{8}$/, '');
+}
+
+/** Tool names in call order → "terminal ×3 · read_file". */
+export function summarizeTools(names: readonly string[]): string {
+  const counts = new Map<string, number>();
+  for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
+  return [...counts].map(([name, n]) => (n > 1 ? `${name} ×${n}` : name)).join(' · ');
 }
 
 export function relativeTime(ms: number, now: number = Date.now()): string {
@@ -257,9 +299,13 @@ function clock(at: number | null): string {
 export function chatMessagesHtml(messages: readonly ExternalChatMessage[], agent: string): string {
   return messages
     .map((m) => {
+      if (m.role === 'tool') {
+        const tools = summarizeTools(m.tools ?? []);
+        return `<div class="agents-msg agents-msg--tool" title="Solo el nombre de cada tool; su salida no se muestra">🔧 ${escapeHtml(tools)}</div>`;
+      }
       const who = m.role === 'user' ? 'Prompt' : agentLabel(agent);
       const cut = m.truncated
-        ? '<span class="agents-msg-cut" title="Suvadu guarda hasta ~4000 caracteres">…recortado</span>'
+        ? '<span class="agents-msg-cut" title="Se guardan hasta ~4000 caracteres por mensaje">…recortado</span>'
         : '';
       return `<div class="agents-msg agents-msg--${m.role}">
         <div class="agents-msg-meta">${escapeHtml(who)} · ${escapeHtml(clock(m.at))}</div>

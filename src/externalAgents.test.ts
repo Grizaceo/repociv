@@ -13,7 +13,9 @@ import {
   partitionSessions,
   placeOnMap,
   relativeTime,
+  sessionLabel,
   shortModel,
+  summarizeTools,
   type ExternalAgentRow,
   type ExternalSessionRow,
 } from './externalAgents.ts';
@@ -331,6 +333,51 @@ describe('panel formatting', () => {
     expect(html).toContain('agents-msg--user');
     expect(html).toContain('Codex');
     expect(html).toContain('recortado');
+  });
+
+  it('keeps Hermes cron and gateway sessions out of Activos / Últimas 24 h', () => {
+    const rows = [
+      session('map', { source: 'hermes', section: '', lastActivityAt: 3 }),
+      session('cron1', { source: 'hermes', section: 'cron', unit: null, lastActivityAt: 9 }),
+      session('cron2', { source: 'hermes', section: 'cron', active: false, lastActivityAt: 1 }),
+      session('tele', { source: 'hermes', section: 'gateway', unit: null, lastActivityAt: 5 }),
+      session('old', { active: false, state: 'inactive', lastActivityAt: 2 }),
+    ];
+    const { active, recent, cron, gateway } = partitionSessions(rows);
+    expect(active.map((r) => r.sessionId)).toEqual(['map']);
+    expect(recent.map((r) => r.sessionId)).toEqual(['old']);
+    expect(cron.map((r) => r.sessionId)).toEqual(['cron1', 'cron2']);
+    expect(gateway.map((r) => r.sessionId)).toEqual(['tele']);
+  });
+
+  it('labels Hermes sessions by profile and strips model providers', () => {
+    expect(sessionLabel({ agent: 'hermes', profile: 'cobalt' })).toBe('Hermes · cobalt');
+    expect(sessionLabel({ agent: 'codex' })).toBe('Codex');
+    expect(shortModel('meituan/longcat-2.0:free')).toBe('longcat-2.0:free');
+    expect(shortModel('anthropic/claude-opus-5')).toBe('opus-5');
+  });
+
+  it('renders tool runs as names only, counted and escaped', () => {
+    expect(summarizeTools(['terminal', 'read_file', 'terminal', 'terminal'])).toBe(
+      'terminal ×3 · read_file',
+    );
+    expect(summarizeTools([])).toBe('');
+    const html = chatMessagesHtml(
+      [
+        {
+          role: 'tool',
+          text: '',
+          tools: ['terminal', '<b>x</b>'],
+          at: null,
+          truncated: false,
+          turn: null,
+        },
+      ],
+      'hermes',
+    );
+    expect(html).toContain('agents-msg--tool');
+    expect(html).toContain('terminal · &lt;b&gt;x&lt;/b&gt;');
+    expect(html).not.toContain('<b>');
   });
 });
 

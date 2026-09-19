@@ -7,7 +7,9 @@
   top: 56px;
   right: 8px;
   width: min(440px, calc(100vw - 16px));
-  max-height: 78vh;
+  /* Stop above the minimap cluster (200px map + button strip) so the last
+     cards stay clickable; the local view hides the minimap. */
+  max-height: min(78vh, calc(100vh - 336px));
   background: var(--ui-panel-bg);
   border: 2px solid var(--ui-border);
   border-radius: var(--panel-radius);
@@ -22,6 +24,9 @@
 }
 #agents-panel.hidden {
   display: none;
+}
+body.local-view #agents-panel {
+  max-height: 78vh;
 }
 
 .agents-header {
@@ -67,12 +72,35 @@
   gap: var(--space-1);
   min-height: 0;
 }
+/* A long list must scroll, not squash the cards (flex items shrink by default). */
+.agents-body > * {
+  flex-shrink: 0;
+}
 .agents-section {
   margin: var(--space-3) 0 var(--space-1);
   font-size: var(--text-2xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ui-gold);
+}
+.agents-fold > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.agents-fold > summary::before {
+  content: '▸ ';
+}
+.agents-fold[open] > summary::before {
+  content: '▾ ';
+}
+.agents-fold > .agents-card {
+  margin-top: var(--space-1);
+}
+.agents-chat-name {
+  font-size: var(--text-xs);
+  color: var(--ui-text);
+  margin-top: 2px;
+  overflow-wrap: anywhere;
 }
 .agents-empty,
 .agents-foot {
@@ -241,6 +269,14 @@
 .agents-msg--assistant {
   align-self: flex-start;
   background: rgba(0, 0, 0, 0.3);
+}
+.agents-msg--tool {
+  align-self: flex-start;
+  padding: 2px var(--space-2);
+  border-style: dashed;
+  color: var(--ui-text-dim);
+  font-size: var(--text-2xs);
+  overflow-wrap: anywhere;
 }
 .agents-msg-meta {
   font-size: var(--text-2xs);

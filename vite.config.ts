@@ -2,6 +2,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { repocivPlugin, expandUser } from './vite-plugins/repociv.ts';
 import { wonderProxyConfig } from './vite-plugins/wonderProxy.ts';
 
@@ -21,6 +22,8 @@ function resolveMapRoot(mode: string): string {
     DEFAULT_MAP_ROOT;
   return resolve(expandUser(raw));
 }
+
+const REPO_ROOT = fileURLToPath(new URL('.', import.meta.url)).replace(/\/$/, '');
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -52,9 +55,11 @@ export default defineConfig(({ mode }) => {
       // build/e2e output trees — under WSL2's inotify that exhausts watchers
       // (ENOSPC) and crashes `npm run dev` mid-startup. node_modules is
       // already ignored by default; these are the repo-local trees that
-      // aren't.
+      // aren't. The agents' scratch dir is anchored to this checkout: the
+      // repo itself lives under ~/.hermes/workspace, so a `**/.hermes/**`
+      // glob ignored every file and silently disabled HMR.
       watch: {
-        ignored: ['**/.venv/**', '**/dist/**', '**/.hermes/**', '**/e2e/**'],
+        ignored: ['**/.venv/**', '**/dist/**', `${REPO_ROOT}/.hermes/**`, '**/e2e/**'],
       },
       proxy: {
         '/bridge': {

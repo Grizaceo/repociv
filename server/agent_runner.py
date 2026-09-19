@@ -18,6 +18,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable
 
+from server import claude_sessions as _claude_sessions
 from server import event_store as _es
 from server import subagent_tracker as _subagent_tracker
 from server.mission_harness import MissionHarnessContext, log_swarm_tracking_capability, swarm_track_enabled
@@ -1041,6 +1042,22 @@ def _find_claude_code() -> str | None:
     return None
 
 
+def _claude_session_args(unit_id: str, city_id: str, *, stateful: bool) -> list[str]:
+    """``--resume <id>`` for a stateful unit's own thread in this city, else
+    ``--session-id <new uuid>``. Never ``--continue``: that resumes the most
+    recent conversation in the directory, possibly the user's own session.
+    Every id is recorded so the external-agents tracker skips these sessions."""
+    from server.suvadu_tracker import transcript_path  # noqa: PLC0415
+
+    city = _session_city_slug(city_id)
+    session_id, resume = _claude_sessions.session_for(unit_id, city, stateful=stateful)
+    if resume and transcript_path("claude-code", session_id) is None:
+        # The stored thread's transcript is gone (never written, or deleted).
+        _claude_sessions.forget_thread(unit_id, city)
+        session_id, resume = _claude_sessions.session_for(unit_id, city, stateful=stateful)
+    return ["--resume", session_id] if resume else ["--session-id", session_id]
+
+
 def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
                                 config: dict[str, Any],
                                 working_dir: str | None = None,
@@ -1064,8 +1081,7 @@ def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
         cmd.extend(["--output-format", "stream-json"])
     if model:
         cmd.extend(["--model", model])
-    if config.get("stateful", True):
-        cmd.append("--continue")
+    cmd.extend(_claude_session_args(unit_id, city_id, stateful=config.get("stateful", True)))
     cmd.append(full_prompt)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, bufsize=1, cwd=working_dir or None,

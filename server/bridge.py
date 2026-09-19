@@ -19,7 +19,7 @@ Endpoints:
   GET  /approvals                 — commands waiting_approval
   GET  /agents                    — agent status + heartbeat + queue depth
   GET  /agents/capabilities       — capability model (Fase 6)
-  GET  /api/external-agents       — Suvadu-detected agent sessions (metadata only)
+  GET  /api/external-agents       — Suvadu / Hermes agent sessions (metadata only)
   GET  /api/external-agents/sessions        — recent sessions, active or not
   GET  /api/external-agents/<session>/chat  — prompts + responses (on demand)
   GET  /metrics                   — observability metrics (Fase 7)
@@ -53,7 +53,7 @@ from .pending_tracker import (
     delete_pending_task,  # noqa: F401
     PENDING_TRACKER,  # noqa: F401
 )
-from .process_scanner import scan_active_processes, detect_lexo
+from .process_scanner import scan_active_processes, detect_lexo, retire_detected_lexo
 from ._env import load_dotenv as _load_dotenv  # noqa: F401 (re-export for tests)
 import hmac
 import re
@@ -775,13 +775,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
             status, body = _routes.get_harness_profiles(ctx)
             self._respond(status, body)
             return
-        # ── Bot Mode assembly integration (read-only roster + presence) ──
+        # ── Bot Mode roster (read-only; ➕ Bot spawner + grid avatars) ──
         if path == "/api/roster":
             status, body = _routes.get_roster(ctx)
-            self._respond(status, body)
-            return
-        if path == "/api/presence":
-            status, body = _routes.get_presence(ctx)
             self._respond(status, body)
             return
         if path.startswith("/api/roster/asset/"):
@@ -878,29 +874,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
             if len(parts) >= 5:
                 pctx = {"params": {"name": parts[3]}}
                 status, resp = _routes.post_profile_identity(body, pctx)
-                self._respond(status, resp)
-                return
-
-        # ─── Bot Mode room relay (participation, not config) ────────────────
-        # POST /api/rooms/<name>/message — relay a message into a Bot Mode
-        # group chat. Isolated shell-out; never writes profile.yaml. Token-gated
-        # by do_POST. Mirrors hermes-bot-mode/SKILL.md group-chat send.
-        if path.startswith("/api/rooms/") and path.endswith("/message"):
-            parts = path.split("/")
-            # ['', 'api', 'rooms', '<name>', 'message']
-            if len(parts) >= 5 and parts[4] == "message":
-                ctx = {"room": parts[3]}
-                status, resp = _routes.post_room_message(body, ctx)
-                self._respond(status, resp)
-                return
-
-        # GET /api/rooms/<name>/messages — read-only relay log for a room
-        if path.startswith("/api/rooms/") and path.endswith("/messages"):
-            parts = path.split("/")
-            # ['', 'api', 'rooms', '<name>', 'messages']
-            if len(parts) >= 5 and parts[4] == "messages":
-                ctx = {"room": parts[3]}
-                status, resp = _routes.get_room_messages(ctx)
                 self._respond(status, resp)
                 return
 
@@ -1172,15 +1145,26 @@ def _scheduler_dispatch(cmd_dict: dict[str, Any]) -> None:
 
 
 # ─── Background scanner ───────────────────────────────────────────────────────
+def _lexo_scan() -> None:
+    """ps-based LexO detection, unless the Hermes session source already shows
+    the lexo-alpha profile (then its LEXO-* units would be duplicates)."""
+    from server import suvadu_tracker as _ext  # noqa: PLC0415
+
+    if _ext.covers_hermes_profile("lexo-alpha"):
+        retire_detected_lexo()
+    else:
+        detect_lexo()
+
+
 def background_scanner() -> None:
     time.sleep(3)
     scan_active_processes()
-    detect_lexo()
+    _lexo_scan()
     while True:
         time.sleep(60)
         scan_active_processes()
         time.sleep(30)
-        detect_lexo()
+        _lexo_scan()
 
 
 # ─── Startup recovery ────────────────────────────────────────────────────────
@@ -1306,7 +1290,7 @@ if __name__ == "__main__":
 
     server = ThreadingHTTPServer((BRIDGE_HOST, BRIDGE_PORT), BridgeHandler)
     threading.Thread(target=background_scanner, daemon=True).start()
-    # External agents (Claude Code / Codex / Cursor…) seen by Suvadu → map units.
+    # External agents (Suvadu: Claude Code / Codex / Cursor…; Hermes state.db) → map units.
     from server import suvadu_tracker as _suvadu  # noqa: PLC0415
 
     _suvadu.start(send=send_to_repociv)

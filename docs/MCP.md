@@ -73,7 +73,7 @@ curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/path/to/workspace
 ### External agents — sesiones vistas por Suvadu
 | Tool | Descripción |
 |------|-------------|
-| `external_agents_list` | Claude Code / Codex / Cursor / OpenCode activos en esta máquina: agente, ciudad/repo, modelo, `working`/`idle`, conteos, última actividad. Solo metadatos. Ver `docs/EXTERNAL_AGENTS.md` |
+| `external_agents_list` | Claude Code / Codex / Cursor / OpenCode (vía Suvadu) y sesiones Hermes activos en esta máquina: agente, ciudad/repo, modelo, `working`/`idle`, conteos, última actividad. Solo metadatos. Ver `docs/EXTERNAL_AGENTS.md` |
 
 ### Commands `[MUTATES]`
 | Tool | Descripción |

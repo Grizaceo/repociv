@@ -70,7 +70,7 @@ _check "GET /agents → has queueDepth" "$AGENTS" '"queueDepth"'
 
 # 5. Capabilities endpoint
 CAPS=$(_curl "$BASE/agents/capabilities")
-_check "GET /agents/capabilities → has DAVI" "$CAPS" '"DAVI"'
+_check "GET /agents/capabilities → has MAIN" "$CAPS" '"MAIN"'
 
 # 6. Metrics endpoint
 METRICS=$(_curl "$BASE/metrics")

@@ -2,12 +2,11 @@
 // Read-only consumption of the bridge's `/api/roster` endpoint. This module
 // NEVER imports agentProfile.ts (the CRUD layer: upsert_profile / delete_profile
 // / saveIdentity). It only reads the roster so units can render their Bot Mode
-// identity (pet / face) on the hex grid AND in the assembly scene. Participation
-// (sending to a room) lives in the chat panel and uses POST /api/rooms, not here.
+// identity (pet / face) on the hex grid and in the "➕ Bot" spawner.
 //
 // Contract (verified live, snake_case wire):
 //   GET /api/roster?harness=hermes → 200
-//     [{ name, is_bot, avatar_kind, avatar_url, pet, face_url }]
+//     { harness, bots: [{ name, is_bot, avatar_kind, avatar_url, pet, face_url }] }
 //   - avatar_kind ∈ { "pet", "face", "asset", null }
 //       • "pet"  → real pet spritesheet (pets/<pet>/spritesheet.webp), `pet`
 //                  carries {id, displayName, description}; avatar_url = spritesheet.
@@ -18,8 +17,8 @@
 //     ("Shadow" hedgehog) so avatar_kind is "pet" now, not "asset".
 //
 // resolveBotIdentity() is the SINGLE source of truth consumed by both the hex
-// unit renderer (drawUnitAvatar) and the assembly scene (Among Us beans), so the
-// same bot looks identical in both places — satisfying "identidad consistente".
+// unit renderer (drawUnitAvatar) and the "➕ Bot" spawner, so the same bot looks
+// identical in both places — satisfying "identidad consistente".
 import { bridgeUrl, bridgeHeaders } from './bridgeEnv.ts';
 
 export type AvatarKind = 'pet' | 'face' | 'asset' | null;
@@ -49,7 +48,7 @@ export interface BotIdentity {
   imageUrl: string | null;
   /** Human label for the bot (from pet.displayName when present, else name). */
   label: string;
-  /** Pet descriptor (for assembly scene tooltip / description). */
+  /** Pet descriptor (tooltip / description). */
   pet: RosterPet | null;
 }
 
@@ -84,9 +83,11 @@ export async function getRosterMap(harness = 'hermes'): Promise<Map<string, Rost
       rosterPromise = null;
       throw new Error(`GET /api/roster → ${resp.status}`);
     }
-    const data = (await resp.json()) as { profiles?: RosterEntry[] };
+    // The bridge answers { harness, bots } (server/routes/core.py get_roster).
+    // Reading `profiles` here left the map empty, so no unit ever got its avatar.
+    const data = (await resp.json()) as { bots?: RosterEntry[] };
     const map = new Map<string, RosterEntry>();
-    for (const entry of data.profiles ?? []) {
+    for (const entry of data.bots ?? []) {
       map.set(keyOf(entry), entry);
     }
     rosterCache = map;
@@ -109,7 +110,7 @@ export function findRosterEntry(map: Map<string, RosterEntry>, unitId: string): 
 
 /**
  * Resolve the single identity descriptor for a unit/bot. This is the ONE function
- * both the hex renderer and the assembly scene call, guaranteeing the same bot
+ * both the hex renderer and the "➕ Bot" spawner call, guaranteeing the same bot
  * looks identical in every view. Returns a `BotIdentity` whose `imageUrl` is the
  * bridge-routed URL to draw (or null → caller uses the AGENT_ICONS glyph).
  */
@@ -144,7 +145,7 @@ export function resolveBotIdentity(entry: RosterEntry | null): BotIdentity {
  * Resolve the avatar image URL for a unit, or null if it should fall back to the
  * existing AGENT_ICONS glyph. Kept for backward compatibility with callers that
  * only need the URL (e.g. the legacy hex badge). New views should use
- * resolveBotIdentity() to stay consistent with the assembly scene.
+ * resolveBotIdentity() to stay consistent with the other views.
  */
 export async function resolveAvatarUrl(unitId: string): Promise<string | null> {
   try {
@@ -170,23 +171,32 @@ export function getAvatarImage(url: string): HTMLImageElement | null {
   if (failedUrls.has(url)) return null;
   let img = imageCache.get(url);
   if (!img) {
-    img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      /* marked ready on next getAvatarImage call */
-    };
-    img.onerror = () => {
+    const el = new Image();
+    const fail = () => {
       failedUrls.add(url);
       imageCache.delete(url);
     };
-    img.src = url;
-    imageCache.set(url, img);
+    el.onerror = fail;
+    imageCache.set(url, el);
+    img = el;
+    // /api/roster/asset/* is behind the bridge token and an <img> cannot send
+    // headers (it got 401, so no avatar ever drew): fetch the bytes with the
+    // token and hand the image an object URL.
+    void fetch(url, { headers: bridgeHeaders() })
+      .then((resp) => (resp.ok ? resp.blob() : Promise.reject(new Error(String(resp.status)))))
+      .then((blob) => {
+        el.src = URL.createObjectURL(blob);
+      })
+      .catch(fail);
   }
   return img.complete && img.naturalWidth > 0 ? img : null;
 }
 
 /** Drop the failed/loaded caches (call on logout or profile change). */
 export function clearAvatarImages(): void {
+  for (const img of imageCache.values()) {
+    if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+  }
   imageCache.clear();
   failedUrls.clear();
 }
