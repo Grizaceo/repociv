@@ -58,9 +58,9 @@ curl "http://127.0.0.1:5274/api/graph-relations?repoId=repociv&limit=5"
 curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/path/to/workspace/repociv"
 ```
 
-## Tools disponibles (44 tools, 15 dominios con tools MCP)
+## Tools disponibles (42 tools, 15 dominios con tools MCP)
 
-> Conteo verificado 2026-06-27 contra `server/mcp_server.py`: 44 funciones decoradas con `@mcp.tool()`. La sección "Subagents" abajo lista endpoints del bridge sin tools MCP dedicadas (no se cuenta como dominio MCP).
+> Conteo verificado 2026-09-19 contra `server/mcp_server.py`: 42 funciones decoradas con `@mcp.tool()` (el "44" anterior estaba mal: eran 41 antes de `external_agents_list`). La sección "Subagents" abajo lista endpoints del bridge sin tools MCP dedicadas (no se cuenta como dominio MCP).
 
 ### Agents — estado del imperio
 | Tool | Descripción |
@@ -69,6 +69,11 @@ curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/path/to/workspace
 | `agents_capabilities` | Matriz de capacidades por tipo (MAIN, WORKER, SCOUT, CLAUDE, CODEX, OPENCLAW; CURSOR según configuración) |
 | `agents_health` | Health check: versión, GPU, comandos en cola |
 | `agents_ready` | Readiness probe del bridge |
+
+### External agents — sesiones vistas por Suvadu
+| Tool | Descripción |
+|------|-------------|
+| `external_agents_list` | Claude Code / Codex / Cursor / OpenCode activos en esta máquina: agente, ciudad/repo, modelo, `working`/`idle`, conteos, última actividad. Solo metadatos. Ver `docs/EXTERNAL_AGENTS.md` |
 
 ### Commands `[MUTATES]`
 | Tool | Descripción |
@@ -210,7 +215,7 @@ ValueError: REPOCIV_TOKEN no configurado — mutating tools requieren token
 
 ```bash
 source .venv/bin/activate
-pytest server/test_mcp_server.py -v   # 39 tests, bridge mockeado
+pytest server/test_mcp_server.py -v   # 42 tests, bridge mockeado
 ```
 
 ## Out of scope (alpha)
