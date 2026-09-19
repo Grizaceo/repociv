@@ -23,6 +23,7 @@ import {
   relativeTime,
   sessionLabel,
   shortModel,
+  stateBadge,
   type ExternalChat,
   type ExternalSessionRow,
   type MapPlace,
@@ -227,6 +228,10 @@ function _cardHtml(row: ExternalSessionRow, now: number): string {
     ? `<span class="agents-model">${escapeHtml(shortModel(row.model))}</span>`
     : '';
   const sub = row.subagent ? '<span class="agents-tag">subagente</span>' : '';
+  const badge = stateBadge(row.state);
+  const busy = badge
+    ? `<span class="agents-busy agents-busy--${escapeHtml(row.state)}" title="${escapeHtml(badge.title)}">${escapeHtml(badge.text)}</span>`
+    : '';
   const origin =
     row.origin && row.origin !== row.section && row.origin !== 'subagent'
       ? `<span class="agents-tag" title="Cómo se inició la sesión">${escapeHtml(row.origin)}</span>`
@@ -234,7 +239,7 @@ function _cardHtml(row: ExternalSessionRow, now: number): string {
   return `<button type="button" class="agents-card agents-card--${escapeHtml(row.state)}" data-session="${escapeHtml(row.sessionId)}">
     <span class="agents-dot" aria-hidden="true"></span>
     <span class="agents-card-main">
-      <span class="agents-card-title">${escapeHtml(sessionLabel(row))} ${model} ${origin} ${sub}</span>
+      <span class="agents-card-title">${escapeHtml(sessionLabel(row))} ${model} ${busy} ${origin} ${sub}</span>
       ${_whereHtml(row)}
     </span>
     <span class="agents-card-meta"><span class="agents-ago">${escapeHtml(relativeTime(row.lastActivityAt, now))}</span><br><span class="agents-stats">${escapeHtml(_statsText(row))}</span></span>
@@ -333,7 +338,10 @@ function _renderChat(firstLoad = false): void {
   const atBottom = !prev || prev.scrollTop + prev.clientHeight >= prev.scrollHeight - 40;
   const row = _chat.session;
   const hermes = _isHermes(row);
-  const status = row.active ? row.state : `inactivo · ${relativeTime(row.lastActivityAt)}`;
+  const badge = stateBadge(row.state);
+  const status = row.active
+    ? (badge?.text ?? row.state)
+    : `inactivo · ${relativeTime(row.lastActivityAt)}`;
   let log: string;
   if (_chat.messages.length > 0) {
     const more = _chat.hasMore
@@ -365,7 +373,11 @@ function _renderChat(firstLoad = false): void {
       <button type="button" class="agents-refresh" title="${hermes ? 'Actualizar' : 'Actualizar (reimporta el transcript)'}" aria-label="Actualizar">${_chatLoading ? '…' : '↻'}</button>
     </div>
     <div class="agents-chat-log">${log}</div>
-    <p class="agents-foot">Solo lectura. Para responder, usá la terminal de ese agente.</p>`;
+    ${
+      badge
+        ? `<p class="agents-foot agents-foot--busy" title="${escapeHtml(badge.title)}">⏳ ${escapeHtml(badge.text)} — mejor no interrumpirlo. Solo lectura: para responder, usá la terminal de ese agente.</p>`
+        : '<p class="agents-foot">Solo lectura. Para responder, usá la terminal de ese agente.</p>'
+    }`;
   bindPanelAction(body, '.agents-back', _backToList);
   bindPanelAction(body, '.agents-locate', () => _locate(row));
   bindPanelAction(body, '.agents-refresh', () => void _loadChat(true));

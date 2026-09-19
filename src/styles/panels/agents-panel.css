@@ -190,12 +190,50 @@ body.local-view #agents-panel {
   background: var(--ui-green);
   box-shadow: 0 0 6px var(--ui-green);
 }
+/* Live but quiet: the process is there, the activity clock is not. Pulses so it
+   reads as "busy", never as the settled gold of idle. */
+.agents-card--thinking .agents-dot {
+  background: var(--ui-green);
+  box-shadow: 0 0 6px var(--ui-green);
+  animation: agents-pulse 1.8s ease-in-out infinite;
+}
+@keyframes agents-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agents-card--thinking .agents-dot {
+    animation: none;
+    opacity: 0.6;
+  }
+}
 .agents-card--idle .agents-dot,
 .agents-dot--idle {
   background: var(--ui-gold);
 }
 .agents-card--inactive {
   opacity: 0.75;
+}
+
+/* "trabajando" / "pensando…" — the answer to "¿puedo escribirle?" */
+.agents-busy {
+  font-size: var(--text-3xs);
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0 4px;
+  white-space: nowrap;
+  color: var(--ui-green);
+}
+.agents-busy--thinking {
+  color: var(--ui-gold);
+}
+.agents-foot--busy {
+  color: var(--ui-gold);
 }
 
 /* ── RepoCiv own units ─────────────────────────────────────────────────── */

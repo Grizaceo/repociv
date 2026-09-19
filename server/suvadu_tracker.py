@@ -51,7 +51,10 @@ import time
 from dataclasses import dataclass, replace
 from typing import Any, Callable, Iterable, Protocol, Sequence
 
+from server import session_liveness
+
 SendFn = Callable[[dict[str, Any]], None]
+LivenessFn = Callable[[], session_liveness.Liveness]
 RepoPathsFn = Callable[[], list[str]]
 RunFn = Callable[[list[str]], str]
 
@@ -163,6 +166,9 @@ class Observation:
     ended: bool = False  # the source knows the session is over → off the map
     profile: str = ""
     origin: str = ""  # how the session was started (Hermes: cli, desktop, cron…)
+    # Set by the tracker, not by the sources: is a process still holding this
+    # session? None when it could not be told (see server/session_liveness.py).
+    live: bool | None = None
 
 
 def _as_int(value: Any) -> int | None:
@@ -593,6 +599,32 @@ class SuvaduSource:
 
 
 # ─── Tracker ─────────────────────────────────────────────────────────────────
+# ─── State ───────────────────────────────────────────────────────────────────
+# The map unit vocabulary (src/types.ts UnitState) has no "thinking": on the map
+# a thinking agent is simply a busy one. The distinction is for the panel, where
+# it answers "can I write to it?".
+_MAP_STATE = {"thinking": "working"}
+
+
+def map_state(state: str) -> str:
+    """The unit state the map understands, for a panel state."""
+    return _MAP_STATE.get(state, state)
+
+
+def derive_state(age_ms: float, working_ms: float, live: bool | None) -> str:
+    """Panel state of a session that is still within the window.
+
+    ``thinking`` is the honest answer when the activity clock went quiet but a
+    process is still holding the session: it may be reasoning between tool
+    calls, or waiting for its user — this tracker cannot tell the two apart,
+    and both mean "do not fire a message at it blind". Without a liveness
+    reading (``live is None``) the old timestamp-only answer stands.
+    """
+    if age_ms <= working_ms:
+        return "working"
+    return "thinking" if live else "idle"
+
+
 class ExternalAgentTracker:
     """Owns the ext-* units. poll_once() is the only writer; snapshot() reads."""
 
@@ -605,12 +637,14 @@ class ExternalAgentTracker:
         run: RunFn | None = None,
         clock: Callable[[], float] = time.time,
         sources: Sequence[AgentSource] | None = None,
+        liveness: LivenessFn = session_liveness.probe,
     ) -> None:
         """``sources`` defaults to Suvadu alone, driven by ``run`` (or the real CLI)."""
         self.config = config
         self._send = send
         self._repo_paths = repo_paths
         self._clock = clock
+        self._liveness = liveness
         if sources is None:
             suv_run: RunFn = run or (lambda args: run_suv(config.bin_path, args, config.timeout_s))
             sources = [SuvaduSource(suv_run, clock)]
@@ -642,6 +676,7 @@ class ExternalAgentTracker:
                 self._last_obs[name] = seen
                 self._set_status(name, ok=True, error=None)
             observations.extend(seen)
+        observations = self._with_liveness(observations)
         try:
             repo_paths = self._repo_paths()
         except Exception:
@@ -651,6 +686,20 @@ class ExternalAgentTracker:
                 self._send(event)
             except Exception:
                 pass
+
+    def _with_liveness(self, observations: list[Observation]) -> list[Observation]:
+        """Tag every observation with "is a process still holding this session?".
+
+        One /proc scan per poll, shared by every observation. A probe that fails
+        leaves ``live`` as None and the states fall back to timestamps alone."""
+        try:
+            reading = self._liveness()
+        except Exception:
+            return observations
+        return [
+            replace(obs, live=reading.live_for(source=obs.source, native_id=obs.native_id, cwd=obs.cwd))
+            for obs in observations
+        ]
 
     def reconcile(
         self,
@@ -686,7 +735,8 @@ class ExternalAgentTracker:
             for session_id, obs in desired.items():
                 city_id, repo = city_of(obs.cwd)
                 age_ms = max(0, now_ms - obs.last_activity_ms)
-                state = "working" if age_ms <= working_ms else "idle"
+                state = derive_state(age_ms, working_ms, obs.live)
+                mapped = map_state(state)
                 rec = self._units.get(session_id)
                 if rec is not None and rec["cityId"] != city_id:
                     events.append({"type": "unit_despawn", "unit": rec["unit"]})
@@ -697,12 +747,14 @@ class ExternalAgentTracker:
                         "unitType": _unit_type(obs),
                         "cityId": city_id,
                         "state": "idle",  # GameState.spawnUnit starts every unit idle
+                        "sessionState": "idle",
                     }
                     self._units[session_id] = rec
                     events.append(self._spawn_event(rec, obs))
-                if rec["state"] != state:
-                    rec["state"] = state
-                    events.append({"type": "unit_state", "unit": rec["unit"], "state": state})
+                if rec["state"] != mapped:
+                    rec["state"] = mapped
+                    events.append({"type": "unit_state", "unit": rec["unit"], "state": mapped})
+                rec["sessionState"] = state
                 rec.update(
                     agent=obs.agent,
                     model=obs.model,
@@ -726,7 +778,11 @@ class ExternalAgentTracker:
         """Every session active within recent_s, newest first (caller holds the lock).
 
         A panel-only session (``section``) never has a unit; it still reads as
-        working / idle while it is live, like the map ones."""
+        working / thinking / idle while it is live, like the map ones.
+
+        Known limit: the reading only covers sessions inside the window. Past
+        it a session reads ``inactive`` even when its process is alive, because
+        that is also when its unit leaves the map."""
         recent_ms = self.config.recent_s * 1000
         window_ms = self.config.window_s * 1000
         working_ms = self.config.working_s * 1000
@@ -740,9 +796,9 @@ class ExternalAgentTracker:
             city_id, repo = city_of(obs.cwd)
             rec = self._units.get(obs.session_id)
             if rec is not None:
-                active, state = True, rec["state"]
+                active, state = True, rec.get("sessionState") or rec["state"]
             elif obs.section and not obs.ended and age_ms <= window_ms:
-                active, state = True, "working" if age_ms <= working_ms else "idle"
+                active, state = True, derive_state(age_ms, working_ms, obs.live)
             else:
                 active, state = False, "inactive"
             rows.append({
@@ -815,8 +871,13 @@ class ExternalAgentTracker:
         }
 
     def agents(self) -> list[dict[str, Any]]:
+        """Map-facing rows. ``sessionState`` stays out: the map speaks the unit
+        vocabulary (see ``map_state``), the finer state is the panel's."""
         with self._lock:
-            rows = [dict(rec) for rec in self._units.values()]
+            rows = [
+                {key: value for key, value in rec.items() if key != "sessionState"}
+                for rec in self._units.values()
+            ]
         return sorted(rows, key=lambda r: r.get("lastActivityAt") or 0, reverse=True)
 
     def sessions(self) -> list[dict[str, Any]]:

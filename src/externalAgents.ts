@@ -104,7 +104,14 @@ export interface ExternalSessionRow {
   repo: string;
   cityId: string;
   active: boolean;
-  state: 'working' | 'idle' | 'inactive';
+  /**
+   * `working` — fresh tool activity; `thinking` — the activity clock went
+   * quiet but a process still holds the session (reasoning, or waiting for its
+   * own user: the bridge cannot tell, and neither is safe to interrupt);
+   * `idle` — quiet and nothing holding it; `inactive` — out of the window.
+   * Older bridges only ever send working / idle / inactive.
+   */
+  state: 'working' | 'thinking' | 'idle' | 'inactive';
   unit: string | null;
   unitType: string;
   firstActivityAt: number;
@@ -250,6 +257,28 @@ const AGENT_LABELS: Record<string, string> = {
 
 export function agentLabel(agent: string): string {
   return AGENT_LABELS[agent.toLowerCase()] ?? agent;
+}
+
+/**
+ * The badge for a session state, or null when there is nothing to warn about.
+ * Both live states get one: the point is answering "¿puedo escribirle?" before
+ * the user goes looking for that agent's terminal.
+ */
+export function stateBadge(state: string): { text: string; title: string } | null {
+  if (state === 'working') {
+    return {
+      text: 'trabajando',
+      title: 'Usó una herramienta hace poco. Está en plena tarea: no lo interrumpas.',
+    };
+  }
+  if (state === 'thinking') {
+    return {
+      text: 'pensando…',
+      title:
+        'Su proceso sigue vivo, pero hace rato que no registra herramientas: puede estar razonando o esperando una respuesta en su terminal. Tampoco conviene interrumpirlo a ciegas.',
+    };
+  }
+  return null;
 }
 
 /** Card title: the agent, plus the profile for Hermes ("Hermes · cobalt"). */

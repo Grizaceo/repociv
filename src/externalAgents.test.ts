@@ -15,6 +15,7 @@ import {
   relativeTime,
   sessionLabel,
   shortModel,
+  stateBadge,
   summarizeTools,
   type ExternalAgentRow,
   type ExternalSessionRow,
@@ -294,6 +295,22 @@ describe('panel formatting', () => {
     const { active, recent } = partitionSessions(rows);
     expect(active.map((r) => r.sessionId)).toEqual(['c', 'b']);
     expect(recent.map((r) => r.sessionId)).toEqual(['d', 'a']);
+  });
+
+  it('badges the two states you should not interrupt, and only those', () => {
+    expect(stateBadge('working')?.text).toBe('trabajando');
+    expect(stateBadge('thinking')?.text).toBe('pensando…');
+    // A thinking agent may also just be waiting for its own user: the badge
+    // must say "no lo interrumpas", never claim to know which it is.
+    expect(stateBadge('thinking')?.title).toMatch(/esperando/);
+    expect(stateBadge('idle')).toBeNull();
+    expect(stateBadge('inactive')).toBeNull();
+    expect(stateBadge('dancing')).toBeNull();
+  });
+
+  it('keeps thinking sessions in Activos', () => {
+    const { active } = partitionSessions([session('t', { state: 'thinking' })]);
+    expect(active.map((r) => r.sessionId)).toEqual(['t']);
   });
 
   it('labels, models, times and tokens', () => {

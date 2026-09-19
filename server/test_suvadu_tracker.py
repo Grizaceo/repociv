@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from server import session_liveness as sl
 from server import suvadu_tracker as st
 
 NOW_MS = 1_789_800_000_000
@@ -128,10 +129,13 @@ class Clock:
 
 
 def _tracker(repo_paths: list[str], suv: FakeSuv, clock: Clock, sent: list[dict[str, Any]],
-             **cfg: Any) -> st.ExternalAgentTracker:
+             liveness: Any = None, **cfg: Any) -> st.ExternalAgentTracker:
+    """``liveness`` defaults to "could not tell": states then follow the activity
+    clock alone, as they did before server/session_liveness.py existed."""
     config = st.TrackerConfig(bin_path="suv", window_s=600, working_s=120, **cfg)
     return st.ExternalAgentTracker(
-        config, send=sent.append, repo_paths=lambda: repo_paths, run=suv, clock=clock
+        config, send=sent.append, repo_paths=lambda: repo_paths, run=suv, clock=clock,
+        liveness=liveness or (lambda: sl.Liveness()),
     )
 
 
@@ -302,6 +306,80 @@ def test_spawn_once_then_idle_then_despawn(repos):
     t.poll_once()
     assert sent == [{"type": "unit_despawn", "unit": "ext-claude-code-5805ab57"}]
     assert t.agents() == []
+
+
+# ─── Liveness → "thinking" ───────────────────────────────────────────────────
+def _aged(repos, sent, liveness, minutes: int = 3):
+    """One session whose activity clock went quiet `minutes` ago."""
+    suv, clock = FakeSuv(), Clock()
+    repo = str(repos / "repociv")
+    suv.sessions = _sessions_json(_session("th000000", cwd=repo + "/src"))
+    t = _tracker([repo], suv, clock, sent, liveness=liveness)
+    t.poll_once()
+    sent.clear()
+    clock.ms = NOW_MS + minutes * MIN
+    t.poll_once()
+    return t
+
+
+def test_quiet_but_alive_reads_thinking(repos):
+    """The bug this exists for: a turn that reasons past the working threshold
+    without touching a tool must not read as idle."""
+    sent: list[dict[str, Any]] = []
+    cwd = str(repos / "repociv") + "/src"
+    t = _aged(repos, sent, lambda: sl.Liveness(agent_cwds=frozenset({cwd}), ok=True))
+
+    [row] = t.sessions()
+    assert (row["active"], row["state"]) == (True, "thinking")
+    # …but the map only knows busy/idle: there it stays working.
+    assert sent == []
+    assert [a["state"] for a in t.agents()] == ["working"]
+
+
+def test_quiet_and_dead_still_reads_idle(repos):
+    sent: list[dict[str, Any]] = []
+    t = _aged(repos, sent, lambda: sl.Liveness(agent_cwds=frozenset({"/elsewhere"}), ok=True))
+
+    assert [r["state"] for r in t.sessions()] == ["idle"]
+    assert sent == [{"type": "unit_state", "unit": "ext-claude-code-th000000", "state": "idle"}]
+
+
+def test_unknown_liveness_falls_back_to_timestamps(repos):
+    """No reading (no /proc, probe raised): the old behaviour, not a guess."""
+    sent: list[dict[str, Any]] = []
+
+    def boom() -> sl.Liveness:
+        raise OSError("/proc unreadable")
+
+    assert [r["state"] for r in _aged(repos, sent, boom).sessions()] == ["idle"]
+    assert [r["state"] for r in _aged(repos, sent, lambda: sl.Liveness()).sessions()] == ["idle"]
+
+
+def test_thinking_to_working_emits_no_redundant_map_event(repos):
+    """thinking and working are one state to the map: no churn on the wire."""
+    suv, clock, sent = FakeSuv(), Clock(), []
+    repo = str(repos / "repociv")
+    cwd = repo + "/src"
+    suv.sessions = _sessions_json(_session("th000000", cwd=cwd))
+    t = _tracker([repo], suv, clock, sent, liveness=lambda: sl.Liveness(agent_cwds=frozenset({cwd}), ok=True))
+    t.poll_once()
+    sent.clear()
+
+    clock.ms = NOW_MS + 3 * MIN  # working → thinking
+    t.poll_once()
+    suv.sessions = _sessions_json(_session("th000000", cwd=cwd, last_ms=clock.ms))
+    t.poll_once()  # thinking → working
+    assert sent == []
+    assert [r["state"] for r in t.sessions()] == ["working"]
+
+
+def test_derive_state_is_pure():
+    assert st.derive_state(0, 120_000, None) == "working"
+    assert st.derive_state(200_000, 120_000, True) == "thinking"
+    assert st.derive_state(200_000, 120_000, False) == "idle"
+    assert st.derive_state(200_000, 120_000, None) == "idle"
+    assert st.map_state("thinking") == "working"
+    assert st.map_state("idle") == "idle"
 
 
 def test_old_sessions_never_spawn(repos):

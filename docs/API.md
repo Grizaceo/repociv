@@ -170,7 +170,7 @@ Sin prompts, comandos ni `cwd`. Los mismos datos llegan al mapa como `unit_spawn
 | GET | `/api/external-agents/sessions` | Todas las sesiones con actividad en las últimas `REPOCIV_EXT_AGENTS_RECENT_H` (24) horas, activas o no, más nuevas primero |
 | GET | `/api/external-agents/<sessionId>/chat?limit=80&refresh=1` | Prompts y respuestas de una sesión listada (a pedido, **contenido**) |
 
-`/sessions`: `{status, windowMinutes, recentHours, sessions: [{sessionId, agent, model, repo, cityId, active, state: "working"|"idle"|"inactive", unit, unitType, firstActivityAt, lastActivityAt, commandCount, eventCount, totalTokens, subagent, imported}]}`. `imported=false` significa que Suvadu solo vio el latido de comandos (todavía no hay transcript).
+`/sessions`: `{status, windowMinutes, recentHours, sessions: [{sessionId, agent, model, repo, cityId, active, state: "working"|"thinking"|"idle"|"inactive", unit, unitType, firstActivityAt, lastActivityAt, commandCount, eventCount, totalTokens, subagent, imported}]}`. `imported=false` significa que Suvadu solo vio el latido de comandos (todavía no hay transcript).
 
 `/chat`: `{session, messages: [{role: "user"|"assistant", text, at, truncated, turn}], hasMore, available, error?, refresh?}`.
 - `sessionId` es el id de Suvadu (`claude-<uuid>`, `codex-<uuid>`…), validado con `^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$`. Un id mal formado da 400; uno no listado, 404.

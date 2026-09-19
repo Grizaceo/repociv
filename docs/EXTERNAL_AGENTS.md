@@ -33,6 +33,10 @@ El botón 🤖 del HUD (o **F8**, o la paleta de comandos → "Agentes") abre un
 - **Unidades RepoCiv:** las unidades propias. El click abre su panel de unidad/chat de
   siempre.
 
+Las sesiones que conviene no interrumpir llevan un distintivo: **trabajando**
+(usó una herramienta recién) o **pensando…** (su proceso sigue vivo pero quedó
+callado). Ver [Vivo o callado](#vivo-o-callado).
+
 Cada tarjeta muestra dónde trabaja el agente:
 - `📍 <ciudad>` si su repo es una ciudad del mapa;
 - `🏛 repociv` si trabaja en RepoCiv mismo, que es la capital;
@@ -72,7 +76,8 @@ si todas funcionaron y `error` es el código de la primera que falló.
 | Misión | `<agente> · <modelo>` (Hermes: `<perfil> · <modelo> · <origen>`) |
 | Ciudad | 1) la ciudad cuyo `repoPath` es el prefijo más largo del `cwd` (por componentes: `repociv-old` no calza con `repociv`); 2) el propio checkout de RepoCiv → la capital (RepoCiv nunca es ciudad: el escaneo lo salta); 3) si no, el repo git que contiene el `cwd`, y el navegador cae a la capital si esa ciudad no está en su mapa; 4) sin repo → capital |
 | `working` | última actividad hace ≤ `REPOCIV_EXT_AGENTS_WORKING_MIN` (2 min) |
-| `idle` | más vieja que eso pero dentro de la ventana |
+| `thinking` | más vieja que eso, pero **un proceso sigue sosteniendo la sesión** (ver [Vivo o callado](#vivo-o-callado)) |
+| `idle` | más vieja que eso y nada la sostiene |
 | despawn | sin actividad en `REPOCIV_EXT_AGENTS_WINDOW_MIN` (10 min), o Hermes cerró la sesión |
 
 Los repos candidatos del paso 1 son los `selectedRepoPaths` de
@@ -94,8 +99,36 @@ el mismo id de sesión (`claude-<native_id>`), así que `suv history --executor 
 sirve de latido. Del historial solo se leen `session_id`, `executor`, `cwd` y
 `started_at`; el texto del comando nunca se lee ni se guarda.
 
-Consecuencia: un agente que piensa varios minutos sin ejecutar comandos pasa a `idle`
-hasta su próximo comando o fin de turno.
+Consecuencia: un agente que piensa varios minutos sin ejecutar comandos deja de
+emitir latido hasta su próximo comando o fin de turno.
+
+### Vivo o callado
+
+Ese reloj congelado mentía justo cuando más importa: decía `idle` —«escribile»—
+mientras el agente estaba en plena tarea. `server/session_liveness.py` responde
+una pregunta distinta y verificable: *¿queda un proceso sosteniendo esta sesión?*
+
+| Fuente | Señal | Fuerza |
+|---|---|---|
+| Hermes | `~/.hermes/runtime/active_sessions.json`: el arriendo que Hermes usa para que dos procesos no escriban una sesión, con su `pid` | exacta (id de sesión ↔ pid, revalidando que el pid siga siendo un proceso `hermes`) |
+| Suvadu (Claude Code, Codex, Cursor…) | escaneo de `/proc`: binarios de agente y su `cwd` | aproximada: no distingue dos sesiones en el mismo directorio |
+
+Sin actividad fresca pero con proceso vivo, el estado es `thinking`, y el panel
+dice «pensando…». Es deliberadamente ambiguo: **puede estar razonando o
+esperando tu respuesta en su terminal**, y el bridge no puede distinguirlo. Las
+dos lecturas llevan al mismo consejo, que es el punto: no le dispares un mensaje
+a ciegas.
+
+El sesgo del escaneo de `/proc` es hacia «vivo» a propósito — un falso «ocupado»
+cuesta una espera, un falso `idle` interrumpe a un agente trabajando. Solo lee
+pids, nombres de binario y directorios: ningún prompt, comando ni transcript.
+Sin `/proc` (fuera de Linux) no hay lectura y los estados vuelven a depender solo
+de los timestamps, como antes.
+
+Dos límites conocidos: el mapa no habla `thinking` (su vocabulario de unidades es
+`working`/`idle`, así que ahí una sesión pensando se ve trabajando), y pasada la
+ventana una sesión se lee `inactive` aunque su proceso siga vivo — que es también
+cuando su unidad deja el mapa.
 
 ### Misiones de RepoCiv (sin duplicados)
 
@@ -185,7 +218,7 @@ frontera que ya tenía el resto del bridge.
 | `SUVADU_BIN` | `~/.cargo/bin/suv` | ruta al binario |
 | `REPOCIV_EXT_AGENTS` | `1` | `0` = no arrancar el tracker |
 | `REPOCIV_EXT_AGENTS_WINDOW_MIN` | `10` | ventana de actividad |
-| `REPOCIV_EXT_AGENTS_WORKING_MIN` | `2` | umbral working → idle (≤ ventana) |
+| `REPOCIV_EXT_AGENTS_WORKING_MIN` | `2` | umbral working → thinking/idle (≤ ventana) |
 | `REPOCIV_EXT_AGENTS_POLL_S` | `30` | intervalo de sondeo (mín. 5) |
 | `REPOCIV_EXT_AGENTS_RECENT_H` | `24` | cuánto atrás lista el panel de Agentes (≥ ventana) |
 | `REPOCIV_HERMES_SESSIONS` | `1` | `0` = no leer los `state.db` de Hermes |
