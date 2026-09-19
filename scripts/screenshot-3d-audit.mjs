@@ -56,20 +56,120 @@ mkdirSync(GOLDEN, { recursive: true });
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5273';
 const updateMode = process.argv.includes('--update');
 
-// Fixed seed: a tiny, deterministic repo selection so screenshots are
-// reproducible across machines and CI runs. The paths are synthetic on
-// purpose: rendering only needs stable labels and tile count; it must
-// not depend on the maintainer's private workspace layout.
+// Synthetic world: every bridge endpoint that decides WHICH repos become
+// cities (and what the local office contains) is answered from these
+// fixtures via page routing, so the goldens never depend on the machine's
+// workspace. Before this, the app's boot step read the bridge's saved
+// repo selection (/api/repo-selections) and overwrote the seed below, so
+// every golden was a picture of the maintainer's real repos.
+const FIXTURE_ROOT = '/tmp/repociv-fixtures';
+function fixtureRepo(name, population, extensions, gold, extra = {}) {
+  const path = `${FIXTURE_ROOT}/${name}`;
+  return {
+    name,
+    path,
+    repoPath: path,
+    rootPath: FIXTURE_ROOT,
+    population,
+    extensions,
+    gold,
+    lastCommitDays: 3,
+    isLegacy: false,
+    hasGit: true,
+    ...extra,
+  };
+}
+// Extensions pick each city's biome (map.ts inferTerrain): ts→plains,
+// py→forest, rs/go→mountain, md→desert, legacy→ice.
+const FIXTURE_REPOS = [
+  fixtureRepo('repo-alpha', 820, { ts: 400, tsx: 120, json: 40, md: 20 }, 420),
+  fixtureRepo('repo-beta', 460, { py: 300, ipynb: 20, md: 30 }, 260),
+  fixtureRepo('repo-gamma', 300, { rs: 180, toml: 10 }, 180),
+  fixtureRepo('repo-delta', 140, { md: 120, yaml: 10 }, 90),
+  fixtureRepo('repo-epsilon', 90, { go: 70 }, 60),
+  fixtureRepo('repo-zeta', 40, { py: 30 }, 20, { isLegacy: true }),
+  // Two more highland repos widen the island enough for a river to spawn
+  // (sources need mountain/hills tiles far from the sea — Rivers3D).
+  fixtureRepo('repo-eta', 240, { rs: 150, c: 40 }, 140),
+  fixtureRepo('repo-theta', 160, { go: 120 }, 100),
+  fixtureRepo('repo-iota', 120, { ts: 90 }, 70),
+];
+const FIXTURE_PATHS = FIXTURE_REPOS.map((r) => r.path);
+const FIXTURE_SELECTION = {
+  activeRoot: FIXTURE_ROOT,
+  roots: [
+    { path: FIXTURE_ROOT, selectedRepoIds: FIXTURE_PATHS, selectedRepoPaths: FIXTURE_PATHS },
+  ],
+  selectedRepoIds: FIXTURE_PATHS,
+  selectedRepoPaths: FIXTURE_PATHS,
+  hasSelections: true,
+};
+// File list for the local-office golden (04), served for any repo id.
+const FIXTURE_FILES = [
+  'README.md',
+  'package.json',
+  'tsconfig.json',
+  'src/main.ts',
+  'src/app.ts',
+  'src/router.ts',
+  'src/store.ts',
+  'src/api/client.ts',
+  'src/api/types.ts',
+  'src/ui/header.ts',
+  'src/ui/sidebar.ts',
+  'src/ui/table.ts',
+  'src/ui/modal.ts',
+  'src/util/format.ts',
+  'src/util/dates.ts',
+  'tests/app.test.ts',
+  'tests/store.test.ts',
+  'tests/router.test.ts',
+  'docs/ARCHITECTURE.md',
+  'docs/API.md',
+  'docs/ROADMAP.md',
+  'scripts/build.sh',
+  'scripts/release.sh',
+  'public/index.html',
+  'public/logo.png',
+];
+
+// Connected wonders normally come from ~/.repociv/wonders/*.json via the
+// bridge; two synthetic iframe wonders give cam 08 monuments to frame.
+function fixtureWonder(id, title, category) {
+  return {
+    id,
+    title,
+    kind: 'iframe',
+    category,
+    version: '0.1.0',
+    defaultEnabled: true,
+    automationLevel: 'passive',
+    passiveMode: true,
+    agenticMode: false,
+    canSuggest: false,
+    canAct: false,
+    requiresConfirmation: false,
+    ui: { url: 'about:blank' },
+    permissions: {
+      readRepos: false,
+      writeRepos: false,
+      network: 'none',
+      requiresApprovalForMutations: false,
+    },
+    optionalFeatures: [],
+    events: { emits: [], accepts: [] },
+    actions: [],
+    mcp: { enabled: false, server: null },
+  };
+}
+const FIXTURE_WONDERS = [
+  fixtureWonder('fixture-archive', 'Archivo Imperial', 'knowledge'),
+  fixtureWonder('fixture-lab', 'Laboratorio Real', 'lab'),
+];
+
 const FIXED_SEED = {
   version: 1,
-  selectedRepoPaths: [
-    '/tmp/repociv-fixtures/repo-alpha',
-    '/tmp/repociv-fixtures/repo-beta',
-    '/tmp/repociv-fixtures/repo-gamma',
-    '/tmp/repociv-fixtures/repo-delta',
-    '/tmp/repociv-fixtures/repo-epsilon',
-    '/tmp/repociv-fixtures/repo-zeta',
-  ],
+  selectedRepoPaths: FIXTURE_PATHS,
   filters: { owners: [], topics: [], languages: [] },
 };
 
@@ -84,34 +184,33 @@ const FIXED_SEED = {
 // regression in any group's texture changes the same set of hashes.
 const CAMERAS = [
   // 01 carries its own ceiling: the bimodal driver float-scheduling flip
-  // (see 07 below) lands on ~98 scattered edge pixels at this macro zoom
-  // since the GLB prop pass (units/crystals/obelisks) added knife edges.
-  { name: '01-general-overview', cam: 'auto,0.9', tolerancePx: 120 },
+  // (see 07 below) lands on scattered edge pixels at this macro zoom —
+  // ~98 px after the GLB prop pass, 112-156 px (15 separate spots) once the
+  // KayKit city/wall kits and the fixture wonders added more knife edges.
+  { name: '01-general-overview', cam: 'auto,0.9', tolerancePx: 200 },
   { name: '02-zoomed-mid',       cam: 'auto,1.8' },
   { name: '03-zoomed-close',     cam: 'auto,3.2' },
   // 05/06 exist to verify biome textures (ocean banding, mountain strata,
   // desert dunes). They are CLOSE-UPS at absolute world coords — macro
   // zoom-outs are useless for this: the FogExp2 atmospheric haze
   // desaturates everything at distance, so texture changes vanish.
-  // Coords come from __repocivDebug.getTileStats().samplePos for the
-  // FIXED_SEED world (stable while the seed doesn't change); reveal=all
-  // lifts fog of war so the rim biomes are actually rendered.
-  // 05 reframed (pase 2): the old -1326,-2207,2.2 frame was deep-ocean
-  // edge-on — prism side faces filled the shot and verified neither the
-  // coastal gradient nor the foam line. This frame holds an actual
-  // coastline with shoreline + foam dots in view.
-  { name: '05-ocean-closeup',  cam: '-900,-1600,1.0', reveal: true },
-  { name: '06-desert-mountain-closeup', cam: '117,157,1.6', reveal: true },
-  // 07: river ribbon (iter7). Coords = midpoint of the longest river for the
-  // FIXED_SEED world, from __repocivDebug.getRiverStats(). Stable while the
-  // seed and the river generator stay unchanged. The ribbon is a long thin
-  // diagonal across the whole frame — the bimodal driver float-scheduling
-  // flip (see tolerance notes below) lands on ~138 scattered edge pixels
-  // here, so this camera carries its own ceiling.
-  { name: '07-river-closeup', cam: '-624,0,1.8', reveal: true, tolerancePx: 170 },
+  // Coords are for the FIXTURE_REPOS world (stable while the fixtures and
+  // the world generator don't change); reveal=all lifts fog of war so the
+  // rim biomes are actually rendered.
+  // 05: north-west coastline — shoreline gradient + foam line in frame.
+  { name: '05-ocean-closeup',  cam: '-330,-380,1.0', reveal: true },
+  // 06: a mountain city (repo-gamma, rs) beside desert dunes, a forest and
+  // the coast.
+  { name: '06-desert-mountain-closeup', cam: '117,-180,1.6', reveal: true },
+  // 07: river ribbon (iter7). Coords = midpoint of the fixture world's river,
+  // from __repocivDebug.getRiverStats(). The ribbon crosses the frame
+  // diagonally — the bimodal driver float-scheduling flip (see tolerance
+  // notes below) lands on scattered edge pixels here, so this camera carries
+  // its own ceiling.
+  { name: '07-river-closeup', cam: '351,203,1.8', reveal: true, tolerancePx: 170 },
   // 08: wonders closeup (F5). auto+1.4 zooms out enough to fit the capital
   // and the wonder ring around it in one frame, so a single golden catches
-  // the monuments of whatever wonders are currently connected.
+  // the monuments of the FIXTURE_WONDERS.
   { name: '08-wonders-closeup', cam: 'auto,1.4', reveal: true },
 ];
 
@@ -138,6 +237,45 @@ async function main() {
     // it, so freezing it stalls initialization and the capture lands on
     // the welcome screen. Time-driven WebGL animation determinism comes
     // from ?freeze=<s> (pins renderer.animTime) instead.
+  });
+  // Serve the synthetic world. Mutating calls to the selection endpoint are
+  // answered locally too, so a capture run never rewrites the bridge's state.
+  await context.route(/\/api\/repos(\?.*)?$/, (route) => route.fulfill({ json: FIXTURE_REPOS }));
+  await context.route(/\/api\/repos\/selected(\?.*)?$/, (route) =>
+    route.fulfill({ json: FIXTURE_REPOS }),
+  );
+  await context.route(/\/api\/repo-selections(\?.*)?$/, (route) =>
+    route.request().method() === 'GET'
+      ? route.fulfill({ json: FIXTURE_SELECTION })
+      : route.fulfill({ json: { ok: true } }),
+  );
+  await context.route(/\/api\/files\/[^/?]+(\?.*)?$/, (route) =>
+    route.fulfill({ json: { files: FIXTURE_FILES } }),
+  );
+  await context.route(/\/api\/wonders(\?.*)?$/, (route) =>
+    route.fulfill({ json: FIXTURE_WONDERS }),
+  );
+  // Per-wonder calls (launch, launch-status, health): the fixture wonders
+  // have no backing service, so answer "offline" instead of asking the
+  // bridge to launch anything.
+  await context.route(/\/api\/wonders\/[^/?]+\/[^?]+/, (route) => {
+    const id = decodeURIComponent(new URL(route.request().url()).pathname.split('/').at(-2) ?? '');
+    return route.fulfill({
+      json: {
+        ok: true,
+        id,
+        status: 'offline',
+        ready: false,
+        api_ready: false,
+        ui_ready: false,
+        pids: {},
+        started_at: null,
+        api_url: '',
+        ui_url: '',
+        log_tail: '',
+        error: null,
+      },
+    });
   });
   const page = await context.newPage();
   // Surface page errors — a shader/WebGL failure renders as an empty sky
@@ -204,7 +342,12 @@ async function main() {
     // panels reflect live bridge state — none of that is what this gate
     // protects (the WebGL world rendering), and all of it breaks SHA
     // equality between runs.
-    await page.addStyleTag({ content: '#hud-overlay { display: none !important; }' });
+    // The Hermes degraded-mode banner lives outside #hud-overlay and covers
+    // the top third of the frame whenever the LLM harness is down — every
+    // golden used to bake it in.
+    await page.addStyleTag({
+      content: '#hud-overlay, .hermes-degraded-banner { display: none !important; }',
+    });
     // The WebGL canvas lives in #three-container; require it so a silent
     // fallback to the flat renderer fails the gate instead of passing.
     await page.locator('#three-container canvas').waitFor({ state: 'attached', timeout: 15_000 });
@@ -280,7 +423,7 @@ async function main() {
 
   // ── Local view golden (office layout regression net) ─────────────────
   // The local view once went visually empty (desks suppressed) without
-  // anything catching it. One deterministic capture of the labhub office:
+  // anything catching it. One deterministic capture of a fixture office:
   // clean mode kills particles/Zzz randomness, freeze pins animations,
   // and DAVI idles at the reception until a mission is dispatched.
   {
@@ -295,17 +438,19 @@ async function main() {
       .waitFor({ state: 'hidden', timeout: 15_000 })
       .catch(() => {});
     await page.evaluate(() => document.getElementById('imperial-welcome')?.remove());
-    await page.addStyleTag({ content: '#hud-overlay { display: none !important; }' });
+    await page.addStyleTag({
+      content: '#hud-overlay, .hermes-degraded-banner { display: none !important; }',
+    });
     await page
       .waitForFunction(() => typeof window.__repocivDebug?.openLocalView === 'function', null, {
         timeout: 15_000,
       })
       .catch(() => {});
     const opened = await page.evaluate(
-      () => window.__repocivDebug?.openLocalView?.('labhub') ?? false,
+      () => window.__repocivDebug?.openLocalView?.('repo-alpha') ?? false,
     );
     if (!opened) {
-      console.error('[AUDIT] could not open local view for labhub — golden skipped');
+      console.error('[AUDIT] could not open local view for repo-alpha — golden skipped');
     } else {
       // Local world generation + static layer build + camera settle.
       await page.waitForTimeout(5000);
