@@ -19,6 +19,11 @@ function wonderLabel(t: WonderType, fallbackName?: string): string | null {
 const labelGroup = new Group();
 labelGroup.name = 'map-labels';
 
+/** World-space lift of a city banner's anchor (its bottom edge) above the
+ *  tile. TileYields3D anchors the city yield row at this same point and lets
+ *  CSS stack it above the banner box. */
+export const CITY_BANNER_LIFT = HEX_SIZE * 0.35;
+
 let cssRenderer: CSS2DRenderer | null = null;
 let lastSignature = '';
 
@@ -115,7 +120,7 @@ export function rebuildMapLabels(
     const tile = getTile(tileKey(city.coord));
     const elev = tile ? terrainElevation(tile.terrain) : 0;
     const pos = axialToWorld3D(city.coord.q, city.coord.r, elev);
-    pos.y += HEX_SIZE * 0.35;
+    pos.y += CITY_BANNER_LIFT;
 
     const label = makeCityBanner(city);
     label.position.copy(pos);

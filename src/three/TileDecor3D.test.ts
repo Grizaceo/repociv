@@ -49,3 +49,37 @@ describe('TileDecor3D mountain decor', () => {
     expect(counts).toEqual([2, 2]);
   });
 });
+
+describe('TileDecor3D plains', () => {
+  // The old plains decor was a hash-gated scatter of green boxes ("grass
+  // patches") and golden slabs ("farms") on ~45% of plains tiles. It carried
+  // no game meaning and read as floating crates/planks at every zoom, so
+  // plains now rely on the terrain surface alone.
+  it('adds no placeholder boxes to plains tiles', () => {
+    const plains: Tile[] = [];
+    for (let q = -6; q <= 6; q++) {
+      for (let r = -6; r <= 6; r++) {
+        plains.push({ ...mountainTile(false), coord: { q, r }, terrain: 'plains' });
+      }
+    }
+    rebuildTileDecor(plains, 'high');
+
+    expect(getTileDecorGroup().children).toHaveLength(0);
+  });
+});
+
+describe('TileDecor3D sacred stone circle', () => {
+  // The capital always sits on a sacred tile; its 6-stone ring (r=0.3·HEX)
+  // landed inside the KayKit castle footprint as bare tan pillars.
+  it('skips the stone circle on a city tile (the capital)', () => {
+    rebuildTileDecor([{ ...mountainTile(true), terrain: 'sacred' }], 'high');
+
+    expect(getTileDecorGroup().children).toHaveLength(0);
+  });
+
+  it('keeps the stone circle on a free sacred tile', () => {
+    rebuildTileDecor([{ ...mountainTile(false), terrain: 'sacred' }], 'high');
+
+    expect(getTileDecorGroup().children.length).toBeGreaterThan(0);
+  });
+});

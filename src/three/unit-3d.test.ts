@@ -181,3 +181,31 @@ describe('UnitMesh3D lifecycle — walking hop', () => {
     }
   });
 });
+
+describe('UnitMesh3D idle phase', () => {
+  // Regression: idlePhase came from Math.random(), whose (seeded) sequence the
+  // golden-capture script can't pin — other code draws from it a
+  // frame-dependent number of times — so the frozen idle pulse landed on a
+  // different ring scale every run. The phase must be a function of the id.
+  it('derives the idle phase from the unit id, not from Math.random', () => {
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0.123);
+    rebuildUnits([makeUnit('MAIN', 0, 0)], getTile);
+    const first = _testGetEntry('MAIN')!.idlePhase;
+    clearUnits();
+
+    spy.mockReturnValue(0.987);
+    rebuildUnits([makeUnit('MAIN', 0, 0)], getTile);
+    const second = _testGetEntry('MAIN')!.idlePhase;
+    spy.mockRestore();
+
+    expect(second).toBe(first);
+    expect(first).toBeGreaterThanOrEqual(0);
+    expect(first).toBeLessThan(Math.PI * 2);
+  });
+
+  it('keeps different units out of phase', () => {
+    rebuildUnits([makeUnit('MAIN', 0, 0), makeUnit('scout-1', 1, 0)], getTile);
+
+    expect(_testGetEntry('MAIN')!.idlePhase).not.toBe(_testGetEntry('scout-1')!.idlePhase);
+  });
+});

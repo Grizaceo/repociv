@@ -276,7 +276,7 @@ export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | und
       unitId: unit.id,
       lifeState: 'spawning',
       tween: 0,
-      idlePhase: Math.random() * Math.PI * 2,
+      idlePhase: idlePhaseForId(unit.id),
       hopY: 0,
       moving: unit.state === 'moving',
       currentPos: { x: pos.x, y: targetY, z: pos.z },
@@ -337,6 +337,18 @@ const HOP_DURATION = 0.2;
 // figurine moves smoothly between dirty-flag rebuilds (which only fire
 // when coord changes, not every pathProgress step).
 const MOVEMENT_SPEED = 2.5; // hexes per second
+
+/** Stable per-unit phase in [0, 2π): units pulse out of step with each
+ *  other, but a given unit always lands on the same phase — Math.random()
+ *  made frozen golden captures differ run to run. FNV-1a over the id. */
+function idlePhaseForId(id: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return ((h >>> 0) / 0x100000000) * Math.PI * 2;
+}
 
 function easeInOutSine(t: number): number {
   return -(Math.cos(Math.PI * t) - 1) / 2;

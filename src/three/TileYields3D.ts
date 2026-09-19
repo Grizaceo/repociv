@@ -5,6 +5,7 @@ import { type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+import { CITY_BANNER_LIFT } from './MapLabels3D.ts';
 
 const yieldGroup = new Group();
 yieldGroup.name = 'tile-yields';
@@ -44,6 +45,19 @@ function makeYieldLabel(text: string): CSS2DObject {
   return obj;
 }
 
+/** One row for all of a city tile's yields, bottom-anchored at the banner
+ *  anchor. `.map-yield-icon-city` pads its bottom by the banner's height, so
+ *  the row always sits directly above the name plate in screen space — a
+ *  world-space offset can't do that, it drifts onto the name as zoom changes. */
+function makeCityYieldRow(icons: string[]): CSS2DObject {
+  const el = document.createElement('div');
+  el.className = 'map-yield-icon map-yield-icon-city';
+  el.textContent = icons.join('');
+  const obj = new CSS2DObject(el);
+  obj.center.set(0.5, 1);
+  return obj;
+}
+
 function clearYields(): void {
   while (yieldGroup.children.length > 0) {
     yieldGroup.remove(yieldGroup.children[0]!);
@@ -69,8 +83,14 @@ export function rebuildTileYields(
 
     const elev = terrainElevation(tile.terrain);
     const pos = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-    // Position icons higher above city tiles so they float above buildings.
-    pos.y += tile.city ? HEX_SIZE * 0.55 : HEX_SIZE * 0.12;
+    if (tile.city) {
+      pos.y += CITY_BANNER_LIFT;
+      const row = makeCityYieldRow(icons);
+      row.position.copy(pos);
+      yieldGroup.add(row);
+      continue;
+    }
+    pos.y += HEX_SIZE * 0.12;
 
     const spacing = HEX_SIZE * 0.14;
     const startX = -((icons.length - 1) * spacing) / 2;

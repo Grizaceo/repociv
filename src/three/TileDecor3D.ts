@@ -402,68 +402,6 @@ function buildSacred(tiles: Tile[]): void {
   }
 }
 
-// ── Plains grass patches (high LOD) ─────────────────────────────────────────
-
-function buildGrass(tiles: Tile[]): void {
-  if (tiles.length === 0) return;
-
-  const geom = new BoxGeometry(HEX_SIZE * 0.16, HEX_SIZE * 0.1, HEX_SIZE * 0.05);
-  // Baked-atlas plains mean (186,219,132) × 0.85 — grass tufts one shade
-  // under the cell instead of the old saturated green.
-  const mat = new MeshLambertMaterial({ color: new Color(0x9eba70) });
-  const mesh = new InstancedMesh(geom, mat, tiles.length * 2);
-
-  let idx = 0;
-  const m = new Matrix4();
-  for (const tile of tiles) {
-    const elev = terrainElevation(tile.terrain);
-    const pos = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-    const h = hashCoord(tile.coord.q, tile.coord.r);
-    for (let g = 0; g < 2; g++) {
-      const angle = ((h + g * 17) % 36) * (Math.PI / 18);
-      m.makeTranslation(
-        pos.x + Math.cos(angle) * HEX_SIZE * 0.18,
-        pos.y + 1.2,
-        pos.z + Math.sin(angle) * HEX_SIZE * 0.18,
-      );
-      mesh.setMatrixAt(idx++, m.clone());
-    }
-  }
-  mesh.instanceMatrix.needsUpdate = true;
-  addMesh(mesh);
-}
-
-// ── Plains farms (high LOD) ──────────────────────────────────────────────────
-
-function buildFarms(tiles: Tile[]): void {
-  if (tiles.length === 0) return;
-
-  // Civ V farms read as golden wheat strips, not slabs: the old single
-  // 0x4e7832 box was darker than the grass and pockmarked every plains
-  // span with green rectangles. Two thin wheat strips per farm, rotated
-  // together by the coord hash.
-  const geom = new BoxGeometry(HEX_SIZE * 0.4, HEX_SIZE * 0.045, HEX_SIZE * 0.13);
-  const mat = new MeshLambertMaterial({ color: new Color(0xbfa14f) });
-  const mesh = new InstancedMesh(geom, mat, tiles.length * 2);
-
-  const m = new Matrix4();
-  const one = new Vector3(1, 1, 1);
-  let idx = 0;
-  for (const tile of tiles) {
-    const elev = terrainElevation(tile.terrain);
-    const pos = axialToWorld3D(tile.coord.q, tile.coord.r, elev);
-    const h = hashCoord(tile.coord.q, tile.coord.r);
-    const rot = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), (h % 12) * (Math.PI / 6));
-    for (const s of [-1, 1]) {
-      const off = new Vector3(0, 0, s * HEX_SIZE * 0.085).applyQuaternion(rot);
-      m.compose(new Vector3(pos.x + off.x, pos.y + 1.0, pos.z + off.z), rot, one);
-      mesh.setMatrixAt(idx++, m.clone());
-    }
-  }
-  mesh.instanceMatrix.needsUpdate = true;
-  addMesh(mesh);
-}
-
 // ── Public API ───────────────────────────────────────────────────────────────
 
 export function rebuildTileDecor(
@@ -490,8 +428,6 @@ export function rebuildTileDecor(
   const deserts: Tile[] = [];
   const ices: Tile[] = [];
   const sacreds: Tile[] = [];
-  const grass: Tile[] = [];
-  const farms: Tile[] = [];
 
   for (const tile of tiles) {
     if (!tile.revealed) continue;
@@ -520,11 +456,10 @@ export function rebuildTileDecor(
         // the generic standing-stones + altar + gem. Skip them here so
         // we don't double-stack geometry on the same hex.
         if (tile.district?.type === 'wonder') break;
+        // The capital always sits on a sacred tile: its castle owns the
+        // centre, and the 0.3·HEX stone ring would stand inside the keep.
+        if (tile.city) break;
         sacreds.push(tile);
-        break;
-      case 'plains':
-        if (h % 5 === 0) farms.push(tile);
-        else if (h % 3 === 0) grass.push(tile);
         break;
       default:
         break;
@@ -537,8 +472,6 @@ export function rebuildTileDecor(
   buildDesert(deserts);
   buildIce(ices);
   buildSacred(sacreds);
-  buildGrass(grass);
-  buildFarms(farms);
 }
 
 export function clearTileDecor(): void {
@@ -560,7 +493,6 @@ export function _terrainNeedsDecor(terrain: Terrain): boolean {
   return (
     terrain === 'mountain' ||
     terrain === 'forest' ||
-    terrain === 'plains' ||
     terrain === 'hills' ||
     terrain === 'desert' ||
     terrain === 'ice' ||

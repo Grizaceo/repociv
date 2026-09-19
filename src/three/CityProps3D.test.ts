@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { _testRecipes } from './CityProps3D.ts';
 
-const { PROP_IDS, RECIPES, LEVEL_RECIPE } = _testRecipes();
+const { PROP_IDS, RECIPES, LEVEL_RECIPE, CAPITAL_SUBURBS } = _testRecipes();
 
 // Inner radius of the procedural wall ring (CityCluster3D): 0.34·HEX.
 // Part edge = dist(offset)·HEX + s·HEX/2 must stay inside it.
@@ -32,11 +32,21 @@ describe('KayKit city prop recipes', () => {
     for (const [name, parts] of Object.entries(RECIPES)) {
       for (const part of parts) {
         const edge = dist(part.ox, part.oz) + part.s / 2;
-        expect(
-          edge,
-          `${name} part ${part.id} edge=${edge.toFixed(3)}·HEX`,
-        ).toBeLessThan(WALL_INNER);
+        expect(edge, `${name} part ${part.id} edge=${edge.toFixed(3)}·HEX`).toBeLessThan(
+          WALL_INNER,
+        );
       }
+    }
+  });
+
+  it('capital suburbs sit outside the wall towers and inside the tile', () => {
+    // Vertex towers reach ~0.5·HEX from centre; the hex inradius is 0.866·HEX.
+    expect(CAPITAL_SUBURBS.length).toBeGreaterThan(0);
+    for (const part of CAPITAL_SUBURBS) {
+      expect(PROP_IDS).toContain(part.id);
+      const d = dist(part.ox, part.oz);
+      expect(d - part.s / 2, `${part.id} inner edge`).toBeGreaterThan(0.5);
+      expect(d + part.s / 2, `${part.id} outer edge`).toBeLessThan(Math.sqrt(3) / 2);
     }
   });
 
@@ -59,18 +69,15 @@ describe('KayKit city prop recipes', () => {
       expect(existsSync(`${base}.gltf`), `${id}.gltf`).toBe(true);
       expect(existsSync(`${base}.bin`), `${id}.bin`).toBe(true);
     }
-    expect(
-      existsSync('public/assets/3d/props/kaykit/buildings/red/hexagons_medieval.png'),
-    ).toBe(true);
+    expect(existsSync('public/assets/3d/props/kaykit/buildings/red/hexagons_medieval.png')).toBe(
+      true,
+    );
     expect(existsSync('public/assets/3d/props/kaykit/LICENSE-KayKit.txt')).toBe(true);
   });
 
   it('gltf files reference their sibling .bin and the shared atlas', () => {
     for (const id of PROP_IDS) {
-      const raw = readFileSync(
-        `public/assets/3d/props/kaykit/buildings/red/${id}.gltf`,
-        'utf-8',
-      );
+      const raw = readFileSync(`public/assets/3d/props/kaykit/buildings/red/${id}.gltf`, 'utf-8');
       expect(raw).toContain(`${id}.bin`);
       expect(raw).toContain('hexagons_medieval.png');
     }

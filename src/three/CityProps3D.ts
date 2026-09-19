@@ -5,8 +5,9 @@
 // a RECIPE: a list of parts with hex-fraction offsets, per-part scale (as a
 // fraction of HEX_SIZE of the part's longest bbox side) and a rotation step
 // (×60°). Part geometries are bbox-normalized at load so recipe scales are
-// footprint-independent. The procedural cluster (CityCluster3D) still
-// supplies plaza, walls, and towers — those complement the GLB clusters.
+// footprint-independent. Walls and towers come from the KayKit wall kit
+// (CityWalls3D); CityCluster3D only draws a procedural fallback while the
+// kits are loading or failed.
 import { Group, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGlbScene, type MergedGlb } from './mergeGlbScene.ts';
@@ -78,6 +79,30 @@ const RECIPES: Record<'capital' | 'hamlet' | 'village' | 'town' | 'city', Recipe
   ],
 };
 
+// Capital suburbs: KayKit homes OUTSIDE the wall ring so the capital reads as
+// a cluster spilling past its fortifications (Civ V capitals are never one
+// monolith). One per alternate hex-edge direction (30°/150°/270°), clear of
+// the vertex towers (inner edge > 0.5·HEX) and inside the tile (outer edge
+// < hex inradius 0.866·HEX). Replaces the old procedural box satellites.
+const SUBURB_R = 0.64;
+const CAPITAL_SUBURBS: RecipePart[] = [
+  {
+    id: 'building_home_A_red',
+    ox: SUBURB_R * Math.cos(Math.PI / 6),
+    oz: SUBURB_R * Math.sin(Math.PI / 6),
+    s: 0.22,
+    rot: 1,
+  },
+  {
+    id: 'building_home_B_red',
+    ox: -SUBURB_R * Math.cos(Math.PI / 6),
+    oz: SUBURB_R * Math.sin(Math.PI / 6),
+    s: 0.2,
+    rot: 4,
+  },
+  { id: 'building_home_A_red', ox: 0, oz: -SUBURB_R, s: 0.2, rot: 3 },
+];
+
 // cityLevel() 0-3 → recipe key (level 3 is a non-capital "city").
 const LEVEL_RECIPE = ['hamlet', 'village', 'town', 'city'] as const;
 
@@ -102,9 +127,7 @@ export function ensureCityPropsLoad(onSettled?: () => void): void {
   if (state !== 'idle') return;
   state = 'loading';
   const loader = new GLTFLoader();
-  Promise.all(
-    PROP_IDS.map((id) => loader.loadAsync(`${KAYKIT_DIR}/${id}.gltf`)),
-  )
+  Promise.all(PROP_IDS.map((id) => loader.loadAsync(`${KAYKIT_DIR}/${id}.gltf`)))
     .then((gltfs) => {
       variants = new Map();
       for (let i = 0; i < PROP_IDS.length; i++) {
@@ -160,7 +183,9 @@ export function rebuildCityProps(
   // recipe. Every part of every city lands in its part's InstancedMesh.
   const byPart = new Map<PartId, InstanceSpec[]>();
   for (const city of cities) {
-    const recipe = city.isCapital ? RECIPES.capital : RECIPES[LEVEL_RECIPE[cityLevel(city)]!];
+    const recipe = city.isCapital
+      ? [...RECIPES.capital, ...CAPITAL_SUBURBS]
+      : RECIPES[LEVEL_RECIPE[cityLevel(city)]!];
     const cityRot = hashCoord(city.coord.q, city.coord.r) % 6;
     for (const part of recipe) {
       const bucket = byPart.get(part.id);
@@ -226,6 +251,7 @@ export function _testRecipes(): {
   PROP_IDS: readonly string[];
   RECIPES: typeof RECIPES;
   LEVEL_RECIPE: readonly string[];
+  CAPITAL_SUBURBS: readonly RecipePart[];
 } {
-  return { PROP_IDS, RECIPES, LEVEL_RECIPE };
+  return { PROP_IDS, RECIPES, LEVEL_RECIPE, CAPITAL_SUBURBS };
 }

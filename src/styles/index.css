@@ -314,3 +314,10 @@ body.local-view::after {
   pointer-events: none;
   user-select: none;
 }
+/* City-tile yields share the banner's anchor (bottom edge); the padding is
+   the banner's height plus a gap, so the row stacks right above the name. */
+.map-yield-icon-city {
+  padding-bottom: 38px;
+  letter-spacing: 2px;
+  white-space: nowrap;
+}
