@@ -32,6 +32,7 @@ import {
 import { cfg } from './gameConfig.ts';
 import { approveCommand } from './commandBus.ts';
 import { terminalPanel } from './terminalPanel.ts';
+import { isExternalAgentUnit } from './externalAgents.ts';
 
 // ─── Context ────────────────────────────────────────────────────────────────
 // Everything a handler might need from the outside world. The BridgeEvents
@@ -82,9 +83,26 @@ const HANDLERS: HandlerByType = {
   unit_spawn(ctx, evt) {
     const parent = evt.parentUnit ? ctx.state.getUnit(evt.parentUnit) : undefined;
     let spawnCoord = { q: evt.hex[0], r: evt.hex[1] };
-    if (parent && evt.hex[0] === 0 && evt.hex[1] === 0) {
+    let cityId = evt.cityId;
+    const unplaced = evt.hex[0] === 0 && evt.hex[1] === 0;
+    if (parent && unplaced) {
       const childIndex = ctx.state.getChildrenOfUnit(parent.id).filter((c) => c.ephemeral).length;
       spawnCoord = pickDetachmentHex(ctx.state, parent.coord, childIndex);
+    } else if (!parent && unplaced && evt.cityId) {
+      // No parent to stand next to (e.g. an external agent seen by Suvadu):
+      // stand next to the city it works in — the capital when that repo is
+      // not on this map.
+      const cities = ctx.state.world.cities;
+      const city =
+        cities.find((c) => c.id === evt.cityId || c.repoPath === evt.cityId) ??
+        cities.find((c) => c.isCapital);
+      if (city) {
+        cityId = city.id;
+        const siblings = ctx.state.world.units.filter(
+          (u) => u.cityId === city.id && u.ephemeral && !u.parentUnitId,
+        ).length;
+        spawnCoord = pickDetachmentHex(ctx.state, city.coord, siblings);
+      }
     }
     const unit = ctx.state.spawnUnit(
       evt.unit,
@@ -93,7 +111,7 @@ const HANDLERS: HandlerByType = {
       evt.civ,
       spawnCoord,
       evt.mission,
-      evt.cityId,
+      cityId,
       {
         parentUnitId: evt.parentUnit,
         ephemeral: evt.ephemeral,
@@ -118,6 +136,9 @@ const HANDLERS: HandlerByType = {
 
   unit_state(ctx, evt) {
     ctx.state.setUnitState(evt.unit, evt.state);
+    // External agents are someone else's work: they must not drive (or clear)
+    // the HUD's global operation ticker.
+    if (isExternalAgentUnit(evt.unit)) return;
     if (evt.state === 'working') ctx.setOperationTicker(true, `${evt.unit} trabajando…`);
     else if (evt.state === 'idle') ctx.setOperationTicker(false);
   },
