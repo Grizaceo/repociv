@@ -1,16 +1,18 @@
 // ─── RepoCiv — Agents panel (F8) ─────────────────────────────────────────────
 // Every agent in one list, whether or not its repo is a city on this map:
-//   · Activos      — external sessions (Claude Code, Codex, Cursor…) seen by
-//                    Suvadu in the tracker window; they also stand on the map.
+//   · Activos      — external sessions (Claude Code, Codex, Cursor… via Suvadu;
+//                    Hermes via its state.db) in the tracker window; they also
+//                    stand on the map.
 //   · Últimas 24 h — the same sessions once they go quiet (chat still readable).
+//   · Cron / Gateway — Hermes cron jobs and gateway chats (Telegram…): listed
+//                    only, never on the map (collapsed by default).
 //   · RepoCiv      — this dashboard's own units (click → their usual chat).
-// Clicking an external session opens its chat (read-only, from Suvadu) and
-// puts the camera on its unit — or on its city, when the repo is on the map.
+// Clicking an external session opens its chat (read-only) and puts the camera
+// on its unit — or on its city, when the repo is on the map.
 import type { GameState } from '../game.ts';
 import type { Axial } from '../hex.ts';
 import type { Unit } from '../types.ts';
 import {
-  agentLabel,
   chatMessagesHtml,
   fetchExternalChat,
   fetchExternalSessions,
@@ -19,6 +21,7 @@ import {
   partitionSessions,
   placeOnMap,
   relativeTime,
+  sessionLabel,
   shortModel,
   type ExternalChat,
   type ExternalSessionRow,
@@ -49,6 +52,8 @@ let _listTimer = 0;
 let _chatTimer = 0;
 let _renderedKey = '';
 const _refreshed = new Set<string>();
+/** Collapsible sections (cron, gateway) the user opened; survives list rebuilds. */
+const _openSections = new Set<string>();
 
 export function bindAgentsPanel(deps: AgentsPanelDeps): void {
   _deps = deps;
@@ -80,7 +85,7 @@ export function toggleAgentsPanel(): void {
   else openAgentsPanel();
 }
 
-/** Open the chat of an external agent, by Suvadu session id or by its ext-* unit id. */
+/** Open the chat of an external agent, by session id or by its ext-* unit id. */
 export function openExternalAgentChat(ref: string): void {
   if (!_visible) openAgentsPanel();
   const byUnit = isExternalAgentUnit(ref);
@@ -112,15 +117,27 @@ async function _loadList(): Promise<void> {
 /** The list's structure: which cards, in which state and place. Clock and
  *  counters are left out — they tick in place (_tickAgo). */
 function _listKey(): string {
-  const sessions = _rows?.map((r) => [r.sessionId, r.state, r.model, r.cityId, r.subagent]);
+  const sessions = _rows?.map((r) => [
+    r.sessionId,
+    r.state,
+    r.model,
+    r.cityId,
+    r.subagent,
+    r.section,
+  ]);
   const units = (_deps?.state.getAllUnits() ?? [])
     .filter((u) => !u.ephemeral)
     .map((u) => `${u.id}:${u.state}`);
   return JSON.stringify([sessions ?? null, units, _deps?.state.world.cities.length ?? 0]);
 }
 
+function _isHermes(row: ExternalSessionRow): boolean {
+  return row.source === 'hermes';
+}
+
 function _statsText(row: ExternalSessionRow): string {
-  return [`${row.commandCount} cmd`, formatTokens(row.totalTokens)].filter(Boolean).join(' · ');
+  const unit = _isHermes(row) ? 'tools' : 'cmd';
+  return [`${row.commandCount} ${unit}`, formatTokens(row.totalTokens)].filter(Boolean).join(' · ');
 }
 
 function _tickAgo(): void {
@@ -154,7 +171,9 @@ function _openChat(row: ExternalSessionRow): void {
   _locate(row);
   // Suvadu re-imports a transcript only on prompt/stop: pull it now for a live
   // session (once per session per panel lifetime; ↻ does it on demand).
-  const refresh = (row.active || !row.imported) && !_refreshed.has(row.sessionId);
+  // Hermes reads its live database: nothing to import.
+  const refresh =
+    !_isHermes(row) && (row.active || !row.imported) && !_refreshed.has(row.sessionId);
   if (refresh) _refreshed.add(row.sessionId);
   void _loadChat(refresh);
   window.clearInterval(_chatTimer);
@@ -208,10 +227,14 @@ function _cardHtml(row: ExternalSessionRow, now: number): string {
     ? `<span class="agents-model">${escapeHtml(shortModel(row.model))}</span>`
     : '';
   const sub = row.subagent ? '<span class="agents-tag">subagente</span>' : '';
+  const origin =
+    row.origin && row.origin !== row.section && row.origin !== 'subagent'
+      ? `<span class="agents-tag" title="Cómo se inició la sesión">${escapeHtml(row.origin)}</span>`
+      : '';
   return `<button type="button" class="agents-card agents-card--${escapeHtml(row.state)}" data-session="${escapeHtml(row.sessionId)}">
     <span class="agents-dot" aria-hidden="true"></span>
     <span class="agents-card-main">
-      <span class="agents-card-title">${escapeHtml(agentLabel(row.agent))} ${model} ${sub}</span>
+      <span class="agents-card-title">${escapeHtml(sessionLabel(row))} ${model} ${origin} ${sub}</span>
       ${_whereHtml(row)}
     </span>
     <span class="agents-card-meta"><span class="agents-ago">${escapeHtml(relativeTime(row.lastActivityAt, now))}</span><br><span class="agents-stats">${escapeHtml(_statsText(row))}</span></span>
@@ -245,21 +268,44 @@ function _render(): void {
     external =
       '<div class="agents-empty">⚠ No pude leer los agentes (¿bridge o Suvadu caídos?). Ver <code>/health</code> → externalAgents.</div>';
   } else {
-    const { active, recent } = partitionSessions(_rows);
+    const { active, recent, cron, gateway } = partitionSessions(_rows);
     const list = (rows: ExternalSessionRow[], empty: string) =>
       rows.length
         ? rows.map((r) => _cardHtml(r, now)).join('')
         : `<div class="agents-empty">${empty}</div>`;
+    // Cron and gateway sessions never go on the map; they fold away unless
+    // there is one running, or the user opened the section.
+    const folded = (key: string, title: string, rows: ExternalSessionRow[], hint: string) => {
+      if (rows.length === 0) return '';
+      const live = rows.filter((r) => r.active).length;
+      const open = _openSections.has(key) ? ' open' : '';
+      const count = live
+        ? `${rows.length} · ${live} activa${live > 1 ? 's' : ''}`
+        : `${rows.length}`;
+      return `<details class="agents-fold" data-fold="${key}"${open}>
+        <summary class="agents-section" title="${escapeHtml(hint)}">${title} · ${count}</summary>
+        ${list(rows, '')}
+      </details>`;
+    };
     external = `
       <h4 class="agents-section">Activos · ${active.length}</h4>
       ${list(active, 'Ningún agente externo trabajando ahora.')}
       <h4 class="agents-section">Últimas 24 h · ${recent.length}</h4>
-      ${list(recent, 'Nada más en las últimas 24 h.')}`;
+      ${list(recent, 'Nada más en las últimas 24 h.')}
+      ${folded('cron', 'Cron (Hermes)', cron, 'Tareas programadas de Hermes: solo aquí, no en el mapa')}
+      ${folded('gateway', 'Gateway (Hermes)', gateway, 'Chats de Telegram / API de Hermes: solo aquí, no en el mapa')}`;
   }
   body.innerHTML = `${external}
     <h4 class="agents-section">Unidades RepoCiv</h4>
     <div class="agents-own-list">${_ownUnitsHtml()}</div>
-    <p class="agents-foot">Externos vía Suvadu · chat de solo lectura.</p>`;
+    <p class="agents-foot">Externos vía Suvadu y Hermes · chat de solo lectura.</p>`;
+  body.querySelectorAll<HTMLDetailsElement>('.agents-fold').forEach((el) =>
+    el.addEventListener('toggle', () => {
+      const key = el.dataset['fold'] ?? '';
+      if (el.open) _openSections.add(key);
+      else _openSections.delete(key);
+    }),
+  );
   body.querySelectorAll<HTMLElement>('.agents-card').forEach((el) =>
     el.addEventListener('click', () => {
       const row = _rows?.find((r) => r.sessionId === el.dataset['session']);
@@ -286,6 +332,7 @@ function _renderChat(firstLoad = false): void {
   const prevTop = prev?.scrollTop ?? 0;
   const atBottom = !prev || prev.scrollTop + prev.clientHeight >= prev.scrollHeight - 40;
   const row = _chat.session;
+  const hermes = _isHermes(row);
   const status = row.active ? row.state : `inactivo · ${relativeTime(row.lastActivityAt)}`;
   let log: string;
   if (_chat.messages.length > 0) {
@@ -295,6 +342,8 @@ function _renderChat(firstLoad = false): void {
     log = more + chatMessagesHtml(_chat.messages, row.agent);
   } else if (_chatLoading) {
     log = '<div class="agents-empty">Cargando chat…</div>';
+  } else if (!_chat.available && hermes) {
+    log = `<div class="agents-empty">No pude leer esta sesión en la base de Hermes (${escapeHtml(_chat.error ?? 'sin datos')}); probá ↻.</div>`;
   } else if (!_chat.available) {
     log = `<div class="agents-empty">Suvadu aún no tiene el transcript de esta sesión (${escapeHtml(_chat.error ?? 'sin datos')}). Se importa al terminar cada turno; probá ↻.</div>`;
   } else {
@@ -308,11 +357,12 @@ function _renderChat(firstLoad = false): void {
     <div class="agents-chat-head">
       <button type="button" class="agents-back" aria-label="Volver a la lista">←</button>
       <div class="agents-chat-title">
-        <strong>${escapeHtml(agentLabel(row.agent))}</strong> ${row.model ? escapeHtml(shortModel(row.model)) : ''}
+        <strong>${escapeHtml(sessionLabel(row))}</strong> ${row.model ? escapeHtml(shortModel(row.model)) : ''}
+        ${_chat.title ? `<div class="agents-chat-name">${escapeHtml(_chat.title)}</div>` : ''}
         <div class="agents-chat-sub">${_whereHtml(row)} · ${escapeHtml(status)} ${note}</div>
       </div>
       <button type="button" class="agents-locate" title="Ubicar en el mapa" aria-label="Ubicar en el mapa">📍</button>
-      <button type="button" class="agents-refresh" title="Actualizar (reimporta el transcript)" aria-label="Actualizar">${_chatLoading ? '…' : '↻'}</button>
+      <button type="button" class="agents-refresh" title="${hermes ? 'Actualizar' : 'Actualizar (reimporta el transcript)'}" aria-label="Actualizar">${_chatLoading ? '…' : '↻'}</button>
     </div>
     <div class="agents-chat-log">${log}</div>
     <p class="agents-foot">Solo lectura. Para responder, usá la terminal de ese agente.</p>`;
