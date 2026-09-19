@@ -100,7 +100,6 @@ import { bindSubagentSessionPanel } from './ui/subagentSessionPanel.ts';
 import { bindSlashCommandState } from './ui/chat/slashCommands.ts';
 import { ensureWondersLoaded, listIframeWonders } from './wonders/manifest.ts';
 import { findCityByWonderSelection, findNearbyCities } from './wonders/cityLookup.ts';
-import { toggleAssemblyRoom } from './assemblyScene.ts';
 import type { City } from './types.ts';
 import {
   toggleLayerPanel,
@@ -721,9 +720,6 @@ async function bootstrap() {
   document.getElementById('btn-toggle-3d')?.addEventListener('click', toggleView);
   document.getElementById('btn-approvals')?.addEventListener('click', toggleApprovalPanel);
   document.getElementById('btn-tasks')?.addEventListener('click', toggleTaskPanel);
-  document
-    .getElementById('btn-assembly')
-    ?.addEventListener('click', () => void toggleAssemblyRoom());
 
   // ─── Idle agent finder (Age of Empires pattern) ─────────────────────
   // Uses the shared singleton so the cycle index stays in sync with the

@@ -2,8 +2,7 @@
 // Read-only consumption of the bridge's `/api/roster` endpoint. This module
 // NEVER imports agentProfile.ts (the CRUD layer: upsert_profile / delete_profile
 // / saveIdentity). It only reads the roster so units can render their Bot Mode
-// identity (pet / face) on the hex grid AND in the assembly scene. Participation
-// (sending to a room) lives in the chat panel and uses POST /api/rooms, not here.
+// identity (pet / face) on the hex grid and in the "➕ Bot" spawner.
 //
 // Contract (verified live, snake_case wire):
 //   GET /api/roster?harness=hermes → 200
@@ -18,8 +17,8 @@
 //     ("Shadow" hedgehog) so avatar_kind is "pet" now, not "asset".
 //
 // resolveBotIdentity() is the SINGLE source of truth consumed by both the hex
-// unit renderer (drawUnitAvatar) and the assembly scene (Among Us beans), so the
-// same bot looks identical in both places — satisfying "identidad consistente".
+// unit renderer (drawUnitAvatar) and the "➕ Bot" spawner, so the same bot looks
+// identical in both places — satisfying "identidad consistente".
 import { bridgeUrl, bridgeHeaders } from './bridgeEnv.ts';
 
 export type AvatarKind = 'pet' | 'face' | 'asset' | null;
@@ -49,7 +48,7 @@ export interface BotIdentity {
   imageUrl: string | null;
   /** Human label for the bot (from pet.displayName when present, else name). */
   label: string;
-  /** Pet descriptor (for assembly scene tooltip / description). */
+  /** Pet descriptor (tooltip / description). */
   pet: RosterPet | null;
 }
 
@@ -109,7 +108,7 @@ export function findRosterEntry(map: Map<string, RosterEntry>, unitId: string): 
 
 /**
  * Resolve the single identity descriptor for a unit/bot. This is the ONE function
- * both the hex renderer and the assembly scene call, guaranteeing the same bot
+ * both the hex renderer and the "➕ Bot" spawner call, guaranteeing the same bot
  * looks identical in every view. Returns a `BotIdentity` whose `imageUrl` is the
  * bridge-routed URL to draw (or null → caller uses the AGENT_ICONS glyph).
  */
@@ -144,7 +143,7 @@ export function resolveBotIdentity(entry: RosterEntry | null): BotIdentity {
  * Resolve the avatar image URL for a unit, or null if it should fall back to the
  * existing AGENT_ICONS glyph. Kept for backward compatibility with callers that
  * only need the URL (e.g. the legacy hex badge). New views should use
- * resolveBotIdentity() to stay consistent with the assembly scene.
+ * resolveBotIdentity() to stay consistent with the other views.
  */
 export async function resolveAvatarUrl(unitId: string): Promise<string | null> {
   try {

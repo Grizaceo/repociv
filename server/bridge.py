@@ -775,13 +775,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
             status, body = _routes.get_harness_profiles(ctx)
             self._respond(status, body)
             return
-        # ── Bot Mode assembly integration (read-only roster + presence) ──
+        # ── Bot Mode roster (read-only; ➕ Bot spawner + grid avatars) ──
         if path == "/api/roster":
             status, body = _routes.get_roster(ctx)
-            self._respond(status, body)
-            return
-        if path == "/api/presence":
-            status, body = _routes.get_presence(ctx)
             self._respond(status, body)
             return
         if path.startswith("/api/roster/asset/"):
@@ -878,29 +874,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
             if len(parts) >= 5:
                 pctx = {"params": {"name": parts[3]}}
                 status, resp = _routes.post_profile_identity(body, pctx)
-                self._respond(status, resp)
-                return
-
-        # ─── Bot Mode room relay (participation, not config) ────────────────
-        # POST /api/rooms/<name>/message — relay a message into a Bot Mode
-        # group chat. Isolated shell-out; never writes profile.yaml. Token-gated
-        # by do_POST. Mirrors hermes-bot-mode/SKILL.md group-chat send.
-        if path.startswith("/api/rooms/") and path.endswith("/message"):
-            parts = path.split("/")
-            # ['', 'api', 'rooms', '<name>', 'message']
-            if len(parts) >= 5 and parts[4] == "message":
-                ctx = {"room": parts[3]}
-                status, resp = _routes.post_room_message(body, ctx)
-                self._respond(status, resp)
-                return
-
-        # GET /api/rooms/<name>/messages — read-only relay log for a room
-        if path.startswith("/api/rooms/") and path.endswith("/messages"):
-            parts = path.split("/")
-            # ['', 'api', 'rooms', '<name>', 'messages']
-            if len(parts) >= 5 and parts[4] == "messages":
-                ctx = {"room": parts[3]}
-                status, resp = _routes.get_room_messages(ctx)
                 self._respond(status, resp)
                 return
 

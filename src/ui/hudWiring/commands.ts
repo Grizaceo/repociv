@@ -22,7 +22,6 @@ import { toggleSettingsPanel } from '../settingsPanel.ts';
 import { toggleLayerPanel } from '../layerPanel.ts';
 import { toggleConstructionPanel } from '../constructionPanel.ts';
 import { takeScreenshot } from './screenshot.ts';
-import { toggleAssemblyRoom } from '../../assemblyScene.ts';
 import { toggleAgentsPanel } from '../agentsPanel.ts';
 
 // Agent spawn types and their toolbar hotkeys — MUST mirror the bindings in
@@ -138,13 +137,6 @@ export function registerHudCommands(
       label: 'Captura de pantalla',
       hint: 'F12',
       run: () => takeScreenshot(renderer),
-    },
-    {
-      id: 'a-assembly',
-      group: 'Asamblea',
-      label: 'Abrir Asamblea (sala de Bot Mode)',
-      hint: 'F7',
-      run: () => void toggleAssemblyRoom(),
     },
   ]);
 

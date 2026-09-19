@@ -13,8 +13,7 @@
 //
 // Identity comes straight from the enriched endpoint (avatar_kind / avatar_url /
 // pet / face_url) and is mapped through resolveBotIdentity() — the SAME resolver
-// the hex renderer and the assembly scene use, so a spawned bot looks identical
-// everywhere.
+// the hex renderer uses, so a spawned bot looks identical everywhere.
 import { type Renderer } from '../renderer.ts';
 import { type GameState } from '../game.ts';
 import { type BridgeEvents } from '../bridge.ts';
