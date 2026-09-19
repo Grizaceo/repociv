@@ -41,6 +41,38 @@ from server.routes.core import (
 
 RouteContext = dict[str, Any]
 
+_ROSTER_NAMES = ["shadow-davi", "lexo-alpha", "davi"]
+
+
+@pytest.fixture
+def fake_hermes_profiles(tmp_path, monkeypatch):
+    """Hermetic roster: a fake HERMES_ROOT/profiles tree and a fixed profile list.
+
+    get_roster reads identity from HERMES_ROOT/profiles/<name>/{pets,assets} and
+    names from profile_identity.list_harness_options. Both used to hit the real
+    ~/.hermes, so the result depended on which profiles existed that day (a new
+    avatar-less profile broke test_other_bots_have_real_identity) and on test
+    order (a sys.modules patch is ignored once server.profile_identity was
+    imported). Patch the real module attribute and HERMES_ROOT instead.
+    """
+    import json
+
+    from server import bridge, profile_identity
+
+    root = tmp_path / "hermes"
+    pet = root / "profiles" / "shadow-davi" / "pets" / "shadow"
+    pet.mkdir(parents=True)
+    (pet / "pet.json").write_text(json.dumps({"id": "shadow", "displayName": "Shadow", "description": "hedgehog"}))
+    (pet / "spritesheet.webp").write_bytes(b"RIFF0000WEBP")
+    face = root / "profiles" / "lexo-alpha" / "assets"
+    face.mkdir(parents=True)
+    (face / "avatar.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    (root / "profiles" / "davi").mkdir(parents=True)
+
+    monkeypatch.setattr(bridge, "HERMES_ROOT", root)
+    monkeypatch.setattr(profile_identity, "list_harness_options", lambda harness: list(_ROSTER_NAMES))
+    return root
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. GET /api/roster — contrato snake_case + shadow-davi asset + resto null
@@ -55,37 +87,15 @@ class TestGetRosterContract:
     snake_case, DAVI mapeado a shadow-davi con avatar_kind:"asset" y el
     asset URL hardcodeado, resto null (no lee profile.yaml).
 
-    NOTA: necesitamos mockear profile_identity.list_harness_options porque
-    lee el filesystem real. Sin mock, el test depende de qué perfiles
-    existan en el harness — no es determinista.
+    NOTA: list_harness_options y la identidad (pets/avatar.png) leen el
+    filesystem real; fake_hermes_profiles los apunta a un árbol en tmp_path
+    para que el test sea determinista.
     """
 
     @pytest.fixture
-    def mock_profile_identity(self):
-        """Mock profile_identity para que list_harness_options devuelva
-        nombres deterministas incluyendo shadow-davi."""
-
-        class _MockProfileIdentity:
-            def list_harness_options(self, harness):
-                return [
-                    "shadow-davi",
-                    "lexo-alpha",
-                    "davi",
-                ]
-
-        # profile_identity es un import local dentro de get_roster,
-        # no un atributo del módulo. Mockeamos el import local
-        # reemplazando la referencia dentro de la función.
-        # Usamos patch.object sobre el módulo y cross-patch el nombre
-        # en el namespace donde get_roster lo usa.
-
-        # La forma más simple: mockear el módulo profile_identity completo
-        # y asegurar que get_roster lo vea.
-        with patch.dict("sys.modules", {"server.profile_identity": _MockProfileIdentity()}):
-            # También necesitamos que el import dentro de get_roster funcione
-            # — pero get_roster hace `from server import profile_identity`
-            # que carga server.profile_identity desde sys.modules.
-            yield
+    def mock_profile_identity(self, fake_hermes_profiles):
+        """Deterministic roster (see fake_hermes_profiles)."""
+        return fake_hermes_profiles
 
     def test_returns_200_with_harness_and_bots(self, mock_profile_identity):
         """GET /api/roster devuelve 200 con {harness, bots}."""
@@ -589,36 +599,9 @@ class TestAssemblyFlowIntegration:
     """
 
     @pytest.fixture
-    def mock_profile_identity(self):
-        """Mock profile_identity para que list_harness_options devuelva
-        nombres deterministas incluyendo shadow-davi.
-
-        profile_identity es importado LOCAL dentro de get_roster
-        (`from server import profile_identity`), no es atributo del
-        módulo routes.core. Para mockearlo, injectamos un módulo falso
-        en sys.modules antes de que get_roster lo importe.
-        """
-        import sys
-        from unittest.mock import MagicMock
-
-        mock = MagicMock()
-        mock.list_harness_options.return_value = [
-            "shadow-davi",
-            "lexo-alpha",
-            "davi",
-        ]
-
-        # Injectamos el mock en sys.modules para que
-        # `from server import profile_identity` lo vea.
-        old = sys.modules.get("server.profile_identity")
-        sys.modules["server.profile_identity"] = mock
-        try:
-            yield mock
-        finally:
-            if old is not None:
-                sys.modules["server.profile_identity"] = old
-            else:
-                sys.modules.pop("server.profile_identity", None)
+    def mock_profile_identity(self, fake_hermes_profiles):
+        """Deterministic roster (see fake_hermes_profiles)."""
+        return fake_hermes_profiles
 
     def test_assembly_flow_roster_then_post(self, mock_profile_identity):
         """Flujo completo de la asamblea: obtener roster (para encontrar el
