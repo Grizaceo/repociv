@@ -24,6 +24,7 @@ import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { areCityPropsReady } from './CityProps3D.ts';
+import { areCityWallsReady } from './CityWalls3D.ts';
 import { PROP_SURFACE_CLEARANCE, terrainSurfaceY } from './terrainSurfaceY.ts';
 
 const cityGroup = new Group();
@@ -121,7 +122,11 @@ export function rebuildCityClusters(
   getTile: (key: string) => Tile | undefined,
   lod: 'low' | 'medium' | 'high',
 ): void {
-  const signature = `${lod}:${citySignature(cities)}`;
+  // Kit readiness participates: the KayKit props/walls load async, and the
+  // procedural fallback (capital compound, corner towers, wall ring) must be
+  // rebuilt OUT when they land even though no city changed.
+  const kit = `p${areCityPropsReady() ? 1 : 0}w${areCityWallsReady() ? 1 : 0}`;
+  const signature = `${lod}:${kit}:${citySignature(cities)}`;
   if (signature === lastSignature) return;
   lastSignature = signature;
 
@@ -349,19 +354,14 @@ export function rebuildCityClusters(
       return 11;
     }
 
-    // Capitals with the GLB keep get 3 village-style satellite houses so
-    // the tile reads as a building CLUSTER (Civ V capitals are never one
-    // monolith). The procedural-capital fallback builds its own compound,
-    // so satellites only apply while the glTF prop is live.
-    const satellitesPerCapital = areCityPropsReady() ? 3 : 0;
     // When GLB city props are loaded, normal cities use their GLB model
     // instead of procedural boxes — so no procedural buildings for them.
     // The spire/landmark and procedural buildings are fallback visuals.
+    // (Capital satellite houses live in CityProps3D as KayKit suburbs.)
     const propsReady = areCityPropsReady();
     const bldCount = propsReady
-      ? capitals.length * satellitesPerCapital
-      : normalCities.reduce((s, c) => s + buildingCountForCity(c.population), 0) +
-        capitals.length * satellitesPerCapital;
+      ? 0
+      : normalCities.reduce((s, c) => s + buildingCountForCity(c.population), 0);
     const roofCount = bldCount;
     // Perimeter wall: ONE closed hexagonal ring per city (was 6 separate
     // box segments that left corner gaps → walls read as scattered dots).
@@ -369,8 +369,10 @@ export function rebuildCityClusters(
     // The ring geometry is always created; the scale.y = 0 trick hides
     // incomplete walls (they're underground). A per-instance Y-scale
     // controls how much of the wall is visible.
-    const wallCount = normalCities.length;
-    const towerCount = normalCities.length * 6; // 6 towers (one per hex vertex)
+    // Not allocated at all while the wall kit is live: an unset instance
+    // keeps its identity matrix and would draw a ring at the world origin.
+    const wallCount = areCityWallsReady() ? 0 : normalCities.length;
+    const towerCount = areCityWallsReady() ? 0 : normalCities.length * 6; // 6 towers (one per hex vertex)
     const towerRoofCount = towerCount;
 
     clusterMesh = new InstancedMesh(bldGeom, bldMat, bldCount);
@@ -444,8 +446,10 @@ export function rebuildCityClusters(
 
       // Perimeter wall: ONE closed hexagonal ring centered on the city,
       // sitting on top of the plaza (plaza top ≈ base.y + 1.5 + HEX_SIZE*0.05).
-      const wallY = surfaceY + PROP_SURFACE_CLEARANCE;
-      {
+      // Suppressed when the KayKit modular wall kit is live — otherwise the
+      // procedural ring and the modular pieces z-fight on the same radius.
+      if (!areCityWallsReady()) {
+        const wallY = surfaceY + PROP_SURFACE_CLEARANCE;
         const m = new Matrix4().makeTranslation(base.x, wallY, base.z);
         // Scale Y by wall completeness: 0 = fully underground, 1 = full height.
         m.scale(new Vector3(1, wallComplete, 1));
@@ -453,61 +457,35 @@ export function rebuildCityClusters(
       }
 
       // Corner towers: 6 towers (one per hex vertex), with conical roofs.
-      const towerAngles = [
-        0,
-        Math.PI / 3,
-        (2 * Math.PI) / 3,
-        Math.PI,
-        (4 * Math.PI) / 3,
-        (5 * Math.PI) / 3,
-      ];
+      // Skipped entirely when the KayKit wall kit is live — its own faction
+      // towers sit at these same vertices.
+      const towerAngles = areCityWallsReady()
+        ? []
+        : [0, Math.PI / 3, (2 * Math.PI) / 3, Math.PI, (4 * Math.PI) / 3, (5 * Math.PI) / 3];
       const towerYScale = Math.max(0, wallComplete);
       for (const ca of towerAngles) {
         const tx = base.x + Math.cos(ca) * HEX_SIZE * 0.42;
         const tz = base.z + Math.sin(ca) * HEX_SIZE * 0.42;
-        const towerM = new Matrix4().makeTranslation(tx, wallY + HEX_SIZE * 0.14, tz);
+        const towerM = new Matrix4().makeTranslation(
+          tx,
+          surfaceY + PROP_SURFACE_CLEARANCE + HEX_SIZE * 0.14,
+          tz,
+        );
         towerM.scale(new Vector3(1, towerYScale, 1));
         towerMesh.setMatrixAt(towerIdx++, towerM);
 
         // Tower roof cone sits on top of the tower (half-height offset).
         const roofM = new Matrix4().makeTranslation(
           tx,
-          wallY + HEX_SIZE * 0.14 + HEX_SIZE * 0.14 * towerYScale + HEX_SIZE * 0.05,
+          surfaceY +
+            PROP_SURFACE_CLEARANCE +
+            HEX_SIZE * 0.14 +
+            HEX_SIZE * 0.14 * towerYScale +
+            HEX_SIZE * 0.05,
           tz,
         );
         roofM.scale(new Vector3(1, towerYScale, 1));
         towerRoofMesh.setMatrixAt(towerRoofIdx++, roofM);
-      }
-    }
-
-    // Capital satellite houses (ring around the GLB keep, clear of its
-    // 0.27·HEX half-footprint).
-    if (satellitesPerCapital > 0) {
-      const satAngles = [0, (Math.PI * 2) / 3 + 0.35, (Math.PI * 4) / 3 - 0.2];
-      for (const city of capitals) {
-        const tile = getTile(tileKey(city.coord));
-        const elev = tile ? terrainElevation(tile.terrain) : 0;
-        const base = axialToWorld3D(city.coord.q, city.coord.r, elev);
-        const surfaceY = tile ? terrainSurfaceY(tile) : base.y;
-        const h = hashCoord(city.coord.q, city.coord.r);
-        for (let si = 0; si < satellitesPerCapital; si++) {
-          const angle = satAngles[si]! + (h % 6) * (Math.PI / 3);
-          const r = HEX_SIZE * (0.5 + ((h >> (si + 2)) % 3) * 0.04);
-          const sx = base.x + Math.cos(angle) * r;
-          const sz = base.z + Math.sin(angle) * r;
-          const ht = 0.58 + ((h >> si) % 3) * 0.09;
-          const m = new Matrix4().makeTranslation(sx, surfaceY + 4 + ht * 7, sz);
-          m.scale(new Vector3(1, ht, 1));
-          clusterMesh.setMatrixAt(bldIdx++, m);
-          const roofY = surfaceY + 4 + ht * 7 + HEX_SIZE * 0.28 * ht * 0.5 + HEX_SIZE * 0.04;
-          const roofM = new Matrix4().makeTranslation(sx, roofY, sz);
-          const rot = new Quaternion().setFromAxisAngle(
-            new Vector3(0, 1, 0),
-            ((h + si) % 4) * (Math.PI / 4),
-          );
-          roofM.multiply(new Matrix4().makeRotationFromQuaternion(rot));
-          roofMesh.setMatrixAt(roofIdx++, roofM);
-        }
       }
     }
 
