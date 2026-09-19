@@ -3,7 +3,7 @@
 
 Produces:
   - public/assets/office-atlas.webp  (atlas image, 640x192, 5 cols x 3 rows)
-  - public/assets/office-atlas.json  (manifest consumed by src/officeAtlas.ts)
+  - src/assets/office-atlas.json     (manifest bundled by src/officeAtlas.ts)
 
 Run via:
   python scripts/generate-office-atlas.py
@@ -28,7 +28,7 @@ except ImportError:
 ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / 'public' / 'assets'
 OUT_IMG = ASSETS / 'office-atlas.webp'
-OUT_JSON = ASSETS / 'office-atlas.json'
+OUT_JSON = ROOT / 'src' / 'assets' / 'office-atlas.json'  # bundled, not served
 
 W, H = 640, 192
 CELL_W, CELL_H = 128, 64
