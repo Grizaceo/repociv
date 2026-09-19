@@ -19,6 +19,7 @@ Endpoints:
   GET  /approvals                 — commands waiting_approval
   GET  /agents                    — agent status + heartbeat + queue depth
   GET  /agents/capabilities       — capability model (Fase 6)
+  GET  /api/external-agents       — Suvadu-detected agent sessions (metadata only)
   GET  /metrics                   — observability metrics (Fase 7)
   POST /commands                  — new Command Bus intake
   POST /commands/<id>/cancel      — cancel a queued command
@@ -1288,6 +1289,10 @@ if __name__ == "__main__":
 
     server = ThreadingHTTPServer((BRIDGE_HOST, BRIDGE_PORT), BridgeHandler)
     threading.Thread(target=background_scanner, daemon=True).start()
+    # External agents (Claude Code / Codex / Cursor…) seen by Suvadu → map units.
+    from server import suvadu_tracker as _suvadu  # noqa: PLC0415
+
+    _suvadu.start(send=send_to_repociv)
 
     # Graceful shutdown on SIGTERM (systemd / dev-stop.sh)
     def _handle_sigterm(signum: int, frame: object) -> None:

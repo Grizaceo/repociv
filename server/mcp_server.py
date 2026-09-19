@@ -114,6 +114,15 @@ def agents_ready() -> Any:
     return _get("/ready")
 
 
+@mcp.tool(description=(
+    "Agentes externos (Claude Code, Codex, Cursor, OpenCode) detectados por Suvadu en esta "
+    "máquina, activos en los últimos minutos: agente, ciudad/repo, modelo, estado working/idle, "
+    "conteos y última actividad (epoch ms). Solo metadatos — sin prompts ni comandos."
+))
+def external_agents_list() -> Any:
+    return _get("/api/external-agents")
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # COMMANDS  [MUTATES]
 # ══════════════════════════════════════════════════════════════════════════════

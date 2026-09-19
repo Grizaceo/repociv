@@ -13,6 +13,7 @@ from server.routes.core import _probe_url  # noqa: F401
 from server.routes.core import _extract_model_ids  # noqa: F401
 from server.routes.core import get_health  # noqa: F401
 from server.routes.core import get_ready  # noqa: F401
+from server.routes.core import get_external_agents  # noqa: F401
 from server.routes.core import get_missions  # noqa: F401
 from server.routes.core import post_subagent_cancel  # noqa: F401
 from server.routes.core import get_subagents  # noqa: F401
