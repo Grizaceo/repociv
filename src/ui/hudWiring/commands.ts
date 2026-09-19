@@ -23,6 +23,7 @@ import { toggleLayerPanel } from '../layerPanel.ts';
 import { toggleConstructionPanel } from '../constructionPanel.ts';
 import { takeScreenshot } from './screenshot.ts';
 import { toggleAssemblyRoom } from '../../assemblyScene.ts';
+import { toggleAgentsPanel } from '../agentsPanel.ts';
 
 // Agent spawn types and their toolbar hotkeys — MUST mirror the bindings in
 // hudWiring/hotkeys.ts (q/w/e/o/c/x/r). The hint badges are shown to the user,
@@ -85,6 +86,13 @@ export function registerHudCommands(
       run: () => togglePendingPanel(),
     },
     { id: 'p-log', group: 'Panel', label: 'Log en vivo', hint: 'F10', run: () => toggleLogPanel() },
+    {
+      id: 'p-agents',
+      group: 'Panel',
+      label: 'Agentes (todos, con su chat)',
+      hint: 'F8',
+      run: () => toggleAgentsPanel(),
+    },
     { id: 'p-harness', group: 'Panel', label: 'Harness', run: () => toggleHarnessPanel() },
     {
       id: 'p-kanban',

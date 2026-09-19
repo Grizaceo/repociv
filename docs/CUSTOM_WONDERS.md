@@ -233,6 +233,37 @@ el campo `launch`**. El launcher la ignora. El registry la lista
 igual. Útil para maravillas que el usuario inicia a mano
 (playwright servers, jupyter notebooks, etc.).
 
+### 4.5 Maravilla accesible desde otra máquina (Tailscale) — `/wonder-proxy/<id>/`
+
+Una `ui.url` a `http://127.0.0.1:<puerto>` solo funciona en un navegador del mismo host:
+desde el notebook, `127.0.0.1` es el notebook. Para que la maravilla se vea también por
+`http://<host>:5273` sin exponer su puerto, servila en el origen de RepoCiv:
+
+```bash
+# .env del repo (Vite lo lee al arrancar; hay que reiniciarlo)
+REPOCIV_WONDER_PROXIES=mi-maravilla=http://127.0.0.1:9998,otra=http://127.0.0.1:6080
+```
+
+```json
+"ui": { "url": "/wonder-proxy/mi-maravilla/" },
+"launch": { "ui_url": "http://127.0.0.1:9998", "...": "..." }
+```
+
+- Los destinos deben ser loopback (`127.0.0.1`, `localhost`, `[::1]`); cualquier otra
+  entrada se ignora con un aviso. Es un túnel a servicios locales, no un proxy abierto.
+- HTTP y WebSocket pasan por el proxy. Los upgrades WS solo se aceptan si el `Origin` es
+  el mismo origen de RepoCiv, porque muchos servicios (websockify, por ejemplo) no validan
+  `Origin`.
+- Una `ui.url` **relativa** hace que la viñeta la respete tras el auto-arranque en vez de
+  cambiarla por `launch.ui_url` (que es loopback y el bridge la sigue usando para su
+  health-check).
+- El iframe queda en el mismo origen que RepoCiv. Con el `sandbox` por defecto
+  (`allow-scripts allow-same-origin`), el JS de la maravilla puede leer la página de
+  RepoCiv. Hacelo solo con servicios en los que confíes.
+- Solo existe con el servidor de desarrollo de Vite (`npm start`).
+
+Caso real completo: [`GHOSTDESK.md`](./GHOSTDESK.md).
+
 ---
 
 ## 5. Verificación

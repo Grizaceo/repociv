@@ -28,6 +28,7 @@ import {
 } from './bridgeEnv.ts';
 import { RepoCivWebSocket } from './websocket.ts';
 import { dispatchBridgeEvent, type MessageContext } from './bridgeMessageHandlers.ts';
+import { externalAgentEvents, fetchExternalAgents } from './externalAgents.ts';
 import { registerPoll, type PollUnregister } from './ui/pollScheduler.ts';
 
 const DEMO_INTERVAL_MS = 30_000;
@@ -141,6 +142,7 @@ export class BridgeEvents {
         this.sseConnected = false;
         this.reconnectDelay = 1000;
         this.onBridgeOnline('hermes');
+        this.syncExternalAgents();
       } else if (status === 'disconnected' || status === 'auth_failed') {
         this.wsConnected = false;
         // Fall back to SSE after WS fails
@@ -175,6 +177,7 @@ export class BridgeEvents {
       src.onopen = () => {
         this.sseConnected = true;
         this.reconnectDelay = 1000;
+        this.syncExternalAgents();
       };
       src.onmessage = (e: MessageEvent<string>) => {
         try {
@@ -251,6 +254,16 @@ export class BridgeEvents {
       // fall through
     }
     this.onBridgeOffline();
+  }
+
+  /** Events are fire-and-forget: on every (re)connect, replay the Suvadu
+   *  tracker snapshot so ext-* units match the bridge (externalAgents.ts). */
+  private syncExternalAgents() {
+    void fetchExternalAgents().then((rows) => {
+      if (!rows || this.stopped) return;
+      const ids = this.state.getAllUnits().map((u) => u.id);
+      for (const evt of externalAgentEvents(ids, rows)) this.handleBridgeEvent(evt);
+    });
   }
 
   private onBridgeOnline(mode: 'claude-code' | 'openclaw' | 'hermes') {

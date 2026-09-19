@@ -59,6 +59,8 @@ import { startMcpStatusPolling } from './ui/mcpStatus.ts';
 import { maybeStartFirstRunTour } from './ui/firstRunTour.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { wireHUD, selectHero } from './ui/hudWiring.ts';
+import { bindAgentsPanel, openExternalAgentChat, toggleAgentsPanel } from './ui/agentsPanel.ts';
+import { isExternalAgentUnit } from './externalAgents.ts';
 import { initHudMode } from './ui/hudMode.ts';
 import { initCommandPalette } from './ui/commandPalette.ts';
 import { registerHudCommands } from './ui/hudWiring/commands.ts';
@@ -750,6 +752,7 @@ async function bootstrap() {
   document.getElementById('btn-idle-agent')?.addEventListener('click', findIdleAgent);
   document.getElementById('btn-pending')?.addEventListener('click', togglePendingPanel);
   document.getElementById('btn-log')?.addEventListener('click', toggleLogPanel);
+  document.getElementById('btn-agents')?.addEventListener('click', toggleAgentsPanel);
   document.getElementById('btn-wb-labels')?.addEventListener('click', () => {
     const active = renderer.toggleWorkbenchLabels();
     const btn = document.getElementById('btn-wb-labels');
@@ -811,6 +814,7 @@ async function bootstrap() {
     'btn-tasks': 'tasks',
     'btn-pending': 'pending',
     'btn-log': 'log',
+    'btn-agents': 'agents',
     'btn-settings': 'settings',
   };
   for (const [id, name] of Object.entries(analyticsPanels)) {
@@ -1247,10 +1251,32 @@ async function bootstrap() {
     }
   });
 
+  bindAgentsPanel({
+    state,
+    locate: (coord) => {
+      renderer.focusOnCoord(coord);
+      renderer.flashIdleHighlight(coord);
+    },
+    selectOwnUnit: (u) => selectHero(u, renderer, state, bridge),
+  });
+
   // Re-render hero bar on state changes
+  let extSelected: string | null = null;
   const refreshHero = () => {
     renderHeroBar(state, (u) => selectHero(u, renderer, state, bridge));
-    if (state.selectedUnit) showUnitPanel(state.selectedUnit, state);
+    const selected = state.selectedUnit;
+    // An external agent (Suvadu ext-* unit) is not ours to command: clicking it
+    // on the map opens its chat in the Agents panel instead of the unit panel
+    // and its mission composer.
+    if (selected && isExternalAgentUnit(selected.id)) {
+      if (extSelected !== selected.id) {
+        extSelected = selected.id;
+        openExternalAgentChat(selected.id);
+      }
+      return;
+    }
+    extSelected = null;
+    if (selected) showUnitPanel(selected, state);
   };
   state.subscribe(refreshHero);
   // Draw once up front: subscribing alone left the bar's container literally

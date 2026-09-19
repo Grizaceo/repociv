@@ -36,6 +36,18 @@ from server.wonder_launcher import (
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 
 
+@pytest.fixture(autouse=True)
+def _isolated_wonders_dir(tmp_path, monkeypatch):
+    """Never read the developer's real ~/.repociv/wonders/: a wonder connected on
+    this machine (e.g. ghostdesk) would leak into the "zero launchable" asserts.
+    Tests that need custom manifests set REPOCIV_WONDERS_DIR again themselves."""
+    empty = tmp_path / "no-user-wonders"
+    empty.mkdir()
+    monkeypatch.setenv("REPOCIV_WONDERS_DIR", str(empty))
+    # Specs are loaded once at import; drop whatever the real dir contributed.
+    monkeypatch.setattr(wonder_launcher, "_CUSTOM_LAUNCH_SPECS", {})
+
+
 @pytest.fixture
 def fake_repos(tmp_path, monkeypatch):
     """Create two fake wonder repos and inject launch specs for them.

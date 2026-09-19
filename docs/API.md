@@ -38,9 +38,12 @@ curl http://localhost:5274/health
   "openclaw": true,
   "claudeCode": true,
   "cursor": false,
-  "defaultTransport": "hermes"
+  "defaultTransport": "hermes",
+  "externalAgents": { "enabled": true, "ok": true, "error": null, "heartbeat": true, "lastPollAt": 1789792545.1, "units": 1 }
 }
 ```
+
+`externalAgents` es el estado del tracker de Suvadu (`server/suvadu_tracker.py`). Como `/health` no pide token, solo expone salud (sin sesiones): `error` es un código corto (`binary_not_found`, `timeout`, `exit_<n>`, `bad_json`), `heartbeat=false` si falló `suv history` (se sigue con `suv agent sessions`). `enabled=false` si el bridge no lo arrancó (`REPOCIV_EXT_AGENTS=0`).
 
 **`/ready`**
 ```bash
@@ -134,6 +137,45 @@ Response 200:
 ```
 
 La fuente es `duckdb` (research_ledger persistido) si hay rows; fallback a `memory` (subagent_tracker in-memory) si no.
+
+---
+
+### Agentes externos (Suvadu)
+
+| Method | Path | Descripción |
+|--------|------|-------------|
+| GET | `/api/external-agents` | Sesiones de Claude Code / Codex / Cursor / OpenCode detectadas por Suvadu y activas en la ventana (solo metadatos) |
+
+Response 200:
+```json
+{
+  "status": { "enabled": true, "ok": true, "error": null, "heartbeat": true, "lastPollAt": 1789792545.1, "units": 1 },
+  "windowMinutes": 10.0,
+  "agents": [
+    {
+      "unit": "ext-claude-code-5805ab57", "unitType": "claude", "state": "working",
+      "cityId": "repo:L2hvbWUv…", "repo": "repociv",
+      "agent": "claude-code", "model": "claude-opus-5", "mission": "claude-code · claude-opus-5",
+      "firstActivityAt": 1789785503705, "lastActivityAt": 1789792545694,
+      "commandCount": 30, "eventCount": 282, "totalTokens": 54131818
+    }
+  ]
+}
+```
+
+Sin prompts, comandos ni `cwd`. Los mismos datos llegan al mapa como `unit_spawn` / `unit_state` / `unit_despawn` con `unit` = `ext-<agente>-<native_id[:8]>`. Ver `docs/EXTERNAL_AGENTS.md`.
+
+| Method | Path | Descripción |
+|--------|------|-------------|
+| GET | `/api/external-agents/sessions` | Todas las sesiones con actividad en las últimas `REPOCIV_EXT_AGENTS_RECENT_H` (24) horas, activas o no, más nuevas primero |
+| GET | `/api/external-agents/<sessionId>/chat?limit=80&refresh=1` | Prompts y respuestas de una sesión listada (a pedido, **contenido**) |
+
+`/sessions`: `{status, windowMinutes, recentHours, sessions: [{sessionId, agent, model, repo, cityId, active, state: "working"|"idle"|"inactive", unit, unitType, firstActivityAt, lastActivityAt, commandCount, eventCount, totalTokens, subagent, imported}]}`. `imported=false` significa que Suvadu solo vio el latido de comandos (todavía no hay transcript).
+
+`/chat`: `{session, messages: [{role: "user"|"assistant", text, at, truncated, turn}], hasMore, available, error?, refresh?}`.
+- `sessionId` es el id de Suvadu (`claude-<uuid>`, `codex-<uuid>`…), validado con `^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$`. Un id mal formado da 400; uno no listado, 404.
+- `refresh=1` reimporta el transcript nativo (Claude Code / Codex; como máximo cada 5 s por sesión). Resultado en `refresh`: `ok`, `throttled`, `no_transcript` o `failed`.
+- `available=false` con `error` significa que Suvadu aún no importó esa sesión.
 
 **`/subagents/cancel`** — Body:
 ```json

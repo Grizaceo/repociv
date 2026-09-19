@@ -19,6 +19,9 @@ Endpoints:
   GET  /approvals                 — commands waiting_approval
   GET  /agents                    — agent status + heartbeat + queue depth
   GET  /agents/capabilities       — capability model (Fase 6)
+  GET  /api/external-agents       — Suvadu-detected agent sessions (metadata only)
+  GET  /api/external-agents/sessions        — recent sessions, active or not
+  GET  /api/external-agents/<session>/chat  — prompts + responses (on demand)
   GET  /metrics                   — observability metrics (Fase 7)
   POST /commands                  — new Command Bus intake
   POST /commands/<id>/cancel      — cancel a queued command
@@ -53,6 +56,7 @@ from .pending_tracker import (
 from .process_scanner import scan_active_processes, detect_lexo
 from ._env import load_dotenv as _load_dotenv  # noqa: F401 (re-export for tests)
 import hmac
+import re
 import json
 import os
 import queue
@@ -62,6 +66,7 @@ import subprocess
 import threading
 import time
 import urllib.request  # noqa: F401 (patched by tests via bridge.urllib.request)
+from urllib.parse import unquote
 import uuid
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -76,6 +81,8 @@ BRIDGE_PORT = int(os.environ.get("BRIDGE_PORT", "5274"))
 BRIDGE_WS_PORT = int(os.environ.get("BRIDGE_WS_PORT", "5275"))
 REPOCIV_TOKEN = os.environ.get("REPOCIV_TOKEN", "")  # empty = auth disabled (dev only)
 REPOCIV_REMOTE = os.environ.get("REPOCIV_REMOTE", "").lower() in ("true", "1", "yes")
+# Suvadu session ids look like claude-<uuid>, codex-<uuid>, cursor-<id>.
+_EXTERNAL_SESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$")
 
 # ─── Bind + token policy (Fase 0 / audit 0.4) ────────────────────────────────
 # Single source of truth for the bridge startup checks. Same helper
@@ -689,6 +696,17 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._respond(status, body)
             return
 
+        # ── External agent chat (Suvadu, on demand) ────────────────────────────
+        if path.startswith("/api/external-agents/") and path.endswith("/chat"):
+            session_id = unquote(path[len("/api/external-agents/") : -len("/chat")])
+            if not _EXTERNAL_SESSION_RE.match(session_id):
+                self._err_json(400, "invalid session id")
+                return
+            ctx["session_id"] = session_id
+            status, body = _routes.get_external_agent_chat(ctx)
+            self._respond(status, body)
+            return
+
         if path.startswith("/api/wonders/") or path.startswith("/wonders/"):
             # Canonical: /api/wonders/{id}[/health|launch-status]; legacy: /wonders/{id}[...]
             prefix = "/api/wonders/" if path.startswith("/api/wonders/") else "/wonders/"
@@ -1288,6 +1306,10 @@ if __name__ == "__main__":
 
     server = ThreadingHTTPServer((BRIDGE_HOST, BRIDGE_PORT), BridgeHandler)
     threading.Thread(target=background_scanner, daemon=True).start()
+    # External agents (Claude Code / Codex / Cursor…) seen by Suvadu → map units.
+    from server import suvadu_tracker as _suvadu  # noqa: PLC0415
+
+    _suvadu.start(send=send_to_repociv)
 
     # Graceful shutdown on SIGTERM (systemd / dev-stop.sh)
     def _handle_sigterm(signum: int, frame: object) -> None:

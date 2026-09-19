@@ -117,6 +117,7 @@ def _extract_model_ids(data: Any, url: str) -> list[str]:
 def get_health(ctx: "RouteContext") -> tuple[int, Any]:
     from server.agent_runner import _has_claude_code, _has_openclaw, _has_cursor, _has_codex
     from server.bridge import _sched, get_gpu_info, _es, mcp_status
+    from server import suvadu_tracker as _suvadu
     agent_status = _sched.get_agent_status()
     queue_depth = len(_sched.queue_snapshot())
     gpu = get_gpu_info()
@@ -137,7 +138,29 @@ def get_health(ctx: "RouteContext") -> tuple[int, Any]:
         },
         "gpu": gpu,
         "eventStore": str(_es._store_path) if hasattr(_es, "_store_path") else None,
+        "externalAgents": _suvadu.status(),
     }
+
+def get_external_agents(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/external-agents — Suvadu-detected agent sessions (metadata only)."""
+    from server import suvadu_tracker as _suvadu
+    return 200, _suvadu.snapshot()
+
+def get_external_agent_sessions(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/external-agents/sessions — every recent session, active or not."""
+    from server import suvadu_tracker as _suvadu
+    return 200, _suvadu.sessions()
+
+def get_external_agent_chat(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/external-agents/<session>/chat[?limit=N&refresh=1] — prompts + responses."""
+    from server import suvadu_tracker as _suvadu
+    params = ctx.get("params", {})
+    try:
+        limit = int(params.get("limit", "80"))
+    except (TypeError, ValueError):
+        limit = 80
+    refresh = str(params.get("refresh", "")).lower() in ("1", "true", "yes")
+    return _suvadu.chat(str(ctx.get("session_id", "")), limit=limit, refresh=refresh)
 
 def get_ready(ctx: "RouteContext") -> tuple[int, Any]:
     from server.bridge import _es, REPOCIV_TOKEN

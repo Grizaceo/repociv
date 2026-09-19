@@ -107,35 +107,79 @@ def test_underscore_canonical_handles_nonexistent_paths(fake_state):
 
 
 # --- End-to-end test against actual user state ---
-# This test uses the real ~/.local/state/repociv/state.json — it verifies
-# the bug fix against your own real config (the workspace + active root).
+# These tests use the real ~/.local/state/repociv/state.json — they verify
+# the bug fix against your own real config (workspace + active root).
+# Portable: home-relative, and they skip when the state has nothing
+# selected yet (fresh machine / post-migration).
 
-def test_real_workspace_carcosa_two_paths_both_pass():
-    """CARCOSA must validate from BOTH the state.json path AND the
-    bind-mount-equivalent path. This is the bug the user hit."""
 
-    state_file = Path("/home/gris/.local/state/repociv/state.json")
+def _real_state_file() -> Path:
+    return Path.home() / ".local" / "state" / "repociv" / "state.json"
+
+
+def _real_selected_paths() -> list[str]:
+    """Repo paths selected in the real state.json ([] when missing/unreadable)."""
+    state_file = _real_state_file()
+    if not state_file.exists():
+        return []
+    try:
+        data = json.loads(state_file.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    roots = data.get("roots") or {}
+    if not isinstance(roots, dict):
+        return []
+    return [
+        str(p)
+        for entry in roots.values()
+        if isinstance(entry, dict)
+        for p in (entry.get("selectedRepoPaths") or [])
+        if isinstance(p, str)
+    ]
+
+
+def test_real_workspace_carcosa_two_paths_both_pass(tmp_path, monkeypatch):
+    """CARCOSA must validate from BOTH the state.json path AND an alternate
+    view (symlink) of the same directory — the bind-mount equivalence the
+    user hit on WSL, kept alive via realpath()."""
+
+    state_file = _real_state_file()
     if not state_file.exists():
         pytest.skip("Real state.json not present; integration test only.")
 
-    os.environ["REPOCIV_STATE_FILE"] = str(state_file)
+    carcosa = next(
+        (
+            p
+            for p in _real_selected_paths()
+            if os.path.basename(os.path.normpath(p)) == "CARCOSA" and Path(p).exists()
+        ),
+        None,
+    )
+    if carcosa is None:
+        pytest.skip("Real state.json has no existing CARCOSA selected; integration test only.")
 
-    out_a = rrs.resolve_selected_repo("ignored",
-        "/home/gris/.hermes/workspace/ACTIVE/CARCOSA")
-    out_b = rrs.resolve_selected_repo("ignored",
-        "/home/gris/workspace/ACTIVE/CARCOSA")
+    monkeypatch.setenv("REPOCIV_STATE_FILE", str(state_file))
+
+    out_a = rrs.resolve_selected_repo("ignored", carcosa)
+
+    # Alternate view of the same directory: the symlink resolves to the same
+    # inode-level path, so the validator must accept it too (this is the
+    # bug fix the test guards).
+    alt = tmp_path / "CARCOSA-alt"
+    alt.symlink_to(carcosa)
+    out_b = rrs.resolve_selected_repo("ignored", str(alt))
 
     assert out_a is not None, "path matching state.json should pass"
-    assert out_b is not None, "alt bind-mount path must also pass (this is the bug fix)"
+    assert out_b is not None, "alternate view of the same dir must also pass (this is the bug fix)"
     # both should canonicalize to the same inode-level path
     assert os.path.realpath(out_a) == os.path.realpath(out_b)
 
 
-def test_real_unselected_path_still_rejected():
-    state_file = Path("/home/gris/.local/state/repociv/state.json")
+def test_real_unselected_path_still_rejected(monkeypatch):
+    state_file = _real_state_file()
     if not state_file.exists():
         pytest.skip("Real state.json not present; integration test only.")
-    os.environ["REPOCIV_STATE_FILE"] = str(state_file)
+    monkeypatch.setenv("REPOCIV_STATE_FILE", str(state_file))
 
     # /tmp is never a selected repo
     out = rrs.resolve_selected_repo("ignored", "/tmp/anything-not-selected")

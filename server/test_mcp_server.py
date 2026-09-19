@@ -105,6 +105,14 @@ def test_agents_ready():
     assert m.call_args[0][0].endswith("/ready")
 
 
+def test_external_agents_list():
+    payload = {"status": {"enabled": True, "ok": True}, "agents": []}
+    with _mock_get(payload) as m:
+        result = _mcp.external_agents_list()
+    assert m.call_args[0][0].endswith("/api/external-agents")
+    assert result == payload
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # COMMANDS (mutating)
 # ══════════════════════════════════════════════════════════════════════════════

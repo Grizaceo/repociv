@@ -219,3 +219,68 @@ describe('/api/map-root handlers', () => {
     expect(JSON.parse(getRes.body).path).toBe(resolve(fixture.outside));
   });
 });
+
+// Regression lock for the onboarding harness bug: `/api/config/default-harness`
+// is a bridge route, but it was fetched bare, so it landed here, fell through to
+// Vite's SPA fallback, and came back as index.html with a 200. The GET read that
+// as success and threw parsing HTML as JSON inside a bare catch (the saved
+// harness was discarded on every visit); the POST 404'd and blocked onboarding.
+// The handler now terminates unmatched /api/* itself so the mistake is loud.
+describe('unmatched /api/* routing guard', () => {
+  let fixture: ReturnType<typeof makeFixture>;
+  let handler: Connect.NextHandleFunction;
+  const prevStateFile = process.env['REPOCIV_STATE_FILE'];
+
+  beforeEach(() => {
+    fixture = makeFixture();
+    process.env['REPOCIV_STATE_FILE'] = join(fixture.root, 'state.json');
+    const plugin = repocivPlugin(fixture.mapRoot);
+    let captured: Connect.NextHandleFunction | undefined;
+    plugin.configureServer!({
+      middlewares: { use: (fn: Connect.NextHandleFunction) => { captured = fn; } },
+      ws: { send: () => {} },
+    } as never);
+    if (!captured) throw new Error('middleware not registered');
+    handler = captured;
+  });
+
+  afterEach(() => {
+    if (prevStateFile === undefined) delete process.env['REPOCIV_STATE_FILE'];
+    else process.env['REPOCIV_STATE_FILE'] = prevStateFile;
+    rmSync(fixture.root, { recursive: true, force: true });
+  });
+
+  it('answers an unknown /api route with 404 JSON instead of falling through to the SPA', async () => {
+    const res = await invokeHandler(handler, 'GET', '/api/config/default-harness');
+    expect(res.statusCode).toBe(404);
+    expect(res.headers['Content-Type']).toBe('application/json');
+    const body = JSON.parse(res.body) as { error: string };
+    // The message must name the fix, not just report the miss.
+    expect(body.error).toContain('bridgeUrl');
+    expect(body.error).toContain('/api/config/default-harness');
+  });
+
+  it('guards every method, so a bare POST cannot be mistaken for a bridge write', async () => {
+    const res = await invokeHandler(
+      handler,
+      'POST',
+      '/api/config/default-harness',
+      JSON.stringify({ harness: 'hermes' }),
+    );
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body).error).toContain('bridgeUrl');
+  });
+
+  it('still hands non-API requests to Vite so the SPA and assets keep working', async () => {
+    for (const url of ['/', '/index.html', '/src/main.ts', '/assets/logo.png']) {
+      const req = mockRequest('GET', url);
+      const res = mockResponse();
+      let nextCalled = false;
+      await handler(req, res as unknown as Connect.ServerResponse, () => {
+        nextCalled = true;
+      });
+      expect(nextCalled, `${url} must fall through to Vite`).toBe(true);
+      expect(res.body).toBe('');
+    }
+  });
+});
