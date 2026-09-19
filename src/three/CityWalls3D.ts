@@ -119,7 +119,11 @@ const STRAIGHT_SPAN = 0.4;
 // Vertex radius (hex circumradius at the wall ring) in HEX fractions.
 const RING_R = 0.42;
 
-function buildWallPieces(q: number, r: number, base: { x: number; z: number }): {
+function buildWallPieces(
+  q: number,
+  r: number,
+  base: { x: number; z: number },
+): {
   pieces: WallPiece[];
 } {
   const pieces: WallPiece[] = [];

@@ -39,7 +39,8 @@ describe('KayKit modular wall kit', () => {
     // longest side) extends inward from the edge midpoint — it must not
     // reach past the building area boundary (0.30·HEX from center).
     const wallDepthFrac = 0.8 / 2.0; // wall_straight depth/length ratio
-    const innerReach = RING_R * (1 - STRAIGHT_SPAN / 2) - (RING_R * STRAIGHT_SPAN) * (wallDepthFrac / 2) / RING_R;
+    const innerReach =
+      RING_R * (1 - STRAIGHT_SPAN / 2) - (RING_R * STRAIGHT_SPAN * (wallDepthFrac / 2)) / RING_R;
     // innerReach approximates the inward extent of the wall body in HEX
     // fractions; it must stay outside the building area (0.30·HEX).
     expect(innerReach).toBeGreaterThan(0.25);
@@ -55,7 +56,12 @@ describe('KayKit modular wall kit', () => {
   });
 
   it('all referenced wall kit assets exist on disk', () => {
-    for (const id of ['wall_straight', 'wall_straight_gate', 'wall_corner_A_inside', 'wall_corner_A_outside']) {
+    for (const id of [
+      'wall_straight',
+      'wall_straight_gate',
+      'wall_corner_A_inside',
+      'wall_corner_A_outside',
+    ]) {
       const base = `public/assets/3d/props/kaykit/buildings/neutral/${id}`;
       expect(existsSync(`${base}.gltf`), `${id}.gltf`).toBe(true);
       expect(existsSync(`${base}.bin`), `${id}.bin`).toBe(true);
@@ -65,7 +71,9 @@ describe('KayKit modular wall kit', () => {
       expect(existsSync(`${base}.gltf`), `${id}.gltf`).toBe(true);
       expect(existsSync(`${base}.bin`), `${id}.bin`).toBe(true);
     }
-    expect(existsSync('public/assets/3d/props/kaykit/buildings/neutral/hexagons_medieval.png')).toBe(true);
+    expect(
+      existsSync('public/assets/3d/props/kaykit/buildings/neutral/hexagons_medieval.png'),
+    ).toBe(true);
   });
 
   it('gltf files reference their sibling .bin and the shared atlas', () => {
