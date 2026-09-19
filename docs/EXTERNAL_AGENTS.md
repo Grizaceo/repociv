@@ -1,15 +1,21 @@
-# Agentes externos en el mapa (Suvadu)
+# Agentes externos en el mapa (Suvadu y Hermes)
 
 RepoCiv muestra como unidades del mapa a los agentes de IA que trabajan en tus repos
 aunque no los haya lanzado RepoCiv: Claude Code en otra terminal, Codex, Cursor,
-OpenCode. La fuente es [Suvadu](https://github.com/AppachiTech/suvadu) (`suv`), que
-registra esas sesiones localmente vía hooks.
+OpenCode y los chats de Hermes. Hay dos fuentes:
+
+- [Suvadu](https://github.com/AppachiTech/suvadu) (`suv`), que registra las sesiones de
+  Claude Code, Codex, Cursor… localmente vía hooks;
+- los `state.db` de Hermes (`~/.hermes/state.db` y uno por perfil), leídos en solo
+  lectura. Suvadu no tiene integración para Hermes, y Hermes ejecuta sus tools sin hooks
+  de shell. Ver [Hermes](#hermes).
 
 ```
-suv agent sessions ─┐                      unit_spawn / unit_state / unit_despawn
-suv history (agent) ┴─► server/suvadu_tracker.py ──────────────────────────────► mapa
-                          (cada ~30 s, argv, sin shell)   GET /api/external-agents
-                                                          MCP external_agents_list
+suv agent sessions ─┐
+suv history (agent) ┤                                 unit_spawn / unit_state / unit_despawn
+~/.hermes/**/state.db ┴─► server/suvadu_tracker.py ──────────────────────────────────► mapa
+  (server/hermes_sessions.py)  (cada ~30 s)           GET /api/external-agents
+                                                      MCP external_agents_list
 ```
 
 ## Panel de Agentes (F8)
@@ -21,6 +27,9 @@ El botón 🤖 del HUD (o **F8**, o la paleta de comandos → "Agentes") abre un
   mapa.
 - **Últimas 24 h:** las mismas sesiones cuando ya quedaron quietas
   (`REPOCIV_EXT_AGENTS_RECENT_H`).
+- **Cron (Hermes)** y **Gateway (Hermes)**: tareas programadas y chats de Telegram / API
+  de Hermes. Solo se listan aquí, nunca en el mapa. Vienen plegadas; el título dice
+  cuántas hay activas.
 - **Unidades RepoCiv:** las unidades propias. El click abre su panel de unidad/chat de
   siempre.
 
@@ -31,7 +40,8 @@ Cada tarjeta muestra dónde trabaja el agente:
   en la capital.
 
 Click en una tarjeta:
-- abre el **chat de solo lectura** (prompts y respuestas guardados por Suvadu);
+- abre el **chat de solo lectura** (prompts y respuestas guardados por Suvadu o por
+  Hermes);
 - lleva la cámara a su unidad, o a su ciudad si la sesión ya no está activa.
 
 En el chat, ↻ pide a Suvadu reimportar el transcript nativo (`suv agent import-session`,
@@ -49,19 +59,21 @@ ajeno.
 - El bridge busca el binario en `SUVADU_BIN` (default `~/.cargo/bin/suv`); no depende del `PATH`.
 
 Si `suv` falta o falla, no se rompe nada: el tracker reporta el código de error en
-`GET /health` → `externalAgents` y las unidades que ya estaban envejecen solas.
+`GET /health` → `externalAgents` y las unidades que ya estaban envejecen solas. Cada fuente
+tiene su propio estado en `externalAgents.sources.{suvadu,hermes}`; `ok` es verdadero solo
+si todas funcionaron y `error` es el código de la primera que falló.
 
 ## Qué aparece y dónde
 
 | Regla | Detalle |
 |---|---|
-| Unidad | `ext-<agente>-<native_id[:8]>`, efímera, fuera de la barra de héroes |
-| Tipo | `claude-code → claude`, `codex → codex`, resto → `scout` |
-| Misión | `<agente> · <modelo>` |
+| Unidad | `ext-<agente>-<native_id[:8]>` (Hermes: `ext-hermes-<hash8>`), efímera, fuera de la barra de héroes |
+| Tipo | `claude-code → claude`, `codex → codex`, Hermes → `hero` (perfiles `lexo*` → `lexo`), resto → `scout` |
+| Misión | `<agente> · <modelo>` (Hermes: `<perfil> · <modelo> · <origen>`) |
 | Ciudad | 1) la ciudad cuyo `repoPath` es el prefijo más largo del `cwd` (por componentes: `repociv-old` no calza con `repociv`); 2) el propio checkout de RepoCiv → la capital (RepoCiv nunca es ciudad: el escaneo lo salta); 3) si no, el repo git que contiene el `cwd`, y el navegador cae a la capital si esa ciudad no está en su mapa; 4) sin repo → capital |
 | `working` | última actividad hace ≤ `REPOCIV_EXT_AGENTS_WORKING_MIN` (2 min) |
 | `idle` | más vieja que eso pero dentro de la ventana |
-| despawn | sin actividad en `REPOCIV_EXT_AGENTS_WINDOW_MIN` (10 min) |
+| despawn | sin actividad en `REPOCIV_EXT_AGENTS_WINDOW_MIN` (10 min), o Hermes cerró la sesión |
 
 Los repos candidatos del paso 1 son los `selectedRepoPaths` de
 `~/.local/state/repociv/state.json` (lo que elegiste en el onboarding). El paso 3 cubre
@@ -85,15 +97,68 @@ sirve de latido. Del historial solo se leen `session_id`, `executor`, `cwd` y
 Consecuencia: un agente que piensa varios minutos sin ejecutar comandos pasa a `idle`
 hasta su próximo comando o fin de turno.
 
+## Hermes
+
+`server/hermes_sessions.py` lee `~/.hermes/state.db` (perfil `default`) y
+`~/.hermes/profiles/*/state.db`. El archivo raíz pesa ~7 GB y Hermes escribe en él
+todo el tiempo, así que:
+
+- **Solo lectura:** cada conexión es `file:…?mode=ro`, con `busy_timeout` de 0,5 s,
+  `PRAGMA query_only` y un plazo de 2 s por base (3 s para el chat) vía progress handler.
+  Nunca escribe, ni hace VACUUM, checkpoint o rebuild de FTS.
+- **Sin transacciones colgadas:** cada sondeo abre la conexión, consulta y la cierra.
+- **Consultas acotadas:** la lista usa `idx_sessions_effective_activity`
+  (`WHERE COALESCE(last_activity_at, started_at) >= ?`, con esa expresión textual para
+  que el planner use el índice) y `LIMIT 200` por base. Los padres se buscan por clave
+  primaria y el último mensaje por `idx_messages_session`. Medido el 2026-09-19 con 29
+  bases: ~25 ms por sondeo en total, ~1 ms por chat.
+
+| Origen (`sessions.source`) | Dónde |
+|---|---|
+| `cli`, `desktop`, `tui`, `hermes_browser`, `kanban`, `subagent` | mapa + Activos |
+| `cron` | solo panel, sección Cron |
+| cualquier otro (`telegram`, `discord`, `api_server`…) | solo panel, sección Gateway |
+| `tool` (misiones de RepoCiv) | nunca |
+
+Un subagente va a la sección de la sesión que lo lanzó: un subagente de un cron queda
+en Cron.
+
+- **Actividad:** se mide con `last_activity_at` (Hermes lo actualiza aprox. una vez por
+  minuto) o con el último mensaje, lo que sea más reciente. Nunca con
+  `ended_at IS NULL`: cientos de sesiones quedaron sin cerrar. Si Hermes cerró la sesión
+  (`ended_at` posterior a la última actividad), la unidad sale del mapa en el siguiente
+  sondeo.
+- **Compresión:** cuando Hermes comprime una conversación larga, cierra la sesión con
+  `end_reason='compression'` y sigue en una sesión hija. Toda la cadena conserva una sola
+  unidad (el id sale de la primera sesión), y su chat se lee a través de la cadena. Un
+  subagente (`source='subagent'`) no es una continuación: tiene su propia unidad y la
+  etiqueta "subagente".
+- **Ciudad:** `git_repo_root` si existe; si no, `cwd`. Con la regla de siempre
+  (`city_for`). Las sesiones de desktop suelen no tener `cwd`, así que caen en la
+  capital.
+- **Sin duplicados:**
+  - Las misiones Hermes que lanza RepoCiv (`hermes chat … --source tool`) ya tienen su
+    unidad. Se excluyen por `source='tool'` y por los ids de
+    `~/.repociv/hermes-sessions.json`. También sus subagentes.
+  - Mientras la fuente Hermes funcione y lea el perfil `lexo-alpha`, el detector de LexO
+    por `ps` (`process_scanner.detect_lexo`) no crea unidades `LEXO-*` y retira las que
+    había. Si la fuente falla, el detector vuelve a funcionar solo.
+  - Las sesiones con `hidden=1` no se muestran.
+- **Chat:** turnos `user` y `assistant`, de hasta 4 000 caracteres cada uno. De las tools
+  solo se muestran los nombres ("🔧 terminal ×3 · read_file"): el SQL nunca selecciona la
+  salida de una tool ni sus argumentos. Se omite lo que Hermes tampoco muestra
+  (`display_kind` no nulo, mensajes inactivos) y el resumen de compactación. El título
+  de la sesión sale del contenido, así que viaja solo con el chat.
+
 ## Privacidad
 
 - **Metadatos, siempre:** los eventos del mapa (SSE/WS), `GET /api/external-agents[/sessions]`
-  y la tool MCP llevan solo agente, ciudad/repo, modelo, conteos, primera y última
-  actividad. Ni prompts, ni comandos, ni `cwd`.
+  y la tool MCP llevan solo agente, perfil, origen, ciudad/repo, modelo, conteos, primera
+  y última actividad. Ni prompts, ni comandos, ni títulos, ni `cwd`.
 - **Chat, solo a pedido:** `GET /api/external-agents/<sesión>/chat` (con token) devuelve
   prompts y respuestas cuando abrís el chat en el panel. Solo para sesiones que el tracker
-  listó; nunca se difunde por SSE/WS ni se expone por MCP. Los comandos de shell no se
-  muestran.
+  listó; nunca se difunde por SSE/WS ni se expone por MCP. Ni los comandos de shell ni la
+  salida de las tools se muestran.
 - **Salud:** `/health` (sin token) muestra solo la salud del tracker.
 
 Quien llegue a la UI (tailnet) con el token embebido puede leer esos chats. Es la misma
@@ -109,6 +174,9 @@ frontera que ya tenía el resto del bridge.
 | `REPOCIV_EXT_AGENTS_WORKING_MIN` | `2` | umbral working → idle (≤ ventana) |
 | `REPOCIV_EXT_AGENTS_POLL_S` | `30` | intervalo de sondeo (mín. 5) |
 | `REPOCIV_EXT_AGENTS_RECENT_H` | `24` | cuánto atrás lista el panel de Agentes (≥ ventana) |
+| `REPOCIV_HERMES_SESSIONS` | `1` | `0` = no leer los `state.db` de Hermes |
+| `REPOCIV_HERMES_HOME` | `~/.hermes` | raíz de Hermes (`state.db`, `profiles/*/state.db`) |
+| `REPOCIV_HERMES_PROFILES_EXCLUDE` | — | perfiles a ignorar, separados por comas (`default` es la raíz) |
 
 ## Limitaciones conocidas
 
@@ -119,7 +187,10 @@ frontera que ya tenía el resto del bridge.
   `--continue`) y que el tracker excluya esos ids.
 - Codex / Cursor / OpenCode dependen de que su integración de Suvadu registre sesiones;
   solo Claude Code está verificado en esta máquina.
-- Suvadu es local: agentes de otras máquinas no aparecen.
+- Suvadu y Hermes son locales: agentes de otras máquinas no aparecen.
+- **Hermes en vivo:** `last_activity_at` se actualiza aprox. una vez por minuto, pero el
+  último mensaje se lee en cada sondeo, así que una sesión nueva aparece en ≤ 30 s
+  apenas escribe su primer mensaje.
 - **Largo del chat:** Suvadu guarda hasta ~4 000 caracteres por mensaje (se marca
   "…recortado"). El panel muestra los últimos 80 mensajes.
 - **Refresh:** el import a pedido solo existe para Claude Code
