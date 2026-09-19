@@ -97,6 +97,20 @@ sirve de latido. Del historial solo se leen `session_id`, `executor`, `cwd` y
 Consecuencia: un agente que piensa varios minutos sin ejecutar comandos pasa a `idle`
 hasta su próximo comando o fin de turno.
 
+### Misiones de RepoCiv (sin duplicados)
+
+Los `claude --print` que lanza el propio `agent_runner` también pasan por los hooks de
+Suvadu. Para que no aparezcan dos veces (la unidad de la misión y una
+`ext-claude-code-*` al lado), cada misión corre con un id de sesión explícito
+(`server/claude_sessions.py`, estado en `~/.repociv/claude-sessions.json`):
+
+- una unidad *stateful* retoma su propio hilo por (unidad, ciudad) con
+  `--resume <id>`, o abre uno con `--session-id <uuid>` si no hay transcript;
+- una misión *stateless* usa un `--session-id` nuevo cada vez.
+
+El tracker descarta esos ids y a sus subagentes. Antes se usaba `--continue`, que
+retoma la conversación más reciente del directorio y podía ser una sesión tuya.
+
 ## Hermes
 
 `server/hermes_sessions.py` lee `~/.hermes/state.db` (perfil `default`) y
@@ -180,11 +194,6 @@ frontera que ya tenía el resto del bridge.
 
 ## Limitaciones conocidas
 
-- **Misiones de RepoCiv duplicadas.** Los `claude --print` que lanza el propio
-  `agent_runner` también pasan por los hooks de Suvadu, así que mientras corren se ven
-  dos veces: la unidad de la misión y una `ext-claude-code-*` en la misma ciudad.
-  Arreglo propuesto: lanzar esas misiones con `--session-id <uuid>` (hoy usan
-  `--continue`) y que el tracker excluya esos ids.
 - Codex / Cursor / OpenCode dependen de que su integración de Suvadu registre sesiones;
   solo Claude Code está verificado en esta máquina.
 - Suvadu y Hermes son locales: agentes de otras máquinas no aparecen.

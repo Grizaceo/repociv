@@ -502,9 +502,18 @@ class SuvaduSource:
 
     name = "suvadu"
 
-    def __init__(self, run: RunFn, clock: Callable[[], float] = time.time) -> None:
+    def __init__(
+        self,
+        run: RunFn,
+        clock: Callable[[], float] = time.time,
+        *,
+        owned_ids: Callable[[], frozenset[str]] = frozenset,
+    ) -> None:
+        """``owned_ids``: native ids of the Claude sessions RepoCiv launched
+        itself (server/claude_sessions.py) — their mission unit already shows them."""
         self._run = run
         self._clock = clock
+        self._owned_ids = owned_ids
         self._heartbeat: bool | None = None
         self._imported_at: dict[str, float] = {}
 
@@ -519,7 +528,18 @@ class SuvaduSource:
             beats, self._heartbeat = {}, False
         else:
             self._heartbeat = True
-        return merge(sessions, beats)
+        observations = merge(sessions, beats)
+        try:
+            owned = self._owned_ids()
+        except Exception:
+            owned = frozenset()
+        if not owned:
+            return observations
+        def mine(session: str | None) -> bool:
+            return bool(session) and (session in owned or _native_of(session or "") in owned)
+
+        # Skip RepoCiv's own missions and the subagents they spawned.
+        return [obs for obs in observations if obs.native_id not in owned and not mine(obs.parent_id)]
 
     def status(self) -> dict[str, Any]:
         return {"heartbeat": self._heartbeat}
@@ -853,10 +873,13 @@ def start(send: SendFn, config: TrackerConfig | None = None) -> bool:
     cfg = config or TrackerConfig.from_env()
     if not cfg.enabled or _thread is not None:
         return False
-    from server import hermes_sessions  # noqa: PLC0415
+    from server import claude_sessions, hermes_sessions  # noqa: PLC0415
 
     sources: list[AgentSource] = [
-        SuvaduSource(lambda args: run_suv(cfg.bin_path, args, cfg.timeout_s)),
+        SuvaduSource(
+            lambda args: run_suv(cfg.bin_path, args, cfg.timeout_s),
+            owned_ids=claude_sessions.owned_ids,
+        ),
     ]
     hermes = hermes_sessions.source_from_env(recent_s=cfg.recent_s, window_s=cfg.window_s)
     if hermes is not None:
