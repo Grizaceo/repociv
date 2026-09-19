@@ -11,7 +11,12 @@ import {
   loadGitInfo,
   loadFilesInfo,
 } from '../index.ts';
-import { type RepoCivProfile, type HarnessId, getProfiles } from '../../agentProfile.ts';
+import {
+  type RepoCivProfile,
+  type HarnessId,
+  getProfiles,
+  nativeProfileFor,
+} from '../../agentProfile.ts';
 
 export function selectHero(
   unit: Unit,
@@ -89,7 +94,9 @@ export function spawnFromProfile(
     'En espera de misión',
   );
 
-  // Persist harness / model config for the chat panel
+  // Persist harness / model / native profile for the chat panel. Without the
+  // profile, a "➕ Bot" unit (e.g. cobalt) chatted through the main Hermes
+  // profile instead of its own.
   try {
     localStorage.setItem(
       `repociv:chatConfig:${unitId}`,
@@ -97,6 +104,7 @@ export function spawnFromProfile(
         harness: profile.harness,
         provider: profile.provider ?? '',
         model: profile.model ?? '',
+        profile: nativeProfileFor(profile),
       }),
     );
   } catch {

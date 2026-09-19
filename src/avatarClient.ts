@@ -6,7 +6,7 @@
 //
 // Contract (verified live, snake_case wire):
 //   GET /api/roster?harness=hermes → 200
-//     [{ name, is_bot, avatar_kind, avatar_url, pet, face_url }]
+//     { harness, bots: [{ name, is_bot, avatar_kind, avatar_url, pet, face_url }] }
 //   - avatar_kind ∈ { "pet", "face", "asset", null }
 //       • "pet"  → real pet spritesheet (pets/<pet>/spritesheet.webp), `pet`
 //                  carries {id, displayName, description}; avatar_url = spritesheet.
@@ -83,9 +83,11 @@ export async function getRosterMap(harness = 'hermes'): Promise<Map<string, Rost
       rosterPromise = null;
       throw new Error(`GET /api/roster → ${resp.status}`);
     }
-    const data = (await resp.json()) as { profiles?: RosterEntry[] };
+    // The bridge answers { harness, bots } (server/routes/core.py get_roster).
+    // Reading `profiles` here left the map empty, so no unit ever got its avatar.
+    const data = (await resp.json()) as { bots?: RosterEntry[] };
     const map = new Map<string, RosterEntry>();
-    for (const entry of data.profiles ?? []) {
+    for (const entry of data.bots ?? []) {
       map.set(keyOf(entry), entry);
     }
     rosterCache = map;
@@ -169,23 +171,32 @@ export function getAvatarImage(url: string): HTMLImageElement | null {
   if (failedUrls.has(url)) return null;
   let img = imageCache.get(url);
   if (!img) {
-    img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      /* marked ready on next getAvatarImage call */
-    };
-    img.onerror = () => {
+    const el = new Image();
+    const fail = () => {
       failedUrls.add(url);
       imageCache.delete(url);
     };
-    img.src = url;
-    imageCache.set(url, img);
+    el.onerror = fail;
+    imageCache.set(url, el);
+    img = el;
+    // /api/roster/asset/* is behind the bridge token and an <img> cannot send
+    // headers (it got 401, so no avatar ever drew): fetch the bytes with the
+    // token and hand the image an object URL.
+    void fetch(url, { headers: bridgeHeaders() })
+      .then((resp) => (resp.ok ? resp.blob() : Promise.reject(new Error(String(resp.status)))))
+      .then((blob) => {
+        el.src = URL.createObjectURL(blob);
+      })
+      .catch(fail);
   }
   return img.complete && img.naturalWidth > 0 ? img : null;
 }
 
 /** Drop the failed/loaded caches (call on logout or profile change). */
 export function clearAvatarImages(): void {
+  for (const img of imageCache.values()) {
+    if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+  }
   imageCache.clear();
   failedUrls.clear();
 }

@@ -29,6 +29,18 @@ export interface RepoCivProfile {
   profile_path?: string;
 }
 
+/**
+ * Native Hermes profile dir a spawned unit should chat through, or '' for the
+ * main profile. Mirrors the bridge (agent_runner._get_agent_config): an
+ * explicit profile_path, else ~/.hermes/profiles/<harness_ref> for hermes.
+ */
+export function nativeProfileFor(profile: RepoCivProfile): string {
+  if (profile.profile_path) return profile.profile_path;
+  const ref = profile.harness_ref ?? '';
+  if (profile.harness === 'hermes' && ref && ref !== 'default') return `~/.hermes/profiles/${ref}`;
+  return '';
+}
+
 export interface ProfileIdentity {
   content: string;
   path: string;
