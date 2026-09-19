@@ -21,8 +21,11 @@ Two read-only CLI calls (argv, no shell) feed each poll:
     the PostToolUse hook, keyed by the same session id (``<prefix>-<native_id>``).
     Used only as a heartbeat: the command text is never read or kept.
 
-Privacy: only metadata leaves this module (agent, repo/city, model, counts,
-last activity). No prompts, no commands, no cwd.
+Privacy: map events, /api/external-agents[/sessions] and /health carry only
+metadata (agent, repo/city, model, counts, last activity) — no prompts, no
+commands, no cwd. Chat text (Suvadu's prompt/response events) is read only on
+demand through the token-protected GET /api/external-agents/<session>/chat,
+for sessions this tracker listed; it is never broadcast.
 
 Fail-open: a missing binary, a timeout, a non-zero exit or bad JSON never
 raises out of the poll loop; the error code is kept in ``status()`` for /health
@@ -32,6 +35,7 @@ and the units already on the map age out on their last known activity.
 from __future__ import annotations
 
 import base64
+import glob
 import json
 import os
 import re
@@ -49,6 +53,11 @@ CAPITAL_ID = "capital"  # src/map.ts CAPITAL_ID
 _REPOCIV_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SESSIONS_LIMIT = 50  # `agent sessions` is ordered by updated_at DESC
 _HISTORY_LIMIT = 300
+_EVENT_PAGE = 100  # `suv agent session --limit` max
+_MAX_EVENT_PAGES = 30
+_IMPORT_MIN_INTERVAL_S = 5.0
+_CHAT_ROLES = {"prompt": "user", "response": "assistant"}
+_NATIVE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]{7,79}$")
 
 # Suvadu agent id → unitType from the bridgeSchema.ts picklist.
 _UNIT_TYPES = {"claude-code": "claude", "claude": "claude", "codex": "codex"}
@@ -74,6 +83,7 @@ class TrackerConfig:
     poll_s: float = 30.0
     window_s: float = 600.0  # last activity older than this → despawn
     working_s: float = 120.0  # last activity fresher than this → working, else idle
+    recent_s: float = 86400.0  # sessions listed in the Agents panel (chat access)
     timeout_s: float = 5.0
     enabled: bool = True
 
@@ -81,11 +91,13 @@ class TrackerConfig:
     def from_env(cls) -> TrackerConfig:
         window_s = _env_float("REPOCIV_EXT_AGENTS_WINDOW_MIN", 10.0, 1.0) * 60
         working_s = _env_float("REPOCIV_EXT_AGENTS_WORKING_MIN", 2.0, 0.5) * 60
+        recent_s = _env_float("REPOCIV_EXT_AGENTS_RECENT_H", 24.0, 0.5) * 3600
         return cls(
             bin_path=os.path.expanduser(os.environ.get("SUVADU_BIN", "") or "~/.cargo/bin/suv"),
             poll_s=_env_float("REPOCIV_EXT_AGENTS_POLL_S", 30.0, 5.0),
             window_s=window_s,
             working_s=min(working_s, window_s),
+            recent_s=max(recent_s, window_s),
             enabled=os.environ.get("REPOCIV_EXT_AGENTS", "1").lower() not in ("0", "false", "no"),
         )
 
@@ -130,6 +142,8 @@ class Observation:
     command_count: int
     event_count: int
     total_tokens: int | None
+    parent_id: str | None = None
+    imported: bool = True  # False: seen only through the history heartbeat
 
 
 def _as_int(value: Any) -> int | None:
@@ -183,6 +197,7 @@ def parse_sessions(raw: str) -> list[Observation]:
                 command_count=_as_int(row.get("command_count")) or 0,
                 event_count=_as_int(row.get("event_count")) or 0,
                 total_tokens=_as_int(usage.get("total_tokens")) if isinstance(usage, dict) else None,
+                parent_id=_str(row.get("parent_id")) or None,
             )
         )
     return out
@@ -265,6 +280,7 @@ def merge(sessions: list[Observation], beats: dict[str, _Beat]) -> list[Observat
                 command_count=beat.count,
                 event_count=0,
                 total_tokens=None,
+                imported=False,
             )
         )
     return out
@@ -296,12 +312,23 @@ def _enclosing_git_repo(path: str) -> str | None:
         current = parent
 
 
-def city_for_cwd(
-    cwd: str,
-    repo_paths: Iterable[str],
-    *,
-    home_repo: str = _REPOCIV_ROOT,
-) -> tuple[str, str]:
+_Candidate = tuple[str, str, bool]  # (canonical path, path as given, is RepoCiv's own checkout)
+
+
+def city_candidates(repo_paths: Iterable[str], *, home_repo: str = _REPOCIV_ROOT) -> list[_Candidate]:
+    """Canonicalise the repo list once per poll (realpath is a syscall per path)."""
+    out: list[_Candidate] = []
+    for raw in repo_paths:
+        if raw:
+            repo_abs = os.path.abspath(os.path.expanduser(raw))
+            out.append((_canonical(repo_abs), repo_abs, False))
+    if home_repo:
+        home_abs = os.path.abspath(home_repo)
+        out.append((_canonical(home_abs), home_abs, True))
+    return out
+
+
+def city_for(cwd: str, candidates: list[_Candidate]) -> tuple[str, str]:
     """(cityId, repo name) for a session cwd.
 
     1. The selected repo (a city) that is the longest prefix of ``cwd``, compared
@@ -317,13 +344,8 @@ def city_for_cwd(
     if not cwd:
         return CAPITAL_ID, ""
     cwd_c = _canonical(cwd)
-    candidates = [(p, False) for p in repo_paths if p]
-    if home_repo:
-        candidates.append((home_repo, True))
     best: tuple[int, str, bool] | None = None
-    for raw, is_home in candidates:
-        repo_abs = os.path.abspath(os.path.expanduser(raw))
-        repo_c = _canonical(repo_abs)
+    for repo_c, repo_abs, is_home in candidates:
         try:
             inside = os.path.commonpath([cwd_c, repo_c]) == repo_c
         except ValueError:
@@ -337,6 +359,16 @@ def city_for_cwd(
     if enclosing is not None:
         return encode_repo_id(enclosing), os.path.basename(enclosing)
     return CAPITAL_ID, ""
+
+
+def city_for_cwd(
+    cwd: str,
+    repo_paths: Iterable[str],
+    *,
+    home_repo: str = _REPOCIV_ROOT,
+) -> tuple[str, str]:
+    """One-off form of :func:`city_for`."""
+    return city_for(cwd, city_candidates(repo_paths, home_repo=home_repo))
 
 
 def selected_repo_paths() -> list[str]:
@@ -367,6 +399,49 @@ def _mission_for(obs: Observation) -> str:
     return f"{obs.agent} · {obs.model}" if obs.model else obs.agent
 
 
+def transcript_path(agent: str, native_id: str, *, home: str | None = None) -> str | None:
+    """Native transcript Suvadu can (re)import for this session, if any.
+
+    Claude Code: ~/.claude/projects/<project>/<native_id>.jsonl
+    Codex:       ~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<native_id>.jsonl
+    ``native_id`` is validated before it reaches a glob pattern.
+    """
+    if not _NATIVE_RE.match(native_id):
+        return None
+    base = home or os.path.expanduser("~")
+    agent = agent.lower()
+    if agent in ("claude-code", "claude"):
+        pattern = os.path.join(base, ".claude", "projects", "*", f"{native_id}.jsonl")
+    elif agent in ("codex", "openai-codex"):
+        pattern = os.path.join(base, ".codex", "sessions", "*", "*", "*", f"*{native_id}*.jsonl")
+    else:
+        return None
+    hits = [h for h in glob.glob(pattern) if os.path.isfile(h)]
+    if not hits:
+        return None
+    try:
+        return max(hits, key=os.path.getmtime)
+    except OSError:
+        return hits[0]
+
+
+def _chat_message(event: Any) -> dict[str, Any] | None:
+    """Suvadu prompt/response event → chat message; everything else → None."""
+    if not isinstance(event, dict):
+        return None
+    role = _CHAT_ROLES.get(_str(event.get("kind")))
+    data = event.get("data")
+    if role is None or not isinstance(data, dict) or not isinstance(data.get("text"), str):
+        return None
+    return {
+        "role": role,
+        "text": data["text"],
+        "at": _as_int(event.get("at")),
+        "truncated": bool(data.get("truncated")),
+        "turn": _str(event.get("turn_id")) or None,
+    }
+
+
 # ─── Tracker ─────────────────────────────────────────────────────────────────
 class ExternalAgentTracker:
     """Owns the ext-* units. poll_once() is the only writer; snapshot() reads."""
@@ -387,6 +462,9 @@ class ExternalAgentTracker:
         self._clock = clock
         self._lock = threading.Lock()
         self._units: dict[str, dict[str, Any]] = {}  # session_id → unit record
+        self._rows: list[dict[str, Any]] = []  # recent sessions, Agents panel
+        self._natives: dict[str, tuple[str, str]] = {}  # session_id → (agent, native_id)
+        self._imported_at: dict[str, float] = {}
         self._last_obs: list[Observation] = []
         self._status: dict[str, Any] = {
             "ok": None,
@@ -443,6 +521,14 @@ class ExternalAgentTracker:
                 if prev is None or obs.last_activity_ms > prev.last_activity_ms:
                     desired[obs.session_id] = obs
 
+        candidates = city_candidates(repo_paths)
+        cities: dict[str, tuple[str, str]] = {}
+
+        def city_of(cwd: str) -> tuple[str, str]:
+            if cwd not in cities:
+                cities[cwd] = city_for(cwd, candidates)
+            return cities[cwd]
+
         events: list[dict[str, Any]] = []
         with self._lock:
             for session_id in list(self._units):
@@ -450,7 +536,7 @@ class ExternalAgentTracker:
                     events.append({"type": "unit_despawn", "unit": self._units.pop(session_id)["unit"]})
 
             for session_id, obs in desired.items():
-                city_id, repo = city_for_cwd(obs.cwd, repo_paths)
+                city_id, repo = city_of(obs.cwd)
                 age_ms = max(0, now_ms - obs.last_activity_ms)
                 state = "working" if age_ms <= working_ms else "idle"
                 rec = self._units.get(session_id)
@@ -480,7 +566,44 @@ class ExternalAgentTracker:
                     eventCount=obs.event_count,
                     totalTokens=obs.total_tokens,
                 )
+            self._rows, self._natives = self._recent_rows(observations, now_ms, city_of)
         return events
+
+    def _recent_rows(
+        self,
+        observations: list[Observation],
+        now_ms: int,
+        city_of: Callable[[str], tuple[str, str]],
+    ) -> tuple[list[dict[str, Any]], dict[str, tuple[str, str]]]:
+        """Every session active within recent_s, newest first (caller holds the lock)."""
+        recent_ms = self.config.recent_s * 1000
+        rows: list[dict[str, Any]] = []
+        natives: dict[str, tuple[str, str]] = {}
+        for obs in sorted(observations, key=lambda o: o.last_activity_ms, reverse=True):
+            if obs.session_id in natives or now_ms - obs.last_activity_ms > recent_ms:
+                continue
+            natives[obs.session_id] = (obs.agent, obs.native_id)
+            city_id, repo = city_of(obs.cwd)
+            rec = self._units.get(obs.session_id)
+            rows.append({
+                "sessionId": obs.session_id,
+                "agent": obs.agent,
+                "model": obs.model,
+                "repo": repo,
+                "cityId": city_id,
+                "active": rec is not None,
+                "state": rec["state"] if rec is not None else "inactive",
+                "unit": rec["unit"] if rec is not None else None,
+                "unitType": unit_type_for(obs.agent),
+                "firstActivityAt": obs.first_activity_ms,
+                "lastActivityAt": obs.last_activity_ms,
+                "commandCount": obs.command_count,
+                "eventCount": obs.event_count,
+                "totalTokens": obs.total_tokens,
+                "subagent": obs.parent_id is not None,
+                "imported": obs.imported,
+            })
+        return rows, natives
 
     @staticmethod
     def _spawn_event(rec: dict[str, Any], obs: Observation) -> dict[str, Any]:
@@ -508,6 +631,72 @@ class ExternalAgentTracker:
         with self._lock:
             rows = [dict(rec) for rec in self._units.values()]
         return sorted(rows, key=lambda r: r.get("lastActivityAt") or 0, reverse=True)
+
+    def sessions(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return [dict(row) for row in self._rows]
+
+    # -- chat (on demand, never broadcast) -----------------------------------
+    def refresh_transcript(self, session_id: str) -> str:
+        """Ask Suvadu to re-import the native transcript (it only does so itself on
+        prompt/stop, so a long turn would otherwise read stale)."""
+        with self._lock:
+            known = self._natives.get(session_id)
+        if known is None:
+            return "unknown_session"
+        now = self._clock()
+        if now - self._imported_at.get(session_id, 0.0) < _IMPORT_MIN_INTERVAL_S:
+            return "throttled"
+        path = transcript_path(*known)
+        if path is None:
+            return "no_transcript"
+        self._imported_at[session_id] = now
+        try:
+            self._run(["agent", "import-session", path])
+        except Exception:
+            return "failed"
+        return "ok"
+
+    def chat(self, session_id: str, *, limit: int = 80, refresh: bool = False) -> tuple[int, dict[str, Any]]:
+        """Last ``limit`` prompts/responses of a listed session, oldest first."""
+        with self._lock:
+            row = next((dict(r) for r in self._rows if r["sessionId"] == session_id), None)
+        if row is None:
+            return 404, {"error": "unknown_session", "sessionId": session_id}
+        limit = max(1, min(limit, 400))
+        body: dict[str, Any] = {"session": row, "messages": [], "hasMore": False, "available": False}
+        if refresh:
+            body["refresh"] = self.refresh_transcript(session_id)
+        try:
+            head = json.loads(self._run(["agent", "session", session_id, "--limit", "1"]))
+            total = _as_int((head.get("session") or {}).get("event_count")) or 0
+        except SuvaduError as exc:
+            body["error"] = str(exc)  # e.g. not imported yet
+            return 200, body
+        except (ValueError, AttributeError):
+            body["error"] = "bad_json"
+            return 200, body
+        messages: list[dict[str, Any]] = []
+        offset = max(0, total - _EVENT_PAGE)
+        try:
+            for _ in range(_MAX_EVENT_PAGES):
+                page = json.loads(self._run([
+                    "agent", "session", session_id,
+                    "--limit", str(_EVENT_PAGE), "--offset", str(offset),
+                ]))
+                batch = [m for m in map(_chat_message, page.get("events") or []) if m]
+                messages = batch + messages
+                if len(messages) >= limit or offset == 0:
+                    break
+                offset = max(0, offset - _EVENT_PAGE)
+        except (SuvaduError, ValueError, AttributeError) as exc:
+            body["error"] = str(exc) if isinstance(exc, SuvaduError) else "bad_json"
+        body.update(
+            available=True,
+            hasMore=offset > 0 or len(messages) > limit,
+            messages=messages[-limit:],
+        )
+        return 200, body
 
 
 # ─── Module singleton (wired from bridge.py) ─────────────────────────────────
@@ -540,6 +729,25 @@ def status() -> dict[str, Any]:
     if _tracker is None:
         return {"enabled": False, "ok": None, "error": None, "units": 0}
     return _tracker.status()
+
+
+def sessions() -> dict[str, Any]:
+    """Payload of GET /api/external-agents/sessions (metadata only)."""
+    if _tracker is None:
+        return {"status": status(), "sessions": []}
+    return {
+        "status": _tracker.status(),
+        "windowMinutes": _tracker.config.window_s / 60,
+        "recentHours": _tracker.config.recent_s / 3600,
+        "sessions": _tracker.sessions(),
+    }
+
+
+def chat(session_id: str, *, limit: int = 80, refresh: bool = False) -> tuple[int, dict[str, Any]]:
+    """Payload of GET /api/external-agents/<session>/chat — prompts and responses."""
+    if _tracker is None:
+        return 503, {"error": "tracker_not_running"}
+    return _tracker.chat(session_id, limit=limit, refresh=refresh)
 
 
 def snapshot() -> dict[str, Any]:

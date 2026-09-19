@@ -76,6 +76,7 @@ class FakeSuv:
         self.history = ""
         self.fail_sessions: Exception | None = None
         self.fail_history: Exception | None = None
+        self.events: dict[str, list[dict[str, Any]]] = {}  # `agent session <id>`
         self.calls: list[list[str]] = []
 
     def __call__(self, args: list[str]) -> str:
@@ -88,7 +89,34 @@ class FakeSuv:
             if self.fail_history:
                 raise self.fail_history
             return self.history
+        if args[:2] == ["agent", "session"]:
+            sid = args[2]
+            if sid not in self.events:
+                raise st.SuvaduError("exit_1")  # "Session not found or excluded"
+            opts = dict(zip(args[3::2], args[4::2]))
+            limit, offset = int(opts.get("--limit", 50)), int(opts.get("--offset", 0))
+            evs = self.events[sid]
+            return json.dumps({
+                "session": {"id": sid, "event_count": len(evs)},
+                "events": evs[offset : offset + limit],
+                "commands": [],
+            })
+        if args[:2] == ["agent", "import-session"]:
+            return "{}"
         raise AssertionError(f"unexpected suv call {args}")
+
+
+def _events(n_turns: int, usage_per_turn: int = 8) -> list[dict[str, Any]]:
+    """A transcript shaped like Suvadu's: prompt, usage noise, response, per turn."""
+    evs: list[dict[str, Any]] = [{"id": "s", "kind": "session_started", "at": NOW_MS, "data": {}}]
+    for t in range(n_turns):
+        evs.append({"id": f"p{t}", "kind": "prompt", "at": NOW_MS + t, "turn_id": f"t{t}",
+                    "data": {"text": f"prompt {t}", "text_hash": "h", "truncated": False}})
+        evs.extend({"id": f"u{t}-{i}", "kind": "usage", "at": NOW_MS + t,
+                    "data": {"last": {}, "total": {}}} for i in range(usage_per_turn))
+        evs.append({"id": f"r{t}", "kind": "response", "at": NOW_MS + t, "turn_id": f"t{t}",
+                    "data": {"text": f"answer {t} <b>", "text_hash": "h", "truncated": t == 0}})
+    return evs
 
 
 class Clock:
@@ -466,3 +494,114 @@ def test_external_agents_route_registered():
     assert registry.GET_EXACT["/api/external-agents"] is get_external_agents
     status, body = get_external_agents({"params": {}})
     assert status == 200 and "agents" in body
+
+
+# ─── Agents panel: recent sessions + chat ────────────────────────────────────
+def test_recent_sessions_list_active_and_inactive(repos):
+    suv, clock, sent = FakeSuv(), Clock(), []
+    repo = str(repos / "repociv")
+    suv.sessions = _sessions_json(
+        _session("live0000", cwd=repo),
+        _session("done0000", cwd="/elsewhere", last_ms=NOW_MS - 3 * 3600_000),
+        _session("old00000", cwd=repo, last_ms=NOW_MS - 30 * 3600_000),
+    )
+    t = _tracker([repo], suv, clock, sent)
+    t.poll_once()
+    rows = {r["sessionId"]: r for r in t.sessions()}
+    assert set(rows) == {"claude-live0000", "claude-done0000"}
+    live, done = rows["claude-live0000"], rows["claude-done0000"]
+    assert (live["active"], live["state"], live["unit"]) == (True, "working", "ext-claude-code-live0000")
+    assert live["cityId"] == st.encode_repo_id(repo) and live["repo"] == "repociv"
+    assert (done["active"], done["state"], done["unit"], done["cityId"]) == (False, "inactive", None, "capital")
+    assert "cwd" not in json.dumps(t.sessions())
+    assert [r["sessionId"] for r in t.sessions()] == ["claude-live0000", "claude-done0000"]
+
+
+def test_chat_pages_backwards_from_the_end(repos):
+    suv, clock, sent = FakeSuv(), Clock(), []
+    suv.sessions = _sessions_json(_session("chat0000"))
+    suv.events["claude-chat0000"] = _events(25)  # 1 + 25 * 10 = 251 events
+    t = _tracker([], suv, clock, sent)
+    t.poll_once()
+    status, body = t.chat("claude-chat0000", limit=5)
+    assert status == 200 and body["available"] is True and body["hasMore"] is True
+    msgs = body["messages"]
+    assert [m["text"] for m in msgs] == ["answer 22 <b>", "prompt 23", "answer 23 <b>", "prompt 24", "answer 24 <b>"]
+    assert msgs[1] == {"role": "user", "text": "prompt 23", "at": NOW_MS + 23, "truncated": False, "turn": "t23"}
+    reads = [c for c in suv.calls if c[:2] == ["agent", "session"]]
+    assert reads[1][-2:] == ["--offset", "151"]  # last page first
+
+
+def test_chat_whole_session_when_it_fits(repos):
+    suv, clock, sent = FakeSuv(), Clock(), []
+    suv.sessions = _sessions_json(_session("small000"))
+    suv.events["claude-small000"] = _events(3)
+    t = _tracker([], suv, clock, sent)
+    t.poll_once()
+    _, body = t.chat("claude-small000", limit=80)
+    assert [m["role"] for m in body["messages"]] == ["user", "assistant"] * 3
+    assert body["messages"][1]["truncated"] is True
+    assert body["hasMore"] is False
+
+
+def test_chat_unknown_or_not_imported(repos):
+    suv, clock, sent = FakeSuv(), Clock(), []
+    suv.history = _history_line("claude-fresh000-aaaa", NOW_MS)  # heartbeat only
+    t = _tracker([], suv, clock, sent)
+    t.poll_once()
+    assert t.chat("claude-nope")[0] == 404
+    status, body = t.chat("claude-fresh000-aaaa")
+    assert status == 200 and body["available"] is False and body["error"] == "exit_1"
+    assert t.sessions()[0]["imported"] is False
+
+
+def test_refresh_imports_the_native_transcript(repos, tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    native = "5805ab57-15ab-48a6-b622-3e6ca0c69981"
+    transcript = tmp_path / ".claude/projects/-w-repociv" / f"{native}.jsonl"
+    transcript.parent.mkdir(parents=True)
+    transcript.write_text("{}\n")
+    suv, clock, sent = FakeSuv(), Clock(), []
+    suv.sessions = _sessions_json(_session(native))
+    suv.events[f"claude-{native}"] = _events(1)
+    t = _tracker([], suv, clock, sent)
+    t.poll_once()
+    _, body = t.chat(f"claude-{native}", refresh=True)
+    assert body["refresh"] == "ok"
+    assert ["agent", "import-session", str(transcript)] in suv.calls
+    _, again = t.chat(f"claude-{native}", refresh=True)
+    assert again["refresh"] == "throttled"
+    clock.ms += 6000
+    assert t.refresh_transcript(f"claude-{native}") == "ok"
+    assert t.refresh_transcript("claude-unknown") == "unknown_session"
+
+
+def test_transcript_path_validation(tmp_path):
+    codex = tmp_path / ".codex/sessions/2026/09/19/rollout-2026-09-19T01-00-00-abcdef12-3456.jsonl"
+    codex.parent.mkdir(parents=True)
+    codex.write_text("{}\n")
+    home = str(tmp_path)
+    assert st.transcript_path("codex", "abcdef12-3456", home=home) == str(codex)
+    assert st.transcript_path("claude-code", "abcdef12-3456", home=home) is None
+    assert st.transcript_path("cursor", "abcdef12-3456", home=home) is None
+    for bad in ("../../etc/passwd", "*", "abc", "a/b-c-d-e-f", "x" * 90):
+        assert st.transcript_path("claude-code", bad, home=home) is None
+
+
+def test_chat_routes():
+    from server.routes import registry
+    from server.routes.core import get_external_agent_chat, get_external_agent_sessions
+
+    assert registry.GET_EXACT["/api/external-agents/sessions"] is get_external_agent_sessions
+    assert get_external_agent_sessions({"params": {}})[0] == 200
+    if st._tracker is None:
+        assert get_external_agent_chat({"params": {}, "session_id": "claude-x"})[0] == 503
+
+
+def test_bridge_session_id_guard():
+    from server import bridge
+
+    ok = ["claude-5805ab57-15ab-48a6-b622-3e6ca0c69981", "codex-1", "cursor-abc.def"]
+    bad = ["", "../etc", "a/b", "-x", "x y", "a" * 201]
+    assert all(bridge._EXTERNAL_SESSION_RE.match(s) for s in ok)
+    assert not any(bridge._EXTERNAL_SESSION_RE.match(s) for s in bad)
