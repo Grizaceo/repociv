@@ -696,16 +696,20 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._respond(status, body)
             return
 
-        # ── External agent chat (Suvadu, on demand) ────────────────────────────
-        if path.startswith("/api/external-agents/") and path.endswith("/chat"):
-            session_id = unquote(path[len("/api/external-agents/") : -len("/chat")])
-            if not _EXTERNAL_SESSION_RE.match(session_id):
-                self._err_json(400, "invalid session id")
+        # ── External agent chat / resume (Suvadu, on demand) ───────────────────
+        for suffix, handler in (
+            ("/chat", _routes.get_external_agent_chat),
+            ("/resume", _routes.get_external_agent_resume),
+        ):
+            if path.startswith("/api/external-agents/") and path.endswith(suffix):
+                session_id = unquote(path[len("/api/external-agents/") : -len(suffix)])
+                if not _EXTERNAL_SESSION_RE.match(session_id):
+                    self._err_json(400, "invalid session id")
+                    return
+                ctx["session_id"] = session_id
+                status, body = handler(ctx)
+                self._respond(status, body)
                 return
-            ctx["session_id"] = session_id
-            status, body = _routes.get_external_agent_chat(ctx)
-            self._respond(status, body)
-            return
 
         if path.startswith("/api/wonders/") or path.startswith("/wonders/"):
             # Canonical: /api/wonders/{id}[/health|launch-status]; legacy: /wonders/{id}[...]

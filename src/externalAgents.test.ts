@@ -7,6 +7,7 @@ import {
   externalAgentEvents,
   fetchExternalAgents,
   fetchExternalChat,
+  fetchExternalResume,
   fetchExternalSessions,
   formatTokens,
   isExternalAgentUnit,
@@ -422,12 +423,28 @@ describe('sessions / chat fetchers', () => {
     expect(url).toContain('refresh=1');
   });
 
+  it('fetches the resume plan and encodes the session id', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({ mode: 'resume', command: 'cd /w && claude --resume a', note: '' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const plan = await fetchExternalResume('claude-a/../x');
+    expect(plan?.command).toBe('cd /w && claude --resume a');
+    expect(String(fetchMock.mock.calls[0]![0])).toContain(
+      '/api/external-agents/claude-a%2F..%2Fx/resume',
+    );
+  });
+
   it('returns null when the bridge fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')));
     expect(await fetchExternalSessions()).toBeNull();
     expect(await fetchExternalChat('x')).toBeNull();
+    expect(await fetchExternalResume('x')).toBeNull();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
     expect(await fetchExternalChat('x')).toBeNull();
+    expect(await fetchExternalResume('x')).toBeNull();
   });
 });
 

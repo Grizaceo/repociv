@@ -175,6 +175,33 @@ export async function fetchExternalChat(
   }
 }
 
+/**
+ * How to pick a session back up in a terminal (server/session_resume.py).
+ * `resume` carries the command; `attached` and `unavailable` carry only a note.
+ */
+export interface ExternalResume {
+  mode: 'resume' | 'attached' | 'unavailable';
+  command: string;
+  agent: string;
+  live: boolean | null;
+  note: string;
+  sessionId?: string;
+  error?: string;
+}
+
+export async function fetchExternalResume(sessionId: string): Promise<ExternalResume | null> {
+  try {
+    const res = await fetch(
+      bridgeUrl(`/api/external-agents/${encodeURIComponent(sessionId)}/resume`),
+      { headers: bridgeHeaders() },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as ExternalResume;
+  } catch {
+    return null;
+  }
+}
+
 /** `repo:<base64url(abs path)>` → abs path (vite-plugins/repoRootsState.ts encodeRepoId). */
 export function decodeRepoCityId(id: string): string | null {
   if (!id.startsWith('repo:')) return null;

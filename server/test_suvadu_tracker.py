@@ -595,6 +595,44 @@ def test_recent_sessions_list_active_and_inactive(repos):
     assert [r["sessionId"] for r in t.sessions()] == ["claude-live0000", "claude-done0000"]
 
 
+def test_resume_builds_the_command_for_a_listed_session(repos):
+    suv, clock, sent = FakeSuv(), Clock(), []
+    repo = str(repos / "repociv")
+    suv.sessions = _sessions_json(_session("res00000", cwd=repo))
+    t = _tracker([repo], suv, clock, sent)
+    t.poll_once()
+
+    status, body = t.resume("claude-res00000")
+    assert status == 200
+    assert body["mode"] == "resume"
+    assert body["command"] == f"cd {repo} && claude --resume res00000"
+    assert body["sessionId"] == "claude-res00000"
+
+    assert t.resume("claude-nope")[0] == 404
+
+
+def test_resume_of_a_live_session_offers_no_command(repos):
+    suv, clock, sent = FakeSuv(), Clock(), []
+    repo = str(repos / "repociv")
+    suv.sessions = _sessions_json(_session("res00000", cwd=repo))
+    t = _tracker([repo], suv, clock, sent,
+                 liveness=lambda: sl.Liveness(agent_cwds=frozenset({repo}), ok=True))
+    t.poll_once()
+
+    _, body = t.resume("claude-res00000")
+    assert (body["mode"], body["command"]) == ("attached", "")
+
+
+def test_resume_route_is_registered(repos):
+    from server import http_routes
+    from server.routes.core import get_external_agent_resume
+
+    assert http_routes.get_external_agent_resume is get_external_agent_resume
+    status, body = get_external_agent_resume({"session_id": "claude-nothing"})
+    # No tracker running in this process: fail soft, never 500.
+    assert status in (404, 503) and "error" in body
+
+
 def test_chat_pages_backwards_from_the_end(repos):
     suv, clock, sent = FakeSuv(), Clock(), []
     suv.sessions = _sessions_json(_session("chat0000"))

@@ -49,6 +49,7 @@ body.local-view #agents-panel {
 .agents-close,
 .agents-back,
 .agents-locate,
+.agents-resume-btn,
 .agents-refresh {
   background: none;
   border: none;
@@ -60,6 +61,7 @@ body.local-view #agents-panel {
 .agents-close:hover,
 .agents-back:hover,
 .agents-locate:hover,
+.agents-resume-btn:hover,
 .agents-refresh:hover {
   color: var(--ui-gold-bright);
 }
@@ -331,5 +333,30 @@ body.local-view #agents-panel {
   display: block;
   margin-top: 2px;
   font-size: var(--text-2xs);
+  color: var(--ui-gold);
+}
+
+/* ── Retomar: el comando, nunca la ejecución ───────────────────────────────── */
+.agents-resume {
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--ui-border-light);
+  border-radius: 4px;
+  font-size: var(--text-xs);
+  color: var(--ui-text-dim);
+}
+.agents-resume-cmd {
+  display: block;
+  margin-top: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 3px;
+  color: var(--ui-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.agents-resume--attached {
   color: var(--ui-gold);
 }

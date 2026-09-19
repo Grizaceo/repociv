@@ -15,6 +15,7 @@ import type { Unit } from '../types.ts';
 import {
   chatMessagesHtml,
   fetchExternalChat,
+  fetchExternalResume,
   fetchExternalSessions,
   formatTokens,
   isExternalAgentUnit,
@@ -25,10 +26,12 @@ import {
   shortModel,
   stateBadge,
   type ExternalChat,
+  type ExternalResume,
   type ExternalSessionRow,
   type MapPlace,
 } from '../externalAgents.ts';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
+import { clipboardWrite } from './chat/clipboard.ts';
 import { escapeHtml } from './escapeHtml.ts';
 
 const LIST_POLL_MS = 10_000;
@@ -49,6 +52,9 @@ let _rows: ExternalSessionRow[] | null = [];
 let _chatSession: string | null = null;
 let _chat: ExternalChat | null = null;
 let _chatLoading = false;
+/** The open chat's resume plan, once the user asked for it (null = not asked). */
+let _resume: ExternalResume | null = null;
+let _resumeCopied = false;
 let _listTimer = 0;
 let _chatTimer = 0;
 let _renderedKey = '';
@@ -169,6 +175,8 @@ async function _loadChat(refresh: boolean): Promise<void> {
 function _openChat(row: ExternalSessionRow): void {
   _chatSession = row.sessionId;
   _chat = { session: row, messages: [], hasMore: false, available: false };
+  _resume = null;
+  _resumeCopied = false;
   _locate(row);
   // Suvadu re-imports a transcript only on prompt/stop: pull it now for a live
   // session (once per session per panel lifetime; ↻ does it on demand).
@@ -181,9 +189,46 @@ function _openChat(row: ExternalSessionRow): void {
   _chatTimer = window.setInterval(() => void _loadChat(false), CHAT_POLL_MS);
 }
 
+/**
+ * Ask the bridge how to pick this session back up, and put the command on the
+ * clipboard in the same click — the point is not having to go hunt for it.
+ * Nothing is executed here: the user runs it in their own terminal.
+ */
+async function _loadResume(): Promise<void> {
+  const sessionId = _chatSession;
+  if (!sessionId) return;
+  const plan = await fetchExternalResume(sessionId);
+  if (_chatSession !== sessionId) return; // the user moved on while it loaded
+  _resume = plan ?? {
+    mode: 'unavailable',
+    command: '',
+    agent: '',
+    live: null,
+    note: 'No pude pedirle el comando al bridge.',
+  };
+  _resumeCopied =
+    _resume.mode === 'resume' && _resume.command !== '' && clipboardWrite(_resume.command);
+  _renderChat();
+}
+
+function _resumeHtml(): string {
+  if (!_resume) return '';
+  const note = escapeHtml(_resume.note);
+  if (_resume.mode !== 'resume' || !_resume.command) {
+    return `<div class="agents-resume agents-resume--${escapeHtml(_resume.mode)}">${note}</div>`;
+  }
+  const copied = _resumeCopied ? '<strong>✅ Copiado.</strong> ' : '';
+  return `<div class="agents-resume">
+    ${copied}${note}
+    <code class="agents-resume-cmd">${escapeHtml(_resume.command)}</code>
+  </div>`;
+}
+
 function _backToList(): void {
   _chatSession = null;
   _chat = null;
+  _resume = null;
+  _resumeCopied = false;
   _renderedKey = '';
   window.clearInterval(_chatTimer);
   _chatTimer = 0;
@@ -369,16 +414,19 @@ function _renderChat(firstLoad = false): void {
         ${_chat.title ? `<div class="agents-chat-name">${escapeHtml(_chat.title)}</div>` : ''}
         <div class="agents-chat-sub">${_whereHtml(row)} · ${escapeHtml(status)} ${note}</div>
       </div>
+      <button type="button" class="agents-resume-btn" title="Retomar esta sesión: copia el comando para tu terminal" aria-label="Retomar esta sesión">⏎</button>
       <button type="button" class="agents-locate" title="Ubicar en el mapa" aria-label="Ubicar en el mapa">📍</button>
       <button type="button" class="agents-refresh" title="${hermes ? 'Actualizar' : 'Actualizar (reimporta el transcript)'}" aria-label="Actualizar">${_chatLoading ? '…' : '↻'}</button>
     </div>
     <div class="agents-chat-log">${log}</div>
+    ${_resumeHtml()}
     ${
       badge
         ? `<p class="agents-foot agents-foot--busy" title="${escapeHtml(badge.title)}">⏳ ${escapeHtml(badge.text)} — mejor no interrumpirlo. Solo lectura: para responder, usá la terminal de ese agente.</p>`
         : '<p class="agents-foot">Solo lectura. Para responder, usá la terminal de ese agente.</p>'
     }`;
   bindPanelAction(body, '.agents-back', _backToList);
+  bindPanelAction(body, '.agents-resume-btn', () => void _loadResume());
   bindPanelAction(body, '.agents-locate', () => _locate(row));
   bindPanelAction(body, '.agents-refresh', () => void _loadChat(true));
   const logEl = body.querySelector<HTMLElement>('.agents-chat-log');

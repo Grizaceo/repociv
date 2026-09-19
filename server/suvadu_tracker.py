@@ -51,7 +51,7 @@ import time
 from dataclasses import dataclass, replace
 from typing import Any, Callable, Iterable, Protocol, Sequence
 
-from server import session_liveness
+from server import session_liveness, session_resume
 
 SendFn = Callable[[dict[str, Any]], None]
 LivenessFn = Callable[[], session_liveness.Liveness]
@@ -884,6 +884,26 @@ class ExternalAgentTracker:
         with self._lock:
             return [dict(row) for row in self._rows]
 
+    # -- resume (on demand: the command, never the run) ----------------------
+    def resume(self, session_id: str) -> tuple[int, dict[str, Any]]:
+        """How to pick this session back up in a terminal (server/session_resume.py)."""
+        with self._lock:
+            obs = self._listed.get(session_id)
+        if obs is None:
+            return 404, {"error": "unknown_session"}
+        hermes = self._sources.get("hermes")
+        body = session_resume.plan(
+            agent=obs.agent,
+            native_id=obs.native_id,
+            cwd=obs.cwd,
+            profile=obs.profile,
+            live=obs.live,
+            hermes_home=getattr(hermes, "home", "~/.hermes"),
+            ended=obs.ended,
+        )
+        body["sessionId"] = session_id
+        return 200, body
+
     # -- chat (on demand, never broadcast) -----------------------------------
     def _listed_source(self, session_id: str) -> tuple[Observation, AgentSource] | None:
         with self._lock:
@@ -994,6 +1014,13 @@ def chat(session_id: str, *, limit: int = 80, refresh: bool = False) -> tuple[in
     if _tracker is None:
         return 503, {"error": "tracker_not_running"}
     return _tracker.chat(session_id, limit=limit, refresh=refresh)
+
+
+def resume(session_id: str) -> tuple[int, dict[str, Any]]:
+    """Payload of GET /api/external-agents/<session>/resume — the command only."""
+    if _tracker is None:
+        return 503, {"error": "tracker_not_running"}
+    return _tracker.resume(session_id)
 
 
 def snapshot() -> dict[str, Any]:

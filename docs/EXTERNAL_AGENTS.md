@@ -48,6 +48,25 @@ Click en una tarjeta:
   Hermes);
 - lleva la cámara a su unidad, o a su ciudad si la sesión ya no está activa.
 
+### Retomar (⏎)
+
+En el chat, **⏎** pide `GET /api/external-agents/<sesión>/resume` y copia al
+portapapeles el comando para seguir esa conversación en tu terminal. **RepoCiv
+no ejecuta nada**: devuelve el comando, como hace `server/recovery.py`. Tres
+respuestas posibles:
+
+| Modo | Cuándo | Qué da |
+|---|---|---|
+| `resume` | nada sostiene la sesión | `cd <cwd> && claude --resume <id>`, `cd <cwd> && codex resume <id>`, o `HERMES_HOME=<perfil> hermes chat --resume <id>` |
+| `attached` | su proceso sigue vivo ([Vivo o callado](#vivo-o-callado)) | nada: retomarla abriría un segundo turno sobre el mismo estado, que es justo lo que el arriendo de sesión evita |
+| `unavailable` | ese agente no tiene un resume que el bridge sepa escribir (Cursor, OpenCode), o falta el id | una explicación |
+
+El `cd` es necesario para `claude` y `codex`: resuelven la sesión contra el
+directorio desde el que arrancan. Hermes vuelve solo al suyo. Por eso el comando
+lleva el `cwd`, el único dato que los sondeos nunca difunden — es la misma
+excepción a pedido que ya hace el endpoint de chat, y solo para la sesión que
+abriste.
+
 En el chat, ↻ pide a Suvadu reimportar el transcript nativo (`suv agent import-session`,
 incremental), porque Suvadu por sí solo lo hace recién al terminar cada turno. Abrir el
 chat de una sesión activa lo hace una vez automáticamente.

@@ -155,6 +155,11 @@ def get_external_agent_chat(ctx: "RouteContext") -> tuple[int, Any]:
     refresh = str(params.get("refresh", "")).lower() in ("1", "true", "yes")
     return _suvadu.chat(str(ctx.get("session_id", "")), limit=limit, refresh=refresh)
 
+def get_external_agent_resume(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/external-agents/<session>/resume — the command to pick it back up."""
+    from server import suvadu_tracker as _suvadu
+    return _suvadu.resume(str(ctx.get("session_id", "")))
+
 def get_ready(ctx: "RouteContext") -> tuple[int, Any]:
     from server.bridge import _es, REPOCIV_TOKEN
     return 200, {"ok": True, "eventStore": str(_es._store_path), "token": bool(REPOCIV_TOKEN)}

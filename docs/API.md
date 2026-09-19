@@ -169,6 +169,7 @@ Sin prompts, comandos ni `cwd`. Los mismos datos llegan al mapa como `unit_spawn
 |--------|------|-------------|
 | GET | `/api/external-agents/sessions` | Todas las sesiones con actividad en las últimas `REPOCIV_EXT_AGENTS_RECENT_H` (24) horas, activas o no, más nuevas primero |
 | GET | `/api/external-agents/<sessionId>/chat?limit=80&refresh=1` | Prompts y respuestas de una sesión listada (a pedido, **contenido**) |
+| GET | `/api/external-agents/<sessionId>/resume` | Cómo retomar esa sesión en una terminal (el comando; RepoCiv no lo ejecuta) |
 
 `/sessions`: `{status, windowMinutes, recentHours, sessions: [{sessionId, agent, model, repo, cityId, active, state: "working"|"thinking"|"idle"|"inactive", unit, unitType, firstActivityAt, lastActivityAt, commandCount, eventCount, totalTokens, subagent, imported}]}`. `imported=false` significa que Suvadu solo vio el latido de comandos (todavía no hay transcript).
 
@@ -176,6 +177,11 @@ Sin prompts, comandos ni `cwd`. Los mismos datos llegan al mapa como `unit_spawn
 - `sessionId` es el id de Suvadu (`claude-<uuid>`, `codex-<uuid>`…), validado con `^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$`. Un id mal formado da 400; uno no listado, 404.
 - `refresh=1` reimporta el transcript nativo (Claude Code / Codex; como máximo cada 5 s por sesión). Resultado en `refresh`: `ok`, `throttled`, `no_transcript` o `failed`.
 - `available=false` con `error` significa que Suvadu aún no importó esa sesión.
+
+`/resume`: `{sessionId, mode: "resume"|"attached"|"unavailable", command, agent, live, note}`.
+- `resume` trae el comando (`cd <cwd> && claude --resume <id>`, `cd <cwd> && codex resume <id>`, `HERMES_HOME=<perfil> hermes chat --resume <id>`); `attached` y `unavailable` traen `command: ""` y explican por qué en `note`.
+- `attached` es una sesión cuyo proceso sigue vivo: retomarla abriría un segundo turno sobre el mismo estado. Ver `docs/EXTERNAL_AGENTS.md` → Retomar.
+- Es el único endpoint que expone el `cwd` de la sesión, dentro del comando y solo a pedido: `claude` y `codex` encuentran la sesión desde su propio directorio.
 
 **`/subagents/cancel`** — Body:
 ```json
