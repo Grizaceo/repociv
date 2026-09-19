@@ -142,7 +142,7 @@ def get_health(ctx: "RouteContext") -> tuple[int, Any]:
     }
 
 def get_external_agents(ctx: "RouteContext") -> tuple[int, Any]:
-    """GET /api/external-agents — Suvadu-detected agent sessions (metadata only)."""
+    """GET /api/external-agents — Suvadu / Hermes agent sessions (metadata only)."""
     from server import suvadu_tracker as _suvadu
     return 200, _suvadu.snapshot()
 

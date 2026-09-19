@@ -115,8 +115,8 @@ def agents_ready() -> Any:
 
 
 @mcp.tool(description=(
-    "Agentes externos (Claude Code, Codex, Cursor, OpenCode) detectados por Suvadu en esta "
-    "máquina, activos en los últimos minutos: agente, ciudad/repo, modelo, estado working/idle, "
+    "Agentes externos activos en esta máquina en los últimos minutos: Claude Code, Codex, "
+    "Cursor, OpenCode (vía Suvadu) y sesiones Hermes: agente, ciudad/repo, modelo, estado working/idle, "
     "conteos y última actividad (epoch ms). Solo metadatos — sin prompts ni comandos."
 ))
 def external_agents_list() -> Any:

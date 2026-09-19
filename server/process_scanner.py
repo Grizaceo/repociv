@@ -78,6 +78,21 @@ _LEXO_RE = re.compile(
 )
 
 
+def retire_detected_lexo() -> None:
+    """Despawn every LEXO-* unit detect_lexo spawned.
+
+    Called instead of detect_lexo while the Hermes session source
+    (server/hermes_sessions.py) reads the lexo-alpha profile: it already shows
+    those sessions as ext-hermes-* units, in their city and with their chat.
+    """
+    seen = _load_lexo_seen()
+    if not seen:
+        return
+    for unit_id in seen.values():
+        send_to_repociv({"type": "unit_despawn", "unit": unit_id})
+    _save_lexo_seen({})
+
+
 def detect_lexo() -> None:
     seen = _load_lexo_seen()
 
