@@ -12,6 +12,36 @@ suv history (agent) ┴─► server/suvadu_tracker.py ────────�
                                                           MCP external_agents_list
 ```
 
+## Panel de Agentes (F8)
+
+El botón 🤖 del HUD (o **F8**, o la paleta de comandos → "Agentes") abre una lista con
+**todos** los agentes, estén o no en un repo que es ciudad de tu mapa:
+
+- **Activos:** sesiones con actividad dentro de la ventana (10 min). También están en el
+  mapa.
+- **Últimas 24 h:** las mismas sesiones cuando ya quedaron quietas
+  (`REPOCIV_EXT_AGENTS_RECENT_H`).
+- **Unidades RepoCiv:** las unidades propias. El click abre su panel de unidad/chat de
+  siempre.
+
+Cada tarjeta muestra dónde trabaja el agente:
+- `📍 <ciudad>` si su repo es una ciudad del mapa;
+- `🏛 repociv` si trabaja en RepoCiv mismo, que es la capital;
+- `⊘ <repo> · fuera del mapa` si su repo no está en el mapa. En ese caso la unidad espera
+  en la capital.
+
+Click en una tarjeta:
+- abre el **chat de solo lectura** (prompts y respuestas guardados por Suvadu);
+- lleva la cámara a su unidad, o a su ciudad si la sesión ya no está activa.
+
+En el chat, ↻ pide a Suvadu reimportar el transcript nativo (`suv agent import-session`,
+incremental), porque Suvadu por sí solo lo hace recién al terminar cada turno. Abrir el
+chat de una sesión activa lo hace una vez automáticamente.
+
+Click sobre una unidad `ext-*` en el mapa abre su chat en este panel. Antes abría el panel
+de unidad de RepoCiv, con un compositor de misiones que no tiene sentido para un agente
+ajeno.
+
 ## Requisitos
 
 - `suv` instalado (`cargo install suvadu`) y con los hooks del agente:
@@ -57,9 +87,17 @@ hasta su próximo comando o fin de turno.
 
 ## Privacidad
 
-Solo metadatos salen del tracker: agente, ciudad/repo, modelo, conteos
-(comandos, eventos, tokens), primera y última actividad. Ni prompts, ni comandos, ni
-`cwd`. `/health` (sin token) muestra solo la salud del tracker, no sesiones.
+- **Metadatos, siempre:** los eventos del mapa (SSE/WS), `GET /api/external-agents[/sessions]`
+  y la tool MCP llevan solo agente, ciudad/repo, modelo, conteos, primera y última
+  actividad. Ni prompts, ni comandos, ni `cwd`.
+- **Chat, solo a pedido:** `GET /api/external-agents/<sesión>/chat` (con token) devuelve
+  prompts y respuestas cuando abrís el chat en el panel. Solo para sesiones que el tracker
+  listó; nunca se difunde por SSE/WS ni se expone por MCP. Los comandos de shell no se
+  muestran.
+- **Salud:** `/health` (sin token) muestra solo la salud del tracker.
+
+Quien llegue a la UI (tailnet) con el token embebido puede leer esos chats. Es la misma
+frontera que ya tenía el resto del bridge.
 
 ## Configuración
 
@@ -70,6 +108,7 @@ Solo metadatos salen del tracker: agente, ciudad/repo, modelo, conteos
 | `REPOCIV_EXT_AGENTS_WINDOW_MIN` | `10` | ventana de actividad |
 | `REPOCIV_EXT_AGENTS_WORKING_MIN` | `2` | umbral working → idle (≤ ventana) |
 | `REPOCIV_EXT_AGENTS_POLL_S` | `30` | intervalo de sondeo (mín. 5) |
+| `REPOCIV_EXT_AGENTS_RECENT_H` | `24` | cuánto atrás lista el panel de Agentes (≥ ventana) |
 
 ## Limitaciones conocidas
 
@@ -81,3 +120,10 @@ Solo metadatos salen del tracker: agente, ciudad/repo, modelo, conteos
 - Codex / Cursor / OpenCode dependen de que su integración de Suvadu registre sesiones;
   solo Claude Code está verificado en esta máquina.
 - Suvadu es local: agentes de otras máquinas no aparecen.
+- **Largo del chat:** Suvadu guarda hasta ~4 000 caracteres por mensaje (se marca
+  "…recortado"). El panel muestra los últimos 80 mensajes.
+- **Refresh:** el import a pedido solo existe para Claude Code
+  (`~/.claude/projects/*/<id>.jsonl`) y Codex (`~/.codex/sessions/…`).
+- **Ids de ciudad:** las ciudades que crea `generateWorld` usan `id = nombre del repo` y
+  las que se agregan después usan `id = repo:<base64>`. El cliente resuelve ambas formas
+  por `repoPath` (`findCityByRef`).
