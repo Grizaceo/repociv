@@ -33,6 +33,7 @@ import {
 } from '../index.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from '../settingsPanel.ts';
 import { toggleAssemblyRoom } from '../../assemblyScene.ts';
+import { toggleAgentsPanel, closeAgentsPanel, isAgentsPanelOpen } from '../agentsPanel.ts';
 import { closeConstructionPanel, isConstructionPanelOpen } from '../constructionPanel.ts';
 import { selectHero, spawnAgent, spawnFromProfile } from './spawn.ts';
 import { takeScreenshot } from './screenshot.ts';
@@ -61,7 +62,7 @@ export function wireHotkeys(
     if (isPickerOpen()) return;
 
     // Same for the command palette (Ctrl/Cmd-K): while open it is modal, so no
-    // global hotkey — including the F-key panel toggles (F6/F7/F9/F10/F11/F12)
+    // global hotkey — including the F-key panel toggles (F6/F7/F8/F9/F10/F11/F12)
     // below — may fire and open a panel behind the overlay.
     if (isCommandPaletteOpen()) return;
 
@@ -85,6 +86,10 @@ export function wireHotkeys(
       }
       if (isLogPanelOpen()) {
         closeLogPanel();
+        return;
+      }
+      if (isAgentsPanelOpen()) {
+        closeAgentsPanel();
         return;
       }
       if (isApprovalPanelOpen()) {
@@ -343,6 +348,12 @@ export function wireHotkeys(
       e.preventDefault();
       trackHotkey('F7:assembly');
       void toggleAssemblyRoom();
+    }
+
+    if (e.key === 'F8') {
+      e.preventDefault();
+      trackHotkey('F8:agents');
+      toggleAgentsPanel();
     }
 
     if (e.key === 'F9') {

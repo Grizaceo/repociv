@@ -3,6 +3,7 @@ import autoAnimate from '@formkit/auto-animate';
 import {
   Activity,
   AlertTriangle,
+  Bot,
   Box,
   Camera,
   CheckCircle,
@@ -32,6 +33,7 @@ import {
 const lucideIcons = {
   Activity,
   AlertTriangle,
+  Bot,
   Box,
   Camera,
   CheckCircle,

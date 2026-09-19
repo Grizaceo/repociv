@@ -1,9 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  agentLabel,
+  decodeRepoCityId,
+  findCityByRef,
+  chatMessagesHtml,
   externalAgentEvents,
   fetchExternalAgents,
+  fetchExternalChat,
+  fetchExternalSessions,
+  formatTokens,
   isExternalAgentUnit,
+  partitionSessions,
+  placeOnMap,
+  relativeTime,
+  shortModel,
   type ExternalAgentRow,
+  type ExternalSessionRow,
 } from './externalAgents.ts';
 import { GameState } from './game.ts';
 import { dispatchBridgeEvent, type MessageContext } from './bridgeMessageHandlers.ts';
@@ -219,5 +231,173 @@ describe('unit_spawn / unit_state for ext units', () => {
       unitType: 'lexo',
     });
     expect(state.getUnit('LEXO-1')!.coord).toEqual({ q: 3, r: 1 });
+  });
+});
+
+// ─── Agents panel helpers ────────────────────────────────────────────────────
+
+function session(id: string, extra: Partial<ExternalSessionRow> = {}): ExternalSessionRow {
+  return {
+    sessionId: id,
+    agent: 'claude-code',
+    model: 'claude-opus-5',
+    repo: 'repociv',
+    cityId: 'capital',
+    active: true,
+    state: 'working',
+    unit: `ext-claude-code-${id.slice(0, 8)}`,
+    unitType: 'claude',
+    firstActivityAt: 0,
+    lastActivityAt: 0,
+    commandCount: 0,
+    eventCount: 0,
+    totalTokens: null,
+    subagent: false,
+    imported: true,
+    ...extra,
+  };
+}
+
+describe('placeOnMap', () => {
+  const cities = [city('capital', 0, 0, true), city(REPOCIV, 6, -2)];
+
+  it('finds the city of a repo on this map (by id or repoPath)', () => {
+    const byId = placeOnMap({ cityId: REPOCIV }, cities);
+    expect(byId.kind).toBe('city');
+    expect(byId.city?.id).toBe(REPOCIV);
+    expect(placeOnMap({ cityId: '/w/repociv' }, cities).kind).toBe('city');
+  });
+
+  it('capital for RepoCiv itself; off-map (standing at the capital) otherwise', () => {
+    expect(placeOnMap({ cityId: 'capital' }, cities)).toMatchObject({
+      kind: 'capital',
+      city: { id: 'capital' },
+    });
+    expect(placeOnMap({ cityId: 'repo:elsewhere' }, cities)).toMatchObject({
+      kind: 'off-map',
+      city: { id: 'capital' },
+    });
+    expect(placeOnMap({ cityId: 'repo:x' }, []).kind).toBe('off-map');
+  });
+});
+
+describe('panel formatting', () => {
+  it('partitions active vs recent, newest first', () => {
+    const rows = [
+      session('a', { active: false, state: 'inactive', lastActivityAt: 5 }),
+      session('b', { lastActivityAt: 1 }),
+      session('c', { lastActivityAt: 9 }),
+      session('d', { active: false, state: 'inactive', lastActivityAt: 7 }),
+    ];
+    const { active, recent } = partitionSessions(rows);
+    expect(active.map((r) => r.sessionId)).toEqual(['c', 'b']);
+    expect(recent.map((r) => r.sessionId)).toEqual(['d', 'a']);
+  });
+
+  it('labels, models, times and tokens', () => {
+    expect(agentLabel('claude-code')).toBe('Claude Code');
+    expect(agentLabel('mystery')).toBe('mystery');
+    expect(shortModel('claude-opus-5')).toBe('opus-5');
+    expect(shortModel('claude-haiku-4-5-20251001')).toBe('haiku-4-5');
+    expect(shortModel('gpt-5-codex')).toBe('gpt-5-codex');
+    const now = 10_000_000;
+    expect(relativeTime(now - 12_000, now)).toBe('hace 12 s');
+    expect(relativeTime(now - 5 * 60_000, now)).toBe('hace 5 min');
+    expect(relativeTime(now - 3 * 3_600_000, now)).toBe('hace 3 h');
+    expect(relativeTime(now + 5_000, now)).toBe('hace 0 s');
+    expect(formatTokens(54_131_818)).toBe('54M tok');
+    expect(formatTokens(3_200)).toBe('3.2k tok');
+    expect(formatTokens(512)).toBe('512 tok');
+    expect(formatTokens(null)).toBe('');
+  });
+
+  it('chat HTML escapes agent text and marks truncation', () => {
+    const html = chatMessagesHtml(
+      [
+        {
+          role: 'user',
+          text: '<img src=x onerror=alert(1)>',
+          at: null,
+          truncated: false,
+          turn: null,
+        },
+        { role: 'assistant', text: 'ok & done', at: null, truncated: true, turn: 't1' },
+      ],
+      'codex',
+    );
+    expect(html).not.toContain('<img');
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(html).toContain('ok &amp; done');
+    expect(html).toContain('agents-msg--user');
+    expect(html).toContain('Codex');
+    expect(html).toContain('recortado');
+  });
+});
+
+describe('sessions / chat fetchers', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('lists sessions and encodes the session id in the chat URL', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ sessions: [session('a')] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ session: session('a'), messages: [], available: true }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+    expect((await fetchExternalSessions())?.[0]?.sessionId).toBe('a');
+    const chat = await fetchExternalChat('claude-a/../x', { refresh: true, limit: 5 });
+    expect(chat?.available).toBe(true);
+    const url = String(fetchMock.mock.calls[1]![0]);
+    expect(url).toContain('/api/external-agents/claude-a%2F..%2Fx/chat?');
+    expect(url).toContain('limit=5');
+    expect(url).toContain('refresh=1');
+  });
+
+  it('returns null when the bridge fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')));
+    expect(await fetchExternalSessions()).toBeNull();
+    expect(await fetchExternalChat('x')).toBeNull();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+    expect(await fetchExternalChat('x')).toBeNull();
+  });
+});
+
+describe('city refs (both id forms)', () => {
+  it('decodes repo:<base64url> ids like the Vite plugin encodes them', () => {
+    expect(decodeRepoCityId('repo:L3cvcmVwb2Npdg')).toBe('/w/repociv');
+    expect(decodeRepoCityId('repo:L2hvbWUveC_DsWFuZMO6LXJlcG8vYSBi')).toBe(
+      '/home/x/ñandú-repo/a b',
+    );
+    expect(decodeRepoCityId('repociv')).toBeNull();
+    expect(decodeRepoCityId('repo:%%%')).toBeNull();
+  });
+
+  it('finds world-generated cities (id = repo name) from a repo: ref', () => {
+    // generateWorld builds `id: repo.name`, addCityToWorld `id: repo.path` (repo:<b64>).
+    const named = { ...city('repociv', 6, -2), repoPath: '/w/repociv/' };
+    expect(findCityByRef([named], REPOCIV)?.id).toBe('repociv');
+    expect(findCityByRef([named], '/w/repociv')?.id).toBe('repociv');
+    expect(findCityByRef([named], 'repociv')?.id).toBe('repociv');
+    expect(findCityByRef([named], 'repo:L3cvcmVwb2Npdi1vbGQ')).toBeUndefined(); // /w/repociv-old
+  });
+
+  it('places an ext unit next to a name-id city (regression: it fell to the capital)', () => {
+    const { state, ctx } = makeCtx();
+    state.world.cities[1] = { ...state.world.cities[1]!, id: 'repociv', repoPath: '/w/repociv' };
+    for (const evt of externalAgentEvents([], [row('ext-claude-code-bbbbbbbb')])) {
+      dispatchBridgeEvent(ctx, evt);
+    }
+    const unit = state.getUnit('ext-claude-code-bbbbbbbb')!;
+    expect(unit.cityId).toBe('repociv');
+    expect(axialDistance(unit.coord, { q: 6, r: -2 })).toBe(1);
+    expect(placeOnMap({ cityId: REPOCIV }, state.world.cities)).toMatchObject({
+      kind: 'city',
+      city: { id: 'repociv' },
+    });
   });
 });

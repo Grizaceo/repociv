@@ -9,7 +9,8 @@
 
 import { parseBridgeEvent } from './bridgeSchema.ts';
 import { bridgeHeaders, bridgeUrl } from './bridgeEnv.ts';
-import type { BridgeEvent } from './types.ts';
+import type { BridgeEvent, City } from './types.ts';
+import { escapeHtml } from './ui/escapeHtml.ts';
 
 /** Every unit owned by the Suvadu tracker has this id prefix. */
 export const EXTERNAL_UNIT_PREFIX = 'ext-';
@@ -73,4 +74,197 @@ export async function fetchExternalAgents(): Promise<ExternalAgentRow[] | null> 
   } catch {
     return null;
   }
+}
+
+// ─── Agents panel: every recent session + its chat ──────────────────────────
+// GET /api/external-agents/sessions lists sessions active in the last ~24 h,
+// on the map or not. Chat text comes on demand from
+// GET /api/external-agents/<session>/chat (never broadcast over SSE/WS).
+
+/** One row of GET /api/external-agents/sessions (metadata only). */
+export interface ExternalSessionRow {
+  sessionId: string;
+  agent: string;
+  model: string;
+  repo: string;
+  cityId: string;
+  active: boolean;
+  state: 'working' | 'idle' | 'inactive';
+  unit: string | null;
+  unitType: string;
+  firstActivityAt: number;
+  lastActivityAt: number;
+  commandCount: number;
+  eventCount: number;
+  totalTokens: number | null;
+  subagent: boolean;
+  imported: boolean;
+}
+
+export interface ExternalChatMessage {
+  role: 'user' | 'assistant';
+  text: string;
+  at: number | null;
+  truncated: boolean;
+  turn: string | null;
+}
+
+export interface ExternalChat {
+  session: ExternalSessionRow;
+  messages: ExternalChatMessage[];
+  hasMore: boolean;
+  available: boolean;
+  error?: string;
+  refresh?: string;
+}
+
+export async function fetchExternalSessions(): Promise<ExternalSessionRow[] | null> {
+  try {
+    const res = await fetch(bridgeUrl('/api/external-agents/sessions'), {
+      headers: bridgeHeaders(),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { sessions?: unknown };
+    return Array.isArray(body.sessions) ? (body.sessions as ExternalSessionRow[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchExternalChat(
+  sessionId: string,
+  opts: { refresh?: boolean; limit?: number } = {},
+): Promise<ExternalChat | null> {
+  const qs = new URLSearchParams({ limit: String(opts.limit ?? 80) });
+  if (opts.refresh) qs.set('refresh', '1');
+  try {
+    const res = await fetch(
+      bridgeUrl(`/api/external-agents/${encodeURIComponent(sessionId)}/chat?${qs.toString()}`),
+      { headers: bridgeHeaders() },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as ExternalChat;
+  } catch {
+    return null;
+  }
+}
+
+/** `repo:<base64url(abs path)>` → abs path (vite-plugins/repoRootsState.ts encodeRepoId). */
+export function decodeRepoCityId(id: string): string | null {
+  if (!id.startsWith('repo:')) return null;
+  try {
+    const b64 = id.slice('repo:'.length).replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
+    return new TextDecoder().decode(Uint8Array.from(bin, (ch) => ch.charCodeAt(0)));
+  } catch {
+    return null;
+  }
+}
+
+const _trimSlash = (p: string | undefined): string => (p ?? '').replace(/\/+$/, '');
+
+/**
+ * City for a bridge city ref, exact matches only. Cities built at world
+ * generation use `id = repo name`, cities added later use `id = repo:<b64>`;
+ * both carry the absolute `repoPath`, which is what `repo:` refs decode to.
+ */
+export function findCityByRef(cities: readonly City[], ref: string): City | undefined {
+  const path = decodeRepoCityId(ref);
+  return cities.find(
+    (c) =>
+      c.id === ref ||
+      (!!c.repoPath && _trimSlash(c.repoPath) === _trimSlash(ref)) ||
+      (path !== null && (_trimSlash(c.repoPath) === _trimSlash(path) || c.id === path)),
+  );
+}
+
+/** Where a session's repo is on this browser's map. */
+export type MapPlace =
+  | { kind: 'city'; city: City }
+  | { kind: 'capital'; city: City | undefined }
+  | { kind: 'off-map'; city: City | undefined };
+
+/**
+ * `city` — its repo is a city here; `capital` — RepoCiv itself (or no repo);
+ * `off-map` — a repo this map does not show (its unit waits at the capital).
+ * The bridge resolves cityId from the session cwd; only the browser knows
+ * which cities its own selection put on the map.
+ */
+export function placeOnMap(
+  row: Pick<ExternalSessionRow, 'cityId'>,
+  cities: readonly City[],
+): MapPlace {
+  const capital = cities.find((c) => c.isCapital);
+  if (row.cityId === 'capital') return { kind: 'capital', city: capital };
+  const city = findCityByRef(cities, row.cityId);
+  if (city && !city.isCapital) return { kind: 'city', city };
+  return { kind: 'off-map', city: capital };
+}
+
+export function partitionSessions(rows: readonly ExternalSessionRow[]): {
+  active: ExternalSessionRow[];
+  recent: ExternalSessionRow[];
+} {
+  const byRecency = [...rows].sort((a, b) => b.lastActivityAt - a.lastActivityAt);
+  return {
+    active: byRecency.filter((r) => r.active),
+    recent: byRecency.filter((r) => !r.active),
+  };
+}
+
+const AGENT_LABELS: Record<string, string> = {
+  'claude-code': 'Claude Code',
+  claude: 'Claude Code',
+  codex: 'Codex',
+  cursor: 'Cursor',
+  opencode: 'OpenCode',
+  pi: 'pi.dev',
+  antigravity: 'Antigravity',
+};
+
+export function agentLabel(agent: string): string {
+  return AGENT_LABELS[agent.toLowerCase()] ?? agent;
+}
+
+/** "claude-opus-5" → "opus-5"; "gpt-5-codex" stays. */
+export function shortModel(model: string): string {
+  return model.replace(/^claude-/, '').replace(/-\d{8}$/, '');
+}
+
+export function relativeTime(ms: number, now: number = Date.now()): string {
+  const s = Math.max(0, Math.round((now - ms) / 1000));
+  if (s < 60) return `hace ${s} s`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `hace ${h} h`;
+  return `hace ${Math.round(h / 24)} d`;
+}
+
+export function formatTokens(n: number | null | undefined): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return '';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M tok`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}k tok`;
+  return `${n} tok`;
+}
+
+function clock(at: number | null): string {
+  if (at === null) return '';
+  return new Date(at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Chat messages → escaped HTML (agent text is untrusted). */
+export function chatMessagesHtml(messages: readonly ExternalChatMessage[], agent: string): string {
+  return messages
+    .map((m) => {
+      const who = m.role === 'user' ? 'Prompt' : agentLabel(agent);
+      const cut = m.truncated
+        ? '<span class="agents-msg-cut" title="Suvadu guarda hasta ~4000 caracteres">…recortado</span>'
+        : '';
+      return `<div class="agents-msg agents-msg--${m.role}">
+        <div class="agents-msg-meta">${escapeHtml(who)} · ${escapeHtml(clock(m.at))}</div>
+        <div class="agents-msg-text">${escapeHtml(m.text)}</div>${cut}
+      </div>`;
+    })
+    .join('');
 }
