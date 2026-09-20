@@ -35,6 +35,63 @@ def write_selection_state(path: Path, root: Path, selected: list[Path]) -> None:
     )
 
 
+def test_execute_agent_without_repo_path_resolves_selected_city_for_cli(
+    monkeypatch, tmp_path: Path
+):
+    root = tmp_path / "root"
+    selected = root / "city-a"
+    selected.mkdir(parents=True)
+    state_file = tmp_path / "state.json"
+    write_selection_state(state_file, root, [selected])
+    monkeypatch.setenv("REPOCIV_STATE_FILE", str(state_file))
+
+    command = validate_command(
+        {
+            "type": "execute_agent",
+            "target": "city-a",
+            "payload": {
+                "unit": "CLAUDE",
+                "city": "city-a",
+                "mission": "Inspect",
+                "harness": "claude",
+            },
+        }
+    )
+
+    assert _validate_command_target(command) is None
+    assert command.payload["repoPath"] == str(selected.resolve())
+
+
+@pytest.mark.parametrize("city", ["unselected-city", "unknown-city", "../outside"])
+def test_execute_agent_without_repo_path_rejects_unknown_or_unselected_city(
+    monkeypatch, tmp_path: Path, city: str
+):
+    root = tmp_path / "root"
+    selected = root / "selected-city"
+    unselected = root / "unselected-city"
+    selected.mkdir(parents=True)
+    unselected.mkdir()
+    state_file = tmp_path / "state.json"
+    write_selection_state(state_file, root, [selected])
+    monkeypatch.setenv("REPOCIV_STATE_FILE", str(state_file))
+
+    command = validate_command(
+        {
+            "type": "execute_agent",
+            "target": city,
+            "payload": {
+                "unit": "CODEX",
+                "city": city,
+                "mission": "Inspect",
+                "harness": "codex",
+            },
+        }
+    )
+
+    assert _validate_command_target(command) == "city must reference a selected RepoCiv repository"
+    assert "repoPath" not in command.payload
+
+
 def test_command_target_validation_fails_fast_on_unselected_or_repo_less_cli(
     monkeypatch, tmp_path: Path
 ):

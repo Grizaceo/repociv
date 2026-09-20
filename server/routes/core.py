@@ -887,17 +887,28 @@ def _validate_command_target(cmd: Any) -> str | None:
 
     payload = cmd.payload
     harness = str(payload.get("harness") or "").strip().lower()
+    city = str(payload.get("city") or cmd.target).strip()
+    has_requested_city = bool(str(payload.get("city") or "").strip())
     raw_repo = str(payload.get("repoPath") or "").strip()
     if not raw_repo:
-        # Chat/hermes path: any unit may talk without a registered repoPath.
-        # CLI harnesses (claude/cursor/codex/…) still require a selected repo.
-        if harness in {"", "auto", "hermes"}:
+        selected = _rrs.resolve_selected_repo(city)
+        if selected is not None:
+            # The browser supplies only a city id. Keep the canonical filesystem
+            # path server-side after validating it against the selected roots.
+            payload["repoPath"] = selected
+        elif has_requested_city:
+            return "city must reference a selected RepoCiv repository"
+        # Chat/hermes path: legacy callers without a requested city may talk
+        # without a registered repoPath. CLI harnesses still require one.
+        elif harness in {"", "auto", "hermes"}:
             return None
-        return "execute_agent requires repoPath for non-MAIN or CLI harnesses"
-    selected = _rrs.resolve_selected_repo(str(payload.get("city") or cmd.target), raw_repo)
-    if selected is None:
-        return "repoPath must reference a selected RepoCiv repository"
-    payload["repoPath"] = selected
+        else:
+            return "execute_agent requires repoPath for non-MAIN or CLI harnesses"
+    else:
+        selected = _rrs.resolve_selected_repo(city, raw_repo)
+        if selected is None:
+            return "repoPath must reference a selected RepoCiv repository"
+        payload["repoPath"] = selected
     file_path = str(payload.get("filePath") or "").strip()
     if file_path:
         try:

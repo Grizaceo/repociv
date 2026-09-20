@@ -59,6 +59,9 @@ import { startMcpStatusPolling } from './ui/mcpStatus.ts';
 import { maybeStartFirstRunTour } from './ui/firstRunTour.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { wireHUD, selectHero } from './ui/hudWiring.ts';
+import { nextSessionUnitId, spawnAcceptedSession } from './ui/hudWiring/spawn.ts';
+import { buildAgentSessionCommand } from './ui/agentSessionStart.ts';
+import { subscribeExternalSessionDirectory } from './ui/externalSessionDirectory.ts';
 import { bindAgentsPanel, openExternalAgentChat, toggleAgentsPanel } from './ui/agentsPanel.ts';
 import { isExternalAgentUnit } from './externalAgents.ts';
 import { initHudMode } from './ui/hudMode.ts';
@@ -1254,6 +1257,21 @@ async function bootstrap() {
       renderer.flashIdleHighlight(coord);
     },
     selectOwnUnit: (u) => selectHero(u, renderer, state, bridge),
+    startSession: async ({ profile, cityId, mission }) => {
+      const city = state.world.cities.find((candidate) => candidate.id === cityId);
+      if (!city || city.isCapital || !city.repoPath) {
+        return { ok: false, reason: 'La ciudad ya no está disponible para una sesión.' };
+      }
+      const unitId = nextSessionUnitId(profile, state);
+      const response = await sendCommand(
+        buildAgentSessionCommand({ unitId, profile, cityId, mission }),
+      );
+      if (!response.ok) {
+        return { ok: false, reason: response.reason ?? 'El bridge rechazó la sesión.' };
+      }
+      spawnAcceptedSession(profile, city, mission, unitId, state, renderer, bridge);
+      return { ok: true };
+    },
   });
 
   // Re-render hero bar on state changes
@@ -1275,6 +1293,7 @@ async function bootstrap() {
     if (selected) showUnitPanel(selected, state);
   };
   state.subscribe(refreshHero);
+  subscribeExternalSessionDirectory(() => refreshHero());
   // Draw once up front: subscribing alone left the bar's container literally
   // empty until the first state notify arrived — measured at ~10 s from load,
   // which is the whole first impression of the session. With nothing to draw

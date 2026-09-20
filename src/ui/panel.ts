@@ -4,7 +4,9 @@ import type { Unit, UnitState } from '../types.ts';
 import { cfg } from '../gameConfig.ts';
 import { escapeHtml } from './escapeHtml.ts';
 import { agentTooltip } from './agentGlossary.ts';
-import { heroBarVisible, heroBarOverflowCount, heroBarRoster } from './heroBarUnits.ts';
+import { activeSessionDock, sessionDockOverflowCount, visibleSessionDock } from './agentDock.ts';
+import { externalSessionSnapshot } from './externalSessionDirectory.ts';
+import { openExternalAgentChat } from './agentsPanel.ts';
 import { renderCapabilityBadges, clearCapabilityBadges } from './capabilityBadges.ts';
 import {
   renderOrdenDeBatalla,
@@ -132,73 +134,85 @@ export function renderHeroBar(state: GameState, onSelect: (u: Unit) => void) {
   const slots = document.getElementById('hero-bar-slots');
   if (!slots) return;
 
-  const heroes = heroBarVisible(state);
-  const overflow = heroBarOverflowCount(state);
+  const dock = activeSessionDock(state.getAllUnits(), externalSessionSnapshot());
+  const visible = visibleSessionDock(dock);
+  const overflow = sessionDockOverflowCount(dock);
+  const ownById = new Map(state.getAllUnits().map((unit) => [unit.id, unit]));
 
   const zone = document.getElementById('hero-bar-zone');
-  if (zone)
-    zone.textContent = heroes.length ? `En campo · ${heroBarRoster(state).length}` : 'En campo';
+  if (zone) zone.textContent = visible.length ? `En campo · ${dock.length}` : 'En campo';
   const hint = document.getElementById('hero-bar-hint');
-  if (hint) hint.classList.toggle('hidden', heroes.length === 0);
+  if (hint) hint.classList.toggle('hidden', visible.length === 0);
 
   slots.innerHTML = '';
 
   // Empty bar teaches the next action instead of showing a blank strip.
-  if (heroes.length === 0) {
+  if (visible.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'hero-empty';
     empty.innerHTML = `
       <svg class="hero-empty-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6 13.6 4.8V11.2L8 14.4 2.4 11.2V4.8Z"/></svg>
       <div class="hero-empty-copy">
         <span class="hero-empty-title">Sin agentes en campo</span>
-        <span class="hero-empty-hint">Apretá <kbd>Q</kbd> para desplegar el agente principal, o elegí una plantilla abajo.</span>
+        <span class="hero-empty-hint">Apretá <kbd>F8</kbd> para iniciar una sesión intencional.</span>
       </div>
     `;
     slots.appendChild(empty);
     return;
   }
 
-  heroes.forEach((unit, idx) => {
-    const { pct, color, band } = contextBand(unit);
-    const fPct = Math.round(pct * 100);
-
+  visible.forEach((item, idx) => {
+    const unit = item.kind === 'own' ? ownById.get(item.key) : undefined;
     const chip = document.createElement('div');
     chip.className = 'hero-chip';
-    chip.dataset['unitId'] = unit.id;
-    if (state.selectedUnit?.id === unit.id) chip.classList.add('selected');
-    if (unit.hidden) chip.classList.add('hidden-unit');
-    chip.style.borderLeftColor = unitStateColor(unit.state);
+    chip.dataset['dockKind'] = item.kind;
+    chip.dataset['dockKey'] = item.key;
+    chip.style.borderLeftColor = unit ? unitStateColor(unit.state) : 'var(--ui-gold)';
+    const numberBadge = `<span class="chip-kbd">${idx + 1}</span>`;
 
-    // The number is only meaningful because heroBarVisible is also what the
-    // 1–9 hotkeys index — see heroBarUnits.ts.
-    const numberBadge = idx < 9 ? `<span class="chip-kbd">${idx + 1}</span>` : '';
-    const pctReadout =
-      band === 'ok' ? '' : `<span class="chip-pct" style="color:${color}">${fPct}%</span>`;
-
-    chip.innerHTML = `
-      ${roleIcon(unit)}
-      <div class="chip-meat">
-        <div class="chip-name">${escapeHtml(unit.name)}</div>
-        <div class="chip-sub-row">
-          <span class="chip-sub">${escapeHtml(chipSubtitle(unit))}</span>
-          ${pctReadout}
+    if (unit) {
+      const { pct, color, band } = contextBand(unit);
+      const fPct = Math.round(pct * 100);
+      if (state.selectedUnit?.id === unit.id) chip.classList.add('selected');
+      if (unit.hidden) chip.classList.add('hidden-unit');
+      const pctReadout =
+        band === 'ok' ? '' : `<span class="chip-pct" style="color:${color}">${fPct}%</span>`;
+      chip.innerHTML = `
+        ${roleIcon(unit)}
+        <div class="chip-meat">
+          <div class="chip-name">${escapeHtml(unit.name)}</div>
+          <div class="chip-sub-row">
+            <span class="chip-sub">${escapeHtml(chipSubtitle(unit))}</span>
+            ${pctReadout}
+          </div>
         </div>
-      </div>
-      ${numberBadge}
-      <div class="chip-ctx"><div class="chip-ctx-fill" style="width:${fPct}%;background:${color}"></div></div>
-    `;
-
-    chip.title = `${unit.name} — ${unit.state} | Contexto ${fPct}%${unit.isResting ? ' (descansando)' : ''}${unit.hidden ? ' | Oculto del mapa (clic para mostrar)' : ''}\n${agentTooltip(unit.type)}`;
-    chip.addEventListener('click', () => onSelect(unit));
+        ${numberBadge}
+        <div class="chip-ctx"><div class="chip-ctx-fill" style="width:${fPct}%;background:${color}"></div></div>
+      `;
+      chip.title = `${unit.name} — ${unit.state} | Contexto ${fPct}%${unit.isResting ? ' (descansando)' : ''}${unit.hidden ? ' | Oculto del mapa (clic para mostrar)' : ''}\n${agentTooltip(unit.type)}`;
+      chip.addEventListener('click', () => onSelect(unit));
+    } else {
+      chip.classList.add('hero-chip-external');
+      chip.innerHTML = `
+        <svg class="chip-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2.5h10v8H8l-3.5 3V10.5H3z"/></svg>
+        <div class="chip-meat">
+          <div class="chip-name">${escapeHtml(item.label)}</div>
+          <div class="chip-sub-row"><span class="chip-sub">Sesión externa · ${escapeHtml(item.state)}</span></div>
+        </div>
+        ${numberBadge}
+        <div class="chip-ctx"><div class="chip-ctx-fill" style="width:100%;background:var(--ui-gold)"></div></div>
+      `;
+      chip.title = `${item.label} — sesión externa ${item.state}. Abrir en F8.`;
+      chip.addEventListener('click', () => openExternalAgentChat(item.key));
+    }
     slots.appendChild(chip);
   });
 
-  // Nobody falls out of the UI silently: the rest sit behind one chip.
   if (overflow > 0) {
     const more = document.createElement('div');
     more.className = 'hero-chip-more';
     more.textContent = `+${overflow}`;
-    more.title = `${overflow} agente(s) más — Tab cicla por todos`;
+    more.title = `${overflow} sesión(es) más — Tab cicla por todas`;
     slots.appendChild(more);
   }
 }

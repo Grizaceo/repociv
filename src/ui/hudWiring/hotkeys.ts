@@ -32,12 +32,21 @@ import {
   isKanbanPanelOpen,
 } from '../index.ts';
 import { toggleSettingsPanel, closeSettingsPanel } from '../settingsPanel.ts';
-import { toggleAgentsPanel, closeAgentsPanel, isAgentsPanelOpen } from '../agentsPanel.ts';
+import {
+  toggleAgentsPanel,
+  closeAgentsPanel,
+  isAgentsPanelOpen,
+  openNewAgentSession,
+  openExternalAgentChat,
+} from '../agentsPanel.ts';
 import { closeConstructionPanel, isConstructionPanelOpen } from '../constructionPanel.ts';
-import { selectHero, spawnAgent, spawnFromProfile } from './spawn.ts';
+import { selectHero } from './spawn.ts';
 import { takeScreenshot } from './screenshot.ts';
 import { getSelectedProfile } from '../agentProfileStrip.ts';
-import { heroBarRoster, heroBarVisible } from '../heroBarUnits.ts';
+import type { RepoCivProfile } from '../../agentProfile.ts';
+import { heroBarRoster } from '../heroBarUnits.ts';
+import { activeSessionDock, visibleSessionDock } from '../agentDock.ts';
+import { externalSessionSnapshot } from '../externalSessionDirectory.ts';
 import { toggleLayerPanel, closeLayerPanel, isLayerPanelOpen } from '../layerPanel.ts';
 import { trackHotkey, trackPanelOpen } from '../analytics.ts';
 import { isPickerOpen } from '../chat/slashPicker.ts';
@@ -50,6 +59,20 @@ export function wireHotkeys(
   bridge: BridgeEvents,
   toggleView: () => void,
 ): void {
+  let lastDockKey: string | null = null;
+  const selectDockItem = (item: ReturnType<typeof activeSessionDock>[number]) => {
+    lastDockKey = `${item.kind}:${item.key}`;
+    if (item.kind === 'external') {
+      state.selectUnit(null);
+      renderer.selectUnit(null);
+      hideUnitPanel();
+      openExternalAgentChat(item.key);
+      return;
+    }
+    const unit = state.getUnit(item.key);
+    if (unit) selectHero(unit, renderer, state, bridge);
+  };
+
   document.addEventListener('keydown', (e) => {
     const target = e.target as HTMLElement;
     const inField = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
@@ -64,6 +87,10 @@ export function wireHotkeys(
     // global hotkey — including the F-key panel toggles (F6/F8/F9/F10/F11/F12)
     // below — may fire and open a panel behind the overlay.
     if (isCommandPaletteOpen()) return;
+
+    // Native session wizard is modal too. Returning lets its form and the
+    // browser's Esc-to-close behavior own this event without moving the map.
+    if (document.querySelector('dialog[open]')) return;
 
     // Hotkey panels
     if (e.key === 'Escape') {
@@ -128,74 +155,41 @@ export function wireHotkeys(
 
     if (inField) return;
 
-    // Spawn agents (Ctrl+Q/W/E/O/C/X). WASD is reserved for camera panning,
-    // so every spawn hotkey now requires Ctrl. Ctrl+W would close the browser
-    // tab (not interceptable), so WORKER uses Ctrl+Shift+W; Ctrl+R would
-    // reload the page, so CURSOR stays on bare R. N opens the new profile
-    // wizard.
+    // N still manages the profile registry; session creation always goes through
+    // the wizard so profile + territory + mission are explicit before dispatch.
     if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.altKey && !e.metaKey) {
       trackHotkey('N:new-profile');
-      // Delegate to profile strip wizard (loaded lazily)
       void import('../agentProfileStrip.ts').then(({ openNewProfileWizard }) => {
         void openNewProfileWizard();
       });
       return;
     }
-    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'q') {
+    const quickHarness: Record<string, RepoCivProfile['harness']> = {
+      q: 'hermes', w: 'openclaw', e: 'claude', o: 'openclaw', c: 'claude', x: 'codex', r: 'cursor', g: 'hermes',
+    };
+    const quickKey = e.key.toLowerCase();
+    if (
+      (e.ctrlKey && !e.shiftKey && quickKey !== 'w' && quickHarness[quickKey]) ||
+      (e.ctrlKey && e.shiftKey && quickKey === 'w') ||
+      (!e.ctrlKey && !e.altKey && !e.metaKey && quickKey === 'r')
+    ) {
       e.preventDefault();
-      // If a profile is selected in the strip, spawn from it; else fall back to MAIN
-      const selectedProfile = getSelectedProfile();
-      if (selectedProfile) {
-        trackHotkey(`Ctrl+Q:spawn-profile:${selectedProfile.name}`);
-        return spawnFromProfile(selectedProfile, state, renderer, bridge);
-      }
-      trackHotkey('Ctrl+Q:spawn:MAIN');
-      return spawnAgent('MAIN', state, renderer, bridge);
-    }
-    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'w') {
-      e.preventDefault();
-      trackHotkey('Ctrl+Shift+W:spawn:WORKER');
-      return spawnAgent('WORKER', state, renderer, bridge);
-    }
-    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'e') {
-      e.preventDefault();
-      trackHotkey('Ctrl+E:spawn:SCOUT');
-      return spawnAgent('SCOUT', state, renderer, bridge);
-    }
-    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'o') {
-      e.preventDefault();
-      trackHotkey('Ctrl+O:spawn:OPENCLAW');
-      return spawnAgent('OPENCLAW', state, renderer, bridge);
-    }
-    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'c') {
-      e.preventDefault();
-      trackHotkey('Ctrl+C:spawn:CLAUDE');
-      return spawnAgent('CLAUDE', state, renderer, bridge);
-    }
-    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'x') {
-      e.preventDefault();
-      trackHotkey('Ctrl+X:spawn:CODEX');
-      return spawnAgent('CODEX', state, renderer, bridge);
-    }
-    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'g') {
-      e.preventDefault();
-      trackHotkey('Ctrl+G:spawn:PRAETORIAN');
-      return spawnAgent('PRAETORIAN', state, renderer, bridge);
-    }
-    if (!e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === 'r') {
-      trackHotkey('R:spawn:CURSOR');
-      return spawnAgent('CURSOR', state, renderer, bridge);
+      const selectedProfile = quickKey === 'q' ? getSelectedProfile() : null;
+      trackHotkey(`session-wizard:${quickKey}`);
+      openNewAgentSession({
+        profileName: selectedProfile?.name,
+        harness: selectedProfile ? undefined : quickHarness[quickKey],
+      });
+      return;
     }
 
-    // Hero selection 1–9 — heroBarVisible is what renderHeroBar draws and
-    // numbers, so badge N and key N always resolve to the same unit.
+    // Hero selection 1–9 is the same active-session dock the HUD renders.
     if (/^[1-9]$/.test(e.key)) {
       const idx = parseInt(e.key, 10) - 1;
-      const heroes = heroBarVisible(state);
-      const target = heroes[idx];
+      const target = visibleSessionDock(activeSessionDock(state.getAllUnits(), externalSessionSnapshot()))[idx];
       if (target) {
-        trackHotkey(`${e.key}:select-hero`);
-        selectHero(target, renderer, state, bridge);
+        trackHotkey(`${e.key}:select-session`);
+        selectDockItem(target);
       }
       return;
     }
@@ -213,16 +207,16 @@ export function wireHotkeys(
       return;
     }
 
-    // Tab: cycle through all heroes
+    // Tab: cycle through every active session, including external sessions.
     if (e.key === 'Tab') {
       e.preventDefault();
-      const heroes = heroBarRoster(state);
-      if (heroes.length === 0) return;
-      const cur = state.selectedUnit;
-      const idx = cur ? heroes.findIndex((h) => h.id === cur.id) : -1;
-      const next = heroes[(idx + 1) % heroes.length]!;
-      trackHotkey('Tab:cycle-hero');
-      selectHero(next, renderer, state, bridge);
+      const dock = activeSessionDock(state.getAllUnits(), externalSessionSnapshot());
+      if (dock.length === 0) return;
+      const selectedKey = state.selectedUnit ? `own:${state.selectedUnit.id}` : lastDockKey;
+      const idx = selectedKey ? dock.findIndex((item) => `${item.kind}:${item.key}` === selectedKey) : -1;
+      const next = dock[(idx + 1) % dock.length]!;
+      trackHotkey('Tab:cycle-session');
+      selectDockItem(next);
       return;
     }
 

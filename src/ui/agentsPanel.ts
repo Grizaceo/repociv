@@ -22,7 +22,6 @@ import {
   chatMessagesHtml,
   fetchExternalChat,
   fetchExternalResume,
-  fetchExternalSessions,
   formatTokens,
   isExternalAgentUnit,
   partitionSessions,
@@ -41,8 +40,13 @@ import {
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
 import { clipboardWrite } from './chat/clipboard.ts';
 import { escapeHtml } from './escapeHtml.ts';
+import type { RepoCivProfile } from '../agentProfile.ts';
+import { openAgentSessionWizard, type SessionStartResult } from './agentSessionWizard.ts';
+import {
+  refreshExternalSessionDirectory,
+  subscribeExternalSessionDirectory,
+} from './externalSessionDirectory.ts';
 
-const LIST_POLL_MS = 10_000;
 const CHAT_POLL_MS = 15_000;
 
 export interface AgentsPanelDeps {
@@ -51,6 +55,8 @@ export interface AgentsPanelDeps {
   locate: (coord: Axial) => void;
   /** Select one of RepoCiv's own units — opens its regular chat/unit panel. */
   selectOwnUnit: (unit: Unit) => void;
+  /** Submit and materialize a confirmed profile/city/mission session. */
+  startSession: (draft: { profile: RepoCivProfile; cityId: string; mission: string }) => Promise<SessionStartResult>;
 }
 
 let _deps: AgentsPanelDeps | null = null;
@@ -67,7 +73,7 @@ let _resumeCopied = false;
 let _draft = '';
 let _replyError = '';
 let _sending = false;
-let _listTimer = 0;
+let _stopDirectory: (() => void) | null = null;
 let _chatTimer = 0;
 let _renderedKey = '';
 const _refreshed = new Set<string>();
@@ -85,15 +91,17 @@ export function isAgentsPanelOpen(): boolean {
 export function openAgentsPanel(): void {
   _visible = true;
   showPanel(_getOrCreate());
+  _watchExternalSessions();
   _render();
   void _loadList();
   _stopTimers();
-  _listTimer = window.setInterval(() => void _loadList(), LIST_POLL_MS);
 }
 
 export function closeAgentsPanel(): void {
   _visible = false;
   _stopTimers();
+  _stopDirectory?.();
+  _stopDirectory = null;
   _chatSession = null;
   _chat = null;
   if (_panel) hidePanel(_panel);
@@ -102,6 +110,17 @@ export function closeAgentsPanel(): void {
 export function toggleAgentsPanel(): void {
   if (_visible) closeAgentsPanel();
   else openAgentsPanel();
+}
+
+/** Opens the intentional-session wizard from F8 or a legacy creation shortcut. */
+export function openNewAgentSession(
+  options: { profileName?: string; harness?: RepoCivProfile['harness'] } = {},
+): void {
+  if (!_deps) return;
+  void openAgentSessionWizard(
+    { state: _deps.state, startSession: _deps.startSession },
+    { ...options, onStarted: () => _render() },
+  );
 }
 
 /** Open the chat of an external agent, by session id or by its ext-* unit id. */
@@ -123,14 +142,19 @@ export function openExternalAgentChat(ref: string): void {
 }
 
 // ─── Data ────────────────────────────────────────────────────────────────────
+function _watchExternalSessions(): void {
+  if (_stopDirectory) return;
+  _stopDirectory = subscribeExternalSessionDirectory((rows) => {
+    _rows = rows;
+    if (!_visible || _chatSession !== null) return;
+    const key = _listKey();
+    if (key === _renderedKey) _tickAgo();
+    else _render();
+  });
+}
+
 async function _loadList(): Promise<void> {
-  _rows = await fetchExternalSessions();
-  if (!_visible || _chatSession !== null) return;
-  // Rebuild only when something changed (a rebuild drops hover/focus and a
-  // click landing mid-rebuild); otherwise just tick the "hace …" labels.
-  const key = _listKey();
-  if (key === _renderedKey) _tickAgo();
-  else _render();
+  await refreshExternalSessionDirectory();
 }
 
 /** The list's structure: which cards, in which state and place. Clock and
@@ -315,9 +339,7 @@ function _backToList(): void {
 }
 
 function _stopTimers(): void {
-  window.clearInterval(_listTimer);
   window.clearInterval(_chatTimer);
-  _listTimer = 0;
   _chatTimer = 0;
 }
 
@@ -544,10 +566,14 @@ function _getOrCreate(): HTMLElement {
     'panel agents-panel hidden',
     `<div class="agents-header">
       <span class="agents-title">🤖 Agentes</span>
-      <button class="agents-close" aria-label="Cerrar panel" title="Cerrar [F8]">✕</button>
+      <div class="agents-header-actions">
+        <button class="agents-new-session" title="Nueva sesión">+ Sesión</button>
+        <button class="agents-close" aria-label="Cerrar panel" title="Cerrar [F8]">✕</button>
+      </div>
     </div>
     <div class="agents-body"></div>`,
   );
   bindPanelAction(_panel, '.agents-close', closeAgentsPanel);
+  bindPanelAction(_panel, '.agents-new-session', () => openNewAgentSession());
   return _panel;
 }

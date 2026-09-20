@@ -416,3 +416,124 @@ body.local-view #agents-panel {
 .agents-compose-hint--error {
   color: var(--state-error);
 }
+
+.agents-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.agents-new-session {
+  padding: 3px 7px;
+  border: 1px solid var(--ui-gold);
+  border-radius: 3px;
+  background: rgba(200, 168, 75, 0.12);
+  color: var(--ui-gold-bright);
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+.agents-new-session:hover,
+.agents-new-session:focus-visible {
+  background: rgba(200, 168, 75, 0.24);
+}
+
+/* Intentional F8 session start: native dialog keeps focus trapped and Esc works. */
+.agent-session-dialog {
+  width: min(440px, calc(100vw - 32px));
+  padding: 0;
+  color: var(--ui-text);
+  background: var(--ui-panel-bg);
+  border: 2px solid var(--ui-border);
+  border-radius: var(--panel-radius);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.9);
+  font-family: var(--font-ui);
+}
+.agent-session-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.58);
+}
+.agent-session-form {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+.agent-session-form h2 {
+  margin: 0;
+  color: var(--ui-gold-bright);
+  font-size: var(--text-md);
+}
+.agent-session-help,
+.agent-session-status {
+  margin: 0;
+  color: var(--ui-text-dim);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+.agent-session-form > label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--ui-text);
+  font-size: var(--text-xs);
+}
+.agent-session-form > label select,
+.agent-session-form > label textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--space-2);
+  color: var(--ui-text);
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  font: inherit;
+}
+.agent-session-form > label textarea { resize: vertical; min-height: 5.5em; }
+.agent-session-form > label select:focus-visible,
+.agent-session-form > label textarea:focus-visible,
+.agent-session-close:focus-visible,
+.agent-session-cancel:focus-visible,
+.agent-session-submit:focus-visible { outline: 2px solid var(--ui-gold-bright); outline-offset: 2px; }
+.agent-session-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.agent-session-actions button {
+  padding: 6px 10px;
+  border-radius: 4px;
+  font: inherit;
+  cursor: pointer;
+}
+.agent-session-cancel {
+  color: var(--ui-text-dim);
+  background: transparent;
+  border: 1px solid var(--ui-border);
+}
+.agent-session-submit {
+  color: #1d1707;
+  background: var(--ui-gold-bright);
+  border: 1px solid var(--ui-gold-bright);
+  font-weight: 700;
+}
+.agent-session-submit:disabled,
+.agent-session-form > label :disabled { opacity: 0.55; cursor: default; }
+.agent-session-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.agent-session-kicker {
+  margin: 0 0 var(--space-1);
+  color: var(--ui-gold);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.agent-session-close {
+  padding: 2px 6px;
+  color: var(--ui-text-dim);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.agent-session-close:hover { color: var(--ui-gold-bright); }
+.agent-session-status--error { color: var(--state-error); }

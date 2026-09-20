@@ -1,5 +1,5 @@
 // ─── Hero selection + agent spawning ────────────────────────────────────────
-import { type Unit } from '../../types.ts';
+import { type Unit, type City } from '../../types.ts';
 import { type Renderer } from '../../renderer.ts';
 import { type GameState } from '../../game.ts';
 import { type BridgeEvents } from '../../bridge.ts';
@@ -112,6 +112,68 @@ export function spawnFromProfile(
   }
 
   selectHero(unit, renderer, state, bridge);
+}
+
+/** Stable id allocation for a confirmed session; never reuses an existing unit. */
+export function nextSessionUnitId(profile: RepoCivProfile, state: GameState): string {
+  const base = profile.name.trim().toUpperCase();
+  if (!state.getUnit(base)) return base;
+  let suffix = 2;
+  while (state.getUnit(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
+/**
+ * Materialize the map representation only after `/commands` accepted the
+ * session. The bridge receives just the city id; this local helper uses the
+ * already-loaded city coordinate for the visual placement.
+ */
+export function spawnAcceptedSession(
+  profile: RepoCivProfile,
+  city: City,
+  mission: string,
+  unitId: string,
+  state: GameState,
+  renderer: Renderer,
+  bridge: BridgeEvents,
+): Unit {
+  const existingCount = state.getAllUnits().filter((u) => u.id.startsWith(profile.name.toUpperCase())).length;
+  const offset = existingCount % 6;
+  const coord = {
+    q: city.coord.q + 1 + (offset % 3),
+    r: city.coord.r - Math.floor(offset / 3),
+  };
+  const typeMap: Record<string, Unit['type']> = {
+    claude: 'claude',
+    codex: 'codex',
+    cursor: 'cursor',
+    hermes: 'hero',
+    openclaw: 'hero',
+    praetorian: 'praetorian',
+  };
+  const unit = state.spawnUnit(
+    unitId,
+    profile.display_name ?? profile.name,
+    typeMap[profile.harness] ?? 'hero',
+    'capital',
+    coord,
+    mission,
+  );
+  try {
+    localStorage.setItem(
+      `repociv:chatConfig:${unitId}`,
+      JSON.stringify({
+        harness: profile.harness,
+        provider: profile.provider ?? '',
+        model: profile.model ?? '',
+        profile: nativeProfileFor(profile),
+      }),
+    );
+  } catch {
+    // The session still exists when browser storage is unavailable.
+  }
+  selectHero(unit, renderer, state, bridge);
+  return unit;
 }
 
 /** Spawn from the registry profile for a harness (O/C/X templates), or fallback to legacy spawn. */

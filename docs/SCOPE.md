@@ -22,7 +22,7 @@ La razón de tener tanta infraestructura "industrial" siendo un solo usuario
 es **deliberada**: el alpha-test sirve precisamente para descubrir cuáles de
 esas capas aportan valor real y cuáles se destilan o se borran después.
 
-Versión: **v2.0 — congelada en scope hasta que el dogfooding diga otra cosa.**
+Versión: **v2.1 — congelada en scope salvo el flujo F1 autorizado abajo.**
 
 ---
 
@@ -57,6 +57,25 @@ Métricas concretas para considerar el alpha "exitoso":
 - Cerrar bugs y deudas técnicas que aparezcan durante el dogfooding.
 - Mejoras visuales menores (assets, animaciones, tooltips) que hagan el
   alpha-test más placentero — pero sin reescribir capas grandes.
+- **F1 — sesiones activas y arranque guiado (autorizada por owner):** consolidar
+  los puntos de entrada ya duplicados en un único dock de sesiones del HUD y
+  en F8. No introduce un segundo scheduler ni una ruta de ejecución nueva.
+  - El dock lista unidades propias persistentes y sesiones externas activas;
+    una selección propia conserva el panel de unidad y una externa abre F8 en
+    modo solo lectura. Los datos externos tienen un único store/poll compartido
+    entre el dock y F8.
+  - F8 agrega **Nueva sesión**. El wizard exige: perfil registrado, ciudad ya
+    presente en el mapa y una misión no vacía. La ciudad aporta solo su `cityId`:
+    el navegador no envía ni persiste rutas locales.
+  - **Contrato backend canónico:** el submit es `POST /commands` con
+    `type: "execute_agent"`, `target` y `payload.city` iguales al `cityId`,
+    y `payload` `{unit, mission, agentType, harness, provider, model, profile}`.
+    El bridge valida/política/encola el comando y responde el `commandId`; el
+    frontend crea la unidad visual solo después de una respuesta `ok`, y el
+    estado final llega por los eventos existentes `mission_*` y `unit_*`.
+  - El unit id es generado por el cliente y deriva del nombre de perfil; el
+    bridge resuelve la configuración registrada por su base. No se puede usar
+    el wizard para ejecutar una sesión externa ni para inventar una ciudad.
 - **Los DOS renderers son trunk oficial.** El Canvas 2D (`flat`) es el modo
   por defecto y canónico; el WebGL/Three.js (`webgl`) es opt-in por
   `?renderer=webgl` o hotkey `3`. Decisión del owner (2026-06): lo oficial no
