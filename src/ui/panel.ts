@@ -1,12 +1,11 @@
 // ─── RepoCiv — Unit panel & hero bar (Civ V Aesthetic) ─────────────────────────
 import type { GameState } from '../game.ts';
 import type { Unit, UnitState } from '../types.ts';
-import { cfg } from '../gameConfig.ts';
 import { escapeHtml } from './escapeHtml.ts';
-import { agentTooltip } from './agentGlossary.ts';
-import { activeSessionDock, sessionDockOverflowCount, visibleSessionDock } from './agentDock.ts';
+import { activeSessionDock } from './agentDock.ts';
 import { externalSessionSnapshot } from './externalSessionDirectory.ts';
-import { openExternalAgentChat } from './agentsPanel.ts';
+import { openAgentsPanel } from './agentsPanel.ts';
+import { sessionLauncherSummary } from './sessionLauncherSummary.ts';
 import { renderCapabilityBadges, clearCapabilityBadges } from './capabilityBadges.ts';
 import {
   renderOrdenDeBatalla,
@@ -81,138 +80,34 @@ export function hideUnitPanel() {
   hideOrdenDeBatalla();
 }
 
-/** Role icons. Drawn, not typed: two agents whose names both start with "W"
- *  used to render as two identical "W" boxes. */
-const ROLE_ICONS: Record<string, string> = {
-  hero: '<path d="M8 2.4V13.6M3.2 5.2 12.8 10.8M3.2 10.8 12.8 5.2"/>',
-  worker:
-    '<circle cx="8" cy="8" r="2.6"/><path d="M12.2 8H14M10.1 11.64 11 13.2M5.9 11.64 5 13.2M3.8 8H2M5.9 4.36 5 2.8M10.1 4.36 11 2.8"/>',
-  scout: '<circle cx="7.2" cy="7.2" r="4"/><path d="M10.2 10.2 14 14"/>',
-  praetorian: '<path d="M8 2 13.5 4.2V8.4C13.5 11.4 11 13.4 8 14.4 5 13.4 2.5 11.4 2.5 8.4V4.2Z"/>',
-  cli: '<path d="M3.5 4.5 7 8 3.5 11.5M8.5 12.5H13"/>',
-};
-
-const ROLE_BY_TYPE: Record<string, keyof typeof ROLE_ICONS> = {
-  hero: 'hero',
-  worker: 'worker',
-  army: 'worker',
-  caravan: 'worker',
-  scout: 'scout',
-  praetorian: 'praetorian',
-  claude: 'cli',
-  codex: 'cli',
-  cursor: 'cli',
-  openclaw: 'cli',
-  lexo: 'cli',
-};
-
-function roleIcon(unit: Unit): string {
-  const shape = ROLE_ICONS[ROLE_BY_TYPE[unit.type] ?? 'worker'] ?? ROLE_ICONS['worker'];
-  return `<svg class="chip-ico" viewBox="0 0 16 16" aria-hidden="true">${shape}</svg>`;
-}
-
-/** Remaining context as a fraction, plus the band it falls in. One scale, read
- *  one way: 1 = fresh, 0 = exhausted, and each threshold is a floor. */
-function contextBand(unit: Unit): { pct: number; color: string; band: 'ok' | 'warn' | 'critical' } {
-  const pct = unit.maxFatigue > 0 ? unit.fatigue / unit.maxFatigue : 0;
-  const { warnThreshold, criticalThreshold } = cfg.fatigue;
-  if (pct > warnThreshold) return { pct, color: '#4caf50', band: 'ok' };
-  if (pct > criticalThreshold) return { pct, color: '#ff9800', band: 'warn' };
-  return { pct, color: '#f44336', band: 'critical' };
-}
-
-function chipSubtitle(unit: Unit): string {
-  const parts: string[] = [];
-  if (unit.tier) parts.push(unit.tier);
-  else parts.push(unitModelLabel(unit));
-  if (unit.isResting) parts.push('descansa');
-  if (unit.hidden) parts.push('oculto');
-  return parts.join(' · ');
-}
-
-export function renderHeroBar(state: GameState, onSelect: (u: Unit) => void) {
+export function renderHeroBar(state: GameState): void {
   const slots = document.getElementById('hero-bar-slots');
   if (!slots) return;
 
-  const dock = activeSessionDock(state.getAllUnits(), externalSessionSnapshot());
-  const visible = visibleSessionDock(dock);
-  const overflow = sessionDockOverflowCount(dock);
-  const ownById = new Map(state.getAllUnits().map((unit) => [unit.id, unit]));
-
+  const summary = sessionLauncherSummary(
+    activeSessionDock(state.getAllUnits(), externalSessionSnapshot()),
+    state.selectedUnit?.id ?? null,
+  );
+  const focus = summary.focus;
   const zone = document.getElementById('hero-bar-zone');
-  if (zone) zone.textContent = visible.length ? `En campo · ${dock.length}` : 'En campo';
+  if (zone) zone.textContent = `Sesiones · ${summary.total}`;
   const hint = document.getElementById('hero-bar-hint');
-  if (hint) hint.classList.toggle('hidden', visible.length === 0);
+  if (hint) hint.textContent = 'F8 abre la lista · Tab / 1–9 ciclan';
 
-  slots.innerHTML = '';
+  const context = focus ? `${focus.label} · ${focus.state}` : 'Sin sesiones en campo';
+  const activity = summary.total
+    ? `${summary.active} activa${summary.active === 1 ? '' : 's'} · ${summary.total} contexto${summary.total === 1 ? '' : 's'}`
+    : 'Abrí F8 para iniciar una sesión intencional';
 
-  // Empty bar teaches the next action instead of showing a blank strip.
-  if (visible.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'hero-empty';
-    empty.innerHTML = `
-      <svg class="hero-empty-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6 13.6 4.8V11.2L8 14.4 2.4 11.2V4.8Z"/></svg>
-      <div class="hero-empty-copy">
-        <span class="hero-empty-title">Sin agentes en campo</span>
-        <span class="hero-empty-hint">Apretá <kbd>F8</kbd> para iniciar una sesión intencional.</span>
-      </div>
-    `;
-    slots.appendChild(empty);
-    return;
-  }
-
-  visible.forEach((item, idx) => {
-    const unit = item.kind === 'own' ? ownById.get(item.key) : undefined;
-    const chip = document.createElement('div');
-    chip.className = 'hero-chip';
-    chip.dataset['dockKind'] = item.kind;
-    chip.dataset['dockKey'] = item.key;
-    chip.style.borderLeftColor = unit ? unitStateColor(unit.state) : 'var(--ui-gold)';
-    const numberBadge = `<span class="chip-kbd">${idx + 1}</span>`;
-
-    if (unit) {
-      const { pct, color, band } = contextBand(unit);
-      const fPct = Math.round(pct * 100);
-      if (state.selectedUnit?.id === unit.id) chip.classList.add('selected');
-      if (unit.hidden) chip.classList.add('hidden-unit');
-      const pctReadout =
-        band === 'ok' ? '' : `<span class="chip-pct" style="color:${color}">${fPct}%</span>`;
-      chip.innerHTML = `
-        ${roleIcon(unit)}
-        <div class="chip-meat">
-          <div class="chip-name">${escapeHtml(unit.name)}</div>
-          <div class="chip-sub-row">
-            <span class="chip-sub">${escapeHtml(chipSubtitle(unit))}</span>
-            ${pctReadout}
-          </div>
-        </div>
-        ${numberBadge}
-        <div class="chip-ctx"><div class="chip-ctx-fill" style="width:${fPct}%;background:${color}"></div></div>
-      `;
-      chip.title = `${unit.name} — ${unit.state} | Contexto ${fPct}%${unit.isResting ? ' (descansando)' : ''}${unit.hidden ? ' | Oculto del mapa (clic para mostrar)' : ''}\n${agentTooltip(unit.type)}`;
-      chip.addEventListener('click', () => onSelect(unit));
-    } else {
-      chip.classList.add('hero-chip-external');
-      chip.innerHTML = `
-        <svg class="chip-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2.5h10v8H8l-3.5 3V10.5H3z"/></svg>
-        <div class="chip-meat">
-          <div class="chip-name">${escapeHtml(item.label)}</div>
-          <div class="chip-sub-row"><span class="chip-sub">Sesión externa · ${escapeHtml(item.state)}</span></div>
-        </div>
-        ${numberBadge}
-        <div class="chip-ctx"><div class="chip-ctx-fill" style="width:100%;background:var(--ui-gold)"></div></div>
-      `;
-      chip.title = `${item.label} — sesión externa ${item.state}. Abrir en F8.`;
-      chip.addEventListener('click', () => openExternalAgentChat(item.key));
-    }
-    slots.appendChild(chip);
-  });
-
-  if (overflow > 0) {
-    const more = document.createElement('div');
-    more.className = 'hero-chip-more';
-    more.textContent = `+${overflow}`;
-    more.title = `${overflow} sesión(es) más — Tab cicla por todas`;
-    slots.appendChild(more);
-  }
+  slots.innerHTML = `
+    <button type="button" class="session-launcher${focus ? '' : ' session-launcher--empty'}"
+      aria-label="Abrir agentes y sesiones" title="Abrir agentes y sesiones [F8]">
+      <svg class="session-launcher-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6 13.6 4.8V11.2L8 14.4 2.4 11.2V4.8Z"/><path d="M5.2 8h5.6M8 5.2v5.6"/></svg>
+      <span class="session-launcher-copy">
+        <strong>${escapeHtml(context)}</strong>
+        <span>${escapeHtml(activity)}</span>
+      </span>
+      <kbd>F8</kbd>
+    </button>`;
+  slots.querySelector<HTMLButtonElement>('.session-launcher')?.addEventListener('click', openAgentsPanel);
 }

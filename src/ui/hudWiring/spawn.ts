@@ -29,7 +29,7 @@ export function selectHero(
   state.selectUnit(unit);
   renderer.selectUnit(unit);
   showUnitPanel(unit, state);
-  renderHeroBar(state, (u) => selectHero(u, renderer, state, _bridge));
+  renderHeroBar(state);
 
   // Only sync chat when the side panel is already open. Map-only clicks must
   // not overwrite the active chat tab (that sent SCOUT replies into MAIN).

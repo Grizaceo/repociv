@@ -422,7 +422,8 @@ body.local-view #agents-panel {
   align-items: center;
   gap: var(--space-1);
 }
-.agents-new-session {
+.agents-new-session,
+.agents-profiles {
   padding: 3px 7px;
   border: 1px solid var(--ui-gold);
   border-radius: 3px;
@@ -432,7 +433,9 @@ body.local-view #agents-panel {
   font-size: var(--text-xs);
 }
 .agents-new-session:hover,
-.agents-new-session:focus-visible {
+.agents-new-session:focus-visible,
+.agents-profiles:hover,
+.agents-profiles:focus-visible {
   background: rgba(200, 168, 75, 0.24);
 }
 

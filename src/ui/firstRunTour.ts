@@ -24,9 +24,9 @@ export const TOUR_STEPS: TourStep[] = [
     body: 'Hacé click en una ciudad para abrir su ficha (estilo Civ V): estado git, archivos y agentes.',
   },
   {
-    selector: '.hero-bar-spawn',
-    title: 'Mandá un agente',
-    body: 'Desplegá un agente con estos botones o las teclas Q/W/E… Un Worker hace una tarea puntual; el principal mantiene contexto.',
+    selector: '.session-launcher',
+    title: 'Abrí tus sesiones',
+    body: 'La tira muestra el contexto activo. Abrí F8 para ver todas las sesiones y crear una: perfil, territorio y misión.',
   },
   {
     selector: '#chat-input',

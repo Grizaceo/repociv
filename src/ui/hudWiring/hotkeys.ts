@@ -148,7 +148,7 @@ export function wireHotkeys(
         state.selectUnit(null);
         renderer.selectUnit(null);
         hideUnitPanel();
-        renderHeroBar(state, (u) => selectHero(u, renderer, state, bridge));
+        renderHeroBar(state);
       }
       return;
     }

@@ -446,9 +446,9 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
 
 /* ─── Command Bar (Horizontal Slot System) ────────────────────────── */
 #command-bar {
-  flex: 1;
-  max-width: 720px;
-  min-height: 132px;
+  flex: 0 1 460px;
+  max-width: 460px;
+  min-height: 0;
   background: var(--glass-bg);
   border: 1px solid var(--panel-border);
   backdrop-filter: blur(16px);
@@ -456,8 +456,8 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
-  gap: 10px;
-  padding: 10px 14px 12px;
+  gap: 6px;
+  padding: 8px 10px;
   position: relative;
   box-shadow: var(--shadow-deep);
   border-radius: 4px 4px 0 0;
@@ -489,18 +489,82 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
 }
 
 #hero-bar-slots {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-start;
   width: 100%;
 }
 
-/* ─── Agent chip ────────────────────────────────────────────────────────────
-   One primary signal per channel: role in the icon, state on the left edge,
-   remaining context in the bottom bar. The old 68px square stacked five
-   encodings (number, initial, state dot, fatigue bar, rest badge) with no
-   legend, and spent the same greens and oranges on two different scales. */
+.session-launcher {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-left: 3px solid var(--gold-mid);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition-fast);
+}
+
+.session-launcher:hover,
+.session-launcher:focus-visible {
+  border-color: var(--gold-bright);
+  background: var(--panel-hover);
+  outline: none;
+}
+
+.session-launcher--empty {
+  border-left-color: var(--ui-text-dim);
+}
+
+.session-launcher-ico {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: var(--gold-mid);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.session-launcher-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.session-launcher-copy strong,
+.session-launcher-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-launcher-copy strong {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.session-launcher-copy span {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ui-text-dim);
+}
+
+.session-launcher kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--gold-bright);
+  border: 1px solid var(--panel-border);
+  padding: 2px 4px;
+}
+
+/* Legacy chip styling remains for story/replay exports. */
 .hero-chip {
   position: relative;
   width: 148px;
@@ -765,23 +829,55 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   color: var(--gold-bright);
 }
 
-/* ─── Command Bar two-column layout ─────────────────────────────────── */
-.command-bar-inner {
-  display: flex;
-  gap: 12px;
-  width: 100%;
-  align-items: flex-start;
+/* ─── Profile studio ─────────────────────────────────────────────────── */
+.profile-studio-dialog {
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(620px, calc(100vh - 32px));
+  padding: 0;
+  overflow: auto;
+  color: var(--ui-text, #e8dcc0);
+  background: var(--panel-bg, #17140f);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.72);
 }
-
-.command-bar-left {
+.profile-studio-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.58);
+}
+.profile-studio-head {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--panel-border);
+  color: var(--ui-gold-bright, #e6c45e);
+  font-family: var(--font-ui);
+  font-weight: 700;
+}
+.profile-studio-close {
+  border: 0;
+  background: transparent;
+  color: var(--ui-text-dim, #8a7a5a);
+  font: inherit;
+  cursor: pointer;
+}
+.profile-studio-close:hover,
+.profile-studio-close:focus-visible {
+  color: var(--ui-gold-bright, #e6c45e);
+}
+.profile-studio-body {
+  padding: 12px;
+}
+.profile-studio-body .profile-strip-container {
+  width: auto;
   min-width: 0;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  padding: 8px 10px;
 }
 
-/* ─── Profile Strip (right column in command bar) ───────────────────── */
+/* ─── Profile editor ─────────────────────────────────────────────────── */
 .profile-strip-container {
   width: 220px;
   min-width: 180px;
@@ -810,7 +906,13 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   color: var(--ui-text-dim, #8a7a5a);
 }
 
+.pstrip-profile-picker {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .pstrip-name {
+  max-width: 116px;
   font-size: 12px;
   font-weight: 600;
   color: var(--ui-gold, #c8a84b);

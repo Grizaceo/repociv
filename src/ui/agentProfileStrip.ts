@@ -34,15 +34,43 @@ function _el<T extends HTMLElement>(id: string): T | null {
   return document.getElementById(id) as T | null;
 }
 
+// ─── Profile studio ───────────────────────────────────────────────────────────
+
+let _studio: HTMLDialogElement | null = null;
+
+export function openProfileStudio(): void {
+  const studio = _getProfileStudio();
+  if (!studio.open) studio.showModal();
+  void initProfileStrip();
+}
+
+function _getProfileStudio(): HTMLDialogElement {
+  if (_studio) return _studio;
+  const studio = document.createElement('dialog');
+  studio.id = 'profile-studio';
+  studio.className = 'profile-studio-dialog';
+  studio.innerHTML = `
+    <div class="profile-studio-head">
+      <span>Perfiles de agente</span>
+      <button type="button" class="profile-studio-close" aria-label="Cerrar perfiles">✕</button>
+    </div>
+    <div id="profile-studio-content" class="profile-studio-body"></div>`;
+  studio.querySelector<HTMLButtonElement>('.profile-studio-close')?.addEventListener('click', () => {
+    studio.close();
+  });
+  document.body.appendChild(studio);
+  _studio = studio;
+  return studio;
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 export async function initProfileStrip(): Promise<void> {
-  const bar = _el('command-bar');
-  if (!bar) return;
+  const host = _el('profile-studio-content');
+  if (!host) return;
 
-  // Inject HTML structure if not already present
   if (!_el('profile-strip-container')) {
-    _injectStripHTML(bar);
+    _injectStripHTML(host);
     _wireStripEvents();
   }
 
@@ -53,27 +81,15 @@ export async function initProfileStrip(): Promise<void> {
   });
 }
 
-function _injectStripHTML(bar: HTMLElement): void {
-  // Create the two-column layout: left = existing hero slots, right = strip
-  const inner = document.createElement('div');
-  inner.id = 'command-bar-inner';
-  inner.className = 'command-bar-inner';
-
-  // Move existing children (hero slots + spawn buttons) into left column
-  const left = document.createElement('div');
-  left.id = 'command-bar-left';
-  left.className = 'command-bar-left';
-  while (bar.firstChild) left.appendChild(bar.firstChild);
-  inner.appendChild(left);
-
-  // Right column: profile strip
-  const right = document.createElement('div');
-  right.id = 'profile-strip-container';
-  right.className = 'profile-strip-container';
-  right.innerHTML = `
+function _injectStripHTML(host: HTMLElement): void {
+  const studio = document.createElement('div');
+  studio.id = 'profile-strip-container';
+  studio.className = 'profile-strip-container';
+  studio.innerHTML = `
     <div class="pstrip-header">
-      <span class="pstrip-label">Perfil</span>
-      <span id="pstrip-name" class="pstrip-name">—</span>
+      <label class="pstrip-label" for="pstrip-profile-picker">Perfil</label>
+      <select id="pstrip-profile-picker" class="pstrip-select pstrip-profile-picker" aria-label="Perfil"></select>
+      <span id="pstrip-name" class="pstrip-name" aria-live="polite">—</span>
     </div>
     <div class="pstrip-row">
       <select id="pstrip-harness" class="pstrip-select" title="Harness">
@@ -98,12 +114,15 @@ function _injectStripHTML(bar: HTMLElement): void {
       </div>
     </div>
   `;
-
-  inner.appendChild(right);
-  bar.appendChild(inner);
+  host.appendChild(studio);
 }
 
 function _wireStripEvents(): void {
+  document.getElementById('pstrip-profile-picker')?.addEventListener('change', (e) => {
+    const name = (e.target as HTMLSelectElement).value;
+    if (name) selectProfile(name);
+  });
+
   document.getElementById('pstrip-harness')?.addEventListener('change', async (e) => {
     const h = (e.target as HTMLSelectElement).value as HarnessId;
     _pendingChanges.harness = h;
@@ -143,7 +162,7 @@ export async function refreshProfiles(): Promise<void> {
   } catch {
     _profiles = {};
   }
-  _renderSlots();
+  _renderProfilePicker();
   if (_selectedName && _profiles[_selectedName]) {
     _renderStripForProfile(_profiles[_selectedName]!);
   } else {
@@ -157,78 +176,20 @@ export async function refreshProfiles(): Promise<void> {
   }
 }
 
-// ─── Slot rendering ───────────────────────────────────────────────────────────
+// ─── Profile picker ────────────────────────────────────────────────────────────
 
-function _renderSlots(): void {
-  // Profiles are LAUNCHERS, not agents: they live in the spawn row next to the
-  // Q/W/E buttons that do the same job, never mixed in with the live-agent
-  // chips. Sharing #hero-bar-slots also meant renderHeroBar's innerHTML reset
-  // wiped them on every state tick, with nothing subscribed to put them back.
-  const slotsContainer = _el('profile-launchers');
-  if (!slotsContainer) return;
+function _renderProfilePicker(): void {
+  const picker = _el<HTMLSelectElement>('pstrip-profile-picker');
+  if (!picker) return;
 
-  slotsContainer.querySelectorAll('.profile-slot').forEach((el) => el.remove());
-
-  const sorted = Object.values(_profiles).sort(
+  const profiles = Object.values(_profiles).sort(
     (a, b) => (a.slot_order ?? 99) - (b.slot_order ?? 99),
   );
-
-  sorted.forEach((profile) => {
-    const slot = document.createElement('div');
-    slot.className = 'profile-slot';
-    if (profile.name === _selectedName) slot.classList.add('selected');
-    slot.title = `${profile.display_name ?? profile.name} [${profile.harness}]`;
-    slot.dataset['name'] = profile.name;
-
-    const meta = HARNESS_META[profile.harness] ?? { emoji: '?', label: profile.harness };
-    const label = profile.display_name ?? profile.name;
-    slot.innerHTML = `
-      <span class="slot-profile-glyph">${meta.emoji}</span>
-      <span class="slot-profile-name">${label.substring(0, 4)}</span>
-    `;
-    slot.addEventListener('click', () => selectProfile(profile.name));
-    slot.draggable = true;
-    slot.addEventListener('dragstart', (e) => {
-      e.dataTransfer?.setData('text/plain', profile.name);
-      slot.classList.add('dragging');
-    });
-    slot.addEventListener('dragend', () => slot.classList.remove('dragging'));
-    slot.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      slot.classList.add('drag-over');
-    });
-    slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
-    slot.addEventListener('drop', (e) => {
-      e.preventDefault();
-      slot.classList.remove('drag-over');
-      const fromName = e.dataTransfer?.getData('text/plain');
-      if (fromName && fromName !== profile.name) void _reorderProfile(fromName, profile.name);
-    });
-    slotsContainer.appendChild(slot);
-  });
-}
-
-// ─── Slot reorder (drag-and-drop) ─────────────────────────────────────────────
-
-async function _reorderProfile(fromName: string, toName: string): Promise<void> {
-  const sorted = Object.values(_profiles).sort(
-    (a, b) => (a.slot_order ?? 99) - (b.slot_order ?? 99),
-  );
-  const fromIdx = sorted.findIndex((p) => p.name === fromName);
-  const toIdx = sorted.findIndex((p) => p.name === toName);
-  if (fromIdx < 0 || toIdx < 0) return;
-
-  const moved = sorted.splice(fromIdx, 1)[0]!;
-  sorted.splice(toIdx, 0, moved);
-
-  try {
-    await Promise.all(sorted.map((p, idx) => saveProfile({ ...p, slot_order: idx })));
-    invalidateProfileCache();
-    await refreshProfiles();
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error('[ProfileStrip] reorder error:', err);
-  }
+  picker.replaceChildren(...profiles.map((profile) => {
+    const option = new Option(profile.display_name ?? profile.name, profile.name);
+    option.selected = profile.name === _selectedName;
+    return option;
+  }));
 }
 
 // ─── Profile selection ────────────────────────────────────────────────────────
@@ -239,7 +200,7 @@ export function selectProfile(name: string): void {
   const profile = _profiles[name];
   if (!profile) return;
   _renderStripForProfile(profile);
-  _renderSlots(); // refresh selected state
+  _renderProfilePicker(); // refresh selected state
 }
 
 function _renderStripForProfile(profile: RepoCivProfile): void {

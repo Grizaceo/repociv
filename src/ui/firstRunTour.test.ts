@@ -30,6 +30,13 @@ describe('firstRunTour', () => {
     expect(shouldShowTour()).toBe(false);
   });
 
+  it('teaches the current session launcher instead of the removed spawn row', () => {
+    expect(TOUR_STEPS).toEqual(expect.arrayContaining([
+      expect.objectContaining({ selector: '.session-launcher' }),
+    ]));
+    expect(TOUR_STEPS.some((step) => step.selector === '.hero-bar-spawn')).toBe(false);
+  });
+
   it('has a non-empty, well-formed step list (the core loop)', () => {
     expect(TOUR_STEPS.length).toBeGreaterThanOrEqual(3);
     for (const s of TOUR_STEPS) {

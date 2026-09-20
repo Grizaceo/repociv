@@ -193,37 +193,19 @@
           </div>
         </aside>
 
-        <!-- Command Bar (All Heroes) -->
+        <!-- Compact session launcher. F8 is the canonical inventory; this strip
+             only keeps the current map context visible and opens it. -->
         <div id="command-bar">
           <div id="hero-bar-header">
-            <span id="hero-bar-zone" class="hero-zone-label">En campo</span>
-            <span id="hero-bar-hint" class="hero-zone-hint">1–9 selecciona · Tab cicla</span>
+            <span id="hero-bar-zone" class="hero-zone-label">Sesiones</span>
+            <span id="hero-bar-hint" class="hero-zone-hint">F8 abre la lista</span>
           </div>
-          <!-- First-frame content: bootstrap() only reaches renderHeroBar after
-               onboarding, world generation and asset loading, so an empty
-               container here is what the user stares at on open. renderHeroBar
-               replaces this wholesale on its first run. -->
           <div id="hero-bar-slots">
-            <div class="hero-empty">
-              <svg class="hero-empty-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6 13.6 4.8V11.2L8 14.4 2.4 11.2V4.8Z"/></svg>
-              <div class="hero-empty-copy">
-                <span class="hero-empty-title">Desplegando el mapa…</span>
-                <span class="hero-empty-hint">Los agentes en campo aparecen acá.</span>
-              </div>
-            </div>
-          </div>
-          <div class="hero-bar-spawn">
-            <div id="profile-launchers" class="profile-launchers"></div>
-            <span class="hero-bar-divider" aria-hidden="true"></span>
-            <button class="spawn-btn spawn-new-profile" id="spawn-new-profile" title="Nuevo perfil [N]" aria-label="Crear nuevo perfil">+ Nuevo</button>
-            <button class="spawn-btn spawn-botmode" id="spawn-botmode" title="Spawnear bot de Bot Mode" aria-label="Spawnear bot del Bot Mode">➕ Bot</button>
-            <button class="spawn-btn" data-type="MAIN" title="Agente principal [Ctrl+Q]" aria-label="Desplegar agente principal">Q</button>
-            <button class="spawn-btn" data-type="WORKER" title="Worker [Ctrl+Shift+W]" aria-label="Desplegar agente Worker">W</button>
-            <button class="spawn-btn" data-type="SCOUT" title="Scout [Ctrl+E]" aria-label="Desplegar agente Scout">E</button>
-            <button class="spawn-btn" data-type="OPENCLAW" title="OpenClaw [Ctrl+O]" aria-label="Plantilla OpenClaw">O</button>
-            <button class="spawn-btn" data-type="CLAUDE" title="Claude Code [Ctrl+C]" aria-label="Plantilla Claude">C</button>
-            <button class="spawn-btn" data-type="CODEX" title="Codex [Ctrl+X]" aria-label="Plantilla Codex">X</button>
-            <button class="spawn-btn" data-type="PRAETORIAN" title="Praetorian [Ctrl+G]" aria-label="Desplegar agente Praetorian">G</button>
+            <button type="button" class="session-launcher session-launcher--empty" aria-label="Abrir agentes y sesiones">
+              <svg class="session-launcher-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6 13.6 4.8V11.2L8 14.4 2.4 11.2V4.8Z"/><path d="M5.2 8h5.6M8 5.2v5.6"/></svg>
+              <span class="session-launcher-copy"><strong>Preparando sesiones…</strong><span>F8 abre agentes y sesiones</span></span>
+              <kbd>F8</kbd>
+            </button>
           </div>
         </div>
 

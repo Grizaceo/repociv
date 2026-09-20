@@ -42,6 +42,7 @@ import { clipboardWrite } from './chat/clipboard.ts';
 import { escapeHtml } from './escapeHtml.ts';
 import type { RepoCivProfile } from '../agentProfile.ts';
 import { openAgentSessionWizard, type SessionStartResult } from './agentSessionWizard.ts';
+import { openProfileStudio } from './agentProfileStrip.ts';
 import {
   refreshExternalSessionDirectory,
   subscribeExternalSessionDirectory,
@@ -567,6 +568,7 @@ function _getOrCreate(): HTMLElement {
     `<div class="agents-header">
       <span class="agents-title">🤖 Agentes</span>
       <div class="agents-header-actions">
+        <button class="agents-profiles" title="Editar perfiles de agente">Perfiles</button>
         <button class="agents-new-session" title="Nueva sesión">+ Sesión</button>
         <button class="agents-close" aria-label="Cerrar panel" title="Cerrar [F8]">✕</button>
       </div>
@@ -574,6 +576,7 @@ function _getOrCreate(): HTMLElement {
     <div class="agents-body"></div>`,
   );
   bindPanelAction(_panel, '.agents-close', closeAgentsPanel);
+  bindPanelAction(_panel, '.agents-profiles', openProfileStudio);
   bindPanelAction(_panel, '.agents-new-session', () => openNewAgentSession());
   return _panel;
 }

@@ -1231,17 +1231,7 @@ async function bootstrap() {
   initCommandPalette();
   registerHudCommands(state, renderer, bridge, toggleView);
 
-  // Init profile strip (async — non-blocking)
-  import('./ui/agentProfileStrip.ts').then(({ initProfileStrip, openNewProfileWizard }) => {
-    void initProfileStrip();
-    const newBtn = document.getElementById('spawn-new-profile');
-    if (newBtn) newBtn.addEventListener('click', () => void openNewProfileWizard());
-  });
-
-  // Init Bot Mode spawner (async — non-blocking)
-  import('./ui/botModeSpawner.ts').then(({ initBotModeSpawner }) => {
-    initBotModeSpawner(state, renderer, bridge);
-  });
+  // Profile editing is opened intentionally from the canonical F8 session list.
 
   // Load pending tracker missions at boot
   fetchPendingTracker().then((pending) => {
@@ -1277,7 +1267,7 @@ async function bootstrap() {
   // Re-render hero bar on state changes
   let extSelected: string | null = null;
   const refreshHero = () => {
-    renderHeroBar(state, (u) => selectHero(u, renderer, state, bridge));
+    renderHeroBar(state);
     const selected = state.selectedUnit;
     // An external agent (Suvadu ext-* unit) is not ours to command: clicking it
     // on the map opens its chat in the Agents panel instead of the unit panel
