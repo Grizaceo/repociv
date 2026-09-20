@@ -277,8 +277,33 @@ frontera que ya tenía el resto del bridge.
 | `REPOCIV_HERMES_HOME` | `~/.hermes` | raíz de Hermes (`state.db`, `profiles/*/state.db`) |
 | `REPOCIV_HERMES_PROFILES_EXCLUDE` | — | perfiles a ignorar, separados por comas (`default` es la raíz) |
 
+## Pendiente: escribirle a una sesión **activa**
+
+Hoy el compositor sirve para las sesiones quietas y se deshabilita justo en las
+que más se quieren usar: las activas. No es un bug del compositor, es que no
+existe canal hacia un proceso que ya está corriendo — reanudar la sesión por
+fuera abriría un segundo turno sobre el mismo estado. De ahí el rechazo
+`session_is_live`.
+
+Los tres caminos posibles, ya explorados (2026-09-19), de menor a mayor obra:
+
+1. **API del gateway de Hermes.** Escucha en `127.0.0.1:8742` (`enabled: true`
+   en `~/.hermes/config.yaml`, y su CORS ya incluye `http://127.0.0.1:5273`).
+   Expone `POST /api/sessions/{id}/chat` y `/chat/stream` (SSE), más
+   `GET /api/sessions/{id}/messages` — chat bidireccional de verdad, con
+   streaming, sin tocar la terminal. Responde `401` porque falta `API_SERVER_KEY`
+   en `~/.hermes/.env`; haría falta esa llave y un proxy en el bridge para no
+   exponerla al front. **Solo cubre Hermes**, y hay que ver cómo trata el
+   arriendo de una sesión abierta en una terminal.
+2. **Multiplexor.** Si RepoCiv lanzara los agentes dentro de tmux, se podría
+   espejar la terminal (`ttyd --readonly` / xterm.js) y escribirle con
+   `tmux send-keys` — el «slot de terminal» que pedía el usuario. Exige cambiar
+   cómo nacen los agentes: a los que ya corren no se los puede adoptar.
+3. **Nada.** Dejar las activas en solo lectura y confiar en ⏎ Retomar.
+
 ## Limitaciones conocidas
 
+- **Sesiones activas: solo lectura.** Ver la sección de arriba.
 - Codex / Cursor / OpenCode dependen de que su integración de Suvadu registre sesiones;
   solo Claude Code está verificado en esta máquina.
 - Suvadu y Hermes son locales: agentes de otras máquinas no aparecen.
