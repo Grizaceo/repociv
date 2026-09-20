@@ -28,6 +28,22 @@ export interface OpenAgentSessionWizardOptions {
   onStarted?: () => void;
 }
 
+/**
+ * Convert a rejected transport promise into the result the dialog can render.
+ * Event listeners do not surface rejected async handlers, so leaving this to
+ * the submit listener stranded the form in "Enviando al bridge…".
+ */
+export async function startAgentSession(
+  startSession: AgentSessionWizardDeps['startSession'],
+  draft: ConfirmedAgentSessionDraft,
+): Promise<SessionStartResult> {
+  try {
+    return await startSession(draft);
+  } catch {
+    return { ok: false, reason: 'No pude hablar con el bridge.' };
+  }
+}
+
 let _dialog: HTMLDialogElement | null = null;
 
 function _setStatus(status: HTMLElement, text: string, error = false): void {
@@ -135,7 +151,7 @@ export async function openAgentSessionWizard(
     }
     submit.disabled = true;
     _setStatus(status, 'Enviando al bridge…');
-    const result = await deps.startSession({
+    const result = await startAgentSession(deps.startSession, {
       profile: profile!,
       cityId: citySelect.value,
       mission: missionInput.value.trim(),
