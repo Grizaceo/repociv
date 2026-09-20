@@ -1,0 +1,28 @@
+<!-- RepoCiv app icon. Same mark as the favicon in index.html (green field, gold
+     peak), drawn at launcher size: rounded tile, a hex nod to the map grid. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="field" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#37703010"/>
+      <stop offset="0%" stop-color="#3a7333"/>
+      <stop offset="100%" stop-color="#1f4a1b"/>
+    </linearGradient>
+    <linearGradient id="peak" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0cf9a"/>
+      <stop offset="100%" stop-color="#c8a84b"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="256" height="256" rx="56" fill="url(#field)"/>
+
+  <!-- the map grid, barely there -->
+  <g fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="3">
+    <polygon points="128,28 158,46 158,82 128,100 98,82 98,46"/>
+    <polygon points="60,146 90,164 90,200 60,218 30,200 30,164"/>
+    <polygon points="196,146 226,164 226,200 196,218 166,200 166,164"/>
+  </g>
+
+  <!-- the peak -->
+  <polygon points="128,64 216,212 40,212" fill="url(#peak)"/>
+  <polygon points="128,64 168,132 88,132" fill="#ffffff" fill-opacity="0.22"/>
+</svg>

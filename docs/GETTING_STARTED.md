@@ -167,6 +167,35 @@ If the map is blank or shows "Bridge offline", go to Troubleshooting below.
 
 ---
 
+## Optional: install it as a desktop app (Omarchy / Linux)
+
+RepoCiv is not a hosted site, so a plain browser shortcut opens a dead page
+whenever the stack is down. `scripts/repociv-app.sh` handles that: it starts
+`scripts/dev-start.sh` detached if the port is not answering, waits for it, and
+then opens — or focuses — the app window.
+
+On Omarchy, register it once:
+
+```bash
+rsvg-convert -w 256 -h 256 public/repociv-icon.svg -o /tmp/repociv.png
+omarchy webapp install RepoCiv http://localhost:5273 /tmp/repociv.png \
+  "$PWD/scripts/repociv-app.sh"
+```
+
+That writes `~/.local/share/applications/RepoCiv.desktop` and the icon under
+`~/.local/share/icons/`; RepoCiv then shows up in the launcher like any other
+app. Remove it with `omarchy webapp remove RepoCiv`.
+
+On another desktop, write the same `.desktop` entry by hand with
+`Exec=<repo>/scripts/repociv-app.sh` — the script only needs `curl` and, for
+the window itself, `omarchy-launch-or-focus-webapp` (swap in your browser's
+`--app=` invocation otherwise).
+
+Starting the app at login is deliberately **not** part of this: the stack is a
+dev server, and it should come up when you ask for it.
+
+---
+
 ## First Steps: Navigating the Map
 
 ### Mouse Controls
