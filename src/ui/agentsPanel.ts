@@ -7,8 +7,14 @@
 //   · Cron / Gateway — Hermes cron jobs and gateway chats (Telegram…): listed
 //                    only, never on the map (collapsed by default).
 //   · RepoCiv      — this dashboard's own units (click → their usual chat).
-// Clicking an external session opens its chat (read-only) and puts the camera
-// on its unit — or on its city, when the repo is on the map.
+// Clicking an external session opens its chat and puts the camera on its unit
+// — or on its city, when the repo is on the map.
+//
+// The chat reads the session's own transcript, and its composer runs one turn
+// over that session: the bridge resumes it in a new process (there is nothing
+// listening on the other side — see server/session_reply.py). A session whose
+// process is still alive is read-only, and ⏎ hands back the command to pick it
+// up in a terminal instead.
 import type { GameState } from '../game.ts';
 import type { Axial } from '../hex.ts';
 import type { Unit } from '../types.ts';
@@ -22,6 +28,8 @@ import {
   partitionSessions,
   placeOnMap,
   relativeTime,
+  replyErrorText,
+  sendExternalReply,
   sessionLabel,
   shortModel,
   stateBadge,
@@ -55,6 +63,10 @@ let _chatLoading = false;
 /** The open chat's resume plan, once the user asked for it (null = not asked). */
 let _resume: ExternalResume | null = null;
 let _resumeCopied = false;
+/** Composer state. The draft survives the 15 s re-render. */
+let _draft = '';
+let _replyError = '';
+let _sending = false;
 let _listTimer = 0;
 let _chatTimer = 0;
 let _renderedKey = '';
@@ -177,6 +189,9 @@ function _openChat(row: ExternalSessionRow): void {
   _chat = { session: row, messages: [], hasMore: false, available: false };
   _resume = null;
   _resumeCopied = false;
+  _draft = '';
+  _replyError = '';
+  _sending = false;
   _locate(row);
   // Suvadu re-imports a transcript only on prompt/stop: pull it now for a live
   // session (once per session per panel lifetime; ↻ does it on demand).
@@ -211,6 +226,38 @@ async function _loadResume(): Promise<void> {
   _renderChat();
 }
 
+/** The composer, plus the one line that says why it is or is not usable. */
+function _composerHtml(row: ExternalSessionRow): string {
+  const badge = stateBadge(row.state);
+  const running = _chat?.lastReply?.state === 'running';
+  const disabled = badge !== null || running || _sending;
+  let hint: string;
+  let tone = '';
+  if (badge) {
+    hint = `⏳ ${badge.text} — mejor no interrumpirlo. Mientras tanto, solo lectura.`;
+    tone = ' agents-compose-hint--busy';
+  } else if (running || _sending) {
+    hint = '⏳ Turno en curso. Su respuesta aparece en el chat cuando termine.';
+  } else if (_replyError) {
+    hint = `⚠ ${_replyError}`;
+    tone = ' agents-compose-hint--error';
+  } else if (_chat?.lastReply?.state === 'failed') {
+    hint = `⚠ El último turno falló: ${_chat.lastReply.error}`;
+    tone = ' agents-compose-hint--error';
+  } else {
+    hint =
+      'Reanuda la sesión y corre un turno. No es un chat en vivo: el agente no está escuchando.';
+  }
+  return `<div class="agents-compose">
+    <textarea class="agents-compose-text" rows="2" ${disabled ? 'disabled' : ''}
+      placeholder="Escribile a esta sesión…"
+      aria-label="Mensaje para esta sesión">${escapeHtml(_draft)}</textarea>
+    <button type="button" class="agents-compose-send" ${disabled || !_draft.trim() ? 'disabled' : ''}
+      title="Enviar (Ctrl+Enter)">${_sending ? '…' : 'Enviar'}</button>
+    <p class="agents-compose-hint${tone}">${escapeHtml(hint)}</p>
+  </div>`;
+}
+
 function _resumeHtml(): string {
   if (!_resume) return '';
   const note = escapeHtml(_resume.note);
@@ -224,11 +271,42 @@ function _resumeHtml(): string {
   </div>`;
 }
 
+/**
+ * Send the draft as one turn over this session.
+ *
+ * Worth being blunt in the UI about what this is: the session is closed, so
+ * the bridge spawns a process that resumes it, runs one turn and exits. It is
+ * not a live chat, and a session whose process is still alive is refused.
+ */
+async function _send(): Promise<void> {
+  const sessionId = _chatSession;
+  const text = _draft.trim();
+  if (!sessionId || !text || _sending) return;
+  _sending = true;
+  _replyError = '';
+  _renderChat();
+  const result = await sendExternalReply(sessionId, text);
+  if (_chatSession !== sessionId) return;
+  _sending = false;
+  if (result === null) {
+    _replyError = 'No pude hablar con el bridge.';
+  } else if ('error' in result) {
+    _replyError = replyErrorText(result.error);
+  } else {
+    _draft = '';
+    if (_chat) _chat = { ..._chat, lastReply: result };
+  }
+  _renderChat();
+}
+
 function _backToList(): void {
   _chatSession = null;
   _chat = null;
   _resume = null;
   _resumeCopied = false;
+  _draft = '';
+  _replyError = '';
+  _sending = false;
   _renderedKey = '';
   window.clearInterval(_chatTimer);
   _chatTimer = 0;
@@ -381,6 +459,12 @@ function _renderChat(firstLoad = false): void {
   const prev = body.querySelector<HTMLElement>('.agents-chat-log');
   const prevTop = prev?.scrollTop ?? 0;
   const atBottom = !prev || prev.scrollTop + prev.clientHeight >= prev.scrollHeight - 40;
+  // The poll rebuilds this view every 15 s: keep what the user is typing, and
+  // their place in it.
+  const box = body.querySelector<HTMLTextAreaElement>('.agents-compose-text');
+  if (box) _draft = box.value;
+  const hadFocus = box !== null && document.activeElement === box;
+  const caret = box?.selectionStart ?? null;
   const row = _chat.session;
   const hermes = _isHermes(row);
   const badge = stateBadge(row.state);
@@ -420,15 +504,35 @@ function _renderChat(firstLoad = false): void {
     </div>
     <div class="agents-chat-log">${log}</div>
     ${_resumeHtml()}
-    ${
-      badge
-        ? `<p class="agents-foot agents-foot--busy" title="${escapeHtml(badge.title)}">⏳ ${escapeHtml(badge.text)} — mejor no interrumpirlo. Solo lectura: para responder, usá la terminal de ese agente.</p>`
-        : '<p class="agents-foot">Solo lectura. Para responder, usá la terminal de ese agente.</p>'
-    }`;
+    ${_composerHtml(row)}`;
   bindPanelAction(body, '.agents-back', _backToList);
   bindPanelAction(body, '.agents-resume-btn', () => void _loadResume());
   bindPanelAction(body, '.agents-locate', () => _locate(row));
   bindPanelAction(body, '.agents-refresh', () => void _loadChat(true));
+  bindPanelAction(body, '.agents-compose-send', () => void _send());
+  const textEl = body.querySelector<HTMLTextAreaElement>('.agents-compose-text');
+  if (textEl) {
+    textEl.addEventListener('input', () => {
+      const wasEmpty = _draft.trim() === '';
+      _draft = textEl.value;
+      // The send button flips enabled/disabled on the first and last character;
+      // toggle it in place instead of rebuilding the view under the cursor.
+      if (wasEmpty !== (_draft.trim() === '')) {
+        const send = body.querySelector<HTMLButtonElement>('.agents-compose-send');
+        if (send) send.disabled = _draft.trim() === '';
+      }
+    });
+    textEl.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
+        ev.preventDefault();
+        void _send();
+      }
+    });
+    if (hadFocus) {
+      textEl.focus();
+      if (caret !== null) textEl.setSelectionRange(caret, caret);
+    }
+  }
   const logEl = body.querySelector<HTMLElement>('.agents-chat-log');
   if (logEl) logEl.scrollTop = firstLoad || atBottom ? logEl.scrollHeight : prevTop;
 }

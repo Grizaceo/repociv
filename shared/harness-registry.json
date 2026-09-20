@@ -152,7 +152,7 @@
         "status": "healthy"
       },
       "recovery_modes": ["copy_command"],
-      "allowed_actions": ["inspect_repo", "read_file", "run_tests", "run_build", "edit_file", "create_branch", "git_commit", "delete_file", "execute_agent", "send_message", "unit_command", "quest_add", "e2e_probe"],
+      "allowed_actions": ["inspect_repo", "read_file", "run_tests", "run_build", "edit_file", "create_branch", "git_commit", "delete_file", "execute_agent", "send_message", "external_reply", "unit_command", "quest_add", "e2e_probe"],
       "blocked_actions": [],
       "recovery": {
         "copy_command": {

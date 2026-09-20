@@ -899,6 +899,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 self._respond(status, resp)
                 return
 
+        # ── External agent reply (one turn over a foreign session) ─────────────
+        if path.startswith("/api/external-agents/") and path.endswith("/reply"):
+            session_id = unquote(path[len("/api/external-agents/") : -len("/reply")])
+            if not _EXTERNAL_SESSION_RE.match(session_id):
+                self._err_json(400, "invalid session id")
+                return
+            status, resp = _routes.post_external_agent_reply(body, {"session_id": session_id})
+            self._respond(status, resp)
+            return
+
         # ── Prefix-match POST routes ───────────────────────────────────────────
         if path.startswith("/commands/") and path.endswith("/cancel"):
             cmd_id = path.split("/")[2]

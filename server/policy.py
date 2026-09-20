@@ -63,6 +63,12 @@ _TYPE_POLICY: dict[str, PolicyDecision] = {
     "quest_add":     "auto-safe",   # low-risk bookkeeping
     "unit_command":  "auto-safe",   # legacy compat — already gated by UX
     "execute_agent": "auto-safe",   # chat flow — gated by UX (user types and sends)
+    # Same as the chat flow above: typing the message and sending it IS the
+    # approval. The hard gate for these sits elsewhere — a session whose process
+    # is still alive is refused outright (server/session_reply.py). To require a
+    # prompt per message instead: a policies.d rule for this type, or retag it
+    # "high" in COMMAND_RISK and let the step 7 risk floor do it.
+    "external_reply": "auto-safe",
     "e2e_probe":     "auto-safe",   # browser→bridge→event probe, no external agent
     "edit_file":     "approve",
     "create_branch": "approve",

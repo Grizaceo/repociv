@@ -142,6 +142,16 @@ export interface ExternalChat {
   refresh?: string;
   /** Session title (Hermes) — content-derived, so only sent with the chat. */
   title?: string | null;
+  /** The last turn RepoCiv ran over this session, if it ran one. */
+  lastReply?: ExternalReplyRun;
+}
+
+/** One turn RepoCiv spawned over a session (server/session_reply.py). */
+export interface ExternalReplyRun {
+  state: 'running' | 'done' | 'failed';
+  startedAt: number;
+  finishedAt: number | null;
+  error: string;
 }
 
 export async function fetchExternalSessions(): Promise<ExternalSessionRow[] | null> {
@@ -200,6 +210,47 @@ export async function fetchExternalResume(sessionId: string): Promise<ExternalRe
   } catch {
     return null;
   }
+}
+
+/**
+ * Run one turn over a session with `text` (POST .../reply). Resolves to the
+ * run record, or to an `{error}` the caller shows as-is: `session_is_live`,
+ * `already_running`, `needs_approval`, `blocked_by_policy`…
+ */
+export async function sendExternalReply(
+  sessionId: string,
+  text: string,
+): Promise<ExternalReplyRun | { error: string } | null> {
+  try {
+    const res = await fetch(
+      bridgeUrl(`/api/external-agents/${encodeURIComponent(sessionId)}/reply`),
+      {
+        method: 'POST',
+        headers: { ...bridgeHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      },
+    );
+    const body = (await res.json()) as ExternalReplyRun & { error?: string };
+    if (!res.ok) return { error: body?.error || `http_${res.status}` };
+    return body;
+  } catch {
+    return null;
+  }
+}
+
+/** Spanish for the refusal codes the reply endpoint can answer with. */
+export function replyErrorText(code: string): string {
+  const texts: Record<string, string> = {
+    session_is_live: 'Su proceso sigue vivo: no le escribo encima. Esperá a que termine.',
+    already_running: 'Ya hay un turno corriendo sobre esta sesión.',
+    needs_approval: 'La política pide aprobación para cada mensaje (ver /approvals).',
+    blocked_by_policy: 'La política del harness bloquea escribirle a esta sesión.',
+    no_resume_path: 'El CLI de este agente no tiene un resume que yo sepa usar.',
+    empty_message: 'Escribí algo primero.',
+    unknown_session: 'El bridge ya no lista esta sesión.',
+    tracker_not_running: 'El tracker de agentes externos no está corriendo.',
+  };
+  return texts[code] ?? `No pude enviarlo (${code}).`;
 }
 
 /** `repo:<base64url(abs path)>` → abs path (vite-plugins/repoRootsState.ts encodeRepoId). */

@@ -48,6 +48,39 @@ Click en una tarjeta:
   Hermes);
 - lleva la cámara a su unidad, o a su ciudad si la sesión ya no está activa.
 
+### Responder
+
+El chat tiene compositor. Conviene ser directo sobre qué hace, porque no es lo
+que «mandar un mensaje» sugiere: **la sesión está cerrada y no hay nadie
+escuchando**. Lo que pasa es que el bridge lanza un proceso nuevo que reanuda la
+sesión, corre un turno con tu texto y termina (`server/session_reply.py`). No le
+estás hablando al agente que estaba ahí: estás reviviendo su contexto por un
+turno. La respuesta llega al transcript de la sesión, que el panel ya sondea.
+
+Dos reglas son toda la seguridad de esto:
+
+1. **Una sesión con proceso vivo se rechaza** (`409 session_is_live`). Dos
+   procesos sobre un mismo hilo es justo lo que el arriendo de Hermes evita. El
+   compositor queda deshabilitado mientras la tarjeta diga *trabajando* o
+   *pensando…*, y ⏎ te da el comando para retomarla vos.
+2. **El turno hereda los permisos que RepoCiv ya le da a sus propias misiones**
+   (`server/agent_runner.py`): `--dangerously-skip-permissions` en Claude Code,
+   `--dangerously-bypass-approvals-and-sandbox` en Codex, `--source tool` en
+   Hermes. Es herencia deliberada, no una decisión nueva: el turno puede editar
+   y ejecutar en ese repo sin preguntarte.
+
+Si querés que pregunte, hay tres palancas, de menor a mayor alcance:
+
+| Palanca | Dónde | Efecto |
+|---|---|---|
+| `policies.d/*.yaml` | `$REPOCIV_CONFIG_DIR/policies.d/` | una regla sobre `command_types: [external_reply]` con `decision: approve` o `blocked` — es autoritativa y corre antes que todo |
+| `blocked_actions` | `shared/harness-registry.json` → `local-cli` | sacar `external_reply` de `allowed_actions` bloquea la función entera |
+| `COMMAND_RISK` | `server/command_schema.py` | marcarlo `high` en vez de `low` hace que el piso de riesgo de `policy.py` exija aprobación por mensaje |
+
+Por defecto va como el chat de RepoCiv: `external_reply` es `low` / `auto-safe`,
+con el mismo razonamiento que `execute_agent` — escribir el mensaje y mandarlo
+**es** la aprobación.
+
 ### Retomar (⏎)
 
 En el chat, **⏎** pide `GET /api/external-agents/<sesión>/resume` y copia al

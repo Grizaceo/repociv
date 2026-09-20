@@ -51,7 +51,7 @@ import time
 from dataclasses import dataclass, replace
 from typing import Any, Callable, Iterable, Protocol, Sequence
 
-from server import session_liveness, session_resume
+from server import session_liveness, session_reply, session_resume
 
 SendFn = Callable[[dict[str, Any]], None]
 LivenessFn = Callable[[], session_liveness.Liveness]
@@ -904,6 +904,38 @@ class ExternalAgentTracker:
         body["sessionId"] = session_id
         return 200, body
 
+    # -- reply (one turn over a session RepoCiv does not own) ----------------
+    def reply(self, session_id: str, text: str) -> tuple[int, dict[str, Any]]:
+        """Run one turn with the user's message (server/session_reply.py).
+
+        The session's own model is left alone: resuming a thread and silently
+        switching its model would be a surprise, not a feature."""
+        with self._lock:
+            obs = self._listed.get(session_id)
+        if obs is None:
+            return 404, {"error": "unknown_session"}
+        hermes = self._sources.get("hermes")
+        try:
+            spec = session_reply.build(
+                agent=obs.agent,
+                native_id=obs.native_id,
+                cwd=obs.cwd,
+                text=text,
+                profile=obs.profile,
+                live=obs.live,
+                hermes_home=getattr(hermes, "home", "~/.hermes"),
+                ended=obs.ended,
+            )
+            run = session_reply.start(session_id, spec)
+        except session_reply.ReplyRefused as exc:
+            code = str(exc)
+            status = 409 if code in ("session_is_live", "already_running") else 400
+            return status, {"error": code, "sessionId": session_id}
+        return 202, {"sessionId": session_id, **run}
+
+    def reply_status(self, session_id: str) -> dict[str, Any] | None:
+        return session_reply.status(session_id)
+
     # -- chat (on demand, never broadcast) -----------------------------------
     def _listed_source(self, session_id: str) -> tuple[Observation, AgentSource] | None:
         with self._lock:
@@ -940,6 +972,11 @@ class ExternalAgentTracker:
             body["error"] = str(exc)  # e.g. not imported yet, db locked
         except Exception:
             body["error"] = "unexpected"
+        # The composer polls this endpoint anyway: it is where it learns whether
+        # the turn RepoCiv started is still running, and how it ended.
+        last_reply = session_reply.status(session_id)
+        if last_reply is not None:
+            body["lastReply"] = last_reply
         return 200, body
 
 
@@ -1021,6 +1058,13 @@ def resume(session_id: str) -> tuple[int, dict[str, Any]]:
     if _tracker is None:
         return 503, {"error": "tracker_not_running"}
     return _tracker.resume(session_id)
+
+
+def reply(session_id: str, text: str) -> tuple[int, dict[str, Any]]:
+    """Payload of POST /api/external-agents/<session>/reply."""
+    if _tracker is None:
+        return 503, {"error": "tracker_not_running"}
+    return _tracker.reply(session_id, text)
 
 
 def snapshot() -> dict[str, Any]:

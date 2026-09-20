@@ -25,6 +25,7 @@ CommandType = Literal[
     "delete_file",
     "execute_agent",
     "send_message",
+    "external_reply",  # one turn over a foreign agent session (server/session_reply.py)
     "subagent_spawn",  # high-risk Task delegation audit gate
     "subagent_dispatch",  # explicit sub-mission dispatch (phase 2 stub)
     "unit_command",  # legacy compat
@@ -56,6 +57,10 @@ COMMAND_RISK: dict[str, Risk] = {
     "delete_file":    "destructive",
     "execute_agent":  "low",  # user-gated: the act of clicking/sending IS the approval
     "send_message":   "high",
+    # Same rationale as execute_agent above: the user typing the message and
+    # sending it IS the approval. Tag it "high" instead and the risk floor in
+    # policy.py turns every reply into an approval prompt — that is the knob.
+    "external_reply": "low",
     "subagent_spawn": "high",
     "subagent_dispatch": "high",
     "unit_command":   "medium",

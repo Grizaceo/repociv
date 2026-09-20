@@ -160,6 +160,29 @@ def get_external_agent_resume(ctx: "RouteContext") -> tuple[int, Any]:
     from server import suvadu_tracker as _suvadu
     return _suvadu.resume(str(ctx.get("session_id", "")))
 
+def post_external_agent_reply(body: Any, ctx: "RouteContext") -> tuple[int, Any]:
+    """POST /api/external-agents/<session>/reply — run one turn with {text}.
+
+    Policy first: this is the ``external_reply`` command type, so a policies.d
+    overlay can promote it to approve/blocked before anything spawns."""
+    from server import suvadu_tracker as _suvadu
+    from server.command_schema import COMMAND_RISK, Command
+    from server.policy import decide
+
+    session_id = str(ctx.get("session_id", ""))
+    text = str((body or {}).get("text", ""))
+    cmd = Command(
+        type="external_reply",
+        target=session_id,
+        risk=COMMAND_RISK.get("external_reply", "high"),
+    )
+    decision, reason = decide(cmd)
+    if decision == "blocked":
+        return 403, {"error": "blocked_by_policy", "reason": reason, "sessionId": session_id}
+    if decision == "approve":
+        return 409, {"error": "needs_approval", "reason": reason, "sessionId": session_id}
+    return _suvadu.reply(session_id, text)
+
 def get_ready(ctx: "RouteContext") -> tuple[int, Any]:
     from server.bridge import _es, REPOCIV_TOKEN
     return 200, {"ok": True, "eventStore": str(_es._store_path), "token": bool(REPOCIV_TOKEN)}

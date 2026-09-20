@@ -360,3 +360,59 @@ body.local-view #agents-panel {
 .agents-resume--attached {
   color: var(--ui-gold);
 }
+
+/* ── Compositor: un turno sobre la sesión, no un chat en vivo ─────────────── */
+.agents-compose {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1) var(--space-2);
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--ui-border);
+  padding-top: var(--space-2);
+}
+.agents-compose-text {
+  resize: vertical;
+  min-height: 2.4em;
+  padding: var(--space-1) var(--space-2);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  color: var(--ui-text);
+  font-family: inherit;
+  font-size: var(--text-xs);
+}
+.agents-compose-text:focus-visible {
+  outline: none;
+  border-color: var(--ui-gold);
+}
+.agents-compose-text:disabled {
+  opacity: 0.5;
+}
+.agents-compose-send {
+  align-self: end;
+  padding: 4px 10px;
+  background: rgba(200, 168, 75, 0.12);
+  border: 1px solid var(--ui-gold);
+  border-radius: 4px;
+  color: var(--ui-gold-bright);
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+.agents-compose-send:disabled {
+  opacity: 0.4;
+  cursor: default;
+  border-color: var(--ui-border);
+  color: var(--ui-text-dim);
+}
+.agents-compose-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ui-text-dim);
+  font-size: var(--text-2xs);
+}
+.agents-compose-hint--busy {
+  color: var(--ui-gold);
+}
+.agents-compose-hint--error {
+  color: var(--state-error);
+}

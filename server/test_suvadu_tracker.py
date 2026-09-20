@@ -633,6 +633,64 @@ def test_resume_route_is_registered(repos):
     assert status in (404, 503) and "error" in body
 
 
+def test_reply_runs_one_turn_over_a_listed_session(repos, monkeypatch):
+    from server import session_reply as sr
+
+    monkeypatch.setattr(sr, "_RUNS", {})
+    monkeypatch.setattr(sr, "_binary", lambda family: "/usr/bin/true")
+    spawned: list[list[str]] = []
+    monkeypatch.setattr(
+        sr.threading, "Thread",
+        lambda **kw: type("T", (), {"start": lambda self: spawned.append(kw["args"][1]["argv"])})(),
+    )
+    suv, clock, sent = FakeSuv(), Clock(), []
+    repo = str(repos / "repociv")
+    suv.sessions = _sessions_json(_session("rep00000", cwd=repo))
+    t = _tracker([repo], suv, clock, sent)
+    t.poll_once()
+
+    status, body = t.reply("claude-rep00000", "seguí con el refactor")
+    assert status == 202 and body["state"] == "running"
+    assert spawned[0][-2:] == ["rep00000", "seguí con el refactor"]
+    assert t.reply_status("claude-rep00000")["state"] == "running"
+
+
+def test_reply_refuses_a_live_session(repos, monkeypatch):
+    from server import session_reply as sr
+
+    monkeypatch.setattr(sr, "_RUNS", {})
+    suv, clock, sent = FakeSuv(), Clock(), []
+    repo = str(repos / "repociv")
+    suv.sessions = _sessions_json(_session("rep00000", cwd=repo))
+    t = _tracker([repo], suv, clock, sent,
+                 liveness=lambda: sl.Liveness(agent_cwds=frozenset({repo}), ok=True))
+    t.poll_once()
+
+    status, body = t.reply("claude-rep00000", "hola")
+    assert status == 409 and body["error"] == "session_is_live"
+    assert t.reply("claude-nope", "hola")[0] == 404
+
+
+def test_reply_route_asks_policy_first(monkeypatch):
+    from server import http_routes
+    from server.routes.core import post_external_agent_reply
+
+    assert http_routes.post_external_agent_reply is post_external_agent_reply
+    # Default policy for external_reply mirrors the chat flow: the send is the
+    # approval, so it reaches the tracker (absent here → 503, never 500).
+    status, body = post_external_agent_reply({"text": "hola"}, {"session_id": "claude-x"})
+    assert status == 503 and "error" in body
+
+    from server import policy
+    monkeypatch.setitem(policy._TYPE_POLICY, "external_reply", "approve")
+    status, body = post_external_agent_reply({"text": "hola"}, {"session_id": "claude-x"})
+    assert status == 409 and body["error"] == "needs_approval"
+
+    monkeypatch.setitem(policy._TYPE_POLICY, "external_reply", "blocked")
+    status, body = post_external_agent_reply({"text": "hola"}, {"session_id": "claude-x"})
+    assert status == 403 and body["error"] == "blocked_by_policy"
+
+
 def test_chat_pages_backwards_from_the_end(repos):
     suv, clock, sent = FakeSuv(), Clock(), []
     suv.sessions = _sessions_json(_session("chat0000"))

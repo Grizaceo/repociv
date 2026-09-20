@@ -14,6 +14,8 @@ import {
   partitionSessions,
   placeOnMap,
   relativeTime,
+  replyErrorText,
+  sendExternalReply,
   sessionLabel,
   shortModel,
   stateBadge,
@@ -435,6 +437,32 @@ describe('sessions / chat fetchers', () => {
     expect(String(fetchMock.mock.calls[0]![0])).toContain(
       '/api/external-agents/claude-a%2F..%2Fx/resume',
     );
+  });
+
+  it('posts a reply and surfaces the refusal code as text', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ state: 'running', startedAt: 1, finishedAt: null, error: '' }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: () => Promise.resolve({ error: 'session_is_live' }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const ok = await sendExternalReply('claude-a', 'seguí');
+    expect(ok).toMatchObject({ state: 'running' });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toContain('/api/external-agents/claude-a/reply');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ text: 'seguí' });
+
+    expect(await sendExternalReply('claude-a', 'hola')).toEqual({ error: 'session_is_live' });
+    expect(replyErrorText('session_is_live')).toMatch(/no le escribo encima/);
+    expect(replyErrorText('weird_code')).toContain('weird_code');
   });
 
   it('returns null when the bridge fails', async () => {

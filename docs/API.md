@@ -170,6 +170,7 @@ Sin prompts, comandos ni `cwd`. Los mismos datos llegan al mapa como `unit_spawn
 | GET | `/api/external-agents/sessions` | Todas las sesiones con actividad en las últimas `REPOCIV_EXT_AGENTS_RECENT_H` (24) horas, activas o no, más nuevas primero |
 | GET | `/api/external-agents/<sessionId>/chat?limit=80&refresh=1` | Prompts y respuestas de una sesión listada (a pedido, **contenido**) |
 | GET | `/api/external-agents/<sessionId>/resume` | Cómo retomar esa sesión en una terminal (el comando; RepoCiv no lo ejecuta) |
+| POST | `/api/external-agents/<sessionId>/reply` | Corre **un turno** sobre esa sesión con `{text}` (**escribe**) |
 
 `/sessions`: `{status, windowMinutes, recentHours, sessions: [{sessionId, agent, model, repo, cityId, active, state: "working"|"thinking"|"idle"|"inactive", unit, unitType, firstActivityAt, lastActivityAt, commandCount, eventCount, totalTokens, subagent, imported}]}`. `imported=false` significa que Suvadu solo vio el latido de comandos (todavía no hay transcript).
 
@@ -182,6 +183,11 @@ Sin prompts, comandos ni `cwd`. Los mismos datos llegan al mapa como `unit_spawn
 - `resume` trae el comando (`cd <cwd> && claude --resume <id>`, `cd <cwd> && codex resume <id>`, `HERMES_HOME=<perfil> hermes chat --resume <id>`); `attached` y `unavailable` traen `command: ""` y explican por qué en `note`.
 - `attached` es una sesión cuyo proceso sigue vivo: retomarla abriría un segundo turno sobre el mismo estado. Ver `docs/EXTERNAL_AGENTS.md` → Retomar.
 - Es el único endpoint que expone el `cwd` de la sesión, dentro del comando y solo a pedido: `claude` y `codex` encuentran la sesión desde su propio directorio.
+
+`/reply` (POST, body `{text}`): `202 {sessionId, state: "running", startedAt, finishedAt, error}`. El estado del turno vuelve después en `lastReply` dentro de `/chat`.
+- La sesión está cerrada: el bridge lanza un proceso que la reanuda y corre **un** turno. No es un chat en vivo. Ver `docs/EXTERNAL_AGENTS.md` → Responder.
+- Rechazos: `409 session_is_live` (su proceso sigue vivo), `409 already_running`, `409 needs_approval` y `403 blocked_by_policy` (política), `400 empty_message` / `no_resume_path`, `404 unknown_session`, `503 tracker_not_running`.
+- El turno corre con los mismos permisos que las misiones propias de RepoCiv. Las palancas para exigir aprobación están en `docs/EXTERNAL_AGENTS.md`.
 
 **`/subagents/cancel`** — Body:
 ```json
