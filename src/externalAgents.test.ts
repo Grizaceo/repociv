@@ -444,7 +444,8 @@ describe('sessions / chat fetchers', () => {
       .fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ state: 'running', startedAt: 1, finishedAt: null, error: '' }),
+        json: () =>
+          Promise.resolve({ state: 'running', startedAt: 1, finishedAt: null, error: '' }),
       })
       .mockResolvedValueOnce({
         ok: false,

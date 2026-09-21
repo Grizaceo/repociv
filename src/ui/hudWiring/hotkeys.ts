@@ -163,7 +163,14 @@ export function wireHotkeys(
       return;
     }
     const quickHarness: Record<string, RepoCivProfile['harness']> = {
-      q: 'hermes', w: 'openclaw', e: 'claude', o: 'openclaw', c: 'claude', x: 'codex', r: 'cursor', g: 'hermes',
+      q: 'hermes',
+      w: 'openclaw',
+      e: 'claude',
+      o: 'openclaw',
+      c: 'claude',
+      x: 'codex',
+      r: 'cursor',
+      g: 'hermes',
     };
     const quickKey = e.key.toLowerCase();
     if (
@@ -184,7 +191,9 @@ export function wireHotkeys(
     // Hero selection 1–9 is the same active-session dock the HUD renders.
     if (/^[1-9]$/.test(e.key)) {
       const idx = parseInt(e.key, 10) - 1;
-      const target = visibleSessionDock(activeSessionDock(state.getAllUnits(), externalSessionSnapshot()))[idx];
+      const target = visibleSessionDock(
+        activeSessionDock(state.getAllUnits(), externalSessionSnapshot()),
+      )[idx];
       if (target) {
         trackHotkey(`${e.key}:select-session`);
         selectDockItem(target);
@@ -211,7 +220,9 @@ export function wireHotkeys(
       const dock = activeSessionDock(state.getAllUnits(), externalSessionSnapshot());
       if (dock.length === 0) return;
       const selectedKey = state.selectedUnit ? `own:${state.selectedUnit.id}` : lastDockKey;
-      const idx = selectedKey ? dock.findIndex((item) => `${item.kind}:${item.key}` === selectedKey) : -1;
+      const idx = selectedKey
+        ? dock.findIndex((item) => `${item.kind}:${item.key}` === selectedKey)
+        : -1;
       const next = dock[(idx + 1) % dock.length]!;
       trackHotkey('Tab:cycle-session');
       selectDockItem(next);

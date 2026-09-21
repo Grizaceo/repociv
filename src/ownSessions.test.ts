@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ownSessionEvents, fetchOwnSessions, closeOwnSession, type OwnSessionRow } from './ownSessions.ts';
+import {
+  ownSessionEvents,
+  fetchOwnSessions,
+  closeOwnSession,
+  type OwnSessionRow,
+} from './ownSessions.ts';
 import { GameState } from './game.ts';
 import { dispatchBridgeEvent, type MessageContext } from './bridgeMessageHandlers.ts';
 import type { City, World } from './types.ts';
@@ -65,11 +70,10 @@ describe('ownSessionEvents', () => {
   });
 
   it('skips rows without a usable unit id', () => {
-    const events = ownSessionEvents([], [
-      row(''),
-      { unit: 42 } as unknown as OwnSessionRow,
-      row('SESSION-03'),
-    ]);
+    const events = ownSessionEvents(
+      [],
+      [row(''), { unit: 42 } as unknown as OwnSessionRow, row('SESSION-03')],
+    );
     expect(events.map((e) => e.type)).toEqual(['unit_spawn']);
   });
 
@@ -79,11 +83,14 @@ describe('ownSessionEvents', () => {
   });
 
   it('despawns only sessions the store explicitly closed', () => {
-    const events = ownSessionEvents(['SESSION-01', 'SESSION-02'], [
-      row('SESSION-01', { state: 'closed' }),
-      row('SESSION-02', { state: 'idle' }),
-      row('SESSION-03', { state: 'closed' }), // not on the map: no event
-    ]);
+    const events = ownSessionEvents(
+      ['SESSION-01', 'SESSION-02'],
+      [
+        row('SESSION-01', { state: 'closed' }),
+        row('SESSION-02', { state: 'idle' }),
+        row('SESSION-03', { state: 'closed' }), // not on the map: no event
+      ],
+    );
     expect(events).toEqual([{ type: 'unit_despawn', unit: 'SESSION-01' }]);
   });
 

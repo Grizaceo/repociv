@@ -136,38 +136,44 @@ export async function openAgentSessionWizard(
     if (harnessProfile) profileSelect.value = harnessProfile.name;
   }
 
-  const cities = deps.state.world.cities.filter((city) => !city.isCapital && Boolean(city.repoPath));
+  const cities = deps.state.world.cities.filter(
+    (city) => !city.isCapital && Boolean(city.repoPath),
+  );
   for (const city of cities) citySelect.appendChild(_option(city.id, city.name));
 
-  if (profiles.length === 0) _setStatus(status, 'Creá un perfil antes de iniciar una sesión.', true);
-  else if (cities.length === 0) _setStatus(status, 'No hay una ciudad con repositorio disponible en el mapa.', true);
+  if (profiles.length === 0)
+    _setStatus(status, 'Creá un perfil antes de iniciar una sesión.', true);
+  else if (cities.length === 0)
+    _setStatus(status, 'No hay una ciudad con repositorio disponible en el mapa.', true);
   submit.disabled = profiles.length === 0 || cities.length === 0;
 
-  dialog.querySelector<HTMLFormElement>('.agent-session-form')?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const profile = profiles.find((candidate) => candidate.name === profileSelect.value);
-    const draft = { profile, cityId: citySelect.value, mission: missionInput.value };
-    const invalid = validateAgentSessionDraft(draft);
-    if (invalid) {
-      _setStatus(status, invalid, true);
-      return;
-    }
-    submit.disabled = true;
-    _setStatus(status, 'Enviando al bridge…');
-    const result = await startAgentSession(deps.startSession, {
-      profile: profile!,
-      cityId: citySelect.value,
-      mission: missionInput.value.trim(),
+  dialog
+    .querySelector<HTMLFormElement>('.agent-session-form')
+    ?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const profile = profiles.find((candidate) => candidate.name === profileSelect.value);
+      const draft = { profile, cityId: citySelect.value, mission: missionInput.value };
+      const invalid = validateAgentSessionDraft(draft);
+      if (invalid) {
+        _setStatus(status, invalid, true);
+        return;
+      }
+      submit.disabled = true;
+      _setStatus(status, 'Enviando al bridge…');
+      const result = await startAgentSession(deps.startSession, {
+        profile: profile!,
+        cityId: citySelect.value,
+        mission: missionInput.value.trim(),
+      });
+      if (!result.ok) {
+        _setStatus(status, result.reason ?? 'El bridge no aceptó la sesión.', true);
+        submit.disabled = false;
+        return;
+      }
+      _setStatus(status, 'Sesión encolada.');
+      options.onStarted?.(result.unitId ?? '');
+      window.setTimeout(_closeDialog, 300);
     });
-    if (!result.ok) {
-      _setStatus(status, result.reason ?? 'El bridge no aceptó la sesión.', true);
-      submit.disabled = false;
-      return;
-    }
-    _setStatus(status, 'Sesión encolada.');
-    options.onStarted?.(result.unitId ?? '');
-    window.setTimeout(_closeDialog, 300);
-  });
 
   dialog.showModal();
   (profiles.length && cities.length ? missionInput : profileSelect).focus();

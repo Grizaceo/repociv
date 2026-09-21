@@ -49,9 +49,11 @@ function _getProfileStudio(): HTMLDialogElement {
       <button type="button" class="profile-studio-close" aria-label="Cerrar perfiles">✕</button>
     </div>
     <div id="profile-studio-content" class="profile-studio-body"></div>`;
-  studio.querySelector<HTMLButtonElement>('.profile-studio-close')?.addEventListener('click', () => {
-    studio.close();
-  });
+  studio
+    .querySelector<HTMLButtonElement>('.profile-studio-close')
+    ?.addEventListener('click', () => {
+      studio.close();
+    });
   document.body.appendChild(studio);
   _studio = studio;
   return studio;
@@ -179,11 +181,13 @@ function _renderProfilePicker(): void {
   const profiles = Object.values(_profiles).sort(
     (a, b) => (a.slot_order ?? 99) - (b.slot_order ?? 99),
   );
-  picker.replaceChildren(...profiles.map((profile) => {
-    const option = new Option(profile.display_name ?? profile.name, profile.name);
-    option.selected = profile.name === _selectedName;
-    return option;
-  }));
+  picker.replaceChildren(
+    ...profiles.map((profile) => {
+      const option = new Option(profile.display_name ?? profile.name, profile.name);
+      option.selected = profile.name === _selectedName;
+      return option;
+    }),
+  );
 }
 
 // ─── Profile selection ────────────────────────────────────────────────────────

@@ -58,9 +58,11 @@ export interface AgentsPanelDeps {
   /** Select one of RepoCiv's own units — opens its regular chat/unit panel. */
   selectOwnUnit: (unit: Unit) => void;
   /** Submit and materialize a confirmed profile/city/mission session. */
-  startSession: (
-    draft: { profile: RepoCivProfile; cityId: string; mission: string },
-  ) => Promise<SessionStartResult>;
+  startSession: (draft: {
+    profile: RepoCivProfile;
+    cityId: string;
+    mission: string;
+  }) => Promise<SessionStartResult>;
 }
 
 let _deps: AgentsPanelDeps | null = null;
@@ -421,7 +423,12 @@ async function _closeOwnSession(unitId: string): Promise<void> {
   if (!unitId) return;
   const unit = _deps?.state.getUnit(unitId);
   const label = unit?.name ?? unitId;
-  if (!window.confirm(`¿Cerrar la sesión de ${label}? La unidad se retira del mapa (el transcript queda en el store).`)) return;
+  if (
+    !window.confirm(
+      `¿Cerrar la sesión de ${label}? La unidad se retira del mapa (el transcript queda en el store).`,
+    )
+  )
+    return;
   const ok = await closeOwnSession(unitId);
   if (ok) _render();
 }

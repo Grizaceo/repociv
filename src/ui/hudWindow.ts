@@ -224,12 +224,9 @@ const installHeaderControls = (
       if (!isInteractiveTarget(event.target)) startPointerInteraction(panel, event, 'move');
     });
     // Mouse drag for headless / older browsers where Pointer Events may be absent.
-    header.addEventListener(
-      'mousedown',
-      (event) => {
-        if (!isInteractiveTarget(event.target)) startPointerInteraction(panel, event, 'move');
-      },
-    );
+    header.addEventListener('mousedown', (event) => {
+      if (!isInteractiveTarget(event.target)) startPointerInteraction(panel, event, 'move');
+    });
   }
 
   if (binding.resetControl?.isConnected) return;

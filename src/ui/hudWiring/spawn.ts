@@ -135,7 +135,9 @@ export function spawnAcceptedSession(
   renderer: Renderer,
   bridge: BridgeEvents,
 ): Unit {
-  const existingCount = state.getAllUnits().filter((u) => u.id.startsWith(profile.name.toUpperCase())).length;
+  const existingCount = state
+    .getAllUnits()
+    .filter((u) => u.id.startsWith(profile.name.toUpperCase())).length;
   const offset = existingCount % 6;
   const coord = {
     q: city.coord.q + 1 + (offset % 3),

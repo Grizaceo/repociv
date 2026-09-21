@@ -16,7 +16,9 @@ const draft = {
 
 describe('startAgentSession', () => {
   it('preserves an explicit bridge rejection for the dialog to render', async () => {
-    const startSession = vi.fn().mockResolvedValue({ ok: false, reason: 'La ciudad no está disponible.' });
+    const startSession = vi
+      .fn()
+      .mockResolvedValue({ ok: false, reason: 'La ciudad no está disponible.' });
 
     await expect(startAgentSession(startSession, draft)).resolves.toEqual({
       ok: false,

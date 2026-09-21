@@ -500,12 +500,18 @@ body.local-view #agents-panel {
   border-radius: 4px;
   font: inherit;
 }
-.agent-session-form > label textarea { resize: vertical; min-height: 5.5em; }
+.agent-session-form > label textarea {
+  resize: vertical;
+  min-height: 5.5em;
+}
 .agent-session-form > label select:focus-visible,
 .agent-session-form > label textarea:focus-visible,
 .agent-session-close:focus-visible,
 .agent-session-cancel:focus-visible,
-.agent-session-submit:focus-visible { outline: 2px solid var(--ui-gold-bright); outline-offset: 2px; }
+.agent-session-submit:focus-visible {
+  outline: 2px solid var(--ui-gold-bright);
+  outline-offset: 2px;
+}
 .agent-session-actions {
   display: flex;
   justify-content: flex-end;
@@ -529,7 +535,10 @@ body.local-view #agents-panel {
   font-weight: 700;
 }
 .agent-session-submit:disabled,
-.agent-session-form > label :disabled { opacity: 0.55; cursor: default; }
+.agent-session-form > label :disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 .agent-session-head {
   display: flex;
   align-items: flex-start;
@@ -551,5 +560,9 @@ body.local-view #agents-panel {
   cursor: pointer;
   font: inherit;
 }
-.agent-session-close:hover { color: var(--ui-gold-bright); }
-.agent-session-status--error { color: var(--state-error); }
+.agent-session-close:hover {
+  color: var(--ui-gold-bright);
+}
+.agent-session-status--error {
+  color: var(--state-error);
+}

@@ -444,7 +444,6 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   box-shadow: 0 0 8px var(--gold-glow);
 }
 
-
 /* Legacy chip styling remains for story/replay exports. */
 .hero-chip {
   position: relative;

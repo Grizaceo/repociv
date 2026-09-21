@@ -31,9 +31,9 @@ describe('firstRunTour', () => {
   });
 
   it('teaches the F8 agents panel instead of the removed session launcher', () => {
-    expect(TOUR_STEPS).toEqual(expect.arrayContaining([
-      expect.objectContaining({ selector: '#btn-agents' }),
-    ]));
+    expect(TOUR_STEPS).toEqual(
+      expect.arrayContaining([expect.objectContaining({ selector: '#btn-agents' })]),
+    );
     expect(TOUR_STEPS.some((step) => step.selector === '.session-launcher')).toBe(false);
     expect(TOUR_STEPS.some((step) => step.selector === '.hero-bar-spawn')).toBe(false);
   });
