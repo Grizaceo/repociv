@@ -207,16 +207,31 @@ def test_city_for_cwd_longest_prefix_wins(repos):
     assert name == "repociv"
 
 
-def test_city_for_cwd_is_component_wise(repos):
+def test_city_for_cwd_is_component_wise(repos, monkeypatch):
     # /w/repociv must not claim /w/repociv-old just because the string is a prefix.
+    # Rule 3 (enclosing git repo) is pinned off: on hosts where the pytest tmp
+    # dir itself sits inside a git repo (e.g. TMPDIR under ~/.hermes) it would
+    # claim these cwds and mask the prefix rule under test.
+    monkeypatch.setattr(st, "_enclosing_git_repo", lambda path: None)
     city, name = st.city_for_cwd(str(repos / "repociv-old"), [str(repos / "repociv")])
     assert (city, name) == (st.CAPITAL_ID, "")
 
 
-def test_city_for_cwd_falls_back_to_capital(repos):
+def test_city_for_cwd_falls_back_to_capital(repos, monkeypatch):
+    monkeypatch.setattr(st, "_enclosing_git_repo", lambda path: None)
     assert st.city_for_cwd("/somewhere/else", [str(repos / "repociv")]) == (st.CAPITAL_ID, "")
     assert st.city_for_cwd("", [str(repos / "repociv")]) == (st.CAPITAL_ID, "")
     assert st.city_for_cwd(str(repos / "repociv"), []) == (st.CAPITAL_ID, "")
+
+
+def test_city_for_cwd_enclosing_git_repo(repos):
+    # Rule 3: a session inside a real git repo that is not on the map still
+    # gets a city of its own (nearest ancestor with .git, found before the
+    # walk leaves the temp dir — no dependence on the host filesystem).
+    repo = repos / "unmapped"
+    (repo / ".git").mkdir(parents=True)
+    city, name = st.city_for_cwd(str(repo / "sub"), [])
+    assert (city, name) == (st.encode_repo_id(str(repo)), "unmapped")
 
 
 def test_repociv_itself_is_the_capital(repos):
