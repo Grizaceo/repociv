@@ -48,7 +48,12 @@ run_step "vite build"                     npx --no-install vite build
 # Backend
 run_step "ruff check server/"             ruff check server/
 run_step "ruff check scripts/"            ruff check scripts/
-run_step "pytest --cov=server (≥50%)"     pytest --cov=server --cov-fail-under=50 -q
+# Resolve the project pytest: prefer the repo .venv (local dev, where a bare
+# `pytest` on PATH can resolve to an unrelated interpreter missing deps like
+# fastmcp), fall back to PATH (CI installs into the runner's python).
+PYTEST_BIN="$REPO_ROOT/.venv/bin/pytest"
+[ -x "$PYTEST_BIN" ] || PYTEST_BIN="$(command -v pytest || true)"
+run_step "pytest --cov=server (≥50%)"     "$PYTEST_BIN" --cov=server --cov-fail-under=50 -q
 
 # Asset budget: the 3 terrain atlas PNGs must stay under 6MB combined.
 # (The Blender/numpy generators can silently fatten them; tracked binaries
