@@ -144,6 +144,11 @@ def get_external_agent_sessions(ctx: "RouteContext") -> tuple[int, Any]:
     from server import suvadu_tracker as _suvadu
     return 200, _suvadu.sessions()
 
+def get_own_sessions(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/own-sessions — RepoCiv's own sessions on disk + liveness."""
+    from server import own_sessions as _own
+    return 200, _own.snapshot()
+
 def get_external_agent_chat(ctx: "RouteContext") -> tuple[int, Any]:
     """GET /api/external-agents/<session>/chat[?limit=N&refresh=1] — prompts + responses."""
     from server import suvadu_tracker as _suvadu

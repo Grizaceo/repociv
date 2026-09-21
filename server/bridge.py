@@ -196,6 +196,7 @@ def _pop_approval(cmd_id: str) -> dict[str, Any] | None:
 # ─── Event store init
 from server import event_store as _es  # noqa: E402
 from server import sessions as _sessions  # noqa: E402
+from server import own_sessions as _own_sessions  # noqa: E402
 from server import run_state as _run_state  # noqa: E402
 from server import workspace_issue as _wi  # noqa: E402
 from server import checkpoint as _checkpoint  # noqa: E402
@@ -239,6 +240,7 @@ def init_bridge_state(config_dir: Path | str | None = None) -> Path:
     _missions_store.init(CONFIG_DIR)
     _es.init(CONFIG_DIR)
     _sessions.init(CONFIG_DIR)
+    _own_sessions.init(CONFIG_DIR)
     _run_state.init(CONFIG_DIR)
     _wi.init(CONFIG_DIR)
     _checkpoint.init(CONFIG_DIR)

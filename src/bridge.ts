@@ -29,6 +29,7 @@ import {
 import { RepoCivWebSocket } from './websocket.ts';
 import { dispatchBridgeEvent, type MessageContext } from './bridgeMessageHandlers.ts';
 import { externalAgentEvents, fetchExternalAgents } from './externalAgents.ts';
+import { ownSessionEvents, fetchOwnSessions } from './ownSessions.ts';
 import { registerPoll, type PollUnregister } from './ui/pollScheduler.ts';
 
 const DEMO_INTERVAL_MS = 30_000;
@@ -143,6 +144,7 @@ export class BridgeEvents {
         this.reconnectDelay = 1000;
         this.onBridgeOnline('hermes');
         this.syncExternalAgents();
+        this.syncOwnSessions();
       } else if (status === 'disconnected' || status === 'auth_failed') {
         this.wsConnected = false;
         // Fall back to SSE after WS fails
@@ -178,6 +180,7 @@ export class BridgeEvents {
         this.sseConnected = true;
         this.reconnectDelay = 1000;
         this.syncExternalAgents();
+        this.syncOwnSessions();
       };
       src.onmessage = (e: MessageEvent<string>) => {
         try {
@@ -263,6 +266,17 @@ export class BridgeEvents {
       if (!rows || this.stopped) return;
       const ids = this.state.getAllUnits().map((u) => u.id);
       for (const evt of externalAgentEvents(ids, rows)) this.handleBridgeEvent(evt);
+    });
+  }
+
+  /** Same replay for RepoCiv's own sessions: the wizard spawns units
+   *  client-side, so a reload loses them while the session keeps living
+   *  server-side (server/own_sessions.py, GET /api/own-sessions). */
+  private syncOwnSessions() {
+    void fetchOwnSessions().then((rows) => {
+      if (!rows || this.stopped) return;
+      const ids = this.state.getAllUnits().map((u) => u.id);
+      for (const evt of ownSessionEvents(ids, rows)) this.handleBridgeEvent(evt);
     });
   }
 

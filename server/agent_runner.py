@@ -1020,9 +1020,15 @@ def _run_hermes_cli_streaming(
     output = "".join(output_buf)
     # Remember the real session id so the next mission can --resume it.
     if config.get("stateful", True):
-        _save_hermes_session_id(
-            profile_path, unit_id, city_id, _extract_hermes_session_id(output)
-        )
+        _extracted = _extract_hermes_session_id(output)
+        _save_hermes_session_id(profile_path, unit_id, city_id, _extracted)
+        # Expose it to GET /api/own-sessions liveness (server/own_sessions.py):
+        # the lease registry keys on this native id.
+        try:
+            if _extracted:
+                _sessions.patch(unit_id, nativeSessionId=_extracted)
+        except Exception:
+            pass  # liveness is best-effort; never fail a finished mission
     return proc.returncode == 0, output
 
 

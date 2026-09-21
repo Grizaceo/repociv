@@ -15,6 +15,7 @@ from server.routes.core import get_health  # noqa: F401
 from server.routes.core import get_ready  # noqa: F401
 from server.routes.core import get_external_agents  # noqa: F401
 from server.routes.core import get_external_agent_sessions  # noqa: F401
+from server.routes.core import get_own_sessions  # noqa: F401
 from server.routes.core import get_external_agent_chat  # noqa: F401
 from server.routes.core import get_external_agent_resume  # noqa: F401
 from server.routes.core import post_external_agent_reply  # noqa: F401
