@@ -24,9 +24,9 @@ export const TOUR_STEPS: TourStep[] = [
     body: 'Hacé click en una ciudad para abrir su ficha (estilo Civ V): estado git, archivos y agentes.',
   },
   {
-    selector: '.session-launcher',
+    selector: '#btn-agents',
     title: 'Abrí tus sesiones',
-    body: 'La tira muestra el contexto activo. Abrí F8 para ver todas las sesiones y crear una: perfil, territorio y misión.',
+    body: 'El panel de Agentes (F8) es la vista única: todas las sesiones, propias y externas, con su chat. Creá una nueva con perfil, territorio y misión.',
   },
   {
     selector: '#chat-input',

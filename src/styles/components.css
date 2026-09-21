@@ -444,125 +444,6 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   box-shadow: 0 0 8px var(--gold-glow);
 }
 
-/* ─── Command Bar (Horizontal Slot System) ────────────────────────── */
-#command-bar {
-  flex: 0 1 460px;
-  max-width: 460px;
-  min-height: 0;
-  background: var(--glass-bg);
-  border: 1px solid var(--panel-border);
-  backdrop-filter: blur(16px);
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 10px;
-  position: relative;
-  box-shadow: var(--shadow-deep);
-  border-radius: 4px 4px 0 0;
-}
-
-#hero-bar-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-}
-
-.hero-zone-label {
-  font-family: var(--font-ui);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ui-text-dim);
-  opacity: 0.75;
-}
-
-.hero-zone-hint {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--ui-text-dim);
-  opacity: 0.6;
-}
-
-#hero-bar-slots {
-  width: 100%;
-}
-
-.session-launcher {
-  width: 100%;
-  min-height: 44px;
-  box-sizing: border-box;
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 9px;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-left: 3px solid var(--gold-mid);
-  color: var(--text-primary);
-  cursor: pointer;
-  text-align: left;
-  transition: var(--transition-fast);
-}
-
-.session-launcher:hover,
-.session-launcher:focus-visible {
-  border-color: var(--gold-bright);
-  background: var(--panel-hover);
-  outline: none;
-}
-
-.session-launcher--empty {
-  border-left-color: var(--ui-text-dim);
-}
-
-.session-launcher-ico {
-  width: 17px;
-  height: 17px;
-  fill: none;
-  stroke: var(--gold-mid);
-  stroke-width: 1.25;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.session-launcher-copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.session-launcher-copy strong,
-.session-launcher-copy span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.session-launcher-copy strong {
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.session-launcher-copy span {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--ui-text-dim);
-}
-
-.session-launcher kbd {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--gold-bright);
-  border: 1px solid var(--panel-border);
-  padding: 2px 4px;
-}
 
 /* Legacy chip styling remains for story/replay exports. */
 .hero-chip {
@@ -757,58 +638,6 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   padding: 1px 4px;
 }
 
-.hero-bar-spawn {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-}
-.botmode-menu {
-  z-index: 1200;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-  max-height: 280px;
-  overflow-y: auto;
-  min-width: 200px;
-  padding: 4px;
-}
-.botmode-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  border: none;
-  color: var(--text-primary);
-  font-family: var(--font-ui);
-  font-size: 14px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.botmode-item:hover {
-  background: var(--accent-muted, rgba(255, 215, 0, 0.12));
-}
-.botmode-kind {
-  font-size: 14px;
-  opacity: 0.8;
-}
-.botmode-empty {
-  color: var(--text-dim);
-  font-style: italic;
-  cursor: default;
-  justify-content: flex-start;
-}
-.botmode-error {
-  color: #ff6b6b;
-  font-style: normal;
-  cursor: default;
-  justify-content: flex-start;
-  white-space: normal;
-}
 .spawn-btn {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
@@ -1051,14 +880,6 @@ body:not(.hud-advanced) [data-hud-tier='advanced'] {
   gap: 8px;
   flex: 0 1 auto;
   min-width: 0;
-}
-
-.hero-bar-divider {
-  width: 1px;
-  align-self: stretch;
-  background: var(--panel-border);
-  flex: none;
-  margin: 0 2px;
 }
 
 .profile-slot {

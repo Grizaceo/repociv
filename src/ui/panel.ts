@@ -1,11 +1,6 @@
-// ─── RepoCiv — Unit panel & hero bar (Civ V Aesthetic) ─────────────────────────
+// ─── RepoCiv — Unit panel (Civ V Aesthetic) ─────────────────────────
 import type { GameState } from '../game.ts';
 import type { Unit, UnitState } from '../types.ts';
-import { escapeHtml } from './escapeHtml.ts';
-import { activeSessionDock } from './agentDock.ts';
-import { externalSessionSnapshot } from './externalSessionDirectory.ts';
-import { openAgentsPanel } from './agentsPanel.ts';
-import { sessionLauncherSummary } from './sessionLauncherSummary.ts';
 import { renderCapabilityBadges, clearCapabilityBadges } from './capabilityBadges.ts';
 import {
   renderOrdenDeBatalla,
@@ -78,36 +73,4 @@ export function hideUnitPanel() {
   document.getElementById('unit-panel')?.classList.add('hidden');
   clearCapabilityBadges();
   hideOrdenDeBatalla();
-}
-
-export function renderHeroBar(state: GameState): void {
-  const slots = document.getElementById('hero-bar-slots');
-  if (!slots) return;
-
-  const summary = sessionLauncherSummary(
-    activeSessionDock(state.getAllUnits(), externalSessionSnapshot()),
-    state.selectedUnit?.id ?? null,
-  );
-  const focus = summary.focus;
-  const zone = document.getElementById('hero-bar-zone');
-  if (zone) zone.textContent = `Sesiones · ${summary.total}`;
-  const hint = document.getElementById('hero-bar-hint');
-  if (hint) hint.textContent = 'F8 abre la lista · Tab / 1–9 ciclan';
-
-  const context = focus ? `${focus.label} · ${focus.state}` : 'Sin sesiones en campo';
-  const activity = summary.total
-    ? `${summary.active} activa${summary.active === 1 ? '' : 's'} · ${summary.total} contexto${summary.total === 1 ? '' : 's'}`
-    : 'Abrí F8 para iniciar una sesión intencional';
-
-  slots.innerHTML = `
-    <button type="button" class="session-launcher${focus ? '' : ' session-launcher--empty'}"
-      aria-label="Abrir agentes y sesiones" title="Abrir agentes y sesiones [F8]">
-      <svg class="session-launcher-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6 13.6 4.8V11.2L8 14.4 2.4 11.2V4.8Z"/><path d="M5.2 8h5.6M8 5.2v5.6"/></svg>
-      <span class="session-launcher-copy">
-        <strong>${escapeHtml(context)}</strong>
-        <span>${escapeHtml(activity)}</span>
-      </span>
-      <kbd>F8</kbd>
-    </button>`;
-  slots.querySelector<HTMLButtonElement>('.session-launcher')?.addEventListener('click', openAgentsPanel);
 }

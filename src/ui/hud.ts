@@ -78,11 +78,6 @@ export function initExternalLibs() {
   if (hudOverlay) {
     autoAnimate(hudOverlay);
   }
-
-  const heroBarSlots = document.getElementById('hero-bar-slots');
-  if (heroBarSlots) {
-    autoAnimate(heroBarSlots);
-  }
 }
 
 export function showLoadingProgress(pct: number, text: string) {

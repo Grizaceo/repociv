@@ -30,10 +30,11 @@ describe('firstRunTour', () => {
     expect(shouldShowTour()).toBe(false);
   });
 
-  it('teaches the current session launcher instead of the removed spawn row', () => {
+  it('teaches the F8 agents panel instead of the removed session launcher', () => {
     expect(TOUR_STEPS).toEqual(expect.arrayContaining([
-      expect.objectContaining({ selector: '.session-launcher' }),
+      expect.objectContaining({ selector: '#btn-agents' }),
     ]));
+    expect(TOUR_STEPS.some((step) => step.selector === '.session-launcher')).toBe(false);
     expect(TOUR_STEPS.some((step) => step.selector === '.hero-bar-spawn')).toBe(false);
   });
 

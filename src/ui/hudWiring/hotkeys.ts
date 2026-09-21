@@ -5,7 +5,6 @@ import { type BridgeEvents } from '../../bridge.ts';
 import { terminalPanel } from '../../terminalPanel.ts';
 import {
   hideUnitPanel,
-  renderHeroBar,
   openSidePanel,
   closeSidePanel,
   isSidePanelOpen,
@@ -148,7 +147,6 @@ export function wireHotkeys(
         state.selectUnit(null);
         renderer.selectUnit(null);
         hideUnitPanel();
-        renderHeroBar(state);
       }
       return;
     }

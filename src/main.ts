@@ -36,7 +36,6 @@ import {
   hideLoadingScreen,
   showUnitPanel,
   hideUnitPanel,
-  renderHeroBar,
   initExternalLibs,
   updateResource,
   updateBadges,
@@ -1268,14 +1267,11 @@ async function bootstrap() {
     },
   });
 
-  // Re-render hero bar on state changes
+  // Keep the unit panel in sync with state; external (Suvadu ext-*) selection
+  // routes to the Agents panel instead of the mission composer.
   let extSelected: string | null = null;
-  const refreshHero = () => {
-    renderHeroBar(state);
+  const syncSelection = () => {
     const selected = state.selectedUnit;
-    // An external agent (Suvadu ext-* unit) is not ours to command: clicking it
-    // on the map opens its chat in the Agents panel instead of the unit panel
-    // and its mission composer.
     if (selected && isExternalAgentUnit(selected.id)) {
       if (extSelected !== selected.id) {
         extSelected = selected.id;
@@ -1286,17 +1282,11 @@ async function bootstrap() {
     extSelected = null;
     if (selected) showUnitPanel(selected, state);
   };
-  state.subscribe(refreshHero);
-  subscribeExternalSessionDirectory(() => refreshHero());
-  // Draw once up front: subscribing alone left the bar's container literally
-  // empty until the first state notify arrived — measured at ~10 s from load,
-  // which is the whole first impression of the session. With nothing to draw
-  // yet this paints the empty state, which names the next action.
-  refreshHero();
+  state.subscribe(syncSelection);
+  subscribeExternalSessionDirectory(() => syncSelection());
   bindOrdenDeBatalla(state);
   bindSubagentSessionPanel(state);
   bindSlashCommandState(state);
-  refreshHero();
 }
 
 // ─── Start ────────────────────────────────────────────────────────────────────

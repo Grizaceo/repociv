@@ -63,8 +63,7 @@ html {
 #main-canvas,
 #hud-overlay,
 #bottom-hud,
-.spawn-btn,
-#hero-bar-slots {
+.spawn-btn {
   user-select: none;
 }
 

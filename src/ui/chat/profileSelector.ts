@@ -17,7 +17,7 @@
 //   - Manual dropdown/slash changes → re-sync: if the config no longer
 //     matches the shown profile, the select falls back to "— (config manual)".
 //
-// The command-bar profile strip (agentProfileStrip.ts) is NOT synced with this
+// The profile strip (agentProfileStrip.ts) is NOT synced with this
 // selector: that strip is the spawn/edit context (Ctrl+Q), this is the chat
 // context. They share the same profile data, not the same selection state.
 import {

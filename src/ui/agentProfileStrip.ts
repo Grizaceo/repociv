@@ -1,11 +1,5 @@
 // ─── RepoCiv — Agent Profile Strip ───────────────────────────────────────────
-// Command bar Profile Studio: slot bar (top row) + mini-editor strip (right).
-//
-// Layout:
-//   [slot1][slot2][slot3]...  │  Perfil: <name>
-//   [drag reorder]            │  Harness ▾  │  Model ▾  │  Alma ▾  │  Guardar
-//
-// The strip occupies the right side of #command-bar when a slot is selected.
+// Profile Studio: slot bar + mini-editor strip.
 
 import {
   loadProfiles,
