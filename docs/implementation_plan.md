@@ -28,13 +28,31 @@
 - Chat UI: resizable panel, message alignment, timestamps, scroll-to-bottom, history persistence
 - Map: hex grid, fog of war, pathfinding A*, city placement, repo onboarding
 
-### Lo que FALTA (deudas reales)
-- `validation_contract` — no existe
-- `validator role` — no existe como entidad independiente
-- Behavioural validation en loop principal
-- Handoff estructurado tipado
-- Enforcement real de modelo por rol (model_router no se refleja en runtime)
-- Mission Control semántico unificado (paneles fragmentados)
+### Lo que FALTA (deudas reales) — auditado contra el código 2026-09-21
+
+Cerradas (verificadas):
+- ~~`validation_contract` — no existe~~ → ✅ **existe**: gate antes de ejecutar en
+  `task_orchestrator.py:292-301` (`has_validation_contract` + `generate_contract_from_spec`
+  + `read_validation_contract` en `workspace_issue.py`).
+- ~~`validator role` — no existe como entidad independiente~~ → ✅ **existe**:
+  `server/validator.py` ("Separated from worker/orchestrator to ensure independent
+  validation"; veredictos `pass` / `fail` / `needs-human-review`) + gate
+  executing→validating en `task_orchestrator.py:597-612`.
+- ~~Handoff estructurado tipado~~ → ✅ **existe**: `write_handoff` v1.0
+  (`workspace_issue.py:574-585`, roles SCOUT/WORKER/VALIDATOR/MAIN) + consumo como
+  `latest_handoff` en la construcción de misión (`step_executor.py:160-213`).
+- ~~Enforcement real de modelo por rol (model_router no se reflejaba en runtime)~~ →
+  ✅ **existe**: `route_model` por paso con semántica `enforced` propagada y retry
+  condicionado (`step_executor.py:293-321`) + rama provider-aware (Nebius) del plan
+  de hackathon.
+
+Vivas:
+- **Behavioural validation en loop principal** — la fase validating corre
+  `validator.validate_issue`; la validación behavioural existe solo como
+  `security_harness.py`, no integrada al loop.
+- **Mission Control semántico unificado (paneles fragmentados)** — sin cambios;
+  se solapa con el pruning de paneles (Task C2 del plan Nebius 2026-08-29,
+  pendiente de decisión del mantenedor).
 
 ### Deudas cerradas
 - ~~`npm run check` fallaba por TS~~ → ✅ resuelto (2026-05-07)

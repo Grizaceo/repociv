@@ -1,7 +1,7 @@
 # RepoCiv — Roadmap Canonico: Taller Imperial de Maravillas
 
 Fecha: 2026-05-25
-Estado: canonico para la siguiente etapa de producto alpha
+Estado: historico (2026-09-21) — fue "canonico para la siguiente etapa de producto alpha". Las Fases 4 y 5 (Bibliotheca/LabHub-Institutum) fueron retiradas del codebase el 2026-09-07 (`b58395f`); la Fase 0 se cerró verificada el 2026-09-21. El foco vigente de producto está en `docs/plans/2026-08-29-nebius-competition-readiness.md`; `SCOPE.md` sigue mandando si hay contradicción.
 Reemplaza como foco operativo a planes sueltos de integración visual, pero no reemplaza `SCOPE.md`: si este documento contradice `SCOPE.md`, gana `SCOPE.md`.
 
 > ⚠️ **Histórico (2026-09-07).** Bibliotheca (La Gran Biblioteca) y
@@ -375,7 +375,7 @@ Anotacion mas importante: marcar read-only vs mutating con claridad. El cliente 
 
 ## 4. Roadmap por fases
 
-### Fase 0 — Baseline verde y deuda que bloquea confianza
+### Fase 0 — Baseline verde y deuda que bloquea confianza ✅ CERRADA (verificada 2026-09-21)
 
 Objetivo: dejar el suelo estable antes de construir encima.
 
@@ -385,14 +385,19 @@ Tareas:
    - `get_latest_news()` debe tolerar ausencia de columna `categories`.
    - O el test debe crear la columna si el schema real ya la exige. Preferencia: tolerancia, porque CDaily puede tener DB vieja.
    - Archivos: `server/http_routes.py`, `server/test_cdaily_bridge.py`.
+   - ✅ **Sin referencias a `categories` en `http_routes.py` ni en el test** — obsoleta
+     por drift de schema; verificación: grep 2026-09-21 vacío.
 
 2. Arreglar 4 errores ESLint.
    - Archivos: `src/localRenderer.ts`, `src/renderer.ts`, `src/ui/hudWiring/inputs.ts`.
+   - ✅ **ESLint 0-warn verificado en HEAD** (2026-09-21, `npx eslint src/` limpio).
 
 3. Decidir Prettier.
    - O se corre `npm run format` en commit separado.
    - O se baja `format:check` como gate no obligatorio hasta una pasada dedicada.
    - Recomendacion: correr Prettier en commit unico y no mezclar con features.
+   - ✅ **Ejecutado tal cual la recomendación**: pasada dedicada `206132f`
+     (2026-09-21); `format:check` verde y check.sh completo en verde.
 
 4. ~~Revisar puerto de LabHub.~~ Resuelto en F1 (2026-06-16, commit e64c7dd): UI :5280, API :5281. Ver §169 arriba para detalle.
 
@@ -479,6 +484,11 @@ Tareas:
 5. PostMessage bridge.
    - Archivo candidato: `src/wonders/postMessageBridge.ts`.
    - Validar origin/schema.
+   - ✅ **Auditado 2026-09-21: NO es candidato a borrado.** El puente está vivo
+     bidireccional (outbound context/focus/layer/open_local_view desde
+     `wonderVignette.ts`/`capitalPanel.ts`; inbound `focus_city`/`selection`
+     consumidos en `main.ts:962/970`). La limpieza del 2026-09-21 (`cddda28`)
+     retiró solo los 3 mensajes inbound huérfanos (`ready`/`report`/`notification`).
    - Integrar con `BridgeEvents` solo por eventos tipados.
 
 6. Empty states comunes.
@@ -603,6 +613,11 @@ Gates:
 
 ### Fase 4 — Bibliotheca: navegación visual primero, descubrimiento AI opcional
 
+> ⚠️ **OBSOLETA (2026-09-07):** Bibliotheca fue **retirada del codebase** en
+> `b58395f` ("Neither ever earned its keep"). Esta fase no se implementará como
+> está escrita; cualquier idea rescatable de navegación visual vive o muere en el
+> backlog general, no aquí. Se conserva por valor histórico/diseño.
+
 Objetivo: que La Gran Biblioteca sea ante todo una forma dinámica y visual de moverse
 por carpetas/repos locales. No reemplaza el sistema de archivos. Las relaciones
 sugeridas por AI/grafo son un extra que el usuario activa si quiere.
@@ -700,6 +715,11 @@ Gates:
 ---
 
 ### Fase 5 — LabHub / Institutum: avisos automáticos, locks suaves por defecto, acciones fuertes opt-in
+
+> ⚠️ **OBSOLETA (2026-09-07):** LabHub/Institutum fueron **retirados del codebase**
+> en `b58395f`. Esta fase no se implementará como está escrita; se conserva por
+> valor histórico/diseño. El patrón de "locks suaves + opt-in" queda registrado
+> como referencia para cualquier feature futura de protección de trabajo vivo.
 
 Objetivo: que LabHub proteja trabajo vivo sin impedir la operación.
 

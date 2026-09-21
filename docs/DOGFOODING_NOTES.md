@@ -65,3 +65,11 @@
 - Error o bug observado: HERMES_MODEL default inválido (minimax-m2.6 → hermes-agent)
 - Decisión tomada: Milestones 2-5 del execplan quedan deferred hasta completar Lotes 1-8 del plan corregido
 - Follow-up: continuar con Lote 3 (Validation Contract MVP)
+
+## Update 2026-09-21 (auditoría de pendientes)
+
+- Re-chequeo de las fricciones [baja]: el naming "Agente Principal N" sigue presente
+  (`src/ui/panel.ts:29`, hero 'Agente Principal'); discoverability del chat y latencia
+  MAIN sin cambios (arquitectural). Sin acción tomada — prioridad baja; quedan
+  registradas aquí hasta que se decida el pruning de paneles (UX_IMPROVEMENT_PLAN /
+  Task C2 del plan Nebius).
