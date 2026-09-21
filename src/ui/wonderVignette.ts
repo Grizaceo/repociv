@@ -87,24 +87,9 @@ function _wonderTitle(manifest: WonderManifest | undefined, type: WonderType): s
 
 function _attachWonderListener(): void {
   startWonderListener({
-    onReady: (id) => {
-      window.dispatchEvent(new CustomEvent('repociv:wonder-ready', { detail: { id } }));
-    },
     onFocusCity: (cityId, mode) => {
       window.dispatchEvent(
         new CustomEvent('repociv:wonder-focus-city', { detail: { cityId, mode: mode ?? 'macro' } }),
-      );
-    },
-    onReport: (id, title, markdown, relatedCities) => {
-      window.dispatchEvent(
-        new CustomEvent('repociv:wonder-report', {
-          detail: { id, title, markdown, relatedCities },
-        }),
-      );
-    },
-    onNotification: (level, text) => {
-      window.dispatchEvent(
-        new CustomEvent('repociv:wonder-notification', { detail: { level, text } }),
       );
     },
     onSelection: (nodeId, nodePath, nodeType) => {

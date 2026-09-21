@@ -90,10 +90,7 @@ export type RepoCivToWonderMessage =
   | { type: 'repociv.open_local_view'; repoPath: string };
 
 export type WonderToRepoCivMessage =
-  | { type: 'wonder.ready'; id: string }
   | { type: 'wonder.focus_city'; cityId: string; open?: 'macro' | 'local' }
-  | { type: 'wonder.report'; id: string; title: string; markdown: string; relatedCities: string[] }
-  | { type: 'wonder.notification'; level: 'info' | 'warn' | 'critical'; text: string }
   | {
       type: 'wonder.selection';
       nodeId: string;

@@ -1,5 +1,7 @@
 // ─── RepoCiv — PostMessage Bridge for Wonder iframes ─────────────────────────
-// Two-way communication between RepoCiv and iframe-based Wonders.
+// Host↔Wonder postMessage channel for generic iframe wonders. Outbound: context,
+// focus, layer and open_local_view events. Inbound: focus_city and selection
+// requests, which the vignette forwards to main.ts as window CustomEvents.
 
 import type { RepoCivToWonderMessage, WonderManifest, WonderToRepoCivMessage } from './types.ts';
 
@@ -53,13 +55,7 @@ function _isWonderMessage(data: unknown): data is WonderToRepoCivMessage {
     return false;
   }
   const t = (data as { type: string }).type;
-  return (
-    t === 'wonder.ready' ||
-    t === 'wonder.focus_city' ||
-    t === 'wonder.report' ||
-    t === 'wonder.notification' ||
-    t === 'wonder.selection'
-  );
+  return t === 'wonder.focus_city' || t === 'wonder.selection';
 }
 
 export function postToWonder(
@@ -110,10 +106,7 @@ export function postOpenLocalViewToWonder(
 }
 
 type WonderMessageHandler = {
-  onReady?: (id: string) => void;
   onFocusCity?: (cityId: string, mode?: 'macro' | 'local') => void;
-  onReport?: (id: string, title: string, markdown: string, relatedCities: string[]) => void;
-  onNotification?: (level: 'info' | 'warn' | 'critical', text: string) => void;
   onSelection?: (nodeId: string, nodePath: string, nodeType: 'repo' | 'file' | 'folder') => void;
 };
 
@@ -125,26 +118,9 @@ function _handleMessage(event: MessageEvent): void {
   if (!_isWonderMessage(event.data)) return;
 
   switch (event.data.type) {
-    case 'wonder.ready': {
-      _handler?.onReady?.(event.data.id);
-      break;
-    }
     case 'wonder.focus_city': {
       if (!event.data.cityId) break;
       _handler?.onFocusCity?.(event.data.cityId, event.data.open);
-      break;
-    }
-    case 'wonder.report': {
-      _handler?.onReport?.(
-        event.data.id,
-        event.data.title,
-        event.data.markdown,
-        event.data.relatedCities,
-      );
-      break;
-    }
-    case 'wonder.notification': {
-      _handler?.onNotification?.(event.data.level, event.data.text);
       break;
     }
     case 'wonder.selection': {
