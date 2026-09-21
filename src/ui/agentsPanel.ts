@@ -57,7 +57,9 @@ export interface AgentsPanelDeps {
   /** Select one of RepoCiv's own units — opens its regular chat/unit panel. */
   selectOwnUnit: (unit: Unit) => void;
   /** Submit and materialize a confirmed profile/city/mission session. */
-  startSession: (draft: { profile: RepoCivProfile; cityId: string; mission: string }) => Promise<SessionStartResult>;
+  startSession: (
+    draft: { profile: RepoCivProfile; cityId: string; mission: string },
+  ) => Promise<SessionStartResult>;
 }
 
 let _deps: AgentsPanelDeps | null = null;
@@ -120,8 +122,29 @@ export function openNewAgentSession(
   if (!_deps) return;
   void openAgentSessionWizard(
     { state: _deps.state, startSession: _deps.startSession },
-    { ...options, onStarted: () => _render() },
+    {
+      ...options,
+      // Nueva sesión = entrar a conversar: cuando el bridge acepta la sesión,
+      // F8 cae directamente en el chat de esa unidad con el compositor listo.
+      onStarted: (unitId) => {
+        if (unitId) focusOwnChat(unitId);
+        else _render();
+      },
+    },
   );
+}
+
+/** Open the chat of one of RepoCiv's own sessions, straight from the list. */
+export function focusOwnChat(unitId: string): void {
+  const unit = _deps?.state.getUnit(unitId);
+  if (!unit || !_deps) {
+    // Not materialized yet (panel just opened): fall back to the list.
+    if (!_visible) openAgentsPanel();
+    _render();
+    return;
+  }
+  if (!_visible) openAgentsPanel();
+  _deps.selectOwnUnit(unit);
 }
 
 /** Open the chat of an external agent, by session id or by its ext-* unit id. */

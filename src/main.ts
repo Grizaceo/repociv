@@ -1263,7 +1263,7 @@ async function bootstrap() {
         return { ok: false, reason: response.reason ?? 'El bridge rechazó la sesión.' };
       }
       spawnAcceptedSession(profile, city, mission, unitId, state, renderer, bridge);
-      return { ok: true };
+      return { ok: true, unitId };
     },
   });
 

@@ -9,6 +9,8 @@ import { validateAgentSessionDraft } from './agentSessionStart.ts';
 export interface SessionStartResult {
   ok: boolean;
   reason?: string;
+  /** Local unit id materialized for the accepted session (ok only). */
+  unitId?: string;
 }
 
 export interface ConfirmedAgentSessionDraft {
@@ -25,7 +27,8 @@ export interface AgentSessionWizardDeps {
 export interface OpenAgentSessionWizardOptions {
   profileName?: string;
   harness?: RepoCivProfile['harness'];
-  onStarted?: () => void;
+  /** Called after the bridge accepts the session, with the local unit id. */
+  onStarted?: (unitId: string) => void;
 }
 
 /**
@@ -162,7 +165,7 @@ export async function openAgentSessionWizard(
       return;
     }
     _setStatus(status, 'Sesión encolada.');
-    options.onStarted?.();
+    options.onStarted?.(result.unitId ?? '');
     window.setTimeout(_closeDialog, 300);
   });
 
