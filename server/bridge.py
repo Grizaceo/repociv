@@ -901,6 +901,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 self._respond(status, resp)
                 return
 
+        # ── Own session close (explicit retire of an own-session unit) ────────
+        if path.startswith("/api/own-sessions/") and path.endswith("/close"):
+            unit_id = unquote(path[len("/api/own-sessions/") : -len("/close")])
+            status, resp = _routes.post_own_session_close(body, {"params": {"unit": unit_id}})
+            self._respond(status, resp)
+            return
+
         # ── External agent reply (one turn over a foreign session) ─────────────
         if path.startswith("/api/external-agents/") and path.endswith("/reply"):
             session_id = unquote(path[len("/api/external-agents/") : -len("/reply")])

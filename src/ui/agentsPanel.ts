@@ -43,6 +43,7 @@ import { escapeHtml } from './escapeHtml.ts';
 import type { RepoCivProfile } from '../agentProfile.ts';
 import { openAgentSessionWizard, type SessionStartResult } from './agentSessionWizard.ts';
 import { openProfileStudio } from './agentProfileStrip.ts';
+import { closeOwnSession } from '../ownSessions.ts';
 import {
   refreshExternalSessionDirectory,
   subscribeExternalSessionDirectory,
@@ -415,6 +416,16 @@ function _cardHtml(row: ExternalSessionRow, now: number): string {
   </button>`;
 }
 
+/** Explicit retire of an own session: confirm → POST close → re-render. */
+async function _closeOwnSession(unitId: string): Promise<void> {
+  if (!unitId) return;
+  const unit = _deps?.state.getUnit(unitId);
+  const label = unit?.name ?? unitId;
+  if (!window.confirm(`¿Cerrar la sesión de ${label}? La unidad se retira del mapa (el transcript queda en el store).`)) return;
+  const ok = await closeOwnSession(unitId);
+  if (ok) _render();
+}
+
 function _ownUnitsHtml(): string {
   const units = (_deps?.state.getAllUnits() ?? []).filter((u) => !u.ephemeral);
   if (units.length === 0) return '<div class="agents-empty">Sin unidades propias.</div>';
@@ -423,6 +434,7 @@ function _ownUnitsHtml(): string {
       (u) => `<button type="button" class="agents-own" data-unit="${escapeHtml(u.id)}">
         <span class="agents-dot agents-dot--${escapeHtml(u.state)}" aria-hidden="true"></span>
         <span>${escapeHtml(u.name)}</span><span class="agents-own-state">${escapeHtml(u.state)}</span>
+        <span class="agents-own-close" role="button" tabindex="0" aria-label="Cerrar sesión ${escapeHtml(u.id)}" title="Cerrar sesión (retira la unidad del mapa)">✕</span>
       </button>`,
     )
     .join('');
@@ -493,6 +505,12 @@ function _render(): void {
         _deps.selectOwnUnit(unit);
         _deps.locate(unit.coord);
       }
+    }),
+  );
+  body.querySelectorAll<HTMLElement>('.agents-own-close').forEach((el) =>
+    el.addEventListener('click', (ev) => {
+      ev.stopPropagation(); // the row's click selects/locates; ✕ must not
+      void _closeOwnSession(el.closest<HTMLElement>('.agents-own')?.dataset['unit'] ?? '');
     }),
   );
 }

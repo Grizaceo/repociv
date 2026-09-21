@@ -263,6 +263,19 @@ body.local-view #agents-panel {
   color: var(--ui-text-dim);
   font-size: var(--text-3xs);
 }
+.agents-own-close {
+  margin-left: 2px;
+  padding: 0 3px;
+  color: var(--ui-text-dim);
+  font-size: var(--text-3xs);
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.agents-own-close:hover {
+  color: var(--ui-danger, #e05b5b);
+  background: rgba(0, 0, 0, 0.35);
+}
 
 /* ── Chat view ─────────────────────────────────────────────────────────── */
 .agents-chat-head {

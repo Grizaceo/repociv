@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ownSessionEvents, fetchOwnSessions, type OwnSessionRow } from './ownSessions.ts';
+import { ownSessionEvents, fetchOwnSessions, closeOwnSession, type OwnSessionRow } from './ownSessions.ts';
 import { GameState } from './game.ts';
 import { dispatchBridgeEvent, type MessageContext } from './bridgeMessageHandlers.ts';
 import type { City, World } from './types.ts';
@@ -73,8 +73,22 @@ describe('ownSessionEvents', () => {
     expect(events.map((e) => e.type)).toEqual(['unit_spawn']);
   });
 
-  it('never despawns own units (idle sessions keep their map anchor)', () => {
+  it('never despawns idle/unknown sessions (they keep their map anchor)', () => {
     const events = ownSessionEvents(['SESSION-01'], []);
+    expect(events).toEqual([]);
+  });
+
+  it('despawns only sessions the store explicitly closed', () => {
+    const events = ownSessionEvents(['SESSION-01', 'SESSION-02'], [
+      row('SESSION-01', { state: 'closed' }),
+      row('SESSION-02', { state: 'idle' }),
+      row('SESSION-03', { state: 'closed' }), // not on the map: no event
+    ]);
+    expect(events).toEqual([{ type: 'unit_despawn', unit: 'SESSION-01' }]);
+  });
+
+  it('never spawns a closed session back onto the map', () => {
+    const events = ownSessionEvents([], [row('SESSION-04', { state: 'closed' })]);
     expect(events).toEqual([]);
   });
 
@@ -146,5 +160,25 @@ describe('fetchOwnSessions', () => {
     expect(await fetchOwnSessions()).toBeNull();
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')));
     expect(await fetchOwnSessions()).toBeNull();
+  });
+});
+
+describe('closeOwnSession', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('POSTs to the close endpoint and returns ok', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await closeOwnSession('SESSION-01')).toBe(true);
+    const url = String(fetchMock.mock.calls[0]![0]);
+    expect(url).toMatch(/\/api\/own-sessions\/SESSION-01\/close$/);
+    expect(fetchMock.mock.calls[0]![1]).toMatchObject({ method: 'POST' });
+  });
+
+  it('returns false on HTTP error or unreachable bridge', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+    expect(await closeOwnSession('SESSION-01')).toBe(false);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')));
+    expect(await closeOwnSession('SESSION-01')).toBe(false);
   });
 });

@@ -51,6 +51,19 @@ def _now_iso(ts: float | None = None) -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts or time.time()))
 
 
+def get(unit_id: str) -> dict[str, Any] | None:
+    """Read-only canonical lookup: None when the session does not exist."""
+    with _locks.hold(f"session:{unit_id}"):
+        path = _canonical_path(unit_id)
+        if not path.exists():
+            return None
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+        return data if isinstance(data, dict) else None
+
+
 def get_or_create(unit_id: str, *, defaults: dict[str, Any] | None = None) -> dict[str, Any]:
     with _locks.hold(f"session:{unit_id}"):
         path = _canonical_path(unit_id)

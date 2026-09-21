@@ -69,9 +69,11 @@ def snapshot() -> dict[str, Any]:
     Rows carry what the client sync needs to rebuild a unit: id, civ, unit
     type, cityId (the repo id the bridge encodes for cities), mission summary
     and liveness state. Liveness values: ``working`` (the lease registry says
-    the Hermes conversation is running), ``idle`` (it is not), or ``unknown``
-    (probe degraded or no native session id recorded — the client keeps the
-    previous state instead of guessing).
+    the Hermes conversation is running), ``idle`` (it is not), ``closed``
+    (explicit user action recorded ``status: closed`` in the canonical — the
+    client retires the unit), or ``unknown`` (probe degraded or no native
+    session id recorded — the client keeps the previous state instead of
+    guessing).
     """
     try:
         probe = _liveness.probe()
@@ -90,11 +92,14 @@ def snapshot() -> dict[str, Any]:
         unit = str(data.get("unitId") or dir_unit or "")
         if not unit:
             continue
+        closed = str(data.get("status") or "") == "closed"
         native = str(data.get("nativeSessionId") or "")
         live: bool | None = None
-        if native:
+        if not closed and native:
             live = probe.live_for(source="hermes", native_id=native, cwd="")
-        if not probe.ok or live is None:
+        if closed:
+            state = "closed"
+        elif not probe.ok or live is None:
             state = "unknown"
         elif live:
             state = "working"

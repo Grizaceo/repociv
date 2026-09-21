@@ -149,6 +149,25 @@ def get_own_sessions(ctx: "RouteContext") -> tuple[int, Any]:
     from server import own_sessions as _own
     return 200, _own.snapshot()
 
+def post_own_session_close(body: Any, ctx: "RouteContext") -> tuple[int, Any]:
+    """POST /api/own-sessions/<unit>/close — retire the session's map unit.
+
+    Explicit user action only: marks the canonical ``status: closed`` so the
+    next snapshot reports the unit as closed (and the client despawns it).
+    Never infers closure from liveness — an idle conversation is not a dead
+    one (resumable-chat model, docs/plans/2026-09-19-hud-agentes-y-sesiones.md).
+    """
+    from server import sessions as _sessions
+
+    unit_id = str((ctx or {}).get("params", {}).get("unit", ""))
+    if not unit_id or not unit_id.replace("-", "").replace("_", "").isalnum():
+        return 400, {"error": "invalid unit id"}
+    canonical = _sessions.get(unit_id)
+    if not isinstance(canonical, dict):
+        return 404, {"error": "no such own session"}
+    data = _sessions.patch(unit_id, status="closed")
+    return 200, {"ok": True, "unit": unit_id, "status": data.get("status", "closed")}
+
 def get_external_agent_chat(ctx: "RouteContext") -> tuple[int, Any]:
     """GET /api/external-agents/<session>/chat[?limit=N&refresh=1] — prompts + responses."""
     from server import suvadu_tracker as _suvadu

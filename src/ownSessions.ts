@@ -29,19 +29,23 @@ export interface OwnSessionRow {
 
 /**
  * Pure: the bridge events that bring the map's own-session units in line with
- * the store snapshot — spawn missing ones, re-assert state for known ones.
- * Unlike externalAgentEvents there is no despawn branch: own units are only
- * removed by explicit user action. Rows that do not validate as bridge events
- * are skipped.
+ * the store snapshot — spawn missing ones, and despawn exactly one kind of
+ * unit: sessions the store marks ``closed`` (explicit user action via
+ * POST /api/own-sessions/<unit>/close). Idle/unknown/working sessions keep
+ * their map anchor. Rows that do not validate as bridge events are skipped.
  */
 export function ownSessionEvents(
   currentUnitIds: Iterable<string>,
   rows: readonly OwnSessionRow[],
 ): BridgeEvent[] {
+  const closed = new Set(
+    rows.filter((r) => r?.state === 'closed' && typeof r.unit === 'string').map((r) => r.unit),
+  );
   const onMap = new Set(currentUnitIds);
   const raw: unknown[] = [];
   for (const row of rows) {
     if (typeof row?.unit !== 'string' || !row.unit) continue;
+    if (closed.has(row.unit)) continue; // handled below: despawn, not spawn
     if (onMap.has(row.unit)) continue; // already materialized by the wizard
     if (row.state === 'working') continue; // mid-turn: the runner emits its own spawn/state stream
     raw.push({
@@ -54,6 +58,11 @@ export function ownSessionEvents(
       cityId: row.cityId,
     });
   }
+  const despawned: string[] = [];
+  for (const id of currentUnitIds) {
+    if (closed.has(id) && !despawned.includes(id)) despawned.push(id);
+  }
+  for (const unit of despawned) raw.push({ type: 'unit_despawn', unit });
   return raw.map(parseBridgeEvent).filter((e): e is BridgeEvent => e !== null);
 }
 
@@ -66,5 +75,19 @@ export async function fetchOwnSessions(): Promise<OwnSessionRow[] | null> {
     return Array.isArray(body.agents) ? (body.agents as OwnSessionRow[]) : null;
   } catch {
     return null;
+  }
+}
+
+/** Explicit retire: mark an own session closed server-side. True on 2xx. */
+export async function closeOwnSession(unit: string): Promise<boolean> {
+  try {
+    const res = await fetch(bridgeUrl(`/api/own-sessions/${encodeURIComponent(unit)}/close`), {
+      method: 'POST',
+      headers: bridgeHeaders(),
+      body: '{}',
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
