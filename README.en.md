@@ -29,7 +29,7 @@ RepoCiv turns your repos folder into an interactive map:
 - **Background processes** are buildings inside the city
 - The **HTTP + WebSocket bridge** connects the map in real time with your agent runtime
 
-It is single-user by design: a board for coordinating your own agent ecosystem, locally, with no cloud.
+It is single-user by design: a board for coordinating your own agent ecosystem, running locally on your own repos. Cloud inference (Nebius Token Factory) is opt-in, explicit, and visible per unit — without it, everything runs local.
 
 ---
 

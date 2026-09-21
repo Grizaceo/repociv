@@ -16,13 +16,17 @@ en `~/.hermes/workspace/repos/`. Los agentes shipped (built-in) son WORKER
 y SCOUT; el resto se enrutan por harness (OPENCLAW, CLAUDE, CODEX, CURSOR)
 o se registran como perfil personal del usuario.
 
-Por debajo del juego hay un Agent OS real (Tensor Context, FrugalGPT Router,
-Swarm Engine, World Model, Security Harness 3-capas, SICA, Docker isolation).
-La razón de tener tanta infraestructura "industrial" siendo un solo usuario
-es **deliberada**: el alpha-test sirve precisamente para descubrir cuáles de
-esas capas aportan valor real y cuáles se destilan o se borran después.
+Por debajo del juego hay un Agent OS real (Tensor Context, Security Harness
+3-capas, task orchestrator con validation contracts y rol validator
+independiente, container runtime). FrugalGPT Router, World Model, SICA y
+Swarm Engine fueron retirados por las podas (2026-08-10 y 2026-09-13,
+ver §Roadmap de poda). La razón de mantener infraestructura "industrial"
+siendo un solo usuario es **deliberada**: el alpha-test sirve precisamente
+para descubrir cuáles de esas capas aportan valor real y cuáles se
+destilan o se borran después.
 
-Versión: **v2.1 — congelada en scope salvo el flujo F1 autorizado abajo.**
+Versión: **v2.2 — 2026-09-21: reconciliada con el código (poda auditada) +
+integración Nebius autorizada. Congelada en scope salvo lo autorizado abajo.**
 
 ---
 
@@ -40,8 +44,10 @@ Métricas concretas para considerar el alpha "exitoso":
   §"Roadmap de poda" abajo).
 - El bridge se mantiene corriendo como systemd unit por ≥ 7 días sin
   intervención manual.
-- Los endpoints `GET /improve/proposals` muestran al menos una propuesta
-  útil que el usuario aplica a mano por mes.
+- La telemetría de inferencia (`inference_telemetry`) muestra coste/latencia
+  real por paso cuando `REPOCIV_INFERENCE_PROVIDER=nebius` está activo
+  (verificable una vez disponible `NEBIUS_API_KEY`; ver §Lo que sí está
+  en scope).
 
 ---
 
@@ -86,6 +92,13 @@ Métricas concretas para considerar el alpha "exitoso":
   lazy: nunca entra al bundle eager del modo 2D (chunk `vendor-three`).
 - Documentar lo que se aprende del uso real en `docs/implementation_plan.md`
   o en un futuro `docs/DOGFOODING_NOTES.md`.
+- **Inferencia provider-aware (Nebius Token Factory, autorizada por el plan
+  del hackathon 2026-08-29):** con `REPOCIV_INFERENCE_PROVIDER=nebius` el
+  router resuelve Nano/Super/Ultra por tier (ECONOMICO/EQUILIBRIO/PREMIUM),
+  el runner despacha directo al Token Factory con cascade y el coste/latencia
+  por paso queda visible en telemetría (`inference_telemetry`) y como anillo
+  de tier en la unidad. Sin la variable, todo funciona local como siempre.
+  La llamada real a Nano sigue pendiente de `NEBIUS_API_KEY` (NOT TESTED).
 
 ## Lo que **sí pero en branch paralela** (no toca trunk)
 
