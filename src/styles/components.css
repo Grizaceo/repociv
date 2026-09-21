@@ -2132,3 +2132,88 @@ button:hover::after,
 #first-run-tour .frt-next:hover {
   background: rgba(200, 168, 75, 0.28);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HUD window layout — local drag, resize, reset and persistence
+   ═══════════════════════════════════════════════════════════════════════════ */
+.hud-window--customized {
+  position: fixed !important;
+  box-sizing: border-box;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+.hud-window--interacting {
+  user-select: none;
+}
+
+.hud-window-handle {
+  cursor: grab;
+  touch-action: none;
+}
+
+.hud-window--interacting .hud-window-handle,
+.hud-window-handle:active {
+  cursor: grabbing;
+}
+
+.hud-window-handle :is(button, a, input, select, textarea, label) {
+  cursor: auto;
+}
+
+.hud-window-reset {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--ui-text-dim, #a99d89);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hud-window-reset:hover,
+.hud-window-reset:focus-visible {
+  color: var(--ui-gold-bright, #e7c35a);
+  border-color: var(--panel-border, #6a5a3a);
+  background: var(--panel-hover, rgba(255, 255, 255, 0.06));
+  outline: none;
+}
+
+.hud-window-resize {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  z-index: 2;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-right: 2px solid var(--ui-text-dim, #a99d89);
+  border-bottom: 2px solid var(--ui-text-dim, #a99d89);
+  border-radius: 0 0 2px 0;
+  background: transparent;
+  opacity: 0.65;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.hud-window-resize:hover,
+.hud-window-resize:focus-visible {
+  opacity: 1;
+  border-color: var(--ui-gold-bright, #e7c35a);
+  outline: 1px solid var(--ui-gold-bright, #e7c35a);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .hud-window-resize {
+    width: 22px;
+    height: 22px;
+  }
+}

@@ -2,6 +2,7 @@
 // Parametric fatigue thresholds, animation controls, model allowlist.
 
 import { loadConfig, saveConfig, resetConfig, type GameConfig } from '../gameConfig.ts';
+import { mountHudWindow } from './hudWindow.ts';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let isOpen = false;
@@ -159,6 +160,7 @@ function buildDOM() {
   `;
 
   app.appendChild(panel);
+  mountHudWindow(panel);
 
   // ─── Wire events ─────────────────────────────────────────────────────────────
   const closeBtn = panel.querySelector<HTMLButtonElement>('#settings-close')!;

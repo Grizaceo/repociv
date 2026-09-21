@@ -8,6 +8,7 @@ import type { WonderManifest } from '../wonders/types.ts';
 import { renderCapabilityBadge, renderCapabilityPanel } from '../wonders/wonderBadges.ts';
 import { connectWonder, disconnectWonder, launchWonder } from '../wonders/wonderLauncher.ts';
 import { showNotification } from './notificationBanner.ts';
+import { mountHudWindow } from './hudWindow.ts';
 
 const STORAGE_TAB = 'repociv-capital-tab';
 let _panel: HTMLElement | null = null;
@@ -87,6 +88,7 @@ export function openCapitalPanel() {
     <div class="capital-body"></div>
   `;
   document.body.appendChild(_panel);
+  mountHudWindow(_panel);
 
   _rebuildTabsBar();
   _panel.querySelector('.capital-close')!.addEventListener('click', closeCapitalPanel);

@@ -1,5 +1,6 @@
 // ─── RepoCiv — Shared panel shell helpers ────────────────────────────────────
 // Tiny DOM helpers for modal-like overlay panels.
+import { mountHudWindow } from './hudWindow.ts';
 
 export function ensurePanel(id: string, className: string, html: string): HTMLElement {
   const existing = document.getElementById(id);
@@ -9,6 +10,7 @@ export function ensurePanel(id: string, className: string, html: string): HTMLEl
   el.className = className;
   el.innerHTML = html;
   document.body.appendChild(el);
+  mountHudWindow(el);
   return el;
 }
 

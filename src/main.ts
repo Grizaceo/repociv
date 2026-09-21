@@ -65,6 +65,7 @@ import { subscribeExternalSessionDirectory } from './ui/externalSessionDirectory
 import { bindAgentsPanel, openExternalAgentChat, toggleAgentsPanel } from './ui/agentsPanel.ts';
 import { isExternalAgentUnit } from './externalAgents.ts';
 import { initHudMode } from './ui/hudMode.ts';
+import { initHudWindows } from './ui/hudWindow.ts';
 import { initCommandPalette } from './ui/commandPalette.ts';
 import { registerHudCommands } from './ui/hudWiring/commands.ts';
 import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
@@ -303,6 +304,9 @@ async function bootstrap() {
   }
 
   hideLoadingScreen();
+
+  // HUD overlays can be rearranged locally without affecting game state.
+  initHudWindows();
 
   // ══ Theme init from localStorage ══
   const savedTheme = localStorage.getItem('repociv:theme');
