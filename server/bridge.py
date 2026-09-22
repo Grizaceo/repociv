@@ -863,7 +863,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
             try:
                 body = json.loads(raw)
             except Exception:
-                self._err_json(400, "invalid JSON")
+                request_path = self.path.split("?")[0]
+                is_external_chat = (
+                    request_path.startswith("/api/external-agents/")
+                    and request_path.endswith("/chat")
+                )
+                self._err_json(400, "invalid_json" if is_external_chat else "invalid JSON")
                 return
 
         path = self.path.split("?")[0]
@@ -905,6 +910,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/own-sessions/") and path.endswith("/close"):
             unit_id = unquote(path[len("/api/own-sessions/") : -len("/close")])
             status, resp = _routes.post_own_session_close(body, {"params": {"unit": unit_id}})
+            self._respond(status, resp)
+            return
+
+        # ── External live chat (transport selected from server-side snapshot) ──
+        if path.startswith("/api/external-agents/") and path.endswith("/chat"):
+            session_id = unquote(path[len("/api/external-agents/") : -len("/chat")])
+            if not _EXTERNAL_SESSION_RE.match(session_id):
+                self._err_json(400, "invalid session id")
+                return
+            status, resp = _routes.post_external_agent_chat(body, {"session_id": session_id})
             self._respond(status, resp)
             return
 

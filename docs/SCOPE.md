@@ -82,6 +82,15 @@ Métricas concretas para considerar el alpha "exitoso":
   - El unit id es generado por el cliente y deriva del nombre de perfil; el
     bridge resuelve la configuración registrada por su base. No se puede usar
     el wizard para ejecutar una sesión externa ni para inventar una ciudad.
+  - **Chat de sesiones externas (V1):** cada fila publica una capability
+    `liveChat`. Una sesión viva solo habilita el compositor cuando esa
+    capability es `available`, y envía por
+    `POST /api/external-agents/{sessionId}/chat`; `probe_required` y
+    `unavailable` quedan deshabilitadas con una explicación breve. Una sesión
+    quieta conserva `POST .../reply`. Un resultado `accepted` o `completed`
+    limpia el draft y refresca el transcript mediante el polling existente.
+    La UI bloquea envíos duplicados mientras la solicitud está pendiente,
+    conserva el error upstream y no reintenta automáticamente.
 - **Los DOS renderers son trunk oficial.** El Canvas 2D (`flat`) es el modo
   por defecto y canónico; el WebGL/Three.js (`webgl`) es opt-in por
   `?renderer=webgl` o hotkey `3`. Decisión del owner (2026-06): lo oficial no

@@ -8,6 +8,9 @@ from http.server import ThreadingHTTPServer
 import pytest
 
 from server import bridge
+from server import suvadu_tracker as st
+from server.live_session_chat import CodexLiveChatAdapter, LiveSessionChatRouter
+from server.suvadu_tracker import ExternalAgentTracker, Observation, TrackerConfig
 
 
 def test_init_bridge_state_rebinds_persistent_paths(tmp_path):
@@ -46,6 +49,184 @@ def _auth_headers(extra=None):
     if bridge.REPOCIV_TOKEN:
         headers["X-RepoCiv-Token"] = bridge.REPOCIV_TOKEN
     return headers
+
+
+def _external_observation(session_id: str, native_id: str) -> Observation:
+    return Observation(
+        session_id=session_id,
+        agent="codex",
+        native_id=native_id,
+        cwd="/repo",
+        model="gpt-test",
+        first_activity_ms=1,
+        last_activity_ms=2,
+        command_count=0,
+        event_count=0,
+        total_tokens=None,
+        source="suvadu",
+        live=True,
+    )
+
+
+def test_external_agent_post_chat_uses_server_snapshot_and_exact_session(monkeypatch):
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append(argv)
+        return __import__("subprocess").CompletedProcess(argv, 0, "queued", "")
+
+    router = LiveSessionChatRouter({
+        "codex": CodexLiveChatAdapter(codex_bin="/bin/codex", run=run),
+    })
+    tracker = ExternalAgentTracker(
+        TrackerConfig(bin_path="suv"),
+        send=lambda event: None,
+        repo_paths=lambda: [],
+        sources=[],
+        live_chat_router=router,
+    )
+    tracker.reconcile(
+        [
+            _external_observation("codex-short", "native-short"),
+            _external_observation("codex-short-extra", "native-extra"),
+        ],
+        now_ms=2,
+        repo_paths=[],
+    )
+    monkeypatch.setattr(st, "_tracker", tracker)
+
+    server, base = _start_test_server()
+    try:
+        payload = json.dumps({
+            "text": "--hello",
+            "native_id": "client-must-not-win",
+            "transport": "client-must-not-win",
+        }).encode()
+        req = urllib.request.Request(
+            f"{base}/api/external-agents/codex-short/chat",
+            data=payload,
+            headers=_auth_headers({"Content-Type": "application/json"}),
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            body = json.loads(resp.read().decode())
+            status = resp.status
+        assert status == 202
+        assert body["state"] == "accepted"
+        assert body["transport"] == "codex-queue"
+        assert body["requestId"]
+        assert calls == [[
+            "/bin/codex",
+            "queue",
+            "--thread=native-short",
+            "--message=--hello",
+        ]]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_external_agent_post_chat_requires_auth(monkeypatch):
+    monkeypatch.setattr(bridge, "REPOCIV_TOKEN", "integration-token")
+    server, base = _start_test_server()
+    try:
+        req = urllib.request.Request(
+            f"{base}/api/external-agents/codex-short/chat",
+            data=b'{"text":"hello"}',
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req, timeout=2)
+        assert exc_info.value.code == 401
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_external_agent_post_chat_rejects_invalid_json() -> None:
+    server, base = _start_test_server()
+    try:
+        req = urllib.request.Request(
+            f"{base}/api/external-agents/codex-short/chat",
+            data=b"{not-json",
+            headers=_auth_headers({"Content-Type": "application/json"}),
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req, timeout=2)
+        assert exc_info.value.code == 400
+        body = json.loads(exc_info.value.read().decode())
+        assert body["error"] == "invalid_json"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_external_agent_get_chat_remains_intact(monkeypatch):
+    expected = {"session": {"sessionId": "codex-short"}, "messages": [], "available": True}
+    monkeypatch.setattr(st, "chat", lambda session_id, limit=80, refresh=False: (200, expected))
+    server, base = _start_test_server()
+    try:
+        req = urllib.request.Request(
+            f"{base}/api/external-agents/codex-short/chat",
+            headers=_auth_headers(),
+        )
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            assert resp.status == 200
+            assert json.loads(resp.read().decode()) == expected
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+@pytest.mark.parametrize(
+    ("status", "code"),
+    [
+        (404, "unknown_session"),
+        (413, "message_too_large"),
+        (501, "transport_unavailable"),
+        (502, "transport_failed"),
+        (503, "tracker_not_running"),
+        (504, "transport_timeout"),
+    ],
+)
+def test_external_agent_post_chat_preserves_route_errors(monkeypatch, status, code):
+    monkeypatch.setattr(st, "send_live_chat", lambda session_id, text, request_id: (status, {"error": code}))
+    server, base = _start_test_server()
+    try:
+        req = urllib.request.Request(
+            f"{base}/api/external-agents/codex-short/chat",
+            data=b'{"text":"hello"}',
+            headers=_auth_headers({"Content-Type": "application/json"}),
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            urllib.request.urlopen(req, timeout=2)
+        assert exc_info.value.code == status
+        assert json.loads(exc_info.value.read().decode()) == {"error": code}
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_external_agent_post_chat_preserves_completed_success(monkeypatch):
+    expected = {"state": "completed", "transport": "future-safe", "requestId": "opaque"}
+    monkeypatch.setattr(st, "send_live_chat", lambda session_id, text, request_id: (200, expected))
+    server, base = _start_test_server()
+    try:
+        req = urllib.request.Request(
+            f"{base}/api/external-agents/codex-short/chat",
+            data=b'{"text":"hello"}',
+            headers=_auth_headers({"Content-Type": "application/json"}),
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            assert resp.status == 200
+            assert json.loads(resp.read().decode()) == expected
+    finally:
+        server.shutdown()
+        server.server_close()
 
 
 def test_health_endpoint_returns_liveness_shape():

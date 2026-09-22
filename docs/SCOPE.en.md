@@ -92,6 +92,15 @@ Concrete metrics to consider the alpha "successful":
   - The unit id is client-generated and derives from the profile name; the
     bridge resolves the registered configuration by its base. The wizard
     cannot be used to run an external session or to invent a city.
+  - **External-session chat (V1):** every row publishes a `liveChat`
+    capability. A live session enables its composer only when that capability
+    is `available`, and sends through
+    `POST /api/external-agents/{sessionId}/chat`; `probe_required` and
+    `unavailable` stay disabled with a short explanation. A quiet session
+    keeps `POST .../reply`. An `accepted` or `completed` result clears the
+    draft and refreshes the transcript through the existing polling path. The
+    UI blocks duplicate sends while the request is pending, preserves the
+    upstream error, and never retries automatically.
 - **Both renderers are official trunk.** Canvas 2D (`flat`) is the default
   and canonical mode; WebGL/Three.js (`webgl`) is opt-in via
   `?renderer=webgl` or hotkey `3`. Owner decision (2026-06): the official

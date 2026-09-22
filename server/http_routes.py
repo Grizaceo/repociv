@@ -18,6 +18,7 @@ from server.routes.core import get_external_agent_sessions  # noqa: F401
 from server.routes.core import get_own_sessions  # noqa: F401
 from server.routes.core import post_own_session_close  # noqa: F401
 from server.routes.core import get_external_agent_chat  # noqa: F401
+from server.routes.core import post_external_agent_chat  # noqa: F401
 from server.routes.core import get_external_agent_resume  # noqa: F401
 from server.routes.core import post_external_agent_reply  # noqa: F401
 from server.routes.core import get_missions  # noqa: F401

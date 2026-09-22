@@ -277,15 +277,48 @@ frontera que ya tenía el resto del bridge.
 | `REPOCIV_HERMES_HOME` | `~/.hermes` | raíz de Hermes (`state.db`, `profiles/*/state.db`) |
 | `REPOCIV_HERMES_PROFILES_EXCLUDE` | — | perfiles a ignorar, separados por comas (`default` es la raíz) |
 
+## Probe `codex queue` — 2026-09-21
+
+Se ejecutó un probe controlado y descartable con codex-cli 0.155.1 en
+`~/.hermes/cache/scratch/repociv-codex-queue-probe`. La sesión se abrió como una
+TUI común (`codex --no-alt-screen`, no mediante `codex agents` ni un app-server
+remoto) y quedó viva mientras se invocaba `codex queue` desde un segundo proceso.
+
+Resultado: **`codex_queue_targets_live_session == true`**.
+
+- El UUID nativo `01a0c632-d9a2-7df3-9e6a-b1befcadead3`, publicado sin
+  transformación por Suvadu, fue aceptado por `--thread=`.
+- `codex queue --thread=<uuid> --message=QUEUE_PROBE_20260921_A` terminó con
+  exit code `0` en 0,176 s y stdout
+  `Queued message 01a0c634-4cbd-76e1-aa12-c6de3cdf612c for thread <uuid>.`
+- El mismo transcript recibió el mensaje como turno
+  `01a0c634-51a6-7e13-a6f0-f4427b29b4e9` y la respuesta correspondiente. No se
+  creó otro rollout: había 7 antes de abrir la TUI y 8 después; el octavo era la
+  propia sesión controlada, no un duplicado del envío.
+- Un UUID inexistente terminó con exit code `1`, stdout vacío y un error
+  `no rollout found for thread id ...` en stderr.
+- Tras cerrar la TUI, enviar al UUID existente terminó igualmente con exit code
+  `0` y `Queued message ...`; no abrió proceso ni rollout nuevo. Por tanto el
+  éxito de `queue` significa **aceptado en la cola del thread**, no prueba que un
+  dueño siga vivo. RepoCiv debe exigir su propia señal `Observation.live is
+  True` antes de habilitar `/chat`, y conservar la semántica `accepted`.
+- No quedó un daemon `codex`/`app-server` persistente tras ninguna invocación de
+  `queue`. La TUI común fue suficiente para recibir el primer mensaje en vivo.
+
+El stdout exitoso es humano, no un contrato JSON. El adaptador usa solo exit
+code `0` como aceptación y nunca intenta extraer los UUID de ese texto. Ante una
+carrera en que el proceso muera después del chequeo de liveness, Codex puede
+aceptar el mensaje para una entrega posterior; RepoCiv no reintenta ni afirma
+que el turno se haya ejecutado.
+
 ## Pendiente: escribirle a una sesión **activa**
 
 Hoy el compositor sirve para las sesiones quietas y se deshabilita justo en las
-que más se quieren usar: las activas. No es un bug del compositor, es que no
-existe canal hacia un proceso que ya está corriendo — reanudar la sesión por
-fuera abriría un segundo turno sobre el mismo estado. De ahí el rechazo
-`session_is_live`.
+que más se quieren usar: las activas. Para Codex ya existe un canal verificado
+hacia la cola del thread; Hermes y Claude Code permanecen fail-closed. Reanudar
+una sesión viva mediante un segundo proceso sigue prohibido.
 
-Los tres caminos posibles, ya explorados (2026-09-19), de menor a mayor obra:
+Los tres caminos posibles explorados inicialmente el 2026-09-19 fueron:
 
 1. **API del gateway de Hermes.** Escucha en `127.0.0.1:8742` (`enabled: true`
    en `~/.hermes/config.yaml`, y su CORS ya incluye `http://127.0.0.1:5273`).
