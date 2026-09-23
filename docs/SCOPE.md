@@ -91,6 +91,12 @@ Métricas concretas para considerar el alpha "exitoso":
     limpia el draft y refresca el transcript mediante el polling existente.
     La UI bloquea envíos duplicados mientras la solicitud está pendiente,
     conserva el error upstream y no reintenta automáticamente.
+  - **Canal proceso-owned de Claude Code (Fase 5):** RepoCiv puede lanzar sus
+    propias sesiones Claude (`POST /api/claude-live/spawn`) y mantener el pipe
+    stream-json vivo; esas sesiones son las únicas de Claude Code
+    direccionables desde el compositor. `POST /api/claude-live/stop` termina el
+    proceso. Una sesión de terminal del usuario permanece observable y no
+    direccionable; nunca se reanuda con un segundo proceso.
 - **Los DOS renderers son trunk oficial.** El Canvas 2D (`flat`) es el modo
   por defecto y canónico; el WebGL/Three.js (`webgl`) es opt-in por
   `?renderer=webgl` o hotkey `3`. Decisión del owner (2026-06): lo oficial no

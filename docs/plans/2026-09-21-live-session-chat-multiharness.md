@@ -1,7 +1,7 @@
 # Live-session chat multiharness
 
 **Fecha:** 2026-09-21  
-**Estado:** diseño aprobado; revisado 2026-09-21 con reorden de rollout aprobado; implementación no iniciada  
+**Estado:** diseño aprobado; revisado 2026-09-21 con reorden de rollout aprobado; Fases 1–5 implementadas (Fase 5: canal proceso-owned `server/claude_live.py`, 2026-09-23); Fase 6 (SSE) no iniciada  
 **Rama de trabajo:** `feat/external-agents-chat`  
 **Alcance:** RepoCiv bridge + frontend; sin cambios al core de Hermes  
 **Gates de evidencia:** cada adaptador permanece fail-closed hasta pasar su probe (§13.7). El probe del gateway Hermes está descrito en §8.3 de este documento; `docs/EXTERNAL_AGENTS.md` solo registra los caminos explorados el 2026-09-19.

@@ -311,14 +311,43 @@ carrera en que el proceso muera después del chequeo de liveness, Codex puede
 aceptar el mensaje para una entrega posterior; RepoCiv no reintenta ni afirma
 que el turno se haya ejecutado.
 
-## Pendiente: escribirle a una sesión **activa**
+## Escribirle a una sesión **activa**
 
-Hoy el compositor sirve para las sesiones quietas y se deshabilita justo en las
-que más se quieren usar: las activas. Para Codex ya existe un canal verificado
-hacia la cola del thread; Hermes y Claude Code permanecen fail-closed. Reanudar
-una sesión viva mediante un segundo proceso sigue prohibido.
+El compositor sirve para las sesiones quietas y se habilita en las activas cuando
+su harness expone un canal real: Codex vía la cola del thread, y Claude Code vía
+un **canal proceso-owned** (stream-json). Hermes permanece fail-closed hasta que
+su Bot Chat tenga una superficie pública verificada. Reanudar una sesión viva
+mediante un segundo proceso sigue prohibido.
 
-Los tres caminos posibles explorados inicialmente el 2026-09-19 fueron:
+### Claude Code: canal proceso-owned (Fase 5, implementado 2026-09-23)
+
+Claude Code **no** tiene un canal local para escribirle a una sesión arbitraria
+ya viva; la CLI 2.1.278 sí expone `--input-format stream-json` para procesos que
+su controlador lanza desde el nacimiento (evidencia completa en
+`docs/evidence/2026-09-21-claude-code-channel-research.md`). RepoCiv implementó
+ese canal en `server/claude_live.py`:
+
+- `POST /api/claude-live/spawn` lanza `claude -p --input-format stream-json
+  --output-format stream-json --verbose --session-id <uuid>
+  --dangerously-skip-permissions` en el `cwd` pedido, con
+  `redact_env_for_spawn` (sin secretos heredados) y registra el id en
+  `claude_sessions` (el escaneo de Suvadu lo salta: RepoCiv es su dueño).
+- `POST /api/claude-live/stop` cierra stdin, termina el proceso y marca la fila
+  muerta.
+- Cada envío es **una línea** `{"type":"user","message":{"role":"user",
+  "content":<texto>}}` por stdin, serializado por sesión; cada evento `result`
+  del stdout es el turno del asistente, visible en el transcript normal del
+  panel.
+- Solo estas sesiones propias son direccionables: una sesión de terminal del
+  usuario queda **observable pero no direccionable** (`claude_live_not_running`)
+  — jamás se degrada a `--resume`.
+
+`ClaudeLiveSource` declara `live` directamente (es dueño del pid); el probe
+aproximado de `/proc` no puede sobreescribirlo (`suvadu_tracker._with_liveness`).
+
+Los caminos alternativos explorados inicialmente el 2026-09-19 (API del gateway
+de Hermes, multiplexor tmux, dejar todo solo-lectura) siguen documentados abajo
+por si alguno se retoma.
 
 1. **API del gateway de Hermes.** Escucha en `127.0.0.1:8742` (`enabled: true`
    en `~/.hermes/config.yaml`, y su CORS ya incluye `http://127.0.0.1:5273`).
