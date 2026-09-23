@@ -168,6 +168,33 @@ def post_own_session_close(body: Any, ctx: "RouteContext") -> tuple[int, Any]:
     data = _sessions.patch(unit_id, status="closed")
     return 200, {"ok": True, "unit": unit_id, "status": data.get("status", "closed")}
 
+def post_claude_live_spawn(body: Any, ctx: "RouteContext") -> tuple[int, Any]:
+    """POST /api/claude-live/spawn — start a process-owned Claude session in {cwd}.
+
+    The channel is RepoCiv's own (server/claude_live.py): the process stays warm
+    between turns and is the only addressable Claude surface — never a resume
+    of the user's terminal session.
+    """
+    from server import claude_live
+
+    cwd = str((body or {}).get("cwd", "") or "") if isinstance(body, dict) else ""
+    try:
+        return 200, claude_live.get_manager().spawn(cwd)
+    except claude_live.ClaudeLiveError as exc:
+        return exc.status, {"error": exc.code}
+
+def post_claude_live_stop(body: Any, ctx: "RouteContext") -> tuple[int, Any]:
+    """POST /api/claude-live/stop — end the session's process ({sessionId|nativeId})."""
+    from server import claude_live
+
+    payload = body if isinstance(body, dict) else {}
+    key = str(payload.get("sessionId") or payload.get("nativeId") or "")
+    try:
+        session_id = claude_live.get_manager().stop(key)
+    except claude_live.ClaudeLiveError as exc:
+        return exc.status, {"error": exc.code}
+    return 200, {"ok": True, "sessionId": session_id}
+
 def get_external_agent_chat(ctx: "RouteContext") -> tuple[int, Any]:
     """GET /api/external-agents/<session>/chat[?limit=N&refresh=1] — prompts + responses."""
     from server import suvadu_tracker as _suvadu
@@ -178,6 +205,16 @@ def get_external_agent_chat(ctx: "RouteContext") -> tuple[int, Any]:
         limit = 80
     refresh = str(params.get("refresh", "")).lower() in ("1", "true", "yes")
     return _suvadu.chat(str(ctx.get("session_id", "")), limit=limit, refresh=refresh)
+
+def post_external_agent_chat(body: Any, ctx: "RouteContext") -> tuple[int, Any]:
+    """POST /api/external-agents/<session>/chat — deliver to a verified live session."""
+    import uuid
+
+    from server import suvadu_tracker as _suvadu
+
+    session_id = str(ctx.get("session_id", ""))
+    text = body.get("text") if isinstance(body, dict) else None
+    return _suvadu.send_live_chat(session_id, text, uuid.uuid4().hex)
 
 def get_external_agent_resume(ctx: "RouteContext") -> tuple[int, Any]:
     """GET /api/external-agents/<session>/resume — the command to pick it back up."""

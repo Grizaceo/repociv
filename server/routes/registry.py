@@ -88,4 +88,6 @@ POST_EXACT: dict[str, Callable[..., Any]] = {
     "/api/profiles": _routes.post_profiles,
     "/api/profiles/delete": _routes.post_profiles_delete,
     "/api/wonders/connect": _routes.post_wonder_connect,
+    "/api/claude-live/spawn": _routes.post_claude_live_spawn,
+    "/api/claude-live/stop": _routes.post_claude_live_stop,
 }

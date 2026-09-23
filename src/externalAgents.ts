@@ -89,6 +89,12 @@ export async function fetchExternalAgents(): Promise<ExternalAgentRow[] | null> 
  */
 export type SessionSection = '' | 'cron' | 'gateway';
 
+export interface ExternalLiveChatCapability {
+  state: 'available' | 'probe_required' | 'unavailable';
+  transport: string | null;
+  reason: string | null;
+}
+
 /** One row of GET /api/external-agents/sessions (metadata only). */
 export interface ExternalSessionRow {
   sessionId: string;
@@ -121,6 +127,8 @@ export interface ExternalSessionRow {
   totalTokens: number | null;
   subagent: boolean;
   imported: boolean;
+  /** Whether this exact live session has a verified, safe write transport. */
+  liveChat: ExternalLiveChatCapability;
 }
 
 export interface ExternalChatMessage {
@@ -152,6 +160,17 @@ export interface ExternalReplyRun {
   startedAt: number;
   finishedAt: number | null;
   error: string;
+}
+
+export interface ExternalLiveChatResult {
+  state: 'accepted' | 'completed';
+  transport: string;
+  requestId: string;
+}
+
+export interface ExternalChatError {
+  error: string;
+  [key: string]: unknown;
 }
 
 export async function fetchExternalSessions(): Promise<ExternalSessionRow[] | null> {
@@ -232,6 +251,32 @@ export async function sendExternalReply(
     );
     const body = (await res.json()) as ExternalReplyRun & { error?: string };
     if (!res.ok) return { error: body?.error || `http_${res.status}` };
+    return body;
+  } catch {
+    return null;
+  }
+}
+
+/** Send text to the already-running session through its verified live transport. */
+export async function sendExternalChat(
+  sessionId: string,
+  text: string,
+): Promise<ExternalLiveChatResult | ExternalChatError | null> {
+  try {
+    const res = await fetch(
+      bridgeUrl(`/api/external-agents/${encodeURIComponent(sessionId)}/chat`),
+      {
+        method: 'POST',
+        headers: { ...bridgeHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      },
+    );
+    const body = (await res.json()) as ExternalLiveChatResult | ExternalChatError;
+    if (!res.ok) {
+      return 'error' in body && typeof body.error === 'string'
+        ? body
+        : { error: `http_${res.status}` };
+    }
     return body;
   } catch {
     return null;

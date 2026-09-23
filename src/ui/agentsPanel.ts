@@ -10,11 +10,9 @@
 // Clicking an external session opens its chat and puts the camera on its unit
 // — or on its city, when the repo is on the map.
 //
-// The chat reads the session's own transcript, and its composer runs one turn
-// over that session: the bridge resumes it in a new process (there is nothing
-// listening on the other side — see server/session_reply.py). A session whose
-// process is still alive is read-only, and ⏎ hands back the command to pick it
-// up in a terminal instead.
+// The chat reads the session's own transcript. A live session is writable only
+// when its row advertises a verified liveChat capability; quiet sessions keep
+// the existing one-turn resume flow. ⏎ still hands back the terminal command.
 import type { GameState } from '../game.ts';
 import type { Axial } from '../hex.ts';
 import type { Unit } from '../types.ts';
@@ -28,11 +26,15 @@ import {
   placeOnMap,
   relativeTime,
   replyErrorText,
+  sendExternalChat,
   sendExternalReply,
   sessionLabel,
   shortModel,
   stateBadge,
   type ExternalChat,
+  type ExternalChatError,
+  type ExternalLiveChatResult,
+  type ExternalReplyRun,
   type ExternalResume,
   type ExternalSessionRow,
   type MapPlace,
@@ -194,6 +196,7 @@ function _listKey(): string {
     r.cityId,
     r.subagent,
     r.section,
+    r.liveChat,
   ]);
   const units = (_deps?.state.getAllUnits() ?? [])
     .filter((u) => !u.ephemeral)
@@ -277,27 +280,123 @@ async function _loadResume(): Promise<void> {
   _renderChat();
 }
 
+export interface ComposerState {
+  enabled: boolean;
+  mode: 'live' | 'reply' | 'disabled';
+  hint: string;
+}
+
+const LIVE_CHAT_REASON_TEXT: Record<string, string> = {
+  codex_probe_pending: 'El canal de esta sesión todavía se debe verificar.',
+  hermes_probe_pending: 'El canal de esta sesión todavía se debe verificar.',
+  codex_queue_unavailable: 'Codex Queue no está disponible para esta sesión.',
+  hermes_not_live_bot_chat: 'Esta sesión Hermes no admite chat vivo seguro.',
+  profile_key_unavailable: 'Falta la autorización local del perfil para este canal.',
+  claude_control_channel_unavailable: 'Claude no ofrece un canal vivo verificado para esta sesión.',
+  unsupported_session_source: 'El chat vivo no está disponible para esta sesión.',
+};
+
+function isQuietSession(row: ExternalSessionRow): boolean {
+  return !row.active || row.state === 'idle' || row.state === 'inactive';
+}
+
+/** Public behavior contract for enabling the external-session composer. */
+export function composerState(
+  row: ExternalSessionRow,
+  flags: { sending?: boolean; replyRunning?: boolean } = {},
+): ComposerState {
+  if (isQuietSession(row)) {
+    const busy = flags.sending || flags.replyRunning;
+    return {
+      enabled: !busy,
+      mode: 'reply',
+      hint: busy
+        ? '⏳ Turno en curso. Su respuesta aparece en el chat cuando termine.'
+        : 'Reanuda la sesión y corre un turno. No es un chat en vivo: el agente no está escuchando.',
+    };
+  }
+  if (row.liveChat?.state === 'available') {
+    return {
+      enabled: !flags.sending,
+      mode: 'live',
+      hint: flags.sending
+        ? '⏳ Enviando al canal vivo. No se reintenta automáticamente.'
+        : 'Chat en vivo mediante el canal verificado de esta sesión.',
+    };
+  }
+  const reason = row.liveChat?.reason ?? 'unsupported_session_source';
+  return {
+    enabled: false,
+    mode: 'disabled',
+    hint:
+      LIVE_CHAT_REASON_TEXT[reason] ??
+      (row.liveChat?.state === 'probe_required'
+        ? 'El canal de esta sesión todavía se debe verificar.'
+        : 'El chat vivo no está disponible para esta sesión.'),
+  };
+}
+
+interface ExternalSendDeps {
+  sendLive: (
+    sessionId: string,
+    text: string,
+  ) => Promise<ExternalLiveChatResult | ExternalChatError | null>;
+  sendReply: (
+    sessionId: string,
+    text: string,
+  ) => Promise<ExternalReplyRun | { error: string } | null>;
+  refresh: () => Promise<unknown>;
+}
+
+export type ExternalSendOutcome =
+  | { ok: true; mode: 'live' }
+  | { ok: true; mode: 'reply'; reply: ExternalReplyRun }
+  | { ok: false; error: string };
+
+/** One user attempt: exactly one transport call, with no automatic retry. */
+export async function performExternalSend(
+  row: ExternalSessionRow,
+  text: string,
+  deps: ExternalSendDeps = {
+    sendLive: sendExternalChat,
+    sendReply: sendExternalReply,
+    refresh: async () => undefined,
+  },
+): Promise<ExternalSendOutcome> {
+  if (!isQuietSession(row)) {
+    if (row.liveChat?.state !== 'available') {
+      return { ok: false, error: row.liveChat?.reason ?? 'transport_unavailable' };
+    }
+    const result = await deps.sendLive(row.sessionId, text);
+    if (result === null) return { ok: false, error: 'bridge_unreachable' };
+    if (!('state' in result)) return { ok: false, error: result.error };
+    await deps.refresh();
+    return { ok: true, mode: 'live' };
+  }
+  const result = await deps.sendReply(row.sessionId, text);
+  if (result === null) return { ok: false, error: 'bridge_unreachable' };
+  if (!('state' in result)) return { ok: false, error: result.error };
+  return { ok: true, mode: 'reply', reply: result };
+}
+
 /** The composer, plus the one line that says why it is or is not usable. */
 function _composerHtml(row: ExternalSessionRow): string {
-  const badge = stateBadge(row.state);
   const running = _chat?.lastReply?.state === 'running';
-  const disabled = badge !== null || running || _sending;
+  const composer = composerState(row, { sending: _sending, replyRunning: running });
+  const disabled = !composer.enabled;
   let hint: string;
   let tone = '';
-  if (badge) {
-    hint = `⏳ ${badge.text} — mejor no interrumpirlo. Mientras tanto, solo lectura.`;
-    tone = ' agents-compose-hint--busy';
-  } else if (running || _sending) {
-    hint = '⏳ Turno en curso. Su respuesta aparece en el chat cuando termine.';
-  } else if (_replyError) {
+  if (_replyError) {
     hint = `⚠ ${_replyError}`;
     tone = ' agents-compose-hint--error';
+  } else if (composer.mode === 'disabled') {
+    hint = composer.hint;
+    tone = ' agents-compose-hint--busy';
   } else if (_chat?.lastReply?.state === 'failed') {
     hint = `⚠ El último turno falló: ${_chat.lastReply.error}`;
     tone = ' agents-compose-hint--error';
   } else {
-    hint =
-      'Reanuda la sesión y corre un turno. No es un chat en vivo: el agente no está escuchando.';
+    hint = composer.hint;
   }
   return `<div class="agents-compose">
     <textarea class="agents-compose-text" rows="2" ${disabled ? 'disabled' : ''}
@@ -332,20 +431,29 @@ function _resumeHtml(): string {
 async function _send(): Promise<void> {
   const sessionId = _chatSession;
   const text = _draft.trim();
-  if (!sessionId || !text || _sending) return;
+  const row = _chat?.session;
+  if (!sessionId || !row || !text || _sending) return;
   _sending = true;
   _replyError = '';
   _renderChat();
-  const result = await sendExternalReply(sessionId, text);
+  const result = await performExternalSend(row, text, {
+    sendLive: sendExternalChat,
+    sendReply: sendExternalReply,
+    refresh: () => (_chatSession === sessionId ? _loadChat(false) : Promise.resolve()),
+  });
   if (_chatSession !== sessionId) return;
   _sending = false;
-  if (result === null) {
-    _replyError = 'No pude hablar con el bridge.';
-  } else if ('error' in result) {
-    _replyError = replyErrorText(result.error);
+  if (!result.ok) {
+    _replyError = row.active
+      ? result.error === 'bridge_unreachable'
+        ? 'No pude hablar con el bridge.'
+        : result.error
+      : result.error === 'bridge_unreachable'
+        ? 'No pude hablar con el bridge.'
+        : replyErrorText(result.error);
   } else {
     _draft = '';
-    if (_chat) _chat = { ..._chat, lastReply: result };
+    if (_chat && result.mode === 'reply') _chat = { ..._chat, lastReply: result.reply };
   }
   _renderChat();
 }
@@ -491,7 +599,7 @@ function _render(): void {
   body.innerHTML = `${external}
     <h4 class="agents-section">Unidades RepoCiv</h4>
     <div class="agents-own-list">${_ownUnitsHtml()}</div>
-    <p class="agents-foot">Externos vía Suvadu y Hermes · chat de solo lectura.</p>`;
+    <p class="agents-foot">Externos vía Suvadu y Hermes · escritura solo por canales verificados.</p>`;
   body.querySelectorAll<HTMLDetailsElement>('.agents-fold').forEach((el) =>
     el.addEventListener('toggle', () => {
       const key = el.dataset['fold'] ?? '';

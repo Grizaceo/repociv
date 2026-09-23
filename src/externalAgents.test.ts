@@ -15,6 +15,7 @@ import {
   placeOnMap,
   relativeTime,
   replyErrorText,
+  sendExternalChat,
   sendExternalReply,
   sessionLabel,
   shortModel,
@@ -260,6 +261,7 @@ function session(id: string, extra: Partial<ExternalSessionRow> = {}): ExternalS
     totalTokens: null,
     subagent: false,
     imported: true,
+    liveChat: { state: 'unavailable', transport: null, reason: 'unsupported_session_source' },
     ...extra,
   };
 }
@@ -464,6 +466,37 @@ describe('sessions / chat fetchers', () => {
     expect(await sendExternalReply('claude-a', 'hola')).toEqual({ error: 'session_is_live' });
     expect(replyErrorText('session_is_live')).toMatch(/no le escribo encima/);
     expect(replyErrorText('weird_code')).toContain('weird_code');
+  });
+
+  it('posts live chat text to the encoded session route and preserves results and errors', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({ state: 'accepted', transport: 'codex-queue', requestId: 'req-1' }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        json: () => Promise.resolve({ error: 'transport_failed', detail: 'queue rejected' }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await sendExternalChat('codex-a/../x', 'seguí')).toEqual({
+      state: 'accepted',
+      transport: 'codex-queue',
+      requestId: 'req-1',
+    });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toContain('/api/external-agents/codex-a%2F..%2Fx/chat');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ text: 'seguí' });
+
+    expect(await sendExternalChat('codex-a', 'otra')).toEqual({
+      error: 'transport_failed',
+      detail: 'queue rejected',
+    });
   });
 
   it('returns null when the bridge fails', async () => {

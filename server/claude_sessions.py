@@ -101,3 +101,13 @@ def owned_ids() -> frozenset[str]:
     """Every Claude Code session id RepoCiv started (threads + recent one-offs)."""
     data = _load()
     return frozenset(data["owned"]) | frozenset(data["threads"].values())
+
+
+def record_owned(session_id: str) -> None:
+    """Remember one more session RepoCiv launched outside a mission (live channel)."""
+    if not _is_uuid(session_id):
+        return
+    with _lock:
+        data = _load()
+        data["owned"] = ([s for s in data["owned"] if s != session_id] + [session_id])[-_MAX_OWNED:]
+        _save(data)

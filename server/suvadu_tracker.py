@@ -638,6 +638,7 @@ class ExternalAgentTracker:
         clock: Callable[[], float] = time.time,
         sources: Sequence[AgentSource] | None = None,
         liveness: LivenessFn = session_liveness.probe,
+        live_chat_router: Any | None = None,
     ) -> None:
         """``sources`` defaults to Suvadu alone, driven by ``run`` (or the real CLI)."""
         self.config = config
@@ -645,6 +646,7 @@ class ExternalAgentTracker:
         self._repo_paths = repo_paths
         self._clock = clock
         self._liveness = liveness
+        self._live_chat_router = live_chat_router
         if sources is None:
             suv_run: RunFn = run or (lambda args: run_suv(config.bin_path, args, config.timeout_s))
             sources = [SuvaduSource(suv_run, clock)]
@@ -691,15 +693,26 @@ class ExternalAgentTracker:
         """Tag every observation with "is a process still holding this session?".
 
         One /proc scan per poll, shared by every observation. A probe that fails
-        leaves ``live`` as None and the states fall back to timestamps alone."""
+        leaves ``live`` as None and the states fall back to timestamps alone. An
+        observation whose source already declared ``live`` (it owns the process,
+        e.g. claude-live) keeps that verdict: the probe is approximate, the
+        source is not."""
         try:
             reading = self._liveness()
         except Exception:
             return observations
-        return [
-            replace(obs, live=reading.live_for(source=obs.source, native_id=obs.native_id, cwd=obs.cwd))
-            for obs in observations
-        ]
+        tagged: list[Observation] = []
+        for obs in observations:
+            if obs.live is not None:
+                tagged.append(obs)
+                continue
+            tagged.append(
+                replace(
+                    obs,
+                    live=reading.live_for(source=obs.source, native_id=obs.native_id, cwd=obs.cwd),
+                )
+            )
+        return tagged
 
     def reconcile(
         self,
@@ -769,6 +782,13 @@ class ExternalAgentTracker:
             self._rows, self._listed = self._recent_rows(observations, now_ms, city_of)
         return events
 
+    def _chat_capability(self, obs: Observation) -> dict[str, Any]:
+        if self._live_chat_router is None:
+            from server.live_session_chat import default_router
+
+            self._live_chat_router = default_router()
+        return self._live_chat_router.capability(obs).to_dict()
+
     def _recent_rows(
         self,
         observations: list[Observation],
@@ -822,6 +842,7 @@ class ExternalAgentTracker:
                 "totalTokens": obs.total_tokens,
                 "subagent": obs.parent_id is not None,
                 "imported": obs.imported,
+                "liveChat": self._chat_capability(obs),
             })
         return rows, listed
 
@@ -883,6 +904,28 @@ class ExternalAgentTracker:
     def sessions(self) -> list[dict[str, Any]]:
         with self._lock:
             return [dict(row) for row in self._rows]
+
+    def observation(self, session_id: str) -> Observation | None:
+        """Return a detached immutable snapshot for server-side routing."""
+        with self._lock:
+            obs = self._listed.get(session_id)
+        return replace(obs) if obs is not None else None
+
+    def send_live_chat(self, session_id: str, text: Any, request_id: str) -> tuple[int, dict[str, Any]]:
+        obs = self.observation(session_id)
+        if obs is None:
+            return 404, {"error": "unknown_session", "sessionId": session_id}
+        if self._live_chat_router is None:
+            from server.live_session_chat import default_router
+
+            self._live_chat_router = default_router()
+        from server.live_session_chat import ChatError
+
+        try:
+            result = self._live_chat_router.send(obs, text, request_id)
+        except ChatError as exc:
+            return exc.status, {"error": exc.code, "sessionId": session_id}
+        return 202, result.to_dict()
 
     # -- resume (on demand: the command, never the run) ----------------------
     def resume(self, session_id: str) -> tuple[int, dict[str, Any]]:
@@ -991,7 +1034,7 @@ def start(send: SendFn, config: TrackerConfig | None = None) -> bool:
     cfg = config or TrackerConfig.from_env()
     if not cfg.enabled or _thread is not None:
         return False
-    from server import claude_sessions, hermes_sessions  # noqa: PLC0415
+    from server import claude_live, claude_sessions, hermes_sessions  # noqa: PLC0415
 
     sources: list[AgentSource] = [
         SuvaduSource(
@@ -1002,6 +1045,8 @@ def start(send: SendFn, config: TrackerConfig | None = None) -> bool:
     hermes = hermes_sessions.source_from_env(recent_s=cfg.recent_s, window_s=cfg.window_s)
     if hermes is not None:
         sources.append(hermes)
+    # The process-owned claude channel: its sessions declare their own liveness.
+    sources.append(claude_live.ClaudeLiveSource(claude_live.get_manager()))
     tracker = ExternalAgentTracker(cfg, send=send, sources=sources)
 
     def _loop() -> None:
@@ -1051,6 +1096,13 @@ def chat(session_id: str, *, limit: int = 80, refresh: bool = False) -> tuple[in
     if _tracker is None:
         return 503, {"error": "tracker_not_running"}
     return _tracker.chat(session_id, limit=limit, refresh=refresh)
+
+
+def send_live_chat(session_id: str, text: Any, request_id: str) -> tuple[int, dict[str, Any]]:
+    """Payload of POST /api/external-agents/<session>/chat."""
+    if _tracker is None:
+        return 503, {"error": "tracker_not_running"}
+    return _tracker.send_live_chat(session_id, text, request_id)
 
 
 def resume(session_id: str) -> tuple[int, dict[str, Any]]:
