@@ -184,3 +184,80 @@ def test_tracker_publishes_per_session_capability_and_returns_observation_copy()
     resolved = tracker.observation("codex-repociv-id")
     assert resolved == observation
     assert resolved is not observation
+
+
+def test_claude_live_adapter_available_only_for_process_owned_sessions() -> None:
+    calls = []
+
+    class Manager:
+        def send(self, native_id, text):
+            calls.append((native_id, text))
+
+    adapter = ClaudeLiveChatAdapter(manager=Manager())
+    owned = _obs(
+        agent="claude-code",
+        source="claude-live",
+        native_id="11111111-1111-4111-8111-111111111111",
+    )
+
+    assert adapter.capability(owned).to_dict() == {
+        "state": "available",
+        "transport": "claude-stream-json",
+        "reason": None,
+    }
+    assert adapter.send(owned, "hello", "request-live").to_dict() == {
+        "state": "accepted",
+        "transport": "claude-stream-json",
+        "requestId": "request-live",
+    }
+    assert calls == [("11111111-1111-4111-8111-111111111111", "hello")]
+
+    # A terminal session Suvadu saw: observable, not addressable — fail closed.
+    assert adapter.capability(_obs(agent="claude-code")).to_dict() == {
+        "state": "unavailable",
+        "transport": None,
+        "reason": "claude_control_channel_unavailable",
+    }
+    assert adapter.capability(_obs(agent="claude-code", source="claude-live", live=False)).to_dict() == {
+        "state": "unavailable",
+        "transport": None,
+        "reason": "claude_live_not_running",
+    }
+
+
+def test_claude_live_adapter_maps_manager_errors() -> None:
+    from server.claude_live import ClaudeLiveError
+
+    class Manager:
+        def send(self, native_id, text):
+            raise ClaudeLiveError(404, "session_not_found")
+
+    adapter = ClaudeLiveChatAdapter(manager=Manager())
+    try:
+        adapter.send(_obs(agent="claude-code", source="claude-live"), "hello", "request-x")
+    except ChatError as exc:
+        assert (exc.status, exc.code) == (404, "session_not_found")
+    else:
+        raise AssertionError("expected ChatError")
+
+
+def test_router_routes_claude_live_to_the_process_channel() -> None:
+    sent = []
+
+    class Manager:
+        def send(self, native_id, text):
+            sent.append((native_id, text))
+
+    router = LiveSessionChatRouter({"claude-code": ClaudeLiveChatAdapter(manager=Manager())})
+    obs = _obs(
+        agent="claude-code",
+        source="claude-live",
+        native_id="22222222-2222-4222-8222-222222222222",
+    )
+    result = router.send(obs, "hola", "request-live")
+    assert result.to_dict() == {
+        "state": "accepted",
+        "transport": "claude-stream-json",
+        "requestId": "request-live",
+    }
+    assert sent == [("22222222-2222-4222-8222-222222222222", "hola")]

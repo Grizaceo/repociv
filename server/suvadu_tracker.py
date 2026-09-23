@@ -693,15 +693,26 @@ class ExternalAgentTracker:
         """Tag every observation with "is a process still holding this session?".
 
         One /proc scan per poll, shared by every observation. A probe that fails
-        leaves ``live`` as None and the states fall back to timestamps alone."""
+        leaves ``live`` as None and the states fall back to timestamps alone. An
+        observation whose source already declared ``live`` (it owns the process,
+        e.g. claude-live) keeps that verdict: the probe is approximate, the
+        source is not."""
         try:
             reading = self._liveness()
         except Exception:
             return observations
-        return [
-            replace(obs, live=reading.live_for(source=obs.source, native_id=obs.native_id, cwd=obs.cwd))
-            for obs in observations
-        ]
+        tagged: list[Observation] = []
+        for obs in observations:
+            if obs.live is not None:
+                tagged.append(obs)
+                continue
+            tagged.append(
+                replace(
+                    obs,
+                    live=reading.live_for(source=obs.source, native_id=obs.native_id, cwd=obs.cwd),
+                )
+            )
+        return tagged
 
     def reconcile(
         self,
@@ -1023,7 +1034,7 @@ def start(send: SendFn, config: TrackerConfig | None = None) -> bool:
     cfg = config or TrackerConfig.from_env()
     if not cfg.enabled or _thread is not None:
         return False
-    from server import claude_sessions, hermes_sessions  # noqa: PLC0415
+    from server import claude_live, claude_sessions, hermes_sessions  # noqa: PLC0415
 
     sources: list[AgentSource] = [
         SuvaduSource(
@@ -1034,6 +1045,8 @@ def start(send: SendFn, config: TrackerConfig | None = None) -> bool:
     hermes = hermes_sessions.source_from_env(recent_s=cfg.recent_s, window_s=cfg.window_s)
     if hermes is not None:
         sources.append(hermes)
+    # The process-owned claude channel: its sessions declare their own liveness.
+    sources.append(claude_live.ClaudeLiveSource(claude_live.get_manager()))
     tracker = ExternalAgentTracker(cfg, send=send, sources=sources)
 
     def _loop() -> None:

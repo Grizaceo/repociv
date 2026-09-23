@@ -110,11 +110,41 @@ class HermesLiveChatAdapter:
 
 
 class ClaudeLiveChatAdapter:
+    """The process-owned channel: only sessions RepoCiv spawned are addressable.
+
+    A Claude session Suvadu merely observed (the user's own terminal run) has
+    no stdin to write to: it stays observable and *not* addressable — the
+    honest answer, never a silent fallback to ``--resume`` (Fase 5).
+    """
+
+    transport = "claude-stream-json"
+
+    def __init__(self, *, manager: Any | None = None) -> None:
+        self._manager = manager
+
+    def _resolve(self) -> Any:
+        """The live manager (injectable for tests); resolved lazily to avoid a cycle."""
+        if self._manager is not None:
+            return self._manager
+        from server import claude_live  # noqa: PLC0415
+
+        return claude_live.get_manager()
+
     def capability(self, session: Observation) -> ChatCapability:
-        return ChatCapability("unavailable", None, "claude_control_channel_unavailable")
+        if session.source != "claude-live":
+            return ChatCapability("unavailable", None, "claude_control_channel_unavailable")
+        if session.live is not True or not session.native_id:
+            return ChatCapability("unavailable", None, "claude_live_not_running")
+        return ChatCapability("available", self.transport, None)
 
     def send(self, session: Observation, text: str, request_id: str) -> ChatResult:
-        raise RuntimeError("transport_unavailable")
+        from server.claude_live import ClaudeLiveError  # noqa: PLC0415
+
+        try:
+            self._resolve().send(session.native_id, text)
+        except ClaudeLiveError as exc:
+            raise ChatError(exc.status, exc.code) from exc
+        return ChatResult("accepted", self.transport, request_id)
 
 
 class LiveSessionChatRouter:
