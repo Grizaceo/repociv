@@ -46,8 +46,20 @@ run_step "vitest run --coverage"          npx --no-install vitest run --coverage
 run_step "vite build"                     npx --no-install vite build
 
 # Backend
-run_step "ruff check server/"             ruff check server/
-run_step "ruff check scripts/"            ruff check scripts/
+# Resolve ruff the same way pytest is below: prefer the repo .venv (a bare
+# `ruff` on PATH may not exist in a non-interactive shell; the venv always
+# has it when the dev deps are installed).
+RUFF_BIN="$REPO_ROOT/.venv/bin/ruff"
+[ -x "$RUFF_BIN" ] || RUFF_BIN="$(command -v ruff || true)"
+if [ -n "$RUFF_BIN" ]; then
+  run_step "ruff check server/"             "$RUFF_BIN" check server/
+  run_step "ruff check scripts/"            "$RUFF_BIN" check scripts/
+else
+  warn "ruff check server/ (ruff not installed)"
+  failures+=("ruff check server/")
+  warn "ruff check scripts/ (ruff not installed)"
+  failures+=("ruff check scripts/")
+fi
 # Resolve the project pytest: prefer the repo .venv (local dev, where a bare
 # `pytest` on PATH can resolve to an unrelated interpreter missing deps like
 # fastmcp), fall back to PATH (CI installs into the runner's python).
