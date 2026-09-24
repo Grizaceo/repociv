@@ -255,15 +255,16 @@ def _work_repo(path: str) -> str:
     return root
 
 
-def _derive_cwd(conn: sqlite3.Connection, sid: str) -> str:
-    """The git repo a cwd-less session worked in, guessed from its own activity.
+def _derive_repos(conn: sqlite3.Connection, sid: str) -> list[str]:
+    """Enumerate git repos a cwd-less session worked in, from its own activity.
 
     Desktop sessions stopped persisting ``cwd`` (2026-09-18), so every Hermes
     unit fell to the capital. Their recent tool calls still name the files they
     touch (``path``/``workdir``) and ``cd`` their commands: counted per enclosing
-    git repo, one repo wins from ``_DERIVE_MIN_HITS`` mentions — a passing
-    glance at another folder must not move the unit. Best effort: any sqlite
-    error (old schema, poll deadline) keeps the capital, exactly as before.
+    git repo, **every** repo that reaches ``_DERIVE_MIN_HITS`` mentions wins —
+    a passing glance at another folder (fewer hits) is ignored, but a session
+    that genuinely worked in two repos spawns a unit in each. Best effort: any
+    sqlite error (old schema, poll deadline) returns an empty list.
     """
     try:
         raw = conn.execute(
@@ -272,7 +273,7 @@ def _derive_cwd(conn: sqlite3.Connection, sid: str) -> str:
             (sid,),
         ).fetchall()
     except sqlite3.Error:
-        return ""
+        return []
     hints: list[str] = []
     for (tc,) in raw:
         try:
@@ -315,9 +316,14 @@ def _derive_cwd(conn: sqlite3.Connection, sid: str) -> str:
         root = _work_repo(path)
         counts[root] = counts.get(root, 0) + 1
     if not counts:
-        return ""
-    root, hits = max(counts.items(), key=lambda kv: kv[1])
-    return root if hits >= _DERIVE_MIN_HITS else ""
+        return []
+    return [root for root, hits in counts.items() if hits >= _DERIVE_MIN_HITS]
+
+
+def _derive_cwd(conn: sqlite3.Connection, sid: str) -> str:
+    """Backwards-compatible single-repo form: the most-hit repo (or ``""``)."""
+    repos = _derive_repos(conn, sid)
+    return repos[0] if repos else ""
 
 
 def _continues(child: _Row, parent: _Row) -> bool:
@@ -460,14 +466,13 @@ class HermesSource:
             cache = _Rows(conn, schema, rows)
             out: list[Observation] = []
             for row in rows:
-                obs = self._observe(conn, db.profile, row, cache, now_s, owned)
-                if obs is not None:
+                for obs in self._observe_multi(conn, db.profile, row, cache, now_s, owned):
                     out.append(obs)
             return out
         finally:
             conn.close()
 
-    def _observe(
+    def _observe_multi(
         self,
         conn: sqlite3.Connection,
         profile: str,
@@ -475,14 +480,21 @@ class HermesSource:
         cache: _Rows,
         now_s: float,
         owned: frozenset[str],
-    ) -> Observation | None:
+    ) -> list[Observation]:
+        """Yield one Observation per significant repo this session worked in.
+
+        Desktop sessions stopped persisting ``cwd``, so a unit that touched two
+        repos (passing glances excluded by ``_DERIVE_MIN_HITS``) appears in each
+        one. With an explicit ``cwd`` we yield exactly one observation. Legacy
+        callers: keep the single-observation shape.
+        """
         if row.hidden or not _ID_RE.match(row.id):
-            return None
+            return []
         lin = cache.lineage(row)
         if lin.ids & owned or any(
             (anc := cache.get(i)) is not None and anc.origin in REPOCIV_ORIGINS for i in lin.ids
         ):
-            return None  # RepoCiv's own mission (or its subagent): it already has a unit
+            return []
         last_s = row.activity_s
         if now_s - last_s <= self.window_s + _LIVE_SLACK_MS / 1000:
             newest = conn.execute("SELECT max(timestamp) FROM messages WHERE session_id = ?", (row.id,)).fetchone()
@@ -494,30 +506,56 @@ class HermesSource:
         section = section_for(lin.root_origin if origin == "subagent" else origin)
         root = lin.chain_root
         model = row.model
-        # Desktop rows stopped persisting cwd: derive it from the session's own
-        # activity so the unit lands in the city of the folder it worked in.
-        cwd = row.cwd or _derive_cwd(conn, row.id)
-        return Observation(
-            session_id=f"hermes-{profile}-{root.id}",
-            agent=AGENT,
-            native_id=row.id,
-            cwd=cwd,
-            model=model,
-            first_activity_ms=int(root.started_s * 1000),
-            last_activity_ms=last_ms,
-            command_count=row.tools,
-            event_count=row.messages,
-            total_tokens=row.tokens,
-            parent_id=lin.delegator,
-            source=self.name,
-            unit_id=unit_id_for(profile, root.id),
-            unit_type=unit_type_for(profile),
-            label=" · ".join(p for p in (profile, _short_model(model), origin) if p),
-            section=section,
-            ended=ended,
-            profile=profile,
-            origin=origin,
-        )
+        repos: list[str]
+        if row.cwd:
+            repos = [row.cwd]
+        else:
+            repos = _derive_repos(conn, row.id)
+            if not repos:
+                repos = [""]
+        out: list[Observation] = []
+        for idx, cwd in enumerate(repos):
+            uid = unit_id_for(profile, root.id)
+            sid = f"hermes-{profile}-{root.id}"
+            if idx > 0:
+                # Distinct session_id + unit_id per extra repo so the bridge
+                # treats each as its own unit and places it in its own city.
+                uid = f"{uid}-{idx}"
+                sid = f"{sid}-{idx}"
+            out.append(Observation(
+                session_id=sid,
+                agent=AGENT,
+                native_id=row.id,
+                cwd=cwd,
+                model=model,
+                first_activity_ms=int(root.started_s * 1000),
+                last_activity_ms=last_ms,
+                command_count=row.tools,
+                event_count=row.messages,
+                total_tokens=row.tokens,
+                parent_id=lin.delegator,
+                source=self.name,
+                unit_id=uid,
+                unit_type=unit_type_for(profile),
+                label=" · ".join(p for p in (profile, _short_model(model), origin) if p),
+                section=section,
+                ended=ended,
+                profile=profile,
+                origin=origin,
+            ))
+        return out
+
+    def _observe(
+        self,
+        conn: sqlite3.Connection,
+        profile: str,
+        row: _Row,
+        cache: _Rows,
+        now_s: float,
+        owned: frozenset[str],
+    ) -> Observation | None:
+        obs_list = self._observe_multi(conn, profile, row, cache, now_s, owned)
+        return obs_list[0] if obs_list else None
 
     def status(self) -> dict[str, Any]:
         return {"databases": self._dbs, "dbErrors": dict(self._errors)}
