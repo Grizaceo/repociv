@@ -88,3 +88,23 @@ diseño / umbral no alcanzado).
   `cwd`.
 - P2 (ciudades no seleccionadas), P3 (localStorage vs state.json) y P4
   (spawn por carpeta) quedan fuera de este cambio: son decisiones del usuario.
+
+## Puesta en vivo
+
+El 2026-09-23 el stack vivo se relanzó **fuera de la sesión de chat** (camino de
+diseño: `setsid` + `scripts/dev-start.sh` desprendido, patrón de
+`scripts/repociv-app.sh`), para que corra el código de esta rama y no muera con
+el chat que lo lanza.
+
+Verificación:
+
+- supervisor **90461** — `SID=PGID=90461`, **PPID 1231** = `systemd --user`
+  (`1231 → 1`): ya no cuelga de la app de Hermes.
+- bridge **90483** y Vite **90500** corren bajo ese supervisor.
+- La API viva sirve unidades **derivadas** (`repo:…`, `lexo-alpha`): el proceso
+  que atiende a la app es el código nuevo.
+
+Nota forense: el traceback de `datetime` en `~/.repociv/logs/bridge.log`
+proviene de una corrida vieja (encabezado del archivo, previo a los reinicios)
+en `_endpoint_usage.record`; `~/.repociv/endpoint_usage.json` se escribe al día
+— no está relacionado con este cambio.
