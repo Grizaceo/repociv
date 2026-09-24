@@ -14,8 +14,10 @@ the map:
   * spawn   — a session with activity in the last WINDOW minutes becomes an
               ephemeral unit ``ext-<agent>-<native_id[:8]>`` in the city it is
               working in: the repo most of its latest touched folders belong
-              to (``Observation.work_dirs``, Hermes), else the city whose repo
-              path is the longest prefix of the session cwd (else capital);
+              to (``Observation.work_dirs``: Hermes tool calls, Claude Code /
+              Codex transcripts), else the city whose repo path is the longest
+              prefix of the session cwd (else capital). When that city changes
+              the unit is relocated (``unit_relocate``: it walks over);
   * state   — ``working`` while the last activity is fresh, ``idle`` once it ages;
   * despawn — when the last activity falls out of the window.
 
@@ -31,7 +33,9 @@ Two read-only CLI calls (argv, no shell) feed each poll:
 
 Privacy: map events, /api/external-agents[/sessions] and /health carry only
 metadata (agent, repo/city, model, counts, last activity) — no prompts, no
-commands, no cwd. Chat text (Suvadu's prompt/response events) is read only on
+commands, no cwd. To place a unit the tracker reads the folders named by the
+tool calls in the session's native transcript (``server/transcript_work.py``);
+they stay in memory, and only the repo they resolve to is sent. Chat text (Suvadu's prompt/response events) is read only on
 demand through the token-protected GET /api/external-agents/<session>/chat,
 for sessions this tracker listed; it is never broadcast.
 
@@ -54,7 +58,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from typing import Any, Callable, Iterable, Protocol, Sequence
 
-from server import session_liveness, session_reply, session_resume
+from server import session_liveness, session_reply, session_resume, transcript_work
 
 SendFn = Callable[[dict[str, Any]], None]
 LivenessFn = Callable[[], session_liveness.Liveness]
@@ -71,7 +75,7 @@ _IMPORT_MIN_INTERVAL_S = 5.0
 _CHAT_ROLES = {"prompt": "user", "response": "assistant"}
 _NATIVE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]{7,79}$")
 _WORK_RECENT = 12  # latest in-repo folder mentions that vote for where a session works
-_WORK_MIN_HITS = 3  # votes one repo needs before it outranks the session cwd
+_WORK_MIN_HITS = 3  # votes one repo needs before it outranks a cwd inside a repo
 
 # Suvadu agent id → unitType from the bridgeSchema.ts picklist.
 _UNIT_TYPES = {"claude-code": "claude", "claude": "claude", "codex": "codex"}
@@ -421,14 +425,14 @@ def work_place(path: str, candidates: list[_Candidate]) -> tuple[str, str] | Non
     return encode_repo_id(root), os.path.basename(root)
 
 
-def busiest(places: Sequence[tuple[str, str]]) -> tuple[str, str] | None:
-    """The place most of ``places`` (newest first) name, from ``_WORK_MIN_HITS``;
+def busiest(places: Sequence[tuple[str, str]], min_hits: int = _WORK_MIN_HITS) -> tuple[str, str] | None:
+    """The place most of ``places`` (newest first) name, from ``min_hits``;
     a tie goes to the one named most recently."""
     counts = Counter(places)  # insertion order = newest first; max keeps the first
     if not counts:
         return None
     best = max(counts, key=counts.__getitem__)
-    return best if counts[best] >= _WORK_MIN_HITS else None
+    return best if counts[best] >= min_hits else None
 
 
 def city_for_cwd(
@@ -559,14 +563,21 @@ class SuvaduSource:
         clock: Callable[[], float] = time.time,
         *,
         owned_ids: Callable[[], frozenset[str]] = frozenset,
+        home: str | None = None,
     ) -> None:
         """``owned_ids``: native ids of the Claude sessions RepoCiv launched
-        itself (server/claude_sessions.py) — their mission unit already shows them."""
+        itself (server/claude_sessions.py) — their mission unit already shows them.
+        ``home``: where the native transcripts live (default ~)."""
         self._run = run
         self._clock = clock
         self._owned_ids = owned_ids
+        self._home = home
         self._heartbeat: bool | None = None
         self._imported_at: dict[str, float] = {}
+        # session → (transcript path or None, last activity when it was looked up)
+        self._transcripts: dict[str, tuple[str | None, int]] = {}
+        # transcript path → ((mtime_ns, size), work dirs): re-read only when it changes
+        self._work: dict[str, tuple[tuple[int, int], tuple[str, ...]]] = {}
 
     def poll(self) -> list[Observation]:
         self._heartbeat = None
@@ -584,13 +595,46 @@ class SuvaduSource:
             owned = self._owned_ids()
         except Exception:
             owned = frozenset()
-        if not owned:
-            return observations
-        def mine(session: str | None) -> bool:
-            return bool(session) and (session in owned or _native_of(session or "") in owned)
+        if owned:
+            def mine(session: str | None) -> bool:
+                return bool(session) and (session in owned or _native_of(session or "") in owned)
 
-        # Skip RepoCiv's own missions and the subagents they spawned.
-        return [obs for obs in observations if obs.native_id not in owned and not mine(obs.parent_id)]
+            # Skip RepoCiv's own missions and the subagents they spawned.
+            observations = [obs for obs in observations if obs.native_id not in owned and not mine(obs.parent_id)]
+        return self._with_work_dirs(observations)
+
+    def _with_work_dirs(self, observations: list[Observation]) -> list[Observation]:
+        """Attach the folders each session's transcript says it works in."""
+        work: dict[str, tuple[tuple[int, int], tuple[str, ...]]] = {}
+        out: list[Observation] = []
+        for obs in observations:
+            path = self._transcript(obs)
+            try:
+                st = os.stat(path) if path else None
+            except OSError:
+                st = None
+            if path is None or st is None:
+                out.append(obs)
+                continue
+            stamp = (st.st_mtime_ns, st.st_size)
+            memo = self._work.get(path)
+            if memo is None or memo[0] != stamp:
+                memo = (stamp, transcript_work.transcript_work_dirs(obs.agent, path))
+            work[path] = memo
+            out.append(replace(obs, work_dirs=memo[1]))
+        # Sessions (and transcripts) gone from the list drop out of both caches.
+        self._work = work
+        self._transcripts = {o.session_id: t for o in observations if (t := self._transcripts.get(o.session_id))}
+        return out
+
+    def _transcript(self, obs: Observation) -> str | None:
+        """Cached :func:`transcript_path`; a miss is retried once the session moves on."""
+        known = self._transcripts.get(obs.session_id)
+        if known is not None and (known[0] is not None or known[1] == obs.last_activity_ms):
+            return known[0]
+        path = transcript_path(obs.agent, obs.native_id, home=self._home)
+        self._transcripts[obs.session_id] = (path, obs.last_activity_ms)
+        return path
 
     def status(self) -> dict[str, Any]:
         return {"heartbeat": self._heartbeat}
@@ -796,6 +840,10 @@ class ExternalAgentTracker:
                 return working_in
             if obs.cwd not in cities:
                 cities[obs.cwd] = city_for(obs.cwd, candidates)
+            if cities[obs.cwd] == (CAPITAL_ID, "") and recent:
+                # Launched outside any repo (~): whatever repo it touched says
+                # more than "nowhere", even a single mention.
+                return busiest(recent, min_hits=1) or cities[obs.cwd]
             return cities[obs.cwd]
 
         events: list[dict[str, Any]] = []
@@ -811,8 +859,8 @@ class ExternalAgentTracker:
                 mapped = map_state(state)
                 rec = self._units.get(session_id)
                 if rec is not None and rec["cityId"] != city_id:
-                    events.append({"type": "unit_despawn", "unit": rec["unit"]})
-                    rec = None
+                    rec["cityId"] = city_id  # it walks over: same unit, new city
+                    events.append({"type": "unit_relocate", "unit": rec["unit"], "cityId": city_id})
                 if rec is None:
                     rec = {
                         "unit": _unit_id(obs),

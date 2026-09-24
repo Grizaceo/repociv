@@ -239,7 +239,9 @@ def test_cwd_derived_from_tool_paths_when_the_row_has_none(home: Home, repos: Pa
     by_native = {r["sessionId"].rsplit("-", 1)[-1]: r for r in t.sessions()}
     assert by_native[derived]["cityId"] == st.encode_repo_id(alpha)
     assert by_native[derived]["repo"] == "alpha"
-    assert by_native[lone]["cityId"] == "capital"  # one mention is a passing glance
+    # No cwd at all: even one mention says more than "nowhere" (a glance only
+    # loses against a repo the session is known to be in).
+    assert by_native[lone]["cityId"] == st.encode_repo_id(beta)
 
 
 def test_cwd_derived_from_terminal_cd_when_the_row_has_none(home: Home, repos: Path) -> None:
@@ -322,10 +324,8 @@ def test_the_unit_follows_the_session_to_its_next_repo(home: Home, repos: Path) 
     conn.commit()  # as Hermes does on every insert
     conn.close()
     t.poll_once()
-    # It moves (same unit); no clone stays behind in alpha.
-    assert [(e["type"], e.get("cityId")) for e in sent if e["type"] != "unit_state"] == [
-        ("unit_despawn", None), ("unit_spawn", st.encode_repo_id(beta))]
-    assert {e["unit"] for e in sent} == {unit}
+    # The same unit walks over; no clone stays behind in alpha.
+    assert sent == [{"type": "unit_relocate", "unit": unit, "cityId": st.encode_repo_id(beta)}]
 
 
 def test_folders_without_git_count_toward_their_city(home: Home, repos: Path) -> None:

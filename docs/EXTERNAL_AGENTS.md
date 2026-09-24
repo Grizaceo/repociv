@@ -126,7 +126,7 @@ si todas funcionaron y `error` es el código de la primera que falló.
 | Unidad | `ext-<agente>-<native_id[:8]>` (Hermes: `ext-hermes-<hash8>`), efímera, fuera de la barra de héroes |
 | Tipo | `claude-code → claude`, `codex → codex`, Hermes → `hero` (perfiles `lexo*` → `lexo`), resto → `scout` |
 | Misión | `<agente> · <modelo>` (Hermes: `<perfil> · <modelo> · <origen>`) |
-| Ciudad | Donde trabaja **ahora**: si la sesión trae carpetas de su actividad (Hermes, ver abajo), el repo que más aparece entre sus últimas 12 menciones, con un mínimo de 3. Si no, por el `cwd`: 1) la ciudad cuyo `repoPath` es el prefijo más largo (por componentes: `repociv-old` no calza con `repociv`); 2) el propio checkout de RepoCiv → la capital (RepoCiv nunca es ciudad: el escaneo lo salta); 3) si no, el repo git que lo contiene, y el navegador cae a la capital si esa ciudad no está en su mapa; 4) sin repo → capital. Una sesión es **una** unidad; si cambia de repo, se muda |
+| Ciudad | Donde trabaja **ahora**: si la sesión trae carpetas de su actividad (Hermes: sus tool calls; Claude Code y Codex: su transcript, ver [Dónde trabaja](#dónde-trabaja-claude-code-y-codex)), el repo que más aparece entre sus últimas 12 menciones, con un mínimo de 3. Si no, por el `cwd`: 1) la ciudad cuyo `repoPath` es el prefijo más largo (por componentes: `repociv-old` no calza con `repociv`); 2) el propio checkout de RepoCiv → la capital (RepoCiv nunca es ciudad: el escaneo lo salta); 3) si no, el repo git que lo contiene, y el navegador cae a la capital si esa ciudad no está en su mapa; 4) sin repo → capital. Una sesión es **una** unidad; si cambia de repo, **camina** hasta la nueva ciudad (`unit_relocate`) |
 | `working` | última actividad hace ≤ `REPOCIV_EXT_AGENTS_WORKING_MIN` (2 min) |
 | `thinking` | más vieja que eso, pero **un proceso sigue sosteniendo la sesión** (ver [Vivo o callado](#vivo-o-callado)) |
 | `idle` | más vieja que eso y nada la sostiene |
@@ -138,8 +138,10 @@ el caso en que el navegador tenga otra selección guardada en `localStorage`.
 
 Los eventos no se repiten entre ciclos: un spawn por sesión y un `unit_state` solo
 cuando cambia. Como SSE/WS no reenvía eventos pasados, el cliente pide
-`GET /api/external-agents` en cada (re)conexión y reconcilia (`src/externalAgents.ts`):
-crea las unidades que faltan y muda las que cambiaron de ciudad mientras no escuchaba.
+`GET /api/external-agents` en cada (re)conexión **y cada 10 s**, y reconcilia
+(`src/externalAgents.ts`): crea las unidades que faltan, hace caminar a las que
+cambiaron de ciudad y corrige estados, sin emitir nada si todo ya coincide. Así un
+evento perdido (WS que no autentica, SSE reconectando) no obliga a recargar la página.
 Los cambios de estado de unidades `ext-*` no tocan el ticker global de operación.
 
 ### Por qué dos fuentes
@@ -151,6 +153,25 @@ primer turno. Los comandos, en cambio, se registran en vivo (hook `PostToolUse`)
 el mismo id de sesión (`claude-<native_id>`), así que `suv history --executor agent`
 sirve de latido. Del historial solo se leen `session_id`, `executor`, `cwd` y
 `started_at`; el texto del comando nunca se lee ni se guarda.
+
+### Dónde trabaja (Claude Code y Codex)
+
+Suvadu solo sabe desde dónde se lanzó la sesión: un `claude` o `codex` abierto en
+`~` tiene `cwd=~` en la sesión y en cada comando. El tracker lee entonces el
+transcript nativo (`~/.claude/projects/…/<id>.jsonl`,
+`~/.codex/sessions/…/rollout-…-<id>.jsonl`) con `server/transcript_work.py`,
+mirando las últimas 60 tool calls, de la más nueva a la más vieja:
+
+- **Claude Code:** el `cwd` que registra en cada línea (sigue sus `cd`), el
+  `file_path`/`path` de Read/Edit/Write/Grep/Glob y las rutas absolutas de sus
+  comandos Bash.
+- **Codex:** el `workdir` de sus comandos, las rutas absolutas dentro de cada
+  `cmd` y las cabeceras `*** Add/Update/Delete File:` de sus parches.
+
+Nunca se leen contenidos de archivos, cuerpos de parches, salidas de herramientas
+ni prompts. Las carpetas quedan en memoria y solo sale el repo al que llevan. El
+transcript se relee solo cuando cambia (`mtime`, tamaño). Cursor y OpenCode
+siguen ubicados por su `cwd`.
 
 Consecuencia: un agente que piensa varios minutos sin ejecutar comandos deja de
 emitir latido hasta su próximo comando o fin de turno.

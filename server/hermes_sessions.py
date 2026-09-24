@@ -61,6 +61,7 @@ from typing import Any, Callable, Iterable, Sequence
 from urllib.parse import quote
 
 from server.suvadu_tracker import Observation, SourceError
+from server.transcript_work import dirs_from_hints
 
 AGENT = "hermes"
 MAP_ORIGINS = frozenset({"cli", "desktop", "tui", "hermes_browser", "kanban", "subagent"})
@@ -291,16 +292,7 @@ def _work_dirs(conn: sqlite3.Connection, sids: Sequence[str]) -> tuple[str, ...]
                 hints.extend(m.group(1) for m in _PATH_HINT_RE.finditer(args))
                 if fn.get("name") in _CMD_TOOLS:
                     hints.extend(m.group(2) for m in _CD_HINT_RE.finditer(args))
-    dirs: list[str] = []
-    for hint in hints:
-        if not hint.startswith(("/", "~")):
-            continue
-        path = os.path.abspath(os.path.expanduser(hint))
-        if not os.path.isdir(path):
-            path = os.path.dirname(path)
-        if path and os.path.isdir(path):
-            dirs.append(path)
-    return tuple(dirs)
+    return dirs_from_hints(hints)
 
 
 def _continues(child: _Row, parent: _Row) -> bool:

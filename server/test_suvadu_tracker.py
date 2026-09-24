@@ -450,7 +450,7 @@ def test_history_only_session_keeps_unit_when_imported(repos):
     assert t.agents()[0]["mission"] == "claude-code · claude-opus-5"
 
 
-def test_city_change_respawns_in_new_city(repos):
+def test_city_change_relocates_the_same_unit(repos):
     suv, clock, sent = FakeSuv(), Clock(), []
     a, b = str(repos / "repociv"), str(repos / "mono")
     suv.sessions = _sessions_json(_session("mover000", cwd=a))
@@ -459,8 +459,77 @@ def test_city_change_respawns_in_new_city(repos):
     sent.clear()
     suv.sessions = _sessions_json(_session("mover000", cwd=b + "/docs"))
     t.poll_once()
-    assert _types(sent) == ["unit_despawn", "unit_spawn", "unit_state"]
-    assert sent[1]["cityId"] == st.encode_repo_id(b)
+    # The unit walks over (client side) instead of vanishing and reappearing.
+    assert sent == [{"type": "unit_relocate", "unit": "ext-claude-code-mover000", "cityId": st.encode_repo_id(b)}]
+    assert t.agents()[0]["cityId"] == st.encode_repo_id(b)
+
+
+def _claude_transcript(home, native: str, cwd: str, paths: list[str]) -> str:
+    path = home / ".claude" / "projects" / "-home-x" / f"{native}.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [json.dumps({"type": "assistant", "cwd": cwd, "message": {"role": "assistant", "content": [
+        {"type": "tool_use", "id": f"t{i}", "name": "Read", "input": {"file_path": p}}]}}) for i, p in enumerate(paths)]
+    path.write_text("\n".join(lines) + "\n")
+    return str(path)
+
+
+def test_a_session_launched_from_home_goes_where_its_transcript_works(repos, tmp_path):
+    # Live case (2026-09-24): `claude` and `codex` started from ~ — Suvadu only
+    # knows cwd=~, their own transcript says which repo they work in.
+    home = tmp_path / "home"
+    mono = str(repos / "mono")
+    native = "aaaaaaaa-1111-2222"
+    _claude_transcript(home, native, str(home), [f"{mono}/docs/a.md", f"{mono}/docs/b.md", f"{mono}/pkg/c.py"])
+    suv, clock, sent = FakeSuv(), Clock(), []
+    suv.sessions = _sessions_json(_session(native, cwd=str(home)))
+    config = st.TrackerConfig(bin_path="suv", window_s=600, working_s=120)
+    t = st.ExternalAgentTracker(config, send=sent.append, repo_paths=lambda: [mono], clock=clock,
+                                sources=[st.SuvaduSource(suv, clock, home=str(home))],
+                                liveness=lambda: sl.Liveness())
+    t.poll_once()
+    assert [e["cityId"] for e in sent if e["type"] == "unit_spawn"] == [st.encode_repo_id(mono)]
+    assert t.sessions()[0]["repo"] == "mono"
+
+
+def test_one_mention_is_enough_when_the_cwd_is_in_no_repo(repos, tmp_path, monkeypatch):
+    # A short `codex exec` from ~ does its whole job in one call: one mention of
+    # cdaily beats "no repo at all". From a real repo, one glance does not move it.
+    monkeypatch.setattr(st, "_enclosing_git_repo", lambda path: None)
+    home = tmp_path / "home"
+    mono, repociv = str(repos / "mono"), str(repos / "repociv")
+    _claude_transcript(home, "cccccccc-1111-2222", str(home), [f"{mono}/docs/a.md"])
+    _claude_transcript(home, "dddddddd-1111-2222", repociv, [f"{mono}/docs/a.md"])
+    suv, clock, sent = FakeSuv(), Clock(), []
+    suv.sessions = _sessions_json(_session("cccccccc-1111-2222", cwd=str(home)),
+                                  _session("dddddddd-1111-2222", cwd=repociv))
+    config = st.TrackerConfig(bin_path="suv", window_s=600, working_s=120)
+    t = st.ExternalAgentTracker(config, send=sent.append, repo_paths=lambda: [mono, repociv], clock=clock,
+                                sources=[st.SuvaduSource(suv, clock, home=str(home))],
+                                liveness=lambda: sl.Liveness())
+    t.poll_once()
+    cities = {e["unit"]: e["cityId"] for e in sent if e["type"] == "unit_spawn"}
+    assert cities == {"ext-claude-code-cccccccc": st.encode_repo_id(mono),
+                      "ext-claude-code-dddddddd": st.encode_repo_id(repociv)}
+
+
+def test_a_transcript_is_read_again_only_when_it_changes(repos, tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    native = "bbbbbbbb-1111-2222"
+    path = _claude_transcript(home, native, str(home), [f"{repos}/mono/docs/a.md"])
+    reads: list[str] = []
+    real = st.transcript_work.transcript_work_dirs
+    monkeypatch.setattr(st.transcript_work, "transcript_work_dirs",
+                        lambda agent, p: reads.append(p) or real(agent, p))
+    suv, clock = FakeSuv(), Clock()
+    suv.sessions = _sessions_json(_session(native, cwd=str(home)))
+    src = st.SuvaduSource(suv, clock, home=str(home))
+    src.poll()
+    src.poll()
+    assert reads == [path]
+    with open(path, "a") as fh:
+        fh.write("{}\n")
+    src.poll()
+    assert reads == [path, path]
 
 
 def test_unmatched_cwd_goes_to_capital(repos):
