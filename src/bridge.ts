@@ -264,8 +264,10 @@ export class BridgeEvents {
   private syncExternalAgents() {
     void fetchExternalAgents().then((rows) => {
       if (!rows || this.stopped) return;
-      const ids = this.state.getAllUnits().map((u) => u.id);
-      for (const evt of externalAgentEvents(ids, rows)) this.handleBridgeEvent(evt);
+      const units = this.state.getAllUnits();
+      for (const evt of externalAgentEvents(units, rows, this.state.world.cities)) {
+        this.handleBridgeEvent(evt);
+      }
     });
   }
 

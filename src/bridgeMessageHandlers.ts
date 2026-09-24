@@ -32,7 +32,7 @@ import {
 import { cfg } from './gameConfig.ts';
 import { approveCommand } from './commandBus.ts';
 import { terminalPanel } from './terminalPanel.ts';
-import { findCityByRef, isExternalAgentUnit } from './externalAgents.ts';
+import { cityForRef, isExternalAgentUnit } from './externalAgents.ts';
 
 // ─── Context ────────────────────────────────────────────────────────────────
 // Everything a handler might need from the outside world. The BridgeEvents
@@ -92,8 +92,7 @@ const HANDLERS: HandlerByType = {
       // No parent to stand next to (e.g. an external agent seen by Suvadu):
       // stand next to the city it works in — the capital when that repo is
       // not on this map.
-      const cities = ctx.state.world.cities;
-      const city = findCityByRef(cities, evt.cityId) ?? cities.find((c) => c.isCapital);
+      const city = cityForRef(ctx.state.world.cities, evt.cityId);
       if (city) {
         cityId = city.id;
         const siblings = ctx.state.world.units.filter(
