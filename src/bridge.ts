@@ -39,6 +39,7 @@ export class BridgeEvents {
   private state: GameState;
   private stopHealthPoll: PollUnregister | null = null;
   private stopGpuPoll: PollUnregister | null = null;
+  private stopExternalAgentsPoll: PollUnregister | null = null;
   private reconnectDelay = 1000;
   private offlineSince: number | null = null;
   private demoInterval: ReturnType<typeof setInterval> | null = null;
@@ -75,6 +76,15 @@ export class BridgeEvents {
     this.stopHealthPoll = registerPoll('bridge:health', () => void this.checkHealth(), 5_000, {
       immediate: false,
     });
+    // Events are fire-and-forget: one lost while the transport is down or
+    // reconnecting (WS auth timeout → SSE churn) would leave the map stale
+    // until a reload. The snapshot replay also runs on a timer.
+    this.stopExternalAgentsPoll = registerPoll(
+      'bridge:external-agents',
+      () => this.syncExternalAgents(),
+      10_000,
+      { immediate: false, phaseMs: 5_000 },
+    );
     this.stopGpuPoll = registerPoll('bridge:gpu', () => void this.fetchGpu(), 5_000, {
       immediate: false,
       phaseMs: 2_500,
@@ -411,6 +421,10 @@ export class BridgeEvents {
     if (this.stopGpuPoll) {
       this.stopGpuPoll();
       this.stopGpuPoll = null;
+    }
+    if (this.stopExternalAgentsPoll) {
+      this.stopExternalAgentsPoll();
+      this.stopExternalAgentsPoll = null;
     }
     if (this.sseReconnectTimer) {
       clearTimeout(this.sseReconnectTimer);

@@ -31,19 +31,20 @@ export interface ExternalAgentRow {
 
 /**
  * Pure: the bridge events that bring the map's `ext-*` units in line with the
- * tracker snapshot — spawn missing ones, move the ones whose session changed
- * city (given `cities`), re-assert their state, despawn the ones the tracker
- * dropped while this client was not listening. Rows that do not validate as
- * bridge events are skipped.
+ * tracker snapshot — spawn missing ones, relocate the ones whose session
+ * changed city (given `cities`), set the state of the ones that show another,
+ * despawn the ones the tracker dropped while this client was not listening.
+ * Rows that do not validate as bridge events are skipped. Runs on every
+ * (re)connect and on a timer, so a unit already in line yields nothing.
  */
 export function externalAgentEvents(
-  currentUnits: Iterable<Pick<Unit, 'id' | 'cityId'>>,
+  currentUnits: Iterable<Pick<Unit, 'id' | 'cityId'> & Partial<Pick<Unit, 'state'>>>,
   rows: readonly ExternalAgentRow[],
   cities: readonly City[] = [],
 ): BridgeEvent[] {
-  const onMap = new Map<string, string | undefined>();
+  const onMap = new Map<string, Pick<Unit, 'cityId'> & Partial<Pick<Unit, 'state'>>>();
   for (const unit of currentUnits) {
-    if (isExternalAgentUnit(unit.id)) onMap.set(unit.id, unit.cityId);
+    if (isExternalAgentUnit(unit.id)) onMap.set(unit.id, unit);
   }
   const wanted = new Set<string>();
   const raw: unknown[] = [];
@@ -54,9 +55,9 @@ export function externalAgentEvents(
     const moved =
       onMap.has(row.unit) &&
       cities.length > 0 &&
-      (cityForRef(cities, row.cityId)?.id ?? row.cityId) !== onMap.get(row.unit);
-    if (moved) raw.push({ type: 'unit_despawn', unit: row.unit });
-    if (!onMap.has(row.unit) || moved) {
+      (cityForRef(cities, row.cityId)?.id ?? row.cityId) !== onMap.get(row.unit)?.cityId;
+    if (moved) raw.push({ type: 'unit_relocate', unit: row.unit, cityId: row.cityId });
+    if (!onMap.has(row.unit)) {
       raw.push({
         type: 'unit_spawn',
         unit: row.unit,
@@ -68,7 +69,9 @@ export function externalAgentEvents(
         ephemeral: true,
       });
     }
-    raw.push({ type: 'unit_state', unit: row.unit, state: row.state });
+    if (onMap.get(row.unit)?.state !== row.state) {
+      raw.push({ type: 'unit_state', unit: row.unit, state: row.state });
+    }
   }
   for (const id of onMap.keys()) {
     if (!wanted.has(id)) raw.push({ type: 'unit_despawn', unit: id });

@@ -122,6 +122,21 @@ const HANDLERS: HandlerByType = {
     ctx.logEvent(`Unidad ${unit.name} apareció en el mapa`, 'success');
   },
 
+  unit_relocate(ctx, evt) {
+    // An external agent moved on to another repo: walk it to that city (or put
+    // it there when no path leads). Units this map lacks come with the replay.
+    const unit = ctx.state.getUnit(evt.unit);
+    const city = cityForRef(ctx.state.world.cities, evt.cityId);
+    if (!unit || !city || unit.cityId === city.id) return;
+    const siblings = ctx.state.world.units.filter(
+      (u) => u.cityId === city.id && u.ephemeral && !u.parentUnitId,
+    ).length;
+    const dest = pickDetachmentHex(ctx.state, city.coord, siblings);
+    if (!ctx.state.walkUnitTo(unit.id, dest)) unit.coord = dest;
+    ctx.state.setUnitCity(unit.id, city.id);
+    ctx.logEvent(`${unit.name} se va a trabajar a ${city.name}`, 'info');
+  },
+
   unit_move(ctx, evt) {
     ctx.state.moveUnit(evt.unit, { q: evt.to[0], r: evt.to[1] });
   },

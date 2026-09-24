@@ -27,6 +27,7 @@ import {
 import { GameState } from './game.ts';
 import { dispatchBridgeEvent, type MessageContext } from './bridgeMessageHandlers.ts';
 import { axialDistance } from './hex.ts';
+import { aStarPath } from './pathfinding.ts';
 import type { City, World } from './types.ts';
 
 // ─── Minimal mocks (same seams as game.test.ts / bridge.test.ts) ─────────────
@@ -94,6 +95,17 @@ describe('externalAgentEvents', () => {
     expect(events).toEqual([{ type: 'unit_state', unit: 'ext-codex-bbbbbbbb', state: 'idle' }]);
   });
 
+  it('does not re-assert a state the unit already shows (the replay runs on a timer)', () => {
+    const events = externalAgentEvents(
+      [
+        { id: 'ext-a-1', state: 'working' },
+        { id: 'ext-a-2', state: 'moving' },
+      ],
+      [row('ext-a-1'), row('ext-a-2')],
+    );
+    expect(events).toEqual([{ type: 'unit_state', unit: 'ext-a-2', state: 'working' }]);
+  });
+
   it('despawns ext units the tracker dropped, never touching other units', () => {
     const events = externalAgentEvents(onMap('MAIN', 'SCOUT-sub-1', 'ext-cursor-cccccccc'), []);
     expect(events).toEqual([{ type: 'unit_despawn', unit: 'ext-cursor-cccccccc' }]);
@@ -124,7 +136,12 @@ describe('externalAgentEvents', () => {
       [row('ext-hermes-aaaaaaaa', { unitType: 'hero' })],
       cities,
     );
-    expect(events.map((e) => e.type)).toEqual(['unit_despawn', 'unit_spawn', 'unit_state']);
+    expect(events.map((e) => e.type)).toEqual(['unit_relocate', 'unit_state']);
+    expect(events[0]).toEqual({
+      type: 'unit_relocate',
+      unit: 'ext-hermes-aaaaaaaa',
+      cityId: REPOCIV,
+    });
   });
 
   it('leaves a unit that already stands at its city (or at the capital for an off-map repo)', () => {
@@ -234,7 +251,7 @@ describe('unit_spawn / unit_state for ext units', () => {
     expect(axialDistance(unit.coord, { q: 0, r: 0 })).toBe(1);
   });
 
-  it('a reconnect replay walks a unit from the capital to its new city', () => {
+  it('a reconnect replay puts a unit at its new city even when no path leads there', () => {
     const { state, ctx } = makeCtx();
     for (const evt of externalAgentEvents([], [row('ext-hermes-1', { cityId: 'capital' })])) {
       dispatchBridgeEvent(ctx, evt);
@@ -249,6 +266,37 @@ describe('unit_spawn / unit_state for ext units', () => {
     const unit = state.getUnit('ext-hermes-1')!;
     expect(unit.cityId).toBe(REPOCIV);
     expect(axialDistance(unit.coord, { q: 6, r: -2 })).toBe(1);
+  });
+
+  it('unit_relocate walks the unit over; a state change on the way waits for the arrival', () => {
+    const { state, ctx } = makeCtx();
+    for (const evt of externalAgentEvents([], [row('ext-hermes-2', { cityId: 'capital' })])) {
+      dispatchBridgeEvent(ctx, evt);
+    }
+    const unit = state.getUnit('ext-hermes-2')!;
+    vi.mocked(aStarPath).mockImplementationOnce((from, to) => [from, to]);
+    dispatchBridgeEvent(ctx, { type: 'unit_relocate', unit: 'ext-hermes-2', cityId: REPOCIV });
+    expect(unit.cityId).toBe(REPOCIV);
+    expect(unit.state).toBe('moving');
+    const dest = unit.targetCoord!;
+    expect(axialDistance(dest, { q: 6, r: -2 })).toBe(1);
+    dispatchBridgeEvent(ctx, { type: 'unit_state', unit: 'ext-hermes-2', state: 'idle' });
+    expect(unit.state).toBe('moving'); // still walking
+    (state as unknown as { updateUnits(dt: number): void }).updateUnits(1000);
+    expect(unit.coord).toEqual(dest);
+    expect(unit.state).toBe('idle');
+  });
+
+  it('unit_relocate ignores units this map lacks and moves within the same city', () => {
+    const { state, ctx } = makeCtx();
+    dispatchBridgeEvent(ctx, { type: 'unit_relocate', unit: 'ext-ghost-1', cityId: REPOCIV });
+    expect(state.getUnit('ext-ghost-1')).toBeUndefined();
+    for (const evt of externalAgentEvents([], [row('ext-a-9')])) dispatchBridgeEvent(ctx, evt);
+    const unit = state.getUnit('ext-a-9')!;
+    const before = { ...unit.coord };
+    dispatchBridgeEvent(ctx, { type: 'unit_relocate', unit: 'ext-a-9', cityId: REPOCIV });
+    expect(unit.coord).toEqual(before);
+    expect(unit.state).toBe('working');
   });
 
   it('spreads several agents of the same city over distinct hexes', () => {
