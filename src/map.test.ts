@@ -214,7 +214,100 @@ describe('generateWorld', () => {
     vi.unstubAllGlobals();
   });
 
-  it('prefers client-side selected repo paths over shared backend selection', async () => {
+  it('prefers shared backend selection (state.json) over the client-side cache', async () => {
+    // Stale cache: this browser once selected repo-a only.
+    window.localStorage.setItem(
+      'repociv:selected-repos:v1',
+      JSON.stringify({
+        version: 1,
+        selectedRepoPaths: ['/workspace/repo-a'],
+        filters: { owners: [], topics: [], languages: [] },
+      }),
+    );
+
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === '/api/repos') {
+        return {
+          ok: true,
+          json: async () => [
+            {
+              name: 'repo-a',
+              path: '/workspace/repo-a',
+              population: 20,
+              extensions: { ts: 10 },
+              gold: 40,
+              lastCommitDays: 1,
+              isLegacy: false,
+              hasGit: true,
+            },
+            {
+              name: 'repo-b',
+              path: '/workspace/repo-b',
+              population: 12,
+              extensions: { py: 6 },
+              gold: 30,
+              lastCommitDays: 2,
+              isLegacy: false,
+              hasGit: true,
+            },
+            {
+              name: 'repo-shared',
+              path: '/workspace/repo-shared',
+              population: 50,
+              extensions: { rs: 5 },
+              gold: 90,
+              lastCommitDays: 1,
+              isLegacy: false,
+              hasGit: true,
+            },
+          ],
+        };
+      }
+      if (input === '/api/repo-selections') {
+        return {
+          ok: true,
+          json: async () => ({
+            activeRoot: '/workspace',
+            roots: [
+              {
+                path: '/workspace',
+                selectedRepoIds: ['repo-b'],
+                selectedRepoPaths: ['/workspace/repo-b'],
+              },
+            ],
+            selectedRepoIds: ['repo-b'],
+            selectedRepoPaths: ['/workspace/repo-b'],
+            hasSelections: true,
+          }),
+        };
+      }
+      if (
+        input.startsWith('/api/files/') ||
+        input.startsWith('/api/skill-health/') ||
+        input.startsWith('/api/session-tint/')
+      ) {
+        return { ok: false, json: async () => ({}) };
+      }
+      throw new Error(`unexpected fetch ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const world = await generateWorld();
+
+    // state.json wins: repo-b renders even though the cache said repo-a.
+    expect(fetchMock).toHaveBeenCalledWith('/api/repo-selections');
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/repos/selected');
+    expect(world.cities.some((city) => city.id === 'repo-b')).toBe(true);
+    expect(world.cities.some((city) => city.id === 'repo-a')).toBe(false);
+    expect(world.cities.some((city) => city.id === 'repo-shared')).toBe(false);
+    // The cache is re-mirrored from the shared selection.
+    const mirrored = JSON.parse(
+      window.localStorage.getItem('repociv:selected-repos:v1') ?? '{}',
+    ) as { selectedRepoPaths?: string[] };
+    expect(mirrored.selectedRepoPaths).toEqual(['/workspace/repo-b']);
+  });
+
+  it('falls back to the client-side cache when the shared selection is empty', async () => {
     window.localStorage.setItem(
       'repociv:selected-repos:v1',
       JSON.stringify({
@@ -262,6 +355,18 @@ describe('generateWorld', () => {
           ],
         };
       }
+      if (input === '/api/repo-selections') {
+        return {
+          ok: true,
+          json: async () => ({
+            activeRoot: '/workspace',
+            roots: [],
+            selectedRepoIds: [],
+            selectedRepoPaths: [],
+            hasSelections: false,
+          }),
+        };
+      }
       if (
         input.startsWith('/api/files/') ||
         input.startsWith('/api/skill-health/') ||
@@ -275,6 +380,7 @@ describe('generateWorld', () => {
 
     const world = await generateWorld();
 
+    expect(fetchMock).toHaveBeenCalledWith('/api/repo-selections');
     expect(fetchMock).not.toHaveBeenCalledWith('/api/repos/selected');
     expect(world.cities.some((city) => city.id === 'repo-a')).toBe(true);
     expect(world.cities.some((city) => city.id === 'repo-b')).toBe(true);
@@ -321,6 +427,18 @@ describe('generateWorld', () => {
                 hasGit: true,
               },
             ],
+          };
+        }
+        if (input === '/api/repo-selections') {
+          return {
+            ok: true,
+            json: async () => ({
+              activeRoot: '/workspace',
+              roots: [],
+              selectedRepoIds: [],
+              selectedRepoPaths: [],
+              hasSelections: false,
+            }),
           };
         }
         if (
@@ -378,6 +496,18 @@ describe('generateWorld', () => {
               hasGit: true,
             },
           ],
+        };
+      }
+      if (input === '/api/repo-selections') {
+        return {
+          ok: true,
+          json: async () => ({
+            activeRoot: '/workspace',
+            roots: [],
+            selectedRepoIds: [],
+            selectedRepoPaths: [],
+            hasSelections: false,
+          }),
         };
       }
       if (input === '/api/repos/selected') {

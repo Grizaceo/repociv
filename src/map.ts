@@ -982,7 +982,9 @@ export async function generateWorld(): Promise<World> {
   const MIN_CITY_DISTANCE = 3;
   const tiles = new Map<string, Tile>();
   const cities: City[] = [];
-  const selectedRepoPaths = loadSelectedRepoPaths();
+  // Shared selection (state.json, served by /api/repo-selections) is the source
+  // of truth; the client-side cache is only a mirror and offline fallback.
+  let selectedRepoPaths = loadSelectedRepoPaths();
 
   // Workspace scan is the source of truth for which repos exist on this machine.
   let diskRepos: ScannedRepo[] | null = null;
@@ -994,28 +996,45 @@ export async function generateWorld(): Promise<World> {
     showMapLoadError(`No pude cargar repos reales: ${message}`);
   }
 
-  // Fetch real repos
+  // Fetch real repos — shared selection wins; the cache only fills in when the
+  // shared state has no selections at all (e.g. bridge down on a stale browser).
   let repos: ScannedRepo[] = [];
+  let selectionFromShared = false;
   try {
-    if (selectedRepoPaths !== null && selectedRepoPaths.size > 0) {
-      repos = (diskRepos ?? []).filter((repo) => repoMatchesSelection(repo, selectedRepoPaths));
-    } else {
-      repos = await fetchSelectedRepos();
-      saveSelectedRepoPaths(repos.map((repo) => repo.path));
+    const shared = await fetchRepoSelectionState();
+    if (shared.selectedRepoPaths.length > 0) {
+      selectionFromShared = true;
+      const sharedPaths = new Set(shared.selectedRepoPaths);
+      selectedRepoPaths = sharedPaths;
+      saveSelectedRepoPaths(shared.selectedRepoPaths); // re-mirror the cache
+      repos = (diskRepos ?? []).filter((repo) => repoMatchesSelection(repo, sharedPaths));
     }
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    logger.error('[map] /api/repos/selected failed', e);
-    showMapLoadError(
-      selectedRepoPaths !== null && selectedRepoPaths.size > 0
-        ? `No pude cargar repos reales: ${message}`
-        : `No pude cargar repos seleccionados: ${message}`,
-    );
-    if (selectedRepoPaths !== null && selectedRepoPaths.size > 0) {
-      try {
+    logger.error('[map] /api/repo-selections failed', e);
+  }
+
+  if (!selectionFromShared) {
+    try {
+      if (selectedRepoPaths !== null && selectedRepoPaths.size > 0) {
+        repos = (diskRepos ?? []).filter((repo) => repoMatchesSelection(repo, selectedRepoPaths));
+      } else {
         repos = await fetchSelectedRepos();
-      } catch {
-        repos = [];
+        saveSelectedRepoPaths(repos.map((repo) => repo.path));
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      logger.error('[map] /api/repos/selected failed', e);
+      showMapLoadError(
+        selectedRepoPaths !== null && selectedRepoPaths.size > 0
+          ? `No pude cargar repos reales: ${message}`
+          : `No pude cargar repos seleccionados: ${message}`,
+      );
+      if (selectedRepoPaths !== null && selectedRepoPaths.size > 0) {
+        try {
+          repos = await fetchSelectedRepos();
+        } catch {
+          repos = [];
+        }
       }
     }
   }
