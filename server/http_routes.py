@@ -93,6 +93,19 @@ from server.routes.wonder_ops import get_wonder_launch_status  # noqa: F401
 from server.routes.wonder_ops import get_wonder_launchable  # noqa: F401
 from server.routes.wonder_ops import post_wonder_connect  # noqa: F401
 from server.routes.wonder_ops import post_wonder_disconnect  # noqa: F401
+from server.routes.onboarding import get_map_roots  # noqa: F401
+from server.routes.onboarding import get_map_root  # noqa: F401
+from server.routes.onboarding import get_repo_selections  # noqa: F401
+from server.routes.onboarding import get_scanned_repos  # noqa: F401
+from server.routes.onboarding import get_selected_repos  # noqa: F401
+from server.routes.onboarding import get_all_roots_repos  # noqa: F401
+from server.routes.onboarding import post_add_map_root  # noqa: F401
+from server.routes.onboarding import post_activate_map_root  # noqa: F401
+from server.routes.onboarding import post_remove_map_root  # noqa: F401
+from server.routes.onboarding import post_pick_map_root  # noqa: F401
+from server.routes.onboarding import post_persist_selection  # noqa: F401
+from server.routes.onboarding import post_add_selected_repo  # noqa: F401
+from server.routes.onboarding import post_remove_selected_repo  # noqa: F401
 
 RouteContext = dict[str, Any]
 
