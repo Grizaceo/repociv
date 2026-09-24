@@ -219,6 +219,45 @@ def test_city_from_repo_root_then_cwd(home: Home, repos: Path) -> None:
     assert sorted(cities.values()) == sorted([st.encode_repo_id(alpha), st.encode_repo_id(beta), "capital"])
 
 
+def test_cwd_derived_from_tool_paths_when_the_row_has_none(home: Home, repos: Path) -> None:
+    clock = Clock()
+    alpha, beta = str(repos / "alpha"), str(repos / "beta")
+    (Path(alpha) / ".git").mkdir()  # subdirs aggregate under their repo root
+    derived, lone = "20260919_060000_derivd", "20260919_060001_lone00"
+    home.session(derived, source="desktop")  # desktop rows carry no cwd
+    for rel in ("src/one.py", "src/two.py", "README.md"):
+        home.message(derived, "assistant", "", NOW - 120,
+                     tool_calls=json.dumps([{"function": {"name": "read_file", "arguments":
+                                                          json.dumps({"path": f"{alpha}/{rel}"})}}]))
+    home.session(lone, source="desktop")
+    home.message(lone, "assistant", "", NOW - 120,
+                 tool_calls=json.dumps([{"function": {"name": "read_file",
+                                                      "arguments": json.dumps({"path": f"{beta}/solo.py"})}}]))
+    sent: list[dict[str, Any]] = []
+    t = _tracker(_source(home, clock), clock, sent, repo_paths=[alpha, beta])
+    t.poll_once()
+    by_native = {r["sessionId"].rsplit("-", 1)[-1]: r for r in t.sessions()}
+    assert by_native[derived]["cityId"] == st.encode_repo_id(alpha)
+    assert by_native[derived]["repo"] == "alpha"
+    assert by_native[lone]["cityId"] == "capital"  # one mention is a passing glance
+
+
+def test_cwd_derived_from_terminal_cd_when_the_row_has_none(home: Home, repos: Path) -> None:
+    clock = Clock()
+    alpha, beta = str(repos / "alpha"), str(repos / "beta")
+    sid = "20260919_060000_cd0001"
+    home.session(sid, source="cli")
+    for _ in range(3):
+        home.message(sid, "assistant", "", NOW - 120,
+                     tool_calls=json.dumps([{"function": {"name": "terminal", "arguments":
+                                                          json.dumps({"command": f"cd {beta} && git status"})}}]))
+    sent: list[dict[str, Any]] = []
+    t = _tracker(_source(home, clock), clock, sent, repo_paths=[alpha, beta])
+    t.poll_once()
+    by_native = {r["sessionId"].rsplit("-", 1)[-1]: r for r in t.sessions()}
+    assert by_native[sid]["cityId"] == st.encode_repo_id(beta)
+
+
 def test_unit_id_label_and_type(home: Home) -> None:
     clock = Clock()
     home.session("20260919_061733_615e9a", source="desktop")
