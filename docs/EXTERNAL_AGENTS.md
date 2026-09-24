@@ -232,9 +232,14 @@ en Cron.
   unidad (el id sale de la primera sesión), y su chat se lee a través de la cadena. Un
   subagente (`source='subagent'`) no es una continuación: tiene su propia unidad y la
   etiqueta "subagente".
-- **Ciudad:** `git_repo_root` si existe; si no, `cwd`. Con la regla de siempre
-  (`city_for`). Las sesiones de desktop suelen no tener `cwd`, así que caen en la
-  capital.
+- **Ciudad:** `git_repo_root` si existe; si no, `cwd`. Si la fila no trae ninguno
+  de los dos (las sesiones de desktop ya no persisten `cwd`), se deriva del repo
+  git donde vivió su actividad reciente: los `path`/`workdir` de sus tool calls y
+  los `cd` de sus comandos. Hacen falta ≥3 menciones del mismo repo — una mirada
+  de paso a otra carpeta no mueve la unidad. Un repo oculto en el camino
+  (`~/.hermes` y otros cachés de tooling) es territorio de herramientas y no
+  captura la unidad, salvo que el archivo viva ahí. Después, la regla de siempre
+  (`city_for`).
 - **Sin duplicados:**
   - Las misiones Hermes que lanza RepoCiv (`hermes chat … --source tool`) ya tienen su
     unidad. Se excluyen por `source='tool'` y por los ids de

@@ -35,6 +35,11 @@ map at once. When Hermes compresses a long conversation it closes the session
 (``end_reason='compression'``) and continues in a child; the chain keeps one
 unit, keyed by its first session.
 
+A row without ``git_repo_root``/``cwd`` (desktop sessions carry none) derives
+its workdir from its own recent tool calls: the ``path``/``workdir`` of its file
+tools and the ``cd`` of its commands, counted per enclosing git repo; a repo
+needs ``_DERIVE_MIN_HITS`` mentions to win, so a passing glance does not move it.
+
 Privacy is the tracker's: metadata only in polls; chat text (user and
 assistant turns, plus the *names* of the tools used — never tool output or
 arguments) only through the token-protected chat endpoint.
@@ -53,7 +58,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable
 from urllib.parse import quote
 
-from server.suvadu_tracker import Observation, SourceError
+from server.suvadu_tracker import Observation, SourceError, _enclosing_git_repo
 
 AGENT = "hermes"
 MAP_ORIGINS = frozenset({"cli", "desktop", "tui", "hermes_browser", "kanban", "subagent"})
@@ -70,8 +75,13 @@ _POLL_DEADLINE_S = 2.0  # per database
 _CHAT_DEADLINE_S = 3.0
 _ENDED_SLACK_MS = 5_000
 _LIVE_SLACK_MS = 120_000  # last_activity_at trails the newest message by ≤ ~60 s
+_DERIVE_ROWS = 60  # newest tool-call messages inspected per cwd-less session
+_DERIVE_MIN_HITS = 3  # mentions of one repo before it moves the unit
 _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_PATH_HINT_RE = re.compile(r'"(?:path|workdir)"\s*:\s*"([^"]+)"')
+_CD_HINT_RE = re.compile(r"(?:^|&&|;|\|\|)\s*cd\s+(['\"]?)(~/[^'\"\s;&|]*|/[^'\"\s;&|]*)")
+_DERIVE_CMD_TOOLS = frozenset({"terminal", "execute_code", "process_manage"})
 
 
 # ─── Config ──────────────────────────────────────────────────────────────────
@@ -230,6 +240,84 @@ def _as_row(r: tuple[Any, ...]) -> _Row | None:
         activity_s=float(activity) if isinstance(activity, (int, float)) else float(started),
         hidden=bool(hidden),
     )
+
+
+def _work_repo(path: str) -> str:
+    """The git repo a hint belongs to: nearest root, never an ambient one.
+
+    ``~/.hermes`` (or any dotted ancestor) is tooling territory — a stray file
+    under a cache must not drag a whole home into one city. A hidden root only
+    wins when the hint sits at it (``~/.dotfiles/x``).
+    """
+    root = _enclosing_git_repo(path)
+    if root is None or (root != path and os.path.basename(root).startswith(".")):
+        return path
+    return root
+
+
+def _derive_cwd(conn: sqlite3.Connection, sid: str) -> str:
+    """The git repo a cwd-less session worked in, guessed from its own activity.
+
+    Desktop sessions stopped persisting ``cwd`` (2026-09-18), so every Hermes
+    unit fell to the capital. Their recent tool calls still name the files they
+    touch (``path``/``workdir``) and ``cd`` their commands: counted per enclosing
+    git repo, one repo wins from ``_DERIVE_MIN_HITS`` mentions — a passing
+    glance at another folder must not move the unit. Best effort: any sqlite
+    error (old schema, poll deadline) keeps the capital, exactly as before.
+    """
+    try:
+        raw = conn.execute(
+            "SELECT tool_calls FROM messages WHERE session_id = ? AND tool_calls IS NOT NULL "
+            f"ORDER BY id DESC LIMIT {_DERIVE_ROWS}",
+            (sid,),
+        ).fetchall()
+    except sqlite3.Error:
+        return ""
+    hints: list[str] = []
+    for (tc,) in raw:
+        try:
+            calls = json.loads(tc or "[]")
+        except (ValueError, TypeError):
+            continue
+        for call in calls if isinstance(calls, list) else []:
+            fn = call.get("function") if isinstance(call, dict) else None
+            if not isinstance(fn, dict):
+                continue
+            args = fn.get("arguments")
+            if not isinstance(args, str):
+                continue
+            try:
+                data = json.loads(args) if args else None
+            except (ValueError, TypeError):
+                data = None
+            if isinstance(data, dict):
+                for key in ("path", "workdir"):
+                    value = data.get(key)
+                    if isinstance(value, str):
+                        hints.append(value)
+                if fn.get("name") in _DERIVE_CMD_TOOLS:
+                    cmd = data.get("command")
+                    if isinstance(cmd, str):
+                        hints.extend(m.group(2) for m in _CD_HINT_RE.finditer(cmd))
+            else:  # truncated or non-JSON arguments: the raw string is all we have
+                hints.extend(m.group(1) for m in _PATH_HINT_RE.finditer(args))
+                if fn.get("name") in _DERIVE_CMD_TOOLS:
+                    hints.extend(m.group(2) for m in _CD_HINT_RE.finditer(args))
+    counts: dict[str, int] = {}
+    for hint in hints:
+        if not hint.startswith(("/", "~")):
+            continue
+        path = os.path.abspath(os.path.expanduser(hint))
+        if not os.path.isdir(path):
+            path = os.path.dirname(path)
+        if not path or not os.path.isdir(path):
+            continue
+        root = _work_repo(path)
+        counts[root] = counts.get(root, 0) + 1
+    if not counts:
+        return ""
+    root, hits = max(counts.items(), key=lambda kv: kv[1])
+    return root if hits >= _DERIVE_MIN_HITS else ""
 
 
 def _continues(child: _Row, parent: _Row) -> bool:
@@ -406,11 +494,14 @@ class HermesSource:
         section = section_for(lin.root_origin if origin == "subagent" else origin)
         root = lin.chain_root
         model = row.model
+        # Desktop rows stopped persisting cwd: derive it from the session's own
+        # activity so the unit lands in the city of the folder it worked in.
+        cwd = row.cwd or _derive_cwd(conn, row.id)
         return Observation(
             session_id=f"hermes-{profile}-{root.id}",
             agent=AGENT,
             native_id=row.id,
-            cwd=row.cwd,
+            cwd=cwd,
             model=model,
             first_activity_ms=int(root.started_s * 1000),
             last_activity_ms=last_ms,
