@@ -35,10 +35,12 @@ map at once. When Hermes compresses a long conversation it closes the session
 (``end_reason='compression'``) and continues in a child; the chain keeps one
 unit, keyed by its first session.
 
-A row without ``git_repo_root``/``cwd`` (desktop sessions carry none) derives
-its workdir from its own recent tool calls: the ``path``/``workdir`` of its file
-tools and the ``cd`` of its commands, counted per enclosing git repo; a repo
-needs ``_DERIVE_MIN_HITS`` mentions to win, so a passing glance does not move it.
+Where a unit stands comes from the session's own recent tool calls: the
+``path``/``workdir`` of its file tools and the ``cd`` of its commands
+(``Observation.work_dirs``), which the tracker counts per repo — one unit, in
+the repo most of the latest mentions name. ``git_repo_root``/``cwd`` decide only
+when the activity names no repo often enough: desktop rows carry no cwd, and a
+CLI launched from ~ keeps ~ for its whole life.
 
 Privacy is the tracker's: metadata only in polls; chat text (user and
 assistant turns, plus the *names* of the tools used — never tool output or
@@ -55,10 +57,10 @@ import re
 import sqlite3
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Sequence
 from urllib.parse import quote
 
-from server.suvadu_tracker import Observation, SourceError, _enclosing_git_repo
+from server.suvadu_tracker import Observation, SourceError
 
 AGENT = "hermes"
 MAP_ORIGINS = frozenset({"cli", "desktop", "tui", "hermes_browser", "kanban", "subagent"})
@@ -75,13 +77,12 @@ _POLL_DEADLINE_S = 2.0  # per database
 _CHAT_DEADLINE_S = 3.0
 _ENDED_SLACK_MS = 5_000
 _LIVE_SLACK_MS = 120_000  # last_activity_at trails the newest message by ≤ ~60 s
-_DERIVE_ROWS = 60  # newest tool-call messages inspected per cwd-less session
-_DERIVE_MIN_HITS = 3  # mentions of one repo before it moves the unit
+_WORK_ROWS = 60  # newest tool-call messages read per session for its work folders
 _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _PATH_HINT_RE = re.compile(r'"(?:path|workdir)"\s*:\s*"([^"]+)"')
 _CD_HINT_RE = re.compile(r"(?:^|&&|;|\|\|)\s*cd\s+(['\"]?)(~/[^'\"\s;&|]*|/[^'\"\s;&|]*)")
-_DERIVE_CMD_TOOLS = frozenset({"terminal", "execute_code", "process_manage"})
+_CMD_TOOLS = frozenset({"terminal", "execute_code", "process_manage"})
 
 
 # ─── Config ──────────────────────────────────────────────────────────────────
@@ -242,45 +243,31 @@ def _as_row(r: tuple[Any, ...]) -> _Row | None:
     )
 
 
-def _work_repo(path: str) -> str:
-    """The git repo a hint belongs to: nearest root, never an ambient one.
+def _work_dirs(conn: sqlite3.Connection, sids: Sequence[str]) -> tuple[str, ...]:
+    """Folders a session's recent tool calls touched, newest first, one per mention.
 
-    ``~/.hermes`` (or any dotted ancestor) is tooling territory — a stray file
-    under a cache must not drag a whole home into one city. A hidden root only
-    wins when the hint sits at it (``~/.dotfiles/x``).
+    Read over the whole compression chain (``sids``): a child fresh from
+    compression has barely any calls of its own. Which repo those folders make
+    the unit's city is the tracker's call (``suvadu_tracker.work_place``), since
+    only it knows the map. Best effort: any sqlite error (old schema, poll
+    deadline) returns nothing and the row's cwd decides, as it always did.
     """
-    root = _enclosing_git_repo(path)
-    if root is None or (root != path and os.path.basename(root).startswith(".")):
-        return path
-    return root
-
-
-def _derive_repos(conn: sqlite3.Connection, sid: str) -> list[str]:
-    """Enumerate git repos a cwd-less session worked in, from its own activity.
-
-    Desktop sessions stopped persisting ``cwd`` (2026-09-18), so every Hermes
-    unit fell to the capital. Their recent tool calls still name the files they
-    touch (``path``/``workdir``) and ``cd`` their commands: counted per enclosing
-    git repo, **every** repo that reaches ``_DERIVE_MIN_HITS`` mentions wins —
-    a passing glance at another folder (fewer hits) is ignored, but a session
-    that genuinely worked in two repos spawns a unit in each. Best effort: any
-    sqlite error (old schema, poll deadline) returns an empty list.
-    """
+    marks = ",".join("?" * len(sids))
     try:
         raw = conn.execute(
-            "SELECT tool_calls FROM messages WHERE session_id = ? AND tool_calls IS NOT NULL "
-            f"ORDER BY id DESC LIMIT {_DERIVE_ROWS}",
-            (sid,),
+            f"SELECT tool_calls FROM messages WHERE session_id IN ({marks}) AND tool_calls IS NOT NULL "
+            f"ORDER BY id DESC LIMIT {_WORK_ROWS}",
+            tuple(sids),
         ).fetchall()
     except sqlite3.Error:
-        return []
+        return ()
     hints: list[str] = []
     for (tc,) in raw:
         try:
             calls = json.loads(tc or "[]")
         except (ValueError, TypeError):
             continue
-        for call in calls if isinstance(calls, list) else []:
+        for call in reversed(calls) if isinstance(calls, list) else []:  # newest first
             fn = call.get("function") if isinstance(call, dict) else None
             if not isinstance(fn, dict):
                 continue
@@ -296,34 +283,24 @@ def _derive_repos(conn: sqlite3.Connection, sid: str) -> list[str]:
                     value = data.get(key)
                     if isinstance(value, str):
                         hints.append(value)
-                if fn.get("name") in _DERIVE_CMD_TOOLS:
+                if fn.get("name") in _CMD_TOOLS:
                     cmd = data.get("command")
                     if isinstance(cmd, str):
                         hints.extend(m.group(2) for m in _CD_HINT_RE.finditer(cmd))
             else:  # truncated or non-JSON arguments: the raw string is all we have
                 hints.extend(m.group(1) for m in _PATH_HINT_RE.finditer(args))
-                if fn.get("name") in _DERIVE_CMD_TOOLS:
+                if fn.get("name") in _CMD_TOOLS:
                     hints.extend(m.group(2) for m in _CD_HINT_RE.finditer(args))
-    counts: dict[str, int] = {}
+    dirs: list[str] = []
     for hint in hints:
         if not hint.startswith(("/", "~")):
             continue
         path = os.path.abspath(os.path.expanduser(hint))
         if not os.path.isdir(path):
             path = os.path.dirname(path)
-        if not path or not os.path.isdir(path):
-            continue
-        root = _work_repo(path)
-        counts[root] = counts.get(root, 0) + 1
-    if not counts:
-        return []
-    return [root for root, hits in counts.items() if hits >= _DERIVE_MIN_HITS]
-
-
-def _derive_cwd(conn: sqlite3.Connection, sid: str) -> str:
-    """Backwards-compatible single-repo form: the most-hit repo (or ``""``)."""
-    repos = _derive_repos(conn, sid)
-    return repos[0] if repos else ""
+        if path and os.path.isdir(path):
+            dirs.append(path)
+    return tuple(dirs)
 
 
 def _continues(child: _Row, parent: _Row) -> bool:
@@ -334,18 +311,35 @@ def _continues(child: _Row, parent: _Row) -> bool:
 @dataclass
 class _Lineage:
     chain_root: _Row  # first session of the compression chain
+    chain: list[str]  # this session and its compression ancestors, newest first
     delegator: str | None  # parent session when this one is a subagent
     root_origin: str  # origin of the topmost ancestor (cron → cron section…)
     ids: set[str] = field(default_factory=set)  # every ancestor id seen
 
 
-class _Rows:
-    """Per-poll PK cache over one database."""
+_WorkMemo = tuple[tuple[int, int, float], tuple[str, ...]]  # (messages, tools, activity), work dirs
 
-    def __init__(self, conn: sqlite3.Connection, schema: _Schema, rows: list[_Row]) -> None:
+
+class _Rows:
+    """Per-poll PK cache over one database, plus the work folders carried over
+    from its previous poll."""
+
+    def __init__(self, conn: sqlite3.Connection, schema: _Schema, rows: list[_Row],
+                 prior_work: dict[str, _WorkMemo] | None = None) -> None:
         self._conn = conn
         self._sql = f"SELECT {_row_sql(schema)} FROM sessions WHERE id = ?"
         self._by_id: dict[str, _Row | None] = {row.id: row for row in rows}
+        self._prior_work = prior_work or {}
+        self.work: dict[str, _WorkMemo] = {}
+
+    def work_dirs(self, row: _Row, chain: Sequence[str]) -> tuple[str, ...]:
+        """:func:`_work_dirs`, reused while the session gains no activity: most
+        of the 24 h list never does, and reading tool calls is the bulk of a poll."""
+        stamp = (row.messages, row.tools, row.activity_s)
+        memo = self._prior_work.get(row.id)
+        dirs = memo[1] if memo is not None and memo[0] == stamp else _work_dirs(self._conn, chain)
+        self.work[row.id] = (stamp, dirs)
+        return dirs
 
     def get(self, sid: str) -> _Row | None:
         if sid not in self._by_id:
@@ -354,7 +348,7 @@ class _Rows:
         return self._by_id[sid]
 
     def lineage(self, row: _Row) -> _Lineage:
-        lin = _Lineage(chain_root=row, delegator=None, root_origin=row.origin, ids={row.id})
+        lin = _Lineage(chain_root=row, chain=[row.id], delegator=None, root_origin=row.origin, ids={row.id})
         in_chain = True
         current = row
         for _ in range(_CHAIN_MAX):
@@ -365,6 +359,7 @@ class _Rows:
                 break
             if in_chain and _continues(current, parent):
                 lin.chain_root = parent
+                lin.chain.append(parent.id)
             elif in_chain:
                 in_chain = False
                 lin.delegator = parent.id
@@ -402,6 +397,7 @@ class HermesSource:
         self._owned_ids = owned_ids
         self._clock = clock
         self._last: dict[str, list[Observation]] = {}  # per profile, for failing dbs
+        self._work: dict[str, dict[str, _WorkMemo]] = {}  # per profile, see _Rows.work_dirs
         self._errors: dict[str, str] = {}
         self._dbs = 0
 
@@ -463,16 +459,18 @@ class HermesSource:
                 (since,),
             ).fetchall()
             rows = [row for row in map(_as_row, raw) if row is not None]
-            cache = _Rows(conn, schema, rows)
+            cache = _Rows(conn, schema, rows, self._work.get(db.profile))
             out: list[Observation] = []
             for row in rows:
-                for obs in self._observe_multi(conn, db.profile, row, cache, now_s, owned):
+                obs = self._observe(conn, db.profile, row, cache, now_s, owned)
+                if obs is not None:
                     out.append(obs)
+            self._work[db.profile] = cache.work  # sessions gone from the list drop out
             return out
         finally:
             conn.close()
 
-    def _observe_multi(
+    def _observe(
         self,
         conn: sqlite3.Connection,
         profile: str,
@@ -480,21 +478,14 @@ class HermesSource:
         cache: _Rows,
         now_s: float,
         owned: frozenset[str],
-    ) -> list[Observation]:
-        """Yield one Observation per significant repo this session worked in.
-
-        Desktop sessions stopped persisting ``cwd``, so a unit that touched two
-        repos (passing glances excluded by ``_DERIVE_MIN_HITS``) appears in each
-        one. With an explicit ``cwd`` we yield exactly one observation. Legacy
-        callers: keep the single-observation shape.
-        """
+    ) -> Observation | None:
         if row.hidden or not _ID_RE.match(row.id):
-            return []
+            return None
         lin = cache.lineage(row)
         if lin.ids & owned or any(
             (anc := cache.get(i)) is not None and anc.origin in REPOCIV_ORIGINS for i in lin.ids
         ):
-            return []
+            return None  # RepoCiv's own mission (or its subagent): it already has a unit
         last_s = row.activity_s
         if now_s - last_s <= self.window_s + _LIVE_SLACK_MS / 1000:
             newest = conn.execute("SELECT max(timestamp) FROM messages WHERE session_id = ?", (row.id,)).fetchone()
@@ -506,56 +497,28 @@ class HermesSource:
         section = section_for(lin.root_origin if origin == "subagent" else origin)
         root = lin.chain_root
         model = row.model
-        repos: list[str]
-        if row.cwd:
-            repos = [row.cwd]
-        else:
-            repos = _derive_repos(conn, row.id)
-            if not repos:
-                repos = [""]
-        out: list[Observation] = []
-        for idx, cwd in enumerate(repos):
-            uid = unit_id_for(profile, root.id)
-            sid = f"hermes-{profile}-{root.id}"
-            if idx > 0:
-                # Distinct session_id + unit_id per extra repo so the bridge
-                # treats each as its own unit and places it in its own city.
-                uid = f"{uid}-{idx}"
-                sid = f"{sid}-{idx}"
-            out.append(Observation(
-                session_id=sid,
-                agent=AGENT,
-                native_id=row.id,
-                cwd=cwd,
-                model=model,
-                first_activity_ms=int(root.started_s * 1000),
-                last_activity_ms=last_ms,
-                command_count=row.tools,
-                event_count=row.messages,
-                total_tokens=row.tokens,
-                parent_id=lin.delegator,
-                source=self.name,
-                unit_id=uid,
-                unit_type=unit_type_for(profile),
-                label=" · ".join(p for p in (profile, _short_model(model), origin) if p),
-                section=section,
-                ended=ended,
-                profile=profile,
-                origin=origin,
-            ))
-        return out
-
-    def _observe(
-        self,
-        conn: sqlite3.Connection,
-        profile: str,
-        row: _Row,
-        cache: _Rows,
-        now_s: float,
-        owned: frozenset[str],
-    ) -> Observation | None:
-        obs_list = self._observe_multi(conn, profile, row, cache, now_s, owned)
-        return obs_list[0] if obs_list else None
+        return Observation(
+            session_id=f"hermes-{profile}-{root.id}",
+            agent=AGENT,
+            native_id=row.id,
+            cwd=row.cwd,
+            model=model,
+            first_activity_ms=int(root.started_s * 1000),
+            last_activity_ms=last_ms,
+            command_count=row.tools,
+            event_count=row.messages,
+            total_tokens=row.tokens,
+            parent_id=lin.delegator,
+            source=self.name,
+            unit_id=unit_id_for(profile, root.id),
+            unit_type=unit_type_for(profile),
+            label=" · ".join(p for p in (profile, _short_model(model), origin) if p),
+            section=section,
+            ended=ended,
+            profile=profile,
+            origin=origin,
+            work_dirs=cache.work_dirs(row, lin.chain),
+        )
 
     def status(self) -> dict[str, Any]:
         return {"databases": self._dbs, "dbErrors": dict(self._errors)}

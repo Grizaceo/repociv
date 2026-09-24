@@ -258,6 +258,93 @@ def test_cwd_derived_from_terminal_cd_when_the_row_has_none(home: Home, repos: P
     assert by_native[sid]["cityId"] == st.encode_repo_id(beta)
 
 
+def _call(home: Home, sid: str, name: str, ts: float = NOW - 120, **args: Any) -> None:
+    home.message(sid, "assistant", "", ts,
+                 tool_calls=json.dumps([{"function": {"name": name, "arguments": json.dumps(args)}}]))
+
+
+def test_activity_beats_a_launch_cwd_outside_any_repo(home: Home, repos: Path, tmp_path: Path) -> None:
+    # Live case (2026-09-24): `hermes` launched from ~ keeps cwd=/home/<user>,
+    # and every tool call after the first look around lands in one repo.
+    clock = Clock()
+    alpha, beta = str(repos / "alpha"), str(repos / "beta")
+    launch = tmp_path / "home"
+    launch.mkdir()
+    sid = "20260924_192345_88e905"
+    home.session(sid, source="cli", cwd=str(launch))
+    for _ in range(4):
+        _call(home, sid, "search_files", ts=NOW - 300, path=str(launch), pattern="*bot*")
+    for name in ("README.md", "bot.ts", "package.json"):
+        _call(home, sid, "read_file", path=f"{beta}/{name}")
+    sent: list[dict[str, Any]] = []
+    t = _tracker(_source(home, clock), clock, sent, repo_paths=[alpha, beta])
+    t.poll_once()
+    # One unit, in beta: the folder outside any repo neither pins it nor clones it.
+    assert [e["cityId"] for e in sent if e["type"] == "unit_spawn"] == [st.encode_repo_id(beta)]
+
+
+def test_one_unit_where_the_session_works_now(home: Home, repos: Path) -> None:
+    clock = Clock()
+    alpha, beta = str(repos / "alpha"), str(repos / "beta")
+    sid = "20260919_060000_moved0"
+    home.session(sid, source="desktop")
+    for i in range(6):
+        _call(home, sid, "read_file", ts=NOW - 600 + i, path=f"{alpha}/src/f{i}.py")
+    for i in range(8):
+        _call(home, sid, "patch", ts=NOW - 120 + i, path=f"{beta}/g{i}.py")
+    sent: list[dict[str, Any]] = []
+    t = _tracker(_source(home, clock), clock, sent, repo_paths=[alpha, beta])
+    t.poll_once()
+    spawns = [(e["unit"], e["cityId"]) for e in sent if e["type"] == "unit_spawn"]
+    assert spawns == [(hs.unit_id_for("default", sid), st.encode_repo_id(beta))]
+    assert [r["repo"] for r in t.sessions()] == ["beta"]
+
+
+def test_the_unit_follows_the_session_to_its_next_repo(home: Home, repos: Path) -> None:
+    clock = Clock()
+    alpha, beta = str(repos / "alpha"), str(repos / "beta")
+    sid = "20260919_060000_walker"
+    home.session(sid, source="desktop")
+    for i in range(4):
+        _call(home, sid, "read_file", ts=NOW - 300 + i, path=f"{alpha}/src/f{i}.py")
+    sent: list[dict[str, Any]] = []
+    t = _tracker(_source(home, clock), clock, sent, repo_paths=[alpha, beta])
+    t.poll_once()
+    unit = hs.unit_id_for("default", sid)
+    assert [e["cityId"] for e in sent if e["type"] == "unit_spawn"] == [st.encode_repo_id(alpha)]
+    sent.clear()
+    for i in range(10):
+        _call(home, sid, "terminal", ts=NOW - 60 + i, command=f"cd {beta} && make t{i}")
+    t.poll_once()
+    assert sent == []  # its row did not change: last poll's folders are reused
+    conn = sqlite3.connect(home.db())
+    conn.execute("UPDATE sessions SET message_count = message_count + 10 WHERE id = ?", (sid,))
+    conn.commit()  # as Hermes does on every insert
+    conn.close()
+    t.poll_once()
+    # It moves (same unit); no clone stays behind in alpha.
+    assert [(e["type"], e.get("cityId")) for e in sent if e["type"] != "unit_state"] == [
+        ("unit_despawn", None), ("unit_spawn", st.encode_repo_id(beta))]
+    assert {e["unit"] for e in sent} == {unit}
+
+
+def test_folders_without_git_count_toward_their_city(home: Home, repos: Path) -> None:
+    # A selected city with no .git (job-search-cristobal): mentions in its
+    # subfolders add up to one place instead of one "repo" per subfolder.
+    clock = Clock()
+    beta = repos / "beta"
+    for sub in ("a", "b", "c"):
+        (beta / sub).mkdir()
+    sid = "20260923_215936_54a804"
+    home.session(sid, source="desktop")
+    for sub in ("a", "b", "c"):
+        _call(home, sid, "write_file", path=f"{beta}/{sub}/notes.md")
+    sent: list[dict[str, Any]] = []
+    t = _tracker(_source(home, clock), clock, sent, repo_paths=[str(repos / "alpha"), str(beta)])
+    t.poll_once()
+    assert [e["cityId"] for e in sent if e["type"] == "unit_spawn"] == [st.encode_repo_id(str(beta))]
+
+
 def test_unit_id_label_and_type(home: Home) -> None:
     clock = Clock()
     home.session("20260919_061733_615e9a", source="desktop")
@@ -292,6 +379,23 @@ def test_compression_chain_keeps_one_unit(home: Home) -> None:
     assert row["sessionId"] == "hermes-default-20260919_050000_seg001"
     assert row["firstActivityAt"] == int((NOW - 3600) * 1000)
     assert row["subagent"] is False
+
+
+def test_a_child_fresh_from_compression_stays_in_its_repo(home: Home, repos: Path) -> None:
+    clock = Clock()
+    alpha = str(repos / "alpha")
+    home.session("20260919_050000_seg001", source="desktop", started=NOW - 3600, ended=NOW - 10 * MIN,
+                 end_reason="compression", last=NOW - 10 * MIN)
+    for i in range(5):
+        _call(home, "20260919_050000_seg001", "read_file", ts=NOW - 15 * MIN + i, path=f"{alpha}/src/f{i}.py")
+    home.session("20260919_055000_seg002", source="desktop", parent="20260919_050000_seg001",
+                 started=NOW - 10 * MIN, last=NOW - 30)
+    _call(home, "20260919_055000_seg002", "read_file", path=f"{alpha}/src/next.py")
+    sent: list[dict[str, Any]] = []
+    t = _tracker(_source(home, clock), clock, sent, repo_paths=[alpha])
+    t.poll_once()
+    [spawn] = [e for e in sent if e["type"] == "unit_spawn"]
+    assert spawn["cityId"] == st.encode_repo_id(alpha)
 
 
 def test_sections_cron_gateway_and_subagents(home: Home) -> None:

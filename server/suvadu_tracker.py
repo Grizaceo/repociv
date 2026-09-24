@@ -12,8 +12,10 @@ The tracker polls every ~30 s and mirrors the recently active sessions onto
 the map:
 
   * spawn   — a session with activity in the last WINDOW minutes becomes an
-              ephemeral unit ``ext-<agent>-<native_id[:8]>`` in the city whose
-              repo path is the longest prefix of the session cwd (else capital);
+              ephemeral unit ``ext-<agent>-<native_id[:8]>`` in the city it is
+              working in: the repo most of its latest touched folders belong
+              to (``Observation.work_dirs``, Hermes), else the city whose repo
+              path is the longest prefix of the session cwd (else capital);
   * state   — ``working`` while the last activity is fresh, ``idle`` once it ages;
   * despawn — when the last activity falls out of the window.
 
@@ -48,6 +50,7 @@ import re
 import subprocess
 import threading
 import time
+from collections import Counter
 from dataclasses import dataclass, replace
 from typing import Any, Callable, Iterable, Protocol, Sequence
 
@@ -67,6 +70,8 @@ _MAX_EVENT_PAGES = 30
 _IMPORT_MIN_INTERVAL_S = 5.0
 _CHAT_ROLES = {"prompt": "user", "response": "assistant"}
 _NATIVE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]{7,79}$")
+_WORK_RECENT = 12  # latest in-repo folder mentions that vote for where a session works
+_WORK_MIN_HITS = 3  # votes one repo needs before it outranks the session cwd
 
 # Suvadu agent id → unitType from the bridgeSchema.ts picklist.
 _UNIT_TYPES = {"claude-code": "claude", "claude": "claude", "codex": "codex"}
@@ -166,6 +171,10 @@ class Observation:
     ended: bool = False  # the source knows the session is over → off the map
     profile: str = ""
     origin: str = ""  # how the session was started (Hermes: cli, desktop, cron…)
+    # Folders the session's own recent activity touched, newest first, one per
+    # mention (Hermes tool calls). Where it works now, which the launch cwd
+    # (often ~, or nothing on desktop) does not tell.
+    work_dirs: tuple[str, ...] = ()
     # Set by the tracker, not by the sources: is a process still holding this
     # session? None when it could not be told (see server/session_liveness.py).
     live: bool | None = None
@@ -353,6 +362,22 @@ def city_candidates(repo_paths: Iterable[str], *, home_repo: str = _REPOCIV_ROOT
     return out
 
 
+def _selected_city(path_c: str, candidates: list[_Candidate]) -> tuple[str, str] | None:
+    """Rules 1–2 of :func:`city_for` for a canonical path, or None."""
+    best: tuple[int, str, bool] | None = None
+    for repo_c, repo_abs, is_home in candidates:
+        try:
+            inside = os.path.commonpath([path_c, repo_c]) == repo_c
+        except ValueError:
+            continue
+        if inside and (best is None or len(repo_c) > best[0]):
+            best = (len(repo_c), repo_abs, is_home)
+    if best is None:
+        return None
+    city_id = CAPITAL_ID if best[2] else encode_repo_id(best[1])
+    return city_id, os.path.basename(best[1])
+
+
 def city_for(cwd: str, candidates: list[_Candidate]) -> tuple[str, str]:
     """(cityId, repo name) for a session cwd.
 
@@ -369,21 +394,41 @@ def city_for(cwd: str, candidates: list[_Candidate]) -> tuple[str, str]:
     if not cwd:
         return CAPITAL_ID, ""
     cwd_c = _canonical(cwd)
-    best: tuple[int, str, bool] | None = None
-    for repo_c, repo_abs, is_home in candidates:
-        try:
-            inside = os.path.commonpath([cwd_c, repo_c]) == repo_c
-        except ValueError:
-            continue
-        if inside and (best is None or len(repo_c) > best[0]):
-            best = (len(repo_c), repo_abs, is_home)
-    if best is not None:
-        city_id = CAPITAL_ID if best[2] else encode_repo_id(best[1])
-        return city_id, os.path.basename(best[1])
+    selected = _selected_city(cwd_c, candidates)
+    if selected is not None:
+        return selected
     enclosing = _enclosing_git_repo(cwd_c)
     if enclosing is not None:
         return encode_repo_id(enclosing), os.path.basename(enclosing)
     return CAPITAL_ID, ""
+
+
+def work_place(path: str, candidates: list[_Candidate]) -> tuple[str, str] | None:
+    """(cityId, repo name) of a folder a session touched; None outside any repo.
+
+    Rules 1–3 of :func:`city_for`, but a folder in no repo (``~``, ``/tmp``)
+    counts for nothing instead of for the capital, and a dotted repo
+    (``~/.hermes``) claims only its own root: a stray file under a cache must
+    not drag a whole home into one city.
+    """
+    path_c = _canonical(path)
+    selected = _selected_city(path_c, candidates)
+    if selected is not None:
+        return selected
+    root = _enclosing_git_repo(path_c)
+    if root is None or (root != path_c and os.path.basename(root).startswith(".")):
+        return None
+    return encode_repo_id(root), os.path.basename(root)
+
+
+def busiest(places: Sequence[tuple[str, str]]) -> tuple[str, str] | None:
+    """The place most of ``places`` (newest first) name, from ``_WORK_MIN_HITS``;
+    a tie goes to the one named most recently."""
+    counts = Counter(places)  # insertion order = newest first; max keeps the first
+    if not counts:
+        return None
+    best = max(counts, key=counts.__getitem__)
+    return best if counts[best] >= _WORK_MIN_HITS else None
 
 
 def city_for_cwd(
@@ -733,11 +778,25 @@ class ExternalAgentTracker:
 
         candidates = city_candidates(repo_paths)
         cities: dict[str, tuple[str, str]] = {}
+        places: dict[str, tuple[str, str] | None] = {}
 
-        def city_of(cwd: str) -> tuple[str, str]:
-            if cwd not in cities:
-                cities[cwd] = city_for(cwd, candidates)
-            return cities[cwd]
+        def city_of(obs: Observation) -> tuple[str, str]:
+            """Where the session works now; its cwd when its activity does not say."""
+            recent: list[tuple[str, str]] = []
+            for path in obs.work_dirs:
+                if path not in places:
+                    places[path] = work_place(path, candidates)
+                place = places[path]
+                if place is not None:
+                    recent.append(place)
+                    if len(recent) == _WORK_RECENT:
+                        break
+            working_in = busiest(recent)
+            if working_in is not None:
+                return working_in
+            if obs.cwd not in cities:
+                cities[obs.cwd] = city_for(obs.cwd, candidates)
+            return cities[obs.cwd]
 
         events: list[dict[str, Any]] = []
         with self._lock:
@@ -746,7 +805,7 @@ class ExternalAgentTracker:
                     events.append({"type": "unit_despawn", "unit": self._units.pop(session_id)["unit"]})
 
             for session_id, obs in desired.items():
-                city_id, repo = city_of(obs.cwd)
+                city_id, repo = city_of(obs)
                 age_ms = max(0, now_ms - obs.last_activity_ms)
                 state = derive_state(age_ms, working_ms, obs.live)
                 mapped = map_state(state)
@@ -793,7 +852,7 @@ class ExternalAgentTracker:
         self,
         observations: list[Observation],
         now_ms: int,
-        city_of: Callable[[str], tuple[str, str]],
+        city_of: Callable[[Observation], tuple[str, str]],
     ) -> tuple[list[dict[str, Any]], dict[str, Observation]]:
         """Every session active within recent_s, newest first (caller holds the lock).
 
@@ -813,7 +872,7 @@ class ExternalAgentTracker:
             if obs.session_id in listed or age_ms > recent_ms:
                 continue
             listed[obs.session_id] = obs
-            city_id, repo = city_of(obs.cwd)
+            city_id, repo = city_of(obs)
             rec = self._units.get(obs.session_id)
             if rec is not None:
                 active, state = True, rec.get("sessionState") or rec["state"]

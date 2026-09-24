@@ -260,6 +260,22 @@ def test_city_for_cwd_through_symlink(repos, tmp_path):
     assert (city, name) == (st.encode_repo_id(str(repos / "repociv")), "repociv")
 
 
+def test_work_place_counts_only_folders_inside_a_repo(repos, tmp_path, monkeypatch):
+    cands = st.city_candidates([str(repos / "mono")], home_repo=str(repos / "repociv"))
+    assert st.work_place(str(repos / "mono/docs"), cands) == (st.encode_repo_id(str(repos / "mono")), "mono")
+    assert st.work_place(str(repos / "repociv/src"), cands) == (st.CAPITAL_ID, "repociv")
+    # A dotted repo (~/.hermes) claims its own root, never what sits below it.
+    dotted = tmp_path / ".tooling"
+    (dotted / ".git").mkdir(parents=True)
+    (dotted / "cache/x").mkdir(parents=True)
+    assert st.work_place(str(dotted / "cache/x"), []) is None
+    assert st.work_place(str(dotted), []) == (st.encode_repo_id(str(dotted)), ".tooling")
+    # Unlike a cwd, a folder in no repo counts for nothing — not for the capital.
+    # (Rule 3 pinned off: the pytest tmp dir may itself sit inside a git repo.)
+    monkeypatch.setattr(st, "_enclosing_git_repo", lambda path: None)
+    assert st.work_place(str(repos / "repociv-old"), cands) is None
+
+
 def test_selected_repo_paths_reads_all_roots(tmp_path, monkeypatch):
     state = tmp_path / "state.json"
     state.write_text(json.dumps({
