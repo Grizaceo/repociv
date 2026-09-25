@@ -231,6 +231,14 @@ export class ThreeMapRenderer {
     return this.picker.pick(mesh, this.camera, this.width, this.height, screenX, screenY);
   }
 
+  /** Terrain point under the cursor in map space (3D world XZ = map x/y). */
+  pickMapPoint(screenX: number, screenY: number): { x: number; y: number } | null {
+    const mesh = getTerrainMesh();
+    if (!mesh) return null;
+    const hit = this.picker.pickPoint(mesh, this.camera, this.width, this.height, screenX, screenY);
+    return hit ? { x: hit.x, y: hit.z } : null;
+  }
+
   /** Tile center in map world space (for canvas overlay sync). */
   projectTileCenter(coord: Axial, state: GameState, cam: MapCamera): { x: number; y: number } {
     const tile = state.world.tiles.get(tileKey(coord));

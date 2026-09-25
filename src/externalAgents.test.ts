@@ -26,7 +26,7 @@ import {
 } from './externalAgents.ts';
 import { GameState } from './game.ts';
 import { dispatchBridgeEvent, type MessageContext } from './bridgeMessageHandlers.ts';
-import { axialDistance } from './hex.ts';
+import { aStarPath } from './pathfinding.ts';
 import type { City, World } from './types.ts';
 
 // ─── Minimal mocks (same seams as game.test.ts / bridge.test.ts) ─────────────
@@ -54,6 +54,10 @@ vi.mock('./localWorldManager.ts', () => ({
 
 const REPOCIV = 'repo:L3cvcmVwb2Npdg';
 
+function onMap(...ids: string[]): { id: string }[] {
+  return ids.map((id) => ({ id }));
+}
+
 function row(unit: string, extra: Partial<ExternalAgentRow> = {}): ExternalAgentRow {
   return {
     unit,
@@ -67,7 +71,7 @@ function row(unit: string, extra: Partial<ExternalAgentRow> = {}): ExternalAgent
 
 describe('externalAgentEvents', () => {
   it('spawns missing ext units and re-asserts state', () => {
-    const events = externalAgentEvents(['MAIN'], [row('ext-claude-code-aaaaaaaa')]);
+    const events = externalAgentEvents(onMap('MAIN'), [row('ext-claude-code-aaaaaaaa')]);
     expect(events).toEqual([
       {
         type: 'unit_spawn',
@@ -84,15 +88,25 @@ describe('externalAgentEvents', () => {
   });
 
   it('does not respawn units already on the map', () => {
-    const events = externalAgentEvents(
-      ['ext-codex-bbbbbbbb'],
-      [row('ext-codex-bbbbbbbb', { unitType: 'codex', state: 'idle' })],
-    );
+    const events = externalAgentEvents(onMap('ext-codex-bbbbbbbb'), [
+      row('ext-codex-bbbbbbbb', { unitType: 'codex', state: 'idle' }),
+    ]);
     expect(events).toEqual([{ type: 'unit_state', unit: 'ext-codex-bbbbbbbb', state: 'idle' }]);
   });
 
+  it('does not re-assert a state the unit already shows (the replay runs on a timer)', () => {
+    const events = externalAgentEvents(
+      [
+        { id: 'ext-a-1', state: 'working' },
+        { id: 'ext-a-2', state: 'moving' },
+      ],
+      [row('ext-a-1'), row('ext-a-2')],
+    );
+    expect(events).toEqual([{ type: 'unit_state', unit: 'ext-a-2', state: 'working' }]);
+  });
+
   it('despawns ext units the tracker dropped, never touching other units', () => {
-    const events = externalAgentEvents(['MAIN', 'SCOUT-sub-1', 'ext-cursor-cccccccc'], []);
+    const events = externalAgentEvents(onMap('MAIN', 'SCOUT-sub-1', 'ext-cursor-cccccccc'), []);
     expect(events).toEqual([{ type: 'unit_despawn', unit: 'ext-cursor-cccccccc' }]);
   });
 
@@ -112,6 +126,34 @@ describe('externalAgentEvents', () => {
       'unit_state:ext-x-1',
       'unit_spawn:ext-x-2',
     ]);
+  });
+
+  it('moves a unit whose session changed city while this client was away', () => {
+    const cities = [city('capital', 0, 0, true), city(REPOCIV, 6, -2)];
+    const events = externalAgentEvents(
+      [{ id: 'ext-hermes-aaaaaaaa', cityId: 'capital' }],
+      [row('ext-hermes-aaaaaaaa', { unitType: 'hero' })],
+      cities,
+    );
+    expect(events.map((e) => e.type)).toEqual(['unit_relocate', 'unit_state']);
+    expect(events[0]).toEqual({
+      type: 'unit_relocate',
+      unit: 'ext-hermes-aaaaaaaa',
+      cityId: REPOCIV,
+    });
+  });
+
+  it('leaves a unit that already stands at its city (or at the capital for an off-map repo)', () => {
+    const cities = [city('capital', 0, 0, true), city(REPOCIV, 6, -2)];
+    const events = externalAgentEvents(
+      [
+        { id: 'ext-a-1', cityId: REPOCIV },
+        { id: 'ext-a-2', cityId: 'capital' },
+      ],
+      [row('ext-a-1'), row('ext-a-2', { cityId: 'repo:unknown' })],
+      cities,
+    );
+    expect(events.map((e) => e.type)).toEqual(['unit_state', 'unit_state']);
   });
 
   it('isExternalAgentUnit', () => {
@@ -186,14 +228,14 @@ function makeCtx() {
 }
 
 describe('unit_spawn / unit_state for ext units', () => {
-  it('places an ext unit next to its city and keeps that cityId', () => {
+  it('places an ext unit in its city and keeps that cityId', () => {
     const { state, ctx } = makeCtx();
     for (const evt of externalAgentEvents([], [row('ext-claude-code-aaaaaaaa')])) {
       dispatchBridgeEvent(ctx, evt);
     }
     const unit = state.getUnit('ext-claude-code-aaaaaaaa')!;
     expect(unit.cityId).toBe(REPOCIV);
-    expect(axialDistance(unit.coord, { q: 6, r: -2 })).toBe(1);
+    expect(unit.coord).toEqual({ q: 6, r: -2 }); // on the city hex, not beside it
     expect(unit.ephemeral).toBe(true);
     expect(unit.state).toBe('working');
   });
@@ -205,18 +247,62 @@ describe('unit_spawn / unit_state for ext units', () => {
     }
     const unit = state.getUnit('ext-codex-1')!;
     expect(unit.cityId).toBe('capital');
-    expect(axialDistance(unit.coord, { q: 0, r: 0 })).toBe(1);
+    expect(unit.coord).toEqual({ q: 0, r: 0 });
   });
 
-  it('spreads several agents of the same city over distinct hexes', () => {
+  it('a reconnect replay puts a unit at its new city even when no path leads there', () => {
+    const { state, ctx } = makeCtx();
+    for (const evt of externalAgentEvents([], [row('ext-hermes-1', { cityId: 'capital' })])) {
+      dispatchBridgeEvent(ctx, evt);
+    }
+    expect(state.getUnit('ext-hermes-1')!.cityId).toBe('capital');
+    const replay = externalAgentEvents(
+      state.getAllUnits(),
+      [row('ext-hermes-1')],
+      state.world.cities,
+    );
+    for (const evt of replay) dispatchBridgeEvent(ctx, evt);
+    const unit = state.getUnit('ext-hermes-1')!;
+    expect(unit.cityId).toBe(REPOCIV);
+    expect(unit.coord).toEqual({ q: 6, r: -2 }); // on the city hex, not beside it
+  });
+
+  it('unit_relocate walks the unit over; a state change on the way waits for the arrival', () => {
+    const { state, ctx } = makeCtx();
+    for (const evt of externalAgentEvents([], [row('ext-hermes-2', { cityId: 'capital' })])) {
+      dispatchBridgeEvent(ctx, evt);
+    }
+    const unit = state.getUnit('ext-hermes-2')!;
+    vi.mocked(aStarPath).mockImplementationOnce((from, to) => [from, to]);
+    dispatchBridgeEvent(ctx, { type: 'unit_relocate', unit: 'ext-hermes-2', cityId: REPOCIV });
+    expect(unit.cityId).toBe(REPOCIV);
+    expect(unit.state).toBe('moving');
+    const dest = unit.targetCoord!;
+    expect(dest).toEqual({ q: 6, r: -2 });
+    dispatchBridgeEvent(ctx, { type: 'unit_state', unit: 'ext-hermes-2', state: 'idle' });
+    expect(unit.state).toBe('moving'); // still walking
+    (state as unknown as { updateUnits(dt: number): void }).updateUnits(1000);
+    expect(unit.coord).toEqual(dest);
+    expect(unit.state).toBe('idle');
+  });
+
+  it('unit_relocate ignores units this map lacks and moves within the same city', () => {
+    const { state, ctx } = makeCtx();
+    dispatchBridgeEvent(ctx, { type: 'unit_relocate', unit: 'ext-ghost-1', cityId: REPOCIV });
+    expect(state.getUnit('ext-ghost-1')).toBeUndefined();
+    for (const evt of externalAgentEvents([], [row('ext-a-9')])) dispatchBridgeEvent(ctx, evt);
+    const unit = state.getUnit('ext-a-9')!;
+    const before = { ...unit.coord };
+    dispatchBridgeEvent(ctx, { type: 'unit_relocate', unit: 'ext-a-9', cityId: REPOCIV });
+    expect(unit.coord).toEqual(before);
+    expect(unit.state).toBe('working');
+  });
+
+  it('several agents of one city all stand in it (the renderers fan them out, unitStack.ts)', () => {
     const { state, ctx } = makeCtx();
     const rows = [row('ext-a-1'), row('ext-a-2'), row('ext-a-3')];
     for (const evt of externalAgentEvents([], rows)) dispatchBridgeEvent(ctx, evt);
-    const keys = rows.map((r) => {
-      const c = state.getUnit(r.unit)!.coord;
-      return `${c.q},${c.r}`;
-    });
-    expect(new Set(keys).size).toBe(3);
+    for (const r of rows) expect(state.getUnit(r.unit)!.coord).toEqual({ q: 6, r: -2 });
   });
 
   it('ext unit state changes never drive the global operation ticker', () => {
@@ -529,7 +615,7 @@ describe('city refs (both id forms)', () => {
     expect(findCityByRef([named], 'repo:L3cvcmVwb2Npdi1vbGQ')).toBeUndefined(); // /w/repociv-old
   });
 
-  it('places an ext unit next to a name-id city (regression: it fell to the capital)', () => {
+  it('places an ext unit in a name-id city (regression: it fell to the capital)', () => {
     const { state, ctx } = makeCtx();
     state.world.cities[1] = { ...state.world.cities[1]!, id: 'repociv', repoPath: '/w/repociv' };
     for (const evt of externalAgentEvents([], [row('ext-claude-code-bbbbbbbb')])) {
@@ -537,7 +623,7 @@ describe('city refs (both id forms)', () => {
     }
     const unit = state.getUnit('ext-claude-code-bbbbbbbb')!;
     expect(unit.cityId).toBe('repociv');
-    expect(axialDistance(unit.coord, { q: 6, r: -2 })).toBe(1);
+    expect(unit.coord).toEqual({ q: 6, r: -2 }); // on the city hex, not beside it
     expect(placeOnMap({ cityId: REPOCIV }, state.world.cities)).toMatchObject({
       kind: 'city',
       city: { id: 'repociv' },

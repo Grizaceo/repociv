@@ -10,7 +10,7 @@
 
 import { parseBridgeEvent } from './bridgeSchema.ts';
 import { bridgeHeaders, bridgeUrl } from './bridgeEnv.ts';
-import type { BridgeEvent, City } from './types.ts';
+import type { BridgeEvent, City, Unit } from './types.ts';
 import { escapeHtml } from './ui/escapeHtml.ts';
 
 /** Every unit owned by the external-agents tracker has this id prefix. */
@@ -31,20 +31,32 @@ export interface ExternalAgentRow {
 
 /**
  * Pure: the bridge events that bring the map's `ext-*` units in line with the
- * tracker snapshot — spawn missing ones, re-assert their state, despawn the
- * ones the tracker dropped while this client was not listening. Rows that do
- * not validate as bridge events are skipped.
+ * tracker snapshot — spawn missing ones, relocate the ones whose session
+ * changed city (given `cities`), set the state of the ones that show another,
+ * despawn the ones the tracker dropped while this client was not listening.
+ * Rows that do not validate as bridge events are skipped. Runs on every
+ * (re)connect and on a timer, so a unit already in line yields nothing.
  */
 export function externalAgentEvents(
-  currentUnitIds: Iterable<string>,
+  currentUnits: Iterable<Pick<Unit, 'id' | 'cityId'> & Partial<Pick<Unit, 'state'>>>,
   rows: readonly ExternalAgentRow[],
+  cities: readonly City[] = [],
 ): BridgeEvent[] {
-  const onMap = new Set([...currentUnitIds].filter(isExternalAgentUnit));
+  const onMap = new Map<string, Pick<Unit, 'cityId'> & Partial<Pick<Unit, 'state'>>>();
+  for (const unit of currentUnits) {
+    if (isExternalAgentUnit(unit.id)) onMap.set(unit.id, unit);
+  }
   const wanted = new Set<string>();
   const raw: unknown[] = [];
   for (const row of rows) {
     if (typeof row?.unit !== 'string' || !isExternalAgentUnit(row.unit)) continue;
     wanted.add(row.unit);
+    // Same resolution as the unit_spawn handler, so a unit already in place stays put.
+    const moved =
+      onMap.has(row.unit) &&
+      cities.length > 0 &&
+      (cityForRef(cities, row.cityId)?.id ?? row.cityId) !== onMap.get(row.unit)?.cityId;
+    if (moved) raw.push({ type: 'unit_relocate', unit: row.unit, cityId: row.cityId });
     if (!onMap.has(row.unit)) {
       raw.push({
         type: 'unit_spawn',
@@ -57,9 +69,11 @@ export function externalAgentEvents(
         ephemeral: true,
       });
     }
-    raw.push({ type: 'unit_state', unit: row.unit, state: row.state });
+    if (onMap.get(row.unit)?.state !== row.state) {
+      raw.push({ type: 'unit_state', unit: row.unit, state: row.state });
+    }
   }
-  for (const id of onMap) {
+  for (const id of onMap.keys()) {
     if (!wanted.has(id)) raw.push({ type: 'unit_despawn', unit: id });
   }
   return raw.map(parseBridgeEvent).filter((e): e is BridgeEvent => e !== null);
@@ -325,6 +339,11 @@ export function findCityByRef(cities: readonly City[], ref: string): City | unde
       (!!c.repoPath && _trimSlash(c.repoPath) === _trimSlash(ref)) ||
       (path !== null && (_trimSlash(c.repoPath) === _trimSlash(path) || c.id === path)),
   );
+}
+
+/** The city an ext unit for this ref stands next to: its own, else the capital. */
+export function cityForRef(cities: readonly City[], ref: string): City | undefined {
+  return findCityByRef(cities, ref) ?? cities.find((c) => c.isCapital);
 }
 
 /** Where a session's repo is on this browser's map. */

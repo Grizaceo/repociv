@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BridgeEvents } from './bridge.ts';
 import * as loggerMod from './logger.ts';
+import { isPollRegistered } from './ui/pollScheduler.ts';
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 vi.mock('./ui/index.ts', () => ({
@@ -194,6 +195,16 @@ describe('BridgeEvents checkHealth', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('re-syncs external agents on a timer, not only on (re)connect', () => {
+    // Map events are fire-and-forget: a spawn lost while the transport is down
+    // or reconnecting must still show up without a page reload.
+    const bridge = new BridgeEvents(makeState());
+    bridge.start();
+    expect(isPollRegistered('bridge:external-agents')).toBe(true);
+    bridge.stop();
+    expect(isPollRegistered('bridge:external-agents')).toBe(false);
   });
 
   it('marks bridge online when /health returns ok', async () => {

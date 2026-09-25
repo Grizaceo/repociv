@@ -44,6 +44,22 @@ export class HexPicker {
     return this.instanceToAxial.get(hits[0]!.instanceId) ?? null;
   }
 
+  /** World point under the cursor on the terrain (where inside the hex). */
+  pickPoint(
+    mesh: InstancedMesh,
+    camera: Camera,
+    canvasWidth: number,
+    canvasHeight: number,
+    screenX: number,
+    screenY: number,
+  ): Vector3 | null {
+    this.ndc.x = (screenX / canvasWidth) * 2 - 1;
+    this.ndc.y = -(screenY / canvasHeight) * 2 + 1;
+    this.raycaster.setFromCamera(this.ndc, camera);
+    const hits = this.raycaster.intersectObject(mesh, false);
+    return hits.length > 0 ? hits[0]!.point.clone() : null;
+  }
+
   /** Test helper: pick from normalized device coords without DOM. */
   pickNdc(mesh: InstancedMesh, camera: Camera, ndcX: number, ndcY: number): Axial | null {
     this.ndc.set(ndcX, ndcY);

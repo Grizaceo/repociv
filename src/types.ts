@@ -150,6 +150,7 @@ export interface Unit {
   pathIndex: number; // current step in path
   pathProgress: number; // 0–1 tween between path[pathIndex] and path[pathIndex+1]
   state: UnitState;
+  arrivalState?: UnitState; // state to resume once a relocation walk ends (GameState.walkUnitTo)
   mission?: string;
   cityId?: string; // which city/repo this unit is working at
   workProgress?: number; // 0–100 when working
@@ -279,6 +280,7 @@ export type BridgeEvent =
       cityId?: string;
     }
   | { type: 'unit_despawn'; unit: string; mission?: string }
+  | { type: 'unit_relocate'; unit: string; cityId: string }
   | { type: 'unit_state'; unit: string; state: UnitState }
   | {
       type: 'building_start';
