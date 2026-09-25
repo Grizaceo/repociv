@@ -123,7 +123,7 @@ si todas funcionaron y `error` es el código de la primera que falló.
 
 | Regla | Detalle |
 |---|---|
-| Unidad | `ext-<agente>-<native_id[:8]>` (Hermes: `ext-hermes-<hash8>`), efímera, fuera de la barra de héroes |
+| Unidad | `ext-<agente>-<native_id[:8]>` (Hermes: `ext-hermes-<hash8>`), efímera, fuera de la barra de héroes. Aparece **en la casilla de su ciudad**: las unidades que comparten casilla se reparten en un anillo dentro de ella (`src/unitStack.ts`, igual en 2D y 3D). Clic cerca de un agente → su chat; clic en el centro → la ciudad |
 | Tipo | `claude-code → claude`, `codex → codex`, Hermes → `hero` (perfiles `lexo*` → `lexo`), resto → `scout` |
 | Misión | `<agente> · <modelo>` (Hermes: `<perfil> · <modelo> · <origen>`) |
 | Ciudad | Donde trabaja **ahora**: si la sesión trae carpetas de su actividad (Hermes: sus tool calls; Claude Code y Codex: su transcript, ver [Dónde trabaja](#dónde-trabaja-claude-code-y-codex)), el repo que más aparece entre sus últimas 12 menciones, con un mínimo de 3. Si no, por el `cwd`: 1) la ciudad cuyo `repoPath` es el prefijo más largo (por componentes: `repociv-old` no calza con `repociv`); 2) el propio checkout de RepoCiv → la capital (RepoCiv nunca es ciudad: el escaneo lo salta); 3) si no, el repo git que lo contiene, y el navegador cae a la capital si esa ciudad no está en su mapa; 4) sin repo → capital. Una sesión es **una** unidad; si cambia de repo, **camina** hasta la nueva ciudad (`unit_relocate`) |

@@ -33,6 +33,7 @@ import { escapeHtml } from './ui/escapeHtml.ts';
 import { relocateCity, canRelocateCityTo } from './map.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { HEX_SIZE } from './constants.ts';
+import { pickOnHex, stackOffsets, type StackOffset } from './unitStack.ts';
 import { renderScreenOverlays, type ScreenOverlayState } from './rendererScreen.ts';
 import {
   type WorldRenderMode,
@@ -89,6 +90,8 @@ export class Renderer {
   private _totalFrameCount = 0;
   /** Idle-agent highlight: pulsing ring drawn for 1s after focusing an idle unit. */
   private _idleHighlightCoord: Axial | null = null;
+  /** Last frame's slots of units sharing a hex — drawing and clicks agree. */
+  private _stackOffsets: ReadonlyMap<string, StackOffset> = new Map();
   private _idleHighlightTime = 0;
   private _placingMode = false; // true when user is picking a hex on map
 
@@ -400,6 +403,26 @@ export class Renderer {
     return worldToAxial(wx, wy, HEX_SIZE, this.cam);
   }
 
+  /** The unit a pointer at (wx, wy) on `coord` means — clicks, drags, menu and
+   *  tooltip alike: the nearest one standing there, or null when the city at
+   *  the hex centre is nearer (unitStack.ts). */
+  private unitAtPoint(coord: Axial, wx: number, wy: number): Unit | null {
+    const key = tileKey(coord);
+    const here = this.state.world.units.filter((u) => !u.hidden && tileKey(u.coord) === key);
+    const cityHere = !!this.state.world.tiles.get(key)?.city;
+    if (here.length === 0) return null;
+    if (here.length === 1 && !cityHere) return here[0]!;
+    let point: { x: number; y: number } | null;
+    if (this.worldRenderMode === 'webgl' && this.threeMap) {
+      point = this.threeMap.pickMapPoint(wx, wy);
+    } else {
+      const map = screenToWorld(this.cam, wx, wy);
+      point = { x: map.wx, y: map.wy };
+    }
+    if (!point) return here[0]!;
+    return pickOnHex(point, coord, here, this._stackOffsets, cityHere, HEX_SIZE);
+  }
+
   private tilePixelPos(coord: Axial, _tile?: Tile | null): { x: number; y: number } {
     if (this.worldRenderMode === 'webgl' && this.threeMap) {
       return this.threeMap.projectTileCenter(coord, this.state, this.cam);
@@ -487,8 +510,9 @@ export class Renderer {
       this.dragStart = { x: e.clientX, y: e.clientY };
       this.camStart = { x: this.cam.x, y: this.cam.y };
 
-      // Priority 1: unit drag (unit under cursor)
-      const unitHere = this.state.getUnitAt(coord);
+      // Priority 1: unit drag (unit under cursor — its slot when it shares the
+      // hex; the centre of a city hex is the city, see unitAtPoint)
+      const unitHere = this.unitAtPoint(coord, wx, wy);
       if (unitHere) {
         this.gestureMode = 'unit_drag';
         this.draggedUnit = unitHere;
@@ -736,7 +760,7 @@ export class Renderer {
       const tile = this.state.world.tiles.get(tileKey(coord));
       // Priority 1: a unit is under the cursor → unit action menu
       // (Mover / Construir / Dormir / Información).
-      const hitUnit = this.state.getUnitAt(coord);
+      const hitUnit = this.unitAtPoint(coord, wx, wy);
       if (hitUnit) {
         const items = contextMenuForUnit(hitUnit, {
           onMove: () => {
@@ -972,7 +996,7 @@ export class Renderer {
       return;
     }
 
-    const unit = this.state.getUnitAt(coord);
+    const unit = this.unitAtPoint(coord, wx, wy);
     if (unit) {
       this.selectedUnit = unit;
       this.selectedCity = null;
@@ -1605,6 +1629,14 @@ export class Renderer {
       }
     }
 
+    // Units sharing a hex (agents in their city) stand on a small ring in it.
+    this._stackOffsets = stackOffsets(
+      this.state.world.units,
+      (key) => !!this.state.world.tiles.get(key)?.city,
+      HEX_SIZE,
+    );
+    this.unitR.setStackOffsets(this._stackOffsets);
+
     // Unit trails (ops layer; also suppressed in clean mode & low LOD)
     if (showOps && !isClean && lod !== 'low') {
       for (const unit of this.state.world.units) {
@@ -1967,7 +1999,10 @@ export class Renderer {
   }
 
   private updateUnitTooltip(clientX: number, clientY: number) {
-    const unit = this.hoveredHex ? this.state.getUnitAt(this.hoveredHex) : null;
+    const rect = this.canvas.getBoundingClientRect();
+    const unit = this.hoveredHex
+      ? this.unitAtPoint(this.hoveredHex, clientX - rect.left, clientY - rect.top)
+      : null;
     if (!unit || this.isDragging) {
       if (this.unitTooltipEl) this.unitTooltipEl.style.display = 'none';
       return;

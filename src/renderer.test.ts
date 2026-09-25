@@ -300,6 +300,8 @@ describe('Renderer input isolation — local view does not fire global pickAxial
     // when the user mousedown-clicks while in local view.
     const pickAxialSpy = vi.fn();
     (renderer as unknown as { pickAxial: typeof pickAxialSpy }).pickAxial = pickAxialSpy;
+    const hitSpy = vi.fn(() => null);
+    (renderer as unknown as { unitAtPoint: typeof hitSpy }).unitAtPoint = hitSpy;
 
     // Pre-condition: at least one mousedown listener was registered on
     // the canvas. If not, the test below is meaningless.
@@ -310,7 +312,7 @@ describe('Renderer input isolation — local view does not fire global pickAxial
     // The global handler must have early-returned; the state methods
     // that the mousedown handler would have called must be untouched.
     expect(pickAxialSpy).not.toHaveBeenCalled();
-    expect(state.getUnitAt).not.toHaveBeenCalled();
+    expect(hitSpy).not.toHaveBeenCalled();
     // tiles.get is called on the Map, not as a state method — but if
     // the guard works, no coord was computed at all.
   });
@@ -351,7 +353,7 @@ describe('Renderer input isolation — local view does not fire global pickAxial
 
 // ─── Test (b): macro-mode click still works (regression guard) ────────────────
 describe('Renderer input isolation — macro mode still processes clicks', () => {
-  it('mousedown in macro mode calls pickAxial and state.getUnitAt', () => {
+  it('mousedown in macro mode calls pickAxial and runs the unit hit test', () => {
     const { canvas, fire } = makeFakeCanvas();
     const state = makeFakeState();
     state.viewMode = 'macro';
@@ -359,11 +361,14 @@ describe('Renderer input isolation — macro mode still processes clicks', () =>
 
     const pickAxialSpy = vi.fn(() => ({ q: 0, r: 0 }));
     (renderer as unknown as { pickAxial: typeof pickAxialSpy }).pickAxial = pickAxialSpy;
+    const hitSpy = vi.fn(() => null);
+    (renderer as unknown as { unitAtPoint: typeof hitSpy }).unitAtPoint = hitSpy;
 
     fire('mousedown', new MouseEvent('mousedown', { button: 0, clientX: 200, clientY: 200 }));
 
     expect(pickAxialSpy).toHaveBeenCalledTimes(1);
-    expect(state.getUnitAt).toHaveBeenCalled();
+    // unitAtPoint: the slot-aware hit test (units sharing a city hex, unitStack.ts)
+    expect(hitSpy).toHaveBeenCalledWith({ q: 0, r: 0 }, expect.any(Number), expect.any(Number));
   });
 
   it('mousedown, mousemove, and mouseup all flow through in macro mode (drag-pan works)', () => {

@@ -20,6 +20,7 @@ import { type Unit, type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+import { stackOffsets } from '../unitStack.ts';
 import { areUnitPropsReady, getUnitPropParts } from './UnitProps3D.ts';
 import { terrainSurfaceY } from './terrainSurfaceY.ts';
 
@@ -225,12 +226,19 @@ export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | und
     }
   }
 
-  // Add or reposition visible units.
+  // Add or reposition visible units. Units sharing a hex (agents in their
+  // city) stand on a ring inside it — same slots as the 2D map and clicks.
+  const stack = stackOffsets(visibleUnits, (key) => !!getTile(key)?.city, HEX_SIZE);
   const newUnitObjects: Mesh[][] = [];
   for (const unit of visibleUnits) {
     const tile = getTile(tileKey(unit.coord));
     const elev = tile ? terrainElevation(tile.terrain) : 0;
     const pos = axialToWorld3D(unit.coord.q, unit.coord.r, elev);
+    const slot = stack.get(unit.id);
+    if (slot) {
+      pos.x += slot.x; // map x → world x, map y → world z (axialToWorld3D)
+      pos.z += slot.y;
+    }
     // CPU mirror of the shader-displaced terrain top. The old pos.y-only
     // placement ignored FBM dunes/ridges, so units sank into hills/desert.
     const targetY = tile

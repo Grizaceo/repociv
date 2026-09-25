@@ -26,7 +26,6 @@ import {
 } from './externalAgents.ts';
 import { GameState } from './game.ts';
 import { dispatchBridgeEvent, type MessageContext } from './bridgeMessageHandlers.ts';
-import { axialDistance } from './hex.ts';
 import { aStarPath } from './pathfinding.ts';
 import type { City, World } from './types.ts';
 
@@ -229,14 +228,14 @@ function makeCtx() {
 }
 
 describe('unit_spawn / unit_state for ext units', () => {
-  it('places an ext unit next to its city and keeps that cityId', () => {
+  it('places an ext unit in its city and keeps that cityId', () => {
     const { state, ctx } = makeCtx();
     for (const evt of externalAgentEvents([], [row('ext-claude-code-aaaaaaaa')])) {
       dispatchBridgeEvent(ctx, evt);
     }
     const unit = state.getUnit('ext-claude-code-aaaaaaaa')!;
     expect(unit.cityId).toBe(REPOCIV);
-    expect(axialDistance(unit.coord, { q: 6, r: -2 })).toBe(1);
+    expect(unit.coord).toEqual({ q: 6, r: -2 }); // on the city hex, not beside it
     expect(unit.ephemeral).toBe(true);
     expect(unit.state).toBe('working');
   });
@@ -248,7 +247,7 @@ describe('unit_spawn / unit_state for ext units', () => {
     }
     const unit = state.getUnit('ext-codex-1')!;
     expect(unit.cityId).toBe('capital');
-    expect(axialDistance(unit.coord, { q: 0, r: 0 })).toBe(1);
+    expect(unit.coord).toEqual({ q: 0, r: 0 });
   });
 
   it('a reconnect replay puts a unit at its new city even when no path leads there', () => {
@@ -265,7 +264,7 @@ describe('unit_spawn / unit_state for ext units', () => {
     for (const evt of replay) dispatchBridgeEvent(ctx, evt);
     const unit = state.getUnit('ext-hermes-1')!;
     expect(unit.cityId).toBe(REPOCIV);
-    expect(axialDistance(unit.coord, { q: 6, r: -2 })).toBe(1);
+    expect(unit.coord).toEqual({ q: 6, r: -2 }); // on the city hex, not beside it
   });
 
   it('unit_relocate walks the unit over; a state change on the way waits for the arrival', () => {
@@ -279,7 +278,7 @@ describe('unit_spawn / unit_state for ext units', () => {
     expect(unit.cityId).toBe(REPOCIV);
     expect(unit.state).toBe('moving');
     const dest = unit.targetCoord!;
-    expect(axialDistance(dest, { q: 6, r: -2 })).toBe(1);
+    expect(dest).toEqual({ q: 6, r: -2 });
     dispatchBridgeEvent(ctx, { type: 'unit_state', unit: 'ext-hermes-2', state: 'idle' });
     expect(unit.state).toBe('moving'); // still walking
     (state as unknown as { updateUnits(dt: number): void }).updateUnits(1000);
@@ -299,15 +298,11 @@ describe('unit_spawn / unit_state for ext units', () => {
     expect(unit.state).toBe('working');
   });
 
-  it('spreads several agents of the same city over distinct hexes', () => {
+  it('several agents of one city all stand in it (the renderers fan them out, unitStack.ts)', () => {
     const { state, ctx } = makeCtx();
     const rows = [row('ext-a-1'), row('ext-a-2'), row('ext-a-3')];
     for (const evt of externalAgentEvents([], rows)) dispatchBridgeEvent(ctx, evt);
-    const keys = rows.map((r) => {
-      const c = state.getUnit(r.unit)!.coord;
-      return `${c.q},${c.r}`;
-    });
-    expect(new Set(keys).size).toBe(3);
+    for (const r of rows) expect(state.getUnit(r.unit)!.coord).toEqual({ q: 6, r: -2 });
   });
 
   it('ext unit state changes never drive the global operation ticker', () => {
@@ -620,7 +615,7 @@ describe('city refs (both id forms)', () => {
     expect(findCityByRef([named], 'repo:L3cvcmVwb2Npdi1vbGQ')).toBeUndefined(); // /w/repociv-old
   });
 
-  it('places an ext unit next to a name-id city (regression: it fell to the capital)', () => {
+  it('places an ext unit in a name-id city (regression: it fell to the capital)', () => {
     const { state, ctx } = makeCtx();
     state.world.cities[1] = { ...state.world.cities[1]!, id: 'repociv', repoPath: '/w/repociv' };
     for (const evt of externalAgentEvents([], [row('ext-claude-code-bbbbbbbb')])) {
@@ -628,7 +623,7 @@ describe('city refs (both id forms)', () => {
     }
     const unit = state.getUnit('ext-claude-code-bbbbbbbb')!;
     expect(unit.cityId).toBe('repociv');
-    expect(axialDistance(unit.coord, { q: 6, r: -2 })).toBe(1);
+    expect(unit.coord).toEqual({ q: 6, r: -2 }); // on the city hex, not beside it
     expect(placeOnMap({ cityId: REPOCIV }, state.world.cities)).toMatchObject({
       kind: 'city',
       city: { id: 'repociv' },

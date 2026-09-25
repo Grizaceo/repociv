@@ -58,7 +58,43 @@ lanzados desde `~`, gate completo.
 ## Límites
 
 - Cursor y OpenCode siguen ubicados por su `cwd`.
-- La unidad aparece en el anillo alrededor de la ciudad
-  (`pickDetachmentHex`), no sobre la casilla de la ciudad.
+- ~~La unidad aparece en el anillo alrededor de la ciudad.~~ Resuelto abajo.
 - Correr el gate reescribe `coverage/`, y el watcher de Vite recarga la página
   abierta. No es parte de este fix.
+
+## Apéndice: el agente aparece *en* la ciudad
+
+Pedido tras el E2E: que la unidad aparezca sobre la casilla de la ciudad, no
+junto a ella.
+
+- **Posición:** `unit_spawn` y `unit_relocate` de las unidades externas usan
+  `city.coord`. `pickDetachmentHex` queda solo para los subagentes.
+- **Dibujo:** `src/unitStack.ts` asigna a cada unidad que comparte casilla con
+  una ciudad, o con otras unidades, un slot en un anillo de radio 0,5 hex. Así
+  el agente no queda enterrado en el modelo de la ciudad ni tapado por los
+  otros. Lo leen el renderer 2D (`UnitRenderer.unitPos`: unidad, badges,
+  enlaces) y el 3D (`rebuildUnits`: mismo desplazamiento en XZ).
+- **Clic:** gana el slot más cercano, y el centro es la ciudad
+  (`Renderer.unitAtPoint`). Lo usan el clic, el arrastre (`mousedown`), el
+  menú contextual y el tooltip. En 3D el punto sale del raycast
+  (`HexPicker.pickPoint`).
+- **Bug encontrado al probar:** el `mousedown` elegía con `getUnitAt` (la
+  primera unidad de la casilla) y el `mouseup` la seleccionaba sin pasar por
+  `handleClick`. Cualquier clic en la capital seleccionaba `MAIN`. Ahora usa
+  `unitAtPoint`.
+
+Verificación headless, con la app viva en modo 2D y un hook solo del test
+(Playwright reescribe `game.ts`/`renderer.ts` servidos para exponer las
+instancias):
+
+| Chequeo | Resultado |
+|---|---|
+| unidades `ext-*` sobre la casilla de su ciudad | 7/7 (5 en la capital, 2 en lexo-case-writer) |
+| clic en el slot de `ext-hermes-c1ab3b22` | selecciona `ext-hermes-c1ab3b22` |
+| clic en el centro de la capital | selecciona la capital, ninguna unidad |
+| captura | 5 agentes y `MAIN` en anillo dentro de la casilla de la capital |
+
+Tests: vitest 1029 en verde (6 nuevos de `unitStack`, placement actualizado a
+la casilla de la ciudad, guardas de `mousedown` en `renderer.test.ts` apuntando
+a `unitAtPoint`). tsc, eslint, prettier, build y budget de JS eager (144 KB de
+185 KB) en verde.
