@@ -32,7 +32,7 @@ import {
 import { cfg } from './gameConfig.ts';
 import { approveCommand } from './commandBus.ts';
 import { terminalPanel } from './terminalPanel.ts';
-import { findCityByRef, isExternalAgentUnit } from './externalAgents.ts';
+import { cityForRef, isExternalAgentUnit } from './externalAgents.ts';
 
 // ─── Context ────────────────────────────────────────────────────────────────
 // Everything a handler might need from the outside world. The BridgeEvents
@@ -90,16 +90,12 @@ const HANDLERS: HandlerByType = {
       spawnCoord = pickDetachmentHex(ctx.state, parent.coord, childIndex);
     } else if (!parent && unplaced && evt.cityId) {
       // No parent to stand next to (e.g. an external agent seen by Suvadu):
-      // stand next to the city it works in — the capital when that repo is
-      // not on this map.
-      const cities = ctx.state.world.cities;
-      const city = findCityByRef(cities, evt.cityId) ?? cities.find((c) => c.isCapital);
+      // stand in the city it works in — the capital when that repo is not on
+      // this map. Units sharing the city hex are fanned out by unitStack.ts.
+      const city = cityForRef(ctx.state.world.cities, evt.cityId);
       if (city) {
         cityId = city.id;
-        const siblings = ctx.state.world.units.filter(
-          (u) => u.cityId === city.id && u.ephemeral && !u.parentUnitId,
-        ).length;
-        spawnCoord = pickDetachmentHex(ctx.state, city.coord, siblings);
+        spawnCoord = { ...city.coord };
       }
     }
     const unit = ctx.state.spawnUnit(
@@ -121,6 +117,18 @@ const HANDLERS: HandlerByType = {
       if (targetCity) ctx.state.moveUnit(unit.id, targetCity.coord);
     }
     ctx.logEvent(`Unidad ${unit.name} apareció en el mapa`, 'success');
+  },
+
+  unit_relocate(ctx, evt) {
+    // An external agent moved on to another repo: walk it into that city (or
+    // put it there when no path leads). Units this map lacks come with the replay.
+    const unit = ctx.state.getUnit(evt.unit);
+    const city = cityForRef(ctx.state.world.cities, evt.cityId);
+    if (!unit || !city || unit.cityId === city.id) return;
+    const dest = { ...city.coord };
+    if (!ctx.state.walkUnitTo(unit.id, dest)) unit.coord = dest;
+    ctx.state.setUnitCity(unit.id, city.id);
+    ctx.logEvent(`${unit.name} se va a trabajar a ${city.name}`, 'info');
   },
 
   unit_move(ctx, evt) {

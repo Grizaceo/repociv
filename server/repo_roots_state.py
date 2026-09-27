@@ -40,6 +40,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 
 def _state_file() -> Path:
@@ -259,3 +260,74 @@ def decode_repo_id(repo_id: str) -> str | None:
         return os.path.expanduser(decoded)
     except Exception:
         return None
+
+
+def _is_within(path: str, root: str) -> bool:
+    try:
+        return os.path.commonpath([path, root]) == root
+    except ValueError:
+        return False
+
+
+def _canonical(path: str) -> str:
+    """Resolve symlinks while retaining a normalized fallback for stale paths."""
+    if not path:
+        return ""
+    try:
+        return os.path.realpath(os.path.expanduser(path))
+    except Exception:
+        return os.path.abspath(os.path.expanduser(path))
+
+
+def resolve_selected_repo(repo_id_or_name: str, explicit_path: str = "") -> str | None:
+    """Resolve a selected repository and reject unselected or escaping paths."""
+    repo_id_or_name = unquote(repo_id_or_name)
+    state = load_state()
+    roots = state.get("roots", {})
+    if not isinstance(roots, dict):
+        return None
+
+    explicit = explicit_path.strip()
+    if explicit.startswith("repo:"):
+        candidate = decode_repo_id(explicit) or ""
+    else:
+        candidate = os.path.expanduser(explicit) if explicit else ""
+    if not candidate:
+        candidate = decode_repo_id(repo_id_or_name) or ""
+    if not candidate:
+        if any(separator in repo_id_or_name for separator in ("/", "\\")) or repo_id_or_name in {
+            ".",
+            "..",
+        }:
+            return None
+        matches: list[str] = []
+        for entry in roots.values():
+            if not isinstance(entry, dict):
+                continue
+            selected = entry.get("selectedRepoPaths", [])
+            if isinstance(selected, list):
+                matches.extend(
+                    str(item)
+                    for item in selected
+                    if isinstance(item, str) and os.path.basename(item) == repo_id_or_name
+                )
+        unique = list(dict.fromkeys(_canonical(match) for match in matches))
+        if len(unique) != 1:
+            return None
+        candidate = unique[0]
+
+    candidate_real = _canonical(candidate)
+    for root_path, entry in roots.items():
+        if not isinstance(root_path, str) or not isinstance(entry, dict):
+            continue
+        selected = entry.get("selectedRepoPaths", [])
+        if not isinstance(selected, list):
+            continue
+        if not any(
+            isinstance(item, str) and _canonical(item) == candidate_real for item in selected
+        ):
+            continue
+        root_real = _canonical(root_path)
+        if os.path.isdir(candidate_real) and _is_within(candidate_real, root_real):
+            return candidate_real
+    return None

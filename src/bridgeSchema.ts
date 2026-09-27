@@ -59,6 +59,11 @@ const Schemas = [
     mission: v.optional(v.string()),
   }),
   v.object({
+    type: v.literal('unit_relocate'),
+    unit: v.string(),
+    cityId: v.string(),
+  }),
+  v.object({
     type: v.literal('unit_state'),
     unit: v.string(),
     state: UnitState,

@@ -20,6 +20,12 @@ describe('parseBridgeEvent', () => {
     expect(evt).not.toBeNull();
   });
 
+  it('accepts unit_relocate and requires its cityId', () => {
+    const evt = parseBridgeEvent({ type: 'unit_relocate', unit: 'ext-a-1', cityId: 'repo:eA' });
+    expect(evt?.type).toBe('unit_relocate');
+    expect(parseBridgeEvent({ type: 'unit_relocate', unit: 'ext-a-1' })).toBeNull();
+  });
+
   it('rejects unit_spawn with missing unit', () => {
     const evt = parseBridgeEvent({ type: 'unit_spawn', civ: 'capital', hex: [0, 0] });
     expect(evt).toBeNull();

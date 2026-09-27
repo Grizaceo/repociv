@@ -123,10 +123,10 @@ si todas funcionaron y `error` es el código de la primera que falló.
 
 | Regla | Detalle |
 |---|---|
-| Unidad | `ext-<agente>-<native_id[:8]>` (Hermes: `ext-hermes-<hash8>`), efímera, fuera de la barra de héroes |
+| Unidad | `ext-<agente>-<native_id[:8]>` (Hermes: `ext-hermes-<hash8>`), efímera, fuera de la barra de héroes. Aparece **en la casilla de su ciudad**: las unidades que comparten casilla se reparten en un anillo dentro de ella (`src/unitStack.ts`, igual en 2D y 3D). Clic cerca de un agente → su chat; clic en el centro → la ciudad |
 | Tipo | `claude-code → claude`, `codex → codex`, Hermes → `hero` (perfiles `lexo*` → `lexo`), resto → `scout` |
 | Misión | `<agente> · <modelo>` (Hermes: `<perfil> · <modelo> · <origen>`) |
-| Ciudad | 1) la ciudad cuyo `repoPath` es el prefijo más largo del `cwd` (por componentes: `repociv-old` no calza con `repociv`); 2) el propio checkout de RepoCiv → la capital (RepoCiv nunca es ciudad: el escaneo lo salta); 3) si no, el repo git que contiene el `cwd`, y el navegador cae a la capital si esa ciudad no está en su mapa; 4) sin repo → capital |
+| Ciudad | Donde trabaja **ahora**: si la sesión trae carpetas de su actividad (Hermes: sus tool calls; Claude Code y Codex: su transcript, ver [Dónde trabaja](#dónde-trabaja-claude-code-y-codex)), el repo que más aparece entre sus últimas 12 menciones, con un mínimo de 3. Si no, por el `cwd`: 1) la ciudad cuyo `repoPath` es el prefijo más largo (por componentes: `repociv-old` no calza con `repociv`); 2) el propio checkout de RepoCiv → la capital (RepoCiv nunca es ciudad: el escaneo lo salta); 3) si no, el repo git que lo contiene, y el navegador cae a la capital si esa ciudad no está en su mapa; 4) sin repo → capital. Una sesión es **una** unidad; si cambia de repo, **camina** hasta la nueva ciudad (`unit_relocate`) |
 | `working` | última actividad hace ≤ `REPOCIV_EXT_AGENTS_WORKING_MIN` (2 min) |
 | `thinking` | más vieja que eso, pero **un proceso sigue sosteniendo la sesión** (ver [Vivo o callado](#vivo-o-callado)) |
 | `idle` | más vieja que eso y nada la sostiene |
@@ -138,7 +138,10 @@ el caso en que el navegador tenga otra selección guardada en `localStorage`.
 
 Los eventos no se repiten entre ciclos: un spawn por sesión y un `unit_state` solo
 cuando cambia. Como SSE/WS no reenvía eventos pasados, el cliente pide
-`GET /api/external-agents` en cada (re)conexión y reconcilia (`src/externalAgents.ts`).
+`GET /api/external-agents` en cada (re)conexión **y cada 10 s**, y reconcilia
+(`src/externalAgents.ts`): crea las unidades que faltan, hace caminar a las que
+cambiaron de ciudad y corrige estados, sin emitir nada si todo ya coincide. Así un
+evento perdido (WS que no autentica, SSE reconectando) no obliga a recargar la página.
 Los cambios de estado de unidades `ext-*` no tocan el ticker global de operación.
 
 ### Por qué dos fuentes
@@ -150,6 +153,25 @@ primer turno. Los comandos, en cambio, se registran en vivo (hook `PostToolUse`)
 el mismo id de sesión (`claude-<native_id>`), así que `suv history --executor agent`
 sirve de latido. Del historial solo se leen `session_id`, `executor`, `cwd` y
 `started_at`; el texto del comando nunca se lee ni se guarda.
+
+### Dónde trabaja (Claude Code y Codex)
+
+Suvadu solo sabe desde dónde se lanzó la sesión: un `claude` o `codex` abierto en
+`~` tiene `cwd=~` en la sesión y en cada comando. El tracker lee entonces el
+transcript nativo (`~/.claude/projects/…/<id>.jsonl`,
+`~/.codex/sessions/…/rollout-…-<id>.jsonl`) con `server/transcript_work.py`,
+mirando las últimas 60 tool calls, de la más nueva a la más vieja:
+
+- **Claude Code:** el `cwd` que registra en cada línea (sigue sus `cd`), el
+  `file_path`/`path` de Read/Edit/Write/Grep/Glob y las rutas absolutas de sus
+  comandos Bash.
+- **Codex:** el `workdir` de sus comandos, las rutas absolutas dentro de cada
+  `cmd` y las cabeceras `*** Add/Update/Delete File:` de sus parches.
+
+Nunca se leen contenidos de archivos, cuerpos de parches, salidas de herramientas
+ni prompts. Las carpetas quedan en memoria y solo sale el repo al que llevan. El
+transcript se relee solo cuando cambia (`mtime`, tamaño). Cursor y OpenCode
+siguen ubicados por su `cwd`.
 
 Consecuencia: un agente que piensa varios minutos sin ejecutar comandos deja de
 emitir latido hasta su próximo comando o fin de turno.
@@ -232,14 +254,18 @@ en Cron.
   unidad (el id sale de la primera sesión), y su chat se lee a través de la cadena. Un
   subagente (`source='subagent'`) no es una continuación: tiene su propia unidad y la
   etiqueta "subagente".
-- **Ciudad:** `git_repo_root` si existe; si no, `cwd`. Si la fila no trae ninguno
-  de los dos (las sesiones de desktop ya no persisten `cwd`), se deriva del repo
-  git donde vivió su actividad reciente: los `path`/`workdir` de sus tool calls y
-  los `cd` de sus comandos. Hacen falta ≥3 menciones del mismo repo — una mirada
-  de paso a otra carpeta no mueve la unidad. Un repo oculto en el camino
-  (`~/.hermes` y otros cachés de tooling) es territorio de herramientas y no
-  captura la unidad, salvo que el archivo viva ahí. Después, la regla de siempre
-  (`city_for`).
+- **Ciudad:** manda la actividad, no la carpeta de arranque. Un `hermes` lanzado
+  desde `~` conserva `cwd=~` toda su vida, y las sesiones de desktop ya no
+  persisten `cwd`. Por eso cada sondeo lee los `path`/`workdir` de las últimas 60
+  tool calls de la sesión (en toda su cadena de compresión) y los `cd` de sus
+  comandos. El tracker cuenta a qué repo pertenece cada carpeta (`work_place`):
+  una ciudad seleccionada, aunque no tenga `.git`, o si no el repo git que la
+  contiene. Gana el repo con más menciones entre las 12 más recientes, con un
+  mínimo de 3, así que una mirada de paso no mueve la unidad. Una carpeta fuera
+  de todo repo (`~`, `/tmp`) no cuenta. Un repo oculto (`~/.hermes` y otros
+  cachés de tooling) solo cuenta si el archivo vive en su raíz, nunca por lo que
+  hay debajo. Si ningún repo junta 3 menciones, deciden `git_repo_root` o `cwd`
+  con la regla de siempre (`city_for`).
 - **Sin duplicados:**
   - Las misiones Hermes que lanza RepoCiv (`hermes chat … --source tool`) ya tienen su
     unidad. Se excluyen por `source='tool'` y por los ids de

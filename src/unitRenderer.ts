@@ -3,6 +3,7 @@ import { axialToPixel, type Axial } from './hex.ts';
 import { type Unit, type Building, tileKey } from './types.ts';
 import { type GameState } from './game.ts';
 import { HEX_SIZE } from './constants.ts';
+import type { StackOffset } from './unitStack.ts';
 import {
   resolveBotIdentity,
   getRosterMap,
@@ -106,6 +107,20 @@ export class UnitRenderer {
     return this.coordProjector(coord);
   }
 
+  private stackOffsets: ReadonlyMap<string, StackOffset> = new Map();
+
+  /** This frame's slots for units sharing a hex (unitStack.ts). */
+  setStackOffsets(offsets: ReadonlyMap<string, StackOffset>): void {
+    this.stackOffsets = offsets;
+  }
+
+  /** Where a standing unit is drawn: its hex, moved to its slot when it shares one. */
+  private unitPos(unit: Unit): { x: number; y: number } {
+    const p = this.tilePos(unit.coord);
+    const off = this.stackOffsets.get(unit.id);
+    return off ? { x: p.x + off.x, y: p.y + off.y } : p;
+  }
+
   drawUnitTrail(unit: Unit) {
     if (!unit.trailPositions || unit.trailPositions.length === 0) return;
     const { ctx } = this;
@@ -125,7 +140,7 @@ export class UnitRenderer {
 
   drawUnitBadge(unit: Unit, animTime: number) {
     const { ctx } = this;
-    const p = this.tilePos(unit.coord);
+    const p = this.unitPos(unit);
     const bx = p.x + HEX_SIZE * 0.45;
     const by = p.y - HEX_SIZE * 0.45;
     const r = 7;
@@ -186,8 +201,8 @@ export class UnitRenderer {
 
   drawSubagentLink(parent: Unit, child: Unit, animTime: number) {
     const { ctx } = this;
-    const pp = this.tilePos(parent.coord);
-    const cp = this.tilePos(child.coord);
+    const pp = this.unitPos(parent);
+    const cp = this.unitPos(child);
     const pulse = 0.25 + 0.15 * Math.sin(animTime * 2 + pp.x);
     ctx.save();
     ctx.strokeStyle = `rgba(139, 180, 248, ${pulse})`;
@@ -203,7 +218,7 @@ export class UnitRenderer {
 
   drawSubagentCountBadge(parent: Unit, childCount: number, animTime: number) {
     const { ctx } = this;
-    const p = this.tilePos(parent.coord);
+    const p = this.unitPos(parent);
     const bx = p.x - HEX_SIZE * 0.5;
     const by = p.y - HEX_SIZE * 0.55;
     const label = childCount > 5 ? `+${childCount - 5}` : String(childCount);
@@ -235,7 +250,7 @@ export class UnitRenderer {
       ux = lerp(from.x, to.x, unit.pathProgress);
       uy = lerp(from.y, to.y, unit.pathProgress);
     } else {
-      const p = this.tilePos(unit.coord);
+      const p = this.unitPos(unit);
       ux = p.x;
       uy = p.y;
     }

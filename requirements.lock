@@ -20,8 +20,11 @@ certifi==2026.5.20
     # via
     #   httpcore
     #   httpx
+    #   requests
 cffi==2.0.0
     # via cryptography
+charset-normalizer==3.5.1
+    # via requests
 click==8.4.1
     # via uvicorn
 coverage[toml]==7.14.1
@@ -46,6 +49,7 @@ idna==3.16
     # via
     #   anyio
     #   httpx
+    #   requests
 iniconfig==2.3.0
     # via pytest
 jsonschema==4.26.0
@@ -94,10 +98,16 @@ referencing==0.37.0
     # via
     #   jsonschema
     #   jsonschema-specifications
+requests==2.34.2
+    # via -r requirements.txt
 rpds-py==0.30.0
     # via
     #   jsonschema
     #   referencing
+ruamel-yaml==0.18.16
+    # via -r requirements.txt
+ruamel-yaml-clib==0.2.15
+    # via ruamel-yaml
 ruff==0.15.5
     # via -r requirements.txt
 sse-starlette==3.4.4
@@ -108,15 +118,21 @@ starlette==1.1.0
     #   sse-starlette
 typing-extensions==4.15.0
     # via
+    #   anyio
     #   mcp
     #   pydantic
     #   pydantic-core
+    #   pytest-asyncio
+    #   referencing
+    #   starlette
     #   typing-inspection
 typing-inspection==0.4.2
     # via
     #   mcp
     #   pydantic
     #   pydantic-settings
+urllib3==2.8.0
+    # via requests
 uvicorn==0.48.0
     # via mcp
 websockets==16.0

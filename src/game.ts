@@ -195,7 +195,8 @@ export class GameState {
             unit.targetCoord = undefined;
             unit.path = [] as Axial[];
             unit.pathIndex = 0;
-            unit.state = unit.mission ? 'working' : 'idle';
+            unit.state = unit.arrivalState ?? (unit.mission ? 'working' : 'idle');
+            unit.arrivalState = undefined;
           } else {
             unit.coord = unit.path[unit.pathIndex]!;
           }
@@ -239,7 +240,9 @@ export class GameState {
   // ─── Unit state ────────────────────────────────────────────────────────────
   setUnitState(unitId: string, state: UnitState) {
     const unit = this.unitMap.get(unitId);
-    if (unit) {
+    if (unit?.state === 'moving' && unit.arrivalState !== undefined) {
+      unit.arrivalState = state; // mid-relocation: applied on arrival, the walk goes on
+    } else if (unit) {
       unit.state = state;
       this.notify();
     }
@@ -533,6 +536,18 @@ export class GameState {
     unit.pathIndex = 0;
     unit.pathProgress = 0;
     unit.state = 'moving';
+    return true;
+  }
+
+  /** Walk a unit to `target` and give it back its current state on arrival
+   *  (a relocation, not a mission leg). False when no path leads there. */
+  walkUnitTo(unitId: string, target: Axial): boolean {
+    const unit = this.unitMap.get(unitId);
+    if (!unit) return false;
+    const resume = unit.state === 'moving' ? unit.arrivalState : unit.state;
+    if (!this.moveUnit(unitId, target)) return false;
+    unit.arrivalState = resume ?? 'idle';
+    this.notify();
     return true;
   }
 
