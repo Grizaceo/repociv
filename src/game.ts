@@ -601,6 +601,9 @@ export class GameState {
   }): void {
     this._local.syncSubagentSpawn(payload);
   }
+  noteUnitActivity(unitId: string, toolName: string): void {
+    this._local.noteUnitActivity(unitId, toolName);
+  }
   getMissionQueue(): LocalMission[] {
     return this._local.getMissionQueue();
   }
