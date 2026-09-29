@@ -38,33 +38,81 @@ corrida completa. Combinado con las 3 pasadas aisladas y la pareja con el test
 de actividad, la hipótesis de estado residual no se sostiene: era ruido de
 carga. **No diagnosticado más a fondo; no hay regresión abierta aquí.**
 
-## El test de FPS: sí es un defecto real, y es del render
+## El test de FPS: atribución por medición — y una corrección
 
-`rendimiento: FPS sostenido` mide **2,7–2,8 FPS de media**, contra un umbral
-de 10 y un rango histórico documentado de 13,9–18,4.
+`rendimiento: FPS sostenido` mide **2,7–2,9 FPS** de media en cuatro corridas,
+contra un umbral de 10 y un rango histórico documentado de 13,9–18,4.
 
-Descartado el entorno con medición, no con suposición. Se añadió
-`e2e/fps-baseline.spec.ts`: abre una página vacía en el mismo Chromium headless
-y mide su techo de `requestAnimationFrame`.
+**Medición 1 — ¿es la máquina?** No, en apariencia: `e2e/fps-baseline.spec.ts`
+abre una página vacía en el mismo Chromium headless y da **57,4 FPS** con load
+9,5, mientras la vista local da 2,8 con la misma carga. Ratio de 20×.
 
-- Página vacía, mismo momento, **load average 9,5**: **57,4 FPS**.
-- Vista Local de RepoCiv, misma carga: **2,8 FPS**.
+**Medición 2 — coste por clase de dibujo.** Con el cronómetro por lotes
+(el `performance.now()` por llamada redondea a 0 en headless y reportaba
+números imposibles):
 
-La máquina no es el techo; el render sí. **Es una regresión de rendimiento de
-la Vista Local**, no un umbral mal puesto ni ruido.
+| Clase | Coste por llamada |
+|---|---|
+| `fillRect` pequeño (2000) | 0,35 µs |
+| `save`/`restore` (2000) | 0,65 µs |
+| `fillText` (2000) | 0,9–1,7 µs |
+| `drawImage` al minimapa (272) | 3,7 µs |
 
-Comparación contra `main` (todo el trabajo de la rama en `git stash`, solo
-`playwright.config.ts` restaurado porque el original usa `python3` sin venv y
-el bridge no arranca — `ModuleNotFoundError: No module named 'idna'`): en
-`main` el test **ni siquiera completa la medición** (`page.evaluate` excede los
-60 s). O sea: `main` tampoco rendía, pero por un motivo distinto. **El
-rendimiento de Vista Local no es una regresión introducida por este trabajo;
-es una degradación preexistente que el test documenta desde 2026-06-05 y que
-hoy es mucho peor que entonces.**
+Total por frame de todo eso: **~1 ms**. Un frame a 10 FPS son 100 ms. **El
+dibujo 2D no es el cuello de botella.**
 
-Siguiente paso al retomar: perfilar el render de Vista Local (`src/isoLocalRenderer.ts`,
-`src/localRenderer.ts`) antes de tocar el umbral. **Bajar el umbral para que
-pase sería falsificar la medición.**
+**Medición 3 — ¿es el minimapa?** `src/renderer.ts:1198` llama a
+`minimapR.draw()` en cada frame, y `computeBounds()` recorre el mapa de tiles
+**dos veces** antes de su propio chequeo de `isDirty` — O(tiles) de JS por
+frame, incluso con el minimap ya cacheado. Parece un culpable obvio.
+
+**Experimento decisivo:** `MinimapRenderer.draw()` retorna de inmediato si
+`#minimap-canvas` no existe, así que quitar el elemento quita la llamada
+entera sin tocar producto. Primera corrida dio 0,3 → 2,7 FPS (¡9×!) y parecía
+confirmarlo. **Era un artefacto de warmup**, exactamente la trampa que
+sospeché: la primera muestra de cualquier sonda rAF cae durante el warmup
+(JIT, first paint, decodificación de assets).
+
+Repetido con warmup previo y **el control medido al final**:
+
+| | FPS |
+|---|---|
+| Sin minimapa | 4,9 y 4,4 |
+| Con minimapa | 4,1 y 4,8 |
+
+**Sin diferencia.** El minimapa no es el cuello de botella. La hipótesis del
+O(tiles) queda como *candidato no confirmado* — puede seguir siendo un
+problema real de CPU, simplemente no uno que mueva la aguja aquí.
+
+**Conclusión honesta: la atribución queda abierta.** Lo que sí es sólido:
+
+- El dibujo 2D no es el problema (~1 ms por frame).
+- El minimapa no explica la caída (medido, no supuesto).
+- **La máquina está saturada durante todas las corridas: load 10–17 sobre 12
+  núcleos**, con RimWorld al 141% y un build de Unreal al 125% compitiendo.
+  El `live` de la sonda pasó de 2,8 a 0,6 mientras el load subía de 10,9 a
+  15,4.
+
+Es decir: **es plausible que el 2,8 sea mayoritariamente la máquina**, y que
+el test de FPS nunca haya tenido una máquina quieta en esta sesión. Eso
+invalidaría la afirmación previa de «degradación de render». **No se baja el
+umbral**: con esta máquina saturada, el umbral no se puede ni confirmar.
+
+Siguiente paso al retomar, en este orden:
+1. Repetir el perfil en una máquina descargada (o con los juegos pausados) y
+   ver si el `live` sube a ~14 como documenta el test. Eso decide si hay un
+   defecto real.
+2. Solo si sigue bajo: instrumentar `render()` con muestreo propio para
+   localizar el JS, no el dibujo.
+
+### Trampas de este perfilado
+
+- `performance.now()` por llamada redondea a 0 en headless: hay que medir
+  **lotes completos** contra el reloj de pared.
+- La primera muestra rAF de la página cae en warmup. Toda comparación
+  A/B necesita warmup y **el control al final**.
+- `live` y `liveWithWrap` quedaron en 0,1–0,6 en la última corrida: son las
+  muestras contaminadas por warmup, no un dato. No citarlas.
 
 ## Prueba de Baseline: cómo atribuir un rojo de FPS
 
