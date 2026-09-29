@@ -38,7 +38,13 @@ corrida completa. Combinado con las 3 pasadas aisladas y la pareja con el test
 de actividad, la hipótesis de estado residual no se sostiene: era ruido de
 carga. **No diagnosticado más a fondo; no hay regresión abierta aquí.**
 
-## El test de FPS: atribución por medición — y una corrección
+## ~~El test de FPS: atribución por medición — y una corrección~~ (superado)
+
+> **Histórico, no vigente.** Este primer intento se hizo con la máquina
+> saturada (load 10–17, RimWorld y Unreal corriendo) y terminó inconcluso: no
+> logré distinguir el ruido de la máquina del coste del render. La sección
+> siguiente lo cierra con la máquina descargada. Se conserva porque documenta
+> el método fallido, que es la parte que costó.
 
 `rendimiento: FPS sostenido` mide **2,7–2,9 FPS** de media en cuatro corridas,
 contra un umbral de 10 y un rango histórico documentado de 13,9–18,4.
@@ -84,35 +90,80 @@ Repetido con warmup previo y **el control medido al final**:
 O(tiles) queda como *candidato no confirmado* — puede seguir siendo un
 problema real de CPU, simplemente no uno que mueva la aguja aquí.
 
-**Conclusión honesta: la atribución queda abierta.** Lo que sí es sólido:
+## El test de FPS: atribución cerrada con CPU profile (máquina descargada)
 
-- El dibujo 2D no es el problema (~1 ms por frame).
-- El minimapa no explica la caída (medido, no supuesto).
-- **La máquina está saturada durante todas las corridas: load 10–17 sobre 12
-  núcleos**, con RimWorld al 141% y un build de Unreal al 125% compitiendo.
-  El `live` de la sonda pasó de 2,8 a 0,6 mientras el load subía de 10,9 a
-  15,4.
+Con RimWorld y Unreal cerrados, load 4–8 sobre 12 núcleos (antes 10–17):
 
-Es decir: **es plausible que el 2,8 sea mayoritariamente la máquina**, y que
-el test de FPS nunca haya tenido una máquina quieta en esta sesión. Eso
-invalidaría la afirmación previa de «degradación de render». **No se baja el
-umbral**: con esta máquina saturada, el umbral no se puede ni confirmar.
+| Medición | Resultado |
+|---|---|
+| Página vacía, mismo Chromium (**57,2 FPS**) | techo de la máquina |
+| Vista Local (**4,0 FPS**) | 14× por debajo del techo |
 
-Siguiente paso al retomar, en este orden:
-1. Repetir el perfil en una máquina descargada (o con los juegos pausados) y
-   ver si el `live` sube a ~14 como documenta el test. Eso decide si hay un
-   defecto real.
-2. Solo si sigue bajo: instrumentar `render()` con muestreo propio para
-   localizar el JS, no el dibujo.
+**La máquina queda descartada por medición.** El hueco es real y es del render.
 
-### Trampas de este perfilado
+### Lo que NO es (medido, no supuesto)
 
-- `performance.now()` por llamada redondea a 0 en headless: hay que medir
-  **lotes completos** contra el reloj de pared.
-- La primera muestra rAF de la página cae en warmup. Toda comparación
-  A/B necesita warmup y **el control al final**.
-- `live` y `liveWithWrap` quedaron en 0,1–0,6 en la última corrida: son las
-  muestras contaminadas por warmup, no un dato. No citarlas.
+| Clase | Coste por frame |
+|---|---|
+| 2000 `fillRect` | 0,6–1,3 ms |
+| 2000 `fillText` | 1,8–3,5 ms |
+| 2000 `save`/`restore` | 1,2–1,7 ms |
+| 136 `drawImage` del minimapa | 5,1 µs c/u (~0,7 ms) |
+
+Un frame a 4 FPS son 250 ms. Todo eso junto: **~2 ms**. El dibujo 2D es
+irrelevante.
+
+**El minimapa tampoco**, confirmado dos veces por A/B (con warmup y control al
+final): sin minimapa 4,3/5,3 FPS; con minimapa 5,7/5,7. Ruido. El
+`computeBounds()` O(tiles) sí aparece en el CPU profile (15 hits de ~50), pero
+es una quinta parte del problema: es un desperdicio real, no la causa del rojo.
+
+### Lo que SÍ es: CPU profile por CDP (`e2e/cpu-profile.spec.ts`)
+
+Muestreo real del hilo, 200 µs de intervalo, sobre el frame vivo:
+
+| Función | Hits |
+|---|---|
+| `renderIso` (isoLocalRenderer.ts:62) | 47 |
+| `drawIsoTile` (isoLocalRenderer.ts:224) | 47 |
+| `drawIsoWorkbenchCluster` | 22 |
+| `computeBounds` (minimapRenderer) | 15 |
+| `drawIsoPrism` / `drawIsoRoomLabel` | 11 / 11 |
+
+Con **3014 tiles** en el mundo y **6 unidades**.
+
+**El defecto concreto está en `renderIso`, líneas 114–150:** por cada tile de
+puerta en el rectángulo de visión, el bucle recorre **todas** las unidades y
+recalcula su posición interpolada desde cero (`path.length`, `pathIndex`,
+`pathProgress`, `isoProject`) — dentro del bucle más interno. Es O(puertas ×
+unidades) con trabajo redundante por par. Se calcula la posición de cada unidad
+una vez por frame, no una vez por puerta.
+
+También noto que `state.isoStaticLayer` **ya existe** y se blitea
+(`ctx.drawImage` línea 152): suelo, muros y ventilación **ya están precompuestos
+en una capa estática**. El coste está en lo que **no** va a esa capa: puertas,
+ventanas, workbenches, NPC y sprites de oficina, redibujados tile a tile cada
+frame. Un `drawIsoTile` por tile no es un problema cuando son 6 unidades y unas
+pocas puertas; lo es cuando el bucle de puertas multiplica trabajo por unidad.
+
+**Nota sobre el perfil:** los conteos son *self time* relativo y el orden es
+estable entre corridas, pero el perfil mezcla render y otros subsistemas
+(`updateLodDisplay`, `_fetchApprovals`, `formkit_auto-animate`). Para atribuir
+con precisión habría que aislar el subsistema; con esto basta para señalar la
+línea, no para dar por buena una corrección sin medirla.
+
+### Siguiente paso
+
+1. **Cachear la posición interpolada de cada unidad una vez por frame** y
+   reutilizarla en el bucle de puertas. Es O(unidades) en vez de
+   O(puertas × unidades). Medir el delta antes/después.
+2. Considerar ampliar `isoStaticLayer` a workbenches/ventanas, que no cambian
+   entre frames.
+3. `computeBounds()` mover **después** del chequeo de `isDirty` — no arregla el
+   rojo, pero es desperdicio que no debería existir.
+
+**No se baja el umbral.** Con la máquina descargada el defecto es real y
+medible: 4,0 FPS contra un techo de 57,2.
 
 ## Prueba de Baseline: cómo atribuir un rojo de FPS
 
