@@ -654,6 +654,57 @@ def _extract_output_file_path(text: str) -> str:
     return m.group(1).strip() if m else ""
 
 
+def _handle_tool_activity(
+    data: dict[str, Any],
+    *,
+    ctx: MissionHarnessContext,
+) -> None:
+    """Surface a tool call as structured activity for the local view.
+
+    The harness stream already carries every tool call; the bridge used to drop
+    them on the floor because they are not readable chat text
+    (agent_runner._parse_cursor_ndjson_chunk returns "" for tool_use). That
+    stays true — this only ADDS an emit, it never turns a tool call into chat.
+
+    The local view (Vista Local) draws this as a glyph above the unit, so the
+    user can see *what kind of thing* the agent is doing without reading the
+    transcript. Results are deliberately not emitted: a tool_result is an
+    answer, not an action.
+    """
+    if data.get("type") != "tool_use":
+        return
+    name = str(data.get("name") or "").strip()
+    if not name:
+        return
+    _send({
+        "type": "unit_tool_call",
+        "unit": ctx.unit_id,
+        "missionId": ctx.mission_id,
+        "toolName": name,
+        "cityId": ctx.city_id,
+    })
+
+
+def _handle_stream_activity(data: dict[str, Any], *, ctx: MissionHarnessContext) -> None:
+    """Read both direct tool_use records and assistant content blocks.
+
+    Claude stream-json wraps tool calls inside assistant.message.content; a
+    top-level-only parser silently drops actual Claude Code activity.
+    """
+    _handle_tool_activity(data, ctx=ctx)
+    if data.get("type") != "assistant":
+        return
+    message = data.get("message")
+    if not isinstance(message, dict):
+        return
+    content = message.get("content")
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if isinstance(block, dict):
+            _handle_tool_activity(block, ctx=ctx)
+
+
 def process_cursor_ndjson_line(
     line: str,
     *,
@@ -678,6 +729,7 @@ def process_cursor_ndjson_line(
     except (json.JSONDecodeError, TypeError):
         return
 
+    _handle_stream_activity(data, ctx=ctx)
     if _handle_task_tool_use(data, ctx=ctx):
         return
     if _handle_tool_result(data):
@@ -701,6 +753,7 @@ def process_claude_stream_line(
     except (json.JSONDecodeError, TypeError):
         return
 
+    _handle_stream_activity(data, ctx=ctx)
     if _handle_task_tool_use(data, ctx=ctx):
         return
     if _handle_tool_result(data):

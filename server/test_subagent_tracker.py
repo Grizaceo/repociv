@@ -1,7 +1,10 @@
 """Tests for subagent_tracker lifecycle."""
 
+import json
+
 from server import subagent_tracker as st
 from server import event_store as es
+from server.mission_harness import MissionHarnessContext
 
 
 def _reset_tracker():
@@ -189,3 +192,117 @@ def test_process_cursor_task_complete(monkeypatch, tmp_path):
     complete_line = '{"type":"tool_result","tool_use_id":"tu-2","content":"all good"}'
     st.process_cursor_ndjson_line(complete_line, mission_id="m9", unit_id="MAIN")
     assert any(e["type"] == "subagent_complete" for e in sent)
+
+
+# ─── Local-view activity (unit_tool_call) ─────────────────────────────────────
+# The harness stream already carries every tool call; the bridge used to drop
+# them on the floor (agent_runner._parse_cursor_ndjson_chunk returns "" for
+# tool_use). Tool calls are not chat text, but they ARE structured activity the
+# local view draws above the unit. Same event, second consumer.
+
+
+def _ctx(harness="claude-code"):
+    return MissionHarnessContext(
+        mission_id="m1", unit_id="MAIN", city_id="repociv", resolved_harness=harness,
+    )
+
+
+def test_claude_assistant_content_tool_use_emits_unit_tool_call(monkeypatch, tmp_path):
+    sent = []
+    monkeypatch.setattr(st, '_send', sent.append)
+    line = json.dumps({
+        'type': 'assistant',
+        'message': {'content': [{'type': 'text', 'text': 'I will inspect it'},
+                                {'type': 'tool_use', 'id': 'tu-nested', 'name': 'Read',
+                                 'input': {'file_path': 'package.json'}}]},
+    })
+    st.process_claude_stream_line(line, ctx=_ctx())
+    calls = [e for e in sent if e['type'] == 'unit_tool_call']
+    assert len(calls) == 1
+    assert calls[0]['toolName'] == 'Read'
+
+
+def test_tool_use_emits_unit_tool_call(monkeypatch, tmp_path):
+    _reset_tracker()
+    sent = []
+    es.init(tmp_path)
+    st.configure(send=lambda e: sent.append(e))
+
+    st.process_claude_stream_line(
+        '{"type":"tool_use","id":"tu-9","name":"read_file","input":{"path":"a.ts"}}',
+        ctx=_ctx(),
+    )
+    evt = next(e for e in sent if e["type"] == "unit_tool_call")
+    assert evt["unit"] == "MAIN"
+    assert evt["missionId"] == "m1"
+    assert evt["toolName"] == "read_file"
+    assert evt["cityId"] == "repociv"
+
+
+def test_tool_result_does_not_emit_activity(monkeypatch, tmp_path):
+    """A result is an answer, not an action — it must not light the glyph."""
+    _reset_tracker()
+    sent = []
+    es.init(tmp_path)
+    st.configure(send=lambda e: sent.append(e))
+
+    st.process_claude_stream_line(
+        '{"type":"tool_result","tool_use_id":"tu-9","content":"file body"}',
+        ctx=_ctx(),
+    )
+    assert not any(e["type"] == "unit_tool_call" for e in sent)
+
+
+def test_task_delegation_also_emits_activity(monkeypatch, tmp_path):
+    """Delegating IS something the parent agent did — the glyph should fire."""
+    _reset_tracker()
+    sent = []
+    es.init(tmp_path)
+    st.configure(send=lambda e: sent.append(e))
+
+    st.process_claude_stream_line(
+        '{"type":"tool_use","name":"Task","id":"tu-1","input":'
+        '{"subagent_type":"explore","description":"scan","run_in_background":true}}',
+        ctx=_ctx(),
+    )
+    evt = next(e for e in sent if e["type"] == "unit_tool_call")
+    assert evt["toolName"] == "Task"
+
+
+def test_tool_use_without_name_is_ignored(monkeypatch, tmp_path):
+    _reset_tracker()
+    sent = []
+    es.init(tmp_path)
+    st.configure(send=lambda e: sent.append(e))
+
+    st.process_claude_stream_line('{"type":"tool_use","id":"tu-0"}', ctx=_ctx())
+    assert not any(e["type"] == "unit_tool_call" for e in sent)
+
+
+def test_cursor_stream_also_emits_activity(monkeypatch, tmp_path):
+    _reset_tracker()
+    sent = []
+    es.init(tmp_path)
+    st.configure(send=lambda e: sent.append(e))
+
+    st.process_cursor_ndjson_line(
+        '{"type":"tool_use","id":"tu-3","name":"bash","input":{"command":"ls"}}',
+        mission_id="m2", unit_id="WORKER-1", city_id="repociv",
+    )
+    evt = next(e for e in sent if e["type"] == "unit_tool_call")
+    assert evt["unit"] == "WORKER-1"
+    assert evt["toolName"] == "bash"
+
+
+def test_activity_is_not_chat_text(monkeypatch, tmp_path):
+    """The tool call must not leak back into the chat transcript."""
+    _reset_tracker()
+    sent = []
+    es.init(tmp_path)
+    st.configure(send=lambda e: sent.append(e))
+
+    st.process_claude_stream_line(
+        '{"type":"tool_use","id":"tu-4","name":"edit_file","input":{}}',
+        ctx=_ctx(),
+    )
+    assert not any(e["type"] == "chat_chunk" for e in sent)
