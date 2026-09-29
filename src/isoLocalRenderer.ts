@@ -17,6 +17,7 @@ import {
   drawIsoStairs as renderIsoStairs,
 } from './isoOfficeRenderer.ts';
 import { worldToScreen } from './hex.ts';
+import { activityGlyphFor, ACTIVITY_TTL_MS } from './localActivity.ts';
 
 export { ISO_TILE_W, ISO_TILE_H, ISO_WALL_H };
 export const isoProject = officeIsoProject;
@@ -777,7 +778,11 @@ export function computeUnitDirAngle(unit: LocalUnit): number {
   return Math.atan2(to.y - from.y, to.x - from.x);
 }
 
-function drawIsoUnit(state: IsoRenderState, unit: LocalUnit, gx: number, gy: number) {
+// Exported for the activity-pulse test: everything else in this module is
+// reached through renderIso, but the glyph draw is worth pinning at the canvas
+// level, since a pure-logic test cannot tell "the event arrived" from "the
+// pixel showed up".
+export function drawIsoUnit(state: IsoRenderState, unit: LocalUnit, gx: number, gy: number) {
   const { ctx } = state;
   const base = isoProject(gx, gy);
   const ux = base.px;
@@ -918,6 +923,27 @@ function drawIsoUnit(state: IsoRenderState, unit: LocalUnit, gx: number, gy: num
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   ctx.fillText(icon, 0, -ISO_TILE_H * 0.35 - 28 * scale);
+
+  // ─── Local view activity pulse ────────────────────────────────────────────
+  // A unit parked at a workbench looks idle, but the agent behind it is mid
+  // tool call. Flash a glyph above the status icon, faded by the TTL it has
+  // left, so a burst of calls reads as one pulse dimming out instead of a
+  // blinking lamp. The glyph itself is decided in localActivity.ts.
+  if (unit.activity) {
+    const age = Date.now() - unit.activity.at;
+    if (age < ACTIVITY_TTL_MS) {
+      const { glyph, color } = activityGlyphFor(unit.activity.toolName);
+      const remaining = 1 - age / ACTIVITY_TTL_MS;
+      ctx.save();
+      ctx.globalAlpha = fadeAlpha * (0.35 + 0.65 * remaining);
+      ctx.fillStyle = color;
+      ctx.font = `${ISO_TILE_W * 0.26}px ${monoFont(state)}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(glyph, 0, -ISO_TILE_H * 0.35 - 48 * scale);
+      ctx.restore();
+    }
+  }
 
   ctx.restore();
 
