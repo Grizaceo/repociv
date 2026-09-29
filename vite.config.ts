@@ -44,13 +44,12 @@ export default defineConfig(({ mode }) => {
     server: {
       port: vitePort,
       strictPort: true,
-      // Loopback-only: la UI de RepoCiv no se expone al tailnet/WSL-LAN.
-      // El bind 0.0.0.0 previo era la misma exposicion que el gateway (:8742).
-      // Se accede via 127.0.0.1:5273 / localhost:5273.
-      host: '0.0.0.0', // loopback-only was hiding the server from Windows browser
-      // allowedHosts:true se mantiene inofensivo porque el bind ya es loopback
-      // (solo acepta conexiones que lleguen a 127.0.0.1); no es vector de exposicion.
-      allowedHosts: true,
+      // Default to loopback. A LAN bind would expose the Vite /api plugin,
+      // bridge proxy, and the client bundle (which includes the local token).
+      // Do not open this server to Windows/LAN as a connectivity workaround.
+      host: '127.0.0.1',
+      // Keep Vite's DNS-rebinding protection; localhost and IP hosts remain allowed.
+      allowedHosts: false,
       // The dev-server HMR watcher must not traverse the Python venv or the
       // build/e2e output trees — under WSL2's inotify that exhausts watchers
       // (ENOSPC) and crashes `npm run dev` mid-startup. node_modules is
