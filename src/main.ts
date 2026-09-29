@@ -98,6 +98,7 @@ import { getStoredEraLabel } from './ui/eraSystem.ts';
 import { logEvent } from './ui/hud.ts';
 import { trackPanelOpen } from './ui/analytics.ts';
 import { initBubbleLayer, updateBubble, clearAllBubbles } from './ui/actionBubbles.ts';
+import { mountLocalChat, type LocalChatHandle } from './ui/localChat/feed.ts';
 import { bindOrdenDeBatalla } from './ui/ordenDeBatalla.ts';
 import { bindSubagentSessionPanel } from './ui/subagentSessionPanel.ts';
 import { bindSlashCommandState } from './ui/chat/slashCommands.ts';
@@ -1193,7 +1194,21 @@ async function bootstrap() {
 
   // ─── Phase 9: Action Bubbles ─────────────────────────────────────────────
   renderer.localUnitRenderedCb = (unit, sx, sy) => updateBubble(unit, sx, sy);
-  renderer.onExitLocalView = () => clearAllBubbles();
+
+  // ─── Local view chat ──────────────────────────────────────────────────────
+  // The same transcript the side panel shows, in its own phone-style feed. It
+  // reads the shared chatHistory and the shared chunk stream, so both views
+  // stay live from one source of truth.
+  let localChat: LocalChatHandle | null = null;
+  renderer.onEnterLocalView = () => {
+    localChat?.destroy();
+    localChat = mountLocalChat(() => state.getLocalUnits());
+  };
+  renderer.onExitLocalView = () => {
+    clearAllBubbles();
+    localChat?.destroy();
+    localChat = null;
+  };
 
   // Zone painting: wire to LocalWorldManager
   renderer.onZonePaintedCb = (type, tiles) => {

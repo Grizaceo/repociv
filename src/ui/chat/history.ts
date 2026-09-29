@@ -12,6 +12,35 @@ import { COPY_SVG, attachCopyListeners, escapeHtml, hasErrorLine } from './clipb
 import { renderMarkdown } from './markdown.ts';
 import { ensureChipExists } from './agentChip.ts';
 import { renderEmptyState, clearEmptyState } from '../emptyStates.ts';
+
+// ─── Chunk subscribers (second presentation of the same transcript) ─────────
+// The local view shows the same conversation as the side panel, in its own
+// skin and its own DOM. Rather than duplicate the transcript or re-derive it
+// from the bridge, the local chat subscribes here and reads the same
+// chatHistory/chatBuffers. The side panel's own rendering is unaffected: this
+// only notifies, it never writes to #chat-messages on its behalf.
+
+export type ChatChunkListener = (unitId: string, text: string) => void;
+
+const _chunkListeners = new Set<ChatChunkListener>();
+
+/** Observe every chat chunk. Returns an unsubscribe function. */
+export function subscribeChatChunks(fn: ChatChunkListener): () => void {
+  _chunkListeners.add(fn);
+  return () => {
+    _chunkListeners.delete(fn);
+  };
+}
+
+function notifyChatChunks(unitId: string, text: string): void {
+  for (const fn of _chunkListeners) {
+    try {
+      fn(unitId, text);
+    } catch {
+      // A broken second presentation must never break the side panel chat.
+    }
+  }
+}
 import { approveCommand, rejectCommand } from '../../commandBus.ts';
 
 /** Render the chat history for a specific unit */
@@ -65,6 +94,7 @@ export function appendChatChunk(unitId: string, text: string): void {
   const prev = chatBuffers.get(unitId) ?? '';
   const newText = prev + text;
   chatBuffers.set(unitId, newText);
+  notifyChatChunks(unitId, text);
 
   // If this agent is not the active one OR the shared DOM still shows another
   // unit's transcript, keep the chunk in that unit's history only (badge).
@@ -126,6 +156,7 @@ export function appendUserMessage(unitId: string, text: string): void {
     const history = chatHistory.get(unitId) ?? [];
     history.push({ role: 'user', text, timestamp: userTime });
     chatHistory.set(unitId, history);
+    notifyChatChunks(unitId, text);
     const agentTime = new Date().toLocaleTimeString('es-CL', {
       hour: '2-digit',
       minute: '2-digit',
@@ -148,6 +179,7 @@ export function appendUserMessage(unitId: string, text: string): void {
   const history = chatHistory.get(unitId) ?? [];
   history.push({ role: 'user', text, timestamp: userTime });
   chatHistory.set(unitId, history);
+  notifyChatChunks(unitId, text);
 
   const msg = document.createElement('div');
   msg.className = 'chat-msg user';

@@ -167,6 +167,9 @@ export class Renderer {
     | ((unitId: string, workbenchTile: import('./types.ts').LocalTile) => void)
     | null = null;
   onExitLocalView: (() => void) | null = null;
+  // Fires once per local-view entry, alongside the body.local-view class. Used
+  // by the local chat to mount its feed; the exit hook tears it down.
+  onEnterLocalView: (() => void) | null = null;
   private _localRendererCtor: (new (canvas: HTMLCanvasElement) => LocalRendererType) | null = null;
   // One latch PER renderer. A single shared `localWorldId` was a race the 2D
   // path always won: LocalScene3D arrives via dynamic import, so frame 1 falls
@@ -1337,6 +1340,7 @@ export class Renderer {
       this.localR?.setInputActive(true);
       if (!document.body.classList.contains('local-view')) {
         document.body.classList.add('local-view');
+        this.onEnterLocalView?.();
       }
       // Layer 3 input isolation: mirror view mode into a DOM attribute
       // on the canvas so CSS and the bailIfLocal backstop have a
