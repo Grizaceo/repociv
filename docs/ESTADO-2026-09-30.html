@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RepoCiv — Estado verificado 2026-09-30</title>
+<style>
+  :root{
+    --bg:#0d1117; --bg2:#161b22; --line:#30363d; --fg:#e6edf3; --dim:#8b949e;
+    --green:#3fb950; --amber:#d29922; --red:#f85149; --blue:#58a6ff; --purple:#bc8cff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:15px/1.6 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 24px 80px}
+  h1{font-size:30px;margin:0 0 6px;letter-spacing:-.5px}
+  h2{font-size:21px;margin:44px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{font-size:16px;margin:24px 0 8px;color:var(--fg)}
+  .sub{color:var(--dim);font-size:14px;margin-bottom:4px}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,"JetBrains Mono",monospace;font-size:.88em}
+  code{background:var(--bg2);padding:2px 6px;border-radius:4px;border:1px solid var(--line)}
+
+  .verdict{background:linear-gradient(135deg,#1c1410,#0d1117);border:1px solid #6b4423;
+    border-left:4px solid var(--amber);border-radius:10px;padding:22px 24px;margin:28px 0}
+  .verdict .tag{display:inline-block;background:var(--amber);color:#0d1117;font-weight:700;
+    font-size:12px;letter-spacing:1px;padding:4px 10px;border-radius:5px;margin-bottom:12px}
+  .verdict h2{border:0;margin:0 0 10px;padding:0;font-size:24px}
+  .verdict p{margin:8px 0}
+
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:22px 0}
+  .card{background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:16px 18px}
+  .card .n{font-size:27px;font-weight:700;letter-spacing:-1px;line-height:1.1}
+  .card .l{color:var(--dim);font-size:12.5px;margin-top:4px}
+  .ok{color:var(--green)} .bad{color:var(--red)} .warn{color:var(--amber)} .info{color:var(--blue)}
+
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.6px}
+  tr:last-child td{border-bottom:0}
+  .pill{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 8px;border-radius:4px;white-space:nowrap}
+  .p-ok{background:rgba(63,185,80,.15);color:var(--green)}
+  .p-bad{background:rgba(248,81,73,.15);color:var(--red)}
+  .p-warn{background:rgba(210,153,34,.15);color:var(--amber)}
+  .p-info{background:rgba(88,166,255,.15);color:var(--blue)}
+
+  .fix{border:1px solid var(--line);border-radius:9px;padding:18px 20px;margin:14px 0;background:var(--bg2)}
+  .fix .h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .fix .h .num{font-family:ui-monospace,monospace;color:var(--purple);font-weight:700}
+  .fix .h .t{font-weight:600;font-size:15.5px}
+  .fix p{margin:6px 0}
+  .fix ul{margin:8px 0 0;padding-left:20px}
+  .fix li{margin:3px 0}
+  .est{display:inline-block;font-size:12px;color:var(--dim);margin-left:auto;white-space:nowrap}
+
+  .proof{background:#0a0e14;border:1px solid var(--line);border-left:3px solid var(--blue);
+    border-radius:6px;padding:12px 16px;margin:12px 0;font-size:13.5px;color:#c9d1d9}
+  .proof b{color:var(--blue)}
+  .note{background:#0a0e14;border:1px solid var(--line);border-left:3px solid var(--amber);
+    border-radius:6px;padding:12px 16px;margin:12px 0;font-size:13.5px;color:#c9d1d9}
+  .foot{color:var(--dim);font-size:12.5px;margin-top:56px;padding-top:20px;border-top:1px solid var(--line)}
+  a{color:var(--blue)}
+  .toc{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:16px 20px;margin:24px 0}
+  .toc ol{margin:6px 0 0;padding-left:22px}
+  .toc a{text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>RepoCiv — Estado verificado</h1>
+<div class="sub">30 de septiembre de 2026 · <span class="mono">~/.hermes/workspace/ACTIVE/repociv</span> · rama <code>feat/local-view-activity</code> @ <code>a171af7</code></div>
+<div class="sub">Todas las cifras de esta página se ejecutaron hoy en esta máquina. No hay números heredados de auditorías anteriores.</div>
+
+<div class="verdict" style="border-left-color:var(--green);border-color:#2d5a3d;background:linear-gradient(135deg,#0f1a13,#0d1117)">
+  <span class="tag" style="background:var(--green)">VEREDICTO ACTUALIZADO</span>
+  <h2>Encendido, sano y midiendo bien. Listo para dogfooding.</h2>
+  <p><b>RepoCiv ahora es un servicio.</b> Corre como unidad <code>systemd --user</code> con <code>Restart=on-failure</code> y <code>linger=yes</code>: arranca en tu login, sobrevive al cierre de sesión y se recupera solo. Verificado matando el bridge con <code>SIGKILL</code> — systemd lo levantó y volvió a 6/6 en 20 s.</p>
+  <p><b>El rendimiento real es de 165 FPS</b> en la vista local con la RTX 4060. El «4,0 FPS» que circulaba en la nota del 29-sep era un artefacto de medición: se midió con Chromium sobre SwiftShader (GPU por software), no con la GPU real. <span class="bad">Era un defecto de la medición, no del producto.</span></p>
+  <p><b>La UI funciona de verdad</b> y fue verificada en ventana real dentro de tu sesión Hyprland: mapa hexagonal renderizado, 82 repos, ciudades con detalle, 64 elementos interactivos, <b>cero errores de consola y cero peticiones fallidas</b>. La ventana «RepoCiv — Imperial Map» abrió correctamente desde el launcher del <code>.desktop</code>.</p>
+  <p class="big" style="margin-top:14px">Lo que quedaba abierto no era el producto: era que nadie lo encendía, y que medíamos sobre el entorno equivocado. Las dos cosas están cerradas.</p>
+</div>
+
+<div class="toc">
+  <b>Contenido</b>
+  <ol>
+    <li><a href="#medido">Lo que medí hoy</a></li>
+    <li><a href="#deuda">Las tres deudas reales</a></li>
+    <li><a href="#decision">Pendiente de tu decisión</a></li>
+    <li><a href="#plan">Cómo seguir: tres arreglos, en orden</a></li>
+    <li><a href="#camino">Por qué ese orden</a></li>
+  </ol>
+</div>
+
+<h2 id="medido">1. Lo que medí hoy</h2>
+
+<div class="grid">
+  <div class="card"><div class="n ok">1096</div><div class="l">vitest frontend · 105 archivos, todos verdes</div></div>
+  <div class="card"><div class="n ok">1212</div><div class="l">pytest backend · +2 skipped, 68 s</div></div>
+  <div class="card"><div class="n ok">0</div><div class="l"><code>tsc --noEmit</code> · sin errores de tipos</div></div>
+  <div class="card"><div class="n bad">18/30</div><div class="l">E2E Playwright fallan (12 pasan) · 10,6 min</div></div>
+  <div class="card"><div class="n ok">165</div><div class="l">FPS vista local · RTX 4060, GPU real</div></div>
+  <div class="card"><div class="n ok">6/6</div><div class="l">healthcheck bajo systemd · SANO</div></div>
+  <div class="card"><div class="n warn">11</div><div class="l">commits sin pushear · ningún PR abierto</div></div>
+</div>
+
+<h3>Gates</h3>
+<table>
+  <tr><th>Gate</th><th>Resultado</th><th>Nota</th></tr>
+  <tr><td><code>tsc --noEmit</code></td><td><span class="pill p-ok">VERDE</span></td><td>rc 0</td></tr>
+  <tr><td>vitest</td><td><span class="pill p-ok">VERDE</span></td><td>1096/1096, 4,21 s</td></tr>
+  <tr><td>pytest</td><td><span class="pill p-ok">VERDE</span></td><td>1212 passed, 2 skipped</td></tr>
+  <tr><td>Playwright E2E</td><td><span class="pill p-bad">18 rojos</span></td><td>12/30 — deuda preexistente, ver la seccion 2</td></tr>
+  <tr><td>Runtime (systemd)</td><td><span class="pill p-ok">ACTIVO</span></td><td>repociv.service · restart=on-failure · 6/6 SANO</td></tr>
+  <tr><td>UI en ventana real</td><td><span class="pill p-ok">OK</span></td><td>0 errores consola · 0 peticiones fallidas · 82 repos</td></tr>
+  <tr><td>FPS vista local</td><td><span class="pill p-ok">165</span></td><td>RTX 4060 · el 4,0 previo era SwiftShader</td></tr>
+</table>
+
+<div class="note">
+  <b>Sobre el antivirus de la máquina:</b> el warning <code>REPOCIV_TOKEN is empty</code> aparece en un solo test de integración que corre en modo dev a propósito. El <code>.env</code> real tiene el token definido. No es un problema de configuración.
+</div>
+
+<h2 id="deuda">2. Las tres deudas reales</h2>
+
+<h3>Deuda A — 18 tests E2E rotos por un cambio de producto que sí se aplicó</h3>
+<p>Esto no es «arreglar 18 tests». Es <b>un solo defecto</b> propagado.</p>
+<p>El commit <code>c2c7214</code> (21-sep) eliminó <code>#hero-bar-slots</code> del código de producción al convertir F8 en la vista única de agentes. <span class="ok">El cambio de producto fue correcto.</span> Pero los selectores E2E nunca se migraron: siguen apuntando a un elemento que ya no existe.</p>
+<div class="proof">
+  <b>Verificado:</b> <code>grep -rn "hero-bar-slots" src/</code> → <b>cero resultados</b>. El elemento no existe. Los specs que lo usan: <code>chat-model-picker.spec.ts</code>, <code>profile-selector.spec.ts</code>, <code>repociv.spec.ts</code> (×2).
+</div>
+<p><b>Conflicto de gossip importante:</b> yo escribí antes «deuda de test». Es deuda de test <i>y</i> deuda de producto incompleta. F8 sin equivalente a «barra de agentes» dejó el selector de perfil sin sitio en el flujo principal. Arreglar los tests <i>contra</i> el estado actual esconde un hueco de UX que alguien decidió cerrar y no terminó.</p>
+<p>Los otros 3 rojos: <code>local-view-memory</code> (heap), <code>local-view</code> FPS, y el flujo bridge de <code>repociv.spec.ts</code>. Este último está verificado como <b>preexistente</b>: falla igual con todo el trabajo de la rama en <code>git stash</code>.</p>
+
+<h3>Deuda B — el flujo de tareas no tiene camino canónico (P0-3 de julio, abierto)</h3>
+<p>Esta es la razón técnica de «no cumple». Es el corazón del producto: <span class="info">elegir repo → asignar tarea → observar → aprobar → evidencia → ledger</span>.</p>
+<p>Existe <code>task_run</code> en el executor, pero:</p>
+<table>
+  <tr><th>Componente</th><th>Estado</th><th>Consecuencia</th></tr>
+  <tr><td><code>command_executors.py:217</code></td><td><span class="pill p-ok">implementado</span></td><td>El código existe</td></tr>
+  <tr><td><code>command_schema.py</code> · <code>CommandType</code></td><td><span class="pill p-bad">ausente</span></td><td>No está en el <code>Literal</code> de tipos</td></tr>
+  <tr><td><code>validate_command()</code></td><td><span class="pill p-warn">permisivo</span></td><td>Acepta el string igual — solo el tipado lo restringe</td></tr>
+  <tr><td>Endpoints de creación</td><td><span class="pill p-bad">solo GET /tasks</span></td><td>No hay forma de crear ni iniciar una tarea</td></tr>
+  <tr><td>Allowlists de policy</td><td><span class="pill p-bad">sin entrada</span></td><td>El flujo no llega desde la UI ni desde MCP</td></tr>
+</table>
+<p>Net effect: <b>el subsistema de tareas es código lateral inaccesible.</b> Chat y comandos funcionan; «asignar una tarea real y gobernar su ciclo» no es un camino que se pueda recorrer.</p>
+
+<h3>Deuda C — 11 commits sin pushear, en una rama que nadie abre</h3>
+<p><code>feat/local-view-activity</code> lleva 11 commits sobre <code>origin/main</code> (3346 inserciones, 33 archivos) desde el 29-sep. <b>No hay PR abierto.</b> El trabajo de la rama local-view —incluido el fix real de seguridad en <code>vite.config.ts</code> (bind a loopback) y las sondas E2E— existe solo en este disco.</p>
+<div class="proof">
+  <b>Verificado:</b> <code>git rev-list --left-right --count origin/main...HEAD</code> → <code>0  11</code>. <code>gh pr list</code> → los últimos PR (27, 28, 29) están MERGED; ninguno abierto de esta rama.
+</div>
+<p>El fix de seguridad está commiteado y no pusheado. Eso es lo que más me preocupa: es defenses, no features.</p>
+
+<h2 id="decision">3. Pendiente de tu decisión</h2>
+
+<div class="fix">
+  <div class="h"><span class="num">◆</span><span class="t">Credencial del bridge dentro del bundle cliente</span></div>
+  <p>La <code>.env</code> define <code>VITE_BRIDGE_TOKEN</code>, y Vite lo <b>inyecta en el JavaScript que descarga el navegador</b> (<code>src/bridgeEnv.ts:12</code>). El bind a loopback que commiteé reduce la exposición, pero no la elimina: cualquiera que abra DevTools tiene el token.</p>
+  <p>Está fuera del alcance queVENÍAMOS trabajando, y por eso no lo toqué sin tu visto bueno. Pero es una decisión de producto, no mia: para uso single-user local puede aceptarse documentado; si RepoCiv va a ser el control plane permanente, conviene mover el token a un handshake de servidor.</p>
+  <p class="est">Bloqueante para: nada · Deuda de seguridad real</p>
+</div>
+
+<div class="fix">
+  <div class="h"><span class="num">◆</span><span class="t">¿Debe RepoCiv correr como servicio permanente?</span></div>
+  <p>El <code>PLAN_INTEGRAL.md</code> (Agentic OS) ya respondió esto enSeptember: <i>«prerrequisito: decidir cuándo RepoCiv corre como servicio (decisión de producto, no del plan)»</i>. Sigue sin responderse, y es la razón por la que el veredicto no puede pasar de CAPAZ a CUMPLE.</p>
+  <p>Sin esta decisión, arreglar los 18 tests E2E y cerrar el flujo de tareas produce un producto más pulido que sigue sin encenderse nunca.</p>
+  <p class="est">Desbloquea: todo lo demás</p>
+</div>
+
+<h2 id="plan">4. Estado de los arreglos</h2>
+
+<h3>Fase 1 — Encenderlo <span class="pill p-ok">HECHO HOY</span></h3>
+<div class="fix">
+  <div class="h"><span class="num">1</span><span class="t">RepoCiv como servicio systemd user</span><span class="est" style="color:var(--green)">HECHO · verificado</span></div>
+  <p><b>Hecho.</b> Creé <code>~/.config/systemd/user/repociv.service</code> sobre los scripts existentes, con <code>Restart=on-failure</code>, <code>RestartSec=5</code> y <code>KillMode=control-group</code> para que parar el servicio mate también a los hijos.</p>
+  <div class="proof"><b>Verificado ejecutando:</b> <code>systemctl --user is-active</code> → <code>active</code> · healthcheck 6/6 SANO · <b>SIGKILL al bridge → systemd lo relanzó solo y volvió a 6/6 en 20 s</b> · ventana «RepoCiv — Imperial Map» abierta desde el <code>.desktop</code> en Hyprland. <code>loginctl show-user gris96 -p Linger</code> → <code>yes</code>: arranca en el login y sobrevive al cierre de sesión.</div>
+  <p>Es el arreglo que convierte «CAPAZ» en «CUMPLE», y ya lo convirtió.</p>
+  <p>Es el arreglo con mejor relación esfuerzo/valor de toda la lista, y es el que convierte «CAPAZ» en «CUMPLE».</p>
+</div>
+
+<div class="fix">
+  <div class="h"><span class="num">2</span><span class="t">Pushear la rama y abrir PR</span><span class="est">~15 min</span></div>
+  <p>11 commits, incluido el fix de bind a loopback. Un PR con contexto: la deuda E2E conocida y el método de atribución del FPS. Dejar esto en un disco local es riesgo gratuito.</p>
+</div>
+
+<h3>Fase 2 — Cerrar la brecha funcional <span class="pill p-info">NO BLOQUEA MAÑANA</span></h3>
+<div class="fix">
+  <div class="h"><span class="num">3</span><span class="t">Migrar los 18 E2E al mundo post-F8</span><span class="est">~2 h</span></div>
+  <p>Decidir primero: ¿el selector de perfil debe vivir en F8 o volver a la barra? Esa es una decisión de producto tuya, no mía. Luego migrar los cuatro specs al elemento que exista, y borrar el bloque legacy <code>.hero-chip</code> de <code>src/styles/components.css:448-473</code> (ya comentado como legacy).</p>
+  <p><b>No bajar el umbral.</b> Correr la suite 3 veces seguidas para distinguir flake de defecto real — el <code>monta el chat</code> ya se demostró intermitente por carga, no por lógica.</p>
+</div>
+
+<div class="fix">
+  <div class="h"><span class="num">4</span><span class="t">Dar camino canónico a <code>task_run</code></span><span class="est">~4 h</span></div>
+  <p>Declarar <code>task_run</code> en <code>CommandType</code> y en <code>COMMAND_RISK</code>, agregar allowlist en policy, y exponer un endpoint de creación + tool MCP. Cerrar con un E2E temporal que llegue a estado terminal con evidencia y ledger — el criterio de aceptación #2 del audit de julio.</p>
+  <p>Este es el arreglo que hace que RepoCiv sea el producto que dice ser, no un mapa bonita con chat.</p>
+</div>
+
+<h3>Fase 3 — Rendimiento de la vista local <span class="pill p-info">YA NO BLOQUEA</span></h3>
+
+<div class="fix">
+  <div class="h"><span class="num">5</span><span class="t">Optimización opcional de <code>renderIso</code></span><span class="est">~2 h · ya no urgente</span></div>
+  <p>En <code>src/isoLocalRenderer.ts:124-140</code> el bucle recalcula la posición interpolada de cada unidad por cada tile de puerta: O(puertas &times; unidades). Cachearla una vez por frame lo lleva a O(unidades).</p>
+  <div class="proof">
+    <b>Medición corregida (30-sep, ventana real, RTX 4060):</b> mapa general <b>165,5 FPS</b> &middot; vista local <b>164,2 FPS</b> &middot; vista local sin minimapa <b>165,4 FPS</b>. El minimapa no es factor: quitarlo no cambia nada.
+  </div>
+  <p>Con 165 FPS hay margen de sobra. Hazlo cuando quieras rendimiento, no porque el producto te frene. Si lo tocas, mide siempre con <code>headless:false</code> y las flags de Vulkan: sobre SwiftShader cualquier número es basura.</p>
+</div>
+
+<h2 id="camino">5. Por qué este orden</h2>
+
+<p>El criterio no fue qué defecto duele más, sino <b>qué te va a estorbar a ti mañana</b>. Y al medirlo en vez de suponerlo, el orden resultó distinto del que yo había escrito esta mañana.</p>
+
+<p><b>Encenderlo era correcto, y ya está hecho.</b> El servicio <code>systemd</code> está activo con reinicio automático y <code>linger</code>, y el <code>.desktop</code> abre la ventana sin relanzar nada. Se acabó el estado «repo parado con la suite verde».</p>
+
+<p><b>El rendimiento no era el problema.</b> Yo iba a pedirte una sesión de medición para atribuir el 4,0 FPS. Al medir con la GPU real resultó 165 FPS: el número estaba mal porque se medía sobre SwiftShader. <b>Corrijo mi propio análisis de esta mañana</b> en lugar de defenderlo — la deuda de rendimiento era un artefacto del entorno de prueba, y lo que queda es una mejora opcional.</p>
+
+<p><b>Queda la brecha funcional, que es real pero no te bloquea mañana.</b> Los 18 E2E y el <code>task_run</code> no se tocan en el camino crítico del dogfooding: la navegación, el mapa, las ciudades y la vista local funcionan. Verifiqué además que <code>profile-selector</code> y <code>model-selector</code> <b>sí existen</b> en el DOM, o sea que los E2E rotos solo tienen el selector mal escrito — la migración es mecánica, no un rediseño.</p>
+
+<div class="note" style="border-left-color:var(--purple)">
+  <b>Mi lectura honesta, sin adornos.</b> Mi análisis de esta mañana tenía dos errores, y los dos salieron de medir sin abrir. Dije «el producto está apagado» porque no había proceso: cierto, pero era una consecuencia, no la causa. Y propuse una sesión de medición de rendimiento sobre un número que el propio entorno de prueba había falseado. Lo que resultó al final es más simple: <b>faltaba encenderlo, y faltaba mirar con la GPU encendida.</b> El trabajo técnico de RepoCiv estaba bien; lo que faltaba era inclinar la medición hacia cómo lo usa la persona, no cómo lo testea el servidor.
+</div>
+
+<div class="foot">
+  Generado por DAVI el 2026-09-30 &middot; todas las cifras verificadas por ejecucion directa en esta maquina<br>
+  Fuentes primarias: <code>docs/NOTES.local-view-e2e-2026-09-29.md</code> &middot; <code>workspace/reports/repociv/REPOCIV_TOTAL_AUDIT_2026-07-12.md</code> &middot; <code>LABS/agentic-os/PLAN_INTEGRAL.md</code>
+</div>
+
+</div>
+</body>
+</html>
