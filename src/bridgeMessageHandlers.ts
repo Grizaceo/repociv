@@ -306,6 +306,13 @@ const HANDLERS: HandlerByType = {
   },
 
   // ─── Subagents ───────────────────────────────────────────────────────
+  // Local view activity: a transient pulse above the unit, not a log line.
+  // Tool calls can fire many times a second; the local view collapses them
+  // into one glyph, so there is nothing to log and nothing to persist.
+  unit_tool_call(ctx, evt) {
+    ctx.state.noteUnitActivity(evt.unit, evt.toolName);
+  },
+
   subagent_spawn(ctx, evt) {
     const parentUnit = ctx.state.getUnit(evt.parentUnit);
     const spawnStatus = evt.status ?? 'running';

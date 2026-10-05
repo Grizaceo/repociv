@@ -11,6 +11,8 @@
 **Stack:** TypeScript + Vite (Canvas 2D + WebGL/Three.js) · Python HTTP bridge · DuckDB/JSONL local ledger
 **Compatible with:** [Hermes Agent](https://hermes-agent.nousresearch.com) (Nous Research) — drop-in in any existing setup
 
+**New demo (40 s):** [watch MP4](docs/design/screenshots/repociv-demo-2026-10-05.mp4) · [GIF](docs/design/screenshots/repociv-demo-2026-10-05.gif). The map, local workspace view, and a real Codex query in an example workspace. [Capture details](docs/design/screenshots/repociv-demo-2026-10-05.md).
+
 ![Macro 2D view](docs/design/screenshots/macro-2d-view.jpg) | ![Polished 3D WebGL view](docs/design/screenshots/3d-polished-overview.png)
 --- | ---
 *Flat hexagonal map — classic, fast, feature-complete.* | *3D WebGL render (Three.js r175) — faceted low-poly Civ V pass: biomes, dense forests, walled cities, golden hour. Units spawn/despawn, cities grow by tier, fog of war transitions.*

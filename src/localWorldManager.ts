@@ -6,6 +6,7 @@ import type { Unit, LocalWorld, LocalUnit, LocalTile, LocalMission, ViewMode } f
 import { UNIT_COLORS } from './types.ts';
 import { generateLocalWorldFromApi, buildMockLocalWorld, BATTERY_STORED } from './localMap.ts';
 import { findPath, findNearestWorkbench, chairTileForWorkbench } from './localPathfinding.ts';
+import { isActivityActive, resolveActivityTarget } from './localActivity.ts';
 import { peekNextMission } from './priorityMatrix.ts';
 import { logger } from './logger.ts';
 
@@ -185,6 +186,11 @@ export class LocalWorldManager {
         if (unit.workProgress >= 100) {
           this._completeLocalMission(unit.id);
         }
+      }
+
+      // 2b. Expire the tool-call pulse. Cheap: only touches units mid-pulse.
+      if (unit.activity && !isActivityActive(unit.activity, Date.now())) {
+        unit.activity = undefined;
       }
     }
 
@@ -674,6 +680,25 @@ export class LocalWorldManager {
     unit.state = 'idle_in_room';
     unit.path = [];
     this.notify();
+  }
+
+  /**
+   * Record a tool call the agent just made, so the renderer can pulse a glyph
+   * above the unit. Transient by design: the pulse decays in tick() and the
+   * unit is left exactly as it was.
+   *
+   * `unitId` is the macro unit the bridge attributed the call to. Which body
+   * in this office lights up is a local-view decision, not a bridge one — see
+   * resolveActivityTarget() for the policy and why it is deliberately scoped
+   * here rather than in the event contract.
+   */
+  noteUnitActivity(unitId: string, toolName: string): void {
+    if (this.viewMode !== 'local') return;
+    const name = toolName.trim();
+    if (!name) return;
+    const unit = resolveActivityTarget(this.localUnits, unitId);
+    if (!unit) return;
+    unit.activity = { toolName: name, at: Date.now() };
   }
 
   /** Swarm Civ: mirror ephemeral subagent as local operator. */

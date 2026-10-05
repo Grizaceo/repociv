@@ -179,3 +179,33 @@ describe('describeBridgeEventError', () => {
     expect(msg).not.toBe('ok');
   });
 });
+
+// ─── unit_tool_call (local view activity) ───────────────────────────────────
+// A missing Valibot schema here would silently drop every tool call before it
+// reached the renderer, with no error anywhere. Pin the whole shape.
+
+describe('parseBridgeEvent — unit_tool_call', () => {
+  it('accepts a tool call', () => {
+    const evt = parseBridgeEvent({
+      type: 'unit_tool_call',
+      unit: 'MAIN',
+      toolName: 'read_file',
+      missionId: 'm1',
+      cityId: 'repociv',
+    });
+    expect(evt?.type).toBe('unit_tool_call');
+  });
+
+  it('accepts a tool call with only the required fields', () => {
+    const evt = parseBridgeEvent({ type: 'unit_tool_call', unit: 'MAIN', toolName: 'bash' });
+    expect(evt?.type).toBe('unit_tool_call');
+  });
+
+  it('rejects a tool call with no toolName', () => {
+    expect(parseBridgeEvent({ type: 'unit_tool_call', unit: 'MAIN' })).toBeNull();
+  });
+
+  it('rejects a tool call with no unit', () => {
+    expect(parseBridgeEvent({ type: 'unit_tool_call', toolName: 'grep' })).toBeNull();
+  });
+});

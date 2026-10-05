@@ -1,6 +1,7 @@
 // ─── RepoCiv — Core Types ─────────────────────────────────────────────────────
 
 import type { Axial } from './hex.ts';
+import type { LocalActivity } from './localActivity.ts';
 
 export interface CDailyArticle {
   id: number;
@@ -282,6 +283,17 @@ export type BridgeEvent =
   | { type: 'unit_despawn'; unit: string; mission?: string }
   | { type: 'unit_relocate'; unit: string; cityId: string }
   | { type: 'unit_state'; unit: string; state: UnitState }
+  // ─── Local view activity (Vista Local) ───────────────────────────────────
+  // A tool call the agent just made. Not chat text — the local view draws it
+  // as a transient glyph above the unit so the user can see at a glance what
+  // kind of work is happening without reading the transcript.
+  | {
+      type: 'unit_tool_call';
+      unit: string;
+      toolName: string;
+      missionId?: string;
+      cityId?: string;
+    }
   | {
       type: 'building_start';
       city: string;
@@ -566,6 +578,10 @@ export interface LocalUnit {
   despawning?: boolean; // true while fading out before removal
   // ─── Observable-routing plane (A5): inference tier for the tier ring ────────
   tier?: string; // "ECONOMICO" | "EQUILIBRIO" | "PREMIUM" when known
+  // ─── Local view: transient tool-call pulse above the unit ──────────────────
+  // Set by a `unit_tool_call` bridge event, decayed in LocalWorldManager.tick().
+  // Undefined means "no recent activity" — the renderer draws nothing.
+  activity?: LocalActivity;
 }
 
 export interface LocalNpc {

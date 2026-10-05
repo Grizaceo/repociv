@@ -22,6 +22,7 @@
 @import './panels/local-spatial.css';
 @import './panels/whiteboard.css';
 @import './panels/local-view-frame.css';
+@import './panels/local-chat.css';
 @import './panels/misc-panels.css';
 @import './panels/empty-states.css';
 @import './panels/error-toast.css';

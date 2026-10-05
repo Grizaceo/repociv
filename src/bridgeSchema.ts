@@ -59,6 +59,13 @@ const Schemas = [
     mission: v.optional(v.string()),
   }),
   v.object({
+    type: v.literal('unit_tool_call'),
+    unit: v.string(),
+    toolName: v.string(),
+    missionId: v.optional(v.string()),
+    cityId: v.optional(v.string()),
+  }),
+  v.object({
     type: v.literal('unit_relocate'),
     unit: v.string(),
     cityId: v.string(),

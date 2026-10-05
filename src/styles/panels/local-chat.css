@@ -1,0 +1,165 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Local view chat — the phone-style transcript
+   A second presentation of the same conversation the side panel shows. Same
+   data, quieter skin: in the local view this sits next to the map, so it
+   reads as a phone feed rather than a control room. Hidden outside the local
+   view (body.local-view gates it).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.local-chat {
+  position: absolute;
+  top: 96px;
+  right: 12px;
+  width: 300px;
+  max-height: 62vh;
+  display: none;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--ui-panel-bg, #14100a) 88%, transparent);
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  z-index: 46;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+body.local-view .local-chat {
+  display: flex;
+}
+
+.local-chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.28);
+  flex-shrink: 0;
+}
+
+.local-chat-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--ui-gold-bright);
+}
+
+.local-chat-agents {
+  display: flex;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.local-chat-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--ui-text-dim);
+  white-space: nowrap;
+}
+
+.local-chat-agent i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--ui-border);
+  font-style: normal;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--ui-gold-bright);
+}
+
+.local-chat-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  scrollbar-width: thin;
+}
+
+.local-chat-empty {
+  margin: auto;
+  text-align: center;
+  color: var(--ui-text-dim);
+  font-size: 11px;
+  font-style: italic;
+}
+
+.local-chat-msg {
+  max-width: 88%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* The user reads as a sent message; the agent as an inbound one. */
+.local-chat-msg.user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.local-chat-msg.agent {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.local-chat-meta {
+  display: flex;
+  gap: 5px;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  color: var(--ui-text-dim);
+  opacity: 0.8;
+}
+
+.local-chat-bubble {
+  padding: 5px 8px;
+  border-radius: 11px;
+  line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.local-chat-msg.agent .local-chat-bubble {
+  background: rgba(255, 255, 255, 0.06);
+  border-bottom-left-radius: 3px;
+}
+
+.local-chat-msg.user .local-chat-bubble {
+  background: color-mix(in srgb, var(--ui-gold-bright) 22%, transparent);
+  border-bottom-right-radius: 3px;
+}
+
+.local-chat-bubble p {
+  margin: 0 0 4px;
+}
+
+.local-chat-bubble p:last-child {
+  margin-bottom: 0;
+}
+
+.local-chat-bubble pre {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  overflow-x: auto;
+  margin: 4px 0;
+}
+
+/* Narrower viewport: the map matters more than the transcript. */
+@media (max-width: 900px) {
+  .local-chat {
+    width: 240px;
+    max-height: 46vh;
+  }
+}
