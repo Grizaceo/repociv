@@ -3,7 +3,7 @@
 - MP4: `repociv-demo-2026-10-05.mp4` — 40 s, 1280×720, H.264, 30 fps, sin audio, 1.1 MB.
 - GIF: `repociv-demo-2026-10-05.gif` — 768×432, 8 fps, 2.8 MB.
 - Portada: `repociv-demo-2026-10-05-preview.jpg`.
-- Build mostrado: `feat/local-view-activity`, commit `af9da36853983a009d79a2ecbc7ba9aee5a6dabf`. La versión capturada corresponde a esta rama de desarrollo; no a main.
+- Build mostrado: commit `af9da36853983a009d79a2ecbc7ba9aee5a6dabf`, capturado desde `feat/local-view-activity` antes de su integración a main.
 
 La demo es un montaje de capturas reales de Chromium obtenidas con cua-driver, con rótulos y transiciones preparados con Pillow y FFmpeg. No es una grabación continua de las interacciones. Se descartaron las grabaciones de gpu-screen-recorder porque sus fotogramas estaban deformados; la prueba X11 produjo imagen negra. Las capturas nativas sí se verificaron visualmente.
 

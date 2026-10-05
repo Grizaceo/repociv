@@ -4,6 +4,7 @@ import { writeFileSync } from 'node:fs';
 const bridgeURL =
   process.env.VITE_BRIDGE_URL ?? `http://127.0.0.1:${process.env.BRIDGE_PORT ?? 5274}`;
 const bridgeToken = process.env.VITE_BRIDGE_TOKEN ?? process.env.REPOCIV_TOKEN ?? '';
+const bridgeWsPort = process.env.BRIDGE_WS_PORT ?? '5275';
 
 function bridgeHeaders(): Record<string, string> {
   return bridgeToken ? { 'X-RepoCiv-Token': bridgeToken } : {};
@@ -236,7 +237,7 @@ test.describe('RepoCiv Local View (RimWorld-style)', () => {
     test.setTimeout(120_000);
     let socket: WebSocketRoute | undefined;
     await page.routeWebSocket('**/*', (ws) => {
-      if (!ws.url().includes(':5275')) return;
+      if (new URL(ws.url()).port !== bridgeWsPort) return;
       socket = ws;
       ws.onMessage((raw) => {
         const msg = JSON.parse(String(raw)) as { type?: string };

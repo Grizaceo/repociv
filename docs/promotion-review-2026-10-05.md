@@ -34,3 +34,9 @@ Una prueba E2E dirigida de main falló al esperar `#hero-bar-slots .hero-chip`, 
 Se preparó `docs/design/screenshots/repociv-demo-2026-10-05.mp4`, con GIF y portada. Muestra capturas nativas del mapa, panel de archivos, vista local y una respuesta real de Codex registrada en el ledger. Es un montaje de capturas verificadas, con workspace de ejemplo y rótulos en inglés. Su procedencia y limitaciones están documentadas junto al archivo.
 
 El mensaje del enlace de X invita a compartir una URL y explicar lo que se está construyendo. RepoCiv encaja como alpha de un dashboard local; conviene evitar presentarlo como producto estable o demo web alojada. No se publicó ningún mensaje ni se modificó el remoto.
+
+## Validación para integrar el PR #30
+
+Después de la revisión inicial, el usuario autorizó publicar la rama y abrir e integrar [PR #30](https://github.com/Grizaceo/repociv/pull/30). Se repitió `scripts/check.sh` completo con datos aislados: todos los gates pasan, incluidos 1096 tests de frontend, 1212 tests de backend (2 omitidos), cobertura, lint, formato, build y presupuestos de assets/bundle.
+
+Cuatro E2E funcionales de vista local pasan en conjunto; el quinto, actividad por WebSocket con comprobación de píxeles y expiración, pasa por separado tras corregir el puerto fijo de la prueba para respetar `BRIDGE_WS_PORT`. No se repitieron los E2E de FPS ni la suite completa con expectativas antiguas. GitHub declaró el PR mergeable, sin check runs de Actions. El texto para X ahora enlaza al repositorio público; no se publicó ningún mensaje en X.
