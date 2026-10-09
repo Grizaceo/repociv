@@ -15,6 +15,7 @@ import subprocess
 import sys
 import warnings
 import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -306,6 +307,33 @@ class TestQuarantine:
 
         dest = quarantine_file(str(src), quarantine_dir=qdir)
         assert str(Path(dest).resolve()).startswith(str(qdir.resolve()))
+
+    def test_dest_outside_qdir_rejected(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Defense-in-depth: the component-aware check (is_relative_to) must
+        reject a destination that escapes qdir, even when it shares qdir's
+        name as a prefix — the exact case a raw-prefix check waves through.
+        We force the escape by making the timestamp prefix `..`, so
+        `qdir / ".._name"` becomes a path SEGMENT outside qdir."""
+        import server.security_harness as sh
+
+        src = tmp_path / "test.txt"
+        src.write_text("data")
+        qdir = tmp_path / "quarantine"
+        qdir.mkdir()
+        # sibling sharing qdir's prefix — raw startswith would pass this
+        sibling = tmp_path / "quarantine-evil"
+        sibling.mkdir()
+
+        # Force dest = qdir/"../quarantine-evil/test.txt" → resolves to sibling.
+        monkeypatch.setattr(sh.time, "strftime", lambda _fmt: "../quarantine-evil")
+        with pytest.raises(ValueError, match="Path traversal"):
+            quarantine_file(str(src), quarantine_dir=qdir)
+
+        # Nothing was moved into the evil sibling: src still in place.
+        assert src.exists(), "file was moved despite failing the qdir check"
+        assert list(sibling.iterdir()) == [], "escape wrote into the sibling dir"
 
 
 # ── Alert System ─────────────────────────────────────────────────────────────

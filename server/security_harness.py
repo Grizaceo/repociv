@@ -373,8 +373,10 @@ def quarantine_file(
     dest_name = f"{ts}_{safe_name}"
     dest = qdir / dest_name
 
-    # Verify destination is truly under quarantine dir (defense in depth)
-    if not str(dest.resolve()).startswith(str(qdir)):
+    # Verify destination is truly under quarantine dir (defense in depth).
+    # Component-aware (is_relative_to): a raw prefix match would wave through
+    # a sibling like "quarantine-evil/" that shares qdir's name as prefix.
+    if not dest.resolve().is_relative_to(qdir):
         raise ValueError(f"Path traversal in quarantine destination: {dest}")
 
     shutil.move(str(src), str(dest))
