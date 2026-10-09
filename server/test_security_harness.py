@@ -230,6 +230,55 @@ class TestDriftDetector:
         assert len(findings) >= 1
         assert any("traversal" in f.description.lower() for f in findings)
 
+    def test_scope_prefix_without_separator_flagged(self, tmp_path: Path) -> None:
+        """H2: 'src-evil/x.py' must NOT satisfy allowed_scope=['src'].
+
+        The old prefix check (rel.startswith(s)) let this through.
+        """
+        findings = detect_drift(
+            str(tmp_path),
+            ["src-evil/x.py"],
+            allowed_scope=["src"],
+        )
+        scope_findings = [
+            f for f in findings if "outside allowed scope" in f.description
+        ]
+        assert len(scope_findings) == 1, (
+            "src-evil/x.py slipped past allowed_scope=['src'] via prefix match"
+        )
+
+    def test_scope_nested_and_exact_still_allowed(self, tmp_path: Path) -> None:
+        for rel in ("src/a.py", "src/deep/b.py"):
+            findings = detect_drift(
+                str(tmp_path), [rel], allowed_scope=["src"]
+            )
+            scope_findings = [
+                f for f in findings if "outside allowed scope" in f.description
+            ]
+            assert len(scope_findings) == 0, f"{rel} wrongly flagged"
+
+    def test_scope_trailing_slash_tolerated(self, tmp_path: Path) -> None:
+        findings = detect_drift(
+            str(tmp_path), ["src/a.py"], allowed_scope=["src/"]
+        )
+        scope_findings = [
+            f for f in findings if "outside allowed scope" in f.description
+        ]
+        assert len(scope_findings) == 0
+
+    def test_scope_evil_prefix_flagged_with_trailing_slash_scope(
+        self, tmp_path: Path
+    ) -> None:
+        findings = detect_drift(
+            str(tmp_path),
+            ["src-evil/x.py"],
+            allowed_scope=["src/"],
+        )
+        scope_findings = [
+            f for f in findings if "outside allowed scope" in f.description
+        ]
+        assert len(scope_findings) == 1
+
 
 # ── Quarantine Engine ────────────────────────────────────────────────────────
 

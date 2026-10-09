@@ -270,6 +270,18 @@ _PROTECTED_PATTERNS = [
 ]
 
 
+def _in_scope(rel: str, scopes: list[str]) -> bool:
+    """True if `rel` (a POSIX-normalized repo-relative path) is inside any
+    scope. Component-exact matching: scope "src" matches "src", "src/a.py"
+    and "src/a/b.py" — but NOT "src-evil/a.py" (prefix without separator).
+    """
+    r = rel.rstrip("/")
+    return any(
+        r == s.strip().rstrip("/") or r.startswith(s.strip().rstrip("/") + "/")
+        for s in scopes
+    )
+
+
 def detect_drift(
     repo_root: str,
     changed_files: list[str],
@@ -321,7 +333,7 @@ def detect_drift(
 
         # Scope enforcement (optional allow-list)
         if allowed_scope:
-            in_scope = any(rel.startswith(s) for s in allowed_scope)
+            in_scope = _in_scope(rel, allowed_scope)
             if not in_scope:
                 findings.append(Finding(
                     scanner="drift",
