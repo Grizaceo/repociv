@@ -12,11 +12,16 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
 _CONFIG_DIR_ENV = "REPOCIV_CONFIG_DIR"
 _APPROVALS_FILENAME = "approvals.json"
+_TTL_ENV = "REPOCIV_APPROVAL_TTL_S"
+_DEFAULT_TTL_S = 86400  # 24h
+
+_APPROVAL_TTL_S = int(os.environ.get(_TTL_ENV, str(_DEFAULT_TTL_S)))
 
 _lock = threading.Lock()
 _loaded = False
@@ -43,6 +48,12 @@ def _ensure_loaded() -> dict[str, dict[str, Any]]:
             _approvals = {}
     else:
         _approvals = {}
+    # Prune expired pendings (material without expires_at survives — legacy).
+    now = time.time()
+    _approvals = {
+        k: v for k, v in _approvals.items()
+        if v.get("expires_at", float("inf")) > now
+    }
     _loaded = True
     return _approvals
 
@@ -51,13 +62,17 @@ def _persist() -> None:
     path = _approvals_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(_approvals, indent=2, sort_keys=True), encoding="utf-8")
+    fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(json.dumps(_approvals, indent=2, sort_keys=True))
     os.replace(tmp, path)
+    os.chmod(path, 0o600)
 
 
 def add_approval(cmd_dict: dict[str, Any]) -> None:
     with _lock:
         store = _ensure_loaded()
+        cmd_dict.setdefault("expires_at", time.time() + _APPROVAL_TTL_S)
         store[cmd_dict["id"]] = cmd_dict
         _persist()
 
