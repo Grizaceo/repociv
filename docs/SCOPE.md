@@ -25,8 +25,8 @@ siendo un solo usuario es **deliberada**: el alpha-test sirve precisamente
 para descubrir cuáles de esas capas aportan valor real y cuáles se
 destilan o se borran después.
 
-Versión: **v2.2 — 2026-09-21: reconciliada con el código (poda auditada) +
-integración Nebius autorizada. Congelada en scope salvo lo autorizado abajo.**
+Versión: **v2.2 — 2026-09-21: reconciliada con el código (poda auditada).
+Congelada en scope salvo lo autorizado abajo.**
 
 ---
 
@@ -45,9 +45,7 @@ Métricas concretas para considerar el alpha "exitoso":
 - El bridge se mantiene corriendo como systemd unit por ≥ 7 días sin
   intervención manual.
 - La telemetría de inferencia (`inference_telemetry`) muestra coste/latencia
-  real por paso cuando `REPOCIV_INFERENCE_PROVIDER=nebius` está activo
-  (verificable una vez disponible `NEBIUS_API_KEY`; ver §Lo que sí está
-  en scope).
+  por paso en el runtime activo.
 
 ---
 
@@ -107,13 +105,6 @@ Métricas concretas para considerar el alpha "exitoso":
   lazy: nunca entra al bundle eager del modo 2D (chunk `vendor-three`).
 - Documentar lo que se aprende del uso real en `docs/implementation_plan.md`
   o en un futuro `docs/DOGFOODING_NOTES.md`.
-- **Inferencia provider-aware (Nebius Token Factory, autorizada por el plan
-  del hackathon 2026-08-29):** con `REPOCIV_INFERENCE_PROVIDER=nebius` el
-  router resuelve Nano/Super/Ultra por tier (ECONOMICO/EQUILIBRIO/PREMIUM),
-  el runner despacha directo al Token Factory con cascade y el coste/latencia
-  por paso queda visible en telemetría (`inference_telemetry`) y como anillo
-  de tier en la unidad. Sin la variable, todo funciona local como siempre.
-  La llamada real a Nano sigue pendiente de `NEBIUS_API_KEY` (NOT TESTED).
 
 ## Lo que **sí pero en branch paralela** (no toca trunk)
 

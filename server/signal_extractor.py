@@ -221,16 +221,13 @@ class SignalExtractor:
 
 
 def get_inference_provider() -> str:
-    """Which runtime executes tier models: 'hermes' (CLI gateway) or 'nebius' (Token Factory, direct)."""
+    """Which runtime executes tier models (default hermes/CLI gateway)."""
     return (os.environ.get("REPOCIV_INFERENCE_PROVIDER") or "hermes").strip().lower()
 
 
 def provider_tier_mapping() -> dict[str, str]:
-    """Tier -> model-id mapping for the ACTIVE inference provider (default hermes)."""
-    if get_inference_provider() == "nebius":
-        from .nebius_client import NEBIUS_MODELS
-        return dict(NEBIUS_MODELS)
-    # legacy Hermes/Claude mapping (unchanged default)
+    """Tier -> model-id mapping for the ACTIVE inference provider (hermes)."""
+    # Hermes/Claude mapping
     return {
         "ECONOMICO": "claude-haiku-3-5",
         "EQUILIBRIO": "claude-sonnet-4-5",
@@ -253,12 +250,6 @@ def tier_to_cascade_chain(tier: str) -> list[str]:
     Returns:
         List of models in fallback order (cheapest first, most powerful last).
     """
-    if get_inference_provider() == "nebius":
-        from .nebius_client import NEBIUS_MODELS
-        models = [NEBIUS_MODELS["ECONOMICO"], NEBIUS_MODELS["EQUILIBRIO"], NEBIUS_MODELS["PREMIUM"]]
-        order = {"ECONOMICO": 0, "EQUILIBRIO": 1, "PREMIUM": 2}
-        i = order.get(tier, 0)
-        return models[i:]
     chains = {
         "ECONOMICO": ["claude-haiku-3-5", "claude-sonnet-4-5", "claude-opus-4-5"],
         "EQUILIBRIO": ["claude-sonnet-4-5", "claude-opus-4-5"],

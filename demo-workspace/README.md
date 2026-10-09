@@ -14,13 +14,11 @@ private or production workspace.
 ## Running the demo
 
 ```bash
-# 1. Put your key in .env (gitignored): NEBIUS_API_KEY=nk-...
-# 2. Point the map at this workspace (absolute path) and flip the provider:
+# 1. Point the map at this workspace (absolute path) and bring it up:
 MAP_ROOT="$PWD/demo-workspace" \
-REPOCIV_INFERENCE_PROVIDER=nebius \
 docker compose up
-# 3. Open the printed Vite URL, spawn a SCOUT on a city and watch the
-#    tier ring + step log show real Nemotron calls (cost_usd > 0).
+# 2. Open the printed Vite URL, spawn a SCOUT on a city and watch the
+#    tier ring + step log show real local agent calls.
 ```
 
 `.env.demo` documents the full variable set. Nothing in this folder contains

@@ -121,5 +121,5 @@ revelar bajo demanda (B) → dar densidad de teclado y observabilidad real al se
 ## Update 2026-09-21 (auditoría de pendientes)
 
 - Estado: **propuesta sin adoptar** — no se ejecutó A1 (tracking global) ni panel
-  pruning. Se cruza con Task C2 del plan Nebius (2026-08-29); si se decide un
+  pruning. Se cruza con Task C2 del plan vigente; si se decide un
   refonte de paneles, este doc y esa task deben fusionarse en un solo plan.

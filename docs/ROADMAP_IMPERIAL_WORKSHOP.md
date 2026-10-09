@@ -1,7 +1,7 @@
 # RepoCiv — Roadmap Canonico: Taller Imperial de Maravillas
 
 Fecha: 2026-05-25
-Estado: historico (2026-09-21) — fue "canonico para la siguiente etapa de producto alpha". Las Fases 4 y 5 (Bibliotheca/LabHub-Institutum) fueron retiradas del codebase el 2026-09-07 (`b58395f`); la Fase 0 se cerró verificada el 2026-09-21. El foco vigente de producto está en `docs/plans/2026-08-29-nebius-competition-readiness.md`; `SCOPE.md` sigue mandando si hay contradicción.
+Estado: historico (2026-09-21) — fue "canonico para la siguiente etapa de producto alpha". Las Fases 4 y 5 (Bibliotheca/LabHub-Institutum) fueron retiradas del codebase el 2026-09-07 (`b58395f`); la Fase 0 se cerró verificada el 2026-09-21. `SCOPE.md` sigue mandando si hay contradicción.
 Reemplaza como foco operativo a planes sueltos de integración visual, pero no reemplaza `SCOPE.md`: si este documento contradice `SCOPE.md`, gana `SCOPE.md`.
 
 > ⚠️ **Histórico (2026-09-07).** Bibliotheca (La Gran Biblioteca) y

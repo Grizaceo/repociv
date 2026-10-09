@@ -140,14 +140,3 @@ def test_provider_defaults_to_hermes(monkeypatch):
     monkeypatch.delenv("REPOCIV_INFERENCE_PROVIDER", raising=False)
     assert se.get_inference_provider() == "hermes"
     assert se.tier_to_model("ECONOMICO") == "claude-haiku-3-5"
-
-
-def test_provider_nemotron_when_token_factory(monkeypatch):
-    from server import signal_extractor as se
-    monkeypatch.setenv("REPOCIV_INFERENCE_PROVIDER", "nebius")
-    assert se.get_inference_provider() == "nebius"
-    assert se.tier_to_model("ECONOMICO") == "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
-    assert se.tier_to_model("PREMIUM") == "nvidia/Nemotron-3-Ultra-550b-a55b"
-    chain = se.tier_to_cascade_chain("ECONOMICO")
-    assert chain[0] == "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
-    assert "opus" not in chain[-1]

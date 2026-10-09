@@ -25,17 +25,8 @@ infrastructure as a single user is **deliberate**: the alpha test exists
 precisely to discover which of those layers earn their keep and which get
 distilled or deleted afterwards.
 
-Cloud inference is **opt-in and explicit**: with
-`REPOCIV_INFERENCE_PROVIDER=nebius` the router resolves
-Nano/Super/Ultra per tier (ECONOMICO/EQUILIBRIO/PREMIUM), the runner
-dispatches directly to the Nebius Token Factory with a cascade, and
-per-step cost/latency shows up in telemetry (`inference_telemetry`) and as
-a tier ring on the unit. Without the variable, everything runs local as
-always.
-
-Version: **v2.2 — 2026-09-21: reconciled with the code (audited pruning) +
-authorized Nebius integration. Frozen in scope except what is authorized
-below.**
+Version: **v2.2 — 2026-09-21: reconciled with the code (audited pruning).
+Frozen in scope except what is authorized below.**
 
 ---
 
@@ -54,8 +45,7 @@ Concrete metrics to consider the alpha "successful":
 - The bridge keeps running as a systemd unit for ≥ 7 days without manual
   intervention.
 - The inference telemetry (`inference_telemetry`) shows real per-step
-  cost/latency when `REPOCIV_INFERENCE_PROVIDER=nebius` is active
-  (verifiable once `NEBIUS_API_KEY` is available; see §In scope now).
+  cost/latency on the active runtime.
 
 ---
 
@@ -116,14 +106,6 @@ Concrete metrics to consider the alpha "successful":
   the informative e2e `e2e/render-mode-parity.spec.ts` (real boot, needs
   GPU). Three.js loads lazy: it never enters the eager bundle of the 2D
   mode (`vendor-three` chunk).
-- **Provider-aware inference (Nebius Token Factory, authorized by the
-  2026-08-29 hackathon plan):** with `REPOCIV_INFERENCE_PROVIDER=nebius`
-  the router resolves Nano/Super/Ultra per tier (ECONOMICO/EQUILIBRIO/
-  PREMIUM), the runner dispatches directly to the Token Factory with a
-  cascade, and per-step cost/latency is visible in telemetry
-  (`inference_telemetry`) and as a tier ring on the unit. Without the
-  variable, everything works local as always. The real Nano call is still
-  pending `NEBIUS_API_KEY` (NOT TESTED).
 - Documenting what real usage teaches in `docs/implementation_plan.md` or
   a future `docs/DOGFOODING_NOTES.md`.
 

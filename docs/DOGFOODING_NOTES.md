@@ -72,4 +72,4 @@
   (`src/ui/panel.ts:29`, hero 'Agente Principal'); discoverability del chat y latencia
   MAIN sin cambios (arquitectural). Sin acción tomada — prioridad baja; quedan
   registradas aquí hasta que se decida el pruning de paneles (UX_IMPROVEMENT_PLAN /
-  Task C2 del plan Nebius).
+  Task C2 del plan vigente).

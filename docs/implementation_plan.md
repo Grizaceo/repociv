@@ -43,15 +43,14 @@ Cerradas (verificadas):
   `latest_handoff` en la construcción de misión (`step_executor.py:160-213`).
 - ~~Enforcement real de modelo por rol (model_router no se reflejaba en runtime)~~ →
   ✅ **existe**: `route_model` por paso con semántica `enforced` propagada y retry
-  condicionado (`step_executor.py:293-321`) + rama provider-aware (Nebius) del plan
-  de hackathon.
+  condicionado (`step_executor.py:293-321`).
 
 Vivas:
 - **Behavioural validation en loop principal** — la fase validating corre
   `validator.validate_issue`; la validación behavioural existe solo como
   `security_harness.py`, no integrada al loop.
 - **Mission Control semántico unificado (paneles fragmentados)** — sin cambios;
-  se solapa con el pruning de paneles (Task C2 del plan Nebius 2026-08-29,
+  se solapa con el pruning de paneles (Task C2 del plan vigente,
   pendiente de decisión del mantenedor).
 
 ### Deudas cerradas
