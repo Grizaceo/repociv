@@ -441,6 +441,68 @@ def test_approval_concurrent_requests_only_one_succeeds():
         server.server_close()
 
 
+# ─── M1: cascade de cancel por misión sobre la cola de aprobaciones ──────────
+
+def test_cancel_command_cascades_to_child_pendings(monkeypatch, tmp_path):
+    """Cancelling a mission command must cascade-reject its waiting_approval
+    children instead of leaving them orphaned in the approval queue."""
+    import importlib
+
+    from server import approval_store as store
+
+    monkeypatch.setenv("REPOCIV_CONFIG_DIR", str(tmp_path))
+    importlib.reload(store)
+    try:
+        bridge.init_bridge_state(tmp_path)
+        mission_id = "mission-cascade-001"
+        # Two child spawns pending under the mission + one from another mission.
+        for cid in ("child-a", "child-b"):
+            bridge._add_approval(
+                {
+                    "id": cid,
+                    "type": "subagent_spawn",
+                    "target": "MAIN",
+                    "payload": {"parentMissionId": mission_id},
+                    "created_by": "MAIN",
+                    "risk": "high",
+                }
+            )
+        bridge._add_approval(
+            {
+                "id": "child-other",
+                "type": "subagent_spawn",
+                "target": "MAIN",
+                "payload": {"parentMissionId": "mission-other"},
+                "created_by": "MAIN",
+                "risk": "high",
+            }
+        )
+
+        server, base = _start_test_server()
+        try:
+            req = urllib.request.Request(
+                f"{base}/commands/{mission_id}/cancel",
+                data=b"{}",
+                headers=_auth_headers({"Content-Type": "application/json"}),
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                body = json.loads(resp.read().decode())
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        assert body["cascade"] == 2, f"expected 2 cascaded children, got {body}"
+        remaining = {c["id"] for c in store.get_approvals()}
+        assert remaining == {"child-other"}, (
+            f"cascade left orphans: {remaining} — only the other mission's "
+            "pending must survive"
+        )
+    finally:
+        monkeypatch.delenv("REPOCIV_CONFIG_DIR", raising=False)
+        importlib.reload(store)
+
+
 def _post_empty(base, path):
     """POST with an empty body (Content-Length: 0) — the shape that the
     launch/stop/disconnect buttons send. Must NOT 400 'invalid JSON'."""

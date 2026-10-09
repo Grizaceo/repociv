@@ -102,6 +102,38 @@ def reset_for_tests() -> None:
             path.unlink()
 
 
+def cancel_mission(mission_id: str) -> list[dict[str, Any]]:
+    """Cascade-cancel: reject every pending whose parent mission matches.
+
+    Returns the list of removed pendings (empty if none matched). Matching
+    is by ``payload.parentMissionId`` — the id already persisted by both
+    approval paths (bridge ``_handle_command`` and subagent ``on_task_spawn``
+    carry it inside the command payload). An empty mission_id matches
+    nothing, so legacy pendings without a parent mission are never swept.
+    Removal reuses the single-use atomic pop semantics of ``pop_approval``;
+    persistence happens once for the whole cascade.
+    """
+    if not mission_id:
+        return []
+    with _lock:
+        store = _ensure_loaded()
+        matches = []
+        for cmd_id, cmd in store.items():
+            payload = cmd.get("payload") if isinstance(cmd, dict) else None
+            if isinstance(payload, dict) and (
+                payload.get("parentMissionId") == mission_id
+            ):
+                matches.append(cmd_id)
+        removed = []
+        for cmd_id in matches:
+            cmd = store.pop(cmd_id, None)
+            if cmd is not None:
+                removed.append(cmd)
+        if removed:
+            _persist()
+        return removed
+
+
 def resolve_approval(
     cmd_id: str,
     *,

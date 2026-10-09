@@ -942,6 +942,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 removed = _pop_approval(cmd_id) is not None
                 if removed:
                     _es.record_rejected(cmd_id, "cancelled by user")
+            # Cascade (M1): a cancelled unit_command IS a mission (agent_runner
+            # uses command_id as mission_id), so its waiting_approval children
+            # must be cascade-rejected instead of left orphaned.
+            cascade = _approval_store.cancel_mission(cmd_id)
+            for child in cascade:
+                _es.record_rejected(child["id"], "parent mission cancelled")
             send_to_repociv(
                 {
                     "type": "log",
@@ -951,7 +957,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     "level": "warn" if removed else "info",
                 }
             )
-            self._json({"ok": removed, "commandId": cmd_id})
+            if cascade:
+                send_to_repociv(
+                    {
+                        "type": "log",
+                        "msg": f"{len(cascade)} aprobación(es) huerfana(s) "
+                        f"rechazada(s) por cancel de mision",
+                        "level": "warn",
+                    }
+                )
+            self._json({"ok": removed, "commandId": cmd_id, "cascade": len(cascade)})
             return
 
         if path.startswith("/tasks/") and path.endswith("/cancel"):

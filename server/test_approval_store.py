@@ -134,6 +134,72 @@ class TestTTLPruning:
         assert "legacy" in ids
 
 
+# ── 4. Cascade de cancel por misión (M1) ─────────────────────────────────────
+
+def _cmd(cmd_id: str, mission: str = "") -> dict:
+    return {
+        "id": cmd_id,
+        "type": "subagent_spawn",
+        "target": "MAIN",
+        "payload": {"parentMissionId": mission} if mission else {},
+        "created_by": "MAIN",
+        "risk": "high",
+    }
+
+
+class TestMissionCascade:
+    def test_cancel_mission_rejects_child_pendings(self, cfg_dir: Path) -> None:
+        """Cancelling a parent mission must cascade-reject its
+        waiting_approval children instead of leaving them orphaned."""
+        store.add_approval(_cmd("c1", mission="m-1"))
+        store.add_approval(_cmd("c2", mission="m-1"))
+        store.add_approval(_cmd("c-other", mission="m-2"))
+
+        rejected = store.cancel_mission("m-1")
+        assert {r["id"] for r in rejected} == {"c1", "c2"}, (
+            "cascade must reject exactly the mission's own pendings"
+        )
+        # Only the mission's children are gone; another mission's pending survives.
+        assert {c["id"] for c in store.get_approvals()} == {"c-other"}
+
+    def test_cancel_mission_is_single_use(self, cfg_dir: Path) -> None:
+        store.add_approval(_cmd("c1", mission="m-1"))
+        assert store.cancel_mission("m-1")
+        assert store.cancel_mission("m-1") == [], "second cascade finds nothing"
+        assert store.get_approvals() == []
+
+    def test_cancel_mission_persists_to_disk(self, cfg_dir: Path) -> None:
+        store.add_approval(_cmd("c1", mission="m-1"))
+        store.cancel_mission("m-1")
+        importlib.reload(store)
+        assert store.get_approvals() == [], "cascade must survive a reload"
+
+    def test_cancel_mission_unknown_mission_noop(self, cfg_dir: Path) -> None:
+        store.add_approval(_cmd("c1", mission="m-1"))
+        assert store.cancel_mission("does-not-exist") == []
+        assert {c["id"] for c in store.get_approvals()} == {"c1"}
+
+    def test_cancel_mission_empty_id_matches_nothing(self, cfg_dir: Path) -> None:
+        """An empty mission id must never cascade (legacy pendings carry
+        no parentMissionId; they must not be swept by a blank match)."""
+        store.add_approval(_cmd("legacy"))  # no mission in payload
+        store.add_approval(_cmd("c1", mission="m-1"))
+        assert store.cancel_mission("") == []
+        assert {c["id"] for c in store.get_approvals()} == {"legacy", "c1"}
+
+
+    def test_cancel_mission_tolerates_non_dict_payload(self, cfg_dir: Path) -> None:
+        """A corrupt pending (payload not a dict) must not crash the cascade
+        nor be swept — the request-path handler can't 500 on bad disk state."""
+        store.add_approval(_cmd("legacy"))
+        store.add_approval({"id": "weird", "type": "x", "target": "t",
+                            "payload": "not-a-dict"})
+        store.add_approval(_cmd("c1", mission="m-1"))
+        rejected = store.cancel_mission("m-1")
+        assert {r["id"] for r in rejected} == {"c1"}
+        assert {c["id"] for c in store.get_approvals()} == {"legacy", "weird"}
+
+
 # ── 5. No-regresión: single-use ──────────────────────────────────────────────
 
 class TestNoRegression:
