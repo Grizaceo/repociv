@@ -11,6 +11,10 @@ Covers all 7 gate criteria from the implementation plan:
 """
 from __future__ import annotations
 
+import subprocess
+import sys
+import warnings
+import os
 from pathlib import Path
 
 import pytest
@@ -30,6 +34,25 @@ from server.security_harness import (
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
+def _run_helper(script: str, log_dir: Path) -> str:
+    """Run `script` in a FRESH interpreter with a distinct AlertSystem logdir.
+
+    Simulates a separate bridge process so module-level state (notably the
+    HMAC key) is regenerated from scratch.
+    """
+    log_dir.mkdir(parents=True, exist_ok=True)
+    env = {k: v for k, v in os.environ.items() if k != "REPOCIV_HMAC_KEY"}
+    proc = subprocess.run(
+        [sys.executable, "-c", script, str(log_dir)],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stderr
+    return proc.stdout.strip()
+
 
 @pytest.fixture
 def harness(tmp_path: Path) -> SecurityHarness:
@@ -237,6 +260,55 @@ class TestQuarantine:
 
 
 # ── Alert System ─────────────────────────────────────────────────────────────
+
+class TestHMACKey:
+    """The audit-log key must never default to a public constant (H1)."""
+
+    def test_no_public_default_key(self) -> None:
+        import importlib
+        import os
+
+        os.environ.pop("REPOCIV_HMAC_KEY", None)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            mod = importlib.reload(
+                importlib.import_module("server.security_harness")
+            )
+        key = mod._HMAC_KEY
+        assert key != b"repociv-audit-default-key"
+        assert len(key) == 32
+        assert any(
+            "REPOCIV_HMAC_KEY not set" in str(w.message) for w in caught
+        ), "expected UserWarning about ephemeral key"
+
+    def test_ephemeral_keys_not_shared_across_processes(
+        self, tmp_path: Path
+    ) -> None:
+        """Two AlertSystem instances from separately-spawned interpreters
+        (simulating distinct bridge processes) must not share a verification
+        key: a tag from one must not validate against the other."""
+        script = (
+            "import sys; sys.path.insert(0, %r)\n"
+            "from server.security_harness import AlertSystem\n"
+            "asys = AlertSystem(log_dir=sys.argv[1])\n"
+            "print(asys._hmac_tag('probe-line'))\n" % str(Path.cwd())
+        )
+        tag1 = _run_helper(script, tmp_path / "p1")
+        tag2 = _run_helper(script, tmp_path / "p2")
+        assert tag1 and tag2
+        assert tag1 != tag2, "ephemeral per-process keys were shared"
+
+    def test_env_key_is_used_when_set(self, tmp_path: Path) -> None:
+        script = (
+            "import sys, os; sys.path.insert(0, %r)\n"
+            "os.environ['REPOCIV_HMAC_KEY'] = 'test-shared-key'\n"
+            "from server.security_harness import AlertSystem\n"
+            "print(AlertSystem(log_dir=sys.argv[1])._hmac_tag('probe-line'))\n"
+            % str(Path.cwd())
+        )
+        tag1 = _run_helper(script, tmp_path / "p1")
+        tag2 = _run_helper(script, tmp_path / "p2")
+        assert tag1 == tag2, "explicit env key must be stable across processes"
 
 class TestAlertSystem:
     def test_records_alert(self, alert_system: AlertSystem) -> None:

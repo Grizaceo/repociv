@@ -26,10 +26,12 @@ import json
 import logging
 import os
 import re
+import secrets
 import shutil
 import threading
 import time
 import uuid
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -371,7 +373,30 @@ def quarantine_file(
 # ── Alert System ─────────────────────────────────────────────────────────────
 
 _DEDUP_WINDOW_S = 1800  # 30 minutes
-_HMAC_KEY = os.environ.get("REPOCIV_HMAC_KEY", "repociv-audit-default-key").encode()
+_HMAC_KEY_ENV = "REPOCIV_HMAC_KEY"
+
+
+def _load_hmac_key() -> bytes:
+    """Return the audit-log HMAC key.
+
+    Prefers ``REPOCIV_HMAC_KEY``. Without it, falls back to an ephemeral
+    per-process key and warns: signatures stay self-consistent within the
+    process but tamper-evidence is NOT verifiable across restarts. Never
+    exits — dev logging must keep working.
+    """
+    raw = os.environ.get(_HMAC_KEY_ENV, "")
+    if raw:
+        return raw.encode()
+    warnings.warn(
+        f"{_HMAC_KEY_ENV} not set — audit log signed with an ephemeral "
+        "per-process key. Tamper-evidence is NOT verifiable across restarts.",
+        UserWarning,
+        stacklevel=2,
+    )
+    return secrets.token_bytes(32)
+
+
+_HMAC_KEY = _load_hmac_key()
 
 
 class AlertSystem:
