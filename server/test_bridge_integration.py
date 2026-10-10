@@ -443,20 +443,25 @@ def test_approval_concurrent_requests_only_one_succeeds():
 
 # ─── M1: cascade de cancel por misión sobre la cola de aprobaciones ──────────
 
-def test_cancel_command_cascades_to_child_pendings(monkeypatch, tmp_path):
+@pytest.mark.parametrize(
+    "queued,child_count", [(False, 2), (True, 2), (True, 0), (False, 0)]
+)
+def test_cancel_command_cascades_to_child_pendings(
+    isolated_approval_store, monkeypatch, queued, child_count
+):
     """Cancelling a mission command must cascade-reject its waiting_approval
     children instead of leaving them orphaned in the approval queue."""
-    import importlib
-
     from server import approval_store as store
 
-    monkeypatch.setenv("REPOCIV_CONFIG_DIR", str(tmp_path))
-    importlib.reload(store)
+    original_config_dir = bridge.CONFIG_DIR
+    messages = []
+    monkeypatch.setattr(bridge._sched, "cancel", lambda _cmd_id: queued)
+    monkeypatch.setattr(bridge, "send_to_repociv", messages.append)
     try:
-        bridge.init_bridge_state(tmp_path)
+        bridge.init_bridge_state(isolated_approval_store)
         mission_id = "mission-cascade-001"
         # Two child spawns pending under the mission + one from another mission.
-        for cid in ("child-a", "child-b"):
+        for cid in ("child-a", "child-b")[:child_count]:
             bridge._add_approval(
                 {
                     "id": cid,
@@ -492,15 +497,23 @@ def test_cancel_command_cascades_to_child_pendings(monkeypatch, tmp_path):
             server.shutdown()
             server.server_close()
 
-        assert body["cascade"] == 2, f"expected 2 cascaded children, got {body}"
+        assert body["ok"] is (queued or child_count > 0), body
+        assert body["cascade"] == child_count, body
+        expected_msg = (
+            f"Comando cancelado: {mission_id}" if queued else
+            f"Aprobaciones de misión canceladas: {mission_id}" if child_count else
+            f"Comando no encontrado: {mission_id}"
+        )
+        assert messages[0]["msg"] == expected_msg
+        assert messages[0]["level"] == ("warn" if body["ok"] else "info")
+        assert len(messages) == (2 if child_count else 1)
         remaining = {c["id"] for c in store.get_approvals()}
         assert remaining == {"child-other"}, (
             f"cascade left orphans: {remaining} — only the other mission's "
             "pending must survive"
         )
     finally:
-        monkeypatch.delenv("REPOCIV_CONFIG_DIR", raising=False)
-        importlib.reload(store)
+        bridge.init_bridge_state(original_config_dir)
 
 
 def _post_empty(base, path):

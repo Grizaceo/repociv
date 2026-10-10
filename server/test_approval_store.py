@@ -6,12 +6,12 @@ Covers:
   3. expired pendings are pruned on reload and absent from get_approvals()
   4. legacy material without expires_at survives reload (no data loss)
   5. pop_approval single-use still works (no regression)
+  6. mission cascade removes only matching pendings
 """
 from __future__ import annotations
 
 import importlib
 import json
-import os
 import time
 from pathlib import Path
 
@@ -21,18 +21,9 @@ from server import approval_store as store
 
 
 @pytest.fixture
-def cfg_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Point the store at an isolated config dir and reload its module state."""
-    d = tmp_path / "repociv_cfg"
-    d.mkdir()
-    monkeypatch.setenv("REPOCIV_CONFIG_DIR", str(d))
-    monkeypatch.delenv("REPOCIV_APPROVAL_TTL_S", raising=False)
-    reloaded = importlib.reload(store)
-    yield d
-    # Restore pristine module for other test files sharing the process.
-    monkeypatch.delenv("REPOCIV_CONFIG_DIR", raising=False)
-    importlib.reload(store)
-    _ = reloaded  # alias for clarity
+def cfg_dir(isolated_approval_store: Path) -> Path:
+    """Use the shared fixture that restores environment and singleton state."""
+    return isolated_approval_store
 
 
 def _approvals_path(cfg_dir: Path) -> Path:
@@ -85,15 +76,16 @@ class TestTTLStamp:
     def test_env_ttl_configurable(
         self, cfg_dir: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setenv("REPOCIV_APPROVAL_TTL_S", "60")
-        reloaded = importlib.reload(store)
-        assert reloaded._APPROVAL_TTL_S == 60
-        before = time.time()
-        reloaded.add_approval(_cmd("cmd-1"))
-        after = time.time()
-        raw = json.loads(_approvals_path(cfg_dir).read_text())
-        exp = raw["cmd-1"]["expires_at"]
-        assert before + 60 <= exp <= after + 60
+        with monkeypatch.context() as mp:
+            mp.setenv("REPOCIV_APPROVAL_TTL_S", "60")
+            reloaded = importlib.reload(store)
+            assert reloaded._APPROVAL_TTL_S == 60
+            before = time.time()
+            reloaded.add_approval(_cmd("cmd-1"))
+            after = time.time()
+            raw = json.loads(_approvals_path(cfg_dir).read_text())
+            exp = raw["cmd-1"]["expires_at"]
+            assert before + 60 <= exp <= after + 60
 
 
 # ── 3. Pruning de expirados ──────────────────────────────────────────────────
@@ -136,7 +128,7 @@ class TestTTLPruning:
 
 # ── 4. Cascade de cancel por misión (M1) ─────────────────────────────────────
 
-def _cmd(cmd_id: str, mission: str = "") -> dict:
+def _spawn_cmd(cmd_id: str, mission: str = "") -> dict:
     return {
         "id": cmd_id,
         "type": "subagent_spawn",
@@ -151,9 +143,9 @@ class TestMissionCascade:
     def test_cancel_mission_rejects_child_pendings(self, cfg_dir: Path) -> None:
         """Cancelling a parent mission must cascade-reject its
         waiting_approval children instead of leaving them orphaned."""
-        store.add_approval(_cmd("c1", mission="m-1"))
-        store.add_approval(_cmd("c2", mission="m-1"))
-        store.add_approval(_cmd("c-other", mission="m-2"))
+        store.add_approval(_spawn_cmd("c1", mission="m-1"))
+        store.add_approval(_spawn_cmd("c2", mission="m-1"))
+        store.add_approval(_spawn_cmd("c-other", mission="m-2"))
 
         rejected = store.cancel_mission("m-1")
         assert {r["id"] for r in rejected} == {"c1", "c2"}, (
@@ -163,38 +155,37 @@ class TestMissionCascade:
         assert {c["id"] for c in store.get_approvals()} == {"c-other"}
 
     def test_cancel_mission_is_single_use(self, cfg_dir: Path) -> None:
-        store.add_approval(_cmd("c1", mission="m-1"))
+        store.add_approval(_spawn_cmd("c1", mission="m-1"))
         assert store.cancel_mission("m-1")
         assert store.cancel_mission("m-1") == [], "second cascade finds nothing"
         assert store.get_approvals() == []
 
     def test_cancel_mission_persists_to_disk(self, cfg_dir: Path) -> None:
-        store.add_approval(_cmd("c1", mission="m-1"))
+        store.add_approval(_spawn_cmd("c1", mission="m-1"))
         store.cancel_mission("m-1")
         importlib.reload(store)
         assert store.get_approvals() == [], "cascade must survive a reload"
 
     def test_cancel_mission_unknown_mission_noop(self, cfg_dir: Path) -> None:
-        store.add_approval(_cmd("c1", mission="m-1"))
+        store.add_approval(_spawn_cmd("c1", mission="m-1"))
         assert store.cancel_mission("does-not-exist") == []
         assert {c["id"] for c in store.get_approvals()} == {"c1"}
 
     def test_cancel_mission_empty_id_matches_nothing(self, cfg_dir: Path) -> None:
         """An empty mission id must never cascade (legacy pendings carry
         no parentMissionId; they must not be swept by a blank match)."""
-        store.add_approval(_cmd("legacy"))  # no mission in payload
-        store.add_approval(_cmd("c1", mission="m-1"))
+        store.add_approval(_spawn_cmd("legacy"))  # no mission in payload
+        store.add_approval(_spawn_cmd("c1", mission="m-1"))
         assert store.cancel_mission("") == []
         assert {c["id"] for c in store.get_approvals()} == {"legacy", "c1"}
-
 
     def test_cancel_mission_tolerates_non_dict_payload(self, cfg_dir: Path) -> None:
         """A corrupt pending (payload not a dict) must not crash the cascade
         nor be swept — the request-path handler can't 500 on bad disk state."""
-        store.add_approval(_cmd("legacy"))
+        store.add_approval(_spawn_cmd("legacy"))
         store.add_approval({"id": "weird", "type": "x", "target": "t",
                             "payload": "not-a-dict"})
-        store.add_approval(_cmd("c1", mission="m-1"))
+        store.add_approval(_spawn_cmd("c1", mission="m-1"))
         rejected = store.cancel_mission("m-1")
         assert {r["id"] for r in rejected} == {"c1"}
         assert {c["id"] for c in store.get_approvals()} == {"legacy", "weird"}

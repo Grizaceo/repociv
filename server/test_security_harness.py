@@ -13,9 +13,8 @@ from __future__ import annotations
 
 import subprocess
 import sys
-import warnings
 import os
-import shutil
+import json
 from pathlib import Path
 
 import pytest
@@ -314,26 +313,25 @@ class TestQuarantine:
         """Defense-in-depth: the component-aware check (is_relative_to) must
         reject a destination that escapes qdir, even when it shares qdir's
         name as a prefix — the exact case a raw-prefix check waves through.
-        We force the escape by making the timestamp prefix `..`, so
-        `qdir / ".._name"` becomes a path SEGMENT outside qdir."""
+        A synthetic timestamp containing `../` makes the generated filename
+        resolve outside qdir, to a sibling file with the same raw prefix."""
         import server.security_harness as sh
 
         src = tmp_path / "test.txt"
         src.write_text("data")
         qdir = tmp_path / "quarantine"
         qdir.mkdir()
-        # sibling sharing qdir's prefix — raw startswith would pass this
-        sibling = tmp_path / "quarantine-evil"
-        sibling.mkdir()
+        # Sibling file sharing qdir's prefix — raw startswith would pass this.
+        escaped = tmp_path / "quarantine-evil_test.txt"
 
-        # Force dest = qdir/"../quarantine-evil/test.txt" → resolves to sibling.
+        # Force dest = qdir/"../quarantine-evil_test.txt".
         monkeypatch.setattr(sh.time, "strftime", lambda _fmt: "../quarantine-evil")
         with pytest.raises(ValueError, match="Path traversal"):
             quarantine_file(str(src), quarantine_dir=qdir)
 
-        # Nothing was moved into the evil sibling: src still in place.
+        # Nothing was moved to the sibling file: src still in place.
         assert src.exists(), "file was moved despite failing the qdir check"
-        assert list(sibling.iterdir()) == [], "escape wrote into the sibling dir"
+        assert not escaped.exists(), "escape wrote into the sibling file"
 
 
 # ── Alert System ─────────────────────────────────────────────────────────────
@@ -341,21 +339,24 @@ class TestQuarantine:
 class TestHMACKey:
     """The audit-log key must never default to a public constant (H1)."""
 
-    def test_no_public_default_key(self) -> None:
-        import importlib
-        import os
-
-        os.environ.pop("REPOCIV_HMAC_KEY", None)
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            mod = importlib.reload(
-                importlib.import_module("server.security_harness")
-            )
-        key = mod._HMAC_KEY
-        assert key != b"repociv-audit-default-key"
-        assert len(key) == 32
+    def test_no_public_default_key(self, tmp_path: Path) -> None:
+        # Keep environment, module identity and the caller's HMAC key intact.
+        script = (
+            "import json, warnings\n"
+            "with warnings.catch_warnings(record=True) as caught:\n"
+            "    warnings.simplefilter('always')\n"
+            "    from server import security_harness as mod\n"
+            "    from server import security_harness as again\n"
+            "print(json.dumps({'public': mod._HMAC_KEY == "
+            "b'repociv-audit-default-key', 'length': len(mod._HMAC_KEY), "
+            "'warnings': [str(w.message) for w in caught]}))\n"
+        )
+        result = json.loads(_run_helper(script, tmp_path / "hmac"))
+        assert result["public"] is False
+        assert result["length"] == 32
+        assert len(result["warnings"]) == 1
         assert any(
-            "REPOCIV_HMAC_KEY not set" in str(w.message) for w in caught
+            "REPOCIV_HMAC_KEY not set" in message for message in result["warnings"]
         ), "expected UserWarning about ephemeral key"
 
     def test_ephemeral_keys_not_shared_across_processes(

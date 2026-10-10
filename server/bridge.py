@@ -948,13 +948,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
             cascade = _approval_store.cancel_mission(cmd_id)
             for child in cascade:
                 _es.record_rejected(child["id"], "parent mission cancelled")
+            cancelled = removed or bool(cascade)
             send_to_repociv(
                 {
                     "type": "log",
                     "msg": f"Comando cancelado: {cmd_id}"
                     if removed
+                    else f"Aprobaciones de misión canceladas: {cmd_id}"
+                    if cascade
                     else f"Comando no encontrado: {cmd_id}",
-                    "level": "warn" if removed else "info",
+                    "level": "warn" if cancelled else "info",
                 }
             )
             if cascade:
@@ -966,7 +969,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                         "level": "warn",
                     }
                 )
-            self._json({"ok": removed, "commandId": cmd_id, "cascade": len(cascade)})
+            self._json({"ok": cancelled, "commandId": cmd_id, "cascade": len(cascade)})
             return
 
         if path.startswith("/tasks/") and path.endswith("/cancel"):
