@@ -1,0 +1,99 @@
+/* A single quiet row, never a sidebar. Cities remain the main surface. */
+.attention-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+#agent-attention-strip {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 450;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: min(620px, calc(100vw - 340px));
+  height: 36px;
+  padding: 3px 5px;
+  box-sizing: border-box;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  background: var(--panel-bg);
+  font-family: var(--font-ui);
+}
+#agent-attention-strip button {
+  min-width: 0;
+  height: 28px;
+  padding: 0 7px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--panel-radius);
+  color: var(--ui-text-dim);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+#agent-attention-strip button:hover,
+#agent-attention-strip button:focus-visible {
+  color: var(--ui-text);
+  border-color: var(--ui-gold);
+  outline: none;
+}
+.attention-chip {
+  flex: 0 1 auto;
+}
+.attention-name {
+  max-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attention-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #89929c;
+  flex-shrink: 0;
+}
+.attention-blocked .attention-dot {
+  background: #e4aa58;
+}
+.attention-unreviewed .attention-dot {
+  background: #77bde8;
+}
+.attention-working .attention-dot {
+  background: #71b88c;
+}
+.attention-thinking .attention-dot {
+  background: transparent;
+  border: 1px solid #c8a84b;
+  box-sizing: border-box;
+}
+#agent-attention-strip .attention-blocked {
+  color: #e4aa58;
+}
+#agent-attention-strip .attention-more {
+  flex-shrink: 0;
+  margin-left: auto;
+  white-space: nowrap;
+  color: var(--ui-gold);
+}
+@media (max-width: 700px) {
+  #agent-attention-strip {
+    max-width: calc(100vw - 24px);
+    bottom: 6px;
+    left: 12px;
+  }
+  .attention-name {
+    max-width: 48px;
+  }
+  #agent-attention-strip button {
+    padding: 0 4px;
+  }
+}

@@ -26,6 +26,16 @@ let _badge: HTMLElement | null = null;
 let _stopPoll: PollUnregister | null = null;
 let _visible = false;
 let _items: ApprovalItem[] = [];
+const _listeners = new Set<(items: readonly ApprovalItem[]) => void>();
+
+/** Share the existing approval poll; consumers must not add a second fetch loop. */
+export function subscribeApprovals(listener: (items: readonly ApprovalItem[]) => void): () => void {
+  _listeners.add(listener);
+  listener(_items);
+  return () => {
+    _listeners.delete(listener);
+  };
+}
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 export function openApprovalPanel() {
@@ -70,6 +80,7 @@ async function _fetchApprovals() {
     const res = await fetch(bridgeUrl('/approvals'), { headers: bridgeHeaders() });
     if (!res.ok) return;
     _items = (await res.json()) as ApprovalItem[];
+    for (const listener of _listeners) listener(_items);
     _updateBadge(_items.length);
     if (_visible) _render();
   } catch {

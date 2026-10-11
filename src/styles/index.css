@@ -6,6 +6,7 @@
 @import './variables.css';
 @import './patterns.css';
 @import './components.css';
+@import './agent-attention.css';
 @import './onboarding.css';
 @import './panels/unit-panel.css';
 @import './panels/model-selectors.css';

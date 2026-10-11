@@ -61,6 +61,7 @@ import { wireHUD, selectHero } from './ui/hudWiring.ts';
 import { nextSessionUnitId, spawnAcceptedSession } from './ui/hudWiring/spawn.ts';
 import { buildAgentSessionCommand } from './ui/agentSessionStart.ts';
 import { subscribeExternalSessionDirectory } from './ui/externalSessionDirectory.ts';
+import { bindAgentAttentionStrip } from './ui/agentAttentionStrip.ts';
 import { bindAgentsPanel, openExternalAgentChat, toggleAgentsPanel } from './ui/agentsPanel.ts';
 import { isExternalAgentUnit } from './externalAgents.ts';
 import { initHudMode } from './ui/hudMode.ts';
@@ -1281,6 +1282,8 @@ async function bootstrap() {
       return { ok: true, unitId };
     },
   });
+
+  bindAgentAttentionStrip(state);
 
   // Keep the unit panel in sync with state; external (Suvadu ext-*) selection
   // routes to the Agents panel instead of the mission composer.
