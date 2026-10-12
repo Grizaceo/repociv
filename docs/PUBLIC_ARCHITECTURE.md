@@ -120,7 +120,7 @@ Fatigue does what it says.
 
 ### HUD & Panels
 
-RepoCiv ships with 21 panels. The most actively used:
+Operational HUD surfaces:
 
 - **Hero Bar**: agent roster with status indicators (idle, working, resting)
 - **Side Panel**: detailed agent info, mission history, logs
@@ -128,14 +128,18 @@ RepoCiv ships with 21 panels. The most actively used:
 - **Approval Panel**: Y/N approval for commands requiring human sign-off
 - **Terminal Panel**: xterm.js-based terminal inside the browser
 - **Settings Panel**: runtime toggles for thresholds, display options
-- **Ledger Panel**: read-only query view of the DuckDB analytics store
-- **Quest Board**: active missions and their status
-- **Timeline Panel**: chronological view of all events
+- **Hermes Kanban**: read-only task view plus explicit native project-board creation
+- **Active Tasks**: local agent process trees and orchestrator tasks
+- **Agent Directory**: own and external agent sessions
 
 Key shortcuts: `Q`/`W`/`E`/`O`/`C`/`X` to spawn MAIN / WORKER / SCOUT /
-OPENCLAW / CLAUDE / CODEX; `Space` cycles idle agents; `P` priority; `A`
-approvals; `T` terminal; `F6` ledger; `F7` replay; `F8` observability;
-`F9` quest board; `F10` timeline; `F11` settings; `?` full keyboard help.
+OPENCLAW / CLAUDE / CODEX; `Space` cycles idle agents; `P` priority;
+`Ctrl+A` approvals; `T` terminal; `F6` Hermes Kanban; `F8` agent directory;
+`F9` active tasks and local agent processes; `F11` settings; `?` keyboard help.
+The layer, ledger and Quest Board controls have been retired. Mission commands
+remain supported; task reads use Hermes' canonical SQLite stores in read-only mode.
+Explicit board creation uses the supported Hermes CLI, without switching the
+current board or launching workers.
 
 ---
 

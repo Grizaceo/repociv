@@ -46,7 +46,6 @@ import type { RepoCivProfile } from '../../agentProfile.ts';
 import { heroBarRoster } from '../heroBarUnits.ts';
 import { activeSessionDock, visibleSessionDock } from '../agentDock.ts';
 import { externalSessionSnapshot } from '../externalSessionDirectory.ts';
-import { toggleLayerPanel, closeLayerPanel, isLayerPanelOpen } from '../layerPanel.ts';
 import { trackHotkey, trackPanelOpen } from '../analytics.ts';
 import { isPickerOpen } from '../chat/slashPicker.ts';
 import { isCommandPaletteOpen } from '../commandPalette.ts';
@@ -93,10 +92,6 @@ export function wireHotkeys(
 
     // Hotkey panels
     if (e.key === 'Escape') {
-      if (isLayerPanelOpen()) {
-        closeLayerPanel();
-        return;
-      }
       if (terminalPanel.isVisible()) {
         terminalPanel.hide();
         return;
@@ -328,11 +323,6 @@ export function wireHotkeys(
       case 'u':
         trackHotkey('U:unhide-all');
         state.unhideAllUnits();
-        break;
-      case 'h':
-        trackHotkey('H:layers');
-        if (!isLayerPanelOpen()) trackPanelOpen('layers');
-        toggleLayerPanel();
         break;
       case '?':
         trackHotkey('?:keyboard-help');

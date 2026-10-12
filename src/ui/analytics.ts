@@ -113,7 +113,6 @@ export const KNOWN_PANELS = [
   'task-assign',
   'pending',
   'log',
-  'layers',
   'priority',
   'settings',
   'construction',

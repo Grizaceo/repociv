@@ -11,6 +11,6 @@ describe('local development server security', () => {
     );
     expect(result).not.toBeNull();
     expect(result?.config.server?.host).toBe('127.0.0.1');
-    expect(result?.config.server?.allowedHosts).toBe(false);
+    expect(result?.config.server?.allowedHosts).toEqual([]);
   });
 });

@@ -182,6 +182,10 @@ class Observation:
     # Set by the tracker, not by the sources: is a process still holding this
     # session? None when it could not be told (see server/session_liveness.py).
     live: bool | None = None
+    position_city_id: str = ""
+    position_repo: str = ""
+    position_at_ms: int = 0
+    related_native_ids: tuple[str, ...] = ()  # source-verified compression lineage only
 
 
 def _as_int(value: Any) -> int | None:
@@ -715,7 +719,7 @@ def derive_state(age_ms: float, working_ms: float, live: bool | None) -> str:
 
 
 class ExternalAgentTracker:
-    """Owns the ext-* units. poll_once() is the only writer; snapshot() reads."""
+    """Owns ext-* units. Poll and position hooks share one serialized writer."""
 
     def __init__(
         self,
@@ -728,8 +732,13 @@ class ExternalAgentTracker:
         sources: Sequence[AgentSource] | None = None,
         liveness: LivenessFn = session_liveness.probe,
         live_chat_router: Any | None = None,
+        positions: Any | None = None,
     ) -> None:
         """``sources`` defaults to Suvadu alone, driven by ``run`` (or the real CLI)."""
+        from server.agent_positions import PositionStore
+
+        self._positions = positions if positions is not None else PositionStore()
+        self._writer_lock = threading.RLock()
         self.config = config
         self._send = send
         self._repo_paths = repo_paths
@@ -751,6 +760,10 @@ class ExternalAgentTracker:
 
     # -- polling -------------------------------------------------------------
     def poll_once(self) -> None:
+        with self._writer_lock:
+            self._poll_once()
+
+    def _poll_once(self) -> None:
         """One poll cycle over every source. Never raises; a failing source keeps
         its last observations so its units age out instead of vanishing."""
         observations: list[Observation] = []
@@ -777,6 +790,26 @@ class ExternalAgentTracker:
                 self._send(event)
             except Exception:
                 pass
+
+    def ingest_position(self, body: Any) -> dict[str, Any]:
+        """Metadata-only hint; defer reconciliation while a source poll is busy."""
+        # PositionStore owns its lock. Accept the hint without waiting for
+        # source subprocess/DB I/O; the next poll overlays it if writer is busy.
+        repo_paths = self._repo_paths()
+        now_ms = int(self._clock() * 1000)
+        result = self._positions.ingest(body, repo_paths, now_ms)
+        if not result.get("accepted") or not self._writer_lock.acquire(blocking=False):
+            return result
+        try:
+            observations = self._with_liveness([obs for seen in self._last_obs.values() for obs in seen])
+            for event in self.reconcile(observations, now_ms, repo_paths):
+                try:
+                    self._send(event)
+                except Exception:
+                    pass
+        finally:
+            self._writer_lock.release()
+        return result
 
     def _with_liveness(self, observations: list[Observation]) -> list[Observation]:
         """Tag every observation with "is a process still holding this session?".
@@ -810,6 +843,9 @@ class ExternalAgentTracker:
         repo_paths: list[str],
     ) -> list[dict[str, Any]]:
         """Diff the desired unit set against what is on the map; return events."""
+        from server import claude_sessions
+
+        observations = self._positions.overlay(observations, now_ms, owned_ids=claude_sessions.owned_ids())
         window_ms = self.config.window_s * 1000
         working_ms = self.config.working_s * 1000
         desired: dict[str, Observation] = {}
@@ -825,7 +861,10 @@ class ExternalAgentTracker:
         places: dict[str, tuple[str, str] | None] = {}
 
         def city_of(obs: Observation) -> tuple[str, str]:
-            """Where the session works now; its cwd when its activity does not say."""
+            """Fresh native hook first; recent activity and launch cwd as fallback."""
+            position = self._positions.location(obs, repo_paths, now_ms)
+            if position is not None:
+                return position
             recent: list[tuple[str, str]] = []
             for path in obs.work_dirs:
                 if path not in places:

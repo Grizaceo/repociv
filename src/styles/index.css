@@ -6,6 +6,7 @@
 @import './variables.css';
 @import './patterns.css';
 @import './components.css';
+@import './agent-attention.css';
 @import './onboarding.css';
 @import './panels/unit-panel.css';
 @import './panels/model-selectors.css';
@@ -20,6 +21,7 @@
 @import './panels/task-assign.css';
 @import './panels/kanban-panel.css';
 @import './panels/local-spatial.css';
+@import './panels/activity.css';
 @import './panels/whiteboard.css';
 @import './panels/local-view-frame.css';
 @import './panels/local-chat.css';

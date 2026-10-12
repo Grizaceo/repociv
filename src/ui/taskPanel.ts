@@ -1,9 +1,27 @@
 // ─── RepoCiv — Task Panel (Sprint C3) ────────────────────────────────────────
-// Side panel listing all active and recent tasks from the task orchestrator.
-// Shows: repo | issue | phase | progress | age, with colour-coding by phase.
-// Polls every 3s while open; provides a Cancel button per task.
+// Agent processes (local UID, recognized entrypoints + every descendant) and
+// orchestrator tasks, kept distinct. Uses the existing 3s polling while open;
+// process metadata never contains argv/env and offers no process kill action.
 import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
+
+import {
+  activityColor,
+  activityPanels,
+  registerActivityPanel,
+  activitySelection,
+  selectActivity,
+  setActivityProcesses,
+  subscribeActivity,
+  markActivityInventoryUnavailable,
+} from './activityCorrelation.ts';
+
+import {
+  presentActivities,
+  activityTitle,
+  type PresentedActivity,
+} from './activityPresentation.ts';
+import { focusOwnChat } from './agentsPanel.ts';
 
 const POLL_MS = 3_000;
 
@@ -42,9 +60,23 @@ let _timer = 0;
 let _visible = false;
 let _tasks: Task[] = [];
 let _offline = false;
+interface AgentProcess {
+  pid: number;
+  ppid: number;
+  rootPid: number;
+  name: string;
+  state: string;
+  family: string;
+  role: string;
+  processIdentity?: string | null;
+}
+let _processes: AgentProcess[] = [];
+let _processError = '';
+let _unreadable = 0;
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 export function openTaskPanel(): void {
+  activityPanels.log?.close();
   _visible = true;
   showPanel(_getOrCreate());
   void _fetch();
@@ -81,20 +113,40 @@ function _stopPolling(): void {
   }
 }
 
-async function _fetch(): Promise<void> {
+async function _fetchProcesses(): Promise<void> {
   try {
-    const res = await fetch(bridgeUrl('/tasks'), { headers: bridgeHeaders() });
-    if (!res.ok) {
+    const res = await fetch(bridgeUrl('/api/agent-processes'), { headers: bridgeHeaders() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data.available) throw new Error('Inventario no disponible');
+    _processes = data.processes;
+    _unreadable = data.unreadable;
+    _processError = '';
+    setActivityProcesses(_processes);
+  } catch (err) {
+    _processError = err instanceof Error ? err.message : String(err);
+    markActivityInventoryUnavailable();
+  }
+}
+
+let _fetching = false;
+async function _fetch(loadHistory = true): Promise<void> {
+  if (_fetching) return;
+  _fetching = true;
+  try {
+    await _fetchProcesses();
+    try {
+      const res = await fetch(bridgeUrl('/tasks'), { headers: bridgeHeaders() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      _tasks = (await res.json()) as Task[];
+      _offline = false;
+    } catch {
       _offline = true;
-      if (_visible) _render();
-      return;
     }
-    _tasks = (await res.json()) as Task[];
-    _offline = false;
+    if (loadHistory) await activityPanels.log?.refresh();
     if (_visible) _render();
-  } catch {
-    _offline = true;
-    if (_visible) _render();
+  } finally {
+    _fetching = false;
   }
 }
 
@@ -114,22 +166,65 @@ async function _cancelTask(key: string): Promise<void> {
   }
 }
 
+let _lastRendered = '';
+
 // ─── Render ───────────────────────────────────────────────────────────────────
 function _render(): void {
   const panel = _getOrCreate();
   const body = panel.querySelector<HTMLElement>('.task-body')!;
+  const replace = (html: string): boolean => {
+    if (html === _lastRendered) return false;
+    _lastRendered = html;
+    const open = new Set(
+      Array.from(body.querySelectorAll<HTMLDetailsElement>('details[open]')).map(
+        (d) => d.dataset['detailId'],
+      ),
+    );
+    const scroll = body.scrollTop;
+    body.innerHTML = html;
+    body.querySelectorAll<HTMLDetailsElement>('details').forEach((d) => {
+      d.open = open.has(d.dataset['detailId']);
+    });
+    body.scrollTop = scroll;
+    return true;
+  };
 
+  const focusKey = (document.activeElement as HTMLElement | null)?.dataset['focusId'];
+  const restore = () => {
+    if (focusKey)
+      Array.from(body.querySelectorAll<HTMLElement>('[data-focus-id]'))
+        .find((b) => b.dataset['focusId'] === focusKey)
+        ?.focus({ preventScroll: true });
+  };
+  const activities = presentActivities(_processes);
+  const processes = `<section class="agent-process-list"><h3>Actividades · ${activities.length} grupos / ${_processes.length} procesos</h3>
+    ${_processError ? '<p role="status">⚠ Inventario no disponible — datos anteriores posiblemente desactualizados</p>' : ''}
+    ${_unreadable ? `<p>${_unreadable} procesos no legibles o terminados durante el muestreo</p>` : ''}
+    <div class="activity-list">${activities.map(_activityCard).join('')}</div>
+    ${!activities.length ? '<p>Sin actividades en el inventario y la historia cargada</p>' : ''}</section>`;
+  const context = _activityContext();
   if (_offline) {
-    body.innerHTML = '<div class="task-offline">⚠ Bridge offline — sin datos</div>';
+    replace(context + processes + '<div class="task-offline">⚠ Orquestador no disponible</div>');
+    restore();
     return;
   }
 
   if (_tasks.length === 0) {
-    body.innerHTML = '<div class="task-empty">Sin tareas registradas</div>';
+    replace(
+      context +
+        processes +
+        '<div class="task-empty">Sin tareas registradas en el orquestador</div>',
+    );
+    restore();
     return;
   }
 
-  body.innerHTML = `
+  if (
+    !replace(
+      context +
+        processes +
+        `
+    <h3>Tareas del orquestador</h3>
     <table class="task-table" aria-label="Lista de tareas activas">
       <thead>
         <tr>
@@ -145,8 +240,12 @@ function _render(): void {
         ${_tasks.map((t) => _taskRow(t)).join('')}
       </tbody>
     </table>
-  `;
+  `,
+    )
+  )
+    return;
 
+  restore();
   // Wire cancel buttons
   body.querySelectorAll<HTMLButtonElement>('.task-btn-cancel').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -165,7 +264,7 @@ function _taskRow(t: Task): string {
   return `
     <tr class="task-row">
       <td class="task-repo" title="${_esc(t.repo)}">${_esc(t.repo.slice(0, 12))}</td>
-      <td class="task-issue" title="${_esc(t.issueId)}">${_esc(t.issueId)}</td>
+      <td class="task-issue" title="${_esc(t.issueId)}">${_activityButton(`task:${t.key}`, t.issueId)}</td>
       <td class="task-phase">
         <span class="task-phase-badge" style="background:${color}22;border-color:${color};color:${color}">${_esc(t.phase)}</span>
       </td>
@@ -225,12 +324,68 @@ function _getOrCreate(): HTMLElement {
     'task-panel hidden',
     `
     <div class="task-header">
-      <span class="task-title">📋 TAREAS</span>
+      <span class="task-title">📋 ACTIVIDAD · EJECUCIONES</span>
       <button id="task-close" title="Cerrar panel de tareas" aria-label="Cerrar panel de tareas">✕</button>
     </div>
+    <nav class="activity-nav" aria-label="Actividad"><button class="activity-log">Crónica de la selección</button><button class="activity-reset">Todas las ejecuciones</button></nav>
     <div class="task-body"></div>
     `,
   );
+  subscribeActivity(() => {
+    if (_visible) _render();
+  });
+  bindPanelAction(_panel, '.activity-log', () => activityPanels.log?.open());
+  bindPanelAction(_panel, '.activity-reset', () => selectActivity(''));
+  _panel.addEventListener('click', (e) => {
+    const button = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-activity]');
+    if (button) selectActivity(button.dataset['activity'] ?? '');
+    const chronicle = (e.target as HTMLElement).closest<HTMLElement>('[data-chronicle]');
+    if (chronicle) {
+      selectActivity(chronicle.dataset['chronicle'] ?? '');
+      activityPanels.log?.open();
+    }
+    const unit = (e.target as HTMLElement).closest<HTMLElement>('[data-unit]');
+    if (unit?.dataset['unit']) {
+      closeTaskPanel();
+      focusOwnChat(unit.dataset['unit']);
+    }
+  });
   bindPanelAction(_panel, '#task-close', closeTaskPanel);
   return _panel;
 }
+
+function _activityButton(key: string, label: string, focusId = key): string {
+  return `<button data-focus-id="${_esc(focusId)}" data-activity="${_esc(key)}" aria-pressed="${activitySelection() === key}" style="--activity-color:${activityColor(key)}">⬡ ${_esc(label)}</button>`;
+}
+function _activityCard(a: PresentedActivity): string {
+  const roots = a.processes.filter((p) => !a.processes.some((parent) => parent.pid === p.ppid));
+  return `<article class="activity-card" data-run="${_esc(a.id)}" style="--activity-color:${activityColor(a.key)}">
+    <div class="activity-card-heading">${_activityButton(a.key, a.title, `card:${a.id}`)}<span class="activity-state">${_esc(a.status)}</span></div>
+    <div class="activity-owner">${a.unit ? `Unidad: ${_esc(a.unitName || (a.title === a.unit ? a.unit : 'vinculada'))}` : 'Sin unidad vinculada'} · ${a.agent ? `Agente: ${_esc(a.agent)}` : !a.profile ? 'Propietario desconocido' : 'Agente no registrado'}</div>
+    <div class="activity-meta"><span>Harness: ${_esc(a.harness || 'no acreditado')}</span><span>Profile: ${_esc(a.profile || 'desconocido')}</span><span>${a.task ? 'Tarea vinculada' : 'Sin tarea vinculada en la historia cargada'}</span></div>
+    ${a.identityWarning ? `<p class="activity-warning">⚠ ${_esc(a.identityWarning)}</p>` : ''}
+    ${!a.commandId ? `<p class="activity-note">Familia detectada: ${_esc(a.processes[0]?.family || 'no disponible')}.</p>` : ''}
+    <div class="activity-card-actions"><button data-chronicle="${_esc(a.key)}" data-focus-id="chronicle:${_esc(a.id)}">Ver Crónica</button>${a.unit ? `<button data-unit="${_esc(a.unit)}" data-focus-id="unit:${_esc(a.id)}">Ver unidad</button>` : ''}</div>
+    <details data-detail-id="processes:${_esc(a.id)}"><summary data-focus-id="expand:${_esc(a.id)}">${a.processes.length} procesos · ${roots.length} raíces observadas${a.processes.length ? ` · ${a.processes.length - roots.length} descendientes` : ' · sin procesos en el último inventario'}</summary>
+    <ul class="activity-process-tree">${a.processes.map((p) => `<li data-process-pid="${p.pid}">${_activityButton(a.key, `PID ${p.pid} ← PPID ${p.ppid} · ${p.name}`, `pid:${p.processIdentity || p.pid}`)}<span>Estado SO: ${_esc(p.state)}${roots.includes(p) ? ' · raíz observada' : ' · descendiente'}</span><code>${_esc(p.processIdentity || 'Identidad de proceso no disponible')}</code></li>`).join('')}</ul></details>
+    <details data-detail-id="technical:${_esc(a.id)}"><summary data-focus-id="technical:${_esc(a.id)}">Identificadores y evidencia</summary><dl><dt>Selección compartida</dt><dd><code>${_esc(a.key)}</code></dd><dt>Comando / ejecución</dt><dd>${_esc(a.commandId || 'Sin ejecución vinculada')}</dd><dt>Unidad</dt><dd><code>${_esc(a.unit || 'Sin unidad vinculada')}</code></dd><dt>Sesión</dt><dd>Sin enlace canónico a una sesión nativa en esta proyección</dd><dt>Identidad al inicio</dt><dd>${a.registered ? 'Registro canónico del runner' : 'Datos no disponibles en la historia cargada'}</dd><dt>Historia</dt><dd>${a.events.length} eventos cargados · no acredita historia completa</dd></dl>${a.events
+      .filter((e) => e.type === 'ExecutionIdentityRecorded')
+      .map(
+        (e) =>
+          `<p class="activity-note">Intento registrado · harness: ${_esc(String(e.data?.['harness'] || 'no disponible'))} · profile: ${_esc(String(e.data?.['profileName'] || 'no registrado'))} · proveedor seleccionado: ${_esc(String(e.data?.['provider'] || 'no registrado'))} · modelo seleccionado: ${_esc(String(e.data?.['model'] || 'no registrado'))}</p>`,
+      )
+      .join('')}</details>
+  </article>`;
+}
+function _activityContext(): string {
+  return `<div class="activity-context" role="status">${_esc(activityTitle(activitySelection()))}</div><p class="activity-note">Identidad registrada al inicio · procesos observados ahora. Un árbol externo no acredita propietario ni trabajo activo. Sin proceso no significa éxito.</p>`;
+}
+export async function refreshTaskInventory(): Promise<void> {
+  await _fetch(false);
+}
+
+registerActivityPanel('tasks', {
+  open: openTaskPanel,
+  close: closeTaskPanel,
+  refresh: refreshTaskInventory,
+});

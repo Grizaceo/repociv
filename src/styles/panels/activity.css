@@ -1,0 +1,162 @@
+/* Compact activity hierarchy, within existing panel shells. */
+#task-panel,
+#log-panel {
+  z-index: 550; /* Above map HUD (500), below dialogs/tutorial. */
+  font-size: 14px;
+  color: var(--ui-text);
+}
+.activity-list {
+  display: grid;
+  gap: 16px;
+}
+.activity-card {
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-left: 4px solid var(--activity-color);
+  border-radius: 6px;
+  background: #18140f;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.activity-card-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.activity-card-heading > button {
+  font-size: 16px;
+  font-weight: 600;
+  flex: 1 1 220px;
+}
+.activity-state {
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  max-width: 240px;
+  line-height: 1.5;
+}
+.activity-owner {
+  margin-top: 8px;
+  font-weight: 500;
+}
+.activity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 8px;
+  line-height: 1.5;
+}
+.activity-note {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 8px 0;
+}
+.activity-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 8px;
+}
+.activity-card-actions button,
+.activity-nav button,
+.activity-older {
+  color: var(--ui-text);
+  background: var(--ui-panel-bg);
+  border: 1px solid var(--ui-border);
+  padding: 8px;
+  border-radius: 4px;
+  min-height: 36px;
+  cursor: pointer;
+}
+.activity-card details,
+#log-panel details {
+  margin-top: 8px;
+}
+.activity-card summary,
+#log-panel summary {
+  padding: 8px 0;
+  cursor: pointer;
+}
+.activity-card button:focus-visible,
+.activity-card summary:focus-visible,
+#log-panel summary:focus-visible,
+.activity-older:focus-visible {
+  outline: 2px solid var(--ui-gold-bright);
+  outline-offset: 2px;
+}
+.activity-process-tree {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.activity-process-tree li {
+  display: grid;
+  gap: 4px;
+  border-bottom: 1px solid var(--ui-border);
+  padding-bottom: 8px;
+}
+.activity-process-tree span,
+.activity-process-tree code {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.activity-card dl {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) minmax(0, 2fr);
+  gap: 8px;
+  font-size: 12px;
+}
+.activity-card dd {
+  margin: 0;
+}
+.activity-context {
+  font-weight: 600;
+  font-size: 16px;
+}
+#task-panel .task-table,
+#log-panel .log-table {
+  table-layout: fixed;
+  overflow-wrap: anywhere;
+}
+#task-panel .task-table th,
+#task-panel .task-table td,
+#log-panel .log-table th,
+#log-panel .log-table td {
+  white-space: normal;
+  padding: 8px 4px;
+  font-size: 12px;
+}
+#log-panel .log-table th:first-child {
+  width: 15%;
+}
+#log-panel .log-table th:nth-child(2) {
+  width: 25%;
+}
+#task-panel .task-body,
+#log-panel .log-body {
+  overflow-x: hidden;
+}
+@media (max-width: 600px) {
+  .activity-card {
+    padding: 8px;
+  }
+  .activity-card-heading {
+    display: grid;
+  }
+  .activity-state {
+    max-width: none;
+  }
+  .activity-card dl {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  #task-panel .task-table th,
+  #task-panel .task-table td {
+    font-size: 11px;
+    padding: 4px 2px;
+  }
+}

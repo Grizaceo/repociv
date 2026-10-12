@@ -17,8 +17,8 @@
   ciudades 3D sobre plazas de piedra, hora dorada. Vende la metáfora mucho mejor
   que el 2D. *El producto se subvende al arrancar en 2D.*
 - **HUD denso:** 23 botones visibles + leyenda de ~12 hotkeys siempre en pantalla
-  (`Q/W/E/L/O/C/X` spawn, `1-9` selección, `ENTER` chat, `H` capas, `F6` gran
-  libro, `F9` quests, `F10` crónica, `A` aprobaciones, `?` ayuda).
+  (atajos vigentes: `Q/W/E/O/C/X` spawn, `1-9` selección, `ENTER` chat,
+  `F6` Kanban de Hermes, `F8` agentes, `F9` tareas activas, `Ctrl+A` aprobaciones, `?` ayuda).
 - **Spawn = 7 tipos de agente** (DAVI, Worker, Scout, LexO, OpenClaw, Claude,
   Codex) en 7 hotkeys. ⚠️ *DAVI/LexO aparecen en el build corriendo pese a que
   el commit `55b9dc0` los "removió de la superficie shipped" — confirmar si es
@@ -62,8 +62,8 @@ Sin datos, cada decisión de UI es opinión. Ya existe `_trackLayerToggle()`
 ### Fase B — On-ramp del novato (disclosure progresivo estilo Civ V) · esfuerzo M-L
 - **B1. Modo Quick vs Advanced** (como el setup de partida de Civ V).
   Default **Quick**: solo el núcleo visible — spawn de agente, chat, aprobaciones,
-  capas. El resto de la botonera (replay, observabilidad, pendientes, log,
-  asignación, crónica, quests, gran libro…) detrás de un "Avanzado / ⋯".
+  agentes. El resto de la botonera vigente (pendientes, log, asignación,
+  Kanban de Hermes, tareas activas…) detrás de un "Avanzado / ⋯".
   Persistir la elección. *Es la palanca #1 contra la saturación observada.*
 - **B2. Tour guiado de primer arranque** (`src/ui/onboardingPanel.ts` ya existe,
   626 LOC). 4 coachmarks: "esta ciudad = tu repo → seleccionala → mandá un agente

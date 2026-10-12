@@ -134,7 +134,6 @@ export interface HexSceneRenderOptions {
   showStructure: boolean;
   showOps: boolean;
   showLabels: boolean;
-  showLabs: boolean;
   animTime: number;
   /** Delta time in seconds since the last frame. Drives per-frame
    *  animations (unit spawn/despawn tweens, idle pulses, walking hops)

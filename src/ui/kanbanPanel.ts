@@ -1,7 +1,6 @@
 // ─── RepoCiv — Hermes Kanban Panel ───────────────────────────────────────────
-// Native read-only view of the Hermes kanban (SQLite stores read by the
-// bridge). Columns mirror the canonical BOARD_COLUMNS; mutations stay in
-// `hermes kanban ...` / the Hermes dashboard.
+// Shared Hermes boards: task reading via SQLite; explicit project-board creation
+// through the native CLI. Task mutations stay in Hermes.
 import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
 import { trackPanelOpen } from './analytics.ts';
@@ -53,6 +52,7 @@ let _board: KanbanBoard | null = null;
 let _boards: KanbanBoardMeta[] = [];
 let _selectedSlug = '';
 let _error = '';
+let _creating = false;
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 export function openKanbanPanel(): void {
@@ -132,7 +132,7 @@ function _render(): void {
 
   const board = _board;
   if (!board) {
-    body.innerHTML = `<div class="kb-empty">Cargando kanban…</div>`;
+    body.innerHTML = `<div class="kb-empty">${_error ? `No se pudo cargar Kanban: ${escapeHtml(_error)}` : 'Cargando kanban…'}</div>`;
     return;
   }
   if (!board.available) {
@@ -212,12 +212,74 @@ function _getOrCreate(): HTMLElement {
     `
     <div class="kb-header">
       <span class="kb-title">📋 KANBAN — Hermes</span>
+      <button id="kb-new" type="button" aria-expanded="false" aria-controls="kb-create-form">Nuevo tablero</button>
       <button id="kb-x" title="Cerrar [F6]" aria-label="Cerrar panel kanban">✕</button>
     </div>
+    <form id="kb-create-form" hidden>
+      <label>Nombre del tablero <input name="name" required maxlength="120" autocomplete="off"></label>
+      <label>ID del tablero <input name="slug" required maxlength="64" pattern="[a-z0-9][a-z0-9_-]{0,63}" placeholder="mi-proyecto" autocomplete="off"></label>
+      <label>Ruta del proyecto <input name="project_path" required placeholder="/home/usuario/repos/mi-proyecto" autocomplete="off"></label>
+      <p>Crea un tablero compartido con Hermes. No inicia agentes ni cambia su tablero activo.</p>
+      <button type="submit">Crear tablero</button>
+      <button id="kb-create-cancel" type="button">Cancelar</button>
+    </form>
+    <div id="kb-create-message" role="status" aria-live="polite"></div>
     <div class="kb-body"></div>
   `,
   );
   bindPanelAction(_panel, '#kb-x', closeKanbanPanel);
+  const form = _panel.querySelector<HTMLFormElement>('#kb-create-form')!;
+  const toggle = _panel.querySelector<HTMLButtonElement>('#kb-new')!;
+  const message = _panel.querySelector<HTMLElement>('#kb-create-message')!;
+  const setForm = (open: boolean) => {
+    form.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+    if (open) form.querySelector<HTMLInputElement>('input')?.focus();
+    else toggle.focus();
+  };
+  toggle.addEventListener('click', () => {
+    if (!_creating) setForm(form.hidden);
+  });
+  bindPanelAction(_panel, '#kb-create-cancel', () => {
+    if (!_creating) setForm(false);
+  });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (_creating || !form.reportValidity()) return;
+    const data = Object.fromEntries(new FormData(form));
+    _creating = true;
+    form.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button').forEach((el) => {
+      el.disabled = true;
+    });
+    toggle.disabled = true;
+    message.textContent = 'Creando tablero…';
+    try {
+      const res = await fetch(bridgeUrl('/api/kanban/boards'), {
+        method: 'POST',
+        headers: bridgeHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(data),
+      });
+      const result = (await res.json()) as { board?: KanbanBoard; error?: string };
+      if (!res.ok || !result.board) throw new Error(result.error || `HTTP ${res.status}`);
+      _selectedSlug = result.board.slug;
+      _board = result.board;
+      _error = '';
+      message.textContent = `Tablero «${result.board.name}» creado en Hermes.`;
+      form.reset();
+      setForm(false);
+      await _loadBoards();
+      await _fetch();
+    } catch (err) {
+      message.textContent = err instanceof Error ? err.message : String(err);
+    } finally {
+      _creating = false;
+      toggle.disabled = false;
+      form.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button').forEach((el) => {
+        el.disabled = false;
+      });
+      if (form.hidden) toggle.focus();
+    }
+  });
   return _panel;
 }
 

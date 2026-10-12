@@ -48,7 +48,48 @@
   border-color: var(--ui-gold, #c8a84b);
 }
 
+#kb-new {
+  width: auto;
+  height: auto;
+  padding: 6px 8px;
+}
+.kb-header {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+#kb-create-form:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  overflow-y: auto;
+  flex-shrink: 0;
+  max-height: 55vh;
+  color: var(--ui-text, #e8e0d0);
+  font-size: 12px;
+}
+#kb-create-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#kb-create-form input,
+#kb-create-form button {
+  padding: 8px;
+  min-width: 0;
+  border: 1px solid var(--ui-border, #3a2f1a);
+  border-radius: 3px;
+  background: var(--ui-dark, #14100a);
+  color: var(--ui-text, #e8e0d0);
+}
+#kb-create-message:not(:empty) {
+  padding: 8px 12px;
+  color: var(--ui-gold-bright, #e8c96a);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
 .kb-body {
+  min-height: 0;
   flex: 1;
   overflow-y: auto;
   padding: 10px;

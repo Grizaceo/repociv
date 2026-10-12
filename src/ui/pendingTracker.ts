@@ -1,6 +1,5 @@
 // ─── RepoCiv — Pending tracker → missions bridge ─────────────────────────────
-// The quest board UI was pruned (SCOPE poda, 2026-08-10). What survives is the
-// data path: pending tracker items are loaded at boot so the mission badges and
+// Pending tracker items are loaded at boot so the mission badges and
 // task panel still reflect real pending work.
 import type { Mission } from '../game.ts';
 import { bridgeUrl, bridgeHeaders } from '../bridgeEnv.ts';

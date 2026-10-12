@@ -76,7 +76,7 @@ export class GameState {
   // Extracted registries (see missionLifecycle.ts, subagentManager.ts)
   private _missions: MissionRegistry;
   private _subagents: SubagentRegistry;
-  // Listener for state changes (used by UI to refresh hero bar / quest board)
+  // Listener for state changes (used by UI to refresh the agent HUD)
   private listeners: Array<() => void> = [];
 
   // ─── Phase 6+7a: Local / RimWorld view (delegated to LocalWorldManager) ─────

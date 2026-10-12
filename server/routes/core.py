@@ -906,6 +906,71 @@ def get_log(ctx: "RouteContext") -> tuple[int, Any]:
         event_type_filter = params.get("type", "")
     except Exception:
         n, event_type_filter = 100, ""
+    if params.get("metadata") == "1":
+        # Read the canonical JSONL, not a second history store. Never send prompts,
+        # command payloads, output, errors, credentials or arbitrary actor text.
+        # ExecutionIdentityRecorded fields (harness, profileName, agentName,
+        # unitId, provider, model, commandType) are safe identity metadata only.
+        safe_fields = {
+            "repo", "taskKey", "runId", "commandId", "agentId", "pid",
+            "processIdentity", "phase",
+            "harness", "profileName", "agentName", "unitId", "provider",
+            "model", "commandType", "unitName",
+        }
+        rows = []
+        cursor = 0
+        path = _es._store_path
+        if path is not None and path.exists():
+            try:
+                with path.open("rb") as stream:
+                    stream.seek(0, 2)
+                    size = stream.tell()
+                    before = params.get("before")
+                    end = min(size, max(0, int(before))) if before is not None else size
+                    start = max(0, end - 262144)  # Bound disk work and response memory per page.
+                    stream.seek(start)
+                    chunk = stream.read(end - start)
+                if start > 0:
+                    boundary = chunk.find(b"\n")
+                    if boundary < 0:
+                        chunk = b""
+                    else:
+                        start += boundary + 1
+                        chunk = chunk[boundary + 1:]
+                offsets = []
+                position = start
+                for line in chunk.splitlines(keepends=True):
+                    offsets.append((position, line))
+                    position += len(line)
+                cursor = start if offsets else max(0, end - 262144)
+                for offset, raw in reversed(offsets):
+                    try:
+                        event = _json_lib.loads(raw)
+                    except (ValueError, UnicodeError):
+                        continue
+                    if not isinstance(event, dict) or event.get("type") == "AgentOutputChunk":
+                        continue
+                    data = event.get("data") or {}
+                    if not isinstance(data, dict):
+                        data = {}
+                    safe = {k: v for k, v in data.items() if k in safe_fields and isinstance(v, (str, int))}
+                    if event.get("type") == "CommandCreated" and isinstance(data.get("type"), str):
+                        safe["commandType"] = data["type"]
+                    rows.append({"id": event.get("id"), "commandId": event.get("commandId", ""),
+                                 "type": event.get("type", ""), "timestamp": event.get("timestamp", 0),
+                                 "data": safe, "sourceOffset": offset})
+                    if len(rows) >= n:
+                        cursor = offset
+                        break
+            except ValueError:
+                return 400, {"error": "invalid_history_cursor"}
+            except OSError:
+                return 503, {"error": "activity_unavailable"}
+        result = list(reversed(rows))
+        if params.get("paged") == "1":
+            return 200, {"events": result, "before": cursor, "more": cursor > 0}
+        # Compatibility: metadata arrays are also bounded, never full-history scans.
+        return 200, result
     events = _es.read_events(since=0, limit=500)
     if event_type_filter:
         events = [e for e in events if e.get("type") == event_type_filter]

@@ -195,11 +195,21 @@ def record_failed(command_id: str, error: str = "") -> None:
     _ledger_ingest(evt)
 
 
-def record_event(event_type: str, data: dict[str, Any]) -> None:
-    """Record a free-form named event (e.g. 'HarnessRecoveryRequested')."""
+def record_event(
+    event_type: str,
+    data: dict[str, Any],
+    *,
+    command_id: str = "",
+) -> None:
+    """Record a free-form named event (e.g. 'HarnessRecoveryRequested').
+
+    ``command_id`` is optional; when given it binds the event to an execution
+    so identity/correlation can join on it. Historical rows written without it
+    keep the empty-string default.
+    """
     _append({
         "id": str(uuid.uuid4())[:12],
-        "commandId": "",
+        "commandId": command_id,
         "type": event_type,
         "timestamp": time.time(),
         "actor": "system",

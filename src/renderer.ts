@@ -17,7 +17,6 @@ import { openWonderVignette } from './ui/wonderVignette.ts';
 import { openCapitalPanel } from './ui/capitalPanel.ts';
 import { hideUnitPanel } from './ui/panel.ts';
 import { isLayerVisible } from './layers.ts';
-import { updateLodDisplay } from './ui/layerPanel.ts';
 // LocalRenderer is lazy-loaded on first local-view entry to keep main bundle small.
 type LocalRendererType = import('./localRenderer.ts').LocalRenderer;
 import {
@@ -1252,7 +1251,6 @@ export class Renderer {
 
     // Compute LOD from zoom level
     this._currentLod = this.calcLod();
-    updateLodDisplay(cam.zoom);
 
     // ─── Phase 6: Local RimWorld view ───────────────────────────────────────
     const currentViewMode = this.state.viewMode === 'local' ? 'local' : 'macro';
@@ -1395,7 +1393,6 @@ export class Renderer {
     // ─── Layer gates (applied to each rendering pass) ─────────────────
     const showStructure = isLayerVisible('structure');
     const showOps = isLayerVisible('ops');
-    const showLabs = isLayerVisible('labs');
     const showSecurity = isLayerVisible('security');
     const showLabels = isLayerVisible('labels');
     const isClean = this._cleanMode;
@@ -1420,7 +1417,6 @@ export class Renderer {
         showStructure,
         showOps,
         showLabels,
-        showLabs,
       });
     } else {
       this.unitR.resetCoordProjector();
@@ -1529,7 +1525,7 @@ export class Renderer {
       }
     }
 
-    // Pass 2.5: Capital wonder flanking sprites (structure + knowledge + labs)
+    // Pass 2.5: Capital wonder flanking sprites (structure)
     if (showStructure) {
       const capital = this.state.world.cities.find((c) => c.isCapital);
       if (capital) {
@@ -1561,8 +1557,8 @@ export class Renderer {
       }
     }
 
-    // Pass 2.7: Labs — active construction / experiment indicators
-    if (showLabs) {
+    // Pass 2.7: Active construction indicators
+    {
       for (const city of this.state.world.cities) {
         const hasActiveExp = this.state.world.buildings.some(
           (b) => b.cityId === city.id && b.state === 'building',
@@ -1576,8 +1572,8 @@ export class Renderer {
         ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('🔬', cp.x + HEX_SIZE * 0.8, cp.y + HEX_SIZE * 0.6);
-        // Pulsing ring around lab cities with active experiments
+        ctx.fillText('🔨', cp.x + HEX_SIZE * 0.8, cp.y + HEX_SIZE * 0.6);
+        // Pulsing ring around cities with active construction
         if (hasActiveExp) {
           ctx.strokeStyle = `rgba(34, 197, 94, ${webglMode ? pulse * 0.2 : pulse * 0.5})`;
           ctx.lineWidth = webglMode ? 1 : 2;

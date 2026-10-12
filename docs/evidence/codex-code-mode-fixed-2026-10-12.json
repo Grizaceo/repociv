@@ -1,0 +1,251 @@
+{
+  "kind": "real-cli-codex-code-mode-fix",
+  "recordedAt": 1791813726.4661994,
+  "passed": true,
+  "nativeSession": "01a13045-8b60-7d20-b303-a3adf5fa892a",
+  "unit": "ext-openai-codex-01a13045",
+  "sameSessionAndUnit": true,
+  "singleUnitAtObservedStages": true,
+  "syntheticHintsEmitted": false,
+  "codeModeRetained": true,
+  "A": {
+    "api": {
+      "at": 1791813445.2235682,
+      "sessions": [
+        {
+          "sessionId": "codex-01a13045-8b60-7d20-b303-a3adf5fa892a",
+          "source": "suvadu",
+          "agent": "openai-codex",
+          "profile": "",
+          "origin": "",
+          "section": "",
+          "model": "gpt-6.1-sol",
+          "repo": "formal-math-lab",
+          "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9mb3JtYWwtbWF0aC1sYWI",
+          "active": true,
+          "state": "working",
+          "unit": "ext-openai-codex-01a13045",
+          "unitType": "scout",
+          "firstActivityAt": 1791811300486,
+          "lastActivityAt": 1791813441800,
+          "commandCount": 5,
+          "eventCount": 30,
+          "totalTokens": 229272,
+          "subagent": false,
+          "imported": true,
+          "liveChat": {
+            "state": "unavailable",
+            "transport": null,
+            "reason": "unsupported_session_source"
+          }
+        }
+      ],
+      "agents": [
+        {
+          "unit": "ext-openai-codex-01a13045",
+          "unitType": "scout",
+          "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9mb3JtYWwtbWF0aC1sYWI",
+          "state": "working",
+          "agent": "openai-codex",
+          "model": "gpt-6.1-sol",
+          "repo": "formal-math-lab",
+          "mission": "openai-codex · gpt-6.1-sol",
+          "firstActivityAt": 1791811300486,
+          "lastActivityAt": 1791813441800,
+          "commandCount": 5,
+          "eventCount": 30,
+          "totalTokens": 229272
+        }
+      ]
+    },
+    "map": {
+      "at": 1791813511612,
+      "units": [
+        {
+          "id": "ext-openai-codex-01a13045",
+          "type": "scout",
+          "state": "working",
+          "coord": {
+            "q": 0,
+            "r": 1
+          },
+          "x": 0,
+          "y": 90
+        }
+      ]
+    }
+  },
+  "B": {
+    "api": {
+      "at": 1791813549.0975537,
+      "sessions": [
+        {
+          "sessionId": "codex-01a13045-8b60-7d20-b303-a3adf5fa892a",
+          "source": "suvadu",
+          "agent": "openai-codex",
+          "profile": "",
+          "origin": "",
+          "section": "",
+          "model": "gpt-6.1-sol",
+          "repo": "financial-lab",
+          "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9maW5hbmNpYWwtbGFi",
+          "active": true,
+          "state": "working",
+          "unit": "ext-openai-codex-01a13045",
+          "unitType": "scout",
+          "firstActivityAt": 1791811300486,
+          "lastActivityAt": 1791813541315,
+          "commandCount": 7,
+          "eventCount": 36,
+          "totalTokens": 279960,
+          "subagent": false,
+          "imported": true,
+          "liveChat": {
+            "state": "unavailable",
+            "transport": null,
+            "reason": "unsupported_session_source"
+          }
+        }
+      ],
+      "agents": [
+        {
+          "unit": "ext-openai-codex-01a13045",
+          "unitType": "scout",
+          "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9maW5hbmNpYWwtbGFi",
+          "state": "working",
+          "agent": "openai-codex",
+          "model": "gpt-6.1-sol",
+          "repo": "financial-lab",
+          "mission": "openai-codex · gpt-6.1-sol",
+          "firstActivityAt": 1791811300486,
+          "lastActivityAt": 1791813541315,
+          "commandCount": 7,
+          "eventCount": 36,
+          "totalTokens": 279960
+        }
+      ]
+    },
+    "map": {
+      "at": 1791813570381,
+      "units": [
+        {
+          "id": "ext-openai-codex-01a13045",
+          "type": "scout",
+          "state": "working",
+          "coord": {
+            "q": 2,
+            "r": 3
+          },
+          "x": 156,
+          "y": 360
+        }
+      ]
+    }
+  },
+  "settled": {
+    "api": {
+      "at": 1791813625.7762403,
+      "sessions": [
+        {
+          "sessionId": "codex-01a13045-8b60-7d20-b303-a3adf5fa892a",
+          "source": "suvadu",
+          "agent": "openai-codex",
+          "profile": "",
+          "origin": "",
+          "section": "",
+          "model": "gpt-6.1-sol",
+          "repo": "financial-lab",
+          "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9maW5hbmNpYWwtbGFi",
+          "active": true,
+          "state": "working",
+          "unit": "ext-openai-codex-01a13045",
+          "unitType": "scout",
+          "firstActivityAt": 1791811300486,
+          "lastActivityAt": 1791813541315,
+          "commandCount": 7,
+          "eventCount": 42,
+          "totalTokens": 332283,
+          "subagent": false,
+          "imported": true,
+          "liveChat": {
+            "state": "unavailable",
+            "transport": null,
+            "reason": "unsupported_session_source"
+          }
+        }
+      ],
+      "agents": [
+        {
+          "unit": "ext-openai-codex-01a13045",
+          "unitType": "scout",
+          "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9maW5hbmNpYWwtbGFi",
+          "state": "working",
+          "agent": "openai-codex",
+          "model": "gpt-6.1-sol",
+          "repo": "financial-lab",
+          "mission": "openai-codex · gpt-6.1-sol",
+          "firstActivityAt": 1791811300486,
+          "lastActivityAt": 1791813541315,
+          "commandCount": 7,
+          "eventCount": 42,
+          "totalTokens": 332283
+        }
+      ]
+    },
+    "map": {
+      "at": 1791813649129,
+      "units": [
+        {
+          "id": "ext-openai-codex-01a13045",
+          "type": "scout",
+          "state": "working",
+          "coord": {
+            "q": 2,
+            "r": 3
+          },
+          "x": 156,
+          "y": 360
+        }
+      ]
+    }
+  },
+  "nativeCompletedExecutions": [
+    {
+      "turn": "01a13067-2517-7463-9ac9-ad41b69ec63f",
+      "tool": "exec-9f88eddc-3d6e-4361-b5dc-b40fe1a12815",
+      "cwd": "file:///home/gris96/.hermes/workspace/ACTIVE/formal-math-lab",
+      "status": "completed",
+      "exitCode": 0
+    },
+    {
+      "turn": "01a13068-9b45-7423-bb32-45d14dbff3b3",
+      "tool": "exec-24d7d638-b6e9-4d35-9289-4f28f29e7296",
+      "cwd": "file:///home/gris96/.hermes/workspace/ACTIVE/financial-lab",
+      "status": "completed",
+      "exitCode": 0
+    }
+  ],
+  "tests": {
+    "redBeforeFix": {
+      "failed": 3,
+      "passed": 25
+    },
+    "focusedPassed": 83,
+    "pythonPassed": 1383,
+    "pythonSkipped": 2,
+    "frontendPassed": 1126,
+    "fullGateExit": 0,
+    "knip": "nonblocking",
+    "mypy": "not installed; skipped"
+  },
+  "cleanup": {
+    "probeRemoved": true,
+    "cliExited": true,
+    "repoStatusUnchanged": {
+      "formal-math-lab": true,
+      "financial-lab": true
+    }
+  },
+  "review": "pending independent review",
+  "originalFailedEvidence": "real-cli-position-2026-10-12.json"
+}

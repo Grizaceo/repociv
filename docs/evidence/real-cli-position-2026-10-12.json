@@ -1,0 +1,427 @@
+{
+  "kind": "real-cli-model-e2e",
+  "recordedAt": "2026-10-12T10:32:47.753944-03:00",
+  "repos": [
+    "formal-math-lab",
+    "financial-lab"
+  ],
+  "noSyntheticHints": true,
+  "observations": {
+    "claude": {
+      "nativeSession": "a588defe-4b53-4fc3-bc55-35fcc94bda7a",
+      "unit": "ext-claude-code-a588defe",
+      "A": {
+        "api": {
+          "at": 1791811227.7955568,
+          "sessions": [
+            {
+              "sessionId": "claude-a588defe-4b53-4fc3-bc55-35fcc94bda7a",
+              "source": "suvadu",
+              "agent": "claude-code",
+              "profile": "",
+              "origin": "",
+              "section": "",
+              "model": "claude-opus-5-5",
+              "repo": "formal-math-lab",
+              "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9mb3JtYWwtbWF0aC1sYWI",
+              "active": true,
+              "state": "working",
+              "unit": "ext-claude-code-a588defe",
+              "unitType": "claude",
+              "firstActivityAt": 1791811201972,
+              "lastActivityAt": 1791811205996,
+              "commandCount": 1,
+              "eventCount": 3,
+              "totalTokens": 119440,
+              "subagent": false,
+              "imported": true,
+              "liveChat": {
+                "state": "unavailable",
+                "transport": null,
+                "reason": "claude_control_channel_unavailable"
+              }
+            }
+          ],
+          "agents": [
+            {
+              "unit": "ext-claude-code-a588defe",
+              "unitType": "claude",
+              "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9mb3JtYWwtbWF0aC1sYWI",
+              "state": "working",
+              "agent": "claude-code",
+              "model": "claude-opus-5-5",
+              "repo": "formal-math-lab",
+              "mission": "claude-code · claude-opus-5-5",
+              "firstActivityAt": 1791811201972,
+              "lastActivityAt": 1791811205996,
+              "commandCount": 1,
+              "eventCount": 3,
+              "totalTokens": 119440
+            }
+          ]
+        },
+        "mapUnit": {
+          "id": "ext-claude-code-a588defe",
+          "type": "claude",
+          "state": "working",
+          "coord": {
+            "q": 0,
+            "r": 1
+          },
+          "x": 0,
+          "y": 90
+        },
+        "mapObservedAt": 1791811236988
+      },
+      "B": {
+        "api": {
+          "at": 1791811812.682604,
+          "sessions": [
+            {
+              "sessionId": "claude-a588defe-4b53-4fc3-bc55-35fcc94bda7a",
+              "source": "suvadu",
+              "agent": "claude-code",
+              "profile": "",
+              "origin": "",
+              "section": "",
+              "model": "claude-opus-5-5",
+              "repo": "financial-lab",
+              "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9maW5hbmNpYWwtbGFi",
+              "active": true,
+              "state": "working",
+              "unit": "ext-claude-code-a588defe",
+              "unitType": "claude",
+              "firstActivityAt": 1791811201972,
+              "lastActivityAt": 1791811796663,
+              "commandCount": 1,
+              "eventCount": 13,
+              "totalTokens": 721569,
+              "subagent": false,
+              "imported": true,
+              "liveChat": {
+                "state": "unavailable",
+                "transport": null,
+                "reason": "claude_control_channel_unavailable"
+              }
+            }
+          ],
+          "agents": [
+            {
+              "unit": "ext-claude-code-a588defe",
+              "unitType": "claude",
+              "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9maW5hbmNpYWwtbGFi",
+              "state": "working",
+              "agent": "claude-code",
+              "model": "claude-opus-5-5",
+              "repo": "financial-lab",
+              "mission": "claude-code · claude-opus-5-5",
+              "firstActivityAt": 1791811201972,
+              "lastActivityAt": 1791811796663,
+              "commandCount": 1,
+              "eventCount": 13,
+              "totalTokens": 721569
+            }
+          ]
+        },
+        "mapUnit": {
+          "id": "ext-claude-code-a588defe",
+          "type": "claude",
+          "state": "working",
+          "coord": {
+            "q": 2,
+            "r": 3
+          },
+          "x": 156,
+          "y": 360
+        },
+        "mapObservedAt": 1791811813298
+      },
+      "settled": {
+        "at": 1791811883.7132735,
+        "sessions": [
+          {
+            "sessionId": "claude-a588defe-4b53-4fc3-bc55-35fcc94bda7a",
+            "source": "suvadu",
+            "agent": "claude-code",
+            "profile": "",
+            "origin": "",
+            "section": "",
+            "model": "claude-opus-5-5",
+            "repo": "financial-lab",
+            "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9maW5hbmNpYWwtbGFi",
+            "active": true,
+            "state": "working",
+            "unit": "ext-claude-code-a588defe",
+            "unitType": "claude",
+            "firstActivityAt": 1791811201972,
+            "lastActivityAt": 1791811796663,
+            "commandCount": 2,
+            "eventCount": 15,
+            "totalTokens": 878437,
+            "subagent": false,
+            "imported": true,
+            "liveChat": {
+              "state": "unavailable",
+              "transport": null,
+              "reason": "claude_control_channel_unavailable"
+            }
+          }
+        ],
+        "agents": [
+          {
+            "unit": "ext-claude-code-a588defe",
+            "unitType": "claude",
+            "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9maW5hbmNpYWwtbGFi",
+            "state": "working",
+            "agent": "claude-code",
+            "model": "claude-opus-5-5",
+            "repo": "financial-lab",
+            "mission": "claude-code · claude-opus-5-5",
+            "firstActivityAt": 1791811201972,
+            "lastActivityAt": 1791811796663,
+            "commandCount": 2,
+            "eventCount": 15,
+            "totalTokens": 878437
+          }
+        ]
+      },
+      "identityPreserved": true,
+      "singleUnitInObservedSnapshots": true,
+      "metricsPreserved": true,
+      "locationPassed": true,
+      "toolResults": [
+        {
+          "id": "toolu_018iu22FcGTMDe8NH8NPaHFy",
+          "deniedOrError": false,
+          "observedCwd": "/home/gris96/.hermes/workspace/ACTIVE/formal-math-lab"
+        },
+        {
+          "id": "toolu_01Rp9jvV4Qkk6mr3E4oa5wdM",
+          "deniedOrError": true,
+          "observedCwd": null
+        },
+        {
+          "id": "toolu_01JqdFtKmynTtbfy9AZLTiXw",
+          "deniedOrError": true,
+          "observedCwd": null
+        },
+        {
+          "id": "toolu_01BdQCgnAovGJoXTcuqmiDBx",
+          "deniedOrError": false,
+          "observedCwd": "/home/gris96/.hermes/workspace/ACTIVE/financial-lab"
+        }
+      ]
+    },
+    "codex": {
+      "nativeSession": "codex-01a13045-8b60-7d20-b303-a3adf5fa892a",
+      "unit": "ext-openai-codex-01a13045",
+      "A": {
+        "api": {
+          "at": 1791811623.0603833,
+          "sessions": [
+            {
+              "sessionId": "codex-01a13045-8b60-7d20-b303-a3adf5fa892a",
+              "source": "suvadu",
+              "agent": "openai-codex",
+              "profile": "",
+              "origin": "",
+              "section": "",
+              "model": "gpt-6.1-sol",
+              "repo": "formal-math-lab",
+              "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9mb3JtYWwtbWF0aC1sYWI",
+              "active": true,
+              "state": "working",
+              "unit": "ext-openai-codex-01a13045",
+              "unitType": "scout",
+              "firstActivityAt": 1791811300486,
+              "lastActivityAt": 1791811622924,
+              "commandCount": 1,
+              "eventCount": 6,
+              "totalTokens": 41535,
+              "subagent": false,
+              "imported": true,
+              "liveChat": {
+                "state": "unavailable",
+                "transport": null,
+                "reason": "unsupported_session_source"
+              }
+            }
+          ],
+          "agents": [
+            {
+              "unit": "ext-openai-codex-01a13045",
+              "unitType": "scout",
+              "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9mb3JtYWwtbWF0aC1sYWI",
+              "state": "working",
+              "agent": "openai-codex",
+              "model": "gpt-6.1-sol",
+              "repo": "formal-math-lab",
+              "mission": "openai-codex · gpt-6.1-sol",
+              "firstActivityAt": 1791811300486,
+              "lastActivityAt": 1791811622924,
+              "commandCount": 1,
+              "eventCount": 6,
+              "totalTokens": 41535
+            }
+          ]
+        },
+        "mapUnit": {
+          "id": "ext-openai-codex-01a13045",
+          "type": "scout",
+          "state": "working",
+          "coord": {
+            "q": 0,
+            "r": 1
+          },
+          "x": 0,
+          "y": 90
+        },
+        "mapObservedAt": 1791811341444
+      },
+      "B": {
+        "api": {
+          "at": 1791811743.050247,
+          "sessions": [
+            {
+              "sessionId": "codex-01a13045-8b60-7d20-b303-a3adf5fa892a",
+              "source": "suvadu",
+              "agent": "openai-codex",
+              "profile": "",
+              "origin": "",
+              "section": "",
+              "model": "gpt-6.1-sol",
+              "repo": "formal-math-lab",
+              "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9mb3JtYWwtbWF0aC1sYWI",
+              "active": true,
+              "state": "working",
+              "unit": "ext-openai-codex-01a13045",
+              "unitType": "scout",
+              "firstActivityAt": 1791811300486,
+              "lastActivityAt": 1791811630997,
+              "commandCount": 2,
+              "eventCount": 12,
+              "totalTokens": 84680,
+              "subagent": false,
+              "imported": true,
+              "liveChat": {
+                "state": "unavailable",
+                "transport": null,
+                "reason": "unsupported_session_source"
+              }
+            }
+          ],
+          "agents": [
+            {
+              "unit": "ext-openai-codex-01a13045",
+              "unitType": "scout",
+              "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9mb3JtYWwtbWF0aC1sYWI",
+              "state": "working",
+              "agent": "openai-codex",
+              "model": "gpt-6.1-sol",
+              "repo": "formal-math-lab",
+              "mission": "openai-codex · gpt-6.1-sol",
+              "firstActivityAt": 1791811300486,
+              "lastActivityAt": 1791811630997,
+              "commandCount": 2,
+              "eventCount": 12,
+              "totalTokens": 84680
+            }
+          ],
+          "expectedRepo": "financial-lab",
+          "passed": false
+        },
+        "mapUnit": {
+          "id": "ext-openai-codex-01a13045",
+          "type": "scout",
+          "state": "working",
+          "coord": {
+            "q": 0,
+            "r": 1
+          },
+          "x": 0,
+          "y": 90
+        },
+        "mapObservedAt": 1791811647990
+      },
+      "settled": {
+        "at": 1791811883.7197733,
+        "sessions": [
+          {
+            "sessionId": "codex-01a13045-8b60-7d20-b303-a3adf5fa892a",
+            "source": "suvadu",
+            "agent": "openai-codex",
+            "profile": "",
+            "origin": "",
+            "section": "",
+            "model": "gpt-6.1-sol",
+            "repo": "formal-math-lab",
+            "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9mb3JtYWwtbWF0aC1sYWI",
+            "active": false,
+            "state": "inactive",
+            "unit": null,
+            "unitType": "scout",
+            "firstActivityAt": 1791811300486,
+            "lastActivityAt": 1791811783792,
+            "commandCount": 2,
+            "eventCount": 13,
+            "totalTokens": 84680,
+            "subagent": false,
+            "imported": true,
+            "liveChat": {
+              "state": "unavailable",
+              "transport": null,
+              "reason": "unsupported_session_source"
+            }
+          }
+        ],
+        "agents": []
+      },
+      "identityPreserved": true,
+      "singleUnitInObservedSnapshots": true,
+      "metricsPreserved": true,
+      "locationPassed": false,
+      "toolResults": [
+        {
+          "id": "call_8502b2b4c9a742cfb9026b92057a2457",
+          "exitCode": 0,
+          "observedCwd": "/home/gris96/.hermes/workspace/ACTIVE/formal-math-lab"
+        },
+        {
+          "id": "call_1bd3dfd8764f45ec985388a8427d9934",
+          "exitCode": 0,
+          "observedCwd": "/home/gris96/.hermes/workspace/ACTIVE/financial-lab"
+        }
+      ]
+    }
+  },
+  "overallPassed": false,
+  "codexDiagnosis": {
+    "nativeTool": "exec",
+    "nestedTool": "tools.exec_command",
+    "nestedWorkdir": "financial-lab",
+    "adapterDoesNotParseCode": true,
+    "offlineReproduction": {
+      "warning": "Reconstructed adapter input from native rollout, not intercepted hook stdin",
+      "toolName": "exec",
+      "parsedPayload": {
+        "cli": "codex",
+        "event": "tool_use",
+        "session_id": "01a13045-8b60-7d20-b303-a3adf5fa892a",
+        "cwd": "/home/gris96/.hermes/workspace/ACTIVE/formal-math-lab",
+        "authority": "cwd"
+      },
+      "codeNotParsed": true
+    },
+    "hookStdinCaptured": false,
+    "status": "strong diagnosis; exact native hook stdin not intercepted"
+  },
+  "repoStatusUnchanged": {
+    "formal-math-lab": true,
+    "financial-lab": true
+  },
+  "cleanup": {
+    "testProcessesExited": true,
+    "testTmuxSessionGone": true,
+    "bridgeHealthOk": true
+  }
+}

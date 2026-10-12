@@ -44,6 +44,7 @@ import {
   toggleHarnessPanel,
   startHarnessPolling,
   toggleTaskPanel,
+  toggleKanbanPanel,
   togglePendingPanel,
   toggleLogPanel,
   isHarnessPanelOpen,
@@ -61,6 +62,7 @@ import { wireHUD, selectHero } from './ui/hudWiring.ts';
 import { nextSessionUnitId, spawnAcceptedSession } from './ui/hudWiring/spawn.ts';
 import { buildAgentSessionCommand } from './ui/agentSessionStart.ts';
 import { subscribeExternalSessionDirectory } from './ui/externalSessionDirectory.ts';
+import { bindAgentAttentionStrip } from './ui/agentAttentionStrip.ts';
 import { bindAgentsPanel, openExternalAgentChat, toggleAgentsPanel } from './ui/agentsPanel.ts';
 import { isExternalAgentUnit } from './externalAgents.ts';
 import { initHudMode } from './ui/hudMode.ts';
@@ -105,12 +107,6 @@ import { bindSlashCommandState } from './ui/chat/slashCommands.ts';
 import { ensureWondersLoaded, listIframeWonders } from './wonders/manifest.ts';
 import { findCityByWonderSelection, findNearbyCities } from './wonders/cityLookup.ts';
 import type { City } from './types.ts';
-import {
-  toggleLayerPanel,
-  initLayerPanel,
-  setOnCleanModeChange,
-  isCleanMode,
-} from './ui/layerPanel.ts';
 import { resolveInitialRenderMode } from './three/renderMode.ts';
 import { HEX_SIZE } from './constants.ts';
 import { logger } from './logger.ts';
@@ -324,14 +320,6 @@ async function bootstrap() {
     // inherits the new theme automatically.
   });
 
-  // ══ Layer panel wiring ══
-  initLayerPanel();
-  document.getElementById('btn-layers')?.addEventListener('click', toggleLayerPanel);
-  // Wire clean mode changes to renderer
-  setOnCleanModeChange((active) => {
-    renderer?.setCleanMode(active);
-  });
-
   // ══ Imperial random salute (Whimsy) ══
   const salutes = [
     { icon: '⬡', line: 'El Imperio te espera.', sub: 'Nueva era de desarrollo.' },
@@ -501,7 +489,6 @@ async function bootstrap() {
   const renderer = new Renderer(canvas, state);
   const bootRenderMode = resolveInitialRenderMode();
   await renderer.applyInitialRenderMode(bootRenderMode);
-  renderer.setCleanMode(isCleanMode());
   await renderer.loadAssets();
   const capital = world.cities.find((c) => c.isCapital) ?? world.cities[0];
   if (world.tiles.size === 0) {
@@ -727,6 +714,7 @@ async function bootstrap() {
   document.getElementById('btn-toggle-3d')?.addEventListener('click', toggleView);
   document.getElementById('btn-approvals')?.addEventListener('click', toggleApprovalPanel);
   document.getElementById('btn-tasks')?.addEventListener('click', toggleTaskPanel);
+  document.getElementById('btn-kanban')?.addEventListener('click', toggleKanbanPanel);
 
   // ─── Idle agent finder (Age of Empires pattern) ─────────────────────
   // Uses the shared singleton so the cycle index stays in sync with the
@@ -815,6 +803,7 @@ async function bootstrap() {
   const analyticsPanels = {
     'btn-approvals': 'approvals',
     'btn-tasks': 'tasks',
+    'btn-kanban': 'kanban',
     'btn-pending': 'pending',
     'btn-log': 'log',
     'btn-agents': 'agents',
@@ -1281,6 +1270,8 @@ async function bootstrap() {
       return { ok: true, unitId };
     },
   });
+
+  bindAgentAttentionStrip(state);
 
   // Keep the unit panel in sync with state; external (Suvadu ext-*) selection
   // routes to the Agents panel instead of the mission composer.

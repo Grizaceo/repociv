@@ -28,9 +28,10 @@ These components are used daily and have passing test suites:
 - GPU monitoring (VRAM + temperature via nvidia-smi)
 - Tech debt scanner
 - SSE real-time event streaming
-- 11 UI panels (terminal, priority, approval, ledger, quest, timeline, etc.)
-  — 5 panels pruned 2026-08-10 (replay, observability, timeline, quest board,
-  ledger) after endpoint telemetry showed zero usage; recovery kept (contextual)
+- Operational panels: agent directory, terminal, priority, approvals, recovery,
+  Hermes Kanban (F6, canonical read-only stores), active tasks / local agent
+  processes (F9), settings and contextual assignment/construction.
+  Retired controls: layers, ledger, Quest Board, replay, observability, timeline.
 - Systemd integration for persistent operation
 - Security Harness (3-layer: gate, audit, runtime)
 - FrugalGPT Router (cost-aware model selection)

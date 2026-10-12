@@ -21,6 +21,13 @@ Excepciones: solo `GET /health` y `GET /ready` no requieren token (utilizados po
 
 ## Endpoints
 
+### Hermes Kanban
+
+- `GET /api/kanban?board=<slug>`: tareas de las bases canónicas de Hermes (solo lectura).
+- `GET /api/kanban/boards`: lista de tableros compartidos.
+- `POST /api/kanban/boards`: crea un tablero con `{ "slug": "mi-proyecto", "name": "Mi proyecto", "project_path": "/ruta/absoluta/existente" }`.
+  Usa la CLI soportada `hermes kanban boards create`, con `--default-workdir`, nunca SQL de escritura. `slug` debe ser minúsculo y válido (1–64 caracteres); `default` está reservado. Nombre requerido (hasta 120 caracteres), ruta local existente absoluta o `~/`. Devuelve `201` con `board` y `project_path`, `400` por datos inválidos, `409` por ID existente, `503` por CLI no disponible, `502` si falla creación/verificación y `504` por timeout (revisar la lista antes de reintentar). No cambia `current` ni inicia agentes. Auth y límites del bridge se aplican también a este POST.
+
 ### Health & Readiness
 
 | Method | Path | Descripción |
@@ -188,6 +195,16 @@ Sin prompts, comandos ni `cwd`. Los mismos datos llegan al mapa como `unit_spawn
 - La sesión está cerrada: el bridge lanza un proceso que la reanuda y corre **un** turno. No es un chat en vivo. Ver `docs/EXTERNAL_AGENTS.md` → Responder.
 - Rechazos: `409 session_is_live` (su proceso sigue vivo), `409 already_running`, `409 needs_approval` y `403 blocked_by_policy` (política), `400 empty_message` / `no_resume_path`, `404 unknown_session`, `503 tracker_not_running`.
 - El turno corre con los mismos permisos que las misiones propias de RepoCiv. Las palancas para exigir aprobación están en `docs/EXTERNAL_AGENTS.md`.
+
+| Method | Path | Descripción |
+|--------|------|-------------|
+| POST | `/api/agent-events` | Pista de ubicación enviada por los hooks nativos de Claude Code / Codex / Hermes (**solo metadatos**) |
+
+Body: `{cli: "claude"|"codex"|"hermes", event: "session_start"|"turn_start"|"tool_use"|"turn_end"|"session_end"|"position", session_id, cwd, authority?: "tool"|"cwd", profile?}`. `profile` solo aplica a Hermes.
+- Response 200: `{accepted: true, changed, cli, session_id, profile, event, cityId, repo}`, o `{accepted: false, reason: "unmapped"}` si la ruta no cae en un repo seleccionado.
+- El servidor resuelve la ciudad desde `cwd` e ignora cualquier `cityId` o `unitId` del cliente. Una pista no crea unidades: se aplica cuando una fuente existente verifica esa sesión.
+- Rechazos: `400 invalid_position`, `401` (token ausente o erróneo), `503 position_auth_required` (bridge sin `REPOCIV_TOKEN`: este endpoint no admite el bypass de dev), `503 tracker_not_running` / `position_unavailable`.
+- Cada cambio de ciudad deja una fila `AgentPosition:<event>` en `events.jsonl` con `{cli, profile, sessionId, cityId}`. Ver `docs/AGENT_POSITION_HOOKS.md`.
 
 **`/subagents/cancel`** — Body:
 ```json
@@ -518,6 +535,8 @@ Restringido a:
 ## Rate Limit
 
 60 requests/minuto por IP (in-memory, resetea al reiniciar).
+
+`POST /api/agent-events` tiene un presupuesto aparte de 600 requests/minuto por IP, que no consume el anterior.
 
 ---
 

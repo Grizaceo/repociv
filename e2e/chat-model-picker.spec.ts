@@ -23,30 +23,62 @@ const MOCK_PROVIDERS = {
   ],
   providers: [
     {
-      id: 'openai-api', name: 'OpenAI', available: true, defaultModel: 'gpt-4o',
+      id: 'openai-api',
+      name: 'OpenAI',
+      available: true,
+      defaultModel: 'gpt-4o',
       models: [
         { id: 'gpt-4o', name: 'GPT-4o', harnesses: ['hermes', 'claude-code'], reachable: true },
-        { id: 'gpt-4o-mini', name: 'GPT-4o mini', harnesses: ['hermes', 'claude-code'], reachable: true },
+        {
+          id: 'gpt-4o-mini',
+          name: 'GPT-4o mini',
+          harnesses: ['hermes', 'claude-code'],
+          reachable: true,
+        },
         { id: 'o1', name: 'o1', harnesses: ['hermes', 'claude-code'], reachable: false },
       ],
     },
     {
-      id: 'anthropic', name: 'Anthropic', available: true, defaultModel: 'claude-opus-4-8',
+      id: 'anthropic',
+      name: 'Anthropic',
+      available: true,
+      defaultModel: 'claude-opus-4-8',
       models: [
-        { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', harnesses: ['hermes', 'claude-code'], reachable: true },
-        { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', harnesses: ['hermes', 'claude-code'], reachable: true },
-        { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', harnesses: ['hermes', 'claude-code'], reachable: true },
+        {
+          id: 'claude-opus-4-8',
+          name: 'Claude Opus 4.8',
+          harnesses: ['hermes', 'claude-code'],
+          reachable: true,
+        },
+        {
+          id: 'claude-sonnet-4-6',
+          name: 'Claude Sonnet 4.6',
+          harnesses: ['hermes', 'claude-code'],
+          reachable: true,
+        },
+        {
+          id: 'claude-haiku-4-5',
+          name: 'Claude Haiku 4.5',
+          harnesses: ['hermes', 'claude-code'],
+          reachable: true,
+        },
       ],
     },
     {
-      id: 'ollama-cloud', name: 'Ollama Cloud', available: true, defaultModel: 'deepseek-v4-pro',
+      id: 'ollama-cloud',
+      name: 'Ollama Cloud',
+      available: true,
+      defaultModel: 'deepseek-v4-pro',
       models: [
         { id: 'deepseek-v4-pro', name: 'DeepSeek v4 Pro', harnesses: ['hermes'], reachable: true },
         { id: 'qwen-3', name: 'Qwen 3', harnesses: ['hermes'], reachable: false },
       ],
     },
     {
-      id: 'xai', name: 'xAI', available: false, defaultModel: 'grok-3',
+      id: 'xai',
+      name: 'xAI',
+      available: false,
+      defaultModel: 'grok-3',
       models: [{ id: 'grok-3', name: 'Grok 3', harnesses: ['hermes'], reachable: false }],
     },
   ],
@@ -80,7 +112,11 @@ async function seedRepoSelection(page: Page) {
   await page.evaluate((p) => {
     window.localStorage.setItem(
       'repociv:selected-repos:v1',
-      JSON.stringify({ version: 1, selectedRepoPaths: p, filters: { owners: [], topics: [], languages: [] } }),
+      JSON.stringify({
+        version: 1,
+        selectedRepoPaths: p,
+        filters: { owners: [], topics: [], languages: [] },
+      }),
     );
     // Skip the first-run coachmark tour: its card captures the Enter key
     // that the chat-opening flow needs.
@@ -93,7 +129,12 @@ async function boot(page: Page) {
   await seedRepoSelection(page);
   await page.goto('/');
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
-  if (await page.locator('#repo-onboarding').isVisible().catch(() => false)) {
+  if (
+    await page
+      .locator('#repo-onboarding')
+      .isVisible()
+      .catch(() => false)
+  ) {
     await page.locator('#repo-onboarding-next').click();
     await page.locator('#repo-onboarding-next').click();
     await expect(page.locator('#repo-onboarding')).toBeHidden({ timeout: 20_000 });
@@ -112,7 +153,12 @@ async function openChat(page: Page) {
   // could select a different city/unit).
   await page.locator('#main-canvas').focus();
   await page.keyboard.press('Enter');
-  if (!(await page.locator('#side-panel').isVisible().catch(() => false))) {
+  if (
+    !(await page
+      .locator('#side-panel')
+      .isVisible()
+      .catch(() => false))
+  ) {
     await slot.click({ force: true });
     await page.locator('#main-canvas').focus();
     await page.keyboard.press('Enter');
@@ -164,12 +210,14 @@ test('/model picker: aísla el teclado global (Tab fija foco; Esc y hotkeys no e
 
   // Fuerza el foco a una fila <button> — el vector exacto del bug original: con
   // el keydown sólo en el input, las teclas se filtraban al handler global.
-  await page.locator('.slash-picker-item').first().evaluate((el) => (el as HTMLElement).focus());
+  await page
+    .locator('.slash-picker-item')
+    .first()
+    .evaluate((el) => (el as HTMLElement).focus());
 
-  // 'h' (hotkey global → panel de Capas) NO debe abrir nada: el handler global
-  // se cortocircuita mientras el picker está abierto (isPickerOpen).
-  await page.keyboard.press('h');
-  await expect(page.locator('#layer-panel')).toBeHidden();
+  // F9 must not open tasks under the modal picker.
+  await page.keyboard.press('F9');
+  await expect(page.locator('#task-panel')).toBeHidden();
   await expect(page.locator('.slash-picker')).toBeVisible();
 
   // Esc cierra sólo el picker, no el panel lateral — aun con foco en la fila.
@@ -192,7 +240,9 @@ test('/model picker: number-pick aplica y confirma', async ({ page }) => {
   await expect(page.locator('#model-selector')).toHaveValue('gpt-4o-mini');
   // El chip activo muestra el modelo elegido en su línea (R3).
   await expect(page.locator('.chat-agent-chip.active .chip-model')).toContainText('gpt-4o-mini');
-  await page.locator('#chat-agent-selector-row').screenshot({ path: 'e2e/_shots/chip-model-line.png' });
+  await page
+    .locator('#chat-agent-selector-row')
+    .screenshot({ path: 'e2e/_shots/chip-model-line.png' });
 });
 
 test('/model picker: el harness filtra los providers compatibles (R2)', async ({ page }) => {
