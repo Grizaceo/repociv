@@ -1,0 +1,133 @@
+{
+  "hermes": {
+    "unit": "ext-hermes-c8fc9fd1",
+    "firstRepo": "formal-math-lab",
+    "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9mb3JtYWwtbWF0aC1sYWI",
+    "nativeHookExit": 0,
+    "elapsedSeconds": 0.221,
+    "mode": "controlled replay through native Hermes diagnostic, existing session identity"
+  },
+  "mapProof": [
+    {
+      "unit": [
+        {
+          "id": "ext-hermes-c8fc9fd1",
+          "type": "hero",
+          "state": "working",
+          "coord": {
+            "q": 0,
+            "r": 1
+          },
+          "x": 0,
+          "y": 90
+        }
+      ],
+      "sessions": [
+        {
+          "sessionId": "hermes-default-20261012_055148_cf6dd0",
+          "unit": "ext-hermes-c8fc9fd1",
+          "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9mb3JtYWwtbWF0aC1sYWI",
+          "repo": "formal-math-lab"
+        }
+      ]
+    },
+    {
+      "unit": [
+        {
+          "id": "ext-hermes-c8fc9fd1",
+          "type": "hero",
+          "state": "working",
+          "coord": {
+            "q": 2,
+            "r": 3
+          },
+          "x": 156,
+          "y": 360
+        }
+      ],
+      "sessions": [
+        {
+          "sessionId": "hermes-default-20261012_055148_cf6dd0",
+          "unit": "ext-hermes-c8fc9fd1",
+          "cityId": "repo:L2hvbWUvZ3Jpczk2Ly5oZXJtZXMvd29ya3NwYWNlL0FDVElWRS9maW5hbmNpYWwtbGFi",
+          "repo": "financial-lab"
+        }
+      ]
+    }
+  ],
+  "checks": {
+    "pythonPassed": 1329,
+    "pythonSkipped": 2,
+    "frontendPassed": 1126,
+    "completeGate": "scripts/check.sh exit 0",
+    "preservedExistingHooks": true,
+    "codexTrustedEntries": 9,
+    "clientMode": "0600"
+  },
+  "postAudit": {
+    "regressionRedFailures": 7,
+    "targetedPassed": 134,
+    "backendPassed": 1342,
+    "backendSkipped": 2,
+    "ruff": "server check exit 0",
+    "realHTTPFailureRecovery": "503 \u2192 400 \u2192 200 (three isolated BridgeHandler tests)",
+    "liveReloadedBridge": [
+      {
+        "cli": "claude",
+        "accepted": true,
+        "phantomSession": false
+      },
+      {
+        "cli": "codex",
+        "accepted": true,
+        "phantomSession": false
+      }
+    ],
+    "identityPolicy": "location-only; wait for verified source; no synthetic units"
+  },
+  "secondAudit": {
+    "reportedLiveDuplicatesConfirmed": false,
+    "currentOwnedHookCounts": {
+      "claude": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "PostToolUse": 1,
+        "PostToolUseFailure": 1,
+        "Stop": 1,
+        "SessionEnd": 1
+      },
+      "codex": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "PostToolUse": 1,
+        "Stop": 1,
+        "SessionEnd": 1
+      },
+      "hermes": {
+        "on_session_start": 1,
+        "post_tool_call": 1,
+        "on_session_end": 1,
+        "on_session_finalize": 1
+      }
+    },
+    "redFailures": 12,
+    "focusedReverseOrderPassed": 55,
+    "pythonPassed": 1355,
+    "pythonSkipped": 2,
+    "frontendPassed": 1126,
+    "completeGate": "scripts/check.sh exit 0",
+    "mypy": "not installed; skipped",
+    "knip": "report only",
+    "liveReloadedBridge": {
+      "healthOK": true,
+      "invalidHookRequests": 61,
+      "invalidHookStatus": 400,
+      "ordinaryUnknownPostStatus": 404,
+      "unauthenticatedHookStatus": 401
+    },
+    "positionRateLimitPerMinute": 600,
+    "interactiveRateLimitPerMinute": 60,
+    "authOffPositionEndpoint": "503 position_auth_required (isolated real HTTP test)",
+    "busyPoll": "hint accepted immediately; reconcile on next source poll"
+  }
+}
