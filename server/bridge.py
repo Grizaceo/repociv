@@ -161,17 +161,21 @@ _MAX_BODY = 128 * 1024  # 128 KB
 # ─── Rate limiter (per-IP, in-memory) ────────────────────────────────────────
 _rate_lock = threading.Lock()
 _rate_buckets: dict[str, list[float]] = {}
+_position_rate_buckets: dict[str, list[float]] = {}
+_POSITION_RATE_LIMIT = 600  # independent telemetry budget; never consumes UI writes
 _RATE_LIMIT = 60
 _RATE_WINDOW = 60.0
 
 
-def _rate_check(ip: str) -> bool:
+def _rate_check(ip: str, *, position: bool = False) -> bool:
     """Return True if request is allowed, False if rate-limited."""
     now = time.time()
     with _rate_lock:
-        bucket = _rate_buckets.setdefault(ip, [])
+        buckets = _position_rate_buckets if position else _rate_buckets
+        limit = _POSITION_RATE_LIMIT if position else _RATE_LIMIT
+        bucket = buckets.setdefault(ip, [])
         bucket[:] = [t for t in bucket if now - t < _RATE_WINDOW]
-        if len(bucket) >= _RATE_LIMIT:
+        if len(bucket) >= limit:
             return False
         bucket.append(now)
         return True
@@ -603,7 +607,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         return self.client_address[0] if self.client_address else "unknown"
 
     def _rate_limited(self) -> bool:
-        return not _rate_check(self._client_ip())
+        return not _rate_check(self._client_ip(), position=self.path.split("?", 1)[0] == "/api/agent-events")
 
     def do_OPTIONS(self) -> None:
         self.send_response(200)
@@ -829,6 +833,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self._err_json(404, "not found")
 
     def do_POST(self) -> None:
+        # Telemetry can change another session's placement; never allow an
+        # auth-off dev bridge to accept these writes (even on loopback).
+        if self.path.split("?", 1)[0] == "/api/agent-events" and not REPOCIV_TOKEN:
+            self._err_json(503, "position_auth_required")
+            return
+
         # Token auth first: an unauthenticated caller must not be able to
         # consume another IP's rate-limit budget (or trip the limiter at all).
         if not self._check_token():

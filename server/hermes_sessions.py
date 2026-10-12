@@ -510,6 +510,7 @@ class HermesSource:
             profile=profile,
             origin=origin,
             work_dirs=cache.work_dirs(row, lin.chain),
+            related_native_ids=tuple(lin.chain),
         )
 
     def status(self) -> dict[str, Any]:
