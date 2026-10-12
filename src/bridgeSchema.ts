@@ -187,6 +187,11 @@ const Schemas = [
     risk: v.string(),
   }),
   v.object({
+    type: v.literal('approval_expired'),
+    commandId: v.string(),
+    reason: v.string(),
+  }),
+  v.object({
     type: v.literal('chat_chunk'),
     unit: v.string(),
     text: v.string(),

@@ -308,7 +308,13 @@ def start_worker() -> None:
 
 
 def _worker_loop() -> None:
+    from server.approval_store import expire_approvals
+
     while True:
+        try:
+            expire_approvals()
+        except Exception as e:
+            logger.error(f"[scheduler] approval sweep error: {e}")
         try:
             dispatched = True
             while dispatched:
