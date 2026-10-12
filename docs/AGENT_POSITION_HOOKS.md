@@ -72,7 +72,10 @@ cuenta como primera ubicación.
 - Si falla la escritura, el hook igual recibe 200.
 
 Verificado con dos pruebas dirigidas y contra un event store real en un directorio
-temporal (4 pistas → 3 filas). No se observó en el bridge vivo: requiere reiniciarlo.
+temporal (4 pistas → 3 filas). En el bridge vivo, tras reiniciarlo, dos sesiones
+reales de Claude Code dejaron una fila cada una: una en la capital y otra en un
+repo seleccionado. Las pistas siguientes de la misma sesión no agregaron filas.
+No se observó en vivo un cambio de ciudad ni un cierre de sesión.
 
 ## Eventos y consentimiento
 
