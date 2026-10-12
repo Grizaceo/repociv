@@ -746,7 +746,7 @@ export class LocalWorldManager {
       isResting: false,
       effectiveSpeed: 1,
       ephemeral: true,
-      // A5: tier from the spawn payload (nebius-direct) for the tier ring
+      // tier from the spawn payload for the tier ring
       tier: payload.tier,
     });
     this.assignDesk(this.localUnits[this.localUnits.length - 1]!);
