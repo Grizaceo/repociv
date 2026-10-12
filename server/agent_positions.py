@@ -144,6 +144,24 @@ class PositionStore:
         return (obs.position_city_id, obs.position_repo) if obs.position_city_id in valid_ids else None
 
 
+def _record_change(result: dict[str, Any]) -> None:
+    """Durable trail of city changes only: never the cwd or tool arguments.
+
+    commandId stays empty. A native session ID is not a RepoCiv command, and the
+    activity panel groups rows into runs by commandId.
+    """
+    if not (result.get("accepted") and result.get("changed")):
+        return
+    try:
+        from server import event_store
+
+        event_store.record_event(f"AgentPosition:{result['event']}", {
+            "cli": result["cli"], "profile": result["profile"],
+            "sessionId": result["session_id"], "cityId": result["cityId"]})
+    except Exception:
+        pass  # A failed append must not turn an accepted hint into a failed hook.
+
+
 def post_agent_events(body: Any, _ctx: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     """Auth/body/rate-limit guards are the existing BridgeHandler's responsibility."""
     from server import suvadu_tracker as st
@@ -156,4 +174,5 @@ def post_agent_events(body: Any, _ctx: dict[str, Any]) -> tuple[int, dict[str, A
         return 400, {"error": "invalid_position"}
     except Exception:
         return 503, {"error": "position_unavailable"}
+    _record_change(result)
     return 200, result

@@ -317,3 +317,42 @@ def test_hook_accepted_during_poll_then_applied(workspace):
         assert future.result(timeout=1)["accepted"]
     tracker.reconcile([obs], NOW, [str(a), str(b)])
     assert tracker.agents()[0]["repo"] == "b"
+
+
+def _posting_tracker(monkeypatch, *repos):
+    tracker = st.ExternalAgentTracker(st.TrackerConfig(bin_path="unused"), send=lambda _: None,
+        sources=[], repo_paths=lambda: [str(r) for r in repos], clock=lambda: NOW / 1000)
+    monkeypatch.setattr(st, "_tracker", tracker)
+    return lambda path, event="tool_use": ap.post_agent_events(
+        {"cli": "claude", "session_id": "uuid", "event": event, "cwd": str(path), "authority": "tool"}, {})
+
+
+def test_city_changes_are_recorded_once_without_cwd(monkeypatch, workspace, tmp_path):
+    from server import event_store
+    a, b = workspace
+    post = _posting_tracker(monkeypatch, a, b)
+    recorded = []
+    monkeypatch.setattr(event_store, "record_event", lambda kind, data, **kw: recorded.append((kind, data, kw)))
+    assert post(a / "src", "session_start")[0] == 200
+    post(a / "src")
+    post(a)  # same city: no new row
+    post(b / "src")
+    assert post(tmp_path / "elsewhere")[1] == {"accepted": False, "reason": "unmapped"}
+    assert recorded == [
+        ("AgentPosition:session_start", {"cli": "claude", "profile": "", "sessionId": "uuid",
+                                         "cityId": st.encode_repo_id(str(a))}, {}),
+        # No commandId: a native session is not a RepoCiv run.
+        ("AgentPosition:tool_use", {"cli": "claude", "profile": "", "sessionId": "uuid",
+                                    "cityId": st.encode_repo_id(str(b))}, {}),
+    ]
+
+
+def test_event_store_failure_does_not_fail_the_hook(monkeypatch, workspace):
+    from server import event_store
+    a, _ = workspace
+    post = _posting_tracker(monkeypatch, a)
+    def full_disk(*_args, **_kwargs):
+        raise OSError("no space left")
+    monkeypatch.setattr(event_store, "record_event", full_disk)
+    status, body = post(a)
+    assert status == 200 and body["accepted"]
