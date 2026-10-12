@@ -38,10 +38,43 @@ def _family(argv: list[str], comm: str) -> str | None:
     return None
 
 
+def process_identity(pid: int, proc_root: Path = Path("/proc")) -> str | None:
+    """Boot + PID + kernel start ticks; PID alone is never historical identity."""
+    try:
+        boot = (proc_root / "sys/kernel/random/boot_id").read_text().strip()
+        stat = (proc_root / str(pid) / "stat").read_text()
+        ticks = stat[stat.rindex(")") + 2:].split()[19]
+        return f"{boot}:{pid}:{ticks}" if boot and ":" not in boot and ticks.isdigit() else None
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def record_process_binding(pid: int, command_id: str, unit_id: str) -> None:
+    """Persist explicit owner evidence only, with no argv/env/output."""
+    if not isinstance(pid, int) or pid <= 0:
+        return
+    identity = process_identity(pid)
+    if identity is not None:
+        from server import event_store
+        try:
+            event_store.record_event("ProcessBound", {
+            "commandId": command_id, "agentId": unit_id,
+            "pid": pid, "processIdentity": identity,
+            })
+        except OSError:
+            # Optional correlation must never abort an agent execution.
+            import logging
+            logging.getLogger(__name__).warning("Process binding unavailable")
+
+
 def snapshot(proc_root: Path = Path("/proc"), uid: int | None = None) -> dict[str, Any]:
     uid = os.getuid() if uid is None else uid
     table: dict[int, dict[str, Any]] = {}
     unreadable = 0
+    try:
+        boot = (proc_root / "sys/kernel/random/boot_id").read_text().strip()
+    except OSError:
+        boot = ""
     try:
         entries = list(proc_root.iterdir())
     except OSError:
@@ -59,7 +92,8 @@ def snapshot(proc_root: Path = Path("/proc"), uid: int | None = None) -> dict[st
             argv = (entry / "cmdline").read_bytes().decode("utf-8", errors="replace").strip("\0").split("\0")
             pid = int(entry.name)
             table[pid] = {"pid": pid, "ppid": int(fields[1]), "name": comm,
-                          "state": fields[0], "family": _family(argv, comm)}
+                          "state": fields[0], "family": _family(argv, comm),
+                          "processIdentity": f"{boot}:{pid}:{fields[19]}" if boot and len(fields) > 19 and fields[19].isdigit() else None}
         except (OSError, ValueError, IndexError):
             unreadable += 1  # Includes exit races; never imply a complete machine census.
     related = {pid: row["family"] for pid, row in table.items() if row["family"]}

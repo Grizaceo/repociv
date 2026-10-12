@@ -901,6 +901,8 @@ def _run_hermes_cli_streaming(
         text=True, bufsize=1, cwd=working_dir or None,
         env=env,
     )
+    from server.agent_processes import record_process_binding
+    record_process_binding(getattr(proc, "pid", 0), mission_id, unit_id)
 
     output_buf: list[str] = []
     assert proc.stdout is not None
@@ -987,6 +989,8 @@ def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, bufsize=1, cwd=working_dir or None,
                             env=redact_env_for_spawn())
+    from server.agent_processes import record_process_binding
+    record_process_binding(getattr(proc, "pid", 0), mission_id, unit_id)
     output_buf: list[str] = []
     assert proc.stdout is not None
     ctx = _harness_ctx(unit_id, mission_id, city_id, "claude-code", working_dir, model=model)
@@ -1135,6 +1139,8 @@ def _run_cursor_agent_streaming(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, bufsize=1, cwd=working_dir or None,
     )
+    from server.agent_processes import record_process_binding
+    record_process_binding(getattr(proc, "pid", 0), mission_id, unit_id)
     output_buf: list[str] = []
     assert proc.stdout is not None
     ctx = _harness_ctx(unit_id, mission_id, city_id, "cursor", working_dir, model=model)
@@ -1181,6 +1187,8 @@ def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
         cmd.extend(["--model", model])
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=working_dir or None,
                             env=redact_env_for_spawn())
+    from server.agent_processes import record_process_binding
+    record_process_binding(getattr(proc, "pid", 0), mission_id, unit_id)
     output_buf: list[str] = []
     assert proc.stdout is not None
     for line in proc.stdout:
@@ -1234,6 +1242,8 @@ def _run_codex_streaming(unit_id: str, mission_id: str, mission: str,
         cwd=working_dir or None,
         env=redact_env_for_spawn(),
     )
+    from server.agent_processes import record_process_binding
+    record_process_binding(getattr(proc, "pid", 0), mission_id, unit_id)
     _, stderr_text = proc.communicate(timeout=600)
 
     if proc.returncode != 0:

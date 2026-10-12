@@ -4,6 +4,22 @@
 // Filter <select> by event type; "Clear" button resets local view buffer.
 import { bridgeUrl, bridgeHeaders } from '../bridgeEnv.ts';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
+import {
+  activityColor,
+  activityPanels,
+  projectActivityMetadata,
+  mergeActivityPages,
+  registerActivityPanel,
+  activitySelection,
+  eventKey,
+  confirmedOutcome,
+  processesFor,
+  selectActivity,
+  setActivityEvents,
+  subscribeActivity,
+  activityInventoryWarning,
+} from './activityCorrelation.ts';
+
 import { escapeHtml } from './escapeHtml.ts';
 
 export const POLL_MS = 2_000;
@@ -75,6 +91,9 @@ let _collapsed = false;
 let _buffer: LogEvent[] = [];
 let _offline = false;
 let _filter = '';
+let _legacyBridge = false;
+let _historyBefore: number | null = null;
+let _hasOlder = false;
 
 // Exposed for testing
 export function getLocalBuffer(): LogEvent[] {
@@ -96,6 +115,7 @@ export function toggleLogCollapse(): void {
 }
 
 export function openLogPanel(): void {
+  activityPanels.tasks?.close();
   _visible = true;
   showPanel(_getOrCreate());
   void _fetch();
@@ -133,21 +153,41 @@ function _stopPolling(): void {
 }
 
 // ─── Data fetch ───────────────────────────────────────────────────────────────
-async function _fetch(): Promise<void> {
+let _fetching = false;
+async function _fetch(loadInventory = true): Promise<void> {
+  if (_fetching) return;
+  _fetching = true;
   try {
-    const typeParam = _filter ? `&type=${encodeURIComponent(_filter)}` : '';
-    const res = await fetch(bridgeUrl(`/log?n=100${typeParam}`), { headers: bridgeHeaders() });
+    const res = await fetch(bridgeUrl('/log?n=500&metadata=1&paged=1'), {
+      headers: bridgeHeaders(),
+    });
     if (!res.ok) {
       _offline = true;
       if (_visible) _render();
       return;
     }
-    _buffer = (await res.json()) as LogEvent[];
+    const payload = (await res.json()) as
+      | LogEvent[]
+      | { events: LogEvent[]; before: number; more: boolean };
+    const raw = Array.isArray(payload) ? payload : payload.events;
+    if (!Array.isArray(payload) && _historyBefore === null) {
+      _historyBefore = payload.before;
+      _hasOlder = payload.more;
+    }
+    _legacyBridge = raw.some((e) => 'actor' in e);
+    _buffer = mergeActivityPages(
+      _buffer,
+      raw.filter((e) => e.type !== 'AgentOutputChunk').map(projectActivityMetadata),
+    );
     _offline = false;
+    setActivityEvents(_buffer);
+    if (_visible && loadInventory) await activityPanels.tasks?.refresh();
     if (_visible) _render();
   } catch {
     _offline = true;
     if (_visible) _render();
+  } finally {
+    _fetching = false;
   }
 }
 
@@ -155,7 +195,34 @@ async function _fetch(): Promise<void> {
 function _render(): void {
   const panel = _getOrCreate();
   const body = panel.querySelector<HTMLElement>('.log-body')!;
-  body.innerHTML = buildBodyHTML(_offline ? null : _buffer);
+  const selected = activitySelection();
+  const rows = filterByType(_buffer, _filter).filter((e) => !selected || eventKey(e) === selected);
+  const associated = selected ? processesFor(selected) : [];
+  const focusKey = (document.activeElement as HTMLElement | null)?.dataset['focusId'];
+  body.innerHTML = `<div class="activity-context" role="status">${escapeHtml(selected || 'Todas las ejecuciones')} · ${associated.length} procesos en el último inventario</div>
+    <p>${_legacyBridge ? 'Bridge anterior: ventana histórica limitada; los nuevos vínculos requieren actualizar el bridge.' : 'Historia canónica paginada: hasta 500 metadatos / 256 KiB por consulta. La vista no acredita una historia completa; carga páginas anteriores para buscar vínculos.'} Un comando completado no valida una tarea. Sin proceso no significa éxito.</p>
+    <p>run: identifica un comando; sólo TaskRunLinked acredita su pertenencia al orquestador. Procesos e historia son muestras independientes, no una fotografía atómica.</p>
+    ${_hasOlder ? '<button class="activity-older">Cargar historia anterior</button>' : ''}
+    ${_offline ? '<p role="status">⚠ Bridge offline — vista anterior, posiblemente desactualizada</p>' : ''}
+    ${activityInventoryWarning() ? `<p role="status">⚠ ${escapeHtml(activityInventoryWarning())}</p>` : ''}
+    <div class="activity-processes">${associated.map((p) => `<span>PID ${p.pid} ← PPID ${p.ppid} · raíz ${p.rootPid}</span>`).join(' · ')}</div>
+    ${
+      rows.length
+        ? `<table class="log-table" aria-label="Crónica correlacionada"><thead><tr><th>Hora</th><th>Evento</th><th>Identidad / resultado</th></tr></thead><tbody>${rows
+            .map((e, index) => {
+              const key = eventKey(e);
+              return `<tr><td>${formatTimestamp(e.timestamp)}</td><td>${escapeHtml(e.type)}</td><td>${key ? `<button data-focus-id="${escapeHtml(e.id || `${e.type}:${e.timestamp}:${index}`)}" data-activity="${escapeHtml(key)}" aria-pressed="${key === selected}" style="--activity-color:${activityColor(key)}">⬡ ${escapeHtml(key)}</button>` : 'sin correlación'}<br>${escapeHtml(confirmedOutcome(e))}<br>ejecución: ${escapeHtml(e.commandId || String(e.data?.['commandId'] ?? '—'))} · agente: ${escapeHtml(String(e.data?.['agentId'] ?? 'sin vínculo explícito'))}</td></tr>`;
+            })
+            .join('')}</tbody></table>`
+        : '<p>Sin eventos para esta selección en la ventana disponible; no demuestra ausencia de historial.</p>'
+    }`;
+  body.querySelector<HTMLButtonElement>('.activity-older')?.addEventListener('click', () => {
+    void _fetchOlder();
+  });
+  body.querySelectorAll<HTMLButtonElement>('[data-activity]').forEach((btn) => {
+    btn.onclick = () => selectActivity(btn.dataset['activity'] ?? '');
+    if (focusKey === btn.dataset['focusId']) btn.focus({ preventScroll: true });
+  });
 }
 
 // ─── Panel creation ───────────────────────────────────────────────────────────
@@ -165,7 +232,7 @@ function _getOrCreate(): HTMLElement {
     'log-panel',
     'panel log-panel hidden',
     `<div class="panel-header">
-      <span class="panel-title">📜 Log en vivo</span>
+      <span class="panel-title">📜 ACTIVIDAD · CRÓNICA</span>
       <div class="log-controls">
         <button class="log-toggle" aria-label="Colapsar / desplegar" title="Colapsar / desplegar">▾</button>
         <select class="log-filter" aria-label="Filtrar por tipo">
@@ -175,15 +242,24 @@ function _getOrCreate(): HTMLElement {
           <option value="CommandStarted">CommandStarted</option>
           <option value="CommandCompleted">CommandCompleted</option>
           <option value="CommandFailed">CommandFailed</option>
-          <option value="AgentOutputChunk">AgentOutputChunk</option>
+          <option value="ProcessBound">Proceso vinculado</option><option value="TaskRunLinked">Ejecución vinculada</option><option value="TaskPhaseRecorded">Fase del orquestador</option><option value="CommandCancelled">CommandCancelled</option>
           <option value="CommandRejected">CommandRejected</option>
         </select>
         <button class="log-clear" aria-label="Limpiar vista">Clear</button>
         <button class="log-close" aria-label="Cerrar panel">✕</button>
       </div>
     </div>
+    <nav class="activity-nav" aria-label="Actividad"><button class="activity-tasks">Tareas y procesos</button><button class="activity-reset">Todas las ejecuciones</button></nav>
     <div class="log-body"></div>`,
   );
+  subscribeActivity(() => {
+    if (_visible) _render();
+  });
+  bindPanelAction(_panel, '.activity-tasks', () => {
+    closeLogPanel();
+    activityPanels.tasks?.open();
+  });
+  bindPanelAction(_panel, '.activity-reset', () => selectActivity(''));
   bindPanelAction(_panel, '.log-close', closeLogPanel);
   bindPanelAction(_panel, '.log-toggle', toggleLogCollapse);
   _panel.querySelector('.log-clear')?.addEventListener('click', () => {
@@ -194,4 +270,37 @@ function _getOrCreate(): HTMLElement {
     void _fetch();
   });
   return _panel;
+}
+
+export async function refreshActivityHistory(): Promise<void> {
+  await _fetch(false);
+}
+
+registerActivityPanel('log', {
+  open: openLogPanel,
+  close: closeLogPanel,
+  refresh: refreshActivityHistory,
+});
+
+async function _fetchOlder(): Promise<void> {
+  if (_fetching || !_hasOlder || _historyBefore === null) return;
+  _fetching = true;
+  try {
+    const response = await fetch(
+      bridgeUrl(`/log?n=500&metadata=1&paged=1&before=${_historyBefore}`),
+      { headers: bridgeHeaders() },
+    );
+    if (!response.ok) throw new Error('history unavailable');
+    const page = (await response.json()) as { events: LogEvent[]; before: number; more: boolean };
+    _buffer = mergeActivityPages(page.events.map(projectActivityMetadata), _buffer);
+    _historyBefore = page.before;
+    _hasOlder = page.more;
+    _offline = false;
+    setActivityEvents(_buffer);
+  } catch {
+    _offline = true;
+  } finally {
+    _fetching = false;
+    if (_visible) _render();
+  }
 }

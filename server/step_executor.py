@@ -310,6 +310,14 @@ def dispatch_plan_step(
         _repo: str, _issue_id: str, _step: str, _meta: dict,
     ) -> str:
         _rid = f"step-{uuid.uuid4().hex[:8]}"
+        from server import event_store as _es
+        try:
+            _es.record_event("TaskRunLinked", {
+            "taskKey": f"{_repo}::{_issue_id}", "runId": _rid,
+            "commandId": _rid, "agentId": agent,
+            })
+        except OSError:
+            logger.warning("Task/run binding unavailable")
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _executor:
             _future = _executor.submit(
                 _agent_runner.run_agent,

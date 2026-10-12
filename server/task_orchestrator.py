@@ -79,6 +79,17 @@ def _task_key(repo: str, issue_id: str) -> str:
     return f"{repo}::{issue_id}"
 
 
+def _record_task_phase(task_key: str, state: dict[str, Any]) -> None:
+    """Record what the orchestrator declared, not what a process exit implies."""
+    from server import event_store
+    try:
+        event_store.record_event("TaskPhaseRecorded", {
+            "taskKey": task_key, "phase": state.get("phase", "unknown"),
+        })
+    except OSError:
+        logger.warning("Task phase history unavailable")
+
+
 def _now_iso(ts: float | None = None) -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts or time.time()))
 
@@ -176,6 +187,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                     "startedAt": state.get("startedAt", ""),
                     "updatedAt": _now_iso(),
                 }
+                _record_task_phase(task_key, _registry[task_key])
             return state
 
         # ── Checkpoint gate resume (H4) ──────────────────────────────────
@@ -197,6 +209,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                         "phase": "blocked",
                         "updatedAt": _now_iso(),
                     }
+                    _record_task_phase(task_key, _registry[task_key])
                 return state
             # Human cleared the sentinel → resume execution
             _wi.clear_sentinel(repo, issue_id)
@@ -225,6 +238,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                         "phase": "blocked",
                         "updatedAt": _now_iso(),
                     }
+                    _record_task_phase(task_key, _registry[task_key])
                 return _wi.load_issue_state(repo, issue_id) or {}
 
         # Register as in-flight
@@ -233,6 +247,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                 "phase": "executing",
                 "startedAt": _now_iso(),
             }
+            _record_task_phase(task_key, _registry[task_key])
 
         try:
             # ── Phase: init/any → spec ────────────────────────────────────
@@ -263,6 +278,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                             "phase": "blocked",
                             "updatedAt": _now_iso(),
                         }
+                        _record_task_phase(task_key, _registry[task_key])
                     return _wi.load_issue_state(repo, issue_id) or {}
 
             # ── Phase: spec → planned ─────────────────────────────────────
@@ -286,6 +302,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                             "phase": "blocked",
                             "updatedAt": _now_iso(),
                         }
+                        _record_task_phase(task_key, _registry[task_key])
                     return _wi.load_issue_state(repo, issue_id) or {}
 
             # ── Phase: planned → executing ────────────────────────────────
@@ -344,6 +361,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                             "blockedAtStep": i,
                             "updatedAt": _now_iso(),
                         }
+                        _record_task_phase(task_key, _registry[task_key])
                     return _wi.load_issue_state(repo, issue_id) or {}
                 # Check for cancellation mid-flight
                 current = _wi.load_issue_state(repo, issue_id)
@@ -354,6 +372,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                             "phase": "cancelled",
                             "updatedAt": _now_iso(),
                         }
+                        _record_task_phase(task_key, _registry[task_key])
                     return current
 
                 # Update progress
@@ -563,6 +582,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                                 "consecutiveFailures": consecutive_failures,
                                 "updatedAt": _now_iso(),
                             }
+                            _record_task_phase(task_key, _registry[task_key])
                         # Run on_circuit_open hook if configured
                         try:
                             _circ_result = _rc.run_hook(repo, "on_circuit_open")
@@ -592,6 +612,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                         "phase": "blocked",
                         "updatedAt": _now_iso(),
                     }
+                    _record_task_phase(task_key, _registry[task_key])
                 return _wi.load_issue_state(repo, issue_id) or {}
 
             # ── Phase: executing → validating ──────────────────────────────
@@ -630,6 +651,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                         "validationVerdict": validation_verdict,
                         "updatedAt": _now_iso(),
                     }
+                    _record_task_phase(task_key, _registry[task_key])
                 return _wi.load_issue_state(repo, issue_id) or {}
 
             if validation_verdict == "needs-human-review":
@@ -644,6 +666,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                         "checkpointGate": "post-validation",
                         "updatedAt": _now_iso(),
                     }
+                    _record_task_phase(task_key, _registry[task_key])
                 return _wi.load_issue_state(repo, issue_id) or {}
 
             # ── Phase: validating → complete ───────────────────────────────
@@ -671,6 +694,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                     "startedAt": result.get("startedAt", "") if result else "",
                     "updatedAt": _now_iso(),
                 }
+                _record_task_phase(task_key, _registry[task_key])
             return result or {}
 
         except Exception as e:
@@ -701,6 +725,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                     "lastError": str(e),
                     "updatedAt": _now_iso(),
                 }
+                _record_task_phase(task_key, _registry[task_key])
             raise
 
 
@@ -715,6 +740,7 @@ def run_task_async(repo: str, issue_id: str) -> str:
     # Mark as queued before spawning
     with _registry_lock:
         _registry[task_key] = {"phase": "queued", "startedAt": _now_iso()}
+        _record_task_phase(task_key, _registry[task_key])
 
     def _runner() -> None:
         try:
@@ -820,6 +846,7 @@ def cancel_task(repo: str, issue_id: str) -> bool:
             "phase": "cancelled",
             "updatedAt": _now_iso(),
         }
+        _record_task_phase(task_key, _registry[task_key])
 
     # Clean workspace_state
     try:

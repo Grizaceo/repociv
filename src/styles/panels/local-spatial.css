@@ -137,3 +137,53 @@
 #log-panel.collapsed .log-toggle {
   margin-right: 4px;
 }
+
+/* Shared activity identity: color plus explicit text and keyboard controls. */
+#task-panel,
+#log-panel {
+  width: min(760px, calc(100vw - 16px));
+}
+.activity-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+}
+.activity-context {
+  overflow-wrap: anywhere;
+  padding: 8px 0;
+}
+[data-activity] {
+  border: 1px solid var(--activity-color, var(--ui-border));
+  border-left-width: 4px;
+  color: var(--ui-text);
+  background: var(--ui-panel-bg);
+  padding: 6px;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+[data-activity][aria-pressed='true'] {
+  outline: 2px solid var(--activity-color);
+}
+.activity-nav button:focus-visible,
+[data-activity]:focus-visible {
+  outline: 2px solid var(--ui-gold-bright);
+  outline-offset: 2px;
+}
+.task-body,
+.log-body {
+  overflow-x: auto;
+  min-width: 0;
+}
+.activity-processes {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .log-controls {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  #log-panel .panel-header {
+    flex-wrap: wrap;
+  }
+}
