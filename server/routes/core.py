@@ -909,7 +909,14 @@ def get_log(ctx: "RouteContext") -> tuple[int, Any]:
     if params.get("metadata") == "1":
         # Read the canonical JSONL, not a second history store. Never send prompts,
         # command payloads, output, errors, credentials or arbitrary actor text.
-        safe_fields = {"repo", "taskKey", "runId", "commandId", "agentId", "pid", "processIdentity", "phase"}
+        # ExecutionIdentityRecorded fields (harness, profileName, agentName,
+        # unitId, provider, model, commandType) are safe identity metadata only.
+        safe_fields = {
+            "repo", "taskKey", "runId", "commandId", "agentId", "pid",
+            "processIdentity", "phase",
+            "harness", "profileName", "agentName", "unitId", "provider",
+            "model", "commandType", "unitName",
+        }
         rows = []
         cursor = 0
         path = _es._store_path
@@ -947,6 +954,8 @@ def get_log(ctx: "RouteContext") -> tuple[int, Any]:
                     if not isinstance(data, dict):
                         data = {}
                     safe = {k: v for k, v in data.items() if k in safe_fields and isinstance(v, (str, int))}
+                    if event.get("type") == "CommandCreated" and isinstance(data.get("type"), str):
+                        safe["commandType"] = data["type"]
                     rows.append({"id": event.get("id"), "commandId": event.get("commandId", ""),
                                  "type": event.get("type", ""), "timestamp": event.get("timestamp", 0),
                                  "data": safe, "sourceOffset": offset})

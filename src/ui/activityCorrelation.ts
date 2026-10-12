@@ -148,6 +148,14 @@ export function projectActivityMetadata(row: ActivityEvent): ActivityEvent {
     'pid',
     'processIdentity',
     'phase',
+    'commandType',
+    'harness',
+    'profileName',
+    'agentName',
+    'unitId',
+    'unitName',
+    'provider',
+    'model',
   ]);
   return {
     id: row.id,

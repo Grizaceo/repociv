@@ -20,6 +20,8 @@ import {
   activityInventoryWarning,
 } from './activityCorrelation.ts';
 
+import { activityTitle, presentActivities } from './activityPresentation.ts';
+
 import { escapeHtml } from './escapeHtml.ts';
 
 export const POLL_MS = 2_000;
@@ -94,6 +96,7 @@ let _filter = '';
 let _legacyBridge = false;
 let _historyBefore: number | null = null;
 let _hasOlder = false;
+let _lastRendered = '';
 
 // Exposed for testing
 export function getLocalBuffer(): LogEvent[] {
@@ -199,10 +202,11 @@ function _render(): void {
   const rows = filterByType(_buffer, _filter).filter((e) => !selected || eventKey(e) === selected);
   const associated = selected ? processesFor(selected) : [];
   const focusKey = (document.activeElement as HTMLElement | null)?.dataset['focusId'];
-  body.innerHTML = `<div class="activity-context" role="status">${escapeHtml(selected || 'Todas las ejecuciones')} · ${associated.length} procesos en el último inventario</div>
-    <p>${_legacyBridge ? 'Bridge anterior: ventana histórica limitada; los nuevos vínculos requieren actualizar el bridge.' : 'Historia canónica paginada: hasta 500 metadatos / 256 KiB por consulta. La vista no acredita una historia completa; carga páginas anteriores para buscar vínculos.'} Un comando completado no valida una tarea. Sin proceso no significa éxito.</p>
-    <p>run: identifica un comando; sólo TaskRunLinked acredita su pertenencia al orquestador. Procesos e historia son muestras independientes, no una fotografía atómica.</p>
-    ${_hasOlder ? '<button class="activity-older">Cargar historia anterior</button>' : ''}
+  const names = new Map(presentActivities().map((a) => [a.commandId, a.title]));
+  const html = `<div class="activity-context" role="status">${escapeHtml(activityTitle(selected))} · ${associated.length} procesos en el último inventario</div>
+    <details data-detail-id="history-contract"><summary data-focus-id="history-contract">Alcance de la evidencia y del historial</summary><p>${_legacyBridge ? 'Bridge anterior: ventana histórica limitada; los nuevos vínculos requieren actualizar el bridge.' : 'Historia canónica paginada: hasta 500 metadatos / 256 KiB por consulta. La vista no acredita una historia completa; carga páginas anteriores para buscar vínculos.'} Un comando completado no valida una tarea. Sin proceso no significa éxito.</p>
+    <p>run: identifica un comando; sólo TaskRunLinked acredita su pertenencia al orquestador. Procesos e historia son muestras independientes, no una fotografía atómica.</p></details>
+    ${_hasOlder ? '<button class="activity-older" data-focus-id="older">Cargar historia anterior</button>' : ''}
     ${_offline ? '<p role="status">⚠ Bridge offline — vista anterior, posiblemente desactualizada</p>' : ''}
     ${activityInventoryWarning() ? `<p role="status">⚠ ${escapeHtml(activityInventoryWarning())}</p>` : ''}
     <div class="activity-processes">${associated.map((p) => `<span>PID ${p.pid} ← PPID ${p.ppid} · raíz ${p.rootPid}</span>`).join(' · ')}</div>
@@ -211,11 +215,28 @@ function _render(): void {
         ? `<table class="log-table" aria-label="Crónica correlacionada"><thead><tr><th>Hora</th><th>Evento</th><th>Identidad / resultado</th></tr></thead><tbody>${rows
             .map((e, index) => {
               const key = eventKey(e);
-              return `<tr><td>${formatTimestamp(e.timestamp)}</td><td>${escapeHtml(e.type)}</td><td>${key ? `<button data-focus-id="${escapeHtml(e.id || `${e.type}:${e.timestamp}:${index}`)}" data-activity="${escapeHtml(key)}" aria-pressed="${key === selected}" style="--activity-color:${activityColor(key)}">⬡ ${escapeHtml(key)}</button>` : 'sin correlación'}<br>${escapeHtml(confirmedOutcome(e))}<br>ejecución: ${escapeHtml(e.commandId || String(e.data?.['commandId'] ?? '—'))} · agente: ${escapeHtml(String(e.data?.['agentId'] ?? 'sin vínculo explícito'))}</td></tr>`;
+              return `<tr><td>${formatTimestamp(e.timestamp)}</td><td>${escapeHtml(e.type)}</td><td>${key ? `<button data-focus-id="${escapeHtml(e.id || `${e.type}:${e.timestamp}:${index}`)}" data-activity="${escapeHtml(key)}" aria-pressed="${key === selected}" style="--activity-color:${activityColor(key)}">⬡ ${escapeHtml(names.get(e.commandId || String(e.data?.['commandId'] ?? e.data?.['runId'] ?? '')) || activityTitle(key))}</button>` : 'sin correlación'}<br>${escapeHtml(confirmedOutcome(e))}<details data-detail-id="event:${escapeHtml(e.id || String(index))}"><summary data-focus-id="event:${escapeHtml(e.id || String(index))}">Identificadores</summary><code>${escapeHtml(key)}</code><br>Comando: ${escapeHtml(e.commandId || String(e.data?.['commandId'] ?? 'Sin comando vinculado'))}</details></td></tr>`;
             })
             .join('')}</tbody></table>`
         : '<p>Sin eventos para esta selección en la ventana disponible; no demuestra ausencia de historial.</p>'
     }`;
+  if (html === _lastRendered) return;
+  _lastRendered = html;
+  const open = new Set(
+    Array.from(body.querySelectorAll<HTMLDetailsElement>('details[open]')).map(
+      (d) => d.dataset['detailId'],
+    ),
+  );
+  const scroll = body.scrollTop;
+  body.innerHTML = html;
+  body.querySelectorAll<HTMLDetailsElement>('details').forEach((d) => {
+    d.open = open.has(d.dataset['detailId']);
+  });
+  body.scrollTop = scroll;
+  if (focusKey)
+    Array.from(body.querySelectorAll<HTMLElement>('[data-focus-id]'))
+      .find((e) => e.dataset['focusId'] === focusKey)
+      ?.focus({ preventScroll: true });
   body.querySelector<HTMLButtonElement>('.activity-older')?.addEventListener('click', () => {
     void _fetchOlder();
   });
@@ -249,7 +270,7 @@ function _getOrCreate(): HTMLElement {
         <button class="log-close" aria-label="Cerrar panel">✕</button>
       </div>
     </div>
-    <nav class="activity-nav" aria-label="Actividad"><button class="activity-tasks">Tareas y procesos</button><button class="activity-reset">Todas las ejecuciones</button></nav>
+    <nav class="activity-nav" aria-label="Actividad"><button class="activity-tasks">Actividad de la selección</button><button class="activity-reset">Todas las ejecuciones</button></nav>
     <div class="log-body"></div>`,
   );
   subscribeActivity(() => {

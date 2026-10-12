@@ -1,5 +1,7 @@
 # Actividad y Crónica: contrato de evidencia
 
+La presentación humana, el contrato `ExecutionIdentityRecorded` y la matriz de fuentes se describen en [activity-presentation.md](activity-presentation.md).
+
 ## Fuentes e identidades
 
 - **Orquestador:** `/tasks` conserva `taskKey` (repo/issue) y fases declaradas. `TaskRunLinked` enlaza explícitamente una ejecución `runId` con `taskKey`; `TaskPhaseRecorded` conserva cambios de fase en el Event Store canónico.

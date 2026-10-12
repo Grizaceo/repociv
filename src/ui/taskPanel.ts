@@ -9,15 +9,19 @@ import {
   activityColor,
   activityPanels,
   registerActivityPanel,
-  activityEvents,
   activitySelection,
-  eventKey,
-  processKey,
   selectActivity,
   setActivityProcesses,
   subscribeActivity,
   markActivityInventoryUnavailable,
 } from './activityCorrelation.ts';
+
+import {
+  presentActivities,
+  activityTitle,
+  type PresentedActivity,
+} from './activityPresentation.ts';
+import { focusOwnChat } from './agentsPanel.ts';
 
 const POLL_MS = 3_000;
 
@@ -171,25 +175,33 @@ function _render(): void {
   const replace = (html: string): boolean => {
     if (html === _lastRendered) return false;
     _lastRendered = html;
+    const open = new Set(
+      Array.from(body.querySelectorAll<HTMLDetailsElement>('details[open]')).map(
+        (d) => d.dataset['detailId'],
+      ),
+    );
+    const scroll = body.scrollTop;
     body.innerHTML = html;
+    body.querySelectorAll<HTMLDetailsElement>('details').forEach((d) => {
+      d.open = open.has(d.dataset['detailId']);
+    });
+    body.scrollTop = scroll;
     return true;
   };
 
   const focusKey = (document.activeElement as HTMLElement | null)?.dataset['focusId'];
   const restore = () => {
     if (focusKey)
-      Array.from(body.querySelectorAll<HTMLButtonElement>('[data-activity]'))
+      Array.from(body.querySelectorAll<HTMLElement>('[data-focus-id]'))
         .find((b) => b.dataset['focusId'] === focusKey)
         ?.focus({ preventScroll: true });
   };
-  // Strings from the bridge are escaped; process identifiers/counts are numeric.
-  const processes = `<section class="agent-process-list"><h3>Procesos de agentes (${_processes.length})</h3>
-    <p>Usuario local · agentes reconocidos y todos sus descendientes. Estado del SO, no progreso de tareas.</p>
-    ${_processError ? `<div role="status">⚠ ${_esc(_processError)} — los datos anteriores pueden estar desactualizados</div>` : ''}
+  const activities = presentActivities(_processes);
+  const processes = `<section class="agent-process-list"><h3>Actividades · ${activities.length} grupos / ${_processes.length} procesos</h3>
+    ${_processError ? '<p role="status">⚠ Inventario no disponible — datos anteriores posiblemente desactualizados</p>' : ''}
     ${_unreadable ? `<p>${_unreadable} procesos no legibles o terminados durante el muestreo</p>` : ''}
-    <table class="task-table" aria-label="Procesos relacionados con agentes"><thead><tr><th>PID</th><th>PPID</th><th>Agente</th><th>Proceso</th><th>Estado SO</th><th>Vínculo</th></tr></thead><tbody>
-    ${_processes.map((p) => `<tr data-process-pid="${p.pid}"><td>${_processButton(p)}</td><td>${p.ppid}</td><td>${_esc(p.family)}</td><td>${_esc(p.name)}</td><td>${_esc(p.state)}</td><td>${p.role === 'agent' ? 'Agente' : `Descendiente de ${p.rootPid}`}</td></tr>`).join('')}
-    </tbody></table>${!_processes.length && !_processError ? '<p>Sin procesos de agentes detectados</p>' : ''}</section>`;
+    <div class="activity-list">${activities.map(_activityCard).join('')}</div>
+    ${!activities.length ? '<p>Sin actividades en el inventario y la historia cargada</p>' : ''}</section>`;
   const context = _activityContext();
   if (_offline) {
     replace(context + processes + '<div class="task-offline">⚠ Orquestador no disponible</div>');
@@ -312,7 +324,7 @@ function _getOrCreate(): HTMLElement {
     'task-panel hidden',
     `
     <div class="task-header">
-      <span class="task-title">📋 ACTIVIDAD · TAREAS ACTIVAS</span>
+      <span class="task-title">📋 ACTIVIDAD · EJECUCIONES</span>
       <button id="task-close" title="Cerrar panel de tareas" aria-label="Cerrar panel de tareas">✕</button>
     </div>
     <nav class="activity-nav" aria-label="Actividad"><button class="activity-log">Crónica de la selección</button><button class="activity-reset">Todas las ejecuciones</button></nav>
@@ -327,6 +339,16 @@ function _getOrCreate(): HTMLElement {
   _panel.addEventListener('click', (e) => {
     const button = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-activity]');
     if (button) selectActivity(button.dataset['activity'] ?? '');
+    const chronicle = (e.target as HTMLElement).closest<HTMLElement>('[data-chronicle]');
+    if (chronicle) {
+      selectActivity(chronicle.dataset['chronicle'] ?? '');
+      activityPanels.log?.open();
+    }
+    const unit = (e.target as HTMLElement).closest<HTMLElement>('[data-unit]');
+    if (unit?.dataset['unit']) {
+      closeTaskPanel();
+      focusOwnChat(unit.dataset['unit']);
+    }
   });
   bindPanelAction(_panel, '#task-close', closeTaskPanel);
   return _panel;
@@ -335,22 +357,28 @@ function _getOrCreate(): HTMLElement {
 function _activityButton(key: string, label: string, focusId = key): string {
   return `<button data-focus-id="${_esc(focusId)}" data-activity="${_esc(key)}" aria-pressed="${activitySelection() === key}" style="--activity-color:${activityColor(key)}">⬡ ${_esc(label)}</button>`;
 }
-function _processButton(p: AgentProcess): string {
-  const key = processKey(p);
-  return key
-    ? _activityButton(key, `PID ${p.pid} · ${key}`, `pid:${p.processIdentity}`)
-    : `<button data-focus-id="pid:${_esc(p.processIdentity || String(p.pid))}" data-activity="process:${_esc(p.processIdentity || `unknown-${p.pid}`)}">PID ${p.pid} · sin correlación</button>`;
+function _activityCard(a: PresentedActivity): string {
+  const roots = a.processes.filter((p) => !a.processes.some((parent) => parent.pid === p.ppid));
+  return `<article class="activity-card" data-run="${_esc(a.id)}" style="--activity-color:${activityColor(a.key)}">
+    <div class="activity-card-heading">${_activityButton(a.key, a.title, `card:${a.id}`)}<span class="activity-state">${_esc(a.status)}</span></div>
+    <div class="activity-owner">${a.unit ? `Unidad: ${_esc(a.unitName || (a.title === a.unit ? a.unit : 'vinculada'))}` : 'Sin unidad vinculada'} · ${a.agent ? `Agente: ${_esc(a.agent)}` : !a.profile ? 'Propietario desconocido' : 'Agente no registrado'}</div>
+    <div class="activity-meta"><span>Harness: ${_esc(a.harness || 'no acreditado')}</span><span>Profile: ${_esc(a.profile || 'desconocido')}</span><span>${a.task ? 'Tarea vinculada' : 'Sin tarea vinculada en la historia cargada'}</span></div>
+    ${a.identityWarning ? `<p class="activity-warning">⚠ ${_esc(a.identityWarning)}</p>` : ''}
+    ${!a.commandId ? `<p class="activity-note">Familia detectada: ${_esc(a.processes[0]?.family || 'no disponible')}.</p>` : ''}
+    <div class="activity-card-actions"><button data-chronicle="${_esc(a.key)}" data-focus-id="chronicle:${_esc(a.id)}">Ver Crónica</button>${a.unit ? `<button data-unit="${_esc(a.unit)}" data-focus-id="unit:${_esc(a.id)}">Ver unidad</button>` : ''}</div>
+    <details data-detail-id="processes:${_esc(a.id)}"><summary data-focus-id="expand:${_esc(a.id)}">${a.processes.length} procesos · ${roots.length} raíces observadas${a.processes.length ? ` · ${a.processes.length - roots.length} descendientes` : ' · sin procesos en el último inventario'}</summary>
+    <ul class="activity-process-tree">${a.processes.map((p) => `<li data-process-pid="${p.pid}">${_activityButton(a.key, `PID ${p.pid} ← PPID ${p.ppid} · ${p.name}`, `pid:${p.processIdentity || p.pid}`)}<span>Estado SO: ${_esc(p.state)}${roots.includes(p) ? ' · raíz observada' : ' · descendiente'}</span><code>${_esc(p.processIdentity || 'Identidad de proceso no disponible')}</code></li>`).join('')}</ul></details>
+    <details data-detail-id="technical:${_esc(a.id)}"><summary data-focus-id="technical:${_esc(a.id)}">Identificadores y evidencia</summary><dl><dt>Selección compartida</dt><dd><code>${_esc(a.key)}</code></dd><dt>Comando / ejecución</dt><dd>${_esc(a.commandId || 'Sin ejecución vinculada')}</dd><dt>Unidad</dt><dd><code>${_esc(a.unit || 'Sin unidad vinculada')}</code></dd><dt>Sesión</dt><dd>Sin enlace canónico a una sesión nativa en esta proyección</dd><dt>Identidad al inicio</dt><dd>${a.registered ? 'Registro canónico del runner' : 'Datos no disponibles en la historia cargada'}</dd><dt>Historia</dt><dd>${a.events.length} eventos cargados · no acredita historia completa</dd></dl>${a.events
+      .filter((e) => e.type === 'ExecutionIdentityRecorded')
+      .map(
+        (e) =>
+          `<p class="activity-note">Intento registrado · harness: ${_esc(String(e.data?.['harness'] || 'no disponible'))} · profile: ${_esc(String(e.data?.['profileName'] || 'no registrado'))} · proveedor seleccionado: ${_esc(String(e.data?.['provider'] || 'no registrado'))} · modelo seleccionado: ${_esc(String(e.data?.['model'] || 'no registrado'))}</p>`,
+      )
+      .join('')}</details>
+  </article>`;
 }
 function _activityContext(): string {
-  const selected = activitySelection();
-  const keys = [
-    ...new Set(
-      activityEvents()
-        .map((e) => eventKey(e))
-        .filter(Boolean),
-    ),
-  ];
-  return `<div class="activity-context" role="status">${_esc(selected || 'Todas las ejecuciones')}</div><p>Kanban ≠ ejecución del orquestador ≠ sesión de agente ≠ proceso del SO. run: identifica un comando, no necesariamente una ejecución del orquestador. Los tableros y sesiones siguen en sus paneles; sin vínculo explícito, sin correlación.</p><details><summary>Comandos y ejecuciones registrados en la Crónica</summary>${keys.map((k) => _activityButton(k, k, `history:${k}`)).join(' ')}</details>`;
+  return `<div class="activity-context" role="status">${_esc(activityTitle(activitySelection()))}</div><p class="activity-note">Identidad registrada al inicio · procesos observados ahora. Un árbol externo no acredita propietario ni trabajo activo. Sin proceso no significa éxito.</p>`;
 }
 export async function refreshTaskInventory(): Promise<void> {
   await _fetch(false);

@@ -27,9 +27,11 @@ test('live activity: exact inventory, selection and safe chronicle navigation', 
   expect(pids).toEqual(
     inventory.processes.map((p: { pid: number }) => p.pid).sort((a: number, b: number) => a - b),
   );
-  const first = task.locator('[data-process-pid] button').first();
+  const first = task.locator('.activity-card-heading button[data-activity]').first();
   await first.focus();
+  await expect(first).toBeFocused();
   await page.keyboard.press('Enter');
+  await expect(first).toHaveAttribute('aria-pressed', 'true');
   const selected = await task.locator('.activity-context').textContent();
   await task.getByRole('button', { name: 'Crónica de la selección' }).focus();
   await page.keyboard.press('Enter');
