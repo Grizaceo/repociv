@@ -28,8 +28,6 @@ def build_identity(*, command_id: str, command_type: str, harness: str,
     # MAIN is the generic slot; missing/mismatching records close conservatively.
     if unit_id and unit_id != "MAIN" and (canonical or {}).get("unitId") == unit_id:
         data["unitId"] = unit_id
-        if data.get("agentName"):
-            data["unitName"] = data["agentName"]
     # HTTP gateway, other CLIs and container execution do NOT load this Hermes home.
     if harness == "hermes-cli":
         path = (config or {}).get("profile")

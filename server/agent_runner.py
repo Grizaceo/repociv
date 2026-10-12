@@ -607,7 +607,7 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
     if base == "CLAUDE":
         send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: claude-code (bypass)", "level": "info"})
         _record_execution_identity(unit_id, mission_id, "claude", config,
-                                   model=model or provider)
+                                   model=model)
         return _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                           model=model or provider)
 
@@ -615,12 +615,12 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
     if base == "CURSOR":
         send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: cursor (bypass)", "level": "info"})
         _record_execution_identity(unit_id, mission_id, "cursor", config,
-                                   model=model or provider)
+                                   model=model)
         return _run_cursor_agent_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model or provider)
     if base == "CODEX":
         send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: codex (bypass)", "level": "info"})
         _record_execution_identity(unit_id, mission_id, "codex", config,
-                                   model=model or provider)
+                                   model=model)
         return _run_codex_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                     model=model or provider, harness_ref=harness_ref)
 
@@ -631,21 +631,21 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
     if harness and harness != "auto":
         send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: {harness}", "level": "info"})
         if harness == "openclaw" and _has_openclaw():
-            _record_execution_identity(unit_id, mission_id, "openclaw", config, model=model or provider)
+            _record_execution_identity(unit_id, mission_id, "openclaw", config, model=model)
             return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                            model=model or provider, harness_ref=harness_ref)
         if harness in ("claude", "claude-code") and _has_claude_code():
-            _record_execution_identity(unit_id, mission_id, "claude", config, model=model or provider)
+            _record_execution_identity(unit_id, mission_id, "claude", config, model=model)
             # For claude-code: if model includes provider prefix (e.g. openrouter/deepseek),
             # pass it through — claude CLI --model accepts provider/model format
             return _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                               model=model or provider)
         if harness == "cursor" and _has_cursor():
-            _record_execution_identity(unit_id, mission_id, "cursor", config, model=model or provider)
+            _record_execution_identity(unit_id, mission_id, "cursor", config, model=model)
             return _run_cursor_agent_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                                model=model or provider)
         if harness == "codex" and _has_codex():
-            _record_execution_identity(unit_id, mission_id, "codex", config, model=model or provider)
+            _record_execution_identity(unit_id, mission_id, "codex", config, model=model)
             return _run_codex_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                         model=model or provider, harness_ref=harness_ref)
         if harness == "hermes":
@@ -655,7 +655,7 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
             if config.get("profile"):
                 if _has_hermes_cli():
                     send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: hermes-cli (profile)", "level": "info"})
-                    _record_execution_identity(unit_id, mission_id, "hermes-cli", config, model=model or provider)
+                    _record_execution_identity(unit_id, mission_id, "hermes-cli", config, model=model)
                     return _run_hermes_cli_streaming(unit_id, mission_id, mission, config, working_dir,
                                                      city_id, model=model or provider)
                 send_to_repociv({"type": "log", "msg": f"[{unit_id}] perfil configurado pero hermes CLI no encontrado", "level": "warn"})
@@ -674,7 +674,7 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
         if _has_hermes_cli():
             send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: hermes-cli", "level": "info"})
             _record_execution_identity(unit_id, mission_id, "hermes-cli", config,
-                                       model=model or provider)
+                                       model=model)
             return _run_hermes_cli_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                              model=model or provider)
         send_to_repociv({"type": "log", "msg": f"[{unit_id}] perfil configurado pero hermes CLI no encontrado — cayendo a HTTP", "level": "warn"})
@@ -693,7 +693,7 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
     if _has_claude_code():
         send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: claude-code (fallback)", "level": "info"})
         _record_execution_identity(unit_id, mission_id, "claude", config,
-                                   model=model or provider)
+                                   model=model)
         success, output = _run_claude_code_streaming(unit_id, mission_id, mission, config, working_dir, city_id, model=model or provider)
         if success:
             return success, output
@@ -701,7 +701,7 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
     if _has_openclaw():
         send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: openclaw (fallback)", "level": "info"})
         _record_execution_identity(unit_id, mission_id, "openclaw", config,
-                                   model=model or provider)
+                                   model=model)
         return _run_openclaw_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                        model=model or provider, harness_ref=harness_ref)
 

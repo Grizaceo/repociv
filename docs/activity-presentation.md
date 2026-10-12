@@ -30,7 +30,8 @@ La nueva vista usa tarjetas compactas por ejecución o árbol externo. Prioriza 
 - `Sin unidad vinculada`, `Propietario desconocido` y `Inventario no disponible` significan cosas distintas. Un error conserva el último inventario con aviso de posible desactualización.
 - Conservación de foco por control, expansión por tarjeta y scroll durante reconstrucciones. HTML idéntico no se reemplaza. No se añade polling paralelo ni almacén persistente.
 - `Ver Crónica` mantiene selección; `Ver unidad` reutiliza `focusOwnChat`: si no está materializada, abre la lista de agentes, no inventa una unidad.
-- Proveedor/modelo y ausencia de enlace a sesión nativa se explican en detalle, separados del harness/profile/agente/unidad.
+- Proveedor/modelo y ausencia de enlace a sesión nativa se explican en detalle, separados del harness/profile/agente/unidad. Los snapshots reciben sólo el modelo explícitamente seleccionado: el fallback legacy `model or provider` del adaptador no acredita un modelo.
+- El nombre de agente del registro no se copia como nombre de unidad: `agentName` y `unitName` requieren fuentes distintas. Un vínculo canónico exacto acredita `unitId`, no el nombre de la unidad.
 - Backend y cliente proyectan campos seguros: sin argv, prompt, output, entorno, credenciales ni rutas de profile. IDs técnicos quedan disponibles en los detalles.
 
 ## Verificación y aplicación

@@ -242,3 +242,81 @@ def test_canonical_link_is_exact_not_prefix():
     assert data["unitId"] == "opaque-id"
     assert "agentName" not in data
     assert "unitId" not in ei.build_identity(**common, unit_id="MAIN", canonical={"unitId": "MAIN"})
+
+
+@pytest.mark.parametrize("unit_id,harness", [
+    ("CLAUDE-1", "auto"), ("CODEX-1", "auto"), ("CURSOR-1", "auto"),
+    ("WORKER-1", "claude"), ("WORKER-1", "codex"),
+    ("WORKER-1", "cursor"), ("WORKER-1", "openclaw"),
+    ("WORKER-1", "hermes"), ("WORKER-1", "auto"),
+])
+@pytest.mark.parametrize("selected_model", ["", "chosen-model"])
+def test_dispatch_does_not_promote_provider_to_model(
+    isolated_store, monkeypatch, tmp_path, unit_id, harness, selected_model,
+):
+    """Exercise real routing with fake adapters; no process or network execution."""
+    from types import SimpleNamespace
+    monkeypatch.setattr(ar, "_get_agent_config", lambda _: {"profile": str(tmp_path / "profile")})
+    monkeypatch.setattr(ar, "_find_registry_profile", lambda _: None)
+    monkeypatch.setattr(ar, "_container_mode_enabled", lambda: False)
+    monkeypatch.setattr(ar._security_harness, "get_harness", lambda: SimpleNamespace(
+        pre_dispatch_gate=lambda _: SimpleNamespace(blocked=False)))
+    for adapter in ("claude_code", "codex", "cursor", "openclaw", "hermes_cli"):
+        monkeypatch.setattr(ar, "_has_" + adapter, lambda: True)
+    calls = []
+    def fake_adapter(*args, **kwargs):
+        calls.append(kwargs)
+        return True, "isolated"
+    for adapter in ("claude_code", "codex", "cursor_agent", "openclaw", "hermes_cli", "hermes"):
+        monkeypatch.setattr(ar, "_run_" + adapter + "_streaming", fake_adapter)
+    assert ar._execute_streaming(unit_id, "routing-fixture", "isolated", str(tmp_path),
+                                 harness=harness, provider="openrouter", model=selected_model)[0]
+    rows = [json.loads(line) for line in isolated_store.read_text().splitlines()]
+    identity = next(row["data"] for row in rows if row["type"] == "ExecutionIdentityRecorded")
+    if selected_model:
+        assert identity["model"] == selected_model
+    else:
+        assert "model" not in identity
+    # Identity correction must not change legacy adapter argument/routing behavior.
+    assert len(calls) == 1
+    assert calls[0]["model"] == (selected_model or "openrouter")
+
+
+@pytest.mark.parametrize("selected_model", ["", "chosen-model"])
+@pytest.mark.parametrize("winner", ["claude", "openclaw"])
+def test_fallback_attempts_preserve_model_provenance(
+    isolated_store, monkeypatch, tmp_path, selected_model, winner,
+):
+    from types import SimpleNamespace
+    monkeypatch.setattr(ar, "_get_agent_config", lambda _: {})
+    monkeypatch.setattr(ar, "_find_registry_profile", lambda _: None)
+    monkeypatch.setattr(ar, "_container_mode_enabled", lambda: False)
+    monkeypatch.setattr(ar._security_harness, "get_harness", lambda: SimpleNamespace(
+        pre_dispatch_gate=lambda _: SimpleNamespace(blocked=False)))
+    monkeypatch.setattr(ar, "_has_claude_code", lambda: True)
+    monkeypatch.setattr(ar, "_has_openclaw", lambda: True)
+    monkeypatch.setattr(ar, "_run_hermes_streaming", lambda *a, **k: (False, "isolated failure"))
+    monkeypatch.setattr(ar, "_run_claude_code_streaming", lambda *a, **k: (winner == "claude", "isolated"))
+    monkeypatch.setattr(ar, "_run_openclaw_streaming", lambda *a, **k: (True, "isolated"))
+    assert ar._execute_streaming("WORKER-1", "fallback-fixture", "isolated", str(tmp_path),
+                                 harness="auto", provider="openrouter", model=selected_model)[0]
+    rows = [json.loads(line) for line in isolated_store.read_text().splitlines()]
+    attempts = [row["data"] for row in rows if row["type"] == "ExecutionIdentityRecorded"]
+    assert [d["harness"] for d in attempts] == (
+        ["hermes", "claude"] if winner == "claude" else ["hermes", "claude", "openclaw"])
+    for attempt in attempts:
+        if selected_model:
+            assert attempt["model"] == selected_model
+        else:
+            assert "model" not in attempt
+
+
+def test_agent_display_name_is_not_automatically_a_unit_name():
+    data = ei.build_identity(
+        command_id="distinct-names", command_type="execute_agent", harness="hermes-cli",
+        unit_id="WORKER-2", canonical={"unitId": "WORKER-2"},
+        registry_profile=("WORKER", _profile("Worker")),
+    )
+    assert data["unitId"] == "WORKER-2"
+    assert data["agentName"] == "Worker"
+    assert "unitName" not in data
