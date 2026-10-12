@@ -59,10 +59,6 @@ vi.mock('./ui/capitalPanel.ts', () => ({
   openCapitalPanel: vi.fn(),
 }));
 
-vi.mock('./ui/layerPanel.ts', () => ({
-  updateLodDisplay: vi.fn(),
-}));
-
 vi.mock('./ui/spatialPreview.ts', () => ({
   hideDirectivePreview: vi.fn(),
   hideContextMenu: vi.fn(),

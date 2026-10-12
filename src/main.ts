@@ -44,6 +44,7 @@ import {
   toggleHarnessPanel,
   startHarnessPolling,
   toggleTaskPanel,
+  toggleKanbanPanel,
   togglePendingPanel,
   toggleLogPanel,
   isHarnessPanelOpen,
@@ -106,12 +107,6 @@ import { bindSlashCommandState } from './ui/chat/slashCommands.ts';
 import { ensureWondersLoaded, listIframeWonders } from './wonders/manifest.ts';
 import { findCityByWonderSelection, findNearbyCities } from './wonders/cityLookup.ts';
 import type { City } from './types.ts';
-import {
-  toggleLayerPanel,
-  initLayerPanel,
-  setOnCleanModeChange,
-  isCleanMode,
-} from './ui/layerPanel.ts';
 import { resolveInitialRenderMode } from './three/renderMode.ts';
 import { HEX_SIZE } from './constants.ts';
 import { logger } from './logger.ts';
@@ -325,14 +320,6 @@ async function bootstrap() {
     // inherits the new theme automatically.
   });
 
-  // ══ Layer panel wiring ══
-  initLayerPanel();
-  document.getElementById('btn-layers')?.addEventListener('click', toggleLayerPanel);
-  // Wire clean mode changes to renderer
-  setOnCleanModeChange((active) => {
-    renderer?.setCleanMode(active);
-  });
-
   // ══ Imperial random salute (Whimsy) ══
   const salutes = [
     { icon: '⬡', line: 'El Imperio te espera.', sub: 'Nueva era de desarrollo.' },
@@ -502,7 +489,6 @@ async function bootstrap() {
   const renderer = new Renderer(canvas, state);
   const bootRenderMode = resolveInitialRenderMode();
   await renderer.applyInitialRenderMode(bootRenderMode);
-  renderer.setCleanMode(isCleanMode());
   await renderer.loadAssets();
   const capital = world.cities.find((c) => c.isCapital) ?? world.cities[0];
   if (world.tiles.size === 0) {
@@ -728,6 +714,7 @@ async function bootstrap() {
   document.getElementById('btn-toggle-3d')?.addEventListener('click', toggleView);
   document.getElementById('btn-approvals')?.addEventListener('click', toggleApprovalPanel);
   document.getElementById('btn-tasks')?.addEventListener('click', toggleTaskPanel);
+  document.getElementById('btn-kanban')?.addEventListener('click', toggleKanbanPanel);
 
   // ─── Idle agent finder (Age of Empires pattern) ─────────────────────
   // Uses the shared singleton so the cycle index stays in sync with the
@@ -816,6 +803,7 @@ async function bootstrap() {
   const analyticsPanels = {
     'btn-approvals': 'approvals',
     'btn-tasks': 'tasks',
+    'btn-kanban': 'kanban',
     'btn-pending': 'pending',
     'btn-log': 'log',
     'btn-agents': 'agents',

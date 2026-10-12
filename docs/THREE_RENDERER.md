@@ -129,11 +129,9 @@ CPU contact sheet under `.hermes/artifacts/`. Consumers:
 - `ForestProps3D.ts` — pines mixed with `forest-deciduous-*` broadleafs
   per `forestTreeKind(hash, slot)` (~1/3 deciduous), both tinted by
   `forestCanopyTint`
-- `WonderProps3D.ts` — swaps the procedural temple/laboratorium for the
-  painted GLBs once loaded (procedural stays as fallback and for generic
-  user-connected wonders). NOTE: wonders gate on the `knowledge`/`labs`
-  layers (default OFF) — enable them in the layer panel (F6) or seed
-  `repociv_layers` in localStorage when capturing.
+- `WonderProps3D.ts` — generic monuments for user-connected wonders. The
+  retired product-specific library/laboratory props are no longer loaded.
+  There is no layer panel; F6 opens the Hermes Kanban.
 - `MountainProps3D.ts` — unchanged
 
 ### Preview atlas (optional)

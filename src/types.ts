@@ -623,8 +623,7 @@ export type MapLayerId =
   | 'base' // terrain, cities, agents — always on
   | 'structure' // folder structure, buildings, wonder sprites
   | 'ops' // tasks, active experiments, approvals, failures
-  | 'labs' // active construction / experiment indicators
-  | 'security' // lab alarms, experiment locks, perimeter alerts
+  | 'security' // perimeter alerts
   | 'labels'; // city labels, district labels, folder labels
 
 export interface MapLayerState {
@@ -715,7 +714,6 @@ export const DEFAULT_MAP_LAYERS: MapLayerState = {
     base: true,
     structure: true,
     ops: false,
-    labs: false,
     security: false,
     labels: true,
   },

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Kanban de Hermes y Tareas activas** — botón y F6 abren la vista de las bases canónicas de Hermes, sin tablero paralelo y en solo lectura. F9 conserva las tareas del orquestador y añade todos los procesos del usuario local detectados por entradas de agentes reconocidas y sus descendientes (herramientas/MCP incluidos), sin truncar filas. Muestra PID, PPID, agente, nombre, estado del SO y vínculo; no expone argv ni entorno ni permite matar procesos. La consulta reutiliza el polling existente del panel y conserva datos con advertencia ante fallos.
+- **Limpieza del dashboard** — retirados el panel Capas, su botón, atajo H, comando, wiring y estilos; nombres Gran Libro/Quest sustituidos por Kanban de Hermes/Tareas activas. Se conserva el cargador de pendientes, la infraestructura de misiones y los manifests de maravillas del usuario.
+
 - **Barra compacta de atención de agentes** — una fila con hasta cinco agentes propios o sesiones externas, prioridad para aprobaciones y actividad que pasó de trabajo a reposo sin revisar, acceso al chat y overflow hacia el directorio F8. Comparte las suscripciones existentes del mundo, sesiones y aprobaciones: no agrega polling. Conserva el foco de teclado durante cambios y anuncia los conteos de atención mediante una región live discreta. El estado «sin revisar» es local a la página, no persiste al recargar y no confirma éxito. Prueba E2E con metadatos sintéticos y aplicación real: transición de estado, foco, chat/F8, apertura de aprobaciones sin ejecutarlas y límites de todos los botones a 320, 390 y 701 px.
 
 ### Removed

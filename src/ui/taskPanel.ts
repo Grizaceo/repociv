@@ -1,7 +1,7 @@
 // ─── RepoCiv — Task Panel (Sprint C3) ────────────────────────────────────────
-// Side panel listing all active and recent tasks from the task orchestrator.
-// Shows: repo | issue | phase | progress | age, with colour-coding by phase.
-// Polls every 3s while open; provides a Cancel button per task.
+// Agent processes (local UID, recognized entrypoints + every descendant) and
+// orchestrator tasks, kept distinct. Uses the existing 3s polling while open;
+// process metadata never contains argv/env and offers no process kill action.
 import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
 
@@ -42,6 +42,18 @@ let _timer = 0;
 let _visible = false;
 let _tasks: Task[] = [];
 let _offline = false;
+interface AgentProcess {
+  pid: number;
+  ppid: number;
+  rootPid: number;
+  name: string;
+  state: string;
+  family: string;
+  role: string;
+}
+let _processes: AgentProcess[] = [];
+let _processError = '';
+let _unreadable = 0;
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 export function openTaskPanel(): void {
@@ -81,20 +93,37 @@ function _stopPolling(): void {
   }
 }
 
-async function _fetch(): Promise<void> {
+async function _fetchProcesses(): Promise<void> {
   try {
-    const res = await fetch(bridgeUrl('/tasks'), { headers: bridgeHeaders() });
-    if (!res.ok) {
+    const res = await fetch(bridgeUrl('/api/agent-processes'), { headers: bridgeHeaders() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data.available) throw new Error('Inventario no disponible');
+    _processes = data.processes;
+    _unreadable = data.unreadable;
+    _processError = '';
+  } catch (err) {
+    _processError = err instanceof Error ? err.message : String(err);
+  }
+}
+
+let _fetching = false;
+async function _fetch(): Promise<void> {
+  if (_fetching) return;
+  _fetching = true;
+  try {
+    await _fetchProcesses();
+    try {
+      const res = await fetch(bridgeUrl('/tasks'), { headers: bridgeHeaders() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      _tasks = (await res.json()) as Task[];
+      _offline = false;
+    } catch {
       _offline = true;
-      if (_visible) _render();
-      return;
     }
-    _tasks = (await res.json()) as Task[];
-    _offline = false;
     if (_visible) _render();
-  } catch {
-    _offline = true;
-    if (_visible) _render();
+  } finally {
+    _fetching = false;
   }
 }
 
@@ -119,17 +148,29 @@ function _render(): void {
   const panel = _getOrCreate();
   const body = panel.querySelector<HTMLElement>('.task-body')!;
 
+  // Strings from the bridge are escaped; process identifiers/counts are numeric.
+  const processes = `<section class="agent-process-list"><h3>Procesos de agentes (${_processes.length})</h3>
+    <p>Usuario local · agentes reconocidos y todos sus descendientes. Estado del SO, no progreso de tareas.</p>
+    ${_processError ? `<div role="status">⚠ ${_esc(_processError)} — los datos anteriores pueden estar desactualizados</div>` : ''}
+    ${_unreadable ? `<p>${_unreadable} procesos no legibles o terminados durante el muestreo</p>` : ''}
+    <table class="task-table" aria-label="Procesos relacionados con agentes"><thead><tr><th>PID</th><th>PPID</th><th>Agente</th><th>Proceso</th><th>Estado SO</th><th>Vínculo</th></tr></thead><tbody>
+    ${_processes.map((p) => `<tr data-process-pid="${p.pid}"><td>${p.pid}</td><td>${p.ppid}</td><td>${_esc(p.family)}</td><td>${_esc(p.name)}</td><td>${_esc(p.state)}</td><td>${p.role === 'agent' ? 'Agente' : `Descendiente de ${p.rootPid}`}</td></tr>`).join('')}
+    </tbody></table>${!_processes.length && !_processError ? '<p>Sin procesos de agentes detectados</p>' : ''}</section>`;
   if (_offline) {
-    body.innerHTML = '<div class="task-offline">⚠ Bridge offline — sin datos</div>';
+    body.innerHTML = processes + '<div class="task-offline">⚠ Orquestador no disponible</div>';
     return;
   }
 
   if (_tasks.length === 0) {
-    body.innerHTML = '<div class="task-empty">Sin tareas registradas</div>';
+    body.innerHTML =
+      processes + '<div class="task-empty">Sin tareas registradas en el orquestador</div>';
     return;
   }
 
-  body.innerHTML = `
+  body.innerHTML =
+    processes +
+    `
+    <h3>Tareas del orquestador</h3>
     <table class="task-table" aria-label="Lista de tareas activas">
       <thead>
         <tr>
@@ -225,7 +266,7 @@ function _getOrCreate(): HTMLElement {
     'task-panel hidden',
     `
     <div class="task-header">
-      <span class="task-title">📋 TAREAS</span>
+      <span class="task-title">📋 TAREAS ACTIVAS</span>
       <button id="task-close" title="Cerrar panel de tareas" aria-label="Cerrar panel de tareas">✕</button>
     </div>
     <div class="task-body"></div>

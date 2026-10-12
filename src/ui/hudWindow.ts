@@ -28,7 +28,6 @@ const HUD_WINDOW_IDS = [
   'agents-panel',
   'capital-panel',
   'settings-panel',
-  'layer-panel',
   'priority-panel',
   'subagent-session-panel',
   'task-panel',
@@ -92,7 +91,6 @@ const viewportBounds = (): HudWindowBounds => ({
 });
 
 const minimumFor = (panel: HTMLElement): HudWindowMinimum => {
-  if (panel.id === 'layer-panel') return { minWidth: 180, minHeight: 180 };
   if (panel.id === 'task-assign-panel') return { minWidth: 220, minHeight: 180 };
   return DEFAULT_MINIMUM;
 };

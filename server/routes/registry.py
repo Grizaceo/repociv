@@ -20,6 +20,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from server import http_routes as _routes
+from server.agent_processes import get_agent_processes
 
 # ── GET: no path params, matched by exact string ───────────────────────────────
 GET_EXACT: dict[str, Callable[..., Any]] = {
@@ -46,6 +47,7 @@ GET_EXACT: dict[str, Callable[..., Any]] = {
     "/api/config/default-harness": _routes.get_default_harness,
     "/log": _routes.get_log,
     "/tasks": _routes.get_tasks,
+    "/api/agent-processes": get_agent_processes,
     "/providers/live": _routes.get_providers_live,
     "/api/hermes/status": _routes.get_hermes_status_route,
     "/api/kanban": _routes.get_kanban,

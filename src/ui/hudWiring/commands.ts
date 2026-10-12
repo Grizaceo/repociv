@@ -19,7 +19,6 @@ import {
   toggleKanbanPanel,
 } from '../index.ts';
 import { toggleSettingsPanel } from '../settingsPanel.ts';
-import { toggleLayerPanel } from '../layerPanel.ts';
 import { toggleConstructionPanel } from '../constructionPanel.ts';
 import { takeScreenshot } from './screenshot.ts';
 import { toggleAgentsPanel } from '../agentsPanel.ts';
@@ -110,13 +109,6 @@ export function registerHudCommands(
           () => state.getLocalUnits(),
           (unitId, task) => state.setLocalUnitTask(unitId, task),
         ),
-    },
-    {
-      id: 'p-layers',
-      group: 'Panel',
-      label: 'Capas del mapa',
-      hint: 'H',
-      run: () => toggleLayerPanel(),
     },
     {
       id: 'p-settings',
