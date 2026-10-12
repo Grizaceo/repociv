@@ -21,6 +21,7 @@ from typing import Any, Callable
 
 from server import http_routes as _routes
 from server.agent_processes import get_agent_processes
+from server.kanban_writer import post_kanban_board
 
 # ── GET: no path params, matched by exact string ───────────────────────────────
 GET_EXACT: dict[str, Callable[..., Any]] = {
@@ -75,6 +76,7 @@ GET_EXACT: dict[str, Callable[..., Any]] = {
 
 # ── POST: no path params, matched by exact string ──────────────────────────────
 POST_EXACT: dict[str, Callable[..., Any]] = {
+    "/api/kanban/boards": post_kanban_board,
     "/directives/record": _routes.post_directives_record,
     "/commands": _routes.post_commands,
     "/pending/add": _routes.post_pending_add,

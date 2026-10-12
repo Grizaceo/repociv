@@ -8,8 +8,9 @@ session-cookie auth. The kanban is a set of SQLite files:
 - ``~/.hermes/kanban/boards/<slug>/kanban.db`` — per-board store + board.json
 - ``~/.hermes/kanban/kanban.db``         — the "default" board store
 
-Read-only by design: RepoCiv visualizes; mutations stay in the Hermes CLI
-(``hermes kanban ...``) or the Hermes dashboard.
+This reader never writes SQL. Explicit project-board creation lives in
+``server/kanban_writer.py`` and calls the supported Hermes CLI; task mutations
+stay in Hermes.
 """
 from __future__ import annotations
 

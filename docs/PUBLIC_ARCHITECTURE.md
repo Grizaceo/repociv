@@ -128,7 +128,7 @@ Operational HUD surfaces:
 - **Approval Panel**: Y/N approval for commands requiring human sign-off
 - **Terminal Panel**: xterm.js-based terminal inside the browser
 - **Settings Panel**: runtime toggles for thresholds, display options
-- **Hermes Kanban**: read-only view of Hermes boards and tasks
+- **Hermes Kanban**: read-only task view plus explicit native project-board creation
 - **Active Tasks**: local agent process trees and orchestrator tasks
 - **Agent Directory**: own and external agent sessions
 
@@ -137,7 +137,9 @@ OPENCLAW / CLAUDE / CODEX; `Space` cycles idle agents; `P` priority;
 `Ctrl+A` approvals; `T` terminal; `F6` Hermes Kanban; `F8` agent directory;
 `F9` active tasks and local agent processes; `F11` settings; `?` keyboard help.
 The layer, ledger and Quest Board controls have been retired. Mission commands
-remain supported; the Kanban reads Hermes' canonical SQLite stores, read-only.
+remain supported; task reads use Hermes' canonical SQLite stores in read-only mode.
+Explicit board creation uses the supported Hermes CLI, without switching the
+current board or launching workers.
 
 ---
 

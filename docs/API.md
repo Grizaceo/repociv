@@ -21,6 +21,13 @@ Excepciones: solo `GET /health` y `GET /ready` no requieren token (utilizados po
 
 ## Endpoints
 
+### Hermes Kanban
+
+- `GET /api/kanban?board=<slug>`: tareas de las bases canónicas de Hermes (solo lectura).
+- `GET /api/kanban/boards`: lista de tableros compartidos.
+- `POST /api/kanban/boards`: crea un tablero con `{ "slug": "mi-proyecto", "name": "Mi proyecto", "project_path": "/ruta/absoluta/existente" }`.
+  Usa la CLI soportada `hermes kanban boards create`, con `--default-workdir`, nunca SQL de escritura. `slug` debe ser minúsculo y válido (1–64 caracteres); `default` está reservado. Nombre requerido (hasta 120 caracteres), ruta local existente absoluta o `~/`. Devuelve `201` con `board` y `project_path`, `400` por datos inválidos, `409` por ID existente, `503` por CLI no disponible, `502` si falla creación/verificación y `504` por timeout (revisar la lista antes de reintentar). No cambia `current` ni inicia agentes. Auth y límites del bridge se aplican también a este POST.
+
 ### Health & Readiness
 
 | Method | Path | Descripción |
