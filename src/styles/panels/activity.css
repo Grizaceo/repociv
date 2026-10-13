@@ -140,6 +140,58 @@
 #log-panel .log-body {
   overflow-x: hidden;
 }
+.pending-work {
+  border-bottom: 1px solid var(--ui-border);
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  overflow-wrap: anywhere;
+}
+.pending-work-card {
+  border: 1px solid var(--ui-border);
+  border-left: 4px solid var(--ui-gold-bright);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 12px 0;
+  min-width: 0;
+}
+.pending-work-card h4 {
+  margin: 0 0 8px;
+}
+.pending-work-card h4 span {
+  display: block;
+  font-weight: normal;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.pending-work-path,
+.pending-work-card li > code:last-child {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pending-work-card p,
+.pending-work-card li {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.pending-work-card summary,
+.pending-work > details > summary {
+  padding: 8px 0;
+  cursor: pointer;
+}
+.pending-work-card summary:focus-visible,
+.pending-work > details > summary:focus-visible {
+  outline: 2px solid var(--ui-gold-bright);
+  outline-offset: 2px;
+}
+.pending-work-files {
+  padding-left: 16px;
+}
+.pending-work-warning {
+  color: var(--ui-gold-bright);
+  font-size: 12px;
+  line-height: 1.5;
+}
 @media (max-width: 600px) {
   .activity-card {
     padding: 8px;
