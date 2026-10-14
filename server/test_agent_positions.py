@@ -240,8 +240,14 @@ def test_real_http_hook_returns_503_then_recovers(monkeypatch, workspace, error_
     import json
     import urllib.error
     import urllib.request
+    from server import bridge
     from server.test_bridge_integration import _start_test_server, _auth_headers
     a, _ = workspace
+    # The hook endpoint refuses to run on an auth-off bridge
+    # (503 position_auth_required), so configure a token like the isolated
+    # guard tests do — otherwise CI, which has no .env, never reaches the
+    # tracker path this test exercises. _auth_headers sends it.
+    monkeypatch.setattr(bridge, "REPOCIV_TOKEN", "isolated-test-token-xxxxxxxxxxxxxxxx")
     def unavailable():
         raise error_type("private registry detail")
     tracker = st.ExternalAgentTracker(st.TrackerConfig(bin_path="unused"), send=lambda _: None,
