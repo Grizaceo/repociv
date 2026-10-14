@@ -119,10 +119,11 @@ import {
   clearTerrainScatter,
 } from './TerrainScatter3D.ts';
 import { getTileYieldsGroup, rebuildTileYields, clearTileYields } from './TileYields3D.ts';
-import { getRiverGroup, rebuildRivers, clearRivers } from './Rivers3D.ts';
+import { getRiverGroup, ensureRiverBridgeLoad, rebuildRivers, clearRivers } from './Rivers3D.ts';
 import { createSkyDome, disposeSkyDome } from './SkyDome3D.ts';
 import {
   getWonderPropsGroup,
+  ensureWonderPropsLoad,
   rebuildWonderProps,
   clearWonderProps,
   setWonderVisible,
@@ -264,6 +265,8 @@ export function createHexWorldScene(): Scene {
   ensureUnitPropsLoad();
   ensureResourcePropsLoad();
   ensureTerrainScatterLoad();
+  ensureWonderPropsLoad();
+  ensureRiverBridgeLoad();
 
   return scene;
 }

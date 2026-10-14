@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { LocalTile3D } from './LocalTile3D.ts';
+import { existsSync } from 'node:fs';
+import { LocalTile3D, LOCAL_FURNITURE_GLB_IDS } from './LocalTile3D.ts';
 import type { LocalWorld, LocalTile, LocalRoom, Workbench } from '../types.ts';
 
 function makeTile(
@@ -164,5 +165,11 @@ describe('LocalTile3D', () => {
     const lt = new LocalTile3D();
     lt.rebuild(world, opts1);
     expect(lt.rebuild(world, opts2)).toBe(true);
+  });
+
+  it('all referenced Kenney local furniture GLBs exist on disk', () => {
+    for (const id of LOCAL_FURNITURE_GLB_IDS) {
+      expect(existsSync(`public/assets/3d/props/kenney/${id}.glb`), `${id}.glb`).toBe(true);
+    }
   });
 });

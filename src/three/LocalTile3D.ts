@@ -16,9 +16,57 @@ import {
   type BufferGeometry,
   type Material,
 } from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeGlbScene, type MergedGlb } from './mergeGlbScene.ts';
 
 import type { LocalWorld, LocalTileType } from '../types.ts';
 import { localGridToWorld3D, ISO_TILE_W, ISO_WALL_H } from './LocalCamera3D.ts';
+
+export const LOCAL_FURNITURE_GLB_IDS = [
+  'fountain-round',
+  'lantern',
+  'hedge',
+  'detail-crate',
+  'detail-barrel',
+] as const;
+
+export type LocalFurnitureGlbId = (typeof LOCAL_FURNITURE_GLB_IDS)[number];
+
+type LocalGlbVariant = MergedGlb & { norm: number; minY: number };
+let localGlbVariants: Map<LocalFurnitureGlbId, LocalGlbVariant> | null = null;
+let localGlbState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
+
+export function areLocalFurniturePropsReady(): boolean {
+  return localGlbState === 'ready';
+}
+
+export function ensureLocalFurniturePropsLoad(onSettled?: () => void): void {
+  if (localGlbState !== 'idle') return;
+  localGlbState = 'loading';
+  const loader = new GLTFLoader();
+  Promise.all(
+    LOCAL_FURNITURE_GLB_IDS.map((id) => loader.loadAsync(`/assets/3d/props/kenney/${id}.glb`)),
+  )
+    .then((gltfs) => {
+      const map = new Map<LocalFurnitureGlbId, LocalGlbVariant>();
+      for (let i = 0; i < LOCAL_FURNITURE_GLB_IDS.length; i++) {
+        const merged = mergeGlbScene(gltfs[i]!.scene);
+        merged.geometry.computeBoundingBox();
+        const bb = merged.geometry.boundingBox!;
+        const size = new Vector3().subVectors(bb.max, bb.min);
+        const norm = 1 / Math.max(size.x, size.y, size.z, 1e-6);
+        map.set(LOCAL_FURNITURE_GLB_IDS[i]!, { ...merged, norm, minY: bb.min.y });
+      }
+      localGlbVariants = map;
+      localGlbState = 'ready';
+      onSettled?.();
+    })
+    .catch(() => {
+      localGlbVariants = null;
+      localGlbState = 'failed';
+      onSettled?.();
+    });
+}
 
 // Zone floor colors (matching isoLocalRenderer.ts ISO_FLOOR map)
 const ZONE_FLOOR_COLORS: Record<string, number> = {
@@ -127,6 +175,7 @@ export class LocalTile3D {
       opts.workbenchLabelOverlay ? 1 : 0,
       opts.powerOverlay ? 1 : 0,
       opts.temperatureOverlay ? 1 : 0,
+      localGlbState === 'ready' ? 1 : 0,
     ].join('#');
   }
 
@@ -270,7 +319,8 @@ export class LocalTile3D {
     this.group.add(this.doorMesh);
   }
 
-  // Furniture types that share box geometry — grouped for efficiency
+  // Furniture types that share geometry — mapped to Kenney GLB props when loaded,
+  // with procedural Box/Cylinder fallback when GLBs are not yet settled.
   private static FURNITURE_SPECS: Array<{
     types: Set<LocalTileType>;
     w: number;
@@ -279,6 +329,8 @@ export class LocalTile3D {
     y: number;
     color: number;
     geom: 'box' | 'cylinder';
+    glbId?: LocalFurnitureGlbId;
+    glbSize?: number;
     key: string;
   }> = [
     {
@@ -299,6 +351,8 @@ export class LocalTile3D {
       y: 12,
       color: 0x4a9e8e,
       geom: 'cylinder',
+      glbId: 'hedge',
+      glbSize: 26,
       key: 'planter',
     },
     {
@@ -319,6 +373,8 @@ export class LocalTile3D {
       y: 20,
       color: 0x7a8b9e,
       geom: 'box',
+      glbId: 'detail-crate',
+      glbSize: 32,
       key: 'server_rack',
     },
     {
@@ -349,6 +405,8 @@ export class LocalTile3D {
       y: ISO_WALL_H * 0.75,
       color: 0x4a8f4a,
       geom: 'box',
+      glbId: 'lantern',
+      glbSize: 34,
       key: 'phone_booth',
     },
     {
@@ -359,6 +417,8 @@ export class LocalTile3D {
       y: 6,
       color: 0xc47a4a,
       geom: 'box',
+      glbId: 'fountain-round',
+      glbSize: 44,
       key: 'break_area',
     },
     {
@@ -369,6 +429,8 @@ export class LocalTile3D {
       y: 6,
       color: 0xc4b8a0,
       geom: 'box',
+      glbId: 'detail-barrel',
+      glbSize: 28,
       key: 'reception',
     },
     {
@@ -389,6 +451,8 @@ export class LocalTile3D {
       y: 10,
       color: 0x5ba3d0,
       geom: 'cylinder',
+      glbId: 'lantern',
+      glbSize: 24,
       key: 'watercooler',
     },
     {
@@ -414,6 +478,7 @@ export class LocalTile3D {
   ];
 
   private buildFurnitureMeshes(world: LocalWorld): void {
+    const glbScale = new Vector3();
     for (const spec of LocalTile3D.FURNITURE_SPECS) {
       const tiles: Array<{ x: number; y: number }> = [];
       for (let y = 0; y < world.height; y++) {
@@ -424,6 +489,27 @@ export class LocalTile3D {
         }
       }
       if (tiles.length === 0) continue;
+
+      const glbVar = spec.glbId ? localGlbVariants?.get(spec.glbId) : undefined;
+      if (glbVar) {
+        const mesh = new InstancedMesh(glbVar.geometry, glbVar.materials, tiles.length);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        const s = (spec.glbSize ?? 28) * glbVar.norm;
+        glbScale.set(s, s, s);
+        for (let i = 0; i < tiles.length; i++) {
+          const t = tiles[i]!;
+          _pos.copy(localGridToWorld3D(t.x, t.y, 0));
+          _pos.y = -glbVar.minY * s + 1;
+          _q.identity();
+          _matrix.compose(_pos, _q, glbScale);
+          mesh.setMatrixAt(i, _matrix);
+        }
+        mesh.instanceMatrix.needsUpdate = true;
+        this.furnitureMeshes.set(spec.key, mesh);
+        this.group.add(mesh);
+        continue;
+      }
 
       const geom: BufferGeometry =
         spec.geom === 'cylinder'

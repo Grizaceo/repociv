@@ -16,7 +16,7 @@ import {
 
 import type { LocalWorld, LocalUnit, LocalNpc, LocalTile } from '../types.ts';
 import { LocalCamera3D, type LocalCamState, ISO_TILE_W, ISO_TILE_H } from './LocalCamera3D.ts';
-import { LocalTile3D } from './LocalTile3D.ts';
+import { LocalTile3D, ensureLocalFurniturePropsLoad } from './LocalTile3D.ts';
 import { LocalAgent3D } from './LocalAgent3D.ts';
 import { LocalPicker3D } from './LocalPicker3D.ts';
 
@@ -113,6 +113,7 @@ export class LocalScene3D {
 
     this.scene.add(this.tile3D.getGroup());
     this.scene.add(this.agent3D.getGroup());
+    ensureLocalFurniturePropsLoad();
 
     this.resizeObserver = new ResizeObserver(() => this.handleResize());
     this.resizeObserver.observe(container);

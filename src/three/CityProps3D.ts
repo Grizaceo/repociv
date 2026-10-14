@@ -26,6 +26,7 @@ type PropVariant = MergedGlb & { norm: number };
 type PropsState = 'idle' | 'loading' | 'ready' | 'failed';
 
 const KAYKIT_DIR = '/assets/3d/props/kaykit/buildings/red';
+const KENNEY_DIR = '/assets/3d/props/kenney';
 
 // Unique part ids across all recipes — one .gltf (+.bin+png) each.
 const PROP_IDS = [
@@ -38,7 +39,20 @@ const PROP_IDS = [
   'building_well_red',
 ] as const;
 
+export const BANNER_PROP_IDS = ['banner-green', 'banner-red'] as const;
+export type BannerPropId = (typeof BANNER_PROP_IDS)[number];
+
 type PartId = (typeof PROP_IDS)[number];
+
+export function cityBannerId(city: City, tile: Tile | undefined): BannerPropId {
+  if (tile?.skillHealth === 'broken' || tile?.skillHealth === 'stale') {
+    return 'banner-red';
+  }
+  if (city.buildings?.some((b) => b.state === 'failed')) {
+    return 'banner-red';
+  }
+  return 'banner-green';
+}
 
 interface RecipePart {
   id: PartId;
@@ -107,6 +121,7 @@ const CAPITAL_SUBURBS: RecipePart[] = [
 const LEVEL_RECIPE = ['hamlet', 'village', 'town', 'city'] as const;
 
 let variants: Map<PartId, PropVariant> | null = null;
+let bannerVariants: Map<BannerPropId, PropVariant> | null = null;
 let state: PropsState = 'idle';
 let lastSignature = '';
 const activeMeshes: InstancedMesh[] = [];
@@ -128,7 +143,7 @@ export function ensureCityPropsLoad(onSettled?: () => void): void {
   state = 'loading';
   const loader = new GLTFLoader();
   Promise.all(PROP_IDS.map((id) => loader.loadAsync(`${KAYKIT_DIR}/${id}.gltf`)))
-    .then((gltfs) => {
+    .then(async (gltfs) => {
       variants = new Map();
       for (let i = 0; i < PROP_IDS.length; i++) {
         const merged = mergeGlbScene(gltfs[i]!.scene);
@@ -140,12 +155,30 @@ export function ensureCityPropsLoad(onSettled?: () => void): void {
         const norm = 1 / Math.max(size.x, size.y, size.z, 1e-6);
         variants.set(PROP_IDS[i]!, { ...merged, norm });
       }
+      try {
+        const bannerGltfs = await Promise.all(
+          BANNER_PROP_IDS.map((id) => loader.loadAsync(`${KENNEY_DIR}/${id}.glb`)),
+        );
+        const bMap = new Map<BannerPropId, PropVariant>();
+        for (let i = 0; i < BANNER_PROP_IDS.length; i++) {
+          const merged = mergeGlbScene(bannerGltfs[i]!.scene);
+          merged.geometry.computeBoundingBox();
+          const bb = merged.geometry.boundingBox!;
+          const size = new Vector3().subVectors(bb.max, bb.min);
+          const norm = 1 / Math.max(size.x, size.y, size.z, 1e-6);
+          bMap.set(BANNER_PROP_IDS[i]!, { ...merged, norm });
+        }
+        bannerVariants = bMap;
+      } catch {
+        bannerVariants = null;
+      }
       state = 'ready';
       lastSignature = '';
       onSettled?.();
     })
     .catch(() => {
       variants = null;
+      bannerVariants = null;
       state = 'failed';
       onSettled?.();
     });
@@ -171,7 +204,13 @@ export function rebuildCityProps(
     return;
   }
 
-  const signature = cities.map((c) => `${c.id}:${c.isCapital ? 1 : 0}:L${cityLevel(c)}`).join('|');
+  const signature = cities
+    .map((c) => {
+      const tile = getTile(tileKey(c.coord));
+      const banner = cityBannerId(c, tile);
+      return `${c.id}:${c.isCapital ? 1 : 0}:L${cityLevel(c)}:${banner}`;
+    })
+    .join('|');
   if (signature === lastSignature && activeMeshes.length > 0) return;
   if (signature === lastSignature && cities.length === 0) return;
   lastSignature = signature;
@@ -234,6 +273,51 @@ export function rebuildCityProps(
     mesh.instanceMatrix.needsUpdate = true;
     activeMeshes.push(mesh);
     propsGroup.add(mesh);
+  }
+
+  // City status banners (banner-green.glb / banner-red.glb from Kenney Fantasy Town Kit CC0)
+  if (bannerVariants) {
+    const byBanner = new Map<BannerPropId, Array<{ city: City; cityRot: number }>>();
+    for (const city of cities) {
+      const tile = getTile(tileKey(city.coord));
+      const bId = cityBannerId(city, tile);
+      const cityRot = hashCoord(city.coord.q, city.coord.r) % 6;
+      const list = byBanner.get(bId);
+      if (list) list.push({ city, cityRot });
+      else byBanner.set(bId, [{ city, cityRot }]);
+    }
+
+    for (const [bId, items] of byBanner) {
+      const bVar = bannerVariants.get(bId);
+      if (!bVar || items.length === 0) continue;
+      bVar.geometry.computeBoundingBox();
+      const minY = bVar.geometry.boundingBox?.min.y ?? 0;
+      const bMesh = new InstancedMesh(bVar.geometry, bVar.materials, items.length);
+      bMesh.castShadow = true;
+      bMesh.receiveShadow = false;
+
+      for (let i = 0; i < items.length; i++) {
+        const { city, cityRot } = items[i]!;
+        const tile = getTile(tileKey(city.coord));
+        const elev = tile ? terrainElevation(tile.terrain) : 0;
+        const base = axialToWorld3D(city.coord.q, city.coord.r, elev);
+        const angle = cityRot * (Math.PI / 3);
+        const localX = Math.cos(angle) * HEX_SIZE * 0.42;
+        const localZ = Math.sin(angle) * HEX_SIZE * 0.42;
+        quat.setFromAxisAngle(up, angle);
+        const s = HEX_SIZE * 0.22 * bVar.norm;
+        const y = tile
+          ? terrainSurfaceY(tile, localX, localZ) - minY * s + PROP_SURFACE_CLEARANCE
+          : base.y - minY * s + PROP_SURFACE_CLEARANCE;
+        pos.set(base.x + localX, y, base.z + localZ);
+        scl.set(s, s, s);
+        matrix.compose(pos, quat, scl);
+        bMesh.setMatrixAt(i, matrix);
+      }
+      bMesh.instanceMatrix.needsUpdate = true;
+      activeMeshes.push(bMesh);
+      propsGroup.add(bMesh);
+    }
   }
 }
 

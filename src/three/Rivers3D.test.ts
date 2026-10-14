@@ -56,10 +56,11 @@ describe('Rivers3D', () => {
     expect(computeRiverPaths(tiles)).toEqual([]);
   });
 
-  it('rebuildRivers builds ribbon meshes and clears cleanly', () => {
+  it('rebuildRivers builds ribbon meshes and bridge crossings, and clears cleanly', () => {
     clearRivers();
     rebuildRivers(makeIsland());
-    expect(getRiverGroup().children.length).toBeGreaterThan(0);
+    // River ribbon + mouth foam + bridge crossing InstancedMesh
+    expect(getRiverGroup().children.length).toBeGreaterThanOrEqual(2);
     clearRivers();
     expect(getRiverGroup().children.length).toBe(0);
   });
