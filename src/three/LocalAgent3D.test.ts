@@ -188,6 +188,20 @@ describe('LocalAgent3D', () => {
     expect(claudeGroup!.children.length).toBe(scoutGroup!.children.length + 2);
   });
 
+  it('hot-swaps figurine when unitType changes on an existing agent', () => {
+    const la = new LocalAgent3D();
+    const u1 = makeUnit({ id: 'u1', unitType: 'scout' });
+    la.update([u1], [], 0.016);
+    const groupBefore = la.getGroup().children[0]!;
+    expect(groupBefore.children.length).toBe(3);
+
+    const u1Hero = makeUnit({ id: 'u1', unitType: 'claude' });
+    la.update([u1Hero], [], 0.016);
+    const groupAfter = la.getGroup().children[0]!;
+    expect(groupAfter).not.toBe(groupBefore);
+    expect(groupAfter.children.length).toBe(5);
+  });
+
   it('maps all agent roles to existing unit GLBs on disk', () => {
     expect(unitRoleGlbForType('claude')).toBe('unit-mage');
     expect(unitRoleGlbForType('codex')).toBe('unit-engineer');

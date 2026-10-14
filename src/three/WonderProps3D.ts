@@ -113,6 +113,10 @@ export function areWonderPropsReady(): boolean {
   return true; // procedural — a wonder can always be drawn
 }
 
+export function areWonderGlbPropsReady(): boolean {
+  return wonderGlbLoadState === 'ready';
+}
+
 /** Debug/capture probe: procedural props have no async load, so they are
  *  settled as soon as the module is live. Kept as a named probe because the
  *  screenshot tooling waits on it before framing a shot. */

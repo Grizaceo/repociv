@@ -282,3 +282,26 @@ def test_dispatch_dedup_is_queue_level_not_external_exactly_once(delivery_env):
     scheduler.enqueue_dict(_pending("c1"))
     assert _queue_ids() == ["c1"]
     assert _queue_file_ids(cfg) == ["c1"]
+
+
+def test_claimed_intent_normalizes_status_and_preserves_existing_queue(delivery_env):
+    """Replaying a claimed intent normalizes status to 'queued' and
+    requires_approval to False, and _init_from_disk merges without clobbering."""
+    cfg = delivery_env
+    store.add_approval(_pending("c1"))
+    store.resolve_approval("c1", approved=True)
+    assert _queue_file_ids(cfg) == ["c1"]
+
+    # Record and claim a second command whose raw dict still has pending_approval
+    raw_c2 = {**_pending("c2"), "status": "pending_approval", "requires_approval": True}
+    dispatch_ledger.record_intent("c2", raw_c2)
+    dispatch_ledger.claim_intent("c2")
+
+    _restart(cfg)
+    result = dispatch_ledger.recover_intents()
+    assert result["enqueued"] == ["c2"]
+    scheduler._init_from_disk()
+    snap = {c["id"]: c for c in scheduler.queue_snapshot()}
+    assert set(snap.keys()) == {"c1", "c2"}
+    assert snap["c2"]["status"] == "queued"
+    assert snap["c2"]["requires_approval"] is False

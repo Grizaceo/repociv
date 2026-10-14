@@ -14,7 +14,13 @@ import pytest
 import server.checkpoint as cp
 import server.workspace_issue as wi
 import server.locks as _locks
-from server.identifiers import IdentifierError, confine, validate_identifier
+from server.identifiers import (
+    IdentifierError,
+    confine,
+    confined_child,
+    confined_path,
+    validate_identifier,
+)
 from server.command_schema import CommandValidationError, validate_command
 
 
@@ -73,6 +79,19 @@ def test_confine_rejects_resolved_escape(tmp_path):
     (root / "link").symlink_to(outside, target_is_directory=True)
     with pytest.raises(IdentifierError):
         confine(root, root / "link" / "secret.txt")
+
+
+def test_confined_child_and_path_resolve_inside_root(tmp_path):
+    root = tmp_path / "store"
+    root.mkdir()
+    child = confined_child(root, "my-repo")
+    assert child == (root / "my-repo").resolve()
+    nested = confined_path(root, "my-repo", "ISS-42")
+    assert nested == (root / "my-repo" / "ISS-42").resolve()
+    with pytest.raises(IdentifierError):
+        confined_child(root, "..")
+    with pytest.raises(IdentifierError):
+        confined_path(root, "my-repo", "../escape")
 
 
 # ─── checkpoint.py confinement ────────────────────────────────────────────────

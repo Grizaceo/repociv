@@ -55,18 +55,19 @@ def _init_from_disk() -> None:
     global _queue
     persisted = _load_queue()
     terminal = {"completed", "failed", "cancelled", "rejected"}
-    seen: set[str] = set()
-    filtered: list[dict[str, Any]] = []
-    for c in persisted:
-        if c.get("status") in terminal:
-            continue
-        cid = str(c.get("id", ""))
-        if cid:
-            if cid in seen:
-                continue
-            seen.add(cid)
-        filtered.append(c)
     with _queue_lock:
+        combined = list(persisted) + list(_queue)
+        seen: set[str] = set()
+        filtered: list[dict[str, Any]] = []
+        for c in combined:
+            if c.get("status") in terminal:
+                continue
+            cid = str(c.get("id", ""))
+            if cid:
+                if cid in seen:
+                    continue
+                seen.add(cid)
+            filtered.append(c)
         _queue = filtered
         _resort()
         if len(filtered) != len(persisted):

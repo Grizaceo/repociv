@@ -324,7 +324,6 @@ export function rebuildCityProps(
 export function clearCityProps(): void {
   for (const mesh of activeMeshes) {
     propsGroup.remove(mesh);
-    propsGroup.remove(mesh);
     mesh.dispose();
   }
   activeMeshes.length = 0;

@@ -169,7 +169,7 @@ export function formatValidationResult(result: ValidationResult): FormattedValid
     verdict: result.verdict,
     verdict_label: style.label,
     summary_html: escapeHtml(result.summary),
-    checks_html: '',
+    checks_html: checksRows,
     limitations_html,
     followups_html,
   };

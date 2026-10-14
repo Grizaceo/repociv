@@ -289,8 +289,13 @@ def recover_intents() -> dict[str, list[str]]:
                 release_intent_if_unclaimed(command_id)
                 unresolved_ids.append(command_id)
                 continue
+            queued_cmd = {
+                **cmd_dict,
+                "requires_approval": False,
+                "status": "queued",
+            }
             try:
-                enqueued_ids = scheduler.enqueue_dict(cmd_dict)
+                enqueued_ids = scheduler.enqueue_dict(queued_cmd)
             except Exception:
                 logger.exception(
                     "Could not enqueue consumed intent %s; left unresolved",
@@ -306,8 +311,13 @@ def recover_intents() -> dict[str, list[str]]:
             if not isinstance(cmd_dict, dict):
                 unresolved_ids.append(command_id)
                 continue
+            queued_cmd = {
+                **cmd_dict,
+                "requires_approval": False,
+                "status": "queued",
+            }
             try:
-                enqueued_ids = scheduler.enqueue_dict(cmd_dict)
+                enqueued_ids = scheduler.enqueue_dict(queued_cmd)
             except Exception:
                 logger.exception(
                     "Could not re-enqueue claimed intent %s; left unresolved",

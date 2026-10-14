@@ -1284,6 +1284,7 @@ if __name__ == "__main__":
         return _token_ledger.get_ledger().get_agent_fatigue(unit_id)
 
     _sched.set_fatigue_provider(_fatigue_for)
+    _sched._init_from_disk()
     # Recover any commands that were running when the bridge last died
     recovered = _recover_hung_commands()
 

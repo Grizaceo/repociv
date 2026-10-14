@@ -237,6 +237,22 @@ describe('UnitProps3D role figurine mapping and GLB assets on disk', () => {
     expect(unitRoleGlbForType('lexo')).toBe('unit-knight');
   });
 
+  it('hot-swaps figurine group when unit type changes without resetting alive lifeState', () => {
+    const u1 = makeUnit('u1', 0, 0);
+    rebuildUnits([u1], getTile);
+    tickUnits(0.3, 0.3);
+    const entryBefore = _testGetEntry('u1')!;
+    expect(entryBefore.lifeState).toBe('alive');
+    const oldGroup = entryBefore.group;
+
+    const u1Promoted: Unit = { ...u1, type: 'claude' };
+    rebuildUnits([u1Promoted], getTile);
+    const entryAfter = _testGetEntry('u1')!;
+    expect(entryAfter.lifeState).toBe('alive');
+    expect(entryAfter.unitType).toBe('claude');
+    expect(entryAfter.group).not.toBe(oldGroup);
+  });
+
   it('has valid glTF 2.0 binary files (< 60 KB, tintable slot 1) on disk for all role figurines', async () => {
     expect(existsSync('public/assets/3d/props/unit-worker-0.glb')).toBe(true);
     const loader = new GLTFLoader();

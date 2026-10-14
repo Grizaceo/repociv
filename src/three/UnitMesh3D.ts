@@ -41,6 +41,8 @@ type UnitLifeState = 'spawning' | 'alive' | 'despawning';
 interface UnitEntry {
   group: Group;
   unitId: string;
+  unitType: Unit['type'];
+  usedGlb: boolean;
   lifeState: UnitLifeState;
   /** Tween progress 0→1 for spawn, 1→0 for despawn. */
   tween: number;
@@ -220,7 +222,7 @@ export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | und
   // the async load finishes, even when no unit moved.
   const signature =
     `uprops${areUnitPropsReady() ? 1 : 0}#` +
-    visibleUnits.map((u) => `${u.id}:${u.coord.q},${u.coord.r}:${u.state}`).join('|');
+    visibleUnits.map((u) => `${u.id}:${u.type}:${u.coord.q},${u.coord.r}:${u.state}`).join('|');
   if (signature === lastSignature) return;
   lastSignature = signature;
 
@@ -254,8 +256,23 @@ export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | und
       ? terrainSurfaceY(tile) + UNIT_SURFACE_CLEARANCE
       : pos.y + UNIT_SURFACE_CLEARANCE;
 
+    const propsReady = areUnitPropsReady();
     const existing = unitEntries.get(unit.id);
     if (existing && existing.lifeState !== 'despawning') {
+      // Hot-swap procedural capsule -> role GLB (or role change) without resetting lifecycle tween
+      if (existing.usedGlb !== propsReady || existing.unitType !== unit.type) {
+        const prevScale = existing.group.scale.x;
+        unitGroup.remove(existing.group);
+        disposeFigurine(existing.group);
+        const swapped = buildUnitFigurine(unit);
+        swapped.position.set(pos.x, targetY, pos.z);
+        swapped.scale.setScalar(prevScale);
+        swapped.userData.basePos = { x: pos.x, y: targetY, z: pos.z };
+        existing.group = swapped;
+        existing.usedGlb = propsReady;
+        existing.unitType = unit.type;
+        unitGroup.add(swapped);
+      }
       // Update path/movement state for the tween.
       existing.moving = unit.state === 'moving';
       existing.path = unit.path ? [...unit.path] : [];
@@ -291,6 +308,8 @@ export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | und
     const entry: UnitEntry = {
       group: fig,
       unitId: unit.id,
+      unitType: unit.type,
+      usedGlb: propsReady,
       lifeState: 'spawning',
       tween: 0,
       idlePhase: idlePhaseForId(unit.id),

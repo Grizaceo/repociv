@@ -71,11 +71,26 @@ def confine(root: Path | str, candidate: Path | str, *, label: str = "path") -> 
     component of it) points outside *root*, the operation is rejected
     before any mkdir/read/write/delete happens.
     """
-    root_resolved = Path(root).resolve()
+    root_path = Path(root)
+    root_resolved = root_path.resolve()
     candidate_path = Path(candidate)
     if candidate_path.is_absolute():
-        raise IdentifierError(f"{label} must be relative to the store root: {candidate_path!r}")
-    resolved = candidate_path.resolve()
+        # Only accept an absolute candidate when it was constructed under root
+        # (e.g. ``root / "link" / "file"``); arbitrary absolute paths such as
+        # ``/etc/passwd`` are rejected immediately.
+        try:
+            candidate_path.relative_to(root_path)
+        except ValueError:
+            try:
+                candidate_path.relative_to(root_resolved)
+            except ValueError as exc:
+                raise IdentifierError(
+                    f"{label} must be relative to the store root: {candidate_path!r}"
+                ) from exc
+        joined = candidate_path
+    else:
+        joined = root_resolved / candidate_path
+    resolved = joined.resolve()
     if resolved != root_resolved and root_resolved not in resolved.parents:
         raise IdentifierError(f"{label} escapes the store root: {candidate!r}")
     return resolved

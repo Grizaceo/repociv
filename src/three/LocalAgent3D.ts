@@ -29,6 +29,8 @@ type AgentLifeState = 'spawning' | 'alive' | 'despawning';
 interface AgentEntry {
   group: Group;
   unitId: string;
+  unitType: Unit['type'];
+  usedGlb: boolean;
   lifeState: AgentLifeState;
   /** Tween progress 0->1 for spawn, 1->0 for despawn. */
   tween: number;
@@ -83,16 +85,21 @@ export class LocalAgent3D {
 
   private computeSignature(units: LocalUnit[], npcs: LocalNpc[]): string {
     return [
+      areUnitPropsReady() ? 1 : 0,
       units.length,
       npcs.length,
       units
-        .map((u) => `${u.id}:${u.gridX},${u.gridY}:${u.state}:${u.despawning ? 'd' : 'a'}`)
+        .map(
+          (u) =>
+            `${u.id}:${u.unitType}:${u.gridX},${u.gridY}:${u.state}:${u.despawning ? 'd' : 'a'}`,
+        )
         .join('|'),
       npcs.map((n) => `${n.id}:${n.gridX},${n.gridY}`).join('|'),
     ].join('#');
   }
 
   private reconcile(units: LocalUnit[], npcs: LocalNpc[]): void {
+    const propsReady = areUnitPropsReady();
     const currentIds = new Set<string>();
     for (const u of units) currentIds.add(u.id);
     for (const n of npcs) currentIds.add(n.id);
@@ -105,17 +112,53 @@ export class LocalAgent3D {
       }
     }
 
-    // Spawn new units
+    // Spawn new units or hot-swap procedural -> GLB figurine when props load
     for (const unit of units) {
-      if (!this.entries.has(unit.id)) {
+      const existing = this.entries.get(unit.id);
+      if (!existing) {
         this.spawnAgent(unit.id, unit.color, HERO_TYPES.has(unit.unitType), unit.unitType);
+      } else if (
+        existing.lifeState !== 'despawning' &&
+        (existing.usedGlb !== propsReady || existing.unitType !== unit.unitType)
+      ) {
+        this.swapEntryFigurine(existing, unit.color, HERO_TYPES.has(unit.unitType), unit.unitType);
       }
     }
     for (const npc of npcs) {
-      if (!this.entries.has(npc.id)) {
+      const existing = this.entries.get(npc.id);
+      if (!existing) {
         this.spawnAgent(npc.id, npc.color, false, 'worker');
+      } else if (existing.lifeState !== 'despawning' && existing.usedGlb !== propsReady) {
+        this.swapEntryFigurine(existing, npc.color, false, 'worker');
       }
     }
+  }
+
+  private swapEntryFigurine(
+    entry: AgentEntry,
+    color: string,
+    isHero: boolean,
+    unitType: Unit['type'],
+  ): void {
+    const prevScale = entry.group.scale.x;
+    const prevPos = entry.group.position.clone();
+    this.group.remove(entry.group);
+    entry.group.traverse((obj) => {
+      const m = obj as Mesh;
+      if (m.isMesh) {
+        if (!m.userData.sharedGeometry) m.geometry.dispose();
+        if (Array.isArray(m.material)) m.material.forEach((mt) => mt.dispose());
+        else m.material.dispose();
+      }
+    });
+    const nextGroup = this.buildFigurine(isHero, new Color(color), unitType);
+    nextGroup.castShadow = true;
+    nextGroup.position.copy(prevPos);
+    nextGroup.scale.setScalar(prevScale);
+    entry.group = nextGroup;
+    entry.unitType = unitType;
+    entry.usedGlb = areUnitPropsReady();
+    this.group.add(nextGroup);
   }
 
   private spawnAgent(
@@ -129,6 +172,8 @@ export class LocalAgent3D {
     const entry: AgentEntry = {
       group,
       unitId: id,
+      unitType,
+      usedGlb: areUnitPropsReady(),
       lifeState: 'spawning',
       tween: 0,
       idlePhase: Math.random() * Math.PI * 2,
