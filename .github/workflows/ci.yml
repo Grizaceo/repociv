@@ -82,7 +82,37 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Seed demo workspace state for e2e
+        # A fresh runner has no active map root and no repo selection, so the
+        # UI opens the picker wizard and the map is empty — most specs then
+        # fail on missing elements. Seed the state the bridge and the Vite
+        # plugin share, pointing at the synthetic demo workspace shipped in
+        # the repo (the same fixture the judge demo uses).
+        env:
+          REPOCIV_MAP_ROOT: ${{ github.workspace }}/demo-workspace
+          REPOCIV_STATE_FILE: ${{ github.workspace }}/.e2e-state.json
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const root = process.env.REPOCIV_MAP_ROOT;
+            const repos = fs.readdirSync(root, { withFileTypes: true })
+              .filter((d) => d.isDirectory() && !d.name.startsWith("."))
+              .map((d) => `${root}/${d.name}`)
+              .sort();
+            const now = new Date().toISOString();
+            fs.writeFileSync(process.env.REPOCIV_STATE_FILE, JSON.stringify({
+              version: 1,
+              activeRoot: root,
+              roots: { [root]: { selectedRepoPaths: repos, addedAt: now, lastSeen: now } },
+            }, null, 2));
+          '
+
       - name: Run e2e
+        env:
+          REPOCIV_MAP_ROOT: ${{ github.workspace }}/demo-workspace
+          WORKSPACE_ROOT: ${{ github.workspace }}/demo-workspace
+          REPOCIV_REPOS_ROOT: ${{ github.workspace }}/demo-workspace
+          REPOCIV_STATE_FILE: ${{ github.workspace }}/.e2e-state.json
         run: npx playwright test
 
       - name: Run golden captures (informative; GPU-dependent)
