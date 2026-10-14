@@ -1,5 +1,7 @@
+import { existsSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { LocalAgent3D } from './LocalAgent3D.ts';
+import { UNIT_ROLE_GLB_IDS, unitRoleGlbForType } from './UnitProps3D.ts';
 import type { LocalUnit, LocalNpc } from '../types.ts';
 
 function makeUnit(overrides: Partial<LocalUnit> = {}): LocalUnit {
@@ -174,5 +176,25 @@ describe('LocalAgent3D', () => {
     }
     const child = la.getGroup().children[0];
     expect(child).toBeDefined();
+  });
+
+  it('adds hero crown and halo meshes for HERO_TYPES vs non-hero roles', () => {
+    const la = new LocalAgent3D();
+    const claude = makeUnit({ id: 'c1', unitType: 'claude', color: '#d4a574' });
+    const scout = makeUnit({ id: 's1', unitType: 'scout', color: '#5b9bd5' });
+    la.update([claude, scout], [], 0.016);
+    const [claudeGroup, scoutGroup] = la.getGroup().children;
+    // Hero figurine has 2 extra crown/halo meshes compared to non-hero figurine
+    expect(claudeGroup!.children.length).toBe(scoutGroup!.children.length + 2);
+  });
+
+  it('maps all agent roles to existing unit GLBs on disk', () => {
+    expect(unitRoleGlbForType('claude')).toBe('unit-mage');
+    expect(unitRoleGlbForType('codex')).toBe('unit-engineer');
+    expect(unitRoleGlbForType('scout')).toBe('unit-rogue');
+    expect(unitRoleGlbForType('praetorian')).toBe('unit-knight');
+    for (const roleId of UNIT_ROLE_GLB_IDS) {
+      expect(existsSync(`public/assets/3d/props/units/${roleId}.glb`)).toBe(true);
+    }
   });
 });

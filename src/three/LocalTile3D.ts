@@ -28,6 +28,11 @@ export const LOCAL_FURNITURE_GLB_IDS = [
   'hedge',
   'detail-crate',
   'detail-barrel',
+  'desk',
+  'chairDesk',
+  'loungeSofa',
+  'tableConference',
+  'bookcaseOpen',
 ] as const;
 
 export type LocalFurnitureGlbId = (typeof LOCAL_FURNITURE_GLB_IDS)[number];
@@ -82,7 +87,7 @@ const ZONE_FLOOR_COLORS: Record<string, number> = {
 };
 
 // Extension → color map (matching isoLocalRenderer.ts ext color system)
-const EXT_COLORS: Record<string, number> = {
+export const EXT_COLORS: Record<string, number> = {
   ts: 0x4a8fb5,
   tsx: 0x4a8fb5,
   js: 0xd4b04a,
@@ -138,6 +143,11 @@ export class LocalTile3D {
   /** Expose floor InstancedMesh for raycast picking. */
   getFloorMesh(): InstancedMesh | null {
     return this.floorMesh;
+  }
+
+  /** Expose workbench InstancedMesh for inspection and picking. */
+  getWorkbenchMesh(): InstancedMesh | null {
+    return this.workbenchMesh;
   }
 
   /** Rebuild all InstancedMeshes if the world signature changed.
@@ -264,6 +274,30 @@ export class LocalTile3D {
     }
     if (wbTiles.length === 0) return;
 
+    const deskGlb = localGlbVariants?.get('desk');
+    if (deskGlb) {
+      this.workbenchMesh = new InstancedMesh(deskGlb.geometry, deskGlb.materials, wbTiles.length);
+      this.workbenchMesh.castShadow = true;
+      this.workbenchMesh.receiveShadow = true;
+      const s = 30 * deskGlb.norm;
+      const glbScale = new Vector3(s, s, s);
+      const color = new Color();
+      for (let i = 0; i < wbTiles.length; i++) {
+        const wb = wbTiles[i]!;
+        _pos.copy(localGridToWorld3D(wb.x, wb.y, 0));
+        _pos.y = -deskGlb.minY * s + 1;
+        _q.identity();
+        _matrix.compose(_pos, _q, glbScale);
+        this.workbenchMesh.setMatrixAt(i, _matrix);
+        color.setHex(EXT_COLORS[wb.ext] ?? 0x8a8a8a);
+        this.workbenchMesh.setColorAt(i, color);
+      }
+      this.workbenchMesh.instanceMatrix.needsUpdate = true;
+      if (this.workbenchMesh.instanceColor) this.workbenchMesh.instanceColor.needsUpdate = true;
+      this.group.add(this.workbenchMesh);
+      return;
+    }
+
     const geom = new BoxGeometry(ISO_TILE_W * 0.7, 8, ISO_TILE_W * 0.7);
     const mat = new MeshStandardMaterial({ roughness: 0.6 });
     this.geometries.push(geom);
@@ -341,6 +375,8 @@ export class LocalTile3D {
       y: 3,
       color: 0x8b6b4a,
       geom: 'box',
+      glbId: 'chairDesk',
+      glbSize: 22,
       key: 'chair',
     },
     {
@@ -385,6 +421,8 @@ export class LocalTile3D {
       y: 6,
       color: 0xc47a4a,
       geom: 'box',
+      glbId: 'loungeSofa',
+      glbSize: 38,
       key: 'sofa',
     },
     {
@@ -395,6 +433,8 @@ export class LocalTile3D {
       y: 3,
       color: 0xd49b3a,
       geom: 'box',
+      glbId: 'tableConference',
+      glbSize: 42,
       key: 'meeting_room',
     },
     {
@@ -441,6 +481,8 @@ export class LocalTile3D {
       y: 8,
       color: 0x8b7355,
       geom: 'box',
+      glbId: 'desk',
+      glbSize: 28,
       key: 'standing_desk',
     },
     {
@@ -473,6 +515,8 @@ export class LocalTile3D {
       y: 4,
       color: 0x9a8fc4,
       geom: 'box',
+      glbId: 'bookcaseOpen',
+      glbSize: 32,
       key: 'research_bench',
     },
   ];

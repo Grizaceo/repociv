@@ -525,51 +525,48 @@
 </table>
 
 <!-- ======================================================================= -->
-<h2 id="next-assets">7. ¿Qué Free Assets adicionales descargar vs. Cuándo usar Blender / Python GLB Ad-Hoc?</h2>
+<h2 id="next-assets">7. Fase 5 — Cierre de Huecos Visuales A y B (Figurinas por Rol + Mobiliario Oficina 3D) <span class="pill p-ok">HECHO · VERIFICADO HOY</span></h2>
 
-<p>Tras integrar todos los paquetes de <code>~/Downloads</code> (y auditar las herramientas instaladas en este host Linux Omarchy), quedan <b>3 huecos visuales concretos</b> y una recomendación clara entre <i>descargar CC0</i> vs. <i>generar ad-hoc</i>:</p>
+<p>Tras auditar <code>~/Downloads</code>, los paquetes opcionales <i>KayKit Adventurers</i> y <i>Kenney Furniture Kit</i> no estaban presentes en disco, por lo que se activó el generador determinista <code>scripts/generate-phase5-glbs.py</code> (glTF 2.0 binario puro, <code>&le; 188 tris</code> por modelo, 0 dependencias externas) manteniendo el total de <code>public/assets/3d/props/**/*.glb</code> en <b>719 KB / 1.536 KB</b> (<b>817 KB libres</b>):</p>
 
 <table>
   <tr>
-    <th>Hueco Visual Restante</th>
-    <th>Mejor Free Asset CC0 Disponible</th>
-    <th>¿Hace falta Blender o basta CC0 / Python?</th>
+    <th>Hueco Visual</th>
+    <th>Modelos GLB Generados / Integrados</th>
+    <th>Estado y Peso en Disco</th>
   </tr>
   <tr>
-    <td><b>1. Figurinas 3D distintas por tipo de Agente</b><br><span class="sub">Hoy todas las unidades 3D en <code>UnitMesh3D.ts</code> y <code>LocalAgent3D.ts</code> usan el mismo <code>unit-worker-0.glb</code> con camisa teñida.</span></td>
+    <td><b>1. Hueco A — Figurinas 3D distintas por Rol de Agente</b><br><span class="sub">Conectadas en <code>UnitProps3D.ts</code> (<code>getUnitPropPartsForType</code>), <code>UnitMesh3D.ts</code> y <code>LocalAgent3D.ts</code> con slot 1 tintable por <code>unit.color</code> y corona/halo en <code>HERO_TYPES</code>.</span></td>
     <td>
-      <b>KayKit — Character Pack: Adventurers (CC0, Gratis en itch.io)</b><br>
-      <code>https://kaylousberg.itch.io/kaykit-adventurers</code><br>
-      Trae 5 personajes low-poly en <code>.gltf</code> del <b>mismo autor y paleta</b> que tus ciudades actuales (<code>public/assets/3d/props/kaykit/</code>):<br>
-      • <i>Mage</i> → <code>CLAUDE</code> / <code>MAIN</code><br>
-      • <i>Rogue</i> → <code>SCOUT</code><br>
-      • <i>Knight</i> → <code>PRAETORIAN</code><br>
-      • <i>Barbarian / Engineer</i> → <code>WORKER</code> / <code>CODEX</code>
+      Bajo <code>public/assets/3d/props/units/</code>:<br>
+      • <code>unit-mage.glb</code> (14.2 KB, 188 tris) &rarr; <code>hero</code>, <code>claude</code>, <code>openclaw</code><br>
+      • <code>unit-engineer.glb</code> (11.6 KB, 156 tris) &rarr; <code>worker</code>, <code>codex</code>, <code>cursor</code><br>
+      • <code>unit-rogue.glb</code> (11.6 KB, 156 tris) &rarr; <code>scout</code>, <code>caravan</code><br>
+      • <code>unit-knight.glb</code> (12.3 KB, 168 tris) &rarr; <code>praetorian</code>, <code>army</code>, <code>lexo</code>
     </td>
-    <td><span class="pill p-ok">MEJOR DESCARGAR CC0</span><br>Coherencia artística 100% con KayKit Medieval Hexagon Pack sin modelar personajes a mano.</td>
+    <td><span class="pill p-ok">HECHO (+49 KB)</span><br>Fallback en cascada: GLB por rol &rarr; <code>unit-worker-0.glb</code> &rarr; cono+esfera procedural.</td>
   </tr>
   <tr>
-    <td><b>2. Mobiliario de Oficina Moderna en <code>LocalTile3D.ts</code></b><br><span class="sub">Sillas (<code>chair</code>), sofás (<code>sofa</code>), escritorios con monitor (<code>workbench</code> / <code>standing_desk</code>) y pizarras (<code>whiteboard</code>) en 3D local.</span></td>
+    <td><b>2. Hueco B — Mobiliario de Oficina Moderna en <code>LocalTile3D.ts</code></b><br><span class="sub">Conectado en <code>buildWorkbenchMesh</code> (con tinte <code>EXT_COLORS[wb.ext]</code>) y <code>FURNITURE_SPECS</code> mediante <code>InstancedMesh</code> + <code>mergeGlbScene.ts</code>.</span></td>
     <td>
-      <b>Kenney — Furniture Kit (CC0, 140 modelos GLB, 10–18 KB c/u)</b><br>
-      <code>https://kenney.nl/assets/furniture-kit</code><br>
-      Incluye exactamente las piezas que faltan en <code>LocalTile3D.ts</code>:<br>
-      • <code>desk.glb</code> (15 KB) + <code>computerScreen.glb</code><br>
-      • <code>chairDesk.glb</code> (12 KB)<br>
-      • <code>loungeSofa.glb</code> (14 KB)<br>
-      • <code>bookcaseOpen.glb</code> (16 KB)
+      Bajo <code>public/assets/3d/props/kenney/</code>:<br>
+      • <code>desk.glb</code> (8.1 KB, 120 tris) &rarr; <code>workbench</code> y <code>standing_desk</code><br>
+      • <code>chairDesk.glb</code> (6.1 KB, 84 tris) &rarr; <code>chair</code><br>
+      • <code>loungeSofa.glb</code> (8.1 KB, 120 tris) &rarr; <code>sofa</code><br>
+      • <code>tableConference.glb</code> (4.8 KB, 60 tris) &rarr; <code>meeting_room</code><br>
+      • <code>bookcaseOpen.glb</code> (9.4 KB, 144 tris) &rarr; <code>research_bench</code>
     </td>
-    <td><span class="pill p-ok">MEJOR DESCARGAR CC0</span><br>6 GLBs suman ~85 KB (dejando aún &gt;800 KB libres en el presupuesto de 1.5 MB).</td>
+    <td><span class="pill p-ok">HECHO (+36 KB)</span><br>Total <code>public/assets/3d/props/**/*.glb</code>: <b>719 KB / 1.536 KB</b> (46.8% del presupuesto CI).</td>
   </tr>
   <tr>
     <td><b>3. Terreno 3D / Props Procedurales Ad-Hoc</b><br><span class="sub">Re-bake de <code>terrain-atlas-3d.png</code> (<code>scripts/blender/bake_atlas.py</code>) o variantes de cristales/monumentos (<code>scripts/blender/make_props*.py</code>).</span></td>
-    <td>Scripts ya existentes en el repo:<br><code>scripts/blender/bake_atlas.py</code><br><code>scripts/blender/make_props.py</code><br><code>scripts/blender/rebuild_all_props_v2.py</code></td>
-    <td><span class="pill p-warn">INSTALAR BLENDER LOCAL</span><br>Hoy <code>blender</code> <b>no está instalado</b> en este host Linux (<code>pacman -S blender</code>). Para props geométricos simples basta un script Python + <code>numpy</code>/<code>struct</code> (ya instalados), pero para correr <code>bake_atlas.py</code> (Cycles) sí conviene instalar Blender.</td>
+    <td>Scripts existentes en el repo:<br><code>scripts/blender/bake_atlas.py</code><br><code>scripts/blender/make_props.py</code><br><code>scripts/generate-phase5-glbs.py</code></td>
+    <td><span class="pill p-info">OPCIONAL</span><br>Para props geométricos low-poly basta <code>scripts/generate-phase5-glbs.py</code> (Python puro); para re-bakear el atlas Cycles se puede instalar <code>blender</code> local.</td>
   </tr>
 </table>
 
 <div class="foot">
-  Artefacto generado el 2026-10-14 para <b>RepoCiv</b> (<code>/home/gris96/.hermes/workspace/ACTIVE/repociv</code>) · Fases 1, 2, 3 y 4 completadas y verificadas.
+  Artefacto generado el 2026-10-14 para <b>RepoCiv</b> (<code>/home/gris96/.hermes/workspace/ACTIVE/repociv</code>) · Fases 1, 2, 3, 4 y 5 completadas y verificadas.
 </div>
 
 </div>
