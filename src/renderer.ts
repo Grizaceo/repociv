@@ -1478,6 +1478,9 @@ export class Renderer {
           : undefined;
 
         if (lodLow) {
+          if (tile.city && shouldDrawDecor) {
+            this.hexR.drawCitySprite(tile.city, axialToPixel(tile.coord, HEX_SIZE), 0.85);
+          }
           if (tile.city && tile.city.isCapital && showTextLabels) {
             this.hexR.drawCityLabel(tile.city, axialToPixel(tile.coord, HEX_SIZE), activeBuilding);
           }
@@ -1485,12 +1488,26 @@ export class Renderer {
         }
 
         if (lodMed) {
+          const pos = axialToPixel(tile.coord, HEX_SIZE);
+          if (shouldDrawDecor && !isClean) {
+            this.hexR.drawTerrainDecorForTile(tile, this.fogEnabled, this.animTime);
+            if (tile.city) {
+              const alpha = tile.inFog && this.fogEnabled ? 0.35 : 1;
+              this.hexR.drawCitySprite(tile.city, pos, alpha);
+            }
+          }
           const labelThisCity = tile.city ? (medLabelIds?.has(tile.city.id) ?? true) : false;
+          const isFocusedCity =
+            tile.city &&
+            (this.selectedCity?.id === tile.city.id ||
+              (this.hoveredHex !== null &&
+                this.hoveredHex.q === tile.coord.q &&
+                this.hoveredHex.r === tile.coord.r));
           if (tile.city && showTextLabels && labelThisCity) {
-            this.hexR.drawCityLabel(tile.city, axialToPixel(tile.coord, HEX_SIZE), activeBuilding);
+            this.hexR.drawCityLabel(tile.city, pos, activeBuilding, !isFocusedCity);
           }
           if (tile.city && tile.skillHealth && showTextLabels && labelThisCity) {
-            this.hexR.drawSkillHealth(tile, axialToPixel(tile.coord, HEX_SIZE));
+            this.hexR.drawSkillHealth(tile, pos);
           }
           if (
             tile.city &&
@@ -1764,6 +1781,16 @@ export class Renderer {
     if (this.selectedUnit && this.actionMode === 'move') {
       this.unitR.drawMoveRange(this.selectedUnit);
       this.unitR.drawMovementPath(this.selectedUnit);
+    } else if (!webglMode && showOps && !isClean && lod !== 'low') {
+      for (const unit of this.state.world.units) {
+        if (unit.hidden) continue;
+        if (
+          unit.path.length > 1 &&
+          (unit.state === 'moving' || this.selectedUnit?.id === unit.id)
+        ) {
+          this.unitR.drawMovementPath(unit);
+        }
+      }
     }
 
     // Update breadcrumb for current selection

@@ -121,17 +121,48 @@ export class UnitRenderer {
     return off ? { x: p.x + off.x, y: p.y + off.y } : p;
   }
 
+  private traceSmoothSpline(pts: Array<{ x: number; y: number }>) {
+    const { ctx } = this;
+    if (pts.length === 0) return;
+    ctx.beginPath();
+    ctx.moveTo(pts[0]!.x, pts[0]!.y);
+    if (pts.length === 2) {
+      ctx.lineTo(pts[1]!.x, pts[1]!.y);
+      return;
+    }
+    for (let i = 1; i < pts.length - 1; i++) {
+      const curr = pts[i]!;
+      const next = pts[i + 1]!;
+      const mx = (curr.x + next.x) * 0.5;
+      const my = (curr.y + next.y) * 0.5;
+      ctx.quadraticCurveTo(curr.x, curr.y, mx, my);
+    }
+    const last = pts[pts.length - 1]!;
+    ctx.lineTo(last.x, last.y);
+  }
+
   drawUnitTrail(unit: Unit) {
     if (!unit.trailPositions || unit.trailPositions.length === 0) return;
     const { ctx } = this;
+    const pts = unit.trailPositions.map((pos) => this.tilePos(pos));
     ctx.save();
-    unit.trailPositions.forEach((pos, i) => {
-      const alpha = ((i + 1) / unit.trailPositions!.length) * 0.4;
-      const p = this.tilePos(pos);
+    if (pts.length >= 2) {
+      ctx.strokeStyle = unit.color || '#c8a84b';
+      ctx.globalAlpha = 0.28;
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.setLineDash([5, 6]);
+      this.traceSmoothSpline(pts);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    pts.forEach((p, i) => {
+      const alpha = ((i + 1) / pts.length) * 0.45;
       ctx.globalAlpha = alpha;
       ctx.fillStyle = unit.color;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
       ctx.fill();
     });
     ctx.globalAlpha = 1.0;
@@ -396,20 +427,73 @@ export class UnitRenderer {
   }
 
   drawMovementPath(unit: Unit) {
-    if (unit.path.length === 0) return;
+    if (unit.path.length < 2) return;
+    const startIdx = Math.max(0, Math.min(unit.pathIndex ?? 0, unit.path.length - 2));
+    const coords = unit.path.slice(startIdx);
+    if (coords.length < 2) return;
+
+    const pts = coords.map((c) => this.tilePos(c));
     const { ctx } = this;
+    const accent = unit.color || '#f0c050';
+
     ctx.save();
-    ctx.strokeStyle = '#c8a84b';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([6, 4]);
-    ctx.beginPath();
-    const start = this.tilePos(unit.path[0]!);
-    ctx.moveTo(start.x, start.y);
-    for (let i = 1; i < unit.path.length; i++) {
-      const p = this.tilePos(unit.path[i]!);
-      ctx.lineTo(p.x, p.y);
-    }
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // 1. Dark outer casing (tranberry-bysa3-movementpath2 style)
+    ctx.strokeStyle = 'rgba(18, 12, 4, 0.85)';
+    ctx.lineWidth = 6.5;
+    this.traceSmoothSpline(pts);
     ctx.stroke();
+
+    // 2. Inner golden/agent ribbon
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 3.5;
+    this.traceSmoothSpline(pts);
+    ctx.stroke();
+
+    // 3. Directional arrowhead at destination hex
+    const prev = pts[pts.length - 2]!;
+    const dest = pts[pts.length - 1]!;
+    const angle = Math.atan2(dest.y - prev.y, dest.x - prev.x);
+    const arrowLen = 11;
+    const arrowSpread = Math.PI * 0.78;
+    ctx.save();
+    ctx.translate(dest.x, dest.y);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(4, 0);
+    ctx.lineTo(4 - arrowLen, Math.sin(arrowSpread) * arrowLen);
+    ctx.lineTo(4 - arrowLen * 0.65, 0);
+    ctx.lineTo(4 - arrowLen, -Math.sin(arrowSpread) * arrowLen);
+    ctx.closePath();
+    ctx.fillStyle = accent;
+    ctx.strokeStyle = 'rgba(18, 12, 4, 0.9)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fill();
+    ctx.restore();
+
+    // 4. Numbered step/turn cost pips along waypoints (1, 2, ...)
+    for (let i = 1; i < pts.length; i++) {
+      const p = pts[i]!;
+      const isLast = i === pts.length - 1;
+      const r = isLast ? 9 : 7.5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(20, 14, 6, 0.92)';
+      ctx.fill();
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+
+      ctx.fillStyle = '#f5e6c4';
+      ctx.font = `bold ${isLast ? 9.5 : 8.5}px 'Cinzel', sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(i), p.x, p.y + 0.5);
+    }
+
     ctx.restore();
   }
 

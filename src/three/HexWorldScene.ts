@@ -62,6 +62,12 @@ import {
   clearUnits,
   tickUnits,
 } from './UnitMesh3D.ts';
+import {
+  getUnitPathGroup,
+  rebuildUnitPaths,
+  setUnitPathsVisible,
+  clearUnitPaths,
+} from './UnitPathRibbon3D.ts';
 import { rebuildMapLabels, getLabelGroup } from './MapLabels3D.ts';
 import { rebuildGroundPlane, getGroundMesh, disposeGroundMesh } from './GroundPlane3D.ts';
 import {
@@ -238,6 +244,7 @@ export function createHexWorldScene(): Scene {
   scene.add(getResourcePropsGroup());
   scene.add(getTerrainScatterGroup());
   scene.add(getTileYieldsGroup());
+  scene.add(getUnitPathGroup());
   scene.add(getUnitGroup());
   scene.add(getTileFlashGroup());
   scene.add(getTilePopupGroup());
@@ -1250,6 +1257,12 @@ export function updateHexWorldScene(
 
   setUnitsVisible(true);
   rebuildUnits(state.world.units, (key) => state.world.tiles.get(key));
+  setUnitPathsVisible(opts.showOps);
+  rebuildUnitPaths(
+    state.world.units,
+    (key) => state.world.tiles.get(key),
+    state.selectedUnit?.id ?? null,
+  );
 
   // Wonder 3D props follow the structure layer — otherwise the 3D map would
   // show a wonder tile with no model on it.
@@ -1278,6 +1291,7 @@ export function disposeHexWorldScene(scene: Scene): void {
   disposeSkyDome();
   clearCityClusters();
   clearUnits();
+  clearUnitPaths();
   clearTileFlash();
   clearTilePopup();
   clearFogTransition();

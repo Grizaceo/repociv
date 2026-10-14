@@ -11,6 +11,7 @@ import { HEX_SIZE } from './constants.ts';
 
 export class HexRenderer {
   private patterns: Record<string, CanvasPattern | null> = {};
+  private hexTileSprites: Record<string, HTMLImageElement | HTMLCanvasElement> = {};
   private assetsLoaded = false;
   private readonly _labelWidthCache = new Map<string, number>();
 
@@ -22,6 +23,9 @@ export class HexRenderer {
     // ── Load atlas manifest ──
     let manifest: {
       terrainAtlas: string;
+      hexTilesAtlas?: string;
+      hexTileSize?: number;
+      hexTileRects?: Record<string, number[]>;
       decorAtlas: string;
       cellSize: number;
       terrainRects: Record<string, number[]>;
@@ -95,6 +99,17 @@ export class HexRenderer {
         }
       }
 
+      // ── 2.5D bevelled hex tile sprites (SBS CC0) ──
+      if (manifest.hexTilesAtlas && manifest.hexTileRects) {
+        const hexImg = await loadImage(manifest.hexTilesAtlas);
+        const hexCellSize = manifest.hexTileSize ?? 256;
+        const hexSprites: Record<string, HTMLImageElement | HTMLCanvasElement> = {};
+        for (const [name, rect] of Object.entries(manifest.hexTileRects)) {
+          hexSprites[name] = extractToCanvas(hexImg, rect, hexCellSize);
+        }
+        this.hexTileSprites = hexSprites;
+      }
+
       // ── Decor atlas → individual sprite canvases ──
       const decorImg = await loadImage(manifest.decorAtlas);
       for (const [name, rect] of Object.entries(manifest.decorRects)) {
@@ -142,26 +157,38 @@ export class HexRenderer {
     ctx.save();
     ctx.globalAlpha = alpha;
 
+    const hexSprite = this.hexTileSprites[tile.terrain] || this.hexTileSprites['plains'];
     const pattern = this.patterns[tile.terrain] || this.patterns['plains'];
-    if (this.assetsLoaded && pattern) {
-      ctx.fillStyle = pattern;
-    } else if (colors.gradient) {
-      const grad = ctx.createRadialGradient(
-        pos.x - HEX_SIZE * 0.2,
-        pos.y - HEX_SIZE * 0.2,
-        HEX_SIZE * 0.1,
-        pos.x,
-        pos.y,
-        HEX_SIZE * 0.85,
+    if (this.assetsLoaded && hexSprite) {
+      // Pointy-topped 2.5D bevelled hex sprite (radius = 0.465 * cell, center Y = 125/256)
+      const drawSize = (HEX_SIZE * 1.005) / 0.465;
+      ctx.drawImage(
+        hexSprite,
+        pos.x - drawSize / 2,
+        pos.y - drawSize * (125 / 256),
+        drawSize,
+        drawSize,
       );
-      grad.addColorStop(0, colors.gradient[0]!);
-      grad.addColorStop(1, colors.gradient[1]!);
-      ctx.fillStyle = grad;
     } else {
-      ctx.fillStyle = colors.fill;
+      if (this.assetsLoaded && pattern) {
+        ctx.fillStyle = pattern;
+      } else if (colors.gradient) {
+        const grad = ctx.createRadialGradient(
+          pos.x - HEX_SIZE * 0.2,
+          pos.y - HEX_SIZE * 0.2,
+          HEX_SIZE * 0.1,
+          pos.x,
+          pos.y,
+          HEX_SIZE * 0.85,
+        );
+        grad.addColorStop(0, colors.gradient[0]!);
+        grad.addColorStop(1, colors.gradient[1]!);
+        ctx.fillStyle = grad;
+      } else {
+        ctx.fillStyle = colors.fill;
+      }
+      this.fillHex(pos.x, pos.y, HEX_SIZE);
     }
-
-    this.fillHex(pos.x, pos.y, HEX_SIZE);
 
     // Shoreline effect (Ocean tiles touching land)
     if (tile.terrain === 'ocean') {
@@ -194,7 +221,22 @@ export class HexRenderer {
     ctx.restore();
 
     // Fog of War
-    if (!tile.revealed && this.patterns['fog']) {
+    const fogSprite = this.hexTileSprites['fog'];
+    if (!tile.revealed && this.assetsLoaded && fogSprite) {
+      const drawSize = (HEX_SIZE * 1.005) / 0.465;
+      ctx.save();
+      ctx.drawImage(
+        fogSprite,
+        pos.x - drawSize / 2,
+        pos.y - drawSize * (125 / 256),
+        drawSize,
+        drawSize,
+      );
+      ctx.globalAlpha = 0.25;
+      ctx.fillStyle = '#000';
+      this.fillHex(pos.x, pos.y, HEX_SIZE);
+      ctx.restore();
+    } else if (!tile.revealed && this.patterns['fog']) {
       ctx.save();
       ctx.fillStyle = this.patterns['fog']!;
       this.fillHex(pos.x, pos.y, HEX_SIZE);
@@ -236,13 +278,63 @@ export class HexRenderer {
       ctx.restore();
     }
 
-    if (tile.city) this.drawCityLabel(tile.city, pos, activeBuilding);
+    if (tile.city) {
+      this.drawCitySprite(tile.city, pos, alpha);
+      this.drawCityLabel(tile.city, pos, activeBuilding);
+    }
     // Wonder districts get rich building visuals instead of plain text labels
     if (tile.district?.type === 'wonder' && tile.district.wonderType) {
       this.drawWonderDistrict(tile.district, pos);
     } else if (tile.district) {
       this.drawDistrictLabel(tile.district.name, pos);
     }
+  }
+
+  /** Public: draw terrain decor for a tile at medium/high LOD without labels. */
+  drawTerrainDecorForTile(tile: Tile, fogEnabled: boolean, animTime?: number) {
+    if (!tile.revealed) return;
+    if (tile.city) return; // City sprite occupies the tile center
+    const pos = axialToPixel(tile.coord, HEX_SIZE);
+    const alpha = tile.inFog && fogEnabled ? 0.35 : 1;
+    this.drawTerrainDecor(tile.terrain, pos, alpha, animTime);
+  }
+
+  /** Public: draw 2D building cluster sprite for a city by level (hamlet/village/town/capital). */
+  drawCitySprite(city: City, pos: { x: number; y: number }, alpha = 1) {
+    const { ctx } = this;
+    const pop = city.population ?? 1;
+    const spriteKey = city.isCapital
+      ? 'city_capital'
+      : pop >= 8
+        ? 'city_town'
+        : pop >= 4
+          ? 'city_village'
+          : 'city_hamlet';
+    const sprite = this.spriteImages[spriteKey];
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    if (this.assetsLoaded && sprite) {
+      const size = city.isCapital ? HEX_SIZE * 1.55 : HEX_SIZE * 1.35;
+      ctx.drawImage(sprite, pos.x - size / 2, pos.y - size * 0.56, size, size);
+    } else {
+      // Procedural 2.5D silhouette fallback when assets are not loaded
+      const w = city.isCapital ? HEX_SIZE * 0.52 : HEX_SIZE * 0.38;
+      const h = city.isCapital ? HEX_SIZE * 0.48 : HEX_SIZE * 0.34;
+      ctx.fillStyle = 'rgba(0,0,0,0.32)';
+      ctx.beginPath();
+      ctx.ellipse(pos.x, pos.y + h * 0.35, w * 0.85, h * 0.35, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = city.isCapital ? '#d4b46a' : '#9a8c78';
+      ctx.fillRect(pos.x - w / 2, pos.y - h * 0.45, w, h * 0.75);
+      ctx.fillStyle = city.isCapital ? '#b84a32' : '#8f4432';
+      ctx.beginPath();
+      ctx.moveTo(pos.x - w * 0.6, pos.y - h * 0.45);
+      ctx.lineTo(pos.x, pos.y - h * 0.95);
+      ctx.lineTo(pos.x + w * 0.6, pos.y - h * 0.45);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   private drawTileResources(
@@ -488,7 +580,12 @@ export class HexRenderer {
   }
 
   /** Public: draw city label (used by renderer for LOD/clean-mode paths). */
-  drawCityLabel(city: City, pos: { x: number; y: number }, activeBuilding?: Building) {
+  drawCityLabel(
+    city: City,
+    pos: { x: number; y: number },
+    activeBuilding?: Building,
+    compact = false,
+  ) {
     const { ctx } = this;
     if (city.isCapital) {
       ctx.save();
@@ -496,10 +593,11 @@ export class HexRenderer {
       ctx.font = `${HEX_SIZE * 0.45}px serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('★', pos.x, pos.y - HEX_SIZE * 0.25);
+      ctx.fillText('★', pos.x, pos.y - HEX_SIZE * 0.42);
       ctx.restore();
     }
-    const label = city.name.toUpperCase();
+    const rawLabel = city.name.toUpperCase();
+    const label = compact && rawLabel.length > 16 ? `${rawLabel.slice(0, 15)}…` : rawLabel;
     ctx.save();
     ctx.font = `bold ${HEX_SIZE * 0.26}px 'Cinzel', serif`;
     ctx.textAlign = 'center';
