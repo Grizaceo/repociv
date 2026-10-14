@@ -53,7 +53,9 @@ jobs:
   e2e:
     name: e2e (Playwright)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 48 specs on 2 workers: ~25-35 min once the demo workspace seed lets the
+    # suite actually run (the previous 20-minute cap killed it mid-flight).
+    timeout-minutes: 40
 
     steps:
       - uses: actions/checkout@v4
