@@ -94,7 +94,11 @@ _EXTERNAL_SESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$")
 # See server/_security.py for the full rules.
 from server._security import build_allowed_origins, enforce_token_policy  # noqa: E402
 
-BRIDGE_HOST = "0.0.0.0" if REPOCIV_REMOTE else "127.0.0.1"
+# An explicit BRIDGE_HOST wins (the Docker entrypoint sets 0.0.0.0 so the
+# published ports reach the container); otherwise derive it from remote mode.
+BRIDGE_HOST = os.environ.get("BRIDGE_HOST", "").strip() or (
+    "0.0.0.0" if REPOCIV_REMOTE else "127.0.0.1"
+)
 enforce_token_policy(
     token=REPOCIV_TOKEN,
     bind_host=BRIDGE_HOST,

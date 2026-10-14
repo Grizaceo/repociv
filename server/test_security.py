@@ -179,6 +179,10 @@ def _run_in_subprocess(import_line: str, env: dict[str, str]) -> subprocess.Comp
     full_env = os.environ.copy()
     # conftest.py sets REPOCIV_CONFIG_DIR to a tmp path; preserve that
     # for the subprocess so bridge.py doesn't try to write to ~/.repociv.
+    # Bind-host overrides never inherit from the developer's shell: tests
+    # that need them pass them explicitly via ``env``.
+    full_env.pop("BRIDGE_HOST", None)
+    full_env.pop("BRIDGE_WS_HOST", None)
     full_env.update(env)
     return subprocess.run(
         [sys.executable, "-c", script],
@@ -256,6 +260,26 @@ def test_bridge_import_warns_loopback_no_token():
     assert "REPOCIV_TOKEN is empty" in combined_stderr or "IMPORT_OK" in result2.stdout
 
 
+def test_bridge_import_honors_explicit_bridge_host():
+    """BRIDGE_HOST=0.0.0.0 + valid token → binds 0.0.0.0 (the Docker entrypoint path)."""
+    result = _run_in_subprocess(
+        "from server import bridge; print('HOST=' + bridge.BRIDGE_HOST)",
+        env={"REPOCIV_TOKEN": "x" * 32, "BRIDGE_HOST": "0.0.0.0"},
+    )
+    assert result.returncode == 0, f"stderr={result.stderr!r}"
+    assert "HOST=0.0.0.0" in result.stdout
+
+
+def test_bridge_import_refuses_explicit_non_loopback_host_without_token():
+    """BRIDGE_HOST=0.0.0.0 + no token → exit 1 (same floor as REPOCIV_REMOTE)."""
+    result = _run_in_subprocess(
+        "from server import bridge",
+        env={"REPOCIV_TOKEN": "", "BRIDGE_HOST": "0.0.0.0"},
+    )
+    assert result.returncode == 1, f"stderr={result.stderr!r}"
+    assert "refusing to bind" in result.stderr
+
+
 def test_ws_import_refuses_non_loopback_host_without_token():
     """BRIDGE_WS_HOST=0.0.0.0 + no token → exit 1 (NEW safety net)."""
     result = _run_in_subprocess(
@@ -281,6 +305,40 @@ def test_ws_import_succeeds_non_loopback_with_token():
     )
     assert result.returncode == 0, f"stderr={result.stderr!r}"
     assert "IMPORT_OK" in result.stdout
+
+
+def test_ws_import_follows_bridge_host_when_ws_host_unset():
+    """BRIDGE_WS_HOST unset → WS_HOST follows BRIDGE_HOST (no HTTP/WS drift)."""
+    result = _run_in_subprocess(
+        "from server import websocket_handler; print('HOST=' + websocket_handler.WS_HOST)",
+        env={"REPOCIV_TOKEN": "x" * 32, "BRIDGE_HOST": "0.0.0.0"},
+    )
+    assert result.returncode == 0, f"stderr={result.stderr!r}"
+    assert "HOST=0.0.0.0" in result.stdout
+
+
+def test_ws_import_refuses_bridge_host_without_token():
+    """BRIDGE_HOST=0.0.0.0 + no token, BRIDGE_WS_HOST unset → exit 1."""
+    result = _run_in_subprocess(
+        "from server import websocket_handler",
+        env={"REPOCIV_TOKEN": "", "BRIDGE_HOST": "0.0.0.0"},
+    )
+    assert result.returncode == 1, f"stderr={result.stderr!r}"
+    assert "refusing to bind" in result.stderr
+
+
+def test_ws_host_precedence_over_bridge_host():
+    """BRIDGE_WS_HOST is WS-specific and wins over BRIDGE_HOST."""
+    result = _run_in_subprocess(
+        "from server import websocket_handler; print('HOST=' + websocket_handler.WS_HOST)",
+        env={
+            "REPOCIV_TOKEN": "",
+            "BRIDGE_WS_HOST": "127.0.0.1",
+            "BRIDGE_HOST": "0.0.0.0",
+        },
+    )
+    assert result.returncode == 0, f"stderr={result.stderr!r}"
+    assert "HOST=127.0.0.1" in result.stdout
 
 
 def test_ws_import_refuses_short_token():

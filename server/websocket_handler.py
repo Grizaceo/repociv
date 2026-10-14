@@ -54,7 +54,14 @@ REPOCIV_REMOTE = os.environ.get("REPOCIV_REMOTE", "").lower() in ("true", "1", "
 #   3. loopback + token empty                    → UserWarning (dev default)
 from server._security import build_allowed_origins, enforce_token_policy  # noqa: E402
 
-WS_HOST = "0.0.0.0" if REPOCIV_REMOTE else os.environ.get("BRIDGE_WS_HOST", "127.0.0.1")
+# Precedence: BRIDGE_WS_HOST (WS-specific) → BRIDGE_HOST (the host bridge.py
+# binds both transports to) → loopback. Keeps this policy check evaluating the
+# same host the server actually binds, so HTTP and WS never drift.
+WS_HOST = "0.0.0.0" if REPOCIV_REMOTE else (
+    os.environ.get("BRIDGE_WS_HOST", "").strip()
+    or os.environ.get("BRIDGE_HOST", "").strip()
+    or "127.0.0.1"
+)
 enforce_token_policy(
     token=REPOCIV_TOKEN,
     bind_host=WS_HOST,

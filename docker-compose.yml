@@ -58,10 +58,14 @@ services:
       BRIDGE_PORT: "5274"
       BRIDGE_WS_PORT: "5275"
 
-      # Dev mode: empty token = loopback-only auth bypass because ports are
-      # published to 127.0.0.1 above. To expose beyond localhost, set a 32+
-      # char token, REPOCIV_REMOTE=true, and change port bindings deliberately.
-      # See .env.example and docs/REMOTE_ACCESS.md for the full key list.
+      # Auth: the entrypoint auto-provisions a 64-hex token on first boot and
+      # persists it in the state volume, because the bridge binds 0.0.0.0
+      # inside the container and the Fase 0 policy refuses a non-loopback
+      # bind without a token. The UI receives the same token through VITE_*
+      # env. Set REPOCIV_TOKEN here (32+ chars) to bring your own.
+      # To expose beyond localhost, also set REPOCIV_REMOTE=true and change
+      # the port bindings deliberately. See .env.example and
+      # docs/REMOTE_ACCESS.md for the full key list.
       REPOCIV_TOKEN: ""
       REPOCIV_REMOTE: ""
 

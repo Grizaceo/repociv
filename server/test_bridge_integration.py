@@ -352,9 +352,12 @@ def test_events_endpoint_streams_sse_fanout():
 
 # ─── Remote mode tests ────────────────────────────────────────────────────────
 
-def test_remote_mode_defaults_to_localhost():
-    """Without REPOCIV_REMOTE, bridge uses 127.0.0.1 as default host."""
-    # The bridge module was loaded without REPOCIV_REMOTE in the test session
+def test_remote_mode_defaults_to_localhost(monkeypatch):
+    """Without REPOCIV_REMOTE (or BRIDGE_HOST), bridge uses 127.0.0.1 as default host."""
+    monkeypatch.delenv("REPOCIV_REMOTE", raising=False)
+    monkeypatch.delenv("BRIDGE_HOST", raising=False)
+    import importlib
+    importlib.reload(bridge)
     assert bridge.BRIDGE_HOST == "127.0.0.1", f"Expected 127.0.0.1, got {bridge.BRIDGE_HOST}"
     assert bridge.REPOCIV_REMOTE is False
 
@@ -387,6 +390,30 @@ def test_dev_mode_works_without_token(monkeypatch):
     assert bridge.REPOCIV_REMOTE is False
     assert bridge.REPOCIV_TOKEN == ""  # Empty = dev mode
     assert bridge.BRIDGE_HOST == "127.0.0.1"
+
+
+def test_bridge_host_env_overrides_derived_default():
+    """BRIDGE_HOST env (the Docker entrypoint's contract) wins over the default."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.delenv("REPOCIV_REMOTE", raising=False)
+        mp.setenv("REPOCIV_TOKEN", "test-token-for-remote-32-chars-min!!")
+        mp.setenv("BRIDGE_HOST", "0.0.0.0")
+        import importlib
+        importlib.reload(bridge)
+        assert bridge.BRIDGE_HOST == "0.0.0.0"
+    importlib.reload(bridge)  # restore the suite baseline after the env undo
+
+
+def test_bridge_host_blank_is_not_an_override():
+    """A whitespace BRIDGE_HOST falls back to the derived default."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.delenv("REPOCIV_REMOTE", raising=False)
+        mp.setenv("REPOCIV_TOKEN", "")
+        mp.setenv("BRIDGE_HOST", "   ")
+        import importlib
+        importlib.reload(bridge)
+        assert bridge.BRIDGE_HOST == "127.0.0.1"
+    importlib.reload(bridge)  # restore the suite baseline after the env undo
 
 
 # ─── Approval idempotency ─────────────────────────────────────────────────────
