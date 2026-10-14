@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { LocalTile3D } from './LocalTile3D.ts';
+import { existsSync, readFileSync } from 'node:fs';
+import { Color } from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { LocalTile3D, LOCAL_FURNITURE_GLB_IDS, EXT_COLORS } from './LocalTile3D.ts';
+import { mergeGlbScene } from './mergeGlbScene.ts';
 import type { LocalWorld, LocalTile, LocalRoom, Workbench } from '../types.ts';
 
 function makeTile(
@@ -90,7 +94,7 @@ describe('LocalTile3D', () => {
   });
 
   it('creates workbench mesh with extension color', () => {
-    const wb: Workbench = {
+    const wbTs: Workbench = {
       id: '1',
       filePath: '/test.ts',
       fileName: 'test.ts',
@@ -98,14 +102,50 @@ describe('LocalTile3D', () => {
       isTest: false,
       repoPath: 'test',
     };
-    const grid: LocalTile[][] = [[makeTile(0, 0, 'workbench', { workbench: wb })]];
-    const world = makeWorld({ grid, width: 1, height: 1, workbenches: [wb] });
+    const wbPy: Workbench = {
+      id: '2',
+      filePath: '/script.py',
+      fileName: 'script.py',
+      extension: 'py',
+      isTest: false,
+      repoPath: 'test',
+    };
+    const wbUnknown: Workbench = {
+      id: '3',
+      filePath: '/file.xyz',
+      fileName: 'file.xyz',
+      extension: 'xyz',
+      isTest: false,
+      repoPath: 'test',
+    };
+    const grid: LocalTile[][] = [
+      [
+        makeTile(0, 0, 'workbench', { workbench: wbTs }),
+        makeTile(1, 0, 'workbench', { workbench: wbPy }),
+        makeTile(2, 0, 'workbench', { workbench: wbUnknown }),
+      ],
+    ];
+    const world = makeWorld({
+      grid,
+      width: 3,
+      height: 1,
+      workbenches: [wbTs, wbPy, wbUnknown],
+    });
     const opts = { workbenchLabelOverlay: false, powerOverlay: false, temperatureOverlay: false };
 
     const lt = new LocalTile3D();
     lt.rebuild(world, opts);
-    const g = lt.getGroup();
-    expect(g.children.length).toBeGreaterThanOrEqual(1);
+    const wbMesh = lt.getWorkbenchMesh();
+    expect(wbMesh).not.toBeNull();
+    expect(wbMesh!.count).toBe(3);
+
+    const c = new Color();
+    wbMesh!.getColorAt(0, c);
+    expect(c.getHex()).toBe(EXT_COLORS.ts);
+    wbMesh!.getColorAt(1, c);
+    expect(c.getHex()).toBe(EXT_COLORS.py);
+    wbMesh!.getColorAt(2, c);
+    expect(c.getHex()).toBe(0x8a8a8a);
   });
 
   it('creates furniture meshes for various types', () => {
@@ -164,5 +204,39 @@ describe('LocalTile3D', () => {
     const lt = new LocalTile3D();
     lt.rebuild(world, opts1);
     expect(lt.rebuild(world, opts2)).toBe(true);
+  });
+
+  it('all referenced Kenney local furniture GLBs exist on disk and are valid binary glTF 2.0', async () => {
+    expect(LOCAL_FURNITURE_GLB_IDS).toEqual(
+      expect.arrayContaining([
+        'fountain-round',
+        'lantern',
+        'hedge',
+        'detail-crate',
+        'detail-barrel',
+        'desk',
+        'chairDesk',
+        'loungeSofa',
+        'tableConference',
+        'bookcaseOpen',
+      ]),
+    );
+    const loader = new GLTFLoader();
+    for (const id of LOCAL_FURNITURE_GLB_IDS) {
+      const p = `public/assets/3d/props/kenney/${id}.glb`;
+      expect(existsSync(p), `${id}.glb`).toBe(true);
+      const buf = readFileSync(p);
+      expect(buf.readUInt32LE(0)).toBe(0x46546c67);
+      expect(buf.readUInt32LE(4)).toBe(2);
+    }
+    // Verify the 5 newly generated modern office furniture GLBs parse and merge cleanly
+    for (const id of ['desk', 'chairDesk', 'loungeSofa', 'tableConference', 'bookcaseOpen']) {
+      const buf = readFileSync(`public/assets/3d/props/kenney/${id}.glb`);
+      const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+      const gltf = await loader.parseAsync(ab, '');
+      const merged = mergeGlbScene(gltf.scene);
+      expect(merged.geometry.getAttribute('position').count).toBeGreaterThan(0);
+      expect(merged.materials.length).toBeGreaterThanOrEqual(1);
+    }
   });
 });

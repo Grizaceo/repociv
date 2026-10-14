@@ -11,12 +11,14 @@ import {
   Group,
   Mesh,
   MeshStandardMaterial,
+  OctahedronGeometry,
   SphereGeometry,
+  TorusGeometry,
   Vector3,
 } from 'three';
 
-import type { LocalUnit, LocalNpc } from '../types.ts';
-import { areUnitPropsReady, getUnitPropParts } from './UnitProps3D.ts';
+import type { LocalUnit, LocalNpc, Unit } from '../types.ts';
+import { areUnitPropsReady, getUnitPropParts, getUnitPropPartsForType } from './UnitProps3D.ts';
 import { localGridToWorld3D } from './LocalCamera3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 
@@ -27,6 +29,8 @@ type AgentLifeState = 'spawning' | 'alive' | 'despawning';
 interface AgentEntry {
   group: Group;
   unitId: string;
+  unitType: Unit['type'];
+  usedGlb: boolean;
   lifeState: AgentLifeState;
   /** Tween progress 0->1 for spawn, 1->0 for despawn. */
   tween: number;
@@ -81,16 +85,21 @@ export class LocalAgent3D {
 
   private computeSignature(units: LocalUnit[], npcs: LocalNpc[]): string {
     return [
+      areUnitPropsReady() ? 1 : 0,
       units.length,
       npcs.length,
       units
-        .map((u) => `${u.id}:${u.gridX},${u.gridY}:${u.state}:${u.despawning ? 'd' : 'a'}`)
+        .map(
+          (u) =>
+            `${u.id}:${u.unitType}:${u.gridX},${u.gridY}:${u.state}:${u.despawning ? 'd' : 'a'}`,
+        )
         .join('|'),
       npcs.map((n) => `${n.id}:${n.gridX},${n.gridY}`).join('|'),
     ].join('#');
   }
 
   private reconcile(units: LocalUnit[], npcs: LocalNpc[]): void {
+    const propsReady = areUnitPropsReady();
     const currentIds = new Set<string>();
     for (const u of units) currentIds.add(u.id);
     for (const n of npcs) currentIds.add(n.id);
@@ -103,25 +112,68 @@ export class LocalAgent3D {
       }
     }
 
-    // Spawn new units
+    // Spawn new units or hot-swap procedural -> GLB figurine when props load
     for (const unit of units) {
-      if (!this.entries.has(unit.id)) {
-        this.spawnAgent(unit.id, unit.color, HERO_TYPES.has(unit.unitType));
+      const existing = this.entries.get(unit.id);
+      if (!existing) {
+        this.spawnAgent(unit.id, unit.color, HERO_TYPES.has(unit.unitType), unit.unitType);
+      } else if (
+        existing.lifeState !== 'despawning' &&
+        (existing.usedGlb !== propsReady || existing.unitType !== unit.unitType)
+      ) {
+        this.swapEntryFigurine(existing, unit.color, HERO_TYPES.has(unit.unitType), unit.unitType);
       }
     }
     for (const npc of npcs) {
-      if (!this.entries.has(npc.id)) {
-        this.spawnAgent(npc.id, npc.color, false);
+      const existing = this.entries.get(npc.id);
+      if (!existing) {
+        this.spawnAgent(npc.id, npc.color, false, 'worker');
+      } else if (existing.lifeState !== 'despawning' && existing.usedGlb !== propsReady) {
+        this.swapEntryFigurine(existing, npc.color, false, 'worker');
       }
     }
   }
 
-  private spawnAgent(id: string, color: string, isHero: boolean): void {
-    const group = this.buildFigurine(isHero, new Color(color));
+  private swapEntryFigurine(
+    entry: AgentEntry,
+    color: string,
+    isHero: boolean,
+    unitType: Unit['type'],
+  ): void {
+    const prevScale = entry.group.scale.x;
+    const prevPos = entry.group.position.clone();
+    this.group.remove(entry.group);
+    entry.group.traverse((obj) => {
+      const m = obj as Mesh;
+      if (m.isMesh) {
+        if (!m.userData.sharedGeometry) m.geometry.dispose();
+        if (Array.isArray(m.material)) m.material.forEach((mt) => mt.dispose());
+        else m.material.dispose();
+      }
+    });
+    const nextGroup = this.buildFigurine(isHero, new Color(color), unitType);
+    nextGroup.castShadow = true;
+    nextGroup.position.copy(prevPos);
+    nextGroup.scale.setScalar(prevScale);
+    entry.group = nextGroup;
+    entry.unitType = unitType;
+    entry.usedGlb = areUnitPropsReady();
+    this.group.add(nextGroup);
+  }
+
+  private spawnAgent(
+    id: string,
+    color: string,
+    isHero: boolean,
+    unitType: Unit['type'] = 'worker',
+  ): void {
+    const group = this.buildFigurine(isHero, new Color(color), unitType);
     group.castShadow = true;
     const entry: AgentEntry = {
       group,
       unitId: id,
+      unitType,
+      usedGlb: areUnitPropsReady(),
       lifeState: 'spawning',
       tween: 0,
       idlePhase: Math.random() * Math.PI * 2,
@@ -137,30 +189,66 @@ export class LocalAgent3D {
     this.group.add(group);
   }
 
-  /** Build a figurine: GLB if loaded, procedural fallback otherwise.
+  private addHeroCrown(group: Group, col: Color, gemY: number): void {
+    const gemMat = new MeshStandardMaterial({
+      color: col,
+      emissive: col,
+      emissiveIntensity: 1.2,
+      roughness: 0.1,
+      metalness: 0.8,
+    });
+    const gem = new Mesh(new OctahedronGeometry(HEX_SIZE * 0.055), gemMat);
+    gem.position.y = gemY;
+    gem.rotation.y = Math.PI / 4;
+    group.add(gem);
+
+    const haloMat = new MeshStandardMaterial({
+      color: col,
+      emissive: col,
+      emissiveIntensity: 0.8,
+      roughness: 0.3,
+      metalness: 0.5,
+      transparent: true,
+      opacity: 0.65,
+    });
+    const halo = new Mesh(new TorusGeometry(HEX_SIZE * 0.095, HEX_SIZE * 0.012, 4, 16), haloMat);
+    halo.position.y = gemY;
+    halo.rotation.x = Math.PI / 2;
+    group.add(halo);
+  }
+
+  /** Build a figurine: role-specific GLB if loaded, procedural fallback otherwise.
    *  Reuses the exact pattern from UnitMesh3D.buildGlbFigurine. */
-  private buildFigurine(isHero: boolean, col: Color): Group {
+  private buildFigurine(isHero: boolean, col: Color, unitType: Unit['type'] = 'worker'): Group {
     if (areUnitPropsReady()) {
-      const group = new Group();
-      const parts = getUnitPropParts()!;
-      parts.forEach((part, i) => {
-        const mat = (part.material as MeshStandardMaterial).clone();
-        if (i === 1) {
-          mat.color.lerp(col, 0.55);
-          mat.emissive.copy(col);
-          mat.emissiveIntensity = isHero ? 0.4 : 0.22;
+      const parts =
+        (typeof getUnitPropPartsForType === 'function'
+          ? getUnitPropPartsForType(unitType)
+          : null) ?? getUnitPropParts();
+      if (parts && parts.length > 0) {
+        const group = new Group();
+        parts.forEach((part, i) => {
+          const mat = (part.material as MeshStandardMaterial).clone();
+          if (i === 1 || mat.name.includes('tint')) {
+            mat.color.lerp(col, 0.55);
+            mat.emissive.copy(col);
+            mat.emissiveIntensity = isHero ? 0.4 : 0.22;
+          }
+          const mesh = new Mesh(part.geometry, mat);
+          mesh.applyMatrix4(part.matrix);
+          mesh.userData.sharedGeometry = true;
+          mesh.castShadow = true;
+          group.add(mesh);
+        });
+        const s = HEX_SIZE * (isHero ? 0.44 : 0.38);
+        group.scale.setScalar(s);
+        const wrapper = new Group();
+        wrapper.add(group);
+        if (isHero) {
+          this.addHeroCrown(wrapper, col, HEX_SIZE * 0.46);
         }
-        const mesh = new Mesh(part.geometry, mat);
-        mesh.applyMatrix4(part.matrix);
-        mesh.userData.sharedGeometry = true;
-        mesh.castShadow = true;
-        group.add(mesh);
-      });
-      const s = HEX_SIZE * (isHero ? 0.44 : 0.38);
-      group.scale.setScalar(s);
-      const wrapper = new Group();
-      wrapper.add(group);
-      return wrapper;
+        return wrapper;
+      }
     }
 
     // Procedural fallback: cone + sphere
@@ -188,6 +276,9 @@ export class LocalAgent3D {
     head.position.y = HEX_SIZE * 0.04 + HEX_SIZE * 0.22 + headR;
     head.castShadow = true;
     group.add(head);
+    if (isHero) {
+      this.addHeroCrown(group, col, head.position.y + headR + HEX_SIZE * 0.1);
+    }
     return group;
   }
 

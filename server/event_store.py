@@ -291,3 +291,28 @@ def command_id(event: dict[str, Any]) -> str:
     spellings from drifting again.
     """
     return str(event.get("commandId") or event.get("command_id") or "")
+
+
+def has_command_dispatched(cmd_id: str) -> bool:
+    """Return True if cmd_id already reached a post-queue execution event."""
+    if not cmd_id or _store_path is None or not _store_path.exists():
+        return False
+    dispatched_types = {
+        "CommandStarted",
+        "CommandCompleted",
+        "CommandFailed",
+        "CommandRejected",
+    }
+    with _lock:
+        try:
+            for line in _iter_lines_reverse(_store_path):
+                try:
+                    evt = json.loads(line)
+                except Exception:
+                    continue
+                if command_id(evt) == cmd_id and evt.get("type") in dispatched_types:
+                    return True
+        except Exception:
+            return False
+    return False
+

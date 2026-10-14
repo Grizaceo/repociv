@@ -21,7 +21,12 @@ import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { stackOffsets } from '../unitStack.ts';
-import { areUnitPropsReady, getUnitPropParts } from './UnitProps3D.ts';
+import {
+  areUnitPropsReady,
+  getUnitPropParts,
+  getUnitPropPartsForType,
+  type UnitPropPart,
+} from './UnitProps3D.ts';
 import { terrainSurfaceY } from './terrainSurfaceY.ts';
 
 const unitGroup = new Group();
@@ -36,6 +41,8 @@ type UnitLifeState = 'spawning' | 'alive' | 'despawning';
 interface UnitEntry {
   group: Group;
   unitId: string;
+  unitType: Unit['type'];
+  usedGlb: boolean;
   lifeState: UnitLifeState;
   /** Tween progress 0→1 for spawn, 1→0 for despawn. */
   tween: number;
@@ -76,15 +83,14 @@ const HERO_TYPES = new Set(['hero', 'lexo', 'claude', 'codex', 'cursor', 'opencl
  *  tool metal). We preserve the sculpted GLB colours and only tint the
  *  shirt (part index 1, the largest body area) toward the agent colour
  *  so ownership reads at a glance without nuking the whole figurine. */
-function buildGlbFigurine(isHero: boolean, col: Color): Group {
+function buildGlbFigurine(parts: UnitPropPart[], isHero: boolean, col: Color): Group {
   const group = new Group();
-  const parts = getUnitPropParts()!;
   parts.forEach((part, i) => {
     const mat = (part.material as MeshStandardMaterial).clone();
-    // Part 1 = shirt/torso → tint with agent colour (Civ V player colour).
-    // All other parts keep their original GLB colours so the worker still
-    // reads as a person (skin, pants, wooden pickaxe, iron head).
-    if (i === 1) {
+    // Part 1 = shirt/robe/cloak/tabard → tint with agent colour (Civ V player colour).
+    // All other parts keep their original GLB colours so the figurine still
+    // reads clearly (skin, boots, staff/pickaxe/shield/sword).
+    if (i === 1 || mat.name.includes('tint')) {
       mat.color.lerp(col, 0.55);
       mat.emissive.copy(col);
       mat.emissiveIntensity = isHero ? 0.4 : 0.22;
@@ -144,9 +150,14 @@ function buildUnitFigurine(unit: Unit): Group {
   const isHero = HERO_TYPES.has(unit.type);
 
   if (areUnitPropsReady()) {
-    const group = buildGlbFigurine(isHero, col);
-    if (isHero) addHeroCrown(group, col, HEX_SIZE * 0.46);
-    return group;
+    const parts =
+      (typeof getUnitPropPartsForType === 'function' ? getUnitPropPartsForType(unit.type) : null) ??
+      getUnitPropParts();
+    if (parts && parts.length > 0) {
+      const group = buildGlbFigurine(parts, isHero, col);
+      if (isHero) addHeroCrown(group, col, HEX_SIZE * 0.46);
+      return group;
+    }
   }
 
   const group = new Group();
@@ -211,7 +222,7 @@ export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | und
   // the async load finishes, even when no unit moved.
   const signature =
     `uprops${areUnitPropsReady() ? 1 : 0}#` +
-    visibleUnits.map((u) => `${u.id}:${u.coord.q},${u.coord.r}:${u.state}`).join('|');
+    visibleUnits.map((u) => `${u.id}:${u.type}:${u.coord.q},${u.coord.r}:${u.state}`).join('|');
   if (signature === lastSignature) return;
   lastSignature = signature;
 
@@ -245,8 +256,23 @@ export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | und
       ? terrainSurfaceY(tile) + UNIT_SURFACE_CLEARANCE
       : pos.y + UNIT_SURFACE_CLEARANCE;
 
+    const propsReady = areUnitPropsReady();
     const existing = unitEntries.get(unit.id);
     if (existing && existing.lifeState !== 'despawning') {
+      // Hot-swap procedural capsule -> role GLB (or role change) without resetting lifecycle tween
+      if (existing.usedGlb !== propsReady || existing.unitType !== unit.type) {
+        const prevScale = existing.group.scale.x;
+        unitGroup.remove(existing.group);
+        disposeFigurine(existing.group);
+        const swapped = buildUnitFigurine(unit);
+        swapped.position.set(pos.x, targetY, pos.z);
+        swapped.scale.setScalar(prevScale);
+        swapped.userData.basePos = { x: pos.x, y: targetY, z: pos.z };
+        existing.group = swapped;
+        existing.usedGlb = propsReady;
+        existing.unitType = unit.type;
+        unitGroup.add(swapped);
+      }
       // Update path/movement state for the tween.
       existing.moving = unit.state === 'moving';
       existing.path = unit.path ? [...unit.path] : [];
@@ -282,6 +308,8 @@ export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | und
     const entry: UnitEntry = {
       group: fig,
       unitId: unit.id,
+      unitType: unit.type,
+      usedGlb: propsReady,
       lifeState: 'spawning',
       tween: 0,
       idlePhase: idlePhaseForId(unit.id),

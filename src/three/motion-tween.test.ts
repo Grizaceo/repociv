@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('./UnitProps3D.ts', () => ({
   areUnitPropsReady: () => false,
   getUnitPropParts: () => null,
+  getUnitPropPartsForType: () => null,
   ensureUnitPropsLoad: () => {},
   areUnitPropsSettled: () => true,
 }));

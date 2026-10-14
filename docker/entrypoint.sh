@@ -23,6 +23,26 @@ BRIDGE_HEALTH_TIMEOUT="${BRIDGE_HEALTH_TIMEOUT:-30}"  # seconds
 # BRIDGE_HOST=127.0.0.1 in the environment if you want the dev default.
 export BRIDGE_HOST="${BRIDGE_HOST:-0.0.0.0}"
 
+# ─── Auth token (auto-provisioned) ───────────────────────────────────────────
+# The bridge binds 0.0.0.0 above, and server/_security.py refuses a non-loopback
+# bind without REPOCIV_TOKEN. Provision a strong token on first boot and persist
+# it in the state volume so restarts keep the same secret. Set REPOCIV_TOKEN
+# yourself (32+ chars) to opt out. The Vite UI authenticates with the same token.
+TOKEN_FILE="${XDG_STATE_HOME:-/workspace/state}/repociv-docker-token"
+if [[ -z "${REPOCIV_TOKEN:-}" ]]; then
+    if [[ -s "$TOKEN_FILE" ]]; then
+        REPOCIV_TOKEN="$(cat "$TOKEN_FILE")"
+    else
+        REPOCIV_TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+        mkdir -p "$(dirname "$TOKEN_FILE")"
+        printf '%s\n' "$REPOCIV_TOKEN" > "$TOKEN_FILE"
+        chmod 600 "$TOKEN_FILE" 2>/dev/null || true
+    fi
+    export REPOCIV_TOKEN
+fi
+export VITE_BRIDGE_TOKEN="${VITE_BRIDGE_TOKEN:-$REPOCIV_TOKEN}"
+export VITE_REPOCIV_TOKEN="${VITE_REPOCIV_TOKEN:-$REPOCIV_TOKEN}"
+
 # ─── Pretty banner (matches the Python bridge's own banner) ─────────────────
 cat <<'BANNER'
 ┌──────────────────────────────────────────────────────────────┐
@@ -33,6 +53,11 @@ echo "  Bridge HTTP:    http://localhost:${BRIDGE_PORT}"
 echo "  Bridge WS:      ws://localhost:${BRIDGE_WS_PORT}"
 echo "  Vite (UI):      http://localhost:${VITE_PORT}"
 echo "  MAP_ROOT:       ${REPOCIV_MAP_ROOT:-(not set; using built-in fallback)}"
+if [[ -n "${REPOCIV_TOKEN:-}" ]]; then
+    echo "  Auth:           token set (persisted at ${TOKEN_FILE})"
+else
+    echo "  Auth:           DISABLED (empty REPOCIV_TOKEN)"
+fi
 echo
 
 # ─── Start bridge in the background ──────────────────────────────────────────

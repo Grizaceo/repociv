@@ -8,6 +8,7 @@ import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
 import { renderEmptyState, clearEmptyState } from './emptyStates.ts';
 import { registerPoll, type PollUnregister } from './pollScheduler.ts';
+import { reconcileApprovalCards } from './approvalCards.ts';
 
 const POLL_MS = 3_000;
 
@@ -80,6 +81,7 @@ async function _fetchApprovals() {
     const res = await fetch(bridgeUrl('/approvals'), { headers: bridgeHeaders() });
     if (!res.ok) return;
     _items = (await res.json()) as ApprovalItem[];
+    reconcileApprovalCards(new Set(_items.map((item) => item.id)));
     for (const listener of _listeners) listener(_items);
     _updateBadge(_items.length);
     if (_visible) _render();

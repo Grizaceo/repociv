@@ -7,7 +7,8 @@
 //     dev-server root, so presence there == served at /assets/…)
 import { describe, expect, it } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
-import { _testRecipes } from './CityProps3D.ts';
+import { _testRecipes, BANNER_PROP_IDS, cityBannerId } from './CityProps3D.ts';
+import type { City, Tile } from '../types.ts';
 
 const { PROP_IDS, RECIPES, LEVEL_RECIPE, CAPITAL_SUBURBS } = _testRecipes();
 
@@ -81,5 +82,32 @@ describe('KayKit city prop recipes', () => {
       expect(raw).toContain(`${id}.bin`);
       expect(raw).toContain('hexagons_medieval.png');
     }
+  });
+
+  it('maps city health to Kenney banner-green / banner-red and verifies GLBs on disk', () => {
+    for (const id of BANNER_PROP_IDS) {
+      expect(existsSync(`public/assets/3d/props/kenney/${id}.glb`), `${id}.glb`).toBe(true);
+    }
+    const city: City = {
+      id: 'repo-1',
+      name: 'repo-1',
+      coord: { q: 0, r: 0 },
+      population: 4,
+      isCapital: false,
+      territory: [],
+      districts: [],
+      buildings: [],
+    };
+    const okTile: Tile = {
+      coord: { q: 0, r: 0 },
+      terrain: 'plains',
+      revealed: true,
+      inFog: false,
+      skillHealth: 'ok',
+      resources: { gold: 1, science: 1, production: 1 },
+    };
+    expect(cityBannerId(city, okTile)).toBe('banner-green');
+    expect(cityBannerId(city, { ...okTile, skillHealth: 'broken' })).toBe('banner-red');
+    expect(cityBannerId(city, { ...okTile, skillHealth: 'stale' })).toBe('banner-red');
   });
 });

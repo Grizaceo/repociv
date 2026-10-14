@@ -12,6 +12,7 @@ import { COPY_SVG, attachCopyListeners, escapeHtml, hasErrorLine } from './clipb
 import { renderMarkdown } from './markdown.ts';
 import { ensureChipExists } from './agentChip.ts';
 import { renderEmptyState, clearEmptyState } from '../emptyStates.ts';
+import { settleApprovalCard } from '../approvalCards.ts';
 
 // ─── Chunk subscribers (second presentation of the same transcript) ─────────
 // The local view shows the same conversation as the side panel, in its own
@@ -329,33 +330,14 @@ export function appendApprovalCard(
   const approveBtn = card.querySelector<HTMLButtonElement>('.approval-approve');
   const rejectBtn = card.querySelector<HTMLButtonElement>('.approval-reject');
 
-  function freeze(approved: boolean) {
-    const strip = card.querySelector<HTMLElement>('.approval-strip');
-    if (strip) {
-      const label = strip.querySelector<HTMLElement>('.approval-label');
-      const actions = strip.querySelector<HTMLElement>('.approval-actions');
-      if (actions) actions.remove();
-      if (label) {
-        const result = document.createElement('span');
-        result.className = 'approval-result';
-        result.style.color = approved ? 'var(--civ-food)' : 'var(--civ-happiness)';
-        result.textContent = approved ? '✓ Aprobado' : '✗ Rechazado';
-        strip.appendChild(result);
-      }
-      const icon = strip.querySelector<HTMLElement>('.approval-icon');
-      if (icon) icon.textContent = approved ? '✓' : '✗';
-      icon?.style.setProperty('color', approved ? 'var(--civ-food)' : 'var(--civ-happiness)');
-    }
+  async function decide(approved: boolean) {
+    if (approveBtn) approveBtn.disabled = true;
+    if (rejectBtn) rejectBtn.disabled = true;
+    const ok = await (approved ? approveCommand(commandId) : rejectCommand(commandId));
+    settleApprovalCard(card, ok ? (approved ? 'approved' : 'rejected') : 'unavailable');
   }
-
-  approveBtn?.addEventListener('click', () => {
-    freeze(true);
-    void approveCommand(commandId);
-  });
-  rejectBtn?.addEventListener('click', () => {
-    freeze(false);
-    void rejectCommand(commandId);
-  });
+  approveBtn?.addEventListener('click', () => void decide(true));
+  rejectBtn?.addEventListener('click', () => void decide(false));
 
   container.appendChild(card);
   container.scrollTop = container.scrollHeight;

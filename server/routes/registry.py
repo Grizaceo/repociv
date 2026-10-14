@@ -23,6 +23,7 @@ from server import http_routes as _routes
 from server.agent_processes import get_agent_processes
 from server.kanban_writer import post_kanban_board
 from server.agent_positions import post_agent_events
+from server.routes.pending_work import get_pending_work
 
 # ── GET: no path params, matched by exact string ───────────────────────────────
 GET_EXACT: dict[str, Callable[..., Any]] = {
@@ -73,6 +74,7 @@ GET_EXACT: dict[str, Callable[..., Any]] = {
     "/api/repos": _routes.get_scanned_repos,
     "/api/repos/selected": _routes.get_selected_repos,
     "/api/repos/all-roots": _routes.get_all_roots_repos,
+    "/api/pending-work": get_pending_work,
 }
 
 # ── POST: no path params, matched by exact string ──────────────────────────────

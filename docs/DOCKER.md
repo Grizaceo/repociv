@@ -106,7 +106,7 @@ The compose file sets sensible defaults. Override any of them in the `environmen
 | `VITE_PORT`            | `5273`                   | Frontend dev server port                      |
 | `BRIDGE_PORT`          | `5274`                   | Bridge HTTP API port                          |
 | `BRIDGE_WS_PORT`       | `5275`                   | Bridge WebSocket port                         |
-| `REPOCIV_TOKEN`        | *(empty)*                | Empty = loopback-only dev mode in Docker. Set for remote access. |
+| `REPOCIV_TOKEN`        | *(auto)*                 | Auto-provisioned on first boot and persisted in the state volume; set your own 32+ char token to override |
 | `REPOCIV_REMOTE`       | *(empty)*                | Set `true` + a token to expose beyond loopback |
 | `BRIDGE_HOST`          | `0.0.0.0`                | Always bound to all interfaces inside the container |
 
@@ -134,7 +134,7 @@ If the healthcheck fails, run `docker inspect --format '{{json .State.Health}}' 
 
 - **Dev mode**, not production. Vite runs with HMR; the image is sized for a workstation, not a server.
 - **The Vite dev server is bound to all interfaces** inside the container (because the entrypoint forces `--host 0.0.0.0`). This is safe in the default compose file because published ports bind to host loopback (`127.0.0.1`).
-- **The bridge binds to `0.0.0.0` inside the container** as well, so the port mapping works. The default `127.0.0.1` of the dev bridge is overridden by the entrypoint setting `BRIDGE_HOST=0.0.0.0` in the environment; host exposure is still constrained by the loopback port bindings.
+- **The bridge binds to `0.0.0.0` inside the container** as well, so the port mapping works. The default `127.0.0.1` of the dev bridge is overridden by the entrypoint setting `BRIDGE_HOST=0.0.0.0` in the environment; host exposure is still constrained by the loopback port bindings. Because a non-loopback bind requires a token (`server/_security.py`, Fase 0), the entrypoint auto-provisions `REPOCIV_TOKEN` on first boot and persists it at `$XDG_STATE_HOME/repociv-docker-token`; the Vite UI receives the same token through its `VITE_*` env.
 - **`.hermes`, `.gstack`, `.claude`, `.cursor`, `execplan/`, `data/`, `coverage/`, `*.log`** are excluded from the build context in `.dockerignore`. A fresh `docker build` ships a clean tree, even if your working copy is full of personal tooling.
 - **The container is single-user by design.** Same scope as the local dev mode: it visualizes your repos folder; it does not serve multiple tenants.
 - **Folder picking in Docker is mount-based.** To load a different host folder, change `MAP_ROOT` and restart the compose stack. The in-app onboarding filters repos inside the mounted root; it does not grant access to unmounted host paths.
@@ -150,3 +150,4 @@ If the healthcheck fails, run `docker inspect --format '{{json .State.Health}}' 
 | I want to redo onboarding from scratch               | Previous selection is stored in the `repociv-state` volume         | Run `docker compose down -v`, then `docker compose up --build`            |
 | `WebSocket connection failed` in browser console     | Port 5275 not exposed on host loopback or remapped incorrectly    | Use the default `127.0.0.1:5275:5275` binding; non-default WS ports need code/config changes |
 | `Bridge offline` status in the UI                    | Browser can't reach 5274 (Vite proxy target) or 5275 (events)     | Confirm both 5274 and 5275 are mapped; the UI needs both                 |
+| Direct API call from the host returns `401`          | The bridge requires the auto-provisioned token                    | Read it with `docker exec repociv cat /workspace/state/repociv-docker-token` and send it as `X-RepoCiv-Token` |

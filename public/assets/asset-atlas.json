@@ -1,25 +1,163 @@
 {
   "terrainAtlas": "/assets/terrain-atlas.webp",
+  "hexTilesAtlas": "/assets/hex-tiles-2d.webp",
+  "hexTileSize": 256,
+  "hexTileRects": {
+    "plains": [
+      0,
+      0,
+      256,
+      256
+    ],
+    "forest": [
+      256,
+      0,
+      512,
+      256
+    ],
+    "desert": [
+      512,
+      0,
+      768,
+      256
+    ],
+    "ocean": [
+      768,
+      0,
+      1024,
+      256
+    ],
+    "mountain": [
+      1024,
+      0,
+      1280,
+      256
+    ],
+    "ice": [
+      1280,
+      0,
+      1536,
+      256
+    ],
+    "hills": [
+      1536,
+      0,
+      1792,
+      256
+    ],
+    "sacred": [
+      1792,
+      0,
+      2048,
+      256
+    ],
+    "fog": [
+      2048,
+      0,
+      2304,
+      256
+    ]
+  },
   "decorAtlas": "/assets/decor-atlas.png",
-  "cellSize": 1024,
-  "stylizedTerrainNote": "Flat legacy mode uses terrainAtlas photo patterns; iso25d uses procedural TERRAIN_COLOR fills.",
+  "cellSize": 512,
   "terrainRects": {
-    "plains": [0, 0, 1024, 1024],
-    "forest": [1024, 0, 2048, 1024],
-    "desert": [2048, 0, 3072, 1024],
-    "ocean": [3072, 0, 4096, 1024],
-    "mountain": [4096, 0, 5120, 1024],
-    "ice": [5120, 0, 6144, 1024],
-    "fog": [6144, 0, 7168, 1024],
-    "hills": [0, 0, 1024, 1024],
-    "sacred": [4096, 0, 5120, 1024]
+    "plains": [
+      0,
+      0,
+      512,
+      512
+    ],
+    "forest": [
+      512,
+      0,
+      1024,
+      512
+    ],
+    "desert": [
+      1024,
+      0,
+      1536,
+      512
+    ],
+    "ocean": [
+      1536,
+      0,
+      2048,
+      512
+    ],
+    "mountain": [
+      2048,
+      0,
+      2560,
+      512
+    ],
+    "ice": [
+      2560,
+      0,
+      3072,
+      512
+    ],
+    "hills": [
+      3072,
+      0,
+      3584,
+      512
+    ],
+    "sacred": [
+      3584,
+      0,
+      4096,
+      512
+    ],
+    "fog": [
+      4096,
+      0,
+      4608,
+      512
+    ]
   },
   "decorRects": {
-    "hill_sprite": [0, 0, 1024, 1024],
-    "mountain_sprite": [1024, 0, 2048, 1024],
-    "forest_sprite": [2048, 0, 3072, 1024],
-    "city_block": [3072, 0, 4096, 1024],
-    "farm_patch": [4096, 0, 5120, 1024],
-    "road_segment": [5120, 0, 6144, 1024]
+    "hill_sprite": [
+      0,
+      0,
+      512,
+      512
+    ],
+    "mountain_sprite": [
+      512,
+      0,
+      1024,
+      512
+    ],
+    "forest_sprite": [
+      1024,
+      0,
+      1536,
+      512
+    ],
+    "city_hamlet": [
+      1536,
+      0,
+      2048,
+      512
+    ],
+    "city_village": [
+      2048,
+      0,
+      2560,
+      512
+    ],
+    "city_town": [
+      2560,
+      0,
+      3072,
+      512
+    ],
+    "city_capital": [
+      3072,
+      0,
+      3584,
+      512
+    ]
   }
 }

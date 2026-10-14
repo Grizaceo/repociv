@@ -403,6 +403,7 @@ export type BridgeEvent =
       target: string;
       risk: string;
     }
+  | { type: 'approval_expired'; commandId: string; reason: string }
   | { type: 'chat_chunk'; unit: string; missionId?: string; text: string }
   | { type: 'log'; msg: string; level?: 'info' | 'warn' | 'success' };
 

@@ -48,6 +48,7 @@ export interface MessageContext {
   terminalPanel: typeof terminalPanel;
   playSound: (type: 'move' | 'complete' | 'mission') => void;
   approveCommand: typeof approveCommand;
+  expireApproval?: (commandId: string) => void;
   cfg: typeof cfg;
 }
 
@@ -303,6 +304,10 @@ const HANDLERS: HandlerByType = {
       'warn',
     );
     ctx.appendApprovalCard(evt.target, evt.commandId, evt.commandType, evt.target, evt.risk);
+  },
+
+  approval_expired(ctx, evt) {
+    ctx.expireApproval?.(evt.commandId);
   },
 
   // ─── Subagents ───────────────────────────────────────────────────────

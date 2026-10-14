@@ -1,12 +1,20 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-// Mock UnitProps3D so we get the procedural fallback figurine (no async GLB).
-vi.mock('./UnitProps3D.ts', () => ({
-  areUnitPropsReady: () => false,
-  getUnitPropParts: () => null,
-  ensureUnitPropsLoad: () => {},
-  areUnitPropsSettled: () => true,
-}));
+// Mock UnitProps3D so we get the procedural fallback figurine (no async GLB),
+// while preserving pure helpers (UNIT_ROLE_GLB_IDS, unitRoleGlbForType, extractUnitPartsFromScene).
+vi.mock('./UnitProps3D.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./UnitProps3D.ts')>();
+  return {
+    ...actual,
+    areUnitPropsReady: () => false,
+    getUnitPropParts: () => null,
+    getUnitPropPartsForType: () => null,
+    ensureUnitPropsLoad: () => {},
+    areUnitPropsSettled: () => true,
+  };
+});
 
 import {
   clearUnits,
@@ -15,6 +23,7 @@ import {
   _testGetEntry,
   _testEntryCount,
 } from './UnitMesh3D.ts';
+import { UNIT_ROLE_GLB_IDS, unitRoleGlbForType, extractUnitPartsFromScene } from './UnitProps3D.ts';
 import type { Unit, Tile } from '../types.ts';
 
 function makeUnit(id: string, q: number, r: number, state: 'idle' | 'moving' = 'idle'): Unit {
@@ -207,5 +216,64 @@ describe('UnitMesh3D idle phase', () => {
     rebuildUnits([makeUnit('MAIN', 0, 0), makeUnit('scout-1', 1, 0)], getTile);
 
     expect(_testGetEntry('MAIN')!.idlePhase).not.toBe(_testGetEntry('scout-1')!.idlePhase);
+  });
+});
+
+describe('UnitProps3D role figurine mapping and GLB assets on disk', () => {
+  it('maps every UnitType to its expected role figurine GLB', () => {
+    expect(unitRoleGlbForType('hero')).toBe('unit-mage');
+    expect(unitRoleGlbForType('claude')).toBe('unit-mage');
+    expect(unitRoleGlbForType('openclaw')).toBe('unit-mage');
+
+    expect(unitRoleGlbForType('worker')).toBe('unit-engineer');
+    expect(unitRoleGlbForType('codex')).toBe('unit-engineer');
+    expect(unitRoleGlbForType('cursor')).toBe('unit-engineer');
+
+    expect(unitRoleGlbForType('scout')).toBe('unit-rogue');
+    expect(unitRoleGlbForType('caravan')).toBe('unit-rogue');
+
+    expect(unitRoleGlbForType('praetorian')).toBe('unit-knight');
+    expect(unitRoleGlbForType('army')).toBe('unit-knight');
+    expect(unitRoleGlbForType('lexo')).toBe('unit-knight');
+  });
+
+  it('hot-swaps figurine group when unit type changes without resetting alive lifeState', () => {
+    const u1 = makeUnit('u1', 0, 0);
+    rebuildUnits([u1], getTile);
+    tickUnits(0.3, 0.3);
+    const entryBefore = _testGetEntry('u1')!;
+    expect(entryBefore.lifeState).toBe('alive');
+    const oldGroup = entryBefore.group;
+
+    const u1Promoted: Unit = { ...u1, type: 'claude' };
+    rebuildUnits([u1Promoted], getTile);
+    const entryAfter = _testGetEntry('u1')!;
+    expect(entryAfter.lifeState).toBe('alive');
+    expect(entryAfter.unitType).toBe('claude');
+    expect(entryAfter.group).not.toBe(oldGroup);
+  });
+
+  it('has valid glTF 2.0 binary files (< 60 KB, tintable slot 1) on disk for all role figurines', async () => {
+    expect(existsSync('public/assets/3d/props/unit-worker-0.glb')).toBe(true);
+    const loader = new GLTFLoader();
+    for (const id of UNIT_ROLE_GLB_IDS) {
+      const p = `public/assets/3d/props/units/${id}.glb`;
+      expect(existsSync(p), p).toBe(true);
+      const buf = readFileSync(p);
+      expect(buf.byteLength).toBeGreaterThan(100);
+      expect(buf.byteLength).toBeLessThan(60 * 1024);
+      // Verify glTF magic (0x46546C67) and version 2
+      expect(buf.readUInt32LE(0)).toBe(0x46546c67);
+      expect(buf.readUInt32LE(4)).toBe(2);
+      const jsonLen = buf.readUInt32LE(12);
+      const gltfJson = JSON.parse(buf.subarray(20, 20 + jsonLen).toString('utf8'));
+      expect(gltfJson.materials.length).toBeGreaterThanOrEqual(2);
+      expect(gltfJson.materials[1].name).toContain('tint');
+
+      const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+      const parsed = await loader.parseAsync(ab, '');
+      const extracted = extractUnitPartsFromScene(parsed.scene);
+      expect(extracted.length).toBeGreaterThanOrEqual(2);
+    }
   });
 });

@@ -14,6 +14,12 @@ Resolution order for the store directory (first hit wins):
 
 Writes are atomic: data is written to a tmp file in the same directory and
 then renamed, so a partial write never corrupts an existing checkpoint.
+
+Path confinement (R16): ``repo`` and ``issue_id`` are validated as literal
+single-component identifiers before any filesystem effect, and the resolved
+path must stay inside the resolved checkpoints directory. Malformed tokens
+and symlink escapes are rejected without repair — no separator folding, no
+traversal stripping.
 """
 
 from __future__ import annotations
@@ -24,6 +30,15 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from .identifiers import IdentifierError, validate_identifier
+
+__all__ = [
+    "IdentifierError",
+    "init",
+    "save_checkpoint",
+    "load_checkpoint",
+    "delete_checkpoint",
+]
 
 def _resolve_default_dir() -> Path:
     """Resolve the checkpoints directory from env or fall back to ~/.repociv."""
@@ -59,7 +74,19 @@ def _reset() -> None:
 
 
 def _checkpoint_path(repo: str, issue_id: str) -> Path:
-    return _CHECKPOINTS_DIR / repo / f"{issue_id}.json"
+    """Return the confined checkpoint path for *repo*/*issue_id*.
+
+    Raises ``IdentifierError`` before any filesystem effect when either
+    token is malformed or the resolved path escapes the store root.
+    """
+    repo_tok = validate_identifier(repo, field="repo")
+    issue_tok = validate_identifier(issue_id, field="issue_id")
+    root = Path(_CHECKPOINTS_DIR).resolve()
+    candidate = root / repo_tok / f"{issue_tok}.json"
+    resolved = candidate.resolve()
+    if resolved != root and root not in resolved.parents:
+        raise IdentifierError(f"checkpoint path escapes store root: {candidate!r}")
+    return resolved
 
 
 def save_checkpoint(repo: str, issue_id: str, state: dict[str, Any]) -> None:

@@ -10,6 +10,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from .identifiers import IdentifierError, validate_identifier
+
 # ─── Risk levels ──────────────────────────────────────────────────────────────
 Risk = Literal["low", "medium", "high", "destructive"]
 
@@ -96,6 +98,32 @@ class CommandValidationError(ValueError):
     pass
 
 
+# ─── R16 store-identifier contract ───────────────────────────────────────────
+
+# Command types whose payload feeds the checkpoint / workspace_issue stores.
+_STORE_SCOPED_TYPES = frozenset({"task_run"})
+
+
+def _validate_store_identifiers(cmd_type: str, payload: dict[str, Any]) -> None:
+    """Validate store-scoped identifiers for command payloads.
+
+    Currently applies to ``task_run`` (the only dispatch path that joins
+    ``repo``/``issue_id`` into local store paths). A missing issue id is
+    rejected here too, so a store-bound command never reaches dispatch
+    with an empty identifier. Malformed tokens are rejected without
+    repair, exactly as the direct helpers do.
+    """
+    if cmd_type not in _STORE_SCOPED_TYPES:
+        return
+    issue_raw = payload.get("issueId", payload.get("issue_id"))
+    if issue_raw is None or (isinstance(issue_raw, str) and not issue_raw.strip()):
+        raise IdentifierError("task_run requires issueId in payload")
+    validate_identifier(str(issue_raw), field="issueId")
+    repo_raw = payload.get("repo")
+    if repo_raw is not None:
+        validate_identifier(str(repo_raw), field="repo")
+
+
 def validate_command(data: dict[str, Any]) -> Command:
     """Parse and validate a raw dict into a Command. Raises CommandValidationError."""
     missing = _REQUIRED_FIELDS - data.keys()
@@ -132,6 +160,15 @@ def validate_command(data: dict[str, Any]) -> Command:
         harness_id = str(data["harness_id"])[:64]
     elif isinstance(payload, dict) and payload.get("harnessId"):
         harness_id = str(payload["harnessId"])[:64]
+
+    # R16: store-scoped identifier contract shared with checkpoint.py and
+    # workspace_issue.py. Payloads that name a repo/issue for the local
+    # state stores must satisfy the same confinement rules as the direct
+    # helpers — a valid token or approval cannot bypass this boundary.
+    try:
+        _validate_store_identifiers(cmd_type, payload)
+    except IdentifierError as exc:
+        raise CommandValidationError(str(exc)) from exc
 
     return Command(
         type=cmd_type,

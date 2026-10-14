@@ -5,6 +5,14 @@ Task-folder portable per issue: spec/plan/state/output under
 
 Inspired by sortie's A2O protocol, subtask file-based context passing,
 and full-stack-orchestration's artifact-driven state management.
+
+Path confinement (R16): ``repo`` and ``issue_id`` are validated as literal
+single-component identifiers at every read/write/list boundary, and the
+resolved issue directory must stay inside the resolved store root.
+Malformed tokens (``..``, absolute paths, separators, dot-prefixed names)
+and symlink escapes are rejected without repair before any filesystem
+effect. Artifact names are likewise confined to the issue ``output/``
+directory. Separator folding is no longer performed.
 """
 from __future__ import annotations
 
@@ -15,6 +23,22 @@ from pathlib import Path
 from typing import Any
 
 from . import locks as _locks
+from .identifiers import IdentifierError, validate_identifier
+
+__all__ = [
+    "IdentifierError",
+    "init",
+    "init_issue_workspace",
+    "load_issue_state",
+    "save_issue_state",
+    "patch_issue_state",
+    "add_artifact",
+    "list_artifacts",
+    "read_artifact",
+]
+
+_MAX_ARTIFACT_NAME_LEN = 200
+_ARTIFACT_ALLOWED_EXTRA = {".", "-", "_"}
 
 
 _base_dir: Path | None = None
@@ -34,12 +58,57 @@ def _require_base() -> Path:
 
 
 def _sanitize(s: str) -> str:
-    """Sanitize repo/issue IDs for filesystem safety."""
+    """Filesystem-name mapping for pre-R16 directories on disk.
+
+    Retained only so ``list_issues`` can report legacy directory names
+    created by the old separator-folding scheme. Never used to build
+    write paths — see :func:`_issue_dir`.
+    """
     return s.replace("/", "_").replace("\\", "_")
 
 
 def _issue_dir(repo: str, issue_id: str) -> Path:
-    return _require_base() / _sanitize(repo) / _sanitize(issue_id)
+    """Return the confined issue directory, or raise ``IdentifierError``.
+
+    Validates both identifiers, then checks the resolved path stays inside
+    the resolved store root (following symlinks). Runs before any mkdir,
+    read, write, or delete.
+    """
+    repo_tok = validate_identifier(repo, field="repo")
+    issue_tok = validate_identifier(issue_id, field="issue_id")
+    base = _require_base().resolve()
+    candidate = base / repo_tok / issue_tok
+    resolved = candidate.resolve()
+    if resolved != base and base not in resolved.parents:
+        raise IdentifierError(f"issue dir escapes store root: {candidate!r}")
+    return resolved
+
+
+def _artifact_dest(repo: str, issue_id: str, name: str) -> Path:
+    """Validate an artifact *name* and confine it under the output dir."""
+    if not isinstance(name, str) or not name.strip():
+        raise IdentifierError("artifact name must be a non-empty string")
+    token = name.strip()
+    if len(token) > _MAX_ARTIFACT_NAME_LEN:
+        raise IdentifierError("artifact name exceeds max length")
+    if "\x00" in token:
+        raise IdentifierError("artifact name must not contain NUL")
+    if "/" in token or "\\" in token:
+        raise IdentifierError(f"artifact name must not contain separators: {token!r}")
+    if token in (".", ".."):
+        raise IdentifierError(f"artifact name must not be a traversal component: {token!r}")
+    if token.startswith("."):
+        raise IdentifierError(f"artifact name must not start with a dot: {token!r}")
+    for ch in token:
+        if ch.isalnum() or ch in _ARTIFACT_ALLOWED_EXTRA or ch == " ":
+            continue
+        raise IdentifierError(f"artifact name contains disallowed character {ch!r}: {token!r}")
+    out_dir = _output_dir(repo, issue_id)
+    candidate = out_dir / token
+    resolved = candidate.resolve()
+    if resolved != out_dir and out_dir not in resolved.parents:
+        raise IdentifierError(f"artifact path escapes output dir: {token!r}")
+    return resolved
 
 
 def _state_path(repo: str, issue_id: str) -> Path:
@@ -93,6 +162,7 @@ def init_issue_workspace(repo: str, issue_id: str) -> dict[str, Any]:
     """
     lock_key = f"issue:{repo}:{issue_id}"
     with _locks.hold(lock_key):
+        # R16: fail before any mkdir/write when identifiers are malformed.
         issue_dir = _issue_dir(repo, issue_id)
         issue_dir.mkdir(parents=True, exist_ok=True)
         _output_dir(repo, issue_id).mkdir(exist_ok=True)
@@ -171,8 +241,8 @@ def add_artifact(repo: str, issue_id: str, name: str, *,
 
     with _locks.hold(f"issue:{repo}:{issue_id}"):
         out_dir = _output_dir(repo, issue_id)
+        dest = _artifact_dest(repo, issue_id, name)
         out_dir.mkdir(parents=True, exist_ok=True)
-        dest = out_dir / name
 
         if source_path:
             shutil.copy2(source_path, str(dest))
@@ -250,7 +320,7 @@ def read_output_artifacts(
 
 def read_artifact(repo: str, issue_id: str, name: str) -> str | None:
     """Read an artifact's text content. Returns None if not found."""
-    path = _output_dir(repo, issue_id) / name
+    path = _artifact_dest(repo, issue_id, name)
     if not path.exists():
         return None
     return path.read_text(encoding="utf-8")
@@ -319,6 +389,8 @@ def list_issues(repo: str | None = None) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
 
     if repo is not None:
+        # R16: validate the filter before touching the filesystem.
+        validate_identifier(repo, field="repo")
         safe_repo = _sanitize(repo)
         repo_dir = base / safe_repo
         if not repo_dir.is_dir():
@@ -332,7 +404,7 @@ def list_issues(repo: str | None = None) -> list[dict[str, str]]:
     for repo_dir in sorted(base.iterdir()):
         if not repo_dir.is_dir():
             continue
-        r_name = repo_dir.name.replace("_", "/")
+        r_name = repo_dir.name
         for issue_dir in sorted(repo_dir.iterdir()):
             if issue_dir.is_dir() and (issue_dir / "state.json").exists():
                 out.append({"repo": r_name, "issueId": issue_dir.name})
@@ -531,7 +603,9 @@ def generate_contract_from_spec(repo: str, issue_id: str) -> dict[str, Any]:
     """
     spec = read_spec(repo, issue_id) or ""
     goal = ""
+    h1_title = ""
     deliverables: list[str] = []
+    requirements: list[str] = []
     done_definition = ""
 
     # Simple heuristic parse: extract first H2 section as goal,
@@ -539,6 +613,9 @@ def generate_contract_from_spec(repo: str, issue_id: str) -> dict[str, Any]:
     current_section = ""
     for line in spec.splitlines():
         stripped = line.strip()
+        if stripped.startswith("# ") and not h1_title:
+            h1_title = stripped[2:].strip()
+            continue
         if stripped.startswith("## "):
             current_section = stripped[3:].lower()
             continue
@@ -553,13 +630,22 @@ def generate_contract_from_spec(repo: str, issue_id: str) -> dict[str, Any]:
                 deliverables.append(item)
             elif "done" in current_section or "definition" in current_section:
                 done_definition = item
+            else:
+                requirements.append(item)
         elif current_section and stripped and not stripped.startswith("#"):
             if "goal" in current_section and not goal:
                 goal = stripped[:200]
 
+    if not goal and h1_title and (deliverables or requirements):
+        goal = h1_title
+    if not deliverables and requirements:
+        deliverables = list(requirements)
+
     contract = _default_validation_contract(repo, issue_id)
     contract["goal"] = goal
     contract["deliverables"] = deliverables
+    if goal and deliverables:
+        contract["behaviourChecks"] = list(requirements or deliverables)
     contract["doneDefinition"] = done_definition
     contract["autoGenerated"] = True
     # Only add must-pass checks if the spec explicitly mentions tests or quality

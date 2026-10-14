@@ -1,0 +1,215 @@
+{
+  "baseline": "a74dd53",
+  "initial_git_clean": true,
+  "scope": [
+    "R01",
+    "R02",
+    "R03",
+    "R04",
+    "R05",
+    "R06",
+    "R12",
+    "R16"
+  ],
+  "production_activation": "not authorized; not performed",
+  "limits": "No push, live approvals, real missions, model provider tests, live restarts, other profiles, destructive changes",
+  "items": [
+    {
+      "id": "R01",
+      "priority": "P1",
+      "phase": "A · Trust and recovery",
+      "type": "Known reliability gap",
+      "effort": "High / design first",
+      "title": "Make authorization delivery recoverable",
+      "why": "A valid approval must not disappear between being consumed and being queued. A recovery path must also avoid accidental duplicate execution.",
+      "evidence": [],
+      "action": "Define durable states for authorized, queued, started, and terminal commands. Choose a minimal outbox or recovery protocol using stable command IDs, replay rules, and idempotency. Keep the existing command path; do not introduce a second scheduler.",
+      "acceptance": [
+        "Inject a failure after each durable write and recover after a process restart.",
+        "Each command is either delivered once at dispatch level, explicitly rejected, or marked unresolved for operator review; no silent disappearance.",
+        "Repeated HTTP/WS responses, worker retries, and restarts cannot enqueue a second runnable copy.",
+        "Document that deduplicated dispatch does not guarantee exactly-once external side effects."
+      ],
+      "dependency": "Agree on the recovery contract before changing write order. R05 adds the diagnostic surface.",
+      "permission": "Local implementation needs a separate work order. Never test by approving real pending commands.",
+      "sources": [
+        "E05"
+      ],
+      "implementation_status": "pending"
+    },
+    {
+      "id": "R02",
+      "priority": "P1",
+      "phase": "A · Trust and recovery",
+      "type": "Code-observed semantic defect",
+      "effort": "Medium",
+      "title": "Do not call a minimal contract a validated success",
+      "why": "A green pass can imply more evidence than the validator actually has.",
+      "evidence": [],
+      "action": "Define explicit semantics for evidence missing, structural checks passed, needs human review, and verified success. Default insufficient contracts to needs-human-review or a separate non-success state. Keep command completion distinct from task acceptance.",
+      "acceptance": [
+        "Regression: auto-generated contract, empty goal, and a failing non-critical check never produce validated success.",
+        "Missing reviewer, missing artifacts, or empty behavioral evidence cannot silently upgrade a task to verified success.",
+        "The UI exposes the checks and limitations behind the verdict.",
+        "Existing valid contracts retain their documented pass/fail behavior."
+      ],
+      "dependency": "Audit callers and persisted verdict compatibility before changing the enum. Independent review automation is R14, not a prerequisite.",
+      "permission": "No autonomous merge or acceptance-policy change without Cristóbal's approval.",
+      "sources": [
+        "E11",
+        "E08"
+      ],
+      "implementation_status": "pending"
+    },
+    {
+      "id": "R03",
+      "priority": "P1",
+      "phase": "A · Trust and recovery",
+      "type": "Reproduced mechanism defect",
+      "effort": "Medium–high",
+      "title": "Enforce step timeout and truthful cancellation",
+      "why": "The step deadline can expire while the caller still waits for the worker thread. A cancellation label also does not prove process exit.",
+      "evidence": [],
+      "action": "Define cancellation ownership across runner, process group, and step executor. Do not replace the context with shutdown(wait=False) and call that termination. Propagate a cancellation signal and confirm owned-process exit, or show stop unconfirmed. Prevent retries while prior work is still running.",
+      "acceptance": [
+        "A controlled hanging runner returns within the documented deadline and cleanup budget, without waiting for normal completion.",
+        "Owned child and grandchild processes are terminated or explicitly reported as unconfirmed; unrelated processes are untouched.",
+        "Retries never overlap an unresolved earlier attempt.",
+        "A recycled PID cannot receive a stop request meant for an older process identity; the UI separates requested cancellation from confirmed exit."
+      ],
+      "dependency": "R01 lifecycle and E08 identity. Keep observation and termination as separate contracts.",
+      "permission": "Use inert fixtures and scratch processes only. Do not cancel live agents or restart the live bridge as a test.",
+      "sources": [
+        "E08",
+        "E16",
+        "E18"
+      ],
+      "implementation_status": "pending"
+    },
+    {
+      "id": "R04",
+      "priority": "P1",
+      "phase": "A · Trust and recovery",
+      "type": "Security contract clarification",
+      "effort": "Medium",
+      "title": "Publish a per-route execution protection matrix",
+      "why": "A pre-launch scanner is not a sandbox, and a Docker policy does not protect a direct host CLI path.",
+      "evidence": [],
+      "action": "List each supported HTTP/CLI/container execution route, its approval boundary, launch checks, mounts, network policy, secret handling, audit, and known bypass surface. Test the matrix instead of adding a broad host-monitoring subsystem.",
+      "acceptance": [
+        "Every supported adapter is mapped to its actual launch and audit calls.",
+        "An unsafe supported container configuration is rejected in a route-level test.",
+        "Direct-host execution is labeled as trusted-operator execution, not sandboxed execution.",
+        "Documentation makes no claim of continuous runtime supervision unless such supervision is implemented and exercised."
+      ],
+      "dependency": "Decide which adapters are officially supported before expanding them.",
+      "permission": "No eBPF, Landlock rollout, wider privileges, or changed host policy without an explicit architecture decision.",
+      "sources": [
+        "E09",
+        "E10"
+      ],
+      "implementation_status": "pending"
+    },
+    {
+      "id": "R05",
+      "priority": "P1",
+      "phase": "A · Trust and recovery",
+      "type": "Operational visibility",
+      "effort": "Medium",
+      "title": "Show loaded code and audit capability without exposing secrets",
+      "why": "The source tree can be newer than a running process, while a green health check says little about loaded features or durable audit signatures.",
+      "evidence": [],
+      "action": "Add a privacy-safe diagnostic snapshot to an existing surface: loaded commit/build, start time, relevant capabilities, read/write-store status, and persistent/ephemeral audit-key mode. Return booleans or capability states, never secret material.",
+      "acceptance": [
+        "Changing the checkout without restart does not change the reported loaded build.",
+        "Missing endpoint is shown as unknown/unsupported, never as feature absent or healthy by default.",
+        "Ephemeral audit mode is visibly distinguished from persistent cross-restart verification.",
+        "Diagnostics never include tokens, keys, environment dumps, prompts, or argv."
+      ],
+      "dependency": "Choose build attestation that survives editable local development. Coordinate safe activation with active agents.",
+      "permission": "Checking live configuration must not reveal secret values. Restart only with an agreed safe window.",
+      "sources": [
+        "E01",
+        "E06",
+        "E07",
+        "E08"
+      ],
+      "implementation_status": "pending"
+    },
+    {
+      "id": "R06",
+      "priority": "P1",
+      "phase": "A · Trust and recovery",
+      "type": "Documentation defect",
+      "effort": "Small–medium",
+      "title": "Replace the historical feature inventory with a current one",
+      "why": "Stale documentation can send the next agent to reimplement a feature, revive a retired subsystem, or promise a guarantee that does not exist.",
+      "evidence": [],
+      "action": "Reconcile SCOPE, ROADMAP, README, security notes, and RepoCiv skills against current code. Mark active, experimental, retired, and reference-only components. Keep this HTML as a dated review, not a second canonical backlog.",
+      "acceptance": [
+        "No item is both implemented and retired without a dated explanation.",
+        "2D and 3D remain official; expiry and position hooks are not listed as missing.",
+        "Each active subsystem has one source-of-truth document and an evidence pointer.",
+        "Correct the AgentCraft comparison's authentication claim, review-failure semantics, and unreproducible score."
+      ],
+      "dependency": "Cristóbal confirms disputed product boundaries. Current code is evidence, not automatic permission to keep a subsystem.",
+      "permission": "Do not delete code or revive retired features as part of a documentation cleanup.",
+      "sources": [
+        "E02",
+        "E13",
+        "E14"
+      ],
+      "implementation_status": "pending"
+    },
+    {
+      "id": "R12",
+      "priority": "P1",
+      "phase": "A · Trust and recovery",
+      "type": "Code-observed recovery gap",
+      "effort": "Medium",
+      "title": "Reconcile interrupted tasks before any restart replay",
+      "why": "A disk checkpoint does not, by itself, restore a live registry or prove that prior work stopped.",
+      "evidence": [],
+      "action": "Define interrupted task states and rebuild a read-only recovery view at startup. Identify owned surviving work before offering an explicit resume. Never automatically replay an external side effect. Include authoritative-store backup and isolated restore tests.",
+      "acceptance": [
+        "Restart a scratch bridge with persisted executing/blocked tasks and show them as interrupted or blocked, not silently absent or completed.",
+        "A surviving process is correlated by stable identity before a resume or stop decision.",
+        "Restoring a checkpoint never renews approval deadlines or silently repeats completed external actions.",
+        "The restore procedure identifies authoritative stores, derived caches, permissions, version compatibility, and unresolved records."
+      ],
+      "dependency": "R01 recovery invariants, R03 process ownership, and R05 diagnostic identity.",
+      "permission": "Use scratch state only. A checkpoint is not permission to resume an agent, overwrite live state, or restart the service.",
+      "sources": [
+        "E05",
+        "E08",
+        "E17"
+      ],
+      "implementation_status": "pending"
+    },
+    {
+      "id": "R16",
+      "priority": "P1",
+      "phase": "A · Trust and recovery",
+      "type": "Reproduced path-confinement defect",
+      "effort": "Medium",
+      "title": "Confine repository and issue IDs before filesystem access",
+      "why": "A malformed identifier can resolve outside the intended state-store root, even in a single-operator alpha. Approval does not make a malformed path safe.",
+      "evidence": [],
+      "action": "Define literal identifier formats and reject malformed values before any side effect. Use component-aware resolved-path confinement at each store boundary, including symlink handling. Decide whether task_run is an officially supported command before documenting its risk and policy.",
+      "acceptance": [
+        "Parent-directory IDs, absolute paths, separators, malformed values, and symlink escapes are rejected before mkdir/read/write/delete.",
+        "Valid repository identifiers retain collision-free storage mapping; do not silently normalize invalid tokens.",
+        "HTTP/WS/direct helper tests share the identifier contract and contain writes within scratch roots.",
+        "A trusted token or approval cannot bypass the store-boundary check."
+      ],
+      "dependency": "R06 supported-surface decision. Fix store helpers even if a command is later retired.",
+      "permission": "Test only path construction and scratch stores. Do not probe user files or label this a remote exploit without proving reachability and authorization conditions.",
+      "sources": [
+        "E15",
+        "E18",
+        "E10"
+      ],
+      "implementation_status": "pending"
+    }
+  ]
+}

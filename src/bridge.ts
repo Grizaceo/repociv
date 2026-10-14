@@ -17,6 +17,7 @@ import {
   updateGpuBar,
 } from './ui/index.ts';
 import { cfg } from './gameConfig.ts';
+import { expireApproval } from './ui/approvalCards.ts';
 import { approveCommand } from './commandBus.ts';
 import { terminalPanel } from './terminalPanel.ts';
 import {
@@ -373,6 +374,7 @@ export class BridgeEvents {
         terminalPanel,
         playSound,
         approveCommand,
+        expireApproval,
         cfg,
       };
       this._ctx = ctx;

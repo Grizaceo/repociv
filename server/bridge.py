@@ -94,7 +94,11 @@ _EXTERNAL_SESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$")
 # See server/_security.py for the full rules.
 from server._security import build_allowed_origins, enforce_token_policy  # noqa: E402
 
-BRIDGE_HOST = "0.0.0.0" if REPOCIV_REMOTE else "127.0.0.1"
+# An explicit BRIDGE_HOST wins (the Docker entrypoint sets 0.0.0.0 so the
+# published ports reach the container); otherwise derive it from remote mode.
+BRIDGE_HOST = os.environ.get("BRIDGE_HOST", "").strip() or (
+    "0.0.0.0" if REPOCIV_REMOTE else "127.0.0.1"
+)
 enforce_token_policy(
     token=REPOCIV_TOKEN,
     bind_host=BRIDGE_HOST,
@@ -1284,6 +1288,14 @@ if __name__ == "__main__":
         return _token_ledger.get_ledger().get_agent_fatigue(unit_id)
 
     _sched.set_fatigue_provider(_fatigue_for)
+    _sched._init_from_disk()
+    # Recover any commands that were running when the bridge last died
+    recovered = _recover_hung_commands()
+
+    # Replay durable approval dispatch intents before starting the worker loop
+    from server import dispatch_ledger as _dispatch_ledger
+
+    _dispatch_ledger.recover_intents()
     _sched.start_worker()
     _seed_initial_heartbeats()
 
@@ -1291,9 +1303,6 @@ if __name__ == "__main__":
     from server.step_executor import dispatch_plan_step
 
     _to.set_step_executor(dispatch_plan_step)
-
-    # Recover any commands that were running when the bridge last died
-    recovered = _recover_hung_commands()
 
     # ─── WebSocket server (Phase 1: bidirectional transport) ───────────
     from server.websocket_handler import start_ws_server, broadcast as ws_broadcast

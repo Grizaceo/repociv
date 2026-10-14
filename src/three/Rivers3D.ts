@@ -12,6 +12,7 @@
 // coord), via coordinate hashes — no Math.random, no Date. The same world
 // always grows the same rivers, so goldens stay run-to-run stable.
 import {
+  BoxGeometry,
   BufferGeometry,
   Float32BufferAttribute,
   CatmullRomCurve3,
@@ -21,9 +22,12 @@ import {
   Mesh,
   MeshStandardMaterial,
   Color,
+  Quaternion,
   SphereGeometry,
   Vector3,
 } from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeGlbScene, type MergedGlb } from './mergeGlbScene.ts';
 import { AXIAL_DIRECTIONS, axialDistance, type Axial } from '../hex.ts';
 import { tileKey, type Tile } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
@@ -33,6 +37,38 @@ import { HEX_SIZE } from '../constants.ts';
 const riverGroup = new Group();
 riverGroup.name = 'rivers';
 let lastSignature = '';
+
+type BridgeVariant = MergedGlb & { norm: number; minY: number };
+let bridgeVariant: BridgeVariant | null = null;
+let bridgeLoadState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
+
+export function areRiverBridgesReady(): boolean {
+  return bridgeLoadState === 'ready';
+}
+
+export function ensureRiverBridgeLoad(onSettled?: () => void): void {
+  if (bridgeLoadState !== 'idle') return;
+  bridgeLoadState = 'loading';
+  const loader = new GLTFLoader();
+  loader
+    .loadAsync('/assets/3d/props/kenney/bridge.glb')
+    .then((gltf) => {
+      const merged = mergeGlbScene(gltf.scene);
+      merged.geometry.computeBoundingBox();
+      const bb = merged.geometry.boundingBox!;
+      const size = new Vector3().subVectors(bb.max, bb.min);
+      const norm = 1 / Math.max(size.x, size.y, size.z, 1e-6);
+      bridgeVariant = { ...merged, norm, minY: bb.min.y };
+      bridgeLoadState = 'ready';
+      lastSignature = '';
+      onSettled?.();
+    })
+    .catch(() => {
+      bridgeVariant = null;
+      bridgeLoadState = 'failed';
+      onSettled?.();
+    });
+}
 
 export function getRiverGroup(): Group {
   return riverGroup;
@@ -300,7 +336,7 @@ function riverSignature(tiles: Tile[]): string {
     const s = `${tileKey(t.coord)}:${t.terrain}:${t.revealed ? 1 : 0}`;
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   }
-  return `${tiles.length}:${h}`;
+  return `${tiles.length}:${h}:b${bridgeLoadState === 'ready' ? 1 : 0}`;
 }
 
 export function rebuildRivers(tiles: Map<string, Tile>): void {
@@ -394,16 +430,78 @@ export function rebuildRivers(tiles: Map<string, Tile>): void {
     foam.instanceMatrix.needsUpdate = true;
     riverGroup.add(foam);
   }
+
+  // River crossings: place a 3D bridge (Kenney bridge.glb or procedural stone span)
+  // at the revealed midpoint of each river path.
+  const bridgeSpans: Array<{ pos: Vector3; angle: number }> = [];
+  for (const path of paths) {
+    if (path.points.length < 3) continue;
+    const midIdx = Math.floor(path.points.length / 2);
+    if (!path.revealed[midIdx]) continue;
+    const p = path.points[midIdx]!;
+    const prev = path.points[Math.max(0, midIdx - 1)]!;
+    const next = path.points[Math.min(path.points.length - 1, midIdx + 1)]!;
+    // Orient perpendicular to river flow tangent
+    const flowAngle = Math.atan2(next.z - prev.z, next.x - prev.x);
+    bridgeSpans.push({ pos: p, angle: flowAngle + Math.PI / 2 });
+  }
+
+  if (bridgeSpans.length > 0) {
+    const up = new Vector3(0, 1, 0);
+    const quat = new Quaternion();
+    const scl = new Vector3();
+    const pos = new Vector3();
+    const mat4 = new Matrix4();
+
+    if (bridgeVariant) {
+      const bMesh = new InstancedMesh(
+        bridgeVariant.geometry,
+        bridgeVariant.materials,
+        bridgeSpans.length,
+      );
+      bMesh.userData.sharedGeometry = true;
+      bMesh.castShadow = true;
+      bMesh.receiveShadow = true;
+      const s = HEX_SIZE * 0.34 * bridgeVariant.norm;
+      scl.set(s, s, s);
+      for (let i = 0; i < bridgeSpans.length; i++) {
+        const span = bridgeSpans[i]!;
+        quat.setFromAxisAngle(up, -span.angle);
+        pos.set(span.pos.x, span.pos.y - bridgeVariant.minY * s, span.pos.z);
+        mat4.compose(pos, quat, scl);
+        bMesh.setMatrixAt(i, mat4);
+      }
+      bMesh.instanceMatrix.needsUpdate = true;
+      riverGroup.add(bMesh);
+    } else {
+      const deckGeom = new BoxGeometry(HEX_SIZE * 0.28, HEX_SIZE * 0.04, HEX_SIZE * 0.12);
+      const deckMat = new MeshStandardMaterial({ color: 0x8b7355, roughness: 0.78 });
+      const bMesh = new InstancedMesh(deckGeom, deckMat, bridgeSpans.length);
+      bMesh.castShadow = true;
+      scl.set(1, 1, 1);
+      for (let i = 0; i < bridgeSpans.length; i++) {
+        const span = bridgeSpans[i]!;
+        quat.setFromAxisAngle(up, -span.angle);
+        pos.set(span.pos.x, span.pos.y + HEX_SIZE * 0.02, span.pos.z);
+        mat4.compose(pos, quat, scl);
+        bMesh.setMatrixAt(i, mat4);
+      }
+      bMesh.instanceMatrix.needsUpdate = true;
+      riverGroup.add(bMesh);
+    }
+  }
 }
 
 export function clearRivers(): void {
   while (riverGroup.children.length > 0) {
     const child = riverGroup.children[0] as Mesh;
     riverGroup.remove(child);
-    child.geometry.dispose();
-    const mat = child.material;
-    if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
-    else mat.dispose();
+    if (!child.userData.sharedGeometry) {
+      child.geometry.dispose();
+      const mat = child.material;
+      if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
+      else mat.dispose();
+    }
   }
   lastSignature = '';
 }

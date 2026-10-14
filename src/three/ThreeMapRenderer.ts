@@ -29,6 +29,8 @@ import { areResourcePropsReady } from './ResourceProps3D.ts';
 import { areForestPropsReady } from './ForestProps3D.ts';
 import { areCityPropsReady } from './CityProps3D.ts';
 import { isTerrainScatterReady } from './TerrainScatter3D.ts';
+import { areWonderGlbPropsReady } from './WonderProps3D.ts';
+import { areRiverBridgesReady } from './Rivers3D.ts';
 import { PostFX3D } from './PostFX3D.ts';
 import { resolveInitialPostFx, persistPostFx } from './renderMode.ts';
 import { axialToWorld3D, hexCornerAngle3D } from './axialToWorld3D.ts';
@@ -206,6 +208,8 @@ export class ThreeMapRenderer {
       `:uprops${areUnitPropsReady() ? 1 : 0}` +
       `:rprops${areResourcePropsReady() ? 1 : 0}` +
       `:sprops${isTerrainScatterReady() ? 1 : 0}` +
+      `:wprops${areWonderGlbPropsReady() ? 1 : 0}` +
+      `:bprops${areRiverBridgesReady() ? 1 : 0}` +
       '';
     const stateDirty = tileSignature !== this.lastTileSignature;
     this.lastTileSignature = tileSignature;
@@ -393,15 +397,23 @@ export function computeWorldSignature(state: GameState): string {
     // (which replaces a territory tile in place — tiles.size unchanged) still
     // flips the dirty flag and rebuilds the wonder props.
     cities
+      .map((c) => {
+        const tile = tiles.get(tileKey(c.coord));
+        const failed = c.buildings?.some((b) => b.state === 'failed') ? 1 : 0;
+        const wonders = (c.districts ?? [])
+          .filter((d) => d.type === 'wonder')
+          .map((d) => d.wonderType)
+          .join(',');
+        return `${c.id}:${c.name}:${c.territory.length}:${tile?.skillHealth ?? ''}:${failed}:${wonders}`;
+      })
+      .join('|'),
+    units
       .map(
-        (c) =>
-          `${c.id}:${c.name}:${c.territory.length}:${(c.districts ?? [])
-            .filter((d) => d.type === 'wonder')
-            .map((d) => d.wonderType)
-            .join(',')}`,
+        (u) =>
+          `${u.id}:${u.type}:${u.coord.q},${u.coord.r}:${u.state}:${u.path.length}:${u.pathIndex ?? 0}`,
       )
       .join('|'),
-    units.map((u) => `${u.id}:${u.coord.q},${u.coord.r}:${u.state}`).join('|'),
+    state.selectedUnit?.id ?? '',
   ].join('#');
 }
 

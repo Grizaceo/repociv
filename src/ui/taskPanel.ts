@@ -23,7 +23,11 @@ import {
 } from './activityPresentation.ts';
 import { focusOwnChat } from './agentsPanel.ts';
 
+import { parsePendingWork, renderPendingWork, type PendingWorkSnapshot } from './pendingWork.ts';
+
 const POLL_MS = 3_000;
+let _pendingWork: PendingWorkSnapshot | null = null;
+let _pendingError = '';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Task {
@@ -129,12 +133,26 @@ async function _fetchProcesses(): Promise<void> {
   }
 }
 
+async function _fetchPendingWork(): Promise<void> {
+  try {
+    const res = await fetch(bridgeUrl('/api/pending-work'), {
+      headers: bridgeHeaders(),
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    _pendingWork = parsePendingWork(await res.json());
+    _pendingError = '';
+  } catch (error) {
+    _pendingError = error instanceof Error ? error.message : String(error);
+  }
+}
+
 let _fetching = false;
 async function _fetch(loadHistory = true): Promise<void> {
   if (_fetching) return;
   _fetching = true;
   try {
-    await _fetchProcesses();
+    await Promise.all([_fetchProcesses(), _fetchPendingWork()]);
     try {
       const res = await fetch(bridgeUrl('/tasks'), { headers: bridgeHeaders() });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -202,7 +220,7 @@ function _render(): void {
     ${_unreadable ? `<p>${_unreadable} procesos no legibles o terminados durante el muestreo</p>` : ''}
     <div class="activity-list">${activities.map(_activityCard).join('')}</div>
     ${!activities.length ? '<p>Sin actividades en el inventario y la historia cargada</p>' : ''}</section>`;
-  const context = _activityContext();
+  const context = renderPendingWork(_pendingWork, _pendingError) + _activityContext();
   if (_offline) {
     replace(context + processes + '<div class="task-offline">⚠ Orquestador no disponible</div>');
     restore();

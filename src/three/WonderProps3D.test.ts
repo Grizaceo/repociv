@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
 import type { District, Tile, WonderType } from '../types.ts';
 import {
   areWonderPropsReady,
@@ -7,6 +8,8 @@ import {
   getWonderPropsGroup,
   rebuildWonderProps,
   setWonderVisible,
+  wonderModelForType,
+  WONDER_KENNEY_IDS,
   _wonderPropsSignature,
 } from './WonderProps3D.ts';
 
@@ -132,5 +135,18 @@ describe('WonderProps3D', () => {
     expect(_wonderPropsSignature()).toBe('');
     expect(wonderMonuments().children).toHaveLength(0);
     expect(disposed.length).toBeGreaterThan(0);
+  });
+
+  it('maps wonder types to semantic Kenney 3D models and verifies GLBs exist on disk', () => {
+    expect(wonderModelForType('ollama-llm')).toBe('building-wizard-tower');
+    expect(wonderModelForType('prefect-pipeline')).toBe('building-watermill');
+    expect(wonderModelForType('gpu-worker-pool')).toBe('building-smelter');
+    expect(wonderModelForType('duckdb-ledger')).toBe('building-mine');
+    expect(wonderModelForType('tailscale-gateway')).toBe('building-port');
+
+    for (const id of WONDER_KENNEY_IDS) {
+      expect(existsSync(`public/assets/3d/props/kenney/${id}.glb`), `${id}.glb`).toBe(true);
+    }
+    expect(existsSync('public/assets/3d/props/kenney/LICENSE-Kenney.txt')).toBe(true);
   });
 });
