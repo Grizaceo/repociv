@@ -94,9 +94,14 @@ export function formatValidationResult(result: ValidationResult): FormattedValid
     </div>`
     : '';
 
+  const medalImg =
+    result.verdict === 'pass'
+      ? '<img src="/assets/medals/shaded_medal1.png" alt="" class="validation-medal" style="width:18px;height:18px;vertical-align:middle;margin-right:6px;" />'
+      : '';
+
   const html = `<div class="validation-result">
     <div class="validation-verdict" style="background:${style.bg}; border-color:${style.border}; color:${style.color};">
-      <strong>${style.label}</strong>
+      <strong>${medalImg}${style.label}</strong>
       <p class="summary">${escapeHtml(result.summary)}</p>
     </div>
 

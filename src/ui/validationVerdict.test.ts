@@ -1,7 +1,10 @@
 // ─── Unit tests for the validation verdict UI module ─────────────────────────
 // Tests cover formatting and rendering of validation results in the task panel.
 import { describe, it, expect } from 'vitest';
+import { existsSync } from 'node:fs';
 import { formatValidationResult, renderValidationResult } from './validationVerdict.ts';
+import { unitModelLabel, unitRankMedalUrl } from './panel.ts';
+import type { Unit } from '../types.ts';
 
 describe('validationVerdict', () => {
   it('formats a "pass" verdict correctly', () => {
@@ -138,5 +141,22 @@ describe('validationVerdict', () => {
 
     expect(container.innerHTML).toContain('Test pass');
     expect(container.innerHTML).toContain('✓ Validated');
+    expect(container.innerHTML).toContain('/assets/medals/shaded_medal1.png');
+  });
+
+  it('resolves distinct unit model labels and Kenney CC0 medal badges per role', () => {
+    expect(unitModelLabel({ type: 'claude' } as Unit)).toBe('Claude Code');
+    expect(unitModelLabel({ type: 'codex' } as Unit)).toBe('Codex CLI');
+    expect(unitModelLabel({ type: 'cursor' } as Unit)).toBe('Cursor');
+    expect(unitModelLabel({ type: 'hero' } as Unit)).toBe('Hermes (Principal)');
+    expect(unitModelLabel({ type: 'scout' } as Unit)).toBe('Scout');
+
+    expect(unitRankMedalUrl({ type: 'claude' })).toBe('/assets/medals/shaded_medal1.png');
+    expect(unitRankMedalUrl({ type: 'worker' })).toBe('/assets/medals/shaded_medal2.png');
+    expect(unitRankMedalUrl({ type: 'scout' })).toBe('/assets/medals/shaded_medal3.png');
+
+    expect(existsSync('public/assets/medals/shaded_medal1.png')).toBe(true);
+    expect(existsSync('public/assets/medals/shaded_medal2.png')).toBe(true);
+    expect(existsSync('public/assets/medals/shaded_medal3.png')).toBe(true);
   });
 });

@@ -452,7 +452,7 @@
 </div>
 
 <!-- ----------------------------------------------------------------------- -->
-<h3>Fase 4 — Claridad de Producto, Medallas en HUD y Coherencia Documental <span class="pill p-ok">PULIDO &amp; UX · PRIORIDAD 4</span></h3>
+<h3>Fase 4 — Claridad de Producto, Medallas en HUD y Coherencia Documental <span class="pill p-ok">HECHO · VERIFICADO HOY</span></h3>
 <p>Objetivo: resolver las fricciones del dogfooding (<code>docs/DOGFOODING_NOTES.md</code> y <code>docs/UX_IMPROVEMENT_PLAN.md</code>) y alinear la documentación con el código real (<code>R06</code>).</p>
 
 <div class="fix">
@@ -518,14 +518,58 @@
     <td><b>Fase 4 (HUD &amp; Docs)</b></td>
     <td><code>npm test &amp;&amp; git diff docs/</code></td>
     <td>
-      • Unidades muestran perfil/rango real + medalla SVG/PNG en <code>panel.ts</code> y <code>agentDock.ts</code><br>
+      • Unidades muestran perfil/rango real + medalla SVG/PNG en <code>panel.ts</code> y <code>validationVerdict.ts</code><br>
       • Ningún módulo retirado figura como activo en <code>ROADMAP.md</code> ni <code>README.md</code>
     </td>
   </tr>
 </table>
 
+<!-- ======================================================================= -->
+<h2 id="next-assets">7. ¿Qué Free Assets adicionales descargar vs. Cuándo usar Blender / Python GLB Ad-Hoc?</h2>
+
+<p>Tras integrar todos los paquetes de <code>~/Downloads</code> (y auditar las herramientas instaladas en este host Linux Omarchy), quedan <b>3 huecos visuales concretos</b> y una recomendación clara entre <i>descargar CC0</i> vs. <i>generar ad-hoc</i>:</p>
+
+<table>
+  <tr>
+    <th>Hueco Visual Restante</th>
+    <th>Mejor Free Asset CC0 Disponible</th>
+    <th>¿Hace falta Blender o basta CC0 / Python?</th>
+  </tr>
+  <tr>
+    <td><b>1. Figurinas 3D distintas por tipo de Agente</b><br><span class="sub">Hoy todas las unidades 3D en <code>UnitMesh3D.ts</code> y <code>LocalAgent3D.ts</code> usan el mismo <code>unit-worker-0.glb</code> con camisa teñida.</span></td>
+    <td>
+      <b>KayKit — Character Pack: Adventurers (CC0, Gratis en itch.io)</b><br>
+      <code>https://kaylousberg.itch.io/kaykit-adventurers</code><br>
+      Trae 5 personajes low-poly en <code>.gltf</code> del <b>mismo autor y paleta</b> que tus ciudades actuales (<code>public/assets/3d/props/kaykit/</code>):<br>
+      • <i>Mage</i> → <code>CLAUDE</code> / <code>MAIN</code><br>
+      • <i>Rogue</i> → <code>SCOUT</code><br>
+      • <i>Knight</i> → <code>PRAETORIAN</code><br>
+      • <i>Barbarian / Engineer</i> → <code>WORKER</code> / <code>CODEX</code>
+    </td>
+    <td><span class="pill p-ok">MEJOR DESCARGAR CC0</span><br>Coherencia artística 100% con KayKit Medieval Hexagon Pack sin modelar personajes a mano.</td>
+  </tr>
+  <tr>
+    <td><b>2. Mobiliario de Oficina Moderna en <code>LocalTile3D.ts</code></b><br><span class="sub">Sillas (<code>chair</code>), sofás (<code>sofa</code>), escritorios con monitor (<code>workbench</code> / <code>standing_desk</code>) y pizarras (<code>whiteboard</code>) en 3D local.</span></td>
+    <td>
+      <b>Kenney — Furniture Kit (CC0, 140 modelos GLB, 10–18 KB c/u)</b><br>
+      <code>https://kenney.nl/assets/furniture-kit</code><br>
+      Incluye exactamente las piezas que faltan en <code>LocalTile3D.ts</code>:<br>
+      • <code>desk.glb</code> (15 KB) + <code>computerScreen.glb</code><br>
+      • <code>chairDesk.glb</code> (12 KB)<br>
+      • <code>loungeSofa.glb</code> (14 KB)<br>
+      • <code>bookcaseOpen.glb</code> (16 KB)
+    </td>
+    <td><span class="pill p-ok">MEJOR DESCARGAR CC0</span><br>6 GLBs suman ~85 KB (dejando aún &gt;800 KB libres en el presupuesto de 1.5 MB).</td>
+  </tr>
+  <tr>
+    <td><b>3. Terreno 3D / Props Procedurales Ad-Hoc</b><br><span class="sub">Re-bake de <code>terrain-atlas-3d.png</code> (<code>scripts/blender/bake_atlas.py</code>) o variantes de cristales/monumentos (<code>scripts/blender/make_props*.py</code>).</span></td>
+    <td>Scripts ya existentes en el repo:<br><code>scripts/blender/bake_atlas.py</code><br><code>scripts/blender/make_props.py</code><br><code>scripts/blender/rebuild_all_props_v2.py</code></td>
+    <td><span class="pill p-warn">INSTALAR BLENDER LOCAL</span><br>Hoy <code>blender</code> <b>no está instalado</b> en este host Linux (<code>pacman -S blender</code>). Para props geométricos simples basta un script Python + <code>numpy</code>/<code>struct</code> (ya instalados), pero para correr <code>bake_atlas.py</code> (Cycles) sí conviene instalar Blender.</td>
+  </tr>
+</table>
+
 <div class="foot">
-  Artefacto generado el 2026-10-14 para <b>RepoCiv</b> (<code>/home/gris96/.hermes/workspace/ACTIVE/repociv</code>) · Basado en inspección directa del código fuente, corrida de suites y análisis de los paquetes de assets en <code>/home/gris96/Downloads</code>.
+  Artefacto generado el 2026-10-14 para <b>RepoCiv</b> (<code>/home/gris96/.hermes/workspace/ACTIVE/repociv</code>) · Fases 1, 2, 3 y 4 completadas y verificadas.
 </div>
 
 </div>

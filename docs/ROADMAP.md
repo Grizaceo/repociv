@@ -33,10 +33,12 @@ These components are used daily and have passing test suites:
   processes (F9), settings and contextual assignment/construction.
   Retired controls: layers, ledger, Quest Board, replay, observability, timeline.
 - Systemd integration for persistent operation
-- Security Harness (3-layer: gate, audit, runtime)
-- FrugalGPT Router (cost-aware model selection)
-- Swarm Engine (parallel multi-agent execution)
-- SICA self-improvement (read-only proposal generation)
+- Security Harness (3-layer: gate, audit, runtime) with route-level execution protection matrix
+- MCP stdio server (`server/mcp_server.py`, 44 tools across 15 domains)
+- Pending Git work inventory (`GET /api/pending-work`) with persistent observed age
+- Fail-open CLI position hooks (`POST /api/agent-events`) for Claude, Codex, and Hermes
+- Durable approval delivery (`server/dispatch_ledger.py`) and fail-closed approval expiry
+- Retired backend modules (pruned 2026-08-10 / 2026-09-13, see `docs/SCOPE.md`): FrugalGPT Router, Swarm Engine, SICA self-improvement
 
 ### Test coverage
 

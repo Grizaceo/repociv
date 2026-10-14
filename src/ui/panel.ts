@@ -24,9 +24,13 @@ function unitStateColor(state: UnitState): string {
   return colors[state] ?? '#888';
 }
 
-function unitModelLabel(unit: Unit): string {
+export function unitModelLabel(unit: Unit): string {
   const labels: Record<string, string> = {
-    hero: 'Agente Principal',
+    hero: 'Hermes (Principal)',
+    claude: 'Claude Code',
+    codex: 'Codex CLI',
+    cursor: 'Cursor',
+    praetorian: 'Praetorian',
     worker: 'Worker',
     scout: 'Scout',
     army: 'Ejército',
@@ -35,6 +39,25 @@ function unitModelLabel(unit: Unit): string {
     openclaw: 'OpenClaw',
   };
   return labels[unit.type] ?? unit.type;
+}
+
+export function unitRankMedalUrl(unit: Pick<Unit, 'type'>): string {
+  switch (unit.type) {
+    case 'hero':
+    case 'claude':
+    case 'codex':
+    case 'cursor':
+    case 'openclaw':
+      return '/assets/medals/shaded_medal1.png';
+    case 'worker':
+    case 'praetorian':
+    case 'army':
+      return '/assets/medals/shaded_medal2.png';
+    case 'scout':
+    case 'caravan':
+    default:
+      return '/assets/medals/shaded_medal3.png';
+  }
 }
 
 export function showUnitPanel(unit: Unit, state?: GameState) {
@@ -47,6 +70,7 @@ export function showUnitPanel(unit: Unit, state?: GameState) {
     sprite.textContent = unit.name[0] ?? '?';
     sprite.style.background = unit.color;
     sprite.style.borderColor = 'var(--gold-mid)';
+    sprite.dataset['medal'] = unitRankMedalUrl(unit);
   }
 
   const setText = (id: string, value: string) => {
