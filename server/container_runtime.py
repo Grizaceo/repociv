@@ -100,6 +100,14 @@ def run_agent_container(
         policy=policy,
         agent_command=agent_command,
     )
+    # Direct-call frontier: the caller being trusted does not exempt the
+    # container configuration. Rerun the launch policy gate on the exact
+    # command about to execute; unsafe flags fail closed here too.
+    from .security_harness import get_harness
+
+    gate = get_harness().pre_launch_gate(mission, container_command=command)
+    if gate.blocked or any(f.scanner == "runtime" for f in gate.findings):
+        raise ValueError("container security blocked: " + gate.reason)
     proc = subprocess.run(
         command,
         capture_output=True,

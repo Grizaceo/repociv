@@ -97,6 +97,8 @@ def add_approval(cmd_dict: dict[str, Any]) -> None:
     with _lock:
         store = _ensure_loaded()
         cmd = dict(cmd_dict)
+        if "expires_at" not in cmd and "expiresAt" in cmd:
+            cmd["expires_at"] = cmd["expiresAt"]
         cmd.setdefault("expires_at", time.time() + _APPROVAL_TTL_S)
         store[cmd["id"]] = cmd
         _persist()
@@ -107,7 +109,9 @@ def _valid_timestamp(value: Any) -> bool:
 
 
 def _expiry_reason(cmd: Any, now: float) -> str | None:
-    deadline = cmd.get("expires_at") if isinstance(cmd, dict) else None
+    if not isinstance(cmd, dict):
+        return "invalid approval deadline"
+    deadline = cmd.get("expires_at") if "expires_at" in cmd else cmd.get("expiresAt")
     if not _valid_timestamp(deadline):
         return "invalid approval deadline"
     return "approval expired" if deadline <= now else None
@@ -231,6 +235,25 @@ def cancel_mission(mission_id: str) -> list[dict[str, Any]]:
         return removed
 
 
+def _peek_pending(cmd_id: str) -> tuple[dict[str, Any] | None, bool]:
+    """Read-only check + snapshot of a pending approval without consuming it.
+
+    Returns ``(cmd_copy, expired)``. Expired entries are swept and audited
+    under ``_lock`` just like ``_take_approval``, but a valid pending entry
+    remains in the store until ``pop_approval`` consumes it.
+    """
+    with _lock:
+        store = _ensure_loaded()
+        now = time.time()
+        expired = _expire_locked(store, now)
+        if cmd_id in store and _expiry_reason(store[cmd_id], now) is not None:
+            return None, True
+        cmd = store.get(cmd_id)
+        if cmd is not None:
+            return dict(cmd), False
+        return None, cmd_id in expired
+
+
 def resolve_approval(
     cmd_id: str,
     *,
@@ -240,36 +263,52 @@ def resolve_approval(
     log_rejected: str | None = None,
 ) -> dict[str, Any]:
     """Approve or reject a pending command. Shared by HTTP and WebSocket paths."""
-    cmd_dict, expired = _take_approval(cmd_id)
-    if not cmd_dict:
-        if expired:
-            return {"ok": False, "error": "approval expired", "status": "expired", "commandId": cmd_id}
-        return {"ok": False, "error": "approval not found"}
-
+    from server import approval_resolution
+    from server import dispatch_ledger
     from server import event_store as es
-    from server import scheduler as sched
-    from server.command_schema import Command
     from server.sse_server import send_to_repociv
 
-    if approved:
-        es.record_approved(cmd_id)
-        cmd = Command(
-            id=cmd_dict["id"],
-            type=cmd_dict["type"],
-            target=cmd_dict["target"],
-            payload=cmd_dict.get("payload", {}),
-            created_by=cmd_dict.get("created_by", "user"),
-            risk=cmd_dict.get("risk", "medium"),
-            requires_approval=False,
-            status="queued",
-        )
-        es.record_queued(cmd.id)
-        sched.enqueue(cmd)
-        msg = log_approved or f"Comando aprobado: {cmd.type}"
-        send_to_repociv({"type": "log", "msg": msg, "level": "success"})
-        return {"ok": True, "status": "queued", "commandId": cmd_id}
+    if not approved:
+        cmd_dict, expired = _take_approval(cmd_id)
+        dispatch_ledger.release_intent_if_unclaimed(cmd_id)
+        if not cmd_dict:
+            if expired:
+                return {
+                    "ok": False,
+                    "error": "approval expired",
+                    "status": "expired",
+                    "commandId": cmd_id,
+                }
+            return {"ok": False, "error": "approval not found"}
+        es.record_rejected(cmd_id, reject_reason)
+        msg = log_rejected or f"Comando rechazado: {cmd_dict.get('type')}"
+        send_to_repociv({"type": "log", "msg": msg, "level": "warn"})
+        return {"ok": True, "status": "rejected", "commandId": cmd_id}
 
-    es.record_rejected(cmd_id, reject_reason)
-    msg = log_rejected or f"Comando rechazado: {cmd_dict.get('type')}"
-    send_to_repociv({"type": "log", "msg": msg, "level": "warn"})
-    return {"ok": True, "status": "rejected", "commandId": cmd_id}
+    cmd_dict, expired = _peek_pending(cmd_id)
+    if not cmd_dict:
+        dispatch_ledger.release_intent_if_unclaimed(cmd_id)
+        if expired:
+            return {
+                "ok": False,
+                "error": "approval expired",
+                "status": "expired",
+                "commandId": cmd_id,
+            }
+        return {"ok": False, "error": "approval not found"}
+
+    try:
+        return approval_resolution.dispatch_approved(
+            cmd_dict, log_approved=log_approved
+        )
+    except Exception:
+        logger.exception(
+            "Durable approval delivery failed for %s; left unresolved for operator review",
+            cmd_id,
+        )
+        return {
+            "ok": False,
+            "status": "unresolved",
+            "error": "dispatch intent not durable; command left for operator review",
+            "commandId": cmd_id,
+        }

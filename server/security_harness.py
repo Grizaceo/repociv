@@ -412,6 +412,16 @@ def _load_hmac_key() -> bytes:
 
 _HMAC_KEY = _load_hmac_key()
 
+# R05: audit-key provenance mode, captured at import alongside the key.
+# "persistent" — an operator key (REPOCIV_HMAC_KEY) backs the signature, so
+# tamper-evidence survives restarts. "ephemeral" — a per-process random key.
+_AUDIT_KEY_MODE = "persistent" if os.environ.get(_HMAC_KEY_ENV) else "ephemeral"
+
+
+def audit_key_mode() -> str:
+    """Report how audit-log signatures are keyed, never the key itself."""
+    return _AUDIT_KEY_MODE
+
 
 class AlertSystem:
     """Security alert system with dedup and HMAC audit log.
@@ -685,7 +695,12 @@ class SecurityHarness:
             findings.extend(self._validate_container_command(container_command))
 
         level = self._incident_level(findings)
-        blocked = level >= INCIDENT_L2_HIGH_RISK
+        # Container-policy violations (scanner "runtime") block by themselves:
+        # a single unsafe flag (network=host, rw repo mount, secret mount) is a
+        # rejected launch, never an L1 warning. Mission heuristics keep the
+        # _incident_level thresholds untouched.
+        runtime_violations = any(f.scanner == "runtime" for f in findings)
+        blocked = level >= INCIDENT_L2_HIGH_RISK or runtime_violations
         for finding in findings:
             self.alerts.alert(finding, context={"phase": "pre_launch"})
         return GateResult(
@@ -734,6 +749,8 @@ class SecurityHarness:
         if container_command is not None:
             findings.extend(self._validate_container_command(container_command))
         level = self._incident_level(findings)
+        # Same rule as pre_launch_gate: any container-policy violation blocks.
+        runtime_violations = any(f.scanner == "runtime" for f in findings)
         for finding in findings:
             self.alerts.alert(finding, context={"phase": "runtime"})
         logger.debug(
@@ -743,7 +760,7 @@ class SecurityHarness:
             len(findings),
         )
         return GateResult(
-            blocked=level >= INCIDENT_L2_HIGH_RISK,
+            blocked=level >= INCIDENT_L2_HIGH_RISK or runtime_violations,
             findings=findings,
             incident_level=level,
             reason="; ".join(f.description for f in findings if f.severity in {"high", "critical"})[:500],

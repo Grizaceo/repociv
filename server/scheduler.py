@@ -51,14 +51,26 @@ def _dump_queue(queue: list[dict[str, Any]]) -> None:
 
 
 def _init_from_disk() -> None:
-    """Pre-populate queue from persisted file at startup."""
+    """Pre-populate queue from persisted file at startup (deduplicating by id)."""
     global _queue
     persisted = _load_queue()
     terminal = {"completed", "failed", "cancelled", "rejected"}
-    filtered = [c for c in persisted if c.get("status") not in terminal]
+    seen: set[str] = set()
+    filtered: list[dict[str, Any]] = []
+    for c in persisted:
+        if c.get("status") in terminal:
+            continue
+        cid = str(c.get("id", ""))
+        if cid:
+            if cid in seen:
+                continue
+            seen.add(cid)
+        filtered.append(c)
     with _queue_lock:
         _queue = filtered
         _resort()
+        if len(filtered) != len(persisted):
+            _dump_queue(_queue)
     n = len(filtered)
     if n:
         logger.info(f"[scheduler] Recovered {n} queued mission(s) from disk.")
@@ -170,12 +182,46 @@ def set_dispatcher(fn: Callable[[dict[str, Any]], None]) -> None:
     _dispatcher = fn
 
 
-def enqueue(cmd: Command) -> None:
-    """Add a command to the priority queue."""
+def enqueue(cmd: Command) -> list[str]:
+    """Add a command to the priority queue (idempotent by command id)."""
+    return enqueue_dict(asdict(cmd))
+
+
+def _has_queued(cmd_id: str) -> bool:
+    """Return True if cmd_id is already queued (memory or disk) or dispatched.
+
+    Must be called under ``_queue_lock``.
+    """
+    if any(c.get("id") == cmd_id for c in _queue):
+        return True
+    if any(c.get("id") == cmd_id for c in _load_queue()):
+        return True
+    if _es.has_command_dispatched(cmd_id):
+        return True
+    return False
+
+
+def enqueue_dict(cmd_dict: dict[str, Any]) -> list[str]:
+    """Add a raw command dict to the priority queue (idempotent by id).
+
+    Returns the ids actually enqueued: ``[]`` when a command with the same id
+    is already queued or has already been dispatched (dispatch-level dedup —
+    restarts, worker retries and duplicated responses cannot create a second
+    runnable copy).
+    """
+    cmd_id = str(cmd_dict.get("id", ""))
+    if not cmd_id:
+        return []
     with _queue_lock:
-        _queue.append(asdict(cmd))
+        if _has_queued(cmd_id):
+            return []
+        stored = dict(cmd_dict)
+        stored.setdefault("status", "queued")
+        stored.setdefault("created_at", time.time())
+        _queue.append(stored)
         _resort()
         _dump_queue(_queue)
+    return [cmd_id]
 
 
 def cancel(command_id: str) -> bool:
@@ -282,9 +328,11 @@ def _dispatch_next() -> bool:
         else:
             return False
 
+    cmd_id = str(cmd_to_run.get("id", ""))
+    _es.record_started(cmd_id)
+
     def _run() -> None:
         heartbeat(base_to_run)
-        _es.record_started(cmd_to_run.get("id", ""))
         try:
             if _dispatcher:
                 _dispatcher(cmd_to_run)

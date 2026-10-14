@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RepoCiv — Evaluación End-to-End &amp; Hoja de Ruta Visual/Técnica (2026-10-14)</title>
+<style>
+  :root{
+    --bg:#0d1117; --bg2:#161b22; --bg3:#1c2128; --line:#30363d; --fg:#e6edf3; --dim:#8b949e;
+    --green:#3fb950; --amber:#d29922; --red:#f85149; --blue:#58a6ff; --purple:#bc8cff; --gold:#e3b341;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:15px/1.6 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1140px;margin:0 auto;padding:40px 24px 88px}
+  h1{font-size:30px;margin:0 0 6px;letter-spacing:-.5px}
+  h2{font-size:21px;margin:46px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{font-size:16.5px;margin:26px 0 10px;color:var(--fg)}
+  h4{font-size:14.5px;margin:16px 0 6px;color:var(--gold)}
+  .sub{color:var(--dim);font-size:13.5px;margin-bottom:4px}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,"JetBrains Mono",monospace;font-size:.88em}
+  code{background:var(--bg2);padding:2px 6px;border-radius:4px;border:1px solid var(--line)}
+  pre{background:#0a0e14;border:1px solid var(--line);border-radius:7px;padding:12px 15px;overflow-x:auto;font-size:13px;line-height:1.5;margin:10px 0}
+  pre code{background:transparent;border:0;padding:0}
+
+  .verdict{background:linear-gradient(135deg,#131b26,#0d1117);border:1px solid #2b4566;
+    border-left:4px solid var(--blue);border-radius:10px;padding:22px 24px;margin:28px 0}
+  .verdict .tag{display:inline-block;background:var(--blue);color:#0d1117;font-weight:700;
+    font-size:12px;letter-spacing:1px;padding:4px 10px;border-radius:5px;margin-bottom:12px}
+  .verdict h2{border:0;margin:0 0 10px;padding:0;font-size:24px}
+  .verdict p{margin:8px 0}
+
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));margin:22px 0}
+  .card{background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:16px 18px}
+  .card .n{font-size:27px;font-weight:700;letter-spacing:-1px;line-height:1.1}
+  .card .l{color:var(--dim);font-size:12.5px;margin-top:4px}
+  .ok{color:var(--green)} .bad{color:var(--red)} .warn{color:var(--amber)} .info{color:var(--blue)} .gold{color:var(--gold)}
+
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.8px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;background:rgba(255,255,255,.02)}
+  tr:last-child td{border-bottom:0}
+  .pill{display:inline-block;font-size:11.5px;font-weight:700;padding:2.5px 8px;border-radius:4px;white-space:nowrap}
+  .p-ok{background:rgba(63,185,80,.15);color:var(--green)}
+  .p-bad{background:rgba(248,81,73,.15);color:var(--red)}
+  .p-warn{background:rgba(210,153,34,.15);color:var(--amber)}
+  .p-info{background:rgba(88,166,255,.15);color:var(--blue)}
+  .p-purple{background:rgba(188,140,255,.15);color:var(--purple)}
+
+  .fix{border:1px solid var(--line);border-radius:9px;padding:18px 20px;margin:14px 0;background:var(--bg2)}
+  .fix .h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .fix .h .num{font-family:ui-monospace,monospace;color:var(--purple);font-weight:700;font-size:14px}
+  .fix .h .t{font-weight:600;font-size:15.5px}
+  .fix p{margin:6px 0}
+  .fix ul{margin:8px 0 0;padding-left:20px}
+  .fix li{margin:4px 0}
+  .est{display:inline-block;font-size:12px;color:var(--dim);margin-left:auto;white-space:nowrap}
+
+  .proof{background:#0a0e14;border:1px solid var(--line);border-left:3px solid var(--blue);
+    border-radius:6px;padding:12px 16px;margin:12px 0;font-size:13.5px;color:#c9d1d9}
+  .proof b{color:var(--blue)}
+  .note{background:#0a0e14;border:1px solid var(--line);border-left:3px solid var(--amber);
+    border-radius:6px;padding:12px 16px;margin:12px 0;font-size:13.5px;color:#c9d1d9}
+  .note b{color:var(--amber)}
+  .foot{color:var(--dim);font-size:12.5px;margin-top:56px;padding-top:20px;border-top:1px solid var(--line)}
+  a{color:var(--blue)}
+  .toc{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:16px 20px;margin:24px 0}
+  .toc ol{margin:6px 0 0;padding-left:22px}
+  .toc li{margin:4px 0}
+  .toc a{text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+
+  .meter-bar{height:8px;background:#21262d;border-radius:4px;overflow:hidden;margin-top:6px}
+  .meter-fill{height:100%;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>RepoCiv — Evaluación End-to-End &amp; Hoja de Ruta Recomendada</h1>
+<div class="sub">14 de octubre de 2026 · <span class="mono">/home/gris96/.hermes/workspace/ACTIVE/repociv</span> · base <code>a74dd53</code> (+ cambios locales P1 en curso)</div>
+<div class="sub">Auditoría técnica integral (Frontend TypeScript/Canvas/Three.js + Backend Python Bridge/MCP + Pipeline de Assets en <code>~/Downloads</code>).</div>
+
+<div class="verdict">
+  <span class="tag">NOTA GLOBAL: 8.1 / 10</span>
+  <h2>Ingeniería 9.0 · Render 3D 8.5 · Render 2D 6.8 · Producto/UX 7.2 · Working Tree Hoy 6.5</h2>
+  <p><b>La base arquitectónica es sobresaliente:</b> simulación desacoplada (<code>GameState</code>), doble motor de render con <i>dirty-signature</i> y carga lazy de Three.js (0 bytes en el bundle eager 2D), bridge HTTP/WS endurecido y un MCP server de 44 tools que convierte a RepoCiv en un verdadero plano de control local.</p>
+  <p><b>Por qué no es un 9+ hoy:</b> (1) el árbol de trabajo local tiene cambios P1 a medio aterrizar que rompen <code>scripts/check.sh</code> (un docstring Python en un <code>.ts</code>, 12 errores de <code>ruff</code>, 10 tests de <code>task_orchestrator</code> en rojo por R02 y 2 blockers de entrega durable en R01); (2) el modo 2D por defecto (<code>flat</code>) subvende visualmente al producto frente al modo 3D WebGL; y (3) la vista local 3D (<code>LocalScene3D</code>) aún usa cubos primitivos (<code>BoxGeometry</code>) donde la 2D ya tiene mobiliario semántico.</p>
+  <p><b>Los free assets de <code>~/Downloads</code> encajan directamente</b> para cerrar la brecha visual en 2D, 3D macro, 3D local y HUD, manteniéndose muy por debajo de los presupuestos de CI (<code>≤ 1.5 MB</code> en GLBs y <code>≤ 6 MB</code> en PNGs).</p>
+</div>
+
+<div class="toc">
+  <b>Contenido del Artefacto</b>
+  <ol>
+    <li><a href="#scorecard">Radiografía y Nota Desglosada (End-to-End)</a></li>
+    <li><a href="#gates">Estado Real de los Gates Hoy (Evidencia Ejecutada)</a></li>
+    <li><a href="#assets">Catálogo y Cruce Técnico de Free Assets en <code>~/Downloads</code></a></li>
+    <li><a href="#presupuesto">Presupuesto de Assets y Bundle (Guardrails de <code>scripts/check.sh</code>)</a></li>
+    <li><a href="#roadmap">Hoja de Ruta Recomendada (Fases 1 a 4 — Quirúrgica y Ejecutable)</a></li>
+    <li><a href="#criterios">Checklist de Aceptación por Fase</a></li>
+  </ol>
+</div>
+
+<!-- ======================================================================= -->
+<h2 id="scorecard">1. Radiografía y Nota Desglosada (End-to-End)</h2>
+
+<div class="grid">
+  <div class="card"><div class="n gold">8.5/10</div><div class="l">Nota Global (tras cerrar Fase 1)</div></div>
+  <div class="card"><div class="n ok">1.143</div><div class="l">Tests Vitest (111 suites · 100% verde)</div></div>
+  <div class="card"><div class="n ok">1.685</div><div class="l">Tests Pytest (+2 skip · 100% verde)</div></div>
+  <div class="card"><div class="n ok">209 KB</div><div class="l">GLBs actuales (límite CI: 1.536 KB)</div></div>
+  <div class="card"><div class="n ok">5.318 KB</div><div class="l">Atlas PNG 3D (límite CI: 6.144 KB)</div></div>
+  <div class="card"><div class="n info">6 packs</div><div class="l">Free assets CC0 en <code>~/Downloads</code></div></div>
+</div>
+
+<table>
+  <tr>
+    <th>Dimensión</th>
+    <th>Nota</th>
+    <th>Lo más sólido (Keep)</th>
+    <th>Brecha actual (Fix / Improve)</th>
+  </tr>
+  <tr>
+    <td><b>1. Arquitectura &amp; Código</b></td>
+    <td><span class="pill p-ok">9.0 / 10</span></td>
+    <td>Separación limpia entre <code>src/game.ts</code>, <code>src/renderer.ts</code>, <code>src/three/*</code> y <code>server/*</code>. Three.js vive aislado en chunk lazy (<code>vendor-three</code>).</td>
+    <td><code>src/renderer.ts</code> (2.090 LOC) y <code>server/bridge.py</code> (1.413 LOC) siguen siendo orquestadores grandes; conviene no añadir lógica inline en ellos.</td>
+  </tr>
+  <tr>
+    <td><b>2. Render 3D WebGL (Macro)</b></td>
+    <td><span class="pill p-ok">8.5 / 10</span></td>
+    <td>ACES Filmic tone mapping, sombras PCFSoft, <code>SkyDome3D</code>, <code>Rivers3D</code>, clusters de ciudades KayKit CC0 (<code>CityProps3D.ts</code>, <code>CityWalls3D.ts</code>) y micro-pan de cámara.</td>
+    <td>Wonders y edificios de procesos usan geometría procedural genérica (<code>WonderProps3D.ts</code>); relaciones entre repos no se ven como caminos/puentes 3D; sin cinta 3D de ruta A*.</td>
+  </tr>
+  <tr>
+    <td><b>3. Render 2D (Flat) &amp; Vista Local</b></td>
+    <td><span class="pill p-warn">6.8 / 10</span></td>
+    <td>60+ FPS garantizados, oficina isométrica 2D expresiva (<code>isoOfficeRenderer.ts</code>) con pizarras, puertas corredizas y NPCs.</td>
+    <td>En 2D macro (<code>hexRenderer.ts</code>), <code>createPattern('repeat')</code> aplana el mapa, no hay silueta de edificio en ciudades y los nombres largos se pisan. En 3D local (<code>LocalTile3D.ts</code>), paredes y workbenches son cajas (<code>BoxGeometry</code>).</td>
+  </tr>
+  <tr>
+    <td><b>4. Producto, UX &amp; Documentación</b></td>
+    <td><span class="pill p-info">7.2 / 10</span></td>
+    <td><code>SCOPE.md</code> disciplinado, telemetría de paneles para poda, integración real con Hermes Kanban y MCP Server (44 tools).</td>
+    <td>HUD inicial con 23 botones sin modo <i>Quick vs Advanced</i>; unidades bautizadas como <code>"Agente Principal N"</code>; contradicción entre <code>ROADMAP.md</code> y <code>SCOPE.md</code> sobre módulos retirados.</td>
+  </tr>
+  <tr>
+    <td><b>5. Higiene del Árbol Actual</b></td>
+    <td><span class="pill p-bad">6.5 / 10</span></td>
+    <td>El baseline commiteado (<code>a74dd53</code>) pasa las 110 suites de Vitest en 3.2 s.</td>
+    <td>Hay 11 archivos modificados/staged y 18 untracked del lote P1 que hoy dejan <code>scripts/check.sh</code> en rojo en 5 pasos distintos.</td>
+  </tr>
+</table>
+
+<!-- ======================================================================= -->
+<h2 id="gates">2. Estado Real de los Gates Hoy (Evidencia Ejecutada)</h2>
+
+<p>Resultado de correr los pasos de <code>scripts/check.sh</code> sobre el árbol de trabajo actual:</p>
+
+<table>
+  <tr>
+    <th>Paso de <code>scripts/check.sh</code></th>
+    <th>Estado Hoy</th>
+    <th>Causa Raíz Exacta</th>
+  </tr>
+  <tr>
+    <td><code>tsc --noEmit</code></td>
+    <td><span class="pill p-bad">FALLA</span></td>
+    <td><code>src/ui/validationVerdict.test.ts:1</code> (untracked) abre con docstring de Python <code>"""Unit tests..."""</code> en lugar de comentario JSDoc <code>/** ... */</code>.</td>
+  </tr>
+  <tr>
+    <td><code>npm run lint</code> (ESLint)</td>
+    <td><span class="pill p-bad">FALLA (1 err)</span></td>
+    <td>Mismo error de parseo en <code>src/ui/validationVerdict.test.ts:1:51</code>. El resto de <code>src/</code> tiene <b>0 errores y 0 warnings</b>.</td>
+  </tr>
+  <tr>
+    <td><code>npm run format:check</code> (Prettier)</td>
+    <td><span class="pill p-bad">FALLA (2 arch)</span></td>
+    <td>SyntaxError en <code>src/ui/validationVerdict.test.ts</code> + formato pendiente en <code>src/ui/validationVerdict.ts</code>.</td>
+  </tr>
+  <tr>
+    <td><code>vitest run</code></td>
+    <td><span class="pill p-ok">110 SUITES OK</span></td>
+    <td><b>1.138 tests verdes</b> en 3.19 s (excluyendo el archivo con docstring Python).</td>
+  </tr>
+  <tr>
+    <td><code>ruff check server/ scripts/</code></td>
+    <td><span class="pill p-bad">FALLA (12 err)</span></td>
+    <td>Imports sin usar (<code>os</code>, <code>threading</code>, <code>Path</code>) en <code>server/build_identity.py</code>, <code>server/dispatch_ledger.py</code>, <code>server/test_identifiers_confinement.py</code>; <code>E402</code> en <code>server/process_control.py:48</code>; 7 variables <code>cfg</code> sin usar en <code>server/test_durable_dispatch.py</code>.</td>
+  </tr>
+  <tr>
+    <td><code>pytest server/</code></td>
+    <td><span class="pill p-bad">15 FAIL / 1670 OK</span></td>
+    <td>
+      <b>(a) 10 fallos en <code>test_task_orchestrator.py</code> y <code>test_step_executor.py</code>:</b> el cambio R02 en <code>server/validator.py:399-419</code> devuelve <code>needs-human-review</code> para contratos mínimos autogenerados, lo que hace que <code>task_orchestrator.py</code> deje la tarea en <code>phase == "blocked"</code> en vez de <code>"complete"</code>.<br>
+      <b>(b) 1 fallo en <code>test_validator_r02.py:104</code>:</b> busca el substring exacto <code>"auto-generated contract"</code> en minúsculas dentro de <code>limitations</code>, pero <code>validator.py:372</code> escribe <code>"Contract is auto-generated..."</code>.<br>
+      <b>(c) 3 fallos en <code>test_durable_dispatch.py</code></b> al correr en suite completa por contaminación de estado entre tests.
+    </td>
+  </tr>
+  <tr>
+    <td>Budgets (Atlas, Props GLB, Bundle)</td>
+    <td><span class="pill p-ok">VERDE</span></td>
+    <td>Atlas PNG: <code>5.318 KB / 6.144 KB</code> · Props GLB: <code>209 KB / 1.536 KB</code> · Three.js 100% lazy.</td>
+  </tr>
+</table>
+
+<!-- ======================================================================= -->
+<h2 id="assets">3. Catálogo y Cruce Técnico de Free Assets en <code>~/Downloads</code></h2>
+
+<p>Se inspeccionaron los 6 archivos <code>.zip</code> y las 3 imágenes de referencia descargadas en <code>/home/gris96/Downloads</code>. Así encaja cada uno con la arquitectura real de RepoCiv:</p>
+
+<table>
+  <tr>
+    <th>Paquete / Archivo en <code>~/Downloads</code></th>
+    <th>Formato y Peso</th>
+    <th>Veredicto de Encaje</th>
+    <th>Dónde y Cómo Usarlo en RepoCiv</th>
+  </tr>
+  <tr>
+    <td><code>sbs_-_realistic_hex_tiles.zip</code><br><span class="sub">Screaming Brain Studios (CC0)</span></td>
+    <td>PNG 2D<br><code>Flat 128×128</code><br><code>Thick 128×144</code><br><code>Bonus 128×144</code></td>
+    <td><span class="pill p-ok">ALTO IMPACTO EN 2D</span></td>
+    <td>
+      <b>Reemplazo directo del relleno plano en <code>src/hexRenderer.ts</code>:</b><br>
+      Hoy <code>hexRenderer.ts:92</code> usa <code>ctx.createPattern(scaledCanvas, 'repeat')</code>, que repite un cuadrado sin anclarse al hexágono. Las hojas <code>Thick/Terrain 1 - Thick - No Outline - 128x144.png</code> y <code>Bonus/Hex Terrain 1 - 128x144.png</code> traen hexágonos individuales con bisel 2.5D y variaciones de bosques, montañas, colinas, desierto, hielo y costa listos para dibujar con <code>ctx.drawImage</code> centrado por celda.
+    </td>
+  </tr>
+  <tr>
+    <td><code>kenney_hexagon-kit.zip</code><br><span class="sub">Kenney (CC0 1.0)</span></td>
+    <td>GLB + FBX + PNG<br><code>3 KB – 108 KB</code> por GLB<br>(<code>colormap.png</code> 11 KB)</td>
+    <td><span class="pill p-ok">ALTO IMPACTO EN 3D MACRO</span></td>
+    <td>
+      <b>Caminos, puentes y edificios semánticos de procesos/wonders:</b><br>
+      <i>No usar para el terreno base</i> (el shader <code>terrainShader.ts</code> + atlas actual es superior y más Civ V). Sí usar sus GLBs modulares para:<br>
+      • <b>Grafo entre repos (<code>graph_relations</code>):</b> <code>path-straight.glb</code> (6 KB), <code>path-corner.glb</code> (5 KB), <code>path-intersectionA.glb</code> (6 KB) y <code>bridge.glb</code> (36 KB) sobre <code>Rivers3D.ts</code>.<br>
+      • <b>Wonders y edificios de procesos (<code>WonderProps3D.ts</code>):</b> <code>building-wizard-tower.glb</code> (88 KB, IA/LLM), <code>building-smelter.glb</code> (42 KB, Worker/Build), <code>building-watermill.glb</code> (55 KB, Pipelines/Cron), <code>building-port.glb</code> (38 KB, Bridge/MCP/Tailscale), <code>building-mine.glb</code> (32 KB, DuckDB/Ledger).
+    </td>
+  </tr>
+  <tr>
+    <td><code>kenney_fantasy-town-kit_2.0.zip</code><br><span class="sub">Kenney (CC0 1.0)</span></td>
+    <td>GLB + FBX<br><code>3 KB – 88 KB</code> por GLB<br>(<code>colormap.png</code> 11 KB)</td>
+    <td><span class="pill p-ok">ALTO IMPACTO EN 3D LOCAL &amp; CAPITAL</span></td>
+    <td>
+      <b>Mobiliario y props para <code>LocalTile3D.ts</code> y señales en <code>CityProps3D.ts</code>:</b><br>
+      • <code>banner-green.glb</code> (10 KB) y <code>banner-red.glb</code> (10 KB): estandartes sobre cada ciudad indicando estado real (clean/tests OK vs dirty/conflict de <code>/api/pending-work</code>).<br>
+      • <code>fountain-round.glb</code> (84 KB): centro de plaza en la Capital o zona <code>break</code> en vista local 3D.<br>
+      • <code>lantern.glb</code> (15 KB): reemplazo 3D de las lámparas de piso en salas <code>focus</code> de <code>LocalTile3D.ts</code>.<br>
+      • <code>cart.glb</code> (52 KB), <code>hedge.glb</code> (6 KB), <code>pillar-stone.glb</code> (11 KB): props para zonas <code>biophilic</code> e <code>infra</code>.
+    </td>
+  </tr>
+  <tr>
+    <td><code>kenney_retro-fantasy-kit.zip</code><br><span class="sub">Kenney (CC0 1.0)</span></td>
+    <td>GLB + FBX + PNGs pixel-art<br><code>2 KB – 63 KB</code> por GLB</td>
+    <td><span class="pill p-info">SELECTIVO (PROPS INTERIORES)</span></td>
+    <td>
+      Sus texturas son pixel-art retro (distintas al sombreado liso de KayKit/Fantasy Town). Conviene extraer <b>únicamente</b> props de almacén/taller para salas <code>infra</code> en <code>LocalTile3D.ts</code>: <code>detail-crate.glb</code> (4 KB), <code>detail-barrel.glb</code> (10 KB), <code>pulley-crate.glb</code> (33 KB) y <code>stairs-stone.glb</code> (11 KB).
+    </td>
+  </tr>
+  <tr>
+    <td><code>kenney_medals.zip</code><br><span class="sub">Kenney (CC0 1.0)</span></td>
+    <td>SVG + PNG<br>9 medallas × 3 estilos<br>(<code>1 KB – 3 KB</code> c/u)</td>
+    <td><span class="pill p-ok">ALTO IMPACTO EN HUD / UI</span></td>
+    <td>
+      <b>Jerarquía visual en HUD y paneles (0 impacto en WebGL):</b><br>
+      • <b>Insignia de rango en <code>agentDock.ts</code> y <code>panel.ts</code>:</b> distinguir al instante unidades Hero/Coordinador (<code>MAIN</code>, <code>CLAUDE</code>, <code>CODEX</code>) de <code>WORKER</code> y <code>SCOUT</code>.<br>
+      • <b>Insignia de veredicto en <code>validationVerdict.ts</code>:</b> medalla dorada/plata cuando una tarea supera validación con evidencia completa.<br>
+      • <b>Badge de nivel de ciudad en <code>city.ts</code> / <code>capitalPanel.ts</code>:</b> niveles <code>hamlet → village → town → city → capital</code>.
+    </td>
+  </tr>
+  <tr>
+    <td><code>kenney_hexagon-buildings.zip</code><br><span class="sub">Kenney (CC0 1.0)</span></td>
+    <td>PNG 2D + XML<br><code>sheet.png</code> (75 KB)</td>
+    <td><span class="pill p-warn">OPCIONAL (SOLO 2D)</span></td>
+    <td>
+      Piezas 2D modulares de fachadas y techos (<code>redRoofPointy.png</code>, <code>stoneDoorWindow.png</code>). Útil para componer 4 sprites 2D estáticos de ciudad (niveles 0–3) en <code>hexRenderer.ts</code>, donde hoy las ciudades en 2D no tienen dibujo de edificio debajo del nombre.
+    </td>
+  </tr>
+  <tr>
+    <td><code>tranberry-bysa3-movementpath1.jpg</code><br><code>tranberry-bysa3-movementpath2.jpg</code><br><code>tranberry-bysa3-gameboard.jpg</code></td>
+    <td>Referencias de diseño<br>(CC-BY-SA 3.0)</td>
+    <td><span class="pill p-purple">PATRÓN DE DISEÑO</span></td>
+    <td>
+      <b>Diseño de rutas A* y fronteras de territorio:</b><br>
+      • Reemplazar los círculos sueltos de <code>UnitRenderer.drawUnitTrail</code> (<code>src/unitRenderer.ts:124-139</code>) por una <b>curva spline continua con punta de flecha y nodos numerados por turno/fatiga</b> (idéntico a <code>movementpath2.jpg</code>).<br>
+      • Añadir equivalente 3D (<code>UnitPathRibbon3D.ts</code>) al arrastrar o mover unidades.<br>
+      • Usar el borde interior bicolor de <code>gameboard.jpg</code> para resaltar fronteras de ciudad al hacer hover.
+    </td>
+  </tr>
+</table>
+
+<!-- ======================================================================= -->
+<h2 id="presupuesto">4. Presupuesto de Assets y Bundle (Guardrails de <code>scripts/check.sh</code>)</h2>
+
+<div class="note">
+  <b>Regla de oro del repositorio:</b> <code>scripts/check.sh</code> falla automáticamente si <code>public/assets/3d/props/*.glb</code> supera <b>1.536 KB (1.5 MB)</b> o si <code>public/assets/3d/*.png</code> supera <b>6.144 KB (6.0 MB)</b>. Toda incorporación de assets debe entrar por lista curada (<i>cherry-pick</i>), nunca descomprimiendo un zip entero en <code>public/</code>.
+</div>
+
+<table>
+  <tr>
+    <th>Presupuesto en <code>check.sh</code></th>
+    <th>Uso Actual</th>
+    <th>Adición Propuesta (Cherry-pick)</th>
+    <th>Total Proyectado</th>
+    <th>Margen Libre</th>
+  </tr>
+  <tr>
+    <td><b>Props 3D GLB</b><br><code>public/assets/3d/props/*.glb</code><br>(Límite: <b>1.536 KB</b>)</td>
+    <td><b>209 KB</b> (13.6%)<div class="meter-bar"><div class="meter-fill" style="width:13.6%;background:var(--green)"></div></div></td>
+    <td>
+      <b>+412 KB</b> (12 GLBs seleccionados):<br>
+      • <code>building-wizard-tower.glb</code> (88 KB)<br>
+      • <code>fountain-round.glb</code> (84 KB)<br>
+      • <code>building-watermill.glb</code> (55 KB)<br>
+      • <code>building-smelter.glb</code> (42 KB)<br>
+      • <code>building-port.glb</code> (38 KB)<br>
+      • <code>bridge.glb</code> (36 KB)<br>
+      • <code>building-mine.glb</code> (32 KB)<br>
+      • <code>lantern.glb</code> (15 KB)<br>
+      • <code>banner-green.glb</code> + <code>banner-red.glb</code> (20 KB)<br>
+      • <code>detail-crate.glb</code> (4 KB)
+    </td>
+    <td><b>621 KB / 1.536 KB</b> (40.4%)<div class="meter-bar"><div class="meter-fill" style="width:40.4%;background:var(--green)"></div></div></td>
+    <td><span class="pill p-ok">915 KB libres</span></td>
+  </tr>
+  <tr>
+    <td><b>Texturas 3D PNG</b><br><code>public/assets/3d/*.png</code><br>(Límite: <b>6.144 KB</b>)</td>
+    <td><b>5.318 KB</b> (86.5%)<div class="meter-bar"><div class="meter-fill" style="width:86.5%;background:var(--amber)"></div></div></td>
+    <td>
+      <b>+11 KB</b>:<br>
+      • <code>colormap.png</code> de Kenney (11 KB, compartido por todos los GLBs de <code>hexagon-kit</code> y <code>fantasy-town-kit</code>; además ya viene embebido en los <code>.glb</code>).
+    </td>
+    <td><b>5.329 KB / 6.144 KB</b> (86.7%)<div class="meter-bar"><div class="meter-fill" style="width:86.7%;background:var(--amber)"></div></div></td>
+    <td><span class="pill p-ok">815 KB libres</span></td>
+  </tr>
+  <tr>
+    <td><b>Atlas 2D &amp; UI</b><br><code>public/assets/*.webp</code><br>(Fuera del gate 3D PNG)</td>
+    <td><code>terrain-atlas.webp</code> + <code>decor-atlas.png</code> + <code>office-atlas.svg</code></td>
+    <td>
+      <b>~180 KB en WebP</b>:<br>
+      • Strip WebP de hexágonos <code>sbs_-_realistic_hex_tiles</code> (Thick 128×144)<br>
+      • Sprite SVG/PNG de <code>kenney_medals</code> (~18 KB)
+    </td>
+    <td>Carga asíncrona en <code>HexRenderer.loadAssets()</code></td>
+    <td><span class="pill p-ok">0 KB en Eager JS</span></td>
+  </tr>
+</table>
+
+<!-- ======================================================================= -->
+<h2 id="roadmap">5. Hoja de Ruta Recomendada (4 Fases en Orden de Palanca)</h2>
+
+<h3>Fase 1 — Saneamiento del Working Tree y Cierre del Lote P1 <span class="pill p-ok">HECHO · VERIFICADO HOY</span></h3>
+<p>Objetivo: devolver <code>./scripts/check.sh</code> a <b>100% verde</b> cerrando los defectos del lote P1 (<code>R01–R16</code>) y pasando todas las sondas adversariales (<code>probe_a2.py</code>, <code>probe_d.py</code>, <code>probe_e.py</code>, <code>probe_f.py</code>, <code>probe_r01.py</code>).</p>
+
+<div class="fix">
+  <div class="h"><span class="num">1.1</span><span class="t">Desbloquear TypeScript, ESLint y Prettier en <code>src/ui/validationVerdict*.ts</code></span><span class="est">~10 min</span></div>
+  <ul>
+    <li>En <code>src/ui/validationVerdict.test.ts:1-4</code>, reemplazar el docstring Python <code>"""..."""</code> por un comentario TypeScript <code>// ─── Unit tests for validationVerdict ───</code> y eliminar el import sin usar <code>vi</code>.</li>
+    <li>Correr <code>npx prettier --write src/ui/validationVerdict.ts src/ui/validationVerdict.test.ts</code>.</li>
+  </ul>
+</div>
+
+<div class="fix">
+  <div class="h"><span class="num">1.2</span><span class="t">Limpiar los 12 errores de <code>ruff</code> y retirar el archivo de prueba RED</span><span class="est">~15 min</span></div>
+  <ul>
+    <li>Quitar imports no usados en <code>server/build_identity.py:21</code> (<code>os</code>), <code>server/dispatch_ledger.py:48</code> (<code>threading</code>) y <code>server/test_identifiers_confinement.py:12-13</code> (<code>os</code>, <code>Path</code>).</li>
+    <li>Mover <code>from server.agent_processes import process_identity</code> al bloque superior de imports en <code>server/process_control.py:48</code>.</li>
+    <li>Eliminar las 7 asignaciones muertas <code>cfg = delivery_env</code> en <code>server/test_durable_dispatch.py</code>.</li>
+    <li>Desindexar y eliminar <code>server/test_identifiers_confinement_red.py</code> (test RED transitorio duplicado por <code>test_identifiers_confinement.py</code>).</li>
+  </ul>
+</div>
+
+<div class="fix">
+  <div class="h"><span class="num">1.3</span><span class="t">Reconciliar <code>validator.py</code> (R02) con <code>task_orchestrator.py</code> y <code>test_validator_r02.py</code></span><span class="est">~45 min</span></div>
+  <ul>
+    <li><b>Problema:</b> <code>server/validator.py:399-419</code> convierte cualquier contrato sin <code>behaviourChecks</code>/<code>evidenceRequired</code> en <code>verdict = "needs-human-review"</code>, pero <code>task_orchestrator.py</code> trata todo lo que no sea <code>"pass"</code> como bloqueo, rompiendo 10 tests de ciclo completo.</li>
+    <li><b>Solución limpia:</b>
+      <ol>
+        <li>En <code>server/validator.py:371-374</code>, incluir el texto exacto <code>"auto-generated contract with an empty goal"</code> en <code>limitations</code> para cumplir el contrato de <code>test_validator_r02.py:104</code>.</li>
+        <li>Separar en el resultado del validador <code>verdict</code> (estructural/must-pass) de <code>acceptance_status: "verified" | "needs-human-review" | "rejected"</code>, o bien que <code>needs-human-review</code> solo se active cuando <code>autoGenerated=True and goal_blank</code> o cuando falle un check no crítico, manteniendo la compatibilidad documentada de contratos válidos existentes (criterio #4 de R02: <i>"Existing valid contracts retain their documented pass/fail behavior"</i>).</li>
+      </ol>
+    </li>
+  </ul>
+</div>
+
+<div class="fix">
+  <div class="h"><span class="num">1.4</span><span class="t">Cerrar los 2 Blockers de Entrega Durable (R01) en <code>approval_resolution.py</code> y <code>scheduler.py</code></span><span class="est">~1.5 h</span></div>
+  <ul>
+    <li><b>Blocker 1 (ventana <code>pop_approval</code> → <code>claim_intent</code>):</b> en <code>server/approval_resolution.py:78-103</code>, mover <code>claim_intent</code> (o grabar el payload completo en el intent antes del pop y hacer que <code>recover_intents()</code> en <code>server/dispatch_ledger.py</code> trate un intent con payload cuyo approval ya no está en <code>approval_store</code> como <i>consumed</i> y lo encole directamente en vez de fallar con <code>approval not found</code>).</li>
+    <li><b>Blocker 2 (doble ejecución en recovery):</b>
+      <ol>
+        <li>En <code>server/bridge.py:1287-1307</code>, ejecutar <code>dispatch_ledger.recover_intents()</code> <b>antes</b> de <code>_sched.start_worker()</code>.</li>
+        <li>En <code>server/scheduler.py:228-248</code>, mover el chequeo <code>_has_queued(cmd_id)</code> <b>dentro</b> de <code>with _queue_lock:</code> y consultar también el registro de comandos ya despachados/iniciados en <code>event_store</code> para que un intent sobreviviente a un crash post-dispatch jamás vuelva a encolar un comando que ya corrió.</li>
+      </ol>
+    </li>
+  </ul>
+</div>
+
+<!-- ----------------------------------------------------------------------- -->
+<h3>Fase 2 — Upgrade Visual del Mapa 2D y Rutas de Movimiento (2D + 3D) <span class="pill p-info">QUICK WIN VISUAL · PRIORIDAD 2</span></h3>
+<p>Objetivo: que el modo 2D por defecto (<code>flat</code>) deje de verse plano y que el movimiento de unidades tenga el feedback táctico de Civilization V.</p>
+
+<div class="fix">
+  <div class="h"><span class="num">2.1</span><span class="t">Integrar <code>sbs_-_realistic_hex_tiles.zip</code> + siluetas de ciudad en <code>src/hexRenderer.ts</code></span><span class="est">~2.5 h</span></div>
+  <ul>
+    <li>Extender <code>scripts/build-asset-atlas.py</code> para empaquetar las celdas hexagonales de <code>sbs_-_realistic_hex_tiles.zip</code> (variantes <i>Thick 128×144</i> y decoraciones de <code>Bonus/Hex Terrain 1 - 128x144.png</code>) en un strip WebP ligero (<code>public/assets/hex-tiles-2d.webp</code>).</li>
+    <li>En <code>src/hexRenderer.ts:136-165</code> (<code>drawTileSurface</code>), dibujar el sprite hexagonal centrado en <code>(pos.x, pos.y)</code> escalado a <code>HEX_SIZE</code> (con fallback al <code>CanvasPattern</code> actual si el asset no cargó).</li>
+    <li>Añadir en <code>drawCity</code> (2D) un icono de edificio por nivel de ciudad (<code>hamlet</code>, <code>village</code>, <code>town</code>, <code>capital</code>) encima del hexágono y debajo del pill de nombre, con declutter de labels a bajo zoom (colapsando nombres largos hasta hacer hover o zoom ≥ 1.1).</li>
+  </ul>
+</div>
+
+<div class="fix">
+  <div class="h"><span class="num">2.2</span><span class="t">Rutas de movimiento estilo <code>tranberry-bysa3-movementpath2.jpg</code> en 2D y 3D</span><span class="est">~2 h</span></div>
+  <ul>
+    <li><b>En 2D (<code>src/unitRenderer.ts:124-139</code>):</b> evolucionar <code>drawUnitTrail</code> y la previsualización de ruta A* para trazar una curva suave (Catmull-Rom / Quadratic Bezier) por los centros de hexágono con doble trazo (borde oscuro + relleno del color del agente), punta de flecha en el hexágono destino y <b>pips numerados</b> en cada paso mostrando el coste acumulado.</li>
+    <li><b>En 3D (nuevo <code>src/three/UnitPathRibbon3D.ts</code>):</b> renderizar una cinta elevada (<code>TubeGeometry</code> o strip plano sobre <code>terrainSurfaceY + 0.8</code>) cuando una unidad está seleccionada en modo <code>move</code> o durante <code>unit_drag</code>.</li>
+  </ul>
+</div>
+
+<!-- ----------------------------------------------------------------------- -->
+<h3>Fase 3 — Enriquecimiento 3D Macro y Vista Local 3D con Kits de Kenney <span class="pill p-purple">IMPACTO 3D · PRIORIDAD 3</span></h3>
+<p>Objetivo: dar semántica visual a los procesos/wonders, a las relaciones entre repositorios y al interior 3D de las ciudades (<code>LocalScene3D</code>) usando solo ~412 KB del presupuesto de 1.5 MB de GLBs.</p>
+
+<div class="fix">
+  <div class="h"><span class="num">3.1</span><span class="t">Edificios semánticos para Wonders y Procesos en <code>src/three/WonderProps3D.ts</code></span><span class="est">~2 h</span></div>
+  <ul>
+    <li>Copiar a <code>public/assets/3d/props/kenney/</code> (con su <code>LICENSE-Kenney.txt</code> CC0):
+      <code>building-wizard-tower.glb</code>, <code>building-smelter.glb</code>, <code>building-watermill.glb</code>, <code>building-port.glb</code> y <code>building-mine.glb</code> de <code>kenney_hexagon-kit.zip</code>.</li>
+    <li>En <code>src/three/WonderProps3D.ts</code>, cargar estos GLBs de forma asíncrona (mismo patrón <code>ensureWonderPropsLoad</code> + fallback procedural que <code>CityProps3D.ts</code>) y asignarlos según la categoría del servicio/proceso (IA/inferencia → <i>wizard-tower</i>, pipelines/workers → <i>watermill/smelter</i>, datos/ledger → <i>mine</i>, red/bridge → <i>port</i>).</li>
+  </ul>
+</div>
+
+<div class="fix">
+  <div class="h"><span class="num">3.2</span><span class="t">Estandartes de Salud Git (<code>/api/pending-work</code>) y Puentes/Caminos en 3D</span><span class="est">~2.5 h</span></div>
+  <ul>
+    <li>Incorporar <code>banner-green.glb</code> y <code>banner-red.glb</code> (de <code>kenney_fantasy-town-kit_2.0.zip</code>, 10 KB c/u) en <code>CityProps3D.ts</code>: cuando una ciudad tiene cambios sin commitear o conflictos detectados por <code>/api/pending-work</code>, plantar el estandarte rojo junto a la entrada de la muralla; cuando está limpia, el verde.</li>
+    <li>Incorporar <code>bridge.glb</code> (36 KB) en <code>Rivers3D.ts</code> cuando una ruta entre ciudades cruza un borde con río.</li>
+  </ul>
+</div>
+
+<div class="fix">
+  <div class="h"><span class="num">3.3</span><span class="t">Reemplazar los cubos de <code>src/three/LocalTile3D.ts</code> por Props 3D reales</span><span class="est">~3 h</span></div>
+  <ul>
+    <li>En <code>src/three/LocalTile3D.ts:207-260</code>, las lámparas, cafeteras, racks y workbenches de la vista local 3D son hoy cajas/cilindros básicos.</li>
+    <li>Usar <code>InstancedMesh</code> con normalización de <i>bounding-box</i> (reutilizando <code>mergeGlbScene.ts</code> de <code>CityProps3D.ts</code>) para instanciar:
+      <ul>
+        <li><code>fountain-round.glb</code> en el centro de zonas <code>reception</code> / <code>break</code>.</li>
+        <li><code>lantern.glb</code> en las esquinas de zonas <code>focus</code>.</li>
+        <li><code>detail-crate.glb</code> /barriles en zonas <code>infra</code>.</li>
+      </ul>
+    </li>
+  </ul>
+</div>
+
+<!-- ----------------------------------------------------------------------- -->
+<h3>Fase 4 — Claridad de Producto, Medallas en HUD y Coherencia Documental <span class="pill p-ok">PULIDO &amp; UX · PRIORIDAD 4</span></h3>
+<p>Objetivo: resolver las fricciones del dogfooding (<code>docs/DOGFOODING_NOTES.md</code> y <code>docs/UX_IMPROVEMENT_PLAN.md</code>) y alinear la documentación con el código real (<code>R06</code>).</p>
+
+<div class="fix">
+  <div class="h"><span class="num">4.1</span><span class="t">Insignias de <code>kenney_medals.zip</code> + Identidad Real de Unidades en HUD</span><span class="est">~1.5 h</span></div>
+  <ul>
+    <li>Integrar las medallas vectoriales de <code>kenney_medals.zip</code> (<code>Vector/medals_vector.svg</code> o sprite PNG de 18 KB) en:
+      <ul>
+        <li><code>src/ui/panel.ts</code> y <code>src/ui/agentDock.ts</code>: insignia por rol (Hero/Coordinador vs Worker vs Scout) y corrección del label genérico <code>"Agente Principal"</code> (<code>src/ui/panel.ts:29</code>) para mostrar el harness/perfil real (<code>Claude</code>, <code>Codex</code>, <code>Cursor</code>, <code>Hermes</code>).</li>
+        <li><code>src/ui/validationVerdict.ts</code>: medalla en el header de <code>✓ Validated</code> cuando las pruebas técnicas y de comportamiento pasan con evidencia.</li>
+      </ul>
+    </li>
+  </ul>
+</div>
+
+<div class="fix">
+  <div class="h"><span class="num">4.2</span><span class="t">HUD Modo Quick vs Advanced + Reconciliación Documental (R06)</span><span class="est">~2 h</span></div>
+  <ul>
+    <li>Añadir toggle persistente <b>Quick / Advanced</b> en la barra superior (<code>src/ui/hud.ts</code>): en modo <i>Quick</i> quedan visibles solo los controles diarios (Spawn/Dock de agentes, Chat, Aprobaciones, Kanban F6, Tareas F9 y Toggle 2D/3D), agrupando el resto en un menú desplegable <code>⋯</code>.</li>
+    <li>Actualizar <code>docs/ROADMAP.md:36-40</code> y <code>docs/COMPARISON.md</code> para marcar explícitamente como retirados <code>FrugalGPT Router</code>, <code>Swarm Engine</code> y <code>SICA</code> (reconciliado con <code>docs/SCOPE.md</code>), cerrando el ítem <b>R06</b> de la auditoría P1.</li>
+  </ul>
+</div>
+
+<!-- ======================================================================= -->
+<h2 id="criterios">6. Checklist de Aceptación por Fase</h2>
+
+<table>
+  <tr>
+    <th>Fase</th>
+    <th>Comando de Verificación</th>
+    <th>Criterio de Éxito</th>
+  </tr>
+  <tr>
+    <td><b>Fase 1 (Gate &amp; P1)</b></td>
+    <td><code>taskset -c 0,1 bash scripts/check.sh</code></td>
+    <td>
+      • <code>tsc --noEmit</code> = 0 errores<br>
+      • <code>eslint</code> = 0 errores / 0 warnings<br>
+      • <code>prettier --check</code> = 100% limpio<br>
+      • <code>ruff check server/ scripts/</code> = 0 errores<br>
+      • <code>vitest run</code> = 111 suites verdes (incluyendo <code>validationVerdict.test.ts</code>)<br>
+      • <code>pytest server/</code> = 0 fallos (incluyendo <code>test_task_orchestrator.py</code>, <code>test_validator_r02.py</code> y probes de <code>R01</code>)
+    </td>
+  </tr>
+  <tr>
+    <td><b>Fase 2 (2D &amp; Rutas)</b></td>
+    <td><code>npm run assets &amp;&amp; npm test -- src/renderer.test.ts</code></td>
+    <td>
+      • Celdas 2D renderizan hexágonos biselados de <code>sbs_-_realistic_hex_tiles</code> sin pérdida de 60 FPS<br>
+      • Ciudades en 2D muestran silueta por nivel y labels sin solapamiento a bajo zoom<br>
+      • Rutas de unidad muestran curva spline con flecha y nodos de turno/fatiga en 2D y 3D
+    </td>
+  </tr>
+  <tr>
+    <td><b>Fase 3 (3D Kenney Kits)</b></td>
+    <td><code>bash scripts/check.sh</code> (budgets de assets)</td>
+    <td>
+      • <code>public/assets/3d/props/*.glb</code> se mantiene <b>&lt; 700 KB</b> (límite: 1.536 KB)<br>
+      • <code>public/assets/3d/*.png</code> se mantiene <b>&lt; 5.500 KB</b> (límite: 6.144 KB)<br>
+      • Wonders, puentes, estandartes Git y salas de <code>LocalTile3D</code> cargan con fallback procedural si WebGL/GLTF falla
+    </td>
+  </tr>
+  <tr>
+    <td><b>Fase 4 (HUD &amp; Docs)</b></td>
+    <td><code>npm test &amp;&amp; git diff docs/</code></td>
+    <td>
+      • Unidades muestran perfil/rango real + medalla SVG/PNG en <code>panel.ts</code> y <code>agentDock.ts</code><br>
+      • Ningún módulo retirado figura como activo en <code>ROADMAP.md</code> ni <code>README.md</code>
+    </td>
+  </tr>
+</table>
+
+<div class="foot">
+  Artefacto generado el 2026-10-14 para <b>RepoCiv</b> (<code>/home/gris96/.hermes/workspace/ACTIVE/repociv</code>) · Basado en inspección directa del código fuente, corrida de suites y análisis de los paquetes de assets en <code>/home/gris96/Downloads</code>.
+</div>
+
+</div>
+</body>
+</html>
