@@ -2,6 +2,11 @@
 # ─── RepoCiv — Clean shutdown ─────────────────────────────────────────────────
 # Reads the lockfile, kills bridge + vite, removes lockfile.
 # Safe to run even if processes are already dead.
+#
+# ⚠ Con la unit `repociv.service` activa (dev-start.sh como supervisor) NO
+# uses este script: mata los hijos del supervisor por lockfile/puertos y
+# systemd lo lee como fallo. El restart correcto con la unit viva es:
+#   systemctl --user restart repociv
 set -euo pipefail
 
 if [[ -f .env ]]; then
