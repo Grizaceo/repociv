@@ -1,7 +1,4 @@
 // ─── RepoCiv — Local Renderer (RimWorld-style 2D grid) ─────────────────────────
-// Re-exports
-export { isoProject } from './isoLocalRenderer.ts';
-
 // Types
 import type { LocalWorld, LocalTile, LocalUnit, ZoneType } from './types.ts';
 import { loadOfficeAtlas } from './officeAtlas.ts';

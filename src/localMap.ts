@@ -26,7 +26,7 @@ import {
 } from './officeLayout.ts';
 
 // ─── File tree node (mirrors bridge API shape) ────────────────────────────────
-export interface FileNode {
+interface FileNode {
   name: string;
   path: string;
   type: 'file' | 'dir';
@@ -40,21 +40,20 @@ const MAX_DEPTH = 3;
 const MIN_GRID = 60;
 
 // Power constants
-export const CONDUIT_SPACING = 4; // tiles between conduit lines
-export const GENERATOR_WATTS = 2000;
+const CONDUIT_SPACING = 4; // tiles between conduit lines
+const GENERATOR_WATTS = 2000;
 export const BATTERY_STORED = 5000;
-export const SOLAR_WATTS = 800;
+const SOLAR_WATTS = 800;
 
 // Temperature constants
-export const HEATER_WATTS = 500;
-export const COOLER_WATTS = 500;
-export const DEFAULT_TARGET_TEMP = 21; // Celsius
-export const HEAT_TRANSFER_RATE = 0.02; // per tick through doors/vents
+const HEATER_WATTS = 500;
+const COOLER_WATTS = 500;
+const DEFAULT_TARGET_TEMP = 21; // Celsius
 
 let _workbenchIdCounter = 0;
 
 // ─── Entry point (browser-safe: accepts FileNode tree) ───────────────────────
-export function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
+function buildLocalWorld(repoId: string, root: FileNode): LocalWorld {
   const folders = collectFolders(root, MAX_DEPTH);
   folders.unshift({ path: root.path, name: root.name, node: root, depth: 0 });
   folders.sort((a, b) => b.depth - a.depth);

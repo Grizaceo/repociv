@@ -12,7 +12,7 @@ const TILE_SIZE = 32;
 
 // ─── Floor Background ──────────────────────────────────────────────────────
 
-export function drawFloorBackground(
+function drawFloorBackground(
   ctx: CanvasRenderingContext2D,
   tile: LocalTile,
   px: number,
@@ -119,7 +119,7 @@ export function drawFloorBackground(
 
 // ─── Path Background ──────────────────────────────────────────────────────
 
-export function drawPathBackground(
+function drawPathBackground(
   ctx: CanvasRenderingContext2D,
   tile: LocalTile,
   px: number,
@@ -207,7 +207,7 @@ export function drawPathBackground(
 
 // ─── Wall Facade ───────────────────────────────────────────────────────────
 
-export function drawWallFacade(
+function drawWallFacade(
   ctx: CanvasRenderingContext2D,
   tile: LocalTile,
   px: number,
@@ -318,7 +318,7 @@ export function drawWallFacade(
 
 // ─── Door Tile (static) ────────────────────────────────────────────────────
 
-export function drawDoorTile(
+function drawDoorTile(
   ctx: CanvasRenderingContext2D,
   px: number,
   py: number,
@@ -350,12 +350,7 @@ export function drawDoorTile(
 
 // ─── Debris Tile ───────────────────────────────────────────────────────────
 
-export function drawDebrisTile(
-  ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
-  s: number,
-): void {
+function drawDebrisTile(ctx: CanvasRenderingContext2D, px: number, py: number, s: number): void {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
   ctx.fillRect(px + 4, py + 4, s - 8, s - 8);
   ctx.fillStyle = '#443d35';
@@ -375,7 +370,7 @@ export function drawDebrisTile(
 
 // ─── Kiosk Tile ────────────────────────────────────────────────────────────
 
-export function drawKioskTile(
+function drawKioskTile(
   ctx: CanvasRenderingContext2D,
   px: number,
   py: number,
@@ -404,7 +399,7 @@ export function drawKioskTile(
 
 // ─── Workbench Tile ────────────────────────────────────────────────────────
 
-export function drawWorkbenchTile(
+function drawWorkbenchTile(
   ctx: CanvasRenderingContext2D,
   wb: { extension: string; isTest?: boolean; fileName?: string },
   px: number,
@@ -472,7 +467,7 @@ export function drawWorkbenchTile(
 
 // ─── Power Source Tile ─────────────────────────────────────────────────────
 
-export function drawPowerSourceTile(
+function drawPowerSourceTile(
   ctx: CanvasRenderingContext2D,
   px: number,
   py: number,
@@ -510,7 +505,7 @@ export function drawPowerSourceTile(
 
 // ─── Power Consumer Tile ───────────────────────────────────────────────────
 
-export function drawPowerConsumerTile(
+function drawPowerConsumerTile(
   ctx: CanvasRenderingContext2D,
   px: number,
   py: number,
@@ -532,12 +527,7 @@ export function drawPowerConsumerTile(
 
 // ─── Bed Tile ──────────────────────────────────────────────────────────────
 
-export function drawBedTile(
-  ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
-  s: number,
-): void {
+function drawBedTile(ctx: CanvasRenderingContext2D, px: number, py: number, s: number): void {
   const frameColor = '#B09060';
   const sheetColor = '#D0D0D0';
   const blanketColor = '#FCE4EC';
@@ -578,12 +568,7 @@ export function drawBedTile(
 
 // ─── Heater Tile ───────────────────────────────────────────────────────────
 
-export function drawHeaterTile(
-  ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
-  s: number,
-): void {
+function drawHeaterTile(ctx: CanvasRenderingContext2D, px: number, py: number, s: number): void {
   ctx.fillStyle = '#FAF0E6';
   ctx.beginPath();
   ctx.roundRect(px + 4, py + 4, s - 8, s - 8, 3);
@@ -608,12 +593,7 @@ export function drawHeaterTile(
 
 // ─── Cooler Tile ───────────────────────────────────────────────────────────
 
-export function drawCoolerTile(
-  ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
-  s: number,
-): void {
+function drawCoolerTile(ctx: CanvasRenderingContext2D, px: number, py: number, s: number): void {
   const centerX = px + s / 2;
   const centerY = py + s / 2;
   ctx.fillStyle = '#D8DCE0';
@@ -647,7 +627,7 @@ export function drawCoolerTile(
 
 // ─── Vent Tile ─────────────────────────────────────────────────────────────
 
-export function drawVentTile(
+function drawVentTile(
   ctx: CanvasRenderingContext2D,
   px: number,
   py: number,
@@ -675,7 +655,7 @@ export function drawVentTile(
 
 // ─── Office Furniture Tiles ────────────────────────────────────────────────
 
-export function drawStandingDeskTile(
+function drawStandingDeskTile(
   ctx: CanvasRenderingContext2D,
   px: number,
   py: number,
@@ -707,7 +687,7 @@ export function drawStandingDeskTile(
   ctx.fill();
 }
 
-export function drawPhoneBoothTile(
+function drawPhoneBoothTile(
   ctx: CanvasRenderingContext2D,
   px: number,
   py: number,
@@ -739,12 +719,7 @@ export function drawPhoneBoothTile(
   ctx.fill();
 }
 
-export function drawBreakAreaTile(
-  ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
-  s: number,
-): void {
+function drawBreakAreaTile(ctx: CanvasRenderingContext2D, px: number, py: number, s: number): void {
   ctx.fillStyle = '#FAF0E6';
   ctx.beginPath();
   ctx.roundRect(px + 2, py + 10, s - 4, s - 12, 2);
@@ -771,7 +746,7 @@ export function drawBreakAreaTile(
   ctx.stroke();
 }
 
-export function drawMeetingRoomTile(
+function drawMeetingRoomTile(
   ctx: CanvasRenderingContext2D,
   px: number,
   py: number,
@@ -804,7 +779,7 @@ export function drawMeetingRoomTile(
   ctx.fill();
 }
 
-export function drawWhiteboardTile(
+function drawWhiteboardTile(
   ctx: CanvasRenderingContext2D,
   px: number,
   py: number,
@@ -840,7 +815,7 @@ export function drawWhiteboardTile(
   ctx.fill();
 }
 
-export function drawServerRackTile(
+function drawServerRackTile(
   ctx: CanvasRenderingContext2D,
   px: number,
   py: number,
@@ -872,12 +847,7 @@ export function drawServerRackTile(
   ctx.stroke();
 }
 
-export function drawPlanterTile(
-  ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
-  s: number,
-): void {
+function drawPlanterTile(ctx: CanvasRenderingContext2D, px: number, py: number, s: number): void {
   ctx.fillStyle = '#B09060';
   ctx.beginPath();
   ctx.moveTo(px + 5, py + s - 3);
@@ -907,12 +877,7 @@ export function drawPlanterTile(
   ctx.fill();
 }
 
-export function drawReceptionTile(
-  ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
-  s: number,
-): void {
+function drawReceptionTile(ctx: CanvasRenderingContext2D, px: number, py: number, s: number): void {
   ctx.fillStyle = '#B09060';
   ctx.beginPath();
   ctx.moveTo(px + 4, py + s - 4);
@@ -940,12 +905,7 @@ export function drawReceptionTile(
   ctx.fillRect(px + s / 2 - 2, py + 9, 4, 3);
 }
 
-export function drawStairsTile(
-  ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
-  s: number,
-): void {
+function drawStairsTile(ctx: CanvasRenderingContext2D, px: number, py: number, s: number): void {
   const steps = 4;
   const stepH = (s - 4) / steps;
   for (let i = 0; i < steps; i++) {
@@ -1209,12 +1169,7 @@ export function drawTileModule(
 
 // ─── Small utilities ────────────────────────────────────────────────────────
 
-export function drawConduitTile(
-  ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
-  s: number,
-): void {
+function drawConduitTile(ctx: CanvasRenderingContext2D, px: number, py: number, s: number): void {
   ctx.strokeStyle = 'rgba(217, 119, 6, 0.6)';
   ctx.lineWidth = 2;
   ctx.beginPath();

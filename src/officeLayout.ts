@@ -3,7 +3,7 @@
 
 import type { LocalRoom, LocalTile, LocalTileType, CubicleFacing, CubiclePlan } from './types.ts';
 
-export const MIN_AISLE_WIDTH = 2;
+const MIN_AISLE_WIDTH = 2;
 /** Visual cap: a room never renders more than this many desks. Folders with
  *  more files keep every workbench in room.workbenches (missions fall back to
  *  the unit's assigned desk) and the renderer's cluster pill summarizes the
@@ -12,7 +12,7 @@ export const MIN_AISLE_WIDTH = 2;
 export const MAX_DESKS_PER_ROOM = 12;
 const WALL_THICKNESS = 1;
 
-export interface LayoutPlacement {
+interface LayoutPlacement {
   x: number;
   y: number;
   type: LocalTileType;
