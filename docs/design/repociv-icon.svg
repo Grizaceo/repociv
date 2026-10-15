@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background radial glow -->
+    <radialGradient id="bgGlow" cx="50%" cy="42%" r="58%">
+      <stop offset="0%" stop-color="#281e11"/>
+      <stop offset="55%" stop-color="#120d08"/>
+      <stop offset="100%" stop-color="#060402"/>
+    </radialGradient>
+
+    <!-- Imperial Gold Metallic Gradient -->
+    <linearGradient id="goldGrad" gradientUnits="userSpaceOnUse" x1="76" y1="48" x2="436" y2="464">
+      <stop offset="0%" stop-color="#fae3a0"/>
+      <stop offset="35%" stop-color="#e5b858"/>
+      <stop offset="70%" stop-color="#c49035"/>
+      <stop offset="100%" stop-color="#8c621d"/>
+    </linearGradient>
+
+    <linearGradient id="goldBright" gradientUnits="userSpaceOnUse" x1="256" y1="330" x2="256" y2="70">
+      <stop offset="0%" stop-color="#d4a045"/>
+      <stop offset="55%" stop-color="#f5d580"/>
+      <stop offset="100%" stop-color="#fff3c4"/>
+    </linearGradient>
+
+    <!-- Terrain Facet Gradients -->
+    <linearGradient id="terrainTop" gradientUnits="userSpaceOnUse" x1="256" y1="244" x2="256" y2="380">
+      <stop offset="0%" stop-color="#8fb569"/>
+      <stop offset="100%" stop-color="#568244"/>
+    </linearGradient>
+    <linearGradient id="terrainLeft" gradientUnits="userSpaceOnUse" x1="116" y1="308" x2="256" y2="418">
+      <stop offset="0%" stop-color="#4e7a3e"/>
+      <stop offset="100%" stop-color="#27471e"/>
+    </linearGradient>
+    <linearGradient id="terrainRight" gradientUnits="userSpaceOnUse" x1="256" y1="308" x2="396" y2="418">
+      <stop offset="0%" stop-color="#3d6630"/>
+      <stop offset="100%" stop-color="#1d3816"/>
+    </linearGradient>
+
+    <!-- Citadel Stone & Roof Gradients -->
+    <linearGradient id="stoneLight" gradientUnits="userSpaceOnUse" x1="200" y1="150" x2="256" y2="365">
+      <stop offset="0%" stop-color="#f0d8ae"/>
+      <stop offset="100%" stop-color="#bf9b68"/>
+    </linearGradient>
+    <linearGradient id="stoneShadow" gradientUnits="userSpaceOnUse" x1="256" y1="150" x2="312" y2="365">
+      <stop offset="0%" stop-color="#b5905c"/>
+      <stop offset="100%" stop-color="#7c5d34"/>
+    </linearGradient>
+    <linearGradient id="roofLight" gradientUnits="userSpaceOnUse" x1="200" y1="100" x2="256" y2="230">
+      <stop offset="0%" stop-color="#ee684f"/>
+      <stop offset="100%" stop-color="#c43f2a"/>
+    </linearGradient>
+    <linearGradient id="roofShadow" gradientUnits="userSpaceOnUse" x1="256" y1="100" x2="312" y2="230">
+      <stop offset="0%" stop-color="#b83824"/>
+      <stop offset="100%" stop-color="#822214"/>
+    </linearGradient>
+
+    <!-- Drop Shadow -->
+    <filter id="dropShadow" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.65"/>
+    </filter>
+    <filter id="goldGlow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#f5d580" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- Rounded Square App/Badge Backdrop -->
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="#060402"/>
+  <rect x="22" y="22" width="468" height="468" rx="90" fill="url(#bgGlow)" stroke="#3d2e18" stroke-width="2.5"/>
+
+  <!-- Subtle background radial hex lattice -->
+  <g stroke="#c8a84b" stroke-opacity="0.09" stroke-width="1.5" fill="none">
+    <polygon points="256,42 441,149 441,363 256,470 71,363 71,149"/>
+    <line x1="256" y1="42" x2="256" y2="470"/>
+    <line x1="71" y1="149" x2="441" y2="363"/>
+    <line x1="441" y1="149" x2="71" y2="363"/>
+  </g>
+
+  <!-- Outer Imperial Hexagon Frame -->
+  <g filter="url(#dropShadow)">
+    <polygon points="256,46 438,151 438,361 256,466 74,361 74,151"
+             fill="#110d08" stroke="url(#goldGrad)" stroke-width="13" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Inner Art Deco Gold Rim -->
+  <polygon points="256,65 421,160 421,352 256,447 91,352 91,160"
+           fill="none" stroke="#f5d580" stroke-opacity="0.32" stroke-width="2" stroke-linejoin="round"/>
+
+  <!-- 3D Isometric Hex Terrain Platform -->
+  <g filter="url(#dropShadow)">
+    <!-- Left Front Skirt -->
+    <polygon points="116,296 172,354 256,382 256,422 166,390 116,334" fill="url(#terrainLeft)"/>
+    <!-- Right Front Skirt -->
+    <polygon points="396,296 340,354 256,382 256,422 346,390 396,334" fill="url(#terrainRight)"/>
+    <!-- Center Skirt Seam Highlight -->
+    <line x1="256" y1="382" x2="256" y2="422" stroke="#7ba05b" stroke-opacity="0.35" stroke-width="2"/>
+    <!-- Isometric Hex Top Face -->
+    <polygon points="256,240 340,264 396,296 340,354 256,382 172,354 116,296 172,264"
+             fill="url(#terrainTop)" stroke="#a8cf82" stroke-opacity="0.5" stroke-width="2" stroke-linejoin="round"/>
+    <!-- Inner Golden Imperial Territory Border on Tile -->
+    <polygon points="256,258 326,278 368,302 324,344 256,366 188,344 144,302 186,278"
+             fill="#d4a574" fill-opacity="0.22" stroke="#f5d580" stroke-opacity="0.6" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Imperial Citadel / Capital Bastion (True Isometric 3D Towers) -->
+  <g filter="url(#dropShadow)">
+    <!-- Left Flanking Bastion Tower (center ridge x=188) -->
+    <polygon points="150,214 188,230 188,328 150,310" fill="url(#stoneLight)"/>
+    <polygon points="188,230 220,214 220,310 188,328" fill="url(#stoneShadow)"/>
+    <!-- Left Tower Faceted Pyramid Roof -->
+    <polygon points="144,214 188,164 188,234" fill="url(#roofLight)"/>
+    <polygon points="188,234 188,164 226,214" fill="url(#roofShadow)"/>
+
+    <!-- Right Flanking Bastion Tower (center ridge x=324) -->
+    <polygon points="292,214 324,230 324,328 292,310" fill="url(#stoneLight)"/>
+    <polygon points="324,230 362,214 362,310 324,328" fill="url(#stoneShadow)"/>
+    <!-- Right Tower Faceted Pyramid Roof -->
+    <polygon points="286,214 324,164 324,234" fill="url(#roofLight)"/>
+    <polygon points="324,234 324,164 368,214" fill="url(#roofShadow)"/>
+
+    <!-- Central Keep / Sovereign Tower (center ridge x=256) -->
+    <polygon points="204,162 256,182 256,356 204,334" fill="url(#stoneLight)"/>
+    <polygon points="256,182 308,162 308,334 256,356" fill="url(#stoneShadow)"/>
+    <!-- Central Keep Ridge Line -->
+    <line x1="256" y1="182" x2="256" y2="356" stroke="#fae19c" stroke-opacity="0.35" stroke-width="1.5"/>
+
+    <!-- Central Keep Imperial Spire Roof -->
+    <polygon points="196,162 256,96 256,186" fill="url(#roofLight)"/>
+    <polygon points="256,186 256,96 316,162" fill="url(#roofShadow)"/>
+
+    <!-- Fortress Gate Arch (grounded at bottom of central keep) -->
+    <path d="M236,347 L236,302 A20,20 0 0,1 276,302 L276,347 L256,356 Z" fill="#120d08" stroke="#f5d580" stroke-width="3" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Git Branch / Agent Network Constellation (The "Repo" in RepoCiv) -->
+  <!-- Dark Contrast Casing Behind Branches -->
+  <g fill="none" stroke="#120d08" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M256,324 L256,204" stroke-width="14"/>
+    <path d="M256,284 C256,254 188,270 188,244" stroke-width="13"/>
+    <path d="M256,266 C256,236 324,252 324,226" stroke-width="13"/>
+  </g>
+
+  <!-- Glowing Branch Lines & Agent Nodes -->
+  <g filter="url(#goldGlow)">
+    <!-- Left Branch to Scout Node (Cyan) -->
+    <path d="M256,284 C256,254 188,270 188,244" fill="none" stroke="#3fb8d8" stroke-width="7" stroke-linecap="round"/>
+    <!-- Right Branch to Worker Node (Green) -->
+    <path d="M256,266 C256,236 324,252 324,226" fill="none" stroke="#5ec26a" stroke-width="7" stroke-linecap="round"/>
+    <!-- Main Trunk Line from Gate to Crown (Imperial Gold) -->
+    <path d="M256,324 L256,204" fill="none" stroke="url(#goldBright)" stroke-width="8" stroke-linecap="round"/>
+
+    <!-- Base Commit Node (Root inside Gate) -->
+    <circle cx="256" cy="324" r="11" fill="#120d08" stroke="#f5d580" stroke-width="5.5"/>
+    <!-- Main Sovereign Agent Node (Gold) -->
+    <circle cx="256" cy="204" r="14" fill="#f5d580" stroke="#120d08" stroke-width="4.5"/>
+    <!-- Left Agent Node (Scout Cyan) -->
+    <circle cx="188" cy="244" r="12" fill="#3fb8d8" stroke="#120d08" stroke-width="4"/>
+    <!-- Right Agent Node (Worker Green) -->
+    <circle cx="324" cy="226" r="12" fill="#5ec26a" stroke="#120d08" stroke-width="4"/>
+  </g>
+
+  <!-- Capital Star Crest at Apex -->
+  <polygon points="256,60 264,76 282,79 269,91 272,108 256,99 240,108 243,91 230,79 248,76"
+           fill="url(#goldBright)" stroke="#120d08" stroke-width="2" stroke-linejoin="round" filter="url(#goldGlow)"/>
+
+  <!-- Corner Hex Rivets -->
+  <circle cx="256" cy="46" r="5" fill="#fae3a0"/>
+  <circle cx="438" cy="151" r="5" fill="#fae3a0"/>
+  <circle cx="438" cy="361" r="5" fill="#fae3a0"/>
+  <circle cx="256" cy="466" r="5" fill="#fae3a0"/>
+  <circle cx="74" cy="361" r="5" fill="#fae3a0"/>
+  <circle cx="74" cy="151" r="5" fill="#fae3a0"/>
+</svg>
