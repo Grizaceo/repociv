@@ -26,6 +26,10 @@ async function seedRepoSelection(page: Page) {
         filters: { owners: [], topics: [], languages: [] },
       }),
     );
+    // CI has no Hermes harness: the degraded-mode banner is a fixed
+    // strip over the top bar that intercepts pointer events (measured in
+    // CI run 38674628310). Dismiss it for the session so HUD clicks land.
+    sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
   }, selectedRepoPaths);
 }
 
@@ -35,7 +39,11 @@ async function bootRepoCiv(page: Page, options: { seedSelection?: boolean } = {}
 
   if (options.seedSelection !== false) await seedRepoSelection(page);
 
-  await page.goto('/');
+  // Flat macro map: the dblclick→local-view hit test (renderer.pickAxial) uses
+  // the flat-view transform, so the city screen positions resolved by
+  // getMacroCityScreenPositions only line up in flat mode — the same setup
+  // local-view.spec.ts uses. (The webgl default made the dblclick path miss.)
+  await page.goto('/?renderer=flat');
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
   if (await page.locator('#repo-onboarding').isVisible().catch(() => false)) {
     await expect(page.locator('#repo-onboarding-next')).toBeEnabled({ timeout: 20_000 });
@@ -92,14 +100,13 @@ async function tryEnterLocalView(page: Page): Promise<boolean> {
   if (positions.length > 0) {
     for (const pos of positions) {
       await page.mouse.dblclick(pos.x, pos.y);
-      await page.waitForTimeout(300);
 
       const localFrame = page.locator('#local-view-frame');
-      const isVisible = await localFrame.isVisible().catch(() => false);
-
-      if (isVisible) {
-        return true;
-      }
+      // The local world builds client-side (GET /api/files/<repoId>) before the
+      // frame toggles, so poll instead of assuming a fixed 300 ms; measured
+      // ~360 ms on a healthy run, and one city can miss the hit test entirely.
+      const visible = await localFrame.isVisible({ timeout: 6_000 }).catch(() => false);
+      if (visible) return true;
     }
   }
 
@@ -118,7 +125,9 @@ async function tryEnterLocalView(page: Page): Promise<boolean> {
   if (!openedViaDebug) return false;
 
   const localFrame = page.locator('#local-view-frame');
-  await expect(localFrame).toBeVisible({ timeout: 5000 });
+  // Measured ~350 ms normally; give the async entry real headroom on a loaded
+  // CI runner instead of the old 5 s race.
+  await expect(localFrame).toBeVisible({ timeout: 15_000 });
   await page.locator('#main-canvas').focus();
   return true;
 }
@@ -131,7 +140,11 @@ async function getJSHeapSize(page: Page): Promise<number> {
 }
 
 test.describe('RepoCiv Local View - Memory Leak Test', () => {
-  test.setTimeout(120_000);
+  // CI evidence (run 38652342208, 2026-10-14): both tests timed out at 120 s
+  // while still doing legitimate work — boot costs ~40-60 s on the 2-worker
+  // runner, plus the 30 s heap soak and the GC/snapshot steps. 180 s keeps the
+  // soak intact instead of shrinking the test to fit a tight budget.
+  test.setTimeout(180_000);
 
   test('heap snapshot: sin memory leaks tras 30s en vista local', async ({ page }) => {
     await bootRepoCiv(page);

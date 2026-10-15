@@ -4,7 +4,15 @@ for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.addInitScript(() => {
       localStorage.setItem('repociv:tour-seen:v1', '1');
-      localStorage.setItem('repociv:world-render-mode', 'canvas');
+      // CI has no Hermes harness: the degraded-mode banner is a fixed
+      // strip over the top bar that intercepts pointer events (measured in
+      // CI run 38674628310). Dismiss it for the session so HUD clicks land.
+      sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
+      // Flat macro renderer (the old 'repociv:world-render-mode' key is dead).
+      // These cards are panel-only; the webgl default would put the CI runner
+      // (SwiftShader, 2 workers) under load heavy enough to starve Playwright's
+      // in-page queries and detach cards mid-click.
+      localStorage.setItem('repociv:renderer', 'flat');
     });
     let stage: string = 'initial';
     const identity = (commandId: string, data: Record<string, unknown>) => ({

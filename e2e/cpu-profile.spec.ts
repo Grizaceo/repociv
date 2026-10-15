@@ -23,6 +23,10 @@ test('profile: sampled CPU profile of the live local-view frame', async ({ page 
   expect(paths.length).toBeGreaterThan(0);
   await page.addInitScript((selected) => {
     window.localStorage.setItem('repociv:tour-seen:v1', '1');
+    // CI has no Hermes harness: the degraded-mode banner is a fixed
+    // strip over the top bar that intercepts pointer events (measured in
+    // CI run 38674628310). Dismiss it for the session so HUD clicks land.
+    sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
     window.localStorage.setItem(
       'repociv:selected-repos:v1',
       JSON.stringify({

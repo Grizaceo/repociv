@@ -121,6 +121,14 @@ async function seedRepoSelection(page: Page) {
     // Skip the first-run coachmark tour: its backdrop intercepts pointer
     // events on the canvas, which the chat-opening flow needs.
     window.localStorage.setItem('repociv:tour-seen:v1', '1');
+    // CI has no Hermes harness: the degraded-mode banner is a fixed
+    // strip over the top bar that intercepts pointer events (measured in
+    // CI run 38674628310). Dismiss it for the session so HUD clicks land.
+    sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
+    // Flat macro renderer: these specs drive the chat/HUD panels, and the
+    // webgl default only adds SwiftShader load on the CI runner (measured:
+    // the page stopped answering keyboard events under that load).
+    window.localStorage.setItem('repociv:renderer', 'flat');
   }, paths);
 }
 
@@ -136,26 +144,54 @@ async function boot(page: Page) {
     await expect(page.locator('#repo-onboarding')).toBeHidden({ timeout: 20_000 });
   }
   await expect(page.locator('#main-canvas')).toBeVisible();
+  // HUD listeners (incl. #btn-agents) are wired after the loading screen hides;
+  // wait for the readiness flag so HUD clicks are not silent no-ops.
+  await expect(page.locator('html')).toHaveAttribute('data-app-ready', '1', {
+    timeout: 30_000,
+  });
 }
 
-/** Open the chat with the first non-profile hero slot (the initial unit).
- *  Profile slots only select a profile; they do not open the chat, so they
- *  are excluded. The click is dispatched via evaluate: Playwright's own
- *  scroll-into-view hangs on the command-bar layout once the profile strip
- *  is injected, while a direct DOM click works reliably. */
+/** Open the chat through the canonical F8 flow: the agents panel lists
+ *  RepoCiv's own units (.agents-own[data-unit]); clicking one selects it on
+ *  the map, and Enter opens its side-panel chat — the surface that hosts
+ *  #profile-selector. (The old #hero-bar-slots chips were removed when F8
+ *  became the single agents view.) */
 async function openChat(page: Page) {
-  const slot = page.locator('#hero-bar-slots .hero-chip').first();
-  await expect(slot).toBeVisible({ timeout: 20_000 });
-  // force:true skips Playwright's scroll-into-view (which hangs on the
-  // command-bar layout once the profile strip is injected). The slot click
-  // selects the unit; Enter (handled by the canvas hotkey) opens the chat.
-  await slot.click({ force: true });
+  await page.locator('#btn-agents').click();
+  const panel = page.locator('#agents-panel');
+  await expect(panel).toBeVisible();
+  const own = panel.locator('.agents-own').first();
+  await expect(own).toBeVisible({ timeout: 20_000 });
+  await own.click();
+  // Close F8 so the canvas owns the keyboard; the selection persists.
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
   // Focus the canvas (the Enter hotkey lives there) without clicking: a
   // click could select a different city/unit.
   await page.locator('#main-canvas').focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#side-panel')).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('#chat-input')).toBeVisible();
+  // The harness/provider selects only populate after /providers and
+  // /providers/live resolve (both mocked; the fixture's defaultHarness is
+  // 'hermes'), and the profile list is filtered by the active harness — wait
+  // for that init instead of racing it.
+  await expect(page.locator('#harness-selector')).toHaveValue('hermes');
+}
+
+/** PR-review artifact. The side panel's entry transition plus a loaded machine
+ *  can keep Playwright's element-stability check waiting far past any useful
+ *  budget (measured on the 2026-10-14 CI-shaped runs); a screenshot must never
+ *  fail the functional test, so fall back to the viewport shot. */
+async function shot(page: Page, selector: string, path: string): Promise<void> {
+  try {
+    await page.locator(selector).screenshot({ path, timeout: 5_000 });
+  } catch {
+    console.warn(`[e2e] element screenshot timed out; falling back to viewport: ${path}`);
+    // The fallback is best-effort too: on a starved machine a full-page shot
+    // can hang, and an artifact must never eat the test's budget.
+    await page.screenshot({ path, timeout: 5_000 }).catch(() => {});
+  }
 }
 
 test('profile selector: aparece en el header del chat con la etiqueta y perfiles filtrados por harness', async ({
@@ -174,7 +210,7 @@ test('profile selector: aparece en el header del chat con la etiqueta y perfiles
   await expect(sel.locator('option[value="lexo"]')).toHaveCount(0);
   await expect(sel.locator('option[value="~/.hermes/profiles/main"]')).toHaveCount(1);
   await expect(sel.locator('option[value="~/.hermes/profiles/lexo-alpha"]')).toHaveCount(1);
-  await page.locator('#side-panel').screenshot({ path: 'e2e/_shots/profile-selector.png' });
+  await shot(page, '#side-panel', 'e2e/_shots/profile-selector.png');
 });
 
 test('profile selector: cambiar el harness del panel filtra los perfiles disponibles', async ({

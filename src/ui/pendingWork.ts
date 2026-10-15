@@ -112,7 +112,7 @@ export function renderPendingWork(data: PendingWorkSnapshot | null, fetchError: 
   return `<section class="pending-work" aria-label="Trabajo pendiente">${heading}${warning}
     <p class="pending-work-summary">${dirtyCount} worktrees con cambios · ${clean.length} limpios · ${unavailableCount} no disponibles · ${data.entries.length} observados</p>
     <p class="activity-note">Antigüedad observada, no edad real de los cambios. Muestreo al abrir este panel; no cubre ramas sin worktree ni cambios entre muestras. Sesiones relacionadas ≠ autores.</p>
-    <p class="activity-note">Última muestra: ${esc(date(data.sampledAtMs))}.</p>
+    <p class="activity-note" data-pending-sampled>Última muestra: ${esc(date(data.sampledAtMs))}.</p>
     ${data.persistenceError ? `<p role="status" class="pending-work-warning">⚠ Persistencia: ${esc(data.persistenceError)}. La antigüedad podría no conservarse al reiniciar.</p>` : ''}
     ${data.errors.map((error) => `<p role="status" class="pending-work-warning">⚠ ${esc(error)}</p>`).join('')}
     ${pending.map(card).join('')}

@@ -298,7 +298,7 @@ Sirve para auditar sesiones largas sin abrir logs externos: es el "story so far"
 | Tecla | Acción |
 |-------|--------|
 | `Q` `W` `E` `O` `C` `X` `R` | Spawn MAIN / WORKER / SCOUT / OPENCLAW / CLAUDE / CODEX / CURSOR |
-| `1`–`9` | Seleccionar héroe por slot |
+| `1`, `4`–`9` | Seleccionar sesión por slot (`2`/`3` están reservados para la vista) |
 | `Space` | Ciclar al siguiente héroe idle |
 | `Tab` | Ciclar todos los héroes |
 | `Enter` | Abrir/cerrar side panel |
@@ -311,7 +311,7 @@ Sirve para auditar sesiones largas sin abrir logs externos: es el "story so far"
 | `A` | Aprobaciones pendientes |
 | `T` | Terminal panel |
 | `N` | Gaceta de noticias |
-| `3` | Alternar render 2D (`flat`) ↔ WebGL (`webgl`) |
+| `2` / `3` | Alternar render 2D (`flat`) ↔ WebGL (`webgl`) |
 | `F11` | Settings Panel |
 | `?` | Keyboard help |
 

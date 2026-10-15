@@ -8,10 +8,15 @@ import { expect, test, type Page } from '@playwright/test';
  * What this test verifies:
  *   - Both modes boot without JS errors.
  *   - Hotkey 3 (cycleWorldRenderMode) flips localStorage between
- *     'flat' and 'webgl' and the next reload lands in the chosen
- *     mode.
+ *     'flat' and 'webgl'. The first flip lazily loads Three.js, so the
+ *     assertion polls instead of racing the async toggle with a fixed
+ *     sleep.
+ *   - An explicit 3D choice is sticky across reloads (plan B5: 3D is
+ *     the default view, so honouring the stored preference is the
+ *     contract).
  *   - The legacy 'iso25d' value is migrated to 'webgl' on read
- *     (Phase 1's persistence contract).
+ *     (Phase 1's persistence contract). The migration runs during the
+ *     async boot, so this also polls.
  *
  * What this test does NOT verify (out of scope for Phase 2):
  *   - Pixel-level parity of the hover highlight shape. The two
@@ -38,6 +43,10 @@ async function bootWithMode(page: Page, mode: 'flat' | 'webgl') {
   await page.evaluate(
     ([mode, repos]) => {
       window.localStorage.setItem('repociv:renderer', mode);
+      // CI has no Hermes harness: the degraded-mode banner is a fixed
+      // strip over the top bar that intercepts pointer events (measured in
+      // CI run 38674628310). Dismiss it for the session so HUD clicks land.
+      sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
       window.localStorage.setItem(
         'repociv:selected-repos:v1',
         JSON.stringify({
@@ -84,26 +93,24 @@ test.describe('hex2d ↔ WebGL parity', () => {
     // persistRenderMode(). Result: localStorage 'repociv:renderer'
     // flips from 'flat' to 'webgl'.
     await page.keyboard.press('3');
-    // Give the event loop a tick to flush persistRenderMode.
-    await page.waitForTimeout(50);
-    const stored = await page.evaluate(() =>
-      window.localStorage.getItem('repociv:renderer'),
-    );
-    expect(stored).toBe('webgl');
+    // The flip awaits the lazy Three.js chunk + WebGL init, so poll
+    // instead of assuming a fixed 50ms is enough on a loaded machine.
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem('repociv:renderer')), {
+        timeout: 20_000,
+      })
+      .toBe('webgl');
   });
 
   test('mode persists across reloads', async ({ page }) => {
     await bootWithMode(page, 'webgl');
-    // No toggle needed: webgl session-only behavior rewrites
-    // storage to 'flat' on read; this test just confirms the
-    // post-reload state is internally consistent.
-    await page.reload({ waitUntil: 'networkidle' });
-    const afterReload = await page.evaluate(() =>
-      window.localStorage.getItem('repociv:renderer'),
-    );
-    // 'flat' is the rewritten value (webgl is session-only, per
-    // the resolver's session-only contract).
-    expect(afterReload).toBe('flat');
+    // A bare navigation without the ?renderer= param: the persisted
+    // explicit 3D choice is sticky (plan B5), so the resolver must
+    // land in webgl from storage alone.
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem('repociv:renderer')))
+      .toBe('webgl');
     await expect(page.locator('#main-canvas')).toBeVisible();
   });
 
@@ -112,6 +119,10 @@ test.describe('hex2d ↔ WebGL parity', () => {
     await page.evaluate(
       ([repos]) => {
         window.localStorage.setItem('repociv:renderer', 'iso25d');
+        // CI has no Hermes harness: the degraded-mode banner is a fixed
+        // strip over the top bar that intercepts pointer events (measured in
+        // CI run 38674628310). Dismiss it for the session so HUD clicks land.
+        sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
         window.localStorage.setItem(
           'repociv:selected-repos:v1',
           JSON.stringify({
@@ -125,11 +136,14 @@ test.describe('hex2d ↔ WebGL parity', () => {
     );
     // Force the URL to NOT override the resolver. Bare '/' reads
     // from storage; the migration in resolveInitialRenderMode
-    // rewrites the key from 'iso25d' to 'webgl'.
+    // rewrites the key from 'iso25d' to 'webgl'. It runs inside the
+    // async boot, so poll rather than reading before bootstrap
+    // reaches the resolver.
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    const stored = await page.evaluate(() =>
-      window.localStorage.getItem('repociv:renderer'),
-    );
-    expect(stored).toBe('webgl');
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem('repociv:renderer')), {
+        timeout: 20_000,
+      })
+      .toBe('webgl');
   });
 });

@@ -6,7 +6,8 @@
 import { sessionLabel, type ExternalSessionRow } from '../externalAgents.ts';
 import type { Unit } from '../types.ts';
 
-/** The first nine entries have direct number-key access (1–9). */
+/** The first nine entries have direct number-key access (1–9), except the
+ *  digits 2 and 3, which are reserved for the 2D/3D view toggle (SCOPE.md). */
 export const ACTIVE_SESSION_DOCK_LIMIT = 9;
 
 export interface AgentDockItem {

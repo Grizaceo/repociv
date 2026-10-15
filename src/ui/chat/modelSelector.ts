@@ -463,7 +463,11 @@ export function loadConfigForUnit(unitId: string): void {
 
   if (harnessSel) {
     const exists = saved.harness && _harnesses.find((h) => h.id === saved.harness && h.available);
-    const newHarness = exists ? saved.harness : 'auto';
+    // No saved harness for this unit: keep the current selection instead of
+    // clobbering it with 'auto'. finishInit seeds it from the /providers
+    // defaultHarness, and this call used to race that (whichever resolved last
+    // won), so the same unit could open with 'hermes' or 'auto' at random.
+    const newHarness = exists ? saved.harness : _selectedHarness || 'auto';
     if (newHarness !== _selectedHarness) {
       _selectedHarness = newHarness;
       harnessSel.value = newHarness;
