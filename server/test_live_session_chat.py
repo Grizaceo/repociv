@@ -61,16 +61,27 @@ def test_codex_adapter_uses_exact_argv_without_shell() -> None:
     }
 
 
-def test_router_registers_all_harnesses_and_capabilities_fail_closed() -> None:
+def test_router_registers_all_harnesses_and_capabilities_fail_closed(tmp_path) -> None:
     router = LiveSessionChatRouter(
         {
             "codex": CodexLiveChatAdapter(codex_bin="/bin/codex"),
-            "hermes": HermesLiveChatAdapter(),
+            "openai-codex": CodexLiveChatAdapter(codex_bin="/bin/codex"),
+            "hermes": HermesLiveChatAdapter(
+                hermes_home=str(tmp_path / "hermes"),
+                lock_dir=str(tmp_path / "locks"),
+                proc_root=str(tmp_path / "proc"),
+                tmux_bin="",
+            ),
             "claude-code": ClaudeLiveChatAdapter(),
         }
     )
 
     assert router.capability(_obs()).to_dict() == {
+        "state": "available",
+        "transport": "codex-queue",
+        "reason": None,
+    }
+    assert router.capability(_obs(agent="openai-codex")).to_dict() == {
         "state": "available",
         "transport": "codex-queue",
         "reason": None,
@@ -261,3 +272,286 @@ def test_router_routes_claude_live_to_the_process_channel() -> None:
         "requestId": "request-live",
     }
     assert sent == [("22222222-2222-4222-8222-222222222222", "hola")]
+
+
+def _seed_hermes_proc(proc_root, pid: int, start_ticks: int = 744391, ppid: int = 1, tty: str = "") -> None:
+    import os
+
+    entry = proc_root / str(pid)
+    entry.mkdir(parents=True, exist_ok=True)
+    (entry / "cmdline").write_bytes(b"/usr/bin/python3\0/h/hermes_cli/main.py\0serve\0")
+    # Field 1: pid, Field 2: (comm), Field 3: state, Field 4: ppid ... Field 22 (idx 19 after ')'): starttime
+    after_comm = ["S", str(ppid)] + ["0"] * 17 + [str(start_ticks)]
+    (entry / "stat").write_text(f"{pid} (hermes) {' '.join(after_comm)}\n", encoding="utf-8")
+    if tty:
+        fd_dir = entry / "fd"
+        fd_dir.mkdir(exist_ok=True)
+        try:
+            os.symlink(tty, fd_dir / "0")
+        except OSError:
+            pass
+
+
+def test_hermes_serve_ws_adopts_existing_desktop_and_compressed_sessions(tmp_path) -> None:
+    import hashlib
+    import json
+
+    proc_root = tmp_path / "proc"
+    hermes_home = tmp_path / "hermes"
+    lock_dir = tmp_path / "locks"
+    lock_dir.mkdir(parents=True)
+    _seed_hermes_proc(proc_root, 1566377, start_ticks=744391)
+
+    token = "secret-session-token-for-desktop-serve"
+    fp = hashlib.sha256(token.encode("utf-8")).hexdigest()[:16]
+    (lock_dir / "host-desktop-serve.json").write_text(
+        json.dumps(
+            {
+                "role": "desktop-serve",
+                "pid": 1566377,
+                "startTime": 744391,
+                "host": "127.0.0.1",
+                "port": 45339,
+                "protocolVersion": 1,
+                "tokenFingerprint": fp,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (lock_dir / "host-desktop-serve.token").write_text(token + "\n", encoding="utf-8")
+
+    # Root lease uses pre-compression session_id; named profile 'eidos' has its own lease file
+    rt_default = hermes_home / "runtime"
+    rt_default.mkdir(parents=True)
+    (rt_default / "active_sessions.json").write_text(
+        json.dumps(
+            {
+                "entries": [
+                    {
+                        "pid": 1566377,
+                        "session_id": "20261015_root_id",
+                        "surface": "desktop",
+                        "metadata": {"live_session_id": "4a500c22", "bot_live_delivery_consumer": True},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    rt_eidos = hermes_home / "profiles" / "eidos" / "runtime"
+    rt_eidos.mkdir(parents=True)
+    (rt_eidos / "active_sessions.json").write_text(
+        json.dumps(
+            {
+                "entries": [
+                    {
+                        "pid": 1566377,
+                        "session_id": "20261015_eidos_id",
+                        "surface": "desktop",
+                        "metadata": {"live_session_id": "7ab323cc", "bot_live_delivery_consumer": True},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    ws_calls: list[dict] = []
+
+    def fake_ws_send(**kwargs):
+        ws_calls.append(kwargs)
+
+    adapter = HermesLiveChatAdapter(
+        hermes_home=str(hermes_home),
+        lock_dir=str(lock_dir),
+        proc_root=str(proc_root),
+        tmux_bin="",
+        ws_send=fake_ws_send,
+    )
+
+    compressed_obs = _obs(
+        session_id="hermes-default-20261015_root_id",
+        agent="hermes",
+        source="hermes",
+        profile="default",
+        native_id="20261015_tip_child",
+        related_native_ids=("20261015_root_id", "20261015_tip_child"),
+    )
+    assert adapter.capability(compressed_obs).to_dict() == {
+        "state": "available",
+        "transport": "hermes-serve-ws",
+        "reason": None,
+    }
+    res = adapter.send(compressed_obs, "continúa con el fix", "req-hermes-1")
+    assert res.to_dict() == {
+        "state": "accepted",
+        "transport": "hermes-serve-ws",
+        "requestId": "req-hermes-1",
+    }
+    assert ws_calls == [
+        {
+            "port": 45339,
+            "token": token,
+            "live_session_id": "4a500c22",
+            "profile": "default",
+            "text": "continúa con el fix",
+            "request_id": "req-hermes-1",
+            "timeout_s": adapter.timeout_s,
+        }
+    ]
+
+    eidos_obs = _obs(
+        session_id="hermes-eidos-20261015_eidos_id",
+        agent="hermes",
+        source="hermes",
+        profile="eidos",
+        native_id="20261015_eidos_id",
+    )
+    assert adapter.capability(eidos_obs).to_dict() == {
+        "state": "available",
+        "transport": "hermes-serve-ws",
+        "reason": None,
+    }
+
+
+def test_hermes_tmux_adopts_existing_cli_session_with_separate_send_keys(tmp_path) -> None:
+    import json
+
+    proc_root = tmp_path / "proc"
+    hermes_home = tmp_path / "hermes"
+    _seed_hermes_proc(proc_root, 2200, ppid=2100)
+    rt = hermes_home / "runtime"
+    rt.mkdir(parents=True)
+    (rt / "active_sessions.json").write_text(
+        json.dumps(
+            {
+                "entries": [
+                    {
+                        "pid": 2200,
+                        "session_id": "20261015_cli_tmux",
+                        "surface": "cli",
+                        "metadata": {"live_session_id": "20261015_cli_tmux"},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    tmux_calls: list[list[str]] = []
+
+    def fake_run(argv, **kwargs):
+        if "list-panes" in argv:
+            return subprocess.CompletedProcess(argv, 0, "%3\t2100\t/dev/pts/9\n", "")
+        tmux_calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    adapter = HermesLiveChatAdapter(
+        hermes_home=str(hermes_home),
+        lock_dir=str(tmp_path / "no-locks"),
+        proc_root=str(proc_root),
+        tmux_bin="/usr/bin/tmux",
+        run=fake_run,
+    )
+    obs = _obs(
+        session_id="hermes-default-20261015_cli_tmux",
+        agent="hermes",
+        source="hermes",
+        profile="default",
+        native_id="20261015_cli_tmux",
+    )
+    assert adapter.capability(obs).to_dict() == {
+        "state": "available",
+        "transport": "hermes-tmux",
+        "reason": None,
+    }
+    res = adapter.send(obs, "hola desde F8", "req-tmux-1")
+    assert res.to_dict() == {
+        "state": "accepted",
+        "transport": "hermes-tmux",
+        "requestId": "req-tmux-1",
+    }
+    assert tmux_calls == [
+        ["/usr/bin/tmux", "send-keys", "-t", "%3", "-l", "--", "hola desde F8"],
+        ["/usr/bin/tmux", "send-keys", "-t", "%3", "Enter"],
+    ]
+
+
+def test_ws_prompt_submit_handshake_and_rpc_over_loopback() -> None:
+    import json
+    import socket
+    import struct
+    import threading
+    from server.live_session_chat import _ws_prompt_submit
+
+    received_rpc: list[dict] = []
+
+    server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_sock.bind(("127.0.0.1", 0))
+    server_sock.listen(1)
+    port = server_sock.getsockname()[1]
+
+    def _serve_once() -> None:
+        conn, _ = server_sock.accept()
+        with conn:
+            req = b""
+            while b"\r\n\r\n" not in req:
+                req += conn.recv(4096)
+            assert b"GET /api/ws?token=tok123 HTTP/1.1" in req
+            conn.sendall(
+                b"HTTP/1.1 101 Switching Protocols\r\n"
+                b"Upgrade: websocket\r\n"
+                b"Connection: Upgrade\r\n\r\n"
+            )
+            # Send gateway.ready frame (unmasked server -> client)
+            ready = json.dumps(
+                {"jsonrpc": "2.0", "method": "event", "params": {"type": "gateway.ready"}}
+            ).encode("utf-8")
+            conn.sendall(bytes([0x81, len(ready)]) + ready)
+
+            # Read client masked frame
+            hdr = conn.recv(2)
+            ln = hdr[1] & 0x7F
+            if ln == 126:
+                (ln,) = struct.unpack("!H", conn.recv(2))
+            mask = conn.recv(4)
+            enc = conn.recv(ln)
+            dec = bytes(b ^ mask[i & 3] for i, b in enumerate(enc))
+            rpc = json.loads(dec.decode("utf-8"))
+            received_rpc.append(rpc)
+
+            reply = json.dumps(
+                {"jsonrpc": "2.0", "id": rpc["id"], "result": {"status": "queued"}}
+            ).encode("utf-8")
+            conn.sendall(bytes([0x81, len(reply)]) + reply)
+
+    t = threading.Thread(target=_serve_once, daemon=True)
+    t.start()
+    try:
+        _ws_prompt_submit(
+            port=port,
+            token="tok123",
+            live_session_id="e1cf31e0",
+            profile="eidos",
+            text="mensaje de prueba",
+            request_id="req-ws-1",
+            timeout_s=5.0,
+        )
+    finally:
+        server_sock.close()
+        t.join(timeout=2.0)
+
+    assert received_rpc == [
+        {
+            "jsonrpc": "2.0",
+            "id": "req-ws-1",
+            "method": "prompt.submit",
+            "params": {
+                "session_id": "e1cf31e0",
+                "text": "mensaje de prueba",
+                "queued": True,
+                "profile": "eidos",
+            },
+        }
+    ]
+

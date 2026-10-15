@@ -29,10 +29,12 @@ keeps its timestamp-only behaviour.
 
 from __future__ import annotations
 
+import glob
 import json
 import os
 import re
 from dataclasses import dataclass
+from typing import Sequence
 
 PROC_ROOT = "/proc"
 LEASE_PATH = os.path.expanduser("~/.hermes/runtime/active_sessions.json")
@@ -42,7 +44,9 @@ _MAX_LEASE_BYTES = 1 << 20
 # argv[0] of the agent CLIs Suvadu records. Matched on the whole command line so
 # a wrapper (``node …/claude``, ``python …/hermes``) is caught too.
 _AGENT_RE = re.compile(r"(?:^|[/\s])(claude|codex|cursor-agent|opencode)(?:\s|$)")
-_HERMES_RE = re.compile(r"(?:^|[/\s])hermes(?:\s|$)")
+_HERMES_RE = re.compile(
+    r"(?:^|[/\s'\"])(hermes|hermes_cli(?:\.main|/main\.py)|hermes-agent)(?:[\s'\":/]|$)"
+)
 
 
 @dataclass(frozen=True)
@@ -54,12 +58,21 @@ class Liveness:
     agent_cwds: frozenset[str] = frozenset()
     ok: bool = False
 
-    def live_for(self, *, source: str, native_id: str, cwd: str) -> bool | None:
+    def live_for(
+        self,
+        *,
+        source: str,
+        native_id: str,
+        cwd: str,
+        related_native_ids: Sequence[str] = (),
+    ) -> bool | None:
         """True / False / None (could not tell) for one observed session."""
         if not self.ok:
             return None
         if source == "hermes":
-            return native_id in self.hermes_sessions
+            if native_id in self.hermes_sessions:
+                return True
+            return any(rid in self.hermes_sessions for rid in related_native_ids if rid)
         return bool(cwd) and cwd in self.agent_cwds
 
 
@@ -115,6 +128,17 @@ def probe(proc_root: str = PROC_ROOT, lease_path: str = LEASE_PATH) -> Liveness:
         return Liveness()
 
 
+def _lease_paths(path: str) -> list[str]:
+    """Root lease registry plus named-profile registries under the same Hermes home."""
+    paths = [path]
+    norm = os.path.normpath(path)
+    if os.path.basename(norm) == "active_sessions.json" and os.path.basename(os.path.dirname(norm)) == "runtime":
+        hermes_root = os.path.dirname(os.path.dirname(norm))
+        pattern = os.path.join(hermes_root, "profiles", "*", "runtime", "active_sessions.json")
+        paths.extend(sorted(glob.glob(pattern)))
+    return paths
+
+
 def live_hermes_sessions(path: str, hermes_pids: set[int]) -> frozenset[str]:
     """Session ids in Hermes' lease registry whose pid is a live hermes process.
 
@@ -122,26 +146,27 @@ def live_hermes_sessions(path: str, hermes_pids: set[int]) -> frozenset[str]:
     it) read as dead; re-checking the command line is what stops a recycled pid
     from resurrecting one.
     """
-    raw = _read_bytes(path, _MAX_LEASE_BYTES)
-    if not raw:
-        return frozenset()
-    try:
-        data = json.loads(raw)
-    except ValueError:
-        return frozenset()
-    entries = data.get("entries") if isinstance(data, dict) else None
-    if not isinstance(entries, list):
-        return frozenset()
     out: set[str] = set()
-    for entry in entries:
-        if not isinstance(entry, dict):
+    for lease_file in _lease_paths(path):
+        raw = _read_bytes(lease_file, _MAX_LEASE_BYTES)
+        if not raw:
             continue
-        pid = entry.get("pid")
-        if isinstance(pid, bool) or not isinstance(pid, int) or pid not in hermes_pids:
+        try:
+            data = json.loads(raw)
+        except ValueError:
             continue
-        metadata = entry.get("metadata")
-        live_id = metadata.get("live_session_id") if isinstance(metadata, dict) else None
-        for key in (entry.get("session_id"), live_id):
-            if isinstance(key, str) and key:
-                out.add(key)
+        entries = data.get("entries") if isinstance(data, dict) else None
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            pid = entry.get("pid")
+            if isinstance(pid, bool) or not isinstance(pid, int) or pid not in hermes_pids:
+                continue
+            metadata = entry.get("metadata")
+            live_id = metadata.get("live_session_id") if isinstance(metadata, dict) else None
+            for key in (entry.get("session_id"), live_id):
+                if isinstance(key, str) and key:
+                    out.add(key)
     return frozenset(out)

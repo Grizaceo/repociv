@@ -831,7 +831,12 @@ class ExternalAgentTracker:
             tagged.append(
                 replace(
                     obs,
-                    live=reading.live_for(source=obs.source, native_id=obs.native_id, cwd=obs.cwd),
+                    live=reading.live_for(
+                        source=obs.source,
+                        native_id=obs.native_id,
+                        cwd=obs.cwd,
+                        related_native_ids=obs.related_native_ids,
+                    ),
                 )
             )
         return tagged

@@ -345,10 +345,35 @@ que el turno se haya ejecutado.
 ## Escribirle a una sesión **activa**
 
 El compositor sirve para las sesiones quietas y se habilita en las activas cuando
-su harness expone un canal real: Codex vía la cola del thread, y Claude Code vía
-un **canal proceso-owned** (stream-json). Hermes permanece fail-closed hasta que
-su Bot Chat tenga una superficie pública verificada. Reanudar una sesión viva
-mediante un segundo proceso sigue prohibido.
+su harness expone un canal real: Codex vía la cola del thread (`codex queue`),
+Hermes adoptando sesiones vivas existentes en `hermes serve` (`hermes-serve-ws`)
+o en `tmux` (`hermes-tmux`), y Claude Code vía un **canal proceso-owned**
+(stream-json). Reanudar una sesión viva mediante un segundo proceso sigue
+prohibido.
+
+### Hermes: adopción de sesiones vivas existentes (`hermes-serve-ws` y `hermes-tmux`)
+
+`HermesLiveChatAdapter` (`server/live_session_chat.py`) adopta sesiones Hermes ya
+abiertas sin que RepoCiv las haya lanzado y sin abrir un segundo escritor:
+
+- **`hermes-serve-ws` (Hermes Desktop y Dashboard `/chat`):** cruza `native_id` y
+  `related_native_ids` (cadena de compresión) contra
+  `~/.hermes/[profiles/<perfil>/]runtime/active_sessions.json` para obtener el
+  `pid` dueño y `metadata.live_session_id`. Resuelve el puerto y el token `0600`
+  del mismo usuario OS en `~/.local/state/hermes/gateway-locks/host-desktop-serve.*`
+  o `host-serve.*` (con fallback a `spawn-ledger.json` + `/proc/<pid>/environ`),
+  verificando `pid`, `startTime` y `tokenFingerprint`. Envía JSON-RPC
+  `prompt.submit` (`queued: true`) por loopback a `/api/ws`: `tui_gateway`
+  adjunta el socket en `FanoutTransport` sin desconectar la ventana abierta y, si
+  hay un turno en curso, encola el mensaje sin interrumpirlo.
+- **`hermes-tmux` (`hermes chat` / `hermes --tui` dentro de tmux):** si el `pid`
+  del arriendo corre dentro de un pane de `tmux` existente (por TTY en
+  `/proc/<pid>/fd/0` o árbol `ppid` en `/proc/<pid>/stat` contra `tmux list-panes -a`),
+  envía el texto literal (`tmux send-keys -l -- <texto>`) y `Enter` en llamadas
+  separadas con una pausa de 80 ms para superar la ventana anti-paste de 50 ms
+  (`_RAPID_INPUT_ENTER_WINDOW_S`) de `prompt_toolkit`.
+- Una sesión CLI abierta en una terminal directa fuera de `tmux` y de `hermes serve`
+  permanece `unavailable` (`hermes_not_live_bot_chat`).
 
 ### Claude Code: canal proceso-owned (Fase 5, implementado 2026-09-23)
 

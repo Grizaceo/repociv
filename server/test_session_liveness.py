@@ -130,3 +130,29 @@ def test_lease_rows_that_are_not_rows(tmp_path):
     reading = _probe(tmp_path)
 
     assert reading.hermes_sessions == frozenset({"good"})
+
+
+def test_hermes_named_profile_leases_and_compression_lineage(tmp_path):
+    _proc(tmp_path / "proc", 900, ["hermes", "--profile", "default", "serve"])
+    hermes_home = tmp_path / "hermes"
+    _lease(hermes_home / "runtime" / "active_sessions.json", [
+        {"pid": 900, "session_id": "20261015_root_compressed", "surface": "desktop",
+         "metadata": {"live_session_id": "4a500c22"}},
+    ])
+    _lease(hermes_home / "profiles" / "eidos" / "runtime" / "active_sessions.json", [
+        {"pid": 900, "session_id": "20261015_eidos_session", "surface": "desktop",
+         "metadata": {"live_session_id": "7ab323cc"}},
+    ])
+    reading = sl.probe(
+        str(tmp_path / "proc"),
+        str(hermes_home / "runtime" / "active_sessions.json"),
+    )
+
+    assert reading.live_for(source="hermes", native_id="20261015_eidos_session", cwd="") is True
+    assert reading.live_for(
+        source="hermes",
+        native_id="20261015_tip_child",
+        cwd="",
+        related_native_ids=("20261015_root_compressed", "20261015_tip_child"),
+    ) is True
+
