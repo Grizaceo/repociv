@@ -64,10 +64,6 @@ export function startApprovalPolling() {
   _stopPoll = registerPoll('approvals', () => void _fetchApprovals(), POLL_MS);
 }
 
-export function stopApprovalPolling() {
-  _stopPolling();
-}
-
 // ─── Polling ──────────────────────────────────────────────────────────────────
 function _stopPolling() {
   if (_stopPoll) {

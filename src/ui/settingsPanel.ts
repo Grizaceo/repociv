@@ -12,7 +12,7 @@ function getPanel(): HTMLElement | null {
 }
 
 // ─── Public API (matches priorityPanel.ts pattern) ────────────────────────────
-export function openSettingsPanel() {
+function openSettingsPanel() {
   isOpen = true;
   render();
 }

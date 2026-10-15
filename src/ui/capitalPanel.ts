@@ -101,7 +101,7 @@ export function openCapitalPanel() {
   });
 }
 
-export function closeCapitalPanel() {
+function closeCapitalPanel() {
   if (_panel) _panel.classList.add('hidden');
 }
 

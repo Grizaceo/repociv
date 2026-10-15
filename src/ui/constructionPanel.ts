@@ -65,7 +65,7 @@ export function closeConstructionPanel(): void {
   getPanel()?.classList.add('hidden');
 }
 
-export function openConstructionPanel(): void {
+function openConstructionPanel(): void {
   _rendererRef?.setCityRelocateMode(false);
   if (!isOpen) trackPanelOpen('construction');
   isOpen = true;

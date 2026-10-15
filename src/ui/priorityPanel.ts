@@ -6,13 +6,13 @@ import { sortByPriority, type PrioritizedMission } from '../priorityMatrix.ts';
 
 let _panelEl: HTMLElement | null = null;
 
-export function openPriorityPanel(missions: LocalMission[], onAssign: (missionId: string) => void) {
+function openPriorityPanel(missions: LocalMission[], onAssign: (missionId: string) => void) {
   const container = getOrCreatePanel();
   renderPanel(container, missions, onAssign);
   container.classList.remove('hidden');
 }
 
-export function closePriorityPanel() {
+function closePriorityPanel() {
   _panelEl?.classList.add('hidden');
 }
 

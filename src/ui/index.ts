@@ -5,52 +5,23 @@ export * from './pendingTracker.ts';
 export * from './keyboard.ts';
 export * from './city.ts';
 export { showNotification } from './notificationBanner.ts';
+export { isPriorityPanelOpen, togglePriorityPanel } from './priorityPanel.ts';
+export { closeSettingsPanel, toggleSettingsPanel } from './settingsPanel.ts';
 export {
-  openPriorityPanel,
-  closePriorityPanel,
-  isPriorityPanelOpen,
-  togglePriorityPanel,
-} from './priorityPanel.ts';
-export { openSettingsPanel, closeSettingsPanel, toggleSettingsPanel } from './settingsPanel.ts';
-export {
-  openApprovalPanel,
   closeApprovalPanel,
   isApprovalPanelOpen,
   toggleApprovalPanel,
   startApprovalPolling,
-  stopApprovalPolling,
 } from './approvalPanel.ts';
-export {
-  openHarnessPanel,
-  closeHarnessPanel,
-  isHarnessPanelOpen,
-  toggleHarnessPanel,
-  startHarnessPolling,
-  stopHarnessPolling,
-} from './harnessPanel';
-export { openRecoveryPanel, closeRecoveryPanel, isRecoveryPanelOpen } from './recoveryPanel';
-export { openTaskPanel, closeTaskPanel, isTaskPanelOpen, toggleTaskPanel } from './taskPanel';
-export {
-  openTaskAssignPanel,
-  closeTaskAssignPanel,
-  isTaskAssignPanelOpen,
-  toggleTaskAssignPanel,
-} from './taskAssignPanel.ts';
-export {
-  openPendingPanel,
-  closePendingPanel,
-  isPendingPanelOpen,
-  togglePendingPanel,
-} from './pendingPanel';
-export { openLogPanel, closeLogPanel, isLogPanelOpen, toggleLogPanel } from './logPanel.ts';
-export {
-  openKanbanPanel,
-  closeKanbanPanel,
-  isKanbanPanelOpen,
-  toggleKanbanPanel,
-} from './kanbanPanel.ts';
+export { isHarnessPanelOpen, toggleHarnessPanel, startHarnessPolling } from './harnessPanel';
+export { openRecoveryPanel } from './recoveryPanel';
+export { closeTaskPanel, isTaskPanelOpen, toggleTaskPanel } from './taskPanel';
+export { isTaskAssignPanelOpen, toggleTaskAssignPanel } from './taskAssignPanel.ts';
+export { closePendingPanel, isPendingPanelOpen, togglePendingPanel } from './pendingPanel';
+export { closeLogPanel, isLogPanelOpen, toggleLogPanel } from './logPanel.ts';
+export { closeKanbanPanel, isKanbanPanelOpen, toggleKanbanPanel } from './kanbanPanel.ts';
 
 // Re-export specific initialization helpers
 export { initExternalLibs } from './hud.ts';
-export { openCapitalPanel, closeCapitalPanel } from './capitalPanel.ts';
-export { openWonderVignette, closeWonderVignette } from './wonderVignette.ts';
+export { openCapitalPanel } from './capitalPanel.ts';
+export { openWonderVignette } from './wonderVignette.ts';

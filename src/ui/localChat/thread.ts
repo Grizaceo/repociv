@@ -6,14 +6,6 @@
 import type { LocalUnit } from '../../types.ts';
 import type { ChatMessage } from '../chat/state.ts';
 
-export interface OfficeThread {
-  /** Key into chatHistory — the unit id the bridge keys chat on. */
-  key: string;
-  /** Short label for the feed header. */
-  label: string;
-  messages: ChatMessage[];
-}
-
 /**
  * Chat keys for the office transcript.
  *

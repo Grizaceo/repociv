@@ -52,7 +52,3 @@ export function activeSessionDock(
 export function visibleSessionDock(items: readonly AgentDockItem[]): AgentDockItem[] {
   return items.slice(0, ACTIVE_SESSION_DOCK_LIMIT);
 }
-
-export function sessionDockOverflowCount(items: readonly AgentDockItem[]): number {
-  return Math.max(0, items.length - ACTIVE_SESSION_DOCK_LIMIT);
-}

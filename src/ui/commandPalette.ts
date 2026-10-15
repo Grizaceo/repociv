@@ -182,7 +182,7 @@ function renderList(): void {
   _list.querySelector('.cmdk-item.selected')?.scrollIntoView({ block: 'nearest' });
 }
 
-export function openCommandPalette(): void {
+function openCommandPalette(): void {
   if (!_overlay) build();
   // Remember who had focus (e.g. the chat input) so we can hand it back.
   const active = document.activeElement;
@@ -194,7 +194,7 @@ export function openCommandPalette(): void {
   _input!.focus();
 }
 
-export function closeCommandPalette(): void {
+function closeCommandPalette(): void {
   if (!_overlay || _overlay.classList.contains('hidden')) return;
   _overlay.classList.add('hidden');
   // Restore focus to the opener so keyboard users don't lose their place.

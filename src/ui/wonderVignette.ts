@@ -281,7 +281,7 @@ export async function openWonderVignette(input: WonderType | WonderManifest): Pr
   _mountIframe(body, manifest, type);
 }
 
-export function closeWonderVignette(): void {
+function closeWonderVignette(): void {
   stopWonderListener();
   if (_vignetteRO) {
     _vignetteRO.disconnect();

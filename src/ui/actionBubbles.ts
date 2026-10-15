@@ -89,11 +89,6 @@ export function updateBubble(unit: LocalUnit, screenX: number, screenY: number):
   }
 }
 
-export function hideBubble(unitId: string): void {
-  const entry = pool.get(unitId);
-  if (entry) entry.el.style.opacity = '0';
-}
-
 export function clearAllBubbles(): void {
   pool.forEach(({ el }) => el.remove());
   pool.clear();
