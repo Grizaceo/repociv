@@ -1,3 +1,7 @@
+# ⚠ LEGACY — superado por repociv.service (supervisor: scripts/dev-start.sh).
+# No instalar: apunta a %h/.hermes/workspace/repos/repociv (path inexistente),
+# usa el python del sistema (sin .venv/fastapi) y duplicaría el arranque del
+# bridge. Referencia histórica: ver README.md de este directorio.
 [Unit]
 Description=RepoCiv Bridge Server (Backend API)
 Documentation=file:%h/.hermes/workspace/repos/repociv/deploy/systemd/README.md

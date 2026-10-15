@@ -1,7 +1,7 @@
 [Unit]
 Description=RepoCiv event store backup
-Documentation=file:%h/.hermes/workspace/repos/repociv/deploy/systemd/README.md
+Documentation=file:%h/.hermes/workspace/ACTIVE/repociv/deploy/systemd/README.md
 
 [Service]
 Type=oneshot
-ExecStart=%h/.hermes/workspace/repos/repociv/scripts/repociv-backup.sh
+ExecStart=%h/.hermes/workspace/ACTIVE/repociv/scripts/repociv-backup.sh

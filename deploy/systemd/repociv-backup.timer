@@ -1,6 +1,6 @@
 [Unit]
 Description=RepoCiv backup every 6 hours
-Documentation=file:%h/.hermes/workspace/repos/repociv/deploy/systemd/README.md
+Documentation=file:%h/.hermes/workspace/ACTIVE/repociv/deploy/systemd/README.md
 
 [Timer]
 OnCalendar=*-*-* 00/6:00:00

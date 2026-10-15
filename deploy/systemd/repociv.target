@@ -1,3 +1,6 @@
+# ⚠ LEGACY — superado por repociv.service (supervisor: scripts/dev-start.sh).
+# No instalar: agrupa los units split (bridge + frontend) con paths viejos.
+# Referencia histórica: ver README.md de este directorio.
 [Unit]
 Description=RepoCiv Imperial Console (Bridge + Frontend)
 Documentation=file:%h/.hermes/workspace/repos/repociv/deploy/systemd/README.md

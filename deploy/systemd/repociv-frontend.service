@@ -1,3 +1,6 @@
+# ⚠ LEGACY — superado por repociv.service (supervisor: scripts/dev-start.sh).
+# No instalar: apunta a %h/.hermes/workspace/repos/repociv (path inexistente) y
+# duplicaría Vite. Referencia histórica: ver README.md de este directorio.
 [Unit]
 Description=RepoCiv Frontend (Vite Dev Server)
 Documentation=file:%h/.hermes/workspace/repos/repociv/deploy/systemd/README.md

@@ -1,106 +1,103 @@
 # Systemd User Services for RepoCiv
 
-Servicios systemd para ejecutar RepoCiv de forma permanente en WSL.
+Estado real (2026-10-15): la única unit instalada en esta máquina es
+`repociv.service` (supervisor). Los templates "split" (`repociv-bridge`,
+`repociv-frontend`, `repociv.target`) quedaron **legacy** y `repociv-backup.*`
+es opcional y **no está instalado**. Detalle abajo.
 
-## Arquitectura
+## Canonical — `repociv.service` (supervisor)
 
-- `repociv-bridge.service`: Backend API (Python, puerto 5274)
-- `repociv-frontend.service`: Vite dev server (Node, puerto 5273)
-- `repociv.target`: Target combinado para gestionar ambos servicios juntos
-- `repociv-backup.service` + `repociv-backup.timer`: backup cada 6h de `~/.repociv`
+- Archivo: `~/.config/systemd/user/repociv.service` (enabled; `WantedBy=default.target`,
+  con `linger=yes` para el usuario: arranca al login y sobrevive al logout).
+- Qué corre: `/usr/bin/bash scripts/dev-start.sh` como **supervisor** — escribe el
+  lockfile (`~/.repociv/repociv.lock`), lanza bridge (5274) + Vite (5273), espera el
+  healthcheck, corre el smoke test y monitorea a los hijos.
+- `KillMode=control-group` garantiza que el stop también mata a los hijos;
+  `Restart=on-failure` con `RestartSec=5` y `StartLimitIntervalSec=120/Burst=5`
+  dan margen al arranque del bridge antes de contar CrashLoop.
+- Logs: `~/.repociv/logs/systemd-stdout.log` / `systemd-stderr.log` (append),
+  más `bridge.log` y `vite.log` del supervisor, y `journalctl --user -u repociv`.
+- Drop-in: `~/.config/systemd/user/repociv.service.d/tailscale.conf` agrega
+  `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS` para acceso vía Tailscale.
 
-## Instalación
+> La unit **no está versionada en el repo**: vive en `~/.config/systemd/user/`.
+> Para inspeccionarla o recuperar su contenido exacto:
+> `systemctl --user cat repociv`.
+
+### Operar
 
 ```bash
-# Copiar servicios a ~/.config/systemd/user/
-cp deploy/systemd/*.service ~/.config/systemd/user/
-cp deploy/systemd/*.timer ~/.config/systemd/user/
-cp deploy/systemd/*.target ~/.config/systemd/user/
+systemctl --user status repociv      # estado + árbol de procesos hijos
+systemctl --user restart repociv     # restart correcto con la unit viva
+systemctl --user stop repociv        # detiene supervisor + hijos (control-group)
+journalctl --user -u repociv -f      # logs del supervisor
+```
 
-# Recargar systemd
+⚠ Con la unit activa **no** uses `scripts/dev-stop.sh`: mata los hijos por
+lockfile/puertos y systemd lo lee como fallo (ver el warning en el script).
+
+### Healthcheck
+
+```bash
+curl -sf http://localhost:5274/health   # Bridge
+curl -I  http://localhost:5273/         # Frontend
+```
+
+## Backup (opcional — no instalado)
+
+`repociv-backup.service` + `repociv-backup.timer` respaldan cada 6h
+(`Persistent=true`) `events.jsonl`, `missions.json`, `scheduler-queue.json`,
+`directive_records.jsonl` y `directive_templates.json` en `~/.repociv/backups/`,
+con rotación de 30 días (`scripts/repociv-backup.sh`).
+
+Estado actual: el timer **no está instalado** y `~/.repociv/backups/` no existe
+→ no hay backups corriendo.
+
+```bash
+# Instalar (opcional)
+cp deploy/systemd/repociv-backup.service deploy/systemd/repociv-backup.timer ~/.config/systemd/user/
 systemctl --user daemon-reload
-
-# Habilitar para startup automático
-systemctl --user enable repociv.target
 systemctl --user enable --now repociv-backup.timer
-
-# Iniciar
-systemctl --user start repociv.target
-```
-
-## Comandos útiles
-
-```bash
-# Estado general
-systemctl --user status repociv.target
-
-# Estado individual
-systemctl --user status repociv-bridge.service
-systemctl --user status repociv-frontend.service
-systemctl --user status repociv-backup.timer
 systemctl --user list-timers 'repociv*'
-
-# Detener
-systemctl --user stop repociv.target
-
-# Reiniciar
-systemctl --user restart repociv.target
-
-# Ver logs
-journalctl --user -u repociv-bridge.service -f
-journalctl --user -u repociv-frontend.service -f
-journalctl --user -u repociv-backup.service -n 50 --no-pager
-
-# Deshabilitar startup automático
-systemctl --user disable repociv.target
 ```
+
+## Legacy — split bridge/frontend/target (no instalar)
+
+`repociv-bridge.service`, `repociv-frontend.service` y `repociv.target` son de
+la era WSL y están **superados** por el supervisor `repociv.service`:
+
+- apuntan a `%h/.hermes/workspace/repos/repociv` (path que ya no existe — el repo
+  vive en `.../workspace/ACTIVE/repociv`);
+- corren el bridge con el python del sistema (`/usr/bin/python3`, sin `.venv` y
+  sin `fastapi` instalado);
+- separan bridge y frontend en units independientes, arquitectura que el
+  supervisor reemplazó (lockfile + port cleanup + monitoreo).
+
+Se conservan solo como referencia histórica. No copiar ni instalar: chocarían
+con la unit viva por puertos y lockfile.
 
 ## Troubleshooting
 
 ### Puerto ya en uso
 
-Si el servicio falla con "Address already in use":
+Con la unit viva no hace falta matar PIDs a mano: `dev-start.sh` limpia el
+lockfile anterior y libera 5273/5274/5275 al arrancar. El restart correcto es:
 
 ```bash
-# Bridge (5274)
-lsof -i :5274
-kill -9 <PID>
-
-# Frontend (5273)
-lsof -i :5273
-kill -9 <PID>
-
-# Reiniciar servicio
-systemctl --user restart repociv.target
+systemctl --user restart repociv
 ```
 
-### Permisos de escritura
+Si querés ver quién tiene el puerto:
 
-Si hay errores de "Read-only file system" en ~/.repociv:
-
-1. Verificar que ProtectHome=no esté en los service files
-2. Verificar permisos: `ls -la ~/.repociv`
-3. Corregir: `chmod 755 ~/.repociv`
+```bash
+lsof -i :5274   # bridge
+lsof -i :5273   # vite
+```
 
 ### Logs completos
 
 ```bash
-journalctl --user -u repociv.target --no-pager -n 50
-```
-
-## Persistencia
-
-Los servicios están configurados con:
-- `Restart=on-failure`: Reinicio automático en caso de fallo
-- `RestartSec=5`: Espera 5 segundos entre reintentos
-- Habilitados en el user session: sobreviven a reboot de WSL
-- `repociv-backup.timer`: respalda `events.jsonl`, `missions.json`, `scheduler-queue.json`, `directive_records.jsonl` y `directive_templates.json` en `~/.repociv/backups/`, con rotación de 30 días.
-
-## Healthcheck
-
-Verificar que ambos servicios estén activos:
-
-```bash
-curl http://localhost:5274/health  # Backend
-curl -I http://localhost:5273/     # Frontend
+journalctl --user -u repociv -n 100 --no-pager
+tail -f ~/.repociv/logs/systemd-stdout.log ~/.repociv/logs/systemd-stderr.log
+tail -f ~/.repociv/logs/bridge.log ~/.repociv/logs/vite.log
 ```
