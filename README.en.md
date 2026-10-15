@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/Grizaceo/repociv/actions/workflows/ci.yml/badge.svg)](https://github.com/Grizaceo/repociv/actions)
-[![Status](https://img.shields.io/badge/status-public%20alpha-blue.svg)](docs/ROADMAP.md)
+[![Status](https://img.shields.io/badge/status-public%20alpha-blue.svg)](docs/archive/ROADMAP.md)
 
 > A hexagonal dashboard inspired by Civilization V that visualizes your repos folder as cities on a map, AI agents as units, and background processes as buildings.
 
@@ -22,16 +22,44 @@
 
 ---
 
+## Local View — RimWorld / isometric 2.5D style
+
+Double-clicking a city on the map opens the **local view**: a RimWorld-style isometric office generated procedurally from the repo's real structure.
+
+![Isometric view — full office](docs/design/screenshots/local-isometric-view.jpg)
+
+Each room maps to a folder in the repo. Units (AI agents) walk between workbenches, manager NPCs stand in front of whiteboards, and doors slide as you pass.
+
+![Room detail](docs/design/screenshots/local-isometric-detail.jpg)
+
+### Local view elements
+
+| Element | What it represents |
+|---------|--------------------|
+| **Room** | Repo folder — zone-colored by type (`team_cluster`, `focus`, `break`, `infra`, `meeting`) |
+| **Workbench** (`×`) | File prioritized by the Priority Matrix — hover shows name and score |
+| **Whiteboard** | North wall of each room — click opens a panel with navigable subfolders |
+| **Manager NPC** | Stationary figure in front of the whiteboard — represents the room, clickable for info |
+| **Unit (agent)** | Animated 2.5D prism — walks workbench to workbench while working |
+| **Door** | Divides rooms — slides on enter/exit (parallelogram animation) |
+| **Floor lamp** | `focus` zone — ambient light in the interior NW corner |
+| **Coffee maker** | `break` zone — interior NE corner |
+| **Door plate** | Floating label over each room — hotkey `L` toggles visibility |
+
+**Local view hotkeys:** `F` debug overlay · `L` labels · `Q/W/E` zoom · `1-9` room selection · `ENTER` enter/leave room
+
+---
+
 ## What is this?
 
 RepoCiv turns your repos folder into an interactive map:
 
 - Each **repo** is a **city** on the hexagonal map
-- Each **AI agent** (Claude, Codex, your own LLM) is a **unit** that walks toward workbenches
+- Each **AI agent** (Claude, Codex, your own LLM) is a **unit** that walks toward workbenches in an isometric 2.5D office
 - **Background processes** are buildings inside the city
 - The **HTTP + WebSocket bridge** connects the map in real time with your agent runtime
 
-It is single-user by design: a board for coordinating your own agent ecosystem, running locally on your own repos. Everything runs local on your machine.
+It is single-user by design: a board for coordinating your own agent ecosystem, locally, without cloud.
 
 ---
 
@@ -153,9 +181,13 @@ REPOCIV_MAP_ROOT=~/projects
 ```
 
 - **Macro:** hex map in 2D (default) or 3D WebGL — key `3` or toolbar button toggles `flat` ↔ `webgl`
-- **Local:** double-click a city → interior isometric office view
-  - **Workbenches** are files/folders prioritized by the Priority Matrix
-  - **Units** walk toward workbenches with cached A* (≤300 hexes)
+- **Local:** double-click a city → isometric 2.5D office generated from the repo structure
+  - **Rooms** = folders, zone-colored (`team_cluster` blue, `focus` violet, `break` green, `infra` concrete)
+  - **Workbenches** (`×`) = files prioritized by the Priority Matrix — cached A* (≤300 hexes)
+  - **Whiteboards** = north wall of each room; click → panel with navigable subfolders
+  - **Isometric doors** = sliding panels with correct perspective
+  - **Manager NPCs** = stationary figures in front of whiteboards; click → room info
+  - **Units** = animated 2.5D prisms that walk between workbenches
 - `Esc` exits local view and returns to the macro map
 
 ---
@@ -192,7 +224,23 @@ RepoCiv is also exposed as an **MCP server over stdio** (`server/mcp_server.py`)
 }
 ```
 
-44 tools covering 15 domains with MCP tools: agents, commands, approvals, pending, context, GPU, wonders, graph-relations, foreign-relations and more. See [docs/MCP.md](docs/MCP.md).
+42 tools covering 15 domains with MCP tools: agents, commands, approvals, pending, context, GPU, wonders, graph-relations, foreign-relations and more. See [docs/MCP.md](docs/MCP.md).
+
+> **HUD indicator.** When an MCP client is driving the dashboard, the HUD shows
+> `MCP ●` (green) next to the bridge status; `MCP ○` (dimmed) when there was no
+> MCP activity in the last 60 s. The signal is real: the bridge stamps every
+> request tagged by the MCP server (`X-RepoCiv-Client: mcp`).
+
+**Recipes** (from another Claude Code / Cursor window with the MCP registered):
+
+- **Send work without touching the map:** "List the agents (`agents_list`), pick
+  the shortest-queue one and send it a command (`command_submit`) to run repo X's
+  tests." The result shows up live on the dashboard.
+- **Approval triage:** "Show pending approvals (`approvals_list`) and approve
+  (`approval_approve`) the low-risk ones." `risk=high` commands stay queued until
+  you release them.
+- **Empire health:** "Give me `agents_health` + `gpu_status` + `metrics_snapshot`
+  and summarize which agent is saturated." Mutating tools require `REPOCIV_TOKEN`.
 
 ---
 
@@ -249,7 +297,7 @@ It is useful for auditing long sessions without opening external logs: the "stor
 | Key | Action |
 |-----|--------|
 | `Q` `W` `E` `O` `C` `X` `R` | Spawn MAIN / WORKER / SCOUT / OPENCLAW / CLAUDE / CODEX / CURSOR |
-| `1`–`9` | Select hero by slot |
+| `1`, `4`–`9` | Select session by slot (`2`/`3` are reserved for the view) |
 | `Space` | Cycle to next idle hero |
 | `Tab` | Cycle all heroes |
 | `Enter` | Open/close side panel |
@@ -262,7 +310,7 @@ It is useful for auditing long sessions without opening external logs: the "stor
 | `A` | Pending approvals |
 | `T` | Terminal panel |
 | `N` | News gazette |
-| `3` | Toggle 2D (`flat`) ↔ WebGL (`webgl`) render |
+| `2` / `3` | Toggle 2D (`flat`) ↔ WebGL (`webgl`) render |
 | `F11` | Settings panel |
 | `?` | Keyboard help |
 
@@ -304,7 +352,7 @@ server/
 ├── bridge.py            FastAPI bridge (entry point: python -m server.bridge)
 ├── http_routes.py       All HTTP endpoints
 ├── websocket_handler.py Bidirectional WebSocket
-├── mcp_server.py        MCP stdio server (44 tools)
+├── mcp_server.py        MCP stdio server (42 tools)
 ├── agent_runner.py      Runs agents (Hermes, Claude, Codex, OpenRouter…)
 ├── process_scanner.py   Detects processes → automatic spawns
 ├── task_orchestrator.py Priority task queue
@@ -347,7 +395,7 @@ python3 -m pytest server/ -q
 |-----|----------|
 | [docs/SCOPE.md](docs/SCOPE.md) | What the project is and isn't |
 | [docs/API.md](docs/API.md) | Full endpoint reference |
-| [docs/MCP.md](docs/MCP.md) | MCP server — 44 tools, examples |
+| [docs/MCP.md](docs/MCP.md) | MCP server — 42 tools, examples |
 | [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | Step-by-step tutorial |
 | [docs/REMOTE_ACCESS.md](docs/REMOTE_ACCESS.md) | Remote access via Tailscale |
 | [docs/EVOLUTION.md](docs/EVOLUTION.md) | Project history |
