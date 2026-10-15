@@ -125,6 +125,10 @@ async function seedRepoSelection(page: Page) {
     // strip over the top bar that intercepts pointer events (measured in
     // CI run 38674628310). Dismiss it for the session so HUD clicks land.
     sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
+    // Flat macro renderer: these specs drive the chat/HUD panels, and the
+    // webgl default only adds SwiftShader load on the CI runner (measured:
+    // the page stopped answering keyboard events under that load).
+    window.localStorage.setItem('repociv:renderer', 'flat');
   }, paths);
 }
 
