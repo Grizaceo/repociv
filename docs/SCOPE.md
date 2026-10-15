@@ -197,3 +197,7 @@ superficie de mantenimiento a lo que efectivamente se usa.
   problema no es el código, es que el SCOPE necesita revisión honesta.
 - ¿Acabo de usar RepoCiv y encontré fricción o valor? → registrar en
   `docs/DOGFOODING_NOTES.md`. El aprendizaje de uso real alimenta este SCOPE.
+- **Único documento vigente de alcance y pendientes:** este `docs/SCOPE.md` (junto
+  con `docs/DOGFOODING_NOTES.md` para observaciones de uso). Los documentos
+  históricos (`TODOS-2026-05.md`, `ROADMAP.md`, `ROADMAP_IMPERIAL_WORKSHOP.md`,
+  `PENDING_WORK.md`) están archivados en `docs/archive/`.
