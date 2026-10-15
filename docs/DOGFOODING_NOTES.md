@@ -73,3 +73,22 @@
   MAIN sin cambios (arquitectural). Sin acción tomada — prioridad baja; quedan
   registradas aquí hasta que se decida el pruning de paneles (UX_IMPROVEMENT_PLAN /
   Task C2 del plan vigente).
+
+## Update 2026-10-15 (Fase 3 — Latencia del chat MAIN)
+
+- **Medición antes:** `CommandStarted` → `CommandCompleted` para `"hola"` en `MAIN`
+  sobre `capital`: **37.45 s** hoy (51.97 s–89.05 s en `events.jsonl` histórico; ~55 s en
+  la sesión del 2026-09-13).
+- **Causas raíz identificadas en `server/agent_runner.py`:**
+  1. `resolve_agent_working_dir("capital")` devolvía `None` (la capital es el propio
+     checkout de RepoCiv y no figura en `selectedRepoPaths`), por lo que
+     `_spatial_context_block` inyectaba `"NO resuelta: no existe .../capital"` y forzaba
+     al agente a ejecutar tool calls (`ls`) antes de responder un saludo.
+  2. `_run_hermes_streaming` anteponía `cd {working_dir}\n\n` al texto del usuario incluso
+     en mensajes cortos conversacionales (pese a enviar ya `working_directory` en el JSON),
+     disparando un turno adicional de tool-calling, y omitía `X-Hermes-Session-Key` +
+     `model_options: {"reasoning_effort": "low"}` para chats rápidos, además de un
+     `time.sleep(0.04)` artificial por cada 40 caracteres.
+- **Medición después:** `CommandStarted` → `CommandCompleted` para `"hola"` en `MAIN`
+  sobre `capital`: **9.99 s** (−73.3 % frente al baseline de 37.45 s; −81.8 % frente a
+  los 55 s de dogfooding), manteniendo el mismo scheduler y ruta de ejecución.

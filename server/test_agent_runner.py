@@ -54,8 +54,18 @@ def test_run_hermes_streaming_sends_working_directory(monkeypatch, tmp_path):
     assert f'"working_directory": "{tmp_path}"'.encode() in captured["payload"]
     assert captured["headers"].get("X-hermes-session-id") == "repociv-main-carcosa" or \
         captured["headers"].get("X-Hermes-Session-Id") == "repociv-main-carcosa"
+    assert captured["headers"].get("X-hermes-session-key") == "repociv-main-carcosa" or \
+        captured["headers"].get("X-Hermes-Session-Key") == "repociv-main-carcosa"
+    body = json.loads(captured["payload"].decode())
+    assert body.get("model_options") == {"reasoning_effort": "low"}
+    assert body["messages"][1]["content"] == "hola"
     assert sent[-1] == {"type": "chat_chunk", "unit": "MAIN", "missionId": "m1", "text": "ok"}
     assert recorded[-1] == ("m1", "MAIN", "ok")
+
+
+def test_resolve_agent_working_dir_maps_capital_to_repociv_root():
+    resolved = agent_runner.resolve_agent_working_dir("capital")
+    assert resolved and resolved.endswith("repociv")
 
 
 def test_run_hermes_streaming_sends_provider_and_model(monkeypatch):

@@ -305,6 +305,8 @@ def _path_is_within(path: str, root: str) -> bool:
 def resolve_agent_working_dir(city_id: str, repo_path: str = "") -> str | None:
     if not repo_path and city_id.lower() == "main":
         return None
+    if not repo_path and city_id.lower() == "capital":
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return _rrs.resolve_selected_repo(city_id, repo_path)
 
 
@@ -343,7 +345,7 @@ def _build_stateful_session_id(
 def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
     """Facts about which repo/city this mission targets — models must not invent a fixed home repo."""
     root = _repos_root()
-    expected = os.path.join(root, city_id)
+    expected = working_dir or os.path.join(root, city_id)
     if working_dir:
         path_line = f"- **Ruta de trabajo (cwd del adaptador):** `{working_dir}`"
     else:
@@ -351,8 +353,6 @@ def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
             f"- **Ruta de trabajo:** NO resuelta: no existe `{expected}`. "
             "Alinea el nombre de la carpeta con `city_id` o crea el clone ahi."
         )
-    # El CWD lo fija el `cd {working_dir}` que _run_hermes_streaming inyecta como
-    # primera linea del user message. Aqui solo damos contexto, no instrucciones.
     return (
         "\n\n## Contexto espacial RepoCiv (fuente de verdad)\n"
         f"- **Ciudad / target (`city_id`):** `{city_id}`\n"
@@ -1331,13 +1331,29 @@ def _run_codex_streaming(unit_id: str, mission_id: str, mission: str,
     return True, output
 
 
+_QUICK_CHAT_MAX_CHARS = 80
+_ACTION_VERBS_RE = re.compile(
+    r"\b(revisa|lee|edita|crea|borra|corre|ejecuta|busca|analiza|audita|arregla|fix|run|read|edit|write|test|commit|git|ls|grep)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_quick_chat_message(mission: str) -> bool:
+    text = (mission or "").strip()
+    if not text or len(text) > _QUICK_CHAT_MAX_CHARS or "\n" in text:
+        return False
+    if "/" in text or "`" in text or _ACTION_VERBS_RE.search(text):
+        return False
+    return True
+
+
 def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
                            config: dict[str, Any] | None = None,
                            working_dir: str | None = None,
                            city_id: str = "",
                            model: str = "",
                            provider: str = "") -> tuple[bool, str]:
-    HERMES_URL   = os.environ.get("HERMES_URL",   "http://localhost:8642/v1/chat/completions")
+    HERMES_URL   = os.environ.get("HERMES_URL",   "http://localhost:8742/v1/chat/completions")
     HERMES_KEY   = os.environ.get("HERMES_KEY", "")
     # Priority: explicit payload → per-unit /model/override → env default.
     # Hermes gateway ignores bare `model` unless `provider` is also set (or
@@ -1363,15 +1379,16 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
         unit_id, city_id, mission_id, stateful=cfg.get("stateful", True),
     )
 
+    quick_chat = _is_quick_chat_message(mission)
     spatial = _spatial_context_block(city_id, working_dir)
     system_content = cfg.get("system", "Eres un agente util.") + spatial
-    # CWD fix: el gateway de Hermes usa TERMINAL_CWD global (no per-request),
-    # asi que prefijamos la mision con `cd {working_dir}` para que cualquier
-    # tool-call subsiguiente arranque en el repo correcto. Issue de upstream:
-    # agregar working_directory per-request al gateway requiere tocar ~10500
-    # LOC en gateway/run.py + arriesgar otras plataformas (WhatsApp/QQ/WeCom).
+    if quick_chat:
+        system_content += (
+            "\nRespuesta rápida de chat: responde de forma directa y breve sin invocar "
+            "herramientas salvo que el usuario lo pida explícitamente."
+        )
     user_content: str
-    if working_dir:
+    if working_dir and not quick_chat:
         user_content = f"cd {working_dir}\n\n{mission}"
     else:
         user_content = mission
@@ -1382,8 +1399,10 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
             {"role": "user", "content": user_content},
         ],
         "stream": False,
-        "max_tokens": 4096,
+        "max_tokens": 1024 if quick_chat else 4096,
     }
+    if quick_chat:
+        payload["model_options"] = {"reasoning_effort": "low"}
     # Hermes gateway ignores bare `model` unless `provider` is also set (or
     # direct_model_requests is enabled upstream). Pair them when selected.
     if eff_provider:
@@ -1395,6 +1414,7 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
         headers = {
             "Content-Type": "application/json",
             "X-Hermes-Session-Id": session_id,
+            "X-Hermes-Session-Key": session_id,
         }
         if HERMES_KEY:
             headers["Authorization"] = f"Bearer {HERMES_KEY}"
@@ -1419,7 +1439,6 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
             chunk = content[i:i + 40]
             send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": chunk})
             _es.record_output_chunk(mission_id, unit_id, chunk)
-            time.sleep(0.04)
         return True, content
     except Exception as e:
         err = str(e)
