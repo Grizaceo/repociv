@@ -1,0 +1,5 @@
+[Service]
+# Vite allowed hosts vía Tailscale: reemplazá <tu-host> por el hostname exacto
+# de tu tailnet (`tailscale status`) y guardá este archivo como tailscale.conf
+# en repociv.service.d/. Solo el hostname exacto; Vite sigue en loopback.
+Environment=__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=<tu-host>.ts.net

@@ -21,6 +21,16 @@
 | [`archive/PHASE_1_VERIFICATION.md`](archive/PHASE_1_VERIFICATION.md) | Audit detallada de los Gates de Fase 1 (histórico, archivado) |
 | [`AUDIT_DELTA_ADDENDUM.md`](AUDIT_DELTA_ADDENDUM.md) | Patrones avanzados (eBPF, Landlock, P2P mesh) — explícitamente bloqueados por SCOPE hasta el dogfooding |
 
+## Guías y referencia
+
+| Documento | Para qué |
+|---|---|
+| [`GETTING_STARTED.md`](GETTING_STARTED.md) | Tutorial paso a paso |
+| [`API.md`](API.md) | Referencia completa de endpoints |
+| [`MCP.md`](MCP.md) | MCP server — 42 tools, ejemplos |
+| [`HARNESS_HOOKS.md`](HARNESS_HOOKS.md) | Hooks de posición: tu CLI como unidad en el mapa |
+| [`REMOTE_ACCESS.md`](REMOTE_ACCESS.md) | Acceso remoto via Tailscale |
+
 ## Snapshots (no editar después de creados)
 
 | Documento | Para qué |
