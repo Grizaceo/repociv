@@ -183,7 +183,7 @@ async function openChat(page: Page) {
  *  can keep Playwright's element-stability check waiting far past any useful
  *  budget (measured on the 2026-10-14 CI-shaped runs); a screenshot must never
  *  fail the functional test, so fall back to the viewport shot. */
-async function shotPanel(page: Page, path: string): Promise<void> {
+async function shot(page: Page, selector: string, path: string): Promise<void> {
   try {
     await page.locator(selector).screenshot({ path, timeout: 5_000 });
   } catch {
