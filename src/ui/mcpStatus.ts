@@ -16,7 +16,7 @@ interface HealthMcp {
  * MCP connectivity indicator (plan C2). "Connected" means the bridge saw a
  * request from the stdio MCP server within its liveness window — i.e. an
  * external client (Claude/Cursor/Codex) is currently driving RepoCiv through
- * the 43 MCP tools. Lives here (not hud.ts) so the poller stays free of hud.ts's
+ * the 42 MCP tools. Lives here (not hud.ts) so the poller stays free of hud.ts's
  * top-level `window` access and is testable in the node test environment.
  */
 export function setMcpStatus(connected: boolean, lastSeen?: number): void {
@@ -30,7 +30,7 @@ export function setMcpStatus(connected: boolean, lastSeen?: number): void {
       typeof lastSeen === 'number' && lastSeen > 0
         ? ` · actividad hace ${Math.max(0, Math.round(Date.now() / 1000 - lastSeen))}s`
         : '';
-    el.title = `MCP conectado — un cliente externo (Claude/Cursor/Codex) opera RepoCiv vía las 43 tools del servidor MCP${ago}.\nRecetas: docs/MCP.md`;
+    el.title = `MCP conectado — un cliente externo (Claude/Cursor/Codex) opera RepoCiv vía las 42 tools del servidor MCP${ago}.\nRecetas: docs/MCP.md`;
   } else {
     el.title =
       'MCP inactivo — ningún cliente MCP en los últimos 60s.\nConéctate desde Claude/Cursor/Codex: ver docs/MCP.md';
