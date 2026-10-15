@@ -437,7 +437,7 @@ def get_default_harness(_ctx: "RouteContext") -> tuple[int, Any]:
 def post_default_harness(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
     """POST /api/config/default-harness — persist the user's harness choice.
 
-    Body: { "harness": "hermes" | "claude" | "codex" | "cursor" | "openclaw" }
+    Body: { "harness": "hermes" | "claude" | "codex" | "cursor" | "openclaw" | "opencode" }
     Response 200: { "harness": "<normalized>" }
     Response 400: { "error": "<reason>" }
     """
@@ -590,7 +590,8 @@ def get_harness_profiles(ctx: "RouteContext") -> tuple[int, Any]:
 
     For hermes: subdirs of ~/.hermes/profiles/ (main, lexo-alpha, ...) — the
     same profiles the Hermes app shows in its own profile selector. For
-    codex/openclaw: best-effort via list_harness_options.
+    codex/openclaw: best-effort via list_harness_options. Claude, Cursor and
+    OpenCode have no native profile list (empty).
 
     Response 200:
         {"profiles": [str, ...], "harness": str}

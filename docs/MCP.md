@@ -122,7 +122,7 @@ curl "http://127.0.0.1:5274/api/foreign/repo-profile?repoPath=/path/to/workspace
 |------|-------------|
 | `providers_list` | Proveedores configurados + config de chat |
 | `providers_live` | Alcanzabilidad en vivo de cada modelo |
-| `harnesses_list` | 7 harnesses (incluye `claude-code-local`, `codex-local`) |
+| `harnesses_list` | 9 harnesses (incluye `claude-code-local`, `codex-local`, `opencode-local`) |
 | `harness_recovery(harness_id, ...)` | **[MUTATES]** Plan de recovery para harness caído |
 
 ### Tasks P3 `[MUTATES parcial]`

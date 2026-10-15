@@ -271,14 +271,14 @@ def providers_live() -> Any:
     return _get("/providers/live")
 
 
-@mcp.tool(description="Lista harnesses disponibles incluyendo claude-code-local y codex-local (7 total en alpha).")
+@mcp.tool(description="Lista harnesses disponibles incluyendo claude-code-local, codex-local y opencode-local (9 total en alpha).")
 def harnesses_list() -> Any:
     return _get("/harnesses")
 
 
 @mcp.tool(description=(
     "[MUTATES] Genera un plan de recovery para un harness caído. "
-    "harness_id: hermes-local|claude-code-local|codex-local|openclaw-local|docker-agent|lexo-local|hermes-remote. "
+    "harness_id: hermes-local|claude-code-local|codex-local|openclaw-local|opencode-local|docker-agent|lexo-local|hermes-remote. "
     "command_type: uno de los CommandType válidos."
 ))
 def harness_recovery(

@@ -127,6 +127,7 @@ def default_agent_runtime(unit_id: str) -> RuntimeAdapter:
     base = unit_id.split("-")[0].upper()
     harness_id = (
         "openclaw-local" if base == "OPENCLAW"
+        else "opencode-local" if base == "OPENCODE"
         else "claude-code-local" if base == "CLAUDE"
         else "codex-local" if base == "CODEX"
         else "cursor-local" if base == "CURSOR"

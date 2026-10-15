@@ -39,6 +39,123 @@ MCODE_PLUGIN_MANIFEST = (
     + "\n"
 )
 
+# The whole file is ours, so removal may delete it: the marker is what proves
+# ownership, never the path alone.
+OPENCODE_PLUGIN_MARKER = "repociv-hooks: managed by RepoCiv"
+
+
+def opencode_plugin_js(repo: Path, python: str) -> str:
+    """The opencode v2 global plugin: native hooks -> agent_hook_client.py.
+
+    Opencode discovers ``~/.config/opencode/plugins/*.js`` by itself (no
+    config edit), and the client keeps the single validated/private delivery
+    path shared with the other CLIs. Only session id, cwd and the concrete
+    tool path/command leave the hook; prompts and results never do.
+    """
+    config = json.dumps({"python": python, "client": str(repo / "server/agent_hook_client.py")})
+    return f"""// {OPENCODE_PLUGIN_MARKER} — server/agent_hook_install.py
+// Remove safely with: python -m server.agent_hook_install remove
+import {{ spawn }} from "node:child_process";
+
+const REPOCIV = {config};
+const seenSessions = new Set();
+const sessionDirs = new Map();
+
+function emit(event, payload) {{
+  try {{
+    const child = spawn(REPOCIV.python, [REPOCIV.client, "opencode", event], {{
+      stdio: ["pipe", "ignore", "ignore"],
+      detached: true,
+    }});
+    child.on("error", () => {{}});
+    if (child.stdin) {{
+      child.stdin.on("error", () => {{}});
+      child.stdin.end(JSON.stringify(payload));
+    }}
+    child.unref();
+  }} catch {{
+    // Telemetry must never break the agent.
+  }}
+}}
+
+function toolInput(input) {{
+  if (!input || typeof input !== "object") return undefined;
+  const picked = {{}};
+  for (const key of ["filePath", "file_path", "path", "workdir", "command"]) {{
+    const value = input[key];
+    if (typeof value === "string" && value) picked[key] = value;
+  }}
+  return Object.keys(picked).length ? picked : undefined;
+}}
+
+function directoryOf(value) {{
+  const dir = value && value.location && value.location.directory;
+  return typeof dir === "string" ? dir : "";
+}}
+
+export default {{
+  id: "repociv-hooks",
+  async setup(ctx) {{
+    const fallbackDir = directoryOf(ctx);
+
+    function emitFor(sessionID, event, extra) {{
+      if (typeof sessionID !== "string" || !sessionID) return;
+      const cwd = sessionDirs.get(sessionID) || fallbackDir;
+      if (!cwd) return;
+      emit(event, {{ session_id: sessionID, cwd, ...(extra || {{}}) }});
+    }}
+
+    try {{
+      ctx.session.hook("prompt", (event) => {{
+        const sessionID = event && event.sessionID;
+        if (typeof sessionID !== "string" || !sessionID) return;
+        if (fallbackDir) sessionDirs.set(sessionID, fallbackDir);
+        if (!seenSessions.has(sessionID)) {{
+          seenSessions.add(sessionID);
+          emitFor(sessionID, "session_start");
+        }}
+        emitFor(sessionID, "turn_start");
+      }});
+    }} catch {{}}
+
+    try {{
+      ctx.tool.hook("execute.before", (event) => {{
+        const sessionID = event && event.sessionID;
+        if (typeof sessionID !== "string" || !sessionID) return;
+        const picked = toolInput(event.input);
+        emitFor(sessionID, "tool_use", picked ? {{ tool_input: picked }} : undefined);
+      }});
+    }} catch {{}}
+
+    try {{
+      const controller = new AbortController();
+      void (async () => {{
+        try {{
+          for await (const event of ctx.event.subscribe({{ signal: controller.signal }})) {{
+            const type = event && event.type;
+            const data = event && event.data;
+            const sessionID = data && data.sessionID;
+            if (typeof sessionID !== "string" || !sessionID) continue;
+            const dir = directoryOf(event);
+            if (dir) sessionDirs.set(sessionID, dir);
+            if (type === "session.execution.succeeded" || type === "session.execution.failed") {{
+              emitFor(sessionID, "turn_end");
+            }} else if (type === "session.deleted") {{
+              emitFor(sessionID, "session_end");
+              sessionDirs.delete(sessionID);
+              seenSessions.delete(sessionID);
+            }}
+          }}
+        }} catch {{}}
+      }})();
+      return () => controller.abort();
+    }} catch {{
+      return undefined;
+    }}
+  }},
+}};
+"""
+
 
 def commands(repo: Path, python: str) -> dict[str, dict[str, str]]:
     prefix = f"{shlex.quote(python)} {shlex.quote(str(repo / 'server/agent_hook_client.py'))}"
@@ -192,6 +309,24 @@ def install(home: Path, repo: Path, python: str, *, remove=False) -> dict:
                     before_m = manifest_path.read_text()
                     if before_m == MCODE_PLUGIN_MANIFEST:
                         updates.append((manifest_path, before_m, None, 0o600))
+
+    opencode_dir = home / ".config/opencode"
+    opencode_plugin_path = opencode_dir / "plugins" / "repociv-hooks.js"
+    if not remove:
+        if opencode_dir.is_dir():
+            before_p = opencode_plugin_path.read_text() if opencode_plugin_path.exists() else None
+            after_p = opencode_plugin_js(repo, python)
+            if after_p != before_p:
+                mode_p = (
+                    opencode_plugin_path.stat().st_mode & 0o777
+                    if opencode_plugin_path.exists()
+                    else 0o600
+                )
+                updates.append((opencode_plugin_path, before_p, after_p, mode_p))
+    elif opencode_plugin_path.exists():
+        before_p = opencode_plugin_path.read_text()
+        if OPENCODE_PLUGIN_MARKER in before_p:
+            updates.append((opencode_plugin_path, before_p, None, 0o600))
 
     backup = home / ".config/repociv/hooks/backups" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     if updates:

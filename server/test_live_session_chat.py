@@ -1,6 +1,7 @@
 """Live-session chat contract and harness adapters."""
 from __future__ import annotations
 
+import json
 import subprocess
 
 from server.live_session_chat import (
@@ -10,6 +11,7 @@ from server.live_session_chat import (
     CodexLiveChatAdapter,
     HermesLiveChatAdapter,
     LiveSessionChatRouter,
+    OpenCodeLiveChatAdapter,
 )
 from server.suvadu_tracker import ExternalAgentTracker, Observation, TrackerConfig
 
@@ -555,3 +557,117 @@ def test_ws_prompt_submit_handshake_and_rpc_over_loopback() -> None:
         }
     ]
 
+def test_opencode_adapter_requires_live_open_sessions_and_a_binary() -> None:
+    adapter = OpenCodeLiveChatAdapter(opencode_bin="/bin/opencode")
+    live = _obs(agent="opencode", source="opencode", native_id="ses_live0001")
+
+    assert adapter.capability(live).to_dict() == {
+        "state": "available",
+        "transport": "opencode-api",
+        "reason": None,
+    }
+    # Quiet session: nothing to steer.
+    assert adapter.capability(_obs(agent="opencode", source="opencode", live=False)).to_dict() == {
+        "state": "unavailable",
+        "transport": None,
+        "reason": "opencode_live_chat_unavailable",
+    }
+    # Another source's session never rides this transport.
+    assert adapter.capability(_obs(agent="opencode", live=True)).to_dict() == {
+        "state": "unavailable",
+        "transport": None,
+        "reason": "unsupported_session_source",
+    }
+    # No binary resolved → fail closed.
+    assert OpenCodeLiveChatAdapter(opencode_bin="").capability(live).to_dict() == {
+        "state": "unavailable",
+        "transport": None,
+        "reason": "opencode_live_chat_unavailable",
+    }
+
+
+def test_opencode_adapter_sends_the_prompt_through_the_local_service() -> None:
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return subprocess.CompletedProcess(argv, 0, '{"data":{"delivery":"steer"}}', "")
+
+    adapter = OpenCodeLiveChatAdapter(opencode_bin="/bin/opencode", run=run)
+    result = adapter.send(
+        _obs(agent="opencode", source="opencode", native_id="ses_live0001"),
+        "seguí con el fix",
+        "request-1",
+    )
+
+    assert result.to_dict() == {
+        "state": "accepted",
+        "transport": "opencode-api",
+        "requestId": "request-1",
+    }
+    argv, kwargs = calls[0]
+    assert argv[:4] == [
+        "/bin/opencode",
+        "api",
+        "post",
+        "/api/session/ses_live0001/prompt",
+    ]
+    assert argv[4] == "--data"
+    assert json.loads(argv[5]) == {"text": "seguí con el fix"}
+    assert kwargs == {"capture_output": True, "text": True, "timeout": adapter.timeout_s}
+
+
+def test_opencode_adapter_reads_the_body_not_just_the_exit_code() -> None:
+    # The CLI exits 0 even on HTTP errors; the stdout body is the contract.
+    def body(stdout, stderr="", returncode=0):
+        def run(argv, **kwargs):
+            return subprocess.CompletedProcess(argv, returncode, stdout, stderr)
+
+        return OpenCodeLiveChatAdapter(opencode_bin="/bin/opencode", run=run)
+
+    session = _obs(agent="opencode", source="opencode", native_id="ses_live0001")
+    cases = [
+        (
+            body('{"_tag":"SessionNotFoundError","message":"nope"}', "HTTP 404 Not Found", 1),
+            404,
+            "session_not_found",
+        ),
+        (body('{"_tag":"ConflictError"}', "HTTP 409 Conflict", 0), 409, "session_not_live"),
+        (body("not json at all", "", 0), 502, "transport_failed"),
+        (body("", "", 0), 502, "transport_failed"),
+    ]
+    for adapter, status, code in cases:
+        try:
+            adapter.send(session, "hola", "request-x")
+        except ChatError as exc:
+            assert (exc.status, exc.code) == (status, code)
+        else:
+            raise AssertionError("expected ChatError")
+
+
+def test_opencode_reply_never_interpolates_a_shell_or_bad_session_id() -> None:
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, '{"data":{}}', "")
+
+    adapter = OpenCodeLiveChatAdapter(opencode_bin="/bin/opencode", run=run)
+    bad = _obs(
+        agent="opencode",
+        source="opencode",
+        native_id="ses_bad; rm -rf /",
+    )
+    # Capability refuses ids the path builder would have to escape.
+    assert adapter.capability(bad).to_dict() == {
+        "state": "unavailable",
+        "transport": None,
+        "reason": "opencode_live_chat_unavailable",
+    }
+    try:
+        adapter.send(bad, "hola", "request-x")
+    except ChatError as exc:
+        assert (exc.status, exc.code) == (501, "transport_unavailable")
+    else:
+        raise AssertionError("expected ChatError")
+    assert calls == []

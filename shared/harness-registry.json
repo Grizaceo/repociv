@@ -56,6 +56,28 @@
       }
     },
     {
+      "id": "opencode-local",
+      "label": "OpenCode Local",
+      "kind": "agent_runtime",
+      "trust_level": "local_cli",
+      "transport": "cli",
+      "health": {
+        "kind": "command",
+        "command": "opencode --version",
+        "status": "unknown"
+      },
+      "recovery_modes": ["copy_command", "tmux_attach"],
+      "allowed_actions": ["inspect_repo", "read_file", "run_tests", "run_build", "edit_file", "create_branch", "git_commit", "execute_agent"],
+      "blocked_actions": ["send_message", "delete_file"],
+      "recovery": {
+        "copy_command": {
+          "cwd": "~/.hermes/workspace/repos",
+          "command": "opencode",
+          "notes": ["Opens the OpenCode TUI in the current project directory"]
+        }
+      }
+    },
+    {
       "id": "claude-code-local",
       "label": "Claude Code Local",
       "kind": "agent_runtime",

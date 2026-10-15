@@ -45,6 +45,7 @@ const harnessNames: Record<string, string> = {
   codex: 'Codex',
   cursor: 'Cursor',
   openclaw: 'OpenClaw',
+  opencode: 'OpenCode',
   aider: 'Aider',
 };
 function commandOf(e: ActivityEvent): string {

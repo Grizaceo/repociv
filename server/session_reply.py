@@ -39,6 +39,7 @@ from server._env_filter import redact_env_for_spawn
 _CLAUDE_FLAGS = ["--print", "--dangerously-skip-permissions"]
 _CODEX_FLAGS = ["--dangerously-bypass-approvals-and-sandbox"]
 _HERMES_FLAGS = ["-Q", "--source", "tool"]
+_OPENCODE_FLAGS = ["--auto"]
 
 
 _TIMEOUT_S = 600.0
@@ -97,6 +98,15 @@ def build(
         argv += [native_id, message]
         return {"argv": argv, "cwd": cwd, "env": {}, "family": family}
 
+    if family == "opencode":
+        # One headless turn over the session's own thread via the shared
+        # service; the session resolves against the directory it was run in.
+        argv = ["opencode", "run", "--session", native_id, *_OPENCODE_FLAGS]
+        if model:
+            argv += ["-m", model]
+        argv.append(message)
+        return {"argv": argv, "cwd": cwd, "env": {}, "family": family}
+
     # Hermes restores the session's own working directory, so the spawn does not
     # set one; HERMES_HOME is what points the CLI at the right profile.
     argv = ["hermes", "chat", "-q", message, *_HERMES_FLAGS, "--resume", native_id]
@@ -115,6 +125,7 @@ def _binary(family: str) -> str | None:
         "claude": agent_runner._find_claude_code,
         "codex": agent_runner._find_codex,
         "hermes": agent_runner._find_hermes_cli,
+        "opencode": agent_runner._find_opencode,
     }.get(family)
     return finder() if finder else None
 

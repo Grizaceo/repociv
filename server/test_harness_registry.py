@@ -19,11 +19,12 @@ def reset():
 
 def test_list_harnesses_returns_eight():
     all_h = list_harnesses()
-    assert len(all_h) == 8
+    assert len(all_h) == 9
     ids = sorted(h["id"] for h in all_h)
     assert ids == sorted([
         "hermes-local",
         "openclaw-local",
+        "opencode-local",
         "claude-code-local",
         "codex-local",
         "cursor-local",

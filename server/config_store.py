@@ -39,7 +39,7 @@ _CONFIG_FILENAME = "config.json"
 # accepts these as harness values — adding a new harness is a code
 # change, not a config change.
 _VALID_HARNESSES: frozenset[str] = frozenset({
-    "hermes", "claude", "codex", "cursor", "openclaw",
+    "hermes", "claude", "codex", "cursor", "openclaw", "opencode",
 })
 
 # Optional fields accepted in a profile. Validation is permissive —
@@ -237,6 +237,7 @@ def _default_profiles() -> dict[str, dict[str, Any]]:
         "codex": {"harness": "codex", "harness_ref": "default", "slot_order": 2},
         "cursor": {"harness": "cursor", "harness_ref": "default", "slot_order": 3},
         "openclaw": {"harness": "openclaw", "harness_ref": "default", "slot_order": 4},
+        "opencode": {"harness": "opencode", "harness_ref": "default", "slot_order": 5},
     }
 
 

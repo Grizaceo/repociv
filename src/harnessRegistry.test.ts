@@ -12,7 +12,7 @@ describe('harnessRegistry', () => {
 
   it('listHarnesses returns all seeded harnesses', () => {
     const all = listHarnesses();
-    expect(all).toHaveLength(8);
+    expect(all).toHaveLength(9);
     const ids = all.map((h) => h.id).sort();
     expect(ids).toEqual([
       'claude-code-local',
@@ -22,6 +22,7 @@ describe('harnessRegistry', () => {
       'local-cli',
       'nemoclaw-sandbox',
       'openclaw-local',
+      'opencode-local',
       'reference-only',
     ]);
   });
@@ -116,7 +117,7 @@ describe('harnessRegistry', () => {
   });
 
   it('hermes-local and openclaw-local have cli transport', () => {
-    for (const id of ['hermes-local', 'openclaw-local']) {
+    for (const id of ['hermes-local', 'openclaw-local', 'opencode-local']) {
       const h = getHarness(id)!;
       expect(h.transport).toBe('cli');
       expect(h.health.kind).toBeDefined();

@@ -8,7 +8,8 @@ copy-command instead of acting.
 Three answers, and which one you get is the whole point:
 
   * ``resume`` — nothing is holding the session, so it can be picked up:
-    ``claude --resume``, ``codex resume`` or ``hermes chat --resume``.
+    ``claude --resume``, ``codex resume``, ``hermes chat --resume`` or
+    ``opencode --session``.
   * ``attached`` — a process still holds it (``server/session_liveness.py``).
     Resuming would open a second turn over the same state, which is exactly
     what Hermes' lease registry exists to prevent, so no command is offered.
@@ -16,9 +17,9 @@ Three answers, and which one you get is the whole point:
     spell, or the session predates the id we would need.
 
 The command carries the session's ``cwd``, which polls deliberately never
-broadcast: ``claude`` and ``codex`` find a session only from its own project
-directory. It is the same on-demand exception the chat endpoint already makes,
-and it happens only when the user asks for this one session.
+broadcast: ``claude``, ``codex`` and ``opencode`` find a session only from its
+own project directory. It is the same on-demand exception the chat endpoint
+already makes, and it happens only when the user asks for this one session.
 """
 
 from __future__ import annotations
@@ -28,15 +29,16 @@ import shlex
 from typing import Any
 
 # What each agent's CLI calls "pick that conversation back up". Hermes restores
-# the session's own working directory (hence no cd); the other two resolve a
+# the session's own working directory (hence no cd); the others resolve a
 # session against the directory they are started in, so the cd is load-bearing.
 _CLAUDE = "claude"
 _CODEX = "codex"
 _HERMES = "hermes"
+_OPENCODE = "opencode"
 
 
 def agent_family(agent: str) -> str:
-    """`claude-code`, `openai-codex`, `hermes`… → the CLI that resumes it."""
+    """`claude-code`, `openai-codex`, `hermes`, `opencode`… → the CLI that resumes it."""
     name = (agent or "").lower()
     if "claude" in name:
         return _CLAUDE
@@ -44,6 +46,8 @@ def agent_family(agent: str) -> str:
         return _CODEX
     if name == _HERMES:
         return _HERMES
+    if name == _OPENCODE:
+        return _OPENCODE
     return ""
 
 
@@ -57,7 +61,12 @@ def _command(family: str, native_id: str, cwd: str, hermes_home: str) -> str:
     quoted_id = shlex.quote(native_id)
     if family == _HERMES:
         return f"HERMES_HOME={shlex.quote(hermes_home)} hermes chat --resume {quoted_id}"
-    verb = f"claude --resume {quoted_id}" if family == _CLAUDE else f"codex resume {quoted_id}"
+    if family == _OPENCODE:
+        verb = f"opencode --session {quoted_id}"
+    elif family == _CLAUDE:
+        verb = f"claude --resume {quoted_id}"
+    else:
+        verb = f"codex resume {quoted_id}"
     return f"cd {shlex.quote(cwd)} && {verb}" if cwd else verb
 
 

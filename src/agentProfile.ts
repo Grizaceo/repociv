@@ -12,7 +12,7 @@ import { bridgeUrl, bridgeHeaders } from './bridgeEnv.ts';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type HarnessId = 'hermes' | 'claude' | 'codex' | 'cursor' | 'openclaw';
+export type HarnessId = 'hermes' | 'claude' | 'codex' | 'cursor' | 'openclaw' | 'opencode';
 export type IdentityMode = 'native' | 'managed';
 
 export interface RepoCivProfile {
@@ -61,9 +61,17 @@ export const HARNESS_META: Record<HarnessId, { label: string; emoji: string }> =
   codex: { label: 'Codex', emoji: '📝' },
   cursor: { label: 'Cursor', emoji: '🎯' },
   openclaw: { label: 'OpenClaw', emoji: '🦞' },
+  opencode: { label: 'OpenCode', emoji: '🟣' },
 };
 
-export const VALID_HARNESSES: HarnessId[] = ['hermes', 'claude', 'codex', 'cursor', 'openclaw'];
+export const VALID_HARNESSES: HarnessId[] = [
+  'hermes',
+  'claude',
+  'codex',
+  'cursor',
+  'openclaw',
+  'opencode',
+];
 
 // ─── Profile CRUD ─────────────────────────────────────────────────────────────
 

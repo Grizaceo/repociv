@@ -2,9 +2,10 @@
 
 ## Qué está instalado
 
-Integración de metadatos de Claude Code, Codex y Hermes (solo perfil default).
-Los hooks existentes de Suvadu y otras automatizaciones se conservan. No se modificó
-el núcleo de Hermes ni otros perfiles. OpenClaw no estaba instalado; queda fuera del alcance.
+Integración de metadatos de Claude Code, Codex, Hermes (solo perfil default),
+Devin CLI, MiniMax Code y OpenCode. Los hooks existentes de Suvadu y otras
+automatizaciones se conservan. No se modificó el núcleo de Hermes ni otros
+perfiles. OpenClaw no estaba instalado; queda fuera del alcance.
 
 | CLI | Hooks | Prueba con modelo real |
 |---|---|---|
@@ -13,6 +14,7 @@ el núcleo de Hermes ni otros perfiles. OpenClaw no estaba instalado; queda fuer
 | Hermes (default) | 4 eventos en `~/.hermes/config.yaml` | Prueba controlada con el diagnóstico nativo, sin misión con modelo |
 | Devin CLI | 5 eventos en `~/.config/devin/config.json` (`SessionStart`, `UserPromptSubmit`, `PostToolUse`, `Stop`, `SessionEnd`) | Aprobada (`devin-bubble-seahorse` en `formal-math-lab` → `AgentPosition:session_start` / `session_end`) |
 | MiniMax Code (`mcode`) | 5 eventos en `~/.minimax/plugins/repociv-hooks/hooks/hooks.json` (plugin local compatible) | Aprobada (`mvs_298c65644d3d490c9d31b9d75dea05a3` → `ext-mcode-298c6564` en `formal-math-lab` + `AgentPosition:session_start`) |
+| OpenCode | Plugin global `~/.config/opencode/plugins/repociv-hooks.js` (descubrimiento automático v2, sin editar config) | Aprobada: `opencode run` 2.0.29 con proveedor OpenAI-compatible mock local → `session_start`/`turn_start`/`tool_use`/`turn_end`/`session_end` aceptados por un `PositionStore` real, con `authority=tool` |
 | OpenClaw | No instalado | Fuera de alcance |
 
 Detalle de las pruebas con modelo en «Prueba real con modelos», al final.
@@ -27,7 +29,8 @@ poll, pero evita unidades provisionales, duplicados y contadores inventados.
 
 ## Autoridad de ubicación
 
-- Se priorizan `tool_input.workdir`, `cwd` explícito de herramienta y rutas de archivos.
+- Se priorizan `tool_input.workdir`, `cwd` explícito de herramienta y rutas de archivos
+  (incluida la forma camelCase `filePath` que emite OpenCode).
 - Una ruta relativa se resuelve contra el cwd recibido; el servidor elige el repo mapeado
   más específico que contiene la ruta. No se aceptan `cityId`/`unitId` del cliente.
 - Solo se reconoce un `cd` literal al comienzo de un comando shell. No se interpretan
@@ -88,6 +91,15 @@ habilitados mediante la UI nativa de consentimiento; no se editaron hashes manua
 Hermes: on_session_start, post_tool_call, on_session_end (fin de turno),
 on_session_finalize (cierre de sesión). Sus comandos fueron registrados en la
 allowlist oficial, sin reemplazar otros hooks.
+OpenCode: el plugin usa la API nativa v2 — `prompt` (primer evento → `session_start`,
+luego `turn_start`), `execute.before` → `tool_use`, `session.execution.succeeded/failed`
+→ `turn_end`, `session.deleted` → `session_end`. Solo se envían session_id, cwd y la
+ruta/comando concreto de la herramienta (las claves `filePath`/`file_path`/`path`/
+`workdir`/`command` del input, filtradas); el prompt y los resultados nunca salen.
+La entrega es fail-open vía `spawn` detached, igual que el resto de los hooks.
+`session.execution.*` puede llegar repetido si el servicio opencode de vida larga
+recargó el plugin (suscriptores viejos aún vivos): RepoCiv trata `turn_end` como
+heartbeat idempotente, no como par estricto de turno.
 
 Las sesiones CLI ya abiertas pueden necesitar reinicio para releer su configuración.
 
@@ -204,8 +216,30 @@ completo en `REAL_CLI_POSITION_TEST_2026-10-12.md`.
   reparación es la correlación con el rollout nativo descrita en «Autoridad de
   ubicación». En la repetición, la misma sesión y unidad pasaron de (0,1) a (2,3).
   Evidencia: `evidence/codex-code-mode-fixed-2026-10-12.json`.
+- **OpenCode: aprobado (2026-10-15) con proveedor mock local.** `opencode run`
+  (v2.0.29) contra un proveedor OpenAI-compatible descartable en `127.0.0.1:8899`/
+  `8900` (`provider.opencode.options.baseURL`), porque el free tier de esta máquina
+  bloquea los modelos alojados por CLI/API. Con el plugin global instalado, un
+  `PositionStore` real detrás del bridge real (puerto efímero, token de prueba)
+  recibió: `session_start` + `turn_start` al primer prompt, un `tool_use` con
+  `authority=tool` y la ruta resuelta del `cd` de una tool `shell`, `turn_end` al
+  terminar la ejecución y `session_end` al borrar la sesión. Todos los cuerpos
+  llevaron solo `{cli, event, session_id, cwd, authority}`; un payload manual con
+  `content`/`prompt` secretos no filtró ninguna cadena (la ruta del `filePath` se
+  resolvió con `authority=tool`). El plugin se instaló y se retiró con el marcador
+  de propiedad, sin tocar `opencode.jsonc` ni los hooks ajenos.
 
 Límites de esta evidencia:
+
+- OpenCode usó un modelo servido por el mock local: valida la integración (plugin,
+  cliente, bridge, store), no un modelo alojado. No se probaron la TUI interactiva
+  ni `session.execution.failed`.
+- En una sesión de servicio opencode de vida larga que recarga el plugin (varios
+  ciclos de instalación durante la prueba), el mismo evento nativo se entregó hasta
+  ~10 veces (una por carga viva del plugin). El store es idempotente para pistas
+  iguales y `turn_end` no cambia la ubicación; con el plugin cargado una vez tras un
+  arranque limpio del servicio no se midió (el servicio es compartido y no se
+  reinicia en la verificación).
 
 - La evidencia de la reparación declara su revisión como «pending independent review».
 - `server/agent_hook_client.py` se modificó a las 11:10, después de la repetición
