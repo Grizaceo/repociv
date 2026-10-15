@@ -135,7 +135,7 @@ def position_payload(cli, event, raw, *, cwd=None, profile="default"):
         args = {}
     work = _codex_execution_cwd(raw) if cli == "codex" and event == "tool_use" else None
     if event == "tool_use" and work is None:
-        for key in ("workdir", "working_directory", "cwd", "file_path", "path", "notebook_path"):
+        for key in ("workdir", "working_directory", "cwd", "file_path", "filePath", "path", "notebook_path"):
             hint = args.get(key)
             if isinstance(hint, str) and hint and len(hint) <= 4096 and "\x00" not in hint and "://" not in hint:
                 work = os.path.abspath(os.path.join(base, os.path.expanduser(hint)))

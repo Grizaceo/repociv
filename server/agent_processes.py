@@ -14,6 +14,7 @@ _ENTRYPOINTS = {
     "hermes": "Hermes", "hermes-agent": "Hermes", "hermes_cli": "Hermes",
     "hermes-desktop": "Hermes", "run_agent.py": "Hermes",
     "claude": "Claude Code", "codex": "Codex", "openclaw": "OpenClaw",
+    "opencode": "OpenCode",
     "cursor-agent": "Cursor", "aider": "Aider",
 }
 

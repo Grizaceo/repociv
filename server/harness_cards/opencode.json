@@ -1,0 +1,37 @@
+{
+  "id": "opencode",
+  "type": "harness",
+  "name": "OpenCode",
+  "description": "Local agent harness via the opencode CLI. Runs a headless mission per turn (`opencode run --format json`) over a deterministic per-unit session, and can also answer live sessions through the local opencode service. The OPENCODE unit type in RepoCiv is a direct bypass to this harness — no cascade fallback.",
+  "transport": ["cli"],
+  "discovery": {
+    "binary": "opencode",
+    "search_paths": ["$PATH", "~/.local/bin", "~/.npm-global/bin", "/usr/local/bin"],
+    "env": "REPOCIV_OPENCODE_BIN"
+  },
+  "auth": "none (local binary + shared opencode service; provider auth managed by `opencode auth`)",
+  "session": {
+    "stateful": "--session ses_repociv-<unit>-<city> (deterministic id, continued across missions)",
+    "stateless": "--session ses_repociv-<unit>-<mission_id> (per-mission isolation)",
+    "note": "Sessions under the reserved `ses_repociv-` prefix are skipped by the external-agents source: the mission's own unit already stands on the map."
+  },
+  "model_selection": "-m provider/model[#variant] flag; user selects via the UI model picker",
+  "output": "--format json emits NDJSON events (step_start, tool_use, step_finish, text, error); RepoCiv streams text/tool events into the chat and treats an error event or a non-zero exit as failure",
+  "unit_type": "OPENCODE",
+  "bypass": true,
+  "note": "OPENCODE always routes directly to this harness regardless of the harness selector in the UI.",
+  "timeout_s": 600,
+  "status": "stable",
+  "profile_binding": {
+    "harness_ref_semantics": "OpenCode agent name passed to --agent (e.g. 'build', 'plan'). Use 'default' to omit the flag.",
+    "identity_mode": {
+      "native": "Edit AGENTS.md in the project (or ~/.config/opencode/AGENTS.md globally)",
+      "managed": "Read/write ~/.repociv/profiles/<name>/identity.md"
+    },
+    "identity_file": "AGENTS.md",
+    "dispatch_flag": "--agent {harness_ref}",
+    "harness_options_cmd": null,
+    "harness_options_note": "Agent names are defined in opencode.json (agent section) or ~/.config/opencode/agent/",
+    "default_identity_mode": "native"
+  }
+}

@@ -1191,6 +1191,7 @@ def start(send: SendFn, config: TrackerConfig | None = None) -> bool:
         devin_sessions,
         hermes_sessions,
         mcode_sessions,
+        opencode_sessions,
     )
 
     sources: list[AgentSource] = [
@@ -1208,6 +1209,9 @@ def start(send: SendFn, config: TrackerConfig | None = None) -> bool:
     mcode = mcode_sessions.source_from_env(recent_s=cfg.recent_s)
     if mcode is not None:
         sources.append(mcode)
+    opencode = opencode_sessions.source_from_env(recent_s=cfg.recent_s)
+    if opencode is not None:
+        sources.append(opencode)
     # The process-owned claude channel: its sessions declare their own liveness.
     sources.append(claude_live.ClaudeLiveSource(claude_live.get_manager()))
     tracker = ExternalAgentTracker(cfg, send=send, sources=sources)

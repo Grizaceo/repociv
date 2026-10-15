@@ -188,7 +188,7 @@ def list_harness_options(harness: str) -> list[str]:
         # Fallback: subdirs of ~/.openclaw/agents/
         return _list_dirs(_OPENCLAW_AGENTS_DIR)
 
-    # claude, cursor — no native profile list
+    # claude, cursor, opencode — no native profile list
     return []
 
 

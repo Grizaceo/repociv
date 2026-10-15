@@ -37,6 +37,7 @@ export function unitModelLabel(unit: Unit): string {
     caravan: 'Caravana',
     lexo: 'LexO-α',
     openclaw: 'OpenClaw',
+    opencode: 'OpenCode',
   };
   if (unit.type === 'hero' && unit.id) {
     const prefix = unit.id.split('-')[0]?.toLowerCase() ?? '';

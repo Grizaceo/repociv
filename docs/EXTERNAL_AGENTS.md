@@ -2,7 +2,7 @@
 
 RepoCiv muestra como unidades del mapa a los agentes de IA que trabajan en tus repos
 aunque no los haya lanzado RepoCiv: Claude Code en otra terminal, Codex, Cursor,
-OpenCode, Devin CLI, MiniMax Code (`mcode`) y los chats de Hermes. Hay cuatro fuentes:
+OpenCode, Devin CLI, MiniMax Code (`mcode`) y los chats de Hermes. Hay cinco fuentes:
 
 - [Suvadu](https://github.com/AppachiTech/suvadu) (`suv`), que registra las sesiones de
   Claude Code, Codex, Cursor… localmente vía hooks;
@@ -13,14 +13,18 @@ OpenCode, Devin CLI, MiniMax Code (`mcode`) y los chats de Hermes. Hay cuatro fu
 - `runtime-state.sqlite` + `.mcode-active/<pid>.json` de MiniMax Code
   (`~/.minimax/v2/sqlite/runtime-state.sqlite`, `server/mcode_sessions.py`), leídos en
   solo lectura, incluyendo sus subagentes (`explore`/`verifier` → `scout`,
-  `worker` → `worker`).
+  `worker` → `worker`);
+- `opencode.db` (`~/.local/share/opencode/opencode.db`, `server/opencode_sessions.py`),
+  leído en solo lectura, con liveness exacta contra el servicio local de opencode. Ver
+  [OpenCode](#opencode).
 
 ```
 suv agent sessions ─┐
 suv history (agent) ┤                                 unit_spawn / unit_state / unit_despawn
-~/.hermes/**/state.db ┴─► server/suvadu_tracker.py ──────────────────────────────────► mapa
-  (server/hermes_sessions.py)  (cada ~30 s)           GET /api/external-agents
-                                                      MCP external_agents_list
+~/.hermes/**/state.db ┤
+devin/cli/sessions.db ┤─► server/suvadu_tracker.py ──────────────────────────────────► mapa
+minimax runtime-state.sqlite ┤  (cada ~30 s)          GET /api/external-agents
+opencode.db ─────────┘                                MCP external_agents_list
 ```
 
 ## Panel de Agentes (F8)
@@ -95,13 +99,13 @@ respuestas posibles:
 
 | Modo | Cuándo | Qué da |
 |---|---|---|
-| `resume` | nada sostiene la sesión | `cd <cwd> && claude --resume <id>`, `cd <cwd> && codex resume <id>`, o `HERMES_HOME=<perfil> hermes chat --resume <id>` |
+| `resume` | nada sostiene la sesión | `cd <cwd> && claude --resume <id>`, `cd <cwd> && codex resume <id>`, `cd <cwd> && opencode --session <id>`, o `HERMES_HOME=<perfil> hermes chat --resume <id>` |
 | `attached` | su proceso sigue vivo ([Vivo o callado](#vivo-o-callado)) | nada: retomarla abriría un segundo turno sobre el mismo estado, que es justo lo que el arriendo de sesión evita |
-| `unavailable` | ese agente no tiene un resume que el bridge sepa escribir (Cursor, OpenCode), o falta el id | una explicación |
+| `unavailable` | ese agente no tiene un resume que el bridge sepa escribir (Cursor), o falta el id | una explicación |
 
-El `cd` es necesario para `claude` y `codex`: resuelven la sesión contra el
-directorio desde el que arrancan. Hermes vuelve solo al suyo. Por eso el comando
-lleva el `cwd`, el único dato que los sondeos nunca difunden — es la misma
+El `cd` es necesario para `claude`, `codex` y `opencode`: resuelven la sesión
+contra el directorio desde el que arrancan. Hermes vuelve solo al suyo. Por eso el
+comando lleva el `cwd`, el único dato que los sondeos nunca difunden — es la misma
 excepción a pedido que ya hace el endpoint de chat, y solo para la sesión que
 abriste.
 
@@ -175,8 +179,9 @@ mirando las últimas 60 tool calls, de la más nueva a la más vieja:
 
 Nunca se leen contenidos de archivos, cuerpos de parches, salidas de herramientas
 ni prompts. Las carpetas quedan en memoria y solo sale el repo al que llevan. El
-transcript se relee solo cuando cambia (`mtime`, tamaño). Cursor y OpenCode
-siguen ubicados por su `cwd`.
+transcript se relee solo cuando cambia (`mtime`, tamaño). Cursor sigue ubicado por
+su `cwd`; OpenCode afina su ubicación con su plugin de hooks nativos (ver
+[OpenCode](#opencode)) y sin él cae a su `cwd`, como Cursor.
 
 Consecuencia: un agente que piensa varios minutos sin ejecutar comandos deja de
 emitir latido hasta su próximo comando o fin de turno.
@@ -190,6 +195,7 @@ una pregunta distinta y verificable: *¿queda un proceso sosteniendo esta sesió
 | Fuente | Señal | Fuerza |
 |---|---|---|
 | Hermes | `~/.hermes/runtime/active_sessions.json`: el arriendo que Hermes usa para que dos procesos no escriban una sesión, con su `pid` | exacta (id de sesión ↔ pid, revalidando que el pid siga siendo un proceso `hermes`) |
+| OpenCode | `opencode api get /api/session/active`: los ids que el servicio local reporta `running`; si el servicio no contesta, escaneo de `/proc` por `cwd` de procesos `opencode` | exacta por id cuando el servicio responde; aproximada en el fallback |
 | Suvadu (Claude Code, Codex, Cursor…) | escaneo de `/proc`: binarios de agente y su `cwd` | aproximada: no distingue dos sesiones en el mismo directorio |
 
 Sin actividad fresca pero con proceso vivo, el estado es `thinking`, y el panel
@@ -222,6 +228,11 @@ Suvadu. Para que no aparezcan dos veces (la unidad de la misión y una
 
 El tracker descarta esos ids y a sus subagentes. Antes se usaba `--continue`, que
 retoma la conversación más reciente del directorio y podía ser una sesión tuya.
+
+Las misiones de OpenCode (`opencode run`) usan el mismo truco: `agent_runner` les
+asigna un id determinístico bajo el prefijo reservado `ses_repociv-<unidad>-<ciudad>`,
+y `server/opencode_sessions.py` salta cualquier sesión con ese prefijo: su unidad ya
+está en el mapa.
 
 ## Hermes
 
@@ -285,6 +296,35 @@ en Cron.
   (`display_kind` no nulo, mensajes inactivos) y el resumen de compactación. El título
   de la sesión sale del contenido, así que viaja solo con el chat.
 
+## OpenCode
+
+`server/opencode_sessions.py` lee `~/.local/share/opencode/opencode.db`
+(`session_v2` + `session_message`) y el servicio local:
+
+- **Solo lectura:** cada conexión es `file:…?mode=ro` con `busy_timeout` 0,5 s,
+  `PRAGMA query_only` y un plazo de 2 s por sondeo (3 s para el chat).
+- **Id reservado:** las misiones que RepoCiv lanza con `opencode run` usan
+  `ses_repociv-<unidad>-<ciudad>`; la fuente las salta porque su unidad ya está en el
+  mapa (ver [Misiones de RepoCiv](#misiones-de-repociv-sin-duplicados)).
+- **Subagentes:** una sesión con `parent_id` o `agent` de tipo `explore` / `general` /
+  `verifier` / `worker` se marca como subagente y su tipo de unidad sale de ese rol
+  (`explore`/`verifier` → `scout`, `worker` → `worker`).
+- **Chat:** de cada mensaje se toman los turnos `user` y los bloques `text` del
+  `assistant` (los `reasoning` no viajan). El CLI guarda el prompt JSON-quoteado
+  (`"\"texto\""`); la fuente lo desenvuelve antes de mostrarlo.
+- **Hooks de posición:** el plugin global `~/.config/opencode/plugins/repociv-hooks.js`
+  (ver [Hooks de posición](AGENT_POSITION_HOOKS.md)) convierte los eventos nativos
+  (prompt, `execute.before`, fin de ejecución, borrado de sesión) en llamadas al
+  cliente de hooks. Se instala solo si `~/.config/opencode` ya existe, y se borra solo
+  si el archivo lleva el marcador de RepoCiv.
+- **Verificado (2026-10-15) contra la base real:** el sondeo sobre las 13 sesiones de
+  esta máquina saltó la misión propia `ses_repociv-*`, marcó `live` por id la sesión TUI
+  en curso (también por el fallback `/proc`, cuyo matcher no reconocía el entrypoint
+  real `opencode.exe` y quedó corregido con su test), leyó modelo, turnos y tokens
+  reales, y el chat desenvolvió el prompt JSON-quoteado. Límites de la prueba
+  (proveedor mock local, sin TUI interactiva) en
+  [Hooks de posición](AGENT_POSITION_HOOKS.md).
+
 ## Privacidad
 
 - **Metadatos, siempre:** los eventos del mapa (SSE/WS), `GET /api/external-agents[/sessions]`
@@ -317,6 +357,9 @@ frontera que ya tenía el resto del bridge.
 | `REPOCIV_MCODE_SESSIONS` | `1` | `0` = no leer `runtime-state.sqlite` de MiniMax Code |
 | `REPOCIV_MCODE_HOME` | `~/.minimax` | raíz de MiniMax Code |
 | `REPOCIV_MCODE_ACTIVE_DIR` | `~/.minimax-code/.mcode-active` | directorio de PIDs activos de `mcode` |
+| `REPOCIV_OPENCODE_SESSIONS` | `1` | `0` = no leer `opencode.db` |
+| `REPOCIV_OPENCODE_DATA_DIR` | `~/.local/share/opencode` | directorio de datos de opencode (`XDG_DATA_HOME` si está definido) |
+| `REPOCIV_OPENCODE_BIN` | `opencode` en `PATH` | binario de opencode (liveness y chat en vivo) |
 
 ## Probe `codex queue` — 2026-09-21
 
@@ -357,9 +400,9 @@ que el turno se haya ejecutado.
 El compositor sirve para las sesiones quietas y se habilita en las activas cuando
 su harness expone un canal real: Codex vía la cola del thread (`codex queue`),
 Hermes adoptando sesiones vivas existentes en `hermes serve` (`hermes-serve-ws`)
-o en `tmux` (`hermes-tmux`), y Claude Code vía un **canal proceso-owned**
-(stream-json). Reanudar una sesión viva mediante un segundo proceso sigue
-prohibido.
+o en `tmux` (`hermes-tmux`), Claude Code vía un **canal proceso-owned**
+(stream-json) y OpenCode vía el buzón de su servicio local (`opencode-api`).
+Reanudar una sesión viva mediante un segundo proceso sigue prohibido.
 
 ### Hermes: adopción de sesiones vivas existentes (`hermes-serve-ws` y `hermes-tmux`)
 
@@ -411,6 +454,30 @@ ese canal en `server/claude_live.py`:
 `ClaudeLiveSource` declara `live` directamente (es dueño del pid); el probe
 aproximado de `/proc` no puede sobreescribirlo (`suvadu_tracker._with_liveness`).
 
+### OpenCode: buzón del servicio local (`opencode-api`)
+
+`OpenCodeLiveChatAdapter` (`server/live_session_chat.py`) entrega el texto al
+buzón de la sesión con
+`opencode api post /api/session/<id>/prompt --data '{"text":…}'`. La entrega es
+`delivery: steer`: si hay un dueño procesando el turno, lo recibe sin abrir un
+segundo escritor; si no hay proceso, queda encolado en la sesión. Dos detalles
+del CLI mandan acá:
+
+- `opencode api` sale con código 0 **también en errores HTTP**; el adaptador
+  parsea el stdout (`{"data":…}` = aceptado; `{"_tag":…}`/`{"error":…}` →
+  404/409/502 según el caso) y nunca confía solo en el exit code.
+- La capacidad exige `live is True` (la liveness exacta del servicio) y un id
+  seguro; sin binario o sin sesión viva queda `unavailable`
+  (`opencode_live_chat_unavailable`).
+- **Verificado (2026-10-15) con `opencode run` 2.0.29:** `send` contra una sesión
+  viva aceptó un steer real (stdout `{"data":{…,"delivery":"steer"}}`) y el texto
+  llegó al modelo y al historial de la sesión; un id inexistente devolvió
+  `ChatError(404, "session_not_found")` parseando
+  `{"_tag":"SessionNotFoundError"}`; una sesión sin proceso vivo quedó
+  `unavailable` (`opencode_live_chat_unavailable`). El turno corrió contra un
+  proveedor OpenAI-compatible mock local, no un modelo alojado (detalle en
+  [Hooks de posición](AGENT_POSITION_HOOKS.md)).
+
 Los caminos alternativos explorados inicialmente el 2026-09-19 (API del gateway
 de Hermes, multiplexor tmux, dejar todo solo-lectura) siguen documentados abajo
 por si alguno se retoma.
@@ -432,8 +499,9 @@ por si alguno se retoma.
 ## Limitaciones conocidas
 
 - **Sesiones activas: solo lectura.** Ver la sección de arriba.
-- Codex / Cursor / OpenCode dependen de que su integración de Suvadu registre sesiones;
-  solo Claude Code está verificado en esta máquina.
+- Codex / Cursor dependen de que su integración de Suvadu registre sesiones;
+  solo Claude Code está verificado en esta máquina con ese camino. OpenCode no
+  pasa por Suvadu: su fuente lee `opencode.db`.
 - Suvadu y Hermes son locales: agentes de otras máquinas no aparecen.
 - **Hermes en vivo:** `last_activity_at` se actualiza aprox. una vez por minuto, pero el
   último mensaje se lee en cada sondeo, así que una sesión nueva aparece en ≤ 30 s

@@ -14,6 +14,7 @@ SWARM_CAPABILITIES: dict[str, dict[str, bool]] = {
     "hermes": {"passive_task": False, "progress_mid_flight": False},
     "openclaw": {"passive_task": False, "progress_mid_flight": False},
     "codex": {"passive_task": False, "progress_mid_flight": False},
+    "opencode": {"passive_task": False, "progress_mid_flight": False},
     "container": {"passive_task": False, "progress_mid_flight": False},
 }
 

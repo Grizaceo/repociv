@@ -617,6 +617,86 @@ class MCodeLiveChatAdapter:
         raise ChatError(501, "transport_unavailable")
 
 
+_OPENCODE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
+class OpenCodeLiveChatAdapter:
+    """The local opencode service over ``opencode api``.
+
+    A prompt is admitted to the session's own inbox (``delivery: steer``):
+    the owner process, if any, drains it without a second writer. ``opencode
+    api`` writes errors to stdout as ``{"_tag": …}``, so the body — not the
+    exit code alone — is the contract.
+    """
+
+    transport = "opencode-api"
+
+    def __init__(
+        self,
+        *,
+        opencode_bin: str,
+        run: Callable[..., Any] = subprocess.run,
+        timeout_s: float = 10.0,
+    ) -> None:
+        self.opencode_bin = opencode_bin
+        self._run = run
+        self.timeout_s = timeout_s
+
+    def capability(self, session: Observation) -> ChatCapability:
+        if session.source != "opencode" or session.agent.strip().lower() != "opencode":
+            return ChatCapability("unavailable", None, "unsupported_session_source")
+        if (
+            session.live is not True
+            or not session.native_id
+            or not _OPENCODE_ID_RE.match(session.native_id)
+            or not self.opencode_bin
+        ):
+            return ChatCapability("unavailable", None, "opencode_live_chat_unavailable")
+        return ChatCapability("available", self.transport, None)
+
+    def send(self, session: Observation, text: str, request_id: str) -> ChatResult:
+        if not self.opencode_bin or not _OPENCODE_ID_RE.match(session.native_id or ""):
+            raise ChatError(501, "transport_unavailable")
+        argv = [
+            self.opencode_bin,
+            "api",
+            "post",
+            f"/api/session/{session.native_id}/prompt",
+            "--data",
+            json.dumps({"text": text}),
+        ]
+        try:
+            proc = self._run(
+                argv,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout_s,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise ChatError(504, "transport_timeout") from exc
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise ChatError(502, "transport_failed") from exc
+
+        parsed: dict[str, Any] | None = None
+        try:
+            candidate = json.loads((proc.stdout or "").strip() or "{}")
+        except ValueError:
+            candidate = None
+        if isinstance(candidate, dict):
+            parsed = candidate
+        if parsed is not None and "data" in parsed:
+            return ChatResult("accepted", self.transport, request_id)
+        if parsed is not None and ("_tag" in parsed or "error" in parsed):
+            tag = str(parsed.get("_tag") or parsed.get("error") or "")
+            stderr = (proc.stderr or "").strip()
+            if "NotFound" in tag or "404" in stderr:
+                raise ChatError(404, "session_not_found")
+            if "Conflict" in tag or "409" in stderr:
+                raise ChatError(409, "session_not_live")
+            raise ChatError(502, "transport_failed")
+        raise ChatError(502, "transport_failed")
+
+
 class LiveSessionChatRouter:
     def __init__(self, adapters: Mapping[str, LiveChatAdapter]) -> None:
         self._adapters = {name.strip().lower(): adapter for name, adapter in adapters.items()}
@@ -649,6 +729,9 @@ def default_router() -> LiveSessionChatRouter:
     claude = ClaudeLiveChatAdapter()
     devin = DevinLiveChatAdapter()
     mcode = MCodeLiveChatAdapter()
+    opencode = OpenCodeLiveChatAdapter(
+        opencode_bin=shutil.which(os.environ.get("REPOCIV_OPENCODE_BIN", "opencode")) or ""
+    )
     return LiveSessionChatRouter(
         {
             "codex": codex,
@@ -658,5 +741,6 @@ def default_router() -> LiveSessionChatRouter:
             "claude-code": claude,
             "devin": devin,
             "mcode": mcode,
+            "opencode": opencode,
         }
     )

@@ -624,6 +624,13 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
         return _run_codex_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                     model=model or provider, harness_ref=harness_ref)
 
+    # OPENCODE bypass: always direct to opencode regardless of harness selector
+    if base == "OPENCODE":
+        send_to_repociv({"type": "log", "msg": f"[{unit_id}] harness: opencode (bypass)", "level": "info"})
+        _record_execution_identity(unit_id, mission_id, "opencode", config, model=model)
+        return _run_opencode_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
+                                       model=model or provider, harness_ref=harness_ref)
+
     # ── 3-layer dispatch: harness → provider → model ──────────────────────────
     # If the user selected a specific harness, use it directly.
     # The provider+model are passed through to the harness runner so it can
@@ -648,6 +655,10 @@ def _execute_streaming(unit_id: str, mission_id: str, mission: str,
             _record_execution_identity(unit_id, mission_id, "codex", config, model=model)
             return _run_codex_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
                                         model=model or provider, harness_ref=harness_ref)
+        if harness == "opencode" and _has_opencode():
+            _record_execution_identity(unit_id, mission_id, "opencode", config, model=model)
+            return _run_opencode_streaming(unit_id, mission_id, mission, config, working_dir, city_id,
+                                           model=model or provider, harness_ref=harness_ref)
         if harness == "hermes":
             # Check profile first: agents with a profile need HERMES_HOME
             # pointing at their profile dir, not the HTTP gateway which always
@@ -828,6 +839,23 @@ def _find_codex() -> str | None:
 
 def _has_codex() -> bool:
     return _find_codex() is not None
+
+
+def _find_opencode() -> str | None:
+    candidates = [
+        shutil.which(os.environ.get("REPOCIV_OPENCODE_BIN", "opencode")),
+        str(Path.home() / ".local" / "bin" / "opencode"),
+        str(Path.home() / ".npm-global" / "bin" / "opencode"),
+        "/usr/local/bin/opencode",
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def _has_opencode() -> bool:
+    return _find_opencode() is not None
 
 
 def _find_hermes_cli() -> str | None:
@@ -1253,6 +1281,106 @@ def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
         _es.record_output_chunk(mission_id, unit_id, line)
     proc.wait(timeout=600)
     return proc.returncode == 0, "".join(output_buf)
+
+
+def _run_opencode_streaming(unit_id: str, mission_id: str, mission: str,
+                            config: dict[str, Any],
+                            working_dir: str | None = None,
+                            city_id: str = "",
+                            model: str = "",
+                            harness_ref: str = "") -> tuple[bool, str]:
+    """One mission as an ``opencode run --format json`` NDJSON turn.
+
+    The session id is deterministic (``ses_repociv-<unit>-<city>``) and the
+    external-agents source skips that reserved prefix: the mission's unit is
+    already on the map. ``opencode run`` exits 0 even for provider errors, so
+    an ``error`` event in the stream is what marks the run failed.
+    """
+    opencode_bin = _find_opencode()
+    if not opencode_bin:
+        text = "[opencode error] binary not found in PATH, ~/.local/bin or ~/.npm-global/bin\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, text.strip()
+
+    spatial = _spatial_context_block(city_id, working_dir)
+    cd_cmd = f"cd {working_dir}\n\n" if working_dir else ""
+    full_message = f"{spatial}\n\n{cd_cmd}{mission}"
+
+    session_id = "ses_" + _build_stateful_session_id(
+        unit_id, city_id, mission_id, stateful=config.get("stateful", True),
+    )
+
+    cmd = [opencode_bin, "run", "--session", session_id, "--format", "json", "--auto"]
+    if model:
+        cmd.extend(["-m", model])
+    cmd.append(full_message)
+
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        cwd=working_dir or None,
+        env=redact_env_for_spawn(),
+    )
+    from server.agent_processes import record_process_binding
+    record_process_binding(getattr(proc, "pid", 0), mission_id, unit_id)
+
+    text_parts: list[str] = []
+    errors: list[str] = []
+    stray: list[str] = []
+    tools_used = 0
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            event = json.loads(stripped)
+        except ValueError:
+            if len(stray) < 20:
+                stray.append(stripped)
+            continue
+        if not isinstance(event, dict):
+            continue
+        kind = event.get("type")
+        part = event.get("part")
+        if kind == "text" and isinstance(part, dict):
+            chunk = part.get("text")
+            if isinstance(chunk, str) and chunk:
+                text_parts.append(chunk)
+                text = chunk if chunk.endswith("\n") else f"{chunk}\n"
+                send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+                _es.record_output_chunk(mission_id, unit_id, text)
+        elif kind == "tool_use" and isinstance(part, dict):
+            tools_used += 1
+            tool = part.get("tool")
+            if isinstance(tool, str) and tool:
+                text = f"🔧 {tool}\n"
+                send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+                _es.record_output_chunk(mission_id, unit_id, text)
+        elif kind == "error":
+            err = event.get("error")
+            message = err.get("message") if isinstance(err, dict) else None
+            errors.append(str(message or "unknown"))
+    proc.wait(timeout=600)
+    output = "".join(text_parts)
+
+    if errors or proc.returncode != 0:
+        tail = errors[0] if errors else " | ".join(stray[-3:])
+        text = f"[opencode error] {tail or f'exit_{proc.returncode}'}\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, (output + text).strip()
+
+    if not output and not tools_used:
+        text = "[opencode error] empty final message\n"
+        send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
+        _es.record_output_chunk(mission_id, unit_id, text)
+        return False, text.strip()
+    return True, output
 
 
 def _run_codex_streaming(unit_id: str, mission_id: str, mission: str,

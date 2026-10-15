@@ -39,10 +39,11 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     // Teaching tooltip (plan B3): explain each agent on hover instead of jargon.
     btn.title = agentTooltip(type);
     btn.addEventListener('click', () => {
-      const harnessTemplates: Record<string, 'openclaw' | 'claude' | 'codex'> = {
+      const harnessTemplates: Record<string, 'openclaw' | 'claude' | 'codex' | 'opencode'> = {
         OPENCLAW: 'openclaw',
         CLAUDE: 'claude',
         CODEX: 'codex',
+        OPENCODE: 'opencode',
       };
       const harness = harnessTemplates[type];
       if (harness) {
@@ -211,6 +212,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
       'cursor',
       'codex',
       'openclaw',
+      'opencode',
       'hermes-cli',
     ]);
     if (cliHarnesses.has(selectedHarness) && !resolvedCity?.repoPath?.trim()) {

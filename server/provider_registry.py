@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .agent_runner import _has_claude_code, _has_openclaw, _has_cursor, _has_codex
+from .agent_runner import _has_claude_code, _has_openclaw, _has_cursor, _has_codex, _has_opencode
 
 # ─── HERMES IMPORT BLOCK ────────────────────────────────────────────────────
 # When hermes-agent is importable, source the provider/model list from
@@ -189,6 +189,8 @@ def _build_dynamic_providers() -> tuple[list[dict], list[dict]]:
             available = _has_cursor()
         elif transport == "codex":
             available = _has_codex()
+        elif transport == "opencode":
+            available = _has_opencode()
         elif transport == "hermes":
             # Hermes is always available if the gateway is running
             available = True
