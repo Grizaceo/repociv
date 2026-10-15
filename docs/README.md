@@ -31,7 +31,7 @@
 
 | Carpeta | Contenido |
 |---|---|
-| [`archive/`](archive/) | Documentos conservados: 5 de referencia (CIV5 visual + AgentCraft parity + roadmap RimWorld/Frostpunk + ideación de paradigmas) + cierres de fase y audits superados. Ver [`archive/README.md`](archive/README.md). El resto del histórico vive en git. |
+| [`archive/`](archive/) | Documentos conservados: 5 de referencia (CIV5 visual + AgentCraft parity + roadmap RimWorld/Frostpunk + ideación de paradigmas) + cierres de fase, audits superados y notas de sesión. Ver [`archive/README.md`](archive/README.md). El resto del histórico vive en git. |
 
 ## Regla de oro
 

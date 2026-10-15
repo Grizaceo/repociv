@@ -1,10 +1,11 @@
 # `docs/archive/` — Documentos conservados
 
-Esta carpeta ya no es un cementerio. Conserva dos grupos: (1) los documentos
+Esta carpeta ya no es un cementerio. Conserva tres grupos: (1) los documentos
 **de referencia independiente** que pueden volver a consultarse aunque ya no
-representen la operación diaria, y (2) **cierres de fase y audits** ya
+representen la operación diaria, (2) **cierres de fase y audits** ya
 superados, archivados a medida que se completan (no se borran porque registran
-cómo se verificó cada gate).
+cómo se verificó cada gate), y (3) **notas y one-offs de sesión** cerrados,
+movidos desde `docs/` cuando dejaron de ser operativos.
 
 ### Referencia independiente
 
@@ -26,6 +27,15 @@ cómo se verificó cada gate).
 | `AUDIT_2026-06-19.md` | Auditoría general (build/seguridad/arquitectura/deuda). P0-P1 + P2.3/P2.4 + governance aplicados; P2.1 (hex-core + route registry) cerrado 2026-06. |
 | `local_view_beautification_plan.md` | Plan de embellecimiento de la vista local, ya ejecutado. |
 | `onboarding-repo-selection.md` | Plan del onboarding de selección de repos, ya implementado. |
+
+### Notas y one-offs de sesión
+
+| Documento | Qué fue |
+|---|---|
+| `NOTES.local-view-e2e-2026-09-29.md` | Notas de la sesión E2E de la vista local (citada como fuente por `ESTADO-2026-09-30.html` y el PR #30). |
+| `promotion-post-2026-10-05.md` | Borrador del post de anuncio del alpha. |
+| `promotion-review-2026-10-05.md` | Revisión del lanzamiento alpha (citada por el PR #30). |
+| `phase-a-local-scene-3d-plan.md` | Plan del renderer Three.js de la vista local, ya implementado (`src/three/LocalScene3D.ts`). |
 
 ### Planes implementados (`plans/`)
 
