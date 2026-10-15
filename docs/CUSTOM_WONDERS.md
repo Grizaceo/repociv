@@ -306,8 +306,8 @@ Logs en `~/.repociv/wonders/logs/<tu-log>`.
 ## 7. Referencias
 
 - [`WONDER_CONTRACT.md`](WONDER_CONTRACT.md) — schema del manifest
-- [`server/wonder_launcher.py`](../../server/wonder_launcher.py) — implementación
-- [`server/wonder_registry.py`](../../server/wonder_registry.py) — registry
+- [`server/wonder_launcher.py`](../server/wonder_launcher.py) — implementación
+- [`server/wonder_registry.py`](../server/wonder_registry.py) — registry
 - `server/tests/test_wonder_launcher.py` — tests con custom specs (9 nuevos)
 - `GET /api/wonders` y `GET /api/wonders/launchable` — runtime introspection
 

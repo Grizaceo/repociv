@@ -400,7 +400,7 @@ python3 -m pytest server/ -q
 | [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | Tutorial paso a paso |
 | [docs/REMOTE_ACCESS.md](docs/REMOTE_ACCESS.md) | Acceso remoto via Tailscale |
 | [docs/EVOLUTION.md](docs/EVOLUTION.md) | Historia del proyecto |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Estado actual y próximos pasos |
+| [docs/archive/ROADMAP.md](docs/archive/ROADMAP.md) | Roadmap histórico (alpha, May 2026) |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Cómo contribuir |
 | [SECURITY.md](SECURITY.md) | Política de seguridad |
 

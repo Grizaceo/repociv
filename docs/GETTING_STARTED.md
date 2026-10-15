@@ -442,6 +442,6 @@ tmpfs en `/tmp/workspace`, sin montar `.env` ni `~/.ssh` del host.
 
 - Read [PUBLIC_ARCHITECTURE.md](PUBLIC_ARCHITECTURE.md) for a deep dive into
   how RepoCiv works internally
-- Read [ROADMAP.md](ROADMAP.md) for current status and upcoming features
+- Read [SCOPE.md](SCOPE.md) for what's in and out of scope
 - Read [API.md](API.md) for the full HTTP endpoint reference
 - Check the hotkeys list with `?` in the dashboard
