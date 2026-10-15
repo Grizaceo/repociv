@@ -263,6 +263,27 @@ def get_missions(ctx: "RouteContext") -> tuple[int, Any]:
     from server.bridge import load_missions
     return 200, load_missions()
 
+
+def get_telemetry_usage(_ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/telemetry/usage — audit-ready usage summary (counts only)."""
+    from server import ui_telemetry as _ut
+
+    return 200, _ut.get_usage_summary()
+
+
+def post_telemetry_ui(body: Any, _ctx: "RouteContext") -> tuple[int, Any]:
+    """POST /api/telemetry/ui — record panel/hotkey integer counts on the bridge."""
+    from server import ui_telemetry as _ut
+
+    if not isinstance(body, dict):
+        return 400, {"error": "invalid_payload"}
+    kind = str(body.get("kind") or "")
+    name = str(body.get("name") or "")
+    count = body.get("count", 1)
+    if not _ut.record_ui_event(kind, name, count if isinstance(count, int) else 1):
+        return 400, {"error": "invalid_telemetry_event"}
+    return 200, _ut.get_usage_summary()
+
 def post_subagent_cancel(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
     """POST /subagents/cancel — Recall a running subagent by id."""
     from server import subagent_tracker as _st

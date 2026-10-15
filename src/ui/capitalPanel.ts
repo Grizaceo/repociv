@@ -1,5 +1,5 @@
 // ─── RepoCiv — Capital Palacio Panel (tabs from Wonder Registry) ──────────────
-import { getAnalytics, getPanelUsageReport } from './analytics.ts';
+import { getAnalytics, getPanelUsageReport, refreshBridgeAnalytics } from './analytics.ts';
 import { getStoredEraLabel } from './eraSystem.ts';
 import { mountGacetaWidget } from './gacetaWidget.ts';
 import { openWonderVignette } from './wonderVignette.ts';
@@ -297,12 +297,14 @@ async function _connectFromManifestText(raw: string, status: HTMLElement): Promi
   _rebuildTabsBar();
 }
 
-function _renderStats(container: HTMLElement) {
+function _renderStatsContent(container: HTMLElement) {
   const a = getAnalytics();
   const era = getStoredEraLabel();
   const wonderCount = listWonders().length;
   const usage = getPanelUsageReport();
   const unused = usage.filter((u) => u.opens === 0);
+  const localMessages = Object.values(a.messagesSent).reduce((s, v) => s + v, 0);
+  const chatsSent = Math.max(a.chatsSent, localMessages);
   const podaRows = usage
     .map(
       (u) =>
@@ -311,11 +313,12 @@ function _renderStats(container: HTMLElement) {
     .join('');
   container.innerHTML = `
     <div class="stats-grid">
+      <div class="stat-card"><div class="stat-value">${a.daysWithUsage}</div><div class="stat-label">Días con uso</div></div>
       <div class="stat-card"><div class="stat-value">${Object.values(a.panelsOpened).reduce((s, v) => s + v, 0)}</div><div class="stat-label">Paneles abiertos</div></div>
       <div class="stat-card"><div class="stat-value">${Object.values(a.hotkeysUsed).reduce((s, v) => s + v, 0)}</div><div class="stat-label">Hotkeys usadas</div></div>
-      <div class="stat-card"><div class="stat-value">${Object.values(a.messagesSent).reduce((s, v) => s + v, 0)}</div><div class="stat-label">Mensajes enviados</div></div>
-      <div class="stat-card"><div class="stat-value">${a.commandsIssued}</div><div class="stat-label">Comandos emitidos</div></div>
-      <div class="stat-card"><div class="stat-value">${a.approvalsGiven}</div><div class="stat-label">Aprobaciones</div></div>
+      <div class="stat-card"><div class="stat-value">${chatsSent}</div><div class="stat-label">Chats enviados</div></div>
+      <div class="stat-card"><div class="stat-value">${a.commandsIssued}</div><div class="stat-label">Comandos enviados</div></div>
+      <div class="stat-card"><div class="stat-value">${a.approvalsGiven}</div><div class="stat-label">Approvals resueltos</div></div>
       <div class="stat-card"><div class="stat-value">${era || 'Desconocida'}</div><div class="stat-label">Era actual</div></div>
       <div class="stat-card"><div class="stat-value">${wonderCount}</div><div class="stat-label">Maravillas registradas</div></div>
       <div class="stat-card"><div class="stat-value">${unused.length}/${usage.length}</div><div class="stat-label">Paneles sin uso</div></div>
@@ -325,4 +328,13 @@ function _renderStats(container: HTMLElement) {
       <ul class="poda-list">${podaRows}</ul>
     </div>
   `;
+}
+
+function _renderStats(container: HTMLElement) {
+  _renderStatsContent(container);
+  void refreshBridgeAnalytics().then(() => {
+    if (container.isConnected && _activeTab === 'tab-stats') {
+      _renderStatsContent(container);
+    }
+  });
 }

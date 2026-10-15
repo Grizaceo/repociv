@@ -75,11 +75,13 @@ GET_EXACT: dict[str, Callable[..., Any]] = {
     "/api/repos/selected": _routes.get_selected_repos,
     "/api/repos/all-roots": _routes.get_all_roots_repos,
     "/api/pending-work": get_pending_work,
+    "/api/telemetry/usage": _routes.get_telemetry_usage,
 }
 
 # ── POST: no path params, matched by exact string ──────────────────────────────
 POST_EXACT: dict[str, Callable[..., Any]] = {
     "/api/agent-events": post_agent_events,
+    "/api/telemetry/ui": _routes.post_telemetry_ui,
     "/api/kanban/boards": post_kanban_board,
     "/directives/record": _routes.post_directives_record,
     "/commands": _routes.post_commands,

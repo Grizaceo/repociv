@@ -209,6 +209,7 @@ from server import run_state as _run_state  # noqa: E402
 from server import workspace_issue as _wi  # noqa: E402
 from server import checkpoint as _checkpoint  # noqa: E402
 from server import endpoint_usage as _endpoint_usage  # noqa: E402
+from server import ui_telemetry as _ui_telemetry  # noqa: E402
 
 # ─── Command schema + policy
 from server.command_schema import validate_command, CommandValidationError, Command  # noqa: E402
@@ -253,6 +254,7 @@ def init_bridge_state(config_dir: Path | str | None = None) -> Path:
     _wi.init(CONFIG_DIR)
     _checkpoint.init(CONFIG_DIR)
     _endpoint_usage.init(CONFIG_DIR)
+    _ui_telemetry.init(CONFIG_DIR)
     _ds.init(CONFIG_DIR)
     _dl.set_templates_path(CONFIG_DIR / "directive_templates.json")
     _BRIDGE_STATE_CONFIG_DIR = CONFIG_DIR

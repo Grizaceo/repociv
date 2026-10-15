@@ -24,6 +24,8 @@ from server.routes.core import post_claude_live_stop  # noqa: F401
 from server.routes.core import get_external_agent_resume  # noqa: F401
 from server.routes.core import post_external_agent_reply  # noqa: F401
 from server.routes.core import get_missions  # noqa: F401
+from server.routes.core import get_telemetry_usage  # noqa: F401
+from server.routes.core import post_telemetry_ui  # noqa: F401
 from server.routes.core import post_subagent_cancel  # noqa: F401
 from server.routes.core import get_subagents  # noqa: F401
 from server.routes.core import get_mission_tree  # noqa: F401
