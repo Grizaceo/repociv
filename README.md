@@ -210,6 +210,8 @@ POST /approvals/<id>/reject       # rechazar comando pendiente
 
 Ver [docs/API.md](docs/API.md) para la referencia completa.
 
+**Hooks de posición:** para que tu CLI (Claude Code, Codex, Hermes, Devin, mcode) aparezca como unidad en el mapa, RepoCiv puede instalar hooks que reportan solo ubicación y sesión — ver [docs/HARNESS_HOOKS.md](docs/HARNESS_HOOKS.md).
+
 ### MCP Server
 
 RepoCiv también se expone como **MCP server por stdio** (`server/mcp_server.py`), lo que permite que Claude Code, Cursor u otros clientes operen el dashboard como agentes externos:
@@ -398,6 +400,7 @@ python3 -m pytest server/ -q
 | [docs/API.md](docs/API.md) | Referencia completa de endpoints |
 | [docs/MCP.md](docs/MCP.md) | MCP server — 42 tools, ejemplos |
 | [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | Tutorial paso a paso |
+| [docs/HARNESS_HOOKS.md](docs/HARNESS_HOOKS.md) | Hooks de posición: tu CLI como unidad en el mapa |
 | [docs/REMOTE_ACCESS.md](docs/REMOTE_ACCESS.md) | Acceso remoto via Tailscale |
 | [docs/EVOLUTION.md](docs/EVOLUTION.md) | Historia del proyecto |
 | [docs/archive/ROADMAP.md](docs/archive/ROADMAP.md) | Roadmap histórico (alpha, May 2026) |
