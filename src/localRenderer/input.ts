@@ -1,6 +1,5 @@
 // ─── Input handling — mouse, drag-assign, zone paint, keyboard ─────────────
 import type { LocalWorld, LocalUnit, LocalTile, ZoneType } from '../types.ts';
-import { clampZoom, screenToWorld } from '../hex.ts';
 import type { CameraState } from './state.ts';
 
 export interface InputState {
@@ -74,24 +73,6 @@ export function finalizeZonePaint(
     }
   }
   if (tiles.length > 0) onZonePainted?.(input.zonePaintMode, tiles);
-}
-
-export function handleWheelEvent(
-  cam: CameraState,
-  deltaY: number,
-  clientX: number,
-  clientY: number,
-  canvasRect: DOMRect,
-): void {
-  const factor = deltaY > 0 ? 0.9 : 1.1;
-  const newZoom = clampZoom(cam.zoom * factor, 0.2, 4);
-  const mx = clientX - canvasRect.left;
-  const my = clientY - canvasRect.top;
-  const before = screenToWorld(cam, mx, my);
-  cam.zoom = newZoom;
-  const after = screenToWorld(cam, mx, my);
-  cam.x += before.wx - after.wx;
-  cam.y += before.wy - after.wy;
 }
 
 // Zone painting keyboard shortcuts

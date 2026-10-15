@@ -19,7 +19,6 @@ import {
 import { worldToScreen } from './hex.ts';
 import { activityGlyphFor, ACTIVITY_TTL_MS } from './localActivity.ts';
 
-export { ISO_TILE_W, ISO_TILE_H, ISO_WALL_H };
 export const isoProject = officeIsoProject;
 
 const ISO_FLOOR: Record<string, string> = {
@@ -53,7 +52,7 @@ export function isoUnproject(px: number, py: number): { x: number; y: number } {
   return { x: x / 2, y: y / 2 };
 }
 
-export function isoTileCorners(x: number, y: number, z = 0): Array<{ x: number; y: number }> {
+function isoTileCorners(x: number, y: number, z = 0): Array<{ x: number; y: number }> {
   const base = isoProject(x, y, z);
   return [
     { x: base.px, y: base.py - ISO_TILE_H / 2 },

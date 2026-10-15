@@ -4,16 +4,13 @@ import { type Terrain } from './types.ts';
 import { HEX_SIZE } from './constants.ts';
 
 /** Scale factor applied to flat-top hex layout. */
-export const ISO_HEX_SCALE = 1;
+const ISO_HEX_SCALE = 1;
 
 /** Vertical extrusion per elevation step (pixels, screen-up is negative Y). */
 export const ISO_EXTRUDE_H = 12;
 
 /** Top-face radius factor — slightly below 1.0 to prevent neighbor overlap. */
 export const ISO_HEX_RADIUS = 0.88;
-
-/** @deprecated Layout uses flat hex spacing; kept for test compat. */
-export const ISO_TILT_Y = 1;
 
 /** Relative height steps per terrain type for extruded tiles. */
 export function terrainElevation(terrain: Terrain): number {
@@ -53,9 +50,4 @@ export function screenToAxial(
   const px = (screenX - cam.cx) / cam.zoom + cam.x;
   const py = (screenY - cam.cy) / cam.zoom + cam.y;
   return pixelToAxial(px, py, size * ISO_HEX_SCALE);
-}
-
-/** Six flat-top hex corner angles (degrees). */
-export function hexCornerAngle(index: number): number {
-  return (Math.PI / 180) * (60 * index - 30);
 }

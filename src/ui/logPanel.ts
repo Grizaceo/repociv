@@ -109,7 +109,7 @@ export function clearLocalBuffer(): void {
 }
 
 // ─── Public API ────────────────────────────────────────────
-export function toggleLogCollapse(): void {
+function toggleLogCollapse(): void {
   if (!_panel) return;
   _collapsed = !_collapsed;
   _panel.classList.toggle('collapsed', _collapsed);

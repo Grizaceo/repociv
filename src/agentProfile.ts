@@ -13,7 +13,7 @@ import { bridgeUrl, bridgeHeaders } from './bridgeEnv.ts';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type HarnessId = 'hermes' | 'claude' | 'codex' | 'cursor' | 'openclaw';
-export type IdentityMode = 'native' | 'managed';
+type IdentityMode = 'native' | 'managed';
 
 export interface RepoCivProfile {
   name: string;
@@ -114,21 +114,6 @@ export async function saveProfile(profile: RepoCivProfile): Promise<RepoCivProfi
   return saved;
 }
 
-/** Delete a profile by name. */
-export async function deleteProfile(name: string): Promise<void> {
-  const resp = await fetch(bridgeUrl('/api/profiles/delete'), {
-    method: 'POST',
-    headers: { ...bridgeHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
-  });
-  if (!resp.ok) {
-    const data = (await resp.json()) as { error?: string };
-    throw new Error(data.error ?? `DELETE profile ${name} → ${resp.status}`);
-  }
-  _cacheDirty = true;
-  if (_profileCache) delete _profileCache[name];
-}
-
 /** Invalidate the in-memory cache (use after external changes). */
 export function invalidateProfileCache(): void {
   _profileCache = null;
@@ -188,15 +173,3 @@ export async function listHarnessProfiles(harness: string): Promise<string[]> {
 // ─── Runtime chatConfig merge ─────────────────────────────────────────────────
 // The unit panel stores per-unit harness/model/provider in localStorage.
 // This helper merges a RepoCivProfile into that runtime config.
-
-export function profileToChatConfig(profile: RepoCivProfile): {
-  harness: string;
-  provider: string;
-  model: string;
-} {
-  return {
-    harness: profile.harness,
-    provider: profile.provider ?? '',
-    model: profile.model ?? '',
-  };
-}

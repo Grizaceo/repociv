@@ -82,7 +82,7 @@ function isChatDomBoundTo(unitId: string): boolean {
 }
 
 /** Mark an agent as having new messages (for notification badge) */
-export function markAgentHasNewMessages(unitId: string): void {
+function markAgentHasNewMessages(unitId: string): void {
   agentsWithNewMessages.add(unitId);
   // Update chip badge if it exists
   const chip = document.querySelector<HTMLElement>(
@@ -220,7 +220,7 @@ export function appendUserMessage(unitId: string, text: string): void {
   attachCopyListeners(container, unitId);
 }
 
-export function ensureLiveAgentBubble(unitId: string): void {
+function ensureLiveAgentBubble(unitId: string): void {
   if (currentAgentBubble.has(unitId)) return;
   const container = document.getElementById('chat-messages');
   if (!container) return;

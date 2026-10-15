@@ -15,7 +15,7 @@ import manifestData from './assets/office-atlas.json' with { type: 'json' };
 
 const BUNDLED_MANIFEST = manifestData as unknown as OfficeAtlasManifest;
 
-export interface OfficeAtlasManifest {
+interface OfficeAtlasManifest {
   atlas: string;
   cellWidth: number;
   cellHeight: number;

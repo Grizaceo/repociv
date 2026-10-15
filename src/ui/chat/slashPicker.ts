@@ -166,7 +166,7 @@ function open(kind: PickerKind, unitId: string, append: AppendFn, initialFilter:
 }
 
 /** Close the picker and return focus to the chat input. */
-export function close(): void {
+function close(): void {
   if (!_active) return;
   _active.backdrop.remove();
   _active = null;

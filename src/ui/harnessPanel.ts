@@ -20,13 +20,13 @@ let _visible = false;
 let _harnesses: HarnessDescriptor[] = [];
 
 // ─── Public API ────────────────────────────────────────────────────────────────
-export function openHarnessPanel() {
+function openHarnessPanel() {
   _visible = true;
   showPanel(_getOrCreate());
   void _fetch();
 }
 
-export function closeHarnessPanel() {
+function closeHarnessPanel() {
   _visible = false;
   if (_panel) hidePanel(_panel);
 }
@@ -43,10 +43,6 @@ export function toggleHarnessPanel() {
 export function startHarnessPolling() {
   _stopPolling();
   _stopPoll = registerPoll('harness', () => void _fetch(), POLL_MS);
-}
-
-export function stopHarnessPolling() {
-  _stopPolling();
 }
 
 // ─── Polling ──────────────────────────────────────────────────────────────────

@@ -222,21 +222,3 @@ export function setOperationTicker(active: boolean, text = '') {
   const t = document.getElementById('ticker-text');
   if (t && text) t.textContent = text;
 }
-
-export function toggleViewHUD(is3D: boolean) {
-  const btn = document.getElementById('btn-toggle-3d');
-  if (btn) {
-    btn.innerHTML = is3D ? '<i data-lucide="layers"></i>' : '<i data-lucide="box"></i>';
-    const lucide = (window as unknown as Record<string, unknown>)['lucide'];
-    if (lucide)
-      (lucide as { createIcons: (opts: { icons: unknown; root: Element }) => void }).createIcons({
-        icons: (lucide as Record<string, unknown>)['icons'],
-        root: btn,
-      });
-    btn.classList.toggle('active', is3D);
-  }
-  logEvent(
-    is3D ? 'Cámara de perspectiva activada (3D)' : 'Cámara estratégica activada (2D)',
-    'info',
-  );
-}

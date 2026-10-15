@@ -27,10 +27,8 @@ import {
 import { renderItem, renderForm, escapeHtml } from './pendingPanel/templates.ts';
 import { renderEmptyState, clearEmptyState } from './emptyStates.ts';
 
-export type { PendingItem } from './pendingPanel/state.ts';
-
 // ─── Public API ───────────────────────────────────────────────────────────────
-export function openPendingPanel(): void {
+function openPendingPanel(): void {
   setVisible(true);
   showPanel(_getOrCreate());
   void _fetch();

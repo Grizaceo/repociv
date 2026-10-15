@@ -74,7 +74,7 @@ export function getNpcAt(
 
 // ─── Unit drawing ──────────────────────────────────────────────────────────
 
-export function getUnitGridPos(unit: LocalUnit): [number, number] {
+function getUnitGridPos(unit: LocalUnit): [number, number] {
   if (unit.path.length > 0 && unit.pathIndex < unit.path.length) {
     const from = unit.path[unit.pathIndex]!;
     const to = unit.path[Math.min(unit.pathIndex + 1, unit.path.length - 1)]!;

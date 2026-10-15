@@ -344,7 +344,3 @@ function _renderRecentReports(): void {
     });
   });
 }
-
-export function isGeneratingReport(): boolean {
-  return _state.generating;
-}

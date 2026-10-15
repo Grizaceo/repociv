@@ -112,7 +112,7 @@ function _render(): void {
 }
 
 /** Start the tour now (caller decides whether to via shouldShowTour). */
-export function startFirstRunTour(steps: TourStep[] = TOUR_STEPS): void {
+function startFirstRunTour(steps: TourStep[] = TOUR_STEPS): void {
   if (steps.length === 0) return;
   _steps = steps;
   _step = 0;

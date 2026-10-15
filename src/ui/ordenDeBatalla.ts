@@ -14,9 +14,9 @@ export function setOrdenHighlightCallback(cb: (unitId: string | null) => void): 
   _highlightCb = cb;
 }
 
-export type OrdenDisplayStatus = 'pending' | 'working' | 'done' | 'failed' | 'cancelled';
+type OrdenDisplayStatus = 'pending' | 'working' | 'done' | 'failed' | 'cancelled';
 
-export function displayStatus(s: SubagentRun): OrdenDisplayStatus {
+function displayStatus(s: SubagentRun): OrdenDisplayStatus {
   if (s.status === 'proposed') return 'pending';
   if (s.status === 'running') return 'working';
   if (s.status === 'cancelled') return 'cancelled';

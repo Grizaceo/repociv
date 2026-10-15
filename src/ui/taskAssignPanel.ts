@@ -32,7 +32,7 @@ let _setTask: ((unitId: string, task: AgentTask | null) => void) | null = null;
 let _lastSnapshot = '';
 
 // ─── Public API ───────────────────────────────────────────────────────────────
-export function openTaskAssignPanel(
+function openTaskAssignPanel(
   getUnits: () => LocalUnit[],
   setTask: (unitId: string, task: AgentTask | null) => void,
 ): void {
@@ -44,7 +44,7 @@ export function openTaskAssignPanel(
   _startPolling();
 }
 
-export function closeTaskAssignPanel(): void {
+function closeTaskAssignPanel(): void {
   _visible = false;
   _stopPolling();
   if (_panel) hidePanel(_panel);

@@ -158,15 +158,6 @@ async function _pollHermesBanner(): Promise<void> {
   }
 }
 
-/** Stop the poll loop. Tests use this to clean up between cases. */
-export function unmountHermesStatusBanner(): void {
-  if (_stopPoll) {
-    _stopPoll();
-    _stopPoll = null;
-  }
-  document.getElementById(BANNER_ID)?.remove();
-}
-
 function renderBanner(html: string): HTMLElement {
   const el = document.createElement('div');
   el.id = BANNER_ID;

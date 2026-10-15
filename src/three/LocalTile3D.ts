@@ -41,10 +41,6 @@ type LocalGlbVariant = MergedGlb & { norm: number; minY: number };
 let localGlbVariants: Map<LocalFurnitureGlbId, LocalGlbVariant> | null = null;
 let localGlbState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
 
-export function areLocalFurniturePropsReady(): boolean {
-  return localGlbState === 'ready';
-}
-
 export function ensureLocalFurniturePropsLoad(onSettled?: () => void): void {
   if (localGlbState !== 'idle') return;
   localGlbState = 'loading';

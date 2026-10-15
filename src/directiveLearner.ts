@@ -12,35 +12,6 @@ export interface Suggestion {
   score: number;
 }
 
-export interface Template {
-  gesture: string;
-  agentId: string;
-  cmdType: string;
-  target?: string;
-  successRate: number;
-  count: number;
-}
-
-export interface ReplayEntry {
-  command_id: string;
-  gesture: string;
-  agent_id: string;
-  cmd_type: string;
-  target: string;
-  outcome: string;
-  duration_s: number;
-  ts: number;
-}
-
-export interface DirectiveStats {
-  totalRecorded: number;
-  totalResolved: number;
-  overallSuccessRate: number;
-  successRates: Record<string, Record<string, { rate: number; count: number; success: number }>>;
-  templates: Template[];
-  recentSuccesses: ReplayEntry[];
-}
-
 function _headers(): Record<string, string> {
   return bridgeHeaders();
 }
@@ -97,17 +68,6 @@ export async function fetchSuggestions(
     return (await res.json()) as Suggestion[];
   } catch {
     return [];
-  }
-}
-
-// ─── Full stats (for replay panel and observability) ─────────────────────────
-export async function fetchStats(): Promise<DirectiveStats | null> {
-  try {
-    const res = await fetch(bridgeUrl('/directives/stats'), { headers: _headers() });
-    if (!res.ok) return null;
-    return (await res.json()) as DirectiveStats;
-  } catch {
-    return null;
   }
 }
 

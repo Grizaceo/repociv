@@ -58,12 +58,3 @@ export function subscribeExternalSessionDirectory(listener: Listener): () => voi
     _stopPollingWhenUnused();
   };
 }
-
-/** Test-only reset for isolated timer/cache tests. */
-export function resetExternalSessionDirectoryForTesting(): void {
-  if (_timer) window.clearInterval(_timer);
-  _timer = 0;
-  _refreshing = null;
-  _rows = null;
-  _listeners.clear();
-}

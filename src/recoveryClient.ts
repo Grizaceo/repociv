@@ -2,7 +2,6 @@
 // Lightweight TypeScript client for the bridge recovery endpoints.
 // All calls return typed responses; network errors are surfaced as plain Error.
 
-import type { HarnessDescriptor } from './harnessRegistry';
 import { bridgeHeaders, bridgeUrl } from './bridgeEnv.ts';
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
@@ -73,15 +72,6 @@ export const REASON_LABELS: Record<string, string> = {
 };
 
 // ─── Internal fetch helper ────────────────────────────────────────────────────
-async function _get<T>(path: string): Promise<T> {
-  const res = await fetch(bridgeUrl(path), { headers: bridgeHeaders() });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`[recoveryClient] GET ${path} → ${res.status} ${body}`);
-  }
-  return res.json() as Promise<T>;
-}
-
 async function _post<T>(path: string, body: Record<string, unknown>): Promise<T> {
   const res = await fetch(bridgeUrl(path), {
     method: 'POST',
@@ -93,18 +83,6 @@ async function _post<T>(path: string, body: Record<string, unknown>): Promise<T>
     throw new Error(`[recoveryClient] POST ${path} → ${res.status} ${text}`);
   }
   return res.json() as Promise<T>;
-}
-
-// ─── API surface ──────────────────────────────────────────────────────────────
-
-/** GET /harnesses — list all registered harnesses. */
-export async function listHarnesses(): Promise<HarnessDescriptor[]> {
-  return _get<HarnessDescriptor[]>('/harnesses');
-}
-
-/** GET /harnesses/:id — single harness detail. */
-export async function getHarness(id: string): Promise<HarnessDescriptor> {
-  return _get<HarnessDescriptor>(`/harnesses/${encodeURIComponent(id)}`);
 }
 
 // ─── Recovery plan types ──────────────────────────────────────────────────────

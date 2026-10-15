@@ -21,10 +21,6 @@ export function basenameFromPath(path: string): string {
   return parts[parts.length - 1] ?? normalized;
 }
 
-export function normalizeWonderLookup(value: string): string {
-  return _normalizeToken(value);
-}
-
 export function findCityByWonderSelection(
   cities: CityBridgeCandidate[],
   nodeId: string,

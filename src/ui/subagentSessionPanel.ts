@@ -93,17 +93,12 @@ export function openSubagentSession(subagentId: string | null | undefined): bool
   return true;
 }
 
-export function closeSubagentSession(): void {
+function closeSubagentSession(): void {
   const panel = document.getElementById('subagent-session-panel');
   if (panel) {
     panel.classList.add('hidden');
     panel.innerHTML = '';
   }
-}
-
-export function isSubagentSessionOpen(): boolean {
-  const panel = document.getElementById('subagent-session-panel');
-  return !!panel && !panel.classList.contains('hidden');
 }
 
 export async function recallSubagent(

@@ -106,8 +106,3 @@ export function mountLocalChat(
     },
   };
 }
-
-/** Remove the feed if present. Safe to call when it was never mounted. */
-export function unmountLocalChat(doc: Document = document): void {
-  doc.getElementById(LAYER_ID)?.remove();
-}

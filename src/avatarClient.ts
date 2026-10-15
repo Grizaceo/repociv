@@ -23,7 +23,7 @@ import { bridgeUrl, bridgeHeaders } from './bridgeEnv.ts';
 
 export type AvatarKind = 'pet' | 'face' | 'asset' | null;
 
-export interface RosterPet {
+interface RosterPet {
   id: string;
   displayName: string;
   description: string;
@@ -138,22 +138,6 @@ export function resolveBotIdentity(entry: RosterEntry | null): BotIdentity {
     }
     default:
       return { kind: null, imageUrl: null, label: entry.name, pet: null };
-  }
-}
-
-/**
- * Resolve the avatar image URL for a unit, or null if it should fall back to the
- * existing AGENT_ICONS glyph. Kept for backward compatibility with callers that
- * only need the URL (e.g. the legacy hex badge). New views should use
- * resolveBotIdentity() to stay consistent with the other views.
- */
-export async function resolveAvatarUrl(unitId: string): Promise<string | null> {
-  try {
-    const map = await getRosterMap();
-    const entry = map.get(normalize(unitId));
-    return resolveBotIdentity(entry ?? null).imageUrl;
-  } catch {
-    return null;
   }
 }
 

@@ -46,15 +46,6 @@ export function loadWonderConfig(): WondersConfig {
   }
 }
 
-export function saveWonderConfig(config: WondersConfig): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-  } catch {
-    // localStorage full or unavailable — silent
-  }
-}
-
 export function isFeatureEnabled(
   config: WondersConfig,
   wonderId: string,

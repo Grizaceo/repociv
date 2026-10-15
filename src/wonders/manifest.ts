@@ -8,7 +8,6 @@
 
 import { bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import type { WonderManifest } from './types.ts';
-import type { WonderType } from '../types.ts';
 
 // Native fallback only. iframe wonders (any user-connected service) are NOT
 // hardcoded here — they live in the backend registry (~/.repociv/wonders/*.json,
@@ -147,11 +146,6 @@ export function getWonder(id: string): WonderManifest | undefined {
   return _registry.get(id);
 }
 
-export function getWonderByCategory(category: string): WonderManifest[] {
-  _ensureInit();
-  return Array.from(_registry.values()).filter((m) => m.category === category);
-}
-
 export function isWonderEnabled(id: string): boolean {
   _ensureInit();
   return _registry.get(id)?.defaultEnabled ?? false;
@@ -172,9 +166,3 @@ export function isActionOptIn(id: string, actionId: string): boolean {
   const action = _registry.get(id)?.actions.find((a) => a.id === actionId);
   return action?.requiresUserOptIn ?? false;
 }
-
-export function resolveWonderUrl(type: WonderType): string {
-  return getWonder(type)?.ui.url ?? '';
-}
-
-export const KNOWN_WONDER_TYPES: readonly WonderType[] = ['gaceta'] as const;

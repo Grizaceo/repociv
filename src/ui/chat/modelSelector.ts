@@ -257,11 +257,6 @@ function finishInit(data: { defaultHarness: string; defaultProvider: string }): 
   _onConfigPersisted.forEach((cb) => cb(activeUnit));
 }
 
-/** Whether /health reports cursor-agent installed (Swarm tracking possible). */
-export function isCursorTrackingAvailable(): boolean {
-  return _cursorAvailable;
-}
-
 /** Passive Task tracking available for the given harness (capability table). */
 export function isSwarmTrackingAvailable(harness: string): boolean {
   if (harness === 'cursor') return _cursorAvailable;
@@ -654,7 +649,7 @@ function _registryHarnessId(harness: string): string {
 }
 
 /** Model ids compatible with a harness (for profile strip). 0 external selects). */
-export function listModelsForHarness(harness: string): { id: string; name: string }[] {
+function listModelsForHarness(harness: string): { id: string; name: string }[] {
   const hid = _registryHarnessId(harness);
   const seen = new Map<string, string>();
   for (const p of _allProviders) {
