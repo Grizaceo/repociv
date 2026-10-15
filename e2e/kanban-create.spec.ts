@@ -8,7 +8,10 @@ test('manual project board: errors preserve draft, success selects shared board'
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
     localStorage.setItem('repociv:tour-seen:v1', '1');
-    localStorage.setItem('repociv:world-render-mode', 'canvas');
+    // Flat macro renderer (the old 'repociv:world-render-mode' key is dead).
+    // This spec drives the Kanban iframe; the webgl default only adds
+    // SwiftShader load on the CI runner.
+    localStorage.setItem('repociv:renderer', 'flat');
   });
   let created = false;
   let posts = 0;

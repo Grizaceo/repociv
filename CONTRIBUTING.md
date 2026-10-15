@@ -73,6 +73,29 @@ pytest server/ -v
 pytest server/ --cov=server --cov-report=term-missing
 ```
 
+### Playwright e2e
+
+The e2e suite boots the app against the synthetic `demo-workspace` fixture, so
+it never touches your real `~/.hermes` state. To reproduce the CI conditions
+locally (same seed and env vars, isolated `XDG_STATE_HOME`, ports 5373-5375):
+
+```bash
+# Full suite, like CI
+bash scripts/e2e-ci-sim.sh
+
+# One spec
+bash scripts/e2e-ci-sim.sh e2e/repociv.spec.ts
+```
+
+The helper is deliberately frugal: it pins the run to two CPUs (`taskset`) at
+the lowest priority (`nice -n 19`) with one Playwright worker, so the machine
+stays usable while it runs. Use `E2E_SIM_FULL=1` for the CI shape (all CPUs,
+two workers).
+
+The two live specs (`activity-live`, `dashboard-live-inventory`) skip unless
+`REPOCIV_LIVE_INVENTORY=1`: they read the real local Hermes/kanban stores and
+are opt-in dogfood checks, not CI gates.
+
 ### Pre-push hook (optional)
 
 To run the full gate automatically before every `git push`:

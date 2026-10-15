@@ -1293,6 +1293,12 @@ async function bootstrap() {
   bindOrdenDeBatalla(state);
   bindSubagentSessionPanel(state);
   bindSlashCommandState(state);
+
+  // Readiness contract for e2e/scripts: every HUD listener is wired by now.
+  // The loading screen hides much earlier (before the HUD wiring), so it
+  // cannot gate interactions — clicking a HUD button before this point is a
+  // silent no-op on a loaded machine.
+  document.documentElement.dataset.appReady = '1';
 }
 
 // ─── Start ────────────────────────────────────────────────────────────────────

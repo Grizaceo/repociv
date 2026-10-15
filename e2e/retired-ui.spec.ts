@@ -5,7 +5,11 @@ test('retired controls stay removed while tasks, Kanban and agent attention rema
 }) => {
   await page.addInitScript(() => {
     localStorage.setItem('repociv:tour-seen:v1', '1');
-    localStorage.setItem('repociv:world-render-mode', 'canvas');
+    // Flat macro renderer (the old 'repociv:world-render-mode' key is dead).
+    // This spec is HUD-only; the webgl default would put the CI runner
+    // (SwiftShader, 2 workers) under load heavy enough to starve Playwright's
+    // in-page queries.
+    localStorage.setItem('repociv:renderer', 'flat');
   });
   await page.goto('/');
   await expect(page.locator('#agent-attention-strip')).toBeVisible({ timeout: 60_000 });

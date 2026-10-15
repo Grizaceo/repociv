@@ -184,7 +184,10 @@ export function wireHotkeys(
     }
 
     // Hero selection 1–9 is the same active-session dock the HUD renders.
-    if (/^[1-9]$/.test(e.key)) {
+    // 2 and 3 are reserved for the 2D/3D view toggles below (SCOPE.md, owner
+    // decision 2026-06: `?renderer=webgl` o hotkey 3), so the dock yields
+    // them: digits 1 and 4–9 keep their slots.
+    if (/^[1-9]$/.test(e.key) && e.key !== '2' && e.key !== '3') {
       const idx = parseInt(e.key, 10) - 1;
       const target = visibleSessionDock(
         activeSessionDock(state.getAllUnits(), externalSessionSnapshot()),
@@ -270,8 +273,9 @@ export function wireHotkeys(
         renderer.toggleGrid();
         break;
       case '2':
-        trackHotkey('2:map-render-mode');
-        renderer.toggleWorldRenderMode();
+      case '3':
+        trackHotkey(`${e.key}:cycle-render-mode`);
+        toggleView();
         break;
       case 'f':
         if (state.viewMode === 'local') {
@@ -285,10 +289,6 @@ export function wireHotkeys(
       case 'v':
         trackHotkey('V:fog');
         renderer.toggleFog();
-        break;
-      case '3':
-        trackHotkey('3:cycle-render-mode');
-        toggleView();
         break;
       case 'a':
         // Ctrl+A: approvals panel (bare A is reserved for camera pan left)

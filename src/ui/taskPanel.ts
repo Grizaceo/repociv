@@ -186,12 +186,25 @@ async function _cancelTask(key: string): Promise<void> {
 
 let _lastRendered = '';
 
+// The pending-work sample time moves on (nearly) every 3 s poll. Comparing
+// the HTML with that line normalized keeps a full innerHTML replace from
+// detaching every card each poll — which starves real clicks and selection.
+const SAMPLE_NOTE = /Última muestra: [^<]*\./;
+
 // ─── Render ───────────────────────────────────────────────────────────────────
 function _render(): void {
   const panel = _getOrCreate();
   const body = panel.querySelector<HTMLElement>('.task-body')!;
   const replace = (html: string): boolean => {
     if (html === _lastRendered) return false;
+    if (_lastRendered && html.replace(SAMPLE_NOTE, '') === _lastRendered.replace(SAMPLE_NOTE, '')) {
+      // Only the sample time moved: patch it in place, keep the DOM stable.
+      _lastRendered = html;
+      const note = body.querySelector<HTMLElement>('[data-pending-sampled]');
+      const next = html.match(SAMPLE_NOTE)?.[0];
+      if (note && next) note.textContent = next;
+      return false;
+    }
     _lastRendered = html;
     const open = new Set(
       Array.from(body.querySelectorAll<HTMLDetailsElement>('details[open]')).map(
