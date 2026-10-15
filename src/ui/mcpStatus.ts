@@ -59,10 +59,3 @@ export function startMcpStatusPolling(): void {
   if (isPollRegistered(POLL_ID) || stopPoll) return;
   stopPoll = registerPoll(POLL_ID, () => void pollMcpStatusOnce(), POLL_MS);
 }
-
-export function stopMcpStatusPolling(): void {
-  if (stopPoll) {
-    stopPoll();
-    stopPoll = null;
-  }
-}

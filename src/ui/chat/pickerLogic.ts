@@ -5,7 +5,7 @@
 // module free of any import that touches the browser — that is what lets
 // pickerLogic.test.ts import it directly.
 
-export type PickerStatus = 'ok' | 'warn' | 'off';
+type PickerStatus = 'ok' | 'warn' | 'off';
 
 /** One row in a picker list. */
 export interface PickerOption {
@@ -34,7 +34,7 @@ export interface RawHarness {
   name: string;
   available: boolean;
 }
-export interface RawModel {
+interface RawModel {
   id: string;
   name: string;
   reachable?: boolean;

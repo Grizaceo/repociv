@@ -52,7 +52,7 @@ function getNextUnitId(base: string): string {
 }
 
 // ─── Spawn from a RepoCivProfile ─────────────────────────────────────────────
-export function spawnFromProfile(
+function spawnFromProfile(
   profile: RepoCivProfile,
   state: GameState,
   renderer: Renderer,

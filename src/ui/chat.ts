@@ -3,12 +3,10 @@
 // El split se hizo en commit posterior a b70167e; previamente todo vivía aqui.
 
 export {
-  markAgentHasNewMessages,
   appendChatChunk,
   appendUserMessage,
   appendSystemMessage,
   appendApprovalCard,
-  resetChatHistory,
   clearChat,
 } from './chat/history.ts';
 

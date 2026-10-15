@@ -44,7 +44,7 @@ function chipModelTitle(cfg: { harness: string; provider: string; model: string 
 /** Update the model line on an existing chip to match the unit's persisted
  *  config. Registered as the modelSelector persist handler so any selection
  *  change (dropdown, slash command, or picker) reflects on the active tab. */
-export function updateChipModel(unitId: string): void {
+function updateChipModel(unitId: string): void {
   const container = document.getElementById('chat-agent-selector');
   if (!container) return;
   const chip = container.querySelector<HTMLElement>(`.chat-agent-chip[data-unit="${unitId}"]`);
@@ -135,7 +135,7 @@ async function closeChip(unitId: string): Promise<void> {
 /** Re-render the working-spinner state on every visible chip.
  *  Called on every workingUnits change so the spinner appears/disappears
  *  even when the user is looking at a different tab. */
-export function syncChipsWorking(): void {
+function syncChipsWorking(): void {
   const container = document.getElementById('chat-agent-selector');
   if (!container) return;
   for (const chip of container.querySelectorAll<HTMLElement>('.chat-agent-chip')) {
@@ -207,7 +207,7 @@ export async function switchToChatUnit(
 }
 
 /** Switch active agent + refresh UI (chip click). */
-export async function handleChipClick(unitId: string): Promise<void> {
+async function handleChipClick(unitId: string): Promise<void> {
   await switchToChatUnit(unitId);
 }
 
