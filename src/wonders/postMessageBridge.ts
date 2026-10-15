@@ -58,7 +58,7 @@ function _isWonderMessage(data: unknown): data is WonderToRepoCivMessage {
   return t === 'wonder.focus_city' || t === 'wonder.selection';
 }
 
-export function postToWonder(
+function postToWonder(
   iframe: HTMLIFrameElement,
   manifest: WonderManifest,
   msg: RepoCivToWonderMessage,

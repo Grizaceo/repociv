@@ -27,7 +27,7 @@ export function resolveMountUrl(manifestUrl: string, launcherUiUrl: string | und
   return launcherUiUrl === manifestUrl.replace(/\/$/, '') ? manifestUrl : launcherUiUrl;
 }
 
-export type WonderLaunchStatusValue =
+type WonderLaunchStatusValue =
   | 'offline'
   | 'starting'
   | 'degraded'

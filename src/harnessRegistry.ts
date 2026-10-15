@@ -8,9 +8,9 @@ const _raw = harnessRegistryRaw as unknown;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type HarnessKind = 'reference' | 'agent_runtime' | 'sandbox' | 'local_cli' | 'bridge';
+type HarnessKind = 'reference' | 'agent_runtime' | 'sandbox' | 'local_cli' | 'bridge';
 
-export type HarnessTransport = 'none' | 'cli' | 'http' | 'plugin' | 'sandbox';
+type HarnessTransport = 'none' | 'cli' | 'http' | 'plugin' | 'sandbox';
 
 export type TrustLevel =
   | 'reference_only'
@@ -21,7 +21,7 @@ export type TrustLevel =
 
 export type RecoveryMode = 'copy_command' | 'tmux_attach' | 'view_logs' | 'no_recovery_available';
 
-export interface RecoveryDescriptor {
+interface RecoveryDescriptor {
   cwd?: string;
   command?: string;
   session?: string;
