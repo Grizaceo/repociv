@@ -155,7 +155,7 @@ REPOCIV_MAP_ROOT=~/projects
 ```
 ┌─────────────────────────────────────────────┐
 │  ThreeMapRenderer   (src/three/)*           │  ← Renderizador WebGL 3D (Three.js r175)
-│  Canvas 2D Renderer (src/renderer.ts)        │  ← Dibujo 2D hex nomral (fallback)
+│  Canvas 2D Renderer (src/renderer.ts)        │  ← Dibujo 2D hex normal (fallback)
 │  Minimap Renderer   (src/minimapRenderer.ts) │     minimapa, unidades, ciudades
 ├─────────────────────────────────────────────┤
 │  GameState  (src/game.ts)                   │  ← Loop de simulación,
