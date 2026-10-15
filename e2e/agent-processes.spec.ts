@@ -3,6 +3,10 @@ import { expect, test } from '@playwright/test';
 test('tasks include every agent process, even with an empty orchestrator', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('repociv:tour-seen:v1', '1');
+    // CI has no Hermes harness: the degraded-mode banner is a fixed
+    // strip over the top bar that intercepts pointer events (measured in
+    // CI run 38674628310). Dismiss it for the session so HUD clicks land.
+    sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
     // Flat macro renderer (the old 'repociv:world-render-mode' key is dead).
     // This spec is panel-only; the webgl default would put the CI runner
     // (SwiftShader, 2 workers) under load heavy enough to starve Playwright's

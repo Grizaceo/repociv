@@ -121,6 +121,10 @@ async function seedRepoSelection(page: Page) {
     // Skip the first-run coachmark tour: its backdrop intercepts pointer
     // events on the canvas, which the chat-opening flow needs.
     window.localStorage.setItem('repociv:tour-seen:v1', '1');
+    // CI has no Hermes harness: the degraded-mode banner is a fixed
+    // strip over the top bar that intercepts pointer events (measured in
+    // CI run 38674628310). Dismiss it for the session so HUD clicks land.
+    sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
   }, paths);
 }
 
@@ -177,12 +181,12 @@ async function openChat(page: Page) {
  *  fail the functional test, so fall back to the viewport shot. */
 async function shotPanel(page: Page, path: string): Promise<void> {
   try {
-    await page.locator('#side-panel').screenshot({ path, timeout: 10_000 });
+    await page.locator(selector).screenshot({ path, timeout: 5_000 });
   } catch {
     console.warn(`[e2e] element screenshot timed out; falling back to viewport: ${path}`);
     // The fallback is best-effort too: on a starved machine a full-page shot
     // can hang, and an artifact must never eat the test's budget.
-    await page.screenshot({ path, timeout: 10_000 }).catch(() => {});
+    await page.screenshot({ path, timeout: 5_000 }).catch(() => {});
   }
 }
 
@@ -202,7 +206,7 @@ test('profile selector: aparece en el header del chat con la etiqueta y perfiles
   await expect(sel.locator('option[value="lexo"]')).toHaveCount(0);
   await expect(sel.locator('option[value="~/.hermes/profiles/main"]')).toHaveCount(1);
   await expect(sel.locator('option[value="~/.hermes/profiles/lexo-alpha"]')).toHaveCount(1);
-  await shotPanel(page, 'e2e/_shots/profile-selector.png');
+  await shot(page, '#side-panel', 'e2e/_shots/profile-selector.png');
 });
 
 test('profile selector: cambiar el harness del panel filtra los perfiles disponibles', async ({

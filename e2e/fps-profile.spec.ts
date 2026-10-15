@@ -25,6 +25,10 @@ test('profile: cost of each drawing class in the local-view frame', async ({ pag
     expect(paths.length, 'expected /api/repos to return selectable repos').toBeGreaterThan(0);
     await page.addInitScript((selected) => {
       window.localStorage.setItem('repociv:tour-seen:v1', '1');
+      // CI has no Hermes harness: the degraded-mode banner is a fixed
+      // strip over the top bar that intercepts pointer events (measured in
+      // CI run 38674628310). Dismiss it for the session so HUD clicks land.
+      sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
       window.localStorage.setItem(
         'repociv:selected-repos:v1',
         JSON.stringify({

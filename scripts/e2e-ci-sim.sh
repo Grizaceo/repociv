@@ -62,6 +62,13 @@ export REPOCIV_STATE_FILE="${TMP}/state.json"
 export XDG_STATE_HOME="${TMP}/xdg"
 export REPOCIV_PORT=5373 VITE_PORT=5373 BRIDGE_PORT=5374 BRIDGE_WS_PORT=5375
 
+# CI has no Hermes harness, so the app shows the degraded-mode banner (and the
+# banner's fixed strip covers the top bar). E2E_SIM_NO_HERMES=1 reproduces that
+# condition locally by pointing the bridge probe at a dead port.
+if [[ "${E2E_SIM_NO_HERMES:-0}" == "1" ]]; then
+  export HERMES_URL=http://127.0.0.1:9/v1
+fi
+
 if [[ "${E2E_SIM_FULL:-0}" == "1" ]]; then
   echo "e2e-ci-sim: root=${ROOT} state=${TMP}/state.json ports=5373-5375 (CI shape: all CPUs, 2 workers)"
   exec npx playwright test "$@" --reporter=list

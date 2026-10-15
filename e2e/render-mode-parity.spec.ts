@@ -43,6 +43,10 @@ async function bootWithMode(page: Page, mode: 'flat' | 'webgl') {
   await page.evaluate(
     ([mode, repos]) => {
       window.localStorage.setItem('repociv:renderer', mode);
+      // CI has no Hermes harness: the degraded-mode banner is a fixed
+      // strip over the top bar that intercepts pointer events (measured in
+      // CI run 38674628310). Dismiss it for the session so HUD clicks land.
+      sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
       window.localStorage.setItem(
         'repociv:selected-repos:v1',
         JSON.stringify({
@@ -115,6 +119,10 @@ test.describe('hex2d ↔ WebGL parity', () => {
     await page.evaluate(
       ([repos]) => {
         window.localStorage.setItem('repociv:renderer', 'iso25d');
+        // CI has no Hermes harness: the degraded-mode banner is a fixed
+        // strip over the top bar that intercepts pointer events (measured in
+        // CI run 38674628310). Dismiss it for the session so HUD clicks land.
+        sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
         window.localStorage.setItem(
           'repociv:selected-repos:v1',
           JSON.stringify({

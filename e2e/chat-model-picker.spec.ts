@@ -121,6 +121,10 @@ async function seedRepoSelection(page: Page) {
     // Skip the first-run coachmark tour: its card captures the Enter key
     // that the chat-opening flow needs.
     window.localStorage.setItem('repociv:tour-seen:v1', '1');
+    // CI has no Hermes harness: the degraded-mode banner is a fixed
+    // strip over the top bar that intercepts pointer events (measured in
+    // CI run 38674628310). Dismiss it for the session so HUD clicks land.
+    sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
   }, paths);
 }
 
@@ -181,18 +185,18 @@ async function openModelPicker(page: Page) {
   await expect(page.locator('.slash-picker')).toBeVisible({ timeout: 5_000 });
 }
 
-/** PR-review artifact. The side panel's entry transition plus a loaded machine
- *  can keep Playwright's element-stability check waiting far past any useful
- *  budget (measured on the 2026-10-14 CI-shaped runs); a screenshot must never
- *  fail the functional test, so fall back to the viewport shot. */
-async function shotPanel(page: Page, path: string): Promise<void> {
+/** PR-review artifact. The element's entry transition plus a loaded machine can
+ *  keep Playwright's element-stability check waiting far past any useful budget
+ *  (measured on the 2026-10-14 CI-shaped runs); a screenshot must never fail
+ *  the functional test, so fall back to the viewport shot. */
+async function shot(page: Page, selector: string, path: string): Promise<void> {
   try {
-    await page.locator('#side-panel').screenshot({ path, timeout: 10_000 });
+    await page.locator(selector).screenshot({ path, timeout: 5_000 });
   } catch {
     console.warn(`[e2e] element screenshot timed out; falling back to viewport: ${path}`);
     // The fallback is best-effort too: on a starved machine a full-page shot
     // can hang, and an artifact must never eat the test's budget.
-    await page.screenshot({ path, timeout: 10_000 }).catch(() => {});
+    await page.screenshot({ path, timeout: 5_000 }).catch(() => {});
   }
 }
 
@@ -203,12 +207,12 @@ test('/model picker: abre, filtra y aísla Esc del panel', async ({ page }) => {
 
   // 8 modelos de providers disponibles (xai se omite por no-configurado).
   await expect(page.locator('.slash-picker-item')).toHaveCount(8);
-  await shotPanel(page, 'e2e/_shots/picker-model.png');
+  await shot(page, '#side-panel', 'e2e/_shots/picker-model.png');
 
   // Type-ahead: "g" reduce a los dos modelos GPT.
   await page.locator('.slash-picker-filter').fill('g');
   await expect(page.locator('.slash-picker-item')).toHaveCount(2);
-  await shotPanel(page, 'e2e/_shots/picker-model-filtered.png');
+  await shot(page, '#side-panel', 'e2e/_shots/picker-model-filtered.png');
 
   // Esc cierra el picker pero NO el panel lateral (no debe filtrarse al
   // handler global de Esc que cierra el side panel).
@@ -263,9 +267,7 @@ test('/model picker: number-pick aplica y confirma', async ({ page }) => {
   await expect(page.locator('#model-selector')).toHaveValue('gpt-4o-mini');
   // El chip activo muestra el modelo elegido en su línea (R3).
   await expect(page.locator('.chat-agent-chip.active .chip-model')).toContainText('gpt-4o-mini');
-  await page
-    .locator('#chat-agent-selector-row')
-    .screenshot({ path: 'e2e/_shots/chip-model-line.png' });
+  await shot(page, '#chat-agent-selector-row', 'e2e/_shots/chip-model-line.png');
 });
 
 test('/model picker: el harness filtra los providers compatibles (R2)', async ({ page }) => {
@@ -295,5 +297,5 @@ test('/harness picker: marca el harness activo', async ({ page }) => {
   await expect(page.locator('.slash-picker')).toBeVisible({ timeout: 5_000 });
   // El harness activo (hermes, por defaultHarness) aparece marcado.
   await expect(page.locator('.slash-picker-item.current')).toContainText('Hermes');
-  await shotPanel(page, 'e2e/_shots/picker-harness.png');
+  await shot(page, '#side-panel', 'e2e/_shots/picker-harness.png');
 });

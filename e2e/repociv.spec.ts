@@ -29,6 +29,10 @@ async function seedRepoSelection(page: Page) {
     // Skip the first-run coachmark tour: its backdrop intercepts pointer
     // events, which every click-driven flow in this spec needs.
     window.localStorage.setItem('repociv:tour-seen:v1', '1');
+    // CI has no Hermes harness: the degraded-mode banner is a fixed
+    // strip over the top bar that intercepts pointer events (measured in
+    // CI run 38674628310). Dismiss it for the session so HUD clicks land.
+    sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
   }, selectedRepoPaths);
 }
 

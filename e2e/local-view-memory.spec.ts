@@ -20,6 +20,10 @@ async function seedRepoSelection(page: Page) {
   await page.evaluate((paths) => {
     window.localStorage.setItem(
       'repociv:selected-repos:v1',
+    // CI has no Hermes harness: the degraded-mode banner is a fixed
+    // strip over the top bar that intercepts pointer events (measured in
+    // CI run 38674628310). Dismiss it for the session so HUD clicks land.
+    sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
       JSON.stringify({
         version: 1,
         selectedRepoPaths: paths,
