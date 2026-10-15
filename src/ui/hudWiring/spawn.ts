@@ -224,8 +224,12 @@ export function spawnAgent(
     CODEX: 'codex',
     CURSOR: 'cursor',
     PRAETORIAN: 'praetorian',
+    WORKER: 'worker',
+    SCOUT: 'scout',
+    OPENCLAW: 'openclaw',
+    LEXO: 'lexo',
   };
-  const type = typeMap[base] ?? 'hero';
+  const type = typeMap[base.toUpperCase()] ?? 'hero';
   const unit = state.spawnUnit(unitId, unitId, type, 'capital', coord, 'En espera de misión');
 
   if (base === 'CODEX' || base === 'CURSOR') {

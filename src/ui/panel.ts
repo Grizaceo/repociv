@@ -38,6 +38,12 @@ export function unitModelLabel(unit: Unit): string {
     lexo: 'LexO-α',
     openclaw: 'OpenClaw',
   };
+  if (unit.type === 'hero' && unit.id) {
+    const prefix = unit.id.split('-')[0]?.toLowerCase() ?? '';
+    if (prefix && prefix !== 'main' && prefix !== 'hero' && labels[prefix]) {
+      return labels[prefix];
+    }
+  }
   return labels[unit.type] ?? unit.type;
 }
 
