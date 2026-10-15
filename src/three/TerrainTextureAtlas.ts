@@ -7,10 +7,9 @@ import {
   Texture,
   TextureLoader,
 } from 'three';
-import { type Terrain } from '../types.ts';
 import { logger } from '../logger.ts';
 
-export interface TerrainAtlasMeta {
+interface TerrainAtlasMeta {
   version: number;
   kind: 'repociv-3d-terrain-atlas';
   texture: string;
@@ -100,8 +99,4 @@ export function loadTerrainAtlas(): Promise<LoadedTerrainAtlas | null> {
     }
   })();
   return cached;
-}
-
-export function terrainAtlasIndex(meta: TerrainAtlasMeta | null, terrain: Terrain): number {
-  return meta?.terrains[terrain]?.index ?? 0;
 }

@@ -12,7 +12,7 @@ import {
   Color,
   Vector3,
 } from 'three';
-import { type Tile, type Terrain, tileKey } from '../types.ts';
+import { type Tile, tileKey } from '../types.ts';
 import { type GameState } from '../game.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
@@ -486,16 +486,4 @@ export function clearTileDecor(): void {
 
 export function setDecorVisible(visible: boolean): void {
   decorGroup.visible = visible;
-}
-
-/** @internal test hook */
-export function _terrainNeedsDecor(terrain: Terrain): boolean {
-  return (
-    terrain === 'mountain' ||
-    terrain === 'forest' ||
-    terrain === 'hills' ||
-    terrain === 'desert' ||
-    terrain === 'ice' ||
-    terrain === 'sacred'
-  );
 }
