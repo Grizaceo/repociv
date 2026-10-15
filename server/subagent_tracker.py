@@ -48,11 +48,9 @@ def configure(*, send: SendFn | None = None, add_approval: ApprovalFn | None = N
 
 def map_kind_to_unit_type(kind: str) -> str:
     k = (kind or "").lower()
-    if k in ("explore", "cursor-guide", "ci-investigator"):
+    if k in ("explore", "verifier", "cursor-guide", "ci-investigator"):
         return "scout"
-    if k in ("shell", "best-of-n-runner"):
-        return "worker"
-    if k == "generalpurpose":
+    if k in ("worker", "shell", "best-of-n-runner", "generalpurpose"):
         return "worker"
     return "scout"
 

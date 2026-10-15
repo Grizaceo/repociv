@@ -21,18 +21,37 @@ CLI_EVENTS = {
     "PostToolUse": "tool_use", "PostToolUseFailure": "tool_use",
     "Stop": "turn_end", "SessionEnd": "session_end",
 }
+FIVE_EVENTS = {k: v for k, v in CLI_EVENTS.items() if k != "PostToolUseFailure"}
 # Hermes on_session_end fires at the end of each TURN, not CLI shutdown.
 HERMES_EVENTS = {
     "on_session_start": "session_start", "post_tool_call": "tool_use",
     "on_session_end": "turn_end", "on_session_finalize": "session_end",
 }
+MCODE_PLUGIN_MANIFEST = (
+    json.dumps(
+        {
+            "name": "repociv-hooks",
+            "version": "1.0.0",
+            "description": "RepoCiv position hooks",
+        },
+        indent=2,
+    )
+    + "\n"
+)
 
 
 def commands(repo: Path, python: str) -> dict[str, dict[str, str]]:
     prefix = f"{shlex.quote(python)} {shlex.quote(str(repo / 'server/agent_hook_client.py'))}"
-    return {cli: {event: f"{prefix} {cli} {mapped}" for event, mapped in events.items()}
-            for cli, events in (("claude", CLI_EVENTS), ("codex", {k: v for k, v in CLI_EVENTS.items() if k != "PostToolUseFailure"}),
-                                ("hermes", HERMES_EVENTS))}
+    return {
+        cli: {event: f"{prefix} {cli} {mapped}" for event, mapped in events.items()}
+        for cli, events in (
+            ("claude", CLI_EVENTS),
+            ("codex", FIVE_EVENTS),
+            ("hermes", HERMES_EVENTS),
+            ("devin", FIVE_EVENTS),
+            ("mcode", FIVE_EVENTS),
+        )
+    }
 
 
 def _same_hook(candidate: str, command: str) -> bool:
@@ -125,25 +144,71 @@ def private_write(path: Path, content: str, mode=0o600) -> None:
 
 def install(home: Path, repo: Path, python: str, *, remove=False) -> dict:
     specs = commands(repo, python)
-    targets = [(home / ".claude/settings.json", "claude"),
-               (home / ".codex/hooks.json", "codex"),
-               (home / ".hermes/config.yaml", "hermes")]
-    updates = []
+    targets = [
+        (home / ".claude/settings.json", "claude"),
+        (home / ".codex/hooks.json", "codex"),
+        (home / ".hermes/config.yaml", "hermes"),
+        (home / ".config/devin/config.json", "devin"),
+    ]
+    updates: list[tuple[Path, str | None, str | None, int]] = []
     for path, cli in targets:
         if not path.exists():
             continue  # do not invent installations or touch other profiles
         before = path.read_text()
-        after = (merge_yaml_hooks(before, specs[cli], remove=remove) if cli == "hermes" else
-                 json.dumps(merge_json_hooks(json.loads(before), specs[cli], remove=remove), indent=2) + "\n")
+        after = (
+            merge_yaml_hooks(before, specs[cli], remove=remove)
+            if cli == "hermes"
+            else json.dumps(merge_json_hooks(json.loads(before), specs[cli], remove=remove), indent=2) + "\n"
+        )
         if after != before:
-            updates.append((path, before, after))
+            updates.append((path, before, after, path.stat().st_mode & 0o777))
+
+    minimax_dir = home / ".minimax"
+    if minimax_dir.is_dir():
+        plugin_root = minimax_dir / "plugins" / "repociv-hooks"
+        manifest_path = plugin_root / ".claude-plugin" / "plugin.json"
+        hooks_path = plugin_root / "hooks" / "hooks.json"
+        if not remove:
+            before_m = manifest_path.read_text() if manifest_path.exists() else None
+            if before_m != MCODE_PLUGIN_MANIFEST:
+                mode_m = (manifest_path.stat().st_mode & 0o777) if manifest_path.exists() else 0o600
+                updates.append((manifest_path, before_m, MCODE_PLUGIN_MANIFEST, mode_m))
+            before_h = hooks_path.read_text() if hooks_path.exists() else None
+            base_h = json.loads(before_h) if before_h else {}
+            after_h = json.dumps(merge_json_hooks(base_h, specs["mcode"], remove=False), indent=2) + "\n"
+            if after_h != before_h:
+                mode_h = (hooks_path.stat().st_mode & 0o777) if hooks_path.exists() else 0o600
+                updates.append((hooks_path, before_h, after_h, mode_h))
+        elif hooks_path.exists():
+            before_h = hooks_path.read_text()
+            merged_h = merge_json_hooks(json.loads(before_h), specs["mcode"], remove=True)
+            if merged_h.get("hooks"):
+                after_h = json.dumps(merged_h, indent=2) + "\n"
+                if after_h != before_h:
+                    updates.append((hooks_path, before_h, after_h, hooks_path.stat().st_mode & 0o777))
+            else:
+                updates.append((hooks_path, before_h, None, 0o600))
+                if manifest_path.exists():
+                    before_m = manifest_path.read_text()
+                    if before_m == MCODE_PLUGIN_MANIFEST:
+                        updates.append((manifest_path, before_m, None, 0o600))
+
     backup = home / ".config/repociv/hooks/backups" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     if updates:
         backup.mkdir(parents=True, mode=0o700)
-        for index, (path, before, after) in enumerate(updates):
-            private_write(backup / f"{index}-{path.parent.name}-{path.name}", before)
-            private_write(path, after, mode=path.stat().st_mode & 0o777)
-    return {"changed": [str(p) for p, _, _ in updates], "backup": str(backup) if updates else None}
+        for index, (path, before, after, mode) in enumerate(updates):
+            if before is not None:
+                private_write(backup / f"{index}-{path.parent.name}-{path.name}", before)
+            if after is not None:
+                private_write(path, after, mode=mode)
+            else:
+                path.unlink(missing_ok=True)
+                for d in (path.parent, path.parent.parent):
+                    try:
+                        d.rmdir()
+                    except OSError:
+                        break
+    return {"changed": [str(p) for p, _, _, _ in updates], "backup": str(backup) if updates else None}
 
 
 def main(argv=None):

@@ -11,6 +11,8 @@ el núcleo de Hermes ni otros perfiles. OpenClaw no estaba instalado; queda fuer
 | Claude Code | 6 eventos en `~/.claude/settings.json` | Aprobada |
 | Codex | 5 eventos en `~/.codex/hooks.json` | Aprobada tras reparar Code Mode; revisión independiente pendiente |
 | Hermes (default) | 4 eventos en `~/.hermes/config.yaml` | Prueba controlada con el diagnóstico nativo, sin misión con modelo |
+| Devin CLI | 5 eventos en `~/.config/devin/config.json` (`SessionStart`, `UserPromptSubmit`, `PostToolUse`, `Stop`, `SessionEnd`) | Aprobada (`devin-bubble-seahorse` en `formal-math-lab` → `AgentPosition:session_start` / `session_end`) |
+| MiniMax Code (`mcode`) | 5 eventos en `~/.minimax/plugins/repociv-hooks/hooks/hooks.json` (plugin local compatible) | Aprobada (`mvs_298c65644d3d490c9d31b9d75dea05a3` → `ext-mcode-298c6564` en `formal-math-lab` + `AgentPosition:session_start`) |
 | OpenClaw | No instalado | Fuera de alcance |
 
 Detalle de las pruebas con modelo en «Prueba real con modelos», al final.

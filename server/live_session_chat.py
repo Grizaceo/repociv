@@ -601,6 +601,22 @@ class ClaudeLiveChatAdapter:
         return ChatResult("accepted", self.transport, request_id)
 
 
+class DevinLiveChatAdapter:
+    def capability(self, session: Observation) -> ChatCapability:
+        return ChatCapability("unavailable", None, "devin_live_chat_unavailable")
+
+    def send(self, session: Observation, text: str, request_id: str) -> ChatResult:
+        raise ChatError(501, "transport_unavailable")
+
+
+class MCodeLiveChatAdapter:
+    def capability(self, session: Observation) -> ChatCapability:
+        return ChatCapability("unavailable", None, "mcode_live_chat_unavailable")
+
+    def send(self, session: Observation, text: str, request_id: str) -> ChatResult:
+        raise ChatError(501, "transport_unavailable")
+
+
 class LiveSessionChatRouter:
     def __init__(self, adapters: Mapping[str, LiveChatAdapter]) -> None:
         self._adapters = {name.strip().lower(): adapter for name, adapter in adapters.items()}
@@ -631,6 +647,8 @@ def default_router() -> LiveSessionChatRouter:
     codex = CodexLiveChatAdapter(codex_bin=shutil.which(os.environ.get("CODEX_BIN", "codex")) or "")
     hermes = HermesLiveChatAdapter()
     claude = ClaudeLiveChatAdapter()
+    devin = DevinLiveChatAdapter()
+    mcode = MCodeLiveChatAdapter()
     return LiveSessionChatRouter(
         {
             "codex": codex,
@@ -638,5 +656,7 @@ def default_router() -> LiveSessionChatRouter:
             "hermes": hermes,
             "claude": claude,
             "claude-code": claude,
+            "devin": devin,
+            "mcode": mcode,
         }
     )

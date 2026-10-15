@@ -20,7 +20,8 @@ if TYPE_CHECKING:
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _EVENTS = frozenset({"session_start", "turn_start", "tool_use", "turn_end", "session_end", "position"})
 _ALIASES = {"claude": "claude", "claude-code": "claude", "codex": "codex",
-            "openai-codex": "codex", "hermes": "hermes"}
+            "openai-codex": "codex", "hermes": "hermes",
+            "devin": "devin", "mcode": "mcode", "minimax": "mcode"}
 
 
 class InvalidPosition(ValueError):

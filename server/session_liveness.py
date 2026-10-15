@@ -43,7 +43,7 @@ _MAX_LEASE_BYTES = 1 << 20
 
 # argv[0] of the agent CLIs Suvadu records. Matched on the whole command line so
 # a wrapper (``node …/claude``, ``python …/hermes``) is caught too.
-_AGENT_RE = re.compile(r"(?:^|[/\s])(claude|codex|cursor-agent|opencode)(?:\s|$)")
+_AGENT_RE = re.compile(r"(?:^|[/\s])(claude|codex|cursor-agent|opencode|devin|mcode)(?:\s|$)")
 _HERMES_RE = re.compile(
     r"(?:^|[/\s'\"])(hermes|hermes_cli(?:\.main|/main\.py)|hermes-agent)(?:[\s'\":/]|$)"
 )

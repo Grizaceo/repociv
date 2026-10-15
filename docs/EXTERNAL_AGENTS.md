@@ -2,13 +2,18 @@
 
 RepoCiv muestra como unidades del mapa a los agentes de IA que trabajan en tus repos
 aunque no los haya lanzado RepoCiv: Claude Code en otra terminal, Codex, Cursor,
-OpenCode y los chats de Hermes. Hay dos fuentes:
+OpenCode, Devin CLI, MiniMax Code (`mcode`) y los chats de Hermes. Hay cuatro fuentes:
 
 - [Suvadu](https://github.com/AppachiTech/suvadu) (`suv`), que registra las sesiones de
   Claude Code, Codex, Cursor… localmente vía hooks;
 - los `state.db` de Hermes (`~/.hermes/state.db` y uno por perfil), leídos en solo
-  lectura. Suvadu no tiene integración para Hermes, y Hermes ejecuta sus tools sin hooks
-  de shell. Ver [Hermes](#hermes).
+  lectura (`server/hermes_sessions.py`). Ver [Hermes](#hermes);
+- `sessions.db` + `session_locks/` de Devin CLI (`~/.local/share/devin/cli/`,
+  `server/devin_sessions.py`), leídos en solo lectura;
+- `runtime-state.sqlite` + `.mcode-active/<pid>.json` de MiniMax Code
+  (`~/.minimax/v2/sqlite/runtime-state.sqlite`, `server/mcode_sessions.py`), leídos en
+  solo lectura, incluyendo sus subagentes (`explore`/`verifier` → `scout`,
+  `worker` → `worker`).
 
 ```
 suv agent sessions ─┐
@@ -307,6 +312,11 @@ frontera que ya tenía el resto del bridge.
 | `REPOCIV_HERMES_SESSIONS` | `1` | `0` = no leer los `state.db` de Hermes |
 | `REPOCIV_HERMES_HOME` | `~/.hermes` | raíz de Hermes (`state.db`, `profiles/*/state.db`) |
 | `REPOCIV_HERMES_PROFILES_EXCLUDE` | — | perfiles a ignorar, separados por comas (`default` es la raíz) |
+| `REPOCIV_DEVIN_SESSIONS` | `1` | `0` = no leer `sessions.db` de Devin CLI |
+| `REPOCIV_DEVIN_DATA_DIR` | `~/.local/share/devin/cli` | directorio de datos de Devin CLI |
+| `REPOCIV_MCODE_SESSIONS` | `1` | `0` = no leer `runtime-state.sqlite` de MiniMax Code |
+| `REPOCIV_MCODE_HOME` | `~/.minimax` | raíz de MiniMax Code |
+| `REPOCIV_MCODE_ACTIVE_DIR` | `~/.minimax-code/.mcode-active` | directorio de PIDs activos de `mcode` |
 
 ## Probe `codex queue` — 2026-09-21
 

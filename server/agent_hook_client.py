@@ -121,7 +121,8 @@ def position_payload(cli, event, raw, *, cwd=None, profile="default"):
     if not isinstance(raw, dict) or event not in _EVENTS:
         return None
     native = raw.get("session_id") or raw.get("sessionId") or raw.get("thread-id")
-    base = raw.get("cwd") or raw.get("working_directory") or cwd or os.getcwd()
+    env_cwd = os.environ.get("DEVIN_PROJECT_DIR") if cli == "devin" else None
+    base = raw.get("cwd") or raw.get("working_directory") or env_cwd or cwd or os.getcwd()
     if not isinstance(native, str) or not isinstance(base, str) or not os.path.isabs(base):
         return None
     args = raw.get("tool_input") or raw.get("tool_args") or {}

@@ -293,6 +293,8 @@ const LIVE_CHAT_REASON_TEXT: Record<string, string> = {
   hermes_not_live_bot_chat: 'Esta sesión Hermes no admite chat vivo seguro.',
   profile_key_unavailable: 'Falta la autorización local del perfil para este canal.',
   claude_control_channel_unavailable: 'Claude no ofrece un canal vivo verificado para esta sesión.',
+  devin_live_chat_unavailable: 'Devin CLI no expone un canal vivo externo para esta sesión.',
+  mcode_live_chat_unavailable: 'MiniMax Code no expone un canal vivo externo para esta sesión.',
   unsupported_session_source: 'El chat vivo no está disponible para esta sesión.',
 };
 

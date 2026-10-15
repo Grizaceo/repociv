@@ -1185,7 +1185,13 @@ def start(send: SendFn, config: TrackerConfig | None = None) -> bool:
     cfg = config or TrackerConfig.from_env()
     if not cfg.enabled or _thread is not None:
         return False
-    from server import claude_live, claude_sessions, hermes_sessions  # noqa: PLC0415
+    from server import (  # noqa: PLC0415
+        claude_live,
+        claude_sessions,
+        devin_sessions,
+        hermes_sessions,
+        mcode_sessions,
+    )
 
     sources: list[AgentSource] = [
         SuvaduSource(
@@ -1196,6 +1202,12 @@ def start(send: SendFn, config: TrackerConfig | None = None) -> bool:
     hermes = hermes_sessions.source_from_env(recent_s=cfg.recent_s, window_s=cfg.window_s)
     if hermes is not None:
         sources.append(hermes)
+    devin = devin_sessions.source_from_env(recent_s=cfg.recent_s)
+    if devin is not None:
+        sources.append(devin)
+    mcode = mcode_sessions.source_from_env(recent_s=cfg.recent_s)
+    if mcode is not None:
+        sources.append(mcode)
     # The process-owned claude channel: its sessions declare their own liveness.
     sources.append(claude_live.ClaudeLiveSource(claude_live.get_manager()))
     tracker = ExternalAgentTracker(cfg, send=send, sources=sources)
