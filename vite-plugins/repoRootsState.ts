@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSyn
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 
-export interface RepoRootEntry {
+interface RepoRootEntry {
   label?: string;
   selectedRepoPaths: string[];
   addedAt: string;
@@ -15,7 +15,7 @@ export interface RepoRootsState {
   roots: Record<string, RepoRootEntry>;
 }
 
-export interface RepoSelectionRootState {
+interface RepoSelectionRootState {
   path: string;
   label?: string;
   selectedRepoIds: string[];
@@ -34,7 +34,7 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-export function stateFilePath(): string {
+function stateFilePath(): string {
   const explicit = process.env['REPOCIV_STATE_FILE']?.trim();
   if (explicit) return resolve(explicit);
   const xdg = process.env['XDG_STATE_HOME']?.trim();
@@ -91,7 +91,9 @@ export function loadState(defaultRoot: string): RepoRootsState {
       normalized[rootPath] = {
         label: typeof entry?.label === 'string' ? entry.label : undefined,
         selectedRepoPaths: Array.isArray(entry?.selectedRepoPaths)
-          ? entry.selectedRepoPaths.filter((item): item is string => typeof item === 'string' && item.length > 0)
+          ? entry.selectedRepoPaths.filter(
+              (item): item is string => typeof item === 'string' && item.length > 0,
+            )
           : [],
         addedAt: typeof entry?.addedAt === 'string' ? entry.addedAt : nowIso(),
         lastSeen: typeof entry?.lastSeen === 'string' ? entry.lastSeen : nowIso(),
@@ -119,7 +121,11 @@ export function saveState(state: RepoRootsState): RepoRootsState {
   return state;
 }
 
-export function ensureRoot(state: RepoRootsState, rootPath: string, label?: string): RepoRootsState {
+export function ensureRoot(
+  state: RepoRootsState,
+  rootPath: string,
+  label?: string,
+): RepoRootsState {
   const resolved = resolve(rootPath);
   const existing = state.roots[resolved];
   state.activeRoot = resolved;
@@ -158,7 +164,9 @@ export function setRootSelection(
 ): RepoRootsState {
   ensureRoot(state, rootPath);
   const root = state.roots[resolve(rootPath)]!;
-  root.selectedRepoPaths = Array.from(new Set(repoPaths.map((item) => resolve(item)).filter((item) => item.length > 0)));
+  root.selectedRepoPaths = Array.from(
+    new Set(repoPaths.map((item) => resolve(item)).filter((item) => item.length > 0)),
+  );
   root.lastSeen = nowIso();
   return state;
 }
@@ -178,7 +186,9 @@ export function addRepoSelection(state: RepoRootsState, repoPath: string): RepoR
 export function removeRepoSelection(state: RepoRootsState, repoPath: string): RepoRootsState {
   const resolvedRepoPath = resolve(repoPath);
   for (const root of Object.values(state.roots)) {
-    root.selectedRepoPaths = root.selectedRepoPaths.filter((item) => resolve(item) !== resolvedRepoPath);
+    root.selectedRepoPaths = root.selectedRepoPaths.filter(
+      (item) => resolve(item) !== resolvedRepoPath,
+    );
   }
   return state;
 }

@@ -19,7 +19,7 @@ interface HealthMcp {
  * the 42 MCP tools. Lives here (not hud.ts) so the poller stays free of hud.ts's
  * top-level `window` access and is testable in the node test environment.
  */
-export function setMcpStatus(connected: boolean, lastSeen?: number): void {
+function setMcpStatus(connected: boolean, lastSeen?: number): void {
   const el = document.getElementById('mcp-status');
   if (!el) return;
   el.classList.toggle('mcp-online', connected);

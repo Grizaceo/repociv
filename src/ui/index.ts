@@ -6,7 +6,6 @@ export * from './keyboard.ts';
 export * from './city.ts';
 export { showNotification } from './notificationBanner.ts';
 export { isPriorityPanelOpen, togglePriorityPanel } from './priorityPanel.ts';
-export { closeSettingsPanel, toggleSettingsPanel } from './settingsPanel.ts';
 export {
   closeApprovalPanel,
   isApprovalPanelOpen,
@@ -14,7 +13,6 @@ export {
   startApprovalPolling,
 } from './approvalPanel.ts';
 export { isHarnessPanelOpen, toggleHarnessPanel, startHarnessPolling } from './harnessPanel';
-export { openRecoveryPanel } from './recoveryPanel';
 export { closeTaskPanel, isTaskPanelOpen, toggleTaskPanel } from './taskPanel';
 export { isTaskAssignPanelOpen, toggleTaskAssignPanel } from './taskAssignPanel.ts';
 export { closePendingPanel, isPendingPanelOpen, togglePendingPanel } from './pendingPanel';
@@ -23,5 +21,3 @@ export { closeKanbanPanel, isKanbanPanelOpen, toggleKanbanPanel } from './kanban
 
 // Re-export specific initialization helpers
 export { initExternalLibs } from './hud.ts';
-export { openCapitalPanel } from './capitalPanel.ts';
-export { openWonderVignette } from './wonderVignette.ts';
