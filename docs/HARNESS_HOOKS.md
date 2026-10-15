@@ -1,7 +1,8 @@
 # Hooks de posición por harness
 
 > Guía consumer-facing: cómo hacer que tu CLI (Claude Code, Codex, Hermes,
-> Devin CLI, MiniMax Code) aparezca como **unidad** en el mapa de RepoCiv.
+> Devin CLI, MiniMax Code, OpenCode) aparezca como **unidad** en el mapa de
+> RepoCiv.
 > El estado de la máquina del mantenedor y la evidencia de pruebas viven en
 > [`AGENT_POSITION_HOOKS.md`](AGENT_POSITION_HOOKS.md); esta guía describe el
 > mecanismo y cómo instalarlo en tu máquina.
@@ -39,11 +40,16 @@ ubicación y se aplica cuando aparece esa identidad verificada.
 | Hermes | `~/.hermes/config.yaml` | 4: `on_session_start`, `post_tool_call`, `on_session_end` (fin de **turno**), `on_session_finalize` | Solo perfil `default` |
 | Devin CLI | `~/.config/devin/config.json` | 5: igual que Codex | Se instala solo si el archivo ya existe |
 | MiniMax Code (`mcode`) | `~/.minimax/plugins/repociv-hooks/hooks/hooks.json` + manifest `.claude-plugin/plugin.json` | 5: igual que Codex | El plugin se crea si `~/.minimax/` existe |
+| OpenCode | `~/.config/opencode/plugins/repociv-hooks.js` | 5: `prompt`, `execute.before`, `session.execution.*`, `session.deleted` | Plugin global v2 con descubrimiento automático (sin editar config); se crea si `~/.config/opencode/` existe |
 | OpenClaw | — | — | Fuera de alcance |
 
 Mapeo de eventos → RepoCiv: `SessionStart` → `session_start`,
 `UserPromptSubmit` → `turn_start`, `PostToolUse` (y `PostToolUseFailure` en
 Claude) → `tool_use`, `Stop` → `turn_end`, `SessionEnd` → `session_end`.
+En OpenCode los nombres nativos difieren: `prompt` (primer evento) →
+`session_start` y luego `turn_start`; `execute.before` → `tool_use`;
+`session.execution.succeeded/failed` → `turn_end`; `session.deleted` →
+`session_end`.
 
 ---
 
@@ -136,6 +142,11 @@ MiniMax Code — es un plugin local: creá
 `~/.minimax/plugins/repociv-hooks/hooks/hooks.json` con la forma JSON de
 arriba. El installer hace esto automáticamente.
 
+OpenCode — no hay config que editar: opencode descubre solo los plugins
+globales en `~/.config/opencode/plugins/*.js`. El installer genera el plugin
+(generador `opencode_plugin_js` en `server/agent_hook_install.py`); para
+hacerlo a mano, replicá ese archivo.
+
 ---
 
 ## Consentimiento
@@ -145,7 +156,7 @@ arriba. El installer hace esto automáticamente.
   no los ejecuta.
 - **Hermes**: los comandos deben quedar en su allowlist oficial; la remoción
   no revoca ese historial manualmente.
-- **Claude / Devin / mcode**: sin paso extra.
+- **Claude / Devin / mcode / OpenCode**: sin paso extra.
 - Las sesiones CLI ya abiertas pueden necesitar reinicio para releer su
   configuración.
 
@@ -197,6 +208,9 @@ arriba. El installer hace esto automáticamente.
 - **Codex Code Mode**: el workdir se correlaciona con el rollout nativo de esa
   misma sesión (IDs exactos de sesión/turno/herramienta); si falta o es
   ambiguo, vale el `cwd` recibido.
+- **OpenCode**: si el servicio recarga el plugin en una sesión de vida larga,
+  el mismo evento nativo puede entregarse más de una vez; las pistas repetidas
+  no cambian la ubicación (`turn_end` es un heartbeat idempotente).
 - **OpenClaw**: fuera de alcance.
 
 ---

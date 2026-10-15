@@ -445,5 +445,6 @@ tmpfs en `/tmp/workspace`, sin montar `.env` ni `~/.ssh` del host.
 - Read [SCOPE.md](SCOPE.md) for what's in and out of scope
 - Read [API.md](API.md) for the full HTTP endpoint reference
 - Read [HARNESS_HOOKS.md](HARNESS_HOOKS.md) to install position hooks so your
-  CLI (Claude Code, Codex, Hermes, Devin, mcode) shows up as a unit on the map
+  CLI (Claude Code, Codex, Hermes, Devin, mcode, OpenCode) shows up as a unit
+  on the map
 - Check the hotkeys list with `?` in the dashboard

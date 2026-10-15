@@ -210,7 +210,7 @@ POST /approvals/<id>/reject       # rechazar comando pendiente
 
 Ver [docs/API.md](docs/API.md) para la referencia completa.
 
-**Hooks de posición:** para que tu CLI (Claude Code, Codex, Hermes, Devin, mcode) aparezca como unidad en el mapa, RepoCiv puede instalar hooks que reportan solo ubicación y sesión — ver [docs/HARNESS_HOOKS.md](docs/HARNESS_HOOKS.md).
+**Hooks de posición:** para que tu CLI (Claude Code, Codex, Hermes, Devin, mcode, OpenCode) aparezca como unidad en el mapa, RepoCiv puede instalar hooks que reportan solo ubicación y sesión — ver [docs/HARNESS_HOOKS.md](docs/HARNESS_HOOKS.md).
 
 ### MCP Server
 
