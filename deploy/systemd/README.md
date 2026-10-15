@@ -1,7 +1,8 @@
 # Systemd User Services for RepoCiv
 
 Estado real (2026-10-15): la única unit instalada en esta máquina es
-`repociv.service` (supervisor). Los templates "split" (`repociv-bridge`,
+`repociv.service` (supervisor); su plantilla y un drop-in de ejemplo están
+versionados en este directorio. Los templates "split" (`repociv-bridge`,
 `repociv-frontend`, `repociv.target`) quedaron **legacy** y `repociv-backup.*`
 es opcional y **no está instalado**. Detalle abajo.
 
@@ -18,11 +19,40 @@ es opcional y **no está instalado**. Detalle abajo.
 - Logs: `~/.repociv/logs/systemd-stdout.log` / `systemd-stderr.log` (append),
   más `bridge.log` y `vite.log` del supervisor, y `journalctl --user -u repociv`.
 - Drop-in: `~/.config/systemd/user/repociv.service.d/tailscale.conf` agrega
-  `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS` para acceso vía Tailscale.
+  `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS` para acceso vía Tailscale. Plantilla
+  del drop-in: [`repociv.service.d/tailscale.conf.example`](repociv.service.d/tailscale.conf.example).
 
-> La unit **no está versionada en el repo**: vive en `~/.config/systemd/user/`.
-> Para inspeccionarla o recuperar su contenido exacto:
+> La **copia instalada** vive en `~/.config/systemd/user/` y no se versiona:
+> puede divergir de la plantilla. La plantilla versionada es
+> [`repociv.service`](repociv.service) en este directorio. Para inspeccionar o
+> recuperar el contenido exacto de la copia viva:
 > `systemctl --user cat repociv`.
+
+### Instalar (recrear la unit desde el repo)
+
+```bash
+systemd-analyze --user verify deploy/systemd/repociv.service   # opcional
+mkdir -p ~/.config/systemd/user/repociv.service.d ~/.repociv/logs
+cp deploy/systemd/repociv.service ~/.config/systemd/user/
+
+# Drop-in opcional (acceso vía Tailscale): reemplazá <tu-host> por tu hostname
+cp deploy/systemd/repociv.service.d/tailscale.conf.example \
+   ~/.config/systemd/user/repociv.service.d/tailscale.conf
+
+systemctl --user daemon-reload
+systemctl --user enable --now repociv
+```
+
+- `~/.repociv/logs/` debe existir antes del primer arranque: systemd abre los
+  archivos de `StandardOutput=`/`StandardError=` antes de ejecutar
+  `dev-start.sh` (que también los crea).
+- La plantilla usa `%h` (systemd lo expande al home del usuario en units de
+  usuario). Si tu checkout vive en otra ruta, ajustá `WorkingDirectory`,
+  `ExecStart` y `Documentation`, o usá rutas absolutas. La copia viva de esta
+  máquina usa rutas absolutas y `Documentation=` apunta a
+  `docs/ESTADO-2026-09-30.html` (snapshot histórico); la plantilla apunta al
+  README de este directorio, como los units legacy.
+- Arranque en login y supervivencia al logout: `loginctl enable-linger $USER`.
 
 ### Operar
 

@@ -1,0 +1,50 @@
+# Plantilla versionada de la unit viva `repociv.service` (bridge + Vite).
+# Instalación paso a paso: README.md de este directorio.
+# La copia instalada vive en ~/.config/systemd/user/repociv.service y puede
+# divergir: la referencia operativa es `systemctl --user cat repociv`.
+#
+# Paths: la plantilla usa %h (home del usuario; systemd lo expande en units de
+# usuario). Si tu checkout vive en otra ruta, ajustá WorkingDirectory,
+# ExecStart y Documentation, o usá rutas absolutas.
+[Unit]
+# RepoCiv — control plane local del workspace.
+#
+# Por qué existe esta unidad: hasta el 2026-09-30 RepoCiv solo se encendía con
+# `scripts/dev-start.sh` a mano, lo que dejaba el producto en estado "apagado"
+# la mayor parte del tiempo. Esta unidad lo convierte en servicio persistente.
+#
+# linger=yes en el usuario garantiza que arranca en el login y sobrevive al
+# cierre de sesión.
+Description=RepoCiv — bridge + Vite (workspace control plane)
+Documentation=file:%h/.hermes/workspace/ACTIVE/repociv/deploy/systemd/README.md
+After=network-online.target
+Wants=network-online.target
+
+# StartLimit* viven en [Unit], no en [Service]: puestos aquí systemd los
+# ignora con "Unknown key". Dan margen al arranque del bridge (puede tardar
+# varios segundos en leer el workspace) antes de contar fallos como CrashLoop.
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.hermes/workspace/ACTIVE/repociv
+ExecStart=/usr/bin/bash %h/.hermes/workspace/ACTIVE/repociv/scripts/dev-start.sh
+
+# dev-start.sh es un supervisor: escribe lockfile, lanza bridge + vite y espera.
+# Si muere el supervisor, hay que matar a los hijos; KillMode=control-group lo
+# garantiza en el stop del servicio.
+KillMode=control-group
+TimeoutStopSec=30
+
+# Reinicio con backoff. StartLimitIntervalSec/Burst dan margen al arranque del
+# bridge (puede tardar varios segundos en leer el workspace) antes de que
+# systemd empiece a contar fallos.
+Restart=on-failure
+RestartSec=5
+
+StandardOutput=append:%h/.repociv/logs/systemd-stdout.log
+StandardError=append:%h/.repociv/logs/systemd-stderr.log
+
+[Install]
+WantedBy=default.target
