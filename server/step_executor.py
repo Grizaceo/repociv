@@ -258,7 +258,7 @@ def dispatch_plan_step(
 
     # Build mission with issue context + prior step artifacts for context seeding
     try:
-        spec = _wi.read_spec(repo, issue_id)
+        spec = _wi.read_spec(repo, issue_id) or step_description
     except Exception:
         spec = step_description  # fallback: use step itself as context
 

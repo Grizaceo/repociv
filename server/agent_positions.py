@@ -56,7 +56,8 @@ class PositionStore:
 
         if not isinstance(body, dict):
             raise InvalidPosition("invalid_position")
-        cli = _ALIASES.get(body.get("cli")) if isinstance(body.get("cli"), str) else None
+        raw_cli = body.get("cli")
+        cli = _ALIASES.get(raw_cli) if isinstance(raw_cli, str) else None
         native, event, cwd = body.get("session_id"), body.get("event"), body.get("cwd")
         profile = body.get("profile", "default") if cli == "hermes" else ""
         if cli == "hermes" and profile == "":
@@ -116,7 +117,7 @@ class PositionStore:
             # without rewriting any session/native/unit identifier.
             prefix = f"{cli}-"
             if obs.source == "suvadu" and obs.native_id == obs.session_id and obs.session_id.startswith(prefix):
-                keys.append((cli, key[1], obs.session_id[len(prefix):]))
+                keys.append((key[0], key[1], obs.session_id[len(prefix):]))
             current_natives = {k[2] for k in keys}
             if cli == "hermes":
                 keys.extend((cli, key[1], native) for native in obs.related_native_ids)

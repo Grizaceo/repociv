@@ -263,7 +263,7 @@ def get_repo_file_tree(ctx: "RouteContext") -> tuple[int, Any]:
                 raise _FileTreeLimitExceeded(
                     f"Directory tree exceeds max depth ({_FILE_TREE_MAX_DEPTH})"
                 )
-            node = {"name": dir_path.name or dir_path.name, "path": rel_path, "type": "dir", "children": []}
+            node: dict[str, Any] = {"name": dir_path.name, "path": rel_path, "type": "dir", "children": []}
             try:
                 for item in sorted(dir_path.iterdir(), key=lambda x: (x.is_file(), x.name.lower())):
                     if item.name.startswith(".") or item.name in _FILE_TREE_SKIP_NAMES:

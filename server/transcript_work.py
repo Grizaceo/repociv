@@ -67,7 +67,8 @@ def _claude_calls(entry: dict[str, Any]) -> Iterator[list[str]]:
     for item in reversed(content):
         if not isinstance(item, dict) or item.get("type") != "tool_use":
             continue
-        args = item.get("input") if isinstance(item.get("input"), dict) else {}
+        raw_input = item.get("input")
+        args = raw_input if isinstance(raw_input, dict) else {}
         hints = [v for k in _CLAUDE_PATH_KEYS if isinstance(v := args.get(k), str)]
         hints += _command_paths(args.get("command"))
         if isinstance(cwd, str):
@@ -78,7 +79,9 @@ def _claude_calls(entry: dict[str, Any]) -> Iterator[list[str]]:
 def _codex_calls(entry: dict[str, Any]) -> Iterator[list[str]]:
     """Hints of one rollout line's tool call (outputs are other lines)."""
     payload = entry.get("payload")
-    kind = payload.get("type") if isinstance(payload, dict) else None
+    if not isinstance(payload, dict):
+        return
+    kind = payload.get("type")
     if kind == "custom_tool_call":  # `exec` (JS calling tools.*) or a bare `apply_patch`
         code = payload.get("input")
         if not isinstance(code, str):
@@ -96,7 +99,8 @@ def _codex_calls(entry: dict[str, Any]) -> Iterator[list[str]]:
             hints = [v for k in _CODEX_PATH_KEYS if isinstance(v := args.get(k), str)]
             yield hints + _command_paths(args.get("command") or args.get("cmd"))
     elif kind == "local_shell_call":
-        action = payload.get("action") if isinstance(payload.get("action"), dict) else {}
+        raw_action = payload.get("action")
+        action = raw_action if isinstance(raw_action, dict) else {}
         hints = [v] if isinstance(v := action.get("working_directory"), str) else []
         yield hints + _command_paths(action.get("command"))
 

@@ -149,7 +149,7 @@ def dispatch_command(
             'lines': 0, 'duration': 0,
         }
         save_mission(mission_rec)
-        adapter = infer_adapter_for_command('quest_add', cmd.harness_id)
+        adapter = infer_adapter_for_command('quest_add', str(cmd.harness_id or ''))
         runtime_id = adapter.harness_id if adapter else 'local-cli'
         sessions_patch('MAIN', runtimeId=runtime_id, repo='main', summary=title, lastMissionId=cmd.id)
         sessions_append_message('MAIN', 'user', title, {'missionId': cmd.id, 'kind': 'quest_add'})

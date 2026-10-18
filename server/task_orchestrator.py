@@ -90,6 +90,28 @@ def _record_task_phase(task_key: str, state: dict[str, Any]) -> None:
         logger.warning("Task phase history unavailable")
 
 
+def register_recovered_task(
+    repo: str, issue_id: str, phase: str, *, info: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Expose a task reconciled at startup (R12) through the registry.
+
+    Visibility only: nothing is resumed, re-dispatched or re-approved. The
+    entry lets ``get_task_status`` report ``interrupted``/``blocked`` instead
+    of the stale in-flight phase persisted before the restart.
+    """
+    task_key = _task_key(repo, issue_id)
+    entry: dict[str, Any] = {
+        "phase": phase,
+        "recovered": True,
+        "updatedAt": _now_iso(),
+        "recovery": dict(info or {}),
+    }
+    with _registry_lock:
+        _registry[task_key] = entry
+        _record_task_phase(task_key, entry)
+    return entry
+
+
 def _now_iso(ts: float | None = None) -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts or time.time()))
 
@@ -487,7 +509,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                     if agent_output:
                         _wi.write_step_artifact(
                             repo, issue_id, i,
-                            step_meta.get("agent", "agent"),
+                            str(step_meta.get("agent", "agent")),
                             agent_output,
                         )
 

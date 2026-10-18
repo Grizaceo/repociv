@@ -127,7 +127,7 @@ def _load_episodes() -> tuple[dict[str, dict[str, Any]], str | None]:
                 or not isinstance(record.get("worktreePath"), str)):
             invalid = True
             continue
-        entry = {"firstObservedAtMs": first, "lastObservedAtMs": last}
+        entry: dict[str, Any] = {"firstObservedAtMs": first, "lastObservedAtMs": last}
         for field in ("repoPath", "worktreePath", "branch", "head"):
             value = record.get(field)
             if isinstance(value, str):
@@ -770,7 +770,7 @@ def collect(now_ms: int | None = None, *, force: bool = False) -> dict[str, Any]
     ``now_ms`` pins the clock — tests pass it and bypass the cache.
     """
     pinned = now_ms is not None
-    now = int(now_ms) if pinned else _now_ms()
+    now = int(now_ms) if now_ms is not None else _now_ms()
 
     repo_paths, selection_errors = _selected_repo_paths()
     signature = tuple(repo_paths)

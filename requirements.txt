@@ -43,3 +43,6 @@ PyYAML>=6.0
 
 # Linter (CI gate; also used locally via scripts/check.sh)
 ruff==0.15.5
+
+# Type checker (blocking CI gate via scripts/check.sh; config in pyproject.toml)
+mypy==2.4.0
