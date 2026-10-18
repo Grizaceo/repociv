@@ -214,3 +214,27 @@ def test_agent_fatigue_manual_override_wins(ledger: TokenLedger) -> None:
     assert ledger.get_agent_fatigue("WORKER", window_s=3600.0, max_tokens=200_000) < 100
 
 
+
+
+def test_fatigue_ignores_lifetime_total_and_counts_only_the_window(tmp_path: Path) -> None:
+    """Regression (2026-10-18): fatigue used lifetime_total × recency, so an
+    agent past ~200k lifetime tokens was exhausted after any small call."""
+    import json
+    import time as _time
+
+    (tmp_path / "token_usage.json").write_text(json.dumps({
+        "total_prompt_tokens": 2_000_000, "total_completion_tokens": 0,
+        "total_cost_estimate": 0.0,
+        "per_agent": {"MAIN": {"prompt": 2_000_000, "completion": 0, "lastAt": _time.time()}},
+    }), encoding="utf-8")
+    ledger = TokenLedger(state_dir=tmp_path)
+    assert ledger.get_agent_fatigue("MAIN", window_s=3600.0, max_tokens=200_000) == 100
+    ledger.log_usage("claude-haiku", 2_000, 0, agent="MAIN")
+    assert ledger.get_agent_fatigue("MAIN", window_s=3600.0, max_tokens=200_000) == 99
+    assert ledger.get_agent_usage("MAIN")["total"] == 2_002_000  # lifetime stats kept
+
+
+def test_fatigue_samples_survive_a_restart(tmp_path: Path) -> None:
+    TokenLedger(state_dir=tmp_path).log_usage("claude-haiku", 100_000, 0, agent="WORKER")
+    reloaded = TokenLedger(state_dir=tmp_path)
+    assert reloaded.get_agent_fatigue("WORKER", window_s=3600.0, max_tokens=200_000) == 50

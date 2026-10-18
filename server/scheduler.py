@@ -21,6 +21,7 @@ from dataclasses import asdict
 from .command_schema import Command
 from . import event_store as _es
 from .state_paths import repociv_home
+from .atomic_io import atomic_write_json
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ def _load_queue() -> list[dict[str, Any]]:
 def _dump_queue(queue: list[dict[str, Any]]) -> None:
     """Atomically write queue state to disk."""
     with _queue_file_lock:
-        _QUEUE_FILE.write_text(json.dumps(queue, indent=2, ensure_ascii=False))
+        atomic_write_json(_QUEUE_FILE, queue, durable=True, indent=2, ensure_ascii=False)
 
 
 def _init_from_disk() -> None:

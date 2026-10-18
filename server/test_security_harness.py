@@ -35,14 +35,16 @@ from server.security_harness import (
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
-def _run_helper(script: str, log_dir: Path) -> str:
+def _run_helper(script: str, log_dir: Path, state_root: Path | None = None) -> str:
     """Run `script` in a FRESH interpreter with a distinct AlertSystem logdir.
 
     Simulates a separate bridge process so module-level state (notably the
-    HMAC key) is regenerated from scratch.
+    HMAC key) is regenerated from scratch. ``state_root`` (REPOCIV_CONFIG_DIR)
+    decides where the persistent audit key lives; default: next to log_dir.
     """
     log_dir.mkdir(parents=True, exist_ok=True)
     env = {k: v for k, v in os.environ.items() if k != "REPOCIV_HMAC_KEY"}
+    env["REPOCIV_CONFIG_DIR"] = str(state_root or log_dir / "state")
     proc = subprocess.run(
         [sys.executable, "-c", script, str(log_dir)],
         capture_output=True,
@@ -351,30 +353,62 @@ class TestHMACKey:
             "b'repociv-audit-default-key', 'length': len(mod._HMAC_KEY), "
             "'warnings': [str(w.message) for w in caught]}))\n"
         )
-        result = json.loads(_run_helper(script, tmp_path / "hmac"))
+        state = tmp_path / "hmac" / "state"
+        result = json.loads(_run_helper(script, tmp_path / "hmac", state))
         assert result["public"] is False
         assert result["length"] == 32
-        assert len(result["warnings"]) == 1
-        assert any(
-            "REPOCIV_HMAC_KEY not set" in message for message in result["warnings"]
-        ), "expected UserWarning about ephemeral key"
+        assert result["warnings"] == []  # a persistent key needs no warning
+        key_file = state / "security_logs" / "audit-hmac.key"
+        assert key_file.stat().st_mode & 0o777 == 0o600
+        assert len(key_file.read_bytes()) == 32
 
-    def test_ephemeral_keys_not_shared_across_processes(
+    def test_key_persists_across_restarts_of_the_same_state_root(
         self, tmp_path: Path
     ) -> None:
-        """Two AlertSystem instances from separately-spawned interpreters
-        (simulating distinct bridge processes) must not share a verification
-        key: a tag from one must not validate against the other."""
+        """H3: two bridge processes over the same state root verify each
+        other's tags; different roots never share a key."""
         script = (
             "import sys; sys.path.insert(0, %r)\n"
-            "from server.security_harness import AlertSystem\n"
+            "from server.security_harness import AlertSystem, audit_key_mode\n"
             "asys = AlertSystem(log_dir=sys.argv[1])\n"
-            "print(asys._hmac_tag('probe-line'))\n" % str(Path.cwd())
+            "print(asys._hmac_tag('probe-line'), audit_key_mode())\n" % str(Path.cwd())
         )
-        tag1 = _run_helper(script, tmp_path / "p1")
-        tag2 = _run_helper(script, tmp_path / "p2")
-        assert tag1 and tag2
-        assert tag1 != tag2, "ephemeral per-process keys were shared"
+        shared = tmp_path / "shared-state"
+        tag1, mode1 = _run_helper(script, tmp_path / "p1", shared).split()
+        tag2, mode2 = _run_helper(script, tmp_path / "p2", shared).split()
+        tag3, _ = _run_helper(script, tmp_path / "p3", tmp_path / "other").split()
+        assert mode1 == mode2 == "persistent"
+        assert tag1 == tag2, "restart over the same root must keep the key"
+        assert tag1 != tag3, "distinct state roots must not share a key"
+
+    def test_unwritable_root_falls_back_to_ephemeral_with_warning(
+        self, tmp_path: Path
+    ) -> None:
+        blocker = tmp_path / "not-a-dir"
+        blocker.write_text("x", encoding="utf-8")
+        script = (
+            "import json, warnings\n"
+            "with warnings.catch_warnings(record=True) as caught:\n"
+            "    warnings.simplefilter('always')\n"
+            "    from server import security_harness as mod\n"
+            "print(json.dumps({'mode': mod.audit_key_mode(), "
+            "'warnings': [str(w.message) for w in caught]}))\n"
+        )
+        result = json.loads(_run_helper(script, tmp_path / "w", blocker))
+        assert result["mode"] == "ephemeral"
+        assert any("ephemeral" in m for m in result["warnings"])
+
+    def test_malformed_key_file_is_never_overwritten(self, tmp_path: Path) -> None:
+        state = tmp_path / "state"
+        key_file = state / "security_logs" / "audit-hmac.key"
+        key_file.parent.mkdir(parents=True)
+        key_file.write_bytes(b"short")
+        script = (
+            "from server import security_harness as mod\n"
+            "print(mod.audit_key_mode())\n"
+        )
+        assert _run_helper(script, tmp_path / "m", state).splitlines()[-1] == "ephemeral"
+        assert key_file.read_bytes() == b"short"
 
     def test_env_key_is_used_when_set(self, tmp_path: Path) -> None:
         script = (

@@ -18,6 +18,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 try:
+    from .atomic_io import atomic_write_json
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from atomic_io import atomic_write_json  # type: ignore[no-redef]
+try:
     from .state_paths import repociv_home
 except ImportError:  # imported as a top-level module (server/ on sys.path)
     from state_paths import repociv_home  # type: ignore[no-redef]
@@ -44,10 +48,7 @@ def save_report(report: dict[str, Any]) -> dict[str, Any]:
         report["createdAt"] = datetime.now(timezone.utc).isoformat()
 
     file_path = _REPORTS_DIR / f"{report['id']}.json"
-    file_path.write_text(
-        json.dumps(report, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    atomic_write_json(file_path, report, indent=2, ensure_ascii=False)
     return report
 
 
