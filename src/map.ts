@@ -189,7 +189,7 @@ const TERRAIN_WEIGHTS: Record<Terrain, number> = {
   sacred: 1,
 };
 
-export function inferTerrain(extensions: Record<string, number>): Terrain {
+function inferTerrain(extensions: Record<string, number>): Terrain {
   let best: Terrain = 'plains';
   let bestScore = 0;
   let totalCounted = 0;
@@ -314,7 +314,7 @@ interface RepoSelectionSettings {
   };
 }
 
-export interface RepoSelectionRootState {
+interface RepoSelectionRootState {
   path: string;
   label?: string;
   selectedRepoIds: string[];
@@ -437,12 +437,6 @@ export async function fetchRepoSelectionState(): Promise<RepoSelectionState> {
   return normalizeSelectionState((await res.json()) as RepoSelectionState);
 }
 
-export async function fetchSelectionForRoot(rootPath: string): Promise<Set<string>> {
-  const state = await fetchRepoSelectionState();
-  const root = state.roots.find((item) => item.path === rootPath);
-  return new Set(root?.selectedRepoPaths ?? []);
-}
-
 export async function persistRootSelection(
   rootPath: string,
   repoIds: string[],
@@ -488,7 +482,7 @@ export async function fetchScannedRepos(): Promise<ScannedRepo[]> {
   return (await res.json()) as ScannedRepo[];
 }
 
-export async function fetchSelectedRepos(): Promise<ScannedRepo[]> {
+async function fetchSelectedRepos(): Promise<ScannedRepo[]> {
   const res = await fetch('/api/repos/selected');
   if (!res.ok) throw new Error(`/api/repos/selected HTTP ${res.status}`);
   return (await res.json()) as ScannedRepo[];
@@ -591,7 +585,7 @@ async function fetchSubdirs(repoId: string): Promise<{ name: string; terrain: Te
 }
 
 // ─── Voronoi Territory Partitioning (Civilization-style) ─────────────────────
-export function recalculateAllTerritories(world: World): void {
+function recalculateAllTerritories(world: World): void {
   const { cities } = world;
   if (cities.length === 0) return;
 
@@ -781,7 +775,7 @@ const CITY_PALETTE: [number, number, number][] = [
  *  avalanche step distributes near-identical ids (repos that share a long
  *  path prefix) across the palette far better than the old djb2 `% n`,
  *  which collided three sibling repos onto one color. */
-export function cityColorFromId(id: string): [number, number, number] {
+function cityColorFromId(id: string): [number, number, number] {
   let hash = 2166136261;
   for (let i = 0; i < id.length; i++) {
     hash ^= id.charCodeAt(i);

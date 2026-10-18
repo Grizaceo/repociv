@@ -15,7 +15,7 @@ interface Particle {
 }
 
 /** Flash dorado sobre el canvas (screen-wide) */
-export function flashGlory(canvas: HTMLCanvasElement, intensity = 0.35) {
+function flashGlory(canvas: HTMLCanvasElement, intensity = 0.35) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   let alpha = intensity;
@@ -33,7 +33,7 @@ export function flashGlory(canvas: HTMLCanvasElement, intensity = 0.35) {
 }
 
 /** Explosión dorada de partículas (confeti imperial) */
-export function confettiBurst(canvas: HTMLCanvasElement, cx: number, cy: number) {
+function confettiBurst(canvas: HTMLCanvasElement, cx: number, cy: number) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   const colors = [
@@ -95,7 +95,7 @@ export function confettiBurst(canvas: HTMLCanvasElement, cx: number, cy: number)
 }
 
 /** Sonido procedural (fanfarria imperial) */
-export function hornSound() {
+function hornSound() {
   try {
     const AC =
       window.AudioContext ||
@@ -125,12 +125,5 @@ export function hornSound() {
 export function celebrateMission(canvas: HTMLCanvasElement) {
   flashGlory(canvas, 0.35);
   confettiBurst(canvas, canvas.width / 2, canvas.height / 2);
-  hornSound();
-}
-
-/** City discovered celebration */
-export function celebrateDiscovery(canvas: HTMLCanvasElement, screenX: number, screenY: number) {
-  flashGlory(canvas, 0.2);
-  confettiBurst(canvas, screenX, screenY);
   hornSound();
 }

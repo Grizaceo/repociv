@@ -185,11 +185,3 @@ export function activityTitle(key: string): string {
   if (key.startsWith('task:')) return 'Tarea vinculada · ejecuciones correlacionadas';
   return presentActivities().find((a) => a.key === key)?.title || 'Proceso sin ejecución vinculada';
 }
-export function eventActivityTitle(e: ActivityEvent): string {
-  return (
-    presentActivities([], activityEvents()).find((a) => a.commandId === commandOf(e))?.title ||
-    (eventKey(e).startsWith('task:')
-      ? activityTitle(eventKey(e))
-      : 'Evento sin ejecución vinculada')
-  );
-}

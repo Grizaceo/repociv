@@ -14,7 +14,7 @@ import type { BridgeEvent, City, Unit } from './types.ts';
 import { escapeHtml } from './ui/escapeHtml.ts';
 
 /** Every unit owned by the external-agents tracker has this id prefix. */
-export const EXTERNAL_UNIT_PREFIX = 'ext-';
+const EXTERNAL_UNIT_PREFIX = 'ext-';
 
 export function isExternalAgentUnit(unitId: string): boolean {
   return unitId.startsWith(EXTERNAL_UNIT_PREFIX);
@@ -101,9 +101,9 @@ export async function fetchExternalAgents(): Promise<ExternalAgentRow[] | null> 
  * 24 h); `cron` / `gateway` — Hermes cron jobs and gateway chats (Telegram…),
  * listed in their own panel sections and never put on the map.
  */
-export type SessionSection = '' | 'cron' | 'gateway';
+type SessionSection = '' | 'cron' | 'gateway';
 
-export interface ExternalLiveChatCapability {
+interface ExternalLiveChatCapability {
   state: 'available' | 'probe_required' | 'unavailable';
   transport: string | null;
   reason: string | null;

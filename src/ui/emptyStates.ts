@@ -1,7 +1,7 @@
 // ─── RepoCiv — Imperial Empty States ────────────────────────────────────────
 // 3/8 Whimsy Injector: "Empty states con copy imperial + acción sugerida"
 
-export interface EmptyStateConfig {
+interface EmptyStateConfig {
   icon: string;
   title: string;
   message: string;
@@ -59,7 +59,7 @@ const EMPTY_STATES: Record<string, EmptyStateConfig> = {
   },
 };
 
-export function getEmptyState(key: string): EmptyStateConfig | null {
+function getEmptyState(key: string): EmptyStateConfig | null {
   return EMPTY_STATES[key] ?? null;
 }
 

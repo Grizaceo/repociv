@@ -66,7 +66,7 @@ interface UnitEntry {
   getTileSurfaceY: (q: number, r: number) => number;
 }
 
-export type { UnitEntry, UnitLifeState };
+export type { UnitEntry };
 
 const unitEntries = new Map<string, UnitEntry>();
 

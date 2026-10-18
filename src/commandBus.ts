@@ -7,7 +7,7 @@ import { bridgeHeaders, bridgeUrl } from './bridgeEnv.ts';
 import { trackCommand, trackApproval } from './ui/analytics.ts';
 
 // ─── In-flight command tracking ───────────────────────────────────────────────
-export interface CommandRecord {
+interface CommandRecord {
   id: string;
   type: string;
   target: string;

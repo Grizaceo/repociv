@@ -195,9 +195,3 @@ export function getPanelUsageReport(): PanelUsage[] {
     (a, b) => a.opens - b.opens || a.panel.localeCompare(b.panel),
   );
 }
-
-export function getTopAgents(n = 3): [string, number][] {
-  return Object.entries(data.messagesSent)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, n);
-}

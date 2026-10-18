@@ -13,7 +13,7 @@
 
 import type { ProxyOptions } from 'vite';
 
-export const WONDER_PROXY_PREFIX = '/wonder-proxy';
+const WONDER_PROXY_PREFIX = '/wonder-proxy';
 
 const ID_RE = /^[a-z0-9_-]+$/;
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);

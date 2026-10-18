@@ -224,14 +224,14 @@ async function _refreshNativeProfiles(): Promise<void> {
 
 /** Apply a native profile: harness=hermes + profile path. The bridge runs
  *  hermes-cli with HERMES_HOME pointing at the profile dir. */
-export function applyNativeProfile(profilePath: string): void {
+function applyNativeProfile(profilePath: string): void {
   const unitId = getActiveChatUnit();
   applyHarnessSelection('hermes', unitId);
   applyProfileSelection(profilePath, unitId);
 }
 
 /** Apply a registry profile's harness/provider/model to the active chat unit. */
-export function applyProfileToActiveChat(profile: RepoCivProfile): void {
+function applyProfileToActiveChat(profile: RepoCivProfile): void {
   const unitId = getActiveChatUnit();
   applyHarnessSelection(registryHarnessId(profile.harness), unitId);
   applyProviderSelection(profile.provider ?? '', unitId);
@@ -242,7 +242,7 @@ export function applyProfileToActiveChat(profile: RepoCivProfile): void {
 /** Reflect the active unit's saved config onto the <select>: show the
  *  matching profile (registry or native), or "— (config manual)" when none
  *  matches. */
-export function syncProfileSelector(unitId: string | null): void {
+function syncProfileSelector(unitId: string | null): void {
   const select = _selectEl();
   if (!select) return;
   if (!unitId) {

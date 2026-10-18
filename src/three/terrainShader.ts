@@ -45,32 +45,6 @@ export const TERRAIN_ATLAS_INDEX: Record<Terrain, number> = {
   sacred: 7,
 };
 
-/** Per-biome prism height scale (local Y multiplier in vertex shader).
- *  At TILE_PRISM_HEIGHT=24, scale=1.0 makes hills (elev=2) prism bottom touch plains (elev=0) top.
- *  Scales >1.0 add extra depth for drama; mountain needs ≥1.5 to bridge 3-step gap. */
-export const TERRAIN_HEIGHT_SCALE: Record<Terrain, number> = {
-  plains: 1.0,
-  forest: 1.0,
-  mountain: 1.58,
-  desert: 1.0,
-  ocean: 0.7,
-  ice: 0.9,
-  hills: 1.12,
-  sacred: 1.0,
-};
-
-/** Elevation in world units (coordinates with terrainElevation() in isoHex.ts). */
-export const TERRAIN_ELEVATION_WORLD: Record<Terrain, number> = {
-  plains: 0,
-  forest: 1,
-  mountain: 3,
-  desert: 0,
-  ocean: -1,
-  ice: 0,
-  hills: 2,
-  sacred: 0,
-};
-
 export interface TerrainMaterialOptions {
   terrainAtlas?: Texture | null;
   normalAtlas?: Texture | null;

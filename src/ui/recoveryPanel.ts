@@ -18,11 +18,8 @@ let _currentReason = '';
 let _currentPlan: RecoveryPlan | null = null;
 
 // ─── Public API ────────────────────────────────────────────────────────────────
-export function isRecoveryPanelOpen(): boolean {
-  return _visible;
-}
 
-export function closeRecoveryPanel() {
+function closeRecoveryPanel() {
   _visible = false;
   if (_panel) hidePanel(_panel);
 }

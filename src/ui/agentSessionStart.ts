@@ -25,7 +25,7 @@ export function validateAgentSessionDraft(draft: AgentSessionDraft): string | nu
 }
 
 /** Renderer-compatible type for a registered harness. */
-export function unitTypeForProfile(profile: RepoCivProfile): Unit['type'] {
+function unitTypeForProfile(profile: RepoCivProfile): Unit['type'] {
   const types: Record<RepoCivProfile['harness'], Unit['type']> = {
     claude: 'claude',
     codex: 'codex',

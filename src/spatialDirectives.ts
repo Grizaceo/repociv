@@ -10,7 +10,7 @@ import { canExecute } from './agentCapabilities.ts';
 
 // ─── Core types ───────────────────────────────────────────────────────────────
 
-export type GestureType =
+type GestureType =
   | 'drag_unit_to_city'
   | 'drag_unit_to_unit'
   | 'drag_city_to_city'

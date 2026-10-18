@@ -3,12 +3,7 @@ import { Color } from 'three';
 import { type Tile } from '../types.ts';
 import { TERRAIN_COLOR } from '../map.ts';
 
-export interface FogTileState {
-  revealed: boolean;
-  inFog: boolean;
-}
-
-export function tileFogAlpha(tile: Tile, fogEnabled: boolean): number {
+function tileFogAlpha(tile: Tile, fogEnabled: boolean): number {
   if (!tile.revealed) return 0.1;
   if (tile.inFog && fogEnabled) return 0.35;
   return 1;

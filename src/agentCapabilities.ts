@@ -73,7 +73,7 @@ export interface SkillBadge {
   icon: string;
 }
 
-export const AGENT_SKILLS: Record<AgentBase, SkillBadge[]> = {
+const AGENT_SKILLS: Record<AgentBase, SkillBadge[]> = {
   MAIN: [],
   WORKER: [
     { key: 'test_runner', label: 'Tests', icon: '🧪' },

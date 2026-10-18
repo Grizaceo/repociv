@@ -62,11 +62,11 @@ export function hideLocalWorkbenchTooltip() {
   _wbTooltipEl?.classList.add('hidden');
 }
 
-export function hideLocalContextMenu() {
+function hideLocalContextMenu() {
   _menuEl?.classList.add('hidden');
 }
 
-export function hideLocalMissionPreview() {
+function hideLocalMissionPreview() {
   _previewEl?.classList.add('hidden');
 }
 
@@ -143,7 +143,7 @@ export function showWhiteboardPanel(
   }, 50);
 }
 
-export function hideWhiteboardPanel() {
+function hideWhiteboardPanel() {
   _whiteboardEl?.classList.add('hidden');
 }
 

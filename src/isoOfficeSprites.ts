@@ -6,7 +6,7 @@ import { getOfficeSprite, isOfficeAtlasLoaded } from './officeAtlas.ts';
 export const ISO_TILE_W = 64;
 export const ISO_TILE_H = 32;
 export const ISO_WALL_H = 24;
-export const ISO_PARTITION_H = 12;
+const ISO_PARTITION_H = 12;
 
 export function isoProject(x: number, y: number, z = 0): { px: number; py: number } {
   return {
@@ -54,7 +54,7 @@ function drawSpriteOrFallback(
 }
 
 /** Low cubicle partition (extruded, shorter than full wall). */
-export function drawIsoCubiclePartition(
+function drawIsoCubiclePartition(
   dctx: IsoOfficeDrawContext,
   gx: number,
   gy: number,

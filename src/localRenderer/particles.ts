@@ -8,7 +8,7 @@ import {
   type LocalParticle,
 } from '../localParticles.ts';
 
-export { createParticlePool, type LocalParticle };
+export { type LocalParticle };
 
 export function initParticlePool(_pool: LocalParticle[], max: number): LocalParticle[] {
   return createParticlePool(max);
