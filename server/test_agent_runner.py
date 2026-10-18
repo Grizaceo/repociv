@@ -166,8 +166,8 @@ def test_run_agent_persists_session_and_run_state(monkeypatch, tmp_path):
     monkeypatch.setattr(agent_runner, "save_mission", lambda mission: saved.append(dict(mission)))
     monkeypatch.setattr(agent_runner, "send_to_repociv", lambda evt: sent.append(dict(evt)))
     monkeypatch.setattr(agent_runner._es, "record_started", lambda mission_id: None)
-    monkeypatch.setattr(agent_runner._es, "record_completed", lambda mission_id, result='': completions.append((mission_id, result)))
-    monkeypatch.setattr(agent_runner._es, "record_failed", lambda mission_id, error='': failures.append((mission_id, error)))
+    monkeypatch.setattr(agent_runner._es, "record_completed", lambda mission_id, result='', **_kw: completions.append((mission_id, result)))
+    monkeypatch.setattr(agent_runner._es, "record_failed", lambda mission_id, error='', **_kw: failures.append((mission_id, error)))
     monkeypatch.setattr(agent_runner._ds, "record_outcome", lambda mission_id, status, duration: outcomes.append((mission_id, status)))
     monkeypatch.setattr(agent_runner, "resolve_agent_working_dir", lambda city_id, repo_path="": f"/tmp/{city_id}")
     monkeypatch.setattr(

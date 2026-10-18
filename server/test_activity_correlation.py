@@ -26,14 +26,14 @@ def test_identity_start_ticks_boot_and_exit(tmp_path):
 def test_explicit_binding_and_fail_open(monkeypatch):
     events = []
     monkeypatch.setattr(ap, "process_identity", lambda pid: "boot:10:100")
-    monkeypatch.setattr(es, "record_event", lambda kind, data: events.append((kind, data)))
+    monkeypatch.setattr(es, "record_event", lambda kind, data, **_kw: events.append((kind, data)))
     ap.record_process_binding(10, "run", "WORKER")
     assert events == [("ProcessBound", {"commandId": "run", "agentId": "WORKER", "pid": 10, "processIdentity": "boot:10:100"})]
     monkeypatch.setattr(ap, "process_identity", lambda pid: None)
     ap.record_process_binding(10, "run", "WORKER")
     assert len(events) == 1
     monkeypatch.setattr(ap, "process_identity", lambda pid: "boot:10:100")
-    def broken(*args):
+    def broken(*args, **_kw):
         raise OSError("private disk path")
     monkeypatch.setattr(es, "record_event", broken)
     ap.record_process_binding(10, "run", "WORKER")
@@ -76,7 +76,7 @@ def test_metadata_history_survives_chunks_and_excludes_private_data(tmp_path, mo
 def test_phase_history_records_declared_state_only(monkeypatch):
     from server import task_orchestrator as to
     events = []
-    monkeypatch.setattr(es, "record_event", lambda kind, data: events.append((kind, data)))
+    monkeypatch.setattr(es, "record_event", lambda kind, data, **_kw: events.append((kind, data)))
     for phase in ("executing", "complete", "failed", "cancelled"):
         to._record_task_phase("repo::issue", {"phase": phase, "lastError": "SECRET"})
     assert [data["phase"] for _, data in events] == ["executing", "complete", "failed", "cancelled"]
