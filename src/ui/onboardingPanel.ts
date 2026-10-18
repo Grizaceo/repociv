@@ -63,7 +63,7 @@ async function fetchHarnessOptions(): Promise<HarnessOption[]> {
     // /harnesses is not critical for the onboarding flow.
   }
   if (ids.length === 0) {
-    ids = ['hermes', 'claude', 'codex', 'cursor', 'openclaw'];
+    ids = ['hermes', 'claude', 'codex', 'cursor', 'openclaw', 'opencode'];
   }
   return ids.map((id) => buildHarnessOption(id));
 }
@@ -92,6 +92,10 @@ function buildHarnessOption(id: string): HarnessOption {
     openclaw: {
       name: 'OpenClaw',
       description: 'OpenClaw gateway. Transporte y ejecucion, no edita archivos.',
+    },
+    opencode: {
+      name: 'OpenCode',
+      description: 'OpenCode CLI. Coding agent completo con sesiones persistidas y modo headless.',
     },
   };
   const m = meta[id] ?? {

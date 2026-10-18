@@ -103,6 +103,7 @@ def _infer_external_harness(card: dict) -> str:
         "claude": "claude-code",
         "codex": "codex",
         "openclaw": "openclaw",
+        "opencode": "opencode",
         "cursor": "cursor",
     }
     return mapping.get(card.get("id", ""), card.get("id", "unknown"))

@@ -32,6 +32,7 @@ function unitTypeForProfile(profile: RepoCivProfile): Unit['type'] {
     cursor: 'cursor',
     hermes: 'hero',
     openclaw: 'hero',
+    opencode: 'hero',
   };
   return types[profile.harness];
 }

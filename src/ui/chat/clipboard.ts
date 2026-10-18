@@ -31,12 +31,12 @@ export function clipboardWrite(text: string): boolean {
 
 /** Returns true if the text contains a transport error marker. */
 export function hasErrorLine(text: string): boolean {
-  return /\[(?:hermes|openclaw) error\]/i.test(text);
+  return /\[(?:hermes|openclaw|opencode) error\]/i.test(text);
 }
 
 /** Extracts the first error line from the message text. */
 function extractErrorLine(text: string): string {
-  const m = text.match(/\[(?:hermes|openclaw) error\].*?(?:\n|$)/i);
+  const m = text.match(/\[(?:hermes|openclaw|opencode) error\].*?(?:\n|$)/i);
   return m ? m[0] : '';
 }
 

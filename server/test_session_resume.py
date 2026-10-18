@@ -60,12 +60,20 @@ def test_a_live_session_that_ended_can_still_be_resumed():
     assert plan["mode"] == "resume"
 
 
+def test_opencode_resumes_by_session_id():
+    plan = sr.plan(agent="opencode", native_id="ses_abc123", cwd="/w/repociv")
+
+    assert plan["mode"] == "resume"
+    # opencode also resolves the session from its project directory.
+    assert plan["command"] == "cd /w/repociv && opencode --session ses_abc123"
+
+
 def test_unknown_agent_says_so():
-    plan = sr.plan(agent="opencode", native_id="s1", cwd="/w")
+    plan = sr.plan(agent="aider", native_id="s1", cwd="/w")
 
     assert plan["mode"] == "unavailable"
     assert plan["command"] == ""
-    assert "opencode" in plan["note"]
+    assert "aider" in plan["note"]
 
 
 def test_missing_id_is_not_guessed():
@@ -79,5 +87,6 @@ def test_agent_family():
     assert sr.agent_family("Claude") == "claude"
     assert sr.agent_family("openai-codex") == "codex"
     assert sr.agent_family("hermes") == "hermes"
+    assert sr.agent_family("opencode") == "opencode"
     assert sr.agent_family("cursor") == ""
     assert sr.agent_family("") == ""

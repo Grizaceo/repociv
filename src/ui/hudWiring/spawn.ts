@@ -80,6 +80,7 @@ function spawnFromProfile(
     cursor: 'cursor',
     hermes: 'hero',
     openclaw: 'hero',
+    opencode: 'hero',
     praetorian: 'praetorian',
   };
   const type = typeMap[profile.harness] ?? 'hero';
@@ -149,6 +150,7 @@ export function spawnAcceptedSession(
     cursor: 'cursor',
     hermes: 'hero',
     openclaw: 'hero',
+    opencode: 'hero',
     praetorian: 'praetorian',
   };
   const unit = state.spawnUnit(

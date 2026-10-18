@@ -67,9 +67,29 @@ def test_a_live_session_the_source_says_ended_is_allowed():
     assert _build(live=True, ended=True)["argv"][0] == "claude"
 
 
+def test_opencode_turn_resumes_the_session_headless():
+    spec = _build(agent="opencode", native_id="ses_abc123")
+
+    # One headless turn over the session's own thread; --auto matches the
+    # permissions RepoCiv gives its own missions.
+    assert spec["argv"] == [
+        "opencode", "run", "--session", "ses_abc123", "--auto", "seguí",
+    ]
+    assert spec["cwd"] == "/w/repo" and spec["env"] == {}
+
+
+def test_opencode_turn_passes_the_model_with_a_short_flag():
+    spec = _build(agent="opencode", model="opencode/deepseek-v4.1-flash-free")
+
+    assert spec["argv"][:-1] == [
+        "opencode", "run", "--session", "n1", "--auto",
+        "-m", "opencode/deepseek-v4.1-flash-free",
+    ]
+
+
 def test_an_agent_without_a_resume_is_refused():
     with pytest.raises(sr.ReplyRefused, match="no_resume_path"):
-        _build(agent="opencode")
+        _build(agent="aider")
 
 
 def test_an_empty_message_is_refused():

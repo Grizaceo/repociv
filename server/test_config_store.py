@@ -22,7 +22,7 @@ def test_default_registry_is_one_profile_per_harness(isolated_config: Path) -> N
     # reset_to_default() seeds the shipped baseline on first call.
     profiles = config_store.reset_to_default()
     assert "H" in profiles and profiles["H"]["harness"] == "hermes"
-    for name in ("claude", "codex", "cursor", "openclaw"):
+    for name in ("claude", "codex", "cursor", "openclaw", "opencode"):
         assert name in profiles
         assert profiles[name]["harness"] == name
 
@@ -36,7 +36,8 @@ def test_reset_to_default_populates_shipped_baseline(isolated_config: Path) -> N
     assert "codex" in profiles
     assert "cursor" in profiles
     assert "openclaw" in profiles
-    for name in ("claude", "codex", "cursor", "openclaw"):
+    assert "opencode" in profiles
+    for name in ("claude", "codex", "cursor", "openclaw", "opencode"):
         assert profiles[name]["harness"] == name
 
 
