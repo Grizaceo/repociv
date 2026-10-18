@@ -27,6 +27,10 @@ def test_audit_test_restores_process_state(case: str, tmp_path: Path) -> None:
     script = '''
 import json, os, sys
 import pytest
+# Apply the suite-wide hermetic isolation first (it rewrites HOME and
+# REPOCIV_CONFIG_DIR by design); pytest.main reuses this module, so the
+# snapshot below measures only what the audited test itself leaves behind.
+import conftest  # noqa: F401
 from server import approval_store as store, security_harness as sh
 case = sys.argv[1]
 store._loaded = True

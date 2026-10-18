@@ -47,6 +47,7 @@ from pathlib import Path
 from typing import Any
 
 from server._env_filter import redact_env_for_spawn
+from server.state_paths import repociv_home
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ def _expand(path: str) -> str:
     return os.path.expanduser(path)
 
 
-REPOCIV_CONFIG_DIR = _expand(_env("REPOCIV_CONFIG_DIR", "~/.repociv"))
+REPOCIV_CONFIG_DIR = str(repociv_home())
 WONDERS_DIR = Path(REPOCIV_CONFIG_DIR) / "wonders"
 LAUNCHED_JSON = WONDERS_DIR / "launched.json"
 LOGS_DIR = WONDERS_DIR / "logs"
@@ -94,7 +95,7 @@ def _custom_wonders_dir() -> Path:
     env_dir = os.environ.get("REPOCIV_WONDERS_DIR", "").strip()
     if env_dir:
         return Path(env_dir).expanduser()
-    return Path.home() / ".repociv" / "wonders"
+    return repociv_home() / "wonders"
 
 
 def _validate_launch_field(raw: Any) -> tuple[WonderSpec | None, str | None]:

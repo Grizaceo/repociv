@@ -20,6 +20,10 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+try:
+    from .state_paths import repociv_home
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from state_paths import repociv_home  # type: ignore[no-redef]
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +41,7 @@ _DEFAULT_COSTS: dict[str, dict[str, float]] = {
     "gpt-4o-mini":   {"prompt": 0.00015, "completion": 0.0006},
 }
 
-_DEFAULT_STATE_DIR = Path.home() / ".repociv"
+_DEFAULT_STATE_DIR = repociv_home()
 
 
 class TokenLedger:

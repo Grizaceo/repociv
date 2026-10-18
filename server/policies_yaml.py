@@ -68,7 +68,11 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
+try:
+    from .state_paths import repociv_home
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from state_paths import repociv_home  # type: ignore[no-redef]
 
 _logger = logging.getLogger(__name__)
 
@@ -200,7 +204,7 @@ def _parse_rule(raw: dict[str, Any], source: Path) -> PolicyRule:
     # `risk_levels_raw` was already filtered through _VALID_RISK_LEVELS so the
     # tuple is genuinely Runtime[RiskLevel, ...]; cast preserved through frozen
     # dataclass by AnnotatedField-style declaration below.
-    risk_levels_typed: tuple[RiskLevel, ...] = tuple(risk_levels_raw)  # type: ignore[assignment]
+    risk_levels_typed = cast("tuple[RiskLevel, ...]", tuple(risk_levels_raw))
     harness_ids = tuple(_as_str_list(applies.get("harness_ids"), "applies_to.harness_ids"))
 
     effect = raw.get("effect", {}) or {}
@@ -281,9 +285,8 @@ def _default_policies_dir() -> Path:
         os.environ.get("REPOCIV_CONFIG_DIR")
         or os.environ.get("REPOCIV_STATE_DIR")
         or os.environ.get("REPOCIV_DATA_DIR")
-        or os.path.join(os.path.expanduser("~"), ".repociv")
     )
-    return Path(base) / "policies.d"
+    return (Path(os.path.expanduser(base)) if base else repociv_home()) / "policies.d"
 
 
 def load_policies(policies_dir: Path | str | None = None) -> PolicyOverlayState:

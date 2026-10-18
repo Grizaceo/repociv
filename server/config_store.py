@@ -31,6 +31,10 @@ import json
 import os
 from pathlib import Path
 from typing import Any
+try:
+    from .state_paths import repociv_home
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from state_paths import repociv_home  # type: ignore[no-redef]
 
 _CONFIG_DIR_ENV = "REPOCIV_CONFIG_DIR"
 _CONFIG_FILENAME = "config.json"
@@ -78,11 +82,9 @@ def _config_path() -> Path:
     # sin expandir se crea un directorio literal llamado "~" en el cwd, lo que
     # rompe GET /api/profiles con FileNotFoundError y tumbó 19 tests E2E
     # (bug introducido en c83a577, 2026-06-15; detectado 2026-07-11).
-    # bridge.py:122 ya expandía; esta ruta divergía. Ver test_config_store.py.
-    base = os.environ.get(_CONFIG_DIR_ENV) or os.path.join(
-        os.path.expanduser("~"), ".repociv"
-    )
-    return Path(os.path.expanduser(base)) / _CONFIG_FILENAME
+    # state_paths.repociv_home() expande para todos los stores. Ver
+    # test_config_store.py.
+    return repociv_home() / _CONFIG_FILENAME
 
 
 def _read_raw() -> dict[str, Any]:

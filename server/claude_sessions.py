@@ -18,19 +18,21 @@ State: ``$REPOCIV_CONFIG_DIR/claude-sessions.json`` (default ``~/.repociv``):
 from __future__ import annotations
 
 import json
-import os
 import threading
 import uuid
 from pathlib import Path
 from typing import Any
+try:
+    from .state_paths import repociv_home
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from state_paths import repociv_home  # type: ignore[no-redef]
 
 _MAX_OWNED = 500
 _lock = threading.Lock()
 
 
 def state_file() -> Path:
-    config_dir = os.environ.get("REPOCIV_CONFIG_DIR", "") or str(Path.home() / ".repociv")
-    return Path(config_dir).expanduser() / "claude-sessions.json"
+    return repociv_home() / "claude-sessions.json"
 
 
 def _is_uuid(value: Any) -> bool:

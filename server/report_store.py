@@ -17,9 +17,13 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+try:
+    from .state_paths import repociv_home
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from state_paths import repociv_home  # type: ignore[no-redef]
 
 
-_REPORTS_DIR = Path.home() / ".repociv" / "reports"
+_REPORTS_DIR = repociv_home() / "reports"
 
 
 def _ensure_dir() -> Path:

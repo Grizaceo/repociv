@@ -62,6 +62,7 @@ from urllib.parse import quote
 
 from server.suvadu_tracker import Observation, SourceError
 from server.transcript_work import dirs_from_hints
+from server.state_paths import repociv_home
 
 AGENT = "hermes"
 MAP_ORIGINS = frozenset({"cli", "desktop", "tui", "hermes_browser", "kanban", "subagent"})
@@ -93,8 +94,7 @@ def _csv_env(name: str) -> frozenset[str]:
 
 def repociv_sessions_file() -> str:
     """agent_runner's (profile|unit|city) → Hermes session id map."""
-    config_dir = os.environ.get("REPOCIV_CONFIG_DIR", "") or os.path.join(os.path.expanduser("~"), ".repociv")
-    return os.path.join(os.path.expanduser(config_dir), "hermes-sessions.json")
+    return str(repociv_home() / "hermes-sessions.json")
 
 
 def repociv_session_ids(path: str | None = None) -> frozenset[str]:

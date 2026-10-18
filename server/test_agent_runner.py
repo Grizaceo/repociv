@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from urllib.error import URLError
 
 import pytest
@@ -65,7 +66,9 @@ def test_run_hermes_streaming_sends_working_directory(monkeypatch, tmp_path):
 
 def test_resolve_agent_working_dir_maps_capital_to_repociv_root():
     resolved = agent_runner.resolve_agent_working_dir("capital")
-    assert resolved and resolved.endswith("repociv")
+    # The checkout root, whatever the directory is called (worktrees, CI).
+    repo_root = Path(agent_runner.__file__).resolve().parent.parent
+    assert resolved and Path(resolved).resolve() == repo_root
 
 
 def test_run_hermes_streaming_sends_provider_and_model(monkeypatch):

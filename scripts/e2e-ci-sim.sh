@@ -8,7 +8,8 @@
 #
 #   * demo-workspace as REPOCIV_MAP_ROOT / WORKSPACE_ROOT / REPOCIV_REPOS_ROOT
 #   * a seeded state file (same node block as the CI step)
-#   * an isolated XDG_STATE_HOME (bridge ledger writes stay out of the real one)
+#   * isolated XDG_STATE_HOME and REPOCIV_CONFIG_DIR, and no local .env (bridge
+#     stores and ledger writes stay out of the live ~/.repociv)
 #   * ports 5373-5375 (CI-equivalent, never the live dev stack on 5273-5275)
 #
 # Resource discipline: this is a local helper, not CI. It pins the run to two
@@ -60,6 +61,11 @@ export WORKSPACE_ROOT="${ROOT}"
 export REPOCIV_REPOS_ROOT="${ROOT}"
 export REPOCIV_STATE_FILE="${TMP}/state.json"
 export XDG_STATE_HOME="${TMP}/xdg"
+# Every bridge store resolves under REPOCIV_CONFIG_DIR (server/state_paths.py);
+# without this the spawned bridge would write the live ~/.repociv. The local
+# .env is skipped too (it may carry the live token and REPOCIV_CONFIG_DIR).
+export REPOCIV_CONFIG_DIR="${TMP}/repociv"
+export REPOCIV_SKIP_DOTENV=1
 export REPOCIV_PORT=5373 VITE_PORT=5373 BRIDGE_PORT=5374 BRIDGE_WS_PORT=5375
 
 # CI has no Hermes harness, so the app shows the degraded-mode banner (and the

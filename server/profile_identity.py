@@ -34,10 +34,14 @@ import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
+try:
+    from .state_paths import repociv_home
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from state_paths import repociv_home  # type: ignore[no-redef]
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
-_REPOCIV_PROFILES_DIR = Path.home() / ".repociv" / "profiles"
+_REPOCIV_PROFILES_DIR = repociv_home() / "profiles"
 _HERMES_PROFILES_DIR = Path.home() / ".hermes" / "profiles"
 _CLAUDE_USER_DIR = Path.home() / ".claude"
 _CODEX_DIR = Path.home() / ".codex"

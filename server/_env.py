@@ -25,7 +25,14 @@ _PATHS = (
 
 
 def load_dotenv() -> None:
-    """Load RepoCiv + Hermes .env into os.environ, best-effort."""
+    """Load RepoCiv + Hermes .env into os.environ, best-effort.
+
+    ``REPOCIV_SKIP_DOTENV=1`` disables loading entirely; the test suite sets
+    it so a developer's local ``.env`` (token, map root, Hermes endpoints)
+    cannot make local runs diverge from CI or reach live services.
+    """
+    if os.environ.get("REPOCIV_SKIP_DOTENV", "").strip().lower() in ("1", "true", "yes"):
+        return
     for path in _PATHS:
         try:
             for raw in path.read_text(encoding="utf-8").splitlines():

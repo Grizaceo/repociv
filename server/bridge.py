@@ -55,6 +55,7 @@ from .pending_tracker import (
 )
 from .process_scanner import scan_active_processes, detect_lexo, retire_detected_lexo
 from ._env import load_dotenv as _load_dotenv  # noqa: F401 (re-export for tests)
+from .state_paths import repociv_home
 import hmac
 import re
 import json
@@ -128,7 +129,7 @@ def _ensure_port_free(host: str, port: int, label: str) -> None:
     finally:
         probe.close()
 
-CONFIG_DIR = Path(os.path.expanduser(os.environ.get("REPOCIV_CONFIG_DIR", "~/.repociv")))
+CONFIG_DIR = repociv_home()
 MISSIONS_FILE = CONFIG_DIR / "missions.json"
 HERMES_ROOT = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", "~/.hermes")))
 

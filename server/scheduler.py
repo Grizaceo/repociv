@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
 import time
 from pathlib import Path
@@ -21,11 +20,12 @@ from dataclasses import asdict
 
 from .command_schema import Command
 from . import event_store as _es
+from .state_paths import repociv_home
 
 logger = logging.getLogger(__name__)
 
 # ─── Queue persistence (Fase 4) ──────────────────────────────────────────────
-_CONFIG_DIR = Path(os.path.expanduser(os.environ.get("REPOCIV_CONFIG_DIR", "~/.repociv")))
+_CONFIG_DIR = repociv_home()
 _CONFIG_DIR.mkdir(exist_ok=True, parents=True)
 _QUEUE_FILE = _CONFIG_DIR / "scheduler-queue.json"
 _queue_file_lock = threading.Lock()

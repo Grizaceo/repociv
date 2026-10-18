@@ -35,6 +35,7 @@ import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from .state_paths import repociv_home
 
 logger = logging.getLogger(__name__)
 
@@ -347,7 +348,7 @@ def detect_drift(
 
 # ── Quarantine Engine ────────────────────────────────────────────────────────
 
-_DEFAULT_QUARANTINE_DIR = Path.home() / ".repociv" / "quarantine"
+_DEFAULT_QUARANTINE_DIR = repociv_home() / "quarantine"
 
 
 def quarantine_file(
@@ -433,7 +434,7 @@ class AlertSystem:
     """
 
     def __init__(self, log_dir: str | Path | None = None) -> None:
-        self._log_dir = Path(log_dir or Path.home() / ".repociv" / "security_logs")
+        self._log_dir = Path(log_dir) if log_dir else repociv_home() / "security_logs"
         self._log_dir.mkdir(parents=True, exist_ok=True)
         self._log_file = self._log_dir / "security_audit.jsonl"
         self._lock = threading.Lock()

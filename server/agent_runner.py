@@ -33,6 +33,7 @@ from server import token_ledger as _token_ledger
 from server import repo_roots_state as _rrs
 from server.quest import generate_quest_name
 from server import execution_identity as _exec_identity
+from .state_paths import repociv_home
 
 SendFn = Callable[[dict[str, Any]], None]
 SaveMissionFn = Callable[[dict[str, Any]], None]
@@ -882,8 +883,7 @@ def _hermes_session_state_file() -> Path:
     stateful agents must remember the real session id printed at the end of
     each run (`session_id: <id>`) and resume with `--resume <id>`.
     """
-    config_dir = os.environ.get("REPOCIV_CONFIG_DIR", str(Path.home() / ".repociv"))
-    return Path(config_dir).expanduser() / "hermes-sessions.json"
+    return repociv_home() / "hermes-sessions.json"
 
 
 def _hermes_session_key(profile_path: str, unit_id: str, city_id: str) -> str:

@@ -16,7 +16,8 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeGuard
+from server.state_paths import repociv_home
 
 _CONFIG_DIR_ENV = "REPOCIV_CONFIG_DIR"
 _APPROVALS_FILENAME = "approvals.json"
@@ -47,10 +48,7 @@ _expiry_audited: set[str] = set()
 
 
 def _approvals_path() -> Path:
-    base = os.environ.get(_CONFIG_DIR_ENV) or os.path.join(
-        os.path.expanduser("~"), ".repociv"
-    )
-    return Path(base) / _APPROVALS_FILENAME
+    return repociv_home() / _APPROVALS_FILENAME
 
 
 def _ensure_loaded() -> dict[str, dict[str, Any]]:
@@ -104,7 +102,7 @@ def add_approval(cmd_dict: dict[str, Any]) -> None:
         _persist()
 
 
-def _valid_timestamp(value: Any) -> bool:
+def _valid_timestamp(value: Any) -> TypeGuard[float]:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
@@ -227,9 +225,8 @@ def cancel_mission(mission_id: str) -> list[dict[str, Any]]:
                 matches.append(cmd_id)
         removed = []
         for cmd_id in matches:
-            cmd = store.pop(cmd_id, None)
-            if cmd is not None:
-                removed.append(cmd)
+            if cmd_id in store:
+                removed.append(store.pop(cmd_id))
         if removed:
             _persist()
         return removed
