@@ -14,6 +14,10 @@ import json
 import math
 from pathlib import Path
 from typing import Any
+try:
+    from .atomic_io import atomic_write_json
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from atomic_io import atomic_write_json  # type: ignore[no-redef]
 
 
 # ─── Correlate gesture + outcome records ─────────────────────────────────────
@@ -216,8 +220,7 @@ def save_templates(records: list[dict[str, Any]]) -> int:
     if _TEMPLATES_PATH is None:
         return 0
     templates = top_templates(records, n=20, min_count=2)
-    _TEMPLATES_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _TEMPLATES_PATH.write_text(json.dumps(templates, ensure_ascii=False, indent=2))
+    atomic_write_json(_TEMPLATES_PATH, templates, ensure_ascii=False, indent=2)
     return len(templates)
 
 

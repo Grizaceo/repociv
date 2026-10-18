@@ -18,13 +18,18 @@ BLOCKED = {"blocked", "circuit_open"}
 
 def build_recovery_view() -> dict:
     tasks = []
+    skipped = 0
     for item in wi.list_issues():
         repo, issue = item["repo"], item["issueId"]
-        state = wi.load_issue_state(repo, issue) or {}
+        try:
+            state = wi.load_issue_state(repo, issue) or {}
+            ckpt = checkpoint.load_checkpoint(repo, issue)
+        except wi.IdentifierError:
+            skipped += 1  # legacy/malformed directory names are never touched
+            continue
         phase = state.get("phase", "unknown")
         if phase in TERMINAL:
             continue
-        ckpt = checkpoint.load_checkpoint(repo, issue)
         tasks.append({"repo": repo, "issueId": issue, "taskKey": f"{repo}::{issue}",
                       "persistedPhase": phase,
                       "recoveryPhase": phase if phase in BLOCKED else "interrupted",
@@ -34,7 +39,7 @@ def build_recovery_view() -> dict:
                       "stepCurrent": state.get("stepCurrent"),
                       "checkpointGate": state.get("checkpointGate"),
                       "resumeAvailable": False})
-    return {"readOnly": True, "autoResume": False, "tasks": tasks}
+    return {"readOnly": True, "autoResume": False, "tasks": tasks, "skippedMalformed": skipped}
 
 
 def correlate_surviving_work(view: dict | None = None) -> dict:
@@ -43,7 +48,8 @@ def correlate_surviving_work(view: dict | None = None) -> dict:
     for event in es.read_events(limit=20000):
         if event.get("type") == "ProcessBound":
             data = event.get("data") or {}
-            bindings[es.command_id(event)] = data
+            # Rows written before 2026-10-18 carry the id only inside data.
+            bindings[es.command_id(event) or str(data.get("commandId", ""))] = data
     tasks = []
     for entry in view["tasks"]:
         surviving, unknown = [], []

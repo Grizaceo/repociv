@@ -177,6 +177,16 @@ def unresolved_dispatch_count() -> int:
         return -1  # -1 = the recovery surface itself is unavailable/unknown
 
 
+def interrupted_task_count() -> int:
+    """Orchestrator tasks R12 reconciled as interrupted, awaiting an operator."""
+    try:
+        from server import task_orchestrator  # noqa: PLC0415
+
+        return len(task_orchestrator.interrupted_tasks())
+    except Exception:
+        return -1
+
+
 # ── Full snapshot ────────────────────────────────────────────────────────────
 
 def snapshot() -> dict[str, Any]:
@@ -198,5 +208,6 @@ def snapshot() -> dict[str, Any]:
         },
         "recovery": {
             "unresolvedDispatches": unresolved_dispatch_count(),
+            "interruptedTasks": interrupted_task_count(),
         },
     }

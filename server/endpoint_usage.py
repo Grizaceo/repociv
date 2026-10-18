@@ -12,6 +12,11 @@ import time
 from pathlib import Path
 from typing import Any
 
+try:
+    from .atomic_io import atomic_write_json
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from atomic_io import atomic_write_json  # type: ignore[no-redef]
+
 _lock = threading.Lock()
 _stats_path: Path | None = None
 _stats: dict[str, dict[str, Any]] = {}
@@ -32,7 +37,7 @@ def _persist() -> None:
     if _stats_path is None:
         return
     try:
-        _stats_path.write_text(json.dumps(_stats, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write_json(_stats_path, _stats, ensure_ascii=False, indent=2)
     except Exception:
         pass
 

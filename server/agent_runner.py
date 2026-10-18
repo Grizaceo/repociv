@@ -34,6 +34,7 @@ from server import repo_roots_state as _rrs
 from server.quest import generate_quest_name
 from server import execution_identity as _exec_identity
 from .state_paths import repociv_home
+from .atomic_io import atomic_write_json
 
 SendFn = Callable[[dict[str, Any]], None]
 SaveMissionFn = Callable[[dict[str, Any]], None]
@@ -462,25 +463,34 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
     success, output = _execute_streaming(unit_id, mission_id, mission, working_dir, city_id,
                                          harness=harness, provider=provider, model=model,
                                          profile_ref=profile)
+    # Adapters return after proc.wait(): the owned session is gone (R03).
+    from server import process_control as _process_control
+    _process_control.release_owned_process(mission_id)
 
     duration = time.time() - started_at
 
     # Log token usage — character-count estimate (~4 chars/token) for subprocess
     # adapters. The hermes adapter also logs with real counts when available;
     # this call provides a baseline for all adapters.
+    tokens_in, tokens_out = max(1, len(mission) // 4), max(1, len(output) // 4)
+    model_label = model or _infer_model_label(unit_id)
     _token_ledger.get_ledger().log_usage(
-        model=_infer_model_label(unit_id),
-        prompt_tokens=max(1, len(mission) // 4),
-        completion_tokens=max(1, len(output) // 4),
+        model=model_label,
+        prompt_tokens=tokens_in,
+        completion_tokens=tokens_out,
         agent=unit_id,
     )
+    # H2: terminal events carry who ran it, with what, since when and the
+    # (estimated) token cost, so the ledger stops reading SYSTEM/0 s/0 tokens.
+    attribution: dict[str, Any] = {"agent": unit_id, "model": model_label, "started_at": started_at,
+                                   "tokens_in": tokens_in, "tokens_out": tokens_out}
 
     mission_record.update({"completedAt": time.time(), "status": "complete" if success else "failed",
                            "summary": output[-500:], "duration": duration, "lines": len(output.splitlines())})
     save_mission(mission_record)
 
     if success:
-        _es.record_completed(mission_id, output[-500:])
+        _es.record_completed(mission_id, output[-500:], **attribution)
         _ds.record_outcome(mission_id, "success", duration)
         _run_state.patch(
             mission_id,
@@ -492,7 +502,7 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
         send_to_repociv({"type": "building_complete", "city": city_id, "building": quest_name, "missionId": mission_id})
         send_to_repociv({"type": "log", "msg": f"{unit_id} completó: {quest_name}", "level": "success"})
     else:
-        _es.record_failed(mission_id, output[-500:])
+        _es.record_failed(mission_id, output[-500:], **attribution)
         _ds.record_outcome(mission_id, "failure", duration)
         _run_state.patch(
             mission_id,
@@ -507,6 +517,21 @@ def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero"
     send_to_repociv({"type": "unit_state", "unit": unit_id, "state": "idle"})
     send_to_repociv({"type": "mission_complete", "missionId": mission_id, "unit": unit_id,
                      "success": success, "duration": int(duration)})
+
+
+def _bind_owned_process(proc: Any, mission_id: str, unit_id: str) -> None:
+    """Record a spawned agent for observation and for bounded stop (R03).
+
+    Adapters spawn with ``start_new_session=True`` so the agent leads its own
+    process group; ``process_control`` only ever signals such a dedicated,
+    identity-pinned session, never the bridge's own group.
+    """
+    from server.agent_processes import record_process_binding
+    from server import process_control
+
+    pid = getattr(proc, "pid", 0)
+    record_process_binding(pid, mission_id, unit_id)
+    process_control.register_owned_process(pid, mission_id, unit_id)
 
 
 def _execute_streaming(unit_id: str, mission_id: str, mission: str,
@@ -908,8 +933,7 @@ def _save_hermes_session_id(profile_path: str, unit_id: str, city_id: str, sessi
         path = _hermes_session_state_file()
         data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
         data[_hermes_session_key(profile_path, unit_id, city_id)] = session_id
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        atomic_write_json(path, data, indent=2)
     except Exception:
         pass
 
@@ -983,10 +1007,9 @@ def _run_hermes_cli_streaming(
     proc = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, bufsize=1, cwd=working_dir or None,
-        env=env,
+        env=env, start_new_session=True,
     )
-    from server.agent_processes import record_process_binding
-    record_process_binding(getattr(proc, "pid", 0), mission_id, unit_id)
+    _bind_owned_process(proc, mission_id, unit_id)
 
     output_buf: list[str] = []
     assert proc.stdout is not None
@@ -1072,9 +1095,8 @@ def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
     cmd.append(full_prompt)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, bufsize=1, cwd=working_dir or None,
-                            env=redact_env_for_spawn())
-    from server.agent_processes import record_process_binding
-    record_process_binding(getattr(proc, "pid", 0), mission_id, unit_id)
+                            env=redact_env_for_spawn(), start_new_session=True)
+    _bind_owned_process(proc, mission_id, unit_id)
     output_buf: list[str] = []
     assert proc.stdout is not None
     ctx = _harness_ctx(unit_id, mission_id, city_id, "claude-code", working_dir, model=model)
@@ -1222,9 +1244,9 @@ def _run_cursor_agent_streaming(
     proc = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, bufsize=1, cwd=working_dir or None,
+        env=redact_env_for_spawn(), start_new_session=True,
     )
-    from server.agent_processes import record_process_binding
-    record_process_binding(getattr(proc, "pid", 0), mission_id, unit_id)
+    _bind_owned_process(proc, mission_id, unit_id)
     output_buf: list[str] = []
     assert proc.stdout is not None
     ctx = _harness_ctx(unit_id, mission_id, city_id, "cursor", working_dir, model=model)
@@ -1270,9 +1292,8 @@ def _run_openclaw_streaming(unit_id: str, mission_id: str, mission: str,
     if model:
         cmd.extend(["--model", model])
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=working_dir or None,
-                            env=redact_env_for_spawn())
-    from server.agent_processes import record_process_binding
-    record_process_binding(getattr(proc, "pid", 0), mission_id, unit_id)
+                            env=redact_env_for_spawn(), start_new_session=True)
+    _bind_owned_process(proc, mission_id, unit_id)
     output_buf: list[str] = []
     assert proc.stdout is not None
     for line in proc.stdout:
@@ -1324,9 +1345,9 @@ def _run_opencode_streaming(unit_id: str, mission_id: str, mission: str,
         bufsize=1,
         cwd=working_dir or None,
         env=redact_env_for_spawn(),
+        start_new_session=True,
     )
-    from server.agent_processes import record_process_binding
-    record_process_binding(getattr(proc, "pid", 0), mission_id, unit_id)
+    _bind_owned_process(proc, mission_id, unit_id)
 
     text_parts: list[str] = []
     errors: list[str] = []
@@ -1425,9 +1446,9 @@ def _run_codex_streaming(unit_id: str, mission_id: str, mission: str,
         text=True,
         cwd=working_dir or None,
         env=redact_env_for_spawn(),
+        start_new_session=True,
     )
-    from server.agent_processes import record_process_binding
-    record_process_binding(getattr(proc, "pid", 0), mission_id, unit_id)
+    _bind_owned_process(proc, mission_id, unit_id)
     _, stderr_text = proc.communicate(timeout=600)
 
     if proc.returncode != 0:

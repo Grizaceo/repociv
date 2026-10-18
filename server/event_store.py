@@ -15,6 +15,7 @@ import os
 import threading
 import time
 import uuid
+from collections import OrderedDict
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,11 @@ _logger = logging.getLogger(__name__)
 _lock = threading.Lock()
 _store_path: Path | None = None
 _REVERSE_CHUNK = 8192
+# CommandStarted is emitted at most once per command id per process: the
+# scheduler (dispatch) and run_agent (execution) both mark the start, which
+# made each mission count twice (H5).
+_started_ids: OrderedDict[str, None] = OrderedDict()
+_STARTED_MEMORY = 4096
 
 # ── Dual-write to DuckDB Ledger (best-effort) ─────────────────────────────────
 # Imported lazily to avoid circular imports and to allow the ledger to be
@@ -176,6 +182,13 @@ def record_rejected(command_id: str, reason: str = "") -> None:
 
 
 def record_started(command_id: str) -> None:
+    if command_id:
+        with _lock:
+            if command_id in _started_ids:
+                return
+            _started_ids[command_id] = None
+            if len(_started_ids) > _STARTED_MEMORY:
+                _started_ids.popitem(last=False)
     _append(_event("CommandStarted", command_id, "system", {"startedAt": time.time()}))
 
 
@@ -183,14 +196,46 @@ def record_output_chunk(command_id: str, actor: str, text: str) -> None:
     _append(_event("AgentOutputChunk", command_id, actor, {"text": text[:2048]}))
 
 
-def record_completed(command_id: str, result: str = "") -> None:
-    evt = _event("CommandCompleted", command_id, "system", {"result": result[:1024], "finishedAt": time.time()})
+def _attribution(
+    agent: str, model: str, started_at: float | None,
+    tokens_in: int, tokens_out: int,
+) -> dict[str, Any]:
+    """Who ran a command and at what cost. The actor stays ``system`` (the
+    bridge records the terminal event); attribution travels in ``data`` so the
+    ledger stops reporting every mission as SYSTEM with zero duration."""
+    out: dict[str, Any] = {}
+    if agent:
+        out["agentId"] = agent
+    if model:
+        out["model"] = model
+    if started_at:
+        out["startedAt"] = float(started_at)
+    if tokens_in or tokens_out:
+        out["tokensIn"] = max(0, int(tokens_in))
+        out["tokensOut"] = max(0, int(tokens_out))
+    return out
+
+
+def record_completed(
+    command_id: str, result: str = "", *, agent: str = "", model: str = "",
+    started_at: float | None = None, tokens_in: int = 0, tokens_out: int = 0,
+) -> None:
+    evt = _event("CommandCompleted", command_id, "system", {
+        "result": result[:1024], "finishedAt": time.time(),
+        **_attribution(agent, model, started_at, tokens_in, tokens_out),
+    })
     _append(evt)
     _ledger_ingest(evt)
 
 
-def record_failed(command_id: str, error: str = "") -> None:
-    evt = _event("CommandFailed", command_id, "system", {"error": error[:1024], "finishedAt": time.time()})
+def record_failed(
+    command_id: str, error: str = "", *, agent: str = "", model: str = "",
+    started_at: float | None = None, tokens_in: int = 0, tokens_out: int = 0,
+) -> None:
+    evt = _event("CommandFailed", command_id, "system", {
+        "error": error[:1024], "finishedAt": time.time(),
+        **_attribution(agent, model, started_at, tokens_in, tokens_out),
+    })
     _append(evt)
     _ledger_ingest(evt)
 

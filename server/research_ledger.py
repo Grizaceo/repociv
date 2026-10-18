@@ -321,7 +321,9 @@ class ResearchLedger:
 
         self.record_cycle(
             mission_id=mission_id,
-            agent=actor,
+            # Terminal events are emitted by the bridge (actor "system"); the
+            # agent that actually ran travels in data.agentId when known.
+            agent=str(data.get("agentId") or actor),
             model=str(data.get("model", "")),
             prompt_tokens=int(data.get("tokensIn") or 0),
             completion_tokens=int(data.get("tokensOut") or 0),

@@ -22,7 +22,8 @@ gap without leaking anything sensitive.
 | `stores.eventStore` | `writable` / `not-writable` / `missing` / `unknown`. |
 | `stores.approvalStore` | same status set. |
 | `stores.schedulerQueue` | same status set. |
-| `recovery.unresolvedDispatches` | Count of durable dispatch intents never claimed (R01 visibility for R12). |
+| `recovery.unresolvedDispatches` | Count of durable dispatch intents never claimed (R01). |
+| `recovery.interruptedTasks` | Orchestrator tasks reconciled as `interrupted` at startup (R12), awaiting an operator; `-1` = unknown. |
 
 ## Immutability
 
@@ -50,12 +51,15 @@ enforced by `test_snapshot_never_leaks_secret_material`.
 
 ## HMAC audit-key mode
 
-`security_harness.audit_key_mode()` reports `persistent` when an operator key
-is configured (`REPOCIV_HMAC_KEY`) — audit signatures are then verifiable
-across restarts — and `ephemeral` when a per-process key was generated, in
-which case tamper-evidence is **not** verifiable across restarts. This makes
-the existing ephemeral-key warning an explicit, queryable capability state
-without changing signing behavior.
+`security_harness.audit_key_mode()` reports `persistent` when signatures are
+verifiable across restarts: either an operator key (`REPOCIV_HMAC_KEY`) or,
+since 2026-10-18 (H3), a 32-byte key created once at
+`<state root>/security_logs/audit-hmac.key` (mode 0600, published atomically,
+never overwritten if malformed). It reports `ephemeral` only when neither is
+usable (unwritable state root, unreadable or malformed key file), with a
+warning. The state-root key lives next to the log it signs: it detects
+accidental or out-of-band edits and keeps verification working across
+restarts, not an attacker holding the operator's own file permissions.
 
 ## Testing
 

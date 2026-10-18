@@ -2,6 +2,10 @@ import json
 import time
 from pathlib import Path
 from typing import Any
+try:
+    from .atomic_io import atomic_write_json
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from atomic_io import atomic_write_json  # type: ignore[no-redef]
 
 _REPOCIV_ROOT = Path(__file__).parent.parent
 _DATA_DIR = _REPOCIV_ROOT / "data"
@@ -24,8 +28,7 @@ def _load() -> list[dict[str, Any]]:
 
 
 def _save(items: list[dict[str, Any]]) -> None:
-    _DATA_DIR.mkdir(parents=True, exist_ok=True)
-    _LOCAL_PENDING.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(_LOCAL_PENDING, items, ensure_ascii=False, indent=2)
 
 
 def _next_id(items: list[dict[str, Any]]) -> str:
