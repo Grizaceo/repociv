@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from server import claude_sessions as _claude_sessions
-from server import cli_discovery, harness_output
+from server import cli_discovery, harness_output, hermes_session_store
 from server import event_store as _es
 from server import subagent_tracker as _subagent_tracker
 from server.mission_harness import MissionHarnessContext, log_swarm_tracking_capability, swarm_track_enabled
@@ -831,24 +831,18 @@ def _hermes_session_key(profile_path: str, unit_id: str, city_id: str) -> str:
 
 
 def _load_hermes_session_id(profile_path: str, unit_id: str, city_id: str) -> str:
-    try:
-        data = json.loads(_hermes_session_state_file().read_text(encoding="utf-8"))
-        return str(data.get(_hermes_session_key(profile_path, unit_id, city_id), ""))
-    except Exception:
-        return ""
+    return hermes_session_store.load_session_id(
+        state_file=lambda: _hermes_session_state_file(),
+        session_key=lambda: _hermes_session_key(profile_path, unit_id, city_id),
+    )
 
 
 def _save_hermes_session_id(profile_path: str, unit_id: str, city_id: str, session_id: str) -> None:
-    if not session_id:
-        return
-    try:
-        path = _hermes_session_state_file()
-        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-        data[_hermes_session_key(profile_path, unit_id, city_id)] = session_id
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    except Exception:
-        pass
+    hermes_session_store.save_session_id(
+        session_id,
+        state_file=lambda: _hermes_session_state_file(),
+        session_key=lambda: _hermes_session_key(profile_path, unit_id, city_id),
+    )
 
 
 def _extract_hermes_session_id(output: str) -> str:

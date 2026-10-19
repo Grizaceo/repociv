@@ -114,19 +114,19 @@ prueba ausencia de contratos dinámicos ni autoriza borrado automático.
 
 ### Exports y tipos (27)
 
-| Símbolos | Clasificación / evidencia y límite |
-| --- | --- |
-| `openLogPanel`, `refreshActivityHistory` | Conservar exports. `e2e/activity-presentation.spec.ts:81` y `activity-correlation.spec.ts:123` importan el módulo servido por Vite; también usados internamente en `logPanel.ts:140,301,303`. |
-| `openTaskPanel`, `refreshTaskInventory` | Conservar exports. Imports en `activity-presentation.spec.ts:86,115,130`, `activity-correlation.spec.ts:122` y `pending-work.spec.ts:41`; registro interno de panel en `taskPanel.ts:419,421`. |
-| `openKanbanPanel` | Conservar export. Import en `e2e/kanban-create.spec.ts:54`; llamado internamente en `kanbanPanel.ts:79`. |
-| `notifyWorkingUnitsChanged` | Candidato a desexportar, **no borrar**: referencias internas en `chat/state.ts:132,135,167`. |
-| Tipos `EraDefinition`, `CapabilitiesAgent`, `CapabilitiesSnapshot` | Candidatos a desexportar, no borrar sus definiciones: usos internos en `eraSystem.ts:14` y `capabilitiesClient.ts:18,69,89,92,116,128`. |
-| `unmountGacetaWidget` | Sin caller localizado fuera de su definición (`gacetaWidget.ts:118`). Mantener el teardown hasta revisar ciclo de vida; la ausencia de llamadas no demuestra que eliminarlo sea prudente. |
-| `getCurrentEraIndex`, `getEraLabel`, `updateEraDisplay` | Candidatos a inspeccionar como cadena: los dos primeros tienen callers internos en `eraSystem.ts:62–64`; no se localizó caller externo del tercero. No borrar `getStoredEraLabel`, usado en main y capitalPanel. |
+| Símbolos                                                                                                                                                                                   | Clasificación / evidencia y límite                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `openLogPanel`, `refreshActivityHistory`                                                                                                                                                   | Conservar exports. `e2e/activity-presentation.spec.ts:81` y `activity-correlation.spec.ts:123` importan el módulo servido por Vite; también usados internamente en `logPanel.ts:140,301,303`.                                                                                      |
+| `openTaskPanel`, `refreshTaskInventory`                                                                                                                                                    | Conservar exports. Imports en `activity-presentation.spec.ts:86,115,130`, `activity-correlation.spec.ts:122` y `pending-work.spec.ts:41`; registro interno de panel en `taskPanel.ts:419,421`.                                                                                     |
+| `openKanbanPanel`                                                                                                                                                                          | Conservar export. Import en `e2e/kanban-create.spec.ts:54`; llamado internamente en `kanbanPanel.ts:79`.                                                                                                                                                                           |
+| `notifyWorkingUnitsChanged`                                                                                                                                                                | Candidato a desexportar, **no borrar**: referencias internas en `chat/state.ts:132,135,167`.                                                                                                                                                                                       |
+| Tipos `EraDefinition`, `CapabilitiesAgent`, `CapabilitiesSnapshot`                                                                                                                         | Candidatos a desexportar, no borrar sus definiciones: usos internos en `eraSystem.ts:14` y `capabilitiesClient.ts:18,69,89,92,116,128`.                                                                                                                                            |
+| `unmountGacetaWidget`                                                                                                                                                                      | Sin caller localizado fuera de su definición (`gacetaWidget.ts:118`). Mantener el teardown hasta revisar ciclo de vida; la ausencia de llamadas no demuestra que eliminarlo sea prudente.                                                                                          |
+| `getCurrentEraIndex`, `getEraLabel`, `updateEraDisplay`                                                                                                                                    | Candidatos a inspeccionar como cadena: los dos primeros tienen callers internos en `eraSystem.ts:62–64`; no se localizó caller externo del tercero. No borrar `getStoredEraLabel`, usado en main y capitalPanel.                                                                   |
 | `setFullCapabilitiesForTesting`, `getCapabilitiesSnapshot`, `setCapabilitiesSnapshotForTesting`, `resetCapabilitiesSnapshotForTesting`, `isCapabilitiesSnapshotLoaded`, `initCapabilities` | Sin callers externos localizados en `capabilitiesClient.ts:53–113`. Revisar el subsistema snapshot por separado; **no borrar el módulo**: `setCapabilitiesForAgentsForTesting` se usa en `spatialDirectives.test.ts:10,30`. No confundirlo con la tabla de `agentCapabilities.ts`. |
-| `_testTerrainSurface` | Sin import localizado del objeto de `terrainSurfaceY.ts:121`; el test importa las funciones públicas. Candidato a desexportar/eliminar solo tras cotejar contratos del módulo. |
-| `setUnitWorking`, `syncWorkingUnitsFromGameState`, tipo `GameStateLike` | Sin caller externo localizado (`chat/state.ts:128,144,147`); el tipo sirve al segundo helper. Revisar juntos, sin retirar `workingUnits` ni `subscribeWorkingUnits`, usados por `agentChip.ts`. |
-| `toggleLayer`, `setLayer`, `resetLayers`, `subscribe` de `layers.ts` | Sin callers localizados de estos exports (`layers.ts:72,96,104,110`). **No borrar el módulo**: `getLayerState` e `isLayerVisible` alimentan wonderVignette, renderer y ordenDeBatalla. No confundir este `subscribe` con GameState u otros homónimos. |
+| `_testTerrainSurface`                                                                                                                                                                      | Sin import localizado del objeto de `terrainSurfaceY.ts:121`; el test importa las funciones públicas. Candidato a desexportar/eliminar solo tras cotejar contratos del módulo.                                                                                                     |
+| `setUnitWorking`, `syncWorkingUnitsFromGameState`, tipo `GameStateLike`                                                                                                                    | Sin caller externo localizado (`chat/state.ts:128,144,147`); el tipo sirve al segundo helper. Revisar juntos, sin retirar `workingUnits` ni `subscribeWorkingUnits`, usados por `agentChip.ts`.                                                                                    |
+| `toggleLayer`, `setLayer`, `resetLayers`, `subscribe` de `layers.ts`                                                                                                                       | Sin callers localizados de estos exports (`layers.ts:72,96,104,110`). **No borrar el módulo**: `getLayerState` e `isLayerVisible` alimentan wonderVignette, renderer y ordenDeBatalla. No confundir este `subscribe` con GameState u otros homónimos.                              |
 
 Resumen: **5 exports necesarios por browser/tests; 1 función y 3 tipos con uso
 interno (candidatos a desexportar); 17 exports y 1 tipo requieren revisión de
@@ -488,8 +488,51 @@ No mueve sesiones, streaming/eventos, subprocesos, rutas HTTP ni búsqueda de CL
   una ejecución de misión real desde el navegador; ese límite se comprueba con
   la selección real y el adaptador fake de las integraciones Python.
 
+### Corte de persistencia de sesiones Hermes (base `06618a7`)
+
+Límite: lectura/escritura JSON de ids de sesión nativos, ahora en
+[`server/hermes_session_store.py`](../server/hermes_session_store.py). El leaf
+solo importa stdlib y recibe callbacks sin argumentos. El runner conserva la
+política de ruta/clave, las dos fachadas y todos sus consumidores. No se mueve
+streaming, ejecución de procesos ni registro de sesiones en otros stores.
+
+- Caracterización previa contra el código original; tras extraer, el corpus
+  ejecuta las mismas expectativas sobre helper y fachadas. Cubre JSON válido,
+  inválido y no-mapping, claves ausentes/duplicadas, coerción con `str`, errores
+  de IO/callbacks y su orden, corto-circuito de ids falsey, bytes JSON Unicode y
+  datos no serializables. No añade reparación, validación, locking ni atomicidad.
+- Los callbacks mantienen lookup tardío: un cambio de `_hermes_session_key`
+  durante la lectura afecta la búsqueda/escritura posterior como antes. La ruta
+  se resuelve dentro del mismo bloque `try`; fallos conservan `""` o silencio.
+- Comparación AST: los **2 cuerpos** son equivalentes normalizando solo las
+  llamadas de dependencia; las **2 firmas de fachada** y los **88 statements
+  top-level restantes** no cambian, salvo el import del leaf. La fachada de
+  guardado no propaga un retorno accidental del helper: sigue retornando `None`.
+- [`server/test_hermes_session_store.py`](../server/test_hermes_session_store.py):
+  **102 casos**, incluidos roundtrip con archivo temporal y separación de claves
+  por perfil/unidad/ciudad, integración de dos llamadas al CLI fake con resume
+  stateful y ausencia de caché/resume stateless. El fake sustituye solo el alias
+  `agent_runner.subprocess`, no el módulo global. No ejecuta binarios ni modelos.
+  **53 casos** de fachada/integración también pasan contra los cuerpos originales
+  AST del SHA fijo `06618a725bfbaee735ffe78df6f990c1f564fe73` en proceso aislado;
+  los otros 49 casos prueban directamente el helper nuevo.
+- Dirigidos junto a runner/Codex: **138 aprobados y 1 omitido**. Backend completo:
+  **1.969 aprobados y 2 omitidos**, cobertura **83,90 %**; leaf **100 %**.
+  Frontend completo con cobertura: **1.329 aprobados**, sin cambiar umbrales.
+- Gate baseline y primer gate tras extracción aprobaron con afinidad a dos CPUs
+  (backend 1.867 y 1.968, respectivamente). Tras ajustes de revisión, la repetición
+  aprobó todos los controles excepto Vitest, cuyo proceso terminó `Killed`, sin
+  fallo de aserción. Repetición de toda la cobertura frontend con la misma afinidad
+  y `--maxWorkers=2`: exit 0. No se atribuye una causa al kill ni se presenta esa
+  última invocación de `scripts/check.sh` como exit 0. Mypy sigue ausente/opcional.
+- Revisión adversarial independiente sin bloqueantes; atendidos el retorno `None`,
+  aislamiento del fake de subprocess y documentación del orden de IO.
+- Knip conserva las categorías conocidas: 23 exports, 1 tipo, 5 imports no
+  resueltos y 1 binario. No se retira código frontend en este corte.
+
 Las otras responsabilidades backend siguen pendientes. Elegir una sola en otro
-corte; la cola no autoriza automáticamente sesiones, streaming ni subprocesos.
+corte; ni la extracción de rutas ni la de caché autorizan cambios de streaming,
+ciclo de procesos, políticas de sesión ni rutas HTTP.
 
 ## 6. Renderer principal y arranque
 
