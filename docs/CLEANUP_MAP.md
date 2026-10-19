@@ -223,11 +223,48 @@ políticas de descubrimiento ni excepciones Knip.
   intacta. Se precisó el nombre del test de salida de la proyección inversa; el
   round-trip real permanece en un test separado.
 
-Segundo candidato, separado: zonas, preview de pintado, energía, temperatura y
-debug (`drawIsoZones`, `drawIsoZonePaintPreview`, `drawIsoPowerOverlay`,
-`drawIsoTemperatureOverlay`, `drawIsoDebugOverlay`). Inspeccionar el estado que
-consumen antes de diseñar `isoLocalOverlays.ts`; no arrastrar dependencias circulares.
-No mezclar inicialmente tiles, paredes, puertas, NPCs y workbenches en el mismo corte.
+### Corte de zonas y preview (base `47fd6db`)
+
+- `src/isoLocalZones.ts` recibe solo contexto Canvas, tokens, estado de pintado,
+  zonas y límites de vista mediante tipos estructurales estrechos. No importa el
+  renderer; consume `isoGeometry.ts`. Se extraen únicamente `drawIsoZones` y
+  `drawIsoZonePaintPreview`; energía, temperatura y debug permanecen intactos.
+- `monoFont` pasa a la hoja compartida `src/isoRenderStyle.ts`, manteniendo la
+  expresión `??`, incluido el caso de cadena vacía. Renderer y zonas lo reutilizan
+  sin duplicar el fallback ni introducir callbacks/resolución anticipada.
+- Caracterización **antes** del movimiento y gate base aprobado: 26 capturas de
+  órdenes Canvas, incluyendo escrituras de propiedades y orden. El fixture
+  `src/fixtures/isoLocalZones.canvas.json` conserva 871 operaciones de la base.
+  Cubre las seis paletas, fallback desconocido, tokens de fuente, zonas ausentes/
+  vacías, recorte inclusivo, drag inverso, tile único y objetos fuera de vista.
+  Se preserva el comportamiento existente: bordes/etiquetas pueden dibujarse
+  aunque todos los tiles queden fuera de vista; no se corrige en limpieza.
+- Se añaden 29 tests (26 trazas + 3 de fuente); 84 tests dirigidos aprobados.
+  Las pruebas también comprueban que no se mutan las entradas. La comparación
+  de comandos no se presenta como igualdad pixel a pixel en todos los navegadores.
+- AST/transpilación: las dos funciones Canvas y `monoFont` producen exactamente
+  el mismo código de función que la base. **Todas** las demás declaraciones del
+  renderer fuera de imports permanecen iguales, incluidas guardas y orden de dibujo.
+  El JSON versionado es idéntico al capturado antes de mover, salvo formato.
+- Gate completo con afinidad CPU 0–1 aprobado: **1.225 frontend; 1.796 backend,
+  2 omitidos; cobertura backend 83,45 %**. Tipos, lint, formato, build y presupuestos
+  pasan sin cambiar configuración/umbrales; mypy ausente (opcional). Knip JSON
+  idéntico a la base: 30 avisos, ninguno nuevo.
+- Chromium con fixtures aislados y `E2E_SIM_NO_HERMES=1`: **3 tests** de vista local
+  (entrada/dibujo, montaje/desmontaje de chat y salida). No es una prueba de
+  interacción de pintado de zonas en navegador ni suite e2e completa; la regresión
+  específica de zonas se verifica por sus trazas Canvas unitarias.
+- Revisión adversarial independiente completada sin defectos bloqueantes: cuerpos
+  Canvas idénticos a la base, golden rederivado de HEAD y 26 casos contrastados,
+  guardas/orden de llamadas intactos y ningún ciclo nuevo. El revisor comprobó
+  además que 16 mutaciones deliberadas en copias de scratch eran detectadas por
+  los fixtures; no modificó código del repositorio.
+
+Siguientes candidatos, por separado: energía, temperatura y debug
+(`drawIsoPowerOverlay`, `drawIsoTemperatureOverlay`, `drawIsoDebugOverlay`).
+Inspeccionar dependencias temporales, aleatoriedad y efectos antes de extraerlos;
+no arrastrar dependencias circulares. No mezclar inicialmente tiles, paredes,
+puertas, NPCs y workbenches en el mismo corte.
 
 Pruebas existentes: `src/isoLocalRenderer.test.ts`,
 `src/isoLocalRenderer.activity.test.ts`; e2e `local-view.spec.ts`,
