@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from server import claude_sessions as _claude_sessions
+from server import cli_discovery
 from server import event_store as _es
 from server import subagent_tracker as _subagent_tracker
 from server.mission_harness import MissionHarnessContext, log_swarm_tracking_capability, swarm_track_enabled
@@ -818,10 +819,7 @@ def _find_openclaw() -> str | None:
         shutil.which("openclaw"),
         str(Path.home() / ".npm-global" / "bin" / "openclaw"),
     ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return cli_discovery.first_executable(candidates)
 
 
 def _find_codex() -> str | None:
@@ -831,10 +829,7 @@ def _find_codex() -> str | None:
         str(Path.home() / ".local" / "bin" / "codex"),
         "/usr/local/bin/codex",
     ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return cli_discovery.first_executable(candidates)
 
 
 def _has_codex() -> bool:
@@ -848,10 +843,7 @@ def _find_opencode() -> str | None:
         str(Path.home() / ".npm-global" / "bin" / "opencode"),
         "/usr/local/bin/opencode",
     ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return cli_discovery.first_executable(candidates)
 
 
 def _has_opencode() -> bool:
@@ -864,10 +856,7 @@ def _find_hermes_cli() -> str | None:
         str(Path.home() / ".local" / "bin" / "hermes"),
         "/usr/local/bin/hermes",
     ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return cli_discovery.first_executable(candidates)
 
 
 def _has_hermes_cli() -> bool:
@@ -1018,15 +1007,7 @@ def _has_claude_code() -> bool:
 
 
 def _find_claude_code() -> str | None:
-    candidates = [
-        shutil.which("claude"),
-        str(Path.home() / ".npm-global" / "bin" / "claude"),
-        str(Path.home() / ".local" / "bin" / "claude"),
-    ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return cli_discovery.find_claude()
 
 
 def _claude_session_args(unit_id: str, city_id: str, *, stateful: bool) -> list[str]:
@@ -1109,10 +1090,7 @@ def _find_cursor_agent() -> str | None:
         str(Path.home() / ".cursor" / "bin" / "cursor-agent"),
         "/usr/local/bin/cursor-agent",
     ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return cli_discovery.first_executable(candidates)
 
 
 def _find_cursor_ide() -> str | None:
@@ -1122,10 +1100,7 @@ def _find_cursor_ide() -> str | None:
         str(Path.home() / ".local" / "bin" / "cursor"),
         "/usr/local/bin/cursor",
     ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return cli_discovery.first_executable(candidates)
 
 
 def _has_cursor() -> bool:

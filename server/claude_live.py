@@ -33,15 +33,14 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import threading
 import time
 import uuid
-from pathlib import Path
 from typing import Any, Callable
 
 from server import claude_sessions
+from server import cli_discovery
 from server._env_filter import redact_env_for_spawn
 from server.suvadu_tracker import Observation, SourceError
 
@@ -96,16 +95,13 @@ class _Session:
 
 
 def _find_claude() -> str:
-    """Same candidates as agent_runner._find_claude_code (kept local: no cycle)."""
-    candidates = [
-        shutil.which("claude"),
-        str(Path.home() / ".npm-global" / "bin" / "claude"),
-        str(Path.home() / ".local" / "bin" / "claude"),
-    ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return ""
+    """First executable Claude Code CLI, or ``""`` when absent.
+
+    Same candidates as ``agent_runner._find_claude_code`` (shared via
+    ``cli_discovery``); the empty string is preserved because the manager maps
+    it to a 503 ``claude_unavailable`` instead of spawning.
+    """
+    return cli_discovery.find_claude() or ""
 
 
 class ClaudeLiveManager:
