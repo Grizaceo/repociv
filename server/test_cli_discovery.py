@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from server import agent_runner, claude_live, cli_discovery
 
 
@@ -140,3 +142,82 @@ def test_find_cursor_ide_kept_in_this_batch(monkeypatch, tmp_path):
     exe = _make_executable(tmp_path / "cursor")
     monkeypatch.setattr(agent_runner.shutil, "which", lambda name: str(exe))
     assert agent_runner._find_cursor_ide() == str(exe)
+
+
+@pytest.mark.parametrize(
+    "name,binary,fallbacks",
+    [
+        ("openclaw", "openclaw", [".npm-global/bin/openclaw"]),
+        ("codex", "codex", [".npm-global/bin/codex", ".local/bin/codex", "/usr/local/bin/codex"]),
+        ("opencode", "opencode", [".local/bin/opencode", ".npm-global/bin/opencode", "/usr/local/bin/opencode"]),
+        ("hermes_cli", "hermes", [".local/bin/hermes", "/usr/local/bin/hermes"]),
+        ("cursor_agent", "cursor-agent", [".local/bin/cursor-agent", ".cursor/bin/cursor-agent", "/usr/local/bin/cursor-agent"]),
+        ("cursor_ide", "cursor", [".local/bin/cursor", "/usr/local/bin/cursor"]),
+    ],
+)
+def test_harness_candidate_order(monkeypatch, tmp_path, name, binary, fallbacks):
+    monkeypatch.delenv("REPOCIV_OPENCODE_BIN", raising=False)
+    queries = []
+    seen = []
+
+    def which(command):
+        queries.append(command)
+        return f"/which/{command}"
+
+    def first(candidates):
+        seen.extend(candidates)
+        return "selected"
+
+    monkeypatch.setattr(cli_discovery.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(cli_discovery.shutil, "which", which)
+    monkeypatch.setattr(cli_discovery, "first_executable", first)
+    assert getattr(cli_discovery, f"find_{name}")() == "selected"
+    assert queries == [binary]
+    assert seen == [f"/which/{binary}", *[str(tmp_path / path) for path in fallbacks]]
+
+
+@pytest.mark.parametrize("name", ["openclaw", "codex", "opencode", "hermes_cli", "cursor_agent", "cursor_ide"])
+@pytest.mark.parametrize("result", [None, "/fake/bin/harness"])
+def test_runner_discovery_facades(monkeypatch, name, result):
+    monkeypatch.setattr(cli_discovery, f"find_{name}", lambda: result)
+    assert getattr(agent_runner, f"_find_{name}")() == result
+
+
+@pytest.mark.parametrize(
+    "has_name,find_name",
+    [
+        ("openclaw", "openclaw"),
+        ("codex", "codex"),
+        ("opencode", "opencode"),
+        ("hermes_cli", "hermes_cli"),
+        ("claude_code", "claude_code"),
+        ("cursor", "cursor_agent"),
+    ],
+)
+def test_availability_keeps_runner_lookup(monkeypatch, has_name, find_name):
+    monkeypatch.setattr(agent_runner, f"_find_{find_name}", lambda: "/fake/harness")
+    assert getattr(agent_runner, f"_has_{has_name}")() is True
+    monkeypatch.setattr(agent_runner, f"_find_{find_name}", lambda: None)
+    assert getattr(agent_runner, f"_has_{has_name}")() is False
+
+
+@pytest.mark.parametrize(
+    "name,fallback",
+    [
+        ("openclaw", ".npm-global/bin/openclaw"),
+        ("codex", ".npm-global/bin/codex"),
+        ("opencode", ".local/bin/opencode"),
+        ("hermes_cli", ".local/bin/hermes"),
+        ("cursor_agent", ".local/bin/cursor-agent"),
+        ("cursor_ide", ".local/bin/cursor"),
+    ],
+)
+def test_harness_finds_real_fallback_when_missing_from_path(monkeypatch, tmp_path, name, fallback):
+    monkeypatch.delenv("REPOCIV_OPENCODE_BIN", raising=False)
+    monkeypatch.setattr(cli_discovery.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(cli_discovery.shutil, "which", lambda command: None)
+    executable = tmp_path / fallback
+    executable.parent.mkdir(parents=True, exist_ok=True)
+    _make_executable(executable)
+    assert getattr(cli_discovery, f"find_{name}")() == str(executable)
+    assert getattr(agent_runner, f"_find_{name}")() == str(executable)

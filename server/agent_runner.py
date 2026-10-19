@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
+import shutil as shutil  # Re-export shared module so patches to shutil.which still apply.
 import subprocess
 import tempfile
 import time
@@ -815,21 +815,11 @@ def _has_openclaw() -> bool:
 
 
 def _find_openclaw() -> str | None:
-    candidates = [
-        shutil.which("openclaw"),
-        str(Path.home() / ".npm-global" / "bin" / "openclaw"),
-    ]
-    return cli_discovery.first_executable(candidates)
+    return cli_discovery.find_openclaw()
 
 
 def _find_codex() -> str | None:
-    candidates = [
-        shutil.which("codex"),
-        str(Path.home() / ".npm-global" / "bin" / "codex"),
-        str(Path.home() / ".local" / "bin" / "codex"),
-        "/usr/local/bin/codex",
-    ]
-    return cli_discovery.first_executable(candidates)
+    return cli_discovery.find_codex()
 
 
 def _has_codex() -> bool:
@@ -837,13 +827,7 @@ def _has_codex() -> bool:
 
 
 def _find_opencode() -> str | None:
-    candidates = [
-        shutil.which(os.environ.get("REPOCIV_OPENCODE_BIN", "opencode")),
-        str(Path.home() / ".local" / "bin" / "opencode"),
-        str(Path.home() / ".npm-global" / "bin" / "opencode"),
-        "/usr/local/bin/opencode",
-    ]
-    return cli_discovery.first_executable(candidates)
+    return cli_discovery.find_opencode()
 
 
 def _has_opencode() -> bool:
@@ -851,12 +835,7 @@ def _has_opencode() -> bool:
 
 
 def _find_hermes_cli() -> str | None:
-    candidates = [
-        shutil.which("hermes"),
-        str(Path.home() / ".local" / "bin" / "hermes"),
-        "/usr/local/bin/hermes",
-    ]
-    return cli_discovery.first_executable(candidates)
+    return cli_discovery.find_hermes_cli()
 
 
 def _has_hermes_cli() -> bool:
@@ -1076,31 +1055,11 @@ def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
 
 
 def _find_cursor_agent() -> str | None:
-    """Find the cursor-agent headless binary (NOT the cursor IDE launcher).
-
-    Install via: curl https://cursor.com/install | bash
-    Lands at ~/.local/bin/cursor-agent or ~/.cursor/bin/cursor-agent.
-
-    # TODO: validate flags against `cursor-agent --help` once installed:
-    #   expected: --print, --trust, --output-format stream-json, --model, --workspace
-    """
-    candidates = [
-        shutil.which("cursor-agent"),
-        str(Path.home() / ".local" / "bin" / "cursor-agent"),
-        str(Path.home() / ".cursor" / "bin" / "cursor-agent"),
-        "/usr/local/bin/cursor-agent",
-    ]
-    return cli_discovery.first_executable(candidates)
+    return cli_discovery.find_cursor_agent()
 
 
 def _find_cursor_ide() -> str | None:
-    """Find the cursor IDE launcher binary (opens the editor, not for headless use)."""
-    candidates = [
-        shutil.which("cursor"),
-        str(Path.home() / ".local" / "bin" / "cursor"),
-        "/usr/local/bin/cursor",
-    ]
-    return cli_discovery.first_executable(candidates)
+    return cli_discovery.find_cursor_ide()
 
 
 def _has_cursor() -> bool:
