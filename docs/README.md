@@ -14,6 +14,7 @@
 | Documento | Para qué |
 |---|---|
 | [`SCOPE.md`](SCOPE.md) | Alpha de un solo usuario; multi-device en branch paralela; lista explícita de lo que NO se hace |
+| [`CLEANUP_MAP.md`](CLEANUP_MAP.md) | Mapa priorizado de limpieza sin features: cortes, riesgos y validación |
 | [`EVOLUTION.md`](EVOLUTION.md) | Línea de tiempo cronológica del proyecto, con citas a documentos originales |
 | [`implementation_plan.md`](implementation_plan.md) | Plan maestro v2.0 — Fases 0-5 cerradas con Gates verificables |
 | [`DATA_SOURCES.md`](DATA_SOURCES.md) | Fuentes de verdad: Event Store (JSONL) ↔ Ledger (DuckDB) ↔ Workspace Issues ↔ Sessions |
