@@ -530,8 +530,49 @@ streaming, ejecución de procesos ni registro de sesiones en otros stores.
 - Knip conserva las categorías conocidas: 23 exports, 1 tipo, 5 imports no
   resueltos y 1 binario. No se retira código frontend en este corte.
 
+### Corte de coordinación de reanudación Claude (base `bcf54f3`)
+
+Límite pequeño: elección de argumentos de sesión, comprobación de transcripción
+al reanudar y olvido/reemplazo único de un hilo sin transcripción, ahora en
+[`server/claude_session_args.py`](../server/claude_session_args.py). El leaf solo
+importa stdlib y recibe tres callbacks; no importa stores, runner ni ejecución.
+Se eligió este límite frente al ciclo de subprocess/streaming, que entrelaza
+registro de procesos, salida, eventos y callbacks. No se mueve ese ciclo ni se
+cambia la política de sesiones existente.
+
+- Fachada `_claude_session_args`, firma, import local de `transcript_path` y
+  normalización de ciudad conservados. Las lambdas consultan el global
+  `_claude_sessions` al invocarse, incluso si un callback sustituye el objeto.
+  No se capturan anticipadamente los métodos del store.
+- Caracterización original previa de resultados, excepciones y efectos ordenados;
+  [`server/test_claude_session_args.py`](../server/test_claude_session_args.py)
+  contiene **27 casos** tras revisión. Todos pasan también ejecutando la función
+  original AST del SHA fijo `bcf54f3237757825d9e0de72cc8875574e7f51f4` en un
+  proceso limpio. Incluye dos integraciones de streaming con procesos falsos y
+  store real aislado, stateful/stateless, argumentos y callbacks ordenados.
+  Ningún agente/modelo real valida la extracción.
+- Preserva quirks: solo `None` significa transcripción ausente; no convierte ids,
+  no revalida el reemplazo ni añade fallback/captura de errores. Las excepciones
+  se propagan sin efectos posteriores; `resume` conserva evaluación por veracidad.
+- AST: cuerpo trasladado equivalente normalizando solo dependencias; firma,
+  preludio y **89 statements top-level restantes** del runner intactos salvo el
+  nuevo import. Dirigidos: **68 aprobados y 1 omitido preexistente**.
+- Gate completo final, CPUs **0–1**, `NODE_OPTIONS=--max-old-space-size=1024`:
+  **exit 0**, **1.329 frontend**, **1.996 backend y 2 omitidos**, cobertura backend
+  **83,98 %**, leaf **100 %**. Tipos/lint/formato/build y presupuestos aprobados,
+  sin cambios de configuración, floors ni presupuestos. Mypy ausente/opcional.
+  El gate previo aprobó controles obligatorios pero Knip terminó `Killed`;
+  no se atribuye causa. La repetición final sí completó Knip: diagnóstico
+  no bloqueante con **30 avisos** (23 exports, 1 tipo, 5 imports no resueltos,
+  1 binario), confirmados por JSON separado. No se ejecutó Playwright en este corte.
+- Revisión adversarial (registro privado) sin bloqueantes. Su hueco de veracidad del
+  primer `resume` se cerró con dos casos, también verdes contra el original.
+  Padre reejecutó sonda: **7/7 mutantes detectados**, control sin fallos. Los
+  tests ejercitan el leaf por su fachada; el diferencial original queda en scratch,
+  no se añade una dependencia Git al gate versionado.
+
 Las otras responsabilidades backend siguen pendientes. Elegir una sola en otro
-corte; ni la extracción de rutas ni la de caché autorizan cambios de streaming,
+corte, solo con nuevo encargo; estos cortes no autorizan cambios de streaming,
 ciclo de procesos, políticas de sesión ni rutas HTTP.
 
 ## 6. Renderer principal y arranque

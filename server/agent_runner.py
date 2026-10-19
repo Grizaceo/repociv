@@ -18,6 +18,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable
 
+from server import claude_session_args
 from server import claude_sessions as _claude_sessions
 from server import cli_discovery, harness_output, hermes_session_store
 from server import event_store as _es
@@ -958,12 +959,12 @@ def _claude_session_args(unit_id: str, city_id: str, *, stateful: bool) -> list[
     from server.suvadu_tracker import transcript_path  # noqa: PLC0415
 
     city = _session_city_slug(city_id)
-    session_id, resume = _claude_sessions.session_for(unit_id, city, stateful=stateful)
-    if resume and transcript_path("claude-code", session_id) is None:
-        # The stored thread's transcript is gone (never written, or deleted).
-        _claude_sessions.forget_thread(unit_id, city)
-        session_id, resume = _claude_sessions.session_for(unit_id, city, stateful=stateful)
-    return ["--resume", session_id] if resume else ["--session-id", session_id]
+    return claude_session_args.session_args(
+        unit_id, city, stateful=stateful,
+        session_for=lambda unit, slug, **kwargs: _claude_sessions.session_for(unit, slug, **kwargs),
+        forget_thread=lambda unit, slug: _claude_sessions.forget_thread(unit, slug),
+        transcript_path=transcript_path,
+    )
 
 
 def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
