@@ -296,11 +296,55 @@ políticas de descubrimiento ni excepciones Knip.
   aleatorias en scratch sin divergencias; esto complementa, no sustituye, los
   fixtures deterministas y el gate del padre.
 
-Siguientes candidatos, por separado: temperatura y debug
-(`drawIsoTemperatureOverlay`, `drawIsoDebugOverlay`).
-Inspeccionar dependencias temporales, aleatoriedad y efectos antes de extraerlos;
-no arrastrar dependencias circulares. No mezclar inicialmente tiles, paredes,
-puertas, NPCs y workbenches en el mismo corte.
+### Corte de overlay de temperatura (base `e90c291`)
+
+- Se extrae solo `drawIsoTemperatureOverlay` a `src/isoTemperatureOverlay.ts`.
+  Estado privado: `ctx`, `tokens` y callback `spawnBreath`; mundo limitado a
+  geometría de salas y mapa de climas. Dependencias runtime solo geometría y
+  fuente compartida; no importa el renderer ni modifica debug, backend o arranque.
+- Preflight real: rama y HEAD comprobados, copia principal limpia y `main` en
+  `9d8f358`; remoto de limpieza sigue en `aaa11cc`, con ambos jobs `gate`/`e2e`
+  aprobados en la CI enlazada arriba. Los nuevos commits siguen **sin publicar**.
+  Gate base repetido con afinidad CPU 0–1: 1.250 frontend; 1.796 backend,
+  2 omitidos; cobertura backend 83,45 %.
+- Caracterización capturada desde el original **antes de mover código**:
+  **40 fixtures / 801 operaciones**, incluidas escrituras Canvas, **19 lecturas
+  de reloj y 15 de aleatoriedad**, y callbacks de partículas intercalados.
+  Golden en `src/fixtures/isoTemperatureOverlay.canvas.json`, sin regenerarlo
+  desde la implementación extraída. El overlay no crea gradientes.
+- Casos: climas ausentes/vacíos, salas desconocidas/duplicadas, orden del Map,
+  recorte inclusivo por centros y por dispositivos en los cuatro lados, vista
+  negativa/fraccionaria, dimensiones nulas, colores fríos/confort/calor y extremos,
+  umbral estricto de objetivo 0,5 °C, fuente personalizada/vacía, temperatura 10 °C,
+  probabilidad estricta de aliento 0,02 y coordenadas aleatorias, relojes
+  independientes de calefactores/refrigeradores/ventilaciones y módulo de animación.
+  Se conserva el quirk: dispositivos visibles de salas con centro fuera del
+  viewport se dibujan aunque no haya etiqueta ni aleatoriedad de esa sala.
+- Cuerpo Canvas byte-idéntico y función transpilada idéntica al original.
+  Todas las declaraciones restantes del renderer se comparan tanto por fuente
+  AST como por transpilación, incluidos tipos, guardas y orden de dibujo; solo se
+  añade el import del overlay. Golden idéntico a la captura previa salvo formato.
+  **40 tests nuevos / 149 dirigidos aprobados**; se comprueba no mutación de entradas.
+- Gate completo CPU 0–1 aprobado: **1.290 frontend; 1.796 backend, 2 omitidos;
+  cobertura backend 83,45 %**. Tipos/lint/formato/build/presupuestos aprobados;
+  sin cambiar configuración, umbrales, exclusiones ni descubrimiento de binarios.
+  Mypy ausente (opcional). Knip JSON idéntico a la base: **30 avisos**, ninguno nuevo.
+- Chromium con fixtures aislados, scratch nuevo, un worker y
+  `E2E_SIM_NO_HERMES=1`: **3 smoke tests** de entrada/dibujo, chat y salida.
+  No se ejecutan agentes/modelos. Puertos 5373–5375 sin listeners al terminar.
+  No es interacción específica de temperatura, rendimiento, memoria, paridad de
+  modos ni suite e2e completa; no se afirma igualdad pixel a pixel de todos los frames.
+- Revisión adversarial independiente completada sin bloqueantes: original del
+  commit fijo contrastado contra los 40 fixtures, cuerpo/resto del renderer
+  equivalentes y dependencias sin ciclos. El harness adicional de scratch
+  (artefacto local no publicado) detecta **25/25 mutaciones deliberadas**.
+  Límites de caracterización: no cubre NaN/infinitos ni reloj negativo; no se
+  cambian ni normalizan esas conductas preexistentes en esta extracción.
+
+Siguiente candidato independiente: debug (`drawIsoDebugOverlay`). Inspeccionar
+sus dependencias y efectos antes de extraerlo; no arrastrar dependencias
+circulares. No mezclar tiles, paredes, puertas, NPCs y workbenches en ese corte.
+Backend y renderer principal permanecen en la cola, no incluidos en temperatura.
 
 Pruebas existentes: `src/isoLocalRenderer.test.ts`,
 `src/isoLocalRenderer.activity.test.ts`; e2e `local-view.spec.ts`,
