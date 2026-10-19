@@ -160,6 +160,35 @@ versionados y comprobación independiente de usos browser/CI. Gate completo y
 la suite. Mypy no disponible. Sin cambios de código, config, cobertura, binarios,
 políticas de descubrimiento ni excepciones Knip.
 
+### Corte posterior: tres interfaces pasan a ser internas
+
+- Base local: `d9eb8a1`. Se retira únicamente `export` de `EraDefinition`
+  (`src/ui/eraSystem.ts`), `CapabilitiesAgent` y `CapabilitiesSnapshot`
+  (`src/capabilitiesClient.ts`). Las definiciones y todas las funciones se
+  conservan. No se conecta ni elimina el subsistema capabilities.
+- Cotejo de referencias en código, e2e y scripts: los tres nombres solo se
+  referencian en su módulo. Typecheck completo aprobado. La API de tipos se
+  reduce en esos tres nombres; las firmas estructurales de las funciones se
+  conservan. No hay cambios de comportamiento en ejecución.
+- Verificación por archivo contra HEAD con TypeScript y opciones del proyecto:
+  el fuente cambia solo esos tres modificadores; el JavaScript transpileado es
+  idéntico byte a byte (comparación sin sourcemaps).
+- Gate completo con afinidad CPUs 0–1: **1.160 frontend; 1.796 backend aprobados,
+  2 omitidos; cobertura backend 83,45 %**. Types, lint, formato, build y presupuestos
+  aprobados; mismos tamaños 5.318/719/154 KiB. Mypy no instalado. No se ejecutaron
+  agentes/modelos; no se repitió Playwright en este corte sin cambios de JS.
+- Knip repetido y comparado programáticamente: desaparecen **solo esos tres
+  avisos de tipos**, sin avisos añadidos. Inventario actual: **23 exports,
+  1 tipo, 5 imports no resueltos, 1 binario = 30 avisos**. Las tablas anteriores
+  conservan el inventario de base (33), no el inventario actual.
+- Revisión adversarial completada: sin imports type, reexports de barrel ni
+  consumidores browser de los tres nombres. Comparación esbuild independiente
+  también produjo JS idéntico. Se contrastó su cautela sobre `.d.ts` mediante
+  TypeScript `declaration + emitDeclarationOnly`: ambos módulos emiten sin
+  errores TS4023/TS4053 (salida capturada en memoria, sin escribir archivos).
+  Las interfaces locales siguen siendo expresables en las declaraciones de
+  funciones; solo dejan de ser importables directamente por su nombre.
+
 ## 3–4. Renderer isométrico local
 
 `src/isoLocalRenderer.ts`: 1.691 líneas en la base inspeccionada.
