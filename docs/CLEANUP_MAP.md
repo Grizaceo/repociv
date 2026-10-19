@@ -193,10 +193,35 @@ políticas de descubrimiento ni excepciones Knip.
 
 `src/isoLocalRenderer.ts`: 1.691 líneas en la base inspeccionada.
 
-Primer candidato: geometría (`isoUnproject`, `isoTileCorners`) con constantes y
-dependencias explícitas. Probar entradas/salidas antes de mover y conservar las
-exportaciones existentes. `isoGeometry.ts` es un nombre propuesto, no un módulo
-ya creado ni una arquitectura aprobada.
+### Corte de geometría pura (base `78cb6c2`)
+
+- Se extraen a `src/isoGeometry.ts` las constantes `ISO_TILE_W`, `ISO_TILE_H`,
+  `ISO_WALL_H` y las funciones `isoProject`, `isoUnproject`, `isoTileCorners`.
+  El módulo hoja no importa dibujo, DOM, atlas ni otros módulos.
+- Se conservan las fachadas de `isoOfficeSprites.ts` (constantes/proyección) y
+  `isoLocalRenderer.ts` (proyección/inversa), incluida identidad de funciones.
+  No se modifica ninguna rutina de dibujo, orden de render ni overlay.
+- Caracterización previa al movimiento: 8 fixtures capturados desde el HEAD
+  original mediante AST (coordenadas negativas, fraccionarias, elevadas y grandes),
+  esquinas de origen y round-trips comprobados; las 19 pruebas existentes pasan.
+  Se incorporan 36 pruebas permanentes en `src/isoGeometry.test.ts`.
+- Comparación AST/transpilación: valores de las tres constantes y cuerpos/defaults
+  completos de las tres funciones idénticos a la base. Esta equivalencia se refiere
+  a las funciones trasladadas, no a los bundles completos, cuyos imports cambian.
+- Validación: 55 tests dirigidos; gate completo aprobado con afinidad CPU 0–1:
+  **1.196 frontend; 1.796 backend, 2 omitidos; cobertura backend 83,44 %**.
+  Tipos, lint, formato, build y presupuestos pasan sin cambiar umbrales/exclusiones.
+  Mypy ausente (opcional); Knip JSON idéntico a la base de 30 avisos.
+- Chromium con fixtures aislados y `E2E_SIM_NO_HERMES=1`: **5 tests aprobados** de
+  `local-view.spec.ts`, excluyendo solo rendimiento. Incluyen entrada/dibujo,
+  workbenches/agentes, chat, salida y actividad WebSocket con raster/expiración.
+  No se ejecutan aquí memoria, paridad de modos ni la suite e2e completa; no se
+  afirma paridad visual pixel a pixel de toda la escena.
+- Revisión adversarial independiente completada, sin defectos bloqueantes:
+  declaraciones trasladadas equivalentes por AST, fachadas y bindings preservados,
+  ningún ciclo nuevo, fixtures contrastados con la base y configuración de cobertura
+  intacta. Se precisó el nombre del test de salida de la proyección inversa; el
+  round-trip real permanece en un test separado.
 
 Segundo candidato, separado: zonas, preview de pintado, energía, temperatura y
 debug (`drawIsoZones`, `drawIsoZonePaintPreview`, `drawIsoPowerOverlay`,

@@ -16,6 +16,9 @@ import {
   drawIsoSofa as renderIsoSofa,
   drawIsoStairs as renderIsoStairs,
 } from './isoOfficeRenderer.ts';
+import { isoTileCorners } from './isoGeometry.ts';
+export { isoUnproject } from './isoGeometry.ts';
+
 import { worldToScreen } from './hex.ts';
 import { activityGlyphFor, ACTIVITY_TTL_MS } from './localActivity.ts';
 
@@ -45,22 +48,6 @@ const ISO_WINDOW_SKY: [string, string] = ['rgba(140, 190, 220, 0.5)', 'rgba(180,
 const ISO_HELMET = '#E8B830';
 const ISO_SHADOW = 'rgba(80, 80, 80, 0.18)';
 const ISO_SELECTION = '#B08040';
-
-export function isoUnproject(px: number, py: number): { x: number; y: number } {
-  const x = px / (ISO_TILE_W / 2) + py / (ISO_TILE_H / 2);
-  const y = py / (ISO_TILE_H / 2) - px / (ISO_TILE_W / 2);
-  return { x: x / 2, y: y / 2 };
-}
-
-function isoTileCorners(x: number, y: number, z = 0): Array<{ x: number; y: number }> {
-  const base = isoProject(x, y, z);
-  return [
-    { x: base.px, y: base.py - ISO_TILE_H / 2 },
-    { x: base.px + ISO_TILE_W / 2, y: base.py },
-    { x: base.px, y: base.py + ISO_TILE_H / 2 },
-    { x: base.px - ISO_TILE_W / 2, y: base.py },
-  ];
-}
 
 export interface IsoRenderState {
   ctx: CanvasRenderingContext2D;
