@@ -260,8 +260,44 @@ políticas de descubrimiento ni excepciones Knip.
   además que 16 mutaciones deliberadas en copias de scratch eran detectadas por
   los fixtures; no modificó código del repositorio.
 
-Siguientes candidatos, por separado: energía, temperatura y debug
-(`drawIsoPowerOverlay`, `drawIsoTemperatureOverlay`, `drawIsoDebugOverlay`).
+### Corte de overlay de energía (base `f155846`)
+
+- Se extrae únicamente `drawIsoPowerOverlay` a `src/isoPowerOverlay.ts`.
+  Estado privado limitado a `ctx`/`tokens`, mundo `Pick<LocalWorld, 'powerGrid'>`;
+  dependencias runtime solo geometría y fuente compartida, sin retorno al renderer.
+- Gate base aprobado y caracterización previa: **25 fixtures, 382 operaciones**
+  Canvas/reloj/gradiente en `src/fixtures/isoPowerOverlay.canvas.json`. Se registran
+  propiedades, creación e identidad de gradientes, color stops y cada lectura del
+  reloj intercalada en la secuencia. No se inyecta ni se adelanta tiempo en producción:
+  `performance.now()` sigue ejecutándose una vez por fuente visible.
+- Casos: red ausente/vacía, conduits malformados/no finitos, parsing numérico
+  preexistente (vacíos, espacios, partes extra, exponentes y fracciones), recorte
+  inclusivo y viewport negativo, fuentes visibles/ocultas y varios tiempos,
+  fuente personalizada/vacía, cargas negativas/cero/límites 100/160/200 y exceso,
+  estadísticas con/sin generación, consumo y batería, y orden combinado de capas.
+  No se normalizan ni corrigen estas conductas durante la extracción.
+- Cuerpo Canvas byte-idéntico y función transpilada idéntica a HEAD de base.
+  Todas las demás declaraciones no-import del renderer permanecen iguales:
+  guardas, orden de overlays, temperatura y debug incluidos. El fixture versionado
+  coincide con la captura original, salvo formato. Se añaden **25 tests** y pasan
+  **109 dirigidos**, incluida comprobación de no mutación y lecturas exactas del reloj.
+- Gate completo CPU 0–1 aprobado: **1.250 frontend; 1.796 backend, 2 omitidos;
+  cobertura backend 83,45 %**. Tipos/lint/formato/build/presupuestos pasan, sin
+  modificar configuración/umbrales. Mypy ausente (opcional); Knip JSON idéntico:
+  30 avisos, ninguno nuevo.
+- Chromium con fixtures aislados y `E2E_SIM_NO_HERMES=1`: **3 smoke tests**
+  de vista local (entrada/dibujo,
+  chat y salida), no interacción específica del overlay eléctrico ni suite e2e
+  completa. La animación específica se caracteriza por sus comandos y reloj;
+  no se afirma igualdad pixel a pixel de todos los frames.
+- Revisión adversarial independiente completada sin defectos: cuerpo de dibujo
+  idéntico, golden rederivado de HEAD coincidente, tipos estrechos y dependencias
+  sin ciclos. El revisor también contrastó versiones original/extraída con entradas
+  aleatorias en scratch sin divergencias; esto complementa, no sustituye, los
+  fixtures deterministas y el gate del padre.
+
+Siguientes candidatos, por separado: temperatura y debug
+(`drawIsoTemperatureOverlay`, `drawIsoDebugOverlay`).
 Inspeccionar dependencias temporales, aleatoriedad y efectos antes de extraerlos;
 no arrastrar dependencias circulares. No mezclar inicialmente tiles, paredes,
 puertas, NPCs y workbenches en el mismo corte.
