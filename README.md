@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/Grizaceo/repociv/actions/workflows/ci.yml/badge.svg)](https://github.com/Grizaceo/repociv/actions)
-[![Status](https://img.shields.io/badge/status-public%20alpha-blue.svg)](docs/archive/ROADMAP.md)
+[![Status](https://img.shields.io/badge/status-public%20alpha-blue.svg)](docs/SCOPE.md)
 
 > Un dashboard hexagonal estilo Civilization V que visualiza tu workspace de repos como ciudades en un mapa, agentes de IA como unidades, y procesos en segundo plano como edificios.
 
@@ -396,6 +396,7 @@ python3 -m pytest server/ -q
 
 | Doc | Contenido |
 |-----|-----------|
+| [docs/README.md](docs/README.md) | Índice de documentación: guías, referencia e histórico |
 | [docs/SCOPE.md](docs/SCOPE.md) | Qué es y qué no es el proyecto |
 | [docs/API.md](docs/API.md) | Referencia completa de endpoints |
 | [docs/MCP.md](docs/MCP.md) | MCP server — 42 tools, ejemplos |
