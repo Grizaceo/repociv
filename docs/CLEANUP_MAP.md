@@ -73,10 +73,10 @@ no demuestra que una extracción sea correcta.
   dos CPUs y un worker. Sin ejecución de agentes/modelos. No es la suite e2e completa.
 
 **Cortes 1–2 completados:** documentación en `31cf99e` y clasificación Knip abajo,
-sin retirar exports por el solo informe. Siguiente candidato: elegir un único
-subgrupo de higiene de exports o geometría isométrica (3), con caracterización
-previa. No empezar simultáneamente frontend y backend; las filas siguen
-describiendo las condiciones de cada trabajo.
+sin retirar exports por el solo informe. Geometría, zonas/preview, energía,
+temperatura y debug se documentan en la sección 3–4 con su evidencia por corte.
+No empezar simultáneamente frontend y backend; las filas siguen describiendo
+las condiciones de cada trabajo.
 
 ## 1. Documentación: hallazgos de base atendidos
 
@@ -341,10 +341,57 @@ políticas de descubrimiento ni excepciones Knip.
   Límites de caracterización: no cubre NaN/infinitos ni reloj negativo; no se
   cambian ni normalizan esas conductas preexistentes en esta extracción.
 
-Siguiente candidato independiente: debug (`drawIsoDebugOverlay`). Inspeccionar
-sus dependencias y efectos antes de extraerlo; no arrastrar dependencias
-circulares. No mezclar tiles, paredes, puertas, NPCs y workbenches en ese corte.
-Backend y renderer principal permanecen en la cola, no incluidos en temperatura.
+### Corte de debug (base `51ba9d7`)
+
+- `drawIsoDebugOverlay` pasa a `src/isoDebugOverlay.ts`. Estado limitado a
+  ctx/tokens/FPS; mundo limitado a salas con colecciones opacas de workbenches;
+  unidades limitadas a los campos leídos. Consume geometría y fuente compartidas,
+  sin importar el renderer ni introducir ciclos. No cambia la guarda debug ni su
+  posición al final del dibujo local.
+- Caracterización capturada **antes** de extraer desde el commit fijo original:
+  **39 fixtures / 1.429 operaciones Canvas**, incluidas todas las escrituras de
+  propiedades. Cubre mundo vacío, suma de workbenches, rutas vacías/cortas,
+  índices agotados, negativos y fraccionarios (sin normalizarlos), coordenadas
+  fraccionarias/lejanas, waypoints repetidos, múltiples unidades y dibujo en dos
+  pasadas, textos opcionales/vacíos/largos/Unicode, redondeo, estados, fuente
+  ausente/custom/vacía y FPS literal. No hay reloj, aleatoriedad ni gradientes;
+  los tests fallan ante lecturas nuevas de reloj/random o APIs Canvas no previstas.
+- Fixture histórico: `src/fixtures/isoDebugOverlay.canvas.json`, original fijo
+  `51ba9d7d540c4e3c96d4269562b7215772066442`. No regenerarlo del módulo extraído.
+  El modelo de asignación/save/restore parte de estilos y transformación no
+  triviales; comprueba estado residual y no mutación de entradas. No simula la
+  validación de estilos del navegador. Se conserva el leak preexistente de
+  estilos de rutas/tarjetas: solo el contador de pantalla hace save/restore.
+  `Ticks` sigue contando workbenches; no se corrige la etiqueta.
+- Cuerpo byte-idéntico y función transpilada idéntica. Comparación de todas las
+  declaraciones restantes del renderer: **39 fuente / 36 JS** intactas, incluida
+  la guarda, orden de dibujo y transformaciones. **39 tests nuevos / 188 dirigidos**.
+- Gate completo local con CPUs permitidas 0–1: **1.329 frontend; 1.796 backend
+  aprobados y 2 omitidos; cobertura backend 83,45 %**. Tipos, lint, formato, build
+  y presupuestos aprobados; mypy ausente opcional. Knip JSON idéntico a la base:
+  30 avisos clasificados, ninguno nuevo. No cambian configuración ni umbrales.
+- Chromium: **3 smoke tests** de entrada, render y salida de vista local, con
+  workspace sintético, scratch nuevo, `E2E_SIM_NO_HERMES=1`, dos CPUs y un worker.
+  Sin ejecutar agentes/modelos; puertos liberados al terminar. No es la suite
+  completa ni una prueba de activación del debug por teclado.
+- Comprobación adicional en Canvas real de Chromium **152.0.7977.82**: compara
+  original fijo contra módulo extraído en **39 fixtures**, con trazas, propiedades
+  finales reales, transformación y raster idénticos. Sirve solo el módulo en un
+  documento vacío, sin arrancar la aplicación ni agentes. Incluye la validación
+  real de fuentes vacías del navegador, que el modelo unitario no simula.
+  Es paridad de los fixtures en ese navegador, no paridad visual de toda la app
+  ni garantía entre motores/GPU. NaN e infinitos no están caracterizados.
+- Revisión adversarial independiente sin bloqueantes: golden contrastado contra
+  el original fijo, sin ciclos y sin cambios de comportamiento detectados.
+  Los harnesses scratch (artefacto local no publicado)
+  comprueban además **4.000 casos generados** equivalentes y **12/12 mutaciones**
+  deliberadas detectadas por el golden. El padre reejecutó y verificó esos
+  resultados antes del commit. No amplían la garantía a entradas no finitas.
+
+Debug queda separado; tiles, paredes, puertas, NPCs, workbenches, backend y
+renderer principal no forman parte de este corte. Siguiente candidato: inspección
+acotada de una responsabilidad del runner (sección 5), antes de decidir qué mover.
+La cola no autoriza empezar otro corte automáticamente.
 
 Pruebas existentes: `src/isoLocalRenderer.test.ts`,
 `src/isoLocalRenderer.activity.test.ts`; e2e `local-view.spec.ts`,

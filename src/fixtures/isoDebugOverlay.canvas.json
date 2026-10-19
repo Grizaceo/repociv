@@ -1,0 +1,3505 @@
+[
+  {
+    "name": "empty overlay still draws screen counters",
+    "units": [],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 0", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "room count is sum of workbench counts not number of rooms",
+    "units": [],
+    "roomCounts": [0, 2, 0, 3],
+    "fps": 24.5,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 24.5", 14, 14],
+      ["fillText", "Ticks: 5", 14, 26],
+      ["fillText", "Units: 0", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "one unit without path still gets card",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "one waypoint never draws path",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [
+          {
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "path index 0",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          },
+          {
+            "x": 2,
+            "y": 1
+          }
+        ],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 1.5],
+      ["set", "globalAlpha", 0.7],
+      ["beginPath"],
+      ["moveTo", 0, 0],
+      ["lineTo", 32, 16],
+      ["lineTo", 0, 32],
+      ["lineTo", 32, 48],
+      ["stroke"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "#123456"],
+      ["beginPath"],
+      ["arc", 0, 0, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 32, 16, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 0, 32, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 32, 48, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 1,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "path index 1",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          },
+          {
+            "x": 2,
+            "y": 1
+          }
+        ],
+        "pathIndex": 1,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 1.5],
+      ["set", "globalAlpha", 0.7],
+      ["beginPath"],
+      ["moveTo", 32, 16],
+      ["lineTo", 0, 32],
+      ["lineTo", 32, 48],
+      ["stroke"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "#123456"],
+      ["beginPath"],
+      ["arc", 32, 16, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 0, 32, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 32, 48, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 1,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "path index 2",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          },
+          {
+            "x": 2,
+            "y": 1
+          }
+        ],
+        "pathIndex": 2,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 1.5],
+      ["set", "globalAlpha", 0.7],
+      ["beginPath"],
+      ["moveTo", 0, 32],
+      ["lineTo", 32, 48],
+      ["stroke"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "#123456"],
+      ["beginPath"],
+      ["arc", 0, 32, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 32, 48, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 1,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "path index 3",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          },
+          {
+            "x": 2,
+            "y": 1
+          }
+        ],
+        "pathIndex": 3,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "path index 4",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          },
+          {
+            "x": 2,
+            "y": 1
+          }
+        ],
+        "pathIndex": 4,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "path index 8",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          },
+          {
+            "x": 2,
+            "y": 1
+          }
+        ],
+        "pathIndex": 8,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "path index -1",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          },
+          {
+            "x": 2,
+            "y": 1
+          }
+        ],
+        "pathIndex": -1,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "path index -2",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          },
+          {
+            "x": 2,
+            "y": 1
+          }
+        ],
+        "pathIndex": -2,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 1.5],
+      ["set", "globalAlpha", 0.7],
+      ["beginPath"],
+      ["moveTo", 0, 32],
+      ["lineTo", 32, 48],
+      ["stroke"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "#123456"],
+      ["beginPath"],
+      ["arc", 0, 32, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 32, 48, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 1,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "path index -20",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          },
+          {
+            "x": 2,
+            "y": 1
+          }
+        ],
+        "pathIndex": -20,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 1.5],
+      ["set", "globalAlpha", 0.7],
+      ["beginPath"],
+      ["moveTo", 0, 0],
+      ["lineTo", 32, 16],
+      ["lineTo", 0, 32],
+      ["lineTo", 32, 48],
+      ["stroke"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "#123456"],
+      ["beginPath"],
+      ["arc", 0, 0, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 32, 16, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 0, 32, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 32, 48, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 1,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "path index 0.8",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          },
+          {
+            "x": 2,
+            "y": 1
+          }
+        ],
+        "pathIndex": 0.8,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 1.5],
+      ["set", "globalAlpha", 0.7],
+      ["beginPath"],
+      ["moveTo", 0, 0],
+      ["lineTo", 32, 16],
+      ["lineTo", 0, 32],
+      ["lineTo", 32, 48],
+      ["stroke"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "#123456"],
+      ["beginPath"],
+      ["arc", 0, 0, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 32, 16, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 0, 32, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 32, 48, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 1,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "path index 1.8",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          },
+          {
+            "x": 2,
+            "y": 1
+          }
+        ],
+        "pathIndex": 1.8,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 1.5],
+      ["set", "globalAlpha", 0.7],
+      ["beginPath"],
+      ["moveTo", 32, 16],
+      ["lineTo", 0, 32],
+      ["lineTo", 32, 48],
+      ["stroke"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "#123456"],
+      ["beginPath"],
+      ["arc", 32, 16, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 0, 32, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 32, 48, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 1,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "negative fractional and distant path coordinates are not culled",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": -1000.5,
+        "gridY": 2500.25,
+        "path": [
+          {
+            "x": -1.25,
+            "y": 2.5
+          },
+          {
+            "x": 10000,
+            "y": -2000
+          },
+          {
+            "x": 0.5,
+            "y": 0.25
+          }
+        ],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 1.5],
+      ["set", "globalAlpha", 0.7],
+      ["beginPath"],
+      ["moveTo", -120, 20],
+      ["lineTo", 384000, 128000],
+      ["lineTo", 8, 12],
+      ["stroke"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "#123456"],
+      ["beginPath"],
+      ["arc", -120, 20, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 384000, 128000, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 8, 12, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -112060, 23889, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -112057, 23891],
+      ["fillText", "st: idle_in_room", -112057, 23900],
+      ["fillText", "pos: -1000.5,2500.25", -112057, 23909],
+      ["fillText", "fat: 42", -112057, 23918],
+      ["fillText", "spd: 1.3", -112057, 23927],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 1,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "repeated waypoints remain in path",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [
+          {
+            "x": 2,
+            "y": 2
+          },
+          {
+            "x": 2,
+            "y": 2
+          }
+        ],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 1.5],
+      ["set", "globalAlpha", 0.7],
+      ["beginPath"],
+      ["moveTo", 0, 64],
+      ["lineTo", 0, 64],
+      ["stroke"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "#123456"],
+      ["beginPath"],
+      ["arc", 0, 64, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 0, 64, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 1,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "all paths precede all cards in unit order",
+    "units": [
+      {
+        "name": "First",
+        "color": "#ff0000",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 0
+          },
+          {
+            "x": 1,
+            "y": 1
+          },
+          {
+            "x": 2,
+            "y": 1
+          }
+        ],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      },
+      {
+        "name": "Second",
+        "color": "#00ff00",
+        "gridX": -2,
+        "gridY": 3,
+        "path": [
+          {
+            "x": 2,
+            "y": 0
+          },
+          {
+            "x": 2,
+            "y": 1
+          }
+        ],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [1, 2],
+    "fps": 33,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "strokeStyle", "#ff0000"],
+      ["set", "lineWidth", 1.5],
+      ["set", "globalAlpha", 0.7],
+      ["beginPath"],
+      ["moveTo", 0, 0],
+      ["lineTo", 32, 16],
+      ["lineTo", 0, 32],
+      ["lineTo", 32, 48],
+      ["stroke"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "#ff0000"],
+      ["beginPath"],
+      ["arc", 0, 0, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 32, 16, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 0, 32, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 32, 48, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "strokeStyle", "#00ff00"],
+      ["set", "lineWidth", 1.5],
+      ["set", "globalAlpha", 0.7],
+      ["beginPath"],
+      ["moveTo", 64, 32],
+      ["lineTo", 32, 48],
+      ["stroke"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "#00ff00"],
+      ["beginPath"],
+      ["arc", 64, 32, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 32, 48, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#ff0000"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "First", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -196, -91, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#00ff00"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Second", -193, -89],
+      ["fillText", "st: idle_in_room", -193, -80],
+      ["fillText", "pos: -2,3", -193, -71],
+      ["fillText", "fat: 42", -193, -62],
+      ["fillText", "spd: 1.3", -193, -53],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 33", 14, 14],
+      ["fillText", "Ticks: 3", 14, 26],
+      ["fillText", "Units: 2", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#00ff00",
+        "lineWidth": 0.5,
+        "globalAlpha": 1,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "empty mission and workbench strings do not add lines",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": "",
+        "currentWorkbenchId": ""
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "short mission adds one line",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": "fix",
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -68, 72, 58, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -66],
+      ["fillText", "st: idle_in_room", -65, -57],
+      ["fillText", "pos: 1,2", -65, -48],
+      ["fillText", "fat: 42", -65, -39],
+      ["fillText", "spd: 1.3", -65, -30],
+      ["fillText", "mission: fix", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "short workbench adds one line",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": "wb-7"
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -68, 72, 58, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -66],
+      ["fillText", "st: idle_in_room", -65, -57],
+      ["fillText", "pos: 1,2", -65, -48],
+      ["fillText", "fat: 42", -65, -39],
+      ["fillText", "spd: 1.3", -65, -30],
+      ["fillText", "wb: wb-7", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "exact mission and workbench lengths",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": "abcdefghijkl",
+        "currentWorkbenchId": "12345678"
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -77, 72, 67, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -75],
+      ["fillText", "st: idle_in_room", -65, -66],
+      ["fillText", "pos: 1,2", -65, -57],
+      ["fillText", "fat: 42", -65, -48],
+      ["fillText", "spd: 1.3", -65, -39],
+      ["fillText", "mission: abcdefghijkl", -65, -30],
+      ["fillText", "wb: 12345678", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "long mission and workbench strings are sliced",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": "abcdefghijkl-more",
+        "currentWorkbenchId": "12345678-more"
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -77, 72, 67, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -75],
+      ["fillText", "st: idle_in_room", -65, -66],
+      ["fillText", "pos: 1,2", -65, -57],
+      ["fillText", "fat: 42", -65, -48],
+      ["fillText", "spd: 1.3", -65, -39],
+      ["fillText", "mission: abcdefghijkl", -65, -30],
+      ["fillText", "wb: 12345678", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "whitespace strings remain truthy",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": " ",
+        "currentWorkbenchId": " "
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -77, 72, 67, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -75],
+      ["fillText", "st: idle_in_room", -65, -66],
+      ["fillText", "pos: 1,2", -65, -57],
+      ["fillText", "fat: 42", -65, -48],
+      ["fillText", "spd: 1.3", -65, -39],
+      ["fillText", "mission:  ", -65, -30],
+      ["fillText", "wb:  ", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "unicode labels preserve UTF16 slicing",
+    "units": [
+      {
+        "name": "Éidos 🔬",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": "abcdefghijk🔬tail",
+        "currentWorkbenchId": "1234567🔬tail"
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -77, 72, 67, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Éidos 🔬", -65, -75],
+      ["fillText", "st: idle_in_room", -65, -66],
+      ["fillText", "pos: 1,2", -65, -57],
+      ["fillText", "fat: 42", -65, -48],
+      ["fillText", "spd: 1.3", -65, -39],
+      ["fillText", "mission: abcdefghijk\ud83d", -65, -30],
+      ["fillText", "wb: 1234567\ud83d", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "fatigue rounding -1.5",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": -1.5,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: -1", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "fatigue rounding -0.5",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": -0.5,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 0", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "fatigue rounding 0.49",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 0.49,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 0", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "fatigue rounding 0.5",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 0.5,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 1", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "fatigue rounding 99.5",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 99.5,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 100", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "fatigue rounding 150.5",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 150.5,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 151", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "speed formatting zero negative and rounding",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 0,
+        "mission": null,
+        "currentWorkbenchId": null
+      },
+      {
+        "name": "Negative",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": -1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      },
+      {
+        "name": "Fast",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 2.75,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 0.0", -65, -21],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Negative", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: -1.3", -65, -21],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Fast", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 2.8", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 3", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "state label walking_to_workbench",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "walking_to_workbench",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: walking_to_workbench", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "state label walking_to_room",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "walking_to_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: walking_to_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "state label working_on_file",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "working_on_file",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: working_on_file", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "state label resting",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "resting",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 60,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: resting", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 60", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px 'JetBrains Mono', monospace",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "custom mono font affects cards and counters",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": "task",
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [2],
+    "fps": 59.75,
+    "tokens": {
+      "fontMono": "Debug Mono"
+    },
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -68, 72, 58, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px Debug Mono"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -66],
+      ["fillText", "st: idle_in_room", -65, -57],
+      ["fillText", "pos: 1,2", -65, -48],
+      ["fillText", "fat: 42", -65, -39],
+      ["fillText", "spd: 1.3", -65, -30],
+      ["fillText", "mission: task", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px Debug Mono"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 59.75", 14, 14],
+      ["fillText", "Ticks: 2", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px Debug Mono",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "empty mono font is not replaced",
+    "units": [
+      {
+        "name": "Ada",
+        "color": "#123456",
+        "gridX": 1,
+        "gridY": 2,
+        "path": [],
+        "pathIndex": 0,
+        "state": "idle_in_room",
+        "fatigue": 42.4,
+        "effectiveSpeed": 1.25,
+        "mission": null,
+        "currentWorkbenchId": null
+      }
+    ],
+    "roomCounts": [],
+    "fps": 0,
+    "tokens": {
+      "fontMono": ""
+    },
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.65)"],
+      ["beginPath"],
+      ["roundRect", -68, -59, 72, 49, 2],
+      ["fill"],
+      ["set", "strokeStyle", "#123456"],
+      ["set", "lineWidth", 0.5],
+      ["stroke"],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 7px "],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "Ada", -65, -57],
+      ["fillText", "st: idle_in_room", -65, -48],
+      ["fillText", "pos: 1,2", -65, -39],
+      ["fillText", "fat: 42", -65, -30],
+      ["fillText", "spd: 1.3", -65, -21],
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px "],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: 0", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 1", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#E2E8F0",
+        "strokeStyle": "#123456",
+        "lineWidth": 0.5,
+        "globalAlpha": 0.25,
+        "font": "bold 7px ",
+        "textAlign": "left",
+        "textBaseline": "top"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  },
+  {
+    "name": "negative fps remains literal",
+    "units": [],
+    "roomCounts": [],
+    "fps": -1,
+    "tokens": {},
+    "initialState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    },
+    "trace": [
+      ["save"],
+      ["setTransform", 1, 0, 0, 1, 0, 0],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.6)"],
+      ["fillRect", 8, 8, 90, 40],
+      ["set", "strokeStyle", "#606060"],
+      ["set", "lineWidth", 0.5],
+      ["strokeRect", 8, 8, 90, 40],
+      ["set", "fillStyle", "#E2E8F0"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["set", "textBaseline", "top"],
+      ["fillText", "FPS: -1", 14, 14],
+      ["fillText", "Ticks: 0", 14, 26],
+      ["fillText", "Units: 0", 14, 38],
+      ["restore"]
+    ],
+    "finalState": {
+      "properties": {
+        "fillStyle": "#abcdef",
+        "strokeStyle": "#fedcba",
+        "lineWidth": 4,
+        "globalAlpha": 0.25,
+        "font": "13px Seed Mono",
+        "textAlign": "right",
+        "textBaseline": "bottom"
+      },
+      "transform": [1.5, 0.25, -0.5, 2, 80, -40]
+    }
+  }
+]
