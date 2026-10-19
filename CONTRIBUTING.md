@@ -3,6 +3,11 @@
 Thanks for your interest in contributing. RepoCiv is a single-user alpha, and
 contributions should be small, focused, and dogfooding-driven.
 
+`docs/SCOPE.md` is the single source of truth for what is (and isn't) in
+scope — read it before proposing a feature. Historical roadmaps and plans live
+in `docs/archive/` (e.g. `docs/archive/ROADMAP.md`) and do not describe the
+current trunk.
+
 ## Getting Up and Running
 
 ### Prerequisites
@@ -50,8 +55,11 @@ For local dev, leave `REPOCIV_TOKEN` empty (auth is bypassed).
 
 ## Running Tests
 
-The full gate is one command — it runs TS typecheck, ESLint, Vitest, Vite
-build, Ruff, and Pytest in order and reports any failures:
+The full gate is one command. In order it runs: TypeScript typecheck, ESLint
+(zero warnings), Prettier check, Vitest with the coverage floor, the Vite
+production build, Ruff over `server/` and `scripts/`, Pytest (≥50% coverage),
+and the asset/bundle budgets (terrain atlas ≤6 MiB, props ≤1.5 MiB, eager JS
+≤185 KiB gzip). Knip and mypy run afterwards as non-blocking reports.
 
 ```bash
 bash scripts/check.sh
@@ -69,8 +77,8 @@ npm run test:coverage
 # Backend (pytest)
 pytest server/ -v
 
-# Backend with coverage
-pytest server/ --cov=server --cov-report=term-missing
+# Backend with coverage (the gate enforces ≥50%)
+pytest server/ --cov=server --cov-fail-under=50 --cov-report=term-missing
 ```
 
 ### Playwright e2e
@@ -110,6 +118,7 @@ Bypass with `git push --no-verify` if needed.
 
 - TypeScript strict mode is enabled.
 - ESLint + Prettier enforce formatting. Run `npm run format` to auto-fix.
+- Python is linted by Ruff (`line-length = 100`, Python 3.11 syntax).
 - Commit messages follow the Conventional Commits style when possible:
   `feat:`, `fix:`, `docs:`, `chore:`, `test:`.
 
@@ -118,10 +127,9 @@ Bypass with `git push --no-verify` if needed.
 1. Fork the repository.
 2. Create a feature branch: `git checkout -b feat/my-feature`
 3. Make your change. Keep it small.
-4. Ensure tests pass: `npm test && pytest server/ -v`
-5. Ensure typecheck passes: `npx tsc --noEmit`
-6. Commit with a descriptive message.
-7. Open a Pull Request against `main`.
+4. Ensure the full gate passes: `bash scripts/check.sh`
+5. Commit with a descriptive message.
+6. Open a Pull Request against `main`.
 
 ## What We're Looking For
 
@@ -134,7 +142,14 @@ Bypass with `git push --no-verify` if needed.
 
 - Large refactors without prior discussion.
 - Features that aren't needed by the primary user yet.
-- Multiplayer, 3D renderer, marketplace, or mobile PWA (see ROADMAP.md).
+- Anything `docs/SCOPE.md` marks as out of scope — multi-tenant/multi-user,
+  real-time multiplayer, voice/TTS and achievement systems.
+- Large features that belong on a parallel branch (e.g. the mobile client
+  `feat/multi-device-mobile`) — those merge only when stable and demonstrably
+  valuable.
+- Picking a side between renderers: both the Canvas 2D (`flat`, the default)
+  and the WebGL/Three.js (`webgl`, opt-in) modes are official trunk; the rule
+  is frictionless switching, not "2D only".
 
 ## Code of Conduct
 

@@ -43,12 +43,43 @@ no demuestra que una extracción sea correcta.
 | 6     | Separar interacción, cámara y render del renderer principal | Alto               | Gestos, selección, coordenadas y ciclo de vida sin regresiones                        |
 | 7     | Cierre de higiene y revisión de la rama completa            | Bajo/medio         | Diff acotado, gates y e2e comprobados, sin artefactos locales; revisar antes de merge |
 
-**Siguiente sesión recomendada:** comprobar CI y empezar por el corte documental
-(1). Después, clasificar Knip (2). No empezar simultáneamente frontend y backend.
+### Reanudación: corte documental (base `aaa11cc`)
 
-## 1. Documentación: deuda comprobada y comprobaciones pendientes
+- En la inspección inicial, worktree y remoto de limpieza coincidían en
+  `aaa11cc`; [su CI](https://github.com/Grizaceo/repociv/actions/runs/39196183046)
+  terminó con `gate: success` y `e2e (Playwright): success`.
+- READMEs ES/EN: fatiga ubicada en `GameState`; API real de prioridad,
+  criterios y rangos 60/35/15 cotejados contra implementación, tests y panel.
+  Atajos cotejados contra `hudWiring/hotkeys.ts` y renderer: sesiones mediante
+  wizard, cámara con WASD/flechas, Ctrl+A/Ctrl+S y slots de sesión (no salas).
+  Se distingue Gaceta de noticias del log de actividad F10. La doble escucha de
+  `N` (perfiles/widget) se documenta, **no se corrige** en este corte.
+- Revisión adversarial realizada y corregida: atribuciones a SCOPE, fallback de
+  Ctrl+Q y correspondencia tecla/harness. La fórmula de longitud de ruta se
+  documenta literalmente: con `size = -3`, `Math.min(..., 30)` no impone un
+  límite inferior de −30. No se altera ese comportamiento.
+- CONTRIBUTING se alinea con SCOPE, roadmap archivado y gate ejecutable.
+  No se modifican snapshots históricos, código, configuración ni umbrales.
+- Gate local de reanudación: `taskset -c 0,1 bash scripts/check.sh`, CPUs
+  seleccionadas de la afinidad permitida. Resultado: 1.160 tests frontend;
+  1.796 backend, 2 omitidos; cobertura backend 83,45 %. Presupuestos aprobados:
+  atlas 5.318 KiB, props 719 KiB y eager JS 154 KiB gzip. Mypy no instalado;
+  Knip informa avisos no bloqueantes. Este gate corresponde al mismo árbol de
+  código; los cambios son documentales.
+- Comprobaciones del corte: 57 destinos de enlaces relativos válidos; 48 tests
+  dirigidos de prioridad, fatiga, renderer e inputs aprobados. Playwright local:
+  `activity-presentation.spec.ts` y `approval-expiry.spec.ts`, **5 tests aprobados**
+  en Chromium con workspace sintético, estado scratch aislado, puertos 5373–5375,
+  dos CPUs y un worker. Sin ejecución de agentes/modelos. No es la suite e2e completa.
 
-Hallazgos comprobados en los dos READMEs:
+**Siguiente corte:** clasificar Knip (2), sin retirar exports por el solo informe.
+No empezar simultáneamente frontend y backend. Las comprobaciones 0–1 se registran
+arriba; las filas siguen describiendo las condiciones de cada trabajo.
+
+## 1. Documentación: hallazgos de base atendidos
+
+Hallazgos de la base corregidos en el corte documental (se conservan aquí como
+trazabilidad, no como deuda aún abierta):
 
 - El árbol y el diagrama mencionan `src/fatigue.ts`, que no existe. La lógica
   correspondiente vive en `src/game.ts`; `src/fatigue.test.ts` importa `GameState`.
@@ -65,10 +96,10 @@ En `CONTRIBUTING.md`:
 - Contrastar la descripción del gate con `scripts/check.sh`, incluyendo formato,
   cobertura y presupuestos, y mantener una sola fuente de verdad ejecutable.
 
-Pendiente de cotejo, **no errores dados por probados**: atajos, prioridades y
-umbrales descritos en README ES/EN frente a `src/ui/hudWiring/hotkeys.ts`,
-`src/priorityMatrix.ts`, su test y la UI correspondiente. No editar snapshots
-históricos para hacerlos coincidir retroactivamente.
+Cotejo realizado: atajos, prioridades y umbrales descritos en README ES/EN
+frente a `src/ui/hudWiring/hotkeys.ts`, `src/renderer.ts`,
+`src/priorityMatrix.ts`, su test y `src/ui/priorityPanel.ts`. No se editaron
+snapshots históricos para hacerlos coincidir retroactivamente.
 
 ## 2. Knip: avisos, no permiso para borrar
 
@@ -164,3 +195,14 @@ no reemplaza assertions de comportamiento.
 - No versionar `.venv`, `node_modules`, estados locales, logs ni credenciales.
 - `main` permanece intacto durante la limpieza. PR/merge y futuros pushes requieren
   autorización; publicar este mapa no autoriza automáticamente los próximos lotes.
+
+## 8. Pendientes consolidados
+
+- Completar publicación y verificar gate/E2E de CI del SHA final antes del merge.
+- No reabrir geometría, overlays ni extracciones backend cerradas.
+- Providers live, configuración del runner, identidad/perfiles nativos, roster,
+  cámara y teardown/remount siguen pospuestos: requieren un encargo separado.
+- No homogeneizar contratos distintos de descubrimiento CLI ni perseguir cero
+  avisos Knip. Conservar exports consumidos dinámicamente por browser tests.
+- No versionar estados personales, entornos capturados, logs crudos ni perfiles
+  de ejecución; usar ubicaciones locales ignoradas y documentación pública breve.

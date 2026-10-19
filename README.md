@@ -44,9 +44,9 @@ Cada sala corresponde a una carpeta del repo. Las unidades (agentes IA) caminan 
 | **Puerta** | Divide salas — se desliza al entrar/salir (animación paralela-ográmica) |
 | **Lámpara de piso** | Zona `focus` — luz ambiental en esquina NW interior |
 | **Cafetera** | Zona `break` — esquina NE interior |
-| **Placa de puerta** | Label flotante sobre cada sala — hotkey `L` para alternar visibilidad |
+| **Placa de puerta** | Label flotante sobre cada sala |
 
-**Hotkeys en vista local:** `F` overlay de debug · `L` labels · `Q/W/E` zoom · `1-9` selección de sala · `ENTER` entra/sale de sala
+**Hotkeys en vista local:** `F` overlay de debug · flechas / `W/A/S/D` desplazan la cámara · `Esc` vuelve al mapa macro. `1` y `4–9` seleccionan slots de sesión, no salas; `2`/`3` alternan el renderer 2D/3D.
 
 ---
 
@@ -160,7 +160,7 @@ REPOCIV_MAP_ROOT=~/projects
 ├─────────────────────────────────────────────┤
 │  GameState  (src/game.ts)                   │  ← Loop de simulación,
 │  Priority Matrix (src/priorityMatrix.ts)     │     fatiga, colas misión,
-│  Fatigue System  (src/fatigue.ts)            │     Pathfinding A*
+│  Fatigue (GameState, src/game.ts)            │     Pathfinding A*
 ├─────────────────────────────────────────────┤
 │  Bridge  (src/bridge.ts + server/bridge.py) │  ← HTTP/WebSocket → agent runtime
 │  localMap.ts + localPathfinding.ts           │     Process scanner, task queue
@@ -249,33 +249,39 @@ RepoCiv también se expone como **MCP server por stdio** (`server/mcp_server.py`
 
 ## Priority Matrix
 
-Sistema que decide qué archivo/carpeta es más urgente para cada agente:
+Puntúa las misiones locales en cola con `priorityScore(mission, now)` en
+`src/priorityMatrix.ts`. Los pesos vienen de `shared/priority-weights.json`:
 
-```
-score = (ageWeight × ageScore)
-      + (testWeight × hasTests ? 1 : 0)
-      + (debtWeight × churnRisk)
-      + (extWeight  × extensionScore)
-      + (sizeWeight × sizeScore)
-```
+- Espera en minutos: `ageWeight × log1p(age)`.
+- Bonus de tests por nombre test/spec o rutas `/test/` y `/tests/`.
+- Bonus de deuda por rutas `/debt/`, `/legacy/` y `/stale/` (no mide churn ni inspecciona comentarios).
+- Bonus de extensión y penalización por longitud de ruta (no tamaño real del archivo):
+  `min(sizeWeight × max(0, filePath.length − 40), 30)`. Con el peso actual
+  `size = -3`, el término es no positivo y no tiene límite inferior de −30.
+- Resultado redondeado a dos decimales.
 
-| Label | Condición |
-|-------|-----------|
-| `CRIT` | score ≥ 70 |
-| `HIGH` | score ≥ 50 |
-| `NORM` | score ≥ 30 |
-| `LOW`  | score < 30 |
+| Label | Rango de score (`scoreToPriority`) |
+|-------|----------------------------------|
+| `CRIT` | score ≥ 60 |
+| `HIGH` | 35 ≤ score < 60 |
+| `NORM` | 15 ≤ score < 35 |
+| `LOW` | score < 15 |
 
-Presiona `P` para abrir el Priority Panel. API: `computePriorityScore(fileNode, weights)` en `src/priorityMatrix.ts`.
+Presiona `P` para abrir el Priority Panel. `sortByPriority(missions, now)` ordena
+por score descendente; `peekNextMission(missions, now)` devuelve la siguiente
+misión o `null`.
 
 ---
 
 ## Fatigue System
 
-Las unidades tienen fatiga al estilo XCOM: trabajar la agota, descansar en un RestArea la recupera.
+El estado de fatiga y las áreas de descanso viven en `GameState`
+(`src/game.ts`): `updateUnitFatigue`, `getUnitFatigue`, `decayUnitFatigue`,
+`addRestArea` y `removeRestArea`. El bridge puede actualizar la fatiga mediante
+eventos de contexto.
 
 ```
-effectiveSpeed = currentFatigue / maxFatigue   (0.0 → 1.0)
+effectiveSpeed = maxFatigue > 0 ? fatigue / maxFatigue : 1
 ```
 
 Thresholds configurables en `Settings Panel` (`F11`) o en `src/gameConfig.ts`.
@@ -284,14 +290,14 @@ Thresholds configurables en `Settings Panel` (`F11`) o en `src/gameConfig.ts`.
 
 ## Gaceta de noticias
 
-Cada acción del sistema (misión completada, aprobación solicitada, agente que entra o sale, error, info) se registra como un **evento** en la **Gaceta**, un feed cronológico visible dentro del tablero. Funciona como un mini-log visual estilo "newspaper" de Civilization.
+La **Gaceta** (`src/ui/gacetaWidget.ts`) muestra artículos del bridge de
+noticias: filtros por categoría/fuente, estado de lectura, gestión de fuentes
+y escaneo. No es el log de eventos de misiones.
 
-- Pulsa `N` para abrir/cerrar el panel de la Gaceta
-- Los eventos se ordenan por timestamp, más recientes arriba
-- Filtros por tipo: `mission`, `approval`, `agent`, `error`, `info`
-- Doble click en un evento salta al contexto (ej. el agente o archivo implicado)
-
-Sirve para auditar sesiones largas sin abrir logs externos: es el "story so far" de tu imperio.
+El **log de actividad** (`F10`, `src/ui/logPanel.ts`) muestra el historial
+operativo. Actualmente `N` tiene dos listeners: el wizard de perfiles en
+`hotkeys.ts` y el widget de noticias montado. Esta superposición se documenta;
+la limpieza no la modifica.
 
 ---
 
@@ -299,20 +305,27 @@ Sirve para auditar sesiones largas sin abrir logs externos: es el "story so far"
 
 | Tecla | Acción |
 |-------|--------|
-| `Q` `W` `E` `O` `C` `X` `R` | Spawn MAIN / WORKER / SCOUT / OPENCLAW / CLAUDE / CODEX / CURSOR |
+| `Ctrl+Q` | Wizard de sesión con perfil seleccionado; Hermes si no hay perfil |
+| `Ctrl+G` | Wizard de nueva sesión Hermes |
+| `Ctrl+Shift+W` / `Ctrl+O` | Wizard de nueva sesión OpenClaw |
+| `Ctrl+E` / `Ctrl+C` | Wizard de nueva sesión Claude |
+| `Ctrl+X` | Wizard de nueva sesión Codex |
+| `Ctrl+R` / `R` | Wizard de nueva sesión Cursor |
+| Flechas / `W/A/S/D` | Desplazar cámara |
 | `1`, `4`–`9` | Seleccionar sesión por slot (`2`/`3` están reservados para la vista) |
 | `Space` | Ciclar al siguiente héroe idle |
-| `Tab` | Ciclar todos los héroes |
+| `Tab` | Ciclar todas las sesiones activas (propias y externas) |
 | `Enter` | Abrir/cerrar side panel |
 | `P` | Priority Matrix panel |
 | `M` | Modo Move |
-| `S` | Dormir unidad seleccionada |
+| `Ctrl+S` | Dormir unidad seleccionada |
 | `B` | Modo Build |
 | `G` | Toggle grid |
 | `V` | Toggle fog of war |
-| `A` | Aprobaciones pendientes |
+| `Ctrl+A` | Aprobaciones pendientes |
 | `T` | Terminal panel |
-| `N` | Gaceta de noticias |
+| `N` | Wizard de nuevo perfil; también alterna el widget de noticias montado |
+| `F10` | Log de actividad |
 | `2` / `3` | Alternar render 2D (`flat`) ↔ WebGL (`webgl`) |
 | `F11` | Settings Panel |
 | `?` | Keyboard help |
@@ -324,9 +337,9 @@ Sirve para auditar sesiones largas sin abrir logs externos: es el "story so far"
 ## Agregar un tipo de agente nuevo
 
 1. **Tipo** en `src/types.ts` → `UnitType`
-2. **Color** en `UNIT_COLORS` (`src/types.ts`) y `UNIT_TYPE_COLOR` (`src/game.ts`)
+2. **Color** en `UNIT_COLORS` (`src/types.ts`), usado por `GameState.spawnAgent`
 3. **Spawn** en el método `spawnAgent(type, ...)` de `src/game.ts`
-4. **Hotkey** en `src/main.ts` (sección `wireHUD`)
+4. **Hotkey** en `src/ui/hudWiring/hotkeys.ts` (wizard de sesiones)
 5. (Opcional) **Comportamiento** en `updateUnits(dt)` o módulo dedicado
 
 ---
@@ -335,10 +348,9 @@ Sirve para auditar sesiones largas sin abrir logs externos: es el "story so far"
 
 ```
 src/
-├── game.ts              GameState, misión, loop, spawn
+├── game.ts              GameState, misión, spawn, fatiga/descanso
 ├── gameConfig.ts        Config singleton (localStorage + thresholds)
-├── fatigue.ts           getUnitFatigue, removeRestArea
-├── priorityMatrix.ts    computePriorityScore
+├── priorityMatrix.ts    priorityScore, scoreToPriority, sortByPriority
 ├── map.ts               generateWorld (repos → hex tiles)
 ├── hex.ts               Axial coords, hex math
 ├── pathfinding.ts       A* con cache
@@ -352,8 +364,8 @@ src/
 └── styles/              CSS tokens, hud, components
 
 server/
-├── bridge.py            FastAPI bridge (entry point: python -m server.bridge)
-├── http_routes.py       Todos los endpoints HTTP
+├── bridge.py            HTTP bridge (entry point: python -m server.bridge)
+├── http_routes.py       Fachada compatible; handlers en routes/
 ├── websocket_handler.py WebSocket bidireccional
 ├── mcp_server.py        MCP stdio server (42 tools)
 ├── agent_runner.py      Ejecuta agentes (Hermes, Claude, Codex, OpenRouter…)
