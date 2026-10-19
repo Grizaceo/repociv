@@ -72,9 +72,11 @@ no demuestra que una extracción sea correcta.
   en Chromium con workspace sintético, estado scratch aislado, puertos 5373–5375,
   dos CPUs y un worker. Sin ejecución de agentes/modelos. No es la suite e2e completa.
 
-**Siguiente corte:** clasificar Knip (2), sin retirar exports por el solo informe.
-No empezar simultáneamente frontend y backend. Las comprobaciones 0–1 se registran
-arriba; las filas siguen describiendo las condiciones de cada trabajo.
+**Cortes 1–2 completados:** documentación en `31cf99e` y clasificación Knip abajo,
+sin retirar exports por el solo informe. Siguiente candidato: elegir un único
+subgrupo de higiene de exports o geometría isométrica (3), con caracterización
+previa. No empezar simultáneamente frontend y backend; las filas siguen
+describiendo las condiciones de cada trabajo.
 
 ## 1. Documentación: hallazgos de base atendidos
 
@@ -101,27 +103,62 @@ frente a `src/ui/hudWiring/hotkeys.ts`, `src/renderer.ts`,
 `src/priorityMatrix.ts`, su test y `src/ui/priorityPanel.ts`. No se editaron
 snapshots históricos para hacerlos coincidir retroactivamente.
 
-## 2. Knip: avisos, no permiso para borrar
+## 2. Knip: clasificación completada, sin retirar código
 
-Inventario repetido sobre la base: **23 exports**, **4 tipos**, **5 imports no
-resueltos** y **1 binario**. No reportó archivos sin uso ni dependencias sobrantes
-en esta ejecución (`knip --exclude duplicates --reporter json`).
+Inventario repetido: **23 exports + 4 tipos + 5 imports no resueltos + 1 binario**.
+Son **33 avisos**, no 33 piezas de código muerto. No reportó archivos sin uso ni
+extras de dependencias bajo la configuración actual (`knip --exclude duplicates
+--reporter json`), que contiene excepciones. Se cotejaron referencias en archivos
+versionados, incluidos tests y scripts; ausencia de referencias estáticas **no**
+prueba ausencia de contratos dinámicos ni autoriza borrado automático.
 
-- Los cinco imports no resueltos son `/src/...` de tests Playwright:
-  `e2e/activity-presentation.spec.ts` y `e2e/approval-expiry.spec.ts`.
-  Determinar si son resolución del analizador para imports servidos por Vite;
-  no reescribirlos como imports Node sin comprobar su ejecución en navegador.
-- Entre los exports figuran paneles `openLogPanel`, `openTaskPanel`,
-  `openKanbanPanel`, funciones de refresh, helpers de capabilities y pruebas,
-  `eraSystem`, `layers`, y estado de chat. Algunos pueden usarse de forma dinámica
-  o desde tests: buscar referencias antes de desexportar, y antes de eliminar.
-- `python3` aparece como binario no reconocido de `package.json`; no es prueba de
-  una dependencia npm faltante. Documentar/configurar solo tras verificar el uso.
-- Inspeccionar también `knip.json` por excepciones obsoletas. No silenciar categorías
-  enteras ni declarar todo «falso positivo» sin evidencia.
+### Exports y tipos (27)
 
-Pruebas: typecheck, lint, unitarios completos y Playwright dirigido a los imports
-implicados. Mantener contratos expuestos a scripts y browser imports.
+| Símbolos | Clasificación / evidencia y límite |
+| --- | --- |
+| `openLogPanel`, `refreshActivityHistory` | Conservar exports. `e2e/activity-presentation.spec.ts:81` y `activity-correlation.spec.ts:123` importan el módulo servido por Vite; también usados internamente en `logPanel.ts:140,301,303`. |
+| `openTaskPanel`, `refreshTaskInventory` | Conservar exports. Imports en `activity-presentation.spec.ts:86,115,130`, `activity-correlation.spec.ts:122` y `pending-work.spec.ts:41`; registro interno de panel en `taskPanel.ts:419,421`. |
+| `openKanbanPanel` | Conservar export. Import en `e2e/kanban-create.spec.ts:54`; llamado internamente en `kanbanPanel.ts:79`. |
+| `notifyWorkingUnitsChanged` | Candidato a desexportar, **no borrar**: referencias internas en `chat/state.ts:132,135,167`. |
+| Tipos `EraDefinition`, `CapabilitiesAgent`, `CapabilitiesSnapshot` | Candidatos a desexportar, no borrar sus definiciones: usos internos en `eraSystem.ts:14` y `capabilitiesClient.ts:18,69,89,92,116,128`. |
+| `unmountGacetaWidget` | Sin caller localizado fuera de su definición (`gacetaWidget.ts:118`). Mantener el teardown hasta revisar ciclo de vida; la ausencia de llamadas no demuestra que eliminarlo sea prudente. |
+| `getCurrentEraIndex`, `getEraLabel`, `updateEraDisplay` | Candidatos a inspeccionar como cadena: los dos primeros tienen callers internos en `eraSystem.ts:62–64`; no se localizó caller externo del tercero. No borrar `getStoredEraLabel`, usado en main y capitalPanel. |
+| `setFullCapabilitiesForTesting`, `getCapabilitiesSnapshot`, `setCapabilitiesSnapshotForTesting`, `resetCapabilitiesSnapshotForTesting`, `isCapabilitiesSnapshotLoaded`, `initCapabilities` | Sin callers externos localizados en `capabilitiesClient.ts:53–113`. Revisar el subsistema snapshot por separado; **no borrar el módulo**: `setCapabilitiesForAgentsForTesting` se usa en `spatialDirectives.test.ts:10,30`. No confundirlo con la tabla de `agentCapabilities.ts`. |
+| `_testTerrainSurface` | Sin import localizado del objeto de `terrainSurfaceY.ts:121`; el test importa las funciones públicas. Candidato a desexportar/eliminar solo tras cotejar contratos del módulo. |
+| `setUnitWorking`, `syncWorkingUnitsFromGameState`, tipo `GameStateLike` | Sin caller externo localizado (`chat/state.ts:128,144,147`); el tipo sirve al segundo helper. Revisar juntos, sin retirar `workingUnits` ni `subscribeWorkingUnits`, usados por `agentChip.ts`. |
+| `toggleLayer`, `setLayer`, `resetLayers`, `subscribe` de `layers.ts` | Sin callers localizados de estos exports (`layers.ts:72,96,104,110`). **No borrar el módulo**: `getLayerState` e `isLayerVisible` alimentan wonderVignette, renderer y ordenDeBatalla. No confundir este `subscribe` con GameState u otros homónimos. |
+
+Resumen: **5 exports necesarios por browser/tests; 1 función y 3 tipos con uso
+interno (candidatos a desexportar); 17 exports y 1 tipo requieren revisión de
+contratos antes de una eventual retirada**. Ninguno se retiró en este corte.
+
+### Resolución y herramientas (6)
+
+- Imports `/src/ui/logPanel.ts` y `/src/ui/taskPanel.ts` en
+  `activity-presentation.spec.ts:81,86`; `/src/ui/chat/state.ts`,
+  `/src/ui/chat/history.ts` y `/src/ui/approvalCards.ts` en
+  `approval-expiry.spec.ts:13,14,25`: URLs de módulos servidos por Vite dentro del
+  navegador, no imports Node. Las dos specs se ejecutaron en Chromium: **5 tests
+  aprobados** con fixtures y estado aislado. No reescribir por el aviso Knip.
+- `python3` en los scripts `assets:office` y `assets:props` (`package.json:21–22`)
+  es una herramienta del sistema, no una dependencia npm faltante. No silenciar
+  la categoría completa de binarios ni cambiar su descubrimiento.
+
+### Excepciones de `knip.json`
+
+- `scripts/screenshot-3d-audit.mjs`: se invoca desde `.github/workflows/ci.yml:127`;
+  la excepción evita tratar como huérfano un entrypoint de CI. Si se desea modelar
+  como `entry`, hacerlo en otro corte y comprobar el inventario resultante.
+- `@xterm/xterm` y `@xterm/addon-fit`: no se localizaron imports actuales;
+  `terminalPanel.ts` es un stub y `vite.config.ts:164` conserva una regla de chunk
+  xterm. Los ignores ocultan posibles dependencias sobrantes, no demuestran uso.
+  Revisar deps, lockfile, stub y regla juntos; **no se modificaron** aquí.
+
+Validación del corte: inventario contado por JSON, búsqueda sobre archivos
+versionados y comprobación independiente de usos browser/CI. Gate completo y
+48 unitarios dirigidos registrados arriba; Playwright dirigido no sustituye toda
+la suite. Mypy no disponible. Sin cambios de código, config, cobertura, binarios,
+políticas de descubrimiento ni excepciones Knip.
 
 ## 3–4. Renderer isométrico local
 
