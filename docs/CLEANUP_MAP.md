@@ -404,8 +404,9 @@ Conservar orden de dibujo, z/transformaciones y comportamiento de overlays.
 
 ## 5. Backend: límites antes de extracciones mayores
 
-Tamaños observados: `server/agent_runner.py` 1.472 líneas,
-`server/bridge.py` 1.424 y `server/routes/core.py` 1.258.
+Tamaños antes del corte de rutas (base `869e143`):
+`server/agent_runner.py` 1.472 líneas, `server/bridge.py` 1.424 y
+`server/routes/core.py` 1.258.
 
 - Runner: mapear por separado ciclo de subprocess, streaming/eventos, registro de
   sesiones y resolución de directorio/rutas. Elegir una responsabilidad por corte,
@@ -423,6 +424,72 @@ Tamaños observados: `server/agent_runner.py` 1.472 líneas,
 - Algunas pruebas de kanban invocan el CLI Hermes real, aunque usan stores
   aislados. No describir toda la suite como hermética ni ejecutar agentes/modelos
   reales para validar una extracción pura.
+
+### Corte de rutas del runner (base `869e143`)
+
+Límite: raíz de repos, directorio de trabajo seleccionado, contención de archivos
+y texto de contexto espacial, ahora en
+[`server/agent_paths.py`](../server/agent_paths.py). El módulo solo importa
+stdlib y recibe callbacks tipados; no importa al runner, stores ni adaptadores.
+No mueve sesiones, streaming/eventos, subprocesos, rutas HTTP ni búsqueda de CLI.
+
+- `agent_runner` conserva las cinco fachadas, firmas, defaults y nombres globales;
+  `_resolve_city_path` y todos los consumidores permanecen intactos. Los callbacks
+  diferidos conservan el monkeypatch de `_rrs` (incluso sustituyendo el objeto),
+  `_repos_root` y `_path_is_within`, no solo el valor que tenían al entrar.
+  La ruta especial de `capital` usa el `__file__` del runner, no el del módulo nuevo.
+- Caracterización **antes** de modificar producción, ejecutando el original fijo
+  `869e14388f432e6eb771abbef1e418e8a9dba7f1`: **59 casos** con resultados,
+  excepciones y orden de callbacks, retenidos en
+  [`server/fixtures/agent_paths.json`](../server/fixtures/agent_paths.json).
+  Incluye prioridad state/env/default, tilde/whitespace, main/capital y repos
+  explícitos, rutas relativas/absolutas/inexistentes, traversal, prefijo hermano,
+  symlinks de entrada/salida/bucle, NUL y contexto espacial literal/Unicode.
+  Los paths temporales se normalizan a `$FIXTURE`. El caso original `root-tilde`
+  usa un HOME sintético en la copia pública; solo el prefijo de HOME
+  se normaliza al leerlo, conservando el resultado y los eventos esperados. El harness aísla `Path.home()` y `HOME`; comprobado con
+  `HOME=/nonexistent`. No se regenera el golden desde la implementación movida.
+- Se mantienen quirks: `main`/`capital` no recortan whitespace, el root de estado
+  no pasa por `expanduser`, `commonpath` por sí solo es léxico y `realpath` no
+  exige existencia. No se añade strip, strict, validación de selección ni política
+  nueva. La selección real sigue a cargo del store existente.
+- Comparación AST de los **5 cuerpos**, normalizando únicamente las referencias
+  de dependencias introducidas por los callbacks; las **5 firmas de fachada** y
+  los **84 statements top-level restantes** del runner son idénticos al original.
+  No es identidad byte a byte: las firmas del leaf reciben dependencias explícitas.
+- [`server/test_agent_paths.py`](../server/test_agent_paths.py): **71 tests**
+  (59 golden + 2 casos `ValueError` de `commonpath` + 1 cambio tardío del guard
+  durante `realpath` + 6 integraciones de `run_agent` con selección persistida real
+  y ejecución/stores fake + 2 ramas main/capital con mayúsculas + 1 `__file__`
+  relativo). Los 71 también pasan contra los cuerpos originales en un proceso
+  aislado con HOME alternativo; golden 59/59 con normalización de home al leer.
+  Dirigidos junto a runner/command-security, en ambos órdenes: **115 aprobados y
+  1 omitido preexistente**. No se ejecutan agentes/modelos en estas pruebas.
+- Gate completo posterior, CPUs **0–1**: **1.329 frontend**, **1.867 backend**
+  aprobados y **2 omitidos**; cobertura backend **83,61 %**. Tipos, lint,
+  formato, build y presupuestos sin cambios y aprobados (5318/719/154 KiB).
+  Mypy ausente, opcional; warning preexistente de HMAC efímero sin clave.
+  Knip JSON idéntico al baseline, **30 avisos** ya clasificados.
+- Revisión independiente sin bloqueantes de comportamiento: **641 escenarios**
+  original/extraído sin discrepancias en resultados/excepciones ni callbacks;
+  **14/14 mutaciones** detectadas, con control intacto sin discrepancias.
+  Ambos harnesses reejecutados por el padre. La revisión detectó portabilidad de
+  `root-tilde` y huecos `commonpath`, mayúsculas y filename relativo; atendidos
+  con aislamiento/normalización de test y casos nuevos, sin cambios de producción
+  ni de resultados del golden; su prefijo de HOME se anonimiza en la copia pública. La revisión final confirmó HOME y
+  TMPDIR alternativos y normalización discriminante (`drop-expanduser` falla).
+  El golden solo detecta **11/14** mutaciones; con los tests adicionales, la
+  suite de 71 detecta **14/14**, control sin discrepancias. Padre reprodujo ambas
+  mediciones tras corregir un comparador scratch que leía el golden sin normalizar;
+  no se atribuye al golden la cobertura aportada por los casos nuevos.
+- Chromium con scratch nuevo, **un worker**, CPUs 0–1 y `E2E_SIM_NO_HERMES=1`:
+  **3 smoke tests** (`repociv.spec.ts`: carga inicial, paneles, error de repos).
+  Sin agentes/modelos; puertos 5373–5375 liberados. No es la suite completa ni
+  una ejecución de misión real desde el navegador; ese límite se comprueba con
+  la selección real y el adaptador fake de las integraciones Python.
+
+Las otras responsabilidades backend siguen pendientes. Elegir una sola en otro
+corte; la cola no autoriza automáticamente sesiones, streaming ni subprocesos.
 
 ## 6. Renderer principal y arranque
 

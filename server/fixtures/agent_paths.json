@@ -1,0 +1,517 @@
+{
+  "source": "869e14388f432e6eb771abbef1e418e8a9dba7f1",
+  "module": "server/agent_runner.py",
+  "cases": {
+    "root-state": {
+      "result": "$FIXTURE/state-root",
+      "events": [
+        [
+          "active-root"
+        ]
+      ]
+    },
+    "root-map": {
+      "result": "map",
+      "events": [
+        [
+          "active-root"
+        ]
+      ]
+    },
+    "root-repos": {
+      "result": "repos",
+      "events": [
+        [
+          "active-root"
+        ]
+      ]
+    },
+    "root-workspace": {
+      "result": "ws",
+      "events": [
+        [
+          "active-root"
+        ]
+      ]
+    },
+    "root-default": {
+      "result": "$FIXTURE/home/.hermes/workspace/repos",
+      "events": [
+        [
+          "active-root"
+        ]
+      ]
+    },
+    "root-tilde": {
+      "result": "/home/example/repos",
+      "events": [
+        [
+          "active-root"
+        ]
+      ]
+    },
+    "root-state-tilde": {
+      "result": "~/state",
+      "events": [
+        [
+          "active-root"
+        ]
+      ]
+    },
+    "root-whitespace": {
+      "result": "  ",
+      "events": [
+        [
+          "active-root"
+        ]
+      ]
+    },
+    "root-error": {
+      "error": [
+        "ValueError",
+        "state unavailable"
+      ],
+      "events": [
+        [
+          "active-root"
+        ]
+      ]
+    },
+    "workdir-0-False": {
+      "result": null,
+      "events": [
+        [
+          "selected-repo",
+          "",
+          ""
+        ]
+      ]
+    },
+    "workdir-0-True": {
+      "result": "$FIXTURE/repo",
+      "events": [
+        [
+          "selected-repo",
+          "",
+          "$FIXTURE/explicit"
+        ]
+      ]
+    },
+    "workdir-1-False": {
+      "result": null,
+      "events": []
+    },
+    "workdir-1-True": {
+      "result": "$FIXTURE/repo",
+      "events": [
+        [
+          "selected-repo",
+          "main",
+          "$FIXTURE/explicit"
+        ]
+      ]
+    },
+    "workdir-2-False": {
+      "result": null,
+      "events": [
+        [
+          "selected-repo",
+          " MAIN ",
+          ""
+        ]
+      ]
+    },
+    "workdir-2-True": {
+      "result": "$FIXTURE/repo",
+      "events": [
+        [
+          "selected-repo",
+          " MAIN ",
+          "$FIXTURE/explicit"
+        ]
+      ]
+    },
+    "workdir-3-False": {
+      "result": "$FIXTURE/bridge",
+      "events": []
+    },
+    "workdir-3-True": {
+      "result": "$FIXTURE/repo",
+      "events": [
+        [
+          "selected-repo",
+          "capital",
+          "$FIXTURE/explicit"
+        ]
+      ]
+    },
+    "workdir-4-False": {
+      "result": null,
+      "events": [
+        [
+          "selected-repo",
+          " CaPiTaL ",
+          ""
+        ]
+      ]
+    },
+    "workdir-4-True": {
+      "result": "$FIXTURE/repo",
+      "events": [
+        [
+          "selected-repo",
+          " CaPiTaL ",
+          "$FIXTURE/explicit"
+        ]
+      ]
+    },
+    "workdir-5-False": {
+      "result": null,
+      "events": [
+        [
+          "selected-repo",
+          "repo-a",
+          ""
+        ]
+      ]
+    },
+    "workdir-5-True": {
+      "result": "$FIXTURE/repo",
+      "events": [
+        [
+          "selected-repo",
+          "repo-a",
+          "$FIXTURE/explicit"
+        ]
+      ]
+    },
+    "workdir-6-False": {
+      "result": null,
+      "events": [
+        [
+          "selected-repo",
+          "repo:encoded",
+          ""
+        ]
+      ]
+    },
+    "workdir-6-True": {
+      "result": "$FIXTURE/repo",
+      "events": [
+        [
+          "selected-repo",
+          "repo:encoded",
+          "$FIXTURE/explicit"
+        ]
+      ]
+    },
+    "workdir-7-False": {
+      "result": null,
+      "events": [
+        [
+          "selected-repo",
+          "../outside",
+          ""
+        ]
+      ]
+    },
+    "workdir-7-True": {
+      "result": "$FIXTURE/repo",
+      "events": [
+        [
+          "selected-repo",
+          "../outside",
+          "$FIXTURE/explicit"
+        ]
+      ]
+    },
+    "workdir-8-False": {
+      "result": null,
+      "events": [
+        [
+          "selected-repo",
+          "ciudad ñ",
+          ""
+        ]
+      ]
+    },
+    "workdir-8-True": {
+      "result": "$FIXTURE/repo",
+      "events": [
+        [
+          "selected-repo",
+          "ciudad ñ",
+          "$FIXTURE/explicit"
+        ]
+      ]
+    },
+    "capital-missing": {
+      "result": "$FIXTURE/absent",
+      "events": []
+    },
+    "selection-error": {
+      "error": [
+        "ValueError",
+        "selection unavailable"
+      ],
+      "events": [
+        [
+          "selected-repo",
+          "repo-a",
+          ""
+        ]
+      ]
+    },
+    "file-0": {
+      "result": "",
+      "events": []
+    },
+    "file-1": {
+      "result": "$FIXTURE/repo/ ",
+      "events": [
+        [
+          "within",
+          "$FIXTURE/repo/ ",
+          "$FIXTURE/repo"
+        ]
+      ]
+    },
+    "file-2": {
+      "result": "$FIXTURE/repo",
+      "events": [
+        [
+          "within",
+          "$FIXTURE/repo",
+          "$FIXTURE/repo"
+        ]
+      ]
+    },
+    "file-3": {
+      "result": "$FIXTURE/repo/nested/file.txt",
+      "events": [
+        [
+          "within",
+          "$FIXTURE/repo/nested/file.txt",
+          "$FIXTURE/repo"
+        ]
+      ]
+    },
+    "file-4": {
+      "result": "$FIXTURE/repo/missing.txt",
+      "events": [
+        [
+          "within",
+          "$FIXTURE/repo/missing.txt",
+          "$FIXTURE/repo"
+        ]
+      ]
+    },
+    "file-5": {
+      "result": "$FIXTURE/repo/ nested/file.txt ",
+      "events": [
+        [
+          "within",
+          "$FIXTURE/repo/ nested/file.txt ",
+          "$FIXTURE/repo"
+        ]
+      ]
+    },
+    "file-6": {
+      "result": "$FIXTURE/repo/missing.txt",
+      "events": [
+        [
+          "within",
+          "$FIXTURE/repo/missing.txt",
+          "$FIXTURE/repo"
+        ]
+      ]
+    },
+    "file-7": {
+      "error": [
+        "ValueError",
+        "file path is outside selected repo"
+      ],
+      "events": [
+        [
+          "within",
+          "$FIXTURE/outside/secret.txt",
+          "$FIXTURE/repo"
+        ]
+      ]
+    },
+    "file-8": {
+      "error": [
+        "ValueError",
+        "file path is outside selected repo"
+      ],
+      "events": [
+        [
+          "within",
+          "$FIXTURE/repo-evil/file.txt",
+          "$FIXTURE/repo"
+        ]
+      ]
+    },
+    "file-9": {
+      "result": "$FIXTURE/repo/nested/file.txt",
+      "events": [
+        [
+          "within",
+          "$FIXTURE/repo/nested/file.txt",
+          "$FIXTURE/repo"
+        ]
+      ]
+    },
+    "file-10": {
+      "error": [
+        "ValueError",
+        "file path is outside selected repo"
+      ],
+      "events": [
+        [
+          "within",
+          "$FIXTURE/outside/secret.txt",
+          "$FIXTURE/repo"
+        ]
+      ]
+    },
+    "file-11": {
+      "error": [
+        "ValueError",
+        "file path is outside selected repo"
+      ],
+      "events": [
+        [
+          "within",
+          "$FIXTURE/outside/secret.txt",
+          "$FIXTURE/repo"
+        ]
+      ]
+    },
+    "file-12": {
+      "result": "$FIXTURE/repo/nested/file.txt",
+      "events": [
+        [
+          "within",
+          "$FIXTURE/repo/nested/file.txt",
+          "$FIXTURE/repo"
+        ]
+      ]
+    },
+    "file-13": {
+      "result": "$FIXTURE/repo/loop/file.txt",
+      "events": [
+        [
+          "within",
+          "$FIXTURE/repo/loop/file.txt",
+          "$FIXTURE/repo"
+        ]
+      ]
+    },
+    "file-14": {
+      "error": [
+        "ValueError",
+        "embedded null byte"
+      ],
+      "events": []
+    },
+    "file-cwd": {
+      "result": "$FIXTURE/repo/missing.txt",
+      "events": [
+        [
+          "within",
+          "$FIXTURE/repo/missing.txt",
+          "$FIXTURE/repo"
+        ]
+      ]
+    },
+    "file-guard-override": {
+      "error": [
+        "ValueError",
+        "file path is outside selected repo"
+      ],
+      "events": [
+        [
+          "within",
+          "$FIXTURE/repo/nested/file.txt",
+          "$FIXTURE/repo"
+        ]
+      ]
+    },
+    "within-0": {
+      "result": true,
+      "events": []
+    },
+    "within-1": {
+      "result": true,
+      "events": []
+    },
+    "within-2": {
+      "result": false,
+      "events": []
+    },
+    "within-3": {
+      "result": true,
+      "events": []
+    },
+    "within-4": {
+      "result": true,
+      "events": []
+    },
+    "within-5": {
+      "result": true,
+      "events": []
+    },
+    "within-6": {
+      "result": true,
+      "events": []
+    },
+    "within-7": {
+      "result": true,
+      "events": []
+    },
+    "spatial-0": {
+      "result": "\n\n## Contexto espacial RepoCiv (fuente de verdad)\n- **Ciudad / target (`city_id`):** ``\n- **Ruta de trabajo:** NO resuelta: no existe `$FIXTURE/repos con espacios/`. Alinea el nombre de la carpeta con `city_id` o crea el clone ahi.\n- **Raiz de repos (`REPOCIV_MAP_ROOT` / `REPOCIV_REPOS_ROOT` / `WORKSPACE_ROOT`):** `$FIXTURE/repos con espacios`\n- **Ruta esperada para este target:** `$FIXTURE/repos con espacios/`\n- **Alcance:** responde solo sobre esta ciudad/repo y su cwd. No uses historial, archivos ni estado de otras ciudades.\n",
+      "events": [
+        [
+          "repos-root"
+        ]
+      ]
+    },
+    "spatial-1": {
+      "result": "\n\n## Contexto espacial RepoCiv (fuente de verdad)\n- **Ciudad / target (`city_id`):** ` main `\n- **Ruta de trabajo:** NO resuelta: no existe `$FIXTURE/repos con espacios/ main `. Alinea el nombre de la carpeta con `city_id` o crea el clone ahi.\n- **Raiz de repos (`REPOCIV_MAP_ROOT` / `REPOCIV_REPOS_ROOT` / `WORKSPACE_ROOT`):** `$FIXTURE/repos con espacios`\n- **Ruta esperada para este target:** `$FIXTURE/repos con espacios/ main `\n- **Alcance:** responde solo sobre esta ciudad/repo y su cwd. No uses historial, archivos ni estado de otras ciudades.\n",
+      "events": [
+        [
+          "repos-root"
+        ]
+      ]
+    },
+    "spatial-2": {
+      "result": "\n\n## Contexto espacial RepoCiv (fuente de verdad)\n- **Ciudad / target (`city_id`):** `CARCOSA`\n- **Ruta de trabajo (cwd del adaptador):** `$FIXTURE/repo`\n- **Raiz de repos (`REPOCIV_MAP_ROOT` / `REPOCIV_REPOS_ROOT` / `WORKSPACE_ROOT`):** `$FIXTURE/repos con espacios`\n- **Ruta esperada para este target:** `$FIXTURE/repo`\n- **Alcance:** responde solo sobre esta ciudad/repo y su cwd. No uses historial, archivos ni estado de otras ciudades.\n",
+      "events": [
+        [
+          "repos-root"
+        ]
+      ]
+    },
+    "spatial-3": {
+      "result": "\n\n## Contexto espacial RepoCiv (fuente de verdad)\n- **Ciudad / target (`city_id`):** `ciudad ñ`\n- **Ruta de trabajo (cwd del adaptador):** `$FIXTURE/outside`\n- **Raiz de repos (`REPOCIV_MAP_ROOT` / `REPOCIV_REPOS_ROOT` / `WORKSPACE_ROOT`):** `$FIXTURE/repos con espacios`\n- **Ruta esperada para este target:** `$FIXTURE/outside`\n- **Alcance:** responde solo sobre esta ciudad/repo y su cwd. No uses historial, archivos ni estado de otras ciudades.\n",
+      "events": [
+        [
+          "repos-root"
+        ]
+      ]
+    },
+    "spatial-root-error": {
+      "error": [
+        "ValueError",
+        "root unavailable"
+      ],
+      "events": [
+        [
+          "repos-root"
+        ]
+      ]
+    }
+  }
+}
