@@ -624,6 +624,51 @@ unifican otros protocolos ni se cambia ejecución, política de sesiones o rutas
   Hermes real con stores aislados, no modelos. Sin cambios de configuración,
   umbrales, snapshots ni presupuestos.
 
+### Corte de construcción del cuerpo HTTP Hermes (base `63de7d2`)
+
+Límite: solo construcción del payload (mensajes, modo quick-chat y campos
+opcionales), ahora en
+[`server/hermes_request_payload.py`](../server/hermes_request_payload.py).
+El runner conserva selección de modelo/proveedor, configuración y sesión,
+URL/credenciales, serialización, HTTP, ledger, envío de respuesta y fallback.
+No se modifica el endpoint ni se activa streaming: `stream: False` ya existía.
+
+- Caracterización **antes** de mover el bloque, con HTTP/callbacks/ledger falsos
+  y HOME/config aislados. Los **37 casos** de
+  [`server/test_hermes_request_payload.py`](../server/test_hermes_request_payload.py)
+  pasan contra extraído y contra cuerpo original AST del SHA fijo
+  `63de7d2c3dc44fbedc13011e0c5181d58801ce38` en proceso fresco.
+- Preserva orden quick-chat→espacial→lectura de system, configuración compartida
+  sin copia, strings vacíos/defaults y TypeError de system inválido. La petición
+  mantiene modelo/proveedor previamente resueltos, texto literal de chat rápido,
+  presupuestos 1024/4096, reasoning low y working_directory incluso para chat
+  rápido (sin añadir `cd` a ese mensaje). No se corrigen esas particularidades.
+- Las dos lambdas conservan lookup tardío de `_is_quick_chat_message` y
+  `_spatial_context_block`: el primer callback puede sustituir el segundo.
+  Preparación continúa **fuera** del try de transporte; sus fallos se propagan
+  sin enviar un error HTTP sintético. Serialización/HTTP siguen en su try original.
+- AST: cuerpo movido equivalente normalizando solo dos nombres de callback;
+  firma y todo el resto del runner intactos salvo import y delegación. Dirigidos
+  con runner/Codex/store: **175 aprobados y 1 omitido preexistente**. Módulo nuevo
+  **100 %** de cobertura por fachada; sin petición HTTP ni agente/modelo real.
+- Baseline completo y gate posterior **exit 0**, CPUs **0–1** y heap Node 1024 MB,
+  sin editar configuración ni umbrales. Gate posterior: **2.068 backend y 2
+  omitidos**, cobertura **84,33 %**, **1.329 frontend**; tipos, lint, formato,
+  build y tres presupuestos aprobados. Mypy sigue ausente/opcional; Knip completa
+  sus **30 avisos** conocidos (23 exports, 1 tipo, 5 imports, 1 binario) y 1 hint.
+- Padre ejecutó sonda in-memory con control verde y **10/10 mutantes detectados**,
+  todos por exit pytest 1: presupuestos, stream, guarda de cd, provider/workdir,
+  reasoning, system/spatial, copia temprana de config y spatial prebound.
+  No se confunde fallo de instalación con detección.
+- Revisión adversarial independiente (registro privado): **sin bloqueantes**;
+  inspección del límite/orden/try, 37 casos extraídos y originales y AST verdes.
+  El revisor no ejecutó suite completa; el gate completo anterior lo ejecutó
+  el padre. Sin reclamo de identidad byte a byte ni validación remota.
+- No Playwright ni integración real con gateway Hermes. Los tests generales de
+  kanban pueden invocar CLI Hermes real con stores aislados, no modelos. Sondas
+  de diferencial/mutación permanecen fuera del gate versionado, en scratch:
+  (artefacto local no publicado).
+
 Las otras responsabilidades backend siguen pendientes. Elegir una sola en otro
 corte, solo con nuevo encargo; los cortes cerrados no autorizan más cambios de
 streaming, ciclo de procesos, políticas de sesión ni rutas HTTP.

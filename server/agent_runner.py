@@ -20,7 +20,7 @@ from typing import Any, Callable
 
 from server import claude_session_args
 from server import claude_sessions as _claude_sessions
-from server import cli_discovery, harness_output, hermes_session_store, opencode_stream
+from server import cli_discovery, harness_output, hermes_request_payload, hermes_session_store, opencode_stream
 from server import event_store as _es
 from server import subagent_tracker as _subagent_tracker
 from server.mission_harness import MissionHarnessContext, log_swarm_tracking_capability, swarm_track_enabled
@@ -1337,36 +1337,11 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
         unit_id, city_id, mission_id, stateful=cfg.get("stateful", True),
     )
 
-    quick_chat = _is_quick_chat_message(mission)
-    spatial = _spatial_context_block(city_id, working_dir)
-    system_content = cfg.get("system", "Eres un agente util.") + spatial
-    if quick_chat:
-        system_content += (
-            "\nRespuesta rápida de chat: responde de forma directa y breve sin invocar "
-            "herramientas salvo que el usuario lo pida explícitamente."
-        )
-    user_content: str
-    if working_dir and not quick_chat:
-        user_content = f"cd {working_dir}\n\n{mission}"
-    else:
-        user_content = mission
-    payload: dict[str, Any] = {
-        "model": eff_model,
-        "messages": [
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": user_content},
-        ],
-        "stream": False,
-        "max_tokens": 1024 if quick_chat else 4096,
-    }
-    if quick_chat:
-        payload["model_options"] = {"reasoning_effort": "low"}
-    # Hermes gateway ignores bare `model` unless `provider` is also set (or
-    # direct_model_requests is enabled upstream). Pair them when selected.
-    if eff_provider:
-        payload["provider"] = eff_provider
-    if working_dir:
-        payload["working_directory"] = working_dir
+    payload = hermes_request_payload.build_payload(
+        mission, cfg, working_dir, city_id, eff_model, eff_provider,
+        is_quick_chat_message=lambda text: _is_quick_chat_message(text),
+        spatial_context_block=lambda city, work: _spatial_context_block(city, work),
+    )
     try:
         data = json.dumps(payload).encode()
         headers = {
