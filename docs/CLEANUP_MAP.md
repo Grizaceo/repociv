@@ -724,6 +724,48 @@ Las otras responsabilidades backend siguen pendientes. Elegir una sola en otro
 corte, solo con nuevo encargo; los cortes cerrados no autorizan más cambios de
 streaming, ciclo de procesos, políticas de sesión ni rutas HTTP.
 
+### Corte del registro de perfiles RepoCiv (base `eff8df6`)
+
+Límite: `get_profiles`, `post_profiles`, `post_profiles_delete` se copian **sin
+transformar sus cuerpos** a
+[`server/routes/profile_registry.py`](../server/routes/profile_registry.py).
+Core conserva fachadas, firmas/defaults, docstrings públicos y contexto ignorado.
+No se mueven roster, identidad, lectura/escritura de archivos de perfiles nativos,
+default harness ni políticas; `config_store.py`, `profile_identity.py`, bridge,
+shim y registro HTTP permanecen byte-idénticos.
+
+- **51 casos nuevos** de
+  [`server/test_profile_registry_routes.py`](../server/test_profile_registry_routes.py)
+  pasan antes de extraer, contra el original fresco de SHA fijo
+  `eff8df6fe5f9a578fef17e88ceaf7ea76ff8f0ac` y contra el extraído. Store falso en
+  `sys.modules` y atributo padre de `server`; HOME/config temporales y monkeypatch
+  restaurable. Ningún perfil real, proceso de agente ni modelo en estos casos.
+- Se conservan nombres/harness sin strip ni validación nueva, nueve keywords
+  opcionales con su orden/referencias y valores por defecto None, errores 400/404,
+  formato repr del nombre y resultado de listado/entry sin coerción/copia.
+- Imports locales de store antes de leer body; callee upsert seleccionado antes
+  de evaluar keywords opcionales. Lecturas name/harness fuera del try; lecturas
+  opcionales dentro. Solo ValueError capturado en ese alcance; truthiness de
+  delete fuera del try. Bodies no mapping siguen levantando AttributeError.
+- AST de las tres funciones completas idéntico al original; resto de core intacto
+  salvo import y delegaciones. Identidad de fachadas core→shim→tablas GET/POST y
+  docstrings comprobados. Diferencial restaura __code__ para no romper registro.
+- **60 dirigidos**: 51 falsos más 9 HTTP existentes de
+  `test_profiles_endpoints.py` (localhost y config temporal, no modelos).
+  Cobertura del nuevo módulo **100 %**, 29 sentencias. Control mutacional verde y
+  **10/10 no equivalentes** detectados, pytest exit exactamente 1, sin editar disco.
+- Baseline y gate completo posterior **exit 0**, CPUs 0–1 y heap Node 1024 MB.
+  **2.151 backend, 2 omitidos**, cobertura **84,46 %**; **1.329 frontend**;
+  tipos/lint/formato/build y tres presupuestos verdes, sin rebajar umbrales.
+  Knip 30 avisos conocidos + 1 hint; Mypy ausente/opcional. Los tests generales
+  de kanban pueden invocar CLI Hermes aislada, no modelos.
+- Revisión adversarial (registro privado): **sin hallazgos ni bloqueantes**; las
+  tres funciones comparadas también byte a byte, 51 originales, 51 extraídos y
+  9 HTTP existentes verdes. Ruff y diff-check del revisor verdes; gate completo
+  y mutaciones ejecutados por el padre, no por el revisor.
+  Sin Playwright ni integración con perfiles nativos/modelos. Los HTTP existentes
+  no equivalen a integración de navegador ni a una auditoría completa de auth.
+
 ## 6. Renderer principal y arranque
 
 `src/renderer.ts` tiene 2.117 líneas; `src/main.ts`, 1.309.

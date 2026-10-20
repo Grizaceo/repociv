@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from server.routes import health as _health_routes
+from server.routes import profile_registry as _profile_routes
 
 RouteContext = dict[str, Any]
 
@@ -431,8 +432,7 @@ def get_profiles(_ctx: "RouteContext") -> tuple[int, Any]:
     The shipped default is one profile per built-in harness, but the user
     can rename, add, or remove profiles at any time.
     """
-    from server import config_store as _cs
-    return 200, {"profiles": _cs.list_profiles()}
+    return _profile_routes.get_profiles(_ctx)
 
 
 def post_profiles(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
@@ -442,28 +442,7 @@ def post_profiles(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]
     Response 200: { "profile": {...normalized entry...} }
     Response 400: { "error": "<reason>" }
     """
-    from server import config_store as _cs
-    name = body.get("name")
-    harness = body.get("harness")
-    if not isinstance(name, str) or not isinstance(harness, str):
-        return 400, {"error": "name and harness are required strings"}
-    try:
-        entry = _cs.upsert_profile(
-            name,
-            harness,
-            personality=body.get("personality"),
-            system_prompt=body.get("system_prompt"),
-            profile_path=body.get("profile_path"),
-            model=body.get("model"),
-            provider=body.get("provider"),
-            harness_ref=body.get("harness_ref"),
-            display_name=body.get("display_name"),
-            identity_mode=body.get("identity_mode"),
-            slot_order=body.get("slot_order"),
-        )
-    except ValueError as exc:
-        return 400, {"error": str(exc)}
-    return 200, {"profile": entry}
+    return _profile_routes.post_profiles(body, _ctx)
 
 
 def post_profiles_delete(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
@@ -474,17 +453,7 @@ def post_profiles_delete(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[in
     Response 404: { "error": "profile '<name>' not found" }
     Response 400: { "error": "<reason>" }
     """
-    from server import config_store as _cs
-    name = body.get("name")
-    if not isinstance(name, str):
-        return 400, {"error": "name is required and must be a string"}
-    try:
-        deleted = _cs.delete_profile(name)
-    except ValueError as exc:
-        return 400, {"error": str(exc)}
-    if not deleted:
-        return 404, {"error": f"profile {name!r} not found"}
-    return 200, {"ok": True}
+    return _profile_routes.post_profiles_delete(body, _ctx)
 
 
 def get_profile_identity(ctx: "RouteContext") -> tuple[int, Any]:
