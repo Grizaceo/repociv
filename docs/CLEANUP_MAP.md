@@ -669,6 +669,57 @@ No se modifica el endpoint ni se activa streaming: `stream: False` ya existía.
   de diferencial/mutación permanecen fuera del gate versionado, en scratch:
   (artefacto local no publicado).
 
+### Corte de rutas de salud y disponibilidad (base `31e4540`)
+
+Límite: cuerpos de `get_health` y `get_ready` a
+[`server/routes/health.py`](../server/routes/health.py). `core.py` conserva ambas
+fachadas, firmas, `RouteContext`, `_build_identity` y `time`; `http_routes.py`,
+`routes/registry.py` y `bridge.py` permanecen byte-idénticos. No se mueve registro,
+autenticación, approvals, políticas ni otros dominios HTTP.
+
+- **32 casos** de
+  [`server/test_health_routes.py`](../server/test_health_routes.py) ejecutados
+  contra el original antes de extraer; pasan contra original AST de SHA fijo
+  `31e45406f7187f1261fcfc1ed14fe37a162c696f` y extraído, en proceso fresco.
+  Módulos colaboradores falsos aislados en `sys.modules` y atributos de `server`,
+  restaurados por monkeypatch; HOME/config temporales. Sin GPU, binarios, servicios
+  ni scheduler reales en esos nuevos casos. Contexto sigue ignorado.
+- Conserva orden scheduler→cola→GPU→selección de identidad→timestamp→capabilities
+  →MCP→agregados/store→Suvadu→snapshot. Imports siguen locales: capacidades,
+  scheduler, store y función MCP se capturan al entrar; atributo `Suvadu.status`
+  se resuelve más tarde. Excepciones se propagan sin envolturas nuevas.
+- Dos lambdas leen `_build_identity` y `time.time` de core al invocarse. La
+  identidad se selecciona tras GPU y antes de capabilities; fallback solo para
+  `None`, no para objetos falsey. El snapshot usa la identidad ya seleccionada.
+  No se convierte todo el dominio a dependencias uniformemente eager o late.
+- Se preservan forma/orden de claves y referencias retornadas, conteo exacto de
+  status `active`, `str(_store_path)` incluso para valores falsey y doble lectura
+  del descriptor por `hasattr` en health. Ready sigue sin guarda si falta store y
+  expone solo `bool(REPOCIV_TOKEN)`. No se corrigen estas particularidades.
+- AST de ambos cuerpos equivalente por sustituciones explícitas de source/clock;
+  resto de core intacto salvo import y cuerpos de fachada. La prueba de registro
+  comprueba identidad de callable core→shim→tabla exacta para `/health` y `/ready`.
+  El diferencial original restaura `__code__` de fachada en proceso fresco, no
+  rebind del objeto que rompería artificialmente esa prueba.
+- **45 dirigidos** con diagnósticos existentes aprobados; módulo nuevo **100 %**.
+  Sonda in-memory del padre: control verde y **9/9 mutantes no equivalentes**
+  detectados con pytest exit 1, incluyendo source/clock prebound, fallback falsey,
+  guarda/coerción de store, transporte, capabilities, conteo y token sin bool.
+- Baseline completo y gate posterior **exit 0**, CPUs **0–1**, heap Node 1024 MB,
+  sin cambios de configuración ni umbrales. Gate posterior: **2.100 backend y 2
+  omitidos**, cobertura **84,38 %**, **1.329 frontend**, tipos/lint/formato/build y
+  tres presupuestos verdes. Knip completa sus **30 avisos** conocidos + 1 hint;
+  Mypy ausente/opcional. Los tests generales de kanban pueden invocar CLI Hermes
+  real con stores aislados, no modelos; no se declara toda la suite hermética.
+- Revisión adversarial (registro privado): **aprobado, sin bloqueantes**; AST,
+  32 originales y 45 dirigidos extraídos verificados. Import limpio de core no
+  carga bridge; mantener health sin imports server a nivel módulo. El revisor
+  no ejecutó gate completo; lo ejecutó el padre. No es prueba HTTP end-to-end.
+- No Playwright, peticiones HTTP reales ni nueva prueba end-to-end de auth; su
+  implementación/registro no cambian. Evidencia scratch efímera fuera del gate:
+  (artefacto local no publicado). El mapa
+  conserva evidencia resumida aunque caduque scratch.
+
 Las otras responsabilidades backend siguen pendientes. Elegir una sola en otro
 corte, solo con nuevo encargo; los cortes cerrados no autorizan más cambios de
 streaming, ciclo de procesos, políticas de sesión ni rutas HTTP.
