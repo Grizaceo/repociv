@@ -20,7 +20,7 @@ from typing import Any, Callable
 
 from server import claude_session_args
 from server import claude_sessions as _claude_sessions
-from server import cli_discovery, harness_output, hermes_session_store
+from server import cli_discovery, harness_output, hermes_session_store, opencode_stream
 from server import event_store as _es
 from server import subagent_tracker as _subagent_tracker
 from server.mission_harness import MissionHarnessContext, log_swarm_tracking_capability, swarm_track_enabled
@@ -1188,43 +1188,13 @@ def _run_opencode_streaming(unit_id: str, mission_id: str, mission: str,
     from server.agent_processes import record_process_binding
     record_process_binding(getattr(proc, "pid", 0), mission_id, unit_id)
 
-    text_parts: list[str] = []
-    errors: list[str] = []
-    stray: list[str] = []
-    tools_used = 0
     assert proc.stdout is not None
-    for line in proc.stdout:
-        stripped = line.strip()
-        if not stripped:
-            continue
-        try:
-            event = json.loads(stripped)
-        except ValueError:
-            if len(stray) < 20:
-                stray.append(stripped)
-            continue
-        if not isinstance(event, dict):
-            continue
-        kind = event.get("type")
-        part = event.get("part")
-        if kind == "text" and isinstance(part, dict):
-            chunk = part.get("text")
-            if isinstance(chunk, str) and chunk:
-                text_parts.append(chunk)
-                text = chunk if chunk.endswith("\n") else f"{chunk}\n"
-                send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
-                _es.record_output_chunk(mission_id, unit_id, text)
-        elif kind == "tool_use" and isinstance(part, dict):
-            tools_used += 1
-            tool = part.get("tool")
-            if isinstance(tool, str) and tool:
-                text = f"🔧 {tool}\n"
-                send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
-                _es.record_output_chunk(mission_id, unit_id, text)
-        elif kind == "error":
-            err = event.get("error")
-            message = err.get("message") if isinstance(err, dict) else None
-            errors.append(str(message or "unknown"))
+    text_parts, errors, stray, tools_used = opencode_stream.consume_lines(
+        proc.stdout, unit_id, mission_id,
+        loads=lambda text: json.loads(text),
+        send_to_repociv=lambda event: send_to_repociv(event),
+        record_output_chunk=lambda *args: _es.record_output_chunk(*args),
+    )
     proc.wait(timeout=600)
     output = "".join(text_parts)
 

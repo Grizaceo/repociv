@@ -571,9 +571,62 @@ cambia la política de sesiones existente.
   tests ejercitan el leaf por su fachada; el diferencial original queda en scratch,
   no se añade una dependencia Git al gate versionado.
 
+### Corte de consumo NDJSON OpenCode (base `f593290`)
+
+Límite: solo clasificación de líneas, acumulación de texto/errores/stray y emisión
+ordenada de chunks de `_run_opencode_streaming`, ahora en
+[`server/opencode_stream.py`](../server/opencode_stream.py). El leaf importa solo
+stdlib, recibe iterable y callbacks, y devuelve los cuatro acumuladores originales.
+El runner conserva firma y preludio, creación/registro del proceso, assert de stdout,
+`wait(timeout=600)`, returncode, precedencia de errores y fallbacks finales. No se
+unifican otros protocolos ni se cambia ejecución, política de sesiones o rutas HTTP.
+
+- Caracterización previa contra runner original, ampliada tras revisión:
+  [`server/test_opencode_stream.py`](../server/test_opencode_stream.py), **35 casos**
+  con procesos/callbacks falsos y HOME/config aislados. Todos pasan también contra
+  el cuerpo original AST del SHA fijo `f5932901a0a55c891bca6f6cd5d25720099aa82e`
+  en proceso fresco. Ningún agente/modelo real valida la extracción.
+- Preserva líneas vacías, JSON no-mapping, chunks Unicode/whitespace, newline de
+  envío sin alterar texto acumulado, tools sin nombre que cuentan, primeros veinte
+  stray recortados, primer error y precedencia frente a returncode. Prueba ocho
+  límites de excepción, `ValueError` de decoder frente a otros errores, stdout
+  ausente y lookup tardío de los globals `json`, `send_to_repociv` y `_es`.
+  Los callbacks envían antes de registrar y pueden reemplazar dependencias entre
+  eventos o entre el envío y registro del mismo chunk.
+- AST: bloque movido equivalente normalizando únicamente tres accesos de
+  dependencia; firma, preludio, ciclo/finalización y resto del runner intactos
+  salvo import. Dirigidos con runner/Codex/Claude: **98 aprobados, 1 omitido**.
+- Revisión read-only completada (registro privado): sin bloqueantes. La primera
+  revisión quedó interrumpida sin conclusión; sus artefactos no se tomaron como
+  aprobación. Hueco de whitespace stray cerrado: el caso con espacios está en
+  las tres últimas líneas retenidas, no descartado por `stray[-3:]`.
+- Padre corrigió la sonda scratch de mutación: alcance por función, número de
+  reemplazos explícito y exit pytest **1** obligatorio. **14/14 mutantes no
+  equivalentes detectados**, control verde; una transformación `elif`→`if`
+  equivalente sobre kinds mutuamente excluyentes sobrevive y no cuenta como fallo
+  de cobertura. Fallos al instalar un mutante no se cuentan como detecciones.
+- Primera invocación postextracción interrumpida por timeout de herramienta
+  durante Vitest (420 s), sin aserción fallida ni proceso restante; no se atribuye
+  causa. Repetición completa verde antes del último caso de whitespace:
+  **2.030 backend + 2 omitidos, 84,25 %**, leaf **100 %** y **1.329 frontend**.
+  Gate completo de cierre tras el caso adicional: **exit 0**, **2.031 backend +
+  2 omitidos**, **84,25 %**, leaf **100 %** y **1.329 frontend**. Ambos gates usan
+  `NODE_OPTIONS=--max-old-space-size=1024 taskset -c 0,1 bash scripts/check.sh`.
+  Tipos/lint/formato/build y los tres presupuestos pasan. Knip completa sus
+  diagnósticos: **30 avisos** (23 exports, 1 tipo, 5 imports, 1 binario), además
+  de un hint de configuración, sin retirar código frontend. Baseline íntegro
+  previo a extracción también terminó con exit 0.
+  Revisión previa observó un fallo en el test del CLI kanban; ejecución aislada
+  posterior por el padre pasa y también pasó en el gate completo. No se infiere
+  causa ni se corrige comportamiento ajeno a este corte.
+- Mypy ausente/opcional; Knip diagnóstico no bloqueante. No se ejecuta Playwright
+  ni misión real de OpenCode; los tests generales de kanban pueden invocar el CLI
+  Hermes real con stores aislados, no modelos. Sin cambios de configuración,
+  umbrales, snapshots ni presupuestos.
+
 Las otras responsabilidades backend siguen pendientes. Elegir una sola en otro
-corte, solo con nuevo encargo; estos cortes no autorizan cambios de streaming,
-ciclo de procesos, políticas de sesión ni rutas HTTP.
+corte, solo con nuevo encargo; los cortes cerrados no autorizan más cambios de
+streaming, ciclo de procesos, políticas de sesión ni rutas HTTP.
 
 ## 6. Renderer principal y arranque
 
