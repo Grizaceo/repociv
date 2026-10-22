@@ -329,9 +329,13 @@ vec2 terrainAtlasUv(float idx, vec2 tileUv) {
               (row + tileUv.y) / uAtlasRows);
 }
 
-vec2 terrainMacroUv(float idx, vec2 tileUv, vec2 worldXZ) {
+vec2 terrainMacroRawUv(float idx, vec2 worldXZ) {
   float scale = mix(2.4, 3.6, clamp(idx / 7.0, 0.0, 1.0));
-  vec2 rawUv = worldXZ / (uHexRadius * scale) + vec2(idx * 0.137, idx * 0.173);
+  return worldXZ / (uHexRadius * scale) + vec2(idx * 0.137, idx * 0.173);
+}
+
+vec2 terrainMacroUv(float idx, vec2 tileUv, vec2 worldXZ) {
+  vec2 rawUv = terrainMacroRawUv(idx, worldXZ);
   // Mirror-repeat (triangle wave) instead of sawtooth fract() so non-periodic
   // atlas cells (especially desert dune bands) never stamp a hard 1→0 seam
   // across the middle of a hex.
@@ -342,6 +346,16 @@ vec2 terrainMacroUv(float idx, vec2 tileUv, vec2 worldXZ) {
   // continuous surface → push it almost fully to world-space UV.
   bool water = (idx > 3.5 && idx < 5.5);
   return mix(tileUv, worldUv, water ? 0.93 : 0.38);
+}
+
+// Per-axis sign of d(terrainMacroUv)/d(world). The mirror-repeat runs world UV
+// backward in every other cell. On land the 62% tile UV still dominates the
+// slope (0.30 vs at most 0.16 per hex radius), but water is 93% world UV, so
+// its mirrored cells really do flip, and a normal-map sample there must negate
+// its tangent X/Y or that cell's relief lights from the opposite side.
+vec2 terrainMacroUvSign(float idx, vec2 worldXZ) {
+  if (!(idx > 3.5 && idx < 5.5)) return vec2(1.0);
+  return 1.0 - 2.0 * step(0.5, fract(terrainMacroRawUv(idx, worldXZ) * 0.5));
 }
 
 float terrainDetailNoise(vec2 p) {
@@ -710,6 +724,7 @@ vec3 prepTerrainTex(float idx, vec3 tex) {
           vec2 nmacroUv = terrainMacroUv(_ntidx, vUv, vWorldXZ);
           vec2 nauv  = terrainAtlasUv(_ntidx, nmacroUv);
           vec3 nTex  = texture2D(uNormalAtlas, nauv).rgb * 2.0 - 1.0;
+          nTex.xy *= terrainMacroUvSign(_ntidx, vWorldXZ);
           // Directional neighbor normal blend — same per-edge weights as the
           // albedo, so the relief agrees with the color on every edge.
           float _wSum = 0.0;
@@ -721,7 +736,9 @@ vec3 prepTerrainTex(float idx, vec3 tex) {
             float _w = smoothstep(0.58, 0.96, _edgeT);
             if (_w < 0.001) continue;
             vec2 _nnUv = terrainAtlasUv(_nIdx, terrainMacroUv(_nIdx, vUv, vWorldXZ));
-            _nAccum += _w * (texture2D(uNormalAtlas, _nnUv).rgb * 2.0 - 1.0);
+            vec3 _nn = texture2D(uNormalAtlas, _nnUv).rgb * 2.0 - 1.0;
+            _nn.xy *= terrainMacroUvSign(_nIdx, vWorldXZ);
+            _nAccum += _w * _nn;
             _wSum += _w;
           }
           if (_wSum > 0.001) {
@@ -741,7 +758,7 @@ vec3 prepTerrainTex(float idx, vec3 tex) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v45';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v46';
   // Terrain MUST receive the scene FogExp2: the ground plane and sky dome
   // fade into SKY_HORIZON at distance, so terrain that opted out (the old
   // `mat.fog = false`) popped against the haze instead of dissolving into it.

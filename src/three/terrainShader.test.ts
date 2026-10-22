@@ -23,7 +23,7 @@ describe('terrainShader', () => {
   it('exposes a versioned customProgramCacheKey', () => {
     const mat = createTerrainMaterial();
     // Bumping the version in terrainShader.ts must update this.
-    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v45');
+    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v46');
   });
 
   it('produces a stable fragment shader from onBeforeCompile', () => {
@@ -48,6 +48,9 @@ describe('terrainShader', () => {
     // vTerrainIndex, vWorldXZ, etc.) change as we add biomes.
     expect(capture.fragment).toMatch(/vec2 terrainAtlasUv\(float idx, vec2 tileUv\)/);
     expect(capture.fragment).toMatch(/vec2 terrainMacroUv\(/);
+    // Mirrored water cells flip the normal map's tangent X/Y with the UV.
+    expect(capture.fragment).toContain('nTex.xy *= terrainMacroUvSign(_ntidx, vWorldXZ);');
+    expect(capture.fragment).toContain('_nn.xy *= terrainMacroUvSign(_nIdx, vWorldXZ);');
     // Snapshot for byte-level stability across the chunk-replace chain.
     expect(capture.fragment).toMatchSnapshot();
   });
