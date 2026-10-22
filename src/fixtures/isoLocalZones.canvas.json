@@ -1,0 +1,1621 @@
+[
+  {
+    "name": "missing zones",
+    "kind": "zones",
+    "state": {
+      "tokens": {},
+      "zonePaintMode": null,
+      "zonePaintStart": null,
+      "zonePaintCurrent": null
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": []
+  },
+  {
+    "name": "empty zones",
+    "kind": "zones",
+    "zones": [],
+    "state": {
+      "tokens": {},
+      "zonePaintMode": null,
+      "zonePaintStart": null,
+      "zonePaintCurrent": null
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": []
+  },
+  {
+    "name": "empty zone tiles",
+    "kind": "zones",
+    "zones": [
+      {
+        "type": "stockpile",
+        "tiles": []
+      }
+    ],
+    "state": {
+      "tokens": {},
+      "zonePaintMode": null,
+      "zonePaintStart": null,
+      "zonePaintCurrent": null
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [["save"], ["set", "globalAlpha", 0.2], ["restore"]]
+  },
+  {
+    "name": "zone stockpile",
+    "kind": "zones",
+    "zones": [
+      {
+        "type": "stockpile",
+        "tiles": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 2,
+            "y": 2
+          },
+          {
+            "x": 3,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 0
+          }
+        ]
+      }
+    ],
+    "state": {
+      "tokens": {},
+      "zonePaintMode": null,
+      "zonePaintStart": null,
+      "zonePaintCurrent": null
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.2],
+      ["set", "fillStyle", "#8B5A2B"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#8B5A2B"],
+      ["beginPath"],
+      ["moveTo", 0, 48],
+      ["lineTo", 32, 64],
+      ["lineTo", 0, 80],
+      ["lineTo", -32, 64],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#8B5A2B"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [5, 5]],
+      ["beginPath"],
+      ["moveTo", -32, -32],
+      ["lineTo", 0, -16],
+      ["lineTo", 32, 96],
+      ["lineTo", 0, 80],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#8B5A2B"],
+      ["set", "font", "bold 9px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["fillText", "STOCKPILE", -32, -36]
+    ]
+  },
+  {
+    "name": "zone growing",
+    "kind": "zones",
+    "zones": [
+      {
+        "type": "growing",
+        "tiles": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 2,
+            "y": 2
+          },
+          {
+            "x": 3,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 0
+          }
+        ]
+      }
+    ],
+    "state": {
+      "tokens": {},
+      "zonePaintMode": null,
+      "zonePaintStart": null,
+      "zonePaintCurrent": null
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.2],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["beginPath"],
+      ["moveTo", 0, 48],
+      ["lineTo", 32, 64],
+      ["lineTo", 0, 80],
+      ["lineTo", -32, 64],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#4A7C2E"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [5, 5]],
+      ["beginPath"],
+      ["moveTo", -32, -32],
+      ["lineTo", 0, -16],
+      ["lineTo", 32, 96],
+      ["lineTo", 0, 80],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["set", "font", "bold 9px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["fillText", "GROWING", -32, -36]
+    ]
+  },
+  {
+    "name": "zone recreation",
+    "kind": "zones",
+    "zones": [
+      {
+        "type": "recreation",
+        "tiles": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 2,
+            "y": 2
+          },
+          {
+            "x": 3,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 0
+          }
+        ]
+      }
+    ],
+    "state": {
+      "tokens": {},
+      "zonePaintMode": null,
+      "zonePaintStart": null,
+      "zonePaintCurrent": null
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.2],
+      ["set", "fillStyle", "#D4A537"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#D4A537"],
+      ["beginPath"],
+      ["moveTo", 0, 48],
+      ["lineTo", 32, 64],
+      ["lineTo", 0, 80],
+      ["lineTo", -32, 64],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#D4A537"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [5, 5]],
+      ["beginPath"],
+      ["moveTo", -32, -32],
+      ["lineTo", 0, -16],
+      ["lineTo", 32, 96],
+      ["lineTo", 0, 80],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#D4A537"],
+      ["set", "font", "bold 9px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["fillText", "RECREATION", -32, -36]
+    ]
+  },
+  {
+    "name": "zone bedroom",
+    "kind": "zones",
+    "zones": [
+      {
+        "type": "bedroom",
+        "tiles": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 2,
+            "y": 2
+          },
+          {
+            "x": 3,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 0
+          }
+        ]
+      }
+    ],
+    "state": {
+      "tokens": {},
+      "zonePaintMode": null,
+      "zonePaintStart": null,
+      "zonePaintCurrent": null
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.2],
+      ["set", "fillStyle", "#6B4F8A"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#6B4F8A"],
+      ["beginPath"],
+      ["moveTo", 0, 48],
+      ["lineTo", 32, 64],
+      ["lineTo", 0, 80],
+      ["lineTo", -32, 64],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#6B4F8A"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [5, 5]],
+      ["beginPath"],
+      ["moveTo", -32, -32],
+      ["lineTo", 0, -16],
+      ["lineTo", 32, 96],
+      ["lineTo", 0, 80],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#6B4F8A"],
+      ["set", "font", "bold 9px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["fillText", "BEDROOM", -32, -36]
+    ]
+  },
+  {
+    "name": "zone dining",
+    "kind": "zones",
+    "zones": [
+      {
+        "type": "dining",
+        "tiles": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 2,
+            "y": 2
+          },
+          {
+            "x": 3,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 0
+          }
+        ]
+      }
+    ],
+    "state": {
+      "tokens": {},
+      "zonePaintMode": null,
+      "zonePaintStart": null,
+      "zonePaintCurrent": null
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.2],
+      ["set", "fillStyle", "#C46B3B"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#C46B3B"],
+      ["beginPath"],
+      ["moveTo", 0, 48],
+      ["lineTo", 32, 64],
+      ["lineTo", 0, 80],
+      ["lineTo", -32, 64],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#C46B3B"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [5, 5]],
+      ["beginPath"],
+      ["moveTo", -32, -32],
+      ["lineTo", 0, -16],
+      ["lineTo", 32, 96],
+      ["lineTo", 0, 80],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#C46B3B"],
+      ["set", "font", "bold 9px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["fillText", "DINING", -32, -36]
+    ]
+  },
+  {
+    "name": "zone hospital",
+    "kind": "zones",
+    "zones": [
+      {
+        "type": "hospital",
+        "tiles": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 2,
+            "y": 2
+          },
+          {
+            "x": 3,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 0
+          }
+        ]
+      }
+    ],
+    "state": {
+      "tokens": {},
+      "zonePaintMode": null,
+      "zonePaintStart": null,
+      "zonePaintCurrent": null
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.2],
+      ["set", "fillStyle", "#C0392B"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#C0392B"],
+      ["beginPath"],
+      ["moveTo", 0, 48],
+      ["lineTo", 32, 64],
+      ["lineTo", 0, 80],
+      ["lineTo", -32, 64],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#C0392B"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [5, 5]],
+      ["beginPath"],
+      ["moveTo", -32, -32],
+      ["lineTo", 0, -16],
+      ["lineTo", 32, 96],
+      ["lineTo", 0, 80],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#C0392B"],
+      ["set", "font", "bold 9px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["fillText", "HOSPITAL", -32, -36]
+    ]
+  },
+  {
+    "name": "zone unknown",
+    "kind": "zones",
+    "zones": [
+      {
+        "type": "unknown",
+        "tiles": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 2,
+            "y": 2
+          },
+          {
+            "x": 3,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 0
+          }
+        ]
+      }
+    ],
+    "state": {
+      "tokens": {},
+      "zonePaintMode": null,
+      "zonePaintStart": null,
+      "zonePaintCurrent": null
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.2],
+      ["set", "fillStyle", "#888"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#888"],
+      ["beginPath"],
+      ["moveTo", 0, 48],
+      ["lineTo", 32, 64],
+      ["lineTo", 0, 80],
+      ["lineTo", -32, 64],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#888"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [5, 5]],
+      ["beginPath"],
+      ["moveTo", -32, -32],
+      ["lineTo", 0, -16],
+      ["lineTo", 32, 96],
+      ["lineTo", 0, 80],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#888"],
+      ["set", "font", "bold 9px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["fillText", "UNKNOWN", -32, -36]
+    ]
+  },
+  {
+    "name": "multiple zones and custom font",
+    "kind": "zones",
+    "zones": [
+      {
+        "type": "bedroom",
+        "tiles": [
+          {
+            "x": 1,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "type": "dining",
+        "tiles": [
+          {
+            "x": 2,
+            "y": 1
+          }
+        ]
+      }
+    ],
+    "state": {
+      "tokens": {
+        "fontMono": "Test Mono"
+      },
+      "zonePaintMode": null,
+      "zonePaintStart": null,
+      "zonePaintCurrent": null
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.2],
+      ["set", "fillStyle", "#6B4F8A"],
+      ["beginPath"],
+      ["moveTo", 32, 0],
+      ["lineTo", 64, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 16],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#6B4F8A"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [5, 5]],
+      ["beginPath"],
+      ["moveTo", 32, 0],
+      ["lineTo", 64, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 16],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#6B4F8A"],
+      ["set", "font", "bold 9px Test Mono"],
+      ["set", "textAlign", "left"],
+      ["fillText", "BEDROOM", 32, -4],
+      ["save"],
+      ["set", "globalAlpha", 0.2],
+      ["set", "fillStyle", "#C46B3B"],
+      ["beginPath"],
+      ["moveTo", 32, 32],
+      ["lineTo", 64, 48],
+      ["lineTo", 32, 64],
+      ["lineTo", 0, 48],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#C46B3B"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [5, 5]],
+      ["beginPath"],
+      ["moveTo", 32, 32],
+      ["lineTo", 64, 48],
+      ["lineTo", 32, 64],
+      ["lineTo", 0, 48],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#C46B3B"],
+      ["set", "font", "bold 9px Test Mono"],
+      ["set", "textAlign", "left"],
+      ["fillText", "DINING", 32, 28]
+    ]
+  },
+  {
+    "name": "offscreen zone still has border and label",
+    "kind": "zones",
+    "zones": [
+      {
+        "type": "growing",
+        "tiles": [
+          {
+            "x": 9,
+            "y": 9
+          }
+        ]
+      }
+    ],
+    "state": {
+      "tokens": {},
+      "zonePaintMode": null,
+      "zonePaintStart": null,
+      "zonePaintCurrent": null
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.2],
+      ["restore"],
+      ["set", "strokeStyle", "#4A7C2E"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [5, 5]],
+      ["beginPath"],
+      ["moveTo", 0, 272],
+      ["lineTo", 32, 288],
+      ["lineTo", 0, 304],
+      ["lineTo", -32, 288],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["set", "font", "bold 9px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["fillText", "GROWING", 0, 268]
+    ]
+  },
+  {
+    "name": "empty font is not replaced",
+    "kind": "zones",
+    "zones": [
+      {
+        "type": "hospital",
+        "tiles": [
+          {
+            "x": 0,
+            "y": 0
+          }
+        ]
+      }
+    ],
+    "state": {
+      "tokens": {
+        "fontMono": ""
+      },
+      "zonePaintMode": null,
+      "zonePaintStart": null,
+      "zonePaintCurrent": null
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.2],
+      ["set", "fillStyle", "#C0392B"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#C0392B"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [5, 5]],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#C0392B"],
+      ["set", "font", "bold 9px "],
+      ["set", "textAlign", "left"],
+      ["fillText", "HOSPITAL", 0, -20]
+    ]
+  },
+  {
+    "name": "missing paint start",
+    "kind": "preview",
+    "state": {
+      "tokens": {},
+      "zonePaintMode": null,
+      "zonePaintStart": null,
+      "zonePaintCurrent": {
+        "x": 1,
+        "y": 1
+      }
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": []
+  },
+  {
+    "name": "missing paint current",
+    "kind": "preview",
+    "state": {
+      "tokens": {},
+      "zonePaintMode": null,
+      "zonePaintStart": {
+        "x": 1,
+        "y": 1
+      },
+      "zonePaintCurrent": null
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": []
+  },
+  {
+    "name": "preview stockpile",
+    "kind": "preview",
+    "state": {
+      "tokens": {},
+      "zonePaintMode": "stockpile",
+      "zonePaintStart": {
+        "x": 0,
+        "y": 0
+      },
+      "zonePaintCurrent": {
+        "x": 1,
+        "y": 1
+      }
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.25],
+      ["set", "fillStyle", "#8B5A2B"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#8B5A2B"],
+      ["beginPath"],
+      ["moveTo", 32, 0],
+      ["lineTo", 64, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#8B5A2B"],
+      ["beginPath"],
+      ["moveTo", -32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 32],
+      ["lineTo", -64, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#8B5A2B"],
+      ["beginPath"],
+      ["moveTo", 0, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#8B5A2B"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [8, 4]],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#8B5A2B"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["fillText", "2×2 (4 tiles)", 0, -24]
+    ]
+  },
+  {
+    "name": "preview growing",
+    "kind": "preview",
+    "state": {
+      "tokens": {},
+      "zonePaintMode": "growing",
+      "zonePaintStart": {
+        "x": 0,
+        "y": 0
+      },
+      "zonePaintCurrent": {
+        "x": 1,
+        "y": 1
+      }
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.25],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["beginPath"],
+      ["moveTo", 32, 0],
+      ["lineTo", 64, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["beginPath"],
+      ["moveTo", -32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 32],
+      ["lineTo", -64, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["beginPath"],
+      ["moveTo", 0, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#4A7C2E"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [8, 4]],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["fillText", "2×2 (4 tiles)", 0, -24]
+    ]
+  },
+  {
+    "name": "preview recreation",
+    "kind": "preview",
+    "state": {
+      "tokens": {},
+      "zonePaintMode": "recreation",
+      "zonePaintStart": {
+        "x": 0,
+        "y": 0
+      },
+      "zonePaintCurrent": {
+        "x": 1,
+        "y": 1
+      }
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.25],
+      ["set", "fillStyle", "#D4A537"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#D4A537"],
+      ["beginPath"],
+      ["moveTo", 32, 0],
+      ["lineTo", 64, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#D4A537"],
+      ["beginPath"],
+      ["moveTo", -32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 32],
+      ["lineTo", -64, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#D4A537"],
+      ["beginPath"],
+      ["moveTo", 0, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#D4A537"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [8, 4]],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#D4A537"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["fillText", "2×2 (4 tiles)", 0, -24]
+    ]
+  },
+  {
+    "name": "preview bedroom",
+    "kind": "preview",
+    "state": {
+      "tokens": {},
+      "zonePaintMode": "bedroom",
+      "zonePaintStart": {
+        "x": 0,
+        "y": 0
+      },
+      "zonePaintCurrent": {
+        "x": 1,
+        "y": 1
+      }
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.25],
+      ["set", "fillStyle", "#6B4F8A"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#6B4F8A"],
+      ["beginPath"],
+      ["moveTo", 32, 0],
+      ["lineTo", 64, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#6B4F8A"],
+      ["beginPath"],
+      ["moveTo", -32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 32],
+      ["lineTo", -64, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#6B4F8A"],
+      ["beginPath"],
+      ["moveTo", 0, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#6B4F8A"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [8, 4]],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#6B4F8A"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["fillText", "2×2 (4 tiles)", 0, -24]
+    ]
+  },
+  {
+    "name": "preview dining",
+    "kind": "preview",
+    "state": {
+      "tokens": {},
+      "zonePaintMode": "dining",
+      "zonePaintStart": {
+        "x": 0,
+        "y": 0
+      },
+      "zonePaintCurrent": {
+        "x": 1,
+        "y": 1
+      }
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.25],
+      ["set", "fillStyle", "#C46B3B"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#C46B3B"],
+      ["beginPath"],
+      ["moveTo", 32, 0],
+      ["lineTo", 64, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#C46B3B"],
+      ["beginPath"],
+      ["moveTo", -32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 32],
+      ["lineTo", -64, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#C46B3B"],
+      ["beginPath"],
+      ["moveTo", 0, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#C46B3B"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [8, 4]],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#C46B3B"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["fillText", "2×2 (4 tiles)", 0, -24]
+    ]
+  },
+  {
+    "name": "preview hospital",
+    "kind": "preview",
+    "state": {
+      "tokens": {},
+      "zonePaintMode": "hospital",
+      "zonePaintStart": {
+        "x": 0,
+        "y": 0
+      },
+      "zonePaintCurrent": {
+        "x": 1,
+        "y": 1
+      }
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.25],
+      ["set", "fillStyle", "#C0392B"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#C0392B"],
+      ["beginPath"],
+      ["moveTo", 32, 0],
+      ["lineTo", 64, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#C0392B"],
+      ["beginPath"],
+      ["moveTo", -32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 32],
+      ["lineTo", -64, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#C0392B"],
+      ["beginPath"],
+      ["moveTo", 0, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#C0392B"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [8, 4]],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#C0392B"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["fillText", "2×2 (4 tiles)", 0, -24]
+    ]
+  },
+  {
+    "name": "preview unknown",
+    "kind": "preview",
+    "state": {
+      "tokens": {},
+      "zonePaintMode": "unknown",
+      "zonePaintStart": {
+        "x": 0,
+        "y": 0
+      },
+      "zonePaintCurrent": {
+        "x": 1,
+        "y": 1
+      }
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.25],
+      ["set", "fillStyle", "#888"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#888"],
+      ["beginPath"],
+      ["moveTo", 32, 0],
+      ["lineTo", 64, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#888"],
+      ["beginPath"],
+      ["moveTo", -32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 32],
+      ["lineTo", -64, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#888"],
+      ["beginPath"],
+      ["moveTo", 0, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#888"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [8, 4]],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#888"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["fillText", "2×2 (4 tiles)", 0, -24]
+    ]
+  },
+  {
+    "name": "preview null",
+    "kind": "preview",
+    "state": {
+      "tokens": {},
+      "zonePaintMode": null,
+      "zonePaintStart": {
+        "x": 0,
+        "y": 0
+      },
+      "zonePaintCurrent": {
+        "x": 1,
+        "y": 1
+      }
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.25],
+      ["set", "fillStyle", "#8B5A2B"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#8B5A2B"],
+      ["beginPath"],
+      ["moveTo", 32, 0],
+      ["lineTo", 64, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#8B5A2B"],
+      ["beginPath"],
+      ["moveTo", -32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 32],
+      ["lineTo", -64, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#8B5A2B"],
+      ["beginPath"],
+      ["moveTo", 0, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#8B5A2B"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [8, 4]],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#8B5A2B"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["fillText", "2×2 (4 tiles)", 0, -24]
+    ]
+  },
+  {
+    "name": "reverse drag with clipping",
+    "kind": "preview",
+    "state": {
+      "tokens": {
+        "fontMono": "Custom Mono"
+      },
+      "zonePaintMode": "growing",
+      "zonePaintStart": {
+        "x": 3,
+        "y": 3
+      },
+      "zonePaintCurrent": {
+        "x": -1,
+        "y": -1
+      }
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.25],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 0],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["beginPath"],
+      ["moveTo", 32, 0],
+      ["lineTo", 64, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["beginPath"],
+      ["moveTo", 64, 16],
+      ["lineTo", 96, 32],
+      ["lineTo", 64, 48],
+      ["lineTo", 32, 32],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["beginPath"],
+      ["moveTo", -32, 0],
+      ["lineTo", 0, 16],
+      ["lineTo", -32, 32],
+      ["lineTo", -64, 16],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["beginPath"],
+      ["moveTo", 0, 16],
+      ["lineTo", 32, 32],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 32],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["beginPath"],
+      ["moveTo", 32, 32],
+      ["lineTo", 64, 48],
+      ["lineTo", 32, 64],
+      ["lineTo", 0, 48],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["beginPath"],
+      ["moveTo", -64, 16],
+      ["lineTo", -32, 32],
+      ["lineTo", -64, 48],
+      ["lineTo", -96, 32],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["beginPath"],
+      ["moveTo", -32, 32],
+      ["lineTo", 0, 48],
+      ["lineTo", -32, 64],
+      ["lineTo", -64, 48],
+      ["closePath"],
+      ["fill"],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["beginPath"],
+      ["moveTo", 0, 48],
+      ["lineTo", 32, 64],
+      ["lineTo", 0, 80],
+      ["lineTo", -32, 64],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#4A7C2E"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [8, 4]],
+      ["beginPath"],
+      ["moveTo", 0, -48],
+      ["lineTo", 32, -32],
+      ["lineTo", 0, 112],
+      ["lineTo", -32, 96],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#4A7C2E"],
+      ["set", "font", "bold 10px Custom Mono"],
+      ["set", "textAlign", "center"],
+      ["fillText", "5×5 (25 tiles)", 0, -56]
+    ]
+  },
+  {
+    "name": "single tile inclusive boundary",
+    "kind": "preview",
+    "state": {
+      "tokens": {},
+      "zonePaintMode": "bedroom",
+      "zonePaintStart": {
+        "x": 2,
+        "y": 2
+      },
+      "zonePaintCurrent": {
+        "x": 2,
+        "y": 2
+      }
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.25],
+      ["set", "fillStyle", "#6B4F8A"],
+      ["beginPath"],
+      ["moveTo", 0, 48],
+      ["lineTo", 32, 64],
+      ["lineTo", 0, 80],
+      ["lineTo", -32, 64],
+      ["closePath"],
+      ["fill"],
+      ["restore"],
+      ["set", "strokeStyle", "#6B4F8A"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [8, 4]],
+      ["beginPath"],
+      ["moveTo", 0, 48],
+      ["lineTo", 32, 64],
+      ["lineTo", 0, 80],
+      ["lineTo", -32, 64],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#6B4F8A"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["fillText", "1×1 (1 tiles)", 0, 40]
+    ]
+  },
+  {
+    "name": "fully offscreen preview still has border label",
+    "kind": "preview",
+    "state": {
+      "tokens": {},
+      "zonePaintMode": null,
+      "zonePaintStart": {
+        "x": 8,
+        "y": 8
+      },
+      "zonePaintCurrent": {
+        "x": 9,
+        "y": 9
+      }
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.25],
+      ["restore"],
+      ["set", "strokeStyle", "#8B5A2B"],
+      ["set", "lineWidth", 2],
+      ["setLineDash", [8, 4]],
+      ["beginPath"],
+      ["moveTo", 0, 240],
+      ["lineTo", 32, 256],
+      ["lineTo", 0, 304],
+      ["lineTo", -32, 288],
+      ["closePath"],
+      ["stroke"],
+      ["setLineDash", []],
+      ["set", "fillStyle", "#8B5A2B"],
+      ["set", "font", "bold 10px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["fillText", "2×2 (4 tiles)", 0, 232]
+    ]
+  }
+]

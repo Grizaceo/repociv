@@ -1,0 +1,1143 @@
+[
+  {
+    "name": "missing grid",
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": []
+  },
+  {
+    "name": "empty grid",
+    "grid": {
+      "conduits": [],
+      "sources": [],
+      "consumers": [],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [["save"], ["set", "globalAlpha", 0.6], ["restore"]]
+  },
+  {
+    "name": "conduit parsing and clipping",
+    "grid": {
+      "conduits": [
+        "0,0",
+        "2,2",
+        "3,1",
+        "-1,0",
+        "1,3",
+        "1,-1",
+        "bad",
+        "NaN,0",
+        "0,Infinity",
+        "x,1",
+        "1,x"
+      ],
+      "sources": [],
+      "consumers": [],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.8)"],
+      ["set", "lineWidth", 2],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 0, 16],
+      ["moveTo", -32, 0],
+      ["lineTo", 32, 0],
+      ["stroke"],
+      ["set", "fillStyle", "rgba(245, 158, 11, 0.9)"],
+      ["beginPath"],
+      ["arc", 0, 0, 3, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.8)"],
+      ["set", "lineWidth", 2],
+      ["beginPath"],
+      ["moveTo", 0, 48],
+      ["lineTo", 0, 80],
+      ["moveTo", -32, 64],
+      ["lineTo", 32, 64],
+      ["stroke"],
+      ["set", "fillStyle", "rgba(245, 158, 11, 0.9)"],
+      ["beginPath"],
+      ["arc", 0, 64, 3, 0, 6.283185307179586],
+      ["fill"],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "existing numeric parsing quirks",
+    "grid": {
+      "conduits": [",", " 1 , 2 ", "1,1,extra", "1e0,0", "0.5,1.25", "0,0", "0,0"],
+      "sources": [],
+      "consumers": [],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.8)"],
+      ["set", "lineWidth", 2],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 0, 16],
+      ["moveTo", -32, 0],
+      ["lineTo", 32, 0],
+      ["stroke"],
+      ["set", "fillStyle", "rgba(245, 158, 11, 0.9)"],
+      ["beginPath"],
+      ["arc", 0, 0, 3, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.8)"],
+      ["set", "lineWidth", 2],
+      ["beginPath"],
+      ["moveTo", -32, 32],
+      ["lineTo", -32, 64],
+      ["moveTo", -64, 48],
+      ["lineTo", 0, 48],
+      ["stroke"],
+      ["set", "fillStyle", "rgba(245, 158, 11, 0.9)"],
+      ["beginPath"],
+      ["arc", -32, 48, 3, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.8)"],
+      ["set", "lineWidth", 2],
+      ["beginPath"],
+      ["moveTo", 0, 16],
+      ["lineTo", 0, 48],
+      ["moveTo", -32, 32],
+      ["lineTo", 32, 32],
+      ["stroke"],
+      ["set", "fillStyle", "rgba(245, 158, 11, 0.9)"],
+      ["beginPath"],
+      ["arc", 0, 32, 3, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.8)"],
+      ["set", "lineWidth", 2],
+      ["beginPath"],
+      ["moveTo", 32, 0],
+      ["lineTo", 32, 32],
+      ["moveTo", 0, 16],
+      ["lineTo", 64, 16],
+      ["stroke"],
+      ["set", "fillStyle", "rgba(245, 158, 11, 0.9)"],
+      ["beginPath"],
+      ["arc", 32, 16, 3, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.8)"],
+      ["set", "lineWidth", 2],
+      ["beginPath"],
+      ["moveTo", -24, 12],
+      ["lineTo", -24, 44],
+      ["moveTo", -56, 28],
+      ["lineTo", 8, 28],
+      ["stroke"],
+      ["set", "fillStyle", "rgba(245, 158, 11, 0.9)"],
+      ["beginPath"],
+      ["arc", -24, 28, 3, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.8)"],
+      ["set", "lineWidth", 2],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 0, 16],
+      ["moveTo", -32, 0],
+      ["lineTo", 32, 0],
+      ["stroke"],
+      ["set", "fillStyle", "rgba(245, 158, 11, 0.9)"],
+      ["beginPath"],
+      ["arc", 0, 0, 3, 0, 6.283185307179586],
+      ["fill"],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "negative viewport conduit boundary",
+    "grid": {
+      "conduits": ["-2,-1", "0,0", "-3,-1", "1,0"],
+      "sources": [],
+      "consumers": [],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": -2,
+      "y0": -1,
+      "x1": 0,
+      "y1": 0
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.8)"],
+      ["set", "lineWidth", 2],
+      ["beginPath"],
+      ["moveTo", -32, -64],
+      ["lineTo", -32, -32],
+      ["moveTo", -64, -48],
+      ["lineTo", 0, -48],
+      ["stroke"],
+      ["set", "fillStyle", "rgba(245, 158, 11, 0.9)"],
+      ["beginPath"],
+      ["arc", -32, -48, 3, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.8)"],
+      ["set", "lineWidth", 2],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 0, 16],
+      ["moveTo", -32, 0],
+      ["lineTo", 32, 0],
+      ["stroke"],
+      ["set", "fillStyle", "rgba(245, 158, 11, 0.9)"],
+      ["beginPath"],
+      ["arc", 0, 0, 3, 0, 6.283185307179586],
+      ["fill"],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "one animated source at zero",
+    "grid": {
+      "conduits": [],
+      "sources": [
+        {
+          "id": "s0,0",
+          "tileX": 0,
+          "tileY": 0,
+          "type": "generator",
+          "outputWatts": 100
+        }
+      ],
+      "consumers": [],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [0],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["now", 0],
+      ["createRadialGradient", 0, 0, 0, 0, 0, 0, 37],
+      ["addColorStop", 0, 0, "rgba(245, 158, 11, 0.2)"],
+      ["addColorStop", 0, 1, "rgba(245, 158, 11, 0)"],
+      [
+        "set",
+        "fillStyle",
+        {
+          "gradient": 0
+        }
+      ],
+      ["fillRect", -37, -37, 74, 74],
+      ["set", "fillStyle", "#F59E0B"],
+      ["set", "font", "bold 9px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["fillText", "100W", 0, -8],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "source samples time for each visible source",
+    "grid": {
+      "conduits": [],
+      "sources": [
+        {
+          "id": "s0,0",
+          "tileX": 0,
+          "tileY": 0,
+          "type": "generator",
+          "outputWatts": 100
+        },
+        {
+          "id": "s2,2",
+          "tileX": 2,
+          "tileY": 2,
+          "type": "generator",
+          "outputWatts": 250
+        },
+        {
+          "id": "s1,1",
+          "tileX": 1,
+          "tileY": 1,
+          "type": "generator",
+          "outputWatts": 0
+        }
+      ],
+      "consumers": [],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [0, 250, 1000],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["now", 0],
+      ["createRadialGradient", 0, 0, 0, 0, 0, 0, 37],
+      ["addColorStop", 0, 0, "rgba(245, 158, 11, 0.2)"],
+      ["addColorStop", 0, 1, "rgba(245, 158, 11, 0)"],
+      [
+        "set",
+        "fillStyle",
+        {
+          "gradient": 0
+        }
+      ],
+      ["fillRect", -37, -37, 74, 74],
+      ["set", "fillStyle", "#F59E0B"],
+      ["set", "font", "bold 9px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["fillText", "100W", 0, -8],
+      ["now", 250],
+      ["createRadialGradient", 1, 0, 64, 0, 0, 64, 39.39712769302101],
+      ["addColorStop", 1, 0, "rgba(245, 158, 11, 0.2958851077208406)"],
+      ["addColorStop", 1, 1, "rgba(245, 158, 11, 0)"],
+      [
+        "set",
+        "fillStyle",
+        {
+          "gradient": 1
+        }
+      ],
+      ["fillRect", -39.39712769302101, 24.602872306978988, 78.79425538604202, 78.79425538604202],
+      ["set", "fillStyle", "#F59E0B"],
+      ["set", "font", "bold 9px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["fillText", "250W", 0, 56],
+      ["now", 1000],
+      ["createRadialGradient", 2, 0, 32, 0, 0, 32, 41.54648713412841],
+      ["addColorStop", 2, 0, "rgba(245, 158, 11, 0.38185948536513636)"],
+      ["addColorStop", 2, 1, "rgba(245, 158, 11, 0)"],
+      [
+        "set",
+        "fillStyle",
+        {
+          "gradient": 2
+        }
+      ],
+      ["fillRect", -41.54648713412841, -9.546487134128412, 83.09297426825682, 83.09297426825682],
+      ["set", "fillStyle", "#F59E0B"],
+      ["set", "font", "bold 9px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["fillText", "0W", 0, 24],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "sources clipped on every side",
+    "grid": {
+      "conduits": [],
+      "sources": [
+        {
+          "id": "s-1,0",
+          "tileX": -1,
+          "tileY": 0,
+          "type": "generator",
+          "outputWatts": 100
+        },
+        {
+          "id": "s3,1",
+          "tileX": 3,
+          "tileY": 1,
+          "type": "generator",
+          "outputWatts": 100
+        },
+        {
+          "id": "s1,-1",
+          "tileX": 1,
+          "tileY": -1,
+          "type": "generator",
+          "outputWatts": 100
+        },
+        {
+          "id": "s1,3",
+          "tileX": 1,
+          "tileY": 3,
+          "type": "generator",
+          "outputWatts": 100
+        }
+      ],
+      "consumers": [],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [["save"], ["set", "globalAlpha", 0.6], ["restore"]]
+  },
+  {
+    "name": "custom font and advanced phase",
+    "grid": {
+      "conduits": [],
+      "sources": [
+        {
+          "id": "s1,1",
+          "tileX": 1,
+          "tileY": 1,
+          "type": "generator",
+          "outputWatts": 450
+        }
+      ],
+      "consumers": [],
+      "generatedWatts": 450,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [2345],
+    "tokens": {
+      "fontMono": "Power Mono"
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["now", 2345],
+      ["createRadialGradient", 0, 0, 32, 0, 0, 32, 32.00125311376003],
+      ["addColorStop", 0, 0, "rgba(245, 158, 11, 0.000050124550401209333)"],
+      ["addColorStop", 0, 1, "rgba(245, 158, 11, 0)"],
+      [
+        "set",
+        "fillStyle",
+        {
+          "gradient": 0
+        }
+      ],
+      [
+        "fillRect",
+        -32.00125311376003,
+        -0.0012531137600291231,
+        64.00250622752006,
+        64.00250622752006
+      ],
+      ["set", "fillStyle", "#F59E0B"],
+      ["set", "font", "bold 9px Power Mono"],
+      ["set", "textAlign", "center"],
+      ["fillText", "450W", 0, 24],
+      ["set", "fillStyle", "rgba(13, 13, 20, 0.9)"],
+      ["fillRect", -5, -79, 160, 50],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.5)"],
+      ["strokeRect", -5, -79, 160, 50],
+      ["set", "fillStyle", "#22C55E"],
+      ["set", "font", "11px Power Mono"],
+      ["set", "textAlign", "left"],
+      ["fillText", "⚡ Gen: 450W", 0, -64],
+      ["set", "fillStyle", "#EF4444"],
+      ["fillText", "🔌 Con: 0W", 0, -48],
+      ["set", "fillStyle", "#6B7280"],
+      ["fillText", "🔋 Bat: 0W", 0, -32],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "explicit empty font",
+    "grid": {
+      "conduits": [],
+      "sources": [
+        {
+          "id": "s0,0",
+          "tileX": 0,
+          "tileY": 0,
+          "type": "generator",
+          "outputWatts": 100
+        }
+      ],
+      "consumers": [],
+      "generatedWatts": 100,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [500],
+    "tokens": {
+      "fontMono": ""
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["now", 500],
+      ["createRadialGradient", 0, 0, 0, 0, 0, 0, 41.20735492403948],
+      ["addColorStop", 0, 0, "rgba(245, 158, 11, 0.36829419696157933)"],
+      ["addColorStop", 0, 1, "rgba(245, 158, 11, 0)"],
+      [
+        "set",
+        "fillStyle",
+        {
+          "gradient": 0
+        }
+      ],
+      ["fillRect", -41.20735492403948, -41.20735492403948, 82.41470984807896, 82.41470984807896],
+      ["set", "fillStyle", "#F59E0B"],
+      ["set", "font", "bold 9px "],
+      ["set", "textAlign", "center"],
+      ["fillText", "100W", 0, -8],
+      ["set", "fillStyle", "rgba(13, 13, 20, 0.9)"],
+      ["fillRect", -5, -79, 160, 50],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.5)"],
+      ["strokeRect", -5, -79, 160, 50],
+      ["set", "fillStyle", "#22C55E"],
+      ["set", "font", "11px "],
+      ["set", "textAlign", "left"],
+      ["fillText", "⚡ Gen: 100W", 0, -64],
+      ["set", "fillStyle", "#EF4444"],
+      ["fillText", "🔌 Con: 0W", 0, -48],
+      ["set", "fillStyle", "#6B7280"],
+      ["fillText", "🔋 Bat: 0W", 0, -32],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "consumer load -20",
+    "grid": {
+      "conduits": [],
+      "sources": [],
+      "consumers": [
+        {
+          "id": "c2,2",
+          "tileX": 2,
+          "tileY": 2,
+          "watts": -20,
+          "required": true,
+          "roomId": null
+        }
+      ],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.7)"],
+      ["fillRect", -19.2, 84, 38.4, 3],
+      ["set", "fillStyle", "#22C55E"],
+      ["fillRect", -19.2, 84, -3.84, 3],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "consumer load 0",
+    "grid": {
+      "conduits": [],
+      "sources": [],
+      "consumers": [
+        {
+          "id": "c2,2",
+          "tileX": 2,
+          "tileY": 2,
+          "watts": 0,
+          "required": true,
+          "roomId": null
+        }
+      ],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.7)"],
+      ["fillRect", -19.2, 84, 38.4, 3],
+      ["set", "fillStyle", "#22C55E"],
+      ["fillRect", -19.2, 84, 0, 3],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "consumer load 100",
+    "grid": {
+      "conduits": [],
+      "sources": [],
+      "consumers": [
+        {
+          "id": "c2,2",
+          "tileX": 2,
+          "tileY": 2,
+          "watts": 100,
+          "required": true,
+          "roomId": null
+        }
+      ],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.7)"],
+      ["fillRect", -19.2, 84, 38.4, 3],
+      ["set", "fillStyle", "#22C55E"],
+      ["fillRect", -19.2, 84, 19.2, 3],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "consumer load 101",
+    "grid": {
+      "conduits": [],
+      "sources": [],
+      "consumers": [
+        {
+          "id": "c2,2",
+          "tileX": 2,
+          "tileY": 2,
+          "watts": 101,
+          "required": true,
+          "roomId": null
+        }
+      ],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.7)"],
+      ["fillRect", -19.2, 84, 38.4, 3],
+      ["set", "fillStyle", "#F59E0B"],
+      ["fillRect", -19.2, 84, 19.392, 3],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "consumer load 160",
+    "grid": {
+      "conduits": [],
+      "sources": [],
+      "consumers": [
+        {
+          "id": "c2,2",
+          "tileX": 2,
+          "tileY": 2,
+          "watts": 160,
+          "required": true,
+          "roomId": null
+        }
+      ],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.7)"],
+      ["fillRect", -19.2, 84, 38.4, 3],
+      ["set", "fillStyle", "#F59E0B"],
+      ["fillRect", -19.2, 84, 30.72, 3],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "consumer load 161",
+    "grid": {
+      "conduits": [],
+      "sources": [],
+      "consumers": [
+        {
+          "id": "c2,2",
+          "tileX": 2,
+          "tileY": 2,
+          "watts": 161,
+          "required": true,
+          "roomId": null
+        }
+      ],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.7)"],
+      ["fillRect", -19.2, 84, 38.4, 3],
+      ["set", "fillStyle", "#EF4444"],
+      ["fillRect", -19.2, 84, 30.912, 3],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "consumer load 200",
+    "grid": {
+      "conduits": [],
+      "sources": [],
+      "consumers": [
+        {
+          "id": "c2,2",
+          "tileX": 2,
+          "tileY": 2,
+          "watts": 200,
+          "required": true,
+          "roomId": null
+        }
+      ],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.7)"],
+      ["fillRect", -19.2, 84, 38.4, 3],
+      ["set", "fillStyle", "#EF4444"],
+      ["fillRect", -19.2, 84, 38.4, 3],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "consumer load 250",
+    "grid": {
+      "conduits": [],
+      "sources": [],
+      "consumers": [
+        {
+          "id": "c2,2",
+          "tileX": 2,
+          "tileY": 2,
+          "watts": 250,
+          "required": true,
+          "roomId": null
+        }
+      ],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.7)"],
+      ["fillRect", -19.2, 84, 38.4, 3],
+      ["set", "fillStyle", "#EF4444"],
+      ["fillRect", -19.2, 84, 38.4, 3],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "consumers clipped on every side",
+    "grid": {
+      "conduits": [],
+      "sources": [],
+      "consumers": [
+        {
+          "id": "c-1,0",
+          "tileX": -1,
+          "tileY": 0,
+          "watts": 100,
+          "required": true,
+          "roomId": null
+        },
+        {
+          "id": "c3,1",
+          "tileX": 3,
+          "tileY": 1,
+          "watts": 100,
+          "required": true,
+          "roomId": null
+        },
+        {
+          "id": "c1,-1",
+          "tileX": 1,
+          "tileY": -1,
+          "watts": 100,
+          "required": true,
+          "roomId": null
+        },
+        {
+          "id": "c1,3",
+          "tileX": 1,
+          "tileY": 3,
+          "watts": 100,
+          "required": true,
+          "roomId": null
+        }
+      ],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [["save"], ["set", "globalAlpha", 0.6], ["restore"]]
+  },
+  {
+    "name": "generation stats no battery",
+    "grid": {
+      "conduits": [],
+      "sources": [],
+      "consumers": [],
+      "generatedWatts": 100,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["set", "fillStyle", "rgba(13, 13, 20, 0.9)"],
+      ["fillRect", -5, -79, 160, 50],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.5)"],
+      ["strokeRect", -5, -79, 160, 50],
+      ["set", "fillStyle", "#22C55E"],
+      ["set", "font", "11px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["fillText", "⚡ Gen: 100W", 0, -64],
+      ["set", "fillStyle", "#EF4444"],
+      ["fillText", "🔌 Con: 0W", 0, -48],
+      ["set", "fillStyle", "#6B7280"],
+      ["fillText", "🔋 Bat: 0W", 0, -32],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "consumption stats positive battery",
+    "grid": {
+      "conduits": [],
+      "sources": [],
+      "consumers": [],
+      "generatedWatts": 0,
+      "consumedWatts": 200,
+      "storedWatts": 50
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["set", "fillStyle", "rgba(13, 13, 20, 0.9)"],
+      ["fillRect", -5, -79, 160, 50],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.5)"],
+      ["strokeRect", -5, -79, 160, 50],
+      ["set", "fillStyle", "#22C55E"],
+      ["set", "font", "11px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["fillText", "⚡ Gen: 0W", 0, -64],
+      ["set", "fillStyle", "#EF4444"],
+      ["fillText", "🔌 Con: 200W", 0, -48],
+      ["set", "fillStyle", "#3B82F6"],
+      ["fillText", "🔋 Bat: 50W", 0, -32],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "stats negative battery",
+    "grid": {
+      "conduits": [],
+      "sources": [],
+      "consumers": [],
+      "generatedWatts": 1,
+      "consumedWatts": 0,
+      "storedWatts": -5
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["set", "fillStyle", "rgba(13, 13, 20, 0.9)"],
+      ["fillRect", -5, -79, 160, 50],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.5)"],
+      ["strokeRect", -5, -79, 160, 50],
+      ["set", "fillStyle", "#22C55E"],
+      ["set", "font", "11px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "left"],
+      ["fillText", "⚡ Gen: 1W", 0, -64],
+      ["set", "fillStyle", "#EF4444"],
+      ["fillText", "🔌 Con: 0W", 0, -48],
+      ["set", "fillStyle", "#6B7280"],
+      ["fillText", "🔋 Bat: -5W", 0, -32],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "battery alone does not show stats",
+    "grid": {
+      "conduits": [],
+      "sources": [],
+      "consumers": [],
+      "generatedWatts": 0,
+      "consumedWatts": 0,
+      "storedWatts": 100
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [["save"], ["set", "globalAlpha", 0.6], ["restore"]]
+  },
+  {
+    "name": "nonpositive totals do not show stats",
+    "grid": {
+      "conduits": [],
+      "sources": [],
+      "consumers": [],
+      "generatedWatts": -1,
+      "consumedWatts": 0,
+      "storedWatts": 0
+    },
+    "times": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [["save"], ["set", "globalAlpha", 0.6], ["restore"]]
+  },
+  {
+    "name": "all layers preserve order",
+    "grid": {
+      "conduits": ["0,0"],
+      "sources": [
+        {
+          "id": "s1,1",
+          "tileX": 1,
+          "tileY": 1,
+          "type": "generator",
+          "outputWatts": 300
+        }
+      ],
+      "consumers": [
+        {
+          "id": "c2,2",
+          "tileX": 2,
+          "tileY": 2,
+          "watts": 150,
+          "required": true,
+          "roomId": null
+        }
+      ],
+      "generatedWatts": 300,
+      "consumedWatts": 150,
+      "storedWatts": 20
+    },
+    "times": [789],
+    "tokens": {
+      "fontMono": "Ordered Mono"
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 2,
+      "y1": 2
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.6],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.8)"],
+      ["set", "lineWidth", 2],
+      ["beginPath"],
+      ["moveTo", 0, -16],
+      ["lineTo", 0, 16],
+      ["moveTo", -32, 0],
+      ["lineTo", 32, 0],
+      ["stroke"],
+      ["set", "fillStyle", "rgba(245, 158, 11, 0.9)"],
+      ["beginPath"],
+      ["arc", 0, 0, 3, 0, 6.283185307179586],
+      ["fill"],
+      ["now", 789],
+      ["createRadialGradient", 0, 0, 32, 0, 0, 32, 41.9998702682919],
+      ["addColorStop", 0, 0, "rgba(245, 158, 11, 0.399994810731676)"],
+      ["addColorStop", 0, 1, "rgba(245, 158, 11, 0)"],
+      [
+        "set",
+        "fillStyle",
+        {
+          "gradient": 0
+        }
+      ],
+      ["fillRect", -41.9998702682919, -9.9998702682919, 83.9997405365838, 83.9997405365838],
+      ["set", "fillStyle", "#F59E0B"],
+      ["set", "font", "bold 9px Ordered Mono"],
+      ["set", "textAlign", "center"],
+      ["fillText", "300W", 0, 24],
+      ["set", "fillStyle", "rgba(0, 0, 0, 0.7)"],
+      ["fillRect", -19.2, 84, 38.4, 3],
+      ["set", "fillStyle", "#F59E0B"],
+      ["fillRect", -19.2, 84, 28.799999999999997, 3],
+      ["set", "fillStyle", "rgba(13, 13, 20, 0.9)"],
+      ["fillRect", -5, -79, 160, 50],
+      ["set", "strokeStyle", "rgba(245, 158, 11, 0.5)"],
+      ["strokeRect", -5, -79, 160, 50],
+      ["set", "fillStyle", "#22C55E"],
+      ["set", "font", "11px Ordered Mono"],
+      ["set", "textAlign", "left"],
+      ["fillText", "⚡ Gen: 300W", 0, -64],
+      ["set", "fillStyle", "#EF4444"],
+      ["fillText", "🔌 Con: 150W", 0, -48],
+      ["set", "fillStyle", "#3B82F6"],
+      ["fillText", "🔋 Bat: 20W", 0, -32],
+      ["restore"]
+    ]
+  }
+]

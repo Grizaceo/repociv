@@ -6,7 +6,7 @@
 // TS never ships its own capability table — that was the source of the
 // PR 1+3 drift. The server is the source of truth; this client mirrors it.
 
-export interface CapabilitiesAgent {
+interface CapabilitiesAgent {
   capabilities: string[];
   skills: string[];
   skillLabels: Record<string, string>;
@@ -14,7 +14,7 @@ export interface CapabilitiesAgent {
   isProfile?: boolean;
 }
 
-export interface CapabilitiesSnapshot {
+interface CapabilitiesSnapshot {
   agents: Record<string, CapabilitiesAgent>;
   repoRestrictions: Record<string, string[]>;
   skillRequirements: Record<string, string>;

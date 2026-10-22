@@ -1,6 +1,6 @@
 // ─── RepoCiv — Imperial Era Progression ───────────────────────────────────
 
-export interface EraDefinition {
+interface EraDefinition {
   name: string;
   label: string;
   requirements: {

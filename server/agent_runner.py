@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
+import shutil as shutil  # Re-export shared module so patches to shutil.which still apply.
 import subprocess
 import tempfile
 import time
@@ -18,7 +18,9 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable
 
+from server import claude_session_args
 from server import claude_sessions as _claude_sessions
+from server import cli_discovery, harness_output, hermes_request_payload, hermes_session_store, opencode_stream
 from server import event_store as _es
 from server import subagent_tracker as _subagent_tracker
 from server.mission_harness import MissionHarnessContext, log_swarm_tracking_capability, swarm_track_enabled
@@ -31,6 +33,7 @@ from server import runtime_adapters as _runtime_adapters
 from server import security_harness as _security_harness
 from server import token_ledger as _token_ledger
 from server import repo_roots_state as _rrs
+from server import agent_paths as _agent_paths
 from server.quest import generate_quest_name
 from server import execution_identity as _exec_identity
 
@@ -283,31 +286,18 @@ def _infer_model_label(unit_id: str) -> str:
 
 
 def _repos_root() -> str:
-    state_root = _rrs.active_root()
-    if state_root:
-        return state_root
-    root = (
-        os.environ.get("REPOCIV_MAP_ROOT")
-        or os.environ.get("REPOCIV_REPOS_ROOT")
-        or os.environ.get("WORKSPACE_ROOT")
-        or str(Path.home() / ".hermes" / "workspace" / "repos")
-    )
-    return os.path.expanduser(root)
+    return _agent_paths.repos_root(lambda: _rrs.active_root())
 
 
 def _path_is_within(path: str, root: str) -> bool:
-    try:
-        return os.path.commonpath([path, root]) == root
-    except ValueError:
-        return False
+    return _agent_paths.path_is_within(path, root)
 
 
 def resolve_agent_working_dir(city_id: str, repo_path: str = "") -> str | None:
-    if not repo_path and city_id.lower() == "main":
-        return None
-    if not repo_path and city_id.lower() == "capital":
-        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return _rrs.resolve_selected_repo(city_id, repo_path)
+    return _agent_paths.resolve_agent_working_dir(
+        city_id, repo_path, runner_file=__file__,
+        resolve_selected_repo=lambda city, repo: _rrs.resolve_selected_repo(city, repo),
+    )
 
 
 def _resolve_city_path(city_id: str) -> str | None:
@@ -344,35 +334,16 @@ def _build_stateful_session_id(
 
 def _spatial_context_block(city_id: str, working_dir: str | None) -> str:
     """Facts about which repo/city this mission targets — models must not invent a fixed home repo."""
-    root = _repos_root()
-    expected = working_dir or os.path.join(root, city_id)
-    if working_dir:
-        path_line = f"- **Ruta de trabajo (cwd del adaptador):** `{working_dir}`"
-    else:
-        path_line = (
-            f"- **Ruta de trabajo:** NO resuelta: no existe `{expected}`. "
-            "Alinea el nombre de la carpeta con `city_id` o crea el clone ahi."
-        )
-    return (
-        "\n\n## Contexto espacial RepoCiv (fuente de verdad)\n"
-        f"- **Ciudad / target (`city_id`):** `{city_id}`\n"
-        f"{path_line}\n"
-        f"- **Raiz de repos (`REPOCIV_MAP_ROOT` / `REPOCIV_REPOS_ROOT` / `WORKSPACE_ROOT`):** `{root}`\n"
-        f"- **Ruta esperada para este target:** `{expected}`\n"
-        "- **Alcance:** responde solo sobre esta ciudad/repo y su cwd. "
-        "No uses historial, archivos ni estado de otras ciudades.\n")
+    return _agent_paths.spatial_context_block(
+        city_id, working_dir, repos_root=lambda: _repos_root(),
+    )
 
 
 
 def resolve_absolute_file_path(repo_path: str, file_path: str) -> str:
-    if not file_path:
-        return ""
-    repo_real = os.path.realpath(repo_path)
-    candidate = file_path if os.path.isabs(file_path) else os.path.join(repo_real, file_path)
-    candidate_real = os.path.realpath(candidate)
-    if not _path_is_within(candidate_real, repo_real):
-        raise ValueError("file path is outside selected repo")
-    return candidate_real
+    return _agent_paths.resolve_absolute_file_path(
+        repo_path, file_path, path_is_within=lambda path, root: _path_is_within(path, root),
+    )
 
 
 def run_agent(unit_id: str, city_id: str, mission: str, agent_type: str = "hero",
@@ -814,27 +785,11 @@ def _has_openclaw() -> bool:
 
 
 def _find_openclaw() -> str | None:
-    candidates = [
-        shutil.which("openclaw"),
-        str(Path.home() / ".npm-global" / "bin" / "openclaw"),
-    ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return cli_discovery.find_openclaw()
 
 
 def _find_codex() -> str | None:
-    candidates = [
-        shutil.which("codex"),
-        str(Path.home() / ".npm-global" / "bin" / "codex"),
-        str(Path.home() / ".local" / "bin" / "codex"),
-        "/usr/local/bin/codex",
-    ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return cli_discovery.find_codex()
 
 
 def _has_codex() -> bool:
@@ -842,16 +797,7 @@ def _has_codex() -> bool:
 
 
 def _find_opencode() -> str | None:
-    candidates = [
-        shutil.which(os.environ.get("REPOCIV_OPENCODE_BIN", "opencode")),
-        str(Path.home() / ".local" / "bin" / "opencode"),
-        str(Path.home() / ".npm-global" / "bin" / "opencode"),
-        "/usr/local/bin/opencode",
-    ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return cli_discovery.find_opencode()
 
 
 def _has_opencode() -> bool:
@@ -859,15 +805,7 @@ def _has_opencode() -> bool:
 
 
 def _find_hermes_cli() -> str | None:
-    candidates = [
-        shutil.which("hermes"),
-        str(Path.home() / ".local" / "bin" / "hermes"),
-        "/usr/local/bin/hermes",
-    ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return cli_discovery.find_hermes_cli()
 
 
 def _has_hermes_cli() -> bool:
@@ -894,30 +832,22 @@ def _hermes_session_key(profile_path: str, unit_id: str, city_id: str) -> str:
 
 
 def _load_hermes_session_id(profile_path: str, unit_id: str, city_id: str) -> str:
-    try:
-        data = json.loads(_hermes_session_state_file().read_text(encoding="utf-8"))
-        return str(data.get(_hermes_session_key(profile_path, unit_id, city_id), ""))
-    except Exception:
-        return ""
+    return hermes_session_store.load_session_id(
+        state_file=lambda: _hermes_session_state_file(),
+        session_key=lambda: _hermes_session_key(profile_path, unit_id, city_id),
+    )
 
 
 def _save_hermes_session_id(profile_path: str, unit_id: str, city_id: str, session_id: str) -> None:
-    if not session_id:
-        return
-    try:
-        path = _hermes_session_state_file()
-        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-        data[_hermes_session_key(profile_path, unit_id, city_id)] = session_id
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    except Exception:
-        pass
+    hermes_session_store.save_session_id(
+        session_id,
+        state_file=lambda: _hermes_session_state_file(),
+        session_key=lambda: _hermes_session_key(profile_path, unit_id, city_id),
+    )
 
 
 def _extract_hermes_session_id(output: str) -> str:
-    """hermes chat -Q prints `session_id: <id>` at the end of a run."""
-    m = re.search(r"session_id:\s*([A-Za-z0-9_]+)", output)
-    return m.group(1) if m else ""
+    return harness_output.extract_hermes_session_id(output)
 
 
 def _run_hermes_cli_streaming(
@@ -1018,15 +948,7 @@ def _has_claude_code() -> bool:
 
 
 def _find_claude_code() -> str | None:
-    candidates = [
-        shutil.which("claude"),
-        str(Path.home() / ".npm-global" / "bin" / "claude"),
-        str(Path.home() / ".local" / "bin" / "claude"),
-    ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return cli_discovery.find_claude()
 
 
 def _claude_session_args(unit_id: str, city_id: str, *, stateful: bool) -> list[str]:
@@ -1037,12 +959,12 @@ def _claude_session_args(unit_id: str, city_id: str, *, stateful: bool) -> list[
     from server.suvadu_tracker import transcript_path  # noqa: PLC0415
 
     city = _session_city_slug(city_id)
-    session_id, resume = _claude_sessions.session_for(unit_id, city, stateful=stateful)
-    if resume and transcript_path("claude-code", session_id) is None:
-        # The stored thread's transcript is gone (never written, or deleted).
-        _claude_sessions.forget_thread(unit_id, city)
-        session_id, resume = _claude_sessions.session_for(unit_id, city, stateful=stateful)
-    return ["--resume", session_id] if resume else ["--session-id", session_id]
+    return claude_session_args.session_args(
+        unit_id, city, stateful=stateful,
+        session_for=lambda unit, slug, **kwargs: _claude_sessions.session_for(unit, slug, **kwargs),
+        forget_thread=lambda unit, slug: _claude_sessions.forget_thread(unit, slug),
+        transcript_path=transcript_path,
+    )
 
 
 def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
@@ -1095,37 +1017,11 @@ def _run_claude_code_streaming(unit_id: str, mission_id: str, mission: str,
 
 
 def _find_cursor_agent() -> str | None:
-    """Find the cursor-agent headless binary (NOT the cursor IDE launcher).
-
-    Install via: curl https://cursor.com/install | bash
-    Lands at ~/.local/bin/cursor-agent or ~/.cursor/bin/cursor-agent.
-
-    # TODO: validate flags against `cursor-agent --help` once installed:
-    #   expected: --print, --trust, --output-format stream-json, --model, --workspace
-    """
-    candidates = [
-        shutil.which("cursor-agent"),
-        str(Path.home() / ".local" / "bin" / "cursor-agent"),
-        str(Path.home() / ".cursor" / "bin" / "cursor-agent"),
-        "/usr/local/bin/cursor-agent",
-    ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return cli_discovery.find_cursor_agent()
 
 
 def _find_cursor_ide() -> str | None:
-    """Find the cursor IDE launcher binary (opens the editor, not for headless use)."""
-    candidates = [
-        shutil.which("cursor"),
-        str(Path.home() / ".local" / "bin" / "cursor"),
-        "/usr/local/bin/cursor",
-    ]
-    for candidate in candidates:
-        if candidate and Path(candidate).exists() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return cli_discovery.find_cursor_ide()
 
 
 def _has_cursor() -> bool:
@@ -1134,43 +1030,7 @@ def _has_cursor() -> bool:
 
 
 def _parse_cursor_ndjson_chunk(line: str) -> str:
-    """Extract human-readable text from a cursor-agent NDJSON output line.
-
-    cursor-agent --output-format stream-json emits newline-delimited JSON.
-    Known shapes (may vary — validate against cursor-agent --help):
-      {"type": "assistant", "message": {"content": [{"type": "text", "text": "..."}]}}
-      {"type": "text", "text": "..."}
-      {"type": "tool_use", ...}  — skip, not human-readable output
-    Falls back to the raw line if it is not valid JSON or has no text content.
-    # TODO: validate against actual cursor-agent --output-format stream-json output
-    """
-    line = line.strip()
-    if not line:
-        return ""
-    try:
-        data = json.loads(line)
-        event_type = data.get("type", "")
-        # Tool-use events are noise — don't surface them as chat text
-        if event_type in ("tool_use", "tool_result", "ping", "heartbeat"):
-            return ""
-        # text shorthand
-        if event_type == "text":
-            return data.get("text", "")
-        # assistant message with content array
-        if event_type == "assistant":
-            content = data.get("message", {}).get("content", "")
-            if isinstance(content, list):
-                return "".join(
-                    c.get("text", "") for c in content
-                    if isinstance(c, dict) and c.get("type") == "text"
-                )
-            return str(content) if content else ""
-        # result / final output
-        if event_type in ("result", "final_output"):
-            return data.get("output", data.get("text", ""))
-        return ""
-    except (json.JSONDecodeError, AttributeError, TypeError):
-        return line  # not JSON — pass raw (plaintext fallback)
+    return harness_output.parse_cursor_ndjson_chunk(line)
 
 
 def _run_cursor_agent_streaming(
@@ -1328,43 +1188,13 @@ def _run_opencode_streaming(unit_id: str, mission_id: str, mission: str,
     from server.agent_processes import record_process_binding
     record_process_binding(getattr(proc, "pid", 0), mission_id, unit_id)
 
-    text_parts: list[str] = []
-    errors: list[str] = []
-    stray: list[str] = []
-    tools_used = 0
     assert proc.stdout is not None
-    for line in proc.stdout:
-        stripped = line.strip()
-        if not stripped:
-            continue
-        try:
-            event = json.loads(stripped)
-        except ValueError:
-            if len(stray) < 20:
-                stray.append(stripped)
-            continue
-        if not isinstance(event, dict):
-            continue
-        kind = event.get("type")
-        part = event.get("part")
-        if kind == "text" and isinstance(part, dict):
-            chunk = part.get("text")
-            if isinstance(chunk, str) and chunk:
-                text_parts.append(chunk)
-                text = chunk if chunk.endswith("\n") else f"{chunk}\n"
-                send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
-                _es.record_output_chunk(mission_id, unit_id, text)
-        elif kind == "tool_use" and isinstance(part, dict):
-            tools_used += 1
-            tool = part.get("tool")
-            if isinstance(tool, str) and tool:
-                text = f"🔧 {tool}\n"
-                send_to_repociv({"type": "chat_chunk", "unit": unit_id, "missionId": mission_id, "text": text})
-                _es.record_output_chunk(mission_id, unit_id, text)
-        elif kind == "error":
-            err = event.get("error")
-            message = err.get("message") if isinstance(err, dict) else None
-            errors.append(str(message or "unknown"))
+    text_parts, errors, stray, tools_used = opencode_stream.consume_lines(
+        proc.stdout, unit_id, mission_id,
+        loads=lambda text: json.loads(text),
+        send_to_repociv=lambda event: send_to_repociv(event),
+        record_output_chunk=lambda *args: _es.record_output_chunk(*args),
+    )
     proc.wait(timeout=600)
     output = "".join(text_parts)
 
@@ -1507,36 +1337,11 @@ def _run_hermes_streaming(unit_id: str, mission_id: str, mission: str,
         unit_id, city_id, mission_id, stateful=cfg.get("stateful", True),
     )
 
-    quick_chat = _is_quick_chat_message(mission)
-    spatial = _spatial_context_block(city_id, working_dir)
-    system_content = cfg.get("system", "Eres un agente util.") + spatial
-    if quick_chat:
-        system_content += (
-            "\nRespuesta rápida de chat: responde de forma directa y breve sin invocar "
-            "herramientas salvo que el usuario lo pida explícitamente."
-        )
-    user_content: str
-    if working_dir and not quick_chat:
-        user_content = f"cd {working_dir}\n\n{mission}"
-    else:
-        user_content = mission
-    payload: dict[str, Any] = {
-        "model": eff_model,
-        "messages": [
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": user_content},
-        ],
-        "stream": False,
-        "max_tokens": 1024 if quick_chat else 4096,
-    }
-    if quick_chat:
-        payload["model_options"] = {"reasoning_effort": "low"}
-    # Hermes gateway ignores bare `model` unless `provider` is also set (or
-    # direct_model_requests is enabled upstream). Pair them when selected.
-    if eff_provider:
-        payload["provider"] = eff_provider
-    if working_dir:
-        payload["working_directory"] = working_dir
+    payload = hermes_request_payload.build_payload(
+        mission, cfg, working_dir, city_id, eff_model, eff_provider,
+        is_quick_chat_message=lambda text: _is_quick_chat_message(text),
+        spatial_context_block=lambda city, work: _spatial_context_block(city, work),
+    )
     try:
         data = json.dumps(payload).encode()
         headers = {

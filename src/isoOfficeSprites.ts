@@ -3,17 +3,10 @@
 import type { LocalTile, LocalWorld } from './types.ts';
 import { getOfficeSprite, isOfficeAtlasLoaded } from './officeAtlas.ts';
 
-export const ISO_TILE_W = 64;
-export const ISO_TILE_H = 32;
-export const ISO_WALL_H = 24;
-const ISO_PARTITION_H = 12;
+import { ISO_TILE_W, ISO_TILE_H, ISO_WALL_H, isoProject } from './isoGeometry.ts';
 
-export function isoProject(x: number, y: number, z = 0): { px: number; py: number } {
-  return {
-    px: ((x - y) * ISO_TILE_W) / 2,
-    py: ((x + y) * ISO_TILE_H) / 2 - z * ISO_WALL_H,
-  };
-}
+export { ISO_TILE_W, ISO_TILE_H, ISO_WALL_H, isoProject } from './isoGeometry.ts';
+const ISO_PARTITION_H = 12;
 
 export interface IsoOfficeDrawContext {
   ctx: CanvasRenderingContext2D;

@@ -1,0 +1,2552 @@
+[
+  {
+    "name": "missing climates",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": []
+  },
+  {
+    "name": "empty climates",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [["save"], ["set", "globalAlpha", 0.5], ["restore"]]
+  },
+  {
+    "name": "unmatched room skips labels random and devices",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "missing",
+        {
+          "roomId": "ignored",
+          "temperature": 0,
+          "targetTemperature": 25,
+          "heaters": [
+            {
+              "id": "1,1",
+              "tileX": 1,
+              "tileY": 1
+            }
+          ],
+          "coolers": [
+            {
+              "id": "1,1",
+              "tileX": 1,
+              "tileY": 1
+            }
+          ],
+          "vents": [
+            {
+              "id": "1,1",
+              "tileX": 1,
+              "tileY": 1,
+              "open": true
+            }
+          ]
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [["save"], ["set", "globalAlpha", 0.5], ["restore"]]
+  },
+  {
+    "name": "color and label at -40",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": -40,
+          "targetTemperature": -40,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [0.5],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(80, 14, 220)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(80, 14, 220)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "-40.0°C", 0, 64],
+      ["random", 0.5],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "color and label at -20",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": -20,
+          "targetTemperature": -20,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [0.5],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(80, 100, 220)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(80, 100, 220)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "-20.0°C", 0, 64],
+      ["random", 0.5],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "color and label at 0",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 0,
+          "targetTemperature": 0,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [0.5],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(80, 186, 220)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(80, 186, 220)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "0.0°C", 0, 64],
+      ["random", 0.5],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "color and label at 9.999",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 9.999,
+          "targetTemperature": 9.999,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [0.5],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(80, 229, 220)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(80, 229, 220)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "10.0°C", 0, 64],
+      ["random", 0.5],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "color and label at 10",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 10,
+          "targetTemperature": 10,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(80, 229, 220)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(80, 229, 220)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "10.0°C", 0, 64],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "color and label at 16",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 16,
+          "targetTemperature": 16,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(80, 255, 220)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(80, 255, 220)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "16.0°C", 0, 64],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "color and label at 16.1",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 16.1,
+          "targetTemperature": 16.1,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(198, 255, 198"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(198, 255, 198"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "16.1°C", 0, 64],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "color and label at 21",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 21,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 64],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "color and label at 25.999",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 25.999,
+          "targetTemperature": 25.999,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(0, 255, 0"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(0, 255, 0"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "26.0°C", 0, 64],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "color and label at 26",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 26,
+          "targetTemperature": 26,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(220, 255, 0)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(220, 255, 0)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "26.0°C", 0, 64],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "color and label at 38",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 38,
+          "targetTemperature": 38,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(220, 128, 0)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(220, 128, 0)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "38.0°C", 0, 64],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "color and label at 50",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 50,
+          "targetTemperature": 50,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(220, 0, 0)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(220, 0, 0)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "50.0°C", 0, 64],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "color and label at 80",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 80,
+          "targetTemperature": 80,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(220, 0, 0)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(220, 0, 0)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "80.0°C", 0, 64],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "target threshold 21 to 21.5",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 21.5,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 64],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "target threshold 21 to 20.5",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 20.5,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 64],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "target threshold 21 to 21.501",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 21.501,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 64],
+      ["set", "fillStyle", "#FBBF24"],
+      ["set", "font", "9px 'JetBrains Mono', monospace"],
+      ["fillText", "▲ 21.5°C", 0, 82],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "target threshold 21 to 20.499",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 20.499,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 64],
+      ["set", "fillStyle", "#FBBF24"],
+      ["set", "font", "9px 'JetBrains Mono', monospace"],
+      ["fillText", "▼ 20.5°C", 0, 82],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "target threshold -10.25 to 20.55",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": -10.25,
+          "targetTemperature": 20.55,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [0.8],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(80, 142, 220)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(80, 142, 220)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "-10.3°C", 0, 64],
+      ["set", "fillStyle", "#FBBF24"],
+      ["set", "font", "9px 'JetBrains Mono', monospace"],
+      ["fillText", "▲ 20.6°C", 0, 82],
+      ["random", 0.8],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "breath at zero chance and room origin",
+    "rooms": [
+      {
+        "id": "a",
+        "x": -1,
+        "y": -2,
+        "width": 4,
+        "height": 6
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 0,
+          "targetTemperature": 0,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [0, 0, 0],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(80, 186, 220)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 32, 76.80000000000001, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(80, 186, 220)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "0.0°C", 0, 32],
+      ["random", 0],
+      ["random", 0],
+      ["random", 0],
+      ["spawnBreath", 32, -48],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "breath below strict chance boundary",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 9,
+          "targetTemperature": 9,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [0.019999, 0.25, 0.75],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(80, 225, 220)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(80, 225, 220)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "9.0°C", 0, 64],
+      ["random", 0.019999],
+      ["random", 0.25],
+      ["random", 0.75],
+      ["spawnBreath", -64, 64],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "breath at strict chance boundary does not spawn",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 9,
+          "targetTemperature": 9,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [0.02],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(80, 225, 220)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(80, 225, 220)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "9.0°C", 0, 64],
+      ["random", 0.02],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "temperature ten never samples randomness",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 10,
+          "targetTemperature": 10,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(80, 229, 220)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(80, 229, 220)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "10.0°C", 0, 64],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "custom font for label target and vent",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 25,
+          "heaters": [],
+          "coolers": [],
+          "vents": [
+            {
+              "id": "0,0",
+              "tileX": 0,
+              "tileY": 0,
+              "open": true
+            }
+          ]
+        }
+      ]
+    ],
+    "times": [123],
+    "randoms": [],
+    "tokens": {
+      "fontMono": "Climate Mono"
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px Climate Mono"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 64],
+      ["set", "fillStyle", "#FBBF24"],
+      ["set", "font", "9px Climate Mono"],
+      ["fillText", "▲ 25.0°C", 0, 82],
+      ["now", 123],
+      ["set", "fillStyle", "rgba(144, 164, 174, 0.773087556685619)"],
+      ["set", "font", "11.52px Climate Mono"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "↔", 0, 0],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "empty font remains empty",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 18,
+          "heaters": [],
+          "coolers": [],
+          "vents": [
+            {
+              "id": "0,0",
+              "tileX": 0,
+              "tileY": 0,
+              "open": true
+            }
+          ]
+        }
+      ]
+    ],
+    "times": [456],
+    "randoms": [],
+    "tokens": {
+      "fontMono": ""
+    },
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px "],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 64],
+      ["set", "fillStyle", "#FBBF24"],
+      ["set", "font", "9px "],
+      ["fillText", "▼ 18.0°C", 0, 82],
+      ["now", 456],
+      ["set", "fillStyle", "rgba(144, 164, 174, 0.8276642124542766)"],
+      ["set", "font", "11.52px "],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "↔", 0, 0],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "room centers clipped on all sides skip random",
+    "rooms": [
+      {
+        "id": "l",
+        "x": -4,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      },
+      {
+        "id": "r",
+        "x": 4,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      },
+      {
+        "id": "t",
+        "x": 0,
+        "y": -4,
+        "width": 4,
+        "height": 4
+      },
+      {
+        "id": "b",
+        "x": 0,
+        "y": 4,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "l",
+        {
+          "roomId": "ignored",
+          "temperature": 0,
+          "targetTemperature": 0,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ],
+      [
+        "r",
+        {
+          "roomId": "ignored",
+          "temperature": 0,
+          "targetTemperature": 0,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ],
+      [
+        "t",
+        {
+          "roomId": "ignored",
+          "temperature": 0,
+          "targetTemperature": 0,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ],
+      [
+        "b",
+        {
+          "roomId": "ignored",
+          "temperature": 0,
+          "targetTemperature": 0,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [["save"], ["set", "globalAlpha", 0.5], ["restore"]]
+  },
+  {
+    "name": "inclusive room center boundaries",
+    "rooms": [
+      {
+        "id": "a",
+        "x": -2,
+        "y": -2,
+        "width": 4,
+        "height": 4
+      },
+      {
+        "id": "b",
+        "x": 2,
+        "y": -2,
+        "width": 4,
+        "height": 4
+      },
+      {
+        "id": "c",
+        "x": -2,
+        "y": 2,
+        "width": 4,
+        "height": 4
+      },
+      {
+        "id": "d",
+        "x": 2,
+        "y": 2,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 21,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ],
+      [
+        "b",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 21,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ],
+      [
+        "c",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 21,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ],
+      [
+        "d",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 21,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 0, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 0],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 128, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 128, 64],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", -128, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", -128, 64],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 128, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 128],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "heater waves at zero",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 21,
+          "heaters": [
+            {
+              "id": "0,0",
+              "tileX": 0,
+              "tileY": 0
+            }
+          ],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [0],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 64],
+      ["now", 0],
+      ["set", "strokeStyle", "rgba(239, 83, 80, 0.4)"],
+      ["set", "lineWidth", 1.5],
+      ["beginPath"],
+      ["moveTo", -6, 16],
+      ["quadraticCurveTo", 0, 8, -6, 0],
+      ["stroke"],
+      ["beginPath"],
+      ["moveTo", 0, 16],
+      ["quadraticCurveTo", 3.365883939231586, 8, 0, 0],
+      ["stroke"],
+      ["beginPath"],
+      ["moveTo", 6, 16],
+      ["quadraticCurveTo", 3.637189707302727, 8, 6, 0],
+      ["stroke"],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "independent heater clocks inclusive boundaries",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 21,
+          "heaters": [
+            {
+              "id": "0,0",
+              "tileX": 0,
+              "tileY": 0
+            },
+            {
+              "id": "4,4",
+              "tileX": 4,
+              "tileY": 4
+            }
+          ],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [120, 390],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 64],
+      ["now", 120],
+      ["set", "strokeStyle", "rgba(239, 83, 80, 0.652441295442369)"],
+      ["set", "lineWidth", 1.5],
+      ["beginPath"],
+      ["moveTo", -6, 16],
+      ["quadraticCurveTo", 3.728156343868905, 8, -6, 0],
+      ["stroke"],
+      ["beginPath"],
+      ["moveTo", 0, 16],
+      ["quadraticCurveTo", 3.2339856152783604, 8, 0, 0],
+      ["stroke"],
+      ["beginPath"],
+      ["moveTo", 6, 16],
+      ["quadraticCurveTo", -0.23349657371032034, 8, 6, 0],
+      ["stroke"],
+      ["now", 390],
+      ["set", "strokeStyle", "rgba(239, 83, 80, 0.3675414596409675)"],
+      ["set", "lineWidth", 1.5],
+      ["beginPath"],
+      ["moveTo", -6, 144],
+      ["quadraticCurveTo", -2.751064636735895, 136, -6, 128],
+      ["stroke"],
+      ["beginPath"],
+      ["moveTo", 0, 144],
+      ["quadraticCurveTo", -3.92981045049733, 136, 0, 128],
+      ["stroke"],
+      ["beginPath"],
+      ["moveTo", 6, 144],
+      ["quadraticCurveTo", -1.495506659320944, 136, 6, 128],
+      ["stroke"],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "cooler dots at zero",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 21,
+          "heaters": [],
+          "coolers": [
+            {
+              "id": "0,0",
+              "tileX": 0,
+              "tileY": 0
+            }
+          ],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [0],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 64],
+      ["now", 0],
+      ["set", "fillStyle", "rgba(100, 181, 246, 0.4)"],
+      ["beginPath"],
+      ["arc", -6, 13, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", -2, 12.5, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 2, 12, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 6, 11.5, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "independent cooler clocks and modulo wrap",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 21,
+          "heaters": [],
+          "coolers": [
+            {
+              "id": "0,4",
+              "tileX": 0,
+              "tileY": 4
+            },
+            {
+              "id": "4,0",
+              "tileX": 4,
+              "tileY": 0
+            }
+          ],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [799, 800],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 64],
+      ["now", 799],
+      ["set", "fillStyle", "rgba(100, 181, 246, 0.1548430063451612)"],
+      ["beginPath"],
+      ["arc", -134, 67.0125, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", -130, 76.5125, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", -126, 76.0125, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", -122, 75.5125, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["now", 800],
+      ["set", "fillStyle", "rgba(100, 181, 246, 0.15600118252972603)"],
+      ["beginPath"],
+      ["arc", 122, 77, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 126, 76.5, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 130, 76, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 134, 75.5, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "vent open closed and independent clocks",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 21,
+          "heaters": [],
+          "coolers": [],
+          "vents": [
+            {
+              "id": "1,1",
+              "tileX": 1,
+              "tileY": 1,
+              "open": false
+            },
+            {
+              "id": "0,0",
+              "tileX": 0,
+              "tileY": 0,
+              "open": true
+            },
+            {
+              "id": "4,4",
+              "tileX": 4,
+              "tileY": 4,
+              "open": true
+            }
+          ]
+        }
+      ]
+    ],
+    "times": [200, 900],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 64],
+      ["now", 200],
+      ["set", "fillStyle", "rgba(144, 164, 174, 0.8524412954423689)"],
+      ["set", "font", "11.52px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "↔", 0, 0],
+      ["now", 900],
+      ["set", "fillStyle", "rgba(144, 164, 174, 0.3067409647004709)"],
+      ["set", "font", "11.52px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "↔", 0, 128],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "clipped devices never read time",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 21,
+          "heaters": [
+            {
+              "id": "-1,1",
+              "tileX": -1,
+              "tileY": 1
+            },
+            {
+              "id": "5,1",
+              "tileX": 5,
+              "tileY": 1
+            },
+            {
+              "id": "1,-1",
+              "tileX": 1,
+              "tileY": -1
+            },
+            {
+              "id": "1,5",
+              "tileX": 1,
+              "tileY": 5
+            }
+          ],
+          "coolers": [
+            {
+              "id": "-1,1",
+              "tileX": -1,
+              "tileY": 1
+            },
+            {
+              "id": "5,1",
+              "tileX": 5,
+              "tileY": 1
+            },
+            {
+              "id": "1,-1",
+              "tileX": 1,
+              "tileY": -1
+            },
+            {
+              "id": "1,5",
+              "tileX": 1,
+              "tileY": 5
+            }
+          ],
+          "vents": [
+            {
+              "id": "-1,1",
+              "tileX": -1,
+              "tileY": 1,
+              "open": true
+            },
+            {
+              "id": "5,1",
+              "tileX": 5,
+              "tileY": 1,
+              "open": true
+            },
+            {
+              "id": "1,-1",
+              "tileX": 1,
+              "tileY": -1,
+              "open": true
+            },
+            {
+              "id": "1,5",
+              "tileX": 1,
+              "tileY": 5,
+              "open": true
+            }
+          ]
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 64],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "devices visible despite clipped room center",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 20,
+        "y": 20,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 0,
+          "targetTemperature": 25,
+          "heaters": [
+            {
+              "id": "1,1",
+              "tileX": 1,
+              "tileY": 1
+            }
+          ],
+          "coolers": [
+            {
+              "id": "2,2",
+              "tileX": 2,
+              "tileY": 2
+            }
+          ],
+          "vents": [
+            {
+              "id": "3,3",
+              "tileX": 3,
+              "tileY": 3,
+              "open": true
+            }
+          ]
+        }
+      ]
+    ],
+    "times": [100, 200, 300],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["now", 100],
+      ["set", "strokeStyle", "rgba(239, 83, 80, 0.6220530559588111)"],
+      ["set", "lineWidth", 1.5],
+      ["beginPath"],
+      ["moveTo", -6, 48],
+      ["quadraticCurveTo", 3.365883939231586, 40, -6, 32],
+      ["stroke"],
+      ["beginPath"],
+      ["moveTo", 0, 48],
+      ["quadraticCurveTo", 3.637189707302727, 40, 0, 32],
+      ["stroke"],
+      ["beginPath"],
+      ["moveTo", 6, 48],
+      ["quadraticCurveTo", 0.5644800322394689, 40, 6, 32],
+      ["stroke"],
+      ["now", 200],
+      ["set", "fillStyle", "rgba(100, 181, 246, 0.6915813704089938)"],
+      ["beginPath"],
+      ["arc", -6, 74.5, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", -2, 74, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 2, 73.5, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 6, 73, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["now", 300],
+      ["set", "fillStyle", "rgba(144, 164, 174, 0.8992484959812164)"],
+      ["set", "font", "11.52px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "↔", 0, 96],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "first matching room wins duplicate ids",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 1,
+        "y": 1,
+        "width": 2,
+        "height": 2
+      },
+      {
+        "id": "a",
+        "x": 100,
+        "y": 100,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 21,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 25.6, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 64],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "negative fractional view and room dimensions",
+    "rooms": [
+      {
+        "id": "a",
+        "x": -3.5,
+        "y": -2.5,
+        "width": 1.5,
+        "height": 0.5
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 15.25,
+          "targetTemperature": 15.25,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": -4,
+      "y0": -3,
+      "x1": 0,
+      "y1": 0
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(80, 252, 220)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", -16, -80, 19.200000000000003, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(80, 252, 220)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "15.3°C", -16, -80],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "zero size room retains label and radius zero",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      }
+    ],
+    "climates": [
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 21,
+          "targetTemperature": 21,
+          "heaters": [],
+          "coolers": [],
+          "vents": []
+        }
+      ]
+    ],
+    "times": [],
+    "randoms": [],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 0, 0, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(100, 255, 100"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "21.0°C", 0, 0],
+      ["restore"]
+    ]
+  },
+  {
+    "name": "all labels and breath precede devices in climate map order",
+    "rooms": [
+      {
+        "id": "a",
+        "x": 1,
+        "y": 1,
+        "width": 2,
+        "height": 2
+      },
+      {
+        "id": "b",
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      }
+    ],
+    "climates": [
+      [
+        "b",
+        {
+          "roomId": "ignored",
+          "temperature": 5,
+          "targetTemperature": 22,
+          "heaters": [
+            {
+              "id": "0,0",
+              "tileX": 0,
+              "tileY": 0
+            }
+          ],
+          "coolers": [
+            {
+              "id": "1,1",
+              "tileX": 1,
+              "tileY": 1
+            }
+          ],
+          "vents": [
+            {
+              "id": "2,2",
+              "tileX": 2,
+              "tileY": 2,
+              "open": true
+            }
+          ]
+        }
+      ],
+      [
+        "a",
+        {
+          "roomId": "ignored",
+          "temperature": 30,
+          "targetTemperature": 22,
+          "heaters": [
+            {
+              "id": "3,3",
+              "tileX": 3,
+              "tileY": 3
+            }
+          ],
+          "coolers": [
+            {
+              "id": "4,4",
+              "tileX": 4,
+              "tileY": 4
+            }
+          ],
+          "vents": [
+            {
+              "id": "0,4",
+              "tileX": 0,
+              "tileY": 4,
+              "open": true
+            }
+          ]
+        }
+      ]
+    ],
+    "times": [0, 101, 202, 303, 404, 505],
+    "randoms": [0.01, 0.4, 0.6],
+    "tokens": {},
+    "view": {
+      "x0": 0,
+      "y0": 0,
+      "x1": 4,
+      "y1": 4
+    },
+    "trace": [
+      ["save"],
+      ["set", "globalAlpha", 0.5],
+      ["set", "fillStyle", "rgb(80, 208, 220)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 51.2, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(80, 208, 220)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "5.0°C", 0, 64],
+      ["set", "fillStyle", "#FBBF24"],
+      ["set", "font", "9px 'JetBrains Mono', monospace"],
+      ["fillText", "▲ 22.0°C", 0, 82],
+      ["random", 0.01],
+      ["random", 0.4],
+      ["random", 0.6],
+      ["spawnBreath", -25.599999999999994, 64],
+      ["set", "fillStyle", "rgb(220, 213, 0)"],
+      ["set", "globalAlpha", 0.3],
+      ["beginPath"],
+      ["arc", 0, 64, 25.6, 0, 6.283185307179586],
+      ["fill"],
+      ["set", "globalAlpha", 1],
+      ["set", "fillStyle", "rgb(220, 213, 0)"],
+      ["set", "font", "bold 12px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "30.0°C", 0, 64],
+      ["set", "fillStyle", "#FBBF24"],
+      ["set", "font", "9px 'JetBrains Mono', monospace"],
+      ["fillText", "▼ 22.0°C", 0, 82],
+      ["now", 0],
+      ["set", "strokeStyle", "rgba(239, 83, 80, 0.4)"],
+      ["set", "lineWidth", 1.5],
+      ["beginPath"],
+      ["moveTo", -6, 16],
+      ["quadraticCurveTo", 0, 8, -6, 0],
+      ["stroke"],
+      ["beginPath"],
+      ["moveTo", 0, 16],
+      ["quadraticCurveTo", 3.365883939231586, 8, 0, 0],
+      ["stroke"],
+      ["beginPath"],
+      ["moveTo", 6, 16],
+      ["quadraticCurveTo", 3.637189707302727, 8, 6, 0],
+      ["stroke"],
+      ["now", 101],
+      ["set", "fillStyle", "rgba(100, 181, 246, 0.5870785813496412)"],
+      ["beginPath"],
+      ["arc", -6, 43.7375, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", -2, 43.2375, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 2, 42.7375, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 6, 42.2375, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["now", 202],
+      ["set", "fillStyle", "rgba(144, 164, 174, 0.8540495533854044)"],
+      ["set", "font", "11.52px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "↔", 0, 64],
+      ["now", 303],
+      ["set", "strokeStyle", "rgba(239, 83, 80, 0.5734775881471323)"],
+      ["set", "lineWidth", 1.5],
+      ["beginPath"],
+      ["moveTo", -6, 112],
+      ["quadraticCurveTo", 0.44544475474660006, 104, -6, 96],
+      ["stroke"],
+      ["beginPath"],
+      ["moveTo", 0, 112],
+      ["quadraticCurveTo", -3.104273308353327, 104, 0, 96],
+      ["stroke"],
+      ["beginPath"],
+      ["moveTo", 6, 112],
+      ["quadraticCurveTo", -3.799936807843044, 104, 6, 96],
+      ["stroke"],
+      ["now", 404],
+      ["set", "fillStyle", "rgba(100, 181, 246, 0.5300192457719025)"],
+      ["beginPath"],
+      ["arc", -6, 135.95, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", -2, 135.45, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 2, 134.95, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["beginPath"],
+      ["arc", 6, 134.45, 2, 0, 6.283185307179586],
+      ["fill"],
+      ["now", 505],
+      ["set", "fillStyle", "rgba(144, 164, 174, 0.7734775881471323)"],
+      ["set", "font", "11.52px 'JetBrains Mono', monospace"],
+      ["set", "textAlign", "center"],
+      ["set", "textBaseline", "middle"],
+      ["fillText", "↔", -128, 64],
+      ["restore"]
+    ]
+  }
+]

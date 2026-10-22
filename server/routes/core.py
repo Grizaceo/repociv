@@ -11,6 +11,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
+from server.routes import health as _health_routes
+from server.routes import profile_registry as _profile_routes
+
 RouteContext = dict[str, Any]
 
 # ─── providers-live cache (avoids blocking the HTTP thread for up to 40s) ─────
@@ -112,38 +115,9 @@ _build_identity = None
 
 
 def get_health(ctx: "RouteContext") -> tuple[int, Any]:
-    from server.agent_runner import _has_claude_code, _has_openclaw, _has_cursor, _has_codex
-    from server.bridge import _sched, get_gpu_info, _es, mcp_status
-    from server import suvadu_tracker as _suvadu
-    agent_status = _sched.get_agent_status()
-    queue_depth = len(_sched.queue_snapshot())
-    gpu = get_gpu_info()
-    # R05: identity of the code actually loaded by this process. Served through
-    # the module-level indirection so tests can stub it without a live bridge.
-    build_identity = _build_identity
-    if build_identity is None:
-        from server import build_identity as build_identity_mod
-        build_identity = build_identity_mod
-    return 200, {
-        "ok": True,
-        "version": "0.1.0",
-        "timestamp": time.time(),
-        "openclaw": _has_openclaw(),
-        "claudeCode": _has_claude_code(),
-        "cursor": _has_cursor(),
-        "codex": _has_codex(),
-        "mcp": mcp_status(),
-        "defaultTransport": "hermes",
-        "agents": {
-            "active": sum(1 for a in agent_status if a.get("status") == "active"),
-            "total": len(agent_status),
-            "queueDepth": queue_depth,
-        },
-        "gpu": gpu,
-        "eventStore": str(_es._store_path) if hasattr(_es, "_store_path") else None,
-        "externalAgents": _suvadu.status(),
-        "buildDiagnostic": build_identity.snapshot(),
-    }
+    return _health_routes.get_health(
+        ctx, identity_source=lambda: _build_identity, now=lambda: time.time(),
+    )
 
 def get_external_agents(ctx: "RouteContext") -> tuple[int, Any]:
     """GET /api/external-agents — Suvadu / Hermes agent sessions (metadata only)."""
@@ -256,8 +230,7 @@ def post_external_agent_reply(body: Any, ctx: "RouteContext") -> tuple[int, Any]
     return _suvadu.reply(session_id, text)
 
 def get_ready(ctx: "RouteContext") -> tuple[int, Any]:
-    from server.bridge import _es, REPOCIV_TOKEN
-    return 200, {"ok": True, "eventStore": str(_es._store_path), "token": bool(REPOCIV_TOKEN)}
+    return _health_routes.get_ready(ctx)
 
 def get_missions(ctx: "RouteContext") -> tuple[int, Any]:
     from server.bridge import load_missions
@@ -459,8 +432,7 @@ def get_profiles(_ctx: "RouteContext") -> tuple[int, Any]:
     The shipped default is one profile per built-in harness, but the user
     can rename, add, or remove profiles at any time.
     """
-    from server import config_store as _cs
-    return 200, {"profiles": _cs.list_profiles()}
+    return _profile_routes.get_profiles(_ctx)
 
 
 def post_profiles(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
@@ -470,28 +442,7 @@ def post_profiles(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]
     Response 200: { "profile": {...normalized entry...} }
     Response 400: { "error": "<reason>" }
     """
-    from server import config_store as _cs
-    name = body.get("name")
-    harness = body.get("harness")
-    if not isinstance(name, str) or not isinstance(harness, str):
-        return 400, {"error": "name and harness are required strings"}
-    try:
-        entry = _cs.upsert_profile(
-            name,
-            harness,
-            personality=body.get("personality"),
-            system_prompt=body.get("system_prompt"),
-            profile_path=body.get("profile_path"),
-            model=body.get("model"),
-            provider=body.get("provider"),
-            harness_ref=body.get("harness_ref"),
-            display_name=body.get("display_name"),
-            identity_mode=body.get("identity_mode"),
-            slot_order=body.get("slot_order"),
-        )
-    except ValueError as exc:
-        return 400, {"error": str(exc)}
-    return 200, {"profile": entry}
+    return _profile_routes.post_profiles(body, _ctx)
 
 
 def post_profiles_delete(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
@@ -502,17 +453,7 @@ def post_profiles_delete(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[in
     Response 404: { "error": "profile '<name>' not found" }
     Response 400: { "error": "<reason>" }
     """
-    from server import config_store as _cs
-    name = body.get("name")
-    if not isinstance(name, str):
-        return 400, {"error": "name is required and must be a string"}
-    try:
-        deleted = _cs.delete_profile(name)
-    except ValueError as exc:
-        return 400, {"error": str(exc)}
-    if not deleted:
-        return 404, {"error": f"profile {name!r} not found"}
-    return 200, {"ok": True}
+    return _profile_routes.post_profiles_delete(body, _ctx)
 
 
 def get_profile_identity(ctx: "RouteContext") -> tuple[int, Any]:

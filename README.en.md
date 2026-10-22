@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/Grizaceo/repociv/actions/workflows/ci.yml/badge.svg)](https://github.com/Grizaceo/repociv/actions)
-[![Status](https://img.shields.io/badge/status-public%20alpha-blue.svg)](docs/archive/ROADMAP.md)
+[![Status](https://img.shields.io/badge/status-public%20alpha-blue.svg)](docs/SCOPE.md)
 
 > A hexagonal dashboard inspired by Civilization V that visualizes your repos folder as cities on a map, AI agents as units, and background processes as buildings.
 
@@ -44,9 +44,9 @@ Each room maps to a folder in the repo. Units (AI agents) walk between workbench
 | **Door** | Divides rooms — slides on enter/exit (parallelogram animation) |
 | **Floor lamp** | `focus` zone — ambient light in the interior NW corner |
 | **Coffee maker** | `break` zone — interior NE corner |
-| **Door plate** | Floating label over each room — hotkey `L` toggles visibility |
+| **Door plate** | Floating label over each room |
 
-**Local view hotkeys:** `F` debug overlay · `L` labels · `Q/W/E` zoom · `1-9` room selection · `ENTER` enter/leave room
+**Local view hotkeys:** `F` debug overlay · arrows / `W/A/S/D` pan · `Esc` return to the macro map. `1` and `4–9` select session slots, not rooms; `2`/`3` switch the 2D/3D renderer.
 
 ---
 
@@ -159,7 +159,7 @@ REPOCIV_MAP_ROOT=~/projects
 ├─────────────────────────────────────────────┤
 │  GameState  (src/game.ts)                   │  ← Simulation loop,
 │  Priority Matrix (src/priorityMatrix.ts)     │     fatigue, mission queues,
-│  Fatigue System  (src/fatigue.ts)            │     A* pathfinding
+│  Fatigue (GameState, src/game.ts)            │     A* pathfinding
 ├─────────────────────────────────────────────┤
 │  Bridge  (src/bridge.ts + server/bridge.py) │  ← HTTP/WebSocket → agent runtime
 │  localMap.ts + localPathfinding.ts           │     Process scanner, task queue
@@ -248,33 +248,38 @@ RepoCiv is also exposed as an **MCP server over stdio** (`server/mcp_server.py`)
 
 ## Priority Matrix
 
-System that decides which file/folder is most urgent for each agent:
+Scores queued local missions using `priorityScore(mission, now)` in
+`src/priorityMatrix.ts`. Weights come from `shared/priority-weights.json`:
 
-```
-score = (ageWeight × ageScore)
-      + (testWeight × hasTests ? 1 : 0)
-      + (debtWeight × churnRisk)
-      + (extWeight  × extensionScore)
-      + (sizeWeight × sizeScore)
-```
+- Waiting time in minutes: `ageWeight × log1p(age)`.
+- Test/spec names or `/test/` and `/tests/` paths receive a test bonus.
+- `/debt/`, `/legacy/` and `/stale/` paths receive a debt bonus (not a churn metric or comment scan).
+- Extension bonus and a path-length penalty (not actual file size):
+  `min(sizeWeight × max(0, filePath.length − 40), 30)`. With the current
+  `size = -3`, this term is non-positive and has no −30 lower bound.
+- The result is rounded to two decimal places.
 
-| Label | Condition |
-|-------|-----------|
-| `CRIT` | score ≥ 70 |
-| `HIGH` | score ≥ 50 |
-| `NORM` | score ≥ 30 |
-| `LOW`  | score < 30 |
+| Label | Score range (`scoreToPriority`) |
+|-------|---------------------------------|
+| `CRIT` | score ≥ 60 |
+| `HIGH` | 35 ≤ score < 60 |
+| `NORM` | 15 ≤ score < 35 |
+| `LOW` | score < 15 |
 
-Press `P` to open the Priority Panel. API: `computePriorityScore(fileNode, weights)` in `src/priorityMatrix.ts`.
+Press `P` to open the Priority Panel. `sortByPriority(missions, now)` sorts
+missions by descending score; `peekNextMission(missions, now)` returns the next
+mission or `null`.
 
 ---
 
 ## Fatigue System
 
-Units have XCOM-style fatigue: working drains them, resting in a RestArea restores them.
+Fatigue state and rest areas live in `GameState` (`src/game.ts`):
+`updateUnitFatigue`, `getUnitFatigue`, `decayUnitFatigue`, `addRestArea` and
+`removeRestArea`. The bridge can update unit fatigue through context events.
 
 ```
-effectiveSpeed = currentFatigue / maxFatigue   (0.0 → 1.0)
+effectiveSpeed = maxFatigue > 0 ? fatigue / maxFatigue : 1
 ```
 
 Thresholds configurable in the `Settings Panel` (`F11`) or in `src/gameConfig.ts`.
@@ -283,14 +288,13 @@ Thresholds configurable in the `Settings Panel` (`F11`) or in `src/gameConfig.ts
 
 ## News gazette
 
-Every system action (mission completed, approval requested, agent entering or leaving, error, info) is recorded as an **event** in the **Gazette**, a chronological feed rendered inside the board. It works like a Civilization-style "newspaper" mini-log.
+The **Gazette** (`src/ui/gacetaWidget.ts`) displays articles from the news
+bridge: category/source filters, read state, source management and scanning.
+It is not the mission event log.
 
-- Press `N` to toggle the Gazette panel
-- Events are ordered by timestamp, newest on top
-- Filters by type: `mission`, `approval`, `agent`, `error`, `info`
-- Double-click on an event jumps to context (e.g. the agent or file involved)
-
-It is useful for auditing long sessions without opening external logs: the "story so far" of your empire.
+The **activity log** (`F10`, `src/ui/logPanel.ts`) shows operational history.
+`N` currently has two listeners: the profile wizard in `hotkeys.ts` and the
+mounted news widget. This overlap is documented here, not changed by cleanup.
 
 ---
 
@@ -298,20 +302,27 @@ It is useful for auditing long sessions without opening external logs: the "stor
 
 | Key | Action |
 |-----|--------|
-| `Q` `W` `E` `O` `C` `X` `R` | Spawn MAIN / WORKER / SCOUT / OPENCLAW / CLAUDE / CODEX / CURSOR |
+| `Ctrl+Q` | Session wizard with selected profile; Hermes if no profile is selected |
+| `Ctrl+G` | New Hermes session wizard |
+| `Ctrl+Shift+W` / `Ctrl+O` | New OpenClaw session wizard |
+| `Ctrl+E` / `Ctrl+C` | New Claude session wizard |
+| `Ctrl+X` | New Codex session wizard |
+| `Ctrl+R` / `R` | New Cursor session wizard |
+| Arrows / `W/A/S/D` | Pan camera |
 | `1`, `4`–`9` | Select session by slot (`2`/`3` are reserved for the view) |
 | `Space` | Cycle to next idle hero |
-| `Tab` | Cycle all heroes |
+| `Tab` | Cycle all active sessions (own and external) |
 | `Enter` | Open/close side panel |
 | `P` | Priority Matrix panel |
 | `M` | Move mode |
-| `S` | Sleep selected unit |
+| `Ctrl+S` | Sleep selected unit |
 | `B` | Build mode |
 | `G` | Toggle grid |
 | `V` | Toggle fog of war |
-| `A` | Pending approvals |
+| `Ctrl+A` | Pending approvals |
 | `T` | Terminal panel |
-| `N` | News gazette |
+| `N` | New profile wizard; also toggles the mounted news widget |
+| `F10` | Activity log |
 | `2` / `3` | Toggle 2D (`flat`) ↔ WebGL (`webgl`) render |
 | `F11` | Settings panel |
 | `?` | Keyboard help |
@@ -323,9 +334,9 @@ It is useful for auditing long sessions without opening external logs: the "stor
 ## Adding a new agent type
 
 1. **Type** in `src/types.ts` → `UnitType`
-2. **Color** in `UNIT_COLORS` (`src/types.ts`) and `UNIT_TYPE_COLOR` (`src/game.ts`)
+2. **Color** in `UNIT_COLORS` (`src/types.ts`), used by `GameState.spawnAgent`
 3. **Spawn** in the `spawnAgent(type, ...)` method of `src/game.ts`
-4. **Hotkey** in `src/main.ts` (`wireHUD` section)
+4. **Hotkey** in `src/ui/hudWiring/hotkeys.ts` (session wizard)
 5. (Optional) **Behavior** in `updateUnits(dt)` or a dedicated module
 
 ---
@@ -334,10 +345,9 @@ It is useful for auditing long sessions without opening external logs: the "stor
 
 ```
 src/
-├── game.ts              GameState, mission, loop, spawn
+├── game.ts              GameState, mission, spawn, fatigue/rest areas
 ├── gameConfig.ts        Config singleton (localStorage + thresholds)
-├── fatigue.ts           getUnitFatigue, removeRestArea
-├── priorityMatrix.ts    computePriorityScore
+├── priorityMatrix.ts    priorityScore, scoreToPriority, sortByPriority
 ├── map.ts               generateWorld (repos → hex tiles)
 ├── hex.ts               Axial coords, hex math
 ├── pathfinding.ts       A* with cache
@@ -351,8 +361,8 @@ src/
 └── styles/              CSS tokens, hud, components
 
 server/
-├── bridge.py            FastAPI bridge (entry point: python -m server.bridge)
-├── http_routes.py       All HTTP endpoints
+├── bridge.py            HTTP bridge (entry point: python -m server.bridge)
+├── http_routes.py       Compatibility facade; handlers in routes/
 ├── websocket_handler.py Bidirectional WebSocket
 ├── mcp_server.py        MCP stdio server (42 tools)
 ├── agent_runner.py      Runs agents (Hermes, Claude, Codex, OpenRouter…)
@@ -395,6 +405,7 @@ python3 -m pytest server/ -q
 
 | Doc | Contents |
 |-----|----------|
+| [docs/README.md](docs/README.md) | Documentation index: guides, reference and history |
 | [docs/SCOPE.md](docs/SCOPE.md) | What the project is and isn't |
 | [docs/API.md](docs/API.md) | Full endpoint reference |
 | [docs/MCP.md](docs/MCP.md) | MCP server — 42 tools, examples |
