@@ -22,7 +22,7 @@ import { type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D, hexCornerAngle3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
-import { sharedHexGeometry } from './hexGeometry.ts';
+import { sharedFlatHexGeometry } from './hexGeometry.ts';
 
 const transitionGroup = new Group();
 transitionGroup.name = 'fog-transition';
@@ -111,7 +111,7 @@ function startFadeOut(q: number, r: number, _tile: Tile): void {
     transparent: true,
     opacity: 0.93,
   });
-  const mesh = new InstancedMesh(sharedHexGeometry, mat, 1);
+  const mesh = new InstancedMesh(sharedFlatHexGeometry, mat, 1);
   const matrix = new Matrix4().makeTranslation(pos.x, pos.y, pos.z);
   mesh.setMatrixAt(0, matrix);
   mesh.instanceMatrix.needsUpdate = true;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createHexPrismGeometry, sharedHexGeometry } from './hexGeometry.ts';
+import { createHexPrismGeometry, sharedFlatHexGeometry, sharedHexGeometry } from './hexGeometry.ts';
 
 describe('createHexPrismGeometry', () => {
   it('top-facing triangles have normals pointing +Y', () => {
@@ -57,5 +57,13 @@ describe('createHexPrismGeometry', () => {
   it('exports shared geometry with default size', () => {
     expect(sharedHexGeometry).toBeDefined();
     expect(sharedHexGeometry.getAttribute('position').count).toBeGreaterThan(0);
+  });
+
+  it('builds an unsubdivided 20-triangle prism with the same footprint for fog meshes', () => {
+    // 4 top + 4 bottom + 6 sides × 2 = 20 triangles = 60 vertices.
+    expect(sharedFlatHexGeometry.getAttribute('position').count).toBe(60);
+    sharedFlatHexGeometry.computeBoundingBox();
+    sharedHexGeometry.computeBoundingBox();
+    expect(sharedFlatHexGeometry.boundingBox).toEqual(sharedHexGeometry.boundingBox);
   });
 });

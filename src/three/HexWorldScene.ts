@@ -28,7 +28,7 @@ import { tileKey } from '../types.ts';
 import { type GameState } from '../game.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { HEX_SIZE } from '../constants.ts';
-import { sharedHexGeometry } from './hexGeometry.ts';
+import { sharedFlatHexGeometry, sharedHexGeometry } from './hexGeometry.ts';
 import { axialToWorld3D, hexCornerAngle3D, TILE_HEIGHT } from './axialToWorld3D.ts';
 import { terrainSurfaceY } from './terrainSurfaceY.ts';
 import { instanceColorForTile } from './FogOfWar3D.ts';
@@ -823,7 +823,7 @@ function rebuildFogCover(state: GameState): void {
     transparent: true,
     opacity: 0.93,
   });
-  fogCoverMesh = new InstancedMesh(sharedHexGeometry, mat, unrevealed.length);
+  fogCoverMesh = new InstancedMesh(sharedFlatHexGeometry, mat, unrevealed.length);
 
   const matrix = new Matrix4();
   unrevealed.forEach((tile, i) => {
