@@ -107,7 +107,7 @@ The WebGL terrain shader uses:
       needed — the blender bake IS the blur. If `npm run assets:3d` was
       triggered accidentally, run `bake_atlas.py --group a` to restore.
 
-### Prop GLBs (Blender, deterministic)
+### Prop GLBs (Blender)
 
 Low-poly props under `public/assets/3d/props/` are generated headless
 (driver+payload pattern, explicit LCG, ≤300 tris each, ≤1.5MB dir total
@@ -120,6 +120,22 @@ python3 scripts/blender/make_props.py              # mountain-{0,1,2}
 python3 scripts/blender/make_props_vegetation.py   # desert palms/rocks, ice shards, hill shrubs, forest deciduous
 python3 scripts/blender/make_props_city.py         # city-hamlet/village/town centrepieces
 ```
+
+> **Hand-edited GLBs — the scripts do NOT reproduce them (PR #40).** These
+> props were rebuilt interactively in Blender (MCP) as single-material meshes
+> with baked vertex colors (`COLOR_0`), outward normals and embedded bases;
+> no generator in `scripts/blender/` emits that output:
+>
+> - `mountain-{0,1,2}`, `forest-pine-{0,1,2}`, `forest-deciduous-{0,1}`,
+>   `desert-palm-{0,1}`, `desert-rock-{0,1}`, `shrub-{0,1}`, `ice-shard-{0,1}`
+> - `kenney/*` (bridge, buildings, banners, details): the embedded hex tile
+>   bases, river channels and miniature trees were stripped, and the missing
+>   `Textures/colormap.png` reference was replaced by baked vertex colors.
+>
+> `npm run assets:props`, `make_props.py`, `make_props_vegetation.py` and
+> `rebuild_all_props_v2.py` still emit the older designs and **overwrite** the
+> mountain and vegetation files above. Until those scripts are updated, only
+> `make_props_city.py` (writes `city-*` only) is safe to run on its own.
 
 The vegetation/city/wonders scripts accept `--preview` to render a Cycles
 CPU contact sheet under `.hermes/artifacts/`. Consumers:
