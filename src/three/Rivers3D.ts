@@ -33,6 +33,7 @@ import { tileKey, type Tile } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+import { worldTerrainSurfaceY } from './terrainSurfaceY.ts';
 
 const riverGroup = new Group();
 riverGroup.name = 'rivers';
@@ -85,10 +86,10 @@ const MIN_SOURCE_SEPARATION = 5;
 const MIN_SOURCE_DIST = 3;
 
 /** Ribbon lift above the tile top face. Hills/mountain tops undulate
- *  (shader relief, amplitude HEX_SIZE*0.05 ≈ 2.6) so the river needs more
+ *  (shader relief, amplitude HEX_SIZE*0.12 ≈ 6.2) so the river needs more
  *  clearance there than on flat biomes. */
 function riverLift(terrain: Tile['terrain']): number {
-  return terrain === 'hills' || terrain === 'mountain' ? 3.4 : 1.6;
+  return terrain === 'mountain' ? 6.6 : terrain === 'hills' ? 4.6 : 1.8;
 }
 
 interface RiverPath {
@@ -171,9 +172,13 @@ export function computeRiverPaths(tiles: Map<string, Tile>): RiverPath[] {
         if (nt && nd !== undefined && nd < d && !visited.has(nk)) downs.push(nt);
       }
       if (downs.length === 0) break;
+      // Prefer land continuation before dumping into the sea on short runs so
+      // rivers don't terminate as 1-hex coastal stubs when a valley exists.
+      const nonOceanDowns = path.length < 3 ? downs.filter((t) => t.terrain !== 'ocean') : [];
+      const pool = nonOceanDowns.length > 0 ? nonOceanDowns : downs;
       // Deterministic meander: hash picks among the equally-valid descents.
       const h = hashCoord(current.coord.q, current.coord.r);
-      const next = downs[(h + step) % downs.length]!;
+      const next = pool[(h + step) % pool.length]!;
 
       if (next.terrain === 'ocean') {
         // Mouth: stop at the shared edge, reaching slightly into the sea.
@@ -210,7 +215,7 @@ export function computeRiverPaths(tiles: Map<string, Tile>): RiverPath[] {
     if (path.length < 2 || (mouth === null && !joined)) continue;
     for (const t of path) occupied.add(tileKey(t.coord));
 
-    const { points, revealed } = edgeRoutePath(path, mouth);
+    const { points, revealed } = edgeRoutePath(path, mouth, tiles);
     paths.push({ points, revealed, mouth });
   }
   return paths;
@@ -223,6 +228,12 @@ function tileCenterWorld(t: Tile): Vector3 {
   return p;
 }
 
+function dirIndexBetween(from: Axial, to: Axial): number {
+  const dq = to.q - from.q;
+  const dr = to.r - from.r;
+  return AXIAL_DIRECTIONS.findIndex((d) => d.q === dq && d.r === dr);
+}
+
 /** Re-route a tile-center descent onto the hex EDGE graph (Civ V draws rivers
  *  along edges, not across tile interiors). Two facts about a regular hex grid
  *  make this exact and index-free:
@@ -232,34 +243,66 @@ function tileCenterWorld(t: Tile): Vector3 {
  *    - three mutually-adjacent hexes meet at one corner = the centroid of the
  *      three centers, so a 60° turn routes mid → corner → mid with BOTH spans
  *      lying on actual edges.
- *  Only the spring head keeps the source-tile center (a river is born at a
- *  tile); the whole body hugs edges. Deterministic — same layout, same path. */
+ *  When a river turns by 120° or 180° across tile b (axialDistance(a, c) > 1),
+ *  walk the hex corners around b's perimeter so the ribbon still hugs hex
+ *  edges instead of cutting straight through b's interior mountain/city. */
 function edgeRoutePath(
   path: Tile[],
   mouth: Vector3 | null,
+  tiles: Map<string, Tile>,
 ): {
   points: Vector3[];
   revealed: boolean[];
 } {
-  const points: Vector3[] = [tileCenterWorld(path[0]!)];
+  const c0 = tileCenterWorld(path[0]!);
+  const c1 = tileCenterWorld(path[1]!);
+  // Start the spring on the source flank toward path[1] (outside the central peak)
+  const spring = c0.clone().lerp(c1, 0.36);
+  spring.y = Math.max(spring.y, worldTerrainSurfaceY(spring.x, spring.z, tiles) + 1.4);
+  const points: Vector3[] = [spring];
   const revealed: boolean[] = [path[0]!.revealed];
+
   for (let i = 0; i < path.length - 1; i++) {
     const a = path[i]!;
     const b = path[i + 1]!;
     const ca = tileCenterWorld(a);
     const cb = tileCenterWorld(b);
-    points.push(ca.clone().add(cb).multiplyScalar(0.5));
+    const mid = ca.clone().add(cb).multiplyScalar(0.5);
+    mid.y = Math.max(mid.y, worldTerrainSurfaceY(mid.x, mid.z, tiles) + 1.3);
+    points.push(mid);
     revealed.push(a.revealed && b.revealed);
+
     const c = path[i + 2];
-    if (c && axialDistance(a.coord, c.coord) === 1) {
-      points.push(
-        ca
-          .clone()
-          .add(cb)
-          .add(tileCenterWorld(c))
-          .multiplyScalar(1 / 3),
-      );
+    if (!c) continue;
+    if (axialDistance(a.coord, c.coord) === 1) {
+      const corner = ca
+        .clone()
+        .add(cb)
+        .add(tileCenterWorld(c))
+        .multiplyScalar(1 / 3);
+      corner.y = Math.max(corner.y, worldTerrainSurfaceY(corner.x, corner.z, tiles) + 1.3);
+      points.push(corner);
       revealed.push(a.revealed && b.revealed && c.revealed);
+    } else {
+      // Walk around b's 6-neighbor ring from direction(b->a) to direction(b->c)
+      // so the river follows b's hex edges instead of slicing across b's centre.
+      const dirA = dirIndexBetween(b.coord, a.coord);
+      const dirC = dirIndexBetween(b.coord, c.coord);
+      if (dirA >= 0 && dirC >= 0 && dirA !== dirC) {
+        const cwSteps = (dirC - dirA + 6) % 6;
+        const stepDir = cwSteps <= 3 ? 1 : -1;
+        const midDir = (dirA + stepDir + 6) % 6;
+        const dMid = AXIAL_DIRECTIONS[midDir]!;
+        const pMid = axialToWorld3D(
+          b.coord.q + dMid.q,
+          b.coord.r + dMid.r,
+          terrainElevation(b.terrain),
+        );
+        const edgePivot = cb.clone().add(pMid).multiplyScalar(0.5);
+        edgePivot.y = Math.max(cb.y, worldTerrainSurfaceY(edgePivot.x, edgePivot.z, tiles) + 1.3);
+        points.push(edgePivot);
+        revealed.push(a.revealed && b.revealed && c.revealed);
+      }
     }
   }
   if (mouth) {
@@ -271,7 +314,11 @@ function edgeRoutePath(
 
 /** Insert a hash-offset midpoint between consecutive controls so straight
  *  hex-to-hex runs still meander (Civ V rivers are never straight lines). */
-function meander(points: Vector3[], revealed: boolean[]): { pts: Vector3[]; rev: boolean[] } {
+function meander(
+  points: Vector3[],
+  revealed: boolean[],
+  tiles: Map<string, Tile>,
+): { pts: Vector3[]; rev: boolean[] } {
   const pts: Vector3[] = [];
   const rev: boolean[] = [];
   for (let i = 0; i < points.length; i++) {
@@ -283,16 +330,18 @@ function meander(points: Vector3[], revealed: boolean[]): { pts: Vector3[]; rev:
     const dx = b.x - a.x;
     const dz = b.z - a.z;
     const len = Math.hypot(dx, dz) || 1;
-    // Perpendicular offset, ±0.20 hex, deterministic per segment position.
+    // Gentle perpendicular offset scaled by span length so short corner spans
+    // never cusp or loop.
     const h = hashCoord(Math.round(a.x + b.x), Math.round(a.z + b.z));
-    const amp = (((h % 7) - 3) / 3) * HEX_SIZE * 0.2;
-    pts.push(
-      new Vector3(
-        (a.x + b.x) / 2 + (-dz / len) * amp,
-        (a.y + b.y) / 2,
-        (a.z + b.z) / 2 + (dx / len) * amp,
-      ),
-    );
+    const spanScale = Math.min(1, len / (HEX_SIZE * 0.85));
+    const amp = (((h % 7) - 3) / 3) * HEX_SIZE * 0.075 * spanScale;
+    const mx = (a.x + b.x) / 2 + (-dz / len) * amp;
+    const mz = (a.z + b.z) / 2 + (dx / len) * amp;
+    const isMouthSpan = i === points.length - 2 && b.y < -5;
+    const my = isMouthSpan
+      ? (a.y + b.y) / 2
+      : Math.max((a.y + b.y) / 2, worldTerrainSurfaceY(mx, mz, tiles) + 1.3);
+    pts.push(new Vector3(mx, my, mz));
     rev.push(revealed[i]! && revealed[i + 1]!);
   }
   return { pts, rev };
@@ -304,6 +353,7 @@ function appendRibbon(
   positions: number[],
   indices: number[],
   widthScale: number,
+  tiles: Map<string, Tile>,
 ): void {
   if (samples.length < 2) return;
   const baseVertex = positions.length / 3;
@@ -319,7 +369,18 @@ function appendRibbon(
     const w = halfW * (0.7 + 0.6 * (i / (samples.length - 1)));
     const nx = (-tz / tl) * w;
     const nz = (tx / tl) * w;
-    positions.push(p.x + nx, p.y, p.z + nz, p.x - nx, p.y, p.z - nz);
+    // Keep both banks strictly above the rendered terrain cap at (x ± nx, z ± nz)
+    // so neither side of the river ribbon ever clips underground on slopes.
+    const isMouthEnd = i >= samples.length - 2 && p.y < -5;
+    const y = isMouthEnd
+      ? p.y
+      : Math.max(
+          p.y,
+          worldTerrainSurfaceY(p.x, p.z, tiles) + 1.2,
+          worldTerrainSurfaceY(p.x + nx, p.z + nz, tiles) + 1.2,
+          worldTerrainSurfaceY(p.x - nx, p.z - nz, tiles) + 1.2,
+        );
+    positions.push(p.x + nx, y, p.z + nz, p.x - nx, y, p.z - nz);
   }
   // Winding: counter-clockwise seen from +Y so the face normal points up
   // (the first attempt wound them downward — the whole river backface-culled).
@@ -353,11 +414,12 @@ export function rebuildRivers(tiles: Map<string, Tile>): void {
   const positions: number[] = [];
   const indices: number[] = [];
   const mouths: Vector3[] = [];
+  const bridgeSpans: Array<{ pos: Vector3; angle: number }> = [];
 
   for (const path of paths) {
-    const { pts, rev } = meander(path.points, path.revealed);
+    const { pts, rev } = meander(path.points, path.revealed, tiles);
     if (pts.length < 2) continue;
-    const curve = new CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
+    const curve = new CatmullRomCurve3(pts, false, 'centripetal', 0.5);
     const samplesPerSpan = 6;
     const total = (pts.length - 1) * samplesPerSpan;
     // Sample the curve, tracking which control span each sample falls in so
@@ -370,12 +432,25 @@ export function rebuildRivers(tiles: Map<string, Tile>): void {
       if (visible) {
         run.push(curve.getPoint(t));
       } else if (run.length > 0) {
-        appendRibbon(run, positions, indices, 1);
+        appendRibbon(run, positions, indices, 1, tiles);
         run = [];
       }
     }
-    appendRibbon(run, positions, indices, 1);
+    appendRibbon(run, positions, indices, 1, tiles);
     if (path.mouth && path.revealed[path.revealed.length - 1]) mouths.push(path.mouth);
+
+    // River crossing bridge: sample directly on the meandered curve at t=0.5
+    // so the bridge sits centered over the water and aligns with the flow tangent.
+    if (path.points.length >= 3) {
+      const midSpan = Math.min(pts.length - 2, Math.floor(0.5 * (pts.length - 1)));
+      if (rev[midSpan] || rev[midSpan + 1]) {
+        const p = curve.getPoint(0.5).clone();
+        const tan = curve.getTangent(0.5);
+        p.y = Math.max(p.y, worldTerrainSurfaceY(p.x, p.z, tiles) + 1.2);
+        const flowAngle = Math.atan2(tan.z, tan.x);
+        bridgeSpans.push({ pos: p, angle: flowAngle });
+      }
+    }
   }
 
   if (positions.length === 0) return;
@@ -433,19 +508,6 @@ export function rebuildRivers(tiles: Map<string, Tile>): void {
 
   // River crossings: place a 3D bridge (Kenney bridge.glb or procedural stone span)
   // at the revealed midpoint of each river path.
-  const bridgeSpans: Array<{ pos: Vector3; angle: number }> = [];
-  for (const path of paths) {
-    if (path.points.length < 3) continue;
-    const midIdx = Math.floor(path.points.length / 2);
-    if (!path.revealed[midIdx]) continue;
-    const p = path.points[midIdx]!;
-    const prev = path.points[Math.max(0, midIdx - 1)]!;
-    const next = path.points[Math.min(path.points.length - 1, midIdx + 1)]!;
-    // Orient perpendicular to river flow tangent
-    const flowAngle = Math.atan2(next.z - prev.z, next.x - prev.x);
-    bridgeSpans.push({ pos: p, angle: flowAngle + Math.PI / 2 });
-  }
-
   if (bridgeSpans.length > 0) {
     const up = new Vector3(0, 1, 0);
     const quat = new Quaternion();
@@ -462,7 +524,7 @@ export function rebuildRivers(tiles: Map<string, Tile>): void {
       bMesh.userData.sharedGeometry = true;
       bMesh.castShadow = true;
       bMesh.receiveShadow = true;
-      const s = HEX_SIZE * 0.34 * bridgeVariant.norm;
+      const s = HEX_SIZE * 0.4 * bridgeVariant.norm;
       scl.set(s, s, s);
       for (let i = 0; i < bridgeSpans.length; i++) {
         const span = bridgeSpans[i]!;
@@ -474,7 +536,7 @@ export function rebuildRivers(tiles: Map<string, Tile>): void {
       bMesh.instanceMatrix.needsUpdate = true;
       riverGroup.add(bMesh);
     } else {
-      const deckGeom = new BoxGeometry(HEX_SIZE * 0.28, HEX_SIZE * 0.04, HEX_SIZE * 0.12);
+      const deckGeom = new BoxGeometry(HEX_SIZE * 0.12, HEX_SIZE * 0.04, HEX_SIZE * 0.28);
       const deckMat = new MeshStandardMaterial({ color: 0x8b7355, roughness: 0.78 });
       const bMesh = new InstancedMesh(deckGeom, deckMat, bridgeSpans.length);
       bMesh.castShadow = true;

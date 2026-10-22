@@ -24,7 +24,7 @@ import { type Tile } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
-import { PROP_SURFACE_CLEARANCE, terrainSurfaceY } from './terrainSurfaceY.ts';
+import { PROP_SURFACE_CLEARANCE, terrainFootprintMaxY } from './terrainSurfaceY.ts';
 
 const wonderGroup = new Group();
 wonderGroup.name = 'wonder-props';
@@ -54,7 +54,7 @@ let wonderGlbLoadState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
 export function wonderModelForType(wonderType: string): WonderKenneyId {
   const s = wonderType.toLowerCase();
   if (
-    /(^|[-_])(llm|ai|wizard|ollama|vllm|openrouter|model|chat|bibliotheca|claude|codex)($|[-_])/.test(
+    /(^|[-_])(llm|ai|wizard|ollama|vllm|openrouter|model|chat|bibliotheca|archive|knowledge|wiki|claude|codex)($|[-_])/.test(
       s,
     )
   ) {
@@ -65,7 +65,11 @@ export function wonderModelForType(wonderType: string): WonderKenneyId {
   ) {
     return 'building-watermill';
   }
-  if (/(^|[-_])(worker|build|docker|gpu|compute|smelter|prometheus|grafana|ci)($|[-_])/.test(s)) {
+  if (
+    /(^|[-_])(worker|build|docker|gpu|compute|smelter|lab|forge|prometheus|grafana|ci)($|[-_])/.test(
+      s,
+    )
+  ) {
     return 'building-smelter';
   }
   if (
@@ -271,7 +275,7 @@ export function rebuildWonderProps(tiles: Tile[]): void {
     // even if some tile carried it.
     if (tile.district.wonderType === 'gaceta') continue;
 
-    const wonderY = terrainSurfaceY(tile) + PROP_SURFACE_CLEARANCE;
+    const wonderY = terrainFootprintMaxY(tile, 0, 0, HEX_SIZE * 0.26) + PROP_SURFACE_CLEARANCE;
     const inst = buildWonderInstance(tile.district.wonderType);
     inst.position.set(pos.x, wonderY, pos.z);
     genericGroup.add(inst);

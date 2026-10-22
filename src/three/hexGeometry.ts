@@ -103,9 +103,43 @@ export function createHexPrismGeometry(
 
   const topRing = fullTop ? top : innerTop;
 
-  // 1. Top face (CCW from +Y)
-  for (let i = 1; i < 5; i++) {
-    pushTri(topRing[0]!, topRing[i + 1]!, topRing[i]!);
+  // 1. Top face (CCW from +Y): subdivided into 4 concentric hex rings so the
+  // inner plateau (r <= 0.55 * circumradius, where terrainShader's neighbor
+  // elevation ramp weight smoothstep(0.55, 0.98, edgeT) is 0) stays flat at
+  // the tile's own elevation while only the outer rim ramps to neighbors.
+  // Without interior rings, the 6 corner vertices tented straight across the
+  // hex centre — burying cities next to hills and dropping mountain tops
+  // 18 units below their mountain props.
+  const RING_FRACTIONS = [0.28, 0.55, 0.78, 1.0] as const;
+  const EDGE_SEGMENTS = RING_FRACTIONS.length; // 4 segments per hex edge
+  if (fullTop) {
+    const ringPoint = (wedge: number, ringIdx: number, step: number): [number, number, number] => {
+      if (ringIdx === 0) return [0, 0, 0];
+      const frac = RING_FRACTIONS[ringIdx - 1]!;
+      const c0 = topRing[wedge]!;
+      const c1 = topRing[(wedge + 1) % 6]!;
+      const t = step / ringIdx;
+      return [(c0[0] * (1 - t) + c1[0] * t) * frac, 0, (c0[2] * (1 - t) + c1[2] * t) * frac];
+    };
+
+    for (let w = 0; w < 6; w++) {
+      for (let k = 1; k <= EDGE_SEGMENTS; k++) {
+        for (let j = 0; j < k; j++) {
+          const pInner0 = ringPoint(w, k - 1, j);
+          const pOuter0 = ringPoint(w, k, j);
+          const pOuter1 = ringPoint(w, k, j + 1);
+          pushTri(pInner0, pOuter1, pOuter0);
+          if (j < k - 1) {
+            const pInner1 = ringPoint(w, k - 1, j + 1);
+            pushTri(pInner0, pInner1, pOuter1);
+          }
+        }
+      }
+    }
+  } else {
+    for (let i = 1; i < 5; i++) {
+      pushTri(topRing[0]!, topRing[i + 1]!, topRing[i]!);
+    }
   }
 
   // 2. Bottom face
@@ -124,11 +158,39 @@ export function createHexPrismGeometry(
     }
   }
 
-  // 4. Side faces
+  // 4. Side faces (subdivided along each edge to match the 4-segment top rim)
   for (let i = 0; i < 6; i++) {
     const j = (i + 1) % 6;
-    pushTri(outerTop[i]!, bottom[i]!, bottom[j]!);
-    pushTri(outerTop[i]!, bottom[j]!, outerTop[j]!);
+    const t0 = outerTop[i]!;
+    const t1 = outerTop[j]!;
+    const b0 = bottom[i]!;
+    const b1 = bottom[j]!;
+    for (let s = 0; s < EDGE_SEGMENTS; s++) {
+      const u0 = s / EDGE_SEGMENTS;
+      const u1 = (s + 1) / EDGE_SEGMENTS;
+      const ta: [number, number, number] = [
+        t0[0] * (1 - u0) + t1[0] * u0,
+        t0[1],
+        t0[2] * (1 - u0) + t1[2] * u0,
+      ];
+      const tb: [number, number, number] = [
+        t0[0] * (1 - u1) + t1[0] * u1,
+        t0[1],
+        t0[2] * (1 - u1) + t1[2] * u1,
+      ];
+      const ba: [number, number, number] = [
+        b0[0] * (1 - u0) + b1[0] * u0,
+        b0[1],
+        b0[2] * (1 - u0) + b1[2] * u0,
+      ];
+      const bb: [number, number, number] = [
+        b0[0] * (1 - u1) + b1[0] * u1,
+        b0[1],
+        b0[2] * (1 - u1) + b1[2] * u1,
+      ];
+      pushTri(ta, ba, bb);
+      pushTri(ta, bb, tb);
+    }
   }
 
   const geom = new BufferGeometry();

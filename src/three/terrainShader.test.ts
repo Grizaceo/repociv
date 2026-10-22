@@ -23,7 +23,7 @@ describe('terrainShader', () => {
   it('exposes a versioned customProgramCacheKey', () => {
     const mat = createTerrainMaterial();
     // Bumping the version in terrainShader.ts must update this.
-    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v41');
+    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v44');
   });
 
   it('produces a stable fragment shader from onBeforeCompile', () => {
@@ -83,8 +83,8 @@ describe('terrainShader', () => {
     expect(capture.vertex).toMatch(
       /bool isOceanTile[\s\S]*if \(!isOceanTile && !isIceTile && transformed\.y > -1\.0\)/,
     );
-    // Per-edge ramp: weighted-average elevation diff toward each edge midpoint
-    expect(capture.vertex).toContain('(rampSum / rampW) * 0.5 * uTileHeight');
+    // Per-edge ramp: watertight barycentric elevation blend across edges and 3-tile corners
+    expect(capture.vertex).toContain('(rampSum / (1.0 + rampW)) * uTileHeight');
     expect(capture.vertex).toContain('neighborIdxAt(instanceNeighborPacked, k)');
     // P5: City color attribute and varying
     expect(capture.vertex).toContain('attribute float instanceSideCullMask');

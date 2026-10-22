@@ -290,22 +290,6 @@ def build_shrub(vi):
     export_glb(f'shrub-{vi}')
     clear_scene()
 
-def build_crystal():
-    rng = Lcg(42)
-    verts = []; faces = []
-    for ci in range(3):
-        angle = ci * (math.tau / 3) + rng.range(-0.1, 0.1)
-        cx = math.cos(angle) * 0.15; cy = math.sin(angle) * 0.15
-        h = rng.range(0.35, 0.55); r = rng.range(0.08, 0.14)
-        base = len(verts)
-        verts += [(cx, cy, h), (cx+r, cy, h*0.3), (cx, cy+r, h*0.3), (cx-r, cy, h*0.3), (cx, cy-r, h*0.3), (cx, cy, 0)]
-        faces += [(base,base+1,base+2),(base,base+2,base+4),(base,base+4,base+3),(base,base+3,base+1),
-                  (base+5,base+2,base+1),(base+5,base+4,base+2),(base+5,base+3,base+4),(base+5,base+1,base+3)]
-    mats = [(make_mat('crystal-0', (0.45,0.20,0.65), 0.20, 0.30, (0.30,0.10,0.50), 2.0), len(faces))]
-    add_mesh_to_scene('resource-crystal-0', verts, faces, mats)
-    export_glb('resource-crystal-0')
-    clear_scene()
-
 def build_sacred_marker():
     verts = []; stone_f = []
     n = 6
@@ -498,7 +482,6 @@ def main():
     
     # Resources
     print("=== RESOURCES ===")
-    build_crystal()
     build_sacred_marker()
     
     # Worker

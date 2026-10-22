@@ -32,11 +32,26 @@ describe('createHexPrismGeometry', () => {
     }
   });
 
-  it('uses a full-radius top face for seamless flat-top tiling', () => {
+  it('uses a subdivided full-radius top face with an inner plateau for seamless flat-top tiling', () => {
     const geom = createHexPrismGeometry(50, 8);
-    const count = geom.getAttribute('position').count;
-    // Full-radius prism: 4 top + 4 bottom + 12 side = 20 triangles = 60 vertices
-    expect(count).toBe(60);
+    const posAttr = geom.getAttribute('position');
+    const count = posAttr.count;
+    // Subdivided prism: 96 top + 4 bottom + 48 side = 148 triangles = 444 vertices
+    expect(count).toBe(444);
+
+    // Verify interior plateau vertices exist within r <= 0.55 * circumradius so
+    // neighbor elevation ramps at the outer rim never tent across tile centres.
+    const arr = posAttr.array as Float32Array;
+    let innerPlateauVerts = 0;
+    for (let i = 0; i < arr.length; i += 3) {
+      const x = arr[i]!;
+      const y = arr[i + 1]!;
+      const z = arr[i + 2]!;
+      if (y === 0 && Math.hypot(x, z) <= 50 * 0.56) {
+        innerPlateauVerts++;
+      }
+    }
+    expect(innerPlateauVerts).toBeGreaterThan(30);
   });
 
   it('exports shared geometry with default size', () => {
