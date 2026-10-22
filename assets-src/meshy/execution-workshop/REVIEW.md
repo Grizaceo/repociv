@@ -1,25 +1,42 @@
-# Execution Workshop concept review
+# Execution Workshop review
 
-Cristóbal approved Nano Banana Pro at 9 credits explicitly through the model/cost selector. One paid image-to-image request was submitted using the existing textured Archive PNG as the real reference. No geometry request was submitted.
+## Approved concept
 
-- Task: `01a165c7-ddb4-7453-8364-c1edc5eba490`
-- State read back: SUCCEEDED, 100%, consumed_credits 9
-- Balance: 1085 → 1076; delta reconciles with task credits
-- Local candidate: `preview.png` (ignored)
+Cristóbal approved Nano Banana Pro at 9 credits explicitly through the model/cost selector. One paid image-to-image request used the existing textured Archive PNG as the real reference. Cristóbal subsequently approved the Workshop concept and proceeding to the proposed 5-credit geometry step.
+
+- Concept task: `01a165c7-ddb4-7453-8364-c1edc5eba490`
+- Concept state: SUCCEEDED, consumed_credits 9
+- Concept balance: 1085 → 1076, reconciled
+- Local image: `preview.png` (ignored)
 - Comparison: `/scripts/meshy/family-review.html`
 
-## Image evidence
+The image has two broad gabled roofs, a large recessed loading arch, open doors, pale masonry, slate tiles, brown/copper-colored framing and a short rear stack. The brown framing reads as timber as much as metal; the user approved this differentiation. The concept is not proof of back surfaces, topology or PBR materials.
 
-One compact, low building with two broad gabled roof masses, a large recessed arch/loading entrance, double wooden-looking doors, pale masonry, dark slate roof tiles and brown/copper-colored framing. A short rear stack and small amber-lit windows distinguish it from the Archive's tower/crown. The full silhouette is visible without characters, logos, floating components or surrounding scenery.
+## Untextured geometry
 
-Palette and substantial roof masses plausibly relate it to the Archive, but this is not a strict shape match: gables replace terraces, and the brown framing reads at least as much as timber as metal. This may be desirable workshop differentiation or excessive medieval-house drift; Cristóbal's review decides. Do not report material identity as proven from a single concept image.
+One Image-to-3D request, directly referencing the successful concept task with `input_task_id`; no re-upload or regeneration of the concept. Explicit Meshy T2.5 Smart Topology, 4000 target triangles, should_texture=false, enable_pbr=false, GLB only. Exclusive submission marker retained locally; no automatic POST retry.
 
-The back, topology, actual triangle count and PBR response remain untested because this is 2D only. No claim of a finished game asset or user artistic approval is made.
+- Geometry task: `01a165e0-7aca-741b-bf25-769ef4fa5a66`
+- State read back: SUCCEEDED, 100%, consumed_credits 5
+- Geometry balance: 1076 → 1071, delta 5 reconciled
+- File: `geometry/preview.glb` (ignored), 71940 bytes
+- SHA-256: `6ca232dbf5bccc6318532e3a8d52de56873e69e2966011ffa83b4f6bb6759426`
+- Actual: 3735 triangles, 1 mesh, 0 authored materials
+- Thumbnail plus four side thumbnails downloaded under `geometry/preview.*.png`
+- Viewer: `/scripts/meshy/workshop-preview.html`
+
+The original GLB has POSITION but no NORMAL vertex attribute. Replacing its default display material with a lit standard material initially produced a black silhouette. The viewer now derives missing vertex normals in memory before assigning clay material. This does not alter the saved GLB, vertices or triangle count. Derived smoothing is only a preview decision, not a topology repair.
+
+## Visual and browser evidence
+
+Real Chromium/WebGL import: ready, 3735 triangles, 1 mesh, no page errors. Six review views exercised (isometric, four sides, dragged orbit); missing-GLB error message verified separately. Runtime normals are checked for presence and finite, nonzero values. The local family comparison loads both concept images and links to the new viewer. This is asset-viewer QA, not map integration.
+
+The mesh retains the low twin-wing massing, open entrance doors and rear stack. Actual isometric and rear screenshots show imperfect reconstruction: irregular window openings, and an open-looking separation/slot in the central roof area. Do not certify a closed roof, watertight mesh or faithful back reconstruction. No paid retry, texturing or automatic repair has been submitted. User geometry review remains pending.
+
+Screenshots and browser report: `$TMPDIR/repociv-meshy/workshop/`. Seven offline geometry runner scope/anti-double-spend tests passed before POST. The initial missing-normal display was detected by inspecting real screenshots rather than accepting a successful load as visual success.
 
 ## Next gate
 
-User approval of this concept and explicit 5-credit geometry confirmation before image-to-3D. Use saved image-to-image task ID as the image source. One Meshy T2.5 Smart Topology request, target 4000 triangles, GLB, textures disabled. Do not texture automatically.
+Review geometry, especially the central roof and windows, before paying for texturing. Concept approval is not geometry approval. Any repair/remesh/regeneration or texture call is a separate paid action requiring its cost to be confirmed. No Observatory generation is authorized by this step.
 
-## Client lesson
-
-The MCP Meshy process still lacked MESHY_API_KEY even though the local Hermes env contains the configured credential. A free balance check exposed this before any paid MCP action. Used documented REST with the existing local key, not a second configuration write. The concept runner persists an exclusive marker before POST, saves task ID for GET-only resume, does not persist base64 reference data or API keys, and never automatically retries a paid request. Five offline guard tests passed before submission; Ruff passed.
+All candidates remain local/ignored and outside public/; license clearance remains pending. No push, merge or deployment.
