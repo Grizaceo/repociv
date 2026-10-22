@@ -85,12 +85,9 @@ const MIN_SOURCE_SEPARATION = 5;
 /** Minimum BFS distance to the sea for a tile to qualify as a source. */
 const MIN_SOURCE_DIST = 3;
 
-/** Ribbon lift above the tile top face. Hills/mountain tops undulate
- *  (shader relief, amplitude HEX_SIZE*0.12 ≈ 6.2) so the river needs more
- *  clearance there than on flat biomes. */
-function riverLift(terrain: Tile['terrain']): number {
-  return terrain === 'mountain' ? 6.6 : terrain === 'hills' ? 4.6 : 1.8;
-}
+/** Control-point clearance above the rendered terrain cap (worldTerrainSurfaceY
+ *  mirrors the shader's ramp + relief, so no per-biome lift is needed). */
+const RIVER_CLEARANCE = 1.3;
 
 interface RiverPath {
   /** Tile-center control points, last one reaching into the river mouth. */
@@ -172,13 +169,11 @@ export function computeRiverPaths(tiles: Map<string, Tile>): RiverPath[] {
         if (nt && nd !== undefined && nd < d && !visited.has(nk)) downs.push(nt);
       }
       if (downs.length === 0) break;
-      // Prefer land continuation before dumping into the sea on short runs so
-      // rivers don't terminate as 1-hex coastal stubs when a valley exists.
-      const nonOceanDowns = path.length < 3 ? downs.filter((t) => t.terrain !== 'ocean') : [];
-      const pool = nonOceanDowns.length > 0 ? nonOceanDowns : downs;
       // Deterministic meander: hash picks among the equally-valid descents.
+      // (BFS neighbors differ by at most one hop, so every descent is at
+      // d-1: all land, or — one hop from the coast — all sea.)
       const h = hashCoord(current.coord.q, current.coord.r);
-      const next = pool[(h + step) % pool.length]!;
+      const next = downs[(h + step) % downs.length]!;
 
       if (next.terrain === 'ocean') {
         // Mouth: stop at the shared edge, reaching slightly into the sea.
@@ -221,10 +216,15 @@ export function computeRiverPaths(tiles: Map<string, Tile>): RiverPath[] {
   return paths;
 }
 
-/** Lifted world-space center of a tile (ribbon clearance baked in). */
+/** World-space center of a tile; callers only use its XZ (heights come from
+ *  the terrain surface at each control point). */
 function tileCenterWorld(t: Tile): Vector3 {
-  const p = axialToWorld3D(t.coord.q, t.coord.r, terrainElevation(t.terrain));
-  p.y += riverLift(t.terrain);
+  return axialToWorld3D(t.coord.q, t.coord.r, terrainElevation(t.terrain));
+}
+
+/** Snap a control point onto the rendered terrain cap plus clearance. */
+function onSurface(p: Vector3, tiles: Map<string, Tile>, clearance = RIVER_CLEARANCE): Vector3 {
+  p.y = worldTerrainSurfaceY(p.x, p.z, tiles) + clearance;
   return p;
 }
 
@@ -243,10 +243,11 @@ function dirIndexBetween(from: Axial, to: Axial): number {
  *    - three mutually-adjacent hexes meet at one corner = the centroid of the
  *      three centers, so a 60° turn routes mid → corner → mid with BOTH spans
  *      lying on actual edges.
- *  When a river turns by 120° or 180° across tile b (axialDistance(a, c) > 1),
- *  walk the hex corners around b's perimeter so the ribbon still hugs hex
- *  edges instead of cutting straight through b's interior mountain/city. */
-function edgeRoutePath(
+ *  When a river turns by 120° or runs straight across tile b
+ *  (axialDistance(a, c) > 1), walk the edge midpoints around b's perimeter so
+ *  the ribbon still hugs hex edges instead of cutting through b's interior
+ *  mountain/city. */
+export function edgeRoutePath(
   path: Tile[],
   mouth: Vector3 | null,
   tiles: Map<string, Tile>,
@@ -257,8 +258,7 @@ function edgeRoutePath(
   const c0 = tileCenterWorld(path[0]!);
   const c1 = tileCenterWorld(path[1]!);
   // Start the spring on the source flank toward path[1] (outside the central peak)
-  const spring = c0.clone().lerp(c1, 0.36);
-  spring.y = Math.max(spring.y, worldTerrainSurfaceY(spring.x, spring.z, tiles) + 1.4);
+  const spring = onSurface(c0.clone().lerp(c1, 0.36), tiles, 1.4);
   const points: Vector3[] = [spring];
   const revealed: boolean[] = [path[0]!.revealed];
 
@@ -267,41 +267,46 @@ function edgeRoutePath(
     const b = path[i + 1]!;
     const ca = tileCenterWorld(a);
     const cb = tileCenterWorld(b);
-    const mid = ca.clone().add(cb).multiplyScalar(0.5);
-    mid.y = Math.max(mid.y, worldTerrainSurfaceY(mid.x, mid.z, tiles) + 1.3);
+    const mid = onSurface(ca.clone().add(cb).multiplyScalar(0.5), tiles);
     points.push(mid);
     revealed.push(a.revealed && b.revealed);
 
     const c = path[i + 2];
     if (!c) continue;
     if (axialDistance(a.coord, c.coord) === 1) {
-      const corner = ca
-        .clone()
-        .add(cb)
-        .add(tileCenterWorld(c))
-        .multiplyScalar(1 / 3);
-      corner.y = Math.max(corner.y, worldTerrainSurfaceY(corner.x, corner.z, tiles) + 1.3);
+      const corner = onSurface(
+        ca
+          .clone()
+          .add(cb)
+          .add(tileCenterWorld(c))
+          .multiplyScalar(1 / 3),
+        tiles,
+      );
       points.push(corner);
       revealed.push(a.revealed && b.revealed && c.revealed);
     } else {
       // Walk around b's 6-neighbor ring from direction(b->a) to direction(b->c)
-      // so the river follows b's hex edges instead of slicing across b's centre.
+      // so the river follows b's hex edges instead of slicing across b's centre:
+      // one pivot per edge in between (120° turn: 1, straight run: 2, taken
+      // clockwise). Consecutive edge midpoints keep each chord 0.75·R from b's
+      // centre; a single pivot on a straight run left a chord at 0.43·R,
+      // through b's mountain or city props.
       const dirA = dirIndexBetween(b.coord, a.coord);
       const dirC = dirIndexBetween(b.coord, c.coord);
       if (dirA >= 0 && dirC >= 0 && dirA !== dirC) {
         const cwSteps = (dirC - dirA + 6) % 6;
         const stepDir = cwSteps <= 3 ? 1 : -1;
-        const midDir = (dirA + stepDir + 6) % 6;
-        const dMid = AXIAL_DIRECTIONS[midDir]!;
-        const pMid = axialToWorld3D(
-          b.coord.q + dMid.q,
-          b.coord.r + dMid.r,
-          terrainElevation(b.terrain),
-        );
-        const edgePivot = cb.clone().add(pMid).multiplyScalar(0.5);
-        edgePivot.y = Math.max(cb.y, worldTerrainSurfaceY(edgePivot.x, edgePivot.z, tiles) + 1.3);
-        points.push(edgePivot);
-        revealed.push(a.revealed && b.revealed && c.revealed);
+        const steps = stepDir === 1 ? cwSteps : 6 - cwSteps;
+        for (let s = 1; s < steps; s++) {
+          const dMid = AXIAL_DIRECTIONS[(dirA + stepDir * s + 6) % 6]!;
+          const pMid = axialToWorld3D(
+            b.coord.q + dMid.q,
+            b.coord.r + dMid.r,
+            terrainElevation(b.terrain),
+          );
+          points.push(onSurface(cb.clone().add(pMid).multiplyScalar(0.5), tiles));
+          revealed.push(a.revealed && b.revealed && c.revealed);
+        }
       }
     }
   }

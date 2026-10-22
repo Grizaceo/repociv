@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { computeRiverPaths, rebuildRivers, clearRivers, getRiverGroup } from './Rivers3D.ts';
+import {
+  computeRiverPaths,
+  edgeRoutePath,
+  rebuildRivers,
+  clearRivers,
+  getRiverGroup,
+} from './Rivers3D.ts';
 import { worldTerrainSurfaceY } from './terrainSurfaceY.ts';
+import { axialToWorld3D } from './axialToWorld3D.ts';
+import { HEX_SIZE } from '../constants.ts';
 import { tileKey, type Tile, type Terrain } from '../types.ts';
 
 /** Synthetic island: mountain core, plains ring, ocean rim. */
@@ -79,5 +87,48 @@ describe('Rivers3D', () => {
 
     clearRivers();
     expect(getRiverGroup().children.length).toBe(0);
+  });
+
+  it('keeps river control points on the terrain surface, not floating over highland edges', () => {
+    const island = makeIsland();
+    const paths = computeRiverPaths(island);
+    expect(paths.length).toBeGreaterThan(0);
+    for (const p of paths) {
+      // Body points only: the mouth deliberately dips to the sea surface.
+      const body = p.mouth ? p.points.slice(0, -1) : p.points;
+      for (const pt of body) {
+        const lift = pt.y - worldTerrainSurfaceY(pt.x, pt.z, island);
+        expect(lift).toBeGreaterThanOrEqual(1.29);
+        expect(lift).toBeLessThanOrEqual(1.41);
+      }
+    }
+  });
+
+  it('routes straight runs and 120° turns around the tile perimeter, never near its centre', () => {
+    const island = makeIsland();
+    const tile = (q: number, r: number) => island.get(tileKey({ q, r }))!;
+    const center = axialToWorld3D(0, 0, 0);
+    // Distance from b's centre to segment p→q in XZ.
+    const segDist = (p: { x: number; z: number }, q: { x: number; z: number }) => {
+      const dx = q.x - p.x;
+      const dz = q.z - p.z;
+      const t = Math.max(
+        0,
+        Math.min(1, ((center.x - p.x) * dx + (center.z - p.z) * dz) / (dx * dx + dz * dz)),
+      );
+      return Math.hypot(p.x + dx * t - center.x, p.z + dz * t - center.z);
+    };
+    for (const path of [
+      [tile(-1, 0), tile(0, 0), tile(1, 0)], // straight
+      [tile(0, -1), tile(0, 0), tile(0, 1)], // straight, other axis
+      [tile(-1, 0), tile(0, 0), tile(1, -1)], // 120° turn
+    ]) {
+      const { points } = edgeRoutePath(path, null, island);
+      // Skip the spring (inside the source tile); every later chord is on or
+      // around b's perimeter: consecutive edge midpoints sit 0.75·R out.
+      for (let i = 1; i < points.length - 1; i++) {
+        expect(segDist(points[i]!, points[i + 1]!)).toBeGreaterThan(HEX_SIZE * 0.7);
+      }
+    }
   });
 });
