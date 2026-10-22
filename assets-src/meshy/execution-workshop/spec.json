@@ -1,0 +1,45 @@
+{
+  "asset_id": "execution-workshop-v001",
+  "status": "prepared; awaiting explicit concept model/cost confirmation",
+  "license_status": "unverified; local candidates only",
+  "reference_asset": "memory-archive-v001",
+  "concept": {
+    "tool": "meshy_image_to_image",
+    "proposed_model": "nano-banana-pro",
+    "advertised_credits": 9,
+    "max_create_requests": 1,
+    "reference_relative_paths": ["assets-src/meshy/memory-archive/textured/archive-textured.png"],
+    "request_without_reference_paths": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "Create ONE NEW Execution Workshop building for the same original strategy-game civilization as the reference Memory Archive. Use the reference as a strict architectural art-direction guide, NOT as the building to reproduce. Retain its broad stepped terraces, generous dark slate ceramic eaves, warm pale limestone, aged copper structural accents, compact polygonal base and hand-crafted stylized finish. Change the massing clearly: a LOW HORIZONTAL artisan/compute workshop, two broad staggered work-hall wings around a deep open loading arch, a short sturdy rear exhaust or ventilation stack. Width dominates height. Substantial beams and restrained copper braces, a small amber interior accent. No library tower or lantern crown, no modern industrial factory, no religious temple. Readable at elevated isometric map scale. Show one complete standalone building in a clean three-quarter elevated view on a plain neutral background. Keep all sides inside frame. No scenery, ground tile, characters, text, logos, gears used as signs, floating parts, thin railings, excessive weathering or dramatic baked shadows. Distinct workshop silhouette but unmistakably from the reference building's family.",
+      "generate_multi_view": false,
+      "aspect_ratio": "1:1",
+      "remove_background": true,
+      "response_format": "json"
+    }
+  },
+  "geometry_after_concept_approval": {
+    "tool": "meshy_image_to_3d",
+    "advertised_credits": 5,
+    "max_create_requests": 1,
+    "request_without_input_task_id": {
+      "ai_model": "meshy-t2.5",
+      "model_type": "smart-topology",
+      "target_polycount": 4000,
+      "topology": "triangle",
+      "should_texture": false,
+      "enable_pbr": false,
+      "target_formats": ["glb"],
+      "alpha_thumbnail": true,
+      "multi_view_thumbnails": true,
+      "auto_size": false,
+      "response_format": "json"
+    }
+  },
+  "guards": {
+    "auto_refine": false,
+    "auto_retry_paid_requests": false,
+    "auto_generate_observatory": false,
+    "max_proposed_credits_through_geometry": 14
+  }
+}
