@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="es">
+  <meta charset="UTF-8" /><title>RepoCiv · Archivo de memoria</title>
+  <style>
+    body {
+      margin: 0;
+      background: #151c23;
+      color: #eee;
+      font: 15px system-ui;
+    }
+    #info {
+      position: absolute;
+      top: 16px;
+      left: 20px;
+      max-width: 440px;
+      background: #18222ddd;
+      padding: 14px;
+      border: 1px solid #b99b63;
+      border-radius: 8px;
+    }
+    p {
+      margin: 6px 0;
+    }
+    canvas {
+      display: block;
+    }
+    button {
+      padding: 6px 12px;
+      margin-top: 8px;
+    }
+  </style>
+  <div id="info">
+    <strong>RepoCiv · Archivo de memoria</strong>
+    <p>Prueba local del prop real. Arrastra para orbitar; rueda para acercar.</p>
+    <p id="status">Cargando…</p>
+    <p>
+      Iluminación equivalente al mapa; esta escena aislada no sustituye una prueba del dashboard
+      completo.
+    </p>
+    <button id="reset">Restablecer cámara</button>
+  </div>
+  <script type="module">
+    import * as T from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import {
+      ensureWonderPropsLoad,
+      rebuildWonderProps,
+      getWonderPropsGroup,
+      areWonderPropsSettled,
+    } from '/src/three/WonderProps3D.ts';
+    import { memoryArchiveState } from '/src/three/MemoryArchive3D.ts';
+    import { HEX_SIZE } from '/src/constants.ts';
+    import { terrainFootprintMaxY, PROP_SURFACE_CLEARANCE } from '/src/three/terrainSurfaceY.ts';
+    const scene = new T.Scene();
+    scene.background = new T.Color('#202c36');
+    scene.add(new T.AmbientLight(0xdacfb6, 0.38), new T.HemisphereLight(0xb0d8f0, 0x7aaa60, 0.34));
+    const sun = new T.DirectionalLight(0xffe7bd, 1.3);
+    sun.position.set(150, 240, 100);
+    sun.castShadow = true;
+    sun.shadow.camera.left = sun.shadow.camera.bottom = -HEX_SIZE * 2;
+    sun.shadow.camera.right = sun.shadow.camera.top = HEX_SIZE * 2;
+    sun.shadow.camera.far = 1000;
+    sun.shadow.mapSize.set(1024, 1024);
+    scene.add(sun);
+    const fill = new T.DirectionalLight(0xd0e8ff, 0.16);
+    fill.position.set(-100, 60, -80);
+    scene.add(fill);
+    const renderer = new T.WebGLRenderer({ antialias: true });
+    renderer.shadowMap.enabled = true;
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    document.body.append(renderer.domElement);
+    const camera = new T.PerspectiveCamera(38, 1, 0.1, HEX_SIZE * 100);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    function reset() {
+      camera.position.set(HEX_SIZE * 0.95, HEX_SIZE * 0.9, HEX_SIZE * 1.1);
+      controls.target.set(0, HEX_SIZE * 0.15, 0);
+      controls.update();
+    }
+    reset();
+    document.querySelector('#reset').onclick = reset;
+    const group = getWonderPropsGroup();
+    scene.add(group);
+    const tile = {
+      coord: { q: 0, r: 0 },
+      terrain: 'plains',
+      revealed: true,
+      district: { type: 'wonder', wonderType: 'memory-archive' },
+    };
+    const ground = new T.Mesh(
+      new T.CylinderGeometry(HEX_SIZE * 0.82, HEX_SIZE * 0.82, HEX_SIZE * 0.025, 6),
+      new T.MeshStandardMaterial({ color: 0x738057, roughness: 0.95 }),
+    );
+    ground.position.y =
+      terrainFootprintMaxY(tile, 0, 0, HEX_SIZE * 0.26) +
+      PROP_SURFACE_CLEARANCE -
+      HEX_SIZE * 0.0125;
+    ground.receiveShadow = true;
+    scene.add(ground);
+    ensureWonderPropsLoad();
+    function resize() {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    }
+    addEventListener('resize', resize);
+    resize();
+    window.archivePreview = {
+      snapshot: () => ({
+        state: memoryArchiveState(),
+        settled: areWonderPropsSettled(),
+        archive: !!group.getObjectByName('wonder-memory-archive'),
+        calls: renderer.info.render.calls,
+        triangles: renderer.info.render.triangles,
+        textures: renderer.info.memory.textures,
+      }),
+    };
+    renderer.setAnimationLoop(() => {
+      rebuildWonderProps([tile]);
+      controls.update();
+      renderer.render(scene, camera);
+      document.querySelector('#status').textContent =
+        memoryArchiveState() === 'ready'
+          ? 'Archivo Meshy activo · texturas compartidas · escala normalizada'
+          : memoryArchiveState() === 'failed'
+            ? 'No se pudo cargar el GLB optimizado; fallback preservado. Ejecuta el optimizador local.'
+            : `Estado: ${memoryArchiveState()} · fallback preservado. Requiere VITE_MESHY_PREVIEW=1.`;
+    });
+  </script>
+</html>

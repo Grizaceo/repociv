@@ -30,6 +30,7 @@ import { areForestPropsReady } from './ForestProps3D.ts';
 import { areCityPropsReady } from './CityProps3D.ts';
 import { isTerrainScatterReady } from './TerrainScatter3D.ts';
 import { areWonderGlbPropsReady } from './WonderProps3D.ts';
+import { memoryArchiveState } from './MemoryArchive3D.ts';
 import { areRiverBridgesReady } from './Rivers3D.ts';
 import { PostFX3D } from './PostFX3D.ts';
 import { resolveInitialPostFx, persistPostFx } from './renderMode.ts';
@@ -208,7 +209,7 @@ export class ThreeMapRenderer {
       `:uprops${areUnitPropsReady() ? 1 : 0}` +
       `:rprops${areResourcePropsReady() ? 1 : 0}` +
       `:sprops${isTerrainScatterReady() ? 1 : 0}` +
-      `:wprops${areWonderGlbPropsReady() ? 1 : 0}` +
+      `:wprops${areWonderGlbPropsReady() ? 1 : 0}:${memoryArchiveState()}` +
       `:bprops${areRiverBridgesReady() ? 1 : 0}` +
       '';
     const stateDirty = tileSignature !== this.lastTileSignature;

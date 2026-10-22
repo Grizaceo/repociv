@@ -25,6 +25,11 @@ import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { PROP_SURFACE_CLEARANCE, terrainFootprintMaxY } from './terrainSurfaceY.ts';
+import {
+  createMemoryArchive,
+  ensureMemoryArchiveLoad,
+  memoryArchiveState,
+} from './MemoryArchive3D.ts';
 
 const wonderGroup = new Group();
 wonderGroup.name = 'wonder-props';
@@ -83,6 +88,7 @@ export function wonderModelForType(wonderType: string): WonderKenneyId {
 }
 
 export function ensureWonderPropsLoad(onSettled?: () => void): void {
+  ensureMemoryArchiveLoad(onSettled);
   if (wonderGlbLoadState !== 'idle') return;
   wonderGlbLoadState = 'loading';
   const loader = new GLTFLoader();
@@ -125,7 +131,7 @@ export function areWonderGlbPropsReady(): boolean {
  *  settled as soon as the module is live. Kept as a named probe because the
  *  screenshot tooling waits on it before framing a shot. */
 export function areWonderPropsSettled(): boolean {
-  return true;
+  return memoryArchiveState() !== 'loading';
 }
 
 // ─── Procedural geometries ───────────────────────────────────────────────────
@@ -198,6 +204,8 @@ function buildGenericWonder(): Group {
 }
 
 function buildWonderInstance(wonderType: string): Group {
+  const archive = createMemoryArchive(wonderType);
+  if (archive) return archive;
   const modelId = wonderModelForType(wonderType);
   const variant = wonderGlbVariants?.get(modelId);
   if (!variant) return buildGenericWonder();
@@ -224,7 +232,7 @@ function wonderSignature(tiles: Tile[]): string {
     .map((t) => `${t.coord.q},${t.coord.r}:${t.district!.wonderType}`)
     .join('|');
   if (!base) return '';
-  return wonderGlbLoadState === 'ready' ? `glb#${base}` : base;
+  return `${memoryArchiveState()}#${wonderGlbLoadState === 'ready' ? 'glb#' : ''}${base}`;
 }
 
 function disposeMesh(m: Mesh): void {
