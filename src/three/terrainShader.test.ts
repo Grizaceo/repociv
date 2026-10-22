@@ -23,7 +23,7 @@ describe('terrainShader', () => {
   it('exposes a versioned customProgramCacheKey', () => {
     const mat = createTerrainMaterial();
     // Bumping the version in terrainShader.ts must update this.
-    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v44');
+    expect(mat.customProgramCacheKey?.()).toBe('repociv-terrain-v45');
   });
 
   it('produces a stable fragment shader from onBeforeCompile', () => {
@@ -80,9 +80,15 @@ describe('terrainShader', () => {
     // P2: Elevation blend
     expect(capture.vertex).toContain('terrainElevFromIndex');
     expect(capture.vertex).toContain('bool isOceanTile = abs(tidx - 4.0)');
+    // Top cap is decided before the ramp, so relief survives on ramped rims.
     expect(capture.vertex).toMatch(
-      /bool isOceanTile[\s\S]*if \(!isOceanTile && !isIceTile && transformed\.y > -1\.0\)/,
+      /bool isTopCap = transformed\.y > -1\.0;[\s\S]*if \(!isOceanTile && !isIceTile && isTopCap\)/,
     );
+    // Relief fades out toward edges shared with a different land biome.
+    expect(capture.vertex).toContain(
+      'if (abs(nIdx - tidx) > 0.5) reliefFade = max(reliefFade, w);',
+    );
+    expect(capture.vertex).toContain('transformed.y += relief * (1.0 - reliefFade);');
     // Per-edge ramp: watertight barycentric elevation blend across edges and 3-tile corners
     expect(capture.vertex).toContain('(rampSum / (1.0 + rampW)) * uTileHeight');
     expect(capture.vertex).toContain('neighborIdxAt(instanceNeighborPacked, k)');
