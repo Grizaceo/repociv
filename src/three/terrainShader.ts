@@ -318,7 +318,11 @@ vec2 terrainAtlasUv(float idx, vec2 tileUv) {
 
 vec2 terrainMacroUv(float idx, vec2 tileUv, vec2 worldXZ) {
   float scale = mix(2.4, 3.6, clamp(idx / 7.0, 0.0, 1.0));
-  vec2 worldUv = fract(worldXZ / (uHexRadius * scale) + vec2(idx * 0.137, idx * 0.173));
+  vec2 rawUv = worldXZ / (uHexRadius * scale) + vec2(idx * 0.137, idx * 0.173);
+  // Mirror-repeat (triangle wave) instead of sawtooth fract() so non-periodic
+  // atlas cells (especially desert dune bands) never stamp a hard 1→0 seam
+  // across the middle of a hex.
+  vec2 worldUv = 1.0 - abs(fract(rawUv * 0.5) * 2.0 - 1.0);
   // Per-hex atlas detail (62% tile UV) reads natural on LAND. But on WATER
   // (ocean idx 4, ice idx 5) the per-hex UV stamps the same atlas cell + normal
   // into every hex, so the open sea reads as a honeycomb quilt. Water must be a
@@ -352,8 +356,8 @@ vec3 prepTerrainTex(float idx, vec3 tex) {
   float lum = dot(tex, vec3(0.299, 0.587, 0.114));
   tex = mix(vec3(lum), tex, 1.12);
   if (idx > 2.5 && idx < 3.5) {
-    tex = mix(vec3(lum), tex, 0.88);
-    tex = mix(tex, vec3(0.80, 0.71, 0.50), 0.12);
+    float dlum = dot(tex, vec3(0.299, 0.587, 0.114));
+    tex = mix(tex, vec3(0.84, 0.73, 0.51) * (0.76 + 0.34 * dlum), 0.76);
   }
   if (idx > 6.5) {
     float slum = dot(tex, vec3(0.299, 0.587, 0.114));
@@ -435,15 +439,15 @@ vec3 prepTerrainTex(float idx, vec3 tex) {
             }
             tex = mix(tex, nAccum / nBlendSum, min(nBlendSum, 1.0) * 0.62);
           }
-          // High-frequency detail tap: restore painted grain at every zoom.
+          // High-frequency detail tap: restore painted grain at every zoom
+          // using mirror-repeat UV so cell borders never cut rectangular lines.
           if (tidx < 4.5 || (tidx > 5.5 && tidx < 7.5)) {
-            vec2 dUv = fract(vWorldXZ / (uHexRadius * 1.27) + vec2(tidx * 0.311, tidx * 0.293));
+            vec2 rawDUv = vWorldXZ / (uHexRadius * 1.27) + vec2(tidx * 0.311, tidx * 0.293);
+            vec2 dUv = 1.0 - abs(fract(rawDUv * 0.5) * 2.0 - 1.0);
             vec3 dTex = texture2D(uTerrainAtlas, terrainAtlasUv(tidx, dUv)).rgb;
             float dLum = dot(dTex, vec3(0.299, 0.587, 0.114));
-            // Mean-preserving grain: same +/- amplitude, average multiplier 1.0
-            // (the old 0.82+0.36*dLum averaged ~0.9, dimming every land biome
-            // before the *1.15 brighten + ACES — a documented "muddy" pass).
-            tex *= 1.0 + 0.18 * (dLum - 0.5);
+            float grainAmp = (tidx > 2.5 && tidx < 3.5) ? 0.06 : 0.18;
+            tex *= 1.0 + grainAmp * (dLum - 0.5);
           }
           // Civ V sea gradient: vivid turquoise on the shelf → deep saturated
           // blue offshore. instanceOceanDepth = BFS hops from the nearest
@@ -710,8 +714,11 @@ vec3 prepTerrainTex(float idx, vec3 tex) {
           if (_wSum > 0.001) {
             nTex = mix(nTex, _nAccum / _wSum, min(_wSum, 1.0) * 0.62);
           }
-          // Blend atlas normal into surface normal (TBN for a flat-top hex is identity-ish)
-          normal = normalize(normal + vec3(nTex.x * 0.55, nTex.z, nTex.y * 0.55));
+          // Blend atlas normal into surface normal (TBN for a flat-top hex is identity-ish).
+          // Desert (idx ~ 3) uses a gentle normal weight so the quantized atlas dune bands
+          // read as smooth sand swells instead of stair-step stripes.
+          float _nStrength = (_ntidx > 2.5 && _ntidx < 3.5) ? 0.07 : 0.55;
+          normal = normalize(normal + vec3(nTex.x * _nStrength, max(0.35, nTex.z), nTex.y * _nStrength));
         }`,
         );
   };
@@ -721,7 +728,7 @@ vec3 prepTerrainTex(float idx, vec3 tex) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v42';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v44';
   // Terrain MUST receive the scene FogExp2: the ground plane and sky dome
   // fade into SKY_HORIZON at distance, so terrain that opted out (the old
   // `mat.fog = false`) popped against the haze instead of dissolving into it.

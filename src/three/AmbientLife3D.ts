@@ -314,14 +314,15 @@ export function rebuildAmbientLife(
     lifeGroup.add(birdMesh);
   }
 
-  // Smoke — instanced puffs over each revealed capital
+  // Smoke — instanced soft wisps over each revealed capital (MeshBasicMaterial
+  // so puffs read as translucent vapour instead of shaded grey rock icosahedrons).
   const capitals = cities.filter((c) => c.isCapital && getTile(tileKey(c.coord))?.revealed);
   if (capitals.length > 0) {
-    const geom = new IcosahedronGeometry(2.2, 0);
-    const mat = new MeshLambertMaterial({
-      color: new Color(0xd8dade),
+    const geom = new IcosahedronGeometry(1.4, 1);
+    const mat = new MeshBasicMaterial({
+      color: new Color(0xf2efe9),
       transparent: true,
-      opacity: 0.4,
+      opacity: 0.22,
       depthWrite: false,
     });
     smokeMesh = new InstancedMesh(geom, mat, capitals.length * PUFFS_PER_CAPITAL);
@@ -432,7 +433,7 @@ export function clearAmbientLife(): void {
   if (smokeMesh) {
     lifeGroup.remove(smokeMesh);
     smokeMesh.geometry.dispose();
-    (smokeMesh.material as MeshLambertMaterial).dispose();
+    (smokeMesh.material as MeshBasicMaterial).dispose();
     smokeMesh.dispose();
     smokeMesh = null;
   }

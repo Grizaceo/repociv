@@ -154,7 +154,7 @@ function instanceParts(parts: PropPart[], tiles: Tile[], baseScale: number): voi
 export function rebuildResourceProps(tiles: Tile[]): void {
   if (state !== 'ready' || !crystalParts || !markerParts) return;
 
-  const crystals = tiles.filter((t) => t.revealed && isCrystalTile(t));
+  const crystals = tiles.filter((t) => t.revealed && !t.city && isCrystalTile(t));
   const sacreds = tiles.filter(
     (t) => t.terrain === 'sacred' && t.revealed && !t.city && t.district?.type !== 'wonder',
   );

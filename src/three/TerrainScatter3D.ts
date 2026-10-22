@@ -127,8 +127,8 @@ export const _testRecipes = { RECIPES_BY_TERRAIN, PROP_IDS };
 // Base scale per prop family (models have footprint radius ~1).
 function propBaseScale(prop: PropId): number {
   if (prop.startsWith('desert-palm')) return 0.22;
-  if (prop.startsWith('desert-rock')) return 0.26;
-  if (prop.startsWith('ice-shard')) return 0.26;
+  if (prop.startsWith('desert-rock')) return 0.19;
+  if (prop.startsWith('ice-shard')) return 0.22;
   return 0.2; // shrub
 }
 

@@ -19,7 +19,9 @@ import { axialToWorld3D } from './axialToWorld3D.ts';
 import { areMountainPropsReady } from './MountainProps3D.ts';
 import { areForestPropsReady } from './ForestProps3D.ts';
 import { areResourcePropsReady } from './ResourceProps3D.ts';
+import { isTerrainScatterReady } from './TerrainScatter3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+import { terrainSurfaceY } from './terrainSurfaceY.ts';
 
 const decorGroup = new Group();
 decorGroup.name = 'tile-decor';
@@ -371,11 +373,14 @@ function buildSacred(tiles: Tile[]): void {
     for (let s = 0; s < STONES; s++) {
       const angle = ((Math.PI * 2) / STONES) * s;
       const radius = HEX_SIZE * 0.3;
-      const tx = pos.x + Math.cos(angle) * radius;
-      const tz = pos.z + Math.sin(angle) * radius;
+      const lx = Math.cos(angle) * radius;
+      const lz = Math.sin(angle) * radius;
+      const tx = pos.x + lx;
+      const tz = pos.z + lz;
       const stoneH = HEX_SIZE * 0.28;
+      const surfY = terrainSurfaceY(tile, lx, lz);
       mat.makeRotationY(angle + Math.PI / 2);
-      mat.setPosition(tx, pos.y + stoneH * 0.5 + 1, tz);
+      mat.setPosition(tx, surfY + stoneH * 0.5, tz);
       stoneMesh.setMatrixAt(idx, mat.clone());
       idx++;
     }
@@ -416,7 +421,7 @@ export function rebuildTileDecor(
 
   // Props readiness participates: when the mountain glbs land, the cones
   // must rebuild out of the decor set even though the tiles didn't change.
-  const signature = `${lod}:m${areMountainPropsReady() ? 1 : 0}:f${areForestPropsReady() ? 1 : 0}:r${areResourcePropsReady() ? 1 : 0}:${decorSignature(tiles)}`;
+  const signature = `${lod}:m${areMountainPropsReady() ? 1 : 0}:f${areForestPropsReady() ? 1 : 0}:r${areResourcePropsReady() ? 1 : 0}:s${isTerrainScatterReady() ? 1 : 0}:${decorSignature(tiles)}`;
   if (signature === lastSignature) return;
   lastSignature = signature;
 
@@ -448,7 +453,7 @@ export function rebuildTileDecor(
         deserts.push(tile);
         break;
       case 'ice':
-        if (!tile.city) ices.push(tile);
+        if (!tile.city && !isTerrainScatterReady()) ices.push(tile);
         break;
       case 'sacred':
         // Wonder tiles (district.type==='wonder') are handled by
@@ -459,7 +464,7 @@ export function rebuildTileDecor(
         // The capital always sits on a sacred tile: its castle owns the
         // centre, and the 0.3·HEX stone ring would stand inside the keep.
         if (tile.city) break;
-        sacreds.push(tile);
+        if (!areResourcePropsReady()) sacreds.push(tile);
         break;
       default:
         break;
