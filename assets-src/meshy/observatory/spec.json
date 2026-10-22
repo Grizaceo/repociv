@@ -1,0 +1,25 @@
+{
+  "asset_id": "observatory-v001",
+  "status": "concept SUCCEEDED; awaiting artistic approval; no geometry authorized",
+  "license_status": "unverified; local candidates only; distribution blocked",
+  "reference_asset": "memory-archive-v001",
+  "concept": {
+    "tool": "meshy_image_to_image",
+    "advertised_credits": 9,
+    "max_create_requests": 1,
+    "reference_relative_paths": ["assets-src/meshy/memory-archive/textured/archive-textured.png"],
+    "request_without_reference_paths": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "Create ONE original Observatory building for the same stylized strategy-game civilization as the reference Memory Archive. Use the reference as architectural and material art direction, not the building to copy. A compact polygonal stepped warm pale limestone podium supports a slender observation tower, with broad dark slate eaves and aged copper trim. Crown it with one substantial fixed optical instrument or lens housing integrated into the masonry, with a subtle turquoise glass accent. The silhouette must read as observation and telemetry, not a temple, library lantern, modern radar dish or lighthouse. Taller and more slender than the Archive, with a few broad clear terraces, not a stack of tiny floors. Use solid closed surfaces, simple shallow rectangular window panels and thick reliable architectural members; no punched-out windows, latticework, thin railings, cables or floating pieces. Readable from elevated isometric strategy-game cameras. Show the complete standalone building in one clean elevated three-quarter view, plain neutral background, no ground tile or scenery, no people, text or logos, no dramatic baked lighting or excessive grime.",
+      "generate_multi_view": false,
+      "aspect_ratio": "1:1",
+      "remove_background": true
+    }
+  },
+  "guards": {
+    "auto_geometry": false,
+    "auto_texture": false,
+    "auto_retry_paid_requests": false,
+    "workshop_repair_remains_deferred": true
+  }
+}
