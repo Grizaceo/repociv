@@ -43,7 +43,7 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join, dirname, resolve } from 'node:path';
+import { join, dirname, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -212,18 +212,38 @@ const CAMERAS = [
   { name: '08-wonders-closeup', cam: 'auto,1.4', reveal: true },
 ];
 
+// Same browser resolution policy as playwright.config.ts — keep them in sync.
+//   1. PLAYWRIGHT_CHROMIUM_PATH — explicit override, always wins.
+//   2. A system Chromium, when not on CI (goldens there must keep rendering
+//      with the Playwright-installed browser, not whatever the image ships).
+//   3. Playwright's own Chromium (PLAYWRIGHT_CHROMIUM_CHANNEL, default 'chromium').
+const SYSTEM_CHROMIUM_PATHS = [
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+];
+
+function resolveChromiumPath() {
+  const override = process.env.PLAYWRIGHT_CHROMIUM_PATH;
+  if (override) return existsSync(override) ? override : undefined;
+  if (process.env.CI) return undefined;
+  return SYSTEM_CHROMIUM_PATHS.find((p) => existsSync(p));
+}
+
 async function main() {
-  const sysChromium =
-    process.env.PLAYWRIGHT_CHROMIUM_PATH ??
-    ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'].find((p) =>
-      existsSync(p),
-    );
+  const chromiumPath = resolveChromiumPath();
   const browser = await chromium.launch({
     headless: true,
-    ...(sysChromium
+    ...(chromiumPath
       ? {
-          executablePath: sysChromium,
-          args: ['--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader-webgl'],
+          executablePath: chromiumPath,
+          // Full Chromium gets software WebGL; recognized headless-shell
+          // builds keep their default backend.
+          args: /^(chrome-headless-shell|headless_shell)(\.exe)?$/.test(basename(chromiumPath))
+            ? ['--enable-unsafe-swiftshader']
+            : ['--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader-webgl'],
         }
       : {
           channel: process.env.PLAYWRIGHT_CHROMIUM_CHANNEL ?? 'chromium',
