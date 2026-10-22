@@ -1,5 +1,6 @@
 # Node / Vite
-node_modules/
+# Match dependency directories and local reuse symlinks.
+node_modules
 .vite/
 npm-debug.log*
 yarn-debug.log*
@@ -11,7 +12,8 @@ dist/
 build/
 
 # Python
-.venv/
+# Match virtualenv directories and local reuse symlinks.
+.venv
 venv/
 ENV/
 __pycache__/
@@ -53,6 +55,17 @@ WORKER_FIX_PLAN.md
 CODEX_HARNESS_INTEGRATION.md
 README_PUBLICO.md
 execplan/
+
+# Private local diagnostics; never publish captured environments or user state.
+# Keep these separate from public documentation and application fixtures.
+/.local-private/
+/scratch/
+/artifacts/local/
+command.json
+*-command.json
+*.cpuprofile
+*.heapprofile
+*.heapsnapshot
 
 # Logs
 *.log

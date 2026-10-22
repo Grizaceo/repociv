@@ -1,5 +1,31 @@
 # Mapa de limpieza y modularización
 
+## Estado de cierre local
+
+La ronda de limpieza está validada localmente con fixtures aislados. No quedan
+extracciones obligatorias; publicación, CI y merge se verifican por separado.
+
+- Suite Playwright fixture/offline anterior: 46 aprobados, 2 skips live originales,
+  ningún fallo. No es validación live ni prueba de ejecución de modelos reales.
+- Gate anterior: exit 0; 1.329 tests frontend y 2.143 backend aprobados,
+  10 skips backend, cobertura backend 83,93 %. Knip es report-only; mypy opcional
+  no estaba instalado. La publicación requiere un gate nuevo sobre el SHA final.
+- Revisión independiente final anterior: aprobatoria, contrastada con evidencia.
+  Los registros de diagnóstico y sus rutas permanecen fuera del repositorio.
+- La configuración de lanzamiento cambia efectivamente: Chromium completo usa
+  `swiftshader-webgl`; headless-shell reconocido mantiene su backend predeterminado
+  con `unsafe-swiftshader`. La suite local ejercitó Chromium completo, no todas
+  las variantes. No cambian timeouts, retries, skips, cobertura ni presupuestos.
+- Los SIGKILL históricos siguen sin causa ni emisor demostrados. La suite verde
+  acredita validación fixture/offline, no una reparación causal de esos incidentes.
+- Saneamiento público: el HOME capturado de una fixture se sustituye por un HOME
+  sintético; se conservan resultados, eventos y contratos. No cambia producción.
+
+Los resultados por corte siguientes son históricos; no sustituyen CI del SHA
+publicado. El diario operativo privado no forma parte de este mapa público.
+Los SHA históricos citados identifican las revisiones originales anteriores al
+saneamiento; no todos son accesibles en el historial público saneado.
+
 ## Alcance y punto de partida
 
 Ordenar RepoCiv por responsabilidades, reducir deuda y alinear su documentación,
@@ -27,6 +53,10 @@ terminó con resultado global `success`. Los commits posteriores necesitan su
 propia comprobación de CI.
 
 ## Orden propuesto
+
+> Orden histórico de exploración, no una obligación de ejecutar cada candidato.
+> La decisión vigente está en [Pendientes consolidados](#8-pendientes-consolidados):
+> pasar al cierre de rama, sin una nueva extracción obligatoria.
 
 Cada fila es un corte independiente. Los candidatos de extracción requieren
 confirmar dependencias y pruebas antes de implementarlos: el tamaño por sí solo

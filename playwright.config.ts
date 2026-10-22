@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 
 // ─── Browser resolution ────────────────────────────────────────────────────
 // Playwright's bundled Chromium is a ~150MB download. Plenty of dev machines
@@ -94,12 +94,12 @@ export default defineConfig({
           ? {
               launchOptions: {
                 executablePath: chromiumPath,
-                // The macro hex map defaults to the WebGL renderer, and a
-                // headless system Chromium has no GPU. Playwright's bundled
-                // build enables software GL by default; a distro Chromium does
-                // not, so the map renders nothing and every city position comes
-                // back empty. Opt into SwiftShader explicitly.
-                args: ['--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader'],
+                // Resolved binaries only: full Chromium uses software WebGL
+                // without forcing SwiftShader onto Canvas/compositing.
+                // Recognized headless-shell filenames keep their default backend.
+                args: /^(chrome-headless-shell|headless_shell)(\.exe)?$/.test(basename(chromiumPath))
+                  ? ['--enable-unsafe-swiftshader']
+                  : ['--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader-webgl'],
               },
             }
           : {}),
