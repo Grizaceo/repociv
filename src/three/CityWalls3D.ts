@@ -24,7 +24,7 @@ import { type City, type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
-import { PROP_SURFACE_CLEARANCE } from './terrainSurfaceY.ts';
+import { PROP_SURFACE_CLEARANCE, terrainFootprintMaxY } from './terrainSurfaceY.ts';
 
 const wallPropsGroup = new Group();
 wallPropsGroup.name = 'city-walls';
@@ -180,6 +180,7 @@ function buildWallPieces(
 interface WallInstanceSpec {
   part: WallPiece;
   base: { x: number; y: number; z: number };
+  tile: Tile | undefined;
 }
 
 export function rebuildCityWalls(
@@ -206,7 +207,7 @@ export function rebuildCityWalls(
     const { pieces } = buildWallPieces(city.coord.q, city.coord.r, base);
     for (const part of pieces) {
       const bucket = byPart.get(part.id);
-      const spec: WallInstanceSpec = { part, base };
+      const spec: WallInstanceSpec = { part, base, tile };
       if (bucket) bucket.push(spec);
       else byPart.set(part.id, [spec]);
     }
@@ -227,10 +228,15 @@ export function rebuildCityWalls(
     mesh.castShadow = true;
 
     for (let i = 0; i < specs.length; i++) {
-      const { part, base } = specs[i]!;
+      const { part, base, tile } = specs[i]!;
       const s = HEX_SIZE * part.s * variant.norm;
+      const localX = part.x - base.x;
+      const localZ = part.z - base.z;
+      const surfaceY = tile
+        ? terrainFootprintMaxY(tile, localX, localZ, HEX_SIZE * part.s * 0.25, getTile)
+        : base.y;
       // Parts rest on y=0 in model space; lift so minY sits at the surface.
-      const y = base.y - minY * s + PROP_SURFACE_CLEARANCE;
+      const y = surfaceY - minY * s + PROP_SURFACE_CLEARANCE;
       pos.set(part.x, y, part.z);
       quat.setFromAxisAngle(up, part.rot);
       scl.set(s, s, s);

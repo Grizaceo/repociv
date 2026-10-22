@@ -12,6 +12,7 @@ import { type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+import { PROP_SURFACE_CLEARANCE, terrainSurfaceY } from './terrainSurfaceY.ts';
 
 const propsGroup = new Group();
 propsGroup.name = 'forest-props';
@@ -185,7 +186,10 @@ export function rebuildForestProps(tiles: Tile[]): void {
       const jx = (((h >> (t & 7)) % 9) - 4) * 0.02;
       const jz = (((h >> ((t + 3) & 7)) % 9) - 4) * 0.02;
       const rotSteps = (h + t) % 6;
-      pos.set(base.x + (ox + jx) * HEX_SIZE, base.y + 1.5, base.z + (oz + jz) * HEX_SIZE);
+      const localX = (ox + jx) * HEX_SIZE;
+      const localZ = (oz + jz) * HEX_SIZE;
+      const surfaceY = terrainSurfaceY(tile, localX, localZ) + PROP_SURFACE_CLEARANCE;
+      pos.set(base.x + localX, surfaceY, base.z + localZ);
       quat.setFromAxisAngle(up, rotSteps * (Math.PI / 3));
       // Broadleaf models are squatter than the pine clumps — nudge them up in
       // scale so both canopies meet at a similar height band.

@@ -16,7 +16,11 @@ import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { cityLevel } from './CityCluster3D.ts';
-import { PROP_SURFACE_CLEARANCE, terrainSurfaceY } from './terrainSurfaceY.ts';
+import {
+  PROP_SURFACE_CLEARANCE,
+  terrainFootprintMaxY,
+  terrainSurfaceY,
+} from './terrainSurfaceY.ts';
 
 const propsGroup = new Group();
 propsGroup.name = 'city-props';
@@ -261,8 +265,11 @@ export function rebuildCityProps(
       partQuat.setFromAxisAngle(up, part.rot * (Math.PI / 3));
       quat.multiply(partQuat);
       const s = HEX_SIZE * part.s * variant.norm;
+      const footR = HEX_SIZE * part.s * 0.35;
       const y = tile
-        ? terrainSurfaceY(tile, localX, localZ) - minY * s + PROP_SURFACE_CLEARANCE
+        ? terrainFootprintMaxY(tile, localX, localZ, footR, getTile) -
+          minY * s +
+          PROP_SURFACE_CLEARANCE
         : base.y - minY * s + PROP_SURFACE_CLEARANCE;
       pos.set(base.x + localX, y, base.z + localZ);
       scl.set(s, s, s);
@@ -307,7 +314,7 @@ export function rebuildCityProps(
         quat.setFromAxisAngle(up, angle);
         const s = HEX_SIZE * 0.22 * bVar.norm;
         const y = tile
-          ? terrainSurfaceY(tile, localX, localZ) - minY * s + PROP_SURFACE_CLEARANCE
+          ? terrainSurfaceY(tile, localX, localZ, getTile) - minY * s + PROP_SURFACE_CLEARANCE
           : base.y - minY * s + PROP_SURFACE_CLEARANCE;
         pos.set(base.x + localX, y, base.z + localZ);
         scl.set(s, s, s);

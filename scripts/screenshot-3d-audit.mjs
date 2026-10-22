@@ -97,9 +97,7 @@ const FIXTURE_REPOS = [
 const FIXTURE_PATHS = FIXTURE_REPOS.map((r) => r.path);
 const FIXTURE_SELECTION = {
   activeRoot: FIXTURE_ROOT,
-  roots: [
-    { path: FIXTURE_ROOT, selectedRepoIds: FIXTURE_PATHS, selectedRepoPaths: FIXTURE_PATHS },
-  ],
+  roots: [{ path: FIXTURE_ROOT, selectedRepoIds: FIXTURE_PATHS, selectedRepoPaths: FIXTURE_PATHS }],
   selectedRepoIds: FIXTURE_PATHS,
   selectedRepoPaths: FIXTURE_PATHS,
   hasSelections: true,
@@ -188,8 +186,8 @@ const CAMERAS = [
   // ~98 px after the GLB prop pass, 112-156 px (15 separate spots) once the
   // KayKit city/wall kits and the fixture wonders added more knife edges.
   { name: '01-general-overview', cam: 'auto,0.9', tolerancePx: 200 },
-  { name: '02-zoomed-mid',       cam: 'auto,1.8' },
-  { name: '03-zoomed-close',     cam: 'auto,3.2' },
+  { name: '02-zoomed-mid', cam: 'auto,1.8' },
+  { name: '03-zoomed-close', cam: 'auto,3.2' },
   // 05/06 exist to verify biome textures (ocean banding, mountain strata,
   // desert dunes). They are CLOSE-UPS at absolute world coords — macro
   // zoom-outs are useless for this: the FogExp2 atmospheric haze
@@ -198,7 +196,7 @@ const CAMERAS = [
   // the world generator don't change); reveal=all lifts fog of war so the
   // rim biomes are actually rendered.
   // 05: north-west coastline — shoreline gradient + foam line in frame.
-  { name: '05-ocean-closeup',  cam: '-330,-380,1.0', reveal: true },
+  { name: '05-ocean-closeup', cam: '-330,-380,1.0', reveal: true },
   // 06: a mountain city (repo-gamma, rs) beside desert dunes, a forest and
   // the coast.
   { name: '06-desert-mountain-closeup', cam: '117,-180,1.6', reveal: true },
@@ -215,10 +213,21 @@ const CAMERAS = [
 ];
 
 async function main() {
+  const sysChromium =
+    process.env.PLAYWRIGHT_CHROMIUM_PATH ??
+    ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'].find((p) =>
+      existsSync(p),
+    );
   const browser = await chromium.launch({
     headless: true,
-    // CFT chrome (full) — headless-shell build can't be fetched on this host.
-    channel: process.env.PLAYWRIGHT_CHROMIUM_CHANNEL ?? 'chromium',
+    ...(sysChromium
+      ? {
+          executablePath: sysChromium,
+          args: ['--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader-webgl'],
+        }
+      : {
+          channel: process.env.PLAYWRIGHT_CHROMIUM_CHANNEL ?? 'chromium',
+        }),
   });
   const context = await browser.newContext({
     viewport: { width: 1280, height: 720 },
@@ -362,53 +371,39 @@ async function main() {
     // Mountain glb props load async too — wait until that settles (ready or
     // failed) so captures don't race the cone→glTF swap.
     await page
-      .waitForFunction(
-        () => window.__repocivDebug?.areMountainPropsSettled?.() !== false,
-        null,
-        { timeout: 15_000 },
-      )
+      .waitForFunction(() => window.__repocivDebug?.areMountainPropsSettled?.() !== false, null, {
+        timeout: 15_000,
+      })
       .catch(() => console.error('[AUDIT] mountain props never settled — capturing anyway'));
     await page
-      .waitForFunction(
-        () => window.__repocivDebug?.areForestPropsSettled?.() !== false,
-        null,
-        { timeout: 15_000 },
-      )
+      .waitForFunction(() => window.__repocivDebug?.areForestPropsSettled?.() !== false, null, {
+        timeout: 15_000,
+      })
       .catch(() => console.error('[AUDIT] forest props never settled — capturing anyway'));
     await page
-      .waitForFunction(
-        () => window.__repocivDebug?.areCityPropsSettled?.() !== false,
-        null,
-        { timeout: 15_000 },
-      )
+      .waitForFunction(() => window.__repocivDebug?.areCityPropsSettled?.() !== false, null, {
+        timeout: 15_000,
+      })
       .catch(() => console.error('[AUDIT] city props never settled — capturing anyway'));
     await page
-      .waitForFunction(
-        () => window.__repocivDebug?.areUnitPropsSettled?.() !== false,
-        null,
-        { timeout: 15_000 },
-      )
+      .waitForFunction(() => window.__repocivDebug?.areUnitPropsSettled?.() !== false, null, {
+        timeout: 15_000,
+      })
       .catch(() => console.error('[AUDIT] unit props never settled — capturing anyway'));
     await page
-      .waitForFunction(
-        () => window.__repocivDebug?.areResourcePropsSettled?.() !== false,
-        null,
-        { timeout: 15_000 },
-      )
+      .waitForFunction(() => window.__repocivDebug?.areResourcePropsSettled?.() !== false, null, {
+        timeout: 15_000,
+      })
       .catch(() => console.error('[AUDIT] resource props never settled — capturing anyway'));
     await page
-      .waitForFunction(
-        () => window.__repocivDebug?.isTerrainScatterSettled?.() !== false,
-        null,
-        { timeout: 15_000 },
-      )
+      .waitForFunction(() => window.__repocivDebug?.isTerrainScatterSettled?.() !== false, null, {
+        timeout: 15_000,
+      })
       .catch(() => console.error('[AUDIT] terrain scatter never settled — capturing anyway'));
     await page
-      .waitForFunction(
-        () => window.__repocivDebug?.areWonderPropsSettled?.() !== false,
-        null,
-        { timeout: 15_000 },
-      )
+      .waitForFunction(() => window.__repocivDebug?.areWonderPropsSettled?.() !== false, null, {
+        timeout: 15_000,
+      })
       .catch(() => console.error('[AUDIT] wonder props never settled — capturing anyway'));
     // Fixed settle time: a few frames to compile shaders, run the first
     // dirty rebuild with the atlas-backed material, and settle CSS2D labels.
@@ -481,8 +476,8 @@ async function main() {
   // SCATTERED single-pixel silhouette flips across the frame (cams 02/06).
   // A real regression shifts contiguous regions (hundreds-thousands of px),
   // so 80 scattered pixels is still a safe ceiling.
-  const TOLERANCE_MAX_PX = 80;    // max differing pixels accepted (per-camera override via tolerancePx)
-  const TOLERANCE_CHANNEL = 6;    // a pixel "differs" if any RGB channel deviates more
+  const TOLERANCE_MAX_PX = 80; // max differing pixels accepted (per-camera override via tolerancePx)
+  const TOLERANCE_CHANNEL = 6; // a pixel "differs" if any RGB channel deviates more
   let diffCount = 0;
   for (const { name, shotPath, hash, tolerancePx } of results) {
     const goldenPath = join(GOLDEN, `${name}.sha256`);

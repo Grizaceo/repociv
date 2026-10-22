@@ -12,6 +12,7 @@ import { type Terrain, type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+import { PROP_SURFACE_CLEARANCE, terrainSurfaceY } from './terrainSurfaceY.ts';
 
 const propsGroup = new Group();
 propsGroup.name = 'terrain-scatter';
@@ -226,7 +227,10 @@ export function rebuildTerrainScatter(tiles: Tile[]): void {
       const jx = (((hash >> (slot & 7)) % 9) - 4) * 0.015;
       const jz = (((hash >> ((slot + 3) & 7)) % 9) - 4) * 0.015;
       const rotSteps = (hash + slot) % 6;
-      pos.set(base.x + (ox + jx) * HEX_SIZE, base.y + 1.5, base.z + (oz + jz) * HEX_SIZE);
+      const localX = (ox + jx) * HEX_SIZE;
+      const localZ = (oz + jz) * HEX_SIZE;
+      const surfaceY = terrainSurfaceY(tile, localX, localZ) + PROP_SURFACE_CLEARANCE;
+      pos.set(base.x + localX, surfaceY, base.z + localZ);
       quat.setFromAxisAngle(up, rotSteps * (Math.PI / 3));
       const jitter = 0.9 + ((hash + slot * 7) % 5) * 0.05;
       const s = HEX_SIZE * propBaseScale(prop) * placement.scale * jitter;

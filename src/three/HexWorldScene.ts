@@ -30,6 +30,7 @@ import { terrainElevation } from '../isoHex.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { sharedHexGeometry } from './hexGeometry.ts';
 import { axialToWorld3D, hexCornerAngle3D, TILE_HEIGHT } from './axialToWorld3D.ts';
+import { terrainSurfaceY } from './terrainSurfaceY.ts';
 import { instanceColorForTile } from './FogOfWar3D.ts';
 import { HexPicker } from './HexPicker.ts';
 import {
@@ -337,9 +338,10 @@ interface BorderEdge {
   cx: number;
   cz: number;
   y: number;
+  y2?: number;
 }
 
-/** Build a flat ribbon (XZ plane, at each edge's y) from boundary edges.
+/** Build a ribbon (in XZ, following each edge's y..y2 slope) from boundary edges.
  *  `width` is the band thickness; `inset` shifts the band toward the tile
  *  centre so it reads as the owner's inner frontier. Ends are mitre-extended
  *  by half-width so consecutive segments close the corner gaps. */
@@ -353,6 +355,8 @@ export function buildRibbonGeometry(
   const hw = width * 0.5;
   let o = 0;
   for (const e of edges) {
+    const y1 = e.y;
+    const y2 = e.y2 ?? e.y;
     let tx = e.x2 - e.x1;
     let tz = e.z2 - e.z1;
     const len = Math.hypot(tx, tz) || 1;
@@ -384,22 +388,22 @@ export function buildRibbonGeometry(
     const p4x = bx + nx * o1,
       p4z = bz + nz * o1;
     pos[o++] = p1x;
-    pos[o++] = e.y;
+    pos[o++] = y1;
     pos[o++] = p1z;
     pos[o++] = p2x;
-    pos[o++] = e.y;
+    pos[o++] = y1;
     pos[o++] = p2z;
     pos[o++] = p3x;
-    pos[o++] = e.y;
+    pos[o++] = y2;
     pos[o++] = p3z;
     pos[o++] = p1x;
-    pos[o++] = e.y;
+    pos[o++] = y1;
     pos[o++] = p1z;
     pos[o++] = p3x;
-    pos[o++] = e.y;
+    pos[o++] = y2;
     pos[o++] = p3z;
     pos[o++] = p4x;
-    pos[o++] = e.y;
+    pos[o++] = y2;
     pos[o++] = p4z;
   }
   const geom = new BufferGeometry();
@@ -492,18 +496,51 @@ function rebuildTerritoryLines(
         const e = DIR_TO_EDGE[d]!;
         const a1 = hexCornerAngle3D(e);
         const a2 = hexCornerAngle3D((e + 1) % 6);
-        edges.push({
-          x1: center.x + HEX_SIZE * Math.cos(a1),
-          z1: center.z + HEX_SIZE * Math.sin(a1),
-          x2: center.x + HEX_SIZE * Math.cos(a2),
-          z2: center.z + HEX_SIZE * Math.sin(a2),
-          cx: center.x,
-          cz: center.z,
-          // Ribbon rides just above the tile cap (depthTest + polygonOffset
-          // keep it from z-fighting). The old +6.0 floated it ~half a tile up,
-          // reading as a neon UI overlay instead of paint on the ground.
-          y: center.y + 1.8 + yOff,
-        });
+        const x1 = center.x + HEX_SIZE * Math.cos(a1);
+        const z1 = center.z + HEX_SIZE * Math.sin(a1);
+        const x2 = center.x + HEX_SIZE * Math.cos(a2);
+        const z2 = center.z + HEX_SIZE * Math.sin(a2);
+        const mx = (x1 + x2) * 0.5;
+        const mz = (z1 + z2) * 0.5;
+        const getTileByKey = (k: string) => state.world.tiles.get(k);
+        // Sample at the inset band radius (~0.92) for both corners and the
+        // edge midpoint, then emit two half-edges so the ribbon follows the
+        // terrain slope continuously from corner 1 → midpoint → corner 2.
+        const insetFrac = 0.92;
+        const y1 = tile
+          ? terrainSurfaceY(
+              tile,
+              (x1 - center.x) * insetFrac,
+              (z1 - center.z) * insetFrac,
+              getTileByKey,
+            ) +
+            1.4 +
+            yOff
+          : center.y + 1.4 + yOff;
+        const ym = tile
+          ? terrainSurfaceY(
+              tile,
+              (mx - center.x) * insetFrac,
+              (mz - center.z) * insetFrac,
+              getTileByKey,
+            ) +
+            1.4 +
+            yOff
+          : center.y + 1.4 + yOff;
+        const y2 = tile
+          ? terrainSurfaceY(
+              tile,
+              (x2 - center.x) * insetFrac,
+              (z2 - center.z) * insetFrac,
+              getTileByKey,
+            ) +
+            1.4 +
+            yOff
+          : center.y + 1.4 + yOff;
+        edges.push(
+          { x1, z1, x2: mx, z2: mz, cx: center.x, cz: center.z, y: y1, y2: ym },
+          { x1: mx, z1: mz, x2, z2, cx: center.x, cz: center.z, y: ym, y2 },
+        );
       }
     }
     return edges;
@@ -1055,11 +1092,19 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
       if (n && (n.terrain === 'ocean') !== selfOcean) mask |= 1 << k;
     });
     coastMasks[i] = mask;
-    // Cull side faces where a neighbor shares the same elevation step.
+    // Cull side faces where a neighbor is at the same or higher elevation step,
+    // OR where both tiles are land (land-to-land edges ramp their top caps to
+    // meet seamlessly in terrainShader.ts, so any internal vertical cliff wall
+    // underneath the ramp only risks poking through at 3-tile corners).
     let sideCull = 0;
+    const selfLand = tile.terrain !== 'ocean' && tile.terrain !== 'ice';
     AXIAL_DIRECTIONS.forEach((d, k) => {
       const n = getTile(tileKey({ q: tile.coord.q + d.q, r: tile.coord.r + d.r }));
-      if (n && terrainElevation(n.terrain) === elev) sideCull |= 1 << k;
+      if (!n) return;
+      const nLand = n.terrain !== 'ocean' && n.terrain !== 'ice';
+      if (terrainElevation(n.terrain) >= elev || (selfLand && nLand)) {
+        sideCull |= 1 << k;
+      }
     });
     sideCullMasks[i] = sideCull;
     // Average the integer BFS hop count with the ocean neighbors': raw

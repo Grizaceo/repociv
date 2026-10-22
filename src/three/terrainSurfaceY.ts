@@ -4,10 +4,23 @@
 // face is GPU-displaced in terrainShader.ts. If props use only axialToWorld3D()
 // they can sink into hills/desert dunes or float above depressions. This file
 // mirrors the shader's centre/top-cap relief for object placement.
-import { type Tile, type Terrain } from '../types.ts';
+import { type Tile, type Terrain, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { HEX_SIZE } from '../constants.ts';
-import { axialToWorld3D } from './axialToWorld3D.ts';
+import { AXIAL_DIRECTIONS } from '../hex.ts';
+import { axialToWorld3D, TILE_HEIGHT, world3DToAxialFraction } from './axialToWorld3D.ts';
+
+/** Pre-scaled unit XZ directions toward each axial neighbor (matches uCoastDir
+ *  in terrainShader.ts so dot(localXZ, dir) === 1.0 at the shared hex edge). */
+const COAST_EDGE_DIRS: Array<{ x: number; z: number }> = AXIAL_DIRECTIONS.map((d) => {
+  const origin = axialToWorld3D(0, 0, 0);
+  const neighbor = axialToWorld3D(d.q, d.r, 0);
+  const dx = neighbor.x - origin.x;
+  const dz = neighbor.z - origin.z;
+  const dist = Math.hypot(dx, dz);
+  const half = dist / 2;
+  return { x: dx / dist / half, z: dz / dist / half };
+});
 
 function fract(x: number): number {
   return x - Math.floor(x);
@@ -107,11 +120,120 @@ export function terrainReliefAt(terrain: Terrain, worldX: number, worldZ: number
   }
 }
 
-export function terrainSurfaceY(tile: Tile, localX = 0, localZ = 0): number {
+/** CPU mirror of the per-edge neighbor elevation transition ramp in terrainShader.ts. */
+export function terrainEdgeRampY(
+  tile: Tile,
+  localX: number,
+  localZ: number,
+  getTile?: (key: string) => Tile | undefined,
+): number {
+  if (!getTile || tile.terrain === 'ocean' || tile.terrain === 'ice') return 0;
+  const thisElev = terrainElevation(tile.terrain);
+  let rampSum = 0;
+  let rampW = 0;
+  for (let k = 0; k < 6; k++) {
+    const d = AXIAL_DIRECTIONS[k]!;
+    const n = getTile(tileKey({ q: tile.coord.q + d.q, r: tile.coord.r + d.r }));
+    const nTerrain = n ? n.terrain : tile.terrain;
+    if (nTerrain === 'ocean' || nTerrain === 'ice') continue;
+    const elevDiff = terrainElevation(nTerrain) - thisElev;
+    const dir = COAST_EDGE_DIRS[k]!;
+    const edgeT = Math.max(0, Math.min(1, localX * dir.x + localZ * dir.z));
+    const w = smoothstep(0.55, 0.98, edgeT);
+    rampSum += w * elevDiff;
+    rampW += w;
+  }
+  if (rampW > 0.001) {
+    return (rampSum / (1 + rampW)) * TILE_HEIGHT;
+  }
+  return 0;
+}
+
+export function terrainSurfaceY(
+  tile: Tile,
+  localX = 0,
+  localZ = 0,
+  getTile?: (key: string) => Tile | undefined,
+): number {
   const base = axialToWorld3D(tile.coord.q, tile.coord.r, terrainElevation(tile.terrain));
   const worldX = base.x + localX;
   const worldZ = base.z + localZ;
-  return base.y + terrainReliefAt(tile.terrain, worldX, worldZ);
+  return (
+    base.y +
+    terrainEdgeRampY(tile, localX, localZ, getTile) +
+    terrainReliefAt(tile.terrain, worldX, worldZ)
+  );
+}
+
+/** Sample the highest terrain surface Y across a circular building/wall footprint
+ *  so structures on sloped hills/mountains never get one side buried under a ridge. */
+export function terrainFootprintMaxY(
+  tile: Tile,
+  localX: number,
+  localZ: number,
+  footprintRadius: number,
+  getTile?: (key: string) => Tile | undefined,
+): number {
+  let maxY = terrainSurfaceY(tile, localX, localZ, getTile);
+  if (footprintRadius <= 0.01) return maxY;
+  const r = footprintRadius * 0.65;
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i;
+    const y = terrainSurfaceY(tile, localX + Math.cos(a) * r, localZ + Math.sin(a) * r, getTile);
+    if (y > maxY) maxY = y;
+  }
+  return maxY;
+}
+
+/** Exact terrain surface Y at an arbitrary world-space (worldX, worldZ) point.
+ *  Checks the enclosing hex and any overlapping neighbor hex cap so river ribbons
+ *  and bridges along hex boundaries always sit above the highest rendered cap. */
+export function worldTerrainSurfaceY(
+  worldX: number,
+  worldZ: number,
+  tiles: Map<string, Tile>,
+): number {
+  const frac = world3DToAxialFraction(worldX, worldZ);
+  let rq = Math.round(frac.q);
+  let rr = Math.round(frac.r);
+  const rs = Math.round(-frac.q - frac.r);
+  const dq = Math.abs(rq - frac.q);
+  const dr = Math.abs(rr - frac.r);
+  const ds = Math.abs(rs - (-frac.q - frac.r));
+  if (dq > dr && dq > ds) rq = -rr - rs;
+  else if (dr > ds) rr = -rq - rs;
+
+  const getTile = (k: string) => tiles.get(k);
+  const candidates = [
+    { q: rq, r: rr },
+    ...AXIAL_DIRECTIONS.map((d) => ({ q: rq + d.q, r: rr + d.r })),
+  ];
+
+  let bestY = -Infinity;
+  for (const c of candidates) {
+    const t = tiles.get(tileKey(c));
+    if (!t) continue;
+    const base = axialToWorld3D(t.coord.q, t.coord.r, terrainElevation(t.terrain));
+    const lx = worldX - base.x;
+    const lz = worldZ - base.z;
+    // Check if (lx, lz) lies within the overlapped hex top cap (apothem ratio <= 1.04)
+    let maxEdge = 0;
+    for (let k = 0; k < 6; k++) {
+      const dir = COAST_EDGE_DIRS[k]!;
+      const edgeT = lx * dir.x + lz * dir.z;
+      if (edgeT > maxEdge) maxEdge = edgeT;
+    }
+    if (maxEdge <= 1.06) {
+      const y = terrainSurfaceY(t, lx, lz, getTile);
+      if (y > bestY) bestY = y;
+    }
+  }
+  if (bestY === -Infinity) {
+    const centerTile = tiles.get(tileKey({ q: rq, r: rr }));
+    if (centerTile) return terrainSurfaceY(centerTile, 0, 0, getTile);
+    return 0;
+  }
+  return bestY;
 }
 
 /** Tiny lift above the exact GPU surface to avoid z-fighting/clipping. */

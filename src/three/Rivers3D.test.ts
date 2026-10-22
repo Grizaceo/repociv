@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeRiverPaths, rebuildRivers, clearRivers, getRiverGroup } from './Rivers3D.ts';
+import { worldTerrainSurfaceY } from './terrainSurfaceY.ts';
 import { tileKey, type Tile, type Terrain } from '../types.ts';
 
 /** Synthetic island: mountain core, plains ring, ocean rim. */
@@ -56,11 +57,26 @@ describe('Rivers3D', () => {
     expect(computeRiverPaths(tiles)).toEqual([]);
   });
 
-  it('rebuildRivers builds ribbon meshes and bridge crossings, and clears cleanly', () => {
+  it('rebuildRivers builds ribbon meshes and bridge crossings above terrain surface, and clears cleanly', () => {
     clearRivers();
-    rebuildRivers(makeIsland());
+    const island = makeIsland();
+    rebuildRivers(island);
     // River ribbon + mouth foam + bridge crossing InstancedMesh
     expect(getRiverGroup().children.length).toBeGreaterThanOrEqual(2);
+
+    // Every inland river ribbon vertex must sit above the rendered terrain cap
+    const ribbonMesh = getRiverGroup().children[0] as import('three').Mesh;
+    const pos = ribbonMesh.geometry.getAttribute('position');
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      if (y > -5) {
+        const surfY = worldTerrainSurfaceY(x, z, island);
+        expect(y).toBeGreaterThanOrEqual(surfY);
+      }
+    }
+
     clearRivers();
     expect(getRiverGroup().children.length).toBe(0);
   });

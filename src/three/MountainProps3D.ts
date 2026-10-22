@@ -7,26 +7,19 @@
 // InstancedMesh per variant; placement is a deterministic hash of the tile
 // coord (variant + 60°-step rotation + scale jitter), so rebuilds and golden
 // captures are stable.
-import {
-  BufferGeometry,
-  Group,
-  InstancedMesh,
-  Material,
-  Matrix4,
-  Mesh,
-  Quaternion,
-  Vector3,
-} from 'three';
+import { Group, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeGlbScene, type MergedGlb } from './mergeGlbScene.ts';
 import { type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+import { terrainSurfaceY } from './terrainSurfaceY.ts';
 
 const propsGroup = new Group();
 propsGroup.name = 'mountain-props';
 
-type PropVariant = { geometry: BufferGeometry; material: Material };
+type PropVariant = MergedGlb;
 
 type PropsState = 'idle' | 'loading' | 'ready' | 'failed';
 
@@ -56,15 +49,7 @@ export function ensureMountainPropsLoad(onSettled?: () => void): void {
   const loader = new GLTFLoader();
   Promise.all([0, 1, 2].map((i) => loader.loadAsync(`/assets/3d/props/mountain-${i}.glb`)))
     .then((gltfs) => {
-      variants = gltfs.map((gltf) => {
-        let found: Mesh | null = null;
-        gltf.scene.traverse((obj) => {
-          if (!found && (obj as Mesh).isMesh) found = obj as Mesh;
-        });
-        if (!found) throw new Error('glb without mesh');
-        const mesh = found as Mesh;
-        return { geometry: mesh.geometry, material: mesh.material as Material };
-      });
+      variants = gltfs.map((gltf) => mergeGlbScene(gltf.scene));
       state = 'ready';
       lastSignature = '';
       onSettled?.();
@@ -110,7 +95,7 @@ export function rebuildMountainProps(tiles: Tile[]): void {
   byVariant.forEach((group, vi) => {
     if (group.length === 0) return;
     const variant = variants![vi]!;
-    const mesh = new InstancedMesh(variant.geometry, variant.material, group.length);
+    const mesh = new InstancedMesh(variant.geometry, variant.materials, group.length);
     mesh.castShadow = true;
     mesh.receiveShadow = false;
 
@@ -122,15 +107,14 @@ export function rebuildMountainProps(tiles: Tile[]): void {
       const rotSteps = (h >> 3) % 6;
       const jitter = 0.4 + ((h >> 5) % 5) * 0.02; // 0.40..0.48 × HEX_SIZE
       // City mountain tiles shrink and shift to the rim so the city stays
-      // readable (same intent as the old cone decor's city branch).
-      const cityScale = tile.city ? 0.62 : 1.0;
+      // readable and the peak flanks the wall ring instead of clipping roofs.
+      const cityScale = tile.city ? 0.48 : 1.0;
       const offAngle = ((h >> 7) % 6) * (Math.PI / 3) + Math.PI / 6;
-      const offMag = tile.city ? HEX_SIZE * 0.3 : 0;
-      pos.set(
-        base.x + Math.cos(offAngle) * offMag,
-        base.y + 1.5,
-        base.z + Math.sin(offAngle) * offMag,
-      );
+      const offMag = tile.city ? HEX_SIZE * 0.46 : 0;
+      const offX = Math.cos(offAngle) * offMag;
+      const offZ = Math.sin(offAngle) * offMag;
+      const surfaceY = terrainSurfaceY(tile, offX, offZ);
+      pos.set(base.x + offX, surfaceY, base.z + offZ);
       quat.setFromAxisAngle(up, rotSteps * (Math.PI / 3));
       const s = HEX_SIZE * jitter * cityScale;
       scl.set(s, s, s);

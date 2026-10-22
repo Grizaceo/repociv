@@ -219,19 +219,18 @@ export function createTerrainMaterial(options: TerrainMaterialOptions = {}): Mes
           float rampW = 0.0;
           for (int k = 0; k < 6; k++) {
             float nIdx = neighborIdxAt(instanceNeighborPacked, k);
-            if (abs(nIdx - tidx) < 0.5) continue;
             if (nIdx > 3.5 && nIdx < 5.5) continue; // ocean/ice
             float elevDiff = terrainElevFromIndex(nIdx) - thisElev;
-            if (abs(elevDiff) < 0.5) continue;
             float edgeT = clamp(dot(vLocalXZ, uCoastDir[k]), 0.0, 1.0);
             float w = smoothstep(0.55, 0.98, edgeT);
             rampSum += w * elevDiff;
             rampW += w;
           }
           if (rampW > 0.001) {
-            // weighted-average diff × midpoint × falloff (falloff saturates at
-            // 1 so corner vertices between two ramping edges don't overshoot)
-            transformed.y += (rampSum / rampW) * 0.5 * uTileHeight * min(rampW, 1.0);
+            // Watertight barycentric blend: at an edge midpoint (rampW=1) both
+            // tiles meet at (E_a+E_b)/2; at a 3-tile corner (rampW=2) all three
+            // tiles meet at (E_a+E_b+E_c)/3 with zero vertical tear.
+            transformed.y += (rampSum / (1.0 + rampW)) * uTileHeight;
           }
         }
 
@@ -722,7 +721,7 @@ vec3 prepTerrainTex(float idx, vec3 tex) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v41';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v42';
   // Terrain MUST receive the scene FogExp2: the ground plane and sky dome
   // fade into SKY_HORIZON at distance, so terrain that opted out (the old
   // `mat.fog = false`) popped against the haze instead of dissolving into it.

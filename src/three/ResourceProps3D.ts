@@ -31,6 +31,7 @@ import { type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+import { PROP_SURFACE_CLEARANCE, terrainSurfaceY } from './terrainSurfaceY.ts';
 
 const propsGroup = new Group();
 propsGroup.name = 'resource-props';
@@ -133,11 +134,10 @@ function instanceParts(parts: PropPart[], tiles: Tile[], baseScale: number): voi
       const offAngle = ((h >> 7) % 6) * (Math.PI / 3) + Math.PI / 6;
       const offMag = crowded ? HEX_SIZE * 0.34 : 0;
       const crowdScale = crowded ? 0.7 : 1.0;
-      pos.set(
-        base.x + Math.cos(offAngle) * offMag,
-        base.y + 1.5,
-        base.z + Math.sin(offAngle) * offMag,
-      );
+      const offX = Math.cos(offAngle) * offMag;
+      const offZ = Math.sin(offAngle) * offMag;
+      const surfaceY = terrainSurfaceY(tile, offX, offZ) + PROP_SURFACE_CLEARANCE;
+      pos.set(base.x + offX, surfaceY, base.z + offZ);
       quat.setFromAxisAngle(up, rotSteps * (Math.PI / 3));
       const s = HEX_SIZE * baseScale * jitter * crowdScale;
       scl.set(s, s, s);
@@ -155,7 +155,9 @@ export function rebuildResourceProps(tiles: Tile[]): void {
   if (state !== 'ready' || !crystalParts || !markerParts) return;
 
   const crystals = tiles.filter((t) => t.revealed && isCrystalTile(t));
-  const sacreds = tiles.filter((t) => t.terrain === 'sacred' && t.revealed);
+  const sacreds = tiles.filter(
+    (t) => t.terrain === 'sacred' && t.revealed && !t.city && t.district?.type !== 'wonder',
+  );
   const signature =
     crystals.map((t) => `${tileKey(t.coord)}:${t.city ? 1 : 0}${t.district ? 1 : 0}`).join('|') +
     '#' +

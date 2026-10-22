@@ -218,6 +218,7 @@ export function rebuildCityClusters(
       const tile = getTile(tileKey(city.coord));
       const elev = tile ? terrainElevation(tile.terrain) : 0;
       const base = axialToWorld3D(city.coord.q, city.coord.r, elev);
+      const surfaceY = tile ? terrainSurfaceY(tile, 0, 0, getTile) : base.y;
       const lvl = cityLevel(city);
       const growth = cityGrowth.get(city.id);
       const rise = growth?.spireRise ?? 1;
@@ -226,7 +227,7 @@ export function rebuildCityClusters(
       // Plaza: scale the instance by level multiplier.
       // When GLB is loaded, shrink plaza to 0 so it's invisible — the
       // GLB provides its own base and the procedural plaza clips through it.
-      const plazaM = new Matrix4().makeTranslation(base.x, base.y + 1.5, base.z);
+      const plazaM = new Matrix4().makeTranslation(base.x, surfaceY + 1.5, base.z);
       const plazaActualScale = hideProceduralFocal ? 0.0001 : plazaScale;
       plazaM.scale(new Vector3(plazaActualScale, 1, plazaActualScale));
       plazaMesh.setMatrixAt(plazaIdx++, plazaM);
@@ -236,7 +237,7 @@ export function rebuildCityClusters(
         const spireHScale = LEVEL_SPIRE_SCALE[lvl]! * rise;
         const spireM = new Matrix4().makeTranslation(
           base.x,
-          base.y + 4 + HEX_SIZE * 0.21 * spireHScale,
+          surfaceY + 4 + HEX_SIZE * 0.21 * spireHScale,
           base.z + HEX_SIZE * 0.24,
         );
         spireM.scale(new Vector3(1, spireHScale, 1));
@@ -246,12 +247,15 @@ export function rebuildCityClusters(
         const axis = (h % 6) * (Math.PI / 3);
         for (let li = 0; li < 2; li++) {
           const angle = axis + li * Math.PI;
+          const lx = Math.cos(angle) * HEX_SIZE * 0.42;
+          const lz = Math.sin(angle) * HEX_SIZE * 0.42;
+          const lSurfaceY = tile ? terrainSurfaceY(tile, lx, lz, getTile) : surfaceY;
           capitalLandmarkMesh.setMatrixAt(
             landmarkIdx++,
             new Matrix4().makeTranslation(
-              base.x + Math.cos(angle) * HEX_SIZE * 0.42,
-              base.y + 4 + HEX_SIZE * 0.15,
-              base.z + Math.sin(angle) * HEX_SIZE * 0.42,
+              base.x + lx,
+              lSurfaceY + 4 + HEX_SIZE * 0.15,
+              base.z + lz,
             ),
           );
         }
