@@ -1,0 +1,10 @@
+{
+  "mode": "refine",
+  "preview_task_id": "01a16598-3b66-715c-8f9c-f4d6b673b9b4",
+  "texture_prompt": "Original knowledge-city architecture. Warm pale limestone walls and stepped base, aged copper structural ribs and crown with subtle restrained verdigris, dark slate ceramic roofs, warm amber glass in the lantern and recessed windows. Clear large material regions readable from an elevated strategy-game camera. Hand-crafted stylized low-poly finish, subtle stone variation, clean edges, restrained weathering. Preserve the existing geometry. No text, no logos, no symbols, no excessive grime, no baked dramatic lighting. Copper metallic, limestone matte, ceramic moderately rough. Amber accents small and warm, never covering the entire roof.",
+  "enable_pbr": true,
+  "texture_resolution": "2k",
+  "target_formats": ["glb"],
+  "auto_size": false,
+  "alpha_thumbnail": true
+}

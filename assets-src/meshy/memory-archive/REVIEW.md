@@ -18,6 +18,18 @@ Desviaciones del brief: se parece más a un pabellón/templo fantástico que a u
 
 Decisión: conservar como exploración geométrica, no aprobar como identidad definitiva. No gastar en texturizado para ocultar una ambigüedad de silueta. Antes de otra generación, Cristóbal debe decidir si conserva la dirección arquitectónica o exige un archivo más distintivo y menos ceremonial.
 
+## Aprobación y texturizado posterior
+
+Cristóbal aprobó expresamente la geometría como edificio y autorizó el texturizado. La crítica anterior se conserva como evaluación inicial, no como veto a esa decisión.
+
+Refine confirmado `SUCCEEDED`: tarea `01a165a1-e402-73ab-9253-e4b3ad030260`, heredando el modelo del preview, resolución 2K, PBR solicitado. Una sola petición, sin regenerar intencionalmente la geometría. Consumo: 10 créditos; saldo antes 1095, después 1085. Total del piloto: 15 créditos.
+
+Artefactos locales ignorados por Git: `textured/archive-textured.glb` y `textured/archive-textured.png`. Auditoría estructural: 6942508 bytes, 3730 triángulos, 1 mesh y 1 material. El refine no conservó exactamente el recuento de 3732 triángulos del preview; no se afirma identidad binaria o topológica entre ambos.
+
+Inspección del thumbnail: paredes claras ligeramente cálidas y cubiertas azul pizarra bien diferenciadas. Puerta, paño superior y coronamiento muestran marrones/cobrizos; el thumbnail no demuestra metal envejecido ni un efecto ámbar luminoso convincente. Se observan zonas de borde y ménsulas que merecen revisión cercana. La paleta tiene buena separación visual, pero la intención del prompt no se da por cumplida en todos sus detalles.
+
+El GLB texturizado pesa considerablemente más que la geometría inicial: NO instalar como prop masivo sin medir memoria, texturas y draw calls. No se ha verificado aún dentro de RepoCiv ni se han aclarado los términos de distribución. Geometría aprobada por el usuario; texturizado pendiente de revisión del usuario.
+
 ## Pendiente verificable
 
 - Normalización de ejes, base al suelo y escala; no solicitadas como operación de autosizing ni verificadas geométricamente todavía.

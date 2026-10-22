@@ -1,4 +1,5 @@
 # Unapproved Meshy candidates and local paid-task state (retain locally).
+assets-src/meshy/**/textured/
 assets-src/meshy/**/preview.*
 assets-src/meshy/**/generation.json
 assets-src/meshy/**/submission-lock.json
