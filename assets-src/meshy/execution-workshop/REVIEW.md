@@ -35,6 +35,10 @@ The mesh retains the low twin-wing massing, open entrance doors and rear stack. 
 
 Screenshots and browser report: `$TMPDIR/repociv-meshy/workshop/`. Seven offline geometry runner scope/anti-double-spend tests passed before POST. The initial missing-normal display was detected by inspecting real screenshots rather than accepting a successful load as visual success.
 
+## Decision: repair deferred by Cristóbal
+
+Cristóbal rejected the malformed windows and agreed with local repair of a copy: reconstruct affected wall patches, replace windows with simple framed recessed panels suitable for map scale, and close the central roof following the approved concept. He explicitly requested recording this and moving on rather than executing the repair now. Status: DEFERRED, NOT REPAIRED; original GLB preserved. No further Workshop generation or texturing until this defect review is resolved. Next family member: Observatory concept, with its own paid-call confirmation.
+
 ## Next gate
 
 Review geometry, especially the central roof and windows, before paying for texturing. Concept approval is not geometry approval. Any repair/remesh/regeneration or texture call is a separate paid action requiring its cost to be confirmed. No Observatory generation is authorized by this step.
