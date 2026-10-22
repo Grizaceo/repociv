@@ -45,6 +45,9 @@ run_step "prettier --check"              npm run -s format:check
 run_step "vitest run --coverage"          npx --no-install vitest run --coverage
 run_step "vite build"                     npx --no-install vite build
 
+# Meshy offline checks: no network, credentials, or paid generation.
+run_step "Meshy pilot offline tests" python3 -m unittest discover -s scripts/meshy -p 'test_*.py'
+
 # Backend
 # Resolve ruff the same way pytest is below: prefer the repo .venv (a bare
 # `ruff` on PATH may not exist in a non-interactive shell; the venv always

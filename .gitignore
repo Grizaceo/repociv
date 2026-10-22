@@ -1,3 +1,10 @@
+# Unapproved Meshy candidates and local paid-task state (retain locally).
+assets-src/meshy/**/preview.*
+assets-src/meshy/**/generation.json
+assets-src/meshy/**/submission-lock.json
+assets-src/meshy/**/geometry-audit.json
+assets-src/meshy/**/*.tmp
+
 # Node / Vite
 # Match dependency directories and local reuse symlinks.
 node_modules

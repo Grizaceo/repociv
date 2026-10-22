@@ -1,0 +1,18 @@
+{
+  "asset_id": "memory-archive-v001",
+  "role": "memory infrastructure building; visual candidate, not installed",
+  "license_status": "unverified; distribution blocked pending account terms review",
+  "request": {
+    "mode": "preview",
+    "prompt": "A single stylized low-poly memory archive building for an original knowledge-city strategy dashboard. Compact hexagonal footprint, broad stepped limestone base, squat asymmetrical archive tower, three clearly separated stacked archive tiers with deep recessed niches, a large readable arched entrance, copper structural ribs and one oversized lantern crown. Architectural silhouette expresses stored knowledge, not a castle or church. Warm limestone, dark slate ceramic roof and aged copper are intended material regions for later texturing. Strong chunky shapes readable from a distant elevated isometric camera. One self-contained building only, flat underside, no landscape, no floating parts, no people, no text, no logos, no thin railings, no tiny ornaments.",
+    "model_type": "smart-topology",
+    "ai_model": "meshy-t2.5",
+    "topology": "triangle",
+    "target_polycount": 4000,
+    "target_formats": ["glb"],
+    "auto_size": false,
+    "alpha_thumbnail": true
+  },
+  "budget": {"max_create_requests": 1, "advertised_preview_credits": 5, "auto_refine": false},
+  "review": {"geometry": "pending", "visual_identity": "pending", "runtime": "not_integrated"}
+}
