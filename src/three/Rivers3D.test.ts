@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { Vector3 } from 'three';
 import {
   computeRiverPaths,
   edgeRoutePath,
@@ -104,30 +105,34 @@ describe('Rivers3D', () => {
     }
   });
 
-  it('routes straight runs and 120° turns around the tile perimeter, never near its centre', () => {
+  it('routes along hex edges: corners only, ±60° turns, never near a path tile centre', () => {
     const island = makeIsland();
     const tile = (q: number, r: number) => island.get(tileKey({ q, r }))!;
-    const center = axialToWorld3D(0, 0, 0);
-    // Distance from b's centre to segment p→q in XZ.
-    const segDist = (p: { x: number; z: number }, q: { x: number; z: number }) => {
-      const dx = q.x - p.x;
-      const dz = q.z - p.z;
-      const t = Math.max(
-        0,
-        Math.min(1, ((center.x - p.x) * dx + (center.z - p.z) * dz) / (dx * dx + dz * dz)),
-      );
-      return Math.hypot(p.x + dx * t - center.x, p.z + dz * t - center.z);
+    const centers = Array.from(island.values()).map((t) => axialToWorld3D(t.coord.q, t.coord.r, 0));
+    const nearestCenter = (p: { x: number; z: number }) =>
+      Math.min(...centers.map((c) => Math.hypot(p.x - c.x, p.z - c.z)));
+    const turnDeg = (a: Vector3, b: Vector3, c: Vector3) => {
+      const ux = b.x - a.x;
+      const uz = b.z - a.z;
+      const vx = c.x - b.x;
+      const vz = c.z - b.z;
+      return (Math.abs(Math.atan2(ux * vz - uz * vx, ux * vx + uz * vz)) * 180) / Math.PI;
     };
-    for (const path of [
-      [tile(-1, 0), tile(0, 0), tile(1, 0)], // straight
-      [tile(0, -1), tile(0, 0), tile(0, 1)], // straight, other axis
-      [tile(-1, 0), tile(0, 0), tile(1, -1)], // 120° turn
-    ]) {
-      const { points } = edgeRoutePath(path, null, island);
-      // Skip the spring (inside the source tile); every later chord is on or
-      // around b's perimeter: consecutive edge midpoints sit 0.75·R out.
-      for (let i = 1; i < points.length - 1; i++) {
-        expect(segDist(points[i]!, points[i + 1]!)).toBeGreaterThan(HEX_SIZE * 0.7);
+    const synthetic = [
+      [tile(-1, 0), tile(0, 0), tile(1, 0), tile(2, 0)], // straight
+      [tile(-1, 0), tile(0, 0), tile(1, -1), tile(1, -2)], // two 60° bends, same way
+      [tile(-1, 0), tile(0, 0), tile(1, -1), tile(2, -1)], // S-bend
+      [tile(-1, 0), tile(0, 0), tile(0, 1), tile(0, 2)], // sharp turn, then straight
+    ].map((path) => edgeRoutePath(path, null, island).points);
+    const grown = computeRiverPaths(island).map((p) => p.points);
+    expect(grown.length).toBeGreaterThan(0);
+    for (const points of [...synthetic, ...grown]) {
+      // Body = everything between the spring and the end point (mouth / join).
+      const body = points.slice(1, -1);
+      expect(body.length).toBeGreaterThan(0);
+      for (const p of body) expect(nearestCenter(p)).toBeCloseTo(HEX_SIZE, 3);
+      for (let i = 1; i < body.length - 1; i++) {
+        expect(turnDeg(body[i - 1]!, body[i]!, body[i + 1]!)).toBeLessThanOrEqual(60.001);
       }
     }
   });
