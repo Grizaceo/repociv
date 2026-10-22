@@ -1,6 +1,6 @@
 {
   "asset_id": "observatory-v001",
-  "status": "concept SUCCEEDED; awaiting artistic approval; no geometry authorized",
+  "status": "concept artist-approved; untextured geometry SUCCEEDED; awaiting geometry approval; no texturing",
   "license_status": "unverified; local candidates only; distribution blocked",
   "reference_asset": "memory-archive-v001",
   "concept": {
@@ -14,6 +14,23 @@
       "generate_multi_view": false,
       "aspect_ratio": "1:1",
       "remove_background": true
+    }
+  },
+  "geometry_after_concept_approval": {
+    "tool": "meshy_image_to_3d",
+    "advertised_credits": 5,
+    "max_create_requests": 1,
+    "request_without_input_task_id": {
+      "ai_model": "meshy-t2.5",
+      "model_type": "smart-topology",
+      "target_polycount": 4000,
+      "topology": "triangle",
+      "should_texture": false,
+      "enable_pbr": false,
+      "target_formats": ["glb"],
+      "alpha_thumbnail": true,
+      "multi_view_thumbnails": true,
+      "auto_size": false
     }
   },
   "guards": {
