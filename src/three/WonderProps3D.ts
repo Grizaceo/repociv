@@ -103,6 +103,8 @@ export function familyBuildingForType(wonderType: string): FamilyBuildingId | nu
   if (/(^|[-_])(prometheus|grafana)($|[-_])/.test(s)) return 'observatory';
   if (/(^|[-_])lab($|[-_])/.test(s)) return 'research-laboratory';
   switch (wonderModelForType(wonderType)) {
+    case 'building-smelter':
+      return 'execution-workshop';
     case 'building-mine':
       return 'artifact-vault';
     case 'building-watermill':

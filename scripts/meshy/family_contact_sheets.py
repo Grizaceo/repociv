@@ -14,7 +14,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 ASSETS = {"memory-archive": "Archivo", "observatory": "Observatorio", "coordination-court": "Patio",
           "connection-gateway": "Portal", "artifact-vault": "Bóveda", "research-laboratory": "Laboratorio",
-          "civic-plaza": "Plaza"}
+          "execution-workshop": "Taller", "civic-plaza": "Plaza"}
 BACKGROUND = np.array([32, 44, 54])
 FONTS = ("/usr/share/fonts/TTF/DejaVuSans.ttf", "/usr/share/fonts/noto/NotoSans-Regular.ttf")
 

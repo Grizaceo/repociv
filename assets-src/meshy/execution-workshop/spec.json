@@ -1,7 +1,7 @@
 {
   "asset_id": "execution-workshop-v001",
-  "status": "concept and repair-v003 geometry approved by Cristóbal («apruebo los modelos»); source-uv.glb prepared; pending 10-credit PBR retexture confirmation",
-  "license_status": "unverified; local candidates only",
+  "status": "concept, repair-v003 geometry and PBR materials verified; integrated into RepoCiv runtime (public/assets/3d/props/meshy/execution-workshop-map.glb)",
+  "license_status": "unverified; local candidates only; distribution blocked",
   "reference_asset": "memory-archive-v001",
   "local_repair": {
     "authorization": "Cristóbal: abordemos ahora la reparación local de la geometría de execution-workshop",
@@ -86,6 +86,51 @@
       "target_formats": ["glb"],
       "alpha_thumbnail": true
     },
-    "uv_method": "xatlas-python 0.0.11, 2048 px atlas, 6 px padding, charts on welded positions"
+    "uv_method": "xatlas-python 0.0.11, 2048 px atlas, 6 px padding, charts on welded positions",
+    "result": {
+      "task_id": "01a16b22-3f76-72a3-a4d4-536529268d8e",
+      "status": "SUCCEEDED",
+      "consumed_credits": 10,
+      "balance_before": 502,
+      "balance_after": 492,
+      "reconciled": true,
+      "sent_model_sha256": "44b848396cd78500c27d584a84084eed392298ab225d796743f887a20d7af549",
+      "sent_model_bytes": 240252,
+      "uv_charts": 993,
+      "uv_area_coverage": 0.584,
+      "meshy_output": {
+        "file": "texture-v001/meshy.glb",
+        "sha256": "2adfa86779c34007668b137473ab73fde7ede68beb1f84e1105f0b7f684dee4e",
+        "triangles": 3615,
+        "uniform_scale": 2.1234,
+        "visible_accepted_triangles_missing": 0,
+        "corners_with_normal_opposing_face": 111,
+        "kept_supplied_uvs": false
+      },
+      "candidate": {
+        "file": "texture-v001/textured.glb",
+        "sha256": "5c1caf739ea65e104876597e3ba701afa5f420c131ac214073c137a5b0c4f17e",
+        "bytes": 6429540,
+        "method": "accepted corners and prepared normals + Meshy per-corner UVs and PBR material",
+        "exact_against_accepted_geometry": true,
+        "triangles": 3624,
+        "corners_with_normal_opposing_face": 0,
+        "pbr": "baseColor (sRGB) + metallicRoughness + normal, 2048 px JPEG; doubleSided as delivered by Meshy"
+      },
+      "runtime_copy": {
+        "file": "texture-v001/execution-workshop-map.glb",
+        "sha256": "a4e362831d375232b44457b933d08a496f5527ff5ba501a32a2d2f0c3c40d233",
+        "bytes": 379568,
+        "max_texture_px": 512,
+        "geometry_bytes_identical": true
+      }
+    }
+  },
+  "runtime": {
+    "consumer": "src/three/WonderProps3D.ts familyBuildingForType + src/three/FamilyBuildings3D.ts",
+    "public_path": "public/assets/3d/props/meshy/execution-workshop-map.glb",
+    "default_enabled": true,
+    "mapping": "existing smelter bucket: worker|build|docker|gpu|compute|smelter|forge|ci (excluding prometheus/grafana -> observatory and lab -> research-laboratory)",
+    "scale_status": "approved by Cristóbal (diagonal <= 0.5 hex, height <= 0.62 hex)"
   }
 }

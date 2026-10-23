@@ -40,15 +40,18 @@ describe('local Meshy family trial', () => {
     expect(familyBuildingForType('duckdb')).toBe('artifact-vault');
     expect(familyBuildingForType('airflow')).toBe('coordination-court');
     expect(familyBuildingForType('ghostdesk')).toBe('connection-gateway');
-    // AI and execution services keep their Kenney models (Workshop is deferred).
-    for (const s of ['ollama', 'claude', 'docker', 'ci', 'gpu-worker']) {
+    for (const s of ['docker', 'ci', 'gpu-worker']) {
+      expect(familyBuildingForType(s)).toBe('execution-workshop');
+    }
+    // AI services keep their Kenney wizard-tower model.
+    for (const s of ['ollama', 'claude']) {
       expect(familyBuildingForType(s)).toBeNull();
-      expect(['building-wizard-tower', 'building-smelter']).toContain(wonderModelForType(s));
+      expect(wonderModelForType(s)).toBe('building-wizard-tower');
     }
     expect(familyBuildingForType('gitlab')).toBe('connection-gateway');
   });
-  it('lists neither the deferred Workshop nor the unmapped Plaza, and verifies public GLBs exist on disk', () => {
-    expect(FAMILY_BUILDING_IDS).not.toContain('execution-workshop');
+  it('lists the seven mapped family buildings (excluding unmapped Plaza) and verifies public GLBs exist on disk', () => {
+    expect(FAMILY_BUILDING_IDS).toContain('execution-workshop');
     expect(FAMILY_BUILDING_IDS).not.toContain('civic-plaza');
     expect([...FAMILY_BUILDING_IDS].sort()).toEqual(Object.keys(FAMILY_BUILDING_ASSETS).sort());
     for (const { path, materials } of Object.values(FAMILY_BUILDING_ASSETS)) {

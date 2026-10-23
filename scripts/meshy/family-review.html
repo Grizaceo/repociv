@@ -382,9 +382,19 @@
       <article>
         <h2>Taller de ejecución</h2>
         <img
-          src="/assets-src/meshy/execution-workshop/preview.png"
-          alt="Concepto del Taller, dos alas bajas y entrada amplia"
+          src="/assets-src/meshy/family-texture-review-v001/execution-workshop/lit-iso.png"
+          alt="Taller texturizado candidato bajo luz de mapa"
         />
+        <div class="pair">
+          <img
+            src="/assets-src/meshy/family-texture-review-v001/execution-workshop/unlit-iso.png"
+            alt="Albedo sin luz del Taller"
+          />
+          <img
+            src="/assets-src/meshy/execution-workshop/preview.png"
+            alt="Concepto aprobado del Taller"
+          />
+        </div>
         <table>
           <tr>
             <th>Concepto</th>
@@ -396,15 +406,19 @@
           </tr>
           <tr>
             <th>Materiales</th>
-            <td class="pending">Pendiente confirmación de Retexture PBR 2K (10 créditos)</td>
+            <td class="ok">PBR 2K generados y verificados</td>
           </tr>
           <tr>
             <th>Runtime</th>
-            <td>Sin integrar; los servicios de ejecución conservan Kenney</td>
+            <td class="ok">Integrado por defecto (docker, ci, workers, ejecución)</td>
           </tr>
         </table>
-        <a href="/scripts/meshy/workshop-preview.html?variant=repair"
-          >Rotar geometría reparada del Taller (repair-v003)</a
+        <p class="note">
+          Piedra caliza cálida, cubiertas de pizarra oscura, vigas/puertas de cobre-bronce
+          envejecido y resplandor ámbar cálido en las ventanas hundidas.
+        </p>
+        <a href="/scripts/meshy/family-textured-preview.html?asset=execution-workshop"
+          >Rotar en 3D · PBR, una cara, albedo, arcilla</a
         >
       </article>
     </section>

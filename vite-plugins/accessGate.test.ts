@@ -50,10 +50,11 @@ describe('access gate', () => {
 });
 
 describe('content security policy', () => {
-  it('forbids inline and foreign scripts', () => {
+  it('forbids inline and foreign scripts while permitting blob: for GLTFLoader textures', () => {
     const csp = contentSecurityPolicy();
     expect(csp).toContain("script-src 'self'");
     expect(csp).not.toMatch(/script-src[^;]*unsafe/);
+    expect(csp).toContain("connect-src 'self' blob:");
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("frame-ancestors 'self'");
   });

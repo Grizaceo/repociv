@@ -27,6 +27,7 @@ Pricing read on 2026-10-23 from https://docs.meshy.ai/en/api/pricing: Retexture 
 | artifact-vault | 01a167cf-0468-70be-924c-b04b5efac581 | SUCCEEDED | 10 | 532 → 522 |
 | research-laboratory | 01a167cf-ca24-74a6-81fc-da458df81196 | SUCCEEDED | 10 | 522 → 512 |
 | civic-plaza | 01a167d0-8b39-74df-b163-bb9eac09c010 | SUCCEEDED | 10 | 512 → 502 |
+| execution-workshop | 01a16b22-3f76-72a3-a4d4-536529268d8e | SUCCEEDED | 10 | 502 → 492 |
 
 Aggregated from the five `generation.json` receipts: 5 tasks, 50 credits, every balance delta equals the task's `consumed_credits`. The live balance read before the batch was 570. The 18-credit difference to the first receipt (552) is other account activity, not this batch. The account lists exactly six retexture tasks: the Observatory's and these five. No duplicates, retries or variants were submitted. One exclusive submission lock per asset was kept, and resumption is GET-only.
 

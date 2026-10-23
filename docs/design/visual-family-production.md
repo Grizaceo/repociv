@@ -13,7 +13,7 @@ Las etiquetas «Propuesto» de la tabla inferior son históricas. Prevalecen las
 | artifact-vault | Aprobado | repair-v003 aprobada | Aprobados | Integrado en `public/assets/3d/props/meshy/` (por defecto) |
 | research-laboratory | Aprobado | repair-v003 aprobada | Aprobados | Integrado en `public/assets/3d/props/meshy/` (por defecto) |
 | civic-plaza | Aprobado | Aprobada | Aprobados | Sin consumidor (aprobado sin mapeo) |
-| execution-workshop | Aprobado | repair-v003 aprobada | Pendiente (10 créditos, confirmar envío) | Kenney conservado |
+| execution-workshop | Aprobado | repair-v003 aprobada | Aprobados (PBR 2K) | Integrado en `public/assets/3d/props/meshy/` (por defecto) |
 
 Gasto de la tanda de materiales: 50 créditos (cinco Retexture de 10), saldo 552 → 502. Materiales, mapeo de servicios y escala aprobados por Cristóbal e integrados por defecto en RepoCiv.
 

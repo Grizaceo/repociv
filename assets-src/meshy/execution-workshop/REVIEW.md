@@ -52,8 +52,13 @@ Authorized by Cristóbal («abordemos ahora la reparación local de la geometrí
 
 Cristóbal: «apruebo los modelos». Accepted geometry: `repair-v003/preview.glb` (`SHA-256: 998993daec5408371d0564ad59c74015efdbdbdc9fd288da6b354fcb2ec72b86`, 3624 triangles). Original `geometry/preview.glb` remains preserved and read-only.
 
-## Next gate
+## PBR Retexture (`texture-v001`) and runtime integration
 
-Confirm 10-credit `meshy-7` 2K PBR retexture (`POST /openapi/v1/retexture` via `scripts/meshy/family_texture.py execution-workshop run --generate` using the locally UV-unwrapped `texture-v001/source-uv.glb`), assemble with exact accepted corners and `repair-v003` normals, and review materials before integrating into `public/assets/3d/props/meshy/execution-workshop-map.glb`.
+Authorized by Cristóbal (10 credits, `meshy-7` 2K PBR, `enable_original_uv: true` on `texture-v001/source-uv.glb`).
+
+- Task: `01a16b22-3f76-72a3-a4d4-536529268d8e` (`SUCCEEDED`, 10 credits, balance `502 → 492`, reconciled)
+- Assembled candidate: `texture-v001/textured.glb` (`SHA-256: 5c1caf739ea65e104876597e3ba701afa5f420c131ac214073c137a5b0c4f17e`, 6,429,540 bytes, 3624 triangles, exact against `repair-v003/preview.glb`, 0 opposing normals)
+- Optimized runtime copy: `texture-v001/execution-workshop-map.glb` → `public/assets/3d/props/meshy/execution-workshop-map.glb` (379,568 bytes, 512 px PBR maps, 94.1% smaller, geometry bytes identical)
+- Mapped in `src/three/WonderProps3D.ts` (`familyBuildingForType`) onto the existing `building-smelter` execution bucket (`worker|build|docker|gpu|compute|smelter|forge|ci`).
 
 All candidates remain local/ignored and outside public/; license clearance remains pending. No push, merge or deployment.

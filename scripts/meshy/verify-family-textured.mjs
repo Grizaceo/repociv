@@ -8,13 +8,22 @@ const BASE = process.env.FAMILY_BASE ?? 'http://127.0.0.1:5283';
 const OUT = process.argv[2];
 if (!OUT) throw new Error('usage: node verify-family-textured.mjs <output-dir>');
 const ROOT = new URL('../../', import.meta.url).pathname;
-const NEW = ['coordination-court', 'connection-gateway', 'artifact-vault', 'research-laboratory', 'civic-plaza'];
+const NEW = [
+  'coordination-court',
+  'connection-gateway',
+  'artifact-vault',
+  'research-laboratory',
+  'execution-workshop',
+  'civic-plaza',
+];
 const ALL = ['memory-archive', 'observatory', ...NEW];
 const VIEWS = ['iso', 'front', 'back', 'right', 'left', 'map'];
 
 async function expectedTriangles(id) {
   if (!NEW.includes(id)) return null;
-  const check = JSON.parse(await readFile(`${ROOT}assets-src/meshy/${id}/texture-v001/geometry-check.json`, 'utf8'));
+  const check = JSON.parse(
+    await readFile(`${ROOT}assets-src/meshy/${id}/texture-v001/geometry-check.json`, 'utf8'),
+  );
   return check.structure.triangles;
 }
 
@@ -29,8 +38,14 @@ try {
   page.on('pageerror', (e) => report.errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && report.errors.push(m.text()));
   async function open(asset, diag, view = 'iso') {
-    await page.goto(`${BASE}/scripts/meshy/family-textured-preview.html?asset=${asset}&diag=${diag}&view=${view}`);
-    await page.waitForFunction(() => ['ready', 'failed'].includes(window.familyTextured?.snapshot().status), null, { timeout: 120000 });
+    await page.goto(
+      `${BASE}/scripts/meshy/family-textured-preview.html?asset=${asset}&diag=${diag}&view=${view}`,
+    );
+    await page.waitForFunction(
+      () => ['ready', 'failed'].includes(window.familyTextured?.snapshot().status),
+      null,
+      { timeout: 120000 },
+    );
     await page.evaluate(() => (document.querySelector('aside').style.display = 'none'));
     return page.evaluate(() => window.familyTextured.snapshot());
   }
@@ -48,12 +63,15 @@ try {
     const problems = [];
     if (snap.status !== 'ready') problems.push(`load ${snap.status}`);
     if (info?.meshes !== 1) problems.push(`meshes ${info?.meshes}`);
-    if (expected !== null && info?.triangles !== expected) problems.push(`triangles ${info?.triangles} != ${expected}`);
+    if (expected !== null && info?.triangles !== expected)
+      problems.push(`triangles ${info?.triangles} != ${expected}`);
     const m = info?.materials?.[0];
-    if (!(m?.baseColor && m.normal && m.roughness && m.metalness)) problems.push('missing PBR slot');
+    if (!(m?.baseColor && m.normal && m.roughness && m.metalness))
+      problems.push('missing PBR slot');
     if (m?.baseColorSpace !== 'srgb') problems.push(`base color space ${m?.baseColorSpace}`);
     if (!info?.normalsValid) problems.push('invalid normals');
-    if (Math.abs(info?.placedMinY ?? 1) > 1e-6) problems.push(`not grounded: minY ${info?.placedMinY}`);
+    if (Math.abs(info?.placedMinY ?? 1) > 1e-6)
+      problems.push(`not grounded: minY ${info?.placedMinY}`);
     for (const view of VIEWS) await shoot(view, `${dir}/lit-${view}.png`);
     await open(id, 'single');
     for (const view of VIEWS.slice(0, 5)) await shoot(view, `${dir}/single-${view}.png`);
@@ -70,7 +88,8 @@ try {
   for (const diag of ['lit', 'clay']) {
     const snap = await open('lineup', diag);
     report.lineup[diag] = { status: snap.status, calls: snap.calls, triangles: snap.triangles };
-    for (const view of ['iso', 'front', 'map']) await shoot(view, `${OUT}/lineup/${diag}-${view}.png`);
+    for (const view of ['iso', 'front', 'map'])
+      await shoot(view, `${OUT}/lineup/${diag}-${view}.png`);
   }
   // Negative control: an aborted candidate must surface as failed, never as ready.
   await page.route('**/civic-plaza/texture-v001/textured.glb', (route) => route.abort());
@@ -83,12 +102,20 @@ try {
 } finally {
   await browser.close();
 }
-const benignErrors = report.errors.filter((e) => /civic-plaza\/texture-v001\/textured\.glb|Failed to load resource/.test(e));
+const benignErrors = report.errors.filter((e) =>
+  /civic-plaza\/texture-v001\/textured\.glb|Failed to load resource/.test(e),
+);
 report.unexpectedErrors = report.errors.filter((e) => !benignErrors.includes(e));
 report.ok =
   report.unexpectedErrors.length === 0 &&
   report.negativeControl.status === 'failed' &&
   Object.values(report.assets).every((a) => a.problems.length === 0);
 await writeFile(`${OUT}/browser-report.json`, JSON.stringify(report, null, 2));
-console.log(JSON.stringify({ ok: report.ok, negativeControl: report.negativeControl, unexpectedErrors: report.unexpectedErrors }));
+console.log(
+  JSON.stringify({
+    ok: report.ok,
+    negativeControl: report.negativeControl,
+    unexpectedErrors: report.unexpectedErrors,
+  }),
+);
 if (!report.ok) process.exitCode = 1;

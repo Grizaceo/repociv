@@ -62,8 +62,11 @@ export function contentSecurityPolicy(extraConnect: string[] = []): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    // Direct local WS fallback (ws://localhost:5275) keeps working on this host.
-    ['connect-src', "'self'", 'ws://localhost:*', 'ws://127.0.0.1:*', ...extraConnect].join(' '),
+    // Direct local WS fallback (ws://localhost:5275) keeps working on this host;
+    // blob: is required by Three.js GLTFLoader when decoding embedded GLB textures.
+    ['connect-src', "'self'", 'blob:', 'ws://localhost:*', 'ws://127.0.0.1:*', ...extraConnect].join(
+      ' ',
+    ),
     // Wonders are user-configured iframes (any http/https origin).
     "frame-src 'self' http: https:",
     "worker-src 'self' blob:",

@@ -108,6 +108,11 @@
         url: `${M}/research-laboratory/texture-v001/textured.glb`,
         state: 'Geometría v003 y materiales PBR aprobados · integrado en mapa',
       },
+      'execution-workshop': {
+        label: 'Taller',
+        url: `${M}/execution-workshop/texture-v001/textured.glb`,
+        state: 'Geometría v003 aprobada · materiales PBR 2K generados',
+      },
       'civic-plaza': {
         label: 'Plaza',
         url: `${M}/civic-plaza/texture-v001/textured.glb`,
@@ -116,11 +121,20 @@
     };
     const params = new URLSearchParams(location.search);
     const lineup = params.get('asset') === 'lineup';
-    const selected = lineup ? 'lineup' : ASSETS[params.get('asset')] ? params.get('asset') : 'coordination-court';
-    const diag = ['lit', 'single', 'unlit', 'clay'].includes(params.get('diag')) ? params.get('diag') : 'lit';
+    const selected = lineup
+      ? 'lineup'
+      : ASSETS[params.get('asset')]
+        ? params.get('asset')
+        : 'coordination-court';
+    const diag = ['lit', 'single', 'unlit', 'clay'].includes(params.get('diag'))
+      ? params.get('diag')
+      : 'lit';
 
     const select = document.querySelector('#asset');
-    for (const [id, a] of [['lineup', { label: 'Familia completa (7)' }], ...Object.entries(ASSETS)]) {
+    for (const [id, a] of [
+      ['lineup', { label: 'Familia completa (7)' }],
+      ...Object.entries(ASSETS),
+    ]) {
       select.append(new Option(a.label, id, false, id === selected));
     }
     select.onchange = () => {
@@ -135,7 +149,14 @@
     sun.position.set(-1659, 1377, 1056).normalize().multiplyScalar(8);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    Object.assign(sun.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5, near: 0.1, far: 30 });
+    Object.assign(sun.shadow.camera, {
+      left: -5,
+      right: 5,
+      top: 5,
+      bottom: -5,
+      near: 0.1,
+      far: 30,
+    });
     sun.shadow.camera.updateProjectionMatrix();
     sun.shadow.bias = -0.0005;
     scene.add(sun);
@@ -186,7 +207,14 @@
         .querySelectorAll('[data-view]')
         .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
     }
-    const labels = { iso: 'Perspectiva', front: 'Frente', back: 'Atrás', right: 'Derecha', left: 'Izquierda', map: 'Altura de mapa' };
+    const labels = {
+      iso: 'Perspectiva',
+      front: 'Frente',
+      back: 'Atrás',
+      right: 'Derecha',
+      left: 'Izquierda',
+      map: 'Altura de mapa',
+    };
     for (const v of Object.keys(VIEWS)) {
       const b = document.createElement('button');
       b.dataset.view = v;
@@ -194,7 +222,12 @@
       b.onclick = () => setView(v);
       document.querySelector('#views').append(b);
     }
-    const diagLabels = { lit: 'PBR', single: 'Una cara', unlit: 'Albedo sin luz', clay: 'Arcilla (normales)' };
+    const diagLabels = {
+      lit: 'PBR',
+      single: 'Una cara',
+      unlit: 'Albedo sin luz',
+      clay: 'Arcilla (normales)',
+    };
     for (const d of Object.keys(diagLabels)) {
       const b = document.createElement('button');
       b.textContent = diagLabels[d];
@@ -211,7 +244,11 @@
 
     const state = { status: 'loading', diag, assets: {} };
     window.familyTextured = {
-      snapshot: () => ({ ...state, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }),
+      snapshot: () => ({
+        ...state,
+        calls: renderer.info.render.calls,
+        triangles: renderer.info.render.triangles,
+      }),
       setView,
       scene,
       renderer,
@@ -236,7 +273,8 @@
           return c;
         }
         if (diag === 'unlit') return new T.MeshBasicMaterial({ map: m.map, side: T.FrontSide });
-        if (diag === 'clay') return new T.MeshLambertMaterial({ color: 0xd8d2c4, side: T.FrontSide });
+        if (diag === 'clay')
+          return new T.MeshLambertMaterial({ color: 0xd8d2c4, side: T.FrontSide });
         return m;
       });
       mesh.material = Array.isArray(mesh.material) ? replaced : replaced[0];
@@ -248,7 +286,10 @@
       const size = bounds.getSize(new T.Vector3());
       if (bounds.isEmpty() || !Number.isFinite(size.length()) || size.length() === 0)
         throw new Error('No finite volume');
-      const scale = Math.min(0.5 / Math.max(Math.hypot(size.x, size.z), 1e-6), 0.62 / Math.max(size.y, 1e-6));
+      const scale = Math.min(
+        0.5 / Math.max(Math.hypot(size.x, size.z), 1e-6),
+        0.62 / Math.max(size.y, 1e-6),
+      );
       const center = bounds.getCenter(new T.Vector3());
       model.position.sub(new T.Vector3(center.x, bounds.min.y, center.z));
       const pivot = new T.Group();
@@ -278,7 +319,9 @@
                 metalness: !!m.metalnessMap,
                 emissive: !!m.emissiveMap,
                 doubleSided: m.side === T.DoubleSide,
-                sizes: [m.map, m.normalMap, m.roughnessMap].filter(Boolean).map((t) => [t.image?.width, t.image?.height]),
+                sizes: [m.map, m.normalMap, m.roughnessMap]
+                  .filter(Boolean)
+                  .map((t) => [t.image?.width, t.image?.height]),
               });
             }
             o.castShadow = true;
@@ -299,7 +342,8 @@
       ),
     ).then((results) => {
       results.forEach((r, i) => {
-        if (r.status === 'rejected') state.assets[ids[i]] = { status: 'failed', error: String(r.reason?.message ?? r.reason) };
+        if (r.status === 'rejected')
+          state.assets[ids[i]] = { status: 'failed', error: String(r.reason?.message ?? r.reason) };
       });
       const failed = ids.filter((id) => state.assets[id].status !== 'ready');
       if (!lineup && !failed.length) {
