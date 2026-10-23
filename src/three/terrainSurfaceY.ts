@@ -80,9 +80,8 @@ function ridge3(x: number, y: number): number {
   return s;
 }
 
-/** Shader-equivalent micro-relief at a world-space XZ point on one terrain tile.
- *  Edge transition ramps are intentionally not mirrored: city buildings and
- *  units are placed near tile centres, where the shader ramp has zero weight. */
+/** Shader-equivalent micro-relief at a world-space XZ point on one terrain tile,
+ *  before the edge fade (terrainEdgeBlend) that terrainSurfaceY applies. */
 export function terrainReliefAt(terrain: Terrain, worldX: number, worldZ: number): number {
   switch (terrain) {
     case 'plains': {
@@ -120,21 +119,26 @@ export function terrainReliefAt(terrain: Terrain, worldX: number, worldZ: number
   }
 }
 
-/** CPU mirror of the per-edge neighbor elevation transition ramp in terrainShader.ts. */
-export function terrainEdgeRampY(
+/** CPU mirror of terrainShader.ts's per-edge neighbor blend: the elevation
+ *  ramp (world units) and the 0..1 fade that zeroes micro-relief toward edges
+ *  shared with a different land biome. */
+export function terrainEdgeBlend(
   tile: Tile,
   localX: number,
   localZ: number,
   getTile?: (key: string) => Tile | undefined,
-): number {
-  if (!getTile || tile.terrain === 'ocean' || tile.terrain === 'ice') return 0;
+): { rampY: number; reliefFade: number } {
+  if (!getTile || tile.terrain === 'ocean' || tile.terrain === 'ice') {
+    return { rampY: 0, reliefFade: 0 };
+  }
   const thisElev = terrainElevation(tile.terrain);
   let rampSum = 0;
   let rampW = 0;
+  let reliefFade = 0;
   for (let k = 0; k < 6; k++) {
     const d = AXIAL_DIRECTIONS[k]!;
     const n = getTile(tileKey({ q: tile.coord.q + d.q, r: tile.coord.r + d.r }));
-    const nTerrain = n ? n.terrain : tile.terrain;
+    const nTerrain: Terrain = n ? n.terrain : tile.terrain;
     if (nTerrain === 'ocean' || nTerrain === 'ice') continue;
     const elevDiff = terrainElevation(nTerrain) - thisElev;
     const dir = COAST_EDGE_DIRS[k]!;
@@ -142,11 +146,20 @@ export function terrainEdgeRampY(
     const w = smoothstep(0.55, 0.98, edgeT);
     rampSum += w * elevDiff;
     rampW += w;
+    if (nTerrain !== tile.terrain) reliefFade = Math.max(reliefFade, w);
   }
-  if (rampW > 0.001) {
-    return (rampSum / (1 + rampW)) * TILE_HEIGHT;
-  }
-  return 0;
+  const rampY = rampW > 0.001 ? (rampSum / (1 + rampW)) * TILE_HEIGHT : 0;
+  return { rampY, reliefFade };
+}
+
+/** CPU mirror of the per-edge neighbor elevation transition ramp in terrainShader.ts. */
+export function terrainEdgeRampY(
+  tile: Tile,
+  localX: number,
+  localZ: number,
+  getTile?: (key: string) => Tile | undefined,
+): number {
+  return terrainEdgeBlend(tile, localX, localZ, getTile).rampY;
 }
 
 export function terrainSurfaceY(
@@ -158,11 +171,8 @@ export function terrainSurfaceY(
   const base = axialToWorld3D(tile.coord.q, tile.coord.r, terrainElevation(tile.terrain));
   const worldX = base.x + localX;
   const worldZ = base.z + localZ;
-  return (
-    base.y +
-    terrainEdgeRampY(tile, localX, localZ, getTile) +
-    terrainReliefAt(tile.terrain, worldX, worldZ)
-  );
+  const { rampY, reliefFade } = terrainEdgeBlend(tile, localX, localZ, getTile);
+  return base.y + rampY + terrainReliefAt(tile.terrain, worldX, worldZ) * (1 - reliefFade);
 }
 
 /** Sample the highest terrain surface Y across a circular building/wall footprint

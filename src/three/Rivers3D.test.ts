@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { computeRiverPaths, rebuildRivers, clearRivers, getRiverGroup } from './Rivers3D.ts';
+import type { Vector3 } from 'three';
+import {
+  computeRiverPaths,
+  edgeRoutePath,
+  rebuildRivers,
+  clearRivers,
+  getRiverGroup,
+} from './Rivers3D.ts';
 import { worldTerrainSurfaceY } from './terrainSurfaceY.ts';
+import { axialToWorld3D } from './axialToWorld3D.ts';
+import { HEX_SIZE } from '../constants.ts';
 import { tileKey, type Tile, type Terrain } from '../types.ts';
 
 /** Synthetic island: mountain core, plains ring, ocean rim. */
@@ -79,5 +88,52 @@ describe('Rivers3D', () => {
 
     clearRivers();
     expect(getRiverGroup().children.length).toBe(0);
+  });
+
+  it('keeps river control points on the terrain surface, not floating over highland edges', () => {
+    const island = makeIsland();
+    const paths = computeRiverPaths(island);
+    expect(paths.length).toBeGreaterThan(0);
+    for (const p of paths) {
+      // Body points only: the mouth deliberately dips to the sea surface.
+      const body = p.mouth ? p.points.slice(0, -1) : p.points;
+      for (const pt of body) {
+        const lift = pt.y - worldTerrainSurfaceY(pt.x, pt.z, island);
+        expect(lift).toBeGreaterThanOrEqual(1.29);
+        expect(lift).toBeLessThanOrEqual(1.41);
+      }
+    }
+  });
+
+  it('routes along hex edges: corners only, ±60° turns, never near a path tile centre', () => {
+    const island = makeIsland();
+    const tile = (q: number, r: number) => island.get(tileKey({ q, r }))!;
+    const centers = Array.from(island.values()).map((t) => axialToWorld3D(t.coord.q, t.coord.r, 0));
+    const nearestCenter = (p: { x: number; z: number }) =>
+      Math.min(...centers.map((c) => Math.hypot(p.x - c.x, p.z - c.z)));
+    const turnDeg = (a: Vector3, b: Vector3, c: Vector3) => {
+      const ux = b.x - a.x;
+      const uz = b.z - a.z;
+      const vx = c.x - b.x;
+      const vz = c.z - b.z;
+      return (Math.abs(Math.atan2(ux * vz - uz * vx, ux * vx + uz * vz)) * 180) / Math.PI;
+    };
+    const synthetic = [
+      [tile(-1, 0), tile(0, 0), tile(1, 0), tile(2, 0)], // straight
+      [tile(-1, 0), tile(0, 0), tile(1, -1), tile(1, -2)], // two 60° bends, same way
+      [tile(-1, 0), tile(0, 0), tile(1, -1), tile(2, -1)], // S-bend
+      [tile(-1, 0), tile(0, 0), tile(0, 1), tile(0, 2)], // sharp turn, then straight
+    ].map((path) => edgeRoutePath(path, null, island).points);
+    const grown = computeRiverPaths(island).map((p) => p.points);
+    expect(grown.length).toBeGreaterThan(0);
+    for (const points of [...synthetic, ...grown]) {
+      // Body = everything between the spring and the end point (mouth / join).
+      const body = points.slice(1, -1);
+      expect(body.length).toBeGreaterThan(0);
+      for (const p of body) expect(nearestCenter(p)).toBeCloseTo(HEX_SIZE, 3);
+      for (let i = 1; i < body.length - 1; i++) {
+        expect(turnDeg(body[i - 1]!, body[i]!, body[i + 1]!)).toBeLessThanOrEqual(60.001);
+      }
+    }
   });
 });

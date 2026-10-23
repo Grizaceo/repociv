@@ -25,10 +25,15 @@ const TOP_OVERLAP = 1.028;
  * Extruded flat-top hex prism. Full circumradius top face tiles the plane
  * exactly with flat-top corner angles; terrainShader flattens any residual
  * bevel groove so adjacent caps share one continuous surface.
+ *
+ * `subdivide` adds the concentric top rings and 4-segment sides that the
+ * terrain shader's per-vertex ramp + relief need (148 triangles). Meshes that
+ * never displace vertices (fog cover) pass false and get the 20-triangle prism.
  */
 export function createHexPrismGeometry(
   circumradius = HEX_SIZE,
   height = TILE_PRISM_HEIGHT,
+  subdivide = true,
 ): BufferGeometry {
   const r = circumradius;
   const fullTop = BEVEL_INSET >= 1.0;
@@ -111,8 +116,8 @@ export function createHexPrismGeometry(
   // hex centre — burying cities next to hills and dropping mountain tops
   // 18 units below their mountain props.
   const RING_FRACTIONS = [0.28, 0.55, 0.78, 1.0] as const;
-  const EDGE_SEGMENTS = RING_FRACTIONS.length; // 4 segments per hex edge
-  if (fullTop) {
+  const EDGE_SEGMENTS = subdivide ? RING_FRACTIONS.length : 1; // segments per hex edge
+  if (fullTop && subdivide) {
     const ringPoint = (wedge: number, ringIdx: number, step: number): [number, number, number] => {
       if (ringIdx === 0) return [0, 0, 0];
       const frac = RING_FRACTIONS[ringIdx - 1]!;
@@ -200,5 +205,8 @@ export function createHexPrismGeometry(
   return geom;
 }
 
-/** Reusable unit hex for InstancedMesh. */
+/** Reusable unit hex for InstancedMesh (terrain: subdivided for the shader). */
 export const sharedHexGeometry = createHexPrismGeometry(HEX_SIZE, TILE_PRISM_HEIGHT);
+
+/** Same prism without subdivision, for undisplaced meshes (fog cover). */
+export const sharedFlatHexGeometry = createHexPrismGeometry(HEX_SIZE, TILE_PRISM_HEIGHT, false);

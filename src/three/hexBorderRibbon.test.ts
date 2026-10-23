@@ -32,4 +32,35 @@ describe('culture border ribbon', () => {
     // …and it never reaches deep enough to swallow the tile interior.
     expect(maxOff).toBeLessThanOrEqual(HEX_SIZE * 0.5);
   });
+
+  it('joins the two halves of a split edge end to end, without overlap', () => {
+    // Halves of one vertical edge, split at z=0 as rebuildTerritoryLines does.
+    const base = { x1: 10, x2: 10, cx: 0, cz: 0, y: 0 };
+    const geom = buildRibbonGeometry(
+      [
+        { ...base, z1: -5, z2: 0, extendEnd: false },
+        { ...base, z1: 0, z2: 5, extendStart: false },
+      ],
+      W,
+      INSET,
+    );
+    const pos = geom.getAttribute('position').array as Float32Array;
+    // 6 verts (18 floats) per half: first half's z range, then the second's.
+    const zRange = (from: number) => {
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (let i = from; i < from + 18; i += 3) {
+        lo = Math.min(lo, pos[i + 2]!);
+        hi = Math.max(hi, pos[i + 2]!);
+      }
+      return [lo, hi] as const;
+    };
+    const [lo1, hi1] = zRange(0);
+    const [lo2, hi2] = zRange(18);
+    // Outer ends still mitre out by half a band; the shared midpoint does not.
+    expect(lo1).toBeCloseTo(-5 - W / 2, 5);
+    expect(hi1).toBeCloseTo(0, 5);
+    expect(lo2).toBeCloseTo(0, 5);
+    expect(hi2).toBeCloseTo(5 + W / 2, 5);
+  });
 });

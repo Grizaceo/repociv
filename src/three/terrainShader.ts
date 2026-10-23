@@ -204,6 +204,13 @@ export function createTerrainMaterial(options: TerrainMaterialOptions = {}): Mes
 
         bool isOceanTile = abs(tidx - 4.0) < 0.5;
         bool isIceTile = abs(tidx - 5.0) < 0.5;
+        // Top cap + bevel, decided BEFORE the ramp: the ramp pushes a high
+        // tile's rim below -1.0, and gating relief on the ramped y used to
+        // strip relief there (and only there), so the CPU mirror in
+        // terrainSurfaceY.ts drifted and neighbor caps stopped meeting.
+        bool isTopCap = transformed.y > -1.0;
+        // 0 inside, 1 on an edge shared with a different land biome (see below).
+        float reliefFade = 0.0;
 
         // P2: Biome-blend elevation transitions, PER EDGE. Where a neighbor
         // has a different elevation, the top-cap Y ramps toward the shared
@@ -213,7 +220,7 @@ export function createTerrainMaterial(options: TerrainMaterialOptions = {}): Mes
         // falloff. The old code used ONE dominant neighbor for the whole
         // rim, so a tile between hills and plains ramped every edge the same.
         // Skip water neighbors — the coast mask owns those transitions.
-        if (!isOceanTile && !isIceTile && transformed.y > -1.0) {
+        if (!isOceanTile && !isIceTile && isTopCap) {
           float thisElev = terrainElevFromIndex(tidx);
           float rampSum = 0.0;
           float rampW = 0.0;
@@ -225,6 +232,10 @@ export function createTerrainMaterial(options: TerrainMaterialOptions = {}): Mes
             float w = smoothstep(0.55, 0.98, edgeT);
             rampSum += w * elevDiff;
             rampW += w;
+            // Each biome runs its own relief noise, so two different biomes
+            // can only meet if both fade relief to 0 at their shared edge
+            // (same-biome neighbors share the world-phase noise already).
+            if (abs(nIdx - tidx) > 0.5) reliefFade = max(reliefFade, w);
           }
           if (rampW > 0.001) {
             // Watertight barycentric blend: at an edge midpoint (rampW=1) both
@@ -237,35 +248,37 @@ export function createTerrainMaterial(options: TerrainMaterialOptions = {}): Mes
         // Top-cap micro-relief for all land biomes: FBM noise replaces
         // the old sin/cos mesa-breaker. World-space phase (no uTime)
         // keeps same-biome neighbors continuous; only top cap + bevel
-        // (y > -1.0) moves so prisms stay watertight.
-        if (!isOceanTile && !isIceTile && transformed.y > -1.0) {
+        // moves so prisms stay watertight.
+        if (!isOceanTile && !isIceTile && isTopCap) {
           vec2 noisePos = instanceMatrix[3].xz + transformed.xz;
+          float relief = 0.0;
           if (tidx < 0.5) {
             // plains: gentle rolling, 3% hexRadius
             float r = (fbm3(noisePos * 0.04) - 0.5) * 2.0;
-            transformed.y += r * (uHexRadius * 0.03);
+            relief = r * (uHexRadius * 0.03);
           } else if (tidx < 1.5) {
             // forest: slightly more varied, 4%
             float r = (fbm3(noisePos * 0.05) - 0.5) * 2.0;
-            transformed.y += r * (uHexRadius * 0.04);
+            relief = r * (uHexRadius * 0.04);
           } else if (tidx < 2.5) {
             // mountain: jagged peaks, 12%, ridge noise
             float r = ridge3(noisePos * 0.06);
-            transformed.y += r * (uHexRadius * 0.12);
+            relief = r * (uHexRadius * 0.12);
           } else if (tidx < 3.5) {
             // desert: dune-like swells, 5%, anisotropic
             vec2 dunePos = vec2(noisePos.x * 0.03 + noisePos.y * 0.08, noisePos.y * 0.02);
             float r = (fbm3(dunePos) - 0.5) * 2.0;
-            transformed.y += r * (uHexRadius * 0.05);
+            relief = r * (uHexRadius * 0.05);
           } else if (tidx < 6.5) {
             // hills: clear ridgelines, 8%, ridge noise
             float r = ridge3(noisePos * 0.055);
-            transformed.y += r * (uHexRadius * 0.08);
+            relief = r * (uHexRadius * 0.08);
           } else if (tidx < 7.5) {
             // sacred: gentle, 3%
             float r = (fbm3(noisePos * 0.045) - 0.5) * 2.0;
-            transformed.y += r * (uHexRadius * 0.03);
+            relief = r * (uHexRadius * 0.03);
           }
+          transformed.y += relief * (1.0 - reliefFade);
         }
 
         // Ocean wave animation: gentle vertical displacement. Phase runs on
@@ -316,9 +329,13 @@ vec2 terrainAtlasUv(float idx, vec2 tileUv) {
               (row + tileUv.y) / uAtlasRows);
 }
 
-vec2 terrainMacroUv(float idx, vec2 tileUv, vec2 worldXZ) {
+vec2 terrainMacroRawUv(float idx, vec2 worldXZ) {
   float scale = mix(2.4, 3.6, clamp(idx / 7.0, 0.0, 1.0));
-  vec2 rawUv = worldXZ / (uHexRadius * scale) + vec2(idx * 0.137, idx * 0.173);
+  return worldXZ / (uHexRadius * scale) + vec2(idx * 0.137, idx * 0.173);
+}
+
+vec2 terrainMacroUv(float idx, vec2 tileUv, vec2 worldXZ) {
+  vec2 rawUv = terrainMacroRawUv(idx, worldXZ);
   // Mirror-repeat (triangle wave) instead of sawtooth fract() so non-periodic
   // atlas cells (especially desert dune bands) never stamp a hard 1→0 seam
   // across the middle of a hex.
@@ -329,6 +346,16 @@ vec2 terrainMacroUv(float idx, vec2 tileUv, vec2 worldXZ) {
   // continuous surface → push it almost fully to world-space UV.
   bool water = (idx > 3.5 && idx < 5.5);
   return mix(tileUv, worldUv, water ? 0.93 : 0.38);
+}
+
+// Per-axis sign of d(terrainMacroUv)/d(world). The mirror-repeat runs world UV
+// backward in every other cell. On land the 62% tile UV still dominates the
+// slope (0.30 vs at most 0.16 per hex radius), but water is 93% world UV, so
+// its mirrored cells really do flip, and a normal-map sample there must negate
+// its tangent X/Y or that cell's relief lights from the opposite side.
+vec2 terrainMacroUvSign(float idx, vec2 worldXZ) {
+  if (!(idx > 3.5 && idx < 5.5)) return vec2(1.0);
+  return 1.0 - 2.0 * step(0.5, fract(terrainMacroRawUv(idx, worldXZ) * 0.5));
 }
 
 float terrainDetailNoise(vec2 p) {
@@ -697,6 +724,7 @@ vec3 prepTerrainTex(float idx, vec3 tex) {
           vec2 nmacroUv = terrainMacroUv(_ntidx, vUv, vWorldXZ);
           vec2 nauv  = terrainAtlasUv(_ntidx, nmacroUv);
           vec3 nTex  = texture2D(uNormalAtlas, nauv).rgb * 2.0 - 1.0;
+          nTex.xy *= terrainMacroUvSign(_ntidx, vWorldXZ);
           // Directional neighbor normal blend — same per-edge weights as the
           // albedo, so the relief agrees with the color on every edge.
           float _wSum = 0.0;
@@ -708,7 +736,9 @@ vec3 prepTerrainTex(float idx, vec3 tex) {
             float _w = smoothstep(0.58, 0.96, _edgeT);
             if (_w < 0.001) continue;
             vec2 _nnUv = terrainAtlasUv(_nIdx, terrainMacroUv(_nIdx, vUv, vWorldXZ));
-            _nAccum += _w * (texture2D(uNormalAtlas, _nnUv).rgb * 2.0 - 1.0);
+            vec3 _nn = texture2D(uNormalAtlas, _nnUv).rgb * 2.0 - 1.0;
+            _nn.xy *= terrainMacroUvSign(_nIdx, vWorldXZ);
+            _nAccum += _w * _nn;
             _wSum += _w;
           }
           if (_wSum > 0.001) {
@@ -728,7 +758,7 @@ vec3 prepTerrainTex(float idx, vec3 tex) {
   // below require a version bump here, otherwise three's WebGL
   // program cache will keep the old program around. See test in
   // terrainShader.test.ts.
-  mat.customProgramCacheKey = () => 'repociv-terrain-v44';
+  mat.customProgramCacheKey = () => 'repociv-terrain-v46';
   // Terrain MUST receive the scene FogExp2: the ground plane and sky dome
   // fade into SKY_HORIZON at distance, so terrain that opted out (the old
   // `mat.fog = false`) popped against the haze instead of dissolving into it.

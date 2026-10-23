@@ -85,12 +85,9 @@ const MIN_SOURCE_SEPARATION = 5;
 /** Minimum BFS distance to the sea for a tile to qualify as a source. */
 const MIN_SOURCE_DIST = 3;
 
-/** Ribbon lift above the tile top face. Hills/mountain tops undulate
- *  (shader relief, amplitude HEX_SIZE*0.12 ≈ 6.2) so the river needs more
- *  clearance there than on flat biomes. */
-function riverLift(terrain: Tile['terrain']): number {
-  return terrain === 'mountain' ? 6.6 : terrain === 'hills' ? 4.6 : 1.8;
-}
+/** Control-point clearance above the rendered terrain cap (worldTerrainSurfaceY
+ *  mirrors the shader's ramp + relief, so no per-biome lift is needed). */
+const RIVER_CLEARANCE = 1.3;
 
 interface RiverPath {
   /** Tile-center control points, last one reaching into the river mouth. */
@@ -172,13 +169,11 @@ export function computeRiverPaths(tiles: Map<string, Tile>): RiverPath[] {
         if (nt && nd !== undefined && nd < d && !visited.has(nk)) downs.push(nt);
       }
       if (downs.length === 0) break;
-      // Prefer land continuation before dumping into the sea on short runs so
-      // rivers don't terminate as 1-hex coastal stubs when a valley exists.
-      const nonOceanDowns = path.length < 3 ? downs.filter((t) => t.terrain !== 'ocean') : [];
-      const pool = nonOceanDowns.length > 0 ? nonOceanDowns : downs;
       // Deterministic meander: hash picks among the equally-valid descents.
+      // (BFS neighbors differ by at most one hop, so every descent is at
+      // d-1: all land, or — one hop from the coast — all sea.)
       const h = hashCoord(current.coord.q, current.coord.r);
-      const next = pool[(h + step) % pool.length]!;
+      const next = downs[(h + step) % downs.length]!;
 
       if (next.terrain === 'ocean') {
         // Mouth: stop at the shared edge, reaching slightly into the sea.
@@ -221,10 +216,15 @@ export function computeRiverPaths(tiles: Map<string, Tile>): RiverPath[] {
   return paths;
 }
 
-/** Lifted world-space center of a tile (ribbon clearance baked in). */
+/** World-space center of a tile; callers only use its XZ (heights come from
+ *  the terrain surface at each control point). */
 function tileCenterWorld(t: Tile): Vector3 {
-  const p = axialToWorld3D(t.coord.q, t.coord.r, terrainElevation(t.terrain));
-  p.y += riverLift(t.terrain);
+  return axialToWorld3D(t.coord.q, t.coord.r, terrainElevation(t.terrain));
+}
+
+/** Snap a control point onto the rendered terrain cap plus clearance. */
+function onSurface(p: Vector3, tiles: Map<string, Tile>, clearance = RIVER_CLEARANCE): Vector3 {
+  p.y = worldTerrainSurfaceY(p.x, p.z, tiles) + clearance;
   return p;
 }
 
@@ -234,19 +234,32 @@ function dirIndexBetween(from: Axial, to: Axial): number {
   return AXIAL_DIRECTIONS.findIndex((d) => d.q === dq && d.r === dr);
 }
 
-/** Re-route a tile-center descent onto the hex EDGE graph (Civ V draws rivers
- *  along edges, not across tile interiors). Two facts about a regular hex grid
- *  make this exact and index-free:
- *    - the midpoint of two adjacent tile centers IS the midpoint of their
- *      shared edge (centers are mirror images across that edge), so every
- *      body control point lands on a real tile boundary, never a center;
- *    - three mutually-adjacent hexes meet at one corner = the centroid of the
- *      three centers, so a 60° turn routes mid → corner → mid with BOTH spans
- *      lying on actual edges.
- *  When a river turns by 120° or 180° across tile b (axialDistance(a, c) > 1),
- *  walk the hex corners around b's perimeter so the ribbon still hugs hex
- *  edges instead of cutting straight through b's interior mountain/city. */
-function edgeRoutePath(
+/** Corner of tile t between its neighbors in directions k and k+1: the
+ *  centroid of the three mutually-adjacent centers. The key is the sorted
+ *  triple of tile keys, so all three tiles name the corner the same way. */
+function hexCorner(t: Axial, k: number): { key: string; x: number; z: number } {
+  const d1 = AXIAL_DIRECTIONS[((k % 6) + 6) % 6]!;
+  const d2 = AXIAL_DIRECTIONS[(((k + 1) % 6) + 6) % 6]!;
+  const trio = [t, { q: t.q + d1.q, r: t.r + d1.r }, { q: t.q + d2.q, r: t.r + d2.r }];
+  let x = 0;
+  let z = 0;
+  for (const c of trio) {
+    const w = axialToWorld3D(c.q, c.r, 0);
+    x += w.x / 3;
+    z += w.z / 3;
+  }
+  return { key: trio.map(tileKey).sort().join('|'), x, z };
+}
+
+/** Route a tile-center descent along the hex EDGE graph (Civ V draws rivers
+ *  along edges, not across tile interiors): the shortest corner-to-corner walk
+ *  over the edges of the path tiles, from the edge between the source and the
+ *  next tile to the edge where the river ends (the coast edge for a mouth, the
+ *  edge into the joined tile otherwise). Every span lies on a real tile
+ *  boundary and every turn is ±60°, so the ribbon never cuts through a tile's
+ *  mountain or city and never doubles back. (Routing through edge MIDPOINTS
+ *  instead turned 90-120° wherever two walks met on the same side.) */
+export function edgeRoutePath(
   path: Tile[],
   mouth: Vector3 | null,
   tiles: Map<string, Tile>,
@@ -254,60 +267,103 @@ function edgeRoutePath(
   points: Vector3[];
   revealed: boolean[];
 } {
-  const c0 = tileCenterWorld(path[0]!);
+  const first = path[0]!;
+  const last = path[path.length - 1]!;
+  const c0 = tileCenterWorld(first);
   const c1 = tileCenterWorld(path[1]!);
   // Start the spring on the source flank toward path[1] (outside the central peak)
-  const spring = c0.clone().lerp(c1, 0.36);
-  spring.y = Math.max(spring.y, worldTerrainSurfaceY(spring.x, spring.z, tiles) + 1.4);
+  const spring = onSurface(c0.clone().lerp(c1, 0.36), tiles, 1.4);
   const points: Vector3[] = [spring];
-  const revealed: boolean[] = [path[0]!.revealed];
+  const revealed: boolean[] = [first.revealed];
 
-  for (let i = 0; i < path.length - 1; i++) {
-    const a = path[i]!;
-    const b = path[i + 1]!;
-    const ca = tileCenterWorld(a);
-    const cb = tileCenterWorld(b);
-    const mid = ca.clone().add(cb).multiplyScalar(0.5);
-    mid.y = Math.max(mid.y, worldTerrainSurfaceY(mid.x, mid.z, tiles) + 1.3);
-    points.push(mid);
-    revealed.push(a.revealed && b.revealed);
-
-    const c = path[i + 2];
-    if (!c) continue;
-    if (axialDistance(a.coord, c.coord) === 1) {
-      const corner = ca
-        .clone()
-        .add(cb)
-        .add(tileCenterWorld(c))
-        .multiplyScalar(1 / 3);
-      corner.y = Math.max(corner.y, worldTerrainSurfaceY(corner.x, corner.z, tiles) + 1.3);
-      points.push(corner);
-      revealed.push(a.revealed && b.revealed && c.revealed);
-    } else {
-      // Walk around b's 6-neighbor ring from direction(b->a) to direction(b->c)
-      // so the river follows b's hex edges instead of slicing across b's centre.
-      const dirA = dirIndexBetween(b.coord, a.coord);
-      const dirC = dirIndexBetween(b.coord, c.coord);
-      if (dirA >= 0 && dirC >= 0 && dirA !== dirC) {
-        const cwSteps = (dirC - dirA + 6) % 6;
-        const stepDir = cwSteps <= 3 ? 1 : -1;
-        const midDir = (dirA + stepDir + 6) % 6;
-        const dMid = AXIAL_DIRECTIONS[midDir]!;
-        const pMid = axialToWorld3D(
-          b.coord.q + dMid.q,
-          b.coord.r + dMid.r,
-          terrainElevation(b.terrain),
-        );
-        const edgePivot = cb.clone().add(pMid).multiplyScalar(0.5);
-        edgePivot.y = Math.max(cb.y, worldTerrainSurfaceY(edgePivot.x, edgePivot.z, tiles) + 1.3);
-        points.push(edgePivot);
-        revealed.push(a.revealed && b.revealed && c.revealed);
+  // A mouth ends on the coast edge of the last tile; a join ends on the edge
+  // into the joined (last) tile, whose own edges belong to the other river.
+  const walkTiles = mouth ? path : path.slice(0, -1);
+  const endFrom = mouth ? last : path[path.length - 2]!;
+  let endDir: number;
+  if (mouth) {
+    // The mouth lies on the line from the last center toward the sea center.
+    const lc = tileCenterWorld(last);
+    let best = -Infinity;
+    endDir = 0;
+    for (let k = 0; k < 6; k++) {
+      const d = AXIAL_DIRECTIONS[k]!;
+      const n = axialToWorld3D(last.coord.q + d.q, last.coord.r + d.r, 0);
+      const dot = (n.x - lc.x) * (mouth.x - lc.x) + (n.z - lc.z) * (mouth.z - lc.z);
+      if (dot > best) {
+        best = dot;
+        endDir = k;
       }
     }
+  } else {
+    endDir = dirIndexBetween(endFrom.coord, last.coord);
+  }
+  // Edge of tile t in direction k joins its corners k-1 and k.
+  const edgeEnds = (t: Tile, k: number) => [hexCorner(t.coord, k - 1), hexCorner(t.coord, k)];
+
+  // Corner graph over the walk tiles' edges; remember which walk tiles touch
+  // each corner (revealed flag) and where it is.
+  const adj = new Map<string, string[]>();
+  const pos = new Map<string, { x: number; z: number }>();
+  const touching = new Map<string, Tile[]>();
+  for (const t of walkTiles) {
+    for (let k = 0; k < 6; k++) {
+      const a = hexCorner(t.coord, k);
+      const b = hexCorner(t.coord, k + 1);
+      for (const c of [a, b]) {
+        pos.set(c.key, c);
+        if (!adj.has(c.key)) adj.set(c.key, []);
+      }
+      adj.get(a.key)!.push(b.key);
+      adj.get(b.key)!.push(a.key);
+      const list = touching.get(a.key) ?? [];
+      if (!list.includes(t)) list.push(t);
+      touching.set(a.key, list);
+    }
+  }
+
+  // BFS from both ends of the first edge to either end of the final edge.
+  const goals = new Set(edgeEnds(endFrom, endDir).map((c) => c.key));
+  const prev = new Map<string, string | null>();
+  const queue: string[] = [];
+  for (const c of edgeEnds(first, dirIndexBetween(first.coord, path[1]!.coord))) {
+    if (!prev.has(c.key)) {
+      prev.set(c.key, null);
+      queue.push(c.key);
+    }
+  }
+  let reached: string | null = null;
+  for (let i = 0; i < queue.length && reached === null; i++) {
+    const cur = queue[i]!;
+    if (goals.has(cur)) {
+      reached = cur;
+      break;
+    }
+    for (const n of adj.get(cur) ?? []) {
+      if (prev.has(n)) continue;
+      prev.set(n, cur);
+      queue.push(n);
+    }
+  }
+  const corners: string[] = [];
+  for (let c = reached; c !== null; c = prev.get(c) ?? null) corners.unshift(c);
+
+  for (const key of corners) {
+    const c = pos.get(key)!;
+    points.push(onSurface(new Vector3(c.x, 0, c.z), tiles));
+    revealed.push((touching.get(key) ?? []).every((t) => t.revealed));
   }
   if (mouth) {
     points.push(mouth);
-    revealed.push(path[path.length - 1]!.revealed);
+    revealed.push(last.revealed);
+  } else {
+    // Join: finish at the middle of the edge into the joined tile.
+    const end = onSurface(
+      tileCenterWorld(endFrom).add(tileCenterWorld(last)).multiplyScalar(0.5),
+      tiles,
+    );
+    points.push(end);
+    revealed.push(endFrom.revealed && last.revealed);
   }
   return { points, revealed };
 }

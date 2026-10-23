@@ -28,7 +28,7 @@ import { tileKey } from '../types.ts';
 import { type GameState } from '../game.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { HEX_SIZE } from '../constants.ts';
-import { sharedHexGeometry } from './hexGeometry.ts';
+import { sharedFlatHexGeometry, sharedHexGeometry } from './hexGeometry.ts';
 import { axialToWorld3D, hexCornerAngle3D, TILE_HEIGHT } from './axialToWorld3D.ts';
 import { terrainSurfaceY } from './terrainSurfaceY.ts';
 import { instanceColorForTile } from './FogOfWar3D.ts';
@@ -339,12 +339,19 @@ interface BorderEdge {
   cz: number;
   y: number;
   y2?: number;
+  /** Mitre-extend this end (default true). False where the edge continues
+   *  collinearly into the next piece (a split edge's midpoint): extending
+   *  both halves there overlapped them by a full band width, and the
+   *  transparent band blended twice into a darker patch. */
+  extendStart?: boolean;
+  extendEnd?: boolean;
 }
 
 /** Build a ribbon (in XZ, following each edge's y..y2 slope) from boundary edges.
  *  `width` is the band thickness; `inset` shifts the band toward the tile
  *  centre so it reads as the owner's inner frontier. Ends are mitre-extended
- *  by half-width so consecutive segments close the corner gaps. */
+ *  by half-width (unless extendStart/extendEnd say otherwise) so consecutive
+ *  segments close the corner gaps. */
 export function buildRibbonGeometry(
   edges: BorderEdge[],
   width: number,
@@ -372,10 +379,12 @@ export function buildRibbonGeometry(
       nz = -nz;
     }
     // Mitre-extend the ends along the tangent so corners don't gap.
-    const ax = e.x1 - tx * hw;
-    const az = e.z1 - tz * hw;
-    const bx = e.x2 + tx * hw;
-    const bz = e.z2 + tz * hw;
+    const ext1 = e.extendStart === false ? 0 : hw;
+    const ext2 = e.extendEnd === false ? 0 : hw;
+    const ax = e.x1 - tx * ext1;
+    const az = e.z1 - tz * ext1;
+    const bx = e.x2 + tx * ext2;
+    const bz = e.z2 + tz * ext2;
     // Band spans [inset - hw, inset + hw] along the inward normal.
     const o1 = inset - hw;
     const o2 = inset + hw;
@@ -538,8 +547,8 @@ function rebuildTerritoryLines(
             yOff
           : center.y + 1.4 + yOff;
         edges.push(
-          { x1, z1, x2: mx, z2: mz, cx: center.x, cz: center.z, y: y1, y2: ym },
-          { x1: mx, z1: mz, x2, z2, cx: center.x, cz: center.z, y: ym, y2 },
+          { x1, z1, x2: mx, z2: mz, cx: center.x, cz: center.z, y: y1, y2: ym, extendEnd: false },
+          { x1: mx, z1: mz, x2, z2, cx: center.x, cz: center.z, y: ym, y2, extendStart: false },
         );
       }
     }
@@ -814,7 +823,7 @@ function rebuildFogCover(state: GameState): void {
     transparent: true,
     opacity: 0.93,
   });
-  fogCoverMesh = new InstancedMesh(sharedHexGeometry, mat, unrevealed.length);
+  fogCoverMesh = new InstancedMesh(sharedFlatHexGeometry, mat, unrevealed.length);
 
   const matrix = new Matrix4();
   unrevealed.forEach((tile, i) => {
