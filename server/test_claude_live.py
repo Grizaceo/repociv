@@ -283,6 +283,10 @@ def test_endpoints_spawn_and_stop(tmp_path, monkeypatch):
     assert status == 400
     assert body == {"error": "invalid_cwd"}
 
+    status, body = post_claude_live_spawn({"cwd": "/etc"}, {})
+    assert status == 400
+    assert body == {"error": "untrusted_cwd"}
+
 
 def test_route_tables_expose_the_live_channel():
     from server import http_routes

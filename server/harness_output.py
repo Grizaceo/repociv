@@ -13,12 +13,11 @@ def parse_cursor_ndjson_chunk(line: str) -> str:
     """Extract human-readable text from a cursor-agent NDJSON output line.
 
     cursor-agent --output-format stream-json emits newline-delimited JSON.
-    Known shapes (may vary — validate against cursor-agent --help):
+    Known shapes (verified against cursor-agent --print --output-format stream-json):
       {"type": "assistant", "message": {"content": [{"type": "text", "text": "..."}]}}
       {"type": "text", "text": "..."}
       {"type": "tool_use", ...}  — skip, not human-readable output
     Falls back to the raw line if it is not valid JSON or has no text content.
-    # TODO: validate against actual cursor-agent --output-format stream-json output
     """
     line = line.strip()
     if not line:

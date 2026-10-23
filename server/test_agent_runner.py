@@ -2,8 +2,6 @@ import json
 from pathlib import Path
 from urllib.error import URLError
 
-import pytest
-
 from server import agent_runner
 
 
@@ -497,14 +495,16 @@ def test_repos_root_prefers_state_file(monkeypatch, tmp_path):
     assert agent_runner._repos_root() == str(active)
 
 
-@pytest.mark.skip(reason="pre-existing: _resolve_city_path does not decode base64 repo: prefix — "
-                         "tests refactoring validate the _repos_root/normalize paths directly")
 def test_resolve_city_path_decodes_repo_id(monkeypatch, tmp_path):
     repo = tmp_path / "repo-a"
     repo.mkdir()
     state_file = tmp_path / "state.json"
     state_file.write_text(
-        json.dumps({"version": 1, "activeRoot": str(tmp_path), "roots": {}}),
+        json.dumps({
+            "version": 1,
+            "activeRoot": str(tmp_path),
+            "roots": {str(tmp_path): {"selectedRepoPaths": [str(repo)]}},
+        }),
         encoding="utf-8",
     )
     monkeypatch.setenv("REPOCIV_STATE_FILE", str(state_file))

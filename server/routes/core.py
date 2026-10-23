@@ -153,6 +153,46 @@ def post_own_session_close(body: Any, ctx: "RouteContext") -> tuple[int, Any]:
     data = _sessions.patch(unit_id, status="closed")
     return 200, {"ok": True, "unit": unit_id, "status": data.get("status", "closed")}
 
+def _resolve_claude_live_cwd(raw_cwd: str, city: str = "") -> str | None:
+    """Resolve and confine a claude-live working directory.
+
+    When workspace roots are configured in repo_roots_state, the directory must
+    belong to a selected repository (or the RepoCiv capital checkout). Always
+    reject system/credential directories (/etc, ~/.ssh, ~/.gnupg, state root).
+    """
+    from server import agent_paths as _ap
+    from server import repo_roots_state as _rrs
+    from server.state_paths import repociv_home
+
+    expanded = os.path.realpath(os.path.expanduser(raw_cwd.strip())) if raw_cwd.strip() else ""
+    if not expanded or not os.path.isdir(expanded):
+        return None
+    home = os.path.realpath(os.path.expanduser("~"))
+    forbidden = (
+        "/etc",
+        "/proc",
+        "/sys",
+        "/dev",
+        "/root",
+        os.path.join(home, ".ssh"),
+        os.path.join(home, ".gnupg"),
+        os.path.realpath(str(repociv_home())),
+    )
+    if any(_ap.path_is_within(expanded, f) for f in forbidden if f):
+        return None
+    state = _rrs.load_state()
+    roots = state.get("roots", {})
+    if isinstance(roots, dict) and roots:
+        selected = _rrs.resolve_selected_repo(city or os.path.basename(expanded), expanded)
+        if selected:
+            return selected
+        capital = os.path.realpath(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        if expanded == capital:
+            return capital
+        return None
+    return expanded
+
+
 def post_claude_live_spawn(body: Any, ctx: "RouteContext") -> tuple[int, Any]:
     """POST /api/claude-live/spawn — start a process-owned Claude session in {cwd}.
 
@@ -162,9 +202,16 @@ def post_claude_live_spawn(body: Any, ctx: "RouteContext") -> tuple[int, Any]:
     """
     from server import claude_live
 
-    cwd = str((body or {}).get("cwd", "") or "") if isinstance(body, dict) else ""
+    payload = body if isinstance(body, dict) else {}
+    raw_cwd = str(payload.get("cwd", "") or "")
+    city = str(payload.get("city", "") or "")
+    if not raw_cwd.strip() or not os.path.isdir(os.path.expanduser(raw_cwd.strip())):
+        return 400, {"error": "invalid_cwd"}
+    resolved = _resolve_claude_live_cwd(raw_cwd, city)
+    if resolved is None:
+        return 400, {"error": "untrusted_cwd"}
     try:
-        return 200, claude_live.get_manager().spawn(cwd)
+        return 200, claude_live.get_manager().spawn(resolved)
     except claude_live.ClaudeLiveError as exc:
         return exc.status, {"error": exc.code}
 

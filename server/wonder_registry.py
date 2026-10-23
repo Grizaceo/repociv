@@ -16,6 +16,7 @@ import json
 import os
 import re
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -183,6 +184,11 @@ def _expand_launch_paths(manifest: dict[str, Any]) -> None:
                 p["cwd"] = os.path.expanduser(os.path.expandvars(p["cwd"]))
 
 
+def _is_valid_health_url(url: str) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+
+
 def save_custom_manifest(manifest: Any) -> tuple[dict[str, Any] | None, str | None]:
     """Validate + persist a connected wonder to ~/.repociv/wonders/<id>.json.
 
@@ -199,6 +205,10 @@ def save_custom_manifest(manifest: Any) -> tuple[dict[str, Any] | None, str | No
     if not _is_valid_manifest(manifest):
         missing = sorted(_REQUIRED_TOP_LEVEL_KEYS - set(manifest.keys()))
         return None, f"manifest missing required fields: {missing}"
+    health = manifest.get("health")
+    if isinstance(health, dict) and health.get("url"):
+        if not _is_valid_health_url(str(health.get("url", "")).strip()):
+            return None, "invalid health.url (must use http:// or https://)"
     _expand_launch_paths(manifest)
     base = _custom_manifest_dir()
     base.mkdir(parents=True, exist_ok=True)
@@ -242,6 +252,8 @@ def check_wonder_health(wonder_id: str) -> dict[str, Any]:
 
     if not url:
         return {"id": wonder_id, "status": "native", "note": "no_health_url"}
+    if not _is_valid_health_url(url):
+        return {"id": wonder_id, "status": "unreachable", "error": "invalid_health_url", "url": url}
 
     try:
         req = urllib.request.Request(url, method="HEAD")

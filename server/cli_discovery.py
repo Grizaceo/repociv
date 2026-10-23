@@ -81,8 +81,8 @@ def find_cursor_agent() -> str | None:
     Install via: curl https://cursor.com/install | bash
     Lands at ~/.local/bin/cursor-agent or ~/.cursor/bin/cursor-agent.
 
-    # TODO: validate flags against `cursor-agent --help` once installed:
-    #   expected: --print, --trust, --output-format stream-json, --model, --workspace
+    Verified flags against `cursor-agent --help`:
+      --print, --trust, --output-format stream-json, --model, --workspace
     """
     candidates = [
         shutil.which("cursor-agent"),

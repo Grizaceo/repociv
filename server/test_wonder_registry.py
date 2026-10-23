@@ -156,6 +156,22 @@ def test_connect_rejects_non_object():
     assert err is not None
 
 
+def test_connect_and_health_reject_non_http_schemes(tmp_path):
+    bad = _example_manifest("evil-srv")
+    bad["health"] = {"url": "file:///etc/passwd"}
+    saved, err = save_custom_manifest(bad)
+    assert saved is None
+    assert err is not None and "http" in err
+
+    # Even if a manifest on disk has a non-http URL, check_wonder_health refuses it.
+    wonders_dir = tmp_path / "wonders"
+    wonders_dir.mkdir(parents=True, exist_ok=True)
+    (wonders_dir / "evil-srv.json").write_text(json.dumps(bad), encoding="utf-8")
+    res = check_wonder_health("evil-srv")
+    assert res["status"] == "unreachable"
+    assert res["error"] == "invalid_health_url"
+
+
 def test_disconnect_removes():
     save_custom_manifest(_example_manifest("mi-srv"))
     assert get_wonder("mi-srv") is not None

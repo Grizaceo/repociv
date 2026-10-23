@@ -1067,9 +1067,9 @@ def _run_cursor_agent_streaming(
     Requires cursor-agent to be installed:
         curl https://cursor.com/install | bash
 
-    Flags used (# TODO: validate against `cursor-agent --help` once installed):
+    Flags used (verified against `cursor-agent --help`):
         --print               non-interactive, write output to stdout
-        --trust               auto-approve all tool calls (like --dangerously-skip-permissions)
+        --trust               trust the current workspace without prompting
         --output-format stream-json   NDJSON stream; each line is a typed event
         --model <id>          optional model override
         --workspace <dir>     working directory for tool calls
@@ -1088,7 +1088,6 @@ def _run_cursor_agent_streaming(
     cd_cmd = f"cd {working_dir}\n\n" if working_dir else ""
     full_prompt = f"{spatial}\n\n{cd_cmd}{mission}"
 
-    # TODO: validate these flags against `cursor-agent --help` once installed
     cmd = [cursor_bin, "--print", "--trust", "--output-format", "stream-json"]
     if model:
         cmd.extend(["--model", model])
