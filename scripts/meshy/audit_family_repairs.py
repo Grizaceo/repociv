@@ -1,7 +1,6 @@
 """Read-only integration checks for the locally generated repair-v003 GLBs."""
 import hashlib
 import json
-from pathlib import Path
 
 import numpy as np
 

@@ -85,11 +85,12 @@ check_asset_budget() {
 }
 run_step "asset budget (atlas ≤6MB)"      check_asset_budget
 
-# Prop glTF budget: low-poly props (public/assets/3d/props/*.glb) have
-# their own 1.5MB envelope, separate from the atlas PNGs.
+# Prop glTF budget: low-poly props (public/assets/3d/props/, excluding
+# Meshy PBR family buildings) have their own 1.5MB envelope, separate from
+# the atlas PNGs.
 check_props_budget() {
   local total
-  total=$(find public/assets/3d/props -name '*.glb' -printf '%s\n' 2>/dev/null | awk '{s+=$1} END {print s+0}')
+  total=$(find public/assets/3d/props -path 'public/assets/3d/props/meshy' -prune -o -name '*.glb' -printf '%s\n' 2>/dev/null | awk '{s+=$1} END {print s+0}')
   local limit=$((1536 * 1024))
   if (( total > limit )); then
     echo "prop glbs total $((total / 1024))KB > 1.5MB budget"
@@ -98,6 +99,27 @@ check_props_budget() {
   echo "prop glbs total: $((total / 1024))KB (budget 1.5MB)"
 }
 run_step "asset budget (props ≤1.5MB)"    check_props_budget
+
+# Meshy PBR family buildings (public/assets/3d/props/meshy/*.glb): each
+# runtime copy must be optimized via optimize_glb.py (≤600KB per building,
+# ≤3MB combined) so raw multi-megabyte Meshy GLBs never enter public/.
+check_meshy_props_budget() {
+  local total=0 max_file=$((600 * 1024)) limit=$((3072 * 1024)) f size
+  while IFS= read -r -d '' f; do
+    size=$(stat -c '%s' "$f")
+    if (( size > max_file )); then
+      echo "$f is $((size / 1024))KB > 600KB per-building budget (run scripts/meshy/optimize_glb.py)"
+      return 1
+    fi
+    total=$((total + size))
+  done < <(find public/assets/3d/props/meshy -name '*.glb' -print0 2>/dev/null)
+  if (( total > limit )); then
+    echo "meshy prop glbs total $((total / 1024))KB > 3MB budget"
+    return 1
+  fi
+  echo "meshy prop glbs total: $((total / 1024))KB (budget 3MB; ≤600KB/building)"
+}
+run_step "asset budget (meshy ≤3MB)"      check_meshy_props_budget
 
 # Eager-bundle budget: the JS the browser downloads on first paint (the app
 # defaults to the 2D 'flat' renderer) must stay lean. Three.js (vendor-three,
