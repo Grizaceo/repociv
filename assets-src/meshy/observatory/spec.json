@@ -1,13 +1,15 @@
 {
   "asset_id": "observatory-v001",
-  "status": "geometry artist-approved; PBR retexture SUCCEEDED; awaiting material review; no production integration",
+  "status": "geometry and PBR materials artist-approved by Cristóbal; no production integration",
   "license_status": "unverified; local candidates only; distribution blocked",
   "reference_asset": "memory-archive-v001",
   "concept": {
     "tool": "meshy_image_to_image",
     "advertised_credits": 9,
     "max_create_requests": 1,
-    "reference_relative_paths": ["assets-src/meshy/memory-archive/textured/archive-textured.png"],
+    "reference_relative_paths": [
+      "assets-src/meshy/memory-archive/textured/archive-textured.png"
+    ],
     "request_without_reference_paths": {
       "ai_model": "nano-banana-pro",
       "prompt": "Create ONE original Observatory building for the same stylized strategy-game civilization as the reference Memory Archive. Use the reference as architectural and material art direction, not the building to copy. A compact polygonal stepped warm pale limestone podium supports a slender observation tower, with broad dark slate eaves and aged copper trim. Crown it with one substantial fixed optical instrument or lens housing integrated into the masonry, with a subtle turquoise glass accent. The silhouette must read as observation and telemetry, not a temple, library lantern, modern radar dish or lighthouse. Taller and more slender than the Archive, with a few broad clear terraces, not a stack of tiny floors. Use solid closed surfaces, simple shallow rectangular window panels and thick reliable architectural members; no punched-out windows, latticework, thin railings, cables or floating pieces. Readable from elevated isometric strategy-game cameras. Show the complete standalone building in one clean elevated three-quarter view, plain neutral background, no ground tile or scenery, no people, text or logos, no dramatic baked lighting or excessive grime.",
@@ -27,7 +29,9 @@
       "topology": "triangle",
       "should_texture": false,
       "enable_pbr": false,
-      "target_formats": ["glb"],
+      "target_formats": [
+        "glb"
+      ],
       "alpha_thumbnail": true,
       "multi_view_thumbnails": true,
       "auto_size": false
@@ -44,7 +48,9 @@
       "text_style_prompt": "Original knowledge-city observatory. Warm pale limestone tower and stepped podium with subtle stone variation, aged copper trim with restrained verdigris, dark slate ceramic roof sections, and turquoise glass filling the large fixed lens housing and the shallow rectangular window panels. Clear large material regions readable from an elevated strategy-game camera. Hand-crafted stylized low-poly finish, clean edges, restrained weathering. Preserve the existing geometry exactly. No text, no logos, no symbols, no excessive grime, no baked dramatic lighting. Copper metallic, limestone matte, ceramic moderately rough. Turquoise glass small and crisp, never covering roofs or walls.",
       "enable_pbr": true,
       "texture_resolution": "2k",
-      "target_formats": ["glb"],
+      "target_formats": [
+        "glb"
+      ],
       "alpha_thumbnail": true
     }
   },
@@ -53,5 +59,21 @@
     "auto_texture": false,
     "auto_retry_paid_requests": false,
     "workshop_repair_remains_deferred": true
+  },
+  "runtime": {
+    "runtime_copy": {
+      "file": "textured/observatory-map.glb",
+      "sha256": "f28e35ef97022c597c0ea6421f44141773301e2dac1c56052635007e0fc4b148",
+      "bytes": 394828,
+      "source_sha256": "c94d0a42e69b2a7e0ab68df64b0dd6e7da026fe126f0cf06748a29c130a19317",
+      "max_texture_px": 512,
+      "geometry_bytes_identical": true
+    },
+    "consumer": "src/three/FamilyBuildings3D.ts via WonderProps3D.familyBuildingForType (prometheus|grafana tokens)",
+    "public_path": "public/assets/3d/props/meshy/observatory-map.glb",
+    "default_enabled": true,
+    "mapping_status": "approved by Cristóbal",
+    "scale_status": "approved by Cristóbal (diagonal <= 0.5 hex, height <= 0.62 hex)",
+    "observation_2026_10_23": "The approved Meshy GLB omits 2 small visible source triangles (areas ~1.1e-4) and has 274 corners whose normal opposes its face. Kept unchanged as approved; clay renders show no black wedges at review cameras."
   }
 }

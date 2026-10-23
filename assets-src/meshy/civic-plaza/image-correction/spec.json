@@ -1,0 +1,23 @@
+{
+  "asset_id": "civic-plaza-image-correction-v001",
+  "authorization": "Cristóbal approved the family and said vamos con ello after the proposed correction of Plaza transparency before geometry. One technical image correction preserving design; no blind retries.",
+  "concept": {
+    "advertised_credits": 9,
+    "max_create_requests": 1,
+    "reference_relative_paths": ["assets-src/meshy/civic-plaza/preview.png"],
+    "request_without_reference_paths": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "Technical restoration of THIS EXACT approved civic plaza image, not a redesign. Preserve the camera, composition, round stone council table, amber lantern, curved stone benches, warm pale limestone material, proportions and existing stepped platform outline. Restore the missing opaque stone paving surface and continuous solid stair treads: the transparency cutout mistakenly erased the dark paving and stair regions between existing benches and table. Reconstruct these missing image regions as coherent matching limestone paving with gentle natural shading. The plaza must stand on a single complete solid low polygonal paved stone platform with intact stairs connecting levels, all existing furniture grounded on it. Do not add buildings, roofs, people, symbols, extra furniture or new features. Keep existing architecture and silhouette. Render all stone surfaces fully opaque, including shaded floor and stairs. Use a flat neutral light gray background, NOT transparency; no background removal. Complete standalone subject with all edges visible. Only fix the missing floor and stair image regions.",
+      "generate_multi_view": false,
+      "aspect_ratio": "1:1",
+      "remove_background": false
+    }
+  },
+  "geometry_after_concept_approval": {
+    "authorization": "Cristóbal authorized correction and geometry via vamos con ello. Corrected image inspected: same furniture, silhouette and layout; continuous opaque floor and stairs restored. One untextured geometry request.",
+    "advertised_credits": 5,
+    "max_create_requests": 1,
+    "request_without_input_task_id": {"ai_model":"meshy-t2.5","model_type":"smart-topology","target_polycount":4000,"topology":"triangle","should_texture":false,"enable_pbr":false,"target_formats":["glb"],"alpha_thumbnail":true,"multi_view_thumbnails":true,"auto_size":false}
+  },
+  "status": "technical image correction SUCCEEDED and visually checked; approved design retained; original immutable; geometry authorized"
+}

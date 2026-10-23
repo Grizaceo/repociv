@@ -1,0 +1,136 @@
+{
+  "asset_id": "artifact-vault-v001",
+  "status": "concept, geometry and PBR materials artist-approved by Cristóbal; service mapping and map scale approved; integrated into RepoCiv runtime (public/assets/3d/props/meshy/artifact-vault-map.glb)",
+  "local_repair": {
+    "authorization": "Cristóbal: vamos con los arreglos finales para poder dar por aprobada la familia completa",
+    "candidate": "repair-v003/preview.glb",
+    "audit": "repair-v003/geometry-audit.json",
+    "source_preserved": true,
+    "human_geometry_approval": "approved",
+    "approved_by": "Cristóbal",
+    "approval_quote": "ahora doy por aprobados todos",
+    "approved_sha256": "f7f8fc2f356acc3fbcc176439e6c813b71cb25c2e5762b3d0fc3410012d9ccf3",
+    "method": "boundary patches, 42-degree crease-aware normals, and four folded support faces replaced by two planar closure faces; no vertex displacement",
+    "new_paid_requests": 0
+  },
+  "license_status": "unverified; local only; distribution blocked",
+  "reference_asset": "memory-archive-v001",
+  "authorization": "Cristóbal authorized the five-concept family, prioritizing quality without the proposed credit cap. Coordination Court concept approved; these four concepts remain in the authorized round. No automatic geometry or texturing.",
+  "concept": {
+    "tool": "meshy_image_to_image",
+    "advertised_credits": 9,
+    "max_create_requests": 1,
+    "reference_relative_paths": [
+      "assets-src/meshy/memory-archive/textured/archive-textured.png"
+    ],
+    "request_without_reference_paths": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "Create ONE original standalone asset for the SAME knowledge-city strategy-game civilization as the supplied Memory Archive image. Use the image as a strict material and architectural craftsmanship reference, NOT as a silhouette to copy. Warm pale limestone, broad dark slate ceramic roof elements where appropriate, aged copper structural accents, elegant stepped foundations and restrained luminous details. Large calm material regions, warm handcrafted stylized finish, sophisticated proportions rather than medieval fantasy or photorealism. Artifact Vault: a compact BROAD LOW enclosed repository with thick pale limestone buttresses, a shallow dark slate stepped roof and one deep recessed rectangular entrance with substantial aged copper doors. Sculptural horizontal bands express layers of preserved results. An asymmetric small projecting receiving bay differentiates it from a temple. A narrow warm amber seam at the entrance, no turquoise. A monolithic protective silhouette distinct from the tiered Archive and the open Workshop; not a bank, dungeon, fortress, pyramid or library tower. No stacks of books, coins, locks used as signs or loose objects. Show the complete standalone subject in one clearly ELEVATED THREE-QUARTER ISOMETRIC view, with both front and side visible, all edges inside frame, neutral background and transparent cutout. Readable at small strategy-map scale. All walls and roofs closed except the explicitly intended architectural passage or open plaza. Windows only simple shallow framed recessed panels, never perforations. Thick connected structural pieces, no thin railings or filigree, no text, logos, people, dramatic baked shadows, excessive grime, floating pieces or surrounding scenery.",
+      "generate_multi_view": false,
+      "aspect_ratio": "1:1",
+      "remove_background": true
+    }
+  },
+  "geometry_after_concept_approval": {
+    "authorization": "Cristóbal: vamos con ello, after proposing untextured geometry review. One mesh, no texture or automatic retry.",
+    "advertised_credits": 5,
+    "max_create_requests": 1,
+    "request_without_input_task_id": {
+      "ai_model": "meshy-t2.5",
+      "model_type": "smart-topology",
+      "target_polycount": 4000,
+      "topology": "triangle",
+      "should_texture": false,
+      "enable_pbr": false,
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true,
+      "multi_view_thumbnails": true,
+      "auto_size": false
+    }
+  },
+  "guards": {
+    "auto_geometry": false,
+    "auto_texture": false,
+    "auto_retry_paid_requests": false,
+    "workshop_repair_remains_deferred": true
+  },
+  "texturing_after_geometry_approval": {
+    "tool": "meshy_retexture",
+    "endpoint": "POST /openapi/v1/retexture",
+    "authorization": "Cristóbal: «Apruebo las geometrías presentadas y autorizo continuar con la texturización de los cinco edificios nuevos y su integración local en RepoCiv. Priorizo belleza, coherencia y acabado; no impongas el antiguo tope de créditos, pero registra el gasto y evita solicitudes duplicadas.» One request per asset/stage, no variants, no automatic paid retries. Geometry approval is not advance material approval.",
+    "advertised_credits": 10,
+    "pricing_source": "https://docs.meshy.ai/en/api/pricing read 2026-10-23: Retexture 2K/4K 10, 8K 15",
+    "max_create_requests": 1,
+    "output_dir": "texture-v001",
+    "source": {
+      "route": "model_url",
+      "accepted_geometry": "repair-v003/preview.glb",
+      "accepted_sha256": "f7f8fc2f356acc3fbcc176439e6c813b71cb25c2e5762b3d0fc3410012d9ccf3",
+      "uv_copy": "texture-v001/source-uv.glb",
+      "normals": "accepted repair-v003 normals",
+      "why_not_input_task_id": "the Image-to-3D task holds the rejected original geometry"
+    },
+    "request": {
+      "ai_model": "meshy-7",
+      "text_style_prompt": "Original knowledge-city artifact vault, tall, ceremonial and secure. Thick warm pale limestone walls with horizontal banding and tapered buttresses, a broad octagonal limestone platform and steps, and a pale stone side canopy. Dark slate ceramic stepped hip roof with aged copper ridges and edges. Deep recessed double doors of heavy aged copper with restrained verdigris and one very small warm amber accent at the door frame. No turquoise. Broad calm hand-crafted stylized material regions readable from an elevated strategy-game camera, subtle stone variation, restrained weathering. Preserve the geometry. No text, logos, grime, baked lighting or baked shadows. Limestone matte, slate moderately rough, copper metallic.",
+      "enable_original_uv": true,
+      "enable_pbr": true,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true
+    },
+    "uv_method": "xatlas-python 0.0.11, 2048 px atlas, 6 px padding, charts on welded positions",
+    "material_approval": "approved by Cristóbal («apruebo la totalidad materiales, el mapeo de servicios y la escala trabajemos en integrarlo en repociv»)",
+    "result": {
+      "task_id": "01a167cf-0468-70be-924c-b04b5efac581",
+      "status": "SUCCEEDED",
+      "consumed_credits": 10,
+      "balance_before": 532,
+      "balance_after": 522,
+      "reconciled": true,
+      "sent_model_sha256": "6b1f9627b85bd5d1a4fa7b28f3db6f9cf4cb0bacf71375a89f2db8015776cb8d",
+      "sent_model_bytes": 257100,
+      "uv_charts": 839,
+      "uv_area_coverage": 0.494,
+      "meshy_output": {
+        "file": "texture-v001/meshy.glb",
+        "sha256": "090f974ed5657ef75db60ae9e2a54d5e956e302d27f953bd945187eb6fdb0928",
+        "triangles": 4002,
+        "uniform_scale": 2.0994,
+        "visible_accepted_triangles_missing": 0,
+        "corners_with_normal_opposing_face": 184,
+        "kept_supplied_uvs": false
+      },
+      "candidate": {
+        "file": "texture-v001/textured.glb",
+        "sha256": "2e3b016c8bca79397e9bc18526988695b5ddd19504fe94d5367fb792e9eb70f2",
+        "bytes": 6742720,
+        "method": "accepted corners and prepared normals + Meshy per-corner UVs and PBR material",
+        "exact_against_accepted_geometry": true,
+        "triangles": 4004,
+        "corners_with_normal_opposing_face": 0,
+        "pbr": "baseColor (sRGB) + metallicRoughness + normal, 2048 px JPEG; doubleSided as delivered by Meshy"
+      },
+      "runtime_copy": {
+        "file": "texture-v001/artifact-vault-map.glb",
+        "sha256": "42fd91e17b0fb04debe098a091d213e060d5d822a69beaf1db7db05954e4ad61",
+        "bytes": 409372,
+        "max_texture_px": 512,
+        "geometry_bytes_identical": true
+      },
+      "visual_observations": "Tall ceremonial silhouette kept; no turquoise as requested. Doors read as very dark copper; the small amber accent is not distinguishable."
+    }
+  },
+  "runtime": {
+    "consumer": "src/three/WonderProps3D.ts familyBuildingForType + src/three/FamilyBuildings3D.ts",
+    "public_path": "public/assets/3d/props/meshy/artifact-vault-map.glb",
+    "default_enabled": true,
+    "mapping": "existing mine bucket: db|duckdb|postgres|redis|ledger|mine|suvad|suvadu|qdrant|storage|data",
+    "mapping_status": "approved by Cristóbal",
+    "scale_status": "approved by Cristóbal (diagonal <= 0.5 hex, height <= 0.62 hex)"
+  }
+}

@@ -10,6 +10,7 @@
 // visibility follows the `structure` layer.
 
 import {
+  Box3,
   CylinderGeometry,
   Group,
   Mesh,
@@ -26,10 +27,13 @@ import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { PROP_SURFACE_CLEARANCE, terrainFootprintMaxY } from './terrainSurfaceY.ts';
 import {
-  createMemoryArchive,
-  ensureMemoryArchiveLoad,
-  memoryArchiveState,
-} from './MemoryArchive3D.ts';
+  createFamilyBuilding,
+  ensureFamilyBuildingsLoad,
+  familyBuildingsLoading,
+  familyBuildingsSignature,
+  isMemoryArchiveType,
+} from './FamilyBuildings3D.ts';
+import type { FamilyBuildingId } from './familyBuildingAssets.ts';
 
 const wonderGroup = new Group();
 wonderGroup.name = 'wonder-props';
@@ -87,8 +91,31 @@ export function wonderModelForType(wonderType: string): WonderKenneyId {
   return 'building-port';
 }
 
+/**
+ * Local Meshy trial: which family building replaces a wonder's Kenney model.
+ * Derived only from the keyword buckets above, so it introduces no new service
+ * categories. Execution (smelter, Workshop deferred) and AI (wizard tower) keep
+ * their Kenney models; Civic Plaza has no matching service and is unmapped.
+ */
+export function familyBuildingForType(wonderType: string): FamilyBuildingId | null {
+  if (isMemoryArchiveType(wonderType)) return 'memory-archive';
+  const s = wonderType.toLowerCase();
+  if (/(^|[-_])(prometheus|grafana)($|[-_])/.test(s)) return 'observatory';
+  if (/(^|[-_])lab($|[-_])/.test(s)) return 'research-laboratory';
+  switch (wonderModelForType(wonderType)) {
+    case 'building-mine':
+      return 'artifact-vault';
+    case 'building-watermill':
+      return 'coordination-court';
+    case 'building-port':
+      return 'connection-gateway';
+    default:
+      return null;
+  }
+}
+
 export function ensureWonderPropsLoad(onSettled?: () => void): void {
-  ensureMemoryArchiveLoad(onSettled);
+  ensureFamilyBuildingsLoad(onSettled);
   if (wonderGlbLoadState !== 'idle') return;
   wonderGlbLoadState = 'loading';
   const loader = new GLTFLoader();
@@ -131,7 +158,7 @@ export function areWonderGlbPropsReady(): boolean {
  *  settled as soon as the module is live. Kept as a named probe because the
  *  screenshot tooling waits on it before framing a shot. */
 export function areWonderPropsSettled(): boolean {
-  return memoryArchiveState() !== 'loading';
+  return !familyBuildingsLoading();
 }
 
 // ─── Procedural geometries ───────────────────────────────────────────────────
@@ -204,8 +231,8 @@ function buildGenericWonder(): Group {
 }
 
 function buildWonderInstance(wonderType: string): Group {
-  const archive = createMemoryArchive(wonderType);
-  if (archive) return archive;
+  const family = createFamilyBuilding(familyBuildingForType(wonderType));
+  if (family) return family;
   const modelId = wonderModelForType(wonderType);
   const variant = wonderGlbVariants?.get(modelId);
   if (!variant) return buildGenericWonder();
@@ -232,7 +259,7 @@ function wonderSignature(tiles: Tile[]): string {
     .map((t) => `${t.coord.q},${t.coord.r}:${t.district!.wonderType}`)
     .join('|');
   if (!base) return '';
-  return `${memoryArchiveState()}#${wonderGlbLoadState === 'ready' ? 'glb#' : ''}${base}`;
+  return `${familyBuildingsSignature()}#${wonderGlbLoadState === 'ready' ? 'glb#' : ''}${base}`;
 }
 
 function disposeMesh(m: Mesh): void {
@@ -286,6 +313,10 @@ export function rebuildWonderProps(tiles: Tile[]): void {
     const wonderY = terrainFootprintMaxY(tile, 0, 0, HEX_SIZE * 0.26) + PROP_SURFACE_CLEARANCE;
     const inst = buildWonderInstance(tile.district.wonderType);
     inst.position.set(pos.x, wonderY, pos.z);
+    inst.userData = {
+      wonderType: tile.district.wonderType,
+      surfaceY: wonderY - PROP_SURFACE_CLEARANCE,
+    };
     genericGroup.add(inst);
   }
 }
@@ -298,6 +329,48 @@ export function clearWonderProps(): void {
 /** Wonder prop visibility — follows the `structure` layer. */
 export function setWonderVisible(visible: boolean): void {
   genericGroup.visible = visible;
+}
+
+/** Debug probe (read-only): what each wonder tile actually renders, where it
+ *  sits relative to its terrain probe, and its structural draw-call cost. */
+export function wonderPropsDebug(): Array<Record<string, unknown>> {
+  genericGroup.updateMatrixWorld(true);
+  return genericGroup.children.map((inst) => {
+    const bounds = new Box3().setFromObject(inst);
+    let triangles = 0;
+    let drawCalls = 0;
+    let textured = false;
+    const colors = new Set<string>();
+    inst.traverse((o) => {
+      if (!(o instanceof Mesh)) return;
+      const g = o.geometry;
+      triangles += (g.index?.count ?? g.attributes['position']!.count) / 3;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      drawCalls += Math.max(1, Array.isArray(o.material) ? g.groups.length : 1);
+      for (const m of mats as MeshStandardMaterial[]) {
+        if (m.map) textured = true;
+        if (m.color) colors.add(m.color.getHexString());
+      }
+    });
+    const data = inst.userData as { wonderType?: string; surfaceY?: number };
+    const family = familyBuildingForType(data.wonderType ?? '');
+    return {
+      name: inst.name,
+      wonderType: data.wonderType,
+      // The instance actually built, not the mapping: a failed load falls back.
+      family: family && inst.name === `wonder-${family}` ? family : null,
+      x: inst.position.x,
+      z: inst.position.z,
+      surfaceY: data.surfaceY,
+      minY: bounds.min.y,
+      height: bounds.max.y - bounds.min.y,
+      footprintDiagonal: Math.hypot(bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z),
+      triangles,
+      drawCalls,
+      textured,
+      materialColors: [...colors],
+    };
+  });
 }
 
 /** @internal test hook — exposes the current signature so tests can assert

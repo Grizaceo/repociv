@@ -132,6 +132,7 @@ type ThreeProbes = {
   areResourcePropsSettled: () => boolean;
   isTerrainScatterSettled: () => boolean;
   areWonderPropsSettled: () => boolean;
+  getWonderProps: (typeof import('./three/WonderProps3D.ts'))['wonderPropsDebug'];
   computeRiverPaths: (typeof import('./three/Rivers3D.ts'))['computeRiverPaths'];
 };
 let threeProbes: ThreeProbes | null = null;
@@ -157,6 +158,7 @@ function ensureThreeProbes(): void {
         areResourcePropsSettled: resource.areResourcePropsSettled,
         isTerrainScatterSettled: scatter.isTerrainScatterSettled,
         areWonderPropsSettled: wonder.areWonderPropsSettled,
+        getWonderProps: wonder.wonderPropsDebug,
         computeRiverPaths: rivers.computeRiverPaths,
       };
     })
@@ -189,6 +191,7 @@ type RepoCivDebugApi = {
   areResourcePropsSettled: () => boolean;
   isTerrainScatterSettled: () => boolean;
   areWonderPropsSettled: () => boolean;
+  getWonderProps: () => Array<Record<string, unknown>> | null;
   getGlobalUnits: () => Array<{
     id: string;
     type: string;
@@ -558,6 +561,10 @@ async function bootstrap() {
     areWonderPropsSettled: () => {
       ensureThreeProbes();
       return threeProbes?.areWonderPropsSettled() ?? false;
+    },
+    getWonderProps: () => {
+      ensureThreeProbes();
+      return threeProbes?.getWonderProps() ?? null;
     },
     getWebGLMetrics: () => renderer.getWebGLMetrics(),
     setPostFxEnabled: (enabled: boolean) => renderer.setPostFxEnabled(enabled),

@@ -48,7 +48,8 @@
       getWonderPropsGroup,
       areWonderPropsSettled,
     } from '/src/three/WonderProps3D.ts';
-    import { memoryArchiveState } from '/src/three/MemoryArchive3D.ts';
+    import { familyBuildingState } from '/src/three/FamilyBuildings3D.ts';
+    const memoryArchiveState = () => familyBuildingState('memory-archive');
     import { HEX_SIZE } from '/src/constants.ts';
     import { terrainFootprintMaxY, PROP_SURFACE_CLEARANCE } from '/src/three/terrainSurfaceY.ts';
     const scene = new T.Scene();

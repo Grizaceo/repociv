@@ -19,24 +19,39 @@
     }
     section {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
       gap: 24px;
     }
-    article {
+    article,
+    .family {
       background: #202e38;
       border: 1px solid #746747;
       border-radius: 12px;
       padding: 18px;
     }
+    .family {
+      margin-bottom: 24px;
+    }
     img {
       width: 100%;
-      height: 480px;
+      height: 300px;
       object-fit: contain;
       background: #111a21;
       border-radius: 8px;
     }
+    .family img {
+      height: auto;
+    }
+    .pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .pair img {
+      height: 170px;
+    }
     p {
-      line-height: 1.6;
+      line-height: 1.55;
     }
     .note {
       color: #c6b793;
@@ -44,75 +59,206 @@
     a {
       color: #e7bd75;
     }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      margin: 10px 0;
+    }
+    th {
+      text-align: left;
+      width: 92px;
+      color: #c9d3dc;
+      font-weight: 500;
+      vertical-align: top;
+      padding: 3px 8px 3px 0;
+    }
+    td {
+      padding: 3px 0;
+    }
+    .ok {
+      color: #9fd49a;
+    }
+    .pending {
+      color: #ebc67d;
+    }
+    .hold {
+      color: #e8968a;
+    }
   </style>
   <main>
     <h1>RepoCiv · Una civilización, distintas funciones</h1>
     <p>
-      Familia visual: Archivo aprobado, Taller con reparación diferida y Observatorio en revisión de
-      concepto.
+      Cuatro estados independientes por edificio: concepto, geometría, materiales y runtime. Los
+      materiales, el mapeo de servicios y la escala fueron <strong>aprobados por Cristóbal</strong>
+      e integrados por defecto en RepoCiv (<code>public/assets/3d/props/meshy/</code>).
     </p>
+    <div class="family">
+      <h2>La familia junta · misma escala, luz de mapa y cámara</h2>
+      <img
+        src="/assets-src/meshy/family-texture-review-v001/lineup/lit-iso.png"
+        alt="Fila de los siete edificios texturizados: Archivo, Observatorio, Patio, Portal, Bóveda, Laboratorio y Plaza"
+      />
+      <img
+        src="/assets-src/meshy/family-texture-review-v001/map-dev/main-overview.png"
+        alt="Mapa real de RepoCiv en dev con seis edificios de la familia junto a la capital y dos modelos Kenney conservados"
+      />
+      <p>
+        Arriba: normalización de huella del renderer (diagonal ≤ 0,5 hex). Abajo: mapa real en dev
+        con datos de prueba; ollama y docker conservan sus modelos Kenney.
+        <a href="/scripts/meshy/family-textured-preview.html?asset=lineup">Rotar la familia en 3D</a>
+      </p>
+    </div>
     <section>
       <article>
         <h2>Archivo de memoria</h2>
         <img
-          src="/assets-src/meshy/memory-archive/textured/archive-textured.png"
-          alt="Edificio Archivo aprobado"
+          src="/assets-src/meshy/family-texture-review-v001/memory-archive/lit-iso.png"
+          alt="Archivo texturizado bajo luz de mapa"
         />
-        <p>
-          Referencia canónica: volúmenes escalonados, piedra clara, cubiertas oscuras y coronamiento
-          singular.
-        </p>
-        <a href="/scripts/meshy/archive-preview.html">Rotar Archivo en 3D</a>
+        <table>
+          <tr><th>Concepto</th><td class="ok">Aprobado · referencia canónica</td></tr>
+          <tr><th>Geometría</th><td class="ok">Aprobada</td></tr>
+          <tr><th>Materiales</th><td class="ok">Aprobados</td></tr>
+          <tr><th>Runtime</th><td class="pending">Prueba local verificada (dev y build servido); no distribuible</td></tr>
+        </table>
+        <a href="/scripts/meshy/family-textured-preview.html?asset=memory-archive">Rotar en 3D</a>
       </article>
       <article>
-        <h2>Taller de ejecución · concepto 01</h2>
+        <h2>Observatorio</h2>
+        <img
+          src="/assets-src/meshy/family-texture-review-v001/observatory/lit-iso.png"
+          alt="Observatorio texturizado bajo luz de mapa"
+        />
+        <table>
+          <tr><th>Concepto</th><td class="ok">Aprobado</td></tr>
+          <tr><th>Geometría</th><td class="ok">Aprobada</td></tr>
+          <tr><th>Materiales</th><td class="ok">PBR aprobados (reutilizados, sin compra nueva)</td></tr>
+          <tr><th>Runtime</th><td class="pending">Prueba local verificada para grafana/prometheus; no distribuible</td></tr>
+        </table>
+        <p class="note">
+          Observación: el GLB aprobado devuelto por Meshy omite 2 triángulos pequeños visibles y trae
+          274 esquinas con normal opuesta a su cara. Se conserva tal cual; los negros no aparecen en
+          la prueba de arcilla.
+        </p>
+        <a href="/scripts/meshy/family-textured-preview.html?asset=observatory">Rotar en 3D</a>
+      </article>
+      <article>
+        <h2>Patio de coordinación</h2>
+        <img
+          src="/assets-src/meshy/family-texture-review-v001/coordination-court/lit-iso.png"
+          alt="Patio texturizado candidato bajo luz de mapa"
+        />
+        <div class="pair">
+          <img src="/assets-src/meshy/family-texture-review-v001/coordination-court/unlit-iso.png" alt="Albedo sin luz del Patio" />
+          <img src="/assets-src/meshy/coordination-court/preview.png" alt="Concepto aprobado del Patio" />
+        </div>
+        <table>
+          <tr><th>Concepto</th><td class="ok">Aprobado</td></tr>
+          <tr><th>Geometría</th><td class="ok">repair-v003 aprobada · 3684 triángulos, intacta</td></tr>
+          <tr><th>Materiales</th><td class="ok">PBR 2K aprobados</td></tr>
+          <tr><th>Runtime</th><td class="ok">Integrado por defecto (airflow, pipelines, colas)</td></tr>
+        </table>
+        <p class="note">Ventanas como paneles oscuros, puerta en arco marrón; la luz ámbar apenas se percibe.</p>
+        <a href="/scripts/meshy/family-textured-preview.html?asset=coordination-court">Rotar en 3D · PBR, una cara, albedo, arcilla</a>
+      </article>
+      <article>
+        <h2>Portal de conexión</h2>
+        <img
+          src="/assets-src/meshy/family-texture-review-v001/connection-gateway/lit-iso.png"
+          alt="Portal texturizado candidato bajo luz de mapa"
+        />
+        <div class="pair">
+          <img src="/assets-src/meshy/family-texture-review-v001/connection-gateway/unlit-iso.png" alt="Albedo sin luz del Portal" />
+          <img src="/assets-src/meshy/connection-gateway/preview.png" alt="Concepto aprobado del Portal" />
+        </div>
+        <table>
+          <tr><th>Concepto</th><td class="ok">Aprobado</td></tr>
+          <tr><th>Geometría</th><td class="ok">Aprobada · 3115 triángulos, intacta</td></tr>
+          <tr><th>Materiales</th><td class="ok">PBR 2K aprobados</td></tr>
+          <tr><th>Runtime</th><td class="ok">Integrado por defecto (servicios conectados genéricos)</td></tr>
+        </table>
+        <p class="note">Franja turquesa en el dintel, pero el turquesa también aparece en la cumbrera y en los paneles de los pilares.</p>
+        <a href="/scripts/meshy/family-textured-preview.html?asset=connection-gateway">Rotar en 3D · PBR, una cara, albedo, arcilla</a>
+      </article>
+      <article>
+        <h2>Bóveda de artefactos</h2>
+        <img
+          src="/assets-src/meshy/family-texture-review-v001/artifact-vault/lit-iso.png"
+          alt="Bóveda texturizada candidata bajo luz de mapa"
+        />
+        <div class="pair">
+          <img src="/assets-src/meshy/family-texture-review-v001/artifact-vault/unlit-iso.png" alt="Albedo sin luz de la Bóveda" />
+          <img src="/assets-src/meshy/artifact-vault/preview.png" alt="Concepto aprobado de la Bóveda" />
+        </div>
+        <table>
+          <tr><th>Concepto</th><td class="ok">Aprobado · silueta alta y ceremonial</td></tr>
+          <tr><th>Geometría</th><td class="ok">repair-v003 aprobada · 4004 triángulos, intacta</td></tr>
+          <tr><th>Materiales</th><td class="ok">PBR 2K aprobados</td></tr>
+          <tr><th>Runtime</th><td class="ok">Integrado por defecto (bases de datos, almacenamiento)</td></tr>
+        </table>
+        <p class="note">Sin turquesa, como se pidió. Puertas de cobre muy oscuro; el acento ámbar no se distingue.</p>
+        <a href="/scripts/meshy/family-textured-preview.html?asset=artifact-vault">Rotar en 3D · PBR, una cara, albedo, arcilla</a>
+      </article>
+      <article>
+        <h2>Laboratorio</h2>
+        <img
+          src="/assets-src/meshy/family-texture-review-v001/research-laboratory/lit-iso.png"
+          alt="Laboratorio texturizado candidato bajo luz de mapa"
+        />
+        <div class="pair">
+          <img src="/assets-src/meshy/family-texture-review-v001/research-laboratory/unlit-back.png" alt="Albedo sin luz del Laboratorio, cámara de cobre y ámbar" />
+          <img src="/assets-src/meshy/research-laboratory/preview.png" alt="Concepto aprobado del Laboratorio" />
+        </div>
+        <table>
+          <tr><th>Concepto</th><td class="ok">Aprobado</td></tr>
+          <tr><th>Geometría</th><td class="ok">repair-v003 aprobada · 4218 triángulos, intacta</td></tr>
+          <tr><th>Materiales</th><td class="ok">PBR 2K aprobados</td></tr>
+          <tr><th>Runtime</th><td class="ok">Integrado por defecto (servicios «lab»)</td></tr>
+        </table>
+        <p class="note">Cámara de cobre con ámbar legible. Ventanas de los pabellones en turquesa: más del mínimo pedido.</p>
+        <a href="/scripts/meshy/family-textured-preview.html?asset=research-laboratory">Rotar en 3D · PBR, una cara, albedo, arcilla</a>
+      </article>
+      <article>
+        <h2>Plaza común</h2>
+        <img
+          src="/assets-src/meshy/family-texture-review-v001/civic-plaza/lit-iso.png"
+          alt="Plaza texturizada candidata bajo luz de mapa"
+        />
+        <div class="pair">
+          <img src="/assets-src/meshy/family-texture-review-v001/civic-plaza/unlit-iso.png" alt="Albedo sin luz de la Plaza" />
+          <img src="/assets-src/meshy/civic-plaza/image-correction/preview.png" alt="Imagen corregida de la Plaza usada para la geometría" />
+        </div>
+        <table>
+          <tr><th>Concepto</th><td class="ok">Aprobado (imagen corregida como fuente)</td></tr>
+          <tr><th>Geometría</th><td class="ok">Aprobada · 3926 triángulos, intacta</td></tr>
+          <tr><th>Materiales</th><td class="ok">PBR 2K aprobados</td></tr>
+          <tr><th>Runtime</th><td>Sin consumidor: ninguna función de software le corresponde</td></tr>
+        </table>
+        <p class="note">Pavimento pálido y farol cobre/ámbar. Centro de la mesa e interior de los bancos en pizarra oscura.</p>
+        <a href="/scripts/meshy/family-textured-preview.html?asset=civic-plaza">Rotar en 3D · PBR, una cara, albedo, arcilla</a>
+      </article>
+      <article>
+        <h2>Taller de ejecución</h2>
         <img
           src="/assets-src/meshy/execution-workshop/preview.png"
           alt="Concepto del Taller, dos alas bajas y entrada amplia"
         />
-        <p>
-          Generado usando la imagen del Archivo como referencia. Dos alas bajas, acceso de trabajo
-          amplio y chimenea corta.
-        </p>
-        <a href="/scripts/meshy/workshop-preview.html"
-          >Rotar geometría del Taller en 3D (sin texturas)</a
-        >
-        <p class="note">
-          Concepto aprobado. Ventanas de la geometría rechazadas; reparación local de ventanas y
-          cubierta DIFERIDA. Sin texturizar.
-        </p>
-      </article>
-      <article>
-        <h2>Observatorio · concepto y PBR</h2>
-        <p>
-          <a href="/scripts/meshy/observatory-textured-preview.html"
-            >Rotar Observatorio con materiales PBR</a
-          >
-        </p>
-        <img
-          src="/assets-src/meshy/observatory/textured/preview.png"
-          alt="Observatorio texturizado, candidato pendiente de revisión"
-        />
-        <img
-          src="/assets-src/meshy/observatory/preview.png"
-          alt="Concepto del Observatorio: torre de piedra clara con lente turquesa"
-        />
-        <p>
-          Torre esbelta, cubiertas de pizarra y gran lente turquesa integrada. Ventanas simples y
-          parapetos gruesos. Generado con el Archivo como referencia.
-        </p>
-        <p class="note">
-          Concepto aprobado. Geometría sin texturas disponible, pendiente de aprobación.
-          <a href="/scripts/meshy/observatory-preview.html">Rotar Observatorio en 3D</a>
-        </p>
-        <a href="/assets-src/meshy/observatory/preview.png" target="_blank" rel="noopener"
-          >Abrir concepto a tamaño completo</a
-        >
+        <table>
+          <tr><th>Concepto</th><td class="ok">Aprobado</td></tr>
+          <tr><th>Geometría</th><td class="hold">Rechazada · reparación DIFERIDA, fuera de esta tanda</td></tr>
+          <tr><th>Materiales</th><td>Sin texturizar</td></tr>
+          <tr><th>Runtime</th><td>Sin integrar; los servicios de ejecución conservan Kenney</td></tr>
+        </table>
+        <a href="/scripts/meshy/workshop-preview.html">Rotar geometría del Taller (sin texturas)</a>
       </article>
     </section>
     <p class="note">
-      Solo local. Observatorio: concepto Nano Banana Pro 9 créditos, geometría sin texturas 5
-      créditos. Texturización PBR: 10 créditos. Saldo confirmado posterior: 1047. Taller en pausa.
+      Solo local. Tanda de materiales (2026-10-23): cinco Retexture meshy-7, 2K PBR, 10 créditos cada
+      uno, 50 en total; saldo 552 → 502, cada delta conciliado con su tarea. Antes del primer envío
+      el saldo leído fue 570: la diferencia de 18 es actividad ajena a esta tanda. Rondas
+      anteriores (históricas): conceptos 45 créditos (1047 → 1002); geometrías 25 y corrección de
+      Plaza 9 (712 → 678); Observatorio 9 + 5 + 10.
     </p>
   </main>
 </html>

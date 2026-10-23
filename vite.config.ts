@@ -5,6 +5,7 @@ import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { repocivPlugin, expandUser } from './vite-plugins/repociv.ts';
 import { wonderProxyConfig } from './vite-plugins/wonderProxy.ts';
+import { meshyLocalAssets } from './vite-plugins/meshyLocalAssets.ts';
 
 const DEFAULT_MAP_ROOT = join(homedir(), '.hermes', 'workspace', 'repos');
 
@@ -32,7 +33,8 @@ export default defineConfig(({ mode }) => {
   const vitePort = parseInt(env.VITE_PORT ?? '5273', 10);
   const mapRoot = resolveMapRoot(mode);
   return {
-    plugins: [repocivPlugin(mapRoot)],
+    // Local-only, license-pending Meshy family: served on loopback when opted in, never bundled.
+    plugins: [repocivPlugin(mapRoot), meshyLocalAssets(REPO_ROOT, env.VITE_MESHY_PREVIEW !== '0')],
     define: {
       ...(repocivToken && !env.VITE_REPOCIV_TOKEN
         ? { 'import.meta.env.VITE_REPOCIV_TOKEN': JSON.stringify(repocivToken) }

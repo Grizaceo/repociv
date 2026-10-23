@@ -1,0 +1,125 @@
+{
+  "asset_id": "connection-gateway-v001",
+  "status": "concept, geometry and PBR materials artist-approved by Cristóbal; service mapping and map scale approved; integrated into RepoCiv runtime (public/assets/3d/props/meshy/connection-gateway-map.glb)",
+  "license_status": "unverified; local only; distribution blocked",
+  "reference_asset": "memory-archive-v001",
+  "authorization": "Cristóbal authorized the five-concept family, prioritizing quality without the proposed credit cap. Coordination Court concept approved; these four concepts remain in the authorized round. No automatic geometry or texturing.",
+  "concept": {
+    "tool": "meshy_image_to_image",
+    "advertised_credits": 9,
+    "max_create_requests": 1,
+    "reference_relative_paths": [
+      "assets-src/meshy/memory-archive/textured/archive-textured.png"
+    ],
+    "request_without_reference_paths": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "Create ONE original standalone asset for the SAME knowledge-city strategy-game civilization as the supplied Memory Archive image. Use the image as a strict material and architectural craftsmanship reference, NOT as a silhouette to copy. Warm pale limestone, broad dark slate ceramic roof elements where appropriate, aged copper structural accents, elegant stepped foundations and restrained luminous details. Large calm material regions, warm handcrafted stylized finish, sophisticated proportions rather than medieval fantasy or photorealism. Connection Gateway: two broad substantial pale stone pylons supporting a LOW wide copper-edged slate lintel, framing ONE clear open passage. Make a refined inhabited architectural gateway, not a triumphal arch, castle gate or science-fiction portal. Wide grounded stepped plinth, shallow rectangular service panels on the pylons, a single subtle turquoise glass strip recessed in the lintel. A bold simple portal silhouette, width dominates height. No doors blocking the passage, no spires, towers, defenses, energy effects, chains, thin bars or additional buildings. The passage is intentional negative space; the lintel must be thick and structurally connected. Show the complete standalone subject in one clearly ELEVATED THREE-QUARTER ISOMETRIC view, with both front and side visible, all edges inside frame, neutral background and transparent cutout. Readable at small strategy-map scale. All walls and roofs closed except the explicitly intended architectural passage or open plaza. Windows only simple shallow framed recessed panels, never perforations. Thick connected structural pieces, no thin railings or filigree, no text, logos, people, dramatic baked shadows, excessive grime, floating pieces or surrounding scenery.",
+      "generate_multi_view": false,
+      "aspect_ratio": "1:1",
+      "remove_background": true
+    }
+  },
+  "geometry_after_concept_approval": {
+    "authorization": "Cristóbal: vamos con ello, after proposing untextured geometry review. One mesh, no texture or automatic retry.",
+    "advertised_credits": 5,
+    "max_create_requests": 1,
+    "request_without_input_task_id": {
+      "ai_model": "meshy-t2.5",
+      "model_type": "smart-topology",
+      "target_polycount": 4000,
+      "topology": "triangle",
+      "should_texture": false,
+      "enable_pbr": false,
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true,
+      "multi_view_thumbnails": true,
+      "auto_size": false
+    }
+  },
+  "guards": {
+    "auto_geometry": false,
+    "auto_texture": false,
+    "auto_retry_paid_requests": false,
+    "workshop_repair_remains_deferred": true
+  },
+  "texturing_after_geometry_approval": {
+    "tool": "meshy_retexture",
+    "endpoint": "POST /openapi/v1/retexture",
+    "authorization": "Cristóbal: «Apruebo las geometrías presentadas y autorizo continuar con la texturización de los cinco edificios nuevos y su integración local en RepoCiv. Priorizo belleza, coherencia y acabado; no impongas el antiguo tope de créditos, pero registra el gasto y evita solicitudes duplicadas.» One request per asset/stage, no variants, no automatic paid retries. Geometry approval is not advance material approval.",
+    "advertised_credits": 10,
+    "pricing_source": "https://docs.meshy.ai/en/api/pricing read 2026-10-23: Retexture 2K/4K 10, 8K 15",
+    "max_create_requests": 1,
+    "output_dir": "texture-v001",
+    "source": {
+      "route": "model_url",
+      "accepted_geometry": "geometry/preview.glb",
+      "accepted_sha256": "979c8b02c4cd6d0d38109a0d98ea79ed5d8baf68eefc980b0cee896fd0b510ee",
+      "origin_task_id": "01a16732-69b9-7114-8398-c6cf4f09fcd1",
+      "uv_copy": "texture-v001/source-uv.glb",
+      "normals": "local 42-degree crease normals; approved positions and triangle order unchanged",
+      "why_not_input_task_id": "Meshy's returned normals cannot be trusted (approved Observatory: 274 corners oppose their faces, 2 visible triangles dropped); sending the approved GLB keeps every member on one verified route"
+    },
+    "request": {
+      "ai_model": "meshy-7",
+      "text_style_prompt": "Original knowledge-city connection gateway. Two massive warm pale limestone pylons with shallow recessed stone panels, a stepped limestone base and a clear pale passage floor. Long dark slate ceramic hipped roof with aged copper ridge and edge trim. Small aged copper inset panels and eave brackets with restrained verdigris. Exactly one contained turquoise glass strip set in the recessed lintel band above the opening; turquoise never on the roof, pylons or floor. Broad calm hand-crafted stylized material regions readable from an elevated strategy-game camera, subtle stone variation, restrained weathering. Preserve the geometry. No text, logos, grime, baked lighting or baked shadows. Limestone matte, slate moderately rough, copper metallic.",
+      "enable_original_uv": true,
+      "enable_pbr": true,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true
+    },
+    "uv_method": "xatlas-python 0.0.11, 2048 px atlas, 6 px padding, charts on welded positions",
+    "material_approval": "approved by Cristóbal («apruebo la totalidad materiales, el mapeo de servicios y la escala trabajemos en integrarlo en repociv»)",
+    "result": {
+      "task_id": "01a167ce-3f4e-7660-a5b9-a0e05a3ed50e",
+      "status": "SUCCEEDED",
+      "consumed_credits": 10,
+      "balance_before": 542,
+      "balance_after": 532,
+      "reconciled": true,
+      "sent_model_sha256": "e035fcab877aa4f6fdb83e9d5b205f8d8a1462f1260918bd9d06b35e33391d00",
+      "sent_model_bytes": 200384,
+      "uv_charts": 526,
+      "uv_area_coverage": 0.593,
+      "meshy_output": {
+        "file": "texture-v001/meshy.glb",
+        "sha256": "d2150aa97eefab82e16a6ac3aba985929a496fe581514cf729736bc68ab9d934",
+        "triangles": 3112,
+        "uniform_scale": 2.1048,
+        "visible_accepted_triangles_missing": 0,
+        "corners_with_normal_opposing_face": 118,
+        "kept_supplied_uvs": false
+      },
+      "candidate": {
+        "file": "texture-v001/textured.glb",
+        "sha256": "b3b1f73a9fc616f8aa13508bf60a2ee0b4c2c83b3716d7cda05cb546276b3046",
+        "bytes": 6571864,
+        "method": "accepted corners and prepared normals + Meshy per-corner UVs and PBR material",
+        "exact_against_accepted_geometry": true,
+        "triangles": 3115,
+        "corners_with_normal_opposing_face": 0,
+        "pbr": "baseColor (sRGB) + metallicRoughness + normal, 2048 px JPEG; doubleSided as delivered by Meshy"
+      },
+      "runtime_copy": {
+        "file": "texture-v001/connection-gateway-map.glb",
+        "sha256": "fb5410bef98fe44e7a6bb24881d969623751a0f70938aee0a51da633e69bba3a",
+        "bytes": 308220,
+        "max_texture_px": 512,
+        "geometry_bytes_identical": true
+      },
+      "visual_observations": "Turquoise strip present in the lintel band, but turquoise also spills onto the roof ridge and the recessed pylon panels, contrary to the prompt."
+    }
+  },
+  "runtime": {
+    "consumer": "src/three/WonderProps3D.ts familyBuildingForType + src/three/FamilyBuildings3D.ts",
+    "public_path": "public/assets/3d/props/meshy/connection-gateway-map.glb",
+    "default_enabled": true,
+    "mapping": "existing default (port) bucket: any other connected service",
+    "mapping_status": "approved by Cristóbal",
+    "scale_status": "approved by Cristóbal (diagonal <= 0.5 hex, height <= 0.62 hex)"
+  }
+}

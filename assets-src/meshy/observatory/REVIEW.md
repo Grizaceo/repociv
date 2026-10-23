@@ -39,3 +39,13 @@ Cristóbal approved the geometry and 10-credit texturing. An initial mistaken `/
 - Viewer `/scripts/meshy/observatory-textured-preview.html` preserves returned PBR materials; real browser verifies all four texture slots, normals, counts, five views, no page errors, and missing-GLB failure message. Evidence `$TMPDIR/repociv-meshy/observatory-textured/`.
 
 Actual screenshots show warm pale masonry, dark slate eaves, reddish copper instrument framing and turquoise lens/windows. Turquoise also spills onto the curved upper roof, contrary to the prompt. Rear wall has dotted seam/diagonal texture artifacts; window bars and fine masonry details are not uniformly crisp. Candidate needs artistic review, not an automatic retry. No optimization or map integration has occurred. Workshop repair remains deferred. Distribution blocked pending license review; no publication/push/merge.
+
+## Decision: PBR appearance approved by Cristóbal
+
+Cristóbal explicitly approved the textured Observatory after the roof turquoise and rear texture seams were disclosed. Geometry and PBR appearance are artist-approved as delivered; retain the current candidate without regeneration or texture retries. The observations above remain documented, not blocking artistic approval. This approval does not establish runtime acceptance, optimization, license clearance, distribution or map integration, and does not authorize paid calls. Workshop repair remains deferred.
+
+## Local runtime trial (2026-10-23)
+
+Approved materials reused; no new paid request. A 512 px runtime copy `textured/observatory-map.glb` (394,828 bytes, geometry bytes identical to the approved GLB) is integrated into RepoCiv (`public/assets/3d/props/meshy/observatory-map.glb`) for `prometheus`/`grafana` wonder ids, enabled by default. Tested in the real map in dev and in a locally served build; see `docs/design/visual-family-materials-review.md`. Mapping and scale approved by Cristóbal.
+
+Observation, not a change: compared with its approved geometry, the returned GLB omits 2 small visible triangles and carries 274 corners whose normal opposes its face. The approved file is kept untouched; the clay diagnostic renders show no black wedges at the five review cameras. Distribution remains blocked pending license clearance.

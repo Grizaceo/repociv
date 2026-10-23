@@ -26,3 +26,7 @@ Renderer normalization centers the building, grounds its bounds and constrains i
 - The aggregate `scripts/check.sh` did NOT pass: default Vitest fork terminated unexpectedly (bounded rerun passes), and the worktree's default Python environment lacked Ruff/pytest; an early concurrent optimizer-test run also failed. Separate fresh offline tests and dedicated lint passed. Do not report this as a green complete repository gate.
 
 No binary publication, push, merge, deployment, or additional paid generation was performed.
+
+## Generalized to the family (2026-10-23)
+
+`MemoryArchive3D.ts` was generalized into `src/three/FamilyBuildings3D.ts`, with the allowlist in `familyBuildingAssets.ts`. The archive keeps the same runtime copy, matching tokens, normalization and fallback. The opt-in remains `VITE_MESHY_PREVIEW=1`. It now also works in a locally built bundle served by `vite preview`, through `vite-plugins/meshyLocalAssets.ts`; no binary enters `dist/`. A default build makes no request. See [visual-family-materials-review.md](visual-family-materials-review.md).

@@ -5,6 +5,11 @@ assets-src/meshy/**/generation.json
 assets-src/meshy/**/submission-lock.json
 assets-src/meshy/**/geometry-audit.json
 assets-src/meshy/**/*.tmp
+# Local repair comparison renders; regenerate with verify-family-repairs.mjs.
+assets-src/meshy/**/repair-v*/review/
+# Texture-stage binaries, receipts and renders: license-pending, local only.
+assets-src/meshy/**/texture-v*/
+assets-src/meshy/family-texture-review*/
 
 # Node / Vite
 # Match dependency directories and local reuse symlinks.

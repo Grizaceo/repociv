@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="es">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RepoCiv · Familia texturizada</title>
+  <style>
+    body {
+      margin: 0;
+      background: #202c36;
+      color: #eee;
+      font: 15px system-ui;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+    aside {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 330px;
+      max-height: calc(100vh - 64px);
+      overflow: auto;
+      padding: 16px;
+      background: #18222de8;
+      border: 1px solid #b99b63;
+      border-radius: 8px;
+    }
+    p {
+      line-height: 1.45;
+      margin: 8px 0;
+    }
+    button,
+    select {
+      padding: 5px 7px;
+      margin: 3px 2px;
+      cursor: pointer;
+    }
+    button[aria-pressed='true'] {
+      outline: 2px solid #e7bd75;
+    }
+    a {
+      color: #e7bd75;
+    }
+    #status {
+      color: #ebc67d;
+    }
+    .state {
+      font-size: 13px;
+      color: #c9d3dc;
+    }
+  </style>
+  <aside>
+    <strong>RepoCiv · Familia texturizada</strong>
+    <p>
+      Misma normalización de huella que el renderer (diagonal ≤ 0,5 hex, altura ≤ 0,62 hex),
+      iluminación y tone mapping del mapa. Arrastra para rotar.
+    </p>
+    <label
+      >Edificio
+      <select id="asset"></select>
+    </label>
+    <p class="state" id="state"></p>
+    <p id="status">Cargando…</p>
+    <div id="views"></div>
+    <div id="diags"></div>
+    <p>
+      <a href="/scripts/meshy/family-review.html">Galería de la familia</a>
+    </p>
+    <small
+      >Revisión local de candidatos. No es integración en el mapa, ni aprobación de materiales, ni
+      licencia de distribución.</small
+    >
+  </aside>
+  <script type="module">
+    import * as T from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const M = '/assets-src/meshy';
+    const ASSETS = {
+      'memory-archive': {
+        label: 'Archivo',
+        url: `${M}/memory-archive/textured/archive-textured.glb`,
+        state: 'Apariencia aprobada · referencia canónica',
+      },
+      observatory: {
+        label: 'Observatorio',
+        url: `${M}/observatory/textured/preview.glb`,
+        state: 'Geometría y PBR aprobados',
+      },
+      'coordination-court': {
+        label: 'Patio',
+        url: `${M}/coordination-court/texture-v001/textured.glb`,
+        state: 'Geometría v003 y materiales PBR aprobados · integrado en mapa',
+      },
+      'connection-gateway': {
+        label: 'Portal',
+        url: `${M}/connection-gateway/texture-v001/textured.glb`,
+        state: 'Geometría y materiales PBR aprobados · integrado en mapa',
+      },
+      'artifact-vault': {
+        label: 'Bóveda',
+        url: `${M}/artifact-vault/texture-v001/textured.glb`,
+        state: 'Geometría v003 y materiales PBR aprobados · integrado en mapa',
+      },
+      'research-laboratory': {
+        label: 'Laboratorio',
+        url: `${M}/research-laboratory/texture-v001/textured.glb`,
+        state: 'Geometría v003 y materiales PBR aprobados · integrado en mapa',
+      },
+      'civic-plaza': {
+        label: 'Plaza',
+        url: `${M}/civic-plaza/texture-v001/textured.glb`,
+        state: 'Geometría y materiales PBR aprobados · sin consumidor en runtime',
+      },
+    };
+    const params = new URLSearchParams(location.search);
+    const lineup = params.get('asset') === 'lineup';
+    const selected = lineup ? 'lineup' : ASSETS[params.get('asset')] ? params.get('asset') : 'coordination-court';
+    const diag = ['lit', 'single', 'unlit', 'clay'].includes(params.get('diag')) ? params.get('diag') : 'lit';
+
+    const select = document.querySelector('#asset');
+    for (const [id, a] of [['lineup', { label: 'Familia completa (7)' }], ...Object.entries(ASSETS)]) {
+      select.append(new Option(a.label, id, false, id === selected));
+    }
+    select.onchange = () => {
+      params.set('asset', select.value);
+      location.search = params.toString();
+    };
+
+    const scene = new T.Scene();
+    scene.background = new T.Color('#202c36');
+    scene.add(new T.AmbientLight(0xdacfb6, 0.38), new T.HemisphereLight(0xb0d8f0, 0x7aaa60, 0.34));
+    const sun = new T.DirectionalLight(0xffe7bd, 1.3);
+    sun.position.set(-1659, 1377, 1056).normalize().multiplyScalar(8);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5, near: 0.1, far: 30 });
+    sun.shadow.camera.updateProjectionMatrix();
+    sun.shadow.bias = -0.0005;
+    scene.add(sun);
+    const fill = new T.DirectionalLight(0xd0e8ff, 0.16);
+    fill.position.set(80, 60, -100).normalize().multiplyScalar(8);
+    scene.add(fill);
+    const renderer = new T.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.toneMapping = T.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.22;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = T.PCFSoftShadowMap;
+    renderer.setPixelRatio(1);
+    document.body.append(renderer.domElement);
+    const camera = new T.PerspectiveCamera(42, 1, 0.01, 100);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    const ids = lineup ? Object.keys(ASSETS) : [selected];
+    const spacing = 1.05;
+    const offset = (i) => (i - (ids.length - 1) / 2) * spacing;
+    // Same angles and a fixed distance for every building, so relative size reads
+    // directly; only the orbit target follows each model's half height.
+    const DIRS = {
+      iso: [0.58, 0.5, 0.64],
+      front: [0, 0.28, 1],
+      back: [0, 0.28, -1],
+      right: [1, 0.28, 0],
+      left: [-1, 0.28, 0],
+      map: [0.35, 1.25, 0.95],
+    };
+    const DISTANCE = { map: 1.7 };
+    const LINEUP = { iso: [0, 1.5, 3.0], front: [0, 0.5, 3.4], map: [0, 3.2, 2.4] };
+    const VIEWS = lineup ? LINEUP : DIRS;
+    let targetY = lineup ? 0.12 : 0.16;
+    let currentView = 'iso';
+    function setView(view) {
+      const v = VIEWS[view] ? view : 'iso';
+      currentView = v;
+      if (lineup) {
+        camera.position.fromArray(LINEUP[v]);
+      } else {
+        const d = new T.Vector3(...DIRS[v]).normalize().multiplyScalar(DISTANCE[v] ?? 0.8);
+        camera.position.set(d.x, d.y + targetY, d.z);
+      }
+      controls.target.set(0, targetY, 0);
+      controls.update();
+      document
+        .querySelectorAll('[data-view]')
+        .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
+    }
+    const labels = { iso: 'Perspectiva', front: 'Frente', back: 'Atrás', right: 'Derecha', left: 'Izquierda', map: 'Altura de mapa' };
+    for (const v of Object.keys(VIEWS)) {
+      const b = document.createElement('button');
+      b.dataset.view = v;
+      b.textContent = labels[v];
+      b.onclick = () => setView(v);
+      document.querySelector('#views').append(b);
+    }
+    const diagLabels = { lit: 'PBR', single: 'Una cara', unlit: 'Albedo sin luz', clay: 'Arcilla (normales)' };
+    for (const d of Object.keys(diagLabels)) {
+      const b = document.createElement('button');
+      b.textContent = diagLabels[d];
+      b.setAttribute('aria-pressed', String(d === diag));
+      b.onclick = () => {
+        params.set('diag', d);
+        location.search = params.toString();
+      };
+      document.querySelector('#diags').append(b);
+    }
+    document.querySelector('#state').textContent = lineup
+      ? 'Siete miembros con geometría y materiales PBR aprobados por Cristóbal (seis integrados en mapa).'
+      : ASSETS[selected].state;
+
+    const state = { status: 'loading', diag, assets: {} };
+    window.familyTextured = {
+      snapshot: () => ({ ...state, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }),
+      setView,
+      scene,
+      renderer,
+    };
+
+    function hexTile(x) {
+      const tile = new T.Mesh(
+        new T.CylinderGeometry(0.5, 0.5, 0.02, 6),
+        new T.MeshStandardMaterial({ color: 0x738057, roughness: 0.95 }),
+      );
+      tile.position.set(x, -0.01, 0);
+      tile.receiveShadow = true;
+      scene.add(tile);
+    }
+
+    function diagnose(mesh) {
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      const replaced = materials.map((m) => {
+        if (diag === 'single') {
+          const c = m.clone();
+          c.side = T.FrontSide;
+          return c;
+        }
+        if (diag === 'unlit') return new T.MeshBasicMaterial({ map: m.map, side: T.FrontSide });
+        if (diag === 'clay') return new T.MeshLambertMaterial({ color: 0xd8d2c4, side: T.FrontSide });
+        return m;
+      });
+      mesh.material = Array.isArray(mesh.material) ? replaced : replaced[0];
+    }
+
+    // Same footprint rule as FamilyBuildings3D.prepareFamilyBuilding, with HEX_SIZE = 1.
+    function normalize(model) {
+      const bounds = new T.Box3().setFromObject(model);
+      const size = bounds.getSize(new T.Vector3());
+      if (bounds.isEmpty() || !Number.isFinite(size.length()) || size.length() === 0)
+        throw new Error('No finite volume');
+      const scale = Math.min(0.5 / Math.max(Math.hypot(size.x, size.z), 1e-6), 0.62 / Math.max(size.y, 1e-6));
+      const center = bounds.getCenter(new T.Vector3());
+      model.position.sub(new T.Vector3(center.x, bounds.min.y, center.z));
+      const pivot = new T.Group();
+      pivot.scale.setScalar(scale);
+      pivot.add(model);
+      return { pivot, scale, size: size.toArray() };
+    }
+
+    const loader = new GLTFLoader();
+    Promise.allSettled(
+      ids.map((id, i) =>
+        loader.loadAsync(ASSETS[id].url).then((gltf) => {
+          const info = { meshes: 0, triangles: 0, materials: [], normalsValid: true };
+          gltf.scene.traverse((o) => {
+            if (!o.isMesh) return;
+            info.meshes++;
+            info.triangles += (o.geometry.index?.count ?? o.geometry.attributes.position.count) / 3;
+            const n = o.geometry.attributes.normal;
+            if (!n || !Array.from(n.array).every(Number.isFinite)) info.normalsValid = false;
+            const mats = Array.isArray(o.material) ? o.material : [o.material];
+            for (const m of mats) {
+              info.materials.push({
+                baseColor: !!m.map,
+                baseColorSpace: m.map?.colorSpace ?? null,
+                normal: !!m.normalMap,
+                roughness: !!m.roughnessMap,
+                metalness: !!m.metalnessMap,
+                emissive: !!m.emissiveMap,
+                doubleSided: m.side === T.DoubleSide,
+                sizes: [m.map, m.normalMap, m.roughnessMap].filter(Boolean).map((t) => [t.image?.width, t.image?.height]),
+              });
+            }
+            o.castShadow = true;
+            o.receiveShadow = true;
+            diagnose(o);
+          });
+          const { pivot, scale, size } = normalize(gltf.scene);
+          pivot.position.x = offset(i);
+          scene.add(pivot);
+          hexTile(offset(i));
+          const placed = new T.Box3().setFromObject(pivot);
+          info.normalizedScale = scale;
+          info.sourceSize = size;
+          info.placedMinY = placed.min.y;
+          info.placedSize = placed.getSize(new T.Vector3()).toArray();
+          state.assets[id] = { status: 'ready', ...info };
+        }),
+      ),
+    ).then((results) => {
+      results.forEach((r, i) => {
+        if (r.status === 'rejected') state.assets[ids[i]] = { status: 'failed', error: String(r.reason?.message ?? r.reason) };
+      });
+      const failed = ids.filter((id) => state.assets[id].status !== 'ready');
+      if (!lineup && !failed.length) {
+        targetY = state.assets[selected].placedSize[1] / 2;
+        setView(currentView);
+      }
+      state.status = failed.length ? 'failed' : 'ready';
+      document.querySelector('#status').textContent = failed.length
+        ? `No se pudo cargar: ${failed.map((id) => ASSETS[id].label).join(', ')}. Revisa la ruta del candidato.`
+        : lineup
+          ? `${ids.length} edificios cargados · ${diagLabels[diag]}`
+          : `GLB cargado · ${state.assets[selected].triangles} triángulos · ${diagLabels[diag]}`;
+    });
+
+    setView(params.get('view') || 'iso');
+    function resize() {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    }
+    addEventListener('resize', resize);
+    resize();
+    renderer.setAnimationLoop(() => {
+      controls.update();
+      renderer.render(scene, camera);
+    });
+  </script>
+</html>

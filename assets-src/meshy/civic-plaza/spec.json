@@ -1,0 +1,103 @@
+{
+  "asset_id": "civic-plaza-v001",
+  "status": "concept, geometry and PBR materials artist-approved by Cristóbal; no runtime consumer (approved unmapped); preserved in assets-src/meshy/civic-plaza/",
+  "license_status": "unverified; local only; distribution blocked",
+  "reference_asset": "memory-archive-v001",
+  "authorization": "Cristóbal authorized the five-concept family, prioritizing quality without the proposed credit cap. Coordination Court concept approved; these four concepts remain in the authorized round. No automatic geometry or texturing.",
+  "concept": {
+    "tool": "meshy_image_to_image",
+    "advertised_credits": 9,
+    "max_create_requests": 1,
+    "reference_relative_paths": [
+      "assets-src/meshy/memory-archive/textured/archive-textured.png"
+    ],
+    "request_without_reference_paths": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "Create ONE original standalone asset for the SAME knowledge-city strategy-game civilization as the supplied Memory Archive image. Use the image as a strict material and architectural craftsmanship reference, NOT as a silhouette to copy. Warm pale limestone, broad dark slate ceramic roof elements where appropriate, aged copper structural accents, elegant stepped foundations and restrained luminous details. Large calm material regions, warm handcrafted stylized finish, sophisticated proportions rather than medieval fantasy or photorealism. Civic Plaza: a beautiful LOW OPEN civic gathering place, NOT a building. An irregular compact polygonal stepped limestone terrace with a broad circular stone meeting table slightly off center, three integrated substantial curved stone benches and a single SMALL low copper-and-amber civic beacon on a thick stone plinth at the rear edge. Stone paving has a few broad radial joints. Minimal shallow slate inlay bands tie it to the reference buildings. No roofs, towers, temples, statues, fountains, vegetation, thin poles, chairs or busy furniture. The platform is the architectural subject, no surrounding terrain tile. A quiet memorable communal heart, low horizontal silhouette and spacious clean paving. Show the complete standalone subject in one clearly ELEVATED THREE-QUARTER ISOMETRIC view, with both front and side visible, all edges inside frame, neutral background and transparent cutout. Readable at small strategy-map scale. All walls and roofs closed except the explicitly intended architectural passage or open plaza. Windows only simple shallow framed recessed panels, never perforations. Thick connected structural pieces, no thin railings or filigree, no text, logos, people, dramatic baked shadows, excessive grime, floating pieces or surrounding scenery.",
+      "generate_multi_view": false,
+      "aspect_ratio": "1:1",
+      "remove_background": true
+    }
+  },
+  "guards": {
+    "auto_geometry": false,
+    "auto_texture": false,
+    "auto_retry_paid_requests": false,
+    "workshop_repair_remains_deferred": true
+  },
+  "texturing_after_geometry_approval": {
+    "tool": "meshy_retexture",
+    "endpoint": "POST /openapi/v1/retexture",
+    "authorization": "Cristóbal: «Apruebo las geometrías presentadas y autorizo continuar con la texturización de los cinco edificios nuevos y su integración local en RepoCiv. Priorizo belleza, coherencia y acabado; no impongas el antiguo tope de créditos, pero registra el gasto y evita solicitudes duplicadas.» One request per asset/stage, no variants, no automatic paid retries. Geometry approval is not advance material approval.",
+    "advertised_credits": 10,
+    "pricing_source": "https://docs.meshy.ai/en/api/pricing read 2026-10-23: Retexture 2K/4K 10, 8K 15",
+    "max_create_requests": 1,
+    "output_dir": "texture-v001",
+    "source": {
+      "route": "model_url",
+      "accepted_geometry": "geometry/preview.glb",
+      "accepted_sha256": "d31a1ff0eef629dd18d941bd7db6bb1f2674589ee762c2d692b51c3a89f59e3e",
+      "origin_task_id": "01a16736-33b7-7361-8100-5f4b3770736b",
+      "uv_copy": "texture-v001/source-uv.glb",
+      "normals": "local 42-degree crease normals; approved positions and triangle order unchanged",
+      "why_not_input_task_id": "Meshy's returned normals cannot be trusted (approved Observatory: 274 corners oppose their faces, 2 visible triangles dropped); sending the approved GLB keeps every member on one verified route"
+    },
+    "request": {
+      "ai_model": "meshy-7",
+      "text_style_prompt": "Original knowledge-city civic plaza, a low open stepped stone terrace, not a building. Warm pale limestone paving with a few broad radial joints, steps, curved benches and a round meeting table. Thin dark slate inlay bands along the terrace edge and around the table rim. One small aged copper lantern with warm amber glass on a limestone plinth at the rear edge. Paving clean, calm and bright; no grass, water, dirt or roof colors on the floor. Broad calm hand-crafted stylized material regions readable from an elevated strategy-game camera, subtle stone variation, restrained weathering. Preserve the geometry. No text, logos, grime, baked lighting or baked shadows. Limestone matte, slate moderately rough, copper metallic.",
+      "enable_original_uv": true,
+      "enable_pbr": true,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true
+    },
+    "uv_method": "xatlas-python 0.0.11, 2048 px atlas, 6 px padding, charts on welded positions",
+    "material_approval": "approved by Cristóbal («apruebo la totalidad materiales, el mapeo de servicios y la escala trabajemos en integrarlo en repociv»)",
+    "result": {
+      "task_id": "01a167d0-8b39-74df-b163-bb9eac09c010",
+      "status": "SUCCEEDED",
+      "consumed_credits": 10,
+      "balance_before": 512,
+      "balance_after": 502,
+      "reconciled": true,
+      "sent_model_sha256": "0ec4fc39bf657c3bcff745c0941300251853c35ec615083a231ce06ce749853c",
+      "sent_model_bytes": 239364,
+      "uv_charts": 368,
+      "uv_area_coverage": 0.495,
+      "meshy_output": {
+        "file": "texture-v001/meshy.glb",
+        "sha256": "3c7ee483ae8ea18718d885b4d81e75209bfb51a663fccaf69bba3c4d96bcb19d",
+        "triangles": 3924,
+        "uniform_scale": 2.1092,
+        "visible_accepted_triangles_missing": 0,
+        "corners_with_normal_opposing_face": 110,
+        "kept_supplied_uvs": true
+      },
+      "candidate": {
+        "file": "texture-v001/textured.glb",
+        "sha256": "8d0f36fa72c6992833ff677b2ebd67a1b7f155ebeaa99e169042d624558942b1",
+        "bytes": 7315720,
+        "method": "accepted corners and prepared normals + Meshy per-corner UVs and PBR material",
+        "exact_against_accepted_geometry": true,
+        "triangles": 3926,
+        "corners_with_normal_opposing_face": 0,
+        "pbr": "baseColor (sRGB) + metallicRoughness + normal, 2048 px JPEG; doubleSided as delivered by Meshy"
+      },
+      "runtime_copy": {
+        "file": "texture-v001/civic-plaza-map.glb",
+        "sha256": "713e03ef28806f08f187462106e69fb2d1e414f140fd03ae81debeed43ae42ae",
+        "bytes": 357320,
+        "max_texture_px": 512,
+        "geometry_bytes_identical": true
+      },
+      "visual_observations": "Pale paving and a copper/amber lantern as briefed. The table centre and the inner faces of the benches came back dark slate."
+    }
+  },
+  "runtime": {
+    "consumer": null,
+    "mapping_status": "approved by Cristóbal (unmapped)",
+    "reason": "no RepoCiv software concept corresponds to a civic plaza; not mapped to avoid inventing a feature"
+  }
+}
