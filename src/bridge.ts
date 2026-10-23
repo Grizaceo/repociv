@@ -82,7 +82,10 @@ export class BridgeEvents {
     // until a reload. The snapshot replay also runs on a timer.
     this.stopExternalAgentsPoll = registerPoll(
       'bridge:external-agents',
-      () => this.syncExternalAgents(),
+      () => {
+        this.syncExternalAgents();
+        this.syncOwnSessions();
+      },
       10_000,
       { immediate: false, phaseMs: 5_000 },
     );
@@ -288,8 +291,8 @@ export class BridgeEvents {
   private syncOwnSessions() {
     void fetchOwnSessions().then((rows) => {
       if (!rows || this.stopped) return;
-      const ids = this.state.getAllUnits().map((u) => u.id);
-      for (const evt of ownSessionEvents(ids, rows)) this.handleBridgeEvent(evt);
+      for (const evt of ownSessionEvents(this.state.getAllUnits(), rows))
+        this.handleBridgeEvent(evt);
     });
   }
 

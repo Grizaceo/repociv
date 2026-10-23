@@ -61,6 +61,8 @@ import { refreshCityList } from './ui/constructionPanel.ts';
 import { wireHUD, selectHero } from './ui/hudWiring.ts';
 import { nextSessionUnitId, spawnAcceptedSession } from './ui/hudWiring/spawn.ts';
 import { buildAgentSessionCommand } from './ui/agentSessionStart.ts';
+import { bindChatAgentLocator } from './ui/chat/panel.ts';
+import { agentLocation } from './ui/agentLocation.ts';
 import { subscribeExternalSessionDirectory } from './ui/externalSessionDirectory.ts';
 import { bindAgentAttentionStrip } from './ui/agentAttentionStrip.ts';
 import { bindAgentsPanel, openExternalAgentChat, toggleAgentsPanel } from './ui/agentsPanel.ts';
@@ -1254,12 +1256,18 @@ async function bootstrap() {
     }
   });
 
+  const locateAgent = (coord: { q: number; r: number }) => {
+    state.enterMacroView();
+    renderer.focusOnCoord(coord);
+    renderer.flashIdleHighlight(coord);
+  };
+  bindChatAgentLocator((unitId) => {
+    const unit = state.getUnit(unitId);
+    if (unit) locateAgent(agentLocation(unit, state.world.cities));
+  });
   bindAgentsPanel({
     state,
-    locate: (coord) => {
-      renderer.focusOnCoord(coord);
-      renderer.flashIdleHighlight(coord);
-    },
+    locate: locateAgent,
     selectOwnUnit: (u) => selectHero(u, renderer, state, bridge),
     startSession: async ({ profile, cityId, mission }) => {
       const city = state.world.cities.find((candidate) => candidate.id === cityId);

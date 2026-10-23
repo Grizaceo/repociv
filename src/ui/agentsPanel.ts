@@ -16,6 +16,7 @@
 import type { GameState } from '../game.ts';
 import type { Axial } from '../hex.ts';
 import type { Unit } from '../types.ts';
+import { agentLocation } from './agentLocation.ts';
 import {
   chatMessagesHtml,
   fetchExternalChat,
@@ -82,6 +83,7 @@ let _draft = '';
 let _replyError = '';
 let _sending = false;
 let _stopDirectory: (() => void) | null = null;
+let _stopOwnUnits: (() => void) | null = null;
 let _chatTimer = 0;
 let _renderedKey = '';
 const _refreshed = new Set<string>();
@@ -100,6 +102,11 @@ export function openAgentsPanel(): void {
   _visible = true;
   showPanel(_getOrCreate());
   _watchExternalSessions();
+  _stopOwnUnits?.();
+  _stopOwnUnits =
+    _deps?.state.subscribe(() => {
+      if (_visible && _chatSession === null && _listKey() !== _renderedKey) _render();
+    }) ?? null;
   _render();
   void _loadList();
   _stopTimers();
@@ -110,6 +117,8 @@ export function closeAgentsPanel(): void {
   _stopTimers();
   _stopDirectory?.();
   _stopDirectory = null;
+  _stopOwnUnits?.();
+  _stopOwnUnits = null;
   _chatSession = null;
   _chat = null;
   if (_panel) hidePanel(_panel);
@@ -200,7 +209,7 @@ function _listKey(): string {
   ]);
   const units = (_deps?.state.getAllUnits() ?? [])
     .filter((u) => !u.ephemeral)
-    .map((u) => `${u.id}:${u.state}`);
+    .map((u) => [u.id, u.name, u.state, u.cityId, u.mission]);
   return JSON.stringify([sessions ?? null, units, _deps?.state.world.cities.length ?? 0]);
 }
 
@@ -488,7 +497,7 @@ function _placeOf(row: ExternalSessionRow): MapPlace {
 function _locate(row: ExternalSessionRow): void {
   if (!_deps) return;
   const unit = row.unit ? _deps.state.getUnit(row.unit) : undefined;
-  const coord = unit?.coord ?? _placeOf(row).city?.coord;
+  const coord = _placeOf(row).city?.coord ?? unit?.coord;
   if (coord) _deps.locate(coord);
 }
 
@@ -544,13 +553,14 @@ async function _closeOwnSession(unitId: string): Promise<void> {
 }
 
 function _ownUnitsHtml(): string {
+  // Names, city labels and missions are escaped before insertion into the static markup.
   const units = (_deps?.state.getAllUnits() ?? []).filter((u) => !u.ephemeral);
   if (units.length === 0) return '<div class="agents-empty">Sin unidades propias.</div>';
   return units
     .map(
       (u) => `<button type="button" class="agents-own" data-unit="${escapeHtml(u.id)}">
         <span class="agents-dot agents-dot--${escapeHtml(u.state)}" aria-hidden="true"></span>
-        <span>${escapeHtml(u.name)}</span><span class="agents-own-state">${escapeHtml(u.state)}</span>
+        <span>${escapeHtml(u.name)}${u.cityId ? ` · 📍 ${escapeHtml(_deps?.state.world.cities.find((c) => c.id === u.cityId)?.name ?? u.cityId)}` : ''}${u.mission ? `<small class="agents-own-mission">${escapeHtml(u.mission)}</small>` : ''}</span><span class="agents-own-state">${escapeHtml(u.state)}</span>
         <span class="agents-own-close" role="button" tabindex="0" aria-label="Cerrar sesión ${escapeHtml(u.id)}" title="Cerrar sesión (retira la unidad del mapa)">✕</span>
       </button>`,
     )
@@ -598,9 +608,10 @@ function _render(): void {
       ${folded('cron', 'Cron (Hermes)', cron, 'Tareas programadas de Hermes: solo aquí, no en el mapa')}
       ${folded('gateway', 'Gateway (Hermes)', gateway, 'Chats de Telegram / API de Hermes: solo aquí, no en el mapa')}`;
   }
-  body.innerHTML = `${external}
-    <h4 class="agents-section">Unidades RepoCiv</h4>
+  body.innerHTML = `
+    <h4 class="agents-section">RepoCiv · sesiones propias</h4>
     <div class="agents-own-list">${_ownUnitsHtml()}</div>
+    ${external}
     <p class="agents-foot">Externos vía Suvadu y Hermes · escritura solo por canales verificados.</p>`;
   body.querySelectorAll<HTMLDetailsElement>('.agents-fold').forEach((el) =>
     el.addEventListener('toggle', () => {
@@ -620,7 +631,7 @@ function _render(): void {
       const unit = _deps?.state.getUnit(el.dataset['unit'] ?? '');
       if (unit && _deps) {
         _deps.selectOwnUnit(unit);
-        _deps.locate(unit.coord);
+        _deps.locate(agentLocation(unit, _deps.state.world.cities));
       }
     }),
   );
@@ -675,7 +686,7 @@ function _renderChat(firstLoad = false): void {
     <div class="agents-chat-head">
       <button type="button" class="agents-back" aria-label="Volver a la lista">←</button>
       <div class="agents-chat-title">
-        <strong>${escapeHtml(sessionLabel(row))}</strong> ${row.model ? escapeHtml(shortModel(row.model)) : ''}
+        <button type="button" class="agents-chat-agent" title="Ir a la ciudad del agente">${escapeHtml(sessionLabel(row))}</button> ${row.model ? escapeHtml(shortModel(row.model)) : ''}
         ${_chat.title ? `<div class="agents-chat-name">${escapeHtml(_chat.title)}</div>` : ''}
         <div class="agents-chat-sub">${_whereHtml(row)} · ${escapeHtml(status)} ${note}</div>
       </div>
@@ -689,6 +700,7 @@ function _renderChat(firstLoad = false): void {
   bindPanelAction(body, '.agents-back', _backToList);
   bindPanelAction(body, '.agents-resume-btn', () => void _loadResume());
   bindPanelAction(body, '.agents-locate', () => _locate(row));
+  bindPanelAction(body, '.agents-chat-agent', () => _locate(row));
   bindPanelAction(body, '.agents-refresh', () => void _loadChat(true));
   bindPanelAction(body, '.agents-compose-send', () => void _send());
   const textEl = body.querySelector<HTMLTextAreaElement>('.agents-compose-text');

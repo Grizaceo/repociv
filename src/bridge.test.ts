@@ -160,6 +160,46 @@ describe('BridgeEvents SSE transport', () => {
     expect(src.closed).toBe(true);
   });
 
+  it('recovers working own sessions on the periodic poll without a transport reconnect', async () => {
+    const state = Object.assign(makeState(), { world: { cities: [] }, getAllUnits: () => [] });
+    let snapshots = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (!String(url).endsWith('/api/own-sessions')) return { ok: false };
+        snapshots++;
+        return {
+          ok: true,
+          json: async () => ({
+            agents: [
+              {
+                unit: 'RECOVERED',
+                civ: 'capital',
+                cityId: '',
+                unitType: 'hero',
+                state: 'working',
+              },
+            ],
+          }),
+        };
+      }),
+    );
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+    try {
+      // Deliberately never open SSE: the original spawn/state events were lost.
+      await vi.advanceTimersByTimeAsync(6_000);
+      expect(state.spawned).toContain('RECOVERED');
+      expect(state.setUnitState).toHaveBeenCalledWith('RECOVERED', 'working');
+      const before = snapshots;
+      bridge.stop();
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(snapshots).toBe(before);
+    } finally {
+      bridge.stop();
+    }
+  });
+
   it('reconnects SSE with backoff after transport error', async () => {
     const state = makeState();
     const bridge = new BridgeEvents(state);

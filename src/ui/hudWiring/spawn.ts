@@ -160,6 +160,7 @@ export function spawnAcceptedSession(
     'capital',
     coord,
     mission,
+    city.id,
   );
   try {
     localStorage.setItem(

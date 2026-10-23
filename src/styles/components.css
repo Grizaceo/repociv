@@ -1065,6 +1065,10 @@ body.local-view #local-view-controls {
   color: var(--gold-bright);
 }
 #side-hero-name {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
   font-family: var(--font-ui);
   font-weight: 700;
   color: var(--gold-bright);

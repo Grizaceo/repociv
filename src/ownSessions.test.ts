@@ -64,9 +64,19 @@ describe('ownSessionEvents', () => {
     expect(events).toEqual([]);
   });
 
-  it('working sessions stay out of the way: the runner emits its own stream', () => {
+  it('recovers a working session whose spawn was missed, including after reload', () => {
     const events = ownSessionEvents(['MAIN'], [row('SESSION-02', { state: 'working' })]);
-    expect(events).toEqual([]);
+    expect(events.map((event) => event.type)).toEqual(['unit_spawn', 'unit_state']);
+    expect(events[1]).toEqual({ type: 'unit_state', unit: 'SESSION-02', state: 'working' });
+  });
+
+  it('reconciles known state changes but never guesses unknown or repeats unchanged state', () => {
+    const units = [{ id: 'SESSION-02', state: 'working' as const }];
+    expect(ownSessionEvents(units, [row('SESSION-02', { state: 'idle' })])).toEqual([
+      { type: 'unit_state', unit: 'SESSION-02', state: 'idle' },
+    ]);
+    expect(ownSessionEvents(units, [row('SESSION-02', { state: 'working' })])).toEqual([]);
+    expect(ownSessionEvents(units, [row('SESSION-02', { state: 'unknown' })])).toEqual([]);
   });
 
   it('skips rows without a usable unit id', () => {

@@ -13,7 +13,7 @@
 
 import { parseBridgeEvent } from './bridgeSchema.ts';
 import { bridgeHeaders, bridgeUrl } from './bridgeEnv.ts';
-import type { BridgeEvent } from './types.ts';
+import type { BridgeEvent, Unit } from './types.ts';
 
 /** One row of GET /api/own-sessions `agents`. */
 export interface OwnSessionRow {
@@ -35,31 +35,44 @@ export interface OwnSessionRow {
  * their map anchor. Rows that do not validate as bridge events are skipped.
  */
 export function ownSessionEvents(
-  currentUnitIds: Iterable<string>,
+  currentUnits: Iterable<string | Pick<Unit, 'id' | 'state'>>,
   rows: readonly OwnSessionRow[],
 ): BridgeEvent[] {
   const closed = new Set(
     rows.filter((r) => r?.state === 'closed' && typeof r.unit === 'string').map((r) => r.unit),
   );
-  const onMap = new Set(currentUnitIds);
+  const current = new Map(
+    Array.from(currentUnits, (unit) =>
+      typeof unit === 'string' ? ([unit, undefined] as const) : ([unit.id, unit.state] as const),
+    ),
+  );
   const raw: unknown[] = [];
   for (const row of rows) {
     if (typeof row?.unit !== 'string' || !row.unit) continue;
     if (closed.has(row.unit)) continue; // handled below: despawn, not spawn
-    if (onMap.has(row.unit)) continue; // already materialized by the wizard
-    if (row.state === 'working') continue; // mid-turn: the runner emits its own spawn/state stream
-    raw.push({
-      type: 'unit_spawn',
-      unit: row.unit,
-      civ: typeof row.civ === 'string' && row.civ ? row.civ : 'capital',
-      hex: [0, 0], // unplaced: the handler stands it next to its repo city
-      unitType: row.unitType,
-      mission: row.mission,
-      cityId: row.cityId,
-    });
+    const missing = !current.has(row.unit);
+    if (missing)
+      raw.push({
+        type: 'unit_spawn',
+        unit: row.unit,
+        civ: typeof row.civ === 'string' && row.civ ? row.civ : 'capital',
+        hex: [0, 0], // unplaced: the handler stands it next to its repo city
+        unitType: row.unitType,
+        mission: row.mission,
+        cityId: row.cityId,
+      });
+    // A snapshot must recover a missed spawn even in mid-turn. Unknown leaves
+    // the existing state intact; unchanged states must not reset the HUD ticker.
+    if (
+      (row.state === 'working' || row.state === 'idle') &&
+      (missing
+        ? row.state !== 'idle'
+        : current.get(row.unit) !== undefined && current.get(row.unit) !== row.state)
+    )
+      raw.push({ type: 'unit_state', unit: row.unit, state: row.state });
   }
   const despawned: string[] = [];
-  for (const id of currentUnitIds) {
+  for (const id of current.keys()) {
     if (closed.has(id) && !despawned.includes(id)) despawned.push(id);
   }
   for (const unit of despawned) raw.push({ type: 'unit_despawn', unit });

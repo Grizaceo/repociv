@@ -263,6 +263,14 @@ body.local-view #agents-panel {
   color: var(--ui-text-dim);
   font-size: var(--text-3xs);
 }
+.agents-own-mission {
+  display: block;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ui-text-dim);
+}
 .agents-own-close {
   margin-left: 2px;
   padding: 0 3px;
@@ -291,6 +299,15 @@ body.local-view #agents-panel {
 }
 .agents-chat-title strong {
   color: var(--ui-gold-bright);
+}
+.agents-chat-agent {
+  color: var(--ui-gold-bright);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
 }
 .agents-chat-sub {
   font-size: var(--text-xs);

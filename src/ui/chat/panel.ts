@@ -1,7 +1,12 @@
 // ─── Side panel lifecycle + tab wiring + git/files loaders ──────────────────
 import type { Unit } from '../../types.ts';
 import { trapFocus } from '../focusTrap.ts';
-import { updateChatTargetIndicator, getSidePanelCleanup, setSidePanelCleanup } from './state.ts';
+import {
+  updateChatTargetIndicator,
+  getSidePanelCleanup,
+  setSidePanelCleanup,
+  getActiveChatUnit,
+} from './state.ts';
 import { escapeHtml } from '../escapeHtml.ts';
 import { initAgentSelector } from './agentSelector.ts';
 import { initProviderSelectors } from './modelSelector.ts';
@@ -84,6 +89,16 @@ export function wireSideTabs(onTabChange: (tab: string) => void): void {
       onTabChange(name);
     });
   });
+}
+
+/** Navigate from the active chat tab, never the last map selection. */
+export function bindChatAgentLocator(locate: (unitId: string) => void): void {
+  const name = document.getElementById('side-hero-name');
+  if (name)
+    name.onclick = () => {
+      const unitId = getActiveChatUnit();
+      if (unitId) locate(unitId);
+    };
 }
 
 export async function loadGitInfo(repoName: string): Promise<void> {
