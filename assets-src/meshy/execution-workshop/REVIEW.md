@@ -48,8 +48,12 @@ Authorized by Cristóbal («abordemos ahora la reparación local de la geometrí
 - Pixel regression across all 5 views (`iso`, `front`, `back`, `right`, `left`): 0 pixels with `max(R,G,B) < 30`
 - Viewer: `/scripts/meshy/workshop-preview.html?variant=repair` and `/scripts/meshy/family-geometry-preview.html?asset=execution-workshop&variant=repair`
 
+## Human decision: `repair-v003` geometry APPROVED
+
+Cristóbal: «apruebo los modelos». Accepted geometry: `repair-v003/preview.glb` (`SHA-256: 998993daec5408371d0564ad59c74015efdbdbdc9fd288da6b354fcb2ec72b86`, 3624 triangles). Original `geometry/preview.glb` remains preserved and read-only.
+
 ## Next gate
 
-Human visual review of `repair-v003/preview.glb` (especially the reconstructed wall bands, the 8 framed recessed window panels, and the closed central rear roof/wall) before any paid PBR retexture request.
+Confirm 10-credit `meshy-7` 2K PBR retexture (`POST /openapi/v1/retexture` via `scripts/meshy/family_texture.py execution-workshop run --generate` using the locally UV-unwrapped `texture-v001/source-uv.glb`), assemble with exact accepted corners and `repair-v003` normals, and review materials before integrating into `public/assets/3d/props/meshy/execution-workshop-map.glb`.
 
 All candidates remain local/ignored and outside public/; license clearance remains pending. No push, merge or deployment.

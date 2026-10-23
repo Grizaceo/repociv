@@ -1,18 +1,26 @@
 {
   "asset_id": "execution-workshop-v001",
-  "status": "concept approved; repair-v003 local geometry candidate built and audited (pending human review before texturing); original geometry preserved",
+  "status": "concept and repair-v003 geometry approved by Cristóbal («apruebo los modelos»); source-uv.glb prepared; pending 10-credit PBR retexture confirmation",
   "license_status": "unverified; local candidates only",
   "reference_asset": "memory-archive-v001",
-  "local_repair_candidate": {
-    "file": "repair-v003/preview.glb",
-    "sha256": "998993daec5408371d0564ad59c74015efdbdbdc9fd288da6b354fcb2ec72b86",
+  "local_repair": {
+    "authorization": "Cristóbal: abordemos ahora la reparación local de la geometría de execution-workshop",
+    "candidate": "repair-v003/preview.glb",
+    "audit": "repair-v003/geometry-audit.json",
+    "source_preserved": true,
+    "human_geometry_approval": "approved",
+    "approved_by": "Cristóbal",
+    "approval_quote": "apruebo los modelos",
+    "approved_sha256": "998993daec5408371d0564ad59c74015efdbdbdc9fd288da6b354fcb2ec72b86",
     "source_sha256": "6ca232dbf5bccc6318532e3a8d52de56873e69e2966011ffa83b4f6bb6759426",
     "source_triangles": 3735,
     "triangles": 3624,
     "mullion_and_wafer_triangles_removed": 364,
     "boundary_triangles_added": 13,
     "hexahedra_triangles_added": 240,
-    "crease_angle_degrees": 42
+    "crease_angle_degrees": 42,
+    "method": "reconstructed window-band wall patches, replaced 20 window mullion components and 3 zero-normal wafers with 8 framed recessed panels, closed central rear roof/wall, and applied 42-degree crease normals using only existing source vertex coordinates",
+    "new_paid_requests": 0
   },
   "concept": {
     "tool": "meshy_image_to_image",
@@ -52,5 +60,32 @@
     "auto_retry_paid_requests": false,
     "auto_generate_observatory": false,
     "max_proposed_credits_through_geometry": 14
+  },
+  "texturing_after_geometry_approval": {
+    "tool": "meshy_retexture",
+    "endpoint": "POST /openapi/v1/retexture",
+    "authorization": "Cristóbal approved repair-v003 geometry («apruebo los modelos»). One request per asset/stage, no variants, no automatic paid retries.",
+    "advertised_credits": 10,
+    "pricing_source": "https://docs.meshy.ai/en/api/pricing read 2026-10-23: Retexture 2K/4K 10, 8K 15",
+    "max_create_requests": 1,
+    "output_dir": "texture-v001",
+    "source": {
+      "route": "model_url",
+      "accepted_geometry": "repair-v003/preview.glb",
+      "accepted_sha256": "998993daec5408371d0564ad59c74015efdbdbdc9fd288da6b354fcb2ec72b86",
+      "uv_copy": "texture-v001/source-uv.glb",
+      "normals": "accepted repair-v003 normals",
+      "why_not_input_task_id": "the Image-to-3D task holds the rejected original geometry"
+    },
+    "request": {
+      "ai_model": "meshy-7",
+      "text_style_prompt": "Original knowledge-city execution workshop, a low twin-wing artisan and compute hall around a central loading arch with a short rear stack. Warm pale limestone walls and stepped plinth. Dark slate ceramic gabled roofs and central roof. Aged copper-bronze structural beams, posts, eave brackets, window frames, open double doors and rear stack cap with restrained verdigris. Recessed window panels in dark copper-bronze and warm amber interior glow inside the central arch. Broad calm hand-crafted stylized material regions readable from an elevated strategy-game camera, subtle stone variation, restrained weathering. Preserve the geometry. No text, logos, grime, baked lighting or baked shadows. Limestone matte, slate moderately rough, copper metallic.",
+      "enable_original_uv": true,
+      "enable_pbr": true,
+      "texture_resolution": "2k",
+      "target_formats": ["glb"],
+      "alpha_thumbnail": true
+    },
+    "uv_method": "xatlas-python 0.0.11, 2048 px atlas, 6 px padding, charts on welded positions"
   }
 }

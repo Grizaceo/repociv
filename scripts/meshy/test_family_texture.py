@@ -67,11 +67,11 @@ class FamilyTextureTests(unittest.TestCase):
         return api
 
     def test_only_the_five_members(self):
-        for asset in ("execution-workshop", "observatory", "memory-archive", "../observatory"):
+        for asset in ("observatory", "memory-archive", "../observatory"):
             with self.assertRaises(ValueError):
                 ft.asset_dir(asset)
         self.assertEqual(set(ft.ASSETS), {"coordination-court", "artifact-vault", "research-laboratory",
-                                          "connection-gateway", "civic-plaza"})
+                                          "execution-workshop", "connection-gateway", "civic-plaza"})
 
     def test_sources_are_the_approved_files(self):
         for asset in ft.ASSETS:

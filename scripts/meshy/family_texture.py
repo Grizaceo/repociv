@@ -37,7 +37,7 @@ from workshop_geometry import download
 ROOT = Path(__file__).resolve().parents[2]
 MESHY = ROOT / "assets-src/meshy"
 OUT_NAME = "texture-v001"
-REPAIRED = ("coordination-court", "artifact-vault", "research-laboratory")
+REPAIRED = ("coordination-court", "artifact-vault", "research-laboratory", "execution-workshop")
 ORIGIN_TASKS = {
     "connection-gateway": "01a16732-69b9-7114-8398-c6cf4f09fcd1",
     "civic-plaza": "01a16736-33b7-7361-8100-5f4b3770736b",
