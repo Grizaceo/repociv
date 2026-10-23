@@ -150,7 +150,8 @@ export function wireHotkeys(
 
     // N still manages the profile registry; session creation always goes through
     // the wizard so profile + territory + mission are explicit before dispatch.
-    if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    // Shift+N belongs to the mounted Gaceta widget.
+    if (e.key.toLowerCase() === 'n' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
       trackHotkey('N:new-profile');
       void import('../agentProfileStrip.ts').then(({ openNewProfileWizard }) => {
         void openNewProfileWizard();

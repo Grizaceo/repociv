@@ -293,8 +293,8 @@ bridge: category/source filters, read state, source management and scanning.
 It is not the mission event log.
 
 The **activity log** (`F10`, `src/ui/logPanel.ts`) shows operational history.
-`N` currently has two listeners: the profile wizard in `hotkeys.ts` and the
-mounted news widget. This overlap is documented here, not changed by cleanup.
+`N` opens the profile wizard in `hotkeys.ts`, while `Shift+N` toggles the
+mounted news widget.
 
 ---
 
@@ -321,7 +321,8 @@ mounted news widget. This overlap is documented here, not changed by cleanup.
 | `V` | Toggle fog of war |
 | `Ctrl+A` | Pending approvals |
 | `T` | Terminal panel |
-| `N` | New profile wizard; also toggles the mounted news widget |
+| `N` | New profile wizard |
+| `Shift+N` | Toggle mounted news widget (Gazette) |
 | `F10` | Activity log |
 | `2` / `3` | Toggle 2D (`flat`) ↔ WebGL (`webgl`) render |
 | `F11` | Settings panel |

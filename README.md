@@ -295,9 +295,8 @@ noticias: filtros por categoría/fuente, estado de lectura, gestión de fuentes
 y escaneo. No es el log de eventos de misiones.
 
 El **log de actividad** (`F10`, `src/ui/logPanel.ts`) muestra el historial
-operativo. Actualmente `N` tiene dos listeners: el wizard de perfiles en
-`hotkeys.ts` y el widget de noticias montado. Esta superposición se documenta;
-la limpieza no la modifica.
+operativo. `N` abre el wizard de nuevo perfil en `hotkeys.ts`, mientras que
+`Shift+N` alterna el widget de noticias montado.
 
 ---
 
@@ -324,7 +323,8 @@ la limpieza no la modifica.
 | `V` | Toggle fog of war |
 | `Ctrl+A` | Aprobaciones pendientes |
 | `T` | Terminal panel |
-| `N` | Wizard de nuevo perfil; también alterna el widget de noticias montado |
+| `N` | Wizard de nuevo perfil |
+| `Shift+N` | Alternar widget de noticias (Gaceta) |
 | `F10` | Log de actividad |
 | `2` / `3` | Alternar render 2D (`flat`) ↔ WebGL (`webgl`) |
 | `F11` | Settings Panel |

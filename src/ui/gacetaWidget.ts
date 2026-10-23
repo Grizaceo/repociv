@@ -11,6 +11,8 @@ import {
 } from '../bridge.ts';
 import { openForeignRelationsPanel } from './foreignRelationsPanel.ts';
 import { escapeHtml } from './escapeHtml.ts';
+import { isPickerOpen } from './chat/slashPicker.ts';
+import { isCommandPaletteOpen } from './commandPalette.ts';
 
 const REFRESH_MS = 300_000;
 const TEASER_ROTATE_MS = 30_000;
@@ -21,6 +23,8 @@ let _articles: CDailyArticle[] = [];
 let _teaserIdx = 0;
 let _refreshTimer: ReturnType<typeof setInterval> | null = null;
 let _teaserTimer: ReturnType<typeof setInterval> | null = null;
+let _keydownHandler: ((e: KeyboardEvent) => void) | null = null;
+let _citySelectedHandler: EventListener | null = null;
 let _lastUnreadCount = 0;
 let _selectedCategory = 'all';
 let _selectedBlog = 'all';
@@ -48,78 +52,102 @@ export function mountGacetaWidget(opts: MountOpts = {}): void {
     _setExpanded(true);
   }
 
+  const alreadyBound = widget.dataset['gacetaBound'] === '1';
   if (!widget.querySelector('.gaceta-header')) {
     widget.innerHTML = _buildHTML(mode);
   }
 
-  const header = widget.querySelector('.gaceta-header') as HTMLElement;
-  if (mode === 'widget') {
-    header.addEventListener('click', _toggle);
-    header.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
+  if (!alreadyBound) {
+    widget.dataset['gacetaBound'] = '1';
+    const header = widget.querySelector('.gaceta-header') as HTMLElement;
+    if (mode === 'widget' && header) {
+      header.addEventListener('click', _toggle);
+      header.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          _toggle();
+        }
+      });
+    }
+
+    const linkFull = widget.querySelector('.gaceta-link-full') as HTMLAnchorElement | null;
+    if (linkFull) {
+      linkFull.addEventListener('click', (e) => {
         e.preventDefault();
-        _toggle();
-      }
+        window.dispatchEvent(new CustomEvent('repociv:open-city', { detail: { repo: 'cdaily' } }));
+      });
+    }
+
+    const scanBtn = widget.querySelector('.gaceta-scan-btn') as HTMLElement | null;
+    if (scanBtn) {
+      scanBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _doScan();
+      });
+    }
+
+    const sourcesBtn = widget.querySelector('#gaceta-sources-btn') as HTMLElement | null;
+    sourcesBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      void _toggleSources();
+    });
+    const sourcesEl = widget.querySelector('#gaceta-sources') as HTMLElement | null;
+    sourcesEl?.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement;
+      if (t.classList.contains('gaceta-src-add-btn')) void _addSource();
+      else if (t.classList.contains('gaceta-src-remove'))
+        void _removeSource(t.dataset['name'] ?? '');
     });
   }
 
   if (mode === 'widget') {
-    window.addEventListener('keydown', (e) => {
-      if (e.code !== HOTKEY) return;
+    if (_keydownHandler) window.removeEventListener('keydown', _keydownHandler);
+    // Shift+N toggles the Gaceta widget; bare N is reserved for the profile wizard.
+    _keydownHandler = (e: KeyboardEvent) => {
+      if (e.code !== HOTKEY || !e.shiftKey) return;
+      if (isPickerOpen() || isCommandPaletteOpen() || document.querySelector('dialog[open]'))
+        return;
       const tgt = e.target as HTMLElement | null;
       if (tgt && /^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName)) return;
       if (tgt && tgt.isContentEditable) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       e.preventDefault();
       _toggle();
-    });
+    };
+    window.addEventListener('keydown', _keydownHandler);
   }
 
-  const linkFull = widget.querySelector('.gaceta-link-full') as HTMLAnchorElement | null;
-  if (linkFull) {
-    linkFull.addEventListener('click', (e) => {
-      e.preventDefault();
-      window.dispatchEvent(new CustomEvent('repociv:open-city', { detail: { repo: 'cdaily' } }));
-    });
+  if (_citySelectedHandler) {
+    window.removeEventListener('repociv:city-selected', _citySelectedHandler);
   }
-
-  const scanBtn = widget.querySelector('.gaceta-scan-btn') as HTMLElement | null;
-  if (scanBtn) {
-    scanBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      _doScan();
-    });
-  }
-
-  const sourcesBtn = widget.querySelector('#gaceta-sources-btn') as HTMLElement | null;
-  sourcesBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    void _toggleSources();
-  });
-  const sourcesEl = widget.querySelector('#gaceta-sources') as HTMLElement | null;
-  sourcesEl?.addEventListener('click', (e) => {
-    const t = e.target as HTMLElement;
-    if (t.classList.contains('gaceta-src-add-btn')) void _addSource();
-    else if (t.classList.contains('gaceta-src-remove')) void _removeSource(t.dataset['name'] ?? '');
-  });
-
-  window.addEventListener('repociv:city-selected', ((e: CustomEvent) => {
+  _citySelectedHandler = ((e: CustomEvent) => {
     const detail = e.detail as { cityId: string; repoPath?: string };
     _selectedCityId = detail.cityId;
     _selectedRepoPath = detail.repoPath ?? null;
     _renderToolbar();
-  }) as EventListener);
+  }) as EventListener;
+  window.addEventListener('repociv:city-selected', _citySelectedHandler);
 
   _refresh();
+  if (_refreshTimer) clearInterval(_refreshTimer);
   _refreshTimer = setInterval(_refresh, REFRESH_MS);
-  if (mode === 'widget') _teaserTimer = setInterval(_rotateTeaser, TEASER_ROTATE_MS);
+  if (mode === 'widget') {
+    if (_teaserTimer) clearInterval(_teaserTimer);
+    _teaserTimer = setInterval(_rotateTeaser, TEASER_ROTATE_MS);
+  }
 }
 
 export function unmountGacetaWidget(): void {
   if (_refreshTimer) clearInterval(_refreshTimer);
   if (_teaserTimer) clearInterval(_teaserTimer);
+  if (_keydownHandler) window.removeEventListener('keydown', _keydownHandler);
+  if (_citySelectedHandler) {
+    window.removeEventListener('repociv:city-selected', _citySelectedHandler);
+  }
   _refreshTimer = null;
   _teaserTimer = null;
+  _keydownHandler = null;
+  _citySelectedHandler = null;
 }
 
 function _buildHTML(mode: 'widget' | 'panel'): string {

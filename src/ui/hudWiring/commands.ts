@@ -24,15 +24,15 @@ import { takeScreenshot } from './screenshot.ts';
 import { toggleAgentsPanel } from '../agentsPanel.ts';
 
 // Agent spawn types and their toolbar hotkeys — MUST mirror the bindings in
-// hudWiring/hotkeys.ts (q/w/e/o/c/x/r). The hint badges are shown to the user,
-// so a wrong key actively misinforms.
+// hudWiring/hotkeys.ts (Ctrl+Q, Ctrl+Shift+W, Ctrl+E, Ctrl+O, Ctrl+C, Ctrl+X, R).
+// The hint badges are shown to the user, so a wrong key actively misinforms.
 const AGENTS: ReadonlyArray<readonly [string, string]> = [
-  ['MAIN', 'Q'],
-  ['WORKER', 'W'],
-  ['SCOUT', 'E'],
-  ['OPENCLAW', 'O'],
-  ['CLAUDE', 'C'],
-  ['CODEX', 'X'],
+  ['MAIN', 'Ctrl+Q'],
+  ['WORKER', 'Ctrl+Shift+W'],
+  ['SCOUT', 'Ctrl+E'],
+  ['OPENCLAW', 'Ctrl+O'],
+  ['CLAUDE', 'Ctrl+C'],
+  ['CODEX', 'Ctrl+X'],
   ['CURSOR', 'R'],
 ];
 
@@ -67,7 +67,7 @@ export function registerHudCommands(
       id: 'p-approvals',
       group: 'Panel',
       label: 'Aprobaciones',
-      hint: 'A',
+      hint: 'Ctrl+A',
       run: () => toggleApprovalPanel(),
     },
     {
