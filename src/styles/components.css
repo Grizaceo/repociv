@@ -1624,6 +1624,17 @@ button:hover::after,
 /* ═══════════════════════════════════════════════════════════════════════════
    HUD window layout — local drag, resize, reset and persistence
    ═══════════════════════════════════════════════════════════════════════════ */
+.hud-window--placed {
+  position: fixed !important;
+  box-sizing: border-box;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: calc(100dvh - 16px) !important;
+  max-width: calc(100vw - 16px) !important;
+  overflow: auto !important;
+  transform: none !important;
+}
+
 .hud-window--customized {
   position: fixed !important;
   box-sizing: border-box;

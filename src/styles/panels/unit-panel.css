@@ -1,10 +1,11 @@
 /* ─── PANELS ─────────────────────────────────────────────────────────────── */
 
-/* Unit Panel (bottom-left) */
+/* Unit card defaults beside the Gaceta; hudWindow resolves occupied space. */
 #unit-panel {
-  position: absolute;
-  bottom: 8px;
-  left: 8px;
+  position: fixed;
+  top: 50px;
+  bottom: auto;
+  left: 340px;
   width: 260px;
   background: var(--glass-bg);
   backdrop-filter: blur(20px) saturate(180%);

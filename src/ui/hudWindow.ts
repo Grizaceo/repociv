@@ -23,6 +23,7 @@ const STORAGE_PREFIX = 'repociv:hud-window:v1:';
 const VIEWPORT_GAP = 8;
 const DEFAULT_MINIMUM: HudWindowMinimum = { minWidth: 240, minHeight: 180 };
 const HUD_WINDOW_IDS = [
+  'unit-panel',
   'side-panel',
   'city-panel',
   'agents-panel',
@@ -45,6 +46,7 @@ interface HudWindowBinding {
   header: HTMLElement | null;
   resetControl: HTMLButtonElement | null;
   resizeHandle: HTMLButtonElement | null;
+  visible: boolean;
 }
 
 const bindings = new WeakMap<HTMLElement, HudWindowBinding>();
@@ -84,6 +86,48 @@ export function clampHudWindowGeometry(
 }
 
 export const hudWindowStorageKey = (panelId: string): string => `${STORAGE_PREFIX}${panelId}`;
+
+/** Edge candidates cover every free rectangle for a window of this size.
+ * Prefer the requested position, then the nearest collision-free position.
+ * If no such position exists, keep the clamped window reachable instead.
+ */
+export function placeHudWindow(
+  preferred: HudWindowGeometry,
+  viewport: HudWindowBounds,
+  obstacles: readonly HudWindowGeometry[],
+  minimum: HudWindowMinimum = DEFAULT_MINIMUM,
+): HudWindowGeometry {
+  const base = clampHudWindowGeometry(preferred, viewport, minimum);
+  const xs = [base.left, VIEWPORT_GAP, viewport.width - base.width - VIEWPORT_GAP];
+  const ys = [base.top, VIEWPORT_GAP, viewport.height - base.height - VIEWPORT_GAP];
+  for (const rect of obstacles) {
+    xs.push(rect.left + rect.width + VIEWPORT_GAP, rect.left - base.width - VIEWPORT_GAP);
+    ys.push(rect.top + rect.height + VIEWPORT_GAP, rect.top - base.height - VIEWPORT_GAP);
+  }
+  const candidates: HudWindowGeometry[] = [];
+  for (const left of new Set(xs)) {
+    for (const top of new Set(ys)) {
+      const candidate = clampHudWindowGeometry({ ...base, left, top }, viewport, minimum);
+      if (
+        obstacles.some(
+          (rect) =>
+            candidate.left < rect.left + rect.width + VIEWPORT_GAP &&
+            candidate.left + candidate.width + VIEWPORT_GAP > rect.left &&
+            candidate.top < rect.top + rect.height + VIEWPORT_GAP &&
+            candidate.top + candidate.height + VIEWPORT_GAP > rect.top,
+        )
+      )
+        continue;
+      candidates.push(candidate);
+    }
+  }
+  candidates.sort(
+    (a, b) =>
+      Math.hypot(a.left - base.left, a.top - base.top) -
+      Math.hypot(b.left - base.left, b.top - base.top),
+  );
+  return candidates[0] ?? base;
+}
 
 const viewportBounds = (): HudWindowBounds => ({
   width: window.innerWidth,
@@ -141,7 +185,9 @@ const persistCurrentLayout = (panel: HTMLElement, minimum = minimumFor(panel)): 
 };
 
 const resetLayout = (panel: HTMLElement): void => {
-  panel.classList.remove('hud-window--customized');
+  panel.classList.remove('hud-window--customized', 'hud-window--placed');
+  const binding = bindings.get(panel);
+  if (binding) binding.visible = false;
   ['left', 'top', 'right', 'bottom', 'width', 'height'].forEach((property) =>
     panel.style.removeProperty(property),
   );
@@ -154,7 +200,7 @@ const resetLayout = (panel: HTMLElement): void => {
 
 const headerFor = (panel: HTMLElement): HTMLElement | null =>
   panel.querySelector<HTMLElement>(
-    ':scope > [data-hud-window-handle], :scope > header, :scope > [id$="-header"], :scope > [class*="-header"], :scope > [class*="-titlebar"]',
+    ':scope > [data-hud-window-handle], :scope > header, :scope > [id$="-header"], :scope > [class*="-header"], :scope > [class*="-titlebar"], :scope > .hero-card-main',
   );
 
 const panelLabel = (panel: HTMLElement): string =>
@@ -295,10 +341,16 @@ const installResizeHandle = (panel: HTMLElement, binding: HudWindowBinding): voi
 
 /** Makes a known HUD overlay movable, resizable, resettable and persistent. */
 export function mountHudWindow(panel: HTMLElement): void {
-  const binding = bindings.get(panel) ?? { header: null, resetControl: null, resizeHandle: null };
+  const existing = bindings.get(panel);
+  const binding = existing ?? {
+    header: null,
+    resetControl: null,
+    resizeHandle: null,
+    visible: false,
+  };
   bindings.set(panel, binding);
 
-  const saved = readLayout(panel.id);
+  const saved = existing ? null : readLayout(panel.id);
   if (saved) applyLayout(panel, clampHudWindowGeometry(saved, viewportBounds(), minimumFor(panel)));
 
   const header = headerFor(panel);
@@ -309,10 +361,77 @@ export function mountHudWindow(panel: HTMLElement): void {
 
 /** Mounts current HUD panels and observes later-created overlays. */
 export function initHudWindows(): () => void {
+  let frame = 0;
+  let reflow = false;
+  const visibleGeometry = (panel: HTMLElement): HudWindowGeometry | null => {
+    if (panel.hidden || getComputedStyle(panel).display === 'none') return null;
+    return getPanelGeometry(panel);
+  };
+  const arrange = () => {
+    frame = 0;
+    const panels = Array.from(document.querySelectorAll<HTMLElement>(HUD_WINDOW_SELECTOR));
+    for (const panel of panels) {
+      const binding = bindings.get(panel);
+      if (!binding) continue;
+      const current = visibleGeometry(panel);
+      const opening = !!current && !binding.visible;
+      binding.visible = !!current;
+      if (!current || (!opening && !reflow) || panel.classList.contains('hud-window--interacting'))
+        continue;
+      let preferred = current;
+      const gaceta = document.getElementById('gaceta-widget');
+      const anchor = gaceta && visibleGeometry(gaceta);
+      if (panel.id === 'unit-panel' && !readLayout(panel.id) && anchor) {
+        preferred = {
+          ...current,
+          left: anchor.left + anchor.width + VIEWPORT_GAP,
+          top: anchor.top,
+        };
+      }
+      const obstacles = [
+        ...panels,
+        ...document.querySelectorAll<HTMLElement>('#gaceta-widget, #top-bar'),
+      ]
+        .filter((other) => other !== panel && !other.contains(panel) && !panel.contains(other))
+        .map(visibleGeometry)
+        .filter((rect): rect is HudWindowGeometry => rect !== null);
+      const next = placeHudWindow(preferred, viewportBounds(), obstacles, minimumFor(panel));
+      panel.classList.add('hud-window--placed');
+      panel.style.left = `${next.left}px`;
+      panel.style.top = `${next.top}px`;
+      panel.style.right = 'auto';
+      panel.style.bottom = 'auto';
+      panel.style.width = `${next.width}px`;
+      // Keep natural content height, except for explicitly user-sized windows.
+      if (panel.classList.contains('hud-window--customized'))
+        panel.style.height = `${next.height}px`;
+    }
+    reflow = false;
+  };
+  const schedule = (force = false) => {
+    reflow ||= force;
+    if (!frame) frame = requestAnimationFrame(arrange);
+  };
+  const sizes = new WeakMap<Element, string>();
+  const sizeObserver = new ResizeObserver((entries) => {
+    let changed = false;
+    for (const entry of entries) {
+      const size = `${entry.contentRect.width}:${entry.contentRect.height}`;
+      if (sizes.has(entry.target) && sizes.get(entry.target) !== size) changed = true;
+      sizes.set(entry.target, size);
+    }
+    if (changed) schedule(true);
+  });
+  const mount = (panel: HTMLElement) => {
+    mountHudWindow(panel);
+    sizeObserver.observe(panel);
+    schedule();
+  };
   const mountCandidates = (root: ParentNode) => {
-    root.querySelectorAll<HTMLElement>(HUD_WINDOW_SELECTOR).forEach(mountHudWindow);
+    root.querySelectorAll<HTMLElement>(HUD_WINDOW_SELECTOR).forEach(mount);
   };
   mountCandidates(document);
+  document.querySelectorAll('#gaceta-widget, #top-bar').forEach((el) => sizeObserver.observe(el));
 
   const observer = new MutationObserver((records) => {
     records.forEach((record) => {
@@ -320,25 +439,30 @@ export function initHudWindows(): () => void {
         record.target instanceof HTMLElement
           ? record.target.closest<HTMLElement>(HUD_WINDOW_SELECTOR)
           : null;
-      if (owner) mountHudWindow(owner);
+      if (owner) mount(owner);
       record.addedNodes.forEach((node) => {
         if (!(node instanceof HTMLElement)) return;
-        if (node.matches(HUD_WINDOW_SELECTOR)) mountHudWindow(node);
+        if (node.matches(HUD_WINDOW_SELECTOR)) mount(node);
         mountCandidates(node);
       });
     });
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'style', 'hidden'],
+  });
 
   const constrainWindows = () => {
-    document
-      .querySelectorAll<HTMLElement>('.hud-window--customized')
-      .forEach((panel) => persistCurrentLayout(panel));
+    schedule(true);
   };
   window.addEventListener('resize', constrainWindows);
 
   return () => {
     observer.disconnect();
+    sizeObserver.disconnect();
+    cancelAnimationFrame(frame);
     window.removeEventListener('resize', constrainWindows);
   };
 }
