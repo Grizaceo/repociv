@@ -154,7 +154,7 @@ def score_article_repo(article: dict[str, Any], profile: dict[str, Any], events:
 
     if events:
         event_text = " ".join(
-            e.get("summary", e.get("text", "")) for e in events if isinstance(e, dict)
+            str(e.get("summary", e.get("text", "")) or "") for e in events if isinstance(e, dict)
         )
         event_score = _keyword_overlap(article_text, event_text) * 0.5
 

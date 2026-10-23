@@ -8,7 +8,8 @@
 #   4. vitest run --coverage (TS unit tests + enforced coverage floor)
 #   5. vite build            (production bundle smoke)
 #   6. ruff check server/    (Python lint)
-#   7. pytest --cov=server   (Python unit tests + coverage floor)
+#   7. mypy server/          (Python types)
+#   8. pytest --cov=server   (Python unit tests + coverage floor, tests excluded)
 #
 # Exit code is the first failure (or 0 on full green). Designed to be
 # idempotent and safe to run repeatedly. No `set -e` global because we
@@ -63,12 +64,24 @@ else
   warn "ruff check scripts/ (ruff not installed)"
   failures+=("ruff check scripts/")
 fi
+# mypy — gradual typing on server/ (config in pyproject.toml). Blocking: a
+# missing binary is a failure, not a skip (it used to skip silently everywhere).
+MYPY_BIN="$REPO_ROOT/.venv/bin/mypy"
+[ -x "$MYPY_BIN" ] || MYPY_BIN="$(command -v mypy || true)"
+if [ -n "$MYPY_BIN" ]; then
+  run_step "mypy server/"                 "$MYPY_BIN" server/
+else
+  warn "mypy server/ (mypy not installed — pip install -r requirements.txt)"
+  failures+=("mypy server/")
+fi
 # Resolve the project pytest: prefer the repo .venv (local dev, where a bare
 # `pytest` on PATH can resolve to an unrelated interpreter missing deps like
 # fastmcp), fall back to PATH (CI installs into the runner's python).
 PYTEST_BIN="$REPO_ROOT/.venv/bin/pytest"
 [ -x "$PYTEST_BIN" ] || PYTEST_BIN="$(command -v pytest || true)"
-run_step "pytest --cov=server (≥50%)"     "$PYTEST_BIN" --cov=server --cov-fail-under=50 -q
+# Floor measures production code only ([tool.coverage.run] omits test files):
+# 70% on 2026-10-18. Ratchet upward; never lower it to get a green run.
+run_step "pytest --cov=server (≥68%)"     "$PYTEST_BIN" --cov=server --cov-fail-under=68 -q
 
 # Asset budget: the 3 terrain atlas PNGs must stay under 6MB combined.
 # (The Blender/numpy generators can silently fatten them; tracked binaries
@@ -162,19 +175,6 @@ if npx --no-install knip --exclude duplicates 2>&1; then
   printf "\033[1;32m[OK]\033[0m   knip\\n"
 else
   printf "\033[1;33m[INFO]\033[0m knip found items (non-blocking)\\n"
-fi
-
-# mypy — gradual typing on server/ (non-blocking report; see [tool.mypy] in
-# pyproject.toml). Skipped gracefully where mypy isn't installed. Findings are
-# type-annotation imprecision on working code, not bugs; ratchet to blocking as
-# modules get annotated.
-log "mypy server/ (report only)"
-if ! command -v mypy >/dev/null 2>&1; then
-  printf "\033[1;33m[INFO]\033[0m mypy not installed — skipping (pip install mypy)\\n"
-elif mypy server/ 2>&1; then
-  printf "\033[1;32m[OK]\033[0m   mypy\\n"
-else
-  printf "\033[1;33m[INFO]\033[0m mypy found type issues (non-blocking)\\n"
 fi
 
 # Summary

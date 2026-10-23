@@ -23,7 +23,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
 
       - name: Install JS deps
@@ -37,11 +37,12 @@ jobs:
           cache-dependency-path: requirements.lock
 
       - name: Install Python deps
-        # ruff is pinned in requirements.txt (single source of truth) — no
-        # separate install here, or the two pins can silently drift.
+        # Install the exact lock (ruff, mypy and pytest included), not the
+        # floors in requirements.txt: CI must test what deploys, and a fresh
+        # resolve could silently pick up a release from yesterday.
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.lock
 
       - name: Run gate
         # The same script we use locally — single source of truth.
@@ -63,7 +64,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
 
       - name: Install JS deps
@@ -79,7 +80,7 @@ jobs:
       - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.lock
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium

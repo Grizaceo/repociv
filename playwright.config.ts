@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
-import { existsSync, readFileSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join, resolve } from 'node:path';
 
 // ─── Browser resolution ────────────────────────────────────────────────────
 // Playwright's bundled Chromium is a ~150MB download. Plenty of dev machines
@@ -47,10 +48,31 @@ function loadDotEnv(path = '.env') {
   }
 }
 
-loadDotEnv();
+// ─── Isolation from the live dashboard ─────────────────────────────────────
+// The e2e stack gets its own ports and its own state root unless the caller
+// pins them. Applied BEFORE loading .env so a developer .env (VITE_PORT=5273,
+// REPOCIV_CONFIG_DIR=~/.repociv) cannot point the run at the live service:
+// with the old defaults plus reuseExistingServer, a local `npx playwright test`
+// silently drove the live bridge and wrote its events/ledger (2026-10-14/15).
+const E2E_DEFAULTS: Record<string, string> = {
+  REPOCIV_PORT: '5373',
+  VITE_PORT: '5373',
+  BRIDGE_PORT: '5374',
+  BRIDGE_WS_PORT: '5375',
+};
+for (const [key, value] of Object.entries(E2E_DEFAULTS)) process.env[key] ??= value;
+process.env.REPOCIV_CONFIG_DIR ??= mkdtempSync(join(tmpdir(), 'repociv-e2e-'));
 
-const uiPort = Number(process.env.REPOCIV_PORT ?? process.env.VITE_PORT ?? 5273);
-const bridgePort = Number(process.env.BRIDGE_PORT ?? 5274);
+// REPOCIV_SKIP_DOTENV=1 (set by scripts/e2e-ci-sim.sh) keeps a developer .env —
+// live token, Hermes endpoints — out of the run, as on CI.
+if (process.env.REPOCIV_SKIP_DOTENV !== '1') loadDotEnv();
+
+// Reusing an already-running server is opt-in: it is how a run ends up writing
+// into whatever stack owns the port. PLAYWRIGHT_BASE_URL targets one on purpose.
+const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === '1';
+
+const uiPort = Number(process.env.REPOCIV_PORT ?? process.env.VITE_PORT);
+const bridgePort = Number(process.env.BRIDGE_PORT);
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${uiPort}`;
 const bridgeURL = process.env.VITE_BRIDGE_URL ?? `http://127.0.0.1:${bridgePort}`;
 const bridgePython = existsSync('.venv/bin/python') ? '.venv/bin/python' : 'python3';
@@ -73,14 +95,14 @@ export default defineConfig({
     {
       command: `${bridgePython} -m server.bridge`,
       url: `${bridgeURL}/health`,
-      reuseExistingServer: true,
+      reuseExistingServer,
       timeout: 15_000,
       env: process.env as Record<string, string>,
     },
     {
       command: `npm run dev -- --host 127.0.0.1 --port ${uiPort}`,
       url: baseURL,
-      reuseExistingServer: true,
+      reuseExistingServer,
       timeout: 20_000,
       env: process.env as Record<string, string>,
     },

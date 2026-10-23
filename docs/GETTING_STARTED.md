@@ -97,7 +97,7 @@ The defaults work out of the box for local single-user development:
 | WORKSPACE_ROOT | ~/.hermes/workspace/repos | Where repo-cities are scanned from |
 | HERMES_URL | http://localhost:8642/v1/chat/completions | Hermes agent API endpoint |
 | HERMES_MODEL | minimax-m2.6 | Default model for Hermes bridge calls |
-| REPOCIV_CONFIG_DIR | ~/.repociv | Persistent data directory |
+| REPOCIV_CONFIG_DIR | ~/.repociv | State root for every store (`server/state_paths.py`) |
 
 If you are not using the Hermes agent ecosystem, set WORKSPACE_ROOT to
 any directory containing subdirectories you want to see as cities on the map.
@@ -346,18 +346,15 @@ Settings panel (F11).
 3. If curl works but the browser doesn't, check for browser SSE limits
    (most browsers support 6 concurrent SSE connections)
 
-### Tests fail due to DuckDB lock
+### Tests and the live bridge
 
-If the bridge is running while you run tests:
-
-```bash
-# Option 1: Stop the bridge first
-systemctl --user stop repociv-bridge
-python3 -m pytest server/ -q
-
-# Option 2: Use isolated data directory
-REPOCIV_DATA_DIR=/tmp/repociv-test python3 -m pytest server/ -q
-```
+The backend suite is hermetic: `conftest.py` redirects `HOME`,
+`REPOCIV_CONFIG_DIR` and `XDG_*` to a temporary directory and sets
+`REPOCIV_SKIP_DOTENV=1`, so `python3 -m pytest server/ -q` never touches the live
+`~/.repociv` (events, security log, token ledger, DuckDB lock) even while the
+bridge is running. Every store resolves its path through
+`server/state_paths.py`; `server/test_state_paths.py` fails if a module
+hardcodes `~/.repociv` again.
 
 ---
 

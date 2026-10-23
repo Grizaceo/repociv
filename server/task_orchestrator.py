@@ -47,7 +47,9 @@ MAX_CONSECUTIVE_FAILURES = 3
 # A step is "stalled" when no observable progress (events) occurs within this
 # window. The orchestrator itself is synchronous (blocks on each step), so the
 # effective stall detection is:
-#   1. STEP_TIMEOUT in step_executor — hard kill after N seconds (already exists)
+#   1. STEP_TIMEOUT in step_executor — bounded TERM→KILL of the owned agent
+#      session via process_control; an unconfirmed stop is recorded as such
+#      (StepTimedOut event) and never retried (R03)
 #   2. STALL_TIMEOUT_SECONDS here — the orchestrator-level budget per step
 #   3. STALL_WARN_SECONDS — log a warning if a step exceeds this without finishing
 # These are overridable via environment for per-repo tuning.
@@ -88,6 +90,37 @@ def _record_task_phase(task_key: str, state: dict[str, Any]) -> None:
         })
     except OSError:
         logger.warning("Task phase history unavailable")
+
+
+def register_recovered_task(
+    repo: str, issue_id: str, phase: str, *, info: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Expose a task reconciled at startup (R12) through the registry.
+
+    Visibility only: nothing is resumed, re-dispatched or re-approved. The
+    entry lets ``get_task_status`` report ``interrupted``/``blocked`` instead
+    of the stale in-flight phase persisted before the restart.
+    """
+    task_key = _task_key(repo, issue_id)
+    entry: dict[str, Any] = {
+        "phase": phase,
+        "recovered": True,
+        "updatedAt": _now_iso(),
+        "recovery": dict(info or {}),
+    }
+    with _registry_lock:
+        _registry[task_key] = entry
+        _record_task_phase(task_key, entry)
+    return entry
+
+
+def interrupted_tasks() -> list[str]:
+    """Task keys reconciled as interrupted and not yet resolved by an operator."""
+    with _registry_lock:
+        return sorted(
+            key for key, entry in _registry.items()
+            if entry.get("recovered") and entry.get("phase") == "interrupted"
+        )
 
 
 def _now_iso(ts: float | None = None) -> str:
@@ -189,6 +222,16 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                 }
                 _record_task_phase(task_key, _registry[task_key])
             return state
+
+        # R12: a task reconciled as interrupted at startup never re-runs on its
+        # own — its earlier attempt may have had external effects. The operator
+        # reconciles and then cancels (cancel_task) or opens a new issue.
+        with _registry_lock:
+            recovered = _registry.get(task_key, {})
+        if recovered.get("recovered") and recovered.get("phase") == "interrupted":
+            return {**state, "phase": "interrupted",
+                    "recovery": recovered.get("recovery", {}),
+                    "resumeAvailable": False}
 
         # ── Checkpoint gate resume (H4) ──────────────────────────────────
         # When the orchestrator writes a checkpoint sentinel and returns
@@ -487,7 +530,7 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                     if agent_output:
                         _wi.write_step_artifact(
                             repo, issue_id, i,
-                            step_meta.get("agent", "agent"),
+                            str(step_meta.get("agent", "agent")),
                             agent_output,
                         )
 
@@ -625,9 +668,9 @@ def run_task(repo: str, issue_id: str) -> dict[str, Any]:
                 validation_verdict = val_result.get("verdict", "needs-human-review")
                 validation_summary = val_result.get("summary", "")
             except ImportError:
-                # Validator module not yet available — skip gracefully
-                validation_verdict = "pass"
-                validation_summary = "validator module not installed, auto-pass"
+                # Fail closed: a missing validator is not evidence of success.
+                validation_verdict = "needs-human-review"
+                validation_summary = "validator module unavailable; not validated"
             except Exception as e:
                 validation_verdict = "needs-human-review"
                 validation_summary = f"validator error: {e}"
@@ -737,8 +780,12 @@ def run_task_async(repo: str, issue_id: str) -> str:
     """
     task_key = _task_key(repo, issue_id)
 
-    # Mark as queued before spawning
+    # Mark as queued before spawning — unless R12 reconciled it as interrupted:
+    # overwriting that entry would silently re-arm a task with unknown effects.
     with _registry_lock:
+        current = _registry.get(task_key, {})
+        if current.get("recovered") and current.get("phase") == "interrupted":
+            return task_key
         _registry[task_key] = {"phase": "queued", "startedAt": _now_iso()}
         _record_task_phase(task_key, _registry[task_key])
 

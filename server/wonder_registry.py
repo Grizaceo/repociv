@@ -19,6 +19,10 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
+try:
+    from .state_paths import repociv_home
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from state_paths import repociv_home  # type: ignore[no-redef]
 
 
 _STATIC_WONDER_MANIFESTS: list[dict[str, Any]] = [
@@ -107,7 +111,7 @@ def _custom_manifest_dir() -> Path:
     env_dir = os.environ.get("REPOCIV_WONDERS_DIR", "").strip()
     if env_dir:
         return Path(env_dir).expanduser()
-    return Path.home() / ".repociv" / "wonders"
+    return repociv_home() / "wonders"
 
 
 def _load_custom_manifests() -> list[dict[str, Any]]:

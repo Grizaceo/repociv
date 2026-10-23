@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 
 // Explicit local dogfood check; CI need not contain the user's Hermes stores.
+// Opt-in against the live stack (the config isolates runs by default):
+// REPOCIV_LIVE_INVENTORY=1 PLAYWRIGHT_REUSE_SERVER=1 REPOCIV_PORT=5273 BRIDGE_PORT=5274
 test.skip(process.env.REPOCIV_LIVE_INVENTORY !== '1', 'Requires a live local Hermes board');
 
 test('live bridge: canonical Hermes Kanban and complete process snapshot reach the UI', async ({

@@ -141,6 +141,10 @@ def retry_step(
             run_id = executor_fn(repo, issue_id, step, step_meta)
             return run_id, attempt + 1
         except Exception as exc:
+            # R03: an attempt whose stop could not be proven may still be
+            # running; a retry would overlap it. Such errors opt out.
+            if getattr(exc, "retryable", True) is False:
+                raise
             last_exc = exc
             # Continue to next attempt if retries remain
 

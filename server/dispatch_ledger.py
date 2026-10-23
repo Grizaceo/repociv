@@ -48,6 +48,7 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Any
+from server.state_paths import repociv_home
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +58,7 @@ _SUFFIX = ".json"
 
 
 def _ledger_dir() -> Path:
-    base = os.environ.get(_CONFIG_DIR_ENV) or os.path.join(
-        os.path.expanduser("~"), ".repociv"
-    )
-    return Path(base) / _LEDGER_DIRNAME
+    return repociv_home() / _LEDGER_DIRNAME
 
 
 def _intent_path(command_id: str) -> Path:

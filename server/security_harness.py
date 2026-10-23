@@ -35,6 +35,7 @@ import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from .state_paths import repociv_home
 
 logger = logging.getLogger(__name__)
 
@@ -347,7 +348,7 @@ def detect_drift(
 
 # ── Quarantine Engine ────────────────────────────────────────────────────────
 
-_DEFAULT_QUARANTINE_DIR = Path.home() / ".repociv" / "quarantine"
+_DEFAULT_QUARANTINE_DIR = repociv_home() / "quarantine"
 
 
 def quarantine_file(
@@ -390,32 +391,77 @@ _DEDUP_WINDOW_S = 1800  # 30 minutes
 _HMAC_KEY_ENV = "REPOCIV_HMAC_KEY"
 
 
-def _load_hmac_key() -> bytes:
-    """Return the audit-log HMAC key.
+_HMAC_KEY_FILENAME = "audit-hmac.key"
+_HMAC_KEY_BYTES = 32
 
-    Prefers ``REPOCIV_HMAC_KEY``. Without it, falls back to an ephemeral
-    per-process key and warns: signatures stay self-consistent within the
-    process but tamper-evidence is NOT verifiable across restarts. Never
-    exits — dev logging must keep working.
+
+def _key_path() -> Path:
+    return repociv_home() / "security_logs" / _HMAC_KEY_FILENAME
+
+
+def _ephemeral_key(reason: str) -> tuple[bytes, str]:
+    warnings.warn(
+        f"{_HMAC_KEY_ENV} not set and {reason} — audit log signed with an "
+        "ephemeral per-process key. Tamper-evidence is NOT verifiable across restarts.",
+        UserWarning,
+        stacklevel=3,
+    )
+    return secrets.token_bytes(_HMAC_KEY_BYTES), "ephemeral"
+
+
+def _load_hmac_key() -> tuple[bytes, str]:
+    """Return ``(key, mode)`` for the audit-log HMAC.
+
+    1. ``REPOCIV_HMAC_KEY`` (operator-managed) → ``persistent``.
+    2. ``<state root>/security_logs/audit-hmac.key`` (0600), created once with
+       32 random bytes on first start → ``persistent``: signatures stay
+       verifiable across bridge restarts (H3). It sits next to the log it
+       signs, so it detects accidental or out-of-band edits, not an attacker
+       holding the operator's own file permissions.
+    3. Anything unreadable/uncreatable → ``ephemeral`` with a warning. An
+       existing but malformed key file is never overwritten (that would
+       silently break verification of every earlier line).
+    Never exits — dev logging must keep working.
     """
     raw = os.environ.get(_HMAC_KEY_ENV, "")
     if raw:
-        return raw.encode()
-    warnings.warn(
-        f"{_HMAC_KEY_ENV} not set — audit log signed with an ephemeral "
-        "per-process key. Tamper-evidence is NOT verifiable across restarts.",
-        UserWarning,
-        stacklevel=2,
-    )
-    return secrets.token_bytes(32)
+        return raw.encode(), "persistent"
+    path = _key_path()
+    for _attempt in range(2):
+        try:
+            key = path.read_bytes()
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            return _ephemeral_key(f"the key file is unreadable ({exc.strerror})")
+        else:
+            if len(key) < _HMAC_KEY_BYTES:
+                return _ephemeral_key("the key file is malformed (left untouched)")
+            return key, "persistent"
+        # Publish atomically (write a private temp, then hard-link it into
+        # place): a concurrent reader never sees a half-written key.
+        key = secrets.token_bytes(_HMAC_KEY_BYTES)
+        tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(key)
+            os.link(tmp, path)
+        except FileExistsError:
+            continue  # another process published first: read theirs
+        except OSError as exc:
+            return _ephemeral_key(f"the key file cannot be created ({exc.strerror})")
+        finally:
+            tmp.unlink(missing_ok=True)
+        return key, "persistent"
+    return _ephemeral_key("the key file kept changing while being created")
 
 
-_HMAC_KEY = _load_hmac_key()
-
-# R05: audit-key provenance mode, captured at import alongside the key.
-# "persistent" — an operator key (REPOCIV_HMAC_KEY) backs the signature, so
-# tamper-evidence survives restarts. "ephemeral" — a per-process random key.
-_AUDIT_KEY_MODE = "persistent" if os.environ.get(_HMAC_KEY_ENV) else "ephemeral"
+# R05/H3: audit-key provenance mode, captured at import alongside the key.
+# "persistent" — an operator key or the 0600 state-root key backs the
+# signature, so tamper-evidence survives restarts. "ephemeral" — per-process.
+_HMAC_KEY, _AUDIT_KEY_MODE = _load_hmac_key()
 
 
 def audit_key_mode() -> str:
@@ -433,7 +479,7 @@ class AlertSystem:
     """
 
     def __init__(self, log_dir: str | Path | None = None) -> None:
-        self._log_dir = Path(log_dir or Path.home() / ".repociv" / "security_logs")
+        self._log_dir = Path(log_dir) if log_dir else repociv_home() / "security_logs"
         self._log_dir.mkdir(parents=True, exist_ok=True)
         self._log_file = self._log_dir / "security_audit.jsonl"
         self._lock = threading.Lock()

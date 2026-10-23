@@ -42,9 +42,9 @@ ignore = [
 #   - ignore_missing_imports: no third-party stubs installed (duckdb, yaml, mcp…).
 #   - disable no-redef: server uses the `try: import X / except: X = None` optional-
 #     import fallback pervasively (~110 sites); that pattern is not a real redef.
-# It runs as a NON-BLOCKING report in scripts/check.sh for now (like knip) — the
-# residual findings are type-annotation imprecision on working code, not bugs.
-# Ratchet toward blocking as modules are annotated.
+# BLOCKING in scripts/check.sh since 2026-10-18: while it was report-only it was
+# never installed (not in requirements.txt), so it silently skipped everywhere
+# and missed a real defect (task_recovery calling a function that did not exist).
 [tool.mypy]
 python_version = "3.11"
 ignore_missing_imports = true
@@ -53,3 +53,9 @@ ignore_missing_imports = true
 #   types-* just for mypy is not worth a dependency. Suppress the stub hints.
 disable_error_code = ["no-redef", "import-untyped"]
 exclude = '(^|/)(test_.*|conftest)\.py$'
+
+# ─── coverage (pytest --cov=server) ──────────────────────────────────────────
+# Tests live inside server/; measuring them inflated the headline number
+# (83% with tests vs ~71% of production code on 2026-10-18).
+[tool.coverage.run]
+omit = ["server/test_*.py", "server/**/test_*.py", "*/conftest.py"]

@@ -26,10 +26,14 @@ import os
 import threading
 from pathlib import Path
 from typing import Any
+try:
+    from .state_paths import repociv_home
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from state_paths import repociv_home  # type: ignore[no-redef]
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_STATE_DIR = Path.home() / ".repociv"
+_DEFAULT_STATE_DIR = repociv_home()
 
 try:
     import duckdb  # type: ignore[import-untyped]
@@ -317,7 +321,9 @@ class ResearchLedger:
 
         self.record_cycle(
             mission_id=mission_id,
-            agent=actor,
+            # Terminal events are emitted by the bridge (actor "system"); the
+            # agent that actually ran travels in data.agentId when known.
+            agent=str(data.get("agentId") or actor),
             model=str(data.get("model", "")),
             prompt_tokens=int(data.get("tokensIn") or 0),
             completion_tokens=int(data.get("tokensOut") or 0),

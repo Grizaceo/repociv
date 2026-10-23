@@ -4,6 +4,9 @@
 #   ./scripts/dev-start.sh             # start bridge + vite
 #   ./scripts/dev-start.sh --tmux      # start inside a named tmux session
 #   ./scripts/dev-start.sh --with-mcp  # start bridge + vite + MCP server (logs → ~/.repociv/logs/mcp.log)
+#   REPOCIV_MODE=production ./scripts/dev-start.sh
+#                                      # serve the built dist/ with `vite preview`
+#                                      # (no HMR/file watcher; builds if dist/ is missing)
 #
 # Criterion (Fase 8): one command from a cold WSL restart → system ready.
 set -euo pipefail
@@ -23,9 +26,10 @@ BRIDGE_PORT="${BRIDGE_PORT:-5274}"
 BRIDGE_WS_PORT="${BRIDGE_WS_PORT:-5275}"
 REPOCIV_PORT="${REPOCIV_PORT:-${VITE_PORT:-5273}}"
 export VITE_PORT="${VITE_PORT:-$REPOCIV_PORT}"
-# Mirror bridge auth token into Vite so the UI can call mutating endpoints.
-export VITE_REPOCIV_TOKEN="${VITE_REPOCIV_TOKEN:-${REPOCIV_TOKEN:-}}"
-export VITE_BRIDGE_TOKEN="${VITE_BRIDGE_TOKEN:-${REPOCIV_TOKEN:-}}"
+# The bridge token is NOT mirrored into VITE_* any more: the UI server's
+# /bridge and /repociv-ws proxies attach it server-side (vite.config.ts), so
+# it never ships in the browser bundle.
+REPOCIV_MODE="${REPOCIV_MODE:-development}"
 WITH_MCP=0
 for arg in "$@"; do [[ "$arg" == "--with-mcp" ]] && WITH_MCP=1; done
 CONFIG_DIR="${REPOCIV_CONFIG_DIR:-$HOME/.repociv}"
@@ -94,10 +98,22 @@ python3 -m server.bridge \
   >> "$LOG_DIR/bridge.log" 2>&1 &
 BRIDGE_PID=$!
 
-# ─── Start Vite dev server ────────────────────────────────────────────────────
-echo "▶ Iniciando Vite (puerto $REPOCIV_PORT)…"
-npm run dev \
-  >> "$LOG_DIR/vite.log" 2>&1 &
+# ─── Start the UI server ──────────────────────────────────────────────────────
+if [[ "$REPOCIV_MODE" == "production" ]]; then
+  # Production: the built bundle, no HMR websocket, no watcher over the
+  # checkout (running checks or editing files never reloads live tabs).
+  if [[ ! -f "$REPO_ROOT/dist/index.html" ]]; then
+    echo "▶ dist/ ausente — construyendo (vite build)…"
+    npx --no-install vite build >> "$LOG_DIR/vite.log" 2>&1
+  fi
+  echo "▶ Iniciando UI en modo producción (vite preview, puerto $REPOCIV_PORT)…"
+  npx --no-install vite preview --port "$REPOCIV_PORT" --strictPort \
+    >> "$LOG_DIR/vite.log" 2>&1 &
+else
+  echo "▶ Iniciando Vite dev (puerto $REPOCIV_PORT)…"
+  npm run dev \
+    >> "$LOG_DIR/vite.log" 2>&1 &
+fi
 VITE_PID=$!
 
 # ─── MCP server (opcional) ────────────────────────────────────────────────────
@@ -131,7 +147,10 @@ _cleanup() {
   rm -f "$LOCKFILE"
   echo "✔ Limpieza completa."
 }
-trap _cleanup SIGINT SIGTERM EXIT
+# EXIT does the cleanup; INT/TERM just exit 0 so a normal `systemctl stop`
+# is not recorded as a failure (status=143) on every shutdown.
+trap _cleanup EXIT
+trap 'exit 0' SIGINT SIGTERM
 
 # ─── Wait for bridge to be ready ─────────────────────────────────────────────
 echo "⏳ Esperando que el bridge esté listo…"

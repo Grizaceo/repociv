@@ -3,9 +3,10 @@ import os
 import re
 import subprocess
 import uuid
-from pathlib import Path
 
 from .sse_server import send_to_repociv
+from .atomic_io import atomic_write_json
+from .state_paths import repociv_home
 
 
 # ─── Process scanner ──────────────────────────────────────────────────────────
@@ -41,7 +42,7 @@ def scan_active_processes() -> None:
 
 
 # ─── LexO-Alpha detection ─────────────────────────────────────────────────────
-_LEXO_PERSIST_PATH = Path.home() / ".repociv" / "detected_lexo.json"
+_LEXO_PERSIST_PATH = repociv_home() / "detected_lexo.json"
 
 
 def _load_lexo_seen() -> dict[str, str]:
@@ -57,8 +58,7 @@ def _load_lexo_seen() -> dict[str, str]:
 
 def _save_lexo_seen(seen: dict[str, str]) -> None:
     try:
-        _LEXO_PERSIST_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _LEXO_PERSIST_PATH.write_text(json.dumps(seen), encoding="utf-8")
+        atomic_write_json(_LEXO_PERSIST_PATH, seen)
     except Exception:
         pass
 

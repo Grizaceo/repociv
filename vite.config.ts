@@ -6,6 +6,11 @@ import { fileURLToPath } from 'node:url';
 import { repocivPlugin, expandUser } from './vite-plugins/repociv.ts';
 import { wonderProxyConfig } from './vite-plugins/wonderProxy.ts';
 import { meshyLocalAssets } from './vite-plugins/meshyLocalAssets.ts';
+import {
+  accessGatePlugin,
+  guardProxyUpgrades,
+  parseTailnetUsers,
+} from './vite-plugins/accessGate.ts';
 
 const DEFAULT_MAP_ROOT = join(homedir(), '.hermes', 'workspace', 'repos');
 
@@ -28,26 +33,93 @@ const REPO_ROOT = fileURLToPath(new URL('.', import.meta.url)).replace(/\/$/, ''
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const repocivToken = env.VITE_REPOCIV_TOKEN ?? env.REPOCIV_TOKEN ?? '';
-  const bridgeToken = env.VITE_BRIDGE_TOKEN ?? repocivToken;
+  const bridgeToken = env.REPOCIV_TOKEN || env.VITE_BRIDGE_TOKEN || env.VITE_REPOCIV_TOKEN || '';
+  // Proxy mode (default): the browser talks to /bridge and /repociv-ws on this
+  // origin and the PROXY attaches the token, so it never ships in the bundle,
+  // dist/ or the browser cache. Only a direct bridge URL (Docker / remote
+  // demo, VITE_BRIDGE_URL) still needs the token client-side.
+  const directBridge = Boolean(env.VITE_BRIDGE_URL);
+  const tokenHeaders = bridgeToken ? { 'X-RepoCiv-Token': bridgeToken } : undefined;
+  const tailnetUsers = parseTailnetUsers(env.REPOCIV_TAILNET_USERS);
+  // Vite only appends __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS (the systemd
+  // Tailscale drop-in) to the dev server; preview needs it explicitly.
+  const extraAllowedHosts = (process.env.__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS ?? '')
+    .split(',')
+    .map((h) => h.trim())
+    .filter(Boolean);
+  const guardUpgrades = guardProxyUpgrades(tailnetUsers);
   const vitePort = parseInt(env.VITE_PORT ?? '5273', 10);
   const mapRoot = resolveMapRoot(mode);
+  const proxy = {
+    '/bridge': {
+      target: `http://localhost:${env.BRIDGE_PORT ?? '5274'}`,
+      changeOrigin: true,
+      ws: true, // WebSocket upgrade passthrough (Phase 1)
+      secure: false,
+      headers: tokenHeaders,
+      configure: guardUpgrades,
+      rewrite: (path: string) => path.replace(/^\/bridge/, ''),
+    },
+    // WebSocket bridge transport proxied through Vite so the *Windows*
+    // browser can reach the WSL-loopback WS port (5275). A raw
+    // `ws://localhost:5275` from the browser resolves to Windows-localhost
+    // and never connects, which left bridgeOnline=false → "Puente Cerrado"
+    // → reload loop. Dev client connects to /repociv-ws (Vite loopback).
+    '/repociv-ws': {
+      target: `ws://localhost:${env.BRIDGE_WS_PORT ?? '5275'}`,
+      changeOrigin: true,
+      ws: true,
+      secure: false,
+      headers: tokenHeaders,
+      configure: guardUpgrades,
+      rewrite: (path: string) => path.replace(/^\/repociv-ws/, ''),
+    },
+    // Hermes dashboard (runs on the Tailscale IP by design, for the
+    // Windows Desktop app). Proxied so the RepoCiv browser can reach it
+    // without leaving Vite's loopback origin. Does NOT touch the
+    // hermes-dashboard service; dev server stays bound to 127.0.0.1.
+    '/dashboard': {
+      // Default neutro: la IP real del tailnet va en .env local
+      // (HERMES_DASHBOARD_URL, gitignored) — nunca hardcodeada en repo.
+      target: env.HERMES_DASHBOARD_URL ?? 'http://127.0.0.1:9119',
+      changeOrigin: true,
+      secure: false,
+      rewrite: (path: string) => path.replace(/^\/dashboard/, ''),
+    },
+    // Iframe wonders served on this origin (/wonder-proxy/<id>/, ws too) so
+    // they work from other machines while the service stays on loopback.
+    // Opt-in per wonder via REPOCIV_WONDER_PROXIES — see vite-plugins/wonderProxy.ts.
+    ...wonderProxyConfig(env.REPOCIV_WONDER_PROXIES),
+  };
   return {
+    // The gate must run before the /api plugin and the proxies.
     // Local-only, license-pending Meshy family: served on loopback when opted in, never bundled.
-    plugins: [repocivPlugin(mapRoot), meshyLocalAssets(REPO_ROOT, env.VITE_MESHY_PREVIEW !== '0')],
-    define: {
-      ...(repocivToken && !env.VITE_REPOCIV_TOKEN
-        ? { 'import.meta.env.VITE_REPOCIV_TOKEN': JSON.stringify(repocivToken) }
-        : {}),
-      ...(bridgeToken && !env.VITE_BRIDGE_TOKEN
-        ? { 'import.meta.env.VITE_BRIDGE_TOKEN': JSON.stringify(bridgeToken) }
-        : {}),
+    plugins: [
+      accessGatePlugin(tailnetUsers, directBridge ? [env.VITE_BRIDGE_URL as string] : []),
+      repocivPlugin(mapRoot),
+      meshyLocalAssets(REPO_ROOT, env.VITE_MESHY_PREVIEW !== '0'),
+    ],
+    define: directBridge
+      ? {}
+      : {
+          // Even if a .env still exports VITE_*_TOKEN, keep it out of the bundle.
+          'import.meta.env.VITE_BRIDGE_TOKEN': JSON.stringify(''),
+          'import.meta.env.VITE_REPOCIV_TOKEN': JSON.stringify(''),
+        },
+    // Production mode (scripts/dev-start.sh with REPOCIV_MODE=production):
+    // the built dist/ behind the same loopback bind, gate, API and proxies.
+    preview: {
+      port: vitePort,
+      strictPort: true,
+      host: '127.0.0.1',
+      allowedHosts: extraAllowedHosts,
+      proxy,
     },
     server: {
       port: vitePort,
       strictPort: true,
-      // Default to loopback. A LAN bind would expose the Vite /api plugin,
-      // bridge proxy, and the client bundle (which includes the local token).
+      // Default to loopback. A LAN bind would expose the Vite /api plugin and
+      // the token-attaching bridge proxy.
       // Do not open this server to Windows/LAN as a connectivity workaround.
       host: '127.0.0.1',
       // Keep Vite's DNS-rebinding protection; localhost and IP hosts remain allowed.
@@ -62,43 +134,7 @@ export default defineConfig(({ mode }) => {
       watch: {
         ignored: ['**/.venv/**', '**/dist/**', `${REPO_ROOT}/.hermes/**`, '**/e2e/**'],
       },
-      proxy: {
-        '/bridge': {
-          target: `http://localhost:${env.BRIDGE_PORT ?? '5274'}`,
-          changeOrigin: true,
-          ws: true, // WebSocket upgrade passthrough (Phase 1)
-          secure: false,
-          rewrite: (path) => path.replace(/^\/bridge/, ''),
-        },
-        // WebSocket bridge transport proxied through Vite so the *Windows*
-        // browser can reach the WSL-loopback WS port (5275). A raw
-        // `ws://localhost:5275` from the browser resolves to Windows-localhost
-        // and never connects, which left bridgeOnline=false → "Puente Cerrado"
-        // → reload loop. Dev client connects to /repociv-ws (Vite loopback).
-        '/repociv-ws': {
-          target: `ws://localhost:${env.BRIDGE_WS_PORT ?? '5275'}`,
-          changeOrigin: true,
-          ws: true,
-          secure: false,
-          rewrite: (path) => path.replace(/^\/repociv-ws/, ''),
-        },
-        // Hermes dashboard (runs on the Tailscale IP by design, for the
-        // Windows Desktop app). Proxied so the RepoCiv browser can reach it
-        // without leaving Vite's loopback origin. Does NOT touch the
-        // hermes-dashboard service; dev server stays bound to 127.0.0.1.
-        '/dashboard': {
-          // Default neutro: la IP real del tailnet va en .env local
-          // (HERMES_DASHBOARD_URL, gitignored) — nunca hardcodeada en repo.
-          target: env.HERMES_DASHBOARD_URL ?? 'http://127.0.0.1:9119',
-          changeOrigin: true,
-          secure: false,
-          rewrite: (path) => path.replace(/^\/dashboard/, ''),
-        },
-        // Iframe wonders served on this origin (/wonder-proxy/<id>/, ws too) so
-        // they work from other machines while the service stays on loopback.
-        // Opt-in per wonder via REPOCIV_WONDER_PROXIES — see vite-plugins/wonderProxy.ts.
-        ...wonderProxyConfig(env.REPOCIV_WONDER_PROXIES),
-      },
+      proxy,
     },
     test: {
       exclude: ['node_modules/**', 'dist/**', 'e2e/**'],

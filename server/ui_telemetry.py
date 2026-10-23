@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from server import endpoint_usage as _endpoint_usage
+from server.atomic_io import atomic_write_json
 
 KNOWN_PANELS: tuple[str, ...] = (
     "approvals",
@@ -81,10 +82,7 @@ def _persist() -> None:
     if _telemetry_path is None:
         return
     try:
-        _telemetry_path.write_text(
-            json.dumps(_state, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        atomic_write_json(_telemetry_path, _state, ensure_ascii=False, indent=2)
     except Exception:
         pass
 

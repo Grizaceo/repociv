@@ -27,8 +27,8 @@ import { expect, test, type Page } from '@playwright/test';
  *   - All overlay paths (territory, knowledge, etc.) — each is
  *     independent and would multiply test runtime.
  *
- * Pre-req: a dev server on the standard port (5273) and a bridge
- * on 5274. The Playwright config is responsible for that.
+ * Pre-req: a dev server and a bridge on the isolated e2e ports
+ * (5373/5374 by default). The Playwright config is responsible for that.
  */
 
 const SEED_REPOS = [

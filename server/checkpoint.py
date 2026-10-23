@@ -9,8 +9,8 @@ Storage layout:
 Resolution order for the store directory (first hit wins):
   1. Explicit ``init(store_dir)`` call from the bootstrapper.
   2. ``REPOCIV_DATA_DIR`` env var (preferred for tests/CI).
-  3. ``REPOCIV_CONFIG_DIR`` env var (already used by bridge).
-  4. ``~/.repociv/checkpoints`` (production default).
+  3. The shared state root (``server.state_paths.repociv_home``:
+     ``REPOCIV_CONFIG_DIR`` or ``~/.repociv``) + ``/checkpoints``.
 
 Writes are atomic: data is written to a tmp file in the same directory and
 then renamed, so a partial write never corrupts an existing checkpoint.
@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from .identifiers import IdentifierError, validate_identifier
+from .state_paths import repociv_home
 
 __all__ = [
     "IdentifierError",
@@ -45,10 +46,7 @@ def _resolve_default_dir() -> Path:
     data_dir = os.environ.get("REPOCIV_DATA_DIR")
     if data_dir:
         return Path(os.path.expanduser(data_dir)) / "checkpoints"
-    config_dir = os.environ.get("REPOCIV_CONFIG_DIR")
-    if config_dir:
-        return Path(os.path.expanduser(config_dir)) / "checkpoints"
-    return Path(os.path.expanduser("~/.repociv")) / "checkpoints"
+    return repociv_home() / "checkpoints"
 
 
 # Module-level state. Kept as a module attribute so legacy tests using

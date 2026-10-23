@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import threading
 import time
 from pathlib import Path
@@ -21,11 +20,13 @@ from dataclasses import asdict
 
 from .command_schema import Command
 from . import event_store as _es
+from .state_paths import repociv_home
+from .atomic_io import atomic_write_json
 
 logger = logging.getLogger(__name__)
 
 # ─── Queue persistence (Fase 4) ──────────────────────────────────────────────
-_CONFIG_DIR = Path(os.path.expanduser(os.environ.get("REPOCIV_CONFIG_DIR", "~/.repociv")))
+_CONFIG_DIR = repociv_home()
 _CONFIG_DIR.mkdir(exist_ok=True, parents=True)
 _QUEUE_FILE = _CONFIG_DIR / "scheduler-queue.json"
 _queue_file_lock = threading.Lock()
@@ -47,7 +48,7 @@ def _load_queue() -> list[dict[str, Any]]:
 def _dump_queue(queue: list[dict[str, Any]]) -> None:
     """Atomically write queue state to disk."""
     with _queue_file_lock:
-        _QUEUE_FILE.write_text(json.dumps(queue, indent=2, ensure_ascii=False))
+        atomic_write_json(_QUEUE_FILE, queue, durable=True, indent=2, ensure_ascii=False)
 
 
 def _init_from_disk() -> None:

@@ -331,11 +331,11 @@ def install(home: Path, repo: Path, python: str, *, remove=False) -> dict:
     backup = home / ".config/repociv/hooks/backups" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     if updates:
         backup.mkdir(parents=True, mode=0o700)
-        for index, (path, before, after, mode) in enumerate(updates):
-            if before is not None:
-                private_write(backup / f"{index}-{path.parent.name}-{path.name}", before)
-            if after is not None:
-                private_write(path, after, mode=mode)
+        for index, (path, previous, updated, mode) in enumerate(updates):
+            if previous is not None:
+                private_write(backup / f"{index}-{path.parent.name}-{path.name}", previous)
+            if updated is not None:
+                private_write(path, updated, mode=mode)
             else:
                 path.unlink(missing_ok=True)
                 for d in (path.parent, path.parent.parent):

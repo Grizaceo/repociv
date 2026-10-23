@@ -96,6 +96,7 @@ def dispatch_approved(
             risk=consumed.get("risk", "medium"),
             requires_approval=False,
             status="queued",
+            harness_id=consumed.get("harness_id"),
         )
         # 3 — durable marker: the approval was consumed before this point.
         dispatch_ledger.claim_intent(command_id)
@@ -111,6 +112,19 @@ def dispatch_approved(
             command_id,
         )
         raise
+    if cmd.type == "execute_agent":
+        # The operator approved a sandbox-bypassing launch on this city:
+        # later launches of the same harness there stay one-step.
+        from server import launch_trust  # noqa: PLC0415
+
+        bypass = launch_trust.bypass_harness_for(cmd.payload or {}, cmd.harness_id)
+        if bypass:
+            try:
+                launch_trust.remember(
+                    bypass, str((cmd.payload or {}).get("city") or cmd.target or "main"), cmd.id,
+                )
+            except OSError:
+                logger.warning("launch trust not persisted for %s", cmd.id)
     try:
         sse_server.send_to_repociv({
             "type": "log",

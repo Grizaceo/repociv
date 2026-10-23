@@ -6,6 +6,34 @@ versionados en este directorio. Los templates "split" (`repociv-bridge`,
 `repociv-frontend`, `repociv.target`) quedaron **legacy** y `repociv-backup.*`
 es opcional y **no está instalado**. Detalle abajo.
 
+## Recomendado — `repociv-prod.service` (build de producción, checkout dedicado)
+
+`repociv.service` corre el servidor de **desarrollo** de Vite desde el checkout
+donde trabajás: correr `scripts/check.sh` reescribe `dist/`/`coverage/` y recarga
+las pestañas abiertas, y el bridge sigue con el código que importó al arrancar.
+La variante de producción separa ambas cosas:
+
+```bash
+scripts/deploy-local.sh                   # worktree en ~/.local/share/repociv/deploy @ origin/main,
+                                          # npm ci + requirements.lock + vite build
+cp deploy/systemd/repociv-prod.service ~/.config/systemd/user/
+mkdir -p ~/.config/systemd/user/repociv-prod.service.d
+printf '[Service]\nEnvironmentFile=%%h/.hermes/workspace/ACTIVE/repociv/.env\n' \
+  > ~/.config/systemd/user/repociv-prod.service.d/env.conf   # o copiá el .env
+cp deploy/systemd/repociv.service.d/tailscale.conf.example \
+   ~/.config/systemd/user/repociv-prod.service.d/tailscale.conf  # si usás Tailscale Serve
+systemctl --user daemon-reload
+systemctl --user disable --now repociv.service     # mismo puerto: una u otra
+systemctl --user enable --now repociv-prod.service
+```
+
+- `REPOCIV_MODE=production`: `scripts/dev-start.sh` sirve `dist/` con `vite preview`
+  (mismas rutas `/api`, gate de acceso, CSP y proxies; sin HMR ni watcher).
+- Actualizar: `scripts/deploy-local.sh --restart` (o `--ref <tag|commit>`).
+- Volver al modo anterior: `disable --now repociv-prod`, `enable --now repociv`.
+- Ambas plantillas aceptan `SuccessExitStatus=143`: un stop normal ya no queda
+  registrado como `Failed`.
+
 ## Canonical — `repociv.service` (supervisor)
 
 - Archivo: `~/.config/systemd/user/repociv.service` (enabled; `WantedBy=default.target`,

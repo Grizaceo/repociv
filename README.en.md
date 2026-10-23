@@ -384,11 +384,9 @@ npm test -- --run
 python3 -m pytest server/ -q
 ```
 
-> ⚠️ If the bridge is running (systemd or terminal), DuckDB locks the ledger.
-> To test the backend with the bridge active:
-> ```bash
-> REPOCIV_DATA_DIR=/tmp/repociv-test pytest server/
-> ```
+> The backend suite is hermetic: `conftest.py` points `HOME`,
+> `REPOCIV_CONFIG_DIR` and `XDG_*` at a temporary directory and ignores `.env`,
+> so it can run next to a live bridge without touching `~/.repociv` or its ledger lock.
 
 ---
 

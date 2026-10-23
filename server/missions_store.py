@@ -4,6 +4,10 @@ import json
 import threading
 from pathlib import Path
 from typing import Any
+try:
+    from .atomic_io import atomic_write_json
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from atomic_io import atomic_write_json  # type: ignore[no-redef]
 
 _MISSIONS_FILE: Path | None = None
 _missions_lock = threading.Lock()
@@ -42,4 +46,4 @@ def save_mission(mission: dict[str, Any]) -> None:
         else:
             missions.append(mission)
         missions = missions[-200:]
-        missions_file.write_text(json.dumps(missions, indent=2, ensure_ascii=False))
+        atomic_write_json(missions_file, missions, durable=True, indent=2, ensure_ascii=False)

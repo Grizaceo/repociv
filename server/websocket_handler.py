@@ -207,6 +207,11 @@ async def _auth_ws(ws: websockets.asyncio.server.ServerConnection) -> bool:
             return False
         await ws.send(json.dumps({"type": "auth_ok"}))
         return True
+    # The UI server's /repociv-ws proxy attaches the token as a handshake
+    # header so it never has to ship in the browser bundle.
+    if headers is not None and _token_matches(headers.get("X-RepoCiv-Token")):
+        await ws.send(json.dumps({"type": "auth_ok"}))
+        return True
     try:
         msg = await asyncio.wait_for(ws.recv(), timeout=5.0)
         if isinstance(msg, bytes):

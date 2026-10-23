@@ -59,9 +59,9 @@ def record_process_binding(pid: int, command_id: str, unit_id: str) -> None:
         from server import event_store
         try:
             event_store.record_event("ProcessBound", {
-            "commandId": command_id, "agentId": unit_id,
-            "pid": pid, "processIdentity": identity,
-            })
+                "commandId": command_id, "agentId": unit_id,
+                "pid": pid, "processIdentity": identity,
+            }, command_id=command_id)
         except OSError:
             # Optional correlation must never abort an agent execution.
             import logging

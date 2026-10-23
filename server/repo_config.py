@@ -20,6 +20,10 @@ import re
 import subprocess
 from pathlib import Path
 from typing import Any
+try:
+    from .state_paths import repociv_home
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from state_paths import repociv_home  # type: ignore[no-redef]
 
 try:
     import yaml as _yaml  # PyYAML optional; fallback to no-op if not installed
@@ -46,7 +50,7 @@ KNOWN_HOOK_NAMES: frozenset[str] = frozenset({"pre_step", "post_step", "on_circu
 _REPO_NAME_RE = re.compile(r'^[a-zA-Z0-9_-]{1,128}$')
 
 # Config base directory (can be overridden in tests)
-_CONFIG_BASE: Path = Path.home() / ".repociv" / "configs"
+_CONFIG_BASE: Path = repociv_home() / "configs"
 
 
 def _validate_repo_name(repo: str) -> None:

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from server import event_store as _es
 from server import research_ledger as _rl
+from server.state_paths import state_path
 
 
 def rebuild(state_dir: Path | None = None) -> int:
@@ -46,7 +47,6 @@ def rebuild(state_dir: Path | None = None) -> int:
 
 
 if __name__ == "__main__":
-    import os
-    state = Path(os.environ.get("REPOCIV_STATE_DIR", str(Path.home() / ".repociv")))
+    state = state_path(override_env="REPOCIV_STATE_DIR")
     _es.init(state)
     rebuild(state)

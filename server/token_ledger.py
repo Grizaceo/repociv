@@ -20,6 +20,14 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+try:
+    from .atomic_io import atomic_write_json
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from atomic_io import atomic_write_json  # type: ignore[no-redef]
+try:
+    from .state_paths import repociv_home
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from state_paths import repociv_home  # type: ignore[no-redef]
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +45,23 @@ _DEFAULT_COSTS: dict[str, dict[str, float]] = {
     "gpt-4o-mini":   {"prompt": 0.00015, "completion": 0.0006},
 }
 
-_DEFAULT_STATE_DIR = Path.home() / ".repociv"
+_DEFAULT_STATE_DIR = repociv_home()
+
+# Fatigue samples kept per agent: enough for any reasonable window, bounded so
+# the ledger file cannot grow without limit.
+_RECENT_HORIZON_S = 6 * 3600.0
+_RECENT_MAX_SAMPLES = 500
+
+
+def _clean_recent(raw: Any, now: float) -> list[list[float]]:
+    out: list[list[float]] = []
+    if isinstance(raw, list):
+        for item in raw:
+            if (isinstance(item, list) and len(item) == 2
+                    and all(isinstance(v, (int, float)) for v in item)
+                    and now - item[0] < _RECENT_HORIZON_S and item[1] >= 0):
+                out.append([float(item[0]), float(item[1])])
+    return out[-_RECENT_MAX_SAMPLES:]
 
 
 class TokenLedger:
@@ -70,8 +94,10 @@ class TokenLedger:
         self._completion_tokens: int = 0
         self._cost_estimate: float = 0.0
 
-        # Per-agent usage (agent id → {prompt, completion, lastAt}) — feeds the
-        # XCOM fatigue provider: tokens consumed = work done, idle time = rest.
+        # Per-agent usage (agent id → {prompt, completion, lastAt, recent}) —
+        # feeds the XCOM fatigue provider: tokens consumed = work done, idle
+        # time = rest. ``recent`` holds [timestamp, tokens] samples so fatigue
+        # measures the window, not the agent's lifetime total.
         self._agent_tokens: dict[str, dict[str, Any]] = {}
 
         self._state_dir.mkdir(parents=True, exist_ok=True)
@@ -92,11 +118,13 @@ class TokenLedger:
         self._cost_estimate = float(data.get("total_cost_estimate", 0.0))
         raw_agents = data.get("per_agent", {})
         if isinstance(raw_agents, dict):
+            now = time.time()
             self._agent_tokens = {
                 str(agent): {
                     "prompt": int(entry.get("prompt", 0)),
                     "completion": int(entry.get("completion", 0)),
                     "lastAt": float(entry.get("lastAt", 0.0)),
+                    "recent": _clean_recent(entry.get("recent"), now),
                 }
                 for agent, entry in raw_agents.items()
                 if isinstance(entry, dict)
@@ -105,15 +133,12 @@ class TokenLedger:
     def _save(self) -> None:
         """Must be called with self._lock held."""
         try:
-            self._log_file.write_text(
-                json.dumps({
-                    "total_prompt_tokens": self._prompt_tokens,
-                    "total_completion_tokens": self._completion_tokens,
-                    "total_cost_estimate": round(self._cost_estimate, 8),
-                    "per_agent": self._agent_tokens,
-                }, indent=2),
-                encoding="utf-8",
-            )
+            atomic_write_json(self._log_file, {
+                "total_prompt_tokens": self._prompt_tokens,
+                "total_completion_tokens": self._completion_tokens,
+                "total_cost_estimate": round(self._cost_estimate, 8),
+                "per_agent": self._agent_tokens,
+            }, indent=2)
         except Exception:
             logger.warning("TokenLedger: failed to persist to %s", self._log_file)
 
@@ -158,10 +183,16 @@ class TokenLedger:
             self._completion_tokens += completion_tokens
             self._cost_estimate += cost
             if agent:
-                entry = self._agent_tokens.setdefault(agent, {"prompt": 0, "completion": 0, "lastAt": 0.0})
+                now = time.time()
+                entry = self._agent_tokens.setdefault(
+                    agent, {"prompt": 0, "completion": 0, "lastAt": 0.0, "recent": []},
+                )
                 entry["prompt"] += prompt_tokens
                 entry["completion"] += completion_tokens
-                entry["lastAt"] = time.time()
+                entry["lastAt"] = now
+                entry["recent"] = _clean_recent(
+                    [*entry.get("recent", []), [now, prompt_tokens + completion_tokens]], now,
+                )
             self._save()
 
         logger.debug(
@@ -189,22 +220,24 @@ class TokenLedger:
         """XCOM-style fatigue (0–100) from token consumption.
 
         Fatigue = tokens consumed by *agent* in the last ``window_s``, mapped
-        linearly onto 0–100 against ``max_tokens``. Tokens older than the
-        window decay away (rest), so an agent that stops working recovers.
+        linearly onto 0–100 against ``max_tokens``. Each sample decays
+        linearly with its age, so an agent that stops working recovers.
         Returns 100 (fresh) for unknown agents.
+
+        Before 2026-10-18 this multiplied the agent's *lifetime* total by the
+        recency of its last call: past ~200k lifetime tokens, any call left
+        the agent fully exhausted for an hour regardless of actual load.
         """
-        usage = self.get_agent_usage(agent)
-        if usage["lastAt"] <= 0:
+        if max_tokens <= 0 or window_s <= 0:
             return 100
-        age_s = time.time() - usage["lastAt"]
-        if age_s >= window_s:
-            return 100
-        # Linear decay: tokens consumed at the start of the window count less.
-        # lastAt is the most recent call, so weight by recency of the last call.
-        recency = 1.0 - (age_s / window_s)
-        consumed = usage["total"] * recency
-        if max_tokens <= 0:
-            return 100
+        now = time.time()
+        with self._lock:
+            samples = list((self._agent_tokens.get(agent) or {}).get("recent", []))
+        consumed = sum(
+            tokens * (1.0 - (now - ts) / window_s)
+            for ts, tokens in samples
+            if 0 <= now - ts < window_s
+        )
         fatigue = max(0, min(100, int(100 - (consumed / max_tokens) * 100)))
         return fatigue
 

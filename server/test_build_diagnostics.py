@@ -159,14 +159,26 @@ def test_store_status_unknown_when_unconfigured(health_env, monkeypatch, tmp_pat
 
 # ── 3. Audit key mode: persistent vs ephemeral, no secret material ───────────
 
-def test_audit_key_mode_ephemeral_without_env(health_env, monkeypatch):
-    """Without an operator key the mode is honestly 'ephemeral'."""
+def test_audit_key_mode_persistent_from_state_root_key(health_env, monkeypatch, tmp_path):
+    """Without an operator key, the 0600 state-root key keeps it 'persistent' (H3)."""
     monkeypatch.delenv("REPOCIV_HMAC_KEY", raising=False)
+    monkeypatch.setenv("REPOCIV_CONFIG_DIR", str(tmp_path / "state"))
     reloaded = importlib.reload(security_harness)
+    assert reloaded.audit_key_mode() == "persistent"
+    assert _health()["buildDiagnostic"]["auditKeyMode"] == "persistent"
+    assert (tmp_path / "state" / "security_logs" / "audit-hmac.key").exists()
+
+
+def test_audit_key_mode_ephemeral_when_state_root_unwritable(health_env, monkeypatch, tmp_path):
+    """No operator key and no usable state root: the mode is honestly 'ephemeral'."""
+    blocker = tmp_path / "file-not-dir"
+    blocker.write_text("x", encoding="utf-8")
+    monkeypatch.delenv("REPOCIV_HMAC_KEY", raising=False)
+    monkeypatch.setenv("REPOCIV_CONFIG_DIR", str(blocker))
+    with pytest.warns(UserWarning, match="ephemeral"):
+        reloaded = importlib.reload(security_harness)
     assert reloaded.audit_key_mode() == "ephemeral"
-    diag = _health()["buildDiagnostic"]
-    assert diag["auditKeyMode"] == "ephemeral"
-    monkeypatch.setattr(security_harness, "_AUDIT_KEY_MODE", reloaded.audit_key_mode())
+    assert _health()["buildDiagnostic"]["auditKeyMode"] == "ephemeral"
 
 
 def test_audit_key_mode_persistent_with_env(health_env, monkeypatch):

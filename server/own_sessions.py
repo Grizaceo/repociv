@@ -25,6 +25,7 @@ import os
 from typing import Any
 
 from . import session_liveness as _liveness
+from .state_paths import repociv_home
 
 _STORE_DIR: str | None = None
 
@@ -45,10 +46,7 @@ def init(store_dir: str | os.PathLike[str]) -> None:
 def store_dir() -> str:
     if _STORE_DIR:
         return _STORE_DIR
-    return os.path.join(
-        os.environ.get("REPOCIV_CONFIG_DIR", os.path.expanduser("~/.repociv")),
-        "sessions",
-    )
+    return str(repociv_home() / "sessions")
 
 
 def _canonical_paths() -> list[str]:

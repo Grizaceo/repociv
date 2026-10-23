@@ -40,8 +40,8 @@ if [[ -z "${REPOCIV_TOKEN:-}" ]]; then
     fi
     export REPOCIV_TOKEN
 fi
-export VITE_BRIDGE_TOKEN="${VITE_BRIDGE_TOKEN:-$REPOCIV_TOKEN}"
-export VITE_REPOCIV_TOKEN="${VITE_REPOCIV_TOKEN:-$REPOCIV_TOKEN}"
+# The UI reaches the bridge through the Vite proxy, which attaches the token
+# server-side (vite.config.ts) — it is not exported to the browser bundle.
 
 # ─── Pretty banner (matches the Python bridge's own banner) ─────────────────
 cat <<'BANNER'

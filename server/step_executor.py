@@ -25,11 +25,61 @@ from . import model_router as _mr
 from . import workspace_issue as _wi
 from . import step_retry as _sr
 from . import security_harness as _sec
+from . import process_control as _pc
 from .tensor_context import ContextDirective, TensorContext, DEONTIC_MUST, DEONTIC_SHOULD
 
 logger = logging.getLogger(__name__)
 
 STEP_TIMEOUT = 300  # default per-step timeout in seconds
+
+
+class StepTimeoutError(TimeoutError):
+    """A step exceeded its deadline; ``stop_report`` says what the stop proved.
+
+    Retryable only when the owned agent session is confirmed gone *and* the
+    runner thread finished within the cleanup budget — otherwise the earlier
+    attempt may still be running and a retry would overlap it (R03).
+    """
+
+    def __init__(self, message: str, stop_report: _pc.StopReport, *, retryable: bool) -> None:
+        super().__init__(message)
+        self.stop_report = stop_report
+        self.retryable = retryable
+
+
+def _stop_timed_out_step(
+    run_id: str, agent: str, step: str, timeout: float,
+    future: concurrent.futures.Future[Any],
+) -> StepTimeoutError:
+    """Stop the owned agent session of a timed-out step and report truthfully.
+
+    Bounded: the stop has its own TERM/KILL budget and the runner thread gets
+    at most ``CLEANUP_BUDGET_SECONDS`` to observe the exit — never a wait for
+    normal completion. Requested vs. confirmed stop are recorded separately.
+    """
+    report = _pc.stop_owned_processes(run_id)
+    try:
+        future.result(timeout=_pc.CLEANUP_BUDGET_SECONDS)
+    except Exception:  # still running, or the killed run raised — both expected
+        pass
+    runner_done = future.done()
+    retryable = report.confirmed and runner_done
+    from server import event_store as _es
+    try:
+        _es.record_event("StepTimedOut", {
+            **report.as_dict(), "runId": run_id, "agentId": agent,
+            "timeoutSeconds": timeout, "runnerFinished": runner_done,
+            "retryable": retryable,
+        })
+    except OSError:
+        logger.warning("Step timeout record unavailable for %s", run_id)
+    outcome = "stopped" if report.confirmed else f"stop unconfirmed ({report.reason})"
+    return StepTimeoutError(
+        f"Step '{step[:80]}...' timed out after {timeout}s; agent {outcome}",
+        report, retryable=retryable,
+    )
+
+
 STALL_TIMEOUT_MS = 300_000  # 5 min — no events in this window → stall (Symphony §8.5A)
 STALL_WARN_SECONDS = 120  # log warning when step exceeds this duration
 
@@ -258,7 +308,7 @@ def dispatch_plan_step(
 
     # Build mission with issue context + prior step artifacts for context seeding
     try:
-        spec = _wi.read_spec(repo, issue_id)
+        spec = _wi.read_spec(repo, issue_id) or step_description
     except Exception:
         spec = step_description  # fallback: use step itself as context
 
@@ -318,7 +368,10 @@ def dispatch_plan_step(
             })
         except OSError:
             logger.warning("Task/run binding unavailable")
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _executor:
+        # Not a ``with`` block: its exit calls shutdown(wait=True), which made
+        # the deadline wait for the agent to finish on its own (R03).
+        _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        try:
             _future = _executor.submit(
                 _agent_runner.run_agent,
                 agent,    # unit_id
@@ -330,9 +383,9 @@ def dispatch_plan_step(
             try:
                 _future.result(timeout=timeout)
             except concurrent.futures.TimeoutError:
-                raise TimeoutError(
-                    f"Step '{_step[:80]}...' timed out after {timeout}s"
-                )
+                raise _stop_timed_out_step(_rid, agent, _step, timeout, _future) from None
+        finally:
+            _executor.shutdown(wait=False, cancel_futures=True)
         return _rid
 
     if _should_retry:

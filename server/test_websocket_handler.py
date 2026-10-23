@@ -237,3 +237,21 @@ def test_ws_rate_limit(ws_server):
         data = json.loads(msg)
         assert data["type"] == "error"
         assert "rate limited" in data.get("msg", "")
+
+
+def test_ws_accepts_proxy_attached_token_header(ws_server, monkeypatch):
+    """The UI-server proxy attaches X-RepoCiv-Token on the handshake so the
+    token never ships in the browser bundle; a wrong header still fails."""
+    monkeypatch.setattr(wsh, "REPOCIV_TOKEN", "test-token-32-characters-minimum")
+    port = ws_server
+    with websockets.sync.client.connect(
+        f"ws://127.0.0.1:{port}", origin=_DEV_ORIGIN,
+        additional_headers={"X-RepoCiv-Token": "test-token-32-characters-minimum"},
+    ) as ws:
+        assert json.loads(ws.recv(timeout=5)) == {"type": "auth_ok"}
+    with websockets.sync.client.connect(
+        f"ws://127.0.0.1:{port}", origin=_DEV_ORIGIN,
+        additional_headers={"X-RepoCiv-Token": "wrong"}, close_timeout=10,
+    ) as ws:
+        ws.send(json.dumps({"type": "auth", "token": "also-wrong"}))
+        assert json.loads(ws.recv(timeout=10))["type"] == "auth_error"

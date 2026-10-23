@@ -10,11 +10,14 @@ import json
 import os
 import re
 import threading
-from pathlib import Path
+try:
+    from .state_paths import repociv_home
+except ImportError:  # imported as a top-level module (server/ on sys.path)
+    from state_paths import repociv_home  # type: ignore[no-redef]
 
 # ─── Constants ─────────────────────────────────────────────────────────────────
 
-_INDEX_DIR = Path.home() / ".repociv" / "graph_index"
+_INDEX_DIR = repociv_home() / "graph_index"
 _REPO_SIGNALS_DIR = _INDEX_DIR / "repo_signals"
 _RELATION_CACHE_DIR = _INDEX_DIR / "relation_cache"
 _META_FILE = _INDEX_DIR / "index_meta.json"
