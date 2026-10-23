@@ -27,4 +27,15 @@ Cristóbal approved the concept and one 5-credit Meshy T2.5 geometry-only task. 
 
 Isometric and rear screenshots retain a substantial connected lens housing, tower and rear curved roof. Visible window panels remain framed rectangular recesses, without the Workshop's conspicuous ragged openings. Lens rim has minor unevenness and dark recesses remain around the terrace/tower junction; review these interactively. Do not certify watertightness or perfect topology from screenshots. This is local asset QA, not map integration.
 
-Geometry approval pending. No texturing, paid retries, map integration or Workshop repair performed. Distribution remains blocked until license review. No binary publication or production integration.
+## Geometry approved; PBR candidate generated
+
+Cristóbal approved the geometry and 10-credit texturing. An initial mistaken `/v2/text-to-3d` refine POST returned HTTP 400 without a task ID; subsequent balance read remained 1057. Its local submission marker was preserved. Corrected to documented `/v1/retexture`, using the approved Image-to-3D task as `input_task_id`, explicit `meshy-7`, 2K PBR, prompt 683 characters, GLB only. Source had POSITION only, no UVs: `enable_original_uv: false`. Separate exclusive retexture marker prevents duplicate paid submission.
+
+- Texture task read back: `01a1670c-4e1a-7760-986f-ec898f301de0`, SUCCEEDED, consumed_credits 10
+- Balance 1057 → 1047, delta 10 reconciled
+- Local ignored `textured/preview.glb`: 7130964 bytes, 3866 triangles, 1 mesh/material
+- SHA-256 `c94d0a42e69b2a7e0ab68df64b0dd6e7da026fe126f0cf06748a29c130a19317`
+- Source was 3868 triangles, output 3866; output bounding height is 2m versus source approximately 0.953m. Do NOT claim byte-identical geometry, unchanged scale or exact preservation. Neither source nor returned mesh was locally repaired.
+- Viewer `/scripts/meshy/observatory-textured-preview.html` preserves returned PBR materials; real browser verifies all four texture slots, normals, counts, five views, no page errors, and missing-GLB failure message. Evidence `$TMPDIR/repociv-meshy/observatory-textured/`.
+
+Actual screenshots show warm pale masonry, dark slate eaves, reddish copper instrument framing and turquoise lens/windows. Turquoise also spills onto the curved upper roof, contrary to the prompt. Rear wall has dotted seam/diagonal texture artifacts; window bars and fine masonry details are not uniformly crisp. Candidate needs artistic review, not an automatic retry. No optimization or map integration has occurred. Workshop repair remains deferred. Distribution blocked pending license review; no publication/push/merge.

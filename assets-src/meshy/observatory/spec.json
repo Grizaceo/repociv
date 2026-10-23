@@ -1,6 +1,6 @@
 {
   "asset_id": "observatory-v001",
-  "status": "concept artist-approved; untextured geometry SUCCEEDED; awaiting geometry approval; no texturing",
+  "status": "geometry artist-approved; PBR retexture SUCCEEDED; awaiting material review; no production integration",
   "license_status": "unverified; local candidates only; distribution blocked",
   "reference_asset": "memory-archive-v001",
   "concept": {
@@ -31,6 +31,21 @@
       "alpha_thumbnail": true,
       "multi_view_thumbnails": true,
       "auto_size": false
+    }
+  },
+  "texturing_after_geometry_approval": {
+    "tool": "meshy_retexture",
+    "advertised_credits": 10,
+    "max_create_requests": 1,
+    "request": {
+      "ai_model": "meshy-7",
+      "enable_original_uv": false,
+      "input_task_id": "01a165f2-17f0-76cc-83ab-4fc6d267e41e",
+      "text_style_prompt": "Original knowledge-city observatory. Warm pale limestone tower and stepped podium with subtle stone variation, aged copper trim with restrained verdigris, dark slate ceramic roof sections, and turquoise glass filling the large fixed lens housing and the shallow rectangular window panels. Clear large material regions readable from an elevated strategy-game camera. Hand-crafted stylized low-poly finish, clean edges, restrained weathering. Preserve the existing geometry exactly. No text, no logos, no symbols, no excessive grime, no baked dramatic lighting. Copper metallic, limestone matte, ceramic moderately rough. Turquoise glass small and crisp, never covering roofs or walls.",
+      "enable_pbr": true,
+      "texture_resolution": "2k",
+      "target_formats": ["glb"],
+      "alpha_thumbnail": true
     }
   },
   "guards": {
