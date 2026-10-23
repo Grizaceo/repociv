@@ -19,7 +19,7 @@
 #              repociv:latest
 # Or:      docker compose up
 
-FROM python:3.12-slim-bookworm
+FROM python:3.11-slim-bookworm
 
 # Node 20 from Nodesource (Debian 12 ships Node 18 which is too old for Vite 6).
 RUN apt-get update \
@@ -27,7 +27,7 @@ RUN apt-get update \
     && mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
        | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" \
        > /etc/apt/sources.list.d/nodesource.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends nodejs git \
@@ -38,8 +38,8 @@ RUN apt-get update \
 WORKDIR /app
 
 # ─── Python deps first (better layer cache) ──────────────────────────────────
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements.lock ./
+RUN pip install --no-cache-dir -r requirements.lock
 
 # ─── Node deps (separate layer) ──────────────────────────────────────────────
 COPY package.json package-lock.json ./

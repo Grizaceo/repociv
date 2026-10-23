@@ -36,6 +36,9 @@ ExecStart=/usr/bin/bash %h/.hermes/workspace/ACTIVE/repociv/scripts/dev-start.sh
 # garantiza en el stop del servicio.
 KillMode=control-group
 TimeoutStopSec=30
+# dev-start.sh sale con 0 ante SIGTERM; 143 (128+SIGTERM) se acepta igual por si
+# un hijo propaga la señal, para que un stop normal no quede como "Failed".
+SuccessExitStatus=143
 
 # Reinicio con backoff. StartLimitIntervalSec/Burst dan margen al arranque del
 # bridge (puede tardar varios segundos en leer el workspace) antes de que

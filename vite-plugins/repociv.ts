@@ -885,5 +885,11 @@ export function repocivPlugin(mapRoot: string): Plugin {
       console.log(`[repociv] Active map root: ${getCurrentMapRoot()}`);
       console.log('[repociv] Workspace se escaneara bajo demanda (/api/repos)');
     },
+    // Production mode (`vite preview` over the built dist/): same /api routes,
+    // no HMR channel — bridge events reach the UI over the bridge WS/SSE.
+    configurePreviewServer(s) {
+      s.middlewares.use(handler);
+      console.log(`[repociv] (preview) Active map root: ${getCurrentMapRoot()}`);
+    },
   };
 }

@@ -170,6 +170,21 @@ def decide(cmd: Command) -> tuple[PolicyDecision, str]:
     else:
         decision = _RISK_DEFAULT.get(cmd.risk, "approve")
 
+    # Step 6b: first launch of a sandbox-bypassing harness on a city needs an
+    # explicit approval; the approved (harness, city) pair is then remembered
+    # (server/launch_trust.py). Opt out: REPOCIV_TRUST_BYPASS_HARNESSES=1.
+    if cmd.type == "execute_agent" and decision == "auto-safe":
+        from . import launch_trust as _lt
+
+        bypass = _lt.bypass_harness_for(cmd.payload or {}, cmd.harness_id)
+        city = str((cmd.payload or {}).get("city") or cmd.target or "main")
+        if bypass and not _lt.is_trusted(bypass, city):
+            return "approve", (
+                f"First launch of '{bypass}' on '{city}': it runs with its own permission "
+                "prompts disabled, so this one needs approval (later launches on this "
+                "city stay one-step)."
+            )
+
     # Step 7: risk floor — high/destructive ALWAYS requires approval,
     # regardless of type policy. Audit 1.3 invariant.
     if cmd.risk in ("high", "destructive") and decision == "auto-safe":

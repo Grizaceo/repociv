@@ -7,6 +7,16 @@
 # install/CI drift onto it. The HTTP/SSE-transport CVEs in mcp's deps (starlette,
 # python-multipart, pydantic-settings) are unreachable here: we run stdio only.
 mcp>=1.28.1,<2
+# Security floors for mcp's transitive deps (pip-audit 2026-10-18: 34 known
+# vulns in pyjwt, cryptography, starlette, python-multipart, pydantic-settings,
+# anyio). The HTTP/SSE paths are unreachable with the stdio transport, but a
+# fresh install must not resolve vulnerable versions either.
+pyjwt>=2.15.0
+cryptography>=50.0.1
+starlette>=1.3.1
+python-multipart>=0.0.31
+pydantic-settings>=2.14.2
+anyio>=4.15.0
 
 # Test runner
 pytest>=9.0

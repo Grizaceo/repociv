@@ -1,0 +1,35 @@
+# Dependency update PRs (GitHub-native, nothing to install).
+# cooldown: a release must be at least 7 days old before it is proposed —
+# most supply-chain attacks are caught and yanked within the first days.
+# Security updates still arrive through Dependabot alerts.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    groups:
+      dev-tooling:
+        dependency-type: development
+      runtime:
+        dependency-type: production
+
+  # requirements.txt holds the floors; regenerate requirements.lock with the
+  # command in its header (uv pip compile … --exclude-newer <today-7d>).
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
