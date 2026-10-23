@@ -1,8 +1,19 @@
 {
   "asset_id": "execution-workshop-v001",
-  "status": "concept approved; geometry windows rejected; local wall/window/roof repair agreed but explicitly DEFERRED; no texturing",
+  "status": "concept approved; repair-v003 local geometry candidate built and audited (pending human review before texturing); original geometry preserved",
   "license_status": "unverified; local candidates only",
   "reference_asset": "memory-archive-v001",
+  "local_repair_candidate": {
+    "file": "repair-v003/preview.glb",
+    "sha256": "998993daec5408371d0564ad59c74015efdbdbdc9fd288da6b354fcb2ec72b86",
+    "source_sha256": "6ca232dbf5bccc6318532e3a8d52de56873e69e2966011ffa83b4f6bb6759426",
+    "source_triangles": 3735,
+    "triangles": 3624,
+    "mullion_and_wafer_triangles_removed": 364,
+    "boundary_triangles_added": 13,
+    "hexahedra_triangles_added": 240,
+    "crease_angle_degrees": 42
+  },
   "concept": {
     "tool": "meshy_image_to_image",
     "proposed_model": "nano-banana-pro",

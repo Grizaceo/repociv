@@ -54,10 +54,7 @@
     </div>
     <details>
       <summary>Concepto aprobado</summary>
-      <img
-        src="/assets-src/meshy/coordination-court/preview.png"
-        alt="Concepto de referencia"
-      />
+      <img src="/assets-src/meshy/coordination-court/preview.png" alt="Concepto de referencia" />
     </details>
     <p><a href="/scripts/meshy/family-review.html">Comparar familia visual</a></p>
     <small
@@ -69,16 +66,32 @@
     import * as T from 'three';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    const names = {'coordination-court':'Patio de coordinación','connection-gateway':'Portal de conexión','artifact-vault':'Bóveda de artefactos','research-laboratory':'Laboratorio','civic-plaza':'Plaza común'};
+    const names = {
+      'coordination-court': 'Patio de coordinación',
+      'connection-gateway': 'Portal de conexión',
+      'artifact-vault': 'Bóveda de artefactos',
+      'research-laboratory': 'Laboratorio',
+      'civic-plaza': 'Plaza común',
+      'execution-workshop': 'Taller de ejecución',
+    };
     const selected = new URLSearchParams(location.search).get('asset') || 'coordination-court';
     if (!(selected in names)) throw new Error('Asset fuera de ámbito');
-    const repairable = ['coordination-court', 'artifact-vault', 'research-laboratory'].includes(selected);
+    const repairable = [
+      'coordination-court',
+      'artifact-vault',
+      'research-laboratory',
+      'execution-workshop',
+    ].includes(selected);
     const repaired = repairable && new URLSearchParams(location.search).get('variant') === 'repair';
     const folder = repaired ? 'repair-v003' : 'geometry';
     document.querySelector('strong').textContent = 'RepoCiv · ' + names[selected];
     const selector = document.createElement('select');
-    for (const [value, label] of Object.entries(names)) { const o = new Option(label, value); o.selected = value === selected; selector.add(o); }
-    selector.onchange = () => location.search = '?asset=' + selector.value;
+    for (const [value, label] of Object.entries(names)) {
+      const o = new Option(label, value);
+      o.selected = value === selected;
+      selector.add(o);
+    }
+    selector.onchange = () => (location.search = '?asset=' + selector.value);
     document.querySelector('aside').prepend(selector);
     if (repairable) {
       const compare = document.createElement('p');
@@ -87,10 +100,18 @@
       link.textContent = repaired ? 'Ver original sin modificar' : 'Ver candidato reparado';
       compare.append(link);
       document.querySelector('aside').append(compare);
-      document.querySelector('strong').textContent += repaired ? ' · reparación candidata' : ' · original';
+      document.querySelector('strong').textContent += repaired
+        ? ' · reparación candidata'
+        : ' · original';
     }
-    document.querySelector('details img').src = '/assets-src/meshy/' + selected + (selected === 'civic-plaza' ? '/image-correction/preview.png' : '/preview.png');
-    document.querySelector('summary').textContent = selected === 'civic-plaza' ? 'Imagen corregida (original aprobado conservado)' : 'Concepto aprobado';
+    document.querySelector('details img').src =
+      '/assets-src/meshy/' +
+      selected +
+      (selected === 'civic-plaza' ? '/image-correction/preview.png' : '/preview.png');
+    document.querySelector('summary').textContent =
+      selected === 'civic-plaza'
+        ? 'Imagen corregida (original aprobado conservado)'
+        : 'Concepto aprobado';
     const scene = new T.Scene();
     scene.background = new T.Color('#202c36');
     scene.add(new T.AmbientLight(0xdacfb6, 0.38), new T.HemisphereLight(0xb0d8f0, 0x7aaa60, 0.34));
@@ -160,7 +181,7 @@
         if (![size.x, size.y, size.z].every(Number.isFinite) || Math.max(size.x, size.z) <= 0)
           throw new Error('Invalid bounds');
         const scale = 1 / Math.max(size.x, size.y, size.z);
-        controls.target.set(0, size.y * scale / 2, 0);
+        controls.target.set(0, (size.y * scale) / 2, 0);
         model.scale.setScalar(scale);
         model.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale);
         const clay = new T.MeshStandardMaterial({ color: 0xc8bfae, roughness: 0.85, metalness: 0 });

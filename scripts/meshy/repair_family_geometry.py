@@ -6,7 +6,7 @@ Originals and approved/deferred assets are read-only. No paid API, remeshing,
 global hull, or double-sided material workaround.
 """
 import argparse
-from collections import defaultdict
+from collections import defaultdict, deque
 import hashlib
 import json
 from pathlib import Path
@@ -15,7 +15,41 @@ import numpy as np
 from optimize_glb import parse_glb, build_glb
 
 ROOT = Path(__file__).resolve().parents[2]
-ASSETS = ('coordination-court', 'artifact-vault', 'research-laboratory')
+ASSETS = ('coordination-court', 'artifact-vault', 'research-laboratory', 'execution-workshop')
+WORKSHOP_SHA256 = '6ca232dbf5bccc6318532e3a8d52de56873e69e2966011ffa83b4f6bb6759426'
+WORKSHOP_DROP_COMPONENTS = frozenset({
+    7, 12, 16, 22, 24, 26, 58, 59, 66, 76, 78, 96, 100,
+    115, 121, 127, 128, 148, 154, 155,
+    75, 153, 162,
+})
+WORKSHOP_HEXAHEDRA = (
+    # Front Left wall bands + recessed window panel
+    ([1917, 204, 1083, 1475], [1365, 872, 420, 1631]),
+    ([872, 496, 2032, 420], [1435, 1577, 1377, 1782]),
+    ([888, 1486, 1534, 365], [496, 73, 4, 2032]),
+    # Front Right wall bands + recessed window panel
+    ([411, 1164, 190, 1860], [696, 1633, 724, 302]),
+    ([1633, 1524, 1675, 724], [344, 929, 49, 1152]),
+    ([2003, 1156, 1014, 67], [1524, 982, 337, 1675]),
+    # Back Left & Back Right wall bands + recessed window backing
+    ([393, 620, 2192, 1213], [1526, 769, 1758, 837]),
+    ([1942, 783, 1598, 966], [1335, 467, 1128, 1625]),
+    # Left Side wall bands + 2 recessed window panels
+    ([659, 1443, 1097, 108], [1814, 964, 1137, 1240]),
+    ([964, 604, 1309, 1137], [1059, 1882, 34, 366]),
+    ([296, 1993, 800, 515], [604, 1012, 287, 1309]),
+    ([1012, 1209, 1332, 287], [1170, 304, 1553, 1770]),
+    ([188, 1193, 62, 563], [1209, 342, 485, 1332]),
+    # Right Side wall bands + 2 recessed window panels
+    ([1579, 574, 962, 1328], [590, 1085, 1953, 2194]),
+    ([1085, 1796, 924, 1953], [1594, 1300, 668, 1250]),
+    ([550, 1752, 1859, 1574], [1872, 178, 1362, 924]),
+    ([178, 329, 695, 1362], [1496, 661, 201, 641]),
+    ([843, 1848, 1391, 1484], [329, 399, 97, 695]),
+    # Central rear roof extension & rear central upper wall closure
+    ([1933, 1705, 1454, 1807], [1210, 1650, 906, 117]),
+    ([783, 393, 1030, 873], [1128, 837, 1673, 1366]),
+)
 
 
 def read_mesh(blob):
@@ -205,6 +239,60 @@ def repair_vault_support(vertices, faces):
                            np.array([[136, 600, 860], [860, 600, 2098]])])
 
 
+def repair_workshop_geometry(vertices, faces):
+    """Reconstruct missing wall bands, replace window mullions with framed
+    recessed panels, and close the central rear roof/wall using only existing
+    source vertex coordinates.
+    """
+    if len(vertices) != 2200 or len(faces) != 3735:
+        raise ValueError('Workshop source topology differs from reviewed source')
+    adj = defaultdict(set)
+    for a, b, c in faces:
+        adj[int(a)].update((int(b), int(c)))
+        adj[int(b)].update((int(a), int(c)))
+        adj[int(c)].update((int(a), int(b)))
+    visited = {}
+    comp_count = 0
+    for start in range(len(vertices)):
+        if start in visited or start not in adj:
+            continue
+        queue = deque([start])
+        visited[start] = comp_count
+        while queue:
+            cur = queue.popleft()
+            for nxt in adj[cur]:
+                if nxt not in visited:
+                    visited[nxt] = comp_count
+                    queue.append(nxt)
+        comp_count += 1
+    if comp_count != 163:
+        raise ValueError('Workshop component structure differs from reviewed source')
+    keep_mask = np.array([visited[int(tri[0])] not in WORKSHOP_DROP_COMPONENTS for tri in faces])
+    kept_faces = faces[keep_mask]
+    v_list = vertices.tolist()
+    box_tris = []
+    for front_quad, back_quad in WORKSHOP_HEXAHEDRA:
+        idx = len(v_list)
+        for vi in front_quad + back_quad:
+            v_list.append(vertices[vi].tolist())
+        f0, f1, f2, f3 = idx, idx + 1, idx + 2, idx + 3
+        b0, b1, b2, b3 = idx + 4, idx + 5, idx + 6, idx + 7
+        box_tris.extend((
+            [f0, f1, f2], [f0, f2, f3],
+            [b0, b2, b1], [b0, b3, b2],
+            [f0, b1, f1], [f0, b0, b1],
+            [f3, f2, b2], [f3, b2, b3],
+            [b0, f0, f3], [b0, f3, b3],
+            [f1, b1, b2], [f1, b2, f2],
+        ))
+    return (
+        np.array(v_list, dtype=vertices.dtype),
+        kept_faces,
+        np.array(box_tris, dtype=np.uint32),
+        int((~keep_mask).sum()),
+    )
+
+
 def repair(asset):
     if asset not in ASSETS:
         raise ValueError('Asset not authorized for repair')
@@ -212,14 +300,20 @@ def repair(asset):
     original = (base / 'geometry/preview.glb').read_bytes()
     vertices, faces = read_mesh(original)
     source_triangle_count = len(faces)
+    extra_box_tris = np.empty((0, 3), dtype=np.uint32)
+    removed_mullion_tris = 0
     if asset == 'artifact-vault':
         if hashlib.sha256(original).hexdigest() != '9bb776287ac7f7adf3074ec82fa02ed44d105696eed2a2efd415e4b7e062342b':
             raise ValueError('Vault source hash changed; re-review required')
         faces = repair_vault_support(vertices, faces)
+    elif asset == 'execution-workshop':
+        if hashlib.sha256(original).hexdigest() != WORKSHOP_SHA256:
+            raise ValueError('Workshop source hash changed; re-review required')
+        vertices, faces, extra_box_tris, removed_mullion_tris = repair_workshop_geometry(vertices, faces)
     loops = boundary_loops(faces)
     existing_edges = edge_map(faces)
     patches = [t for loop in loops for t in triangulate_loop(vertices, loop, existing_edges)]
-    repaired = np.concatenate([faces, np.array(patches, dtype=np.uint32)])
+    repaired = np.concatenate([faces, np.array(patches, dtype=np.uint32), extra_box_tris])
     edges = edge_map(repaired)
     assert all(len(e) == 2 and e[0] == e[1][::-1] for e in edges.values())
     out = base / 'repair-v003'
@@ -229,9 +323,12 @@ def repair(asset):
     report = {'asset': asset, 'source_sha256': hashlib.sha256(original).hexdigest(),
               'output_sha256': hashlib.sha256(blob).hexdigest(), 'source_triangles': source_triangle_count,
               'triangles': len(repaired), 'meshes': 1, 'closed_loops': len(loops),
-              'added_boundary_triangles': len(patches), 'boundary_edges_before': sum(map(len, loops)),
+              'added_boundary_triangles': len(patches),
+              'workshop_mullion_and_wafer_triangles_removed': removed_mullion_tris,
+              'workshop_hexahedra_triangles_added': len(extra_box_tris),
+              'boundary_edges_before': sum(map(len, loops)),
               'boundary_edges_after_before_normal_split': 0, 'source_positions_unchanged': True,
-              'original_triangle_coordinates_preserved': asset != 'artifact-vault',
+              'original_triangle_coordinates_preserved': asset not in ('artifact-vault', 'execution-workshop'),
               'vault_folded_faces_replaced': 4 if asset == 'artifact-vault' else 0,
               'vault_planar_faces_added': 2 if asset == 'artifact-vault' else 0,
               'crease_angle_degrees': 42, 'normals_split_without_triangle_displacement': True,

@@ -17,6 +17,7 @@ v003 splits normal discontinuities at a 42-degree crease threshold, preserving t
 | Patio | 3376 | 3684 | Boundary closures and crease-aware normals; open courtyard and intentional architectural passages retained in five-view inspection. |
 | Bóveda | 3879 | 4004 | Boundary closures and crease-aware normals; four folded support-closure triangles replaced by two planar bottom/back triangles. Ceremonial silhouette retained. |
 | Laboratorio | 4034 | 4218 | Irregular wall/base openings closed and crease-aware normals; pavilions and instrument chamber retained. |
+| Taller (`execution-workshop`) | 3735 | 3624 | Missing window-band wall patches reconstructed, 20 malformed window mullion components and 3 duplicate 2-face zero-normal wafers replaced with 8 framed recessed window panels, central rear roof/wall closed, and 42° crease-aware normals applied using only existing source vertex coordinates (candidate built 2026-10-23, pending human review). |
 
 The Bóveda source edit is explicitly guarded by the original SHA-256 and exact source face indices 3667–3670. The replacement uses existing vertices only. The bottom plane has source quantization tolerance 0.0005, the back plane is coplanar, and source outer bounds are unchanged. This addresses an actual folded support closure rather than inferring platform quality from the straight outside edge alone. It is not a general reconstruction of the whole platform; the user must still inspect the repaired support/platform area.
 

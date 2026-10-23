@@ -5,7 +5,13 @@ import json
 import numpy as np
 
 from optimize_glb import parse_glb
-from repair_family_geometry import ASSETS, ROOT, read_mesh, repair_vault_support
+from repair_family_geometry import (
+    ASSETS,
+    ROOT,
+    read_mesh,
+    repair_vault_support,
+    repair_workshop_geometry,
+)
 
 
 def audit(asset):
@@ -31,7 +37,12 @@ def audit(asset):
     assert np.isfinite(vertices).all() and np.isfinite(normals).all()
     assert np.allclose(np.linalg.norm(normals, axis=1), 1., atol=1e-6)
     assert int(faces.max()) < len(vertices) and len(faces) == report['triangles']
-    expected_faces = repair_vault_support(source_vertices, source_faces) if asset == 'artifact-vault' else source_faces
+    if asset == 'artifact-vault':
+        expected_faces = repair_vault_support(source_vertices, source_faces)
+    elif asset == 'execution-workshop':
+        _, expected_faces, _, _ = repair_workshop_geometry(source_vertices, source_faces)
+    else:
+        expected_faces = source_faces
     assert np.array_equal(vertices[faces[:len(expected_faces)]], source_vertices[expected_faces])
     assert np.array_equal(vertices.min(axis=0), source_vertices.min(axis=0))
     assert np.array_equal(vertices.max(axis=0), source_vertices.max(axis=0))

@@ -126,8 +126,21 @@
       scene,
       renderer,
     };
+    const repaired = new URLSearchParams(location.search).get('variant') === 'repair';
+    const folder = repaired ? 'repair-v003' : 'geometry';
+    const compare = document.createElement('p');
+    const link = document.createElement('a');
+    link.href = repaired ? '?variant=original' : '?variant=repair';
+    link.textContent = repaired
+      ? 'Ver original sin modificar'
+      : 'Ver candidato reparado (repair-v003)';
+    compare.append(link);
+    document.querySelector('aside').append(compare);
+    document.querySelector('strong').textContent += repaired
+      ? ' · reparación candidata'
+      : ' · original';
     new GLTFLoader().load(
-      '/assets-src/meshy/execution-workshop/geometry/preview.glb',
+      `/assets-src/meshy/execution-workshop/${folder}/preview.glb`,
       (gltf) => {
         const model = gltf.scene;
         const bounds = new T.Box3().setFromObject(model);

@@ -8,9 +8,16 @@ from optimize_glb import parse_glb
 
 class FamilyRepairTests(unittest.TestCase):
     def test_approved_and_deferred_assets_cannot_be_written(self):
-        for asset in ('connection-gateway', 'civic-plaza', 'execution-workshop', '../other'):
+        for asset in ('connection-gateway', 'civic-plaza', '../other'):
             with self.assertRaises(ValueError):
                 repair.repair(asset)
+
+    def test_workshop_repair_is_source_guarded(self):
+        with self.assertRaises(ValueError):
+            repair.repair_workshop_geometry(
+                np.zeros((10, 3), dtype=np.float32),
+                np.zeros((10, 3), dtype=np.uint32),
+            )
 
     def test_tetrahedron_missing_face_is_closed_with_consistent_winding(self):
         vertices = np.array([[0., 0., 0.], [1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])

@@ -35,12 +35,21 @@ The mesh retains the low twin-wing massing, open entrance doors and rear stack. 
 
 Screenshots and browser report: `$TMPDIR/repociv-meshy/workshop/`. Seven offline geometry runner scope/anti-double-spend tests passed before POST. The initial missing-normal display was detected by inspecting real screenshots rather than accepting a successful load as visual success.
 
-## Decision: repair deferred by Cristóbal
+## Local repair candidate (`repair-v003`)
 
-Cristóbal rejected the malformed windows and agreed with local repair of a copy: reconstruct affected wall patches, replace windows with simple framed recessed panels suitable for map scale, and close the central roof following the approved concept. He explicitly requested recording this and moving on rather than executing the repair now. Status: DEFERRED, NOT REPAIRED; original GLB preserved. No further Workshop generation or texturing until this defect review is resolved. Next family member: Observatory concept, with its own paid-call confirmation.
+Authorized by Cristóbal («abordemos ahora la reparación local de la geometría de execution-workshop»). Executed deterministically via `python3 scripts/meshy/repair_family_geometry.py execution-workshop` on a copy under `repair-v003/`, leaving `geometry/preview.glb` byte-identical.
+
+- Source SHA-256: `6ca232dbf5bccc6318532e3a8d52de56873e69e2966011ffa83b4f6bb6759426` (3735 triangles, 2200 vertices, 163 connected components)
+- Output file: `repair-v003/preview.glb` (ignored), 189984 bytes
+- Output SHA-256: `998993daec5408371d0564ad59c74015efdbdbdc9fd288da6b354fcb2ec72b86`
+- Triangles: 3624 (364 malformed window-mullion and 3 zero-normal duplicate wafer triangles removed; 13 boundary-loop triangles added on `comp 4` and `comp 161`; 240 triangles added across 20 closed hexahedra using exclusively existing 3D coordinates from `source_vertices`)
+- Open boundary edges before normal split: 0 (100% manifold edge pairs)
+- Normals: 42-degree crease split (`min_face_corner_normal_alignment = 0.7615 >= cos(42°)`)
+- Pixel regression across all 5 views (`iso`, `front`, `back`, `right`, `left`): 0 pixels with `max(R,G,B) < 30`
+- Viewer: `/scripts/meshy/workshop-preview.html?variant=repair` and `/scripts/meshy/family-geometry-preview.html?asset=execution-workshop&variant=repair`
 
 ## Next gate
 
-Review geometry, especially the central roof and windows, before paying for texturing. Concept approval is not geometry approval. Any repair/remesh/regeneration or texture call is a separate paid action requiring its cost to be confirmed. No Observatory generation is authorized by this step.
+Human visual review of `repair-v003/preview.glb` (especially the reconstructed wall bands, the 8 framed recessed window panels, and the closed central rear roof/wall) before any paid PBR retexture request.
 
 All candidates remain local/ignored and outside public/; license clearance remains pending. No push, merge or deployment.
