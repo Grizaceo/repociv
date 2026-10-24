@@ -73,6 +73,14 @@
       'research-laboratory': 'Laboratorio',
       'civic-plaza': 'Plaza común',
       'execution-workshop': 'Taller de ejecución',
+      'city-dwelling': 'Vivienda / estudio',
+      'city-guild': 'Gremio',
+      'city-forum': 'Foro / aula',
+      'city-citadel': 'Ciudadela',
+      'unit-coordinator': 'Unidad · Coordinador',
+      'unit-builder': 'Unidad · Constructor',
+      'unit-ranger': 'Unidad · Explorador',
+      'unit-guardian': 'Unidad · Guardián',
     };
     const selected = new URLSearchParams(location.search).get('asset') || 'coordination-court';
     if (!(selected in names)) throw new Error('Asset fuera de ámbito');
@@ -82,8 +90,28 @@
       'research-laboratory',
       'execution-workshop',
     ].includes(selected);
-    const repaired = repairable && new URLSearchParams(location.search).get('variant') === 'repair';
-    const folder = repaired ? 'repair-v003' : 'geometry';
+    const settlementRepair = ['city-forum', 'city-citadel'].includes(selected);
+    const variant = new URLSearchParams(location.search).get('variant');
+    const repaired = (repairable || settlementRepair) && variant === 'repair';
+    const uvPrepared = variant === 'uv';
+    const folder = repaired
+      ? selected === 'city-citadel'
+        ? 'repair-v003'
+        : selected === 'city-forum'
+          ? 'repair-v001'
+          : 'repair-v003'
+      : uvPrepared
+        ? selected === 'city-citadel'
+          ? 'texture-v003'
+          : selected === 'city-forum'
+            ? 'texture-v002'
+            : selected === 'unit-guardian'
+              ? 'texture-v003'
+              : 'texture-v001'
+        : selected === 'unit-builder'
+          ? 'geometry-v002'
+          : 'geometry';
+    const glbFile = uvPrepared ? 'source-uv.glb' : 'preview.glb';
     document.querySelector('strong').textContent = 'RepoCiv · ' + names[selected];
     const selector = document.createElement('select');
     for (const [value, label] of Object.entries(names)) {
@@ -93,7 +121,7 @@
     }
     selector.onchange = () => (location.search = '?asset=' + selector.value);
     document.querySelector('aside').prepend(selector);
-    if (repairable) {
+    if (repairable || settlementRepair) {
       const compare = document.createElement('p');
       const link = document.createElement('a');
       link.href = '?asset=' + selected + (repaired ? '' : '&variant=repair');
@@ -172,7 +200,7 @@
       controls,
     };
     new GLTFLoader().load(
-      '/assets-src/meshy/' + selected + '/' + folder + '/preview.glb',
+      '/assets-src/meshy/' + selected + '/' + folder + '/' + glbFile,
       (gltf) => {
         const model = gltf.scene;
         const bounds = new T.Box3().setFromObject(model);

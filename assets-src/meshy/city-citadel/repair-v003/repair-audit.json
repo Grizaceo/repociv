@@ -1,0 +1,16 @@
+{
+  "asset": "city-citadel",
+  "source": "geometry/preview.glb",
+  "source_sha256": "211c9ed438cfc475aa14b6fc4b068865ec8ffd0d0deae94009ba16018a715596",
+  "candidate": "repair-v003/preview.glb",
+  "dropped_degenerate_triangles": 98,
+  "candidate_sha256": "30559343b5b06e84ea100b3d66bd1020089bffd077f2f8892755e79a6916f228",
+  "source_triangles": 2876,
+  "facade_triangles": 512,
+  "leftover_triangles": 0,
+  "candidate_triangles": 3290,
+  "source_positions_unchanged": true,
+  "source_vertex_prefix": true,
+  "remaining_boundary": "Branched boundary",
+  "note": "Planar facades with recessed window boxes. repair-v001/v002 kept immutable."
+}

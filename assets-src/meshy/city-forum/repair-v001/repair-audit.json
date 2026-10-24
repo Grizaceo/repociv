@@ -1,0 +1,34 @@
+{
+  "asset": "city-forum",
+  "source": "geometry/preview.glb",
+  "source_sha256": "8915ce07e7fb5fd09f655cce2124a50ceb759de3e42d3a3473a8501319120930",
+  "candidate": "repair-v001/preview.glb",
+  "candidate_sha256": "04f6509a20d20783bae1fc86250c8137c837b76090081f8a841119e6b8377718",
+  "source_triangles": 2696,
+  "added_triangles": 412,
+  "candidate_triangles": 3108,
+  "boundary_loops_before": 8,
+  "boundary_loop_lengths": [
+    66,
+    133,
+    66,
+    64,
+    35,
+    37,
+    13,
+    14
+  ],
+  "simplified_loop_lengths": [
+    65,
+    129,
+    66,
+    64,
+    35,
+    37,
+    13,
+    14
+  ],
+  "degenerate_leftover_triangles": 5,
+  "source_positions_unchanged": true,
+  "note": "Closes accidental holes only. Recessed panels with a back face have no boundary."
+}

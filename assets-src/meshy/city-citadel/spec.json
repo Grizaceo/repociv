@@ -1,0 +1,152 @@
+{
+  "asset_id": "city-citadel-v001",
+  "status": "concept artist-approved by Cristóbal; repair-v003 + texture-v003 accepted to continue with a known follow-up of 2 remaining windows",
+  "follow_up": {
+    "date": "2026-10-24",
+    "quote": "quedo mejor faltan solo 2 ventanas por arreglar dejalo anotado",
+    "item": "two remaining windows",
+    "observed": "Left elevation: a brown plaster-missing patch on the ground floor and a torn/open window on the middle terrace. Iso and front otherwise read as a complete keep. Top-storey turquoise spill onto limestone is not part of this follow-up.",
+    "action": "Do not spend Meshy credits on a citadel retry until Cristóbal authorizes a local repair or retexture.",
+    "status": "deferred"
+  },
+  "license_status": "unverified; local only; distribution blocked",
+  "reference_asset": "memory-archive-v001",
+  "authorization": "Wave 1 Step 2 settlement modules. One Image-to-Image concept per asset after explicit human confirmation. No automatic geometry or texturing.",
+  "runtime": {
+    "consumer": "src/three/CityProps3D.ts SETTLEMENT_OVERLAY (replaces building_castle_red in the capital recipe, scale s=0.60 HEX)",
+    "public_path": "public/assets/3d/props/meshy/city-citadel-map.glb",
+    "default_enabled": true,
+    "mapping_status": "wired into the capital recipe; accepted to continue with follow-up of 2 remaining windows"
+  },
+  "concept": {
+    "tool": "meshy_image_to_image",
+    "advertised_credits": 9,
+    "max_create_requests": 1,
+    "reference_relative_paths": [
+      "assets-src/meshy/memory-archive/textured/archive-textured.png"
+    ],
+    "request_without_reference_paths": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "Create ONE original standalone asset for the SAME knowledge-city strategy-game civilization as the supplied Memory Archive image. Use the image as a strict material and architectural craftsmanship reference, NOT as a silhouette to copy. Warm pale limestone as the main matte mass, broad dark slate ceramic roofs, aged copper-bronze structural eaves and frames with contained turquoise patina, subtle warm amber only in shallow window panes or a tiny lantern. Large calm material regions, warm handcrafted stylized finish, sophisticated proportions rather than medieval fantasy or photorealism. City Citadel: the monumental but COMPACT central keep of knowledge. Three stacked limestone terraces, each with a closed slate roof and copper eaves, forming a dense ziggurat-keep rather than a sprawling castle. No crenellations, no battlements, no flags, no corner turrets, no drawbridge, no moat. A single deep rectangular portal on the lowest terrace. Windows only as simple shallow framed rectangular recessed panels with thick frames, never perforations. Compact architectural base with no surrounding terrain hex, silhouette must fit a tight hexagonal tile. Read clearly as a civic citadel of learning, not a medieval fortress, dwelling, guild, forum, observatory or archive copy. Show the complete standalone subject in one clearly ELEVATED THREE-QUARTER ISOMETRIC view, with both front and side visible, all edges inside frame, neutral background and transparent cutout. Readable at small strategy-map scale. All walls and roofs 100% closed except the intended portal recess. Thick connected structural pieces, no thin railings or filigree, no text, logos, people, gears, dramatic baked shadows, excessive grime, floating pieces or surrounding scenery.",
+      "generate_multi_view": false,
+      "aspect_ratio": "1:1",
+      "remove_background": true
+    }
+  },
+  "geometry_after_concept_approval": {
+    "authorization": "Submit only after human approval of this concept image. One untextured mesh, no automatic retry.",
+    "advertised_credits": 5,
+    "max_create_requests": 1,
+    "request_without_input_task_id": {
+      "ai_model": "meshy-t2.5",
+      "model_type": "smart-topology",
+      "target_polycount": 3000,
+      "topology": "triangle",
+      "should_texture": false,
+      "enable_pbr": false,
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true,
+      "multi_view_thumbnails": true,
+      "auto_size": false
+    },
+    "result": {
+      "task_id": "01a16bbf-2d09-72c7-a86e-1b7ecc8261e1",
+      "status": "SUCCEEDED",
+      "consumed_credits": 5,
+      "triangles": 2876,
+      "sha256": "211c9ed438cfc475aa14b6fc4b068865ec8ffd0d0deae94009ba16018a715596",
+      "file": "geometry/preview.glb",
+      "human_geometry_approval": "rejected: window perforations and missing-wall look; see local_repair repair-v003"
+    }
+  },
+  "guards": {
+    "auto_geometry": false,
+    "auto_texture": false,
+    "auto_retry_paid_requests": false
+  },
+  "texturing_after_geometry_approval": {
+    "tool": "meshy_retexture",
+    "endpoint": "POST /openapi/v1/retexture",
+    "authorization": "Cristóbal: «la ciudadela sigue con problemas en las ventanas y texturas que parecen que falta parte del edificio». Third 10-credit PBR retexture of repair-v003 in texture-v003. texture-v001 and texture-v002 locks retained; do not delete or retry earlier tasks. No variants, no automatic paid retries.",
+    "advertised_credits": 10,
+    "pricing_source": "https://docs.meshy.ai/en/api/pricing read 2026-10-23: Retexture 2K/4K 10, 8K 15",
+    "max_create_requests": 1,
+    "output_dir": "texture-v003",
+    "source": {
+      "route": "model_url",
+      "accepted_geometry": "repair-v003/preview.glb",
+      "accepted_sha256": "30559343b5b06e84ea100b3d66bd1020089bffd077f2f8892755e79a6916f228",
+      "origin_task_id": "01a16bbf-2d09-72c7-a86e-1b7ecc8261e1",
+      "uv_copy": "texture-v003/source-uv.glb",
+      "normals": "local 42-degree crease normals; approved positions and triangle order unchanged",
+      "why_not_input_task_id": "Meshy's returned normals cannot be trusted (approved Observatory: 274 corners oppose their faces, 2 visible triangles dropped); sending the approved GLB keeps every member on one verified route"
+    },
+    "request": {
+      "ai_model": "meshy-7",
+      "text_style_prompt": "Original knowledge-city citadel, a compact three-terrace ziggurat-keep of knowledge, not a castle. Warm pale limestone walls, matte and complete on every storey, no missing sections. Broad dark slate ceramic roofs on each terrace with generous aged copper eaves. Contained turquoise patina only on copper frames and eaves, never on stone or slate. Windows are shallow framed rectangular recessed panels with thick limestone frames and subtle warm amber glass, never holes. A copper-framed portal on the lowest terrace. Broad calm hand-crafted stylized material regions readable from an elevated strategy-game camera, subtle stone variation, restrained weathering. Preserve the geometry. No text, logos, grime, baked lighting or baked shadows. Limestone matte, slate moderately rough, copper metallic.",
+      "enable_original_uv": true,
+      "enable_pbr": true,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true
+    },
+    "uv_method": "xatlas-python 0.0.11, 2048 px atlas, 6 px padding, charts on welded positions",
+    "material_approval": "accepted to continue with follow-up of 2 remaining windows (Cristóbal: «quedo mejor faltan solo 2 ventanas por arreglar dejalo anotado»); not a full material sign-off",
+    "result": {
+      "task_id": "01a16bf4-df94-74b0-a4d2-f4c69785b50c",
+      "status": "SUCCEEDED",
+      "consumed_credits": 10,
+      "balance_before": 386,
+      "balance_after": 376,
+      "reconciled": true,
+      "sent_model_sha256": "a28f675b08ceb209add8a846e43fe4a0033f364efd0c4796a401abe8bb238b57",
+      "sent_model_bytes": 213076,
+      "uv_charts": 954,
+      "uv_area_coverage": 0.5349062619964904,
+      "meshy_output": {
+        "file": "texture-v003/meshy.glb",
+        "sha256": "c0ea9ca2ff53ceac9c9e8ae4247d6dd62bc0ba4959104c6f03090ad0b3ef4093",
+        "triangles": 3290,
+        "uniform_scale": 2.0844783715012722,
+        "visible_accepted_triangles_missing": 0,
+        "corners_with_normal_opposing_face": 283,
+        "kept_supplied_uvs": true
+      },
+      "candidate": {
+        "file": "texture-v003/textured.glb",
+        "sha256": "bf1dbf8b7529edcc07e5cf4c6785c8b9208526612b497c8806f68199d7be6f5a",
+        "bytes": 6644796,
+        "method": "accepted corners and prepared normals + Meshy per-corner UVs and PBR material",
+        "exact_against_accepted_geometry": true,
+        "triangles": 3290,
+        "corners_with_normal_opposing_face": 0,
+        "pbr": "baseColor (sRGB) + metallicRoughness + normal, 2048 px JPEG; doubleSided as delivered by Meshy"
+      },
+      "runtime_copy": {
+        "file": "public/assets/3d/props/meshy/city-citadel-map.glb",
+        "sha256": "e5a3e9d1b96d92addfd53cceee1f1428ae35135ddb1f5b9e958dd787085b97da",
+        "bytes": 354300,
+        "max_texture_px": 512,
+        "geometry_bytes_identical": true
+      }
+    }
+  },
+  "local_repair": {
+    "authorization": "Cristóbal: «la ciudadela sigue con problemas en las ventanas y texturas que parecen que falta parte del edificio». repair-v001 membrane kept immutable. repair-v003 rebuilds axis-aligned facades with recessed panes, 0 credits.",
+    "candidate": "repair-v003/preview.glb",
+    "audit": "repair-v003/repair-audit.json",
+    "previous_candidate": "repair-v002/preview.glb",
+    "source_preserved": true,
+    "human_geometry_approval": "accepted to continue with follow-up of 2 remaining windows (Cristóbal: «quedo mejor faltan solo 2 ventanas por arreglar dejalo anotado»)",
+    "candidate_sha256": "30559343b5b06e84ea100b3d66bd1020089bffd077f2f8892755e79a6916f228",
+    "source_sha256": "211c9ed438cfc475aa14b6fc4b068865ec8ffd0d0deae94009ba16018a715596",
+    "source_triangles": 2876,
+    "triangles": 3290,
+    "method": "Shared-grid planar facades on ground-floor sides and middle terrace, with recessed window boxes. Original corners unchanged; new vertices only.",
+    "new_paid_requests": 0
+  }
+}

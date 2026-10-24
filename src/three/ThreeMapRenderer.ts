@@ -24,7 +24,7 @@ import {
 } from './HexWorldScene.ts';
 import { HexPicker } from './HexPicker.ts';
 import { areMountainPropsReady } from './MountainProps3D.ts';
-import { areUnitPropsReady } from './UnitProps3D.ts';
+import { unitPropsSignature } from './UnitProps3D.ts';
 import { areResourcePropsReady } from './ResourceProps3D.ts';
 import { areForestPropsReady } from './ForestProps3D.ts';
 import { areCityPropsReady } from './CityProps3D.ts';
@@ -206,7 +206,7 @@ export class ThreeMapRenderer {
       `:mprops${areMountainPropsReady() ? 1 : 0}` +
       `:fprops${areForestPropsReady() ? 1 : 0}` +
       `:cprops${areCityPropsReady() ? 1 : 0}` +
-      `:uprops${areUnitPropsReady() ? 1 : 0}` +
+      `:uprops${unitPropsSignature()}` +
       `:rprops${areResourcePropsReady() ? 1 : 0}` +
       `:sprops${isTerrainScatterReady() ? 1 : 0}` +
       `:wprops${areWonderGlbPropsReady() ? 1 : 0}:${familyBuildingsSignature()}` +

@@ -1,0 +1,194 @@
+{
+  "asset_id": "unit-coordinator-v001",
+  "status": "geometry and texture-v002 PBR artist-approved by Cristóbal («las texturas que aprobé»); integrated into UnitProps3D overlay (public/assets/3d/props/meshy/unit-coordinator-map.glb)",
+  "license_status": "unverified; local only; distribution blocked",
+  "reference_asset": "memory-archive-v001",
+  "authorization": "Cristóbal: «en concepto bien, pero claro requieren de meshy porque como estan se ven horribles lol». One Image-to-Image concept per unit after that confirmation. No automatic geometry or texturing.",
+  "runtime": {
+    "consumer": "src/three/UnitProps3D.ts KNOWLEDGE_CITY_UNIT_URLS (overlays unit-mage)",
+    "public_path": "public/assets/3d/props/meshy/unit-coordinator-map.glb",
+    "phase5_fallback": "unit-mage",
+    "default_enabled": true,
+    "mapping_status": "wired as overlay for unit-mage; Meshy PBR map approved and copied to public/"
+  },
+  "concept": {
+    "tool": "meshy_image_to_image",
+    "advertised_credits": 9,
+    "max_create_requests": 1,
+    "reference_relative_paths": [
+      "assets-src/meshy/memory-archive/textured/archive-textured.png"
+    ],
+    "request_without_reference_paths": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "Create ONE original standalone STRATEGY-GAME FIGURINE for the SAME knowledge-city civilization as the supplied Memory Archive image. That image is a BUILDING: use it only as a strict material and craftsmanship reference — warm pale limestone, dark slate ceramic, aged copper-bronze with contained turquoise patina, subtle warm amber — NOT as a silhouette to copy. The subject is a compact stylized standing humanoid inhabitant with a slightly large head for map readability, full body, feet together. Handcrafted stylized finish, sophisticated proportions rather than photorealism, medieval fantasy, anime or chibi. Thick connected sculptural pieces, no thin fingers, railings or filigree, no text, logos, extra people, gears, dramatic baked shadows, excessive grime, floating pieces or surrounding scenery. No terrain hex. A tiny circular limestone figurine plinth under the feet is allowed. Show the complete standalone figurine in one clearly ELEVATED THREE-QUARTER ISOMETRIC view, with both front and side visible, all edges inside frame, neutral background and transparent cutout. Readable at small strategy-map scale. Unit Coordinator: a civic scholar-steward of knowledge. Long limestone robe, a slate shoulder mantle, and a copper reading tablet held at the chest. No wizard hat, no pointed cap, no staff, no orb, no magic effects. Read clearly as a coordinator, not a mage, builder, ranger, guardian, knight or monk.",
+      "generate_multi_view": false,
+      "aspect_ratio": "1:1",
+      "remove_background": true
+    },
+    "result": {
+      "task_id": "01a16c24-00fe-76f9-ae51-df9f162c5b81",
+      "status": "SUCCEEDED",
+      "consumed_credits": 9,
+      "balance_before": 376,
+      "balance_after": 367,
+      "reconciled": true,
+      "file": "preview.png"
+    },
+    "human_approval": {
+      "approved_by": "Cristóbal",
+      "approval_quote": "apruebo"
+    }
+  },
+  "geometry_after_concept_approval": {
+    "authorization": "Cristóbal: «apruebo» the four unit concepts. One untextured mesh, no automatic retry.",
+    "advertised_credits": 5,
+    "max_create_requests": 1,
+    "request_without_input_task_id": {
+      "ai_model": "meshy-t2.5",
+      "model_type": "smart-topology",
+      "target_polycount": 2000,
+      "topology": "triangle",
+      "should_texture": false,
+      "enable_pbr": false,
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true,
+      "multi_view_thumbnails": true,
+      "auto_size": false
+    },
+    "result": {
+      "task_id": "01a16c2d-f24c-7419-9b65-457f14a38c63",
+      "status": "SUCCEEDED",
+      "consumed_credits": 5,
+      "balance_before": 340,
+      "balance_after": 335,
+      "reconciled": true,
+      "triangles": 2103,
+      "sha256": "b436f061948053f816057b6c8e71c31a311048be95aa60ddb7b52638d2dbe171",
+      "file": "geometry/preview.glb",
+      "human_geometry_approval": "approved",
+      "approval_quote": "todos estan bien salvo el constructor creo se entenderia más sin mochila y con martillo o una hoz"
+    }
+  },
+  "texturing_after_geometry_approval": {
+    "tool": "meshy_retexture",
+    "endpoint": "POST /openapi/v1/retexture",
+    "authorization": "Cristóbal: «como el de la imagen de referencia justamente» after reviewing texture-v001. One 10-credit PBR retexture in texture-v002 matching the approved concept image. texture-v001 locks stay immutable. Geometry approval is not advance material approval.",
+    "advertised_credits": 10,
+    "pricing_source": "https://docs.meshy.ai/en/api/pricing read 2026-10-23: Retexture 2K/4K 10, 8K 15",
+    "max_create_requests": 1,
+    "output_dir": "texture-v002",
+    "source": {
+      "route": "model_url",
+      "accepted_geometry": "geometry/preview.glb",
+      "accepted_sha256": "b436f061948053f816057b6c8e71c31a311048be95aa60ddb7b52638d2dbe171",
+      "origin_task_id": "01a16c2d-f24c-7419-9b65-457f14a38c63",
+      "uv_copy": "texture-v002/source-uv.glb",
+      "normals": "local 42-degree crease normals; approved positions and triangle order unchanged",
+      "why_not_input_task_id": "Meshy's returned normals cannot be trusted (approved Observatory: 274 corners oppose their faces, 2 visible triangles dropped); sending the approved GLB keeps every member on one verified route"
+    },
+    "request": {
+      "ai_model": "meshy-7",
+      "text_style_prompt": "Original knowledge-city coordinator figurine matching its approved concept: a sculpted limestone statue, not a painted miniature or portrait. Bald stone-carved head with a copper brow band and turquoise patina. Warm pale limestone robe, matte. Dark slate shoulder mantle. Aged copper reading tablet with turquoise frames and warm amber insets. Stone-colored skin, no hair, no beard, no painted eyes. Same craft as the Memory Archive building: limestone, slate, copper. Preserve the geometry. No text, logos, grime, baked lighting or baked shadows. Limestone matte, slate moderately rough, copper metallic.",
+      "enable_original_uv": true,
+      "enable_pbr": true,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true
+    },
+    "uv_method": "xatlas-python 0.0.11, 2048 px atlas, 6 px padding, charts on welded positions; copied from texture-v001 to keep identical charts",
+    "material_approval": "approved by Cristóbal («las texturas que aprobé»); CSG prediseños replaced on the map",
+    "result": {
+      "task_id": "01a16c4d-018b-7056-abdd-87d7f302bf26",
+      "status": "SUCCEEDED",
+      "consumed_credits": 10,
+      "balance_before": 281,
+      "balance_after": 251,
+      "reconciled": false,
+      "reconciliation_note": "Three 10cr texture-v002 retextures posted together; expected delta 30.",
+      "sent_model_sha256": "71ad83cfd02e2783f411b94d5d2918c62b4132b17284851710943c81e225c572",
+      "sent_model_bytes": 113772,
+      "uv_charts": 108,
+      "uv_area_coverage": 0.6088678042534773,
+      "meshy_output": {
+        "file": "texture-v002/meshy.glb",
+        "sha256": "d6b5d69190185575391caa10096b2755b59ef1140b87ef7c7768d761f3bbe2d2",
+        "triangles": 2103,
+        "uniform_scale": 2.1005126953125,
+        "visible_accepted_triangles_missing": 0,
+        "corners_with_normal_opposing_face": 27,
+        "kept_supplied_uvs": true
+      },
+      "candidate": {
+        "file": "texture-v002/textured.glb",
+        "sha256": "f279cca8db78f94bfe43ccecc0b6c0aae63931fadcce432bbbbf52f4b9933d34",
+        "bytes": 6874572,
+        "method": "accepted corners, prepared normals, Meshy per-corner UVs and material",
+        "exact_against_accepted_geometry": true,
+        "triangles": 2103,
+        "corners_with_normal_opposing_face": 0,
+        "pbr": "baseColor (sRGB) + metallicRoughness + normal, 2048 px JPEG; doubleSided as delivered by Meshy"
+      },
+      "runtime_copy": {
+        "file": "texture-v002/unit-coordinator-map.glb",
+        "public_file": "public/assets/3d/props/meshy/unit-coordinator-map.glb",
+        "sha256": "93f41a5737e449f708ecd9d3da3e56465e85e1ec00255e8d2cb3e972bb54d539",
+        "bytes": 223108,
+        "max_texture_px": 512,
+        "geometry_bytes_identical": true
+      },
+      "visual_observations": "Closer to the approved concept than v001: limestone robe, slate mantle, copper tablet with turquoise frames. Head still reads as a painted portrait (hair) rather than the bald stone-carved brow-band of the concept. Geometry exact."
+    }
+  },
+  "guards": {
+    "auto_geometry": false,
+    "auto_texture": false,
+    "auto_retry_paid_requests": false
+  },
+  "rejected_texture_v001": {
+    "reason": "Cristóbal: «como el de la imagen de referencia justamente». v001 read as a painted portrait/toy instead of the approved concept and Memory Archive materials (limestone, slate, copper).",
+    "output_dir": "texture-v001",
+    "immutable": true,
+    "result": {
+      "task_id": "01a16c40-e4ce-7647-8a9a-3c57ee0643ad",
+      "status": "SUCCEEDED",
+      "consumed_credits": 10,
+      "balance_before": 311,
+      "balance_after": 281,
+      "reconciled": false,
+      "reconciliation_note": "Three 10cr retextures posted together; expected delta 30.",
+      "sent_model_sha256": "71ad83cfd02e2783f411b94d5d2918c62b4132b17284851710943c81e225c572",
+      "sent_model_bytes": 113772,
+      "uv_charts": 108,
+      "uv_area_coverage": 0.6088678042534773,
+      "meshy_output": {
+        "file": "texture-v001/meshy.glb",
+        "sha256": "af8d44c1f061c209107d5e7f42429b4bb6f7d759c9f6d9c4ca1294b94defa26c",
+        "triangles": 2103,
+        "uniform_scale": 2.1005126953125,
+        "visible_accepted_triangles_missing": 0,
+        "corners_with_normal_opposing_face": 27,
+        "kept_supplied_uvs": true
+      },
+      "candidate": {
+        "file": "texture-v001/textured.glb",
+        "sha256": "67363cfed5c2a8961de21879ddc7b0c4ac07af0596b50670801aa362c162b5b5",
+        "bytes": 7501536,
+        "method": "accepted corners, prepared normals, Meshy per-corner UVs and material",
+        "exact_against_accepted_geometry": true,
+        "triangles": 2103,
+        "corners_with_normal_opposing_face": 0,
+        "pbr": "baseColor (sRGB) + metallicRoughness + normal, 2048 px JPEG; doubleSided as delivered by Meshy"
+      },
+      "runtime_copy": {
+        "public_file": null,
+        "note": "Not copied to public/; 4.5MB meshy budget and overlay tests still assume CSG until builder v002 is ready and materials are approved."
+      },
+      "visual_observations": "Limestone robe, slate shoulder mantle, copper-edged tablet with turquoise face. Painted portrait head (hair/beard/skin) rather than warm-stone skin. Geometry exact against approved clay. Materials pending review."
+    },
+    "prompt": "Original knowledge-city coordinator figurine, a civic scholar-steward. Warm pale limestone robe, matte. Dark slate shoulder mantle. Aged copper reading tablet with contained turquoise patina and subtle warm amber insets. Skin as warm stone. Broad calm hand-crafted stylized material regions readable from an elevated strategy-game camera. Preserve the geometry. No text, logos, grime, baked lighting or baked shadows. Limestone matte, slate moderately rough, copper metallic."
+  }
+}

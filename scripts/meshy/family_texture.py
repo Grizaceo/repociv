@@ -1,12 +1,15 @@
-"""Five approved family members: one locked 10-credit PBR retexture each.
+"""Authorized family retexture batch: one locked 10-credit PBR pass each.
 
 Every member sends its exact accepted GLB as a data URI with locally generated
-UVs (xatlas) and keeps those UVs (enable_original_uv). Patio, Bóveda and
-Laboratorio use repair-v003 (their Image-to-3D tasks hold rejected geometry) and
-its normals. Portal and Plaza use their approved Image-to-3D GLBs, which carry
-no normals: the v003 42-degree crease rule is applied without moving corners.
-Meshy's own normals are never used: the approved Observatory's returned normals
-oppose their faces at 274 corners. Taller, Observatorio and Archivo are refused.
+UVs (xatlas) and keeps those UVs (enable_original_uv). Patio, Bóveda,
+Laboratorio and Taller use repair-v003 (their Image-to-3D tasks hold rejected
+geometry) and its normals. Portal, Plaza, dwelling, guild, coordinator, ranger
+ranger, guardian and builder v002 use approved Image-to-3D GLBs, which carry no
+normals: the v003 42-degree crease rule is applied without moving corners.
+Forum and citadel use their settlement repair GLBs. Meshy's own normals are
+never used: the approved Observatory's returned normals oppose their faces at
+274 corners. Builder v001 (backpack silhouette) is refused; builder uses
+geometry-v002. Observatorio and Archivo stay out of this batch.
 
 Commands (one asset each; nothing paid happens without --generate):
     prepare   build texture-v001/source-uv.glb from the accepted GLB
@@ -38,9 +41,21 @@ ROOT = Path(__file__).resolve().parents[2]
 MESHY = ROOT / "assets-src/meshy"
 OUT_NAME = "texture-v001"
 REPAIRED = ("coordination-court", "artifact-vault", "research-laboratory", "execution-workshop")
+SETTLEMENT_REPAIRED = ("city-forum", "city-citadel")
 ORIGIN_TASKS = {
     "connection-gateway": "01a16732-69b9-7114-8398-c6cf4f09fcd1",
     "civic-plaza": "01a16736-33b7-7361-8100-5f4b3770736b",
+    "city-dwelling": "01a16b99-8a62-7243-a07b-1bbe225009e7",
+    "city-guild": "01a16bbe-28ef-76ab-bd23-54fa8a735f88",
+    "city-forum": "01a16bbe-bd63-7637-835f-f4bf0b02a6f3",
+    "city-citadel": "01a16bbf-2d09-72c7-a86e-1b7ecc8261e1",
+    "unit-coordinator": "01a16c2d-f24c-7419-9b65-457f14a38c63",
+    "unit-ranger": "01a16c2e-a612-7367-9ab1-56880c2ba01f",
+    "unit-guardian": "01a16c2f-001b-756c-84a6-7cb26ba0e96a",
+    "unit-builder": "01a16c58-bc70-74ea-a01a-506e7ac8ae57",
+}
+REVISED_GEOMETRY = {
+    "unit-builder": "geometry-v002/preview.glb",
 }
 ASSETS = REPAIRED + tuple(ORIGIN_TASKS)
 FIXED = {"ai_model": "meshy-7", "enable_pbr": True, "texture_resolution": "2k",
@@ -56,8 +71,17 @@ def sha256(blob):
 
 def asset_dir(asset):
     if asset not in ASSETS:
-        raise ValueError("Only Patio, Portal, Bóveda, Laboratorio and Plaza are in this batch")
+        raise ValueError("Asset is not in the authorized retexture batch")
     return MESHY / asset
+
+
+def texture_folder(asset, spec=None):
+    if spec is None:
+        spec = json.loads((asset_dir(asset) / "spec.json").read_text())
+    name = spec["texturing_after_geometry_approval"].get("output_dir", OUT_NAME)
+    if not re.fullmatch(r"texture-v\d{3}", name):
+        raise ValueError("output_dir must be texture-vNNN")
+    return asset_dir(asset) / name
 
 
 def accepted_source(asset, spec):
@@ -71,9 +95,25 @@ def accepted_source(asset, spec):
                 or source["accepted_sha256"] != repair["approved_sha256"]
                 or source["route"] != "model_url"):
             raise ValueError("Repaired members must use their approved repair-v003 GLB")
+    elif asset in SETTLEMENT_REPAIRED:
+        repair = spec["local_repair"]
+        candidate = repair.get("candidate")
+        if (source["route"] != "model_url" or source["origin_task_id"] != ORIGIN_TASKS[asset]
+                or candidate not in (
+                    "repair-v001/preview.glb",
+                    "repair-v002/preview.glb",
+                    "repair-v003/preview.glb",
+                )
+                or source["accepted_geometry"] != candidate
+                or source["accepted_sha256"] != repair["candidate_sha256"]):
+            raise ValueError("Settlement repaired members must use their pinned repair GLB")
+    elif asset in REVISED_GEOMETRY:
+        if (source["route"] != "model_url" or source["origin_task_id"] != ORIGIN_TASKS[asset]
+                or source["accepted_geometry"] != REVISED_GEOMETRY[asset]):
+            raise ValueError("Revised members must use their approved revision GLB")
     elif (source["route"] != "model_url" or source["origin_task_id"] != ORIGIN_TASKS[asset]
             or source["accepted_geometry"] != "geometry/preview.glb"):
-        raise ValueError("Portal/Plaza must use their approved Image-to-3D GLB")
+        raise ValueError("Unrepaired members must use their approved Image-to-3D GLB")
     return asset_dir(asset) / source["accepted_geometry"], source["accepted_sha256"]
 
 
@@ -198,7 +238,7 @@ def prepare(asset, spec):
     check = verify_against_source(blob, result)
     if not check["exact"]:
         raise ValueError("UV attachment altered accepted corners")
-    folder = source_path.parent.parent / OUT_NAME
+    folder = texture_folder(asset, spec)
     folder.mkdir(exist_ok=True)
     target = folder / "source-uv.glb"
     if target.exists() and target.read_bytes() != result:
@@ -328,7 +368,7 @@ def build_request(asset, spec, folder):
 
 
 def create_once(asset, spec, api):
-    folder = asset_dir(asset) / OUT_NAME
+    folder = texture_folder(asset, spec)
     request, receipt = build_request(asset, spec, folder)
     balance = api("/v1/balance")
     if balance["balance"] < 10:
@@ -351,8 +391,8 @@ def create_once(asset, spec, api):
     return state
 
 
-def resume(asset, api, polls=60, wait=10):
-    folder = asset_dir(asset) / OUT_NAME
+def resume(asset, api, polls=60, wait=10, spec=None):
+    folder = texture_folder(asset, spec)
     state_path = folder / "generation.json"
     state = json.loads(state_path.read_text())
     task = {}
@@ -405,7 +445,7 @@ def material_payload(doc, binary):
 
 def assemble(asset, spec):
     """Final candidate: accepted corners and normals + Meshy UVs and PBR material."""
-    folder = asset_dir(asset) / OUT_NAME
+    folder = texture_folder(asset, spec)
     meshy_blob = (folder / "meshy.glb").read_bytes()
     source_path, approved = accepted_source(asset, spec)
     accepted_blob = source_path.read_bytes()
@@ -498,11 +538,11 @@ def main():
             raise SystemExit("Network failure; POST outcome may be unknown. "
                              "Inspect the account, do not retry blindly") from None
 
-    if not (asset_dir(args.asset) / OUT_NAME / "generation.json").exists():
+    if not (texture_folder(args.asset, spec) / "generation.json").exists():
         if not args.generate:
             raise SystemExit("No task saved; --generate explicitly authorizes one retexture")
         create_once(args.asset, spec, api)
-    state = resume(args.asset, api)
+    state = resume(args.asset, api, spec=spec)
     print(json.dumps({k: state.get(k) for k in ("task_id", "status", "consumed_credits",
                                                 "balance_after", "reconciliation")}), flush=True)
 

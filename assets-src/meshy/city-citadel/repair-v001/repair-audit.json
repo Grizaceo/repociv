@@ -1,0 +1,36 @@
+{
+  "asset": "city-citadel",
+  "source": "geometry/preview.glb",
+  "source_sha256": "211c9ed438cfc475aa14b6fc4b068865ec8ffd0d0deae94009ba16018a715596",
+  "candidate": "repair-v001/preview.glb",
+  "candidate_sha256": "69fe2380964310b1e042186f2cf53fcdf1c5538d61a2d1944d4e260993808608",
+  "source_triangles": 2876,
+  "added_triangles": 200,
+  "candidate_triangles": 3076,
+  "boundary_loops_before": 9,
+  "boundary_loop_lengths": [
+    25,
+    32,
+    33,
+    26,
+    47,
+    24,
+    24,
+    4,
+    3
+  ],
+  "simplified_loop_lengths": [
+    25,
+    32,
+    33,
+    26,
+    47,
+    24,
+    24,
+    4,
+    3
+  ],
+  "degenerate_leftover_triangles": 0,
+  "source_positions_unchanged": true,
+  "note": "Closes accidental holes only. Recessed panels with a back face have no boundary."
+}

@@ -1,0 +1,144 @@
+{
+  "asset_id": "city-forum-v001",
+  "status": "concept, repair-v001 geometry and PBR materials artist-approved by Cristóbal («apruebo el foro y la vivienda»); integrated into CityProps3D settlement recipes (public/assets/3d/props/meshy/city-forum-map.glb)",
+  "license_status": "unverified; local only; distribution blocked",
+  "reference_asset": "memory-archive-v001",
+  "authorization": "Wave 1 Step 2 settlement modules. One Image-to-Image concept per asset after explicit human confirmation. No automatic geometry or texturing.",
+  "runtime": {
+    "consumer": "src/three/CityProps3D.ts SETTLEMENT_OVERLAY (replaces building_church_red in the village recipe)",
+    "public_path": "public/assets/3d/props/meshy/city-forum-map.glb",
+    "default_enabled": true,
+    "mapping_status": "approved by Cristóbal («apruebo el foro y la vivienda»); overlays building_church_red"
+  },
+  "concept": {
+    "tool": "meshy_image_to_image",
+    "advertised_credits": 9,
+    "max_create_requests": 1,
+    "reference_relative_paths": [
+      "assets-src/meshy/memory-archive/textured/archive-textured.png"
+    ],
+    "request_without_reference_paths": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "Create ONE original standalone asset for the SAME knowledge-city strategy-game civilization as the supplied Memory Archive image. Use the image as a strict material and architectural craftsmanship reference, NOT as a silhouette to copy. Warm pale limestone as the main matte mass, broad dark slate ceramic roofs, aged copper-bronze structural eaves and frames with contained turquoise patina, subtle warm amber only in shallow window panes or a tiny lantern. Large calm material regions, warm handcrafted stylized finish, sophisticated proportions rather than medieval fantasy or photorealism. City Forum: a stepped axial reading hall, NOT a church. A raised limestone podium terrace, a rectangular lecture volume, and a stepped gable of closed slate — no spire, no bell, no cross, no rose window, no stained-glass tracery, no religious iconography. A short flight of thick integrated steps leads to a deep rectangular doorway. Windows only as simple shallow framed rectangular recessed panels with thick frames, never perforations. Compact architectural base with no surrounding terrain hex. Read clearly as a civic forum / aula of reading, not a dwelling, guild, citadel, temple or observatory. Show the complete standalone subject in one clearly ELEVATED THREE-QUARTER ISOMETRIC view, with both front and side visible, all edges inside frame, neutral background and transparent cutout. Readable at small strategy-map scale. All walls and roofs 100% closed except the intended doorway recess. Thick connected structural pieces, no thin railings or filigree, no text, logos, people, gears, dramatic baked shadows, excessive grime, floating pieces or surrounding scenery.",
+      "generate_multi_view": false,
+      "aspect_ratio": "1:1",
+      "remove_background": true
+    }
+  },
+  "geometry_after_concept_approval": {
+    "authorization": "Submit only after human approval of this concept image. One untextured mesh, no automatic retry.",
+    "advertised_credits": 5,
+    "max_create_requests": 1,
+    "request_without_input_task_id": {
+      "ai_model": "meshy-t2.5",
+      "model_type": "smart-topology",
+      "target_polycount": 3000,
+      "topology": "triangle",
+      "should_texture": false,
+      "enable_pbr": false,
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true,
+      "multi_view_thumbnails": true,
+      "auto_size": false
+    },
+    "result": {
+      "task_id": "01a16bbe-bd63-7637-835f-f4bf0b02a6f3",
+      "status": "SUCCEEDED",
+      "consumed_credits": 5,
+      "triangles": 2696,
+      "sha256": "8915ce07e7fb5fd09f655cce2124a50ceb759de3e42d3a3473a8501319120930",
+      "file": "geometry/preview.glb",
+      "human_geometry_approval": "rejected: missing front gable/roof hole; see local_repair repair-v001"
+    }
+  },
+  "guards": {
+    "auto_geometry": false,
+    "auto_texture": false,
+    "auto_retry_paid_requests": false
+  },
+  "texturing_after_geometry_approval": {
+    "tool": "meshy_retexture",
+    "endpoint": "POST /openapi/v1/retexture",
+    "authorization": "Cristóbal: «El foro tiene problema de que le falta un pedazo por el frente» plus earlier «terminemos de hacer los necesarios». One 10-credit PBR retexture of repair-v001 in texture-v002 (unrepaired texture-v001/source-uv.glb kept immutable). No variants, no automatic paid retries. Geometry approval is not advance material approval.",
+    "advertised_credits": 10,
+    "pricing_source": "https://docs.meshy.ai/en/api/pricing read 2026-10-23: Retexture 2K/4K 10, 8K 15",
+    "max_create_requests": 1,
+    "output_dir": "texture-v002",
+    "source": {
+      "route": "model_url",
+      "accepted_geometry": "repair-v001/preview.glb",
+      "accepted_sha256": "04f6509a20d20783bae1fc86250c8137c837b76090081f8a841119e6b8377718",
+      "origin_task_id": "01a16bbe-bd63-7637-835f-f4bf0b02a6f3",
+      "uv_copy": "texture-v002/source-uv.glb",
+      "normals": "local 42-degree crease normals; approved positions and triangle order unchanged",
+      "why_not_input_task_id": "Meshy's returned normals cannot be trusted (approved Observatory: 274 corners oppose their faces, 2 visible triangles dropped); sending the approved GLB keeps every member on one verified route"
+    },
+    "request": {
+      "ai_model": "meshy-7",
+      "text_style_prompt": "Original knowledge-city forum, a stepped axial reading hall, not a church. Warm pale limestone walls, matte. Closed dark slate ceramic roof with a stepped gable and aged copper cornice. Contained turquoise patina only on copper frames and eaves, never on stone or slate. Subtle warm amber glass in shallow recessed window panes with thick frames; amber doors in the deep rectangular doorway. Broad calm hand-crafted stylized material regions readable from an elevated strategy-game camera, subtle stone variation, restrained weathering. Preserve the geometry. No text, logos, grime, baked lighting or baked shadows. Limestone matte, slate moderately rough, copper metallic.",
+      "enable_original_uv": true,
+      "enable_pbr": true,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true
+    },
+    "uv_method": "xatlas-python 0.0.11, 2048 px atlas, 6 px padding, charts on welded positions",
+    "material_approval": "approved by Cristóbal («apruebo el foro y la vivienda»)",
+    "result": {
+      "task_id": "01a16bdd-65d0-73af-a425-1dcec43bf44a",
+      "status": "SUCCEEDED",
+      "consumed_credits": 10,
+      "balance_before": 406,
+      "balance_after": 396,
+      "reconciled": true,
+      "sent_model_sha256": "f81ca1222969be9c0d970df8f1b71edd17c507b30113be5868ce84275030adb6",
+      "sent_model_bytes": 180492,
+      "uv_charts": 486,
+      "uv_area_coverage": 0.6412313606442539,
+      "meshy_output": {
+        "file": "texture-v002/meshy.glb",
+        "sha256": "7d3235adf85db05b17c8eb9f3a47080e4c9ef4f7f6039fc0aad37bdba06211d5",
+        "triangles": 3090,
+        "uniform_scale": 2.0813006889529344,
+        "visible_accepted_triangles_missing": 0,
+        "corners_with_normal_opposing_face": 155,
+        "kept_supplied_uvs": true
+      },
+      "candidate": {
+        "file": "texture-v002/textured.glb",
+        "sha256": "769a6985213fd790fce8c14a585658669fbdac363ccc0f5e99c36f0329349cdb",
+        "bytes": 7213608,
+        "method": "accepted corners and prepared normals + Meshy per-corner UVs and PBR material",
+        "exact_against_accepted_geometry": true,
+        "triangles": 3108,
+        "corners_with_normal_opposing_face": 0,
+        "pbr": "baseColor (sRGB) + metallicRoughness + normal, 2048 px JPEG; doubleSided as delivered by Meshy"
+      },
+      "runtime_copy": {
+        "file": "public/assets/3d/props/meshy/city-forum-map.glb",
+        "sha256": "0c67650146ad1830914f42c622b3a4f1c1ebdc4c9c19f502421c17e7188c45cb",
+        "bytes": 326420,
+        "max_texture_px": 512,
+        "geometry_bytes_identical": true
+      }
+    }
+  },
+  "local_repair": {
+    "authorization": "Cristóbal: «El foro tiene problema de que le falta un pedazo por el frente». Local boundary patch, 0 credits. Original geometry/preview.glb untouched.",
+    "candidate": "repair-v001/preview.glb",
+    "audit": "repair-v001/repair-audit.json",
+    "source_preserved": true,
+    "human_geometry_approval": "approved by Cristóbal («apruebo el foro y la vivienda»)",
+    "candidate_sha256": "04f6509a20d20783bae1fc86250c8137c837b76090081f8a841119e6b8377718",
+    "source_sha256": "8915ce07e7fb5fd09f655cce2124a50ceb759de3e42d3a3473a8501319120930",
+    "source_triangles": 2696,
+    "triangles": 3108,
+    "boundary_triangles_added": 412,
+    "method": "Close all Image-to-3D boundary loops with min-area triangulation of existing corners (consecutive near-duplicates dropped; five leftover degenerate triangles stitched). Recessed doorway with a back face has no boundary and is unchanged.",
+    "new_paid_requests": 0
+  }
+}

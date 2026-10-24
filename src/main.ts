@@ -131,10 +131,12 @@ type ThreeProbes = {
   areForestPropsSettled: () => boolean;
   areCityPropsSettled: () => boolean;
   areUnitPropsSettled: () => boolean;
+  getUnitRoleSources: () => Record<string, string | undefined>;
   areResourcePropsSettled: () => boolean;
   isTerrainScatterSettled: () => boolean;
   areWonderPropsSettled: () => boolean;
   getWonderProps: (typeof import('./three/WonderProps3D.ts'))['wonderPropsDebug'];
+  unitWalkDebug: (typeof import('./three/UnitMesh3D.ts'))['unitWalkDebug'];
   computeRiverPaths: (typeof import('./three/Rivers3D.ts'))['computeRiverPaths'];
 };
 let threeProbes: ThreeProbes | null = null;
@@ -150,17 +152,21 @@ function ensureThreeProbes(): void {
     import('./three/TerrainScatter3D.ts'),
     import('./three/WonderProps3D.ts'),
     import('./three/Rivers3D.ts'),
+    import('./three/UnitMesh3D.ts'),
   ])
-    .then(([mountain, forest, city, unit, resource, scatter, wonder, rivers]) => {
+    .then(([mountain, forest, city, unit, resource, scatter, wonder, rivers, unitMesh]) => {
       threeProbes = {
         areMountainPropsSettled: mountain.areMountainPropsSettled,
         areForestPropsSettled: forest.areForestPropsSettled,
         areCityPropsSettled: city.areCityPropsSettled,
         areUnitPropsSettled: unit.areUnitPropsSettled,
+        getUnitRoleSources: () =>
+          Object.fromEntries(unit.UNIT_ROLE_GLB_IDS.map((id) => [id, unit.getUnitRoleSource(id)])),
         areResourcePropsSettled: resource.areResourcePropsSettled,
         isTerrainScatterSettled: scatter.isTerrainScatterSettled,
         areWonderPropsSettled: wonder.areWonderPropsSettled,
         getWonderProps: wonder.wonderPropsDebug,
+        unitWalkDebug: unitMesh.unitWalkDebug,
         computeRiverPaths: rivers.computeRiverPaths,
       };
     })
@@ -190,10 +196,13 @@ type RepoCivDebugApi = {
   areForestPropsSettled: () => boolean;
   areCityPropsSettled: () => boolean;
   areUnitPropsSettled: () => boolean;
+  getUnitRoleSources: () => Record<string, string | undefined>;
   areResourcePropsSettled: () => boolean;
   isTerrainScatterSettled: () => boolean;
   areWonderPropsSettled: () => boolean;
   getWonderProps: () => Array<Record<string, unknown>> | null;
+  getUnitWalkDebug: () => ReturnType<(typeof import('./three/UnitMesh3D.ts'))['unitWalkDebug']>;
+  walkUnit: (id: string, q: number, r: number) => boolean;
   getGlobalUnits: () => Array<{
     id: string;
     type: string;
@@ -552,6 +561,10 @@ async function bootstrap() {
       ensureThreeProbes();
       return threeProbes?.areUnitPropsSettled() ?? false;
     },
+    getUnitRoleSources: () => {
+      ensureThreeProbes();
+      return threeProbes?.getUnitRoleSources() ?? {};
+    },
     areResourcePropsSettled: () => {
       ensureThreeProbes();
       return threeProbes?.areResourcePropsSettled() ?? false;
@@ -568,6 +581,11 @@ async function bootstrap() {
       ensureThreeProbes();
       return threeProbes?.getWonderProps() ?? null;
     },
+    getUnitWalkDebug: () => {
+      ensureThreeProbes();
+      return threeProbes?.unitWalkDebug?.() ?? [];
+    },
+    walkUnit: (id: string, q: number, r: number) => state.walkUnitTo(id, { q, r }),
     getWebGLMetrics: () => renderer.getWebGLMetrics(),
     setPostFxEnabled: (enabled: boolean) => renderer.setPostFxEnabled(enabled),
     isPostFxEnabled: () => renderer.isPostFxEnabled(),

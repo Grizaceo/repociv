@@ -12,6 +12,8 @@ import {
   BANNER_PROP_IDS,
   cityBannerId,
   MESHY_CITY_PLAZA_URL,
+  MESHY_SETTLEMENT_URLS,
+  SETTLEMENT_OVERLAY,
 } from './CityProps3D.ts';
 import type { City, Tile } from '../types.ts';
 
@@ -116,5 +118,26 @@ describe('KayKit city prop recipes', () => {
     expect(cityBannerId(city, { ...okTile, skillHealth: 'stale' })).toBe('banner-red');
     expect(MESHY_CITY_PLAZA_URL).toBe('/assets/3d/props/meshy/civic-plaza-map.glb');
     expect(existsSync(`public${MESHY_CITY_PLAZA_URL}`)).toBe(true);
+    expect(MESHY_SETTLEMENT_URLS['city-dwelling']).toBe(
+      '/assets/3d/props/meshy/city-dwelling-map.glb',
+    );
+    expect(MESHY_SETTLEMENT_URLS['city-guild']).toBe('/assets/3d/props/meshy/city-guild-map.glb');
+    expect(MESHY_SETTLEMENT_URLS['city-forum']).toBe('/assets/3d/props/meshy/city-forum-map.glb');
+    expect(MESHY_SETTLEMENT_URLS['city-citadel']).toBe(
+      '/assets/3d/props/meshy/city-citadel-map.glb',
+    );
+  });
+
+  it('ships optimized Meshy settlement overlays on disk and maps them onto KayKit parts', () => {
+    expect(SETTLEMENT_OVERLAY.building_home_A_red).toBe(MESHY_SETTLEMENT_URLS['city-dwelling']);
+    expect(SETTLEMENT_OVERLAY.building_home_B_red).toBe(MESHY_SETTLEMENT_URLS['city-dwelling']);
+    expect(SETTLEMENT_OVERLAY.building_market_red).toBe(MESHY_SETTLEMENT_URLS['city-guild']);
+    expect(SETTLEMENT_OVERLAY.building_tavern_red).toBe(MESHY_SETTLEMENT_URLS['city-guild']);
+    expect(SETTLEMENT_OVERLAY.building_church_red).toBe(MESHY_SETTLEMENT_URLS['city-forum']);
+    expect(SETTLEMENT_OVERLAY.building_castle_red).toBe(MESHY_SETTLEMENT_URLS['city-citadel']);
+    expect(SETTLEMENT_OVERLAY.building_well_red).toBe(MESHY_CITY_PLAZA_URL);
+    for (const url of [...Object.values(MESHY_SETTLEMENT_URLS), MESHY_CITY_PLAZA_URL]) {
+      expect(existsSync(`public${url}`), url).toBe(true);
+    }
   });
 });

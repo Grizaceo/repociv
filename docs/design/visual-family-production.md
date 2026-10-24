@@ -14,8 +14,20 @@ Las etiquetas «Propuesto» de la tabla inferior son históricas. Prevalecen las
 | research-laboratory | Aprobado | repair-v003 aprobada | Aprobados | Integrado en `public/assets/3d/props/meshy/` (por defecto) |
 | civic-plaza | Aprobado | Aprobada | Aprobados | Integrado en `CityProps3D.ts` (`public/assets/3d/props/meshy/`, por defecto) |
 | execution-workshop | Aprobado | repair-v003 aprobada | Aprobados (PBR 2K) | Integrado en `public/assets/3d/props/meshy/` (por defecto) |
+| city-dwelling | Aprobado | Aprobada | Aprobados («apruebo el foro y la vivienda») | Overlay `building_home_*` en `CityProps3D` |
+| city-guild | Aprobado | Aprobada | Aprobados («apruebo el gremio por completo») | Overlay `building_market_red` y `building_tavern_red` |
+| city-forum | Aprobado | repair-v001 aprobada | Aprobados («apruebo el foro y la vivienda») | Overlay `building_church_red` |
+| city-citadel | Aprobado | repair-v003 aceptada para continuar | Aceptados para continuar; **follow-up: 2 ventanas** | Overlay `building_castle_red` |
+| unit-builder | Aprobado | geometry-v002 aprobada | Aprobados («apruebo») | Overlay `unit-engineer` → `unit-builder-map.glb` |
+| unit-coordinator | Aprobado | Aprobada | Aprobados («las texturas que aprobé») | Overlay `unit-mage` → `unit-coordinator-map.glb` |
+| unit-ranger | Aprobado | Aprobada | Aprobados («las texturas que aprobé») | Overlay `unit-rogue` → `unit-ranger-map.glb` |
+| unit-guardian | Aprobado | Aprobada | Aprobados («las texturas que aprobé»; texture-v003) | Overlay `unit-knight` → `unit-guardian-map.glb` |
 
-Gasto de la tanda de materiales: 50 créditos (cinco Retexture de 10), saldo 552 → 502. Materiales, mapeo de servicios y escala aprobados por Cristóbal e integrados por defecto en RepoCiv.
+Ola 2 (kit de murallas): GLBs locales en `public/assets/3d/props/knowledge-city/`, overlay en `CityWalls3D.ts`. `RING_R=0.42` y `STRAIGHT_SPAN=0.4` intactos.
+
+**Follow-up ciudadela (2026-10-24).** Cristóbal: «quedo mejor faltan solo 2 ventanas por arreglar dejalo anotado». Vista izquierda: manchón marrón en planta baja y vano abierto en la terraza media. No gastar créditos de Meshy en un reintento hasta autorización expresa. Detalle en `assets-src/meshy/city-citadel/spec.json` → `follow_up`.
+
+Gasto de la tanda de materiales de servicios: 50 créditos (cinco Retexture de 10), saldo 552 → 502. Materiales, mapeo de servicios y escala de esos ocho miembros aprobados por Cristóbal e integrados por defecto en RepoCiv.
 
 ## Encargo y estado
 
@@ -52,7 +64,7 @@ No comprar texturas para salvar una silueta ambigua. El patio del conjunto de co
 
 1. Asentamientos: pequeño núcleo, barrio, ciudad y capital construidos con módulos comunes, no cuatro estilos independientes. El catálogo existente contiene city-hamlet, city-village, city-town y city-capital; el consumidor CityProps3D tiene recetas por nivel, que requieren auditoría antes de sustituir assets.
 2. Kit urbano compartido: caminos/bordes, escaleras, muros bajos, puente robusto, farola, señal y cajas. Preferir construcción local determinista de piezas simples y repetibles, reservando Meshy para siluetas principales.
-3. Habitantes/agentes: identificar roles reales antes de definir personajes; una misma anatomía y proporciones, herramientas y accesorios por función, sin convertir el sistema en ejército de fantasía. Rigging y animación fuera del presupuesto arquitectónico.
+3. Habitantes/agentes: identificar roles reales antes de definir personajes; una misma anatomía y proporciones, herramientas y accesorios por función, sin convertir el sistema en ejército de fantasía. Rigging y animación fuera del presupuesto arquitectónico. **2026-10-24:** las cuatro figurillas Meshy PBR están en el overlay de `UnitProps3D` (CSG prediseños ya no son el runtime). Licencia Meshy sigue sin verificar.
 4. Entorno: armonizar vegetación, rocas, terreno e iluminación después de validar una pequeña escena de familia; no regenerar todo por defecto.
 
 Inventario consultado: public/assets/3d/props y consumidores src/three/CityProps3D.ts, WonderProps3D.ts y UnitProps3D.ts. Inventario de archivos no implica aceptación visual ni compatibilidad de los reemplazos.

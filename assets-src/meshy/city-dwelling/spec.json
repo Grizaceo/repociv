@@ -1,0 +1,131 @@
+{
+  "asset_id": "city-dwelling-v001",
+  "status": "concept, geometry and PBR materials artist-approved by Cristóbal («apruebo el foro y la vivienda»); integrated into CityProps3D settlement recipes (public/assets/3d/props/meshy/city-dwelling-map.glb)",
+  "license_status": "unverified; local only; distribution blocked",
+  "reference_asset": "memory-archive-v001",
+  "authorization": "Wave 1 Step 2 settlement modules. One Image-to-Image concept per asset after explicit human confirmation. No automatic geometry or texturing.",
+  "runtime": {
+    "consumer": "src/three/CityProps3D.ts SETTLEMENT_OVERLAY (replaces building_home_A_red and building_home_B_red)",
+    "public_path": "public/assets/3d/props/meshy/city-dwelling-map.glb",
+    "default_enabled": true,
+    "mapping_status": "approved by Cristóbal («apruebo el foro y la vivienda»); overlays building_home_A_red and building_home_B_red"
+  },
+  "concept": {
+    "tool": "meshy_image_to_image",
+    "advertised_credits": 9,
+    "max_create_requests": 1,
+    "reference_relative_paths": ["assets-src/meshy/memory-archive/textured/archive-textured.png"],
+    "request_without_reference_paths": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "Create ONE original standalone asset for the SAME knowledge-city strategy-game civilization as the supplied Memory Archive image. Use the image as a strict material and architectural craftsmanship reference, NOT as a silhouette to copy. Warm pale limestone as the main matte mass, broad dark slate ceramic roofs, aged copper-bronze structural eaves and frames with contained turquoise patina, subtle warm amber only in shallow window panes or a tiny lantern. Large calm material regions, warm handcrafted stylized finish, sophisticated proportions rather than medieval fantasy or photorealism. City Dwelling: a compact two-storey stepped limestone studio-home. A slightly broader ground terrace, a smaller upper studio offset toward the rear, generous slate hip roof with substantial copper eaves, and a short copper ridge cap. Windows only as simple shallow framed rectangular recessed panels with thick frames, never perforations or floating grids. Compact architectural base with no surrounding terrain hex, no garden, no chimney, no timber framing, no half-timber, no red clay tiles. Read clearly as a dwelling/atelier, not a guild hall, forum, citadel, temple or tower. Show the complete standalone subject in one clearly ELEVATED THREE-QUARTER ISOMETRIC view, with both front and side visible, all edges inside frame, neutral background and transparent cutout. Readable at small strategy-map scale. All walls and roofs 100% closed. Thick connected structural pieces, no thin railings or filigree, no text, logos, people, gears, dramatic baked shadows, excessive grime, floating pieces or surrounding scenery.",
+      "generate_multi_view": false,
+      "aspect_ratio": "1:1",
+      "remove_background": true
+    }
+  },
+  "geometry_after_concept_approval": {
+    "authorization": "Cristóbal: «Apruebo» the city-dwelling concept (wood door, crossed window frames, maquette slab and flat terrace disclosed). One untextured mesh, no automatic retry.",
+    "advertised_credits": 5,
+    "max_create_requests": 1,
+    "request_without_input_task_id": {
+      "ai_model": "meshy-t2.5",
+      "model_type": "smart-topology",
+      "target_polycount": 3000,
+      "topology": "triangle",
+      "should_texture": false,
+      "enable_pbr": false,
+      "target_formats": ["glb"],
+      "alpha_thumbnail": true,
+      "multi_view_thumbnails": true,
+      "auto_size": false
+    },
+    "result": {
+      "task_id": "01a16b99-8a62-7243-a07b-1bbe225009e7",
+      "status": "SUCCEEDED",
+      "consumed_credits": 5,
+      "balance_before": 483,
+      "balance_after": 478,
+      "reconciled": true,
+      "triangles": 2952,
+      "sha256": "d9ee43637f03c4f3535e7109288330c739b89688bcd1d7ea6aaab6957192e89b",
+      "file": "geometry/preview.glb",
+      "human_geometry_approval": "approved",
+      "approved_by": "Cristóbal",
+      "approval_quote": "lo apruebo continua"
+    }
+  },
+  "texturing_after_geometry_approval": {
+    "tool": "meshy_retexture",
+    "endpoint": "POST /openapi/v1/retexture",
+    "authorization": "Cristóbal: «lo apruebo continua» after reviewing the untextured dwelling in the local clay viewer. One 10-credit PBR retexture, no variants, no automatic paid retries. Geometry approval is not advance material approval.",
+    "advertised_credits": 10,
+    "pricing_source": "https://docs.meshy.ai/en/api/pricing read 2026-10-23: Retexture 2K/4K 10, 8K 15",
+    "max_create_requests": 1,
+    "output_dir": "texture-v001",
+    "source": {
+      "route": "model_url",
+      "accepted_geometry": "geometry/preview.glb",
+      "accepted_sha256": "d9ee43637f03c4f3535e7109288330c739b89688bcd1d7ea6aaab6957192e89b",
+      "origin_task_id": "01a16b99-8a62-7243-a07b-1bbe225009e7",
+      "uv_copy": "texture-v001/source-uv.glb",
+      "normals": "local 42-degree crease normals; approved positions and triangle order unchanged",
+      "why_not_input_task_id": "Meshy's returned normals cannot be trusted (approved Observatory: 274 corners oppose their faces, 2 visible triangles dropped); sending the approved GLB keeps every member on one verified route"
+    },
+    "request": {
+      "ai_model": "meshy-7",
+      "text_style_prompt": "Original knowledge-city dwelling, a compact two-storey stepped limestone studio-home. Warm pale limestone walls, matte. Broad dark slate ceramic hipped roof with generous aged copper eaves and a short copper ridge cap. Contained turquoise patina only on copper frames and eaves, never on stone or slate. Subtle warm amber glass in shallow recessed window panes with thick frames. Broad calm hand-crafted stylized material regions readable from an elevated strategy-game camera, subtle stone variation, restrained weathering. Preserve the geometry. No text, logos, grime, baked lighting or baked shadows. Limestone matte, slate moderately rough, copper metallic.",
+      "enable_original_uv": true,
+      "enable_pbr": true,
+      "texture_resolution": "2k",
+      "target_formats": ["glb"],
+      "alpha_thumbnail": true
+    },
+    "uv_method": "xatlas-python 0.0.11, 2048 px atlas, 6 px padding, charts on welded positions",
+    "material_approval": "approved by Cristóbal («apruebo el foro y la vivienda»)",
+    "result": {
+      "task_id": "01a16ba7-4399-7529-bc70-e62e2708a8fe",
+      "status": "SUCCEEDED",
+      "consumed_credits": 10,
+      "balance_before": 478,
+      "balance_after": 468,
+      "reconciled": true,
+      "sent_model_sha256": "b1dc5b4964c84321a1a6d9b07f67a741139e9be00166980013e20f8d1477d725",
+      "sent_model_bytes": 174652,
+      "uv_charts": 426,
+      "uv_area_coverage": 0.7391470351188594,
+      "meshy_output": {
+        "file": "texture-v001/meshy.glb",
+        "sha256": "e4dd6a6ae9d4786fffd9ab652a2e39ea34e514059baf603ec18af50a438482aa",
+        "triangles": 2952,
+        "uniform_scale": 2.0972862263184844,
+        "visible_accepted_triangles_missing": 0,
+        "corners_with_normal_opposing_face": 32,
+        "kept_supplied_uvs": true
+      },
+      "candidate": {
+        "file": "texture-v001/textured.glb",
+        "sha256": "4d68163651b15c9781448d38526d337b6f0e34306a2971f3386fa01136bb3ff4",
+        "bytes": 6317040,
+        "method": "accepted corners and prepared normals + Meshy per-corner UVs and PBR material",
+        "exact_against_accepted_geometry": true,
+        "triangles": 2952,
+        "corners_with_normal_opposing_face": 0,
+        "pbr": "baseColor (sRGB) + metallicRoughness + normal, 2048 px JPEG; doubleSided as delivered by Meshy"
+      },
+      "runtime_copy": {
+        "file": "texture-v001/city-dwelling-map.glb",
+        "public_file": "public/assets/3d/props/meshy/city-dwelling-map.glb",
+        "sha256": "2b25fcbbfb5b84670ffc8797abad627538d8705721dbc189b234ac8f106d9edf",
+        "bytes": 324160,
+        "max_texture_px": 512,
+        "geometry_bytes_identical": true
+      },
+      "visual_observations": "Pale limestone walls and a dark slate hip roof, with a wood door as in the approved concept. Window panes show pale curtains rather than amber glass; frames and eaves read dark brown/black rather than aged copper with turquoise patina. Unlit albedo confirms those colors are in the maps. Single-sided view stays closed. Cristóbal approved materials anyway («apruebo el foro y la vivienda»)."
+    }
+  },
+  "guards": {
+    "auto_geometry": false,
+    "auto_texture": false,
+    "auto_retry_paid_requests": false
+  }
+}

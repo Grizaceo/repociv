@@ -1,13 +1,15 @@
-// ─── City props (KayKit Medieval Hexagon Pack — CC0) ────────────────────────
-// Cities render as multi-building clusters built from KayKit faction-red
-// models (hand-painted texture atlas, CC0 — see
-// public/assets/3d/props/kaykit/LICENSE-KayKit.txt). Each city level maps to
-// a RECIPE: a list of parts with hex-fraction offsets, per-part scale (as a
+// ─── City props (KayKit Medieval Hexagon Pack — CC0, Meshy overlay) ─────────
+// Cities render as multi-building clusters. KayKit faction-red models are the
+// fallback (hand-painted texture atlas, CC0 — see
+// public/assets/3d/props/kaykit/LICENSE-KayKit.txt). When VITE_MESHY_PREVIEW
+// !== '0', living-knowledge-city Meshy modules overlay those part ids
+// (dwelling, guild, forum, citadel, civic plaza). Each city level maps to a
+// RECIPE: a list of parts with hex-fraction offsets, per-part scale (as a
 // fraction of HEX_SIZE of the part's longest bbox side) and a rotation step
 // (×60°). Part geometries are bbox-normalized at load so recipe scales are
-// footprint-independent. Walls and towers come from the KayKit wall kit
-// (CityWalls3D); CityCluster3D only draws a procedural fallback while the
-// kits are loading or failed.
+// footprint-independent. Walls and towers come from CityWalls3D;
+// CityCluster3D only draws a procedural fallback while the kits are loading
+// or failed.
 import { Group, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGlbScene, type MergedGlb } from './mergeGlbScene.ts';
@@ -47,6 +49,24 @@ const PROP_IDS = [
 export const BANNER_PROP_IDS = ['banner-green', 'banner-red'] as const;
 export type BannerPropId = (typeof BANNER_PROP_IDS)[number];
 export const MESHY_CITY_PLAZA_URL = familyBuildingUrl('civic-plaza');
+
+/** Wave 1 step 2 settlement modules. Overlay replaces KayKit when preview is on. */
+export const MESHY_SETTLEMENT_URLS = {
+  'city-dwelling': '/assets/3d/props/meshy/city-dwelling-map.glb',
+  'city-guild': '/assets/3d/props/meshy/city-guild-map.glb',
+  'city-forum': '/assets/3d/props/meshy/city-forum-map.glb',
+  'city-citadel': '/assets/3d/props/meshy/city-citadel-map.glb',
+} as const;
+
+export const SETTLEMENT_OVERLAY: Partial<Record<(typeof PROP_IDS)[number], string>> = {
+  building_home_A_red: MESHY_SETTLEMENT_URLS['city-dwelling'],
+  building_home_B_red: MESHY_SETTLEMENT_URLS['city-dwelling'],
+  building_market_red: MESHY_SETTLEMENT_URLS['city-guild'],
+  building_tavern_red: MESHY_SETTLEMENT_URLS['city-guild'],
+  building_church_red: MESHY_SETTLEMENT_URLS['city-forum'],
+  building_castle_red: MESHY_SETTLEMENT_URLS['city-citadel'],
+  building_well_red: MESHY_CITY_PLAZA_URL,
+};
 
 type PartId = (typeof PROP_IDS)[number];
 
@@ -150,7 +170,7 @@ export function ensureCityPropsLoad(onSettled?: () => void): void {
   const loader = new GLTFLoader();
   Promise.all(PROP_IDS.map((id) => loader.loadAsync(`${KAYKIT_DIR}/${id}.gltf`)))
     .then(async (gltfs) => {
-      variants = new Map();
+      const next = new Map<PartId, PropVariant>();
       for (let i = 0; i < PROP_IDS.length; i++) {
         const merged = mergeGlbScene(gltfs[i]!.scene);
         // Normalize to unit longest-bbox-side so recipe scales are
@@ -159,21 +179,32 @@ export function ensureCityPropsLoad(onSettled?: () => void): void {
         const bb = merged.geometry.boundingBox!;
         const size = new Vector3().subVectors(bb.max, bb.min);
         const norm = 1 / Math.max(size.x, size.y, size.z, 1e-6);
-        variants.set(PROP_IDS[i]!, { ...merged, norm });
+        next.set(PROP_IDS[i]!, { ...merged, norm });
       }
       if (import.meta.env['VITE_MESHY_PREVIEW'] !== '0') {
-        try {
-          const plazaGltf = await loader.loadAsync(MESHY_CITY_PLAZA_URL);
-          const merged = mergeGlbScene(plazaGltf.scene);
-          merged.geometry.computeBoundingBox();
-          const bb = merged.geometry.boundingBox!;
-          const size = new Vector3().subVectors(bb.max, bb.min);
-          const norm = 1 / Math.max(size.x, size.y, size.z, 1e-6);
-          variants.set('building_well_red', { ...merged, norm });
-        } catch {
-          // Keep KayKit building_well_red fallback if civic-plaza-map.glb is unavailable.
+        const unique = new Map<string, PartId[]>();
+        for (const [id, url] of Object.entries(SETTLEMENT_OVERLAY) as Array<[PartId, string]>) {
+          const bucket = unique.get(url);
+          if (bucket) bucket.push(id);
+          else unique.set(url, [id]);
         }
+        await Promise.all(
+          [...unique.entries()].map(async ([url, ids]) => {
+            try {
+              const gltf = await loader.loadAsync(url);
+              const merged = mergeGlbScene(gltf.scene);
+              merged.geometry.computeBoundingBox();
+              const bb = merged.geometry.boundingBox!;
+              const size = new Vector3().subVectors(bb.max, bb.min);
+              const norm = 1 / Math.max(size.x, size.y, size.z, 1e-6);
+              for (const id of ids) next.set(id, { ...merged, norm });
+            } catch {
+              // Keep the KayKit fallback for this module if the Meshy copy is missing.
+            }
+          }),
+        );
       }
+      variants = next;
       try {
         const bannerGltfs = await Promise.all(
           BANNER_PROP_IDS.map((id) => loader.loadAsync(`${KENNEY_DIR}/${id}.glb`)),

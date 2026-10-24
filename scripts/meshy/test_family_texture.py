@@ -28,7 +28,7 @@ def fake_uv_copy(asset, root):
     corners = faces.reshape(-1)
     uv = np.stack([np.linspace(0, 1, len(corners)), np.zeros(len(corners))], 1).astype(np.float32)
     blob = ft.glb_from_arrays(position[corners], normal[corners], uv, np.arange(len(corners)).reshape(-1, 3))
-    folder = root / asset / ft.OUT_NAME
+    folder = root / asset / spec["texturing_after_geometry_approval"].get("output_dir", ft.OUT_NAME)
     folder.mkdir(exist_ok=True)
     (folder / "source-uv.glb").write_bytes(blob)
     check = ft.verify_against_source(path.read_bytes(), blob)
@@ -71,7 +71,13 @@ class FamilyTextureTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ft.asset_dir(asset)
         self.assertEqual(set(ft.ASSETS), {"coordination-court", "artifact-vault", "research-laboratory",
-                                          "execution-workshop", "connection-gateway", "civic-plaza"})
+                                          "execution-workshop", "connection-gateway", "civic-plaza",
+                                          "city-dwelling", "city-guild", "city-forum", "city-citadel",
+                                          "unit-coordinator", "unit-ranger", "unit-guardian",
+                                          "unit-builder"})
+        self.assertEqual(ft.REVISED_GEOMETRY["unit-builder"], "geometry-v002/preview.glb")
+        self.assertNotEqual(ft.ORIGIN_TASKS["unit-builder"],
+                            "01a16c2e-4be4-7665-8cc2-adffde15e341")
 
     def test_sources_are_the_approved_files(self):
         for asset in ft.ASSETS:
@@ -81,10 +87,22 @@ class FamilyTextureTests(unittest.TestCase):
             if asset in ft.REPAIRED:
                 self.assertEqual(path.relative_to(self.root / asset).as_posix(), "repair-v003/preview.glb")
                 self.assertEqual(digest, spec["local_repair"]["approved_sha256"])
+            elif asset in ft.SETTLEMENT_REPAIRED:
+                candidate = spec["local_repair"]["candidate"]
+                self.assertIn(candidate, (
+                    "repair-v001/preview.glb",
+                    "repair-v002/preview.glb",
+                    "repair-v003/preview.glb",
+                ))
+                self.assertEqual(path.relative_to(self.root / asset).as_posix(), candidate)
+                self.assertEqual(digest, spec["local_repair"]["candidate_sha256"])
+            elif asset in ft.REVISED_GEOMETRY:
+                self.assertEqual(path.relative_to(self.root / asset).as_posix(),
+                                 ft.REVISED_GEOMETRY[asset])
             else:
                 self.assertEqual(path.relative_to(self.root / asset).as_posix(), "geometry/preview.glb")
             wrong = copy.deepcopy(spec)
-            wrong["texturing_after_geometry_approval"]["source"]["accepted_geometry"] = "repair-v002/preview.glb"
+            wrong["texturing_after_geometry_approval"]["source"]["accepted_geometry"] = "repair-v009/preview.glb"
             with self.assertRaises(ValueError):
                 ft.accepted_source(asset, wrong)
 
@@ -96,15 +114,15 @@ class FamilyTextureTests(unittest.TestCase):
                 wrong = copy.deepcopy(spec)
                 wrong["texturing_after_geometry_approval"]["request"][field] = value
                 with self.assertRaises(ValueError):
-                    ft.build_request(asset, wrong, self.root / asset / ft.OUT_NAME)
+                    ft.build_request(asset, wrong, ft.texture_folder(asset, spec))
             long = copy.deepcopy(spec)
             long["texturing_after_geometry_approval"]["request"]["text_style_prompt"] = "x" * 801
             with self.assertRaises(ValueError):
-                ft.build_request(asset, long, self.root / asset / ft.OUT_NAME)
+                ft.build_request(asset, long, ft.texture_folder(asset, spec))
             posts = []
             with self.assertRaises(ValueError):
                 ft.create_once(asset, spec, self.api_factory(posts, balance=9))
-            self.assertFalse((self.root / asset / ft.OUT_NAME / "retexture-submission-lock.json").exists())
+            self.assertFalse((ft.texture_folder(asset, spec) / "retexture-submission-lock.json").exists())
             ft.create_once(asset, spec, self.api_factory(posts))
             with self.assertRaises(SystemExit):
                 ft.create_once(asset, spec, self.api_factory(posts))
@@ -114,9 +132,9 @@ class FamilyTextureTests(unittest.TestCase):
             self.assertNotIn("input_task_id", payload)
             prefix = "data:application/octet-stream;base64,"
             self.assertEqual(base64.b64decode(payload["model_url"][len(prefix):]), blob)
-            lock = (self.root / asset / ft.OUT_NAME / "retexture-submission-lock.json").read_text()
+            lock = (ft.texture_folder(asset, spec) / "retexture-submission-lock.json").read_text()
             self.assertNotIn("base64", lock)
-            state = json.loads((self.root / asset / ft.OUT_NAME / "generation.json").read_text())
+            state = json.loads((ft.texture_folder(asset, spec) / "generation.json").read_text())
             self.assertEqual(state["source"]["model_url_sha256"], ft.sha256(blob))
 
     def test_tampered_uv_copy_is_refused(self):
@@ -126,7 +144,7 @@ class FamilyTextureTests(unittest.TestCase):
         moved = a["POSITION"].copy()
         moved[0, 1] += 0.01
         bad = ft.glb_from_arrays(moved, a["NORMAL"], a["TEXCOORD_0"], f)
-        folder = self.root / asset / ft.OUT_NAME
+        folder = ft.texture_folder(asset, spec)
         (folder / "source-uv.glb").write_bytes(bad)
         audit = json.loads((folder / "uv-audit.json").read_text())
         audit["output_sha256"] = ft.sha256(bad)
@@ -140,7 +158,7 @@ class FamilyTextureTests(unittest.TestCase):
         posts = []
         with self.assertRaises(TimeoutError):
             ft.create_once(asset, spec, self.api_factory(posts, fail=TimeoutError("uncertain")))
-        folder = self.root / asset / ft.OUT_NAME
+        folder = ft.texture_folder(asset, spec)
         self.assertTrue((folder / "retexture-submission-lock.json").exists())
         self.assertFalse((folder / "generation.json").exists())
         with self.assertRaises(SystemExit):
@@ -170,7 +188,7 @@ class FamilyTextureTests(unittest.TestCase):
         for asset in ("coordination-court", "connection-gateway"):
             spec, blob = fake_uv_copy(asset, self.root)
             meshy, order, uv = self.meshy_like(blob)
-            folder = self.root / asset / ft.OUT_NAME
+            folder = ft.texture_folder(asset, spec)
             (folder / "meshy.glb").write_bytes(meshy)
             report = ft.assemble(asset, spec)
             self.assertTrue(report["accepted_geometry_check"]["exact"])
@@ -191,10 +209,10 @@ class FamilyTextureTests(unittest.TestCase):
         _, _, a, f, _ = ft.read_mesh(blob)
         areas = ft.triangle_areas(a["POSITION"][f].astype(np.float64))
         meshy, _, _ = self.meshy_like(blob, drop=int(areas.argmax()))
-        (self.root / asset / ft.OUT_NAME / "meshy.glb").write_bytes(meshy)
+        (ft.texture_folder(asset, spec) / "meshy.glb").write_bytes(meshy)
         with self.assertRaises(SystemExit):
             ft.assemble(asset, spec)
-        self.assertFalse((self.root / asset / ft.OUT_NAME / "textured.glb").exists())
+        self.assertFalse((ft.texture_folder(asset, spec) / "textured.glb").exists())
 
     def test_verify_detects_moved_corner(self):
         asset = "coordination-court"

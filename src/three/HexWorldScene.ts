@@ -144,7 +144,7 @@ export interface HexSceneRenderOptions {
   showLabels: boolean;
   animTime: number;
   /** Delta time in seconds since the last frame. Drives per-frame
-   *  animations (unit spawn/despawn tweens, idle pulses, walking hops)
+   *  animations (unit spawn/despawn tweens, idle breath, walk pose)
    *  that progress independently of the dirty-flag rebuilds. */
   dt: number;
 }
@@ -1257,8 +1257,8 @@ export function updateHexWorldScene(
   animateTerritoryPulse(opts.animTime);
   if (stateDirty) rebuildFoam(state, opts.animTime);
   animateFoamPulse(opts.animTime);
-  // Per-frame unit animations (spawn/despawn tweens, idle pulse, walking
-  // hop, movement tween). Runs every frame regardless of dirty state.
+  // Per-frame unit animations (spawn/despawn tweens, idle breath, walk
+  // pose, movement tween). Runs every frame regardless of dirty state.
   // The onTileStep callback triggers a yellow tile flash when a unit
   // steps onto a new tile during the movement tween.
   tickUnits(opts.animTime, opts.dt, (q, r, elev) => flashTile(q, r, elev));

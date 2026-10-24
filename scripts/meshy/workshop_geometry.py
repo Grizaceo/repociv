@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ASSET = ROOT / "assets-src/meshy/execution-workshop"
 OUT = ASSET / "geometry"
 SOURCE_ID = "01a165c7-ddb4-7453-8364-c1edc5eba490"
+TARGET_POLYCOUNT = 4000
 
 
 def create_once(out, spec, source, api):
@@ -20,7 +21,7 @@ def create_once(out, spec, source, api):
     request = dict(config["request_without_input_task_id"])
     request.pop("response_format", None)
     expected = {"ai_model": "meshy-t2.5", "model_type": "smart-topology",
-        "target_polycount": 4000, "topology": "triangle", "should_texture": False,
+        "target_polycount": TARGET_POLYCOUNT, "topology": "triangle", "should_texture": False,
         "enable_pbr": False, "target_formats": ["glb"], "alpha_thumbnail": True,
         "multi_view_thumbnails": True, "auto_size": False}
     if request != expected or config["advertised_credits"] != 5 or config["max_create_requests"] != 1:

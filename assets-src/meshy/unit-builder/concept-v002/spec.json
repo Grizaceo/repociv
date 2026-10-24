@@ -1,0 +1,91 @@
+{
+  "asset_id": "unit-builder-v002",
+  "status": "geometry-v002 and PBR materials artist-approved by Cristóbal («apruebo»); runtime copy public/assets/3d/props/meshy/unit-builder-map.glb",
+  "license_status": "unverified; local only; distribution blocked",
+  "reference_asset": "memory-archive-v001",
+  "parent_asset": "unit-builder-v001",
+  "authorization": "Cristóbal: «todos estan bien salvo el constructor creo se entenderia más sin mochila y con martillo o una hoz». New Image-to-Image concept in concept-v002/; v001 lock and geometry stay immutable. Hammer chosen over sickle for builder identity. No automatic geometry or texturing.",
+  "runtime": {
+    "consumer": "src/three/UnitProps3D.ts KNOWLEDGE_CITY_UNIT_URLS (overlays unit-engineer)",
+    "public_path": "public/assets/3d/props/meshy/unit-builder-map.glb",
+    "phase5_fallback": "unit-engineer",
+    "default_enabled": true,
+    "mapping_status": "wired as overlay for unit-engineer; Meshy PBR map approved and copied to public/"
+  },
+  "concept": {
+    "tool": "meshy_image_to_image",
+    "advertised_credits": 9,
+    "max_create_requests": 1,
+    "reference_relative_paths": [
+      "assets-src/meshy/memory-archive/textured/archive-textured.png"
+    ],
+    "request_without_reference_paths": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "Create ONE original standalone STRATEGY-GAME FIGURINE for the SAME knowledge-city civilization as the supplied Memory Archive image. That image is a BUILDING: use it only as a strict material and craftsmanship reference — warm pale limestone, dark slate ceramic, aged copper-bronze with contained turquoise patina, subtle warm amber — NOT as a silhouette to copy. The subject is a compact stylized standing humanoid inhabitant with a slightly large head for map readability, full body, feet together. Handcrafted stylized finish, sophisticated proportions rather than photorealism, medieval fantasy, anime or chibi. Thick connected sculptural pieces, no thin fingers, railings or filigree, no text, logos, extra people, gears, dramatic baked shadows, excessive grime, floating pieces or surrounding scenery. No terrain hex. A tiny circular limestone figurine plinth under the feet is allowed. Show the complete standalone figurine in one clearly ELEVATED THREE-QUARTER ISOMETRIC view, with both front and side visible, all edges inside frame, neutral background and transparent cutout. Readable at small strategy-map scale. Unit Builder: a compact artisan of the knowledge city. Short limestone tunic, empty unobstructed back — no backpack, no satchel, no pack, no bedroll. A copper hammer in the right hand, short thick handle and a blocky head. No sickle, no chisel, no hardhat, no wrench, no overalls, no power tools. Read clearly as a builder, not an engineer mascot, coordinator, ranger or guardian.",
+      "generate_multi_view": false,
+      "aspect_ratio": "1:1",
+      "remove_background": true
+    },
+    "result": {
+      "task_id": "01a16c40-7b90-71a1-891e-cc8b04267dcd",
+      "status": "SUCCEEDED",
+      "consumed_credits": 9,
+      "balance_before": 320,
+      "balance_after": 281,
+      "reconciled": false,
+      "reconciliation_note": "Concurrent 3×10cr unit retextures posted during this 9cr concept; expected delta 39.",
+      "file": "preview.png"
+    },
+    "human_approval": {
+      "approved_by": "Cristóbal",
+      "approval_quote": "aprebo el constructor y bueno falta terminar de pintar al guardian",
+      "status": "approved"
+    }
+  },
+  "geometry_after_concept_approval": {
+    "authorization": "Cristóbal: «aprebo el constructor y bueno falta terminar de pintar al guardian». One untextured mesh from concept-v002 into geometry-v002, no automatic retry, no automatic texturing. v001 geometry stays immutable.",
+    "advertised_credits": 5,
+    "max_create_requests": 1,
+    "request_without_input_task_id": {
+      "ai_model": "meshy-t2.5",
+      "model_type": "smart-topology",
+      "target_polycount": 2000,
+      "topology": "triangle",
+      "should_texture": false,
+      "enable_pbr": false,
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true,
+      "multi_view_thumbnails": true,
+      "auto_size": false
+    },
+    "result": {
+      "task_id": "01a16c58-bc70-74ea-a01a-506e7ac8ae57",
+      "status": "SUCCEEDED",
+      "consumed_credits": 5,
+      "balance_before": 251,
+      "balance_after": 236,
+      "reconciled": false,
+      "reconciliation_note": "Concurrent 10cr guardian texture-v003; expected delta 15.",
+      "triangles": 2081,
+      "sha256": "b524342accc35c9a4ea779971f2d33e7f75f30344bc8f304af13101848cb53d9",
+      "file": "geometry-v002/preview.glb",
+      "human_geometry_approval": "approved",
+      "approval_quote": "apruebo el obrero continua con las texturas"
+    }
+  },
+  "texturing_after_geometry_approval": {
+    "tool": "meshy_retexture",
+    "endpoint": "POST /openapi/v1/retexture",
+    "authorization": "Submit only after human geometry approval. Geometry approval is not material approval.",
+    "advertised_credits": 10,
+    "max_create_requests": 1,
+    "material_approval": "pending; geometry approval is not material approval"
+  },
+  "guards": {
+    "auto_geometry": false,
+    "auto_texture": false,
+    "auto_retry_paid_requests": false
+  }
+}

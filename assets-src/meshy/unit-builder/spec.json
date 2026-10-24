@@ -1,0 +1,169 @@
+{
+  "asset_id": "unit-builder-v001",
+  "status": "concept, geometry-v002 and PBR materials artist-approved by Cristóbal («apruebo»); integrated into UnitProps3D overlay (public/assets/3d/props/meshy/unit-builder-map.glb)",
+  "license_status": "unverified; local only; distribution blocked",
+  "reference_asset": "memory-archive-v001",
+  "authorization": "Cristóbal: «en concepto bien, pero claro requieren de meshy porque como estan se ven horribles lol». One Image-to-Image concept per unit after that confirmation. No automatic geometry or texturing.",
+  "runtime": {
+    "consumer": "src/three/UnitProps3D.ts KNOWLEDGE_CITY_UNIT_URLS (overlays unit-engineer)",
+    "public_path": "public/assets/3d/props/meshy/unit-builder-map.glb",
+    "phase5_fallback": "unit-engineer",
+    "default_enabled": true,
+    "mapping_status": "wired as overlay for unit-engineer; Meshy PBR map approved and copied to public/"
+  },
+  "concept": {
+    "tool": "meshy_image_to_image",
+    "advertised_credits": 9,
+    "max_create_requests": 1,
+    "reference_relative_paths": [
+      "assets-src/meshy/memory-archive/textured/archive-textured.png"
+    ],
+    "request_without_reference_paths": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "Create ONE original standalone STRATEGY-GAME FIGURINE for the SAME knowledge-city civilization as the supplied Memory Archive image. That image is a BUILDING: use it only as a strict material and craftsmanship reference — warm pale limestone, dark slate ceramic, aged copper-bronze with contained turquoise patina, subtle warm amber — NOT as a silhouette to copy. The subject is a compact stylized standing humanoid inhabitant with a slightly large head for map readability, full body, feet together. Handcrafted stylized finish, sophisticated proportions rather than photorealism, medieval fantasy, anime or chibi. Thick connected sculptural pieces, no thin fingers, railings or filigree, no text, logos, extra people, gears, dramatic baked shadows, excessive grime, floating pieces or surrounding scenery. No terrain hex. A tiny circular limestone figurine plinth under the feet is allowed. Show the complete standalone figurine in one clearly ELEVATED THREE-QUARTER ISOMETRIC view, with both front and side visible, all edges inside frame, neutral background and transparent cutout. Readable at small strategy-map scale. Unit Builder: a compact artisan of the knowledge city. Short limestone tunic, a slate satchel on the back, a copper chisel in the right hand. No hardhat, no wrench, no overalls, no power tools. Read clearly as a builder, not an engineer mascot, coordinator, ranger or guardian.",
+      "generate_multi_view": false,
+      "aspect_ratio": "1:1",
+      "remove_background": true
+    },
+    "result": {
+      "task_id": "01a16c24-d1f3-7631-9fdc-b2e01f2ce360",
+      "status": "SUCCEEDED",
+      "consumed_credits": 9,
+      "balance_before": 367,
+      "balance_after": 358,
+      "reconciled": true,
+      "file": "preview.png"
+    },
+    "human_approval": {
+      "approved_by": "Cristóbal",
+      "approval_quote": "apruebo"
+    }
+  },
+  "geometry_after_concept_approval": {
+    "authorization": "Cristóbal: «apruebo» the four unit concepts. One untextured mesh, no automatic retry.",
+    "advertised_credits": 5,
+    "max_create_requests": 1,
+    "request_without_input_task_id": {
+      "ai_model": "meshy-t2.5",
+      "model_type": "smart-topology",
+      "target_polycount": 2000,
+      "topology": "triangle",
+      "should_texture": false,
+      "enable_pbr": false,
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true,
+      "multi_view_thumbnails": true,
+      "auto_size": false
+    },
+    "result": {
+      "task_id": "01a16c2e-4be4-7665-8cc2-adffde15e341",
+      "status": "SUCCEEDED",
+      "consumed_credits": 5,
+      "balance_before": 335,
+      "balance_after": 330,
+      "reconciled": true,
+      "triangles": 2099,
+      "sha256": "abf925459f3d2d7500b6fac2d916564af68950016b4da396f0f3c7fea3625a06",
+      "file": "geometry/preview.glb",
+      "human_geometry_approval": "rejected",
+      "rejection_reason": "Backpack/satchel silhouette; Cristóbal asked for no backpack and a hammer or sickle. Do not texture this mesh. Do not delete v001 locks.",
+      "approval_quote": "todos estan bien salvo el constructor creo se entenderia más sin mochila y con martillo o una hoz"
+    }
+  },
+  "texturing_after_geometry_approval": {
+    "tool": "meshy_retexture",
+    "endpoint": "POST /openapi/v1/retexture",
+    "authorization": "Cristóbal: «apruebo el obrero continua con las texturas» after reviewing untextured geometry-v002. One 10-credit PBR retexture of geometry-v002, no variants, no automatic paid retries. v001 geometry stays immutable. Geometry approval is not advance material approval.",
+    "advertised_credits": 10,
+    "pricing_source": "https://docs.meshy.ai/en/api/pricing read 2026-10-23: Retexture 2K/4K 10, 8K 15",
+    "max_create_requests": 1,
+    "output_dir": "texture-v001",
+    "source": {
+      "route": "model_url",
+      "accepted_geometry": "geometry-v002/preview.glb",
+      "accepted_sha256": "b524342accc35c9a4ea779971f2d33e7f75f30344bc8f304af13101848cb53d9",
+      "origin_task_id": "01a16c58-bc70-74ea-a01a-506e7ac8ae57",
+      "uv_copy": "texture-v001/source-uv.glb",
+      "normals": "local 42-degree crease normals; approved positions and triangle order unchanged",
+      "why_not_input_task_id": "Meshy's returned normals cannot be trusted (approved Observatory: 274 corners oppose their faces, 2 visible triangles dropped); sending the approved GLB keeps every member on one verified route"
+    },
+    "request": {
+      "ai_model": "meshy-7",
+      "text_style_prompt": "Original knowledge-city builder figurine matching its approved concept: a sculpted limestone statue, not a painted toy. Short limestone tunic, matte, empty unobstructed back — no backpack. Aged copper hammer with a blocky head and contained turquoise patina. Bald stone-carved head. Same craft as the Memory Archive building: limestone, slate, copper. Preserve the geometry. No text, logos, grime, baked lighting or baked shadows. Limestone matte, slate moderately rough, copper metallic.",
+      "enable_original_uv": true,
+      "enable_pbr": true,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true
+    },
+    "uv_method": "xatlas-python 0.0.11, 2048 px atlas, 6 px padding, charts on welded positions",
+    "material_approval": "approved by Cristóbal («apruebo»)",
+    "result": {
+      "task_id": "01a16c5e-12ce-737f-8355-c8b6550953a0",
+      "status": "SUCCEEDED",
+      "consumed_credits": 10,
+      "balance_before": 236,
+      "balance_after": 226,
+      "reconciled": true,
+      "sent_model_sha256": "16c3f7fcc14248856f7466c8e78ced02048cf66abd9877a976eae9816445cbde",
+      "sent_model_bytes": 127940,
+      "uv_charts": 128,
+      "uv_area_coverage": 0.6251112293894658,
+      "meshy_output": {
+        "file": "texture-v001/meshy.glb",
+        "sha256": "8ff4e2f076ed507d87e1d93f133f473b6f96d5f2878f67e68c07018bc5e2b9a9",
+        "triangles": 2081,
+        "uniform_scale": 2.0983605306656634,
+        "visible_accepted_triangles_missing": 0,
+        "corners_with_normal_opposing_face": 19,
+        "kept_supplied_uvs": true
+      },
+      "candidate": {
+        "file": "texture-v001/textured.glb",
+        "sha256": "6fe151aab7f064b45e0b8fef56a075599649c48f5d59dd1bce2cae8c8aa40221",
+        "bytes": 7959312,
+        "method": "accepted corners, prepared normals, Meshy per-corner UVs and material",
+        "exact_against_accepted_geometry": true,
+        "triangles": 2081,
+        "corners_with_normal_opposing_face": 0,
+        "pbr": "baseColor (sRGB) + metallicRoughness + normal, 2048 px JPEG; doubleSided as delivered by Meshy"
+      },
+      "runtime_copy": {
+        "file": "texture-v001/unit-builder-map.glb",
+        "public_file": "public/assets/3d/props/meshy/unit-builder-map.glb",
+        "sha256": "4e27eb19608d04b896a8c2c1826b603d736edf93731c2feb1171f729c62b0315",
+        "bytes": 231904,
+        "max_texture_px": 512,
+        "geometry_bytes_identical": true
+      },
+      "visual_observations": "Empty back and hammer silhouette match approved clay. Tunic reads limestone. Hammer head is grey-teal rather than aged copper with turquoise of the concept; handle reads wood. Geometry exact against geometry-v002."
+    }
+  },
+  "guards": {
+    "auto_geometry": false,
+    "auto_texture": false,
+    "auto_retry_paid_requests": false
+  },
+  "concept_revision": {
+    "id": "unit-builder-v002",
+    "folder": "concept-v002",
+    "reason": "todos estan bien salvo el constructor creo se entenderia más sin mochila y con martillo o una hoz",
+    "tool": "hammer (builder identity; sickle was the alternative)",
+    "status": "concept artist-approved; geometry-v002 authorized",
+    "v001_locks_immutable": true,
+    "task_id": "01a16c40-7b90-71a1-891e-cc8b04267dcd",
+    "file": "concept-v002/preview.png",
+    "approval_quote": "aprebo el constructor y bueno falta terminar de pintar al guardian",
+    "geometry": {
+      "file": "geometry-v002/preview.glb",
+      "task_id": "01a16c58-bc70-74ea-a01a-506e7ac8ae57",
+      "triangles": 2081,
+      "sha256": "b524342accc35c9a4ea779971f2d33e7f75f30344bc8f304af13101848cb53d9",
+      "human_geometry_approval": "pending-clay"
+    }
+  }
+}

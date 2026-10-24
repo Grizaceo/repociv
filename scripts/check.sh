@@ -113,11 +113,12 @@ check_props_budget() {
 }
 run_step "asset budget (props ≤1.5MB)"    check_props_budget
 
-# Meshy PBR family buildings (public/assets/3d/props/meshy/*.glb): each
-# runtime copy must be optimized via optimize_glb.py (≤600KB per building,
-# ≤3MB combined) so raw multi-megabyte Meshy GLBs never enter public/.
+# Meshy PBR family buildings and approved unit maps (public/assets/3d/props/meshy/*.glb):
+# each runtime copy must be optimized via optimize_glb.py (≤600KB per file,
+# ≤5.5MB combined) so raw multi-megabyte Meshy GLBs never enter public/.
+# 5.5MB holds the 12 family buildings plus the four knowledge-city unit maps.
 check_meshy_props_budget() {
-  local total=0 max_file=$((600 * 1024)) limit=$((3072 * 1024)) f size
+  local total=0 max_file=$((600 * 1024)) limit=$((5632 * 1024)) f size
   while IFS= read -r -d '' f; do
     size=$(stat -c '%s' "$f")
     if (( size > max_file )); then
@@ -127,12 +128,12 @@ check_meshy_props_budget() {
     total=$((total + size))
   done < <(find public/assets/3d/props/meshy -name '*.glb' -print0 2>/dev/null)
   if (( total > limit )); then
-    echo "meshy prop glbs total $((total / 1024))KB > 3MB budget"
+    echo "meshy prop glbs total $((total / 1024))KB > 5.5MB budget"
     return 1
   fi
-  echo "meshy prop glbs total: $((total / 1024))KB (budget 3MB; ≤600KB/building)"
+  echo "meshy prop glbs total: $((total / 1024))KB (budget 5.5MB; ≤600KB/file)"
 }
-run_step "asset budget (meshy ≤3MB)"      check_meshy_props_budget
+run_step "asset budget (meshy ≤5.5MB)"      check_meshy_props_budget
 
 # Eager-bundle budget: the JS the browser downloads on first paint (the app
 # defaults to the 2D 'flat' renderer) must stay lean. Three.js (vendor-three,

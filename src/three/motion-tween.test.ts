@@ -6,6 +6,7 @@ vi.mock('./UnitProps3D.ts', () => ({
   getUnitPropPartsForType: () => null,
   ensureUnitPropsLoad: () => {},
   areUnitPropsSettled: () => true,
+  unitPropsSignature: () => 'idle',
 }));
 
 import {
@@ -89,7 +90,7 @@ describe('Movement tween', () => {
     // Tick forward — the unit should move toward tile (1,0).
     tickUnits(0.4, 0.1);
     // After 0.1s at 2.5 hex/s, pathProgress = 0.25. The unit should be
-    // 25% of the way from tile 0 to tile 1.
+    // partway from tile 0 to tile 1 (Catmull-Rom through the hex centres).
     expect(entry.pathProgress).toBeGreaterThan(0);
     expect(entry.pathProgress).toBeLessThan(1);
 

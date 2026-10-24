@@ -1,0 +1,237 @@
+{
+  "asset_id": "unit-guardian-v001",
+  "status": "geometry and texture-v003 PBR artist-approved by Cristóbal («las texturas que aprobé»); integrated into UnitProps3D overlay (public/assets/3d/props/meshy/unit-guardian-map.glb)",
+  "license_status": "unverified; local only; distribution blocked",
+  "reference_asset": "memory-archive-v001",
+  "authorization": "Cristóbal: «en concepto bien, pero claro requieren de meshy porque como estan se ven horribles lol». One Image-to-Image concept per unit after that confirmation. No automatic geometry or texturing.",
+  "runtime": {
+    "consumer": "src/three/UnitProps3D.ts KNOWLEDGE_CITY_UNIT_URLS (overlays unit-knight)",
+    "public_path": "public/assets/3d/props/meshy/unit-guardian-map.glb",
+    "phase5_fallback": "unit-knight",
+    "default_enabled": true,
+    "mapping_status": "wired as overlay for unit-knight; Meshy PBR map approved and copied to public/"
+  },
+  "concept": {
+    "tool": "meshy_image_to_image",
+    "advertised_credits": 9,
+    "max_create_requests": 1,
+    "reference_relative_paths": [
+      "assets-src/meshy/memory-archive/textured/archive-textured.png"
+    ],
+    "request_without_reference_paths": {
+      "ai_model": "nano-banana-pro",
+      "prompt": "Create ONE original standalone STRATEGY-GAME FIGURINE for the SAME knowledge-city civilization as the supplied Memory Archive image. That image is a BUILDING: use it only as a strict material and craftsmanship reference — warm pale limestone, dark slate ceramic, aged copper-bronze with contained turquoise patina, subtle warm amber — NOT as a silhouette to copy. The subject is a compact stylized standing humanoid inhabitant with a slightly large head for map readability, full body, feet together. Handcrafted stylized finish, sophisticated proportions rather than photorealism, medieval fantasy, anime or chibi. Thick connected sculptural pieces, no thin fingers, railings or filigree, no text, logos, extra people, gears, dramatic baked shadows, excessive grime, floating pieces or surrounding scenery. No terrain hex. A tiny circular limestone figurine plinth under the feet is allowed. Show the complete standalone figurine in one clearly ELEVATED THREE-QUARTER ISOMETRIC view, with both front and side visible, all edges inside frame, neutral background and transparent cutout. Readable at small strategy-map scale. Unit Guardian: a compact civic sentinel of knowledge. Broader limestone tunic, copper pauldrons, a rectangular slate tablet-shield on the left arm. No sword, no greathelm, no crest, no heraldic cross. Read clearly as a guardian, not a knight, soldier, coordinator, builder or ranger.",
+      "generate_multi_view": false,
+      "aspect_ratio": "1:1",
+      "remove_background": true
+    },
+    "result": {
+      "task_id": "01a16c25-ef25-70b9-a75e-6ac9fb8caaef",
+      "status": "SUCCEEDED",
+      "consumed_credits": 9,
+      "balance_before": 349,
+      "balance_after": 340,
+      "reconciled": true,
+      "file": "preview.png"
+    },
+    "human_approval": {
+      "approved_by": "Cristóbal",
+      "approval_quote": "apruebo"
+    }
+  },
+  "geometry_after_concept_approval": {
+    "authorization": "Cristóbal: «apruebo» the four unit concepts. One untextured mesh, no automatic retry.",
+    "advertised_credits": 5,
+    "max_create_requests": 1,
+    "request_without_input_task_id": {
+      "ai_model": "meshy-t2.5",
+      "model_type": "smart-topology",
+      "target_polycount": 2000,
+      "topology": "triangle",
+      "should_texture": false,
+      "enable_pbr": false,
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true,
+      "multi_view_thumbnails": true,
+      "auto_size": false
+    },
+    "result": {
+      "task_id": "01a16c2f-001b-756c-84a6-7cb26ba0e96a",
+      "status": "SUCCEEDED",
+      "consumed_credits": 5,
+      "balance_before": 325,
+      "balance_after": 320,
+      "reconciled": true,
+      "triangles": 2070,
+      "sha256": "862dcaea06bdeeda74f801cc0d0d76e6297dd5fb780a2e5a416de5dd704c65dd",
+      "file": "geometry/preview.glb",
+      "human_geometry_approval": "approved",
+      "approval_quote": "todos estan bien salvo el constructor creo se entenderia más sin mochila y con martillo o una hoz"
+    }
+  },
+  "texturing_after_geometry_approval": {
+    "tool": "meshy_retexture",
+    "endpoint": "POST /openapi/v1/retexture",
+    "authorization": "Cristóbal: «aprebo el constructor y bueno falta terminar de pintar al guardian». One 10-credit PBR retexture in texture-v003 to finish the copper and patina paint. texture-v001 and texture-v002 locks stay immutable. Geometry approval is not advance material approval.",
+    "advertised_credits": 10,
+    "pricing_source": "https://docs.meshy.ai/en/api/pricing read 2026-10-23: Retexture 2K/4K 10, 8K 15",
+    "max_create_requests": 1,
+    "output_dir": "texture-v003",
+    "source": {
+      "route": "model_url",
+      "accepted_geometry": "geometry/preview.glb",
+      "accepted_sha256": "862dcaea06bdeeda74f801cc0d0d76e6297dd5fb780a2e5a416de5dd704c65dd",
+      "origin_task_id": "01a16c2f-001b-756c-84a6-7cb26ba0e96a",
+      "uv_copy": "texture-v003/source-uv.glb",
+      "normals": "local 42-degree crease normals; approved positions and triangle order unchanged",
+      "why_not_input_task_id": "Meshy's returned normals cannot be trusted (approved Observatory: 274 corners oppose their faces, 2 visible triangles dropped); sending the approved GLB keeps every member on one verified route"
+    },
+    "request": {
+      "ai_model": "meshy-7",
+      "text_style_prompt": "Finish painting the original knowledge-city guardian figurine to match its approved concept. Complete the metal: bowl helm, both pauldrons and arm cuffs are aged copper-bronze with contained turquoise patina — not silver, not white, not unpainted stone. Warm pale limestone tunic and stone-carved face, matte. Rectangular dark slate tablet-shield with a thick limestone frame. No heraldry, no extra ornament, no painted portrait. Preserve the geometry. No text, logos, grime, baked lighting or baked shadows. Limestone matte, slate moderately rough, copper metallic.",
+      "enable_original_uv": true,
+      "enable_pbr": true,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ],
+      "alpha_thumbnail": true
+    },
+    "uv_method": "xatlas-python 0.0.11, 2048 px atlas, 6 px padding, charts on welded positions; copied from texture-v001",
+    "material_approval": "approved by Cristóbal («las texturas que aprobé»); CSG prediseños replaced on the map",
+    "result": {
+      "task_id": "01a16c58-bdfb-7200-9b16-daf85fe0ec27",
+      "status": "SUCCEEDED",
+      "consumed_credits": 10,
+      "balance_before": 251,
+      "balance_after": 236,
+      "reconciled": false,
+      "reconciliation_note": "Concurrent 5cr builder geometry-v002; expected delta 15.",
+      "sent_model_sha256": "9fed185dd4d374d03797f425b499d41459d914b481fbbb0642eb94ec2df6c8d4",
+      "sent_model_bytes": 120128,
+      "uv_charts": 125,
+      "uv_area_coverage": 0.6140719404398931,
+      "meshy_output": {
+        "file": "texture-v003/meshy.glb",
+        "sha256": "63bab1820fa58178fbf6adf08e81173939d743f6655340729702ffc1920a76df",
+        "triangles": 2070,
+        "uniform_scale": 2.1015905592611595,
+        "visible_accepted_triangles_missing": 0,
+        "corners_with_normal_opposing_face": 34,
+        "kept_supplied_uvs": true
+      },
+      "candidate": {
+        "file": "texture-v003/textured.glb",
+        "sha256": "a8c736ae449b8ca5b47e848ebccc2d144626cd772a618f8fb0baf376b82bbe11",
+        "bytes": 7370012,
+        "method": "accepted corners, prepared normals, Meshy per-corner UVs and material",
+        "exact_against_accepted_geometry": true,
+        "triangles": 2070,
+        "corners_with_normal_opposing_face": 0,
+        "pbr": "baseColor (sRGB) + metallicRoughness + normal, 2048 px JPEG; doubleSided as delivered by Meshy"
+      },
+      "runtime_copy": {
+        "file": "texture-v003/unit-guardian-map.glb",
+        "public_file": "public/assets/3d/props/meshy/unit-guardian-map.glb",
+        "sha256": "d59cec2fa9469504d2ee8a8214931fe7788d5d042d2e1e2c32bc1c38bedd04bf",
+        "bytes": 256728,
+        "max_texture_px": 512,
+        "geometry_bytes_identical": true
+      },
+      "visual_observations": "Helm and pauldrons are now painted metal with turquoise-green patina rather than the unfinished silver of v002. More uniformly teal than the copper-bronze of the approved concept. Limestone tunic and slate shield present. Geometry exact."
+    }
+  },
+  "guards": {
+    "auto_geometry": false,
+    "auto_texture": false,
+    "auto_retry_paid_requests": false
+  },
+  "rejected_texture_v001": {
+    "reason": "Cristóbal: «como el de la imagen de referencia justamente». v001 read as a painted portrait/toy instead of the approved concept and Memory Archive materials (limestone, slate, copper).",
+    "output_dir": "texture-v001",
+    "immutable": true,
+    "result": {
+      "task_id": "01a16c40-ecdf-74e0-be00-8225432d9d96",
+      "status": "SUCCEEDED",
+      "consumed_credits": 10,
+      "balance_before": 311,
+      "balance_after": 281,
+      "reconciled": false,
+      "reconciliation_note": "Three 10cr retextures posted together; expected delta 30.",
+      "sent_model_sha256": "9fed185dd4d374d03797f425b499d41459d914b481fbbb0642eb94ec2df6c8d4",
+      "sent_model_bytes": 120128,
+      "uv_charts": 125,
+      "uv_area_coverage": 0.6140719404398931,
+      "meshy_output": {
+        "file": "texture-v001/meshy.glb",
+        "sha256": "9c9beff9ae64a195837b7aecfb1dce84b3f6770fcbce89a4f12150cd4ee084aa",
+        "triangles": 2070,
+        "uniform_scale": 2.1015905592611595,
+        "visible_accepted_triangles_missing": 0,
+        "corners_with_normal_opposing_face": 34,
+        "kept_supplied_uvs": true
+      },
+      "candidate": {
+        "file": "texture-v001/textured.glb",
+        "sha256": "8b4776519dc7b9f41734b443b0bf17bf39fb15027350c8ca8f8ce3ac697545c4",
+        "bytes": 7521936,
+        "method": "accepted corners, prepared normals, Meshy per-corner UVs and material",
+        "exact_against_accepted_geometry": true,
+        "triangles": 2070,
+        "corners_with_normal_opposing_face": 0,
+        "pbr": "baseColor (sRGB) + metallicRoughness + normal, 2048 px JPEG; doubleSided as delivered by Meshy"
+      },
+      "runtime_copy": {
+        "public_file": null,
+        "note": "Not copied to public/; 4.5MB meshy budget and overlay tests still assume CSG until builder v002 is ready and materials are approved."
+      },
+      "visual_observations": "Copper helm and pauldrons, rectangular slate tablet-shield. Extra ornamental painting on the tunic. Geometry exact against approved clay. Materials pending review."
+    },
+    "prompt": "Original knowledge-city guardian figurine, a compact civic sentinel. Warm pale limestone tunic, matte. Aged copper pauldrons and helm with contained turquoise patina. Rectangular dark slate tablet-shield. Subtle warm amber insets. Skin as warm stone. Broad calm hand-crafted stylized material regions readable from an elevated strategy-game camera. Preserve the geometry. No text, logos, grime, baked lighting or baked shadows. Limestone matte, slate moderately rough, copper metallic."
+  },
+  "rejected_texture_v002": {
+    "reason": "Cristóbal: «aprebo el constructor y bueno falta terminar de pintar al guardian». v002 left helm and pauldrons silver/unpainted instead of finishing the aged copper and turquoise patina of the approved concept.",
+    "output_dir": "texture-v002",
+    "immutable": true,
+    "result": {
+      "task_id": "01a16c4d-08eb-7604-b5f2-2d7f398d630f",
+      "status": "SUCCEEDED",
+      "consumed_credits": 10,
+      "balance_before": 281,
+      "balance_after": 251,
+      "reconciled": false,
+      "reconciliation_note": "Three 10cr texture-v002 retextures posted together; expected delta 30.",
+      "sent_model_sha256": "9fed185dd4d374d03797f425b499d41459d914b481fbbb0642eb94ec2df6c8d4",
+      "sent_model_bytes": 120128,
+      "uv_charts": 125,
+      "uv_area_coverage": 0.6140719404398931,
+      "meshy_output": {
+        "file": "texture-v002/meshy.glb",
+        "sha256": "7fcb94b0135251bc074a798cdf7229f24d15ee268922aedf12a120f2e8437ee3",
+        "triangles": 2070,
+        "uniform_scale": 2.1015905592611595,
+        "visible_accepted_triangles_missing": 0,
+        "corners_with_normal_opposing_face": 34,
+        "kept_supplied_uvs": true
+      },
+      "candidate": {
+        "file": "texture-v002/textured.glb",
+        "sha256": "c348ffee7cf17ac5f92f5c39e02e140fb9a958a626109c711eaa802443900843",
+        "bytes": 7361620,
+        "method": "accepted corners, prepared normals, Meshy per-corner UVs and material",
+        "exact_against_accepted_geometry": true,
+        "triangles": 2070,
+        "corners_with_normal_opposing_face": 0,
+        "pbr": "baseColor (sRGB) + metallicRoughness + normal, 2048 px JPEG; doubleSided as delivered by Meshy"
+      },
+      "runtime_copy": {
+        "public_file": null,
+        "note": "Not copied to public/; materials pending review."
+      },
+      "visual_observations": "Closest to the approved concept: limestone tunic, copper helm and pauldrons, rectangular slate shield, stone-carved face. Less ornamental painting than v001. Geometry exact."
+    },
+    "prompt": "Original knowledge-city guardian figurine matching its approved concept: a sculpted limestone statue, not a painted knight. Warm pale limestone tunic and stone-carved face. Aged copper bowl helm and pauldrons with contained turquoise patina. Rectangular dark slate tablet-shield with a limestone frame. No extra ornament, no heraldry. Same craft as the Memory Archive building: limestone, slate, copper. Preserve the geometry. No text, logos, grime, baked lighting or baked shadows. Limestone matte, slate moderately rough, copper metallic."
+  }
+}

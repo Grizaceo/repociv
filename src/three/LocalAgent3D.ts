@@ -2,7 +2,7 @@
 // Manages 3D figurines for agents in the local view. Reuses the GLB worker
 // figurine from UnitProps3D.ts with per-agent tinted shirt, or falls back to
 // a procedural cone+sphere. Mirrors UnitMesh3D patterns: incremental
-// add/remove, spawn/despawn tweens, idle pulse, walking hop.
+// add/remove, spawn/despawn tweens, idle breath, terrain-locked walk pose.
 
 import {
   Color,
@@ -18,9 +18,27 @@ import {
 } from 'three';
 
 import type { LocalUnit, LocalNpc, Unit } from '../types.ts';
-import { areUnitPropsReady, getUnitPropParts, getUnitPropPartsForType } from './UnitProps3D.ts';
+import {
+  areUnitPropsReady,
+  getUnitPropParts,
+  getUnitPropPartsForType,
+  isUnitTintPart,
+  unitPropsSignature,
+} from './UnitProps3D.ts';
 import { localGridToWorld3D } from './LocalCamera3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+import {
+  expFollow,
+  idleBreathScale,
+  LEAN_MAX,
+  lerpAngle,
+  POSE_FOLLOW,
+  strideLift,
+  stridePhase,
+  SWAY_MAX,
+  yawToward,
+  YAW_FOLLOW,
+} from './unitWalkPose.ts';
 
 const HERO_TYPES = new Set(['hero', 'lexo', 'claude', 'codex', 'cursor', 'openclaw']);
 
@@ -34,11 +52,14 @@ interface AgentEntry {
   lifeState: AgentLifeState;
   /** Tween progress 0->1 for spawn, 1->0 for despawn. */
   tween: number;
-  /** Per-unit phase offset for idle pulse. */
+  /** Per-unit phase offset for idle breath. */
   idlePhase: number;
-  /** Current hop height (0 when grounded). */
-  hopY: number;
-  /** Whether this agent is currently moving (drives hop animation). */
+  /** Current stride lift (0 when grounded). */
+  strideY: number;
+  yaw: number;
+  lean: number;
+  sway: number;
+  /** Whether this agent is currently moving (drives walk pose). */
   moving: boolean;
   /** Current interpolated world position. */
   currentPos: Vector3;
@@ -54,11 +75,12 @@ interface AgentEntry {
 
 /** Manages all local agent figurines (LocalUnits + LocalNpcs).
  *  Reuses the UnitMesh3D pattern: incremental add/remove, spawn/despawn tweens,
- *  idle pulse, per-step walking hop. */
+ *  idle breath, yaw-following walk with a low stride. */
 export class LocalAgent3D {
   private group: Group;
   private entries = new Map<string, AgentEntry>();
   private lastSignature = '';
+  private animTime = 0;
 
   constructor() {
     this.group = new Group();
@@ -80,12 +102,13 @@ export class LocalAgent3D {
     }
 
     // Per-frame animations (always run, independent of dirty flag)
+    this.animTime += dt;
     this.tickAnimations(units, npcs, dt);
   }
 
   private computeSignature(units: LocalUnit[], npcs: LocalNpc[]): string {
     return [
-      areUnitPropsReady() ? 1 : 0,
+      unitPropsSignature(),
       units.length,
       npcs.length,
       units
@@ -155,6 +178,10 @@ export class LocalAgent3D {
     nextGroup.castShadow = true;
     nextGroup.position.copy(prevPos);
     nextGroup.scale.setScalar(prevScale);
+    nextGroup.rotation.order = 'YXZ';
+    nextGroup.rotation.y = entry.yaw;
+    nextGroup.rotation.x = entry.lean;
+    nextGroup.rotation.z = entry.sway;
     entry.group = nextGroup;
     entry.unitType = unitType;
     entry.usedGlb = areUnitPropsReady();
@@ -177,7 +204,10 @@ export class LocalAgent3D {
       lifeState: 'spawning',
       tween: 0,
       idlePhase: Math.random() * Math.PI * 2,
-      hopY: 0,
+      strideY: 0,
+      yaw: 0,
+      lean: 0,
+      sway: 0,
       moving: false,
       currentPos: new Vector3(),
       path: [],
@@ -229,7 +259,7 @@ export class LocalAgent3D {
         const group = new Group();
         parts.forEach((part, i) => {
           const mat = (part.material as MeshStandardMaterial).clone();
-          if (i === 1 || mat.name.includes('tint')) {
+          if (isUnitTintPart(parts, i, mat)) {
             mat.color.lerp(col, 0.55);
             mat.emissive.copy(col);
             mat.emissiveIntensity = isHero ? 0.4 : 0.22;
@@ -243,6 +273,7 @@ export class LocalAgent3D {
         const s = HEX_SIZE * (isHero ? 0.44 : 0.38);
         group.scale.setScalar(s);
         const wrapper = new Group();
+        wrapper.rotation.order = 'YXZ';
         wrapper.add(group);
         if (isHero) {
           this.addHeroCrown(wrapper, col, HEX_SIZE * 0.46);
@@ -253,6 +284,7 @@ export class LocalAgent3D {
 
     // Procedural fallback: cone + sphere
     const group = new Group();
+    group.rotation.order = 'YXZ';
     const bodyMat = new MeshStandardMaterial({
       color: col,
       emissive: col,
@@ -282,7 +314,7 @@ export class LocalAgent3D {
     return group;
   }
 
-  /** Per-frame: advance spawn/despawn tweens, idle pulse, walking hop,
+  /** Per-frame: advance spawn/despawn tweens, idle breath, walk pose,
    *  position interpolation. Mirrors UnitMesh3D.tickUnits. */
   private tickAnimations(units: LocalUnit[], npcs: LocalNpc[], dt: number): void {
     type AgentAnim = {
@@ -371,7 +403,33 @@ export class LocalAgent3D {
     }
     const targetPos = localGridToWorld3D(gx, gy, 0);
     entry.currentPos.lerp(targetPos, Math.min(1, dt * 8));
-    entry.group.position.copy(entry.currentPos);
+
+    entry.moving = agent.moving;
+    if (agent.moving && agent.path.length > 1) {
+      const from = agent.path[agent.pathIndex]!;
+      const to = agent.path[Math.min(agent.pathIndex + 1, agent.path.length - 1)]!;
+      const targetYaw = yawToward(to.x - from.x, to.y - from.y, entry.yaw);
+      entry.yaw = lerpAngle(entry.yaw, targetYaw, expFollow(dt, YAW_FOLLOW));
+      const kPose = expFollow(dt, POSE_FOLLOW);
+      entry.lean += (LEAN_MAX - entry.lean) * kPose;
+      entry.sway += (Math.sin(stridePhase(this.animTime)) * SWAY_MAX - entry.sway) * kPose;
+      entry.strideY = strideLift(this.animTime, true);
+    } else {
+      const kPose = expFollow(dt, POSE_FOLLOW);
+      entry.lean += (0 - entry.lean) * kPose;
+      entry.sway += (0 - entry.sway) * kPose;
+      entry.strideY = 0;
+    }
+
+    entry.group.position.set(
+      entry.currentPos.x,
+      entry.currentPos.y + entry.strideY,
+      entry.currentPos.z,
+    );
+    entry.group.rotation.order = 'YXZ';
+    entry.group.rotation.y = entry.yaw;
+    entry.group.rotation.x = entry.lean;
+    entry.group.rotation.z = entry.sway;
 
     // Spawn tween (scale 0->1)
     if (entry.lifeState === 'spawning') {
@@ -394,18 +452,8 @@ export class LocalAgent3D {
       entry.group.scale.setScalar(entry.tween);
     }
 
-    // Idle pulse (breathing)
-    if (entry.lifeState === 'alive' && !agent.moving) {
-      const pulse = 1 + Math.sin(performance.now() * 0.003 + entry.idlePhase) * 0.02;
-      entry.group.scale.setScalar(pulse);
-    }
-
-    // Walking hop
-    if (agent.moving) {
-      entry.hopY = Math.abs(Math.sin(performance.now() * 0.012)) * HEX_SIZE * 0.06;
-      entry.group.position.y = entry.currentPos.y + entry.hopY;
-    } else {
-      entry.hopY = 0;
+    if (entry.lifeState === 'alive') {
+      entry.group.scale.setScalar(idleBreathScale(this.animTime, entry.idlePhase, agent.moving));
     }
 
     // Fade alpha for despawning units

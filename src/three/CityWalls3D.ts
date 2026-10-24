@@ -1,9 +1,11 @@
-// ─── City walls (KayKit modular wall kit — CC0) ─────────────────────────────
-// Replaces the procedural hexagonal wall ring (CityCluster3D) with the KayKit
-// modular wall set: straight segments along each hex edge, one taller gate
-// piece per city, and a faction tower at each hex vertex. Loads independently
-// of the building GLBs so walls can ship/settle even if the building pack
-// fails (and vice versa).
+// ─── City walls (KayKit modular wall kit — CC0, knowledge-city overlay) ──────
+// Replaces the procedural hexagonal wall ring (CityCluster3D) with modular
+// pieces: straight segments along each hex edge, one taller gate per city,
+// and a tower at each hex vertex. KayKit is the fallback; when
+// VITE_MESHY_PREVIEW !== '0' the deterministic knowledge-city GLBs from
+// scripts/generate-city-walls-glbs.py overlay those four variants. Loads
+// independently of the building GLBs so walls can ship/settle even if the
+// building pack fails (and vice versa).
 //
 // Layout math (matches the procedural ring in CityCluster3D):
 //   • wall body hexagon circumradius R = 0.42·HEX (procedural outerR)
@@ -45,6 +47,15 @@ type PartId = (typeof WALL_IDS)[number] | (typeof TOWER_IDS)[number];
 
 const WALLS_DIR = '/assets/3d/props/kaykit/buildings/neutral';
 const TOWERS_DIR = '/assets/3d/props/kaykit/buildings/red';
+const KNOWLEDGE_CITY_WALLS_DIR = '/assets/3d/props/knowledge-city';
+
+/** Deterministic living-knowledge-city kit. Overlay replaces KayKit when preview is on. */
+export const KNOWLEDGE_CITY_WALL_URLS: Partial<Record<PartId, string>> = {
+  wall_straight: `${KNOWLEDGE_CITY_WALLS_DIR}/wall-straight.glb`,
+  wall_straight_gate: `${KNOWLEDGE_CITY_WALLS_DIR}/wall-gate.glb`,
+  building_tower_A_red: `${KNOWLEDGE_CITY_WALLS_DIR}/wall-tower-a.glb`,
+  building_tower_B_red: `${KNOWLEDGE_CITY_WALLS_DIR}/wall-tower-b.glb`,
+};
 
 let wallVariants: Map<PartId, WallVariant> | null = null;
 let wallState: WallPropsState = 'idle';
@@ -72,15 +83,13 @@ export function ensureCityWallsLoad(onSettled?: () => void): void {
     ...TOWER_IDS.map((id) => ({ id, url: `${TOWERS_DIR}/${id}.gltf` })),
   ];
   Promise.all(jobs.map((j) => loader.loadAsync(j.url).then((g) => ({ j, g }))))
-    .then((loaded) => {
+    .then(async (loaded) => {
       wallVariants = new Map();
       for (const { j, g } of loaded) {
-        const merged = mergeGlbScene(g.scene);
-        merged.geometry.computeBoundingBox();
-        const bb = merged.geometry.boundingBox!;
-        const size = new Vector3().subVectors(bb.max, bb.min);
-        const norm = 1 / Math.max(size.x, size.y, size.z, 1e-6);
-        wallVariants.set(j.id, { ...merged, norm });
+        wallVariants.set(j.id, normalizeWallVariant(g.scene));
+      }
+      if (import.meta.env['VITE_MESHY_PREVIEW'] !== '0') {
+        await overlayKnowledgeCityWalls(loader, wallVariants);
       }
       wallState = 'ready';
       wallLastSignature = '';
@@ -95,6 +104,32 @@ export function ensureCityWallsLoad(onSettled?: () => void): void {
 
 function hashCoord(q: number, r: number): number {
   return Math.abs((q * 73856093) ^ (r * 19349663)) % 997;
+}
+
+function normalizeWallVariant(scene: Group): WallVariant {
+  const merged = mergeGlbScene(scene);
+  merged.geometry.computeBoundingBox();
+  const bb = merged.geometry.boundingBox!;
+  const size = new Vector3().subVectors(bb.max, bb.min);
+  const norm = 1 / Math.max(size.x, size.y, size.z, 1e-6);
+  return { ...merged, norm };
+}
+
+async function overlayKnowledgeCityWalls(
+  loader: GLTFLoader,
+  variants: Map<PartId, WallVariant>,
+): Promise<void> {
+  const jobs = Object.entries(KNOWLEDGE_CITY_WALL_URLS) as Array<[PartId, string]>;
+  await Promise.all(
+    jobs.map(async ([id, url]) => {
+      try {
+        const gltf = await loader.loadAsync(url);
+        variants.set(id, normalizeWallVariant(gltf.scene));
+      } catch {
+        // Keep the KayKit fallback for this part if the local kit is missing.
+      }
+    }),
+  );
 }
 
 // ─── Per-city wall layout ───────────────────────────────────────────────────
@@ -264,4 +299,8 @@ export function _testWallIds(): readonly string[] {
 
 export function _testWallConstants(): { RING_R: number; STRAIGHT_SPAN: number } {
   return { RING_R, STRAIGHT_SPAN };
+}
+
+export function _testKnowledgeCityWallUrls(): Partial<Record<PartId, string>> {
+  return KNOWLEDGE_CITY_WALL_URLS;
 }

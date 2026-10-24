@@ -9,7 +9,7 @@
 //   • every referenced .gltf/.bin asset exists on disk
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { _testWallIds, _testWallConstants } from './CityWalls3D.ts';
+import { _testWallIds, _testWallConstants, _testKnowledgeCityWallUrls } from './CityWalls3D.ts';
 
 const { RING_R, STRAIGHT_SPAN } = _testWallConstants();
 
@@ -84,6 +84,17 @@ describe('KayKit modular wall kit', () => {
       );
       expect(raw).toContain(`${id}.bin`);
       expect(raw).toContain('hexagons_medieval.png');
+    }
+  });
+
+  it('ships the deterministic knowledge-city wall kit on disk', () => {
+    const urls = _testKnowledgeCityWallUrls();
+    expect(urls.wall_straight).toBe('/assets/3d/props/knowledge-city/wall-straight.glb');
+    expect(urls.wall_straight_gate).toBe('/assets/3d/props/knowledge-city/wall-gate.glb');
+    expect(urls.building_tower_A_red).toBe('/assets/3d/props/knowledge-city/wall-tower-a.glb');
+    expect(urls.building_tower_B_red).toBe('/assets/3d/props/knowledge-city/wall-tower-b.glb');
+    for (const url of Object.values(urls)) {
+      expect(existsSync(`public${url}`), url).toBe(true);
     }
   });
 });

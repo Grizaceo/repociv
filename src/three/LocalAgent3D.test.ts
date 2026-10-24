@@ -178,6 +178,30 @@ describe('LocalAgent3D', () => {
     expect(child).toBeDefined();
   });
 
+  it('yaws toward the path and uses a low stride instead of a hop', () => {
+    const la = new LocalAgent3D();
+    const unit = makeUnit({
+      id: 'u1',
+      gridX: 0,
+      gridY: 0,
+      path: [
+        { x: 0, y: 0 },
+        { x: 4, y: 0 },
+      ],
+      pathIndex: 0,
+      pathProgress: 0.4,
+      state: 'walking_to_room',
+    });
+    la.update([unit], [], 0.016);
+    const child = la.getGroup().children[0]!;
+    const startY = child.position.y;
+    for (let i = 0; i < 20; i++) {
+      la.update([unit], [], 0.016);
+    }
+    expect(Math.abs(child.rotation.y)).toBeGreaterThan(0.05);
+    expect(Math.abs(child.position.y - startY)).toBeLessThan(2);
+  });
+
   it('adds hero crown and halo meshes for HERO_TYPES vs non-hero roles', () => {
     const la = new LocalAgent3D();
     const claude = makeUnit({ id: 'c1', unitType: 'claude', color: '#d4a574' });
