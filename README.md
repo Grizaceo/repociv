@@ -311,6 +311,8 @@ operativo. `N` abre el wizard de nuevo perfil en `hotkeys.ts`, mientras que
 | `Ctrl+X` | Wizard de nueva sesión Codex |
 | `Ctrl+R` / `R` | Wizard de nueva sesión Cursor |
 | Flechas / `W/A/S/D` | Desplazar cámara |
+| `Q` / `E` | Rotar yaw de la cámara (mapa WebGL; mantener pulsada) |
+| Rueda mantenida (MMB) + arrastre | Orbitar cámara (mapa WebGL) |
 | `1`, `4`–`9` | Seleccionar sesión por slot (`2`/`3` están reservados para la vista) |
 | `Space` | Ciclar al siguiente héroe idle |
 | `Tab` | Ciclar todas las sesiones activas (propias y externas) |

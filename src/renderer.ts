@@ -42,6 +42,12 @@ import {
   resolveLocalScene3DEnabled,
 } from './three/renderMode.ts';
 import { terrainElevation } from './isoHex.ts';
+import {
+  CAMERA_TILT,
+  ORBIT_MMB_SENSITIVITY,
+  ORBIT_YAW_SPEED,
+  clampOrbitPitch,
+} from './three/cameraOrbit.ts';
 
 // 3D tile overlays — loaded lazily alongside the WebGL renderer (see the
 // threeLoadPromise block) so Three.js stays in its own lazy chunk and never
@@ -57,7 +63,7 @@ export class Renderer {
   private ctx: CanvasRenderingContext2D;
   private state: GameState;
 
-  private cam: Camera = { x: 0, y: 0, cx: 0, cy: 0, zoom: 1 };
+  private cam: Camera = { x: 0, y: 0, cx: 0, cy: 0, zoom: 1, yaw: 0, pitch: CAMERA_TILT };
   private isDragging = false;
   private dragStart = { x: 0, y: 0 };
   private camStart = { x: 0, y: 0 };
@@ -80,8 +86,13 @@ export class Renderer {
   private _dt = 0;
   /** Pan keys currently held (RTS-style continuous scroll). */
   private panDirs = new Set<'up' | 'down' | 'left' | 'right'>();
+  /** Q/E orbit keys currently held (WebGL macro yaw). Independent of panDirs. */
+  private yawDirs = new Set<'ccw' | 'cw'>();
   /** Shift held while panning → faster scroll. */
   private _panFast = false;
+  /** Yaw/pitch captured at MMB-down so drag is absolute, not incremental. */
+  private _orbitStartYaw = 0;
+  private _orbitStartPitch = CAMERA_TILT;
   // Phase D: WebGL frame metrics
   private _frameTimeSum = 0;
   private _frameTimeCount = 0;
@@ -110,7 +121,8 @@ export class Renderer {
   };
 
   // ─── Fase 5: Spatial gesture state ────────────────────────────────────────
-  private gestureMode: 'camera_pan' | 'unit_drag' | 'area_select' | 'route' = 'camera_pan';
+  private gestureMode: 'camera_pan' | 'camera_orbit' | 'unit_drag' | 'area_select' | 'route' =
+    'camera_pan';
   private draggedUnit: Unit | null = null;
   private routeFromCity: { tile: Tile; coord: Axial } | null = null;
   private ghostScreenPos: { x: number; y: number } | null = null;
@@ -487,7 +499,13 @@ export class Renderer {
 
     // ── mousedown: decide gesture mode ──────────────────────────────────────
     this.canvas.addEventListener('mousedown', (e) => {
+      // Kill the browser's middle-click autoscroll before any other work.
+      if (e.button === 1) e.preventDefault();
       if (bailIfLocal()) return;
+      if (e.button === 1) {
+        this.beginCameraOrbit(e);
+        return;
+      }
       if (e.button !== 0) return;
       const rect = this.canvas.getBoundingClientRect();
       const wx = e.clientX - rect.left;
@@ -560,6 +578,13 @@ export class Renderer {
         this.cityGhostScreenPos = { x: wx, y: wy };
       }
 
+      if (this.gestureMode === 'camera_orbit') {
+        const dx = e.clientX - this.dragStart.x;
+        const dy = e.clientY - this.dragStart.y;
+        this.cam.yaw = this._orbitStartYaw - dx * ORBIT_MMB_SENSITIVITY;
+        this.cam.pitch = clampOrbitPitch(this._orbitStartPitch - dy * ORBIT_MMB_SENSITIVITY);
+      }
+
       if (this.gestureMode === 'camera_pan' && this.isDragging) {
         const dx = (wx - this.dragStart.x) / this.cam.zoom;
         const dy = (wy - this.dragStart.y) / this.cam.zoom;
@@ -592,7 +617,9 @@ export class Renderer {
         this.areaEnd = { x: wx, y: wy };
       }
 
-      if (
+      if (this.gestureMode === 'camera_orbit') {
+        this.canvas.style.cursor = 'grabbing';
+      } else if (
         this.gestureMode === 'camera_pan' &&
         this._cityRelocateMode &&
         this.draggedCity &&
@@ -611,6 +638,10 @@ export class Renderer {
     // ── mouseup: resolve gesture ─────────────────────────────────────────────
     this.canvas.addEventListener('mouseup', (e) => {
       if (bailIfLocal()) return;
+      if (e.button === 1) {
+        this.endCameraOrbit(e);
+        return;
+      }
       if (e.button !== 0) return;
       const rect = this.canvas.getBoundingClientRect();
       const wx = e.clientX - rect.left;
@@ -695,6 +726,9 @@ export class Renderer {
           break;
         }
 
+        case 'camera_orbit':
+          break;
+
         case 'camera_pan': {
           if (this._cityRelocateMode && this.draggedCity && this.dragStartPos) {
             const dsp = this.dragStartPos;
@@ -728,6 +762,11 @@ export class Renderer {
       this.gestureMode = 'camera_pan';
       this.isDragging = false;
       this.applyIdleCursor(wx, wy);
+    });
+
+    // ── auxclick: middle-click default is autoscroll; never let it through ──
+    this.canvas.addEventListener('auxclick', (e) => {
+      if (e.button === 1) e.preventDefault();
     });
 
     // ── wheel: zoom ──────────────────────────────────────────────────────────
@@ -882,6 +921,19 @@ export class Renderer {
           return null;
       }
     };
+    const yawKey = (e: KeyboardEvent): 'ccw' | 'cw' | null => {
+      if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return null;
+      switch (e.key) {
+        case 'q':
+        case 'Q':
+          return 'ccw';
+        case 'e':
+        case 'E':
+          return 'cw';
+        default:
+          return null;
+      }
+    };
     window.addEventListener('keydown', (e) => {
       // Never hijack typing in inputs/textareas
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -889,6 +941,12 @@ export class Renderer {
       if (dir) {
         e.preventDefault();
         this.panDirs.add(dir);
+        return;
+      }
+      const yaw = yawKey(e);
+      if (yaw) {
+        e.preventDefault();
+        this.yawDirs.add(yaw);
         return;
       }
       if (e.key === 'Shift') this._panFast = true;
@@ -899,18 +957,49 @@ export class Renderer {
     window.addEventListener('keyup', (e) => {
       const dir = panKey(e);
       if (dir) this.panDirs.delete(dir);
+      const yaw = yawKey(e);
+      if (yaw) this.yawDirs.delete(yaw);
       if (e.key === 'Shift') this._panFast = false;
     });
-    // If the window loses focus while a pan key is held, release it so the
-    // map doesn't keep scrolling when the user alt-tabs away.
+    // If the window loses focus while a pan/orbit key is held, release it so
+    // the map doesn't keep scrolling/spinning when the user alt-tabs away.
     window.addEventListener('blur', () => {
       this.panDirs.clear();
+      this.yawDirs.clear();
       this._panFast = false;
+    });
+    // MMB released off-canvas: drop the grabbing cursor without a click.
+    window.addEventListener('mouseup', (e) => {
+      if (e.button === 1) this.endCameraOrbit(e);
     });
   }
 
   private wasDrag(e: MouseEvent): boolean {
     return Math.abs(e.clientX - this.dragStart.x) > 4 || Math.abs(e.clientY - this.dragStart.y) > 4;
+  }
+
+  /** Middle-mouse orbit around the look-at. WebGL macro only; yaw persists. */
+  private beginCameraOrbit(e: MouseEvent): void {
+    if (this.worldRenderMode !== 'webgl') return;
+    this.gestureMode = 'camera_orbit';
+    this.isDragging = false;
+    this.draggedUnit = null;
+    this.dragStart = { x: e.clientX, y: e.clientY };
+    this._orbitStartYaw = this.cam.yaw ?? 0;
+    this._orbitStartPitch = this.cam.pitch ?? CAMERA_TILT;
+    this.canvas.style.cursor = 'grabbing';
+  }
+
+  private endCameraOrbit(e?: MouseEvent): void {
+    if (this.gestureMode !== 'camera_orbit') return;
+    this.gestureMode = 'camera_pan';
+    this.isDragging = false;
+    if (e) {
+      const rect = this.canvas.getBoundingClientRect();
+      this.applyIdleCursor(e.clientX - rect.left, e.clientY - rect.top);
+    } else {
+      this.canvas.style.cursor = 'default';
+    }
   }
 
   private getTileAt(wx: number, wy: number) {
@@ -1037,8 +1126,14 @@ export class Renderer {
     return this.canvas;
   }
 
-  getCamera(): { x: number; y: number; zoom: number } {
-    return { x: this.cam.x, y: this.cam.y, zoom: this.cam.zoom };
+  getCamera(): { x: number; y: number; zoom: number; yaw: number; pitch: number } {
+    return {
+      x: this.cam.x,
+      y: this.cam.y,
+      zoom: this.cam.zoom,
+      yaw: this.cam.yaw ?? 0,
+      pitch: this.cam.pitch ?? CAMERA_TILT,
+    };
   }
 
   centerOn(coord: import('./hex.ts').Axial) {
@@ -1180,6 +1275,21 @@ export class Renderer {
     }
   }
 
+  /**
+   * Continuous yaw while Q/E are held. Independent of WASD pan: both can
+   * run in the same frame. WebGL macro only; yaw is not reset on keyup.
+   */
+  private applyKeyboardOrbit(dt: number): void {
+    if (this.yawDirs.size === 0) return;
+    if (this.worldRenderMode !== 'webgl') return;
+    if (this.state.viewMode === 'local') return;
+    let dyaw = 0;
+    if (this.yawDirs.has('ccw')) dyaw += 1;
+    if (this.yawDirs.has('cw')) dyaw -= 1;
+    if (dyaw === 0) return;
+    this.cam.yaw = (this.cam.yaw ?? 0) + dyaw * ORBIT_YAW_SPEED * dt;
+  }
+
   start() {
     let lastTime = performance.now();
     const loop = (now: number) => {
@@ -1188,6 +1298,7 @@ export class Renderer {
       lastTime = now;
       this._dt = dt;
       this.applyKeyboardPan(dt);
+      this.applyKeyboardOrbit(dt);
       if (this._frozenAnimTime === null) {
         this.animTime += dt;
       } else {

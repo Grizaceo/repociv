@@ -38,9 +38,8 @@ import { axialToWorld3D, hexCornerAngle3D } from './axialToWorld3D.ts';
 import { initLabelRenderer, renderLabels, disposeLabels } from './MapLabels3D.ts';
 import { updateSkyDome } from './SkyDome3D.ts';
 import { SKY_TOP } from './terrainShader.ts';
+import { CAMERA_BASE_DISTANCE, CAMERA_TILT, orbitOffset } from './cameraOrbit.ts';
 
-const CAMERA_TILT = 0.62;
-const CAMERA_BASE_DISTANCE = 320;
 const CAMERA_FOV = 42;
 
 export class ThreeMapRenderer {
@@ -57,6 +56,8 @@ export class ThreeMapRenderer {
   private lastTileSignature = '';
   // Camera micro-pan: when a unit is moving, the camera yaws ~5° toward
   // the active unit. After movement stops, it returns over 400ms.
+  // This offset is additive on top of the user's persistent cam.yaw —
+  // it must never write cam.yaw or reset the orbit the player set.
   private _panYaw = 0; // current yaw offset in radians
   private _panReturnTimer = 0; // seconds remaining on the return-to-center tween
   // Dirty-rate telemetry: % of frames that triggered the heavy rebuilds.
@@ -138,23 +139,14 @@ export class ThreeMapRenderer {
   }
 
   /** Sync perspective Civ camera with 2D map Camera struct.
-   *  Applies the micro-pan yaw offset (toward active moving unit). */
+   *  User orbit (cam.yaw / cam.pitch) is persistent; micro-pan yaw is additive. */
   syncCamera(cam: MapCamera): void {
     this.target.set(cam.x, 0, cam.y);
     const dist = CAMERA_BASE_DISTANCE / cam.zoom;
-    // Base camera position, then rotate around the target by the pan yaw.
-    const baseX = this.target.x - dist * Math.cos(CAMERA_TILT);
-    const baseZ = this.target.z + dist * 0.38;
-    // Rotate (baseX, baseZ) around (target.x, target.z) by _panYaw.
-    const dx = baseX - this.target.x;
-    const dz = baseZ - this.target.z;
-    const cos = Math.cos(this._panYaw);
-    const sin = Math.sin(this._panYaw);
-    this.camera.position.set(
-      this.target.x + dx * cos - dz * sin,
-      this.target.y + dist * Math.sin(CAMERA_TILT),
-      this.target.z + dx * sin + dz * cos,
-    );
+    const yaw = (cam.yaw ?? 0) + this._panYaw;
+    const pitch = cam.pitch ?? CAMERA_TILT;
+    const off = orbitOffset(dist, yaw, pitch);
+    this.camera.position.set(this.target.x + off.x, this.target.y + off.y, this.target.z + off.z);
     this.camera.lookAt(this.target);
     this.camera.updateMatrixWorld();
   }

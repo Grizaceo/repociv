@@ -169,6 +169,9 @@ export function wireHotkeys(
       g: 'hermes',
     };
     const quickKey = e.key.toLowerCase();
+    // Bare Q/E rotate the WebGL macro camera (renderer.ts). Only Ctrl+Q /
+    // Ctrl+E (and the rest of the ctrl-harness map) open session wizards.
+    // Bare R stays the Cursor wizard.
     if (
       (e.ctrlKey && !e.shiftKey && quickKey !== 'w' && quickHarness[quickKey]) ||
       (e.ctrlKey && e.shiftKey && quickKey === 'w') ||

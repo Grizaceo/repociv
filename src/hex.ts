@@ -163,6 +163,10 @@ export interface Camera {
   cx: number; // canvas-space center (half of canvas width/height)
   cy: number;
   zoom: number; // 1 = 100%, clamped
+  /** Persistent orbit yaw in radians (WebGL macro). Additive micro-pan sits on top. */
+  yaw?: number;
+  /** Persistent orbit pitch in radians (WebGL macro). Defaults to CAMERA_TILT. */
+  pitch?: number;
 }
 
 // Shared pan/zoom transforms. The world↔screen math was duplicated verbatim

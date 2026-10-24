@@ -103,6 +103,24 @@ class FakeMouseEvent {
   }
 }
 
+class FakeKeyboardEvent {
+  type: string;
+  key = '';
+  ctrlKey = false;
+  shiftKey = false;
+  altKey = false;
+  metaKey = false;
+  target: EventTarget | null = null;
+  defaultPrevented = false;
+  constructor(type: string, init: Partial<KeyboardEventInit> = {}) {
+    this.type = type;
+    Object.assign(this, init);
+  }
+  preventDefault() {
+    this.defaultPrevented = true;
+  }
+}
+
 class FakeResizeObserver {
   observe = vi.fn();
   unobserve = vi.fn();
@@ -157,6 +175,19 @@ function installBrowserGlobals() {
   for (const k of Object.keys(windowListeners)) delete windowListeners[k];
 
   vi.stubGlobal('MouseEvent', FakeMouseEvent);
+  vi.stubGlobal('KeyboardEvent', FakeKeyboardEvent);
+  vi.stubGlobal(
+    'HTMLInputElement',
+    class HTMLInputElement {
+      /* stub for instanceof in keydown */
+    },
+  );
+  vi.stubGlobal(
+    'HTMLTextAreaElement',
+    class HTMLTextAreaElement {
+      /* stub for instanceof in keydown */
+    },
+  );
   vi.stubGlobal('ResizeObserver', FakeResizeObserver);
   vi.stubGlobal(
     'getComputedStyle',
@@ -488,5 +519,154 @@ describe('LocalRenderer panBy', () => {
     const after = lr.getCam();
     expect(after.x).toBeCloseTo(beforeX + 48 / zoom);
     expect(after.y).toBeCloseTo(beforeY - 24 / zoom);
+  });
+});
+
+function fireWindow(type: string, ev: Event) {
+  for (const l of windowListeners[type] ?? []) l(ev);
+}
+
+type CamOrbit = {
+  cam: { x: number; y: number; yaw?: number; pitch?: number };
+  worldRenderMode: 'flat' | 'webgl';
+  gestureMode: string;
+  isDragging: boolean;
+  draggedUnit: unknown;
+  yawDirs: Set<string>;
+  panDirs: Set<string>;
+  applyKeyboardOrbit: (dt: number) => void;
+  applyKeyboardPan: (dt: number) => void;
+};
+
+function asOrbit(renderer: unknown): CamOrbit {
+  return renderer as unknown as CamOrbit;
+}
+
+// ─── WebGL camera orbit: Q/E yaw + middle-mouse ──────────────────────────────
+describe('Renderer WebGL camera orbit', () => {
+  it('held Q/E change persistent yaw; keyup does not reset it', () => {
+    const { canvas } = makeFakeCanvas();
+    const state = makeFakeState();
+    const renderer = new Renderer(canvas, state as never);
+    const r = asOrbit(renderer);
+    r.worldRenderMode = 'webgl';
+
+    fireWindow('keydown', new KeyboardEvent('keydown', { key: 'q' }));
+    r.applyKeyboardOrbit(0.25);
+    const yawAfterQ = r.cam.yaw ?? 0;
+    expect(yawAfterQ).toBeGreaterThan(0);
+
+    fireWindow('keyup', new KeyboardEvent('keyup', { key: 'q' }));
+    r.applyKeyboardOrbit(0.25);
+    expect(r.cam.yaw).toBeCloseTo(yawAfterQ);
+
+    fireWindow('keydown', new KeyboardEvent('keydown', { key: 'e' }));
+    r.applyKeyboardOrbit(0.25);
+    expect(r.cam.yaw ?? 0).toBeLessThan(yawAfterQ);
+  });
+
+  it('Q/E and WASD run independently in the same frame', () => {
+    const { canvas } = makeFakeCanvas();
+    const state = makeFakeState();
+    const renderer = new Renderer(canvas, state as never);
+    const r = asOrbit(renderer);
+    r.worldRenderMode = 'webgl';
+    const x0 = r.cam.x;
+    const yaw0 = r.cam.yaw ?? 0;
+
+    fireWindow('keydown', new KeyboardEvent('keydown', { key: 'q' }));
+    fireWindow('keydown', new KeyboardEvent('keydown', { key: 'd' }));
+    r.applyKeyboardPan(0.2);
+    r.applyKeyboardOrbit(0.2);
+
+    expect(r.cam.x).not.toBe(x0);
+    expect(r.cam.yaw ?? 0).not.toBe(yaw0);
+    expect(r.yawDirs.has('ccw')).toBe(true);
+    expect(r.panDirs.has('right')).toBe(true);
+  });
+
+  it('Ctrl+Q does not start yaw (session wizard keeps the key)', () => {
+    const { canvas } = makeFakeCanvas();
+    const state = makeFakeState();
+    const renderer = new Renderer(canvas, state as never);
+    const r = asOrbit(renderer);
+    r.worldRenderMode = 'webgl';
+
+    fireWindow('keydown', new KeyboardEvent('keydown', { key: 'q', ctrlKey: true }));
+    r.applyKeyboardOrbit(0.25);
+    expect(r.cam.yaw ?? 0).toBe(0);
+    expect(r.yawDirs.size).toBe(0);
+  });
+
+  it('Q does not yaw in flat mode or local view', () => {
+    const { canvas } = makeFakeCanvas();
+    const state = makeFakeState();
+    const renderer = new Renderer(canvas, state as never);
+    const r = asOrbit(renderer);
+
+    fireWindow('keydown', new KeyboardEvent('keydown', { key: 'q' }));
+    r.applyKeyboardOrbit(0.25);
+    expect(r.cam.yaw ?? 0).toBe(0);
+
+    r.worldRenderMode = 'webgl';
+    state.viewMode = 'local';
+    r.applyKeyboardOrbit(0.25);
+    expect(r.cam.yaw ?? 0).toBe(0);
+  });
+
+  it('MMB drag orbits yaw and never enters camera_pan or unit_drag', () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeFakeState();
+    const renderer = new Renderer(canvas, state as never);
+    const r = asOrbit(renderer);
+    r.worldRenderMode = 'webgl';
+
+    const pickAxialSpy = vi.fn(() => ({ q: 0, r: 0 }));
+    (renderer as unknown as { pickAxial: typeof pickAxialSpy }).pickAxial = pickAxialSpy;
+    const hitSpy = vi.fn(() => null);
+    (renderer as unknown as { unitAtPoint: typeof hitSpy }).unitAtPoint = hitSpy;
+
+    const down = new MouseEvent('mousedown', { button: 1, clientX: 100, clientY: 100 });
+    fire('mousedown', down);
+    expect(down.defaultPrevented).toBe(true);
+    expect(pickAxialSpy).not.toHaveBeenCalled();
+    expect(hitSpy).not.toHaveBeenCalled();
+    expect(r.gestureMode).toBe('camera_orbit');
+    expect(r.isDragging).toBe(false);
+    expect(r.draggedUnit).toBeNull();
+    expect(canvas.style.cursor).toBe('grabbing');
+
+    const camX = r.cam.x;
+    const yaw0 = r.cam.yaw ?? 0;
+    fire('mousemove', new MouseEvent('mousemove', { clientX: 160, clientY: 110 }));
+    expect(r.cam.x).toBe(camX);
+    expect(r.cam.yaw ?? 0).not.toBe(yaw0);
+    expect(r.gestureMode).toBe('camera_orbit');
+    expect(r.isDragging).toBe(false);
+    expect(r.draggedUnit).toBeNull();
+  });
+
+  it('auxclick button 1 is preventDefaulted so autoscroll does not start', () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeFakeState();
+    new Renderer(canvas, state as never);
+    const ev = new MouseEvent('auxclick', { button: 1, clientX: 40, clientY: 40 });
+    fire('auxclick', ev);
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  it('MMB in local view bails before orbit (shared canvas)', () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeFakeState();
+    state.viewMode = 'local';
+    const renderer = new Renderer(canvas, state as never);
+    const r = asOrbit(renderer);
+    r.worldRenderMode = 'webgl';
+
+    const down = new MouseEvent('mousedown', { button: 1, clientX: 100, clientY: 100 });
+    fire('mousedown', down);
+    expect(down.defaultPrevented).toBe(true);
+    expect(r.gestureMode).toBe('camera_pan');
+    expect(r.cam.yaw ?? 0).toBe(0);
   });
 });

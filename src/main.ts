@@ -212,6 +212,7 @@ type RepoCivDebugApi = {
     y: number;
   }>;
   getWebGLMetrics: () => { frameTimeAvg: number; frameCount: number; dirtyRatePct: number } | null;
+  getCamera: () => { x: number; y: number; zoom: number; yaw: number; pitch: number };
   setPostFxEnabled: (enabled: boolean) => void;
   isPostFxEnabled: () => boolean;
   getShadowDebug: () => {
@@ -587,6 +588,7 @@ async function bootstrap() {
     },
     walkUnit: (id: string, q: number, r: number) => state.walkUnitTo(id, { q, r }),
     getWebGLMetrics: () => renderer.getWebGLMetrics(),
+    getCamera: () => renderer.getCamera(),
     setPostFxEnabled: (enabled: boolean) => renderer.setPostFxEnabled(enabled),
     isPostFxEnabled: () => renderer.isPostFxEnabled(),
     getShadowDebug: () => renderer.getShadowDebug(),

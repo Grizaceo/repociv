@@ -309,6 +309,8 @@ mounted news widget.
 | `Ctrl+X` | New Codex session wizard |
 | `Ctrl+R` / `R` | New Cursor session wizard |
 | Arrows / `W/A/S/D` | Pan camera |
+| `Q` / `E` | Rotate camera yaw (WebGL map; hold) |
+| Middle mouse held + drag | Orbit camera (WebGL map) |
 | `1`, `4`–`9` | Select session by slot (`2`/`3` are reserved for the view) |
 | `Space` | Cycle to next idle hero |
 | `Tab` | Cycle all active sessions (own and external) |
