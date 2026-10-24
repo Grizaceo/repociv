@@ -46,7 +46,7 @@ duckdb>=1.0
 # repo_config, repociv_hooks) lo prefieren a su fallback.
 # Optional Hermes provider-model parity imports Hermes modules from the local
 # checkout; these are direct runtime dependencies of that integration path.
-requests>=2.32
+requests>=2.34.2
 ruamel.yaml==0.18.16
 
 PyYAML>=6.0
