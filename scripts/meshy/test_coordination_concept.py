@@ -8,6 +8,15 @@ from unittest.mock import patch
 import coordination_concept as court
 import workshop_concept as runner
 
+PNG = b"\x89PNG\r\n\x1a\nfixture"
+
+
+def _stub_reference_pngs(spec, root: Path) -> None:
+    for rel in spec["concept"]["reference_relative_paths"]:
+        dest = root / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(PNG)
+
 
 class CoordinationTests(unittest.TestCase):
     def test_entrypoint_isolation_and_restoration(self):
@@ -36,12 +45,17 @@ class CoordinationTests(unittest.TestCase):
             return {"result": "offline-court-task"}
 
         with tempfile.TemporaryDirectory() as name:
-            out = Path(name)
-            result = runner.create_once(out, spec, api)
+            root = Path(name)
+            out = root / "out"
+            out.mkdir()
+            _stub_reference_pngs(spec, root)
+            with patch.object(runner, "ROOT", root):
+                result = runner.create_once(out, spec, api)
             self.assertEqual(result["task_id"], "offline-court-task")
             self.assertNotIn("data:image", (out / "generation.json").read_text())
             with self.assertRaises(SystemExit):
-                runner.create_once(out, spec, api)
+                with patch.object(runner, "ROOT", root):
+                    runner.create_once(out, spec, api)
         self.assertEqual(sum(payload is not None for _, payload in calls), 1)
         self.assertFalse(spec["guards"]["auto_geometry"])
         self.assertFalse(spec["guards"]["auto_texture"])
@@ -57,12 +71,17 @@ class CoordinationTests(unittest.TestCase):
             raise TimeoutError("offline uncertain outcome")
 
         with tempfile.TemporaryDirectory() as name:
-            out = Path(name)
+            root = Path(name)
+            out = root / "out"
+            out.mkdir()
+            _stub_reference_pngs(spec, root)
             with self.assertRaises(TimeoutError):
-                runner.create_once(out, spec, api)
+                with patch.object(runner, "ROOT", root):
+                    runner.create_once(out, spec, api)
             self.assertTrue((out / "submission-lock.json").exists())
             with self.assertRaises(SystemExit):
-                runner.create_once(out, spec, api)
+                with patch.object(runner, "ROOT", root):
+                    runner.create_once(out, spec, api)
         self.assertEqual(len(posts), 1)
 
 

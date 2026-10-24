@@ -8,6 +8,15 @@ from unittest.mock import patch
 import observatory_concept as obs
 import workshop_concept as runner
 
+PNG = b"\x89PNG\r\n\x1a\nfixture"
+
+
+def _stub_reference_pngs(spec, root: Path) -> None:
+    for rel in spec["concept"]["reference_relative_paths"]:
+        dest = root / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(PNG)
+
 
 class ObservatoryTests(unittest.TestCase):
     def test_entrypoint_isolated_and_restored_in_test(self):
@@ -39,12 +48,17 @@ class ObservatoryTests(unittest.TestCase):
             return {"result": "offline-observatory-task"}
 
         with tempfile.TemporaryDirectory() as name:
-            out = Path(name)
-            state = runner.create_once(out, spec, fake_api)
+            root = Path(name)
+            out = root / "out"
+            out.mkdir()
+            _stub_reference_pngs(spec, root)
+            with patch.object(runner, "ROOT", root):
+                state = runner.create_once(out, spec, fake_api)
             self.assertEqual(state["task_id"], "offline-observatory-task")
             self.assertNotIn("data:image", (out / "generation.json").read_text())
             with self.assertRaises(SystemExit):
-                runner.create_once(out, spec, fake_api)
+                with patch.object(runner, "ROOT", root):
+                    runner.create_once(out, spec, fake_api)
         self.assertEqual(sum(payload is not None for _, payload in calls), 1)
 
 
