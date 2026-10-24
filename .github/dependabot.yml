@@ -16,6 +16,17 @@ updates:
         dependency-type: development
       runtime:
         dependency-type: production
+    ignore:
+      # typescript-eslint 8.x still peers typescript <6.1; a grouped bump to 7
+      # fails npm ci. Revisit when the linter stack supports it.
+      - dependency-name: "typescript"
+        versions: [">=6"]
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/coverage-v8"
+        update-types: ["version-update:semver-major"]
 
   # requirements.txt holds the floors; regenerate requirements.lock with the
   # command in its header (uv pip compile … --exclude-newer <today-7d>).
@@ -26,6 +37,16 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    groups:
+      python-floors:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "mcp"
+    ignore:
+      # mcp 2.x is a breaking major; the stdio server still uses FastMCP 1.x.
+      - dependency-name: "mcp"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
@@ -33,3 +54,7 @@ updates:
       interval: monthly
     cooldown:
       default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"

@@ -5,7 +5,7 @@
 
 import {
   ACESFilmicToneMapping,
-  PCFSoftShadowMap,
+  PCFShadowMap,
   WebGLRenderer,
   AmbientLight,
   DirectionalLight,
@@ -79,7 +79,7 @@ export class LocalScene3D {
     this.renderer.toneMapping = ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.22;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = PCFSoftShadowMap;
+    this.renderer.shadowMap.type = PCFShadowMap;
     this.renderer.setClearColor(0x1a1a1e, 1);
     container.appendChild(this.renderer.domElement);
     this.renderer.domElement.style.width = '100%';
