@@ -7,7 +7,12 @@
 //     dev-server root, so presence there == served at /assets/…)
 import { describe, expect, it } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
-import { _testRecipes, BANNER_PROP_IDS, cityBannerId } from './CityProps3D.ts';
+import {
+  _testRecipes,
+  BANNER_PROP_IDS,
+  cityBannerId,
+  MESHY_CITY_PLAZA_URL,
+} from './CityProps3D.ts';
 import type { City, Tile } from '../types.ts';
 
 const { PROP_IDS, RECIPES, LEVEL_RECIPE, CAPITAL_SUBURBS } = _testRecipes();
@@ -109,5 +114,7 @@ describe('KayKit city prop recipes', () => {
     expect(cityBannerId(city, okTile)).toBe('banner-green');
     expect(cityBannerId(city, { ...okTile, skillHealth: 'broken' })).toBe('banner-red');
     expect(cityBannerId(city, { ...okTile, skillHealth: 'stale' })).toBe('banner-red');
+    expect(MESHY_CITY_PLAZA_URL).toBe('/assets/3d/props/meshy/civic-plaza-map.glb');
+    expect(existsSync(`public${MESHY_CITY_PLAZA_URL}`)).toBe(true);
   });
 });

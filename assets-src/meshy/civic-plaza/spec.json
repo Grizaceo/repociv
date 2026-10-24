@@ -1,6 +1,6 @@
 {
   "asset_id": "civic-plaza-v001",
-  "status": "concept, geometry and PBR materials artist-approved by Cristóbal; no runtime consumer (approved unmapped); preserved in assets-src/meshy/civic-plaza/",
+  "status": "concept, geometry and PBR materials artist-approved by Cristóbal; integrated into CityProps3D settlement recipes (public/assets/3d/props/meshy/civic-plaza-map.glb)",
   "license_status": "unverified; local only; distribution blocked",
   "reference_asset": "memory-archive-v001",
   "authorization": "Cristóbal authorized the five-concept family, prioritizing quality without the proposed credit cap. Coordination Court concept approved; these four concepts remain in the authorized round. No automatic geometry or texturing.",
@@ -8,9 +8,7 @@
     "tool": "meshy_image_to_image",
     "advertised_credits": 9,
     "max_create_requests": 1,
-    "reference_relative_paths": [
-      "assets-src/meshy/memory-archive/textured/archive-textured.png"
-    ],
+    "reference_relative_paths": ["assets-src/meshy/memory-archive/textured/archive-textured.png"],
     "request_without_reference_paths": {
       "ai_model": "nano-banana-pro",
       "prompt": "Create ONE original standalone asset for the SAME knowledge-city strategy-game civilization as the supplied Memory Archive image. Use the image as a strict material and architectural craftsmanship reference, NOT as a silhouette to copy. Warm pale limestone, broad dark slate ceramic roof elements where appropriate, aged copper structural accents, elegant stepped foundations and restrained luminous details. Large calm material regions, warm handcrafted stylized finish, sophisticated proportions rather than medieval fantasy or photorealism. Civic Plaza: a beautiful LOW OPEN civic gathering place, NOT a building. An irregular compact polygonal stepped limestone terrace with a broad circular stone meeting table slightly off center, three integrated substantial curved stone benches and a single SMALL low copper-and-amber civic beacon on a thick stone plinth at the rear edge. Stone paving has a few broad radial joints. Minimal shallow slate inlay bands tie it to the reference buildings. No roofs, towers, temples, statues, fountains, vegetation, thin poles, chairs or busy furniture. The platform is the architectural subject, no surrounding terrain tile. A quiet memorable communal heart, low horizontal silhouette and spacious clean paving. Show the complete standalone subject in one clearly ELEVATED THREE-QUARTER ISOMETRIC view, with both front and side visible, all edges inside frame, neutral background and transparent cutout. Readable at small strategy-map scale. All walls and roofs closed except the explicitly intended architectural passage or open plaza. Windows only simple shallow framed recessed panels, never perforations. Thick connected structural pieces, no thin railings or filigree, no text, logos, people, dramatic baked shadows, excessive grime, floating pieces or surrounding scenery.",
@@ -48,9 +46,7 @@
       "enable_original_uv": true,
       "enable_pbr": true,
       "texture_resolution": "2k",
-      "target_formats": [
-        "glb"
-      ],
+      "target_formats": ["glb"],
       "alpha_thumbnail": true
     },
     "uv_method": "xatlas-python 0.0.11, 2048 px atlas, 6 px padding, charts on welded positions",
@@ -96,8 +92,9 @@
     }
   },
   "runtime": {
-    "consumer": null,
-    "mapping_status": "approved by Cristóbal (unmapped)",
-    "reason": "no RepoCiv software concept corresponds to a civic plaza; not mapped to avoid inventing a feature"
+    "consumer": "src/three/CityProps3D.ts ensureCityPropsLoad (replaces building_well_red in hamlet, city and capital recipes)",
+    "public_path": "public/assets/3d/props/meshy/civic-plaza-map.glb",
+    "default_enabled": true,
+    "mapping_status": "approved by Cristóbal (Wave 1 Step 1)"
   }
 }

@@ -38,6 +38,10 @@ export const FAMILY_BUILDING_ASSETS = {
     path: 'assets/3d/props/meshy/execution-workshop-map.glb',
     materials: 'approved',
   },
+  'civic-plaza': {
+    path: 'assets/3d/props/meshy/civic-plaza-map.glb',
+    materials: 'approved',
+  },
 } as const;
 
 export type FamilyBuildingId = keyof typeof FAMILY_BUILDING_ASSETS;
@@ -52,6 +56,7 @@ export const FAMILY_BUILDING_IDS: readonly FamilyBuildingId[] = [
   'artifact-vault',
   'research-laboratory',
   'execution-workshop',
+  'civic-plaza',
 ];
 
 export function familyBuildingUrl(id: FamilyBuildingId): string {

@@ -178,7 +178,7 @@ export function rebuildCityClusters(
   // Plaza radius and spire height scale with city level.
   {
     const plazaGeom = new CylinderGeometry(HEX_SIZE * 0.3, HEX_SIZE * 0.46, HEX_SIZE * 0.1, 14);
-    const plazaMat = new MeshStandardMaterial({ color: new Color(0xc9bfa6), roughness: 0.92 });
+    const plazaMat = new MeshStandardMaterial({ color: new Color(0xd8ccb8), roughness: 0.92 });
     const spireGeom = new CylinderGeometry(HEX_SIZE * 0.013, HEX_SIZE * 0.032, HEX_SIZE * 0.46, 6);
     const spireMat = new MeshStandardMaterial({ color: new Color(0xe4ddca), roughness: 0.5 });
     const landmarkGeom = new CylinderGeometry(
@@ -188,9 +188,10 @@ export function rebuildCityClusters(
       6,
     );
     const landmarkMat = new MeshStandardMaterial({
-      color: new Color(0xd9cca2),
-      roughness: 0.55,
-      emissive: new Color(0x3a3220),
+      color: new Color(0x8c6244),
+      roughness: 0.48,
+      metalness: 0.42,
+      emissive: new Color(0x3a2818),
       emissiveIntensity: 0.15,
     });
 
@@ -278,13 +279,13 @@ export function rebuildCityClusters(
   if (normalCities.length > 0) {
     // Taller, thinner blocks so they read as buildings rather than dunes
     const bldGeom = new BoxGeometry(HEX_SIZE * 0.12, HEX_SIZE * 0.28, HEX_SIZE * 0.12);
-    const bldMat = new MeshLambertMaterial({ color: new Color(0xc8c0b0) });
+    const bldMat = new MeshLambertMaterial({ color: new Color(0xd8ccb8) });
     const roofGeom = new ConeGeometry(HEX_SIZE * 0.1, HEX_SIZE * 0.12, 4);
     // flatShading on the 4-sided roof cone so each triangular face has a
-    // hard normal — reads as a pitched terracotta roof, not a smooth wand.
+    // hard normal — dark slate ceramic roof matching the knowledge-city family.
     const roofMat = new MeshStandardMaterial({
-      color: new Color(0xb0563a),
-      roughness: 0.65,
+      color: new Color(0x343d48),
+      roughness: 0.62,
       flatShading: true,
     });
     // Perimeter wall: a closed hexagonal RING (outer hex with inner hex hole,
@@ -324,9 +325,9 @@ export function rebuildCityClusters(
       ringWallGeom = wall3d;
     }
     const wallGeom: ExtrudeGeometry = ringWallGeom;
-    // PBR flatShaded stone — matches the mountain/forest prop materials.
+    // PBR flatShaded warm pale limestone + dark slate roof caps.
     const wallMat = new MeshStandardMaterial({
-      color: new Color(0x9a9080),
+      color: new Color(0xc9bfa8),
       roughness: 0.82,
       metalness: 0.04,
       flatShading: true,
@@ -334,16 +335,17 @@ export function rebuildCityClusters(
     // Towers: hexagonal prisms with flatShading — chunky and readable.
     const towerGeom = new CylinderGeometry(HEX_SIZE * 0.035, HEX_SIZE * 0.045, HEX_SIZE * 0.28, 6);
     const towerMat = new MeshStandardMaterial({
-      color: new Color(0x8a8270),
+      color: new Color(0xc2b69e),
       roughness: 0.8,
       metalness: 0.04,
       flatShading: true,
     });
-    // Tower roof — small cone cap so towers read as watchtowers, not stumps.
+    // Tower roof — dark slate cone cap with subtle copper sheen.
     const towerRoofGeom = new ConeGeometry(HEX_SIZE * 0.05, HEX_SIZE * 0.1, 6);
     const towerRoofMat = new MeshStandardMaterial({
-      color: new Color(0x6a4030),
-      roughness: 0.72,
+      color: new Color(0x343d48),
+      roughness: 0.65,
+      metalness: 0.12,
       flatShading: true,
     });
 

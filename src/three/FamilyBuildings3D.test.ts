@@ -50,9 +50,9 @@ describe('local Meshy family trial', () => {
     }
     expect(familyBuildingForType('gitlab')).toBe('connection-gateway');
   });
-  it('lists the seven mapped family buildings (excluding unmapped Plaza) and verifies public GLBs exist on disk', () => {
+  it('lists all eight approved family buildings and verifies public GLBs exist on disk', () => {
     expect(FAMILY_BUILDING_IDS).toContain('execution-workshop');
-    expect(FAMILY_BUILDING_IDS).not.toContain('civic-plaza');
+    expect(FAMILY_BUILDING_IDS).toContain('civic-plaza');
     expect([...FAMILY_BUILDING_IDS].sort()).toEqual(Object.keys(FAMILY_BUILDING_ASSETS).sort());
     for (const { path, materials } of Object.values(FAMILY_BUILDING_ASSETS)) {
       expect(path.startsWith('assets/3d/props/meshy/')).toBe(true);

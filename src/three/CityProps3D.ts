@@ -16,6 +16,7 @@ import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { cityLevel } from './CityCluster3D.ts';
+import { familyBuildingUrl } from './familyBuildingAssets.ts';
 import {
   PROP_SURFACE_CLEARANCE,
   terrainFootprintMaxY,
@@ -45,6 +46,7 @@ const PROP_IDS = [
 
 export const BANNER_PROP_IDS = ['banner-green', 'banner-red'] as const;
 export type BannerPropId = (typeof BANNER_PROP_IDS)[number];
+export const MESHY_CITY_PLAZA_URL = familyBuildingUrl('civic-plaza');
 
 type PartId = (typeof PROP_IDS)[number];
 
@@ -72,12 +74,12 @@ interface RecipePart {
 const RECIPES: Record<'capital' | 'hamlet' | 'village' | 'town' | 'city', RecipePart[]> = {
   capital: [
     { id: 'building_castle_red', ox: 0.0, oz: 0.0, s: 0.6, rot: 0 },
-    { id: 'building_well_red', ox: 0.2, oz: 0.1, s: 0.18, rot: 1 },
+    { id: 'building_well_red', ox: 0.2, oz: 0.1, s: 0.22, rot: 1 },
   ],
   hamlet: [
     { id: 'building_home_A_red', ox: 0.0, oz: 0.06, s: 0.5, rot: 0 },
     { id: 'building_home_B_red', ox: -0.13, oz: -0.09, s: 0.28, rot: 2 },
-    { id: 'building_well_red', ox: 0.18, oz: -0.1, s: 0.16, rot: 3 },
+    { id: 'building_well_red', ox: 0.18, oz: -0.1, s: 0.2, rot: 3 },
   ],
   village: [
     { id: 'building_church_red', ox: 0.02, oz: -0.05, s: 0.52, rot: 0 },
@@ -93,7 +95,7 @@ const RECIPES: Record<'capital' | 'hamlet' | 'village' | 'town' | 'city', Recipe
     { id: 'building_tavern_red', ox: -0.04, oz: -0.04, s: 0.54, rot: 0 },
     { id: 'building_market_red', ox: 0.13, oz: 0.12, s: 0.28, rot: 2 },
     { id: 'building_home_A_red', ox: -0.16, oz: 0.13, s: 0.26, rot: 5 },
-    { id: 'building_well_red', ox: 0.02, oz: 0.19, s: 0.16, rot: 1 },
+    { id: 'building_well_red', ox: 0.02, oz: 0.19, s: 0.2, rot: 1 },
   ],
 };
 
@@ -158,6 +160,19 @@ export function ensureCityPropsLoad(onSettled?: () => void): void {
         const size = new Vector3().subVectors(bb.max, bb.min);
         const norm = 1 / Math.max(size.x, size.y, size.z, 1e-6);
         variants.set(PROP_IDS[i]!, { ...merged, norm });
+      }
+      if (import.meta.env['VITE_MESHY_PREVIEW'] !== '0') {
+        try {
+          const plazaGltf = await loader.loadAsync(MESHY_CITY_PLAZA_URL);
+          const merged = mergeGlbScene(plazaGltf.scene);
+          merged.geometry.computeBoundingBox();
+          const bb = merged.geometry.boundingBox!;
+          const size = new Vector3().subVectors(bb.max, bb.min);
+          const norm = 1 / Math.max(size.x, size.y, size.z, 1e-6);
+          variants.set('building_well_red', { ...merged, norm });
+        } catch {
+          // Keep KayKit building_well_red fallback if civic-plaza-map.glb is unavailable.
+        }
       }
       try {
         const bannerGltfs = await Promise.all(

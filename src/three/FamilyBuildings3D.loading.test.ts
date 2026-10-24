@@ -54,7 +54,7 @@ describe('family asynchronous loading', () => {
     expect(module.familyBuildingState('memory-archive')).toBe('ready');
     expect(module.createFamilyBuilding('artifact-vault')).toBeNull();
     expect(module.createFamilyBuilding('memory-archive')?.name).toBe('wonder-memory-archive');
-    expect(settled).toHaveBeenCalledTimes(7);
+    expect(settled).toHaveBeenCalledTimes(8);
     expect(module.familyBuildingsSignature()).toContain('f');
   });
 });
