@@ -60,5 +60,6 @@ Authorized by Cristóbal (10 credits, `meshy-7` 2K PBR, `enable_original_uv: tru
 - Assembled candidate: `texture-v001/textured.glb` (`SHA-256: 5c1caf739ea65e104876597e3ba701afa5f420c131ac214073c137a5b0c4f17e`, 6,429,540 bytes, 3624 triangles, exact against `repair-v003/preview.glb`, 0 opposing normals)
 - Optimized runtime copy: `texture-v001/execution-workshop-map.glb` → `public/assets/3d/props/meshy/execution-workshop-map.glb` (379,568 bytes, 512 px PBR maps, 94.1% smaller, geometry bytes identical)
 - Mapped in `src/three/WonderProps3D.ts` (`familyBuildingForType`) onto the existing `building-smelter` execution bucket (`worker|build|docker|gpu|compute|smelter|forge|ci`).
+- **Material and runtime approval by Cristóbal:** «sip los apruebo».
 
 All candidates remain local/ignored and outside public/; license clearance remains pending. No push, merge or deployment.

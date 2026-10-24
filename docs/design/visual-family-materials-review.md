@@ -1,10 +1,10 @@
 # Family materials and local runtime trial — texture-v001
 
-Scope: Patio (coordination-court), Portal (connection-gateway), Bóveda (artifact-vault), Laboratorio (research-laboratory) and Plaza (civic-plaza), using their approved geometry exactly. Archivo and Observatorio are preserved and reused, with no new paid request. Taller (execution-workshop) remains deferred and outside this batch.
+Scope: Patio (coordination-court), Portal (connection-gateway), Bóveda (artifact-vault), Laboratorio (research-laboratory), Plaza (civic-plaza) and Taller (execution-workshop), using their approved geometry exactly. Archivo and Observatorio are preserved and reused, with no new paid request.
 
-Authorization, Cristóbal: «Apruebo las geometrías presentadas y autorizo continuar con la texturización de los cinco edificios nuevos y su integración local en RepoCiv. Priorizo belleza, coherencia y acabado; no impongas el antiguo tope de créditos, pero registra el gasto y evita solicitudes duplicadas.» Geometry approval is not advance material approval.
+Authorization, Cristóbal: «Apruebo las geometrías presentadas y autorizo continuar con la texturización de los cinco edificios nuevos y su integración local en RepoCiv. Priorizo belleza, coherencia y acabado; no impongas el antiguo tope de créditos, pero registra el gasto y evita solicitudes duplicadas.» Followed by Taller geometry approval («apruebo los modelos»), 10-credit retexture authorization, and material approval («sip los apruebo»).
 
-**Status: PBR materials, service mapping and map scale APPROVED by Cristóbal («apruebo la totalidad materiales, el mapeo de servicios y la escala trabajemos en integrarlo en repociv»).** Integrated by default into RepoCiv runtime (`public/assets/3d/props/meshy/<id>-map.glb`).
+**Status: PBR materials, service mapping and map scale APPROVED by Cristóbal across all eight members («apruebo la totalidad materiales, el mapeo de servicios y la escala trabajemos en integrarlo en repociv» + «sip los apruebo» for Taller).** Seven mapped members integrated by default into RepoCiv runtime (`public/assets/3d/props/meshy/<id>-map.glb`).
 
 ## Route: the exact accepted GLB, never the old task
 

@@ -1,6 +1,6 @@
 {
   "asset_id": "execution-workshop-v001",
-  "status": "concept, repair-v003 geometry and PBR materials verified; integrated into RepoCiv runtime (public/assets/3d/props/meshy/execution-workshop-map.glb)",
+  "status": "concept, repair-v003 geometry and PBR materials artist-approved by Cristóbal («sip los apruebo»); service mapping and map scale approved; integrated into RepoCiv runtime (public/assets/3d/props/meshy/execution-workshop-map.glb)",
   "license_status": "unverified; local candidates only; distribution blocked",
   "reference_asset": "memory-archive-v001",
   "local_repair": {
@@ -87,6 +87,7 @@
       "alpha_thumbnail": true
     },
     "uv_method": "xatlas-python 0.0.11, 2048 px atlas, 6 px padding, charts on welded positions",
+    "material_approval": "approved by Cristóbal («sip los apruebo»)",
     "result": {
       "task_id": "01a16b22-3f76-72a3-a4d4-536529268d8e",
       "status": "SUCCEEDED",
@@ -131,6 +132,7 @@
     "public_path": "public/assets/3d/props/meshy/execution-workshop-map.glb",
     "default_enabled": true,
     "mapping": "existing smelter bucket: worker|build|docker|gpu|compute|smelter|forge|ci (excluding prometheus/grafana -> observatory and lab -> research-laboratory)",
+    "mapping_status": "approved by Cristóbal",
     "scale_status": "approved by Cristóbal (diagonal <= 0.5 hex, height <= 0.62 hex)"
   }
 }
