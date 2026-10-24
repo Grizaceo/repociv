@@ -76,10 +76,10 @@ Consumers inspected: `WonderProps3D.ts`, which assigns Kenney models by wonder-i
   - mine bucket (db, storage, ledger…) → Bóveda.
   - watermill bucket (pipeline, workflow, queue…) → Patio.
   - default/port bucket (any other connected service, e.g. GhostDesk) → Portal.
-  - The AI (wizard tower) and execution (smelter) buckets keep Kenney: the Workshop is deferred.
-  - Plaza has no consumer, because no RepoCiv software concept maps to it.
+  - Execution (smelter / docker / ci / gpu-worker) → Taller. AI (wizard tower: ollama, claude, …) keeps Kenney.
+  - Plaza maps to the well overlay in `CityProps3D` (`building_well_red`), not to a wonder service.
 
-  **Mapping and scale approved by Cristóbal.**
+  **Mapping and scale approved by Cristóbal.** Taller materials were approved later («sip los apruebo») and the building is in the default runtime.
 - Runtime integration: the six optimized runtime copies live in `public/assets/3d/props/meshy/<id>-map.glb` and are enabled by default (`VITE_MESHY_PREVIEW=0` forces Kenney fallback). `vite-plugins/meshyLocalAssets.ts` attaches a content-hash ETag with `Cache-Control: no-cache` on dev/preview servers so a regenerated GLB is never served stale.
 - Runtime copies: 512 px JPEG maps through `optimize_glb.py`, geometry bytes identical to the candidates, 94–95 % smaller. Sizes: 308–484 KB each, 2.34 MB for all six. Estimated GPU texture memory is about 4 MB per building on screen (3 × 512² RGBA with mipmaps). Each building is 1 mesh, 1 material and 1 draw call, plus its shadow pass. Triangles per wonder are 3115–4218, against 183–554 for Kenney.
 - Real map (`scripts/meshy/verify-family-map.mjs`, fixture repos and wonders by page routing, no bridge):
@@ -111,17 +111,16 @@ Still unverified: the plan tier at generation time, whether AI output is copyrig
     python3 scripts/meshy/optimize_glb.py --input …/texture-v001/textured.glb --output …/texture-v001/<asset>-map.glb --report …-map.report.json --max-size 512
     node scripts/meshy/verify-family-textured.mjs assets-src/meshy/family-texture-review-v001
     python3 scripts/meshy/family_contact_sheets.py assets-src/meshy/family-texture-review-v001
-    VITE_MESHY_PREVIEW=1 npx vite --port 5284 --host 127.0.0.1   # then verify-family-map.mjs http://127.0.0.1:5284 <out>
+    npx vite --port 5284 --host 127.0.0.1   # VITE_MESHY_PREVIEW=0 forces Kenney
 
 Do not rerun `run --generate`: each asset holds its submission lock and saved task.
 
 ## Reversion
 
-Without `VITE_MESHY_PREVIEW=1` the app behaves as before: verified on the served default build. To drop a single member, remove it from `src/three/familyBuildingAssets.ts`. Every source stays immutable beside its derived copies: concepts, geometry, repair-v003, `source-uv.glb`, `meshy.glb`, `textured.glb` and the runtime copies. Reverting the code change restores the archive-only trial.
+Default builds load the family from `public/assets/3d/props/meshy/`. `VITE_MESHY_PREVIEW=0` restores Kenney/KayKit. To drop a single member, remove it from `src/three/familyBuildingAssets.ts`. Every source stays immutable beside its derived copies: concepts, geometry, repair-v003, `source-uv.glb`, `meshy.glb`, `textured.glb` and the runtime copies.
 
 ## Pending decisions
 
-1. Material approval or rejection, per building (Cristóbal).
-2. Wonder-to-building mapping proposal, and whether to adjust the family scale on the map.
-3. License clearance before any distribution.
-4. Taller: repair still deferred. The family is not production-ready while Taller, the license and these decisions stay open.
+1. License clearance before any public redistribution of the Meshy GLBs.
+2. Whether to adjust family scale on the map (mapping itself is approved).
+3. Ciudadela: local 0-credit follow-up applied (`repair-v004` / `texture-v004`). Awaiting a human look at the left elevation. No Meshy credits spent.

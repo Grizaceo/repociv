@@ -92,10 +92,10 @@ export function wonderModelForType(wonderType: string): WonderKenneyId {
 }
 
 /**
- * Local Meshy trial: which family building replaces a wonder's Kenney model.
+ * Which family building replaces a wonder's Kenney model.
  * Derived only from the keyword buckets above, so it introduces no new service
- * categories. Execution (smelter, Workshop deferred) and AI (wizard tower) keep
- * their Kenney models; Civic Plaza has no matching service and is unmapped.
+ * categories. Execution (smelter) maps to the Workshop; AI (wizard tower) keeps
+ * Kenney. Civic Plaza is a city overlay in CityProps3D, not a wonder service.
  */
 export function familyBuildingForType(wonderType: string): FamilyBuildingId | null {
   if (isMemoryArchiveType(wonderType)) return 'memory-archive';

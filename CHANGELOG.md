@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Ciudadela: tapado local de las 2 ventanas izquierdas** — cap del vano de terraza media (+14 triángulos) y panel de caliza sobre el manchón de planta baja, 0 créditos Meshy. El runtime `city-citadel-map.glb` pasa a texture-v004; `repair-v003` queda inmutable. Pendiente mirada humana.
+
 ### Fixed
 
 - **R03 cerrado — el timeout de paso termina al agente, con verdad** — los seis adaptadores CLI lanzan el agente con `start_new_session=True` y lo registran como proceso propio (`agent_runner._bind_owned_process` → `process_control.register_owned_process`). Al vencer el plazo, `step_executor` ya no espera al hilo (el `with ThreadPoolExecutor` hacía `shutdown(wait=True)`): pide la parada acotada TERM→KILL de la sesión propia, da al hilo como máximo `CLEANUP_BUDGET_SECONDS` y registra `StepTimedOut` separando parada pedida de confirmada. `StepTimeoutError.retryable` solo es verdadero si la parada se confirmó y el hilo terminó; `step_retry` nunca reintenta un intento sin resolver (sin solapes). La ruta HTTP de Hermes, sin proceso local, se informa `unconfirmed` (`no-owned-local-process`). Además el adaptador de Cursor heredaba el entorno completo del bridge: ahora recibe el entorno saneado, y un test estático exige `start_new_session` + `env` en cada `Popen` de adaptador.

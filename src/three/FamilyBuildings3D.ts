@@ -1,4 +1,5 @@
-// Local-only art trial. Never bundles/distributes the license-pending binaries.
+// Knowledge-city family buildings. Enabled by default; VITE_MESHY_PREVIEW=0
+// restores Kenney fallbacks. Meshy license is still unverified.
 import { Box3, Group, Mesh, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { HEX_SIZE } from '../constants.ts';
