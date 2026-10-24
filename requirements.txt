@@ -36,7 +36,7 @@ pydantic>=2.0
 # Persistencia / ledger anal\u00edtico (Fase 0)
 # research_ledger.py degrada a "sin anal\u00edtica" si falta, pero el invariante
 # DuckDB-as-materialized-view requiere que est\u00e9 instalado en producci\u00f3n.
-duckdb>=1.0
+duckdb>=1.5.6
 
 # Hooks declarativos por repo (Fase 1, H5)
 # repociv_hooks.py parsea repociv.yaml en cada repo gestionado.
