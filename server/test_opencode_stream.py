@@ -65,7 +65,7 @@ def run(monkeypatch, tmp_path):
 
     def popen(cmd, **kwargs):
         assert cmd == ["/fake/opencode", "run", "--session", "ses_thread", "--format", "json", "--auto", "-m", "model", "spatial\n\ncd work\n\nmission"]
-        assert kwargs == dict(stdout="pipe", stderr="stdout", text=True, bufsize=1, cwd="work", env={"FAKE": "1"})
+        assert kwargs == dict(stdout="pipe", stderr="stdout", text=True, bufsize=1, cwd="work", env={"FAKE": "1"}, start_new_session=True)
         step("spawn")
         return Process()
 

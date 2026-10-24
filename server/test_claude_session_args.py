@@ -165,7 +165,7 @@ def test_fake_claude_process_uses_real_isolated_session_store(monkeypatch, tmp_p
     def popen(cmd, **kwargs):
         commands.append(cmd)
         assert kwargs == dict(stdout="pipe", stderr="stdout", text=True, bufsize=1,
-                              cwd=str(tmp_path), env={"FAKE": "1"})
+                              cwd=str(tmp_path), env={"FAKE": "1"}, start_new_session=True)
         events.append(("spawn",))
         return FakeProcess()
 

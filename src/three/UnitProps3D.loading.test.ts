@@ -57,11 +57,15 @@ describe('knowledge-city unit overlay loading', () => {
     expect(module.getUnitPropPartsForType('worker')?.length).toBe(1);
     expect(module.getUnitPropPartsForType('scout')?.length).toBe(1);
     expect(module.getUnitPropPartsForType('praetorian')?.length).toBe(1);
-    expect(module.getUnitRoleSource('unit-mage')).toBe(module.KNOWLEDGE_CITY_UNIT_URLS['unit-mage']);
+    expect(module.getUnitRoleSource('unit-mage')).toBe(
+      module.KNOWLEDGE_CITY_UNIT_URLS['unit-mage'],
+    );
     expect(module.getUnitRoleSource('unit-engineer')).toBe(
       module.KNOWLEDGE_CITY_UNIT_URLS['unit-engineer'],
     );
-    expect(module.getUnitRoleSource('unit-rogue')).toBe(module.KNOWLEDGE_CITY_UNIT_URLS['unit-rogue']);
+    expect(module.getUnitRoleSource('unit-rogue')).toBe(
+      module.KNOWLEDGE_CITY_UNIT_URLS['unit-rogue'],
+    );
     expect(module.getUnitRoleSource('unit-knight')).toBe(
       module.KNOWLEDGE_CITY_UNIT_URLS['unit-knight'],
     );

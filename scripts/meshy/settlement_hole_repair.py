@@ -176,10 +176,14 @@ def wall_with_recessed_windows(v_list, faces, axis, plane, sign, u0, u1, y0, y1,
             i00, i10 = front[i, j], front[i + 1, j]
             i11, i01 = front[i + 1, j + 1], front[i, j + 1]
             if in_window((ua + ub) / 2, (ya + yb) / 2):
-                b00 = len(v_list); v_list.append(_pos_on_wall(axis, plane, sign, ua, ya, recess))
-                b10 = len(v_list); v_list.append(_pos_on_wall(axis, plane, sign, ub, ya, recess))
-                b11 = len(v_list); v_list.append(_pos_on_wall(axis, plane, sign, ub, yb, recess))
-                b01 = len(v_list); v_list.append(_pos_on_wall(axis, plane, sign, ua, yb, recess))
+                b00 = len(v_list)
+                v_list.append(_pos_on_wall(axis, plane, sign, ua, ya, recess))
+                b10 = len(v_list)
+                v_list.append(_pos_on_wall(axis, plane, sign, ub, ya, recess))
+                b11 = len(v_list)
+                v_list.append(_pos_on_wall(axis, plane, sign, ub, yb, recess))
+                b01 = len(v_list)
+                v_list.append(_pos_on_wall(axis, plane, sign, ua, yb, recess))
                 emit(b00, b10, b11, b01)
                 emit(i00, i10, b10, b00)
                 emit(i10, i11, b11, b10)

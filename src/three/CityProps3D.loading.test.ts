@@ -40,10 +40,7 @@ describe('knowledge-city settlement overlay loading', () => {
       .mockResolvedValue({ scene: scene() } as never);
     module.ensureCityPropsLoad();
     await vi.waitFor(() => expect(module.areCityPropsReady()).toBe(true));
-    const urls = [
-      ...Object.values(module.MESHY_SETTLEMENT_URLS),
-      module.MESHY_CITY_PLAZA_URL,
-    ];
+    const urls = [...Object.values(module.MESHY_SETTLEMENT_URLS), module.MESHY_CITY_PLAZA_URL];
     expect(urls).toHaveLength(5);
     for (const url of urls) {
       expect(
