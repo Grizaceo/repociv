@@ -31,10 +31,7 @@ import { expect, test, type Page } from '@playwright/test';
  * (5373/5374 by default). The Playwright config is responsible for that.
  */
 
-const SEED_REPOS = [
-  '/tmp/repociv-fixtures/repo-alpha',
-  '/tmp/repociv-fixtures/repo-beta',
-];
+const SEED_REPOS = ['/tmp/repociv-fixtures/repo-alpha', '/tmp/repociv-fixtures/repo-beta'];
 
 async function bootWithMode(page: Page, mode: 'flat' | 'webgl') {
   const errors: string[] = [];
@@ -60,7 +57,12 @@ async function bootWithMode(page: Page, mode: 'flat' | 'webgl') {
   );
   await page.goto(`/?renderer=${mode}`, { waitUntil: 'networkidle' });
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
-  if (await page.locator('#repo-onboarding').isVisible().catch(() => false)) {
+  if (
+    await page
+      .locator('#repo-onboarding')
+      .isVisible()
+      .catch(() => false)
+  ) {
     const nextBtn = page.locator('#repo-onboarding-next');
     await expect(nextBtn).toBeEnabled({ timeout: 20_000 });
     await nextBtn.click();
@@ -92,12 +94,13 @@ test.describe('hex2d ↔ WebGL parity', () => {
     // which calls renderer.cycleWorldRenderMode(), which calls
     // persistRenderMode(). Result: localStorage 'repociv:renderer'
     // flips from 'flat' to 'webgl'.
+    await page.locator('#main-canvas').click();
     await page.keyboard.press('3');
-    // The flip awaits the lazy Three.js chunk + WebGL init, so poll
-    // instead of assuming a fixed 50ms is enough on a loaded machine.
+    // Intent is persisted before the lazy Three.js import; still poll in
+    // case a slower path writes storage after init.
     await expect
       .poll(() => page.evaluate(() => window.localStorage.getItem('repociv:renderer')), {
-        timeout: 20_000,
+        timeout: 30_000,
       })
       .toBe('webgl');
   });

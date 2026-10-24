@@ -151,14 +151,16 @@ export function openNewAgentSession(
 /** Open the chat of one of RepoCiv's own sessions, straight from the list. */
 export function focusOwnChat(unitId: string): void {
   const unit = _deps?.state.getUnit(unitId);
-  if (!unit || !_deps) {
-    // Not materialized yet (panel just opened): fall back to the list.
+  if (unit && _deps) {
+    // Select first: opening the panel re-renders the list and must not
+    // swallow a click that already identified the unit.
+    _deps.selectOwnUnit(unit);
     if (!_visible) openAgentsPanel();
-    _render();
     return;
   }
+  // Not materialized yet (panel just opened): fall back to the list.
   if (!_visible) openAgentsPanel();
-  _deps.selectOwnUnit(unit);
+  _render();
 }
 
 /** Open the chat of an external agent, by session id or by its ext-* unit id. */
@@ -569,7 +571,8 @@ function _ownUnitsHtml(): string {
 
 function _render(): void {
   if (!_panel) return;
-  const body = _panel.querySelector<HTMLElement>('.agents-body')!;
+  const body = _panel.querySelector<HTMLElement>('.agents-body');
+  if (!body) return;
   if (_chatSession !== null) {
     _renderChat();
     return;

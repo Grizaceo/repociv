@@ -122,7 +122,8 @@ for (const width of [1280, 390]) {
       import { openTaskPanel } from '/src/ui/taskPanel.ts';
       import { refreshActivityHistory } from '/src/ui/logPanel.ts';
       import { bindAgentsPanel } from '/src/ui/agentsPanel.ts';
-      bindAgentsPanel({ state: { getUnit: id => id === 'WORKER-2' ? {id} : null, getAllUnits: () => [], world: {cities:[]} }, locate: () => {}, startSession: async () => null, selectOwnUnit: unit => { window.selectedFixtureUnit = unit.id; } });
+      const own = { id: 'WORKER-2', name: 'Worker', type: 'worker', state: 'idle', ephemeral: false, cityId: '', mission: '' };
+      bindAgentsPanel({ state: { getUnit: id => id === own.id ? own : null, getAllUnits: () => [own], world: {cities:[]}, subscribe: () => () => {} }, locate: () => {}, startSession: async () => null, selectOwnUnit: unit => { window.selectedFixtureUnit = unit.id; } });
       document.querySelector('#open').onclick = openTaskPanel;
       window.refreshHistory = refreshActivityHistory;
       document.querySelector('#open').dataset.ready = 'true';
@@ -186,7 +187,11 @@ for (const width of [1280, 390]) {
     await log.getByLabel('Filtrar por tipo').selectOption('');
     await log.getByRole('button', { name: 'Todas las ejecuciones', exact: true }).click();
     await expect(log.locator('tbody tr')).toHaveCount(5);
+    const olderLoaded = page.waitForResponse(
+      (r) => r.url().includes('/log') && r.url().includes('before='),
+    );
     await log.getByRole('button', { name: 'Cargar historia anterior' }).click();
+    await olderLoaded;
     await expect(log.locator('tbody tr')).toHaveCount(6);
     await log.locator('tbody details').last().locator('summary').click();
     await expect(log).toContainText('older-command');

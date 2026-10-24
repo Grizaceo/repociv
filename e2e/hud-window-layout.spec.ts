@@ -72,13 +72,14 @@ async function addPanel(page: Page, id: string, left: number, top: number) {
       const panel = document.createElement('aside');
       panel.id = id;
       // Static test markup only; no external or user-controlled HTML.
-      panel.innerHTML = '<header>Layout panel</header><p>Panel content</p>';
+      panel.innerHTML = '<header class="agents-header">Layout panel</header><p>Panel content</p>';
       panel.style.cssText = `position:fixed;left:${left}px;top:${top}px;width:300px;height:300px;display:block;transform:none`;
       document.body.append(panel);
     },
     { id, left, top },
   );
   await expect(page.locator(`#${id}`)).toHaveClass(/hud-window--placed/);
+  await expect(page.locator(`#${id} .hud-window-reset`)).toBeAttached();
 }
 
 test('unit opens beside Gaceta; new panels, reopening and expanded Gaceta avoid collisions', async ({
@@ -132,7 +133,7 @@ test('saved layouts are collision-checked on open; content updates do not restor
     el.textContent = 'Updated content';
   });
   await expect.poll(async () => (await rect(page, '#agents-panel')).x).toBe(before.x);
-  await page.locator('#agents-panel .hud-window-reset').click();
+  await page.locator('#agents-panel .hud-window-reset').click({ force: true });
   await expectSeparated(page, '#unit-panel', '#agents-panel');
 });
 

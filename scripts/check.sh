@@ -47,7 +47,14 @@ run_step "vitest run --coverage"          npx --no-install vitest run --coverage
 run_step "vite build"                     npx --no-install vite build
 
 # Meshy offline checks: no network, credentials, or paid generation.
-run_step "Meshy pilot offline tests" python3 -m unittest discover -s scripts/meshy -p 'test_*.py'
+# CI installs requirements.lock (no numpy/Pillow) and does not have the
+# gitignored textured/ sources, so discover of test_*.py fails at import.
+# Concept + pilot tests are stdlib-only and read tracked spec.json files.
+run_meshy_offline() {
+  python3 -m unittest discover -s scripts/meshy -p 'test_pilot.py' &&
+    python3 -m unittest discover -s scripts/meshy -p 'test_*concept.py'
+}
+run_step "Meshy pilot offline tests"    run_meshy_offline
 
 # Backend
 # Resolve ruff the same way pytest is below: prefer the repo .venv (a bare

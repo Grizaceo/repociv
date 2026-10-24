@@ -304,7 +304,11 @@ registerActivityPanel('log', {
 });
 
 async function _fetchOlder(): Promise<void> {
-  if (_fetching || !_hasOlder || _historyBefore === null) return;
+  if (!_hasOlder || _historyBefore === null) return;
+  // A 2s poll can hold _fetching; dropping the click made "Cargar historia
+  // anterior" a no-op under load (activity e2e at 1280px).
+  while (_fetching) await new Promise((r) => setTimeout(r, 20));
+  if (!_hasOlder || _historyBefore === null) return;
   _fetching = true;
   try {
     const response = await fetch(

@@ -268,6 +268,9 @@ export class Renderer {
     if (mode === this.worldRenderMode && (mode !== 'webgl' || this.threeMap)) return;
 
     if (mode === 'webgl') {
+      // Persist intent before the lazy Three.js import so hotkey 3 is
+      // observable immediately; revert to flat below if init fails.
+      persistRenderMode('webgl');
       try {
         await this.ensureThreeMap();
       } catch (err) {
