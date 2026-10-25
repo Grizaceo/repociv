@@ -5,14 +5,7 @@
 import type { CommandType } from './commandSchema.ts';
 
 export type AgentBase =
-  | 'MAIN'
-  | 'WORKER'
-  | 'SCOUT'
-  | 'PRAETORIAN'
-  | 'OPENCLAW'
-  | 'CLAUDE'
-  | 'CODEX'
-  | 'CURSOR';
+  'MAIN' | 'WORKER' | 'SCOUT' | 'PRAETORIAN' | 'OPENCLAW' | 'CLAUDE' | 'CODEX' | 'CURSOR';
 
 const AGENT_BASE_ALIASES: Record<string, AgentBase> = {
   MAIN: 'MAIN',

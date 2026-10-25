@@ -28,12 +28,7 @@ export function resolveMountUrl(manifestUrl: string, launcherUiUrl: string | und
 }
 
 type WonderLaunchStatusValue =
-  | 'offline'
-  | 'starting'
-  | 'degraded'
-  | 'ready'
-  | 'error'
-  | 'already_running';
+  'offline' | 'starting' | 'degraded' | 'ready' | 'error' | 'already_running';
 
 export interface WonderLaunchStatus {
   ok: boolean;

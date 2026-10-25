@@ -12,8 +12,7 @@ describe('HexWorldScene sun stability', () => {
   it('keeps the directional sun position fixed across updates so city walls do not visually swim', () => {
     const scene = createHexWorldScene();
     const sun = scene.children.find((child) => child instanceof DirectionalLight) as
-      | DirectionalLight
-      | undefined;
+      DirectionalLight | undefined;
 
     expect(sun).toBeDefined();
     const start = sun!.position.clone();

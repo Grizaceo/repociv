@@ -170,8 +170,7 @@ async function _fetch(loadInventory = true): Promise<void> {
       return;
     }
     const payload = (await res.json()) as
-      | LogEvent[]
-      | { events: LogEvent[]; before: number; more: boolean };
+      LogEvent[] | { events: LogEvent[]; before: number; more: boolean };
     const raw = Array.isArray(payload) ? payload : payload.events;
     if (!Array.isArray(payload) && _historyBefore === null) {
       _historyBefore = payload.before;

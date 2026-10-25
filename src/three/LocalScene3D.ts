@@ -30,8 +30,7 @@ export interface LocalSceneRenderOptions {
 
 export interface LocalSceneCallbacks {
   onTileClick:
-    | ((x: number, y: number, tile: LocalTile | null, sx: number, sy: number) => void)
-    | null;
+    ((x: number, y: number, tile: LocalTile | null, sx: number, sy: number) => void) | null;
   onLocalUnitClick: ((unit: LocalUnit, sx: number, sy: number) => void) | null;
   onWorkbenchClick: ((tile: LocalTile, sx: number, sy: number) => void) | null;
   onLocalUnitHover: ((unit: LocalUnit | null, sx: number, sy: number) => void) | null;

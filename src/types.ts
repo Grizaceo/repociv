@@ -481,13 +481,7 @@ export interface Workbench {
 
 // ─── Office Zone Classification (Phase 2) ────────────────────────────────────
 export type OfficeZoneType =
-  | 'team_cluster'
-  | 'meeting'
-  | 'focus'
-  | 'break'
-  | 'infra'
-  | 'reception'
-  | 'biophilic';
+  'team_cluster' | 'meeting' | 'focus' | 'break' | 'infra' | 'reception' | 'biophilic';
 
 export interface LocalRoom {
   id: string;
@@ -537,11 +531,7 @@ export interface LocalWorld {
 export type AgentTask = 'explore' | 'plan' | 'debug' | 'code' | 'adversarial_review';
 
 type LocalUnitState =
-  | 'idle_in_room'
-  | 'walking_to_workbench'
-  | 'walking_to_room'
-  | 'working_on_file'
-  | 'resting';
+  'idle_in_room' | 'walking_to_workbench' | 'walking_to_room' | 'working_on_file' | 'resting';
 
 export interface LocalUnit {
   id: string;

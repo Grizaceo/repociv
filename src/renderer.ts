@@ -148,14 +148,13 @@ export class Renderer {
     | ((unit: import('./types.ts').LocalUnit | null, screenX: number, screenY: number) => void)
     | null = null;
   localWorkbenchClickCb:
-    | ((tile: import('./types.ts').LocalTile, screenX: number, screenY: number) => void)
-    | null = null;
+    ((tile: import('./types.ts').LocalTile, screenX: number, screenY: number) => void) | null =
+    null;
   localUnitClickCb:
-    | ((unit: import('./types.ts').LocalUnit, screenX: number, screenY: number) => void)
-    | null = null;
+    ((unit: import('./types.ts').LocalUnit, screenX: number, screenY: number) => void) | null =
+    null;
   localNpcClickCb:
-    | ((npc: import('./types.ts').LocalNpc, screenX: number, screenY: number) => void)
-    | null = null;
+    ((npc: import('./types.ts').LocalNpc, screenX: number, screenY: number) => void) | null = null;
   localTileClickCb:
     | ((
         x: number,
@@ -167,16 +166,15 @@ export class Renderer {
     | null = null;
   // Phase 9: bubble layer callbacks
   localUnitRenderedCb:
-    | ((unit: import('./types.ts').LocalUnit, screenX: number, screenY: number) => void)
-    | null = null;
+    ((unit: import('./types.ts').LocalUnit, screenX: number, screenY: number) => void) | null =
+    null;
   // Zone painting callback
   onZonePaintedCb:
-    | ((type: import('./types.ts').ZoneType, tiles: Array<{ x: number; y: number }>) => void)
-    | null = null;
+    ((type: import('./types.ts').ZoneType, tiles: Array<{ x: number; y: number }>) => void) | null =
+    null;
   // P4: drag-to-assign callback
   localDragAssignCb:
-    | ((unitId: string, workbenchTile: import('./types.ts').LocalTile) => void)
-    | null = null;
+    ((unitId: string, workbenchTile: import('./types.ts').LocalTile) => void) | null = null;
   onExitLocalView: (() => void) | null = null;
   // Fires once per local-view entry, alongside the body.local-view class. Used
   // by the local chat to mount its feed; the exit hook tears it down.
@@ -196,15 +194,13 @@ export class Renderer {
   onUnitSelect: ((unit: Unit | null) => void) | null = null;
   onCitySelect: ((cityId: string) => void) | null = null;
   onTileInspect:
-    | ((cityName: string, coord: { q: number; r: number }, repoPath: string) => void)
-    | null = null;
+    ((cityName: string, coord: { q: number; r: number }, repoPath: string) => void) | null = null;
   onEnterLocal: ((repoId: string, rootPath: string) => void) | null = null; // Phase 6
   /** Click on empty hex while in placing mode. */
   onEmptyTileClick: ((coord: import('./hex.ts').Axial) => void) | null = null;
   // ─── Fase 5 callbacks ─────────────────────────────────────────────────────
   onSpatialGesture:
-    | ((directive: SpatialDirective, screenPos: { x: number; y: number }) => void)
-    | null = null;
+    ((directive: SpatialDirective, screenPos: { x: number; y: number }) => void) | null = null;
   onContextMenu:
     | ((items: ReturnType<typeof contextMenuForCity>, screenPos: { x: number; y: number }) => void)
     | null = null;

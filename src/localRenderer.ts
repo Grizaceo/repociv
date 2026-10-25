@@ -131,8 +131,7 @@ export class LocalRenderer {
   // Callbacks
   hoveredTile: { x: number; y: number } | null = null;
   onTileClick:
-    | ((x: number, y: number, tile: LocalTile | null, sx: number, sy: number) => void)
-    | null = null;
+    ((x: number, y: number, tile: LocalTile | null, sx: number, sy: number) => void) | null = null;
   onTileHover: ((x: number, y: number, tile: LocalTile | null) => void) | null = null;
   onTileDblClick: ((x: number, y: number, tile: LocalTile | null) => void) | null = null;
   onLocalUnitClick: ((unit: LocalUnit, sx: number, sy: number) => void) | null = null;
