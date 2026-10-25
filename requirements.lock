@@ -32,7 +32,7 @@ cryptography==50.0.2
     # via
     #   -r requirements.txt
     #   pyjwt
-duckdb==1.5.3
+duckdb==1.5.6
     # via -r requirements.txt
 h11==0.16.0
     # via
@@ -82,7 +82,7 @@ pydantic==2.13.4
     #   pydantic-settings
 pydantic-core==2.46.4
     # via pydantic
-pydantic-settings==2.15.0
+pydantic-settings==2.16.0
     # via
     #   -r requirements.txt
     #   mcp
@@ -141,6 +141,7 @@ typing-extensions==4.16.0
     #   mypy
     #   pydantic
     #   pydantic-core
+    #   pydantic-settings
     #   pytest-asyncio
     #   referencing
     #   starlette

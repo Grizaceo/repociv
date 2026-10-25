@@ -207,7 +207,7 @@
     renderer.toneMapping = T.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.22;
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = T.PCFSoftShadowMap;
+    renderer.shadowMap.type = T.PCFShadowMap;
     renderer.setPixelRatio(1);
     document.body.append(renderer.domElement);
     const camera = new T.PerspectiveCamera(42, 1, 0.01, 100);

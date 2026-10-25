@@ -1,7 +1,7 @@
 // ─── WebGL map facade: renderer loop, camera sync, resize, picking ───────────
 import {
   ACESFilmicToneMapping,
-  PCFSoftShadowMap,
+  PCFShadowMap,
   WebGLRenderer,
   PerspectiveCamera,
   Vector3,
@@ -83,7 +83,7 @@ export class ThreeMapRenderer {
     // One directional 4k map over the whole world; texel ≈ 1.4 world units,
     // which reads as a soft blob, exactly the target.
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = PCFSoftShadowMap;
+    this.renderer.shadowMap.type = PCFShadowMap;
     this.renderer.setClearColor(SKY_TOP.getHex(), 1);
     container.appendChild(this.renderer.domElement);
     this.renderer.domElement.style.width = '100%';
