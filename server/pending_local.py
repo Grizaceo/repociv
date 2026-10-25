@@ -4,12 +4,15 @@ from pathlib import Path
 from typing import Any
 try:
     from .atomic_io import atomic_write_json
+    from .state_paths import state_path
 except ImportError:  # imported as a top-level module (server/ on sys.path)
     from atomic_io import atomic_write_json  # type: ignore[no-redef]
+    from state_paths import state_path  # type: ignore[no-redef]
 
-_REPOCIV_ROOT = Path(__file__).parent.parent
-_DATA_DIR = _REPOCIV_ROOT / "data"
-_LOCAL_PENDING = _DATA_DIR / "pending_local.json"
+
+def _local_pending_path() -> Path:
+    """Store file under the single state root so tests stay hermetic."""
+    return state_path("pending_local.json", override_env="REPOCIV_PENDING_LOCAL_FILE")
 
 _VALID_STATES = {"🔵", "🟡", "🟢", "🔴"}
 _VALID_PRIORITIES = {"ALTA", "MEDIA", "BAJA"}
@@ -20,15 +23,16 @@ _ID_PREFIX = "L"
 
 def _load() -> list[dict[str, Any]]:
     try:
-        if _LOCAL_PENDING.exists():
-            return json.loads(_LOCAL_PENDING.read_text(encoding="utf-8"))
+        path = _local_pending_path()
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         pass
     return []
 
 
 def _save(items: list[dict[str, Any]]) -> None:
-    atomic_write_json(_LOCAL_PENDING, items, ensure_ascii=False, indent=2)
+    atomic_write_json(_local_pending_path(), items, ensure_ascii=False, indent=2)
 
 
 def _next_id(items: list[dict[str, Any]]) -> str:
