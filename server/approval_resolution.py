@@ -22,8 +22,11 @@ After a restart, ``dispatch_ledger.recover_intents()`` replays what is left:
 unclaimed intents go back through the same single-use consume path (a
 duplicated response still cannot authorize twice), and claimed intents are
 re-enqueued directly, deduplicated by id against the persisted scheduler
-queue. The documented limit stands: deduplicated dispatch does not guarantee
-exactly-once external side effects.
+queue. A duplicate response never deletes an intent that predates it: an
+unclaimed intent whose approval is already gone is the only recoverable copy
+of a dispatch that was interrupted between consume and claim. The documented
+limit stands: deduplicated dispatch does not guarantee exactly-once external
+side effects.
 """
 
 from __future__ import annotations
@@ -78,13 +81,37 @@ def dispatch_approved(
     # 2 — consume the approval (single-use). Serialized with the intent write
     #     so a duplicate response cannot slip a second consume through.
     with _consume_lock:
-        dispatch_ledger.record_intent(command_id, cmd_dict)
+        created = dispatch_ledger.record_intent(command_id, cmd_dict)
         consumed = _pop_for_dispatch(command_id)
         if consumed is None:
-            dispatch_ledger.release_intent_if_unclaimed(command_id)
+            if created:
+                # This attempt created the intent and consumed nothing: the
+                # approval was already gone before we started. Release the
+                # fresh record; a recovered copy cannot exist.
+                dispatch_ledger.release_intent_if_unclaimed(command_id)
+                return {
+                    "ok": False,
+                    "error": "approval not found",
+                    "commandId": command_id,
+                }
+            if not dispatch_ledger.has_unclaimed_intent(command_id):
+                # Another dispatcher already owns this command (claimed intent,
+                # or it finished and released it). This duplicate authorized
+                # nothing; the owner's delivery stands.
+                return {
+                    "ok": False,
+                    "error": "approval not found",
+                    "commandId": command_id,
+                }
+            # The intent predates this attempt, is still unclaimed, and its
+            # approval is gone: a previous dispatcher consumed the approval
+            # and failed before claiming it. This record is the only
+            # recoverable copy, so a duplicate response must NOT delete it.
+            # Restart recovery replays it.
             return {
                 "ok": False,
-                "error": "approval not found",
+                "status": "unresolved",
+                "error": "approval already consumed; durable intent left for recovery",
                 "commandId": command_id,
             }
         cmd = Command(

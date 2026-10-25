@@ -267,7 +267,12 @@ def resolve_approval(
 
     if not approved:
         cmd_dict, expired = _take_approval(cmd_id)
-        dispatch_ledger.release_intent_if_unclaimed(cmd_id)
+        # Only release the ledger when this call actually resolved a pending
+        # approval (or swept an expired one). If the approval was already
+        # consumed by an interrupted dispatch, the unclaimed intent is the
+        # only recoverable copy and must survive a duplicate rejection.
+        if cmd_dict or expired:
+            dispatch_ledger.release_intent_if_unclaimed(cmd_id)
         if not cmd_dict:
             if expired:
                 return {
@@ -284,14 +289,27 @@ def resolve_approval(
 
     cmd_dict, expired = _peek_pending(cmd_id)
     if not cmd_dict:
-        dispatch_ledger.release_intent_if_unclaimed(cmd_id)
         if expired:
+            # Authorization expired unused: safe to release any unclaimed
+            # intent that was recorded before the consume step.
+            dispatch_ledger.release_intent_if_unclaimed(cmd_id)
             return {
                 "ok": False,
                 "error": "approval expired",
                 "status": "expired",
                 "commandId": cmd_id,
             }
+        if dispatch_ledger.has_unclaimed_intent(cmd_id):
+            # A previous attempt consumed the approval and failed before the
+            # claim was durable. Do not delete the only recoverable copy:
+            # restart recovery replays it from the ledger.
+            return {
+                "ok": False,
+                "status": "unresolved",
+                "error": "approval already consumed; durable intent left for recovery",
+                "commandId": cmd_id,
+            }
+        dispatch_ledger.release_intent_if_unclaimed(cmd_id)
         return {"ok": False, "error": "approval not found"}
 
     try:
@@ -306,6 +324,6 @@ def resolve_approval(
         return {
             "ok": False,
             "status": "unresolved",
-            "error": "dispatch intent not durable; command left for operator review",
+            "error": "approval delivery incomplete; command left for operator review",
             "commandId": cmd_id,
         }

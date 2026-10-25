@@ -158,6 +158,49 @@ def test_enqueue_failure_after_claim_is_recovered_on_restart(delivery_env):
     assert _queue_ids() == ["c1"], "queue holds only the recovered command"
 
 
+def test_claim_failure_then_duplicate_response_survives_until_restart(
+    delivery_env, monkeypatch
+):
+    """The approval is consumed, then the claim write fails. A duplicate
+    response must not delete the recoverable intent: restart recovery still
+    delivers the authorized command exactly once."""
+    store.add_approval(_pending("c1"))
+
+    real_claim = dispatch_ledger.claim_intent
+
+    def fail_claim(_cid):
+        raise OSError("claim write failed")
+
+    monkeypatch.setattr(dispatch_ledger, "claim_intent", fail_claim)
+    first = store.resolve_approval("c1", approved=True)
+
+    assert first["ok"] is False
+    assert first["status"] == "unresolved"
+    assert store.get_approvals() == [], "approval was consumed before the failure"
+    assert dispatch_ledger.unresolved() == ["c1"]
+
+    # Duplicate response: the approval is gone. It must leave the unclaimed
+    # intent in place instead of releasing the only recoverable copy.
+    second = store.resolve_approval("c1", approved=True)
+    assert second["ok"] is False
+    assert second["error"] == "approval already consumed; durable intent left for recovery"
+    assert dispatch_ledger.unresolved() == ["c1"]
+
+    # A duplicate rejection must not delete it either.
+    rejected = store.resolve_approval("c1", approved=False)
+    assert rejected["error"] == "approval not found"
+    assert dispatch_ledger.unresolved() == ["c1"]
+
+    # Simulated restart: the claimed-approval state is rebuilt from disk.
+    monkeypatch.setattr(dispatch_ledger, "claim_intent", real_claim)
+    _restart(delivery_env)
+    result = dispatch_ledger.recover_intents()
+
+    assert result["enqueued"] == ["c1"]
+    assert _queue_ids() == ["c1"]
+    assert dispatch_ledger.unresolved() == []
+
+
 def test_failure_after_enqueue_before_release_is_idempotent_on_restart(delivery_env, monkeypatch):
     """Crash between enqueue and the ledger release: the command is already
     durable in the scheduler queue, and replay must not create a second copy."""
