@@ -533,3 +533,13 @@ class TestNewPendingEndpoints:
         with patch("server.pending_tracker.PENDING_TRACKER", tmp_tracker):
             status, body = self._do_post("/pending/state", {"id": "010"})
         assert status == 400
+
+
+def test_local_pending_store_resolves_under_state_root():
+    """The local pending store must live under the isolated state root, not
+    the repo checkout — otherwise every suite run appends rows to the file a
+    live bridge serves."""
+    from server.pending_local import _local_pending_path
+    from server.state_paths import repociv_home
+
+    assert _local_pending_path() == repociv_home() / "pending_local.json"
