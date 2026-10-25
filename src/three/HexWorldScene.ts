@@ -971,8 +971,7 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
     if (terrainMesh.instanceColor) terrainMesh.instanceColor.needsUpdate = true;
     // P5: Update city colors for territory fill tint (territory may have changed)
     const cityColorAttr = terrainMesh.geometry.getAttribute('instanceCityColor') as
-      | InstancedBufferAttribute
-      | undefined;
+      InstancedBufferAttribute | undefined;
     if (cityColorAttr) {
       const tileCityColor = new Map<string, [number, number, number]>();
       for (const city of state.world.cities) {

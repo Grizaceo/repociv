@@ -980,16 +980,14 @@ async function bootstrap() {
   // ─── Wonder ↔ RepoCiv bidirectional focus (generic, any connected wonder) ──
   window.addEventListener('repociv:wonder-focus-city', (e: Event) => {
     const detail = (e as CustomEvent).detail as
-      | { cityId: string; mode: 'macro' | 'local' }
-      | undefined;
+      { cityId: string; mode: 'macro' | 'local' } | undefined;
     if (!detail?.cityId) return;
     _focusCityRequest({ cityId: detail.cityId, mode: detail.mode, source: 'Wonder focus' });
   });
 
   window.addEventListener('repociv:wonder-selection', (e: Event) => {
     const detail = (e as CustomEvent).detail as
-      | { nodeId: string; nodePath: string; nodeType: string }
-      | undefined;
+      { nodeId: string; nodePath: string; nodeType: string } | undefined;
     if (!detail?.nodeId && !detail?.nodePath) return;
     _focusCityRequest({
       cityId: detail?.nodeId,

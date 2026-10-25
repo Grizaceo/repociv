@@ -13,11 +13,7 @@ type HarnessKind = 'reference' | 'agent_runtime' | 'sandbox' | 'local_cli' | 'br
 type HarnessTransport = 'none' | 'cli' | 'http' | 'plugin' | 'sandbox';
 
 export type TrustLevel =
-  | 'reference_only'
-  | 'read_only'
-  | 'local_cli'
-  | 'sandboxed'
-  | 'privileged_external';
+  'reference_only' | 'read_only' | 'local_cli' | 'sandboxed' | 'privileged_external';
 
 export type RecoveryMode = 'copy_command' | 'tmux_attach' | 'view_logs' | 'no_recovery_available';
 

@@ -83,8 +83,7 @@ export function parseSlash(text: string): { cmd: string; args: string } | null {
  *  text as a filter. Pure so the branching is unit-testable; the caller passes
  *  its own provider-id predicate. */
 export type ModelArgs =
-  | { kind: 'apply'; provider: string; model: string }
-  | { kind: 'picker'; filter: string };
+  { kind: 'apply'; provider: string; model: string } | { kind: 'picker'; filter: string };
 
 export function classifyModelArgs(
   args: string,
