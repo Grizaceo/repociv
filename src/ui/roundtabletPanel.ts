@@ -34,7 +34,10 @@ type RoundtabletPanel = {
   element: HTMLElement;
 };
 
+type RoundHost = { cityId: string; repoPath: string };
+
 let panelInstance: RoundtabletPanel | null = null;
+let resolveHost: (() => RoundHost) | null = null;
 
 function createRoundtabletPanel(): RoundtabletPanel {
   let visible = false;
@@ -43,8 +46,8 @@ function createRoundtabletPanel(): RoundtabletPanel {
   let sse: EventSource | null = null;
 
   const panel = document.createElement('div');
-  panel.className = 'roundtablet-panel';
-  panel.style.display = 'none';
+  panel.id = 'roundtablet-panel';
+  panel.className = 'roundtablet-panel hidden';
   panel.innerHTML = `
     <div class="rt-header">
       <h3>RoundTablet</h3>
@@ -181,8 +184,10 @@ function createRoundtabletPanel(): RoundtabletPanel {
   }
 
   // ─── SSE para transcript en tiempo real ────────────────────────────────
-  function connectSSE(roundId: string) {
-    if (sse) sse.close();
+  // Conecta al abrir el panel (antes de cualquier POST) para no perderse los
+  // primeros chunks: la ronda corre en background desde que el endpoint es async.
+  function connectSSE() {
+    if (sse) return;
     const tokenQs = BRIDGE_TOKEN ? `?token=${encodeURIComponent(BRIDGE_TOKEN)}` : '';
     sse = new EventSource(bridgeUrl('/events') + tokenQs);
     sse.onmessage = (e: MessageEvent<string>) => {
@@ -192,15 +197,17 @@ function createRoundtabletPanel(): RoundtabletPanel {
         if (
           data.type === 'chat_chunk' &&
           data.missionId &&
-          String(data.missionId).startsWith(roundId)
+          currentRoundId &&
+          String(data.missionId).startsWith(currentRoundId)
         ) {
           const unit = data.unit || 'bot';
           const text = data.text || '';
           addMessage(unit, text);
         }
-        if (data.type === 'RoundTabletRoundCompleted') {
+        if (data.type === 'RoundTabletRoundCompleted' && data.roundId === currentRoundId) {
           statusEl.textContent = 'Ronda completada.';
           startBtn.disabled = false;
+          currentRoundId = null;
         }
       } catch {
         // ignorar mensajes no JSON
@@ -222,10 +229,16 @@ function createRoundtabletPanel(): RoundtabletPanel {
     clearTranscript();
 
     try {
+      const host = resolveHost?.() ?? { cityId: '', repoPath: '' };
       const res = await fetch(bridgeUrl('/api/roundtablet/round'), {
         method: 'POST',
         headers: bridgeHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ topic, botIds: Array.from(selectedBots) }),
+        body: JSON.stringify({
+          topic,
+          botIds: Array.from(selectedBots),
+          cityId: host.cityId,
+          repoPath: host.repoPath,
+        }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -234,7 +247,6 @@ function createRoundtabletPanel(): RoundtabletPanel {
       const data = await res.json();
       currentRoundId = data.roundId as string;
       statusEl.textContent = `Ronda ${currentRoundId} iniciada — ${data.turns} turno(s).`;
-      connectSSE(currentRoundId);
     } catch (err) {
       showNotification({ type: 'error', title: 'Error iniciando ronda', body: String(err) });
       startBtn.disabled = false;
@@ -250,14 +262,16 @@ function createRoundtabletPanel(): RoundtabletPanel {
   function open() {
     if (visible) return;
     visible = true;
-    panel.style.display = 'block';
+    panel.classList.remove('hidden');
+    connectSSE();
+    updateStartButton();
     loadBots();
   }
 
   function close() {
     if (!visible) return;
     visible = false;
-    panel.style.display = 'none';
+    panel.classList.add('hidden');
     if (sse) {
       sse.close();
       sse = null;
@@ -277,7 +291,11 @@ function createRoundtabletPanel(): RoundtabletPanel {
   return { open, close, toggle, isOpen, element: panel };
 }
 
-export function initRoundtabletPanel(container: HTMLElement): RoundtabletPanel {
+export function initRoundtabletPanel(
+  container: HTMLElement,
+  host?: () => RoundHost,
+): RoundtabletPanel {
+  resolveHost = host ?? null;
   if (!panelInstance) {
     panelInstance = createRoundtabletPanel();
     container.appendChild(panelInstance.element);

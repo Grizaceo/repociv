@@ -39,6 +39,7 @@ const HUD_WINDOW_IDS = [
   'log-panel',
   'harness-panel',
   'pending-panel',
+  'roundtablet-panel',
 ] as const;
 const HUD_WINDOW_SELECTOR = HUD_WINDOW_IDS.map((id) => `#${id}`).join(', ');
 
