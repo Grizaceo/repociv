@@ -108,6 +108,8 @@ from server.routes.onboarding import post_pick_map_root  # noqa: F401
 from server.routes.onboarding import post_persist_selection  # noqa: F401
 from server.routes.onboarding import post_add_selected_repo  # noqa: F401
 from server.routes.onboarding import post_remove_selected_repo  # noqa: F401
+from server.routes.roundtablet import get_roundtablet_bots  # noqa: F401
+from server.routes.roundtablet import post_roundtablet_round  # noqa: F401
 
 RouteContext = dict[str, Any]
 

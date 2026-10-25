@@ -43,7 +43,7 @@ _CONFIG_FILENAME = "config.json"
 # accepts these as harness values — adding a new harness is a code
 # change, not a config change.
 _VALID_HARNESSES: frozenset[str] = frozenset({
-    "hermes", "claude", "codex", "cursor", "openclaw", "opencode",
+    "hermes", "claude", "codex", "cursor", "openclaw", "opencode", "devin",
 })
 
 # Optional fields accepted in a profile. Validation is permissive —

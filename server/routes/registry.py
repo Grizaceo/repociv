@@ -76,6 +76,7 @@ GET_EXACT: dict[str, Callable[..., Any]] = {
     "/api/repos/all-roots": _routes.get_all_roots_repos,
     "/api/pending-work": get_pending_work,
     "/api/telemetry/usage": _routes.get_telemetry_usage,
+    "/api/roundtablet/bots": _routes.get_roundtablet_bots,
 }
 
 # ── POST: no path params, matched by exact string ──────────────────────────────
@@ -104,6 +105,7 @@ POST_EXACT: dict[str, Callable[..., Any]] = {
     "/subagents/cancel": _routes.post_subagent_cancel,
     "/api/profiles": _routes.post_profiles,
     "/api/profiles/delete": _routes.post_profiles_delete,
+    "/api/roundtablet/round": _routes.post_roundtablet_round,
     "/api/wonders/connect": _routes.post_wonder_connect,
     "/api/claude-live/spawn": _routes.post_claude_live_spawn,
     "/api/claude-live/stop": _routes.post_claude_live_stop,

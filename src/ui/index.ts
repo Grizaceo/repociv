@@ -18,6 +18,7 @@ export { isTaskAssignPanelOpen, toggleTaskAssignPanel } from './taskAssignPanel.
 export { closePendingPanel, isPendingPanelOpen, togglePendingPanel } from './pendingPanel';
 export { closeLogPanel, isLogPanelOpen, toggleLogPanel } from './logPanel.ts';
 export { closeKanbanPanel, isKanbanPanelOpen, toggleKanbanPanel } from './kanbanPanel.ts';
+export { initRoundtabletPanel } from './roundtabletPanel';
 
 // Re-export specific initialization helpers
 export { initExternalLibs } from './hud.ts';
