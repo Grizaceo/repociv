@@ -134,11 +134,16 @@
           <button id="side-panel-close" title="Cerrar [Esc]" aria-label="Cerrar panel lateral">✕</button>
         </div>
         <div id="side-panel-tabs">
+          <button class="side-tab" data-tab="unit" aria-label="Pestaña de unidad">Unidad</button>
           <button class="side-tab active" data-tab="chat" aria-label="Pestaña de crónicas">Crónicas</button>
           <button class="side-tab" data-tab="git" aria-label="Pestaña de manuscritos">Manuscritos</button>
           <button class="side-tab" data-tab="files" aria-label="Pestaña de archivos">Archivos</button>
         </div>
         <div id="side-panel-content">
+          <div class="tab-pane" data-pane="unit">
+            <div id="unit-pane-empty" class="hidden">Selecciona una unidad en el mapa para ver su ficha aquí.</div>
+            <div id="unit-pane-body"></div>
+          </div>
           <div class="tab-pane active" data-pane="chat">
             <div id="chat-agent-selector-row">
               <div id="chat-agent-selector"></div>

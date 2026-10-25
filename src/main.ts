@@ -70,6 +70,7 @@ import { bindAgentsPanel, openExternalAgentChat, toggleAgentsPanel } from './ui/
 import { isExternalAgentUnit } from './externalAgents.ts';
 import { initHudMode } from './ui/hudMode.ts';
 import { initHudWindows } from './ui/hudWindow.ts';
+import { initUnitPanelDock } from './ui/unitPanelDock.ts';
 import { initCommandPalette } from './ui/commandPalette.ts';
 import { registerHudCommands } from './ui/hudWiring/commands.ts';
 import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
@@ -319,6 +320,10 @@ async function bootstrap() {
 
   // HUD overlays can be rearranged locally without affecting game state.
   initHudWindows();
+
+  // The hero card docks into the side panel's "Unidad" tab while the panel is
+  // open, so selection + chat never produce two windows.
+  initUnitPanelDock();
 
   // ══ Theme init from localStorage ══
   const savedTheme = localStorage.getItem('repociv:theme');
