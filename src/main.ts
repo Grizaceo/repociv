@@ -764,7 +764,7 @@ async function bootstrap() {
   const rtStyle = document.createElement('style');
   rtStyle.textContent = `
     #btn-roundtablet {
-      position: fixed; bottom: 24px; left: 24px; z-index: 1000;
+      position: fixed; bottom: 64px; left: 24px; z-index: 1000;
       padding: 8px 14px; border: 1px solid #666; border-radius: 6px;
       background: #1a1a1a; color: #eee; cursor: pointer; font-size: 13px;
     }
