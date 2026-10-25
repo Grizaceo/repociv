@@ -1,6 +1,14 @@
 # RepoCiv: identidad visual propia mediante Meshy
 
-## Encargo y frontera
+> **Estado vigente (2026-10-24): histórico.** La gramática visual de este
+> documento se aprobó y se aplicó a la familia de edificios y figurillas. La
+> rama `feat/meshy-visual-identity` y el worktree desde `1240ad7` son el
+> contexto original, no el estado actual. Para el estado por asset —aprobado,
+> integrado, pendiente de mirada humana o bloqueado por licencias— usar
+> [visual-family-production.md](visual-family-production.md) y
+> [visual-family-materials-review.md](visual-family-materials-review.md).
+
+## Encargo y frontera (2026-09-10, al momento del encargo)
 
 Objetivo autorizado: desarrollar una identidad visual propia para RepoCiv mediante assets 3D ad hoc. Rama: `feat/meshy-visual-identity`. El worktree parte de `1240ad7`; los cambios sin confirmar de main NO están incluidos ni se modifican. No hay push, merge, despliegue ni sustitución masiva de assets.
 

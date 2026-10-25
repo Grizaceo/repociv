@@ -18,15 +18,18 @@ CURSOR) or registered as the user's personal profile.
 
 Under the game there is a real Agent OS (Tensor Context, 3-layer Security
 Harness, task orchestrator with validation contracts and an independent
-validator role, container runtime). FrugalGPT Router, World Model, SICA and
-the Swarm Engine were retired by the pruning rounds (2026-08-10 and
-2026-09-13, see §Pruning roadmap). Keeping this much "industrial"
+validator role, container runtime). World Model, SICA and the Swarm Engine
+were retired by the pruning rounds (2026-08-10 and 2026-09-13, see §Pruning
+roadmap). Model routing (FrugalGPT-style) was not retired: it lives in
+`server/model_router.py` and the task orchestrator uses it. Keeping this much
+"industrial"
 infrastructure as a single user is **deliberate**: the alpha test exists
 precisely to discover which of those layers earn their keep and which get
 distilled or deleted afterwards.
 
-Version: **v2.2 — 2026-09-21: reconciled with the code (audited pruning).
-Frozen in scope except what is authorized below.**
+Version: **v2.2.1 — 2026-10-24: factual correction (model routing is still
+active), no scope change. v2.2 — 2026-09-21: reconciled with the code (audited
+pruning). Frozen in scope except what is authorized below.**
 
 ---
 
@@ -172,7 +175,8 @@ After 4-8 weeks of real use, run this audit:
      was almost never activated).
    - `tensor_context.py` → **kept**: it is load-bearing (builds the agent
      mission context in `step_executor`), despite being on this list.
-   - `world_model.py`, `frugal_router.py` → no longer existed.
+   - `world_model.py` → no longer existed; `frugal_router.py` never existed as
+     a module: model routing lives in `model_router.py` and is still active.
    Methodology: if telemetry shows no measurable impact, the module moves
    to `experimental/` or gets deleted.
 
@@ -203,5 +207,5 @@ the maintenance surface to what is actually used.
 
 ---
 
-_ES mirror of `docs/SCOPE.md` (v2.2, 2026-09-21). If the two diverge, fix
+_ES mirror of `docs/SCOPE.md` (v2.2.1, 2026-10-24). If the two diverge, fix
 both or the mirror lies._

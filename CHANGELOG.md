@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Reconciliación de drift documental (2026-10-24)** — la documentación viva vuelve a coincidir con el código y con `SCOPE.md`:
+  - **P1**: nuevo [`docs/audits/p1-closure-2026-10-24.md`](docs/audits/p1-closure-2026-10-24.md) declara R01–R16 **cerrados** con commits y evidencia, y [`docs/audits/README.md`](docs/audits/README.md) fija la regla: los snapshots fechados no se reescriben. El `p1-implementation-2026-10-13.json` conserva `pending` a propósito (era el plan previo); su lectura correcta está en el closure.
+  - **`docs/SCOPE.md` / `SCOPE.en.md`**: se corrige la afirmación de que el FrugalGPT Router estaba retirado. Nunca fue un servicio aparte: el routing por paso vive en `server/model_router.py` y lo usa el task orchestrator (`step_executor.py:343`, `step_retry.py`). World Model, SICA y Swarm Engine sí siguen retirados.
+  - **`docs/COMPARISON.md`**: columna RepoCiv reconciliada — paneles 21→11 (poda del 2026-08-10), WebSocket + SSE en vez de «SSE only», Tailscale documentado en vez de «on roadmap», móvil en branch paralela, fatiga medida en tokens, router por paso, y los «wins» de cost-optimization/SICA reemplazados por recuperación durable y el plano de control MCP. La columna de AgentCraft queda marcada como baseline de mayo 2026, no re-verificada.
+  - **Briefs históricos**: `docs/design/observatory-concept-brief.md` y `docs/design/meshy-visual-identity.md` llevan ahora un estado vigente que apunta a `visual-family-production.md`; sus «pendiente de aprobación» eran del momento del encargo.
+  - **Menores**: `REMOTE_ACCESS.md` pide Python 3.11+ (no 3.13), `AGENTIC_OS_INTEGRATION.md` cita `repociv.service` (no units inexistentes) y `DATA_SOURCES.md` ya no atribuye el budget check a un «FrugalGPT router».
 - **Ciudadela: tapado local de las 2 ventanas izquierdas** — cap del vano de terraza media (+14 triángulos) y panel de caliza sobre el manchón de planta baja, 0 créditos Meshy. El runtime `city-citadel-map.glb` pasa a texture-v004; `repair-v003` queda inmutable. Pendiente mirada humana.
 
 ### Fixed

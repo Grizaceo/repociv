@@ -41,6 +41,7 @@
 
 | Documento o carpeta | Contenido |
 |---|---|
+| [`audits/`](audits/README.md) | Auditorías fechadas. El estado vigente de los hallazgos P1 está en [`audits/p1-closure-2026-10-24.md`](audits/p1-closure-2026-10-24.md); los snapshots no se reescriben. |
 | [`archive/`](archive/) | Planes, audits, cierres de fase y notas de sesión conservados. El mapa del archivo está en [`archive/README.md`](archive/README.md); el resto del histórico vive en git. |
 | [`archive/ROADMAP_IMPERIAL_WORKSHOP.md`](archive/ROADMAP_IMPERIAL_WORKSHOP.md) | Canon post-alpha histórico: legibilidad, Maravillas y Gaceta. Incluye Bibliotheca y LabHub, retiradas; no es el alcance vigente. |
 | [`archive/PHASE_1_VERIFICATION.md`](archive/PHASE_1_VERIFICATION.md) | Verificación histórica de los gates de Fase 1. |

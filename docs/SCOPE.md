@@ -18,15 +18,18 @@ o se registran como perfil personal del usuario.
 
 Por debajo del juego hay un Agent OS real (Tensor Context, Security Harness
 3-capas, task orchestrator con validation contracts y rol validator
-independiente, container runtime). FrugalGPT Router, World Model, SICA y
-Swarm Engine fueron retirados por las podas (2026-08-10 y 2026-09-13,
-ver §Roadmap de poda). La razón de mantener infraestructura "industrial"
+independiente, container runtime). World Model, SICA y Swarm Engine fueron
+retirados por las podas (2026-08-10 y 2026-09-13, ver §Roadmap de poda). El
+routing de modelo (estilo FrugalGPT) no se retiró: vive en
+`server/model_router.py` y lo usa el task orchestrator. La razón de mantener
+infraestructura "industrial"
 siendo un solo usuario es **deliberada**: el alpha-test sirve precisamente
 para descubrir cuáles de esas capas aportan valor real y cuáles se
 destilan o se borran después.
 
-Versión: **v2.2 — 2026-09-21: reconciliada con el código (poda auditada).
-Congelada en scope salvo lo autorizado abajo.**
+Versión: **v2.2.1 — 2026-10-24: corrección factual (el routing de modelo sigue
+activo) sin cambios de alcance. v2.2 — 2026-09-21: reconciliada con el código
+(poda auditada). Congelada en scope salvo lo autorizado abajo.**
 
 ---
 
@@ -169,7 +172,8 @@ Tras 4-8 semanas de uso real, ejecutar este audit:
      `/improve/proposals` 1 llamada histórica; el debate swarm ~nunca activado).
    - `tensor_context.py` → **conservado**: es load-bearing (arma el contexto de
      cada misión de agente en `step_executor`), pese a estar en esta lista.
-   - `world_model.py`, `frugal_router.py` → ya no existían.
+   - `world_model.py` → ya no existía; `frugal_router.py` nunca existió como
+     módulo: el routing de modelo vive en `model_router.py` y sigue activo.
    Metodología: si la telemetría no muestra impacto medible, se mueve a
    `experimental/` o se borra.
 

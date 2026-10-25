@@ -62,9 +62,8 @@ producto** (cuándo RepoCiv vuelve a correr como servicio systemd) + un
 **cambio pequeño y quirúrgico** en el bridge. Pasos:
 
 ### Prerequisito (decisión de Cristóbal)
-RepoCiv corre como servicio systemd user (`repociv-bridge.service` +
-`repociv-vite.service`, ver `scripts/dev-start.sh` y
-`references/server-lifecycle-systemd.md`). Sin servicio, no hay dashboard:
+RepoCiv corre como servicio systemd user (`repociv.service`, ver
+`deploy/systemd/README.md`). Sin servicio, no hay dashboard:
 integrar el bus a un proceso dormido no aporta.
 
 ### 1. Ruta read-only (2 líneas, patrón `get_pending`)

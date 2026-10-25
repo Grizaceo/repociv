@@ -124,7 +124,7 @@ separado de DuckDB para respuestas de latencia ultrabaja (presupuesto real-time)
 TokenLedger (in-memory + ~/.repociv/token_usage.json)
   ├─ Acumulación: log_usage(model, prompt_tokens, completion_tokens)
   ├─ Budget check: check_budget_violation(limit) → bool
-  └─ get_budget_used_pct(limit) → float  ← usado por FrugalGPT router (Fase 2)
+  └─ get_budget_used_pct(limit) → float  ← usado por el model router (step_executor)
 ```
 
 El DuckDB Ledger tiene la versión histórica completa; el TokenLedger tiene la versión

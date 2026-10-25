@@ -17,7 +17,7 @@ without exposing anything to the public internet.
    - macOS/Linux: `brew install tailscale` or `apt install tailscale`
    - Windows: [tailscale.com/download](https://tailscale.com/download)
 
-3. **Python 3.13+** with websockets (Phase 1):
+3. **Python 3.11+** with websockets (Phase 1):
    ```bash
    pip install websockets>=12.0
    ```
