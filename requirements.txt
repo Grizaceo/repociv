@@ -6,7 +6,7 @@
 # a major (breaking) release, and the open >=1.2 floor would otherwise let a fresh
 # install/CI drift onto it. The HTTP/SSE-transport CVEs in mcp's deps (starlette,
 # python-multipart, pydantic-settings) are unreachable here: we run stdio only.
-mcp>=1.28.1,<2
+mcp>=1.30.0,<2
 # Security floors for mcp's transitive deps (pip-audit 2026-10-18: 34 known
 # vulns in pyjwt, cryptography, starlette, python-multipart, pydantic-settings,
 # anyio). The HTTP/SSE paths are unreachable with the stdio transport, but a
