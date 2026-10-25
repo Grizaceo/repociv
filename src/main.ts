@@ -69,7 +69,8 @@ import { bindAgentAttentionStrip } from './ui/agentAttentionStrip.ts';
 import { bindAgentsPanel, openExternalAgentChat, toggleAgentsPanel } from './ui/agentsPanel.ts';
 import { isExternalAgentUnit } from './externalAgents.ts';
 import { initHudMode } from './ui/hudMode.ts';
-import { initHudWindows } from './ui/hudWindow.ts';
+import { initHudWindows, mountHudWindow } from './ui/hudWindow.ts';
+import { initUnitPanelDock } from './ui/unitPanelDock.ts';
 import { initCommandPalette } from './ui/commandPalette.ts';
 import { registerHudCommands } from './ui/hudWiring/commands.ts';
 import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
@@ -319,6 +320,10 @@ async function bootstrap() {
 
   // HUD overlays can be rearranged locally without affecting game state.
   initHudWindows();
+
+  // The hero card docks into the side panel's "Unidad" tab while the panel is
+  // open, so selection + chat never produce two windows.
+  initUnitPanelDock();
 
   // ══ Theme init from localStorage ══
   const savedTheme = localStorage.getItem('repociv:theme');
@@ -747,76 +752,19 @@ async function bootstrap() {
   document.getElementById('btn-kanban')?.addEventListener('click', toggleKanbanPanel);
 
   // ─── RoundTablet — Bot Mode panel ───────────────────────────────────────
-  const rtContainer = document.createElement('div');
-  rtContainer.id = 'rt-container';
-  document.body.appendChild(rtContainer);
-  const rtPanel = initRoundtabletPanel(rtContainer);
-
-  const rtBtn = document.createElement('button');
-  rtBtn.id = 'btn-roundtablet';
-  rtBtn.type = 'button';
-  rtBtn.textContent = 'RoundTablet';
-  rtBtn.className = 'rt-btn';
-  rtBtn.title = 'Abrir mesa redonda de bots';
-  rtBtn.addEventListener('click', () => rtPanel.toggle());
-  document.body.appendChild(rtBtn);
-
-  const rtStyle = document.createElement('style');
-  rtStyle.textContent = `
-    #btn-roundtablet {
-      position: fixed; bottom: 64px; left: 24px; z-index: 1000;
-      padding: 8px 14px; border: 1px solid #666; border-radius: 6px;
-      background: #1a1a1a; color: #eee; cursor: pointer; font-size: 13px;
-    }
-    #btn-roundtablet:hover { background: #333; border-color: #999; }
-    .roundtablet-panel {
-      position: fixed; top: 60px; left: 24px; right: 24px; bottom: 24px;
-      z-index: 1000; width: auto; max-width: 900px; height: auto; max-height: 70vh;
-      background: #1a1a1a; border: 1px solid #444; border-radius: 8px;
-      color: #eee; font-family: system-ui, sans-serif; display: flex; flex-direction: column;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-    }
-    .roundtablet-panel .rt-header {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 10px 14px; border-bottom: 1px solid #444;
-    }
-    .roundtablet-panel .rt-header h3 { margin: 0; font-size: 16px; color: #fff; }
-    .roundtablet-panel .rt-close { background: none; border: none; color: #888; font-size: 24px; cursor: pointer; line-height: 1; }
-    .roundtablet-panel .rt-close:hover { color: #fff; }
-    .roundtablet-panel .rt-body { display: flex; flex: 1; overflow: hidden; }
-    .roundtablet-panel .rt-section { flex: 1; padding: 12px; overflow-y: auto; border-right: 1px solid #333; }
-    .roundtablet-panel .rt-section.rt-narrow { flex: 0 0 320px; border-right: 1px solid #333; }
-    .roundtablet-panel .rt-section.rt-full { flex: 2; border-right: none; }
-    .roundtablet-panel .rt-section-title { display: block; font-size: 12px; color: #999; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .roundtablet-panel .rt-bot-list { display: flex; flex-direction: column; gap: 6px; }
-    .roundtablet-panel .rt-bot {
-      display: flex; align-items: center; gap: 8px; padding: 6px 8px;
-      border: 1px solid #333; border-radius: 4px; cursor: pointer; font-size: 13px;
-    }
-    .roundtablet-panel .rt-bot:hover { background: #252525; border-color: #666; }
-    .roundtablet-panel .rt-bot input { margin: 0; width: 16px; height: 16px; }
-    .roundtablet-panel .rt-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1px solid #555; flex-shrink: 0; }
-    .roundtablet-panel .rt-avatar-glyph { width: 24px; height: 24px; border-radius: 50%; background: #444; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
-    .roundtablet-panel .rt-bot-label { flex: 1; font-weight: 500; }
-    .roundtablet-panel .rt-bot-domain { font-size: 11px; color: #888; }
-    .roundtablet-panel .rt-selected { padding: 6px 8px; font-size: 12px; color: #888; min-height: 20px; }
-    .roundtablet-panel .rt-chip { display: inline-block; background: #333; border: 1px solid #555; border-radius: 10px; padding: 2px 8px; margin: 2px 4px 2px 0; font-size: 11px; }
-    .roundtablet-panel input[type="text"] { width: 100%; padding: 8px; border: 1px solid #444; border-radius: 4px; background: #111; color: #eee; font-size: 13px; margin-bottom: 10px; box-sizing: border-box; }
-    .roundtablet-panel input[type="text"]:focus { outline: none; border-color: #666; }
-    .roundtablet-panel .rt-start {
-      width: 100%; padding: 10px; border: 1px solid #4a7c59; border-radius: 4px;
-      background: #2d4a39; color: #fff; font-size: 13px; cursor: pointer;
-    }
-    .roundtablet-panel .rt-start:disabled { opacity: 0.5; cursor: not-allowed; border-color: #333; background: #222; }
-    .roundtablet-panel .rt-start:hover:not(:disabled) { background: #3a5a49; }
-    .roundtablet-panel .rt-transcript { display: flex; flex-direction: column; }
-    .roundtablet-panel .rt-messages { flex: 1; overflow-y: auto; padding: 8px; font-size: 13px; line-height: 1.4; }
-    .roundtablet-panel .rt-message { margin: 6px 0; padding: 6px 10px; border-radius: 4px; background: #222; border: 1px solid #333; }
-    .roundtablet-panel .rt-message.rt-system { background: #2a2a3a; border-color: #444; color: #ccc; }
-    .roundtablet-panel .rt-message-unit { color: #8bb8f8; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .roundtablet-panel .rt-status { padding: 6px 10px; font-size: 12px; color: #888; border-top: 1px solid #333; }
-  `;
-  document.head.appendChild(rtStyle);
+  // La ventana se monta como hud-window (drag/resize/persistencia) y el botón
+  // vive en el minimap-button-strip junto a los demás toggles de paneles.
+  // La ronda se hospeda en la ciudad de la unidad seleccionada (o la primera
+  // con repo real): los harnesses CLI necesitan un working_dir de repo.
+  const rtPanel = initRoundtabletPanel(document.body, () => {
+    const unitCity = state.world.cities.find((c) => c.id === state.selectedUnit?.cityId);
+    const host =
+      (unitCity?.repoPath?.trim() ? unitCity : null) ??
+      state.world.cities.find((c) => c.repoPath?.trim());
+    return { cityId: host?.id ?? '', repoPath: host?.repoPath ?? '' };
+  });
+  mountHudWindow(rtPanel.element);
+  document.getElementById('btn-roundtablet')?.addEventListener('click', () => rtPanel.toggle());
 
   // ─── Idle agent finder (Age of Empires pattern) ─────────────────────
   // Uses the shared singleton so the cycle index stays in sync with the

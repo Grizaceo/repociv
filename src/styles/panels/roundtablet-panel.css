@@ -1,0 +1,211 @@
+/* ─── RoundTablet — mesa redonda de bots ─────────────────────────────
+   HUD window: drag/resize vienen de hudWindow.ts; la posición inicial
+   es centrada-superior y la persistencia la da el layout storage. */
+
+#roundtablet-panel {
+  position: fixed;
+  top: 80px;
+  left: calc(50% - 450px);
+  width: min(900px, calc(100vw - 48px));
+  height: min(70vh, calc(100vh - 104px));
+  z-index: 48;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-panel-bg, rgba(16, 12, 6, 0.97));
+  border: 2px solid var(--ui-gold, #c8a84b);
+  border-radius: 6px;
+  color: var(--ui-text, #eee);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+#roundtablet-panel.hidden {
+  display: none;
+}
+
+.roundtablet-panel .rt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ui-gold-dim, #6b5a2e);
+  cursor: move;
+  user-select: none;
+}
+.roundtablet-panel .rt-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--ui-gold, #c8a84b);
+}
+.roundtablet-panel .rt-close {
+  background: none;
+  border: none;
+  color: var(--ui-text-dim, #888);
+  font-size: 24px;
+  cursor: pointer;
+  line-height: 1;
+}
+.roundtablet-panel .rt-close:hover {
+  color: var(--ui-text, #fff);
+}
+.roundtablet-panel .rt-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+.roundtablet-panel .rt-section {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  border-right: 1px solid rgba(200, 168, 75, 0.2);
+}
+.roundtablet-panel .rt-section.rt-narrow {
+  flex: 0 0 320px;
+}
+.roundtablet-panel .rt-section.rt-full {
+  flex: 2;
+  border-right: none;
+}
+.roundtablet-panel .rt-section-title {
+  display: block;
+  font-size: 12px;
+  color: var(--ui-text-dim, #999);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.roundtablet-panel .rt-bot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.roundtablet-panel .rt-bot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid rgba(200, 168, 75, 0.25);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.roundtablet-panel .rt-bot:hover {
+  background: rgba(200, 168, 75, 0.08);
+  border-color: var(--ui-gold, #c8a84b);
+}
+.roundtablet-panel .rt-bot input {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+}
+.roundtablet-panel .rt-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(200, 168, 75, 0.4);
+  flex-shrink: 0;
+}
+.roundtablet-panel .rt-avatar-glyph {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(200, 168, 75, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.roundtablet-panel .rt-bot-label {
+  flex: 1;
+  font-weight: 500;
+}
+.roundtablet-panel .rt-bot-domain {
+  font-size: 11px;
+  color: var(--ui-text-dim, #888);
+}
+.roundtablet-panel .rt-selected {
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--ui-text-dim, #888);
+  min-height: 20px;
+}
+.roundtablet-panel .rt-chip {
+  display: inline-block;
+  background: rgba(200, 168, 75, 0.15);
+  border: 1px solid rgba(200, 168, 75, 0.4);
+  border-radius: 10px;
+  padding: 2px 8px;
+  margin: 2px 4px 2px 0;
+  font-size: 11px;
+}
+.roundtablet-panel input[type='text'] {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid rgba(200, 168, 75, 0.3);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--ui-text, #eee);
+  font-size: 13px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+}
+.roundtablet-panel input[type='text']:focus {
+  outline: none;
+  border-color: var(--ui-gold, #c8a84b);
+}
+.roundtablet-panel .rt-start {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--ui-gold, #c8a84b);
+  border-radius: 4px;
+  background: rgba(200, 168, 75, 0.2);
+  color: var(--ui-text, #fff);
+  font-size: 13px;
+  cursor: pointer;
+}
+.roundtablet-panel .rt-start:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: rgba(200, 168, 75, 0.2);
+  background: rgba(0, 0, 0, 0.3);
+}
+.roundtablet-panel .rt-start:hover:not(:disabled) {
+  background: rgba(200, 168, 75, 0.35);
+}
+.roundtablet-panel .rt-transcript {
+  display: flex;
+  flex-direction: column;
+}
+.roundtablet-panel .rt-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.roundtablet-panel .rt-message {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(200, 168, 75, 0.15);
+  white-space: pre-wrap;
+}
+.roundtablet-panel .rt-message.rt-system {
+  background: rgba(200, 168, 75, 0.08);
+  border-color: rgba(200, 168, 75, 0.35);
+  color: var(--ui-text-dim, #ccc);
+}
+.roundtablet-panel .rt-message-unit {
+  color: var(--ui-gold, #c8a84b);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.roundtablet-panel .rt-status {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--ui-text-dim, #888);
+  border-top: 1px solid rgba(200, 168, 75, 0.2);
+}
