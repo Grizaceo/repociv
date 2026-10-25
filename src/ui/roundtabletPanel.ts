@@ -38,7 +38,7 @@ let panelInstance: RoundtabletPanel | null = null;
 
 function createRoundtabletPanel(): RoundtabletPanel {
   let visible = false;
-  let selectedBots = new Set<string>();
+  const selectedBots = new Set<string>();
   let currentRoundId: string | null = null;
   let sse: EventSource | null = null;
 
@@ -93,26 +93,45 @@ function createRoundtabletPanel(): RoundtabletPanel {
       const data = (await res.json()) as { bots: Bot[] };
       renderBots(data.bots);
     } catch (err) {
-      showNotification(`Error cargando bots: ${err}`, 'error');
+      showNotification({ type: 'error', title: 'Error cargando bots', body: String(err) });
     }
   }
 
   function renderBots(bots: Bot[]) {
     botList.innerHTML = '';
     for (const bot of bots) {
-      const checked = selectedBots.has(bot.id) ? 'checked' : '';
-      const avatar = bot.avatar_url
-        ? `<img class="rt-avatar" src="${bridgeUrl(bot.avatar_url)}" alt="${bot.label}" />`
-        : `<div class="rt-avatar rt-avatar-glyph">${bot.label[0]}</div>`;
       const el = document.createElement('label');
       el.className = 'rt-bot';
-      el.innerHTML = `
-        <input type="checkbox" value="${bot.id}" ${checked} />
-        ${avatar}
-        <span class="rt-bot-label">${escapeHtml(bot.label)}</span>
-        <span class="rt-bot-domain">${escapeHtml(bot.domain)}</span>
-      `;
-      const input = el.querySelector('input')! as HTMLInputElement;
+
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.value = bot.id;
+      input.checked = selectedBots.has(bot.id);
+      el.appendChild(input);
+
+      if (bot.avatar_url) {
+        const img = document.createElement('img');
+        img.className = 'rt-avatar';
+        img.src = bridgeUrl(bot.avatar_url);
+        img.alt = bot.label;
+        el.appendChild(img);
+      } else {
+        const glyph = document.createElement('div');
+        glyph.className = 'rt-avatar rt-avatar-glyph';
+        glyph.textContent = bot.label[0] ?? '';
+        el.appendChild(glyph);
+      }
+
+      const label = document.createElement('span');
+      label.className = 'rt-bot-label';
+      label.textContent = bot.label;
+      el.appendChild(label);
+
+      const domain = document.createElement('span');
+      domain.className = 'rt-bot-domain';
+      domain.textContent = bot.domain;
+      el.appendChild(domain);
+
       input.addEventListener('change', () => {
         if (input.checked) selectedBots.add(bot.id);
         else selectedBots.delete(bot.id);
@@ -148,8 +167,11 @@ function createRoundtabletPanel(): RoundtabletPanel {
   function addMessage(unit: string, text: string, isSystem = false) {
     const div = document.createElement('div');
     div.className = `rt-message ${isSystem ? 'rt-system' : ''}`;
-    const label = isSystem ? 'Sistema' : unit;
-    div.innerHTML = `<strong class="rt-message-unit">${escapeHtml(label)}:</strong> ${escapeHtml(text)}`;
+    const strong = document.createElement('strong');
+    strong.className = 'rt-message-unit';
+    strong.textContent = `${isSystem ? 'Sistema' : unit}:`;
+    div.appendChild(strong);
+    div.appendChild(document.createTextNode(` ${text}`));
     messagesEl.appendChild(div);
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
@@ -167,7 +189,11 @@ function createRoundtabletPanel(): RoundtabletPanel {
       try {
         const data = JSON.parse(e.data);
         if (data.type === 'ping') return;
-        if (data.type === 'chat_chunk' && data.missionId && String(data.missionId).startsWith(roundId)) {
+        if (
+          data.type === 'chat_chunk' &&
+          data.missionId &&
+          String(data.missionId).startsWith(roundId)
+        ) {
           const unit = data.unit || 'bot';
           const text = data.text || '';
           addMessage(unit, text);
@@ -210,7 +236,7 @@ function createRoundtabletPanel(): RoundtabletPanel {
       statusEl.textContent = `Ronda ${currentRoundId} iniciada — ${data.turns} turno(s).`;
       connectSSE(currentRoundId);
     } catch (err) {
-      showNotification(`Error iniciando ronda: ${err}`, 'error');
+      showNotification({ type: 'error', title: 'Error iniciando ronda', body: String(err) });
       startBtn.disabled = false;
       statusEl.textContent = 'Error.';
     }
@@ -232,12 +258,16 @@ function createRoundtabletPanel(): RoundtabletPanel {
     if (!visible) return;
     visible = false;
     panel.style.display = 'none';
-    if (sse) { sse.close(); sse = null; }
+    if (sse) {
+      sse.close();
+      sse = null;
+    }
     currentRoundId = null;
   }
 
   function toggle() {
-    if (visible) close(); else open();
+    if (visible) close();
+    else open();
   }
 
   function isOpen() {
@@ -245,15 +275,6 @@ function createRoundtabletPanel(): RoundtabletPanel {
   }
 
   return { open, close, toggle, isOpen, element: panel };
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
 }
 
 export function initRoundtabletPanel(container: HTMLElement): RoundtabletPanel {
