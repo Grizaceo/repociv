@@ -214,15 +214,18 @@ for each agent before execution. It composes:
 
 ### FrugalGPT Router
 
-Model selection based on task complexity and remaining token budget:
+Advisory model-tier selection based on task complexity and remaining token
+budget:
 
-1. A mission arrives with a complexity estimate
-2. The router checks the token ledger for remaining budget
-3. It selects the most cost-effective model that can handle the complexity
-4. Falls back to cheaper models when budget is constrained
+1. The router reads the agent role, task type, signals and token budget
+2. It selects a tier and a fallback chain for the step
+3. `step_executor` records the decision in `step_meta["model_routing"]`
+4. `step_retry` escalates the chain when a step fails
 
-This prevents using expensive frontier models for trivial tasks and
-guarantees the system stays within token budget.
+The selected model is **not yet enforced at the runner boundary**: it is not
+passed to `agent_runner.run_agent`, so the agent keeps its configured model.
+The budget check still runs, but this is computation and telemetry, not a
+guarantee that the cheapest adequate model was used.
 
 ### Agent Cards
 
@@ -292,7 +295,9 @@ FRONTEND                          BACKEND (Python)                  AGENT (Herme
                               |
                         6. Log to Event Store (events.jsonl)
                               |
-                        7. FrugalGPT Router selects model
+                        7. FrugalGPT Router selects
+                           tier + fallback (recorded,
+                           not yet enforced)
                               |
                         8. Tensor Context packages context
                               |

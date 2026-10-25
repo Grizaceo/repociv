@@ -20,16 +20,22 @@ Under the game there is a real Agent OS (Tensor Context, 3-layer Security
 Harness, task orchestrator with validation contracts and an independent
 validator role, container runtime). World Model, SICA and the Swarm Engine
 were retired by the pruning rounds (2026-08-10 and 2026-09-13, see §Pruning
-roadmap). Model routing (FrugalGPT-style) was not retired: it lives in
-`server/model_router.py` and the task orchestrator uses it. Keeping this much
-"industrial"
+roadmap). Model routing (FrugalGPT-style) was not retired:
+`server/model_router.py` computes and records a tier and fallback chain per
+step, and `server/step_retry.py` escalates the chain on retries. The selected
+model is **not yet enforced at the runner boundary** (`step_executor` does not
+pass it to `agent_runner.run_agent`) and the router does not receive the
+mission text: today it is computation and telemetry, not enforcement. Keeping
+this much "industrial"
 infrastructure as a single user is **deliberate**: the alpha test exists
 precisely to discover which of those layers earn their keep and which get
 distilled or deleted afterwards.
 
-Version: **v2.2.1 — 2026-10-24: factual correction (model routing is still
-active), no scope change. v2.2 — 2026-09-21: reconciled with the code (audited
-pruning). Frozen in scope except what is authorized below.**
+Version: **v2.2.2 — 2026-10-25: clarifies that model routing is computed but
+not enforced at the runner; no scope change. v2.2.1 — 2026-10-24: factual
+correction (model routing is still active). v2.2 — 2026-09-21: reconciled
+with the code (audited pruning). Frozen in scope except what is authorized
+below.**
 
 ---
 
@@ -207,5 +213,5 @@ the maintenance surface to what is actually used.
 
 ---
 
-_ES mirror of `docs/SCOPE.md` (v2.2.1, 2026-10-24). If the two diverge, fix
+_ES mirror of `docs/SCOPE.md` (v2.2.2, 2026-10-25). If the two diverge, fix
 both or the mirror lies._

@@ -10,7 +10,7 @@
 
 | Documento | Fecha | Qué es |
 |---|---|---|
-| [`p1-closure-2026-10-24.md`](p1-closure-2026-10-24.md) | 2026-10-24 | **Estado vigente**: R01–R16 cerrados, con commits y evidencia |
+| [`p1-closure-2026-10-24.md`](p1-closure-2026-10-24.md) | 2026-10-24 (rev. 2026-10-25) | **Estado vigente**: R01–R16 cerrados, con commits y evidencia. La revisión adversarial del 2026-10-25 reabrió R01 por una pérdida en el fallo de claim; el cierre documenta el arreglo y la regresión |
 | [`p1-implementation-2026-10-13.json`](p1-implementation-2026-10-13.json) | 2026-10-13 | Plan inicial. Su `implementation_status: "pending"` es el snapshot previo al trabajo, no el estado de hoy |
 | [`p1-review-r01-r05.md`](p1-review-r01-r05.md) | 2026-10-13 | Revisión adversarial que bloqueó el primer cierre (2 bloqueadores P1) |
 | [`p1-r01-r05-evidence.md`](p1-r01-r05-evidence.md) | 2026-10-13 | Evidencia ejecutada de R01/R05 |

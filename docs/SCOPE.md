@@ -20,16 +20,21 @@ Por debajo del juego hay un Agent OS real (Tensor Context, Security Harness
 3-capas, task orchestrator con validation contracts y rol validator
 independiente, container runtime). World Model, SICA y Swarm Engine fueron
 retirados por las podas (2026-08-10 y 2026-09-13, ver §Roadmap de poda). El
-routing de modelo (estilo FrugalGPT) no se retiró: vive en
-`server/model_router.py` y lo usa el task orchestrator. La razón de mantener
+routing de modelo (estilo FrugalGPT) no se retiró: `server/model_router.py`
+calcula y registra un tier y una cadena de fallback por paso, y
+`server/step_retry.py` escala la cadena en los reintentos. El modelo elegido
+**todavía no se impone en el límite del runner** (`step_executor` no lo pasa a
+`agent_runner.run_agent`) ni el router recibe el texto de la misión: hoy es
+cálculo y telemetría, no enforcement. La razón de mantener
 infraestructura "industrial"
 siendo un solo usuario es **deliberada**: el alpha-test sirve precisamente
 para descubrir cuáles de esas capas aportan valor real y cuáles se
 destilan o se borran después.
 
-Versión: **v2.2.1 — 2026-10-24: corrección factual (el routing de modelo sigue
-activo) sin cambios de alcance. v2.2 — 2026-09-21: reconciliada con el código
-(poda auditada). Congelada en scope salvo lo autorizado abajo.**
+Versión: **v2.2.2 — 2026-10-25: aclara que el routing de modelo se calcula
+pero no se impone en el runner; sin cambios de alcance. v2.2.1 — 2026-10-24:
+corrección factual (el routing sigue activo). v2.2 — 2026-09-21: reconciliada
+con el código (poda auditada). Congelada en scope salvo lo autorizado abajo.**
 
 ---
 

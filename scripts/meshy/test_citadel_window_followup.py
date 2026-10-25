@@ -1,5 +1,8 @@
 """Offline tests for the citadel left-elevation window follow-up. Never calls Meshy."""
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
 import numpy as np
 
@@ -42,6 +45,24 @@ class CitadelWindowFollowupTests(unittest.TestCase):
         self.assertTrue(follow.PUBLIC.exists())
         self.assertEqual(report["runtime_sha256"], sha256(follow.PUBLIC.read_bytes()))
         self.assertEqual(report["new_paid_requests"], 0)
+
+    def test_followup_refuses_to_clobber_a_newer_runtime(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp) / "city-citadel-map.glb"
+            runtime.write_bytes(b"newer-runtime-sentinel")
+            with mock.patch.object(follow, "PUBLIC", runtime):
+                with self.assertRaisesRegex(RuntimeError, "Refusing to overwrite"):
+                    follow.followup()
+            self.assertEqual(runtime.read_bytes(), b"newer-runtime-sentinel")
+
+    def test_patched_input_is_rejected_explicitly(self):
+        follow.followup()  # repair-v004/preview.glb is generated, not tracked
+        patched = follow.V004_DIR / "preview.glb"
+        with mock.patch.object(follow, "V003", patched):
+            with self.assertRaisesRegex(
+                ValueError, "No leftover middle-left window belt"
+            ):
+                follow.cap_clay()
 
 
 if __name__ == "__main__":

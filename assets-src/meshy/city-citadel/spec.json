@@ -160,10 +160,11 @@
     "followup_audit": "texture-v004/followup-audit.json",
     "local_repair_candidate_unchanged": "repair-v003/preview.glb",
     "new_paid_requests": 0,
-    "method": "Cap the leftover 16-vertex middle-terrace left window belt (14 triangles on clay; 14 new limestone-UV verts on the textured mesh). Cover the ground-floor brown plaster with a 2-triangle limestone panel slightly outside the wall. Atlas untouched. repair-v003 corners unchanged.",
+    "method": "Cap the leftover 16-vertex middle-terrace left window belt (14 cap triangles on clay: 3290→3304; 16 new limestone-UV vertices on the textured cap). Cover the ground-floor brown plaster with a 2-triangle limestone panel (4 new vertices) slightly outside the wall. Textured mesh adds 20 vertices total; runtime is 3306 triangles (3290→3306). Atlas untouched. repair-v003 corners unchanged.",
     "candidate_sha256": "6c5a5b982db8fb656a20a202490777a9a404057bc8638e6fb3ca3b846c03a176",
     "candidate_triangles": 3304,
     "ground_panel_triangles": 2,
+    "runtime_triangles": 3306,
     "human_review": "pending",
     "runtime_copy": {
       "file": "public/assets/3d/props/meshy/city-citadel-map.glb",

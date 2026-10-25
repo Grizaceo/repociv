@@ -217,7 +217,9 @@ def _golden_outcome(golden, case):
 # 3.11 (the CI interpreter); the wording is a stdlib detail, not the path
 # behavior this characterization protects, and both 3.11 and 3.12 are
 # supported (pyproject requires-python >=3.11).
-_EMBEDDED_NULL_MESSAGE = re.compile(r"^(?:[a-z_]+: )?embedded null character in path$")
+_EMBEDDED_NULL_MESSAGE = re.compile(
+    r"^(?:lstat|stat|open): embedded null character in path\Z"
+)
 
 
 def _canonical_error_message(message):
@@ -232,6 +234,28 @@ def _canonical_outcome(outcome):
         return outcome
     kind, message = outcome["error"]
     return {**outcome, "error": [kind, _canonical_error_message(message)]}
+
+
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        ("lstat: embedded null character in path", "embedded null byte"),
+        ("stat: embedded null character in path", "embedded null byte"),
+        ("open: embedded null character in path", "embedded null byte"),
+        # Not 3.12's wording or not a full match: leave it untouched.
+        (
+            "evil_operation: embedded null character in path",
+            "evil_operation: embedded null character in path",
+        ),
+        (
+            "lstat: embedded null character in path\n",
+            "lstat: embedded null character in path\n",
+        ),
+        ("unrelated error", "unrelated error"),
+    ],
+)
+def test_embedded_null_normalization_is_narrow(message, expected):
+    assert _canonical_error_message(message) == expected
 
 
 @pytest.mark.parametrize("case", _cases(), ids=lambda case: case["id"])

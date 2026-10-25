@@ -41,9 +41,10 @@ Cerradas (verificadas):
 - ~~Handoff estructurado tipado~~ → ✅ **existe**: `write_handoff` v1.0
   (`workspace_issue.py:574-585`, roles SCOUT/WORKER/VALIDATOR/MAIN) + consumo como
   `latest_handoff` en la construcción de misión (`step_executor.py:160-213`).
-- ~~Enforcement real de modelo por rol (model_router no se reflejaba en runtime)~~ →
-  ✅ **existe**: `route_model` por paso con semántica `enforced` propagada y retry
-  condicionado (`step_executor.py:293-321`).
+- **Enforcement real de modelo por rol** — ❌ **todavía no**: `route_model` por
+  paso escribe `model_routing` y `step_retry` escala la cadena en metadata,
+  pero `step_executor` no pasa el modelo elegido a `run_agent`
+  (`step_executor.py:343-382`). Es cálculo y telemetría, no enforcement.
 
 Vivas:
 - **Behavioural validation en loop principal** — la fase validating corre

@@ -12,6 +12,7 @@ No Meshy API, no paid retries, no movement of repair-v003 corners.
 from __future__ import annotations
 
 import json
+import os
 from collections import defaultdict
 
 import numpy as np
@@ -27,6 +28,12 @@ V004_DIR = FOLDER / "repair-v004"
 TEXTURED = FOLDER / "texture-v003/textured.glb"
 OUT_TEX_DIR = FOLDER / "texture-v004"
 PUBLIC = ROOT / "public/assets/3d/props/meshy/city-citadel-map.glb"
+# The runtime this follow-up was written to replace (texture-v003). A rerun
+# after promotion is also allowed because it writes identical bytes.
+EXPECTED_PREVIOUS_RUNTIME_SHA256 = (
+    "e5a3e9d1b96d92addfd53cceee1f1428ae35135ddb1f5b9e958dd787085b97da"
+)
+FORCE_PROMOTE_ENV = "REPOCIV_CITADEL_FORCE_PROMOTE"
 LEFT_X = -0.318
 GROUND_X = -0.429
 # Known limestone texel on the accepted albedo (not a window or slate chart).
@@ -196,6 +203,29 @@ def cover_ground_patch(attr: dict, faces: np.ndarray):
     return attr, faces, n
 
 
+def promote_runtime(optimized: bytes) -> None:
+    """Copy the candidate to the public runtime, refusing to clobber a newer one.
+
+    The script is a one-off promotion from texture-v003. Re-running it must be
+    idempotent, and a runtime that is neither the expected input nor the
+    candidate (for example, a newer human-approved texture) must not be
+    silently replaced. Override with ``REPOCIV_CITADEL_FORCE_PROMOTE=1`` only
+    after inspecting both hashes.
+    """
+    new_sha = sha256(optimized)
+    if PUBLIC.exists():
+        current_sha = sha256(PUBLIC.read_bytes())
+        allowed = {new_sha, EXPECTED_PREVIOUS_RUNTIME_SHA256}
+        if current_sha not in allowed and os.environ.get(FORCE_PROMOTE_ENV) != "1":
+            raise RuntimeError(
+                "Refusing to overwrite the city-citadel runtime: current sha256 "
+                f"{current_sha} is neither the expected pre-followup runtime "
+                f"({EXPECTED_PREVIOUS_RUNTIME_SHA256}) nor the candidate "
+                f"({new_sha}). Set {FORCE_PROMOTE_ENV}=1 to override."
+            )
+    PUBLIC.write_bytes(optimized)
+
+
 def followup() -> dict:
     clay, loop, clay_vertices, clay_faces = cap_clay()
     attr, faces, extra, tex_patches = cap_textured(loop, clay_vertices, clay_faces)
@@ -208,7 +238,7 @@ def followup() -> dict:
     (OUT_TEX_DIR / "textured.glb").write_bytes(textured_blob)
     optimized, opt_report = optimize(textured_blob, max_size=512)
     (OUT_TEX_DIR / "city-citadel-map.glb").write_bytes(optimized)
-    PUBLIC.write_bytes(optimized)
+    promote_runtime(optimized)
     report = {
         **clay,
         "textured_added_triangles": tex_patches,

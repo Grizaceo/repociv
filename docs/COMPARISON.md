@@ -60,7 +60,7 @@
 | Policy engine | Not exposed | Granular capability model per agent | **RepoCiv unique.** |
 | Priority scheduling | FIFO queues | Urgency-driven Priority Matrix | **RepoCiv unique.** Weighted scoring by age, tests, churn, extensions, size. |
 | Fatigue system | Not present | Token-based fatigue (1 h window, 200 k-token cap) | **RepoCiv unique.** Derived from the token ledger; the scheduler prefers fresh agents instead of a manual status. |
-| Model router | Fixed model per session | Per-step routing in the task orchestrator (FrugalGPT-style cascade + Agent Cards + budget pressure) | **RepoCiv unique.** Chooses a tier and a fallback chain per step; enforced for some agent types, advisory for others. It is not a standalone service. |
+| Model router | Fixed model per session | Per-step routing metadata in the task orchestrator (FrugalGPT-style tier + fallback chain + budget pressure) | **Advisory today, not enforced.** The router computes and records a tier and fallback chain per step, and retries escalate the chain; the selected model is not yet passed to the agent runner. It is not a standalone service. |
 | Auth model | Not documented | Token-based with rate limiting | RepoCiv is more transparent about its security model. |
 | Audit trail | Not published | Append-only JSONL + DuckDB rebuildable ledger | **RepoCiv unique.** Immutable event store that survives crashes. |
 | Crash recovery | Not published | Durable dispatch intents, recoverable approvals, startup reconciliation of interrupted tasks | **RepoCiv unique.** A command is delivered once or left visibly unresolved for the operator. |
