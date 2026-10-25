@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -397,7 +398,7 @@ def test_cancel_async_from_registry():
 
     _to.set_step_executor(mock_executor)
 
-    _to.run_task_async("repo", "ISS-12")
+    task_key = _to.run_task_async("repo", "ISS-12")
     time.sleep(0.1)  # let it start
 
     ok = _to.cancel_task("repo", "ISS-12")
@@ -405,6 +406,13 @@ def test_cancel_async_from_registry():
 
     status = _to.get_task_status("repo", "ISS-12")
     assert status["phase"] in ("cancelled", "executing", "failed")
+
+    # The worker is a daemon thread still mid-step: if the next test re-inits
+    # the store before it exits, its writes land in that test's tmp dir and
+    # leak a phantom issue. Join it so the suite stays isolated.
+    for t in threading.enumerate():
+        if t.name == f"task-{task_key}":
+            t.join(timeout=5)
 
 
 # ─── 13. Missing workspace raises ValueError ─────────────────────────────────
