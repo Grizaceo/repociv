@@ -99,23 +99,39 @@ def _read_intent(path: Path) -> dict[str, Any] | None:
 
 # ── Public API ───────────────────────────────────────────────────────────────
 
-def record_intent(command_id: str, cmd_dict: dict[str, Any]) -> None:
+def record_intent(command_id: str, cmd_dict: dict[str, Any]) -> bool:
     """Durably record the dispatch intent for ``command_id``.
 
     Idempotent: an existing intent for the id is left untouched, so a retry
     or a duplicated response cannot duplicate or overwrite the durable state.
-    Raises on I/O failure — the caller must not consume the approval when the
-    intent is not durable.
+    Returns ``True`` only when this call created the intent, which lets the
+    caller distinguish a fresh attempt (nothing was consumed yet) from a
+    duplicate of an in-flight or failed dispatch (whose intent may be the
+    only recoverable copy). Raises on I/O failure — the caller must not
+    consume the approval when the intent is not durable.
     """
     path = _intent_path(command_id)
     if path.exists():
-        return
+        return False
     _atomic_write(path, {
         "commandId": command_id,
         "command": cmd_dict,
         "recordedAt": time.time(),
         "state": "intent",
     })
+    return True
+
+
+def has_unclaimed_intent(command_id: str) -> bool:
+    """True when an unclaimed ``intent`` record exists for ``command_id``.
+
+    An unclaimed intent whose approval is already gone means a previous
+    attempt consumed the approval and failed before writing the claim. That
+    record is the only recoverable copy and must survive duplicate responses
+    until restart recovery replays it.
+    """
+    intent = _read_intent(_intent_path(command_id))
+    return intent is not None and intent.get("state") == "intent"
 
 
 def claim_intent(command_id: str) -> bool:
@@ -156,16 +172,20 @@ def done_intent(command_id: str) -> None:
 
 
 def release_intent_if_unclaimed(command_id: str) -> None:
-    """Delete the intent only while it is still an unclaimed ``intent``.
+    """Delete the intent only while it is a readable, unclaimed ``intent``.
 
     Used when a consume attempt finds no approval (duplicate/expired response):
     nothing was authorized in THIS attempt, but another in-flight dispatcher
     may already own a claimed intent — that marker must survive, otherwise a
-    crash window reopens. Callers must hold the consume lock.
+    crash window reopens. A corrupt/unreadable file is also left in place:
+    ``recover_intents`` reports it for operator review instead of dropping it.
+    Callers must hold the consume lock.
     """
     path = _intent_path(command_id)
+    if not path.exists():
+        return
     intent = _read_intent(path)
-    if intent is not None and intent.get("state") != "intent":
+    if intent is None or intent.get("state") != "intent":
         return
     try:
         path.unlink()
@@ -180,9 +200,10 @@ def release_intent_if_unclaimed(command_id: str) -> None:
 def unresolved() -> list[str]:
     """Command ids with a durable intent that was never claimed.
 
-    These approvals were authorized but never consumed (a crash before the
-    approval was taken). They stay pending in the approval store, remain
-    visible for operator review, and are never silently dropped.
+    The approval may still be pending (a crash before consume) or may have
+    been consumed right before the claim failed. In both cases the intent is
+    the recoverable record: it is replayed after a restart and reported here
+    for operator review in the meantime.
     """
     directory = _ledger_dir()
     if not directory.is_dir():

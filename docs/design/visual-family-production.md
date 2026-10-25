@@ -17,7 +17,7 @@ Las etiquetas «Propuesto» de la tabla inferior son históricas. Prevalecen las
 | city-dwelling | Aprobado | Aprobada | Aprobados («apruebo el foro y la vivienda») | Overlay `building_home_*` en `CityProps3D` |
 | city-guild | Aprobado | Aprobada | Aprobados («apruebo el gremio por completo») | Overlay `building_market_red` y `building_tavern_red` |
 | city-forum | Aprobado | repair-v001 aprobada | Aprobados («apruebo el foro y la vivienda») | Overlay `building_church_red` |
-| city-citadel | Aprobado | repair-v003 aceptada para continuar | Aceptados para continuar; **follow-up: 2 ventanas** | Overlay `building_castle_red` |
+| city-citadel | Aprobado | repair-v003 inmutable + repair-v004 local | texture-v004 (0 créditos); **pendiente mirada humana** | Overlay `building_castle_red` |
 | unit-builder | Aprobado | geometry-v002 aprobada | Aprobados («apruebo») | Overlay `unit-engineer` → `unit-builder-map.glb` |
 | unit-coordinator | Aprobado | Aprobada | Aprobados («las texturas que aprobé») | Overlay `unit-mage` → `unit-coordinator-map.glb` |
 | unit-ranger | Aprobado | Aprobada | Aprobados («las texturas que aprobé») | Overlay `unit-rogue` → `unit-ranger-map.glb` |
@@ -25,17 +25,19 @@ Las etiquetas «Propuesto» de la tabla inferior son históricas. Prevalecen las
 
 Ola 2 (kit de murallas): GLBs locales en `public/assets/3d/props/knowledge-city/`, overlay en `CityWalls3D.ts`. `RING_R=0.42` y `STRAIGHT_SPAN=0.4` intactos.
 
-**Follow-up ciudadela (2026-10-24).** Cristóbal: «quedo mejor faltan solo 2 ventanas por arreglar dejalo anotado». Vista izquierda: manchón marrón en planta baja y vano abierto en la terraza media. No gastar créditos de Meshy en un reintento hasta autorización expresa. Detalle en `assets-src/meshy/city-citadel/spec.json` → `follow_up`.
+**Follow-up ciudadela (2026-10-24).** Cristóbal: «quedo mejor faltan solo 2 ventanas por arreglar dejalo anotado», después autorizó el arreglo local. `citadel_window_followup.py` tapa el vano de 16 vértices en la terraza media izquierda (+14 triángulos) y cubre el manchón de planta baja con un panel de caliza (el atlas no se pinta: las UVs del unwrap mezclaban pizarra). 0 créditos Meshy. `repair-v003` no se toca. Runtime: `public/assets/3d/props/meshy/city-citadel-map.glb` (texture-v004). Pendiente mirada humana. Detalle en `assets-src/meshy/city-citadel/spec.json` → `local_followup`.
 
 Gasto de la tanda de materiales de servicios: 50 créditos (cinco Retexture de 10), saldo 552 → 502. Materiales, mapeo de servicios y escala de esos ocho miembros aprobados por Cristóbal e integrados por defecto en RepoCiv.
 
 ## Encargo y estado
 
-Cristóbal solicita pasar de las tres muestras a crear la familia de assets que dé identidad a RepoCiv. Este documento concreta una propuesta de colección y secuencia; no constituye aprobación de su catálogo ni autorización de gasto. Archivo y Observatorio aprobados artísticamente. Taller: concepto aprobado, geometría rechazada, reparación expresamente diferida. Mantener originales, sin integrar, publicar ni generar automáticamente.
+> Histórico de 2026-10. El estado vigente es la tabla del principio. Taller, Plaza y las figurillas ya están aprobados e integrados.
+
+Cristóbal solicita pasar de las tres muestras a crear la familia de assets que dé identidad a RepoCiv. Este documento concreta una propuesta de colección y secuencia; no constituye aprobación de su catálogo ni autorización de gasto. Archivo y Observatorio aprobados artísticamente.
 
 ## Autorización posterior
 
-Cristóbal autorizó la ronda propuesta y expresó que prioriza que RepoCiv quede precioso, sin necesidad del tope de créditos propuesto. Mantener responsabilidad de gasto, registro del consumo y controles anti-duplicación. Empezar mostrando el Patio antes de los otros cuatro conceptos, como se propuso; esta autorización no equivale a aprobación artística anticipada de conceptos, geometrías o texturas ni levanta el diferimiento del Taller.
+Cristóbal autorizó la ronda propuesta y expresó que prioriza que RepoCiv quede precioso, sin necesidad del tope de créditos propuesto. Mantener responsabilidad de gasto, registro del consumo y controles anti-duplicación. Empezar mostrando el Patio antes de los otros cuatro conceptos, como se propuso; esta autorización no equivale a aprobación artística anticipada de conceptos, geometrías o texturas.
 
 ## Lenguaje común
 
@@ -50,7 +52,7 @@ Los cinco miembros nuevos son propuestas de diseño, no funciones de software ya
 | ID | Función visual | Silueta propia | Estado |
 | --- | --- | --- | --- |
 | memory-archive | Memoria | Terrazas escalonadas y coronamiento compacto | Aprobado |
-| execution-workshop | Ejecución | Dos alas bajas, entrada amplia, chimenea corta | Reparación diferida |
+| execution-workshop | Ejecución | Dos alas bajas, entrada amplia, chimenea corta | Geometría repair-v003 y PBR aprobados; integrado |
 | observatory | Observación | Torre esbelta y lente integrada | Geometría y PBR aprobados |
 | coordination-court | Coordinación | Conjunto horizontal en U, patio amplio y sala central baja; no otra torre | Propuesto, siguiente |
 | connection-gateway | Conexiones | Dos pilares macizos y dintel bajo, vano único legible, detalles turquesa restringidos | Propuesto |

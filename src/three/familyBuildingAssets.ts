@@ -1,13 +1,12 @@
-// Knowledge-city family: optimized runtime copies of the Meshy buildings.
+// Knowledge-city family: optimized runtime copies in public/assets/3d/props/meshy/.
 //
-// Every path is a Git-ignored, license-pending local file under assets-src/. It is
-// never copied into public/ or dist/: vite-plugins/meshyLocalAssets.ts serves
-// exactly these paths to a loopback dev/preview server when VITE_MESHY_PREVIEW=1.
+// Enabled by default; VITE_MESHY_PREVIEW=0 forces Kenney/KayKit fallbacks.
+// Source meshes stay under gitignored assets-src/. Meshy license is still
+// unverified — treat shipped GLBs as local-alpha, not redistributable.
 // Kept free of three.js imports so the Vite config can share the allowlist.
 //
 // `materials` records the human review state; it is documentation, not a gate.
-// Civic Plaza has no consumer (no software concept maps to it) and Execution
-// Workshop is deferred, so neither is listed.
+// All eight approved service buildings are listed, including Workshop and Plaza.
 
 export const FAMILY_BUILDING_ASSETS = {
   'memory-archive': {

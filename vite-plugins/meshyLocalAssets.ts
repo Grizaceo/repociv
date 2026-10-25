@@ -1,12 +1,8 @@
-// ─── Local-only Meshy family assets ──────────────────────────────────────────
-// The knowledge-city buildings are license-pending Meshy output kept in
-// Git-ignored assets-src/. They must never be bundled into dist/ or public/.
-// With VITE_MESHY_PREVIEW=1 this plugin serves exactly the runtime copies listed
-// in src/three/familyBuildingAssets.ts to the dev server AND to `vite preview`,
-// so a built bundle can be tested on loopback without copying binaries.
-//
-// Responses carry a content-hash ETag and `Cache-Control: no-cache`: the browser
-// revalidates every load, so a regenerated GLB can never be served stale.
+// ─── Meshy family runtime copies ─────────────────────────────────────────────
+// Optimized GLBs live in public/assets/3d/props/meshy/ and load by default.
+// This plugin adds a content-hash ETag and Cache-Control: no-cache so a
+// regenerated file is never served stale. Sources stay in gitignored
+// assets-src/. Meshy license is still unverified.
 
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';

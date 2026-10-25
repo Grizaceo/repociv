@@ -1,13 +1,13 @@
 {
   "asset_id": "city-citadel-v001",
-  "status": "concept artist-approved by Cristóbal; repair-v003 + texture-v003 accepted to continue with a known follow-up of 2 remaining windows",
+  "status": "concept artist-approved by Cristóbal; repair-v003 + texture-v003 accepted to continue; local follow-up repair-v004 + texture-v004 applied (0 credits), awaiting human look at the two left-elevation windows",
   "follow_up": {
     "date": "2026-10-24",
     "quote": "quedo mejor faltan solo 2 ventanas por arreglar dejalo anotado",
     "item": "two remaining windows",
     "observed": "Left elevation: a brown plaster-missing patch on the ground floor and a torn/open window on the middle terrace. Iso and front otherwise read as a complete keep. Top-storey turquoise spill onto limestone is not part of this follow-up.",
-    "action": "Do not spend Meshy credits on a citadel retry until Cristóbal authorizes a local repair or retexture.",
-    "status": "deferred"
+    "action": "Local 0-credit repair authorized. Caps the leftover 16-vertex middle-terrace window and covers the ground-floor missing-plaster patch with a limestone panel. No Meshy retry.",
+    "status": "applied as repair-v004 / texture-v004; awaiting human review"
   },
   "license_status": "unverified; local only; distribution blocked",
   "reference_asset": "memory-archive-v001",
@@ -16,7 +16,7 @@
     "consumer": "src/three/CityProps3D.ts SETTLEMENT_OVERLAY (replaces building_castle_red in the capital recipe, scale s=0.60 HEX)",
     "public_path": "public/assets/3d/props/meshy/city-citadel-map.glb",
     "default_enabled": true,
-    "mapping_status": "wired into the capital recipe; accepted to continue with follow-up of 2 remaining windows"
+    "mapping_status": "wired into the capital recipe; runtime copy is texture-v004 (local window follow-up), awaiting human look"
   },
   "concept": {
     "tool": "meshy_image_to_image",
@@ -148,5 +148,29 @@
     "triangles": 3290,
     "method": "Shared-grid planar facades on ground-floor sides and middle terrace, with recessed window boxes. Original corners unchanged; new vertices only.",
     "new_paid_requests": 0
+  },
+  "local_followup": {
+    "authorization": "Cristóbal authorized the local 0-credit repair of the two remaining left-elevation windows after the deferred note.",
+    "script": "scripts/meshy/citadel_window_followup.py",
+    "source_geometry": "repair-v003/preview.glb (immutable)",
+    "source_textured": "texture-v003/textured.glb",
+    "clay_candidate": "repair-v004/preview.glb",
+    "textured_candidate": "texture-v004/textured.glb",
+    "audit": "repair-v004/repair-audit.json",
+    "followup_audit": "texture-v004/followup-audit.json",
+    "local_repair_candidate_unchanged": "repair-v003/preview.glb",
+    "new_paid_requests": 0,
+    "method": "Cap the leftover 16-vertex middle-terrace left window belt (14 cap triangles on clay: 3290→3304; 16 new limestone-UV vertices on the textured cap). Cover the ground-floor brown plaster with a 2-triangle limestone panel (4 new vertices) slightly outside the wall. Textured mesh adds 20 vertices total; runtime is 3306 triangles (3290→3306). Atlas untouched. repair-v003 corners unchanged.",
+    "candidate_sha256": "6c5a5b982db8fb656a20a202490777a9a404057bc8638e6fb3ca3b846c03a176",
+    "candidate_triangles": 3304,
+    "ground_panel_triangles": 2,
+    "runtime_triangles": 3306,
+    "human_review": "pending",
+    "runtime_copy": {
+      "file": "public/assets/3d/props/meshy/city-citadel-map.glb",
+      "sha256": "2a2943e8864fd688b72c76a570fa85da1a4ba8ac576a8fa08ae177f3868c7416",
+      "bytes": 355132,
+      "max_texture_px": 512
+    }
   }
 }

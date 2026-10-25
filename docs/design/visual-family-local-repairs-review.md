@@ -60,6 +60,14 @@ Cristóbal: «ahora doy por aprobados todos». Accepted geometry: coordination-c
 
 The current geometry review batch is closed. Next gate: materials under separate authorization/approval, followed by runtime integration and licensing checks. This approval does not itself execute or authorize paid regeneration, publishing or deployment. Taller's previously deferred repair is not implicitly performed or certified by this decision.
 
+## Update 2026-10-24
+
+Taller geometry (`execution-workshop` repair-v003) was approved later («apruebo los modelos»), textured, and integrated. Plaza and Portal were already approved. This acta remains a snapshot of the Patio/Bóveda/Laboratorio batch; do not read the deferred-Taller sentence above as current product state. See [visual-family-production.md](visual-family-production.md).
+
 ## Next gate executed
 
 Materials for the five approved geometries were textured on 2026-10-23 from these exact repair-v003 files, verified by pinned SHA-256. See [visual-family-materials-review.md](visual-family-materials-review.md). The accepted v003 GLBs were not overwritten.
+
+## Update 2026-10-24 (citadel windows)
+
+Local 0-credit follow-up on the capital keep, outside this Patio/Bóveda/Laboratorio batch. `repair-v003` stays the accepted textured source. `repair-v004` caps the leftover middle-terrace left window; `texture-v004` caps that hole with new limestone-UV verts and covers the ground-floor plaster patch with a panel. See `assets-src/meshy/city-citadel/spec.json` → `local_followup`.

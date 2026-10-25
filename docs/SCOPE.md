@@ -18,15 +18,23 @@ o se registran como perfil personal del usuario.
 
 Por debajo del juego hay un Agent OS real (Tensor Context, Security Harness
 3-capas, task orchestrator con validation contracts y rol validator
-independiente, container runtime). FrugalGPT Router, World Model, SICA y
-Swarm Engine fueron retirados por las podas (2026-08-10 y 2026-09-13,
-ver §Roadmap de poda). La razón de mantener infraestructura "industrial"
+independiente, container runtime). World Model, SICA y Swarm Engine fueron
+retirados por las podas (2026-08-10 y 2026-09-13, ver §Roadmap de poda). El
+routing de modelo (estilo FrugalGPT) no se retiró: `server/model_router.py`
+calcula y registra un tier y una cadena de fallback por paso, y
+`server/step_retry.py` escala la cadena en los reintentos. El modelo elegido
+**todavía no se impone en el límite del runner** (`step_executor` no lo pasa a
+`agent_runner.run_agent`) ni el router recibe el texto de la misión: hoy es
+cálculo y telemetría, no enforcement. La razón de mantener
+infraestructura "industrial"
 siendo un solo usuario es **deliberada**: el alpha-test sirve precisamente
 para descubrir cuáles de esas capas aportan valor real y cuáles se
 destilan o se borran después.
 
-Versión: **v2.2 — 2026-09-21: reconciliada con el código (poda auditada).
-Congelada en scope salvo lo autorizado abajo.**
+Versión: **v2.2.2 — 2026-10-25: aclara que el routing de modelo se calcula
+pero no se impone en el runner; sin cambios de alcance. v2.2.1 — 2026-10-24:
+corrección factual (el routing sigue activo). v2.2 — 2026-09-21: reconciliada
+con el código (poda auditada). Congelada en scope salvo lo autorizado abajo.**
 
 ---
 
@@ -169,7 +177,8 @@ Tras 4-8 semanas de uso real, ejecutar este audit:
      `/improve/proposals` 1 llamada histórica; el debate swarm ~nunca activado).
    - `tensor_context.py` → **conservado**: es load-bearing (arma el contexto de
      cada misión de agente en `step_executor`), pese a estar en esta lista.
-   - `world_model.py`, `frugal_router.py` → ya no existían.
+   - `world_model.py` → ya no existía; `frugal_router.py` nunca existió como
+     módulo: el routing de modelo vive en `model_router.py` y sigue activo.
    Metodología: si la telemetría no muestra impacto medible, se mueve a
    `experimental/` o se borra.
 

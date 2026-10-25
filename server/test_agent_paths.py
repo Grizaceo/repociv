@@ -1,6 +1,7 @@
 """Characterization captured from agent_runner at 869e143, before extraction."""
 
 import json
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -211,12 +212,59 @@ def _golden_outcome(golden, case):
     return expected
 
 
+# CPython 3.12 changed the embedded-NUL failure from "embedded null byte" to
+# "lstat: embedded null character in path". The golden below was captured on
+# 3.11 (the CI interpreter); the wording is a stdlib detail, not the path
+# behavior this characterization protects, and both 3.11 and 3.12 are
+# supported (pyproject requires-python >=3.11).
+_EMBEDDED_NULL_MESSAGE = re.compile(
+    r"^(?:lstat|stat|open): embedded null character in path\Z"
+)
+
+
+def _canonical_error_message(message):
+    if _EMBEDDED_NULL_MESSAGE.match(message):
+        return "embedded null byte"
+    return message
+
+
+def _canonical_outcome(outcome):
+    """Normalize interpreter-specific stdlib wording before comparing to the golden."""
+    if "error" not in outcome:
+        return outcome
+    kind, message = outcome["error"]
+    return {**outcome, "error": [kind, _canonical_error_message(message)]}
+
+
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        ("lstat: embedded null character in path", "embedded null byte"),
+        ("stat: embedded null character in path", "embedded null byte"),
+        ("open: embedded null character in path", "embedded null byte"),
+        # Not 3.12's wording or not a full match: leave it untouched.
+        (
+            "evil_operation: embedded null character in path",
+            "evil_operation: embedded null character in path",
+        ),
+        (
+            "lstat: embedded null character in path\n",
+            "lstat: embedded null character in path\n",
+        ),
+        ("unrelated error", "unrelated error"),
+    ],
+)
+def test_embedded_null_normalization_is_narrow(message, expected):
+    assert _canonical_error_message(message) == expected
+
+
 @pytest.mark.parametrize("case", _cases(), ids=lambda case: case["id"])
 def test_original_path_characterization(case, tmp_path, monkeypatch):
     golden = json.loads(
         (Path(__file__).parent / "fixtures" / "agent_paths.json").read_text(encoding="utf-8")
     )
-    assert _exercise(case, tmp_path, monkeypatch) == _golden_outcome(golden, case)
+    actual = _canonical_outcome(_exercise(case, tmp_path, monkeypatch))
+    assert actual == _canonical_outcome(_golden_outcome(golden, case))
 
 
 @pytest.mark.parametrize("city", ["MAIN", "CaPiTaL"])

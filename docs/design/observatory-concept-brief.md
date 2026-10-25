@@ -1,6 +1,13 @@
 # Observatory — next visual-family concept
 
-## Status
+> **Estado vigente (2026-10-24): histórico.** El concepto, la geometría y los
+> materiales del Observatorio están aprobados e integrados por defecto en
+> `public/assets/3d/props/meshy/observatory-map.glb`. Este brief se conserva
+> como registro del encargo y de la puerta de revisión que se usó; no es una
+> tarea abierta. El estado de la familia vive en
+> [visual-family-production.md](visual-family-production.md).
+
+## Status (al momento del brief)
 
 Cristóbal asked to defer the Workshop's local window/roof repair and move to the next family member. This brief prepares the Observatory; no paid request submitted. Use the approved Archive image as the real Image-to-Image reference, not the defective Workshop mesh.
 

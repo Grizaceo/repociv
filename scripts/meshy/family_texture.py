@@ -3,8 +3,8 @@
 Every member sends its exact accepted GLB as a data URI with locally generated
 UVs (xatlas) and keeps those UVs (enable_original_uv). Patio, Bóveda,
 Laboratorio and Taller use repair-v003 (their Image-to-3D tasks hold rejected
-geometry) and its normals. Portal, Plaza, dwelling, guild, coordinator, ranger
-ranger, guardian and builder v002 use approved Image-to-3D GLBs, which carry no
+geometry) and its normals. Portal, Plaza, dwelling, guild, coordinator, ranger,
+guardian and builder v002 use approved Image-to-3D GLBs, which carry no
 normals: the v003 42-degree crease rule is applied without moving corners.
 Forum and citadel use their settlement repair GLBs. Meshy's own normals are
 never used: the approved Observatory's returned normals oppose their faces at

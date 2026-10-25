@@ -76,7 +76,8 @@ hung-command sweep) replays what a crash left behind:
 
 | Leftover state | Meaning | Recovery action |
 | --- | --- | --- |
-| `state:"intent"` | Intent durable, approval never consumed. | Re-dispatch through the same single-use `resolve_approval` path — a duplicate response still cannot authorize twice. |
+| `state:"intent"`, approval still pending | Intent durable, approval never consumed. | Re-dispatch through the same single-use `resolve_approval` path — a duplicate response still cannot authorize twice. |
+| `state:"intent"`, approval gone | Approval consumed, but the process died (or the claim write failed) before `claim_intent` became durable. | Re-enqueue directly from the durable intent, deduplicated by id against the persisted scheduler queue. This is the only recoverable copy and is never released by a duplicate response. |
 | `state:"claimed"` | Approval consumed, command maybe not enqueued. | Re-enqueue directly from the durable intent, deduplicated by id against the persisted scheduler queue. |
 | unreadable / corrupt | Cannot be trusted. | Reported `unresolved` for operator review; never replayed, never dropped silently. |
 | none | Fully delivered or rejected. | No-op. |
@@ -96,9 +97,12 @@ recovery on top of an already-reconciled command state.
   consume, idempotent `enqueue_dict`, and deduplicating `_init_from_disk`.
 - Every command is **delivered once, explicitly rejected, or reported
   unresolved** — never silently lost. A crash before the intent is durable
-  leaves the approval pending (retryable); a crash after the claim leaves a
-  durable intent that recovery replays; a corrupt intent is surfaced for
-  operator review.
+  leaves the approval pending (retryable); a crash (or claim I/O failure)
+  after the consume leaves an unclaimed intent that recovery replays; a crash
+  after the claim leaves a durable intent that recovery replays; a corrupt
+  intent is surfaced for operator review. A duplicate response is not allowed
+  to release an unclaimed intent whose approval is already gone: that record
+  is the recoverable copy.
 - The durable protocol is **not** dependent on the approval store's in-memory
   state surviving; each durable write is atomic and fsync'd.
 
@@ -116,8 +120,9 @@ recovery on top of an already-reconciled command state.
 
 ## Testing
 
-`server/test_durable_dispatch.py` (12 tests) exercises each criterion with
+`server/test_durable_dispatch.py` (14 tests) exercises each criterion with
 inert fixtures and isolated TMPDIR state: a failure injected after each
-durable write then a simulated restart; concurrent duplicate responses;
-worker-retry idempotency; corrupt-intent honesty; and the documented
-exactly-once side-effect limit.
+durable write then a simulated restart; a claim-write failure followed by a
+duplicate response and a restart; concurrent duplicate responses; worker-retry
+idempotency; corrupt-intent honesty; and the documented exactly-once
+side-effect limit.
