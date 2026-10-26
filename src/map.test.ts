@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Axial } from './hex.ts';
 import { canRelocateCityTo, generateWorld, relocateCity, showMapLoadError } from './map.ts';
+import { resetMapEditsCache } from './mapEdits.ts';
 import type { City, Terrain, Tile, World } from './types.ts';
 import { tileKey } from './types.ts';
 
@@ -527,5 +528,145 @@ describe('generateWorld', () => {
 
     expect(world.cities.some((city) => city.id === 'mcp-servers')).toBe(false);
     expect(fetchMock).not.toHaveBeenCalledWith('/api/files/mcp-servers');
+  });
+
+  it('keeps the position of an old manual entry stored with an absolute path', async () => {
+    resetMapEditsCache();
+    // Legacy entry: keyed by the absolute path, not by the stable repo id.
+    window.localStorage.setItem(
+      'repociv:manual-layout:v1',
+      JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            repoPath: '/w/repo-a',
+            repoName: 'repo-a',
+            coord: { q: 4, r: -2 },
+            addedAt: 1,
+            source: 'manual',
+          },
+        ],
+      }),
+    );
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        if (input === '/api/repos') {
+          return {
+            ok: true,
+            json: async () => [
+              {
+                name: 'repo-a',
+                path: 'repo:enc-a',
+                repoPath: '/w/repo-a',
+                population: 12,
+                extensions: { ts: 4 },
+                gold: 30,
+                lastCommitDays: 1,
+                isLegacy: false,
+                hasGit: true,
+              },
+            ],
+          };
+        }
+        if (input === '/api/repo-selections') {
+          return {
+            ok: true,
+            json: async () => ({
+              activeRoot: '/w',
+              roots: [],
+              selectedRepoIds: [],
+              selectedRepoPaths: [],
+              hasSelections: false,
+            }),
+          };
+        }
+        if (input === '/api/repos/selected') {
+          return { ok: true, json: async () => [] };
+        }
+        if (input.startsWith('/api/files/')) {
+          return { ok: true, json: async () => ({ files: [] }) };
+        }
+        return { ok: false, json: async () => ({}) };
+      }),
+    );
+
+    const world = await generateWorld();
+
+    expect(world.cities.find((city) => city.name === 'repo-a')?.coord).toEqual({ q: 4, r: -2 });
+  });
+
+  it('gives the manual coordinate only to the repo with the exact key when two share a name', async () => {
+    resetMapEditsCache();
+    window.localStorage.setItem(
+      'repociv:manual-layout:v1',
+      JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            repoPath: 'repo:enc-b',
+            repoFsPath: '/b/api',
+            repoName: 'api',
+            coord: { q: 4, r: -2 },
+            addedAt: 1,
+            source: 'manual',
+          },
+        ],
+      }),
+    );
+
+    const api = (path: string, repoPath: string) => ({
+      name: 'api',
+      path,
+      repoPath,
+      population: 12,
+      extensions: { ts: 4 },
+      gold: 30,
+      lastCommitDays: 1,
+      isLegacy: false,
+      hasGit: true,
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        // /api/repos stays down on purpose: findRepoOnDisk matches by name and
+        // would collapse both `api` repos onto the first one (out of scope).
+        if (input === '/api/repos') {
+          return { ok: false, status: 500, json: async () => ({}) };
+        }
+        if (input === '/api/repo-selections') {
+          return {
+            ok: true,
+            json: async () => ({
+              activeRoot: '/w',
+              roots: [],
+              selectedRepoIds: [],
+              selectedRepoPaths: [],
+              hasSelections: false,
+            }),
+          };
+        }
+        if (input === '/api/repos/selected') {
+          return {
+            ok: true,
+            json: async () => [api('repo:enc-a', '/a/api'), api('repo:enc-b', '/b/api')],
+          };
+        }
+        if (input.startsWith('/api/files/')) {
+          return { ok: true, json: async () => ({ files: [] }) };
+        }
+        return { ok: false, json: async () => ({}) };
+      }),
+    );
+
+    const world = await generateWorld();
+
+    expect(world.cities.find((city) => city.repoPath === '/b/api')?.coord).toEqual({ q: 4, r: -2 });
+    expect(world.cities.find((city) => city.repoPath === '/a/api')?.coord).not.toEqual({
+      q: 4,
+      r: -2,
+    });
   });
 });

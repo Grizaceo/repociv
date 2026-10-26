@@ -1187,13 +1187,14 @@ export async function generateWorld(): Promise<World> {
   for (const entry of manualLayout.entries) {
     manualRepoMap.set(entry.repoPath, { q: entry.coord.q, r: entry.coord.r });
     const coord = { q: entry.coord.q, r: entry.coord.r };
-    const existing = repos.find(
+    const exact = repos.find(
       (repo) =>
         repo.path === entry.repoPath ||
         repo.repoPath === entry.repoPath ||
-        repo.name === entry.repoName ||
         (entry.repoFsPath && repo.repoPath === entry.repoFsPath),
     );
+    // Only when no key matches: two repos can share a name.
+    const existing = exact ?? repos.find((repo) => repo.name === entry.repoName);
     if (existing) {
       existing.manualCoord = coord;
       continue;
@@ -1249,7 +1250,9 @@ export async function generateWorld(): Promise<World> {
         : inferTerrain(r.extensions),
     science: Math.min(99, Math.floor(r.gold / 10)),
     production: Math.min(99, Math.floor(r.gold / 50)),
-    manualCoord: manualRepoMap.get(r.path),
+    // Keep the coord the manual loop resolved: an old entry keyed by the
+    // absolute path is not in manualRepoMap (keyed by the stable id).
+    manualCoord: r.manualCoord ?? manualRepoMap.get(r.path),
   }));
   // All selected repos are cities (regardless of population)
   // Orphans only exist when there's no selection and population <= 5
