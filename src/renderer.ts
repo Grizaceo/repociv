@@ -1021,10 +1021,15 @@ export class Renderer {
       this.panDirs.clear();
       this.yawDirs.clear();
       this._panFast = false;
+      // Alt-tabbing with the brush button held also ends the stroke.
+      this._mapEditorPainting = false;
     });
     // MMB released off-canvas: drop the grabbing cursor without a click.
+    // LMB released off-canvas: stop the terrain brush (the canvas mouseup
+    // never fires when the pointer is over a panel or the toolbar).
     window.addEventListener('mouseup', (e) => {
       if (e.button === 1) this.endCameraOrbit(e);
+      if (e.button === 0) this._mapEditorPainting = false;
     });
   }
 

@@ -479,6 +479,34 @@ describe('Renderer map editor — terrain brush', () => {
 
     expect(state.world.tiles.get('0,0')?.terrain).toBe('sacred');
   });
+
+  it('stops painting when the button is released outside the canvas', () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeState([tile({ q: 1, r: 2 }), tile({ q: 2, r: 2 })], []);
+    const renderer = new Renderer(canvas, state as never);
+    let hex: Axial = { q: 1, r: 2 };
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => hex;
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('terrain');
+    renderer.setMapEditorTerrain('mountain');
+
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    // The pointer left the canvas: the mouseup lands on the page, not on it.
+    const windowCalls = (
+      window.addEventListener as unknown as { mock: { calls: Array<[string, Listener]> } }
+    ).mock.calls;
+    for (const [type, listener] of windowCalls) {
+      if (type === 'mouseup') {
+        listener(new FakeMouseEvent('mouseup', { button: 0 }) as never);
+      }
+    }
+
+    hex = { q: 2, r: 2 };
+    fire('mousemove', new FakeMouseEvent('mousemove', { clientX: 30, clientY: 10 }) as never);
+
+    expect(state.world.tiles.get('2,2')?.terrain).toBe('plains');
+  });
 });
 
 describe('Renderer map editor — nation tool', () => {
