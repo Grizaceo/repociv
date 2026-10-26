@@ -215,10 +215,13 @@ export function renderNationsPanel(world: World, onChange?: () => void): void {
   render();
 }
 
-/** Wire the tab: re-render whenever the user opens the "Naciones" tab. */
+/**
+ * Populate the panel up front. The tab click re-renders it through
+ * `renderNationsPanel` (see `wireSideTabs`), so this adds no listener of its
+ * own — otherwise every click drew the panel twice.
+ */
 export function initNationsPanel(world: World, onChange?: () => void): void {
   _state.world = world;
   _state.onChange = onChange ?? null;
-  const tab = document.querySelector<HTMLElement>('.side-tab[data-tab="nations"]');
-  tab?.addEventListener('click', () => render());
+  render();
 }

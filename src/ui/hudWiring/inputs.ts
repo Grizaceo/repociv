@@ -336,7 +336,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
   // ─── Side panel tabs ─────────────────────────────────────────────────────
   wireSideTabs((tab) => {
     if (tab === 'nations') {
-      renderNationsPanel(state.world);
+      renderNationsPanel(state.world, () => state.notifyUpdate());
       return;
     }
     const unit = state.selectedUnit;
@@ -349,7 +349,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
   });
 
   // The nations tab is populated up front so it is never empty when opened.
-  initNationsPanel(state.world);
+  initNationsPanel(state.world, () => state.notifyUpdate());
 
   // ─── City panel ──────────────────────────────────────────────────────────
   wireCityPanel();
