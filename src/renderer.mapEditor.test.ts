@@ -258,6 +258,20 @@ function makeCity(id: string, coord: Axial, repoPath: string): City {
   };
 }
 
+function makeWorld(tiles: Tile[], cities: City[]): World {
+  const world = {
+    tiles: new Map<string, Tile>(),
+    cities,
+    units: [],
+    buildings: [],
+    resources: { gold: 0, science: 0, production: 0 },
+    generatedAt: Date.now(),
+    restAreas: [],
+  } as unknown as World;
+  for (const t of tiles) world.tiles.set(tileKey(t.coord), t);
+  return world;
+}
+
 function makeState(tiles: Tile[], cities: City[]) {
   const world = {
     tiles: new Map<string, Tile>(),
@@ -363,8 +377,12 @@ describe('Renderer map editor — nation tool', () => {
     const { canvas, fire } = makeFakeCanvas();
     const city = makeCity('repociv', { q: 2, r: 0 }, '/workspace/repociv');
     const state = makeState([tile({ q: 2, r: 0 }, 'plains', city)], [city]);
-    // A unit on the hex used to swallow the click (unit drag won the gesture).
-    state.getUnitAt = vi.fn(() => ({ id: 'MAIN' }) as never);
+    // A unit standing on the hex used to swallow the click (unit drag won the
+    // gesture). Put a real one in world.units — mocking getUnitAt alone never
+    // exercised the unit-drag branch.
+    const unit = { id: 'MAIN', coord: { q: 2, r: 0 }, cityId: 'repociv' } as never;
+    state.world.units.push(unit);
+    state.getUnitAt = vi.fn(() => unit);
     const renderer = new Renderer(canvas, state as never);
     (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 2, r: 0 });
 
@@ -395,5 +413,41 @@ describe('Renderer map editor — erase tool', () => {
 
     expect(state.world.tiles.has('1,0')).toBe(false);
     expect(state.world.tiles.has('0,0')).toBe(true);
+  });
+
+  it('takes the city units out through GameState so they can spawn again', async () => {
+    const { GameState } = await import('./game.ts');
+    const { canvas, fire } = makeFakeCanvas();
+    const city = makeCity('repociv', { q: 0, r: 0 }, '/workspace/repociv');
+    const state = new GameState(makeWorld([tile({ q: 0, r: 0 }, 'plains', city)], [city]));
+    const unit = state.spawnUnit(
+      'MAIN',
+      'MAIN',
+      'hero',
+      'gris',
+      { q: 0, r: 0 },
+      undefined,
+      city.id,
+    );
+    state.selectedUnit = unit;
+    const renderer = new Renderer(canvas, state as never);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 0, r: 0 });
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('erase');
+
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+
+    expect(state.world.cities).toHaveLength(0);
+    // Erasing straight out of world.units left unitMap and the selection
+    // pointing at a ghost, so addUnit handed the stale object back forever.
+    expect(state.getUnit('MAIN')).toBeUndefined();
+    expect(state.selectedUnit).toBeNull();
+
+    const revived = state.spawnUnit('MAIN', 'MAIN', 'hero', 'gris', { q: 2, r: 0 });
+    expect(state.world.units).toContain(revived);
+    expect(state.getUnit('MAIN')).toBe(revived);
+    expect(state.selectedUnit).toBeNull();
   });
 });

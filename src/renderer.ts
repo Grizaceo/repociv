@@ -2122,9 +2122,18 @@ export class Renderer {
     if (tile.city) {
       const city = tile.city;
       if (city.isCapital) return; // the capital is not removable
+      // Collect the units first: removeUnit() reassigns world.units, and
+      // removeCityFromWorld() would drop the ones standing on the hex without
+      // telling GameState (leaving stale unitMap entries).
+      const cityUnits = this.state.world.units.filter(
+        (u) => u.cityId === city.id || tileKey(u.coord) === tileKey(city.coord),
+      );
       removeCityFromMap(cityKey(city));
       removeCityFromWorld(this.state.world, city.id);
-      this.state.world.units = this.state.world.units.filter((u) => u.cityId !== city.id);
+      // Go through GameState so unitMap, selectedUnit, the path cache and the
+      // unitRemoved callbacks stay in sync — otherwise a unit coming back with
+      // the same id is handed the ghost and never re-enters world.units.
+      for (const u of cityUnits) this.state.removeUnit(u.id);
       this.state.notifyUpdate();
       return;
     }
