@@ -986,6 +986,222 @@ describe('Renderer map editor — place tool', () => {
   });
 });
 
+describe('Renderer map editor — history round trips', () => {
+  async function snapshot(state: { world: World }) {
+    const { getMapEdits } = await import('./mapEdits.ts');
+    const { getNationStore } = await import('./nations.ts');
+    const tiles: Record<string, string> = {};
+    for (const [key, tile] of state.world.tiles) {
+      tiles[key] = `${tile.terrain}|${tile.city?.id ?? ''}|${tile.district?.id ?? ''}`;
+    }
+    const edits = getMapEdits();
+    return {
+      tiles,
+      cities: state.world.cities.map((c) => `${c.id}@${c.coord.q},${c.coord.r}`).sort(),
+      units: state.world.units.map((u) => `${u.id}@${u.coord.q},${u.coord.r}`).sort(),
+      terrain: { ...edits.terrain },
+      removedHexes: [...edits.removedHexes].sort(),
+      removedCities: [...edits.removedCities].sort(),
+      placed: edits.placedCities.map((p) => `${p.repoPath}@${p.coord.q},${p.coord.r}`).sort(),
+      nations: { ...getNationStore().assignments },
+    };
+  }
+
+  async function dragCity(
+    renderer: InstanceType<typeof Renderer>,
+    fire: (type: string, ev: Event) => void,
+    from: Axial,
+    to: Axial,
+  ) {
+    let hex = from;
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => hex;
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    hex = to;
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 40, clientY: 10 }) as never);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  it('move: undo, redo and undo again keep the city on its hex', async () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const c = makeCity('c', { q: 0, r: 0 }, '/w/c');
+    const state = makeState([tile({ q: 0, r: 0 }, 'plains', c), tile({ q: 3, r: 0 })], [c]);
+    const renderer = new Renderer(canvas, state as never);
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('move');
+
+    const before = await snapshot(state);
+    await dragCity(renderer, fire, { q: 0, r: 0 }, { q: 3, r: 0 });
+    const after = await snapshot(state);
+    expect(after).not.toEqual(before);
+
+    expect(renderer.undoLastMapEdit()).toBe('Mover c');
+    expect(await snapshot(state)).toEqual(before);
+    expect(state.world.tiles.get('0,0')?.city).toBe(c);
+
+    expect(renderer.redoLastMapEdit()).toBe('Mover c');
+    expect(await snapshot(state)).toEqual(after);
+
+    expect(renderer.undoLastMapEdit()).toBe('Mover c');
+    expect(await snapshot(state)).toEqual(before);
+    expect(state.world.tiles.get('0,0')?.city).toBe(c);
+    expect(state.world.tiles.get('3,0')?.city).toBeUndefined();
+
+    expect(renderer.redoLastMapEdit()).toBe('Mover c');
+    expect(await snapshot(state)).toEqual(after);
+  });
+
+  it('remove city: undo, redo and undo again match before and after', async () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const c = makeCity('gone', { q: 0, r: 0 }, '/w/gone');
+    const state = makeState([tile({ q: 0, r: 0 }, 'plains', c), tile({ q: 2, r: 0 })], [c]);
+    const renderer = new Renderer(canvas, state as never);
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('erase');
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 0, r: 0 });
+
+    const before = await snapshot(state);
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    const after = await snapshot(state);
+    expect(after).not.toEqual(before);
+
+    expect(renderer.undoLastMapEdit()).toBe('Sacar gone');
+    expect(await snapshot(state)).toEqual(before);
+    expect(renderer.redoLastMapEdit()).toBe('Sacar gone');
+    expect(await snapshot(state)).toEqual(after);
+    expect(renderer.undoLastMapEdit()).toBe('Sacar gone');
+    expect(await snapshot(state)).toEqual(before);
+    expect(renderer.redoLastMapEdit()).toBe('Sacar gone');
+    expect(await snapshot(state)).toEqual(after);
+  });
+
+  it('redo of a removal takes the units that joined meanwhile through GameState', async () => {
+    const { GameState } = await import('./game.ts');
+    const { canvas, fire } = makeFakeCanvas();
+    const city = makeCity('repociv', { q: 0, r: 0 }, '/workspace/repociv');
+    const state = new GameState(makeWorld([tile({ q: 0, r: 0 }, 'plains', city)], [city]));
+    state.spawnUnit('MAIN', 'MAIN', 'hero', 'gris', { q: 0, r: 0 }, undefined, city.id);
+    const renderer = new Renderer(canvas, state as never);
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('erase');
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 0, r: 0 });
+
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    expect(state.getUnit('MAIN')).toBeUndefined();
+
+    renderer.undoLastMapEdit();
+    expect(state.getUnit('MAIN')).toBeDefined();
+    // An agent joins the city between the undo and the redo.
+    const late = state.spawnUnit('LATE', 'LATE', 'hero', 'gris', { q: 0, r: 0 }, undefined, city.id);
+
+    renderer.redoLastMapEdit();
+    expect(state.getUnit('MAIN')).toBeUndefined();
+    expect(state.getUnit('LATE')).toBeUndefined();
+    expect(state.world.units.some((u) => u.id === late.id)).toBe(false);
+  });
+
+  it('found: undo, redo and undo again match before and after', async () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeState([tile({ q: 1, r: 0 })], []);
+    const renderer = new Renderer(canvas, state as never);
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('place');
+    renderer.setMapEditorRepo(extraRepo);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 0 });
+
+    const before = await snapshot(state);
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    const after = await snapshot(state);
+    expect(after).not.toEqual(before);
+
+    expect(renderer.undoLastMapEdit()).toBe('Fundar extra');
+    expect(await snapshot(state)).toEqual(before);
+    expect(renderer.redoLastMapEdit()).toBe('Fundar extra');
+    expect(await snapshot(state)).toEqual(after);
+    expect(renderer.undoLastMapEdit()).toBe('Fundar extra');
+    expect(await snapshot(state)).toEqual(before);
+    expect(renderer.redoLastMapEdit()).toBe('Fundar extra');
+    expect(await snapshot(state)).toEqual(after);
+  });
+
+  it('erase hex: undo, redo and undo again match before and after', async () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeState([tile({ q: 0, r: 0 }), tile({ q: 1, r: 0 })], []);
+    const renderer = new Renderer(canvas, state as never);
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('erase');
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 0 });
+
+    const before = await snapshot(state);
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    const after = await snapshot(state);
+
+    expect(renderer.undoLastMapEdit()).toBe('Borrar hex');
+    expect(await snapshot(state)).toEqual(before);
+    expect(renderer.redoLastMapEdit()).toBe('Borrar hex');
+    expect(await snapshot(state)).toEqual(after);
+    expect(renderer.undoLastMapEdit()).toBe('Borrar hex');
+    expect(await snapshot(state)).toEqual(before);
+    expect(renderer.redoLastMapEdit()).toBe('Borrar hex');
+    expect(await snapshot(state)).toEqual(after);
+  });
+
+  it('paint: undo, redo and undo again match before and after', async () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeState([tile({ q: 1, r: 0 })], []);
+    const renderer = new Renderer(canvas, state as never);
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('terrain');
+    renderer.setMapEditorTerrain('mountain');
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 0 });
+
+    const before = await snapshot(state);
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    const after = await snapshot(state);
+
+    expect(renderer.undoLastMapEdit()).toBe('Pintar');
+    expect(await snapshot(state)).toEqual(before);
+    expect(renderer.redoLastMapEdit()).toBe('Pintar');
+    expect(await snapshot(state)).toEqual(after);
+    expect(renderer.undoLastMapEdit()).toBe('Pintar');
+    expect(await snapshot(state)).toEqual(before);
+    expect(renderer.redoLastMapEdit()).toBe('Pintar');
+    expect(await snapshot(state)).toEqual(after);
+  });
+
+  it('nation: undo, redo and undo again match before and after', async () => {
+    const { createNation } = await import('./nations.ts');
+    const nation = createNation('Imperio');
+    const { canvas, fire } = makeFakeCanvas();
+    const c = makeCity('c', { q: 0, r: 0 }, '/w/c');
+    const state = makeState([tile({ q: 0, r: 0 }, 'plains', c)], [c]);
+    const renderer = new Renderer(canvas, state as never);
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('nation');
+    renderer.setMapEditorNation(nation.id);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 0, r: 0 });
+
+    const before = await snapshot(state);
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    const after = await snapshot(state);
+    expect(after).not.toEqual(before);
+
+    expect(renderer.undoLastMapEdit()).toBe('Nación de c');
+    expect(await snapshot(state)).toEqual(before);
+    expect(renderer.redoLastMapEdit()).toBe('Nación de c');
+    expect(await snapshot(state)).toEqual(after);
+    expect(renderer.undoLastMapEdit()).toBe('Nación de c');
+    expect(await snapshot(state)).toEqual(before);
+    expect(renderer.redoLastMapEdit()).toBe('Nación de c');
+    expect(await snapshot(state)).toEqual(after);
+  });
+});
+
 describe('Renderer map editor — history bar', () => {
   async function openBar() {
     const { doc } = makeFakeDocument();

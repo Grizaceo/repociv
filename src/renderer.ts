@@ -33,6 +33,7 @@ import { escapeHtml } from './ui/escapeHtml.ts';
 import {
   eraseHexOp,
   foundCityOp,
+  moveCitySync,
   paintHexOp,
   reconnectCities,
   relocateCity,
@@ -825,14 +826,21 @@ export class Renderer {
             if (dragMoved) {
               void relocateCity(this.state.world, dc.id, dropCoord, path).then((moved) => {
                 if (moved) {
+                  let current = moved;
                   pushMapEdit({
                     label: `Mover ${moved.city.name}`,
                     undo: () => {
-                      undoMoveCity(this.state.world, moved);
+                      undoMoveCity(this.state.world, current);
                       void reconnectCities(this.state.world);
                     },
                     redo: () => {
-                      void relocateCity(this.state.world, moved.city.id, moved.to, path);
+                      // Synchronous so an immediate undo already has the new
+                      // result (the copies the previous undo put back must not
+                      // be reused).
+                      current =
+                        moveCitySync(this.state.world, current.city.id, current.to, path) ??
+                        current;
+                      void reconnectCities(this.state.world);
                     },
                   });
                   this.state.notifyUpdate();
@@ -2183,11 +2191,13 @@ export class Renderer {
     const terrain = this._mapEditorTerrain;
     const result = paintHexOp(this.state.world, coord, terrain, { record: true });
     if (!result) return;
+    // The redo replaces the result: undoing again must use the newest one.
+    let current = result;
     pushMapEdit({
       label: 'Pintar',
-      undo: () => undoPaintHex(this.state.world, coord, result),
+      undo: () => undoPaintHex(this.state.world, coord, current),
       redo: () => {
-        paintHexOp(this.state.world, coord, terrain, { record: true });
+        current = paintHexOp(this.state.world, coord, terrain, { record: true }) ?? current;
       },
     });
     // Cached routes do not depend on terrain: repaint them from scratch.
@@ -2227,29 +2237,32 @@ export class Renderer {
       const city = tile.city;
       const removed = removeCityOp(this.state.world, city, { record: true });
       if (!removed) return; // the capital is not removable
+      let current = removed;
       // Go through GameState so unitMap, selectedUnit, the path cache and the
       // unitRemoved callbacks stay in sync — otherwise a unit coming back with
       // the same id is handed the ghost and never re-enters world.units.
-      for (const u of removed.units) this.state.removeUnit(u.id);
+      for (const u of current.units) this.state.removeUnit(u.id);
       pushMapEdit({
         label: `Sacar ${city.name}`,
         undo: () => {
-          undoRemoveCity(this.state.world, removed);
-          for (const u of removed.units) this.state.restoreUnit(u);
+          undoRemoveCity(this.state.world, current);
+          for (const u of current.units) this.state.restoreUnit(u);
         },
         redo: () => {
-          removeCityOp(this.state.world, city, { record: true });
-          for (const u of removed.units) this.state.removeUnit(u.id);
+          // The new removal collects the units that joined the city meanwhile.
+          current = removeCityOp(this.state.world, city, { record: true }) ?? current;
+          for (const u of current.units) this.state.removeUnit(u.id);
         },
       });
     } else {
       const removedTile = eraseHexOp(this.state.world, coord, { record: true });
       if (!removedTile) return; // a district belongs to its city
+      let current = removedTile;
       pushMapEdit({
         label: 'Borrar hex',
-        undo: () => undoEraseHex(this.state.world, removedTile),
+        undo: () => undoEraseHex(this.state.world, current),
         redo: () => {
-          eraseHexOp(this.state.world, coord, { record: true });
+          current = eraseHexOp(this.state.world, coord, { record: true }) ?? current;
         },
       });
     }
@@ -2263,17 +2276,18 @@ export class Renderer {
     if (!repo) return;
     const found = foundCityOp(this.state.world, repo, coord, { record: true });
     if (!found) return;
+    let current = found;
     pushMapEdit({
       label: `Fundar ${repo.name}`,
       undo: () => {
-        undoFoundCity(this.state.world, found);
+        undoFoundCity(this.state.world, current);
         // The repo goes back to the picker so it can be founded again (the
         // renderer keeps its own selection even when the bar is not mounted).
         this._mapEditorRepo = repo;
         selectMapEditorRepo(repo);
       },
       redo: () => {
-        foundCityOp(this.state.world, repo, coord, { record: true });
+        current = foundCityOp(this.state.world, repo, coord, { record: true }) ?? current;
         this._mapEditorRepo = null;
         clearMapEditorRepoSelection();
       },

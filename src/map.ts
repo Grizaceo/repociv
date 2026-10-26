@@ -1070,17 +1070,17 @@ function persistCityCoord(
 }
 
 /**
- * Moves a city (center, districts, territory) and persists the new coordinate
- * according to where the city came from. Returns what the move took, so the
- * editor can stack it for undo; `null` when the move is not possible.
- * Calls `reconnectCities` after mutation (same as dynamic add/remove).
+ * Synchronous half of `relocateCity`: resolves the city key, moves the city in
+ * the world and records the new coordinate, returning what the move took. The
+ * editor's drag and its redo need the result without waiting for
+ * `reconnectCities`, so that part lives in `relocateCity`.
  */
-export async function relocateCity(
+export function moveCitySync(
   world: World,
   cityId: string,
   targetCoord: Axial,
   repoPathFallback: string | null,
-): Promise<MovedCity | null> {
+): MovedCity | null {
   const city = world.cities.find((c) => c.id === cityId);
   if (!city) return null;
   // `city.repoPath` is the city key across reloads: only a real path may land
@@ -1096,7 +1096,17 @@ export async function relocateCity(
   }
   // Undo has to put the original value back, not the one this call resolved.
   moved.prevRepoPath = prevRepoPath;
+  return moved;
+}
 
+export async function relocateCity(
+  world: World,
+  cityId: string,
+  targetCoord: Axial,
+  repoPathFallback: string | null,
+): Promise<MovedCity | null> {
+  const moved = moveCitySync(world, cityId, targetCoord, repoPathFallback);
+  if (!moved) return null;
   invalidatePathCache();
   await reconnectCities(world);
   return moved;
