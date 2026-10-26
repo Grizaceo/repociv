@@ -20,6 +20,12 @@ export interface HudWindowMinimum {
 }
 
 const STORAGE_PREFIX = 'repociv:hud-window:v1:';
+/**
+ * Opt-out marker for windows that live inside another panel. A docked window is
+ * positioned by its host (e.g. the unit card inside the side panel), so its
+ * header must not start a drag nor persist that slot as the floating position.
+ */
+export const HUD_WINDOW_DOCKED_CLASS = 'hud-window--docked';
 const VIEWPORT_GAP = 8;
 const DEFAULT_MINIMUM: HudWindowMinimum = { minWidth: 240, minHeight: 180 };
 const HUD_WINDOW_IDS = [
@@ -219,6 +225,10 @@ const startPointerInteraction = (
   mode: 'move' | 'resize',
 ): void => {
   if (event.button !== 0) return;
+  // A docked window is laid out by its host panel: dragging it would move it out
+  // of its slot and persist that position for the next load. Any window can opt
+  // out by carrying HUD_WINDOW_DOCKED_CLASS.
+  if (panel.classList.contains(HUD_WINDOW_DOCKED_CLASS)) return;
   const initial = getPanelGeometry(panel);
   if (!initial) return;
 

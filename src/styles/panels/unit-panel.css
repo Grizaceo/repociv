@@ -381,6 +381,10 @@
 }
 #unit-panel.unit-panel--docked .hud-window-handle {
   cursor: default;
+  /* The header is not a drag handle while docked: let text selection and
+     touch scrolling through it. */
+  touch-action: auto;
+  user-select: text;
 }
 #unit-pane-empty {
   margin: 24px 8px;

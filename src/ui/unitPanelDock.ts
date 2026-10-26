@@ -4,6 +4,11 @@
 // re-parented (not duplicated) so every id, handler and live update keeps
 // working; on close it returns to its original spot in the bottom HUD.
 
+// hudWindow keys its drag wiring off this class (see hudWindow.ts): a docked
+// card is laid out by the side panel, so it must not be dragged or persist the
+// slot it occupies there.
+import { HUD_WINDOW_DOCKED_CLASS } from './hudWindow.ts';
+
 const DOCKED_CLASS = 'unit-panel--docked';
 const INLINE_PROPS = ['left', 'top', 'right', 'bottom', 'width', 'height'] as const;
 type InlineProp = (typeof INLINE_PROPS)[number];
@@ -43,12 +48,14 @@ export function dockUnitPanel(
   }
   body.appendChild(unit);
   unit.classList.add(DOCKED_CLASS);
+  unit.classList.add(HUD_WINDOW_DOCKED_CLASS);
   empty?.classList.add('hidden');
 }
 
 export function undockUnitPanel(unit: HTMLElement): void {
   if (!unit.classList.contains(DOCKED_CLASS) || !anchor) return;
   unit.classList.remove(DOCKED_CLASS);
+  unit.classList.remove(HUD_WINDOW_DOCKED_CLASS);
   for (const prop of INLINE_PROPS) unit.style[prop] = anchor.inline[prop] ?? '';
   if (anchor.next && anchor.next.parentNode === anchor.parent)
     anchor.parent.insertBefore(unit, anchor.next);

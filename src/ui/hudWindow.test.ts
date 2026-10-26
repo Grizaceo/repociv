@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest';
-import { clampHudWindowGeometry, hudWindowStorageKey, placeHudWindow } from './hudWindow.ts';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  clampHudWindowGeometry,
+  hudWindowStorageKey,
+  mountHudWindow,
+  placeHudWindow,
+} from './hudWindow.ts';
 
 describe('hudWindow geometry', () => {
   it('keeps a resized window completely inside the viewport', () => {
@@ -59,5 +64,171 @@ describe('hudWindow geometry', () => {
         { left: 0, top: 0, width: 320, height: 480 },
       ]),
     ).toEqual({ left: 52, top: 8, width: 260, height: 464 });
+  });
+});
+
+// ─── Drag wiring (fake DOM) ─────────────────────────────────────────────────
+// The docked card lives inside the side panel: its header must not start a
+// drag nor persist the slot it occupies there.
+
+class FakeClassList {
+  private set = new Set<string>();
+  add(...classes: string[]) {
+    for (const c of classes) this.set.add(c);
+  }
+  remove(...classes: string[]) {
+    for (const c of classes) this.set.delete(c);
+  }
+  contains(c: string) {
+    return this.set.has(c);
+  }
+  toggle(c: string, on?: boolean) {
+    if (on ?? !this.set.has(c)) this.set.add(c);
+    else this.set.delete(c);
+  }
+}
+
+class FakeElement {
+  id = '';
+  className = '';
+  type = '';
+  title = '';
+  textContent = '';
+  dataset: Record<string, string> = {};
+  style: Record<string, string> = {};
+  classList = new FakeClassList();
+  rect = { left: 100, top: 100, width: 300, height: 200 };
+  header: FakeElement | null = null;
+  private listeners: Record<string, Array<(e: FakePointerEvent) => void>> = {};
+  private attributes: Record<string, string> = {};
+
+  addEventListener(type: string, fn: (e: FakePointerEvent) => void) {
+    (this.listeners[type] ??= []).push(fn);
+  }
+  removeEventListener() {}
+  dispatch(type: string, event: FakePointerEvent) {
+    for (const fn of this.listeners[type] ?? []) fn(event);
+  }
+  getAttribute(name: string) {
+    return this.attributes[name] ?? null;
+  }
+  setAttribute(name: string, value: string) {
+    this.attributes[name] = value;
+  }
+  append(...nodes: FakeElement[]) {
+    this.children.push(...nodes);
+  }
+  before(node: FakeElement) {
+    this.children.push(node);
+  }
+  children: FakeElement[] = [];
+  querySelector(selector: string) {
+    if (selector.includes('header') || selector.includes('-title') || selector.includes('card'))
+      return this.header;
+    return null;
+  }
+  querySelectorAll() {
+    return [] as FakeElement[];
+  }
+  closest() {
+    return null;
+  }
+  contains() {
+    return false;
+  }
+  getBoundingClientRect() {
+    return this.rect;
+  }
+}
+
+class FakePointerEvent {
+  button = 0;
+  clientX = 100;
+  clientY = 100;
+  defaultPrevented = false;
+  propagationStopped = false;
+  constructor(public target: unknown) {}
+  preventDefault() {
+    this.defaultPrevented = true;
+  }
+  stopPropagation() {
+    this.propagationStopped = true;
+  }
+}
+
+let saved: Array<[string, string]> = [];
+
+function installDom() {
+  saved = [];
+  vi.stubGlobal('Element', FakeElement);
+  vi.stubGlobal('document', { createElement: vi.fn(() => new FakeElement()) });
+  vi.stubGlobal('window', {
+    innerWidth: 1200,
+    innerHeight: 800,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  });
+  vi.stubGlobal('localStorage', {
+    getItem: () => null,
+    setItem: (key: string, value: string) => {
+      saved.push([key, value]);
+    },
+    removeItem: () => {},
+  });
+}
+
+function fireWindow(type: string) {
+  const calls = (
+    window.addEventListener as unknown as {
+      mock: { calls: Array<[string, (e: FakePointerEvent) => void]> };
+    }
+  ).mock.calls;
+  for (const [eventType, listener] of calls) {
+    if (eventType === type) listener(new FakePointerEvent(null));
+  }
+}
+
+function mountPanel() {
+  const panel = new FakeElement();
+  panel.id = 'unit-panel';
+  const header = new FakeElement();
+  header.className = 'hero-card-main';
+  panel.header = header;
+  mountHudWindow(panel as unknown as HTMLElement);
+  return { panel, header };
+}
+
+describe('hudWindow docked windows', () => {
+  beforeEach(installDom);
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('does not drag or persist a docked window', () => {
+    const { panel, header } = mountPanel();
+    panel.classList.add('hud-window--docked');
+
+    const mouseDown = new FakePointerEvent(header);
+    header.dispatch('mousedown', mouseDown);
+    const pointerDown = new FakePointerEvent(header);
+    header.dispatch('pointerdown', pointerDown);
+
+    expect(mouseDown.defaultPrevented).toBe(false);
+    expect(pointerDown.defaultPrevented).toBe(false);
+    expect(panel.classList.contains('hud-window--interacting')).toBe(false);
+
+    fireWindow('mouseup');
+    fireWindow('pointerup');
+    expect(saved).toHaveLength(0);
+  });
+
+  it('still drags and persists a free window', () => {
+    const { panel, header } = mountPanel();
+
+    const mouseDown = new FakePointerEvent(header);
+    header.dispatch('mousedown', mouseDown);
+    expect(mouseDown.defaultPrevented).toBe(true);
+    expect(panel.classList.contains('hud-window--interacting')).toBe(true);
+
+    fireWindow('mouseup');
+    expect(saved).toEqual([[hudWindowStorageKey('unit-panel'), expect.any(String)]]);
   });
 });
