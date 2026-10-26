@@ -27,7 +27,7 @@ import { loadManualLayout, updateManualRepoCoord } from './manualLayout.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
 import { listIframeWonders } from './wonders/manifest.ts';
 import type { WonderManifest } from './wonders/types.ts';
-import { getMapEdits } from './mapEdits.ts';
+import { getMapEdits, placeCity } from './mapEdits.ts';
 import { applyNationsToWorld, cityKey } from './nations.ts';
 
 // ─── Wonder placement ───────────────────────────────────────────────────────
@@ -901,17 +901,11 @@ export function canRelocateCityTo(world: World, city: City, targetCoord: Axial):
 }
 
 /**
- * Moves a city (center, districts, territory) and persists manual layout when `repoPath` resolves.
- * Calls `reconnectCities` after mutation (same as dynamic add/remove).
+ * Synchronous core of `relocateCity`: moves the center, districts, units and
+ * territory inside the world, with no persistence and no reconnection.
+ * `applyMapEdits` needs it to reposition hand-moved cities on a reload.
  */
-export async function relocateCity(
-  world: World,
-  cityId: string,
-  targetCoord: Axial,
-  repoPathFallback: string | null,
-): Promise<boolean> {
-  const city = world.cities.find((c) => c.id === cityId);
-  if (!city) return false;
+export function moveCityInWorld(world: World, city: City, targetCoord: Axial): boolean {
   if (!canRelocateCityTo(world, city, targetCoord)) return false;
 
   const delta = axialSub(targetCoord, city.coord);
@@ -961,12 +955,66 @@ export async function relocateCity(
   tiles.set(destKey, merged);
 
   recalculateAllTerritories(world);
+  return true;
+}
 
-  const path = resolveRepoPathForCity(city, repoPathFallback);
-  if (path) {
-    city.repoPath = path;
-    updateManualRepoCoord(path, targetCoord);
+/** A real filesystem path, as opposed to the stable repo id used by the UI. */
+function isFilesystemPath(value: string): boolean {
+  return value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value);
+}
+
+/**
+ * Remember the new coordinate of a moved city, whatever it came from:
+ * a manual layout entry (keyed by the stable repo id), a `placedCities` entry
+ * (keyed by the path `placeCity` used) or the automatic world generation.
+ * Auto-generated cities get a `placedCities` entry too, which survives the
+ * reload without adding a fake row to the construction panel (that panel lists
+ * `manualLayout` entries only).
+ */
+function persistCityCoord(city: City, coord: Axial): void {
+  const manual = loadManualLayout().entries.find(
+    (e) =>
+      e.repoPath === city.id ||
+      e.repoPath === city.repoPath ||
+      e.repoFsPath === city.id ||
+      (!!city.repoPath && e.repoFsPath === city.repoPath),
+  );
+  if (manual) {
+    updateManualRepoCoord(manual.repoPath, coord);
+    return;
   }
+
+  const placed = getMapEdits().placedCities.find(
+    (p) => p.repoPath === city.id || p.repoPath === city.repoPath || p.repoName === city.name,
+  );
+  if (placed) {
+    placeCity({ repoPath: placed.repoPath, repoName: placed.repoName, coord });
+    return;
+  }
+
+  placeCity({ repoPath: city.repoPath ?? city.id, repoName: city.name, coord });
+}
+
+/**
+ * Moves a city (center, districts, territory) and persists the new coordinate
+ * according to where the city came from.
+ * Calls `reconnectCities` after mutation (same as dynamic add/remove).
+ */
+export async function relocateCity(
+  world: World,
+  cityId: string,
+  targetCoord: Axial,
+  repoPathFallback: string | null,
+): Promise<boolean> {
+  const city = world.cities.find((c) => c.id === cityId);
+  if (!city) return false;
+  if (!moveCityInWorld(world, city, targetCoord)) return false;
+
+  // `city.repoPath` is the city key across reloads: only a real path may land
+  // there. The stable id lives in `city.id`.
+  const path = resolveRepoPathForCity(city, repoPathFallback);
+  if (path && isFilesystemPath(path)) city.repoPath = path;
+  persistCityCoord(city, targetCoord);
 
   invalidatePathCache();
   await reconnectCities(world);
@@ -1017,11 +1065,18 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
     world.units = world.units.filter((u) => u.cityId !== cityId);
   }
 
-  // 2) Cities the user placed by hand.
+  // 2) Cities the user placed (or repositioned) by hand.
   const occupied = occupiedCityCoords(world);
   for (const entry of edits.placedCities) {
-    const alreadyThere = world.cities.some((c) => cityKey(c) === entry.repoPath);
-    if (alreadyThere) continue;
+    const existing = world.cities.find(
+      (c) => cityKey(c) === entry.repoPath || c.id === entry.repoPath,
+    );
+    if (existing) {
+      // A city moved with the editor is already in the world: the entry only
+      // overrides its coordinate.
+      if (!axialEquals(existing.coord, entry.coord)) moveCityInWorld(world, existing, entry.coord);
+      continue;
+    }
     const repo = diskRepos.find(
       (r) =>
         r.repoPath === entry.repoPath ||

@@ -14,7 +14,8 @@ import {
   setHexTerrain,
   terrainOverrideFor,
 } from './mapEdits.ts';
-import { applyMapEdits } from './map.ts';
+import { applyMapEdits, relocateCity, type ScannedRepo } from './map.ts';
+import { loadManualLayout, upsertManualRepoEntry } from './manualLayout.ts';
 import type { City, Tile, World } from './types.ts';
 import { tileKey } from './types.ts';
 
@@ -228,5 +229,127 @@ describe('applyMapEdits', () => {
       },
     ]);
     expect(world.cities).toHaveLength(1);
+  });
+});
+
+/** What a reload does: generate from the workspace + manual layout, then apply the edits. */
+function reloadWorld(diskCities: City[], tiles: Tile[], diskRepos: ScannedRepo[] = []): World {
+  const manual = loadManualLayout().entries;
+  const cities = diskCities.map((c) => {
+    const entry = manual.find(
+      (e) =>
+        e.repoPath === c.id ||
+        e.repoPath === c.repoPath ||
+        e.repoFsPath === c.repoPath ||
+        e.repoFsPath === c.id,
+    );
+    return entry ? { ...c, coord: { q: entry.coord.q, r: entry.coord.r } } : c;
+  });
+  const world = worldWith(cities, tiles);
+  applyMapEdits(world, diskRepos);
+  return world;
+}
+
+describe('relocateCity persistence', () => {
+  beforeEach(() => {
+    stubStorage();
+    resetMapEditsCache();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetMapEditsCache();
+  });
+
+  it('saves the move of a city that has a manual layout entry', async () => {
+    upsertManualRepoEntry({
+      repoPath: 'repociv', // stable id, the one the construction panel lists
+      repoFsPath: '/workspace/repociv',
+      repoName: 'repociv',
+      coord: { q: 0, r: 0 },
+      addedAt: Date.now(),
+      source: 'manual',
+    });
+    const target = city('repociv', { q: 0, r: 0 }, '/workspace/repociv');
+    const world = worldWith(
+      [target],
+      [tile({ q: 0, r: 0 }), tile({ q: 4, r: 1 })],
+    );
+
+    expect(await relocateCity(world, target.id, { q: 4, r: 1 }, null)).toBe(true);
+    expect(target.coord).toEqual({ q: 4, r: 1 });
+    // The absolute path is the city key: it must not be replaced by the stable id.
+    expect(target.repoPath).toBe('/workspace/repociv');
+    expect(loadManualLayout().entries[0]?.coord).toEqual({ q: 4, r: 1 });
+
+    const reloaded = reloadWorld(
+      [city('repociv', { q: 0, r: 0 }, '/workspace/repociv')],
+      [tile({ q: 0, r: 0 }), tile({ q: 4, r: 1 })],
+    );
+    expect(reloaded.cities[0]?.coord).toEqual({ q: 4, r: 1 });
+  });
+
+  it('saves the move of a city that came from placedCities', async () => {
+    const repo: ScannedRepo = {
+      name: 'extra',
+      path: 'extra',
+      repoPath: '/workspace/extra',
+      population: 12,
+      extensions: {},
+      gold: 40,
+      lastCommitDays: 1,
+      isLegacy: false,
+      hasGit: true,
+    };
+    placeCity({ repoPath: '/workspace/extra', repoName: 'extra', coord: { q: 3, r: 0 } });
+    const target = city('extra', { q: 3, r: 0 }, '/workspace/extra');
+    const world = worldWith([target], [tile({ q: 3, r: 0 }), tile({ q: 5, r: -1 })]);
+
+    expect(await relocateCity(world, target.id, { q: 5, r: -1 }, null)).toBe(true);
+    const placed = getMapEdits().placedCities;
+    expect(placed).toHaveLength(1);
+    expect(placed[0]?.coord).toEqual({ q: 5, r: -1 });
+
+    // On reload the generated world has the city where it was placed; the
+    // placement entry has to move it, not skip it because it already exists.
+    const reloaded = reloadWorld(
+      [city('extra', { q: 3, r: 0 }, '/workspace/extra')],
+      [tile({ q: 3, r: 0 }), tile({ q: 5, r: -1 })],
+      [repo],
+    );
+    expect(reloaded.cities).toHaveLength(1);
+    expect(reloaded.cities[0]?.coord).toEqual({ q: 5, r: -1 });
+  });
+
+  it('saves the move of an auto-generated city without touching the manual list', async () => {
+    const target = city('auto', { q: 2, r: 2 }, '/workspace/auto');
+    const world = worldWith([target], [tile({ q: 2, r: 2 }), tile({ q: 6, r: 0 })]);
+
+    expect(await relocateCity(world, target.id, { q: 6, r: 0 }, null)).toBe(true);
+    // The construction panel lists manual layout entries: adding one here would
+    // invent a "manually placed" city the user never picked.
+    expect(loadManualLayout().entries).toHaveLength(0);
+
+    const reloaded = reloadWorld(
+      [city('auto', { q: 2, r: 2 }, '/workspace/auto')],
+      [tile({ q: 2, r: 2 }), tile({ q: 6, r: 0 })],
+    );
+    expect(reloaded.cities[0]?.coord).toEqual({ q: 6, r: 0 });
+  });
+
+  it('never overwrites repoPath with a stable id that is not a filesystem path', async () => {
+    upsertManualRepoEntry({
+      repoPath: 'legacy-id',
+      repoName: 'legacy',
+      coord: { q: 0, r: 0 },
+      addedAt: Date.now(),
+      source: 'manual',
+    });
+    const target = { ...city('legacy-id', { q: 0, r: 0 }, 'legacy-id'), repoPath: undefined };
+    const world = worldWith([target], [tile({ q: 0, r: 0 }), tile({ q: 1, r: 0 })]);
+
+    expect(await relocateCity(world, target.id, { q: 1, r: 0 }, null)).toBe(true);
+    expect(target.repoPath).toBeUndefined();
+    expect(loadManualLayout().entries[0]?.coord).toEqual({ q: 1, r: 0 });
   });
 });
