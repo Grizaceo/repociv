@@ -27,7 +27,13 @@ import { loadManualLayout, updateManualRepoCoord } from './manualLayout.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
 import { listIframeWonders } from './wonders/manifest.ts';
 import type { WonderManifest } from './wonders/types.ts';
-import { findPlacedCityEntry, getMapEdits, isFilesystemPath, placeCity } from './mapEdits.ts';
+import {
+  findPlacedCityEntry,
+  getMapEdits,
+  isFilesystemPath,
+  placeCity,
+  type PlacedCityEntry,
+} from './mapEdits.ts';
 import { applyNationsToWorld, cityKey } from './nations.ts';
 
 // ─── Wonder placement ───────────────────────────────────────────────────────
@@ -1029,6 +1035,26 @@ function occupiedCityCoords(world: World): Set<string> {
 }
 
 /**
+ * The disk repo a placement entry points to: exact keys first (`repoPath` /
+ * `path`), and the repo name only when exactly one repo carries it. Two repos
+ * called `api` in different folders must not be guessed.
+ */
+function findDiskRepoForEntry(
+  diskRepos: ScannedRepo[],
+  entry: PlacedCityEntry,
+): ScannedRepo | undefined {
+  const exact = diskRepos.find(
+    (r) =>
+      r.repoPath === entry.repoPath ||
+      r.path === entry.repoPath ||
+      r.repoPath === entry.repoName,
+  );
+  if (exact) return exact;
+  const byName = diskRepos.filter((r) => r.name === entry.repoName);
+  return byName.length === 1 ? byName[0] : undefined;
+}
+
+/**
  * Applies the manual map edits (painted terrain, erased hexes, cities taken
  * off the map and cities placed by hand) onto a freshly generated world.
  *
@@ -1075,18 +1101,18 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
 
   const occupied = occupiedCityCoords(world);
   for (const entry of placedEntries) {
+    const repo = findDiskRepoForEntry(diskRepos, entry);
+    if (!repo) continue;
+    const repoKey = repo.repoPath ?? repo.path;
+    // The entry may describe a city that is already on the map (the editor
+    // moved it) or one the user removed — also after the repo folder moved.
     const alreadyThere = world.cities.some(
-      (c) => cityKey(c) === entry.repoPath || c.id === entry.repoPath,
+      (c) => cityKey(c) === repoKey || c.id === repo.path || c.repoPath === repo.path,
     );
     if (alreadyThere) continue;
-    const repo = diskRepos.find(
-      (r) =>
-        r.repoPath === entry.repoPath ||
-        r.path === entry.repoPath ||
-        r.name === entry.repoName ||
-        r.repoPath === entry.repoName,
-    );
-    if (!repo) continue;
+    if (edits.removedCities.includes(repoKey) || edits.removedCities.includes(repo.path)) {
+      continue;
+    }
     const key = tileKey(entry.coord);
     const target = world.tiles.get(key);
     if (!target || target.city || occupied.has(key)) continue; // hex already taken

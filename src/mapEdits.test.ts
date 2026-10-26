@@ -65,6 +65,20 @@ function city(id: string, coord: { q: number; r: number }, repoPath: string): Ci
   };
 }
 
+function diskRepo(name: string, path: string, repoPath: string): ScannedRepo {
+  return {
+    name,
+    path,
+    repoPath,
+    population: 12,
+    extensions: {},
+    gold: 1,
+    lastCommitDays: 1,
+    isLegacy: false,
+    hasGit: true,
+  };
+}
+
 function worldWith(cities: City[], tiles: Tile[]): World {
   const map = new Map<string, Tile>();
   for (const t of tiles) map.set(tileKey(t.coord), t);
@@ -317,6 +331,54 @@ describe('applyMapEdits', () => {
     expect(world.cities.find((c) => c.id === '/workspace/a')?.coord).toEqual({ q: 2, r: 0 });
     expect(world.cities.map((c) => c.id)).toContain('/workspace/extra');
     expect(world.cities.find((c) => c.id === '/workspace/extra')?.coord).toEqual({ q: 1, r: 0 });
+  });
+
+  it('does not duplicate another repo with the same name', () => {
+    placeCity({ repoPath: '/a/api', repoName: 'api', coord: { q: 3, r: 0 } });
+    // /b/api is already on the map; the entry belongs to /a/api.
+    const b = city('api', { q: 1, r: 0 }, '/b/api');
+    const world = worldWith([b], [tile({ q: 1, r: 0 }), tile({ q: 3, r: 0 })]);
+
+    applyMapEdits(world, [
+      diskRepo('api', 'b-id', '/b/api'),
+      diskRepo('api', 'a-id', '/a/api'),
+    ]);
+
+    expect(world.cities.filter((c) => c.repoPath === '/b/api')).toHaveLength(1);
+    expect(world.cities.find((c) => c.repoPath === '/a/api')?.coord).toEqual({ q: 3, r: 0 });
+  });
+
+  it('does not resurrect a city erased after its folder moved', () => {
+    placeCity({ repoPath: '/old/api', repoName: 'api', coord: { q: 3, r: 0 } });
+    removeCityFromMap('/new/api');
+    const world = worldWith([], [tile({ q: 3, r: 0 })]);
+
+    applyMapEdits(world, [diskRepo('api', 'api-id', '/new/api')]);
+
+    expect(world.cities).toHaveLength(0);
+  });
+
+  it('still places a moved-folder city when its name is unique', () => {
+    placeCity({ repoPath: '/old/api', repoName: 'api', coord: { q: 3, r: 0 } });
+    const world = worldWith([], [tile({ q: 3, r: 0 })]);
+
+    applyMapEdits(world, [diskRepo('api', 'api-id', '/new/api')]);
+
+    expect(world.cities).toHaveLength(1);
+    expect(world.cities[0]?.coord).toEqual({ q: 3, r: 0 });
+    expect(world.cities[0]?.repoPath).toBe('/new/api');
+  });
+
+  it('does not guess when two repos share the name and no key matches', () => {
+    placeCity({ repoPath: '/old/api', repoName: 'api', coord: { q: 3, r: 0 } });
+    const world = worldWith([], [tile({ q: 3, r: 0 })]);
+
+    applyMapEdits(world, [
+      diskRepo('api', 'a-id', '/a/api'),
+      diskRepo('api', 'b-id', '/b/api'),
+    ]);
+
+    expect(world.cities).toHaveLength(0);
   });
 });
 
