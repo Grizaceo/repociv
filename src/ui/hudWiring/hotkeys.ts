@@ -39,7 +39,7 @@ import {
   openExternalAgentChat,
 } from '../agentsPanel.ts';
 import { closeConstructionPanel, isConstructionPanelOpen } from '../constructionPanel.ts';
-import { toggleMapEditor, isMapEditorOpen } from '../mapEditor.ts';
+import { toggleMapEditor, isMapEditorOpen, closeMapEditor } from '../mapEditor.ts';
 import { selectHero } from './spawn.ts';
 import { takeScreenshot } from './screenshot.ts';
 import { getSelectedProfile } from '../agentProfileStrip.ts';
@@ -136,6 +136,12 @@ export function wireHotkeys(
       }
       if (isConstructionPanelOpen()) {
         closeConstructionPanel();
+        return;
+      }
+      // The map editor is one more panel in the chain: Escape closes it only
+      // when nothing else is on top, and never from inside a text field.
+      if (isMapEditorOpen() && !inField) {
+        closeMapEditor();
         return;
       }
       closeSettingsPanel();

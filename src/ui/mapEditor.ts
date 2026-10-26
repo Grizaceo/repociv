@@ -232,15 +232,10 @@ export function toggleMapEditor(renderer?: Renderer, game?: GameState): void {
   else openMapEditor(renderer, game);
 }
 
-/** Wire the keyboard shortcut and keep the editor in sync with the renderer. */
+/** Keep the editor in sync with the renderer. Escape is handled by the global
+ *  hotkeys chain (`wireHotkeys`), which closes one panel at a time and yields
+ *  to the slash picker, the command palette and modal dialogs. */
 export function initMapEditor(renderer: Renderer, game: GameState): void {
   _state.renderer = renderer;
   _state.game = game;
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && isMapEditorOpen()) {
-      e.preventDefault();
-      closeMapEditor();
-    }
-  });
 }

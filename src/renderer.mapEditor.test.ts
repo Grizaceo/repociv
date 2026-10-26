@@ -763,4 +763,20 @@ describe('Renderer map editor — toolbar', () => {
     expect(panel.classList.contains('hidden')).toBe(true);
     expect(isMapEditorOpen()).toBe(false);
   });
+
+  it('leaves Escape to the global hotkeys instead of wiring its own', async () => {
+    const { canvas } = makeFakeCanvas();
+    const state = makeState([], []);
+    const renderer = new Renderer(canvas, state as never);
+    const doc = document as unknown as {
+      addEventListener: { mock: { calls: Array<[string, unknown]> } };
+    };
+    const keydowns = () => doc.addEventListener.mock.calls.filter(([type]) => type === 'keydown');
+    const before = keydowns().length;
+
+    const { initMapEditor } = await import('./ui/mapEditor.ts');
+    initMapEditor(renderer, state as never);
+
+    expect(keydowns().length).toBe(before);
+  });
 });
