@@ -1089,14 +1089,20 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
   //    and place the new ones. Moving frees the hex the city came from, and the
   //    order of the entries must not decide whether a placement fits.
   const placedEntries = edits.placedCities.filter((e) => !edits.removedCities.includes(e.repoPath));
-  for (const entry of placedEntries) {
-    const existing = world.cities.find(
+  // (a) Move the cities already in the world. Repeat until a full round moves
+  // nothing: a city may be waiting for the hex another one is about to leave,
+  // so the entry order must not decide the outcome. A pure swap (A↔B) stays
+  // unsolved.
+  let pendingMoves = placedEntries.flatMap((entry) => {
+    const city = world.cities.find(
       (c) => cityKey(c) === entry.repoPath || c.id === entry.repoPath,
     );
-    if (!existing) continue;
-    // A city moved with the editor is already in the world: the entry only
-    // overrides its coordinate.
-    if (!axialEquals(existing.coord, entry.coord)) moveCityInWorld(world, existing, entry.coord);
+    return city && !axialEquals(city.coord, entry.coord) ? [{ entry, city }] : [];
+  });
+  while (pendingMoves.length > 0) {
+    const moved = pendingMoves.filter((p) => moveCityInWorld(world, p.city, p.entry.coord));
+    if (moved.length === 0) break;
+    pendingMoves = pendingMoves.filter((p) => !moved.includes(p));
   }
 
   const occupied = occupiedCityCoords(world);

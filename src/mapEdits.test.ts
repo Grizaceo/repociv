@@ -380,6 +380,21 @@ describe('applyMapEdits', () => {
 
     expect(world.cities).toHaveLength(0);
   });
+
+  it('moves in a chain regardless of the entry order', () => {
+    // a goes to the hex b is standing on; b's own entry (the hex it leaves for)
+    // comes after a's in the list.
+    placeCity({ repoPath: '/w/a', repoName: 'a', coord: { q: 2, r: 0 } });
+    placeCity({ repoPath: '/w/b', repoName: 'b', coord: { q: 3, r: 0 } });
+    const a = city('a', { q: 1, r: 0 }, '/w/a');
+    const b = city('b', { q: 2, r: 0 }, '/w/b');
+    const world = worldWith([a, b], [tile({ q: 1, r: 0 }), tile({ q: 3, r: 0 })]);
+
+    applyMapEdits(world);
+
+    expect(b.coord).toEqual({ q: 3, r: 0 });
+    expect(a.coord).toEqual({ q: 2, r: 0 });
+  });
 });
 
 /** What a reload does: generate from the workspace + manual layout, then apply the edits. */
