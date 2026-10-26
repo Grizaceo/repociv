@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Box3, BoxGeometry, Group, Mesh, MeshStandardMaterial } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -33,7 +33,8 @@ import {
 } from './UnitProps3D.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { catmullRom, idleBreathScale, strideLift, yawToward } from './unitWalkPose.ts';
-import type { Unit, Tile, Terrain } from '../types.ts';
+import type { City, Unit, Tile, Terrain } from '../types.ts';
+import { createNation, resetNationStoreCache } from '../nations.ts';
 
 function makeUnit(id: string, q: number, r: number, state: 'idle' | 'moving' = 'idle'): Unit {
   return {
@@ -65,6 +66,19 @@ function makeTile(q: number, r: number, terrain: Terrain = 'plains'): Tile {
     city: undefined,
     inFog: false,
     revealed: true,
+  };
+}
+
+function makeCity(id: string, q: number, r: number): City {
+  return {
+    id,
+    name: id,
+    coord: { q, r },
+    population: 1,
+    territory: [],
+    districts: [],
+    buildings: [],
+    isCapital: false,
   };
 }
 
@@ -317,6 +331,65 @@ describe('UnitMesh3D idle phase', () => {
     rebuildUnits([makeUnit('MAIN', 0, 0), makeUnit('scout-1', 1, 0)], getTile);
 
     expect(_testGetEntry('MAIN')!.idlePhase).not.toBe(_testGetEntry('scout-1')!.idlePhase);
+  });
+});
+
+describe('UnitMesh3D nation colour', () => {
+  beforeEach(() => {
+    const storage: Record<string, string> = {};
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: (key: string) => storage[key] ?? null,
+        setItem: (key: string, value: string) => {
+          storage[key] = value;
+        },
+        removeItem: (key: string) => {
+          delete storage[key];
+        },
+      },
+    });
+    resetNationStoreCache();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetNationStoreCache();
+  });
+
+  function twoNations() {
+    const red = createNation('Roja', '#ff0000');
+    const blue = createNation('Azul', '#0000ff');
+    const cityA = { ...makeCity('city-a', 0, 0), nationId: red.id };
+    const cityB = { ...makeCity('city-b', 1, 0), nationId: blue.id };
+    const tileA = { ...makeTile(0, 0), city: cityA };
+    const tileB = { ...makeTile(1, 0), city: cityB };
+    const getTileWithCities = (key: string) =>
+      key === '0,0' ? tileA : key === '1,0' ? tileB : undefined;
+    return { red, cityA, cityB, getTileWithCities };
+  }
+
+  it('takes the colour of its own city, not of the hex it stands on', () => {
+    const { red, cityA, cityB, getTileWithCities } = twoNations();
+    // The unit works in A but is standing on B's hex.
+    const unit = { ...makeUnit('u1', 1, 0), cityId: cityA.id };
+
+    rebuildUnits([unit], getTileWithCities, [cityA, cityB]);
+
+    expect(_testGetEntry('u1')!.nationColor).toBe(red.color);
+  });
+
+  it('keeps the ring and the figure when the unit walks off the city hex', () => {
+    const { red, cityA, cityB, getTileWithCities } = twoNations();
+    const unit = { ...makeUnit('u1', 1, 0), cityId: cityA.id };
+    rebuildUnits([unit], getTileWithCities, [cityA, cityB]);
+    const before = _testGetEntry('u1')!;
+    const group = before.group;
+
+    rebuildUnits([{ ...unit, coord: { q: 2, r: 0 } }], getTileWithCities, [cityA, cityB]);
+
+    const after = _testGetEntry('u1')!;
+    expect(after.group).toBe(group);
+    expect(after.nationColor).toBe(red.color);
   });
 });
 

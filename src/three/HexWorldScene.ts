@@ -1331,7 +1331,7 @@ export function updateHexWorldScene(
   rebuildTileYields(Array.from(state.world.tiles.values()), opts.lod, opts.showStructure);
 
   setUnitsVisible(true);
-  rebuildUnits(state.world.units, (key) => state.world.tiles.get(key));
+  rebuildUnits(state.world.units, (key) => state.world.tiles.get(key), state.world.cities);
   setUnitPathsVisible(opts.showOps);
   rebuildUnitPaths(
     state.world.units,

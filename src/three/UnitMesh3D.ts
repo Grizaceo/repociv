@@ -18,7 +18,7 @@ import {
   SphereGeometry,
   TorusGeometry,
 } from 'three';
-import { type Unit, type Tile, tileKey } from '../types.ts';
+import { type City, type Unit, type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D, world3DToAxialFraction } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
@@ -32,7 +32,7 @@ import {
   type UnitPropPart,
 } from './UnitProps3D.ts';
 import { terrainSurfaceY } from './terrainSurfaceY.ts';
-import { nationColorHexFor } from '../nations.ts';
+import { nationForUnit } from '../nations.ts';
 import {
   catmullRom,
   catmullRomTangent,
@@ -342,18 +342,21 @@ function disposeFigurine(group: Group): void {
   });
 }
 
-export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | undefined): void {
+export function rebuildUnits(
+  units: Unit[],
+  getTile: (key: string) => Tile | undefined,
+  cities: City[] = [],
+): void {
   const visibleUnits = units.filter((unit) => {
     const tile = getTile(tileKey(unit.coord));
     return !tile || tile.revealed;
   });
 
-  // Flag colour of the nation that owns the unit's city. Part of the
-  // signature so a nation change rebuilds the rings.
-  const nationColorOf = (unit: Unit): string | null => {
-    const city = getTile(tileKey(unit.coord))?.city;
-    return city ? nationColorHexFor(city) : null;
-  };
+  // Flag colour of the nation that owns the unit's city — the same rule the 2D
+  // renderer uses (`nationForUnit` by unit.cityId). Taking the city of the hex
+  // the unit stands on made the 3D ring disagree with 2D and change colour
+  // while walking.
+  const nationColorOf = (unit: Unit): string | null => nationForUnit(unit, cities)?.color ?? null;
 
   // The props flag participates so the capsule→GLB swap happens the frame
   // the async load finishes, even when no unit moved.
