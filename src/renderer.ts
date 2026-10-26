@@ -44,6 +44,7 @@ import {
   removeHex,
   removePlacedCity,
   setHexTerrain,
+  terrainOverrideFor,
 } from './mapEdits.ts';
 import { applyNationsToWorld, assignCityToNation, cityKey } from './nations.ts';
 import { invalidatePathCache } from './pathfinding.ts';
@@ -2115,6 +2116,16 @@ export class Renderer {
     const tile = this.state.world.tiles.get(tileKey(coord));
     if (!tile) return;
     if (tile.city?.isCapital) return; // the capital keeps its sacred ground
+    // Dragging inside one hex must not write the store and redraw on every
+    // mousemove. Both conditions matter: the saved override is what survives a
+    // reload (the fill terrain is randomized per load), so an unpainted hex
+    // that happens to be this terrain still has to be persisted.
+    if (
+      tile.terrain === this._mapEditorTerrain &&
+      terrainOverrideFor(coord) === this._mapEditorTerrain
+    ) {
+      return;
+    }
     setHexTerrain(coord, this._mapEditorTerrain);
     tile.terrain = this._mapEditorTerrain;
     // Cached routes do not depend on terrain: repaint them from scratch.

@@ -139,7 +139,12 @@ function persist(): MapEditStore {
   return store;
 }
 
-/** Paint a terrain on a hex. Painting the current terrain clears the override. */
+/**
+ * Paint a terrain on a hex. Always stores the edit, even when the hex already
+ * has that terrain: the fill terrain is randomized on every load, so a hex that
+ * looks painted by chance still needs the override or the painted area gets
+ * holes on the next reload.
+ */
 export function setHexTerrain(coord: Axial, terrain: Terrain): void {
   const store = getMapEdits();
   const key = tileKey(coord);

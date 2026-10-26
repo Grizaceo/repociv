@@ -508,6 +508,46 @@ describe('Renderer map editor — terrain brush', () => {
     expect(state.world.tiles.get('2,2')?.terrain).toBe('plains');
   });
 
+  it('does not save or redraw while dragging inside one hex', () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeState([tile({ q: 1, r: 2 })], []);
+    const renderer = new Renderer(canvas, state as never);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 2 });
+    const setItem = vi.spyOn(window.localStorage, 'setItem');
+    const mapWrites = () =>
+      setItem.mock.calls.filter(([key]) => key === 'repociv:map-edits:v1');
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('terrain');
+    renderer.setMapEditorTerrain('mountain');
+
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mousemove', new FakeMouseEvent('mousemove', { clientX: 12, clientY: 10 }) as never);
+    fire('mousemove', new FakeMouseEvent('mousemove', { clientX: 14, clientY: 10 }) as never);
+
+    expect(state.notifyUpdate).toHaveBeenCalledTimes(1);
+    expect(mapWrites()).toHaveLength(1);
+    setItem.mockRestore();
+  });
+
+  it('saves the edit even when the hex already has that terrain', async () => {
+    const { terrainOverrideFor } = await import('./mapEdits.ts');
+    const { canvas, fire } = makeFakeCanvas();
+    // The fill terrain is randomized per load: a hex can already be forest by
+    // chance and still needs the edit, or the painted area gets holes.
+    const state = makeState([tile({ q: 1, r: 2 }, 'forest')], []);
+    const renderer = new Renderer(canvas, state as never);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 2 });
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('terrain');
+    renderer.setMapEditorTerrain('forest');
+
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+
+    expect(terrainOverrideFor({ q: 1, r: 2 })).toBe('forest');
+  });
+
   it('invalidates the cached unit paths when it paints', async () => {
     const { aStarPath } = await import('./pathfinding.ts');
     const { canvas, fire } = makeFakeCanvas();
