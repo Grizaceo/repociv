@@ -691,7 +691,11 @@ const FIXTURE_REPOS: ScannedRepo[] = [
 
 const RECORD = { record: true };
 
-function fixtureTile(coord: { q: number; r: number }, terrain: Terrain, extra?: Partial<Tile>): Tile {
+function fixtureTile(
+  coord: { q: number; r: number },
+  terrain: Terrain,
+  extra?: Partial<Tile>,
+): Tile {
   return {
     coord,
     terrain,
@@ -708,7 +712,9 @@ function fixtureWorld(): World {
     { id: 'a-d1', name: 'd1', type: 'campus', coord: { q: -2, r: 1 } },
     { id: 'a-d2', name: 'd2', type: 'commercial', coord: { q: -2, r: 0 } },
   ];
-  const districtsB: District[] = [{ id: 'b-d1', name: 'd1', type: 'campus', coord: { q: 5, r: 0 } }];
+  const districtsB: District[] = [
+    { id: 'b-d1', name: 'd1', type: 'campus', coord: { q: 5, r: 0 } },
+  ];
   const capital: City = {
     id: 'capital',
     name: 'Capital',
@@ -754,8 +760,10 @@ function fixtureWorld(): World {
   tiles.set('0,0', fixtureTile({ q: 0, r: 0 }, 'sacred', { city: capital }));
   tiles.set('-3,1', fixtureTile({ q: -3, r: 1 }, 'plains', { city: a }));
   tiles.set('4,0', fixtureTile({ q: 4, r: 0 }, 'plains', { city: b }));
-  for (const d of districtsA) tiles.set(tileKey(d.coord), fixtureTile(d.coord, 'plains', { district: d }));
-  for (const d of districtsB) tiles.set(tileKey(d.coord), fixtureTile(d.coord, 'plains', { district: d }));
+  for (const d of districtsA)
+    tiles.set(tileKey(d.coord), fixtureTile(d.coord, 'plains', { district: d }));
+  for (const d of districtsB)
+    tiles.set(tileKey(d.coord), fixtureTile(d.coord, 'plains', { district: d }));
 
   return {
     tiles,

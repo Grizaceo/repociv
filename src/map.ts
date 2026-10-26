@@ -1000,10 +1000,7 @@ export function moveCityInWorld(world: World, city: City, targetCoord: Axial): b
 }
 
 /** Origin → destination of every hex in the city's footprint for a move. */
-function cityFootprintMoves(
-  city: City,
-  targetCoord: Axial,
-): Array<{ from: Axial; to: Axial }> {
+function cityFootprintMoves(city: City, targetCoord: Axial): Array<{ from: Axial; to: Axial }> {
   const delta = axialSub(targetCoord, city.coord);
   return [
     { from: city.coord, to: targetCoord },
