@@ -1319,8 +1319,8 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
   }
 
   // 2) Cities the user placed (or repositioned) by hand. Two passes: first
-  //    move the cities already in the world, then recompute what is occupied
-  //    and place the new ones. Moving frees the hex the city came from, and the
+  //    move the cities already in the world, then (after the painted terrain)
+  //    place the new ones. Moving frees the hex the city came from, and the
   //    order of the entries must not decide whether a placement fits.
   const placedEntries = edits.placedCities.filter((e) => !edits.removedCities.includes(e.repoPath));
   // (a) Move the cities already in the world. Repeat until a full round moves
@@ -1342,6 +1342,15 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
     );
   }
 
+  // 3) Painted terrain, before founding a city: a hex painted to land is city
+  //    ground, and the ocean rule is then the same live and on reload.
+  for (const [key, terrain] of Object.entries(edits.terrain)) {
+    const tile = world.tiles.get(key);
+    if (!tile) continue;
+    paintHexOp(world, tile.coord, terrain, NO_RECORD);
+  }
+
+  // 4) Cities the user placed by hand (on the map as it looks after step 3).
   for (const entry of placedEntries) {
     const repo = findDiskRepoForEntry(diskRepos, entry);
     if (!repo) continue;
@@ -1362,20 +1371,14 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
     }
   }
 
-  // 3) Painted terrain.
-  for (const [key, terrain] of Object.entries(edits.terrain)) {
-    const tile = world.tiles.get(key);
-    if (!tile) continue;
-    paintHexOp(world, tile.coord, terrain, NO_RECORD);
-  }
-
-  // 4) Erased hexes. City and district hexes are protected by the shared rule —
+  // 5) Erased hexes. City and district hexes are protected by the shared rule —
   //    erase the city itself instead of punching a hole under it.
   for (const key of edits.removedHexes) {
     const tile = world.tiles.get(key);
     if (!tile) continue;
     eraseHexOp(world, tile.coord, NO_RECORD);
   }
+  // 6) Territories follow the tiles that are left, then the nation layer.
   for (const city of world.cities) {
     city.territory = city.territory.filter((c) => world.tiles.has(tileKey(c)));
   }

@@ -361,6 +361,30 @@ describe('applyMapEdits', () => {
     expect(world.cities.find((c) => c.id === '/workspace/extra')?.coord).toEqual({ q: 1, r: 0 });
   });
 
+  it('founds a hand-placed city on an ocean hex painted to land', () => {
+    placeCity({ repoPath: '/workspace/extra', repoName: 'extra', coord: { q: 3, r: 0 } });
+    setHexTerrain({ q: 3, r: 0 }, 'plains');
+    const world = worldWith([], [tile({ q: 3, r: 0 }, 'ocean')]);
+
+    applyMapEdits(world, [diskRepo('extra', '/workspace/extra', '/workspace/extra')]);
+
+    expect(world.cities).toHaveLength(1);
+    expect(world.tiles.get('3,0')?.terrain).toBe('plains');
+  });
+
+  it('refuses to found a hand-placed city on bare ocean and warns', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    placeCity({ repoPath: '/workspace/extra', repoName: 'extra', coord: { q: 3, r: 0 } });
+    const world = worldWith([], [tile({ q: 3, r: 0 }, 'ocean')]);
+
+    applyMapEdits(world, [diskRepo('extra', '/workspace/extra', '/workspace/extra')]);
+
+    expect(world.cities).toHaveLength(0);
+    const messages = warn.mock.calls.map((call) => String(call[0]));
+    expect(messages.some((m) => m.includes('extra'))).toBe(true);
+    warn.mockRestore();
+  });
+
   it('does not duplicate another repo with the same name', () => {
     placeCity({ repoPath: '/a/api', repoName: 'api', coord: { q: 3, r: 0 } });
     // /b/api is already on the map; the entry belongs to /a/api.
