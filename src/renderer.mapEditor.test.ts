@@ -1050,6 +1050,37 @@ describe('Renderer map editor — history round trips', () => {
     expect(await snapshot(state)).toEqual(after);
   });
 
+  it('stacks the move in the same turn the city is dropped', () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const c = makeCity('c', { q: 0, r: 0 }, '/w/c');
+    const state = makeState(
+      [tile({ q: 0, r: 0 }, 'plains', c), tile({ q: 1, r: 0 }), tile({ q: 3, r: 0 })],
+      [c],
+    );
+    const renderer = new Renderer(canvas, state as never);
+    let hex: Axial = { q: 1, r: 0 };
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => hex;
+
+    // A brush stroke first, so an undo that runs before the move is stacked
+    // would undo the paint instead.
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('terrain');
+    renderer.setMapEditorTerrain('mountain');
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+
+    renderer.setMapEditorTool('move');
+    hex = { q: 0, r: 0 };
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    hex = { q: 3, r: 0 };
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 40, clientY: 10 }) as never);
+
+    // No promise flush: the move has to be on the stack already.
+    expect(renderer.undoLastMapEdit()).toBe('Mover c');
+    expect(c.coord).toEqual({ q: 0, r: 0 });
+    expect(state.world.tiles.get('0,0')?.city).toBe(c);
+  });
+
   it('remove city: undo, redo and undo again match before and after', async () => {
     const { canvas, fire } = makeFakeCanvas();
     const c = makeCity('gone', { q: 0, r: 0 }, '/w/gone');

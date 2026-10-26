@@ -36,7 +36,6 @@ import {
   moveCitySync,
   paintHexOp,
   reconnectCities,
-  relocateCity,
   canRelocateCityTo,
   removeCityOp,
   undoEraseHex,
@@ -806,32 +805,36 @@ export class Renderer {
             const dc = this.draggedCity;
             const path = this.dragCityRepoPath;
             if (dragMoved) {
-              void relocateCity(this.state.world, dc.id, dropCoord, path).then((moved) => {
-                if (moved) {
-                  let current = moved;
-                  pushMapEdit({
-                    label: `Mover ${moved.city.name}`,
-                    undo: () => {
-                      undoMoveCity(this.state.world, current);
-                      void reconnectCities(this.state.world);
-                    },
-                    redo: () => {
-                      // Synchronous so an immediate undo already has the new
-                      // result (the copies the previous undo put back must not
-                      // be reused).
-                      current =
-                        moveCitySync(this.state.world, current.city.id, current.to, path) ??
-                        current;
-                      void reconnectCities(this.state.world);
-                    },
-                  });
-                  this.state.notifyUpdate();
-                  refreshCityList();
-                  // Inside the map editor the mode stays open: the next city
-                  // can be dragged right away.
-                  if (!this._mapEditorMode) this.setCityRelocateMode(false);
-                }
-              });
+              // Stack the move in this turn: a Ctrl+Z right after the drop must
+              // undo the move, not the edit before it. Reconnecting is async
+              // and happens after.
+              const moved = moveCitySync(this.state.world, dc.id, dropCoord, path);
+              if (moved) {
+                let current = moved;
+                pushMapEdit({
+                  label: `Mover ${moved.city.name}`,
+                  undo: () => {
+                    undoMoveCity(this.state.world, current);
+                    void reconnectCities(this.state.world);
+                  },
+                  redo: () => {
+                    // Synchronous so an immediate undo already has the new
+                    // result (the copies the previous undo put back must not
+                    // be reused).
+                    current =
+                      moveCitySync(this.state.world, current.city.id, current.to, path) ??
+                      current;
+                    void reconnectCities(this.state.world);
+                  },
+                });
+                invalidatePathCache();
+                this.state.notifyUpdate();
+                refreshCityList();
+                void reconnectCities(this.state.world).then(() => this.state.notifyUpdate());
+                // Inside the map editor the mode stays open: the next city can
+                // be dragged right away.
+                if (!this._mapEditorMode) this.setCityRelocateMode(false);
+              }
             } else {
               const t = this.state.world.tiles.get(tileKey(dropCoord));
               if (t?.city) {
