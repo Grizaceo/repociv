@@ -84,23 +84,6 @@ let tileFlashMod: typeof import('./three/TileFlash3D.ts') | null = null;
 type ThreeMapRendererType = import('./three/ThreeMapRenderer.ts').ThreeMapRenderer;
 type LocalScene3DType = import('./three/LocalScene3D.ts').LocalScene3D;
 
-/** Renderers that can take map-editor history (one per page; last wins). */
-const mapEditorRenderers: Renderer[] = [];
-
-function activeMapEditorRenderer(): Renderer | null {
-  return mapEditorRenderers[mapEditorRenderers.length - 1] ?? null;
-}
-
-/** Undo the last map-editor edit. Returns its label, or null when empty. */
-export function undoMapEditorEdit(): string | null {
-  return activeMapEditorRenderer()?.undoLastMapEdit() ?? null;
-}
-
-/** Redo the last undone map-editor edit. Returns its label, or null. */
-export function redoMapEditorEdit(): string | null {
-  return activeMapEditorRenderer()?.redoLastMapEdit() ?? null;
-}
-
 export class Renderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -277,7 +260,6 @@ export class Renderer {
     this.canvas.dataset['localActive'] = 'false';
     this.ctx = canvas.getContext('2d')!;
     this.state = state;
-    mapEditorRenderers.push(this);
     this.hexR = new HexRenderer(this.ctx);
     this.unitR = new UnitRenderer(this.ctx, state);
     this.minimapR = new MinimapRenderer(state);

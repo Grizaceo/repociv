@@ -1339,11 +1339,10 @@ describe('Renderer map editor — undo and redo', () => {
     const painted = () => ['1,2', '2,2', '3,2'].map((k) => state.world.tiles.get(k)?.terrain);
     expect(painted()).toEqual(['mountain', 'mountain', 'mountain']);
 
-    const { undoMapEditorEdit, redoMapEditorEdit } = await import('./renderer.ts');
-    expect(undoMapEditorEdit()).toBe('Pintar');
+    expect(renderer.undoLastMapEdit()).toBe('Pintar');
     expect(painted()).toEqual(['plains', 'plains', 'plains']);
 
-    expect(redoMapEditorEdit()).toBe('Pintar');
+    expect(renderer.redoLastMapEdit()).toBe('Pintar');
     expect(painted()).toEqual(['mountain', 'mountain', 'mountain']);
   });
 
@@ -1363,13 +1362,12 @@ describe('Renderer map editor — undo and redo', () => {
     expect(state.world.cities).toHaveLength(0);
     expect(state.getUnit('MAIN')).toBeUndefined();
 
-    const { undoMapEditorEdit, redoMapEditorEdit } = await import('./renderer.ts');
-    expect(undoMapEditorEdit()).toBe('Sacar repociv');
+    expect(renderer.undoLastMapEdit()).toBe('Sacar repociv');
     expect(state.world.cities).toHaveLength(1);
     expect(state.getUnit('MAIN')).toBe(unit);
     expect(state.world.tiles.get('0,0')?.city?.id).toBe('repociv');
 
-    expect(redoMapEditorEdit()).toBe('Sacar repociv');
+    expect(renderer.redoLastMapEdit()).toBe('Sacar repociv');
     expect(state.world.cities).toHaveLength(0);
     expect(state.getUnit('MAIN')).toBeUndefined();
   });
@@ -1388,16 +1386,15 @@ describe('Renderer map editor — undo and redo', () => {
     fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
     expect(state.world.cities).toHaveLength(1);
 
-    const { undoMapEditorEdit, redoMapEditorEdit } = await import('./renderer.ts');
-    expect(undoMapEditorEdit()).toBe('Fundar extra');
+    expect(renderer.undoLastMapEdit()).toBe('Fundar extra');
     expect(state.world.cities).toHaveLength(0);
 
-    expect(redoMapEditorEdit()).toBe('Fundar extra');
+    expect(renderer.redoLastMapEdit()).toBe('Fundar extra');
     expect(state.world.cities).toHaveLength(1);
     expect(state.world.cities[0]?.coord).toEqual({ q: 1, r: 0 });
 
     // Undo again: the repo is selected again, so another hex can be founded.
-    expect(undoMapEditorEdit()).toBe('Fundar extra');
+    expect(renderer.undoLastMapEdit()).toBe('Fundar extra');
     hex = { q: 2, r: 0 };
     fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
     fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);

@@ -61,8 +61,6 @@ const m = vi.hoisted(() => {
     isPickerOpen: vi.fn(() => false),
     isCommandPaletteOpen: vi.fn(() => false),
     sharedIdleFinder: { nextIdle: vi.fn(() => null) },
-    undoMapEditorEdit: vi.fn(() => null),
-    redoMapEditorEdit: vi.fn(() => null),
   };
 });
 
@@ -144,10 +142,6 @@ vi.mock('../analytics.ts', () => ({
 vi.mock('../chat/slashPicker.ts', () => ({ isPickerOpen: m.isPickerOpen }));
 vi.mock('../commandPalette.ts', () => ({ isCommandPaletteOpen: m.isCommandPaletteOpen }));
 vi.mock('../idleAgentFinder.ts', () => ({ sharedIdleFinder: m.sharedIdleFinder }));
-vi.mock('../../renderer.ts', () => ({
-  undoMapEditorEdit: m.undoMapEditorEdit,
-  redoMapEditorEdit: m.redoMapEditorEdit,
-}));
 
 import { wireHotkeys } from './hotkeys.ts';
 
@@ -187,6 +181,8 @@ const renderer = {
   focusOnCoord: vi.fn(),
   flashIdleHighlight: vi.fn(),
   toggleWorldRenderMode: vi.fn(),
+  undoLastMapEdit: vi.fn(),
+  redoLastMapEdit: vi.fn(),
 };
 
 const state = {
@@ -259,8 +255,8 @@ describe('wireHotkeys — undo and redo shortcuts', () => {
 
     const event = pressKey({ key: 'z', ctrlKey: true });
 
-    expect(m.undoMapEditorEdit).toHaveBeenCalledTimes(1);
-    expect(m.redoMapEditorEdit).not.toHaveBeenCalled();
+    expect(renderer.undoLastMapEdit).toHaveBeenCalledTimes(1);
+    expect(renderer.redoLastMapEdit).not.toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(true);
   });
 
@@ -272,8 +268,8 @@ describe('wireHotkeys — undo and redo shortcuts', () => {
     pressKey({ key: 'z', metaKey: true, shiftKey: true });
     pressKey({ key: 'y', ctrlKey: true });
 
-    expect(m.redoMapEditorEdit).toHaveBeenCalledTimes(2);
-    expect(m.undoMapEditorEdit).not.toHaveBeenCalled();
+    expect(renderer.redoLastMapEdit).toHaveBeenCalledTimes(2);
+    expect(renderer.undoLastMapEdit).not.toHaveBeenCalled();
   });
 
   it('does nothing when the editor is closed', () => {
@@ -283,7 +279,7 @@ describe('wireHotkeys — undo and redo shortcuts', () => {
 
     const event = pressKey({ key: 'z', ctrlKey: true });
 
-    expect(m.undoMapEditorEdit).not.toHaveBeenCalled();
+    expect(renderer.undoLastMapEdit).not.toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(false);
   });
 
@@ -296,7 +292,7 @@ describe('wireHotkeys — undo and redo shortcuts', () => {
 
     const event = pressKey({ key: 'z', ctrlKey: true, target: field });
 
-    expect(m.undoMapEditorEdit).not.toHaveBeenCalled();
+    expect(renderer.undoLastMapEdit).not.toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(false);
   });
 
@@ -307,7 +303,7 @@ describe('wireHotkeys — undo and redo shortcuts', () => {
 
     const event = pressKey({ key: 'z', ctrlKey: true, target: new FakeTextAreaElement() });
 
-    expect(m.undoMapEditorEdit).toHaveBeenCalledTimes(1);
+    expect(renderer.undoLastMapEdit).toHaveBeenCalledTimes(1);
     expect(event.defaultPrevented).toBe(true);
   });
 
@@ -318,12 +314,12 @@ describe('wireHotkeys — undo and redo shortcuts', () => {
     m.isPickerOpen.mockReturnValue(true);
 
     pressKey({ key: 'z', ctrlKey: true });
-    expect(m.undoMapEditorEdit).not.toHaveBeenCalled();
+    expect(renderer.undoLastMapEdit).not.toHaveBeenCalled();
 
     m.isPickerOpen.mockReturnValue(false);
     m.isCommandPaletteOpen.mockReturnValue(true);
     pressKey({ key: 'z', ctrlKey: true });
-    expect(m.undoMapEditorEdit).not.toHaveBeenCalled();
+    expect(renderer.undoLastMapEdit).not.toHaveBeenCalled();
   });
 });
 

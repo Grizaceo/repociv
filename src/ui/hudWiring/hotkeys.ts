@@ -40,7 +40,6 @@ import {
 } from '../agentsPanel.ts';
 import { closeConstructionPanel, isConstructionPanelOpen } from '../constructionPanel.ts';
 import { toggleMapEditor, isMapEditorOpen, closeMapEditor } from '../mapEditor.ts';
-import { redoMapEditorEdit, undoMapEditorEdit } from '../../renderer.ts';
 import { selectHero } from './spawn.ts';
 import { takeScreenshot } from './screenshot.ts';
 import { getSelectedProfile } from '../agentProfileStrip.ts';
@@ -102,8 +101,8 @@ export function wireHotkeys(
       const text = field ? ((target as HTMLInputElement).value ?? '') : '';
       if (!field || text.length === 0) {
         e.preventDefault();
-        if (shortcut === 'y' || e.shiftKey) redoMapEditorEdit();
-        else undoMapEditorEdit();
+        if (shortcut === 'y' || e.shiftKey) renderer.redoLastMapEdit();
+        else renderer.undoLastMapEdit();
         return;
       }
     }
