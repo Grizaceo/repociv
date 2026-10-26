@@ -248,9 +248,7 @@ export function findPlacedCityEntry(
   const entries = getMapEdits().placedCities;
   const exact = entries.find((p) => p.repoPath === city.repoPath || p.repoPath === city.id);
   if (exact) return exact;
-  const byName = entries.filter(
-    (p) => p.repoName === city.name && !isFilesystemPath(p.repoPath),
-  );
+  const byName = entries.filter((p) => p.repoName === city.name && !isFilesystemPath(p.repoPath));
   return byName.length === 1 ? byName[0]! : null;
 }
 

@@ -359,10 +359,7 @@ describe('relocateCity persistence', () => {
       source: 'manual',
     });
     const target = city('repociv', { q: 0, r: 0 }, '/workspace/repociv');
-    const world = worldWith(
-      [target],
-      [tile({ q: 0, r: 0 }), tile({ q: 4, r: 1 })],
-    );
+    const world = worldWith([target], [tile({ q: 0, r: 0 }), tile({ q: 4, r: 1 })]);
 
     expect(await relocateCity(world, target.id, { q: 4, r: 1 }, null)).toBe(true);
     expect(target.coord).toEqual({ q: 4, r: 1 });

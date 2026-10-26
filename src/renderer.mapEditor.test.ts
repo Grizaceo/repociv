@@ -241,7 +241,10 @@ class FakeElement {
 
   append(...nodes: Array<FakeElement | string>) {
     for (const node of nodes) {
-      const el = typeof node === 'string' ? Object.assign(new FakeElement('#text'), { textContent: node }) : node;
+      const el =
+        typeof node === 'string'
+          ? Object.assign(new FakeElement('#text'), { textContent: node })
+          : node;
       el.parent = this;
       this.children.push(el);
     }
@@ -265,7 +268,8 @@ class FakeElement {
   }
   removeEventListener() {}
   dispatch(type: string) {
-    for (const fn of this.listeners[type] ?? []) fn({ type, target: this, preventDefault: vi.fn() });
+    for (const fn of this.listeners[type] ?? [])
+      fn({ type, target: this, preventDefault: vi.fn() });
   }
   click() {
     this.dispatch('click');
@@ -306,7 +310,9 @@ function makeFakeDocument() {
     body,
     documentElement: { style: {} },
     createElement: vi.fn((tag: string) => new FakeElement(tag)),
-    createTextNode: vi.fn((text: string) => Object.assign(new FakeElement('#text'), { textContent: text })),
+    createTextNode: vi.fn((text: string) =>
+      Object.assign(new FakeElement('#text'), { textContent: text }),
+    ),
     getElementById: vi.fn(() => null),
     querySelector: vi.fn(() => null),
     querySelectorAll: vi.fn(() => []),
@@ -671,7 +677,10 @@ describe('Renderer map editor — place tool', () => {
     await new Promise((resolve) => setTimeout(resolve, 0)); // repo list arrives
 
     const panel = doc.body.querySelector('#map-editor')!;
-    panel.querySelectorAll('.map-editor-tool').find((b) => b.dataset['tool'] === 'place')!.click();
+    panel
+      .querySelectorAll('.map-editor-tool')
+      .find((b) => b.dataset['tool'] === 'place')!
+      .click();
 
     const picker = panel.querySelector('.map-editor-select')!;
     expect(picker.children.map((o) => o.value)).toContain('/workspace/extra');
@@ -693,7 +702,10 @@ describe('Renderer map editor — toolbar', () => {
     const { doc } = makeFakeDocument();
     vi.stubGlobal('document', doc);
     vi.stubGlobal('Option', FakeOption);
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => [] })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => [] })),
+    );
     const renderer = {
       setMapEditorMode: vi.fn(),
       setMapEditorTool: vi.fn(),
@@ -710,7 +722,10 @@ describe('Renderer map editor — toolbar', () => {
     // renderToolbar() replaces the panel children on every switch: the ✕ used
     // to be thrown away with them and never came back.
     for (const tool of ['terrain', 'erase']) {
-      panel.querySelectorAll('.map-editor-tool').find((b) => b.dataset['tool'] === tool)!.click();
+      panel
+        .querySelectorAll('.map-editor-tool')
+        .find((b) => b.dataset['tool'] === tool)!
+        .click();
       expect(panel.querySelector('.map-editor-close')).not.toBeNull();
     }
 

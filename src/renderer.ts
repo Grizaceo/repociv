@@ -2168,11 +2168,7 @@ export class Renderer {
     // click on another hex would push a second City with the same id.
     const key = repo.repoPath ?? repo.path;
     const alreadyOnMap = this.state.world.cities.some(
-      (c) =>
-        c.id === key ||
-        c.repoPath === key ||
-        c.id === repo.path ||
-        c.repoPath === repo.path,
+      (c) => c.id === key || c.repoPath === key || c.id === repo.path || c.repoPath === repo.path,
     );
     if (alreadyOnMap) return;
     addCityToWorld(this.state.world, repo, coord);

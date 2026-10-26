@@ -27,12 +27,7 @@ import { loadManualLayout, updateManualRepoCoord } from './manualLayout.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
 import { listIframeWonders } from './wonders/manifest.ts';
 import type { WonderManifest } from './wonders/types.ts';
-import {
-  findPlacedCityEntry,
-  getMapEdits,
-  isFilesystemPath,
-  placeCity,
-} from './mapEdits.ts';
+import { findPlacedCityEntry, getMapEdits, isFilesystemPath, placeCity } from './mapEdits.ts';
 import { applyNationsToWorld, cityKey } from './nations.ts';
 
 // ─── Wonder placement ───────────────────────────────────────────────────────
@@ -1067,9 +1062,7 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
   //    move the cities already in the world, then recompute what is occupied
   //    and place the new ones. Moving frees the hex the city came from, and the
   //    order of the entries must not decide whether a placement fits.
-  const placedEntries = edits.placedCities.filter(
-    (e) => !edits.removedCities.includes(e.repoPath),
-  );
+  const placedEntries = edits.placedCities.filter((e) => !edits.removedCities.includes(e.repoPath));
   for (const entry of placedEntries) {
     const existing = world.cities.find(
       (c) => cityKey(c) === entry.repoPath || c.id === entry.repoPath,

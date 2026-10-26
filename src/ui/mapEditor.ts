@@ -160,7 +160,9 @@ function renderToolbar(): void {
   hint.className = 'map-editor-hint';
   hint.textContent = TOOLS.find((t) => t.id === _state.tool)?.hint ?? '';
 
-  panel.replaceChildren(...(_state.close ? [_state.close, tools, context, hint] : [tools, context, hint]));
+  panel.replaceChildren(
+    ...(_state.close ? [_state.close, tools, context, hint] : [tools, context, hint]),
+  );
 }
 
 /**
