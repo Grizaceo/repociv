@@ -28,10 +28,13 @@ import { aStarPath, invalidatePathCache } from './pathfinding.ts';
 import { listIframeWonders } from './wonders/manifest.ts';
 import type { WonderManifest } from './wonders/types.ts';
 import {
+  clearHexTerrain,
   findPlacedCityEntry,
   getMapEdits,
   isFilesystemPath,
   placeCity,
+  setHexTerrain,
+  terrainOverrideFor,
   type PlacedCityEntry,
 } from './mapEdits.ts';
 import { applyNationsToWorld, cityKey } from './nations.ts';
@@ -990,6 +993,18 @@ export function moveCityInWorld(world: World, city: City, targetCoord: Axial): b
   return true;
 }
 
+/** Origin → destination of every hex in the city's footprint for a move. */
+function cityFootprintMoves(
+  city: City,
+  targetCoord: Axial,
+): Array<{ from: Axial; to: Axial }> {
+  const delta = axialSub(targetCoord, city.coord);
+  return [
+    { from: city.coord, to: targetCoord },
+    ...city.districts.map((d) => ({ from: d.coord, to: axialAdd(d.coord, delta) })),
+  ];
+}
+
 /**
  * Remember the new coordinate of a moved city, whatever it came from:
  * a manual layout entry (keyed by the stable repo id), a `placedCities` entry
@@ -997,8 +1012,24 @@ export function moveCityInWorld(world: World, city: City, targetCoord: Axial): b
  * Auto-generated cities get a `placedCities` entry too, which survives the
  * reload without adding a fake row to the construction panel (that panel lists
  * `manualLayout` entries only).
+ *
+ * The painted terrain travels with the footprint too: the live move carries each
+ * origin's terrain to its destination, so the saved overrides have to follow or
+ * a reload would paint the old terrain over the moved city.
  */
-function persistCityCoord(city: City, coord: Axial): void {
+function persistCityCoord(
+  city: City,
+  coord: Axial,
+  footprint: Array<{ from: Axial; to: Axial }>,
+): void {
+  // Read every origin before writing any: a short move makes one origin the
+  // destination of another hex of the same city.
+  const saved = footprint.map((m) => ({ to: m.to, terrain: terrainOverrideFor(m.from) }));
+  for (const m of saved) {
+    if (m.terrain) setHexTerrain(m.to, m.terrain);
+    else clearHexTerrain(m.to);
+  }
+
   const manual = loadManualLayout().entries.find(
     (e) =>
       e.repoPath === city.id ||
@@ -1033,13 +1064,16 @@ export async function relocateCity(
 ): Promise<boolean> {
   const city = world.cities.find((c) => c.id === cityId);
   if (!city) return false;
+  // Footprint before the move: it drives both the terrain that travels with the
+  // city and the saved overrides.
+  const footprint = cityFootprintMoves(city, targetCoord);
   if (!moveCityInWorld(world, city, targetCoord)) return false;
 
   // `city.repoPath` is the city key across reloads: only a real path may land
   // there. The stable id lives in `city.id`.
   const path = resolveRepoPathForCity(city, repoPathFallback);
   if (path && isFilesystemPath(path)) city.repoPath = path;
-  persistCityCoord(city, targetCoord);
+  persistCityCoord(city, targetCoord, footprint);
 
   invalidatePathCache();
   await reconnectCities(world);

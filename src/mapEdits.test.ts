@@ -540,6 +540,39 @@ describe('relocateCity persistence', () => {
     expect(reloaded.cities[0]?.coord).toEqual({ q: 6, r: 0 });
   });
 
+  it('moves the painted terrain with the city instead of leaving it behind', async () => {
+    const target = city('auto', { q: 2, r: 2 }, '/workspace/auto');
+    const world = worldWith([target], [tile({ q: 2, r: 2 }), tile({ q: 6, r: 0 })]);
+    // H is painted desert, but the city brings its own (plains) terrain there.
+    setHexTerrain({ q: 6, r: 0 }, 'desert');
+    world.tiles.get('6,0')!.terrain = 'desert';
+
+    expect(await relocateCity(world, target.id, { q: 6, r: 0 }, null)).toBe(true);
+    const live = world.tiles.get('6,0')?.terrain;
+
+    const reloaded = reloadWorld(
+      [city('auto', { q: 2, r: 2 }, '/workspace/auto')],
+      [tile({ q: 2, r: 2 }), tile({ q: 6, r: 0 })],
+    );
+    expect(reloaded.tiles.get('6,0')?.terrain).toBe(live);
+  });
+
+  it('carries the painted terrain of the city hex to the destination', async () => {
+    const target = city('auto', { q: 2, r: 2 }, '/workspace/auto');
+    const world = worldWith([target], [tile({ q: 2, r: 2 }), tile({ q: 6, r: 0 })]);
+    setHexTerrain({ q: 2, r: 2 }, 'forest');
+    world.tiles.get('2,2')!.terrain = 'forest';
+
+    expect(await relocateCity(world, target.id, { q: 6, r: 0 }, null)).toBe(true);
+    expect(world.tiles.get('6,0')?.terrain).toBe('forest');
+
+    const reloaded = reloadWorld(
+      [city('auto', { q: 2, r: 2 }, '/workspace/auto')],
+      [tile({ q: 2, r: 2 }), tile({ q: 6, r: 0 })],
+    );
+    expect(reloaded.tiles.get('6,0')?.terrain).toBe('forest');
+  });
+
   it('never overwrites repoPath with a stable id that is not a filesystem path', async () => {
     upsertManualRepoEntry({
       repoPath: 'legacy-id',
