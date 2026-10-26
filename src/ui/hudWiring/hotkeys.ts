@@ -40,6 +40,7 @@ import {
 } from '../agentsPanel.ts';
 import { closeConstructionPanel, isConstructionPanelOpen } from '../constructionPanel.ts';
 import { toggleMapEditor, isMapEditorOpen, closeMapEditor } from '../mapEditor.ts';
+import { redoMapEditorEdit, undoMapEditorEdit } from '../../renderer.ts';
 import { selectHero } from './spawn.ts';
 import { takeScreenshot } from './screenshot.ts';
 import { getSelectedProfile } from '../agentProfileStrip.ts';
@@ -90,6 +91,22 @@ export function wireHotkeys(
     // Native session wizard is modal too. Returning lets its form and the
     // browser's Esc-to-close behavior own this event without moving the map.
     if (document.querySelector('dialog[open]')) return;
+
+    // Ctrl/Cmd+Z undoes and Ctrl/Cmd+Shift+Z (or Ctrl+Y) redoes — only while the
+    // map editor is open. Inside a text field with text the browser's own undo
+    // wins; an empty field sends the shortcut to the map.
+    const modKey = e.ctrlKey || e.metaKey;
+    const shortcut = e.key.toLowerCase();
+    if (isMapEditorOpen() && modKey && (shortcut === 'z' || shortcut === 'y')) {
+      const field = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+      const text = field ? ((target as HTMLInputElement).value ?? '') : '';
+      if (!field || text.length === 0) {
+        e.preventDefault();
+        if (shortcut === 'y' || e.shiftKey) redoMapEditorEdit();
+        else undoMapEditorEdit();
+        return;
+      }
+    }
 
     // Hotkey panels
     if (e.key === 'Escape') {

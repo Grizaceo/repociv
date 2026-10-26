@@ -61,6 +61,8 @@ const m = vi.hoisted(() => {
     isPickerOpen: vi.fn(() => false),
     isCommandPaletteOpen: vi.fn(() => false),
     sharedIdleFinder: { nextIdle: vi.fn(() => null) },
+    undoMapEditorEdit: vi.fn(() => null),
+    redoMapEditorEdit: vi.fn(() => null),
   };
 });
 
@@ -142,13 +144,21 @@ vi.mock('../analytics.ts', () => ({
 vi.mock('../chat/slashPicker.ts', () => ({ isPickerOpen: m.isPickerOpen }));
 vi.mock('../commandPalette.ts', () => ({ isCommandPaletteOpen: m.isCommandPaletteOpen }));
 vi.mock('../idleAgentFinder.ts', () => ({ sharedIdleFinder: m.sharedIdleFinder }));
+vi.mock('../../renderer.ts', () => ({
+  undoMapEditorEdit: m.undoMapEditorEdit,
+  redoMapEditorEdit: m.redoMapEditorEdit,
+}));
 
 import { wireHotkeys } from './hotkeys.ts';
 
 let keydown: ((e: unknown) => void) | null = null;
 
-class FakeInputElement {}
-class FakeTextAreaElement {}
+class FakeInputElement {
+  value = '';
+}
+class FakeTextAreaElement {
+  value = '';
+}
 
 function installDom(options: { dialog?: boolean } = {}): void {
   keydown = null;
@@ -200,6 +210,29 @@ function pressEscape(target: unknown = {}): void {
   keydown!({ key: 'Escape', target, preventDefault: vi.fn() });
 }
 
+class FakeKeyEvent {
+  key: string;
+  ctrlKey = false;
+  metaKey = false;
+  shiftKey = false;
+  target: unknown;
+  defaultPrevented = false;
+  constructor(init: { key: string; target?: unknown } & Partial<FakeKeyEvent>) {
+    this.key = init.key;
+    this.target = init.target ?? {};
+    Object.assign(this, init);
+  }
+  preventDefault() {
+    this.defaultPrevented = true;
+  }
+}
+
+function pressKey(init: { key: string; target?: unknown } & Partial<FakeKeyEvent>): FakeKeyEvent {
+  const event = new FakeKeyEvent(init);
+  keydown!(event);
+  return event;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   m.isMapEditorOpen.mockReturnValue(false);
@@ -216,6 +249,82 @@ beforeEach(() => {
   m.isPickerOpen.mockReturnValue(false);
   m.isCommandPaletteOpen.mockReturnValue(false);
   state.selectedUnit = null;
+});
+
+describe('wireHotkeys — undo and redo shortcuts', () => {
+  it('Ctrl+Z undoes while the map editor is open', () => {
+    installDom();
+    wire();
+    m.isMapEditorOpen.mockReturnValue(true);
+
+    const event = pressKey({ key: 'z', ctrlKey: true });
+
+    expect(m.undoMapEditorEdit).toHaveBeenCalledTimes(1);
+    expect(m.redoMapEditorEdit).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('Cmd+Shift+Z and Ctrl+Y redo', () => {
+    installDom();
+    wire();
+    m.isMapEditorOpen.mockReturnValue(true);
+
+    pressKey({ key: 'z', metaKey: true, shiftKey: true });
+    pressKey({ key: 'y', ctrlKey: true });
+
+    expect(m.redoMapEditorEdit).toHaveBeenCalledTimes(2);
+    expect(m.undoMapEditorEdit).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when the editor is closed', () => {
+    installDom();
+    wire();
+    m.isMapEditorOpen.mockReturnValue(false);
+
+    const event = pressKey({ key: 'z', ctrlKey: true });
+
+    expect(m.undoMapEditorEdit).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('leaves the native undo alone when a field has text', () => {
+    installDom();
+    wire();
+    m.isMapEditorOpen.mockReturnValue(true);
+    const field = new FakeInputElement();
+    field.value = 'borrador';
+
+    const event = pressKey({ key: 'z', ctrlKey: true, target: field });
+
+    expect(m.undoMapEditorEdit).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('sends the shortcut to the map when the field is empty', () => {
+    installDom();
+    wire();
+    m.isMapEditorOpen.mockReturnValue(true);
+
+    const event = pressKey({ key: 'z', ctrlKey: true, target: new FakeTextAreaElement() });
+
+    expect(m.undoMapEditorEdit).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('does nothing under the slash picker or the command palette', () => {
+    installDom();
+    wire();
+    m.isMapEditorOpen.mockReturnValue(true);
+    m.isPickerOpen.mockReturnValue(true);
+
+    pressKey({ key: 'z', ctrlKey: true });
+    expect(m.undoMapEditorEdit).not.toHaveBeenCalled();
+
+    m.isPickerOpen.mockReturnValue(false);
+    m.isCommandPaletteOpen.mockReturnValue(true);
+    pressKey({ key: 'z', ctrlKey: true });
+    expect(m.undoMapEditorEdit).not.toHaveBeenCalled();
+  });
 });
 
 describe('wireHotkeys — Escape chain and the map editor', () => {
