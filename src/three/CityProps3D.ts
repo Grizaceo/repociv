@@ -24,6 +24,7 @@ import {
   terrainFootprintMaxY,
   terrainSurfaceY,
 } from './terrainSurfaceY.ts';
+import { terrainRevision } from './terrainRevision.ts';
 
 const propsGroup = new Group();
 propsGroup.name = 'city-props';
@@ -254,13 +255,15 @@ export function rebuildCityProps(
     return;
   }
 
-  const signature = cities
-    .map((c) => {
-      const tile = getTile(tileKey(c.coord));
-      const banner = cityBannerId(c, tile);
-      return `${c.id}:${c.isCapital ? 1 : 0}:L${cityLevel(c)}:${banner}`;
-    })
-    .join('|');
+  const signature =
+    `t${terrainRevision()}:` +
+    cities
+      .map((c) => {
+        const tile = getTile(tileKey(c.coord));
+        const banner = cityBannerId(c, tile);
+        return `${c.id}:${c.isCapital ? 1 : 0}:L${cityLevel(c)}:${banner}`;
+      })
+      .join('|');
   if (signature === lastSignature && activeMeshes.length > 0) return;
   if (signature === lastSignature && cities.length === 0) return;
   lastSignature = signature;

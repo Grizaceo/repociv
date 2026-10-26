@@ -29,6 +29,11 @@ import { type GameState } from '../game.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { sharedFlatHexGeometry, sharedHexGeometry } from './hexGeometry.ts';
+import {
+  noteTerrainMeshSignature,
+  resetTerrainRevision,
+  terrainRevision,
+} from './terrainRevision.ts';
 import { axialToWorld3D, hexCornerAngle3D, TILE_HEIGHT } from './axialToWorld3D.ts';
 import { terrainSurfaceY } from './terrainSurfaceY.ts';
 import { territoryColorFor } from '../nations.ts';
@@ -463,17 +468,21 @@ function rebuildTerritoryLines(
   // only unit positions changed (the common case). Granularity matches the
   // global world signature (per-city coord + territory size), plus colour,
   // capital, the visible toggle and LOD — everything border geometry reads.
-  const sig = visible
-    ? `${lod}:` +
-      state.world.cities
-        .map((c) => {
-          const color = territoryColorFor(c);
-          return `${tileKey(c.coord)};${c.territory.length};${c.isCapital ? 1 : 0};${color
-            .map((v) => v.toFixed(3))
-            .join(',')}`;
-        })
-        .join('|')
-    : 'hidden';
+  // The terrain revision covers the height the border sits at (painting does
+  // not change any city input).
+  const sig =
+    `t${terrainRevision()}:` +
+    (visible
+      ? `${lod}:` +
+        state.world.cities
+          .map((c) => {
+            const color = territoryColorFor(c);
+            return `${tileKey(c.coord)};${c.territory.length};${c.isCapital ? 1 : 0};${color
+              .map((v) => v.toFixed(3))
+              .join(',')}`;
+          })
+          .join('|')
+      : 'hidden');
   if (sig === territorySignature) return;
   territorySignature = sig;
 
@@ -884,7 +893,8 @@ function rebuildFogCover(state: GameState): void {
  *  Visible only when showStructure is true (layer toggle). Low LOD thins it further. */
 function rebuildHexGrid(state: GameState, visible: boolean, lod: 'low' | 'medium' | 'high'): void {
   const tiles = Array.from(state.world.tiles.values());
-  const sig = `${visible}:${lod}:${tiles.filter((t) => t.revealed).length}`;
+  // The grid sits on the terrain: a painted hex needs its lines re-seated.
+  const sig = `t${terrainRevision()}:${visible}:${lod}:${tiles.filter((t) => t.revealed).length}`;
   if (sig === hexGridSignature && hexGridLines) return;
   hexGridSignature = sig;
 
@@ -983,6 +993,9 @@ export function terrainMeshSignature(tiles: Iterable<Tile>): string {
 function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPicker): void {
   const tiles = Array.from(state.world.tiles.values());
   const signature = terrainMeshSignature(tiles);
+  // Bump the shared terrain revision so every layer that sits on the terrain
+  // rebuilds its heights. Same signature (the atlas-finished rebuild) keeps it.
+  noteTerrainMeshSignature(signature);
   // Colour-only changes (fog, territory, nation tint) keep the same signature
   // and take the cheap path; anything that alters the geometry rebuilds.
   if (signature === tileCountSignature && terrainMesh) {
@@ -1372,6 +1385,8 @@ export function disposeHexWorldScene(scene: Scene): void {
   clearFogTransition();
   areCityPropsSettledCalled = false;
   areCityWallsSettledCalled = false;
+  // A recreated scene must not inherit the previous one's terrain revision.
+  resetTerrainRevision();
   if (terrainMesh) {
     terrainGroup.remove(terrainMesh);
     terrainMesh.dispose();

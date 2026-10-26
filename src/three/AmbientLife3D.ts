@@ -25,6 +25,7 @@ import { type City, type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+import { terrainRevision } from './terrainRevision.ts';
 
 const lifeGroup = new Group();
 lifeGroup.name = 'ambient-life';
@@ -266,7 +267,10 @@ export function rebuildAmbientLife(
   getTile: (key: string) => Tile | undefined,
 ): void {
   const anchors = pickBirdAnchors(tiles, BIRD_COUNT);
+  // Flags and birds are placed at the terrain height: the revision re-seats
+  // them after a paint, which no city/anchor input reflects.
   const signature =
+    `t${terrainRevision()}:` +
     cities
       .map(
         (c) =>

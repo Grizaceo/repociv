@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { IcosahedronGeometry, type InstancedMesh } from 'three';
+import { IcosahedronGeometry, Matrix4, type InstancedMesh } from 'three';
 
 // Mutable readiness flags so a test can flip the KayKit props/walls from
 // "loading" to "ready" between two rebuilds, the way the async GLB load does.
@@ -14,6 +14,7 @@ vi.mock('./CityWalls3D.ts', () => ({
 }));
 
 import { clearCityClusters, getCityGroup, rebuildCityClusters } from './CityCluster3D.ts';
+import { noteTerrainMeshSignature, resetTerrainRevision } from './terrainRevision.ts';
 import type { City, Tile } from '../types.ts';
 
 function makeCity(id: string, q: number, r: number): City {
@@ -44,12 +45,46 @@ afterEach(() => {
   clearCityClusters();
   kit.propsReady = false;
   kit.wallsReady = false;
+  resetTerrainRevision();
 });
 
 /** Live instances across every mesh in the city group. */
 function instanceTotal(): number {
   return getCityGroup().children.reduce((n, c) => n + (c as InstancedMesh).count, 0);
 }
+
+/** Highest instance translation Y in the city group (the city sits on it). */
+function maxInstanceY(): number {
+  const matrix = new Matrix4();
+  let max = -Infinity;
+  for (const child of getCityGroup().children) {
+    const mesh = child as InstancedMesh;
+    if (!mesh.isInstancedMesh) continue;
+    for (let i = 0; i < mesh.count; i++) {
+      mesh.getMatrixAt(i, matrix);
+      max = Math.max(max, matrix.elements[13]!);
+    }
+  }
+  return max;
+}
+
+describe('CityCluster3D terrain revision', () => {
+  it('re-seats the city when the terrain under it is painted', () => {
+    const city = makeCity('alpha', 0, 0);
+    const tiles = new Map<string, Tile>([['0,0', makeTile(0, 0)]]);
+    const getTile = (key: string) => tiles.get(key);
+
+    rebuildCityClusters([city], getTile, 'high');
+    const before = maxInstanceY();
+
+    // The brush changes the tile in place: no city input changes, only height.
+    tiles.set('0,0', { ...makeTile(0, 0), terrain: 'mountain' });
+    noteTerrainMeshSignature('painted');
+    rebuildCityClusters([city], getTile, 'high');
+
+    expect(maxInstanceY()).toBeGreaterThan(before);
+  });
+});
 
 describe('CityCluster3D civic framing', () => {
   it('high-detail normal cities include the civic plaza and spire layers that keep walls visually ordered', () => {

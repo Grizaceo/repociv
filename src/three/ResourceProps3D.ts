@@ -26,6 +26,7 @@ import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { PROP_SURFACE_CLEARANCE, terrainSurfaceY } from './terrainSurfaceY.ts';
+import { terrainRevision } from './terrainRevision.ts';
 
 const propsGroup = new Group();
 propsGroup.name = 'resource-props';
@@ -140,7 +141,9 @@ export function rebuildResourceProps(tiles: Tile[]): void {
   const sacreds = tiles.filter(
     (t) => t.terrain === 'sacred' && t.revealed && !t.city && t.district?.type !== 'wonder',
   );
-  const signature = sacreds.map((t) => `${tileKey(t.coord)}:${t.district ? 1 : 0}`).join('|');
+  const signature =
+    `t${terrainRevision()}:` +
+    sacreds.map((t) => `${tileKey(t.coord)}:${t.district ? 1 : 0}`).join('|');
   if (signature === lastSignature && activeMeshes.length > 0) return;
   if (signature === lastSignature && sacreds.length === 0) return;
   lastSignature = signature;

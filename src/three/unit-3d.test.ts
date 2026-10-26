@@ -35,6 +35,7 @@ import { axialToWorld3D } from './axialToWorld3D.ts';
 import { catmullRom, idleBreathScale, strideLift, yawToward } from './unitWalkPose.ts';
 import type { City, Unit, Tile, Terrain } from '../types.ts';
 import { createNation, resetNationStoreCache } from '../nations.ts';
+import { noteTerrainMeshSignature, resetTerrainRevision } from './terrainRevision.ts';
 
 function makeUnit(id: string, q: number, r: number, state: 'idle' | 'moving' = 'idle'): Unit {
   return {
@@ -390,6 +391,25 @@ describe('UnitMesh3D nation colour', () => {
     const after = _testGetEntry('u1')!;
     expect(after.group).toBe(group);
     expect(after.nationColor).toBe(red.color);
+  });
+});
+
+describe('UnitMesh3D terrain revision', () => {
+  afterEach(() => resetTerrainRevision());
+
+  it('re-seats an idle unit when the terrain under it is painted', () => {
+    resetTerrainRevision();
+    const getTerrain = (tile: Tile) => (key: string) => (key === '0,0' ? tile : undefined);
+    const unit = makeUnit('u1', 0, 0);
+
+    rebuildUnits([unit], getTerrain(makeTile(0, 0, 'plains')));
+    const before = _testGetEntry('u1')!.currentPos.y;
+
+    // The brush changes the terrain in place: same unit, same coord, new height.
+    noteTerrainMeshSignature('painted');
+    rebuildUnits([unit], getTerrain(makeTile(0, 0, 'mountain')));
+
+    expect(_testGetEntry('u1')!.currentPos.y).toBeGreaterThan(before);
   });
 });
 

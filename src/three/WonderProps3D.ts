@@ -26,6 +26,7 @@ import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { PROP_SURFACE_CLEARANCE, terrainFootprintMaxY } from './terrainSurfaceY.ts';
+import { terrainRevision } from './terrainRevision.ts';
 import {
   createFamilyBuilding,
   ensureFamilyBuildingsLoad,
@@ -261,7 +262,10 @@ function wonderSignature(tiles: Tile[]): string {
     .map((t) => `${t.coord.q},${t.coord.r}:${t.district!.wonderType}`)
     .join('|');
   if (!base) return '';
-  return `${familyBuildingsSignature()}#${wonderGlbLoadState === 'ready' ? 'glb#' : ''}${base}`;
+  // The props sit on the terrain footprint: the revision re-seats them when a
+  // wonder tile is painted.
+  const tbase = `t${terrainRevision()}`;
+  return `${tbase}:${familyBuildingsSignature()}#${wonderGlbLoadState === 'ready' ? 'glb#' : ''}${base}`;
 }
 
 function disposeMesh(m: Mesh): void {

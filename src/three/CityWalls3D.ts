@@ -27,6 +27,7 @@ import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { PROP_SURFACE_CLEARANCE, terrainFootprintMaxY } from './terrainSurfaceY.ts';
+import { terrainRevision } from './terrainRevision.ts';
 
 const wallPropsGroup = new Group();
 wallPropsGroup.name = 'city-walls';
@@ -227,7 +228,10 @@ export function rebuildCityWalls(
     clearCityWalls();
     return;
   }
-  const signature = cities.map((c) => `${c.id}:${c.coord.q},${c.coord.r}`).join('|');
+  // The walls sit on the terrain: the revision re-seats them after a paint.
+  const signature =
+    `t${terrainRevision()}:` +
+    cities.map((c) => `${c.id}:${c.coord.q},${c.coord.r}`).join('|');
   if (signature === wallLastSignature && activeWallMeshes.length > 0) return;
   if (signature === wallLastSignature && cities.length === 0) return;
   wallLastSignature = signature;

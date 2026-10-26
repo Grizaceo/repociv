@@ -6,6 +6,7 @@ import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { CITY_BANNER_LIFT } from './MapLabels3D.ts';
+import { terrainRevision } from './terrainRevision.ts';
 
 const yieldGroup = new Group();
 yieldGroup.name = 'tile-yields';
@@ -18,13 +19,16 @@ export function getTileYieldsGroup(): Group {
 
 function yieldSignature(tiles: Tile[], lod: string, show: boolean): string {
   if (!show || lod === 'low') return 'off';
-  return tiles
-    .filter((t) => t.revealed)
-    .map((t) => {
-      const r = t.resources;
-      return `${tileKey(t.coord)}:${r.gold}:${r.science}:${r.production}`;
-    })
-    .join('|');
+  return (
+    `t${terrainRevision()}:` +
+    tiles
+      .filter((t) => t.revealed)
+      .map((t) => {
+        const r = t.resources;
+        return `${tileKey(t.coord)}:${r.gold}:${r.science}:${r.production}`;
+      })
+      .join('|')
+  );
 }
 
 function iconsForTile(tile: Tile): string[] {

@@ -33,6 +33,7 @@ import {
 } from './UnitProps3D.ts';
 import { terrainSurfaceY } from './terrainSurfaceY.ts';
 import { nationForUnit } from '../nations.ts';
+import { terrainRevision } from './terrainRevision.ts';
 import {
   catmullRom,
   catmullRomTangent,
@@ -361,7 +362,7 @@ export function rebuildUnits(
   // The props flag participates so the capsule→GLB swap happens the frame
   // the async load finishes, even when no unit moved.
   const signature =
-    `uprops${unitPropsSignature()}#` +
+    `t${terrainRevision()}:uprops${unitPropsSignature()}#` +
     visibleUnits
       .map(
         (u) => `${u.id}:${u.type}:${u.coord.q},${u.coord.r}:${u.state}:${nationColorOf(u) ?? '-'}`,
