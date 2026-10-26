@@ -20,6 +20,7 @@ import {
   type City,
   type District,
   type Building,
+  type Unit,
   type World,
   tileKey,
 } from './types.ts';
@@ -31,8 +32,13 @@ import {
   clearHexTerrain,
   findPlacedCityEntry,
   getMapEdits,
+  isCityRemoved,
   isFilesystemPath,
+  PAINTABLE_TERRAINS,
   placeCity,
+  removeCityFromMap,
+  removeHex,
+  removePlacedCity,
   setHexTerrain,
   terrainOverrideFor,
   type PlacedCityEntry,
@@ -1021,10 +1027,13 @@ function persistCityCoord(
   city: City,
   coord: Axial,
   footprint: Array<{ from: Axial; to: Axial }>,
-): void {
+): MovedCityPersist {
+  const prev: MovedCityPersist = { manual: null, placed: null, placedExisted: false, terrain: [] };
+
   // Read every origin before writing any: a short move makes one origin the
   // destination of another hex of the same city.
   const saved = footprint.map((m) => ({ to: m.to, terrain: terrainOverrideFor(m.from) }));
+  for (const m of saved) prev.terrain.push({ coord: m.to, terrain: terrainOverrideFor(m.to) });
   for (const m of saved) {
     if (m.terrain) setHexTerrain(m.to, m.terrain);
     else clearHexTerrain(m.to);
@@ -1038,17 +1047,27 @@ function persistCityCoord(
       (!!city.repoPath && e.repoFsPath === city.repoPath),
   );
   if (manual) {
+    prev.manual = { repoPath: manual.repoPath, coord: { ...manual.coord } };
     updateManualRepoCoord(manual.repoPath, coord);
-    return;
+    return prev;
   }
 
   const placed = findPlacedCityEntry(city);
   if (placed) {
+    prev.placed = {
+      repoPath: placed.repoPath,
+      repoName: placed.repoName,
+      coord: { ...placed.coord },
+    };
+    prev.placedExisted = true;
     placeCity({ repoPath: placed.repoPath, repoName: placed.repoName, coord });
-    return;
+    return prev;
   }
 
-  placeCity({ repoPath: city.repoPath ?? city.id, repoName: city.name, coord });
+  const created = { repoPath: city.repoPath ?? city.id, repoName: city.name, coord: { ...coord } };
+  prev.placed = created;
+  placeCity(created);
+  return prev;
 }
 
 /**
@@ -1064,16 +1083,12 @@ export async function relocateCity(
 ): Promise<boolean> {
   const city = world.cities.find((c) => c.id === cityId);
   if (!city) return false;
-  // Footprint before the move: it drives both the terrain that travels with the
-  // city and the saved overrides.
-  const footprint = cityFootprintMoves(city, targetCoord);
-  if (!moveCityInWorld(world, city, targetCoord)) return false;
-
   // `city.repoPath` is the city key across reloads: only a real path may land
-  // there. The stable id lives in `city.id`.
+  // there. The stable id lives in `city.id`. Resolve it before the move so the
+  // persisted key is the absolute path.
   const path = resolveRepoPathForCity(city, repoPathFallback);
   if (path && isFilesystemPath(path)) city.repoPath = path;
-  persistCityCoord(city, targetCoord, footprint);
+  if (!moveCityOp(world, city, targetCoord, { record: true })) return false;
 
   invalidatePathCache();
   await reconnectCities(world);
@@ -1112,6 +1127,168 @@ function findDiskRepoForEntry(
   return byName.length === 1 ? byName[0] : undefined;
 }
 
+// ─── Map edit operations ────────────────────────────────────────────────────
+//
+// One version of every edit rule, shared by the live editor (renderer.ts) and
+// the reload (applyMapEdits). They never touch GameState, the path cache or the
+// UI — that is the caller's business. With `record: true` they also persist the
+// edit in localStorage and return what an undo would need to put it back.
+
+export interface MapEditOpts {
+  /** Persist the edit (the live editor does; a reload replays without saving). */
+  record: boolean;
+}
+
+/** What taking a city off the map removed, for undo. */
+export interface RemovedCity {
+  city: City;
+  /** Position in world.cities before the removal. */
+  index: number;
+  /** Units that leave with the city: its workers and the ones on its hex. */
+  units: Unit[];
+  /** placedCities entry the city owned, if any. */
+  placedEntry: PlacedCityEntry | null;
+  /** Whether removedCities already carried the city key. */
+  wasRemovedKey: boolean;
+}
+
+/** Saved state a move overwrote, for undo. */
+export interface MovedCityPersist {
+  /** Manual layout entry the move updated (its stable key) and its old coord. */
+  manual: { repoPath: string; coord: Axial } | null;
+  /** placedCities entry the move updated or created, with its old coord. */
+  placed: { repoPath: string; repoName: string; coord: Axial } | null;
+  /** False when the move created the entry (undo removes it). */
+  placedExisted: boolean;
+  /** Saved terrain override per destination hex, before the move. */
+  terrain: Array<{ coord: Axial; terrain: Terrain | null }>;
+}
+
+export interface MovedCity {
+  from: Axial;
+  to: Axial;
+  /** Null when the move was replayed with `record: false`. */
+  prevPersist: MovedCityPersist | null;
+}
+
+const NO_RECORD: MapEditOpts = { record: false };
+const PAINTABLE = new Set<string>(PAINTABLE_TERRAINS);
+
+/** A hex can be painted unless it is missing or the capital's sacred ground. */
+export function canPaintHex(world: World, coord: Axial): boolean {
+  const tile = world.tiles.get(tileKey(coord));
+  return !!tile && !tile.city?.isCapital;
+}
+
+export function paintHexOp(
+  world: World,
+  coord: Axial,
+  terrain: Terrain,
+  opts: MapEditOpts,
+): { prevTerrain: Terrain; prevOverride: Terrain | null } | null {
+  if (!canPaintHex(world, coord) || !PAINTABLE.has(terrain)) return null;
+  const tile = world.tiles.get(tileKey(coord))!;
+  const prevTerrain = tile.terrain;
+  const prevOverride = terrainOverrideFor(coord);
+  // Brush early exit: the hex already shows this terrain and is saved that way,
+  // so there is nothing to write or redraw.
+  if (opts.record && prevTerrain === terrain && prevOverride === terrain) return null;
+  if (opts.record) setHexTerrain(coord, terrain);
+  tile.terrain = terrain;
+  return { prevTerrain, prevOverride };
+}
+
+/** A hex can be erased unless it holds a city, a district or belongs to one. */
+export function canEraseHex(world: World, coord: Axial): boolean {
+  const tile = world.tiles.get(tileKey(coord));
+  if (!tile) return false;
+  if (tile.city || tile.district) return false;
+  return !occupiedCityCoords(world).has(tileKey(coord));
+}
+
+export function eraseHexOp(world: World, coord: Axial, opts: MapEditOpts): Tile | null {
+  if (!canEraseHex(world, coord)) return null;
+  const key = tileKey(coord);
+  const tile = world.tiles.get(key)!;
+  if (opts.record) removeHex(coord);
+  world.tiles.delete(key);
+  for (const city of world.cities) {
+    city.territory = city.territory.filter((c) => world.tiles.has(tileKey(c)));
+  }
+  return tile;
+}
+
+/** A city can be taken off the map unless it is the capital. */
+export function canRemoveCity(world: World, city: City): boolean {
+  return !city.isCapital && world.cities.includes(city);
+}
+
+export function removeCityOp(world: World, city: City, opts: MapEditOpts): RemovedCity | null {
+  if (!canRemoveCity(world, city)) return null;
+  const index = world.cities.indexOf(city);
+  // Units leave with the city: collect them before it disappears (the live
+  // editor removes them through GameState, a reload filters world.units).
+  const units = world.units.filter(
+    (u) => u.cityId === city.id || tileKey(u.coord) === tileKey(city.coord),
+  );
+  const placedEntry = findPlacedCityEntry(city);
+  const key = cityKey(city);
+  const wasRemovedKey = isCityRemoved(key);
+  if (opts.record) {
+    if (placedEntry) removePlacedCity(placedEntry.repoPath);
+    removeCityFromMap(key);
+  }
+  removeCityFromWorld(world, city.id);
+  return { city, index, units, placedEntry, wasRemovedKey };
+}
+
+/** A repo can be founded on a free hex that is not the ocean. */
+export function canFoundCity(world: World, repo: ScannedRepo, coord: Axial): boolean {
+  const tile = world.tiles.get(tileKey(coord));
+  if (!tile || tile.city || tile.district) return false;
+  if (tile.terrain === 'ocean') return false;
+  if (occupiedCityCoords(world).has(tileKey(coord))) return false;
+  // One city per repo: compare every key the city may be stored under.
+  const key = repo.repoPath ?? repo.path;
+  return !world.cities.some(
+    (c) => c.id === key || c.repoPath === key || c.id === repo.path || c.repoPath === repo.path,
+  );
+}
+
+export function foundCityOp(
+  world: World,
+  repo: ScannedRepo,
+  coord: Axial,
+  opts: MapEditOpts,
+): City | null {
+  if (!canFoundCity(world, repo, coord)) return null;
+  // A painted hex keeps its painted terrain; an unpainted one is plains, like
+  // after a reload (the fill terrain is randomized per load).
+  const city = addCityToWorld(
+    world,
+    { ...repo, terrain: terrainOverrideFor(coord) ?? undefined },
+    coord,
+  );
+  if (opts.record) placeCity({ repoPath: repo.repoPath ?? repo.path, repoName: repo.name, coord });
+  return city;
+}
+
+export function moveCityOp(
+  world: World,
+  city: City,
+  coord: Axial,
+  opts: MapEditOpts,
+): MovedCity | null {
+  if (!world.cities.includes(city)) return null;
+  const from = city.coord;
+  // Footprint before the move: it drives both the terrain that travels with the
+  // city and the saved overrides.
+  const footprint = cityFootprintMoves(city, coord);
+  if (!moveCityInWorld(world, city, coord)) return null;
+  const prevPersist = opts.record ? persistCityCoord(city, coord, footprint) : null;
+  return { from, to: coord, prevPersist };
+}
+
 /**
  * Applies the manual map edits (painted terrain, erased hexes, cities taken
  * off the map and cities placed by hand) onto a freshly generated world.
@@ -1136,10 +1313,9 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
   for (const key of edits.removedCities) {
     const city = world.cities.find((c) => cityKey(c) === key || c.id === key);
     if (!city) continue;
-    const cityId = city.id;
-    removeCityFromWorld(world, cityId);
+    if (!removeCityOp(world, city, NO_RECORD)) continue;
     // Units working in that city leave with it.
-    world.units = world.units.filter((u) => u.cityId !== cityId);
+    world.units = world.units.filter((u) => u.cityId !== city.id);
   }
 
   // 2) Cities the user placed (or repositioned) by hand. Two passes: first
@@ -1156,7 +1332,7 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
     return city && !axialEquals(city.coord, entry.coord) ? [{ entry, city }] : [];
   });
   while (pendingMoves.length > 0) {
-    const moved = pendingMoves.filter((p) => moveCityInWorld(world, p.city, p.entry.coord));
+    const moved = pendingMoves.filter((p) => moveCityOp(world, p.city, p.entry.coord, NO_RECORD));
     if (moved.length === 0) break;
     pendingMoves = pendingMoves.filter((p) => !moved.includes(p));
   }
@@ -1166,7 +1342,6 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
     );
   }
 
-  const occupied = occupiedCityCoords(world);
   for (const entry of placedEntries) {
     const repo = findDiskRepoForEntry(diskRepos, entry);
     if (!repo) continue;
@@ -1180,32 +1355,26 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
     if (edits.removedCities.includes(repoKey) || edits.removedCities.includes(repo.path)) {
       continue;
     }
-    const key = tileKey(entry.coord);
-    const target = world.tiles.get(key);
-    if (!target || target.city || occupied.has(key)) {
+    if (!foundCityOp(world, repo, entry.coord, NO_RECORD)) {
       logger.warn(
         `[map] no pude colocar ${repo.name} en (${entry.coord.q}, ${entry.coord.r}): el hex no está libre`,
       );
-      continue;
     }
-    addCityToWorld(world, repo, entry.coord);
   }
 
   // 3) Painted terrain.
   for (const [key, terrain] of Object.entries(edits.terrain)) {
     const tile = world.tiles.get(key);
     if (!tile) continue;
-    if (tile.city?.isCapital) continue; // the capital keeps its sacred ground
-    tile.terrain = terrain;
+    paintHexOp(world, tile.coord, terrain, NO_RECORD);
   }
 
-  // 4) Erased hexes. City and district hexes are protected — erase the city
-  //    itself instead of punching a hole under it.
+  // 4) Erased hexes. City and district hexes are protected by the shared rule —
+  //    erase the city itself instead of punching a hole under it.
   for (const key of edits.removedHexes) {
     const tile = world.tiles.get(key);
     if (!tile) continue;
-    if (tile.city || tile.district || occupied.has(key)) continue;
-    world.tiles.delete(key);
+    eraseHexOp(world, tile.coord, NO_RECORD);
   }
   for (const city of world.cities) {
     city.territory = city.territory.filter((c) => world.tiles.has(tileKey(c)));

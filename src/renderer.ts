@@ -31,21 +31,14 @@ import {
 import { hideDirectivePreview, hideContextMenu } from './ui/spatialPreview.ts';
 import { escapeHtml } from './ui/escapeHtml.ts';
 import {
+  eraseHexOp,
+  foundCityOp,
+  paintHexOp,
   relocateCity,
   canRelocateCityTo,
-  addCityToWorld,
-  removeCityFromWorld,
+  removeCityOp,
   type ScannedRepo,
 } from './map.ts';
-import {
-  findPlacedCityEntry,
-  placeCity,
-  removeCityFromMap,
-  removeHex,
-  removePlacedCity,
-  setHexTerrain,
-  terrainOverrideFor,
-} from './mapEdits.ts';
 import { applyNationsToWorld, assignCityToNation, cityKey } from './nations.ts';
 import { invalidatePathCache } from './pathfinding.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
@@ -2113,21 +2106,7 @@ export class Renderer {
 
   /** Paint the active terrain on a hex. */
   private paintTerrainAt(coord: Axial): void {
-    const tile = this.state.world.tiles.get(tileKey(coord));
-    if (!tile) return;
-    if (tile.city?.isCapital) return; // the capital keeps its sacred ground
-    // Dragging inside one hex must not write the store and redraw on every
-    // mousemove. Both conditions matter: the saved override is what survives a
-    // reload (the fill terrain is randomized per load), so an unpainted hex
-    // that happens to be this terrain still has to be persisted.
-    if (
-      tile.terrain === this._mapEditorTerrain &&
-      terrainOverrideFor(coord) === this._mapEditorTerrain
-    ) {
-      return;
-    }
-    setHexTerrain(coord, this._mapEditorTerrain);
-    tile.terrain = this._mapEditorTerrain;
+    if (!paintHexOp(this.state.world, coord, this._mapEditorTerrain, { record: true })) return;
     // Cached routes do not depend on terrain: repaint them from scratch.
     invalidatePathCache();
     this.state.notifyUpdate();
@@ -2147,33 +2126,14 @@ export class Renderer {
     const tile = this.state.world.tiles.get(tileKey(coord));
     if (!tile) return;
     if (tile.city) {
-      const city = tile.city;
-      if (city.isCapital) return; // the capital is not removable
-      // Collect the units first: removeUnit() reassigns world.units, and
-      // removeCityFromWorld() would drop the ones standing on the hex without
-      // telling GameState (leaving stale unitMap entries).
-      const cityUnits = this.state.world.units.filter(
-        (u) => u.cityId === city.id || tileKey(u.coord) === tileKey(city.coord),
-      );
-      // A city placed by hand also owns an entry in placedCities: leaving it
-      // there makes step 2 of applyMapEdits place it again on the next load.
-      const placed = findPlacedCityEntry(city);
-      if (placed) removePlacedCity(placed.repoPath);
-      removeCityFromMap(cityKey(city));
-      removeCityFromWorld(this.state.world, city.id);
+      const removed = removeCityOp(this.state.world, tile.city, { record: true });
+      if (!removed) return; // the capital is not removable
       // Go through GameState so unitMap, selectedUnit, the path cache and the
       // unitRemoved callbacks stay in sync — otherwise a unit coming back with
       // the same id is handed the ghost and never re-enters world.units.
-      for (const u of cityUnits) this.state.removeUnit(u.id);
-      invalidatePathCache();
-      this.state.notifyUpdate();
-      return;
-    }
-    if (tile.district) return; // a district belongs to its city
-    removeHex(coord);
-    this.state.world.tiles.delete(tileKey(coord));
-    for (const c of this.state.world.cities) {
-      c.territory = c.territory.filter((t) => this.state.world.tiles.has(tileKey(t)));
+      for (const u of removed.units) this.state.removeUnit(u.id);
+    } else if (!eraseHexOp(this.state.world, coord, { record: true })) {
+      return; // a district belongs to its city
     }
     invalidatePathCache();
     this.state.notifyUpdate();
@@ -2183,30 +2143,7 @@ export class Renderer {
   private placeRepoAt(coord: Axial): void {
     const repo = this._mapEditorRepo;
     if (!repo) return;
-    const tile = this.state.world.tiles.get(tileKey(coord));
-    if (!tile || tile.city) return;
-    // A district belongs to its city: founding here would drop it from the map
-    // and the reload's placement pass would refuse the hex anyway. Ocean is not
-    // city ground either (relocation forbids it). The reload pass cannot check
-    // the ocean: it runs before the painted terrain, so a hex painted to plains
-    // before founding still reads as ocean there, and the map edge is ocean.
-    if (tile.district || tile.terrain === 'ocean') return;
-    // The picker stays selected after a placement: without this check every
-    // click on another hex would push a second City with the same id.
-    const key = repo.repoPath ?? repo.path;
-    const alreadyOnMap = this.state.world.cities.some(
-      (c) => c.id === key || c.repoPath === key || c.id === repo.path || c.repoPath === repo.path,
-    );
-    if (alreadyOnMap) return;
-    // The repo from the picker carries no terrain. A painted hex keeps its
-    // painted terrain; an unpainted one is plains, like after a reload (the
-    // fill terrain is randomized per load, so it must not be inherited).
-    addCityToWorld(
-      this.state.world,
-      { ...repo, terrain: terrainOverrideFor(coord) ?? undefined },
-      coord,
-    );
-    placeCity({ repoPath: key, repoName: repo.name, coord });
+    if (!foundCityOp(this.state.world, repo, coord, { record: true })) return;
     // One city per repo: drop the selection and redraw the bar so the repo
     // leaves the dropdown.
     this._mapEditorRepo = null;
