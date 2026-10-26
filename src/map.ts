@@ -1045,9 +1045,7 @@ function findDiskRepoForEntry(
 ): ScannedRepo | undefined {
   const exact = diskRepos.find(
     (r) =>
-      r.repoPath === entry.repoPath ||
-      r.path === entry.repoPath ||
-      r.repoPath === entry.repoName,
+      r.repoPath === entry.repoPath || r.path === entry.repoPath || r.repoPath === entry.repoName,
   );
   if (exact) return exact;
   const byName = diskRepos.filter((r) => r.name === entry.repoName);
@@ -1094,9 +1092,7 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
   // so the entry order must not decide the outcome. A pure swap (A↔B) stays
   // unsolved and is reported below.
   let pendingMoves = placedEntries.flatMap((entry) => {
-    const city = world.cities.find(
-      (c) => cityKey(c) === entry.repoPath || c.id === entry.repoPath,
-    );
+    const city = world.cities.find((c) => cityKey(c) === entry.repoPath || c.id === entry.repoPath);
     return city && !axialEquals(city.coord, entry.coord) ? [{ entry, city }] : [];
   });
   while (pendingMoves.length > 0) {

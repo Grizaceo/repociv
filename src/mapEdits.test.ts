@@ -344,10 +344,7 @@ describe('applyMapEdits', () => {
     const b = city('api', { q: 1, r: 0 }, '/b/api');
     const world = worldWith([b], [tile({ q: 1, r: 0 }), tile({ q: 3, r: 0 })]);
 
-    applyMapEdits(world, [
-      diskRepo('api', 'b-id', '/b/api'),
-      diskRepo('api', 'a-id', '/a/api'),
-    ]);
+    applyMapEdits(world, [diskRepo('api', 'b-id', '/b/api'), diskRepo('api', 'a-id', '/a/api')]);
 
     expect(world.cities.filter((c) => c.repoPath === '/b/api')).toHaveLength(1);
     expect(world.cities.find((c) => c.repoPath === '/a/api')?.coord).toEqual({ q: 3, r: 0 });
@@ -378,10 +375,7 @@ describe('applyMapEdits', () => {
     placeCity({ repoPath: '/old/api', repoName: 'api', coord: { q: 3, r: 0 } });
     const world = worldWith([], [tile({ q: 3, r: 0 })]);
 
-    applyMapEdits(world, [
-      diskRepo('api', 'a-id', '/a/api'),
-      diskRepo('api', 'b-id', '/b/api'),
-    ]);
+    applyMapEdits(world, [diskRepo('api', 'a-id', '/a/api'), diskRepo('api', 'b-id', '/b/api')]);
 
     expect(world.cities).toHaveLength(0);
   });
