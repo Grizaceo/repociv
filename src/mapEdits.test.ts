@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearHexTerrain,
+  findPlacedCityEntry,
   getMapEdits,
   isCityRemoved,
   isHexRemoved,
@@ -438,5 +439,31 @@ describe('relocateCity persistence', () => {
     expect(await relocateCity(world, target.id, { q: 1, r: 0 }, null)).toBe(true);
     expect(target.repoPath).toBeUndefined();
     expect(loadManualLayout().entries[0]?.coord).toEqual({ q: 1, r: 0 });
+  });
+
+  it('does not hand a path-keyed entry to another repo with the same name', () => {
+    placeCity({ repoPath: '/a/api', repoName: 'api', coord: { q: 3, r: 0 } });
+    // A different `api` folder: same name, different path. The entry belongs
+    // to /a/api and must not be matched by name.
+    expect(findPlacedCityEntry({ id: 'api', name: 'api', repoPath: '/b/api' })).toBeNull();
+  });
+
+  it('does not change the saved coordinate of a same-named repo', async () => {
+    placeCity({ repoPath: '/a/api', repoName: 'api', coord: { q: 3, r: 0 } });
+    const target = city('api', { q: 0, r: 0 }, '/b/api');
+    const world = worldWith([target], [tile({ q: 0, r: 0 }), tile({ q: 2, r: 0 })]);
+
+    expect(await relocateCity(world, target.id, { q: 2, r: 0 }, null)).toBe(true);
+    const placed = getMapEdits().placedCities;
+    expect(placed.find((e) => e.repoPath === '/a/api')?.coord).toEqual({ q: 3, r: 0 });
+    expect(placed.find((e) => e.repoPath === '/b/api')?.coord).toEqual({ q: 2, r: 0 });
+  });
+
+  it('still falls back to the name for a single id-keyed entry', () => {
+    // Entries keyed by a stable id have no path to compare: the name is the
+    // only handle, and there is exactly one candidate.
+    placeCity({ repoPath: 'legacy-api', repoName: 'api', coord: { q: 3, r: 0 } });
+    const entry = findPlacedCityEntry({ id: 'api', name: 'api', repoPath: '/b/api' });
+    expect(entry?.repoPath).toBe('legacy-api');
   });
 });

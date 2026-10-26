@@ -27,7 +27,12 @@ import { loadManualLayout, updateManualRepoCoord } from './manualLayout.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
 import { listIframeWonders } from './wonders/manifest.ts';
 import type { WonderManifest } from './wonders/types.ts';
-import { getMapEdits, placeCity } from './mapEdits.ts';
+import {
+  findPlacedCityEntry,
+  getMapEdits,
+  isFilesystemPath,
+  placeCity,
+} from './mapEdits.ts';
 import { applyNationsToWorld, cityKey } from './nations.ts';
 
 // ─── Wonder placement ───────────────────────────────────────────────────────
@@ -958,11 +963,6 @@ export function moveCityInWorld(world: World, city: City, targetCoord: Axial): b
   return true;
 }
 
-/** A real filesystem path, as opposed to the stable repo id used by the UI. */
-function isFilesystemPath(value: string): boolean {
-  return value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value);
-}
-
 /**
  * Remember the new coordinate of a moved city, whatever it came from:
  * a manual layout entry (keyed by the stable repo id), a `placedCities` entry
@@ -984,9 +984,7 @@ function persistCityCoord(city: City, coord: Axial): void {
     return;
   }
 
-  const placed = getMapEdits().placedCities.find(
-    (p) => p.repoPath === city.id || p.repoPath === city.repoPath || p.repoName === city.name,
-  );
+  const placed = findPlacedCityEntry(city);
   if (placed) {
     placeCity({ repoPath: placed.repoPath, repoName: placed.repoName, coord });
     return;

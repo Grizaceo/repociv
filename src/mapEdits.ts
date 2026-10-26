@@ -228,19 +228,30 @@ export function removePlacedCity(repoPath: string): void {
   }
 }
 
+/** A real filesystem path, as opposed to the stable repo id used by the UI. */
+export function isFilesystemPath(value: string): boolean {
+  return value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value);
+}
+
 /**
  * The `placedCities` entry that owns this city, if any. Its `repoPath` is the
- * key `placeCity` used, which is not necessarily `cityKey(city)` — the entry
- * may have been matched by name when the world was rebuilt from disk.
+ * key `placeCity` used, which is not necessarily `cityKey(city)`.
+ *
+ * Exact keys (`repoPath` / `id`) win. The repo name is only a fallback for
+ * entries keyed by a stable id — never for a path-keyed entry: two repos can be
+ * called `api` in different folders, and matching by name handed /b/api the
+ * entry of /a/api — and only when a single entry carries that name.
  */
 export function findPlacedCityEntry(
   city: Pick<City, 'id' | 'repoPath' | 'name'>,
 ): PlacedCityEntry | null {
-  return (
-    getMapEdits().placedCities.find(
-      (p) => p.repoPath === city.repoPath || p.repoPath === city.id || p.repoName === city.name,
-    ) ?? null
+  const entries = getMapEdits().placedCities;
+  const exact = entries.find((p) => p.repoPath === city.repoPath || p.repoPath === city.id);
+  if (exact) return exact;
+  const byName = entries.filter(
+    (p) => p.repoName === city.name && !isFilesystemPath(p.repoPath),
   );
+  return byName.length === 1 ? byName[0]! : null;
 }
 
 /** Wipe every manual edit (terrain, hexes, cities). Nations are kept. */
