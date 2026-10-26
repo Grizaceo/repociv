@@ -4,9 +4,35 @@ import { DirectionalLight } from 'three';
 import {
   createHexWorldScene,
   disposeHexWorldScene,
+  terrainMeshSignature,
   updateHexWorldScene,
   wonderVisibilityForLayers,
 } from './HexWorldScene.ts';
+import type { Terrain, Tile } from '../types.ts';
+
+function makeTile(q: number, r: number, terrain: Terrain = 'plains'): Tile {
+  return {
+    coord: { q, r },
+    terrain,
+    resources: { gold: 0, science: 0, production: 0 },
+    inFog: false,
+    revealed: true,
+  };
+}
+
+describe('terrainMeshSignature', () => {
+  it('changes when the terrain of a hex changes (painting keeps the tile keys)', () => {
+    const before = [makeTile(0, 0, 'plains'), makeTile(1, 0, 'forest')];
+    const after = [makeTile(0, 0, 'mountain'), makeTile(1, 0, 'forest')];
+    expect(terrainMeshSignature(before)).not.toBe(terrainMeshSignature(after));
+  });
+
+  it('is stable for the same tiles, so colour-only frames keep the fast path', () => {
+    expect(terrainMeshSignature([makeTile(0, 0, 'plains')])).toBe(
+      terrainMeshSignature([makeTile(0, 0, 'plains')]),
+    );
+  });
+});
 
 describe('HexWorldScene sun stability', () => {
   it('keeps the directional sun position fixed across updates so city walls do not visually swim', () => {

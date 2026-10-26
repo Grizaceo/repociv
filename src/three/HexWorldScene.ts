@@ -24,7 +24,7 @@ import {
   Vector3,
 } from 'three';
 import { AXIAL_DIRECTIONS, type Axial } from '../hex.ts';
-import { tileKey } from '../types.ts';
+import { tileKey, type Tile } from '../types.ts';
 import { type GameState } from '../game.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { HEX_SIZE } from '../constants.ts';
@@ -962,9 +962,29 @@ function rebuildHexGrid(state: GameState, visible: boolean, lod: 'low' | 'medium
   terrainGroup.add(hexGridLines);
 }
 
+/**
+ * Signature of the terrain-mesh inputs that need a full rebuild (instance
+ * matrix from terrainElevation, instanceTerrain atlas index, packed neighbours,
+ * coast masks, ocean depth) instead of a colour-only update. The tile list
+ * alone is not enough: painting a hex keeps the keys and the count unchanged,
+ * so each tile's terrain is part of the signature — otherwise the fast path
+ * below only recolours and the hex keeps its old height and atlas.
+ */
+export function terrainMeshSignature(tiles: Iterable<Tile>): string {
+  let out = '';
+  let count = 0;
+  for (const tile of tiles) {
+    out += `${count === 0 ? '' : ','}${tileKey(tile.coord)}=${tile.terrain}`;
+    count++;
+  }
+  return `${count}:${out}`;
+}
+
 function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPicker): void {
   const tiles = Array.from(state.world.tiles.values());
-  const signature = `${tiles.length}:${tiles.map((t) => tileKey(t.coord)).join(',')}`;
+  const signature = terrainMeshSignature(tiles);
+  // Colour-only changes (fog, territory, nation tint) keep the same signature
+  // and take the cheap path; anything that alters the geometry rebuilds.
   if (signature === tileCountSignature && terrainMesh) {
     tiles.forEach((tile, i) => {
       terrainMesh!.setColorAt(i, instanceColorForTile(tile, fogEnabled));
