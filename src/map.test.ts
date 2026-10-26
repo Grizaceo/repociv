@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Axial } from './hex.ts';
+import { axialNeighbours, type Axial } from './hex.ts';
 import { canRelocateCityTo, generateWorld, relocateCity, showMapLoadError } from './map.ts';
-import { placeCity, resetMapEditsCache } from './mapEdits.ts';
+import { placeCity, removeHex, resetMapEditsCache } from './mapEdits.ts';
 import type { City, Terrain, Tile, World } from './types.ts';
 import { tileKey } from './types.ts';
 
@@ -787,5 +787,56 @@ describe('generateWorld', () => {
     for (const city of world.cities) {
       expect(city.coord).toEqual(before.get(city.name));
     }
+  });
+
+  it('does not put an erased hex back into a territory on reload', async () => {
+    resetMapEditsCache();
+    const repo = {
+      name: 'repo-a',
+      path: 'repo:enc-a',
+      repoPath: '/w/repo-a',
+      population: 20,
+      extensions: { ts: 4 },
+      gold: 30,
+      lastCommitDays: 1,
+      isLegacy: false,
+      hasGit: true,
+    };
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        if (input === '/api/repos') return { ok: true, json: async () => [repo] };
+        if (input === '/api/repo-selections') {
+          return {
+            ok: true,
+            json: async () => ({
+              activeRoot: '/w',
+              roots: [],
+              selectedRepoIds: [],
+              selectedRepoPaths: [],
+              hasSelections: false,
+            }),
+          };
+        }
+        if (input === '/api/repos/selected') return { ok: true, json: async () => [repo] };
+        if (input.startsWith('/api/files/')) return { ok: true, json: async () => ({ files: [] }) };
+        return { ok: false, json: async () => ({}) };
+      }),
+    );
+
+    const first = await generateWorld();
+    const city = first.cities.find((c) => c.name === 'repo-a')!;
+    // A neighbour that is not a city hex (no /api/files, so no districts).
+    const target = axialNeighbours(city.coord).find((c) => !first.tiles.get(tileKey(c))?.city)!;
+    removeHex(target);
+    resetMapEditsCache();
+
+    const world = await generateWorld();
+
+    expect(world.tiles.has(tileKey(target))).toBe(false);
+    expect(
+      world.cities.some((c) => c.territory.some((t) => t.q === target.q && t.r === target.r)),
+    ).toBe(false);
   });
 });

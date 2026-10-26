@@ -605,6 +605,9 @@ function recalculateAllTerritories(world: World): void {
     const rangeCoords = axialRange(city.coord, 2);
     for (const c of rangeCoords) {
       const key = tileKey(c);
+      // A hex erased with the editor is not on the map: it must not come back
+      // into a territory (the border would be drawn around the hole).
+      if (!world.tiles.has(key)) continue;
       if (!coordToCities.has(key)) {
         coordToCities.set(key, { coord: c, cityIndices: [] });
       }

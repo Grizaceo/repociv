@@ -652,6 +652,40 @@ describe('Renderer map editor — erase tool', () => {
     expect(after.some((c) => c.q === 1 && c.r === 0)).toBe(false);
   });
 
+  it('does not put an erased hex back into a territory when another city is founded', () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const a = makeCity('a', { q: 0, r: 0 }, '/w/a');
+    const state = makeState(
+      [
+        tile({ q: 0, r: 0 }, 'plains', a),
+        tile({ q: 1, r: 0 }),
+        tile({ q: 2, r: 0 }),
+        tile({ q: 3, r: 0 }),
+        tile({ q: 4, r: 0 }),
+        tile({ q: 5, r: 0 }),
+      ],
+      [a],
+    );
+    const renderer = new Renderer(canvas, state as never);
+    let hex: Axial = { q: 1, r: 0 };
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => hex;
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('erase');
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    expect(state.world.tiles.has('1,0')).toBe(false);
+
+    hex = { q: 5, r: 0 };
+    renderer.setMapEditorTool('place');
+    renderer.setMapEditorRepo(extraRepo);
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    expect(state.world.cities).toHaveLength(2);
+
+    expect(a.territory.some((t) => t.q === 1 && t.r === 0)).toBe(false);
+  });
+
   it('takes the city units out through GameState so they can spawn again', async () => {
     const { GameState } = await import('./game.ts');
     const { canvas, fire } = makeFakeCanvas();
