@@ -10,6 +10,7 @@ import {
   Circle,
   ClipboardList,
   Coins,
+  Columns3,
   Crosshair,
   Ellipsis,
   FileText,
@@ -25,6 +26,7 @@ import {
   SunMoon,
   Terminal,
   TriangleAlert,
+  Users,
   XCircle,
   createIcons,
 } from 'lucide';
@@ -39,6 +41,7 @@ const lucideIcons = {
   Circle,
   ClipboardList,
   Coins,
+  Columns3,
   Crosshair,
   Ellipsis,
   FileText,
@@ -54,6 +57,7 @@ const lucideIcons = {
   SunMoon,
   Terminal,
   TriangleAlert,
+  Users,
   XCircle,
 };
 

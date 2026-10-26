@@ -11,7 +11,7 @@
 **Stack:** TypeScript + Vite (Canvas 2D + WebGL/Three.js) · Python HTTP bridge · DuckDB/JSONL local ledger
 **Compatible with:** [Hermes Agent](https://hermes-agent.nousresearch.com) (Nous Research) — drop-in in any existing setup
 
-**New demo (40 s):** [watch MP4](docs/design/screenshots/repociv-demo-2026-10-05.mp4) · [GIF](docs/design/screenshots/repociv-demo-2026-10-05.gif). The map, local workspace view, and a real Codex query in an example workspace. [Capture details](docs/design/screenshots/repociv-demo-2026-10-05.md).
+**New demo (41 s):** [watch MP4](docs/design/screenshots/repociv-demo-2026-10-25.mp4) · [GIF](docs/design/screenshots/repociv-demo-2026-10-25.gif). 3D map with 2K PBR visual family, `Q/E` camera orbit, docked unit HUD, multi-agent RoundTablet deliberation, and 2.5D local workspace view. [Capture details](docs/design/screenshots/repociv-demo-2026-10-25.md).
 
 ![Macro 2D view](docs/design/screenshots/macro-2d-view.jpg) | ![Polished 3D WebGL view](docs/design/screenshots/3d-polished-overview.png)
 --- | ---
