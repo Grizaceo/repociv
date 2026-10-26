@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Axial } from './hex.ts';
 import { canRelocateCityTo, generateWorld, relocateCity, showMapLoadError } from './map.ts';
-import { resetMapEditsCache } from './mapEdits.ts';
+import { placeCity, resetMapEditsCache } from './mapEdits.ts';
 import type { City, Terrain, Tile, World } from './types.ts';
 import { tileKey } from './types.ts';
 
@@ -668,5 +668,62 @@ describe('generateWorld', () => {
       q: 4,
       r: -2,
     });
+  });
+
+  it('leaves free the hex the user moved a city to', async () => {
+    resetMapEditsCache();
+    const repo = (name: string, path: string, repoPath: string, population: number) => ({
+      name,
+      path,
+      repoPath,
+      population,
+      extensions: { ts: 4 },
+      gold: 30,
+      lastCommitDays: 1,
+      isLegacy: false,
+      hasGit: true,
+    });
+    const repoA = repo('repo-a', 'repo:enc-a', '/w/repo-a', 20);
+    const repoB = repo('repo-b', 'repo:enc-b', '/w/repo-b', 12);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        if (input === '/api/repos') {
+          return { ok: true, json: async () => [repoA, repoB] };
+        }
+        if (input === '/api/repo-selections') {
+          return {
+            ok: true,
+            json: async () => ({
+              activeRoot: '/w',
+              roots: [],
+              selectedRepoIds: [],
+              selectedRepoPaths: [],
+              hasSelections: false,
+            }),
+          };
+        }
+        if (input === '/api/repos/selected') {
+          return { ok: true, json: async () => [repoA, repoB] };
+        }
+        if (input.startsWith('/api/files/')) {
+          return { ok: true, json: async () => ({ files: [] }) };
+        }
+        return { ok: false, json: async () => ({}) };
+      }),
+    );
+
+    const first = await generateWorld();
+    const bCoord = first.cities.find((city) => city.name === 'repo-b')!.coord;
+
+    // The user drags repo-a onto the hex the automatic layout gives repo-b.
+    placeCity({ repoPath: '/w/repo-a', repoName: 'repo-a', coord: bCoord });
+    resetMapEditsCache();
+
+    const world = await generateWorld();
+
+    expect(world.cities.find((city) => city.name === 'repo-a')?.coord).toEqual(bCoord);
+    expect(world.cities.find((city) => city.name === 'repo-b')?.coord).not.toEqual(bCoord);
   });
 });

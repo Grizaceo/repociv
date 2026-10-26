@@ -16,6 +16,7 @@ import {
   terrainOverrideFor,
 } from './mapEdits.ts';
 import { applyMapEdits, relocateCity, type ScannedRepo } from './map.ts';
+import { logger } from './logger.ts';
 import { loadManualLayout, upsertManualRepoEntry } from './manualLayout.ts';
 import type { City, Tile, World } from './types.ts';
 import { tileKey } from './types.ts';
@@ -227,6 +228,7 @@ describe('applyMapEdits', () => {
   });
 
   it('skips a hand-placed city whose hex is already taken', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     placeCity({ repoPath: '/workspace/extra', repoName: 'extra', coord: { q: 0, r: 0 } });
     const target = city('repociv', { q: 0, r: 0 }, '/workspace/repociv');
     const world = worldWith([target], [tile({ q: 0, r: 0 })]);
@@ -244,6 +246,9 @@ describe('applyMapEdits', () => {
       },
     ]);
     expect(world.cities).toHaveLength(1);
+    const messages = warn.mock.calls.map((call) => String(call[0]));
+    expect(messages.some((m) => m.includes('extra'))).toBe(true);
+    warn.mockRestore();
   });
 
   it('never re-places a city whose placement entry is in removedCities', () => {
@@ -394,6 +399,25 @@ describe('applyMapEdits', () => {
 
     expect(b.coord).toEqual({ q: 3, r: 0 });
     expect(a.coord).toEqual({ q: 2, r: 0 });
+  });
+
+  it('warns when two cities cannot swap hexes', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    // A pure swap has no free hex to route through: both stay where they are.
+    placeCity({ repoPath: '/w/alfa', repoName: 'alfa', coord: { q: 2, r: 0 } });
+    placeCity({ repoPath: '/w/beta', repoName: 'beta', coord: { q: 1, r: 0 } });
+    const alfa = city('alfa', { q: 1, r: 0 }, '/w/alfa');
+    const beta = city('beta', { q: 2, r: 0 }, '/w/beta');
+    const world = worldWith([alfa, beta], [tile({ q: 1, r: 0 }), tile({ q: 2, r: 0 })]);
+
+    applyMapEdits(world);
+
+    expect(alfa.coord).toEqual({ q: 1, r: 0 });
+    expect(beta.coord).toEqual({ q: 2, r: 0 });
+    const messages = warn.mock.calls.map((call) => String(call[0]));
+    expect(messages.some((m) => m.includes('alfa'))).toBe(true);
+    expect(messages.some((m) => m.includes('beta'))).toBe(true);
+    warn.mockRestore();
   });
 });
 

@@ -1092,7 +1092,7 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
   // (a) Move the cities already in the world. Repeat until a full round moves
   // nothing: a city may be waiting for the hex another one is about to leave,
   // so the entry order must not decide the outcome. A pure swap (A↔B) stays
-  // unsolved.
+  // unsolved and is reported below.
   let pendingMoves = placedEntries.flatMap((entry) => {
     const city = world.cities.find(
       (c) => cityKey(c) === entry.repoPath || c.id === entry.repoPath,
@@ -1103,6 +1103,11 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
     const moved = pendingMoves.filter((p) => moveCityInWorld(world, p.city, p.entry.coord));
     if (moved.length === 0) break;
     pendingMoves = pendingMoves.filter((p) => !moved.includes(p));
+  }
+  for (const pending of pendingMoves) {
+    logger.warn(
+      `[map] no pude devolver ${pending.city.name} a (${pending.entry.coord.q}, ${pending.entry.coord.r})`,
+    );
   }
 
   const occupied = occupiedCityCoords(world);
@@ -1121,7 +1126,12 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
     }
     const key = tileKey(entry.coord);
     const target = world.tiles.get(key);
-    if (!target || target.city || occupied.has(key)) continue; // hex already taken
+    if (!target || target.city || occupied.has(key)) {
+      logger.warn(
+        `[map] no pude colocar ${repo.name} en (${entry.coord.q}, ${entry.coord.r}): el hex no está libre`,
+      );
+      continue;
+    }
     addCityToWorld(world, repo, entry.coord);
   }
 
@@ -1319,6 +1329,13 @@ export async function generateWorld(): Promise<World> {
   occupiedCoords.add(tileKey({ q: 0, r: 0 })); // capital
   for (const wp of wonderPlacements) {
     occupiedCoords.add(tileKey(wp.coord));
+  }
+  // Hexes the user already chose for a city in the editor: the automatic
+  // placement leaves them free so applyMapEdits can put the city back there.
+  const mapEdits = getMapEdits();
+  for (const entry of mapEdits.placedCities) {
+    if (mapEdits.removedCities.includes(entry.repoPath)) continue;
+    occupiedCoords.add(tileKey(entry.coord));
   }
   let autoCoordCursor = 0;
   for (const repo of cityRepos) {
