@@ -15,10 +15,19 @@ import {
   setHexTerrain,
   terrainOverrideFor,
 } from './mapEdits.ts';
-import { applyMapEdits, relocateCity, type ScannedRepo } from './map.ts';
+import {
+  applyMapEdits,
+  eraseHexOp,
+  foundCityOp,
+  moveCityOp,
+  paintHexOp,
+  relocateCity,
+  removeCityOp,
+  type ScannedRepo,
+} from './map.ts';
 import { logger } from './logger.ts';
 import { loadManualLayout, upsertManualRepoEntry } from './manualLayout.ts';
-import type { City, Tile, World } from './types.ts';
+import type { City, District, Terrain, Tile, World } from './types.ts';
 import { tileKey } from './types.ts';
 
 function stubStorage(): void {
@@ -637,5 +646,245 @@ describe('relocateCity persistence', () => {
     placeCity({ repoPath: 'legacy-api', repoName: 'api', coord: { q: 3, r: 0 } });
     const entry = findPlacedCityEntry({ id: 'api', name: 'api', repoPath: '/b/api' });
     expect(entry?.repoPath).toBe('legacy-api');
+  });
+});
+
+// ─── Live edits and reload agree ────────────────────────────────────────────
+// The property behind the shared operations: whatever the editor does with
+// record: true must be exactly what applyMapEdits rebuilds on the next load.
+
+const FIXTURE_REPOS: ScannedRepo[] = [
+  {
+    name: 'city-a',
+    path: 'a-id',
+    repoPath: '/w/a',
+    population: 10,
+    extensions: {},
+    gold: 5,
+    lastCommitDays: 1,
+    isLegacy: false,
+    hasGit: true,
+  },
+  {
+    name: 'city-b',
+    path: 'b-id',
+    repoPath: '/w/b',
+    population: 8,
+    extensions: {},
+    gold: 5,
+    lastCommitDays: 1,
+    isLegacy: false,
+    hasGit: true,
+  },
+  {
+    name: 'extra',
+    path: 'extra-id',
+    repoPath: '/w/extra',
+    population: 6,
+    extensions: {},
+    gold: 5,
+    lastCommitDays: 1,
+    isLegacy: false,
+    hasGit: true,
+  },
+];
+
+const RECORD = { record: true };
+
+function fixtureTile(coord: { q: number; r: number }, terrain: Terrain, extra?: Partial<Tile>): Tile {
+  return {
+    coord,
+    terrain,
+    resources: { gold: 0, science: 0, production: 0 },
+    inFog: false,
+    revealed: true,
+    ...extra,
+  };
+}
+
+/** Deterministic stand-in for generateWorld: fixed terrains, no Math.random. */
+function fixtureWorld(): World {
+  const districtsA: District[] = [
+    { id: 'a-d1', name: 'd1', type: 'campus', coord: { q: -2, r: 1 } },
+    { id: 'a-d2', name: 'd2', type: 'commercial', coord: { q: -2, r: 0 } },
+  ];
+  const districtsB: District[] = [{ id: 'b-d1', name: 'd1', type: 'campus', coord: { q: 5, r: 0 } }];
+  const capital: City = {
+    id: 'capital',
+    name: 'Capital',
+    coord: { q: 0, r: 0 },
+    population: 1,
+    territory: [],
+    districts: [],
+    buildings: [],
+    isCapital: true,
+  };
+  const a: City = {
+    id: 'city-a',
+    name: 'city-a',
+    coord: { q: -3, r: 1 },
+    repoPath: '/w/a',
+    population: 10,
+    territory: [],
+    districts: districtsA,
+    buildings: [],
+    isCapital: false,
+  };
+  const b: City = {
+    id: 'city-b',
+    name: 'city-b',
+    coord: { q: 4, r: 0 },
+    repoPath: '/w/b',
+    population: 8,
+    territory: [],
+    districts: districtsB,
+    buildings: [],
+    isCapital: false,
+  };
+
+  const tiles = new Map<string, Tile>();
+  for (let q = -6; q <= 8; q++) {
+    for (let r = -4; r <= 4; r++) {
+      const terrain: Terrain = (q * 7 + r * 3) % 5 === 0 ? 'forest' : 'plains';
+      tiles.set(tileKey({ q, r }), fixtureTile({ q, r }, terrain));
+    }
+  }
+  // One ocean hex, for the "paint it to land, then found" sequence.
+  tiles.set(tileKey({ q: -6, r: 3 }), fixtureTile({ q: -6, r: 3 }, 'ocean'));
+  tiles.set('0,0', fixtureTile({ q: 0, r: 0 }, 'sacred', { city: capital }));
+  tiles.set('-3,1', fixtureTile({ q: -3, r: 1 }, 'plains', { city: a }));
+  tiles.set('4,0', fixtureTile({ q: 4, r: 0 }, 'plains', { city: b }));
+  for (const d of districtsA) tiles.set(tileKey(d.coord), fixtureTile(d.coord, 'plains', { district: d }));
+  for (const d of districtsB) tiles.set(tileKey(d.coord), fixtureTile(d.coord, 'plains', { district: d }));
+
+  return {
+    tiles,
+    cities: [capital, a, b],
+    units: [],
+    buildings: [],
+    resources: { gold: 0, science: 0, production: 0 },
+    generatedAt: 0,
+    restAreas: [],
+  };
+}
+
+function cityIn(world: World, id: string): City {
+  const city = world.cities.find((c) => c.id === id);
+  if (!city) throw new Error(`no city ${id}`);
+  return city;
+}
+
+/** What the player sees: terrain, who owns each hex, and each city's shape. */
+function snapshotWorld(world: World) {
+  const tiles: Record<string, string> = {};
+  for (const [key, tile] of world.tiles) {
+    tiles[key] = `${tile.terrain}|${tile.city?.id ?? ''}|${tile.district?.id ?? ''}`;
+  }
+  const cities = world.cities
+    .map((c) => ({
+      id: c.id,
+      coord: `${c.coord.q},${c.coord.r}`,
+      districts: c.districts
+        .map((d) => `${d.id}@${d.coord.q},${d.coord.r}`)
+        .sort()
+        .join(','),
+      territory: c.territory.map((t) => `${t.q},${t.r}`).sort(),
+    }))
+    .sort((x, y) => x.id.localeCompare(y.id));
+  return { tiles, cities };
+}
+
+/** Apply the recorded edits to a fresh world, the way a reload does. */
+function expectReloadMatches(live: World): void {
+  // Guard against a vacuous pass: every sequence has to leave something saved.
+  const edits = getMapEdits();
+  const recorded =
+    edits.removedCities.length +
+    edits.removedHexes.length +
+    edits.placedCities.length +
+    Object.keys(edits.terrain).length;
+  expect(recorded).toBeGreaterThan(0);
+
+  const reloaded = fixtureWorld();
+  applyMapEdits(reloaded, FIXTURE_REPOS);
+  expect(snapshotWorld(reloaded)).toEqual(snapshotWorld(live));
+}
+
+describe('live edits and reload agree', () => {
+  beforeEach(() => {
+    stubStorage();
+    resetMapEditsCache();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetMapEditsCache();
+  });
+
+  const H = { q: 6, r: -2 };
+
+  it('paint H, then move a city onto H', () => {
+    const live = fixtureWorld();
+    paintHexOp(live, H, 'desert', RECORD);
+    moveCityOp(live, cityIn(live, 'city-a'), H, RECORD);
+
+    expectReloadMatches(live);
+  });
+
+  it('move a city onto H, then paint H', () => {
+    const live = fixtureWorld();
+    moveCityOp(live, cityIn(live, 'city-a'), H, RECORD);
+    paintHexOp(live, H, 'desert', RECORD);
+
+    expectReloadMatches(live);
+  });
+
+  it('paint a city hex, then move the city', () => {
+    const live = fixtureWorld();
+    paintHexOp(live, { q: -3, r: 1 }, 'forest', RECORD);
+    moveCityOp(live, cityIn(live, 'city-a'), H, RECORD);
+
+    expectReloadMatches(live);
+  });
+
+  it('move a city with districts far, and another one onto its own district', () => {
+    const live = fixtureWorld();
+    moveCityOp(live, cityIn(live, 'city-a'), H, RECORD);
+    moveCityOp(live, cityIn(live, 'city-b'), { q: 5, r: 0 }, RECORD);
+
+    expectReloadMatches(live);
+  });
+
+  it('move in a chain: A to a free hex, then B to the hex A left', () => {
+    const live = fixtureWorld();
+    moveCityOp(live, cityIn(live, 'city-a'), { q: -3, r: 0 }, RECORD);
+    moveCityOp(live, cityIn(live, 'city-b'), { q: -3, r: 1 }, RECORD);
+
+    expectReloadMatches(live);
+  });
+
+  it('paint an ocean hex to land, then found a city on it', () => {
+    const live = fixtureWorld();
+    const ocean = { q: -6, r: 3 };
+    paintHexOp(live, ocean, 'plains', RECORD);
+    foundCityOp(live, FIXTURE_REPOS[2]!, ocean, RECORD);
+
+    expectReloadMatches(live);
+  });
+
+  it('remove a city with districts, then erase one of its freed district hexes', () => {
+    const live = fixtureWorld();
+    removeCityOp(live, cityIn(live, 'city-b'), RECORD);
+    eraseHexOp(live, { q: 5, r: 0 }, RECORD);
+
+    expectReloadMatches(live);
+  });
+
+  it('erase a hex next to a city, then found another city nearby', () => {
+    const live = fixtureWorld();
+    eraseHexOp(live, { q: -4, r: 1 }, RECORD);
+    foundCityOp(live, FIXTURE_REPOS[2]!, { q: -5, r: 1 }, RECORD);
+
+    expectReloadMatches(live);
   });
 });
