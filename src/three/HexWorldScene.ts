@@ -31,6 +31,7 @@ import { HEX_SIZE } from '../constants.ts';
 import { sharedFlatHexGeometry, sharedHexGeometry } from './hexGeometry.ts';
 import { axialToWorld3D, hexCornerAngle3D, TILE_HEIGHT } from './axialToWorld3D.ts';
 import { terrainSurfaceY } from './terrainSurfaceY.ts';
+import { territoryColorFor } from '../nations.ts';
 import { instanceColorForTile } from './FogOfWar3D.ts';
 import { HexPicker } from './HexPicker.ts';
 import {
@@ -465,12 +466,12 @@ function rebuildTerritoryLines(
   const sig = visible
     ? `${lod}:` +
       state.world.cities
-        .map(
-          (c) =>
-            `${tileKey(c.coord)};${c.territory.length};${c.isCapital ? 1 : 0};${
-              c.color ? c.color.join(',') : ''
-            }`,
-        )
+        .map((c) => {
+          const color = territoryColorFor(c);
+          return `${tileKey(c.coord)};${c.territory.length};${c.isCapital ? 1 : 0};${color
+            .map((v) => v.toFixed(3))
+            .join(',')}`;
+        })
         .join('|')
     : 'hidden';
   if (sig === territorySignature) return;
@@ -574,7 +575,7 @@ function rebuildTerritoryLines(
     // lift stays sub-0.4u and never separates a ribbon from its terrain.
     const edges = collectEdges(city.territory, inTerritory, (cityIdx % 64) * 0.006);
     if (edges.length === 0) return;
-    const cc = city.color ?? [0.725, 0.588, 0.329]; // 0xb99654 fallback
+    const cc = territoryColorFor(city); // nation colour wins over the city colour
     const color = new Color(cc[0], cc[1], cc[2]);
     if (city.isCapital) color.lerp(new Color(1, 1, 1), 0.18);
     const key = `${city.isCapital ? 'cap' : 'c'}:${color.getHexString()}`;
@@ -975,8 +976,7 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
     if (cityColorAttr) {
       const tileCityColor = new Map<string, [number, number, number]>();
       for (const city of state.world.cities) {
-        const c = city.color;
-        if (!c) continue;
+        const c = territoryColorFor(city);
         for (const coord of city.territory) tileCityColor.set(tileKey(coord), c);
         tileCityColor.set(tileKey(city.coord), c);
       }
@@ -1073,8 +1073,7 @@ function rebuildTerrainMesh(state: GameState, fogEnabled: boolean, picker: HexPi
   // Build tileKey → city color map for territory fill tint (P5)
   const tileCityColor = new Map<string, [number, number, number]>();
   for (const city of state.world.cities) {
-    const c = city.color;
-    if (!c) continue;
+    const c = territoryColorFor(city);
     for (const coord of city.territory) {
       tileCityColor.set(tileKey(coord), c);
     }

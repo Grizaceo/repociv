@@ -27,6 +27,8 @@ import { loadManualLayout, updateManualRepoCoord } from './manualLayout.ts';
 import { aStarPath, invalidatePathCache } from './pathfinding.ts';
 import { listIframeWonders } from './wonders/manifest.ts';
 import type { WonderManifest } from './wonders/types.ts';
+import { getMapEdits } from './mapEdits.ts';
+import { applyNationsToWorld, cityKey } from './nations.ts';
 
 // ─── Wonder placement ───────────────────────────────────────────────────────
 export interface WonderPlacement {
@@ -972,6 +974,92 @@ export async function relocateCity(
 }
 
 // ─── World generator ─────────────────────────────────────────────────
+/**
+ * Hexes taken by a city center or a district. Those are never free to paint
+ * over, erase or place a city on.
+ */
+function occupiedCityCoords(world: World): Set<string> {
+  const occupied = new Set<string>();
+  for (const city of world.cities) {
+    occupied.add(tileKey(city.coord));
+    for (const district of city.districts) occupied.add(tileKey(district.coord));
+  }
+  return occupied;
+}
+
+/**
+ * Applies the manual map edits (painted terrain, erased hexes, cities taken
+ * off the map and cities placed by hand) onto a freshly generated world.
+ *
+ * Runs before the territory recalculation so the edited map is the one that
+ * gets Voronoi'd, and never touches the filesystem: a removed city is only
+ * removed from the map, the repo stays on disk.
+ */
+export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void {
+  const edits = getMapEdits();
+  const hasEdits =
+    edits.removedCities.length > 0 ||
+    edits.removedHexes.length > 0 ||
+    edits.placedCities.length > 0 ||
+    Object.keys(edits.terrain).length > 0;
+  if (!hasEdits) {
+    applyNationsToWorld(world);
+    return;
+  }
+
+  // 1) Cities the user took off the map.
+  for (const key of edits.removedCities) {
+    const city = world.cities.find((c) => cityKey(c) === key || c.id === key);
+    if (!city) continue;
+    const cityId = city.id;
+    removeCityFromWorld(world, cityId);
+    // Units working in that city leave with it.
+    world.units = world.units.filter((u) => u.cityId !== cityId);
+  }
+
+  // 2) Cities the user placed by hand.
+  const occupied = occupiedCityCoords(world);
+  for (const entry of edits.placedCities) {
+    const alreadyThere = world.cities.some((c) => cityKey(c) === entry.repoPath);
+    if (alreadyThere) continue;
+    const repo = diskRepos.find(
+      (r) =>
+        r.repoPath === entry.repoPath ||
+        r.path === entry.repoPath ||
+        r.name === entry.repoName ||
+        r.repoPath === entry.repoName,
+    );
+    if (!repo) continue;
+    const key = tileKey(entry.coord);
+    const target = world.tiles.get(key);
+    if (!target || target.city || occupied.has(key)) continue; // hex already taken
+    addCityToWorld(world, repo, entry.coord);
+  }
+
+  // 3) Painted terrain.
+  for (const [key, terrain] of Object.entries(edits.terrain)) {
+    const tile = world.tiles.get(key);
+    if (!tile) continue;
+    if (tile.city?.isCapital) continue; // the capital keeps its sacred ground
+    tile.terrain = terrain;
+  }
+
+  // 4) Erased hexes. City and district hexes are protected — erase the city
+  //    itself instead of punching a hole under it.
+  for (const key of edits.removedHexes) {
+    const tile = world.tiles.get(key);
+    if (!tile) continue;
+    if (tile.city || tile.district || occupied.has(key)) continue;
+    world.tiles.delete(key);
+  }
+  for (const city of world.cities) {
+    city.territory = city.territory.filter((c) => world.tiles.has(tileKey(c)));
+  }
+
+  applyNationsToWorld(world);
+  invalidatePathCache();
+}
+
 export async function generateWorld(): Promise<World> {
   const MIN_CITY_DISTANCE = 3;
   const tiles = new Map<string, Tile>();
@@ -1378,11 +1466,19 @@ export async function generateWorld(): Promise<World> {
     restAreas: [],
   };
 
+  // Manual map edits (terrain paint, erased hexes, hand-placed cities) are
+  // applied before the territory pass so the edited map is the one Voronoi'd.
+  applyMapEdits(world, diskRepos ?? repos);
+
   // Recalculate territories dynamically to prevent overlaps (Civilization Voronoi)
   recalculateAllTerritories(world);
 
   // Reconnect cities dynamically (BFS + A* + intermediate tiles)
   await reconnectCities(world);
+
+  // The nation layer is editorial: re-apply it last so a hand-picked flag
+  // color survives every world regeneration.
+  applyNationsToWorld(world);
 
   return world;
 }

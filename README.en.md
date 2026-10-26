@@ -286,6 +286,27 @@ Thresholds configurable in the `Settings Panel` (`F11`) or in `src/gameConfig.ts
 
 ---
 
+## Map editor and nations
+
+The map is also an editorial layer: you can **align cities to nations**, paint
+terrain, place cities by hand and erase hexes — without ever touching disk (a
+repo removed from the map stays in the filesystem).
+
+- **`Naciones` tab** in the side panel (`src/ui/nationsPanel.ts`): create,
+  rename and recolour nations, then assign each city (repo) to one. Territory
+  borders and agents take their nation's colour, in both 2D and 3D.
+- **Map editor** (`K`, `src/ui/mapEditor.ts`): a floating bar over the map with
+  five tools — **Move** (drag a city), **Terrain** (paint), **Nation** (align
+  with a click), **Place** (drop a repo) and **Erase** (take a city off the map
+  or delete a hex). It replaces the old `✥` move-city button, which only did
+  one thing.
+
+State lives in `localStorage` (`src/nations.ts` and `src/mapEdits.ts`), like the
+manual layout: the world is regenerated on every load and the edits are
+re-applied on top. See [`docs/MAP_EDITOR.md`](docs/MAP_EDITOR.md).
+
+---
+
 ## News gazette
 
 The **Gazette** (`src/ui/gacetaWidget.ts`) displays articles from the news
@@ -317,6 +338,7 @@ mounted news widget.
 | `Enter` | Open/close side panel |
 | `P` | Priority Matrix panel |
 | `M` | Move mode |
+| `K` | Map editor (nations, terrain, cities) |
 | `Ctrl+S` | Sleep selected unit |
 | `B` | Build mode |
 | `G` | Toggle grid |

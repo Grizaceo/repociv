@@ -39,6 +39,7 @@ import {
   openExternalAgentChat,
 } from '../agentsPanel.ts';
 import { closeConstructionPanel, isConstructionPanelOpen } from '../constructionPanel.ts';
+import { toggleMapEditor, isMapEditorOpen } from '../mapEditor.ts';
 import { selectHero } from './spawn.ts';
 import { takeScreenshot } from './screenshot.ts';
 import { getSelectedProfile } from '../agentProfileStrip.ts';
@@ -327,6 +328,14 @@ export function wireHotkeys(
       case 'u':
         trackHotkey('U:unhide-all');
         state.unhideAllUnits();
+        break;
+      case 'k':
+        // K: map editor (move cities, paint terrain, align nations, place, erase)
+        if (e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) break;
+        e.preventDefault();
+        trackHotkey('K:map-editor');
+        if (!isMapEditorOpen()) trackPanelOpen('map-editor');
+        toggleMapEditor(renderer, state);
         break;
       case '?':
         trackHotkey('?:keyboard-help');

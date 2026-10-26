@@ -6,6 +6,7 @@ import {
   type ScannedRepo,
 } from '../map';
 import { upsertManualRepoEntry, removeManualRepoEntry, loadManualLayout } from '../manualLayout';
+import { openMapEditor } from './mapEditor.ts';
 import { showNotification } from './notificationBanner';
 import { trackPanelOpen } from './analytics.ts';
 import { resetTourState } from './firstRunTour.ts';
@@ -125,28 +126,12 @@ export function refreshCityList(): void {
         <span class="construction-city-coord">(${entry.coord.q}, ${entry.coord.r})</span>
       </div>
       <div class="construction-city-actions">
-        <button class="btn-icon construction-move-city" title="Mover ciudad">✥</button>
         <button class="btn-icon construction-delete-city" title="Eliminar ciudad">🗑</button>
       </div>
     </div>
   `,
     )
     .join('');
-
-  // Wire move buttons
-  list.querySelectorAll<HTMLButtonElement>('.construction-move-city').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const path = btn.closest('.construction-city-item')?.getAttribute('data-path');
-      if (!path || !_rendererRef) return;
-      closeConstructionPanel();
-      _rendererRef.setCityRelocateMode(true, path);
-      showNotification({
-        type: 'info',
-        title: 'Mover ciudad',
-        body: 'Arrastra la ciudad en el mapa a una casilla válida (Escape para cancelar).',
-      });
-    });
-  });
 
   // Wire delete buttons
   list.querySelectorAll<HTMLButtonElement>('.construction-delete-city').forEach((btn) => {
@@ -216,7 +201,10 @@ function buildDOM(): void {
     <div class="construction-panel-card">
       <header class="construction-panel-header">
         <h3>Modo construcción</h3>
-        <button id="construction-close" class="icon-btn" aria-label="Cerrar">✕</button>
+        <div class="construction-inline">
+          <button id="construction-edit-map" class="btn-accent" type="button" title="Abrir el editor de mapa (K)">🖌 Editar mapa</button>
+          <button id="construction-close" class="icon-btn" aria-label="Cerrar">✕</button>
+        </div>
       </header>
       <div class="construction-panel-body">
         <p class="construction-help">Agrega un nuevo repo o administra ciudades existentes.</p>
@@ -270,6 +258,15 @@ function buildDOM(): void {
   const close = () => closeConstructionPanel();
   panel.querySelector<HTMLButtonElement>('#construction-close')?.addEventListener('click', close);
   panel.querySelector<HTMLButtonElement>('#construction-cancel')?.addEventListener('click', close);
+
+  // The map editor replaces the old per-city "✥ move" button: one mode for
+  // moving, painting, aligning to a nation, placing and erasing.
+  panel
+    .querySelector<HTMLButtonElement>('#construction-edit-map')
+    ?.addEventListener('click', () => {
+      closeConstructionPanel();
+      openMapEditor();
+    });
 
   // Reboot onboarding tour from the Construction panel (user-requested reset)
   panel

@@ -14,6 +14,7 @@ import { type GameState } from '../game.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { tileKey } from '../types.ts';
 import { HEX_SIZE } from '../constants.ts';
+import { territoryColorFor } from '../nations.ts';
 import {
   createHexWorldScene,
   updateHexWorldScene,
@@ -397,7 +398,12 @@ export function computeWorldSignature(state: GameState): string {
           .filter((d) => d.type === 'wonder')
           .map((d) => d.wonderType)
           .join(',');
-        return `${c.id}:${c.name}:${c.territory.length}:${tile?.skillHealth ?? ''}:${failed}:${wonders}`;
+        // Effective colour (nation colour wins) — a flag change has to flip the
+        // dirty flag so the territory tint and borders rebuild.
+        const color = territoryColorFor(c)
+          .map((v) => v.toFixed(3))
+          .join(',');
+        return `${c.id}:${c.name}:${c.territory.length}:${tile?.skillHealth ?? ''}:${failed}:${wonders}:${color}`;
       })
       .join('|'),
     units

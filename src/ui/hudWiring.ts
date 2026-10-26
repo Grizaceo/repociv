@@ -5,6 +5,7 @@ import { type GameState } from '../game.ts';
 import { type BridgeEvents } from '../bridge.ts';
 import { wireHotkeys } from './hudWiring/hotkeys.ts';
 import { wireInputs } from './hudWiring/inputs.ts';
+import { initMapEditor } from './mapEditor.ts';
 
 export { selectHero } from './hudWiring/spawn.ts';
 
@@ -16,4 +17,5 @@ export function wireHUD(
 ): void {
   wireHotkeys(renderer, state, bridge, toggleView);
   wireInputs(renderer, state, bridge);
+  initMapEditor(renderer, state);
 }

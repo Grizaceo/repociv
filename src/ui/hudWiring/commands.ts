@@ -20,6 +20,7 @@ import {
 } from '../index.ts';
 import { toggleSettingsPanel } from '../settingsPanel.ts';
 import { toggleConstructionPanel } from '../constructionPanel.ts';
+import { toggleMapEditor } from '../mapEditor.ts';
 import { takeScreenshot } from './screenshot.ts';
 import { toggleAgentsPanel } from '../agentsPanel.ts';
 
@@ -122,6 +123,13 @@ export function registerHudCommands(
       group: 'Panel',
       label: 'Modo construcción',
       run: () => toggleConstructionPanel(),
+    },
+    {
+      id: 'p-map-editor',
+      group: 'Panel',
+      label: 'Editar mapa (naciones, terreno, ciudades)',
+      hint: 'K',
+      run: () => toggleMapEditor(renderer, state),
     },
     {
       id: 'a-screenshot',

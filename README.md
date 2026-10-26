@@ -288,6 +288,28 @@ Thresholds configurables en `Settings Panel` (`F11`) o en `src/gameConfig.ts`.
 
 ---
 
+## Editor de mapa y naciones
+
+El mapa es también una capa editorial: el usuario puede **alinear ciudades a
+naciones**, pintar el terreno, colocar ciudades a mano y borrar hexes, sin
+tocar nunca el disco (un repo borrado del mapa sigue en el filesystem).
+
+- **Pestaña `Naciones`** del panel lateral (`src/ui/nationsPanel.ts`): crear,
+  renombrar y recolorear naciones; asignar cada ciudad (repo) a una de ellas.
+  Las fronteras del territorio y los agentes toman el color de su nación, en
+  2D y en 3D.
+- **Editor de mapa** (`K`, `src/ui/mapEditor.ts`): una barra flotante sobre el
+  mapa con cinco herramientas — **Mover** (arrastrar una ciudad), **Terreno**
+  (pintar), **Nación** (alinear con un clic), **Crear** (colocar un repo) y
+  **Borrar** (quitar una ciudad del mapa o borrar un hex). Sustituye al botón
+  `✥` de mover ciudad, que solo resolvía una cosa.
+
+Persistencia en `localStorage` (`src/nations.ts` y `src/mapEdits.ts`), igual que
+el layout manual: el mundo se regenera en cada carga y las ediciones se
+reaplican encima. Ver [`docs/MAP_EDITOR.md`](docs/MAP_EDITOR.md).
+
+---
+
 ## Gaceta de noticias
 
 La **Gaceta** (`src/ui/gacetaWidget.ts`) muestra artículos del bridge de
@@ -319,6 +341,7 @@ operativo. `N` abre el wizard de nuevo perfil en `hotkeys.ts`, mientras que
 | `Enter` | Abrir/cerrar side panel |
 | `P` | Priority Matrix panel |
 | `M` | Modo Move |
+| `K` | Editor de mapa (naciones, terreno, ciudades) |
 | `Ctrl+S` | Dormir unidad seleccionada |
 | `B` | Modo Build |
 | `G` | Toggle grid |

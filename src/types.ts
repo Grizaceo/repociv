@@ -72,6 +72,17 @@ interface TileResources {
   production: number; // features / PRs
 }
 
+// ─── Nation (map-edit layer) ────────────────────────────────────────────────
+// A nation groups cities (repos) and their units under a shared flag color.
+// Purely editorial: it never touches the filesystem or the agent runtime.
+export interface Nation {
+  id: string;
+  name: string;
+  /** Flag/border color as '#rrggbb'. */
+  color: string;
+  createdAt: number;
+}
+
 // ─── City ─────────────────────────────────────────────────────────────────
 export interface City {
   id: string;
@@ -88,6 +99,8 @@ export interface City {
   isCapital: boolean;
   /** Per-city territory border color (RGB 0-1). Assigned deterministically from city.id. */
   color?: [number, number, number];
+  /** Nation this city belongs to (map-edit layer). Undefined = unaligned. */
+  nationId?: string;
 }
 
 export interface District {
@@ -410,6 +423,9 @@ export type BridgeEvent =
 // ─── Renderer state ─────────────────────────────────────────────────────────
 // ─── View Mode ────────────────────────────────────────────────────────────────
 export type ViewMode = 'macro' | 'local';
+
+/** Tools of the map editor mode (replaces the one-off "move city" button). */
+export type MapEditorTool = 'move' | 'terrain' | 'nation' | 'place' | 'erase';
 
 // ─── Local view types (RimWorld grid) ─────────────────────────────────────────
 export type LocalTileType =

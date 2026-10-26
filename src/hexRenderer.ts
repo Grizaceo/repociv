@@ -8,6 +8,7 @@ import { type Axial, axialToPixel, AXIAL_DIRECTIONS } from './hex.ts';
 import { type Terrain, type Tile, type City, type Building, type District } from './types.ts';
 import { TERRAIN_COLOR } from './map.ts';
 import { HEX_SIZE } from './constants.ts';
+import { hexToRgba, nationColorHexFor } from './nations.ts';
 
 export class HexRenderer {
   private patterns: Record<string, CanvasPattern | null> = {};
@@ -532,9 +533,14 @@ export class HexRenderer {
 
     // Pulsating border opacity
     const pulse = prefersReducedMotion ? 0.95 : 0.75 + 0.25 * Math.sin(time * 3.0);
-    const borderColor = city.isCapital
-      ? `rgba(200, 168, 75, ${pulse})`
-      : `rgba(122, 90, 46, ${pulse * 0.95})`;
+    // A nation overrides the city color: its cities share one flag colour, so
+    // the frontier reads as an empire border instead of a per-repo outline.
+    const nationColor = nationColorHexFor(city);
+    const borderColor = nationColor
+      ? hexToRgba(nationColor, pulse)
+      : city.isCapital
+        ? `rgba(200, 168, 75, ${pulse})`
+        : `rgba(122, 90, 46, ${pulse * 0.95})`;
 
     const borderWidth = city.isCapital ? 3.0 : 2.0;
 

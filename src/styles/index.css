@@ -37,6 +37,8 @@
 @import './panels/slash-picker.css';
 @import './panels/hermes-banner.css';
 @import './panels/roundtablet-panel.css';
+@import './panels/nations-panel.css';
+@import './panels/map-editor.css';
 @import './gaceta.css';
 
 /* Global layout — #app sizing lives in reset.css (100vh); do not override with height:100%. */
