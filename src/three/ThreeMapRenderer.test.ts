@@ -126,6 +126,16 @@ describe('computeWorldSignature', () => {
     expect(computeWorldSignature(a)).not.toBe(computeWorldSignature(b));
   });
 
+  it('changes when a tile terrain changes (the brush paints in place)', () => {
+    // Painting keeps the tile count and every other count identical, so the
+    // terrain has to participate or the 3D scene never rebuilds.
+    const a = makeState({ tiles: [[{ q: 0, r: 0 }, mkTile(0, 0)]] });
+    const b = makeState({
+      tiles: [[{ q: 0, r: 0 }, { ...mkTile(0, 0), terrain: 'mountain' as const }]],
+    });
+    expect(computeWorldSignature(a)).not.toBe(computeWorldSignature(b));
+  });
+
   it('stays cheap on large maps (runs at 60fps in the render loop)', () => {
     // 1200 tiles + 60 units ≈ a worst-case workspace. The signature runs
     // every frame; at 60fps it has ~16ms of TOTAL budget, so it must cost

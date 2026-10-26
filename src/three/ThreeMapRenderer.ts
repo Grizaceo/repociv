@@ -12,7 +12,7 @@ import { type Camera as MapCamera } from '../hex.ts';
 import { type Axial } from '../hex.ts';
 import { type GameState } from '../game.ts';
 import { terrainElevation } from '../isoHex.ts';
-import { tileKey } from '../types.ts';
+import { tileKey, type Terrain } from '../types.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { territoryColorFor } from '../nations.ts';
 import {
@@ -357,6 +357,21 @@ export class ThreeMapRenderer {
 }
 
 /**
+ * Numeric code per terrain for the world-signature hash. Integers instead of
+ * strings keep the per-frame signature allocation-free.
+ */
+const TERRAIN_SIGNATURE_CODES: Record<Terrain, number> = {
+  plains: 1,
+  forest: 2,
+  mountain: 3,
+  hills: 4,
+  desert: 5,
+  ice: 6,
+  ocean: 7,
+  sacred: 8,
+};
+
+/**
  * Hash of the world state inputs that drive the "state-driven" rebuilds
  * in HexWorldScene. Changing any of these forces a rebuild of the
  * terrain mesh, ground plane, territory lines, city clusters, units,
@@ -366,9 +381,10 @@ export class ThreeMapRenderer {
  * It must cover every world input the gated rebuilds read, not just
  * entity counts: unit coords/state (units move without changing id),
  * fog/revealed flips (terrain mesh tints by fog), city names and
- * territory growth (labels and territory lines). Misses here freeze
- * the corresponding visual until an unrelated state change — see the
- * Phase-2 audit. It does not include animTime or render options;
+ * territory growth (labels and territory lines), and the terrain itself
+ * (the brush paints a hex in place without touching any count). Misses
+ * here freeze the corresponding visual until an unrelated state change —
+ * see the Phase-2 audit. It does not include animTime or render options;
  * those are appended at the call site in ThreeMapRenderer.render.
  */
 export function computeWorldSignature(state: GameState): string {
@@ -377,14 +393,23 @@ export function computeWorldSignature(state: GameState): string {
   const units = state.world.units;
   let revealed = 0;
   let fogged = 0;
+  // FNV-1a over (position, terrain): a cheap integer per tile, no strings and
+  // no arrays — this runs every frame.
+  let terrainHash = 0x811c9dc5;
   for (const t of tiles.values()) {
     if (t.revealed) revealed++;
     if (t.inFog) fogged++;
+    const code = TERRAIN_SIGNATURE_CODES[t.terrain] ?? 0;
+    terrainHash = Math.imul(
+      terrainHash ^ (((t.coord.q * 73856093) ^ (t.coord.r * 19349663) ^ code) | 0),
+      0x01000193,
+    );
   }
   return [
     tiles.size,
     revealed,
     fogged,
+    terrainHash,
     cities.length,
     units.length,
     // Include wonder districts so connecting/disconnecting a wonder at runtime
