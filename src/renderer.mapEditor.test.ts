@@ -687,3 +687,37 @@ describe('Renderer map editor — place tool', () => {
     expect(redrawn.children.map((o) => o.value)).not.toContain('/workspace/extra');
   });
 });
+
+describe('Renderer map editor — toolbar', () => {
+  it('keeps the close button across tool switches and closes the editor', async () => {
+    const { doc } = makeFakeDocument();
+    vi.stubGlobal('document', doc);
+    vi.stubGlobal('Option', FakeOption);
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => [] })));
+    const renderer = {
+      setMapEditorMode: vi.fn(),
+      setMapEditorTool: vi.fn(),
+      setMapEditorTerrain: vi.fn(),
+      setMapEditorNation: vi.fn(),
+      setMapEditorRepo: vi.fn(),
+    };
+    const { openMapEditor, isMapEditorOpen } = await import('./ui/mapEditor.ts');
+    openMapEditor(renderer as never);
+
+    const panel = doc.body.querySelector('#map-editor')!;
+    expect(panel.querySelector('.map-editor-close')).not.toBeNull();
+
+    // renderToolbar() replaces the panel children on every switch: the ✕ used
+    // to be thrown away with them and never came back.
+    for (const tool of ['terrain', 'erase']) {
+      panel.querySelectorAll('.map-editor-tool').find((b) => b.dataset['tool'] === tool)!.click();
+      expect(panel.querySelector('.map-editor-close')).not.toBeNull();
+    }
+
+    expect(isMapEditorOpen()).toBe(true);
+    panel.querySelector('.map-editor-close')!.click();
+    expect(renderer.setMapEditorMode).toHaveBeenLastCalledWith(false);
+    expect(panel.classList.contains('hidden')).toBe(true);
+    expect(isMapEditorOpen()).toBe(false);
+  });
+});

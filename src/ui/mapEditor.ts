@@ -60,6 +60,8 @@ const _state = {
   renderer: null as Renderer | null,
   game: null as GameState | null,
   panel: null as HTMLElement | null,
+  /** The ✕ lives outside the rebuilt toolbar contents, so it must be kept. */
+  close: null as HTMLButtonElement | null,
   tool: 'move' as MapEditorTool,
   terrain: 'plains' as Terrain,
   nationId: null as string | null,
@@ -158,7 +160,7 @@ function renderToolbar(): void {
   hint.className = 'map-editor-hint';
   hint.textContent = TOOLS.find((t) => t.id === _state.tool)?.hint ?? '';
 
-  panel.replaceChildren(tools, context, hint);
+  panel.replaceChildren(...(_state.close ? [_state.close, tools, context, hint] : [tools, context, hint]));
 }
 
 /**
@@ -193,6 +195,7 @@ export function openMapEditor(renderer?: Renderer, game?: GameState): void {
 
     document.body.append(panel);
     _state.panel = panel;
+    _state.close = close;
   }
 
   _state.panel.classList.remove('hidden');
