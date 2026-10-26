@@ -822,8 +822,7 @@ export class Renderer {
                     // result (the copies the previous undo put back must not
                     // be reused).
                     current =
-                      moveCitySync(this.state.world, current.city.id, current.to, path) ??
-                      current;
+                      moveCitySync(this.state.world, current.city.id, current.to, path) ?? current;
                     void reconnectCities(this.state.world);
                   },
                 });

@@ -1124,7 +1124,15 @@ describe('Renderer map editor — history round trips', () => {
     renderer.undoLastMapEdit();
     expect(state.getUnit('MAIN')).toBeDefined();
     // An agent joins the city between the undo and the redo.
-    const late = state.spawnUnit('LATE', 'LATE', 'hero', 'gris', { q: 0, r: 0 }, undefined, city.id);
+    const late = state.spawnUnit(
+      'LATE',
+      'LATE',
+      'hero',
+      'gris',
+      { q: 0, r: 0 },
+      undefined,
+      city.id,
+    );
 
     renderer.redoLastMapEdit();
     expect(state.getUnit('MAIN')).toBeUndefined();
@@ -1263,7 +1271,10 @@ describe('Renderer map editor — history bar', () => {
     const { doc } = makeFakeDocument();
     vi.stubGlobal('document', doc);
     vi.stubGlobal('Option', FakeOption);
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => [] })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => [] })),
+    );
     const renderer = {
       setMapEditorMode: vi.fn(),
       setMapEditorTool: vi.fn(),
@@ -1300,7 +1311,10 @@ describe('Renderer map editor — history bar', () => {
     history.pushMapEdit({ label: 'Fundar extra', undo: () => {}, redo: () => {} });
 
     for (const tool of ['terrain', 'erase']) {
-      panel.querySelectorAll('.map-editor-tool').find((b) => b.dataset['tool'] === tool)!.click();
+      panel
+        .querySelectorAll('.map-editor-tool')
+        .find((b) => b.dataset['tool'] === tool)!
+        .click();
       expect(buttons()).toHaveLength(2);
     }
 
@@ -1332,7 +1346,10 @@ describe('Renderer map editor — history bar', () => {
     const { panel } = await openBar();
     const reload = vi.fn();
     vi.stubGlobal('window', { location: { reload } });
-    vi.stubGlobal('confirm', vi.fn(() => true));
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true),
+    );
 
     const { placeCity, getMapEdits } = await import('./mapEdits.ts');
     const { canUndoMapEdit, pushMapEdit } = await import('./mapEditHistory.ts');
@@ -1350,10 +1367,7 @@ describe('Renderer map editor — history bar', () => {
 describe('Renderer map editor — undo and redo', () => {
   it('undoes a whole brush stroke with one step and redoes it', async () => {
     const { canvas, fire } = makeFakeCanvas();
-    const state = makeState(
-      [tile({ q: 1, r: 2 }), tile({ q: 2, r: 2 }), tile({ q: 3, r: 2 })],
-      [],
-    );
+    const state = makeState([tile({ q: 1, r: 2 }), tile({ q: 2, r: 2 }), tile({ q: 3, r: 2 })], []);
     const renderer = new Renderer(canvas, state as never);
     let hex: Axial = { q: 1, r: 2 };
     (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => hex;
@@ -1382,7 +1396,15 @@ describe('Renderer map editor — undo and redo', () => {
     const { canvas, fire } = makeFakeCanvas();
     const city = makeCity('repociv', { q: 0, r: 0 }, '/workspace/repociv');
     const state = new GameState(makeWorld([tile({ q: 0, r: 0 }, 'plains', city)], [city]));
-    const unit = state.spawnUnit('MAIN', 'MAIN', 'hero', 'gris', { q: 0, r: 0 }, undefined, city.id);
+    const unit = state.spawnUnit(
+      'MAIN',
+      'MAIN',
+      'hero',
+      'gris',
+      { q: 0, r: 0 },
+      undefined,
+      city.id,
+    );
     const renderer = new Renderer(canvas, state as never);
     (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 0, r: 0 });
 

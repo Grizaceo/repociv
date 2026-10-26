@@ -1382,9 +1382,10 @@ export function undoEraseHex(world: World, tile: Tile): void {
 
 export function undoRemoveCity(world: World, removed: RemovedCity): void {
   const { city } = removed;
-  const index = removed.index >= 0 && removed.index <= world.cities.length
-    ? removed.index
-    : world.cities.length;
+  const index =
+    removed.index >= 0 && removed.index <= world.cities.length
+      ? removed.index
+      : world.cities.length;
   world.cities.splice(index, 0, city);
   const cityTile = world.tiles.get(tileKey(city.coord));
   if (cityTile) cityTile.city = city;

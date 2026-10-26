@@ -699,7 +699,10 @@ function worldAndStores(world: World) {
       .map((c) => ({
         id: c.id,
         coord: `${c.coord.q},${c.coord.r}`,
-        districts: c.districts.map((d) => `${d.id}@${d.coord.q},${d.coord.r}`).sort().join(','),
+        districts: c.districts
+          .map((d) => `${d.id}@${d.coord.q},${d.coord.r}`)
+          .sort()
+          .join(','),
         territory: c.territory.map((t) => `${t.q},${t.r}`).sort(),
       }))
       .sort((a, b) => a.id.localeCompare(b.id)),
