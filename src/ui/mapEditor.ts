@@ -166,13 +166,21 @@ function renderToolbar(): void {
 }
 
 /**
+ * Pick a repo in the "place" tool and redraw the bar (undoing a founding puts
+ * it back in the dropdown). `null` forgets the selection.
+ */
+export function selectMapEditorRepo(repo: ScannedRepo | null): void {
+  _state.repoPath = repo ? (repo.repoPath ?? repo.path) : null;
+  _state.renderer?.setMapEditorRepo(repo);
+  renderToolbar();
+}
+
+/**
  * Forget the repo picked in the "place" tool and redraw the bar. Called after
  * a successful placement: a repo is one city, so it must leave the dropdown.
  */
 export function clearMapEditorRepoSelection(): void {
-  _state.repoPath = null;
-  _state.renderer?.setMapEditorRepo(null);
-  renderToolbar();
+  selectMapEditorRepo(null);
 }
 
 /** Open the editor: the toolbar appears and the map switches to edit mode. */

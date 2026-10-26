@@ -985,6 +985,96 @@ describe('Renderer map editor — place tool', () => {
   });
 });
 
+describe('Renderer map editor — undo and redo', () => {
+  it('undoes a whole brush stroke with one step and redoes it', async () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeState(
+      [tile({ q: 1, r: 2 }), tile({ q: 2, r: 2 }), tile({ q: 3, r: 2 })],
+      [],
+    );
+    const renderer = new Renderer(canvas, state as never);
+    let hex: Axial = { q: 1, r: 2 };
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => hex;
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('terrain');
+    renderer.setMapEditorTerrain('mountain');
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    hex = { q: 2, r: 2 };
+    fire('mousemove', new FakeMouseEvent('mousemove', { clientX: 12, clientY: 10 }) as never);
+    hex = { q: 3, r: 2 };
+    fire('mousemove', new FakeMouseEvent('mousemove', { clientX: 14, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 14, clientY: 10 }) as never);
+    const painted = () => ['1,2', '2,2', '3,2'].map((k) => state.world.tiles.get(k)?.terrain);
+    expect(painted()).toEqual(['mountain', 'mountain', 'mountain']);
+
+    const { undoMapEditorEdit, redoMapEditorEdit } = await import('./renderer.ts');
+    expect(undoMapEditorEdit()).toBe('Pintar');
+    expect(painted()).toEqual(['plains', 'plains', 'plains']);
+
+    expect(redoMapEditorEdit()).toBe('Pintar');
+    expect(painted()).toEqual(['mountain', 'mountain', 'mountain']);
+  });
+
+  it('brings back a removed city and its unit, and removes them again on redo', async () => {
+    const { GameState } = await import('./game.ts');
+    const { canvas, fire } = makeFakeCanvas();
+    const city = makeCity('repociv', { q: 0, r: 0 }, '/workspace/repociv');
+    const state = new GameState(makeWorld([tile({ q: 0, r: 0 }, 'plains', city)], [city]));
+    const unit = state.spawnUnit('MAIN', 'MAIN', 'hero', 'gris', { q: 0, r: 0 }, undefined, city.id);
+    const renderer = new Renderer(canvas, state as never);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 0, r: 0 });
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('erase');
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    expect(state.world.cities).toHaveLength(0);
+    expect(state.getUnit('MAIN')).toBeUndefined();
+
+    const { undoMapEditorEdit, redoMapEditorEdit } = await import('./renderer.ts');
+    expect(undoMapEditorEdit()).toBe('Sacar repociv');
+    expect(state.world.cities).toHaveLength(1);
+    expect(state.getUnit('MAIN')).toBe(unit);
+    expect(state.world.tiles.get('0,0')?.city?.id).toBe('repociv');
+
+    expect(redoMapEditorEdit()).toBe('Sacar repociv');
+    expect(state.world.cities).toHaveLength(0);
+    expect(state.getUnit('MAIN')).toBeUndefined();
+  });
+
+  it('puts the repo back in the picker when a founding is undone', async () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeState([tile({ q: 1, r: 0 }), tile({ q: 2, r: 0 })], []);
+    const renderer = new Renderer(canvas, state as never);
+    let hex: Axial = { q: 1, r: 0 };
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => hex;
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('place');
+    renderer.setMapEditorRepo(extraRepo);
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    expect(state.world.cities).toHaveLength(1);
+
+    const { undoMapEditorEdit, redoMapEditorEdit } = await import('./renderer.ts');
+    expect(undoMapEditorEdit()).toBe('Fundar extra');
+    expect(state.world.cities).toHaveLength(0);
+
+    expect(redoMapEditorEdit()).toBe('Fundar extra');
+    expect(state.world.cities).toHaveLength(1);
+    expect(state.world.cities[0]?.coord).toEqual({ q: 1, r: 0 });
+
+    // Undo again: the repo is selected again, so another hex can be founded.
+    expect(undoMapEditorEdit()).toBe('Fundar extra');
+    hex = { q: 2, r: 0 };
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    expect(state.world.cities).toHaveLength(1);
+    expect(state.world.cities[0]?.coord).toEqual({ q: 2, r: 0 });
+  });
+});
+
 describe('Renderer map editor — toolbar', () => {
   it('keeps the close button across tool switches and closes the editor', async () => {
     const { doc } = makeFakeDocument();
