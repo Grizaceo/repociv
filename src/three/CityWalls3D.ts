@@ -230,8 +230,7 @@ export function rebuildCityWalls(
   }
   // The walls sit on the terrain: the revision re-seats them after a paint.
   const signature =
-    `t${terrainRevision()}:` +
-    cities.map((c) => `${c.id}:${c.coord.q},${c.coord.r}`).join('|');
+    `t${terrainRevision()}:` + cities.map((c) => `${c.id}:${c.coord.q},${c.coord.r}`).join('|');
   if (signature === wallLastSignature && activeWallMeshes.length > 0) return;
   if (signature === wallLastSignature && cities.length === 0) return;
   wallLastSignature = signature;
