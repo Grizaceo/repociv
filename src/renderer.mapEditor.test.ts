@@ -514,8 +514,7 @@ describe('Renderer map editor — terrain brush', () => {
     const renderer = new Renderer(canvas, state as never);
     (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 2 });
     const setItem = vi.spyOn(window.localStorage, 'setItem');
-    const mapWrites = () =>
-      setItem.mock.calls.filter(([key]) => key === 'repociv:map-edits:v1');
+    const mapWrites = () => setItem.mock.calls.filter(([key]) => key === 'repociv:map-edits:v1');
 
     renderer.setMapEditorMode(true);
     renderer.setMapEditorTool('terrain');
@@ -551,10 +550,7 @@ describe('Renderer map editor — terrain brush', () => {
   it('invalidates the cached unit paths when it paints', async () => {
     const { aStarPath } = await import('./pathfinding.ts');
     const { canvas, fire } = makeFakeCanvas();
-    const state = makeState(
-      [tile({ q: 0, r: 0 }), tile({ q: 1, r: 0 }), tile({ q: 2, r: 0 })],
-      [],
-    );
+    const state = makeState([tile({ q: 0, r: 0 }), tile({ q: 1, r: 0 }), tile({ q: 2, r: 0 })], []);
     const renderer = new Renderer(canvas, state as never);
     (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 0 });
 
@@ -640,10 +636,7 @@ describe('Renderer map editor — erase tool', () => {
   it('invalidates the cached unit paths when it erases a hex', async () => {
     const { aStarPath } = await import('./pathfinding.ts');
     const { canvas, fire } = makeFakeCanvas();
-    const state = makeState(
-      [tile({ q: 0, r: 0 }), tile({ q: 1, r: 0 }), tile({ q: 2, r: 0 })],
-      [],
-    );
+    const state = makeState([tile({ q: 0, r: 0 }), tile({ q: 1, r: 0 }), tile({ q: 2, r: 0 })], []);
     const renderer = new Renderer(canvas, state as never);
     (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 0 });
 
