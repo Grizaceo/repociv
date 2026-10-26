@@ -217,6 +217,7 @@ class FakeElement {
   title = '';
   type = '';
   value = '';
+  disabled = false;
   textContent = '';
   style: Record<string, string> = {};
   dataset: Record<string, string> = {};
@@ -982,6 +983,95 @@ describe('Renderer map editor — place tool', () => {
     // The toolbar was redrawn: the repo is on the map now, so it is filtered out.
     const redrawn = panel.querySelector('.map-editor-select')!;
     expect(redrawn.children.map((o) => o.value)).not.toContain('/workspace/extra');
+  });
+});
+
+describe('Renderer map editor — history bar', () => {
+  async function openBar() {
+    const { doc } = makeFakeDocument();
+    vi.stubGlobal('document', doc);
+    vi.stubGlobal('Option', FakeOption);
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => [] })));
+    const renderer = {
+      setMapEditorMode: vi.fn(),
+      setMapEditorTool: vi.fn(),
+      setMapEditorTerrain: vi.fn(),
+      setMapEditorNation: vi.fn(),
+      setMapEditorRepo: vi.fn(),
+      undoLastMapEdit: vi.fn(),
+      redoLastMapEdit: vi.fn(),
+    };
+    const { openMapEditor } = await import('./ui/mapEditor.ts');
+    const history = await import('./mapEditHistory.ts');
+    history.clearMapEditHistory();
+    openMapEditor(renderer as never);
+    const panel = doc.body.querySelector('#map-editor')!;
+    const buttons = () => panel.querySelectorAll('.map-editor-history-btn');
+    return { doc, panel, buttons, renderer, history };
+  }
+
+  it('shows undo and redo disabled until there is history', async () => {
+    const { buttons, history } = await openBar();
+    expect(buttons()).toHaveLength(2);
+    expect(buttons()[0]!.disabled).toBe(true);
+    expect(buttons()[1]!.disabled).toBe(true);
+
+    history.pushMapEdit({ label: 'Pintar', undo: () => {}, redo: () => {} });
+
+    expect(buttons()[0]!.disabled).toBe(false);
+    expect(buttons()[0]!.title).toBe('Deshacer: Pintar (Ctrl+Z)');
+    expect(buttons()[1]!.disabled).toBe(true);
+  });
+
+  it('keeps the buttons across tool switches and they call the renderer', async () => {
+    const { panel, buttons, renderer, history } = await openBar();
+    history.pushMapEdit({ label: 'Fundar extra', undo: () => {}, redo: () => {} });
+
+    for (const tool of ['terrain', 'erase']) {
+      panel.querySelectorAll('.map-editor-tool').find((b) => b.dataset['tool'] === tool)!.click();
+      expect(buttons()).toHaveLength(2);
+    }
+
+    const undo = buttons()[0]!;
+    expect(undo.disabled).toBe(false);
+    undo.click();
+    expect(renderer.undoLastMapEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('restore asks first and does nothing when cancelled', async () => {
+    const { doc, panel } = await openBar();
+    const reload = vi.fn();
+    vi.stubGlobal('window', { location: { reload } });
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal('confirm', confirm);
+
+    const { placeCity, getMapEdits } = await import('./mapEdits.ts');
+    placeCity({ repoPath: '/w/extra', repoName: 'extra', coord: { q: 1, r: 0 } });
+
+    const restore = panel.querySelector('.map-editor-restore')!;
+    restore.click();
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(getMapEdits().placedCities).toHaveLength(1);
+    expect(reload).not.toHaveBeenCalled();
+    expect(doc.body.querySelector('#map-editor')).toBe(panel);
+  });
+
+  it('restore clears every edit and reloads when accepted', async () => {
+    const { panel } = await openBar();
+    const reload = vi.fn();
+    vi.stubGlobal('window', { location: { reload } });
+    vi.stubGlobal('confirm', vi.fn(() => true));
+
+    const { placeCity, getMapEdits } = await import('./mapEdits.ts');
+    const { canUndoMapEdit, pushMapEdit } = await import('./mapEditHistory.ts');
+    placeCity({ repoPath: '/w/extra', repoName: 'extra', coord: { q: 1, r: 0 } });
+    pushMapEdit({ label: 'Pintar', undo: () => {}, redo: () => {} });
+
+    panel.querySelector('.map-editor-restore')!.click();
+
+    expect(getMapEdits().placedCities).toHaveLength(0);
+    expect(canUndoMapEdit()).toBe(false);
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });
 

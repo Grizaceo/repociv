@@ -12,7 +12,13 @@
 import { type Renderer } from '../renderer.ts';
 import { type GameState } from '../game.ts';
 import { fetchScannedRepos, TERRAIN_COLOR, type ScannedRepo } from '../map.ts';
-import { PAINTABLE_TERRAINS, TERRAIN_LABELS } from '../mapEdits.ts';
+import { clearMapEdits, PAINTABLE_TERRAINS, TERRAIN_LABELS } from '../mapEdits.ts';
+import {
+  clearMapEditHistory,
+  nextRedoLabel,
+  nextUndoLabel,
+  onMapEditHistoryChange,
+} from '../mapEditHistory.ts';
 import { getNationStore } from '../nations.ts';
 import type { MapEditorTool, Terrain } from '../types.ts';
 
@@ -67,6 +73,11 @@ const _state = {
   nationId: null as string | null,
   /** Repo picked in the "place" tool, by the same key the renderer uses. */
   repoPath: null as string | null,
+  /** Undo / redo / restore live outside the rebuilt toolbar contents. */
+  historyBar: null as HTMLElement | null,
+  undoButton: null as HTMLButtonElement | null,
+  redoButton: null as HTMLButtonElement | null,
+  historyUnsubscribe: null as (() => void) | null,
   repos: [] as ScannedRepo[],
 };
 
@@ -133,6 +144,67 @@ function buildContext(): HTMLElement {
   return wrap;
 }
 
+/** Keep the undo / redo buttons in sync with the history stack. */
+function updateHistoryButtons(): void {
+  const undo = _state.undoButton;
+  const redo = _state.redoButton;
+  if (undo) {
+    const label = nextUndoLabel();
+    undo.disabled = label === null;
+    undo.title = label ? `Deshacer: ${label} (Ctrl+Z)` : 'Deshacer (Ctrl+Z)';
+  }
+  if (redo) {
+    const label = nextRedoLabel();
+    redo.disabled = label === null;
+    redo.title = label ? `Rehacer: ${label} (Ctrl+Shift+Z)` : 'Rehacer (Ctrl+Shift+Z)';
+  }
+}
+
+/** Undo / redo / restore, built once and kept across renderToolbar. */
+function buildHistoryBar(): HTMLElement {
+  const bar = document.createElement('div');
+  bar.className = 'map-editor-history';
+
+  const undo = document.createElement('button');
+  undo.type = 'button';
+  undo.className = 'map-editor-history-btn';
+  undo.textContent = '↶';
+  undo.setAttribute('aria-label', 'Deshacer');
+  undo.addEventListener('click', () => {
+    _state.renderer?.undoLastMapEdit();
+  });
+
+  const redo = document.createElement('button');
+  redo.type = 'button';
+  redo.className = 'map-editor-history-btn';
+  redo.textContent = '↷';
+  redo.setAttribute('aria-label', 'Rehacer');
+  redo.addEventListener('click', () => {
+    _state.renderer?.redoLastMapEdit();
+  });
+
+  const restore = document.createElement('button');
+  restore.type = 'button';
+  restore.className = 'map-editor-restore';
+  restore.textContent = 'Restaurar todo';
+  restore.title = 'Borrar todas las ediciones del mapa';
+  restore.addEventListener('click', () => {
+    const ok = confirm(
+      '¿Restaurar el mapa? Se borran todas las ediciones del mapa: terreno pintado, hexes borrados y ciudades fundadas, movidas o sacadas. Las naciones se conservan.',
+    );
+    if (!ok) return;
+    clearMapEdits();
+    clearMapEditHistory();
+    window.location.reload();
+  });
+
+  bar.append(undo, redo, restore);
+  _state.undoButton = undo;
+  _state.redoButton = redo;
+  updateHistoryButtons();
+  return bar;
+}
+
 function renderToolbar(): void {
   const panel = _state.panel;
   if (!panel) return;
@@ -160,9 +232,12 @@ function renderToolbar(): void {
   hint.className = 'map-editor-hint';
   hint.textContent = TOOLS.find((t) => t.id === _state.tool)?.hint ?? '';
 
-  panel.replaceChildren(
-    ...(_state.close ? [_state.close, tools, context, hint] : [tools, context, hint]),
-  );
+  const children: Node[] = [];
+  if (_state.close) children.push(_state.close);
+  children.push(tools);
+  if (_state.historyBar) children.push(_state.historyBar);
+  children.push(context, hint);
+  panel.replaceChildren(...children);
 }
 
 /**
@@ -202,6 +277,9 @@ export function openMapEditor(renderer?: Renderer, game?: GameState): void {
     close.setAttribute('aria-label', 'Cerrar el editor de mapa');
     close.addEventListener('click', () => closeMapEditor());
     panel.append(close);
+
+    _state.historyBar = buildHistoryBar();
+    _state.historyUnsubscribe = onMapEditHistoryChange(updateHistoryButtons);
 
     document.body.append(panel);
     _state.panel = panel;

@@ -107,3 +107,38 @@
   max-width: 320px;
   line-height: 1.3;
 }
+
+.map-editor-history {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.map-editor-history-btn,
+.map-editor-restore {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: var(--text-primary, #e8dcc0);
+  font-size: 11px;
+  padding: 4px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.map-editor-history-btn:hover:not(:disabled),
+.map-editor-restore:hover {
+  background: rgba(200, 168, 75, 0.18);
+  border-color: rgba(200, 168, 75, 0.4);
+}
+
+.map-editor-history-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.map-editor-restore {
+  color: var(--ui-gold, #c8a84b);
+}
