@@ -190,6 +190,132 @@ function installBrowserGlobals(): void {
   });
 }
 
+/**
+ * Minimal DOM for the map editor toolbar (no jsdom in this repo): enough of
+ * createElement / append / replaceChildren / classList / querySelector to drive
+ * `src/ui/mapEditor.ts` and inspect the bar it builds.
+ */
+class FakeClassList {
+  private set = new Set<string>();
+  constructor(initial?: string) {
+    for (const c of (initial ?? '').split(/\s+/)) if (c) this.set.add(c);
+  }
+  add(...classes: string[]) {
+    for (const c of classes) this.set.add(c);
+  }
+  remove(...classes: string[]) {
+    for (const c of classes) this.set.delete(c);
+  }
+  contains(c: string) {
+    return this.set.has(c);
+  }
+}
+
+class FakeElement {
+  tagName: string;
+  id = '';
+  title = '';
+  type = '';
+  value = '';
+  textContent = '';
+  style: Record<string, string> = {};
+  dataset: Record<string, string> = {};
+  attributes: Record<string, string> = {};
+  children: FakeElement[] = [];
+  parent: FakeElement | null = null;
+  classList = new FakeClassList();
+  private _className = '';
+  private listeners: Record<string, Array<(e: unknown) => void>> = {};
+
+  constructor(tagName: string) {
+    this.tagName = tagName;
+  }
+
+  get className(): string {
+    return this._className;
+  }
+  set className(value: string) {
+    this._className = value;
+    this.classList = new FakeClassList(value);
+  }
+
+  append(...nodes: Array<FakeElement | string>) {
+    for (const node of nodes) {
+      const el = typeof node === 'string' ? Object.assign(new FakeElement('#text'), { textContent: node }) : node;
+      el.parent = this;
+      this.children.push(el);
+    }
+  }
+  appendChild(node: FakeElement) {
+    this.append(node);
+    return node;
+  }
+  replaceChildren(...nodes: FakeElement[]) {
+    this.children = [];
+    this.append(...nodes);
+  }
+  setAttribute(name: string, value: string) {
+    this.attributes[name] = value;
+  }
+  getAttribute(name: string) {
+    return this.attributes[name] ?? null;
+  }
+  addEventListener(type: string, fn: (e: unknown) => void) {
+    (this.listeners[type] ??= []).push(fn);
+  }
+  removeEventListener() {}
+  dispatch(type: string) {
+    for (const fn of this.listeners[type] ?? []) fn({ type, target: this, preventDefault: vi.fn() });
+  }
+  click() {
+    this.dispatch('click');
+  }
+  private matches(selector: string): boolean {
+    if (selector.startsWith('#')) return this.id === selector.slice(1);
+    const [tag, cls] = selector.split('.');
+    if (tag && this.tagName !== tag) return false;
+    return !cls || this.classList.contains(cls);
+  }
+  querySelectorAll(selector: string): FakeElement[] {
+    const out: FakeElement[] = [];
+    const walk = (el: FakeElement) => {
+      for (const child of el.children) {
+        if (child.matches(selector)) out.push(child);
+        walk(child);
+      }
+    };
+    walk(this);
+    return out;
+  }
+  querySelector(selector: string): FakeElement | null {
+    return this.querySelectorAll(selector)[0] ?? null;
+  }
+}
+
+class FakeOption extends FakeElement {
+  constructor(text?: string, value?: string) {
+    super('option');
+    this.textContent = text ?? '';
+    this.value = value ?? '';
+  }
+}
+
+function makeFakeDocument() {
+  const body = new FakeElement('body');
+  const doc = {
+    body,
+    documentElement: { style: {} },
+    createElement: vi.fn((tag: string) => new FakeElement(tag)),
+    createTextNode: vi.fn((text: string) => Object.assign(new FakeElement('#text'), { textContent: text })),
+    getElementById: vi.fn(() => null),
+    querySelector: vi.fn(() => null),
+    querySelectorAll: vi.fn(() => []),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  };
+  return { doc, body };
+}
+
 function makeFakeCanvas() {
   const listeners: Record<string, Listener[]> = {};
   const ctxStub = new Proxy(
@@ -490,5 +616,74 @@ describe('Renderer map editor — erase a hand-placed city', () => {
     const reloaded = makeWorld([tile({ q: 1, r: 0 })], []);
     applyMapEdits(reloaded, [repo]);
     expect(reloaded.cities).toHaveLength(0);
+  });
+});
+
+const extraRepo = {
+  name: 'extra',
+  path: 'extra',
+  repoPath: '/workspace/extra',
+  population: 12,
+  extensions: {},
+  gold: 40,
+  lastCommitDays: 1,
+  isLegacy: false,
+  hasGit: true,
+};
+
+describe('Renderer map editor — place tool', () => {
+  it('never places the same repo twice', () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeState([tile({ q: 1, r: 0 }), tile({ q: 3, r: 1 })], []);
+    const renderer = new Renderer(canvas, state as never);
+    let coord: Axial = { q: 1, r: 0 };
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => coord;
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('place');
+    renderer.setMapEditorRepo(extraRepo);
+
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    coord = { q: 3, r: 1 };
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 20, clientY: 20 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 20, clientY: 20 }) as never);
+
+    expect(state.world.cities).toHaveLength(1);
+    expect(state.world.cities[0]?.coord).toEqual({ q: 1, r: 0 });
+  });
+
+  it('clears the picker after placing so the repo leaves the dropdown', async () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeState([tile({ q: 1, r: 0 })], []);
+    const renderer = new Renderer(canvas, state as never);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 0 });
+
+    const { doc } = makeFakeDocument();
+    vi.stubGlobal('document', doc);
+    vi.stubGlobal('Option', FakeOption);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => [extraRepo] })),
+    );
+    const { openMapEditor } = await import('./ui/mapEditor.ts');
+    openMapEditor(renderer, state as never);
+    await new Promise((resolve) => setTimeout(resolve, 0)); // repo list arrives
+
+    const panel = doc.body.querySelector('#map-editor')!;
+    panel.querySelectorAll('.map-editor-tool').find((b) => b.dataset['tool'] === 'place')!.click();
+
+    const picker = panel.querySelector('.map-editor-select')!;
+    expect(picker.children.map((o) => o.value)).toContain('/workspace/extra');
+    picker.value = '/workspace/extra';
+    picker.dispatch('change');
+
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    expect(state.world.cities).toHaveLength(1);
+
+    // The toolbar was redrawn: the repo is on the map now, so it is filtered out.
+    const redrawn = panel.querySelector('.map-editor-select')!;
+    expect(redrawn.children.map((o) => o.value)).not.toContain('/workspace/extra');
   });
 });

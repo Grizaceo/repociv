@@ -63,6 +63,8 @@ const _state = {
   tool: 'move' as MapEditorTool,
   terrain: 'plains' as Terrain,
   nationId: null as string | null,
+  /** Repo picked in the "place" tool, by the same key the renderer uses. */
+  repoPath: null as string | null,
   repos: [] as ScannedRepo[],
 };
 
@@ -117,8 +119,10 @@ function buildContext(): HTMLElement {
     for (const repo of available) {
       select.append(new Option(repo.name, repo.repoPath ?? repo.path));
     }
+    select.value = _state.repoPath ?? '';
     select.addEventListener('change', () => {
       const repo = available.find((r) => (r.repoPath ?? r.path) === select.value) ?? null;
+      _state.repoPath = repo ? (repo.repoPath ?? repo.path) : null;
       _state.renderer?.setMapEditorRepo(repo);
     });
     wrap.append(select);
@@ -155,6 +159,16 @@ function renderToolbar(): void {
   hint.textContent = TOOLS.find((t) => t.id === _state.tool)?.hint ?? '';
 
   panel.replaceChildren(tools, context, hint);
+}
+
+/**
+ * Forget the repo picked in the "place" tool and redraw the bar. Called after
+ * a successful placement: a repo is one city, so it must leave the dropdown.
+ */
+export function clearMapEditorRepoSelection(): void {
+  _state.repoPath = null;
+  _state.renderer?.setMapEditorRepo(null);
+  renderToolbar();
 }
 
 /** Open the editor: the toolbar appears and the map switches to edit mode. */

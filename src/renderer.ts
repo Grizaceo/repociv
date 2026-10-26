@@ -47,6 +47,7 @@ import {
 } from './mapEdits.ts';
 import { applyNationsToWorld, assignCityToNation, cityKey } from './nations.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
+import { clearMapEditorRepoSelection } from './ui/mapEditor.ts';
 import { HEX_SIZE } from './constants.ts';
 import { pickOnHex, stackOffsets, type StackOffset } from './unitStack.ts';
 import { renderScreenOverlays, type ScreenOverlayState } from './rendererScreen.ts';
@@ -2163,8 +2164,23 @@ export class Renderer {
     if (!repo) return;
     const tile = this.state.world.tiles.get(tileKey(coord));
     if (!tile || tile.city) return;
+    // The picker stays selected after a placement: without this check every
+    // click on another hex would push a second City with the same id.
+    const key = repo.repoPath ?? repo.path;
+    const alreadyOnMap = this.state.world.cities.some(
+      (c) =>
+        c.id === key ||
+        c.repoPath === key ||
+        c.id === repo.path ||
+        c.repoPath === repo.path,
+    );
+    if (alreadyOnMap) return;
     addCityToWorld(this.state.world, repo, coord);
-    placeCity({ repoPath: repo.repoPath ?? repo.path, repoName: repo.name, coord });
+    placeCity({ repoPath: key, repoName: repo.name, coord });
+    // One city per repo: drop the selection and redraw the bar so the repo
+    // leaves the dropdown.
+    this._mapEditorRepo = null;
+    clearMapEditorRepoSelection();
     this.state.notifyUpdate();
   }
 
