@@ -252,6 +252,71 @@ describe('applyMapEdits', () => {
     ]);
     expect(world.cities).toHaveLength(0);
   });
+
+  it('places a city on the hex another city vacated (move entry first)', () => {
+    // A is generated at (1,0) but was moved to (2,0); B was placed on the hex
+    // A left. The placement must not see that hex as taken.
+    placeCity({ repoPath: '/workspace/a', repoName: 'a', coord: { q: 2, r: 0 } });
+    placeCity({ repoPath: '/workspace/extra', repoName: 'extra', coord: { q: 1, r: 0 } });
+    const a = city('/workspace/a', { q: 1, r: 0 }, '/workspace/a');
+    const world = worldWith(
+      [a],
+      [tile({ q: 1, r: 0 }), tile({ q: 2, r: 0 }), tile({ q: 3, r: 0 })],
+    );
+
+    applyMapEdits(world, [
+      {
+        name: 'extra',
+        path: '/workspace/extra',
+        repoPath: '/workspace/extra',
+        population: 12,
+        extensions: {},
+        gold: 40,
+        lastCommitDays: 1,
+        isLegacy: false,
+        hasGit: true,
+      },
+    ]);
+
+    expect(world.cities.find((c) => c.id === '/workspace/a')?.coord).toEqual({ q: 2, r: 0 });
+    expect(world.cities.map((c) => c.id)).toContain('/workspace/extra');
+    expect(world.cities.find((c) => c.id === '/workspace/extra')?.coord).toEqual({ q: 1, r: 0 });
+  });
+
+  it('places the city no matter the entry order (placed entry before the move)', () => {
+    // placeCity updates an existing entry in place, so B's entry stays first
+    // in the list even after it was moved.
+    placeCity({ repoPath: '/workspace/extra', repoName: 'extra', coord: { q: 3, r: 0 } });
+    placeCity({ repoPath: '/workspace/a', repoName: 'a', coord: { q: 2, r: 0 } });
+    placeCity({ repoPath: '/workspace/extra', repoName: 'extra', coord: { q: 1, r: 0 } });
+    expect(getMapEdits().placedCities.map((e) => e.repoPath)).toEqual([
+      '/workspace/extra',
+      '/workspace/a',
+    ]);
+    const a = city('/workspace/a', { q: 1, r: 0 }, '/workspace/a');
+    const world = worldWith(
+      [a],
+      [tile({ q: 1, r: 0 }), tile({ q: 2, r: 0 }), tile({ q: 3, r: 0 })],
+    );
+
+    applyMapEdits(world, [
+      {
+        name: 'extra',
+        path: '/workspace/extra',
+        repoPath: '/workspace/extra',
+        population: 12,
+        extensions: {},
+        gold: 40,
+        lastCommitDays: 1,
+        isLegacy: false,
+        hasGit: true,
+      },
+    ]);
+
+    expect(world.cities.find((c) => c.id === '/workspace/a')?.coord).toEqual({ q: 2, r: 0 });
+    expect(world.cities.map((c) => c.id)).toContain('/workspace/extra');
+    expect(world.cities.find((c) => c.id === '/workspace/extra')?.coord).toEqual({ q: 1, r: 0 });
+  });
 });
 
 /** What a reload does: generate from the workspace + manual layout, then apply the edits. */

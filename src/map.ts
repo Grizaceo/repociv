@@ -1065,20 +1065,29 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
     world.units = world.units.filter((u) => u.cityId !== cityId);
   }
 
-  // 2) Cities the user placed (or repositioned) by hand.
-  const occupied = occupiedCityCoords(world);
-  for (const entry of edits.placedCities) {
-    // A placement entry left behind by a removal must not resurrect the city.
-    if (edits.removedCities.includes(entry.repoPath)) continue;
+  // 2) Cities the user placed (or repositioned) by hand. Two passes: first
+  //    move the cities already in the world, then recompute what is occupied
+  //    and place the new ones. Moving frees the hex the city came from, and the
+  //    order of the entries must not decide whether a placement fits.
+  const placedEntries = edits.placedCities.filter(
+    (e) => !edits.removedCities.includes(e.repoPath),
+  );
+  for (const entry of placedEntries) {
     const existing = world.cities.find(
       (c) => cityKey(c) === entry.repoPath || c.id === entry.repoPath,
     );
-    if (existing) {
-      // A city moved with the editor is already in the world: the entry only
-      // overrides its coordinate.
-      if (!axialEquals(existing.coord, entry.coord)) moveCityInWorld(world, existing, entry.coord);
-      continue;
-    }
+    if (!existing) continue;
+    // A city moved with the editor is already in the world: the entry only
+    // overrides its coordinate.
+    if (!axialEquals(existing.coord, entry.coord)) moveCityInWorld(world, existing, entry.coord);
+  }
+
+  const occupied = occupiedCityCoords(world);
+  for (const entry of placedEntries) {
+    const alreadyThere = world.cities.some(
+      (c) => cityKey(c) === entry.repoPath || c.id === entry.repoPath,
+    );
+    if (alreadyThere) continue;
     const repo = diskRepos.find(
       (r) =>
         r.repoPath === entry.repoPath ||
