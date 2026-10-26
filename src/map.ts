@@ -39,6 +39,8 @@ import {
   removeCityFromMap,
   removeHex,
   removePlacedCity,
+  restoreCityToMap,
+  restoreHex,
   setHexTerrain,
   terrainOverrideFor,
   type PlacedCityEntry,
@@ -602,7 +604,7 @@ async function fetchSubdirs(repoId: string): Promise<{ name: string; terrain: Te
 }
 
 // ─── Voronoi Territory Partitioning (Civilization-style) ─────────────────────
-function recalculateAllTerritories(world: World): void {
+export function recalculateAllTerritories(world: World): void {
   const { cities } = world;
   if (cities.length === 0) return;
 
@@ -1069,7 +1071,8 @@ function persistCityCoord(
 
 /**
  * Moves a city (center, districts, territory) and persists the new coordinate
- * according to where the city came from.
+ * according to where the city came from. Returns what the move took, so the
+ * editor can stack it for undo; `null` when the move is not possible.
  * Calls `reconnectCities` after mutation (same as dynamic add/remove).
  */
 export async function relocateCity(
@@ -1077,19 +1080,26 @@ export async function relocateCity(
   cityId: string,
   targetCoord: Axial,
   repoPathFallback: string | null,
-): Promise<boolean> {
+): Promise<MovedCity | null> {
   const city = world.cities.find((c) => c.id === cityId);
-  if (!city) return false;
+  if (!city) return null;
   // `city.repoPath` is the city key across reloads: only a real path may land
   // there. The stable id lives in `city.id`. Resolve it before the move so the
   // persisted key is the absolute path.
+  const prevRepoPath = city.repoPath;
   const path = resolveRepoPathForCity(city, repoPathFallback);
   if (path && isFilesystemPath(path)) city.repoPath = path;
-  if (!moveCityOp(world, city, targetCoord, { record: true })) return false;
+  const moved = moveCityOp(world, city, targetCoord, { record: true });
+  if (!moved) {
+    city.repoPath = prevRepoPath;
+    return null;
+  }
+  // Undo has to put the original value back, not the one this call resolved.
+  moved.prevRepoPath = prevRepoPath;
 
   invalidatePathCache();
   await reconnectCities(world);
-  return true;
+  return moved;
 }
 
 // ─── World generator ─────────────────────────────────────────────────
@@ -1162,10 +1172,30 @@ export interface MovedCityPersist {
 }
 
 export interface MovedCity {
+  city: City;
   from: Axial;
   to: Axial;
+  /** `city.repoPath` before the move (relocateCity may have set it). */
+  prevRepoPath: string | undefined;
+  /** Copies of every footprint tile (origins and destinations) before the move. */
+  prevTiles: Array<{ coord: Axial; tile: Tile }>;
+  /** District coordinates before the move. */
+  prevDistrictCoords: Array<{ district: District; coord: Axial }>;
+  /** Units that travelled with the city (they stood on the old centre hex). */
+  units: Unit[];
   /** Null when the move was replayed with `record: false`. */
   prevPersist: MovedCityPersist | null;
+}
+
+/** What founding a city replaced, for undo. */
+export interface FoundedCity {
+  city: City;
+  /** The tile addCityToWorld replaced on that hex. */
+  prevTile: Tile;
+  /** Whether removedCities already carried the key before founding. */
+  wasRemovedKey: boolean;
+  /** placedCities entry the repo already had, if any. */
+  prevPlaced: PlacedCityEntry | null;
 }
 
 const NO_RECORD: MapEditOpts = { record: false };
@@ -1257,8 +1287,12 @@ export function foundCityOp(
   repo: ScannedRepo,
   coord: Axial,
   opts: MapEditOpts,
-): City | null {
+): FoundedCity | null {
   if (!canFoundCity(world, repo, coord)) return null;
+  const prevTile = world.tiles.get(tileKey(coord))!;
+  const key = repo.repoPath ?? repo.path;
+  const wasRemovedKey = isCityRemoved(key);
+  const prevPlaced = getMapEdits().placedCities.find((p) => p.repoPath === key) ?? null;
   // A painted hex keeps its painted terrain; an unpainted one is plains, like
   // after a reload (the fill terrain is randomized per load).
   const city = addCityToWorld(
@@ -1266,8 +1300,8 @@ export function foundCityOp(
     { ...repo, terrain: terrainOverrideFor(coord) ?? undefined },
     coord,
   );
-  if (opts.record) placeCity({ repoPath: repo.repoPath ?? repo.path, repoName: repo.name, coord });
-  return city;
+  if (opts.record) placeCity({ repoPath: key, repoName: repo.name, coord });
+  return { city, prevTile, wasRemovedKey, prevPlaced };
 }
 
 export function moveCityOp(
@@ -1278,12 +1312,138 @@ export function moveCityOp(
 ): MovedCity | null {
   if (!world.cities.includes(city)) return null;
   const from = city.coord;
+  const prevRepoPath = city.repoPath;
   // Footprint before the move: it drives both the terrain that travels with the
   // city and the saved overrides.
   const footprint = cityFootprintMoves(city, coord);
+  const prevTiles = footprintTileCopies(world, footprint);
+  const prevDistrictCoords = city.districts.map((district) => ({
+    district,
+    coord: { ...district.coord },
+  }));
+  const units = world.units.filter((u) => axialEquals(u.coord, from));
   if (!moveCityInWorld(world, city, coord)) return null;
   const prevPersist = opts.record ? persistCityCoord(city, coord, footprint) : null;
-  return { from, to: coord, prevPersist };
+  return { city, from, to: coord, prevRepoPath, prevTiles, prevDistrictCoords, units, prevPersist };
+}
+
+/** Shallow copies of every footprint tile (origins + destinations), deduped. */
+function footprintTileCopies(
+  world: World,
+  footprint: Array<{ from: Axial; to: Axial }>,
+): Array<{ coord: Axial; tile: Tile }> {
+  const seen = new Set<string>();
+  const copies: Array<{ coord: Axial; tile: Tile }> = [];
+  for (const move of footprint) {
+    for (const coord of [move.from, move.to]) {
+      const key = tileKey(coord);
+      if (seen.has(key)) continue;
+      const tile = world.tiles.get(key);
+      if (!tile) continue;
+      seen.add(key);
+      copies.push({ coord, tile: { ...tile } });
+    }
+  }
+  return copies;
+}
+
+// ─── Inverses ───────────────────────────────────────────────────────────────
+//
+// Each one puts back exactly what its operation changed, in the world and in
+// the saved store — never the whole store: a nation or a city created between
+// the edit and its undo must survive. Redo is the operation itself.
+
+export function undoPaintHex(
+  world: World,
+  coord: Axial,
+  result: { prevTerrain: Terrain; prevOverride: Terrain | null },
+): void {
+  const tile = world.tiles.get(tileKey(coord));
+  if (tile) tile.terrain = result.prevTerrain;
+  if (result.prevOverride) setHexTerrain(coord, result.prevOverride);
+  else clearHexTerrain(coord);
+}
+
+export function undoEraseHex(world: World, tile: Tile): void {
+  world.tiles.set(tileKey(tile.coord), tile);
+  restoreHex(tile.coord);
+  recalculateAllTerritories(world);
+}
+
+export function undoRemoveCity(world: World, removed: RemovedCity): void {
+  const { city } = removed;
+  const index = removed.index >= 0 && removed.index <= world.cities.length
+    ? removed.index
+    : world.cities.length;
+  world.cities.splice(index, 0, city);
+  const cityTile = world.tiles.get(tileKey(city.coord));
+  if (cityTile) cityTile.city = city;
+  for (const district of city.districts) {
+    const tile = world.tiles.get(tileKey(district.coord));
+    if (tile) tile.district = district;
+  }
+  if (removed.placedEntry) {
+    placeCity({
+      repoPath: removed.placedEntry.repoPath,
+      repoName: removed.placedEntry.repoName,
+      coord: removed.placedEntry.coord,
+    });
+  }
+  if (!removed.wasRemovedKey) restoreCityToMap(cityKey(city));
+  recalculateAllTerritories(world);
+}
+
+export function undoFoundCity(world: World, found: FoundedCity): void {
+  const { city } = found;
+  const key = city.repoPath ?? city.id;
+  removeCityFromWorld(world, city.id);
+  world.tiles.set(tileKey(found.prevTile.coord), found.prevTile);
+  if (found.prevPlaced) {
+    placeCity({
+      repoPath: found.prevPlaced.repoPath,
+      repoName: found.prevPlaced.repoName,
+      coord: found.prevPlaced.coord,
+    });
+  } else {
+    removePlacedCity(key);
+  }
+  if (found.wasRemovedKey) removeCityFromMap(cityKey(city));
+  recalculateAllTerritories(world);
+}
+
+export function undoMoveCity(world: World, moved: MovedCity): void {
+  const { city } = moved;
+  // The copies point at the same city/district objects, so the links come back
+  // with them (origins keep their terrain, destinations lose what the move put
+  // there).
+  for (const { coord, tile } of moved.prevTiles) world.tiles.set(tileKey(coord), tile);
+  city.coord = { ...moved.from };
+  city.repoPath = moved.prevRepoPath;
+  for (const { district, coord } of moved.prevDistrictCoords) district.coord = coord;
+  for (const unit of moved.units) unit.coord = { ...moved.from };
+  restorePersist(moved.prevPersist);
+  recalculateAllTerritories(world);
+}
+
+/** Put the saved state a move overwrote back (coordinates and terrain). */
+function restorePersist(prev: MovedCityPersist | null): void {
+  if (!prev) return;
+  if (prev.manual) updateManualRepoCoord(prev.manual.repoPath, prev.manual.coord);
+  if (prev.placed) {
+    if (prev.placedExisted) {
+      placeCity({
+        repoPath: prev.placed.repoPath,
+        repoName: prev.placed.repoName,
+        coord: prev.placed.coord,
+      });
+    } else {
+      removePlacedCity(prev.placed.repoPath);
+    }
+  }
+  for (const saved of prev.terrain) {
+    if (saved.terrain) setHexTerrain(saved.coord, saved.terrain);
+    else clearHexTerrain(saved.coord);
+  }
 }
 
 /**

@@ -21,13 +21,20 @@ import {
   foundCityOp,
   moveCityOp,
   paintHexOp,
+  recalculateAllTerritories,
   relocateCity,
   removeCityOp,
+  undoEraseHex,
+  undoFoundCity,
+  undoMoveCity,
+  undoPaintHex,
+  undoRemoveCity,
   type ScannedRepo,
 } from './map.ts';
+import { createNation, getNationStore, resetNationStoreCache } from './nations.ts';
 import { logger } from './logger.ts';
 import { loadManualLayout, upsertManualRepoEntry } from './manualLayout.ts';
-import type { City, District, Terrain, Tile, World } from './types.ts';
+import type { City, District, Terrain, Tile, Unit, World } from './types.ts';
 import { tileKey } from './types.ts';
 
 function stubStorage(): void {
@@ -512,7 +519,7 @@ describe('relocateCity persistence', () => {
     const target = city('repociv', { q: 0, r: 0 }, '/workspace/repociv');
     const world = worldWith([target], [tile({ q: 0, r: 0 }), tile({ q: 4, r: 1 })]);
 
-    expect(await relocateCity(world, target.id, { q: 4, r: 1 }, null)).toBe(true);
+    expect(await relocateCity(world, target.id, { q: 4, r: 1 }, null)).not.toBeNull();
     expect(target.coord).toEqual({ q: 4, r: 1 });
     // The absolute path is the city key: it must not be replaced by the stable id.
     expect(target.repoPath).toBe('/workspace/repociv');
@@ -541,7 +548,7 @@ describe('relocateCity persistence', () => {
     const target = city('extra', { q: 3, r: 0 }, '/workspace/extra');
     const world = worldWith([target], [tile({ q: 3, r: 0 }), tile({ q: 5, r: -1 })]);
 
-    expect(await relocateCity(world, target.id, { q: 5, r: -1 }, null)).toBe(true);
+    expect(await relocateCity(world, target.id, { q: 5, r: -1 }, null)).not.toBeNull();
     const placed = getMapEdits().placedCities;
     expect(placed).toHaveLength(1);
     expect(placed[0]?.coord).toEqual({ q: 5, r: -1 });
@@ -561,7 +568,7 @@ describe('relocateCity persistence', () => {
     const target = city('auto', { q: 2, r: 2 }, '/workspace/auto');
     const world = worldWith([target], [tile({ q: 2, r: 2 }), tile({ q: 6, r: 0 })]);
 
-    expect(await relocateCity(world, target.id, { q: 6, r: 0 }, null)).toBe(true);
+    expect(await relocateCity(world, target.id, { q: 6, r: 0 }, null)).not.toBeNull();
     // The construction panel lists manual layout entries: adding one here would
     // invent a "manually placed" city the user never picked.
     expect(loadManualLayout().entries).toHaveLength(0);
@@ -580,7 +587,7 @@ describe('relocateCity persistence', () => {
     setHexTerrain({ q: 6, r: 0 }, 'desert');
     world.tiles.get('6,0')!.terrain = 'desert';
 
-    expect(await relocateCity(world, target.id, { q: 6, r: 0 }, null)).toBe(true);
+    expect(await relocateCity(world, target.id, { q: 6, r: 0 }, null)).not.toBeNull();
     const live = world.tiles.get('6,0')?.terrain;
 
     const reloaded = reloadWorld(
@@ -596,7 +603,7 @@ describe('relocateCity persistence', () => {
     setHexTerrain({ q: 2, r: 2 }, 'forest');
     world.tiles.get('2,2')!.terrain = 'forest';
 
-    expect(await relocateCity(world, target.id, { q: 6, r: 0 }, null)).toBe(true);
+    expect(await relocateCity(world, target.id, { q: 6, r: 0 }, null)).not.toBeNull();
     expect(world.tiles.get('6,0')?.terrain).toBe('forest');
 
     const reloaded = reloadWorld(
@@ -617,7 +624,7 @@ describe('relocateCity persistence', () => {
     const target = { ...city('legacy-id', { q: 0, r: 0 }, 'legacy-id'), repoPath: undefined };
     const world = worldWith([target], [tile({ q: 0, r: 0 }), tile({ q: 1, r: 0 })]);
 
-    expect(await relocateCity(world, target.id, { q: 1, r: 0 }, null)).toBe(true);
+    expect(await relocateCity(world, target.id, { q: 1, r: 0 }, null)).not.toBeNull();
     expect(target.repoPath).toBeUndefined();
     expect(loadManualLayout().entries[0]?.coord).toEqual({ q: 1, r: 0 });
   });
@@ -634,7 +641,7 @@ describe('relocateCity persistence', () => {
     const target = city('api', { q: 0, r: 0 }, '/b/api');
     const world = worldWith([target], [tile({ q: 0, r: 0 }), tile({ q: 2, r: 0 })]);
 
-    expect(await relocateCity(world, target.id, { q: 2, r: 0 }, null)).toBe(true);
+    expect(await relocateCity(world, target.id, { q: 2, r: 0 }, null)).not.toBeNull();
     const placed = getMapEdits().placedCities;
     expect(placed.find((e) => e.repoPath === '/a/api')?.coord).toEqual({ q: 3, r: 0 });
     expect(placed.find((e) => e.repoPath === '/b/api')?.coord).toEqual({ q: 2, r: 0 });
@@ -646,6 +653,195 @@ describe('relocateCity persistence', () => {
     placeCity({ repoPath: 'legacy-api', repoName: 'api', coord: { q: 3, r: 0 } });
     const entry = findPlacedCityEntry({ id: 'api', name: 'api', repoPath: '/b/api' });
     expect(entry?.repoPath).toBe('legacy-api');
+  });
+});
+
+// ─── Inverses ───────────────────────────────────────────────────────────────
+// Every operation has an inverse that puts back exactly what it changed, in the
+// world and in the saved store; redo is the operation again.
+
+function settled(world: World): World {
+  recalculateAllTerritories(world);
+  return world;
+}
+
+function unitAt(id: string, coord: { q: number; r: number }): Unit {
+  return {
+    id,
+    name: id,
+    type: 'worker',
+    civ: 'gris',
+    coord,
+    path: [],
+    pathIndex: 0,
+    pathProgress: 0,
+    state: 'idle',
+    speed: 1,
+    color: '#fff',
+    movesLeft: 1,
+    maxMoves: 1,
+    fatigue: 0,
+    maxFatigue: 100,
+    isResting: false,
+    effectiveSpeed: 1,
+  };
+}
+
+function worldAndStores(world: World) {
+  const tiles: Record<string, string> = {};
+  for (const [key, tile] of world.tiles) {
+    tiles[key] = `${tile.terrain}|${tile.city?.id ?? ''}|${tile.district?.id ?? ''}`;
+  }
+  const edits = getMapEdits();
+  return {
+    tiles,
+    cities: world.cities
+      .map((c) => ({
+        id: c.id,
+        coord: `${c.coord.q},${c.coord.r}`,
+        districts: c.districts.map((d) => `${d.id}@${d.coord.q},${d.coord.r}`).sort().join(','),
+        territory: c.territory.map((t) => `${t.q},${t.r}`).sort(),
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+    units: world.units.map((u) => `${u.id}@${u.coord.q},${u.coord.r}`).sort(),
+    terrain: { ...edits.terrain },
+    removedHexes: [...edits.removedHexes].sort(),
+    removedCities: [...edits.removedCities].sort(),
+    placed: edits.placedCities.map((p) => `${p.repoPath}@${p.coord.q},${p.coord.r}`).sort(),
+    manual: loadManualLayout()
+      .entries.map((e) => `${e.repoPath}@${e.coord.q},${e.coord.r}`)
+      .sort(),
+  };
+}
+
+describe('map edit inverses', () => {
+  beforeEach(() => {
+    stubStorage();
+    resetMapEditsCache();
+    resetNationStoreCache();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetMapEditsCache();
+    resetNationStoreCache();
+  });
+
+  const REC = { record: true };
+
+  it('undoes and redoes painting a hex', () => {
+    const world = settled(worldWith([], [tile({ q: 1, r: 0 })]));
+    setHexTerrain({ q: 1, r: 0 }, 'forest');
+    world.tiles.get('1,0')!.terrain = 'forest';
+    const before = worldAndStores(world);
+
+    const result = paintHexOp(world, { q: 1, r: 0 }, 'desert', REC)!;
+    expect(world.tiles.get('1,0')?.terrain).toBe('desert');
+
+    undoPaintHex(world, { q: 1, r: 0 }, result);
+    expect(worldAndStores(world)).toEqual(before);
+
+    expect(paintHexOp(world, { q: 1, r: 0 }, 'desert', REC)).not.toBeNull();
+    expect(world.tiles.get('1,0')?.terrain).toBe('desert');
+    expect(terrainOverrideFor({ q: 1, r: 0 })).toBe('desert');
+  });
+
+  it('undoes and redoes erasing a hex', () => {
+    const world = settled(
+      worldWith([city('a', { q: 0, r: 0 }, '/w/a')], [tile({ q: 0, r: 0 }), tile({ q: 1, r: 0 })]),
+    );
+    const before = worldAndStores(world);
+
+    const removed = eraseHexOp(world, { q: 1, r: 0 }, REC)!;
+    expect(world.tiles.has('1,0')).toBe(false);
+
+    undoEraseHex(world, removed);
+    expect(worldAndStores(world)).toEqual(before);
+
+    expect(eraseHexOp(world, { q: 1, r: 0 }, REC)).not.toBeNull();
+    expect(world.tiles.has('1,0')).toBe(false);
+  });
+
+  it('undoes and redoes taking a hand-placed city off the map', () => {
+    placeCity({ repoPath: '/w/extra', repoName: 'extra', coord: { q: 2, r: 0 } });
+    const extra = city('extra', { q: 2, r: 0 }, '/w/extra');
+    const world = settled(worldWith([extra], [tile({ q: 2, r: 0 })]));
+    const before = worldAndStores(world);
+
+    const removed = removeCityOp(world, extra, REC)!;
+    expect(world.cities).toHaveLength(0);
+    expect(getMapEdits().placedCities).toHaveLength(0);
+
+    undoRemoveCity(world, removed);
+    expect(worldAndStores(world)).toEqual(before);
+    expect(isCityRemoved('/w/extra')).toBe(false);
+    expect(getMapEdits().placedCities).toHaveLength(1);
+
+    expect(removeCityOp(world, extra, REC)).not.toBeNull();
+    expect(world.cities).toHaveLength(0);
+    expect(getMapEdits().placedCities).toHaveLength(0);
+  });
+
+  it('undoes and redoes founding a city', () => {
+    const world = settled(worldWith([], [tile({ q: 3, r: 0 }, 'forest')]));
+    setHexTerrain({ q: 3, r: 0 }, 'forest');
+    const repo = diskRepo('extra', 'extra-id', '/w/extra');
+    const before = worldAndStores(world);
+
+    const found = foundCityOp(world, repo, { q: 3, r: 0 }, REC)!;
+    expect(world.cities).toHaveLength(1);
+    expect(getMapEdits().placedCities).toHaveLength(1);
+
+    undoFoundCity(world, found);
+    expect(worldAndStores(world)).toEqual(before);
+    expect(world.tiles.get('3,0')?.terrain).toBe('forest');
+
+    expect(foundCityOp(world, repo, { q: 3, r: 0 }, REC)).not.toBeNull();
+    expect(world.cities).toHaveLength(1);
+    expect(getMapEdits().placedCities).toHaveLength(1);
+  });
+
+  it('undoes and redoes moving a city with districts and a unit', () => {
+    const target = city('a', { q: 0, r: 0 }, '/w/a');
+    const district = { id: 'a-d1', name: 'd1', type: 'campus' as const, coord: { q: 1, r: 0 } };
+    target.districts = [district];
+    const world = settled(
+      worldWith(
+        [target],
+        [
+          tile({ q: 0, r: 0 }),
+          { ...tile({ q: 1, r: 0 }), district },
+          tile({ q: 2, r: 0 }),
+          tile({ q: 3, r: 0 }),
+        ],
+      ),
+    );
+    world.units.push(unitAt('MAIN', { q: 0, r: 0 }));
+    const before = worldAndStores(world);
+
+    const moved = moveCityOp(world, target, { q: 2, r: 0 }, REC)!;
+    expect(target.coord).toEqual({ q: 2, r: 0 });
+    expect(world.tiles.get('2,0')?.city).toBe(target);
+    expect(world.units[0]?.coord).toEqual({ q: 2, r: 0 });
+
+    undoMoveCity(world, moved);
+    expect(worldAndStores(world)).toEqual(before);
+    expect(world.tiles.get('1,0')?.district?.id).toBe('a-d1');
+    expect(world.units[0]?.coord).toEqual({ q: 0, r: 0 });
+
+    expect(moveCityOp(world, target, { q: 2, r: 0 }, REC)).not.toBeNull();
+    expect(target.coord).toEqual({ q: 2, r: 0 });
+    expect(world.units[0]?.coord).toEqual({ q: 2, r: 0 });
+  });
+
+  it('does not wipe a nation created between the edit and its undo', () => {
+    const world = settled(worldWith([], [tile({ q: 1, r: 0 })]));
+    const result = paintHexOp(world, { q: 1, r: 0 }, 'desert', REC)!;
+    const nation = createNation('Imperio');
+
+    undoPaintHex(world, { q: 1, r: 0 }, result);
+
+    expect(getNationStore().nations.some((n) => n.id === nation.id)).toBe(true);
   });
 });
 

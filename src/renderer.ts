@@ -784,8 +784,8 @@ export class Renderer {
             const dc = this.draggedCity;
             const path = this.dragCityRepoPath;
             if (dragMoved) {
-              void relocateCity(this.state.world, dc.id, dropCoord, path).then((ok) => {
-                if (ok) {
+              void relocateCity(this.state.world, dc.id, dropCoord, path).then((moved) => {
+                if (moved) {
                   this.state.notifyUpdate();
                   refreshCityList();
                   // Inside the map editor the mode stays open: the next city

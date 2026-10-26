@@ -234,8 +234,8 @@ describe('relocateCity', () => {
   it('returns false without mutating when target is invalid', async () => {
     const { world, city } = minimalWorldWithCity({ q: 0, r: 0 }, { q: 2, r: 0 });
     world.tiles.delete(tileKey({ q: 2, r: 0 }));
-    const ok = await relocateCity(world, city.id, { q: 2, r: 0 }, city.repoPath ?? null);
-    expect(ok).toBe(false);
+    const moved = await relocateCity(world, city.id, { q: 2, r: 0 }, city.repoPath ?? null);
+    expect(moved).toBeNull();
     expect(city.coord).toEqual({ q: 0, r: 0 });
   });
 
@@ -244,8 +244,8 @@ describe('relocateCity', () => {
     const dest = { q: 2, r: 0 };
     const { world, city } = minimalWorldWithCity(center, dest);
 
-    const ok = await relocateCity(world, city.id, dest, city.repoPath ?? null);
-    expect(ok).toBe(true);
+    const moved = await relocateCity(world, city.id, dest, city.repoPath ?? null);
+    expect(moved).not.toBeNull();
     expect(city.coord).toEqual(dest);
 
     expect(world.tiles.get(tileKey(center))?.city).toBeUndefined();
@@ -256,8 +256,8 @@ describe('relocateCity', () => {
 
   it('returns false when source and target are the same', async () => {
     const { world, city } = minimalWorldWithCity({ q: 0, r: 0 }, { q: 2, r: 0 });
-    const ok = await relocateCity(world, city.id, { q: 0, r: 0 }, city.repoPath ?? null);
-    expect(ok).toBe(false);
+    const moved = await relocateCity(world, city.id, { q: 0, r: 0 }, city.repoPath ?? null);
+    expect(moved).toBeNull();
   });
 });
 
