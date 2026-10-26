@@ -787,6 +787,45 @@ describe('Renderer map editor — place tool', () => {
     expect(state.world.cities).toHaveLength(0);
   });
 
+  it('keeps the painted terrain of the hex it founds on', () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeState([tile({ q: 1, r: 0 })], []);
+    const renderer = new Renderer(canvas, state as never);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 0 });
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('terrain');
+    renderer.setMapEditorTerrain('forest');
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    expect(state.world.tiles.get('1,0')?.terrain).toBe('forest');
+
+    renderer.setMapEditorTool('place');
+    renderer.setMapEditorRepo(extraRepo);
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+
+    expect(state.world.cities).toHaveLength(1);
+    expect(state.world.tiles.get('1,0')?.terrain).toBe('forest');
+  });
+
+  it('uses plains when the hex is not painted, whatever it looks like', () => {
+    const { canvas, fire } = makeFakeCanvas();
+    // Fill terrain is randomized per load: an unpainted forest hex must not be
+    // kept, or the city would change terrain on every reload.
+    const state = makeState([tile({ q: 1, r: 0 }, 'forest')], []);
+    const renderer = new Renderer(canvas, state as never);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 0 });
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('place');
+    renderer.setMapEditorRepo(extraRepo);
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+
+    expect(state.world.cities).toHaveLength(1);
+    expect(state.world.tiles.get('1,0')?.terrain).toBe('plains');
+  });
+
   it('never places the same repo twice', () => {
     const { canvas, fire } = makeFakeCanvas();
     const state = makeState([tile({ q: 1, r: 0 }), tile({ q: 3, r: 1 })], []);

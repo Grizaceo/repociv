@@ -2198,7 +2198,14 @@ export class Renderer {
       (c) => c.id === key || c.repoPath === key || c.id === repo.path || c.repoPath === repo.path,
     );
     if (alreadyOnMap) return;
-    addCityToWorld(this.state.world, repo, coord);
+    // The repo from the picker carries no terrain. A painted hex keeps its
+    // painted terrain; an unpainted one is plains, like after a reload (the
+    // fill terrain is randomized per load, so it must not be inherited).
+    addCityToWorld(
+      this.state.world,
+      { ...repo, terrain: terrainOverrideFor(coord) ?? undefined },
+      coord,
+    );
     placeCity({ repoPath: key, repoName: repo.name, coord });
     // One city per repo: drop the selection and redraw the bar so the repo
     // leaves the dropdown.
