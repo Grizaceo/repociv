@@ -928,51 +928,63 @@ export function canRelocateCityTo(world: World, city: City, targetCoord: Axial):
 export function moveCityInWorld(world: World, city: City, targetCoord: Axial): boolean {
   if (!canRelocateCityTo(world, city, targetCoord)) return false;
 
+  const tiles = world.tiles;
   const delta = axialSub(targetCoord, city.coord);
   const oldCoord = city.coord;
-  const tiles = world.tiles;
   const oldCityTile = tiles.get(tileKey(oldCoord));
-
-  // 1) Shift district tiles
-  for (const d of city.districts) {
-    const oldDc = d.coord;
-    const newDc = axialAdd(oldDc, delta);
-    const oldK = tileKey(oldDc);
-    const newK = tileKey(newDc);
-    const src = tiles.get(oldK);
-    if (!src?.district || src.district.id !== d.id) continue;
-    tiles.delete(oldK);
-    d.coord = newDc;
-    tiles.set(newK, { ...src, coord: newDc, district: d });
-  }
-
-  // 2) Move units standing on the city center hex with the city
-  for (const u of world.units) {
-    if (axialEquals(u.coord, oldCoord)) u.coord = targetCoord;
-  }
-
-  // 3) Detach city from old tile (keep terrain tile)
-  if (oldCityTile) {
-    oldCityTile.city = undefined;
-  }
-
-  // 4) Place city on destination tile (preserve metadata from old city tile)
   const destKey = tileKey(targetCoord);
-  const destBase = tiles.get(destKey);
-  if (!destBase) return false;
 
+  // 1) Resolve every destination before touching anything. A district can land
+  //    on the hex another district is leaving, so all the sources have to be
+  //    copied first; a missing tile aborts without mutating the world.
+  const districtMoves = city.districts.map((district) => ({
+    district,
+    to: axialAdd(district.coord, delta),
+    src: tiles.get(tileKey(district.coord)),
+  }));
+  if (!oldCityTile || !tiles.has(destKey)) return false;
+  if (districtMoves.some((m) => !tiles.has(tileKey(m.to)))) return false;
+
+  // 2) Release the sources: no tile is deleted — the hexes stay on the map with
+  //    their terrain, they just stop belonging to the city.
+  oldCityTile.city = undefined;
+  for (const m of districtMoves) {
+    if (m.src?.district?.id === m.district.id) m.src.district = undefined;
+  }
+
+  // 3) Place the districts, carrying the terrain, resources and metadata of
+  //    their own origin.
+  for (const m of districtMoves) {
+    const key = tileKey(m.to);
+    const base = tiles.get(key)!;
+    m.district.coord = m.to;
+    tiles.set(key, {
+      ...(m.src ?? base),
+      coord: m.to,
+      district: m.district,
+    });
+  }
+
+  // 4) Place the city center on its destination (preserve metadata from the old
+  //    city tile).
   city.coord = targetCoord;
+  const destBase = tiles.get(destKey)!;
   const merged: Tile = {
     ...destBase,
     coord: targetCoord,
-    terrain: oldCityTile?.terrain ?? destBase.terrain,
-    resources: oldCityTile?.resources ?? destBase.resources,
+    terrain: oldCityTile.terrain,
+    resources: oldCityTile.resources,
     city,
     district: undefined,
-    skillHealth: oldCityTile?.skillHealth ?? destBase.skillHealth,
-    sessionTint: oldCityTile?.sessionTint ?? destBase.sessionTint,
+    skillHealth: oldCityTile.skillHealth ?? destBase.skillHealth,
+    sessionTint: oldCityTile.sessionTint ?? destBase.sessionTint,
   };
   tiles.set(destKey, merged);
+
+  // 5) Move units standing on the city center hex with the city
+  for (const u of world.units) {
+    if (axialEquals(u.coord, oldCoord)) u.coord = targetCoord;
+  }
 
   recalculateAllTerritories(world);
   return true;

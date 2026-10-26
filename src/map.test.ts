@@ -1,8 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { axialNeighbours, type Axial } from './hex.ts';
-import { canRelocateCityTo, generateWorld, relocateCity, showMapLoadError } from './map.ts';
+import {
+  canRelocateCityTo,
+  generateWorld,
+  moveCityInWorld,
+  relocateCity,
+  showMapLoadError,
+} from './map.ts';
 import { placeCity, removeHex, resetMapEditsCache } from './mapEdits.ts';
-import type { City, Terrain, Tile, World } from './types.ts';
+import type { City, District, Terrain, Tile, World } from './types.ts';
 import { tileKey } from './types.ts';
 
 describe('showMapLoadError', () => {
@@ -136,6 +142,76 @@ describe('canRelocateCityTo', () => {
       effectiveSpeed: 1,
     });
     expect(canRelocateCityTo(world, city, { q: 2, r: 0 })).toBe(false);
+  });
+});
+
+describe('moveCityInWorld', () => {
+  function cityWithDistricts(): { world: World; city: City } {
+    const districts: District[] = [
+      { id: 'c-a', name: 'a', type: 'campus', coord: { q: 1, r: 0 } },
+      { id: 'c-b', name: 'b', type: 'campus', coord: { q: 2, r: 0 } },
+    ];
+    const city: City = {
+      id: 'c',
+      name: 'c',
+      coord: { q: 0, r: 0 },
+      repoPath: '/w/c',
+      population: 1,
+      territory: [],
+      districts,
+      buildings: [],
+      isCapital: false,
+    };
+    const tiles = new Map<string, Tile>();
+    for (let q = -3; q <= 6; q++) {
+      for (let r = -2; r <= 2; r++) tiles.set(tileKey({ q, r }), baseTile({ q, r }, 'plains'));
+    }
+    tiles.set('0,0', baseTile({ q: 0, r: 0 }, 'plains', { city }));
+    for (const d of districts) {
+      tiles.set(tileKey(d.coord), baseTile(d.coord, 'plains', { district: d }));
+    }
+    const world: World = {
+      tiles,
+      cities: [city],
+      units: [],
+      buildings: [],
+      resources: { gold: 0, science: 0, production: 0 },
+      generatedAt: 0,
+      restAreas: [],
+    };
+    return { world, city };
+  }
+
+  it('keeps the old district hexes on the map instead of punching holes', () => {
+    const { world, city } = cityWithDistricts();
+
+    expect(moveCityInWorld(world, city, { q: 0, r: 2 })).toBe(true);
+
+    expect(world.tiles.has('1,0')).toBe(true);
+    expect(world.tiles.has('2,0')).toBe(true);
+    expect(world.tiles.get('1,0')?.district).toBeUndefined();
+    expect(world.tiles.get('2,0')?.district).toBeUndefined();
+    expect(world.tiles.get('1,2')?.district?.id).toBe('c-a');
+    expect(world.tiles.get('2,2')?.district?.id).toBe('c-b');
+  });
+
+  it('moves a city onto the hex of one of its own districts without corruption', () => {
+    const { world, city } = cityWithDistricts();
+    expect(canRelocateCityTo(world, city, { q: 1, r: 0 })).toBe(true);
+
+    expect(moveCityInWorld(world, city, { q: 1, r: 0 })).toBe(true);
+
+    expect(city.coord).toEqual({ q: 1, r: 0 });
+    expect(city.districts.map((d) => [d.id, d.coord])).toEqual([
+      ['c-a', { q: 2, r: 0 }],
+      ['c-b', { q: 3, r: 0 }],
+    ]);
+    expect(world.tiles.get('2,0')?.district?.id).toBe('c-a');
+    expect(world.tiles.get('3,0')?.district?.id).toBe('c-b');
+    const origin = world.tiles.get('0,0');
+    expect(origin).toBeDefined();
+    expect(origin?.city).toBeUndefined();
+    expect(origin?.district).toBeUndefined();
   });
 });
 
