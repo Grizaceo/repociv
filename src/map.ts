@@ -834,10 +834,21 @@ export function removeCityFromWorld(world: World, cityRef: string): boolean {
   );
   if (idx === -1) return false;
   const [city] = world.cities.splice(idx, 1);
-  // Remove city tile from world.tiles
-  world.tiles.delete(tileKey(city!.coord));
+  const removed = city!;
+  // The hex stays on the map with its terrain: deleting it left a permanent
+  // hole, live and after a reload.
+  const cityTile = world.tiles.get(tileKey(removed.coord));
+  if (cityTile?.city === removed) cityTile.city = undefined;
+  // The districts belong to the city: free their tiles so their labels stop
+  // drawing and the editor can erase or reuse them.
+  for (const district of removed.districts) {
+    const tile = world.tiles.get(tileKey(district.coord));
+    if (tile?.district?.id === district.id) tile.district = undefined;
+  }
+  // The vacated hexes pass to the neighbouring cities.
+  recalculateAllTerritories(world);
   // Remove any units on this city
-  world.units = world.units.filter((u) => tileKey(u.coord) !== tileKey(city!.coord));
+  world.units = world.units.filter((u) => tileKey(u.coord) !== tileKey(removed.coord));
   return true;
 }
 

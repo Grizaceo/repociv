@@ -190,6 +190,29 @@ describe('applyMapEdits', () => {
     expect(world.units).toHaveLength(0);
   });
 
+  it('keeps the city hex and frees its district tiles when it removes a city', () => {
+    removeCityFromMap('/workspace/repociv');
+    const target = city('repociv', { q: 0, r: 0 }, '/workspace/repociv');
+    const district = {
+      id: 'repociv-src',
+      name: 'src',
+      type: 'campus' as const,
+      coord: { q: 1, r: 0 },
+    };
+    target.districts = [district];
+    const world = worldWith(
+      [target],
+      [tile({ q: 0, r: 0 }), { ...tile({ q: 1, r: 0 }), district }],
+    );
+
+    applyMapEdits(world);
+
+    expect(world.cities).toHaveLength(0);
+    expect(world.tiles.has('0,0')).toBe(true);
+    expect(world.tiles.get('0,0')?.city).toBeUndefined();
+    expect(world.tiles.get('1,0')?.district).toBeUndefined();
+  });
+
   it('paints terrain and erases free hexes', () => {
     setHexTerrain({ q: 1, r: 0 }, 'forest');
     removeHex({ q: 2, r: 0 });

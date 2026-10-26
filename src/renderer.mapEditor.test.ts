@@ -686,6 +686,48 @@ describe('Renderer map editor — erase tool', () => {
     expect(a.territory.some((t) => t.q === 1 && t.r === 0)).toBe(false);
   });
 
+  it('keeps the hex, frees the districts and recalcs the territory of an erased city', () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const gone = makeCity('gone', { q: 0, r: 0 }, '/w/gone');
+    const district = {
+      id: 'gone-src',
+      name: 'src',
+      type: 'campus' as const,
+      coord: { q: 1, r: 0 },
+    };
+    gone.districts = [district];
+    const stay = makeCity('stay', { q: 3, r: 0 }, '/w/stay');
+    const state = makeState(
+      [
+        tile({ q: 0, r: 0 }, 'plains', gone),
+        { ...tile({ q: 1, r: 0 }), district },
+        tile({ q: 2, r: 0 }),
+        tile({ q: 3, r: 0 }, 'plains', stay),
+      ],
+      [gone, stay],
+    );
+    const renderer = new Renderer(canvas, state as never);
+    let hex: Axial = { q: 0, r: 0 };
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => hex;
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('erase');
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+
+    expect(state.world.cities.map((c) => c.id)).toEqual(['stay']);
+    expect(state.world.tiles.has('0,0')).toBe(true);
+    expect(state.world.tiles.get('0,0')?.city).toBeUndefined();
+    expect(state.world.tiles.get('1,0')?.district).toBeUndefined();
+    expect(stay.territory.some((t) => t.q === 1 && t.r === 0)).toBe(true);
+
+    // The freed district hex can now be erased like any other hex.
+    hex = { q: 1, r: 0 };
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    expect(state.world.tiles.has('1,0')).toBe(false);
+  });
+
   it('takes the city units out through GameState so they can spawn again', async () => {
     const { GameState } = await import('./game.ts');
     const { canvas, fire } = makeFakeCanvas();
