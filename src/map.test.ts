@@ -726,4 +726,66 @@ describe('generateWorld', () => {
     expect(world.cities.find((city) => city.name === 'repo-a')?.coord).toEqual(bCoord);
     expect(world.cities.find((city) => city.name === 'repo-b')?.coord).not.toEqual(bCoord);
   });
+
+  it('a city moved back to its own hex keeps it and does not shift the rest', async () => {
+    resetMapEditsCache();
+    const names = ['repo-a', 'repo-b', 'repo-c', 'repo-d', 'repo-e', 'repo-f'];
+    const repos = names.map((name, i) => ({
+      name,
+      path: `repo:enc-${name}`,
+      repoPath: `/w/${name}`,
+      population: 30 - i,
+      extensions: { ts: 4 },
+      gold: 30,
+      lastCommitDays: 1,
+      isLegacy: false,
+      hasGit: true,
+    }));
+    // Four subdirectories per city, three files each: every city has districts,
+    // so a forced move has to shift them too.
+    const files = Array.from({ length: 4 }, (_, d) =>
+      Array.from({ length: 3 }, (_, f) => `d${d}/f${f + 1}.ts`),
+    ).flat();
+
+    const stubMapFetch = () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: string) => {
+          if (input === '/api/repos') return { ok: true, json: async () => repos };
+          if (input === '/api/repo-selections') {
+            return {
+              ok: true,
+              json: async () => ({
+                activeRoot: '/w',
+                roots: [],
+                selectedRepoIds: [],
+                selectedRepoPaths: [],
+                hasSelections: false,
+              }),
+            };
+          }
+          if (input === '/api/repos/selected') return { ok: true, json: async () => repos };
+          if (input.startsWith('/api/files/')) return { ok: true, json: async () => ({ files }) };
+          return { ok: false, json: async () => ({}) };
+        }),
+      );
+    };
+
+    stubMapFetch();
+    const first = await generateWorld();
+    const before = new Map(first.cities.map((city) => [city.name, { ...city.coord }]));
+    const aCoord = before.get('repo-a')!;
+
+    // The user moved repo-a away and back: the saved entry equals its generated
+    // hex, so the automatic layout must not treat it as taken by someone else.
+    placeCity({ repoPath: '/w/repo-a', repoName: 'repo-a', coord: aCoord });
+    resetMapEditsCache();
+
+    const world = await generateWorld();
+
+    expect(world.cities).toHaveLength(first.cities.length);
+    for (const city of world.cities) {
+      expect(city.coord).toEqual(before.get(city.name));
+    }
+  });
 });

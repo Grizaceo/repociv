@@ -1330,12 +1330,15 @@ export async function generateWorld(): Promise<World> {
   for (const wp of wonderPlacements) {
     occupiedCoords.add(tileKey(wp.coord));
   }
-  // Hexes the user already chose for a city in the editor: the automatic
-  // placement leaves them free so applyMapEdits can put the city back there.
+  // Hexes the user already chose for a city in the editor, keyed by the entry
+  // that owns them: the automatic layout leaves each one free for its own city
+  // (a city moved back to its generated hex keeps it) and out of the way for
+  // the rest, so applyMapEdits can put the city back there.
+  const placedHexOwners = new Map<string, string>();
   const mapEdits = getMapEdits();
   for (const entry of mapEdits.placedCities) {
     if (mapEdits.removedCities.includes(entry.repoPath)) continue;
-    occupiedCoords.add(tileKey(entry.coord));
+    placedHexOwners.set(tileKey(entry.coord), entry.repoPath);
   }
   let autoCoordCursor = 0;
   for (const repo of cityRepos) {
@@ -1350,6 +1353,11 @@ export async function generateWorld(): Promise<World> {
       autoCoordCursor++;
       const key = tileKey(coord);
       if (occupiedCoords.has(key)) continue;
+      // A hex saved by the editor is skipped only when it belongs to another
+      // city. persistCityCoord saves `city.repoPath ?? city.id`.
+      const owner = placedHexOwners.get(key);
+      const ownsHex = owner === (repo.repoPath ?? repo.path) || owner === repo.path;
+      if (owner !== undefined && !ownsHex) continue;
 
       // Enforce minimum distance from all previously assigned city coordinates
       let tooClose = false;
