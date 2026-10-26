@@ -451,3 +451,44 @@ describe('Renderer map editor — erase tool', () => {
     expect(state.selectedUnit).toBeNull();
   });
 });
+
+describe('Renderer map editor — erase a hand-placed city', () => {
+  it('does not bring the city back on the next reload', async () => {
+    const { getMapEdits } = await import('./mapEdits.ts');
+    const { applyMapEdits } = await import('./map.ts');
+    const { canvas, fire } = makeFakeCanvas();
+    const repo = {
+      name: 'extra',
+      path: 'extra',
+      repoPath: '/workspace/extra',
+      population: 12,
+      extensions: {},
+      gold: 40,
+      lastCommitDays: 1,
+      isLegacy: false,
+      hasGit: true,
+    };
+    const state = makeState([tile({ q: 1, r: 0 })], []);
+    const renderer = new Renderer(canvas, state as never);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 0 });
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('place');
+    renderer.setMapEditorRepo(repo);
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    expect(state.world.cities).toHaveLength(1);
+    expect(getMapEdits().placedCities).toHaveLength(1);
+
+    renderer.setMapEditorTool('erase');
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    expect(state.world.cities).toHaveLength(0);
+    expect(getMapEdits().placedCities).toHaveLength(0);
+
+    // Reload: step 2 of applyMapEdits must not place it again.
+    const reloaded = makeWorld([tile({ q: 1, r: 0 })], []);
+    applyMapEdits(reloaded, [repo]);
+    expect(reloaded.cities).toHaveLength(0);
+  });
+});

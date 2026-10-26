@@ -15,7 +15,7 @@
 
 import type { Axial } from './hex.ts';
 import { tileKey } from './types.ts';
-import type { Terrain } from './types.ts';
+import type { City, Terrain } from './types.ts';
 
 export const MAP_EDITS_STORAGE_KEY = 'repociv:map-edits:v1';
 
@@ -226,6 +226,21 @@ export function removePlacedCity(repoPath: string): void {
     store.placedCities.splice(idx, 1);
     persist();
   }
+}
+
+/**
+ * The `placedCities` entry that owns this city, if any. Its `repoPath` is the
+ * key `placeCity` used, which is not necessarily `cityKey(city)` — the entry
+ * may have been matched by name when the world was rebuilt from disk.
+ */
+export function findPlacedCityEntry(
+  city: Pick<City, 'id' | 'repoPath' | 'name'>,
+): PlacedCityEntry | null {
+  return (
+    getMapEdits().placedCities.find(
+      (p) => p.repoPath === city.repoPath || p.repoPath === city.id || p.repoName === city.name,
+    ) ?? null
+  );
 }
 
 /** Wipe every manual edit (terrain, hexes, cities). Nations are kept. */

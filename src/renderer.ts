@@ -37,7 +37,14 @@ import {
   removeCityFromWorld,
   type ScannedRepo,
 } from './map.ts';
-import { placeCity, removeCityFromMap, removeHex, setHexTerrain } from './mapEdits.ts';
+import {
+  findPlacedCityEntry,
+  placeCity,
+  removeCityFromMap,
+  removeHex,
+  removePlacedCity,
+  setHexTerrain,
+} from './mapEdits.ts';
 import { applyNationsToWorld, assignCityToNation, cityKey } from './nations.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { HEX_SIZE } from './constants.ts';
@@ -2128,6 +2135,10 @@ export class Renderer {
       const cityUnits = this.state.world.units.filter(
         (u) => u.cityId === city.id || tileKey(u.coord) === tileKey(city.coord),
       );
+      // A city placed by hand also owns an entry in placedCities: leaving it
+      // there makes step 2 of applyMapEdits place it again on the next load.
+      const placed = findPlacedCityEntry(city);
+      if (placed) removePlacedCity(placed.repoPath);
       removeCityFromMap(cityKey(city));
       removeCityFromWorld(this.state.world, city.id);
       // Go through GameState so unitMap, selectedUnit, the path cache and the

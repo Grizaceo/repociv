@@ -230,6 +230,28 @@ describe('applyMapEdits', () => {
     ]);
     expect(world.cities).toHaveLength(1);
   });
+
+  it('never re-places a city whose placement entry is in removedCities', () => {
+    // Defensive: placeCity clears removedCities, but a stale store (or a
+    // removal that only knew the absolute path) can leave both entries.
+    placeCity({ repoPath: '/workspace/extra', repoName: 'extra', coord: { q: 3, r: 0 } });
+    removeCityFromMap('/workspace/extra');
+    const world = worldWith([], [tile({ q: 3, r: 0 })]);
+    applyMapEdits(world, [
+      {
+        name: 'extra',
+        path: '/workspace/extra',
+        repoPath: '/workspace/extra',
+        population: 12,
+        extensions: {},
+        gold: 40,
+        lastCommitDays: 1,
+        isLegacy: false,
+        hasGit: true,
+      },
+    ]);
+    expect(world.cities).toHaveLength(0);
+  });
 });
 
 /** What a reload does: generate from the workspace + manual layout, then apply the edits. */

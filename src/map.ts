@@ -1068,6 +1068,8 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
   // 2) Cities the user placed (or repositioned) by hand.
   const occupied = occupiedCityCoords(world);
   for (const entry of edits.placedCities) {
+    // A placement entry left behind by a removal must not resurrect the city.
+    if (edits.removedCities.includes(entry.repoPath)) continue;
     const existing = world.cities.find(
       (c) => cityKey(c) === entry.repoPath || c.id === entry.repoPath,
     );
