@@ -1126,6 +1126,31 @@ describe('Renderer map editor — history round trips', () => {
     expect(await snapshot(state)).toEqual(after);
   });
 
+  it('undo of a founding takes its units through GameState', async () => {
+    const { GameState } = await import('./game.ts');
+    const { canvas, fire } = makeFakeCanvas();
+    const state = new GameState(makeWorld([tile({ q: 1, r: 0 })], []));
+    const renderer = new Renderer(canvas, state as never);
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('place');
+    renderer.setMapEditorRepo(extraRepo);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 0 });
+
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    const city = state.world.cities[0]!;
+    // An agent of the new city appears before the undo.
+    const unit = state.spawnUnit('NEW', 'NEW', 'hero', 'gris', { q: 1, r: 0 }, undefined, city.id);
+
+    expect(renderer.undoLastMapEdit()).toBe('Fundar extra');
+    expect(state.getUnit('NEW')).toBeUndefined();
+    expect(state.world.units.some((u) => u.id === unit.id)).toBe(false);
+
+    expect(renderer.redoLastMapEdit()).toBe('Fundar extra');
+    expect(state.getUnit('NEW')).toBe(unit);
+    expect(state.world.units.some((u) => u.id === unit.id)).toBe(true);
+  });
+
   it('erase hex: undo, redo and undo again match before and after', async () => {
     const { canvas, fire } = makeFakeCanvas();
     const state = makeState([tile({ q: 0, r: 0 }), tile({ q: 1, r: 0 })], []);

@@ -2277,10 +2277,17 @@ export class Renderer {
     const found = foundCityOp(this.state.world, repo, coord, { record: true });
     if (!found) return;
     let current = found;
+    // Units that appeared in the new city leave through GameState on undo and
+    // come back on redo (removeCityFromWorld alone would leave them in unitMap).
+    let foundedUnits: Unit[] = [];
     pushMapEdit({
       label: `Fundar ${repo.name}`,
       undo: () => {
+        foundedUnits = this.state.world.units.filter(
+          (u) => u.cityId === current.city.id || tileKey(u.coord) === tileKey(current.city.coord),
+        );
         undoFoundCity(this.state.world, current);
+        for (const u of foundedUnits) this.state.removeUnit(u.id);
         // The repo goes back to the picker so it can be founded again (the
         // renderer keeps its own selection even when the bar is not mounted).
         this._mapEditorRepo = repo;
@@ -2288,6 +2295,7 @@ export class Renderer {
       },
       redo: () => {
         current = foundCityOp(this.state.world, repo, coord, { record: true }) ?? current;
+        for (const u of foundedUnits) this.state.restoreUnit(u);
         this._mapEditorRepo = null;
         clearMapEditorRepoSelection();
       },
