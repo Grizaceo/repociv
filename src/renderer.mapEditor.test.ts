@@ -743,6 +743,50 @@ const extraRepo = {
 };
 
 describe('Renderer map editor — place tool', () => {
+  it('refuses to found on a district hex', () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const owner = makeCity('owner', { q: 0, r: 0 }, '/w/owner');
+    const district = {
+      id: 'owner-src',
+      name: 'src',
+      type: 'campus' as const,
+      coord: { q: 1, r: 0 },
+    };
+    owner.districts = [district];
+    const state = makeState(
+      [tile({ q: 0, r: 0 }, 'plains', owner), { ...tile({ q: 1, r: 0 }), district }],
+      [owner],
+    );
+    const renderer = new Renderer(canvas, state as never);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 0 });
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('place');
+    renderer.setMapEditorRepo(extraRepo);
+
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+
+    expect(state.world.cities).toHaveLength(1);
+    expect(state.world.tiles.get('1,0')?.district?.id).toBe('owner-src');
+  });
+
+  it('refuses to found on the ocean', () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeState([tile({ q: 1, r: 0 }, 'ocean')], []);
+    const renderer = new Renderer(canvas, state as never);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 0 });
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('place');
+    renderer.setMapEditorRepo(extraRepo);
+
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+
+    expect(state.world.cities).toHaveLength(0);
+  });
+
   it('never places the same repo twice', () => {
     const { canvas, fire } = makeFakeCanvas();
     const state = makeState([tile({ q: 1, r: 0 }), tile({ q: 3, r: 1 })], []);

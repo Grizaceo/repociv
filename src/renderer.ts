@@ -2185,6 +2185,12 @@ export class Renderer {
     if (!repo) return;
     const tile = this.state.world.tiles.get(tileKey(coord));
     if (!tile || tile.city) return;
+    // A district belongs to its city: founding here would drop it from the map
+    // and the reload's placement pass would refuse the hex anyway. Ocean is not
+    // city ground either (relocation forbids it). The reload pass cannot check
+    // the ocean: it runs before the painted terrain, so a hex painted to plains
+    // before founding still reads as ocean there, and the map edge is ocean.
+    if (tile.district || tile.terrain === 'ocean') return;
     // The picker stays selected after a placement: without this check every
     // click on another hex would push a second City with the same id.
     const key = repo.repoPath ?? repo.path;
