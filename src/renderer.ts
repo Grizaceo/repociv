@@ -46,6 +46,7 @@ import {
   setHexTerrain,
 } from './mapEdits.ts';
 import { applyNationsToWorld, assignCityToNation, cityKey } from './nations.ts';
+import { invalidatePathCache } from './pathfinding.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { clearMapEditorRepoSelection } from './ui/mapEditor.ts';
 import { HEX_SIZE } from './constants.ts';
@@ -2116,6 +2117,8 @@ export class Renderer {
     if (tile.city?.isCapital) return; // the capital keeps its sacred ground
     setHexTerrain(coord, this._mapEditorTerrain);
     tile.terrain = this._mapEditorTerrain;
+    // Cached routes do not depend on terrain: repaint them from scratch.
+    invalidatePathCache();
     this.state.notifyUpdate();
   }
 
@@ -2151,6 +2154,7 @@ export class Renderer {
       // unitRemoved callbacks stay in sync — otherwise a unit coming back with
       // the same id is handed the ghost and never re-enters world.units.
       for (const u of cityUnits) this.state.removeUnit(u.id);
+      invalidatePathCache();
       this.state.notifyUpdate();
       return;
     }
@@ -2160,6 +2164,7 @@ export class Renderer {
     for (const c of this.state.world.cities) {
       c.territory = c.territory.filter((t) => this.state.world.tiles.has(tileKey(t)));
     }
+    invalidatePathCache();
     this.state.notifyUpdate();
   }
 
@@ -2182,6 +2187,7 @@ export class Renderer {
     // leaves the dropdown.
     this._mapEditorRepo = null;
     clearMapEditorRepoSelection();
+    invalidatePathCache();
     this.state.notifyUpdate();
   }
 

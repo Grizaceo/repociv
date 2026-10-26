@@ -507,6 +507,28 @@ describe('Renderer map editor — terrain brush', () => {
 
     expect(state.world.tiles.get('2,2')?.terrain).toBe('plains');
   });
+
+  it('invalidates the cached unit paths when it paints', async () => {
+    const { aStarPath } = await import('./pathfinding.ts');
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeState(
+      [tile({ q: 0, r: 0 }), tile({ q: 1, r: 0 }), tile({ q: 2, r: 0 })],
+      [],
+    );
+    const renderer = new Renderer(canvas, state as never);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 0 });
+
+    const before = aStarPath({ q: 0, r: 0 }, { q: 2, r: 0 }, state.world, 'hero');
+    expect(before.some((c) => c.q === 1 && c.r === 0)).toBe(true);
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('terrain');
+    renderer.setMapEditorTerrain('ocean');
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+
+    const after = aStarPath({ q: 0, r: 0 }, { q: 2, r: 0 }, state.world, 'hero');
+    expect(after.some((c) => c.q === 1 && c.r === 0)).toBe(false);
+  });
 });
 
 describe('Renderer map editor — nation tool', () => {
@@ -573,6 +595,28 @@ describe('Renderer map editor — erase tool', () => {
 
     expect(state.world.tiles.has('1,0')).toBe(false);
     expect(state.world.tiles.has('0,0')).toBe(true);
+  });
+
+  it('invalidates the cached unit paths when it erases a hex', async () => {
+    const { aStarPath } = await import('./pathfinding.ts');
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeState(
+      [tile({ q: 0, r: 0 }), tile({ q: 1, r: 0 }), tile({ q: 2, r: 0 })],
+      [],
+    );
+    const renderer = new Renderer(canvas, state as never);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 0 });
+
+    const before = aStarPath({ q: 0, r: 0 }, { q: 2, r: 0 }, state.world, 'hero');
+    expect(before.some((c) => c.q === 1 && c.r === 0)).toBe(true);
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('erase');
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+
+    const after = aStarPath({ q: 0, r: 0 }, { q: 2, r: 0 }, state.world, 'hero');
+    expect(after.some((c) => c.q === 1 && c.r === 0)).toBe(false);
   });
 
   it('takes the city units out through GameState so they can spawn again', async () => {
@@ -685,6 +729,30 @@ describe('Renderer map editor — place tool', () => {
 
     expect(state.world.cities).toHaveLength(1);
     expect(state.world.cities[0]?.coord).toEqual({ q: 1, r: 0 });
+  });
+
+  it('invalidates the cached unit paths when it places a city', async () => {
+    const { aStarPath } = await import('./pathfinding.ts');
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeState(
+      [tile({ q: 0, r: 0 }), tile({ q: 1, r: 0 }), tile({ q: 2, r: 0 }), tile({ q: 3, r: 0 })],
+      [],
+    );
+    const renderer = new Renderer(canvas, state as never);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 3, r: 0 });
+
+    const before = aStarPath({ q: 0, r: 0 }, { q: 2, r: 0 }, state.world, 'hero');
+
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('place');
+    renderer.setMapEditorRepo(extraRepo);
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    expect(state.world.cities).toHaveLength(1);
+
+    // A fresh computation returns a new array; the cached one was the same object.
+    const after = aStarPath({ q: 0, r: 0 }, { q: 2, r: 0 }, state.world, 'hero');
+    expect(after).not.toBe(before);
   });
 
   it('clears the picker after placing so the repo leaves the dropdown', async () => {
