@@ -65,7 +65,10 @@ async function seedRepoSelection(page: Page) {
     .map((repo) => repo.path)
     .filter((path): path is string => typeof path === 'string' && path.length > 0)
     .slice(0, 12);
-  expect(selectedRepoPaths.length, 'expected /api/repos to return selectable repos').toBeGreaterThan(0);
+  expect(
+    selectedRepoPaths.length,
+    'expected /api/repos to return selectable repos',
+  ).toBeGreaterThan(0);
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.evaluate((paths) => {
     window.localStorage.setItem(
@@ -89,7 +92,12 @@ async function bootRepoCiv(page: Page) {
   await seedRepoSelection(page);
   await page.goto('/');
   await expect(page.locator('#loading-screen')).toBeHidden({ timeout: 20_000 });
-  if (await page.locator('#repo-onboarding').isVisible().catch(() => false)) {
+  if (
+    await page
+      .locator('#repo-onboarding')
+      .isVisible()
+      .catch(() => false)
+  ) {
     await expect(page.locator('#repo-onboarding-next')).toBeEnabled({ timeout: 20_000 });
     await page.locator('#repo-onboarding-next').click();
     await expect(page.locator('#repo-onboarding-title')).toContainText(/Revisa tu seleccion/);
@@ -125,9 +133,8 @@ test.describe('map editor — harness', () => {
       .poll(async () =>
         page.evaluate(
           () =>
-            (
-              window as never as { __nations: () => { nations: { name: string }[] } }
-            ).__nations().nations[0]?.name,
+            (window as never as { __nations: () => { nations: { name: string }[] } }).__nations()
+              .nations[0]?.name,
         ),
       )
       .toBe('Liga del Norte');
@@ -194,7 +201,10 @@ test.describe('map editor — app real', () => {
     await expect(page.locator('#map-editor .map-editor-tool')).toHaveCount(5);
 
     // The terrain tool reveals the palette.
-    await page.locator('#map-editor').getByRole('button', { name: /Terreno/ }).click();
+    await page
+      .locator('#map-editor')
+      .getByRole('button', { name: /Terreno/ })
+      .click();
     await expect(page.locator('#map-editor .map-editor-terrain')).toHaveCount(7);
 
     // Escape closes one panel at a time, and the side panel is earlier in the
