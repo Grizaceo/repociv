@@ -197,7 +197,12 @@ test.describe('map editor — app real', () => {
     await page.locator('#map-editor').getByRole('button', { name: /Terreno/ }).click();
     await expect(page.locator('#map-editor .map-editor-terrain')).toHaveCount(7);
 
-    // Escape closes the editor again.
+    // Escape closes one panel at a time, and the side panel is earlier in the
+    // chain: the first press closes it, the second closes the editor.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#side-panel')).toBeHidden();
+    await expect(page.locator('#map-editor')).toBeVisible();
+
     await page.keyboard.press('Escape');
     await expect(page.locator('#map-editor')).toBeHidden();
   });
