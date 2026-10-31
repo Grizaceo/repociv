@@ -35,6 +35,7 @@ CLOSE_REFUSED = 4003
 _HELLO_TIMEOUT_S = 5.0
 # No event fires when a PTY changes size, so an open terminal has to ask.
 _SIZE_POLL_S = 1.0
+_REOPEN_DELAY_S = 0.5
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 
 
@@ -87,6 +88,7 @@ class _Session:
         self.terminal_id = agent.terminal_id
         self.pane_id = agent.pane_id
         self._status_task: asyncio.Task[None] | None = None
+        self._streamed = False
 
     async def _control(self, message: dict[str, Any]) -> None:
         await self.ws.send(json.dumps(message))
@@ -131,25 +133,46 @@ class _Session:
 
     async def _pump_screen(self, geometry: PaneGeometry) -> str:
         """Stream at the PTY's real size, reopening when it changes: a smaller
-        viewer would clip the screen. Returns why the terminal is gone."""
-        while True:
-            outcome = await self._stream_at(geometry.cols, geometry.rows)
-            if isinstance(outcome, str):
-                return outcome
-            geometry = outcome
-            await self._control({"type": "size", "cols": geometry.cols, "rows": geometry.rows})
+        viewer would clip the screen. Returns why the terminal is gone.
 
-    async def _stream_at(self, cols: int, rows: int) -> str | PaneGeometry:
+        A stream ending proves nothing by itself: a bridge going down takes its
+        observer along, and "closed" tells the browser to stop reconnecting. Only
+        herdr can say the terminal is gone; anything else raises, which drops the
+        connection and leaves the pacing to the browser's back-off.
+        """
+        while True:
+            self._streamed = False
+            resized = await self._stream_at(geometry.cols, geometry.rows)
+            if resized is None:
+                if not self._streamed:
+                    raise HerdrError("observer_failed")
+                await asyncio.sleep(_REOPEN_DELAY_S)
+                try:
+                    resized = await herdr_runtime.locate(self.terminal_id)
+                except HerdrError as exc:
+                    if exc.code == "pane_not_found":
+                        return exc.code
+                    raise
+            if (resized.cols, resized.rows) != (geometry.cols, geometry.rows):
+                await self._control({"type": "size", "cols": resized.cols, "rows": resized.rows})
+            geometry = resized
+
+    async def _stream_at(self, cols: int, rows: int) -> PaneGeometry | None:
+        """Forward frames until the PTY changes size, which returns the new
+        geometry, or until the observer ends, which returns None."""
         forward = asyncio.create_task(self._forward(cols, rows))
         try:
             while True:
                 done, _ = await asyncio.wait({forward}, timeout=_SIZE_POLL_S)
                 if done:
-                    return forward.result()
+                    forward.result()
+                    return None
                 try:
                     geometry = await herdr_runtime.locate(self.terminal_id)
-                except HerdrError as exc:
-                    return exc.code
+                except HerdrError:
+                    # A move can fail this between its two requests. The observer
+                    # follows the terminal, so its ending is what gets checked.
+                    continue
                 if geometry.pane_id != self.pane_id:
                     self.pane_id = geometry.pane_id
                     self._restart_status()
@@ -159,16 +182,16 @@ class _Session:
             forward.cancel()
             await asyncio.gather(forward, return_exceptions=True)
 
-    async def _forward(self, cols: int, rows: int) -> str:
+    async def _forward(self, cols: int, rows: int) -> None:
         stream = herdr_runtime.observe(self.terminal_id, cols, rows, binary=self.binary)
         try:
             async for item in stream:
                 if isinstance(item, Closed):
-                    return item.reason
+                    return
+                self._streamed = True
                 await self.ws.send(item)
         finally:
             await stream.aclose()
-        return "observer_exited"
 
     async def _read_client(self) -> None:
         async for message in self.ws:

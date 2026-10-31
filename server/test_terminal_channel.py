@@ -153,6 +153,7 @@ def runtime(monkeypatch: pytest.MonkeyPatch) -> FakeRuntime:
     fake = FakeRuntime()
     fake.install(monkeypatch)
     monkeypatch.setattr(terminal_channel, "_SIZE_POLL_S", 0.02)
+    monkeypatch.setattr(terminal_channel, "_REOPEN_DELAY_S", 0.0)
     return fake
 
 
@@ -321,11 +322,57 @@ def test_a_failed_input_is_reported_not_swallowed(runtime: FakeRuntime) -> None:
 def test_closing_the_pane_tells_the_client_and_ends_the_session(runtime: FakeRuntime) -> None:
     async def session(ws: Any) -> None:
         await _json(ws)
+        runtime.frames.put_nowait(b"last screen")
+        await ws.recv()
+        runtime.geometry = HerdrError("pane_not_found")
         runtime.frames.put_nowait(Closed("terminal exited"))
-        assert await _json(ws) == {"type": "closed", "reason": "terminal exited"}
+        assert await _json(ws) == {"type": "closed", "reason": "pane_not_found"}
 
     _run(session)
     assert runtime.observers_open == 0
+
+
+def test_an_observer_dying_is_not_the_terminal_closing(runtime: FakeRuntime) -> None:
+    """A bridge going down takes its observer along. Calling that "closed" would
+    tell the browser the agent is gone, and it would stop reconnecting."""
+
+    async def session(ws: Any) -> None:
+        await _json(ws)
+        runtime.frames.put_nowait(b"before")
+        assert await ws.recv() == b"before"
+        runtime.frames.put_nowait(Closed("observer_exited"))
+        await _until(lambda: len(runtime.opened) == 2)
+        runtime.frames.put_nowait(b"after")
+        assert await ws.recv() == b"after"
+
+    _run(session)
+
+
+def test_herdr_going_away_drops_the_link_so_the_browser_retries(runtime: FakeRuntime) -> None:
+    async def session(ws: Any) -> None:
+        await _json(ws)
+        runtime.frames.put_nowait(b"screen")
+        await ws.recv()
+        runtime.geometry = HerdrError("unavailable")
+        runtime.frames.put_nowait(Closed("server stopped"))
+        with pytest.raises(websockets.exceptions.ConnectionClosed):
+            await ws.recv()
+
+    _run(session)
+
+
+def test_an_observer_that_never_streams_drops_the_link_instead_of_spinning(runtime: FakeRuntime) -> None:
+    """A protocol mismatch fails at once, forever. The browser's back-off paces
+    the retries, and its next attach reports what is wrong."""
+
+    async def session(ws: Any) -> None:
+        await _json(ws)
+        runtime.frames.put_nowait(Closed("observer_exited"))
+        with pytest.raises(websockets.exceptions.ConnectionClosed):
+            await ws.recv()
+
+    _run(session)
+    assert len(runtime.opened) == 1
 
 
 def test_a_browser_leaving_stops_the_observer(runtime: FakeRuntime) -> None:
@@ -365,3 +412,21 @@ def test_wants_matches_only_the_terminal_path() -> None:
     assert terminal_channel.wants(Ws("/terminal?x=1"))
     assert not terminal_channel.wants(Ws("/"))
     assert not terminal_channel.wants(Ws("/terminal/extra"))
+
+
+def test_a_failed_size_poll_does_not_end_a_live_terminal(runtime: FakeRuntime) -> None:
+    """A move can fail the poll between its two requests. Only the observer knows
+    a terminal is gone: it follows the terminal, not the pane."""
+    good = runtime.geometry
+
+    async def session(ws: Any) -> None:
+        await _json(ws)
+        await _until(lambda: bool(runtime.opened))
+        runtime.geometry = HerdrError("pane_not_found")
+        await asyncio.sleep(0.1)
+        runtime.geometry = good
+        runtime.frames.put_nowait(b"still here")
+        assert await ws.recv() == b"still here"
+
+    _run(session)
+    assert runtime.opened == [("term_a", 114, 39)]
