@@ -325,6 +325,10 @@ body.local-view #agents-panel {
   max-height: 58vh;
   padding: var(--space-2) 0;
 }
+.agents-body--chat > .agents-chat-log {
+  flex-shrink: 1;
+  min-height: 0;
+}
 .agents-msg {
   border-radius: 6px;
   padding: var(--space-2) var(--space-3);
@@ -394,13 +398,14 @@ body.local-view #agents-panel {
 /* ── Compositor: un turno sobre la sesión, no un chat en vivo ─────────────── */
 .agents-compose {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-1) var(--space-2);
   margin-top: var(--space-2);
   border-top: 1px solid var(--ui-border);
   padding-top: var(--space-2);
 }
 .agents-compose-text {
+  min-width: 0;
   resize: vertical;
   min-height: 2.4em;
   padding: var(--space-1) var(--space-2);
@@ -439,6 +444,7 @@ body.local-view #agents-panel {
   margin: 0;
   color: var(--ui-text-dim);
   font-size: var(--text-2xs);
+  overflow-wrap: anywhere;
 }
 .agents-compose-hint--busy {
   color: var(--ui-gold);

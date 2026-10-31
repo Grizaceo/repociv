@@ -77,14 +77,18 @@ describe('sortAgents', () => {
 
 describe('messages', () => {
   it('explains a refusal in plain words and shows unknown codes as they are', () => {
-    expect(reasonText('herdr_stopped')).toBe('herdr no está corriendo.');
+    expect(reasonText('herdr_stopped')).toBe('herdr no está corriendo. Ábrelo con herdr en una terminal y abre este agente en un panel.');
+    expect(reasonText('herdr_missing')).toBe('RepoCiv solo puede escribirle a Claude y Devin cuando corren dentro de herdr, y herdr no está instalado. Instálalo (README → «Agentes en herdr») y abre ahí el agente.');
+    expect(reasonText('herdr_incompatible')).toBe('herdr se actualizó, pero su servidor sigue en la versión anterior. Reinicia herdr cuando no tengas agentes trabajando y RepoCiv se reconectará.');
     expect(reasonText('terminal exited')).toBe('terminal exited');
   });
 
   it('names both versions for an old herdr', () => {
-    expect(runtimeText({ state: 'outdated', version: '0.8.0', minVersion: '0.9.1' })).toContain('0.8.0');
+    expect(runtimeText({ state: 'outdated', version: '0.8.0', minVersion: '0.9.1' })).toBe(
+      'RepoCiv necesita herdr 0.9.1 o superior y tienes 0.8.0. Actualízalo con herdr update y abre el agente dentro de herdr.',
+    );
     expect(runtimeText({ state: 'missing', version: '', minVersion: '0.9.1' })).toBe(
-      'herdr no está instalado.',
+      'RepoCiv solo puede escribirle a Claude y Devin cuando corren dentro de herdr, y herdr no está instalado. Instálalo (README → «Agentes en herdr») y abre ahí el agente.',
     );
   });
 });
