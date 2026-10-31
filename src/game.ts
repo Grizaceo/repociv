@@ -44,6 +44,8 @@ export interface Mission {
   unit: string;
   questName: string;
   status: 'running' | 'complete' | 'failed';
+  /** City the unit belonged to when the mission started (for "última misión"). */
+  cityId?: string;
   startedAt: number;
   completedAt: number | null;
   simulated?: boolean; // true = bridge was offline/simulated
@@ -664,8 +666,19 @@ export class GameState {
   }
 
   // ─── Mission tracking ────────────────────────────────────────────────────
-  startMission(id: string, unit: string, questName: string) {
-    this._missions.start(id, unit, questName);
+  startMission(id: string, unit: string, questName: string, cityId?: string) {
+    this._missions.start(id, unit, questName, cityId);
+  }
+
+  /** Most recent finished mission for a city, or undefined. Missions are
+   *  never GC'd, so history is always available. */
+  lastFinishedMissionForCity(cityId: string): Mission | undefined {
+    let best: Mission | undefined;
+    for (const m of this.missions.values()) {
+      if (m.cityId !== cityId || m.status === 'running' || !m.completedAt) continue;
+      if (!best || m.completedAt > (best.completedAt ?? 0)) best = m;
+    }
+    return best;
   }
 
   completeMission(id: string, success: boolean) {

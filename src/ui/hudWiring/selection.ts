@@ -47,7 +47,7 @@ export function wireSelection({ renderer, state, bridge }: SelectionDeps): void 
       const activeBuildings = state.world.buildings.filter((b) => b.cityId === cityId);
       const tile = state.world.tiles.get(tileKey(city.coord));
       // Show loading state immediately, then resolve asynchronously
-      openCityPanel(city, activeBuildings, tile);
+      openCityPanel(city, activeBuildings, tile, state.lastFinishedMissionForCity(cityId));
       loadGitInfo(city);
       loadFilesInfo(city);
     }

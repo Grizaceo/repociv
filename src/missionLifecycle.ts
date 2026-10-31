@@ -25,12 +25,13 @@ export class MissionRegistry {
     readonly ops: MissionOps,
   ) {}
 
-  start(id: string, unit: string, questName: string): void {
+  start(id: string, unit: string, questName: string, cityId?: string): void {
     this.s.active.set(id, {
       id,
       unit,
       questName,
       status: 'running',
+      cityId,
       startedAt: Date.now(),
       completedAt: null,
     });

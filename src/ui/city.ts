@@ -1,5 +1,6 @@
 // ─── RepoCiv — City Panel ─────────────────────────────────────────────────────
 import type { City, Building, Tile } from '../types.ts';
+import type { Mission } from '../game.ts';
 import { trapFocus } from './focusTrap.ts';
 import { getLatestNews, markNewsAsRead } from '../bridge.ts';
 import { trackCityVisit } from './analytics.ts';
@@ -35,7 +36,12 @@ const SKILL_LABEL: Record<string, string> = {
   broken: '✗ Roto',
 };
 
-export function openCityPanel(city: City, activeBuildings: Building[], tile?: Tile) {
+export function openCityPanel(
+  city: City,
+  activeBuildings: Building[],
+  tile?: Tile,
+  lastMission?: Mission | null,
+) {
   const panel = document.getElementById('city-panel');
   if (!panel) return;
   // Count cold opens AND city→city switches, but not same-city data refreshes
@@ -83,11 +89,15 @@ export function openCityPanel(city: City, activeBuildings: Building[], tile?: Ti
     setText('city-res-prod', activeBuildings.length.toString());
   }
 
-  // Active buildings → missions list
+  // Active buildings → missions list, then the last finished mission
   const missionsEl = document.getElementById('city-missions-list');
   if (missionsEl) {
+    const lastMissionHtml = lastMission
+      ? `<div class="city-item" style="color:var(--text-dim)" title="Última misión terminada">${lastMission.status === 'complete' ? '✓' : '✗'} ${escapeHtml(lastMission.questName)}</div>`
+      : '';
     if (activeBuildings.length === 0) {
       missionsEl.innerHTML =
+        lastMissionHtml ||
         '<div class="city-item" style="color:var(--text-dim)">Sin misiones activas</div>';
     } else {
       missionsEl.innerHTML = activeBuildings
@@ -102,7 +112,7 @@ export function openCityPanel(city: City, activeBuildings: Building[], tile?: Ti
           const pct = b.state === 'building' ? ` (${Math.round(b.progress)}%)` : '';
           return `<div class="city-item" style="color:${color}" title="${escapeHtml(b.name)}${pct}">${icon} ${escapeHtml(b.name)}${pct}</div>`;
         })
-        .join('');
+        .join('') + lastMissionHtml;
     }
   }
 
