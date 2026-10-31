@@ -21,8 +21,6 @@ from server.routes.core import get_own_sessions  # noqa: F401
 from server.routes.core import post_own_session_close  # noqa: F401
 from server.routes.core import get_external_agent_chat  # noqa: F401
 from server.routes.core import post_external_agent_chat  # noqa: F401
-from server.routes.core import post_claude_live_spawn  # noqa: F401
-from server.routes.core import post_claude_live_stop  # noqa: F401
 from server.routes.core import get_external_agent_resume  # noqa: F401
 from server.routes.core import post_external_agent_reply  # noqa: F401
 from server.routes.core import get_missions  # noqa: F401
@@ -84,8 +82,6 @@ from server.routes.graph import get_wonders  # noqa: F401
 from server.routes.graph import get_wonder_by_id  # noqa: F401
 from server.routes.graph import get_wonder_health  # noqa: F401
 from server.routes.foreign import get_repo_profile  # noqa: F401
-from server.routes.foreign import get_repo_profile_cache  # noqa: F401
-from server.routes.foreign import post_foreign_score  # noqa: F401
 from server.routes.foreign import post_foreign_report  # noqa: F401
 from server.routes.foreign import get_reports  # noqa: F401
 from server.routes.foreign import get_report_by_id  # noqa: F401

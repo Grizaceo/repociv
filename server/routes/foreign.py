@@ -40,54 +40,6 @@ def get_repo_profile(ctx: "RouteContext") -> tuple[int, Any]:
                       "Verify the repo path exists and is a directory")
     return 200, profile
 
-def get_repo_profile_cache(ctx: "RouteContext") -> tuple[int, Any]:
-    """GET /api/foreign/repo-profile/cache — list cached profiles."""
-    cache = _rp.get_cached_profiles()
-    return 200, {
-        "count": len(cache),
-        "profiles": {k: {"repoName": v.get("repoName", "") if v else None,
-                         "recentFilesCount": v.get("recentFilesCount", 0) if v else 0}
-                      for k, v in cache.items()},
-    }
-
-def post_foreign_score(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
-    """POST /api/foreign/score — score an article against a repo profile.
-
-    Body:
-        article (dict): article with title, blogName, category, url
-        repoPath (str): path to the repo
-        events (list, optional): recent events
-    """
-    article = body.get("article", {})
-    repo_path = body.get("repoPath", "")
-    events = body.get("events", [])
-
-    if not article or not repo_path:
-        return _error(400, "article and repoPath are required",
-                      "Request body missing required fields",
-                      "Send { article: {...}, repoPath: '/path/to/repo' }")
-
-    selected_path = _selected_repo_path(repo_path)
-    if selected_path is None:
-        return 403, {"error": "repoPath must reference a selected RepoCiv repository"}
-    profile = _rp.build_profile(selected_path)
-    if profile is None:
-        return _error(404, f"Repo path not found: {selected_path}",
-                      f"Cannot build profile for '{selected_path}' — path does not exist or is not a directory",
-                      "Send a valid repo path that exists on the filesystem")
-
-    scoring = _fr.score_article_repo(article, profile, events=events if events else None)
-    return 200, {
-        "scoring": scoring,
-        "profile": {
-            "repoName": profile["repoName"],
-            "repoPath": profile["repoPath"],
-            "topLevelDirs": profile["topLevelDirs"][:10],
-            "recentFilesCount": profile["recentFilesCount"],
-            "skillTags": profile["skillTags"],
-        },
-    }
-
 def post_foreign_report(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
     """POST /api/foreign/report — generate and save a ForeignRelationsReport.
 

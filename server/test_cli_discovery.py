@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from server import agent_runner, claude_live, cli_discovery
+from server import agent_runner, cli_discovery
 
 
 def _make_executable(path: Path) -> Path:
@@ -81,18 +81,6 @@ def test_find_claude_none_when_absent(monkeypatch):
     monkeypatch.setattr(cli_discovery.shutil, "which", lambda name: None)
     monkeypatch.setattr(cli_discovery.Path, "exists", lambda self: False)
     assert cli_discovery.find_claude() is None
-
-
-# ─── claude_live keeps "" (not None) and owns no candidate list ──────────────
-
-def test_claude_live_find_claude_empty_string_when_absent(monkeypatch):
-    monkeypatch.setattr(cli_discovery, "find_claude", lambda: None)
-    assert claude_live._find_claude() == ""
-
-
-def test_claude_live_find_claude_delegates_when_present(monkeypatch):
-    monkeypatch.setattr(cli_discovery, "find_claude", lambda: "/opt/claude")
-    assert claude_live._find_claude() == "/opt/claude"
 
 
 # ─── agent_runner wrappers delegate; _has_* resolve the runner globals ───────

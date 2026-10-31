@@ -833,9 +833,8 @@ class ExternalAgentTracker:
 
         One /proc scan per poll, shared by every observation. A probe that fails
         leaves ``live`` as None and the states fall back to timestamps alone. An
-        observation whose source already declared ``live`` (it owns the process,
-        e.g. claude-live) keeps that verdict: the probe is approximate, the
-        source is not."""
+        observation whose source already declared ``live`` keeps that verdict:
+        the probe is approximate."""
         try:
             reading = self._liveness()
         except Exception:
@@ -1219,7 +1218,6 @@ def start(send: SendFn, config: TrackerConfig | None = None) -> bool:
     if not cfg.enabled or _thread is not None:
         return False
     from server import (  # noqa: PLC0415
-        claude_live,
         claude_sessions,
         devin_sessions,
         hermes_sessions,
@@ -1245,8 +1243,6 @@ def start(send: SendFn, config: TrackerConfig | None = None) -> bool:
     opencode = opencode_sessions.source_from_env(recent_s=cfg.recent_s)
     if opencode is not None:
         sources.append(opencode)
-    # The process-owned claude channel: its sessions declare their own liveness.
-    sources.append(claude_live.ClaudeLiveSource(claude_live.get_manager()))
     tracker = ExternalAgentTracker(cfg, send=send, sources=sources)
 
     def _loop() -> None:
