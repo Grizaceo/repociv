@@ -50,7 +50,7 @@ describe('fitFontSize', () => {
   });
 
   it('never goes past the readable range', () => {
-    expect(fitFontSize(13, { cols: 10, rows: 10 }, { cols: 300, rows: 90 })).toBe(8);
+    expect(fitFontSize(13, { cols: 10, rows: 10 }, { cols: 300, rows: 90 })).toBe(6);
     expect(fitFontSize(13, { cols: 400, rows: 200 }, { cols: 80, rows: 24 })).toBe(16);
   });
 

@@ -91,6 +91,13 @@ el umbral exacto: 61 caracteres pasaron, 78 no, y `/zzz…` de 300 sí. Por eso:
 
 ### Tamaño y cierre
 
+- El tamaño real lo manda la ventana de herdr: medimos 140×84 y, con la ventana
+  maximizada, 322×84. A 322 columnas la fuente baja a 6 px y el panel crece lo
+  necesario. Si aun así no cabe, el recorte nunca cae sobre la última fila, donde
+  los agentes tienen el cuadro de entrada.
+- Claude Code con `tui: fullscreen` usa pantalla alternativa: no deja scrollback en
+  el PTY (83 líneas contra 750–999 de Devin) y captura el ratón, que `observe` no
+  deja llegar. En RepoCiv su conversación anterior no se puede recorrer.
 - `pane.layout` da el tamaño real. El observador con ese tamaño recibe `width` y
   `height` iguales. xterm siempre usa ese tamaño y la fuente se ajusta al panel:
   redimensionar el navegador no toca el PTY.

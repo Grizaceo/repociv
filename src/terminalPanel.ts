@@ -16,12 +16,17 @@ import { RETRY_MS, TerminalLink } from './terminalLink.ts';
 import type { TerminalAgent, TerminalAttachment } from './terminalLink.ts';
 import { bindPanelAction, ensurePanel, hidePanel, showPanel } from './ui/panelShell.ts';
 
-const MIN_FONT_PX = 8;
+// Small on purpose: a maximized herdr window is over 300 columns, and seeing the
+// whole screen beats reading it comfortably.
+const MIN_FONT_PX = 6;
 const MAX_FONT_PX = 16;
 const DEFAULT_FONT_PX = 13;
 /** What fits a bridge WebSocket message once JSON-escaped. */
 const MAX_PASTE_CHARS = 200_000;
 const SCROLLBACK_LINES = 5000;
+/** xterm's own scrollbar overlays the grid's right edge. */
+const SCROLLBAR_PX = 14;
+const WINDOW_GAP_PX = 8;
 /** ESC CR: a newline in the prompt. xterm sends a plain CR for Shift+Enter. */
 const NEWLINE_SEQUENCE = '\x1b\r';
 
@@ -119,6 +124,7 @@ class XTermPanel {
   private _link: TerminalLink | null = null;
   private _target: TerminalAgent | null = null;
   private _pty: CellGrid = { cols: 80, rows: 24 };
+  private _grown = false;
 
   /** Open on `target`, or on the last agent, or on the list of agents. */
   async open(target?: TerminalAgent): Promise<void> {
@@ -220,6 +226,7 @@ class XTermPanel {
 
   private async _showPicker(): Promise<void> {
     this._disconnect();
+    this._restorePanel();
     this._setHeader(null);
     this._setNotice('');
     this._showView('picker');
@@ -322,7 +329,42 @@ class XTermPanel {
   private _resize(pty: CellGrid): void {
     this._pty = pty;
     this._term?.resize(pty.cols, pty.rows);
+    this._restorePanel();
     this._fitFont();
+    requestAnimationFrame(() => this._revealPty());
+  }
+
+  private _restorePanel(): void {
+    if (!this._grown) return;
+    this._grown = false;
+    this._panel?.style.removeProperty('width');
+    this._panel?.style.removeProperty('height');
+  }
+
+  /** The smallest font may still not fit: grow into the free screen, unless the
+   *  user sized this window. Whatever stays clipped is the top of the screen,
+   *  never the prompt, which agents keep on the last rows. */
+  private _revealPty(): void {
+    const panel = this._panel;
+    const viewport = this._element('.terminal-viewport');
+    const screen = this._element('.xterm-screen');
+    if (!this._isOpen || !panel || !viewport || !screen) return;
+    if (!panel.classList.contains('hud-window--customized')) {
+      const { left, top } = panel.getBoundingClientRect();
+      const needed = {
+        width: panel.offsetWidth - viewport.clientWidth + screen.offsetWidth + SCROLLBAR_PX,
+        height: panel.offsetHeight - viewport.clientHeight + screen.offsetHeight,
+      };
+      if (screen.offsetWidth > viewport.clientWidth) {
+        panel.style.width = `${Math.min(needed.width, innerWidth - left - WINDOW_GAP_PX)}px`;
+        this._grown = true;
+      }
+      if (screen.offsetHeight > viewport.clientHeight) {
+        panel.style.height = `${Math.min(needed.height, innerHeight - top - WINDOW_GAP_PX)}px`;
+        this._grown = true;
+      }
+    }
+    viewport.scrollTop = viewport.scrollHeight;
   }
 
   private _fitFont(): void {

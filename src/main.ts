@@ -276,6 +276,8 @@ function showToast(message: string, duration = 3000) {
 async function bootstrap() {
   // Global error handlers for capturing unhandled errors (e.g., merge folder errors)
   window.onerror = (msg, source, lineno, colno, error) => {
+    // A browser notice, not a failure: the notification arrives a frame later.
+    if (typeof msg === 'string' && msg.startsWith('ResizeObserver loop')) return;
     // eslint-disable-next-line no-console
     console.error('[Global Error]', { msg, source, lineno, colno, error: error?.stack });
     let el = document.getElementById('global-error-toast');

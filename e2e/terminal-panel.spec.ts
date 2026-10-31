@@ -221,3 +221,70 @@ test('an agent in a herdr pane opens its CLI from the agents panel', async ({ pa
   await expect(page.locator('.agents-compose-text')).toHaveCount(0);
   await expect(page.locator('.agents-open-cli')).toBeVisible();
 });
+
+/** A PTY the size of a maximized herdr window, with the prompt on its last row. */
+async function stageWidePty(page: Page, pty: { cols: number; rows: number }): Promise<void> {
+  const { cols, rows } = pty;
+  await stage(page, (ws) => {
+    ws.send(JSON.stringify({ type: 'attached', agent: AGENT, cols, rows, history: '' }));
+    ws.send(Buffer.from(`\x1b[2J\x1b[1;1Hprimera fila\x1b[${rows};1H> cuadro de entrada`));
+  });
+  await page.setViewportSize({ width: 1908, height: 990 });
+  await boot(page);
+  await page.keyboard.press('t');
+  await page.locator('.terminal-agent').click();
+  await expect(page.locator('.xterm-rows')).toContainText('cuadro de entrada');
+}
+
+const fits = (page: Page) =>
+  page.evaluate(() => {
+    const view = document.querySelector('.terminal-viewport')!.getBoundingClientRect();
+    const screen = document.querySelector('.xterm-screen')!.getBoundingClientRect();
+    return { bottom: screen.bottom <= view.bottom + 1, right: screen.right <= view.right + 1 };
+  });
+
+test('a maximized herdr window fits: the panel grows to show the whole PTY', async ({ page }) => {
+  await stageWidePty(page, { cols: 322, rows: 84 });
+  await expect.poll(() => fits(page)).toEqual({ bottom: true, right: true });
+});
+
+test('a small PTY after a big one gives the map back', async ({ page }) => {
+  const wire = await stage(page);
+  await page.setViewportSize({ width: 1908, height: 990 });
+  await openTerminal(page);
+  const panel = page.locator('#terminal-panel');
+  const before = await panel.boundingBox();
+  wire.socket().send(JSON.stringify({ type: 'size', cols: 322, rows: 84 }));
+  await expect.poll(async () => (await panel.boundingBox())!.width).toBeGreaterThan(before!.width);
+  wire.socket().send(JSON.stringify({ type: 'size', cols: 80, rows: 24 }));
+  await expect.poll(async () => (await panel.boundingBox())!.width).toBe(before!.width);
+});
+
+test('when the PTY cannot fit the window, the prompt stays in view', async ({ page }) => {
+  await stageWidePty(page, { cols: 322, rows: 200 });
+  await expect.poll(() => page.evaluate(() => {
+    const view = document.querySelector('.terminal-viewport')!;
+    return view.scrollHeight - view.clientHeight - view.scrollTop;
+  })).toBeLessThanOrEqual(1);
+  await expect(page.locator('.xterm-rows')).toContainText('cuadro de entrada');
+});
+
+test('a ResizeObserver notice does not raise the red error toast', async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    window.dispatchEvent(
+      new ErrorEvent('error', {
+        message: 'ResizeObserver loop completed with undelivered notifications.',
+      }),
+    );
+  });
+  await expect(page.locator('#global-error-toast')).toHaveCount(0);
+});
+
+test('a real error still raises it', async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    window.dispatchEvent(new ErrorEvent('error', { message: 'something really broke' }));
+  });
+  await expect(page.locator('#global-error-toast')).toContainText('something really broke');
+});
