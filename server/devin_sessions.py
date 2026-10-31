@@ -66,10 +66,11 @@ def connect_ro(path: str, deadline_s: float = _POLL_DEADLINE_S) -> sqlite3.Conne
     return conn
 
 
-def _live_locked_sessions(locks_dir: str, proc_root: str = session_liveness.PROC_ROOT) -> frozenset[str]:
+def locked_session_pids(locks_dir: str, proc_root: str = session_liveness.PROC_ROOT) -> dict[str, int]:
+    """Session id → the live Devin pid holding its lock."""
     if not os.path.isdir(locks_dir):
-        return frozenset()
-    out: set[str] = set()
+        return {}
+    out: dict[str, int] = {}
     for lock_path in glob.glob(os.path.join(locks_dir, "*.lock")):
         sid = os.path.basename(lock_path)[: -len(".lock")]
         if not _ID_RE.match(sid):
@@ -84,8 +85,16 @@ def _live_locked_sessions(locks_dir: str, proc_root: str = session_liveness.PROC
             continue
         cmd = session_liveness._cmdline(proc_root, str(pid))
         if cmd and "devin" in cmd.lower():
-            out.add(sid)
-    return frozenset(out)
+            out[sid] = pid
+    return out
+
+
+def _live_locked_sessions(locks_dir: str, proc_root: str = session_liveness.PROC_ROOT) -> frozenset[str]:
+    return frozenset(locked_session_pids(locks_dir, proc_root))
+
+
+def session_pids() -> dict[str, int]:
+    return locked_session_pids(os.path.join(default_data_dir(), "session_locks"))
 
 
 def _extract_work_dirs(conn: sqlite3.Connection, session_id: str, workspace_dirs_raw: str | None) -> tuple[str, ...]:

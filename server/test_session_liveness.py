@@ -156,3 +156,22 @@ def test_hermes_named_profile_leases_and_compression_lineage(tmp_path):
         related_native_ids=("20261015_root_compressed", "20261015_tip_child"),
     ) is True
 
+
+
+def test_claude_session_pids_reads_only_well_formed_files(tmp_path):
+    (tmp_path / "10.json").write_text(json.dumps({"pid": 10, "sessionId": "s-ten"}))
+    (tmp_path / "11.json").write_text(json.dumps({"pid": True, "sessionId": "s-bool"}))
+    (tmp_path / "12.json").write_text(json.dumps(["not", "an", "object"]))
+    (tmp_path / "13.json").write_text("{broken")
+    assert sl.claude_session_pids(str(tmp_path)) == {"s-ten": 10}
+
+
+def test_hermes_session_pids_keeps_both_ids_of_a_lease(tmp_path):
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    (runtime / "active_sessions.json").write_text(json.dumps({"entries": [
+        {"pid": 20, "session_id": "stored", "metadata": {"live_session_id": "live"}},
+        {"pid": "nope", "session_id": "bad"},
+    ]}))
+    pids = sl.hermes_session_pids(str(runtime / "active_sessions.json"))
+    assert pids == {"stored": 20, "live": 20}

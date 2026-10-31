@@ -13,6 +13,7 @@ from server.live_session_chat import (
     LiveSessionChatRouter,
     OpenCodeLiveChatAdapter,
 )
+from server.herdr_runtime import AgentPane
 from server.suvadu_tracker import ExternalAgentTracker, Observation, TrackerConfig
 
 
@@ -671,3 +672,41 @@ def test_opencode_reply_never_interpolates_a_shell_or_bad_session_id() -> None:
     else:
         raise AssertionError("expected ChatError")
     assert calls == []
+
+
+def _tracker_with_panes(panes: dict[str, AgentPane]) -> ExternalAgentTracker:
+    return ExternalAgentTracker(
+        TrackerConfig(bin_path="suv"),
+        send=lambda event: None,
+        repo_paths=lambda: [],
+        sources=[],
+        live_chat_router=LiveSessionChatRouter({}),
+        herdr_panes=lambda: panes,
+    )
+
+
+def test_tracker_row_carries_the_session_pane_without_its_path() -> None:
+    pane = AgentPane("w1:p1", "term_a", "codex", "working", cwd="/home/someone/project")
+    tracker = _tracker_with_panes({_obs().native_id: pane})
+    tracker.reconcile([_obs()], now_ms=2, repo_paths=[])
+    assert tracker.sessions()[0]["herdrPane"] == {
+        "paneId": "w1:p1",
+        "terminalId": "term_a",
+        "agent": "codex",
+        "status": "working",
+        "name": "",
+        "folder": "project",
+    }
+
+
+def test_tracker_row_finds_a_pane_through_a_compressed_session_lineage() -> None:
+    pane = AgentPane("w1:p1", "term_a", "hermes", "idle")
+    tracker = _tracker_with_panes({"older-id": pane})
+    tracker.reconcile([_obs(related_native_ids=("older-id",))], now_ms=2, repo_paths=[])
+    assert tracker.sessions()[0]["herdrPane"]["terminalId"] == "term_a"
+
+
+def test_tracker_row_without_a_pane_says_so() -> None:
+    tracker = _tracker_with_panes({})
+    tracker.reconcile([_obs()], now_ms=2, repo_paths=[])
+    assert tracker.sessions()[0]["herdrPane"] is None

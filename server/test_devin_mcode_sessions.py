@@ -405,3 +405,15 @@ def test_devin_and_mcode_position_hooks_relocate_existing_units(tmp_path: Path, 
         st.encode_repo_id(str(repo_b)),
         st.encode_repo_id(str(repo_b)),
     ]
+
+
+def test_locked_session_pids_only_trusts_a_live_devin_process(tmp_path: Path) -> None:
+    locks, proc = tmp_path / "locks", tmp_path / "proc"
+    locks.mkdir()
+    for pid, cmdline in ((30, b"devin\0"), (31, b"unrelated\0")):
+        (proc / str(pid)).mkdir(parents=True)
+        (proc / str(pid) / "cmdline").write_bytes(cmdline)
+    (locks / "alive.lock").write_text("30")
+    (locks / "recycled.lock").write_text("31")
+    (locks / "garbage.lock").write_text("not-a-pid")
+    assert ds.locked_session_pids(str(locks), str(proc)) == {"alive": 30}

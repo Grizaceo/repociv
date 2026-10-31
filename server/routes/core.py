@@ -129,6 +129,18 @@ def get_external_agent_sessions(ctx: "RouteContext") -> tuple[int, Any]:
     from server import suvadu_tracker as _suvadu
     return 200, _suvadu.sessions()
 
+def get_herdr_agents(ctx: "RouteContext") -> tuple[int, Any]:
+    """GET /api/herdr/agents — herdr's state and the agents it holds, for the terminal."""
+    from server import herdr_runtime as _herdr
+    status = _herdr.probe()
+    if status.state != "ready":
+        return 200, {"runtime": status.to_dict(), "agents": []}
+    try:
+        agents = [agent.to_dict() for agent in _herdr.list_agents()]
+    except _herdr.HerdrError:
+        return 200, {"runtime": _herdr.RuntimeStatus("stopped", status.version).to_dict(), "agents": []}
+    return 200, {"runtime": status.to_dict(), "agents": agents}
+
 def get_own_sessions(ctx: "RouteContext") -> tuple[int, Any]:
     """GET /api/own-sessions — RepoCiv's own sessions on disk + liveness."""
     from server import own_sessions as _own

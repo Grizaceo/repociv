@@ -74,8 +74,6 @@ el umbral exacto: 61 caracteres pasaron, 78 no, y `/zzz…` de 300 sí. Por eso:
 - `blocked` se detectó en el diálogo de confianza de la carpeta y en una aprobación
   real de herramienta, antes de ejecutarla, **sin** `herdr integration install`.
 - `done` significa terminado y no visto; `idle`, listo. Ambos aceptan entrada.
-- `agent prompt` a un agente en `blocked` no se rechazó cuando el estado todavía no
-  había cambiado: los permisos dependen de lo que herdr ya haya detectado.
 - `agent start` devuelve `agent_not_ready` si el agente arranca en un diálogo.
 - Sin validar: un prompt que herdr no reconozca. Es el fallo más peligroso para un
   RTS y sigue pendiente para la Fase 4.

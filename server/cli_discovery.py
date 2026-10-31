@@ -75,6 +75,16 @@ def find_hermes_cli() -> str | None:
     return first_executable(candidates)
 
 
+def find_herdr() -> str | None:
+    candidates = [
+        shutil.which("herdr"),
+        str(Path.home() / ".local" / "bin" / "herdr"),
+        str(Path.home() / ".cargo" / "bin" / "herdr"),
+        "/usr/local/bin/herdr",
+    ]
+    return first_executable(candidates)
+
+
 def find_cursor_agent() -> str | None:
     """Find the cursor-agent headless binary (NOT the cursor IDE launcher).
 

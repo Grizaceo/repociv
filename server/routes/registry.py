@@ -34,6 +34,7 @@ GET_EXACT: dict[str, Callable[..., Any]] = {
     "/api/external-agents": _routes.get_external_agents,
     "/api/external-agents/sessions": _routes.get_external_agent_sessions,
     "/api/own-sessions": _routes.get_own_sessions,
+    "/api/herdr/agents": _routes.get_herdr_agents,
     "/gpu": _routes.get_gpu,
     "/pending": _routes.get_pending,
     "/context": _routes.get_context,

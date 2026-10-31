@@ -34,7 +34,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Iterator, Sequence
 
 PROC_ROOT = "/proc"
 LEASE_PATH = os.path.expanduser("~/.hermes/runtime/active_sessions.json")
@@ -139,14 +139,8 @@ def _lease_paths(path: str) -> list[str]:
     return paths
 
 
-def live_hermes_sessions(path: str, hermes_pids: set[int]) -> frozenset[str]:
-    """Session ids in Hermes' lease registry whose pid is a live hermes process.
-
-    The pid check is what makes a stale lease (a crashed CLI that never released
-    it) read as dead; re-checking the command line is what stops a recycled pid
-    from resurrecting one.
-    """
-    out: set[str] = set()
+def _lease_entries(path: str) -> Iterator[tuple[int, tuple[str, ...]]]:
+    """(pid, session ids) of every well-formed entry in the lease registries."""
     for lease_file in _lease_paths(path):
         raw = _read_bytes(lease_file, _MAX_LEASE_BYTES)
         if not raw:
@@ -162,11 +156,43 @@ def live_hermes_sessions(path: str, hermes_pids: set[int]) -> frozenset[str]:
             if not isinstance(entry, dict):
                 continue
             pid = entry.get("pid")
-            if isinstance(pid, bool) or not isinstance(pid, int) or pid not in hermes_pids:
+            if isinstance(pid, bool) or not isinstance(pid, int):
                 continue
             metadata = entry.get("metadata")
             live_id = metadata.get("live_session_id") if isinstance(metadata, dict) else None
-            for key in (entry.get("session_id"), live_id):
-                if isinstance(key, str) and key:
-                    out.add(key)
-    return frozenset(out)
+            yield pid, tuple(key for key in (entry.get("session_id"), live_id) if isinstance(key, str) and key)
+
+
+def live_hermes_sessions(path: str, hermes_pids: set[int]) -> frozenset[str]:
+    """Session ids in Hermes' lease registry whose pid is a live hermes process.
+
+    The pid check is what makes a stale lease (a crashed CLI that never released
+    it) read as dead; re-checking the command line is what stops a recycled pid
+    from resurrecting one.
+    """
+    return frozenset(key for pid, keys in _lease_entries(path) if pid in hermes_pids for key in keys)
+
+
+def hermes_session_pids(path: str = LEASE_PATH) -> dict[str, int]:
+    """Session id → the pid holding its lease. Whether that pid is still a Hermes
+    process is the caller's check; a stale lease simply matches no pane."""
+    return {key: pid for pid, keys in _lease_entries(path) for key in keys}
+
+
+def claude_session_pids(sessions_dir: str | None = None) -> dict[str, int]:
+    """Session id → pid, from the ``<pid>.json`` Claude Code keeps while it runs."""
+    root = sessions_dir or os.path.join(
+        os.environ.get("CLAUDE_CONFIG_DIR", "").strip() or os.path.expanduser("~/.claude"), "sessions"
+    )
+    out: dict[str, int] = {}
+    for path in glob.glob(os.path.join(root, "*.json")):
+        try:
+            data = json.loads(_read_bytes(path, _MAX_LEASE_BYTES))
+        except ValueError:
+            continue
+        if not isinstance(data, dict):
+            continue
+        session, pid = data.get("sessionId"), data.get("pid")
+        if isinstance(session, str) and session and isinstance(pid, int) and not isinstance(pid, bool):
+            out[session] = pid
+    return out

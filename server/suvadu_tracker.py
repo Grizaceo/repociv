@@ -56,7 +56,7 @@ import threading
 import time
 from collections import Counter
 from dataclasses import dataclass, replace
-from typing import Any, Callable, Iterable, Protocol, Sequence
+from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
 
 from server import session_liveness, session_reply, session_resume, transcript_work
 
@@ -186,6 +186,14 @@ class Observation:
     position_repo: str = ""
     position_at_ms: int = 0
     related_native_ids: tuple[str, ...] = ()  # source-verified compression lineage only
+
+
+def _herdr_pane(panes: Mapping[str, Any], obs: Observation) -> dict[str, Any] | None:
+    for native_id in (obs.native_id, *obs.related_native_ids):
+        pane = panes.get(native_id)
+        if pane is not None:
+            return pane.to_dict()
+    return None
 
 
 def _as_int(value: Any) -> int | None:
@@ -732,6 +740,7 @@ class ExternalAgentTracker:
         sources: Sequence[AgentSource] | None = None,
         liveness: LivenessFn = session_liveness.probe,
         live_chat_router: Any | None = None,
+        herdr_panes: Callable[[], Mapping[str, Any]] | None = None,
         positions: Any | None = None,
     ) -> None:
         """``sources`` defaults to Suvadu alone, driven by ``run`` (or the real CLI)."""
@@ -745,6 +754,7 @@ class ExternalAgentTracker:
         self._clock = clock
         self._liveness = liveness
         self._live_chat_router = live_chat_router
+        self._herdr_panes = herdr_panes
         if sources is None:
             suv_run: RunFn = run or (lambda args: run_suv(config.bin_path, args, config.timeout_s))
             sources = [SuvaduSource(suv_run, clock)]
@@ -940,6 +950,20 @@ class ExternalAgentTracker:
             self._live_chat_router = default_router()
         return self._live_chat_router.capability(obs).to_dict()
 
+    def _herdr_panes_by_session(self) -> Mapping[str, Any]:
+        """Session id → its herdr pane. Exact owners only: see ``panes_for_sessions``."""
+        if self._herdr_panes is not None:
+            return self._herdr_panes()
+        from server import devin_sessions, herdr_runtime, session_liveness
+
+        return herdr_runtime.panes_for_sessions(
+            {
+                **session_liveness.claude_session_pids(),
+                **session_liveness.hermes_session_pids(),
+                **devin_sessions.session_pids(),
+            }
+        )
+
     def _recent_rows(
         self,
         observations: list[Observation],
@@ -959,6 +983,7 @@ class ExternalAgentTracker:
         working_ms = self.config.working_s * 1000
         rows: list[dict[str, Any]] = []
         listed: dict[str, Observation] = {}
+        panes = self._herdr_panes_by_session()
         for obs in sorted(observations, key=lambda o: o.last_activity_ms, reverse=True):
             age_ms = max(0, now_ms - obs.last_activity_ms)
             if obs.session_id in listed or age_ms > recent_ms:
@@ -994,6 +1019,7 @@ class ExternalAgentTracker:
                 "subagent": obs.parent_id is not None,
                 "imported": obs.imported,
                 "liveChat": self._chat_capability(obs),
+                "herdrPane": _herdr_pane(panes, obs),
             })
         return rows, listed
 
