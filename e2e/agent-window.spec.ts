@@ -78,6 +78,28 @@ test('opens the side panel with bubbles, status, basename and screenless attach'
   await expect(page.locator('#terminal-panel')).toBeHidden();
 });
 
+test('fresh agent chat keeps its composer and last message inside the side panel', async ({ page }) => {
+  await stage(page);
+  expect(await page.evaluate(() => localStorage.getItem('repociv:hud-window:v1:side-panel'))).toBeNull();
+  const panel = page.locator('#side-panel');
+  await expect(panel).toHaveClass(/hud-window--placed/);
+  const message = panel.locator('#agent-window .chat-msg').last();
+  await expect(message).toContainText('respuesta anterior');
+  const panelRect = (await panel.boundingBox())!;
+  const composerRect = (await panel.locator('.agent-window-input-row').boundingBox())!;
+  const logRect = (await panel.locator('.agent-window-log').boundingBox())!;
+  const messageRect = (await message.boundingBox())!;
+  const inside = (box: typeof panelRect, parent: typeof panelRect) =>
+    box.x >= parent.x && box.y >= parent.y &&
+    box.x + box.width <= parent.x + parent.width &&
+    box.y + box.height <= parent.y + parent.height;
+  expect({
+    height: panelRect.height >= 300,
+    composer: inside(composerRect, panelRect),
+    message: inside(messageRect, panelRect) && inside(messageRect, logRect),
+  }).toEqual({ height: true, composer: true, message: true });
+});
+
 for (const variant of [
   { result: 'confirmed', reason: undefined, label: 'Entregado' },
   { result: 'unconfirmed', reason: 'agent_busy', label: 'Sin confirmar' },

@@ -178,3 +178,52 @@ test('small screen with no free slot keeps the unit in bounds and scrollable', a
     .toBe(true);
   await expect(page.locator('#unit-panel')).toHaveCSS('overflow-y', 'auto');
 });
+
+test('fresh unit chat keeps its composer and last message inside the side panel', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.route('**/api/external-agents/sessions', (route) =>
+    route.fulfill({ json: { sessions: [] } }),
+  );
+  await page.addInitScript(() => {
+    localStorage.setItem('repociv:tour-seen:v1', '1');
+    sessionStorage.setItem('repociv:hermes-banner-dismissed', '1');
+    localStorage.setItem('repociv:renderer', 'flat');
+    localStorage.setItem('repociv:chatHistory', JSON.stringify({
+      MAIN: [{ role: 'user', text: 'Mensaje de geometría', timestamp: '12:00' }],
+    }));
+  });
+  await page.goto('/');
+  await page.waitForSelector('html[data-app-ready="1"]', { timeout: 60_000 });
+  expect(await page.evaluate(() => localStorage.getItem('repociv:hud-window:v1:side-panel'))).toBeNull();
+  await page.keyboard.press('F8');
+  await page.locator('.agents-own[data-unit="MAIN"]').click();
+  await page.keyboard.press('Escape');
+  await page.locator('#main-canvas').focus();
+  await page.keyboard.press('Enter');
+  const panel = page.locator('#side-panel');
+  await expect(panel).toHaveClass(/hud-window--placed/);
+  const message = panel.locator('#chat-messages .chat-msg').last();
+  await expect(message).toHaveCount(1);
+  const panelRect = (await panel.boundingBox())!;
+  const composerRect = (await panel.locator('#chat-input-row').boundingBox())!;
+  const logRect = (await panel.locator('#chat-messages').boundingBox())!;
+  const messageRect = (await message.boundingBox())!;
+  const inside = (box: typeof panelRect, parent: typeof panelRect) =>
+    box.x >= parent.x && box.y >= parent.y &&
+    box.x + box.width <= parent.x + parent.width &&
+    box.y + box.height <= parent.y + parent.height;
+  expect({
+    height: panelRect.height >= 300,
+    composer: inside(composerRect, panelRect),
+    message: inside(messageRect, panelRect) && inside(messageRect, logRect),
+  }).toEqual({ height: true, composer: true, message: true });
+  await panel.locator(':scope > .hud-window-resize').focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(panel).toHaveClass(/hud-window--customized/);
+  await panel.locator(':scope > #side-panel-header > .hud-window-reset').click();
+  await expect(panel).not.toHaveClass(/hud-window--customized/);
+  expect(await page.evaluate(() => localStorage.getItem('repociv:hud-window:v1:side-panel'))).toBeNull();
+  await expect.poll(async () => (await panel.boundingBox())!.height).toBeGreaterThanOrEqual(300);
+});

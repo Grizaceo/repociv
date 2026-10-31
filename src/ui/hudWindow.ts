@@ -413,8 +413,8 @@ export function initHudWindows(): () => void {
       panel.style.right = 'auto';
       panel.style.bottom = 'auto';
       panel.style.width = `${next.width}px`;
-      // Keep natural content height, except for explicitly user-sized windows.
-      if (panel.classList.contains('hud-window--customized'))
+      // Keep natural content height except for the side panel and user-sized windows.
+      if (panel.id === 'side-panel' || panel.classList.contains('hud-window--customized'))
         panel.style.height = `${next.height}px`;
     }
     reflow = false;
