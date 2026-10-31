@@ -13,9 +13,9 @@ mcp>=1.30.0,<2
 # fresh install must not resolve vulnerable versions either.
 pyjwt>=2.15.1
 cryptography>=50.0.2
-starlette>=1.8.0
+starlette>=1.9.0
 python-multipart>=0.0.32
-pydantic-settings>=2.16.0
+pydantic-settings>=2.16.1
 anyio>=4.15.1
 
 # Test runner
@@ -28,7 +28,7 @@ pytest-cov>=7.1.0
 httpx>=0.28.1
 
 # WebSocket (Phase 1: bidirectional transport)
-websockets>=17.2
+websockets>=17.3
 
 # Schemas
 pydantic>=2.14.1
@@ -36,7 +36,7 @@ pydantic>=2.14.1
 # Persistencia / ledger anal\u00edtico (Fase 0)
 # research_ledger.py degrada a "sin anal\u00edtica" si falta, pero el invariante
 # DuckDB-as-materialized-view requiere que est\u00e9 instalado en producci\u00f3n.
-duckdb>=1.5.6
+duckdb>=2.0.0
 
 # Hooks declarativos por repo (Fase 1, H5)
 # repociv_hooks.py parsea repociv.yaml en cada repo gestionado.
@@ -52,7 +52,7 @@ ruamel.yaml==0.19.1
 PyYAML>=6.0.3
 
 # Linter (CI gate; also used locally via scripts/check.sh)
-ruff==0.17.1
+ruff==0.17.2
 
 # Type checker (blocking CI gate via scripts/check.sh; config in pyproject.toml)
 mypy==2.4.0
