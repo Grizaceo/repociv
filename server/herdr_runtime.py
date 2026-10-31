@@ -334,7 +334,7 @@ def _agent_pane(row: Any) -> AgentPane | None:
 def list_agents(
     *, path: str | None = None, instance: str | None = None, timeout: float | None = None,
 ) -> list[AgentPane]:
-    kwargs = {"instance": instance} if instance is not None else {}
+    kwargs: dict[str, Any] = {"instance": instance} if instance is not None else {}
     if timeout is not None:
         kwargs["timeout"] = timeout
     rows = request("agent.list", path=path, **kwargs).get("agents")
@@ -576,14 +576,14 @@ async def history(pane_id: str, *, path: str | None = None) -> str:
 
 async def send_text(pane_id: str, text: str, *, path: str | None = None, instance: str | None = None) -> None:
     """Raw bytes to the PTY, exactly as a keyboard would send them."""
-    kwargs = {"instance": instance} if instance is not None else {}
+    kwargs: dict[str, Any] = {"instance": instance} if instance is not None else {}
     await arequest("pane.send_text", {"pane_id": pane_id, "text": text}, path=path, **kwargs)
 
 
 async def paste(pane_id: str, text: str, *, path: str | None = None, instance: str | None = None) -> None:
     """Text as a paste. ``observe`` hides the pane's bracketed-paste mode from
     the viewer, so only the server can wrap it; sent raw, each line would submit."""
-    kwargs = {"instance": instance} if instance is not None else {}
+    kwargs: dict[str, Any] = {"instance": instance} if instance is not None else {}
     await arequest("pane.send_input", {"pane_id": pane_id, "text": text}, path=path, **kwargs)
 
 
@@ -606,7 +606,7 @@ async def submit(
         return SubmitResult("refused", "text_too_long")
 
     async def agent() -> AgentPane | None:
-        kwargs = {"path": path} if path is not None else {}
+        kwargs: dict[str, Any] = {"path": path} if path is not None else {}
         if instance is not None:
             kwargs["instance"] = instance
         rows = await asyncio.to_thread(list_agents, **kwargs)
@@ -625,7 +625,7 @@ async def submit(
     if before.status == "blocked":
         return SubmitResult("refused", "agent_blocked")
 
-    kwargs = {"path": path} if path is not None else {}
+    kwargs: dict[str, Any] = {"path": path} if path is not None else {}
     if instance is not None:
         kwargs["instance"] = instance
     try:

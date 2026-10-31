@@ -179,14 +179,14 @@ def dispatch_command(
         return
 
     if cmd.type == 'subagent_dispatch':
-        result = subagent_request_dispatch(
+        dispatch = subagent_request_dispatch(
             parent_mission_id=str(payload.get('parentMissionId', '')),
             parent_unit=str(payload.get('parentUnit', cmd.target)),
             kind=str(payload.get('kind', 'generalPurpose')),
             label=str(payload.get('label', '')),
             harness=str(payload.get('harness', '')),
         )
-        event_record_failed(cmd.id, result.get('error', 'not_implemented'))
+        event_record_failed(cmd.id, dispatch.get('error', 'not_implemented'))
         send_to_repociv({
             'type': 'log',
             'msg': '[swarm] subagent_dispatch no implementado (fase 2)',
@@ -277,11 +277,11 @@ def dispatch_command(
             event_record_failed(cmd.id, 'task_run requires issueId in payload')
             return
         try:
-            result = task_run(repo, issue_id)
-            event_record_completed(cmd.id, json.dumps({'phase': result.get('phase'), 'repo': repo, 'issueId': issue_id}))
+            outcome = task_run(repo, issue_id)
+            event_record_completed(cmd.id, json.dumps({'phase': outcome.get('phase'), 'repo': repo, 'issueId': issue_id}))
             send_to_repociv({
                 'type': 'task_complete', 'repo': repo, 'issueId': issue_id,
-                'phase': result.get('phase'), 'missionId': cmd.id,
+                'phase': outcome.get('phase'), 'missionId': cmd.id,
             })
         except Exception as e:
             event_record_failed(cmd.id, str(e))
