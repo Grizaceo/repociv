@@ -5,11 +5,13 @@
 #terminal-panel {
   position: absolute;
   top: 56px;
-  left: 8px;
+  /* Right of the left column: the gazette, the event log and the minimap stay in
+     view, and nothing lands on top of the agent's prompt. */
+  left: 340px;
   /* Leaves room for the agents panel on the right. */
-  width: min(980px, calc(100vw - 472px));
-  min-width: min(420px, calc(100vw - 16px));
-  height: min(66vh, calc(100vh - 120px));
+  width: min(1040px, calc(100vw - 796px));
+  min-width: min(520px, calc(100vw - 348px));
+  height: min(74vh, calc(100vh - 120px));
   background: var(--ui-panel-bg);
   border: 2px solid var(--ui-border);
   border-radius: var(--panel-radius);
@@ -170,8 +172,12 @@
 }
 
 @media (max-width: 900px) {
+  /* No room beside the left column: cover the HUD while it is open. */
   #terminal-panel {
+    left: 8px;
     width: calc(100vw - 16px);
+    min-width: 0;
+    z-index: 500;
   }
   .terminal-keys {
     display: none;
