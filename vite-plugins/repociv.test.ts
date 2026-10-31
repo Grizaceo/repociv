@@ -6,6 +6,7 @@ import type { Connect } from 'vite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   SKIP_DIRS,
+  isTrustedJsonMutation,
   countFiles,
   expandUser,
   repocivPlugin,
@@ -36,10 +37,20 @@ type MockResponse = {
   end: (body: string) => void;
 };
 
-function mockRequest(method: string, url: string, body?: string): Connect.IncomingMessage {
+function mockRequest(
+  method: string,
+  url: string,
+  body?: string,
+  headers: Record<string, string> = {
+    host: '127.0.0.1:5273',
+    origin: 'http://127.0.0.1:5273',
+    'content-type': 'application/json',
+  },
+): Connect.IncomingMessage {
   const req = new EventEmitter() as Connect.IncomingMessage;
   req.method = method;
   req.url = url;
+  req.headers = headers;
   queueMicrotask(() => {
     if (body !== undefined) req.emit('data', Buffer.from(body));
     req.emit('end');
@@ -67,8 +78,9 @@ async function invokeHandler(
   method: string,
   url: string,
   body?: string,
+  headers?: Record<string, string>,
 ): Promise<MockResponse> {
-  const req = mockRequest(method, url, body);
+  const req = mockRequest(method, url, body, headers);
   const res = mockResponse();
   let nextCalled = false;
   await handler(req, res as unknown as Connect.ServerResponse, () => {
@@ -282,5 +294,90 @@ describe('unmatched /api/* routing guard', () => {
       expect(nextCalled, `${url} must fall through to Vite`).toBe(true);
       expect(res.body).toBe('');
     }
+  });
+});
+
+describe('Vite mutation handler boundary', () => {
+  it('rejects foreign requests before invalidating the repo cache and accepts trusted JSON', async () => {
+    const fixture = makeFixture();
+    const prevStateFile = process.env['REPOCIV_STATE_FILE'];
+    try {
+      process.env['REPOCIV_STATE_FILE'] = join(fixture.root, 'state.json');
+      let handler: Connect.NextHandleFunction | undefined;
+      repocivPlugin(fixture.mapRoot, 'test-token-32-characters-minimum').configureServer!({
+        middlewares: { use: (fn: Connect.NextHandleFunction) => { handler = fn; } },
+        ws: { send: () => {} },
+      } as never);
+      if (!handler) throw new Error('middleware not registered');
+      await invokeHandler(handler, 'GET', '/api/repos');
+      mkdirSync(join(fixture.mapRoot, 'new-repo'));
+      const host = '127.0.0.1:5273';
+      const plain = await invokeHandler(handler, 'POST', '/api/repos/refresh', '{}', {
+        host, origin: 'https://evil.example', 'content-type': 'text/plain',
+      });
+      expect(plain.statusCode).toBe(415);
+      expect(JSON.parse(plain.body).error).toBe('application/json required');
+      const foreign = await invokeHandler(handler, 'POST', '/api/repos/refresh', '{}', {
+        host, origin: 'https://evil.example', 'content-type': 'application/json',
+      });
+      expect(foreign.statusCode).toBe(403);
+      expect(JSON.parse(foreign.body).error).toBe('trusted Origin or token required');
+      const event = await invokeHandler(handler, 'POST', '/event', '{}', {
+        host, origin: 'https://evil.example', 'content-type': 'application/json',
+      });
+      expect(event.statusCode).toBe(403);
+      const cached = await invokeHandler(handler, 'GET', '/api/repos');
+      expect(JSON.parse(cached.body).map((repo: { name: string }) => repo.name))
+        .not.toContain('new-repo');
+      const same = await invokeHandler(handler, 'POST', '/api/repos/refresh', '{}', {
+        host, origin: 'http://127.0.0.1:5273', 'content-type': 'application/json',
+      });
+      expect(same.statusCode).toBe(200);
+      const refreshed = await invokeHandler(handler, 'GET', '/api/repos');
+      expect(JSON.parse(refreshed.body).map((repo: { name: string }) => repo.name)).toContain('new-repo');
+      const token = await invokeHandler(handler, 'POST', '/api/repos/refresh', '{}', {
+        host, 'x-repociv-token': 'test-token-32-characters-minimum', 'content-type': 'application/json',
+      });
+      expect(token.statusCode).toBe(200);
+    } finally {
+      if (prevStateFile === undefined) delete process.env['REPOCIV_STATE_FILE'];
+      else process.env['REPOCIV_STATE_FILE'] = prevStateFile;
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('Vite mutation authentication boundary', () => {
+  const baseHeaders = { host: '127.0.0.1:5273', 'content-type': 'application/json' };
+
+  it('accepts same-origin JSON and rejects a foreign browser Origin', () => {
+    expect(isTrustedJsonMutation({ ...baseHeaders, origin: 'http://127.0.0.1:5273' }, ''))
+      .toBe(true);
+    expect(isTrustedJsonMutation({ ...baseHeaders, origin: 'https://evil.example' }, '')).toBe(false);
+  });
+
+  it('accepts a configured token for non-browser clients but rejects empty-token requests', () => {
+    expect(isTrustedJsonMutation(baseHeaders, '')).toBe(false);
+    expect(
+      isTrustedJsonMutation(
+        { ...baseHeaders, 'x-repociv-token': 'test-token-32-characters-minimum' },
+        'test-token-32-characters-minimum',
+      ),
+    ).toBe(true);
+    expect(
+      isTrustedJsonMutation(
+        { ...baseHeaders, 'x-repociv-token': 'wrong' },
+        'test-token-32-characters-minimum',
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects text/plain even when Origin is same-host', () => {
+    expect(
+      isTrustedJsonMutation(
+        { host: '127.0.0.1:5273', origin: 'http://127.0.0.1:5273', 'content-type': 'text/plain' },
+        '',
+      ),
+    ).toBe(false);
   });
 });

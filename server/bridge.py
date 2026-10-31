@@ -840,6 +840,11 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self._err_json(404, "not found")
 
     def do_POST(self) -> None:
+        origins = self.headers.get_all("Origin")
+        if origins and (len(origins) != 1 or origins[0] not in _ALLOWED_ORIGINS):
+            self._err_json(403, "origin_not_allowed")
+            return
+
         # Telemetry can change another session's placement; never allow an
         # auth-off dev bridge to accept these writes (even on loopback).
         if self.path.split("?", 1)[0] == "/api/agent-events" and not REPOCIV_TOKEN:

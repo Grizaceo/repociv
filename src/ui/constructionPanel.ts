@@ -86,7 +86,11 @@ export function toggleConstructionPanel(): void {
 }
 
 async function pickRepoFromSystem(): Promise<ScannedRepo> {
-  const res = await fetch('/api/repo/pick', { method: 'POST' });
+  const res = await fetch('/api/repo/pick', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
   const data = (await res.json()) as RepoPickResponse;
   if (!res.ok || !data.repo) throw new Error(data.error ?? `HTTP ${res.status}`);
   return data.repo;
