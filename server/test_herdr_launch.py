@@ -369,7 +369,7 @@ def test_executor_sends_mission_once_only_when_ready_and_exposes_no_paths(
     monkeypatch: pytest.MonkeyPatch, state: str, instance: str | None,
 ) -> None:
     from server import command_executors
-    from server.routes.core import get_herdr_launch
+    from server.routes.external_agents import get_herdr_launch
 
     sent: list[tuple[str, str, str | None, str | None]] = []
     events: list[dict] = []
@@ -422,7 +422,7 @@ def test_executor_distinguishes_launch_and_mission_exceptions(
     monkeypatch: pytest.MonkeyPatch, failure: str, state: str, reason: str | None, delivery: dict,
 ) -> None:
     from server import command_executors
-    from server.routes.core import get_herdr_launch
+    from server.routes.external_agents import get_herdr_launch
 
     events: list[dict] = []
     completed, failed = Mock(), Mock()

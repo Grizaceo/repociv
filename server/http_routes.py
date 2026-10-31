@@ -7,7 +7,7 @@ from typing import Any
 from server import city_graph_adapter as _cga  # noqa: E402
 from server import graph_relations as _gr  # noqa: E402
 
-from server.routes.providers import _error  # noqa: F401
+from server.routes import _error  # noqa: F401
 from server.routes.providers import _auth_headers  # noqa: F401
 from server.routes.providers import _probe_url  # noqa: F401
 from server.routes.providers import _extract_model_ids  # noqa: F401

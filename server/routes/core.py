@@ -7,35 +7,9 @@ import time
 from pathlib import Path
 from typing import Any
 
+from server.routes import _error
 from server.routes import health as _health_routes
 from server.routes import profile_registry as _profile_routes
-from server.routes.external_agents import (
-    get_external_agents as get_external_agents,
-    get_external_agent_sessions as get_external_agent_sessions,
-    get_herdr_agents as get_herdr_agents,
-    get_herdr_launch as get_herdr_launch,
-    get_own_sessions as get_own_sessions,
-    post_own_session_close as post_own_session_close,
-    get_external_agent_chat as get_external_agent_chat,
-    post_external_agent_chat as post_external_agent_chat,
-    get_external_agent_resume as get_external_agent_resume,
-    post_external_agent_reply as post_external_agent_reply,
-)
-from server.routes.pending import (
-    get_pending as get_pending,
-    post_pending_add as post_pending_add,
-    post_pending_resolve as post_pending_resolve,
-    post_pending_edit as post_pending_edit,
-    post_pending_delete as post_pending_delete,
-    post_pending_state as post_pending_state,
-)
-from server.routes.providers import (
-    _error as _error,
-    _auth_headers as _auth_headers,
-    _probe_url as _probe_url,
-    _extract_model_ids as _extract_model_ids,
-    get_providers_live as get_providers_live,
-)
 
 RouteContext = dict[str, Any]
 

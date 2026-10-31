@@ -17,10 +17,6 @@ _providers_live_cache: dict | None = None
 _providers_live_ts: float = 0.0
 _PROVIDERS_CACHE_TTL = 30.0
 
-def _error(status: int, error: str, cause: str, hint: str) -> tuple[int, dict]:
-    """Return a structured error envelope: {error, cause, hint}."""
-    return status, {"error": error, "cause": cause, "hint": hint}
-
 def _auth_headers(provider: str) -> dict[str, str]:
     """Return Authorization header for a given provider, if API key is set.
 

@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from server.routes.core import _error
+from server.routes import _error
 
 RouteContext = dict[str, Any]
 

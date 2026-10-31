@@ -667,7 +667,7 @@ def test_config_from_env(monkeypatch):
 
 def test_external_agents_route_registered():
     from server.routes import registry
-    from server.routes.core import get_external_agents
+    from server.routes.external_agents import get_external_agents
 
     assert registry.GET_EXACT["/api/external-agents"] is get_external_agents
     status, body = get_external_agents({"params": {}})
@@ -725,7 +725,7 @@ def test_resume_of_a_live_session_offers_no_command(repos):
 
 def test_resume_route_is_registered(repos):
     from server import http_routes
-    from server.routes.core import get_external_agent_resume
+    from server.routes.external_agents import get_external_agent_resume
 
     assert http_routes.get_external_agent_resume is get_external_agent_resume
     status, body = get_external_agent_resume({"session_id": "claude-nothing"})
@@ -773,7 +773,7 @@ def test_reply_refuses_a_live_session(repos, monkeypatch):
 
 def test_reply_route_asks_policy_first(monkeypatch):
     from server import http_routes
-    from server.routes.core import post_external_agent_reply
+    from server.routes.external_agents import post_external_agent_reply
 
     assert http_routes.post_external_agent_reply is post_external_agent_reply
     # Default policy for external_reply mirrors the chat flow: the send is the
@@ -899,7 +899,7 @@ def test_transcript_path_validation(tmp_path):
 
 def test_chat_routes():
     from server.routes import registry
-    from server.routes.core import get_external_agent_chat, get_external_agent_sessions
+    from server.routes.external_agents import get_external_agent_chat, get_external_agent_sessions
 
     assert registry.GET_EXACT["/api/external-agents/sessions"] is get_external_agent_sessions
     assert get_external_agent_sessions({"params": {}})[0] == 200

@@ -39,6 +39,7 @@ from server.repo_roots_state import (
     set_active_root,
     set_selection,
 )
+from server.routes import _error
 
 # ── Skip directories when scanning for repos ─────────────────────────────────
 _SKIP_DIRS = frozenset(
@@ -63,10 +64,6 @@ _SKIP_DIRS = frozenset(
         ".vscode",
     }
 )
-
-
-def _error(status: int, error: str, cause: str = "", hint: str = "") -> tuple[int, dict[str, Any]]:
-    return status, {"error": error, "cause": cause, "hint": hint}
 
 
 def _ok(body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
