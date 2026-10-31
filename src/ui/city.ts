@@ -4,6 +4,7 @@ import { trapFocus } from './focusTrap.ts';
 import { getLatestNews, markNewsAsRead } from '../bridge.ts';
 import { trackCityVisit } from './analytics.ts';
 import { escapeHtml } from './escapeHtml.ts';
+import { cityRepoRef } from './chat/panel.ts';
 
 let _cityPanelCleanup: (() => void) | null = null;
 
@@ -106,17 +107,17 @@ export function openCityPanel(city: City, activeBuildings: Building[], tile?: Ti
   }
 
   // Async: fetch real git + files data
-  void fetchCityGit(city.name);
-  void fetchCityFiles(city.name);
+  void fetchCityGit(city);
+  void fetchCityFiles(city);
 }
 
-async function fetchCityGit(repoName: string) {
+async function fetchCityGit(city: City) {
   const gitDetailsEl = document.getElementById('city-git-details');
   if (!gitDetailsEl) return;
   gitDetailsEl.innerHTML =
     '<div class="city-item" style="color:var(--text-dim)">cargando git…</div>';
   try {
-    const res = await fetch(`/api/git/${encodeURIComponent(repoName)}`);
+    const res = await fetch(`/api/git/${encodeURIComponent(cityRepoRef(city))}`);
     if (!res.ok) {
       setText('city-git-branch', '—');
       setText('city-git-status', 'sin git');
@@ -155,12 +156,12 @@ async function fetchCityGit(repoName: string) {
   }
 }
 
-async function fetchCityFiles(repoName: string) {
+async function fetchCityFiles(city: City) {
   const filesEl = document.getElementById('city-files-list');
   if (!filesEl) return;
 
   // Interceptar la ciudad CDAILY para mostrar el feed en lugar de archivos
-  if (repoName.toLowerCase() === 'cdaily') {
+  if (city.name.toLowerCase() === 'cdaily') {
     filesEl.innerHTML =
       '<div class="city-item" style="color:var(--text-dim)">Leyendo feed de noticias...</div>';
     try {
@@ -191,7 +192,7 @@ async function fetchCityFiles(repoName: string) {
         btn.addEventListener('click', async () => {
           const id = parseInt(btn.getAttribute('data-id') ?? '0', 10);
           if (id && (await markNewsAsRead(id))) {
-            fetchCityFiles('cdaily');
+            fetchCityFiles(city);
           }
         });
       });
@@ -205,7 +206,7 @@ async function fetchCityFiles(repoName: string) {
   filesEl.innerHTML =
     '<div class="city-item" style="color:var(--text-dim)">cargando archivos…</div>';
   try {
-    const res = await fetch(`/api/files/${encodeURIComponent(repoName)}`);
+    const res = await fetch(`/api/files/${encodeURIComponent(cityRepoRef(city))}`);
     if (!res.ok) {
       filesEl.innerHTML = '<div class="city-item" style="color:var(--text-dim)">—</div>';
       return;

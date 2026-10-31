@@ -284,3 +284,35 @@ describe('unmatched /api/* routing guard', () => {
     }
   });
 });
+
+describe('duplicate names across map roots', () => {
+  it('uses an absolute path for the second root and plain names for the active root', async () => {
+    const fixture = makeFixture();
+    const prevStateFile = process.env['REPOCIV_STATE_FILE'];
+    try {
+      process.env['REPOCIV_STATE_FILE'] = join(fixture.root, 'state.json');
+      const first = join(fixture.mapRoot, 'api');
+      const second = join(fixture.outside, 'api');
+      mkdirSync(join(first, '.git'), { recursive: true });
+      mkdirSync(second, { recursive: true });
+      writeFileSync(join(first, 'first.txt'), 'first');
+      writeFileSync(join(second, 'second.txt'), 'second');
+      let handler: Connect.NextHandleFunction | undefined;
+      repocivPlugin(fixture.mapRoot).configureServer!({
+        middlewares: { use: (fn: Connect.NextHandleFunction) => { handler = fn; } },
+        ws: { send: () => {} },
+      } as never);
+      if (!handler) throw new Error('middleware not registered');
+      const other = await invokeHandler(handler, 'GET', `/api/files/${encodeURIComponent(second)}`);
+      const active = await invokeHandler(handler, 'GET', '/api/files/api');
+      expect(other.statusCode).toBe(200);
+      expect(JSON.parse(other.body).files).toEqual(['second.txt']);
+      expect(active.statusCode).toBe(200);
+      expect(JSON.parse(active.body).files).toEqual(['first.txt']);
+    } finally {
+      if (prevStateFile === undefined) delete process.env['REPOCIV_STATE_FILE'];
+      else process.env['REPOCIV_STATE_FILE'] = prevStateFile;
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+});

@@ -976,9 +976,9 @@ async function bootstrap() {
       const tile = state.world.tiles.get(tileKey(city.coord));
       // Show loading state immediately, then resolve asynchronously
       openCityPanel(city, activeBuildings, tile);
+      loadGitInfo(city);
+      loadFilesInfo(city);
     }
-    loadGitInfo(cityId);
-    loadFilesInfo(cityId);
     _publishWonderContext(cityId);
     window.dispatchEvent(
       new CustomEvent('repociv:city-selected', {
