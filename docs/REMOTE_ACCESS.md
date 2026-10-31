@@ -4,6 +4,16 @@ RepoCiv can be accessed from any device on your Tailscale network. This is
 useful for checking the dashboard from a phone, tablet, or another laptop
 without exposing anything to the public internet.
 
+There are two ways to do it:
+
+- **Tailscale Serve (recommended):** the UI stays bound to `127.0.0.1` and
+  Serve forwards tailnet HTTPS to it. RepoCiv authenticates the user by the
+  `Tailscale-User-Login` identity header that Serve injects (and cannot be
+  spoofed through the tailnet). This is the setup described in SECURITY.md.
+- **`REPOCIV_REMOTE` (alternative):** binds the UI, bridge and WebSocket on
+  `0.0.0.0` inside the tailnet and requires `REPOCIV_TOKEN`. Heavier and only
+  reasonable when Serve cannot be used.
+
 ## Prerequisites
 
 1. **Tailscale** installed on the host machine running RepoCiv:
@@ -22,16 +32,51 @@ without exposing anything to the public internet.
    pip install websockets>=12.0
    ```
 
-## Setup
+## Recommended setup: Tailscale Serve
 
-### 1. Generate an auth token
+### 1. Configure `.env`
 
-```bash
-python3 -c "import secrets; print(secrets.token_hex(32))"
-# Example output: <64-hex-character-token>
+```ini
+REPOCIV_TOKEN=<64-hex-character-token>
+REPOCIV_TAILNET_USERS=you@example.com
+REPOCIV_CORS_ORIGINS=https://<host>.<tailnet>.ts.net:5273
+REPOCIV_TERMINAL_ORIGINS=https://<host>.<tailnet>.ts.net:5273
 ```
 
-### 2. Configure `.env`
+- Generate the token with
+  `python3 -c "import secrets; print(secrets.token_hex(32))"`.
+- `REPOCIV_TAILNET_USERS` lists the tailnet logins allowed in (comma-separated,
+  case-insensitive). Without it, every tailnet device that passes
+  `allowedHosts` is treated as the operator — set it.
+- `REPOCIV_TERMINAL_ORIGINS` is separate on purpose: the agent terminal is a
+  shell on this machine, so `REPOCIV_CORS_ORIGINS` alone does not grant it.
+
+### 2. Publish the UI port through Serve
+
+```bash
+tailscale serve --bg --https=5273 http://127.0.0.1:5273
+tailscale serve status
+```
+
+The ts.net hostname must also pass Vite's `allowedHosts`. The systemd
+`tailscale` drop-in appends it via `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS`;
+without systemd, export that variable before starting RepoCiv.
+
+### 3. Start RepoCiv in production mode
+
+```bash
+REPOCIV_MODE=production ./scripts/dev-start.sh
+```
+
+Production serves the built `dist/` behind the same loopback bind, the access
+gate and the proxies — no dev server and no HMR socket.
+
+Then open `https://<host>.<tailnet>.ts.net:5273` from any device in your
+tailnet. Devices without a listed login get 403 on HTTP and WebSocket.
+
+## Alternative: `REPOCIV_REMOTE` (bind 0.0.0.0)
+
+### 1. Configure `.env`
 
 ```ini
 REPOCIV_TOKEN=<64-hex-character-token>
@@ -41,28 +86,16 @@ REPOCIV_REMOTE=true
 **Warning:** `REPOCIV_REMOTE=true` without `REPOCIV_TOKEN` will cause the bridge
 to refuse startup. This is intentional — remote mode requires authentication.
 
-### 3. Verify Tailscale is connected
+`REPOCIV_REMOTE_ORIGIN` restricts CORS to a specific origin; omitting it allows
+localhost only. Do NOT leave it blank in production remote mode.
 
-```bash
-tailscale status
-# Should show your machine with a 100.x.x.x IP
-```
-
-### 4. Start RepoCiv in remote mode
-
-```bash
-REPOCIV_TOKEN="<your-token>" ./scripts/remote-start.sh
-```
-
-Or set the token in `.env` and run:
+### 2. Start RepoCiv in remote mode
 
 ```bash
 ./scripts/remote-start.sh
 ```
 
-## Connecting from Another Device
-
-### Web UI
+### Connecting from Another Device
 
 Once RepoCiv is running on the host, find its Tailscale IP:
 
@@ -77,8 +110,7 @@ On any device connected to the same Tailscale network, open:
 http://<tailscale-ip>:5273
 ```
 
-Replace `<tailscale-ip>` with your host's actual Tailscale IP. The WebSocket
-transport (port 5275) is also accessible via the same IP.
+The WebSocket transport (port 5275) is also accessible via the same IP.
 
 ### API Access
 
@@ -96,15 +128,19 @@ curl -H "X-RepoCiv-Token: <your-token>" http://<tailscale-ip>:5274/health
 
 ## Architecture
 
+Tailscale Serve (recommended):
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Tailscale Network                      │
 │   ┌──────────────┐        ┌─────────────────────────┐   │
-│   │ Client Device │◄──────►│ Host (RepoCiv Server)   │   │
-│   │ (phone/laptop)│        │                         │   │
-│   │              │        │  Vite (5273) ← 0.0.0.0  │   │
-│   │              │        │  Bridge (5274) ← 0.0.0.0│   │
-│   │              │        │  WS (5275) ← 0.0.0.0    │   │
+│   │ Client Device │─HTTPS─►│ Host                    │   │
+│   │ (phone/laptop)│        │  Tailscale Serve (:443/ │   │
+│   │              │        │   :5273, identity hdr)   │   │
+│   │              │        │     ↓ 127.0.0.1          │   │
+│   │              │        │  Vite UI (127.0.0.1:5273)│   │
+│   │              │        │  Bridge (127.0.0.1:5274) │   │
+│   │              │        │  WS (127.0.0.1:5275)     │   │
 │   └──────────────┘        └─────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
                         │
@@ -113,33 +149,37 @@ curl -H "X-RepoCiv-Token: <your-token>" http://<tailscale-ip>:5274/health
                 (no open ports)
 ```
 
-All ports bind to `0.0.0.0` in remote mode. Tailscale encrypts traffic between
-devices. No ports are exposed to the public internet.
+`REPOCIV_REMOTE` alternative: all ports bind to `0.0.0.0` inside the tailnet.
+Tailscale encrypts traffic between devices. No ports are exposed to the public
+internet.
 
 ## Security
 
 - **Token auth required:** All non-GET requests (and GET /events) require
   `X-RepoCiv-Token` header matching `REPOCIV_TOKEN`
+- **Tailnet identity:** with `REPOCIV_TAILNET_USERS` set, only listed tailnet
+  logins reach the UI; Serve strips client-supplied identity headers, so the
+  check cannot be spoofed through the tailnet
 - **WebSocket auth:** WS connections require sending `{"type":"auth","token":"..."}`
   within 5 seconds of connecting
 - **Tailscale encryption:** All traffic between devices is encrypted by Tailscale
-  (WireGuard). No additional TLS needed for LAN/internal use
+  (WireGuard). Serve also terminates TLS, so the browser sees HTTPS
 - **Public internet:** RepoCiv never binds to a public interface unless
   `REPOCIV_REMOTE=true` is explicitly set. Default is `127.0.0.1` only
 - **Token rotation:** Change the token anytime by updating `.env` and restarting
 - **Minimum token length:** 32 characters (256 bits)
 
-## Comparing Local vs Remote
+## Comparing setups
 
-| Feature | Local (dev) | Remote (Tailscale) |
-|---------|-------------|-------------------|
-| Default | ✅ | ❌ (opt-in) |
-| Bind address | 127.0.0.1 | 0.0.0.0 |
-| Auth required | No | Yes |
-| CORS | localhost only | All origins |
-| WS transport | ✅ | ✅ |
-| SSE fallback | ✅ | ✅ |
-| Token required | No | Yes (REPOCIV_TOKEN) |
+| Feature | Local (dev) | Tailscale Serve | `REPOCIV_REMOTE` |
+|---------|-------------|-----------------|-------------------|
+| Default | ✅ | ❌ (opt-in) | ❌ (opt-in) |
+| UI bind address | 127.0.0.1 | 127.0.0.1 | 0.0.0.0 |
+| Auth | — | `Tailscale-User-Login` + allowlist | `REPOCIV_TOKEN` |
+| TLS | — | Serve (HTTPS) | none (WireGuard) |
+| CORS | localhost only | localhost + listed origins | configured origin |
+| WS transport | ✅ | ✅ | ✅ |
+| Token required | No | Yes (proxy attaches it) | Yes (REPOCIV_TOKEN) |
 
 ## Troubleshooting
 
@@ -156,23 +196,25 @@ Common causes:
 - `.venv` missing dependencies (run `pip install -r requirements.txt`)
 - `REPOCIV_TOKEN` not set or too short
 
+### 403 over Tailscale Serve
+
+- The login is not in `REPOCIV_TAILNET_USERS`, or the request carries no
+  `Tailscale-User-Login` header (tagged device, or not actually going through
+  Serve). Check `tailscale serve status` and `tailscale whois` for the login
+  Serve reports.
+
 ### Cannot reach the UI from another device
 
 1. Verify both devices are on the same Tailscale network:
    ```bash
    tailscale status
    ```
-2. Verify the host's Tailscale IP:
-   ```bash
-   tailscale ip -4
-   ```
-3. Check that services are listening on 0.0.0.0:
+2. With Serve: verify the rule and that the hostname passes `allowedHosts`
+   (`__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS`).
+3. With `REPOCIV_REMOTE`: verify the host's Tailscale IP (`tailscale ip -4`)
+   and that services listen on 0.0.0.0:
    ```bash
    ss -tlnp | grep -E '527[345]'
-   ```
-4. Try a direct ping:
-   ```bash
-   ping <tailscale-ip>
    ```
 
 ### WebSocket connection fails from remote

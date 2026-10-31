@@ -19,7 +19,7 @@
 
 | Dependency | Minimum Version | Check Command |
 |------------|----------------|---------------|
-| Node.js | 20.x | `node --version` |
+| Node.js | 24.x | `node --version` |
 | npm | 10.x | `npm --version` |
 | Python | 3.11 | `python3 --version` |
 | pip | 24.x | `pip --version` |
@@ -288,7 +288,7 @@ curl -X POST http://localhost:5274/commands \
 3. Once at the city, the agent enters "Working" state
 4. SSE events stream progress back to the UI
 5. When complete, the mission is logged in the Event Store
-6. You can see mission history in the Timeline panel (F10)
+6. You can see mission history in the Crónica panel (F10)
 
 ---
 

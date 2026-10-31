@@ -14,7 +14,12 @@ Un dashboard hexagonal estilo Civilization V que **un usuario alpha de un solo a
 corre localmente para coordinar sus propios agentes sobre los repos
 en `~/.hermes/workspace/repos/`. Los agentes shipped (built-in) son WORKER
 y SCOUT; el resto se enrutan por harness (OPENCLAW, CLAUDE, CODEX, CURSOR)
-o se registran como perfil personal del usuario.
+o se registran como perfil personal del usuario. Los agentes que ya corren en
+paneles de **herdr** son ciudadanos de primera clase: la ventana de agente los
+muestra con su crónica en vivo y su CLI real (terminal `observe` + input por
+socket), y `herdr_launch` crea workspaces y agentes herdr desde el bus de
+comandos con las políticas de aprobación normales. Lo medido sobre el protocolo
+de herdr vive en `docs/HERDR_LIVE_CLI.md`.
 
 Por debajo del juego hay un Agent OS real (Tensor Context, Security Harness
 3-capas, task orchestrator con validation contracts y rol validator
@@ -31,10 +36,13 @@ siendo un solo usuario es **deliberada**: el alpha-test sirve precisamente
 para descubrir cuáles de esas capas aportan valor real y cuáles se
 destilan o se borran después.
 
-Versión: **v2.2.2 — 2026-10-25: aclara que el routing de modelo se calcula
-pero no se impone en el runner; sin cambios de alcance. v2.2.1 — 2026-10-24:
-corrección factual (el routing sigue activo). v2.2 — 2026-09-21: reconciliada
-con el código (poda auditada). Congelada en scope salvo lo autorizado abajo.**
+Versión: **v2.3 — 2026-10-31: herdr entra al scope como runtime de CLIs en vivo
+(ventana de agente, crónicas, `herdr_launch`) y se retira claude-live; sin
+cambios de alcance nuevo. v2.2.2 — 2026-10-25: aclara que el routing de modelo
+se calcula pero no se impone en el runner; sin cambios de alcance. v2.2.1 —
+2026-10-24: corrección factual (el routing sigue activo). v2.2 — 2026-09-21:
+reconciliada con el código (poda auditada). Congelada en scope salvo lo
+autorizado abajo.**
 
 ---
 
@@ -97,12 +105,12 @@ Métricas concretas para considerar el alpha "exitoso":
     limpia el draft y refresca el transcript mediante el polling existente.
     La UI bloquea envíos duplicados mientras la solicitud está pendiente,
     conserva el error upstream y no reintenta automáticamente.
-  - **Canal proceso-owned de Claude Code (Fase 5):** RepoCiv puede lanzar sus
-    propias sesiones Claude (`POST /api/claude-live/spawn`) y mantener el pipe
-    stream-json vivo; esas sesiones son las únicas de Claude Code
-    direccionables desde el compositor. `POST /api/claude-live/stop` termina el
-    proceso. Una sesión de terminal del usuario permanece observable y no
-    direccionable; nunca se reanuda con un segundo proceso.
+  - **Canal proceso-owned de Claude Code (Fase 5): retirado** en la limpieza
+    de 2026-10-31 (`/api/claude-live/*` quedó sin cliente una vez que herdr
+    cubre lanzar y dirigir agentes reales; ver `docs/HERDR_LIVE_CLI.md`).
+    Una sesión de terminal del usuario en herdr es observable y direccionable
+    por su socket (`pane.send_text`/`send_input`), con confirmación por
+    `state_change_seq`; nunca se reanuda con un segundo proceso.
 - **Los DOS renderers son trunk oficial.** El Canvas 2D (`flat`) es el modo
   por defecto y canónico; el WebGL/Three.js (`webgl`) es opt-in por
   `?renderer=webgl` o hotkey `3`. Decisión del owner (2026-06): lo oficial no

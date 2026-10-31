@@ -6,7 +6,8 @@ You are inside the **RepoCiv** repository, a Civilization V-style hexagonal dash
 **What this is:** A single-user alpha dashboard for a local agent workspace. It visualizes `~/.hermes/workspace/repos/` as cities, agents as units, and processes as buildings on a hex grid.
 **Stack:** TypeScript + Vite (Canvas 2D + WebGL/Three.js) · Python HTTP bridge · DuckDB ledger
 **Owner:** RepoCiv maintainers
-**Version:** v0.1.0 alpha — scope frozen until dogfooding says otherwise.
+**Version:** v0.1.0 alpha (la de `package.json`; `docs/SCOPE.md` versiona el
+documento de scope aparte) — scope frozen until dogfooding says otherwise.
 
 Key files to know about:
 - `README.md` — full overview, architecture, hotkeys

@@ -91,7 +91,7 @@ Three ports are exposed on loopback by default. **All three are required** — t
 
 If any of these ports is taken on the host (e.g. a local RepoCiv already running), the safest path is to stop the local service first. Do **not** blindly remap only the host ports yet: the current frontend discovers WebSocket metadata as `ws://localhost:5275`, so a mapping like `8275:5275` would make the UI load while the event stream still dials the wrong host port.
 
-If you need a remote or non-default-port setup today, use `REPOCIV_TOKEN` + `REPOCIV_REMOTE=true` and treat it as an advanced deployment; see `docs/REMOTE_ACCESS.md`.
+If you need a remote or non-default-port setup today, the recommended path is Tailscale Serve to the UI port; `REPOCIV_TOKEN` + `REPOCIV_REMOTE=true` is the advanced alternative. See `docs/REMOTE_ACCESS.md`.
 
 ## Environment variables
 
