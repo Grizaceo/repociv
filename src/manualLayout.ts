@@ -1,4 +1,5 @@
 import type { Axial } from './hex.ts';
+import { restoreCityToMap } from './mapEdits.ts';
 
 export interface ManualRepoEntry {
   repoPath: string;
@@ -67,6 +68,10 @@ export function upsertManualRepoEntry(entry: ManualRepoEntry): ManualLayoutStore
     entries: [...withoutSameCoord, entry],
   };
   saveManualLayout(next);
+  // A repo the user just placed is on the map, even if the editor took it off
+  // before: otherwise the next reload would remove it again.
+  restoreCityToMap(entry.repoPath);
+  if (entry.repoFsPath) restoreCityToMap(entry.repoFsPath);
   return next;
 }
 

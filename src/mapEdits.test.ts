@@ -1087,6 +1087,23 @@ describe('live edits and reload agree', () => {
     expectReloadMatches(live);
   });
 
+  it('remove a city, then add it back from the construction panel', () => {
+    const live = fixtureWorld();
+    removeCityOp(live, cityIn(live, 'city-a'), RECORD);
+    upsertManualRepoEntry({
+      repoPath: 'city-a',
+      repoFsPath: '/w/a',
+      repoName: 'city-a',
+      coord: { q: -3, r: 1 },
+      addedAt: 0,
+      source: 'manual',
+    });
+
+    const reloaded = fixtureWorld();
+    applyMapEdits(reloaded, FIXTURE_REPOS);
+    expect(reloaded.cities.map((c) => c.id)).toContain('city-a');
+  });
+
   it('erase a hex next to a city, then found another city nearby', () => {
     const live = fixtureWorld();
     eraseHexOp(live, { q: -4, r: 1 }, RECORD);
