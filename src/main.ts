@@ -73,6 +73,7 @@ import { wireCityEvents } from './ui/hudWiring/cityEvents.ts';
 import { wireLocalView } from './ui/hudWiring/localView.ts';
 import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
 import { sendCommand } from './commandBus.ts';
+import { tileInspectedCommand } from './commandDrafts.ts';
 import { recordGesture } from './directiveLearner.ts';
 import { tileKey } from './types.ts';
 import { clearChat } from './ui/chat.ts';
@@ -881,7 +882,7 @@ async function bootstrap() {
   });
 
   renderer.onTileInspect = (cityName, coord, repoPath) => {
-    bridge.send('tile_inspected', { cityName, coord, repoPath });
+    void sendCommand(tileInspectedCommand(cityName, coord, repoPath));
   };
   renderer.onEmptyTileClick = (coord) => {
     notifyTilePicked(coord);

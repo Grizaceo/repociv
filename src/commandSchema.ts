@@ -16,6 +16,8 @@ export type CommandType =
   | 'send_message'
   | 'unit_command'
   | 'quest_add'
+  | 'open_file'
+  | 'tile_inspected'
   | 'e2e_probe';
 
 export type Risk = 'low' | 'medium' | 'high' | 'destructive';
@@ -51,6 +53,8 @@ export const COMMAND_RISK: Record<CommandType, Risk> = {
   run_tests: 'low',
   run_build: 'low',
   quest_add: 'low',
+  open_file: 'low', // user-gated: clicking "open" IS the approval
+  tile_inspected: 'low',
   e2e_probe: 'low',
   unit_command: 'medium',
   edit_file: 'medium',

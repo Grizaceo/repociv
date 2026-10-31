@@ -877,27 +877,13 @@ describe('BridgeEvents WS transport', () => {
     bridge.stop();
   });
 
-  it('sends commands via WS when connected', async () => {
+  it('no longer exposes the broken legacy send() command path', async () => {
+    // A1: BridgeEvents.send(type, payload) shipped {type, ...payload} with no
+    // `target` over the WS command channel and was rejected by bridge.py.
+    // Command drafts go through sendCommand() (HTTP /commands) instead.
     const state = makeState();
     const bridge = new BridgeEvents(state);
-    bridge.start();
-
-    await vi.advanceTimersByTimeAsync(200);
-
-    const ws = FakeWebSocket.instances[0]!;
-    ws.authenticate();
-
-    // Clear the auth message sent on open
-    ws.sentMessages = [];
-
-    bridge.bridgeOnline = true;
-    bridge.send('unit_command', { unit: 'MAIN', city: 'main', mission: 'test' });
-
-    expect(ws.sentMessages.length).toBeGreaterThan(0);
-    const sent = JSON.parse(ws.sentMessages[0]!);
-    expect(sent.type).toBe('command');
-
-    bridge.stop();
+    expect('send' in bridge).toBe(false);
   });
 
   it('sends approvals via WS when connected', async () => {

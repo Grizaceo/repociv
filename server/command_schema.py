@@ -33,6 +33,8 @@ CommandType = Literal[
     "subagent_dispatch",  # explicit sub-mission dispatch (phase 2 stub)
     "unit_command",  # legacy compat
     "quest_add",     # legacy compat
+    "open_file",     # open a path in the OS editor — user-gated click
+    "tile_inspected",  # city-tile inspection ping
     "e2e_probe",     # safe browser/bridge test probe, no external agent
 ]
 
@@ -69,6 +71,8 @@ COMMAND_RISK: dict[str, Risk] = {
     "subagent_dispatch": "high",
     "unit_command":   "medium",
     "quest_add":      "low",
+    "open_file":      "low",
+    "tile_inspected": "low",
     "e2e_probe":      "low",
 }
 

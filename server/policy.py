@@ -61,6 +61,8 @@ _TYPE_POLICY: dict[str, PolicyDecision] = {
     "run_tests":     "auto-safe",
     "run_build":     "auto-safe",
     "quest_add":     "auto-safe",   # low-risk bookkeeping
+    "open_file":     "auto-safe",   # user-gated: the click IS the approval
+    "tile_inspected": "auto-safe",  # inspection ping, no mutation
     "unit_command":  "auto-safe",   # legacy compat — already gated by UX
     "execute_agent": "auto-safe",   # chat flow — gated by UX (user types and sends)
     "herdr_launch":  "auto-safe",   # explicit user launch

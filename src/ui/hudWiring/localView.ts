@@ -1,5 +1,7 @@
 import type { BridgeEvents } from '../../bridge.ts';
 import { sendCommand } from '../../commandBus.ts';
+import { openFileCommand } from '../../commandDrafts.ts';
+import { bridgeHeaders, bridgeUrl } from '../../bridgeEnv.ts';
 import type { GameState } from '../../game.ts';
 import type { Renderer } from '../../renderer.ts';
 import type { City, LocalNpc, LocalRoom, Unit } from '../../types.ts';
@@ -28,7 +30,6 @@ interface LocalViewDeps {
 export function wireLocalView({
   renderer,
   state,
-  bridge,
   enterLocalViewForCity,
   getFirstUserUnit,
   showToast,
@@ -59,7 +60,7 @@ export function wireLocalView({
         return;
       }
       if (action === 'code') {
-        bridge.send('open_file', { filePath: wb.filePath });
+        void sendCommand(openFileCommand(wb.filePath));
         return;
       }
       if (action === 'info') {
@@ -137,7 +138,7 @@ export function wireLocalView({
         room,
         { x: sx, y: sy },
         (folderPath) => {
-          bridge.send('open_file', { filePath: folderPath });
+          void sendCommand(openFileCommand(folderPath));
         },
         navigateToFolder,
       );
@@ -146,11 +147,20 @@ export function wireLocalView({
   // ─── Kiosk click → discover rest area with 1.25x bonus ───────────────────
   renderer.localTileClickCb = (x, y, tile, sx, sy) => {
     if (tile?.type === 'kiosk') {
-      bridge.send('discover_rest_area', {
-        restAreaId: `kiosk-${x}-${y}`,
-        roomId: 'kiosk',
-        coord: [x, y],
-      });
+      // discover_rest_area has no command executor — it is handled by the
+      // legacy root POST in bridge.py (fatigue state, not a validated
+      // Command). Post it there directly; the old BridgeEvents.send() routed
+      // it over WS where it was rejected for lack of `target`.
+      void fetch(bridgeUrl(''), {
+        method: 'POST',
+        headers: bridgeHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          type: 'discover_rest_area',
+          restAreaId: `kiosk-${x}-${y}`,
+          roomId: 'kiosk',
+          coord: [x, y],
+        }),
+      }).catch(() => {});
       return;
     }
     if (tile?.type === 'whiteboard') {
@@ -161,7 +171,7 @@ export function wireLocalView({
           room,
           { x: sx, y: sy },
           (folderPath) => {
-            bridge.send('open_file', { filePath: folderPath });
+            void sendCommand(openFileCommand(folderPath));
           },
           navigateToFolder,
         );

@@ -400,20 +400,10 @@ export class BridgeEvents {
     }
   }
 
-  // ─── Send legacy command to bridge.py root POST ───────────────────────────
-  send(type: string, payload: Record<string, unknown>) {
-    if (!this.bridgeOnline) return;
-    // Prefer WS for commands
-    if (this.wsConnected) {
-      this._sendViaWs('command', { data: { type, ...payload } });
-      return;
-    }
-    fetch(bridgeUrl(''), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
-      body: JSON.stringify({ type, ...payload }),
-    }).catch(() => {});
-  }
+  // NOTE: the legacy send(type, payload) wrapper was removed (A1). It shipped
+  // {type, ...payload} with no `target` over the WS command channel, and
+  // bridge.py rejected it. Commands go through sendCommand() (HTTP /commands);
+  // non-command events like discover_rest_area POST to the legacy root.
 
   stop() {
     this.stopped = true;
