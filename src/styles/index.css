@@ -246,11 +246,6 @@ body.local-view::after {
   pointer-events: none;
   user-select: none;
 }
-.map-label-capital {
-  color: #f0d060;
-  border-color: rgba(240, 208, 96, 0.55);
-  font-size: 12px;
-}
 .map-label-district {
   font-size: 9px;
   opacity: 0.85;

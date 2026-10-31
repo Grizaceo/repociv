@@ -21,6 +21,3 @@
   font-size: var(--text-lg);
   margin-right: var(--space-3);
 }
-#global-error-toast[data-herald='true'] {
-  border-left-color: var(--civ-gold) !important;
-}

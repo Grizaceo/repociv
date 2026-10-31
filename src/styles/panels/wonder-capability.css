@@ -437,11 +437,6 @@
   color: var(--gold-mid, #c8a84b);
   vertical-align: middle;
 }
-.obs-agent-ago {
-  font-size: 10px;
-  opacity: 0.65;
-  margin-left: 4px;
-}
 .mission-log-panel {
   position: fixed;
   right: 12px;
