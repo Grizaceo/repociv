@@ -89,6 +89,7 @@ function renderNotice(): void {
   if (status === 'blocked') {
     const button = document.createElement('button');
     button.type = 'button';
+    button.className = 'agents-compose-send';
     button.textContent = '⌨ Abrir CLI';
     button.addEventListener('click', cli);
     box.append(' ', button);
@@ -229,14 +230,14 @@ function mount(): HTMLElement | null {
   windowEl.innerHTML = `
     <div class="agent-window-header">
       <span class="agent-window-status"></span><span class="agent-window-place"></span>
-      <button type="button" class="agent-window-locate" aria-label="Ir al agente en el mapa">📍</button>
-      <button type="button" class="agent-window-cli">⌨ Abrir CLI</button>
+      <button type="button" class="agent-window-locate agents-compose-send" aria-label="Ir al agente en el mapa">📍</button>
+      <button type="button" class="agent-window-cli agents-compose-send">⌨ Abrir CLI</button>
     </div>
     <div class="agent-window-log"></div>
     <div class="agent-window-notice hidden" role="status"></div>
     <div class="agent-window-input-row">
       <textarea class="agent-window-input" rows="1" maxlength="100000" placeholder="Hablar con el agente..." aria-label="Mensaje al agente"></textarea>
-      <button type="button" class="agent-window-send">Enviar</button>
+      <button type="button" class="agent-window-send agents-compose-send">Enviar</button>
     </div>`;
   pane.append(windowEl);
   windowEl.querySelector('.agent-window-locate')?.addEventListener('click', () => {
