@@ -344,8 +344,8 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     const cityHere = state.world.cities.find((c) =>
       c.territory.some((t) => t.q === unit.coord.q && t.r === unit.coord.r),
     );
-    if (tab === 'git' && cityHere) loadGitInfo(cityHere.id);
-    if (tab === 'files' && cityHere) loadFilesInfo(cityHere.id);
+    if (tab === 'git' && cityHere) loadGitInfo(cityHere);
+    if (tab === 'files' && cityHere) loadFilesInfo(cityHere);
   });
 
   // The nations tab is populated up front so it is never empty when opened.

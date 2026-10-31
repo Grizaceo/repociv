@@ -1,5 +1,5 @@
 // ─── Side panel lifecycle + tab wiring + git/files loaders ──────────────────
-import type { Unit } from '../../types.ts';
+import type { City, Unit } from '../../types.ts';
 import { trapFocus } from '../focusTrap.ts';
 import {
   updateChatTargetIndicator,
@@ -101,14 +101,18 @@ export function bindChatAgentLocator(locate: (unitId: string) => void): void {
     };
 }
 
-export async function loadGitInfo(repoName: string): Promise<void> {
+export function cityRepoRef(city: Pick<City, 'id' | 'repoPath'>): string {
+  return city.repoPath || city.id;
+}
+
+export async function loadGitInfo(city: Pick<City, 'id' | 'name' | 'repoPath'>): Promise<void> {
   const target = document.getElementById('git-info');
   if (!target) return;
-  target.innerHTML = `<div class="git-line" style="color:var(--text-dim)">consultando manuscritos de ${escapeHtml(repoName)}...</div>`;
+  target.innerHTML = `<div class="git-line" style="color:var(--text-dim)">consultando manuscritos de ${escapeHtml(city.name)}...</div>`;
   try {
-    const res = await fetch(`/api/git/${encodeURIComponent(repoName)}`);
+    const res = await fetch(`/api/git/${encodeURIComponent(cityRepoRef(city))}`);
     if (!res.ok) {
-      target.innerHTML = `<div class="git-line" style="color:var(--civ-happiness)">${escapeHtml(repoName)} no es un territorio git.</div>`;
+      target.innerHTML = `<div class="git-line" style="color:var(--civ-happiness)">${escapeHtml(city.name)} no es un territorio git.</div>`;
       return;
     }
     const data = (await res.json()) as { branch: string; lastCommit: string; changes: string[] };
@@ -140,12 +144,12 @@ export async function loadGitInfo(repoName: string): Promise<void> {
   }
 }
 
-export async function loadFilesInfo(repoName: string): Promise<void> {
+export async function loadFilesInfo(city: Pick<City, 'id' | 'name' | 'repoPath'>): Promise<void> {
   const target = document.getElementById('files-info');
   if (!target) return;
-  target.innerHTML = `<div class="file-row" style="color:var(--text-dim)">explorando archivos de ${escapeHtml(repoName)}...</div>`;
+  target.innerHTML = `<div class="file-row" style="color:var(--text-dim)">explorando archivos de ${escapeHtml(city.name)}...</div>`;
   try {
-    const res = await fetch(`/api/files/${encodeURIComponent(repoName)}`);
+    const res = await fetch(`/api/files/${encodeURIComponent(cityRepoRef(city))}`);
     if (!res.ok) {
       target.innerHTML = `<div class="file-row" style="color:var(--civ-happiness)">No se pudieron leer los archivos.</div>`;
       return;

@@ -37,8 +37,8 @@ export function selectHero(
       (c) => c.coord.q === unit.coord.q && c.coord.r === unit.coord.r,
     );
     if (cityHere) {
-      loadGitInfo(cityHere.id);
-      loadFilesInfo(cityHere.id);
+      loadGitInfo(cityHere);
+      loadFilesInfo(cityHere);
     }
   }
 }
