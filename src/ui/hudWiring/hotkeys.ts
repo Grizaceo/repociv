@@ -223,7 +223,7 @@ export function wireHotkeys(
     ) {
       // Ctrl+C must never hijack a real text selection: copy wins over the
       // Claude wizard. Ctrl+E still spawns Claude either way.
-      if (quickKey === 'c' && e.ctrlKey && globalThis.getSelection?.().toString()) {
+      if (quickKey === 'c' && e.ctrlKey && globalThis.getSelection?.()?.toString()) {
         return;
       }
       e.preventDefault();
