@@ -78,6 +78,18 @@ el umbral exacto: 61 caracteres pasaron, 78 no, y `/zzz…` de 300 sí. Por eso:
 - Sin validar: un prompt que herdr no reconozca. Es el fallo más peligroso para un
   RTS y sigue pendiente para la Fase 4.
 
+### Envío desde Crónicas
+
+El WebSocket de terminal acepta `submit`: verifica el estado actual, pega una sola
+vez con `pane.send_input`, espera 200 ms y manda `\r` aparte con `pane.send_text`.
+No reintenta. Solo un aumento de `state_change_seq` confirma la entrega; si el
+agente ya estaba trabajando, la confirmación queda pendiente. Si está `blocked`,
+se rechaza sin enviar nada: los permisos y diálogos se responden en el CLI.
+La burbuja local sigue visible hasta que la crónica contiene una aparición nueva
+del mismo mensaje; así una transcripción atrasada no duplica ni oculta el envío.
+Para Claude, la crónica lee directamente el final del `.jsonl` nativo (solo texto
+de usuario y respuestas), sin esperar la próxima importación de Suvadu.
+
 ### Identidad de un panel
 
 - **`pane_id` cambia al mover un panel** entre workspaces (`w1:p4` → `w2:p2`), y
