@@ -12,10 +12,10 @@
 
 import type { City, Nation, Unit, World } from './types.ts';
 
-export const NATION_STORE_KEY = 'repociv:nations:v1';
+const NATION_STORE_KEY = 'repociv:nations:v1';
 
 /** Editorial flag palette — heraldic hues that read on the golden-hour terrain. */
-export const NATION_PALETTE: string[] = [
+const NATION_PALETTE: string[] = [
   '#4a70b8', // azul heráldico
   '#c74d47', // rojo óxido
   '#3d948c', // verdemar
@@ -125,11 +125,7 @@ export function getNationStore(): NationStore {
   return _cache;
 }
 
-export function loadNationStore(): NationStore {
-  return getNationStore();
-}
-
-export function saveNationStore(store: NationStore): void {
+function saveNationStore(store: NationStore): void {
   _cache = store;
   if (!canUseLocalStorage()) return;
   window.localStorage.setItem(NATION_STORE_KEY, JSON.stringify(store));
@@ -147,7 +143,7 @@ function persist(): NationStore {
 }
 
 /** Next free flag color for a new nation, skipping colors already in use. */
-export function nextNationColor(existing: Nation[] = getNationStore().nations): string {
+function nextNationColor(existing: Nation[] = getNationStore().nations): string {
   const used = new Set(existing.map((n) => n.color.toLowerCase()));
   for (const color of NATION_PALETTE) {
     if (!used.has(color.toLowerCase())) return color;
@@ -204,7 +200,7 @@ export function assignCityToNation(key: string, nationId: string | null): void {
   persist();
 }
 
-export function nationById(id: string | undefined): Nation | null {
+function nationById(id: string | undefined): Nation | null {
   if (!id) return null;
   return getNationStore().nations.find((n) => n.id === id) ?? null;
 }
@@ -253,16 +249,4 @@ export function applyNationsToWorld(world: World): void {
       delete city.nationId;
     }
   }
-}
-
-/** Cities grouped by nation id. Cities without a nation land under `null`. */
-export function citiesByNation(world: World): Map<string | null, City[]> {
-  const grouped = new Map<string | null, City[]>();
-  for (const city of world.cities) {
-    const key = city.nationId ?? null;
-    const list = grouped.get(key) ?? [];
-    list.push(city);
-    grouped.set(key, list);
-  }
-  return grouped;
 }

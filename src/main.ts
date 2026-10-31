@@ -1041,13 +1041,11 @@ async function bootstrap() {
     _enterLocalViewForCity(city);
   });
 
-  window.addEventListener('repociv:city-mission-request', async (e: Event) => {
+  window.addEventListener('repociv:city-mission-request', (e: Event) => {
     const detail = (e as CustomEvent).detail as { cityId?: string } | undefined;
     if (!detail?.cityId) return;
     const city = state.world.cities.find((c) => c.id === detail.cityId);
     if (!city) return;
-    if (!(await Promise.resolve(true))) return;
-
     if (!state.selectedUnit) renderer.centerOn(city.coord);
 
     renderer.onCitySelect?.(city.id);

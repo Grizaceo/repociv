@@ -80,10 +80,6 @@ export function initAgentWindow(value: { locate(row: ExternalSessionRow): void }
   deps = value;
 }
 
-export function isAgentWindowOpen(): boolean {
-  return destination !== null;
-}
-
 function element<T extends HTMLElement>(selector: string): T | null {
   return document.querySelector<T>(`#agent-window ${selector}`);
 }

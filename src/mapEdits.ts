@@ -17,7 +17,7 @@ import type { Axial } from './hex.ts';
 import { tileKey } from './types.ts';
 import type { City, Terrain } from './types.ts';
 
-export const MAP_EDITS_STORAGE_KEY = 'repociv:map-edits:v1';
+const MAP_EDITS_STORAGE_KEY = 'repociv:map-edits:v1';
 
 /** Terrains the editor can paint. `sacred` is capital-only and not paintable. */
 export const PAINTABLE_TERRAINS: Terrain[] = [
@@ -124,11 +124,7 @@ export function getMapEdits(): MapEditStore {
   return _cache;
 }
 
-export function loadMapEdits(): MapEditStore {
-  return getMapEdits();
-}
-
-export function saveMapEdits(store: MapEditStore): void {
+function saveMapEdits(store: MapEditStore): void {
   _cache = store;
   if (!canUseLocalStorage()) return;
   window.localStorage.setItem(MAP_EDITS_STORAGE_KEY, JSON.stringify(store));

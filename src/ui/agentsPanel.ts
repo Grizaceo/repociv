@@ -555,7 +555,7 @@ function _placeOf(row: ExternalSessionRow): MapPlace {
 }
 
 /** Camera to the agent's unit if it is on the map, else to its city. */
-export function locateExternalAgent(row: ExternalSessionRow): void {
+function locateExternalAgent(row: ExternalSessionRow): void {
   if (!_deps) return;
   const unit = row.unit ? _deps.state.getUnit(row.unit) : undefined;
   const coord = _placeOf(row).city?.coord ?? unit?.coord;

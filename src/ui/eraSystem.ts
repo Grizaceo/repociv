@@ -58,22 +58,6 @@ export function getEraLabel(index: number): string {
   return ERAS[Math.min(index, ERAS.length - 1)]?.label ?? 'ERA I — FUNDACIÓN';
 }
 
-/** Render era badge in top bar */
-export function updateEraDisplay(metrics: Parameters<typeof getCurrentEraIndex>[0]) {
-  const idx = getCurrentEraIndex(metrics);
-  const label = getEraLabel(idx);
-  const el = document.getElementById('era-display');
-  if (el) el.textContent = label;
-  // store for next boot
-  try {
-    localStorage.setItem('repociv:eraIndex', String(idx));
-    localStorage.setItem('repociv:eraLabel', label);
-  } catch {
-    /* noop */
-  }
-  return label;
-}
-
 export function getStoredEraLabel(): string {
   try {
     return localStorage.getItem('repociv:eraLabel') ?? 'ERA I — FUNDACIÓN';
