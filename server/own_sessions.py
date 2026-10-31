@@ -22,6 +22,7 @@ from __future__ import annotations
 import glob
 import json
 import os
+import time
 from typing import Any
 
 from . import session_liveness as _liveness
@@ -59,6 +60,22 @@ def _canonical_paths() -> list[str]:
 def _unit_type(runtime_id: str) -> str:
     base = (runtime_id or "").split(":")[0].strip().lower()
     return _UNIT_TYPE_BY_RUNTIME.get(base, "hero")
+
+
+def _stale_unknown(path: str) -> bool:
+    """True when a canonical file is older than the ghost-unit TTL.
+
+    ``unknown`` means "probe degraded or no native session id" — a session
+    that stays unknown past ``REPOCIV_OWN_SESSION_UNKNOWN_TTL_S`` (default
+    7 days) is a ghost: the client keeps the unit forever otherwise. File
+    mtime is the staleness clock; any stat failure fails open (row kept).
+    """
+    try:
+        ttl = float(os.environ.get("REPOCIV_OWN_SESSION_UNKNOWN_TTL_S", 7 * 24 * 3600))
+        age = time.time() - os.path.getmtime(path)
+    except (OSError, ValueError):
+        return False
+    return age > ttl
 
 
 def snapshot() -> dict[str, Any]:
@@ -103,6 +120,8 @@ def snapshot() -> dict[str, Any]:
             state = "working"
         else:
             state = "idle"
+        if state == "unknown" and _stale_unknown(path):
+            continue
         rows.append({
             "unit": unit,
             "civ": "capital",

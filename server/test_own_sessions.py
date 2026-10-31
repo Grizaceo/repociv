@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import time
 from typing import Any
 
 import pytest
@@ -47,6 +49,28 @@ def test_snapshot_rebuilds_row_from_canonical(store, monkeypatch):
     assert row["mission"] == "Dime Donde Estas"
     assert row["state"] == "unknown"
     assert snap["livenessOk"] is False
+
+
+def test_snapshot_expires_stale_unknown_row(store, monkeypatch):
+    """Ghost units: an ``unknown`` row whose canonical file is older than the
+    TTL is a stale ghost (probe degraded long ago, session never closed) and
+    must drop out of the snapshot instead of living on the map forever."""
+    _patch_probe(monkeypatch, sl.Liveness(ok=False))  # every row → unknown
+    stale = time.time() - 8 * 24 * 3600
+    os.utime(store / "MAIN" / "canonical.json", (stale, stale))
+    assert osn.snapshot()["agents"] == []
+
+
+def test_snapshot_keeps_fresh_unknown_row(store, monkeypatch):
+    _patch_probe(monkeypatch, sl.Liveness(ok=False))
+    [row] = osn.snapshot()["agents"]
+    assert row["state"] == "unknown"
+
+
+def test_snapshot_unknown_ttl_env_override(store, monkeypatch):
+    _patch_probe(monkeypatch, sl.Liveness(ok=False))
+    monkeypatch.setenv("REPOCIV_OWN_SESSION_UNKNOWN_TTL_S", "0")
+    assert osn.snapshot()["agents"] == []
 
 
 def test_snapshot_liveness_working_and_idle(store, monkeypatch):
