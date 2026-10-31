@@ -187,6 +187,18 @@ const Schemas = [
     risk: v.string(),
   }),
   v.object({
+    type: v.literal('herdr_launch'),
+    commandId: v.string(),
+    state: v.string(),
+    reason: v.nullable(v.string()),
+    terminalId: v.string(),
+    paneId: v.string(),
+    kind: v.string(),
+    cityId: v.string(),
+    name: v.string(),
+    missionDelivery: v.nullable(v.object({ state: v.string(), reason: v.nullable(v.string()) })),
+  }),
+  v.object({
     type: v.literal('approval_expired'),
     commandId: v.string(),
     reason: v.string(),

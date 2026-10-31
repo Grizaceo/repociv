@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RepoCivProfile } from '../agentProfile.ts';
-import { buildAgentSessionCommand, validateAgentSessionDraft } from './agentSessionStart.ts';
+import { buildAgentSessionCommand, buildHerdrLaunchCommand, validateAgentSessionDraft } from './agentSessionStart.ts';
 
 const hermesProfile: RepoCivProfile = {
   name: 'cobalt',
@@ -12,6 +12,14 @@ const hermesProfile: RepoCivProfile = {
 };
 
 describe('agentSessionStart', () => {
+  it('builds a herdr launch without filesystem paths', () => {
+    expect(buildHerdrLaunchCommand({ kind: 'devin', cityId: 'city-a', mission: 'Hola' })).toEqual({
+      type: 'herdr_launch',
+      target: 'city-a',
+      payload: { city: 'city-a', kind: 'devin', mission: 'Hola', unit: 'HERDR' },
+      created_by: 'agent-session-wizard',
+    });
+  });
   it('creates the canonical execute_agent command without exposing a local path', () => {
     expect(
       buildAgentSessionCommand({

@@ -289,6 +289,10 @@ const HANDLERS: HandlerByType = {
   },
 
   // ─── Approvals ──────────────────────────────────────────────────────
+  herdr_launch() {
+    // The window reconciles launches with the authoritative HTTP snapshot.
+  },
+
   waiting_approval(ctx, evt) {
     // Auto-approve execute_agent (chat) when the setting is on — user
     // already expressed intent by typing and sending the message.

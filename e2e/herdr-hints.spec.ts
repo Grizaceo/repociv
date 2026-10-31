@@ -4,8 +4,8 @@ import type { ExternalSessionRow } from '../src/externalAgents.ts';
 
 const stopped = 'herdr no está corriendo. Ábrelo con herdr en una terminal y abre este agente en un panel.';
 const missing = 'RepoCiv solo puede escribirle a Claude y Devin cuando corren dentro de herdr, y herdr no está instalado. Instálalo (README → «Agentes en herdr») y abre ahí el agente.';
-const readyClaude = 'Este Claude corre en una terminal fuera de herdr: RepoCiv lo lee, pero no puede escribirle. Para hablarle desde aquí, ciérralo y retómalo en un panel de herdr (ya cerrado, ⏎ copia el comando).';
-const readyDevin = 'Este Devin corre en una terminal fuera de herdr: RepoCiv lo lee, pero no puede escribirle. Para hablarle desde aquí, ábrelo dentro de un panel de herdr.';
+const readyClaude = 'Este Claude corre en una terminal fuera de herdr: RepoCiv lo lee, pero no puede escribirle. Para hablarle desde aquí, ciérralo y retómalo en un panel de herdr (ya cerrado, ⏎ copia el comando), o lanza uno nuevo con «+ Sesión» → En herdr.';
+const readyDevin = 'Este Devin corre en una terminal fuera de herdr: RepoCiv lo lee, pero no puede escribirle. Para hablarle desde aquí, ábrelo dentro de un panel de herdr, o lanza uno nuevo con «+ Sesión» → En herdr.';
 const unknown = 'Este agente no corre dentro de herdr, así que RepoCiv no puede escribirle. Ábrelo en un panel de herdr para hablarle desde aquí.';
 
 async function boot(page: Page) {

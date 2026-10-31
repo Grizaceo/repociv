@@ -46,8 +46,10 @@ import { escapeHtml } from './escapeHtml.ts';
 import { fetchAgents, terminalPanel } from '../terminalPanel.ts';
 import { herdrHint } from './herdrHint.ts';
 import type { HerdrRuntime } from './herdrHint.ts';
-import { initAgentWindow, openAgentWindow } from './agentWindow.ts';
+import { agentWindowDestination, initAgentWindow, openAgentWindow } from './agentWindow.ts';
 import type { RepoCivProfile } from '../agentProfile.ts';
+import type { CommandResponse } from '../commandSchema.ts';
+import { HERDR_AGENT_LABELS, type HerdrLaunchDraft } from './agentSessionStart.ts';
 import { openAgentSessionWizard, type SessionStartResult } from './agentSessionWizard.ts';
 import { openProfileStudio } from './agentProfileStrip.ts';
 import { closeOwnSession } from '../ownSessions.ts';
@@ -70,6 +72,7 @@ export interface AgentsPanelDeps {
     cityId: string;
     mission: string;
   }) => Promise<SessionStartResult>;
+  startHerdrSession: (draft: HerdrLaunchDraft) => Promise<CommandResponse>;
 }
 
 let _deps: AgentsPanelDeps | null = null;
@@ -142,7 +145,7 @@ export function openNewAgentSession(
 ): void {
   if (!_deps) return;
   void openAgentSessionWizard(
-    { state: _deps.state, startSession: _deps.startSession },
+    { state: _deps.state, startSession: _deps.startSession, startHerdrSession: _deps.startHerdrSession },
     {
       ...options,
       // Nueva sesión = entrar a conversar: cuando el bridge acepta la sesión,
@@ -150,6 +153,13 @@ export function openNewAgentSession(
       onStarted: (unitId) => {
         if (unitId) focusOwnChat(unitId);
         else _render();
+      },
+      onHerdrStarted: (draft, cityName, result) => {
+        openAgentWindow({
+          terminalId: null, paneId: '', kind: draft.kind, label: HERDR_AGENT_LABELS[draft.kind],
+          place: cityName, sessionId: null, status: result.status,
+          launch: { commandId: result.commandId, mission: draft.mission },
+        });
       },
     },
   );
@@ -284,7 +294,7 @@ function _openChat(row: ExternalSessionRow): void {
     _stopTimers();
     _render();
     locateExternalAgent(row);
-    openAgentWindow(row);
+    openAgentWindow(agentWindowDestination(row));
     return;
   }
   _chatSession = row.sessionId;

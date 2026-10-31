@@ -16,6 +16,26 @@ export interface AgentSessionCommandInput extends AgentSessionDraft {
   unitId: string;
 }
 
+export type HerdrLaunchKind = 'claude' | 'codex' | 'devin' | 'hermes';
+export interface HerdrLaunchDraft {
+  kind: HerdrLaunchKind;
+  cityId: string;
+  mission: string;
+}
+
+export const HERDR_AGENT_LABELS: Record<HerdrLaunchKind, string> = {
+  claude: 'Claude Code', codex: 'Codex', devin: 'Devin', hermes: 'Hermes',
+};
+
+export function buildHerdrLaunchCommand({ kind, cityId, mission }: HerdrLaunchDraft): CommandDraft {
+  return {
+    type: 'herdr_launch',
+    target: cityId,
+    payload: { city: cityId, kind, mission, unit: 'HERDR' },
+    created_by: 'agent-session-wizard',
+  };
+}
+
 /** A human-readable validation error, or null when the wizard can submit. */
 export function validateAgentSessionDraft(draft: AgentSessionDraft): string | null {
   if (!draft.profile?.name.trim()) return 'Elegí un perfil válido.';

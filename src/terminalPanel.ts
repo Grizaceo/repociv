@@ -47,6 +47,8 @@ const REASONS: Record<string, string> = {
   herdr_outdated: 'Esta versión de herdr es demasiado antigua.',
   herdr_incompatible: plainHerdrHint(herdrHint('claude', { state: 'incompatible', version: '', minVersion: '' })),
   unavailable: 'No pude hablar con herdr.',
+  agent_starting: 'El agente todavía está arrancando. Espera a que esté listo.',
+  agent_changed: 'En ese panel ya corre otro agente. No se envió.',
 };
 
 export function reasonText(reason: string): string {

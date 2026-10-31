@@ -6,8 +6,8 @@ export interface HerdrRuntime {
 
 const UNKNOWN = 'Este agente no corre dentro de herdr, así que RepoCiv no puede escribirle. Ábrelo en un panel de herdr para hablarle desde aquí.';
 const READY = {
-  claude: 'Este Claude corre en una terminal fuera de herdr: RepoCiv lo lee, pero no puede escribirle. Para hablarle desde aquí, ciérralo y retómalo en un panel de herdr (ya cerrado, ⏎ copia el comando).',
-  devin: 'Este Devin corre en una terminal fuera de herdr: RepoCiv lo lee, pero no puede escribirle. Para hablarle desde aquí, ábrelo dentro de un panel de herdr.',
+  claude: 'Este Claude corre en una terminal fuera de herdr: RepoCiv lo lee, pero no puede escribirle. Para hablarle desde aquí, ciérralo y retómalo en un panel de herdr (ya cerrado, ⏎ copia el comando), o lanza uno nuevo con «+ Sesión» → En herdr.',
+  devin: 'Este Devin corre en una terminal fuera de herdr: RepoCiv lo lee, pero no puede escribirle. Para hablarle desde aquí, ábrelo dentro de un panel de herdr, o lanza uno nuevo con «+ Sesión» → En herdr.',
 };
 const RUNTIME_HINTS: Record<string, string> = {
   missing: 'RepoCiv solo puede escribirle a Claude y Devin cuando corren dentro de herdr, y herdr no está instalado. Instálalo (README → «Agentes en herdr») y abre ahí el agente.',

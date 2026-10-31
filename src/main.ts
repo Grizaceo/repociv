@@ -61,7 +61,7 @@ import { maybeStartFirstRunTour } from './ui/firstRunTour.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
 import { wireHUD, selectHero } from './ui/hudWiring.ts';
 import { nextSessionUnitId, spawnAcceptedSession } from './ui/hudWiring/spawn.ts';
-import { buildAgentSessionCommand } from './ui/agentSessionStart.ts';
+import { buildAgentSessionCommand, buildHerdrLaunchCommand } from './ui/agentSessionStart.ts';
 import { bindChatAgentLocator } from './ui/chat/panel.ts';
 import { agentLocation } from './ui/agentLocation.ts';
 import { subscribeExternalSessionDirectory } from './ui/externalSessionDirectory.ts';
@@ -1310,6 +1310,13 @@ async function bootstrap() {
     state,
     locate: locateAgent,
     selectOwnUnit: (u) => selectHero(u, renderer, state, bridge),
+    startHerdrSession: async (draft) => {
+      const city = state.world.cities.find((candidate) => candidate.id === draft.cityId);
+      if (!city || city.isCapital || !city.repoPath) {
+        return { ok: false, status: 'rejected', commandId: '', reason: 'La ciudad ya no está disponible para una sesión.' };
+      }
+      return sendCommand(buildHerdrLaunchCommand(draft));
+    },
     startSession: async ({ profile, cityId, mission }) => {
       const city = state.world.cities.find((candidate) => candidate.id === cityId);
       if (!city || city.isCapital || !city.repoPath) {

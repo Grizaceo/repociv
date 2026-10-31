@@ -12,14 +12,14 @@ import { initAgentSelector } from './agentSelector.ts';
 import { initProviderSelectors } from './modelSelector.ts';
 import { initProfileSelector } from './profileSelector.ts';
 import { switchToChatUnit } from './agentChip.ts';
-import { closeAgentWindow, openAgentWindow } from '../agentWindow.ts';
+import { agentWindowDestination, closeAgentWindow, openAgentWindow } from '../agentWindow.ts';
 import { externalSessionSnapshot } from '../externalSessionDirectory.ts';
 
 export async function openSidePanel(unit: Unit): Promise<void> {
   closeAgentWindow();
   const external = externalSessionSnapshot()?.find((row) => row.unit === unit.id && row.herdrPane);
   if (external) {
-    openAgentWindow(external);
+    openAgentWindow(agentWindowDestination(external));
     return;
   }
   const panel = document.getElementById('side-panel');
