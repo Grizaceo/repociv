@@ -260,6 +260,20 @@ export function findPlacedCityEntry(
 }
 
 /** Wipe every manual edit (terrain, hexes, cities). Nations are kept. */
+/**
+ * Which city owns the hex at `coord` — territory containment OR exact centre
+ * match. Shared by every "unit → city" resolution (spawn side-panel sync,
+ * chat context, approval navigation) so a unit standing on a district hex
+ * resolves the same city everywhere.
+ */
+export function findCityForCoord(cities: readonly City[], coord: Axial): City | undefined {
+  return cities.find(
+    (c) =>
+      (c.coord.q === coord.q && c.coord.r === coord.r) ||
+      c.territory.some((t) => t.q === coord.q && t.r === coord.r),
+  );
+}
+
 export function clearMapEdits(): void {
   saveMapEdits({
     ...EMPTY_STORE,

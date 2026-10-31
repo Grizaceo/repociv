@@ -5,7 +5,8 @@ import {
   saveSelectedRepoPaths,
   type ScannedRepo,
 } from '../map';
-import { upsertManualRepoEntry, removeManualRepoEntry, loadManualLayout } from '../manualLayout';
+import { removeManualRepoEntry, loadManualLayout } from '../manualLayout';
+import { getMapEdits, removePlacedCity } from '../mapEdits.ts';
 import { openMapEditor } from './mapEditor.ts';
 import { showNotification } from './notificationBanner';
 import { trackPanelOpen } from './analytics.ts';
@@ -17,20 +18,17 @@ let _rendererRef: {
   getPlacingMode(): boolean;
   setCityRelocateMode(active: boolean, panelRepoPath?: string | null): void;
   getCityRelocateMode(): boolean;
+  /** Shared founding pipeline (validation + undo + placedCities persist). */
+  foundRepoCity(repo: ScannedRepo, coord: { q: number; r: number }): boolean;
 } | null = null;
 let _onPickTileCb: ((coord: { q: number; r: number }) => void) | null = null;
 let selectedRepo: ScannedRepo | null = null;
 
-// Callbacks for dynamic city add/delete (no reload)
-type CityAddedCallback = (repo: ScannedRepo, coord: { q: number; r: number }) => void;
+// Callback for dynamic city delete (no reload). City ADD now goes through
+// renderer.foundRepoCity — the same pipeline the map editor uses.
 type CityDeletedCallback = (repoPath: string) => void;
 
-let _onCityAdded: CityAddedCallback | null = null;
 let _onCityDeleted: CityDeletedCallback | null = null;
-
-export function setOnCityAddedCb(cb: CityAddedCallback): void {
-  _onCityAdded = cb;
-}
 
 export function setOnCityDeletedCb(cb: CityDeletedCallback): void {
   _onCityDeleted = cb;
@@ -55,8 +53,24 @@ export function setRendererRef(renderer: {
   getPlacingMode(): boolean;
   setCityRelocateMode(active: boolean, panelRepoPath?: string | null): void;
   getCityRelocateMode(): boolean;
+  foundRepoCity(repo: ScannedRepo, coord: { q: number; r: number }): boolean;
 }) {
   _rendererRef = renderer;
+}
+
+/**
+ * Commit a picked tile for `repo` through renderer.foundRepoCity — the same
+ * pipeline as the map editor: canFoundCity validation, undo history and
+ * placedCities persistence. The repo stays in the scan selection
+ * (upsertSelection) so it survives reloads. Returns false when the hex
+ * cannot host the city.
+ */
+export function placePickedCity(repo: ScannedRepo, coord: { q: number; r: number }): boolean {
+  if (!_rendererRef?.foundRepoCity(repo, coord)) return false;
+  void upsertSelection(repo.path);
+  closeConstructionPanel();
+  _rendererRef.setPlacingMode(false);
+  return true;
 }
 
 export function closeConstructionPanel(): void {
@@ -115,13 +129,23 @@ async function upsertSelection(repoPath: string): Promise<void> {
 export function refreshCityList(): void {
   const list = document.getElementById('construction-city-list');
   if (!list) return;
-  const store = loadManualLayout();
-  if (store.entries.length === 0) {
+  // Cities can be persisted in two stores: legacy manualLayout entries and
+  // the map editor's placedCities (where new foundings land via
+  // foundRepoCity). Merge both, deduped by repoPath.
+  const manual = loadManualLayout().entries;
+  const manualPaths = new Set(manual.map((e) => e.repoPath));
+  const entries = [
+    ...manual.map((e) => ({ repoPath: e.repoPath, repoName: e.repoName, coord: e.coord })),
+    ...getMapEdits()
+      .placedCities.filter((p) => !manualPaths.has(p.repoPath))
+      .map((p) => ({ repoPath: p.repoPath, repoName: p.repoName, coord: p.coord })),
+  ];
+  if (entries.length === 0) {
     list.innerHTML =
       '<p class="construction-empty">No hay ciudades manuales. Agrega un repo primero.</p>';
     return;
   }
-  list.innerHTML = store.entries
+  list.innerHTML = entries
     .map(
       (entry) => `
     <div class="construction-city-item" data-path="${escapeHtml(entry.repoPath)}">
@@ -144,6 +168,7 @@ export function refreshCityList(): void {
       if (!path) return;
       if (confirm('Eliminar esta ciudad del mapa?')) {
         removeManualRepoEntry(path);
+        removePlacedCity(path);
         void removeSelectedRepoPath(path)
           .then((selected) => saveSelectedRepoPaths([...selected]))
           .catch(() => {
@@ -177,8 +202,11 @@ function refreshRepoSelect(): void {
   const selectedPaths = loadSelectedRepoPaths();
   const manualLayout = loadManualLayout();
 
-  // Get repos not in manualLayout
-  const placedPaths = new Set(manualLayout.entries.map((e) => e.repoPath));
+  // Repos already on the map (manualLayout + placedCities) are not offered.
+  const placedPaths = new Set([
+    ...manualLayout.entries.map((e) => e.repoPath),
+    ...getMapEdits().placedCities.map((e) => e.repoPath),
+  ]);
   const unplaced: string[] = [];
 
   if (selectedPaths) {
@@ -384,25 +412,9 @@ function buildDOM(): void {
       error.classList.add('hidden');
       _onPickTileCb = (coord) => {
         if (!selectedRepo) return;
-        // Save to manual layout
-        upsertManualRepoEntry({
-          repoPath: selectedRepo.path,
-          repoFsPath: selectedRepo.repoPath,
-          repoName: selectedRepo.name,
-          coord,
-          addedAt: Date.now(),
-          source: 'manual',
-        });
-        void upsertSelection(selectedRepo.path);
-        // Notify main.ts to add city dynamically (no reload)
-        if (_onCityAdded) {
-          _onCityAdded(selectedRepo, coord);
-        }
-        // Close panel and exit placing mode
-        closeConstructionPanel();
-        if (_rendererRef) {
-          _rendererRef.setPlacingMode(false);
-        }
+        // Found through the shared pipeline (validation + undo + placedCities)
+        // instead of the old manualLayout side-channel.
+        placePickedCity(selectedRepo, coord);
       };
       _rendererRef.setPlacingMode(true);
       closeConstructionPanel();

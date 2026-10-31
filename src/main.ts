@@ -4,12 +4,9 @@ import './styles/index.css';
 import {
   generateWorld,
   reconnectCities,
-  addCityToWorld,
   removeCityFromWorld,
-  fetchScannedRepos,
   syncWorldWonders,
 } from './map.ts';
-import { type ScannedRepo } from './map.ts';
 import { Renderer } from './renderer.ts';
 import { BridgeEvents } from './bridge.ts';
 import { ensureWondersUp, isAutoStartWondersEnabled } from './wonders/wonderLauncher.ts';
@@ -84,7 +81,6 @@ import { sharedIdleFinder } from './ui/idleAgentFinder.ts';
 import {
   setRendererRef,
   notifyTilePicked,
-  setOnCityAddedCb,
   setOnCityDeletedCb,
 } from './ui/constructionPanel.ts';
 
@@ -373,19 +369,8 @@ async function bootstrap() {
   const state = new GameState(world);
   state.start();
 
-  // Set up dynamic city add/delete callbacks from constructionPanel
-  setOnCityAddedCb(async (repo: ScannedRepo, coord) => {
-    // Fetch repo data to get population, terrain, etc.
-    const repos = await fetchScannedRepos();
-    const repoData = repos.find((r) => r.path === repo.path) ?? repo;
-    // Add city to world
-    addCityToWorld(state.world, repoData, coord);
-    // Reconnect cities to ensure pathfinding works
-    await reconnectCities(state.world);
-    // Notify state update to refresh UI/renderer
-    state.notifyUpdate();
-  });
-
+  // Set up the dynamic city-delete callback from constructionPanel. City ADD
+  // goes through renderer.foundRepoCity (constructionPanel.placePickedCity).
   setOnCityDeletedCb((repoPath: string) => {
     // Remove city from world
     const removed = removeCityFromWorld(state.world, repoPath);

@@ -1,5 +1,6 @@
 // ─── Hero selection + agent spawning ────────────────────────────────────────
 import { type Unit, type City } from '../../types.ts';
+import { findCityForCoord } from '../../mapEdits.ts';
 import { type Renderer } from '../../renderer.ts';
 import { type GameState } from '../../game.ts';
 import { type BridgeEvents } from '../../bridge.ts';
@@ -33,9 +34,7 @@ export function selectHero(
   // not overwrite the active chat tab (that sent SCOUT replies into MAIN).
   if (isSidePanelOpen()) {
     void openSidePanel(unit);
-    const cityHere = state.world.cities.find(
-      (c) => c.coord.q === unit.coord.q && c.coord.r === unit.coord.r,
-    );
+    const cityHere = findCityForCoord(state.world.cities, unit.coord);
     if (cityHere) {
       loadGitInfo(cityHere);
       loadFilesInfo(cityHere);

@@ -28,6 +28,7 @@ import type { CommandDraft, CommandType } from '../../commandSchema.ts';
 import { sendCommand } from '../../commandBus.ts';
 import { buildExecuteAgentPayload } from './executeAgentPayload.ts';
 import { findUnitForChatId, resolveChatDispatchUnitId } from './resolveChatDispatchUnit.ts';
+import { findCityForCoord } from '../../mapEdits.ts';
 import { switchToChatUnit } from '../chat/agentChip.ts';
 import { initNationsPanel, renderNationsPanel } from '../nationsPanel.ts';
 import {
@@ -142,11 +143,7 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     if (unit) {
       const lookupCoord = unit.targetCoord ?? unit.coord;
       const tile = state.world.tiles.get(tileKey(lookupCoord));
-      const cityFromTile =
-        tile?.city ??
-        state.world.cities.find((c) =>
-          c.territory.some((t) => t.q === lookupCoord.q && t.r === lookupCoord.r),
-        );
+      const cityFromTile = tile?.city ?? findCityForCoord(state.world.cities, lookupCoord);
       if (cityFromTile?.repoPath?.trim()) {
         resolvedCity = cityFromTile;
       } else if (!resolvedCity) {
