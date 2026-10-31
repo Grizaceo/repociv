@@ -1002,7 +1002,13 @@ function snapshotWorld(world: World) {
   return { tiles, cities };
 }
 
-/** Apply the recorded edits to a fresh world, the way a reload does. */
+/** A fresh world with the recorded edits applied, the way a reload builds it. */
+function reloadedFixture(): World {
+  const reloaded = fixtureWorld();
+  applyMapEdits(reloaded, FIXTURE_REPOS);
+  return reloaded;
+}
+
 function expectReloadMatches(live: World): void {
   // Guard against a vacuous pass: every sequence has to leave something saved.
   const edits = getMapEdits();
@@ -1013,8 +1019,7 @@ function expectReloadMatches(live: World): void {
     Object.keys(edits.terrain).length;
   expect(recorded).toBeGreaterThan(0);
 
-  const reloaded = fixtureWorld();
-  applyMapEdits(reloaded, FIXTURE_REPOS);
+  const reloaded = reloadedFixture();
   expect(snapshotWorld(reloaded)).toEqual(snapshotWorld(live));
 }
 
@@ -1078,6 +1083,16 @@ describe('live edits and reload agree', () => {
     foundCityOp(live, FIXTURE_REPOS[2]!, ocean, RECORD);
 
     expectReloadMatches(live);
+  });
+
+  it('paint an ocean hex to land, then move a city onto it', () => {
+    const live = fixtureWorld();
+    const ocean = { q: -6, r: 3 };
+    paintHexOp(live, ocean, 'plains', RECORD);
+    expect(moveCityOp(live, cityIn(live, 'city-a'), ocean, RECORD)).not.toBeNull();
+
+    expectReloadMatches(live);
+    expect(cityIn(reloadedFixture(), 'city-a').coord).toEqual(ocean);
   });
 
   it('remove a city with districts, then erase one of its freed district hexes', () => {

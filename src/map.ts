@@ -1023,6 +1023,7 @@ function cityFootprintMoves(city: City, targetCoord: Axial): Array<{ from: Axial
  * a reload would paint the old terrain over the moved city.
  */
 function persistCityCoord(
+  world: World,
   city: City,
   coord: Axial,
   footprint: Array<{ from: Axial; to: Axial }>,
@@ -1034,7 +1035,11 @@ function persistCityCoord(
   const saved = footprint.map((m) => ({ to: m.to, terrain: terrainOverrideFor(m.from) }));
   for (const m of saved) prev.terrain.push({ coord: m.to, terrain: terrainOverrideFor(m.to) });
   for (const m of saved) {
+    const carried = world.tiles.get(tileKey(m.to))?.terrain;
     if (m.terrain) setHexTerrain(m.to, m.terrain);
+    // A painted destination stays saved, with the terrain the move left there:
+    // that paint may be the only reason the hex is land on the next reload.
+    else if (terrainOverrideFor(m.to) && carried) setHexTerrain(m.to, carried);
     else clearHexTerrain(m.to);
   }
 
@@ -1344,7 +1349,7 @@ export function moveCityOp(
   }));
   const units = world.units.filter((u) => axialEquals(u.coord, from));
   if (!moveCityInWorld(world, city, coord)) return null;
-  const prevPersist = opts.record ? persistCityCoord(city, coord, footprint) : null;
+  const prevPersist = opts.record ? persistCityCoord(world, city, coord, footprint) : null;
   return { city, from, to: coord, prevRepoPath, prevTiles, prevDistrictCoords, units, prevPersist };
 }
 
@@ -1513,6 +1518,15 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
     const city = world.cities.find((c) => cityKey(c) === entry.repoPath || c.id === entry.repoPath);
     return city && !axialEquals(city.coord, entry.coord) ? [{ entry, city }] : [];
   });
+  // Step 3 paints after the moves, but a hex painted to land already has to
+  // read as land here or the ocean rule refuses the city.
+  for (const { city, entry } of pendingMoves) {
+    for (const hex of relocateTargetHexes(city, entry.coord)) {
+      const terrain = edits.terrain[tileKey(hex)];
+      const isOcean = world.tiles.get(tileKey(hex))?.terrain === 'ocean';
+      if (terrain && isOcean) paintHexOp(world, hex, terrain, NO_RECORD);
+    }
+  }
   while (pendingMoves.length > 0) {
     const moved = pendingMoves.filter((p) => moveCityOp(world, p.city, p.entry.coord, NO_RECORD));
     if (moved.length === 0) break;
