@@ -58,7 +58,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
 
-from server import session_liveness, session_reply, session_resume, transcript_work
+from server import claude_transcript, session_liveness, session_reply, session_resume, transcript_work
 
 SendFn = Callable[[dict[str, Any]], None]
 LivenessFn = Callable[[], session_liveness.Liveness]
@@ -669,6 +669,13 @@ class SuvaduSource:
 
     def chat(self, obs: Observation, *, limit: int) -> dict[str, Any]:
         """Last ``limit`` prompts/responses, paging back from the end."""
+        if obs.agent.lower() in ("claude", "claude-code"):
+            path = self._transcript(obs)
+            if path:
+                try:
+                    return claude_transcript.read_chat(path, limit=limit)
+                except OSError:
+                    pass
         session_id = obs.session_id
         try:
             head = json.loads(self._run(["agent", "session", session_id, "--limit", "1"]))

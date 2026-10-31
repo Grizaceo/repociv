@@ -818,6 +818,32 @@ def test_chat_whole_session_when_it_fits(repos):
     assert body["hasMore"] is False
 
 
+def test_claude_chat_reads_native_transcript_without_suv(tmp_path):
+    native = "abcdef12-3456"
+    path = tmp_path / ".claude" / "projects" / "x" / f"{native}.jsonl"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({
+        "type": "user", "message": {"content": "native prompt"},
+        "timestamp": "2025-01-02T03:04:05Z",
+    }) + "\n")
+    suv = FakeSuv()
+    source = st.SuvaduSource(suv, home=str(tmp_path))
+    obs = st.parse_sessions(_sessions_json(_session(native)))[0]
+    chat = source.chat(obs, limit=10)
+    assert [m["text"] for m in chat["messages"]] == ["native prompt"]
+    assert not suv.calls
+
+
+def test_non_claude_chat_still_uses_suv(tmp_path):
+    suv = FakeSuv()
+    suv.events["codex-abcdef12"] = _events(1)
+    source = st.SuvaduSource(suv, home=str(tmp_path))
+    obs = st.parse_sessions(_sessions_json(_session("abcdef12", agent="codex")))[0]
+    chat = source.chat(obs, limit=10)
+    assert [m["text"] for m in chat["messages"]] == ["prompt 0", "answer 0 <b>"]
+    assert suv.calls
+
+
 def test_chat_unknown_or_not_imported(repos):
     suv, clock, sent = FakeSuv(), Clock(), []
     suv.history = _history_line("claude-fresh000-aaaa", NOW_MS)  # heartbeat only
