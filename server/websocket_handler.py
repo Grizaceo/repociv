@@ -157,10 +157,6 @@ async def _rate_check(ws: websockets.asyncio.server.ServerConnection) -> bool:
 
 
 # ─── WS event loop access (for sync → async broadcast) ────────────────────────
-def get_event_loop() -> asyncio.AbstractEventLoop | None:
-    return _loop
-
-
 async def _do_broadcast(event: dict[str, Any]) -> None:
     """Async internal broadcast to all connected WS clients."""
     if not _connections:
@@ -466,15 +462,3 @@ def stop_ws_server() -> None:
     _loop = None
     _connections.clear()
     _start_time = 0.0
-
-
-# ─── Direct sysnc-client support (for tests) ─────────────────────────────────
-def create_sync_broadcast(host: str = WS_HOST, port: int = BRIDGE_WS_PORT) -> Callable[[dict[str, Any]], None]:
-    """Create a sync broadcast function for testing.
-
-    Returns a callable that takes an event dict and broadcasts it.
-    This is a convenience wrapper for tests that don't have access to the
-    async event loop.
-    """
-    # The real broadcast function already handles sync→async scheduling
-    return broadcast

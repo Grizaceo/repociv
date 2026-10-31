@@ -230,9 +230,7 @@ Acepta también `subagent_id` como alias. Response 200: `{"ok": true|false, "sub
 
 | Method | Path | Descripción |
 |--------|------|-------------|
-| GET | `/api/providers` | Configuración de providers LLM |
-| GET | `/providers` | Alias de `/api/providers` |
-| GET | `/api/chat-config` | Back-compat alias |
+| GET | `/providers` | Configuración de providers LLM |
 | GET | `/providers/live` | Providers disponibles en tiempo real |
 | GET | `/harnesses` | Harnesses registrados |
 | GET | `/harnesses/<id>` | Detalle de un harness |
@@ -399,7 +397,6 @@ Persiste **en memoria** hasta que el bridge se reinicie o se invoque otro `/mode
 | GET | `/api/graph-relations` | Relaciones candidatas para una ciudad |
 | GET | `/api/graph-relations/evidence` | Evidencia entre dos ciudades |
 | GET | `/api/graph-relations/stats` | Estadísticas del índice |
-| POST | `/api/graph-relations/flags` | Sincronizar flags opt-in desde UI |
 | POST | `/api/graph-relations/refresh` | Forzar rebuild del índice |
 
 **`/api/graph-relations`** — Query params:
@@ -420,14 +417,6 @@ Persiste **en memoria** hasta que el bridge se reinicie o se invoque otro `/mode
 - `fromId` (str, required): ciudad origen.
 - `toId` (str, required): ciudad destino.
 
-**`/api/graph-relations/flags`** — Body:
-```json
-{
-  "graphSuggestions": true,
-  "aiRelationDiscovery": false
-}
-```
-
 **`/api/graph-relations/refresh`** — Body:
 ```json
 {
@@ -443,24 +432,12 @@ Persiste **en memoria** hasta que el bridge se reinicie o se invoque otro `/mode
 | Method | Path | Descripción |
 |--------|------|-------------|
 | GET | `/api/foreign/repo-profile` | Construir perfil de un repo (query: `?repoPath=`) |
-| GET | `/api/foreign/repo-profile/cache` | Listar perfiles cacheados |
 | GET | `/api/foreign/reports` | Listar reportes (query: `?cityId=&articleId=`) |
 | GET | `/api/foreign/reports/<id>` | Obtener un reporte por ID |
-| DELETE | `/api/foreign/reports/<id>` | Eliminar un reporte |
-| POST | `/api/foreign/score` | Score de artículo vs perfil de repo |
 | POST | `/api/foreign/report` | Generar y guardar ForeignRelationsReport |
 
 **`/api/foreign/repo-profile`** — Query params:
 - `repoPath` (str, required): path absoluto al repo.
-
-**`/api/foreign/score`** — Body:
-```json
-{
-  "article": { "title": "...", "url": "...", "blogName": "..." },
-  "repoPath": "/path/to/workspace/repociv",
-  "events": []
-}
-```
 
 **`/api/foreign/report`** — Body:
 ```json

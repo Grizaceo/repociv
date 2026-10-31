@@ -1,8 +1,6 @@
 """Shared executable discovery without importing agent execution or live sessions.
 
-Candidate order is significant. Harness-specific search paths live here, while
-callers retain their existing absent-binary contract
-(``None`` in agent_runner, an empty string in claude_live).
+Candidate order is significant. Harness-specific search paths live here.
 """
 from __future__ import annotations
 

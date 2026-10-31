@@ -23,38 +23,6 @@
   display: none;
 }
 
-.log-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--ui-border);
-  background: rgba(0, 0, 0, 0.3);
-  flex-shrink: 0;
-}
-.log-header-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.log-header h3 {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--ui-gold-bright);
-  margin: 0;
-}
-.log-header button {
-  background: none;
-  border: none;
-  color: var(--ui-text-dim);
-  cursor: pointer;
-  font-size: 14px;
-  padding: 2px 6px;
-}
-.log-header button:hover {
-  color: var(--ui-gold-bright);
-}
 .log-filter {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid var(--ui-border);
@@ -83,16 +51,6 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   border-bottom: 1px solid rgba(90, 74, 46, 0.3);
-}
-.log-row td {
-  padding: 3px 8px;
-  border-bottom: 1px solid rgba(90, 74, 46, 0.1);
-  color: var(--ui-text);
-  font-family: var(--font-mono);
-  font-size: 10px;
-}
-.log-row:hover td {
-  background: rgba(255, 255, 255, 0.03);
 }
 .log-ts {
   color: var(--ui-text-dim);

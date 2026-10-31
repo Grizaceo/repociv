@@ -90,17 +90,6 @@ def _reset_cache() -> None:
     _cache = None
 
 
-# Expose raw static registries for bridge.py backward compat
-def _PROVIDER_REGISTRY() -> list[dict]:
-    """Return the raw provider list from static JSON."""
-    return _load_registry().get("providers", [])
-
-
-def _HARNESS_REGISTRY() -> list[dict]:
-    """Return the raw harness list from static JSON."""
-    return _load_registry().get("harnesses", [])
-
-
 # ─── Dynamic Hermes config reader ────────────────────────────────────────────────
 
 def _read_hermes_yaml() -> dict[str, Any] | None:

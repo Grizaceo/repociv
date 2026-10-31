@@ -269,9 +269,6 @@
 #chat-messages .chat-msg,
 #git-info,
 #files-info,
-#city-overview,
-#city-districts,
-#city-buildings,
 #event-log {
   user-select: text;
 }
@@ -731,18 +728,6 @@
 .git-line {
   padding: 2px 0;
   white-space: pre;
-}
-.git-status-M {
-  color: #c8a84b;
-}
-.git-status-A {
-  color: #5b9b5b;
-}
-.git-status-D {
-  color: #d45b5b;
-}
-.git-status-untracked {
-  color: #888;
 }
 .git-branch {
   font-family: var(--font-ui);

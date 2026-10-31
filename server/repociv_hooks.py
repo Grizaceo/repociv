@@ -291,62 +291,6 @@ def remove_worktree(repo: str, issue_id: str) -> bool:
     return True
 
 
-def cleanup_all_worktrees(repo: str) -> list[str]:
-    """Remove all RepoCiv-managed worktrees for a repo (crash recovery).
-
-    Identifies worktrees via ``git worktree list --porcelain``. Only removes
-    paths containing ``/repociv/`` or ``/.worktrees/`` to avoid touching the
-    main worktree or unrelated entries.
-
-    Returns:
-        List of worktree path strings that were cleaned up.
-    """
-    if not worktrees_enabled(repo):
-        return []
-
-    repo_root = _repo_root(repo)
-    cleaned: list[str] = []
-
-    try:
-        result = subprocess.run(
-            ["git", "worktree", "list", "--porcelain"],
-            cwd=str(repo_root),
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        if result.returncode != 0:
-            return []
-
-        for line in result.stdout.splitlines():
-            if not line.startswith("worktree "):
-                continue
-            wt_path = line[len("worktree "):].strip()
-            # Only touch RepoCiv-managed worktrees (never the main checkout)
-            if "/repociv/" in wt_path or "/.worktrees/" in wt_path:
-                subprocess.run(
-                    ["git", "worktree", "remove", "--force", wt_path],
-                    cwd=str(repo_root),
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                )
-                cleaned.append(wt_path)
-
-        if cleaned:
-            subprocess.run(
-                ["git", "worktree", "prune"],
-                cwd=str(repo_root),
-                capture_output=True,
-                text=True,
-                timeout=15,
-            )
-    except Exception:
-        pass  # Best-effort
-
-    return cleaned
-
-
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 def _is_registered_worktree(repo_root: Path, worktree_path: Path) -> bool:

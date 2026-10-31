@@ -62,13 +62,6 @@
   gap: 8px;
   min-width: 0;
 }
-.city-star {
-  color: var(--ui-gold-bright);
-  font-size: 16px;
-}
-.city-star.hidden {
-  display: none;
-}
 #city-panel-name {
   font-family: var(--font-display);
   font-size: 16px;
@@ -76,12 +69,6 @@
   color: var(--ui-gold-bright);
   letter-spacing: 0.08em;
   white-space: nowrap;
-}
-.city-pop {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ui-text-dim);
-  letter-spacing: 0.05em;
 }
 #city-panel-close,
 #city-panel-minimize {
@@ -104,43 +91,6 @@
   border-color: var(--ui-gold);
 }
 
-.city-panel-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--ui-border);
-  background: var(--ui-dark);
-}
-.city-tab {
-  flex: 1;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--ui-text-dim);
-  font-family: var(--font-ui);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  padding: 7px 0;
-  cursor: pointer;
-  transition:
-    color 0.15s,
-    border-color 0.15s,
-    background 0.15s;
-}
-.city-tab:hover {
-  color: var(--ui-text);
-}
-.city-tab.active {
-  color: var(--ui-gold-bright);
-  border-bottom-color: var(--ui-gold);
-  background: rgba(200, 168, 75, 0.05);
-}
-
-#city-panel-content {
-  flex: 1;
-  overflow: hidden;
-  position: relative;
-  min-height: 160px;
-}
 .city-pane {
   position: absolute;
   inset: 0;
@@ -150,166 +100,6 @@
 }
 .city-pane.active {
   display: block;
-}
-
-/* Overview pane */
-.city-stat-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-.city-stat {
-  background: var(--ui-dark);
-  border: 1px solid var(--ui-border);
-  border-radius: 3px;
-  padding: 8px 10px;
-}
-.city-stat-label {
-  font-family: var(--font-ui);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ui-text-dim);
-  margin-bottom: 3px;
-}
-.city-stat-value {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--ui-gold-bright);
-  font-family: var(--font-ui);
-}
-.city-mono {
-  font-family: var(--font-mono);
-  font-size: 13px;
-}
-
-.city-section-label {
-  font-family: var(--font-ui);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ui-text-dim);
-  margin-bottom: 6px;
-}
-.city-project {
-  background: var(--ui-dark);
-  border: 1px solid var(--ui-border);
-  border-radius: 4px;
-  padding: 10px 12px;
-}
-.city-project-name {
-  font-family: var(--font-ui);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ui-gold-bright);
-  margin-bottom: 8px;
-}
-.city-project-meta {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ui-text-dim);
-  margin-top: 4px;
-}
-
-.city-progress-bar {
-  height: 6px;
-  background: #2a1e0a;
-  border-radius: 3px;
-  overflow: hidden;
-  border: 1px solid var(--ui-border);
-}
-.city-progress-fill {
-  height: 100%;
-  background: #5b9b5b;
-  border-radius: 3px;
-  transition: width 0.3s ease;
-}
-.city-progress-fill.wonder {
-  background: var(--ui-gold);
-}
-
-/* Districts pane */
-.city-district-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 4px;
-  border-bottom: 1px solid var(--ui-border);
-}
-.city-district-row:last-child {
-  border-bottom: none;
-}
-.city-district-icon {
-  font-size: 18px;
-  flex-shrink: 0;
-}
-.city-district-name {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  color: var(--ui-gold-bright);
-  font-weight: 600;
-}
-.city-district-type {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ui-text-dim);
-  margin-top: 2px;
-}
-
-/* Buildings pane */
-.city-building-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 8px 4px;
-  border-bottom: 1px solid var(--ui-border);
-}
-.city-building-row:last-child {
-  border-bottom: none;
-}
-.city-building-state {
-  font-size: 14px;
-  width: 20px;
-  text-align: center;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-.city-building-state.complete {
-  color: #5b9b5b;
-}
-.city-building-state.building {
-  color: #c8a84b;
-}
-.city-building-state.failed {
-  color: #d45b5b;
-}
-.city-building-state.planned {
-  color: #888;
-}
-.city-building-info {
-  flex: 1;
-}
-.city-building-name {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  color: var(--ui-text);
-  margin-bottom: 4px;
-}
-.city-building-meta {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ui-text-dim);
-  margin-top: 3px;
-}
-
-.city-empty {
-  text-align: center;
-  color: var(--ui-text-dim);
-  padding: 30px 16px;
-  font-style: italic;
-  font-family: var(--font-body);
-  font-size: 13px;
 }
 
 /* ─── City Panel Body & Stats (from index.html, no prior CSS) ─── */

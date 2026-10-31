@@ -434,18 +434,12 @@
   gap: 8px;
 }
 
-.construction-inline input,
-.construction-coords input {
+.construction-inline input {
   height: 36px;
   border: 1px solid var(--panel-border);
   background: rgba(0, 0, 0, 0.4);
   color: var(--civ-text-beige);
   padding: 0 10px;
-}
-
-.construction-coords {
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
 }
 
 .construction-preview {

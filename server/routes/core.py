@@ -2,113 +2,42 @@
 from __future__ import annotations
 
 import json as _json_lib
-import logging
 import os
 import time
-import urllib.error
-import urllib.request
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
 from server.routes import health as _health_routes
 from server.routes import profile_registry as _profile_routes
+from server.routes.external_agents import (
+    get_external_agents as get_external_agents,
+    get_external_agent_sessions as get_external_agent_sessions,
+    get_herdr_agents as get_herdr_agents,
+    get_herdr_launch as get_herdr_launch,
+    get_own_sessions as get_own_sessions,
+    post_own_session_close as post_own_session_close,
+    get_external_agent_chat as get_external_agent_chat,
+    post_external_agent_chat as post_external_agent_chat,
+    get_external_agent_resume as get_external_agent_resume,
+    post_external_agent_reply as post_external_agent_reply,
+)
+from server.routes.pending import (
+    get_pending as get_pending,
+    post_pending_add as post_pending_add,
+    post_pending_resolve as post_pending_resolve,
+    post_pending_edit as post_pending_edit,
+    post_pending_delete as post_pending_delete,
+    post_pending_state as post_pending_state,
+)
+from server.routes.providers import (
+    _error as _error,
+    _auth_headers as _auth_headers,
+    _probe_url as _probe_url,
+    _extract_model_ids as _extract_model_ids,
+    get_providers_live as get_providers_live,
+)
 
 RouteContext = dict[str, Any]
-
-# ─── providers-live cache (avoids blocking the HTTP thread for up to 40s) ─────
-_providers_live_cache: dict | None = None
-_providers_live_ts: float = 0.0
-_PROVIDERS_CACHE_TTL = 30.0
-
-def _error(status: int, error: str, cause: str, hint: str) -> tuple[int, dict]:
-    """Return a structured error envelope: {error, cause, hint}."""
-    return status, {"error": error, "cause": cause, "hint": hint}
-
-def _auth_headers(provider: str) -> dict[str, str]:
-    """Return Authorization header for a given provider, if API key is set.
-
-    Slugs are the canonical Hermes names; legacy aliases (``openai``,
-    ``nvidia-nim``) are kept as fallbacks for persisted selections from
-    pre-v2.1 RepoCiv state. See execplan/provider-model-parity-with-hermes-tui.md §A.6.
-    """
-    env_keys = {
-        "ollama-cloud": "OLLAMA_API_KEY",
-        "openrouter": "OPENROUTER_API_KEY",
-        # Canonical Hermes slugs:
-        "openai-api": "OPENAI_API_KEY",
-        "nvidia": "NVIDIA_API_KEY",
-        # Legacy aliases (RepoCiv static registry used these pre-v2.1):
-        "openai": "OPENAI_API_KEY",
-        "nvidia-nim": "NVIDIA_API_KEY",
-        "anthropic": "ANTHROPIC_API_KEY",
-        "deepseek": "DEEPSEEK_API_KEY",
-        "xai": "XAI_API_KEY",
-    }
-    key = env_keys.get(provider)
-    if key:
-        token = os.environ.get(key, "")
-        if token:
-            # OpenRouter and xAI use Bearer; OpenAI/Anthropic use Bearer; Ollama uses header
-            if provider == "ollama-cloud":
-                return {"Authorization": f"Bearer {token}"}
-            return {"Authorization": f"Bearer {token}"}
-    return {}
-
-def _probe_url(url: str, method: str = "GET", headers: dict | None = None, timeout: int = 5) -> list[str]:
-    """Attempt HTTP request; return list of model IDs or empty on failure."""
-    try:
-        h: dict[str, str] = headers or {}
-        req = urllib.request.Request(url, headers=h, method=method)
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = _json_lib.loads(resp.read())
-            # Normalise various provider response shapes into a flat list of model ID strings
-            return _extract_model_ids(data, url)
-    except Exception:
-        return []
-
-def _extract_model_ids(data: Any, url: str) -> list[str]:
-    """Extract model ID strings from various API response shapes."""
-    ids: list[str] = []
-
-    # OpenAI / Anthropic / DeepSeek / xAI / NVIDIA — { "data": [{ "id": "..." }] }
-    if isinstance(data, dict):
-        raw = data.get("data")
-        if isinstance(raw, list):
-            for m in raw:
-                mid = m.get("id") if isinstance(m, dict) else None
-                if mid:
-                    ids.append(str(mid))
-            if ids:
-                return ids
-
-        # OpenRouter — { "data": [{ "id": "..." }] }  (same shape, already handled)
-        # Ollama tags — { "models": [{ "name": "..." }] }
-        if "models" in data and isinstance(data["models"], list):
-            for m in data["models"]:
-                name = m.get("name") if isinstance(m, dict) else None
-                if name:
-                    ids.append(str(name))
-            if ids:
-                return ids
-
-        # NVIDIA NIM — { "models": [{"model_id": "..." }] }
-        if "models" in data and isinstance(data["models"], list):
-            for m in data["models"]:
-                mid = m.get("model_id") if isinstance(m, dict) else None
-                if mid:
-                    ids.append(str(mid))
-            if ids:
-                return ids
-
-    # Fallback: if data itself is a list
-    if isinstance(data, list):
-        for m in data:
-            mid = m.get("id") if isinstance(m, dict) else None
-            if mid:
-                ids.append(str(mid))
-
-    return ids
 
 # Module-level indirection (R05) so tests can stub the diagnostic source.
 _build_identity = None
@@ -118,180 +47,6 @@ def get_health(ctx: "RouteContext") -> tuple[int, Any]:
     return _health_routes.get_health(
         ctx, identity_source=lambda: _build_identity, now=lambda: time.time(),
     )
-
-def get_external_agents(ctx: "RouteContext") -> tuple[int, Any]:
-    """GET /api/external-agents — Suvadu / Hermes agent sessions (metadata only)."""
-    from server import suvadu_tracker as _suvadu
-    return 200, _suvadu.snapshot()
-
-def get_external_agent_sessions(ctx: "RouteContext") -> tuple[int, Any]:
-    """GET /api/external-agents/sessions — every recent session, active or not."""
-    from server import suvadu_tracker as _suvadu
-    return 200, _suvadu.sessions()
-
-def get_herdr_agents(ctx: "RouteContext") -> tuple[int, Any]:
-    """GET /api/herdr/agents — herdr's state and the agents it holds, for the terminal."""
-    from server import herdr_runtime as _herdr
-    status = _herdr.probe()
-    if status.state != "ready":
-        return 200, {"runtime": status.to_dict(), "agents": []}
-    try:
-        agents = [agent.to_dict() for agent in _herdr.list_agents()]
-    except _herdr.HerdrError:
-        return 200, {"runtime": _herdr.RuntimeStatus("stopped", status.version).to_dict(), "agents": []}
-    return 200, {"runtime": status.to_dict(), "agents": agents}
-
-def get_herdr_launch(ctx: "RouteContext") -> tuple[int, Any]:
-    from server import herdr_launches
-    entry = herdr_launches.get(str(ctx.get("command_id") or ""))
-    return (200, entry) if entry is not None else (404, {"error": "launch_not_found"})
-
-def get_own_sessions(ctx: "RouteContext") -> tuple[int, Any]:
-    """GET /api/own-sessions — RepoCiv's own sessions on disk + liveness."""
-    from server import own_sessions as _own
-    return 200, _own.snapshot()
-
-def post_own_session_close(body: Any, ctx: "RouteContext") -> tuple[int, Any]:
-    """POST /api/own-sessions/<unit>/close — retire the session's map unit.
-
-    Explicit user action only: marks the canonical ``status: closed`` so the
-    next snapshot reports the unit as closed (and the client despawns it).
-    Never infers closure from liveness — an idle conversation is not a dead
-    one (resumable-chat model, docs/plans/2026-09-19-hud-agentes-y-sesiones.md).
-    """
-    from server import sessions as _sessions
-
-    unit_id = str((ctx or {}).get("params", {}).get("unit", ""))
-    if not unit_id or not unit_id.replace("-", "").replace("_", "").isalnum():
-        return 400, {"error": "invalid unit id"}
-    canonical = _sessions.get(unit_id)
-    if not isinstance(canonical, dict):
-        return 404, {"error": "no such own session"}
-    data = _sessions.patch(unit_id, status="closed")
-    return 200, {"ok": True, "unit": unit_id, "status": data.get("status", "closed")}
-
-def _resolve_claude_live_cwd(raw_cwd: str, city: str = "") -> str | None:
-    """Resolve and confine a claude-live working directory.
-
-    When workspace roots are configured in repo_roots_state, the directory must
-    belong to a selected repository (or the RepoCiv capital checkout). Always
-    reject system/credential directories (/etc, ~/.ssh, ~/.gnupg, state root).
-    """
-    from server import agent_paths as _ap
-    from server import repo_roots_state as _rrs
-    from server.state_paths import repociv_home
-
-    expanded = os.path.realpath(os.path.expanduser(raw_cwd.strip())) if raw_cwd.strip() else ""
-    if not expanded or not os.path.isdir(expanded):
-        return None
-    home = os.path.realpath(os.path.expanduser("~"))
-    forbidden = (
-        "/etc",
-        "/proc",
-        "/sys",
-        "/dev",
-        "/root",
-        os.path.join(home, ".ssh"),
-        os.path.join(home, ".gnupg"),
-        os.path.realpath(str(repociv_home())),
-    )
-    if any(_ap.path_is_within(expanded, f) for f in forbidden if f):
-        return None
-    state = _rrs.load_state()
-    roots = state.get("roots", {})
-    if isinstance(roots, dict) and roots:
-        selected = _rrs.resolve_selected_repo(city or os.path.basename(expanded), expanded)
-        if selected:
-            return selected
-        capital = os.path.realpath(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        if expanded == capital:
-            return capital
-        return None
-    return expanded
-
-
-def post_claude_live_spawn(body: Any, ctx: "RouteContext") -> tuple[int, Any]:
-    """POST /api/claude-live/spawn — start a process-owned Claude session in {cwd}.
-
-    The channel is RepoCiv's own (server/claude_live.py): the process stays warm
-    between turns and is the only addressable Claude surface — never a resume
-    of the user's terminal session.
-    """
-    from server import claude_live
-
-    payload = body if isinstance(body, dict) else {}
-    raw_cwd = str(payload.get("cwd", "") or "")
-    city = str(payload.get("city", "") or "")
-    if not raw_cwd.strip() or not os.path.isdir(os.path.expanduser(raw_cwd.strip())):
-        return 400, {"error": "invalid_cwd"}
-    resolved = _resolve_claude_live_cwd(raw_cwd, city)
-    if resolved is None:
-        return 400, {"error": "untrusted_cwd"}
-    try:
-        return 200, claude_live.get_manager().spawn(resolved)
-    except claude_live.ClaudeLiveError as exc:
-        return exc.status, {"error": exc.code}
-
-def post_claude_live_stop(body: Any, ctx: "RouteContext") -> tuple[int, Any]:
-    """POST /api/claude-live/stop — end the session's process ({sessionId|nativeId})."""
-    from server import claude_live
-
-    payload = body if isinstance(body, dict) else {}
-    key = str(payload.get("sessionId") or payload.get("nativeId") or "")
-    try:
-        session_id = claude_live.get_manager().stop(key)
-    except claude_live.ClaudeLiveError as exc:
-        return exc.status, {"error": exc.code}
-    return 200, {"ok": True, "sessionId": session_id}
-
-def get_external_agent_chat(ctx: "RouteContext") -> tuple[int, Any]:
-    """GET /api/external-agents/<session>/chat[?limit=N&refresh=1] — prompts + responses."""
-    from server import suvadu_tracker as _suvadu
-    params = ctx.get("params", {})
-    try:
-        limit = int(params.get("limit", "80"))
-    except (TypeError, ValueError):
-        limit = 80
-    refresh = str(params.get("refresh", "")).lower() in ("1", "true", "yes")
-    return _suvadu.chat(str(ctx.get("session_id", "")), limit=limit, refresh=refresh)
-
-def post_external_agent_chat(body: Any, ctx: "RouteContext") -> tuple[int, Any]:
-    """POST /api/external-agents/<session>/chat — deliver to a verified live session."""
-    import uuid
-
-    from server import suvadu_tracker as _suvadu
-
-    session_id = str(ctx.get("session_id", ""))
-    text = body.get("text") if isinstance(body, dict) else None
-    return _suvadu.send_live_chat(session_id, text, uuid.uuid4().hex)
-
-def get_external_agent_resume(ctx: "RouteContext") -> tuple[int, Any]:
-    """GET /api/external-agents/<session>/resume — the command to pick it back up."""
-    from server import suvadu_tracker as _suvadu
-    return _suvadu.resume(str(ctx.get("session_id", "")))
-
-def post_external_agent_reply(body: Any, ctx: "RouteContext") -> tuple[int, Any]:
-    """POST /api/external-agents/<session>/reply — run one turn with {text}.
-
-    Policy first: this is the ``external_reply`` command type, so a policies.d
-    overlay can promote it to approve/blocked before anything spawns."""
-    from server import suvadu_tracker as _suvadu
-    from server.command_schema import COMMAND_RISK, Command
-    from server.policy import decide
-
-    session_id = str(ctx.get("session_id", ""))
-    text = str((body or {}).get("text", ""))
-    cmd = Command(
-        type="external_reply",
-        target=session_id,
-        risk=COMMAND_RISK.get("external_reply", "high"),
-    )
-    decision, reason = decide(cmd)
-    if decision == "blocked":
-        return 403, {"error": "blocked_by_policy", "reason": reason, "sessionId": session_id}
-    if decision == "approve":
-        return 409, {"error": "needs_approval", "reason": reason, "sessionId": session_id}
-    return _suvadu.reply(session_id, text)
 
 def get_ready(ctx: "RouteContext") -> tuple[int, Any]:
     return _health_routes.get_ready(ctx)
@@ -364,19 +119,6 @@ def get_mission_tree(ctx: "RouteContext") -> tuple[int, Any]:
 def get_gpu(ctx: "RouteContext") -> tuple[int, Any]:
     from server.bridge import get_gpu_info
     return 200, get_gpu_info()
-
-def get_pending(ctx: "RouteContext") -> tuple[int, Any]:
-    from server.pending_tracker import load_pending_tasks
-    from server.pending_local import load_local_tasks
-    hermes_items = []
-    try:
-        hermes_items = load_pending_tasks()
-        for it in hermes_items:
-            it["source"] = "hermes"
-    except Exception:
-        pass
-    local_items = load_local_tasks()
-    return 200, hermes_items + local_items
 
 def get_context(ctx: "RouteContext") -> tuple[int, Any]:
     from server.bridge import _fatigue_state, _rest_areas
@@ -796,150 +538,6 @@ def get_roster_asset(ctx: "RouteContext") -> tuple[int, Any]:
     return 404, {"error": "unknown asset"}
 
 
-def get_providers_live(ctx: "RouteContext") -> tuple[int, Any]:
-    """Fetch live model reachability from each provider's own API.
-
-    Probes are run in parallel (ThreadPoolExecutor) and the result is cached
-    for 30 s to avoid blocking the HTTP handler on every call.
-    """
-    global _providers_live_cache, _providers_live_ts
-
-    now = time.time()
-    if _providers_live_cache and now - _providers_live_ts < _PROVIDERS_CACHE_TTL:
-        return 200, _providers_live_cache
-
-    # ── 1. Resolve Hermes base URL ──
-    hermes_url_raw = os.environ.get("HERMES_URL", "http://localhost:8642/v1")
-    for suffix in ("/v1/chat/completions", "/v1/completions", "/v1", ""):
-        if hermes_url_raw.endswith(suffix):
-            hermes_url = hermes_url_raw[: -len(suffix)] if suffix else hermes_url_raw
-            break
-    else:
-        hermes_url = hermes_url_raw
-
-    hermes_headers: dict[str, str] = {}
-    hermes_key = os.environ.get("HERMES_KEY", "")
-    if hermes_key:
-        hermes_headers["Authorization"] = f"Bearer {hermes_key}"
-
-    # ── 2. Build probe map: all providers + hermes in one pass ──
-    # Canonical Hermes slugs (post-v2.1); legacy aliases removed from the
-    # probe set so a probe result for a slug is keyed by the canonical name
-    # the new builder emits. Legacy aliases still resolve to env keys via
-    # `_auth_headers` (above) for backward compat with persisted state.
-    _PROVIDER_MODEL_ENDPOINTS = {
-        "ollama-cloud": "https://api.ollama.com/v1/models",
-        "openrouter":   "https://openrouter.ai/api/v1/models",
-        "openai-api":   "https://api.openai.com/v1/models",
-        "anthropic":    "https://api.anthropic.com/v1/models",
-        "deepseek":     "https://api.deepseek.com/v1/models",
-        "xai":          "https://api.x.ai/v1/models",
-        "nvidia":       "https://integrate.api.nvidia.com/v1/models",
-    }
-    # Auto-extend from any provider declared in ~/.hermes/config.yaml with
-    # a base_url ending in /v1 — that gives live probe for user-added
-    # custom endpoints (and any future plugin provider). No-op if the
-    # YAML doesn't expose a base_url for that provider.
-    try:
-        from server.provider_registry import _read_hermes_yaml
-        _yaml_providers = (_read_hermes_yaml() or {}).get("providers", {}) or {}
-        for _pid, _pcfg in _yaml_providers.items():
-            if _pid in _PROVIDER_MODEL_ENDPOINTS:
-                continue
-            base = str((_pcfg or {}).get("base_url", "")).rstrip("/")
-            if base.endswith("/v1"):
-                _PROVIDER_MODEL_ENDPOINTS[_pid] = base + "/models"
-    except Exception:
-        logging.exception("[/providers/live] failed to extend endpoints from YAML")
-
-    to_probe: dict[str, tuple[str, dict[str, str]]] = {
-        "__hermes__": (f"{hermes_url}/v1/models", hermes_headers),
-    }
-    for pid, ep_url in _PROVIDER_MODEL_ENDPOINTS.items():
-        to_probe[pid] = (ep_url, _auth_headers(pid))
-
-    # ── 3. Run all probes in parallel — max wall-clock ≈ 6 s ──
-    probe_results: dict[str, list[str]] = {}
-    with ThreadPoolExecutor(max_workers=len(to_probe)) as pool:
-        futures = {
-            pool.submit(_probe_url, url, "GET", headers): pid
-            for pid, (url, headers) in to_probe.items()
-        }
-        for future in as_completed(futures, timeout=6):
-            pid = futures[future]
-            try:
-                probe_results[pid] = future.result()
-            except Exception:
-                probe_results[pid] = []
-
-    hermes_models: set[str] = set(probe_results.pop("__hermes__", []))
-    hermes_reachable = len(hermes_models) > 0
-    provider_live = probe_results
-
-    # ── 4. Merge with static provider registry ──
-    from server.provider_registry import _get_chat_config, _hermes_models_payload
-    chat_cfg = _get_chat_config()
-    static_providers = {p["id"]: p for p in chat_cfg["providers"]}
-
-    # Use Hermes' own model inventory as the source of truth for reachability.
-    # The gateway /v1/models endpoint only returns the *active* model (usually
-    # one), so the previous `hermes_models` fallback marked everything else as
-    # unreachable even when Hermes can route to it. `build_models_payload` is
-    # the same data Hermes' GUI pickers consume, so any model that appears
-    # there is reachable by definition (Hermes is the actual inference path).
-    #
-    # Layered reachability:
-    #   1. The provider's own live probe (if we have a URL for it)
-    #   2. The active model list from the Hermes gateway
-    #   3. The full Hermes model inventory (parity layer — covers all 44
-    #      providers in build_models_payload, including ones without a probe)
-    hermes_inventory: set[str] = set()
-    try:
-        payload = _hermes_models_payload() or {}
-        for row in payload.get("providers", []) or []:
-            for mid in row.get("models") or []:
-                if mid:
-                    hermes_inventory.add(mid)
-    except Exception:
-        logging.exception("[/providers/live] _hermes_models_payload failed")
-
-    providers_out = []
-    for pid, p in static_providers.items():
-        live_ids = provider_live.get(pid, [])
-        reachable_set = set(live_ids) | hermes_models | hermes_inventory
-
-        models = []
-        for m in p.get("models", []):
-            mid = m.get("id", "")
-            models.append({**m, "reachable": mid in reachable_set})
-
-        known_ids = {m["id"] for m in models}
-        for mid in live_ids:
-            if mid not in known_ids:
-                models.append({"id": mid, "name": mid, "harnesses": ["hermes", "openclaw"], "reachable": True})
-
-        providers_out.append({
-            "id": pid,
-            "name": p["name"],
-            "available": p["available"],
-            "configured": p.get("configured", False),
-            "defaultModel": p["defaultModel"],
-            "models": models,
-            "env": p.get("env", ""),
-            "hermesReachable": hermes_reachable,
-            "liveModelCount": len(live_ids),
-        })
-
-    response: dict = {
-        "defaultProvider": chat_cfg["defaultProvider"],
-        "hermesReachable": hermes_reachable,
-        "hermesBaseUrl": hermes_url,
-        "providers": providers_out,
-    }
-    _providers_live_cache = response
-    _providers_live_ts = time.time()
-    return 200, response
-
 def get_log(ctx: "RouteContext") -> tuple[int, Any]:
     from server.bridge import _es
     params = ctx.get("params", {})
@@ -1128,81 +726,6 @@ def post_commands(body: dict[str, Any], ctx: "RouteContext") -> tuple[int, Any]:
         return 429, {"error": "rate_limit", "agent": agent_type}
     result = _handle_command(cmd)
     return 200, result
-
-def post_pending_add(body: dict[str, Any], ctx: "RouteContext") -> tuple[int, Any]:
-    from server.pending_local import add_local_task
-    title = str(body.get("title", "")).strip()
-    priority = str(body.get("priority", "MEDIA")).upper()
-    detail = str(body.get("detail", "")).strip()
-    if priority not in ("ALTA", "MEDIA", "BAJA"):
-        priority = "MEDIA"
-    if not title:
-        return 400, {"error": "title is required"}
-    new_id = add_local_task(title, priority, detail)
-    if new_id is None:
-        return 409, {"error": "write error"}
-    return 200, {"ok": True, "id": new_id, "title": title, "priority": priority, "source": "local"}
-
-def post_pending_resolve(body: dict[str, Any], ctx: "RouteContext") -> tuple[int, Any]:
-    from server.pending_local import is_local_id, resolve_local_task
-    from server.pending_tracker import resolve_pending_task
-    item_id = str(body.get("id", "")).strip()
-    if not item_id:
-        return 400, {"error": "id is required"}
-    ok = resolve_local_task(item_id) if is_local_id(item_id) else resolve_pending_task(item_id)
-    if not ok:
-        return 404, {"error": "item not found"}
-    return 200, {"ok": True, "id": item_id}
-
-def post_pending_edit(body: dict[str, Any], ctx: "RouteContext") -> tuple[int, Any]:
-    from server.pending_local import is_local_id, edit_local_task
-    from server.pending_tracker import edit_pending_task
-    item_id = str(body.get("id", "")).strip()
-    title = body.get("title")
-    priority = body.get("priority")
-    detail = body.get("detail")
-    if not item_id:
-        return 400, {"error": "id is required"}
-    if is_local_id(item_id):
-        ok = edit_local_task(
-            item_id,
-            title=str(title).strip() if title else None,
-            priority=str(priority).upper().strip() if priority else None,
-            detail=str(detail) if detail else None,
-        )
-    else:
-        ok = edit_pending_task(
-            item_id,
-            title=str(title).strip() if title else None,
-            priority=str(priority).upper().strip() if priority else None,
-            detail=str(detail) if detail else None,
-        )
-    if not ok:
-        return 404, {"error": "item not found"}
-    return 200, {"ok": True, "id": item_id}
-
-def post_pending_delete(body: dict[str, Any], ctx: "RouteContext") -> tuple[int, Any]:
-    from server.pending_local import is_local_id, delete_local_task
-    from server.pending_tracker import delete_pending_task
-    item_id = str(body.get("id", "")).strip()
-    if not item_id:
-        return 400, {"error": "id is required"}
-    ok = delete_local_task(item_id) if is_local_id(item_id) else delete_pending_task(item_id)
-    if not ok:
-        return 404, {"error": "item not found"}
-    return 200, {"ok": True, "id": item_id}
-
-def post_pending_state(body: dict[str, Any], ctx: "RouteContext") -> tuple[int, Any]:
-    from server.pending_local import is_local_id, change_local_state
-    from server.pending_tracker import change_pending_state
-    item_id = str(body.get("id", "")).strip()
-    new_state = str(body.get("state", "")).strip()
-    if not item_id or not new_state:
-        return 400, {"error": "id and state are required"}
-    ok = change_local_state(item_id, new_state) if is_local_id(item_id) else change_pending_state(item_id, new_state)
-    if not ok:
-        return 404, {"error": "item not found or invalid state"}
-    return 200, {"ok": True, "id": item_id, "state": new_state}
 
 def _validate_unit_id(raw: Any) -> str | None:
     """Return sanitized unit_id (uppercase, alphanumeric + dash/underscore, 1–32 chars)

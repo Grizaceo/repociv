@@ -35,7 +35,6 @@ import {
   showLoadingProgress,
   hideLoadingScreen,
   showUnitPanel,
-  hideUnitPanel,
   initExternalLibs,
   updateResource,
   updateBadges,
@@ -49,10 +48,6 @@ import {
   togglePendingPanel,
   toggleLogPanel,
   isHarnessPanelOpen,
-  closeSidePanel,
-  openCityPanel,
-  loadGitInfo,
-  loadFilesInfo,
   fetchPendingTracker,
 } from './ui/index.ts';
 import { mountGacetaWidget } from './ui/gacetaWidget.ts';
@@ -73,21 +68,13 @@ import { initHudWindows, mountHudWindow } from './ui/hudWindow.ts';
 import { initUnitPanelDock } from './ui/unitPanelDock.ts';
 import { initCommandPalette } from './ui/commandPalette.ts';
 import { registerHudCommands } from './ui/hudWiring/commands.ts';
+import { wireSelection } from './ui/hudWiring/selection.ts';
+import { wireCityEvents } from './ui/hudWiring/cityEvents.ts';
+import { wireLocalView } from './ui/hudWiring/localView.ts';
 import { showDirectivePreview, showContextMenu, showDragTooltip } from './ui/spatialPreview.ts';
-import {
-  showLocalUnitTooltip,
-  hideLocalUnitTooltip,
-  showLocalWorkbenchTooltip,
-  hideLocalWorkbenchTooltip,
-  showLocalContextMenu,
-  showLocalMissionPreview,
-  showGitForFile,
-  showWhiteboardPanel,
-} from './ui/localSpatialPreview.ts';
 import { sendCommand } from './commandBus.ts';
 import { recordGesture } from './directiveLearner.ts';
 import { tileKey } from './types.ts';
-import type { LocalRoom, LocalNpc } from './types.ts';
 import { clearChat } from './ui/chat.ts';
 import { openOnboardingPanel } from './ui/onboardingPanel.ts';
 import { mountHermesStatusBanner } from './ui/hermesStatusBanner.ts';
@@ -103,13 +90,11 @@ import {
 import { getStoredEraLabel } from './ui/eraSystem.ts';
 import { logEvent } from './ui/hud.ts';
 import { trackPanelOpen } from './ui/analytics.ts';
-import { initBubbleLayer, updateBubble, clearAllBubbles } from './ui/actionBubbles.ts';
-import { mountLocalChat, type LocalChatHandle } from './ui/localChat/feed.ts';
+import { initBubbleLayer } from './ui/actionBubbles.ts';
 import { bindOrdenDeBatalla } from './ui/ordenDeBatalla.ts';
 import { bindSubagentSessionPanel } from './ui/subagentSessionPanel.ts';
 import { bindSlashCommandState } from './ui/chat/slashCommands.ts';
 import { ensureWondersLoaded, listIframeWonders } from './wonders/manifest.ts';
-import { findCityByWonderSelection, findNearbyCities } from './wonders/cityLookup.ts';
 import type { City } from './types.ts';
 import { resolveInitialRenderMode } from './three/renderMode.ts';
 import { HEX_SIZE } from './constants.ts';
@@ -875,29 +860,6 @@ async function bootstrap() {
     }
   });
 
-  // Canvas click → select unit / open city panels
-  renderer.onUnitSelect = (unit) => {
-    if (unit) selectHero(unit, renderer, state, bridge);
-    else {
-      hideUnitPanel();
-      closeSidePanel();
-    }
-  };
-  let _selectedCityId: string | null = null;
-
-  function _publishWonderContext(cityId?: string | null): void {
-    const selected = cityId ? (state.world.cities.find((c) => c.id === cityId) ?? null) : null;
-    window.dispatchEvent(
-      new CustomEvent('repociv:wonder-context', {
-        detail: {
-          cities: state.world.cities.map((c) => ({ id: c.id, name: c.name, repoPath: c.repoPath })),
-          selectedCityId: selected?.id ?? cityId ?? _selectedCityId,
-          selectedRepoPath: selected?.repoPath ?? null,
-        },
-      }),
-    );
-  }
-
   function _enterLocalViewForCity(city: City): void {
     // No bridge command here. Entering a sector is a view change, not an intent
     // the executor acts on: `enter_local` is not in CommandType and carries no
@@ -910,149 +872,12 @@ async function bootstrap() {
     void import('./ui/wonderVignette.ts').then((m) => m.pushContextToOpenWonder('local'));
   }
 
-  function _primeMissionComposerForCity(city: City): void {
-    const unit = getFirstUserUnit(state);
-    if (!unit) return;
-    state.selectUnit(unit);
-    renderer.selectUnit(unit);
-    showUnitPanel(unit, state);
-    const missionInput = document.getElementById('mission-input') as HTMLInputElement | null;
-    if (missionInput) {
-      missionInput.placeholder = `Misión para ${city.name} (${city.id})`;
-      missionInput.focus();
-    }
-  }
-
-  function _focusCityRequest(detail: {
-    cityId?: string;
-    repoPath?: string;
-    nodePath?: string;
-    mode?: 'macro' | 'local';
-    source?: string;
-  }): void {
-    const cityQuery = detail.cityId ?? '';
-    const target = findCityByWonderSelection(
-      state.world.cities,
-      cityQuery,
-      detail.repoPath ?? detail.nodePath,
-    );
-    if (target) {
-      const fullCity = state.world.cities.find((c) => c.id === target.id);
-      if (!fullCity) return;
-
-      // Si el usuario está enfocado en una unidad, no mover la cámara
-      if (!state.selectedUnit) renderer.centerOn(fullCity.coord);
-
-      renderer.onCitySelect?.(fullCity.id);
-      if (detail.mode === 'local' && fullCity.repoPath) {
-        _enterLocalViewForCity(fullCity);
-      }
-      logEvent(`📍 ${detail.source ?? 'Wonder'} → ${fullCity.name}`, 'info');
-      return;
-    }
-
-    const nearby = findNearbyCities(
-      state.world.cities,
-      detail.repoPath || detail.nodePath || detail.cityId || '',
-    );
-    if (nearby.length > 0) {
-      logEvent(
-        `⚠ Sin match exacto para ${detail.cityId || detail.repoPath || detail.nodePath}. Cercanas: ${nearby.map((entry) => entry.city.name).join(', ')}`,
-        'warn',
-      );
-      return;
-    }
-    logEvent(
-      `⚠ RepoCiv no encontró ciudad para ${detail.cityId || detail.repoPath || detail.nodePath}`,
-      'warn',
-    );
-  }
-
-  renderer.onCitySelect = (cityId) => {
-    _selectedCityId = cityId;
-    const city = state.world.cities.find((c) => c.id === cityId);
-    if (city) {
-      const activeBuildings = state.world.buildings.filter((b) => b.cityId === cityId);
-      const tile = state.world.tiles.get(tileKey(city.coord));
-      // Show loading state immediately, then resolve asynchronously
-      openCityPanel(city, activeBuildings, tile);
-      loadGitInfo(city);
-      loadFilesInfo(city);
-    }
-    _publishWonderContext(cityId);
-    window.dispatchEvent(
-      new CustomEvent('repociv:city-selected', {
-        detail: { cityId, repoPath: state.world.cities.find((c) => c.id === cityId)?.repoPath },
-      }),
-    );
-  };
-  _publishWonderContext(null);
-
-  // Listener para "Ver feed completo →" desde el widget Gaceta
-  window.addEventListener('repociv:open-city', (e: Event) => {
-    const detail = (e as CustomEvent).detail as { repo?: string } | undefined;
-    if (!detail?.repo) return;
-    const target = state.world.cities.find(
-      (c) =>
-        c.id.toLowerCase() === detail.repo!.toLowerCase() ||
-        (c.name || '').toLowerCase() === detail.repo!.toLowerCase(),
-    );
-    if (target && renderer.onCitySelect) renderer.onCitySelect(target.id);
-  });
-
-  // ─── Wonder ↔ RepoCiv bidirectional focus (generic, any connected wonder) ──
-  window.addEventListener('repociv:wonder-focus-city', (e: Event) => {
-    const detail = (e as CustomEvent).detail as
-      { cityId: string; mode: 'macro' | 'local' } | undefined;
-    if (!detail?.cityId) return;
-    _focusCityRequest({ cityId: detail.cityId, mode: detail.mode, source: 'Wonder focus' });
-  });
-
-  window.addEventListener('repociv:wonder-selection', (e: Event) => {
-    const detail = (e as CustomEvent).detail as
-      { nodeId: string; nodePath: string; nodeType: string } | undefined;
-    if (!detail?.nodeId && !detail?.nodePath) return;
-    _focusCityRequest({
-      cityId: detail?.nodeId,
-      nodePath: detail?.nodePath,
-      source: `Wonder ${detail?.nodeType ?? 'selection'}`,
-    });
-  });
-
-  window.addEventListener('repociv:focus-city-request', (e: Event) => {
-    const detail = (e as CustomEvent).detail as
-      | {
-          cityId?: string;
-          repoPath?: string;
-          nodePath?: string;
-          mode?: 'macro' | 'local';
-          source?: string;
-        }
-      | undefined;
-    if (!detail) return;
-    _focusCityRequest(detail);
-  });
-
-  window.addEventListener('repociv:open-local-view-request', (e: Event) => {
-    const detail = (e as CustomEvent).detail as { cityId?: string; repoPath?: string } | undefined;
-    if (!detail?.cityId) return;
-    const city = state.world.cities.find((c) => c.id === detail.cityId);
-    if (!city) return;
-    _enterLocalViewForCity(city);
-  });
-
-  window.addEventListener('repociv:city-mission-request', async (e: Event) => {
-    const detail = (e as CustomEvent).detail as { cityId?: string } | undefined;
-    if (!detail?.cityId) return;
-    const city = state.world.cities.find((c) => c.id === detail.cityId);
-    if (!city) return;
-    if (!(await Promise.resolve(true))) return;
-
-    if (!state.selectedUnit) renderer.centerOn(city.coord);
-
-    renderer.onCitySelect?.(city.id);
-    _primeMissionComposerForCity(city);
-    logEvent(`🧪 Mission composer preparado para ${city.name}`, 'info');
+  wireSelection({ renderer, state, bridge });
+  wireCityEvents({
+    renderer,
+    state,
+    enterLocalViewForCity: _enterLocalViewForCity,
+    getFirstUserUnit,
   });
 
   renderer.onTileInspect = (cityName, coord, repoPath) => {
@@ -1094,181 +919,14 @@ async function bootstrap() {
     showDragTooltip(gesture, agentId, screenPos, dropTarget);
   };
 
-  // ─── Phase 6: Double-click city → enter RimWorld local view ─────────────────
-  renderer.onEnterLocal = (repoId, _rootPath) => {
-    const city = state.world.cities.find((c) => c.id === repoId);
-    if (!city) return;
-    _enterLocalViewForCity(city);
-  };
-
-  // ─── Local view callbacks (wired to renderer; applied lazily when localR is created) ──
-  renderer.localUnitHoverCb = (unit, mx, my) => {
-    if (unit) showLocalUnitTooltip(unit, { x: mx, y: my });
-    else hideLocalUnitTooltip();
-  };
-  renderer.localWorkbenchClickCb = (tile, sx, sy) => {
-    const wb = tile.workbench;
-    if (!wb) return;
-    const availableAgents = state
-      .getAllUnits()
-      .map((u) => ({ id: u.id, name: u.name, type: u.type, state: u.state }));
-    const localWorld = state.localWorld;
-    const repoId = localWorld?.repoId ?? wb.repoPath;
-    showLocalContextMenu(wb, availableAgents, { x: sx, y: sy }, async (action) => {
-      if (action === 'git') {
-        void showGitForFile(repoId, wb.filePath, { x: sx, y: sy });
-        return;
-      }
-      if (action === 'code') {
-        bridge.send('open_file', { filePath: wb.filePath });
-        return;
-      }
-      if (action === 'info') {
-        showLocalWorkbenchTooltip(wb, { x: sx, y: sy });
-        setTimeout(() => hideLocalWorkbenchTooltip(), 3000);
-        return;
-      }
-      if (!(await Promise.resolve(true))) return;
-      // Resolve which agent will receive the mission: prefer idle, fallback to busy ones
-      const agentUnit =
-        action === 'WORKER'
-          ? (state.getAllUnits().find((u) => u.type === 'worker' && u.state === 'idle') ??
-            state.getAllUnits().find((u) => u.type === 'worker'))
-          : getFirstUserUnit(state);
-      const agentId = agentUnit?.id ?? action;
-      // Resolve the actual repo filesystem path for bridge context
-      const city = state.world.cities.find((c) => c.id === repoId);
-      const repoPath = city?.repoPath ?? wb.repoPath ?? repoId;
-      showLocalMissionPreview(
-        action,
-        wb.fileName,
-        { x: sx, y: sy },
-        () => {
-          // 1. Animate the unit walking to the workbench locally
-          state.queueLocalMission(repoId, wb.filePath, wb.fileName, agentId);
-          // 2. Dispatch the real agent command to the bridge with full repo context
-          void sendCommand({
-            type: 'execute_agent',
-            target: agentId,
-            payload: {
-              unit: agentId,
-              city: repoId,
-              repoPath,
-              filePath: wb.filePath,
-              fileName: wb.fileName,
-              mission: `Trabajar en ${wb.fileName}`,
-              cwd: repoPath,
-            },
-            created_by: 'local_view',
-          });
-        },
-        () => {},
-      );
-    });
-  };
-  renderer.localUnitClickCb = (unit, _sx, _sy) => {
-    // Highlight selected local unit (future: show detail panel)
-    showLocalUnitTooltip(unit, { x: _sx, y: _sy });
-  };
-  // P4: Drag-to-assign — reuse queueLocalMission for the drag flow
-  renderer.localDragAssignCb = (unitId, tile) => {
-    const wb = tile.workbench;
-    if (!wb) return;
-    const localWorld = state.localWorld;
-    const repoId = localWorld?.repoId ?? wb.repoPath;
-    state.queueLocalMission(repoId, wb.filePath, wb.fileName, unitId);
-  };
-  // Pan the local-view camera to the room matching `folderName`, or toast if it has no room of its own.
-  const navigateToFolder = (folderName: string) => {
-    const lw = state.getLocalWorld();
-    const target = lw?.rooms.find(
-      (r: LocalRoom) => r.folderName === folderName || r.label === folderName,
-    );
-    if (target) {
-      renderer.animateCameraToGrid(target.x + target.width / 2, target.y + target.height / 2, 500);
-    } else {
-      showToast(`📁 ${folderName} no tiene sala propia`);
-    }
-  };
-  renderer.localNpcClickCb = (npc: LocalNpc, sx, sy) => {
-    const localWorld = state.getLocalWorld();
-    const room = localWorld?.rooms.find((r: LocalRoom) => r.id === npc.roomId);
-    if (room) {
-      showWhiteboardPanel(
-        room,
-        { x: sx, y: sy },
-        (folderPath) => {
-          bridge.send('open_file', { filePath: folderPath });
-        },
-        navigateToFolder,
-      );
-    }
-  };
-  // ─── Kiosk click → discover rest area with 1.25x bonus ───────────────────
-  renderer.localTileClickCb = (x, y, tile, sx, sy) => {
-    if (tile?.type === 'kiosk') {
-      bridge.send('discover_rest_area', {
-        restAreaId: `kiosk-${x}-${y}`,
-        roomId: 'kiosk',
-        coord: [x, y],
-      });
-      return;
-    }
-    if (tile?.type === 'whiteboard') {
-      const localWorld = state.getLocalWorld();
-      const room = localWorld?.rooms.find((r: LocalRoom) => r.id === tile.roomId);
-      if (room) {
-        showWhiteboardPanel(
-          room,
-          { x: sx, y: sy },
-          (folderPath) => {
-            bridge.send('open_file', { filePath: folderPath });
-          },
-          navigateToFolder,
-        );
-      }
-      return;
-    }
-  };
-
-  // ─── Phase 9: Action Bubbles ─────────────────────────────────────────────
-  renderer.localUnitRenderedCb = (unit, sx, sy) => updateBubble(unit, sx, sy);
-
-  // ─── Local view chat ──────────────────────────────────────────────────────
-  // The same transcript the side panel shows, in its own phone-style feed. It
-  // reads the shared chatHistory and the shared chunk stream, so both views
-  // stay live from one source of truth.
-  let localChat: LocalChatHandle | null = null;
-  renderer.onEnterLocalView = () => {
-    localChat?.destroy();
-    localChat = mountLocalChat(() => state.getLocalUnits());
-  };
-  renderer.onExitLocalView = () => {
-    clearAllBubbles();
-    localChat?.destroy();
-    localChat = null;
-  };
-
-  // Zone painting: wire to LocalWorldManager
-  renderer.onZonePaintedCb = (type, tiles) => {
-    const lw = state.getLocalWorld();
-    if (!lw) return;
-    if (!lw.zones) lw.zones = [];
-    const zoneId = `zone-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    lw.zones.push({
-      id: zoneId,
-      type,
-      tiles,
-      filters: [],
-      priority: 1,
-    });
-    // Also update tile types visually
-    for (const t of tiles) {
-      const tile = lw.grid[t.y]?.[t.x];
-      if (tile) tile.type = 'stockpile';
-    }
-    state.notifyUpdate();
-  };
+  wireLocalView({
+    renderer,
+    state,
+    bridge,
+    enterLocalViewForCity: _enterLocalViewForCity,
+    getFirstUserUnit,
+    showToast,
+  });
 
   // Spawn MAIN as the default hero, near the capital if present.
   // MAIN's runtime identity is configured by the onboarding step (PR 2):

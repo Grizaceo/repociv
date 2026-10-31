@@ -3,12 +3,12 @@
 import { HEX_SIZE } from '../constants.ts';
 
 /** Peak extra height while walking. Far below one terrain step (TILE_HEIGHT=12). */
-export const STRIDE_HEIGHT = HEX_SIZE * 0.015;
+const STRIDE_HEIGHT = HEX_SIZE * 0.015;
 /** Seconds for a full two-step cycle (left+right implicit foot). */
-export const STRIDE_PERIOD = 0.36;
+const STRIDE_PERIOD = 0.36;
 /** Idle scale amplitude. Token pulse used 5%; this is breath, not a bob. */
-export const IDLE_BREATH_AMPLITUDE = 0.01;
-export const IDLE_BREATH_PERIOD = 2.4;
+const IDLE_BREATH_AMPLITUDE = 0.01;
+const IDLE_BREATH_PERIOD = 2.4;
 /** Forward pitch while marching (radians). */
 export const LEAN_MAX = 0.1;
 /** Side-to-side weight shift (radians). */

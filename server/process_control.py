@@ -216,17 +216,6 @@ def _identity_of(pid: int, proc_root: Path) -> str | None:
         return None
 
 
-def _wait_gone(pid: int, identity: str, deadline: float, proc_root: Path) -> bool:
-    """True when ``pid`` no longer holds ``identity`` (exited, or recycled)."""
-    while True:
-        current = _identity_of(pid, proc_root)
-        if current is None or current != identity:
-            return True
-        if time.monotonic() >= deadline:
-            return False
-        time.sleep(_POLL_INTERVAL)
-
-
 # ─── Stop ────────────────────────────────────────────────────────────────────
 
 

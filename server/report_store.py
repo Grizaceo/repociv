@@ -99,20 +99,3 @@ def delete_report(report_id: str) -> bool:
         return False
     file_path.unlink()
     return True
-
-
-def get_reports_for_article(article_id: str | int) -> list[dict[str, Any]]:
-    """Get all reports linked to a specific article ID."""
-    article_id_str = str(article_id)
-    return list_reports(article_id=article_id_str)
-
-
-def get_reports_for_city(city_id: str) -> list[dict[str, Any]]:
-    """Get all reports linked to a specific city/repo."""
-    return list_reports(city_id=city_id)
-
-
-def report_count() -> int:
-    """Return total number of stored reports."""
-    _ensure_dir()
-    return len(list(_REPORTS_DIR.glob("*.json")))

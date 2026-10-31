@@ -137,19 +137,6 @@ export function mountGacetaWidget(opts: MountOpts = {}): void {
   }
 }
 
-export function unmountGacetaWidget(): void {
-  if (_refreshTimer) clearInterval(_refreshTimer);
-  if (_teaserTimer) clearInterval(_teaserTimer);
-  if (_keydownHandler) window.removeEventListener('keydown', _keydownHandler);
-  if (_citySelectedHandler) {
-    window.removeEventListener('repociv:city-selected', _citySelectedHandler);
-  }
-  _refreshTimer = null;
-  _teaserTimer = null;
-  _keydownHandler = null;
-  _citySelectedHandler = null;
-}
-
 function _buildHTML(mode: 'widget' | 'panel'): string {
   const isWidget = mode === 'widget';
   return `

@@ -63,7 +63,7 @@ export function undockUnitPanel(unit: HTMLElement): void {
   anchor = null;
 }
 
-export function syncUnitPanelDock(): void {
+function syncUnitPanelDock(): void {
   const { side, unit, body, empty } = els();
   if (!side || !unit || !body) return;
   if (side.classList.contains('hidden')) {

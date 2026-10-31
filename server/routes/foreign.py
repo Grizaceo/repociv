@@ -40,54 +40,6 @@ def get_repo_profile(ctx: "RouteContext") -> tuple[int, Any]:
                       "Verify the repo path exists and is a directory")
     return 200, profile
 
-def get_repo_profile_cache(ctx: "RouteContext") -> tuple[int, Any]:
-    """GET /api/foreign/repo-profile/cache — list cached profiles."""
-    cache = _rp.get_cached_profiles()
-    return 200, {
-        "count": len(cache),
-        "profiles": {k: {"repoName": v.get("repoName", "") if v else None,
-                         "recentFilesCount": v.get("recentFilesCount", 0) if v else 0}
-                      for k, v in cache.items()},
-    }
-
-def post_foreign_score(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
-    """POST /api/foreign/score — score an article against a repo profile.
-
-    Body:
-        article (dict): article with title, blogName, category, url
-        repoPath (str): path to the repo
-        events (list, optional): recent events
-    """
-    article = body.get("article", {})
-    repo_path = body.get("repoPath", "")
-    events = body.get("events", [])
-
-    if not article or not repo_path:
-        return _error(400, "article and repoPath are required",
-                      "Request body missing required fields",
-                      "Send { article: {...}, repoPath: '/path/to/repo' }")
-
-    selected_path = _selected_repo_path(repo_path)
-    if selected_path is None:
-        return 403, {"error": "repoPath must reference a selected RepoCiv repository"}
-    profile = _rp.build_profile(selected_path)
-    if profile is None:
-        return _error(404, f"Repo path not found: {selected_path}",
-                      f"Cannot build profile for '{selected_path}' — path does not exist or is not a directory",
-                      "Send a valid repo path that exists on the filesystem")
-
-    scoring = _fr.score_article_repo(article, profile, events=events if events else None)
-    return 200, {
-        "scoring": scoring,
-        "profile": {
-            "repoName": profile["repoName"],
-            "repoPath": profile["repoPath"],
-            "topLevelDirs": profile["topLevelDirs"][:10],
-            "recentFilesCount": profile["recentFilesCount"],
-            "skillTags": profile["skillTags"],
-        },
-    }
-
 def post_foreign_report(body: dict[str, Any], _ctx: dict[str, Any]) -> tuple[int, Any]:
     """POST /api/foreign/report — generate and save a ForeignRelationsReport.
 
@@ -181,20 +133,6 @@ def get_report_by_id(ctx: "RouteContext") -> tuple[int, Any]:
                       "Check existing reports: GET /api/foreign/reports")
     return 200, report
 
-def delete_report_by_id(ctx: dict[str, Any], _body: dict[str, Any]) -> tuple[int, Any]:
-    """DELETE /api/foreign/reports/{id} — delete a report."""
-    report_id = ctx.get("report_id", "")
-    if not report_id:
-        return _error(400, "report_id is required",
-                      "Path parameter 'report_id' is missing",
-                      "Use /api/foreign/reports/{report_id} with a valid report ID")
-    ok = _rs.delete_report(report_id)
-    if not ok:
-        return _error(404, f"Report not found: {report_id}",
-                      f"No report exists with id '{report_id}'",
-                      "Check existing reports: GET /api/foreign/reports")
-    return 200, {"ok": True, "deleted": report_id}
-
 _FILE_TREE_MAX_DEPTH = 32
 _FILE_TREE_MAX_FILES = 10_000
 _FILE_TREE_SKIP_NAMES = frozenset({"__pycache__", "node_modules", "dist", "build", ".git"})
@@ -204,21 +142,6 @@ class _FileTreeLimitExceeded(Exception):
     def __init__(self, message: str) -> None:
         self.message = message
         super().__init__(message)
-
-
-def _configured_repos_root() -> Path:
-    from server import repo_roots_state as _rrs
-
-    state_root = _rrs.active_root()
-    if state_root:
-        return Path(os.path.expanduser(state_root)).resolve()
-    map_root = (
-        os.environ.get("REPOCIV_MAP_ROOT")
-        or os.environ.get("REPOCIV_REPOS_ROOT")
-        or os.environ.get("WORKSPACE_ROOT")
-        or str(Path.home() / ".hermes" / "workspace" / "repos")
-    )
-    return Path(os.path.expanduser(map_root)).resolve()
 
 
 def _path_under_root(path: Path, root: Path) -> bool:

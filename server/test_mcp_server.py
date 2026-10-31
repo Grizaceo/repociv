@@ -7,7 +7,7 @@ Cubre:
   - Bridge caído → RuntimeError con mensaje útil
   - Respuestas de error HTTP se propagan
   - Representantes de cada dominio (agents, commands, approvals, pending,
-    context, observability, improve, providers, tasks, directives, events, ws)
+    context, observability, providers, tasks, directives, events, ws)
 """
 from __future__ import annotations
 

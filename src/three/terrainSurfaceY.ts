@@ -122,7 +122,7 @@ export function terrainReliefAt(terrain: Terrain, worldX: number, worldZ: number
 /** CPU mirror of terrainShader.ts's per-edge neighbor blend: the elevation
  *  ramp (world units) and the 0..1 fade that zeroes micro-relief toward edges
  *  shared with a different land biome. */
-export function terrainEdgeBlend(
+function terrainEdgeBlend(
   tile: Tile,
   localX: number,
   localZ: number,
@@ -248,6 +248,3 @@ export function worldTerrainSurfaceY(
 
 /** Tiny lift above the exact GPU surface to avoid z-fighting/clipping. */
 export const PROP_SURFACE_CLEARANCE = HEX_SIZE * 0.015;
-
-// Keep this exported for tests and future visual placement math.
-export const _testTerrainSurface = { hash21, valueNoise2D, fbm3, ridge3, smoothstep };

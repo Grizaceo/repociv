@@ -212,14 +212,6 @@
   cursor: not-allowed;
 }
 
-.ap-empty {
-  text-align: center;
-  color: var(--ui-text-dim);
-  padding: 30px;
-  font-style: italic;
-  font-size: 13px;
-}
-
 /* ─── Approval badge on top bar button ─────────────────────────────────────── */
 #btn-approvals {
   position: relative;

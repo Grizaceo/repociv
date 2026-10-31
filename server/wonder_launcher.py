@@ -59,10 +59,6 @@ def _env(name: str, default: str) -> str:
     return v if v is not None and v.strip() != "" else default
 
 
-def _expand(path: str) -> str:
-    return os.path.expanduser(path)
-
-
 REPOCIV_CONFIG_DIR = str(repociv_home())
 WONDERS_DIR = Path(REPOCIV_CONFIG_DIR) / "wonders"
 LAUNCHED_JSON = WONDERS_DIR / "launched.json"

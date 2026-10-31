@@ -111,7 +111,6 @@ html {
 }
 
 /* ═══ Global cursor helpers: make text panels selectable ═══ */
-.selectable-text,
 #chat-messages,
 .log-text,
 .hero-mission-text,

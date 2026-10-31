@@ -1190,7 +1190,7 @@ export interface RemovedCity {
 }
 
 /** Saved state a move overwrote, for undo. */
-export interface MovedCityPersist {
+interface MovedCityPersist {
   /** Manual layout entry the move updated (its stable key) and its old coord. */
   manual: { repoPath: string; coord: Axial } | null;
   /** placedCities entry the move updated or created, with its old coord. */
@@ -1232,7 +1232,7 @@ const NO_RECORD: MapEditOpts = { record: false };
 const PAINTABLE = new Set<string>(PAINTABLE_TERRAINS);
 
 /** A hex can be painted unless it is missing or the capital's sacred ground. */
-export function canPaintHex(world: World, coord: Axial): boolean {
+function canPaintHex(world: World, coord: Axial): boolean {
   const tile = world.tiles.get(tileKey(coord));
   return !!tile && !tile.city?.isCapital;
 }
@@ -1256,7 +1256,7 @@ export function paintHexOp(
 }
 
 /** A hex can be erased unless it holds a city, a district or belongs to one. */
-export function canEraseHex(world: World, coord: Axial): boolean {
+function canEraseHex(world: World, coord: Axial): boolean {
   const tile = world.tiles.get(tileKey(coord));
   if (!tile) return false;
   if (tile.city || tile.district) return false;
@@ -1276,7 +1276,7 @@ export function eraseHexOp(world: World, coord: Axial, opts: MapEditOpts): Tile 
 }
 
 /** A city can be taken off the map unless it is the capital. */
-export function canRemoveCity(world: World, city: City): boolean {
+function canRemoveCity(world: World, city: City): boolean {
   return !city.isCapital && world.cities.includes(city);
 }
 
@@ -1300,7 +1300,7 @@ export function removeCityOp(world: World, city: City, opts: MapEditOpts): Remov
 }
 
 /** A repo can be founded on a free hex that is not the ocean. */
-export function canFoundCity(world: World, repo: ScannedRepo, coord: Axial): boolean {
+function canFoundCity(world: World, repo: ScannedRepo, coord: Axial): boolean {
   const tile = world.tiles.get(tileKey(coord));
   if (!tile || tile.city || tile.district) return false;
   if (tile.terrain === 'ocean') return false;

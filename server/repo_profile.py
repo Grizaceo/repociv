@@ -146,11 +146,6 @@ def build_profile(repo_path: str) -> dict[str, Any] | None:
     return profile
 
 
-def clear_cache() -> None:
-    """Clear the profile cache (e.g., after a deploy)."""
-    _PROFILE_CACHE.clear()
-
-
 def get_cached_profiles() -> dict[str, dict[str, Any] | None]:
     """Return a copy of the current cache (for diagnostics)."""
     return dict(_PROFILE_CACHE)

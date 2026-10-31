@@ -524,10 +524,6 @@ def _handle_command(cmd: Command) -> dict[str, Any]:
     return {"ok": True, "status": "queued", "commandId": cmd.id}
 
 
-def _default_mission_for_command(cmd: Command) -> str:
-    return _command_executors.default_mission_for_command(cmd)
-
-
 def _register_issue_run(payload: dict[str, Any], run_id: str) -> None:
     _command_executors.register_issue_run(payload, run_id, _wi.register_run)
 

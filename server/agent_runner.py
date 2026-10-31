@@ -61,10 +61,6 @@ def set_model_override(unit_id: str, provider: str, model: str) -> None:
     _model_overrides[unit_id] = {"provider": provider, "model": model}
 
 
-def get_model_override(unit_id: str) -> dict[str, str] | None:
-    return _model_overrides.get(unit_id)
-
-
 def configure(*, send: SendFn | None = None, save: SaveMissionFn | None = None) -> None:
     global send_to_repociv, save_mission
     if send is not None:

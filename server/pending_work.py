@@ -364,14 +364,13 @@ def _within(path: str, root: str) -> bool:
 
 def _session_sources() -> tuple[dict[str, Any], list[str]]:
     """Snapshot each registry once per inventory, not once per worktree."""
-    from server import claude_live, own_sessions, suvadu_tracker  # noqa: PLC0415
+    from server import own_sessions, suvadu_tracker  # noqa: PLC0415
 
     sources: dict[str, Any] = {}
     errors: list[str] = []
     for name, read in (
         ("external", suvadu_tracker.sessions),
         ("own", own_sessions.snapshot),
-        ("live claude", lambda: claude_live.get_manager().sessions()),
     ):
         try:
             sources[name] = read()
@@ -440,16 +439,6 @@ def _related_sessions(worktree_path: str, sources: dict[str, Any] | None = None)
                 add(row.get("unit"), row.get("unit"), row.get("state"), row.get("lastActivityAt"))
     except Exception as exc:  # noqa: BLE001
         errors.append(f"own sessions unavailable: {exc}")
-
-    # Live Claude sessions — cwd is the exact working directory.
-    try:
-        for row in sources.get("live claude", []):
-            if not isinstance(row, dict):
-                continue
-            if _within(str(row.get("cwd") or ""), worktree_path):
-                add(row.get("sessionId"), row.get("nativeId"), "live" if row.get("alive") else "ended", row.get("lastActivityAt"))
-    except Exception as exc:  # noqa: BLE001
-        errors.append(f"live claude sessions unavailable: {exc}")
 
     found.sort(key=lambda row: (row["lastActivityAtMs"] is None, -(row["lastActivityAtMs"] or 0), row["id"]))
     return found, errors

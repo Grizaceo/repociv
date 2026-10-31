@@ -170,26 +170,6 @@ def repo_allows(target: str, cmd_type: str) -> bool:
     return True
 
 
-def check_capability(agent_id: str, cmd_type: str, target: str) -> tuple[bool, str]:
-    """
-    Return (allowed: bool, reason: str).
-    Checks agent capability then repo restrictions.
-    """
-    if not can_execute(agent_id, cmd_type):
-        caps = agent_capabilities(agent_id)
-        return False, (
-            f"Agente {agent_id} no tiene capacidad '{cmd_type}'. "
-            f"Capacidades: {', '.join(caps)}"
-        )
-    if not repo_allows(target, cmd_type):
-        for fragment, allowed in REPO_RESTRICTIONS.items():
-            if fragment in target.lower():
-                return False, (
-                    f"Repo '{target}' restringido: solo permite {', '.join(allowed)}"
-                )
-    return True, ""
-
-
 def capabilities_snapshot() -> dict[str, Any]:
     """Full capability model for GET /agents/capabilities."""
     # For MAIN, surface the live (harness-driven) capabilities so the UI

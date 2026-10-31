@@ -930,19 +930,14 @@ def test_related_sessions_require_exact_containment(tmp_path, monkeypatch):
         pw._related_sessions,
     )
 
+    from server import suvadu_tracker
+
     rows = [
-        {"cwd": str(inside), "sessionId": "in", "nativeId": "in", "alive": True, "lastActivityAt": 5},
-        {"cwd": str(worktree), "sessionId": "root", "nativeId": "root", "alive": False, "lastActivityAt": 4},
-        {"cwd": str(outside), "sessionId": "out", "nativeId": "out", "alive": True, "lastActivityAt": 3},
+        {"cityId": suvadu_tracker.encode_repo_id(str(inside)), "sessionId": "in", "unit": "in", "state": "live", "lastActivityAt": 5},
+        {"cityId": suvadu_tracker.encode_repo_id(str(worktree)), "sessionId": "root", "unit": "root", "state": "ended", "lastActivityAt": 4},
+        {"cityId": suvadu_tracker.encode_repo_id(str(outside)), "sessionId": "out", "unit": "out", "state": "live", "lastActivityAt": 3},
     ]
-
-    class _Manager:
-        def sessions(self):
-            return rows
-
-    import server.claude_live as claude_live
-
-    monkeypatch.setattr(claude_live, "get_manager", _Manager)
+    monkeypatch.setattr(suvadu_tracker, "sessions", lambda: {"sessions": rows})
 
     found, errors = pw._related_sessions(str(worktree))
 
@@ -976,13 +971,10 @@ def test_related_sessions_are_attached_to_entries(tmp_path, selection, monkeypat
     (repo / "a.txt").write_text("a\n", encoding="utf-8")
     selection([repo])
 
-    class _Manager:
-        def sessions(self):
-            return [{"cwd": str(repo), "sessionId": "s1", "nativeId": "claude-1", "alive": True, "lastActivityAt": 42}]
+    from server import suvadu_tracker
 
-    import server.claude_live as claude_live
-
-    monkeypatch.setattr(claude_live, "get_manager", _Manager)
+    rows = [{"cityId": suvadu_tracker.encode_repo_id(str(repo)), "sessionId": "s1", "unit": "claude-1", "state": "live", "lastActivityAt": 42}]
+    monkeypatch.setattr(suvadu_tracker, "sessions", lambda: {"sessions": rows})
 
     (entry,) = pw.collect(now_ms=1)["entries"]
 
