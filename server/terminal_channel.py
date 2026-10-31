@@ -219,7 +219,7 @@ class _Session:
     async def _submit(self, request_id: str, text: str) -> None:
         try:
             pane_id = (await herdr_runtime.locate(self.terminal_id)).pane_id
-            result = await herdr_runtime.submit(pane_id, text)
+            result = await herdr_runtime.submit(pane_id, text, expect_agent=self.agent.agent)
         except HerdrError as exc:
             result = herdr_runtime.SubmitResult("failed", exc.code)
         await self._control({"type": "submit_result", "id": request_id, **result.to_dict()})

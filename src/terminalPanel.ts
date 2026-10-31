@@ -15,6 +15,8 @@ import { BRIDGE_URL, bridgeHeaders, bridgeUrl } from './bridgeEnv.ts';
 import { RETRY_MS, TerminalLink } from './terminalLink.ts';
 import type { TerminalAgent, TerminalAttachment } from './terminalLink.ts';
 import { bindPanelAction, ensurePanel, hidePanel, showPanel } from './ui/panelShell.ts';
+import { herdrHint, plainHerdrHint } from './ui/herdrHint.ts';
+import type { HerdrRuntime } from './ui/herdrHint.ts';
 
 // Small on purpose: a maximized herdr window is over 300 columns, and seeing the
 // whole screen beats reading it comfortably.
@@ -40,27 +42,22 @@ const REASONS: Record<string, string> = {
   unauthorized: 'El token del bridge no coincide.',
   not_an_agent_pane: 'Ese panel ya no tiene un agente.',
   pane_not_found: 'Ese panel ya no existe.',
-  herdr_missing: 'herdr no está instalado.',
-  herdr_stopped: 'herdr no está corriendo.',
+  herdr_missing: plainHerdrHint(herdrHint('claude', { state: 'missing', version: '', minVersion: '' })),
+  herdr_stopped: plainHerdrHint(herdrHint('claude', { state: 'stopped', version: '', minVersion: '' })),
   herdr_outdated: 'Esta versión de herdr es demasiado antigua.',
-  herdr_incompatible:
-    'herdr se actualizó y su servidor sigue en la versión anterior. Reinícialo para reconectar.',
+  herdr_incompatible: plainHerdrHint(herdrHint('claude', { state: 'incompatible', version: '', minVersion: '' })),
   unavailable: 'No pude hablar con herdr.',
+  agent_starting: 'El agente todavía está arrancando. Espera a que esté listo.',
+  agent_changed: 'En ese panel ya corre otro agente. No se envió.',
 };
 
 export function reasonText(reason: string): string {
   return REASONS[reason] ?? reason;
 }
 
-interface HerdrRuntime {
-  state: string;
-  version: string;
-  minVersion: string;
-}
-
 export function runtimeText(runtime: HerdrRuntime): string {
   if (runtime.state === 'outdated') {
-    return `RepoCiv necesita herdr ${runtime.minVersion} o superior; tienes ${runtime.version}.`;
+    return plainHerdrHint(herdrHint('claude', runtime));
   }
   return reasonText(`herdr_${runtime.state}`);
 }
@@ -106,7 +103,7 @@ function terminalUrl(): string {
   return `${scheme}://${location.host}/repociv-ws/terminal`;
 }
 
-async function fetchAgents(): Promise<{ runtime: HerdrRuntime; agents: TerminalAgent[] } | null> {
+export async function fetchAgents(): Promise<{ runtime: HerdrRuntime; agents: TerminalAgent[] } | null> {
   try {
     const res = await fetch(bridgeUrl('/api/herdr/agents'), { headers: bridgeHeaders() });
     return res.ok ? ((await res.json()) as { runtime: HerdrRuntime; agents: TerminalAgent[] }) : null;

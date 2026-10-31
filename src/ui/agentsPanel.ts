@@ -43,9 +43,13 @@ import {
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
 import { clipboardWrite } from './chat/clipboard.ts';
 import { escapeHtml } from './escapeHtml.ts';
-import { terminalPanel } from '../terminalPanel.ts';
-import { initAgentWindow, openAgentWindow } from './agentWindow.ts';
+import { fetchAgents, terminalPanel } from '../terminalPanel.ts';
+import { herdrHint } from './herdrHint.ts';
+import type { HerdrRuntime } from './herdrHint.ts';
+import { agentWindowDestination, initAgentWindow, openAgentWindow } from './agentWindow.ts';
 import type { RepoCivProfile } from '../agentProfile.ts';
+import type { CommandResponse } from '../commandSchema.ts';
+import { HERDR_AGENT_LABELS, type HerdrLaunchDraft } from './agentSessionStart.ts';
 import { openAgentSessionWizard, type SessionStartResult } from './agentSessionWizard.ts';
 import { openProfileStudio } from './agentProfileStrip.ts';
 import { closeOwnSession } from '../ownSessions.ts';
@@ -68,6 +72,7 @@ export interface AgentsPanelDeps {
     cityId: string;
     mission: string;
   }) => Promise<SessionStartResult>;
+  startHerdrSession: (draft: HerdrLaunchDraft) => Promise<CommandResponse>;
 }
 
 let _deps: AgentsPanelDeps | null = null;
@@ -77,6 +82,8 @@ let _rows: ExternalSessionRow[] | null = [];
 let _chatSession: string | null = null;
 let _chat: ExternalChat | null = null;
 let _chatLoading = false;
+let _herdrRuntime: HerdrRuntime | null = null;
+let _herdrRequest = 0;
 /** The open chat's resume plan, once the user asked for it (null = not asked). */
 let _resume: ExternalResume | null = null;
 let _resumeCopied = false;
@@ -138,7 +145,7 @@ export function openNewAgentSession(
 ): void {
   if (!_deps) return;
   void openAgentSessionWizard(
-    { state: _deps.state, startSession: _deps.startSession },
+    { state: _deps.state, startSession: _deps.startSession, startHerdrSession: _deps.startHerdrSession },
     {
       ...options,
       // Nueva sesión = entrar a conversar: cuando el bridge acepta la sesión,
@@ -146,6 +153,13 @@ export function openNewAgentSession(
       onStarted: (unitId) => {
         if (unitId) focusOwnChat(unitId);
         else _render();
+      },
+      onHerdrStarted: (draft, cityName, result) => {
+        openAgentWindow({
+          terminalId: null, paneId: '', kind: draft.kind, label: HERDR_AGENT_LABELS[draft.kind],
+          place: cityName, sessionId: null, status: result.status,
+          launch: { commandId: result.commandId, mission: draft.mission },
+        });
       },
     },
   );
@@ -253,14 +267,34 @@ async function _loadChat(refresh: boolean): Promise<void> {
   _renderChat(firstLoad);
 }
 
+function herdrFamily(row: ExternalSessionRow): 'claude' | 'devin' | null {
+  if (row.herdrPane || isQuietSession(row)) return null;
+  if (row.liveChat?.reason === 'claude_control_channel_unavailable') return 'claude';
+  if (row.liveChat?.reason === 'devin_live_chat_unavailable') return 'devin';
+  return null;
+}
+
+async function _loadHerdrRuntime(row: ExternalSessionRow): Promise<void> {
+  if (!herdrFamily(row)) return;
+  const request = ++_herdrRequest;
+  _herdrRuntime = null;
+  _renderChat();
+  const data = await fetchAgents();
+  if (_chatSession !== row.sessionId || request !== _herdrRequest) return;
+  _herdrRuntime = data?.runtime ?? null;
+  _renderChat();
+}
+
 function _openChat(row: ExternalSessionRow): void {
+  _herdrRequest++;
+  _herdrRuntime = null;
   if (row.herdrPane) {
     _chatSession = null;
     _chat = null;
     _stopTimers();
     _render();
     locateExternalAgent(row);
-    openAgentWindow(row);
+    openAgentWindow(agentWindowDestination(row));
     return;
   }
   _chatSession = row.sessionId;
@@ -277,6 +311,7 @@ function _openChat(row: ExternalSessionRow): void {
   const refresh =
     !_isHermes(row) && (row.active || !row.imported) && !_refreshed.has(row.sessionId);
   if (refresh) _refreshed.add(row.sessionId);
+  void _loadHerdrRuntime(row);
   void _loadChat(refresh);
   window.clearInterval(_chatTimer);
   _chatTimer = window.setInterval(() => void _loadChat(false), CHAT_POLL_MS);
@@ -329,7 +364,7 @@ function isQuietSession(row: ExternalSessionRow): boolean {
 /** Public behavior contract for enabling the external-session composer. */
 export function composerState(
   row: ExternalSessionRow,
-  flags: { sending?: boolean; replyRunning?: boolean } = {},
+  flags: { sending?: boolean; replyRunning?: boolean; runtime?: HerdrRuntime | null } = {},
 ): ComposerState {
   if (isQuietSession(row)) {
     const busy = flags.sending || flags.replyRunning;
@@ -341,7 +376,8 @@ export function composerState(
         : 'Reanuda la sesión y corre un turno. No es un chat en vivo: el agente no está escuchando.',
     };
   }
-  if (row.liveChat?.state === 'available') {
+  const family = herdrFamily(row);
+  if (!family && row.liveChat?.state === 'available') {
     return {
       enabled: !flags.sending,
       mode: 'live',
@@ -355,7 +391,7 @@ export function composerState(
     enabled: false,
     mode: 'disabled',
     hint:
-      LIVE_CHAT_REASON_TEXT[reason] ??
+      (family ? herdrHint(family, flags.runtime ?? null) : LIVE_CHAT_REASON_TEXT[reason]) ??
       (row.liveChat?.state === 'probe_required'
         ? 'El canal de esta sesión todavía se debe verificar.'
         : 'El chat vivo no está disponible para esta sesión.'),
@@ -415,7 +451,7 @@ function _composerHtml(row: ExternalSessionRow): string {
     </div>`;
   }
   const running = _chat?.lastReply?.state === 'running';
-  const composer = composerState(row, { sending: _sending, replyRunning: running });
+  const composer = composerState(row, { sending: _sending, replyRunning: running, runtime: _herdrRuntime });
   const disabled = !composer.enabled;
   let hint: string;
   let tone = '';
@@ -431,13 +467,16 @@ function _composerHtml(row: ExternalSessionRow): string {
   } else {
     hint = composer.hint;
   }
+  const hintHtml = composer.mode === 'disabled' && !_replyError && herdrFamily(row)
+    ? escapeHtml(hint).replace(/`([^`]+)`/g, '<code>$1</code>')
+    : escapeHtml(hint);
   return `<div class="agents-compose">
     <textarea class="agents-compose-text" rows="2" ${disabled ? 'disabled' : ''}
       placeholder="Escribile a esta sesión…"
       aria-label="Mensaje para esta sesión">${escapeHtml(_draft)}</textarea>
     <button type="button" class="agents-compose-send" ${disabled || !_draft.trim() ? 'disabled' : ''}
       title="Enviar (Ctrl+Enter)">${_sending ? '…' : 'Enviar'}</button>
-    <p class="agents-compose-hint${tone}">${escapeHtml(hint)}</p>
+    <p class="agents-compose-hint${tone}">${hintHtml}</p>
   </div>`;
 }
 
@@ -597,6 +636,7 @@ function _render(): void {
     _renderChat();
     return;
   }
+  body.classList.remove('agents-body--chat');
   _renderedKey = _listKey();
   const now = Date.now();
   let external: string;
@@ -669,6 +709,7 @@ function _render(): void {
 function _renderChat(firstLoad = false): void {
   if (!_panel || !_chat) return;
   const body = _panel.querySelector<HTMLElement>('.agents-body')!;
+  body.classList.add('agents-body--chat');
   // Keep the reader's place across the 15 s refresh; follow the tail only when
   // they were already at the bottom (or on first load).
   const prev = body.querySelector<HTMLElement>('.agents-chat-log');
@@ -724,7 +765,10 @@ function _renderChat(firstLoad = false): void {
   bindPanelAction(body, '.agents-resume-btn', () => void _loadResume());
   bindPanelAction(body, '.agents-locate', () => locateExternalAgent(row));
   bindPanelAction(body, '.agents-chat-agent', () => locateExternalAgent(row));
-  bindPanelAction(body, '.agents-refresh', () => void _loadChat(true));
+  bindPanelAction(body, '.agents-refresh', () => {
+    void _loadHerdrRuntime(row);
+    void _loadChat(true);
+  });
   bindPanelAction(body, '.agents-compose-send', () => void _send());
   bindPanelAction(body, '.agents-open-cli', () => {
     if (row.herdrPane) void terminalPanel.open(row.herdrPane);

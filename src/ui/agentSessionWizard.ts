@@ -3,8 +3,11 @@
 // filesystem path; the bridge resolves the selected map city server-side.
 
 import { getSortedProfiles, type RepoCivProfile } from '../agentProfile.ts';
+import type { CommandResponse } from '../commandSchema.ts';
 import type { GameState } from '../game.ts';
-import { validateAgentSessionDraft } from './agentSessionStart.ts';
+import { fetchAgents, runtimeText } from '../terminalPanel.ts';
+import { HERDR_AGENT_LABELS, validateAgentSessionDraft } from './agentSessionStart.ts';
+import type { HerdrLaunchDraft, HerdrLaunchKind } from './agentSessionStart.ts';
 
 export interface SessionStartResult {
   ok: boolean;
@@ -22,6 +25,7 @@ export interface ConfirmedAgentSessionDraft {
 export interface AgentSessionWizardDeps {
   state: GameState;
   startSession: (draft: ConfirmedAgentSessionDraft) => Promise<SessionStartResult>;
+  startHerdrSession: (draft: HerdrLaunchDraft) => Promise<CommandResponse>;
 }
 
 export interface OpenAgentSessionWizardOptions {
@@ -29,6 +33,7 @@ export interface OpenAgentSessionWizardOptions {
   harness?: RepoCivProfile['harness'];
   /** Called after the bridge accepts the session, with the local unit id. */
   onStarted?: (unitId: string) => void;
+  onHerdrStarted?: (draft: HerdrLaunchDraft, cityName: string, result: CommandResponse) => void;
 }
 
 /**
@@ -87,13 +92,16 @@ export async function openAgentSessionWizard(
         </div>
         <button type="button" class="agent-session-close" aria-label="Cancelar nueva sesión">✕</button>
       </div>
+      <label>Dónde
+        <select name="where"><option value="background">En segundo plano</option><option value="herdr">En herdr (terminal real)</option></select>
+      </label>
       <label>Agente
         <select name="profile" required aria-describedby="agent-session-help"></select>
       </label>
       <label>Territorio
         <select name="city" required></select>
       </label>
-      <label>Misión inicial
+      <label><span class="agent-session-mission-label">Misión inicial</span>
         <textarea name="mission" rows="4" required placeholder="Qué tiene que lograr este agente?"></textarea>
       </label>
       <p id="agent-session-help" class="agent-session-help">Se encolará con el bridge. La ruta local se resuelve allí y nunca sale del navegador.</p>
@@ -113,10 +121,13 @@ export async function openAgentSessionWizard(
   dialog.querySelector('.agent-session-cancel')?.addEventListener('click', _closeDialog);
 
   const profileSelect = dialog.querySelector<HTMLSelectElement>('[name="profile"]')!;
+  const whereSelect = dialog.querySelector<HTMLSelectElement>('[name="where"]')!;
   const citySelect = dialog.querySelector<HTMLSelectElement>('[name="city"]')!;
   const missionInput = dialog.querySelector<HTMLTextAreaElement>('[name="mission"]')!;
   const submit = dialog.querySelector<HTMLButtonElement>('.agent-session-submit')!;
   const status = dialog.querySelector<HTMLElement>('.agent-session-status')!;
+  const help = dialog.querySelector<HTMLElement>('.agent-session-help')!;
+  const missionLabel = dialog.querySelector<HTMLElement>('.agent-session-mission-label')!;
 
   let profiles: RepoCivProfile[] = [];
   try {
@@ -124,33 +135,83 @@ export async function openAgentSessionWizard(
   } catch {
     _setStatus(status, 'No pude cargar los perfiles del bridge.', true);
   }
-  for (const profile of profiles) {
-    profileSelect.appendChild(
-      _option(profile.name, `${profile.display_name ?? profile.name} · ${profile.harness}`),
-    );
-  }
-  if (options.profileName && profiles.some((profile) => profile.name === options.profileName)) {
-    profileSelect.value = options.profileName;
-  } else if (options.harness) {
-    const harnessProfile = profiles.find((profile) => profile.harness === options.harness);
-    if (harnessProfile) profileSelect.value = harnessProfile.name;
-  }
-
   const cities = deps.state.world.cities.filter(
     (city) => !city.isCapital && Boolean(city.repoPath),
   );
   for (const city of cities) citySelect.appendChild(_option(city.id, city.name));
 
-  if (profiles.length === 0)
-    _setStatus(status, 'Creá un perfil antes de iniciar una sesión.', true);
-  else if (cities.length === 0)
-    _setStatus(status, 'No hay una ciudad con repositorio disponible en el mapa.', true);
-  submit.disabled = profiles.length === 0 || cities.length === 0;
+  let runtimeReady = false;
+  let runtimeRequest = 0;
+  const updateMode = async () => {
+    const herdr = whereSelect.value === 'herdr';
+    const request = ++runtimeRequest;
+    profileSelect.replaceChildren();
+    if (herdr) {
+      for (const [kind, label] of Object.entries(HERDR_AGENT_LABELS)) profileSelect.appendChild(_option(kind, label));
+    } else {
+      for (const profile of profiles) profileSelect.appendChild(_option(profile.name, `${profile.display_name ?? profile.name} · ${profile.harness}`));
+      if (options.profileName && profiles.some((profile) => profile.name === options.profileName)) {
+        profileSelect.value = options.profileName;
+      } else if (options.harness) {
+        const harnessProfile = profiles.find((profile) => profile.harness === options.harness);
+        if (harnessProfile) profileSelect.value = harnessProfile.name;
+      }
+    }
+    missionLabel.textContent = herdr ? 'Primer mensaje (opcional)' : 'Misión inicial';
+    missionInput.required = !herdr;
+    help.textContent = herdr
+      ? 'Se abre en una pestaña de herdr, en la carpeta de la ciudad. Sigue vivo aunque cierres RepoCiv.'
+      : 'Se encolará con el bridge. La ruta local se resuelve allí y nunca sale del navegador.';
+    runtimeReady = false;
+    submit.disabled = true;
+    if (cities.length === 0) {
+      _setStatus(status, 'No hay una ciudad con repositorio disponible en el mapa.', true);
+      return;
+    }
+    if (!herdr) {
+      _setStatus(status, profiles.length ? '' : 'Creá un perfil antes de iniciar una sesión.', !profiles.length);
+      submit.disabled = !profiles.length;
+      return;
+    }
+    _setStatus(status, 'Consultando herdr…');
+    const response = await fetchAgents();
+    if (request !== runtimeRequest || !dialog.isConnected) return;
+    runtimeReady = response?.runtime.state === 'ready';
+    _setStatus(status, response ? (runtimeReady ? '' : runtimeText(response.runtime)) : 'No pude hablar con herdr.', !runtimeReady);
+    submit.disabled = !runtimeReady;
+  };
+  whereSelect.addEventListener('change', () => void updateMode());
+  void updateMode();
 
   dialog
     .querySelector<HTMLFormElement>('.agent-session-form')
     ?.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (whereSelect.value === 'herdr') {
+        if (!runtimeReady || !citySelect.value) return;
+        const draft: HerdrLaunchDraft = {
+          kind: profileSelect.value as HerdrLaunchKind, cityId: citySelect.value, mission: missionInput.value.trim(),
+        };
+        submit.disabled = true;
+        _setStatus(status, 'Enviando al bridge…');
+        let result: CommandResponse;
+        try {
+          result = await deps.startHerdrSession(draft);
+        } catch {
+          _setStatus(status, 'No pude hablar con el bridge.', true);
+          submit.disabled = false;
+          return;
+        }
+        if (!result.ok) {
+          _setStatus(status, result.reason ?? 'El bridge no aceptó la sesión.', true);
+          submit.disabled = false;
+          return;
+        }
+        const cityName = cities.find((city) => city.id === draft.cityId)?.name ?? draft.cityId;
+        dialog.close();
+        options.onHerdrStarted?.(draft, cityName, result);
+        return;
+      }
       const profile = profiles.find((candidate) => candidate.name === profileSelect.value);
       const draft = { profile, cityId: citySelect.value, mission: missionInput.value };
       const invalid = validateAgentSessionDraft(draft);

@@ -79,6 +79,18 @@ describe('external-session composer capability', () => {
       hint: expect.stringMatching(/no se reintenta/i),
     });
   });
+
+  it.each([
+    ['claude', 'claude_control_channel_unavailable'],
+    ['devin', 'devin_live_chat_unavailable'],
+  ])('only uses herdr guidance for active unavailable %s sessions', (agent, reason) => {
+    const row = session({ agent, liveChat: { state: 'unavailable', transport: null, reason } });
+    expect(composerState(row).hint).toBe('Este agente no corre dentro de herdr, así que RepoCiv no puede escribirle. Ábrelo en un panel de herdr para hablarle desde aquí.');
+    expect(composerState({ ...row, liveChat: { state: 'probe_required', transport: null, reason } }).hint)
+      .toBe('Este agente no corre dentro de herdr, así que RepoCiv no puede escribirle. Ábrelo en un panel de herdr para hablarle desde aquí.');
+    expect(composerState({ ...row, state: 'idle' })).toMatchObject({ enabled: true, mode: 'reply' });
+    expect(composerState({ ...row, active: false })).toMatchObject({ enabled: true, mode: 'reply' });
+  });
 });
 
 describe('performExternalSend', () => {

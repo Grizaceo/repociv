@@ -23,6 +23,7 @@ class FakeHerdr:
         self.path = str(path)
         self.answer = answer
         self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.received: list[bytes] = []
         self._server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self._server.bind(self.path)
         self._server.listen(16)
@@ -37,6 +38,7 @@ class FakeHerdr:
                 return
             with conn:
                 raw = conn.makefile("rb").readline()
+                self.received.append(raw)
                 if not raw:
                     continue  # _server_binary connects without asking anything
                 message = json.loads(raw)
@@ -95,6 +97,88 @@ def test_request_without_a_server_is_unavailable(tmp_path: Path) -> None:
     assert exc.value.code == "unavailable"
 
 
+@pytest.mark.parametrize("asynchronous", [False, True])
+def test_wrong_instance_sends_no_bytes_and_correct_instance_works(fake: FakeHerdr, asynchronous: bool) -> None:
+    instance = herdr_runtime.server_instance(fake.path)
+    assert instance
+    with pytest.raises(HerdrError) as exc:
+        if asynchronous:
+            asyncio.run(herdr_runtime.arequest("pane.send_text", {"text": "unsafe"}, path=fake.path, instance="999999:1"))
+        else:
+            herdr_runtime.request("pane.send_text", {"text": "unsafe"}, path=fake.path, instance="999999:1")
+    assert exc.value.code == "server_changed"
+    if asynchronous:
+        assert asyncio.run(herdr_runtime.arequest("ping", path=fake.path, instance=instance))["type"] == "ok"
+    else:
+        assert herdr_runtime.request("ping", path=fake.path, instance=instance)["type"] == "ok"
+    assert fake.calls == [("ping", {})]
+    assert fake.received[:2] == [b"", b""]
+    assert len(fake.received) == 3
+
+
+@pytest.mark.parametrize("asynchronous", [False, True])
+def test_unreadable_peer_fails_closed_without_sending(
+    fake: FakeHerdr, monkeypatch: pytest.MonkeyPatch, asynchronous: bool,
+) -> None:
+    monkeypatch.setattr(herdr_runtime, "_peer_instance", lambda _sock: None)
+    with pytest.raises(HerdrError) as exc:
+        if asynchronous:
+            asyncio.run(herdr_runtime.arequest("pane.send_text", {"text": "unsafe"}, path=fake.path, instance="123:456"))
+        else:
+            herdr_runtime.request("pane.send_text", {"text": "unsafe"}, path=fake.path, instance="123:456")
+    assert exc.value.code == "server_changed"
+    assert herdr_runtime.request("ping", path=fake.path)["type"] == "ok"
+    assert fake.received[0] == b""
+    assert fake.calls == [("ping", {})]
+
+
+def test_launch_mission_pins_agent_checks_paste_and_enter(monkeypatch: pytest.MonkeyPatch) -> None:
+    seq = 0
+    calls: list[tuple[str, str | None]] = []
+
+    def agents(*, path: str, instance: str) -> list[AgentPane]:
+        nonlocal seq
+        assert path == "/private" and instance == "123:456"
+        seq += 1
+        return [AgentPane("w1:p1", "t1", "claude", "idle", state_change_seq=seq)]
+
+    async def request(method: str, _params: dict, *, path: str, instance: str) -> dict:
+        assert path == "/private"
+        calls.append((method, instance))
+        return {}
+
+    monkeypatch.setattr(herdr_runtime, "list_agents", agents)
+    monkeypatch.setattr(herdr_runtime, "arequest", request)
+    monkeypatch.setattr(herdr_runtime, "_SUBMIT_PAUSE_S", 0)
+    result = asyncio.run(herdr_runtime.submit(
+        "w1:p1", "hello", path="/private", instance="123:456", expect_agent="claude",
+    ))
+    assert result.state == "confirmed"
+    assert calls == [("pane.send_input", "123:456"), ("pane.send_text", "123:456")]
+
+
+def test_launch_mission_does_not_send_enter_if_instance_changes_after_paste(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    def agents(*, instance: str) -> list[AgentPane]:
+        assert instance == "123:456"
+        return [AgentPane("w1:p1", "t1", "claude", "idle")]
+
+    async def request(method: str, _params: dict, *, path: str | None, instance: str) -> dict:
+        assert instance == "123:456"
+        if method == "pane.send_text":
+            raise HerdrError("server_changed")
+        calls.append(method)
+        return {}
+
+    monkeypatch.setattr(herdr_runtime, "list_agents", agents)
+    monkeypatch.setattr(herdr_runtime, "arequest", request)
+    monkeypatch.setattr(herdr_runtime, "_SUBMIT_PAUSE_S", 0)
+    result = asyncio.run(herdr_runtime.submit("w1:p1", "hello", instance="123:456", expect_agent="claude"))
+    assert (result.state, result.reason) == ("unconfirmed", "enter_failed")
+    assert calls == ["pane.send_input"]
+
+
 @pytest.mark.parametrize(
     "fake", [{"pane.get": {"id": "", "error": {"code": "pane_not_found", "message": "nope"}}}], indirect=True
 )
@@ -102,6 +186,7 @@ def test_request_raises_herdr_error_code(fake: FakeHerdr) -> None:
     with pytest.raises(HerdrError) as exc:
         herdr_runtime.request("pane.get", {"pane_id": "w1:p9"}, path=fake.path)
     assert exc.value.code == "pane_not_found"
+    assert exc.value.sent is True
 
 
 @pytest.mark.parametrize("fake", [{"ping": _ok(type="pong", version="0.9.1")}], indirect=True)

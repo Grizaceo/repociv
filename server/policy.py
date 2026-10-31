@@ -63,6 +63,7 @@ _TYPE_POLICY: dict[str, PolicyDecision] = {
     "quest_add":     "auto-safe",   # low-risk bookkeeping
     "unit_command":  "auto-safe",   # legacy compat — already gated by UX
     "execute_agent": "auto-safe",   # chat flow — gated by UX (user types and sends)
+    "herdr_launch":  "auto-safe",   # explicit user launch
     # Same as the chat flow above: typing the message and sending it IS the
     # approval. The hard gate for these sits elsewhere — a session whose process
     # is still alive is refused outright (server/session_reply.py). To require a

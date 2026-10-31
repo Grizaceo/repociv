@@ -136,11 +136,42 @@ Medido con un proceso de prueba y con Claude Code real a 72×34:
 Sin validar: Devin. Un agente que escribe en la pantalla normal podría dejar líneas
 angostas en su historial, impresas mientras el PTY estaba reducido.
 
-## Ciclo de vida: pendiente para la Fase 3
+## Lanzamiento desde RepoCiv
 
-`repociv.service` usa `KillMode=control-group`. Un `herdr server` iniciado por el
-bridge quedaría en ese cgroup y moriría con el servicio, junto con todos los agentes.
-Debe lanzarse fuera, por ejemplo con `systemd-run --user`.
+Un clic explícito en «+ Sesión» → «En herdr» pasa por el bus de comandos y las
+políticas de aprobación. Se crea un workspace por ciudad y una pestaña por agente;
+el primer agente usa el panel raíz. El bridge resuelve la carpeta de la ciudad.
+Solo reutiliza un workspace creado por RepoCiv si coincide la instancia del
+servidor (PID y hora de inicio del peer del socket), su id y la etiqueta.
+Si la instancia es legible pero el workspace no se puede verificar, crea otro;
+si no puede identificar la instancia, falla sin crear nada. Cada operación del
+lanzamiento comprueba esa identidad en su propia conexión **antes** de escribir.
+En herdr 0.9.1 los ids `w1`, `w2` se
+reutilizaron tras reiniciar el servidor; dentro de una misma instancia, al cerrar
+`w2` y `w1` los siguientes workspaces recibieron `w3` y `w4`.
+
+En el servidor aislado con herdr 0.9.1 y un `claude` falso, el socket
+`agent.start` respondió enseguida con `agent_started` y `launch_pending`. La CLI
+`herdr agent start` esperó unos 4 segundos hasta `idle` y devolvió exit 0 con JSON.
+El falso solo imprimía texto y dormía: esa detección de pantalla no demuestra un
+prompt real. Un panel ocupado devolvió `agent_pane_busy` inmediatamente.
+RepoCiv no usa esa CLI para lanzar: se conectaría por su cuenta y podría alcanzar
+otro servidor tras un reinicio. Envía `agent.start` una vez por un socket fijado
+a la instancia y replica la espera de la CLI sondeando `agent.list`, también
+fijado, hasta `idle` o `done`. Nunca reintenta el lanzamiento. Si vence el plazo,
+el resultado queda sin confirmar y la misión vuelve como borrador; el agente
+puede seguir arrancando. Los envíos de la misión inicial también fijan la instancia.
+
+Riesgo residual: la ventana y la terminal de agentes existentes resuelven el
+`pane_id` desde `terminal_id`, pero no fijan la instancia al mandar input, pegar
+o enviar. Un reinicio de herdr entre la resolución y el envío puede producir
+una carrera de la misma clase; esa ruta queda pendiente de endurecer.
+
+## Ciclo de vida
+
+RepoCiv no arranca ni detiene herdr. El usuario inicia su servidor fuera de
+`repociv.service`; sus agentes viven en ese servidor y no en el cgroup del
+servicio de RepoCiv. Cerrar la ventana o reiniciar RepoCiv no los cierra.
 
 ## Seguridad
 
@@ -158,17 +189,13 @@ Medido a través del proxy real de Vite: solo conecta el `Origin` propio. Se rec
 un origen ajeno, otro puerto local, `null`, la ausencia de `Origin`, y el origen de
 tailnet aunque esté en `REPOCIV_CORS_ORIGINS`.
 
-### Pendiente antes de la Fase 3: POST entre sitios
+### Resuelto: POST entre sitios
 
-Un POST con `Origin` ajeno y `Content-Type: text/plain` no dispara preflight, y el
-proxy le agrega el token. Medido en un stack aislado: `POST /bridge/directives/record`
-y `POST /api/repos/refresh` respondieron 200. El bridge no valida `Origin` en
-`do_POST`, y eso incluye `/commands`.
+`server/bridge.py` rechaza en `do_POST` un `Origin` ajeno o duplicado con
+`403 origin_not_allowed`, también para las rutas detrás de `/bridge/*`.
+En `vite-plugins/repociv.ts`, `isTrustedJsonMutation` protege los POST a `/event`
+y `/api/*`: exige JSON y un origen coincidente con el host o un token válido.
 
-La solución del tag `archive/audit-rehabilitation-20260712` cubre solo `/event` y
-`/api/*` en `vite-plugins/repociv.ts`: rescatarla no cierra `/bridge/*`. Hace falta
-además rechazar en `do_POST` un `Origin` fuera de la lista.
-
-La terminal no depende de esa capa, por lo que no bloquea la Fase 2. La Fase 3 sí,
-porque lanzará agentes: no debe agregarse ningún POST que escriba en un panel o cree
-uno hasta cerrar esto.
+Antes, en un stack aislado, un POST `text/plain` con origen ajeno a
+`/bridge/directives/record` y `/api/repos/refresh` respondió 200; esa medición
+documentó la brecha ya corregida.

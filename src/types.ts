@@ -416,6 +416,18 @@ export type BridgeEvent =
       target: string;
       risk: string;
     }
+  | {
+      type: 'herdr_launch';
+      commandId: string;
+      state: string;
+      reason: string | null;
+      terminalId: string;
+      paneId: string;
+      kind: string;
+      cityId: string;
+      name: string;
+      missionDelivery: { state: string; reason: string | null } | null;
+    }
   | { type: 'approval_expired'; commandId: string; reason: string }
   | { type: 'chat_chunk'; unit: string; missionId?: string; text: string }
   | { type: 'log'; msg: string; level?: 'info' | 'warn' | 'success' };

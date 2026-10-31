@@ -12,6 +12,7 @@ export type CommandType =
   | 'git_commit'
   | 'delete_file'
   | 'execute_agent'
+  | 'herdr_launch'
   | 'send_message'
   | 'unit_command'
   | 'quest_add'
@@ -55,6 +56,7 @@ export const COMMAND_RISK: Record<CommandType, Risk> = {
   edit_file: 'medium',
   create_branch: 'medium',
   execute_agent: 'low', // user-gated: the act of clicking/sending IS the approval
+  herdr_launch: 'low', // explicit user launch
   git_commit: 'high',
   send_message: 'high',
   delete_file: 'destructive',

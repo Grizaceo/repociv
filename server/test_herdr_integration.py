@@ -67,6 +67,12 @@ def private() -> Iterator[Private]:
         pytest.skip("temp dir too long for a unix socket; set TMPDIR")
     (root / "config" / "herdr").mkdir(parents=True)
     (root / "config" / "herdr" / "config.toml").write_text("onboarding = false\n")
+    (root / "bin").mkdir()
+    fake_claude = root / "bin" / "claude"
+    fake_claude.write_text("#!/bin/sh\nprintf 'fake claude started\\n'\nsleep 20\n")
+    fake_claude.chmod(0o700)
+    server.env["PATH"] = str(root / "bin") + os.pathsep + server.env.get("PATH", "")
+    server.env["SHELL"] = "/bin/bash"
     proc = subprocess.Popen(
         [HERDR, "server"],
         env=server.env,
@@ -138,6 +144,133 @@ def test_probe_finds_the_running_server_and_its_binary(private: Private) -> None
     status = herdr_runtime.probe(private.socket)
     assert status.state == "ready"
     assert os.path.realpath(status.binary) == os.path.realpath(HERDR)
+
+
+def test_request_pins_the_private_server_instance(private: Private) -> None:
+    instance = herdr_runtime.server_instance(private.socket)
+    assert instance
+    assert herdr_runtime.request("ping", path=private.socket, instance=instance)["type"] == "pong"
+    with pytest.raises(herdr_runtime.HerdrError) as exc:
+        herdr_runtime.request("ping", path=private.socket, instance="999999:1")
+    assert exc.value.code == "server_changed"
+
+
+def test_workspace_ids_are_not_reused_during_one_server_lifetime(private: Private) -> None:
+    first, _ = private.new_workspace()
+    second, _ = private.new_workspace()
+    herdr_runtime.request("workspace.close", {"workspace_id": second}, path=private.socket)
+    third, _ = private.new_workspace()
+    herdr_runtime.request("workspace.close", {"workspace_id": first}, path=private.socket)
+    fourth, _ = private.new_workspace()
+    assert len({first, second, third, fourth}) == 4
+    for workspace in (third, fourth):
+        herdr_runtime.request("workspace.close", {"workspace_id": workspace}, path=private.socket)
+
+
+def test_workspace_and_tab_roots_start_in_the_requested_cwd(private: Private) -> None:
+    city = private.root / "city"
+    city.mkdir(exist_ok=True)
+    workspace = herdr_runtime.request("workspace.create", {
+        "cwd": str(city), "label": "Contract", "focus": False,
+    }, path=private.socket)
+    workspace_id = workspace["workspace"]["workspace_id"]
+    assert workspace["root_pane"]["cwd"] == str(city)
+    tab = herdr_runtime.request("tab.create", {
+        "workspace_id": workspace_id, "cwd": str(city), "label": "Other", "focus": False,
+    }, path=private.socket)
+    assert tab["root_pane"]["cwd"] == str(city)
+    assert tab["root_pane"]["pane_id"] != workspace["root_pane"]["pane_id"]
+    herdr_runtime.request("workspace.close", {"workspace_id": workspace_id}, path=private.socket)
+
+
+def test_fake_cli_waits_until_herdr_reports_interactive_ready(private: Private) -> None:
+    workspace, pane = private.new_workspace()
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        info = herdr_runtime.request("pane.process_info", {"pane_id": pane}, path=private.socket)["process_info"]
+        if any(process["pid"] == info["shell_pid"] for process in info["foreground_processes"]):
+            break
+        time.sleep(0.05)
+    else:
+        pytest.fail("private shell never became foreground")
+    start = time.monotonic()
+    result = subprocess.run(
+        [HERDR, "agent", "start", "claude-contract", "--kind", "claude", "--pane", pane, "--timeout", "6000"],
+        env=private.env, cwd=private.root, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=11,
+    )
+    assert time.monotonic() - start >= 1
+    assert result.returncode == 0, result.stderr
+    response = json.loads(result.stdout)["result"]
+    assert response["type"] == "agent_started"
+    assert response["agent"]["agent"] == "claude"
+    assert response["agent"]["agent_status"] == "idle"
+    assert response["agent"].get("launch_pending") is not True
+    herdr_runtime.request("workspace.close", {"workspace_id": workspace}, path=private.socket)
+
+
+def test_launch_fake_claude_waits_for_idle_in_a_private_workspace(private: Private) -> None:
+    assert (private.root / "bin" / "claude").is_file()
+    result = herdr_runtime.launch("claude", city_id="contract", cwd=str(private.root),
+                                  label="Contract", path=private.socket, book={}, timeout_ms=6000)
+    assert result.state == "ready"
+    agent = next(row for row in herdr_runtime.list_agents(path=private.socket) if row.pane_id == result.pane_id)
+    assert agent.agent == "claude" and agent.status == "idle" and not agent.launch_pending
+    read = herdr_runtime.request("pane.read", {"pane_id": result.pane_id, "source": "visible", "format": "text"},
+                                 path=private.socket)["read"]
+    assert "fake claude started" in read["text"]
+    herdr_runtime.request("workspace.close", {"workspace_id": result.workspace_id}, path=private.socket)
+
+
+def test_restart_reuses_workspace_id_but_launch_does_not_adopt_it() -> None:
+    root = Path(tempfile.mkdtemp(prefix="rhi"))
+    private = Private(root)
+    (root / "config" / "herdr").mkdir(parents=True)
+    (root / "config" / "herdr" / "config.toml").write_text("onboarding = false\n")
+    (root / "bin").mkdir()
+    fake = root / "bin" / "claude"
+    fake.write_text("#!/bin/sh\nprintf 'fake claude started\\n'\nsleep 20\n")
+    fake.chmod(0o700)
+    private.env["PATH"] = str(root / "bin") + os.pathsep + private.env.get("PATH", "")
+    private.env["SHELL"] = "/bin/bash"
+    process: subprocess.Popen | None = None
+
+    def start() -> subprocess.Popen:
+        proc = subprocess.Popen([HERDR, "server"], env=private.env, cwd=root, stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        for _ in range(100):
+            try:
+                herdr_runtime.request("ping", path=private.socket)
+                return proc
+            except herdr_runtime.HerdrError:
+                time.sleep(0.05)
+        proc.kill()
+        pytest.fail("private herdr did not start")
+
+    def stop(proc: subprocess.Popen) -> None:
+        subprocess.run([HERDR, "server", "stop"], env=private.env, cwd=root, timeout=10, check=True)
+        proc.wait(timeout=10)
+
+    try:
+        process = start()
+        old, _ = private.new_workspace()
+        identity = herdr_runtime.server_instance(private.socket)
+        assert identity
+        book = {"city": {"server": identity, "workspaceId": old}}
+        herdr_runtime.request("workspace.close", {"workspace_id": old}, path=private.socket)
+        stop(process)
+        process = start()
+        unrelated, _ = private.new_workspace()
+        assert unrelated == old
+        assert herdr_runtime.server_instance(private.socket) != identity
+        result = herdr_runtime.launch("claude", city_id="city", cwd=str(root), label="City",
+                                      path=private.socket, book=book, timeout_ms=6000)
+        assert result.state == "ready"
+        assert result.workspace_id != unrelated
+        assert book["city"]["workspaceId"] == result.workspace_id
+    finally:
+        if process is not None and process.poll() is None:
+            stop(process)
+        shutil.rmtree(root)
 
 
 def test_observe_paints_the_screen_and_send_text_reaches_the_pty(private: Private, pane: str) -> None:

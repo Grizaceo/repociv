@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import type { Page, WebSocketRoute } from '@playwright/test';
+import type { Locator, Page, WebSocketRoute } from '@playwright/test';
 import type { ExternalChatMessage, ExternalSessionRow } from '../src/externalAgents.ts';
 
 const agent = {
@@ -54,6 +54,7 @@ async function stage(
   await expect(page.locator('#agent-attention-strip')).toBeVisible({ timeout: 60_000 });
   await page.keyboard.press('F8');
   await page.locator('.agents-card[data-session="agent-fixture"]').click();
+  if (!options.noPane) await expect(page.locator('#agent-window .agent-window-send')).toBeEnabled();
   return {
     wire, messages, socket: () => socket!,
     addUser(text: string) {
@@ -98,6 +99,85 @@ test('fresh agent chat keeps its composer and last message inside the side panel
     composer: inside(composerRect, panelRect),
     message: inside(messageRect, panelRect) && inside(messageRect, logRect),
   }).toEqual({ height: true, composer: true, message: true });
+});
+
+test('agent window uses RepoCiv typography and buttons without overflowing', async ({ page }) => {
+  const fixture = await stage(page);
+  await expect.poll(() => fixture.wire.some((m) => m.type === 'attach')).toBe(true);
+  const panel = page.locator('#side-panel');
+  const window = panel.locator('#agent-window');
+  const header = window.locator('.agent-window-header');
+  const selectors = ['.agent-window-locate', '.agent-window-cli', '.agent-window-send'];
+  const screenshots = process.env.AGENT_WINDOW_SHOTS;
+  if (screenshots) {
+    await expect(page.locator('#imperial-welcome')).toBeHidden();
+    await panel.screenshot({ path: `${screenshots}-normal.png`, animations: 'disabled' });
+  }
+  const checkGeometry = async (buttons: Locator[]) => {
+    const panelRect = (await panel.boundingBox())!;
+    for (const button of buttons) {
+      await expect(button).toBeVisible();
+      const box = (await button.boundingBox())!;
+      expect.soft(box.x >= panelRect.x && box.y >= panelRect.y &&
+        box.x + box.width <= panelRect.x + panelRect.width &&
+        box.y + box.height <= panelRect.y + panelRect.height).toBe(true);
+    }
+    expect.soft(await header.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  };
+  await checkGeometry([window.locator(selectors[0]), window.locator(selectors[1])]);
+
+  const normal = await window.evaluate((root, buttonSelectors) => {
+    const reference = document.createElement('button');
+    reference.className = 'agents-compose-send';
+    const native = document.createElement('button');
+    native.style.all = 'revert';
+    const font = document.createElement('span');
+    font.style.fontFamily = 'var(--font-ui)';
+    root.append(reference, native, font);
+    const style = (element: Element) => {
+      const css = getComputedStyle(element);
+      return { font: css.fontFamily, background: css.backgroundColor, border: css.borderTopColor, color: css.color };
+    };
+    const result = {
+      font: style(font).font,
+      native: style(native),
+      reference: style(reference),
+      elements: Object.fromEntries(
+        ['.agent-window-status', '.agent-window-place', ...buttonSelectors]
+          .map((selector) => [selector, style(root.querySelector(selector)!)]),
+      ),
+    };
+    reference.remove();
+    native.remove();
+    font.remove();
+    return result;
+  }, selectors);
+
+  fixture.socket().send(JSON.stringify({ type: 'status', status: 'blocked' }));
+  const noticeButton = window.locator('.agent-window-notice button');
+  await expect(noticeButton).toBeVisible();
+  if (screenshots) await panel.screenshot({ path: `${screenshots}-blocked.png`, animations: 'disabled' });
+  const blockedStyle = await noticeButton.evaluate((element) => {
+    const css = getComputedStyle(element);
+    return { font: css.fontFamily, background: css.backgroundColor, border: css.borderTopColor, color: css.color };
+  });
+
+  for (const [selector, style] of Object.entries(normal.elements)) {
+    expect.soft(style.font, `${selector} font`).toBe(normal.font);
+    expect.soft(style.font, `${selector} is not browser font`).not.toBe(normal.native.font);
+  }
+  expect.soft(blockedStyle.font, 'blocked CLI font').toBe(normal.font);
+  expect.soft(blockedStyle.font, 'blocked CLI is not browser font').not.toBe(normal.native.font);
+  for (const [selector, style] of [
+    ...selectors.map((selector) => [selector, normal.elements[selector]] as const),
+    ['blocked CLI', blockedStyle] as const,
+  ]) {
+    for (const property of ['background', 'border', 'color'] as const) {
+      expect.soft(style[property], `${selector} ${property} matches RepoCiv button`).toBe(normal.reference[property]);
+      expect.soft(style[property], `${selector} ${property} is not native`).not.toBe(normal.native[property]);
+    }
+  }
+  await checkGeometry([window.locator(selectors[0]), window.locator(selectors[1]), noticeButton]);
 });
 
 for (const variant of [

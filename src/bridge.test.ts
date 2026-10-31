@@ -399,6 +399,23 @@ describe('BridgeEvents handleBridgeEvent', () => {
     bridge.stop();
   });
 
+  it('never auto-approves a herdr launch when chat auto-approval is enabled', async () => {
+    const appendApprovalCard = vi.mocked(uiMod.appendApprovalCard);
+    appendApprovalCard.mockClear();
+    const state = makeState();
+    const bridge = new BridgeEvents(state);
+    bridge.start();
+    await vi.advanceTimersByTimeAsync(100);
+    const src = FakeEventSource.instances[0]!;
+    src.open();
+    src.message({
+      type: 'waiting_approval', commandId: 'herdr-1', commandType: 'herdr_launch',
+      target: 'repociv', risk: 'low',
+    });
+    expect(appendApprovalCard).toHaveBeenCalledWith('repociv', 'herdr-1', 'herdr_launch', 'repociv', 'low');
+    bridge.stop();
+  });
+
   it('discards and logs invalid bridge events', async () => {
     const logEvent = vi.mocked(uiMod.logEvent);
     logEvent.mockClear();

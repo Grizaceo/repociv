@@ -1,14 +1,37 @@
-import { BRIDGE_URL } from '../bridgeEnv.ts';
+import { BRIDGE_URL, bridgeHeaders, bridgeUrl } from '../bridgeEnv.ts';
 import { fetchExternalChat, sessionLabel } from '../externalAgents.ts';
 import type { ExternalChatMessage, ExternalSessionRow } from '../externalAgents.ts';
 import { TerminalLink } from '../terminalLink.ts';
-import type { SubmitResult } from '../terminalLink.ts';
+import type { SubmitResult, TerminalAgent } from '../terminalLink.ts';
 import { reasonText, terminalPanel } from '../terminalPanel.ts';
 import { countUserText, normalizeMessage, statusLabel } from './agentWindowState.ts';
 import { attachCopyListeners } from './chat/clipboard.ts';
 import { renderMarkdown } from './chat/markdown.ts';
 import { getSidePanelCleanup, setSidePanelCleanup } from './chat/state.ts';
 import { trapFocus } from './focusTrap.ts';
+import { externalSessionSnapshot, subscribeExternalSessionDirectory } from './externalSessionDirectory.ts';
+
+export interface AgentWindowDestination {
+  terminalId: string | null;
+  paneId: string;
+  kind: string;
+  label: string;
+  place: string;
+  sessionId: string | null;
+  status: string;
+  launch?: { commandId: string; mission: string };
+  row?: ExternalSessionRow;
+}
+
+export function agentWindowDestination(value: ExternalSessionRow): AgentWindowDestination {
+  const pane = value.herdrPane;
+  if (!pane) throw new Error('Agent session has no herdr pane');
+  return {
+    terminalId: pane.terminalId, paneId: pane.paneId, kind: pane.agent,
+    label: sessionLabel(value), place: value.repo.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || 'capital',
+    sessionId: value.sessionId, status: pane.status, row: value,
+  };
+}
 
 interface Pending {
   id: string;
@@ -34,8 +57,16 @@ const UNCONFIRMED: Record<string, string> = {
 
 let deps: { locate(row: ExternalSessionRow): void } | null = null;
 let row: ExternalSessionRow | null = null;
+let destination: AgentWindowDestination | null = null;
 let link: TerminalLink | null = null;
 let timer = 0;
+let launchTimer = 0;
+let attachTimer = 0;
+let attachDeadline = 0;
+let stopDirectory: (() => void) | null = null;
+let launchState = '';
+let attachUnrecognized = false;
+let connected = false;
 let generation = 0;
 let status = '';
 let notice = '';
@@ -50,7 +81,7 @@ export function initAgentWindow(value: { locate(row: ExternalSessionRow): void }
 }
 
 export function isAgentWindowOpen(): boolean {
-  return row !== null;
+  return destination !== null;
 }
 
 function element<T extends HTMLElement>(selector: string): T | null {
@@ -58,7 +89,12 @@ function element<T extends HTMLElement>(selector: string): T | null {
 }
 
 function cli(): void {
-  if (row?.herdrPane) void terminalPanel.open(row.herdrPane);
+  if (!destination?.terminalId || !destination.paneId) return;
+  const agent: TerminalAgent = row?.herdrPane ?? {
+    paneId: destination.paneId, terminalId: destination.terminalId, agent: destination.kind,
+    status, name: destination.label, folder: destination.place,
+  };
+  void terminalPanel.open(agent);
 }
 
 function setStatus(value: string): void {
@@ -80,19 +116,26 @@ function renderNotice(): void {
   const box = element<HTMLElement>('.agent-window-notice');
   const send = element<HTMLButtonElement>('.agent-window-send');
   if (!box || !send) return;
-  send.disabled = status === 'blocked' || Boolean(BRIDGE_URL);
+  send.disabled = !canSend();
   box.replaceChildren();
   const text = status === 'blocked' ? BLOCKED_NOTICE : notice;
   box.classList.toggle('hidden', !text);
   if (!text) return;
   box.append(document.createTextNode(text));
-  if (status === 'blocked') {
+  if (destination?.terminalId && (status === 'blocked' || attachUnrecognized ||
+    (Boolean(destination.launch) && (launchState === 'unknown' || launchState === 'failed')))) {
     const button = document.createElement('button');
     button.type = 'button';
+    button.className = 'agents-compose-send';
     button.textContent = '⌨ Abrir CLI';
     button.addEventListener('click', cli);
     box.append(' ', button);
   }
+}
+
+function canSend(): boolean {
+  return Boolean(destination && connected && !BRIDGE_URL && status !== 'blocked' &&
+    (!destination.launch || ['ready', 'blocked', 'unknown'].includes(launchState)));
 }
 
 function bubble(text: string, role: 'user' | 'assistant', label: string, detail = ''): HTMLElement {
@@ -119,7 +162,7 @@ function bubble(text: string, role: 'user' | 'assistant', label: string, detail 
 
 function renderMessages(): void {
   const log = element<HTMLElement>('.agent-window-log');
-  if (!log || !row) return;
+  if (!log || !destination) return;
   const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 50;
   const fragment = document.createDocumentFragment();
   for (const message of messages) {
@@ -127,8 +170,13 @@ function renderMessages(): void {
     const time = message.at === null ? '' : new Date(message.at).toLocaleTimeString('es-CL', {
       hour: '2-digit', minute: '2-digit',
     });
-    const who = message.role === 'user' ? 'TÚ' : sessionLabel(row);
+    const who = message.role === 'user' ? 'TÚ' : row ? sessionLabel(row) : destination.label;
     fragment.append(bubble(message.text, message.role, [who, time].filter(Boolean).join(' · ')));
+  }
+  if (!destination.sessionId) {
+    const placeholder = document.createElement('p');
+    placeholder.textContent = 'La crónica aparece cuando el agente registre su sesión (tras el primer mensaje).';
+    fragment.append(placeholder);
   }
   for (const item of pending) {
     const detail = item.state === 'sending' ? 'Enviando…'
@@ -137,22 +185,23 @@ function renderMessages(): void {
     fragment.append(bubble(item.text, 'user', 'TÚ', detail));
   }
   log.replaceChildren(fragment);
-  attachCopyListeners(log, row.sessionId);
+  if (destination.sessionId) attachCopyListeners(log, destination.sessionId);
   if (nearBottom) log.scrollTop = log.scrollHeight;
 }
 
 function schedulePoll(): void {
   window.clearTimeout(timer);
-  if (!row) return;
+  if (!destination?.sessionId) return;
   timer = window.setTimeout(() => void poll(false), pending.length ? 5_000 : 15_000);
 }
 
 async function poll(refresh: boolean): Promise<void> {
-  const current = row;
+  const current = destination;
   const version = generation;
-  if (!current) return;
-  const chat = await fetchExternalChat(current.sessionId, { refresh });
-  if (version !== generation || !row) return;
+  if (!current?.sessionId) return;
+  const sessionId = current.sessionId;
+  const chat = await fetchExternalChat(sessionId, { refresh });
+  if (version !== generation || destination?.sessionId !== sessionId) return;
   if (chat) {
     messages = chat.messages;
     pending = pending.filter((item) => countUserText(messages, item.text) < item.target);
@@ -196,7 +245,7 @@ function resultReceived(result: SubmitResult): void {
 
 function send(): void {
   const input = element<HTMLTextAreaElement>('.agent-window-input');
-  if (!row || !input || status === 'blocked' || BRIDGE_URL) return;
+  if (!input || !canSend()) return;
   const text = input.value;
   if (!text.trim()) return;
   const normalized = normalizeMessage(text);
@@ -207,6 +256,7 @@ function send(): void {
   pending.push(item);
   renderMessages();
   if (!link?.submit(item.id, text)) {
+    connected = false;
     pending = pending.filter((candidate) => candidate !== item);
     notice = 'Sin conexión con el agente: no se envió.';
     renderMessages();
@@ -229,14 +279,14 @@ function mount(): HTMLElement | null {
   windowEl.innerHTML = `
     <div class="agent-window-header">
       <span class="agent-window-status"></span><span class="agent-window-place"></span>
-      <button type="button" class="agent-window-locate" aria-label="Ir al agente en el mapa">📍</button>
-      <button type="button" class="agent-window-cli">⌨ Abrir CLI</button>
+      <button type="button" class="agent-window-locate agents-compose-send" aria-label="Ir al agente en el mapa">📍</button>
+      <button type="button" class="agent-window-cli agents-compose-send">⌨ Abrir CLI</button>
     </div>
     <div class="agent-window-log"></div>
     <div class="agent-window-notice hidden" role="status"></div>
     <div class="agent-window-input-row">
       <textarea class="agent-window-input" rows="1" maxlength="100000" placeholder="Hablar con el agente..." aria-label="Mensaje al agente"></textarea>
-      <button type="button" class="agent-window-send">Enviar</button>
+      <button type="button" class="agent-window-send agents-compose-send">Enviar</button>
     </div>`;
   pane.append(windowEl);
   windowEl.querySelector('.agent-window-locate')?.addEventListener('click', () => {
@@ -253,18 +303,165 @@ function mount(): HTMLElement | null {
   return windowEl;
 }
 
-export function openAgentWindow(value: ExternalSessionRow): void {
-  if (!value.herdrPane) return;
+function linkSession(rows: ExternalSessionRow[] | null): void {
+  if (!destination?.launch || !destination.terminalId || !rows) return;
+  const best = rows
+    .filter((item) => item.herdrPane?.terminalId === destination?.terminalId)
+    .sort((a, b) => b.lastActivityAt - a.lastActivityAt)[0];
+  if (!best || (row && best.sessionId !== row.sessionId && best.lastActivityAt <= row.lastActivityAt)) return;
+  if (best.sessionId === destination.sessionId) {
+    row = best;
+    return;
+  }
+  row = best;
+  destination.sessionId = best.sessionId;
+  messages = [];
+  renderMessages();
+  void poll(best.source !== 'hermes' && (best.active || !best.imported));
+}
+
+function connectTerminal(): void {
+  const value = destination;
+  if (!value?.terminalId || BRIDGE_URL) return;
+  link?.stop();
+  connected = false;
+  renderNotice();
+  const version = generation;
+  if (!attachDeadline) attachDeadline = Date.now() + 30_000;
+  const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+  link = new TerminalLink(`${scheme}://${location.host}/repociv-ws/terminal`, value.terminalId, {
+    onAttached: (attachment) => {
+      if (version !== generation) return;
+      connected = true;
+      attachUnrecognized = false;
+      if (notice === 'Sin conexión con el agente.' ||
+        notice === 'herdr aún no reconoce al agente en ese panel. Ábrelo en el CLI.') {
+        notice = launchState === 'unknown'
+          ? 'No se pudo confirmar que el agente arrancó. Revisa su CLI antes de lanzar otro.' : '';
+      }
+      setStatus(attachment.agent.status);
+    },
+    onStatus: (next) => { if (version === generation) setStatus(next); },
+    onSize: () => {},
+    onScreen: () => {},
+    onError: (reason) => { if (version === generation) { notice = reasonText(reason); renderNotice(); } },
+    onClosed: (reason) => {
+      if (version === generation) { connected = false; notice = reasonText(reason); renderNotice(); }
+    },
+    onRefused: (reason) => {
+      if (version !== generation) return;
+      connected = false;
+      if (value.launch && reason === 'not_an_agent_pane') {
+        attachUnrecognized = true;
+        notice = 'herdr aún no reconoce al agente en ese panel. Ábrelo en el CLI.';
+        renderNotice();
+        if (Date.now() < attachDeadline) attachTimer = window.setTimeout(connectTerminal, 2000);
+      } else {
+        notice = reasonText(reason);
+        renderNotice();
+      }
+    },
+    onDropped: () => {
+      if (version !== generation) return;
+      connected = false;
+      for (const item of pending) {
+        if (item.state === 'sending') { item.state = 'unconfirmed'; item.reason = 'confirm_unavailable'; }
+      }
+      notice = 'Sin conexión con el agente.';
+      renderNotice();
+      renderMessages();
+      schedulePoll();
+    },
+    onSubmitResult: (result) => { if (version === generation) resultReceived(result); },
+  }, undefined, { screen: false });
+  link.start();
+}
+
+interface LaunchSnapshot {
+  state: string;
+  reason?: string | null;
+  terminalId?: string;
+  paneId?: string;
+  missionDelivery?: { state: string; reason: string | null } | null;
+}
+
+async function pollLaunch(): Promise<void> {
+  const value = destination;
+  const version = generation;
+  if (!value?.launch) return;
+  let entry: LaunchSnapshot | null = null;
+  try {
+    const response = await fetch(bridgeUrl(`/api/herdr/launches/${encodeURIComponent(value.launch.commandId)}`),
+      { headers: bridgeHeaders() });
+    if (response.ok) entry = await response.json() as LaunchSnapshot;
+  } catch {
+    // A lost bridge is not proof that the launch stopped.
+  }
+  if (version !== generation || destination !== value) return;
+  if (!entry || entry.state === 'starting') {
+    if (entry?.state === 'starting') {
+      launchState = 'starting';
+      notice = `Abriendo ${value.label} en herdr…`;
+      if (entry.terminalId) value.terminalId = entry.terminalId;
+      if (entry.paneId) value.paneId = entry.paneId;
+      renderNotice();
+    }
+    launchTimer = window.setTimeout(() => void pollLaunch(), 1000);
+    return;
+  }
+  if (!['ready', 'blocked', 'unknown', 'failed'].includes(entry.state)) {
+    launchTimer = window.setTimeout(() => void pollLaunch(), 1000);
+    return;
+  }
+  launchState = entry.state;
+  value.terminalId = entry.terminalId || value.terminalId;
+  value.paneId = entry.paneId || value.paneId;
+  const cliButton = element<HTMLButtonElement>('.agent-window-cli');
+  if (cliButton) cliButton.hidden = !value.terminalId;
+  if (value.launch.mission && entry.missionDelivery) {
+    const delivery = entry.missionDelivery;
+    if (delivery.state === 'confirmed' || delivery.state === 'unconfirmed') {
+      pending.push({
+        id: `launch-${value.launch.commandId}`, text: value.launch.mission,
+        target: countUserText(messages, value.launch.mission) + 1,
+        state: delivery.state, reason: delivery.reason,
+      });
+    } else {
+      restoreDraft(value.launch.mission);
+    }
+  }
+  if (entry.state === 'blocked') {
+    notice = '';
+    setStatus('blocked');
+  } else if (entry.state === 'unknown') {
+    notice = 'No se pudo confirmar que el agente arrancó. Revisa su CLI antes de lanzar otro.';
+    setStatus('unknown');
+  } else if (entry.state === 'failed') {
+    notice = reasonText(entry.reason || 'launch_failed');
+    setStatus('unknown');
+  } else {
+    notice = '';
+    setStatus('idle');
+  }
+  renderMessages();
+  linkSession(externalSessionSnapshot());
+  if (entry.state !== 'failed') connectTerminal();
+}
+
+export function openAgentWindow(value: AgentWindowDestination): void {
   closeAgentWindow();
   const panel = document.getElementById('side-panel');
   const windowEl = mount();
   if (!panel || !windowEl) return;
-  row = value;
+  destination = { ...value };
+  row = value.row ?? null;
   generation += 1;
-  const version = generation;
   messages = [];
   pending = [];
-  notice = BRIDGE_URL ? 'La terminal solo funciona a través del proxy de la interfaz.' : '';
+  launchState = value.launch ? (value.status === 'waiting_approval' ? 'waiting_approval' : 'starting') : '';
+  notice = BRIDGE_URL ? 'La terminal solo funciona a través del proxy de la interfaz.'
+    : launchState === 'waiting_approval' ? 'Esperando aprobación en la cola de RepoCiv.'
+      : value.launch ? `Abriendo ${value.label} en herdr…` : '';
   hidden = HIDDEN_IDS.flatMap((id) => {
     const target = document.getElementById(id);
     if (!target) return [];
@@ -282,54 +479,45 @@ export function openAgentWindow(value: ExternalSessionRow): void {
   );
   const name = document.getElementById('side-hero-name');
   if (name) {
-    name.textContent = sessionLabel(value);
+    name.textContent = value.launch ? `${value.label} · ${value.place}` : value.label;
     originalNameClick = name.onclick;
     name.onclick = () => { if (row) deps?.locate(row); };
   }
   const place = element<HTMLElement>('.agent-window-place');
-  if (place) place.textContent = value.repo.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || 'capital';
+  if (place) place.textContent = value.place;
+  const cliButton = element<HTMLButtonElement>('.agent-window-cli');
+  if (cliButton) cliButton.hidden = !value.terminalId;
+  const locateButton = element<HTMLButtonElement>('.agent-window-locate');
+  if (locateButton) locateButton.hidden = !row;
   const input = element<HTMLTextAreaElement>('.agent-window-input');
   if (input) input.value = '';
-  setStatus(value.herdrPane.status);
+  setStatus(value.status);
   renderMessages();
   getSidePanelCleanup()?.();
   setSidePanelCleanup(trapFocus(panel));
-  if (!BRIDGE_URL) {
-    const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-    link = new TerminalLink(`${scheme}://${location.host}/repociv-ws/terminal`, value.herdrPane.terminalId, {
-      onAttached: (attachment) => {
-        if (version !== generation) return;
-        if (notice === 'Sin conexión con el agente.') notice = '';
-        setStatus(attachment.agent.status);
-      },
-      onStatus: (next) => { if (version === generation) setStatus(next); },
-      onSize: () => {},
-      onScreen: () => {},
-      onError: (reason) => { if (version === generation) { notice = reasonText(reason); renderNotice(); } },
-      onClosed: (reason) => { if (version === generation) { notice = reasonText(reason); renderNotice(); } },
-      onRefused: (reason) => { if (version === generation) { notice = reasonText(reason); renderNotice(); } },
-      onDropped: () => {
-        if (version !== generation) return;
-        for (const item of pending) {
-          if (item.state === 'sending') { item.state = 'unconfirmed'; item.reason = 'confirm_unavailable'; }
-        }
-        notice = 'Sin conexión con el agente.';
-        renderNotice();
-        renderMessages();
-        schedulePoll();
-      },
-      onSubmitResult: (result) => { if (version === generation) resultReceived(result); },
-    }, undefined, { screen: false });
-    link.start();
+  if (value.launch) {
+    stopDirectory = subscribeExternalSessionDirectory(linkSession);
+    void pollLaunch();
+  } else {
+    connectTerminal();
+    void poll(Boolean(row && row.source !== 'hermes' && (row.active || !row.imported)));
   }
-  void poll(value.source !== 'hermes' && (value.active || !value.imported));
 }
 
 export function closeAgentWindow(): void {
-  if (!row) return;
+  if (!destination) return;
   generation += 1;
   row = null;
+  destination = null;
   window.clearTimeout(timer);
+  window.clearTimeout(launchTimer);
+  window.clearTimeout(attachTimer);
+  stopDirectory?.();
+  stopDirectory = null;
+  attachDeadline = 0;
+  attachUnrecognized = false;
+  launchState = '';
+  connected = false;
   timer = 0;
   link?.stop();
   link = null;

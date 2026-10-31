@@ -479,7 +479,10 @@ def _has_codex() -> bool:
 def _handle_command(cmd: Command) -> dict[str, Any]:
     """Apply policy, attach context pack, dispatch or queue command."""
     cmd, block_reason = _policy.apply_policy(cmd)
-    _es.record_created(cmd.id, cmd.created_by, asdict(cmd))
+    snapshot = asdict(cmd)
+    if cmd.type == "herdr_launch":
+        snapshot["payload"].pop("repoPath", None)
+    _es.record_created(cmd.id, cmd.created_by, snapshot)
 
     if cmd.status == "rejected":
         reason = block_reason or "blocked by policy"
@@ -703,6 +706,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return
 
         # ── Prefix-match GET routes ────────────────────────────────────────────
+        if path.startswith("/api/herdr/launches/"):
+            ctx["command_id"] = path[len("/api/herdr/launches/"):]
+            status, body = _routes.get_herdr_launch(ctx)
+            self._respond(status, body)
+            return
+
         if path.startswith("/harnesses/"):
             ctx["harness_id"] = path.split("/", 2)[2]
             status, body = _routes.get_harness_by_id(ctx)
