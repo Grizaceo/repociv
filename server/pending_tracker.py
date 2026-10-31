@@ -1,14 +1,34 @@
+import functools
 import logging
 import os
 from pathlib import Path
 from typing import Any
 import re
+import threading
 import time
+
+from .atomic_io import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
 HERMES_ROOT = Path(os.path.expanduser(os.environ.get("HERMES_ROOT", "~/.hermes")))
 PENDING_TRACKER = HERMES_ROOT / "workspace" / "PENDING_TRACKER.md"
+
+# One lock for every PENDING_TRACKER read-modify-write. The bridge serves on a
+# ThreadingHTTPServer: without it two requests interleave read→mutate→write
+# and the second write silently drops the first one's item.
+_TRACKER_LOCK = threading.Lock()
+
+
+def _serialized(fn):
+    """Hold _TRACKER_LOCK for the whole read-modify-write, not just the write."""
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        with _TRACKER_LOCK:
+            return fn(*args, **kwargs)
+
+    return wrapper
 
 # ─── PENDING_TRACKER ──────────────────────────────────────────────────────────
 
@@ -144,6 +164,7 @@ def load_pending_tasks() -> list[dict[str, Any]]:
     return tasks
 
 
+@_serialized
 def append_pending_task(title: str, priority: str = "MEDIA") -> str | None:
     """Append a new item to PENDING_TRACKER.md under the given priority section.
 
@@ -220,9 +241,9 @@ def append_pending_task(title: str, priority: str = "MEDIA") -> str | None:
             if not result_str.endswith("\n"):
                 result_str += "\n"
             result_str += f"\n## Pending\n\n{new_block}"
-            PENDING_TRACKER.write_text(result_str, encoding="utf-8")
+            atomic_write_text(PENDING_TRACKER, result_str)
         else:
-            PENDING_TRACKER.write_text("".join(result), encoding="utf-8")
+            atomic_write_text(PENDING_TRACKER, "".join(result))
 
         return new_id
     except Exception as e:
@@ -230,6 +251,7 @@ def append_pending_task(title: str, priority: str = "MEDIA") -> str | None:
         return None
 
 
+@_serialized
 def resolve_pending_task(item_id: str) -> bool:
     """Move an item from its active section to the HECHO section.
 
@@ -310,13 +332,14 @@ def resolve_pending_task(item_id: str) -> bool:
                 insert_idx = hecho_start + 1
             new_content_lines = remaining[:insert_idx] + [table_row] + remaining[insert_idx:]
 
-        PENDING_TRACKER.write_text("\n".join(new_content_lines) + "\n", encoding="utf-8")
+        atomic_write_text(PENDING_TRACKER, "\n".join(new_content_lines) + "\n")
         return True
     except Exception as e:
         logger.error(f"[bridge] No pude resolver pendiente: {e}")
         return False
 
 
+@_serialized
 def edit_pending_task(item_id: str, title: str | None = None,
                       priority: str | None = None,
                       detail: str | None = None) -> bool:
@@ -441,13 +464,14 @@ def edit_pending_task(item_id: str, title: str | None = None,
         else:
             lines = lines[:item_start] + item_lines + lines[item_end:]
 
-        PENDING_TRACKER.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        atomic_write_text(PENDING_TRACKER, "\n".join(lines) + "\n")
         return True
     except Exception as e:
         logger.error(f"[bridge] No pude editar pendiente: {e}")
         return False
 
 
+@_serialized
 def delete_pending_task(item_id: str) -> bool:
     """Remove an item entirely from PENDING_TRACKER.md. Returns True if found."""
     try:
@@ -474,13 +498,14 @@ def delete_pending_task(item_id: str) -> bool:
             return False
 
         remaining = lines[:item_start] + lines[item_end:]
-        PENDING_TRACKER.write_text("\n".join(remaining) + "\n", encoding="utf-8")
+        atomic_write_text(PENDING_TRACKER, "\n".join(remaining) + "\n")
         return True
     except Exception as e:
         logger.error(f"[bridge] No pude eliminar pendiente: {e}")
         return False
 
 
+@_serialized
 def change_pending_state(item_id: str, new_state: str) -> bool:
     """Change the state emoji of an item (🔵 🟡 🟢 🔴). Returns True if found."""
     valid_states = {"🔵", "🟡", "🟢", "🔴"}
@@ -503,7 +528,7 @@ def change_pending_state(item_id: str, new_state: str) -> bool:
                     if _STATE_RE.match(lines[j]):
                         lines[j] = f"**Estado:** {new_state}"
                         break
-                PENDING_TRACKER.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                atomic_write_text(PENDING_TRACKER, "\n".join(lines) + "\n")
                 return True
         return False
     except Exception as e:
