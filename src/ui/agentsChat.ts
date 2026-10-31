@@ -393,6 +393,7 @@ export function createAgentsChat(deps: AgentsChatDeps) {
       _chat.refresh && _chat.refresh !== 'ok' && _chat.refresh !== 'throttled'
         ? `<span class="agents-refresh-note">↻ ${escapeHtml(_chat.refresh)}</span>`
         : '';
+    // eslint-disable-next-line no-unsanitized/property
     body.innerHTML = `
     <div class="agents-chat-head">
       <button type="button" class="agents-back" aria-label="Volver a la lista">←</button>
