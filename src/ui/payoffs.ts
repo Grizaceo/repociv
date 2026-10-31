@@ -121,6 +121,15 @@ function hornSound() {
   }
 }
 
+/**
+ * One-shot horn for a newly arrived approval. Reuses the protected
+ * hornSound() (autoplay-safe try/catch) — call it only on a real "new id"
+ * transition, never per render or poll tick.
+ */
+export function signalApproval() {
+  hornSound();
+}
+
 /** Complete mission celebration pipeline */
 export function celebrateMission(canvas: HTMLCanvasElement) {
   flashGlory(canvas, 0.35);

@@ -56,9 +56,18 @@ import { nextSessionUnitId, spawnAcceptedSession } from './ui/hudWiring/spawn.ts
 import { buildAgentSessionCommand, buildHerdrLaunchCommand } from './ui/agentSessionStart.ts';
 import { bindChatAgentLocator } from './ui/chat/panel.ts';
 import { agentLocation } from './ui/agentLocation.ts';
-import { subscribeExternalSessionDirectory } from './ui/externalSessionDirectory.ts';
+import {
+  externalSessionSnapshot,
+  subscribeExternalSessionDirectory,
+} from './ui/externalSessionDirectory.ts';
 import { bindAgentAttentionStrip } from './ui/agentAttentionStrip.ts';
-import { bindAgentsPanel, openExternalAgentChat, toggleAgentsPanel } from './ui/agentsPanel.ts';
+import {
+  bindAgentsPanel,
+  focusOwnChat,
+  openExternalAgentChat,
+  toggleAgentsPanel,
+} from './ui/agentsPanel.ts';
+import { bindApprovalPanel } from './ui/approvalPanel.ts';
 import { isExternalAgentUnit } from './externalAgents.ts';
 import { initHudMode } from './ui/hudMode.ts';
 import { initHudWindows, mountHudWindow } from './ui/hudWindow.ts';
@@ -949,6 +958,30 @@ async function bootstrap() {
   bindChatAgentLocator((unitId) => {
     const unit = state.getUnit(unitId);
     if (unit) locateAgent(agentLocation(unit, state.world.cities));
+  });
+  // "Ir al chat" on approval items: resolve the ref (unit id or session id)
+  // against the existing stores and reuse the session navigation flows.
+  bindApprovalPanel({
+    gotoChat: (ref) => {
+      if (!ref) return false;
+      const unit = state.getUnit(ref);
+      if (unit) {
+        locateAgent(agentLocation(unit, state.world.cities));
+        if (isExternalAgentUnit(unit.id)) openExternalAgentChat(unit.id);
+        else focusOwnChat(unit.id);
+        return true;
+      }
+      const row = externalSessionSnapshot()?.find(
+        (r) => r.sessionId === ref || r.unit === ref || r.agent === ref,
+      );
+      if (row) {
+        openExternalAgentChat(row.sessionId);
+        const extUnit = row.unit ? state.getUnit(row.unit) : undefined;
+        if (extUnit) locateAgent(agentLocation(extUnit, state.world.cities));
+        return true;
+      }
+      return false;
+    },
   });
   bindAgentsPanel({
     state,

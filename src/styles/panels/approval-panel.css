@@ -161,6 +161,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.ap-requester {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: var(--ui-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 1px;
+}
 .ap-payload {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -173,6 +182,22 @@
   display: flex;
   gap: 8px;
   margin-top: 6px;
+}
+.ap-goto {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border-radius: 3px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  cursor: pointer;
+  border: 1px solid var(--ui-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ui-text-dim);
+  transition: color 0.15s, border-color 0.15s;
+}
+.ap-goto:hover {
+  color: var(--ui-gold-bright, #ffd76a);
+  border-color: var(--ui-border);
 }
 .ap-approve,
 .ap-reject {

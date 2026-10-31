@@ -9,10 +9,12 @@ import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell
 import { renderEmptyState, clearEmptyState } from './emptyStates.ts';
 import { registerPoll, type PollUnregister } from './pollScheduler.ts';
 import { reconcileApprovalCards } from './approvalCards.ts';
+import { signalApproval } from './payoffs.ts';
+import { logEvent } from './hud.ts';
 
 const POLL_MS = 3_000;
 
-interface ApprovalItem {
+export interface ApprovalItem {
   id: string;
   type: string;
   target: string;
@@ -28,6 +30,55 @@ let _stopPoll: PollUnregister | null = null;
 let _visible = false;
 let _items: ApprovalItem[] = [];
 const _listeners = new Set<(items: readonly ApprovalItem[]) => void>();
+
+/** Ids already surfaced — the fanfare rings only on first sighting. */
+const _seenApprovalIds = new Set<string>();
+
+/** Returns the ids not seen before and marks every listed id as seen. */
+export function diffNewApprovalIds(ids: string[]): string[] {
+  const fresh = ids.filter((id) => !_seenApprovalIds.has(id));
+  for (const id of ids) _seenApprovalIds.add(id);
+  return fresh;
+}
+
+/** Ring the one-shot fanfare when the list carries previously unseen ids. */
+export function noteApprovalFanfare(items: readonly { id: string }[]): void {
+  if (diffNewApprovalIds(items.map((i) => i.id)).length > 0) signalApproval();
+}
+
+/** Tests only — forget seen ids so the diff starts clean. */
+export function resetApprovalTrackingForTests(): void {
+  _seenApprovalIds.clear();
+}
+
+/** Who asked for this approval: the unit/session in the payload, else created_by. */
+export function approvalRequesterLabel(item: ApprovalItem): string {
+  const unit = item.payload?.['unit'];
+  if (typeof unit === 'string' && unit) return unit;
+  return item.created_by || 'desconocido';
+}
+
+/** Reference the "Ir al chat" button navigates to: unit, session or requester. */
+export function approvalChatRef(item: ApprovalItem): string {
+  const p = item.payload ?? {};
+  for (const key of ['unit', 'sessionId', 'session', 'harnessId'] as const) {
+    const v = p[key];
+    if (typeof v === 'string' && v) return v;
+  }
+  return item.created_by || '';
+}
+
+export interface ApprovalPanelDeps {
+  /** Navigate to the chat/map position of `ref`. True when the agent was found. */
+  gotoChat: (ref: string) => boolean;
+}
+
+let _deps: ApprovalPanelDeps | null = null;
+
+/** Wire navigation so "Ir al chat" reuses the existing session/unit flows. */
+export function bindApprovalPanel(deps: ApprovalPanelDeps): void {
+  _deps = deps;
+}
 
 /** Share the existing approval poll; consumers must not add a second fetch loop. */
 export function subscribeApprovals(listener: (items: readonly ApprovalItem[]) => void): () => void {
@@ -77,6 +128,8 @@ async function _fetchApprovals() {
     const res = await fetch(bridgeUrl('/approvals'), { headers: bridgeHeaders() });
     if (!res.ok) return;
     _items = (await res.json()) as ApprovalItem[];
+    // One-shot fanfare per newly arrived approval id (not per render/poll).
+    noteApprovalFanfare(_items);
     reconcileApprovalCards(new Set(_items.map((item) => item.id)));
     for (const listener of _listeners) listener(_items);
     _updateBadge(_items.length);
@@ -137,6 +190,14 @@ function _render() {
       const payloadFull = payloadJson.length > 80 && payloadJson !== '{}';
       const isConfirming = _confirming.has(item.id);
       const needsConfirm = item.risk === 'destructive' || item.risk === 'high';
+      const requester = approvalRequesterLabel(item);
+      // Relevant payload context next to the requester: session/harness names.
+      const contextBits = (['sessionId', 'session', 'harness', 'harnessId', 'city'] as const)
+        .map((key) => {
+          const v = item.payload?.[key];
+          return typeof v === 'string' && v && v !== requester ? `${key}: ${v}` : null;
+        })
+        .filter((bit): bit is string => bit !== null);
 
       return `
       <div class="ap-item" data-id="${_esc(item.id)}">
@@ -146,8 +207,10 @@ function _render() {
           <span class="ap-age">${ageStr}</span>
         </div>
         <div class="ap-target" title="${_esc(item.target)}">${_esc(item.target.slice(0, 50))}</div>
+        <div class="ap-requester">por ${_esc(requester)}${contextBits.length ? ` · ${_esc(contextBits.join(' · '))}` : ''}</div>
         ${payloadPreview ? `<div class="ap-payload-expand" data-id="${_esc(item.id)}" title="Ver payload completo">${_esc(payloadPreview)}${payloadFull ? ' …' : ''}</div>` : ''}
         <div class="ap-actions">
+          <button class="ap-goto" data-id="${_esc(item.id)}" title="Ir al chat de ${_esc(requester)}">💬 Ir al chat</button>
           <button class="ap-approve${isConfirming ? ' confirming' : ''}" data-id="${_esc(item.id)}" data-needs-confirm="${needsConfirm}" aria-label="Aprobar comando ${_esc(item.id)}">${isConfirming ? '¿Confirmar?' : '✔ Aprobar'}</button>
           <button class="ap-reject"  data-id="${_esc(item.id)}" aria-label="Rechazar comando ${_esc(item.id)}">✗ Rechazar</button>
         </div>
@@ -165,6 +228,18 @@ function _render() {
       full.className = 'ap-payload-full';
       full.textContent = JSON.stringify(item.payload, null, 2);
       el.replaceWith(full);
+    });
+  });
+
+  list.querySelectorAll<HTMLButtonElement>('.ap-goto').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset['id']!;
+      const item = _items.find((i) => i.id === id);
+      if (!item) return;
+      const located = _deps?.gotoChat(approvalChatRef(item)) ?? false;
+      if (!located) {
+        logEvent('No se pudo localizar al agente de esta aprobación', 'warn');
+      }
     });
   });
 
