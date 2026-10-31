@@ -20,6 +20,12 @@ export interface TerminalAttachment {
   history: string;
 }
 
+export interface SubmitResult {
+  id: string;
+  state: 'confirmed' | 'unconfirmed' | 'refused' | 'failed';
+  reason: string | null;
+}
+
 export interface TerminalLinkHandlers {
   onAttached(attachment: TerminalAttachment): void;
   onSize(cols: number, rows: number): void;
@@ -33,6 +39,7 @@ export interface TerminalLinkHandlers {
   onRefused(reason: string): void;
   /** Connection lost; another attempt comes in `retryMs`. */
   onDropped(retryMs: number): void;
+  onSubmitResult?(result: SubmitResult): void;
 }
 
 /** Back-off between attempts; the last value repeats while the panel is open. */
@@ -52,6 +59,7 @@ export class TerminalLink {
     private readonly _terminalId: string,
     private readonly _on: TerminalLinkHandlers,
     private readonly _open: OpenSocket = (url) => new WebSocket(url),
+    private readonly _options: { screen?: boolean } = {},
   ) {}
 
   start(): void {
@@ -77,6 +85,16 @@ export class TerminalLink {
     return this._send('paste', data);
   }
 
+  submit(id: string, text: string): boolean {
+    if (!this._attached || this._ws?.readyState !== WebSocket.OPEN) return false;
+    try {
+      this._ws.send(JSON.stringify({ type: 'submit', id, text }));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private _send(type: 'input' | 'paste', data: string): boolean {
     if (!this._attached || this._ws?.readyState !== WebSocket.OPEN) return false;
     this._ws.send(JSON.stringify({ type, data }));
@@ -87,7 +105,11 @@ export class TerminalLink {
     const ws = this._open(this._url);
     ws.binaryType = 'arraybuffer';
     this._ws = ws;
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'attach', terminalId: this._terminalId }));
+    ws.onopen = () => ws.send(JSON.stringify({
+      type: 'attach',
+      terminalId: this._terminalId,
+      ...(this._options.screen === false ? { screen: false } : {}),
+    }));
     ws.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
       if (this._ws === ws) this._receive(event.data);
     };
@@ -118,6 +140,19 @@ export class TerminalLink {
         break;
       case 'status':
         this._on.onStatus(String(message['status']));
+        break;
+      case 'submit_result':
+        if (
+          typeof message['id'] === 'string' &&
+          ['confirmed', 'unconfirmed', 'refused', 'failed'].includes(String(message['state'])) &&
+          (typeof message['reason'] === 'string' || message['reason'] === null)
+        ) {
+          this._on.onSubmitResult?.({
+            id: message['id'],
+            state: message['state'] as SubmitResult['state'],
+            reason: message['reason'],
+          });
+        }
         break;
       case 'error':
         this._on.onError(String(message['reason']));

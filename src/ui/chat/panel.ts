@@ -12,8 +12,16 @@ import { initAgentSelector } from './agentSelector.ts';
 import { initProviderSelectors } from './modelSelector.ts';
 import { initProfileSelector } from './profileSelector.ts';
 import { switchToChatUnit } from './agentChip.ts';
+import { closeAgentWindow, openAgentWindow } from '../agentWindow.ts';
+import { externalSessionSnapshot } from '../externalSessionDirectory.ts';
 
 export async function openSidePanel(unit: Unit): Promise<void> {
+  closeAgentWindow();
+  const external = externalSessionSnapshot()?.find((row) => row.unit === unit.id && row.herdrPane);
+  if (external) {
+    openAgentWindow(external);
+    return;
+  }
   const panel = document.getElementById('side-panel');
   if (!panel) return;
   panel.classList.remove('hidden');
@@ -69,6 +77,7 @@ export async function openSidePanel(unit: Unit): Promise<void> {
 }
 
 export function closeSidePanel(): void {
+  closeAgentWindow();
   getSidePanelCleanup()?.();
   setSidePanelCleanup(null);
   document.getElementById('side-panel')?.classList.add('hidden');

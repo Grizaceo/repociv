@@ -217,9 +217,9 @@ test('an agent in a herdr pane opens its CLI from the agents panel', async ({ pa
   await boot(page);
   await page.keyboard.press('F8');
   await page.locator('.agents-card[data-session="herdr-fixture"]').click();
+  await expect(page.locator('#agent-window')).toBeVisible();
+  await page.locator('#agent-window').getByRole('button', { name: /Abrir CLI/ }).first().click();
   await expect(page.locator('.xterm-rows')).toContainText('pantalla viva');
-  await expect(page.locator('.agents-compose-text')).toHaveCount(0);
-  await expect(page.locator('.agents-open-cli')).toBeVisible();
 });
 
 /** A PTY the size of a maximized herdr window, with the prompt on its last row. */

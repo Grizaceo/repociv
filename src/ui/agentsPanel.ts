@@ -44,6 +44,7 @@ import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell
 import { clipboardWrite } from './chat/clipboard.ts';
 import { escapeHtml } from './escapeHtml.ts';
 import { terminalPanel } from '../terminalPanel.ts';
+import { initAgentWindow, openAgentWindow } from './agentWindow.ts';
 import type { RepoCivProfile } from '../agentProfile.ts';
 import { openAgentSessionWizard, type SessionStartResult } from './agentSessionWizard.ts';
 import { openProfileStudio } from './agentProfileStrip.ts';
@@ -93,6 +94,7 @@ const _openSections = new Set<string>();
 
 export function bindAgentsPanel(deps: AgentsPanelDeps): void {
   _deps = deps;
+  initAgentWindow({ locate: locateExternalAgent });
 }
 
 export function isAgentsPanelOpen(): boolean {
@@ -252,6 +254,15 @@ async function _loadChat(refresh: boolean): Promise<void> {
 }
 
 function _openChat(row: ExternalSessionRow): void {
+  if (row.herdrPane) {
+    _chatSession = null;
+    _chat = null;
+    _stopTimers();
+    _render();
+    locateExternalAgent(row);
+    openAgentWindow(row);
+    return;
+  }
   _chatSession = row.sessionId;
   _chat = { session: row, messages: [], hasMore: false, available: false };
   _resume = null;
@@ -259,8 +270,7 @@ function _openChat(row: ExternalSessionRow): void {
   _draft = '';
   _replyError = '';
   _sending = false;
-  _locate(row);
-  if (row.herdrPane) void terminalPanel.open(row.herdrPane);
+  locateExternalAgent(row);
   // Suvadu re-imports a transcript only on prompt/stop: pull it now for a live
   // session (once per session per panel lifetime; ↻ does it on demand).
   // Hermes reads its live database: nothing to import.
@@ -506,7 +516,7 @@ function _placeOf(row: ExternalSessionRow): MapPlace {
 }
 
 /** Camera to the agent's unit if it is on the map, else to its city. */
-function _locate(row: ExternalSessionRow): void {
+export function locateExternalAgent(row: ExternalSessionRow): void {
   if (!_deps) return;
   const unit = row.unit ? _deps.state.getUnit(row.unit) : undefined;
   const coord = _placeOf(row).city?.coord ?? unit?.coord;
@@ -712,8 +722,8 @@ function _renderChat(firstLoad = false): void {
     ${_composerHtml(row)}`;
   bindPanelAction(body, '.agents-back', _backToList);
   bindPanelAction(body, '.agents-resume-btn', () => void _loadResume());
-  bindPanelAction(body, '.agents-locate', () => _locate(row));
-  bindPanelAction(body, '.agents-chat-agent', () => _locate(row));
+  bindPanelAction(body, '.agents-locate', () => locateExternalAgent(row));
+  bindPanelAction(body, '.agents-chat-agent', () => locateExternalAgent(row));
   bindPanelAction(body, '.agents-refresh', () => void _loadChat(true));
   bindPanelAction(body, '.agents-compose-send', () => void _send());
   bindPanelAction(body, '.agents-open-cli', () => {
