@@ -3,6 +3,12 @@
    The editorial layer over the map: flags, names and city membership.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+#nations-pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .nations-panel {
   display: flex;
   flex-direction: column;
