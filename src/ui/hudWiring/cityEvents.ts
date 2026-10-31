@@ -1,8 +1,17 @@
 import type { GameState } from '../../game.ts';
 import type { Renderer } from '../../renderer.ts';
 import type { City, Unit } from '../../types.ts';
+import {
+  addSelectedRepoPath,
+  autoCityCoord,
+  fetchScannedRepos,
+  type ScannedRepo,
+} from '../../map.ts';
+import { decodeRepoCityId, findCityByRef } from '../../externalAgents.ts';
 import { findCityByWonderSelection, findNearbyCities } from '../../wonders/cityLookup.ts';
 import { logEvent } from '../hud.ts';
+import { showNotification } from '../notificationBanner.ts';
+import { startPlacingRepo } from '../mapEditor.ts';
 import { showUnitPanel } from '../index.ts';
 
 interface CityEventsDeps {
@@ -139,5 +148,59 @@ export function wireCityEvents({
     renderer.onCitySelect?.(city.id);
     _primeMissionComposerForCity(city);
     logEvent(`🧪 Mission composer preparado para ${city.name}`, 'info');
+  });
+
+  // Add the repo an off-map agent works on to the map: persist the selection
+  // (the server resolves repo ids and registers the parent root), then either
+  // auto-place it near its nation (or the capital) or hand it to the editor.
+  async function addRepoToMap(repoId: string, mode: 'auto' | 'pick'): Promise<void> {
+    try {
+      await addSelectedRepoPath(repoId);
+    } catch (error) {
+      showNotification({
+        type: 'error',
+        title: 'No se pudo agregar el repo',
+        body: String(error),
+      });
+      return;
+    }
+    const repos = await fetchScannedRepos().catch(() => [] as ScannedRepo[]);
+    const repo = repos.find(
+      (r) =>
+        r.path === repoId ||
+        (r.repoPath !== undefined && r.repoPath === decodeRepoCityId(repoId)),
+    );
+    if (!repo) {
+      showNotification({
+        type: 'warn',
+        title: 'Repo no encontrado',
+        body: 'El repo quedó seleccionado, pero el escaneo aún no lo devuelve.',
+      });
+      return;
+    }
+    // Already a city on this map: nothing else to do.
+    if (findCityByRef(state.world.cities, repoId)) return;
+    if (mode === 'pick') {
+      startPlacingRepo(renderer, state, repo);
+      return;
+    }
+    const coord = autoCityCoord(state.world, repo);
+    if (!coord) {
+      showNotification({
+        type: 'warn',
+        title: 'Sin casilla libre',
+        body: 'No hay casilla libre cerca para fundar la ciudad.',
+      });
+      return;
+    }
+    renderer.foundRepoCity(repo, coord);
+  }
+
+  window.addEventListener('repociv:add-repo-to-map', (e: Event) => {
+    const detail = (e as CustomEvent).detail as
+      | { repoId?: string; mode?: 'auto' | 'pick' }
+      | undefined;
+    if (!detail?.repoId) return;
+    void addRepoToMap(detail.repoId, detail.mode === 'pick' ? 'pick' : 'auto');
   });
 }

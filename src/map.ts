@@ -10,6 +10,7 @@ import {
   spiralCoords,
   axialDistance,
   axialNeighbours,
+  axialRing,
   axialAdd,
   axialEquals,
   axialSub,
@@ -45,7 +46,7 @@ import {
   terrainOverrideFor,
   type PlacedCityEntry,
 } from './mapEdits.ts';
-import { applyNationsToWorld, cityKey } from './nations.ts';
+import { applyNationsToWorld, cityKey, getNationStore } from './nations.ts';
 
 // ─── Wonder placement ───────────────────────────────────────────────────────
 export interface WonderPlacement {
@@ -1299,6 +1300,8 @@ export function removeCityOp(world: World, city: City, opts: MapEditOpts): Remov
   return { city, index, units, placedEntry, wasRemovedKey };
 }
 
+const MIN_CITY_DISTANCE = 3;
+
 /** A repo can be founded on a free hex that is not the ocean. */
 function canFoundCity(world: World, repo: ScannedRepo, coord: Axial): boolean {
   const tile = world.tiles.get(tileKey(coord));
@@ -1310,6 +1313,38 @@ function canFoundCity(world: World, repo: ScannedRepo, coord: Axial): boolean {
   return !world.cities.some(
     (c) => c.id === key || c.repoPath === key || c.id === repo.path || c.repoPath === repo.path,
   );
+}
+
+/**
+ * Closest free hex for a repo added to the map without the editor: around its
+ * nation's cities when the repo is aligned to one, else around the capital.
+ */
+export function autoCityCoord(world: World, repo: ScannedRepo): Axial | null {
+  const cities = world.cities;
+  const assignments = getNationStore().assignments;
+  const nationId = assignments[repo.repoPath ?? repo.path];
+  let anchors = nationId
+    ? cities.filter((c) => assignments[cityKey(c)] === nationId)
+    : [];
+  if (anchors.length === 0) {
+    const capital = cities.find((c) => c.isCapital) ?? cities[0];
+    anchors = capital ? [capital] : [];
+  }
+  // Prefer MIN_CITY_DISTANCE like generated cities; dense worlds may leave no
+  // such hex, so fall back to any legal founding spot in the same ring order.
+  for (const minDist of [MIN_CITY_DISTANCE, 1]) {
+    for (let r = MIN_CITY_DISTANCE; r <= 12; r++) {
+      for (const anchor of anchors) {
+        for (const coord of axialRing(anchor.coord, r)) {
+          if (!canFoundCity(world, repo, coord)) continue;
+          if (cities.every((c) => axialDistance(coord, c.coord) >= minDist)) {
+            return coord;
+          }
+        }
+      }
+    }
+  }
+  return null;
 }
 
 export function foundCityOp(
@@ -1590,7 +1625,6 @@ export function applyMapEdits(world: World, diskRepos: ScannedRepo[] = []): void
 }
 
 export async function generateWorld(): Promise<World> {
-  const MIN_CITY_DISTANCE = 3;
   const tiles = new Map<string, Tile>();
   const cities: City[] = [];
   // Shared selection (state.json, served by /api/repo-selections) is the source

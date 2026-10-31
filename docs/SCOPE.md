@@ -105,6 +105,10 @@ Métricas concretas para considerar el alpha "exitoso":
     limpia el draft y refresca el transcript mediante el polling existente.
     La UI bloquea envíos duplicados mientras la solicitud está pendiente,
     conserva el error upstream y no reintenta automáticamente.
+  - Con la ventana de agente abierta, las pestañas Unidad/Manuscritos/Archivos
+    describen al agente y a la ciudad de su repo; si el repo no está en el
+    mapa se muestra la Capital y se ofrece agregarlo (automático cerca de su
+    nación o de la Capital, o eligiendo casilla en el editor de mapa).
   - **Canal proceso-owned de Claude Code (Fase 5): retirado** en la limpieza
     de 2026-10-31 (`/api/claude-live/*` quedó sin cliente una vez que herdr
     cubre lanzar y dirigir agentes reales; ver `docs/HERDR_LIVE_CLI.md`).

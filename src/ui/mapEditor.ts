@@ -20,6 +20,7 @@ import {
   onMapEditHistoryChange,
 } from '../mapEditHistory.ts';
 import { getNationStore } from '../nations.ts';
+import { showNotification } from './notificationBanner.ts';
 import type { MapEditorTool, Terrain } from '../types.ts';
 
 interface ToolDef {
@@ -301,6 +302,23 @@ export function openMapEditor(renderer?: Renderer, game?: GameState): void {
     });
 
   renderToolbar();
+}
+
+/**
+ * Open the editor straight into the "place" tool with `repo` preselected —
+ * the "elegir casilla" half of the off-map agent offer. The click on a free
+ * hex runs the normal placeRepoAt flow (with undo).
+ */
+export function startPlacingRepo(renderer: Renderer, game: GameState, repo: ScannedRepo): void {
+  openMapEditor(renderer, game);
+  _state.tool = 'place';
+  _state.renderer?.setMapEditorTool('place');
+  selectMapEditorRepo(repo);
+  showNotification({
+    type: 'info',
+    title: 'Colocar ciudad',
+    body: `Haz clic en una casilla para fundar ${repo.name}`,
+  });
 }
 
 /** Close the editor and give the map back to the player. */

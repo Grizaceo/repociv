@@ -760,3 +760,55 @@
 .file-row:hover {
   background: rgba(200, 168, 75, 0.1);
 }
+
+/* Agent session ficha (Unidad tab) + off-map offer (Manuscritos/Archivos) */
+#agent-unit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  overflow-y: auto;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--ui-text);
+}
+#agent-unit-card.hidden {
+  display: none;
+}
+.agent-card-title {
+  font-weight: 700;
+  color: var(--ui-gold-bright);
+}
+.agent-card-meta {
+  color: var(--ui-text-dim, #9a8f7a);
+}
+.agent-card-line {
+  display: flex;
+  gap: 8px;
+}
+.agent-card-key {
+  min-width: 90px;
+  color: var(--ui-text-dim, #9a8f7a);
+}
+.agent-card-actions,
+.agent-add-repo-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.agent-card-empty {
+  color: var(--ui-text-dim, #9a8f7a);
+}
+.agent-offmap-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-gold-bright);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+}
+.agent-offmap-text {
+  margin: 0;
+}

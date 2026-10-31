@@ -1,14 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { axialNeighbours, type Axial } from './hex.ts';
+import { axialDistance, axialNeighbours, type Axial } from './hex.ts';
 import {
+  autoCityCoord,
   canRelocateCityTo,
   generateWorld,
   moveCityInWorld,
   relocateCity,
   showMapLoadError,
+  type ScannedRepo,
 } from './map.ts';
 import { placeCity, removeCityFromMap, removeHex, resetMapEditsCache } from './mapEdits.ts';
-import { cityKey } from './nations.ts';
+import { cityKey, resetNationStoreCache } from './nations.ts';
 import type { City, District, Terrain, Tile, World } from './types.ts';
 import { tileKey } from './types.ts';
 
@@ -1009,5 +1011,154 @@ describe('generateWorld', () => {
     expect(
       world.cities.some((c) => c.territory.some((t) => t.q === target.q && t.r === target.r)),
     ).toBe(false);
+  });
+});
+
+describe('autoCityCoord', () => {
+  function stubStorage(): void {
+    const storage: Record<string, string> = {};
+    const localStorageMock = {
+      getItem: (key: string) => storage[key] ?? null,
+      setItem: (key: string, value: string) => {
+        storage[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete storage[key];
+      },
+    };
+    vi.stubGlobal('window', { localStorage: localStorageMock });
+    vi.stubGlobal('localStorage', localStorageMock);
+  }
+
+  function scannedRepo(name: string): ScannedRepo {
+    return {
+      name,
+      path: `repo:${name}`,
+      repoPath: `/workspace/${name}`,
+      population: 1,
+      extensions: {},
+      gold: 0,
+      lastCommitDays: 0,
+      isLegacy: false,
+      hasGit: true,
+    };
+  }
+
+  function mapCity(id: string, coord: Axial, isCapital = false): City {
+    return {
+      id,
+      name: id,
+      coord,
+      repoPath: `/workspace/${id}`,
+      population: 1,
+      territory: [coord],
+      districts: [],
+      buildings: [],
+      isCapital,
+    };
+  }
+
+  function discTiles(tiles: Map<string, Tile>, center: Axial, radius: number): void {
+    for (let q = center.q - radius; q <= center.q + radius; q++) {
+      for (let r = center.r - radius; r <= center.r + radius; r++) {
+        const coord = { q, r };
+        if (axialDistance(coord, center) <= radius) {
+          tiles.set(tileKey(coord), baseTile(coord, 'plains'));
+        }
+      }
+    }
+  }
+
+  function worldOf(tiles: Map<string, Tile>, cities: City[]): World {
+    const world: World = {
+      tiles,
+      cities,
+      units: [],
+      buildings: [],
+      resources: { gold: 0, science: 0, production: 0 },
+      generatedAt: 0,
+      restAreas: [],
+    };
+    for (const city of cities) {
+      tiles.set(tileKey(city.coord), baseTile(city.coord, 'plains', { city }));
+    }
+    return world;
+  }
+
+  beforeEach(() => {
+    stubStorage();
+    resetNationStoreCache();
+  });
+
+  afterEach(() => {
+    resetNationStoreCache();
+    vi.unstubAllGlobals();
+  });
+
+  it('without a nation picks the closest free ring around the capital', () => {
+    const capital = mapCity('capital', { q: 0, r: 0 }, true);
+    const tiles = new Map<string, Tile>();
+    discTiles(tiles, capital.coord, 5);
+    const world = worldOf(tiles, [capital]);
+
+    const coord = autoCityCoord(world, scannedRepo('offmap'));
+
+    expect(coord).not.toBeNull();
+    // The smallest ring: exactly MIN_CITY_DISTANCE from the capital and at
+    // least that far from every other city.
+    expect(axialDistance(coord!, capital.coord)).toBe(3);
+    for (const city of world.cities) {
+      expect(axialDistance(coord!, city.coord)).toBeGreaterThanOrEqual(3);
+    }
+    const tile = world.tiles.get(tileKey(coord!));
+    expect(tile).toBeDefined();
+    expect(tile!.terrain).not.toBe('ocean');
+    expect(tile!.city).toBeUndefined();
+  });
+
+  it('prefers the assigned nation cities over the capital', () => {
+    const capital = mapCity('capital', { q: 0, r: 0 }, true);
+    const far = mapCity('faraway', { q: 20, r: 0 });
+    const tiles = new Map<string, Tile>();
+    discTiles(tiles, capital.coord, 5);
+    discTiles(tiles, far.coord, 5);
+    const world = worldOf(tiles, [capital, far]);
+    const repo = scannedRepo('offmap');
+    window.localStorage.setItem(
+      'repociv:nations:v1',
+      JSON.stringify({
+        version: 1,
+        nations: [{ id: 'n1', name: 'Nación X', color: '#4a70b8', createdAt: 0 }],
+        assignments: {
+          [repo.repoPath!]: 'n1',
+          [cityKey(far)]: 'n1',
+        },
+      }),
+    );
+    resetNationStoreCache();
+
+    const coord = autoCityCoord(world, repo);
+
+    expect(coord).not.toBeNull();
+    expect(axialDistance(coord!, far.coord)).toBeLessThan(axialDistance(coord!, capital.coord));
+    for (const city of world.cities) {
+      expect(axialDistance(coord!, city.coord)).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('returns null when no free hex exists', () => {
+    const capital = mapCity('capital', { q: 0, r: 0 }, true);
+    const tiles = new Map<string, Tile>();
+    for (let q = -12; q <= 12; q++) {
+      for (let r = -12; r <= 12; r++) {
+        const coord = { q, r };
+        if (axialDistance(coord, capital.coord) <= 12) {
+          tiles.set(tileKey(coord), baseTile(coord, 'ocean'));
+        }
+      }
+    }
+    const world = worldOf(tiles, [capital]);
+
+    expect(autoCityCoord(world, scannedRepo('offmap'))).toBeNull();
   });
 });

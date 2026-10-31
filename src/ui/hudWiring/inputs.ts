@@ -30,6 +30,18 @@ import { buildExecuteAgentPayload } from './executeAgentPayload.ts';
 import { findUnitForChatId, resolveChatDispatchUnitId } from './resolveChatDispatchUnit.ts';
 import { switchToChatUnit } from '../chat/agentChip.ts';
 import { initNationsPanel, renderNationsPanel } from '../nationsPanel.ts';
+import {
+  agentWindowCli,
+  agentWindowRow,
+  isAgentWindowOpen,
+  locateAgentWindowRow,
+} from '../agentWindow.ts';
+import { renderAgentUnitCard, renderOffMapOffer } from '../agentContext.ts';
+import {
+  placeOnMap,
+  type ExternalSessionRow,
+  type MapPlace,
+} from '../../externalAgents.ts';
 
 export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeEvents): void {
   const missionInput = document.getElementById('mission-input') as HTMLInputElement;
@@ -334,7 +346,64 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
   document.getElementById('side-panel-close')?.addEventListener('click', () => closeSidePanel());
 
   // ─── Side panel tabs ─────────────────────────────────────────────────────
+  // With the agent window open, Unidad/Manuscritos/Archivos describe the agent
+  // and its repo's city; off-map repos get the add-to-map offer instead.
+  const syncAgentOffer = (
+    paneName: 'git' | 'files',
+    infoId: 'git-info' | 'files-info',
+    row: ExternalSessionRow | null,
+    place: MapPlace | null,
+  ): void => {
+    const pane = document.querySelector<HTMLElement>(`.tab-pane[data-pane="${paneName}"]`);
+    const info = document.getElementById(infoId);
+    if (!pane || !info) return;
+    let offer = pane.querySelector<HTMLElement>('.agent-offmap-offer');
+    if (!row || place?.kind !== 'off-map') {
+      offer?.remove();
+      return;
+    }
+    if (!offer) {
+      offer = document.createElement('div');
+      offer.className = 'agent-offmap-offer';
+      info.before(offer);
+    }
+    renderOffMapOffer(offer, row);
+  };
+
+  const renderAgentSideTab = (tab: string): void => {
+    const row = agentWindowRow();
+    const place = row ? placeOnMap(row, state.world.cities) : null;
+    const city =
+      place?.city ?? state.world.cities.find((c) => c.isCapital) ?? state.world.cities[0];
+    if (tab === 'unit') {
+      const card = document.getElementById('agent-unit-card');
+      if (card) {
+        renderAgentUnitCard(card, row, place, {
+          locate: locateAgentWindowRow,
+          cli: agentWindowCli(),
+        });
+      }
+      return;
+    }
+    if (tab === 'nations') {
+      renderNationsPanel(state.world, () => state.notifyUpdate());
+      return;
+    }
+    if (tab === 'git' && city) {
+      syncAgentOffer('git', 'git-info', row, place);
+      void loadGitInfo(city);
+    }
+    if (tab === 'files' && city) {
+      syncAgentOffer('files', 'files-info', row, place);
+      void loadFilesInfo(city);
+    }
+  };
+
   wireSideTabs((tab) => {
+    if (isAgentWindowOpen()) {
+      renderAgentSideTab(tab);
+      return;
+    }
     if (tab === 'nations') {
       renderNationsPanel(state.world, () => state.notifyUpdate());
       return;
@@ -346,6 +415,13 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     );
     if (tab === 'git' && cityHere) loadGitInfo(cityHere);
     if (tab === 'files' && cityHere) loadFilesInfo(cityHere);
+  });
+
+  // After an off-map repo is founded, the open tab re-renders without the offer.
+  window.addEventListener('repociv:city-founded', () => {
+    if (!isAgentWindowOpen()) return;
+    const active = document.querySelector<HTMLElement>('.side-tab.active')?.dataset['tab'];
+    if (active) renderAgentSideTab(active);
   });
 
   // The nations tab is populated up front so it is never empty when opened.

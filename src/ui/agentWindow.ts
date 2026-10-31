@@ -43,7 +43,7 @@ interface Pending {
 
 const HIDDEN_IDS = [
   'chat-agent-selector-row', 'chat-messages', 'operation-ticker', 'chat-input-row',
-  'model-selector-wrapper', 'chat-scroll-bottom',
+  'model-selector-wrapper', 'chat-scroll-bottom', 'unit-pane-body', 'unit-pane-empty',
 ];
 const BLOCKED_NOTICE =
   'El agente espera tu respuesta en su terminal (un permiso o un diálogo). ' +
@@ -78,6 +78,24 @@ let nextId = 0;
 
 export function initAgentWindow(value: { locate(row: ExternalSessionRow): void }): void {
   deps = value;
+}
+
+export function agentWindowRow(): ExternalSessionRow | null {
+  return row;
+}
+
+export function isAgentWindowOpen(): boolean {
+  return destination !== null;
+}
+
+/** The same 📍 the agent window header uses. */
+export function locateAgentWindowRow(): void {
+  if (row) deps?.locate(row);
+}
+
+/** The CLI action when the destination has a terminal, else null. */
+export function agentWindowCli(): (() => void) | null {
+  return destination?.terminalId ? cli : null;
 }
 
 function element<T extends HTMLElement>(selector: string): T | null {
@@ -268,6 +286,13 @@ function send(): void {
 function mount(): HTMLElement | null {
   const pane = document.querySelector<HTMLElement>('#side-panel .tab-pane[data-pane="chat"]');
   if (!pane) return null;
+  const unitPane = document.querySelector<HTMLElement>('#side-panel .tab-pane[data-pane="unit"]');
+  if (unitPane && !document.getElementById('agent-unit-card')) {
+    const card = document.createElement('div');
+    card.id = 'agent-unit-card';
+    card.className = 'hidden';
+    unitPane.append(card);
+  }
   let windowEl = document.getElementById('agent-window');
   if (windowEl) return windowEl;
   windowEl = document.createElement('div');
@@ -466,6 +491,7 @@ export function openAgentWindow(value: AgentWindowDestination): void {
     return [old];
   });
   windowEl.classList.remove('hidden');
+  document.getElementById('agent-unit-card')?.classList.remove('hidden');
   panel.classList.remove('hidden');
   panel.querySelectorAll('.side-tab').forEach((tab) =>
     tab.classList.toggle('active', (tab as HTMLElement).dataset['tab'] === 'chat'),
@@ -522,6 +548,10 @@ export function closeAgentWindow(): void {
   for (const item of hidden) item.element.style.display = item.display;
   hidden = [];
   document.getElementById('agent-window')?.classList.add('hidden');
+  document.getElementById('agent-unit-card')?.classList.add('hidden');
+  document
+    .querySelectorAll('.agent-offmap-offer')
+    .forEach((el) => el.remove());
   const name = document.getElementById('side-hero-name');
   if (name) name.onclick = originalNameClick;
 }

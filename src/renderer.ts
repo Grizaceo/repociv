@@ -2262,8 +2262,13 @@ export class Renderer {
   private placeRepoAt(coord: Axial): void {
     const repo = this._mapEditorRepo;
     if (!repo) return;
+    this.foundRepoCity(repo, coord);
+  }
+
+  /** Found a city for `repo` on `coord`; shared by the editor and add-to-map. */
+  foundRepoCity(repo: ScannedRepo, coord: Axial): boolean {
     const found = foundCityOp(this.state.world, repo, coord, { record: true });
-    if (!found) return;
+    if (!found) return false;
     let current = found;
     // Units that appeared in the new city leave through GameState on undo and
     // come back on redo (removeCityFromWorld alone would leave them in unitMap).
@@ -2294,6 +2299,12 @@ export class Renderer {
     clearMapEditorRepoSelection();
     invalidatePathCache();
     this.state.notifyUpdate();
+    window.dispatchEvent?.(
+      new CustomEvent('repociv:city-founded', {
+        detail: { repoPath: repo.repoPath ?? repo.path },
+      }),
+    );
+    return true;
   }
 
   getCityRelocateMode(): boolean {
