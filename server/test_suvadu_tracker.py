@@ -844,6 +844,15 @@ def test_non_claude_chat_still_uses_suv(tmp_path):
     assert suv.calls
 
 
+def test_claude_missing_transcript_falls_back_to_suv(tmp_path):
+    suv = FakeSuv()
+    suv.events["claude-abcdef12"] = _events(1)
+    source = st.SuvaduSource(suv, home=str(tmp_path))
+    obs = st.parse_sessions(_sessions_json(_session("abcdef12")))[0]
+    assert [m["text"] for m in source.chat(obs, limit=10)["messages"]] == ["prompt 0", "answer 0 <b>"]
+    assert suv.calls
+
+
 def test_chat_unknown_or_not_imported(repos):
     suv, clock, sent = FakeSuv(), Clock(), []
     suv.history = _history_line("claude-fresh000-aaaa", NOW_MS)  # heartbeat only

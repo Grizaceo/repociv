@@ -520,3 +520,34 @@ def test_submit_locates_current_pane_and_rejects_bad_messages(runtime: FakeRunti
 
     _run(session, screen=False)
     assert runtime.sent == []
+
+
+def test_submit_refuses_a_pane_no_longer_in_agent_list(runtime: FakeRuntime) -> None:
+    async def session(ws: Any) -> None:
+        await _json(ws)
+        runtime.agents = []
+        await ws.send(json.dumps({"type": "submit", "id": "one", "text": "hello"}))
+        assert await _json(ws) == {
+            "type": "submit_result", "id": "one", "state": "refused", "reason": "not_an_agent_pane"
+        }
+
+    _run(session, screen=False)
+    assert runtime.sent == []
+
+
+def test_submit_reports_unavailable_confirmation_without_retry(
+    runtime: FakeRuntime, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    def list_agents() -> list[AgentPane]:
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            raise HerdrError("unavailable")
+        return runtime.agents
+
+    monkeypatch.setattr(herdr_runtime, "list_agents", list_agents)
+    result = asyncio.run(herdr_runtime.submit("w1:p1", "hello"))
+    assert (result.state, result.reason) == ("unconfirmed", "confirm_unavailable")
+    assert [kind for kind, _, _ in runtime.sent] == ["paste", "input"]
