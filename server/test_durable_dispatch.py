@@ -256,6 +256,36 @@ def test_concurrent_approval_responses_dispatch_once(delivery_env):
     assert dispatch_ledger.unresolved() == []
 
 
+def test_duplicate_during_inflight_dispatch_reports_not_found(delivery_env, monkeypatch):
+    """A duplicate response that arrives while the winner has consumed the
+    approval but not yet claimed the durable intent must report
+    "approval not found": the in-flight dispatch owns delivery, so the
+    unclaimed-intent check must run under the consume lock."""
+    store.add_approval(_pending("c1"))
+    popped, release = threading.Event(), threading.Event()
+    real_claim = dispatch_ledger.claim_intent
+
+    def slow_claim(cid):
+        popped.set()
+        release.wait(5)
+        return real_claim(cid)
+
+    monkeypatch.setattr(dispatch_ledger, "claim_intent", slow_claim)
+    out = {}
+    winner = threading.Thread(
+        target=lambda: out.setdefault("a", store.resolve_approval("c1", approved=True))
+    )
+    winner.start()
+    assert popped.wait(5)
+    out["b"] = store.resolve_approval("c1", approved=True)
+    release.set()
+    winner.join(5)
+
+    assert out["a"]["status"] == "queued"
+    assert _queue_ids() == ["c1"]
+    assert out["b"]["error"] == "approval not found", out["b"]
+
+
 def test_worker_retry_after_restart_does_not_duplicate(delivery_env):
     """Worker retries the recovery sweep after a restart; the scheduler's
     idempotent enqueue keeps a single copy."""

@@ -299,18 +299,19 @@ def resolve_approval(
                 "status": "expired",
                 "commandId": cmd_id,
             }
-        if dispatch_ledger.has_unclaimed_intent(cmd_id):
-            # A previous attempt consumed the approval and failed before the
-            # claim was durable. Do not delete the only recoverable copy:
-            # restart recovery replays it from the ledger.
-            return {
-                "ok": False,
-                "status": "unresolved",
-                "error": "approval already consumed; durable intent left for recovery",
-                "commandId": cmd_id,
-            }
-        dispatch_ledger.release_intent_if_unclaimed(cmd_id)
-        return {"ok": False, "error": "approval not found"}
+        with approval_resolution._consume_lock:
+            if dispatch_ledger.has_unclaimed_intent(cmd_id):
+                # A previous attempt consumed the approval and failed before the
+                # claim was durable. Do not delete the only recoverable copy:
+                # restart recovery replays it from the ledger.
+                return {
+                    "ok": False,
+                    "status": "unresolved",
+                    "error": "approval already consumed; durable intent left for recovery",
+                    "commandId": cmd_id,
+                }
+            dispatch_ledger.release_intent_if_unclaimed(cmd_id)
+            return {"ok": False, "error": "approval not found"}
 
     try:
         return approval_resolution.dispatch_approved(
