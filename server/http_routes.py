@@ -89,7 +89,6 @@ from server.routes.foreign import post_foreign_score  # noqa: F401
 from server.routes.foreign import post_foreign_report  # noqa: F401
 from server.routes.foreign import get_reports  # noqa: F401
 from server.routes.foreign import get_report_by_id  # noqa: F401
-from server.routes.foreign import delete_report_by_id  # noqa: F401
 from server.routes.foreign import get_repo_file_tree  # noqa: F401
 from server.routes.wonder_ops import post_wonder_launch  # noqa: F401
 from server.routes.wonder_ops import post_wonder_stop  # noqa: F401

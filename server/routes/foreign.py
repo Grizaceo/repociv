@@ -181,20 +181,6 @@ def get_report_by_id(ctx: "RouteContext") -> tuple[int, Any]:
                       "Check existing reports: GET /api/foreign/reports")
     return 200, report
 
-def delete_report_by_id(ctx: dict[str, Any], _body: dict[str, Any]) -> tuple[int, Any]:
-    """DELETE /api/foreign/reports/{id} — delete a report."""
-    report_id = ctx.get("report_id", "")
-    if not report_id:
-        return _error(400, "report_id is required",
-                      "Path parameter 'report_id' is missing",
-                      "Use /api/foreign/reports/{report_id} with a valid report ID")
-    ok = _rs.delete_report(report_id)
-    if not ok:
-        return _error(404, f"Report not found: {report_id}",
-                      f"No report exists with id '{report_id}'",
-                      "Check existing reports: GET /api/foreign/reports")
-    return 200, {"ok": True, "deleted": report_id}
-
 _FILE_TREE_MAX_DEPTH = 32
 _FILE_TREE_MAX_FILES = 10_000
 _FILE_TREE_SKIP_NAMES = frozenset({"__pycache__", "node_modules", "dist", "build", ".git"})
@@ -204,21 +190,6 @@ class _FileTreeLimitExceeded(Exception):
     def __init__(self, message: str) -> None:
         self.message = message
         super().__init__(message)
-
-
-def _configured_repos_root() -> Path:
-    from server import repo_roots_state as _rrs
-
-    state_root = _rrs.active_root()
-    if state_root:
-        return Path(os.path.expanduser(state_root)).resolve()
-    map_root = (
-        os.environ.get("REPOCIV_MAP_ROOT")
-        or os.environ.get("REPOCIV_REPOS_ROOT")
-        or os.environ.get("WORKSPACE_ROOT")
-        or str(Path.home() / ".hermes" / "workspace" / "repos")
-    )
-    return Path(os.path.expanduser(map_root)).resolve()
 
 
 def _path_under_root(path: Path, root: Path) -> bool:
