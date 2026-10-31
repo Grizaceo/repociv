@@ -108,7 +108,7 @@ Concrete metrics to consider the alpha "successful":
     resumed through a second process.
 - **Both renderers are official trunk.** Canvas 2D (`flat`) is the default
   and canonical mode; WebGL/Three.js (`webgl`) is opt-in via
-  `?renderer=webgl` or hotkey `3`. Owner decision (2026-06): the official
+  `?renderer=webgl` or hotkey `F2`. Owner decision (2026-06): the official
   thing is not "2D or 3D" but **switching between both without friction**.
   The switching invariant is covered by a non-GPU test
   (`src/three/renderMode.test.ts`, persistence/migration state machine) and

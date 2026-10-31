@@ -58,6 +58,7 @@ const m = vi.hoisted(() => {
     visibleSessionDock: vi.fn(() => []),
     externalSessionSnapshot: vi.fn(() => []),
     trackHotkey: fn(),
+    toggleView: fn(),
     trackPanelOpen: fn(),
     isPickerOpen: vi.fn(() => false),
     isCommandPaletteOpen: vi.fn(() => false),
@@ -201,7 +202,7 @@ const state = {
 };
 
 function wire(): void {
-  wireHotkeys(renderer as never, state as never, {} as never, vi.fn());
+  wireHotkeys(renderer as never, state as never, {} as never, m.toggleView);
 }
 
 function pressEscape(target: unknown = {}): void {
@@ -248,6 +249,106 @@ beforeEach(() => {
   m.isPickerOpen.mockReturnValue(false);
   m.isCommandPaletteOpen.mockReturnValue(false);
   state.selectedUnit = null;
+});
+
+describe('wireHotkeys — 2D/3D view toggle (F2)', () => {
+  it('F2 toggles the renderer', () => {
+    installDom();
+    wire();
+    const event = pressKey({ key: 'F2' });
+    expect(m.toggleView).toHaveBeenCalledOnce();
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('digits 2 and 3 select dock sessions again', () => {
+    installDom();
+    wire();
+    m.visibleSessionDock.mockReturnValue([
+      { kind: 'own', key: 'u1' },
+      { kind: 'own', key: 'u2' },
+      { kind: 'own', key: 'u3' },
+    ] as never);
+    const u2 = { id: 'u2' };
+    const u3 = { id: 'u3' };
+    (state.getUnit as ReturnType<typeof vi.fn>).mockImplementation(
+      (id: string) => (id === 'u2' ? u2 : id === 'u3' ? u3 : null),
+    );
+    pressKey({ key: '2' });
+    expect(m.selectHero.mock.calls[0]?.[0]).toBe(u2);
+    pressKey({ key: '3' });
+    expect(m.selectHero.mock.calls[1]?.[0]).toBe(u3);
+    expect(m.toggleView).not.toHaveBeenCalled();
+  });
+});
+
+describe('wireHotkeys — global chords inside text fields', () => {
+  it('F-keys still toggle their panels while an input has focus', () => {
+    installDom();
+    wire();
+    const input = new FakeInputElement();
+    const f8 = pressKey({ key: 'F8', target: input });
+    expect(m.toggleAgentsPanel).toHaveBeenCalledOnce();
+    expect(f8.defaultPrevented).toBe(true);
+    pressKey({ key: 'F10', target: input });
+    expect(m.toggleLogPanel).toHaveBeenCalledOnce();
+    pressKey({ key: 'F6', target: input });
+    expect(m.toggleKanbanPanel).toHaveBeenCalledOnce();
+  });
+
+  it('Ctrl+S sleeps the selected unit while an input has focus', () => {
+    installDom();
+    wire();
+    const event = pressKey({ key: 's', ctrlKey: true, target: new FakeInputElement() });
+    expect(renderer.sleepSelectedUnit).toHaveBeenCalledOnce();
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('typing keys keep their native field behavior', () => {
+    installDom();
+    wire();
+    const input = new FakeInputElement();
+    pressKey({ key: 'm', target: input });
+    expect(renderer.setActionMode).not.toHaveBeenCalled();
+    pressKey({ key: 'F', target: input });
+    expect(renderer.toggleDebug).not.toHaveBeenCalled();
+    pressKey({ key: '1', target: input });
+    expect(m.selectHero).not.toHaveBeenCalled();
+  });
+
+  it('Ctrl+C copies a text selection instead of opening the wizard', () => {
+    installDom();
+    wire();
+    vi.stubGlobal('getSelection', () => ({ toString: () => 'selected text' }));
+    const event = pressKey({ key: 'c', ctrlKey: true });
+    expect(m.openNewAgentSession).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('Ctrl+C still opens the claude wizard with nothing selected', () => {
+    installDom();
+    wire();
+    vi.stubGlobal('getSelection', () => ({ toString: () => '' }));
+    pressKey({ key: 'c', ctrlKey: true });
+    expect(m.openNewAgentSession).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  });
+
+  it('modals keep priority over field hotkeys', () => {
+    installDom();
+    wire();
+    m.isPickerOpen.mockReturnValue(true);
+    pressKey({ key: 'F8', target: new FakeInputElement() });
+    expect(m.toggleAgentsPanel).not.toHaveBeenCalled();
+    m.isPickerOpen.mockReturnValue(false);
+    m.isCommandPaletteOpen.mockReturnValue(true);
+    pressKey({ key: 'F8', target: new FakeInputElement() });
+    expect(m.toggleAgentsPanel).not.toHaveBeenCalled();
+    m.isCommandPaletteOpen.mockReturnValue(false);
+    m.terminalHasFocus.mockReturnValue(true);
+    pressKey({ key: 's', ctrlKey: true, target: new FakeInputElement() });
+    expect(renderer.sleepSelectedUnit).not.toHaveBeenCalled();
+  });
 });
 
 describe('wireHotkeys — undo and redo shortcuts', () => {

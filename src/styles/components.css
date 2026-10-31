@@ -1182,6 +1182,13 @@ kbd {
   position: absolute;
   top: calc(var(--header-height) + 4px);
   right: 16px;
+  /* Legend, not chrome: it must paint UNDER the floating windows (owner
+     decision — "que quede abajo"). Inside #hud-overlay it sits above the bare
+     canvas but below every floating panel (lowest: unit-panel at 10); the
+     overlay's own z-index:100 keeps body-level panels (map editor 2100,
+     settings 9000) above it too. */
+  z-index: 5;
+  pointer-events: none;
   display: flex;
   gap: 14px;
   font-family: var(--font-ui);

@@ -173,7 +173,24 @@ export function wireHotkeys(
       return;
     }
 
-    if (inField) return;
+    // Inside a text field the browser owns typing keys (letters, digits,
+    // Space, Enter, native undo…). Two families of global chords still reach
+    // through because they can never be text input:
+    //   • F-keys — no character; they keep toggling their panels below.
+    //   • Ctrl/Cmd+S — "save" means sleep-the-unit here, never the browser
+    //     save dialog. Ctrl/Cmd+A stays native (select-all in the field).
+    if (inField) {
+      if (/^F\d{1,2}$/.test(e.key)) {
+        // fall through to the F-key block at the bottom of this listener
+      } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && shortcut === 's') {
+        e.preventDefault();
+        trackHotkey('Ctrl+S:sleep-unit');
+        renderer.sleepSelectedUnit();
+        return;
+      } else {
+        return;
+      }
+    }
 
     // N still manages the profile registry; session creation always goes through
     // the wizard so profile + territory + mission are explicit before dispatch.
@@ -204,6 +221,11 @@ export function wireHotkeys(
       (e.ctrlKey && e.shiftKey && quickKey === 'w') ||
       (!e.ctrlKey && !e.altKey && !e.metaKey && quickKey === 'r')
     ) {
+      // Ctrl+C must never hijack a real text selection: copy wins over the
+      // Claude wizard. Ctrl+E still spawns Claude either way.
+      if (quickKey === 'c' && e.ctrlKey && globalThis.getSelection?.().toString()) {
+        return;
+      }
       e.preventDefault();
       const selectedProfile = quickKey === 'q' ? getSelectedProfile() : null;
       trackHotkey(`session-wizard:${quickKey}`);
@@ -215,10 +237,9 @@ export function wireHotkeys(
     }
 
     // Hero selection 1–9 is the same active-session dock the HUD renders.
-    // 2 and 3 are reserved for the 2D/3D view toggles below (SCOPE.md, owner
-    // decision 2026-06: `?renderer=webgl` o hotkey 3), so the dock yields
-    // them: digits 1 and 4–9 keep their slots.
-    if (/^[1-9]$/.test(e.key) && e.key !== '2' && e.key !== '3') {
+    // The 2D/3D view toggle moved to F2 (owner decision), so every digit
+    // selects its dock slot again.
+    if (/^[1-9]$/.test(e.key)) {
       const idx = parseInt(e.key, 10) - 1;
       const target = visibleSessionDock(
         activeSessionDock(state.getAllUnits(), externalSessionSnapshot()),
@@ -303,11 +324,6 @@ export function wireHotkeys(
         trackHotkey('G:grid');
         renderer.toggleGrid();
         break;
-      case '2':
-      case '3':
-        trackHotkey(`${e.key}:cycle-render-mode`);
-        toggleView();
-        break;
       case 'f':
         if (state.viewMode === 'local') {
           trackHotkey('F:local-debug');
@@ -367,6 +383,12 @@ export function wireHotkeys(
         trackHotkey('?:keyboard-help');
         toggleKeyboardHelp();
         break;
+    }
+
+    if (e.key === 'F2') {
+      e.preventDefault();
+      trackHotkey('F2:cycle-render-mode');
+      toggleView();
     }
 
     if (e.key === 'F6') {
