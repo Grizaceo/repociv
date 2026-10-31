@@ -26,7 +26,7 @@ import socket
 import struct
 import subprocess
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Iterable, Mapping
+from typing import Any, AsyncGenerator, AsyncIterator, Iterable, Mapping
 
 from server.cli_discovery import find_herdr
 
@@ -382,7 +382,7 @@ async def observe(
     *,
     binary: str,
     path: str | None = None,
-) -> AsyncIterator[bytes | Closed]:
+) -> AsyncGenerator[bytes | Closed, None]:
     """Screen updates as ANSI bytes, ending in one ``Closed``.
 
     The first frame paints the whole screen. Frames carry the screen and nothing

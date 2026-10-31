@@ -6,6 +6,7 @@ here instead of in a user's terminal. Skipped where herdr is not installed.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import shutil
 import subprocess
@@ -17,7 +18,10 @@ from typing import Iterator
 
 import pytest
 
-from server import herdr_runtime
+from websockets.asyncio.client import connect
+from websockets.asyncio.server import serve as ws_serve
+
+from server import herdr_runtime, terminal_channel
 from server.herdr_runtime import Closed
 
 HERDR = shutil.which("herdr")
@@ -250,3 +254,40 @@ def test_observing_a_missing_terminal_closes_at_once(private: Private) -> None:
     assert len(items) == 1 and isinstance(items[0], Closed)
 
 
+
+
+def test_a_browser_session_end_to_end(private: Private, pane: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Real herdr, real WebSocket: the wire the terminal panel uses."""
+    monkeypatch.setenv(herdr_runtime.SOCKET_ENV, private.socket)
+    monkeypatch.setattr(herdr_runtime, "list_agents", lambda path=None: [_agent(private, pane)])
+    token, origin = "t" * 32, "http://127.0.0.1:5273"
+    log = _recorder(private, pane, "e2e")
+
+    async def handler(ws: object) -> None:
+        await terminal_channel.serve(ws, token=token, origins={origin}, bind_host="127.0.0.1", remote=False)
+
+    async def go() -> dict[str, object]:
+        async with ws_serve(handler, "127.0.0.1", 0) as server:
+            port = server.sockets[0].getsockname()[1]
+            uri = f"ws://127.0.0.1:{port}{terminal_channel.PATH}"
+            headers = {"Origin": origin, "X-RepoCiv-Token": token}
+            async with connect(uri, additional_headers=headers) as ws:
+                await ws.send(json.dumps({"type": "attach", "terminalId": _terminal(private, pane)}))
+                attached = json.loads(await ws.recv())
+                screen = await ws.recv()
+                assert isinstance(screen, bytes) and b"RECORDING" in screen
+                await ws.send(json.dumps({"type": "input", "data": "typed\x1b[A"}))
+                await ws.send(json.dumps({"type": "paste", "data": "p1\np2"}))
+                await asyncio.to_thread(_wait_for_log, log, "p2")
+                return attached
+
+    attached = asyncio.run(asyncio.wait_for(go(), 15))
+    assert attached["type"] == "attached"
+    assert attached["cols"], attached["rows"]
+    text = log.read_text()
+    assert "typed\\x1b[A" in text
+    assert "\\x1b[200~p1\\np2\\x1b[201~" in text
+
+
+def _agent(private: Private, pane_id: str) -> herdr_runtime.AgentPane:
+    return herdr_runtime.AgentPane(pane_id, _terminal(private, pane_id), "claude", "idle")

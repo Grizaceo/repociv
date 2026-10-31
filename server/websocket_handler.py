@@ -22,6 +22,7 @@ Rate limit:
 Security:
   - Requires X-RepoCiv-Token on connect if REPOCIV_TOKEN is set.
   - Rate limited per connection.
+  - The terminal path has stricter rules of its own: server/terminal_channel.py.
 """
 
 from __future__ import annotations
@@ -37,6 +38,8 @@ from typing import Any, Callable
 
 import websockets
 import websockets.asyncio.server
+
+from server import terminal_channel
 
 logger = logging.getLogger("repociv.ws")
 
@@ -81,6 +84,16 @@ _ALLOWED_ORIGINS: set[str] = build_allowed_origins(
     remote=REPOCIV_REMOTE,
     remote_origin=os.environ.get("REPOCIV_REMOTE_ORIGIN", ""),
     extra_origins=os.environ.get("REPOCIV_CORS_ORIGINS", ""),
+)
+
+# The terminal is a shell, so it gets its own list: loopback plus what was named
+# for it on purpose. REPOCIV_CORS_ORIGINS lets a device read the dashboard; that
+# is not consent to hand it a terminal.
+_TERMINAL_ORIGINS: set[str] = build_allowed_origins(
+    int(os.environ.get("REPOCIV_PORT", "5273")),
+    remote=False,
+    remote_origin="",
+    extra_origins=os.environ.get("REPOCIV_TERMINAL_ORIGINS", ""),
 )
 
 # Rate limit: 60 messages / 60s window per connection
@@ -351,6 +364,16 @@ _start_time: float = 0.0
 
 async def _ws_handler(ws: websockets.asyncio.server.ServerConnection) -> None:
     """Handle a single WebSocket connection lifecycle."""
+    if terminal_channel.wants(ws):
+        await terminal_channel.serve(
+            ws,
+            token=REPOCIV_TOKEN,
+            origins=_TERMINAL_ORIGINS,
+            bind_host=WS_HOST,
+            remote=REPOCIV_REMOTE,
+        )
+        return
+
     # Auth
     if not await _auth_ws(ws):
         await ws.close(4001, "auth failed")
