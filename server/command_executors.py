@@ -86,22 +86,29 @@ def dispatch_command(
             result = herdr_runtime.launch(
                 kind, city_id=city, cwd=cwd, label=os.path.basename(os.path.normpath(cwd)), on_pane=on_pane,
             )
+        except Exception:
+            if entry["paneId"]:
+                entry.update(state="unknown", reason="launch_unconfirmed")
+            else:
+                entry.update(state="failed", reason="launch_failed")
+            if mission:
+                entry["missionDelivery"] = {"state": "refused", "reason": "agent_not_ready"}
+        else:
             entry.update(state=result.state, reason=result.reason, terminalId=result.terminal_id,
                          paneId=result.pane_id, name=result.name)
             if result.state == "ready" and not result.instance:
                 entry.update(state="failed", reason="server_changed")
             if mission:
                 if entry["state"] == "ready":
-                    delivery = asyncio.run(herdr_runtime.submit(
-                        result.pane_id, mission, expect_agent=kind, instance=result.instance,
-                    ))
-                    entry["missionDelivery"] = delivery.to_dict()
+                    try:
+                        delivery = asyncio.run(herdr_runtime.submit(
+                            result.pane_id, mission, expect_agent=kind, instance=result.instance,
+                        ))
+                        entry["missionDelivery"] = delivery.to_dict()
+                    except Exception:
+                        entry["missionDelivery"] = {"state": "failed", "reason": "submit_failed"}
                 else:
                     entry["missionDelivery"] = {"state": "refused", "reason": "agent_not_ready"}
-        except Exception:
-            entry.update(state="failed", reason="launch_failed")
-            if mission:
-                entry["missionDelivery"] = {"state": "refused", "reason": "agent_not_ready"}
         publish()
         if entry["state"] == "failed":
             event_record_failed(cmd.id, str(entry["reason"]))

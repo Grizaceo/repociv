@@ -126,8 +126,6 @@ def decide(cmd: Command) -> tuple[PolicyDecision, str]:
             harness_id=cmd.harness_id,
         )
         if overlay_match is not None:
-            if cmd.type == "herdr_launch" and cmd.risk in ("high", "destructive") and overlay_match.decision == "auto-safe":
-                return "approve", f"Command '{cmd.type}' is tagged risk='{cmd.risk}' — risk floor requires approval."
             return overlay_match.decision, overlay_match.reason
 
     # Step 1: resolve the harness descriptor

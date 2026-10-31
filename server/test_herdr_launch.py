@@ -342,9 +342,9 @@ def test_policy_approval_never_dispatches_and_hides_server_path(tmp_path: Path, 
     finally:
         policies_yaml.reset_for_tests()
 
-def test_launch_risk_floor_survives_auto_safe_overlay(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("risk", ["high", "destructive"])
+def test_launch_auto_safe_overlay_is_authoritative(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, risk: str) -> None:
     from server import policies_yaml
-    monkeypatch.setenv("REPOCIV_CONFIG_DIR", str(tmp_path))
     policies = tmp_path / "policies.d"
     policies.mkdir()
     (policies / "herdr.yaml").write_text("""policies:
@@ -352,10 +352,12 @@ def test_launch_risk_floor_survives_auto_safe_overlay(tmp_path: Path, monkeypatc
     applies_to: {command_types: [herdr_launch]}
     effect: {decision: auto-safe}
 """)
-    policies_yaml.reset_for_tests()
     try:
-        cmd = Command(type="herdr_launch", target="city", risk="high")
-        assert policy.decide(cmd)[0] == "approve"
+        with monkeypatch.context() as scoped:
+            scoped.setenv("REPOCIV_CONFIG_DIR", str(tmp_path))
+            policies_yaml.reset_for_tests()
+            cmd = Command(type="herdr_launch", target="city", risk=risk)
+            assert policy.decide(cmd)[0] == "auto-safe"
     finally:
         policies_yaml.reset_for_tests()
 
@@ -409,3 +411,51 @@ def test_executor_sends_mission_once_only_when_ready_and_exposes_no_paths(
     assert failed.called == (final_state == "failed")
     assert completed.called == (final_state != "failed")
     assert get_herdr_launch({"command_id": "absent"})[0] == 404
+
+
+@pytest.mark.parametrize(("failure", "state", "reason", "delivery"), [
+    ("before_pane", "failed", "launch_failed", {"state": "refused", "reason": "agent_not_ready"}),
+    ("after_pane", "unknown", "launch_unconfirmed", {"state": "refused", "reason": "agent_not_ready"}),
+    ("submit", "ready", None, {"state": "failed", "reason": "submit_failed"}),
+])
+def test_executor_distinguishes_launch_and_mission_exceptions(
+    monkeypatch: pytest.MonkeyPatch, failure: str, state: str, reason: str | None, delivery: dict,
+) -> None:
+    from server import command_executors
+    from server.routes.core import get_herdr_launch
+
+    events: list[dict] = []
+    completed, failed = Mock(), Mock()
+    submissions: list[str] = []
+
+    def launch(_kind: str, *, on_pane: Any, **_kwargs: Any) -> herdr_runtime.LaunchResult:
+        if failure == "before_pane":
+            raise RuntimeError("failure before pane")
+        on_pane("w1:p1", "term1")
+        if failure == "after_pane":
+            raise RuntimeError("failure after pane")
+        return herdr_runtime.LaunchResult("ready", None, "term1", "w1:p1", "w1", "claude-city-1234", "123:456")
+
+    async def submit(pane: str, _text: str, **_kwargs: Any) -> Any:
+        submissions.append(pane)
+        raise RuntimeError("submit failed")
+
+    monkeypatch.setattr(herdr_runtime, "launch", launch)
+    monkeypatch.setattr(herdr_runtime, "submit", submit)
+    cmd = Command(id=f"exception-{failure}", type="herdr_launch", target="city", payload={
+        "city": "city", "kind": "claude", "mission": "hello", "repoPath": "/secret/city", "unit": "HERDR",
+    })
+    kwargs = {name: Mock() for name in (
+        "run_agent", "append_pending_task", "save_mission", "infer_adapter_for_command", "sessions_patch",
+        "sessions_append_message", "run_state_save", "event_record_output_chunk", "record_outcome",
+        "register_issue_run_fn", "task_run", "subagent_approve_spawn", "subagent_request_dispatch",
+    )}
+    command_executors.dispatch_command(cmd, send_to_repociv=events.append, event_record_completed=completed,
+                                       event_record_failed=failed, **kwargs)
+    code, entry = get_herdr_launch({"command_id": cmd.id})
+    assert code == 200 and (entry["state"], entry["reason"]) == (state, reason)
+    assert entry["missionDelivery"] == delivery
+    assert submissions == (["w1:p1"] if failure == "submit" else [])
+    assert failed.called == (state == "failed")
+    assert completed.called == (state != "failed")
+    assert "/secret" not in json.dumps([entry, events])
