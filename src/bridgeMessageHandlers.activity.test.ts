@@ -17,7 +17,6 @@ function stubContext(): MessageContext & { noteUnitActivity: ReturnType<typeof v
     setOperationTicker: vi.fn(),
     appendChatChunk: vi.fn(),
     appendApprovalCard: vi.fn(),
-    terminalPanel: {} as MessageContext['terminalPanel'],
     playSound: vi.fn(),
     approveCommand: vi.fn(),
     cfg: {} as MessageContext['cfg'],

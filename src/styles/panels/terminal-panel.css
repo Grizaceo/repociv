@@ -1,0 +1,179 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Terminal panel (T) — an agent's real CLI, attached through herdr
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#terminal-panel {
+  position: absolute;
+  top: 56px;
+  left: 8px;
+  /* Leaves room for the agents panel on the right. */
+  width: min(980px, calc(100vw - 472px));
+  min-width: min(420px, calc(100vw - 16px));
+  height: min(66vh, calc(100vh - 120px));
+  background: var(--ui-panel-bg);
+  border: 2px solid var(--ui-border);
+  border-radius: var(--panel-radius);
+  z-index: 47;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.9);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--ui-text);
+}
+#terminal-panel.hidden {
+  display: none;
+}
+#terminal-panel button {
+  font-family: inherit;
+}
+
+.terminal-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--ui-border);
+  background: rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+  min-width: 0;
+}
+.terminal-title {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ui-gold-bright);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.terminal-keys {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.terminal-actions {
+  display: flex;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+.terminal-switch,
+.terminal-close {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--ui-text);
+  cursor: pointer;
+  padding: 2px 8px;
+}
+.terminal-switch:hover,
+.terminal-close:hover {
+  border-color: var(--ui-border);
+}
+
+.terminal-status {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: var(--text-xs);
+  border: 1px solid var(--ui-border);
+}
+.terminal-status.hidden {
+  display: none;
+}
+.terminal-status--working {
+  color: var(--ui-gold-bright);
+}
+.terminal-status--blocked {
+  background: oklch(0.45 0.18 25);
+  border-color: oklch(0.6 0.2 25);
+  color: #fff;
+  font-weight: 700;
+}
+
+.terminal-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.terminal-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: #0b0e13;
+}
+.terminal-viewport.hidden,
+.terminal-picker.hidden,
+.terminal-notice.hidden {
+  display: none;
+}
+.terminal-host {
+  height: 100%;
+  width: 100%;
+}
+.terminal-notice {
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: var(--space-2);
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+}
+
+.terminal-picker {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.terminal-agent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  color: var(--ui-text);
+  cursor: pointer;
+  text-align: left;
+}
+.terminal-agent:hover,
+.terminal-agent:focus-visible {
+  border-color: var(--ui-gold-bright);
+}
+.terminal-agent-name {
+  font-weight: 700;
+}
+.terminal-agent-folder {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+.terminal-agent-pane {
+  font-size: var(--text-xs);
+  opacity: 0.6;
+}
+
+@media (max-width: 900px) {
+  #terminal-panel {
+    width: calc(100vw - 16px);
+  }
+  .terminal-keys {
+    display: none;
+  }
+}

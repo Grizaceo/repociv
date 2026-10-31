@@ -9,6 +9,7 @@
 // through the normal, validated event path.
 
 import { parseBridgeEvent } from './bridgeSchema.ts';
+import type { TerminalAgent } from './terminalLink.ts';
 import { bridgeHeaders, bridgeUrl } from './bridgeEnv.ts';
 import type { BridgeEvent, City, Unit } from './types.ts';
 import { escapeHtml } from './ui/escapeHtml.ts';
@@ -143,6 +144,8 @@ export interface ExternalSessionRow {
   imported: boolean;
   /** Whether this exact live session has a verified, safe write transport. */
   liveChat: ExternalLiveChatCapability;
+  /** Its herdr pane, when a process owning this exact session is in one. */
+  herdrPane?: TerminalAgent | null;
 }
 
 export interface ExternalChatMessage {

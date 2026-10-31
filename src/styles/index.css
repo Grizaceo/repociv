@@ -12,6 +12,7 @@
 @import './panels/model-selectors.css';
 @import './panels/city-panel.css';
 @import './panels/agents-panel.css';
+@import './panels/terminal-panel.css';
 @import './panels/approval-panel.css';
 @import './panels/spatial-directive.css';
 @import './panels/context-menu.css';

@@ -31,7 +31,6 @@ import {
 } from './ui/index.ts';
 import { cfg } from './gameConfig.ts';
 import { approveCommand } from './commandBus.ts';
-import { terminalPanel } from './terminalPanel.ts';
 import { cityForRef, isExternalAgentUnit } from './externalAgents.ts';
 
 // ─── Context ────────────────────────────────────────────────────────────────
@@ -45,7 +44,6 @@ export interface MessageContext {
   setOperationTicker: typeof setOperationTicker;
   appendChatChunk: typeof appendChatChunk;
   appendApprovalCard: typeof appendApprovalCard;
-  terminalPanel: typeof terminalPanel;
   playSound: (type: 'move' | 'complete' | 'mission') => void;
   approveCommand: typeof approveCommand;
   expireApproval?: (commandId: string) => void;
@@ -221,7 +219,6 @@ const HANDLERS: HandlerByType = {
   // ─── Chat & logs ─────────────────────────────────────────────────────
   chat_chunk(ctx, evt) {
     ctx.appendChatChunk(evt.unit, evt.text);
-    ctx.terminalPanel.write(`[${evt.unit}] ${evt.text}`);
   },
 
   log(ctx, evt) {

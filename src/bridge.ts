@@ -19,7 +19,6 @@ import {
 import { cfg } from './gameConfig.ts';
 import { expireApproval } from './ui/approvalCards.ts';
 import { approveCommand } from './commandBus.ts';
-import { terminalPanel } from './terminalPanel.ts';
 import {
   bridgeHeaders,
   bridgeUrl,
@@ -374,7 +373,6 @@ export class BridgeEvents {
         appendChatChunk,
         appendApprovalCard,
         showNotification,
-        terminalPanel,
         playSound,
         approveCommand,
         expireApproval,

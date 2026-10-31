@@ -35,6 +35,7 @@ const m = vi.hoisted(() => {
     closeKanbanPanel: fn(),
     isKanbanPanelOpen: vi.fn(() => false),
     terminalVisible: vi.fn(() => false),
+    terminalHasFocus: vi.fn(() => false),
     terminalHide: fn(),
     terminalToggle: fn(),
     toggleSettingsPanel: fn(),
@@ -95,6 +96,7 @@ vi.mock('../index.ts', () => ({
 vi.mock('../../terminalPanel.ts', () => ({
   terminalPanel: {
     isVisible: m.terminalVisible,
+    hasFocus: m.terminalHasFocus,
     hide: m.terminalHide,
     toggle: m.terminalToggle,
   },
@@ -242,6 +244,7 @@ beforeEach(() => {
   m.isKanbanPanelOpen.mockReturnValue(false);
   m.isCityPanelOpen.mockReturnValue(false);
   m.terminalVisible.mockReturnValue(false);
+  m.terminalHasFocus.mockReturnValue(false);
   m.isPickerOpen.mockReturnValue(false);
   m.isCommandPaletteOpen.mockReturnValue(false);
   state.selectedUnit = null;
@@ -333,6 +336,20 @@ describe('wireHotkeys — Escape chain and the map editor', () => {
 
     expect(m.closeMapEditor).toHaveBeenCalledTimes(1);
     expect(state.selectUnit).not.toHaveBeenCalled();
+  });
+
+  it('leaves the keyboard to the agent while the live terminal has focus', () => {
+    // Esc interrupts the agent's turn; it must not close the panel on the way.
+    installDom();
+    wire();
+    m.terminalVisible.mockReturnValue(true);
+    m.terminalHasFocus.mockReturnValue(true);
+
+    pressEscape();
+    pressKey({ key: 't' });
+
+    expect(m.terminalHide).not.toHaveBeenCalled();
+    expect(m.terminalToggle).not.toHaveBeenCalled();
   });
 
   it('closes the terminal first when both are open', () => {

@@ -91,6 +91,10 @@ export function wireHotkeys(
     // browser's Esc-to-close behavior own this event without moving the map.
     if (document.querySelector('dialog[open]')) return;
 
+    // The live terminal is the agent's keyboard: Esc interrupts its turn, and
+    // every letter is a letter. Shift+Esc hands the keys back to the map.
+    if (terminalPanel.hasFocus()) return;
+
     // Ctrl/Cmd+Z undoes and Ctrl/Cmd+Shift+Z (or Ctrl+Y) redoes — only while the
     // map editor is open. Inside a text field with text the browser's own undo
     // wins; an empty field sends the shortcut to the map.

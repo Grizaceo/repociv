@@ -222,7 +222,6 @@ function makeCtx() {
     setOperationTicker: vi.fn(),
     appendChatChunk: vi.fn(),
     appendApprovalCard: vi.fn(),
-    terminalPanel: {},
   } as unknown as MessageContext;
   return { state, ctx };
 }

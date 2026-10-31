@@ -43,6 +43,7 @@ import {
 import { ensurePanel, hidePanel, showPanel, bindPanelAction } from './panelShell.ts';
 import { clipboardWrite } from './chat/clipboard.ts';
 import { escapeHtml } from './escapeHtml.ts';
+import { terminalPanel } from '../terminalPanel.ts';
 import type { RepoCivProfile } from '../agentProfile.ts';
 import { openAgentSessionWizard, type SessionStartResult } from './agentSessionWizard.ts';
 import { openProfileStudio } from './agentProfileStrip.ts';
@@ -208,6 +209,7 @@ function _listKey(): string {
     r.subagent,
     r.section,
     r.liveChat,
+    r.herdrPane,
   ]);
   const units = (_deps?.state.getAllUnits() ?? [])
     .filter((u) => !u.ephemeral)
@@ -258,6 +260,7 @@ function _openChat(row: ExternalSessionRow): void {
   _replyError = '';
   _sending = false;
   _locate(row);
+  if (row.herdrPane) void terminalPanel.open(row.herdrPane);
   // Suvadu re-imports a transcript only on prompt/stop: pull it now for a live
   // session (once per session per panel lifetime; ↻ does it on demand).
   // Hermes reads its live database: nothing to import.
@@ -392,8 +395,15 @@ export async function performExternalSend(
   return { ok: true, mode: 'reply', reply: result };
 }
 
-/** The composer, plus the one line that says why it is or is not usable. */
+/** The composer, plus the one line that says why it is or is not usable. A
+ *  session in a herdr pane has its real CLI instead: one way in, no second writer. */
 function _composerHtml(row: ExternalSessionRow): string {
+  if (row.herdrPane) {
+    return `<div class="agents-compose">
+      <button type="button" class="agents-open-cli">⌨ Abrir su CLI</button>
+      <p class="agents-compose-hint">Escribes en su terminal real, en herdr. Cerrar RepoCiv no lo detiene.</p>
+    </div>`;
+  }
   const running = _chat?.lastReply?.state === 'running';
   const composer = composerState(row, { sending: _sending, replyRunning: running });
   const disabled = !composer.enabled;
@@ -706,6 +716,9 @@ function _renderChat(firstLoad = false): void {
   bindPanelAction(body, '.agents-chat-agent', () => _locate(row));
   bindPanelAction(body, '.agents-refresh', () => void _loadChat(true));
   bindPanelAction(body, '.agents-compose-send', () => void _send());
+  bindPanelAction(body, '.agents-open-cli', () => {
+    if (row.herdrPane) void terminalPanel.open(row.herdrPane);
+  });
   const textEl = body.querySelector<HTMLTextAreaElement>('.agents-compose-text');
   if (textEl) {
     textEl.addEventListener('input', () => {
