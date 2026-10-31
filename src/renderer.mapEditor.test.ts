@@ -1165,6 +1165,31 @@ describe('Renderer map editor — history round trips', () => {
     expect(await snapshot(state)).toEqual(after);
   });
 
+  it('redo of a removal finds the city a redone founding built', async () => {
+    const { canvas, fire } = makeFakeCanvas();
+    const state = makeState([tile({ q: 1, r: 0 })], []);
+    const renderer = new Renderer(canvas, state as never);
+    renderer.setMapEditorMode(true);
+    renderer.setMapEditorTool('place');
+    renderer.setMapEditorRepo(extraRepo);
+    (renderer as unknown as { pickAxial: () => Axial }).pickAxial = () => ({ q: 1, r: 0 });
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    renderer.setMapEditorTool('erase');
+    fire('mousedown', new FakeMouseEvent('mousedown', { clientX: 10, clientY: 10 }) as never);
+    fire('mouseup', new FakeMouseEvent('mouseup', { clientX: 10, clientY: 10 }) as never);
+    const removed = await snapshot(state);
+
+    expect(renderer.undoLastMapEdit()).toBe('Sacar extra');
+    expect(renderer.undoLastMapEdit()).toBe('Fundar extra');
+    expect(renderer.redoLastMapEdit()).toBe('Fundar extra');
+    expect(renderer.redoLastMapEdit()).toBe('Sacar extra');
+    expect(await snapshot(state)).toEqual(removed);
+
+    expect(renderer.undoLastMapEdit()).toBe('Sacar extra');
+    expect(state.world.cities).toHaveLength(1);
+  });
+
   it('undo of a founding takes its units through GameState', async () => {
     const { GameState } = await import('./game.ts');
     const { canvas, fire } = makeFakeCanvas();

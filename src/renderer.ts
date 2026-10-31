@@ -2219,6 +2219,7 @@ export class Renderer {
     if (!tile) return;
     if (tile.city) {
       const city = tile.city;
+      const key = cityKey(city);
       const removed = removeCityOp(this.state.world, city, { record: true });
       if (!removed) return; // the capital is not removable
       let current = removed;
@@ -2233,8 +2234,11 @@ export class Renderer {
           for (const u of current.units) this.state.restoreUnit(u);
         },
         redo: () => {
-          // The new removal collects the units that joined the city meanwhile.
-          current = removeCityOp(this.state.world, city, { record: true }) ?? current;
+          // Redoing a founding builds a new City, so the object captured here
+          // may be gone. The new removal collects the units that joined the
+          // city meanwhile.
+          const live = this.state.world.cities.find((c) => cityKey(c) === key);
+          current = (live && removeCityOp(this.state.world, live, { record: true })) ?? current;
           for (const u of current.units) this.state.removeUnit(u.id);
         },
       });
