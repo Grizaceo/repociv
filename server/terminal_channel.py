@@ -9,8 +9,9 @@ dashboard from another page in the same browser.
 Everything herdr-specific lives in ``server/herdr_runtime.py``.
 
 Protocol. Server → client: binary messages are ANSI screen bytes, text messages
-are JSON (``attached``, ``size``, ``status``, ``error``, ``closed``, ``refused``).
-Client → server: ``attach`` once, then ``input`` (keystrokes) and ``paste``.
+are JSON (``attached``, ``size``, ``status``, ``error``, ``closed``, ``refused``,
+``submit_result``). Client → server: ``attach`` once, then ``input`` (keystrokes),
+``paste`` or ``submit``. Attach can disable screen and history with ``screen: false``.
 """
 from __future__ import annotations
 
@@ -81,7 +82,7 @@ def _scrollback(text: str, rows: int) -> str:
 
 
 class _Session:
-    def __init__(self, ws: Any, agent: AgentPane, binary: str) -> None:
+    def __init__(self, ws: Any, agent: AgentPane, binary: str, screen: bool = True) -> None:
         self.ws = ws
         self.agent = agent
         self.binary = binary
@@ -89,6 +90,7 @@ class _Session:
         self.pane_id = agent.pane_id
         self._status_task: asyncio.Task[None] | None = None
         self._streamed = False
+        self.screen = screen
 
     async def _control(self, message: dict[str, Any]) -> None:
         await self.ws.send(json.dumps(message))
@@ -96,7 +98,7 @@ class _Session:
     async def run(self) -> None:
         geometry = await herdr_runtime.locate(self.terminal_id)
         self.pane_id = geometry.pane_id
-        history = await herdr_runtime.history(self.pane_id)
+        history = await herdr_runtime.history(self.pane_id) if self.screen else ""
         await self._control(
             {
                 "type": "attached",
@@ -189,7 +191,8 @@ class _Session:
                 if isinstance(item, Closed):
                     return
                 self._streamed = True
-                await self.ws.send(item)
+                if self.screen:
+                    await self.ws.send(item)
         finally:
             await stream.aclose()
 
@@ -201,8 +204,25 @@ class _Session:
                 data = json.loads(message)
             except ValueError:
                 continue
-            if isinstance(data, dict) and isinstance(data.get("data"), str):
+            if not isinstance(data, dict):
+                continue
+            if (
+                data.get("type") == "submit"
+                and isinstance(data.get("id"), str)
+                and len(data["id"]) <= 64
+                and isinstance(data.get("text"), str)
+            ):
+                await self._submit(data["id"], data["text"])
+            elif isinstance(data.get("data"), str):
                 await self._deliver(data.get("type"), data["data"])
+
+    async def _submit(self, request_id: str, text: str) -> None:
+        try:
+            pane_id = (await herdr_runtime.locate(self.terminal_id)).pane_id
+            result = await herdr_runtime.submit(pane_id, text)
+        except HerdrError as exc:
+            result = herdr_runtime.SubmitResult("failed", exc.code)
+        await self._control({"type": "submit_result", "id": request_id, **result.to_dict()})
 
     async def _deliver(self, kind: Any, text: str) -> None:
         send = {"input": herdr_runtime.send_text, "paste": herdr_runtime.paste}.get(kind)
@@ -272,7 +292,7 @@ async def serve(
         if agent is None:
             await _refuse(ws, "not_an_agent_pane")
             return
-        await _Session(ws, agent, status.binary).run()
+        await _Session(ws, agent, status.binary, screen=hello.get("screen") is not False).run()
     except HerdrError as exc:
         await _refuse(ws, exc.code)
     except websockets.exceptions.ConnectionClosed:

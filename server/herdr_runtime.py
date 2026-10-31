@@ -37,6 +37,10 @@ HISTORY_LINES = 2000
 _REQUEST_TIMEOUT_S = 2.0
 _STATUS_TIMEOUT_S = 5.0
 _STOP_TIMEOUT_S = 2.0
+_SUBMIT_PAUSE_S = 0.2
+_CONFIRM_TIMEOUT_S = 3.0
+_CONFIRM_POLL_S = 0.1
+MAX_SUBMIT_CHARS = 100_000
 # One NDJSON line carries a whole base64 frame; a busy, wide TUI goes well past
 # asyncio's default 64 KiB limit.
 _MAX_LINE_BYTES = 16 * 1024 * 1024
@@ -365,6 +369,61 @@ async def paste(pane_id: str, text: str, *, path: str | None = None) -> None:
     """Text as a paste. ``observe`` hides the pane's bracketed-paste mode from
     the viewer, so only the server can wrap it; sent raw, each line would submit."""
     await arequest("pane.send_input", {"pane_id": pane_id, "text": text}, path=path)
+
+
+@dataclass(frozen=True)
+class SubmitResult:
+    state: str
+    reason: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"state": self.state, "reason": self.reason}
+
+
+async def submit(pane_id: str, text: str, *, path: str | None = None) -> SubmitResult:
+    if not text.strip():
+        return SubmitResult("refused", "empty_text")
+    if len(text) > MAX_SUBMIT_CHARS:
+        return SubmitResult("refused", "text_too_long")
+
+    async def agent() -> AgentPane | None:
+        rows = await asyncio.to_thread(list_agents, **({"path": path} if path is not None else {}))
+        return next((row for row in rows if row.pane_id == pane_id), None)
+
+    try:
+        before = await agent()
+    except HerdrError as exc:
+        return SubmitResult("failed", exc.code)
+    if before is None:
+        return SubmitResult("refused", "not_an_agent_pane")
+    if before.status == "blocked":
+        return SubmitResult("refused", "agent_blocked")
+
+    kwargs = {"path": path} if path is not None else {}
+    try:
+        await paste(pane_id, text, **kwargs)
+    except HerdrError as exc:
+        return SubmitResult("failed", exc.code)
+    await asyncio.sleep(_SUBMIT_PAUSE_S)
+    try:
+        await send_text(pane_id, "\r", **kwargs)
+    except HerdrError:
+        return SubmitResult("unconfirmed", "enter_failed")
+    if before.status == "working":
+        return SubmitResult("unconfirmed", "agent_busy")
+
+    deadline = asyncio.get_running_loop().time() + _CONFIRM_TIMEOUT_S
+    while asyncio.get_running_loop().time() < deadline:
+        try:
+            current = await agent()
+        except HerdrError:
+            return SubmitResult("unconfirmed", "confirm_unavailable")
+        if current is None:
+            return SubmitResult("unconfirmed", "confirm_unavailable")
+        if current.state_change_seq > before.state_change_seq:
+            return SubmitResult("confirmed")
+        await asyncio.sleep(_CONFIRM_POLL_S)
+    return SubmitResult("unconfirmed", "no_state_change")
 
 
 # ─── Streams ──────────────────────────────────────────────────────────────────

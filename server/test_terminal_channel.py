@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
+from dataclasses import replace
 from typing import Any, AsyncIterator, Awaitable, Callable
 
 import pytest
@@ -103,6 +105,10 @@ class FakeRuntime:
         self.statuses: asyncio.Queue[str] = asyncio.Queue()
         self.subscribed: list[str] = []
         self.fail_send: list[HerdrError] = []
+        self.fail_kind: str | None = None
+        self.sent_at: list[float] = []
+        self.on_send: Callable[[str, str], None] | None = None
+        self.history_calls = 0
 
     async def locate(self, terminal_id: str, *, path: str | None = None) -> PaneGeometry:
         if isinstance(self.geometry, HerdrError):
@@ -110,6 +116,7 @@ class FakeRuntime:
         return self.geometry
 
     async def history(self, pane_id: str, *, path: str | None = None) -> str:
+        self.history_calls += 1
         return self.hist
 
     async def observe(self, terminal_id: str, cols: int, rows: int, *, binary: str, path: str | None = None) -> Any:
@@ -133,7 +140,12 @@ class FakeRuntime:
         async def send(pane_id: str, text: str, *, path: str | None = None) -> None:
             if self.fail_send:
                 raise self.fail_send.pop()
+            if self.fail_kind == kind:
+                raise HerdrError("unavailable")
             self.sent.append((kind, pane_id, text))
+            self.sent_at.append(time.monotonic())
+            if self.on_send:
+                self.on_send(kind, text)
 
         return send
 
@@ -160,7 +172,10 @@ def runtime(monkeypatch: pytest.MonkeyPatch) -> FakeRuntime:
 Client = Callable[[Any], Awaitable[None]]
 
 
-def _run(session: Client, *, attach: bool = True, headers: dict[str, str] | None = None) -> None:
+def _run(
+    session: Client, *, attach: bool = True, headers: dict[str, str] | None = None,
+    screen: bool = True,
+) -> None:
     async def handler(ws: Any) -> None:
         await terminal_channel.serve(ws, token=TOKEN, origins={ORIGIN}, bind_host="127.0.0.1", remote=False)
 
@@ -171,7 +186,7 @@ def _run(session: Client, *, attach: bool = True, headers: dict[str, str] | None
             sent = headers if headers is not None else {"Origin": ORIGIN, "X-RepoCiv-Token": TOKEN}
             async with connect(uri, additional_headers=sent, compression=None) as ws:
                 if attach:
-                    await ws.send(json.dumps({"type": "attach", "terminalId": "term_a"}))
+                    await ws.send(json.dumps({"type": "attach", "terminalId": "term_a", "screen": screen}))
                 await session(ws)
 
     asyncio.run(asyncio.wait_for(go(), 10))
@@ -430,3 +445,78 @@ def test_a_failed_size_poll_does_not_end_a_live_terminal(runtime: FakeRuntime) -
 
     _run(session)
     assert runtime.opened == [("term_a", 114, 39)]
+
+
+def test_screenless_attach_keeps_status_and_observer_without_history_or_frames(runtime: FakeRuntime) -> None:
+    async def session(ws: Any) -> None:
+        assert (await _json(ws))["history"] == ""
+        await _until(lambda: bool(runtime.subscribed) and bool(runtime.opened))
+        runtime.frames.put_nowait(b"private screen")
+        runtime.statuses.put_nowait("blocked")
+        assert await _json(ws) == {"type": "status", "status": "blocked"}
+
+    _run(session, screen=False)
+    assert runtime.history_calls == 0
+
+
+@pytest.mark.parametrize(
+    ("status", "fail_kind", "bump", "text", "expected", "sent"),
+    [
+        ("idle", None, True, "hello", ("confirmed", None), ["paste", "input"]),
+        ("idle", None, False, "hello", ("unconfirmed", "no_state_change"), ["paste", "input"]),
+        ("working", None, False, "hello", ("unconfirmed", "agent_busy"), ["paste", "input"]),
+        ("blocked", None, False, "hello", ("refused", "agent_blocked"), []),
+        ("idle", "paste", False, "hello", ("failed", "unavailable"), []),
+        ("idle", "input", False, "hello", ("unconfirmed", "enter_failed"), ["paste"]),
+        ("idle", None, False, "  ", ("refused", "empty_text"), []),
+        ("idle", None, False, "x" * 100_001, ("refused", "text_too_long"), []),
+    ],
+)
+def test_submit_once_over_websocket(
+    runtime: FakeRuntime, monkeypatch: pytest.MonkeyPatch, status: str,
+    fail_kind: str | None, bump: bool, text: str, expected: tuple[str, str | None],
+    sent: list[str],
+) -> None:
+    runtime.agents = [replace(AGENT, status=status, state_change_seq=11)]
+    runtime.fail_kind = fail_kind
+    monkeypatch.setattr(herdr_runtime, "_CONFIRM_TIMEOUT_S", 0.15, raising=False)
+    monkeypatch.setattr(herdr_runtime, "_CONFIRM_POLL_S", 0.01, raising=False)
+
+    def react(kind: str, value: str) -> None:
+        if bump and kind == "input" and value == "\r":
+            runtime.agents = [replace(runtime.agents[0], state_change_seq=12)]
+
+    runtime.on_send = react
+
+    async def session(ws: Any) -> None:
+        await _json(ws)
+        await ws.send(json.dumps({"type": "submit", "id": "one", "text": text}))
+        assert await _json(ws) == {
+            "type": "submit_result", "id": "one", "state": expected[0], "reason": expected[1]
+        }
+
+    _run(session, screen=False)
+    assert [kind for kind, _, _ in runtime.sent] == sent
+    if sent == ["paste", "input"]:
+        assert runtime.sent[0][2] == text
+        assert runtime.sent[1][2] == "\r"
+        assert runtime.sent_at[1] - runtime.sent_at[0] >= 0.19
+
+
+def test_submit_locates_current_pane_and_rejects_bad_messages(runtime: FakeRuntime) -> None:
+    async def session(ws: Any) -> None:
+        await _json(ws)
+        runtime.geometry = HerdrError("pane_not_found")
+        for message in (
+            {"type": "submit", "id": 5, "text": "bad"},
+            {"type": "submit", "id": "x" * 65, "text": "bad"},
+            {"type": "submit", "id": "a", "text": 5},
+        ):
+            await ws.send(json.dumps(message))
+        await ws.send(json.dumps({"type": "submit", "id": "valid", "text": "ok"}))
+        assert await _json(ws) == {
+            "type": "submit_result", "id": "valid", "state": "failed", "reason": "pane_not_found"
+        }
+
+    _run(session, screen=False)
+    assert runtime.sent == []

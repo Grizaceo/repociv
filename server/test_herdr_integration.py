@@ -291,3 +291,56 @@ def test_a_browser_session_end_to_end(private: Private, pane: str, monkeypatch: 
 
 def _agent(private: Private, pane_id: str) -> herdr_runtime.AgentPane:
     return herdr_runtime.AgentPane(pane_id, _terminal(private, pane_id), "claude", "idle")
+
+
+def _report(private: Private, pane_id: str, state: str) -> None:
+    herdr_runtime.request(
+        "pane.report_agent",
+        {"pane_id": pane_id, "source": "repociv-test", "agent": "claude", "state": state},
+        path=private.socket,
+    )
+
+
+def test_reported_agent_has_increasing_state_sequence(private: Private, pane: str) -> None:
+    _report(private, pane, "idle")
+    before = next(p for p in herdr_runtime.list_agents(path=private.socket) if p.pane_id == pane)
+    _report(private, pane, "working")
+    after = next(p for p in herdr_runtime.list_agents(path=private.socket) if p.pane_id == pane)
+    assert after.state_change_seq > before.state_change_seq
+
+
+def test_submit_on_real_recorder_pane(private: Private, pane: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    log = _recorder(private, pane, "submit")
+    monkeypatch.setattr(herdr_runtime, "_CONFIRM_TIMEOUT_S", 0.2, raising=False)
+    text = "safe text " * 10
+    _report(private, pane, "idle")
+    result = asyncio.run(herdr_runtime.submit(pane, text, path=private.socket))
+    assert (result.state, result.reason) == ("unconfirmed", "no_state_change")
+    lines = _wait_for_log(log, "\\r").splitlines()
+    assert lines == [repr(b"\x1b[200~" + text.encode() + b"\x1b[201~"), repr(b"\r")]
+
+    log.write_text("")
+    _report(private, pane, "blocked")
+    result = asyncio.run(herdr_runtime.submit(pane, text, path=private.socket))
+    assert (result.state, result.reason) == ("refused", "agent_blocked")
+    assert log.read_text() == ""
+
+    _report(private, pane, "working")
+    result = asyncio.run(herdr_runtime.submit(pane, text, path=private.socket))
+    assert (result.state, result.reason) == ("unconfirmed", "agent_busy")
+    assert len(_wait_for_log(log, "\\r").splitlines()) == 2
+
+    log.write_text("")
+    _report(private, pane, "idle")
+
+    async def confirm() -> herdr_runtime.SubmitResult:
+        async def react() -> None:
+            await asyncio.to_thread(_wait_for_log, log, "\\r")
+            await asyncio.to_thread(_report, private, pane, "working")
+        task = asyncio.create_task(react())
+        result = await herdr_runtime.submit(pane, text, path=private.socket)
+        await task
+        return result
+
+    result = asyncio.run(confirm())
+    assert (result.state, result.reason) == ("confirmed", None)
