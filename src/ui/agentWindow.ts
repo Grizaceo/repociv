@@ -297,7 +297,11 @@ export function openAgentWindow(value: ExternalSessionRow): void {
   if (!BRIDGE_URL) {
     const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
     link = new TerminalLink(`${scheme}://${location.host}/repociv-ws/terminal`, value.herdrPane.terminalId, {
-      onAttached: (attachment) => { if (version === generation) setStatus(attachment.agent.status); },
+      onAttached: (attachment) => {
+        if (version !== generation) return;
+        if (notice === 'Sin conexión con el agente.') notice = '';
+        setStatus(attachment.agent.status);
+      },
       onStatus: (next) => { if (version === generation) setStatus(next); },
       onSize: () => {},
       onScreen: () => {},

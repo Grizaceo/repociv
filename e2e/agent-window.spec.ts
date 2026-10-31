@@ -14,7 +14,9 @@ const row: ExternalSessionRow = {
 };
 type WireMessage = { type: string; id?: string; text?: string; screen?: boolean };
 
-async function stage(page: Page, options: { result?: string; reason?: string; noPane?: boolean } = {}) {
+async function stage(
+  page: Page, options: { result?: string; reason?: string; noPane?: boolean; noResult?: boolean } = {},
+) {
   const messages: ExternalChatMessage[] = [
     { role: 'user', text: 'pregunta anterior', at: null, turn: null, truncated: false },
     { role: 'assistant', text: '**respuesta anterior**', at: null, turn: null, truncated: false },
@@ -35,7 +37,7 @@ async function stage(page: Page, options: { result?: string; reason?: string; no
         ws.send(JSON.stringify({ type: 'attached', agent, cols: 80, rows: 24, history: '' }));
         if (message.screen !== false) ws.send(Buffer.from('\x1b[2J\x1b[1;1Hpantalla viva'));
       }
-      if (message.type === 'submit') {
+      if (message.type === 'submit' && !options.noResult) {
         ws.send(JSON.stringify({
           type: 'submit_result', id: message.id, state: options.result ?? 'confirmed',
           reason: options.reason ?? null,
@@ -103,6 +105,20 @@ test('unconfirmed does not retry', async ({ page }) => {
   await page.locator('#agent-window textarea').press('Enter');
   await expect(page.locator('#agent-window')).toContainText('Sin confirmar');
   await page.waitForTimeout(1100);
+  expect(fixture.wire.filter((m) => m.type === 'submit')).toHaveLength(1);
+});
+
+test('a lost submit is not replayed when the connection returns', async ({ page }) => {
+  const fixture = await stage(page, { noResult: true });
+  const panel = page.locator('#agent-window');
+  await expect.poll(() => fixture.wire.some((m) => m.type === 'attach')).toBe(true);
+  await panel.locator('textarea').fill('no repetir');
+  await panel.locator('textarea').press('Enter');
+  await expect(panel).toContainText('Enviando');
+  await fixture.socket().close();
+  await expect(panel).toContainText('Sin confirmar');
+  await expect.poll(() => fixture.wire.filter((m) => m.type === 'attach').length).toBe(2);
+  await expect(panel).not.toContainText('Sin conexión con el agente.');
   expect(fixture.wire.filter((m) => m.type === 'submit')).toHaveLength(1);
 });
 
