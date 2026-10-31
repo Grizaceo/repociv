@@ -254,7 +254,7 @@ Linux bloquea la inyección de teclas en otra terminal (`TIOCSTI`,
 `dev.tty.legacy_tiocsti=0`). herdr es un multiplexor de terminales para agentes:
 expone cada panel por un socket local, para que RepoCiv vea la pantalla real y
 escriba en el agente sin tomar la terminal. Necesitas herdr **0.9.1 o superior**.
-Si aún no lo tienes, consulta la [sitio de herdr](https://herdr.dev).
+Si aún no lo tienes, consulta el [sitio de herdr](https://herdr.dev).
 
 Corre `herdr` y abre `claude`, `devin` o `hermes` en un panel. En F8 selecciona
 el agente para abrir su ventana en Crónicas; allí encontrarás «⌨ Abrir CLI».
