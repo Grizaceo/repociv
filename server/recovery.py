@@ -268,6 +268,7 @@ def _build_no_recovery(
         "available_modes": available_modes,
     }
 
+
 def _build_copy_command(
     harness: dict[str, Any],
     harness_id: str,

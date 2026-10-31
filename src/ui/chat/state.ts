@@ -118,6 +118,3 @@ export function subscribeWorkingUnits(fn: () => void): () => void {
   _workingSubscribers.add(fn);
   return () => _workingSubscribers.delete(fn);
 }
-export function notifyWorkingUnitsChanged(): void {
-  for (const fn of _workingSubscribers) fn();
-}
