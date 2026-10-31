@@ -147,9 +147,13 @@ export async function openAgentSessionWizard(
     const request = ++runtimeRequest;
     profileSelect.replaceChildren();
     if (herdr) {
-      for (const [kind, label] of Object.entries(HERDR_AGENT_LABELS)) profileSelect.appendChild(_option(kind, label));
+      for (const [kind, label] of Object.entries(HERDR_AGENT_LABELS))
+        profileSelect.appendChild(_option(kind, label));
     } else {
-      for (const profile of profiles) profileSelect.appendChild(_option(profile.name, `${profile.display_name ?? profile.name} · ${profile.harness}`));
+      for (const profile of profiles)
+        profileSelect.appendChild(
+          _option(profile.name, `${profile.display_name ?? profile.name} · ${profile.harness}`),
+        );
       if (options.profileName && profiles.some((profile) => profile.name === options.profileName)) {
         profileSelect.value = options.profileName;
       } else if (options.harness) {
@@ -169,7 +173,11 @@ export async function openAgentSessionWizard(
       return;
     }
     if (!herdr) {
-      _setStatus(status, profiles.length ? '' : 'Creá un perfil antes de iniciar una sesión.', !profiles.length);
+      _setStatus(
+        status,
+        profiles.length ? '' : 'Creá un perfil antes de iniciar una sesión.',
+        !profiles.length,
+      );
       submit.disabled = !profiles.length;
       return;
     }
@@ -177,7 +185,11 @@ export async function openAgentSessionWizard(
     const response = await fetchAgents();
     if (request !== runtimeRequest || !dialog.isConnected) return;
     runtimeReady = response?.runtime.state === 'ready';
-    _setStatus(status, response ? (runtimeReady ? '' : runtimeText(response.runtime)) : 'No pude hablar con herdr.', !runtimeReady);
+    _setStatus(
+      status,
+      response ? (runtimeReady ? '' : runtimeText(response.runtime)) : 'No pude hablar con herdr.',
+      !runtimeReady,
+    );
     submit.disabled = !runtimeReady;
   };
   whereSelect.addEventListener('change', () => void updateMode());
@@ -190,7 +202,9 @@ export async function openAgentSessionWizard(
       if (whereSelect.value === 'herdr') {
         if (!runtimeReady || !citySelect.value) return;
         const draft: HerdrLaunchDraft = {
-          kind: profileSelect.value as HerdrLaunchKind, cityId: citySelect.value, mission: missionInput.value.trim(),
+          kind: profileSelect.value as HerdrLaunchKind,
+          cityId: citySelect.value,
+          mission: missionInput.value.trim(),
         };
         submit.disabled = true;
         _setStatus(status, 'Enviando al bridge…');

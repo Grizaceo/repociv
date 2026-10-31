@@ -105,11 +105,19 @@ describe('TerminalLink', () => {
     const on = { ...handlers(), onSubmitResult: vi.fn() };
     const socket = new FakeSocket();
     const instance = new TerminalLink(
-      'ws://x/terminal', 'term_a', on, () => socket as unknown as WebSocket, { screen: false },
+      'ws://x/terminal',
+      'term_a',
+      on,
+      () => socket as unknown as WebSocket,
+      { screen: false },
     );
     instance.start();
     socket.open();
-    expect(JSON.parse(socket.sent[0]!)).toEqual({ type: 'attach', terminalId: 'term_a', screen: false });
+    expect(JSON.parse(socket.sent[0]!)).toEqual({
+      type: 'attach',
+      terminalId: 'term_a',
+      screen: false,
+    });
     expect(instance.submit('one', 'hello')).toBe(false);
     socket.message(ATTACHED);
     expect(instance.submit('one', 'hello')).toBe(true);
@@ -138,9 +146,9 @@ describe('TerminalLink', () => {
     vi.advanceTimersByTime(RETRY_MS[0]);
     sockets[1]!.open();
     sockets[1]!.message(ATTACHED);
-    expect(sockets[1]!.sent.map((raw) => JSON.parse(raw) as { type: string }).map((m) => m.type)).toEqual([
-      'attach',
-    ]);
+    expect(
+      sockets[1]!.sent.map((raw) => JSON.parse(raw) as { type: string }).map((m) => m.type),
+    ).toEqual(['attach']);
   });
 
   it('reconnects with back-off, and an attach resets it', () => {

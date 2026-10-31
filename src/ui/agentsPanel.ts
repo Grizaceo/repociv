@@ -74,7 +74,9 @@ const _chatView = createAgentsChat({
   whereHtml: _whereHtml,
   render: _render,
   loadList: _loadList,
-  invalidateList: () => { _renderedKey = ''; },
+  invalidateList: () => {
+    _renderedKey = '';
+  },
 });
 
 export function bindAgentsPanel(deps: AgentsPanelDeps): void {
@@ -122,7 +124,11 @@ export function openNewAgentSession(
 ): void {
   if (!_deps) return;
   void openAgentSessionWizard(
-    { state: _deps.state, startSession: _deps.startSession, startHerdrSession: _deps.startHerdrSession },
+    {
+      state: _deps.state,
+      startSession: _deps.startSession,
+      startHerdrSession: _deps.startHerdrSession,
+    },
     {
       ...options,
       // Nueva sesión = entrar a conversar: cuando el bridge acepta la sesión,
@@ -133,8 +139,13 @@ export function openNewAgentSession(
       },
       onHerdrStarted: (draft, cityName, result) => {
         openAgentWindow({
-          terminalId: null, paneId: '', kind: draft.kind, label: HERDR_AGENT_LABELS[draft.kind],
-          place: cityName, sessionId: null, status: result.status,
+          terminalId: null,
+          paneId: '',
+          kind: draft.kind,
+          label: HERDR_AGENT_LABELS[draft.kind],
+          place: cityName,
+          sessionId: null,
+          status: result.status,
           launch: { commandId: result.commandId, mission: draft.mission },
         });
       },

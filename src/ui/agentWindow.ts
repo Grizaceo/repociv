@@ -9,7 +9,10 @@ import { attachCopyListeners } from './chat/clipboard.ts';
 import { renderMarkdown } from './chat/markdown.ts';
 import { getSidePanelCleanup, setSidePanelCleanup } from './chat/state.ts';
 import { trapFocus } from './focusTrap.ts';
-import { externalSessionSnapshot, subscribeExternalSessionDirectory } from './externalSessionDirectory.ts';
+import {
+  externalSessionSnapshot,
+  subscribeExternalSessionDirectory,
+} from './externalSessionDirectory.ts';
 
 export interface AgentWindowDestination {
   terminalId: string | null;
@@ -27,9 +30,18 @@ export function agentWindowDestination(value: ExternalSessionRow): AgentWindowDe
   const pane = value.herdrPane;
   if (!pane) throw new Error('Agent session has no herdr pane');
   return {
-    terminalId: pane.terminalId, paneId: pane.paneId, kind: pane.agent,
-    label: sessionLabel(value), place: value.repo.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || 'capital',
-    sessionId: value.sessionId, status: pane.status, row: value,
+    terminalId: pane.terminalId,
+    paneId: pane.paneId,
+    kind: pane.agent,
+    label: sessionLabel(value),
+    place:
+      value.repo
+        .replace(/[/\\]+$/, '')
+        .split(/[/\\]/)
+        .pop() || 'capital',
+    sessionId: value.sessionId,
+    status: pane.status,
+    row: value,
   };
 }
 
@@ -42,8 +54,14 @@ interface Pending {
 }
 
 const HIDDEN_IDS = [
-  'chat-agent-selector-row', 'chat-messages', 'operation-ticker', 'chat-input-row',
-  'model-selector-wrapper', 'chat-scroll-bottom', 'unit-pane-body', 'unit-pane-empty',
+  'chat-agent-selector-row',
+  'chat-messages',
+  'operation-ticker',
+  'chat-input-row',
+  'model-selector-wrapper',
+  'chat-scroll-bottom',
+  'unit-pane-body',
+  'unit-pane-empty',
 ];
 const BLOCKED_NOTICE =
   'El agente espera tu respuesta en su terminal (un permiso o un diálogo). ' +
@@ -105,8 +123,12 @@ function element<T extends HTMLElement>(selector: string): T | null {
 function cli(): void {
   if (!destination?.terminalId || !destination.paneId) return;
   const agent: TerminalAgent = row?.herdrPane ?? {
-    paneId: destination.paneId, terminalId: destination.terminalId, agent: destination.kind,
-    status, name: destination.label, folder: destination.place,
+    paneId: destination.paneId,
+    terminalId: destination.terminalId,
+    agent: destination.kind,
+    status,
+    name: destination.label,
+    folder: destination.place,
   };
   void terminalPanel.open(agent);
 }
@@ -136,8 +158,12 @@ function renderNotice(): void {
   box.classList.toggle('hidden', !text);
   if (!text) return;
   box.append(document.createTextNode(text));
-  if (destination?.terminalId && (status === 'blocked' || attachUnrecognized ||
-    (Boolean(destination.launch) && (launchState === 'unknown' || launchState === 'failed')))) {
+  if (
+    destination?.terminalId &&
+    (status === 'blocked' ||
+      attachUnrecognized ||
+      (Boolean(destination.launch) && (launchState === 'unknown' || launchState === 'failed')))
+  ) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'agents-compose-send';
@@ -148,8 +174,13 @@ function renderNotice(): void {
 }
 
 function canSend(): boolean {
-  return Boolean(destination && connected && !BRIDGE_URL && status !== 'blocked' &&
-    (!destination.launch || ['ready', 'blocked', 'unknown'].includes(launchState)));
+  return Boolean(
+    destination &&
+    connected &&
+    !BRIDGE_URL &&
+    status !== 'blocked' &&
+    (!destination.launch || ['ready', 'blocked', 'unknown'].includes(launchState)),
+  );
 }
 
 function bubble(text: string, role: 'user' | 'assistant', label: string, detail = ''): HTMLElement {
@@ -181,21 +212,29 @@ function renderMessages(): void {
   const fragment = document.createDocumentFragment();
   for (const message of messages) {
     if (message.role !== 'user' && message.role !== 'assistant') continue;
-    const time = message.at === null ? '' : new Date(message.at).toLocaleTimeString('es-CL', {
-      hour: '2-digit', minute: '2-digit',
-    });
+    const time =
+      message.at === null
+        ? ''
+        : new Date(message.at).toLocaleTimeString('es-CL', {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
     const who = message.role === 'user' ? 'TÚ' : row ? sessionLabel(row) : destination.label;
     fragment.append(bubble(message.text, message.role, [who, time].filter(Boolean).join(' · ')));
   }
   if (!destination.sessionId) {
     const placeholder = document.createElement('p');
-    placeholder.textContent = 'La crónica aparece cuando el agente registre su sesión (tras el primer mensaje).';
+    placeholder.textContent =
+      'La crónica aparece cuando el agente registre su sesión (tras el primer mensaje).';
     fragment.append(placeholder);
   }
   for (const item of pending) {
-    const detail = item.state === 'sending' ? 'Enviando…'
-      : item.state === 'confirmed' ? '✓ Entregado'
-        : `Sin confirmar${item.reason ? ` · ${UNCONFIRMED[item.reason] ?? 'Revisa su CLI antes de reenviar.'}` : ''}`;
+    const detail =
+      item.state === 'sending'
+        ? 'Enviando…'
+        : item.state === 'confirmed'
+          ? '✓ Entregado'
+          : `Sin confirmar${item.reason ? ` · ${UNCONFIRMED[item.reason] ?? 'Revisa su CLI antes de reenviar.'}` : ''}`;
     fragment.append(bubble(item.text, 'user', 'TÚ', detail));
   }
   log.replaceChildren(fragment);
@@ -237,16 +276,22 @@ function resultReceived(result: SubmitResult): void {
   if (result.state === 'refused' || result.state === 'failed') {
     pending.splice(index, 1);
     for (const other of pending) {
-      if (normalizeMessage(other.text) === normalizeMessage(item.text) && other.target > item.target) {
+      if (
+        normalizeMessage(other.text) === normalizeMessage(item.text) &&
+        other.target > item.target
+      ) {
         other.target -= 1;
       }
     }
     restoreDraft(item.text);
-    notice = result.reason === 'agent_blocked'
-      ? BLOCKED_NOTICE
-      : `No se entregó: ${reasonText(
-        result.reason && /^[a-z0-9_]+$/i.test(result.reason) ? result.reason : 'error desconocido',
-      )}`;
+    notice =
+      result.reason === 'agent_blocked'
+        ? BLOCKED_NOTICE
+        : `No se entregó: ${reasonText(
+            result.reason && /^[a-z0-9_]+$/i.test(result.reason)
+              ? result.reason
+              : 'error desconocido',
+          )}`;
     if (result.reason === 'agent_blocked') setStatus('blocked');
     else renderNotice();
   } else {
@@ -264,9 +309,20 @@ function send(): void {
   if (!text.trim()) return;
   const normalized = normalizeMessage(text);
   const count = countUserText(messages, text);
-  const target = Math.max(count, ...pending.filter((item) => normalizeMessage(item.text) === normalized)
-    .map((item) => item.target)) + 1;
-  const item: Pending = { id: `submit-${Date.now()}-${++nextId}`, text, target, state: 'sending', reason: null };
+  const target =
+    Math.max(
+      count,
+      ...pending
+        .filter((item) => normalizeMessage(item.text) === normalized)
+        .map((item) => item.target),
+    ) + 1;
+  const item: Pending = {
+    id: `submit-${Date.now()}-${++nextId}`,
+    text,
+    target,
+    state: 'sending',
+    reason: null,
+  };
   pending.push(item);
   renderMessages();
   if (!link?.submit(item.id, text)) {
@@ -329,7 +385,11 @@ function linkSession(rows: ExternalSessionRow[] | null): void {
   const best = rows
     .filter((item) => item.herdrPane?.terminalId === destination?.terminalId)
     .sort((a, b) => b.lastActivityAt - a.lastActivityAt)[0];
-  if (!best || (row && best.sessionId !== row.sessionId && best.lastActivityAt <= row.lastActivityAt)) return;
+  if (
+    !best ||
+    (row && best.sessionId !== row.sessionId && best.lastActivityAt <= row.lastActivityAt)
+  )
+    return;
   if (best.sessionId === destination.sessionId) {
     row = best;
     return;
@@ -350,51 +410,77 @@ function connectTerminal(): void {
   const version = generation;
   if (!attachDeadline) attachDeadline = Date.now() + 30_000;
   const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-  link = new TerminalLink(`${scheme}://${location.host}/repociv-ws/terminal`, value.terminalId, {
-    onAttached: (attachment) => {
-      if (version !== generation) return;
-      connected = true;
-      attachUnrecognized = false;
-      if (notice === 'Sin conexión con el agente.' ||
-        notice === 'herdr aún no reconoce al agente en ese panel. Ábrelo en el CLI.') {
-        notice = launchState === 'unknown'
-          ? 'No se pudo confirmar que el agente arrancó. Revisa su CLI antes de lanzar otro.' : '';
-      }
-      setStatus(attachment.agent.status);
-    },
-    onStatus: (next) => { if (version === generation) setStatus(next); },
-    onSize: () => {},
-    onScreen: () => {},
-    onError: (reason) => { if (version === generation) { notice = reasonText(reason); renderNotice(); } },
-    onClosed: (reason) => {
-      if (version === generation) { connected = false; notice = reasonText(reason); renderNotice(); }
-    },
-    onRefused: (reason) => {
-      if (version !== generation) return;
-      connected = false;
-      if (value.launch && reason === 'not_an_agent_pane') {
-        attachUnrecognized = true;
-        notice = 'herdr aún no reconoce al agente en ese panel. Ábrelo en el CLI.';
+  link = new TerminalLink(
+    `${scheme}://${location.host}/repociv-ws/terminal`,
+    value.terminalId,
+    {
+      onAttached: (attachment) => {
+        if (version !== generation) return;
+        connected = true;
+        attachUnrecognized = false;
+        if (
+          notice === 'Sin conexión con el agente.' ||
+          notice === 'herdr aún no reconoce al agente en ese panel. Ábrelo en el CLI.'
+        ) {
+          notice =
+            launchState === 'unknown'
+              ? 'No se pudo confirmar que el agente arrancó. Revisa su CLI antes de lanzar otro.'
+              : '';
+        }
+        setStatus(attachment.agent.status);
+      },
+      onStatus: (next) => {
+        if (version === generation) setStatus(next);
+      },
+      onSize: () => {},
+      onScreen: () => {},
+      onError: (reason) => {
+        if (version === generation) {
+          notice = reasonText(reason);
+          renderNotice();
+        }
+      },
+      onClosed: (reason) => {
+        if (version === generation) {
+          connected = false;
+          notice = reasonText(reason);
+          renderNotice();
+        }
+      },
+      onRefused: (reason) => {
+        if (version !== generation) return;
+        connected = false;
+        if (value.launch && reason === 'not_an_agent_pane') {
+          attachUnrecognized = true;
+          notice = 'herdr aún no reconoce al agente en ese panel. Ábrelo en el CLI.';
+          renderNotice();
+          if (Date.now() < attachDeadline) attachTimer = window.setTimeout(connectTerminal, 2000);
+        } else {
+          notice = reasonText(reason);
+          renderNotice();
+        }
+      },
+      onDropped: () => {
+        if (version !== generation) return;
+        connected = false;
+        for (const item of pending) {
+          if (item.state === 'sending') {
+            item.state = 'unconfirmed';
+            item.reason = 'confirm_unavailable';
+          }
+        }
+        notice = 'Sin conexión con el agente.';
         renderNotice();
-        if (Date.now() < attachDeadline) attachTimer = window.setTimeout(connectTerminal, 2000);
-      } else {
-        notice = reasonText(reason);
-        renderNotice();
-      }
+        renderMessages();
+        schedulePoll();
+      },
+      onSubmitResult: (result) => {
+        if (version === generation) resultReceived(result);
+      },
     },
-    onDropped: () => {
-      if (version !== generation) return;
-      connected = false;
-      for (const item of pending) {
-        if (item.state === 'sending') { item.state = 'unconfirmed'; item.reason = 'confirm_unavailable'; }
-      }
-      notice = 'Sin conexión con el agente.';
-      renderNotice();
-      renderMessages();
-      schedulePoll();
-    },
-    onSubmitResult: (result) => { if (version === generation) resultReceived(result); },
-  }, undefined, { screen: false });
+    undefined,
+    { screen: false },
+  );
   link.start();
 }
 
@@ -412,9 +498,11 @@ async function pollLaunch(): Promise<void> {
   if (!value?.launch) return;
   let entry: LaunchSnapshot | null = null;
   try {
-    const response = await fetch(bridgeUrl(`/api/herdr/launches/${encodeURIComponent(value.launch.commandId)}`),
-      { headers: bridgeHeaders() });
-    if (response.ok) entry = await response.json() as LaunchSnapshot;
+    const response = await fetch(
+      bridgeUrl(`/api/herdr/launches/${encodeURIComponent(value.launch.commandId)}`),
+      { headers: bridgeHeaders() },
+    );
+    if (response.ok) entry = (await response.json()) as LaunchSnapshot;
   } catch {
     // A lost bridge is not proof that the launch stopped.
   }
@@ -443,9 +531,11 @@ async function pollLaunch(): Promise<void> {
     const delivery = entry.missionDelivery;
     if (delivery.state === 'confirmed' || delivery.state === 'unconfirmed') {
       pending.push({
-        id: `launch-${value.launch.commandId}`, text: value.launch.mission,
+        id: `launch-${value.launch.commandId}`,
+        text: value.launch.mission,
         target: countUserText(messages, value.launch.mission) + 1,
-        state: delivery.state, reason: delivery.reason,
+        state: delivery.state,
+        reason: delivery.reason,
       });
     } else {
       restoreDraft(value.launch.mission);
@@ -479,10 +569,18 @@ export function openAgentWindow(value: AgentWindowDestination): void {
   generation += 1;
   messages = [];
   pending = [];
-  launchState = value.launch ? (value.status === 'waiting_approval' ? 'waiting_approval' : 'starting') : '';
-  notice = BRIDGE_URL ? 'La terminal solo funciona a través del proxy de la interfaz.'
-    : launchState === 'waiting_approval' ? 'Esperando aprobación en la cola de RepoCiv.'
-      : value.launch ? `Abriendo ${value.label} en herdr…` : '';
+  launchState = value.launch
+    ? value.status === 'waiting_approval'
+      ? 'waiting_approval'
+      : 'starting'
+    : '';
+  notice = BRIDGE_URL
+    ? 'La terminal solo funciona a través del proxy de la interfaz.'
+    : launchState === 'waiting_approval'
+      ? 'Esperando aprobación en la cola de RepoCiv.'
+      : value.launch
+        ? `Abriendo ${value.label} en herdr…`
+        : '';
   hidden = HIDDEN_IDS.flatMap((id) => {
     const target = document.getElementById(id);
     if (!target) return [];
@@ -493,17 +591,23 @@ export function openAgentWindow(value: AgentWindowDestination): void {
   windowEl.classList.remove('hidden');
   document.getElementById('agent-unit-card')?.classList.remove('hidden');
   panel.classList.remove('hidden');
-  panel.querySelectorAll('.side-tab').forEach((tab) =>
-    tab.classList.toggle('active', (tab as HTMLElement).dataset['tab'] === 'chat'),
-  );
-  panel.querySelectorAll('.tab-pane').forEach((pane) =>
-    pane.classList.toggle('active', (pane as HTMLElement).dataset['pane'] === 'chat'),
-  );
+  panel
+    .querySelectorAll('.side-tab')
+    .forEach((tab) =>
+      tab.classList.toggle('active', (tab as HTMLElement).dataset['tab'] === 'chat'),
+    );
+  panel
+    .querySelectorAll('.tab-pane')
+    .forEach((pane) =>
+      pane.classList.toggle('active', (pane as HTMLElement).dataset['pane'] === 'chat'),
+    );
   const name = document.getElementById('side-hero-name');
   if (name) {
     name.textContent = value.launch ? `${value.label} · ${value.place}` : value.label;
     originalNameClick = name.onclick;
-    name.onclick = () => { if (row) deps?.locate(row); };
+    name.onclick = () => {
+      if (row) deps?.locate(row);
+    };
   }
   const place = element<HTMLElement>('.agent-window-place');
   if (place) place.textContent = value.place;
@@ -549,9 +653,7 @@ export function closeAgentWindow(): void {
   hidden = [];
   document.getElementById('agent-window')?.classList.add('hidden');
   document.getElementById('agent-unit-card')?.classList.add('hidden');
-  document
-    .querySelectorAll('.agent-offmap-offer')
-    .forEach((el) => el.remove());
+  document.querySelectorAll('.agent-offmap-offer').forEach((el) => el.remove());
   const name = document.getElementById('side-hero-name');
   if (name) name.onclick = originalNameClick;
 }

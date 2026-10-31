@@ -42,10 +42,16 @@ const REASONS: Record<string, string> = {
   unauthorized: 'El token del bridge no coincide.',
   not_an_agent_pane: 'Ese panel ya no tiene un agente.',
   pane_not_found: 'Ese panel ya no existe.',
-  herdr_missing: plainHerdrHint(herdrHint('claude', { state: 'missing', version: '', minVersion: '' })),
-  herdr_stopped: plainHerdrHint(herdrHint('claude', { state: 'stopped', version: '', minVersion: '' })),
+  herdr_missing: plainHerdrHint(
+    herdrHint('claude', { state: 'missing', version: '', minVersion: '' }),
+  ),
+  herdr_stopped: plainHerdrHint(
+    herdrHint('claude', { state: 'stopped', version: '', minVersion: '' }),
+  ),
   herdr_outdated: 'Esta versión de herdr es demasiado antigua.',
-  herdr_incompatible: plainHerdrHint(herdrHint('claude', { state: 'incompatible', version: '', minVersion: '' })),
+  herdr_incompatible: plainHerdrHint(
+    herdrHint('claude', { state: 'incompatible', version: '', minVersion: '' }),
+  ),
   unavailable: 'No pude hablar con herdr.',
   agent_starting: 'El agente todavía está arrancando. Espera a que esté listo.',
   agent_changed: 'En ese panel ya corre otro agente. No se envió.',
@@ -86,7 +92,11 @@ interface CellGrid {
 }
 
 /** Font that fits the PTY's grid in the space `proposed` measured at `current`. */
-export function fitFontSize(current: number, proposed: CellGrid | undefined, pty: CellGrid): number {
+export function fitFontSize(
+  current: number,
+  proposed: CellGrid | undefined,
+  pty: CellGrid,
+): number {
   if (!proposed || proposed.cols <= 0 || proposed.rows <= 0) return current;
   const scale = Math.min(proposed.cols / pty.cols, proposed.rows / pty.rows);
   const halfSteps = Math.floor(current * scale * 2) / 2;
@@ -103,10 +113,15 @@ function terminalUrl(): string {
   return `${scheme}://${location.host}/repociv-ws/terminal`;
 }
 
-export async function fetchAgents(): Promise<{ runtime: HerdrRuntime; agents: TerminalAgent[] } | null> {
+export async function fetchAgents(): Promise<{
+  runtime: HerdrRuntime;
+  agents: TerminalAgent[];
+} | null> {
   try {
     const res = await fetch(bridgeUrl('/api/herdr/agents'), { headers: bridgeHeaders() });
-    return res.ok ? ((await res.json()) as { runtime: HerdrRuntime; agents: TerminalAgent[] }) : null;
+    return res.ok
+      ? ((await res.json()) as { runtime: HerdrRuntime; agents: TerminalAgent[] })
+      : null;
   } catch {
     return null;
   }
@@ -203,7 +218,9 @@ class XTermPanel {
   private _setHeader(agent: TerminalAgent | null): void {
     const title = this._element('.terminal-title');
     if (title) {
-      const where = agent ? [agent.name || agent.agent, agent.folder].filter(Boolean).join(' · ') : '';
+      const where = agent
+        ? [agent.name || agent.agent, agent.folder].filter(Boolean).join(' · ')
+        : '';
       title.textContent = where ? `⌨ ${where}` : '⌨ Terminal';
     }
     this._setStatus(agent?.status ?? '');
@@ -367,7 +384,11 @@ class XTermPanel {
   private _fitFont(): void {
     const term = this._term;
     if (!term || !this._fit) return;
-    const next = fitFontSize(term.options.fontSize ?? DEFAULT_FONT_PX, this._fit.proposeDimensions(), this._pty);
+    const next = fitFontSize(
+      term.options.fontSize ?? DEFAULT_FONT_PX,
+      this._fit.proposeDimensions(),
+      this._pty,
+    );
     if (next !== term.options.fontSize) term.options.fontSize = next;
   }
 
@@ -377,7 +398,9 @@ class XTermPanel {
     const text = (event.clipboardData?.getData('text/plain') ?? '').replace(/\r\n?/g, '\n');
     if (!text) return;
     if (text.length > MAX_PASTE_CHARS) {
-      this._setNotice(`⚠ Texto demasiado largo para pegarlo (máximo ${MAX_PASTE_CHARS} caracteres).`);
+      this._setNotice(
+        `⚠ Texto demasiado largo para pegarlo (máximo ${MAX_PASTE_CHARS} caracteres).`,
+      );
       return;
     }
     if (!this._link?.paste(text)) this._setNotice('⚠ No se pegó: sin conexión con el agente.');
@@ -420,7 +443,8 @@ class XTermPanel {
     term.open(host);
     term.attachCustomKeyEventHandler((event) => this._onKey(event));
     term.onData((data) => {
-      if (!this._link?.input(data)) this._setNotice('⚠ Sin conexión con el agente: la tecla no se envió.');
+      if (!this._link?.input(data))
+        this._setNotice('⚠ Sin conexión con el agente: la tecla no se envió.');
     });
     this._term = term;
     this._fit = fit;

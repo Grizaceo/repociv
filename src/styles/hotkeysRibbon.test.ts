@@ -39,9 +39,7 @@ describe('hotkeys ribbon stacking', () => {
   it('keeps a z-index below the lowest floating panel (unit-panel:10)', () => {
     const ruleStart = css.indexOf('#hotkeys-ribbon');
     expect(ruleStart).toBeGreaterThanOrEqual(0);
-    const rule = css
-      .slice(ruleStart, css.indexOf('}', ruleStart))
-      .replace(/\/\*[\s\S]*?\*\//g, ''); // strip comments so prose can't fake a z-index
+    const rule = css.slice(ruleStart, css.indexOf('}', ruleStart)).replace(/\/\*[\s\S]*?\*\//g, ''); // strip comments so prose can't fake a z-index
     const z = /z-index:\s*(\d+)/.exec(rule);
     expect(z, 'ribbon needs an explicit z-index').not.toBeNull();
     expect(Number(z![1])).toBeGreaterThan(0); // above the bare canvas

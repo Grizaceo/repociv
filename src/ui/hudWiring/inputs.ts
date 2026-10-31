@@ -38,11 +38,7 @@ import {
   locateAgentWindowRow,
 } from '../agentWindow.ts';
 import { renderAgentUnitCard, renderOffMapOffer } from '../agentContext.ts';
-import {
-  placeOnMap,
-  type ExternalSessionRow,
-  type MapPlace,
-} from '../../externalAgents.ts';
+import { placeOnMap, type ExternalSessionRow, type MapPlace } from '../../externalAgents.ts';
 
 export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeEvents): void {
   const missionInput = document.getElementById('mission-input') as HTMLInputElement;

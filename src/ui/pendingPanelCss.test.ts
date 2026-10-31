@@ -7,10 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-const css = readFileSync(
-  new URL('../styles/panels/pending-panel.css', import.meta.url),
-  'utf8',
-);
+const css = readFileSync(new URL('../styles/panels/pending-panel.css', import.meta.url), 'utf8');
 
 const REQUIRED = [
   '#pending-panel',

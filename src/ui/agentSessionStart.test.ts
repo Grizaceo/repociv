@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { RepoCivProfile } from '../agentProfile.ts';
-import { buildAgentSessionCommand, buildHerdrLaunchCommand, validateAgentSessionDraft } from './agentSessionStart.ts';
+import {
+  buildAgentSessionCommand,
+  buildHerdrLaunchCommand,
+  validateAgentSessionDraft,
+} from './agentSessionStart.ts';
 
 const hermesProfile: RepoCivProfile = {
   name: 'cobalt',

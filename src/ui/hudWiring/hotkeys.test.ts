@@ -270,8 +270,8 @@ describe('wireHotkeys — 2D/3D view toggle (F2)', () => {
     ] as never);
     const u2 = { id: 'u2' };
     const u3 = { id: 'u3' };
-    (state.getUnit as ReturnType<typeof vi.fn>).mockImplementation(
-      (id: string) => (id === 'u2' ? u2 : id === 'u3' ? u3 : null),
+    (state.getUnit as ReturnType<typeof vi.fn>).mockImplementation((id: string) =>
+      id === 'u2' ? u2 : id === 'u3' ? u3 : null,
     );
     pressKey({ key: '2' });
     expect(m.selectHero.mock.calls[0]?.[0]).toBe(u2);

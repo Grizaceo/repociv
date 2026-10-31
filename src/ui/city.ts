@@ -100,19 +100,20 @@ export function openCityPanel(
         lastMissionHtml ||
         '<div class="city-item" style="color:var(--text-dim)">Sin misiones activas</div>';
     } else {
-      missionsEl.innerHTML = activeBuildings
-        .map((b) => {
-          const icon = b.state === 'complete' ? '✓' : b.state === 'failed' ? '✗' : '◉';
-          const color =
-            b.state === 'complete'
-              ? 'var(--civ-food)'
-              : b.state === 'failed'
-                ? 'var(--civ-happiness)'
-                : 'var(--text-primary)';
-          const pct = b.state === 'building' ? ` (${Math.round(b.progress)}%)` : '';
-          return `<div class="city-item" style="color:${color}" title="${escapeHtml(b.name)}${pct}">${icon} ${escapeHtml(b.name)}${pct}</div>`;
-        })
-        .join('') + lastMissionHtml;
+      missionsEl.innerHTML =
+        activeBuildings
+          .map((b) => {
+            const icon = b.state === 'complete' ? '✓' : b.state === 'failed' ? '✗' : '◉';
+            const color =
+              b.state === 'complete'
+                ? 'var(--civ-food)'
+                : b.state === 'failed'
+                  ? 'var(--civ-happiness)'
+                  : 'var(--text-primary)';
+            const pct = b.state === 'building' ? ` (${Math.round(b.progress)}%)` : '';
+            return `<div class="city-item" style="color:${color}" title="${escapeHtml(b.name)}${pct}">${icon} ${escapeHtml(b.name)}${pct}</div>`;
+          })
+          .join('') + lastMissionHtml;
     }
   }
 

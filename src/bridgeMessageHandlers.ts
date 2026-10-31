@@ -195,7 +195,12 @@ const HANDLERS: HandlerByType = {
 
   // ─── Missions ─────────────────────────────────────────────────────────
   mission_start(ctx, evt) {
-    ctx.state.startMission(evt.missionId, evt.unit, evt.questName, ctx.state.getUnit(evt.unit)?.cityId);
+    ctx.state.startMission(
+      evt.missionId,
+      evt.unit,
+      evt.questName,
+      ctx.state.getUnit(evt.unit)?.cityId,
+    );
     ctx.logEvent(`▶ ${evt.questName}`, 'info');
   },
 

@@ -6,8 +6,8 @@ export function normalizeMessage(text: string): string {
 
 export function countUserText(messages: readonly ExternalChatMessage[], text: string): number {
   const normalized = normalizeMessage(text);
-  return messages.filter((message) =>
-    message.role === 'user' && normalizeMessage(message.text) === normalized,
+  return messages.filter(
+    (message) => message.role === 'user' && normalizeMessage(message.text) === normalized,
   ).length;
 }
 

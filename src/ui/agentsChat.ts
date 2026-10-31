@@ -253,7 +253,11 @@ export function createAgentsChat(deps: AgentsChatDeps) {
     </div>`;
     }
     const running = _chat?.lastReply?.state === 'running';
-    const composer = composerState(row, { sending: _sending, replyRunning: running, runtime: _herdrRuntime });
+    const composer = composerState(row, {
+      sending: _sending,
+      replyRunning: running,
+      runtime: _herdrRuntime,
+    });
     const disabled = !composer.enabled;
     let hint: string;
     let tone = '';
@@ -269,9 +273,10 @@ export function createAgentsChat(deps: AgentsChatDeps) {
     } else {
       hint = composer.hint;
     }
-    const hintHtml = composer.mode === 'disabled' && !_replyError && herdrFamily(row)
-      ? escapeHtml(hint).replace(/`([^`]+)`/g, '<code>$1</code>')
-      : escapeHtml(hint);
+    const hintHtml =
+      composer.mode === 'disabled' && !_replyError && herdrFamily(row)
+        ? escapeHtml(hint).replace(/`([^`]+)`/g, '<code>$1</code>')
+        : escapeHtml(hint);
     return `<div class="agents-compose">
     <textarea class="agents-compose-text" rows="2" ${disabled ? 'disabled' : ''}
       placeholder="Escribile a esta sesión…"

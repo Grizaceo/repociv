@@ -105,11 +105,14 @@ export class TerminalLink {
     const ws = this._open(this._url);
     ws.binaryType = 'arraybuffer';
     this._ws = ws;
-    ws.onopen = () => ws.send(JSON.stringify({
-      type: 'attach',
-      terminalId: this._terminalId,
-      ...(this._options.screen === false ? { screen: false } : {}),
-    }));
+    ws.onopen = () =>
+      ws.send(
+        JSON.stringify({
+          type: 'attach',
+          terminalId: this._terminalId,
+          ...(this._options.screen === false ? { screen: false } : {}),
+        }),
+      );
     ws.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
       if (this._ws === ws) this._receive(event.data);
     };

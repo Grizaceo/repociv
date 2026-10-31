@@ -167,8 +167,7 @@ export function wireCityEvents({
     const repos = await fetchScannedRepos().catch(() => [] as ScannedRepo[]);
     const repo = repos.find(
       (r) =>
-        r.path === repoId ||
-        (r.repoPath !== undefined && r.repoPath === decodeRepoCityId(repoId)),
+        r.path === repoId || (r.repoPath !== undefined && r.repoPath === decodeRepoCityId(repoId)),
     );
     if (!repo) {
       showNotification({
@@ -198,8 +197,7 @@ export function wireCityEvents({
 
   window.addEventListener('repociv:add-repo-to-map', (e: Event) => {
     const detail = (e as CustomEvent).detail as
-      | { repoId?: string; mode?: 'auto' | 'pick' }
-      | undefined;
+      { repoId?: string; mode?: 'auto' | 'pick' } | undefined;
     if (!detail?.repoId) return;
     void addRepoToMap(detail.repoId, detail.mode === 'pick' ? 'pick' : 'auto');
   });

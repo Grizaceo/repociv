@@ -1,12 +1,7 @@
 // ─── RepoCiv — Main Entry Point ───────────────────────────────────────────────
 
 import './styles/index.css';
-import {
-  generateWorld,
-  reconnectCities,
-  removeCityFromWorld,
-  syncWorldWonders,
-} from './map.ts';
+import { generateWorld, reconnectCities, removeCityFromWorld, syncWorldWonders } from './map.ts';
 import { Renderer } from './renderer.ts';
 import { BridgeEvents } from './bridge.ts';
 import { ensureWondersUp, isAutoStartWondersEnabled } from './wonders/wonderLauncher.ts';
@@ -87,11 +82,7 @@ import { openOnboardingPanel } from './ui/onboardingPanel.ts';
 import { mountHermesStatusBanner } from './ui/hermesStatusBanner.ts';
 import { axialToPixel } from './hex.ts';
 import { sharedIdleFinder } from './ui/idleAgentFinder.ts';
-import {
-  setRendererRef,
-  notifyTilePicked,
-  setOnCityDeletedCb,
-} from './ui/constructionPanel.ts';
+import { setRendererRef, notifyTilePicked, setOnCityDeletedCb } from './ui/constructionPanel.ts';
 
 import { getStoredEraLabel } from './ui/eraSystem.ts';
 import { logEvent } from './ui/hud.ts';
@@ -990,7 +981,12 @@ async function bootstrap() {
     startHerdrSession: async (draft) => {
       const city = state.world.cities.find((candidate) => candidate.id === draft.cityId);
       if (!city || city.isCapital || !city.repoPath) {
-        return { ok: false, status: 'rejected', commandId: '', reason: 'La ciudad ya no está disponible para una sesión.' };
+        return {
+          ok: false,
+          status: 'rejected',
+          commandId: '',
+          reason: 'La ciudad ya no está disponible para una sesión.',
+        };
       }
       return sendCommand(buildHerdrLaunchCommand(draft));
     },

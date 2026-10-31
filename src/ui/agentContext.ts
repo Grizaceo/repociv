@@ -15,7 +15,12 @@ import {
 } from '../externalAgents.ts';
 
 function basename(path: string): string {
-  return path.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || path;
+  return (
+    path
+      .replace(/[/\\]+$/, '')
+      .split(/[/\\]/)
+      .pop() || path
+  );
 }
 
 function addButton(row: ExternalSessionRow, mode: 'auto' | 'pick'): HTMLButtonElement {
@@ -73,7 +78,11 @@ export function renderAgentUnitCard(
 
   const meta = document.createElement('div');
   meta.className = 'agent-card-meta';
-  const bits = [row.agent, row.model ? shortModel(row.model) : '', stateBadge(row.state)?.text ?? ''];
+  const bits = [
+    row.agent,
+    row.model ? shortModel(row.model) : '',
+    stateBadge(row.state)?.text ?? '',
+  ];
   meta.textContent = bits.filter(Boolean).join(' · ');
   const badge = stateBadge(row.state);
   if (badge?.title) meta.title = badge.title;

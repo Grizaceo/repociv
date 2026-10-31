@@ -24,7 +24,10 @@ export interface HerdrLaunchDraft {
 }
 
 export const HERDR_AGENT_LABELS: Record<HerdrLaunchKind, string> = {
-  claude: 'Claude Code', codex: 'Codex', devin: 'Devin', hermes: 'Hermes',
+  claude: 'Claude Code',
+  codex: 'Codex',
+  devin: 'Devin',
+  hermes: 'Hermes',
 };
 
 export function buildHerdrLaunchCommand({ kind, cityId, mission }: HerdrLaunchDraft): CommandDraft {

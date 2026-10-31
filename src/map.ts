@@ -1323,9 +1323,7 @@ export function autoCityCoord(world: World, repo: ScannedRepo): Axial | null {
   const cities = world.cities;
   const assignments = getNationStore().assignments;
   const nationId = assignments[repo.repoPath ?? repo.path];
-  let anchors = nationId
-    ? cities.filter((c) => assignments[cityKey(c)] === nationId)
-    : [];
+  let anchors = nationId ? cities.filter((c) => assignments[cityKey(c)] === nationId) : [];
   if (anchors.length === 0) {
     const capital = cities.find((c) => c.isCapital) ?? cities[0];
     anchors = capital ? [capital] : [];

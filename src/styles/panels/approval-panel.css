@@ -193,7 +193,9 @@
   border: 1px solid var(--ui-border);
   background: rgba(255, 255, 255, 0.04);
   color: var(--ui-text-dim);
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 .ap-goto:hover {
   color: var(--ui-gold-bright, #ffd76a);
