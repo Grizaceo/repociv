@@ -409,10 +409,19 @@ describe('BridgeEvents handleBridgeEvent', () => {
     const src = FakeEventSource.instances[0]!;
     src.open();
     src.message({
-      type: 'waiting_approval', commandId: 'herdr-1', commandType: 'herdr_launch',
-      target: 'repociv', risk: 'low',
+      type: 'waiting_approval',
+      commandId: 'herdr-1',
+      commandType: 'herdr_launch',
+      target: 'repociv',
+      risk: 'low',
     });
-    expect(appendApprovalCard).toHaveBeenCalledWith('repociv', 'herdr-1', 'herdr_launch', 'repociv', 'low');
+    expect(appendApprovalCard).toHaveBeenCalledWith(
+      'repociv',
+      'herdr-1',
+      'herdr_launch',
+      'repociv',
+      'low',
+    );
     bridge.stop();
   });
 
@@ -648,7 +657,7 @@ describe('BridgeEvents handleBridgeEvent', () => {
       unit: 'WORKER',
       questName: 'Analyze repo',
     });
-    expect(state.startMission).toHaveBeenCalledWith('ms-10', 'WORKER', 'Analyze repo');
+    expect(state.startMission).toHaveBeenCalledWith('ms-10', 'WORKER', 'Analyze repo', undefined);
     bridge.stop();
   });
 
