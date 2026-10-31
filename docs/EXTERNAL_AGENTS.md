@@ -478,6 +478,9 @@ del CLI mandan acá:
   proveedor OpenAI-compatible mock local, no un modelo alojado (detalle en
   [Hooks de posición](AGENT_POSITION_HOOKS.md)).
 
+**Desde 2026-10-30:** una sesión cuyo proceso corre en un panel de herdr abre su CLI
+real en la terminal de RepoCiv. Ver [`HERDR_LIVE_CLI.md`](HERDR_LIVE_CLI.md).
+
 Los caminos alternativos explorados inicialmente el 2026-09-19 (API del gateway
 de Hermes, multiplexor tmux, dejar todo solo-lectura) siguen documentados abajo
 por si alguno se retoma.

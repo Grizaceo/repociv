@@ -92,7 +92,10 @@ el umbral exacto: 61 caracteres pasaron, 78 no, y `/zzz…` de 300 sí. Por eso:
 ### Tamaño y cierre
 
 - `pane.layout` da el tamaño real. El observador con ese tamaño recibe `width` y
-  `height` iguales.
+  `height` iguales. xterm siempre usa ese tamaño y la fuente se ajusta al panel:
+  redimensionar el navegador no toca el PTY.
+- Un error de `locate` durante un movimiento no prueba que la terminal murió. Solo
+  el observador, que sigue al `terminal_id`, informa un cierre real.
 - `terminal.closed` llega al cerrarse el panel, y también en `stdout` con código 0
   si el destino no existe.
 - Un observador huérfano sale con la siguiente salida del panel (EPIPE).
@@ -113,5 +116,23 @@ ruta el token no distingue a un cliente de otro: la barrera real es el `Origin`.
 - Token obligatorio, por encabezado. Sin `REPOCIV_TOKEN` la terminal no abre.
 - Si el WS no está en loopback (`REPOCIV_REMOTE`), la terminal no abre.
 - Solo se adjuntan paneles con un agente detectado.
-- La escritura va solo por el WS. No hay POST que escriba en un panel: los POST de
-  `/bridge` no validan `Origin` y el proxy les agrega el token.
+- La escritura va solo por el WS.
+
+Medido a través del proxy real de Vite: solo conecta el `Origin` propio. Se rechazan
+un origen ajeno, otro puerto local, `null`, la ausencia de `Origin`, y el origen de
+tailnet aunque esté en `REPOCIV_CORS_ORIGINS`.
+
+### Pendiente antes de la Fase 3: POST entre sitios
+
+Un POST con `Origin` ajeno y `Content-Type: text/plain` no dispara preflight, y el
+proxy le agrega el token. Medido en un stack aislado: `POST /bridge/directives/record`
+y `POST /api/repos/refresh` respondieron 200. El bridge no valida `Origin` en
+`do_POST`, y eso incluye `/commands`.
+
+La solución del tag `archive/audit-rehabilitation-20260712` cubre solo `/event` y
+`/api/*` en `vite-plugins/repociv.ts`: rescatarla no cierra `/bridge/*`. Hace falta
+además rechazar en `do_POST` un `Origin` fuera de la lista.
+
+La terminal no depende de esa capa, por lo que no bloquea la Fase 2. La Fase 3 sí,
+porque lanzará agentes: no debe agregarse ningún POST que escriba en un panel o cree
+uno hasta cerrar esto.
