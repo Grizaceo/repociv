@@ -6,6 +6,7 @@ import { type Tile, tileKey, type WonderType } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
+import { terrainRevision } from './terrainRevision.ts';
 
 /** Short, all-caps label for a wonder type. Matches the 2D canvas style
  *  (renderer.ts) so the WebGL and 2D views agree on what the wonder reads as:
@@ -96,7 +97,9 @@ function labelSignature(state: GameState, lod: string, show: boolean): string {
     .filter((t) => t.revealed && t.district?.type === 'wonder' && t.district.wonderType)
     .map((t) => `${tileKey(t.coord)}:${t.district!.wonderType}`)
     .join('|');
-  return `${lod}:${state.world.cities.map((c) => `${c.id}:${c.name}:${c.population}`).join('|')}:wonders[${wonderSig}]`;
+  // The terrain revision re-seats the labels after a paint: their Y comes from
+  // the tile height, which no city input reflects.
+  return `t${terrainRevision()}:${lod}:${state.world.cities.map((c) => `${c.id}:${c.name}:${c.population}`).join('|')}:wonders[${wonderSig}]`;
 }
 
 export function rebuildMapLabels(

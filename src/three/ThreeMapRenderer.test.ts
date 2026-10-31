@@ -83,6 +83,12 @@ describe('computeWorldSignature', () => {
     expect(computeWorldSignature(a)).not.toBe(computeWorldSignature(b));
   });
 
+  it('changes when a city moves without changing its terrain or territory size', () => {
+    const a = makeState({ cities: [mkCity('c1', 0, 0)] });
+    const b = makeState({ cities: [mkCity('c1', 3, 0)] });
+    expect(computeWorldSignature(a)).not.toBe(computeWorldSignature(b));
+  });
+
   it('changes when a unit is added', () => {
     const a = makeState({ units: [] });
     const b = makeState({ units: [mkUnit('u1', 0, 0)] });
@@ -123,6 +129,21 @@ describe('computeWorldSignature', () => {
     const shown = { ...mkTile(0, 0), revealed: true };
     const a = makeState({ tiles: [[{ q: 0, r: 0 }, hidden]] });
     const b = makeState({ tiles: [[{ q: 0, r: 0 }, shown]] });
+    expect(computeWorldSignature(a)).not.toBe(computeWorldSignature(b));
+  });
+
+  it('changes when a tile terrain changes (the brush paints in place)', () => {
+    // Painting keeps the tile count and every other count identical, so the
+    // terrain has to participate or the 3D scene never rebuilds.
+    const a = makeState({ tiles: [[{ q: 0, r: 0 }, mkTile(0, 0)]] });
+    const b = makeState({
+      tiles: [
+        [
+          { q: 0, r: 0 },
+          { ...mkTile(0, 0), terrain: 'mountain' as const },
+        ],
+      ],
+    });
     expect(computeWorldSignature(a)).not.toBe(computeWorldSignature(b));
   });
 

@@ -3,6 +3,7 @@ import { axialToPixel, type Axial } from './hex.ts';
 import { type Unit, type Building, tileKey } from './types.ts';
 import { type GameState } from './game.ts';
 import { HEX_SIZE } from './constants.ts';
+import { hexToRgba, nationForUnit } from './nations.ts';
 import type { StackOffset } from './unitStack.ts';
 import {
   resolveBotIdentity,
@@ -302,6 +303,17 @@ export class UnitRenderer {
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(0, 0, HEX_SIZE * 0.45, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Nation ring: an agent carries the flag of the nation that owns the city
+    // it works in. Drawn under the selection ring so both stay readable.
+    const nation = nationForUnit(unit, this.state.world.cities);
+    if (nation) {
+      ctx.strokeStyle = hexToRgba(nation.color, 0.9);
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, HEX_SIZE * 0.52, 0, Math.PI * 2);
       ctx.stroke();
     }
 

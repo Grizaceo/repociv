@@ -11,7 +11,7 @@
 **Stack:** TypeScript + Vite (Canvas 2D + WebGL/Three.js) · Python HTTP bridge · DuckDB/JSONL ledger local
 **Compatible con:** [Hermes Agent](https://hermes-agent.nousresearch.com) (Nous Research) — drop-in en cualquier setup existente
 
-**Nueva demo (40 s):** [ver MP4](docs/design/screenshots/repociv-demo-2026-10-05.mp4) · [GIF](docs/design/screenshots/repociv-demo-2026-10-05.gif). Mapa, vista local y una consulta real de Codex, en un workspace de ejemplo. [Detalles de la captura](docs/design/screenshots/repociv-demo-2026-10-05.md).
+**Nueva demo (41 s):** [ver MP4](docs/design/screenshots/repociv-demo-2026-10-25.mp4) · [GIF](docs/design/screenshots/repociv-demo-2026-10-25.gif). Mapa 3D con familia visual 2K PBR, órbita `Q/E`, unidad acoplada, deliberación multi-agente en RoundTablet y vista local 2.5D. [Detalles de la captura](docs/design/screenshots/repociv-demo-2026-10-25.md).
 
 ![Vista macro 2D](docs/design/screenshots/macro-2d-view.jpg) | ![Vista 3D WebGL pulida](docs/design/screenshots/3d-polished-overview.png)
 --- | ---
@@ -288,6 +288,28 @@ Thresholds configurables en `Settings Panel` (`F11`) o en `src/gameConfig.ts`.
 
 ---
 
+## Editor de mapa y naciones
+
+El mapa es también una capa editorial: el usuario puede **alinear ciudades a
+naciones**, pintar el terreno, colocar ciudades a mano y borrar hexes, sin
+tocar nunca el disco (un repo borrado del mapa sigue en el filesystem).
+
+- **Pestaña `Naciones`** del panel lateral (`src/ui/nationsPanel.ts`): crear,
+  renombrar y recolorear naciones; asignar cada ciudad (repo) a una de ellas.
+  Las fronteras del territorio y los agentes toman el color de su nación, en
+  2D y en 3D.
+- **Editor de mapa** (`K`, `src/ui/mapEditor.ts`): una barra flotante sobre el
+  mapa con cinco herramientas — **Mover** (arrastrar una ciudad), **Terreno**
+  (pintar), **Nación** (alinear con un clic), **Crear** (colocar un repo) y
+  **Borrar** (quitar una ciudad del mapa o borrar un hex). Sustituye al botón
+  `✥` de mover ciudad, que solo resolvía una cosa.
+
+Persistencia en `localStorage` (`src/nations.ts` y `src/mapEdits.ts`), igual que
+el layout manual: el mundo se regenera en cada carga y las ediciones se
+reaplican encima. Ver [`docs/MAP_EDITOR.md`](docs/MAP_EDITOR.md).
+
+---
+
 ## Gaceta de noticias
 
 La **Gaceta** (`src/ui/gacetaWidget.ts`) muestra artículos del bridge de
@@ -319,6 +341,7 @@ operativo. `N` abre el wizard de nuevo perfil en `hotkeys.ts`, mientras que
 | `Enter` | Abrir/cerrar side panel |
 | `P` | Priority Matrix panel |
 | `M` | Modo Move |
+| `K` | Editor de mapa (naciones, terreno, ciudades) |
 | `Ctrl+S` | Dormir unidad seleccionada |
 | `B` | Modo Build |
 | `G` | Toggle grid |

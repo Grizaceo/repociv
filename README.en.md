@@ -11,7 +11,7 @@
 **Stack:** TypeScript + Vite (Canvas 2D + WebGL/Three.js) · Python HTTP bridge · DuckDB/JSONL local ledger
 **Compatible with:** [Hermes Agent](https://hermes-agent.nousresearch.com) (Nous Research) — drop-in in any existing setup
 
-**New demo (40 s):** [watch MP4](docs/design/screenshots/repociv-demo-2026-10-05.mp4) · [GIF](docs/design/screenshots/repociv-demo-2026-10-05.gif). The map, local workspace view, and a real Codex query in an example workspace. [Capture details](docs/design/screenshots/repociv-demo-2026-10-05.md).
+**New demo (41 s):** [watch MP4](docs/design/screenshots/repociv-demo-2026-10-25.mp4) · [GIF](docs/design/screenshots/repociv-demo-2026-10-25.gif). 3D map with 2K PBR visual family, `Q/E` camera orbit, docked unit HUD, multi-agent RoundTablet deliberation, and 2.5D local workspace view. [Capture details](docs/design/screenshots/repociv-demo-2026-10-25.md).
 
 ![Macro 2D view](docs/design/screenshots/macro-2d-view.jpg) | ![Polished 3D WebGL view](docs/design/screenshots/3d-polished-overview.png)
 --- | ---
@@ -286,6 +286,27 @@ Thresholds configurable in the `Settings Panel` (`F11`) or in `src/gameConfig.ts
 
 ---
 
+## Map editor and nations
+
+The map is also an editorial layer: you can **align cities to nations**, paint
+terrain, place cities by hand and erase hexes — without ever touching disk (a
+repo removed from the map stays in the filesystem).
+
+- **`Naciones` tab** in the side panel (`src/ui/nationsPanel.ts`): create,
+  rename and recolour nations, then assign each city (repo) to one. Territory
+  borders and agents take their nation's colour, in both 2D and 3D.
+- **Map editor** (`K`, `src/ui/mapEditor.ts`): a floating bar over the map with
+  five tools — **Move** (drag a city), **Terrain** (paint), **Nation** (align
+  with a click), **Place** (drop a repo) and **Erase** (take a city off the map
+  or delete a hex). It replaces the old `✥` move-city button, which only did
+  one thing.
+
+State lives in `localStorage` (`src/nations.ts` and `src/mapEdits.ts`), like the
+manual layout: the world is regenerated on every load and the edits are
+re-applied on top. See [`docs/MAP_EDITOR.md`](docs/MAP_EDITOR.md).
+
+---
+
 ## News gazette
 
 The **Gazette** (`src/ui/gacetaWidget.ts`) displays articles from the news
@@ -317,6 +338,7 @@ mounted news widget.
 | `Enter` | Open/close side panel |
 | `P` | Priority Matrix panel |
 | `M` | Move mode |
+| `K` | Map editor (nations, terrain, cities) |
 | `Ctrl+S` | Sleep selected unit |
 | `B` | Build mode |
 | `G` | Toggle grid |

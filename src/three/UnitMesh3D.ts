@@ -11,12 +11,14 @@ import {
   CylinderGeometry,
   Group,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   OctahedronGeometry,
+  RingGeometry,
   SphereGeometry,
   TorusGeometry,
 } from 'three';
-import { type Unit, type Tile, tileKey } from '../types.ts';
+import { type City, type Unit, type Tile, tileKey } from '../types.ts';
 import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D, world3DToAxialFraction } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
@@ -30,6 +32,8 @@ import {
   type UnitPropPart,
 } from './UnitProps3D.ts';
 import { terrainSurfaceY } from './terrainSurfaceY.ts';
+import { nationForUnit } from '../nations.ts';
+import { terrainRevision } from './terrainRevision.ts';
 import {
   catmullRom,
   catmullRomTangent,
@@ -84,6 +88,8 @@ interface UnitEntry {
   pathProgress: number;
   /** Live tile lookup so feet can sample the displaced surface at XZ. */
   getTile: (key: string) => Tile | undefined;
+  /** Flag colour of the nation that owns this unit's city (null = unaligned). */
+  nationColor: string | null;
 }
 
 export type { UnitEntry };
@@ -247,7 +253,26 @@ function addHeroCrown(group: Group, col: Color, gemY: number): void {
   group.add(halo);
 }
 
-function buildUnitFigurine(unit: Unit): Group {
+/** Flat flag-coloured ring under a unit, marking the nation that owns it. */
+function addNationRing(group: Group, nationColor: string): void {
+  const inner = HEX_SIZE * 0.17;
+  const outer = HEX_SIZE * 0.24;
+  const geom = new RingGeometry(inner, outer, 24);
+  geom.rotateX(-Math.PI / 2);
+  const mat = new MeshBasicMaterial({
+    color: new Color(nationColor),
+    transparent: true,
+    opacity: 0.85,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const ring = new Mesh(geom, mat);
+  ring.position.y = HEX_SIZE * 0.012;
+  ring.renderOrder = 2;
+  group.add(ring);
+}
+
+function buildUnitFigurine(unit: Unit, nationColor: string | null = null): Group {
   const col = new Color(unit.color || '#888888');
   const isHero = HERO_TYPES.has(unit.type);
 
@@ -258,6 +283,7 @@ function buildUnitFigurine(unit: Unit): Group {
     if (parts && parts.length > 0) {
       const group = buildGlbFigurine(parts, isHero, col);
       if (isHero) addHeroCrown(group, col, HEX_SIZE * 0.46);
+      if (nationColor) addNationRing(group, nationColor);
       return group;
     }
   }
@@ -299,6 +325,8 @@ function buildUnitFigurine(unit: Unit): Group {
     addHeroCrown(group, col, head.position.y + headR + HEX_SIZE * 0.1);
   }
 
+  if (nationColor) addNationRing(group, nationColor);
+
   return group;
 }
 
@@ -315,17 +343,31 @@ function disposeFigurine(group: Group): void {
   });
 }
 
-export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | undefined): void {
+export function rebuildUnits(
+  units: Unit[],
+  getTile: (key: string) => Tile | undefined,
+  cities: City[] = [],
+): void {
   const visibleUnits = units.filter((unit) => {
     const tile = getTile(tileKey(unit.coord));
     return !tile || tile.revealed;
   });
 
+  // Flag colour of the nation that owns the unit's city — the same rule the 2D
+  // renderer uses (`nationForUnit` by unit.cityId). Taking the city of the hex
+  // the unit stands on made the 3D ring disagree with 2D and change colour
+  // while walking.
+  const nationColorOf = (unit: Unit): string | null => nationForUnit(unit, cities)?.color ?? null;
+
   // The props flag participates so the capsule→GLB swap happens the frame
   // the async load finishes, even when no unit moved.
   const signature =
-    `uprops${unitPropsSignature()}#` +
-    visibleUnits.map((u) => `${u.id}:${u.type}:${u.coord.q},${u.coord.r}:${u.state}`).join('|');
+    `t${terrainRevision()}:uprops${unitPropsSignature()}#` +
+    visibleUnits
+      .map(
+        (u) => `${u.id}:${u.type}:${u.coord.q},${u.coord.r}:${u.state}:${nationColorOf(u) ?? '-'}`,
+      )
+      .join('|');
   if (signature === lastSignature) return;
   lastSignature = signature;
 
@@ -360,14 +402,19 @@ export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | und
       : pos.y + UNIT_SURFACE_CLEARANCE;
 
     const propsReady = areUnitPropsReady();
+    const nationColor = nationColorOf(unit);
     const existing = unitEntries.get(unit.id);
     if (existing && existing.lifeState !== 'despawning') {
       // Hot-swap procedural capsule -> role GLB (or role change) without resetting lifecycle tween
-      if (existing.usedGlb !== propsReady || existing.unitType !== unit.type) {
+      if (
+        existing.usedGlb !== propsReady ||
+        existing.unitType !== unit.type ||
+        existing.nationColor !== nationColor
+      ) {
         const prevScale = existing.group.scale.x;
         unitGroup.remove(existing.group);
         disposeFigurine(existing.group);
-        const swapped = buildUnitFigurine(unit);
+        const swapped = buildUnitFigurine(unit, nationColor);
         swapped.position.copy(existing.group.position);
         swapped.scale.setScalar(prevScale);
         applyWalkPose(swapped, existing.yaw, existing.lean, existing.sway);
@@ -375,6 +422,7 @@ export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | und
         existing.group = swapped;
         existing.usedGlb = propsReady;
         existing.unitType = unit.type;
+        existing.nationColor = nationColor;
         unitGroup.add(swapped);
       }
       // Update path/movement state for the tween. tickUnits owns pathIndex /
@@ -411,7 +459,7 @@ export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | und
     }
 
     // New unit: build figurine, start at scale 0 for spawn animation.
-    const fig = buildUnitFigurine(unit);
+    const fig = buildUnitFigurine(unit, nationColor);
     fig.position.set(pos.x, targetY, pos.z);
     fig.scale.setScalar(0);
 
@@ -441,6 +489,7 @@ export function rebuildUnits(units: Unit[], getTile: (key: string) => Tile | und
       pathIndex: unit.pathIndex,
       pathProgress: unit.pathProgress,
       getTile,
+      nationColor,
     };
     unitEntries.set(unit.id, entry);
     unitGroup.add(fig);

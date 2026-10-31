@@ -9,6 +9,7 @@ import {
 } from './hex.ts';
 import { logger } from './logger.ts';
 import { type Unit, type Tile, type City, tileKey } from './types.ts';
+import type { MapEditorTool, Terrain } from './types.ts';
 import { type GameState } from './game.ts';
 import { HexRenderer } from './hexRenderer.ts';
 import { UnitRenderer } from './unitRenderer.ts';
@@ -29,8 +30,32 @@ import {
 } from './spatialDirectives.ts';
 import { hideDirectivePreview, hideContextMenu } from './ui/spatialPreview.ts';
 import { escapeHtml } from './ui/escapeHtml.ts';
-import { relocateCity, canRelocateCityTo } from './map.ts';
+import {
+  eraseHexOp,
+  foundCityOp,
+  moveCitySync,
+  paintHexOp,
+  reconnectCities,
+  canRelocateCityTo,
+  removeCityOp,
+  undoEraseHex,
+  undoFoundCity,
+  undoMoveCity,
+  undoPaintHex,
+  undoRemoveCity,
+  type ScannedRepo,
+} from './map.ts';
+import {
+  beginMapEditGroup,
+  endMapEditGroup,
+  pushMapEdit,
+  redoMapEdit,
+  undoMapEdit,
+} from './mapEditHistory.ts';
+import { applyNationsToWorld, assignCityToNation, cityKey, getNationStore } from './nations.ts';
+import { invalidatePathCache } from './pathfinding.ts';
 import { refreshCityList } from './ui/constructionPanel.ts';
+import { clearMapEditorRepoSelection, selectMapEditorRepo } from './ui/mapEditor.ts';
 import { HEX_SIZE } from './constants.ts';
 import { pickOnHex, stackOffsets, type StackOffset } from './unitStack.ts';
 import { renderScreenOverlays, type ScreenOverlayState } from './rendererScreen.ts';
@@ -119,6 +144,17 @@ export class Renderer {
     e.preventDefault();
     this.setCityRelocateMode(false);
   };
+
+  // ─── Map editor mode ─────────────────────────────────────────────────────
+  // One mode for the whole map surface: move cities, paint terrain, align a
+  // city to a nation, place a repo by hand or erase a hex. Replaces the
+  // one-off "✥ move city" button of the construction panel.
+  private _mapEditorMode = false;
+  private _mapEditorTool: MapEditorTool = 'move';
+  private _mapEditorTerrain: Terrain = 'plains';
+  private _mapEditorNation: string | null = null;
+  private _mapEditorRepo: ScannedRepo | null = null;
+  private _mapEditorPainting = false;
 
   // ─── Fase 5: Spatial gesture state ────────────────────────────────────────
   private gestureMode: 'camera_pan' | 'camera_orbit' | 'unit_drag' | 'area_select' | 'route' =
@@ -232,6 +268,12 @@ export class Renderer {
     this.resizeObserver.observe(document.body);
     this.setupInput();
     document.addEventListener('keydown', this._onCityRelocateKeyDown);
+  }
+
+  /** Close a brush stroke so the whole drag is a single undo step. */
+  private endMapEditorStroke(): void {
+    this._mapEditorPainting = false;
+    endMapEditGroup();
   }
 
   private clearCityRelocateDrag() {
@@ -512,6 +554,25 @@ export class Renderer {
       const coord = this.pickAxial(wx, wy);
       const tile = this.state.world.tiles.get(tileKey(coord)) ?? null;
 
+      // Map editor: the terrain brush paints on press and keeps painting
+      // while the pointer moves. The "move" tool falls through to the city
+      // relocate branch below (it reuses the same drag machinery). The other
+      // tools act on the hex, so they must claim the gesture before the unit
+      // drag branch — otherwise a unit standing on the hex swallows the click.
+      if (this._mapEditorMode && this._mapEditorTool !== 'move') {
+        if (this._mapEditorTool === 'terrain') {
+          // One stroke (mousedown → mouseup) is one undo step.
+          beginMapEditGroup('Pintar');
+          this._mapEditorPainting = true;
+          this.paintTerrainAt(coord);
+        }
+        this.dragStart = { x: e.clientX, y: e.clientY };
+        this.camStart = { x: this.cam.x, y: this.cam.y };
+        this.gestureMode = 'camera_pan';
+        this.isDragging = false;
+        return;
+      }
+
       if (this._cityRelocateMode && tile?.city) {
         this.dragStart = { x: e.clientX, y: e.clientY };
         this.camStart = { x: this.cam.x, y: this.cam.y };
@@ -569,6 +630,11 @@ export class Renderer {
       const wy = e.clientY - rect.top;
       this.hoveredHex = this.pickAxial(wx, wy);
       this.updateUnitTooltip(e.clientX, e.clientY);
+
+      // Map editor: keep painting while the pointer is down.
+      if (this._mapEditorMode && this._mapEditorTool === 'terrain' && this._mapEditorPainting) {
+        this.paintTerrainAt(this.hoveredHex);
+      }
 
       if (this._cityRelocateMode && this.draggedCity && this.dragStartPos) {
         const dx = e.clientX - this.dragStartPos.x;
@@ -646,6 +712,9 @@ export class Renderer {
       const wx = e.clientX - rect.left;
       const wy = e.clientY - rect.top;
       const screenPos = { x: e.clientX, y: e.clientY };
+
+      // The terrain brush stops painting when the button comes up.
+      this.endMapEditorStroke();
 
       switch (this.gestureMode) {
         case 'unit_drag': {
@@ -736,13 +805,35 @@ export class Renderer {
             const dc = this.draggedCity;
             const path = this.dragCityRepoPath;
             if (dragMoved) {
-              void relocateCity(this.state.world, dc.id, dropCoord, path).then((ok) => {
-                if (ok) {
-                  this.state.notifyUpdate();
-                  refreshCityList();
-                  this.setCityRelocateMode(false);
-                }
-              });
+              // Stack the move in this turn: a Ctrl+Z right after the drop must
+              // undo the move, not the edit before it. Reconnecting is async
+              // and happens after.
+              const moved = moveCitySync(this.state.world, dc.id, dropCoord, path);
+              if (moved) {
+                let current = moved;
+                pushMapEdit({
+                  label: `Mover ${moved.city.name}`,
+                  undo: () => {
+                    undoMoveCity(this.state.world, current);
+                    void reconnectCities(this.state.world);
+                  },
+                  redo: () => {
+                    // Synchronous so an immediate undo already has the new
+                    // result (the copies the previous undo put back must not
+                    // be reused).
+                    current =
+                      moveCitySync(this.state.world, current.city.id, current.to, path) ?? current;
+                    void reconnectCities(this.state.world);
+                  },
+                });
+                invalidatePathCache();
+                this.state.notifyUpdate();
+                refreshCityList();
+                void reconnectCities(this.state.world).then(() => this.state.notifyUpdate());
+                // Inside the map editor the mode stays open: the next city can
+                // be dragged right away.
+                if (!this._mapEditorMode) this.setCityRelocateMode(false);
+              }
             } else {
               const t = this.state.world.tiles.get(tileKey(dropCoord));
               if (t?.city) {
@@ -966,10 +1057,15 @@ export class Renderer {
       this.panDirs.clear();
       this.yawDirs.clear();
       this._panFast = false;
+      // Alt-tabbing with the brush button held also ends the stroke.
+      this.endMapEditorStroke();
     });
     // MMB released off-canvas: drop the grabbing cursor without a click.
+    // LMB released off-canvas: stop the terrain brush (the canvas mouseup
+    // never fires when the pointer is over a panel or the toolbar).
     window.addEventListener('mouseup', (e) => {
       if (e.button === 1) this.endCameraOrbit(e);
+      if (e.button === 0) this.endMapEditorStroke();
     });
   }
 
@@ -1029,7 +1125,7 @@ export class Renderer {
 
   /** Cursor when not actively grabbing/panning (respects placing + city relocate modes). */
   private applyIdleCursor(wx: number, wy: number) {
-    if (this._placingMode || this._cityRelocateMode) {
+    if (this._placingMode || this._cityRelocateMode || this._mapEditorMode) {
       this.canvas.style.cursor = 'crosshair';
       return;
     }
@@ -1037,7 +1133,7 @@ export class Renderer {
   }
 
   private syncChromeCursor() {
-    if (this._placingMode || this._cityRelocateMode) {
+    if (this._placingMode || this._cityRelocateMode || this._mapEditorMode) {
       this.canvas.style.cursor = 'crosshair';
     } else {
       this.canvas.style.cursor = 'default';
@@ -1058,6 +1154,25 @@ export class Renderer {
     const coord = this.pickAxial(wx, wy);
     const tile = this.state.world.tiles.get(tileKey(coord));
     const city = tile?.city ?? this.getCityAtScreen(wx, wy);
+
+    // Map editor tools act on the hex and swallow the normal selection.
+    if (this._mapEditorMode) {
+      switch (this._mapEditorTool) {
+        case 'terrain':
+          return;
+        case 'nation':
+          this.assignNationAt(coord);
+          return;
+        case 'erase':
+          this.eraseAt(coord);
+          return;
+        case 'place':
+          this.placeRepoAt(coord);
+          return;
+        case 'move':
+          break;
+      }
+    }
 
     // Placing mode: click empty hex → callback, then exit placing mode
     if (this._placingMode) {
@@ -1975,7 +2090,210 @@ export class Renderer {
     this._cityRelocateMode = active;
     this._cityRelocatePanelRepoPath = panelRepoPath ?? null;
     if (!active) this.clearCityRelocateDrag();
+    // The map editor owns the relocate drag while it is open: closing the
+    // construction panel must not silently disable the editor's move tool.
+    if (this._mapEditorMode) this.applyMapEditorTool();
     this.syncChromeCursor();
+  }
+
+  // ─── Map editor ───────────────────────────────────────────────────────────
+  /** Enter/exit the map editor. */
+  setMapEditorMode(active: boolean): void {
+    this._mapEditorMode = active;
+    if (!active) {
+      this.endMapEditorStroke();
+      this._cityRelocateMode = false;
+      this._cityRelocatePanelRepoPath = null;
+      this.clearCityRelocateDrag();
+    } else {
+      this.applyMapEditorTool();
+    }
+    this.syncChromeCursor();
+  }
+
+  getMapEditorMode(): boolean {
+    return this._mapEditorMode;
+  }
+
+  setMapEditorTool(tool: MapEditorTool): void {
+    this._mapEditorTool = tool;
+    this.endMapEditorStroke();
+    this.applyMapEditorTool();
+    this.syncChromeCursor();
+  }
+
+  getMapEditorTool(): MapEditorTool {
+    return this._mapEditorTool;
+  }
+
+  setMapEditorTerrain(terrain: Terrain): void {
+    this._mapEditorTerrain = terrain;
+  }
+
+  setMapEditorNation(nationId: string | null): void {
+    this._mapEditorNation = nationId;
+  }
+
+  setMapEditorRepo(repo: ScannedRepo | null): void {
+    this._mapEditorRepo = repo;
+  }
+
+  // ─── Map editor history ───────────────────────────────────────────────────
+  /** Undo the last edit the editor stacked. Returns its label, or null. */
+  undoLastMapEdit(): string | null {
+    const label = undoMapEdit();
+    if (!label) return null;
+    this.afterMapEditHistoryChange();
+    return label;
+  }
+
+  /** Redo the last undone edit. Returns its label, or null. */
+  redoLastMapEdit(): string | null {
+    const label = redoMapEdit();
+    if (!label) return null;
+    this.afterMapEditHistoryChange();
+    return label;
+  }
+
+  /** Session state that follows any undo/redo: routes, paint and panels. */
+  private afterMapEditHistoryChange(): void {
+    invalidatePathCache();
+    applyNationsToWorld(this.state.world);
+    refreshCityList();
+    this.state.notifyUpdate();
+  }
+
+  /** The "move" tool reuses the city relocate machinery (drag + validation). */
+  private applyMapEditorTool(): void {
+    const wantsRelocate = this._mapEditorMode && this._mapEditorTool === 'move';
+    this._cityRelocateMode = wantsRelocate;
+    if (!wantsRelocate) this.clearCityRelocateDrag();
+  }
+
+  /** Paint the active terrain on a hex. */
+  private paintTerrainAt(coord: Axial): void {
+    const terrain = this._mapEditorTerrain;
+    const result = paintHexOp(this.state.world, coord, terrain, { record: true });
+    if (!result) return;
+    // The redo replaces the result: undoing again must use the newest one.
+    let current = result;
+    pushMapEdit({
+      label: 'Pintar',
+      undo: () => undoPaintHex(this.state.world, coord, current),
+      redo: () => {
+        current = paintHexOp(this.state.world, coord, terrain, { record: true }) ?? current;
+      },
+    });
+    // Cached routes do not depend on terrain: repaint them from scratch.
+    invalidatePathCache();
+    this.state.notifyUpdate();
+  }
+
+  /** Align the city under the cursor to the active nation. */
+  private assignNationAt(coord: Axial): void {
+    const city = this.state.world.tiles.get(tileKey(coord))?.city;
+    if (!city) return;
+    const key = cityKey(city);
+    const next = this._mapEditorNation;
+    const prev = getNationStore().assignments[key] ?? null;
+    if (prev === next) return;
+    assignCityToNation(key, next);
+    applyNationsToWorld(this.state.world);
+    pushMapEdit({
+      label: `Nación de ${city.name}`,
+      undo: () => {
+        assignCityToNation(key, prev);
+        applyNationsToWorld(this.state.world);
+      },
+      redo: () => {
+        assignCityToNation(key, next);
+        applyNationsToWorld(this.state.world);
+      },
+    });
+    this.state.notifyUpdate();
+  }
+
+  /** Erase a hex, or take the city standing on it off the map. */
+  private eraseAt(coord: Axial): void {
+    const tile = this.state.world.tiles.get(tileKey(coord));
+    if (!tile) return;
+    if (tile.city) {
+      const city = tile.city;
+      const key = cityKey(city);
+      const removed = removeCityOp(this.state.world, city, { record: true });
+      if (!removed) return; // the capital is not removable
+      let current = removed;
+      // Go through GameState so unitMap, selectedUnit, the path cache and the
+      // unitRemoved callbacks stay in sync — otherwise a unit coming back with
+      // the same id is handed the ghost and never re-enters world.units.
+      for (const u of current.units) this.state.removeUnit(u.id);
+      pushMapEdit({
+        label: `Sacar ${city.name}`,
+        undo: () => {
+          undoRemoveCity(this.state.world, current);
+          for (const u of current.units) this.state.restoreUnit(u);
+        },
+        redo: () => {
+          // Redoing a founding builds a new City, so the object captured here
+          // may be gone. The new removal collects the units that joined the
+          // city meanwhile.
+          const live = this.state.world.cities.find((c) => cityKey(c) === key);
+          current = (live && removeCityOp(this.state.world, live, { record: true })) ?? current;
+          for (const u of current.units) this.state.removeUnit(u.id);
+        },
+      });
+    } else {
+      const removedTile = eraseHexOp(this.state.world, coord, { record: true });
+      if (!removedTile) return; // a district belongs to its city
+      let current = removedTile;
+      pushMapEdit({
+        label: 'Borrar hex',
+        undo: () => undoEraseHex(this.state.world, current),
+        redo: () => {
+          current = eraseHexOp(this.state.world, coord, { record: true }) ?? current;
+        },
+      });
+    }
+    invalidatePathCache();
+    this.state.notifyUpdate();
+  }
+
+  /** Place the selected repo on a free hex. */
+  private placeRepoAt(coord: Axial): void {
+    const repo = this._mapEditorRepo;
+    if (!repo) return;
+    const found = foundCityOp(this.state.world, repo, coord, { record: true });
+    if (!found) return;
+    let current = found;
+    // Units that appeared in the new city leave through GameState on undo and
+    // come back on redo (removeCityFromWorld alone would leave them in unitMap).
+    let foundedUnits: Unit[] = [];
+    pushMapEdit({
+      label: `Fundar ${repo.name}`,
+      undo: () => {
+        foundedUnits = this.state.world.units.filter(
+          (u) => u.cityId === current.city.id || tileKey(u.coord) === tileKey(current.city.coord),
+        );
+        undoFoundCity(this.state.world, current);
+        for (const u of foundedUnits) this.state.removeUnit(u.id);
+        // The repo goes back to the picker so it can be founded again (the
+        // renderer keeps its own selection even when the bar is not mounted).
+        this._mapEditorRepo = repo;
+        selectMapEditorRepo(repo);
+      },
+      redo: () => {
+        current = foundCityOp(this.state.world, repo, coord, { record: true }) ?? current;
+        for (const u of foundedUnits) this.state.restoreUnit(u);
+        this._mapEditorRepo = null;
+        clearMapEditorRepoSelection();
+      },
+    });
+    // One city per repo: drop the selection and redraw the bar so the repo
+    // leaves the dropdown.
+    this._mapEditorRepo = null;
+    clearMapEditorRepoSelection();
+    invalidatePathCache();
+    this.state.notifyUpdate();
   }
 
   getCityRelocateMode(): boolean {

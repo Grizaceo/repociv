@@ -26,6 +26,7 @@ import { HEX_SIZE } from '../constants.ts';
 import { areCityPropsReady } from './CityProps3D.ts';
 import { areCityWallsReady } from './CityWalls3D.ts';
 import { PROP_SURFACE_CLEARANCE, terrainSurfaceY } from './terrainSurfaceY.ts';
+import { terrainRevision } from './terrainRevision.ts';
 
 const cityGroup = new Group();
 cityGroup.name = 'cities';
@@ -126,7 +127,7 @@ export function rebuildCityClusters(
   // procedural fallback (capital compound, corner towers, wall ring) must be
   // rebuilt OUT when they land even though no city changed.
   const kit = `p${areCityPropsReady() ? 1 : 0}w${areCityWallsReady() ? 1 : 0}`;
-  const signature = `${lod}:${kit}:${citySignature(cities)}`;
+  const signature = `t${terrainRevision()}:${lod}:${kit}:${citySignature(cities)}`;
   if (signature === lastSignature) return;
   lastSignature = signature;
 

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Editor de mapa y naciones (`feat/map-edit-nations`)** — el mapa deja de ser de solo lectura en todo lo que no sea repositorio. Nueva pestaña **Naciones** en el panel lateral (crear, renombrar, recolorear y asignar ciudades a una bandera) y un **editor de mapa** con hotkey `K`: una barra flotante con cinco herramientas — *Mover* (arrastrar una ciudad), *Terreno* (pintar), *Nación* (alinear con un clic), *Crear* (fundar una ciudad con un repo) y *Borrar* (quitar una ciudad del mapa o borrar un hex). El botón `✥` de mover ciudad, que solo resolvía un caso, se retira en favor del editor.
+  - El color de la nación **pisa** el color propio de la ciudad: fronteras de territorio, relleno del área y un anillo bajo cada agente toman la bandera, en 2D y en 3D. Sin nación, el mapa se ve igual que antes.
+  - Capa **editorial**: no se toca el filesystem ni el runtime de los agentes. Un repo quitado del mapa sigue en disco.
+  - Persistencia en `localStorage` (`repociv:nations:v1`, `repociv:map-edits:v1`), igual que el layout manual: el mundo se regenera en cada carga y las ediciones se reaplican encima (`applyMapEdits` + `applyNationsToWorld`).
+  - Verificación: `src/nations.test.ts`, `src/mapEdits.test.ts`, `src/renderer.mapEditor.test.ts` y `e2e/map-editor-nations.spec.ts` (panel + barra en navegador, y un caso contra la app real). Documentación en [`docs/MAP_EDITOR.md`](docs/MAP_EDITOR.md).
+
 ### Changed
 
 - **Reconciliación de drift documental (2026-10-24, rev. 2026-10-25)** — la documentación viva vuelve a coincidir con el código y con `SCOPE.md`:

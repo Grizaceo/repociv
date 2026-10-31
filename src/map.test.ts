@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Axial } from './hex.ts';
-import { canRelocateCityTo, generateWorld, relocateCity, showMapLoadError } from './map.ts';
-import type { City, Terrain, Tile, World } from './types.ts';
+import { axialNeighbours, type Axial } from './hex.ts';
+import {
+  canRelocateCityTo,
+  generateWorld,
+  moveCityInWorld,
+  relocateCity,
+  showMapLoadError,
+} from './map.ts';
+import { placeCity, removeCityFromMap, removeHex, resetMapEditsCache } from './mapEdits.ts';
+import { cityKey } from './nations.ts';
+import type { City, District, Terrain, Tile, World } from './types.ts';
 import { tileKey } from './types.ts';
 
 describe('showMapLoadError', () => {
@@ -138,6 +146,76 @@ describe('canRelocateCityTo', () => {
   });
 });
 
+describe('moveCityInWorld', () => {
+  function cityWithDistricts(): { world: World; city: City } {
+    const districts: District[] = [
+      { id: 'c-a', name: 'a', type: 'campus', coord: { q: 1, r: 0 } },
+      { id: 'c-b', name: 'b', type: 'campus', coord: { q: 2, r: 0 } },
+    ];
+    const city: City = {
+      id: 'c',
+      name: 'c',
+      coord: { q: 0, r: 0 },
+      repoPath: '/w/c',
+      population: 1,
+      territory: [],
+      districts,
+      buildings: [],
+      isCapital: false,
+    };
+    const tiles = new Map<string, Tile>();
+    for (let q = -3; q <= 6; q++) {
+      for (let r = -2; r <= 2; r++) tiles.set(tileKey({ q, r }), baseTile({ q, r }, 'plains'));
+    }
+    tiles.set('0,0', baseTile({ q: 0, r: 0 }, 'plains', { city }));
+    for (const d of districts) {
+      tiles.set(tileKey(d.coord), baseTile(d.coord, 'plains', { district: d }));
+    }
+    const world: World = {
+      tiles,
+      cities: [city],
+      units: [],
+      buildings: [],
+      resources: { gold: 0, science: 0, production: 0 },
+      generatedAt: 0,
+      restAreas: [],
+    };
+    return { world, city };
+  }
+
+  it('keeps the old district hexes on the map instead of punching holes', () => {
+    const { world, city } = cityWithDistricts();
+
+    expect(moveCityInWorld(world, city, { q: 0, r: 2 })).toBe(true);
+
+    expect(world.tiles.has('1,0')).toBe(true);
+    expect(world.tiles.has('2,0')).toBe(true);
+    expect(world.tiles.get('1,0')?.district).toBeUndefined();
+    expect(world.tiles.get('2,0')?.district).toBeUndefined();
+    expect(world.tiles.get('1,2')?.district?.id).toBe('c-a');
+    expect(world.tiles.get('2,2')?.district?.id).toBe('c-b');
+  });
+
+  it('moves a city onto the hex of one of its own districts without corruption', () => {
+    const { world, city } = cityWithDistricts();
+    expect(canRelocateCityTo(world, city, { q: 1, r: 0 })).toBe(true);
+
+    expect(moveCityInWorld(world, city, { q: 1, r: 0 })).toBe(true);
+
+    expect(city.coord).toEqual({ q: 1, r: 0 });
+    expect(city.districts.map((d) => [d.id, d.coord])).toEqual([
+      ['c-a', { q: 2, r: 0 }],
+      ['c-b', { q: 3, r: 0 }],
+    ]);
+    expect(world.tiles.get('2,0')?.district?.id).toBe('c-a');
+    expect(world.tiles.get('3,0')?.district?.id).toBe('c-b');
+    const origin = world.tiles.get('0,0');
+    expect(origin).toBeDefined();
+    expect(origin?.city).toBeUndefined();
+    expect(origin?.district).toBeUndefined();
+  });
+});
+
 describe('relocateCity', () => {
   beforeEach(() => {
     const ls: Record<string, string> = {};
@@ -157,8 +235,8 @@ describe('relocateCity', () => {
   it('returns false without mutating when target is invalid', async () => {
     const { world, city } = minimalWorldWithCity({ q: 0, r: 0 }, { q: 2, r: 0 });
     world.tiles.delete(tileKey({ q: 2, r: 0 }));
-    const ok = await relocateCity(world, city.id, { q: 2, r: 0 }, city.repoPath ?? null);
-    expect(ok).toBe(false);
+    const moved = await relocateCity(world, city.id, { q: 2, r: 0 }, city.repoPath ?? null);
+    expect(moved).toBeNull();
     expect(city.coord).toEqual({ q: 0, r: 0 });
   });
 
@@ -167,8 +245,8 @@ describe('relocateCity', () => {
     const dest = { q: 2, r: 0 };
     const { world, city } = minimalWorldWithCity(center, dest);
 
-    const ok = await relocateCity(world, city.id, dest, city.repoPath ?? null);
-    expect(ok).toBe(true);
+    const moved = await relocateCity(world, city.id, dest, city.repoPath ?? null);
+    expect(moved).not.toBeNull();
     expect(city.coord).toEqual(dest);
 
     expect(world.tiles.get(tileKey(center))?.city).toBeUndefined();
@@ -179,8 +257,102 @@ describe('relocateCity', () => {
 
   it('returns false when source and target are the same', async () => {
     const { world, city } = minimalWorldWithCity({ q: 0, r: 0 }, { q: 2, r: 0 });
-    const ok = await relocateCity(world, city.id, { q: 0, r: 0 }, city.repoPath ?? null);
-    expect(ok).toBe(false);
+    const moved = await relocateCity(world, city.id, { q: 0, r: 0 }, city.repoPath ?? null);
+    expect(moved).toBeNull();
+  });
+});
+
+describe('generateWorld with hexes saved by the editor', () => {
+  const NAMES = ['alpha', 'bravo', 'charlie', 'delta', 'echo'];
+
+  beforeEach(() => {
+    const storage: Record<string, string> = {};
+    const localStorageMock = {
+      getItem: (key: string) => storage[key] ?? null,
+      setItem: (key: string, value: string) => {
+        storage[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete storage[key];
+      },
+    };
+    vi.stubGlobal('window', { localStorage: localStorageMock });
+    vi.stubGlobal('localStorage', localStorageMock);
+    vi.stubGlobal('document', {
+      getElementById: vi.fn(() => null),
+      createElement: vi.fn(() => ({ id: '', textContent: '', style: {}, setAttribute: vi.fn() })),
+      body: { appendChild: vi.fn() },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        if (input === '/api/repos') {
+          return {
+            ok: true,
+            json: async () =>
+              NAMES.map((name) => ({
+                name,
+                path: `/workspace/${name}`,
+                population: 20,
+                extensions: { ts: 10 },
+                gold: 40,
+                lastCommitDays: 1,
+                isLegacy: false,
+                hasGit: true,
+              })),
+          };
+        }
+        if (input === '/api/repo-selections') {
+          const selectedRepoPaths = NAMES.map((name) => `/workspace/${name}`);
+          return {
+            ok: true,
+            json: async () => ({
+              activeRoot: '/workspace',
+              roots: [{ path: '/workspace', selectedRepoIds: NAMES, selectedRepoPaths }],
+              selectedRepoIds: NAMES,
+              selectedRepoPaths,
+              hasSelections: true,
+            }),
+          };
+        }
+        return { ok: false, json: async () => ({}) };
+      }),
+    );
+    resetMapEditsCache();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetMapEditsCache();
+  });
+
+  const repoCities = (world: World) => world.cities.filter((c) => !c.isCapital);
+  const coordOf = (world: World, name: string) => world.cities.find((c) => c.name === name)?.coord;
+
+  it('keeps the other cities on their hex when a removed city gives its hex away', async () => {
+    const base = await generateWorld();
+    const [first, second, ...rest] = repoCities(base);
+    removeCityFromMap(cityKey(first!));
+    placeCity({ repoPath: cityKey(second!), repoName: second!.name, coord: first!.coord });
+
+    const world = await generateWorld();
+
+    expect(coordOf(world, first!.name)).toBeUndefined();
+    expect(coordOf(world, second!.name)).toEqual(first!.coord);
+    for (const city of rest) expect(coordOf(world, city.name)).toEqual(city.coord);
+  });
+
+  it('puts two swapped cities back without moving the rest', async () => {
+    const base = await generateWorld();
+    const [first, second, ...rest] = repoCities(base);
+    placeCity({ repoPath: cityKey(first!), repoName: first!.name, coord: second!.coord });
+    placeCity({ repoPath: cityKey(second!), repoName: second!.name, coord: first!.coord });
+
+    const world = await generateWorld();
+
+    expect(coordOf(world, first!.name)).toEqual(second!.coord);
+    expect(coordOf(world, second!.name)).toEqual(first!.coord);
+    for (const city of rest) expect(coordOf(world, city.name)).toEqual(city.coord);
   });
 });
 
@@ -527,5 +699,315 @@ describe('generateWorld', () => {
 
     expect(world.cities.some((city) => city.id === 'mcp-servers')).toBe(false);
     expect(fetchMock).not.toHaveBeenCalledWith('/api/files/mcp-servers');
+  });
+
+  it('keeps the position of an old manual entry stored with an absolute path', async () => {
+    resetMapEditsCache();
+    // Legacy entry: keyed by the absolute path, not by the stable repo id.
+    window.localStorage.setItem(
+      'repociv:manual-layout:v1',
+      JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            repoPath: '/w/repo-a',
+            repoName: 'repo-a',
+            coord: { q: 4, r: -2 },
+            addedAt: 1,
+            source: 'manual',
+          },
+        ],
+      }),
+    );
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        if (input === '/api/repos') {
+          return {
+            ok: true,
+            json: async () => [
+              {
+                name: 'repo-a',
+                path: 'repo:enc-a',
+                repoPath: '/w/repo-a',
+                population: 12,
+                extensions: { ts: 4 },
+                gold: 30,
+                lastCommitDays: 1,
+                isLegacy: false,
+                hasGit: true,
+              },
+            ],
+          };
+        }
+        if (input === '/api/repo-selections') {
+          return {
+            ok: true,
+            json: async () => ({
+              activeRoot: '/w',
+              roots: [],
+              selectedRepoIds: [],
+              selectedRepoPaths: [],
+              hasSelections: false,
+            }),
+          };
+        }
+        if (input === '/api/repos/selected') {
+          return { ok: true, json: async () => [] };
+        }
+        if (input.startsWith('/api/files/')) {
+          return { ok: true, json: async () => ({ files: [] }) };
+        }
+        return { ok: false, json: async () => ({}) };
+      }),
+    );
+
+    const world = await generateWorld();
+
+    expect(world.cities.find((city) => city.name === 'repo-a')?.coord).toEqual({ q: 4, r: -2 });
+  });
+
+  it('gives the manual coordinate only to the repo with the exact key when two share a name', async () => {
+    resetMapEditsCache();
+    window.localStorage.setItem(
+      'repociv:manual-layout:v1',
+      JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            repoPath: 'repo:enc-b',
+            repoFsPath: '/b/api',
+            repoName: 'api',
+            coord: { q: 4, r: -2 },
+            addedAt: 1,
+            source: 'manual',
+          },
+        ],
+      }),
+    );
+
+    const api = (path: string, repoPath: string) => ({
+      name: 'api',
+      path,
+      repoPath,
+      population: 12,
+      extensions: { ts: 4 },
+      gold: 30,
+      lastCommitDays: 1,
+      isLegacy: false,
+      hasGit: true,
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        // /api/repos stays down on purpose: findRepoOnDisk matches by name and
+        // would collapse both `api` repos onto the first one (out of scope).
+        if (input === '/api/repos') {
+          return { ok: false, status: 500, json: async () => ({}) };
+        }
+        if (input === '/api/repo-selections') {
+          return {
+            ok: true,
+            json: async () => ({
+              activeRoot: '/w',
+              roots: [],
+              selectedRepoIds: [],
+              selectedRepoPaths: [],
+              hasSelections: false,
+            }),
+          };
+        }
+        if (input === '/api/repos/selected') {
+          return {
+            ok: true,
+            json: async () => [api('repo:enc-a', '/a/api'), api('repo:enc-b', '/b/api')],
+          };
+        }
+        if (input.startsWith('/api/files/')) {
+          return { ok: true, json: async () => ({ files: [] }) };
+        }
+        return { ok: false, json: async () => ({}) };
+      }),
+    );
+
+    const world = await generateWorld();
+
+    expect(world.cities.find((city) => city.repoPath === '/b/api')?.coord).toEqual({ q: 4, r: -2 });
+    expect(world.cities.find((city) => city.repoPath === '/a/api')?.coord).not.toEqual({
+      q: 4,
+      r: -2,
+    });
+  });
+
+  it('leaves free the hex the user moved a city to', async () => {
+    resetMapEditsCache();
+    const repo = (name: string, path: string, repoPath: string, population: number) => ({
+      name,
+      path,
+      repoPath,
+      population,
+      extensions: { ts: 4 },
+      gold: 30,
+      lastCommitDays: 1,
+      isLegacy: false,
+      hasGit: true,
+    });
+    const repoA = repo('repo-a', 'repo:enc-a', '/w/repo-a', 20);
+    const repoB = repo('repo-b', 'repo:enc-b', '/w/repo-b', 12);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        if (input === '/api/repos') {
+          return { ok: true, json: async () => [repoA, repoB] };
+        }
+        if (input === '/api/repo-selections') {
+          return {
+            ok: true,
+            json: async () => ({
+              activeRoot: '/w',
+              roots: [],
+              selectedRepoIds: [],
+              selectedRepoPaths: [],
+              hasSelections: false,
+            }),
+          };
+        }
+        if (input === '/api/repos/selected') {
+          return { ok: true, json: async () => [repoA, repoB] };
+        }
+        if (input.startsWith('/api/files/')) {
+          return { ok: true, json: async () => ({ files: [] }) };
+        }
+        return { ok: false, json: async () => ({}) };
+      }),
+    );
+
+    const first = await generateWorld();
+    const bCoord = first.cities.find((city) => city.name === 'repo-b')!.coord;
+
+    // The user drags repo-a onto the hex the automatic layout gives repo-b.
+    placeCity({ repoPath: '/w/repo-a', repoName: 'repo-a', coord: bCoord });
+    resetMapEditsCache();
+
+    const world = await generateWorld();
+
+    expect(world.cities.find((city) => city.name === 'repo-a')?.coord).toEqual(bCoord);
+    expect(world.cities.find((city) => city.name === 'repo-b')?.coord).not.toEqual(bCoord);
+  });
+
+  it('a city moved back to its own hex keeps it and does not shift the rest', async () => {
+    resetMapEditsCache();
+    const names = ['repo-a', 'repo-b', 'repo-c', 'repo-d', 'repo-e', 'repo-f'];
+    const repos = names.map((name, i) => ({
+      name,
+      path: `repo:enc-${name}`,
+      repoPath: `/w/${name}`,
+      population: 30 - i,
+      extensions: { ts: 4 },
+      gold: 30,
+      lastCommitDays: 1,
+      isLegacy: false,
+      hasGit: true,
+    }));
+    // Four subdirectories per city, three files each: every city has districts,
+    // so a forced move has to shift them too.
+    const files = Array.from({ length: 4 }, (_, d) =>
+      Array.from({ length: 3 }, (_, f) => `d${d}/f${f + 1}.ts`),
+    ).flat();
+
+    const stubMapFetch = () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: string) => {
+          if (input === '/api/repos') return { ok: true, json: async () => repos };
+          if (input === '/api/repo-selections') {
+            return {
+              ok: true,
+              json: async () => ({
+                activeRoot: '/w',
+                roots: [],
+                selectedRepoIds: [],
+                selectedRepoPaths: [],
+                hasSelections: false,
+              }),
+            };
+          }
+          if (input === '/api/repos/selected') return { ok: true, json: async () => repos };
+          if (input.startsWith('/api/files/')) return { ok: true, json: async () => ({ files }) };
+          return { ok: false, json: async () => ({}) };
+        }),
+      );
+    };
+
+    stubMapFetch();
+    const first = await generateWorld();
+    const before = new Map(first.cities.map((city) => [city.name, { ...city.coord }]));
+    const aCoord = before.get('repo-a')!;
+
+    // The user moved repo-a away and back: the saved entry equals its generated
+    // hex, so the automatic layout must not treat it as taken by someone else.
+    placeCity({ repoPath: '/w/repo-a', repoName: 'repo-a', coord: aCoord });
+    resetMapEditsCache();
+
+    const world = await generateWorld();
+
+    expect(world.cities).toHaveLength(first.cities.length);
+    for (const city of world.cities) {
+      expect(city.coord).toEqual(before.get(city.name));
+    }
+  });
+
+  it('does not put an erased hex back into a territory on reload', async () => {
+    resetMapEditsCache();
+    const repo = {
+      name: 'repo-a',
+      path: 'repo:enc-a',
+      repoPath: '/w/repo-a',
+      population: 20,
+      extensions: { ts: 4 },
+      gold: 30,
+      lastCommitDays: 1,
+      isLegacy: false,
+      hasGit: true,
+    };
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        if (input === '/api/repos') return { ok: true, json: async () => [repo] };
+        if (input === '/api/repo-selections') {
+          return {
+            ok: true,
+            json: async () => ({
+              activeRoot: '/w',
+              roots: [],
+              selectedRepoIds: [],
+              selectedRepoPaths: [],
+              hasSelections: false,
+            }),
+          };
+        }
+        if (input === '/api/repos/selected') return { ok: true, json: async () => [repo] };
+        if (input.startsWith('/api/files/')) return { ok: true, json: async () => ({ files: [] }) };
+        return { ok: false, json: async () => ({}) };
+      }),
+    );
+
+    const first = await generateWorld();
+    const city = first.cities.find((c) => c.name === 'repo-a')!;
+    // A neighbour that is not a city hex (no /api/files, so no districts).
+    const target = axialNeighbours(city.coord).find((c) => !first.tiles.get(tileKey(c))?.city)!;
+    removeHex(target);
+    resetMapEditsCache();
+
+    const world = await generateWorld();
+
+    expect(world.tiles.has(tileKey(target))).toBe(false);
+    expect(
+      world.cities.some((c) => c.territory.some((t) => t.q === target.q && t.r === target.r)),
+    ).toBe(false);
   });
 });

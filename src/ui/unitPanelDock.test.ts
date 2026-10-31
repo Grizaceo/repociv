@@ -76,6 +76,9 @@ describe('unitPanelDock', () => {
 
     expect(unit.parentElement).toBe(pane);
     expect(unit.classList.contains('unit-panel--docked')).toBe(true);
+    // hudWindow keys its drag wiring off this class: a docked card must not be
+    // draggable (or persist the slot it occupies inside the side panel).
+    expect(unit.classList.contains('hud-window--docked')).toBe(true);
     expect(unit.style['left']).toBe('');
 
     undockUnitPanel(asEl(unit));
@@ -83,6 +86,7 @@ describe('unitPanelDock', () => {
     expect(unit.parentElement).toBe(hud);
     expect(unit.nextSibling).toBe(sibling);
     expect(unit.classList.contains('unit-panel--docked')).toBe(false);
+    expect(unit.classList.contains('hud-window--docked')).toBe(false);
     expect(unit.style['left']).toBe('340px');
   });
 

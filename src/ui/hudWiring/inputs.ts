@@ -29,6 +29,7 @@ import { sendCommand } from '../../commandBus.ts';
 import { buildExecuteAgentPayload } from './executeAgentPayload.ts';
 import { findUnitForChatId, resolveChatDispatchUnitId } from './resolveChatDispatchUnit.ts';
 import { switchToChatUnit } from '../chat/agentChip.ts';
+import { initNationsPanel, renderNationsPanel } from '../nationsPanel.ts';
 
 export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeEvents): void {
   const missionInput = document.getElementById('mission-input') as HTMLInputElement;
@@ -334,6 +335,10 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
 
   // ─── Side panel tabs ─────────────────────────────────────────────────────
   wireSideTabs((tab) => {
+    if (tab === 'nations') {
+      renderNationsPanel(state.world, () => state.notifyUpdate());
+      return;
+    }
     const unit = state.selectedUnit;
     if (!unit) return;
     const cityHere = state.world.cities.find((c) =>
@@ -342,6 +347,9 @@ export function wireInputs(renderer: Renderer, state: GameState, bridge: BridgeE
     if (tab === 'git' && cityHere) loadGitInfo(cityHere.id);
     if (tab === 'files' && cityHere) loadFilesInfo(cityHere.id);
   });
+
+  // The nations tab is populated up front so it is never empty when opened.
+  initNationsPanel(state.world, () => state.notifyUpdate());
 
   // ─── City panel ──────────────────────────────────────────────────────────
   wireCityPanel();

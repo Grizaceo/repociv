@@ -20,6 +20,7 @@ import { terrainElevation } from '../isoHex.ts';
 import { axialToWorld3D } from './axialToWorld3D.ts';
 import { HEX_SIZE } from '../constants.ts';
 import { terrainSurfaceY } from './terrainSurfaceY.ts';
+import { terrainRevision } from './terrainRevision.ts';
 
 const pathGroup = new Group();
 pathGroup.name = 'unit-paths';
@@ -60,16 +61,20 @@ export function rebuildUnitPaths(
     return u.state === 'moving' || u.id === selectedUnitId;
   });
 
-  const sig = activeUnits
-    .map((u) => {
-      const idx = Math.max(0, Math.min(u.pathIndex ?? 0, u.path.length - 2));
-      const coords = u.path
-        .slice(idx)
-        .map((c) => `${c.q},${c.r}`)
-        .join('>');
-      return `${u.id}:${u.color}:${coords}`;
-    })
-    .join('|');
+  // The ribbon follows the terrain surface: the revision rebuilds it after a
+  // paint even though the path itself did not change.
+  const sig =
+    `t${terrainRevision()}:` +
+    activeUnits
+      .map((u) => {
+        const idx = Math.max(0, Math.min(u.pathIndex ?? 0, u.path.length - 2));
+        const coords = u.path
+          .slice(idx)
+          .map((c) => `${c.q},${c.r}`)
+          .join('>');
+        return `${u.id}:${u.color}:${coords}`;
+      })
+      .join('|');
 
   if (sig === lastSignature) return;
   clearUnitPaths();

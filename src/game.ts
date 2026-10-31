@@ -446,6 +446,17 @@ export class GameState {
     return true;
   }
 
+  /**
+   * Put a unit back after undoing the removal of its city. If the agent already
+   * came back on its own (same id in unitMap) this is a no-op.
+   */
+  restoreUnit(unit: Unit): void {
+    if (this.unitMap.has(unit.id)) return;
+    this.world.units.push(unit);
+    this.unitMap.set(unit.id, unit);
+    this.notify();
+  }
+
   private notify() {
     for (const l of this.listeners) l();
   }
