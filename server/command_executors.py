@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import subprocess
@@ -59,6 +60,54 @@ def dispatch_command(
     subagent_request_dispatch: Callable[..., dict[str, Any]],
 ) -> None:
     payload = cmd.payload
+
+    if cmd.type == "herdr_launch":
+        from server import herdr_launches, herdr_runtime
+
+        kind = str(payload["kind"])
+        city = str(payload["city"])
+        mission = str(payload.get("mission") or "")
+        cwd = str(payload["repoPath"])
+        entry: dict[str, Any] = {
+            "state": "starting", "reason": None, "terminalId": "", "paneId": "",
+            "kind": kind, "cityId": city, "name": "", "missionDelivery": None,
+        }
+
+        def publish() -> None:
+            snapshot = herdr_launches.put(cmd.id, entry)
+            send_to_repociv({"type": "herdr_launch", "commandId": cmd.id, **snapshot})
+
+        def on_pane(pane_id: str, terminal_id: str) -> None:
+            entry.update(paneId=pane_id, terminalId=terminal_id)
+            publish()
+
+        publish()
+        try:
+            result = herdr_runtime.launch(
+                kind, city_id=city, cwd=cwd, label=os.path.basename(os.path.normpath(cwd)), on_pane=on_pane,
+            )
+            entry.update(state=result.state, reason=result.reason, terminalId=result.terminal_id,
+                         paneId=result.pane_id, name=result.name)
+            if result.state == "ready" and not result.instance:
+                entry.update(state="failed", reason="server_changed")
+            if mission:
+                if entry["state"] == "ready":
+                    delivery = asyncio.run(herdr_runtime.submit(
+                        result.pane_id, mission, expect_agent=kind, instance=result.instance,
+                    ))
+                    entry["missionDelivery"] = delivery.to_dict()
+                else:
+                    entry["missionDelivery"] = {"state": "refused", "reason": "agent_not_ready"}
+        except Exception:
+            entry.update(state="failed", reason="launch_failed")
+            if mission:
+                entry["missionDelivery"] = {"state": "refused", "reason": "agent_not_ready"}
+        publish()
+        if entry["state"] == "failed":
+            event_record_failed(cmd.id, str(entry["reason"]))
+        else:
+            event_record_completed(cmd.id, f"herdr launch {entry['state']}")
+        return
 
     agent_command_types = {
         'unit_command', 'execute_agent', 'inspect_repo', 'read_file',

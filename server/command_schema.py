@@ -26,6 +26,7 @@ CommandType = Literal[
     "git_commit",
     "delete_file",
     "execute_agent",
+    "herdr_launch",
     "send_message",
     "external_reply",  # one turn over a foreign agent session (server/session_reply.py)
     "subagent_spawn",  # high-risk Task delegation audit gate
@@ -58,6 +59,7 @@ COMMAND_RISK: dict[str, Risk] = {
     "git_commit":     "high",
     "delete_file":    "destructive",
     "execute_agent":  "low",  # user-gated: the act of clicking/sending IS the approval
+    "herdr_launch":   "low",  # user-gated: the act of clicking IS the approval
     "send_message":   "high",
     # Same rationale as execute_agent above: the user typing the message and
     # sending it IS the approval. Tag it "high" instead and the risk floor in

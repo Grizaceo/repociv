@@ -1,8 +1,8 @@
 """The one module that talks to herdr.
 
-herdr owns the agents' terminals; RepoCiv only attaches to them. It connects to
-the user's default server, because a private copy would not see the agents
-opened in the CLI, and it never starts, stops or reconfigures anything here.
+herdr owns the agents' terminals. RepoCiv attaches to them and, only on explicit
+user command, creates workspaces and tabs and starts agents. It never starts or
+stops the server, reconfigures it, or closes its panes.
 
 Two channels, both local:
 
@@ -22,17 +22,23 @@ import base64
 import json
 import os
 import re
+import secrets
 import socket
 import struct
 import subprocess
+import time
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator, AsyncIterator, Iterable, Mapping
+from pathlib import Path
+from typing import Any, AsyncGenerator, AsyncIterator, Callable, Iterable, Mapping, MutableMapping
 
+from server.atomic_io import atomic_write_json
 from server.cli_discovery import find_herdr
+from server.state_paths import repociv_home
 
 MIN_VERSION = (0, 9, 1)
 SOCKET_ENV = "REPOCIV_HERDR_SOCKET"
 HISTORY_LINES = 2000
+LAUNCH_KINDS = frozenset({"claude", "codex", "devin", "hermes"})
 
 _REQUEST_TIMEOUT_S = 2.0
 _STATUS_TIMEOUT_S = 5.0
@@ -50,9 +56,10 @@ TERMINAL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_:.-]{0,127}$")
 
 
 class HerdrError(Exception):
-    def __init__(self, code: str, message: str = "") -> None:
+    def __init__(self, code: str, message: str = "", *, sent: bool = False) -> None:
         super().__init__(message or code)
         self.code = code
+        self.sent = sent
 
 
 def socket_path() -> str:
@@ -97,19 +104,36 @@ def _decode(line: bytes) -> dict[str, Any]:
     return result
 
 
+def _peer_instance(sock: Any) -> str | None:
+    try:
+        raw = sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
+        pid = struct.unpack("3i", raw)[0]
+        if pid <= 0:
+            return None
+        fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+        return f"{pid}:{int(fields[19])}"
+    except (AttributeError, OSError, IndexError, ValueError, struct.error):
+        return None
+
+
 def request(
     method: str,
     params: Mapping[str, Any] | None = None,
     *,
     path: str | None = None,
     timeout: float = _REQUEST_TIMEOUT_S,
+    instance: str | None = None,
 ) -> dict[str, Any]:
     """One socket request on its own connection."""
     buffer = bytearray()
+    sent = False
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
         sock.settimeout(timeout)
         try:
             sock.connect(path or socket_path())
+            if instance is not None and _peer_instance(sock) != instance:
+                raise HerdrError("server_changed")
+            sent = True
             sock.sendall(_encode(method, params))
             while b"\n" not in buffer:
                 chunk = sock.recv(65536)
@@ -117,8 +141,12 @@ def request(
                     break
                 buffer.extend(chunk)
         except OSError as exc:
-            raise HerdrError("unavailable", str(exc)) from exc
-    return _decode(bytes(buffer).split(b"\n", 1)[0])
+            raise HerdrError("unavailable", str(exc), sent=sent) from exc
+    try:
+        return _decode(bytes(buffer).split(b"\n", 1)[0])
+    except HerdrError as exc:
+        exc.sent = sent
+        raise
 
 
 async def arequest(
@@ -127,22 +155,31 @@ async def arequest(
     *,
     path: str | None = None,
     timeout: float = _REQUEST_TIMEOUT_S,
+    instance: str | None = None,
 ) -> dict[str, Any]:
     """``request`` for the WebSocket event loop, which must never block."""
+    sent = False
     try:
         async with asyncio.timeout(timeout):
             reader, writer = await asyncio.open_unix_connection(
                 path or socket_path(), limit=_MAX_LINE_BYTES
             )
             try:
+                if instance is not None and _peer_instance(writer.get_extra_info("socket")) != instance:
+                    raise HerdrError("server_changed")
+                sent = True
                 writer.write(_encode(method, params))
                 await writer.drain()
                 line = await reader.readline()
             finally:
                 writer.close()
     except (OSError, TimeoutError) as exc:
-        raise HerdrError("unavailable", str(exc)) from exc
-    return _decode(line)
+        raise HerdrError("unavailable", str(exc), sent=sent) from exc
+    try:
+        return _decode(line)
+    except HerdrError as exc:
+        exc.sent = sent
+        raise
 
 
 # ─── Installation ─────────────────────────────────────────────────────────────
@@ -180,6 +217,16 @@ def _server_binary(path: str) -> str | None:
         return None
     # A replaced binary reads "/usr/bin/herdr (deleted)", which is no path at all.
     return exe if os.access(exe, os.X_OK) else None
+
+
+def server_instance(path: str | None = None) -> str | None:
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+            sock.settimeout(_REQUEST_TIMEOUT_S)
+            sock.connect(path or socket_path())
+            return _peer_instance(sock)
+    except OSError:
+        return None
 
 
 def _client_compatible(binary: str, path: str) -> bool:
@@ -251,6 +298,7 @@ class AgentPane:
     cwd: str = ""
     name: str = ""
     state_change_seq: int = 0
+    launch_pending: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         """What the browser gets: the folder's name, never its path."""
@@ -279,13 +327,179 @@ def _agent_pane(row: Any) -> AgentPane | None:
         cwd=str(row.get("cwd") or ""),
         name=str(row.get("name") or ""),
         state_change_seq=seq if isinstance(seq, int) and not isinstance(seq, bool) else 0,
+        launch_pending=row.get("launch_pending") is True,
     )
 
 
-def list_agents(*, path: str | None = None) -> list[AgentPane]:
-    rows = request("agent.list", path=path).get("agents")
+def list_agents(
+    *, path: str | None = None, instance: str | None = None, timeout: float | None = None,
+) -> list[AgentPane]:
+    kwargs = {"instance": instance} if instance is not None else {}
+    if timeout is not None:
+        kwargs["timeout"] = timeout
+    rows = request("agent.list", path=path, **kwargs).get("agents")
     panes = (_agent_pane(row) for row in (rows if isinstance(rows, list) else []))
     return [pane for pane in panes if pane is not None]
+
+
+@dataclass(frozen=True)
+class LaunchResult:
+    state: str
+    reason: str | None = None
+    terminal_id: str = ""
+    pane_id: str = ""
+    workspace_id: str = ""
+    name: str = ""
+    instance: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "state": self.state, "reason": self.reason, "terminalId": self.terminal_id,
+            "paneId": self.pane_id, "workspaceId": self.workspace_id, "name": self.name,
+        }
+
+
+def _launch_book() -> dict[str, Any]:
+    try:
+        value = json.loads((repociv_home() / "herdr-workspaces.json").read_text())
+        return value if isinstance(value, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _launch_name(kind: str, city: str) -> str:
+    slug = re.sub(r"[^a-z0-9_-]+", "-", city.lower()).strip("-_")[:12] or "city"
+    return f"{kind}-{slug}-{secrets.token_hex(2)}"
+
+
+def _shell_ready(pane_id: str, path: str | None, instance: str) -> bool:
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            timeout = max(0.001, min(_REQUEST_TIMEOUT_S, deadline - time.monotonic()))
+            info = request(
+                "pane.process_info", {"pane_id": pane_id}, path=path, instance=instance, timeout=timeout,
+            ).get("process_info")
+            if isinstance(info, dict):
+                pid = info.get("shell_pid")
+                foreground = info.get("foreground_processes")
+                if isinstance(pid, int) and isinstance(foreground, list) and any(
+                    isinstance(row, dict) and row.get("pid") == pid for row in foreground
+                ):
+                    return True
+        except HerdrError as exc:
+            if exc.code in {"server_changed", "unavailable"}:
+                raise
+            return False
+        time.sleep(max(0, min(0.1, deadline - time.monotonic())))
+    return False
+
+
+def launch(
+    kind: str, *, city_id: str, cwd: str, label: str,
+    on_pane: Callable[[str, str], None] | None = None, path: str | None = None,
+    timeout_ms: int = 30000, book: MutableMapping[str, Any] | None = None,
+) -> LaunchResult:
+    if kind not in LAUNCH_KINDS:
+        return LaunchResult("failed", "invalid_kind")
+    runtime = probe(path)
+    if runtime.state != "ready":
+        return LaunchResult("failed", f"herdr_{runtime.state}")
+    instance = server_instance(path)
+    if not instance:
+        return LaunchResult("failed", "server_changed")
+    try:
+        version = request("ping", path=path, instance=instance).get("version")
+    except HerdrError:
+        return LaunchResult("failed", "server_changed")
+    if not _version_ok(str(version or "")):
+        return LaunchResult("failed", "herdr_outdated")
+    persistent = book is None
+    entries = _launch_book() if book is None else book
+    name = _launch_name(kind, label)
+    saved = entries.get(city_id)
+    workspace_id = ""
+    pane_id = ""
+    terminal_id = ""
+
+    def result(state: str, reason: str | None = None) -> LaunchResult:
+        return LaunchResult(state, reason, terminal_id, pane_id, workspace_id, name, instance)
+
+    def created() -> dict[str, Any]:
+        nonlocal workspace_id
+        value = request("workspace.create", {"cwd": cwd, "label": label, "focus": False}, path=path, instance=instance)
+        workspace = value.get("workspace")
+        if not isinstance(workspace, dict) or not isinstance(workspace.get("workspace_id"), str):
+            raise HerdrError("bad_response")
+        workspace_id = workspace["workspace_id"]
+        entries[city_id] = {"server": instance, "workspaceId": workspace_id}
+        if persistent:
+            atomic_write_json(repociv_home() / "herdr-workspaces.json", entries, durable=True)
+        return value
+
+    try:
+        if instance and isinstance(saved, dict) and saved.get("server") == instance:
+            candidate = saved.get("workspaceId")
+            if isinstance(candidate, str) and candidate:
+                try:
+                    workspace = request("workspace.get", {"workspace_id": candidate}, path=path, instance=instance).get("workspace")
+                    if isinstance(workspace, dict) and workspace.get("label") == label:
+                        workspace_id = candidate
+                except HerdrError as exc:
+                    if exc.code == "server_changed":
+                        raise
+        if workspace_id:
+            try:
+                made = request("tab.create", {"workspace_id": workspace_id, "cwd": cwd, "label": name, "focus": False}, path=path, instance=instance)
+            except HerdrError as exc:
+                if exc.code != "workspace_not_found":
+                    raise
+                made = created()
+        else:
+            made = created()
+        root = made.get("root_pane")
+        if not isinstance(root, dict) or not isinstance(root.get("pane_id"), str) or not isinstance(root.get("terminal_id"), str):
+            raise HerdrError("bad_response")
+        pane_id, terminal_id = root["pane_id"], root["terminal_id"]
+    except (HerdrError, OSError) as exc:
+        code = exc.code if isinstance(exc, HerdrError) else "workspace_store_failed"
+        return result("failed", code if re.fullmatch(r"[a-z0-9_]+", code) else "herdr_error")
+    if on_pane:
+        on_pane(pane_id, terminal_id)
+    try:
+        if not _shell_ready(pane_id, path, instance):
+            return result("failed", "shell_not_ready")
+    except HerdrError:
+        return result("failed", "server_changed")
+    try:
+        request("agent.start", {"name": name, "kind": kind, "pane_id": pane_id, "timeout_ms": timeout_ms},
+                path=path, instance=instance, timeout=timeout_ms / 1000 + 5)
+    except HerdrError as exc:
+        if exc.code in {"server_changed", "unavailable"} and not exc.sent:
+            return result("failed", "server_changed")
+        if exc.code in {"server_changed", "unavailable", "bad_response"}:
+            return result("unknown", "launch_unconfirmed")
+        code = exc.code if re.fullmatch(r"[a-z0-9_]+", exc.code) else "herdr_error"
+        return result("failed", code)
+
+    deadline = time.monotonic() + timeout_ms / 1000
+    while True:
+        try:
+            timeout = max(0.001, min(_REQUEST_TIMEOUT_S, deadline - time.monotonic()))
+            agent = next((row for row in list_agents(path=path, instance=instance, timeout=timeout)
+                          if row.pane_id == pane_id), None)
+        except HerdrError as exc:
+            return result("unknown", "server_changed" if exc.code == "server_changed" else "launch_unconfirmed")
+        if agent is None:
+            return result("failed", "agent_exited")
+        if agent.status == "blocked":
+            return result("blocked", "agent_not_ready")
+        if agent.agent == kind and not agent.launch_pending and agent.status in {"idle", "done"}:
+            return result("ready")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return result("unknown", "launch_unconfirmed")
+        time.sleep(min(0.25, remaining))
 
 
 def _pane_pids(pane_id: str, path: str | None) -> frozenset[int]:
@@ -360,15 +574,17 @@ async def history(pane_id: str, *, path: str | None = None) -> str:
     return text if isinstance(text, str) else ""
 
 
-async def send_text(pane_id: str, text: str, *, path: str | None = None) -> None:
+async def send_text(pane_id: str, text: str, *, path: str | None = None, instance: str | None = None) -> None:
     """Raw bytes to the PTY, exactly as a keyboard would send them."""
-    await arequest("pane.send_text", {"pane_id": pane_id, "text": text}, path=path)
+    kwargs = {"instance": instance} if instance is not None else {}
+    await arequest("pane.send_text", {"pane_id": pane_id, "text": text}, path=path, **kwargs)
 
 
-async def paste(pane_id: str, text: str, *, path: str | None = None) -> None:
+async def paste(pane_id: str, text: str, *, path: str | None = None, instance: str | None = None) -> None:
     """Text as a paste. ``observe`` hides the pane's bracketed-paste mode from
     the viewer, so only the server can wrap it; sent raw, each line would submit."""
-    await arequest("pane.send_input", {"pane_id": pane_id, "text": text}, path=path)
+    kwargs = {"instance": instance} if instance is not None else {}
+    await arequest("pane.send_input", {"pane_id": pane_id, "text": text}, path=path, **kwargs)
 
 
 @dataclass(frozen=True)
@@ -380,14 +596,20 @@ class SubmitResult:
         return {"state": self.state, "reason": self.reason}
 
 
-async def submit(pane_id: str, text: str, *, path: str | None = None) -> SubmitResult:
+async def submit(
+    pane_id: str, text: str, *, path: str | None = None, expect_agent: str | None = None,
+    instance: str | None = None,
+) -> SubmitResult:
     if not text.strip():
         return SubmitResult("refused", "empty_text")
     if len(text) > MAX_SUBMIT_CHARS:
         return SubmitResult("refused", "text_too_long")
 
     async def agent() -> AgentPane | None:
-        rows = await asyncio.to_thread(list_agents, **({"path": path} if path is not None else {}))
+        kwargs = {"path": path} if path is not None else {}
+        if instance is not None:
+            kwargs["instance"] = instance
+        rows = await asyncio.to_thread(list_agents, **kwargs)
         return next((row for row in rows if row.pane_id == pane_id), None)
 
     try:
@@ -396,10 +618,16 @@ async def submit(pane_id: str, text: str, *, path: str | None = None) -> SubmitR
         return SubmitResult("failed", exc.code)
     if before is None:
         return SubmitResult("refused", "not_an_agent_pane")
+    if expect_agent is not None and before.agent != expect_agent:
+        return SubmitResult("refused", "agent_changed")
+    if before.launch_pending:
+        return SubmitResult("refused", "agent_starting")
     if before.status == "blocked":
         return SubmitResult("refused", "agent_blocked")
 
     kwargs = {"path": path} if path is not None else {}
+    if instance is not None:
+        kwargs["instance"] = instance
     try:
         await paste(pane_id, text, **kwargs)
     except HerdrError as exc:

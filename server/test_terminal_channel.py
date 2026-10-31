@@ -551,3 +551,22 @@ def test_submit_reports_unavailable_confirmation_without_retry(
     result = asyncio.run(herdr_runtime.submit("w1:p1", "hello"))
     assert (result.state, result.reason) == ("unconfirmed", "confirm_unavailable")
     assert [kind for kind, _, _ in runtime.sent] == ["paste", "input"]
+
+
+@pytest.mark.parametrize(("changes", "reason"), [
+    ({"launch_pending": True}, "agent_starting"),
+    ({"agent": "codex"}, "agent_changed"),
+])
+def test_submit_refuses_starting_or_changed_agent_without_sending(
+    runtime: FakeRuntime, changes: dict, reason: str,
+) -> None:
+    async def session(ws: Any) -> None:
+        await _json(ws)
+        runtime.agents = [replace(AGENT, **changes)]
+        await ws.send(json.dumps({"type": "submit", "id": "one", "text": "hello"}))
+        assert await _json(ws) == {
+            "type": "submit_result", "id": "one", "state": "refused", "reason": reason,
+        }
+
+    _run(session, screen=False)
+    assert runtime.sent == []

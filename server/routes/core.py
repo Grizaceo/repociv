@@ -141,6 +141,11 @@ def get_herdr_agents(ctx: "RouteContext") -> tuple[int, Any]:
         return 200, {"runtime": _herdr.RuntimeStatus("stopped", status.version).to_dict(), "agents": []}
     return 200, {"runtime": status.to_dict(), "agents": agents}
 
+def get_herdr_launch(ctx: "RouteContext") -> tuple[int, Any]:
+    from server import herdr_launches
+    entry = herdr_launches.get(str(ctx.get("command_id") or ""))
+    return (200, entry) if entry is not None else (404, {"error": "launch_not_found"})
+
 def get_own_sessions(ctx: "RouteContext") -> tuple[int, Any]:
     """GET /api/own-sessions — RepoCiv's own sessions on disk + liveness."""
     from server import own_sessions as _own
@@ -379,7 +384,11 @@ def get_context(ctx: "RouteContext") -> tuple[int, Any]:
 
 def get_approvals(ctx: "RouteContext") -> tuple[int, Any]:
     from server.bridge import _get_approvals
-    return 200, _get_approvals()
+    approvals = _get_approvals()
+    for cmd in approvals:
+        if cmd.get("type") == "herdr_launch" and isinstance(cmd.get("payload"), dict):
+            cmd["payload"] = {k: v for k, v in cmd["payload"].items() if k not in {"repoPath", "cwd", "_context"}}
+    return 200, approvals
 
 def get_agents(ctx: "RouteContext") -> tuple[int, Any]:
     from server.bridge import _sched
@@ -1039,6 +1048,28 @@ def post_directives_record(body: dict[str, Any], ctx: "RouteContext") -> tuple[i
 
 
 def _validate_command_target(cmd: Any) -> str | None:
+    if cmd.type == "herdr_launch":
+        from server import herdr_runtime as _herdr
+        from server import repo_roots_state as _rrs
+
+        payload = cmd.payload
+        if "repoPath" in payload or "cwd" in payload:
+            return "herdr_launch does not accept paths"
+        city = payload.get("city")
+        if not isinstance(city, str) or not city.strip() or city != cmd.target or "/" in city or "\\" in city:
+            return "city must reference a selected RepoCiv repository"
+        kind = payload.get("kind")
+        if not isinstance(kind, str) or kind not in _herdr.LAUNCH_KINDS:
+            return "invalid herdr kind"
+        mission = payload.get("mission", "")
+        if not isinstance(mission, str) or len(mission) > _herdr.MAX_SUBMIT_CHARS:
+            return "invalid mission"
+        selected = _rrs.resolve_selected_repo(city)
+        if selected is None:
+            return "city must reference a selected RepoCiv repository"
+        payload["repoPath"] = selected
+        payload["unit"] = "HERDR"
+        return None
     if cmd.type != "execute_agent":
         return None
     from server import agent_runner as _runner
